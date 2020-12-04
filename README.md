@@ -1,5 +1,5 @@
-[![CircleCI](https://img.shields.io/circleci/project/github/krober10nd/spyro/master.svg?style=flat-square)](https://circleci.com/gh/krober10nd/spyro/tree/master)
-[![CodeCov](https://codecov.io/gh/krober10nd/spyro/branch/master/graph/badge.svg)](https://codecov.io/gh/krober10nd/spyro)
+[![CircleCI](https://img.shields.io/circleci/project/github/krober10nd/spyro/main.svg?style=flat-square)](https://circleci.com/gh/krober10nd/spyro/tree/main)
+[![CodeCov](https://codecov.io/gh/krober10nd/spyro/branch/main/graph/badge.svg)](https://codecov.io/gh/krober10nd/spyro)
 
 spyro: Acoustic wave modeling in Firedrake
 ============================================
