@@ -1,16 +1,15 @@
-[![CircleCI](https://img.shields.io/circleci/project/github/krober10nd/Spyro/master.svg?style=flat-square)](https://circleci.com/gh/krober10nd/Spyro/tree/master)
-[![CodeCov](https://codecov.io/gh/krober10nd/Spyro/branch/master/graph/badge.svg)](https://codecov.io/gh/krober10nd/Spyro)
+[![CircleCI](https://img.shields.io/circleci/project/github/krober10nd/spyro/master.svg?style=flat-square)](https://circleci.com/gh/krober10nd/spyro/tree/master)
+[![CodeCov](https://codecov.io/gh/krober10nd/spyro/branch/master/graph/badge.svg)](https://codecov.io/gh/krober10nd/spyro)
 
-Spyro: Acoustic wave modeling in Firedrake
+spyro: Acoustic wave modeling in Firedrake
 ============================================
 
-Spyro is a Python library for modeling acoustic waves in the subsurface. The main
+spyro is a Python library for modeling acoustic waves in the subsurface. The main
 functionality is a set of forward and discrete adjoint wave propagators for solving the acoustic wave equation in the time domain.
 These wave propagators can be used to form complete Full Waveform Inversion or Reverse Time Migration.
-To implement these solvers, Spyro uses the finite element analysis package [Firedrake](https://www.firedrakeproject.org/index.html).
+To implement these solvers, spyro uses the finite element analysis package [Firedrake](https://www.firedrakeproject.org/index.html).
 
-To use Spyro, you'll need to have some knowledge of Python and some basic concepts in inverse modeling relevant to seismology. Firedrake,
-makes it straightforward to do the computational physics, even if you're not an expert in numerical methods.
+To use Spyro, you'll need to have some knowledge of Python and some basic concepts in inverse modeling relevant to seismology.
 
 Functionality
 =============
@@ -28,10 +27,10 @@ Using this functionality, short Python scripts can written that perform Full Wav
 A worked example
 =================
 
-A simple example of a forward simulation in 2D on a rectangle with a uniform triangular mesh and using the Perfectly Matched Layer is like the following below. Note here we first specify the input file and build a uniform mesh using the meshing capabilities provided by Firedrake. However, more complex meshes for realistic problems can be generated via [SeismicMesh](https://github.com/krober10nd/SeismicMesh). 
+A simple example of a forward simulation in 2D on a rectangle with a uniform triangular mesh and using the Perfectly Matched Layer is like the following below. Note here we first specify the input file and build a uniform mesh using the meshing capabilities provided by Firedrake. However, more complex meshes for realistic problems can be generated via [SeismicMesh](https://github.com/krober10nd/SeismicMesh).
 
 
-See the demos folder for an FWI example (this requires some other dependencies pyrol and ROLtrilinos). 
+See the demos folder for an FWI example (this requires some other dependencies pyrol and ROLtrilinos).
 
 
 
@@ -47,25 +46,25 @@ from firedrake import (
     File,
 )
 
-import Spyro
+import spyro
 
 model = {}
 
 # Choose method and parameters
 model["opts"] = {
-    "method": "CG", # either CG or KMV
+    "method": "KMV",  # either CG or KMV
     "variant": None,
     "degree": 1,  # p order
     "dimension": 2,  # dimension
 }
 
 # Number of cores for the shot. For simplicity, we keep things serial.
-# Spyro however supports both spatial parallelism and "shot" parallelism.
+# spyro however supports both spatial parallelism and "shot" parallelism.
 model["parallelism"] = {
-    "type" : "off", # options: automatic (same number of cores for evey processor), custom, off.
-    "custom_cores_per_shot": [], # only if the user wants a different number of cores for every shot.
+    "type": "off",  # options: automatic (same number of cores for evey processor), custom, off.
+    "custom_cores_per_shot": [],  # only if the user wants a different number of cores for every shot.
     # input is a list of integers with the length of the number of shots.
-    }
+}
 
 # Define the domain size without the PML. Here we'll assume a 0.75 x 1.50 km
 # domain and reserve the remaining 250 m for the Perfectly Matched Layer (PML) to absorb
@@ -82,9 +81,9 @@ model["mesh"] = {
 # Specify a 250-m PML on the three sides of the domain to damp outgoing waves.
 model["PML"] = {
     "status": True,  # True,  # True or false
-    "outer_bc": "non-reflective",  #  None or non-reflective (outer boundary condition)
+    "outer_bc": None,  # "non-reflective",  #  None or non-reflective (outer boundary condition)
     "damping_type": "polynomial",  # polynomial, hyperbolic, shifted_hyperbolic
-    "exponent": 1,
+    "exponent": 2,  # damping layer has a exponent variation
     "cmax": 4.7,  # maximum acoustic wave velocity in PML - km/s
     "R": 0.001,  # theoretical reflection coefficient
     "lz": 0.25,  # thickness of the PML in the z-direction (km) - always positive
@@ -103,7 +102,7 @@ model["acquisition"] = {
     "frequency": 8.0,
     "delay": 1.0,
     "num_receivers": 100,
-    "receiver_locations": Spyro.create_receiver_transect(
+    "receiver_locations": spyro.create_receiver_transect(
         (-0.10, 0.1), (-0.10, 1.4), 100
     ),
 }
@@ -112,10 +111,10 @@ model["acquisition"] = {
 model["timeaxis"] = {
     "t0": 0.0,  #  Initial time for event
     "tf": 2.00,  # Final time for event
-    "dt": 0.001,  # timestep size
-    "amplitude": 1, # the Ricker has an amplitude of 1. 
+    "dt": 0.0005,  # timestep size
+    "amplitude": 1,  # the Ricker has an amplitude of 1.
     "nspool": 20,  # how frequently to output solution to pvds
-    "fspool": 1,  # how frequently to save solution to RAM
+    "fspool": 20,  # how frequently to save solution to RAM
 }
 
 
@@ -132,9 +131,11 @@ mesh.coordinates.dat.data[:, 1] -= 0.25
 
 
 # Create the computational environment
-comm = Spyro.utils.mpi_init(model)
+comm = spyro.utils.mpi_init(model)
 
-element = Spyro.domains.space.FE_method(mesh, "CG", 1)
+element = spyro.domains.space.FE_method(
+    mesh, model["opts"]["method"], model["opts"]["degree"]
+)
 V = FunctionSpace(mesh, element)
 
 # Manually create a simple two layer seismic velocity model `vp`.
@@ -150,27 +151,27 @@ File("simple_velocity_model.pvd").write(vp)
 
 
 # Now we instantiate both the receivers and source objects.
-sources = Spyro.Sources(model, mesh, V, comm).create()
+sources = spyro.Sources(model, mesh, V, comm).create()
 
-receivers = Spyro.Receivers(model, mesh, V, comm).create()
+receivers = spyro.Receivers(model, mesh, V, comm).create()
 
 # And now we simulate the shot using a Leapfrog time-stepping scheme
 # Other time-stepping options are available (see the documentation).
 # Note: simulation results are stored in the folder `results/`
-p_field, p_at_recv = Spyro.solvers.Leapfrog(
+p_field, p_at_recv = spyro.solvers.Leapfrog(
     model, mesh, comm, vp, sources, receivers, source_num=0
 )
 
 # Visualize the shot record
-Spyro.plots.plot_shotrecords(model, p_at_recv, "example_shot", vmin=-1e-5, vmax=1e-5)
+spyro.plots.plot_shotrecords(model, p_at_recv, "example_shot", appear=False,  vmin=-1e-5, vmax=1e-5)
 
 # Save the shot (a numpy array) as a pickle for other use.
-Spyro.io.save_shots("example_shot.dat", p_at_recv)
+spyro.io.save_shots("example_shot.dat", p_at_recv)
 ```
 
 ### Testing
 
-To run the Spyro unit tests (and turn off plots), check out this repository and type
+To run the spyro unit tests (and turn off plots), check out this repository and type
 ```
 MPLBACKEND=Agg pytest --maxfail=1
 ```

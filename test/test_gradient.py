@@ -1,16 +1,16 @@
 import os
 from firedrake import *
 
-import Spyro
+import spyro
 
 from .inputfiles.Model1_Leapfrog_adjoint_2d import model
 
 
 def test_gradient():
 
-    comm = Spyro.utils.mpi_init(model)
+    comm = spyro.utils.mpi_init(model)
 
-    mesh, V = Spyro.io.read_mesh(model, comm)
+    mesh, V = spyro.io.read_mesh(model, comm)
 
     num_sources = model["acquisition"]["num_sources"]
 
@@ -25,21 +25,21 @@ def test_gradient():
     vp_guess_2 = Function(V)
     dJ = Function(V)
 
-    sources = Spyro.Sources(model, mesh, V, comm).create()
-    receivers = Spyro.Receivers(model, mesh, V, comm).create()
+    sources = spyro.Sources(model, mesh, V, comm).create()
+    receivers = spyro.Receivers(model, mesh, V, comm).create()
 
     Jtmp = 0.0
     # Compute the gradient of the functional
     for isour in range(num_sources):
-        p_exact, p_exact_recv = Spyro.solvers.Leapfrog(
+        p_exact, p_exact_recv = spyro.solvers.Leapfrog(
             model, mesh, comm, vp_exact, sources, receivers, source_num=isour
         )
-        p_guess, p_guess_recv = Spyro.solvers.Leapfrog(
+        p_guess, p_guess_recv = spyro.solvers.Leapfrog(
             model, mesh, comm, vp_guess, sources, receivers, source_num=isour
         )
-        residual = Spyro.utils.evaluate_misfit(model, comm, p_guess_recv, p_exact_recv)
-        Jtmp += Spyro.utils.compute_functional(model, comm, residual)
-        grad = Spyro.solvers.Leapfrog_adjoint(
+        residual = spyro.utils.evaluate_misfit(model, comm, p_guess_recv, p_exact_recv)
+        Jtmp += spyro.utils.compute_functional(model, comm, residual)
+        grad = spyro.solvers.Leapfrog_adjoint(
             model, mesh, comm, vp_guess, p_guess, residual, source_num=isour
         )
         dJ.dat.data[:] += grad.dat.data[:]
@@ -62,11 +62,11 @@ def test_gradient():
     # File("vp_guess2.pvd").write(vp_guess_2)
     J = 0
     for isour in range(num_sources):
-        p_guess, p_guess_recv = Spyro.solvers.Leapfrog(
+        p_guess, p_guess_recv = spyro.solvers.Leapfrog(
             model, mesh, comm, vp_guess_2, sources, receivers, source_num=isour
         )
-        residual = Spyro.utils.evaluate_misfit(model, comm, p_guess_recv, p_exact_recv)
-        J += Spyro.utils.compute_functional(model, comm, residual)
+        residual = spyro.utils.evaluate_misfit(model, comm, p_guess_recv, p_exact_recv)
+        J += spyro.utils.compute_functional(model, comm, residual)
 
     assert (J - J0) < 1e-8
     # fileout.write(str(epsilon) + " " + str(J - J0) + "\n")

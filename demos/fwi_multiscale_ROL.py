@@ -3,7 +3,7 @@ from firedrake import *
 import numpy as np
 from ROL.firedrake_vector import FiredrakeVector as FeVector
 import ROL
-import Spyro
+import spyro
 from mpi4py import MPI
 
 
@@ -50,11 +50,11 @@ model["PML"] = {
 model["acquisition"] = {
     "source_type": "Ricker",
     "num_sources": 20,
-    "source_pos": Spyro.create_receiver_transect((-0.15, 0.1), (-0.15, 16.9), 20),
+    "source_pos": spyro.create_receiver_transect((-0.15, 0.1), (-0.15, 16.9), 20),
     "frequency": 10.0,
     "delay": 1.0,
     "num_receivers": 301,
-    "receiver_locations": Spyro.create_receiver_transect(
+    "receiver_locations": spyro.create_receiver_transect(
         (-0.15, 0.1), (-0.15, 16.9), 301
     ),
 }
@@ -76,20 +76,20 @@ model["parallelism"] = {
 
 model["inversion"] = {"freq_bands": [2.0]}
 
-comm = Spyro.utils.mpi_init(model)
+comm = spyro.utils.mpi_init(model)
 
-mesh, V = Spyro.io.read_mesh(model, comm)
+mesh, V = spyro.io.read_mesh(model, comm)
 
-vp_guess = Spyro.io.interpolate(model, mesh, V, guess=True)
+vp_guess = spyro.io.interpolate(model, mesh, V, guess=True)
 
-sources = Spyro.Sources(model, mesh, V, comm).create()
+sources = spyro.Sources(model, mesh, V, comm).create()
 
-receivers = Spyro.Receivers(model, mesh, V, comm).create()
+receivers = spyro.Receivers(model, mesh, V, comm).create()
 
 water = np.where(vp_guess.dat.data[:] < 1.51)
 
 # quadrature rules
-qr_x, _, _ = Spyro.domains.quadrature.quadrature_rules(V)
+qr_x, _, _ = spyro.domains.quadrature.quadrature_rules(V)
 
 
 for index, freq_band in enumerate(model["inversion"]["freq_bands"]):
@@ -138,9 +138,9 @@ for index, freq_band in enumerate(model["inversion"]["freq_bands"]):
         def value(self, x, tol):
             """Compute the functional"""
             for sn in range(model["acquisition"]["num_sources"]):
-                if Spyro.io.is_owner(comm, sn):
+                if spyro.io.is_owner(comm, sn):
                     # run a simulation low-pass filtering the source
-                    self.p_guess, p_guess_recv = Spyro.solvers.Leapfrog(
+                    self.p_guess, p_guess_recv = spyro.solvers.Leapfrog(
                         model,
                         mesh,
                         comm,
@@ -150,18 +150,18 @@ for index, freq_band in enumerate(model["inversion"]["freq_bands"]):
                         source_num=sn,
                         lp_freq_index=index,
                     )
-                    p_exact_recv = Spyro.io.load_shots(
+                    p_exact_recv = spyro.io.load_shots(
                         "shots/mm_exact_" + str(10.0) + "_Hz_source_" + str(sn) + ".dat"
                     )
                     # low-pass filter the shot record for the current frequency band.
-                    p_exact_recv = Spyro.utils.butter_lowpass_filter(
+                    p_exact_recv = spyro.utils.butter_lowpass_filter(
                         p_exact_recv, freq_band, 1.0 / model["timeaxis"]["dt"]
                     )
                     # Calculate the misfit.
-                    self.misfit = Spyro.utils.evaluate_misfit(
+                    self.misfit = spyro.utils.evaluate_misfit(
                         model, comm, p_guess_recv, p_exact_recv
                     )
-            J = Spyro.utils.compute_functional(model, comm, self.misfit)
+            J = spyro.utils.compute_functional(model, comm, self.misfit)
             self.J_local[0] = J
             # reduce over all cores
             COMM_WORLD.Allreduce(self.J_local, self.J_total, op=MPI.SUM)
@@ -178,16 +178,16 @@ for index, freq_band in enumerate(model["inversion"]["freq_bands"]):
             self.dJ_total = Function(V, name="grad_total")
             # solve the forward problem
             for sn in range(model["acquisition"]["num_sources"]):
-                if Spyro.io.is_owner(comm, sn):
-                    p_exact_recv = Spyro.io.load_shots(
+                if spyro.io.is_owner(comm, sn):
+                    p_exact_recv = spyro.io.load_shots(
                         "shots/mm_exact_" + str(10.0) + "_Hz_source_" + str(sn) + ".dat"
                     )
                     # low-pass filter the shot record for the current frequency band.
-                    p_exact_recv = Spyro.utils.butter_lowpass_filter(
+                    p_exact_recv = spyro.utils.butter_lowpass_filter(
                         p_exact_recv, freq_band, 1.0 / model["timeaxis"]["dt"]
                     )
                     # Calculate the gradient of the functional.
-                    dJ = Spyro.solvers.Leapfrog_adjoint(
+                    dJ = spyro.solvers.Leapfrog_adjoint(
                         model,
                         mesh,
                         comm,
@@ -203,7 +203,7 @@ for index, freq_band in enumerate(model["inversion"]["freq_bands"]):
                 self.dJ_local.dat.data[:], self.dJ_total.dat.data[:], op=MPI.SUM
             )
 
-            # mask the water layer 
+            # mask the water layer
             self.dJ_total.dat.data[water]=0.0
 
             if comm.ensemble_comm.rank == 0:
@@ -266,4 +266,4 @@ for index, freq_band in enumerate(model["inversion"]["freq_bands"]):
         File("res" + str(freq_band) + ".pvd", comm=comm.comm).write(obj.vp_guess)
 
     # important: update the control for the next frequency band to start!
-    vp_guess = Function(V, opt.vec)                                         
+    vp_guess = Function(V, opt.vec)
