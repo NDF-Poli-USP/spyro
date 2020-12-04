@@ -1,0 +1,8 @@
+*.pyc
+*.vtu
+*.pvd
+*.pdf
+*.pvtu
+*.dat
+*.hdf5
+*.msh
