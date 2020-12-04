@@ -407,22 +407,15 @@ def Leapfrog_adjoint_level_set(
             outfile.write(u_n, time=t)
             helpers.display_progress(comm, t)
 
-    # produces gradi_11, gradi_12, gradi_21, gradi_22
+    # produces gradi_11, gradi_12, gradi_21, gradi_22 summed over all timesteps
 
-    # sum up gradi, k0_fe0 over all shots
-    gradi_11_np = comm.ensemble_comm.allreduce(gradi_11_np, op=MPI.SUM)
-    gradi_12_np = comm.ensemble_comm.allreduce(gradi_12_np, op=MPI.SUM)
-    gradi_21_np = comm.ensemble_comm.allreduce(gradi_21_np, op=MPI.SUM)
-    gradi_22_np = comm.ensemble_comm.allreduce(gradi_22_np, op=MPI.SUM)
-
-    k0_fe0_np = comm.ensemble_comm.allreduce(k0_fe0_np, op=MPI.SUM)
-
-    # assign the summed in time and summed over shots components to the induvidual gradient components
+    # assign the summed in time to the induvidual gradient components
     gradi_11.dat.data[:] = gradi_11_np
     gradi_12.dat.data[:] = gradi_12_np
     gradi_21.dat.data[:] = gradi_21_np
     gradi_22.dat.data[:] = gradi_22_np
 
+    # k0_fe0 summed over all timesteps
     k0_fe0 = assemble(k0_fe0 * dx(rule=qr_x))
     k0_fe0.dat.data[:] = k0_fe0_np
     # variational formulation for the descent direction
@@ -459,8 +452,6 @@ def Leapfrog_adjoint_level_set(
     solver_csi = LinearSolver(Lterm, solver_parameters=params)
     descent = Function(VF)
     solver_csi.solve(descent, Rterm)
-
-    File("theta.pvd").write(descent)
 
     if comm.ensemble_comm.rank == 0 and comm.comm.rank == 0:
         print(

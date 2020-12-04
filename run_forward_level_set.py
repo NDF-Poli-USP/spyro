@@ -50,7 +50,7 @@ model["PML"] = {
 model["acquisition"] = {
     "source_type": "Ricker",
     "num_sources": 5,
-    "source_pos": spyro.create_receiver_transect((-0.10, 0.1),(-0.10, 1.4), 5),
+    "source_pos": spyro.create_receiver_transect((-0.10, 0.1), (-0.10, 1.4), 5),
     "frequency": 10.0,
     "delay": 1.0,
     "num_receivers": 200,
@@ -61,8 +61,8 @@ model["acquisition"] = {
 
 model["timeaxis"] = {
     "t0": 0.0,  #  initial time for event
-    "tf": 1.0,  # final time for event
-    "dt": 0.0005,  # timestep size
+    "tf": 0.70,  # final time for event
+    "dt": 0.0001,  # timestep size
     "nspool": 200,  # how frequently to output solution to pvds
     "fspool": 1000,  # how frequently to save solution to ram
 }

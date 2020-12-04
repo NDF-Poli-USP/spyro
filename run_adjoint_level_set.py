@@ -1,9 +1,7 @@
 import time
-from advect import advect
-
 from firedrake import *
 
-import Spyro
+import spyro
 
 # 10 outside
 # 11 inside
@@ -13,16 +11,12 @@ model = {}
 model["opts"] = {
     "method": "KMV",
     "variant": None,
-    "type": "SIP",  # for dg only - sip, nip and iip
     "degree": 1,  # p order
     "dimension": 2,  # dimension
-    "_size": 0.005,  # h
-    "beta": 0.0,  # for newmark time integration only
-    "gamma": 0.5,  # for newmark time integration only
 }
 
 model["parallelism"] = {
-    "type": "automatic",  # options: automatic (same number of cores for evey processor), custom, off
+    "type": "off",  # options: automatic (same number of cores for evey processor), custom, off
     "custom_cores_per_shot": [],  # only if the user wants a different number of cores for every shot.
     # input is a list of integers with the length of the number of shots.
 }
@@ -50,33 +44,33 @@ model["PML"] = {
 
 model["acquisition"] = {
     "source_type": "Ricker",
-    "num_sources": 3,
-    "source_pos": [(-0.10, 0.20), (-0.10, 0.50), (-0.10, 0.80)],
+    "num_sources": 5,
+    "source_pos": spyro.create_receiver_transect((-0.10, 0.1), (-0.10, 1.4), 5),
     "frequency": 10.0,
     "delay": 1.0,
     "num_receivers": 200,
-    "receiver_locations": Spyro.create_receiver_transect(
+    "receiver_locations": spyro.create_receiver_transect(
         (-0.10, 0.1), (-0.10, 0.9), 200
     ),
 }
 
 model["timeaxis"] = {
     "t0": 0.0,  #  initial time for event
-    "tf": 1.0,  # final time for event
+    "tf": 0.70,  # final time for event
     "dt": 0.0001,  # timestep size
     "nspool": 200,  # how frequently to output solution to pvds
     "fspool": 10,  # how frequently to save solution to ram
 }
 
-comm = Spyro.utils.mpi_init(model)
+comm = spyro.utils.mpi_init(model)
 
-mesh, V = Spyro.io.read_mesh(model, comm)
+mesh, V = spyro.io.read_mesh(model, comm)
 
 vp = [4.5, 2.0]  # inside and outside subdomain respectively in km/s
 
-comm = Spyro.utils.mpi_init(model)
+comm = spyro.utils.mpi_init(model)
 
-qr_x, _, _ = Spyro.domains.quadrature.quadrature_rules(V)
+qr_x, _, _ = spyro.domains.quadrature.quadrature_rules(V)
 
 # Determine subdomains originally specified in the mesh
 subdomains = []
@@ -88,30 +82,29 @@ u = TrialFunction(V)
 v = TestFunction(V)
 solve(u * v * dx == 1 * v * dx(10) + -1 * v * dx(11), indicator)
 
-sources = Spyro.Sources(model, mesh, V, comm).create()
+sources = spyro.Sources(model, mesh, V, comm).create()
 
-receivers = Spyro.Receivers(model, mesh, V, comm).create()
+receivers = spyro.Receivers(model, mesh, V, comm).create()
 
-J_local = np.zeros((1))
 J_total = np.zeros((1))
 
+VF = VectorFunctionSpace(mesh, "CG", 1)
+theta_global = Function(VF)
 for sn in range(model["acquisition"]["num_sources"]):
-    if Spyro.io.is_owner(comm, sn):
+    if spyro.io.is_owner(comm, sn):
         t1 = time.time()
         # run for guess model
-        guess, guess_dt, p_recv = Spyro.solvers.Leapfrog_level_set(
+        guess, guess_dt, p_recv = spyro.solvers.Leapfrog_level_set(
             model, mesh, comm, vp, sources, receivers, subdomains, source_num=sn
         )
-        # load exact solution
-        p_exact_recv = Spyro.io.load_shots("forward_exact_level_set" + str(sn) + ".dat")
+        # load exact solution for this shot
+        p_exact_recv = spyro.io.load_shots("forward_exact_level_set" + str(sn) + ".dat")
         # compute the residual between guess and exact
-        residual = Spyro.utils.evaluate_misfit(model, comm, p_exact_recv, p_recv)
+        residual = spyro.utils.evaluate_misfit(model, comm, p_exact_recv, p_recv)
         # compute the functional for the current model
-        J_local[0] = Spyro.utils.compute_functional(model, comm, residual)
-        # sum over all processors
-        COMM_WORLD.Allreduce(J_local, J_total, op=MPI.SUM)
+        J_total[0] += spyro.utils.compute_functional(model, comm, residual)
         # run the adjoint and return the shape gradient
-        theta = Spyro.solvers.Leapfrog_adjoint_level_set(
+        theta_local = spyro.solvers.Leapfrog_adjoint_level_set(
             model,
             mesh,
             comm,
@@ -123,7 +116,18 @@ for sn in range(model["acquisition"]["num_sources"]):
             source_num=sn,
         )
         print(time.time() - t1, flush=True)
-        # solve a transport equation to move the subdomains around
-        candidate_indicator, candidate_subdomains = advect(
-            mesh, indicator, theta, number_of_timesteps=10
-        )
+    theta_global.dat.data[:] += theta_local.dat.data[:]
+
+# visualzie the shape gradient from all shots
+File("theta_global.pvd").write(theta_global)
+
+# sum functional over all processors
+if COMM_WORLD.size > 1:
+    COMM_WORLD.Allreduce(J_total, J_total, op=MPI.SUM)
+if COMM_WORLD.rank == 0:
+    print("The functional is " + str(J_total[0]), flush=True)
+
+# solve a transport equation to move the subdomains around
+candidate_indicator, candidate_subdomains = spyro.solvers.advect(
+    mesh, indicator, theta_global, number_of_timesteps=10
+)
