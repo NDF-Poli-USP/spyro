@@ -1,10 +1,10 @@
+import copy
+import math
+
+import numpy as np
 from firedrake import *
 from firedrake.petsc import PETSc
-
-import copy
 from mpi4py import MPI
-import numpy as np
-import math
 from scipy.signal import butter, filtfilt
 
 
@@ -94,17 +94,18 @@ def mpi_init(model):
     rank = myrank()
     size = mysize()
     available_cores = COMM_WORLD.size
-    
+
     if model["parallelism"]["type"] == "automatic":
-        num_cores_per_shot = available_cores/model["acquisition"]["num_sources"]
+        num_cores_per_shot = available_cores / model["acquisition"]["num_sources"]
         if available_cores % model["acquisition"]["num_sources"] != 0:
-            raise ValueError("Available cores cannot be divided between sources equally.")
+            raise ValueError(
+                "Available cores cannot be divided between sources equally."
+            )
 
     elif model["parallelism"]["type"] == "off":
         num_cores_per_shot = available_cores
     elif model["parallelism"]["type"] == "custom":
         raise ValueError("Custom parallelism not yet implemented")
-
 
     comm_ens = Ensemble(COMM_WORLD, num_cores_per_shot)
     return comm_ens

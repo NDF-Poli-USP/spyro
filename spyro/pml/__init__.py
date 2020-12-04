@@ -1,4 +1,3 @@
-from . import damping
-from . import formulation
+from . import damping, formulation
 
 __all__ = ["damping", "formulation"]

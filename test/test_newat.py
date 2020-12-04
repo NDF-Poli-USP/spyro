@@ -1,7 +1,7 @@
 import math
-import numpy as np
 from copy import deepcopy
 
+import numpy as np
 from firedrake import *
 
 import spyro
