@@ -1,10 +1,10 @@
 [![CircleCI](https://img.shields.io/circleci/project/github/krober10nd/Spyro/master.svg?style=flat-square)](https://circleci.com/gh/krober10nd/Spyro/tree/master)
 [![CodeCov](https://codecov.io/gh/krober10nd/Spyro/branch/master/graph/badge.svg)](https://codecov.io/gh/krober10nd/Spyro)
 
-Spyro: Acoustic wave modeling in Firedrake
+spyro: Acoustic wave modeling in Firedrake
 ============================================
 
-Spyro is a Python library for modeling acoustic waves in the subsurface. The main
+spyro is a Python library for modeling acoustic waves in the subsurface. The main
 functionality is a set of forward and discrete adjoint wave propagators for solving the acoustic wave equation in the time domain.
 These wave propagators can be used to form complete Full Waveform Inversion or Reverse Time Migration.
 To implement these solvers, Spyro uses the finite element analysis package [Firedrake](https://www.firedrakeproject.org/index.html).
