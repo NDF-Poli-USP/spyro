@@ -111,10 +111,10 @@ def functions(
         )
     sigma_z = Function(V, name="sigma_z").interpolate(aux1)
 
-    sgm_x = File("pmlField/sigma_x.pvd")  # , target_degree=1, target_continuity=H1
-    sgm_x.write(sigma_x)
-    sgm_z = File("pmlField/sigma_z.pvd")
-    sgm_z.write(sigma_z)
+    #sgm_x = File("pmlField/sigma_x.pvd")  # , target_degree=1, target_continuity=H1
+    #sgm_x.write(sigma_x)
+    #sgm_z = File("pmlField/sigma_z.pvd")
+    #sgm_z.write(sigma_z)
 
     if dimension == 2:
 
@@ -168,10 +168,10 @@ def functions(
                     0.0,
                 )
             )
-        sigma_y = Function(V, name="sigma_y").interpolate(aux1 + aux2)
+        #sigma_y = Function(V, name="sigma_y").interpolate(aux1 + aux2)
 
-        sgm_y = File("pmlField/sigma_y.pvd")
-        sgm_y.write(sigma_y)
+        #sgm_y = File("pmlField/sigma_y.pvd")
+        #sgm_y.write(sigma_y)
 
         return (sigma_x, sigma_y, sigma_z)
 
