@@ -1,5 +1,5 @@
-[![CircleCI](https://img.shields.io/circleci/project/github/krober10nd/spyro/master.svg?style=flat-square)](https://circleci.com/gh/krober10nd/spyro/tree/master)
-[![CodeCov](https://codecov.io/gh/krober10nd/spyro/branch/master/graph/badge.svg)](https://codecov.io/gh/krober10nd/spyro)
+[![CircleCI](https://img.shields.io/circleci/project/github/krober10nd/spyro/main.svg?style=flat-square)](https://circleci.com/gh/krober10nd/spyro/tree/main)
+[![CodeCov](https://codecov.io/gh/krober10nd/spyro/branch/main/graph/badge.svg)](https://codecov.io/gh/krober10nd/spyro)
 
 spyro: Acoustic wave modeling in Firedrake
 ============================================
@@ -163,9 +163,9 @@ p_field, p_at_recv = spyro.solvers.Leapfrog(
 )
 
 # Visualize the shot record
-spyro.plots.plot_shotrecords(model, p_at_recv, "example_shot", appear=False,  vmin=-1e-5, vmax=1e-5)
+spyro.plots.plot_shotrecords(model, p_at_recv, "example_shot", vmin=-1e-5, vmax=1e-5)
 
-# Save the shot (a numpy array) as a pickle for other use.
+# Save the shot (a Numpy array) as a pickle for other use.
 spyro.io.save_shots("example_shot.dat", p_at_recv)
 ```
 
