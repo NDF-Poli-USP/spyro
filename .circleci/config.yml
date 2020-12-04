@@ -9,7 +9,7 @@ commands:
   test:
     steps:
       - run: . /home/firedrake/firedrake/bin/activate &&  pip3 install . && pip3 install pytest-cov &&  pytest --cov-report=xml --cov=spyro test/
-      - run: export CODECOV_TOKEN="131bc577-2caf-4f72-8f43-64371a2f7828" && bash <(curl -s https://codecov.io/bash)
+      - run: export CODECOV_TOKEN="51300caa-4c44-4982-a086-8ea580a7c828" && bash <(curl -s https://codecov.io/bash)
 jobs:
   python36:
     docker:
