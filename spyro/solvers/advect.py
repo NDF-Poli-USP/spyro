@@ -81,8 +81,8 @@ def advect(mesh, q, theta, number_of_timesteps=10):
 
     # reset q
     q.assign(1)
-    q.interpolate(Constant(1), sd1)
-    q.interpolate(Constant(-1), sd2)
+    q.interpolate(Constant(1), sd10)
+    q.interpolate(Constant(-1), sd11)
     File("final_q.pvd").write(q)
 
     return q, [sd10, sd11]
