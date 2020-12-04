@@ -25,10 +25,15 @@ Functionality
 
 Using this functionality, short Python scripts can written that perform Full Waveform Inversion (FWI) type algorithms using well-developed numerical optimization algorithms such as L-BFGS from the SciPy package. See the notebooks folder for an FWI example.
 
-Example
-=======
+A worked example
+=================
 
-An example of a simple forward simulation in 2D on a rectangle with a uniform mesh and using the Perfectly Matched Layer is like so::
+A simple example of a forward simulation in 2D on a rectangle with a uniform triangular mesh and using the Perfectly Matched Layer is like the following below. Note here we first specify the input file and build a uniform mesh using the meshing capabilities provided by Firedrake. However, more complex meshes for realistic problems can be generated via [SeismicMesh](https://github.com/krober10nd/SeismicMesh). 
+
+
+See the demos folder for an FWI example (this requires some other dependencies pyrol and ROLtrilinos). 
+
+
 
 ![Above shows the simulation at two timesteps in ParaView that results from running the code below](https://user-images.githubusercontent.com/18619644/94087976-7e81df00-fde5-11ea-96c0-474348286091.png)
 
@@ -48,20 +53,16 @@ model = {}
 
 # Choose method and parameters
 model["opts"] = {
-    "method": "CG",
+    "method": "CG", # either CG or KMV
     "variant": None,
-    "type": "SIP",  # for DG only - SIP, NIP and IIP
     "degree": 1,  # p order
     "dimension": 2,  # dimension
-    "mesh_size": 0.005,  # h
-    "beta": 0.0,  # for Newmark time integration only
-    "gamma": 0.5,  # for Newmark time integration only
 }
 
 # Number of cores for the shot. For simplicity, we keep things serial.
 # Spyro however supports both spatial parallelism and "shot" parallelism.
 model["parallelism"] = {
-    "type" : "off", # options: automatic (same number of cores for evey processor), custom, off
+    "type" : "off", # options: automatic (same number of cores for evey processor), custom, off.
     "custom_cores_per_shot": [], # only if the user wants a different number of cores for every shot.
     # input is a list of integers with the length of the number of shots.
     }
@@ -81,7 +82,7 @@ model["mesh"] = {
 # Specify a 250-m PML on the three sides of the domain to damp outgoing waves.
 model["PML"] = {
     "status": True,  # True,  # True or false
-    "outer_bc": "non-reflective",  #  dirichlet, neumann, non-reflective (outer boundary condition)
+    "outer_bc": "non-reflective",  #  None or non-reflective (outer boundary condition)
     "damping_type": "polynomial",  # polynomial, hyperbolic, shifted_hyperbolic
     "exponent": 1,
     "cmax": 4.7,  # maximum acoustic wave velocity in PML - km/s
@@ -112,13 +113,11 @@ model["timeaxis"] = {
     "t0": 0.0,  #  Initial time for event
     "tf": 2.00,  # Final time for event
     "dt": 0.001,  # timestep size
+    "amplitude": 1, # the Ricker has an amplitude of 1. 
     "nspool": 20,  # how frequently to output solution to pvds
     "fspool": 1,  # how frequently to save solution to RAM
 }
 
-
-# Create the computational environment
-comm = Spyro.utils.mpi_init(model)
 
 # Create a simple mesh of a rectangle ∈ [1 x 2] km with ~100 m sized elements
 # and then create a function space for P=1 Continuous Galerkin FEM
@@ -130,6 +129,10 @@ mesh = RectangleMesh(100, 200, 1.0, 2.0)
 # SeismicMesh https://github.com/krober10nd/SeismicMesh
 mesh.coordinates.dat.data[:, 0] -= 1.0
 mesh.coordinates.dat.data[:, 1] -= 0.25
+
+
+# Create the computational environment
+comm = Spyro.utils.mpi_init(model)
 
 element = Spyro.domains.space.FE_method(mesh, "CG", 1)
 V = FunctionSpace(mesh, element)
@@ -148,20 +151,21 @@ File("simple_velocity_model.pvd").write(vp)
 
 # Now we instantiate both the receivers and source objects.
 sources = Spyro.Sources(model, mesh, V, comm).create()
+
 receivers = Spyro.Receivers(model, mesh, V, comm).create()
 
 # And now we simulate the shot using a Leapfrog time-stepping scheme
 # Other time-stepping options are available (see the documentation).
 # Note: simulation results are stored in the folder `results/`
-p_field, p_recv = Spyro.solvers.Leapfrog(
+p_field, p_at_recv = Spyro.solvers.Leapfrog(
     model, mesh, comm, vp, sources, receivers, source_num=0
 )
 
 # Visualize the shot record
-Spyro.plots.plot_shotrecords(model, p_recv, "example_shot", vmin=-1e-5, vmax=1e-5)
+Spyro.plots.plot_shotrecords(model, p_at_recv, "example_shot", vmin=-1e-5, vmax=1e-5)
 
 # Save the shot (a numpy array) as a pickle for other use.
-Spyro.io.save_shots("example_shot.dat", p_recv)
+Spyro.io.save_shots("example_shot.dat", p_at_recv)
 ```
 
 ### Testing
