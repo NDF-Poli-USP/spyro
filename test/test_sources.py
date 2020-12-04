@@ -5,7 +5,7 @@ import numpy as np
 import firedrake as fire
 from firedrake import dx, dot, grad, Constant
 
-import Spyro
+import spyro
 
 """Read in an external mesh and interpolate velocity to it"""
 from .inputfiles.Model1_2d_CG import model as model
@@ -26,7 +26,7 @@ def test_ricker_varies_in_time():
     delay = 1.5 * math.sqrt(6.0) / (math.pi * frequency)
     t = 0.0
     test1 = math.isclose(
-        Spyro.sources.timedependentSource(modelRicker, t, frequency, amplitude),
+        spyro.sources.timedependentSource(modelRicker, t, frequency, amplitude),
         0,
         abs_tol=1e-3,
     )
@@ -35,17 +35,17 @@ def test_ricker_varies_in_time():
     minimum = -amplitude * 2 / math.exp(3.0 / 2.0)
     t = 0.0 + delay + math.sqrt(6.0) / (2.0 * math.pi * frequency)
     test2 = math.isclose(
-        Spyro.sources.timedependentSource(modelRicker, t, frequency, amplitude), minimum
+        spyro.sources.timedependentSource(modelRicker, t, frequency, amplitude), minimum
     )
     t = 0.0 + delay - math.sqrt(6.0) / (2.0 * math.pi * frequency)
     test3 = math.isclose(
-        Spyro.sources.timedependentSource(modelRicker, t, frequency, amplitude), minimum
+        spyro.sources.timedependentSource(modelRicker, t, frequency, amplitude), minimum
     )
 
     # tests if maximum value in correct and occurs at correct location
     t = 0.0 + delay
     test4 = math.isclose(
-        Spyro.sources.timedependentSource(modelRicker, t, frequency, amplitude),
+        spyro.sources.timedependentSource(modelRicker, t, frequency, amplitude),
         amplitude,
     )
 
@@ -56,11 +56,11 @@ def test_ricker_varies_in_time():
     modelRicker["opts"]["method"] = "CG"
     modelRicker["opts"]["degree"] = 2
     modelRicker["opts"]["dimension"] = 2
-    comm = Spyro.utils.mpi_init(modelRicker)
+    comm = spyro.utils.mpi_init(modelRicker)
     mesh = fire.UnitSquareMesh(10, 10)
     element = fire.FiniteElement("CG", mesh.ufl_cell(), 2, variant="equispaced")
     V = fire.FunctionSpace(mesh, element)
-    excitations = Spyro.Sources(modelRicker, mesh, V, comm).create()
+    excitations = spyro.Sources(modelRicker, mesh, V, comm).create()
 
     ### Defining variables for our wave problem
     t = 0.0
@@ -76,7 +76,7 @@ def test_ricker_varies_in_time():
     ricker = Constant(0)
     expr = excitation * ricker
     ricker.assign(
-        Spyro.sources.timedependentSource(modelRicker, t, frequency, amplitude)
+        spyro.sources.timedependentSource(modelRicker, t, frequency, amplitude)
     )
     f = fire.Function(V).assign(expr)
 
@@ -106,7 +106,7 @@ def test_ricker_varies_in_time():
     for step in range(1, steps):
         t = step * float(dt)
         ricker.assign(
-            Spyro.sources.timedependentSource(modelRicker, t, frequency, amplitude)
+            spyro.sources.timedependentSource(modelRicker, t, frequency, amplitude)
         )
         f.assign(expr)
         B = fire.assemble(b)
@@ -118,7 +118,7 @@ def test_ricker_varies_in_time():
 
         udat = u_h.dat.data[:]
 
-        r_y[step - 1] = Spyro.sources.timedependentSource(
+        r_y[step - 1] = spyro.sources.timedependentSource(
             modelRicker, t, frequency, amplitude, delay=1.5
         )
         p_y[step - 1] = udat[204]  # hardcoded mesh and degree dependent location

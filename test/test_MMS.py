@@ -4,7 +4,7 @@ from copy import deepcopy
 
 from firedrake import *
 
-import Spyro
+import spyro
 
 from .model import model
 
@@ -19,14 +19,14 @@ def mesh(mesh_type):
     if mesh_type == "square":
         model["opts"]["element"] = "tria"
         model["opts"]["dimension"] = 2
-        model["acquisition"]["receiver_locations"] = Spyro.create_receiver_transect(
+        model["acquisition"]["receiver_locations"] = spyro.create_receiver_transect(
             (0.0, 1.0), (0.0, 0.9), 256
         )
         model["acquisition"]["source_pos"] = [(-0.05, 1.5)]
     elif mesh_type == "cube":
         model["opts"]["element"] = "tetra"
         model["opts"]["dimension"] = 3
-        model["acquisition"]["receiver_locations"] = Spyro.create_receiver_transect(
+        model["acquisition"]["receiver_locations"] = spyro.create_receiver_transect(
             (0.0, 0.0, 0.0), (0.0, 0.0, 1.0), 256
         )
         model["acquisition"]["source_pos"] = [(-0.05, 1.5, 1.5)]
@@ -36,7 +36,7 @@ def mesh(mesh_type):
     }[mesh_type]
 
 
-@pytest.fixture(params=["CG", "DG", "KMV"])
+@pytest.fixture(params=["CG", "KMV"])
 def method_type(request):
     return request.param
 
@@ -47,7 +47,7 @@ def spatial_method(method_type):
     return method_type
 
 
-@pytest.fixture(params=["leapfrog", "newmark", "ssprk"])
+@pytest.fixture(params=["leapfrog", "ssprk"])
 def timestep_method_type(request):
     return request.param
 
@@ -73,25 +73,20 @@ def run_solve(timestep_method, method, model, mesh, expr):
     else:
         variant = "equispaced"
 
-    
-    comm = Spyro.utils.mpi_init(testmodel)
+    comm = spyro.utils.mpi_init(testmodel)
 
     element = FiniteElement(method, mesh.ufl_cell(), degree=1, variant=variant)
     V = FunctionSpace(mesh, element)
 
-    excitation = Spyro.Sources(testmodel, mesh, V, comm).create()
-    receivers = Spyro.Receivers(testmodel, mesh, V, comm).create()
+    excitation = spyro.Sources(testmodel, mesh, V, comm).create()
+    receivers = spyro.Receivers(testmodel, mesh, V, comm).create()
 
     if timestep_method == "leapfrog":
-        p, _ = Spyro.solvers.Leapfrog(
-            testmodel, mesh, comm, Constant(1.0), excitation, receivers
-        )
-    elif timestep_method == "newmark":
-        p, _ = Spyro.solvers.Newmark(
+        p, _ = spyro.solvers.Leapfrog(
             testmodel, mesh, comm, Constant(1.0), excitation, receivers
         )
     elif timestep_method == "ssprk":
-        p, _ = Spyro.solvers.SSPRK3(
+        p, _ = spyro.solvers.SSPRK3(
             testmodel, mesh, comm, Constant(1.0), excitation, receivers
         )
     expr = expr(*SpatialCoordinate(mesh))
@@ -99,10 +94,6 @@ def run_solve(timestep_method, method, model, mesh, expr):
 
 
 def test_method(mesh, timestep_method, spatial_method, interpolation_expr):
-    if spatial_method == "DG" and timestep_method == "ssprk":
-        pytest.skip("DG is not yet supported in ssprk")
-    if spatial_method == "KMV" and timestep_method == "newmark":
-        pytest.skip("KMV is not yet supported in newmark")
     if spatial_method == "KMV" and timestep_method == "ssprk":
         pytest.skip("KMV is not yet supported in ssprk")
     error = run_solve(
