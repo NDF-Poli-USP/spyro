@@ -1,5 +1,6 @@
+import FIAT
+import finat
 from firedrake import *
-import FIAT, finat
 
 
 def quadrature_rules(V):
@@ -7,39 +8,43 @@ def quadrature_rules(V):
     degree = V.ufl_element().degree()
     dimension = V.mesh().geometric_dimension()
     cell_geometry = V.mesh().ufl_cell()
-    
+
     # Getting method, this returns the names used in Firedrake and UFL
-    # current implementation supports 'Lagrange' ('CG'), 
+    # current implementation supports 'Lagrange' ('CG'),
     # 'Kong-Mulder-Veldhuizen' ('KMV'), 'Discontinuous Lagrange' ('DG'),
     # 'DQ' ('DG' with quads).
 
-    ufl_method = V.ufl_element().family() 
+    ufl_method = V.ufl_element().family()
 
     # Dealing with mixed function spaces
     if ufl_method == "Mixed":
-        ufl_method = V.sub(1).ufl_element().family() 
+        ufl_method = V.sub(1).ufl_element().family()
 
-    if (cell_geometry == quadrilateral) and ufl_method == 'Lagrange':
+    if (cell_geometry == quadrilateral) and ufl_method == "Lagrange":
         # In this case, for the spectral element method we use GLL quadrature
         qr_x = gauss_lobatto_legendre_cube_rule(dimension=dimension, degree=degree)
         qr_k = qr_x
         qr_s = gauss_lobatto_legendre_cube_rule(
             dimension=(dimension - 1), degree=degree
         )
-    elif (cell_geometry == quadrilateral) and ufl_method == 'DQ':
+    elif (cell_geometry == quadrilateral) and ufl_method == "DQ":
         # In this case, we use GL quadrature
         qr_x = gauss_legendre_cube_rule(dimension=dimension, degree=degree)
         qr_k = qr_x
         qr_s = gauss_legendre_cube_rule(dimension=(dimension - 1), degree=degree)
-    elif (cell_geometry == triangle) and (ufl_method == 'Lagrange' or ufl_method == 'Discontinuous Lagrange'):
+    elif (cell_geometry == triangle) and (
+        ufl_method == "Lagrange" or ufl_method == "Discontinuous Lagrange"
+    ):
         qr_x = None
         qr_s = None
         qr_k = None
-    elif (cell_geometry == tetrahedron) and (ufl_method == 'Lagrange' or ufl_method == 'Discontinuous Lagrange'):
+    elif (cell_geometry == tetrahedron) and (
+        ufl_method == "Lagrange" or ufl_method == "Discontinuous Lagrange"
+    ):
         qr_x = None
         qr_s = None
         qr_k = None
-    elif ufl_method == 'Kong-Mulder-Veldhuizen':
+    elif ufl_method == "Kong-Mulder-Veldhuizen":
         qr_x = finat.quadrature.make_quadrature(
             V.finat_element.cell, V.ufl_element().degree(), "KMV"
         )

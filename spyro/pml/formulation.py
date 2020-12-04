@@ -31,12 +31,12 @@ def acoustic(
     y2=None,
     b_pml=None,
 ):
-    """ Perfectly Matched Layer
+    """Perfectly Matched Layer
 
     Reference:
     Kaltenbacher et al. (2013) - A modified and stable version of a perfectly matched
     layer technique for the 3-d second order wave equation in time domain with an
-    application to aeroacoustics """
+    application to aeroacoustics"""
 
     method = model["opts"]["method"]
     dimension = model["opts"]["dimension"]
@@ -76,13 +76,15 @@ def acoustic(
                 F = -LHS + RHS + dt * dt * (add_a + add_f + nf)
             elif outer_bc == "neumann" or outer_bc == "dirichlet":
                 F = -LHS + RHS + dt * dt * (add_a + add_f)
-            else: 
+            else:
                 raise ValueError("Boundary condition not supported")
 
         elif method == "DG":
             # Vectorial equation
             n = FacetNormal(mesh)
-            add_dg_l = -inner(jump(u_prevs[1], n), avg(c * c * dot(Gamma_2, q))) * dS(rule=qr_s)
+            add_dg_l = -inner(jump(u_prevs[1], n), avg(c * c * dot(Gamma_2, q))) * dS(
+                rule=qr_s
+            )
             l = l + dt * add_dg_l  # update with dg term
             # Scalar equation
             add_dg_f = -inner(avg(p_prevs), jump(v, n)) * dS(rule=qr_s)
@@ -127,11 +129,14 @@ def acoustic(
 
         # Scalar equation - Integrand - main equation - (I)
         add_a = (
-            - (sigma_x + sigma_y + sigma_z) * ((u - u_prevs[1]) / dt) * v * dx(rule=qr_x)
-            - (sigma_x * sigma_y + sigma_x * sigma_z + sigma_y * sigma_z)* u_prevs[1]* v * dx(rule=qr_x)
+            -(sigma_x + sigma_y + sigma_z) * ((u - u_prevs[1]) / dt) * v * dx(rule=qr_x)
+            - (sigma_x * sigma_y + sigma_x * sigma_z + sigma_y * sigma_z)
+            * u_prevs[1]
+            * v
+            * dx(rule=qr_x)
             - (sigma_x * sigma_y * sigma_z) * omega_prevs * v * dx(rule=qr_x)
         )
-        add_f = + inner(p_prevs, grad(v)) * dx(rule=qr_x)
+        add_f = +inner(p_prevs, grad(v)) * dx(rule=qr_x)
 
         if method == "CG":
             # Non-liear form - main equation - (I)
@@ -145,7 +150,11 @@ def acoustic(
         elif method == "DG":
             # Vectorial equation
             n = FacetNormal(mesh)
-            add_dg_l = - inner(jump(u_prevs[1], n), avg(c * c * dot(Gamma_2, q))) * dS(rule=qr_s) + inner(jump(omega_prevs, n), avg(c * c * dot(Gamma_3, q))) * dS(rule=qr_s)
+            add_dg_l = -inner(jump(u_prevs[1], n), avg(c * c * dot(Gamma_2, q))) * dS(
+                rule=qr_s
+            ) + inner(jump(omega_prevs, n), avg(c * c * dot(Gamma_3, q))) * dS(
+                rule=qr_s
+            )
             l = l + dt * add_dg_l  # update with the dg term - (II)
             # Scalar equation
             add_dg_f = -inner(avg(p_prevs), jump(v, n)) * dS(rule=qr_s)
@@ -159,5 +168,3 @@ def acoustic(
                 raise ValueError("Boundary condition not supported")
 
         return (g, l, o, d, p_prevs, omega_prevs, F)
-
-

@@ -1,11 +1,9 @@
 from firedrake import *
 
-from .. import io
-from .. import utils
-from ..sources import FullRickerWavelet
+from .. import io, utils
 from ..domains import quadrature, space
 from ..pml import damping
-
+from ..sources import FullRickerWavelet
 from . import helpers
 
 set_log_level(ERROR)

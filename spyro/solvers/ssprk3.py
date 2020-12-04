@@ -1,16 +1,13 @@
 from __future__ import print_function
 
 import firedrake as fd
-from firedrake import Constant, dx, grad
-from firedrake import inner, div
+import numpy as np
+from firedrake import Constant, div, dx, grad, inner
 
 from .. import io, utils
-from ..sources import MMS_time, timedependentSource
 from ..domains import quadrature
-
+from ..sources import MMS_time, timedependentSource
 from . import helpers
-
-import numpy as np
 
 
 def SSPRK3(model, mesh, comm, c, excitations, receivers, source_num=0):
@@ -134,7 +131,9 @@ def SSPRK3(model, mesh, comm, c, excitations, receivers, source_num=0):
 
         f.assign(expr)
         # Setting up equations
-        LHS = (1 / c ** 2) * (dp_trial) * q * dx(rule=qr_k) + inner(du_trial, q_vec) * dx(rule=qr_k) 
+        LHS = (1 / c ** 2) * (dp_trial) * q * dx(rule=qr_k) + inner(
+            du_trial, q_vec
+        ) * dx(rule=qr_k)
 
         RHS = inner(u, grad(q)) * dx + f * q * dx + p * div(q_vec) * dx
 

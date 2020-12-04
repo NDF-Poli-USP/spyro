@@ -1,5 +1,4 @@
-from . import space
-from . import quadrature
+from . import quadrature, space
 
 __all__ = [
     "space",

@@ -1,8 +1,6 @@
 # from scipy.io import savemat
 import matplotlib.pyplot as plt
-
 import numpy as np
-
 
 __all__ = ["plot_shotrecords", "plot_shotrecords_difference", "plot_pml_error"]
 

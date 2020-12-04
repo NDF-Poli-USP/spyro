@@ -1,13 +1,12 @@
 from __future__ import with_statement
 
 import os
+import pickle
 
 import firedrake as fire
-
-from scipy.interpolate import RegularGridInterpolator
-import pickle
-import numpy as np
 import h5py
+import numpy as np
+from scipy.interpolate import RegularGridInterpolator
 
 from .. import domains
 
@@ -199,7 +198,13 @@ def read_mesh(model, ens_comm):
     mshname = model["mesh"]["meshfile"]
 
     if method == "CG" or method == "KMV":
-        mesh = fire.Mesh(mshname, comm=ens_comm.comm, distribution_parameters={"overlap_type": (fire.DistributedMeshOverlapType.NONE,0)})
+        mesh = fire.Mesh(
+            mshname,
+            comm=ens_comm.comm,
+            distribution_parameters={
+                "overlap_type": (fire.DistributedMeshOverlapType.NONE, 0)
+            },
+        )
     else:
         mesh = fire.Mesh(mshname, comm=ens_comm.comm)
     if ens_comm.comm.rank == 0 and ens_comm.ensemble_comm.rank == 0:

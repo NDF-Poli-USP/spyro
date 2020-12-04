@@ -1,12 +1,11 @@
 from . import Sources
-
 from .Sources import (
-    RickerWavelet,
     FullRickerWavelet,
+    MMS_time,
+    RickerWavelet,
     delta_expr,
     delta_expr_3d,
-    MMS_time,
-    timedependentSource
+    timedependentSource,
 )
 
 __all__ = [
@@ -16,5 +15,5 @@ __all__ = [
     "delta_expr",
     "delta_expr_3d",
     "MMS_time",
-    "timedependentSource"
+    "timedependentSource",
 ]
