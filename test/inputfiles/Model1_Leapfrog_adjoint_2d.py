@@ -1,5 +1,5 @@
 import os
-from Spyro import create_receiver_transect
+from spyro import create_receiver_transect
 
 fname = os.path.join(os.path.dirname(__file__), "../meshes/Uniform2D")
 
@@ -24,10 +24,10 @@ opts = {
 }
 
 parallelism = {
-    "type": "automatic", # options: automatic, custom, off
-    "custom_cores_per_shot": [], # only if the user wants a different number of cores for every shot.
-    # input is a list of integers with the length of the number of shots. 
-    }
+    "type": "automatic",  # options: automatic, custom, off
+    "custom_cores_per_shot": [],  # only if the user wants a different number of cores for every shot.
+    # input is a list of integers with the length of the number of shots.
+}
 
 mesh = {
     "Lz": 3.000,  # depth in km - always positive
