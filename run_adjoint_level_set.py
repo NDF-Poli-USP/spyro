@@ -77,9 +77,9 @@ subdomains = []
 subdomains.append(dx(10, rule=qr_x))
 subdomains.append(dx(11, rule=qr_x))
 
-indicator = Function(V)
-u = TrialFunction(V)
-v = TestFunction(V)
+dgV = FunctionSpace(mesh, "DG", 0)
+u = TrialFunction(dgV)
+v = TestFunction(dgV)
 solve(u * v * dx == 1 * v * dx(10) + -1 * v * dx(11), indicator)
 
 sources = spyro.Sources(model, mesh, V, comm).create()
@@ -116,7 +116,7 @@ for sn in range(model["acquisition"]["num_sources"]):
             source_num=sn,
         )
         print(time.time() - t1, flush=True)
-    theta_global.dat.data[:] += theta_local.dat.data[:]
+    theta_global += theta_local
 
 # visualzie the shape gradient from all shots
 File("theta_global.pvd").write(theta_global)
