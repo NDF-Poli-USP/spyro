@@ -21,7 +21,7 @@ model["opts"] = {
 }
 
 model["parallelism"] = {
-    "type": "automatic",  # options: automatic (same number of cores for evey processor), custom, off
+    "type": "off",  # options: automatic (same number of cores for evey processor), custom, off
     "custom_cores_per_shot": [],  # only if the user wants a different number of cores for every shot.
     # input is a list of integers with the length of the number of shots.
 }
@@ -40,7 +40,7 @@ model["PML"] = {
     "outer_bc": None,  # "non-reflective",  #  dirichlet, neumann, non-reflective (outer boundary condition)
     "damping_type": "polynomial",  # polynomial, hyperbolic, shifted_hyperbolic
     "exponent": 1,
-    "cmax": 4.7,  # maximum acoustic wave velocity in pml - km/s
+    "cmax": 4.5,  # maximum acoustic wave velocity in pml - km/s
     "R": 0.001,  # theoretical reflection coefficient
     "lz": 0.25,  # thickness of the pml in the z-direction (km) - always positive
     "lx": 0.25,  # thickness of the pml in the x-direction (km) - always positive
@@ -50,7 +50,7 @@ model["PML"] = {
 model["acquisition"] = {
     "source_type": "Ricker",
     "num_sources": 5,
-    "source_pos": [(-0.10, 0.20), (-0.10, 0.50), (-0.10, 0.80)],
+    "source_pos": spyro.create_receiver_transect((-0.10, 0.1),(-0.10, 1.4), 5),
     "frequency": 10.0,
     "delay": 1.0,
     "num_receivers": 200,
@@ -62,7 +62,7 @@ model["acquisition"] = {
 model["timeaxis"] = {
     "t0": 0.0,  #  initial time for event
     "tf": 1.0,  # final time for event
-    "dt": 0.0001,  # timestep size
+    "dt": 0.0005,  # timestep size
     "nspool": 200,  # how frequently to output solution to pvds
     "fspool": 1000,  # how frequently to save solution to ram
 }
