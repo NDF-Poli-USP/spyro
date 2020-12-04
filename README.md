@@ -9,8 +9,7 @@ functionality is a set of forward and discrete adjoint wave propagators for solv
 These wave propagators can be used to form complete Full Waveform Inversion or Reverse Time Migration.
 To implement these solvers, Spyro uses the finite element analysis package [Firedrake](https://www.firedrakeproject.org/index.html).
 
-To use Spyro, you'll need to have some knowledge of Python and some basic concepts in inverse modeling relevant to seismology. Firedrake,
-makes it straightforward to do the computational physics, even if you're not an expert in numerical methods.
+To use Spyro, you'll need to have some knowledge of Python and some basic concepts in inverse modeling relevant to seismology.
 
 Functionality
 =============
