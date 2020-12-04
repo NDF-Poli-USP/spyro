@@ -2,7 +2,7 @@ import time
 
 from firedrake import *
 
-import Spyro
+import spyro
 
 # 10 outside
 # 11 inside
@@ -49,12 +49,12 @@ model["PML"] = {
 
 model["acquisition"] = {
     "source_type": "Ricker",
-    "num_sources": 3,
+    "num_sources": 5,
     "source_pos": [(-0.10, 0.20), (-0.10, 0.50), (-0.10, 0.80)],
     "frequency": 10.0,
     "delay": 1.0,
     "num_receivers": 200,
-    "receiver_locations": Spyro.create_receiver_transect(
+    "receiver_locations": spyro.create_receiver_transect(
         (-0.10, 0.1), (-0.10, 0.9), 200
     ),
 }
@@ -70,30 +70,30 @@ model["timeaxis"] = {
 
 vp = [4.5, 2.0]  # inside and outside subdomain respectively in km/s
 
-comm = Spyro.utils.mpi_init(model)
+comm = spyro.utils.mpi_init(model)
 
-mesh, V = Spyro.io.read_mesh(model, comm)
+mesh, V = spyro.io.read_mesh(model, comm)
 
-qr_x, _, _ = Spyro.domains.quadrature.quadrature_rules(V)
+qr_x, _, _ = spyro.domains.quadrature.quadrature_rules(V)
 
 # Determine subdomains originally specified in the mesh
 subdomains = []
 subdomains.append(dx(10, rule=qr_x))
 subdomains.append(dx(11, rule=qr_x))
 
-sources = Spyro.Sources(model, mesh, V, comm).create()
+sources = spyro.Sources(model, mesh, V, comm).create()
 
-receivers = Spyro.Receivers(model, mesh, V, comm).create()
+receivers = spyro.Receivers(model, mesh, V, comm).create()
 
 for sn in range(model["acquisition"]["num_sources"]):
-    if Spyro.io.is_owner(comm, sn):
+    if spyro.io.is_owner(comm, sn):
         t1 = time.time()
-        p_field, p_field_dt, p_recv = Spyro.solvers.Leapfrog_level_set(
+        p_field, p_field_dt, p_recv = spyro.solvers.Leapfrog_level_set(
             model, mesh, comm, vp, sources, receivers, subdomains, source_num=sn
         )
         print(time.time() - t1)
-        Spyro.io.save_shots("forward_exact_level_set" + str(sn) + ".dat", p_recv)
-        Spyro.plots.plot_shotrecords(
+        spyro.io.save_shots("forward_exact_level_set" + str(sn) + ".dat", p_recv)
+        spyro.plots.plot_shotrecords(
             model,
             p_recv,
             name="level_set_" + str(sn),
