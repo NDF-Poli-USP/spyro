@@ -1,6 +1,6 @@
 from firedrake import File
 import time
-import Spyro
+import spyro
 
 model = {}
 
@@ -42,11 +42,11 @@ model["PML"] = {
 model["acquisition"] = {
     "source_type": "Ricker",
     "num_sources": 40,
-    "source_pos": Spyro.create_receiver_transect((-0.15, 0.1), (-0.15, 16.9), 40),
+    "source_pos": spyro.create_receiver_transect((-0.15, 0.1), (-0.15, 16.9), 40),
     "frequency": 10.0,
     "delay": 1.0,
     "num_receivers": 301,
-    "receiver_locations": Spyro.create_receiver_transect(
+    "receiver_locations": spyro.create_receiver_transect(
         (-0.15, 0.1), (-0.15, 16.9), 301
     ),
 }
@@ -65,28 +65,28 @@ model["timeaxis"] = {
 # Use one core per shot.
 model["parallelism"] = {"num_cores_per_shot": 1}
 
-comm = Spyro.utils.mpi_init(model)
+comm = spyro.utils.mpi_init(model)
 
-mesh, V = Spyro.io.read_mesh(model, comm)
+mesh, V = spyro.io.read_mesh(model, comm)
 
-vp_exact = Spyro.io.interpolate(model, mesh, V, guess=False)
+vp_exact = spyro.io.interpolate(model, mesh, V, guess=False)
 
 File("vp_exact.pvd").write(vp_exact)
 
-sources = Spyro.Sources(model, mesh, V, comm).create()
-receivers = Spyro.Receivers(model, mesh, V, comm).create()
+sources = spyro.Sources(model, mesh, V, comm).create()
+receivers = spyro.Receivers(model, mesh, V, comm).create()
 
 
 for sn in range(model["acquisition"]["num_sources"]):
-    if Spyro.io.is_owner(comm, sn):
+    if spyro.io.is_owner(comm, sn):
         t1 = time.time()
-        p_field, p_exact_recv = Spyro.solvers.Leapfrog(
+        p_field, p_exact_recv = spyro.solvers.Leapfrog(
             model, mesh, comm, vp_exact, sources, receivers, source_num=sn
         )
         print(time.time() - t1)
 
-        Spyro.plots.plot_shotrecords(
+        spyro.plots.plot_shotrecords(
             model, p_exact_recv, name=str(sn + 1), vmin=-1e-5, vmax=1e-5
         )
 
-        Spyro.io.save_shots("shots/mm_exact" + str(sn) + ".dat", p_exact_recv)
+        spyro.io.save_shots("shots/mm_exact" + str(sn) + ".dat", p_exact_recv)
