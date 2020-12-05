@@ -11,13 +11,8 @@ model = {}
 
 model["opts"] = {
     "method": "KMV",
-    "variant": None,
-    "type": "SIP",  # for dg only - sip, nip and iip
     "degree": 1,  # p order
     "dimension": 2,  # dimension
-    "mesh_size": 0.005,  # h
-    "beta": 0.0,  # for newmark time integration only
-    "gamma": 0.5,  # for newmark time integration only
 }
 
 model["parallelism"] = {
@@ -36,10 +31,10 @@ model["mesh"] = {
 }
 
 model["PML"] = {
-    "status": False,  # true,  # true or false
+    "status": True,  # true,  # true or false
     "outer_bc": None,  # "non-reflective",  #  dirichlet, neumann, non-reflective (outer boundary condition)
     "damping_type": "polynomial",  # polynomial, hyperbolic, shifted_hyperbolic
-    "exponent": 1,
+    "exponent": 2,
     "cmax": 4.5,  # maximum acoustic wave velocity in pml - km/s
     "R": 0.001,  # theoretical reflection coefficient
     "lz": 0.25,  # thickness of the pml in the z-direction (km) - always positive
@@ -49,13 +44,14 @@ model["PML"] = {
 
 model["acquisition"] = {
     "source_type": "Ricker",
-    "num_sources": 5,
-    "source_pos": spyro.create_receiver_transect((-0.10, 0.1), (-0.10, 1.4), 5),
+    "num_sources": 4,
+    "source_pos": spyro.create_receiver_transect((-0.10, 0.30), (-0.10, 1.20), 4),
     "frequency": 10.0,
     "delay": 1.0,
+    "amplitude": 1e6,
     "num_receivers": 200,
     "receiver_locations": spyro.create_receiver_transect(
-        (-0.10, 0.1), (-0.10, 0.9), 200
+        (-0.10, 0.30), (-0.10, 1.20), 200
     ),
 }
 
@@ -97,7 +93,7 @@ for sn in range(model["acquisition"]["num_sources"]):
             model,
             p_recv,
             name="level_set_" + str(sn),
-            vmin=-1e-5,
-            vmax=1e-5,
+            vmin=-1e-1,
+            vmax=1e-1,
             appear=False,
         )

@@ -10,7 +10,6 @@ model = {}
 
 model["opts"] = {
     "method": "KMV",
-    "variant": None,
     "degree": 1,  # p order
     "dimension": 2,  # dimension
 }
@@ -31,11 +30,11 @@ model["mesh"] = {
 }
 
 model["PML"] = {
-    "status": False,  # true,  # true or false
+    "status": True,  # true,  # true or false
     "outer_bc": None,  #  dirichlet, neumann, non-reflective (outer boundary condition)
     "damping_type": "polynomial",  # polynomial, hyperbolic, shifted_hyperbolic
     "exponent": 2,
-    "cmax": 4.7,  # maximum acoustic wave velocity in pml - km/s
+    "cmax": 4.5,  # maximum acoustic wave velocity in pml - km/s
     "R": 0.001,  # theoretical reflection coefficient
     "lz": 0.25,  # thickness of the pml in the z-direction (km) - always positive
     "lx": 0.25,  # thickness of the pml in the x-direction (km) - always positive
@@ -44,13 +43,14 @@ model["PML"] = {
 
 model["acquisition"] = {
     "source_type": "Ricker",
-    "num_sources": 5,
-    "source_pos": spyro.create_receiver_transect((-0.10, 0.1), (-0.10, 1.4), 5),
+    "num_sources": 4,
+    "source_pos": spyro.create_receiver_transect((-0.10, 0.30), (-0.10, 1.20), 4),
     "frequency": 10.0,
     "delay": 1.0,
+    "ampltiude": 1e6,
     "num_receivers": 200,
     "receiver_locations": spyro.create_receiver_transect(
-        (-0.10, 0.1), (-0.10, 0.9), 200
+        (-0.10, 0.30), (-0.10, 1.20), 200
     ),
 }
 
@@ -73,11 +73,13 @@ comm = spyro.utils.mpi_init(model)
 qr_x, _, _ = spyro.domains.quadrature.quadrature_rules(V)
 
 # Determine subdomains originally specified in the mesh
-subdomains = []
-subdomains.append(dx(10, rule=qr_x))
-subdomains.append(dx(11, rule=qr_x))
+candidate_subdomains = []
+candidate_subdomains.append(dx(10, rule=qr_x))
+candidate_subdomains.append(dx(11, rule=qr_x))
 
+# create the indicator
 dgV = FunctionSpace(mesh, "DG", 0)
+indicator = Function(dgV)
 u = TrialFunction(dgV)
 v = TestFunction(dgV)
 solve(u * v * dx == 1 * v * dx(10) + -1 * v * dx(11), indicator)
@@ -90,44 +92,58 @@ J_total = np.zeros((1))
 
 VF = VectorFunctionSpace(mesh, "CG", 1)
 theta_global = Function(VF)
-for sn in range(model["acquisition"]["num_sources"]):
-    if spyro.io.is_owner(comm, sn):
-        t1 = time.time()
-        # run for guess model
-        guess, guess_dt, p_recv = spyro.solvers.Leapfrog_level_set(
-            model, mesh, comm, vp, sources, receivers, subdomains, source_num=sn
+outfile_theta = File("theta_global.pvd")
+
+for fwi_itr in range(5):
+    for sn in range(model["acquisition"]["num_sources"]):
+        if spyro.io.is_owner(comm, sn):
+            t1 = time.time()
+            # run for guess model
+            guess, guess_dt, p_recv = spyro.solvers.Leapfrog_level_set(
+                model, mesh, comm, vp, sources, receivers, subdomains, source_num=sn
+            )
+            # load exact solution for this shot
+            p_exact_recv = spyro.io.load_shots(
+                "forward_exact_level_set" + str(sn) + ".dat"
+            )
+            # compute the residual between guess and exact
+            residual = spyro.utils.evaluate_misfit(model, comm, p_exact_recv, p_recv)
+            # compute the functional for the current model
+            J_total[0] += spyro.utils.compute_functional(model, comm, residual)
+            # run the adjoint and return the shape gradient
+            theta_local = spyro.solvers.Leapfrog_adjoint_level_set(
+                model,
+                mesh,
+                comm,
+                vp,
+                guess,
+                guess_dt,
+                residual,
+                subdomains,
+                source_num=sn,
+            )
+            print(time.time() - t1, flush=True)
+        theta_global += theta_local
+
+    if comm.ensemble_comm.size > 1:
+        comm.ensemble_comm.Allreduce(
+            theta_global.dat.data[:], theta_global.dat.data[:], op=MPI.SUM
         )
-        # load exact solution for this shot
-        p_exact_recv = spyro.io.load_shots("forward_exact_level_set" + str(sn) + ".dat")
-        # compute the residual between guess and exact
-        residual = spyro.utils.evaluate_misfit(model, comm, p_exact_recv, p_recv)
-        # compute the functional for the current model
-        J_total[0] += spyro.utils.compute_functional(model, comm, residual)
-        # run the adjoint and return the shape gradient
-        theta_local = spyro.solvers.Leapfrog_adjoint_level_set(
-            model,
-            mesh,
-            comm,
-            vp,
-            guess,
-            guess_dt,
-            residual,
-            subdomains,
-            source_num=sn,
+    # scale theta so update moves the functional
+    theta_global *= 10000
+    outfile_theta.write(theta_global)
+
+    # sum functional over all ensembles
+    if comm.ensemble_comm.size > 1:
+        comm.ensemble_comm.Allreduce(J_total, J_total, op=MPI.SUM)
+
+    if COMM_WORLD.rank == 0:
+        print(
+            "At iteration " + str(fwi_itr) + " the functional is " + str(J_total[0]),
+            flush=True,
         )
-        print(time.time() - t1, flush=True)
-    theta_global += theta_local
 
-# visualzie the shape gradient from all shots
-File("theta_global.pvd").write(theta_global)
-
-# sum functional over all processors
-if COMM_WORLD.size > 1:
-    COMM_WORLD.Allreduce(J_total, J_total, op=MPI.SUM)
-if COMM_WORLD.rank == 0:
-    print("The functional is " + str(J_total[0]), flush=True)
-
-# solve a transport equation to move the subdomains around
-candidate_indicator, candidate_subdomains = spyro.solvers.advect(
-    mesh, indicator, theta_global, number_of_timesteps=10
-)
+    # solve a transport equation to move the subdomains around
+    candidate_indicator, candidate_subdomains = spyro.solvers.advect(
+        mesh, indicator, theta_global, number_of_timesteps=10
+    )

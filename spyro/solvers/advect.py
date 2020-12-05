@@ -2,16 +2,16 @@ from firedrake import *
 
 
 def advect(mesh, q, theta, number_of_timesteps=10):
-    """Advect a mesh with two subdomains based on the shape gradient `theta`"""
+    """Advect a mesh with two subdomains based on the shape gradient `theta`
+    solves a transport equation for `number_of_timesteps` using an upwinding DG scheme
+    marching in time with a 4th order RK scheme.
+    """
 
     V = FunctionSpace(mesh, "DG", 0)
     W = VectorFunctionSpace(mesh, "CG", 1)
 
     u = TrialFunction(V)
     v = TestFunction(V)
-    # q = Function(V)
-    # make the assumption that subdomains are named 10 and 11
-    # solve(u * v * dx == 1 * v * dx(10) + -1 * v * dx(11), q)
 
     u = Function(W).assign(theta)
 
@@ -65,8 +65,9 @@ def advect(mesh, q, theta, number_of_timesteps=10):
         solv3.solve()
         q.assign((1.0 / 3.0) * q + (2.0 / 3.0) * (q2 + dq))
 
-        if step % 5 == 0:
-            print(t)
+        # visualize the evolution of the indicator funciton
+        if step % 1 == 0:
+            # print(t)
             outfile.write(q)
         step += 1
         t += dt
