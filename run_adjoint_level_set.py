@@ -62,11 +62,14 @@ model["timeaxis"] = {
     "fspool": 10,  # how frequently to save solution to ram
 }
 
+# the "velocity model"
+vp = [4.5, 2.0]  # inside and outside subdomain respectively in km/s
+
+#### end of options ####
+
 comm = spyro.utils.mpi_init(model)
 
 mesh, V = spyro.io.read_mesh(model, comm)
-
-vp = [4.5, 2.0]  # inside and outside subdomain respectively in km/s
 
 comm = spyro.utils.mpi_init(model)
 
@@ -77,41 +80,45 @@ candidate_subdomains = []
 candidate_subdomains.append(dx(10, rule=qr_x))
 candidate_subdomains.append(dx(11, rule=qr_x))
 
-# create the indicator
-dgV = FunctionSpace(mesh, "DG", 0)
-indicator = Function(dgV)
-u = TrialFunction(dgV)
-v = TestFunction(dgV)
-solve(u * v * dx == 1 * v * dx(10) + -1 * v * dx(11), indicator)
-
 sources = spyro.Sources(model, mesh, V, comm).create()
 
 receivers = spyro.Receivers(model, mesh, V, comm).create()
 
-J_total = np.zeros((1))
+def calculate_indicator_from_mesh(mesh):
+    dgV = FunctionSpace(mesh, "DG", 0)
+    indicator = Function(dgV)
+    u = TrialFunction(dgV)
+    v = TestFunction(dgV)
+    solve(u * v * dx == 1 * v * dx(10) + -1 * v * dx(11), indicator)
+    return indicator
 
-VF = VectorFunctionSpace(mesh, "CG", 1)
-theta_global = Function(VF)
-outfile_theta = File("theta_global.pvd")
 
-for fwi_itr in range(5):
+def calculate_functional(model, mesh, comm, vp, sources, receivers, subdomains):
     for sn in range(model["acquisition"]["num_sources"]):
         if spyro.io.is_owner(comm, sn):
-            t1 = time.time()
-            # run for guess model
-            guess, guess_dt, p_recv = spyro.solvers.Leapfrog_level_set(
+            guess, guess_dt, guess_recv = spyro.solvers.Leapfrog_level_set(
                 model, mesh, comm, vp, sources, receivers, subdomains, source_num=sn
             )
-            # load exact solution for this shot
             p_exact_recv = spyro.io.load_shots(
                 "forward_exact_level_set" + str(sn) + ".dat"
             )
-            # compute the residual between guess and exact
             residual = spyro.utils.evaluate_misfit(model, comm, p_exact_recv, p_recv)
-            # compute the functional for the current model
-            J_total[0] += spyro.utils.compute_functional(model, comm, residual)
-            # run the adjoint and return the shape gradient
-            theta_local = spyro.solvers.Leapfrog_adjoint_level_set(
+            J = spyro.utils.compute_functional(model, comm, residual)
+    # todo: sum functional if ensemble parallelism here
+    return (
+        J,
+        guess,
+        guess_dt,
+        residual,
+    )
+
+
+def calculate_gradient(model, mesh, comm, vp, guess, guess_dt, residual, subdomains):
+    """Calculate the shape gradient"""
+    scale = 1e9
+    for sn in range(model["acquisition"]["num_sources"]):
+        if spyro.io.is_owner(comm, sn):
+            theta= spyro.solvers.Leapfrog_adjoint_level_set(
                 model,
                 mesh,
                 comm,
@@ -121,29 +128,67 @@ for fwi_itr in range(5):
                 residual,
                 subdomains,
                 source_num=sn,
-            )
-            print(time.time() - t1, flush=True)
-        theta_global += theta_local
-
-    if comm.ensemble_comm.size > 1:
-        comm.ensemble_comm.Allreduce(
-            theta_global.dat.data[:], theta_global.dat.data[:], op=MPI.SUM
-        )
+    # todo: sum shape gradient if ensemble parallelism here
     # scale theta so update moves the functional
-    theta_global *= 10000
-    outfile_theta.write(theta_global)
+    theta *= scale
+    return theta
 
-    # sum functional over all ensembles
-    if comm.ensemble_comm.size > 1:
-        comm.ensemble_comm.Allreduce(J_total, J_total, op=MPI.SUM)
 
-    if COMM_WORLD.rank == 0:
-        print(
-            "At iteration " + str(fwi_itr) + " the functional is " + str(J_total[0]),
-            flush=True,
-        )
-
-    # solve a transport equation to move the subdomains around
-    candidate_indicator, candidate_subdomains = spyro.solvers.advect(
-        mesh, indicator, theta_global, number_of_timesteps=10
+def model_update(mesh, indicator, theta, step):
+    """Solve a transport equation to move the subdomains around based
+    on the shape gradient.
+    """
+    new_indicator, new_subdomains = spyro.solvers.advect(
+        mesh, indicator, step*theta, number_of_timesteps=10
     )
+    return new_indicator, new_subdomains
+
+def line_search(model, mesh, comm, vp, sources, receivers, subdomains, max_number_of_iterations=10):
+    """Optimization"""
+    beta0=beta0_init=1.5
+    max_line_search = 3
+    gamma = gamma2 = 0.8
+
+    # compute the functional
+    J_old, guess, guess_dt, residual  = calculate_functional(model, mesh, comm, vp, sources, receivers, subdomains)
+
+    iter_num = 0
+    while iter_num < max_number_of_iterations:
+        line_search_iter = 0
+        # compute the shape gradient
+        theta = calculate_gradient(model, mesh, comm, vp, guess, guess_dt, residual)
+        # update the new shape
+        indicator_new, subdomains_new = model_update(mesh, indicator, theta, beta0)
+        # calculate the new functional for the new model
+        J_new, guess_new, guess_new_dt, residual_new  = calculate_functional(model, mesh, comm, vp, sources, receivers, subdomains_new)
+        # using some basic logic reduce the functional
+        if J_new < J_old:
+            print('Iteration '+str(iter_num)+' : Accepting shape update...functional is '+str(J_new))
+
+            iter_num += 1
+
+            # accept new domain
+            J_old = J_new
+            guess = guess_new
+            guess_dt = guess_dt_new
+            residual = residual_new
+            subdomains = subdomains_new
+            indicator = indicator_new
+            # update step
+            if line_search_iter == max_line_search:
+                beta0 = max(beta0*gamma2, 0.1*beta_0_init)
+            elif line_search_iter == 0:
+                beta0 = min(beta0/gamma2, 1.0)
+            else:
+                # no change to step
+                beta0 = beta0
+        else:
+            print('Reducing step...')
+
+            line_search_iter += 1
+            # reduce step length by gamma
+            beta0 *= gamma
+            # solve the transport equation over again but changing the step
+
+
+    return subdomains, indicator

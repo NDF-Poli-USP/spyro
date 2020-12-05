@@ -16,7 +16,7 @@ model["opts"] = {
 }
 
 model["parallelism"] = {
-    "type": "off",  # options: automatic (same number of cores for evey processor), custom, off
+    "type": "automatic",  # options: automatic (same number of cores for evey processor), custom, off
     "custom_cores_per_shot": [],  # only if the user wants a different number of cores for every shot.
     # input is a list of integers with the length of the number of shots.
 }
@@ -48,7 +48,7 @@ model["acquisition"] = {
     "source_pos": spyro.create_receiver_transect((-0.10, 0.30), (-0.10, 1.20), 4),
     "frequency": 10.0,
     "delay": 1.0,
-    "amplitude": 1e6,
+    "amplitude": 1.0,
     "num_receivers": 200,
     "receiver_locations": spyro.create_receiver_transect(
         (-0.10, 0.30), (-0.10, 1.20), 200
@@ -89,11 +89,11 @@ for sn in range(model["acquisition"]["num_sources"]):
         )
         print(time.time() - t1)
         spyro.io.save_shots("forward_exact_level_set" + str(sn) + ".dat", p_recv)
-        spyro.plots.plot_shotrecords(
-            model,
-            p_recv,
-            name="level_set_" + str(sn),
-            vmin=-1e-1,
-            vmax=1e-1,
-            appear=False,
-        )
+        # spyro.plots.plot_shotrecords(
+        #    model,
+        #    p_recv,
+        #    name="level_set_" + str(sn),
+        #    vmin=-1e-1,
+        #    vmax=1e-1,
+        #    appear=False,
+        # )
