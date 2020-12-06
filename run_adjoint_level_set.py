@@ -76,9 +76,9 @@ comm = spyro.utils.mpi_init(model)
 qr_x, _, _ = spyro.domains.quadrature.quadrature_rules(V)
 
 # Determine subdomains originally specified in the mesh
-candidate_subdomains = []
-candidate_subdomains.append(dx(10, rule=qr_x))
-candidate_subdomains.append(dx(11, rule=qr_x))
+subdomains = []
+subdomains.append(dx(10, rule=qr_x))
+subdomains.append(dx(11, rule=qr_x))
 
 sources = spyro.Sources(model, mesh, V, comm).create()
 
@@ -96,6 +96,7 @@ def calculate_indicator_from_mesh(mesh):
 
 def calculate_functional(model, mesh, comm, vp, sources, receivers, subdomains):
     J = 0
+    print("Computing the functional")
     for sn in range(model["acquisition"]["num_sources"]):
         if spyro.io.is_owner(comm, sn):
             guess, guess_dt, guess_recv = spyro.solvers.Leapfrog_level_set(
@@ -118,6 +119,7 @@ def calculate_functional(model, mesh, comm, vp, sources, receivers, subdomains):
 
 def calculate_gradient(model, mesh, comm, vp, guess, guess_dt, residual, subdomains):
     """Calculate the shape gradient"""
+    print("Computing the gradient")
     scale = 1e9
     for sn in range(model["acquisition"]["num_sources"]):
         if spyro.io.is_owner(comm, sn):
@@ -144,6 +146,7 @@ def model_update(mesh, indicator, theta, step):
     """Solve a transport equation to move the subdomains around based
     on the shape gradient.
     """
+    print("Updating the model")
     new_indicator, new_subdomains = spyro.solvers.advect(
         mesh, indicator, step * theta, number_of_timesteps=10
     )
