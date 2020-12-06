@@ -1,4 +1,4 @@
-import time
+from mpi4py import MPI
 from firedrake import *
 
 import spyro
@@ -15,7 +15,7 @@ model["opts"] = {
 }
 
 model["parallelism"] = {
-    "type": "off",  # options: automatic (same number of cores for evey processor), custom, off
+    "type": "automatic",  # options: automatic (same number of cores for evey processor), custom, off
     "custom_cores_per_shot": [],  # only if the user wants a different number of cores for every shot.
     # input is a list of integers with the length of the number of shots.
 }
@@ -84,6 +84,7 @@ sources = spyro.Sources(model, mesh, V, comm).create()
 
 receivers = spyro.Receivers(model, mesh, V, comm).create()
 
+
 def calculate_indicator_from_mesh(mesh):
     dgV = FunctionSpace(mesh, "DG", 0)
     indicator = Function(dgV)
@@ -94,6 +95,7 @@ def calculate_indicator_from_mesh(mesh):
 
 
 def calculate_functional(model, mesh, comm, vp, sources, receivers, subdomains):
+    J = 0
     for sn in range(model["acquisition"]["num_sources"]):
         if spyro.io.is_owner(comm, sn):
             guess, guess_dt, guess_recv = spyro.solvers.Leapfrog_level_set(
@@ -103,8 +105,9 @@ def calculate_functional(model, mesh, comm, vp, sources, receivers, subdomains):
                 "forward_exact_level_set" + str(sn) + ".dat"
             )
             residual = spyro.utils.evaluate_misfit(model, comm, p_exact_recv, p_recv)
-            J = spyro.utils.compute_functional(model, comm, residual)
-    # todo: sum functional if ensemble parallelism here
+            J += spyro.utils.compute_functional(model, comm, residual)
+    if comm.ensemble_comm.size > 1:
+        comm.ensemble_comm.Allreduce(J, J, op=MPI.SUM)
     return (
         J,
         guess,
@@ -118,7 +121,7 @@ def calculate_gradient(model, mesh, comm, vp, guess, guess_dt, residual, subdoma
     scale = 1e9
     for sn in range(model["acquisition"]["num_sources"]):
         if spyro.io.is_owner(comm, sn):
-            theta= spyro.solvers.Leapfrog_adjoint_level_set(
+            theta = spyro.solvers.Leapfrog_adjoint_level_set(
                 model,
                 mesh,
                 comm,
@@ -128,7 +131,10 @@ def calculate_gradient(model, mesh, comm, vp, guess, guess_dt, residual, subdoma
                 residual,
                 subdomains,
                 source_num=sn,
-    # todo: sum shape gradient if ensemble parallelism here
+            )
+    # sum shape gradient if ensemble parallelism here
+    if comm.ensemble_comm.size > 1:
+        comm.ensemble_comm.Allreduce(theta, theta, op=MPI.SUM)
     # scale theta so update moves the functional
     theta *= scale
     return theta
@@ -139,34 +145,48 @@ def model_update(mesh, indicator, theta, step):
     on the shape gradient.
     """
     new_indicator, new_subdomains = spyro.solvers.advect(
-        mesh, indicator, step*theta, number_of_timesteps=10
+        mesh, indicator, step * theta, number_of_timesteps=10
     )
     return new_indicator, new_subdomains
 
-def line_search(model, mesh, comm, vp, sources, receivers, subdomains, max_number_of_iterations=10):
-    """Optimization"""
-    beta0=beta0_init=1.5
+
+def optimization(
+    model, mesh, comm, vp, sources, receivers, subdomains, max_number_of_iterations=10
+):
+    """Optimization with line search"""
+    beta0 = beta0_init = 1.5
     max_line_search = 3
     gamma = gamma2 = 0.8
 
+    indicator = calculate_indicator_from_mesh(mesh)
+
     # compute the functional
-    J_old, guess, guess_dt, residual  = calculate_functional(model, mesh, comm, vp, sources, receivers, subdomains)
+    J_old, guess, guess_dt, residual = calculate_functional(
+        model, mesh, comm, vp, sources, receivers, subdomains
+    )
+    # compute the shape gradient
+    theta = calculate_gradient(
+        model, mesh, comm, vp, guess, guess_dt, residual, subdomains
+    )
 
     iter_num = 0
+    line_search_iter = 0
     while iter_num < max_number_of_iterations:
-        line_search_iter = 0
-        # compute the shape gradient
-        theta = calculate_gradient(model, mesh, comm, vp, guess, guess_dt, residual)
         # update the new shape
         indicator_new, subdomains_new = model_update(mesh, indicator, theta, beta0)
         # calculate the new functional for the new model
-        J_new, guess_new, guess_new_dt, residual_new  = calculate_functional(model, mesh, comm, vp, sources, receivers, subdomains_new)
-        # using some basic logic reduce the functional
+        J_new, guess_new, guess_new_dt, residual_new = calculate_functional(
+            model, mesh, comm, vp, sources, receivers, subdomains_new
+        )
+        # using some basic logic attempt to reduce the functional
         if J_new < J_old:
-            print('Iteration '+str(iter_num)+' : Accepting shape update...functional is '+str(J_new))
-
+            print(
+                "Iteration "
+                + str(iter_num)
+                + " : Accepting shape update...functional is: "
+                + str(J_new)
+            )
             iter_num += 1
-
             # accept new domain
             J_old = J_new
             guess = guess_new
@@ -176,19 +196,27 @@ def line_search(model, mesh, comm, vp, sources, receivers, subdomains, max_numbe
             indicator = indicator_new
             # update step
             if line_search_iter == max_line_search:
-                beta0 = max(beta0*gamma2, 0.1*beta_0_init)
+                beta0 = max(beta0 * gamma2, 0.1 * beta_0_init)
             elif line_search_iter == 0:
-                beta0 = min(beta0/gamma2, 1.0)
+                beta0 = min(beta0 / gamma2, 1.0)
             else:
                 # no change to step
                 beta0 = beta0
+            line_search_iter = 0
+            # compute the shape gradient for the new domain
+            theta = calculate_gradient(model, mesh, comm, vp, guess, guess_dt, residual)
         else:
-            print('Reducing step...')
-
+            print("Reducing step...")
+            # advance the line search counter
             line_search_iter += 1
             # reduce step length by gamma
             beta0 *= gamma
-            # solve the transport equation over again but changing the step
-
+            # now solve the transport equation over again but with the reduced step
 
     return subdomains, indicator
+
+
+# run the optimization
+subdomains, indicator = optimization(
+    model, mesh, comm, vp, sources, receivers, subdomains, max_number_of_iterations=10
+)

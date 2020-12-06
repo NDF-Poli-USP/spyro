@@ -15,9 +15,6 @@ def advect(mesh, q, theta, number_of_timesteps=10):
 
     u = Function(W).assign(theta)
 
-    outfile = File("DGadv_domain.pvd")
-    outfile.write(q)
-
     dt = 0.0001
     T = dt * number_of_timesteps
     dtc = Constant(dt)
@@ -65,10 +62,6 @@ def advect(mesh, q, theta, number_of_timesteps=10):
         solv3.solve()
         q.assign((1.0 / 3.0) * q + (2.0 / 3.0) * (q2 + dq))
 
-        # visualize the evolution of the indicator funciton
-        if step % 1 == 0:
-            # print(t)
-            outfile.write(q)
         step += 1
         t += dt
 
@@ -84,6 +77,5 @@ def advect(mesh, q, theta, number_of_timesteps=10):
     q.assign(1)
     q.interpolate(Constant(1), sd10)
     q.interpolate(Constant(-1), sd11)
-    File("final_q.pvd").write(q)
 
     return q, [sd10, sd11]
