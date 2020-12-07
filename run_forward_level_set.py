@@ -32,7 +32,7 @@ model["mesh"] = {
 
 model["PML"] = {
     "status": True,  # true,  # true or false
-    "outer_bc": None,  # "non-reflective",  #  dirichlet, neumann, non-reflective (outer boundary condition)
+    "outer_bc": "non-reflective",  #  dirichlet, neumann, non-reflective (outer boundary condition)
     "damping_type": "polynomial",  # polynomial, hyperbolic, shifted_hyperbolic
     "exponent": 2,
     "cmax": 4.5,  # maximum acoustic wave velocity in pml - km/s
@@ -44,8 +44,10 @@ model["PML"] = {
 
 model["acquisition"] = {
     "source_type": "Ricker",
-    "num_sources": 4,
-    "source_pos": spyro.create_receiver_transect((-0.10, 0.30), (-0.10, 1.20), 4),
+    "num_sources": 1,
+    "source_pos": [
+        (-0.10, 0.50)
+    ],  # spyro.create_receiver_transect((-0.10, 0.30), (-0.10, 1.20), 4),
     "frequency": 10.0,
     "delay": 1.0,
     "amplitude": 1.0,

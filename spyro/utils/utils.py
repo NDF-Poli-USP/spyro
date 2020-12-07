@@ -1,10 +1,8 @@
 from firedrake import *
-from firedrake.petsc import PETSc
 
 import copy
 from mpi4py import MPI
 import numpy as np
-import math
 from scipy.signal import butter, filtfilt
 
 
@@ -23,39 +21,12 @@ def butter_lowpass_filter(shot, cutoff, fs, order=2):
     return filtered_shot
 
 
-def pml_error(model, p_pml, p_ref):
-    """ Erro with PML for a each shot (source) ..."""
-
-    num_sources = model["acquisition"]["num_sources"]
-    num_receivers = model["acquisition"]["num_receivers"]
-    dt = model["timeaxis"]["dt"]
-    tf = model["timeaxis"]["tf"]
-
-    nt = int(tf / dt)  # number of timesteps
-    error = []
-
-    for sn in range(num_sources):
-        error.append([])
-        for ti in range(nt):
-            soma = 0
-            for rn in range(num_receivers):
-                soma += (p_pml[sn][rn][ti] - p_ref[sn][rn][ti]) * (
-                    p_pml[sn][rn][ti] - p_ref[sn][rn][ti]
-                )
-            error[sn].append(math.sqrt(soma / num_receivers))
-
-    return error
-
-
 def compute_functional(model, comm, residual):
     """ Compute the functional to be optimized """
     num_receivers = model["acquisition"]["num_receivers"]
     dt = model["timeaxis"]["dt"]
     tf = model["timeaxis"]["tf"]
     nt = int(tf / dt)  # number of timesteps
-
-    if comm.comm.rank == 0 and comm.ensemble_comm.rank == 0:
-        print("Computing the functional...", flush=True)
 
     Jtemp = 0.0
     J = 0.0
@@ -74,10 +45,6 @@ def compute_functional(model, comm, residual):
 def evaluate_misfit(model, my_ensemble, guess, exact):
     """Compute the difference between the guess and exact
     at the receiver locations"""
-
-    if my_ensemble.comm.rank == 0 and my_ensemble.ensemble_comm.rank == 0:
-        print("Computing the misfit...", flush=True)
-
     return guess - exact
 
 
@@ -94,17 +61,18 @@ def mpi_init(model):
     rank = myrank()
     size = mysize()
     available_cores = COMM_WORLD.size
-    
+
     if model["parallelism"]["type"] == "automatic":
-        num_cores_per_shot = available_cores/model["acquisition"]["num_sources"]
+        num_cores_per_shot = available_cores / model["acquisition"]["num_sources"]
         if available_cores % model["acquisition"]["num_sources"] != 0:
-            raise ValueError("Available cores cannot be divided between sources equally.")
+            raise ValueError(
+                "Available cores cannot be divided between sources equally."
+            )
 
     elif model["parallelism"]["type"] == "off":
         num_cores_per_shot = available_cores
     elif model["parallelism"]["type"] == "custom":
         raise ValueError("Custom parallelism not yet implemented")
-
 
     comm_ens = Ensemble(COMM_WORLD, num_cores_per_shot)
     return comm_ens
@@ -137,6 +105,7 @@ def communicate(array, my_ensemble):
 
 
 def analytical_solution_for_pressure_based_on_MMS(model, mesh, time):
+    """to do docstring"""
     degree = model["opts"]["degree"]
     V = FunctionSpace(mesh, "CG", degree)
     z, x = SpatialCoordinate(mesh)

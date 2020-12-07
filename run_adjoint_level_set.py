@@ -31,9 +31,9 @@ model["mesh"] = {
 
 model["PML"] = {
     "status": True,  # true,  # true or false
-    "outer_bc": None,  #  dirichlet, neumann, non-reflective (outer boundary condition)
+    "outer_bc": "non-reflective",  #  dirichlet, neumann, non-reflective (outer boundary condition)
     "damping_type": "polynomial",  # polynomial, hyperbolic, shifted_hyperbolic
-    "exponent": 2,
+    "exponent": 1,
     "cmax": 4.5,  # maximum acoustic wave velocity in pml - km/s
     "R": 0.001,  # theoretical reflection coefficient
     "lz": 0.25,  # thickness of the pml in the z-direction (km) - always positive
@@ -43,11 +43,11 @@ model["PML"] = {
 
 model["acquisition"] = {
     "source_type": "Ricker",
-    "num_sources": 4,
-    "source_pos": spyro.create_receiver_transect((-0.10, 0.30), (-0.10, 1.20), 4),
+    "num_sources": 1,
+    "source_pos": [(-0.10, 0.50)],
     "frequency": 10.0,
     "delay": 1.0,
-    "ampltiude": 1e6,
+    "ampltiude": 1,
     "num_receivers": 200,
     "receiver_locations": spyro.create_receiver_transect(
         (-0.10, 0.30), (-0.10, 1.20), 200
@@ -105,7 +105,9 @@ def calculate_functional(model, mesh, comm, vp, sources, receivers, subdomains):
             p_exact_recv = spyro.io.load_shots(
                 "forward_exact_level_set" + str(sn) + ".dat"
             )
-            residual = spyro.utils.evaluate_misfit(model, comm, p_exact_recv, p_recv)
+            residual = spyro.utils.evaluate_misfit(
+                model, comm, p_exact_recv, guess_recv
+            )
             J += spyro.utils.compute_functional(model, comm, residual)
     if comm.ensemble_comm.size > 1:
         comm.ensemble_comm.Allreduce(J, J, op=MPI.SUM)
@@ -156,31 +158,28 @@ def model_update(mesh, indicator, theta, step):
 def optimization(
     model, mesh, comm, vp, sources, receivers, subdomains, max_number_of_iterations=10
 ):
-    """Optimization with line search"""
+    """Optimization with a line search"""
     beta0 = beta0_init = 1.5
     max_line_search = 3
     gamma = gamma2 = 0.8
 
     indicator = calculate_indicator_from_mesh(mesh)
 
-    # compute the functional
-    J_old, guess, guess_dt, residual = calculate_functional(
-        model, mesh, comm, vp, sources, receivers, subdomains
-    )
-    # compute the shape gradient
-    theta = calculate_gradient(
-        model, mesh, comm, vp, guess, guess_dt, residual, subdomains
-    )
-
     iter_num = 0
     line_search_iter = 0
+    # some very large number to start
+    J_old = 9999999.0
     while iter_num < max_number_of_iterations:
-        # update the new shape
-        indicator_new, subdomains_new = model_update(mesh, indicator, theta, beta0)
         # calculate the new functional for the new model
         J_new, guess_new, guess_new_dt, residual_new = calculate_functional(
-            model, mesh, comm, vp, sources, receivers, subdomains_new
+            model, mesh, comm, vp, sources, receivers, subdomains
         )
+        # compute the shape gradient for the new domain
+        theta = calculate_gradient(
+            model, mesh, comm, vp, guess_new, guess_new_dt, residual_new, subdomains
+        )
+        # update the new shape...solve transport equation
+        indicator_new, subdomains_new = model_update(mesh, indicator, theta, beta0)
         # using some basic logic attempt to reduce the functional
         if J_new < J_old:
             print(
@@ -206,10 +205,8 @@ def optimization(
                 # no change to step
                 beta0 = beta0
             line_search_iter = 0
-            # compute the shape gradient for the new domain
-            theta = calculate_gradient(model, mesh, comm, vp, guess, guess_dt, residual)
         else:
-            print("Reducing step...")
+            print("Line search...reducing step...")
             # advance the line search counter
             line_search_iter += 1
             # reduce step length by gamma

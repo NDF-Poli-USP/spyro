@@ -138,12 +138,6 @@ def Leapfrog_adjoint_level_set(
                 model, V, dim, x, x1, x2, a_pml, z, z1, z2, c_pml
             )
             (Gamma_1, Gamma_2) = damping.matrices_2D(sigma_z, sigma_x)
-            pml1 = (
-                (sigma_x + sigma_z)
-                * ((u - u_nm1) / (2.0 * Constant(dt)))
-                * v
-                * dx(rule=qr_x)
-            )
         # in 3d
         elif dim == 3:
 
@@ -182,8 +176,8 @@ def Leapfrog_adjoint_level_set(
     # a weighting function that produces large values near the boundary
     # to diminish the gradient calculation near the boundary of the domain
     m = V.ufl_domain()
-    W = VectorFunctionSpace(m, V.ufl_element())
-    coords = interpolate(m.coordinates, W)
+    W2 = VectorFunctionSpace(m, V.ufl_element())
+    coords = interpolate(m.coordinates, W2)
     z, x = coords.dat.data[:, 0], coords.dat.data[:, 1]
 
     # a weighting function that produces large values near the boundary
@@ -204,8 +198,6 @@ def Leapfrog_adjoint_level_set(
     VF = VectorFunctionSpace(mesh, "CG", 1)
     theta = TrialFunction(VF)
     csi = TestFunction(VF)
-
-    t = 0.0
 
     # -------------------------------------------------------
     m1 = ((u - 2.0 * u_n + u_nm1) / Constant(dt ** 2)) * v * dx(rule=qr_x)
@@ -287,15 +279,16 @@ def Leapfrog_adjoint_level_set(
         * v
         * dx(rule=qr_x)
     )
-
     ffG_12 = (
         ((-2 * grad(uufor)[0] * grad(uuadj)[1] - 2 * grad(uufor)[1] * grad(uuadj)[0]))
         * v
         * dx(rule=qr_x)
     )
-
-    ffG_21 = ffG_12
-
+    ffG_21 = (
+        ((-2 * grad(uufor)[0] * grad(uuadj)[1] - 2 * grad(uufor)[1] * grad(uuadj)[0]))
+        * v
+        * dx(rule=qr_x)
+    )
     ffG_22 = (
         (dot(grad(uuadj), grad(uufor)) - 2 * grad(uufor)[1] * grad(uuadj)[1])
         * v
