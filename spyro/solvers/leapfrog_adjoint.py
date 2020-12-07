@@ -1,17 +1,14 @@
 from __future__ import print_function
 
-from firedrake import *
-
 import numpy as np
+from firedrake import *
 from scipy.sparse import csc_matrix
 
 from .. import io
-from ..sources import delta_expr, delta_expr_3d
 from ..domains import quadrature, space
 from ..pml import damping
-
+from ..sources import delta_expr, delta_expr_3d
 from . import helpers
-
 
 set_log_level(ERROR)
 

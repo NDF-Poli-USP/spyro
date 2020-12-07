@@ -1,6 +1,6 @@
 import os
-import numpy as np
 
+import numpy as np
 from firedrake import File
 
 from .. import io
@@ -12,6 +12,7 @@ __all__ = [
     "receivers_local",
     "fill",
 ]
+
 
 
 def fill(usol_recv, is_local, nt, nr):

@@ -1,6 +1,5 @@
-from firedrake import *
-
 import numpy as np
+from firedrake import *
 
 
 class Receivers:
@@ -10,7 +9,7 @@ class Receivers:
     """
 
     def __init__(self, model, mesh, V, my_ensemble):
-        """Initializes class and gets all receiver parameters from 
+        """Initializes class and gets all receiver parameters from
         input file.
 
         Parameters
@@ -116,7 +115,7 @@ class Receivers:
         """Function that evaluates the receiver value given its id.
 
         Parameters
-        ----------        
+        ----------
         udat: array-like
             An array of the solution at a given timestep at all nodes
         receiver_id: a list of integers
@@ -125,7 +124,7 @@ class Receivers:
         is_local: a list of booleans
             A list of integers. Positive if the receiver is local to
             the subdomain and negative otherwise.
-            
+
         Returns
         -------
         at: function value at receiver locations
@@ -844,14 +843,14 @@ def _lagrange_basis_1d(x, p, P, zeros):
 
 def triangle_area(p1, p2, p3):
     """Calculate the area of a triangle.
-    
+
     Parameters
     ----------
-    
+
     p1: 1st vertex of the triangle
     p2: 2nd vertex of the triangle
     p3: 3rd vertex of the triangle
-    
+
     Returns
     -------
     Triangle area

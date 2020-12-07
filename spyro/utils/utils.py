@@ -1,8 +1,9 @@
+import copy
+
+import numpy as np
 from firedrake import *
 
-import copy
 from mpi4py import MPI
-import numpy as np
 from scipy.signal import butter, filtfilt
 
 
