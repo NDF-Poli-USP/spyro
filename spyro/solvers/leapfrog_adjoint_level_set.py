@@ -223,7 +223,7 @@ def Leapfrog_adjoint_level_set(
 
             FF += pml1 + pml2 + pml3
             # -------------------------------------------------------
-            mm1 = (dot((pp - pp_n), qq) / Constant(dt)) * dx(rule=qr_x)
+            mm1 = (dot((pp - pp_n), qq) / dt) * dx(rule=qr_x)
             mm2 = inner(dot(Gamma_1, pp_n), qq) * dx(rule=qr_x)
             dd = inner(qq, grad(u_n)) * dx(rule=qr_x)
 
@@ -262,33 +262,36 @@ def Leapfrog_adjoint_level_set(
     solver = LinearSolver(A, solver_parameters=params)
 
     # Define gradient problem
-    # this solves for the shape gradient WITHOUT the PML
-    mgrad = u * v * dx(rule=qr_x)
+    g_u = TrialFunction(V)
+    g_v = TestFunction(V)
 
-    # mass matrix (note u trial function is the gradient of functional)
+    # Define gradient problem
+    # this solves for the shape gradient WITHOUT the PML
+    mgrad = g_u * g_v * dx(rule=qr_x)
+
     uuadj = Function(V)  # auxiliarly function for the gradient compt.
     uufor = Function(V)  # auxiliarly function for the gradient compt.
 
     uuadj_dt = Function(V)  # the time deriv. of the adjoint solution at timestep n
     uufor_dt = Function(V)  # the time deriv. of the forward solution at timestep n
 
-    k0_fe0 = dot(uufor_dt, uuadj_dt) * v  # defer subdomain integration until later
+    k0_fe0 = dot(uufor_dt, uuadj_dt) * g_v  # defer subdomain integration until later
 
     ffG_11 = (
         (dot(grad(uuadj), grad(uufor)) - 2 * grad(uufor)[0] * grad(u_n)[0])
-        * v
+        * g_v
         * dx(rule=qr_x)
     )
     ffG_12 = (
         ((-2 * grad(uufor)[0] * grad(uuadj)[1] - 2 * grad(uufor)[1] * grad(uuadj)[0]))
-        * v
+        * g_v
         * dx(rule=qr_x)
     )
     ffG_21 = ffG_12
 
     ffG_22 = (
         (dot(grad(uuadj), grad(uufor)) - 2 * grad(uufor)[1] * grad(uuadj)[1])
-        * v
+        * g_v
         * dx(rule=qr_x)
     )
 
@@ -326,9 +329,6 @@ def Leapfrog_adjoint_level_set(
     gradi_22_np = np.zeros((sz))
 
     k0_fe0_np = np.zeros(sz)
-
-    uuadj = Function(V)  # auxiliarly function for the gradient compt.
-    uufor = Function(V)  # auxiliarly function for the gradient compt.
 
     rhs_forcing = Function(V)  # forcing term
     for IT in range(nt - 1, 0, -1):
