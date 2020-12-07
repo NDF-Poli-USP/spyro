@@ -31,7 +31,7 @@ model["mesh"] = {
 }
 
 model["PML"] = {
-    "status": True,  # true,  # true or false
+    "status": False,  # true,  # true or false
     "outer_bc": "non-reflective",  #  dirichlet, neumann, non-reflective (outer boundary condition)
     "damping_type": "polynomial",  # polynomial, hyperbolic, shifted_hyperbolic
     "exponent": 2,

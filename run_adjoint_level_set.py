@@ -30,7 +30,7 @@ model["mesh"] = {
 }
 
 model["PML"] = {
-    "status": True,  # true,  # true or false
+    "status": False,  # true,  # true or false
     "outer_bc": "non-reflective",  #  dirichlet, neumann, non-reflective (outer boundary condition)
     "damping_type": "polynomial",  # polynomial, hyperbolic, shifted_hyperbolic
     "exponent": 1,
@@ -122,7 +122,7 @@ def calculate_functional(model, mesh, comm, vp, sources, receivers, subdomains):
 def calculate_gradient(model, mesh, comm, vp, guess, guess_dt, residual, subdomains):
     """Calculate the shape gradient"""
     print("Computing the gradient")
-    scale = 1e9
+    scale = 1e11
     for sn in range(model["acquisition"]["num_sources"]):
         if spyro.io.is_owner(comm, sn):
             theta = spyro.solvers.Leapfrog_adjoint_level_set(
@@ -139,47 +139,54 @@ def calculate_gradient(model, mesh, comm, vp, guess, guess_dt, residual, subdoma
     # sum shape gradient if ensemble parallelism here
     if comm.ensemble_comm.size > 1:
         comm.ensemble_comm.Allreduce(theta, theta, op=MPI.SUM)
-    # scale theta so update moves the functional
     theta *= scale
     return theta
 
 
 def model_update(mesh, indicator, theta, step):
     """Solve a transport equation to move the subdomains around based
-    on the shape gradient.
+    on the shape gradient to minimize the functional.
     """
-    print("Updating the model")
-    new_indicator, new_subdomains = spyro.solvers.advect(
-        mesh, indicator, step * theta, number_of_timesteps=10
+    print("Updating the shape...")
+    indicator_new, domains_new = spyro.solvers.advect(
+        mesh, indicator, step * theta, number_of_timesteps=100
     )
-    return new_indicator, new_subdomains
+    return indicator_new, domains_new
 
 
-def optimization(
-    model, mesh, comm, vp, sources, receivers, subdomains, max_number_of_iterations=10
-):
+def optimization(model, mesh, comm, vp, sources, receivers, subdomains, max_iter=10):
     """Optimization with a line search"""
     beta0 = beta0_init = 1.5
-    max_line_search = 3
+    max_ls = 3
     gamma = gamma2 = 0.8
 
     indicator = calculate_indicator_from_mesh(mesh)
 
+    # the file that contains the shape gradient each iteration
+    grad_file = File("theta.pvd")
+    # the file that contains the indicator each iteration
+    # indicator_file = File("indicator.pvd").write(indicator)
+
+    ls_iter = 0
     iter_num = 0
-    line_search_iter = 0
-    # some very large number to start
+    # some very large number to start for the functional
     J_old = 9999999.0
-    while iter_num < max_number_of_iterations:
+    while iter_num < max_iter:
         # calculate the new functional for the new model
-        J_new, guess_new, guess_new_dt, residual_new = calculate_functional(
+        J_new, guess_new, guess_dt_new, residual_new = calculate_functional(
             model, mesh, comm, vp, sources, receivers, subdomains
         )
         # compute the shape gradient for the new domain
         theta = calculate_gradient(
-            model, mesh, comm, vp, guess_new, guess_new_dt, residual_new, subdomains
+            model, mesh, comm, vp, guess_new, guess_dt_new, residual_new, subdomains
         )
+        grad_file.write(theta)
         # update the new shape...solve transport equation
-        indicator_new, subdomains_new = model_update(mesh, indicator, theta, beta0)
+        indicator_new, domains = model_update(mesh, indicator, theta, beta0)
+        # form new measures
+        subdomains_new = []
+        subdomains_new.append(dx(subdomain_data=domains[0], rule=qr_x))
+        subdomains_new.append(dx(subdomain_data=domains[1], rule=qr_x))
         # using some basic logic attempt to reduce the functional
         if J_new < J_old:
             print(
@@ -197,26 +204,29 @@ def optimization(
             subdomains = subdomains_new
             indicator = indicator_new
             # update step
-            if line_search_iter == max_line_search:
+            if ls_iter == max_ls:
                 beta0 = max(beta0 * gamma2, 0.1 * beta_0_init)
-            elif line_search_iter == 0:
+            elif ls_iter == 0:
                 beta0 = min(beta0 / gamma2, 1.0)
             else:
                 # no change to step
                 beta0 = beta0
-            line_search_iter = 0
-        else:
-            print("Line search...reducing step...")
+            ls_iter = 0
+        elif ls_iter < 3:
+            print("Line search " + str(ls_iter) + "...reducing step...")
             # advance the line search counter
-            line_search_iter += 1
+            ls_iter += 1
             # reduce step length by gamma
             beta0 *= gamma
-            # now solve the transport equation over again but with the reduced step
+            # now solve the transport equation over again
+            # but with the reduced step
+        else:
+            raise ValueError("failed to reduce the functional...")
 
     return subdomains, indicator
 
 
 # run the optimization
 subdomains, indicator = optimization(
-    model, mesh, comm, vp, sources, receivers, subdomains, max_number_of_iterations=10
+    model, mesh, comm, vp, sources, receivers, subdomains
 )

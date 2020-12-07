@@ -284,11 +284,8 @@ def Leapfrog_adjoint_level_set(
         * v
         * dx(rule=qr_x)
     )
-    ffG_21 = (
-        ((-2 * grad(uufor)[0] * grad(uuadj)[1] - 2 * grad(uufor)[1] * grad(uuadj)[0]))
-        * v
-        * dx(rule=qr_x)
-    )
+    ffG_21 = ffG_12
+
     ffG_22 = (
         (dot(grad(uuadj), grad(uufor)) - 2 * grad(uufor)[1] * grad(uuadj)[1])
         * v
@@ -452,7 +449,7 @@ def Leapfrog_adjoint_level_set(
             flush=True,
         )
 
-    return -descent
+    return descent
 
 
 def _adjoint_update_rhs(rhs_forcing, excitations, residual, IT, is_local):

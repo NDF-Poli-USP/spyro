@@ -10,9 +10,6 @@ def advect(mesh, q, theta, number_of_timesteps=10):
     V = FunctionSpace(mesh, "DG", 0)
     W = VectorFunctionSpace(mesh, "CG", 1)
 
-    u = TrialFunction(V)
-    v = TestFunction(V)
-
     u = Function(W).assign(theta)
 
     dt = 0.0001
@@ -49,7 +46,11 @@ def advect(mesh, q, theta, number_of_timesteps=10):
     prob3 = LinearVariationalProblem(a, L3, dq)
     solv3 = LinearVariationalSolver(prob3, solver_parameters=params)
 
+    outfile = File("evolution_of_indicator.pvd")
+    outfile.write(q)
+
     t = 0.0
+
     step = 0
     while t < T - 0.5 * dt:
 
@@ -62,6 +63,8 @@ def advect(mesh, q, theta, number_of_timesteps=10):
         solv3.solve()
         q.assign((1.0 / 3.0) * q + (2.0 / 3.0) * (q2 + dq))
 
+        outfile.write(q)
+
         step += 1
         t += dt
 
@@ -69,13 +72,11 @@ def advect(mesh, q, theta, number_of_timesteps=10):
     sd10 = SubDomainData(q > 0)
     sd11 = SubDomainData(q < 0)
 
-    # solve for the new q
-    uu = TrialFunction(V)
-    vv = TestFunction(V)
-
     # reset q
     q.assign(1)
     q.interpolate(Constant(1), sd10)
     q.interpolate(Constant(-1), sd11)
+
+    outfile.write(q)
 
     return q, [sd10, sd11]
