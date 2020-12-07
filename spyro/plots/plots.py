@@ -1,8 +1,9 @@
 # from scipy.io import savemat
 import matplotlib.pyplot as plt
+
 import numpy as np
 
-__all__ = ["plot_shotrecords", "plot_shotrecords_difference", "plot_pml_error"]
+__all__ = ["plot_shotrecords", "plot_shotrecords_difference"]
 
 
 def plot_shotrecords(
@@ -10,8 +11,8 @@ def plot_shotrecords(
     arr,
     appear=False,
     name="MODEL",
-    vmin=1e-8,
-    vmax=1e-8,
+    vmin=-1e-5,
+    vmax=1e-5,
     ft="PDF",
     start_index=0,
     end_index=0,
@@ -60,7 +61,7 @@ def plot_shotrecords(
     X, Y = np.meshgrid(x_rec, t_rec)
 
     cmap = plt.get_cmap("gray")
-    plt.contourf(X, Y, arr, 700, cmap=cmap, vmax=vmax, vmin=vmin)
+    plt.contourf(X, Y, arr, cmap=cmap, vmin=vmin, vmax=vmax)
     # savemat("test.mat", {"mydata": arr})
     plt.xlabel("receiver number", fontsize=18)
     plt.ylabel("time (s)", fontsize=18)

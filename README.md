@@ -80,12 +80,12 @@ model["mesh"] = {
 
 # Specify a 250-m PML on the three sides of the domain to damp outgoing waves.
 model["PML"] = {
-    "status": True,  # True,  # True or false
-    "outer_bc": None,  # "non-reflective",  #  None or non-reflective (outer boundary condition)
+    "status": True,  # True or false
+    "outer_bc": "non-reflective",  #  None or non-reflective (outer boundary condition)
     "damping_type": "polynomial",  # polynomial, hyperbolic, shifted_hyperbolic
     "exponent": 2,  # damping layer has a exponent variation
     "cmax": 4.7,  # maximum acoustic wave velocity in PML - km/s
-    "R": 0.001,  # theoretical reflection coefficient
+    "R": 1e-6,  # theoretical reflection coefficient
     "lz": 0.25,  # thickness of the PML in the z-direction (km) - always positive
     "lx": 0.25,  # thickness of the PML in the x-direction (km) - always positive
     "ly": 0.0,  # thickness of the PML in the y-direction (km) - always positive
@@ -107,14 +107,14 @@ model["acquisition"] = {
     ),
 }
 
-# Simulate for 2 seconds.
+# Simulate for 2.0 seconds.
 model["timeaxis"] = {
     "t0": 0.0,  #  Initial time for event
     "tf": 2.00,  # Final time for event
     "dt": 0.0005,  # timestep size
     "amplitude": 1,  # the Ricker has an amplitude of 1.
-    "nspool": 20,  # how frequently to output solution to pvds
-    "fspool": 20,  # how frequently to save solution to RAM
+    "nspool": 100,  # how frequently to output solution to pvds
+    "fspool": 100,  # how frequently to save solution to RAM
 }
 
 

@@ -10,7 +10,7 @@ from scipy.interpolate import RegularGridInterpolator
 
 from .. import domains
 
-__all__ = ["save_shots", "load_shots", "read_mesh", "interpolate"]
+__all__ = ["is_owner", "save_shots", "load_shots", "read_mesh", "interpolate"]
 
 
 def save_shots(filename, array):
