@@ -44,10 +44,12 @@ model["PML"] = {
 
 model["acquisition"] = {
     "source_type": "Ricker",
-    "num_sources": 2,
+    "num_sources": 4,
     "source_pos": [
-        (-0.10, 0.25),
-        (-0.10, 0.75),
+        (-0.10, 0.20),
+        (-0.10, 0.40),
+        (-0.10, 0.60),
+        (-0.10, 0.80),
     ],  # spyro.create_receiver_transect((-0.10, 0.30), (-0.10, 1.20), 4),
     "frequency": 10.0,
     "delay": 1.0,

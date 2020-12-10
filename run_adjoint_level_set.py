@@ -43,10 +43,12 @@ model["PML"] = {
 
 model["acquisition"] = {
     "source_type": "Ricker",
-    "num_sources": 2,
+    "num_sources": 4,
     "source_pos": [
-        (-0.10, 0.25),
-        (-0.10, 0.75),
+        (-0.10, 0.20),
+        (-0.10, 0.40),
+        (-0.10, 0.60),
+        (-0.10, 0.80),
     ],  # spyro.create_receiver_transect((-0.10, 0.30), (-0.10, 1.20), 4),
     "frequency": 10.0,
     "delay": 1.0,
@@ -128,6 +130,8 @@ def calculate_gradient(model, mesh, comm, vp, guess, guess_dt, residual):
     print("Computing the gradient", flush=True)
     # gradient is scaled because it appears very small??
     scale = 1e11
+    VF = VectorFunctionSpace(mesh, "CG", 1)
+    theta = Function(VF, name="grad")
     for sn in range(model["acquisition"]["num_sources"]):
         if spyro.io.is_owner(comm, sn):
             theta_local = spyro.solvers.Leapfrog_adjoint_level_set(
@@ -142,7 +146,6 @@ def calculate_gradient(model, mesh, comm, vp, guess, guess_dt, residual):
             )
     # sum shape gradient if ensemble parallelism here
     if comm.ensemble_comm.size > 1:
-        theta = theta_local.copy()
         comm.ensemble_comm.Allreduce(
             theta_local.dat.data[:], theta.dat.data[:], op=MPI.SUM
         )
