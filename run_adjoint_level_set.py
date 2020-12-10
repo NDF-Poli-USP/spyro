@@ -146,6 +146,8 @@ def calculate_gradient(model, mesh, comm, vp, guess, guess_dt, residual):
         comm.ensemble_comm.Allreduce(
             theta_local.dat.data[:], theta.dat.data[:], op=MPI.SUM
         )
+    else:
+        theta = theta_local
     theta *= scale
     return theta
 
