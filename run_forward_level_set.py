@@ -44,9 +44,10 @@ model["PML"] = {
 
 model["acquisition"] = {
     "source_type": "Ricker",
-    "num_sources": 1,
+    "num_sources": 2,
     "source_pos": [
-        (-0.10, 0.50)
+        (-0.10, 0.25),
+        (-0.10, 0.75),
     ],  # spyro.create_receiver_transect((-0.10, 0.30), (-0.10, 1.20), 4),
     "frequency": 10.0,
     "delay": 1.0,
@@ -66,18 +67,27 @@ model["timeaxis"] = {
 }
 
 
-vp = [4.5, 2.0]  # inside and outside subdomain respectively in km/s
-
 comm = spyro.utils.mpi_init(model)
 
 mesh, V = spyro.io.read_mesh(model, comm)
 
+# assign values [4.5 and 2.0]
+u = TrialFunction(V)
+v = TestFunction(V)
+q = Function(V)
+# make the assumption that subdomains are named 10 and 11
+solve(u * v * dx == 1 * v * dx(10) + -1 * v * dx(11), q)
+
+vp = Function(V)
+sd1 = SubDomainData(q < 0)
+sd2 = SubDomainData(q > 0)
+
+vp.interpolate(Constant(4.5), subset=sd1)
+vp.interpolate(Constant(2.0), subset=sd2)
+File("exact_vp.pvd").write(vp)
+
 qr_x, _, _ = spyro.domains.quadrature.quadrature_rules(V)
 
-# Determine subdomains originally specified in the mesh
-subdomains = []
-subdomains.append(dx(10, rule=qr_x))
-subdomains.append(dx(11, rule=qr_x))
 
 sources = spyro.Sources(model, mesh, V, comm).create()
 
@@ -87,7 +97,7 @@ for sn in range(model["acquisition"]["num_sources"]):
     if spyro.io.is_owner(comm, sn):
         t1 = time.time()
         p_field, p_field_dt, p_recv = spyro.solvers.Leapfrog_level_set(
-            model, mesh, comm, vp, sources, receivers, subdomains, source_num=sn
+            model, mesh, comm, vp, sources, receivers, source_num=sn
         )
         print(time.time() - t1)
         spyro.io.save_shots("forward_exact_level_set" + str(sn) + ".dat", p_recv)

@@ -4,7 +4,6 @@ from firedrake import *
 import SeismicMesh
 
 import numpy as np
-from mpi4py import MPI
 from scipy.sparse import csc_matrix
 
 from ..sources import delta_expr, delta_expr_3d
@@ -27,7 +26,6 @@ def Leapfrog_adjoint_level_set(
     guess,
     guess_dt,
     residual,
-    subdomains,
     source_num=0,
 ):
 
@@ -70,12 +68,6 @@ def Leapfrog_adjoint_level_set(
     V = FunctionSpace(mesh, element)
 
     qr_x, qr_s, _ = quadrature.quadrature_rules(V)
-
-    dx10, dx11 = subdomains
-
-    # c10 = 2.0  # km/s outside circle
-    # c11 = 4.5  # km/s inside circle
-    c11, c10 = c
 
     # Prepare receiver forcing terms
     if dim == 2:
@@ -201,12 +193,10 @@ def Leapfrog_adjoint_level_set(
 
     # -------------------------------------------------------
     m1 = ((u - 2.0 * u_n + u_nm1) / Constant(dt ** 2)) * v * dx(rule=qr_x)
-    a10 = c10 * c10 * dot(grad(u_n), grad(v)) * dx10
-    a11 = c11 * c11 * dot(grad(u_n), grad(v)) * dx11
-    a = a10 + a11
+    a = c * c * dot(grad(u_n), grad(v)) * dx(rule=qr_x)
 
     if model["PML"]["outer_bc"] == "non-reflective":
-        nf = c10 * ((u_n - u_nm1) / dt) * v * ds(rule=qr_s)
+        nf = c * ((u_n - u_nm1) / dt) * v * ds(rule=qr_s)
     else:
         nf = 0
 
@@ -345,6 +335,7 @@ def Leapfrog_adjoint_level_set(
         if PML:
             if dim == 2:
                 u_np1, pp_np1 = X.split()
+
             elif dim == 3:
                 u_np1, psi_np1, pp_np1 = X.split()
 
@@ -422,10 +413,7 @@ def Leapfrog_adjoint_level_set(
     ) + alpha2 * wei * inner(theta, csi) * dx(rule=qr_x)
 
     # gradient problem for two subdomains
-    rhs_grad = -1.0 * (
-        (1 / c10 ** 2) * k0_fe0 * div(csi) * dx10
-        + (1 / c11 ** 2) * k0_fe0 * div(csi) * dx11
-    )
+    rhs_grad = -1.0 * ((1 / c ** 2) * k0_fe0 * div(csi) * dx(rule=qr_x))
 
     rhs_grad += -1.0 * (
         (
@@ -440,14 +428,14 @@ def Leapfrog_adjoint_level_set(
     lterm, rterm = lhs(L), rhs(L)
     Lterm, Rterm = assemble(lterm), assemble(rterm)
     solver_csi = LinearSolver(Lterm, solver_parameters=params)
-    descent = Function(VF)
+    descent = Function(VF, name="grad")
     solver_csi.solve(descent, Rterm)
 
-    if comm.ensemble_comm.rank == 0 and comm.comm.rank == 0:
-        print(
-            "---------------------------------------------------------------",
-            flush=True,
-        )
+    # if comm.ensemble_comm.rank == 0 and comm.comm.rank == 0:
+    #    print(
+    #        "---------------------------------------------------------------",
+    #        flush=True,
+    #    )
 
     return descent
 

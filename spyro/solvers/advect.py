@@ -46,9 +46,6 @@ def advect(mesh, q, theta, number_of_timesteps=10):
     prob3 = LinearVariationalProblem(a, L3, dq)
     solv3 = LinearVariationalSolver(prob3, solver_parameters=params)
 
-    outfile = File("evolution_of_indicator.pvd")
-    outfile.write(q)
-
     t = 0.0
 
     step = 0
@@ -63,20 +60,7 @@ def advect(mesh, q, theta, number_of_timesteps=10):
         solv3.solve()
         q.assign((1.0 / 3.0) * q + (2.0 / 3.0) * (q2 + dq))
 
-        outfile.write(q)
-
         step += 1
         t += dt
 
-    # relabel the cells
-    sd10 = SubDomainData(q > 0)
-    sd11 = SubDomainData(q < 0)
-
-    # reset q
-    q.assign(1)
-    q.interpolate(Constant(1), sd10)
-    q.interpolate(Constant(-1), sd11)
-
-    outfile.write(q)
-
-    return q, [sd10, sd11]
+    return q

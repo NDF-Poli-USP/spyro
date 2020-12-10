@@ -18,7 +18,6 @@ def Leapfrog_level_set(
     c,
     excitations,
     receivers,
-    subdomains,
     source_num=0,
     lp_freq_index=0,
 ):
@@ -41,7 +40,6 @@ def Leapfrog_level_set(
         emulated a Dirac delta at the location of source `source_num`
     receivers: A :class:`Spyro.Receivers` object.
         Contains the receiver locations and sparse interpolation methods.
-    subdomains: A list of measures
     source_num: `int`, optional
         The source number you wish to simulate
 
@@ -168,12 +166,6 @@ def Leapfrog_level_set(
 
     outfile = helpers.create_output_file("Leapfrog_level_set.pvd", comm, source_num)
 
-    dx10, dx11 = subdomains
-
-    # c10 = 2.0  # km/s outside circle
-    # c11 = 4.5  # km/s inside circle
-    c11, c10 = c
-
     t = 0.0
 
     cutoff = freq_bands[lp_freq_index] if "inversion" in model else None
@@ -187,12 +179,10 @@ def Leapfrog_level_set(
     m1 = ((u - 2.0 * u_n + u_nm1) / Constant(dt ** 2)) * v * dx(rule=qr_x)
 
     # stiffness matrix is integrated on subdomains
-    a10 = c10 * c10 * dot(grad(u_n), grad(v)) * dx10
-    a11 = c11 * c11 * dot(grad(u_n), grad(v)) * dx11
-    a = a10 + a11
+    a = c * c * dot(grad(u_n), grad(v)) * dx(rule=qr_x)
 
     if model["PML"]["outer_bc"] == "non-reflective":
-        nf = c10 * ((u_n - u_nm1) / dt) * v * ds(rule=qr_s)
+        nf = c * ((u_n - u_nm1) / dt) * v * ds(rule=qr_s)
     else:
         nf = 0
 
