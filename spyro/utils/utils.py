@@ -1,10 +1,10 @@
-import copy
-import math
-
-import numpy as np
 from firedrake import *
 from firedrake.petsc import PETSc
+
+import copy
 from mpi4py import MPI
+import numpy as np
+import math
 from scipy.signal import butter, filtfilt
 
 
@@ -96,16 +96,15 @@ def mpi_init(model):
     available_cores = COMM_WORLD.size
 
     if model["parallelism"]["type"] == "automatic":
-        num_cores_per_shot = available_cores / model["acquisition"]["num_sources"]
+        num_cores_per_shot = available_cores/model["acquisition"]["num_sources"]
         if available_cores % model["acquisition"]["num_sources"] != 0:
-            raise ValueError(
-                "Available cores cannot be divided between sources equally."
-            )
+            raise ValueError("Available cores cannot be divided between sources equally.")
 
     elif model["parallelism"]["type"] == "off":
         num_cores_per_shot = available_cores
     elif model["parallelism"]["type"] == "custom":
         raise ValueError("Custom parallelism not yet implemented")
+
 
     comm_ens = Ensemble(COMM_WORLD, num_cores_per_shot)
     return comm_ens
@@ -143,3 +142,121 @@ def analytical_solution_for_pressure_based_on_MMS(model, mesh, time):
     z, x = SpatialCoordinate(mesh)
     p = Function(V).interpolate((time ** 2) * sin(pi * z) * sin(pi * x))
     return p
+
+
+def normalize_vp(model, vp):
+
+    control = firedrake.Function(vp)
+
+    if model["material"]["type"] is "simp":
+        vp_min = model["material"]["vp_min"]
+        vp_max = model["material"]["vp_max"]
+        penal = model["material"]["penal"]
+        control.dat.data[:] -= vp_min
+        control.dat.data[:] /= (vp_max - vp_min)
+        control.dat.data[:] = control.dat.data[:] ** (1 / penal)
+
+    return control
+
+
+def discretize_field(c, n=4):
+
+    c_ = firedrake.Function(c)
+    vp = c.dat.data
+    # Get histogram
+    counts, bins = np.histogram(c.dat.data, bins=n)
+
+    for i, count in enumerate(counts):
+        c_.dat.data[(bins[i] <= vp) & (vp < bins[i+1])] = (bins[i]+bins[i+1])/2
+
+    return c_
+
+
+def control_to_vp(model, control):
+
+    vp = firedrake.Function(control)
+
+    if model["material"]["type"] is "simp":
+        vp_min = Constant(model["material"]["vp_min"])
+        vp_max = Constant(model["material"]["vp_max"])
+        penal = Constant(model["material"]["penal"])
+
+        vp.assign(vp_min + (vp_max - vp_min) * control ** penal)
+
+    return vp
+
+
+def save_velocity_model(comm, vp_model, dest_file):
+    """Save Firedrake.Function representative of a seismic velocity model.
+    Stores both nodal values and coordinates into a HDF5 file.
+
+    Parameters
+    comm: Firedrake.ensemble_communicator
+        The MPI communicator for parallelism
+    vp_model: Firedrake.Function
+        P-wave seismic velocity interpolated onto the nodes of the
+        finite elements.
+    dest_file: str
+        path to hdf5 file to be written.
+
+    """
+    # Sanitize units
+    _check_units(vp_model)
+    # # Get coordinates
+    V = vp_model.function_space()
+    W = firedrake.VectorFunctionSpace(V.ufl_domain(), V.ufl_element())
+    coords = firedrake.interpolate(V.ufl_domain().coordinates, W)
+
+    # Gather vectors on the master rank
+    vp_global = vp_model.vector().gather()
+    coords_global = coords.vector().gather()
+
+    if comm.comm.rank == 0 and comm.ensemble_comm.rank == 0:
+        print("Writing velocity model: " + dest_file, flush=True)
+        with h5py.File(dest_file, "w") as f:
+            f.create_dataset("velocity_model", data=vp_global, dtype="f")
+            f.create_dataset("coordinates", data=coords_global, dtype="f")
+            f.attrs["geometric dimension"] = coords.dat.data.shape[1]
+            f.attrs["units"] = "km/s"
+
+
+def load_velocity_model(params, V, source_file=None):
+    """Load Firedrake.Function representative of a seismic velocity model
+    from a HDF5 file.
+
+    Prameters
+    ---------
+    V: Firedrake.FunctionSpace object
+        The space of the finite elements.
+    dsource_file: str
+        path to hdf5 file to be loaded.
+
+    Returns
+    -------
+    vp_model: Firedrake.Function
+        P-wave seismic velocity interpolated onto the nodes of the
+        finite elements.
+
+    """
+
+    if not source_file:
+        source_file = params['input']['model']
+
+    # Get interpolant
+    with h5py.File(source_file, "r") as f:
+        vp = np.asarray(f.get("velocity_model")[()])
+        gd = f.attrs['geometric dimension']
+        coords = np.asarray(f.get("coordinates")[()])
+        coords = coords.reshape((-1, gd))
+
+    interpolant = NearestNDInterpolator(coords, vp)
+
+    # Get current coordinates
+    W = firedrake.VectorFunctionSpace(V.ufl_domain(), V.ufl_element())
+    coordinates = firedrake.interpolate(V.ufl_domain().coordinates, W)
+
+    # Get velocity model
+    vp_model = firedrake.Function(V)
+    vp_model.dat.data[:] = interpolant(coordinates.dat.data)
+
+    return _check_units(vp_model)

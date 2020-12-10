@@ -228,6 +228,18 @@ def Leapfrog_adjoint(
         # Define gradient problem
         g_u = TrialFunction(V)
         g_v = TestFunction(V)
+        dvp = Function(V)
+
+        if model["material"]["type"] is "simp":
+            vp_min = Constant(model["material"]["vp_min"])
+            vp_max = Constant(model["material"]["vp_max"])
+            penal = Constant(model["material"]["penal"])
+            control = utils.normalize_vp(model, c)
+
+            dvp.assign(penal*(vp_max-vp_min)*control**(penal - Constant(1)))
+
+        elif model["material"]["type"] is None:
+            dvp.assign(Constant(1))
 
         mgrad = g_u * g_v * dx(rule=qr_x)
 
@@ -239,7 +251,8 @@ def Leapfrog_adjoint(
             ppfor = Function(Z)  # auxiliarly function for the gradient compt.
 
             ffG = (
-                2.0
+                dvp
+                * 2
                 * c
                 * Constant(dt)
                 * (
@@ -251,7 +264,8 @@ def Leapfrog_adjoint(
             )
         else:
             ffG = (
-                2.0
+                dvp
+                * 2
                 * c
                 * Constant(dt)
                 * dot(grad(uuadj), grad(uufor))
