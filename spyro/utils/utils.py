@@ -148,13 +148,14 @@ def normalize_vp(model, vp):
 
     control = firedrake.Function(vp)
 
-    if model["material"]["type"] is "simp":
-        vp_min = model["material"]["vp_min"]
-        vp_max = model["material"]["vp_max"]
-        penal = model["material"]["penal"]
-        control.dat.data[:] -= vp_min
-        control.dat.data[:] /= (vp_max - vp_min)
-        control.dat.data[:] = control.dat.data[:] ** (1 / penal)
+    if "material" in model:
+        if model["material"]["type"] is "simp":
+            vp_min = model["material"]["vp_min"]
+            vp_max = model["material"]["vp_max"]
+            penal = model["material"]["penal"]
+            control.dat.data[:] -= vp_min
+            control.dat.data[:] /= (vp_max - vp_min)
+            control.dat.data[:] = control.dat.data[:] ** (1 / penal)
 
     return control
 
@@ -176,12 +177,13 @@ def control_to_vp(model, control):
 
     vp = firedrake.Function(control)
 
-    if model["material"]["type"] is "simp":
-        vp_min = Constant(model["material"]["vp_min"])
-        vp_max = Constant(model["material"]["vp_max"])
-        penal = Constant(model["material"]["penal"])
+    if "material" in model:
+        if model["material"]["type"] is "simp":
+            vp_min = Constant(model["material"]["vp_min"])
+            vp_max = Constant(model["material"]["vp_max"])
+            penal = Constant(model["material"]["penal"])
 
-        vp.assign(vp_min + (vp_max - vp_min) * control ** penal)
+            vp.assign(vp_min + (vp_max - vp_min) * control ** penal)
 
     return vp
 

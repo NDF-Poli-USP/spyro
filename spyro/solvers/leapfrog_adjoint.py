@@ -230,16 +230,17 @@ def Leapfrog_adjoint(
         g_v = TestFunction(V)
         dvp = Function(V)
 
-        if model["material"]["type"] is "simp":
-            vp_min = Constant(model["material"]["vp_min"])
-            vp_max = Constant(model["material"]["vp_max"])
-            penal = Constant(model["material"]["penal"])
-            control = utils.normalize_vp(model, c)
+        if "material" in model:
+            if model["material"]["type"] is "simp":
+                vp_min = Constant(model["material"]["vp_min"])
+                vp_max = Constant(model["material"]["vp_max"])
+                penal = Constant(model["material"]["penal"])
+                control = utils.normalize_vp(model, c)
 
-            dvp.assign(penal*(vp_max-vp_min)*control**(penal - Constant(1)))
+                dvp.assign(penal*(vp_max-vp_min)*control**(penal - Constant(1)))
 
-        elif model["material"]["type"] is None:
-            dvp.assign(Constant(1))
+            elif model["material"]["type"] is None:
+                dvp.assign(Constant(1))
 
         mgrad = g_u * g_v * dx(rule=qr_x)
 
