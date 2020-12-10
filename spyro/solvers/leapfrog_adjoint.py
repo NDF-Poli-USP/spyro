@@ -237,10 +237,10 @@ def Leapfrog_adjoint(
                 penal = Constant(model["material"]["penal"])
                 control = utils.normalize_vp(model, c)
 
-                dvp.assign(penal*(vp_max-vp_min)*control**(penal - Constant(1)))
+                dvp.assign(penal*(vp_max-vp_min)*control**(penal-Constant(1)))
 
-            elif model["material"]["type"] is None:
-                dvp.assign(Constant(1))
+        else:
+            dvp.assign(Constant(1))
 
         mgrad = g_u * g_v * dx(rule=qr_x)
 
