@@ -113,13 +113,14 @@ def interpolate(model, mesh, V, guess=False):
         miny = 0.0 - model["PML"]["ly"]
         maxy = model["mesh"]["Ly"] + model["PML"]["ly"]
     else:
-        minz = -model["mesh"]["Lz"]
+        pad = model["mesh"].get("pad", 0)
+        minz = -model["mesh"]["Lz"] - pad
         maxz = 0.0
-        minx = 0.0
-        maxx = model["mesh"]["Lx"]
-        miny = 0.0
-        maxy = model["mesh"]["Ly"]
-
+        minx = 0.0 - pad
+        maxx = model["mesh"]["Lx"] + pad
+        miny = 0.0 - pad
+        maxy = model["mesh"]["Ly"] + pad
+        
     W = fire.VectorFunctionSpace(m, V.ufl_element())
     coords = fire.interpolate(m.coordinates, W)
     # (z,x) or (z,x,y)
