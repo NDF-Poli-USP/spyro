@@ -1,6 +1,7 @@
 from firedrake import *
 from firedrake.petsc import PETSc
 
+import h5py
 import copy
 from mpi4py import MPI
 import numpy as np
