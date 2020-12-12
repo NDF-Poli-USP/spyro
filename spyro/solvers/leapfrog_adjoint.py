@@ -238,6 +238,8 @@ def Leapfrog_adjoint(
                 control = utils.normalize_vp(model, c)
 
                 dvp.assign(penal*(vp_max-vp_min)*control**(penal-Constant(1)))
+            else:
+                dvp.assign(Constant(1))
 
         else:
             dvp.assign(Constant(1))
