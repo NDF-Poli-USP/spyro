@@ -262,3 +262,11 @@ def load_velocity_model(params, V, source_file=None):
     vp_model.dat.data[:] = interpolant(coordinates.dat.data)
 
     return _check_units(vp_model)
+
+def _check_units(c):
+    if min(c.dat.data[:]) > 1000.0:
+        # data is in m/s but must be in km/s
+        if firedrake.COMM_WORLD.rank == 0:
+            print("INFO: converting from m/s to km/s", flush=True)
+        c.assign(c / 1000.0)  # meters to kilometers
+    return c
