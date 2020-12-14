@@ -161,17 +161,20 @@ def normalize_vp(model, vp):
     return control
 
 
-def discretize_field(c, n=4):
+def discretize_field(c, bins=None, n=4):
 
     c_ = firedrake.Function(c)
     vp = c.dat.data
     # Get histogram
-    counts, bins = np.histogram(c.dat.data, bins=n)
+    if bins is None:
+        counts, bins = np.histogram(c.dat.data, bins=n)
+    else:
+        counts, _ = np.histogram(c.dat.data, bins=n)
 
     for i, count in enumerate(counts):
-        c_.dat.data[(bins[i] <= vp) & (vp < bins[i+1])] = (bins[i]+bins[i+1])/2
+        c_.dat.data[(bins[i] <= vp)&(vp <= bins[i+1])] = (bins[i]+bins[i+1])/2
 
-    return c_
+    return c_, bins
 
 
 def control_to_vp(model, control):
@@ -263,6 +266,7 @@ def load_velocity_model(params, V, source_file=None):
     vp_model.dat.data[:] = interpolant(coordinates.dat.data)
 
     return _check_units(vp_model)
+
 
 def _check_units(c):
     if min(c.dat.data[:]) > 1000.0:
