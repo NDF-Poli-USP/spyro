@@ -2,7 +2,14 @@
 *.vtu
 *.pvd
 *.pdf
+*.PDF
+*.png
 *.pvtu
 *.dat
 *.hdf5
 *.msh
+*.segy
+*.xdmf
+*.h5
+*forward*
+*fwi*
