@@ -4,7 +4,7 @@ import numpy as np
 from firedrake import *
 from scipy.sparse import csc_matrix
 
-from .. import io
+from .. import io, utils
 from ..domains import quadrature, space
 from ..pml import damping
 from ..sources import delta_expr, delta_expr_3d
