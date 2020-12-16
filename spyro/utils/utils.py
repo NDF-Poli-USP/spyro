@@ -1,11 +1,39 @@
 import copy
 import math
 
-import numpy as np
 from firedrake import *
-from firedrake.petsc import PETSc
+
+import numpy as np
 from mpi4py import MPI
 from scipy.signal import butter, filtfilt
+from scipy.interpolate import griddata
+
+
+def write_function_to_grid(function, V, grid_spacing):
+    """Interpolate a Firedrake function to a structured grid"""
+    # get DoF coordinates
+    m = V.ufl_domain()
+    W = VectorFunctionSpace(m, V.ufl_element())
+    coords = interpolate(m.coordinates, W)
+    x, y = coords.dat.data[:, 0], coords.dat.data[:, 1]
+
+    # add buffer to avoid NaN when calling griddata
+    min_x = np.amin(x) + 0.01
+    max_x = np.amax(x) - 0.01
+    min_y = np.amin(y) + 0.01
+    max_y = np.amax(y) - 0.01
+
+    z = function.dat.data[:] * 1000.0  # convert from km/s to m/s
+
+    # target grid to interpolate to
+    xi = np.arange(min_x, max_x, grid_spacing)
+    yi = np.arange(min_y, max_y, grid_spacing)
+    xi, yi = np.meshgrid(xi, yi)
+
+    # interpolate
+    zi = griddata((x, y), z, (xi, yi), method="linear")
+
+    return xi, yi, zi
 
 
 def butter_lowpass_filter(shot, cutoff, fs, order=2):

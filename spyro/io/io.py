@@ -10,7 +10,27 @@ from scipy.interpolate import RegularGridInterpolator
 
 from .. import domains
 
-__all__ = ["is_owner", "save_shots", "load_shots", "read_mesh", "interpolate"]
+import segyio
+
+__all__ = ["is_owner", "save_shots", "load_shots", "read_mesh", "interpolate", "create_segy"]
+
+def create_segy(velocity, filename):
+    """Write the velocity data into a segy file named filename"""
+    spec = segyio.spec()
+
+    velocity = np.flipud(velocity.T)
+
+    spec.sorting = 2 # not sure what this means
+    spec.format = 1 # not sure what this means
+    spec.samples = range(velocity.shape[0])
+    spec.ilines = range(velocity.shape[1])
+    spec.xlines = range(velocity.shape[0])
+
+    assert np.sum(np.isnan(velocity[:])) == 0
+
+    with segyio.create(filename, spec) as f:
+        for tr, il in enumerate(spec.ilines):
+            f.trace[tr] = velocity[:, tr]
 
 
 def save_shots(filename, array):
