@@ -112,7 +112,14 @@ def remesh(fname, freq, mesh_iter, comm):
                 "meshes/mm_GUESS" + str(mesh_iter) + ".msh",
                 points / 1000,
                 [("triangle", cells)],
-                file_format="msh22",
+                file_format="gmsh22",
+                binary=False,
+            )
+            # for visualization
+            meshio.write_points_cells(
+                "meshes/mm_GUESS" + str(mesh_iter) + ".vtk",
+                points / 1000.0,
+                [("tetra", cells)],
             )
 
 
