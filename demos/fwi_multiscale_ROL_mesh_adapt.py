@@ -77,7 +77,7 @@ model["parallelism"] = {
     # input is a list of integers with the length of the number of shots.
 }
 
-model["inversion"] = {"freq_bands": [2.0]}
+model["inversion"] = {"freq_bands": [2.0, 4.0]}
 
 
 def remesh(fname, freq, mesh_iter, comm):
@@ -141,7 +141,7 @@ for index, freq_band in enumerate(model["inversion"]["freq_bands"]):
 
         # write a new file to be used in the re-meshing
         if comm.comm.rank == 0 and comm.ensemble_comm.rank == 0:
-            spyro.io.create_segy(vp_guess, segy_fname)
+            spyro.io.create_segy(vp_i, segy_fname)
 
         # call SeismicMesh in serial to build a new mesh of the domain based on new_segy
         remesh(segy_fname, freq_band, mesh_iter, comm)
@@ -299,7 +299,7 @@ for index, freq_band in enumerate(model["inversion"]["freq_bands"]):
         },
         "Status Test": {
             "Gradient Tolerance": 1e-16,
-            "Iteration Limit": 5,
+            "Iteration Limit": 2,
             "Step Tolerance": 1.0e-16,
         },
     }
