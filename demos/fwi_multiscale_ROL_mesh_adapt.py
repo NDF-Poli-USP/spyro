@@ -32,7 +32,7 @@ model["mesh"] = {
     "Lx": 18.0,  # width in km - always positive
     "Ly": 0.0,  # thickness in km - always positive
     "meshfile": "meshes/mm_init.msh",
-    "initmodel": "velocity_models/mm_guess.hdf5",
+    "initmodel": "velocity_models/mm_init.hdf5",
     "truemodel": "velocity_models/mm_exact.hdf5",
 }
 # Use a Perfectly Matched Layer to damp reflected waves.
@@ -52,8 +52,8 @@ model["PML"] = {
 # and record the solution at 301 receivers.
 model["acquisition"] = {
     "source_type": "Ricker",
-    "num_sources": 20,
-    "source_pos": spyro.create_receiver_transect((-0.15, 0.1), (-0.15, 16.9), 20),
+    "num_sources": 4,
+    "source_pos": spyro.create_receiver_transect((-0.15, 0.1), (-0.15, 16.9), 4),
     "frequency": 10.0,
     "delay": 1.0,
     "num_receivers": 301,
@@ -80,39 +80,40 @@ model["parallelism"] = {
 model["inversion"] = {"freq_bands": [2.0]}
 
 
-def remesh(fname, freq, mesh_iter):
+def remesh(fname, freq, mesh_iter, comm):
     """for now some hardcoded options"""
-    bbox = (-4000.0, 0.0, -500.0, 17500.0)
+    if comm.ensemble_comm.rank == 0:
+        bbox = (-4000.0, 0.0, -500.0, 17500.0)
 
-    wl = 10
+        wl = 10
 
-    # Desired minimum mesh size in domain
-    hmin = 1500.0 / (wl * freq)
+        # Desired minimum mesh size in domain
+        hmin = 1500.0 / (wl * freq)
 
-    rectangle = SeismicMesh.Rectangle(bbox)
+        rectangle = SeismicMesh.Rectangle(bbox)
 
-    # Construct mesh sizing object from velocity model
-    ef = SeismicMesh.get_sizing_function_from_segy(
-        fname,
-        bbox,
-        hmin=hmin,
-        wl=wl,
-        freq=freq,
-        dt=0.001,
-    )
+        # Construct mesh sizing object from velocity model
+        ef = SeismicMesh.get_sizing_function_from_segy(
+            fname, bbox, hmin=hmin, wl=wl, freq=freq, dt=0.001, comm=comm.comm
+        )
 
-    SeismicMesh.write_velocity_model(
-        fname, ofname="velocity_models/mm_GUESS" + str(mesh_iter) + ".hdf5"
-    )
+        SeismicMesh.write_velocity_model(
+            fname,
+            ofname="velocity_models/mm_GUESS" + str(mesh_iter) + ".hdf5",
+            comm=comm.comm,
+        )
 
-    points, cells = SeismicMesh.generate_mesh(domain=rectangle, edge_length=ef)
+        points, cells = SeismicMesh.generate_mesh(
+            domain=rectangle, edge_length=ef, comm=comm.comm
+        )
 
-    meshio.write_points_cells(
-        "meshes/mm_GUESS" + str(mesh_iter) + ".msh",
-        points / 1000,
-        [("triangle", cells)],
-        file_format="vtk",
-    )
+        if comm.comm.rank == 0:
+            meshio.write_points_cells(
+                "meshes/mm_GUESS" + str(mesh_iter) + ".msh",
+                points / 1000,
+                [("triangle", cells)],
+                file_format="msh22",
+            )
 
 
 comm = spyro.utils.mpi_init(model)
@@ -131,18 +132,19 @@ for index, freq_band in enumerate(model["inversion"]["freq_bands"]):
     # do the mesh adaptation here based on the new guess mesh
     if mesh_iter > 0:
 
+        segy_fname = "velocity_models/mm_GUESS" + str(mesh_iter) + ".segy"
+
         # interpolate vp_exact to a structured grid and write to a segy file for later meshing with SeismicMesh
         xi, yi, vp_i = spyro.utils.write_function_to_grid(
             vp_guess, V, grid_spacing=1.0 / 1000.0
         )
 
-        segy_fname = "velocity_models/mm_GUESS" + str(mesh_iter) + ".segy"
-
-        spyro.io.create_segy(vp_guess, segy_fname)
+        # write a new file to be used in the re-meshing
+        if comm.comm.rank == 0 and comm.ensemble_comm.rank == 0:
+            spyro.io.create_segy(vp_guess, segy_fname)
 
         # call SeismicMesh in serial to build a new mesh of the domain based on new_segy
-        if comm.ensemble_comm.rank == 0 and comm.comm.rank == 0:
-            remesh(segy_fname, freq_band, mesh_iter)
+        remesh(segy_fname, freq_band, mesh_iter, comm)
 
         # point to latest mesh file
         model["mesh"]["meshfile"] = "meshes/mm_GUESS" + str(mesh_iter) + ".msh"
@@ -297,7 +299,7 @@ for index, freq_band in enumerate(model["inversion"]["freq_bands"]):
         },
         "Status Test": {
             "Gradient Tolerance": 1e-16,
-            "Iteration Limit": 25,
+            "Iteration Limit": 5,
             "Step Tolerance": 1.0e-16,
         },
     }
