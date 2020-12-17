@@ -4,20 +4,20 @@
 spyro: Acoustic wave modeling in Firedrake
 ============================================
 
-spyro is a Python library for modeling acoustic waves in the subsurface. The main
+spyro is a Python library for modeling acoustic waves. The main
 functionality is a set of forward and discrete adjoint wave propagators for solving the acoustic wave equation in the time domain.
-These wave propagators can be used to form complete Full Waveform Inversion or Reverse Time Migration.
+These wave propagators can be used to form complete Full Waveform Inversion or Reverse Time Migration applications. See the demos.
 To implement these solvers, spyro uses the finite element analysis package [Firedrake](https://www.firedrakeproject.org/index.html).
 
-To use Spyro, you'll need to have some knowledge of Python and some basic concepts in inverse modeling relevant to seismology.
+To use Spyro, you'll need to have some knowledge of Python and some basic concepts in inverse modeling relevant to active-sourcce seismology.
 
 Functionality
 =============
 
-* Finite Element discretizations for wave propagators in 2D and 3D for triangular and tetrahedral meshes.
-    * Continuous Galerkin with arbitrary spatial order and higher-order mass lumping up to p = 5.
+* Finite Element discretizations for scalar wave equation in 2D and 3D using triangular and tetrahedral meshes.
+    * Continuous Galerkin with arbitrary spatial order and stable and accurate higher-order mass lumping up to p = 5.
 * Spatial and ensemble (*shot*) parallelism for source simulations.
-* Leapfrog and Strong Stability Preserving Runga-Kutta time-stepping schemes (up to 4th order accurate in time).
+* Leapfrog and Strong Stability Preserving Runga-Kutta (SSPRK) time-stepping schemes (up to 4th order accurate in time).
 * Perfectly Matched Layer to absorb reflected waves in both 2D and 3D.
 * Mesh-independent functional gradient for Leapfrog and SSPRK time-stepping methods using the discrete adjoint method.
 * Sparse interpolation and injection.
