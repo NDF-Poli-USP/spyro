@@ -119,7 +119,7 @@ def remesh(fname, freq, mesh_iter, comm):
             meshio.write_points_cells(
                 "meshes/mm_GUESS" + str(mesh_iter) + ".vtk",
                 points / 1000.0,
-                [("tetra", cells)],
+                [("triangle", cells)],
             )
 
 
