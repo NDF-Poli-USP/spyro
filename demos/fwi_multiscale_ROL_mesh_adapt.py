@@ -141,9 +141,11 @@ for index, freq_band in enumerate(model["inversion"]["freq_bands"]):
 
         # write a new file to be used in the re-meshing
         if comm.comm.rank == 0 and comm.ensemble_comm.rank == 0:
+            print("creating new velocity model...", flush=True)
             spyro.io.create_segy(vp_i, segy_fname)
 
         # call SeismicMesh in serial to build a new mesh of the domain based on new_segy
+        print("About to re-mesh the velocity model...", flush=True)
         remesh(segy_fname, freq_band, mesh_iter, comm)
 
         # point to latest mesh file
@@ -153,6 +155,7 @@ for index, freq_band in enumerate(model["inversion"]["freq_bands"]):
         model["mesh"]["initmodel"] = (
             "velocity_models/mm_GUESS" + str(mesh_iter) + ".hdf5"
         )
+        comm.ensemble_comm.barrier()
 
     # Given the new mesh, we need to reinitialize some things
     mesh, V = spyro.io.read_mesh(model, comm)
