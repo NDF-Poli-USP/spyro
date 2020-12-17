@@ -21,9 +21,9 @@ model["mesh"] = {
     "Lz": 4.0,  # depth in km - always positive
     "Lx": 18.0,  # width in km - always positive
     "Ly": 0.0,  # thickness in km - always positive
-    "meshfile": "demos/mm_exact.msh",
-    "initmodel": "demos/mm_init.hdf5",
-    "truemodel": "demos/mm_exact.hdf5",
+    "meshfile": "meshes/mm_exact.msh",
+    "initmodel": "velocity_models/mm_init.hdf5",
+    "truemodel": "velocity_models/mm_exact.hdf5",
 }
 
 
@@ -41,8 +41,8 @@ model["PML"] = {
 
 model["acquisition"] = {
     "source_type": "Ricker",
-    "num_sources": 40,
-    "source_pos": spyro.create_receiver_transect((-0.15, 0.1), (-0.15, 16.9), 40),
+    "num_sources": 4,
+    "source_pos": spyro.create_receiver_transect((-0.15, 0.1), (-0.15, 16.9), 4),
     "frequency": 10.0,
     "delay": 1.0,
     "num_receivers": 301,
@@ -63,7 +63,11 @@ model["timeaxis"] = {
 
 
 # Use one core per shot.
-model["parallelism"] = {"num_cores_per_shot": 1}
+model["parallelism"] = {
+    "type": "automatic",  # options: automatic (same number of cores for evey processor), custom, off
+    "custom_cores_per_shot": [],  # only if the user wants a different number of cores for every shot.
+    # input is a list of integers with the length of the number of shots.
+}
 
 comm = spyro.utils.mpi_init(model)
 
@@ -76,6 +80,7 @@ File("vp_exact.pvd").write(vp_exact)
 sources = spyro.Sources(model, mesh, V, comm).create()
 receivers = spyro.Receivers(model, mesh, V, comm).create()
 
+src_freq = model["acquisition"]["frequency"]
 
 for sn in range(model["acquisition"]["num_sources"]):
     if spyro.io.is_owner(comm, sn):
@@ -89,4 +94,7 @@ for sn in range(model["acquisition"]["num_sources"]):
             model, p_exact_recv, name=str(sn + 1), vmin=-1e-5, vmax=1e-5
         )
 
-        spyro.io.save_shots("shots/mm_exact" + str(sn) + ".dat", p_exact_recv)
+        spyro.io.save_shots(
+            "shots/mm_exact_" + str(src_freq) + "_Hz_source_" + str(sn) + ".dat",
+            p_exact_recv,
+        )
