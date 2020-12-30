@@ -4,7 +4,7 @@ from copy import deepcopy
 
 from firedrake import *
 
-import Spyro
+import spyro
 
 from .inputfiles.Model1_2d_CG import model
 from .inputfiles.Model1_3d_CG import model as model3D
