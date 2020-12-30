@@ -1,5 +1,10 @@
-import numpy as np
 from firedrake import *
+from FIAT.reference_element import UFCTriangle, UFCTetrahedron
+from FIAT.kong_mulder_veldhuizen import KongMulderVeldhuizen as KMV
+from FIAT.lagrange import Lagrange as CG
+from FIAT.discontinuous_lagrange import DiscontinuousLagrange as DG
+
+import numpy as np
 
 
 class Receivers:
@@ -9,7 +14,7 @@ class Receivers:
     """
 
     def __init__(self, model, mesh, V, my_ensemble):
-        """Initializes class and gets all receiver parameters from
+        """Initializes class and gets all receiver parameters from 
         input file.
 
         Parameters
@@ -38,9 +43,11 @@ class Receivers:
         self.num_receivers = model["acquisition"]["num_receivers"]
         self.receiver_locations = model["acquisition"]["receiver_locations"]
 
-        self.map1 = None
-        self.map2 = None
-        self.matrix_IJK = None
+        self.cellIDs = None
+        self.cellVertices = None
+        self.cell_tabulations = None
+        self.cellNodeMaps = None
+        self.nodes_per_cell = None
 
     @property
     def num_receivers(self):
@@ -55,8 +62,9 @@ class Receivers:
     def create(self):
         """Initialzies maps used in point interpolation"""
 
-        self.map1, self.map2 = self.__func_receiver_locator()
-        self.matrix_IJK = self.__build_local_nodes()
+        self.cellIDs, self.cellVertices, self.cellNodeMaps = self.__func_receiver_locator()
+        self.cell_tabulations  = self.__func_build_cell_tabulations()
+        #__build_local_nodes()
 
         self.num_receivers = len(self.receiver_locations)
 
@@ -111,31 +119,6 @@ class Receivers:
         else:
             raise ValueError
 
-    def __new_at(self, udat, receiver_id, is_local):
-        """Function that evaluates the receiver value given its id.
-
-        Parameters
-        ----------
-        udat: array-like
-            An array of the solution at a given timestep at all nodes
-        receiver_id: a list of integers
-            A list of receiver ids, ranging from 0 to total receivers
-            minus one.
-        is_local: a list of booleans
-            A list of integers. Positive if the receiver is local to
-            the subdomain and negative otherwise.
-
-        Returns
-        -------
-        at: function value at receiver locations
-        """
-        if self.dimension == 2:
-            return self.__new_at_2D(udat, receiver_id, is_local)
-        elif self.dimension == 3:
-            return self.__new_at_3D(udat, receiver_id, is_local)
-        else:
-            raise ValueError
-
     def __func_node_locations(self):
         """Function that returns a list which includes a numpy matrix
         where line n has the x and y values of the nth degree of freedom,
@@ -164,29 +147,31 @@ class Receivers:
         cell_node_map = fdrake_cell_node_map.values_with_halo
         (num_cells, nodes_per_cell) = cell_node_map.shape
         node_locations = self.__func_node_locations()
+        self.nodes_per_cell = nodes_per_cell
 
-        receiver_maps_to_position = []
-        receiver_maps_to_dof = np.zeros((num_recv, nodes_per_cell))
+        cellId_maps  = np.zeros((num_recv, 1))
+        cellNodeMaps = np.zeros((num_recv, nodes_per_cell))
+        cellVertices = []
 
         for receiver_id in range(num_recv):
             (receiver_z, receiver_x) = self.receiver_locations[receiver_id]
-            receiver_maps_to_position.append([])
 
             cell_id = self.mesh.locate_cell([receiver_z, receiver_x], tolerance=0.0100)
+            cellId_maps[receiver_id] = cell_id
+            cellNodeMaps[receiver_id, :] = cell_node_map[cell_id, :]
+
+            cellVertices.append([])
 
             if cell_id is not None:
-                receiver_maps_to_position[receiver_id].append([])
-                receiver_maps_to_position[receiver_id][0] = (receiver_z, receiver_x)
-                for cont in range(nodes_per_cell):
-                    z = node_locations[cell_node_map[cell_id, cont], 0]
-                    x = node_locations[cell_node_map[cell_id, cont], 1]
-                    receiver_maps_to_position[receiver_id].append((z, x))
-                    receiver_maps_to_dof[receiver_id, cont] = cell_node_map[
-                        cell_id, cont
-                    ]
-        return receiver_maps_to_position, receiver_maps_to_dof
+                for vertex_number in range(0,3):
+                    cellVertices[receiver_id].append([])
+                    z = node_locations[cell_node_map[cell_id, vertex_number], 0]
+                    x = node_locations[cell_node_map[cell_id, vertex_number], 1]
+                    cellVertices[receiver_id][vertex_number] = (z, x)
+                    
+        return cellId_maps, cellVertices, cellNodeMaps
 
-    def __new_at_2D(self, udat, receiver_id, is_local):
+    def __new_at(self, udat, receiver_id, is_local):
         """Function that evaluates the receiver value given its id.
         For 2D simplices only.
 
@@ -208,44 +193,19 @@ class Receivers:
         """
 
         if is_local is not None:
-            # Getting triangle/tetrahedron vertices and receiver point
-            p = self.map1[receiver_id][0]
-            v2 = self.map1[receiver_id][1]
-            v1 = self.map1[receiver_id][2]
-            v0 = self.map1[receiver_id][3]
-            areaT = triangle_area(v0, v1, v2)
-
-            u = udat[np.int_(self.map2[receiver_id, :])]
+            # Getting relevant receiver points
+            u = udat[np.int_(self.cellNodeMaps[receiver_id, :])]
         else:
             return udat[0]  # junk receiver isn't local
 
-        # Changing coordinates to L0, L1, L2 (area ratios)
-
-        L0 = triangle_area(p, v1, v2) / areaT
-        L1 = triangle_area(v0, p, v2) / areaT
-        L2 = triangle_area(v0, v1, p) / areaT
-
-        # Defining zeros for basis functions
-        degree = self.degree
-
-        zeros = []
-        for i in range(degree + 1):
-            zeros.append(i / degree)
-
-        # summing over all basis functions
+        phis = self.cell_tabulations[receiver_id, :]
         at = 0
 
-        for i in range(len(self.matrix_IJK)):
-            I = self.matrix_IJK[i, 0]
-            J = self.matrix_IJK[i, 1]
-            K = self.matrix_IJK[i, 2]
-            base1 = _lagrange_basis_1d(L0, I, I, zeros)
-            base2 = _lagrange_basis_1d(L1, J, J, zeros)
-            base3 = _lagrange_basis_1d(L2, K, K, zeros)
-            unode = u[i]
-            at += base1 * base2 * base3 * unode
+        for i in range(len(u)):
 
-        return at
+            at += phis[i]* u[i]
+
+        return float(at)
 
     def __func_node_locations_2D(self):
         """Function that returns a list which includes a numpy matrix
@@ -257,7 +217,7 @@ class Receivers:
         uz = Function(self.space).interpolate(z)
         datax = ux.dat.data_ro_with_halos[:]
         dataz = uz.dat.data_ro_with_halos[:]
-        node_locations = np.zeros((len(datax), 3))
+        node_locations = np.zeros((len(datax), 2))
         node_locations[:, 0] = dataz
         node_locations[:, 1] = datax
 
@@ -279,95 +239,30 @@ class Receivers:
         cell_node_map = fdrake_cell_node_map.values_with_halo
         (num_cells, nodes_per_cell) = cell_node_map.shape
         node_locations = self.__func_node_locations()
+        self.nodes_per_cell = nodes_per_cell
 
-        receiver_maps_to_position = []
-        receiver_maps_to_dof = np.zeros((num_recv, nodes_per_cell))
+        cellId_maps  = np.zeros((num_recv, 1))
+        cellNodeMaps = np.zeros((num_recv, nodes_per_cell))
+        cellVertices = []
 
         for receiver_id in range(num_recv):
             (receiver_z, receiver_x, receiver_y) = self.receiver_locations[receiver_id]
-            receiver_maps_to_position.append([])
 
-            cell_id = self.mesh.locate_cell(
-                [receiver_z, receiver_x, receiver_y], tolerance=0.0100
-            )
+            cell_id = self.mesh.locate_cell([receiver_z, receiver_x, receiver_y], tolerance=0.0100)
+            cellId_maps[receiver_id] = cell_id
+            cellNodeMaps[receiver_id, :] = cell_node_map[cell_id, :]
+
+            cellVertices.append([])
 
             if cell_id is not None:
-                receiver_maps_to_position[receiver_id].append([])
-                receiver_maps_to_position[receiver_id][0] = (
-                    receiver_z,
-                    receiver_x,
-                    receiver_y,
-                )
-                for cont in range(nodes_per_cell):
-                    z = node_locations[cell_node_map[cell_id, cont], 0]
-                    x = node_locations[cell_node_map[cell_id, cont], 1]
-                    y = node_locations[cell_node_map[cell_id, cont], 2]
-                    receiver_maps_to_position[receiver_id].append((z, x, y))
-                    receiver_maps_to_dof[receiver_id, cont] = cell_node_map[
-                        cell_id, cont
-                    ]
-        return receiver_maps_to_position, receiver_maps_to_dof
-
-    def __new_at_3D(self, udat, receiver_id, is_local):
-        """Function that evaluates the receiver value given its id.
-        For 3D simplices only.
-
-        Parameters
-        ----------
-
-        udat: array-like
-            An array of the solution at a given timestep at all nodes
-        receiver_id: a list of integers
-            A list of receiver ids, ranging from 0 to total receivers
-            minus one.
-        is_local: a list of booleans
-            A list of integers. Positive if the receiver is local to
-            the subdomain and negative otherwise.
-
-        Returns:
-        -------
-        at: function value at receveir location
-        """
-
-        if is_local is not None:
-            # Getting triangle vertices and receiver point
-            p = self.map1[receiver_id][0]
-            v3 = self.map1[receiver_id][1]
-            v2 = self.map1[receiver_id][3]
-            v1 = self.map1[receiver_id][2]
-            v0 = self.map1[receiver_id][4]
-            volumeT = tetrahedral_volume(v0, v1, v2, v3)
-
-            u = udat[np.int_(self.map2[receiver_id, :])]
-        else:
-            return udat[0]  # junk receiver isn't local
-
-        # Changing coordinates to L0, L1, L2 (area ratios)
-        L0 = tetrahedral_volume(p, v1, v2, v3) / volumeT
-        L1 = tetrahedral_volume(v0, p, v2, v3) / volumeT
-        L2 = tetrahedral_volume(v0, v1, p, v3) / volumeT
-        L3 = tetrahedral_volume(v0, v1, v2, p) / volumeT
-
-        # Defining zeros for basis functions
-        degree = self.degree
-        zeros = []
-        for i in range(degree + 1):
-            zeros.append(i / degree)
-
-        # summing over all basis functions
-        at = 0
-        for i in range(len(self.matrix_IJK[0])):
-            I = self.matrix_IJK[i, 0]
-            J = self.matrix_IJK[i, 1]
-            K = self.matrix_IJK[i, 2]
-            Q = self.matrix_IJK[i, 3]
-            base1 = _lagrange_basis_1d(L0, I, I, zeros)
-            base2 = _lagrange_basis_1d(L1, J, J, zeros)
-            base3 = _lagrange_basis_1d(L2, K, K, zeros)
-            base4 = _lagrange_basis_1d(L3, Q, Q, zeros)
-            unode = u[i]
-            at += base1 * base2 * base3 * base4 * unode
-        return at
+                for vertex_number in range(0,4):
+                    cellVertices[receiver_id].append([])
+                    z = node_locations[cell_node_map[cell_id, vertex_number], 0]
+                    x = node_locations[cell_node_map[cell_id, vertex_number], 1]
+                    y = node_locations[cell_node_map[cell_id, vertex_number], 2]
+                    cellVertices[receiver_id][vertex_number] = (z, x, y)
+                    
+        return cellId_maps, cellVertices, cellNodeMaps
 
     def __func_node_locations_3D(self):
         """Function that returns a list which includes a numpy matrix
@@ -387,490 +282,110 @@ class Receivers:
         node_locations[:, 2] = dataz
         return node_locations
 
-    def __build_local_nodes_2D(self):
-        """Builds local element nodes, locations and I,J,K numbering"""
-        degree = self.degree
-        if degree == 1:
-            matrix_IJK = np.array([[0, 0, 1], [0, 1, 0], [1, 0, 0]])
-        elif degree == 2:
-            matrix_IJK = np.array(
-                [[0, 0, 2], [0, 2, 0], [2, 0, 0], [1, 1, 0], [1, 0, 1], [0, 1, 1]]
-            )
-        elif degree == 3:
-            matrix_IJK = np.array(
-                [
-                    [0, 0, 3],
-                    [0, 3, 0],
-                    [3, 0, 0],
-                    [1, 2, 0],
-                    [2, 1, 0],
-                    [1, 0, 2],
-                    [2, 0, 1],
-                    [0, 1, 2],
-                    [0, 2, 1],
-                    [1, 1, 1],
-                ]
-            )
-
-        elif degree == 4:
-            matrix_IJK = np.array(
-                [
-                    [0, 0, 4],
-                    [0, 4, 0],
-                    [4, 0, 0],
-                    [1, 3, 0],
-                    [2, 2, 0],
-                    [3, 1, 0],
-                    [1, 0, 3],
-                    [2, 0, 2],
-                    [3, 0, 1],
-                    [0, 1, 3],
-                    [0, 2, 2],
-                    [0, 3, 1],
-                    [1, 1, 2],
-                    [1, 2, 1],
-                    [2, 1, 1],
-                ]
-            )
-
-        elif degree == 5:
-            matrix_IJK = np.array(
-                [
-                    [0, 0, 5],
-                    [0, 5, 0],
-                    [5, 0, 0],
-                    [1, 4, 0],
-                    [2, 3, 0],
-                    [3, 2, 0],
-                    [4, 1, 0],
-                    [1, 0, 4],
-                    [2, 0, 3],
-                    [3, 0, 2],
-                    [4, 0, 1],
-                    [0, 1, 4],
-                    [0, 2, 3],
-                    [0, 3, 2],
-                    [0, 4, 1],
-                    [1, 1, 3],
-                    [1, 2, 2],
-                    [1, 3, 1],
-                    [2, 1, 2],
-                    [2, 2, 1],
-                    [3, 1, 1],
-                ]
-            )
-
-        elif degree == 6:
-            matrix_IJK = np.array(
-                [
-                    [0, 0, 6],
-                    [0, 6, 0],
-                    [6, 0, 0],
-                    [1, 5, 0],
-                    [2, 4, 0],
-                    [3, 3, 0],
-                    [4, 2, 0],
-                    [5, 1, 0],
-                    [1, 0, 5],
-                    [2, 0, 4],
-                    [3, 0, 3],
-                    [4, 0, 2],
-                    [5, 0, 1],
-                    [0, 1, 5],
-                    [0, 2, 4],
-                    [0, 3, 3],
-                    [0, 4, 2],
-                    [0, 5, 1],
-                    [1, 1, 4],
-                    [1, 2, 3],
-                    [1, 3, 2],
-                    [1, 4, 1],
-                    [2, 1, 3],
-                    [2, 2, 2],
-                    [2, 3, 1],
-                    [3, 1, 2],
-                    [3, 2, 1],
-                    [4, 1, 1],
-                ]
-            )
-
-        elif degree > 6:
-            mesh = UnitSquareMesh(1, 1)
-            xmesh, ymesh = SpatialCoordinate(mesh)
-            V = FunctionSpace(mesh, "CG", degree)
-            u = Function(V).interpolate(xmesh)
-            x = u.dat.data[:]
-
-            u = Function(V).interpolate(ymesh)
-            y = u.dat.data[:]
-
-            # Getting vetor that shows dof of each node
-            fdrake_cell_node_map = V.cell_node_map()
-            cell_node_map = fdrake_cell_node_map.values
-            local_nodes = cell_node_map[
-                0:2
-            ]  # first 3 are vertices, then sides, then interior following a diagonal
-
-            matrix_IJK = np.zeros((len(local_nodes), 3))
-            TOL = 1e-6
-
-            cont_aux = 0
-            for node in local_nodes:
-                # Finding I
-                I = degree - (x[node] + y[node] + TOL) // (1 / degree)
-                # Finding J
-                J = (x[node] + TOL) // (1 / degree)
-                # Fingind K
-                K = (y[node] + TOL) // (1 / degree)
-
-                matrix_IJK[cont_aux, :] = [I, J, K]
-                cont_aux += 1
+    def __func_build_cell_tabulations(self):
+        if self.dimension == 2:
+            return self.__func_build_cell_tabulations_2D()
+        elif self.dimension == 3:
+            return self.__func_build_cell_tabulations_3D()
         else:
-            raise ValueError("Degree is not supported by the interpolator")
+            raise ValueError
 
-        return matrix_IJK
+    def __func_build_cell_tabulations_2D(self):
+        
+        element = choosing_element(self.space,self.degree)
 
-    def __build_local_nodes_3D(self):
-        """Builds local element nodes, locations and I,J,K numbering"""
-        degree = self.degree
-        if degree == 1:
-            matrix_IJK = np.array(
-                [
-                    [1.0, 0.0, 0.0, 0.0],
-                    [0.0, 1.0, 0.0, 0.0],
-                    [0.0, 0.0, 1.0, 0.0],
-                    [0.0, 0.0, 0.0, 1.0],
-                ]
-            )
-        elif degree == 2:
-            matrix_IJK = np.array(
-                [
-                    [2.0, 0.0, 0.0, 0.0],
-                    [0.0, 2.0, 0.0, 0.0],
-                    [0.0, 0.0, 2.0, 0.0],
-                    [0.0, 0.0, 0.0, 2.0],
-                    [0.0, 0.0, 1.0, 1.0],
-                    [0.0, 1.0, 0.0, 1.0],
-                    [0.0, 1.0, 1.0, 0.0],
-                    [1.0, 0.0, 0.0, 1.0],
-                    [1.0, 0.0, 1.0, 0.0],
-                    [1.0, 1.0, 0.0, 0.0],
-                ]
-            )
+        cell_tabulations = np.zeros((self.num_receivers, self.nodes_per_cell))
 
-        elif degree == 3:
-            matrix_IJK = np.array(
-                [
-                    [3.0, 0.0, 0.0, 0.0],
-                    [0.0, 3.0, 0.0, 0.0],
-                    [0.0, 0.0, 3.0, 0.0],
-                    [0.0, 0.0, 0.0, 3.0],
-                    [0.0, 0.0, 2.0, 1.0],
-                    [0.0, 0.0, 1.0, 2.0],
-                    [0.0, 2.0, 0.0, 1.0],
-                    [0.0, 1.0, 0.0, 2.0],
-                    [0.0, 2.0, 1.0, 0.0],
-                    [0.0, 1.0, 2.0, 0.0],
-                    [2.0, 0.0, 0.0, 1.0],
-                    [1.0, 0.0, 0.0, 2.0],
-                    [2.0, 0.0, 1.0, 0.0],
-                    [1.0, 0.0, 2.0, 0.0],
-                    [2.0, 1.0, 0.0, 0.0],
-                    [1.0, 2.0, 0.0, 0.0],
-                    [0.0, 1.0, 1.0, 1.0],
-                    [1.0, 0.0, 1.0, 1.0],
-                    [1.0, 1.0, 0.0, 1.0],
-                    [1.0, 1.0, 1.0, 0.0],
-                ]
-            )
+        for receiver_id in range(self.num_receivers):
+            # getting coordinates to change to reference element
+            p  = self.receiver_locations[receiver_id]
+            v0 = self.cellVertices[receiver_id][0]
+            v1 = self.cellVertices[receiver_id][1]
+            v2 = self.cellVertices[receiver_id][2]
 
-        elif degree == 4:
-            matrix_IJK = np.array(
-                [
-                    [4.0, 0.0, 0.0, 0.0],
-                    [0.0, 4.0, 0.0, 0.0],
-                    [0.0, 0.0, 4.0, 0.0],
-                    [0.0, 0.0, 0.0, 4.0],
-                    [0.0, 0.0, 3.0, 1.0],
-                    [0.0, 0.0, 2.0, 2.0],
-                    [0.0, 0.0, 1.0, 3.0],
-                    [0.0, 3.0, 0.0, 1.0],
-                    [0.0, 2.0, 0.0, 2.0],
-                    [0.0, 1.0, 0.0, 3.0],
-                    [0.0, 3.0, 1.0, 0.0],
-                    [0.0, 2.0, 2.0, 0.0],
-                    [0.0, 1.0, 3.0, 0.0],
-                    [3.0, 0.0, 0.0, 1.0],
-                    [2.0, 0.0, 0.0, 2.0],
-                    [1.0, 0.0, 0.0, 3.0],
-                    [3.0, 0.0, 1.0, 0.0],
-                    [2.0, 0.0, 2.0, 0.0],
-                    [1.0, 0.0, 3.0, 0.0],
-                    [3.0, 1.0, 0.0, 0.0],
-                    [2.0, 2.0, 0.0, 0.0],
-                    [1.0, 3.0, 0.0, 0.0],
-                    [0.0, 2.0, 1.0, 1.0],
-                    [0.0, 1.0, 2.0, 1.0],
-                    [0.0, 1.0, 1.0, 2.0],
-                    [2.0, 0.0, 1.0, 1.0],
-                    [1.0, 0.0, 2.0, 1.0],
-                    [1.0, 0.0, 1.0, 2.0],
-                    [2.0, 1.0, 0.0, 1.0],
-                    [1.0, 2.0, 0.0, 1.0],
-                    [1.0, 1.0, 0.0, 2.0],
-                    [2.0, 1.0, 1.0, 0.0],
-                    [1.0, 2.0, 1.0, 0.0],
-                    [1.0, 1.0, 2.0, 0.0],
-                    [1.0, 1.0, 1.0, 1.0],
-                ]
-            )
+            p_reference = change_to_reference_triangle(p, v0, v1, v2)
+            initial_tab = element.tabulate(0, [p_reference] )
+            phi_tab = initial_tab[(0,0)]
 
-        elif degree == 5:
-            matrix_IJK = np.array(
-                [
-                    [5.0, 0.0, 0.0, 0.0],
-                    [0.0, 5.0, 0.0, 0.0],
-                    [0.0, 0.0, 5.0, 0.0],
-                    [0.0, 0.0, 0.0, 5.0],
-                    [0.0, 0.0, 4.0, 1.0],
-                    [0.0, 0.0, 3.0, 2.0],
-                    [0.0, 0.0, 2.0, 3.0],
-                    [0.0, 0.0, 1.0, 4.0],
-                    [0.0, 4.0, 0.0, 1.0],
-                    [0.0, 3.0, 0.0, 2.0],
-                    [0.0, 2.0, 0.0, 3.0],
-                    [0.0, 1.0, 0.0, 4.0],
-                    [0.0, 4.0, 1.0, 0.0],
-                    [0.0, 3.0, 2.0, 0.0],
-                    [0.0, 2.0, 3.0, 0.0],
-                    [0.0, 1.0, 4.0, 0.0],
-                    [4.0, 0.0, 0.0, 1.0],
-                    [3.0, 0.0, 0.0, 2.0],
-                    [2.0, 0.0, 0.0, 3.0],
-                    [1.0, 0.0, 0.0, 4.0],
-                    [4.0, 0.0, 1.0, 0.0],
-                    [3.0, 0.0, 2.0, 0.0],
-                    [2.0, 0.0, 3.0, 0.0],
-                    [1.0, 0.0, 4.0, 0.0],
-                    [4.0, 1.0, 0.0, 0.0],
-                    [3.0, 2.0, 0.0, 0.0],
-                    [2.0, 3.0, 0.0, 0.0],
-                    [1.0, 4.0, 0.0, 0.0],
-                    [0.0, 3.0, 1.0, 1.0],
-                    [0.0, 2.0, 2.0, 1.0],
-                    [0.0, 1.0, 3.0, 1.0],
-                    [0.0, 2.0, 1.0, 2.0],
-                    [0.0, 1.0, 2.0, 2.0],
-                    [0.0, 1.0, 1.0, 3.0],
-                    [3.0, 0.0, 1.0, 1.0],
-                    [2.0, 0.0, 2.0, 1.0],
-                    [1.0, 0.0, 3.0, 1.0],
-                    [2.0, 0.0, 1.0, 2.0],
-                    [1.0, 0.0, 2.0, 2.0],
-                    [1.0, 0.0, 1.0, 3.0],
-                    [3.0, 1.0, 0.0, 1.0],
-                    [2.0, 2.0, 0.0, 1.0],
-                    [1.0, 3.0, 0.0, 1.0],
-                    [2.0, 1.0, 0.0, 2.0],
-                    [1.0, 2.0, 0.0, 2.0],
-                    [1.0, 1.0, 0.0, 3.0],
-                    [3.0, 1.0, 1.0, 0.0],
-                    [2.0, 2.0, 1.0, 0.0],
-                    [1.0, 3.0, 1.0, 0.0],
-                    [2.0, 1.0, 2.0, 0.0],
-                    [1.0, 2.0, 2.0, 0.0],
-                    [1.0, 1.0, 3.0, 0.0],
-                    [2.0, 1.0, 1.0, 1.0],
-                    [1.0, 2.0, 1.0, 1.0],
-                    [1.0, 1.0, 2.0, 1.0],
-                    [1.0, 1.0, 1.0, 2.0],
-                ]
-            )
+            cell_tabulations[receiver_id, :] = phi_tab.transpose()
+        
+        return cell_tabulations
 
-        elif degree == 6:
-            matrix_IJK = np.array(
-                [
-                    [6.0, 0.0, 0.0, 0.0],
-                    [0.0, 6.0, 0.0, 0.0],
-                    [0.0, 0.0, 6.0, 0.0],
-                    [0.0, 0.0, 0.0, 6.0],
-                    [0.0, 0.0, 5.0, 1.0],
-                    [0.0, 0.0, 4.0, 2.0],
-                    [0.0, 0.0, 3.0, 3.0],
-                    [0.0, 0.0, 2.0, 4.0],
-                    [0.0, 0.0, 1.0, 5.0],
-                    [0.0, 5.0, 0.0, 1.0],
-                    [0.0, 4.0, 0.0, 2.0],
-                    [0.0, 3.0, 0.0, 3.0],
-                    [0.0, 2.0, 0.0, 4.0],
-                    [0.0, 1.0, 0.0, 5.0],
-                    [0.0, 5.0, 1.0, 0.0],
-                    [0.0, 4.0, 2.0, 0.0],
-                    [0.0, 3.0, 3.0, 0.0],
-                    [0.0, 2.0, 4.0, 0.0],
-                    [0.0, 1.0, 5.0, 0.0],
-                    [5.0, 0.0, 0.0, 1.0],
-                    [4.0, 0.0, 0.0, 2.0],
-                    [3.0, 0.0, 0.0, 3.0],
-                    [2.0, 0.0, 0.0, 4.0],
-                    [1.0, 0.0, 0.0, 5.0],
-                    [5.0, 0.0, 1.0, 0.0],
-                    [4.0, 0.0, 2.0, 0.0],
-                    [3.0, 0.0, 3.0, 0.0],
-                    [2.0, 0.0, 4.0, 0.0],
-                    [1.0, 0.0, 5.0, 0.0],
-                    [5.0, 1.0, 0.0, 0.0],
-                    [4.0, 2.0, 0.0, 0.0],
-                    [3.0, 3.0, 0.0, 0.0],
-                    [2.0, 4.0, 0.0, 0.0],
-                    [1.0, 5.0, 0.0, 0.0],
-                    [0.0, 4.0, 1.0, 1.0],
-                    [0.0, 3.0, 2.0, 1.0],
-                    [0.0, 2.0, 3.0, 1.0],
-                    [0.0, 1.0, 4.0, 1.0],
-                    [0.0, 3.0, 1.0, 2.0],
-                    [0.0, 2.0, 2.0, 2.0],
-                    [0.0, 1.0, 3.0, 2.0],
-                    [0.0, 2.0, 1.0, 3.0],
-                    [0.0, 1.0, 2.0, 3.0],
-                    [0.0, 1.0, 1.0, 4.0],
-                    [4.0, 0.0, 1.0, 1.0],
-                    [3.0, 0.0, 2.0, 1.0],
-                    [2.0, 0.0, 3.0, 1.0],
-                    [1.0, 0.0, 4.0, 1.0],
-                    [3.0, 0.0, 1.0, 2.0],
-                    [2.0, 0.0, 2.0, 2.0],
-                    [1.0, 0.0, 3.0, 2.0],
-                    [2.0, 0.0, 1.0, 3.0],
-                    [1.0, 0.0, 2.0, 3.0],
-                    [1.0, 0.0, 1.0, 4.0],
-                    [4.0, 1.0, 0.0, 1.0],
-                    [3.0, 2.0, 0.0, 1.0],
-                    [2.0, 3.0, 0.0, 1.0],
-                    [1.0, 4.0, 0.0, 1.0],
-                    [3.0, 1.0, 0.0, 2.0],
-                    [2.0, 2.0, 0.0, 2.0],
-                    [1.0, 3.0, 0.0, 2.0],
-                    [2.0, 1.0, 0.0, 3.0],
-                    [1.0, 2.0, 0.0, 3.0],
-                    [1.0, 1.0, 0.0, 4.0],
-                    [4.0, 1.0, 1.0, 0.0],
-                    [3.0, 2.0, 1.0, 0.0],
-                    [2.0, 3.0, 1.0, 0.0],
-                    [1.0, 4.0, 1.0, 0.0],
-                    [3.0, 1.0, 2.0, 0.0],
-                    [2.0, 2.0, 2.0, 0.0],
-                    [1.0, 3.0, 2.0, 0.0],
-                    [2.0, 1.0, 3.0, 0.0],
-                    [1.0, 2.0, 3.0, 0.0],
-                    [1.0, 1.0, 4.0, 0.0],
-                    [3.0, 1.0, 1.0, 1.0],
-                    [2.0, 2.0, 1.0, 1.0],
-                    [1.0, 3.0, 1.0, 1.0],
-                    [2.0, 1.0, 2.0, 1.0],
-                    [1.0, 2.0, 2.0, 1.0],
-                    [1.0, 1.0, 3.0, 1.0],
-                    [2.0, 1.0, 1.0, 2.0],
-                    [1.0, 2.0, 1.0, 2.0],
-                    [1.0, 1.0, 2.0, 2.0],
-                    [1.0, 1.0, 1.0, 3.0],
-                ]
-            )
+    def __func_build_cell_tabulations_3D(self):
+        element = choosing_element(self.space,self.degree)
 
-        elif degree > 6:
-            mesh = UnitTetrahedronMesh()
-            xmesh, ymesh, zmesh = SpatialCoordinate(mesh)
-            V = FunctionSpace(mesh, "CG", degree)
-            u = Function(V).interpolate(xmesh)
-            x = u.dat.data[:]
+        cell_tabulations = np.zeros((self.num_receivers, self.nodes_per_cell))
 
-            u = Function(V).interpolate(ymesh)
-            y = u.dat.data[:]
+        for receiver_id in range(self.num_receivers):
+            # getting coordinates to change to reference element
+            p  = self.receiver_locations[receiver_id]
+            v0 = self.cellVertices[receiver_id][0]
+            v1 = self.cellVertices[receiver_id][1]
+            v2 = self.cellVertices[receiver_id][2]
+            v3 = self.cellVertices[receiver_id][3]
 
-            u = Function(V).interpolate(zmesh)
-            z = u.dat.data[:]
+            p_reference = change_to_reference_tetrahedron(p, v0, v1, v2, v3)
+            initial_tab = element.tabulate(0, [p_reference] )
+            phi_tab = initial_tab[(0,0,0)]
 
-            # Getting vetor that shows dof of each node
-            fdrake_cell_node_map = V.cell_node_map()
-            cell_node_map = fdrake_cell_node_map.values
-            local_nodes = cell_node_map[
-                0, :
-            ]  # first 3 are vertices, then sides, then interior following a diagonal
-
-            matrix_IJK = np.zeros((len(local_nodes), 4))
-            TOL = 1e-6
-
-            cont_aux = 0
-            for node in local_nodes:
-                # Finding I
-                I = degree - (x[node] + y[node] + z[node] + TOL) // (1 / degree)
-                # Finding J
-                J = (x[node] + TOL) // (1 / degree)
-                # Fingind K
-                K = (y[node] + TOL) // (1 / degree)
-                # Finding Q
-                Q = (z[node] + TOL) // (1 / degree)
-
-                matrix_IJK[cont_aux, :] = [I, J, K, Q]
-                cont_aux += 1
-        else:
-            raise ValueError("degree is not supported by the interpolator")
-
-        return matrix_IJK
+            cell_tabulations[receiver_id, :] = phi_tab.transpose()
+        
+        return cell_tabulations
+        
 
 
-# End of class, some helper functions
+## Some helper functions
 
+def choosing_element(V, degree):
+    cell_geometry = V.mesh().ufl_cell()
+    if cell_geometry == quadrilateral:
+        T = UFCQuadrilateral()
+        raise ValueError("Point interpolation not yet implemented for quads")
 
-def _lagrange_basis_1d(x, p, P, zeros):
-    """Builds a simple Lagrange basis function
+    elif cell_geometry == triangle:
+        T = UFCTriangle()
 
-    Parameters
-    x: location to evaluate basis function
-    p: current degree
-    P: Overall degree of function space
-    zeros: zeros to be used in this basis
-        function (equispaced, GLL, or etc.)
-    """
-    p = int(p)
-    P = int(P)
-    value = 1
-    for q in range(P + 1):
-        if q != p:
-            value *= (x - zeros[q]) / (zeros[p] - zeros[q])
-    return value
+    elif cell_geometry == tetrahedron:
+        T = UFCTetrahedron()
 
+    else:
+        raise ValueError("Unrecognized cell geometry.")
 
-def triangle_area(p1, p2, p3):
-    """Calculate the area of a triangle.
+    if V.ufl_element().family()  == 'Kong-Mulder-Veldhuizen': 
+        element = KMV(T, degree)
+    elif V.ufl_element().family() == 'Lagrange':
+        element = CG(T,degree)
+    elif V.ufl_element().family() == 'Discontinuous Lagrange':
+        element = DG(T, degree)
+    else:
+        raise ValueError("Function space not yet supported.")
 
-    Parameters
-    ----------
+    return element
 
-    p1: 1st vertex of the triangle
-    p2: 2nd vertex of the triangle
-    p3: 3rd vertex of the triangle
+def change_to_reference_triangle(p, a, b, c):
+    (xa, ya) = a
+    (xb, yb) = b
+    (xc, yc) = c
+    (px, py) = p
 
-    Returns
-    -------
-    Triangle area
-    """
-    (x1, y1) = p1
-    (x2, y2) = p2
-    (x3, y3) = p3
-    return abs(x1 * (y2 - y3) + x2 * (y3 - y1) + x3 * (y1 - y2)) / 2
+    xna = 0.0
+    yna = 0.0
+    xnb = 1.0
+    ynb = 0.0
+    xnc = 0.0
+    ync = 1.0
 
+    div = (xa*yb - xb*ya - xa*yc + xc*ya + xb*yc - xc*yb)
+    a11 = -(xnb*ya - xnc*ya - xna*yb + xnc*yb + xna*yc - xnb*yc)/div
+    a12 =  (xa*xnb - xa*xnc - xb*xna + xb*xnc + xc*xna - xc*xnb)/div
+    a13 =  (xa*xnc*yb - xb*xnc*ya - xa*xnb*yc + xc*xnb*ya + xb*xna*yc - xc*xna*yb)/div
+    a21 = -(ya*ynb - ya*ync - yb*yna + yb*ync + yc*yna - yc*ynb)/div
+    a22 =  (xa*ynb - xa*ync - xb*yna + xb*ync + xc*yna - xc*ynb)/div
+    a23 = (xa*yb*ync - xb*ya*ync - xa*yc*ynb + xc*ya*ynb + xb*yc*yna - xc*yb*yna)/div
 
-def tetrahedral_volume(p1, p2, p3, p4):
-    """Calculate the volume of a tetrahedral."""
-    (x1, y1, z1) = p1
-    (x2, y2, z2) = p2
-    (x3, y3, z3) = p3
-    (x4, y4, z4) = p4
+    pnx = px*a11 + py*a12 + a13
+    pny = px*a21 + py*a22 + a23
 
-    A = np.array([x1, y1, z1])
-    B = np.array([x2, y2, z2])
-    C = np.array([x3, y3, z3])
-    D = np.array([x4, y4, z4])
+    return (pnx, pny)
 
-    return abs(1.0 / 6.0 * (np.dot(B - A, np.cross(C - A, D - A))))
+def change_to_reference_tetrahedron(p, a, b, c, d):
