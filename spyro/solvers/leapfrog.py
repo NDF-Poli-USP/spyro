@@ -6,9 +6,11 @@ from ..pml import damping
 from ..sources import FullRickerWavelet
 from . import helpers
 
+#from memory_profiler import profile
+
 set_log_level(ERROR)
 
-
+#@profile
 def Leapfrog(
     model, mesh, comm, c, excitations, receivers, source_num=0, lp_freq_index=0
 ):
@@ -78,16 +80,17 @@ def Leapfrog(
     nt = int(tf / dt)  # number of timesteps
     dstep = int(delay / dt)  # number of timesteps with source
 
-    if method == "KMV":
+    if method == "KMV" or method == "Lagrange":
         params = {"ksp_type": "preonly", "pc_type": "jacobi"}
     elif method == "CG":
         params = {"ksp_type": "cg", "pc_type": "jacobi"}
     else:
+        print (f"method: {method}")
         raise ValueError("method is not yet supported")
 
-    element = space.FE_method(mesh, method, degree)
+    V = c.function_space()
 
-    V = FunctionSpace(mesh, element)
+    element = V.ufl_element()
 
     qr_x, qr_s, _ = quadrature.quadrature_rules(V)
 

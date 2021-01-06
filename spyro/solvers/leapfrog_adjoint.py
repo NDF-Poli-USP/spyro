@@ -46,16 +46,16 @@ def Leapfrog_adjoint(
             y2 = Ly
             b_pml = ly
 
-    if method == "KMV":
+    if method == "KMV" or method == "Lagrange":
         params = {"ksp_type": "preonly", "pc_type": "jacobi"}
     elif method == "CG":
         params = {"ksp_type": "cg", "pc_type": "jacobi"}
     else:
         raise ValueError("method is not yet supported")
 
-    element = space.FE_method(mesh, method, degree)
+    V = c.function_space()
 
-    V = FunctionSpace(mesh, element)
+    element = V.ufl_element()
 
     qr_x, qr_s, _ = quadrature.quadrature_rules(V)
 
@@ -281,7 +281,7 @@ def Leapfrog_adjoint(
 
         gradi = Function(V)
         grad_prob = LinearVariationalProblem(lhsG, rhsG, gradi)
-        if method == "KMV":
+        if method == "KMV" or method == "Lagrange":
             grad_solv = LinearVariationalSolver(
                 grad_prob,
                 solver_parameters={
