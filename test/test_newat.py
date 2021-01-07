@@ -21,10 +21,10 @@ def triangle_area(p1, p2, p3):
 
 def test_correct_receiver_location_generation2D():
     """Tests if receiver locations where generated correctly"""
-    comm = Spyro.utils.mpi_init(model)
-    mesh, V = Spyro.io.read_mesh(model, comm)
+    comm = spyro.utils.mpi_init(model)
+    mesh, V = spyro.io.read_mesh(model, comm)
 
-    receivers = Spyro.create_receiver_transect((-0.1, 0.3), (-0.1, 0.9), 3)
+    receivers = spyro.create_receiver_transect((-0.1, 0.3), (-0.1, 0.9), 3)
     answer = np.array([[-0.1, 0.3], [-0.1, 0.6], [-0.1, 0.9]])
 
     assert np.allclose(receivers, answer)
@@ -32,15 +32,15 @@ def test_correct_receiver_location_generation2D():
 
 def test_correct_receiver_to_cell_location2D():
     """Tests if the receivers where located in the correct cell"""
-    comm = Spyro.utils.mpi_init(model)
+    comm = spyro.utils.mpi_init(model)
     model["opts"]["degree"] = 3
-    mesh, V = Spyro.io.read_mesh(model, comm)
+    mesh, V = spyro.io.read_mesh(model, comm)
 
     model["acquisition"]["num_receivers"] = 3
-    recvs = Spyro.create_receiver_transect((-0.1, 0.3), (-0.1, 0.9), 3)
+    recvs = spyro.create_receiver_transect((-0.1, 0.3), (-0.1, 0.9), 3)
     recvs = model["acquisition"]["receiver_locations"] = recvs
 
-    receivers = Spyro.Receivers(model, mesh, V, comm).create()
+    receivers = spyro.Receivers(model, mesh, V, comm).create()
 
     # test 1
     cell_vertex1 = receivers.cellVertices[0][0]
@@ -91,21 +91,21 @@ def test_correct_receiver_to_cell_location2D():
 
 
 def test_correct_at_value2D():
-    comm = Spyro.utils.mpi_init(model)
+    comm = spyro.utils.mpi_init(model)
     model["opts"]["degree"] = 3
-    mesh, V = Spyro.io.read_mesh(model, comm)
+    mesh, V = spyro.io.read_mesh(model, comm)
     pz = -0.1
     px = 0.3
-    recvs = Spyro.create_receiver_transect(
+    recvs = spyro.create_receiver_transect(
         (pz, px), (pz, px), 3
     )
-    #recvs = Spyro.create_receiver_transect(
+    #recvs = spyro.create_receiver_transect(
     #    (-0.00935421,  3.25160664), (-0.00935421,  3.25160664), 3
     #)
     model["acquisition"]["receiver_locations"] = recvs
     model["acquisition"]["num_receivers"] = 3
 
-    receivers = Spyro.Receivers(model, mesh, V, comm).create()
+    receivers = spyro.Receivers(model, mesh, V, comm).create()
     V = receivers.space
     z, x = SpatialCoordinate(mesh)
 
@@ -144,12 +144,12 @@ def test_correct_receiver_location_generation3D():
     """Tests if receiver locations where generated correctly"""
 
     test_model = deepcopy(model3D)
-    comm = Spyro.utils.mpi_init(test_model)
-    mesh, V = Spyro.io.read_mesh(test_model, comm)
+    comm = spyro.utils.mpi_init(test_model)
+    mesh, V = spyro.io.read_mesh(test_model, comm)
     test_model["acquisition"]["num_receivers"] = 3
-    receivers = Spyro.create_receiver_transect((-0.05, 0.3, 0.5), (-0.05, 0.9, 0.5), 3)
+    receivers = spyro.create_receiver_transect((-0.05, 0.3, 0.5), (-0.05, 0.9, 0.5), 3)
     test_model["acquisition"]["receiver_locations"] = receivers
-    receivers = Spyro.Receivers(test_model, mesh, V, comm).create()
+    receivers = spyro.Receivers(test_model, mesh, V, comm).create()
     answer = np.array([[-0.05, 0.3, 0.5], [-0.05, 0.6, 0.5], [-0.05, 0.9, 0.5]])
 
     assert np.allclose(receivers.receiver_locations, answer)
@@ -159,12 +159,12 @@ def test_correct_receiver_to_cell_location3D():
     """Tests if the receivers where located in the correct cell"""
 
     test_model1 = deepcopy(model3D)
-    comm = Spyro.utils.mpi_init(test_model1)
-    mesh, V = Spyro.io.read_mesh(test_model1, comm)
-    rec = Spyro.create_receiver_transect((-0.05, 0.1, 0.5), (-0.05, 0.9, 0.5), 3)
+    comm = spyro.utils.mpi_init(test_model1)
+    mesh, V = spyro.io.read_mesh(test_model1, comm)
+    rec = spyro.create_receiver_transect((-0.05, 0.1, 0.5), (-0.05, 0.9, 0.5), 3)
     test_model1["acquisition"]["receiver_locations"] = rec
     test_model1["acquisition"]["num_receivers"] = 3
-    receivers = Spyro.Receivers(test_model1, mesh, V, comm).create()
+    receivers = spyro.Receivers(test_model1, mesh, V, comm).create()
 
     # test 1
     cell_vertex1 = receivers.cellVertices[0][0]
@@ -233,8 +233,8 @@ def test_correct_at_value3D():
     test_model2 = deepcopy(model3D)
     test_model2["acquisition"]["num_receivers"] = 3
     test_model2["opts"]["degree"] = 3
-    comm = Spyro.utils.mpi_init(test_model2)
-    mesh, V = Spyro.io.read_mesh(test_model2, comm)
+    comm = spyro.utils.mpi_init(test_model2)
+    mesh, V = spyro.io.read_mesh(test_model2, comm)
     x_start = 0.09153949331982138
     x_end = 0.09153949331982138
     z_start = 0.0
@@ -244,11 +244,11 @@ def test_correct_at_value3D():
 
     x_real, y_real, z_real = x_start, y_start, z_start
 
-    recvs = Spyro.create_receiver_transect(
+    recvs = spyro.create_receiver_transect(
         (z_start, x_start, y_start), (z_end, x_end, y_end), 3
     )
     test_model2["acquisition"]["receiver_locations"] = recvs
-    receivers = Spyro.Receivers(test_model2, mesh, V, comm).create()
+    receivers = spyro.Receivers(test_model2, mesh, V, comm).create()
     V = receivers.space
     z, x, y = SpatialCoordinate(mesh)
 
