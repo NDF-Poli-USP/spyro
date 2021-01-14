@@ -99,7 +99,7 @@ def remesh(fname, freq, mesh_iter, comm):
 
         SeismicMesh.write_velocity_model(
             fname,
-            ofname="velocity_models/mm_GUESS" + str(mesh_iter) + ".hdf5",
+            ofname="velocity_models/mm_GUESS" + str(mesh_iter),
             comm=comm.comm,
         )
 
@@ -143,7 +143,7 @@ for index, freq_band in enumerate(model["inversion"]["freq_bands"]):
 
         # interpolate vp_exact to a structured grid and write to a segy file for later meshing with SeismicMesh
         xi, yi, vp_i = spyro.utils.write_function_to_grid(
-            vp_guess, V, grid_spacing=1.0 / 1000.0
+            vp_guess, V, grid_spacing=10.0 / 1000.0
         )
 
         # write a new file to be used in the re-meshing
