@@ -158,9 +158,14 @@ receivers = spyro.Receivers(model, mesh, V, comm).create()
 # And now we simulate the shot using a Leapfrog time-stepping scheme
 # Other time-stepping options are available (see the documentation).
 # Note: simulation results are stored in the folder `results/`
-p_field, p_at_recv = spyro.solvers.Leapfrog(
+
+# First we build the solver object for a particular source
+solver = spyro.solvers.Leapfrog(
     model, mesh, comm, vp, sources, receivers, source_num=0
 )
+
+# ...and then we timestep with it
+p_field, p_at_recv = solver.timestep()
 
 # Visualize the shot record
 spyro.plots.plot_shotrecords(model, p_at_recv, "example_shot", vmin=-1e-5, vmax=1e-5)
