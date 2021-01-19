@@ -54,6 +54,7 @@ class Leapfrog:
         if "amplitude" in model["acquisition"]:
             self.amp = model["acquisition"]["amplitude"]
         self.freq = model["acquisition"]["frequency"]
+        self.lp_freq_index = lp_freq_index
         if "inversion" in model:
             self.freq_bands = model["inversion"]["freq_bands"]
         self.dt = model["timeaxis"]["dt"]
@@ -79,7 +80,7 @@ class Leapfrog:
 
         self.V = FunctionSpace(self.mesh, element)
 
-        cutoff = freq_bands[lp_freq_index] if "inversion" in model else None
+        cutoff = self.freq_bands[lp_freq_index] if "inversion" in model else None
         RW = FullRickerWavelet(self.dt, self.tf, self.freq, amp=self.amp, cutoff=cutoff)
 
         self.ricker = Constant(0)
@@ -184,7 +185,9 @@ class Leapfrog:
             self.mesh, sd, self.receivers.receiver_locations
         )
 
-        cutoff = self.freq_bands[lp_freq_index] if "inversion" in self.model else None
+        cutoff = (
+            self.freq_bands[self.lp_freq_index] if "inversion" in self.model else None
+        )
         self.RW = FullRickerWavelet(
             self.dt, self.tf, self.freq, amp=self.amp, cutoff=cutoff
         )
@@ -252,8 +255,8 @@ class Leapfrog:
 
                 FF += mm1 + uuu1
         else:
-            X = Function(V)
-            B = Function(V)
+            X = Function(self.V)
+            B = Function(self.V)
 
         lhs_ = lhs(FF)
         rhs_ = rhs(FF)
@@ -303,7 +306,7 @@ class Leapfrog:
                 self.pp_nm1.assign(self.pp_n)
                 self.pp_n.assign(self.pp_np1)
             else:
-                self.u_np1.assign(X)
+                self.u_np1.assign(self.X)
 
             self.u_nm1.assign(self.u_n)
             self.u_n.assign(self.u_np1)
