@@ -58,7 +58,7 @@ model["timeaxis"] = {
     "tf": 3.0,  # Final time for event
     "dt": 0.001,  # timestep size
     "nspool": 200,  # how frequently to output solution to pvds
-    "fspool": 1,  # how frequently to save solution to RAM
+    "fspool": 200,  # how frequently to save solution to RAM
 }  # how freq. to output to files and screen
 
 
@@ -85,9 +85,10 @@ src_freq = model["acquisition"]["frequency"]
 for sn in range(model["acquisition"]["num_sources"]):
     if spyro.io.is_owner(comm, sn):
         t1 = time.time()
-        p_field, p_exact_recv = spyro.solvers.Leapfrog(
+        solver = spyro.solvers.Leapfrog(
             model, mesh, comm, vp_exact, sources, receivers, source_num=sn
         )
+        p_field, p_exact_recv = solver.timestep()
         print(time.time() - t1)
 
         spyro.plots.plot_shotrecords(

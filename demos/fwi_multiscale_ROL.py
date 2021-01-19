@@ -49,8 +49,8 @@ model["PML"] = {
 # and record the solution at 301 receivers.
 model["acquisition"] = {
     "source_type": "Ricker",
-    "num_sources": 20,
-    "source_pos": spyro.create_receiver_transect((-0.15, 0.1), (-0.15, 16.9), 20),
+    "num_sources": 4,
+    "source_pos": spyro.create_receiver_transect((-0.15, 0.1), (-0.15, 16.9), 4),
     "frequency": 10.0,
     "delay": 1.0,
     "num_receivers": 301,
@@ -63,9 +63,9 @@ model["acquisition"] = {
 model["timeaxis"] = {
     "t0": 0.0,  #  Initial time for event
     "tf": 3.0,  # Final time for event
-    "dt": 0.0005,  # timestep size
+    "dt": 0.001,  # timestep size
     "nspool": 200,  # how frequently to output solution to pvds
-    "fspool": 10,  # how frequently to save solution to RAM
+    "fspool": 25,  # how frequently to save solution to RAM
 }
 # Use one core per shot.
 model["parallelism"] = {
@@ -135,12 +135,14 @@ for index, freq_band in enumerate(model["inversion"]["freq_bands"]):
             self.J_local = np.zeros((1))
             self.J_total = np.zeros((1))
 
-        def value(self, x, tol):
-            """Compute the functional"""
+            self.dJ_local = Function(V, name="grad_local")
+            self.dJ_total = Function(V, name="grad_total")
+
+            # ASSUMPTION: ONE SOURCE FOR ONE CORE
             for sn in range(model["acquisition"]["num_sources"]):
                 if spyro.io.is_owner(comm, sn):
-                    # run a simulation low-pass filtering the source
-                    self.p_guess, p_guess_recv = spyro.solvers.Leapfrog(
+                    # build forward solver
+                    self.solver = spyro.solvers.Leapfrog(
                         model,
                         mesh,
                         comm,
@@ -150,13 +152,32 @@ for index, freq_band in enumerate(model["inversion"]["freq_bands"]):
                         source_num=sn,
                         lp_freq_index=index,
                     )
+                    # build gradient solver
+                    self.grad_solver = spyro.solvers.LeapfrogAdjoint(
+                        model,
+                        mesh,
+                        comm,
+                        self.vp_guess,
+                        self.p_guess,
+                        self.misfit,
+                    )
+
+        def value(self, x, tol):
+            """Compute the functional"""
+            for sn in range(model["acquisition"]["num_sources"]):
+                if spyro.io.is_owner(comm, sn):
+
+                    self.p_guess, p_guess_recv = self.solver.timestep()
+
                     p_exact_recv = spyro.io.load_shots(
                         "shots/mm_exact_" + str(10.0) + "_Hz_source_" + str(sn) + ".dat"
                     )
+
                     # low-pass filter the shot record for the current frequency band.
                     p_exact_recv = spyro.utils.butter_lowpass_filter(
                         p_exact_recv, freq_band, 1.0 / model["timeaxis"]["dt"]
                     )
+
                     # Calculate the misfit.
                     self.misfit = spyro.utils.evaluate_misfit(
                         model, comm, p_guess_recv, p_exact_recv
@@ -174,28 +195,26 @@ for index, freq_band in enumerate(model["inversion"]["freq_bands"]):
             # Check if the program has converged (and exit if so).
             # reset the functional and gradient to zero
             self.J_local[0] = np.zeros((1))
-            self.dJ_local = Function(V, name="grad_local")
-            self.dJ_total = Function(V, name="grad_total")
+            self.dJ_local.assign(0.0)
+            self.dJ_total.assign(0.0)
+
             # solve the forward problem
             for sn in range(model["acquisition"]["num_sources"]):
                 if spyro.io.is_owner(comm, sn):
+
                     p_exact_recv = spyro.io.load_shots(
                         "shots/mm_exact_" + str(10.0) + "_Hz_source_" + str(sn) + ".dat"
                     )
+
                     # low-pass filter the shot record for the current frequency band.
                     p_exact_recv = spyro.utils.butter_lowpass_filter(
                         p_exact_recv, freq_band, 1.0 / model["timeaxis"]["dt"]
                     )
+
                     # Calculate the gradient of the functional.
-                    dJ = spyro.solvers.Leapfrog_adjoint(
-                        model,
-                        mesh,
-                        comm,
-                        self.vp_guess,
-                        self.p_guess,
-                        self.misfit,
-                        source_num=sn,
-                    )
+                    dJ = self.grad_solver.timestep()
+
+                    # sum it up
                     self.dJ_local.dat.data[:] += dJ.dat.data[:]
 
             # sum over all ensemble members
@@ -204,7 +223,7 @@ for index, freq_band in enumerate(model["inversion"]["freq_bands"]):
             )
 
             # mask the water layer
-            self.dJ_total.dat.data[water]=0.0
+            self.dJ_total.dat.data[water] = 0.0
 
             if comm.ensemble_comm.rank == 0:
                 grad_file.write(self.dJ_total)

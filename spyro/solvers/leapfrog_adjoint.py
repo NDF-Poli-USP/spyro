@@ -147,7 +147,7 @@ class LeapfrogAdjoint:
             if sd == 2:
                 Lx, lx, Lz, lz, x1, x2, a_pml, z1, z2, c_pml = _unpack_pml(self.model)
                 (sigma_x, sigma_z) = damping.functions(
-                    model, V, dim, x, x1, x2, a_pml, z, z1, z2, c_pml
+                    self.model, self.V, sd, x, x1, x2, a_pml, z, z1, z2, c_pml
                 )
                 (Gamma_1, Gamma_2) = damping.matrices_2D(sigma_z, sigma_x)
                 pml1 = (
@@ -176,9 +176,9 @@ class LeapfrogAdjoint:
                 ) = _unpack_pml(self.model)
 
                 sigma_x, sigma_y, sigma_z = damping.functions(
-                    model,
-                    V,
-                    dim,
+                    self.model,
+                    self.V,
+                    sd,
                     x,
                     x1,
                     x2,
