@@ -9,7 +9,7 @@ from mpi4py import MPI
 
 outdir = "testing_fwi/"
 
-# START DEFINING OPTIONS
+# START DEFINING OPTIONS for FWI
 model = {}
 # Specify Finite Element related options
 model["opts"] = {
@@ -58,7 +58,7 @@ model["acquisition"] = {
         (-0.15, 0.1), (-0.15, 16.9), 301
     ),
 }
-# Perform each shot simulation for 3.0 seconds and save all
+# Perform each shot simulation for 3.0 seconds and save every fspool
 # timesteps for the gradient calculation.
 model["timeaxis"] = {
     "t0": 0.0,  #  Initial time for event
@@ -73,8 +73,9 @@ model["parallelism"] = {
     "custom_cores_per_shot": [],  # only if the user wants a different number of cores for every shot.
     # input is a list of integers with the length of the number of shots.
 }
-
+# Execute for the following frequency bands.
 model["inversion"] = {"freq_bands": [2.0]}
+# OPTIONS END HERE 
 
 comm = spyro.utils.mpi_init(model)
 
@@ -86,13 +87,35 @@ sources = spyro.Sources(model, mesh, V, comm).create()
 
 receivers = spyro.Receivers(model, mesh, V, comm).create()
 
+# Water is normally defined where P-wave velocity is ~1.46 km/s
 water = np.where(vp_guess.dat.data[:] < 1.51)
 
-# quadrature rules
 qr_x, _, _ = spyro.domains.quadrature.quadrature_rules(V)
 
+class L2Inner(object):
+    """How ROL computes the L2 norm
+       Important for mesh-independent optimization.
+    """
+    def __init__(self):
+        self.A = assemble(
+            TrialFunction(V) * TestFunction(V) * dx(rule=qr_x), mat_type="matfree"
+        )
+        self.Ap = as_backend_type(self.A).mat()
 
+    def eval(self, _u, _v):
+        upet = as_backend_type(_u).vec()
+        vpet = as_backend_type(_v).vec()
+        A_u = self.Ap.createVecLeft()
+        self.Ap.mult(upet, A_u)
+        return vpet.dot(A_u)
+
+
+# Multiscale time domain Full Waveform Inversion.
+# Loop over all frequency lowpass cutoffs and perform 
+# N FWI iterations for each frequency band progrissvely
+# improving the last velocity model.
 for index, freq_band in enumerate(model["inversion"]["freq_bands"]):
+
     if comm.comm.rank == 0 and comm.ensemble_comm.rank == 0:
         print(
             "INFO: Executing inversion for low-passed cut off of "
@@ -101,48 +124,36 @@ for index, freq_band in enumerate(model["inversion"]["freq_bands"]):
             flush=True,
         )
 
+    # Prepare the files for writing during FWI for this frequency band
     if comm.ensemble_comm.rank == 0:
         control_file = File(
             outdir + "control" + str(freq_band) + "Hz+.pvd", comm=comm.comm
         )
         grad_file = File(outdir + "grad" + str(freq_band) + "Hz.pvd", comm=comm.comm)
 
-    class L2Inner(object):
-        """How ROL computes the L2 norm"""
-
-        def __init__(self):
-            self.A = assemble(
-                TrialFunction(V) * TestFunction(V) * dx(rule=qr_x), mat_type="matfree"
-            )
-            self.Ap = as_backend_type(self.A).mat()
-
-        def eval(self, _u, _v):
-            upet = as_backend_type(_u).vec()
-            vpet = as_backend_type(_v).vec()
-            A_u = self.Ap.createVecLeft()
-            self.Ap.mult(upet, A_u)
-            return vpet.dot(A_u)
 
     class Objective(ROL.Objective):
-        """Subclass of ROL.Objective to define value and gradient for problem"""
+        """Subclass of ROL.Objective to define functional and 
+           gradient for optimization problem
+        """
 
         def __init__(self, inner_product):
             ROL.Objective.__init__(self)
             self.inner_product = inner_product
             self.vp_guess = vp_guess
-            self.p_guess = None
-            self.misfit = 0.0
+
             self.J_local = np.zeros((1))
             self.J_total = np.zeros((1))
 
-            self.dJ_local = Function(V, name="grad_local")
             self.dJ_total = Function(V, name="grad_total")
 
-            # ASSUMPTION: ONE SOURCE FOR ONE CORE
+            # Prepare variational forms for forward, adjoint, and gradient calculations.
+            # Note: that this is configured for one source per ensemble member
+            # However, one ensemble member may have more than one core.
             for sn in range(model["acquisition"]["num_sources"]):
                 if spyro.io.is_owner(comm, sn):
-                    # build forward solver
-                    self.solver = spyro.solvers.Leapfrog(
+                    # Build forward solver
+                    self.forward = spyro.solvers.Leapfrog(
                         model,
                         mesh,
                         comm,
@@ -152,53 +163,54 @@ for index, freq_band in enumerate(model["inversion"]["freq_bands"]):
                         source_num=sn,
                         lp_freq_index=index,
                     )
-                    # build gradient solver
-                    self.grad_solver = spyro.solvers.LeapfrogAdjoint(
+                    # Build adjoint and gradient solver
+                    self.gradient = spyro.solvers.LeapfrogAdjoint(
                         model,
                         mesh,
                         comm,
                         self.vp_guess,
-                        self.p_guess,
-                        self.misfit,
+                        None, # no guess solution yet
+                        0.0, # misfit is zero to begin with
                     )
 
         def value(self, x, tol):
-            """Compute the functional"""
+            """How to compute the functional
+               This is a standard L2-norm at the receivers.
+            """
             for sn in range(model["acquisition"]["num_sources"]):
                 if spyro.io.is_owner(comm, sn):
 
-                    self.p_guess, p_guess_recv = self.solver.timestep()
+                    self.gradient.guess, p_guess_recv = self.forward.timestep()
 
                     p_exact_recv = spyro.io.load_shots(
                         "shots/mm_exact_" + str(10.0) + "_Hz_source_" + str(sn) + ".dat"
                     )
 
-                    # low-pass filter the shot record for the current frequency band.
+                    # Low-pass filter the shot record for the current frequency band.
                     p_exact_recv = spyro.utils.butter_lowpass_filter(
                         p_exact_recv, freq_band, 1.0 / model["timeaxis"]["dt"]
                     )
 
-                    # Calculate the misfit.
-                    self.misfit = spyro.utils.evaluate_misfit(
+                    # Calculate the misfit at the receivers
+                    self.gradient.misfit = spyro.utils.evaluate_misfit(
                         model, comm, p_guess_recv, p_exact_recv
                     )
-            J = spyro.utils.compute_functional(model, comm, self.misfit)
+
+            J = spyro.utils.compute_functional(model, comm, self.gradient.misfit)
             self.J_local[0] = J
-            # reduce over all cores
+            # Reduce over all cores
             COMM_WORLD.Allreduce(self.J_local, self.J_total, op=MPI.SUM)
-            # divide by the size of the ensemble
+            # Divide by the size of the ensemble communicator
             self.J_total[0] /= comm.ensemble_comm.size
             return self.J_total[0]
 
         def gradient(self, g, x, tol):
-            """Compute the gradient of the functional"""
-            # Check if the program has converged (and exit if so).
-            # reset the functional and gradient to zero
+            """How to compute the gradient of the functional"""
+
+            # Set the functional and gradient to zero
             self.J_local[0] = np.zeros((1))
-            self.dJ_local.assign(0.0)
             self.dJ_total.assign(0.0)
 
-            # solve the forward problem
             for sn in range(model["acquisition"]["num_sources"]):
                 if spyro.io.is_owner(comm, sn):
 
@@ -206,36 +218,38 @@ for index, freq_band in enumerate(model["inversion"]["freq_bands"]):
                         "shots/mm_exact_" + str(10.0) + "_Hz_source_" + str(sn) + ".dat"
                     )
 
-                    # low-pass filter the shot record for the current frequency band.
+                    # Low-pass filter the shot record for the current frequency band.
                     p_exact_recv = spyro.utils.butter_lowpass_filter(
                         p_exact_recv, freq_band, 1.0 / model["timeaxis"]["dt"]
                     )
 
                     # Calculate the gradient of the functional.
-                    dJ = self.grad_solver.timestep()
+                    dJ = self.gradient.timestep(source_num = sn)
 
-                    # sum it up
-                    self.dJ_local.dat.data[:] += dJ.dat.data[:]
-
-            # sum over all ensemble members
+            # Sum the gradient over all ensemble members
             comm.ensemble_comm.Allreduce(
-                self.dJ_local.dat.data[:], self.dJ_total.dat.data[:], op=MPI.SUM
+                self.dJ.dat.data[:], self.dJ_total.dat.data[:], op=MPI.SUM
             )
 
-            # mask the water layer
+            # Mask the water layer
             self.dJ_total.dat.data[water] = 0.0
 
             if comm.ensemble_comm.rank == 0:
                 grad_file.write(self.dJ_total)
+
             g.scale(0)
             g.vec += self.dJ_total
-            # switch order of misfit calculation to switch this
+            # Note: switch order of misfit calculation to switch this
             g.vec *= -1
 
         def update(self, x, flag, iteration):
-            """Update the control"""
+            """Update the control function"""
             u = Function(V, x.vec, name="velocity")
             self.vp_guess.assign(u)
+            # In the adjoint and gradient calculation 
+            self.gradient.c.assign(u)
+            # In the forward calculation as well. 
+            self.forward.c.assign(u)
             if iteration >= 0:
                 if comm.ensemble_comm.rank == 0:
                     control_file.write(self.vp_guess)
@@ -278,11 +292,12 @@ for index, freq_band in enumerate(model["inversion"]["freq_bands"]):
 
     algo = ROL.Algorithm("Line Search", params)
 
-    # this calls a sequence of processes
+    # This calls a sequence of processes in this order.
+    # value -> gradient -> L-BFGS -> update
     algo.run(opt, obj, bnd)
 
     if comm.ensemble_comm.rank == 0:
         File("res" + str(freq_band) + ".pvd", comm=comm.comm).write(obj.vp_guess)
 
-    # important: update the control for the next frequency band to start!
-    vp_guess = Function(V, opt.vec)
+    # Important: update the control for the next frequency band to start!
+    vp_guess = Function(V, opt.vec)                                                                                    
