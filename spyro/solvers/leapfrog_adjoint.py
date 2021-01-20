@@ -4,7 +4,6 @@ import numpy as np
 from firedrake import *
 from scipy.sparse import csc_matrix
 
-from .. import io
 from ..domains import quadrature, space
 from ..pml import damping
 from ..sources import delta_expr, delta_expr_3d
@@ -287,7 +286,6 @@ class LeapfrogAdjoint:
 
         if self.PML:
             self.ppadj = Function(Z)  # auxiliarly function for the gradient compt.
-            self.ppfor = Function(Z)  # auxiliarly function for the gradient compt.
 
             ffG = (
                 2.0
@@ -332,12 +330,13 @@ class LeapfrogAdjoint:
                 },
             )
 
-    def timestep(self, source_num=0):
+    def timestep(self, write=False, source_num=0):
 
         sd = self.dim
-        outfile = helpers.create_output_file(
-            "Leapfrog_adjoint.pvd", self.comm, source_num
-        )
+        if write:
+            outfile = helpers.create_output_file(
+                "Leapfrog_adjoint.pvd", self.comm, source_num
+            )
 
         t = 0.0
 
@@ -383,7 +382,8 @@ class LeapfrogAdjoint:
                 self.dJdC += self.gradi
 
             if step % self.nspool == 0:
-                outfile.write(self.u_n, time=t)
+                if write:
+                    outfile.write(self.u_n, time=t)
                 helpers.display_progress(self.comm, t)
 
         if self.comm.ensemble_comm.rank == 0 and self.comm.comm.rank == 0:

@@ -268,11 +268,14 @@ class Leapfrog:
         self.X = X
         self.B = B
 
-    def timestep(self):
+    def timestep(self, write=False):
 
         sd = self.dim
 
-        outfile = helpers.create_output_file("Leapfrog.pvd", self.comm, self.source_num)
+        if write:
+            outfile = helpers.create_output_file(
+                "Leapfrog.pvd", self.comm, self.source_num
+            )
 
         usol = [
             Function(self.V, name="pressure")
@@ -322,7 +325,8 @@ class Leapfrog:
                 save_step += 1
 
             if step % self.nspool == 0:
-                outfile.write(self.u_n, time=t)
+                if write:
+                    outfile.write(self.u_n, time=t)
                 helpers.display_progress(self.comm, t)
 
             t = step * float(self.dt)
