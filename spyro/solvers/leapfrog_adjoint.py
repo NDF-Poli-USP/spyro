@@ -15,13 +15,12 @@ set_log_level(ERROR)
 __all__ = ["LeapfrogAdjoint"]
 
 
-def _adjoint_update_rhs(rhs_forcing, excitations, residual, IT, is_local):
+def _adjoint_update_rhs(rhs_forcing, excitations, misfit, step, is_local):
     """Builds assembled forcing function f for adjoint for a given time_step
     given a number of receivers
     """
     recs = [recv for recv in range(excitations.shape[1]) if is_local[recv]]
-    rhs_forcing.dat.data[:] = excitations[:, recs].dot(residual[IT][recs])
-
+    rhs_forcing.dat.data[:] = excitations[:, recs].dot(misfit[step][recs])
     return rhs_forcing
 
 
@@ -48,13 +47,13 @@ def _unpack_pml(model):
 
 
 class LeapfrogAdjoint:
-    def __init__(self, model, mesh, comm, c, guess, residual):
+    def __init__(self, model, mesh, comm, c, guess, misfit):
         self.model = model
         self.mesh = mesh
         self.comm = comm
         self.c = c
         self.guess = guess
-        self.residual = residual
+        self.misfit = misfit
         self.dim = model["opts"]["dimension"]
         self.method = model["opts"]["method"]
         self.degree = model["opts"]["degree"]
@@ -272,7 +271,7 @@ class LeapfrogAdjoint:
         rhs_ = rhs(FF)
 
         A = assemble(lhs_, mat_type="matfree")
-        self.solver = LinearSolver(A, solver_parameters=self.params)
+        self.adjoint_solver = LinearSolver(A, solver_parameters=self.params)
         self.rhs_ = rhs_
         self.X = X
         self.B = B
@@ -317,7 +316,7 @@ class LeapfrogAdjoint:
         gradi = Function(self.V)
         grad_prob = LinearVariationalProblem(lhsG, rhsG, gradi)
         if self.method == "KMV":
-            self.grad_solv = LinearVariationalSolver(
+            self.gradient_solver = LinearVariationalSolver(
                 grad_prob,
                 solver_parameters={
                     "ksp_type": "preonly",
@@ -326,16 +325,17 @@ class LeapfrogAdjoint:
                 },
             )
         elif self.method == "CG":
-            self.grad_solv = LinearVariationalSolver(
+            self.gradient_solver = LinearVariationalSolver(
                 grad_prob,
                 solver_parameters={
                     "mat_type": "matfree",
                 },
             )
 
-    def timestep(self):
+    def timestep(self, source_num = 0):
 
-        # outfile = helpers.create_output_file("Leapfrog_adjoint.pvd", self.comm, source_num)
+        sd = self.dim
+        outfile = helpers.create_output_file("Leapfrog_adjoint.pvd", self.comm, source_num)
 
         t = 0.0
 
@@ -348,18 +348,18 @@ class LeapfrogAdjoint:
             # Solver - main equation - (I)
             self.B = assemble(self.rhs_, tensor=self.B)
             f = _adjoint_update_rhs(
-                rhs_forcing, self.sparse_excitations, self.residual, step, self.is_local
+                rhs_forcing, self.sparse_excitations, self.misfit, step, self.is_local
             )
             # add forcing term to solve scalar pressure
             self.B.sub(0).dat.data[:] += f.dat.data[:]
 
             # AX=B --> solve for X = B/Aˆ-1
-            self.solver.solve(self.X, self.B)
+            self.adjoint_solver.solve(self.X, self.B)
             if self.PML:
                 if sd == 2:
-                    self.u_np1, self.pp_np1 = X.split()
+                    self.u_np1, self.pp_np1 = self.X.split()
                 elif sd == 3:
-                    self.u_np1, self.psi_np1, self.pp_np1 = X.split()
+                    self.u_np1, self.psi_np1, self.pp_np1 = self.X.split()
 
                     self.psi_nm1.assign(self.psi_n)
                     self.psi_n.assign(self.psi_np1)
@@ -377,14 +377,13 @@ class LeapfrogAdjoint:
 
             # only compute for snaps that were saved
             if step % self.fspool == 0:
-                gradi.assign = 0.0
                 self.uufor.assign(self.guess.pop())
 
-                self.grad_solv.solve()
+                self.gradient_solver.solve()
                 self.dJdC += gradi
 
             if step % self.nspool == 0:
-                # outfile.write(self.u_n, time=t)
+                outfile.write(self.u_n, time=t)
                 helpers.display_progress(self.comm, t)
 
         if self.comm.ensemble_comm.rank == 0 and self.comm.comm.rank == 0:
@@ -393,4 +392,4 @@ class LeapfrogAdjoint:
                 flush=True,
             )
 
-        return self.dJdC
+        return self.dJdC                                     
