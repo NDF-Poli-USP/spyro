@@ -313,8 +313,8 @@ class LeapfrogAdjoint:
         G = mgrad - ffG
         lhsG, rhsG = lhs(G), rhs(G)
 
-        gradi = Function(self.V)
-        grad_prob = LinearVariationalProblem(lhsG, rhsG, gradi)
+        self.gradi = Function(self.V)
+        grad_prob = LinearVariationalProblem(lhsG, rhsG, self.gradi)
         if self.method == "KMV":
             self.gradient_solver = LinearVariationalSolver(
                 grad_prob,
@@ -332,14 +332,14 @@ class LeapfrogAdjoint:
                 },
             )
 
-    def timestep(self, source_num = 0):
+    def timestep(self, source_num=0):
 
         sd = self.dim
-        outfile = helpers.create_output_file("Leapfrog_adjoint.pvd", self.comm, source_num)
+        outfile = helpers.create_output_file(
+            "Leapfrog_adjoint.pvd", self.comm, source_num
+        )
 
         t = 0.0
-
-        gradi = Function(self.V)
 
         rhs_forcing = Function(self.V)  # forcing term
         for step in range(self._nt - 1, 0, -1):
@@ -380,7 +380,7 @@ class LeapfrogAdjoint:
                 self.uufor.assign(self.guess.pop())
 
                 self.gradient_solver.solve()
-                self.dJdC += gradi
+                self.dJdC += self.gradi
 
             if step % self.nspool == 0:
                 outfile.write(self.u_n, time=t)
@@ -392,4 +392,4 @@ class LeapfrogAdjoint:
                 flush=True,
             )
 
-        return self.dJdC                                     
+        return self.dJdC
