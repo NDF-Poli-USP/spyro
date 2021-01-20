@@ -164,7 +164,7 @@ for index, freq_band in enumerate(model["inversion"]["freq_bands"]):
                         lp_freq_index=index,
                     )
                     # Build adjoint and gradient solver
-                    self.gradient = spyro.solvers.LeapfrogAdjoint(
+                    self.adjoint = spyro.solvers.LeapfrogAdjoint(
                         model,
                         mesh,
                         comm,
@@ -180,7 +180,7 @@ for index, freq_band in enumerate(model["inversion"]["freq_bands"]):
             for sn in range(model["acquisition"]["num_sources"]):
                 if spyro.io.is_owner(comm, sn):
 
-                    self.gradient.guess, p_guess_recv = self.forward.timestep()
+                    self.adjoint.guess, p_guess_recv = self.forward.timestep()
 
                     p_exact_recv = spyro.io.load_shots(
                         "shots/mm_exact_" + str(10.0) + "_Hz_source_" + str(sn) + ".dat"
@@ -192,11 +192,11 @@ for index, freq_band in enumerate(model["inversion"]["freq_bands"]):
                     )
 
                     # Calculate the misfit at the receivers
-                    self.gradient.misfit = spyro.utils.evaluate_misfit(
+                    self.adjoint.misfit = spyro.utils.evaluate_misfit(
                         model, comm, p_guess_recv, p_exact_recv
                     )
 
-            J = spyro.utils.compute_functional(model, comm, self.gradient.misfit)
+            J = spyro.utils.compute_functional(model, comm, self.adjoint.misfit)
             self.J_local[0] = J
             # Reduce over all cores
             COMM_WORLD.Allreduce(self.J_local, self.J_total, op=MPI.SUM)
@@ -224,7 +224,7 @@ for index, freq_band in enumerate(model["inversion"]["freq_bands"]):
                     )
 
                     # Calculate the gradient of the functional.
-                    dJ = self.gradient.timestep(source_num = sn)
+                    dJ = self.adjoint.timestep(source_num = sn)
 
             # Sum the gradient over all ensemble members
             comm.ensemble_comm.Allreduce(
@@ -247,7 +247,7 @@ for index, freq_band in enumerate(model["inversion"]["freq_bands"]):
             u = Function(V, x.vec, name="velocity")
             self.vp_guess.assign(u)
             # In the adjoint and gradient calculation 
-            self.gradient.c.assign(u)
+            self.adjoint.c.assign(u)
             # In the forward calculation as well. 
             self.forward.c.assign(u)
             if iteration >= 0:
@@ -293,7 +293,7 @@ for index, freq_band in enumerate(model["inversion"]["freq_bands"]):
     algo = ROL.Algorithm("Line Search", params)
 
     # This calls a sequence of processes in this order.
-    # value -> gradient -> L-BFGS -> update
+    # value -> adjoint -> L-BFGS -> update
     algo.run(opt, obj, bnd)
 
     if comm.ensemble_comm.rank == 0:
