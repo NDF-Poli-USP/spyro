@@ -228,7 +228,7 @@ for index, freq_band in enumerate(model["inversion"]["freq_bands"]):
 
             # Sum the gradient over all ensemble members
             comm.ensemble_comm.Allreduce(
-                self.dJ.dat.data[:], self.dJ_total.dat.data[:], op=MPI.SUM
+                dJ.dat.data[:], self.dJ_total.dat.data[:], op=MPI.SUM
             )
 
             # Mask the water layer
