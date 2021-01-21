@@ -268,6 +268,25 @@ class Leapfrog:
         self.X = X
         self.B = B
 
+    def _set_initial_conditions(self):
+        sd = self.dim
+        if self.PML:
+            if sd == 2:
+                self.u_np1.assign(0.0), self.pp_np1.assign(0.0)
+                self.u_n.assign(0.0), self.pp_n.assign(0.0)
+                self.u_nm1.assign(0.0), self.pp_nm1.assign(0.0)
+            elif dim == 3:
+                self.u_np1.assign(0.0), self.psi_np1.assign(0.0), self.pp_np1.assign(
+                    0.0
+                )
+                self.u_n.assign(0.0), self.psi_n.assign(0.0), self.pp_n.assign(0.0)
+                self.u_nm1.assign(0.0), self.psi_nm1.assign(0.0), self.pp_nm1.assign(
+                    0.0
+                )
+        else:
+            self.X.assign(0.0)
+            self.B.assign(0.0)
+
     def timestep(self, write=False):
 
         sd = self.dim
@@ -286,6 +305,9 @@ class Leapfrog:
         save_step = 0
 
         t = 0.0
+
+        # zero out all terms
+        self._set_initial_conditions()
 
         for step in range(self._nt):
 

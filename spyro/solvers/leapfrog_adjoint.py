@@ -330,6 +330,25 @@ class LeapfrogAdjoint:
                 },
             )
 
+    def _set_initial_conditions(self):
+        sd = self.dim
+        if self.PML:
+            if sd == 2:
+                self.u_np1.assign(0.0), self.pp_np1.assign(0.0)
+                self.u_n.assign(0.0), self.pp_n.assign(0.0)
+                self.u_nm1.assign(0.0), self.pp_nm1.assign(0.0)
+            elif dim == 3:
+                self.u_np1.assign(0.0), self.psi_np1.assign(0.0), self.pp_np1.assign(
+                    0.0
+                )
+                self.u_n.assign(0.0), self.psi_n.assign(0.0), self.pp_n.assign(0.0)
+                self.u_nm1.assign(0.0), self.psi_nm1.assign(0.0), self.pp_nm1.assign(
+                    0.0
+                )
+        else:
+            self.X.assign(0.0)
+            self.B.assign(0.0)
+
     def timestep(self, write=False, source_num=0):
 
         sd = self.dim
@@ -339,6 +358,9 @@ class LeapfrogAdjoint:
             )
 
         t = 0.0
+
+        # zero out all terms
+        self._set_initial_conditions()
 
         rhs_forcing = Function(self.V)  # forcing term
         for step in range(self._nt - 1, 0, -1):
@@ -376,8 +398,9 @@ class LeapfrogAdjoint:
 
             # only compute for snaps that were saved
             if step % self.fspool == 0:
-                self.uufor.assign(self.guess.pop())
 
+                self.uufor.assign(self.guess.pop())
+                self.gradi.assign(0.0)
                 self.gradient_solver.solve()
                 self.dJdC += self.gradi
 

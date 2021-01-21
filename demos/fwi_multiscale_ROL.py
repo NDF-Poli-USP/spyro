@@ -49,10 +49,11 @@ model["PML"] = {
 # and record the solution at 301 receivers.
 model["acquisition"] = {
     "source_type": "Ricker",
-    "num_sources": 4,
-    "source_pos": spyro.create_receiver_transect((-0.15, 0.1), (-0.15, 16.9), 4),
+    "num_sources": 40,
+    "source_pos": spyro.create_receiver_transect((-0.15, 0.1), (-0.15, 16.9), 40),
     "frequency": 10.0,
     "delay": 1.0,
+    "amplitude": 1,
     "num_receivers": 301,
     "receiver_locations": spyro.create_receiver_transect(
         (-0.15, 0.1), (-0.15, 16.9), 301
@@ -63,9 +64,9 @@ model["acquisition"] = {
 model["timeaxis"] = {
     "t0": 0.0,  #  Initial time for event
     "tf": 3.0,  # Final time for event
-    "dt": 0.001,  # timestep size
+    "dt": 0.0005,  # timestep size
     "nspool": 200,  # how frequently to output solution to pvds
-    "fspool": 25,  # how frequently to save solution to RAM
+    "fspool": 100,  # how frequently to save solution to RAM
 }
 # Use one core per shot.
 model["parallelism"] = {
@@ -75,7 +76,7 @@ model["parallelism"] = {
 }
 # Execute for the following frequency bands.
 model["inversion"] = {"freq_bands": [2.0]}
-# OPTIONS END HERE 
+# OPTIONS END HERE
 
 comm = spyro.utils.mpi_init(model)
 
@@ -92,26 +93,9 @@ water = np.where(vp_guess.dat.data[:] < 1.51)
 
 qr_x, _, _ = spyro.domains.quadrature.quadrature_rules(V)
 
-class L2Inner(object):
-    """How ROL computes the L2 norm
-       Important for mesh-independent optimization.
-    """
-    def __init__(self):
-        self.A = assemble(
-            TrialFunction(V) * TestFunction(V) * dx(rule=qr_x), mat_type="matfree"
-        )
-        self.Ap = as_backend_type(self.A).mat()
-
-    def eval(self, _u, _v):
-        upet = as_backend_type(_u).vec()
-        vpet = as_backend_type(_v).vec()
-        A_u = self.Ap.createVecLeft()
-        self.Ap.mult(upet, A_u)
-        return vpet.dot(A_u)
-
 
 # Multiscale time domain Full Waveform Inversion.
-# Loop over all frequency lowpass cutoffs and perform 
+# Loop over all frequency lowpass cutoffs and perform
 # N FWI iterations for each frequency band progrissvely
 # improving the last velocity model.
 for index, freq_band in enumerate(model["inversion"]["freq_bands"]):
@@ -131,10 +115,27 @@ for index, freq_band in enumerate(model["inversion"]["freq_bands"]):
         )
         grad_file = File(outdir + "grad" + str(freq_band) + "Hz.pvd", comm=comm.comm)
 
+    class L2Inner(object):
+        """How ROL computes the L2 norm
+        Important for mesh-independent optimization.
+        """
+
+        def __init__(self):
+            self.A = assemble(
+                TrialFunction(V) * TestFunction(V) * dx(rule=qr_x), mat_type="matfree"
+            )
+            self.Ap = as_backend_type(self.A).mat()
+
+        def eval(self, _u, _v):
+            upet = as_backend_type(_u).vec()
+            vpet = as_backend_type(_v).vec()
+            A_u = self.Ap.createVecLeft()
+            self.Ap.mult(upet, A_u)
+            return vpet.dot(A_u)
 
     class Objective(ROL.Objective):
-        """Subclass of ROL.Objective to define functional and 
-           gradient for optimization problem
+        """Subclass of ROL.Objective to define functional and
+        gradient for optimization problem
         """
 
         def __init__(self, inner_product):
@@ -169,14 +170,15 @@ for index, freq_band in enumerate(model["inversion"]["freq_bands"]):
                         mesh,
                         comm,
                         self.vp_guess,
-                        None, # no guess solution yet
-                        0.0, # misfit is zero to begin with
+                        None,  # no guess solution yet
+                        0.0,  # misfit is zero to begin with
                     )
 
         def value(self, x, tol):
             """How to compute the functional
-               This is a standard L2-norm at the receivers.
+            This is a standard L2-norm at the receivers.
             """
+            self.J_local[0] = np.zeros((1))
             for sn in range(model["acquisition"]["num_sources"]):
                 if spyro.io.is_owner(comm, sn):
 
@@ -202,13 +204,13 @@ for index, freq_band in enumerate(model["inversion"]["freq_bands"]):
             COMM_WORLD.Allreduce(self.J_local, self.J_total, op=MPI.SUM)
             # Divide by the size of the ensemble communicator
             self.J_total[0] /= comm.ensemble_comm.size
+            print(self.J_total[0], flush=True)
             return self.J_total[0]
 
         def gradient(self, g, x, tol):
             """How to compute the gradient of the functional"""
 
             # Set the functional and gradient to zero
-            self.J_local[0] = np.zeros((1))
             self.dJ_total.assign(0.0)
 
             for sn in range(model["acquisition"]["num_sources"]):
@@ -224,7 +226,7 @@ for index, freq_band in enumerate(model["inversion"]["freq_bands"]):
                     )
 
                     # Calculate the gradient of the functional.
-                    dJ = self.adjoint.timestep(source_num = sn)
+                    dJ = self.adjoint.timestep()
 
             # Sum the gradient over all ensemble members
             comm.ensemble_comm.Allreduce(
@@ -244,15 +246,16 @@ for index, freq_band in enumerate(model["inversion"]["freq_bands"]):
 
         def update(self, x, flag, iteration):
             """Update the control function"""
+            print("updating the control", flush=True)
             u = Function(V, x.vec, name="velocity")
             self.vp_guess.assign(u)
-            # In the adjoint and gradient calculation 
+            # In the adjoint and gradient calculation
             self.adjoint.c.assign(u)
-            # In the forward calculation as well. 
+            # In the forward calculation as well.
             self.forward.c.assign(u)
-            if iteration >= 0:
-                if comm.ensemble_comm.rank == 0:
-                    control_file.write(self.vp_guess)
+            # if iteration >= 0:
+            if comm.ensemble_comm.rank == 0:
+                control_file.write(self.vp_guess)
 
     paramsDict = {
         "General": {"Secant": {"Type": "Limited-Memory BFGS", "Maximum Storage": 10}},
@@ -293,11 +296,11 @@ for index, freq_band in enumerate(model["inversion"]["freq_bands"]):
     algo = ROL.Algorithm("Line Search", params)
 
     # This calls a sequence of processes in this order.
-    # value -> adjoint -> L-BFGS -> update
+    # value -> gradient -> L-BFGS -> update
     algo.run(opt, obj, bnd)
 
     if comm.ensemble_comm.rank == 0:
         File("res" + str(freq_band) + ".pvd", comm=comm.comm).write(obj.vp_guess)
 
     # Important: update the control for the next frequency band to start!
-    vp_guess = Function(V, opt.vec)                                                                                    
+    vp_guess = Function(V, opt.vec)
