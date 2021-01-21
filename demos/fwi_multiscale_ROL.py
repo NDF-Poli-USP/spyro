@@ -49,8 +49,8 @@ model["PML"] = {
 # and record the solution at 301 receivers.
 model["acquisition"] = {
     "source_type": "Ricker",
-    "num_sources": 40,
-    "source_pos": spyro.create_receiver_transect((-0.15, 0.1), (-0.15, 16.9), 40),
+    "num_sources": 4,
+    "source_pos": spyro.create_receiver_transect((-0.15, 0.1), (-0.15, 16.9), 4),
     "frequency": 10.0,
     "delay": 1.0,
     "amplitude": 1,
@@ -139,6 +139,7 @@ for index, freq_band in enumerate(model["inversion"]["freq_bands"]):
         """
 
         def __init__(self, inner_product):
+            print("in here")
             ROL.Objective.__init__(self)
             self.inner_product = inner_product
             self.vp_guess = vp_guess
@@ -248,6 +249,7 @@ for index, freq_band in enumerate(model["inversion"]["freq_bands"]):
             """Update the control function"""
             print("updating the control", flush=True)
             u = Function(V, x.vec, name="velocity")
+            vp_guess.assign(u)
             self.vp_guess.assign(u)
             # In the adjoint and gradient calculation
             self.adjoint.c.assign(u)
