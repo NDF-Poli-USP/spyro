@@ -6,11 +6,8 @@ from ..pml import damping
 from ..sources import FullRickerWavelet
 from . import helpers
 
-#from memory_profiler import profile
-
 set_log_level(ERROR)
 
-#@profile
 def Leapfrog(
     model, mesh, comm, c, excitations, receivers, source_num=0, lp_freq_index=0
 ):
