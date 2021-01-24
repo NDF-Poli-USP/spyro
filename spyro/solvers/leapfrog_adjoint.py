@@ -367,7 +367,6 @@ def Leapfrog_adjoint(
 
     return dJdC_local
 
-
 def _adjoint_update_rhs(rhs_forcing, excitations, residual, IT, is_local):
     """Builds assembled forcing function f for adjoint for a given time_step
     given a number of receivers
