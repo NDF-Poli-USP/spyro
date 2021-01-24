@@ -344,13 +344,26 @@ def Leapfrog_adjoint(
                 outfile.write(u_n, time=t)
                 helpers.display_progress(comm, t)
 
+    if "inversion" in model:
+        if model["inversion"]["optimizer"] is "scipy":
+
+
+            # In the case of spatial parallelism, gather the solution to rank 0
+            gathered_total = dJdC_local.dat.data[:]
+
+            if comm.comm.size > 1:
+                if comm.comm.rank == 0 and comm.ensemble_comm.rank == 0:
+                    print("Spatial parallelism, reducing to comm 0", flush=True)
+                gathered_total = dJdC_local.vector().gather()
+
     if comm.ensemble_comm.rank == 0 and comm.comm.rank == 0:
         print(
             "---------------------------------------------------------------",
             flush=True,
         )
 
-    return dJdC_local
+#    return dJdC_local
+    return gathered_total
 
 
 def _adjoint_update_rhs(rhs_forcing, excitations, residual, IT, is_local):
