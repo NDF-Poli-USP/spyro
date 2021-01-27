@@ -49,8 +49,8 @@ model["PML"] = {
 # and record the solution at 301 receivers.
 model["acquisition"] = {
     "source_type": "Ricker",
-    "num_sources": 20,
-    "source_pos": spyro.create_receiver_transect((-0.15, 0.1), (-0.15, 16.9), 20),
+    "num_sources": 40,
+    "source_pos": spyro.create_receiver_transect((-0.15, 0.1), (-0.15, 16.9), 40),
     "frequency": 10.0,
     "delay": 1.0,
     "num_receivers": 301,
@@ -64,8 +64,8 @@ model["timeaxis"] = {
     "t0": 0.0,  #  Initial time for event
     "tf": 3.0,  # Final time for event
     "dt": 0.0005,  # timestep size
-    "nspool": 200,  # how frequently to output solution to pvds
-    "fspool": 10,  # how frequently to save solution to RAM
+    "nspool": 300,  # how frequently to output solution to pvds
+    "fspool": 25,  # how frequently to save solution to RAM
 }
 # Use one core per shot.
 model["parallelism"] = {
@@ -88,7 +88,6 @@ receivers = spyro.Receivers(model, mesh, V, comm).create()
 
 water = np.where(vp_guess.dat.data[:] < 1.51)
 
-# quadrature rules
 qr_x, _, _ = spyro.domains.quadrature.quadrature_rules(V)
 
 
@@ -100,6 +99,12 @@ for index, freq_band in enumerate(model["inversion"]["freq_bands"]):
             + " Hz...",
             flush=True,
         )
+    def _load_exact_shot(freq_band):
+        for sn in range(model["acquisition"]["num_sources"]):
+            if spyro.io.is_owner(comm, sn):
+                shot = spyro.io.load_shots("shots/mm_exact_" + str(10.0) + "_Hz_source_" + str(sn) + ".dat")
+                # low-pass filter the shot record for the current frequency band.
+                return spyro.utils.butter_lowpass_filter(shot, freq_band, 1.0 / model["timeaxis"]["dt"])
 
     if comm.ensemble_comm.rank == 0:
         control_file = File(
@@ -129,97 +134,69 @@ for index, freq_band in enumerate(model["inversion"]["freq_bands"]):
         def __init__(self, inner_product):
             ROL.Objective.__init__(self)
             self.inner_product = inner_product
-            self.vp_guess = vp_guess
             self.p_guess = None
             self.misfit = 0.0
-            self.J_local = np.zeros((1))
-            self.J_total = np.zeros((1))
+            self.p_exact_recv = _load_exact_shot(freq_band)
 
         def value(self, x, tol):
             """Compute the functional"""
+            J_total = np.zeros((1))
             for sn in range(model["acquisition"]["num_sources"]):
                 if spyro.io.is_owner(comm, sn):
-                    # run a simulation low-pass filtering the source
                     self.p_guess, p_guess_recv = spyro.solvers.Leapfrog(
                         model,
                         mesh,
                         comm,
-                        self.vp_guess,
+                        vp_guess,
                         sources,
                         receivers,
                         source_num=sn,
                         lp_freq_index=index,
                     )
-                    p_exact_recv = spyro.io.load_shots(
-                        "shots/mm_exact_" + str(10.0) + "_Hz_source_" + str(sn) + ".dat"
-                    )
-                    # low-pass filter the shot record for the current frequency band.
-                    p_exact_recv = spyro.utils.butter_lowpass_filter(
-                        p_exact_recv, freq_band, 1.0 / model["timeaxis"]["dt"]
-                    )
-                    # Calculate the misfit.
                     self.misfit = spyro.utils.evaluate_misfit(
-                        model, comm, p_guess_recv, p_exact_recv
+                        model, comm, p_guess_recv, self.p_exact_recv
                     )
-            J = spyro.utils.compute_functional(model, comm, self.misfit)
-            self.J_local[0] = J
+                    J_total[0] += spyro.utils.compute_functional(model, comm, self.misfit)
             # reduce over all cores
-            COMM_WORLD.Allreduce(self.J_local, self.J_total, op=MPI.SUM)
-            # divide by the size of the ensemble
-            self.J_total[0] /= comm.ensemble_comm.size
-            return self.J_total[0]
+            J_total = COMM_WORLD.allreduce(J_total, op=MPI.SUM)
+            J_total[0] /= comm.ensemble_comm.size
+            return J_total[0]
 
         def gradient(self, g, x, tol):
             """Compute the gradient of the functional"""
-            # Check if the program has converged (and exit if so).
-            # reset the functional and gradient to zero
-            self.J_local[0] = np.zeros((1))
-            self.dJ_local = Function(V, name="grad_local")
-            self.dJ_total = Function(V, name="grad_total")
-            # solve the forward problem
+            dJ_local = Function(V, name='total_gradient')
             for sn in range(model["acquisition"]["num_sources"]):
                 if spyro.io.is_owner(comm, sn):
-                    p_exact_recv = spyro.io.load_shots(
-                        "shots/mm_exact_" + str(10.0) + "_Hz_source_" + str(sn) + ".dat"
-                    )
-                    # low-pass filter the shot record for the current frequency band.
-                    p_exact_recv = spyro.utils.butter_lowpass_filter(
-                        p_exact_recv, freq_band, 1.0 / model["timeaxis"]["dt"]
-                    )
-                    # Calculate the gradient of the functional.
                     dJ = spyro.solvers.Leapfrog_adjoint(
                         model,
                         mesh,
                         comm,
-                        self.vp_guess,
+                        vp_guess,
                         self.p_guess,
                         self.misfit,
                         source_num=sn,
                     )
-                    self.dJ_local.dat.data[:] += dJ.dat.data[:]
+                    dJ_local.dat.data[:] += dJ.dat.data[:]
 
             # sum over all ensemble members
-            comm.ensemble_comm.Allreduce(
-                self.dJ_local.dat.data[:], self.dJ_total.dat.data[:], op=MPI.SUM
+            dJ_local.dat.data[:] = comm.ensemble_comm.allreduce(
+                dJ_local.dat.data[:], op=MPI.SUM
             )
-
             # mask the water layer
-            self.dJ_total.dat.data[water]=0.0
-
+            dJ_local.dat.data[water]=0.0
             if comm.ensemble_comm.rank == 0:
-                grad_file.write(self.dJ_total)
+                grad_file.write(dJ_local)
             g.scale(0)
-            g.vec += self.dJ_total
+            g.vec += dJ_local
             # switch order of misfit calculation to switch this
             g.vec *= -1
 
         def update(self, x, flag, iteration):
             """Update the control"""
-            u = Function(V, x.vec, name="velocity")
-            self.vp_guess.assign(u)
+            vp_guess.assign(Function(V, x.vec, name="velocity"))
             if iteration >= 0:
                 if comm.ensemble_comm.rank == 0:
-                    control_file.write(self.vp_guess)
+                    control_file.write(vp_guess)
 
     paramsDict = {
         "General": {"Secant": {"Type": "Limited-Memory BFGS", "Maximum Storage": 10}},
@@ -259,7 +236,6 @@ for index, freq_band in enumerate(model["inversion"]["freq_bands"]):
 
     algo = ROL.Algorithm("Line Search", params)
 
-    # this calls a sequence of processes
     algo.run(opt, obj, bnd)
 
     if comm.ensemble_comm.rank == 0:
@@ -267,3 +243,6 @@ for index, freq_band in enumerate(model["inversion"]["freq_bands"]):
 
     # important: update the control for the next frequency band to start!
     vp_guess = Function(V, opt.vec)
+~                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                     
+~                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                     
+~                                                                                
