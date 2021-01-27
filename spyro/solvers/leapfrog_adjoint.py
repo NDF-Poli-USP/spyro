@@ -282,7 +282,7 @@ def Leapfrog_adjoint(
             )
 
         rhs_forcing = Function(V)  # forcing term
-        for IT in range(nt - 1, 0, -1):
+        for IT in range(nt - 1, -1, -1):
             t = IT * float(dt)
 
             # Solver - main equation - (I)
