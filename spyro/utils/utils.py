@@ -275,3 +275,19 @@ def _check_units(c):
             print("INFO: converting from m/s to km/s", flush=True)
         c.assign(c / 1000.0)  # meters to kilometers
     return c
+
+def spatial_scatter(comm, xi, u):
+    """Scatter xi through processes"""
+
+    # Spatial communicator rank and size
+    rank = comm.comm.rank
+    size = comm.comm.size
+
+    # Update control xi from rank 0
+    xi = COMM_WORLD.bcast(xi, root=0)
+
+    # Update Function u
+    n = len(u.dat.data[:])
+    N = [comm.comm.bcast(n, r) for r in range(size)]
+    indices = np.insert(np.cumsum(N), 0, 0)
+    u.dat.data[:] = xi[indices[rank] : indices[rank + 1]]

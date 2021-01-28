@@ -7,6 +7,7 @@ from .sources.Sources import Sources
 from .utils import utils
 from .io import io
 from . import solvers
+from . import optimizers
 
 __all__ = [
     "io",
@@ -19,5 +20,6 @@ __all__ = [
     "insert_fixed_value",
     "Sources",
     "solvers",
+    "optimizers",
     "plots",
 ]
