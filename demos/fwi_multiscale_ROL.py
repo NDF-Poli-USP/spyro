@@ -88,6 +88,7 @@ receivers = spyro.Receivers(model, mesh, V, comm).create()
 
 qr_x, _, _ = spyro.domains.quadrature.quadrature_rules(V)
 
+water = np.where(vp_guess.dat.data[:] < 1.51)
 
 for index, freq_band in enumerate(model["inversion"]["freq_bands"]):
     if comm.comm.rank == 0 and comm.ensemble_comm.rank == 0:
@@ -181,7 +182,7 @@ for index, freq_band in enumerate(model["inversion"]["freq_bands"]):
                 dJ_local.dat.data[:], op=MPI.SUM
             )
             # mask the water layer
-            dJ_local.dat.data[np.where(vp_guess.dat.data[:] < 1.51)]=0.0
+            dJ_local.dat.data[water]=0.0
             if comm.ensemble_comm.rank == 0:
                 grad_file.write(dJ_local)
             g.scale(0)
