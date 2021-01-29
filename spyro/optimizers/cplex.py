@@ -31,9 +31,12 @@ def iterate_cplex(dJ, beta, xi):
     dxi = np.array(problem.solution.get_values())
     xin = xi + dxi
 
-    # Iteration info
-    iter_info = "it.: {:d} | obj.f.: {:e} | rel.var.: {: 2.2f}% | move: {:g}"
-
-    print(iter_info.format(0, J, 1, rhs[0]))
-
     return xin
+
+def optimize_cplex(dJ, beta, xi):
+    """Solve optimization problem by Integer Linear Programming"""
+
+    # Initial flip
+    xi = iterate_cplex(dJ, beta, xi)
+
+    return xi
