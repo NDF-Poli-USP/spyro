@@ -1,3 +1,4 @@
+
 from firedrake import *
 
 import SeismicMesh
@@ -8,6 +9,13 @@ from ROL.firedrake_vector import FiredrakeVector as FeVector
 import ROL
 import spyro
 from mpi4py import MPI
+
+from pympler import muppy, summary, tracker
+import psutil
+import sys
+import os
+import gc
+
 
 
 outdir = "testing_fwi/"
@@ -52,8 +60,8 @@ model["PML"] = {
 # and record the solution at 301 receivers.
 model["acquisition"] = {
     "source_type": "Ricker",
-    "num_sources": 4,
-    "source_pos": spyro.create_receiver_transect((-0.15, 0.1), (-0.15, 16.9), 4),
+    "num_sources": 40,
+    "source_pos": spyro.create_receiver_transect((-0.15, 0.1), (-0.15, 16.9), 40),
     "frequency": 10.0,
     "delay": 1.0,
     "num_receivers": 301,
@@ -65,10 +73,10 @@ model["acquisition"] = {
 # timesteps for the gradient calculation.
 model["timeaxis"] = {
     "t0": 0.0,  #  Initial time for event
-    "tf": 3.0,  # Final time for event
+    "tf": 3.00,  # Final time for event
     "dt": 0.0005,  # timestep size
     "nspool": 200,  # how frequently to output solution to pvds
-    "fspool": 10,  # how frequently to save solution to RAM
+    "fspool": 50,  # how frequently to save solution to RAM
 }
 # Use one core per shot.
 model["parallelism"] = {
@@ -77,15 +85,20 @@ model["parallelism"] = {
     # input is a list of integers with the length of the number of shots.
 }
 
-model["inversion"] = {"freq_bands": [2.0, 4.0]}
+model["inversion"] = {"freq_bands": [3.0, 5.0, 8.0]}
 
+def get_memory_usage():
+    """Return the memory usage in Mo."""
+    process = psutil.Process(os.getpid())
+    mem = process.memory_info()[0] / float(2 ** 20)
+    return mem
 
 def remesh(fname, freq, mesh_iter, comm):
     """for now some hardcoded options"""
     if comm.ensemble_comm.rank == 0:
         bbox = (-4000.0, 0.0, -500.0, 17500.0)
 
-        wl = 10
+        wl = 7
 
         # Desired minimum mesh size in domain
         hmin = 1500.0 / (wl * freq)
@@ -185,6 +198,51 @@ for index, freq_band in enumerate(model["inversion"]["freq_bands"]):
 
     class L2Inner(object):
         """How ROL computes the L2 norm"""
+        def __init__(self):
+            self.A = assemble(
+                TrialFunction(V) * TestFunction(V) * dx(rule=qr_x), mat_type="matfree"
+            )
+            self.Ap = as_backend_type(self.A).mat()
+
+        def eval(self, _u, _v):
+            upet = as_backend_type(_u).vec()
+            vpet = as_backend_type(_v).vec()
+            A_u = self.Ap.createVecLeft()
+            self.Ap.mult(upet, A_u)
+            return vpet.dot(A_u)
+
+    if COMM_WORLD.rank == 0:
+        print(
+            f"START OF FWI, rank {comm.comm.rank}, memory usage = {get_memory_usage():.3f} Mo"
+        )
+
+    if comm.comm.rank == 0 and comm.ensemble_comm.rank == 0:
+        print(
+            "INFO: Executing inversion for low-passed cut off of "
+            + str(freq_band)
+            + " Hz...",
+            flush=True,
+        )
+
+    def _load_exact_shot(freq_band):
+        for sn in range(model["acquisition"]["num_sources"]):
+            if spyro.io.is_owner(comm, sn):
+                shot = spyro.io.load_shots(
+                    "shots/mm_exact_" + str(10.0) + "_Hz_source_" + str(sn) + ".dat"
+                )
+                # low-pass filter the shot record for the current frequency band.
+                return spyro.utils.butter_lowpass_filter(
+                    shot, freq_band, 1.0 / model["timeaxis"]["dt"]
+                )
+
+    if comm.ensemble_comm.rank == 0:
+        control_file = File(
+            outdir + "control" + str(freq_band) + "Hz+.pvd", comm=comm.comm
+        )
+        grad_file = File(outdir + "grad" + str(freq_band) + "Hz.pvd", comm=comm.comm)
+
+    class L2Inner(object):
+        """How ROL computes the L2 norm"""
 
         def __init__(self):
             self.A = assemble(
@@ -205,97 +263,126 @@ for index, freq_band in enumerate(model["inversion"]["freq_bands"]):
         def __init__(self, inner_product):
             ROL.Objective.__init__(self)
             self.inner_product = inner_product
-            self.vp_guess = vp_guess
             self.p_guess = None
             self.misfit = 0.0
-            self.J_local = np.zeros((1))
-            self.J_total = np.zeros((1))
+            self.p_exact_recv = _load_exact_shot(freq_band)
 
         def value(self, x, tol):
             """Compute the functional"""
+
+            gc.collect()
+
+            if COMM_WORLD.rank == 0:
+                print(
+                    f"START OF ITER, rank {comm.comm.rank}, memory usage = {get_memory_usage():.3f} Mo"
+                )
+                # biggest_vars = muppy.sort(muppy.get_objects())[-5:]
+                # sum1 = summary.summarize(biggest_vars)
+                # summary.print_(sum1)
+                # objgraph.show_backrefs(biggest_vars, filename='backref_start1.png')
+
+                # self.memory_tracker = tracker.SummaryTracker()
+
+            J_total = np.zeros((1))
             for sn in range(model["acquisition"]["num_sources"]):
                 if spyro.io.is_owner(comm, sn):
-                    # run a simulation low-pass filtering the source
                     self.p_guess, p_guess_recv = spyro.solvers.Leapfrog(
                         model,
                         mesh,
                         comm,
-                        self.vp_guess,
+                        vp_guess,
                         sources,
                         receivers,
                         source_num=sn,
                         lp_freq_index=index,
                     )
-                    p_exact_recv = spyro.io.load_shots(
-                        "shots/mm_exact_" + str(10.0) + "_Hz_source_" + str(sn) + ".dat"
-                    )
-                    # low-pass filter the shot record for the current frequency band.
-                    p_exact_recv = spyro.utils.butter_lowpass_filter(
-                        p_exact_recv, freq_band, 1.0 / model["timeaxis"]["dt"]
-                    )
-                    # Calculate the misfit.
                     self.misfit = spyro.utils.evaluate_misfit(
-                        model, comm, p_guess_recv, p_exact_recv
+                        model, comm, p_guess_recv, self.p_exact_recv
                     )
-            J = spyro.utils.compute_functional(model, comm, self.misfit)
-            self.J_local[0] = J
+                    J_total[0] += spyro.utils.compute_functional(
+                        model, comm, self.misfit
+                    )
+
             # reduce over all cores
-            COMM_WORLD.Allreduce(self.J_local, self.J_total, op=MPI.SUM)
-            # divide by the size of the ensemble
-            self.J_total[0] /= comm.ensemble_comm.size
-            return self.J_total[0]
+            J_total = COMM_WORLD.allreduce(J_total, op=MPI.SUM)
+            J_total[0] /= comm.ensemble_comm.size
+
+            gc.collect()
+
+            if COMM_WORLD.rank == 0:
+                print(
+                    f"END OF FORWARD, rank {comm.comm.rank}, memory usage = {get_memory_usage():.3f} Mo"
+                )
+                biggest_vars = muppy.sort(muppy.get_objects())[-600:]
+                sum1 = summary.summarize(biggest_vars)
+                summary.print_(sum1)
+                #objgraph.show_backrefs(biggest_vars[:20], filename="backref_start2.png")
+                #objgraph.show_refs(biggest_vars[:20], filename="forwardref_start2.png")
+
+            return J_total[0]
 
         def gradient(self, g, x, tol):
             """Compute the gradient of the functional"""
-            # Check if the program has converged (and exit if so).
-            # reset the functional and gradient to zero
-            self.J_local[0] = np.zeros((1))
-            self.dJ_local = Function(V, name="grad_local")
-            self.dJ_total = Function(V, name="grad_total")
-            # solve the forward problem
+
+            gc.collect()
+
+            if COMM_WORLD.rank == 0:
+                print(
+                    f"START OF GRAD, rank {comm.comm.rank}, memory usage = {get_memory_usage():.3f} Mb"
+                )
+            #    biggest_vars = muppy.sort(muppy.get_objects())[-20:]
+            #    sum1 = summary.summarize(biggest_vars)
+            #    summary.print_(sum1)
+            #    objgraph.show_backrefs(biggest_vars, filename='backref_end1.png')
+
+            dJ_local = Function(V, name="total_gradient")
             for sn in range(model["acquisition"]["num_sources"]):
                 if spyro.io.is_owner(comm, sn):
-                    p_exact_recv = spyro.io.load_shots(
-                        "shots/mm_exact_" + str(10.0) + "_Hz_source_" + str(sn) + ".dat"
-                    )
-                    # low-pass filter the shot record for the current frequency band.
-                    p_exact_recv = spyro.utils.butter_lowpass_filter(
-                        p_exact_recv, freq_band, 1.0 / model["timeaxis"]["dt"]
-                    )
-                    # Calculate the gradient of the functional.
                     dJ = spyro.solvers.Leapfrog_adjoint(
                         model,
                         mesh,
                         comm,
-                        self.vp_guess,
+                        vp_guess,
                         self.p_guess,
                         self.misfit,
                         source_num=sn,
                     )
-                    self.dJ_local.dat.data[:] += dJ.dat.data[:]
+                    dJ_local.dat.data[:] += dJ.dat.data[:]
 
             # sum over all ensemble members
-            comm.ensemble_comm.Allreduce(
-                self.dJ_local.dat.data[:], self.dJ_total.dat.data[:], op=MPI.SUM
+            dJ_local.dat.data[:] = comm.ensemble_comm.allreduce(
+                dJ_local.dat.data[:], op=MPI.SUM
             )
-
             # mask the water layer
-            self.dJ_total.dat.data[water] = 0.0
-
+            dJ_local.dat.data[water] = 0.0
             if comm.ensemble_comm.rank == 0:
-                grad_file.write(self.dJ_total)
+                grad_file.write(dJ_local)
             g.scale(0)
-            g.vec += self.dJ_total
+            g.vec += dJ_local
             # switch order of misfit calculation to switch this
             g.vec *= -1
 
+            gc.collect()
+
+            if COMM_WORLD.rank == 0:
+                print(
+                    f"END OF GRADIENT, rank {comm.comm.rank}, memory usage = {get_memory_usage():.3f} Mo"
+                )
+                biggest_vars = muppy.sort(muppy.get_objects())[-600:]
+                sum1 = summary.summarize(biggest_vars)
+                summary.print_(sum1)
+                #objgraph.show_backrefs(biggest_vars[:20], filename="backref_end2.png")
+                #objgraph.show_refs(biggest_vars[:20], filename="forwardref_end2.png")
+
+            # if COMM_WORLD.rank == 0:
+            #    self.memory_tracker.print_diff()
+
         def update(self, x, flag, iteration):
             """Update the control"""
-            u = Function(V, x.vec, name="velocity")
-            self.vp_guess.assign(u)
+            vp_guess.assign(Function(V, x.vec, name="velocity"))
             if iteration >= 0:
                 if comm.ensemble_comm.rank == 0:
-                    control_file.write(self.vp_guess)
+                    control_file.write(vp_guess)
 
     paramsDict = {
         "General": {"Secant": {"Type": "Limited-Memory BFGS", "Maximum Storage": 10}},
@@ -309,7 +396,7 @@ for index, freq_band in enumerate(model["inversion"]["freq_bands"]):
         },
         "Status Test": {
             "Gradient Tolerance": 1e-16,
-            "Iteration Limit": 2,
+            "Iteration Limit": 50,
             "Step Tolerance": 1.0e-16,
         },
     }
@@ -323,26 +410,29 @@ for index, freq_band in enumerate(model["inversion"]["freq_bands"]):
     u = Function(V, name="velocity").assign(vp_guess)
     opt = FeVector(u.vector(), inner_product)
 
-    xlo = Function(V)
-    xlo.interpolate(Constant(1.0))
-    x_lo = FeVector(xlo.vector(), inner_product)
+    #xlo = Function(V)
+    #xlo.interpolate(Constant(1.0))
+    #x_lo = FeVector(xlo.vector(), inner_product)
 
-    xup = Function(V)
-    xup.interpolate(Constant(5.0))
-    x_up = FeVector(xup.vector(), inner_product)
+    #xup = Function(V)
+    #xup.interpolate(Constant(5.0))
+    #x_up = FeVector(xup.vector(), inner_product)
 
-    bnd = ROL.Bounds(x_lo, x_up, 1.0)
+    #bnd = ROL.Bounds(x_lo, x_up, 1.0)
 
     algo = ROL.Algorithm("Line Search", params)
 
-    # this calls a sequence of processes
-    algo.run(opt, obj, bnd)
+    algo.run(opt, obj) #, bnd)
 
     if comm.ensemble_comm.rank == 0:
         File("res" + str(freq_band) + ".pvd", comm=comm.comm).write(obj.vp_guess)
 
-    # important: update the control for the next frequency band to start!
-    vp_guess = Function(V, opt.vec)
+    # interpolate vp_exact to a structured grid and write to a segy file for later meshing with SeismicMesh
+    _, _, vp_i = spyro.utils.write_function_to_grid(obj.vp_guess, V, grid_spacing=10.0 / 1000.0)
+    # write a new file to be used in the re-meshing
+    if comm.comm.rank == 0 and comm.ensemble_comm.rank == 0:
+        print("writing the final velocity model...", flush=True)
+        spyro.io.create_segy(vp_i, "velocity_models/mm_FINAL_"+str(freq_band))
 
-    # increment the mesh counter
-    mesh_iter += 1
+    # important: update the control for the next frequency band to start!
+    vp_guess = Function(V, opt.vec)                                                        
