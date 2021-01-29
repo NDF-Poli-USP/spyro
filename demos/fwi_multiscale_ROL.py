@@ -6,6 +6,8 @@ import ROL
 import spyro
 from mpi4py import MPI
 
+import gc 
+
 
 outdir = "testing_fwi/"
 
@@ -139,6 +141,7 @@ for index, freq_band in enumerate(model["inversion"]["freq_bands"]):
 
         def value(self, x, tol):
             """Compute the functional"""
+            gc.collect()
             J_total = np.zeros((1))
             for sn in range(model["acquisition"]["num_sources"]):
                 if spyro.io.is_owner(comm, sn):
@@ -159,10 +162,13 @@ for index, freq_band in enumerate(model["inversion"]["freq_bands"]):
             # reduce over all cores
             J_total = COMM_WORLD.allreduce(J_total, op=MPI.SUM)
             J_total[0] /= comm.ensemble_comm.size
+            
+            gc.collect()
             return J_total[0]
 
         def gradient(self, g, x, tol):
             """Compute the gradient of the functional"""
+            gc.collect()
             dJ_local = Function(V, name='total_gradient')
             for sn in range(model["acquisition"]["num_sources"]):
                 if spyro.io.is_owner(comm, sn):
@@ -185,11 +191,14 @@ for index, freq_band in enumerate(model["inversion"]["freq_bands"]):
             dJ_local.dat.data[water]=0.0
             if comm.ensemble_comm.rank == 0:
                 grad_file.write(dJ_local)
+            
+            gc.collect()
+            
             g.scale(0)
             g.vec += dJ_local
             # switch order of misfit calculation to switch this
             g.vec *= -1
-
+            
         def update(self, x, flag, iteration):
             """Update the control"""
             vp_guess.assign(Function(V, x.vec, name="velocity"))
@@ -203,13 +212,13 @@ for index, freq_band in enumerate(model["inversion"]["freq_bands"]):
             "Type": "Augmented Lagrangian",
             "Augmented Lagrangian": {
                 "Subproblem Step Type": "Line Search",
-                "Subproblem Iteration Limit": 10.0,
+                "Subproblem Iteration Limit": 5.0,
             },
             "Line Search": {"Descent Method": {"Type": "Quasi-Newton Step"}},
         },
         "Status Test": {
             "Gradient Tolerance": 1e-16,
-            "Iteration Limit": 25,
+            "Iteration Limit": 45,
             "Step Tolerance": 1.0e-16,
         },
     }
@@ -223,19 +232,19 @@ for index, freq_band in enumerate(model["inversion"]["freq_bands"]):
     u = Function(V, name="velocity").assign(vp_guess)
     opt = FeVector(u.vector(), inner_product)
 
-    xlo = Function(V)
-    xlo.interpolate(Constant(1.0))
-    x_lo = FeVector(xlo.vector(), inner_product)
+#     xlo = Function(V)
+#     xlo.interpolate(Constant(1.0))
+#     x_lo = FeVector(xlo.vector(), inner_product)
 
-    xup = Function(V)
-    xup.interpolate(Constant(5.0))
-    x_up = FeVector(xup.vector(), inner_product)
+#     xup = Function(V)
+#     xup.interpolate(Constant(5.0))
+#     x_up = FeVector(xup.vector(), inner_product)
 
-    bnd = ROL.Bounds(x_lo, x_up, 1.0)
+#     bnd = ROL.Bounds(x_lo, x_up, 1.0)
 
     algo = ROL.Algorithm("Line Search", params)
 
-    algo.run(opt, obj, bnd)
+    algo.run(opt, obj) #, bnd)
 
     if comm.ensemble_comm.rank == 0:
         File("res" + str(freq_band) + ".pvd", comm=comm.comm).write(obj.vp_guess)
