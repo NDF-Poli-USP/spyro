@@ -27,8 +27,8 @@ model["opts"] = {
 }
 # Define the mesh geometry and filenames of the velocity models
 model["mesh"] = {
-    "Lz": 4.0,  # depth in km - always positive
-    "Lx": 18.0,  # width in km - always positive
+    "Lz": 3.5,  # depth in km - always positive
+    "Lx": 17.0,  # width in km - always positive
     "Ly": 0.0,  # thickness in km - always positive
     "meshfile": "meshes/mm_init.msh",
     "initmodel": "velocity_models/mm_init.hdf5",
