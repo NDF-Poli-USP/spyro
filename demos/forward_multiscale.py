@@ -18,8 +18,8 @@ model["opts"] = {
 
 
 model["mesh"] = {
-    "Lz": 4.0,  # depth in km - always positive
-    "Lx": 18.0,  # width in km - always positive
+    "Lz": 3.0,  # depth in km - always positive
+    "Lx": 17.0,  # width in km - always positive
     "Ly": 0.0,  # thickness in km - always positive
     "meshfile": "demos/mm_exact.msh",
     "initmodel": "demos/mm_init.hdf5",
