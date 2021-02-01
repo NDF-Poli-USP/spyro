@@ -168,7 +168,7 @@ class Receivers:
                     z = node_locations[cell_node_map[cell_id, vertex_number], 0]
                     x = node_locations[cell_node_map[cell_id, vertex_number], 1]
                     cellVertices[receiver_id][vertex_number] = (z, x)
-                    
+
         return cellId_maps, cellVertices, cellNodeMaps
 
     def __new_at(self, udat, receiver_id, is_local):
@@ -248,20 +248,18 @@ class Receivers:
         for receiver_id in range(num_recv):
             (receiver_z, receiver_x, receiver_y) = self.receiver_locations[receiver_id]
 
-            cell_id = self.mesh.locate_cell([receiver_z, receiver_x, receiver_y], tolerance=0.0100)
-            cellId_maps[receiver_id] = cell_id
-            cellNodeMaps[receiver_id, :] = cell_node_map[cell_id, :]
-
+            cell_id = self.mesh.locate_cell([receiver_z, receiver_x, receiver_y], tolerance=0.0500)
             cellVertices.append([])
-
             if cell_id is not None:
+                cellId_maps[receiver_id] = cell_id
+                cellNodeMaps[receiver_id, :] = cell_node_map[cell_id, :]
                 for vertex_number in range(0,4):
                     cellVertices[receiver_id].append([])
                     z = node_locations[cell_node_map[cell_id, vertex_number], 0]
                     x = node_locations[cell_node_map[cell_id, vertex_number], 1]
                     y = node_locations[cell_node_map[cell_id, vertex_number], 2]
                     cellVertices[receiver_id][vertex_number] = (z, x, y)
-                    
+
         return cellId_maps, cellVertices, cellNodeMaps
 
     def __func_node_locations_3D(self):
@@ -291,7 +289,7 @@ class Receivers:
             raise ValueError
 
     def __func_build_cell_tabulations_2D(self):
-        
+
         element = choosing_element(self.space,self.degree)
 
         cell_tabulations = np.zeros((self.num_receivers, self.nodes_per_cell))
@@ -308,7 +306,7 @@ class Receivers:
             phi_tab = initial_tab[(0,0)]
 
             cell_tabulations[receiver_id, :] = phi_tab.transpose()
-        
+
         return cell_tabulations
 
     def __func_build_cell_tabulations_3D(self):
@@ -317,21 +315,26 @@ class Receivers:
         cell_tabulations = np.zeros((self.num_receivers, self.nodes_per_cell))
 
         for receiver_id in range(self.num_receivers):
-            # getting coordinates to change to reference element
-            p  = self.receiver_locations[receiver_id]
-            v0 = self.cellVertices[receiver_id][0]
-            v1 = self.cellVertices[receiver_id][1]
-            v2 = self.cellVertices[receiver_id][2]
-            v3 = self.cellVertices[receiver_id][3]
+            (receiver_z, receiver_x, receiver_y) = self.receiver_locations[receiver_id]
+            cell_id = self.mesh.locate_cell([receiver_z, receiver_x, receiver_y], tolerance=0.0500)
 
-            p_reference = change_to_reference_tetrahedron(p, v0, v1, v2, v3)
-            initial_tab = element.tabulate(0, [p_reference] )
-            phi_tab = initial_tab[(0,0,0)]
 
-            cell_tabulations[receiver_id, :] = phi_tab.transpose()
-        
+            if cell_id is not None:
+                # getting coordinates to change to reference element
+                p  = self.receiver_locations[receiver_id]
+                v0 = self.cellVertices[receiver_id][0]
+                v1 = self.cellVertices[receiver_id][1]
+                v2 = self.cellVertices[receiver_id][2]
+                v3 = self.cellVertices[receiver_id][3]
+
+                p_reference = change_to_reference_tetrahedron(p, v0, v1, v2, v3)
+                initial_tab = element.tabulate(0, [p_reference] )
+                phi_tab = initial_tab[(0,0,0)]
+
+                cell_tabulations[receiver_id, :] = phi_tab.transpose()
+
         return cell_tabulations
-        
+
 
 
 ## Some helper functions
@@ -351,7 +354,7 @@ def choosing_element(V, degree):
     else:
         raise ValueError("Unrecognized cell geometry.")
 
-    if V.ufl_element().family()  == 'Kong-Mulder-Veldhuizen': 
+    if V.ufl_element().family()  == 'Kong-Mulder-Veldhuizen':
         element = KMV(T, degree)
     elif V.ufl_element().family() == 'Lagrange':
         element = CG(T,degree)
