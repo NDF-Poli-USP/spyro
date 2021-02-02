@@ -156,7 +156,7 @@ class Receivers:
         for receiver_id in range(num_recv):
             (receiver_z, receiver_x) = self.receiver_locations[receiver_id]
 
-            cell_id = self.mesh.locate_cell([receiver_z, receiver_x], xerance=0.0100)
+            cell_id = self.mesh.locate_cell([receiver_z, receiver_x], tolerance=0.0100)
             cellId_maps[receiver_id] = cell_id
             cellNodeMaps[receiver_id, :] = cell_node_map[cell_id, :]
 
