@@ -8,6 +8,24 @@ import numpy as np
 import math
 from scipy.signal import butter, filtfilt
 
+from ..domains import quadrature
+
+def helmholtz_filter(u, r_min):
+    """Smooth scalar field"""
+
+    V = u.function_space()
+    qr_x, _, _ = quadrature.quadrature_rules(V)
+
+    s = Function(V)
+    u_ = TrialFunction(V)
+    v = TestFunction(V)
+    a = r_min**2*inner(grad(u_), grad(v))*dx(rule=qr_x) + u_*v*dx(rule=qr_x)
+    L = u*v*dx(rule=qr_x) 
+    parameters = {'kse_type': 'preonly', 'pctype': 'lu'}
+    solve(a == L, s, solver_parameters=parameters)
+
+    return s
+
 
 def butter_lowpass_filter(shot, cutoff, fs, order=2):
     """Low-pass filter the shot record with sampling-rate fs Hz
