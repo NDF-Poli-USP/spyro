@@ -1,5 +1,29 @@
 from firedrake import *
+import numpy as np
 import cplex
+
+def update_flip_limits(beta, counter, multiple, change, xi, mode='counter'):
+    """update limit no number of 'flips'"""
+
+    if mode is 'counter':
+        condition = counter % multiple == 0
+    elif mode is 'change':
+        condition = change > 0
+
+    if condition and counter > 0:
+        new_beta = 0.9 * beta
+        beta = np.maximum(new_beta, 1 / xi.size)
+    
+    return beta
+
+def update_rmin(rmin, counter, limit, multiple):
+    """update radius for sensitivity filer"""
+    
+    if counter >= limit and counter % multiple == 0:
+        new_rmin = rmin / 2
+        rmin = np.maximum(new_rmin, 1e-3)
+
+    return rmin
 
 def iterate_cplex(dJ, beta, xi):
     """Solve subproblem by Integer Linear Programming"""
