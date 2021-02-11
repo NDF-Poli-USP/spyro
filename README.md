@@ -29,15 +29,16 @@ Performance
 
 TODO
 
-A worked example
+Examples
 =================
 
 A simple example of a forward simulation in 2D on a rectangle with a uniform triangular mesh and using the Perfectly Matched Layer is like the following below. Note here we first specify the input file and build a uniform mesh using the meshing capabilities provided by Firedrake. However, more complex meshes for realistic problems can be generated via [SeismicMesh](https://github.com/krober10nd/SeismicMesh).
 
 
-See the demos folder for an FWI example (this requires some other dependencies pyrol and ROLtrilinos).
+See the demos folder for other FWI example (this requires some other dependencies pyrol and ROLtrilinos).
 
-
+Forward wave propagation
+-------------------------
 
 ![Above shows the simulation at two timesteps in ParaView that results from running the code below](https://user-images.githubusercontent.com/18619644/94087976-7e81df00-fde5-11ea-96c0-474348286091.png)
 
@@ -173,6 +174,14 @@ spyro.plots.plot_shotrecords(model, p_at_recv, "example_shot", vmin=-1e-5, vmax=
 # Save the shot (a Numpy array) as a pickle for other use.
 spyro.io.save_shots("example_shot.dat", p_at_recv)
 ```
+
+Full-waveform inversion
+------------------------
+
+`spyro` is designed to let you set up objective functions that can be passed to other optimization packages. The following example demonstrates how to perform full-waveform inversion on a two-dimensional slice of the Overthrust mode using a l-BFGS approach available from the Rapid Optimization Library (ROL).  A small test dataset (XX MB) and the model can be downloaded from this FTP server: 
+
+
+
 
 ### Testing
 
