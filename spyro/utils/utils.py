@@ -176,6 +176,11 @@ def normalize_vp(model, vp):
             control.dat.data[:] -= vp_min
             control.dat.data[:] /= (vp_max - vp_min)
             control.dat.data[:] = control.dat.data[:] ** (1 / penal)
+            # trim loose ends
+            lb, ub = 0, 1
+            control.dat.data[:] = np.minimum(
+                np.maximum(lb, control.dat.data[:]), ub
+            )
 
     return control
 
