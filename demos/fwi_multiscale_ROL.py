@@ -162,7 +162,8 @@ for index, freq_band in enumerate(model["inversion"]["freq_bands"]):
             # reduce over all cores
             J_total = COMM_WORLD.allreduce(J_total, op=MPI.SUM)
             J_total[0] /= comm.ensemble_comm.size
-            
+            if comm.comm.size > 1: 
+                J_total[0] /= comm.comm.size
             gc.collect()
             return J_total[0]
 
