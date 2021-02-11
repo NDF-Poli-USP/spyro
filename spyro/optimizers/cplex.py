@@ -35,8 +35,9 @@ def iterate_cplex(dJ, beta, xi):
     rhs = [int(beta * xi.size)]
 
     # Variable limits
-    lb = -1*(abs(xi - 1) < 0.001)
-    ub =  1*(abs(xi) < 0.001)
+    lb = 0 - xi
+    ub = 1 - xi
+    import IPython; IPython.embed(); exit()
 
     # Set up problem
     problem = cplex.Cplex()
