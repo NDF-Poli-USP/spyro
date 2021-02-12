@@ -198,7 +198,7 @@ for index, freq_band in enumerate(model["inversion"]["freq_bands"]):
             g.scale(0)
             g.vec += dJ_local
             # switch order of misfit calculation to switch this
-            g.vec *= -1
+            #g.vec *= -1
             
         def update(self, x, flag, iteration):
             """Update the control"""
