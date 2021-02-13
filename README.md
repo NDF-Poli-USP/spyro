@@ -6,8 +6,8 @@ spyro: Acoustic wave modeling in Firedrake
 
 spyro is a Python library for modeling acoustic waves. The main
 functionality is a set of forward and discrete adjoint wave propagators for solving the acoustic wave equation in the time domain.
-These wave propagators can be used to form complete Full Waveform Inversion or Reverse Time Migration applications. See the demos.
-To implement these solvers, spyro uses the finite element analysis package [Firedrake](https://www.firedrakeproject.org/index.html).
+These wave propagators can be used to form complete Full Waveform Inversion or Reverse Time Migration applications. See the [demos](https://github.com/krober10nd/spyro/tree/main/demos).
+To implement these solvers, spyro uses the finite element package [Firedrake](https://www.firedrakeproject.org/index.html).
 
 To use Spyro, you'll need to have some knowledge of Python and some basic concepts in inverse modeling relevant to active-sourcce seismology.
 
@@ -23,6 +23,11 @@ Functionality
 * Sparse interpolation and injection.
 
 Using this functionality, short Python scripts can written that perform Full Waveform Inversion (FWI) type algorithms using well-developed numerical optimization algorithms such as L-BFGS from the SciPy package. See the notebooks folder for an FWI example.
+
+Performance
+===========
+
+TODO
 
 A worked example
 =================
@@ -53,7 +58,7 @@ model = {}
 # Choose method and parameters
 model["opts"] = {
     "method": "KMV",  # either CG or KMV
-    "variant": None,
+    "quadratrue": "KMV", # Equi or KMV
     "degree": 1,  # p order
     "dimension": 2,  # dimension
 }

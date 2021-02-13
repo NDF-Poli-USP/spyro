@@ -95,10 +95,15 @@ def evaluate_misfit(model, my_ensemble, guess, exact):
     """Compute the difference between the guess and exact
     at the receiver locations"""
 
+    if "skip" in model["timeaxis"]:
+        skip = model["timeaxis"]["skip"]
+    else:
+        skip = 1
+
     if my_ensemble.comm.rank == 0 and my_ensemble.ensemble_comm.rank == 0:
         print("Computing the misfit...", flush=True)
 
-    return guess - exact
+    return exact[::skip] - guess
 
 
 def myrank(COMM=COMM_SELF):

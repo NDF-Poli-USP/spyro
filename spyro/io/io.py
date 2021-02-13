@@ -74,7 +74,7 @@ def is_owner(ens_comm, rank):
 
 
 def _check_units(c):
-    if min(c.dat.data[:]) > 1000.0:
+    if min(c.dat.data[:]) > 100.0:
         # data is in m/s but must be in km/s
         if fire.COMM_WORLD.rank == 0:
             print("INFO: converting from m/s to km/s", flush=True)
