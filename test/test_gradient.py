@@ -59,7 +59,7 @@ def test_gradient():
 
     # fileout = open("grad_fin_dif_test.txt", "w")
     epsilon = 1e-10
-    vp_guess_2.dat.data[:] = vp_guess.dat.data[:] + epsilon * dJ.dat.data[:]
+    vp_guess_2.dat.data[:] = vp_guess.dat.data[:] - epsilon * dJ.dat.data[:]
     # File("vp_guess2.pvd").write(vp_guess_2)
     J = 0
     for isour in range(num_sources):
