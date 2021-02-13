@@ -1,6 +1,7 @@
 *.pyc
 *.vtu
 *.pvd
+*.vtk
 *.pdf
 *.PDF
 *.png
