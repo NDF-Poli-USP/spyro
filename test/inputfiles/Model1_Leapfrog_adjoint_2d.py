@@ -1,5 +1,5 @@
 import os
-from spyro import create_receiver_transect
+from spyro import create_transect
 
 fname = os.path.join(os.path.dirname(__file__), "../meshes/Uniform2D")
 
@@ -55,11 +55,9 @@ acquisition = {
     "frequency": 5.0,
     "delay": 1.0,
     "num_sources": 1,
-    "source_pos": [
-        (1.5, -0.5)
-    ],  # create_receiver_transect((0.1, -0.05), (2.9, -0.05), 5),
+    "source_pos": [(1.5, -0.5)],
     "num_receivers": 101,
-    "receiver_locations": create_receiver_transect((0.1, -2.90), (2.9, -2.90), 101),
+    "receiver_locations": create_transect((0.1, -2.90), (2.9, -2.90), 101),
 }
 
 timeaxis = {
