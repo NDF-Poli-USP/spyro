@@ -99,7 +99,7 @@ model["PML"] = {
 # Create a source injection operator. Here we use a single source with a
 # Ricker wavelet that has a peak frequency of 8 Hz injected at the center of the mesh.
 # We also specify to record the solution at 101 microphones near the top of the domain.
-# This transect of receivers is created with the helper function `create_receiver_transect`.
+# This transect of receivers is created with the helper function `create_transect`.
 model["acquisition"] = {
     "source_type": "Ricker",
     "num_sources": 1,
@@ -107,7 +107,7 @@ model["acquisition"] = {
     "frequency": 8.0,
     "delay": 1.0,
     "num_receivers": 100,
-    "receiver_locations": spyro.create_receiver_transect(
+    "receiver_locations": spyro.create_transect(
         (-0.10, 0.1), (-0.10, 1.4), 100
     ),
 }
