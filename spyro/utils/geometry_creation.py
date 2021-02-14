@@ -1,8 +1,8 @@
 import numpy as np
 
 
-def create_receiver_transect(start, end, num):
-    """Create a line of `num` receivers between coordinates
+def create_transect(start, end, num):
+    """Create a line of `num` of points between coordinates
     `start` and `end`
 
     Parameters
@@ -22,8 +22,8 @@ def create_receiver_transect(start, end, num):
     return np.linspace(start, end, num)
 
 
-def create_receiver_grid_2d(start1, end1, start2, end2, num):
-    """Create a 2d grid of `num**2` receivers between `start1`
+def create_2d_grid(start1, end1, start2, end2, num):
+    """Create a 2d grid of `num**2` points between `start1`
     and `end1` and `start2` and `end2`
 
     Parameters

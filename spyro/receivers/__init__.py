@@ -1,3 +1,3 @@
-from . import Receivers, create_receivers
+from . import Receivers
 
-__all__ = ["Receivers", "create_receivers"]
+__all__ = ["Receivers"]

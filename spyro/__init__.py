@@ -2,9 +2,9 @@ from . import plots
 from . import domains
 from . import pml
 from .receivers.Receivers import Receivers
-from .receivers.create_receivers import create_receiver_transect, create_receiver_grid_2d, insert_fixed_value
 from .sources.Sources import Sources
 from .utils import utils
+from .utils.geometry_creation import create_transect, create_2d_grid, insert_fixed_value
 from .io import io
 from . import solvers
 
@@ -14,8 +14,8 @@ __all__ = [
     "domains",
     "pml",
     "Receivers",
-    "create_receiver_transect",
-    "create_receiver_grid_2d",
+    "create_transect",
+    "create_2d_grid",
     "insert_fixed_value",
     "Sources",
     "solvers",
