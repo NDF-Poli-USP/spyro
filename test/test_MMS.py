@@ -19,14 +19,14 @@ def mesh(mesh_type):
     if mesh_type == "square":
         model["opts"]["element"] = "tria"
         model["opts"]["dimension"] = 2
-        model["acquisition"]["receiver_locations"] = spyro.create_receiver_transect(
+        model["acquisition"]["receiver_locations"] = spyro.create_transect(
             (0.0, 1.0), (0.0, 0.9), 256
         )
         model["acquisition"]["source_pos"] = [(-0.05, 1.5)]
     elif mesh_type == "cube":
         model["opts"]["element"] = "tetra"
         model["opts"]["dimension"] = 3
-        model["acquisition"]["receiver_locations"] = spyro.create_receiver_transect(
+        model["acquisition"]["receiver_locations"] = spyro.create_transect(
             (0.0, 0.0, 0.0), (0.0, 0.0, 1.0), 256
         )
         model["acquisition"]["source_pos"] = [(-0.05, 1.5, 1.5)]
