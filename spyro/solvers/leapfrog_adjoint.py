@@ -354,7 +354,7 @@ def Leapfrog_adjoint(
     gathered_total = dJdC_local.dat.data[:]
 
     if "inversion" in model:
-        if model["inversion"]["optimizer"] == "scipy":
+        if ["scipy", "cplex"] in model["inversion"]["optimizer"]:
 
             if comm.comm.size > 1:
                 if comm.comm.rank == 0 and comm.ensemble_comm.rank == 0:
@@ -368,7 +368,7 @@ def Leapfrog_adjoint(
         )
 
     if "inversion" in model:
-        if model["inversion"]["optimizer"] == "scipy":
+        if ["scipy", "cplex"] in model["inversion"]["optimizer"]:
             return gathered_total
 
     return dJdC_local
