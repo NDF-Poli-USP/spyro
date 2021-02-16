@@ -19,7 +19,7 @@ def fill(usol_recv, is_local, nt, nr):
     usol_recv = np.asarray(usol_recv)
     for ti in range(nt):
         for rn in range(nr):
-            if is_local[rn] is None:
+            if is_local[rn] == None:
                 usol_recv[ti][rn] = -99999.0
     return usol_recv
 

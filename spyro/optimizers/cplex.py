@@ -5,9 +5,9 @@ import cplex
 def update_flip_limits(beta, counter, multiple, change, xi, mode='counter'):
     """update limit no number of 'flips'"""
 
-    if mode is 'counter':
+    if mode == 'counter':
         condition = counter % multiple == 0
-    elif mode is 'change':
+    elif mode == 'change':
         condition = change > 0
 
     if condition and counter > 0:

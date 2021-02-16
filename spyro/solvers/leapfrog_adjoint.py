@@ -233,7 +233,7 @@ def Leapfrog_adjoint(
         dvp = Function(V)
 
         if "material" in model:
-            if model["material"]["type"] is "simp":
+            if model["material"]["type"] == "simp":
                 vp_min = Constant(model["material"]["vp_min"])
                 vp_max = Constant(model["material"]["vp_max"])
                 penal = Constant(model["material"]["penal"])
@@ -354,7 +354,7 @@ def Leapfrog_adjoint(
     gathered_total = dJdC_local.dat.data[:]
 
     if "inversion" in model:
-        if model["inversion"]["optimizer"] is "scipy":
+        if model["inversion"]["optimizer"] == "scipy":
 
             if comm.comm.size > 1:
                 if comm.comm.rank == 0 and comm.ensemble_comm.rank == 0:
@@ -368,7 +368,7 @@ def Leapfrog_adjoint(
         )
 
     if "inversion" in model:
-        if model["inversion"]["optimizer"] is "scipy":
+        if model["inversion"]["optimizer"] == "scipy":
             return gathered_total
 
     return dJdC_local

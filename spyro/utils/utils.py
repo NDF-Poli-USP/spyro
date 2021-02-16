@@ -95,7 +95,7 @@ def evaluate_misfit(model, my_ensemble, guess, exact):
     """Compute the difference between the guess and exact
     at the receiver locations"""
 
-    if "skip" in model["timeaxis"]:
+    if "skip" == model["timeaxis"]:
         skip = model["timeaxis"]["skip"]
     else:
         skip = 1
@@ -174,7 +174,7 @@ def normalize_vp(model, vp):
     control = firedrake.Function(vp)
 
     if "material" in model:
-        if model["material"]["type"] is "simp":
+        if model["material"]["type"] == "simp":
             vp_min = model["material"]["vp_min"]
             vp_max = model["material"]["vp_max"]
             penal = model["material"]["penal"]
@@ -211,7 +211,7 @@ def control_to_vp(model, control):
     vp = firedrake.Function(control)
 
     if "material" in model:
-        if model["material"]["type"] is "simp":
+        if model["material"]["type"] == "simp":
             vp_min = Constant(model["material"]["vp_min"])
             vp_max = Constant(model["material"]["vp_max"])
             penal = Constant(model["material"]["penal"])
