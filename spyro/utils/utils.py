@@ -341,3 +341,15 @@ def create_mesh(model, comm, quad=True):
 
     return mesh, V
 
+def water_layer(mesh, V, vp, depth=None, vw=1.51):
+    """Get DoFs in water"""
+
+    if depth:
+        z = mesh.coordinates[0]
+        water = Function(V).interpolate(conditional(z < depth, 1, 0))
+        water_dofs = np.where(water.dat.data[:] < vw)
+    else:
+        water_dofs = np.where(vp.dat.data[:] < vw)
+
+    return water_dofs
+        
