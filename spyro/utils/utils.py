@@ -320,3 +320,24 @@ def spatial_scatter(comm, xi, u):
     N = [comm.comm.bcast(n, r) for r in range(size)]
     indices = np.insert(np.cumsum(N), 0, 0)
     u.dat.data[:] = xi[indices[rank] : indices[rank + 1]]
+
+def create_mesh(model, comm, quad=True):
+    """Create mesh from model parameters"""
+
+    mesh = RectangleMesh(model["mesh"]["nz"],
+                                   model["mesh"]["nx"],
+                                   model["mesh"]["Lz"],
+                                   model["mesh"]["Lx"],
+                                   quadrilateral=quad,
+                                   diagonal='crossed',
+                                   comm=comm.comm)
+    
+    element = FiniteElement(model["opts"]["method"],
+                                      mesh.ufl_cell(),
+                                      degree=model["opts"]["degree"],
+                                      variant=model["opts"]["variant"])
+
+    V = FunctionSpace(mesh, element)
+
+    return mesh, V
+
