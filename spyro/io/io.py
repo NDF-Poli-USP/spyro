@@ -1,6 +1,9 @@
 from __future__ import with_statement
 
+from io import StringIO
 import os
+import json
+import argparse
 
 import firedrake as fire
 
@@ -227,3 +230,27 @@ def read_mesh(model, ens_comm):
     element = domains.space.FE_method(mesh, method, degree)
     # Space of problem
     return mesh, fire.FunctionSpace(mesh, element)
+
+def load_model(jsonfile=None):
+    """Load model dictionary describing forward/inversion problem"""
+
+    parser = argparse.ArgumentParser(description="Run Full Waveform Inversion")
+    parser.add_argument(
+        "-c", "--config-file",type=str, required=False, help="json file with parameters"
+    )
+
+    file = parser.parse_args().config_file if not jsonfile else jsonfile
+
+    with open(file, "r") if file else StringIO('{}') as f:
+        model = json.load(f)
+
+    return model
+
+def save_model(model, jsonfile=None):
+    """Save model dictionary describing forward/inversion problem"""
+
+    if not jsonfile: jsonfile = "model.json"
+
+    with open(jsonfile, "w") as f:
+        json.dump(model, f, indent=4)
+
