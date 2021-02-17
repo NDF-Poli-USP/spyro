@@ -299,8 +299,8 @@ def Leapfrog(
 
         t = IT * float(dt)
 
-        usol_recv = helpers.fill(usol_recv, is_local, nt, receivers.num_receivers)
-        usol_recv = utils.communicate(usol_recv, comm)
+    usol_recv = helpers.fill(usol_recv, is_local, nt, receivers.num_receivers)
+    usol_recv = utils.communicate(usol_recv, comm)
 
     if comm.ensemble_comm.rank == 0 and comm.comm.rank == 0:
         print(
