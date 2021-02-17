@@ -6,7 +6,6 @@ from firedrake.assemble import create_assembly_callable
 
 from scipy.sparse import csc_matrix
 
-from .. import io
 from ..domains import quadrature, space
 from ..pml import damping
 from ..sources import delta_expr, delta_expr_3d
@@ -17,9 +16,33 @@ set_log_level(ERROR)
 __all__ = ["Leapfrog_adjoint"]
 
 
-def Leapfrog_adjoint(
-    model, mesh, comm, c, guess, residual, source_num=0, save_adjoint=False
-):
+def Leapfrog_adjoint(model, mesh, comm, c, guess, residual):
+    """Discrete adjoint for secord-order in time fully-explicit Leapfrog scheme
+    with implementation of a Perfectly Matched Layer (PML) using
+    CG FEM with or without higher order mass lumping (KMV type elements).
+
+    Parameters
+    ----------
+    model: Python `dictionary`
+        Contains model options and parameters
+    mesh: Firedrake.mesh object
+        The 2D/3D triangular mesh
+    comm: Firedrake.ensemble_communicator
+        The MPI communicator for parallelism
+       c: Firedrake.Function
+        The velocity model interpolated onto the mesh nodes.
+    guess: A list of Firedrake functions
+        Contains the forward wavefield at a set of timesteps
+    residual: array-like
+        The difference between the observed and modeled data at
+        the receivers
+
+    Returns
+    -------
+    dJdc_local: A Firedrake.Function containing the gradient of
+                the functional w.r.t. `c`
+
+    """
 
     numrecs = model["acquisition"]["num_receivers"]
     method = model["opts"]["method"]
@@ -159,179 +182,166 @@ def Leapfrog_adjoint(
         u_n = Function(V)
         u_np1 = Function(V)
 
-    outfile = helpers.create_output_file("Leapfrog_adjoint.pvd", comm, source_num)
+    # outfile = helpers.create_output_file("Leapfrog_adjoint.pvd", comm, source_num)
 
-    if io.is_owner(comm, source_num):
+    t = 0.0
 
-        t = 0.0
+    # -------------------------------------------------------
+    m1 = ((u - 2.0 * u_n + u_nm1) / Constant(dt ** 2)) * v * dx(rule=qr_x)
+    a = c * c * dot(grad(u_n), grad(v)) * dx(rule=qr_x)  # explicit
 
-        # -------------------------------------------------------
-        m1 = ((u - 2.0 * u_n + u_nm1) / Constant(dt ** 2)) * v * dx(rule=qr_x)
-        a = c * c * dot(grad(u_n), grad(v)) * dx(rule=qr_x)  # explicit
+    if model["PML"]["outer_bc"] == "non-reflective":
+        nf = c * ((u_n - u_nm1) / dt) * v * ds(rule=qr_s)
+    else:
+        nf = 0
 
-        if model["PML"]["outer_bc"] == "non-reflective":
-            nf = c * ((u_n - u_nm1) / dt) * v * ds(rule=qr_s)
-        else:
-            nf = 0
+    FF = m1 + a + nf
 
-        FF = m1 + a + nf
+    if PML:
+        X = Function(W)
+        B = Function(W)
 
+        if dim == 2:
+            pml1 = (sigma_x + sigma_z) * ((u - u_n) / dt) * v * dx(rule=qr_x)
+            pml2 = sigma_x * sigma_z * u_n * v * dx(rule=qr_x)
+            pml3 = inner(grad(v), dot(Gamma_2, pp_n)) * dx(rule=qr_x)
+
+            FF += pml1 + pml2 + pml3
+            # -------------------------------------------------------
+            mm1 = (dot((pp - pp_n), qq) / Constant(dt)) * dx(rule=qr_x)
+            mm2 = inner(dot(Gamma_1, pp_n), qq) * dx(rule=qr_x)
+            dd = inner(qq, grad(u_n)) * dx(rule=qr_x)
+
+            FF += mm1 + mm2 + dd
+        elif dim == 3:
+            pml1 = (sigma_x + sigma_y + sigma_z) * ((u - u_n) / dt) * v * dx(rule=qr_x)
+            pml2 = (
+                (sigma_x * sigma_y + sigma_x * sigma_z + sigma_y * sigma_z)
+                * u_n
+                * v
+                * dx(rule=qr_x)
+            )
+            dd1 = inner(grad(v), dot(Gamma_2, pp_n)) * dx(rule=qr_x)
+
+            FF += pml1 + pml2 + dd1
+            # -------------------------------------------------------
+            mm1 = (dot((pp - pp_n), qq) / dt) * dx(rule=qr_x)
+            mm2 = inner(dot(Gamma_1, pp_n), qq) * dx(rule=qr_x)
+            pml4 = inner(qq, grad(u_n)) * dx(rule=qr_x)
+
+            FF += mm1 + mm2 + pml4
+            # -------------------------------------------------------
+            pml3 = (sigma_x * sigma_y * sigma_z) * phi * u_n * dx(rule=qr_x)
+            mmm1 = (dot((psi - psi_n), phi) / dt) * dx(rule=qr_x)
+            uuu1 = (-u_n * phi) * dx(rule=qr_x)
+
+            FF += mm1 + uuu1 + pml3
+    else:
+        X = Function(V)
+        B = Function(V)
+
+    lhs_ = lhs(FF)
+    rhs_ = rhs(FF)
+
+    A = assemble(lhs_, mat_type="matfree")
+    solver = LinearSolver(A, solver_parameters=params)
+
+    # Define gradient problem
+    g_u = TrialFunction(V)
+    g_v = TestFunction(V)
+
+    mgrad = g_u * g_v * dx(rule=qr_x)
+
+    uuadj = Function(V)  # auxiliarly function for the gradient compt.
+    uufor = Function(V)  # auxiliarly function for the gradient compt.
+
+    if PML:
+        ppadj = Function(Z)  # auxiliarly function for the gradient compt.
+        ppfor = Function(Z)  # auxiliarly function for the gradient compt.
+
+        ffG = (
+            2.0
+            * c
+            * Constant(dt)
+            * (dot(grad(uuadj), grad(uufor)) + inner(grad(uufor), dot(Gamma_2, ppadj)))
+            * g_v
+            * dx(rule=qr_x)
+        )
+    else:
+        ffG = (
+            2.0 * c * Constant(dt) * dot(grad(uuadj), grad(uufor)) * g_v * dx(rule=qr_x)
+        )
+
+    G = mgrad - ffG
+    lhsG, rhsG = lhs(G), rhs(G)
+
+    gradi = Function(V)
+    grad_prob = LinearVariationalProblem(lhsG, rhsG, gradi)
+    if method == "KMV":
+        grad_solv = LinearVariationalSolver(
+            grad_prob,
+            solver_parameters={
+                "ksp_type": "preonly",
+                "pc_type": "jacobi",
+                "mat_type": "matfree",
+            },
+        )
+    elif method == "CG":
+        grad_solv = LinearVariationalSolver(
+            grad_prob,
+            solver_parameters={
+                "mat_type": "matfree",
+            },
+        )
+
+    assembly_callable = create_assembly_callable(rhs_, tensor=B)
+
+    rhs_forcing = Function(V)  # forcing term
+    for IT in range(nt - 1, -1, -1):
+        t = IT * float(dt)
+
+        # Solver - main equation - (I)
+        # B = assemble(rhs_, tensor=B)
+        assembly_callable()
+
+        f = _adjoint_update_rhs(rhs_forcing, sparse_excitations, residual, IT, is_local)
+        # add forcing term to solve scalar pressure
+        B.sub(0).dat.data[:] += f.dat.data[:]
+
+        # AX=B --> solve for X = B/Aˆ-1
+        solver.solve(X, B)
         if PML:
-            X = Function(W)
-            B = Function(W)
-
             if dim == 2:
-                pml1 = (sigma_x + sigma_z) * ((u - u_n) / dt) * v * dx(rule=qr_x)
-                pml2 = sigma_x * sigma_z * u_n * v * dx(rule=qr_x)
-                pml3 = inner(grad(v), dot(Gamma_2, pp_n)) * dx(rule=qr_x)
-
-                FF += pml1 + pml2 + pml3
-                # -------------------------------------------------------
-                mm1 = (dot((pp - pp_n), qq) / Constant(dt)) * dx(rule=qr_x)
-                mm2 = inner(dot(Gamma_1, pp_n), qq) * dx(rule=qr_x)
-                dd = inner(qq, grad(u_n)) * dx(rule=qr_x)
-
-                FF += mm1 + mm2 + dd
+                u_np1, pp_np1 = X.split()
             elif dim == 3:
-                pml1 = (
-                    (sigma_x + sigma_y + sigma_z) * ((u - u_n) / dt) * v * dx(rule=qr_x)
-                )
-                pml2 = (
-                    (sigma_x * sigma_y + sigma_x * sigma_z + sigma_y * sigma_z)
-                    * u_n
-                    * v
-                    * dx(rule=qr_x)
-                )
-                dd1 = inner(grad(v), dot(Gamma_2, pp_n)) * dx(rule=qr_x)
+                u_np1, psi_np1, pp_np1 = X.split()
 
-                FF += pml1 + pml2 + dd1
-                # -------------------------------------------------------
-                mm1 = (dot((pp - pp_n), qq) / dt) * dx(rule=qr_x)
-                mm2 = inner(dot(Gamma_1, pp_n), qq) * dx(rule=qr_x)
-                pml4 = inner(qq, grad(u_n)) * dx(rule=qr_x)
+                psi_nm1.assign(psi_n)
+                psi_n.assign(psi_np1)
 
-                FF += mm1 + mm2 + pml4
-                # -------------------------------------------------------
-                pml3 = (sigma_x * sigma_y * sigma_z) * phi * u_n * dx(rule=qr_x)
-                mmm1 = (dot((psi - psi_n), phi) / dt) * dx(rule=qr_x)
-                uuu1 = (-u_n * phi) * dx(rule=qr_x)
-
-                FF += mm1 + uuu1 + pml3
+            pp_nm1.assign(pp_n)
+            pp_n.assign(pp_np1)
         else:
-            X = Function(V)
-            B = Function(V)
+            u_np1.assign(X)
 
-        lhs_ = lhs(FF)
-        rhs_ = rhs(FF)
+        u_nm1.assign(u_n)
+        u_n.assign(u_np1)
 
-        A = assemble(lhs_, mat_type="matfree")
-        solver = LinearSolver(A, solver_parameters=params)
+        # compute the gradient increment
+        uuadj.assign(u_n)
 
-        # Define gradient problem
-        g_u = TrialFunction(V)
-        g_v = TestFunction(V)
+        # only compute for snaps that were saved
+        if IT % fspool == 0:
+            gradi.assign = 0.0
+            uufor.assign(guess.pop())
 
-        mgrad = g_u * g_v * dx(rule=qr_x)
+            grad_solv.solve()
+            dJdC_local += gradi
 
-        uuadj = Function(V)  # auxiliarly function for the gradient compt.
-        uufor = Function(V)  # auxiliarly function for the gradient compt.
-
-        if PML:
-            ppadj = Function(Z)  # auxiliarly function for the gradient compt.
-            ppfor = Function(Z)  # auxiliarly function for the gradient compt.
-
-            ffG = (
-                2.0
-                * c
-                * Constant(dt)
-                * (
-                    dot(grad(uuadj), grad(uufor))
-                    + inner(grad(uufor), dot(Gamma_2, ppadj))
-                )
-                * g_v
-                * dx(rule=qr_x)
-            )
-        else:
-            ffG = (
-                2.0
-                * c
-                * Constant(dt)
-                * dot(grad(uuadj), grad(uufor))
-                * g_v
-                * dx(rule=qr_x)
-            )
-
-        G = mgrad - ffG
-        lhsG, rhsG = lhs(G), rhs(G)
-
-        gradi = Function(V)
-        grad_prob = LinearVariationalProblem(lhsG, rhsG, gradi)
-        if method == "KMV":
-            grad_solv = LinearVariationalSolver(
-                grad_prob,
-                solver_parameters={
-                    "ksp_type": "preonly",
-                    "pc_type": "jacobi",
-                    "mat_type": "matfree",
-                },
-            )
-        elif method == "CG":
-            grad_solv = LinearVariationalSolver(
-                grad_prob,
-                solver_parameters={
-                    "mat_type": "matfree",
-                },
-            )
-
-        assembly_callable = create_assembly_callable(rhs_, tensor=B)
-
-        rhs_forcing = Function(V)  # forcing term
-        for IT in range(nt - 1, -1, -1):
-            t = IT * float(dt)
-
-            # Solver - main equation - (I)
-            # B = assemble(rhs_, tensor=B)
-            assembly_callable()
-
-            f = _adjoint_update_rhs(
-                rhs_forcing, sparse_excitations, residual, IT, is_local
-            )
-            # add forcing term to solve scalar pressure
-            B.sub(0).dat.data[:] += f.dat.data[:]
-
-            # AX=B --> solve for X = B/Aˆ-1
-            solver.solve(X, B)
-            if PML:
-                if dim == 2:
-                    u_np1, pp_np1 = X.split()
-                elif dim == 3:
-                    u_np1, psi_np1, pp_np1 = X.split()
-
-                    psi_nm1.assign(psi_n)
-                    psi_n.assign(psi_np1)
-
-                pp_nm1.assign(pp_n)
-                pp_n.assign(pp_np1)
-            else:
-                u_np1.assign(X)
-
-            u_nm1.assign(u_n)
-            u_n.assign(u_np1)
-
-            # compute the gradient increment
-            uuadj.assign(u_n)
-
-            # only compute for snaps that were saved
-            if IT % fspool == 0:
-                gradi.assign = 0.0
-                uufor.assign(guess.pop())
-
-                grad_solv.solve()
-                dJdC_local += gradi
-
-            if IT % nspool == 0:
-                outfile.write(u_n, time=t)
-                helpers.display_progress(comm, t)
+        if IT % nspool == 0:
+            # if output:
+            #    outfile.write(u_n, time=t)
+            helpers.display_progress(comm, t)
 
     if comm.ensemble_comm.rank == 0 and comm.comm.rank == 0:
         print(
