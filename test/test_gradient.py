@@ -41,7 +41,7 @@ def test_gradient():
         residual = spyro.utils.evaluate_misfit(model, comm, p_guess_recv, p_exact_recv)
         Jtmp += spyro.utils.compute_functional(model, comm, residual)
         grad = spyro.solvers.Leapfrog_adjoint(
-            model, mesh, comm, vp_guess, p_guess, residual, source_num=isour
+            model, mesh, comm, vp_guess, p_guess, residual
         )
         dJ.dat.data[:] += grad.dat.data[:]
 
