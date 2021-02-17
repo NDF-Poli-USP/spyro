@@ -181,7 +181,7 @@ def Leapfrog(
 
     t = 0.0
 
-    cutoff = freq_bands[lp_freq_index] if "inversion" in model else None
+    cutoff = freq_bands[freq_index] if "inversion" in model else None
     RW = FullRickerWavelet(dt, tf, freq, amp=amp, cutoff=cutoff)
 
     excitation = excitations[source_num]
