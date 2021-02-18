@@ -1,4 +1,5 @@
 import os
+import numpy as np
 
 from firedrake import *
 
@@ -24,6 +25,7 @@ def _make_vp_guess(V, mesh):
     """The guess is a uniform velocity of 4.0 km/s"""
     z, x = SpatialCoordinate(mesh)
     vp_guess = Function(V).interpolate(4.0 + 0.0 * x)
+    File("guess_vel.pvd").write(vp_guess)
     return vp_guess
 
 
@@ -94,11 +96,11 @@ def test_gradient_talyor_remainder():
     J = []
     J.append(_compute_functional(model, mesh, comm, misfit))
 
-    delta_m = Function(V).assign(0.001)
-    step = 0.001  #
+    delta_m = Function(V).assign(0.50)
+    step = 0.50  #
 
     remainder = []
-    for i in range(4):
+    for i in range(3):
         vp_guess = _make_vp_guess(V, mesh)
         # perturb the model and calculate the functional (again)
         # J(m + delta_m*h)
@@ -112,16 +114,19 @@ def test_gradient_talyor_remainder():
         # compute the functional (again)
         J.append(_compute_functional(model, mesh, comm, misfit))
         # compute the second-order Taylor remainder
-        remainder.append(J[i + 1] - J[0] - step * assemble(grad * delta_m * dx))
-        # np.dot(grad.dat.data[:], delta_m.dat.data[:])
+        remainder.append(
+            J[i + 1] - J[0] - step * np.dot(grad.dat.data[:], delta_m.dat.data[:])
+        )
+        # assemble(grad * delta_m * dx))
         # halve the step and repeat
         step /= 2.0
 
     # remainder should decrease at a second order rate
     remainder = np.array(np.abs(remainder))
     l2conv = np.log2(remainder[:-1] / remainder[1:])
-    print(remainder)
+    # print(remainder)
     print(l2conv)
+    assert (l2conv > 1.8).all()
 
 
 if __name__ == "__main__":
