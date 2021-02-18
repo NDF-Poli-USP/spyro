@@ -37,13 +37,13 @@ def test_gradient_3d():
         p_exact, p_exact_recv = spyro.solvers.Leapfrog(
             model, mesh, comm, vp_exact, sources, receivers, source_num=isour
         )
-        p_guess, p_guess_recv = spyro.solvers.Leapfrog(
+        p_guess, p_guess_recv, psi_guess = spyro.solvers.Leapfrog(
             model, mesh, comm, vp_guess, sources, receivers, source_num=isour
         )
         residual = spyro.utils.evaluate_misfit(model, comm, p_guess_recv, p_exact_recv)
         Jtmp += spyro.utils.compute_functional(model, comm, residual)
         grad = spyro.solvers.Leapfrog_adjoint(
-            model, mesh, comm, vp_guess, p_guess, residual, source_num=isour
+            model, mesh, comm, vp_guess, p_guess, residual, psisol=psi_guess
         )
         dJ.dat.data[:] += grad.dat.data[:]
 
@@ -65,7 +65,7 @@ def test_gradient_3d():
     File("vp_guess2.pvd").write(vp_guess_2)
     J = 0
     for isour in range(num_sources):
-        p_guess, p_guess_recv = spyro.solvers.Leapfrog(
+        p_guess, p_guess_recv, _ = spyro.solvers.Leapfrog(
             model, mesh, comm, vp_guess_2, sources, receivers, source_num=isour
         )
         residual = spyro.utils.evaluate_misfit(model, comm, p_guess_recv, p_exact_recv)
