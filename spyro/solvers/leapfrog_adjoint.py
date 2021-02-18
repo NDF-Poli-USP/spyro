@@ -16,7 +16,7 @@ set_log_level(ERROR)
 __all__ = ["Leapfrog_adjoint"]
 
 
-def Leapfrog_adjoint(model, mesh, comm, c, guess, residual, psisol=None):
+def Leapfrog_adjoint(model, mesh, comm, c, guess, residual, psi_sol=None):
     """Discrete adjoint for secord-order in time fully-explicit Leapfrog scheme
     with implementation of a Perfectly Matched Layer (PML) using
     CG FEM with or without higher order mass lumping (KMV type elements).
@@ -36,6 +36,9 @@ def Leapfrog_adjoint(model, mesh, comm, c, guess, residual, psisol=None):
     residual: array-like
         The difference between the observed and modeled data at
         the receivers
+       psi_sol: A list of Firedrake functions, (necessary for 3d with PML)
+        Contains the forward solution for the auxillary equation psi 
+        for a set of timesteps
 
     Returns
     -------
@@ -215,7 +218,7 @@ def Leapfrog_adjoint(model, mesh, comm, c, guess, residual, psisol=None):
             FF += mm1 + mm2 + dd
         elif dim == 3:
             pml1 = (sigma_x + sigma_y + sigma_z) * ((u - u_n) / dt) * v * dx(rule=qr_x)
-            uuu1 = (-v * phi_n) * dx(rule=qr_x)
+            uuu1 = (-v * psi_n) * dx(rule=qr_x)
             pml2 = (
                 (sigma_x * sigma_y + sigma_x * sigma_z + sigma_y * sigma_z)
                 * u_n
