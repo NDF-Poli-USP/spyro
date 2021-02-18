@@ -189,13 +189,11 @@ def Leapfrog(
     f = excitation * ricker
     ricker.assign(RW[0])
     # -------------------------------------------------------
-    m1 = (
-        (1 / c ** 2) * ((u - 2.0 * u_n + u_nm1) / Constant(dt ** 2)) * v * dx(rule=qr_x)
-    )
-    a = dot(grad(u_n), grad(v)) * dx(rule=qr_x)  # explicit
+    m1 = ((u - 2.0 * u_n + u_nm1) / Constant(dt ** 2)) * v * dx(rule=qr_x)
+    a = c * c * dot(grad(u_n), grad(v)) * dx(rule=qr_x)  # explicit
 
     if model["PML"]["outer_bc"] == "non-reflective":
-        nf = ((u_n - u_nm1) / dt) * v * ds(rule=qr_s)
+        nf = c * ((u_n - u_nm1) / dt) * v * ds(rule=qr_s)
     else:
         nf = 0
 
@@ -206,36 +204,36 @@ def Leapfrog(
         B = Function(W)
 
         if dim == 2:
-            pml2 = ((sigma_x * sigma_z) / c ** 2) * u_n * v * dx(rule=qr_x)
+            pml2 = sigma_x * sigma_z * u_n * v * dx(rule=qr_x)
             pml3 = inner(pp_n, grad(v)) * dx(rule=qr_x)
             FF += pml1 + pml2 + pml3
             # -------------------------------------------------------
             mm1 = (dot((pp - pp_n), qq) / Constant(dt)) * dx(rule=qr_x)
             mm2 = inner(dot(Gamma_1, pp_n), qq) * dx(rule=qr_x)
-            dd = inner(grad(u_n), dot(Gamma_2, qq)) * dx(rule=qr_x)
+            dd = c * c * inner(grad(u_n), dot(Gamma_2, qq)) * dx(rule=qr_x)
             FF += mm1 + mm2 + dd
         elif dim == 3:
             pml1 = (
-                ((sigma_x + sigma_y + sigma_z) / c ** 2)
+                (sigma_x + sigma_y + sigma_z)
                 * ((u - u_n) / Constant(dt))
                 * v
                 * dx(rule=qr_x)
             )
             pml2 = (
-                ((sigma_x * sigma_y + sigma_x * sigma_z + sigma_y * sigma_z) / c ** 2)
+                (sigma_x * sigma_y + sigma_x * sigma_z + sigma_y * sigma_z)
                 * u_n
                 * v
                 * dx(rule=qr_x)
             )
-            pml3 = ((sigma_x * sigma_y * sigma_z) / c ** 2) * psi_n * v * dx(rule=qr_x)
+            pml3 = (sigma_x * sigma_y * sigma_z) * psi_n * v * dx(rule=qr_x)
             pml4 = inner(pp_n, grad(v)) * dx(rule=qr_x)
 
             FF += pml1 + pml2 + pml3 + pml4
             # -------------------------------------------------------
             mm1 = (dot((pp - pp_n), qq) / Constant(dt)) * dx(rule=qr_x)
             mm2 = inner(dot(Gamma_1, pp_n), qq) * dx(rule=qr_x)
-            dd1 = inner(grad(u_n), dot(Gamma_2, qq)) * dx(rule=qr_x)
-            dd2 = -inner(grad(psi_n), dot(Gamma_3, qq)) * dx(rule=qr_x)
+            dd1 = c * c * inner(grad(u_n), dot(Gamma_2, qq)) * dx(rule=qr_x)
+            dd2 = -c * c * inner(grad(psi_n), dot(Gamma_3, qq)) * dx(rule=qr_x)
 
             FF += mm1 + mm2 + dd1 + dd2
             # -------------------------------------------------------
@@ -254,6 +252,9 @@ def Leapfrog(
     solver = LinearSolver(A, solver_parameters=params)
 
     usol = [Function(V, name="pressure") for t in range(nt) if t % fspool == 0]
+    if dim == 3 and PML:
+        psisol = [Function(V, name="pressure") for t in range(nt) if t % fspool == 0]
+
     usol_recv = []
     saveIT = 0
 
@@ -292,6 +293,8 @@ def Leapfrog(
 
         if IT % fspool == 0:
             usol[saveIT].assign(u_n)
+            if dim == 3 and PML:
+                psisol[saveIT].assign(psi_n)
             saveIT += 1
 
         if IT % nspool == 0:
@@ -310,4 +313,7 @@ def Leapfrog(
             flush=True,
         )
 
-    return usol, usol_recv
+    if dim == 3 and PML:
+        return usol, usol_recv, psisol
+    else:
+        return usol, usol_recv

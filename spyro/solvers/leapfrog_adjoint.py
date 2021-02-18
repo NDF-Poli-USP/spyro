@@ -16,7 +16,7 @@ set_log_level(ERROR)
 __all__ = ["Leapfrog_adjoint"]
 
 
-def Leapfrog_adjoint(model, mesh, comm, c, guess, residual):
+def Leapfrog_adjoint(model, mesh, comm, c, guess, residual, psisol=None):
     """Discrete adjoint for secord-order in time fully-explicit Leapfrog scheme
     with implementation of a Perfectly Matched Layer (PML) using
     CG FEM with or without higher order mass lumping (KMV type elements).
@@ -204,7 +204,7 @@ def Leapfrog_adjoint(model, mesh, comm, c, guess, residual):
         if dim == 2:
             pml1 = (sigma_x + sigma_z) * ((u - u_n) / dt) * v * dx(rule=qr_x)
             pml2 = sigma_x * sigma_z * u_n * v * dx(rule=qr_x)
-            pml3 = inner(grad(v), dot(Gamma_2, pp_n)) * dx(rule=qr_x)
+            pml3 = c * c * inner(grad(v), dot(Gamma_2, pp_n)) * dx(rule=qr_x)
 
             FF += pml1 + pml2 + pml3
             # -------------------------------------------------------
@@ -215,15 +215,16 @@ def Leapfrog_adjoint(model, mesh, comm, c, guess, residual):
             FF += mm1 + mm2 + dd
         elif dim == 3:
             pml1 = (sigma_x + sigma_y + sigma_z) * ((u - u_n) / dt) * v * dx(rule=qr_x)
+            uuu1 = (-v * phi_n) * dx(rule=qr_x)
             pml2 = (
                 (sigma_x * sigma_y + sigma_x * sigma_z + sigma_y * sigma_z)
                 * u_n
                 * v
                 * dx(rule=qr_x)
             )
-            dd1 = inner(grad(v), dot(Gamma_2, pp_n)) * dx(rule=qr_x)
+            dd1 = c * c * inner(grad(v), dot(Gamma_2, pp_n)) * dx(rule=qr_x)
 
-            FF += pml1 + pml2 + dd1
+            FF += pml1 + pml2 + dd1 + uuu1
             # -------------------------------------------------------
             mm1 = (dot((pp - pp_n), qq) / dt) * dx(rule=qr_x)
             mm2 = inner(dot(Gamma_1, pp_n), qq) * dx(rule=qr_x)
@@ -233,9 +234,9 @@ def Leapfrog_adjoint(model, mesh, comm, c, guess, residual):
             # -------------------------------------------------------
             pml3 = (sigma_x * sigma_y * sigma_z) * phi * u_n * dx(rule=qr_x)
             mmm1 = (dot((psi - psi_n), phi) / dt) * dx(rule=qr_x)
-            uuu1 = (-u_n * phi) * dx(rule=qr_x)
+            mmm2 = -c * c * inner(grad(phi), dot(Gamma_3, pp_n)) * dx(rule=qr_x)
 
-            FF += mm1 + uuu1 + pml3
+            FF += mmm1 + mmm2 + pml3
     else:
         X = Function(V)
         B = Function(V)
@@ -256,17 +257,38 @@ def Leapfrog_adjoint(model, mesh, comm, c, guess, residual):
     uufor = Function(V)  # auxiliarly function for the gradient compt.
 
     if PML:
-        ppadj = Function(Z)  # auxiliarly function for the gradient compt.
-        ppfor = Function(Z)  # auxiliarly function for the gradient compt.
+        if dim == 2:
+            ppadj = Function(Z)  # auxiliarly function for the gradient compt.
+            ppfor = Function(Z)  # auxiliarly function for the gradient compt.
 
-        ffG = (
-            2.0
-            * c
-            * Constant(dt)
-            * (dot(grad(uuadj), grad(uufor)) + inner(grad(uufor), dot(Gamma_2, ppadj)))
-            * g_v
-            * dx(rule=qr_x)
-        )
+            ffG = (
+                2.0
+                * c
+                * Constant(dt)
+                * (
+                    dot(grad(uuadj), grad(uufor))
+                    + inner(grad(uufor), dot(Gamma_2, ppadj))
+                )
+                * g_v
+                * dx(rule=qr_x)
+            )
+        elif dim == 3:
+            ppadj = Function(Z)  # auxiliarly function for the gradient compt.
+            ppfor = Function(Z)  # auxiliarly function for the gradient compt.
+            psifor = Function(V)  # auxiliarly function for the gradient compt.
+
+            ffG = (
+                2.0
+                * c
+                * Constant(dt)
+                * (
+                    dot(grad(uuadj), grad(uufor))
+                    + inner(grad(uufor), dot(Gamma_2, ppadj))
+                    - inner(grad(psifor), dot(Gamma_3, ppadj))
+                )
+                * g_v
+                * dx(rule=qr_x)
+            )
     else:
         ffG = (
             2.0 * c * Constant(dt) * dot(grad(uuadj), grad(uufor)) * g_v * dx(rule=qr_x)
@@ -334,6 +356,8 @@ def Leapfrog_adjoint(model, mesh, comm, c, guess, residual):
         if IT % fspool == 0:
             gradi.assign = 0.0
             uufor.assign(guess.pop())
+            if dim == 3 and PML:
+                psifor.assign(psisol.pop())
 
             grad_solv.solve()
             dJdC_local += gradi
