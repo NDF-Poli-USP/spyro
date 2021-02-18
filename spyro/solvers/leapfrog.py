@@ -189,11 +189,13 @@ def Leapfrog(
     f = excitation * ricker
     ricker.assign(RW[0])
     # -------------------------------------------------------
-    m1 = ((u - 2.0 * u_n + u_nm1) / Constant(dt ** 2)) * v * dx(rule=qr_x)
-    a = c * c * dot(grad(u_n), grad(v)) * dx(rule=qr_x)  # explicit
+    m1 = (
+        (1 / c ** 2) * ((u - 2.0 * u_n + u_nm1) / Constant(dt ** 2)) * v * dx(rule=qr_x)
+    )
+    a = dot(grad(u_n), grad(v)) * dx(rule=qr_x)  # explicit
 
     if model["PML"]["outer_bc"] == "non-reflective":
-        nf = c * ((u_n - u_nm1) / dt) * v * ds(rule=qr_s)
+        nf = ((u_n - u_nm1) / dt) * v * ds(rule=qr_s)
     else:
         nf = 0
 
@@ -204,7 +206,7 @@ def Leapfrog(
         B = Function(W)
 
         if dim == 2:
-            pml2 = sigma_x * sigma_z * u_n * v * dx(rule=qr_x)
+            pml2 = ((sigma_x * sigma_z) / c ** 2) * u_n * v * dx(rule=qr_x)
             pml3 = inner(pp_n, grad(v)) * dx(rule=qr_x)
             FF += pml1 + pml2 + pml3
             # -------------------------------------------------------
@@ -214,18 +216,18 @@ def Leapfrog(
             FF += mm1 + mm2 + dd
         elif dim == 3:
             pml1 = (
-                (sigma_x + sigma_y + sigma_z)
+                ((sigma_x + sigma_y + sigma_z) / c ** 2)
                 * ((u - u_n) / Constant(dt))
                 * v
                 * dx(rule=qr_x)
             )
             pml2 = (
-                (sigma_x * sigma_y + sigma_x * sigma_z + sigma_y * sigma_z)
+                ((sigma_x * sigma_y + sigma_x * sigma_z + sigma_y * sigma_z) / c ** 2)
                 * u_n
                 * v
                 * dx(rule=qr_x)
             )
-            pml3 = (sigma_x * sigma_y * sigma_z) * psi_n * v * dx(rule=qr_x)
+            pml3 = ((sigma_x * sigma_y * sigma_z) / c ** 2) * psi_n * v * dx(rule=qr_x)
             pml4 = inner(pp_n, grad(v)) * dx(rule=qr_x)
 
             FF += pml1 + pml2 + pml3 + pml4
