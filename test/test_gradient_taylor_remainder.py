@@ -30,7 +30,7 @@ def _make_vp_guess(V, mesh):
 def _simulate_exact(model, mesh, comm, vp_exact, sources, receivers):
     """Simulate the observed data"""
     p_exact, p_exact_recv = spyro.solvers.Leapfrog(
-        model, mesh, comm, vp_exact, sources, receivers
+        model, mesh, comm, vp_exact, sources, receivers, output=False
     )
     return p_exact, p_exact_recv
 
@@ -38,7 +38,7 @@ def _simulate_exact(model, mesh, comm, vp_exact, sources, receivers):
 def _simulate_guess(model, mesh, comm, vp_guess, sources, receivers):
     """Simulate the guess data"""
     p_guess, p_guess_recv = spyro.solvers.Leapfrog(
-        model, mesh, comm, vp_guess, sources, receivers, output=True
+        model, mesh, comm, vp_guess, sources, receivers, output=False
     )
     return p_guess, p_guess_recv
 
@@ -94,11 +94,12 @@ def test_gradient_talyor_remainder():
     J = []
     J.append(_compute_functional(model, mesh, comm, misfit))
 
-    delta_m = Function(V).assign(0.5)
-    step = 0.1  #
+    delta_m = Function(V).assign(0.001)
+    step = 0.0001  #
 
     remainder = []
     for _ in range(4):
+        vp_guess = _make_vp_guess(V, mesh)
         # perturb the model and calculate the functional (again)
         # J(m + delta_m*h)
         vp_guess.dat.data[:] += step * delta_m.dat.data[:]
@@ -117,7 +118,7 @@ def test_gradient_talyor_remainder():
         step /= 2.0
 
     # remainder should decrease at a second order rate
-    remainder = np.array(remainder)
+    remainder = np.array(np.abs(remainder))
     l2conv = np.log2(remainder[:-1] / remainder[1:])
     print(remainder)
     print(l2conv)
