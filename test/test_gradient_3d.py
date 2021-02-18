@@ -34,7 +34,7 @@ def test_gradient_3d():
     Jtmp = 0.0
     # Compute the gradient of the functional
     for isour in range(num_sources):
-        p_exact, p_exact_recv = spyro.solvers.Leapfrog(
+        p_exact, p_exact_recv, _ = spyro.solvers.Leapfrog(
             model, mesh, comm, vp_exact, sources, receivers, source_num=isour
         )
         p_guess, p_guess_recv, psi_guess = spyro.solvers.Leapfrog(
@@ -43,7 +43,7 @@ def test_gradient_3d():
         residual = spyro.utils.evaluate_misfit(model, comm, p_guess_recv, p_exact_recv)
         Jtmp += spyro.utils.compute_functional(model, comm, residual)
         grad = spyro.solvers.Leapfrog_adjoint(
-            model, mesh, comm, vp_guess, p_guess, residual, psisol=psi_guess
+            model, mesh, comm, vp_guess, p_guess, residual, psi_sol=psi_guess
         )
         dJ.dat.data[:] += grad.dat.data[:]
 
