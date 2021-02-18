@@ -47,7 +47,7 @@ PML = {
     "ly": 0.25,  # thickness of the pml in the y-direction (km) - always positive
 }
 
-recvs = spyro.create_receiver_grid_2d(0.10, 0.40, 0.10, 0.40, 8)  # 64 receivers
+recvs = spyro.create_2d_grid(0.10, 0.40, 0.10, 0.40, 8)  # 64 receivers
 recvs = spyro.insert_fixed_value(recvs, -0.15, 0)  # at 0.15 m deep
 
 acquisition = {
@@ -62,7 +62,7 @@ acquisition = {
 
 timeaxis = {
     "t0": 0.0,  #  Initial time for event
-    "tf": 0.5,  # Final time for event
+    "tf": 1.5,  # Final time for event
     "dt": 0.0005,  # timestep size
     "nspool": 20,  # how frequently to output solution to pvds
     "fspool": 1,  # how frequently to save solution to RAM
