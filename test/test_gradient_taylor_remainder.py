@@ -95,10 +95,10 @@ def test_gradient_talyor_remainder():
     J.append(_compute_functional(model, mesh, comm, misfit))
 
     delta_m = Function(V).assign(0.001)
-    step = 0.0001  #
+    step = 0.001  #
 
     remainder = []
-    for _ in range(4):
+    for i in range(4):
         vp_guess = _make_vp_guess(V, mesh)
         # perturb the model and calculate the functional (again)
         # J(m + delta_m*h)
@@ -112,7 +112,7 @@ def test_gradient_talyor_remainder():
         # compute the functional (again)
         J.append(_compute_functional(model, mesh, comm, misfit))
         # compute the second-order Taylor remainder
-        remainder.append(J[-2] - J[-1] - step * assemble(grad * delta_m * dx))
+        remainder.append(J[i + 1] - J[0] - step * assemble(grad * delta_m * dx))
         # np.dot(grad.dat.data[:], delta_m.dat.data[:])
         # halve the step and repeat
         step /= 2.0
