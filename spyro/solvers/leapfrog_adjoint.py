@@ -37,7 +37,7 @@ def Leapfrog_adjoint(model, mesh, comm, c, guess, residual, psi_sol=None):
         The difference between the observed and modeled data at
         the receivers
        psi_sol: A list of Firedrake functions, (necessary for 3d with PML)
-        Contains the forward solution for the auxillary equation psi 
+        Contains the forward solution for the auxillary equation psi
         for a set of timesteps
 
     Returns
@@ -360,7 +360,7 @@ def Leapfrog_adjoint(model, mesh, comm, c, guess, residual, psi_sol=None):
             gradi.assign = 0.0
             uufor.assign(guess.pop())
             if dim == 3 and PML:
-                psifor.assign(psisol.pop())
+                psifor.assign(psi_sol.pop())
 
             grad_solv.solve()
             dJdC_local += gradi
