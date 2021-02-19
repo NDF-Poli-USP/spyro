@@ -240,7 +240,7 @@ def Leapfrog(
             mmm1 = (dot((psi - psi_n), phi) / Constant(dt)) * dx(rule=qr_x)
             uuu1 = (-u_n * phi) * dx(rule=qr_x)
 
-            FF += mm1 + uuu1
+            FF += mmm1 + uuu1
     else:
         X = Function(V)
         B = Function(V)
