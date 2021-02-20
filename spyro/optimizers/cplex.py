@@ -19,7 +19,10 @@ def update_flip_limits(beta, counter, multiple, change, xi, mode='counter'):
 def update_rmin(rmin, counter, limit, multiple):
     """update radius for sensitivity filer"""
     
-    if counter >= limit and counter % multiple == 0:
+    if isinstance(limit, bool):
+        return rmin
+
+    elif counter >= limit and counter % multiple == 0:
         new_rmin = rmin / 2
         rmin = np.maximum(new_rmin, 1e-3)
 

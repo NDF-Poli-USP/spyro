@@ -339,6 +339,28 @@ def create_mesh(model, comm, quad=True):
 
     V = FunctionSpace(mesh, element)
 
+     
+    if comm.comm.rank == 0 and comm.ensemble_comm.rank == 0:
+        print(
+            "INFO: Distributing %d shot(s) across %d processor(s). Each shot is using %d cores"
+            % (
+                model["acquisition"]["num_sources"],
+                COMM_WORLD.size,
+                COMM_WORLD.size / comm.ensemble_comm.size,
+            ),
+            flush=True,
+        )
+    print(
+        "  rank %d on ensemble %d owns %d elements and can access %d vertices"
+        % (
+            mesh.comm.rank,
+            comm.ensemble_comm.rank,
+            mesh.num_cells(),
+            mesh.num_vertices(),
+        ),
+        flush=True,
+    )
+
     return mesh, V
 
 def water_layer(mesh, V, vp, depth=None, vw=1.51):
