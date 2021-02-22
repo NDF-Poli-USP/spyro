@@ -56,9 +56,9 @@ def iterate_cplex(dJ, beta, xi):
 
     # Update values
     dxi = np.array(problem.solution.get_values())
-    xin = xi + dxi
+    # xin = xi + dxi
 
-    return xin
+    return dxi
 
 def optimize_cplex(dJ, beta, xi):
     """Solve optimization problem by Integer Linear Programming"""
