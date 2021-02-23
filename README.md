@@ -164,7 +164,7 @@ receivers = spyro.Receivers(model, mesh, V, comm).create()
 # Other time-stepping options are available (see the documentation).
 # Note: simulation results are stored in the folder `results/`
 p_field, p_at_recv = spyro.solvers.Leapfrog(
-    model, mesh, comm, vp, sources, receivers, source_num=0
+    model, mesh, comm, vp, sources, receivers
 )
 
 # Visualize the shot record
