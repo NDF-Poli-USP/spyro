@@ -2,7 +2,7 @@ from setuptools import setup, find_packages
 
 setup(
     name="spyro",
-    version="0.0.12",
+    version="0.0.16",
     license="GPL v3",
     description="acoustic wave modeling with the finite element method",
     author="João A. Isler,  Keith J. Roberts, Alexandre F. G. Olender, Lucas Franceschini",
