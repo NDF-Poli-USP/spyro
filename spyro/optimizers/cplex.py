@@ -28,7 +28,7 @@ def update_rmin(rmin, counter, limit, multiple):
 
     return rmin
 
-def iterate_cplex(dJ, beta, xi):
+def iterate_cplex_quadratic(dJ, qmat, beta, xi):
     """Solve subproblem by Integer Linear Programming"""
     
     # Flip limits
@@ -43,6 +43,41 @@ def iterate_cplex(dJ, beta, xi):
 
     # Set up problem
     problem = cplex.Cplex()
+    problem.objective.set_sense(problem.objective.sense.minimize)
+    problem.variables.add(
+        obj = dJ, lb = lb.tolist(), ub = ub.tolist(), types = "I"*xi.size)
+
+    # Impose flip limits
+    rows = [[[i for i in range(xi.size)], truncation.tolist()]]
+    problem.linear_constraints.add(lin_expr=rows, senses="L", rhs=rhs)
+
+    # Add quadratic term
+    problem.objective.set_quadratic(qmat)
+
+    # Solve sub-problem
+    problem.solve()
+
+    # Update values
+    dxi = np.array(problem.solution.get_values())
+
+    return dxi
+
+def iterate_cplex_linear(dJ, beta, xi):
+    """Solve subproblem by Integer Linear Programming"""
+    
+    # Flip limits
+    c1 =  (xi == 0).astype(int)
+    c2 = -(xi == 1).astype(int)
+    truncation = c1 + c2
+    rhs = [int(beta * xi.size)]
+
+    # Variable limits
+    lb = 0 - xi
+    ub = 1 - xi
+
+    # Set up problem
+    problem = cplex.Cplex()
+    problem.set_results_stream(None)
     problem.objective.set_sense(problem.objective.sense.minimize)
     problem.variables.add(
         obj = dJ, lb = lb.tolist(), ub = ub.tolist(), types = "I"*xi.size)
