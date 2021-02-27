@@ -1,7 +1,7 @@
 import os
-from spyro import create_transect
+import spyro
 
-fname = os.path.join(os.path.dirname(__file__), "../meshes/Uniform2D")
+fname = os.path.join(os.path.dirname(__file__), "../meshes/Uniform3D")
 
 # Define mesh file to be used:
 meshfile = fname
@@ -14,9 +14,10 @@ initmodel = "not_used"
 # Choose method and parameters
 opts = {
     "method": "KMV",
+    "variant": None,
     "quadrature": "KMV",
-    "degree": 1,  # p order
-    "dimension": 2,  # dimension
+    "degree": 3,  # p order
+    "dimension": 3,  # dimension
 }
 
 parallelism = {
@@ -26,40 +27,43 @@ parallelism = {
 }
 
 mesh = {
-    "Lz": 3.000,  # depth in km - always positive
-    "Lx": 3.000,  # width in km - always positive
-    "Ly": 0.0,  # thickness in km - always positive
+    "Lz": 0.75,  # depth in km - always positive
+    "Lx": 0.50,  # width in km - always positive
+    "Ly": 0.50,  # thickness in km - always positive
     "meshfile": meshfile + ".msh",
     "initmodel": initmodel + ".hdf5",
     "truemodel": truemodel + ".hdf5",
 }
 
 PML = {
-    "status": False,  # True,  # True or false
-    "outer_bc": "None",  # "non-reflective",  #  neumann, non-reflective (outer boundary condition)
+    "status": True,  # True,  # True or false
+    "outer_bc": "none",  #  neumann, non-reflective (outer boundary condition)
     "damping_type": "polynomial",  # polynomial. hyperbolic, shifted_hyperbolic
     "exponent": 2,
-    "cmax": 4.7,  # maximum acoustic wave velocity in PML - km/s
+    "cmax": 3.0,  # maximum acoustic wave velocity in PML - km/s
     "R": 0.001,  # theoretical reflection coefficient
-    "lz": 1.000,  # thickness of the pml in the z-direction (km) - always positive
-    "lx": 1.000,  # thickness of the pml in the x-direction (km) - always positive
-    "ly": 0.0,  # thickness of the pml in the y-direction (km) - always positive
+    "lz": 0.25,  # thickness of the pml in the z-direction (km) - always positive
+    "lx": 0.25,  # thickness of the pml in the x-direction (km) - always positive
+    "ly": 0.25,  # thickness of the pml in the y-direction (km) - always positive
 }
+
+recvs = spyro.create_2d_grid(0.10, 0.40, 0.10, 0.40, 8)  # 64 receivers
+recvs = spyro.insert_fixed_value(recvs, -0.15, 0)  # at 0.15 m deep
 
 acquisition = {
     "source_type": "Ricker",
-    "frequency": 5.0,
+    "frequency": 10.0,
     "delay": 1.0,
     "num_sources": 1,
-    "source_pos": [(1.5, -0.5)],
-    "num_receivers": 501,
-    "receiver_locations": create_transect((0.1, -2.90), (2.9, -2.90), 501),
+    "source_pos": [(-0.10, 0.25, 0.25)],
+    "num_receivers": len(recvs),
+    "receiver_locations": recvs,
 }
 
 timeaxis = {
     "t0": 0.0,  #  Initial time for event
-    "tf": 1.0,  # Final time for event
-    "dt": 0.001,  # timestep size
+    "tf": 0.5,  # Final time for event
+    "dt": 0.0005,  # timestep size
     "nspool": 20,  # how frequently to output solution to pvds
     "fspool": 1,  # how frequently to save solution to RAM
 }  # how freq. to output to files and screen
