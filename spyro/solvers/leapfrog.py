@@ -234,6 +234,8 @@ def Leapfrog(
             mm2 = inner(dot(Gamma_1, pp_n), qq) * dx(rule=qr_x)
             dd1 = c * c * inner(grad(u_n), dot(Gamma_2, qq)) * dx(rule=qr_x)
             dd2 = -c * c * inner(grad(psi_n), dot(Gamma_3, qq)) * dx(rule=qr_x)
+            # dd1 = 1 * inner(grad(u_n), dot(Gamma_2, qq)) * dx(rule=qr_x)
+            # dd2 = -1 * inner(grad(psi_n), dot(Gamma_3, qq)) * dx(rule=qr_x)
 
             FF += mm1 + mm2 + dd1 + dd2
             # -------------------------------------------------------
@@ -252,9 +254,6 @@ def Leapfrog(
     solver = LinearSolver(A, solver_parameters=params)
 
     usol = [Function(V, name="pressure") for t in range(nt) if t % fspool == 0]
-    if dim == 3 and PML:
-        psisol = [Function(V, name="pressure") for t in range(nt) if t % fspool == 0]
-
     usol_recv = []
     saveIT = 0
 
@@ -293,8 +292,6 @@ def Leapfrog(
 
         if IT % fspool == 0:
             usol[saveIT].assign(u_n)
-            if dim == 3 and PML:
-                psisol[saveIT].assign(psi_n)
             saveIT += 1
 
         if IT % nspool == 0:
@@ -313,7 +310,4 @@ def Leapfrog(
             flush=True,
         )
 
-    if dim == 3 and PML:
-        return usol, usol_recv, psisol
-    else:
-        return usol, usol_recv
+    return usol, usol_recv
