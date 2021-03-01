@@ -1,7 +1,7 @@
 import os
 
 fname = os.path.join(os.path.dirname(__file__), "../meshes/foo3d")
-vname = os.path.join(os.path.dirname(__file__), "../velocity_models/foo3d")
+vname = os.path.join(os.path.dirname(__file__), "../velocity_models/testing")
 
 # Define mesh file to be used:
 meshfile = fname
@@ -24,10 +24,10 @@ opts = {
 }
 
 parallelism = {
-    "type": "automatic", # options: automatic, custom, off
-    "custom_cores_per_shot": [], # only if the user wants a different number of cores for every shot.
-    # input is a list of integers with the length of the number of shots. 
-    }
+    "type": "automatic",  # options: automatic, custom, off
+    "custom_cores_per_shot": [],  # only if the user wants a different number of cores for every shot.
+    # input is a list of integers with the length of the number of shots.
+}
 
 mesh = {
     "Lz": 2.000,  # depth in km - always positive
@@ -57,7 +57,7 @@ acquisition = {
     "delay": 1.0,
     "source_pos": [(-0.5, 0.5, 0.5)],  # z,x,y
     "num_receivers": 256,
-    "receiver_locations":[()],
+    "receiver_locations": [()],
 }  # equi-spaced for now
 
 timeaxis = {
