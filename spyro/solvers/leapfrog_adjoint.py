@@ -16,7 +16,7 @@ set_log_level(ERROR)
 __all__ = ["Leapfrog_adjoint"]
 
 
-def Leapfrog_adjoint(model, mesh, comm, c, guess, residual, psi_sol=None):
+def Leapfrog_adjoint(model, mesh, comm, c, guess, residual):
     """Discrete adjoint for secord-order in time fully-explicit Leapfrog scheme
     with implementation of a Perfectly Matched Layer (PML) using
     CG FEM with or without higher order mass lumping (KMV type elements).
@@ -36,9 +36,6 @@ def Leapfrog_adjoint(model, mesh, comm, c, guess, residual, psi_sol=None):
     residual: array-like
         The difference between the observed and modeled data at
         the receivers
-       psi_sol: A list of Firedrake functions, (necessary for 3d with PML)
-        Contains the forward solution for the auxillary equation psi
-        for a set of timesteps
 
     Returns
     -------
@@ -185,7 +182,7 @@ def Leapfrog_adjoint(model, mesh, comm, c, guess, residual, psi_sol=None):
         u_n = Function(V)
         u_np1 = Function(V)
 
-    # outfile = helpers.create_output_file("Leapfrog_adjoint.pvd", comm, source_num)
+    outfile = helpers.create_output_file("Leapfrog_adjoint.pvd", comm, 0)
 
     t = 0.0
 
@@ -259,43 +256,7 @@ def Leapfrog_adjoint(model, mesh, comm, c, guess, residual, psi_sol=None):
     uuadj = Function(V)  # auxiliarly function for the gradient compt.
     uufor = Function(V)  # auxiliarly function for the gradient compt.
 
-    if PML:
-        if dim == 2:
-            ppadj = Function(Z)  # auxiliarly function for the gradient compt.
-            ppfor = Function(Z)  # auxiliarly function for the gradient compt.
-
-            ffG = (
-                2.0
-                * c
-                * Constant(dt)
-                * (
-                    dot(grad(uuadj), grad(uufor))
-                    + inner(grad(uufor), dot(Gamma_2, ppadj))
-                )
-                * g_v
-                * dx(rule=qr_x)
-            )
-        elif dim == 3:
-            ppadj = Function(Z)  # auxiliarly function for the gradient compt.
-            ppfor = Function(Z)  # auxiliarly function for the gradient compt.
-            psifor = Function(V)  # auxiliarly function for the gradient compt.
-
-            ffG = (
-                2.0
-                * c
-                * Constant(dt)
-                * (
-                    dot(grad(uuadj), grad(uufor))
-                    + inner(grad(uufor), dot(Gamma_2, ppadj))
-                    - inner(grad(psifor), dot(Gamma_3, ppadj))
-                )
-                * g_v
-                * dx(rule=qr_x)
-            )
-    else:
-        ffG = (
-            2.0 * c * Constant(dt) * dot(grad(uuadj), grad(uufor)) * g_v * dx(rule=qr_x)
-        )
+    ffG = 2.0 * c * Constant(dt) * dot(grad(uuadj), grad(uufor)) * g_v * dx(rule=qr_x)
 
     G = mgrad - ffG
     lhsG, rhsG = lhs(G), rhs(G)
@@ -359,8 +320,6 @@ def Leapfrog_adjoint(model, mesh, comm, c, guess, residual, psi_sol=None):
         if IT % fspool == 0:
             gradi.assign = 0.0
             uufor.assign(guess.pop())
-            if dim == 3 and PML:
-                psifor.assign(psi_sol.pop())
 
             grad_solv.solve()
             dJdC_local += gradi
