@@ -1,6 +1,6 @@
 from firedrake import *
+from firedrake.assemble import create_assembly_callable
 
-from .. import io
 from .. import utils
 from ..sources import FullRickerWavelet
 from ..domains import quadrature, space
@@ -19,7 +19,8 @@ def Leapfrog_level_set(
     excitations,
     receivers,
     source_num=0,
-    lp_freq_index=0,
+    freq_index=0,
+    output=False,
 ):
     """Secord order in time fully-explicit Leapfrog scheme
     with implementation of a Perfectly Matched Layer (PML) using
@@ -42,13 +43,15 @@ def Leapfrog_level_set(
         Contains the receiver locations and sparse interpolation methods.
     source_num: `int`, optional
         The source number you wish to simulate
+    output: `boolean`, optional
+        Whether or not you want to save the forward simulation
 
     Returns
     -------
     usol: list of Firedrake.Functions
         The full field solution at `fspool` timesteps
     usol_dt: list of Firedrake.Functions
-        The first time derivative full-field solution at `fspool` timesteps
+        The first order time derivative full-field solution at `fspool` timesteps
     usol_recv: array-like
         The solution interpolated to the receivers at all timesteps
 
@@ -121,10 +124,10 @@ def Leapfrog_level_set(
             u_n, pp_n = Function(W).split()
             u_nm1, pp_nm1 = Function(W).split()
 
-            (sigma_x, sigma_z) = damping.functions(
+            sigma_x, sigma_z = damping.functions(
                 model, V, dim, x, x1, x2, a_pml, z, z1, z2, c_pml
             )
-            (Gamma_1, Gamma_2) = damping.matrices_2D(sigma_z, sigma_x)
+            Gamma_1, Gamma_2 = damping.matrices_2D(sigma_z, sigma_x)
         elif dim == 3:
             W = V * V * Z
             u, psi, pp = TrialFunctions(W)
@@ -164,11 +167,12 @@ def Leapfrog_level_set(
 
     is_local = helpers.receivers_local(mesh, dim, receivers.receiver_locations)
 
-    outfile = helpers.create_output_file("Leapfrog_level_set.pvd", comm, source_num)
+    if output:
+        outfile = helpers.create_output_file("Leapfrog_level_set.pvd", comm, source_num)
 
     t = 0.0
 
-    cutoff = freq_bands[lp_freq_index] if "inversion" in model else None
+    cutoff = freq_bands[freq_index] if "inversion" in model else None
     RW = FullRickerWavelet(dt, tf, freq, amp=amp, cutoff=cutoff)
 
     excitation = excitations[source_num]
@@ -205,7 +209,7 @@ def Leapfrog_level_set(
             # -------------------------------------------------------
             mm1 = (dot((pp - pp_n), qq) / Constant(dt)) * dx(rule=qr_x)
             mm2 = inner(dot(Gamma_1, pp_n), qq) * dx(rule=qr_x)
-            dd = inner(grad(u_n), dot(Gamma_2, qq)) * dx(rule=qr_x)
+            dd = c * c * inner(grad(u_n), dot(Gamma_2, qq)) * dx(rule=qr_x)
             FF += mm1 + mm2 + dd
         elif dim == 3:
             pml1 = (
@@ -227,15 +231,15 @@ def Leapfrog_level_set(
             # -------------------------------------------------------
             mm1 = (dot((pp - pp_n), qq) / Constant(dt)) * dx(rule=qr_x)
             mm2 = inner(dot(Gamma_1, pp_n), qq) * dx(rule=qr_x)
-            dd1 = inner(grad(u_n), dot(Gamma_2, qq)) * dx(rule=qr_x)
-            dd2 = -inner(grad(psi_n), dot(Gamma_3, qq)) * dx(rule=qr_x)
+            dd1 = c * c * inner(grad(u_n), dot(Gamma_2, qq)) * dx(rule=qr_x)
+            dd2 = -c * c * inner(grad(psi_n), dot(Gamma_3, qq)) * dx(rule=qr_x)
 
             FF += mm1 + mm2 + dd1 + dd2
             # -------------------------------------------------------
             mmm1 = (dot((psi - psi_n), phi) / Constant(dt)) * dx(rule=qr_x)
             uuu1 = (-u_n * phi) * dx(rule=qr_x)
 
-            FF += mm1 + uuu1
+            FF += mmm1 + uuu1
     else:
         X = Function(V)
         B = Function(V)
@@ -246,17 +250,19 @@ def Leapfrog_level_set(
     A = assemble(lhs_, mat_type="matfree")
     solver = LinearSolver(A, solver_parameters=params)
 
-    saveIT = 0
+    save_step = 0
 
     usol = [Function(V, name="pressure") for t in range(nt) if t % fspool == 0]
     usol_recv = []
 
-    # store the time derivative term of the pressure field as well
+    # store the first order time derivative term of the pressure field as well
     usol_dt = [
         Function(V, name="pressure_time_derivative")
         for t in range(nt)
         if t % fspool == 0
     ]
+
+    assembly_callable = create_assembly_callable(rhs_, tensor=B)
 
     for IT in range(nt):
 
@@ -266,7 +272,8 @@ def Leapfrog_level_set(
             ricker.assign(0.0)
 
         # AX=B --> solve for X = B/Aˆ-1
-        B = assemble(rhs_, tensor=B)
+        assembly_callable()
+
         solver.solve(X, B)
         if PML:
             if dim == 2:
@@ -288,23 +295,24 @@ def Leapfrog_level_set(
         usol_recv.append(receivers.interpolate(u_n.dat.data_ro_with_halos[:], is_local))
 
         if IT % fspool == 0:
-            usol[saveIT].assign(u_n)
-            usol_dt[saveIT].assign((u_n - u_nm1) / float(dt))
-            saveIT += 1
+            usol[save_step].assign(u_n)
+            # first order time derivative
+            usol_dt[save_step].assign((u_n - u_nm1) / float(dt))
+            save_step += 1
 
         if IT % nspool == 0:
             outfile.write(u_n, time=t)
-            # helpers.display_progress(comm, t)
+            helpers.display_progress(comm, t)
 
         t = IT * float(dt)
 
     usol_recv = helpers.fill(usol_recv, is_local, nt, receivers.num_receivers)
     usol_recv = utils.communicate(usol_recv, comm)
 
-    # if comm.ensemble_comm.rank == 0 and comm.comm.rank == 0:
-    #    print(
-    #        "---------------------------------------------------------------",
-    #        flush=True,
-    #    )
+    if comm.ensemble_comm.rank == 0 and comm.comm.rank == 0:
+        print(
+            "---------------------------------------------------------------",
+            flush=True,
+        )
 
     return usol, usol_dt, usol_recv
