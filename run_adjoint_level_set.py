@@ -5,80 +5,68 @@ import spyro
 
 # 10 outside
 # 11 inside
-
 model = {}
-
 model["opts"] = {
     "method": "KMV",
-    "degree": 1,  # p order
+    "degree": 2,  # p order
     "dimension": 2,  # dimension
 }
-
-model["parallelism"] = {
-    "type": "automatic",  # options: automatic (same number of cores for evey processor), custom, off
-    "custom_cores_per_shot": [],  # only if the user wants a different number of cores for every shot.
-    # input is a list of integers with the length of the number of shots.
-}
-
 model["mesh"] = {
     "Lz": 1.50,  # depth in km - always positive
     "Lx": 1.50,  # width in km - always positive
     "Ly": 0.0,  # thickness in km - always positive
-    "meshfile": "meshes/immersed_disk_v2_guess.msh",
-    "initmodel": "not_used.hdf5",
-    "truemodel": "not_used.hdf5",
+    "meshfile": "level_set_mesh_creation/immersed_disk_guess_vp.msh",
+    "initmodel": "level_set_mesh_creation/immersed_disk_guess_vp.hdf5",
+    "truemodel": "level_set_mesh_creation/immersed_disk_true_vp.hdf5",
 }
-
 model["PML"] = {
     "status": True,  # true,  # true or false
     "outer_bc": "non-reflective",  #  dirichlet, neumann, non-reflective (outer boundary condition)
     "damping_type": "polynomial",  # polynomial, hyperbolic, shifted_hyperbolic
-    "exponent": 1,
+    "exponent": 2,
     "cmax": 4.5,  # maximum acoustic wave velocity in pml - km/s
     "R": 0.001,  # theoretical reflection coefficient
-    "lz": 0.25,  # thickness of the pml in the z-direction (km) - always positive
-    "lx": 0.25,  # thickness of the pml in the x-direction (km) - always positive
+    "lz": 0.50,  # thickness of the pml in the z-direction (km) - always positive
+    "lx": 0.50,  # thickness of the pml in the x-direction (km) - always positive
     "ly": 0.0,  # thickness of the pml in the y-direction (km) - always positive
 }
-
+recvs = spyro.create_transect((-0.10, 0.30), (-0.10, 1.20), 200)
+sources = spyro.create_transect((-0.05, 0.30), (-0.10, 1.20), 4)
 model["acquisition"] = {
     "source_type": "Ricker",
-    "num_sources": 4,
-    "source_pos": [
-        (-0.10, 0.20),
-        (-0.10, 0.40),
-        (-0.10, 0.60),
-        (-0.10, 0.80),
-    ],  # spyro.create_receiver_transect((-0.10, 0.30), (-0.10, 1.20), 4),
-    "frequency": 10.0,
+    "num_sources": len(sources),
+    "source_pos": sources,
+    "frequency": 5.0,
     "delay": 1.0,
-    "ampltiude": 1,
-    "num_receivers": 200,
-    "receiver_locations": spyro.create_receiver_transect(
-        (-0.10, 0.30), (-0.10, 1.20), 200
-    ),
+    "amplitude": 1.0,
+    "num_receivers": len(recvs),
+    "receiver_locations": recvs,
 }
-
 model["timeaxis"] = {
     "t0": 0.0,  #  initial time for event
-    "tf": 0.70,  # final time for event
-    "dt": 0.0001,  # timestep size
-    "nspool": 200,  # how frequently to output solution to pvds
+    "tf": 2.0,  # final time for event
+    "dt": 0.001,  # timestep size
+    "nspool": 100,  # how frequently to output solution to pvds
     "fspool": 10,  # how frequently to save solution to ram
 }
-
+model["parallelism"] = {
+    "type": "off",  # options: automatic (same number of cores for evey processor), custom, off
+    "custom_cores_per_shot": [],  # only if the user wants a different number of cores for every shot.
+    # input is a list of integers with the length of the number of shots.
+}
 #### end of options ####
 
 
-def calculate_indicator_from_mesh(mesh):
+def calculate_indicator_from_vp(vp):
     """Create an indicator function
     assumes the sudomains are labeled 10 and 11
     """
     dgV = FunctionSpace(mesh, "DG", 0)
-    indicator = Function(dgV)
-    u = TrialFunction(dgV)
-    v = TestFunction(dgV)
-    solve(u * v * dx == 1 * v * dx(10) + -1 * v * dx(11), indicator)
+    cond = conditional(vp > 4.4, -1, 1)
+    indicator = Function(dgV, name="indicator").interpolate(cond)
+    # u = TrialFunction(dgV)
+    # v = TestFunction(dgV)
+    # solve(u * v * dx == 1 * v * dx(10) + -1 * v * dx(11), indicator)
     return indicator
 
 
@@ -92,16 +80,15 @@ def update_velocity(q, vp):
     vp.interpolate(Constant(4.5), subset=sd1)
     vp.interpolate(Constant(2.0), subset=sd2)
 
-    # write the current status to disk
     evolution_of_velocity.write(vp, name="control")
     return vp
 
 
 def calculate_functional(model, mesh, comm, vp, sources, receivers):
     """Calculate the l2-norm functional"""
+    print("Computing the functional")
     J_local = np.zeros((1))
     J_total = np.zeros((1))
-    print("Computing the functional")
     for sn in range(model["acquisition"]["num_sources"]):
         if spyro.io.is_owner(comm, sn):
             guess, guess_dt, guess_recv = spyro.solvers.Leapfrog_level_set(
@@ -128,10 +115,8 @@ def calculate_functional(model, mesh, comm, vp, sources, receivers):
 def calculate_gradient(model, mesh, comm, vp, guess, guess_dt, residual):
     """Calculate the shape gradient"""
     print("Computing the gradient", flush=True)
-    # gradient is scaled because it appears very small??
-    scale = 1e11
     VF = VectorFunctionSpace(mesh, "CG", 1)
-    theta = Function(VF, name="grad")
+    theta = Function(VF, name="gradient")
     for sn in range(model["acquisition"]["num_sources"]):
         if spyro.io.is_owner(comm, sn):
             theta_local = spyro.solvers.Leapfrog_adjoint_level_set(
@@ -151,7 +136,6 @@ def calculate_gradient(model, mesh, comm, vp, guess, guess_dt, residual):
         )
     else:
         theta = theta_local
-    theta *= scale
     return theta
 
 
@@ -190,7 +174,7 @@ def optimization(model, mesh, comm, vp, sources, receivers, max_iter=10):
         theta = calculate_gradient(
             model, mesh, comm, vp, guess_new, guess_dt_new, residual_new
         )
-        grad_file.write(theta, name="grad")
+        grad_file.write(theta, name="gradient")
         # update the new shape...solve transport equation
         indicator_new = model_update(mesh, indicator, theta, beta0)
         # update the velocity
@@ -244,16 +228,10 @@ comm = spyro.utils.mpi_init(model)
 
 mesh, V = spyro.io.read_mesh(model, comm)
 
-# the "velocity model"
-vp = Function(V)
+vp = spyro.io.interpolate(model, mesh, V, guess=True)
 
-# create initial velocity field
-q = calculate_indicator_from_mesh(mesh)
+q = calculate_indicator_from_vp(vp)
 
-# initial velocity field
-vp = update_velocity(q, vp)
-
-# spyro stuff
 sources = spyro.Sources(model, mesh, V, comm).create()
 
 receivers = spyro.Receivers(model, mesh, V, comm).create()
