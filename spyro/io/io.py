@@ -7,10 +7,59 @@ import firedrake as fire
 import h5py
 import numpy as np
 from scipy.interpolate import RegularGridInterpolator
+from scipy.interpolate import griddata
+import segyio 
 
 from .. import domains
 
-__all__ = ["is_owner", "save_shots", "load_shots", "read_mesh", "interpolate"]
+__all__ = ["write_function_to_grid", "create_segy", "is_owner", "save_shots", "load_shots", "read_mesh", "interpolate"]
+
+
+
+def write_function_to_grid(function, V, grid_spacing):
+    """Interpolate a Firedrake function to a structured grid"""
+    # get DoF coordinates
+    m = V.ufl_domain()
+    W = VectorFunctionSpace(m, V.ufl_element())
+    coords = interpolate(m.coordinates, W)
+    x, y = coords.dat.data[:, 0], coords.dat.data[:, 1]
+
+    # add buffer to avoid NaN when calling griddata
+    min_x = np.amin(x) + 0.01
+    max_x = np.amax(x) - 0.01
+    min_y = np.amin(y) + 0.01
+    max_y = np.amax(y) - 0.01
+
+    z = function.dat.data[:] * 1000.0  # convert from km/s to m/s
+
+    # target grid to interpolate to
+    xi = np.arange(min_x, max_x, grid_spacing)
+    yi = np.arange(min_y, max_y, grid_spacing)
+    xi, yi = np.meshgrid(xi, yi)
+
+    # interpolate
+    zi = griddata((x, y), z, (xi, yi), method="linear")
+
+    return xi, yi, zi
+
+
+def create_segy(velocity, filename):
+    """Write the velocity data into a segy file named filename"""
+    spec = segyio.spec()
+
+    velocity = np.flipud(velocity.T)
+
+    spec.sorting = 2 # not sure what this means
+    spec.format = 1 # not sure what this means
+    spec.samples = range(velocity.shape[0])
+    spec.ilines = range(velocity.shape[1])
+    spec.xlines = range(velocity.shape[0])
+
+    assert np.sum(np.isnan(velocity[:])) == 0
+
+    with segyio.create(filename, spec) as f:
+        for tr, il in enumerate(spec.ilines):
+            f.trace[tr] = velocity[:, tr]
 
 
 def save_shots(filename, array):
@@ -73,7 +122,7 @@ def is_owner(ens_comm, rank):
 
 
 def _check_units(c):
-    if min(c.dat.data[:]) > 1000.0:
+    if min(c.dat.data[:]) > 100.0:
         # data is in m/s but must be in km/s
         if fire.COMM_WORLD.rank == 0:
             print("INFO: converting from m/s to km/s", flush=True)

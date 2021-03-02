@@ -169,7 +169,7 @@ def functions(
                     0.0,
                 )
             )
-        # sigma_y = Function(V, name="sigma_y").interpolate(aux1 + aux2)
+        sigma_y = Function(V, name="sigma_y").interpolate(aux1 + aux2)
 
         # sgm_y = File("pmlField/sigma_y.pvd")
         # sgm_y.write(sigma_y)

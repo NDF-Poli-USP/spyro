@@ -18,8 +18,8 @@ model["opts"] = {
 
 
 model["mesh"] = {
-    "Lz": 4.0,  # depth in km - always positive
-    "Lx": 18.0,  # width in km - always positive
+    "Lz": 3.0,  # depth in km - always positive
+    "Lx": 17.0,  # width in km - always positive
     "Ly": 0.0,  # thickness in km - always positive
     "meshfile": "demos/mm_exact.msh",
     "initmodel": "demos/mm_init.hdf5",
@@ -58,7 +58,7 @@ model["timeaxis"] = {
     "tf": 3.0,  # Final time for event
     "dt": 0.001,  # timestep size
     "nspool": 200,  # how frequently to output solution to pvds
-    "fspool": 1,  # how frequently to save solution to RAM
+    "fspool": 100,  # how frequently to save solution to RAM
 }  # how freq. to output to files and screen
 
 
