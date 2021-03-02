@@ -1,6 +1,7 @@
 from __future__ import print_function
 
 from firedrake import *
+from firedrake.assemble import create_assembly_callable
 import SeismicMesh
 
 import numpy as np
@@ -27,6 +28,7 @@ def Leapfrog_adjoint_level_set(
     guess_dt,
     residual,
     source_num=0,
+    output=False,
 ):
 
     numrecs = model["acquisition"]["num_receivers"]
@@ -126,10 +128,10 @@ def Leapfrog_adjoint_level_set(
 
         # in 2d
         if dim == 2:
-            (sigma_x, sigma_z) = damping.functions(
+            sigma_x, sigma_z = damping.functions(
                 model, V, dim, x, x1, x2, a_pml, z, z1, z2, c_pml
             )
-            (Gamma_1, Gamma_2) = damping.matrices_2D(sigma_z, sigma_x)
+            Gamma_1, Gamma_2 = damping.matrices_2D(sigma_z, sigma_x)
         # in 3d
         elif dim == 3:
 
@@ -161,9 +163,10 @@ def Leapfrog_adjoint_level_set(
         u_n = Function(V)
         u_np1 = Function(V)
 
-    outfile = helpers.create_output_file(
-        "Leapfrog_adjoint_level_set.pvd", comm, source_num
-    )
+    if output:
+        outfile = helpers.create_output_file(
+            "Leapfrog_adjoint_level_set.pvd", comm, source_num
+        )
 
     # a weighting function that produces large values near the boundary
     # to diminish the gradient calculation near the boundary of the domain
@@ -179,7 +182,7 @@ def Leapfrog_adjoint_level_set(
     d = disk0.eval(pts)
     d[d < 0] = 0.0
     vals = 1 + 1000.0 * d
-    wei = Function(V, vals)
+    wei = Function(V, vals, name="weighting_function")
     File("weighting_function.pvd").write(wei)
 
     alpha1, alpha2 = 0.01, 0.97
@@ -209,7 +212,7 @@ def Leapfrog_adjoint_level_set(
         if dim == 2:
             pml1 = (sigma_x + sigma_z) * ((u - u_n) / dt) * v * dx(rule=qr_x)
             pml2 = sigma_x * sigma_z * u_n * v * dx(rule=qr_x)
-            pml3 = inner(grad(v), dot(Gamma_2, pp_n)) * dx(rule=qr_x)
+            pml3 = c * c * inner(grad(v), dot(Gamma_2, pp_n)) * dx(rule=qr_x)
 
             FF += pml1 + pml2 + pml3
             # -------------------------------------------------------
@@ -220,15 +223,16 @@ def Leapfrog_adjoint_level_set(
             FF += mm1 + mm2 + dd
         elif dim == 3:
             pml1 = (sigma_x + sigma_y + sigma_z) * ((u - u_n) / dt) * v * dx(rule=qr_x)
+            uuu1 = (-v * psi_n) * dx(rule=qr_x)
             pml2 = (
                 (sigma_x * sigma_y + sigma_x * sigma_z + sigma_y * sigma_z)
                 * u_n
                 * v
                 * dx(rule=qr_x)
             )
-            dd1 = inner(grad(v), dot(Gamma_2, pp_n)) * dx(rule=qr_x)
+            dd1 = c * c * inner(grad(v), dot(Gamma_2, pp_n)) * dx(rule=qr_x)
 
-            FF += pml1 + pml2 + dd1
+            FF += pml1 + pml2 + dd1 + uuu1
             # -------------------------------------------------------
             mm1 = (dot((pp - pp_n), qq) / dt) * dx(rule=qr_x)
             mm2 = inner(dot(Gamma_1, pp_n), qq) * dx(rule=qr_x)
@@ -238,9 +242,9 @@ def Leapfrog_adjoint_level_set(
             # -------------------------------------------------------
             pml3 = (sigma_x * sigma_y * sigma_z) * phi * u_n * dx(rule=qr_x)
             mmm1 = (dot((psi - psi_n), phi) / dt) * dx(rule=qr_x)
-            uuu1 = (-u_n * phi) * dx(rule=qr_x)
+            mmm2 = -c * c * inner(grad(phi), dot(Gamma_3, pp_n)) * dx(rule=qr_x)
 
-            FF += mm1 + uuu1 + pml3
+            FF += mmm1 + mmm2 + pml3
     else:
         X = Function(V)
         B = Function(V)
@@ -321,11 +325,13 @@ def Leapfrog_adjoint_level_set(
     k0_fe0_np = np.zeros(sz)
 
     rhs_forcing = Function(V)  # forcing term
+
+    assembly_callable = create_assembly_callable(rhs_, tensor=B)
     for IT in range(nt - 1, 0, -1):
         t = IT * float(dt)
 
         # Solver - main equation - (I)
-        B = assemble(rhs_, tensor=B)
+        assembly_callable()
         f = _adjoint_update_rhs(rhs_forcing, sparse_excitations, residual, IT, is_local)
         # add forcing term to solve scalar pressure
         B.sub(0).dat.data[:] += f.dat.data[:]
@@ -385,7 +391,8 @@ def Leapfrog_adjoint_level_set(
 
         # write the adjoint to disk for checking
         if IT % nspool == 0:
-            outfile.write(u_n, time=t)
+            if output:
+                outfile.write(u_n, time=t)
             helpers.display_progress(comm, t)
 
     # produces gradi_11, gradi_12, gradi_21, gradi_22 summed over all timesteps
@@ -431,11 +438,11 @@ def Leapfrog_adjoint_level_set(
     descent = Function(VF, name="grad")
     solver_csi.solve(descent, Rterm)
 
-    # if comm.ensemble_comm.rank == 0 and comm.comm.rank == 0:
-    #    print(
-    #        "---------------------------------------------------------------",
-    #        flush=True,
-    #    )
+    if comm.ensemble_comm.rank == 0 and comm.comm.rank == 0:
+        print(
+            "---------------------------------------------------------------",
+            flush=True,
+        )
 
     return descent
 
