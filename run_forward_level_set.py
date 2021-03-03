@@ -22,7 +22,7 @@ model["mesh"] = {
     "Lz": 1.50,  # depth in km - always positive
     "Lx": 1.50,  # width in km - always positive
     "Ly": 0.0,  # thickness in km - always positive
-    "meshfile": "level_set_mesh_creation/immersed_disk_guess_vp.msh",
+    "meshfile": "level_set_mesh_creation/immersed_disk_true_vp.msh",
     "initmodel": "level_set_mesh_creation/immersed_disk_guess_vp.hdf5",
     "truemodel": "level_set_mesh_creation/immersed_disk_true_vp.hdf5",
 }
@@ -62,7 +62,7 @@ comm = spyro.utils.mpi_init(model)
 
 mesh, V = spyro.io.read_mesh(model, comm)
 
-vp_exact = spyro.io.interpolate(model, mesh, V, guess=True)
+vp_exact = spyro.io.interpolate(model, mesh, V, guess=False)
 
 File("exact_vp.pvd").write(vp_exact)
 

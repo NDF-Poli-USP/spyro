@@ -301,7 +301,8 @@ def Leapfrog_level_set(
             save_step += 1
 
         if IT % nspool == 0:
-            outfile.write(u_n, time=t)
+            if output:
+                outfile.write(u_n, time=t)
             helpers.display_progress(comm, t)
 
         t = IT * float(dt)

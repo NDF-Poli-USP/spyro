@@ -50,7 +50,7 @@ model["timeaxis"] = {
     "fspool": 10,  # how frequently to save solution to ram
 }
 model["parallelism"] = {
-    "type": "off",  # options: automatic (same number of cores for evey processor), custom, off
+    "type": "automatic",  # options: automatic (same number of cores for evey processor), custom, off
     "custom_cores_per_shot": [],  # only if the user wants a different number of cores for every shot.
     # input is a list of integers with the length of the number of shots.
 }
@@ -95,7 +95,7 @@ def calculate_functional(model, mesh, comm, vp, sources, receivers):
                 model, mesh, comm, vp, sources, receivers, source_num=sn
             )
             p_exact_recv = spyro.io.load_shots(
-                "forward_exact_level_set" + str(sn) + ".dat"
+                "shots/forward_exact_level_set" + str(sn) + ".dat"
             )
             residual = spyro.utils.evaluate_misfit(
                 model, comm, p_exact_recv, guess_recv
@@ -156,7 +156,7 @@ def optimization(model, mesh, comm, vp, sources, receivers, max_iter=10):
     max_ls = 3
     gamma = gamma2 = 0.8
 
-    indicator = calculate_indicator_from_mesh(mesh)
+    indicator = calculate_indicator_from_vp(vp)
 
     # the file that contains the shape gradient each iteration
     grad_file = File("theta.pvd")
