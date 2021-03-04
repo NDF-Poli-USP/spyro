@@ -8,12 +8,9 @@ from mpi4py import MPI
 
 import psutil
 import os
-import gc
 
 # https://github.com/firedrakeproject/firedrake/issues/1617
-gc.disable()
-
-outdir = "overthrust3d_fwi/"
+outdir = "overthrust3d_fwi_v11/take4/"
 
 model = {}
 
@@ -25,9 +22,7 @@ model["opts"] = {
     "dimension": 3,  # dimension
 }
 model["mesh"] = {
-
-   
-   "Lz": 4.14,  # depth in km - always positive
+    "Lz": 4.14,  # depth in km - always positive
     "Lx": 4.0,  # width in km - always positive
     "Ly": 4.0,  # thickness in km - always positive
     "meshfile": "meshes/overthrust_3D_initial_model_reduced_v2.msh",
@@ -46,7 +41,6 @@ model["PML"] = {
     "ly": 0.75,  # thickness of the pml in the y-direction (km) - always positive
 }
 
-# four sources in a grid like pattern
 sources = spyro.insert_fixed_value(spyro.create_2d_grid(0.25,3.75,0.25,3.75,2),-0.05, 0)
 
 recvs = spyro.insert_fixed_value(spyro.create_2d_grid(0.2,3.8,0.2,3.8,20),-0.15, 0)
@@ -69,7 +63,7 @@ model["timeaxis"] = {
     "fspool": 20,  # how frequently to save solution to RAM
     "skip": 1,
 }  # how frq. to output to files and screen
-
+# Use one core per shot.
 model["parallelism"] = {
     "type": "automatic",  # options: automatic (same number of cores for evey processor), custom, off
     "custom_cores_per_shot": [],  # only if the user wants a different number of cores for every shot.
@@ -85,13 +79,22 @@ mesh, V = spyro.io.read_mesh(model, comm)
 
 vp_guess = spyro.io.interpolate(model, mesh, V, guess=True)
 
-#File("vp_overthrust3d_guess.pvd").write(vp_guess)
+
+chk = DumbCheckpoint("saving_vp_guess_"+str(comm.ensemble_comm.rank), mode=FILE_UPDATE, comm=comm.comm)
+#chk = DumbCheckpoint("saving_vp_guess_"+str(comm.ensemble_comm.rank), mode=FILE_UPDATE, comm=comm.comm)
+#chk.load(vp_guess)
+
+
+if comm.ensemble_comm.rank ==0):
+   File("vp_overthrust3d_guess.pvd").write(vp_guess)
 
 sources = spyro.Sources(model, mesh, V, comm).create()
 
 receivers = spyro.Receivers(model, mesh, V, comm).create()
 
 qr_x, _, _ = spyro.domains.quadrature.quadrature_rules(V)
+
+print(gc.isenabled(), flush=True)
 
 
 def get_memory_usage():
@@ -100,7 +103,7 @@ def get_memory_usage():
     mem = process.memory_info()[0] / float(2 ** 20)
     return mem
 
-
+# Mask the source/receiver/water layer
 mask_depth = -0.50
 z = mesh.coordinates[0]
 water_index = Function(V).interpolate(conditional(z < mask_depth, 1, 0))
@@ -115,7 +118,6 @@ for index, freq_band in enumerate(model["inversion"]["freq_bands"]):
         )
 
     def _load_exact_shot():
-        shots = []
         for sn in range(model["acquisition"]["num_sources"]):
             if spyro.io.is_owner(comm, sn):
                 shot = spyro.io.load_shots(
@@ -125,9 +127,9 @@ for index, freq_band in enumerate(model["inversion"]["freq_bands"]):
                     + str(sn)
                     + ".dat"
                 )
-                shots.append(shot)
-        return shots
+        return shot
 
+    # spool files for writing
     if comm.ensemble_comm.rank == 0:
         control_file = File(outdir + "control5.0_Hz.pvd", comm=comm.comm)
         grad_file = File(outdir + "grad5.0_Hz.pvd", comm=comm.comm)
@@ -154,10 +156,9 @@ for index, freq_band in enumerate(model["inversion"]["freq_bands"]):
         def __init__(self, inner_product):
             ROL.Objective.__init__(self)
             self.inner_product = inner_product
-            self.p_guess = []
-            self.misfit = []
+            self.p_guess = None
+            self.misfit = None
             self.p_exact_recv = _load_exact_shot()
-            self.iteration = 0
 
         def value(self, x, tol):
             """Compute the functional"""
@@ -169,13 +170,10 @@ for index, freq_band in enumerate(model["inversion"]["freq_bands"]):
                 )
 
             J_total = np.zeros((1))
-            count = 0
-            self.p_guess = []
-            self.misfit = []
             for sn in range(model["acquisition"]["num_sources"]):
                 if spyro.io.is_owner(comm, sn):
 
-                    p_guess, p_guess_recv = spyro.solvers.Leapfrog(
+                    self.p_guess, p_guess_recv = spyro.solvers.Leapfrog(
                         model,
                         mesh,
                         comm,
@@ -185,22 +183,15 @@ for index, freq_band in enumerate(model["inversion"]["freq_bands"]):
                         source_num=sn,
                         output=False,
                     )
-                    misfit = spyro.utils.evaluate_misfit(
-                        model, comm, p_guess_recv, self.p_exact_recv[count]
+                    self.misfit = spyro.utils.evaluate_misfit(
+                        model, comm, p_guess_recv, self.p_exact_recv
                     )
-                    J_total[0] += spyro.utils.compute_functional(model, comm, misfit)
-                    self.p_guess.append(p_guess)
-                    self.misfit.append(misfit)
-                    count += 1
+                    J_total[0] += spyro.utils.compute_functional(model, comm, self.misfit)
 
-            self.iteration += 1
-
-            # reduce over all cores
+            # reduce over ALL cores
             J_total = COMM_WORLD.allreduce(J_total, op=MPI.SUM)
-            J_total[0] /= comm.ensemble_comm.size
 
-            COMM_WORLD.barrier()
-            gc.collect()
+            #gc.collect()
 
             if COMM_WORLD.rank == 0:
                 print(
@@ -219,8 +210,9 @@ for index, freq_band in enumerate(model["inversion"]["freq_bands"]):
                     flush=True,
                 )
 
+            #gc.collect()
+
             dJ_local = Function(V, name="total_gradient")
-            count = 0
             for sn in range(model["acquisition"]["num_sources"]):
                 if spyro.io.is_owner(comm, sn):
                     dJ = spyro.solvers.Leapfrog_adjoint(
@@ -228,28 +220,22 @@ for index, freq_band in enumerate(model["inversion"]["freq_bands"]):
                         mesh,
                         comm,
                         vp_guess,
-                        self.p_guess[count],
-                        self.misfit[count],
+                        self.p_guess,
+                        self.misfit,
                     )
-                    dJ_local.dat.data[:] += dJ.dat.data[:]
-                    count += 1
 
             # sum over all ensemble members
-            dJ_local.dat.data[:] = comm.ensemble_comm.allreduce(
-                dJ_local.dat.data[:], op=MPI.SUM
-            )
+            comm.allreduce(dJ, dJ_local)
 
             # mask the water layer
             dJ_local.dat.data[water] = 0.0
 
             if comm.ensemble_comm.rank == 0:
+                print('writing: '+str(comm.comm.rank)+" on ensemble "+str(comm.ensemble_comm.rank),flush=True)
                 grad_file.write(dJ_local)
 
             g.scale(0)
             g.vec += dJ_local
-
-            COMM_WORLD.barrier()
-            gc.collect()
 
             if COMM_WORLD.rank == 0:
                 print(
@@ -261,7 +247,7 @@ for index, freq_band in enumerate(model["inversion"]["freq_bands"]):
             """Update the control"""
             vp_guess.assign(Function(V, x.vec, name="velocity"))
             if iteration >= 0:
-                COMM_WORLD.barrier()
+                chk.store(vp_guess)
                 if comm.ensemble_comm.rank == 0:
                     control_file.write(vp_guess)
 
@@ -278,7 +264,7 @@ for index, freq_band in enumerate(model["inversion"]["freq_bands"]):
         },
         "Status Test": {
             "Gradient Tolerance": 1e-16,
-            "Iteration Limit": 35,
+            "Iteration Limit": 50,
             "Step Tolerance": 1.0e-16,
         },
     }
@@ -310,3 +296,6 @@ for index, freq_band in enumerate(model["inversion"]["freq_bands"]):
 
     if comm.ensemble_comm.rank == 0:
         File("overthrust3d_res5.pvd", comm=comm.comm).write(vp_guess)
+~                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                     
+~                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                     
+~                                                                                  
