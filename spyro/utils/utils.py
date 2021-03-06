@@ -82,8 +82,8 @@ def evaluate_misfit(model, my_ensemble, guess, exact):
 
     if my_ensemble.comm.rank == 0 and my_ensemble.ensemble_comm.rank == 0:
         print("Computing the misfit...", flush=True)
-
-    return exact[::skip] - guess
+    l = int(exact.shape[0]/skip)
+    return exact[:l:skip] - guess
 
 
 def myrank(COMM=COMM_SELF):
