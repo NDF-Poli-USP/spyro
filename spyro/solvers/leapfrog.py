@@ -288,6 +288,7 @@ def Leapfrog(
         u_nm1.assign(u_n)
         u_n.assign(u_np1)
 
+        
         usol_recv.append(receivers.interpolate(u_n.dat.data_ro_with_halos[:], is_local))
 
         if IT % fspool == 0:
@@ -295,8 +296,11 @@ def Leapfrog(
             saveIT += 1
 
         if IT % nspool == 0:
+            assert (
+                 norm(u_n) < 1
+            ), "Numerical instability. Try reducing dt or building the mesh differently"
             if output:
-                outfile.write(u_n, time=t)
+                outfile.write(u_n, time=t, name="Pressure")
             helpers.display_progress(comm, t)
 
         t = IT * float(dt)
