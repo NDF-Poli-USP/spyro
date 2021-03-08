@@ -31,7 +31,7 @@ def estimate_timestep(mesh, V, c, estimate_max_eigenvalue=True):
     Asp = scipy.sparse.csr_matrix((av, aj, ai))
     Asp_inv = scipy.sparse.csr_matrix((av_inv, aj, ai))
 
-    K = fd.assemble(c * c * dot(grad(u), grad(v)) * dxlump)
+    K = fd.assemble(c*c*dot(grad(u), grad(v)) * dxlump)
     ai, aj, av = K.petscmat.getValuesCSR()
     Ksp = scipy.sparse.csr_matrix((av, aj, ai))
 
@@ -41,6 +41,10 @@ def estimate_timestep(mesh, V, c, estimate_max_eigenvalue=True):
         # absolute maximum of diagonals
         max_eigval = np.amax(np.abs(Lsp.diagonal()))
     else:
+        print(
+            "Computing exact eigenvalues is extremely computationally demanding!",
+            flush=True,
+        )
         max_eigval = scipy.sparse.linalg.eigs(
             Ksp, M=Asp, k=1, which="LM", return_eigenvectors=False
         )[0]
@@ -48,6 +52,7 @@ def estimate_timestep(mesh, V, c, estimate_max_eigenvalue=True):
     # print(max_eigval)
     max_dt = np.float(2 / np.sqrt(max_eigval))
     print(
-        f"Maximum stable timestep should be about: {np.float(2 / np.sqrt(max_eigval))} seconds"
+        f"Maximum stable timestep should be about: {np.float(2 / np.sqrt(max_eigval))} seconds",
+        flush=True,
     )
     return max_dt
