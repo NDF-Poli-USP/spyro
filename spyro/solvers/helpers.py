@@ -52,7 +52,7 @@ def display(comm, source_num):
 
 def display_progress(comm, t):
     if comm.ensemble_comm.rank == 0 and comm.comm.rank == 0:
-        print("Simulation time is ", t, " seconds", flush=True)
+        print(f"Simulation time is: {t:{10}.{4}} seconds", flush=True)
 
 
 def receivers_local(mesh, dimension, receiver_locations):
