@@ -8,7 +8,7 @@ from firedrake import *
 
 ## When testing locally:
 import sys
-sys.path.append('/home/alexandre/Development/NewEarthdrake/NewEarthdrake')
+sys.path.append('/home/alexandre/Development/Spyro-main/spyro')
 import spyro
 
 def test_mesh_generation():
