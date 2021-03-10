@@ -7,8 +7,8 @@ from firedrake import *
 #import spyro
 
 ## When testing locally:
-import sys
-sys.path.append('/home/alexandre/Development/NewEarthdrake/NewEarthdrake')
+#import sys
+#sys.path.append('/home/alexandre/Development/NewEarthdrake/NewEarthdrake')
 import spyro
 
 def test_mesh_generation():
@@ -24,7 +24,7 @@ def test_mesh_generation():
     return True
 
 def test_wave_solver():
-    #pytest.skip("Model is too big for CircleCI resources. Test it locally.")
+    pytest.skip("Model is too big for CircleCI resources. Test it locally.")
     method = 'KMV'
     degree = 3
     G=5
@@ -37,7 +37,7 @@ def test_wave_solver():
     return True
 
 def test_error_calc():
-    #pytest.skip("Model is too big for CircleCI resources. Test it locally.")
+    pytest.skip("Model is too big for CircleCI resources. Test it locally.")
     method = 'KMV'
     degree = 2
     frequency = 10.
