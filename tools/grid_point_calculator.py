@@ -96,3 +96,32 @@ def generate_mesh(model,G):
         )
 
     return mesh
+
+def searching_for_minimum(model, p_exact, TOL, accuracy = 0.1, starting_G = 5.0):
+    error = 0.0
+    G = starting_G
+
+    # fast loop
+    while error < TOL:
+        dif = max(G*0.2, accuracy)
+        G = G - dif
+        print(G)
+        wave_solver(model,G)
+        error = error_calc(p_exact, p0, model)
+        print(error)
+
+    G += diff
+    # slow loop
+    if diff > accuracy :
+        error = 0.0
+        while error < TOL:
+            dif = accuracy
+            G = G - dif
+            print(G)
+            wave_solver(model,G)
+            error = error_calc(p_exact, p0, model)
+            print(error)
+
+        G+= diff
+
+    return G
