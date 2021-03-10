@@ -50,3 +50,49 @@ def wave_solver(model, G):
             print(time.time() - t1)
 
     return p_recv
+
+def generate_mesh(model,G):
+    M = grid_point_to_mesh_point_converter_for_seismicmesh(model, G)
+    minimum_mesh_velocity = model['testing_parameters']['minimum_mesh_velocity']
+    frequency = model["acquisition"]['frequency']
+    lbda = minimum_mesh_velocity/frequency
+    method = model["opts"]["method"]
+
+    Lz = model["mesh"]['Lz']
+    lz = model['PML']['lz']
+    Lx = model["mesh"]['Lx']
+    lx = model['PML']['lx']
+    pml_fraction = lx/Lx
+
+    Real_Lz = Lz + 2*lz
+    Real_Lx = Lx + lx
+    edge_length = lbda/M
+
+    bbox = (0.0, Real_Lz, 0.0, Real_Lx)
+    rec = SeismicMesh.Rectangle(bbox)
+    
+    points, cells = SeismicMesh.generate_mesh(
+        domain=rec, 
+        edge_length=edge_length, 
+        mesh_improvement = False
+        )
+    meshio.write_points_cells("homogeneous"+str(G)+".msh",
+        points,[("triangle", cells)],
+        file_format="gmsh22", 
+        binary = False
+        )
+    meshio.write_points_cells("homogeneous"+str(G)+".vtk",
+        points,[("triangle", cells)],
+        file_format="vtk", 
+        binary = False
+        )
+
+    if method == "CG" or method == "KMV":
+        mesh = fire.Mesh(
+            "homogeneous"+str(G)+".msh",
+            distribution_parameters={
+                "overlap_type": (fire.DistributedMeshOverlapType.NONE, 0)
+            },
+        )
+
+    return mesh
