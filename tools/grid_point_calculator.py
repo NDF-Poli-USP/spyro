@@ -165,3 +165,28 @@ def grid_point_to_mesh_point_converter_for_seismicmesh(model, G):
             M = 0.23991190372440996*G
 
     return M
+
+def error_calc(p_exact, p0, model):
+
+    times, receivers = p_exact.shape
+    dt = model["timeaxis"]['tf']/times
+
+    numerator = 0.0
+    denominator = 0.0
+    for receiver in range(receivers):
+        numerator_time_int = 0.0
+        denominator_time_int = 0.0
+        for time in range(times):
+            numerator_time_int   += (p_exact[time,receiver]-p0[time,receiver])**2*dt
+            denominator_time_int += (p_exact[time,receiver])**2*dt
+
+        numerator   += numerator_time_int
+        denominator += denominator_time_int
+
+    error = np.sqrt(numerator/denominator)
+
+    if numerator < 1e-15:
+        print('Warning: error too small to measure correctly.')
+        error = 0.0
+
+    return error
