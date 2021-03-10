@@ -26,3 +26,27 @@ def minimum_grid_point_calculator(frequency, method, degree, experient_type = 'h
     G = searching_for_minimum(model, p_exact, model)
 
     return G
+
+def wave_solver(model, G):
+    minimum_mesh_velocity = model['testing_parameters']['minimum_mesh_velocity']
+    comm = spyro.utils.mpi_init(model)
+
+    mesh = generate_mesh(model, G)
+    
+    element = spyro.domains.space.FE_method(mesh, model["opts"]["method"], model["opts"]["degree"])
+    V = fire.FunctionSpace(mesh, element)
+
+    vp_exact = fire.Constant(minimum_mesh_velocity)
+
+    sources = spyro.Sources(model, mesh, V, comm).create()
+    receivers = spyro.Receivers(model, mesh, V, comm).create()
+
+    for sn in range(model["acquisition"]["num_sources"]):
+        if spyro.io.is_owner(comm, sn):
+            t1 = time.time()
+            p_field, p_recv = spyro.solvers.Leapfrog(
+                model, mesh, comm, vp_exact, sources, receivers, source_num=sn
+            )
+            print(time.time() - t1)
+
+    return p_recv
