@@ -1,42 +1,50 @@
 from mpi4py import MPI
 import numpy as np
+from scipy import interpolate
 import meshio
 import SeismicMesh
 import firedrake as fire
 import time
 import spyro
 
-def minimum_grid_point_calculator(frequency, method, degree, experient_type = 'homogeneous', TOL = 0.01):
-    
+def minimum_grid_point_calculator(frequency, method, degree, experient_type = 'homogeneous', TOL = 0.2):
     ## Chossing parameters
 
     if experient_type == 'homogeneous':
         minimum_mesh_velocity = 1.0
 
     model = spyro.tools.create_model_for_grid_point_calculation(frequency, degree, method, minimum_mesh_velocity, experiment_type = experient_type, receiver_type = 'near')
+    comm = spyro.utils.mpi_init(model)
     
-    p_exact = wave_solver(model, G =12.0)
-    p_0 = wave_solver(model, G =10.0)
+    print("Initial method check")
+    p_exact = wave_solver(model, G =12.0, comm = comm)
+    p_0 = wave_solver(model, G =10.0, comm = comm)
 
-    error = error_calc(p_exact, p0)
+    error = error_calc(p_exact, p_0, model, comm = comm)
 
     if error > TOL:
+        print(error)
         raise ValueError('There might be something wrong with the simulation since G = 10 fails with the defined error.')
 
-    G = searching_for_minimum(model, p_exact, model)
+    print("Searching for minimum")
+    G = searching_for_minimum(model, p_exact, TOL, starting_G=10.0, comm = comm)
 
     return G
 
-def wave_solver(model, G):
+def wave_solver(model, G, comm = False):
     minimum_mesh_velocity = model['testing_parameters']['minimum_mesh_velocity']
-    comm = spyro.utils.mpi_init(model)
 
-    mesh = generate_mesh(model, G)
+    mesh = generate_mesh(model, G, comm.comm)
     
     element = spyro.domains.space.FE_method(mesh, model["opts"]["method"], model["opts"]["degree"])
     V = fire.FunctionSpace(mesh, element)
 
     vp_exact = fire.Constant(minimum_mesh_velocity)
+
+    ### ADD timestep calculation at core zero
+    new_dt = 0.5*spyro.estimate_timestep(mesh, V, vp_exact)
+
+    model['timeaxis']['dt'] = comm.comm.allreduce(new_dt, op=MPI.MIN)
 
     sources = spyro.Sources(model, mesh, V, comm).create()
     receivers = spyro.Receivers(model, mesh, V, comm).create()
@@ -45,13 +53,14 @@ def wave_solver(model, G):
         if spyro.io.is_owner(comm, sn):
             t1 = time.time()
             p_field, p_recv = spyro.solvers.Leapfrog(
-                model, mesh, comm, vp_exact, sources, receivers, source_num=sn
+                model, mesh, comm, vp_exact, sources, receivers, source_num=sn, output= True
             )
             print(time.time() - t1)
 
     return p_recv
 
-def generate_mesh(model,G):
+def generate_mesh(model,G, spatial_comm):
+    print(spatial_comm.rank)
     M = grid_point_to_mesh_point_converter_for_seismicmesh(model, G)
     minimum_mesh_velocity = model['testing_parameters']['minimum_mesh_velocity']
     frequency = model["acquisition"]['frequency']
@@ -74,18 +83,21 @@ def generate_mesh(model,G):
     points, cells = SeismicMesh.generate_mesh(
         domain=rec, 
         edge_length=edge_length, 
-        mesh_improvement = False
+        mesh_improvement = False,
+        comm= spatial_comm
         )
-    meshio.write_points_cells("homogeneous"+str(G)+".msh",
-        points,[("triangle", cells)],
-        file_format="gmsh22", 
-        binary = False
-        )
-    meshio.write_points_cells("homogeneous"+str(G)+".vtk",
-        points,[("triangle", cells)],
-        file_format="vtk", 
-        binary = False
-        )
+
+    if spatial_comm.rank == 0:
+        #points, cells = SeismicMesh.geometry.laplacian2(points, cells)
+        meshio.write_points_cells("homogeneous"+str(G)+".msh",
+            points,[("triangle", cells)],
+            file_format="gmsh22", 
+            binary = False
+            )
+        meshio.write_points_cells("homogeneous"+str(G)+".vtk",
+            points,[("triangle", cells)],
+            file_format="vtk"
+            )
 
     if method == "CG" or method == "KMV":
         mesh = fire.Mesh(
@@ -97,7 +109,7 @@ def generate_mesh(model,G):
 
     return mesh
 
-def searching_for_minimum(model, p_exact, TOL, accuracy = 0.1, starting_G = 5.0):
+def searching_for_minimum(model, p_exact, TOL, accuracy = 0.1, starting_G = 10.0):
     error = 0.0
     G = starting_G
 
@@ -105,10 +117,10 @@ def searching_for_minimum(model, p_exact, TOL, accuracy = 0.1, starting_G = 5.0)
     while error < TOL:
         dif = max(G*0.2, accuracy)
         G = G - dif
-        print(G)
-        wave_solver(model,G)
+        print('With G equal to '+str(G) )
+        p0 = wave_solver(model,G)
         error = error_calc(p_exact, p0, model)
-        print(error)
+        print('Error of '+str(error))
 
     G += diff
     # slow loop
@@ -117,10 +129,10 @@ def searching_for_minimum(model, p_exact, TOL, accuracy = 0.1, starting_G = 5.0)
         while error < TOL:
             dif = accuracy
             G = G - dif
-            print(G)
-            wave_solver(model,G)
+            print('With G equal to '+str(G) )
+            p0 = wave_solver(model,G)
             error = error_calc(p_exact, p0, model)
-            print(error)
+            print('Error of '+str(error))
 
         G+= diff
 
@@ -166,27 +178,62 @@ def grid_point_to_mesh_point_converter_for_seismicmesh(model, G):
 
     return M
 
-def error_calc(p_exact, p0, model):
+def error_calc(p_exact, p0, model, comm = False):
 
+    #comm = spyro.utils.mpi_init(model)
     times, receivers = p_exact.shape
     dt = model["timeaxis"]['tf']/times
+    print(type(p_exact))
+    print(p_exact.shape)
 
-    numerator = 0.0
-    denominator = 0.0
-    for receiver in range(receivers):
-        numerator_time_int = 0.0
-        denominator_time_int = 0.0
-        for time in range(times):
-            numerator_time_int   += (p_exact[time,receiver]-p0[time,receiver])**2*dt
-            denominator_time_int += (p_exact[time,receiver])**2*dt
+    # p0 doesn't necessarily have the same dt as p_exact
+    # therefore we have to interpolate the missing points
+    # to have them at the same length
+    p = time_interpolation(p0, p_exact, model)
 
-        numerator   += numerator_time_int
-        denominator += denominator_time_int
+    if comm.ensemble_comm.rank ==0:
+        numerator = 0.0
+        denominator = 0.0
+        for receiver in range(receivers):
+            numerator_time_int = 0.0
+            denominator_time_int = 0.0
+            for t in range(times-1):
+                numerator_time_int   += (p_exact[t,receiver]-p[t,receiver])**2*dt
+                denominator_time_int += (p_exact[t,receiver])**2*dt
 
-    error = np.sqrt(numerator/denominator)
+            numerator   += numerator_time_int
+            denominator += denominator_time_int
+
+        error = np.sqrt(numerator/denominator)
 
     if numerator < 1e-15:
         print('Warning: error too small to measure correctly.')
         error = 0.0
+    if denominator < 1e-15:
+        print("Warning: receivers don't appear to register a shot.")
+        error = 0.0
 
+    print(error)
+    print(type(error))
     return error
+
+def time_interpolation(p_old, p_exact, model):
+    times, receivers = p_exact.shape
+    dt = model["timeaxis"]['tf']/times
+
+    times_old, rec = p_old.shape
+    dt_old = model["timeaxis"]['tf']/times_old
+    time_vector_old = np.zeros((1,times_old))
+    for ite in range(times_old):
+        time_vector_old[0,ite] = dt_old*ite
+
+    time_vector_new = np.zeros((1,times))
+    for ite in range(times_old):
+        time_vector_new[0,ite] = dt*ite
+
+    p = np.zeros((times, receivers))
+    for receiver in range(receivers):
+        f = interpolate.interp1d(time_vector_old[0,:], p_old[:,receiver] )
+        p[:,receiver] = f(time_vector_new[0,:])
+
+    return p
