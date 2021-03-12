@@ -7,7 +7,7 @@ def create_model_for_grid_point_calculation(frequency, degree, method, minimum_m
     model = {}
     # domain calculations
     lbda = minimum_mesh_velocity/frequency
-    pml_fraction = 0.15
+    pml_fraction = lbda
     if receiver_type == 'near':
         Lz = 100*lbda
         Real_Lz = Lz*(1. + 2*pml_fraction)
@@ -19,7 +19,7 @@ def create_model_for_grid_point_calculation(frequency, degree, method, minimum_m
 
         # time calculations
         tmin = 1./frequency
-        final_time = 60*tmin #should be 60
+        final_time = 35*tmin #should be 35
 
         # receiver calculations
 

@@ -54,7 +54,6 @@ def test_error_calc():
     return True
 #def test_grid_point_calculator():
 
-    
 if __name__ == "__main__":
     test_mesh_generation()
     test_wave_solver()
