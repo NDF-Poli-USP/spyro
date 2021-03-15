@@ -294,6 +294,7 @@ def load_velocity_model(params, V, source_file=None):
     vp_model = firedrake.Function(V)
     vp_model.dat.data[:] = interpolant(coordinates.dat.data)
 
+
     return _check_units(vp_model)
 
 
@@ -324,6 +325,8 @@ def spatial_scatter(comm, xi, u):
 def create_mesh(model, comm, quad=True):
     """Create mesh from model parameters"""
 
+    origin = tuple(model["mesh"]["origin"]) if "origin" in model["mesh"] else (0, 0) 
+
     mesh = RectangleMesh(model["mesh"]["nz"],
                                    model["mesh"]["nx"],
                                    model["mesh"]["Lz"],
@@ -331,6 +334,10 @@ def create_mesh(model, comm, quad=True):
                                    quadrilateral=quad,
                                    diagonal='crossed',
                                    comm=comm.comm)
+
+
+    mesh.coordinates.dat.data[:,0] += origin[0]
+    mesh.coordinates.dat.data[:,1] += origin[1]
     
     element = FiniteElement(model["opts"]["method"],
                                       mesh.ufl_cell(),
