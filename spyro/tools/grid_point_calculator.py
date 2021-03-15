@@ -7,7 +7,7 @@ import firedrake as fire
 import time
 import spyro
 
-def minimum_grid_point_calculator(frequency, method, degree, experient_type = 'homogeneous', TOL = 0.2):
+def minimum_grid_point_calculator(frequency, method, degree, experient_type = 'homogeneous', TOL = 0.2, G_init = 12):
     ## Chossing parameters
 
     if experient_type == 'homogeneous':
@@ -17,8 +17,8 @@ def minimum_grid_point_calculator(frequency, method, degree, experient_type = 'h
     comm = spyro.utils.mpi_init(model)
     
     print("Initial method check")
-    p_exact = wave_solver(model, G =12.0, comm = comm)
-    p_0 = wave_solver(model, G =10.0, comm = comm)
+    p_exact = wave_solver(model, G =G_init, comm = comm)
+    p_0 = wave_solver(model, G =G_init - 0.2*G_init, comm = comm)
 
     error = error_calc(p_exact, p_0, model, comm = comm)
 
@@ -27,7 +27,7 @@ def minimum_grid_point_calculator(frequency, method, degree, experient_type = 'h
         raise ValueError('There might be something wrong with the simulation since G = 10 fails with the defined error.')
 
     print("Searching for minimum")
-    G = searching_for_minimum(model, p_exact, TOL, starting_G=10.0, comm = comm)
+    G = searching_for_minimum(model, p_exact, TOL, starting_G=G_init - 0.2*G_init, comm = comm)
 
     return G
 
@@ -42,7 +42,9 @@ def wave_solver(model, G, comm = False):
     vp_exact = fire.Constant(minimum_mesh_velocity)
 
     ### ADD timestep calculation at core zero
-    new_dt = 0.5*spyro.estimate_timestep(mesh, V, vp_exact)
+    if comm.comm.rank == 0:
+        print('a')
+    new_dt = 0.2*spyro.estimate_timestep(mesh, V, vp_exact)
 
     model['timeaxis']['dt'] = comm.comm.allreduce(new_dt, op=MPI.MIN)
 
@@ -84,11 +86,16 @@ def generate_mesh(model,G, spatial_comm):
         domain=rec, 
         edge_length=edge_length, 
         mesh_improvement = False,
-        comm= spatial_comm
+        comm= spatial_comm,
+        verbose = 0
         )
 
     if spatial_comm.rank == 0:
-        #points, cells = SeismicMesh.geometry.laplacian2(points, cells)
+        points, cells = SeismicMesh.geometry.delete_boundary_entities(points, cells, min_qual= 0.6)
+        a=np.amin(SeismicMesh.geometry.simp_qual(points, cells))
+        print(a)
+        if model['testing_parameters']['experiment_type'] == 'heterogenous':
+            points, cells = SeismicMesh.geometry.laplacian2(points, cells)
         meshio.write_points_cells("homogeneous"+str(G)+".msh",
             points,[("triangle", cells)],
             file_format="gmsh22", 
@@ -109,7 +116,7 @@ def generate_mesh(model,G, spatial_comm):
 
     return mesh
 
-def searching_for_minimum(model, p_exact, TOL, accuracy = 0.1, starting_G = 10.0):
+def searching_for_minimum(model, p_exact, TOL, accuracy = 0.1, starting_G = 10.0, comm=False):
     error = 0.0
     G = starting_G
 
@@ -118,23 +125,23 @@ def searching_for_minimum(model, p_exact, TOL, accuracy = 0.1, starting_G = 10.0
         dif = max(G*0.2, accuracy)
         G = G - dif
         print('With G equal to '+str(G) )
-        p0 = wave_solver(model,G)
-        error = error_calc(p_exact, p0, model)
+        p0 = wave_solver(model,G, comm)
+        error = error_calc(p_exact, p0, model, comm = comm)
         print('Error of '+str(error))
 
-    G += diff
+    G += dif
     # slow loop
-    if diff > accuracy :
+    if dif > accuracy :
         error = 0.0
         while error < TOL:
             dif = accuracy
             G = G - dif
             print('With G equal to '+str(G) )
-            p0 = wave_solver(model,G)
-            error = error_calc(p_exact, p0, model)
+            p0 = wave_solver(model,G, comm )
+            error = error_calc(p_exact, p0, model, comm = comm)
             print('Error of '+str(error))
 
-        G+= diff
+        G+= dif
 
     return G
 
@@ -213,6 +220,7 @@ def error_calc(p_exact, p0, model, comm = False):
         print("Warning: receivers don't appear to register a shot.")
         error = 0.0
 
+    print("ERROR IS ")
     print(error)
     print(type(error))
     return error
