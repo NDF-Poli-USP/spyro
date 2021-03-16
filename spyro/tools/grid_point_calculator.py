@@ -241,7 +241,7 @@ def time_interpolation(p_old, p_exact, model):
         time_vector_old[0,ite] = dt_old*ite
 
     time_vector_new = np.zeros((1,times))
-    for ite in range(times_old):
+    for ite in range(times):
         time_vector_new[0,ite] = dt*ite
 
     p = np.zeros((times, receivers))
