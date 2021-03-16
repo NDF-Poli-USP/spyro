@@ -17,17 +17,12 @@ def minimum_grid_point_calculator(frequency, method, degree, experient_type = 'h
     model = spyro.tools.create_model_for_grid_point_calculation(frequency, degree, method, minimum_mesh_velocity, experiment_type = experient_type, receiver_type = 'near')
     comm = spyro.utils.mpi_init(model)
     
-    print("Initial method check", flush = True)
     p_exact = wave_solver(model, G =G_init, comm = comm)
     comm.comm.barrier()
-    
-    print('Before p0 calc', flush = True)
     p_0 = wave_solver(model, G =G_init - 0.2*G_init, comm = comm)
     quit()
 
-    print('Before error calc', flush = True)
     error = error_calc(p_exact, p_0, model, comm = comm)
-    print('After error calc')
 
     if error > TOL:
         print(error)
