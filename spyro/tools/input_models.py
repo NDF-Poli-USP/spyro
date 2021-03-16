@@ -9,9 +9,9 @@ def create_model_for_grid_point_calculation(frequency, degree, method, minimum_m
     lbda = minimum_mesh_velocity/frequency
     pml_fraction = lbda
     if receiver_type == 'near':
-        Lz = 15*lbda
+        Lz = 100*lbda
         Real_Lz = Lz*(1. + 2*pml_fraction)
-        Lx = 13*lbda
+        Lx = 90*lbda
         Real_Lx = Lx*(1. + 1*pml_fraction)
 
         # source location
@@ -19,7 +19,7 @@ def create_model_for_grid_point_calculation(frequency, degree, method, minimum_m
 
         # time calculations
         tmin = 1./frequency
-        final_time = 4*tmin #should be 35
+        final_time = 3*tmin #should be 35
 
         # receiver calculations
 
@@ -83,7 +83,7 @@ def create_model_for_grid_point_calculation(frequency, degree, method, minimum_m
         "fspool": 100,  # how frequently to save solution to RAM
     }  
     model["parallelism"] = {
-    "type": "automatic",  # options: automatic (same number of cores for evey processor), custom, off.
+    "type": "off",  # options: automatic (same number of cores for evey processor), custom, off.
     "custom_cores_per_shot": [],  # only if the user wants a different number of cores for every shot.
     # input is a list of integers with the length of the number of shots.
     }
