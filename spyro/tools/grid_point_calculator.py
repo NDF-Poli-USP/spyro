@@ -5,6 +5,7 @@ import meshio
 import SeismicMesh
 import firedrake as fire
 import time
+import copy
 import spyro
 
 def minimum_grid_point_calculator(frequency, method, degree, experient_type = 'homogeneous', TOL = 0.2, G_init = 12):
@@ -93,7 +94,6 @@ def generate_mesh(model,G, spatial_comm):
     if spatial_comm.rank == 0:
         points, cells = SeismicMesh.geometry.delete_boundary_entities(points, cells, min_qual= 0.6)
         a=np.amin(SeismicMesh.geometry.simp_qual(points, cells))
-        print(a)
         if model['testing_parameters']['experiment_type'] == 'heterogenous':
             points, cells = SeismicMesh.geometry.laplacian2(points, cells)
         meshio.write_points_cells("homogeneous"+str(G)+".msh",
@@ -185,18 +185,18 @@ def grid_point_to_mesh_point_converter_for_seismicmesh(model, G):
 
     return M
 
-def error_calc(p_exact, p0, model, comm = False):
+def error_calc(p_exact, p, model, comm = False):
 
     #comm = spyro.utils.mpi_init(model)
-    times, receivers = p_exact.shape
+    times, receivers = p.shape
     dt = model["timeaxis"]['tf']/times
-    print(type(p_exact))
-    print(p_exact.shape)
 
     # p0 doesn't necessarily have the same dt as p_exact
     # therefore we have to interpolate the missing points
     # to have them at the same length
-    p = time_interpolation(p0, p_exact, model)
+    p_exact = time_interpolation(p_exact, p, model)
+    p_diff = p_exact-p
+    max_diff = 0.0
 
     if comm.ensemble_comm.rank ==0:
         numerator = 0.0
@@ -207,6 +207,10 @@ def error_calc(p_exact, p0, model, comm = False):
             for t in range(times-1):
                 numerator_time_int   += (p_exact[t,receiver]-p[t,receiver])**2*dt
                 denominator_time_int += (p_exact[t,receiver])**2*dt
+
+                diff = abs(p_exact[t,receiver]-p[t,receiver])/p_exact[t,receiver]
+                if diff > 1e-9 and diff > max_diff:
+                    max_diff = copy.deepcopy(diff)
 
             numerator   += numerator_time_int
             denominator += denominator_time_int
@@ -222,7 +226,8 @@ def error_calc(p_exact, p0, model, comm = False):
 
     print("ERROR IS ")
     print(error)
-    print(type(error))
+    print("Maximum percentage difference ")
+    print(max_diff)
     return error
 
 def time_interpolation(p_old, p_exact, model):

@@ -5,10 +5,10 @@ import spyro
 print("===================================================")
 frequency = 5.0
 method = 'KMV'
-degree = 4
+degree = 3
 print("Running with "+method+ " and p =" + str(degree))
 
-G = spyro.tools.minimum_grid_point_calculator(frequency, method, degree, experient_type = 'homogeneous', TOL = 0.5, G_init= 12)
+G = spyro.tools.minimum_grid_point_calculator(frequency, method, degree, experient_type = 'homogeneous', TOL = 0.2, G_init= 12)
 
 print("===================================================")
 
