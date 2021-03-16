@@ -19,9 +19,12 @@ def minimum_grid_point_calculator(frequency, method, degree, experient_type = 'h
     
     print("Initial method check")
     p_exact = wave_solver(model, G =G_init, comm = comm)
+    print('Before p0 calc')
     p_0 = wave_solver(model, G =G_init - 0.2*G_init, comm = comm)
 
+    print('Before error calc')
     error = error_calc(p_exact, p_0, model, comm = comm)
+    print('After error calc')
 
     if error > TOL:
         print(error)
@@ -42,12 +45,14 @@ def wave_solver(model, G, comm = False):
 
     vp_exact = fire.Constant(minimum_mesh_velocity)
 
-    ### ADD timestep calculation at core zero
-    if comm.comm.rank == 0:
-        print('a')
     new_dt = 0.2*spyro.estimate_timestep(mesh, V, vp_exact)
 
     model['timeaxis']['dt'] = comm.comm.allreduce(new_dt, op=MPI.MIN)
+    if comm.comm.rank == 0:
+        print(
+            f"Maximum stable timestep used is: {model['timeaxis']['dt']} seconds",
+            flush=True,
+        )
 
     sources = spyro.Sources(model, mesh, V, comm).create()
     receivers = spyro.Receivers(model, mesh, V, comm).create()
@@ -92,6 +97,7 @@ def generate_mesh(model,G, spatial_comm):
         )
 
     if spatial_comm.rank == 0:
+        print('entering spatial rank 0 after mesh generation')
         points, cells = SeismicMesh.geometry.delete_boundary_entities(points, cells, min_qual= 0.6)
         a=np.amin(SeismicMesh.geometry.simp_qual(points, cells))
         if model['testing_parameters']['experiment_type'] == 'heterogenous':
