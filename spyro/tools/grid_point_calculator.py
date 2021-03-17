@@ -17,9 +17,10 @@ def minimum_grid_point_calculator(frequency, method, degree, experient_type = 'h
     model = spyro.tools.create_model_for_grid_point_calculation(frequency, degree, method, minimum_mesh_velocity, experiment_type = experient_type, receiver_type = 'near')
     comm = spyro.utils.mpi_init(model)
     
-    print("Initial method check")
     p_exact = wave_solver(model, G =G_init, comm = comm)
+    comm.comm.barrier()
     p_0 = wave_solver(model, G =G_init - 0.2*G_init, comm = comm)
+    quit()
 
     error = error_calc(p_exact, p_0, model, comm = comm)
 
@@ -35,19 +36,21 @@ def minimum_grid_point_calculator(frequency, method, degree, experient_type = 'h
 def wave_solver(model, G, comm = False):
     minimum_mesh_velocity = model['testing_parameters']['minimum_mesh_velocity']
 
-    mesh = generate_mesh(model, G, comm.comm)
+    mesh = generate_mesh(model, G, comm)
     
     element = spyro.domains.space.FE_method(mesh, model["opts"]["method"], model["opts"]["degree"])
     V = fire.FunctionSpace(mesh, element)
 
     vp_exact = fire.Constant(minimum_mesh_velocity)
 
-    ### ADD timestep calculation at core zero
-    if comm.comm.rank == 0:
-        print('a')
     new_dt = 0.2*spyro.estimate_timestep(mesh, V, vp_exact)
 
     model['timeaxis']['dt'] = comm.comm.allreduce(new_dt, op=MPI.MIN)
+    if comm.comm.rank == 0:
+        print(
+            f"Maximum stable timestep used is: {model['timeaxis']['dt']} seconds",
+            flush=True,
+        )
 
     sources = spyro.Sources(model, mesh, V, comm).create()
     receivers = spyro.Receivers(model, mesh, V, comm).create()
@@ -62,8 +65,8 @@ def wave_solver(model, G, comm = False):
 
     return p_recv
 
-def generate_mesh(model,G, spatial_comm):
-    print(spatial_comm.rank)
+def generate_mesh(model,G, comm):
+    print('Entering mesh generation', flush = True)
     M = grid_point_to_mesh_point_converter_for_seismicmesh(model, G)
     minimum_mesh_velocity = model['testing_parameters']['minimum_mesh_velocity']
     frequency = model["acquisition"]['frequency']
@@ -82,16 +85,16 @@ def generate_mesh(model,G, spatial_comm):
 
     bbox = (0.0, Real_Lz, 0.0, Real_Lx)
     rec = SeismicMesh.Rectangle(bbox)
-    
-    points, cells = SeismicMesh.generate_mesh(
+
+    if comm.comm.rank == 0:
+        points, cells = SeismicMesh.generate_mesh(
         domain=rec, 
         edge_length=edge_length, 
         mesh_improvement = False,
-        comm= spatial_comm,
+        comm = comm.ensemble_comm,
         verbose = 0
         )
-
-    if spatial_comm.rank == 0:
+        print('entering spatial rank 0 after mesh generation')
         points, cells = SeismicMesh.geometry.delete_boundary_entities(points, cells, min_qual= 0.6)
         a=np.amin(SeismicMesh.geometry.simp_qual(points, cells))
         if model['testing_parameters']['experiment_type'] == 'heterogenous':
@@ -106,6 +109,7 @@ def generate_mesh(model,G, spatial_comm):
             file_format="vtk"
             )
 
+    comm.comm.barrier()
     if method == "CG" or method == "KMV":
         mesh = fire.Mesh(
             "homogeneous"+str(G)+".msh",
@@ -114,6 +118,7 @@ def generate_mesh(model,G, spatial_comm):
             },
         )
 
+    print('Finishing mesh generation', flush = True)
     return mesh
 
 def searching_for_minimum(model, p_exact, TOL, accuracy = 0.1, starting_G = 10.0, comm=False):
@@ -208,13 +213,15 @@ def error_calc(p_exact, p, model, comm = False):
                 numerator_time_int   += (p_exact[t,receiver]-p[t,receiver])**2*dt
                 denominator_time_int += (p_exact[t,receiver])**2*dt
 
-                diff = abs(p_exact[t,receiver]-p[t,receiver])/p_exact[t,receiver]
-                if diff > 1e-9 and diff > max_diff:
-                    max_diff = copy.deepcopy(diff)
+                # if p_exact[t,receiver] > 1e-10:
+                #     diff = abs(p_exact[t,receiver]-p[t,receiver])/p_exact[t,receiver]
+                #     if diff > 1e-9 and diff > max_diff:
+                #         max_diff = copy.deepcopy(diff)
 
             numerator   += numerator_time_int
             denominator += denominator_time_int
-
+	
+    if denominator > 1e-15:
         error = np.sqrt(numerator/denominator)
 
     if numerator < 1e-15:
