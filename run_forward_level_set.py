@@ -14,7 +14,7 @@ model["parallelism"] = {
 }
 model["opts"] = {
     "method": "KMV",
-    "degree": 2,  # p order
+    "degree": 3,  # p order
     "quadrature": "KMV",
     "dimension": 2,  # dimension
 }
@@ -22,9 +22,9 @@ model["mesh"] = {
     "Lz": 1.50,  # depth in km - always positive
     "Lx": 1.50,  # width in km - always positive
     "Ly": 0.0,  # thickness in km - always positive
-    "meshfile": "level_set_mesh_creation/immersed_disk_true_vp.msh",
-    "initmodel": "level_set_mesh_creation/immersed_disk_guess_vp.hdf5",
-    "truemodel": "level_set_mesh_creation/immersed_disk_true_vp.hdf5",
+    "meshfile": "meshes/immersed_disk_true_vp.msh",
+    "initmodel": "velocity_models/immersed_disk_guess_vp.hdf5",
+    "truemodel": "velocity_models/immersed_disk_true_vp.hdf5",
 }
 model["PML"] = {
     "status": True,  # true,  # true or false
@@ -52,7 +52,7 @@ model["acquisition"] = {
 model["timeaxis"] = {
     "t0": 0.0,  #  initial time for event
     "tf": 2.0,  # final time for event
-    "dt": 0.001,  # timestep size
+    "dt": 0.00075,  # timestep size
     "nspool": 100,  # how frequently to output solution to pvds
     "fspool": 9999,  # how frequently to save solution to ram
 }

@@ -8,7 +8,7 @@ def advect(mesh, q, theta, number_of_timesteps=10):
     """
 
     V = FunctionSpace(mesh, "DG", 0)
-    W = VectorFunctionSpace(mesh, "CG", 1)
+    W = VectorFunctionSpace(mesh, "KMV", 3)
 
     u = Function(W).assign(theta)
 

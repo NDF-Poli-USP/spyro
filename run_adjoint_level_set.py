@@ -2,29 +2,31 @@ from mpi4py import MPI
 from firedrake import *
 
 import spyro
+import SeismicMesh
 
 # 10 outside
 # 11 inside
 model = {}
 model["opts"] = {
     "method": "KMV",
-    "degree": 2,  # p order
+    "degree": 3,  # p order
     "dimension": 2,  # dimension
+    "quadrature": "KMV",
 }
 model["mesh"] = {
     "Lz": 1.50,  # depth in km - always positive
     "Lx": 1.50,  # width in km - always positive
     "Ly": 0.0,  # thickness in km - always positive
-    "meshfile": "level_set_mesh_creation/immersed_disk_guess_vp.msh",
-    "initmodel": "level_set_mesh_creation/immersed_disk_guess_vp.hdf5",
-    "truemodel": "level_set_mesh_creation/immersed_disk_true_vp.hdf5",
+    "meshfile": "meshes/immersed_disk_guess_vp.msh",
+    "initmodel": "velocity_models/immersed_disk_guess_vp.hdf5",
+    "truemodel": "velocity_models/immersed_disk_true_vp.hdf5",
 }
 model["PML"] = {
     "status": True,  # true,  # true or false
     "outer_bc": "non-reflective",  #  dirichlet, neumann, non-reflective (outer boundary condition)
     "damping_type": "polynomial",  # polynomial, hyperbolic, shifted_hyperbolic
     "exponent": 2,
-    "cmax": 4.5,  # maximum acoustic wave velocity in pml - km/s
+    "cmax": 5.0,  # maximum acoustic wave velocity in pml - km/s
     "R": 0.001,  # theoretical reflection coefficient
     "lz": 0.50,  # thickness of the pml in the z-direction (km) - always positive
     "lx": 0.50,  # thickness of the pml in the x-direction (km) - always positive
@@ -45,7 +47,7 @@ model["acquisition"] = {
 model["timeaxis"] = {
     "t0": 0.0,  #  initial time for event
     "tf": 2.0,  # final time for event
-    "dt": 0.001,  # timestep size
+    "dt": 0.00075,  # timestep size
     "nspool": 100,  # how frequently to output solution to pvds
     "fspool": 10,  # how frequently to save solution to ram
 }
@@ -62,31 +64,49 @@ def calculate_indicator_from_vp(vp):
     assumes the sudomains are labeled 10 and 11
     """
     dgV = FunctionSpace(mesh, "DG", 0)
-    cond = conditional(vp > 4.4, -1, 1)
+    cond = conditional(vp > 4.9, -1, 1)
     indicator = Function(dgV, name="indicator").interpolate(cond)
-    # u = TrialFunction(dgV)
-    # v = TestFunction(dgV)
-    # solve(u * v * dx == 1 * v * dx(10) + -1 * v * dx(11), indicator)
     return indicator
 
 
 def update_velocity(q, vp):
     """Update the velocity (material properties)
-    based on the indicator
+    based on the indicator function
     """
     sd1 = SubDomainData(q < 0)
     sd2 = SubDomainData(q > 0)
 
-    vp.interpolate(Constant(4.5), subset=sd1)
+    vp.interpolate(Constant(5.0), subset=sd1)
     vp.interpolate(Constant(2.0), subset=sd2)
 
     evolution_of_velocity.write(vp, name="control")
     return vp
 
 
+def create_weighting_function(V):
+    """Create a weighting function to mask the gradient"""
+    # a weighting function that produces large values near the boundary
+    # to diminish the gradient calculation near the boundary of the domain
+    m = V.ufl_domain()
+    W2 = VectorFunctionSpace(m, V.ufl_element())
+    coords = interpolate(m.coordinates, W2)
+    z, x = coords.dat.data[:, 0], coords.dat.data[:, 1]
+
+    # a weighting function that produces large values near the boundary
+    # to diminish the gradient calculation near the boundary of the domain
+    disk0 = SeismicMesh.Disk([-0.75, 0.75], 0.25)
+    pts = np.column_stack((z[:, None], x[:, None]))
+    d = disk0.eval(pts)
+    d[d < 0] = 0.0
+    vals = 1 + 1000.0 * d
+    wei = Function(V, vals, name="weighting_function")
+    File("weighting_function.pvd").write(wei)
+    return wei
+
+
 def calculate_functional(model, mesh, comm, vp, sources, receivers):
     """Calculate the l2-norm functional"""
-    print("Computing the functional")
+    print("Computing the functional", flush=True)
     J_local = np.zeros((1))
     J_total = np.zeros((1))
     for sn in range(model["acquisition"]["num_sources"]):
@@ -112,10 +132,10 @@ def calculate_functional(model, mesh, comm, vp, sources, receivers):
     )
 
 
-def calculate_gradient(model, mesh, comm, vp, guess, guess_dt, residual):
+def calculate_gradient(model, mesh, comm, vp, guess, guess_dt, weighting, residual):
     """Calculate the shape gradient"""
     print("Computing the gradient", flush=True)
-    VF = VectorFunctionSpace(mesh, "CG", 1)
+    VF = VectorFunctionSpace(mesh, model["opts"]["method"], model["opts"]["degree"])
     theta = Function(VF, name="gradient")
     for sn in range(model["acquisition"]["num_sources"]):
         if spyro.io.is_owner(comm, sn):
@@ -126,8 +146,10 @@ def calculate_gradient(model, mesh, comm, vp, guess, guess_dt, residual):
                 vp,
                 guess,
                 guess_dt,
+                weighting,
                 residual,
                 source_num=sn,
+                output=True,
             )
     # sum shape gradient if ensemble parallelism here
     if comm.ensemble_comm.size > 1:
@@ -150,7 +172,7 @@ def model_update(mesh, indicator, theta, step):
     return indicator_new
 
 
-def optimization(model, mesh, comm, vp, sources, receivers, max_iter=10):
+def optimization(model, mesh, V, comm, vp, sources, receivers, max_iter=10):
     """Optimization with a line search algorithm"""
     beta0 = beta0_init = 1.5
     max_ls = 3
@@ -160,6 +182,8 @@ def optimization(model, mesh, comm, vp, sources, receivers, max_iter=10):
 
     # the file that contains the shape gradient each iteration
     grad_file = File("theta.pvd")
+
+    weighting = create_weighting_function(V)
 
     ls_iter = 0
     iter_num = 0
@@ -172,7 +196,7 @@ def optimization(model, mesh, comm, vp, sources, receivers, max_iter=10):
         )
         # compute the shape gradient for the new domain
         theta = calculate_gradient(
-            model, mesh, comm, vp, guess_new, guess_dt_new, residual_new
+            model, mesh, comm, vp, guess_new, guess_dt_new, weighting, residual_new
         )
         grad_file.write(theta, name="gradient")
         # update the new shape...solve transport equation
@@ -214,7 +238,7 @@ def optimization(model, mesh, comm, vp, sources, receivers, max_iter=10):
             # now solve the transport equation over again
             # but with the reduced step
         else:
-            raise ValueError("failed to reduce the functional...")
+            raise ValueError("Failed to reduce the functional...")
 
     return vp
 
@@ -230,11 +254,14 @@ mesh, V = spyro.io.read_mesh(model, comm)
 
 vp = spyro.io.interpolate(model, mesh, V, guess=True)
 
+# The guess velocity model
+File("guess.pvd").write(vp)
+
 q = calculate_indicator_from_vp(vp)
 
 sources = spyro.Sources(model, mesh, V, comm).create()
 
 receivers = spyro.Receivers(model, mesh, V, comm).create()
 
-# run the optimization based on a line search
-vp = optimization(model, mesh, comm, vp, sources, receivers)
+# run the optimization based on a line search for max_iter iterations
+vp = optimization(model, mesh, V, comm, vp, sources, receivers, max_iter=5)

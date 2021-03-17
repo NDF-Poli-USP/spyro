@@ -2,7 +2,6 @@ from __future__ import print_function
 
 from firedrake import *
 from firedrake.assemble import create_assembly_callable
-import SeismicMesh
 
 import numpy as np
 from scipy.sparse import csc_matrix
@@ -26,6 +25,7 @@ def Leapfrog_adjoint_level_set(
     c,
     guess,
     guess_dt,
+    weighting,
     residual,
     source_num=0,
     output=False,
@@ -168,29 +168,12 @@ def Leapfrog_adjoint_level_set(
             "Leapfrog_adjoint_level_set.pvd", comm, source_num
         )
 
-    # a weighting function that produces large values near the boundary
-    # to diminish the gradient calculation near the boundary of the domain
-    m = V.ufl_domain()
-    W2 = VectorFunctionSpace(m, V.ufl_element())
-    coords = interpolate(m.coordinates, W2)
-    z, x = coords.dat.data[:, 0], coords.dat.data[:, 1]
-
-    # a weighting function that produces large values near the boundary
-    # to diminish the gradient calculation near the boundary of the domain
-    disk0 = SeismicMesh.Disk([-0.5, 0.5], 0.25)
-    pts = np.column_stack((z[:, None], x[:, None]))
-    d = disk0.eval(pts)
-    d[d < 0] = 0.0
-    vals = 1 + 1000.0 * d
-    wei = Function(V, vals, name="weighting_function")
-    File("weighting_function.pvd").write(wei)
-
     alpha1, alpha2 = 0.01, 0.97
 
     # ----------------------------------------
     # Define theta which is our descent direction
     # ---------------------------------------
-    VF = VectorFunctionSpace(mesh, "CG", 1)
+    VF = VectorFunctionSpace(mesh, model['opts']['method'], model['opts']['degree'])
     theta = TrialFunction(VF)
     csi = TestFunction(VF)
 
@@ -415,9 +398,9 @@ def Leapfrog_adjoint_level_set(
     # very large values on the boundary
     # sigma_inside
 
-    a = wei * alpha1 * inner(grad(theta), grad(csi)) * dx(
+    a = weighting * alpha1 * inner(grad(theta), grad(csi)) * dx(
         rule=qr_x
-    ) + alpha2 * wei * inner(theta, csi) * dx(rule=qr_x)
+    ) + alpha2 * weighting * inner(theta, csi) * dx(rule=qr_x)
 
     # gradient problem for two subdomains
     rhs_grad = -1.0 * ((1 / c ** 2) * k0_fe0 * div(csi) * dx(rule=qr_x))
