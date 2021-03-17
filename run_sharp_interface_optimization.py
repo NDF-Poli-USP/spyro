@@ -57,13 +57,16 @@ model["parallelism"] = {
 }
 #### end of options ####
 
+VP_1 = 4.5  # inside subdomain to be optimized
+VP_2 = 2.0  # outside subdomain to be optimized
+
 
 def calculate_indicator_from_vp(vp):
     """Create an indicator function
     assumes the sudomains are labeled 10 and 11
     """
     dgV = FunctionSpace(mesh, "DG", 0)
-    cond = conditional(vp > 4.4, -1, 1)
+    cond = conditional(vp > (VP_1 - 0.1), -1, 1)
     indicator = Function(dgV, name="indicator").interpolate(cond)
     return indicator
 
@@ -75,10 +78,9 @@ def update_velocity(q, vp):
     sd1 = SubDomainData(q < 0)
     sd2 = SubDomainData(q > 0)
 
-    vp.interpolate(Constant(4.5), subset=sd1)
-    vp.interpolate(Constant(2.0), subset=sd2)
+    vp.interpolate(Constant(VP_1), subset=sd1)
+    vp.interpolate(Constant(VP_2), subset=sd2)
 
-    evolution_of_velocity.write(vp, name="control")
     return vp
 
 
@@ -169,7 +171,7 @@ def model_update(mesh, indicator, theta, step):
     """
     print("Updating the shape...", flush=True)
     indicator_new = spyro.solvers.advect(
-        mesh, indicator, step * theta, number_of_timesteps=100
+        mesh, indicator, step * theta, number_of_timesteps=1000
     )
     return indicator_new
 
@@ -179,8 +181,6 @@ def optimization(model, mesh, V, comm, vp, sources, receivers, max_iter=10):
     beta0 = beta0_init = 1.5
     max_ls = 3
     gamma = gamma2 = 0.8
-
-    indicator = calculate_indicator_from_vp(vp)
 
     # the file that contains the shape gradient each iteration
     grad_file = File("theta.pvd")
@@ -200,12 +200,17 @@ def optimization(model, mesh, V, comm, vp, sources, receivers, max_iter=10):
         theta = calculate_gradient(
             model, mesh, comm, vp, guess_new, guess_dt_new, weighting, residual_new
         )
+        # write the gradient to a vtk file
         grad_file.write(theta, name="gradient")
-        # update the new shape...solve transport equation
+        # calculate the so-called indicator function by thresholding vp
+        indicator = calculate_indicator_from_vp(vp)
+        # update the new shape by solvoing the transport equation with the indicator field
         indicator_new = model_update(mesh, indicator, theta, beta0)
-        # update the velocity
+        # update the velocity according to the new indicator
         vp_new = update_velocity(indicator_new, vp)
-        # using some basic logic attempt to reduce the functional
+        # write the new velocity to a vtk file
+        evolution_of_velocity.write(vp_new)
+        # using a line search to attempt to reduce the functional
         print(J_new, flush=True)
         if J_new < J_old:
             print(
@@ -248,23 +253,20 @@ def optimization(model, mesh, V, comm, vp, sources, receivers, max_iter=10):
 
 # run the script
 
-# visualize the updates
-evolution_of_velocity = File("evolution_of_velocity.pvd")
-
 comm = spyro.utils.mpi_init(model)
 
 mesh, V = spyro.io.read_mesh(model, comm)
 
 vp = spyro.io.interpolate(model, mesh, V, guess=True)
 
-# The guess velocity model
-File("guess.pvd").write(vp)
+# visualize the updates with this file
+evolution_of_velocity = File("evolution_of_velocity.pvd")
+evolution_of_velocity.write(vp)
 
-q = calculate_indicator_from_vp(vp)
-
+# Configure the sources and receivers
 sources = spyro.Sources(model, mesh, V, comm).create()
 
 receivers = spyro.Receivers(model, mesh, V, comm).create()
 
 # run the optimization based on a line search for max_iter iterations
-vp = optimization(model, mesh, V, comm, vp, sources, receivers, max_iter=5)
+vp = optimization(model, mesh, V, comm, vp, sources, receivers, max_iter=10)

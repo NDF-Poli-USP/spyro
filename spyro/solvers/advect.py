@@ -12,7 +12,7 @@ def advect(mesh, q, theta, number_of_timesteps=10):
 
     u = Function(W).assign(theta)
 
-    dt = 0.0001
+    dt = 0.0005
     T = dt * number_of_timesteps
     dtc = Constant(dt)
     q_in = Constant(1.0)

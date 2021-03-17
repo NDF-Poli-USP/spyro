@@ -19,6 +19,7 @@ ef = get_sizing_function_from_segy(
     hmax=300,
     wl=wl,
     freq=freq,
+    grad=hmin/5,
     dt=0.001,
     cr_max=0.5,
     grade=0.15,

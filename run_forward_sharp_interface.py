@@ -66,6 +66,7 @@ vp_exact = spyro.io.interpolate(model, mesh, V, guess=False)
 
 File("exact_vp.pvd").write(vp_exact)
 
+quit()
 sources = spyro.Sources(model, mesh, V, comm).create()
 
 receivers = spyro.Receivers(model, mesh, V, comm).create()
@@ -82,7 +83,7 @@ for sn in range(model["acquisition"]["num_sources"]):
             model,
             p_recv,
             name="level_set_" + str(sn),
-            vmin=-5e-5,
-            vmax=5e-5,
+            vmin=-1e-5,
+            vmax=1e-5,
             appear=False,
         )
