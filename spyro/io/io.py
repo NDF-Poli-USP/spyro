@@ -258,7 +258,7 @@ def read_mesh(model, ens_comm):
         mesh = fire.Mesh(mshname, comm=ens_comm.comm)
     if ens_comm.comm.rank == 0 and ens_comm.ensemble_comm.rank == 0:
         print(
-            "INFO: Distributing %d shot(s) across %d processor(s). Each shot is using %d cores"
+            "INFO: Distributing %d shot(s) across %d core(s). Each shot is using %d cores"
             % (
                 num_sources,
                 fire.COMM_WORLD.size,
