@@ -220,8 +220,9 @@ def error_calc(p_exact, p, model, comm = False):
 
             numerator   += numerator_time_int
             denominator += denominator_time_int
-
-        error = np.sqrt(numerator/denominator)
+	
+	if denominator > 1e-15:
+        	error = np.sqrt(numerator/denominator)
 
     if numerator < 1e-15:
         print('Warning: error too small to measure correctly.')
