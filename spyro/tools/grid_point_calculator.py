@@ -20,7 +20,6 @@ def minimum_grid_point_calculator(frequency, method, degree, experient_type = 'h
     p_exact = wave_solver(model, G =G_init, comm = comm)
     comm.comm.barrier()
     p_0 = wave_solver(model, G =G_init - 0.2*G_init, comm = comm)
-    quit()
 
     error = error_calc(p_exact, p_0, model, comm = comm)
 
@@ -225,16 +224,16 @@ def error_calc(p_exact, p, model, comm = False):
         error = np.sqrt(numerator/denominator)
 
     if numerator < 1e-15:
-        print('Warning: error too small to measure correctly.')
+        print('Warning: error too small to measure correctly.', flush = True)
         error = 0.0
     if denominator < 1e-15:
-        print("Warning: receivers don't appear to register a shot.")
+        print("Warning: receivers don't appear to register a shot.", flush = True)
         error = 0.0
 
-    print("ERROR IS ")
-    print(error)
-    print("Maximum percentage difference ")
-    print(max_diff)
+    print("ERROR IS ", flush = True)
+    print(error, flush = True)
+    # print("Maximum percentage difference ", flush = True)
+    # print(max_diff, flush = True)
     return error
 
 def time_interpolation(p_old, p_exact, model):
