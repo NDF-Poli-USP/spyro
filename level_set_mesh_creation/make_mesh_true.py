@@ -6,7 +6,7 @@ fname = (
     "immersed_disk_true_vp.segy"  # generated via create_immersed_disk_velocity_models.m
 )
 bbox = (-1500.0, 0.0, 0.0, 1500.0)
-wl = 5
+wl = 10
 freq = 5
 hmin = 1500 / (wl * freq)
 
@@ -21,7 +21,7 @@ ef = get_sizing_function_from_segy(
     freq=freq,
     dt=0.001,
     cr_max=0.5,
-    grade=0.35,
+    grade=0.15,
     domain_pad=500,
     pad_style="edge",
     units="km-s",

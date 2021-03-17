@@ -173,7 +173,7 @@ def Leapfrog_adjoint_level_set(
     # ----------------------------------------
     # Define theta which is our descent direction
     # ---------------------------------------
-    VF = VectorFunctionSpace(mesh, model['opts']['method'], model['opts']['degree'])
+    VF = VectorFunctionSpace(mesh, model["opts"]["method"], 1)
     theta = TrialFunction(VF)
     csi = TestFunction(VF)
 
@@ -243,7 +243,6 @@ def Leapfrog_adjoint_level_set(
     g_v = TestFunction(V)
 
     # Define gradient problem
-    # this solves for the shape gradient WITHOUT the PML
     mgrad = g_u * g_v * dx(rule=qr_x)
 
     uuadj = Function(V)  # auxiliarly function for the gradient compt.

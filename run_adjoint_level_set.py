@@ -4,12 +4,10 @@ from firedrake import *
 import spyro
 import SeismicMesh
 
-# 10 outside
-# 11 inside
 model = {}
 model["opts"] = {
     "method": "KMV",
-    "degree": 3,  # p order
+    "degree": 1,  # p order
     "dimension": 2,  # dimension
     "quadrature": "KMV",
 }
@@ -47,9 +45,10 @@ model["acquisition"] = {
 model["timeaxis"] = {
     "t0": 0.0,  #  initial time for event
     "tf": 2.0,  # final time for event
-    "dt": 0.00075,  # timestep size
+    "dt": 0.001,  # timestep size
     "nspool": 100,  # how frequently to output solution to pvds
     "fspool": 10,  # how frequently to save solution to ram
+    "skip": 2,
 }
 model["parallelism"] = {
     "type": "automatic",  # options: automatic (same number of cores for evey processor), custom, off
@@ -64,7 +63,7 @@ def calculate_indicator_from_vp(vp):
     assumes the sudomains are labeled 10 and 11
     """
     dgV = FunctionSpace(mesh, "DG", 0)
-    cond = conditional(vp > 4.9, -1, 1)
+    cond = conditional(vp > 4.4, -1, 1)
     indicator = Function(dgV, name="indicator").interpolate(cond)
     return indicator
 
@@ -76,7 +75,7 @@ def update_velocity(q, vp):
     sd1 = SubDomainData(q < 0)
     sd2 = SubDomainData(q > 0)
 
-    vp.interpolate(Constant(5.0), subset=sd1)
+    vp.interpolate(Constant(4.5), subset=sd1)
     vp.interpolate(Constant(2.0), subset=sd2)
 
     evolution_of_velocity.write(vp, name="control")
@@ -94,7 +93,7 @@ def create_weighting_function(V):
 
     # a weighting function that produces large values near the boundary
     # to diminish the gradient calculation near the boundary of the domain
-    disk0 = SeismicMesh.Disk([-0.75, 0.75], 0.25)
+    disk0 = SeismicMesh.Disk([-0.75, 0.75], 0.40)
     pts = np.column_stack((z[:, None], x[:, None]))
     d = disk0.eval(pts)
     d[d < 0] = 0.0
@@ -118,7 +117,10 @@ def calculate_functional(model, mesh, comm, vp, sources, receivers):
                 "shots/forward_exact_level_set" + str(sn) + ".dat"
             )
             residual = spyro.utils.evaluate_misfit(
-                model, comm, p_exact_recv, guess_recv
+                model,
+                comm,
+                guess_recv,
+                p_exact_recv,
             )
             J_local[0] += spyro.utils.compute_functional(model, comm, residual)
     if comm.ensemble_comm.size > 1:
@@ -204,6 +206,7 @@ def optimization(model, mesh, V, comm, vp, sources, receivers, max_iter=10):
         # update the velocity
         vp_new = update_velocity(indicator_new, vp)
         # using some basic logic attempt to reduce the functional
+        print(J_new, flush=True)
         if J_new < J_old:
             print(
                 "Iteration "
