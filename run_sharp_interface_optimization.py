@@ -30,8 +30,8 @@ model["PML"] = {
     "lx": 0.50,  # thickness of the pml in the x-direction (km) - always positive
     "ly": 0.0,  # thickness of the pml in the y-direction (km) - always positive
 }
-recvs = spyro.create_transect((-0.10, 0.30), (-0.10, 1.20), 200)
-sources = spyro.create_transect((-0.05, 0.30), (-0.10, 1.20), 4)
+recvs = spyro.create_transect((-0.10, 0.1), (-0.10, 1.40), 200)
+sources = spyro.create_transect((-0.05, 0.30), (-0.05, 1.20), 4)
 model["acquisition"] = {
     "source_type": "Ricker",
     "num_sources": len(sources),
@@ -62,9 +62,7 @@ VP_2 = 2.0  # outside subdomain to be optimized
 
 
 def calculate_indicator_from_vp(vp):
-    """Create an indicator function
-    assumes the sudomains are labeled 10 and 11
-    """
+    """Create an indicator function"""
     dgV = FunctionSpace(mesh, "DG", 0)
     cond = conditional(vp > (VP_1 - 0.1), -1, 1)
     indicator = Function(dgV, name="indicator").interpolate(cond)
@@ -105,7 +103,7 @@ def create_weighting_function(V):
     return wei
 
 
-def calculate_functional(model, mesh, comm, vp, sources, receivers):
+def calculate_functional(model, mesh, comm, vp, sources, receivers, iter_num):
     """Calculate the l2-norm functional"""
     print("Computing the functional", flush=True)
     J_local = np.zeros((1))
@@ -115,9 +113,23 @@ def calculate_functional(model, mesh, comm, vp, sources, receivers):
             guess, guess_dt, guess_recv = spyro.solvers.Leapfrog_level_set(
                 model, mesh, comm, vp, sources, receivers, source_num=sn
             )
-            p_exact_recv = spyro.io.load_shots(
-                "shots/forward_exact_level_set" + str(sn) + ".dat"
+            f = "shots/forward_exact_level_set" + str(sn) + ".dat"
+            p_exact_recv = spyro.io.load_shots(f)
+            import matplotlib.pyplot as plt
+
+            plt.plot(p_exact_recv[:-1:2, 100], "k-")
+            plt.plot(guess_recv[:, 100], "r-")
+            plt.ylim(-5e-5, 5e-5)
+            plt.title("Receiver #100")
+            plt.savefig(
+                "comparison_"
+                + str(comm.ensemble_comm.rank)
+                + "_iter_"
+                + str(iter_num)
+                + ".png"
             )
+            plt.close()
+
             residual = spyro.utils.evaluate_misfit(
                 model,
                 comm,
@@ -191,25 +203,27 @@ def optimization(model, mesh, V, comm, vp, sources, receivers, max_iter=10):
     iter_num = 0
     # some very large number to start for the functional
     J_old = 9999999.0
+    # calculate the new functional for the new model
+    J, guess, guess_dt, residual = calculate_functional(
+        model, mesh, comm, vp, sources, receivers, iter_num
+    )
     while iter_num < max_iter:
-        # calculate the new functional for the new model
-        J_new, guess_new, guess_dt_new, residual_new = calculate_functional(
-            model, mesh, comm, vp, sources, receivers
-        )
         # compute the shape gradient for the new domain
         theta = calculate_gradient(
-            model, mesh, comm, vp, guess_new, guess_dt_new, weighting, residual_new
+            model, mesh, comm, vp, guess, guess_dt, weighting, residual
         )
         # write the gradient to a vtk file
         grad_file.write(theta, name="gradient")
         # calculate the so-called indicator function by thresholding vp
         indicator = calculate_indicator_from_vp(vp)
-        # update the new shape by solvoing the transport equation with the indicator field
+        # update the new shape by solving the transport equation with the indicator field
         indicator_new = model_update(mesh, indicator, theta, beta0)
         # update the velocity according to the new indicator
         vp_new = update_velocity(indicator_new, vp)
-        # write the new velocity to a vtk file
-        evolution_of_velocity.write(vp_new)
+        # compute the new functional
+        J_new, guess_new, guess_dt_new, residual_new = calculate_functional(
+            model, mesh, comm, vp_new, sources, receivers, iter_num
+        )
         # using a line search to attempt to reduce the functional
         print(J_new, flush=True)
         if J_new < J_old:
@@ -220,6 +234,9 @@ def optimization(model, mesh, V, comm, vp, sources, receivers, max_iter=10):
                 + str(J_new),
                 flush=True,
             )
+            # write the new velocity to a vtk file
+            evolution_of_velocity.write(vp_new)
+
             iter_num += 1
             # accept new domain
             J_old = J_new
@@ -245,6 +262,12 @@ def optimization(model, mesh, V, comm, vp, sources, receivers, max_iter=10):
             beta0 *= gamma
             # now solve the transport equation over again
             # but with the reduced step
+
+            # compute the new functional
+            J, guess, guess_dt, residual = calculate_functional(
+                model, mesh, comm, vp_new, sources, receivers, iter_num
+            )
+
         else:
             raise ValueError("Failed to reduce the functional...")
 

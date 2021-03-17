@@ -35,8 +35,8 @@ model["PML"] = {
     "lx": 0.50,  # thickness of the pml in the x-direction (km) - always positive
     "ly": 0.0,  # thickness of the pml in the y-direction (km) - always positive
 }
-recvs = spyro.create_transect((-0.10, 0.30), (-0.10, 1.20), 200)
-sources = spyro.create_transect((-0.05, 0.30), (-0.10, 1.20), 4)
+recvs = spyro.create_transect((-0.10, 0.1), (-0.10, 1.40), 200)
+sources = spyro.create_transect((-0.05, 0.30), (-0.05, 1.20), 4)
 model["acquisition"] = {
     "source_type": "Ricker",
     "num_sources": len(sources),
