@@ -4,7 +4,7 @@ from SeismicMesh import *
 # velocity model for guess problem
 fname = "immersed_disk_guess_vp.segy"  # generated via create_immersed_disk_velocity_models.m
 bbox = (-1500.0, 0.0, 0.0, 1500.0)
-wl = 10
+wl = 15
 freq = 5
 hmin = 1500 / (wl * freq)
 
@@ -19,7 +19,7 @@ ef = get_sizing_function_from_segy(
     freq=freq,
     dt=0.001,
     cr_max=0.5,
-    grad=hmin/3,
+    grad=hmin / 3,
     grade=0.15,
     domain_pad=500,
     pad_style="edge",

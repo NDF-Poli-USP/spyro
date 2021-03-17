@@ -15,9 +15,9 @@ model["mesh"] = {
     "Lz": 1.50,  # depth in km - always positive
     "Lx": 1.50,  # width in km - always positive
     "Ly": 0.0,  # thickness in km - always positive
-    "meshfile": "meshes/immersed_disk_guess_vp.msh",
-    "initmodel": "velocity_models/immersed_disk_guess_vp.hdf5",
-    "truemodel": "velocity_models/immersed_disk_true_vp.hdf5",
+    "meshfile": "meshes/immersed_disk_true_vp.msh",
+    "initmodel": "velocity_models/immersed_disk_true_vp.hdf5",
+    "truemodel": "velocity_models/immersed_disk_guess_vp.hdf5",
 }
 model["PML"] = {
     "status": True,  # true,  # true or false
@@ -63,7 +63,6 @@ VP_2 = 2.0  # outside subdomain to be optimized
 
 def calculate_indicator_from_vp(vp):
     """Create an indicator function
-    assumes the sudomains are labeled 10 and 11
     """
     dgV = FunctionSpace(mesh, "DG", 0)
     cond = conditional(vp > (VP_1 - 0.1), -1, 1)
