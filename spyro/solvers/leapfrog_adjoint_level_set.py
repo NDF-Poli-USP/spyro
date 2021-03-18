@@ -173,7 +173,7 @@ def Leapfrog_adjoint_level_set(
     # ----------------------------------------
     # Define theta which is our descent direction
     # ---------------------------------------
-    VF = VectorFunctionSpace(mesh, model["opts"]["method"], 1)
+    VF = VectorFunctionSpace(mesh, model["opts"]["method"], model["opts"]["degree"])
     theta = TrialFunction(VF)
     csi = TestFunction(VF)
 

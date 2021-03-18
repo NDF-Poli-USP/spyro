@@ -48,7 +48,7 @@ def advect(mesh, q, theta, number_of_timesteps=10):
 
     t = 0.0
 
-    #indicator = File("indicator.pvd")
+    # indicator = File("indicator.pvd")
 
     step = 0
     while t < T - 0.5 * dt:
@@ -62,7 +62,7 @@ def advect(mesh, q, theta, number_of_timesteps=10):
         solv3.solve()
         q.assign((1.0 / 3.0) * q + (2.0 / 3.0) * (q2 + dq))
 
-        #indicator.write(q)
+        # indicator.write(q)
 
         step += 1
         t += dt

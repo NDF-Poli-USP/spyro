@@ -8,7 +8,7 @@ import h5py
 import numpy as np
 from scipy.interpolate import RegularGridInterpolator
 from scipy.interpolate import griddata
-import segyio 
+import segyio
 
 from .. import domains
 

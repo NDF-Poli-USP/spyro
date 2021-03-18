@@ -306,7 +306,8 @@ def Leapfrog_level_set(
             ), "Numerical instability. Try reducing dt or building the mesh differently"
             if output:
                 outfile.write(u_n, time=t)
-            helpers.display_progress(comm, t)
+            if IT != 0:
+                helpers.display_progress(comm, t)
 
         t = IT * float(dt)
 

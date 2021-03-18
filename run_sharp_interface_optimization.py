@@ -2,7 +2,6 @@ from mpi4py import MPI
 from firedrake import *
 
 import spyro
-import SeismicMesh
 
 model = {}
 model["opts"] = {
@@ -46,7 +45,7 @@ model["timeaxis"] = {
     "t0": 0.0,  #  initial time for event
     "tf": 1.0,  # final time for event
     "dt": 0.0005,  # timestep size
-    "nspool": 100,  # how frequently to output solution to pvds
+    "nspool": 9999,  # how frequently to output solution to pvds
     "fspool": 10,  # how frequently to save solution to ram
     "skip": 2,
 }
@@ -90,25 +89,9 @@ def create_weighting_function(V):
     W2 = VectorFunctionSpace(m, V.ufl_element())
     coords = interpolate(m.coordinates, W2)
     z, x = coords.dat.data[:, 0], coords.dat.data[:, 1]
-
-    # a weighting function that produces large values near the boundary
-    # to diminish the gradient calculation near the boundary of the domain
-    # disk0 = SeismicMesh.Disk([-0.75, 0.75], 0.60)
-    # rect0 = SeismicMesh.Rectangle(
-    #    (
-    #        -1.9,
-    #        0.4,
-    #        -0.1,
-    #        1.9,
-    #    )
-    # )
-    # pts = np.column_stack((z[:, None], x[:, None]))
-    # d = disk0.eval(pts)
-    # d = rect0.eval(pts)
-    # d[d < 0] = 100.0
-    # vals = 1 + 1000.0 * d
-    vals = 1.0e8 * (pow(z[:, None] + 1.0, 8) + pow(x[:, None] - 0.75, 10)) + 100
+    # What they were using:
     # wei_equation = '1.0e8*(pow(x[0] - 0.5, 16) + pow(x[1] - 0.325, 10))+100'
+    vals = 1.0e8 * (pow(z[:, None] + 1.0, 2) + pow(x[:, None] - 0.75, 2)) + 100
     wei = Function(V, vals, name="weighting_function")
     File("weighting_function.pvd").write(wei)
     return wei
@@ -116,7 +99,8 @@ def create_weighting_function(V):
 
 def calculate_functional(model, mesh, comm, vp, sources, receivers, iter_num):
     """Calculate the l2-norm functional"""
-    print("Computing the functional", flush=True)
+    if comm.ensemble_comm.rank == 0:
+        print("Computing the cost functional", flush=True)
     J_local = np.zeros((1))
     J_total = np.zeros((1))
     for sn in range(model["acquisition"]["num_sources"]):
@@ -126,6 +110,8 @@ def calculate_functional(model, mesh, comm, vp, sources, receivers, iter_num):
             )
             f = "shots/forward_exact_level_set" + str(sn) + ".dat"
             p_exact_recv = spyro.io.load_shots(f)
+            # DEBUG
+            # viz the signal at receiver # 100
             import matplotlib.pyplot as plt
 
             plt.plot(p_exact_recv[:-1:2, 100], "k-")
@@ -140,6 +126,7 @@ def calculate_functional(model, mesh, comm, vp, sources, receivers, iter_num):
                 + ".png"
             )
             plt.close()
+            # END DEBUG
 
             residual = spyro.utils.evaluate_misfit(
                 model,
@@ -151,6 +138,8 @@ def calculate_functional(model, mesh, comm, vp, sources, receivers, iter_num):
     if comm.ensemble_comm.size > 1:
         COMM_WORLD.Allreduce(J_local, J_total, op=MPI.SUM)
         J_total[0] /= comm.ensemble_comm.size
+    if comm.ensemble_comm.rank == 0:
+        print(f"The cost functional is: {J_total[0]}")
     return (
         J_total[0],
         guess,
@@ -161,7 +150,8 @@ def calculate_functional(model, mesh, comm, vp, sources, receivers, iter_num):
 
 def calculate_gradient(model, mesh, comm, vp, guess, guess_dt, weighting, residual):
     """Calculate the shape gradient"""
-    print("Computing the gradient", flush=True)
+    if comm.ensemble_comm.rank == 0:
+        print("Computing the shape derivative...", flush=True)
     VF = VectorFunctionSpace(mesh, model["opts"]["method"], model["opts"]["degree"])
     theta = Function(VF, name="gradient")
     for sn in range(model["acquisition"]["num_sources"]):
@@ -186,7 +176,7 @@ def calculate_gradient(model, mesh, comm, vp, guess, guess_dt, weighting, residu
     else:
         theta = theta_local
     # scale factor
-    theta *= -1e8
+    theta *= -1e7
     # theta *= -1.0
     return theta
 
@@ -195,7 +185,8 @@ def model_update(mesh, indicator, theta, step):
     """Solve a transport equation to move the subdomains around based
     on the shape gradient which hopefully minimizes the functional.
     """
-    print("Updating the shape...", flush=True)
+    if comm.ensemble_comm.rank == 0:
+        print("Updating the shape...", flush=True)
     indicator_new = spyro.solvers.advect(
         mesh, indicator, step * theta, number_of_timesteps=10
     )
@@ -220,6 +211,8 @@ def optimization(model, mesh, V, comm, vp, sources, receivers, max_iter=10):
         model, mesh, comm, vp, sources, receivers, iter_num
     )
     while iter_num < max_iter:
+        if comm.ensemble_comm.rank == 0 and iter_num == 0:
+            print("Commencing the inversion...")
         # compute the shape gradient for the new domain
         theta = calculate_gradient(
             model, mesh, comm, vp, guess, guess_dt, weighting, residual
@@ -238,13 +231,11 @@ def optimization(model, mesh, V, comm, vp, sources, receivers, max_iter=10):
         )
         # using a line search to attempt to reduce the functional
         if J_new < J_old:
-            print(
-                "Iteration "
-                + str(iter_num)
-                + " : Accepting shape update...functional is: "
-                + str(J_new),
-                flush=True,
-            )
+            if comm.ensemble_comm.rank == 0:
+                print(
+                    f"Iteration {iter_num}: Functional was {J_old}. Accepting shape update...new functional is: {J_new}",
+                    flush=True,
+                )
             # write the new velocity to a vtk file
             evolution_of_velocity.write(vp_new)
 
@@ -266,21 +257,24 @@ def optimization(model, mesh, V, comm, vp, sources, receivers, max_iter=10):
                 beta0 = beta0
             ls_iter = 0
         elif ls_iter < 3:
-            print(J_old, J_new, flush=True)
-            print("Line search " + str(ls_iter) + "...reducing step...", flush=True)
+            if comm.ensemble_comm.rank == 0:
+                print(J_old, J_new, flush=True)
+                print(f"Line search {ls_iter}...reducing step...", flush=True)
             # advance the line search counter
             ls_iter += 1
             # reduce step length by gamma
             beta0 *= gamma
             # now solve the transport equation over again
             # but with the reduced step
-
+            # Need to recompute guess-dt since was discarded above
             # compute the new functional (using old velocity field)
             J, guess, guess_dt, residual = calculate_functional(
                 model, mesh, comm, vp, sources, receivers, iter_num
             )
         else:
-            raise ValueError("Failed to reduce the functional...")
+            raise ValueError(
+                f"Failed to reduce the functional after {ls_iter} line searches..."
+            )
 
     return vp
 
