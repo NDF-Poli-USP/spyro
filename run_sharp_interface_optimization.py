@@ -69,20 +69,22 @@ def calculate_indicator_from_vp(vp):
     return indicator
 
 
-def update_velocity(q, vp):
+def update_velocity(V, q, vp):
     """Update the velocity (material properties)
     based on the indicator function
     """
     sd1 = SubDomainData(q < 1.5)
     sd2 = SubDomainData(q > 1.5)
 
-    vp.interpolate(Constant(VP_1), subset=sd1)
-    vp.interpolate(Constant(VP_2), subset=sd2)
+    vp_new = Function(V)
 
-    return vp
+    vp_new.interpolate(Constant(VP_1), subset=sd1)
+    vp_new.interpolate(Constant(VP_2), subset=sd2)
+
+    return vp_new
 
 
-def create_weighting_function(V, const=100.0, M=10, width=0.1, show=False):
+def create_weighting_function(V, const=100.0, M=5, width=0.1, show=False):
     """Create a weighting function g, which is large near the
     boundary of the domain and a constant smaller value in the interior
 
@@ -231,7 +233,7 @@ def model_update(mesh, indicator, theta, step):
         mesh,
         indicator,
         step * theta,
-        number_of_timesteps=10,
+        number_of_timesteps=20,
         output=True,
     )
     return indicator_new
@@ -246,7 +248,7 @@ def optimization(model, mesh, V, comm, vp, sources, receivers, max_iter=10):
     # the file that contains the shape gradient each iteration
     grad_file = File("theta.pvd")
 
-    weighting = create_weighting_function(V, M=44)
+    weighting = create_weighting_function(V, width=0.1)
 
     ls_iter = 0
     iter_num = 0
@@ -261,6 +263,7 @@ def optimization(model, mesh, V, comm, vp, sources, receivers, max_iter=10):
         if comm.ensemble_comm.rank == 0:
             print(f"The step size is: {beta0}", flush=True)
 
+        evolution_of_velocity.write(vp)
         # compute the shape gradient for the new domain
         theta = calculate_gradient(
             model, mesh, comm, vp, guess, guess_dt, weighting, residual
@@ -272,13 +275,12 @@ def optimization(model, mesh, V, comm, vp, sources, receivers, max_iter=10):
         # update the new shape by solving the transport equation with the indicator field
         indicator_new = model_update(mesh, indicator, theta, beta0)
         # update the velocity according to the new indicator
-        vp_new = update_velocity(indicator_new, vp)
+        vp_new = update_velocity(V, indicator_new, vp)
         # compute the new functional
         J_new, guess_new, guess_dt_new, residual_new = calculate_functional(
             model, mesh, comm, vp_new, sources, receivers, iter_num
         )
         # write the new velocity to a vtk file
-        evolution_of_velocity.write(vp_new)
         # using a line search to attempt to reduce the functional
         if J_new < J_old:
             if comm.ensemble_comm.rank == 0:
@@ -307,8 +309,8 @@ def optimization(model, mesh, V, comm, vp, sources, receivers, max_iter=10):
                 beta0 = beta0
             ls_iter = 0
         elif ls_iter < 3:
+            print(J_old, J_new, flush=True)
             if comm.ensemble_comm.rank == 0:
-                print(J_old, J_new, flush=True)
                 print(
                     f"Line search number {ls_iter}...reducing step size...", flush=True
                 )
