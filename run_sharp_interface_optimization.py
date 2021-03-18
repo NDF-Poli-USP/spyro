@@ -186,7 +186,7 @@ def calculate_gradient(model, mesh, comm, vp, guess, guess_dt, weighting, residu
     else:
         theta = theta_local
     # scale factor
-    theta *= -1e7
+    theta *= -1e8
     # theta *= -1.0
     return theta
 
@@ -215,10 +215,8 @@ def optimization(model, mesh, V, comm, vp, sources, receivers, max_iter=10):
 
     ls_iter = 0
     iter_num = 0
-    # some very large number to start for the functional
-    J_old = 9999999.0
     # calculate the new functional for the new model
-    J, guess, guess_dt, residual = calculate_functional(
+    J_old, guess, guess_dt, residual = calculate_functional(
         model, mesh, comm, vp, sources, receivers, iter_num
     )
     while iter_num < max_iter:
@@ -239,7 +237,6 @@ def optimization(model, mesh, V, comm, vp, sources, receivers, max_iter=10):
             model, mesh, comm, vp_new, sources, receivers, iter_num
         )
         # using a line search to attempt to reduce the functional
-        print(J_new, flush=True)
         if J_new < J_old:
             print(
                 "Iteration "
@@ -269,6 +266,7 @@ def optimization(model, mesh, V, comm, vp, sources, receivers, max_iter=10):
                 beta0 = beta0
             ls_iter = 0
         elif ls_iter < 3:
+            print(J_old, J_new, flush=True)
             print("Line search " + str(ls_iter) + "...reducing step...", flush=True)
             # advance the line search counter
             ls_iter += 1
