@@ -416,7 +416,9 @@ def Leapfrog_adjoint_level_set(
     L = a + rhs_grad
     lterm, rterm = lhs(L), rhs(L)
     Lterm, Rterm = assemble(lterm), assemble(rterm)
-    solver_csi = LinearSolver(Lterm, solver_parameters=params)
+    solver_csi = LinearSolver(
+        Lterm, solver_parameters={"ksp_type": "cg", "pc_type": "jacobi"}
+    )
     descent = Function(VF, name="grad")
     solver_csi.solve(descent, Rterm)
 

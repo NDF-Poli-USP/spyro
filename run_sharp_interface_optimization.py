@@ -93,11 +93,11 @@ def create_weighting_function(V):
 
     # a weighting function that produces large values near the boundary
     # to diminish the gradient calculation near the boundary of the domain
-    disk0 = SeismicMesh.Disk([-0.75, 0.75], 0.40)
+    disk0 = SeismicMesh.Disk([-0.75, 0.75], 0.60)
     pts = np.column_stack((z[:, None], x[:, None]))
     d = disk0.eval(pts)
     d[d < 0] = 0.0
-    vals = 1 + 1000.0 * d
+    vals = 1 + 10.0 * d
     wei = Function(V, vals, name="weighting_function")
     File("weighting_function.pvd").write(wei)
     return wei
@@ -183,7 +183,7 @@ def model_update(mesh, indicator, theta, step):
     """
     print("Updating the shape...", flush=True)
     indicator_new = spyro.solvers.advect(
-        mesh, indicator, step * theta, number_of_timesteps=10
+        mesh, indicator, step * theta, number_of_timesteps=100
     )
     return indicator_new
 

@@ -62,8 +62,7 @@ VP_2 = 2.0  # outside subdomain to be optimized
 
 
 def calculate_indicator_from_vp(vp):
-    """Create an indicator function
-    """
+    """Create an indicator function"""
     dgV = FunctionSpace(mesh, "DG", 0)
     cond = conditional(vp > (VP_1 - 0.1), -1, 1)
     indicator = Function(dgV, name="indicator").interpolate(cond)
@@ -114,9 +113,18 @@ def calculate_functional(model, mesh, comm, vp, sources, receivers):
             guess, guess_dt, guess_recv = spyro.solvers.Leapfrog_level_set(
                 model, mesh, comm, vp, sources, receivers, source_num=sn
             )
+
             p_exact_recv = spyro.io.load_shots(
                 "shots/forward_exact_level_set" + str(sn) + ".dat"
             )
+
+            import matplotlib.pyplot as plt
+
+            plt.plot(p_exact_recv[100], "k-")
+            plt.plot(guess_recv[100], "r-")
+
+            plt.savefig("comparison.png")
+
             residual = spyro.utils.evaluate_misfit(
                 model,
                 comm,
@@ -260,6 +268,7 @@ vp = spyro.io.interpolate(model, mesh, V, guess=True)
 
 # visualize the updates with this file
 evolution_of_velocity = File("evolution_of_velocity.pvd")
+
 evolution_of_velocity.write(vp)
 
 # Configure the sources and receivers
