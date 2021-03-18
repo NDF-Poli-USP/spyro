@@ -11,23 +11,32 @@ import spyro
 def minimum_grid_point_calculator(frequency, method, degree, experient_type = 'homogeneous', TOL = 0.2, G_init = 12):
     ## Chossing parameters
 
+    start_time= time.time()
+    print("Starting initial method check", flush = True)
+
     if experient_type == 'homogeneous':
         minimum_mesh_velocity = 1.0
 
     model = spyro.tools.create_model_for_grid_point_calculation(frequency, degree, method, minimum_mesh_velocity, experiment_type = experient_type, receiver_type = 'near')
+    #print("Model built at time "+str(time.time()-start_time), flush = True)
     comm = spyro.utils.mpi_init(model)
+    #print("Comm built at time "+str(time.time()-start_time), flush = True)
     
     p_exact = wave_solver(model, G =G_init, comm = comm)
-    comm.comm.barrier()
+    print("p_exact finished at time "+str(time.time()-start_time), flush = True)
     p_0 = wave_solver(model, G =G_init - 0.2*G_init, comm = comm)
+    print("p_0 finished at time "+str(time.time()-start_time), flush = True)
 
+    comm.comm.barrier()
     error = error_calc(p_exact, p_0, model, comm = comm)
+    print("error calc at time "+str(time.time()-start_time), flush = True)
 
     if error > TOL:
         print(error)
         raise ValueError('There might be something wrong with the simulation since G = 10 fails with the defined error.')
 
-    print("Searching for minimum")
+    print("Entering search at time "+str(time.time()-start_time), flush = True)
+    #print("Searching for minimum")
     G = searching_for_minimum(model, p_exact, TOL, starting_G=G_init - 0.2*G_init, comm = comm)
 
     return G
@@ -58,7 +67,7 @@ def wave_solver(model, G, comm = False):
         if spyro.io.is_owner(comm, sn):
             t1 = time.time()
             p_field, p_recv = spyro.solvers.Leapfrog(
-                model, mesh, comm, vp_exact, sources, receivers, source_num=sn, output= True
+                model, mesh, comm, vp_exact, sources, receivers, source_num=sn, output= True, G = G
             )
             print(time.time() - t1)
 
@@ -121,27 +130,35 @@ def generate_mesh(model,G, comm):
     return mesh
 
 def searching_for_minimum(model, p_exact, TOL, accuracy = 0.1, starting_G = 10.0, comm=False):
+    print("Search began, time reset", flush = True)
+    start_time = time.time()
     error = 0.0
     G = starting_G
 
     # fast loop
+    print("Entering fast loop at time "+str(time.time()-start_time), flush = True)
     while error < TOL:
         dif = max(G*0.2, accuracy)
         G = G - dif
         print('With G equal to '+str(G) )
+        print("Entering wave solver at time "+str(time.time()-start_time), flush = True)
         p0 = wave_solver(model,G, comm)
+        print("Entering error calc at time "+str(time.time()-start_time), flush = True)
         error = error_calc(p_exact, p0, model, comm = comm)
         print('Error of '+str(error))
 
     G += dif
     # slow loop
+    print("Entering slow loop at time "+str(time.time()-start_time), flush = True)
     if dif > accuracy :
         error = 0.0
         while error < TOL:
             dif = accuracy
             G = G - dif
             print('With G equal to '+str(G) )
+            print("Entering wave solver at time "+str(time.time()-start_time), flush = True)
             p0 = wave_solver(model,G, comm )
+            print("Entering error calc at time "+str(time.time()-start_time), flush = True)
             error = error_calc(p_exact, p0, model, comm = comm)
             print('Error of '+str(error))
 
@@ -200,7 +217,8 @@ def error_calc(p_exact, p, model, comm = False):
     # to have them at the same length
     p_exact = time_interpolation(p_exact, p, model)
     p_diff = p_exact-p
-    max_diff = 0.0
+    max_absolute_diff = 0.0
+    max_percentage_diff = 0.0
 
     if comm.ensemble_comm.rank ==0:
         numerator = 0.0
@@ -209,13 +227,36 @@ def error_calc(p_exact, p, model, comm = False):
             numerator_time_int = 0.0
             denominator_time_int = 0.0
             for t in range(times-1):
-                numerator_time_int   += (p_exact[t,receiver]-p[t,receiver])**2*dt
+                top_integration = (p_exact[t,receiver]-p[t,receiver])**2*dt
+                bot_integration = (p_exact[t,receiver])**2*dt
+
                 denominator_time_int += (p_exact[t,receiver])**2*dt
 
-                # if p_exact[t,receiver] > 1e-10:
-                #     diff = abs(p_exact[t,receiver]-p[t,receiver])/p_exact[t,receiver]
-                #     if diff > 1e-9 and diff > max_diff:
-                #         max_diff = copy.deepcopy(diff)
+                # Adding 1e-25 filter to receivers to eliminate noise
+                if abs(numerator_time_int) < 1e-25:
+                    numerator_time_int   += 0.0
+                else:
+                    numerator_time_int   += top_integration
+
+                if abs(denominator_time_int) <1e-25:
+                    denominator_time_int += 0.0
+                else:
+                    denominator_time_int += bot_integration
+
+
+                diff = p_exact[t,receiver]-p[t,receiver]
+                if abs(diff) > 1e-9 and abs(diff) > max_absolute_diff:
+                    max_absolute_diff = copy.deepcopy(diff)
+                
+                if abs(diff) > 1e-15 and abs(p_exact[t,receiver]) > 1e-15:
+                    percentage_diff = abs( diff/p_exact[t,receiver]  )*100
+                    if percentage_diff > max_percentage_diff:
+                        max_percentage_diff = copy.deepcopy(percentage_diff)
+                        if max_percentage_diff > 10.:
+                            print("Weird error "+ str(max_percentage_diff) +" on time "+str(dt*t)+" and receiver "+str(receiver), flush = True)
+                            print(p_exact[t,receiver], flush = True)
+                            print(p[t,receiver], flush = True)
+
 
             numerator   += numerator_time_int
             denominator += denominator_time_int
@@ -232,8 +273,10 @@ def error_calc(p_exact, p, model, comm = False):
 
     print("ERROR IS ", flush = True)
     print(error, flush = True)
-    # print("Maximum percentage difference ", flush = True)
-    # print(max_diff, flush = True)
+    print("Maximum absolute error ", flush = True)
+    print(max_absolute_diff, flush = True)
+    print("Maximum percentage error ", flush = True)
+    print(max_percentage_diff, flush = True)
     return error
 
 def time_interpolation(p_old, p_exact, model):

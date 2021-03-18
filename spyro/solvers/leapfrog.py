@@ -20,6 +20,7 @@ def Leapfrog(
     source_num=0,
     freq_index=0,
     output=False,
+    G=1.0 #Added G only for debugging, will remove later
 ):
     """Secord-order in time fully-explicit Leapfrog scheme
     with implementation of a Perfectly Matched Layer (PML) using
@@ -177,7 +178,7 @@ def Leapfrog(
 
     is_local = helpers.receivers_local(mesh, dim, receivers.receiver_locations)
 
-    outfile = helpers.create_output_file("Leapfrog.pvd", comm, source_num)
+    outfile = helpers.create_output_file("Leapfrog_G"+str(G)+".pvd", comm, source_num)
 
     t = 0.0
 
