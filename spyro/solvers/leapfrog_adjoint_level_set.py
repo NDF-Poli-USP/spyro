@@ -251,7 +251,7 @@ def Leapfrog_adjoint_level_set(
     k0_fe0 = dot(uufor_dt, uuadj_dt) * g_v  # defer subdomain integration until later
 
     G_11 = (
-        (dot(grad(uuadj), grad(uufor)) - 1 * grad(uufor)[0] * grad(u_n)[0])
+        (dot(grad(uuadj), grad(uufor)) - 2 * grad(uufor)[0] * grad(u_n)[0])
         * g_v
         * dx(rule=qr_x)
     )
@@ -261,7 +261,7 @@ def Leapfrog_adjoint_level_set(
         * dx(rule=qr_x)
     )
     G_22 = (
-        (dot(grad(uuadj), grad(uufor)) - 1 * grad(uufor)[1] * grad(uuadj)[1])
+        (dot(grad(uuadj), grad(uufor)) - 2 * grad(uufor)[1] * grad(uuadj)[1])
         * g_v
         * dx(rule=qr_x)
     )
@@ -365,7 +365,7 @@ def Leapfrog_adjoint_level_set(
     ) + alpha2 * weighting * inner(theta, csi) * dx(rule=qr_x)
 
     # gradient problem for two subdomains
-    rhs_grad = 1.0 * ((1 / c ** 2) * k0_fe0 * div(csi) * dx(rule=qr_x))
+    rhs_grad = -1.0 * ((1 / c ** 2) * k0_fe0 * div(csi) * dx(rule=qr_x))
 
     rhs_grad += 1.0 * (
         (
@@ -376,7 +376,7 @@ def Leapfrog_adjoint_level_set(
         * dx(rule=qr_x)
     )
 
-    L = a + rhs_grad
+    L = a - rhs_grad
     lterm, rterm = lhs(L), rhs(L)
     Lterm, Rterm = assemble(lterm), assemble(rterm)
     solver_csi = LinearSolver(
