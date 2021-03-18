@@ -1,4 +1,5 @@
 from mpi4py import MPI
+import numpy as np
 from firedrake import *
 
 import spyro
@@ -81,18 +82,57 @@ def update_velocity(q, vp):
     return vp
 
 
-def create_weighting_function(V):
-    """Create a weighting function to mask the gradient"""
-    # a weighting function that produces large values near the boundary
-    # to diminish the gradient calculation near the boundary of the domain
+def create_weighting_function(V, const=100.0, M=10, width=0.1, show=False):
+    """Create a weighting function g, which is large near the
+    boundary of the domain and a constant smaller value in the interior
+
+    Inputs
+    ------
+       V: Firedrake.FunctionSpace
+    const: the weight function is equal to this constant value, except close to the boundary
+    M:   maximum value on the boundary will be M**2
+    width:  the decimal fraction of the domain where the weight is > constant
+    show: Visualize the weighting function
+
+    Outputs
+    -------
+    wei: a Firedrake.Function containing the weights
+
+    """
+
+    # get coordinates of DoFs
     m = V.ufl_domain()
     W2 = VectorFunctionSpace(m, V.ufl_element())
     coords = interpolate(m.coordinates, W2)
-    z, x = coords.dat.data[:, 0], coords.dat.data[:, 1]
-    # What they were using:
-    # wei_equation = '1.0e8*(pow(x[0] - 0.5, 16) + pow(x[1] - 0.325, 10))+100'
-    vals = 1.0e8 * (pow(z[:, None] + 1.0, 2) + pow(x[:, None] - 0.75, 2)) + 100
-    wei = Function(V, vals, name="weighting_function")
+    Z, X = coords.dat.data[:, 0], coords.dat.data[:, 1]
+
+    a0 = np.amin(X)
+    a1 = np.amax(X)
+    b0 = np.amin(Z)
+    b1 = np.amax(Z)
+
+    cx = a1 - a0  # x-coordinate of center of rectangle
+    cz = b1 - b0  # z-coordinate of center of rectangle
+
+    def h(t, d):
+        L = width * d  # fraction of the domain where the weight is > constant
+        return (np.maximum(0.0, M / L * t + M)) ** 2
+
+    w = const * (
+        1.0
+        + np.maximum(
+            h(X - a1, a1 - a0) + h(a0 - X, a1 - a0),
+            h(b0 - Z, b1 - b0) + h(Z - b1, b1 - b0),
+        )
+    )
+    if show:
+        import matplotlib.pyplot as plt
+
+        plt.scatter(Z, X, 5, c=w)
+        plt.colorbar()
+        plt.show()
+
+    wei = Function(V, w, name="weighting_function")
     File("weighting_function.pvd").write(wei)
     return wei
 
@@ -176,7 +216,7 @@ def calculate_gradient(model, mesh, comm, vp, guess, guess_dt, weighting, residu
     else:
         theta = theta_local
     # scale factor
-    theta *= -1e7
+    theta *= -1e6
     # theta *= -1.0
     return theta
 
@@ -188,13 +228,16 @@ def model_update(mesh, indicator, theta, step):
     if comm.ensemble_comm.rank == 0:
         print("Updating the shape...", flush=True)
     indicator_new = spyro.solvers.advect(
-        mesh, indicator, step * theta, number_of_timesteps=10
+        mesh,
+        indicator,
+        step * theta,
+        number_of_timesteps=20,
     )
     return indicator_new
 
 
 def optimization(model, mesh, V, comm, vp, sources, receivers, max_iter=10):
-    """Optimization with a line search algorithm"""
+    """Optimization with steepest descent using a line search algorithm"""
     beta0 = beta0_init = 1.5
     max_ls = 3
     gamma = gamma2 = 0.8
@@ -202,7 +245,7 @@ def optimization(model, mesh, V, comm, vp, sources, receivers, max_iter=10):
     # the file that contains the shape gradient each iteration
     grad_file = File("theta.pvd")
 
-    weighting = create_weighting_function(V)
+    weighting = create_weighting_function(V, width=0.2)
 
     ls_iter = 0
     iter_num = 0
@@ -213,6 +256,9 @@ def optimization(model, mesh, V, comm, vp, sources, receivers, max_iter=10):
     while iter_num < max_iter:
         if comm.ensemble_comm.rank == 0 and iter_num == 0:
             print("Commencing the inversion...")
+        if comm.ensemble_comm.rank == 0:
+            print(f"The step size is: {beta0}", flush=True)
+
         # compute the shape gradient for the new domain
         theta = calculate_gradient(
             model, mesh, comm, vp, guess, guess_dt, weighting, residual
@@ -259,14 +305,16 @@ def optimization(model, mesh, V, comm, vp, sources, receivers, max_iter=10):
         elif ls_iter < 3:
             if comm.ensemble_comm.rank == 0:
                 print(J_old, J_new, flush=True)
-                print(f"Line search {ls_iter}...reducing step...", flush=True)
+                print(
+                    f"Line search number {ls_iter}...reducing step size...", flush=True
+                )
             # advance the line search counter
             ls_iter += 1
             # reduce step length by gamma
             beta0 *= gamma
             # now solve the transport equation over again
             # but with the reduced step
-            # Need to recompute guess-dt since was discarded above
+            # Need to recompute guess_dt since was discarded above
             # compute the new functional (using old velocity field)
             J, guess, guess_dt, residual = calculate_functional(
                 model, mesh, comm, vp, sources, receivers, iter_num
