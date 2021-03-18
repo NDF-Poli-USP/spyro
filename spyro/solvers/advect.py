@@ -1,16 +1,13 @@
 from firedrake import *
 
 
-def advect(mesh, q, theta, number_of_timesteps=10):
+def advect(mesh, q, u, number_of_timesteps=10, output=False):
     """Advect a mesh with two subdomains based on the shape gradient `theta`
     solves a transport equation for `number_of_timesteps` using an upwinding DG scheme
     marching in time with a 4th order RK scheme.
     """
 
     V = FunctionSpace(mesh, "DG", 0)
-    W = VectorFunctionSpace(mesh, "KMV", 1)
-
-    u = Function(W).assign(theta)
 
     dt = 0.0005
     T = dt * number_of_timesteps
@@ -48,7 +45,8 @@ def advect(mesh, q, theta, number_of_timesteps=10):
 
     t = 0.0
 
-    # indicator = File("indicator.pvd")
+    if output:
+        indicator = File("indicator.pvd")
 
     step = 0
     while t < T - 0.5 * dt:
@@ -62,7 +60,8 @@ def advect(mesh, q, theta, number_of_timesteps=10):
         solv3.solve()
         q.assign((1.0 / 3.0) * q + (2.0 / 3.0) * (q2 + dq))
 
-        # indicator.write(q)
+        if step % 5 == 0:
+            indicator.write(q)
 
         step += 1
         t += dt

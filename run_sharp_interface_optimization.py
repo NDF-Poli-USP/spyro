@@ -64,7 +64,7 @@ VP_2 = 2.0  # outside subdomain to be optimized
 def calculate_indicator_from_vp(vp):
     """Create an indicator function"""
     dgV = FunctionSpace(mesh, "DG", 0)
-    cond = conditional(vp > (VP_1 - 0.1), -1, 1)
+    cond = conditional(vp > (VP_1 - 0.1), 1, 2)
     indicator = Function(dgV, name="indicator").interpolate(cond)
     return indicator
 
@@ -73,8 +73,8 @@ def update_velocity(q, vp):
     """Update the velocity (material properties)
     based on the indicator function
     """
-    sd1 = SubDomainData(q < 0)
-    sd2 = SubDomainData(q > 0)
+    sd1 = SubDomainData(q < 1.5)
+    sd2 = SubDomainData(q > 1.5)
 
     vp.interpolate(Constant(VP_1), subset=sd1)
     vp.interpolate(Constant(VP_2), subset=sd2)
@@ -216,7 +216,7 @@ def calculate_gradient(model, mesh, comm, vp, guess, guess_dt, weighting, residu
     else:
         theta = theta_local
     # scale factor
-    theta *= -1e10
+    theta *= -1e11
     # theta *= -1.0
     return theta
 
@@ -231,7 +231,8 @@ def model_update(mesh, indicator, theta, step):
         mesh,
         indicator,
         step * theta,
-        number_of_timesteps=20,
+        number_of_timesteps=10,
+        output=True,
     )
     return indicator_new
 
@@ -254,8 +255,9 @@ def optimization(model, mesh, V, comm, vp, sources, receivers, max_iter=10):
         model, mesh, comm, vp, sources, receivers, iter_num
     )
     while iter_num < max_iter:
-        if comm.ensemble_comm.rank == 0 and iter_num == 0:
+        if comm.ensemble_comm.rank == 0 and iter_num == 0 and ls_iter == 0:
             print("Commencing the inversion...")
+
         if comm.ensemble_comm.rank == 0:
             print(f"The step size is: {beta0}", flush=True)
 
@@ -275,6 +277,8 @@ def optimization(model, mesh, V, comm, vp, sources, receivers, max_iter=10):
         J_new, guess_new, guess_dt_new, residual_new = calculate_functional(
             model, mesh, comm, vp_new, sources, receivers, iter_num
         )
+        # write the new velocity to a vtk file
+        evolution_of_velocity.write(vp_new)
         # using a line search to attempt to reduce the functional
         if J_new < J_old:
             if comm.ensemble_comm.rank == 0:
