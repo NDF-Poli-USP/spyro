@@ -216,7 +216,7 @@ def calculate_gradient(model, mesh, comm, vp, guess, guess_dt, weighting, residu
     else:
         theta = theta_local
     # scale factor
-    theta *= -1e6
+    theta *= -1e10
     # theta *= -1.0
     return theta
 
@@ -245,7 +245,7 @@ def optimization(model, mesh, V, comm, vp, sources, receivers, max_iter=10):
     # the file that contains the shape gradient each iteration
     grad_file = File("theta.pvd")
 
-    weighting = create_weighting_function(V, width=0.2)
+    weighting = create_weighting_function(V, M=44)
 
     ls_iter = 0
     iter_num = 0
