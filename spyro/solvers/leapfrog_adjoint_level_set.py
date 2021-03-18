@@ -239,11 +239,8 @@ def Leapfrog_adjoint_level_set(
     solver = LinearSolver(A, solver_parameters=params)
 
     # Define gradient problem
-    g_u = TrialFunction(V)
+    # g_u = TrialFunction(V)
     g_v = TestFunction(V)
-
-    # Define gradient problem
-    mgrad = g_u * g_v * dx(rule=qr_x)
 
     uuadj = Function(V)  # auxiliarly function for the gradient compt.
     uufor = Function(V)  # auxiliarly function for the gradient compt.
@@ -253,55 +250,30 @@ def Leapfrog_adjoint_level_set(
 
     k0_fe0 = dot(uufor_dt, uuadj_dt) * g_v  # defer subdomain integration until later
 
-    ffG_11 = (
-        (dot(grad(uuadj), grad(uufor)) - 2 * grad(uufor)[0] * grad(u_n)[0])
+    G_11 = (
+        (dot(grad(uuadj), grad(uufor)) - 1 * grad(uufor)[0] * grad(u_n)[0])
         * g_v
         * dx(rule=qr_x)
     )
-    ffG_12 = (
-        ((-2 * grad(uufor)[0] * grad(uuadj)[1] - 2 * grad(uufor)[1] * grad(uuadj)[0]))
+    G_12 = (
+        ((-1 * grad(uufor)[0] * grad(uuadj)[1] - 1 * grad(uufor)[1] * grad(uuadj)[0]))
         * g_v
         * dx(rule=qr_x)
     )
-    ffG_21 = ffG_12
-
-    ffG_22 = (
-        (dot(grad(uuadj), grad(uufor)) - 2 * grad(uufor)[1] * grad(uuadj)[1])
+    G_22 = (
+        (dot(grad(uuadj), grad(uufor)) - 1 * grad(uufor)[1] * grad(uuadj)[1])
         * g_v
         * dx(rule=qr_x)
     )
 
-    G_11 = mgrad - ffG_11
-    G_12 = mgrad - ffG_12
-    G_21 = mgrad - ffG_21
-    G_22 = mgrad - ffG_22
-
-    lhsG_11, rhsG_11 = lhs(G_11), rhs(G_11)
-    lhsG_12, rhsG_12 = lhs(G_12), rhs(G_12)
-    lhsG_21, rhsG_21 = lhs(G_21), rhs(G_21)
-    lhsG_22, rhsG_22 = lhs(G_22), rhs(G_22)
-
-    ## Note to self, tensor is symmetric no need to compute gradi_21
     gradi_11 = Function(V)
     gradi_12 = Function(V)
-    gradi_21 = Function(V)
     gradi_22 = Function(V)
 
-    grad_prob_11 = LinearVariationalProblem(lhsG_11, rhsG_11, gradi_11)
-    grad_prob_12 = LinearVariationalProblem(lhsG_12, rhsG_12, gradi_12)
-    grad_prob_21 = LinearVariationalProblem(lhsG_21, rhsG_21, gradi_21)
-    grad_prob_22 = LinearVariationalProblem(lhsG_22, rhsG_22, gradi_22)
-
-    grad_solv_11 = LinearVariationalSolver(grad_prob_11, solver_parameters=params)
-    grad_solv_12 = LinearVariationalSolver(grad_prob_12, solver_parameters=params)
-    grad_solv_21 = LinearVariationalSolver(grad_prob_21, solver_parameters=params)
-    grad_solv_22 = LinearVariationalSolver(grad_prob_22, solver_parameters=params)
-
-    # these arrays are used for summing in parallel
+    # these arrays are used for summing over all shots
     sz = len(guess[0].dat.data[:])
     gradi_11_np = np.zeros((sz))
     gradi_12_np = np.zeros((sz))
-    gradi_21_np = np.zeros((sz))
     gradi_22_np = np.zeros((sz))
 
     k0_fe0_np = np.zeros(sz)
@@ -358,18 +330,11 @@ def Leapfrog_adjoint_level_set(
             # scalar product
             k0_fe0_np += assemble(k0_fe0 * dx(rule=qr_x)).dat.data[:]
 
-            # we assigned uufor_dt, uufor_n, uuadj_n, uufor_dt
-            grad_solv_11.solve()
-            grad_solv_12.solve()
-            grad_solv_21.solve()
-            grad_solv_22.solve()
-
             # produce all the incremental gradients for
             # each component of the tensor.
-            gradi_11_np += gradi_11.dat.data[:]
-            gradi_12_np += gradi_12.dat.data[:]
-            gradi_21_np += gradi_21.dat.data[:]
-            gradi_22_np += gradi_22.dat.data[:]
+            gradi_11_np += assemble(G_11).dat.data[:]
+            gradi_12_np += assemble(G_12).dat.data[:]
+            gradi_22_np += assemble(G_22).dat.data[:]
 
         # write the adjoint to disk for checking
         if IT % nspool == 0:
@@ -377,12 +342,10 @@ def Leapfrog_adjoint_level_set(
                 outfile.write(u_n, time=t)
             helpers.display_progress(comm, t)
 
-    # produces gradi_11, gradi_12, gradi_21, gradi_22 summed over all timesteps
-
-    # assign the summed in time to the induvidual gradient components
+    # produces gradi_11, gradi_12, gradi_22 summed over all timesteps
+    # now assign the summed in time to the induvidual gradient components
     gradi_11.dat.data[:] = gradi_11_np
     gradi_12.dat.data[:] = gradi_12_np
-    gradi_21.dat.data[:] = gradi_21_np
     gradi_22.dat.data[:] = gradi_22_np
 
     # k0_fe0 summed over all timesteps
@@ -402,13 +365,13 @@ def Leapfrog_adjoint_level_set(
     ) + alpha2 * weighting * inner(theta, csi) * dx(rule=qr_x)
 
     # gradient problem for two subdomains
-    rhs_grad = -1.0 * ((1 / c ** 2) * k0_fe0 * div(csi) * dx(rule=qr_x))
+    rhs_grad = 1.0 * ((1 / c ** 2) * k0_fe0 * div(csi) * dx(rule=qr_x))
 
-    rhs_grad += -1.0 * (
+    rhs_grad += 1.0 * (
         (
-            2.0 * gradi_22 * grad(csi)[1, 1]
+            1.0 * gradi_22 * grad(csi)[1, 1]
             + gradi_12 * (grad(csi)[0, 1] + grad(csi)[1, 0])
-            + 2.0 * gradi_11 * grad(csi)[0, 0]
+            + 1.0 * gradi_11 * grad(csi)[0, 0]
         )
         * dx(rule=qr_x)
     )
