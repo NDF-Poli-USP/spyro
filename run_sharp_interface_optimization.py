@@ -93,11 +93,22 @@ def create_weighting_function(V):
 
     # a weighting function that produces large values near the boundary
     # to diminish the gradient calculation near the boundary of the domain
-    disk0 = SeismicMesh.Disk([-0.75, 0.75], 0.60)
-    pts = np.column_stack((z[:, None], x[:, None]))
-    d = disk0.eval(pts)
-    d[d < 0] = 0.0
-    vals = 1 + 10.0 * d
+    # disk0 = SeismicMesh.Disk([-0.75, 0.75], 0.60)
+    # rect0 = SeismicMesh.Rectangle(
+    #    (
+    #        -1.9,
+    #        0.4,
+    #        -0.1,
+    #        1.9,
+    #    )
+    # )
+    # pts = np.column_stack((z[:, None], x[:, None]))
+    # d = disk0.eval(pts)
+    # d = rect0.eval(pts)
+    # d[d < 0] = 100.0
+    # vals = 1 + 1000.0 * d
+    vals = 1.0e8 * (pow(z[:, None] + 1.0, 8) + pow(x[:, None] - 0.75, 10)) + 100
+    # wei_equation = '1.0e8*(pow(x[0] - 0.5, 16) + pow(x[1] - 0.325, 10))+100'
     wei = Function(V, vals, name="weighting_function")
     File("weighting_function.pvd").write(wei)
     return wei
@@ -174,6 +185,9 @@ def calculate_gradient(model, mesh, comm, vp, guess, guess_dt, weighting, residu
         )
     else:
         theta = theta_local
+    # scale factor
+    theta *= -1e7
+    # theta *= -1.0
     return theta
 
 
@@ -183,7 +197,7 @@ def model_update(mesh, indicator, theta, step):
     """
     print("Updating the shape...", flush=True)
     indicator_new = spyro.solvers.advect(
-        mesh, indicator, step * theta, number_of_timesteps=100
+        mesh, indicator, step * theta, number_of_timesteps=10
     )
     return indicator_new
 
@@ -263,11 +277,10 @@ def optimization(model, mesh, V, comm, vp, sources, receivers, max_iter=10):
             # now solve the transport equation over again
             # but with the reduced step
 
-            # compute the new functional
+            # compute the new functional (using old velocity field)
             J, guess, guess_dt, residual = calculate_functional(
-                model, mesh, comm, vp_new, sources, receivers, iter_num
+                model, mesh, comm, vp, sources, receivers, iter_num
             )
-
         else:
             raise ValueError("Failed to reduce the functional...")
 
