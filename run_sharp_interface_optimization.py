@@ -232,7 +232,7 @@ def model_update(mesh, indicator, theta, step):
         mesh,
         indicator,
         step * theta,
-        number_of_timesteps=50,
+        number_of_timesteps=20,
         output=True,
     )
     return indicator_new
