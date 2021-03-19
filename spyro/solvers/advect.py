@@ -60,7 +60,7 @@ def advect(mesh, q, u, number_of_timesteps=10, output=False):
         solv3.solve()
         q.assign((1.0 / 3.0) * q + (2.0 / 3.0) * (q2 + dq))
 
-        if step % 5 == 0:
+        if step % 5 == 0 and output:
             indicator.write(q)
 
         step += 1
