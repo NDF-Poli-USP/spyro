@@ -9,9 +9,9 @@ def create_model_for_grid_point_calculation(frequency, degree, method, minimum_m
     lbda = minimum_mesh_velocity/frequency
     pml_fraction = lbda
     if receiver_type == 'near':
-        Lz = 100*lbda
+        Lz = 30*lbda#100*lbda
         Real_Lz = Lz*(1. + 2*pml_fraction)
-        Lx = 90*lbda
+        Lx = 20*lbda#90*lbda
         Real_Lx = Lx*(1. + 1*pml_fraction)
 
         # source location
@@ -19,18 +19,20 @@ def create_model_for_grid_point_calculation(frequency, degree, method, minimum_m
 
         # time calculations
         tmin = 1./frequency
-        final_time = 35*tmin #should be 35
+        final_time = 10*tmin #should be 35
 
         # receiver calculations
 
-        receiver_bin_center1 = 20*lbda
-        receiver_bin_width = 15*lbda
-        receiver_quantity = 2500 # 50 squared
+        receiver_bin_center1 = 5*lbda#20*lbda
+        receiver_bin_width = 5*lbda#15*lbda
+        receiver_quantity = 16#2500 # 50 squared
 
         bin1_startZ = Real_Lz/2. + receiver_bin_center1 - receiver_bin_width/2.
         bin1_endZ   = Real_Lz/2. + receiver_bin_center1 + receiver_bin_width/2.
         bin1_startX = Real_Lx/2. - receiver_bin_width/2.
         bin1_endX   = Real_Lx/2. + receiver_bin_width/2.
+
+        print('test.')
 
     elif receiver_type == 'far':
         raise ValueError('Far receivers minimum grid point calculation experiment not implemented because of computational limits.')

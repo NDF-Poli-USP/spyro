@@ -26,6 +26,7 @@ def minimum_grid_point_calculator(frequency, method, degree, experient_type = 'h
     print("p_exact finished at time "+str(time.time()-start_time), flush = True)
     p_0 = wave_solver(model, G =G_init - 0.2*G_init, comm = comm)
     print("p_0 finished at time "+str(time.time()-start_time), flush = True)
+    #quit()
 
     comm.comm.barrier()
     error = error_calc(p_exact, p_0, model, comm = comm)
@@ -233,19 +234,19 @@ def error_calc(p_exact, p, model, comm = False):
                 denominator_time_int += (p_exact[t,receiver])**2*dt
 
                 # Adding 1e-25 filter to receivers to eliminate noise
-                if abs(numerator_time_int) < 1e-25:
+                if abs(top_integration) < 1e-25:
                     numerator_time_int   += 0.0
                 else:
                     numerator_time_int   += top_integration
 
-                if abs(denominator_time_int) <1e-25:
+                if abs(bot_integration) <1e-25:
                     denominator_time_int += 0.0
                 else:
                     denominator_time_int += bot_integration
 
 
                 diff = p_exact[t,receiver]-p[t,receiver]
-                if abs(diff) > 1e-9 and abs(diff) > max_absolute_diff:
+                if abs(diff) > 1e-15 and abs(diff) > max_absolute_diff:
                     max_absolute_diff = copy.deepcopy(diff)
                 
                 if abs(diff) > 1e-15 and abs(p_exact[t,receiver]) > 1e-15:
@@ -299,3 +300,13 @@ def time_interpolation(p_old, p_exact, model):
         p[:,receiver] = f(time_vector_new[0,:])
 
     return p
+
+def p_filter(p, tol=1e-20):
+    times, receivers = p.shape
+    for ti in range(times):
+        for r in range(receivers):
+            if abs(p[ti,r])< tol:
+                p[ti,r] = 0.0
+
+    return p
+
