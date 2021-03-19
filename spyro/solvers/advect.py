@@ -9,7 +9,7 @@ def advect(mesh, q, u, number_of_timesteps=10, output=False):
 
     V = FunctionSpace(mesh, "DG", 0)
 
-    dt = 0.0005
+    dt = 0.0001
     T = dt * number_of_timesteps
     dtc = Constant(dt)
     q_in = Constant(1.0)

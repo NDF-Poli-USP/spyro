@@ -215,7 +215,7 @@ def interpolate(model, mesh, V, guess=False):
             interpolant = RegularGridInterpolator((z, x, y), Z)
             tmp = interpolant((qp_z2, qp_x2, qp_y2))
 
-    c = fire.Function(V)
+    c = fire.Function(V, name="velocity")
     c.dat.data[:] = tmp
     c = _check_units(c)
     return c

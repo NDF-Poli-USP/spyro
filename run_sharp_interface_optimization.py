@@ -76,7 +76,7 @@ def update_velocity(V, q, vp):
     sd1 = SubDomainData(q < 1.5)
     sd2 = SubDomainData(q > 1.5)
 
-    vp_new = Function(V)
+    vp_new = Function(V, name="velocity")
 
     vp_new.interpolate(Constant(VP_1), subset=sd1)
     vp_new.interpolate(Constant(VP_2), subset=sd2)
@@ -218,8 +218,7 @@ def calculate_gradient(model, mesh, comm, vp, guess, guess_dt, weighting, residu
     else:
         theta = theta_local
     # scale factor
-    theta *= -1e11
-    # theta *= -1.0
+    theta.dat.data[:] *= 1e11
     return theta
 
 
@@ -233,7 +232,7 @@ def model_update(mesh, indicator, theta, step):
         mesh,
         indicator,
         step * theta,
-        number_of_timesteps=20,
+        number_of_timesteps=50,
         output=True,
     )
     return indicator_new
@@ -248,7 +247,7 @@ def optimization(model, mesh, V, comm, vp, sources, receivers, max_iter=10):
     # the file that contains the shape gradient each iteration
     grad_file = File("theta.pvd")
 
-    weighting = create_weighting_function(V, width=0.1)
+    weighting = create_weighting_function(V, width=0.1, M=20, const=100)
 
     ls_iter = 0
     iter_num = 0
@@ -263,7 +262,7 @@ def optimization(model, mesh, V, comm, vp, sources, receivers, max_iter=10):
         if comm.ensemble_comm.rank == 0:
             print(f"The step size is: {beta0}", flush=True)
 
-        evolution_of_velocity.write(vp)
+        evolution_of_velocity.write(vp, name="velocity")
         # compute the shape gradient for the new domain
         theta = calculate_gradient(
             model, mesh, comm, vp, guess, guess_dt, weighting, residual
@@ -343,7 +342,7 @@ vp = spyro.io.interpolate(model, mesh, V, guess=True)
 
 # visualize the updates with this file
 evolution_of_velocity = File("evolution_of_velocity.pvd")
-evolution_of_velocity.write(vp)
+evolution_of_velocity.write(vp, name="velocity")
 
 # Configure the sources and receivers
 sources = spyro.Sources(model, mesh, V, comm).create()
