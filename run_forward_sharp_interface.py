@@ -20,12 +20,12 @@ model["mesh"] = {
     "Lz": 1.50,  # depth in km - always positive
     "Lx": 1.50,  # width in km - always positive
     "Ly": 0.0,  # thickness in km - always positive
-    "meshfile": "meshes/immersed_disk_true_vp.msh",
-    "initmodel": "velocity_models/immersed_disk_guess_vp.hdf5",
-    "truemodel": "velocity_models/immersed_disk_true_vp.hdf5",
+    "meshfile": "meshes/immersed_disk_guess_vp.msh",
+    "initmodel": "velocity_models/immersed_disk_true_vp.hdf5",
+    "truemodel": "velocity_models/immersed_disk_guess_vp.hdf5",
 }
 model["PML"] = {
-    "status": True,  # true,  # true or false
+    "status": False,  # true,  # true or false
     "outer_bc": "non-reflective",  #  dirichlet, neumann, non-reflective (outer boundary condition)
     "damping_type": "polynomial",  # polynomial, hyperbolic, shifted_hyperbolic
     "exponent": 2,
@@ -35,7 +35,8 @@ model["PML"] = {
     "lx": 0.50,  # thickness of the pml in the x-direction (km) - always positive
     "ly": 0.0,  # thickness of the pml in the y-direction (km) - always positive
 }
-recvs = spyro.create_transect((-0.10, 0.1), (-0.10, 1.40), 200)
+recvs = spyro.create_transect((-1.4, 0.1), (-1.4, 1.40), 200)
+
 sources = spyro.create_transect((-0.05, 0.30), (-0.05, 1.20), 4)
 model["acquisition"] = {
     "source_type": "Ricker",
@@ -62,7 +63,7 @@ mesh, V = spyro.io.read_mesh(model, comm)
 
 vp_exact = spyro.io.interpolate(model, mesh, V, guess=False)
 
-File("exact_vp.pvd").write(vp_exact)
+File("exact_vp.pvd").write(vp_exact, name="true_velocity")
 
 sources = spyro.Sources(model, mesh, V, comm).create()
 

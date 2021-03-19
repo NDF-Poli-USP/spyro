@@ -15,12 +15,12 @@ model["mesh"] = {
     "Lz": 1.50,  # depth in km - always positive
     "Lx": 1.50,  # width in km - always positive
     "Ly": 0.0,  # thickness in km - always positive
-    "meshfile": "meshes/immersed_disk_guess_vp.msh",
-    "initmodel": "velocity_models/immersed_disk_guess_vp.hdf5",
-    "truemodel": "velocity_models/immersed_disk_true_vp.hdf5",
+    "meshfile": "meshes/immersed_disk_true_vp.msh",
+    "initmodel": "velocity_models/immersed_disk_true_vp.hdf5",
+    "truemodel": "velocity_models/immersed_disk_guess_vp.hdf5",
 }
 model["PML"] = {
-    "status": True,  # true,  # true or false
+    "status": False,  # true,  # true or false
     "outer_bc": "non-reflective",  #  dirichlet, neumann, non-reflective (outer boundary condition)
     "damping_type": "polynomial",  # polynomial, hyperbolic, shifted_hyperbolic
     "exponent": 2,
@@ -30,7 +30,9 @@ model["PML"] = {
     "lx": 0.50,  # thickness of the pml in the x-direction (km) - always positive
     "ly": 0.0,  # thickness of the pml in the y-direction (km) - always positive
 }
-recvs = spyro.create_transect((-0.10, 0.1), (-0.10, 1.40), 200)
+# recvs1 = spyro.create_transect((-0.10, 0.1), (-0.10, 1.40), 200)
+recvs = spyro.create_transect((-1.4, 0.1), (-1.4, 1.40), 200)
+# recvs = np.vstack((recvs1, recvs2))
 sources = spyro.create_transect((-0.05, 0.30), (-0.05, 1.20), 4)
 model["acquisition"] = {
     "source_type": "Ricker",
@@ -218,7 +220,7 @@ def calculate_gradient(model, mesh, comm, vp, guess, guess_dt, weighting, residu
     else:
         theta = theta_local
     # scale factor
-    theta.dat.data[:] *= 1e11
+    theta.dat.data[:] *= -1
     return theta
 
 
@@ -247,7 +249,7 @@ def optimization(model, mesh, V, comm, vp, sources, receivers, max_iter=10):
     # the file that contains the shape gradient each iteration
     grad_file = File("theta.pvd")
 
-    weighting = create_weighting_function(V, width=0.1, M=20, const=100)
+    weighting = create_weighting_function(V, width=0.1, M=20, const=1e-9)
 
     ls_iter = 0
     iter_num = 0
@@ -262,7 +264,6 @@ def optimization(model, mesh, V, comm, vp, sources, receivers, max_iter=10):
         if comm.ensemble_comm.rank == 0:
             print(f"The step size is: {beta0}", flush=True)
 
-        evolution_of_velocity.write(vp, name="velocity")
         # compute the shape gradient for the new domain
         theta = calculate_gradient(
             model, mesh, comm, vp, guess, guess_dt, weighting, residual
@@ -275,6 +276,8 @@ def optimization(model, mesh, V, comm, vp, sources, receivers, max_iter=10):
         indicator_new = model_update(mesh, indicator, theta, beta0)
         # update the velocity according to the new indicator
         vp_new = update_velocity(V, indicator_new, vp)
+        # write ALL velocity updates to a vtk file
+        evolution_of_velocity.write(vp_new)
         # compute the new functional
         J_new, guess_new, guess_dt_new, residual_new = calculate_functional(
             model, mesh, comm, vp_new, sources, receivers, iter_num
@@ -287,8 +290,6 @@ def optimization(model, mesh, V, comm, vp, sources, receivers, max_iter=10):
                     f"Iteration {iter_num}: Functional was {J_old}. Accepting shape update...new functional is: {J_new}",
                     flush=True,
                 )
-            # write the new velocity to a vtk file
-            evolution_of_velocity.write(vp_new)
 
             iter_num += 1
             # accept new domain

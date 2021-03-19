@@ -23,8 +23,8 @@ ef = get_sizing_function_from_segy(
     dt=0.001,
     cr_max=0.5,
     grade=0.15,
-    domain_pad=500,
-    pad_style="edge",
+    # domain_pad=500,
+    # pad_style="edge",
     units="km-s",
 )
 
@@ -32,8 +32,8 @@ write_velocity_model(
     fname,
     ofname="immersed_disk_true_vp",
     bbox=bbox,
-    domain_pad=500.0,
-    pad_style="edge",
+    # domain_pad=500.0,
+    # pad_style="edge",
     units="km-s",
 )
 
