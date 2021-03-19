@@ -107,12 +107,12 @@ def generate_mesh(model,G, comm):
         a=np.amin(SeismicMesh.geometry.simp_qual(points, cells))
         if model['testing_parameters']['experiment_type'] == 'heterogenous':
             points, cells = SeismicMesh.geometry.laplacian2(points, cells)
-        meshio.write_points_cells("homogeneous"+str(G)+".msh",
+        meshio.write_points_cells("meshes/homogeneous"+str(G)+".msh",
             points,[("triangle", cells)],
             file_format="gmsh22", 
             binary = False
             )
-        meshio.write_points_cells("homogeneous"+str(G)+".vtk",
+        meshio.write_points_cells("meshes/homogeneous"+str(G)+".vtk",
             points,[("triangle", cells)],
             file_format="vtk"
             )
@@ -120,7 +120,7 @@ def generate_mesh(model,G, comm):
     comm.comm.barrier()
     if method == "CG" or method == "KMV":
         mesh = fire.Mesh(
-            "homogeneous"+str(G)+".msh",
+            "meshes/homogeneous"+str(G)+".msh",
             distribution_parameters={
                 "overlap_type": (fire.DistributedMeshOverlapType.NONE, 0)
             },
