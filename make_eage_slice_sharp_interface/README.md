@@ -1,6 +1,8 @@
-You have to download the EAGE velocity model to run these scripts. This model this is sliced in these scripts to produce the true velocity model from here 
+You have to download the EAGE velocity model to run these scripts. 
 
 wget https://s3.amazonaws.com/open.source.geoscience/open_data/seg_eage_models_cd/Salt_Model_3D.tar.gz
+
+This model this is sliced in these scripts to produce the true velocity model.
 
 1. Build the velocity models by running make_eage_slice_velocity_models.py
 
