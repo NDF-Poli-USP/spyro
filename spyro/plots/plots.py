@@ -224,21 +224,19 @@ def plot_receiver_difference(model, p_receiver0, p_receiver1, id, appear = False
     times0, receivers0 = p_receiver0.shape
     times1, receivers1 = p_receiver1.shape
 
-    if times0 == times1:
-        dt = model["timeaxis"]["dt"]
+    dt0 = final_time/times0
+    dt1 = final_time/times1
+    
+    nt0 = round(final_time / dt0)  # number of timesteps
+    nt1 = round(final_time / dt1)  # number of timesteps
 
-    else:
-        dt = final_time/times1
-        p_receiver0 = spyro.tools.grid_point_calculator.time_interpolation(p_receiver0, p_receiver1, model)
-
-    nt = int(final_time / dt)  # number of timesteps
-
-    time_vector = np.linspace(0.0, final_time, nt)
+    time_vector0 = np.linspace(0.0, final_time, nt0)
+    time_vector1 = np.linspace(0.0, final_time, nt1)
     fig = plt.figure()
     ax = fig.add_subplot(111)
     plt.tick_params(reset=True, direction="in", which="both")
     plt.rc("legend", **{"fontsize": 18})
-    plt.plot(time_vector, p_receiver0[:, id], 'bo', time_vector, p_receiver1[:,id], 'go' ) 
+    plt.plot(time_vector0, p_receiver0[:, id], 'bo', time_vector1, p_receiver1[:,id], 'go' ) 
     ax.yaxis.get_offset_text().set_fontsize(18)
     plt.subplots_adjust(left=0.18, right=0.95, bottom=0.14, top=0.95)
     plt.legend(loc="best")
