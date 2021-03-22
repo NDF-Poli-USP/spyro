@@ -9,7 +9,7 @@ G_reference = 15
 p_reference = 5
 
 # Degrees and Gs for sweep
-Gs = [x for x in range(3,10) ]
+Gs = [x for x in range(10,13) ]
 degrees = [1,2,3,4,5]
 
 # Experiment parameters
