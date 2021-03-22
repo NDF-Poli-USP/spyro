@@ -96,14 +96,28 @@ def generate_mesh(model,G, comm):
     rec = SeismicMesh.Rectangle(bbox)
 
     if comm.comm.rank == 0:
+        #creating disk around source
+        disk_M = grid_point_to_mesh_point_converter_for_seismicmesh(model, 15)
+        disk = SeismicMesh.Disk([Real_Lz/2, Real_Lx/2], lbda)
+        disk_points, disk_cells = SeismicMesh.generate_mesh(
+            domain=disk,
+            edge_length=lbda/disk_M,
+            mesh_improvement = False,
+            comm = comm.ensemble_comm,
+            verbose = 0
+        )
+
+        # Creating rectangular mesh
         points, cells = SeismicMesh.generate_mesh(
         domain=rec, 
         edge_length=edge_length, 
         mesh_improvement = False,
         comm = comm.ensemble_comm,
+        pfix = disk_points,
         verbose = 0
         )
         print('entering spatial rank 0 after mesh generation')
+        
         points, cells = SeismicMesh.geometry.delete_boundary_entities(points, cells, min_qual= 0.6)
         a=np.amin(SeismicMesh.geometry.simp_qual(points, cells))
         if model['testing_parameters']['experiment_type'] == 'heterogenous':
@@ -139,7 +153,7 @@ def searching_for_minimum(model, p_exact, TOL, accuracy = 0.1, starting_G = 10.0
     # fast loop
     print("Entering fast loop at time "+str(time.time()-start_time), flush = True)
     while error < TOL:
-        dif = max(G*0.2, accuracy)
+        dif = max(G*0.1, accuracy)
         G = G - dif
         print('With G equal to '+str(G) )
         print("Entering wave solver at time "+str(time.time()-start_time), flush = True)
@@ -208,15 +222,25 @@ def grid_point_to_mesh_point_converter_for_seismicmesh(model, G):
     return M
 
 def error_calc(p_exact, p, model, comm = False):
-
-    #comm = spyro.utils.mpi_init(model)
-    times, receivers = p.shape
-    dt = model["timeaxis"]['tf']/times
-
     # p0 doesn't necessarily have the same dt as p_exact
     # therefore we have to interpolate the missing points
     # to have them at the same length
-    p_exact = time_interpolation(p_exact, p, model)
+    # testing shape
+    times_p_exact, r_p_exact = p_exact.shape
+    times_p, r_p = p.shape
+    if times_p_exact > times_p: #then we interpolate p_exact
+        times, receivers = p.shape
+        dt = model["timeaxis"]['tf']/times
+        p_exact = time_interpolation(p_exact, p, model)
+    elif times_p_exact < times_p: #then we interpolate p
+        times, receivers = p_exact.shape
+        dt = model["timeaxis"]['tf']/times
+        p = time_interpolation(p, p_exact, model)
+    else: #then we dont need to interpolate
+        times, receivers = p.shape
+        dt = model["timeaxis"]['tf']/times
+    #p = time_interpolation(p, p_exact, model)
+
     p_diff = p_exact-p
     max_absolute_diff = 0.0
     max_percentage_diff = 0.0
