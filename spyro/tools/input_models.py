@@ -32,7 +32,6 @@ def create_model_for_grid_point_calculation(frequency, degree, method, minimum_m
         bin1_startX = Real_Lx/2. - receiver_bin_width/2.
         bin1_endX   = Real_Lx/2. + receiver_bin_width/2.
 
-        print('test.')
 
     elif receiver_type == 'far':
         raise ValueError('Far receivers minimum grid point calculation experiment not implemented because of computational limits.')
