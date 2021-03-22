@@ -74,12 +74,13 @@ def update_velocity(V, q, vp):
     based on the indicator function
     """
     sd1 = SubDomainData(q < 1.5)
-    sd2 = SubDomainData(q > 1.5)
+    #sd2 = SubDomainData(q > 1.5)
 
     vp_new = Function(V, name="velocity")
 
+    vp_new.assign(Constant(VP_2))
     vp_new.interpolate(Constant(VP_1), subset=sd1)
-    vp_new.interpolate(Constant(VP_2), subset=sd2)
+    #vp_new.interpolate(Constant(VP_2), subset=sd2)
 
     return vp_new
 
