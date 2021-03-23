@@ -287,6 +287,7 @@ def Leapfrog_adjoint_level_set(
         # Solver - main equation - (I)
         assembly_callable()
         f = _adjoint_update_rhs(rhs_forcing, sparse_excitations, residual, IT, is_local)
+        f *= c * c
         # add forcing term to solve scalar pressure
         B.sub(0).dat.data[:] += f.dat.data[:]
 

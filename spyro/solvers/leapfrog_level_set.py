@@ -190,7 +190,7 @@ def Leapfrog_level_set(
     else:
         nf = 0
 
-    FF = m1 + a + nf - f * v * dx(rule=qr_x)
+    FF = m1 + a + nf - c * c * f * v * dx(rule=qr_x)
 
     if PML:
         X = Function(W)
