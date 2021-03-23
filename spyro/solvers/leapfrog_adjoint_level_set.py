@@ -169,6 +169,7 @@ def Leapfrog_adjoint_level_set(
         )
 
     alpha1, alpha2 = 0.01, 0.97
+    # alpha1, alpha2 = 0.0001, 0.99
 
     # ----------------------------------------
     # Define theta which is our descent direction
@@ -240,29 +241,28 @@ def Leapfrog_adjoint_level_set(
 
     # Define gradient problem
     # g_u = TrialFunction(V)
-    g_v = TestFunction(V)
-
+    # g_v = TestFunction(V)
     uuadj = Function(V)  # auxiliarly function for the gradient compt.
     uufor = Function(V)  # auxiliarly function for the gradient compt.
 
     uuadj_dt = Function(V)  # the time deriv. of the adjoint solution at timestep n
     uufor_dt = Function(V)  # the time deriv. of the forward solution at timestep n
 
-    k0_fe0 = dot(uufor_dt, uuadj_dt) * g_v  # defer subdomain integration until later
+    k0_fe0 = dot(uufor_dt, uuadj_dt) * v  # defer subdomain integration until later
 
     G_11 = (
-        (dot(grad(uuadj), grad(uufor)) - 2 * grad(uufor)[0] * grad(u_n)[0])
-        * g_v
+        (dot(grad(uuadj), grad(uufor)) - 2 * grad(uufor)[0] * grad(uuadj)[0])
+        * v
         * dx(rule=qr_x)
     )
     G_12 = (
         ((-1 * grad(uufor)[0] * grad(uuadj)[1] - 1 * grad(uufor)[1] * grad(uuadj)[0]))
-        * g_v
+        * v
         * dx(rule=qr_x)
     )
     G_22 = (
         (dot(grad(uuadj), grad(uufor)) - 2 * grad(uufor)[1] * grad(uuadj)[1])
-        * g_v
+        * v
         * dx(rule=qr_x)
     )
 
