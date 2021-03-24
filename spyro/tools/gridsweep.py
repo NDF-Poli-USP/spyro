@@ -9,7 +9,7 @@ G_reference = 15
 p_reference = 5
 
 # Degrees and Gs for sweep
-Gs = [x for x in range(10,13) ]
+Gs = [7.2,7.3,7.4,7.5,7.6]
 degrees = [1,2,3,4,5]
 
 # Experiment parameters
@@ -24,7 +24,7 @@ comm = spyro.utils.mpi_init(model)
 
 ## Output file for saving data
 date = datetime.today().strftime('%Y_%m_%d')
-text_file = open("output_FullSweep"+date+".txt", "w")
+text_file = open("output_p5Accurate"+date+".txt", "w")
 text_file.write('Homogenous and KMV \n')
 
 ## Calculating reference solution with p=5 and g=15:
