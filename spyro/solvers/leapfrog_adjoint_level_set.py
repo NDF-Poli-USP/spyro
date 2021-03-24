@@ -366,10 +366,11 @@ def Leapfrog_adjoint_level_set(
     ) + alpha2 * weighting * inner(theta, csi) * dx(rule=qr_x)
 
     # gradient problem for two subdomains
-    rhs_grad = -1.0 * ((1 / c ** 2) * k0_fe0 * div(csi) * dx(rule=qr_x))
+    rhs_grad = -1.0 * k0_fe0 * div(csi) * dx(rule=qr_x)
 
-    rhs_grad += 1.0 * (
-        (
+    rhs_grad += (
+        (c ** 2)
+        * (
             1.0 * gradi_22 * grad(csi)[1, 1]
             + gradi_12 * (grad(csi)[0, 1] + grad(csi)[1, 0])
             + 1.0 * gradi_11 * grad(csi)[0, 0]
@@ -377,11 +378,15 @@ def Leapfrog_adjoint_level_set(
         * dx(rule=qr_x)
     )
 
-    L = a - rhs_grad
+    L = a + rhs_grad
     lterm, rterm = lhs(L), rhs(L)
     Lterm, Rterm = assemble(lterm), assemble(rterm)
     solver_csi = LinearSolver(
-        Lterm, solver_parameters={"ksp_type": "cg", "pc_type": "jacobi"}
+        Lterm,
+        solver_parameters={
+            "ksp_type": "preonly",
+            "pc_type": "lu",
+        },
     )
     descent = Function(VF, name="grad")
     solver_csi.solve(descent, Rterm)
