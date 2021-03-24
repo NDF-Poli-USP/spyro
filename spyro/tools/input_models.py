@@ -3,6 +3,28 @@ import spyro
 
 def create_model_for_grid_point_calculation(frequency, degree, method, minimum_mesh_velocity, experiment_type = 'homogeneous', receiver_type = 'near'):
     ''' Creates models  with the correct parameters for for grid point calculation experiments.
+    
+    Parameters
+    ----------
+    frequency: `float`
+        Source frequency to use in calculation
+    degree: `int`
+        Polynomial degree of finite element space
+    method: `string`
+        The finite element method choosen
+    minimum_mesh_velocity: `float`
+        Minimum velocity presented in the medium
+    experiment_type: `string`
+        Only options are `homogenous` or `heterogenous`
+    receiver_type: `string`
+        Options: `near`, `far` or `near_and_far`. Specifies receiver grid locations for experiment
+
+    Returns
+    -------
+    model: Python `dictionary`
+        Contains model options and parameters for use in Spyro
+        
+
     '''
     model = {}
     # domain calculations

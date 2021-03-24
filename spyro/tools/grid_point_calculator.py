@@ -9,6 +9,31 @@ import copy
 import spyro
 
 def minimum_grid_point_calculator(frequency, method, degree, experient_type = 'homogeneous', TOL = 0.2, G_init = 12):
+    """ Function to calculate necessary grid point density.
+
+    Parameters
+    ----------
+    frequency: `float`
+        Source frequency to use in calculation
+    method: `string`
+        The finite element method choosen
+    degree: `int`
+        Polynomial degree of finite element space
+    experiment_type: `string`
+        Only options are `homogenous` or `heterogenous`
+    TOL: `float`
+        Error threshold permited on minimum grid density
+    G_init: `float`
+        Initial grid density value to begin search
+
+    Returns
+    -------
+    G: `float`
+        Minimum grid point density necessary for a `experiment_type` mesh with a FEM whith 
+        the degree and method specified within the specified error tolerance
+        
+    """
+    
     ## Chossing parameters
 
     start_time= time.time()
