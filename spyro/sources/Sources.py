@@ -149,7 +149,7 @@ def FullRickerWavelet(dt, tf, freq, amp=1.0, cutoff=None):
     return FullWavelet
 
 
-def delta_expr(x0, z, x, sigma_x=1000.0):
+def delta_expr(x0, z, x, sigma_x=500.0):
     sigma_x = Constant(sigma_x)
     return exp(-sigma_x * ((z - x0[0]) ** 2 + (x - x0[1]) ** 2))
 
