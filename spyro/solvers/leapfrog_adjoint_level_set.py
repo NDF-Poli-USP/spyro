@@ -168,8 +168,8 @@ def Leapfrog_adjoint_level_set(
             "Leapfrog_adjoint_level_set.pvd", comm, source_num
         )
 
-    alpha1, alpha2 = 0.01, 0.97
-    # alpha1, alpha2 = 0.0001, 0.99
+    #alpha1, alpha2 = 0.01, 0.97
+    alpha1, alpha2 = 0.0001, 0.99
 
     # ----------------------------------------
     # Define theta which is our descent direction
@@ -240,15 +240,38 @@ def Leapfrog_adjoint_level_set(
     solver = LinearSolver(A, solver_parameters=params)
 
     # Define gradient problem
-    uuadj, _ = Function(W).split()  # auxiliarly function for the gradient compt.
-    uufor, _ = Function(W).split()  # auxiliarly function for the gradient compt.
+    if PML:
+        uuadj, _ = Function(W).split()  # auxiliarly function for the gradient compt.
+        uufor, _ = Function(W).split()  # auxiliarly function for the gradient compt.
 
-    uuadj_dt, _ = Function(
-        W
-    ).split()  # the time deriv. of the adjoint solution at timestep n
-    uufor_dt, _ = Function(
-        W
-    ).split()  # the time deriv. of the forward solution at timestep n
+        uuadj_dt, _ = Function(
+            W
+        ).split()  # the time deriv. of the adjoint solution at timestep n
+        uufor_dt, _ = Function(
+            W
+        ).split()  # the time deriv. of the forward solution at timestep n
+
+        gradi_11, _ = Function(W).split()
+        gradi_12, _ = Function(W).split()
+        gradi_22, _ = Function(W).split()
+
+        k0_fe0, _ = Function(W).split()
+
+        rhs_forcing, _ = Function(W).split()  # forcing term
+    else:
+        uuadj = Function(V)
+        uufor = Function(V)
+
+        uuadj_dt = Function(V)
+        uufor_dt = Function(V)
+
+        gradi_11 = Function(V)
+        gradi_12 = Function(V)
+        gradi_22 = Function(V)
+
+        k0_fe0 = Function(V)
+
+        rhs_forcing = Function(V)
 
     G_11 = (
         (dot(grad(uuadj), grad(uufor)) - 2 * grad(uufor)[0] * grad(uuadj)[0])
@@ -265,14 +288,6 @@ def Leapfrog_adjoint_level_set(
         * v
         * dx(rule=qr_x)
     )
-
-    gradi_11, _ = Function(W).split()
-    gradi_12, _ = Function(W).split()
-    gradi_22, _ = Function(W).split()
-
-    k0_fe0, _ = Function(W).split()
-
-    rhs_forcing, _ = Function(W).split()  # forcing term
 
     assembly_callable = create_assembly_callable(rhs_, tensor=B)
     for IT in range(nt - 1, 0, -1):
@@ -352,11 +367,19 @@ def Leapfrog_adjoint_level_set(
         rule=qr_x
     ) + alpha2 * weighting * inner(theta, csi) * dx(rule=qr_x)
 
+    # sigma0 = 1.0/(seismic_vel[1]*seismic_vel[1])
+    # sigma1 = 1.0/(seismic_vel[0]*seismic_vel[0])
+    # rhs = -1.0*(sigma0 * k0_fe * div(csi) * dx(0) +
+    #            sigma1 * k0_fe * div(csi) * dx(1))
+    # rhs += 1.0 * (k2_fe * div(csi) * dtotal)
+    # rhs += -1.0*((2.0*k3_zz_fe*grad(csi)[1, 1] + k3_xz_fe * (
+    #    grad(csi)[0, 1] + grad(csi)[1, 0]) + 2.0*k3_xx_fe*grad(csi)[0, 0]) * dtotal)
+
     # gradient problem for two subdomains
     rhs_grad = -1.0 * k0_fe0 * div(csi) * dx(rule=qr_x)
 
     rhs_grad += (
-        (c ** 2)
+        -(c ** 2)
         * (
             1.0 * gradi_22 * grad(csi)[1, 1]
             + gradi_12 * (grad(csi)[0, 1] + grad(csi)[1, 0])
@@ -365,7 +388,7 @@ def Leapfrog_adjoint_level_set(
         * dx(rule=qr_x)
     )
 
-    L = a + rhs_grad
+    L = a - rhs_grad
     lterm, rterm = lhs(L), rhs(L)
     Lterm, Rterm = assemble(lterm), assemble(rterm)
     solver_csi = LinearSolver(Lterm)
