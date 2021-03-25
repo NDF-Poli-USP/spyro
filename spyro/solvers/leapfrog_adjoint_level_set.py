@@ -240,15 +240,15 @@ def Leapfrog_adjoint_level_set(
     solver = LinearSolver(A, solver_parameters=params)
 
     # Define gradient problem
-    # g_u = TrialFunction(V)
-    # g_v = TestFunction(V)
-    uuadj = Function(V)  # auxiliarly function for the gradient compt.
-    uufor = Function(V)  # auxiliarly function for the gradient compt.
+    uuadj, _ = Function(W).split()  # auxiliarly function for the gradient compt.
+    uufor, _ = Function(W).split()  # auxiliarly function for the gradient compt.
 
-    uuadj_dt = Function(V)  # the time deriv. of the adjoint solution at timestep n
-    uufor_dt = Function(V)  # the time deriv. of the forward solution at timestep n
-
-    k0_fe0 = dot(uufor_dt, uuadj_dt) * v  # defer subdomain integration until later
+    uuadj_dt, _ = Function(
+        W
+    ).split()  # the time deriv. of the adjoint solution at timestep n
+    uufor_dt, _ = Function(
+        W
+    ).split()  # the time deriv. of the forward solution at timestep n
 
     G_11 = (
         (dot(grad(uuadj), grad(uufor)) - 2 * grad(uufor)[0] * grad(uuadj)[0])
@@ -266,19 +266,13 @@ def Leapfrog_adjoint_level_set(
         * dx(rule=qr_x)
     )
 
-    gradi_11 = Function(V)
-    gradi_12 = Function(V)
-    gradi_22 = Function(V)
+    gradi_11, _ = Function(W).split()
+    gradi_12, _ = Function(W).split()
+    gradi_22, _ = Function(W).split()
 
-    # these arrays are used for summing over all shots
-    sz = len(guess[0].dat.data[:])
-    gradi_11_np = np.zeros((sz))
-    gradi_12_np = np.zeros((sz))
-    gradi_22_np = np.zeros((sz))
+    k0_fe0, _ = Function(W).split()
 
-    k0_fe0_np = np.zeros(sz)
-
-    rhs_forcing = Function(V)  # forcing term
+    rhs_forcing, _ = Function(W).split()  # forcing term
 
     assembly_callable = create_assembly_callable(rhs_, tensor=B)
     for IT in range(nt - 1, 0, -1):
@@ -329,13 +323,13 @@ def Leapfrog_adjoint_level_set(
             uufor.assign(guess.pop())
 
             # scalar product
-            k0_fe0_np += assemble(k0_fe0 * dx(rule=qr_x)).dat.data[:]
+            k0_fe0 += assemble(dot(uufor_dt, uuadj_dt) * v * dx(rule=qr_x)).sub(0)
 
             # produce all the incremental gradients for
             # each component of the tensor.
-            gradi_11_np += assemble(G_11).dat.data[:]
-            gradi_12_np += assemble(G_12).dat.data[:]
-            gradi_22_np += assemble(G_22).dat.data[:]
+            gradi_11 += assemble(G_11).sub(0)
+            gradi_12 += assemble(G_12).sub(0)
+            gradi_22 += assemble(G_22).sub(0)
 
         # write the adjoint to disk for checking
         if IT % nspool == 0:
@@ -343,15 +337,8 @@ def Leapfrog_adjoint_level_set(
                 outfile.write(u_n, time=t)
             helpers.display_progress(comm, t)
 
-    # produces gradi_11, gradi_12, gradi_22 summed over all timesteps
-    # now assign the summed in time to the induvidual gradient components
-    gradi_11.dat.data[:] = gradi_11_np
-    gradi_12.dat.data[:] = gradi_12_np
-    gradi_22.dat.data[:] = gradi_22_np
+    # produces gradi_11, gradi_12, gradi_22, k0_fe0 summed over all timesteps
 
-    # k0_fe0 summed over all timesteps
-    k0_fe0 = assemble(k0_fe0 * dx(rule=qr_x))
-    k0_fe0.dat.data[:] = k0_fe0_np
     # variational formulation for the descent direction
     # calculation
     # theta = descent direction vector-valued function
@@ -381,13 +368,7 @@ def Leapfrog_adjoint_level_set(
     L = a + rhs_grad
     lterm, rterm = lhs(L), rhs(L)
     Lterm, Rterm = assemble(lterm), assemble(rterm)
-    solver_csi = LinearSolver(
-        Lterm,
-        solver_parameters={
-            "ksp_type": "preonly",
-            "pc_type": "lu",
-        },
-    )
+    solver_csi = LinearSolver(Lterm)
     descent = Function(VF, name="grad")
     solver_csi.solve(descent, Rterm)
 
