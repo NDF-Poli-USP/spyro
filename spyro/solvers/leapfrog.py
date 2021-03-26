@@ -96,8 +96,10 @@ def Leapfrog(
 
     if method == "KMV":
         params = {"ksp_type": "preonly", "pc_type": "jacobi"}
-    elif method == "CG":
+    elif method == "CG" and mesh.ufl_cell() != quadrilateral and mesh.ufl_cell() != hexahedron :
         params = {"ksp_type": "cg", "pc_type": "jacobi"}
+    elif method == "CG" and (mesh.ufl_cell() == quadrilateral or mesh.ufl_cell() == hexahedron ):
+        params = {"ksp_type": "preonly", "pc_type": "jacobi"}
     else:
         raise ValueError("method is not yet supported")
 
