@@ -168,8 +168,8 @@ def Leapfrog_adjoint_level_set(
             "Leapfrog_adjoint_level_set.pvd", comm, source_num
         )
 
-    #alpha1, alpha2 = 0.01, 0.97
-    alpha1, alpha2 = 0.0001, 0.99
+    alpha1, alpha2 = 0.01, 0.97
+    #alpha1, alpha2 = 0.0001, 0.99
 
     # ----------------------------------------
     # Define theta which is our descent direction

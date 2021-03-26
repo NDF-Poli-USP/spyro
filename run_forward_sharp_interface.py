@@ -6,13 +6,13 @@ import spyro
 
 model = {}
 model["parallelism"] = {
-    "type": "off",  # options: automatic (same number of cores for evey processor), custom, off
+    "type": "automatic",  # options: automatic (same number of cores for evey processor), custom, off
     "custom_cores_per_shot": [],  # only if the user wants a different number of cores for every shot.
     # input is a list of integers with the length of the number of shots.
 }
 model["opts"] = {
     "method": "KMV",
-    "degree": 2,  # p order
+    "degree": 1,  # p order
     "quadrature": "KMV",
     "dimension": 2,  # dimension
 }
@@ -20,12 +20,12 @@ model["mesh"] = {
     "Lz": 1.50,  # depth in km - always positive
     "Lx": 1.50,  # width in km - always positive
     "Ly": 0.0,  # thickness in km - always positive
-    "meshfile": "meshes/immersed_disk_guess_vp.msh",
-    "initmodel": "velocity_models/immersed_disk_true_vp.hdf5",
-    "truemodel": "velocity_models/immersed_disk_guess_vp.hdf5",
+    "meshfile": "meshes/immersed_disk_true_vp.msh",
+    "initmodel": "velocity_models/immersed_disk_guess_vp.hdf5",
+    "truemodel": "velocity_models/immersed_disk_true_vp.hdf5",
 }
 model["PML"] = {
-    "status": False,  # true,  # true or false
+    "status": True,  # true,  # true or false
     "outer_bc": "non-reflective",  #  dirichlet, neumann, non-reflective (outer boundary condition)
     "damping_type": "polynomial",  # polynomial, hyperbolic, shifted_hyperbolic
     "exponent": 2,
@@ -35,9 +35,8 @@ model["PML"] = {
     "lx": 0.50,  # thickness of the pml in the x-direction (km) - always positive
     "ly": 0.0,  # thickness of the pml in the y-direction (km) - always positive
 }
-recvs = spyro.create_transect((-1.4, 0.1), (-1.4, 1.40), 200)
-
-sources = spyro.create_transect((-0.05, 0.30), (-0.05, 1.20), 4)
+recvs = spyro.create_transect((-0.01, 0.1), (-0.01, 1.40), 200)
+sources = spyro.create_transect((-0.01, 0.30), (-0.01, 1.20), 4)
 model["acquisition"] = {
     "source_type": "Ricker",
     "num_sources": len(sources),
@@ -80,7 +79,7 @@ for sn in range(model["acquisition"]["num_sources"]):
             sources,
             receivers,
             source_num=sn,
-            output=False,
+            output=True,
         )
         print(time.time() - t1)
         spyro.io.save_shots("shots/forward_exact_level_set" + str(sn) + ".dat", p_recv)
@@ -88,7 +87,7 @@ for sn in range(model["acquisition"]["num_sources"]):
             model,
             p_recv,
             name="level_set_" + str(sn),
-            vmin=-1e-5,
-            vmax=1e-5,
+            vmin=-1e-3,
+            vmax=1e-3,
             appear=False,
         )

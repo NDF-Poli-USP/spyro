@@ -3,6 +3,9 @@ import numpy as np
 from firedrake import *
 
 import spyro
+import gc
+
+gc.disable()
 
 model = {}
 model["opts"] = {
@@ -15,12 +18,12 @@ model["mesh"] = {
     "Lz": 1.50,  # depth in km - always positive
     "Lx": 1.50,  # width in km - always positive
     "Ly": 0.0,  # thickness in km - always positive
-    "meshfile": "meshes/immersed_disk_true_vp.msh",
-    "initmodel": "velocity_models/immersed_disk_true_vp.hdf5",
-    "truemodel": "velocity_models/immersed_disk_guess_vp.hdf5",
+    "meshfile": "meshes/immersed_disk_guess_vp.msh",
+    "initmodel": "velocity_models/immersed_disk_guess_vp.hdf5",
+    "truemodel": "velocity_models/immersed_disk_true_vp.hdf5",
 }
 model["PML"] = {
-    "status": False,  # true,  # true or false
+    "status": True,  # true,  # true or false
     "outer_bc": "non-reflective",  #  dirichlet, neumann, non-reflective (outer boundary condition)
     "damping_type": "polynomial",  # polynomial, hyperbolic, shifted_hyperbolic
     "exponent": 2,
@@ -30,10 +33,8 @@ model["PML"] = {
     "lx": 0.50,  # thickness of the pml in the x-direction (km) - always positive
     "ly": 0.0,  # thickness of the pml in the y-direction (km) - always positive
 }
-# recvs1 = spyro.create_transect((-0.10, 0.1), (-0.10, 1.40), 200)
-recvs = spyro.create_transect((-1.4, 0.1), (-1.4, 1.40), 200)
-# recvs = np.vstack((recvs1, recvs2))
-sources = spyro.create_transect((-0.05, 0.30), (-0.05, 1.20), 4)
+recvs = spyro.create_transect((-0.01, 0.1), (-0.01, 1.40), 200)
+sources = spyro.create_transect((-0.01, 0.30), (-0.01, 1.20), 4)
 model["acquisition"] = {
     "source_type": "Ricker",
     "num_sources": len(sources),
@@ -76,12 +77,12 @@ def update_velocity(V, q, vp):
     based on the indicator function
     """
     sd1 = SubDomainData(q < 1.5)
-    sd2 = SubDomainData(q > 1.5)
+    # sd2 = SubDomainData(q > 1.5)
 
     vp_new = Function(V, name="velocity")
 
+    vp_new.assign(Constant(VP_2))
     vp_new.interpolate(Constant(VP_1), subset=sd1)
-    vp_new.interpolate(Constant(VP_2), subset=sd2)
 
     return vp_new
 
@@ -220,7 +221,7 @@ def calculate_gradient(model, mesh, comm, vp, guess, guess_dt, weighting, residu
     else:
         theta = theta_local
     # scale factor
-    theta.dat.data[:] *= -1
+    # theta.dat.data[:] *= -1
     return theta
 
 
@@ -234,9 +235,10 @@ def model_update(mesh, indicator, theta, step):
         mesh,
         indicator,
         step * theta,
-        number_of_timesteps=20,
-        output=True,
+        number_of_timesteps=100,
+        output=False,
     )
+    gc.collect()
     return indicator_new
 
 
@@ -249,7 +251,7 @@ def optimization(model, mesh, V, comm, vp, sources, receivers, max_iter=10):
     # the file that contains the shape gradient each iteration
     grad_file = File("theta.pvd")
 
-    weighting = create_weighting_function(V, width=0.1, M=20, const=1e-9)
+    weighting = create_weighting_function(V, width=0.1, M=10, const=1e-6)
 
     ls_iter = 0
     iter_num = 0
@@ -351,4 +353,4 @@ sources = spyro.Sources(model, mesh, V, comm).create()
 receivers = spyro.Receivers(model, mesh, V, comm).create()
 
 # run the optimization based on a line search for max_iter iterations
-vp = optimization(model, mesh, V, comm, vp, sources, receivers, max_iter=10)
+vp = optimization(model, mesh, V, comm, vp, sources, receivers, max_iter=30)
