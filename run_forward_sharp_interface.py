@@ -35,8 +35,8 @@ model["PML"] = {
     "lx": 0.50,  # thickness of the pml in the x-direction (km) - always positive
     "ly": 0.0,  # thickness of the pml in the y-direction (km) - always positive
 }
-recvs = spyro.create_transect((-0.01, 0.1), (-0.01, 1.40), 200)
-sources = spyro.create_transect((-0.01, 0.30), (-0.01, 1.20), 4)
+recvs = spyro.create_transect((-0.01, 0.01), (-0.01, 1.49), 200)
+sources = spyro.create_transect((-0.01, 0.01), (-0.01, 1.49), 4)
 model["acquisition"] = {
     "source_type": "Ricker",
     "num_sources": len(sources),
@@ -49,7 +49,7 @@ model["acquisition"] = {
 }
 model["timeaxis"] = {
     "t0": 0.0,  #  initial time for event
-    "tf": 1.0,  # final time for event
+    "tf": 1.5,  # final time for event
     "dt": 0.00025,  # timestep size
     "nspool": 100,  # how frequently to output solution to pvds
     "fspool": 9999,  # how frequently to save solution to ram
@@ -79,7 +79,7 @@ for sn in range(model["acquisition"]["num_sources"]):
             sources,
             receivers,
             source_num=sn,
-            output=True,
+            #output=True,
         )
         print(time.time() - t1)
         spyro.io.save_shots("shots/forward_exact_level_set" + str(sn) + ".dat", p_recv)
