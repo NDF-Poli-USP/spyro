@@ -138,7 +138,7 @@ def create_weighting_function(V, const=100.0, M=5, width=0.1, show=False):
         plt.show()
 
     wei = Function(V, w, name="weighting_function")
-    #File("weighting_function.pvd").write(wei)
+    # File("weighting_function.pvd").write(wei)
     return wei
 
 
@@ -267,13 +267,14 @@ def optimization(model, mesh, V, comm, vp, sources, receivers, max_iter=10):
         if comm.ensemble_comm.rank == 0:
             print(f"The step size is: {beta0}", flush=True)
 
-        # compute the shape gradient for the new domain
-        theta = calculate_gradient(
-            model, mesh, comm, vp, guess, guess_dt, weighting, residual
-        )
-        # write the gradient to a vtk file
-        if comm.ensemble_comm.rank == 0:
-            grad_file.write(theta, name="gradient")
+        # compute the shape gradient for the new domain (only on the first line search)
+        if ls_iter == 0:
+            theta = calculate_gradient(
+                model, mesh, comm, vp, guess, guess_dt, weighting, residual
+            )
+            # write the gradient to a vtk file
+            if comm.ensemble_comm.rank == 0:
+                grad_file.write(theta, name="gradient")
         # calculate the so-called indicator function by thresholding vp
         indicator = calculate_indicator_from_vp(vp)
         # update the new shape by solving the transport equation with the indicator field
@@ -358,4 +359,4 @@ sources = spyro.Sources(model, mesh, V, comm).create()
 receivers = spyro.Receivers(model, mesh, V, comm).create()
 
 # run the optimization based on a line search for max_iter iterations
-vp = optimization(model, mesh, V, comm, vp, sources, receivers, max_iter=30)                                                                                            
+vp = optimization(model, mesh, V, comm, vp, sources, receivers, max_iter=30)
