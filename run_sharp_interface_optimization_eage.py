@@ -42,7 +42,7 @@ model["acquisition"] = {
     "source_type": "Ricker",
     "num_sources": len(sources),
     "source_pos": sources,
-    "frequency": 2.0,
+    "frequency": 3.0,
     "delay": 1.0,
     "amplitude": 1.0,
     "num_receivers": len(recvs),
@@ -156,20 +156,21 @@ def calculate_functional(model, mesh, comm, vp, sources, receivers, iter_num):
             p_exact_recv = spyro.io.load_shots(f)
             # DEBUG
             # viz the signal at receiver # 100
-            import matplotlib.pyplot as plt
+            if comm.comm.rank == 0:
+                import matplotlib.pyplot as plt
 
-            plt.plot(p_exact_recv[:-1:1, 100], "k-")
-            plt.plot(guess_recv[:, 100], "r-")
-            plt.ylim(-5e-5, 5e-5)
-            plt.title("Receiver #100")
-            plt.savefig(
-                "comparison_"
-                + str(comm.ensemble_comm.rank)
-                + "_iter_"
-                + str(iter_num)
-                + ".png"
-            )
-            plt.close()
+                plt.plot(p_exact_recv[:-1:1, 100], "k-")
+                plt.plot(guess_recv[:, 100], "r-")
+                plt.ylim(-5e-5, 5e-5)
+                plt.title("Receiver #100")
+                plt.savefig(
+                    "comparison_"
+                    + str(comm.ensemble_comm.rank)
+                    + "_iter_"
+                    + str(iter_num)
+                    + ".png"
+                )
+                plt.close()
             # END DEBUG
 
             residual = spyro.utils.evaluate_misfit(
@@ -243,7 +244,7 @@ def model_update(mesh, indicator, theta, step):
 def optimization(model, mesh, V, comm, vp, sources, receivers, max_iter=10):
     """Optimization with steepest descent using a line search algorithm"""
     beta0 = beta0_init = 1.5
-    max_ls = 3
+    max_ls = 8
     gamma = gamma2 = 0.8
 
     # the file that contains the shape gradient each iteration
@@ -266,12 +267,13 @@ def optimization(model, mesh, V, comm, vp, sources, receivers, max_iter=10):
             print(f"The step size is: {beta0}", flush=True)
 
         # compute the shape gradient for the new domain
-        theta = calculate_gradient(
-            model, mesh, comm, vp, guess, guess_dt, weighting, residual
-        )
+        if ls_iter == 0:
+            theta = calculate_gradient(
+                model, mesh, comm, vp, guess, guess_dt, weighting, residual
+            )
         # write the gradient to a vtk file
         if comm.ensemble_comm.rank == 0:
-            grad_file.write(theta, name="gradient", comm=comm.comm)
+            grad_file.write(theta, name="gradient")
         # calculate the so-called indicator function by thresholding vp
         indicator = calculate_indicator_from_vp(vp)
         # update the new shape by solving the transport equation with the indicator field
@@ -280,7 +282,7 @@ def optimization(model, mesh, V, comm, vp, sources, receivers, max_iter=10):
         vp_new = update_velocity(V, indicator_new, vp)
         # write ALL velocity updates to a vtk file
         if comm.ensemble_comm.rank ==0:
-            evolution_of_velocity.write(vp_new)
+            evolution_of_velocity.write(vp_new, name="velocity")
         # compute the new functional
         J_new, guess_new, guess_dt_new, residual_new = calculate_functional(
             model, mesh, comm, vp_new, sources, receivers, iter_num
@@ -311,7 +313,7 @@ def optimization(model, mesh, V, comm, vp, sources, receivers, max_iter=10):
                 # no change to step
                 beta0 = beta0
             ls_iter = 0
-        elif ls_iter < 3:
+        elif ls_iter < max_ls:
             print(J_old, J_new, flush=True)
             if comm.ensemble_comm.rank == 0:
                 print(
@@ -355,5 +357,4 @@ sources = spyro.Sources(model, mesh, V, comm).create()
 receivers = spyro.Receivers(model, mesh, V, comm).create()
 
 # run the optimization based on a line search for max_iter iterations
-vp = optimization(model, mesh, V, comm, vp, sources, receivers, max_iter=50)
-                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                     
+vp = optimization(model, mesh, V, comm, vp, sources, receivers, max_iter=50)                                                                                       
