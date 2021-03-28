@@ -333,9 +333,8 @@ def optimization(model, mesh, V, comm, vp, sources, receivers, max_iter=10):
                 model, mesh, comm, vp, sources, receivers, iter_num
             )
         else:
-            raise ValueError(
-                f"Failed to reduce the functional after {ls_iter} line searches..."
-            )
+            print(f"Failed to reduce the functional after {ls_iter} line searches...", flush=True)
+            break
 
     return vp
 
