@@ -36,7 +36,6 @@ model["PML"] = {
     "ly": 0.0,  # thickness of the pml in the y-direction (km) - always positive
 }
 recvs = spyro.create_transect((-0.1, 6.0), (-0.1, 13.51), 400)
-
 sources = spyro.create_transect((-0.1, 6.0), (-0.1, 13.51), 20)
 model["acquisition"] = {
     "source_type": "Ricker",
@@ -55,10 +54,10 @@ model["timeaxis"] = {
     "nspool": 100,  # how frequently to output solution to pvds
     "fspool": 2,  # how frequently to save solution to ram
 }
-#### end of options ####
 
 VP_1 = 4.5  # inside subdomain to be optimized
 VP_2 = 2.0  # outside subdomain to be optimized
+#### end of options ####
 
 
 def calculate_indicator_from_vp(vp):
@@ -74,13 +73,13 @@ def update_velocity(V, q, vp):
     based on the indicator function
     """
     sd1 = SubDomainData(q < 1.5)
-    #sd2 = SubDomainData(q > 1.5)
+    # sd2 = SubDomainData(q > 1.5)
 
     vp_new = Function(V, name="velocity")
 
     vp_new.assign(Constant(VP_2))
     vp_new.interpolate(Constant(VP_1), subset=sd1)
-    #vp_new.interpolate(Constant(VP_2), subset=sd2)
+    # vp_new.interpolate(Constant(VP_2), subset=sd2)
 
     return vp_new
 
@@ -137,7 +136,7 @@ def create_weighting_function(V, const=100.0, M=5, width=0.1, show=False):
 
     wei = Function(V, w, name="weighting_function")
 
-    #File("weighting_function.pvd").write(wei)
+    # File("weighting_function.pvd").write(wei)
     return wei
 
 
@@ -152,7 +151,7 @@ def calculate_functional(model, mesh, comm, vp, sources, receivers, iter_num):
             guess, guess_dt, guess_recv = spyro.solvers.Leapfrog_level_set(
                 model, mesh, comm, vp, sources, receivers, source_num=sn
             )
-            f = "shots/eage_true_slice_"+ str(sn) + ".dat"
+            f = "shots/eage_true_slice_" + str(sn) + ".dat"
             p_exact_recv = spyro.io.load_shots(f)
             # DEBUG
             # viz the signal at receiver # 100
@@ -221,7 +220,7 @@ def calculate_gradient(model, mesh, comm, vp, guess, guess_dt, weighting, residu
     else:
         theta = theta_local
     # scale factor
-    #theta.dat.data[:] *= -1
+    # theta.dat.data[:] *= -1
     return theta
 
 
@@ -281,7 +280,7 @@ def optimization(model, mesh, V, comm, vp, sources, receivers, max_iter=10):
         # update the velocity according to the new indicator
         vp_new = update_velocity(V, indicator_new, vp)
         # write ALL velocity updates to a vtk file
-        if comm.ensemble_comm.rank ==0:
+        if comm.ensemble_comm.rank == 0:
             evolution_of_velocity.write(vp_new, name="velocity")
         # compute the new functional
         J_new, guess_new, guess_dt_new, residual_new = calculate_functional(
@@ -314,8 +313,11 @@ def optimization(model, mesh, V, comm, vp, sources, receivers, max_iter=10):
                 beta0 = beta0
             ls_iter = 0
         elif ls_iter < max_ls:
-            print(J_old, J_new, flush=True)
             if comm.ensemble_comm.rank == 0:
+                print(
+                    f"Previous cost functional {J_old}...new cost functional {J_new}",
+                    flush=True,
+                )
                 print(
                     f"Line search number {ls_iter}...reducing step size...", flush=True
                 )
@@ -357,4 +359,4 @@ sources = spyro.Sources(model, mesh, V, comm).create()
 receivers = spyro.Receivers(model, mesh, V, comm).create()
 
 # run the optimization based on a line search for max_iter iterations
-vp = optimization(model, mesh, V, comm, vp, sources, receivers, max_iter=50)                                                                                       
+vp = optimization(model, mesh, V, comm, vp, sources, receivers, max_iter=50)
