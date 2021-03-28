@@ -6,7 +6,7 @@ import spyro
 
 model = {}
 model["parallelism"] = {
-    "type": "off",  # options: automatic (same number of cores for evey processor), custom, off
+    "type": "automatic",  # options: automatic (same number of cores for evey processor), custom, off
     "custom_cores_per_shot": [],  # only if the user wants a different number of cores for every shot.
     # input is a list of integers with the length of the number of shots.
 }
@@ -20,7 +20,7 @@ model["mesh"] = {
     "Lz": 4.20,  # depth in km - always positive
     "Lx": 13.52,  # width in km - always positive
     "Ly": 0.0,  # thickness in km - always positive
-    "meshfile": "meshes/eage_true_slice.msh",
+    "meshfile": "meshes/eage_guess_slice.msh",
     "initmodel": "velocity_models/eage_guess_slice.hdf5",
     "truemodel": "velocity_models/eage_true_slice.hdf5",
 }
@@ -35,14 +35,14 @@ model["PML"] = {
     "lx": 0.50,  # thickness of the pml in the x-direction (km) - always positive
     "ly": 0.0,  # thickness of the pml in the y-direction (km) - always positive
 }
-recvs = spyro.create_transect((-0.1, 0.1), (-0.1, 13.51), 400)
+recvs = spyro.create_transect((-0.1, 6.0), (-0.1, 13.51), 400)
 
 sources = spyro.create_transect((-0.1, 6.0), (-0.1, 13.51), 20)
 model["acquisition"] = {
     "source_type": "Ricker",
     "num_sources": len(sources),
     "source_pos": sources,
-    "frequency": 5.0,
+    "frequency": 2.0,
     "delay": 1.0,
     "amplitude": 1.0,
     "num_receivers": len(recvs),
@@ -53,7 +53,7 @@ model["timeaxis"] = {
     "tf": 3.0,  # final time for event
     "dt": 0.001,  # timestep size
     "nspool": 100,  # how frequently to output solution to pvds
-    "fspool": 9999,  # how frequently to save solution to ram
+    "fspool": 2,  # how frequently to save solution to ram
 }
 #### end of options ####
 
@@ -136,7 +136,8 @@ def create_weighting_function(V, const=100.0, M=5, width=0.1, show=False):
         plt.show()
 
     wei = Function(V, w, name="weighting_function")
-    File("weighting_function.pvd").write(wei)
+
+    #File("weighting_function.pvd").write(wei)
     return wei
 
 
@@ -151,13 +152,13 @@ def calculate_functional(model, mesh, comm, vp, sources, receivers, iter_num):
             guess, guess_dt, guess_recv = spyro.solvers.Leapfrog_level_set(
                 model, mesh, comm, vp, sources, receivers, source_num=sn
             )
-            f = "shots/forward_exact_level_set" + str(sn) + ".dat"
+            f = "shots/eage_true_slice_"+ str(sn) + ".dat"
             p_exact_recv = spyro.io.load_shots(f)
             # DEBUG
             # viz the signal at receiver # 100
             import matplotlib.pyplot as plt
 
-            plt.plot(p_exact_recv[:-1:2, 100], "k-")
+            plt.plot(p_exact_recv[:-1:1, 100], "k-")
             plt.plot(guess_recv[:, 100], "r-")
             plt.ylim(-5e-5, 5e-5)
             plt.title("Receiver #100")
@@ -219,7 +220,7 @@ def calculate_gradient(model, mesh, comm, vp, guess, guess_dt, weighting, residu
     else:
         theta = theta_local
     # scale factor
-    theta.dat.data[:] *= -1
+    #theta.dat.data[:] *= -1
     return theta
 
 
@@ -233,8 +234,8 @@ def model_update(mesh, indicator, theta, step):
         mesh,
         indicator,
         step * theta,
-        number_of_timesteps=20,
-        output=True,
+        number_of_timesteps=100,
+        output=False,
     )
     return indicator_new
 
@@ -246,9 +247,10 @@ def optimization(model, mesh, V, comm, vp, sources, receivers, max_iter=10):
     gamma = gamma2 = 0.8
 
     # the file that contains the shape gradient each iteration
-    grad_file = File("theta.pvd")
+    if comm.ensemble_comm.rank == 0:
+        grad_file = File("theta.pvd", comm=comm.comm)
 
-    weighting = create_weighting_function(V, width=0.1, M=20, const=1e-9)
+    weighting = create_weighting_function(V, width=0.1, M=10, const=1e-6)
 
     ls_iter = 0
     iter_num = 0
@@ -268,7 +270,8 @@ def optimization(model, mesh, V, comm, vp, sources, receivers, max_iter=10):
             model, mesh, comm, vp, guess, guess_dt, weighting, residual
         )
         # write the gradient to a vtk file
-        grad_file.write(theta, name="gradient")
+        if comm.ensemble_comm.rank == 0:
+            grad_file.write(theta, name="gradient", comm=comm.comm)
         # calculate the so-called indicator function by thresholding vp
         indicator = calculate_indicator_from_vp(vp)
         # update the new shape by solving the transport equation with the indicator field
@@ -276,7 +279,8 @@ def optimization(model, mesh, V, comm, vp, sources, receivers, max_iter=10):
         # update the velocity according to the new indicator
         vp_new = update_velocity(V, indicator_new, vp)
         # write ALL velocity updates to a vtk file
-        evolution_of_velocity.write(vp_new)
+        if comm.ensemble_comm.rank ==0:
+            evolution_of_velocity.write(vp_new)
         # compute the new functional
         J_new, guess_new, guess_dt_new, residual_new = calculate_functional(
             model, mesh, comm, vp_new, sources, receivers, iter_num
@@ -300,7 +304,7 @@ def optimization(model, mesh, V, comm, vp, sources, receivers, max_iter=10):
             vp = vp_new
             # update step
             if ls_iter == max_ls:
-                beta0 = max(beta0 * gamma2, 0.1 * beta_0_init)
+                beta0 = max(beta0 * gamma2, 0.1 * beta0_init)
             elif ls_iter == 0:
                 beta0 = min(beta0 / gamma2, 1.0)
             else:
@@ -341,8 +345,9 @@ mesh, V = spyro.io.read_mesh(model, comm)
 vp = spyro.io.interpolate(model, mesh, V, guess=True)
 
 # visualize the updates with this file
-evolution_of_velocity = File("evolution_of_velocity.pvd")
-evolution_of_velocity.write(vp, name="velocity")
+if comm.ensemble_comm.rank == 0:
+    evolution_of_velocity = File("evolution_of_velocity.pvd", comm=comm.comm)
+    evolution_of_velocity.write(vp, name="velocity")
 
 # Configure the sources and receivers
 sources = spyro.Sources(model, mesh, V, comm).create()
@@ -350,4 +355,5 @@ sources = spyro.Sources(model, mesh, V, comm).create()
 receivers = spyro.Receivers(model, mesh, V, comm).create()
 
 # run the optimization based on a line search for max_iter iterations
-vp = optimization(model, mesh, V, comm, vp, sources, receivers, max_iter=30)
+vp = optimization(model, mesh, V, comm, vp, sources, receivers, max_iter=50)
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                     
