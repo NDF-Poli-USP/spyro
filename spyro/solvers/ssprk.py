@@ -177,12 +177,12 @@ def SSPRK(model, mesh, comm, c, excitations, receivers, source_num=0, freq_index
                 saveIT += 1
 
             if IT % nspool == 0:
-                assert (
-                    norm(p) < 1
-                ), "Numerical instability. Try reducing dt or building the mesh differently"
-            if output:
-                outfile.write(p, time=t, name="Pressure")
-            helpers.display_progress(comm, t)
+                # assert (
+                #     norm(p) < 1
+                # ), "Numerical instability. Try reducing dt or building the mesh differently"
+                if output:
+                    outfile.write(p, time=t, name="Pressure")
+                helpers.display_progress(comm, t)
 
         usol_recv = helpers.fill(usol_recv, is_local, nt, receivers.num_receivers)
         usol_recv = utils.communicate(usol_recv, comm)
