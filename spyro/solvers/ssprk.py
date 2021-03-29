@@ -10,9 +10,9 @@ from ..sources import MMS_time, timedependentSource
 from . import helpers
 
 
-def SSPRK3(model, mesh, comm, c, excitations, receivers, source_num=0):
+def SSPRK(model, mesh, comm, c, excitations, receivers, source_num=0):
     """Acoustic wave equation solved using pressure-velocity formulation
-    and Strong Stability Preserving Ruge-Kutta 3.
+    and Strong Stability Preserving Ruge-Kutta.
 
     Parameters
     ----------
