@@ -89,6 +89,12 @@ def SSPRK(model, mesh, comm, c, excitations, receivers, source_num=0):
     UP0 = fire.Function(V)
     u0, p0 = UP0.split()
 
+    if method == "KMV":
+        qr_x0, qr_x1 = qr_x
+    else:
+        qr_x0 = qr_x
+        qr_x1 = qr_x
+
     # Defining boundary conditions
     bcp = fire.DirichletBC(V.sub(1), 0.0, "on_boundary")
 
