@@ -67,8 +67,8 @@ def SSPRK(model, mesh, comm, c, excitations, receivers, source_num=0):
     else:
         raise ValueError("Spatial dimension is correct")
 
-    nt = int(tf / dt)  # number of timesteps
-    dstep = int(delay / dt)  # number of timesteps with source
+    nt = round(tf / dt)  # number of timesteps
+    dstep = round(delay / dt)  # number of timesteps with source
 
     # Element
     element = fire.FiniteElement(method, mesh.ufl_cell(), degree, variant=variant)
@@ -84,16 +84,10 @@ def SSPRK(model, mesh, comm, c, excitations, receivers, source_num=0):
 
     # Initial condition
     (q_vec, q) = fire.TestFunctions(V)
-    initialU = fire.as_vector((0, 0))
-    initialP = fire.Function(V.sub(1)).interpolate(0.0 * x * z)
     UP = fire.Function(V)
     u, p = UP.split()
-    u.assign(initialU)
-    p.interpolate(initialP)
     UP0 = fire.Function(V)
     u0, p0 = UP0.split()
-    u0.assign(u)
-    p0.assign(p)
 
     # Defining boundary conditions
     bcp = fire.DirichletBC(V.sub(1), 0.0, "on_boundary")
