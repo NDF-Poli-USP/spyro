@@ -11,7 +11,7 @@ from .timestepping_scheme import ssprk_timestepping_with_source, ssprk_timestepp
 from . import helpers
 
 
-def SSPRK(model, mesh, comm, c, excitations, receivers, source_num=0):
+def SSPRK(model, mesh, comm, c, excitations, receivers, source_num=0, freq_index =0, output = False):
     """Acoustic wave equation solved using pressure-velocity formulation
     and Strong Stability Preserving Ruge-Kutta.
 
