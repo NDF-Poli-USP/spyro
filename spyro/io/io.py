@@ -16,6 +16,59 @@ from .. import domains
 
 __all__ = ["save_shots", "load_shots", "read_mesh", "interpolate"]
 
+class Callback:
+
+    def __init__(self, model, comm):
+        """Class for writing output.
+
+        Parameters
+        ----------
+        model: dict
+            Contains simulation parameters and options.
+        comm: Firedrake.ensemble_communicator
+            An ensemble communicator
+        """
+
+        self.comm = comm
+        self.model = model
+
+    def create_file(self, m=None, dm=None, vp=None):
+        """Create output file(s)"""
+
+        outdir = self.model["output"]["outdir"]
+        os.makedirs(outdir, exist_ok=True)
+        mfile = outdir+"/"+"m.pvd"
+        dmfile = outdir+"/"+"dm.pvd"
+        vpfile = outdir+"/"+"vp.pvd"
+
+        if self.comm.ensemble_comm.rank == 0:
+            if m:
+                self.m_file = fire.File(
+                    mfile, comm=self.comm.comm
+                )
+                self.m_file.write(m)
+            if dm:
+                self.dm_file = fire.File(
+                    dmfile, comm=self.comm.comm
+                )
+                self.dm_file.write(dm)
+            if vp:
+                self.vp_file = fire.File(
+                    vpfile, comm=self.comm.comm
+                )
+                self.vp_file.write(vp)
+
+    def write_file(self, m=None, dm=None, vp=None):
+        "Write output file(s)"""
+
+        if self.comm.ensemble_comm.rank == 0:
+            if m:
+                self.m_file.write(m)
+            if dm:
+                self.dm_file.write(dm)
+            if vp:
+                self.vp_file.write(vp)
+
 
 def save_shots(filename, array):
     """Save a `numpy.ndarray` to a `pickle`.
@@ -238,11 +291,39 @@ def load_model(jsonfile=None):
     parser.add_argument(
         "-c", "--config-file",type=str, required=False, help="json file with parameters"
     )
+    parser.add_argument(
+        "-i", "--input-field",type=str, required=False, help="hdf5 file with initial guess"
+    )
+    parser.add_argument(
+        "-o", "--output-field",type=str, required=False, help="hdf5 file where result is stored"
+    )
+    parser.add_argument(
+        "-O", "--optimizer",type=str, required=False, help="type of optimizer used"
+    )
 
     file = parser.parse_args().config_file if not jsonfile else jsonfile
+    inputfile = parser.parse_args().input_field
+    outputfile = parser.parse_args().output_field
+    optimizer = parser.parse_args().optimizer
 
     with open(file, "r") if file else StringIO('{}') as f:
         model = json.load(f)
+
+    if inputfile:
+        if "data" in model:
+            model["data"]["initfile"] = inputfile
+        else:
+            model["data"] = {"initfile": inputfile}
+    if outputfile:
+        if "data" in model:
+            model["data"]["resultfile"] = outputfile
+        else:
+            model["data"] = {"resultfile": outputfile}
+    if optimizer:
+        if "inversion" in model:
+            model["inversion"]["optimizer"] = optimizer
+        else:
+            model["inversion"] = {"optimizer": optimizer}
 
     return model
 
