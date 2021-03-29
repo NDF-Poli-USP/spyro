@@ -114,54 +114,89 @@ def SSPRK(model, mesh, comm, c, excitations, receivers, source_num=0, freq_index
 
         # current time
         t = 0.0
-       # Time-dependent source
-        f = fire.Function(ScaFS)
+        # Time-dependent source
+        f = fd.Function(ScaFS)
         excitation = excitations[source_num]
         if source_type == "Ricker":
             ricker = Constant(0)
             ricker.assign(timedependentSource(model, t, freq))
-            f = excitation * ricker
+            expr = excitation * ricker
 
+            f.assign(expr)
         if source_type == "MMS":
             MMS = Constant(0)
             MMS.assign(MMS_time(t))
-            f = excitation * MMS
+            expr = excitation * MMS
 
+        f.assign(expr)
         # Setting up equations
-        LHS = (1 / c ** 2) * (dp_trial) * q * dx(rule=qr_x1) + inner(du_trial, q_vec) * dx(rule=qr_x0)
+        LHS = (1 / c ** 2) * (dp_trial) * q * dx(rule=qr_k) + inner(
+            du_trial, q_vec
+        ) * dx(rule=qr_k)
 
-        # split the time variable part of the right hand side
-        RHS_1 = inner(u, grad(q)) * dx + p * div(q_vec) * dx
-        RHS_2 = excitation * q * dx
+        RHS = inner(u, grad(q)) * dx + f * q * dx + p * div(q_vec) * dx
 
         # we must save the data like so
         usol = [
-            fire.Function(V.sub(1), name="pressure") for t in range(nt) if t % fspool == 0
+            fd.Function(V.sub(1), name="pressure") for t in range(nt) if t % fspool == 0
         ]
         usol_recv = []
 
         saveIT = 0
-        #prob = fire.LinearVariationalProblem(LHS, RHS, dUP, bcp)
-        #solv = fire.LinearVariationalSolver(prob, solver_parameters=params)
-
-        A    = fire.assemble(LHS, bcs = bcp)
-        b1   = fire.assemble(RHS_1, bcs = bcp)
-        b2   = fire.assemble(RHS_2, bcs = bcp)
-        solv = fire.LinearSolver(A, solver_parameters=params)
+        prob = fd.LinearVariationalProblem(LHS, RHS, dUP, bcp)
+        solv = fd.LinearVariationalSolver(prob, solver_parameters=params)
 
         # Evolution in time
         for IT in range(nt):
             # uptade time
             t = IT * float(dt)
 
-            if source_type == "Ricker" and IT < dstep:
-                UP = ssprk_timestepping_with_source(4, solv, b1, b2, dUP, UP0, UP, dt, K, model, t)
+            if source_type == "Ricker":
+                if IT < dstep:
+                    ricker.assign(timedependentSource(model, t, freq))
+                    # And set the function to the excitation
+                    # multiplied by the wavelet.
+                    f.assign(expr)
+                elif IT == dstep:
+                    # source is dead
+                    ricker.assign(0.0)
+                    # And set the function to the excitation
+                    # multiplied by the wavelet.
+                    f.assign(expr)
             elif source_type == "MMS":
-                UP = ssprk_timestepping_with_source(4, solv, b1, b2, dUP, UP0, UP, dt, K, model, t)
+                MMS.assign(timedependentSource(model, t))
+                # And set the function to the excitation
+                # multiplied by the wavelet.
+                f.assign(expr)
             else:
-                UP = ssprk_timestepping_no_source(4, solv, b1, dUP, UP0, UP, dt, K)
+                raise ValueError("source not estabilished")
 
-            u, p = UP.split()
+            # solv.solve() #Solve for du and dp
+            solv.solve()  # Solve for du and dp
+            K1.assign(dUP)
+            k1U, k1P = K1.split()
+
+            # Second step
+            u.assign(u0 + dt * k1U)
+            p.assign(p0 + dt * k1P)
+
+            # solv.solve() #Solve for du and dp
+            solv.solve()  # Solve for du and dp
+            K2.assign(dUP)
+            k2U, k2P = K2.split()
+
+            # Third step
+            u.assign(0.75 * u0 + 0.25 * (u + dt * k2U))
+            p.assign(0.75 * p0 + 0.25 * (p + dt * k2P))
+
+            # solve.solve() #Solve for du and dp
+            solv.solve()  # Solve for du and dp
+            K3.assign(dUP)
+            k3U, k3P = K3.split()
+
+            # Updating answer
+            u.assign((1.0 / 3.0) * u0 + (2.0 / 3.0) * (u + dt * k3U))
+            p.assign((1.0 / 3.0) * p0 + (2.0 / 3.0) * (p + dt * k3P))
 
             u0.assign(u)
             p0.assign(p)
@@ -170,7 +205,6 @@ def SSPRK(model, mesh, comm, c, excitations, receivers, source_num=0, freq_index
             usol_recv.append(
                 receivers.interpolate(p.dat.data_ro_with_halos[:], is_local)
             )
-
             # Save to RAM
             if IT % fspool == 0:
                 usol[saveIT].assign(p)
