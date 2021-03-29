@@ -1,5 +1,5 @@
 from firedrake import dx
-from ..sources import MMS_time, timedependentSource, sourceDerivative_in_source
+from ..sources import MMS_time, timedependentSource#, sourceDerivative_in_source
 
 def ssprk_timestepping_with_source(time_order, solv, b1, b2, dUP, UP0, UP, dt, K, model, t):
     if time_order == 3:
@@ -45,9 +45,9 @@ def ssprk4_with_source(solv, b1, b2, dUP, UP0, UP, dt, K, model, t):
         K.assign(dUP)
         solv.solve(dUP, b2)
         K.assign(K+dUP*source)
-        source_derivative = 
+        #source_derivative = 
         
-        source = source + dt*source_derivative/6.
+        source = timedependentSource(model, t+i*dt, freq)#source + dt*source_derivative/6.
         UP.assign(UP + dt*K/6.)
         i+=1
     
@@ -60,7 +60,7 @@ def ssprk4_with_source(solv, b1, b2, dUP, UP0, UP, dt, K, model, t):
         solv.solve(dUP, b2)
         K.assign(K+dUP*source)
 
-        source = source + dt*source_derivative/6.
+        source = timedependentSource(model, t+i*dt, freq)#source + dt*source_derivative/6.source + dt*source_derivative/6.
         UP.assign( UP + dt*K/6. )
         i+=1
 
@@ -74,9 +74,9 @@ def ssprk4_with_source(solv, b1, b2, dUP, UP0, UP, dt, K, model, t):
 
 def ssprk_timestepping_no_source(time_order, solv, b1, dUP, UP0, UP, dt, K):
     if time_order == 3:
-        return ssprk3_with_source(solv, b1, dUP, UP0, UP, dt, K)
+        return ssprk3_no_source(solv, b1, dUP, UP0, UP, dt, K)
     elif time_order == 4:
-        return ssprk4_with_source(solv, b1, dUP, UP0, UP, dt, K)
+        return ssprk4_no_source(solv, b1, dUP, UP0, UP, dt, K)
     else:
         raise ValueError("This time order not yet implemented.")
 
