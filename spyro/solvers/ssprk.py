@@ -100,14 +100,12 @@ def SSPRK(model, mesh, comm, c, excitations, receivers, source_num=0):
 
     dUP = fire.Function(V)
     du, dp = dUP.split()
-    K1 = fire.Function(V)
-    K2 = fire.Function(V)
-    K3 = fire.Function(V)
+    K = fire.Function(V)
 
     du_trial, dp_trial = fire.TrialFunctions(V)
 
     # create output files
-    outfile = helpers.create_output_file("SSPRK3.pvd", comm, source_num)
+    outfile = helpers.create_output_file("SSPRK.pvd", comm, source_num)
 
     # Distribute shots in a circular way between processors
     if io.is_owner(comm, source_num):
@@ -116,27 +114,25 @@ def SSPRK(model, mesh, comm, c, excitations, receivers, source_num=0):
 
         # current time
         t = 0.0
-        # Time-dependent source
+       # Time-dependent source
         f = fire.Function(ScaFS)
         excitation = excitations[source_num]
         if source_type == "Ricker":
             ricker = Constant(0)
             ricker.assign(timedependentSource(model, t, freq))
-            expr = excitation * ricker
+            f = excitation * ricker
 
-            f.assign(expr)
         if source_type == "MMS":
             MMS = Constant(0)
             MMS.assign(MMS_time(t))
-            expr = excitation * MMS
+            f = excitation * MMS
 
-        f.assign(expr)
         # Setting up equations
-        LHS = (1 / c ** 2) * (dp_trial) * q * dx(rule=qr_k) + inner(
-            du_trial, q_vec
-        ) * dx(rule=qr_k)
+        LHS = (1 / c ** 2) * (dp_trial) * q * dx(rule=qr_x1) + inner(du_trial, q_vec) * dx(rule=qr_x0)
 
-        RHS = inner(u, grad(q)) * dx + f * q * dx + p * div(q_vec) * dx
+        # split the time variable part of the right hand side
+        RHS_1 = inner(u, grad(q)) * dx + p * div(q_vec) * dx
+        RHS_2 = excitation * q * dx
 
         # we must save the data like so
         usol = [
