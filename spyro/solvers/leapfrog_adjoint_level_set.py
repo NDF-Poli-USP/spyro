@@ -168,8 +168,8 @@ def Leapfrog_adjoint_level_set(
             "Leapfrog_adjoint_level_set.pvd", comm, source_num
         )
 
-    alpha1, alpha2 = 0.001, 0.97
-    #alpha1, alpha2 = 0.0001, 0.99
+    alpha1, alpha2 = 0.01, 0.97
+    # alpha1, alpha2 = 0.0001, 0.99
 
     # ----------------------------------------
     # Define theta which is our descent direction
@@ -352,6 +352,11 @@ def Leapfrog_adjoint_level_set(
                 outfile.write(u_n, time=t)
             helpers.display_progress(comm, t)
 
+    gradi_11 /= Constant(dt)
+    gradi_12 /= Constant(dt)
+    gradi_22 /= Constant(dt)
+    k0_fe0 /= Constant(dt)
+
     # produces gradi_11, gradi_12, gradi_22, k0_fe0 summed over all timesteps
 
     # variational formulation for the descent direction
@@ -367,15 +372,6 @@ def Leapfrog_adjoint_level_set(
         rule=qr_x
     ) + alpha2 * weighting * inner(theta, csi) * dx(rule=qr_x)
 
-    # sigma0 = 1.0/(seismic_vel[1]*seismic_vel[1])
-    # sigma1 = 1.0/(seismic_vel[0]*seismic_vel[0])
-    # rhs = -1.0*(sigma0 * k0_fe * div(csi) * dx(0) +
-    #            sigma1 * k0_fe * div(csi) * dx(1))
-    # rhs += 1.0 * (k2_fe * div(csi) * dtotal)
-    # rhs += -1.0*((2.0*k3_zz_fe*grad(csi)[1, 1] + k3_xz_fe * (
-    #    grad(csi)[0, 1] + grad(csi)[1, 0]) + 2.0*k3_xx_fe*grad(csi)[0, 0]) * dtotal)
-
-    # gradient problem for two subdomains
     rhs_grad = -1.0 * k0_fe0 * div(csi) * dx(rule=qr_x)
 
     rhs_grad += (
@@ -390,7 +386,9 @@ def Leapfrog_adjoint_level_set(
 
     L = a - rhs_grad
     lterm, rterm = lhs(L), rhs(L)
-    Lterm, Rterm = assemble(lterm), assemble(rterm)
+    bcval = Constant((0.0, 0.0))
+    bcs = DirichletBC(VF, bcval, "on_boundary")
+    Lterm, Rterm = assemble(lterm, bcs=bcs), assemble(rterm)
     solver_csi = LinearSolver(Lterm)
     descent = Function(VF, name="grad")
     solver_csi.solve(descent, Rterm)
