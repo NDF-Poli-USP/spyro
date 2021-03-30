@@ -59,6 +59,7 @@ class Geometry:
                 (depth, self.rec_XMIN), (depth, self.rec_XMAX), self.num_receivers
             ).tolist()
         self.model["acquisition"]["receiver_locations"] = np.array(self.model["acquisition"]["receiver_locations"])
+        self.model["acquisition"]["num_receivers"] = len(self.model["acquisition"]["receiver_locations"])
     
         receivers = spyro.Receivers(self.model, self.mesh, self.V, self.my_ensemble).create()
     
