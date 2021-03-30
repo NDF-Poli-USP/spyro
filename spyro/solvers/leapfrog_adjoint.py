@@ -167,14 +167,21 @@ def Leapfrog_adjoint(
 
         # -------------------------------------------------------
         m1 = ((u - 2.0 * u_n + u_nm1) / Constant(dt ** 2)) * v * dx(rule=qr_x)
-        a = c * c * dot(grad(u_n), grad(v)) * dx(rule=qr_x)  # explicit
+        if model["opts"]["timestepping"] == "implicit":
+            a = c * c * dot(grad(u), grad(v)) * dx(rule=qr_x)
+        else:
+            a = c * c * dot(grad(u_n), grad(v)) * dx(rule=qr_x)
 
         if model["PML"]["outer_bc"] == "non-reflective":
-            nf = c * ((u_n - u_nm1) / dt) * v * ds(rule=qr_s)
+            if model["opts"]["timestepping"] == "implicit":
+                nf = c * ((u - u_nm1) / dt) * v * ds(rule=qr_s)
+            else:
+                nf = c * ((u_n - u_nm1) / dt) * v * ds(rule=qr_s)
         else:
             nf = 0
 
         FF = m1 + a + nf
+
 
         if PML:
             X = Function(W)
