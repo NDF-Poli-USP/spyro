@@ -34,7 +34,7 @@ model["PML"] = {
     "ly": 0.0,  # thickness of the pml in the y-direction (km) - always positive
 }
 recvs = spyro.create_transect((-0.01, 0.01), (-0.01, 1.49), 200)
-sources = spyro.create_transect((-0.01, 0.01), (-0.01, 1.49), 10)
+sources = spyro.create_transect((-0.01, 0.01), (-0.01, 1.49), 2)
 model["acquisition"] = {
     "source_type": "Ricker",
     "num_sources": len(sources),
@@ -109,7 +109,7 @@ def create_weighting_function(V, const=100.0, M=5, width=0.1, show=False):
     m = V.ufl_domain()
     W2 = VectorFunctionSpace(m, V.ufl_element())
     coords = interpolate(m.coordinates, W2)
-    Z, X = coords.dat.data[:, 0], coords.dat.data[:, 1]
+    Z, X = coords.dat.data_ro_with_halos[:, 0], coords.dat.data_ro_with_halos[:, 1]
 
     a0 = np.amin(X)
     a1 = np.amax(X)
@@ -138,13 +138,12 @@ def create_weighting_function(V, const=100.0, M=5, width=0.1, show=False):
         plt.show()
 
     wei = Function(V, w, name="weighting_function")
-    # File("weighting_function.pvd").write(wei)
     return wei
 
 
 def calculate_functional(model, mesh, comm, vp, sources, receivers, iter_num):
     """Calculate the l2-norm functional"""
-    if comm.ensemble_comm.rank == 0:
+    if comm.ensemble_comm.rank == 0 and comm.comm.rank == 0:
         print("Computing the cost functional", flush=True)
     J_local = np.zeros((1))
     J_total = np.zeros((1))
@@ -157,21 +156,22 @@ def calculate_functional(model, mesh, comm, vp, sources, receivers, iter_num):
             p_exact_recv = spyro.io.load_shots(f)
             # DEBUG
             # viz the signal at receiver # 100
-            import matplotlib.pyplot as plt
+            # if comm.comm.rank == 0:
+            #    import matplotlib.pyplot as plt
 
-            plt.plot(p_exact_recv[:-1:2, 100], "k-")
-            plt.plot(guess_recv[:, 100], "r-")
-            plt.ylim(-5e-5, 5e-5)
-            plt.title("Receiver #100")
-            plt.savefig(
-                "comparison_"
-                + str(comm.ensemble_comm.rank)
-                + "_iter_"
-                + str(iter_num)
-                + ".png"
-            )
-            plt.close()
-            # END DEBUG
+            #    plt.plot(p_exact_recv[:-1:2, 100], "k-")
+            #    plt.plot(guess_recv[:, 100], "r-")
+            #    plt.ylim(-5e-5, 5e-5)
+            #    plt.title("Receiver #100")
+            #    plt.savefig(
+            #        "comparison_"
+            #        + str(comm.ensemble_comm.rank)
+            #        + "_iter_"
+            #        + str(iter_num)
+            #        + ".png"
+            #    )
+            #    plt.close()
+            ## END DEBUG
 
             residual = spyro.utils.evaluate_misfit(
                 model,
@@ -182,9 +182,10 @@ def calculate_functional(model, mesh, comm, vp, sources, receivers, iter_num):
             J_local[0] += spyro.utils.compute_functional(model, comm, residual)
     if comm.ensemble_comm.size > 1:
         COMM_WORLD.Allreduce(J_local, J_total, op=MPI.SUM)
-        J_total[0] /= comm.ensemble_comm.size
-    if comm.ensemble_comm.rank == 0:
-        print(f"The cost functional is: {J_total[0]}")
+        if comm.comm.size > 1:
+            J_total[0] /= COMM_WORLD.size
+    if comm.ensemble_comm.rank == 0 and comm.comm.rank == 0:
+        print(f"The cost functional is: {J_total[0]}", flush=True)
     return (
         J_total[0],
         guess,
@@ -195,7 +196,7 @@ def calculate_functional(model, mesh, comm, vp, sources, receivers, iter_num):
 
 def calculate_gradient(model, mesh, comm, vp, guess, guess_dt, weighting, residual):
     """Calculate the shape gradient"""
-    if comm.ensemble_comm.rank == 0:
+    if comm.ensemble_comm.rank == 0 and comm.comm.rank == 0:
         print("Computing the shape derivative...", flush=True)
     VF = VectorFunctionSpace(mesh, model["opts"]["method"], model["opts"]["degree"])
     theta = Function(VF, name="gradient")
@@ -215,12 +216,10 @@ def calculate_gradient(model, mesh, comm, vp, guess, guess_dt, weighting, residu
             )
     # sum shape gradient if ensemble parallelism here
     if comm.ensemble_comm.size > 1:
-        comm.ensemble_comm.Allreduce(
-            theta_local.dat.data[:], theta.dat.data[:], op=MPI.SUM
-        )
+        comm.allreduce(theta_local, theta)
     else:
         theta = theta_local
-    # scale factor
+    # scale
     # theta.dat.data[:] *= -1
     return theta
 
@@ -229,7 +228,7 @@ def model_update(mesh, indicator, theta, step):
     """Solve a transport equation to move the subdomains around based
     on the shape gradient which hopefully minimizes the functional.
     """
-    if comm.ensemble_comm.rank == 0:
+    if comm.ensemble_comm.rank == 0 and comm.comm.rank == 0:
         print("Updating the shape...", flush=True)
     indicator_new = spyro.solvers.advect(
         mesh,
@@ -262,9 +261,9 @@ def optimization(model, mesh, V, comm, vp, sources, receivers, max_iter=10):
     )
     while iter_num < max_iter:
         if comm.ensemble_comm.rank == 0 and iter_num == 0 and ls_iter == 0:
-            print("Commencing the inversion...")
+            print("Commencing the inversion...", flush=True)
 
-        if comm.ensemble_comm.rank == 0:
+        if comm.ensemble_comm.rank == 0 and comm.comm.rank == 0:
             print(f"The step size is: {beta0}", flush=True)
 
         # compute the shape gradient for the new domain (only on the first line search)
@@ -288,10 +287,11 @@ def optimization(model, mesh, V, comm, vp, sources, receivers, max_iter=10):
         J_new, guess_new, guess_dt_new, residual_new = calculate_functional(
             model, mesh, comm, vp_new, sources, receivers, iter_num
         )
+        quit()
         # write the new velocity to a vtk file
         # using a line search to attempt to reduce the functional
         if J_new < J_old:
-            if comm.ensemble_comm.rank == 0:
+            if comm.ensemble_comm.rank == 0 and comm.comm.rank == 0:
                 print(
                     f"Iteration {iter_num}: Functional was {J_old}. Accepting shape update...new functional is: {J_new}",
                     flush=True,
@@ -315,8 +315,8 @@ def optimization(model, mesh, V, comm, vp, sources, receivers, max_iter=10):
                 beta0 = beta0
             ls_iter = 0
         elif ls_iter < 3:
-            print(J_old, J_new, flush=True)
-            if comm.ensemble_comm.rank == 0:
+            if comm.ensemble_comm.rank == 0 and comm.comm.rank == 0:
+                print(J_old, J_new, flush=True)
                 print(
                     f"Line search number {ls_iter}...reducing step size...", flush=True
                 )
@@ -336,7 +336,8 @@ def optimization(model, mesh, V, comm, vp, sources, receivers, max_iter=10):
                 f"Failed to reduce the functional after {ls_iter} line searches..."
             )
 
-    print(f"Termination: Reached {max_iter} iterations...")
+    if comm.comm.rank == 0 and comm.ensemble_comm.rank == 0:
+        print(f"Termination: Reached {max_iter} iterations...")
     return vp
 
 
