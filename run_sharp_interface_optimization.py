@@ -15,8 +15,8 @@ model["opts"] = {
     "quadrature": "KMV",
 }
 model["mesh"] = {
-    "Lz": 1.50,  # depth in km - always positive
-    "Lx": 1.50,  # width in km - always positive
+    "Lz": 0.65,  # depth in km - always positive
+    "Lx": 1.00,  # width in km - always positive
     "Ly": 0.0,  # thickness in km - always positive
     "meshfile": "meshes/immersed_disk_guess_vp.msh",
     "initmodel": "velocity_models/immersed_disk_guess_vp.hdf5",
@@ -33,8 +33,8 @@ model["PML"] = {
     "lx": 0.50,  # thickness of the pml in the x-direction (km) - always positive
     "ly": 0.0,  # thickness of the pml in the y-direction (km) - always positive
 }
-recvs = spyro.create_transect((-0.01, 0.01), (-0.01, 1.49), 200)
-sources = spyro.create_transect((-0.01, 0.01), (-0.01, 1.49), 2)
+recvs = spyro.create_transect((-0.01, 0.01), (-0.01, 0.99), 100)
+sources = spyro.create_transect((-0.01, 0.01), (-0.01, 0.99), 4)
 model["acquisition"] = {
     "source_type": "Ricker",
     "num_sources": len(sources),
@@ -47,7 +47,7 @@ model["acquisition"] = {
 }
 model["timeaxis"] = {
     "t0": 0.0,  #  initial time for event
-    "tf": 1.5,  # final time for event
+    "tf": 1.0,  # final time for event
     "dt": 0.0005,  # timestep size
     "nspool": 9999,  # how frequently to output solution to pvds
     "fspool": 10,  # how frequently to save solution to ram
@@ -156,21 +156,21 @@ def calculate_functional(model, mesh, comm, vp, sources, receivers, iter_num):
             p_exact_recv = spyro.io.load_shots(f)
             # DEBUG
             # viz the signal at receiver # 100
-            # if comm.comm.rank == 0:
-            #    import matplotlib.pyplot as plt
+            if comm.comm.rank == 0:
+                import matplotlib.pyplot as plt
 
-            #    plt.plot(p_exact_recv[:-1:2, 100], "k-")
-            #    plt.plot(guess_recv[:, 100], "r-")
-            #    plt.ylim(-5e-5, 5e-5)
-            #    plt.title("Receiver #100")
-            #    plt.savefig(
-            #        "comparison_"
-            #        + str(comm.ensemble_comm.rank)
-            #        + "_iter_"
-            #        + str(iter_num)
-            #        + ".png"
-            #    )
-            #    plt.close()
+                plt.plot(p_exact_recv[:-1:2, 50], "k-")
+                plt.plot(guess_recv[:, 50], "r-")
+                plt.ylim(-5e-5, 5e-5)
+                plt.title("Receiver #100")
+                plt.savefig(
+                    "comparison_"
+                    + str(comm.ensemble_comm.rank)
+                    + "_iter_"
+                    + str(iter_num)
+                    + ".png"
+                )
+                plt.close()
             ## END DEBUG
 
             residual = spyro.utils.evaluate_misfit(
@@ -219,8 +219,6 @@ def calculate_gradient(model, mesh, comm, vp, guess, guess_dt, weighting, residu
         comm.allreduce(theta_local, theta)
     else:
         theta = theta_local
-    # scale
-    # theta.dat.data[:] *= -1
     return theta
 
 
@@ -234,7 +232,7 @@ def model_update(mesh, indicator, theta, step):
         mesh,
         indicator,
         step * theta,
-        number_of_timesteps=100,
+        number_of_timesteps=50,
         output=False,
     )
     gc.collect()
@@ -251,7 +249,7 @@ def optimization(model, mesh, V, comm, vp, sources, receivers, max_iter=10):
     if comm.ensemble_comm.rank == 0:
         grad_file = File("theta.pvd", comm=comm.comm)
 
-    weighting = create_weighting_function(V, width=0.1, M=10, const=1e-6)
+    weighting = create_weighting_function(V, width=0.1, M=10, const=1e-9)
 
     ls_iter = 0
     iter_num = 0
@@ -287,7 +285,6 @@ def optimization(model, mesh, V, comm, vp, sources, receivers, max_iter=10):
         J_new, guess_new, guess_dt_new, residual_new = calculate_functional(
             model, mesh, comm, vp_new, sources, receivers, iter_num
         )
-        quit()
         # write the new velocity to a vtk file
         # using a line search to attempt to reduce the functional
         if J_new < J_old:
@@ -360,4 +357,4 @@ sources = spyro.Sources(model, mesh, V, comm).create()
 receivers = spyro.Receivers(model, mesh, V, comm).create()
 
 # run the optimization based on a line search for max_iter iterations
-vp = optimization(model, mesh, V, comm, vp, sources, receivers, max_iter=30)
+vp = optimization(model, mesh, V, comm, vp, sources, receivers, max_iter=50)

@@ -289,7 +289,13 @@ def Leapfrog_adjoint_level_set(
         * dx(rule=qr_x)
     )
 
+    ke_fe0_list = []
+    gradi_11_list = []
+    gradi_12_list = []
+    gradi_22_list = []
+
     assembly_callable = create_assembly_callable(rhs_, tensor=B)
+    calc_grad = False
     for IT in range(nt - 1, 0, -1):
         t = IT * float(dt)
 
@@ -338,13 +344,35 @@ def Leapfrog_adjoint_level_set(
             uufor.assign(guess.pop())
 
             # scalar product
-            k0_fe0 += assemble(dot(uufor_dt, uuadj_dt) * v * dx(rule=qr_x)).sub(0)
+            ke_fe0_list.append(
+                assemble(dot(uufor_dt, uuadj_dt) * v * dx(rule=qr_x)).sub(0)
+            )
 
             # produce all the incremental gradients for
             # each component of the tensor.
-            gradi_11 += assemble(G_11).sub(0)
-            gradi_12 += assemble(G_12).sub(0)
-            gradi_22 += assemble(G_22).sub(0)
+            gradi_11_list.append(assemble(G_11).sub(0))
+            gradi_12_list.append(assemble(G_12).sub(0))
+            gradi_22_list.append(assemble(G_22).sub(0))
+
+            if calc_grad:
+                k0_fe0 += 0.5 * (ke_fe0_list[0] + ke_fe0_list[1]) * float(fspool * dt)
+                gradi_11 += (
+                    0.5 * (gradi_11_list[0] + gradi_11_list[1]) * float(fspool * dt)
+                )
+                gradi_12 += (
+                    0.5 * (gradi_12_list[0] + gradi_12_list[1]) * float(fspool * dt)
+                )
+                gradi_22 += (
+                    0.5 * (gradi_22_list[0] + gradi_22_list[1]) * float(fspool * dt)
+                )
+                ke_fe0_list = []
+                gradi_11_list = []
+                gradi_12_list = []
+                gradi_22_list = []
+
+                calc_grad = False
+            else:
+                calc_grad = True
 
         # write the adjoint to disk for checking
         if IT % nspool == 0:
@@ -352,12 +380,11 @@ def Leapfrog_adjoint_level_set(
                 outfile.write(u_n, time=t)
             helpers.display_progress(comm, t)
 
-    gradi_11 /= Constant(dt)
-    gradi_12 /= Constant(dt)
-    gradi_22 /= Constant(dt)
-    k0_fe0 /= Constant(dt)
-
-    # produces gradi_11, gradi_12, gradi_22, k0_fe0 summed over all timesteps
+    # produces gradi_11, gradi_12, gradi_22, k0_fe0 time integrated
+    #k0_fe0all = Function(V)
+    #comm.allreduce(k0_fe0, k0_fe0all)
+    #if comm.ensemble_comm.rank == 0:
+    #    File("ke_fe0.pvd", comm=comm.comm).write(k0_fe0all)
 
     # variational formulation for the descent direction
     # calculation
@@ -386,9 +413,9 @@ def Leapfrog_adjoint_level_set(
 
     L = a - rhs_grad
     lterm, rterm = lhs(L), rhs(L)
-    bcval = Constant((0.0, 0.0))
-    bcs = DirichletBC(VF, bcval, "on_boundary")
-    Lterm, Rterm = assemble(lterm, bcs=bcs), assemble(rterm)
+    #bcval = Constant((0.0, 0.0))
+    #bcs = DirichletBC(VF, bcval, "on_boundary")
+    Lterm, Rterm = assemble(lterm), assemble(rterm)  # assemble(lterm, bcs=bcs)
     solver_csi = LinearSolver(Lterm)
     descent = Function(VF, name="grad")
     solver_csi.solve(descent, Rterm)
