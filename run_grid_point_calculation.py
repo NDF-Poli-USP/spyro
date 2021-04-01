@@ -1,5 +1,5 @@
 import sys
-sys.path.append('/home/alexandre/Development/Spyro-main/spyro')
+sys.path.append('/home/alexandre/Development/Spyro-3workingBranch')
 import spyro
 
 print("===================================================", flush = True)
