@@ -370,7 +370,7 @@ def create_mesh(model, comm, quad=True):
 
     return mesh, V
 
-def water_layer(mesh, V, vp, depth=None, vw=1.51):
+def legacy_water_layer(mesh, V, vp, depth=None, vw=1.51):
     """Get DoFs in water"""
 
     # import IPython; IPython.embed()
@@ -382,4 +382,38 @@ def water_layer(mesh, V, vp, depth=None, vw=1.51):
         water_dofs = np.where(vp.dat.data[:] < vw)
 
     return water_dofs
-        
+
+def water_layer(mesh, V, vp, model):
+    """Get DoFs in water"""
+
+    water_depth = np.array([], dtype=np.int32)
+    water_top = np.array([], dtype=np.int32)
+    water_bottom = np.array([], dtype=np.int32)
+    water_dofs = np.array([], dtype=np.int32)
+    if "depth" in model["water"]:
+        depth = model["water"]["depth"]
+        z = mesh.coordinates[0]
+        wata = Function(V).interpolate(conditional(z > depth, 1, 0))
+        water_depth = np.where(wata.dat.data[:] > 0.5)
+    if "depth_top" in model["water"]:
+        depth = model["water"]["depth_top"]
+        z = mesh.coordinates[0]
+        wata = Function(V).interpolate(conditional(z > depth, 1, 0))
+        water_top = np.where(wata.dat.data[:] > 0.5)
+    if "depth_bottom" in model["water"]:
+        depth = model["water"]["depth_bottom"]
+        z = mesh.coordinates[0]
+        wata = Function(V).interpolate(conditional(z > depth, 1, 0))
+        water_bottom = np.where(wata.dat.data[:] <= 0.5)
+
+    if water_depth or water_top or water_bottom:
+        water_dofs = np.union1d(
+            np.union1d(water_depth, water_top), water_bottom
+        )
+
+    if "by_value" in model["water"]:
+        water_dofs = np.where(vp.dat.data[:] < model["water"]["vw"])
+
+    # import IPython; IPython.embed()
+
+    return water_dofs
