@@ -7,6 +7,60 @@ from mpi4py import MPI
 from scipy.signal import butter, filtfilt
 
 
+def create_weighting_function(V, const=100.0, M=5, width=0.1, show=False):
+    """Create a weighting function g, which is large near the
+    boundary of the domain and a constant smaller value in the interior
+
+    Inputs
+    ------
+       V: Firedrake.FunctionSpace
+    const: the weight function is equal to this constant value, except close to the boundary
+    M:   maximum value on the boundary will be M**2
+    width:  the decimal fraction of the domain where the weight is > constant
+    show: Visualize the weighting function
+
+    Outputs
+    -------
+    wei: a Firedrake.Function containing the weights
+
+    """
+
+    # get coordinates of DoFs
+    m = V.ufl_domain()
+    W2 = VectorFunctionSpace(m, V.ufl_element())
+    coords = interpolate(m.coordinates, W2)
+    Z, X = coords.dat.data_ro_with_halos[:, 0], coords.dat.data_ro_with_halos[:, 1]
+
+    a0 = np.amin(X)
+    a1 = np.amax(X)
+    b0 = np.amin(Z)
+    b1 = np.amax(Z)
+
+    cx = a1 - a0  # x-coordinate of center of rectangle
+    cz = b1 - b0  # z-coordinate of center of rectangle
+
+    def h(t, d):
+        L = width * d  # fraction of the domain where the weight is > constant
+        return (np.maximum(0.0, M / L * t + M)) ** 2
+
+    w = const * (
+        1.0
+        + np.maximum(
+            h(X - a1, a1 - a0) + h(a0 - X, a1 - a0),
+            h(b0 - Z, b1 - b0) + h(Z - b1, b1 - b0),
+        )
+    )
+    if show:
+        import matplotlib.pyplot as plt
+
+        plt.scatter(Z, X, 5, c=w)
+        plt.colorbar()
+        plt.show()
+
+    wei = Function(V, w, name="weighting_function")
+    return wei
+
+
 def butter_lowpass_filter(shot, cutoff, fs, order=2):
     """Low-pass filter the shot record with sampling-rate fs Hz
     and cutoff freq. Hz
