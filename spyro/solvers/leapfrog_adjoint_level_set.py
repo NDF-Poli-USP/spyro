@@ -1,7 +1,6 @@
 from __future__ import print_function
 
 import numpy as np
-
 from firedrake import *
 from firedrake.assemble import create_assembly_callable
 
@@ -418,14 +417,7 @@ def Leapfrog_adjoint_level_set(
     bcval = Constant((0.0, 0.0))
     bcs = DirichletBC(VF, bcval, "on_boundary")
     Lterm, Rterm = assemble(lterm, bcs=bcs), assemble(rterm)
-    solver_csi = LinearSolver(
-        Lterm,
-        solver_parameters={
-            "ksp_type": "preonly",
-            "pc_type": "lu",
-            "pc_factor_mat_solver_type": "mumps",
-        },
-    )
+    solver_csi = LinearSolver(Lterm)
     descent = Function(VF, name="grad")
     solver_csi.solve(descent, Rterm)
 

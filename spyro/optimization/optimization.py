@@ -6,7 +6,7 @@ from .. import utils
 from .. import io
 
 
-from firedrake import Constant, dx, dot, div, ds, COMM_WORLD
+import from firedrake import Constant, dx, dot, div, ds, dS, COMM_WORLD
 import firedrake as fd
 
 
@@ -39,7 +39,7 @@ def _advect(mesh, q, u, number_of_timesteps=10, output=False):
         q * div(phi * u) * dx
         - fd.conditional(dot(u, n) < 0, phi * dot(u, n) * q_in, 0.0) * ds
         - fd.conditional(dot(u, n) > 0, phi * dot(u, n) * q, 0.0) * ds
-        - (phi("+") - phi("-")) * (un("+") * q("+") - un("-") * q("-")) * ds
+        - (phi("+") - phi("-")) * (un("+") * q("+") - un("-") * q("-")) * dS
     )
 
     q1 = fd.Function(V)
@@ -106,7 +106,7 @@ def _create_weighting_function(V, const=100.0, M=5, width=0.1, show=False):
     m = V.ufl_domain()
     W2 = fd.VectorFunctionSpace(m, V.ufl_element())
     coords = fd.interpolate(m.coordinates, W2)
-    Z, X = coords.dat.data[:, 0], coords.dat.data[:, 1]
+    Z, X = coords.dat.data_ro_with_halos[:,0], coords.dat.data_ro_with_halos[:, 1]
 
     a0 = np.amin(X)
     a1 = np.amax(X)
@@ -237,9 +237,10 @@ def _calculate_gradient(model, mesh, comm, vp, guess, guess_dt, weighting, resid
         comm.allreduce(theta_local, theta)
     else:
         theta = theta_local
+    return theta
 
 
-def _model_update(mesh, comm, indicator, theta, step_size, timestesp):
+def _model_update(mesh, comm, indicator, theta, step_size, timesteps):
     """Solve a transport equation to move the subdomains around based
     on the shape gradient which hopefully minimizes the functional.
     """
@@ -322,7 +323,7 @@ def optimization(model, mesh, V, comm, vp, sources, receivers):
         if J_new < J_old:
             if comm.ensemble_comm.rank == 0 and comm.comm.rank == 0:
                 print(
-                    f"Iteration {iter_num}: Functional was {J_old}. Accepting shape update...new functional is: {J_new}",
+                    f"Iteration {iter_num}: Cost functional was {J_old}. Accepting shape update...new cost functional is: {J_new}",
                     flush=True,
                 )
 
@@ -346,7 +347,7 @@ def optimization(model, mesh, V, comm, vp, sources, receivers):
         elif ls_iter < 3:
             if comm.ensemble_comm.rank == 0 and comm.comm.rank == 0:
                 print(
-                    f"Old function was: {J_old} and the new functional is {J_new}",
+                    f"Old cost functional was: {J_old} and the new cost functional is {J_new}",
                     flush=True,
                 )
                 print(
