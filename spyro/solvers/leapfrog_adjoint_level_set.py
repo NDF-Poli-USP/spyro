@@ -331,7 +331,10 @@ def Leapfrog_adjoint_level_set(
 
         # calculate the time derivative of the adjoint here
         # which is used inside the gradient calculation
-        uuadj_dt.assign((u_n - u_nm1) / float(dt))
+        # This is reversed in sign to be consistent with
+        # Antoine's and Yuri's theory on the calculation
+        # of the shape derivative
+        uuadj_dt.assign((u_nm1 - u_n) / float(dt))
 
         # compute the gradient increment
         # only compute for snaps that were saved
@@ -381,10 +384,6 @@ def Leapfrog_adjoint_level_set(
             helpers.display_progress(comm, t)
 
     # produces gradi_11, gradi_12, gradi_22, k0_fe0 time integrated
-    #k0_fe0all = Function(V)
-    #comm.allreduce(k0_fe0, k0_fe0all)
-    #if comm.ensemble_comm.rank == 0:
-    #    File("ke_fe0.pvd", comm=comm.comm).write(k0_fe0all)
 
     # variational formulation for the descent direction
     # calculation
@@ -399,7 +398,7 @@ def Leapfrog_adjoint_level_set(
         rule=qr_x
     ) + alpha2 * weighting * inner(theta, csi) * dx(rule=qr_x)
 
-    rhs_grad = -1.0 * k0_fe0 * div(csi) * dx(rule=qr_x)
+    rhs_grad = +1.0 * k0_fe0 * div(csi) * dx(rule=qr_x)
 
     rhs_grad += (
         -(c ** 2)
@@ -413,9 +412,9 @@ def Leapfrog_adjoint_level_set(
 
     L = a - rhs_grad
     lterm, rterm = lhs(L), rhs(L)
-    #bcval = Constant((0.0, 0.0))
-    #bcs = DirichletBC(VF, bcval, "on_boundary")
-    Lterm, Rterm = assemble(lterm), assemble(rterm)  # assemble(lterm, bcs=bcs)
+    bcval = Constant((0.0, 0.0))
+    bcs = DirichletBC(VF, bcval, "on_boundary")
+    Lterm, Rterm = assemble(lterm, bcs=bcs), assemble(rterm)
     solver_csi = LinearSolver(Lterm)
     descent = Function(VF, name="grad")
     solver_csi.solve(descent, Rterm)
