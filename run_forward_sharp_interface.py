@@ -39,8 +39,8 @@ recvs = spyro.create_transect((-0.01, 0.01), (-0.01, 0.99), 100)
 sources = spyro.create_transect((-0.01, 0.01), (-0.01, 0.99), 4)
 model["acquisition"] = {
     "source_type": "Ricker",
-    "num_sources": len(sources),
-    "source_pos": sources,
+    "num_sources": 1, #len(sources),
+    "source_pos": [(-0.1, 0.5)],#sources,
     "frequency": 5.0,
     "delay": 1.0,
     "amplitude": 1.0,
@@ -50,7 +50,7 @@ model["acquisition"] = {
 model["timeaxis"] = {
     "t0": 0.0,  #  initial time for event
     "tf": 1.0,  # final time for event
-    "dt": 0.00025,  # timestep size
+    "dt": 0.0005,  # timestep size
     "nspool": 100,  # how frequently to output solution to pvds
     "fspool": 9999,  # how frequently to save solution to ram
 }
