@@ -2,9 +2,9 @@ from firedrake import *
 
 
 def advect(mesh, q, u, number_of_timesteps=10, output=False):
-    """Advect a mesh with two subdomains based on the shape gradient `theta`
+    """Advect a mesh with an indicator function based on the shape gradient `theta`
     solves a transport equation for `number_of_timesteps` using an upwinding DG scheme
-    marching in time with a 4th order RK scheme.
+    explictly marching in time with a 4th order RK scheme.
     """
 
     V = FunctionSpace(mesh, "DG", 0)
