@@ -6,7 +6,7 @@ from .. import utils
 from .. import io
 
 
-import from firedrake import Constant, dx, dot, div, ds, dS, COMM_WORLD
+from firedrake import Constant, dx, dot, div, ds, dS, COMM_WORLD
 import firedrake as fd
 
 
@@ -287,7 +287,7 @@ def optimization(model, mesh, V, comm, vp, sources, receivers):
         model, mesh, comm, vp, sources, receivers, iter_num, exact_shot_prefix
     )
     while iter_num < max_iter:
-        if comm.ensemble_comm.rank == 0 and iter_num == 0 and ls_iter == 0:
+        if comm.ensemble_comm.rank == 0 and comm.comm.rank == 0 and iter_num == 0 and ls_iter == 0:
             print("Commencing the inversion...", flush=True)
 
         if comm.ensemble_comm.rank == 0 and comm.comm.rank == 0:
@@ -353,9 +353,9 @@ def optimization(model, mesh, V, comm, vp, sources, receivers):
             if abs(J_new - J_old) < 1e-16:
                 # increase the step by 1/gamma
                 print(
-                    f"Line search number {ls_iter}...increasing step size...", flush=True
+                    f"Line search number {ls_iter}...increasing number of timesteps...", flush=True
                 )
-                beta0 /= gamma
+                advect_timesteps *= 2
             else:
                 print(
                     f"Line search number {ls_iter}...reducing step size...", flush=True
