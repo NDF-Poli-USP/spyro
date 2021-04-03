@@ -59,6 +59,8 @@ def Leapfrog_adjoint_level_set(
             y2 = Ly
             b_pml = ly
 
+    piecewise_smooth = model["optimization"]["piecewise_smooth"]
+
     if method == "KMV":
         params = {"ksp_type": "preonly", "pc_type": "jacobi"}
     elif method == "CG":
@@ -291,10 +293,18 @@ def Leapfrog_adjoint_level_set(
         * dx(rule=qr_x)
     )
 
+    if piecewise_smooth:
+        G_01 = 2.0 * c * dot(grad(uuadj), grad(uufor)) * grad(c)[0] * v * dx(rule=qr_x)
+        G_02 = 2.0 * c * dot(grad(uuadj), grad(uufor)) * grad(c)[1] * v * dx(rule=qr_x)
+
     ke_fe0_list = []
     gradi_11_list = []
     gradi_12_list = []
     gradi_22_list = []
+
+    if piecewise_smooth:
+        gradi_01_list = []
+        gradi_02_list = []
 
     assembly_callable = create_assembly_callable(rhs_, tensor=B)
     calc_grad = False
@@ -359,6 +369,10 @@ def Leapfrog_adjoint_level_set(
             gradi_12_list.append(assemble(G_12).sub(0))
             gradi_22_list.append(assemble(G_22).sub(0))
 
+            if piecewise_smooth:
+                gradi_01_list.append(assemble(G_01).sub(0))
+                gradi_02_list.append(assemble(G_02).sub(0))
+
             if calc_grad:
                 k0_fe0 += 0.5 * (ke_fe0_list[0] + ke_fe0_list[1]) * float(fspool * dt)
                 gradi_11 += (
@@ -370,10 +384,22 @@ def Leapfrog_adjoint_level_set(
                 gradi_22 += (
                     0.5 * (gradi_22_list[0] + gradi_22_list[1]) * float(fspool * dt)
                 )
+                if piecewise_smooth:
+                    gradi_01 += (
+                        0.5 * (gradi_01_list[0] + gradi_01_list[1]) * float(fspool * dt)
+                    )
+                    gradi_02 += (
+                        0.5 * (gradi_02_list[0] + gradi_02_list[1]) * float(fspool * dt)
+                    )
+
                 ke_fe0_list = []
                 gradi_11_list = []
                 gradi_12_list = []
                 gradi_22_list = []
+
+                if piecewise_smooth:
+                    gradi_01_list = []
+                    gradi_02_list = []
 
                 calc_grad = False
             else:
@@ -411,6 +437,9 @@ def Leapfrog_adjoint_level_set(
         )
         * dx(rule=qr_x)
     )
+
+    if piecewise_smooth:
+        rhs_grad += -(g_01 * csi[0] + g_02 * csi[1]) * dx(rule=qr_x)
 
     L = a - rhs_grad
     lterm, rterm = lhs(L), rhs(L)
