@@ -350,13 +350,22 @@ def optimization(model, mesh, V, comm, vp, sources, receivers):
                     f"Old cost functional was: {J_old} and the new cost functional is {J_new}",
                     flush=True,
                 )
+            if abs(J_new - J_old) < 1e-16:
+                # increase the step by 1/gamma
+                print(
+                    f"Line search number {ls_iter}...increasing step size...", flush=True
+                )
+                beta0 /= gamma
+            else:
                 print(
                     f"Line search number {ls_iter}...reducing step size...", flush=True
                 )
+                # reduce step length by gamma
+                beta0 *= gamma
+
             # advance the line search counter
             ls_iter += 1
-            # reduce step length by gamma
-            beta0 *= gamma
+       
             # now solve the transport equation over again
             # but with the reduced step
             # Need to recompute guess_dt since was discarded above
