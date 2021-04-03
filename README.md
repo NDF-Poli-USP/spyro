@@ -20,6 +20,7 @@ Functionality
 * Leapfrog and Strong Stability Preserving Runga-Kutta (SSPRK) time-stepping schemes (up to 4th order accurate in time).
 * Perfectly Matched Layer to absorb reflected waves in both 2D and 3D.
 * Mesh-independent functional gradient for Leapfrog and SSPRK time-stepping methods using the discrete adjoint method.
+* Shape-derivative calculation for constant bulk modulus acoustic wave equation for sharp interface modeling (particularly relevant for salt body identification). 
 * Sparse interpolation and injection.
 
 Using this functionality, short Python scripts can written that perform Full Waveform Inversion (FWI) type algorithms using well-developed numerical optimization algorithms such as L-BFGS from the SciPy package. See the notebooks folder for an FWI example.
