@@ -344,7 +344,7 @@ def optimization(model, mesh, V, comm, vp, sources, receivers):
                 # no change to step
                 beta0 = beta0
             ls_iter = 0
-        elif ls_iter < 3:
+        elif ls_iter < max_ls:
             if comm.ensemble_comm.rank == 0 and comm.comm.rank == 0:
                 print(
                     f"Old cost functional was: {J_old} and the new cost functional is {J_new}",
