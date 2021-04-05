@@ -148,6 +148,44 @@ def FullRickerWavelet(dt, tf, freq, amp=1.0, cutoff=None):
         FullWavelet = filtfilt(b, a, FullWavelet)
     return FullWavelet
 
+def source_dof_finder(space,  model):
+
+    # getting 1 source position
+    source_positions = model["acquisition"]['source_pos']
+    if len(source_positions) != 1:
+        raise ValueError('Not yet implemented for more then 1 source.')
+    
+    mesh = space.mesh()
+    source_z , source_x = source_positions[0]
+
+    # Getting mesh coordinates
+    z, x = SpatialCoordinate(mesh)
+    ux = Function(space).interpolate(x)
+    uz = Function(space).interpolate(z)
+    datax = ux.dat.data_ro_with_halos[:]
+    dataz = uz.dat.data_ro_with_halos[:]
+    node_locations = np.zeros((len(datax), 2))
+    node_locations[:, 0] = dataz
+    node_locations[:, 1] = datax
+
+    # generating cell node map
+    fdrake_cell_node_map = space.cell_node_map()
+    cell_node_map = fdrake_cell_node_map.values_with_halo
+
+    # finding cell where the source is located
+    cell_id = mesh.locate_cell( [source_z, source_x], tolerance = 0.01 )
+
+    # finding dof where the source is located
+    for dof in cell_node_map[cell_id]:
+        if np.isclose(dataz[dof], source_z, rtol = 1e-8) and np.isclose(datax[dof], source_x, rtol = 1e-8):
+            model['acquisition']['source_point_dof'] = dof
+
+    if model['acquisition']['source_point_dof'] == False:
+        raise ValueError('Finding source dof failed')
+    print("test")
+    return False
+
+
 
 def delta_expr(x0, z, x, sigma_x=500.0):
     sigma_x = Constant(sigma_x)

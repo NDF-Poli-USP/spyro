@@ -188,9 +188,15 @@ def Leapfrog(
     RW = FullRickerWavelet(dt, tf, freq, amp=amp, cutoff=cutoff)
 
     excitation = excitations[source_num]
-    ricker = Constant(0)
-    f = excitation * ricker
-    ricker.assign(RW[0])
+    if model['acquisition']['source_mesh_point']== False:
+        ricker = Constant(0)
+        f = excitation * ricker
+        ricker.assign(RW[0])
+    if model['acquisition']['source_mesh_point']== True:
+        f = Function(V)
+        dof = model['acquisition']["source_point_dof"]
+        f.dat.data[dof] = RW[0]
+
     # -------------------------------------------------------
     m1 = ((u - 2.0 * u_n + u_nm1) / Constant(dt ** 2)) * v * dx(rule=qr_x)
     a = c * c * dot(grad(u_n), grad(v)) * dx(rule=qr_x)  # explicit
@@ -265,9 +271,15 @@ def Leapfrog(
     for IT in range(nt):
 
         if IT < dstep:
-            ricker.assign(RW[IT])
+            if model['acquisition']['source_mesh_point']== False:
+                ricker.assign(RW[IT])
+            elif model['acquisition']['source_mesh_point']== True:
+                f.dat.data[dof] = RW[IT]
         elif IT == dstep:
-            ricker.assign(0.0)
+            if model['acquisition']['source_mesh_point']== False:
+                ricker.assign(0.0)
+            elif model['acquisition']['source_mesh_point']== True:
+                f.dat.data[dof] = 0.0
 
         # AX=B --> solve for X = B/Aˆ-1
         # B = assemble(rhs_, tensor=B)

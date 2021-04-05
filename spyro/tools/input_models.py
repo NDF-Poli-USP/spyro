@@ -148,6 +148,8 @@ def create_model_for_grid_point_calculation(frequency, degree, method, minimum_m
         "source_type": "Ricker",
         "num_sources": 1,
         "source_pos": source_coordinates,
+        "source_mesh_point": True,
+        "source_point_dof": False,
         "frequency": frequency,
         "delay": 1.0,
         "num_receivers": receiver_quantity,
