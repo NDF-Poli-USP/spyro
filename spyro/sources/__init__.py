@@ -6,6 +6,7 @@ from .Sources import (
     delta_expr,
     delta_expr_3d,
     timedependentSource,
+    source_dof_finder,
 )
 
 __all__ = [
@@ -16,4 +17,5 @@ __all__ = [
     "delta_expr_3d",
     "MMS_time",
     "timedependentSource",
+    "source_dof_finder",
 ]
