@@ -1,7 +1,7 @@
 
 from __future__ import print_function
 
-import firedrake as fd
+import firedrake as fire
 import numpy as np
 from firedrake import Constant, div, dx, grad, inner
 
@@ -58,9 +58,9 @@ def SSPRK(model, mesh, comm, c, excitations, receivers, source_num=0):
         variant = "equispaced"
 
     if dimension == 2:
-        z, x = fd.SpatialCoordinate(mesh)
+        z, x = fire.SpatialCoordinate(mesh)
     elif dimension == 3:
-        z, x, y = fd.SpatialCoordinate(mesh)
+        z, x, y = fire.SpatialCoordinate(mesh)
     else:
         raise ValueError("Spatial dimension is correct")
 
@@ -68,40 +68,40 @@ def SSPRK(model, mesh, comm, c, excitations, receivers, source_num=0):
     dstep = int(delay / dt)  # number of timesteps with source
 
     # Element
-    element = fd.FiniteElement(method, mesh.ufl_cell(), degree, variant=variant)
+    element = fire.FiniteElement(method, mesh.ufl_cell(), degree, variant=variant)
 
     # Determine which receivers are local to the subdomain
     is_local = helpers.receivers_local(mesh, dimension, receivers.receiver_locations)
 
-    VecFS = fd.VectorFunctionSpace(mesh, element)
-    ScaFS = fd.FunctionSpace(mesh, element)
+    VecFS = fire.VectorFunctionSpace(mesh, element)
+    ScaFS = fire.FunctionSpace(mesh, element)
     V = VecFS * ScaFS
 
     qr_x, qr_s, qr_k = quadrature.quadrature_rules(V)
 
     # Initial condition
-    (q_vec, q) = fd.TestFunctions(V)
-    initialU = fd.as_vector((0, 0))
-    initialP = fd.Function(V.sub(1)).interpolate(0.0 * x * z)
-    UP = fd.Function(V)
+    (q_vec, q) = fire.TestFunctions(V)
+    initialU = fire.as_vector((0, 0))
+    initialP = fire.Function(V.sub(1)).interpolate(0.0 * x * z)
+    UP = fire.Function(V)
     u, p = UP.split()
     u.assign(initialU)
     p.interpolate(initialP)
-    UP0 = fd.Function(V)
+    UP0 = fire.Function(V)
     u0, p0 = UP0.split()
     u0.assign(u)
     p0.assign(p)
 
     # Defining boundary conditions
-    bcp = fd.DirichletBC(V.sub(1), 0.0, "on_boundary")
+    bcp = fire.DirichletBC(V.sub(1), 0.0, "on_boundary")
 
-    dUP = fd.Function(V)
+    dUP = fire.Function(V)
     du, dp = dUP.split()
-    K1 = fd.Function(V)
-    K2 = fd.Function(V)
-    K3 = fd.Function(V)
+    K1 = fire.Function(V)
+    K2 = fire.Function(V)
+    K3 = fire.Function(V)
 
-    du_trial, dp_trial = fd.TrialFunctions(V)
+    du_trial, dp_trial = fire.TrialFunctions(V)
 
     # create output files
     outfile = helpers.create_output_file("SSPRK3.pvd", comm, source_num)
@@ -114,7 +114,7 @@ def SSPRK(model, mesh, comm, c, excitations, receivers, source_num=0):
         # current time
         t = 0.0
         # Time-dependent source
-        f = fd.Function(ScaFS)
+        f = fire.Function(ScaFS)
         excitation = excitations[source_num]
         if source_type == "Ricker":
             ricker = Constant(0)
@@ -137,13 +137,13 @@ def SSPRK(model, mesh, comm, c, excitations, receivers, source_num=0):
 
         # we must save the data like so
         usol = [
-            fd.Function(V.sub(1), name="pressure") for t in range(nt) if t % fspool == 0
+            fire.Function(V.sub(1), name="pressure") for t in range(nt) if t % fspool == 0
         ]
         usol_recv = []
 
         saveIT = 0
-        prob = fd.LinearVariationalProblem(LHS, RHS, dUP, bcp)
-        solv = fd.LinearVariationalSolver(prob, solver_parameters=params)
+        prob = fire.LinearVariationalProblem(LHS, RHS, dUP, bcp)
+        solv = fire.LinearVariationalSolver(prob, solver_parameters=params)
 
         # Evolution in time
         for IT in range(nt):
