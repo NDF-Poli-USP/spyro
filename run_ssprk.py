@@ -8,7 +8,7 @@ import time
 import copy
 
 import sys
-sys.path.append('/home/alexandre/Development/Spyro-main/spyro')
+sys.path.append('/home/alexandre/Development/Spyro-4workingBranch/spyro')
 import spyro
 
 def grid_point_to_mesh_point_converter_for_seismicmesh(model, G):
@@ -241,7 +241,7 @@ def wave_solver(model, G, comm = False):
         if spyro.io.is_owner(comm, sn):
             t1 = time.time()
             p_field, p_recv = spyro.solvers.SSPRK(
-                model, mesh, comm, vp_exact, sources, receivers, source_num=sn
+                model, mesh, comm, vp_exact, sources, receivers, source_num=sn, output = True
             )
             print(time.time() - t1)
 
@@ -260,4 +260,4 @@ comm = spyro.utils.mpi_init(model)
 #print("Comm built at time "+str(time.time()-start_time), flush = True)
 
 p_exact = wave_solver(model, G =9, comm = comm)
-print("p_exact finished at time "+str(time.time()-start_time), flush = True)
+print("FIM", flush = True)

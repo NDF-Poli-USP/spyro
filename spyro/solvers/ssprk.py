@@ -91,6 +91,7 @@ def SSPRK(model, mesh, comm, c, excitations, receivers, source_num=0, output = T
 
     dUP = fire.Function(V)
     du, dp = dUP.split()
+    K  = fire.Function(V)
     K1 = fire.Function(V)
     K2 = fire.Function(V)
     K3 = fire.Function(V)
@@ -127,7 +128,9 @@ def SSPRK(model, mesh, comm, c, excitations, receivers, source_num=0, output = T
             du_trial, q_vec
         ) * dx(rule=qr_k)
 
-        RHS = inner(u, grad(q)) * dx + f * q * dx + p * div(q_vec) * dx
+        #RHS = inner(u, grad(q)) * dx + f * q * dx + p * div(q_vec) * dx
+        RHS_1 = inner(u, grad(q)) * dx + p * div(q_vec) * dx
+        RHS_2 = f * q * dx
 
         # we must save the data like so
         usol = [
@@ -136,8 +139,10 @@ def SSPRK(model, mesh, comm, c, excitations, receivers, source_num=0, output = T
         usol_recv = []
 
         saveIT = 0
-        prob = fire.LinearVariationalProblem(LHS, RHS, dUP, bcp)
-        solv = fire.LinearVariationalSolver(prob, solver_parameters=params)
+        A  = fire.assemble(LHS, bcs = bcp)
+        b1 = fire.assemble(RHS_1, bcs = bcp)
+        b2 = fire.assemble(RHS_2, bcs = bcp)
+        solv = fire.LinearSolver(A, solver_parameters=params)
 
         # Evolution in time
         for IT in range(nt):
@@ -147,26 +152,22 @@ def SSPRK(model, mesh, comm, c, excitations, receivers, source_num=0, output = T
             if source_type == "Ricker":
                 if IT < dstep:
                     ricker.assign(timedependentSource(model, t, freq))
-                    # And set the function to the excitation
-                    # multiplied by the wavelet.
                     f.assign(expr)
+                    b2 = fire.assemble(RHS_2, bcs = bcp)
                 elif IT == dstep:
-                    # source is dead
+                    print('Source ended.', flush = True)
                     ricker.assign(0.0)
-                    # And set the function to the excitation
-                    # multiplied by the wavelet.
                     f.assign(expr)
-            elif source_type == "MMS":
-                MMS.assign(timedependentSource(model, t))
-                # And set the function to the excitation
-                # multiplied by the wavelet.
-                f.assign(expr)
+                    b2 = fire.assemble(RHS_2, bcs = bcp)
             else:
                 raise ValueError("source not estabilished")
 
-            # solv.solve() #Solve for du and dp
-            solv.solve()  # Solve for du and dp
-            K1.assign(dUP)
+            b1 = fire.assemble(RHS_1, bcs = bcp)
+            solv.solve(dUP, b1)  # Solve for du and dp
+            K.assign(dUP)
+            solv.solve(dUP, b2)
+            K.assign(K+dUP)
+            K1.assign(K)
             k1U, k1P = K1.split()
 
             # Second step
@@ -174,8 +175,12 @@ def SSPRK(model, mesh, comm, c, excitations, receivers, source_num=0, output = T
             p.assign(p0 + dt * k1P)
 
             # solv.solve() #Solve for du and dp
-            solv.solve()  # Solve for du and dp
-            K2.assign(dUP)
+            b1 = fire.assemble(RHS_1, bcs = bcp)
+            solv.solve(dUP, b1)  # Solve for du and dp
+            K.assign(dUP)
+            solv.solve(dUP, b2)
+            K.assign(K+dUP)
+            K2.assign(K)
             k2U, k2P = K2.split()
 
             # Third step
@@ -183,8 +188,12 @@ def SSPRK(model, mesh, comm, c, excitations, receivers, source_num=0, output = T
             p.assign(0.75 * p0 + 0.25 * (p + dt * k2P))
 
             # solve.solve() #Solve for du and dp
-            solv.solve()  # Solve for du and dp
-            K3.assign(dUP)
+            b1 = fire.assemble(RHS_1, bcs = bcp)
+            solv.solve(dUP, b1)  # Solve for du and dp
+            K.assign(dUP)
+            solv.solve(dUP, b2)
+            K.assign(K+dUP)
+            K3.assign(K)
             k3U, k3P = K3.split()
 
             # Updating answer
