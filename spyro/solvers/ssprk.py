@@ -99,7 +99,7 @@ def SSPRK(model, mesh, comm, c, excitations, receivers, source_num=0, output = T
     du_trial, dp_trial = fire.TrialFunctions(V)
 
     # create output files
-    outfile = helpers.create_output_file("SSPRK3.pvd", comm, source_num)
+    outfile = helpers.create_output_file("SSPRK_withLSource.pvd", comm, source_num)
 
     # Distribute shots in a circular way between processors
     if io.is_owner(comm, source_num):
@@ -176,6 +176,10 @@ def SSPRK(model, mesh, comm, c, excitations, receivers, source_num=0, output = T
 
             # solv.solve() #Solve for du and dp
             b1 = fire.assemble(RHS_1, bcs = bcp)
+            if IT < dstep:
+                ricker.assign(timedependentSource(model, t+float(dt), freq))
+                f.assign(expr)
+                b2 = fire.assemble(RHS_2, bcs = bcp)
             solv.solve(dUP, b1)  # Solve for du and dp
             K.assign(dUP)
             solv.solve(dUP, b2)
@@ -189,6 +193,10 @@ def SSPRK(model, mesh, comm, c, excitations, receivers, source_num=0, output = T
 
             # solve.solve() #Solve for du and dp
             b1 = fire.assemble(RHS_1, bcs = bcp)
+            if IT < dstep:
+                ricker.assign(3./4.*timedependentSource(model, t, freq) + 1./4.*timedependentSource(model, t+2*float(dt), freq) )
+                f.assign(expr)
+                b2 = fire.assemble(RHS_2, bcs = bcp)
             solv.solve(dUP, b1)  # Solve for du and dp
             K.assign(dUP)
             solv.solve(dUP, b2)
