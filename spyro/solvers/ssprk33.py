@@ -11,7 +11,7 @@ from ..sources import MMS_time, timedependentSource
 from . import helpers
 
 
-def SSPRK(model, mesh, comm, c, excitations, receivers, source_num=0, output = True):
+def SSPRK33(model, mesh, comm, c, excitations, receivers, source_num=0, output = True):
     """Acoustic wave equation solved using pressure-velocity formulation
     and Strong Stability Preserving Ruge-Kutta 3.
     Parameters
