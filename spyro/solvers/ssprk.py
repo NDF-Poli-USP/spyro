@@ -11,7 +11,7 @@ from ..sources import MMS_time, timedependentSource
 from . import helpers
 
 
-def SSPRK(model, mesh, comm, c, excitations, receivers, source_num=0):
+def SSPRK(model, mesh, comm, c, excitations, receivers, source_num=0, output = True):
     """Acoustic wave equation solved using pressure-velocity formulation
     and Strong Stability Preserving Ruge-Kutta 3.
     Parameters
@@ -211,7 +211,8 @@ def SSPRK(model, mesh, comm, c, excitations, receivers, source_num=0):
                 saveIT += 1
 
             if IT % nspool == 0:
-                outfile.write(p)
+                if output:
+                    outfile.write(p, time=t, name="Pressure")
                 helpers.display_progress(comm, t)
 
         usol_recv = helpers.fill(usol_recv, is_local, nt, receivers.num_receivers)
