@@ -81,16 +81,10 @@ def SSPRK(model, mesh, comm, c, excitations, receivers, source_num=0, output = T
 
     # Initial condition
     (q_vec, q) = fire.TestFunctions(V)
-    initialU = fire.as_vector((0, 0))
-    initialP = fire.Function(V.sub(1)).interpolate(0.0 * x * z)
     UP = fire.Function(V)
     u, p = UP.split()
-    u.assign(initialU)
-    p.interpolate(initialP)
     UP0 = fire.Function(V)
     u0, p0 = UP0.split()
-    u0.assign(u)
-    p0.assign(p)
 
     # Defining boundary conditions
     bcp = fire.DirichletBC(V.sub(1), 0.0, "on_boundary")
