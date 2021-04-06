@@ -1,20 +1,19 @@
+
 from __future__ import print_function
 
-import firedrake as fire
+import firedrake as fd
 import numpy as np
 from firedrake import Constant, div, dx, grad, inner
 
 from .. import io, utils
 from ..domains import quadrature
 from ..sources import MMS_time, timedependentSource
-from .timestepping_scheme import ssprk_timestepping_with_source, ssprk_timestepping_no_source
 from . import helpers
 
 
-def SSPRK(model, mesh, comm, c, excitations, receivers, source_num=0, freq_index =0, output = False):
+def SSPRK(model, mesh, comm, c, excitations, receivers, source_num=0):
     """Acoustic wave equation solved using pressure-velocity formulation
-    and Strong Stability Preserving Ruge-Kutta.
-
+    and Strong Stability Preserving Ruge-Kutta 3.
     Parameters
     ----------
     model: Python `dictionary`
@@ -30,14 +29,12 @@ def SSPRK(model, mesh, comm, c, excitations, receivers, source_num=0, freq_index
         Contains the receiver locations and sparse interpolation methods.
     source_num: `int`, optional
         The source number you wish to simulate
-
     Returns
     -------
     usol: list of Firedrake.Functions
         The full field solution at `fspool` timesteps
     usol_recv: array-like
         The solution interpolated to the receivers at all timesteps
-
     """
 
     freq = model["acquisition"]["frequency"]
@@ -61,51 +58,53 @@ def SSPRK(model, mesh, comm, c, excitations, receivers, source_num=0, freq_index
         variant = "equispaced"
 
     if dimension == 2:
-        z, x = fire.SpatialCoordinate(mesh)
+        z, x = fd.SpatialCoordinate(mesh)
     elif dimension == 3:
-        z, x, y = fire.SpatialCoordinate(mesh)
+        z, x, y = fd.SpatialCoordinate(mesh)
     else:
         raise ValueError("Spatial dimension is correct")
 
-    nt = round(tf / dt)  # number of timesteps
-    dstep = round(delay / dt)  # number of timesteps with source
+    nt = int(tf / dt)  # number of timesteps
+    dstep = int(delay / dt)  # number of timesteps with source
 
     # Element
-    element = fire.FiniteElement(method, mesh.ufl_cell(), degree, variant=variant)
+    element = fd.FiniteElement(method, mesh.ufl_cell(), degree, variant=variant)
 
     # Determine which receivers are local to the subdomain
     is_local = helpers.receivers_local(mesh, dimension, receivers.receiver_locations)
 
-    VecFS = fire.VectorFunctionSpace(mesh, element)
-    ScaFS = fire.FunctionSpace(mesh, element)
+    VecFS = fd.VectorFunctionSpace(mesh, element)
+    ScaFS = fd.FunctionSpace(mesh, element)
     V = VecFS * ScaFS
 
     qr_x, qr_s, qr_k = quadrature.quadrature_rules(V)
 
     # Initial condition
-    (q_vec, q) = fire.TestFunctions(V)
-    UP = fire.Function(V)
+    (q_vec, q) = fd.TestFunctions(V)
+    initialU = fd.as_vector((0, 0))
+    initialP = fd.Function(V.sub(1)).interpolate(0.0 * x * z)
+    UP = fd.Function(V)
     u, p = UP.split()
-    UP0 = fire.Function(V)
+    u.assign(initialU)
+    p.interpolate(initialP)
+    UP0 = fd.Function(V)
     u0, p0 = UP0.split()
-
-    if method == "KMV":
-        qr_x0, qr_x1 = qr_x
-    else:
-        qr_x0 = qr_x
-        qr_x1 = qr_x
+    u0.assign(u)
+    p0.assign(p)
 
     # Defining boundary conditions
-    bcp = fire.DirichletBC(V.sub(1), 0.0, "on_boundary")
+    bcp = fd.DirichletBC(V.sub(1), 0.0, "on_boundary")
 
-    dUP = fire.Function(V)
+    dUP = fd.Function(V)
     du, dp = dUP.split()
-    K = fire.Function(V)
+    K1 = fd.Function(V)
+    K2 = fd.Function(V)
+    K3 = fd.Function(V)
 
-    du_trial, dp_trial = fire.TrialFunctions(V)
+    du_trial, dp_trial = fd.TrialFunctions(V)
 
     # create output files
-    outfile = helpers.create_output_file("SSPRK.pvd", comm, source_num)
+    outfile = helpers.create_output_file("SSPRK3.pvd", comm, source_num)
 
     # Distribute shots in a circular way between processors
     if io.is_owner(comm, source_num):
@@ -205,17 +204,14 @@ def SSPRK(model, mesh, comm, c, excitations, receivers, source_num=0, freq_index
             usol_recv.append(
                 receivers.interpolate(p.dat.data_ro_with_halos[:], is_local)
             )
+
             # Save to RAM
             if IT % fspool == 0:
                 usol[saveIT].assign(p)
                 saveIT += 1
 
             if IT % nspool == 0:
-                # assert (
-                #     norm(p) < 1
-                # ), "Numerical instability. Try reducing dt or building the mesh differently"
-                if output:
-                    outfile.write(p, time=t, name="Pressure")
+                outfile.write(p)
                 helpers.display_progress(comm, t)
 
         usol_recv = helpers.fill(usol_recv, is_local, nt, receivers.num_receivers)

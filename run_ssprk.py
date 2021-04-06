@@ -240,8 +240,8 @@ def wave_solver(model, G, comm = False):
     for sn in range(model["acquisition"]["num_sources"]):
         if spyro.io.is_owner(comm, sn):
             t1 = time.time()
-            p_field, p_recv = spyro.solvers.Leapfrog(
-                model, mesh, comm, vp_exact, sources, receivers, source_num=sn, output= True
+            p_field, p_recv = spyro.solvers.SSPRK(
+                model, mesh, comm, vp_exact, sources, receivers, source_num=sn
             )
             print(time.time() - t1)
 
