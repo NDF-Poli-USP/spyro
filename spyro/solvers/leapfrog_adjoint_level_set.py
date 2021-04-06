@@ -179,6 +179,17 @@ def Leapfrog_adjoint_level_set(
     theta = TrialFunction(VF)
     csi = TestFunction(VF)
 
+    if piecewise_smooth:
+        # \tilde\nabla c  =  H*nabla c_salt + (1-H)*nabla c_background
+        c_salt = Function(V).assign(4.5)  # velocity in salt
+        # analytical background gradient
+        Z, _ = SpatialCoordinate(mesh)
+        c_background = Function(V).interpolate(Min(1.5 + 4.0 * abs(Z), 4.1))
+        indicator = Function(V).interpolate(c > 4.4)  # 1 inside shape, 0 outside
+        gradc = Function(VF, name="grad_c").interpolate(
+            indicator * grad(c_salt) + (1 - indicator) * grad(c_background)
+        )
+
     # -------------------------------------------------------
     m1 = ((u - 2.0 * u_n + u_nm1) / Constant(dt ** 2)) * v * dx(rule=qr_x)
     a = c * c * dot(grad(u_n), grad(v)) * dx(rule=qr_x)
@@ -295,8 +306,8 @@ def Leapfrog_adjoint_level_set(
     )
 
     if piecewise_smooth:
-        G_01 = 2.0 * c * dot(grad(uuadj), grad(uufor)) * grad(c)[0] * v * dx(rule=qr_x)
-        G_02 = 2.0 * c * dot(grad(uuadj), grad(uufor)) * grad(c)[1] * v * dx(rule=qr_x)
+        G_01 = 2.0 * c * dot(grad(uuadj), grad(uufor)) * gradc[0] * v * dx(rule=qr_x)
+        G_02 = 2.0 * c * dot(grad(uuadj), grad(uufor)) * gradc[1] * v * dx(rule=qr_x)
 
     ke_fe0_list = []
     gradi_11_list = []
