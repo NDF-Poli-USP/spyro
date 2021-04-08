@@ -41,7 +41,7 @@ model["acquisition"] = {
     "source_type": "Ricker",
     "num_sources": len(sources),
     "source_pos": sources,
-    "frequency": 10.0,
+    "frequency": 5.0,
     "delay": 1.0,
     "amplitude": 1.0,
     "num_receivers": len(recvs),
@@ -50,7 +50,7 @@ model["acquisition"] = {
 model["timeaxis"] = {
     "t0": 0.0,  #  initial time for event
     "tf": 1.0,  # final time for event
-    "dt": 0.001,  # timestep size
+    "dt": 0.0005,  # timestep size
     "nspool": 100,  # how frequently to output solution to pvds
     "fspool": 9999,  # how frequently to save solution to ram
 }

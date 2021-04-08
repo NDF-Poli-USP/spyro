@@ -5,8 +5,6 @@ from firedrake import *
 import spyro
 import gc
 
-from scipy.optimize import line_search
-
 gc.disable()
 
 model = {}
@@ -41,7 +39,7 @@ model["acquisition"] = {
     "source_type": "Ricker",
     "num_sources": len(sources),
     "source_pos": sources,
-    "frequency": 10.0,
+    "frequency": 5.0,
     "delay": 1.0,
     "amplitude": 1.0,
     "num_receivers": len(recvs),
@@ -53,7 +51,7 @@ model["timeaxis"] = {
     "dt": 0.001,  # timestep size
     "nspool": 9999,  # how frequently to output solution to pvds
     "fspool": 5,  # how frequently to save solution to ram
-    "skip": 1,
+    "skip": 2,
 }
 model["parallelism"] = {
     "type": "automatic",  # options: automatic (same number of cores for evey processor), custom, off
@@ -248,14 +246,14 @@ def model_update(mesh, indicator, theta, step):
 def optimization(model, mesh, V, comm, vp, sources, receivers, max_iter=10):
     """Optimization with steepest descent using a line search algorithm"""
     beta0 = beta0_init = 1.5
-    max_ls = 3
+    max_ls = 10
     gamma = gamma2 = 0.8
 
     # the file that contains the shape gradient each iteration
     if comm.ensemble_comm.rank == 0:
         grad_file = File("theta.pvd", comm=comm.comm)
 
-    weighting = create_weighting_function(V, width=0.1, M=10, const=1e-9)
+    weighting = create_weighting_function(V, width=0.1, M=10, const=1e-10)
 
     ls_iter = 0
     iter_num = 0
@@ -310,23 +308,30 @@ def optimization(model, mesh, V, comm, vp, sources, receivers, max_iter=10):
             vp = vp_new
             # update step
             if ls_iter == max_ls:
-                beta0 = max(beta0 * gamma2, 0.1 * beta_0_init)
+                beta0 = max(beta0 * gamma2, 0.1 * beta0_init)
             elif ls_iter == 0:
-                beta0 = min(beta0 / gamma2, 1.0)
+                beta0 = min(beta0 / gamma2, 10.0)
             else:
                 # no change to step
                 beta0 = beta0
             ls_iter = 0
-        elif ls_iter < 3:
+        elif ls_iter < max_ls:
             if comm.ensemble_comm.rank == 0 and comm.comm.rank == 0:
                 print(J_old, J_new, flush=True)
+            # advance the line search counter
+            ls_iter += 1
+            if abs(J_new - J_old) < 1e-16:
+                print(
+                    f"Line search number {ls_iter}...increasing step size...",
+                    flush=True,
+                )
+                beta0 = min(beta0 / gamma2, 10.0)
+            else:
                 print(
                     f"Line search number {ls_iter}...reducing step size...", flush=True
                 )
-            # advance the line search counter
-            ls_iter += 1
-            # reduce step length by gamma
-            beta0 *= gamma
+                # reduce step length by gamma
+                beta0 *= gamma
             # now solve the transport equation over again
             # but with the reduced step
             # Need to recompute guess_dt since was discarded above
