@@ -97,7 +97,8 @@ _create_segy(true_slice.T, "eage_slice_true.segy")
 p = np.vstack((zg.ravel(), yg.ravel())).T
 initial_slice = true_slice.copy()
 initial_slice[:] = 2000.0
-disk = sm.Disk((-1690.0, 7890.0), 500.0, stretch=[0.001, 4.0], translate=[0.0, -23710])
+disk = sm.Disk((-1690.0, 7890.0), 550.0, stretch=[0.001, 5.0], translate=[0.0, -31710])
+
 # points,cells = sm.generate_mesh(domain=disk, edge_length=100)
 # meshio.write_points_cells('mesh.vtk', points, [('triangle', cells)])
 # quit()
@@ -106,7 +107,7 @@ d = disk.eval(p)
 print(np.amin(d))
 print(np.amax(d))
 d = np.reshape(d, initial_slice.shape)
-initial_slice[d < 0] = 4000.0
+initial_slice[d < 0] = 4500.0
 
 plt.pcolor(y, z, initial_slice)
 plt.title("EAGE Salt, Initial model")
@@ -117,4 +118,4 @@ plt.ylabel("z-axis (m)")
 plt.xlabel("y-axis (m)")
 plt.show()
 
-_create_segy(initial_slice, "eage_slice_guess.segy")
+_create_segy(initial_slice.T, "eage_slice_guess.segy")
