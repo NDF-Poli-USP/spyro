@@ -40,7 +40,7 @@ def minimum_grid_point_calculator(frequency, method, degree, experient_type = 'h
     print("Starting initial method check", flush = True)
 
     if experient_type == 'homogeneous':
-        minimum_mesh_velocity = 1.0
+        minimum_mesh_velocity = 1.429
     elif experiment_type == 'heterogenous':
         minimum_mesh_velocity = False # This variable isnt needed in heterogenous models because of seismicmesh
 
