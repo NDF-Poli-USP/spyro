@@ -1,14 +1,16 @@
 from __future__ import with_statement
 
 import os
+import json
 import pickle
+import argparse
 
 import firedrake as fire
 import h5py
 import numpy as np
 from scipy.interpolate import RegularGridInterpolator
 from scipy.interpolate import griddata
-import segyio 
+import segyio
 
 from .. import domains
 
@@ -280,3 +282,45 @@ def read_mesh(model, ens_comm):
     element = domains.space.FE_method(mesh, method, degree)
     # Space of problem
     return mesh, fire.FunctionSpace(mesh, element)
+
+def load_model(jsonfile=None):
+    """Load model dictionary describing forward/inversion problem"""
+
+    parser = argparse.ArgumentParser(description="Run Wave Propagator / Full Waveform Inversion")
+    parser.add_argument(
+        "-c", "--config-file",type=str, required=False, help="json file with parameters"
+    )
+    parser.add_argument(
+        "-i", "--input-field",type=str, required=False, help="file with initial guess"
+    )
+    parser.add_argument(
+        "-o", "--output-field",type=str, required=False, help="file where result is stored"
+    )
+
+    file = parser.parse_args().config_file if not jsonfile else jsonfile
+    inputfile = parser.parse_args().input_field
+    outputfile = parser.parse_args().output_field
+
+    with open(file, "r") if file else StringIO('{}') as f:
+        model = json.load(f)
+
+    if inputfile:
+        if "data" in model:
+            model["data"]["initfile"] = inputfile
+        else:
+            model["data"] = {"initfile": inputfile}
+    if outputfile:
+        if "data" in model:
+            model["data"]["resultfile"] = outputfile
+        else:
+            model["data"] = {"resultfile": outputfile}
+
+    return model
+
+def save_model(model, jsonfile=None):
+    """Save model dictionary describing forward/inversion problem"""
+
+    if not jsonfile: jsonfile = "model.json"
+
+    with open(jsonfile, "w") as f:
+        json.dump(model, f, indent=4)
