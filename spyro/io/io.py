@@ -130,7 +130,7 @@ def _check_units(c):
     return c
 
 
-def interpolate(model, mesh, V, guess=False):
+def interpolate(model, mesh, V, guess=False, background=False):
     """Read and interpolate a seismic velocity model stored
     in a HDF5 file onto the nodes of a finite element space.
 
@@ -142,8 +142,10 @@ def interpolate(model, mesh, V, guess=False):
         A mesh object read in by Firedrake.
     V: Firedrake.FunctionSpace object
         The space of the finite elements.
-    guess: boolean, optinal
+    guess: boolean, optional
         Is it a guess model or a `exact` model?
+    background: boolean, optional
+        background velocity model for sharp interface modeling
 
     Returns
     -------
@@ -186,6 +188,11 @@ def interpolate(model, mesh, V, guess=False):
         fname = model["mesh"]["initmodel"]
     else:
         fname = model["mesh"]["truemodel"]
+
+    if background:
+        fname = model["mesh"]["background"]
+
+    print(fname)
 
     with h5py.File(fname, "r") as f:
         Z = np.asarray(f.get("velocity_model")[()])

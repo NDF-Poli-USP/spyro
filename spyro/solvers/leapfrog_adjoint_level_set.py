@@ -23,6 +23,7 @@ def Leapfrog_adjoint_level_set(
     mesh,
     comm,
     c,
+    c_background,
     guess,
     guess_dt,
     weighting,
@@ -181,14 +182,16 @@ def Leapfrog_adjoint_level_set(
 
     if piecewise_smooth:
         # \tilde\nabla c  =  H*nabla c_salt + (1-H)*nabla c_background
-        c_salt = Function(V).assign(4.5)  # velocity in salt
+        c_salt = Function(V).assign(4.4)  # velocity in salt
         # analytical background gradient
-        Z, _ = SpatialCoordinate(mesh)
-        c_background = Function(V).interpolate(Min(1.5 + 4.0 * abs(Z), 4.1))
-        indicator = Function(V).interpolate(c > 4.4)  # 1 inside shape, 0 outside
+        # Z, _ = SpatialCoordinate(mesh)
+        # c_background = Function(V).interpolate(Min(1.5 + 4.0 * abs(Z), 4.1))
+        indicator = Function(V).interpolate(c > 3.9)  # 1 inside shape, 0 outside
+
         gradc = Function(VF, name="grad_c").interpolate(
             indicator * grad(c_salt) + (1 - indicator) * grad(c_background)
         )
+        # File("gradc.pvd").write(gradc)
 
     # -------------------------------------------------------
     m1 = ((u - 2.0 * u_n + u_nm1) / Constant(dt ** 2)) * v * dx(rule=qr_x)

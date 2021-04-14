@@ -15,7 +15,6 @@ model["opts"] = {
     "quadrature": "KMV",
     "dimension": 2,  # dimension
 }
-# bbox = (-9.15162, 0.0, 0.0, 27.43962)
 model["mesh"] = {
     "Lz": 9.15162,  # depth in km - always positive
     "Lx": 27.43962,  # width in km - always positive
@@ -37,7 +36,7 @@ model["PML"] = {
 }
 """The three surveys shared the same acquisition geometry. Each receiver recorded data every .008 seconds for 1 500 timesteps resulting in 12 seconds of data. A 7 950 m (26 100 ft) long streamer cable was deployed with 348 hydrophones spaced 22.86 m (75 ft) apart. Shots were fired every 45.72 m (150 ft) starting at 3 330 m (10 925 ft). Table 5 shows the values that Sigsbee shot headers should contain."""
 # We do 1/10 of the total number of true shots
-sources = spyro.create_transect((-0.01, 3.33), (-0.01, 19.4896), 50)
+sources = spyro.create_transect((-0.01, 3.33), (-0.01, 19.4896), 40)
 model["acquisition"] = {
     "source_type": "Ricker",
     "num_sources": len(sources),
@@ -56,12 +55,11 @@ model["timeaxis"] = {
     "fspool": 9999,  # how frequently to save solution to ram
 }
 
-
 comm = spyro.utils.mpi_init(model)
 
 mesh, V = spyro.io.read_mesh(model, comm)
 
-vp_exact = spyro.io.interpolate(model, mesh, V, guess=True)
+vp_exact = spyro.io.interpolate(model, mesh, V, guess=False)
 
 File("exact_vp.pvd").write(vp_exact, name="true_velocity")
 
@@ -89,10 +87,10 @@ for sn in range(model["acquisition"]["num_sources"]):
             sources,
             receivers,
             source_num=sn,
-            output=True,
+            output=False,
         )
         print(time.time() - t1)
-        spyro.io.save_shots("shots/forward_exact_level_set" + str(sn) + ".dat", p_recv)
+        spyro.io.save_shots("shots/sigsbee2b_true_" + str(sn) + ".dat", p_recv)
         spyro.plots.plot_shotrecords(
             model,
             p_recv,
