@@ -186,7 +186,7 @@ def Leapfrog_adjoint_level_set(
         # analytical background gradient
         # Z, _ = SpatialCoordinate(mesh)
         # c_background = Function(V).interpolate(Min(1.5 + 4.0 * abs(Z), 4.1))
-        indicator = Function(V).interpolate(c > 3.9)  # 1 inside shape, 0 outside
+        indicator = Function(V).interpolate(c > 4.3)  # 1 inside shape, 0 outside
 
         gradc = Function(VF, name="grad_c").interpolate(
             indicator * grad(c_salt) + (1 - indicator) * grad(c_background)
