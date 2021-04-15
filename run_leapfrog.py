@@ -6,7 +6,7 @@ import SeismicMesh
 import time
 
 import sys
-sys.path.append('/home/alexandre/Development/Spyro-3workingBranch')
+sys.path.append('/home/alexandre/Development/Spyro-SSPRK-based-onCD')
 import spyro
 
 def create_model_for_grid_point_calculation(frequency, degree, method, minimum_mesh_velocity= 1.0, experiment_type = 'homogeneous', receiver_type = 'near'):
@@ -70,7 +70,7 @@ def create_model_for_grid_point_calculation(frequency, degree, method, minimum_m
 
         # time calculations
         tmin = 1./frequency
-        final_time = 10*tmin #should be 35
+        final_time = 35*tmin #should be 35
 
         # receiver calculations
 
@@ -83,7 +83,6 @@ def create_model_for_grid_point_calculation(frequency, degree, method, minimum_m
         bin1_startX = source_x - receiver_bin_width/2.
         bin1_endX   = source_x + receiver_bin_width/2.
         receiver_coordinates = spyro.create_2d_grid(bin1_startZ, bin1_endZ, bin1_startX, bin1_endX, int(np.sqrt(receiver_quantity)))
-
 
     if receiver_type == 'near' and experiment_type == 'heterogenous':
 
@@ -165,8 +164,8 @@ def create_model_for_grid_point_calculation(frequency, degree, method, minimum_m
         "t0": 0.0,  #  Initial time for event
         "tf": final_time,  # Final time for event
         "dt": 0.001,  # timestep size
-        "nspool": 200,  # how frequently to output solution to pvds
-        "fspool": 100,  # how frequently to save solution to RAM
+        "nspool": 2,  # how frequently to output solution to pvds
+        "fspool": 1,  # how frequently to save solution to RAM
     }  
     model["parallelism"] = {
     "type": "off",  # options: automatic (same number of cores for evey processor), custom, off.
@@ -299,7 +298,7 @@ def wave_solver(model, G, comm = False):
     for sn in range(model["acquisition"]["num_sources"]):
         if spyro.io.is_owner(comm, sn):
             t1 = time.time()
-            p_field, p_recv = spyro.solvers.Leapfrog(
+            p_field, p_recv = spyro.solvers.SSPRKMOD(
                 model, mesh, comm, vp_exact, sources, receivers, source_num=sn, output= True, G = G
             )
             print(time.time() - t1)
@@ -308,7 +307,7 @@ def wave_solver(model, G, comm = False):
 
 frequency = 5.0
 degree = 2
-method = 'KMV'
+method = 'CG'
 G=10.0
 
 model = create_model_for_grid_point_calculation(frequency,degree,method)
