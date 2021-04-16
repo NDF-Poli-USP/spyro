@@ -149,6 +149,9 @@ def FullRickerWavelet(dt, tf, freq, amp=1.0, cutoff=None):
     return FullWavelet
 
 def source_dof_finder(space,  model):
+    if model['acquisition']['source_mesh_point'] == False:
+        print('Warning not using point source', flush = True)
+        return None
 
     # getting 1 source position
     source_positions = model["acquisition"]['source_pos']
