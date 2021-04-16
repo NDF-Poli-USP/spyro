@@ -79,7 +79,7 @@ def wave_solver(model, G, comm = False):
 
     spyro.sources.source_dof_finder(V, model)
 
-    if model['testing_parameters']['experiment_type'] == 'homogenous':
+    if model['testing_parameters']['experiment_type'] == 'homogeneous':
         vp_exact = fire.Constant(minimum_mesh_velocity)
     elif model['testing_parameters']['experiment_type'] == 'heterogenous':
         vp_exact = spyro.io.interpolate(model, mesh, V, guess=False)
@@ -136,7 +136,7 @@ def generate_mesh(model,G, comm):
         Real_Lx = Lx + 2*lx
         edge_length = lbda/M
 
-        bbox = (0.0, Real_Lz, 0.0, Real_Lx)
+        bbox = (-Real_Lz, 0.0, 0.0, Real_Lx)
         rec = SeismicMesh.Rectangle(bbox)
 
         if comm.comm.rank == 0:
