@@ -29,7 +29,7 @@ def create_model_for_grid_point_calculation(frequency, degree, method, minimum_m
     '''
     model = {}
     # domain calculations
-    if experiment_type == 'homogenous':
+    if experiment_type == 'homogeneous':
         lbda = minimum_mesh_velocity/frequency
         pml_fraction = lbda
         pad = 1000./1000.
@@ -60,22 +60,36 @@ def create_model_for_grid_point_calculation(frequency, degree, method, minimum_m
         padz = pad
         padx = pad
     
-    if receiver_type == 'near' and experiment_type == 'homogenous':
+    if receiver_type == 'near' and experiment_type == 'homogeneous':
 
         # time calculations
         tmin = 1./frequency
-        final_time = 10*tmin #should be 35
+        final_time = 2*10*tmin #should be 35
 
         # receiver calculations
 
-        receiver_bin_center1 = 5*lbda#20*lbda
-        receiver_bin_width = 5*lbda#15*lbda
-        receiver_quantity = 16#2500 # 50 squared
+        receiver_bin_center1 = 2.5*750.0/1000
+        receiver_bin_width = 500.0/1000
+        receiver_quantity_in_bin = 100#2500 # 50 squared
 
-        bin1_startZ = source_z + receiver_bin_center1 - receiver_bin_width/2.
-        bin1_endZ   = source_z + receiver_bin_center1 + receiver_bin_width/2.
-        bin1_startX = source_x - receiver_bin_width/2.
-        bin1_endX   = source_x + receiver_bin_width/2.
+        bin1_startZ = source_z - receiver_bin_width/2.
+        bin1_endZ   = source_z + receiver_bin_width/2.
+        bin1_startX = source_x + receiver_bin_center1 - receiver_bin_width/2.
+        bin1_endX   = source_x + receiver_bin_center1 + receiver_bin_width/2.
+
+        receiver_coordinates = spyro.create_2d_grid(bin1_startZ, bin1_endZ, bin1_startX, bin1_endX, int(np.sqrt(receiver_quantity_in_bin)))
+
+        receiver_bin_center2 = 6500.0/1000
+        receiver_bin_width = 500.0/1000
+
+        bin2_startZ = source_z - receiver_bin_width/2.
+        bin2_endZ   = source_z + receiver_bin_width/2.
+        bin2_startX = source_x + receiver_bin_center2 - receiver_bin_width/2.
+        bin2_endX   = source_x + receiver_bin_center2 + receiver_bin_width/2.
+
+        receiver_coordinates= receiver_coordinates + spyro.create_2d_grid(bin2_startZ, bin2_endZ, bin2_startX, bin2_endX, int(np.sqrt(receiver_quantity_in_bin))) 
+
+        receiver_quantity = 2*receiver_quantity_in_bin
 
     if receiver_type == 'near' and experiment_type == 'heterogenous':
 
@@ -108,10 +122,6 @@ def create_model_for_grid_point_calculation(frequency, degree, method, minimum_m
 
         receiver_quantity = 2*receiver_quantity_in_bin
 
-    
-
-
-
     elif receiver_type == 'far':
         raise ValueError('Far receivers minimum grid point calculation experiment not implemented because of computational limits.')
     
@@ -131,8 +141,8 @@ def create_model_for_grid_point_calculation(frequency, degree, method, minimum_m
         "exponent": 1,
         "cmax": 4.7,  # maximum acoustic wave velocity in PML - km/s
         "R": 0.001,  # theoretical reflection coefficient
-        "lz": padz,  # thickness of the pml in the z-direction (km) - always positive
-        "lx": padx,  # thickness of the pml in the x-direction (km) - always positive
+        "lz": pad,  # thickness of the pml in the z-direction (km) - always positive
+        "lx": pad,  # thickness of the pml in the x-direction (km) - always positive
         "ly": 0.0,  # thickness of the pml in the y-direction (km) - always positive
     }
 
