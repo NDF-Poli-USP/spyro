@@ -1,3 +1,4 @@
+[![DOI](https://zenodo.org/badge/216707188.svg)](https://zenodo.org/badge/latestdoi/216707188)
 [![CircleCI](https://img.shields.io/circleci/project/github/krober10nd/spyro/main.svg?style=flat-square)](https://circleci.com/gh/krober10nd/spyro/tree/main)
 [![CodeCov](https://codecov.io/gh/krober10nd/spyro/branch/main/graph/badge.svg)](https://codecov.io/gh/krober10nd/spyro)
 
