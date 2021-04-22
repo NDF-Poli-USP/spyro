@@ -32,17 +32,18 @@ def create_model_for_grid_point_calculation(frequency, degree, method, minimum_m
     if experiment_type == 'homogenous':
         lbda = minimum_mesh_velocity/frequency
         pml_fraction = lbda
-        Lz = 30*lbda#100*lbda
-        Real_Lz = Lz*(1. + 2*pml_fraction)
-        Lx = 20*lbda#90*lbda
-        Real_Lx = Lx*(1. + 1*pml_fraction)
+        pad = 1000./1000.
+        Lz = 12000.0/1000.
+        Real_Lz = Lz+ pad
+        Lx = 67000.0/1000.
+        Real_Lx = Lx+ 2*pad
 
         # source location
-        source_coordinates = [(Real_Lz/2, Real_Lx/2)] #Source at the center. If this is changes receiver's bin has to also be changed.
-        source_z = Real_Lz/2.
+        source_z = -1.0
         source_x = Real_Lx/2.
-        padz = Lz*pml_fraction
-        padx = Lx*pml_fraction
+        source_coordinates = [(source_z, source_x)] #Source at the center. If this is changes receiver's bin has to also be changed.
+        padz = pad
+        padx = pad
 
     if experiment_type == 'heterogenous':
         #using the BP2004 velocity model
