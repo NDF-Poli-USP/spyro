@@ -181,7 +181,7 @@ def source_dof_finder(space,  model):
             model['acquisition']['source_point_dof'] = dof
 
     if model['acquisition']['source_point_dof'] == False:
-        raise ValueError('Finding source dof failed')
+        print('Warning: source not a dof', flush = True)
     print("test")
     return False
 

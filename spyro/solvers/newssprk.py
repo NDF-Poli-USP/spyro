@@ -170,12 +170,13 @@ def SSPRKMOD(
 
     # typical CG in N-d
     else:
-        u = TrialFunction(V)
-        v = TestFunction(V)
+        W =  V* V
+        dwdt_trial, dpdt_trial = TrialFunctions(W)
+        q1, q2 = TestFunctions(W)
 
-        u_nm1 = Function(V)
-        u_n = Function(V)
-        u_np1 = Function(V)
+        w_n, p_n= Function(W).split()
+
+
 
     is_local = helpers.receivers_local(mesh, dim, receivers.receiver_locations)
 
@@ -252,8 +253,8 @@ def SSPRKMOD(
 
             FF += mmm1 + uuu1
     else:
-        X = Function(V)
-        B = Function(V)
+        X = Function(W)
+        B = Function(W)
 
     # DOF FROM RK substitution
     FF += dudt_trial*sw*dx(rule=qr_x) - dudt_n*sw*dx(rule=qr_x)
@@ -269,7 +270,11 @@ def SSPRKMOD(
     saveIT = 0
 
     X0 = Function(W)
-    w0, u0, pp0 = X0.split()
+    if PML:
+        dudt0, u0, pp0 = X0.split()
+    else:
+        dudt0, u0= X0.split()
+
     X1 = Function(W)
     X2 = Function(W)
     X3 = Function(W)
@@ -296,36 +301,46 @@ def SSPRKMOD(
         ## FISRT STEP
         solver.solve(X, B)
         X1.assign(X)
-        x1w, x1u, x1pp = X1.split()
+        if PML:
+            x1w, x1u, x1pp = X1.split()
+            pp_n.assign(pp0 + dt*x1pp)
+        else:
+            x1w, x1u= X1.split()
 
-        w_n.assign( w0  + dt*x1w)
+        dudt_n.assign( dudt0  + dt*x1w)
         u_n.assign( u0  + dt*x1u)
-        pp_n.assign(pp0 + dt*x1pp)
 
         ## SECOND STEP
         assembly_callable()
         solver.solve(X, B)
         X2.assign(X)
-        x2w, x2u, x2pp = X2.split()
+        if PML:
+            x2w, x2u, x2pp = X2.split()
+            pp_n.assign(0.75*pp0 + 0.25*(pp_n + dt*x2pp))
+        else:
+            x2w, x2u = X2.split()
 
-        w_n.assign( 0.75*w0  + 0.25*(w_n  + dt*x2w) )
+        dudt_n.assign( 0.75*dudt0  + 0.25*(dudt_n  + dt*x2w) )
         u_n.assign( 0.75*u0  + 0.25*(u_n  + dt*x2u) )
-        pp_n.assign(0.75*pp0 + 0.25*(pp_n + dt*x2pp))
 
         ## THIRD STEP
         assembly_callable()
         solver.solve(X, B)
         X3.assign(X)
-        x3w, x3u, x3pp = X3.split()
+        if PML:
+            x3w, x3u, x3pp = X3.split()
+            pp_n.assign((1./3.)*pp0 + 0.25*(pp_n + dt*x2pp))
+        else:
+            x3w, x3u= X3.split()
 
-        w_n.assign( (1./3.)*w0  + 0.25*(w_n  + dt*x2w) )
+        dudt_n.assign( (1./3.)*dudt0  + 0.25*(dudt_n  + dt*x2w) )
         u_n.assign( (1./3.)*u0  + 0.25*(u_n  + dt*x2u) )
-        pp_n.assign((1./3.)*pp0 + 0.25*(pp_n + dt*x2pp))
 
         ## UPDATING
-        w0.assign( w_n)
+        dudt0.assign( dudt_n)
         u0.assign( u_n)
-        pp0.assign(pp_n)
+        if PML:
+            pp0.assign(pp_n)
 
         usol_recv.append(receivers.interpolate(u_n.dat.data_ro_with_halos[:], is_local))
 
