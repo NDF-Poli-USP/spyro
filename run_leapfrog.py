@@ -128,8 +128,8 @@ def create_model_for_grid_point_calculation(frequency, degree, method, minimum_m
     }
 
     model["PML"] = {
-        "status": True,  # True or false
-        "outer_bc": "non-reflective",  #  neumann, non-reflective (outer boundary condition)
+        "status": False,  # True or false
+        "outer_bc": False, #"non-reflective",  #  neumann, non-reflective (outer boundary condition)
         "damping_type": "polynomial",  # polynomial. hyperbolic, shifted_hyperbolic
         "exponent": 1,
         "cmax": 4.7,  # maximum acoustic wave velocity in PML - km/s
@@ -152,7 +152,7 @@ def create_model_for_grid_point_calculation(frequency, degree, method, minimum_m
         "source_type": "Ricker",
         "num_sources": 1,
         "source_pos": source_coordinates,
-        "source_mesh_point": True,
+        "source_mesh_point": False,
         "source_point_dof": False,
         "frequency": frequency,
         "delay": 1.0,
@@ -164,8 +164,8 @@ def create_model_for_grid_point_calculation(frequency, degree, method, minimum_m
         "t0": 0.0,  #  Initial time for event
         "tf": final_time,  # Final time for event
         "dt": 0.001,  # timestep size
-        "nspool": 2,  # how frequently to output solution to pvds
-        "fspool": 1,  # how frequently to save solution to RAM
+        "nspool": 200,  # how frequently to output solution to pvds
+        "fspool": 100,  # how frequently to save solution to RAM
     }  
     model["parallelism"] = {
     "type": "off",  # options: automatic (same number of cores for evey processor), custom, off.
@@ -217,6 +217,10 @@ def generate_mesh(model,G, comm):
             comm = comm.ensemble_comm,
             verbose = 0
         )
+        meshio.write_points_cells("meshes/disk"+str(G)+".vtk",
+            disk_points,[("triangle", disk_cells)],
+            file_format="vtk"
+            )
 
         if model['acquisition']['source_mesh_point']:
             source_position = model['acquisition']['source_pos']
@@ -267,10 +271,87 @@ def generate_mesh(model,G, comm):
 
     return mesh
 
+def generate_mesh_immersed_disk(model,G, comm):
+    
+    print('Entering mesh generation', flush = True)
+    M = spyro.tools.grid_point_to_mesh_point_converter_for_seismicmesh(model, G)
+    disk_M = spyro.tools.grid_point_to_mesh_point_converter_for_seismicmesh(model, 15)
+    method = model["opts"]["method"]
+    minimum_mesh_velocity = model['testing_parameters']['minimum_mesh_velocity']
+    frequency = model["acquisition"]['frequency']
+    lbda = minimum_mesh_velocity/frequency
+
+    Lz = model["mesh"]['Lz']
+    lz = model['PML']['lz']
+    Lx = model["mesh"]['Lx']
+    lx = model['PML']['lx']
+    pml_fraction = lx/Lx
+
+    Real_Lz = Lz + lz
+    Real_Lx = Lx + 2*lx
+    edge_length = lbda/M
+
+    bbox = (0.0, Real_Lz, 0.0, Real_Lx)
+    disk = SeismicMesh.Disk([Real_Lz/2, Real_Lx/2], lbda)
+    rec = SeismicMesh.Rectangle(bbox)
+
+    if comm.comm.rank == 0:
+        #creating disk around source
+        
+        if model['acquisition']['source_mesh_point']:
+            source_position = model['acquisition']['source_pos']
+            fixed_points = np.append(disk_points,source_position, axis=0)
+        else:
+            fixed_points = None
+
+        # Creating rectangular mesh
+        points, cells = SeismicMesh.generate_mesh(
+        domain=rec, 
+        edge_length=edge_length, 
+        mesh_improvement = False,
+        comm = comm.ensemble_comm,
+        subdomains = [disk] ,
+        pfix = fixed_points ,
+        verbose = 0
+        )
+        print('entering spatial rank 0 after mesh generation')
+        
+        points, cells = SeismicMesh.geometry.delete_boundary_entities(points, cells, min_qual= 0.6)
+        a=np.amin(SeismicMesh.geometry.simp_qual(points, cells))
+        if model['testing_parameters']['experiment_type'] == 'heterogenous':
+            points, cells = SeismicMesh.geometry.laplacian2(points, cells)
+        meshio.write_points_cells("meshes/homogeneous"+str(G)+".msh",
+            points,[("triangle", cells)],
+            file_format="gmsh22", 
+            binary = False
+            )
+        meshio.write_points_cells("meshes/IMMERSEDhomogeneous"+str(G)+".vtk",
+            points,[("triangle", cells)],
+            file_format="vtk"
+            )
+
+    comm.comm.barrier()
+    if method == "CG" or method == "KMV":
+        mesh = fire.Mesh(
+            "meshes/homogeneous"+str(G)+".msh",
+            distribution_parameters={
+                "overlap_type": (fire.DistributedMeshOverlapType.NONE, 0)
+            },
+        )
+
+    if model['acquisition']['source_mesh_point']== True:
+        element = spyro.domains.space.FE_method(mesh, model["opts"]["method"], model["opts"]["degree"])
+        V = fire.FunctionSpace(mesh, element)
+
+
+    print('Finishing mesh generation', flush = True)
+
+    return mesh
+
 def wave_solver(model, G, comm = False):
     minimum_mesh_velocity = model['testing_parameters']['minimum_mesh_velocity']
 
-    mesh = generate_mesh(model, G, comm)
+    mesh = generate_mesh_immersed_disk(model, G, comm)
     
     element = spyro.domains.space.FE_method(mesh, model["opts"]["method"], model["opts"]["degree"])
     V = fire.FunctionSpace(mesh, element)
