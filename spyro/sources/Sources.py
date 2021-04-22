@@ -3,13 +3,15 @@ import math
 import numpy as np
 from firedrake import *
 from scipy.signal import butter, filtfilt
+import spyro
 
 
-class Sources:
+class Sources(spyro.receivers.Receivers.Receivers):
     """Methods that inject a wavelet into a mesh"""
 
-    def __init__(self, model, mesh, V, comm):
-        """Create injection operator(s) to excite source(s).
+    def __init__(self, model, mesh, V, my_ensemble):
+        """Initializes class and gets all receiver parameters from
+        input file.
 
         Parameters
         ----------
@@ -19,75 +21,40 @@ class Sources:
             2D/3D simplicial mesh read in by Firedrake.Mesh
         V: Firedrake.FunctionSpace object
             The space of the finite elements
-        comm: Firedrake.ensemble_communicator
+        my_ensemble: Firedrake.ensemble_communicator
             An ensemble communicator
-
 
         Returns
         -------
-        Sources: :class:`Source` object
-            Contains a list of excitations
+        Receivers: :class: 'Receiver' object
 
         """
 
-        self.source_type = model["acquisition"]["source_type"]
-        self.num_sources = model["acquisition"]["num_sources"]
-        self.pos = model["acquisition"]["source_pos"]
-        self.dimension = model["opts"]["dimension"]
         self.mesh = mesh
-        self.V = V
-        self.my_ensemble = comm
+        self.space = V
+        self.my_ensemble = my_ensemble
+        self.dimension = model["opts"]["dimension"]
+        self.degree = model["opts"]["degree"]
 
-        @property
-        def num_sources(self):
-            return self.__num_sources
+        self.num_receivers = model["acquisition"]["num_sources"]
+        self.receiver_locations = model["acquisition"]["source_pos"]
+        self.source_type = model["acquisition"]["source_type"]
 
-        @num_sources.setter
-        def num_sources(self, value):
-            assert value > 0, "Number of sources must be > 0"
-            self.__num_sources = value
+        self.cellIDs = None
+        self.cellVertices = None
+        self.cell_tabulations = None
+        self.cellNodeMaps = None
+        self.nodes_per_cell = None
 
-        @property
-        def pos(self):
-            return self.__pos
+    def apply_source(self, rhs_forcing,value):
+        """ Applies source in a assembled right hand side.
+        """
+        for source_id in range(self.num_receivers):
+            for i in range(len(self.cellNodeMaps[source_id])):
+                rhs_forcing.dat.data[int(self.cellNodeMaps[source_id][i])] = value * self.cell_tabulations[source_id][i]
 
-        @pos.setter
-        def pos(self, value):
-            self.__pos = value
-
-    def create(self):
-        """ Create injection operator(s) to excite source(s)."""
-
-        V = self.V
-
-        if self.dimension == 2:
-            z, x = SpatialCoordinate(self.mesh)
-        elif self.dimension == 3:
-            z, x, y = SpatialCoordinate(self.mesh)
-
-        if self.dimension == 2:
-            source = Constant([0, 0])
-            if self.source_type == "Ricker":
-                delta = Interpolator(delta_expr(source, z, x), V)
-            elif self.source_type == "MMS":
-                delta = Interpolator(MMS_space(source, z, x), V)
-            else:
-                raise ValueError("Unrecognized source type")
-        elif self.dimension == 3:
-            source = Constant([0, 0, 0])
-            if self.source_type == "Ricker":
-                delta = Interpolator(delta_expr_3d(source, z, x, y), V)
-            elif self.source_type == "MMS":
-                delta = Interpolator(MMS_space_3d(source, z, x, y), V)
-        else:
-            raise ValueError("Incorrect dimension")
-
-        excitations = []
-        for x0 in self.pos:
-            source.assign(x0)
-            excitations.append(Function(delta.interpolate()))
-
-        return excitations
+        return rhs_forcing
+    
 
 
 def timedependentSource(model, t, freq=None, amp=1, delay=1.5):
@@ -181,7 +148,7 @@ def source_dof_finder(space,  model):
             model['acquisition']['source_point_dof'] = dof
 
     if model['acquisition']['source_point_dof'] == False:
-        raise ValueError('Finding source dof failed')
+        print('Warning not using point source')
     print("test")
     return False
 
