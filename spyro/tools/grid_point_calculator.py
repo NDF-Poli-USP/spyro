@@ -79,7 +79,7 @@ def wave_solver(model, G, comm = False):
 
     spyro.sources.source_dof_finder(V, model)
 
-    if model['testing_parameters']['experiment_type'] == 'homogenous':
+    if model['testing_parameters']['experiment_type'] == 'homogeneous':
         vp_exact = fire.Constant(minimum_mesh_velocity)
     elif model['testing_parameters']['experiment_type'] == 'heterogenous':
         vp_exact = spyro.io.interpolate(model, mesh, V, guess=False)
