@@ -84,18 +84,6 @@ def Leapfrog_adjoint(model, mesh, comm, c, receivers, guess, residual):
 
     qr_x, qr_s, _ = quadrature.quadrature_rules(V)
 
-    # Prepare receiver forcing terms
-    if dim == 2:
-        z, x = SpatialCoordinate(mesh)
-        receiver = Constant([0, 0])
-        delta = Interpolator(delta_expr(receiver, z, x), V)
-    elif dim == 3:
-        z, x, y = SpatialCoordinate(mesh)
-        receiver = Constant([0, 0, 0])
-        delta = Interpolator(delta_expr_3d(receiver, z, x, y), V)
-
-    receiver_locations = model["acquisition"]["receiver_locations"]
-
     nt = int(tf / dt)  # number of timesteps
     timeaxis = np.linspace(model["timeaxis"]["t0"], model["timeaxis"]["tf"], nt)
 
@@ -105,18 +93,6 @@ def Leapfrog_adjoint(model, mesh, comm, c, receivers, guess, residual):
         is_local = [mesh.locate_cell([z, x, y]) for z, x, y in receiver_locations]
 
     dJdC_local = Function(V)
-
-    # receivers are forced through sparse matrix vec multiplication
-    sparse_excitations = csc_matrix((len(dJdC_local.dat.data), numrecs))
-    for r, x0 in enumerate(receiver_locations):
-        receiver.assign(x0)
-        exct = delta.interpolate().dat.data_ro.copy()
-        row = exct.nonzero()[0]
-        col = np.repeat(r, len(row))
-        sparse_exct = csc_matrix(
-            (exct[row], (row, col)), shape=sparse_excitations.shape
-        )
-        sparse_excitations += sparse_exct
 
     # if using the PML
     if PML:
