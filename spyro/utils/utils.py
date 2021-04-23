@@ -59,9 +59,10 @@ def compute_functional(model, comm, residual):
 
     
     J = 0.0
+    Jtemp = 0.0
     Jlist = []
     for ti in range(nt):
-        Jtemp = 0.0
+        
         for rn in range(num_receivers):
             Jtemp += 0.5 * (residual[ti][rn] ** 2)
         Jlist.append(Jtemp)
