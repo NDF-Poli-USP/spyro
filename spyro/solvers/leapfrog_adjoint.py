@@ -87,6 +87,8 @@ def Leapfrog_adjoint(model, mesh, comm, c, receivers, guess, residual):
     nt = int(tf / dt)  # number of timesteps
     timeaxis = np.linspace(model["timeaxis"]["t0"], model["timeaxis"]["tf"], nt)
 
+    receiver_locations = model["acquisition"]["receiver_locations"]
+        
     if dim == 2:
         is_local = [mesh.locate_cell([z, x]) for z, x in receiver_locations]
     elif dim == 3:
