@@ -9,6 +9,27 @@ import sys
 sys.path.append('/home/alexandre/Development/Spyro-3workingBranch')
 import spyro
 
+def saving_source_and_receiver_location_in_csv(model):
+    file_name = 'experiment/sources.txt'
+    file_obj = open(file_name,'w')
+    file_obj.write('Z,\tX \n')
+    for source in model['acquisition']['source_pos']:
+        z, x = source
+        string = str(z)+',\t'+str(x)+' \n'
+        file_obj.write(string)
+    file_obj.close()
+
+    file_name = 'experiment/receivers.txt'
+    file_obj = open(file_name,'w')
+    file_obj.write('Z,\tX \n')
+    for receiver in model['acquisition']['receiver_locations']:
+        z, x = receiver
+        string = str(z)+',\t'+str(x)+' \n'
+        file_obj.write(string)
+    file_obj.close()
+
+    return None
+
 def create_model_for_grid_point_calculation(frequency, degree, method, minimum_mesh_velocity= 1.0, experiment_type = 'homogeneous', receiver_type = 'near'):
     ''' Creates models  with the correct parameters for for grid point calculation experiments.
     
@@ -204,26 +225,30 @@ def generate_mesh(model,G, comm):
     Real_Lx = Lx + 2*lx
     edge_length = lbda/M
 
-    bbox = (0.0, Real_Lz, 0.0, Real_Lx)
+    bbox = (-Real_Lz, 0.0, 0.0, Real_Lx)
+    #bbox = (0.0, Real_Lz, 0.0, Real_Lx)
     rec = SeismicMesh.Rectangle(bbox)
 
     if comm.comm.rank == 0:
         #creating disk around source
-        disk_M = spyro.tools.grid_point_to_mesh_point_converter_for_seismicmesh(model, 15)
-        disk = SeismicMesh.Disk([Real_Lz/2, Real_Lx/2], lbda)
-        disk_points, disk_cells = SeismicMesh.generate_mesh(
-            domain=disk,
-            edge_length=lbda/disk_M,
-            mesh_improvement = False,
-            comm = comm.ensemble_comm,
-            verbose = 0
-        )
+        if model['testing_parameters']['source_mesh']=='imersed_disk':
+            disk_M = spyro.tools.grid_point_to_mesh_point_converter_for_seismicmesh(model, 15)
+            disk = SeismicMesh.Disk([-Real_Lz/2, Real_Lx/2], lbda)
+            disk_points, disk_cells = SeismicMesh.generate_mesh(
+                domain=disk,
+                edge_length=lbda/disk_M,
+                mesh_improvement = False,
+                comm = comm.ensemble_comm,
+                verbose = 0
+            )
 
-        if model['acquisition']['source_mesh_point']:
-            source_position = model['acquisition']['source_pos']
-            fixed_points = np.append(disk_points,source_position, axis=0)
-        else:
-            fixed_points = disk_points
+            if model['acquisition']['source_mesh_point']:
+                source_position = model['acquisition']['source_pos']
+                fixed_points = np.append(disk_points,source_position, axis=0)
+            else:
+                fixed_points = disk_points
+        elif model['testing_parameters']['source_mesh'] == None:
+            fixed_points = None
 
         # Creating rectangular mesh
         points, cells = SeismicMesh.generate_mesh(
@@ -280,7 +305,7 @@ def wave_solver(model, G, comm = False):
 
     if model['testing_parameters']['experiment_type'] == 'homogeneous':
         vp_exact = fire.Constant(minimum_mesh_velocity)
-    elif model['testing_parameters']['experiment_type'] == 'heterogenous':
+    elif model['testing_parameters']['experiment_type'] == 'heterogeneous':
         vp_exact = spyro.io.interpolate(model, mesh, V, guess=False)
 
 
@@ -311,9 +336,14 @@ degree = 2
 method = 'KMV'
 G=10.0
 
-model = create_model_for_grid_point_calculation(frequency,degree,method)
+model = spyro.tools.create_model_for_grid_point_calculation(frequency,degree,method,  minimum_mesh_velocity= 1.429, experiment_type= 'heterogeneous')
+
+## Generating csv file for visualizing receiver and source position in paraview
+saving_source_and_receiver_location_in_csv(model)
 
 # Create the computational environment
 comm = spyro.utils.mpi_init(model)
 
-p_rec = wave_solver(model,G,comm=comm)
+#p_rec = wave_solver(model,G,comm=comm)
+
+p_rec = spyro.tools.wave_solver(model, G, comm=comm)
