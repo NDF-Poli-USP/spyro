@@ -81,13 +81,15 @@ def wave_solver(model, G, comm = False):
 
     if model['testing_parameters']['experiment_type'] == 'homogeneous':
         vp_exact = fire.Constant(minimum_mesh_velocity)
-    elif model['testing_parameters']['experiment_type'] == 'heterogenous':
+    elif model['testing_parameters']['experiment_type'] == 'heterogeneous':
         vp_exact = spyro.io.interpolate(model, mesh, V, guess=False)
 
 
     new_dt = 0.2*spyro.estimate_timestep(mesh, V, vp_exact)
 
     model['timeaxis']['dt'] = comm.comm.allreduce(new_dt, op=MPI.MIN)
+    if model['timeaxis']['dt'] > 0.001:
+        model['timeaxis']['dt'] = 0.001
     if comm.comm.rank == 0:
         print(
             f"Maximum stable timestep used is: {model['timeaxis']['dt']} seconds",
@@ -126,14 +128,8 @@ def generate_mesh(model,G, comm):
         frequency = model["acquisition"]['frequency']
         lbda = minimum_mesh_velocity/frequency
 
-        Lz = model["mesh"]['Lz']
-        lz = model['PML']['lz']
-        Lx = model["mesh"]['Lx']
-        lx = model['PML']['lx']
         pml_fraction = lx/Lx
 
-        Real_Lz = Lz + lz
-        Real_Lx = Lx + 2*lx
         edge_length = lbda/M
 
         bbox = (-Real_Lz, 0.0, 0.0, Real_Lx)
@@ -141,13 +137,10 @@ def generate_mesh(model,G, comm):
 
         if comm.comm.rank == 0:
             #creating disk around source
-            if model['acquisition']['source_mesh_point']:
-                source_position = model['acquisition']['source_pos']
-                fixed_points = source_position
-            elif model['acquisition']['source_mesh_point'] == False:
-                disk_M = grid_point_to_mesh_point_converter_for_seismicmesh(model, 15)
-                disk = SeismicMesh.Disk([Real_Lz/2, Real_Lx/2], lbda)
-                fixed_points, disk_cells = SeismicMesh.generate_mesh(
+            if model['testing_parameters']['source_mesh']=='immersed_disk':
+                disk_M = spyro.tools.grid_point_to_mesh_point_converter_for_seismicmesh(model, 15)
+                disk = SeismicMesh.Disk([-Real_Lz/2, Real_Lx/2], lbda)
+                disk_points, disk_cells = SeismicMesh.generate_mesh(
                     domain=disk,
                     edge_length=lbda/disk_M,
                     mesh_improvement = False,
@@ -155,18 +148,32 @@ def generate_mesh(model,G, comm):
                     verbose = 0
                 )
 
-            # Creating rectangular mesh
-            points, cells = SeismicMesh.generate_mesh(
-            domain=rec, 
-            edge_length=edge_length, 
-            mesh_improvement = False,
-            comm = comm.ensemble_comm,
-            pfix = fixed_points,
-            verbose = 0
-            )
+                if model['acquisition']['source_mesh_point']:
+                    source_position = model['acquisition']['source_pos']
+                    fixed_points = np.append(disk_points,source_position, axis=0)
+                else:
+                    fixed_points = None
+                points, cells = SeismicMesh.generate_mesh(
+                    domain=rec, 
+                    edge_length=edge_length, 
+                    mesh_improvement = False,
+                    comm = comm.ensemble_comm,
+                    subdomains = [disk] ,
+                    verbose = 0
+                    )
+            elif model['testing_parameters']['source_mesh'] == None:
+                fixed_points = None
+                points, cells = SeismicMesh.generate_mesh(
+                    domain=rec, 
+                    edge_length=edge_length, 
+                    mesh_improvement = False,
+                    comm = comm.ensemble_comm,
+                    verbose = 0
+                    )
+            
             print('entering spatial rank 0 after mesh generation')
             
-            points, cells = SeismicMesh.geometry.delete_boundary_entities(points, cells, min_qual= 0.6)
+            #points, cells = SeismicMesh.geometry.delete_boundary_entities(points, cells, min_qual= 0.6)
             a=np.amin(SeismicMesh.geometry.simp_qual(points, cells))
             if model['testing_parameters']['experiment_type'] == 'heterogenous':
                 points, cells = SeismicMesh.geometry.laplacian2(points, cells)
@@ -189,7 +196,7 @@ def generate_mesh(model,G, comm):
                 },
             )
 
-    elif model['testing_parameters']['experiment_type']== 'heterogenous':
+    elif model['testing_parameters']['experiment_type']== 'heterogeneous':
         # Name of SEG-Y file containg velocity model.
         fname = "vel_z6.25m_x12.5m_exact.segy"
 
@@ -207,6 +214,7 @@ def generate_mesh(model,G, comm):
             source_position = model['acquisition']['source_pos']
             z_source, x_source = source_position[0]
             disk = SeismicMesh.Disk([z_source*1000, x_source*1000], 1429.0/frequency)
+
             disk_points, cells = SeismicMesh.generate_mesh(domain=disk, edge_length=edge_length_disk, verbose = 0, mesh_improvement=False )
             meshio.write_points_cells("meshes/disk"+str(G)+".vtk",
                     disk_points/1000,[("triangle", cells)],
@@ -221,11 +229,7 @@ def generate_mesh(model,G, comm):
             source_pos = model['acquisition']['source_pos']
             z_source, x_source = source_pos[0]
             disk = SeismicMesh.Disk([z_source*1000, x_source*1000], 1429.0/frequency)
-            fixed_points, cells = SeismicMesh.generate_mesh(domain=disk, edge_length=edge_length_disk, verbose = 0, mesh_improvement=False )
-            meshio.write_points_cells("meshes/disk"+str(G)+".vtk",
-                    disk_points/1000,[("triangle", cells)],
-                    file_format="vtk"
-                    )
+            fixed_points = False
 
         # Construct mesh sizing object from velocity model
         ef = SeismicMesh.get_sizing_function_from_segy(
@@ -239,7 +243,7 @@ def generate_mesh(model,G, comm):
             pad_style="edge",
         )
 
-        points, cells = SeismicMesh.generate_mesh(domain=rectangle, edge_length=ef, pfix =fixed_points, verbose = 0, mesh_improvement=False )
+        points, cells = SeismicMesh.generate_mesh(domain=rectangle, edge_length=ef, subdomains = [disk] , verbose = 0, mesh_improvement=False )
 
         #points, cells = SeismicMesh.geometry.laplacian2(points, cells)
         meshio.write_points_cells("meshes/heterogenous"+str(G)+".msh",

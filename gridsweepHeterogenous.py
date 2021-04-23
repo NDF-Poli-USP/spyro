@@ -33,7 +33,7 @@ Gs = [8, 9, 10, 11, 12]
 degrees = [2,3,4,5]
 
 # Experiment parameters
-experiment_type = 'heterogenous'
+experiment_type = 'heterogeneous'
 method = 'KMV'
 minimum_mesh_velocity = False
 frequency = 5.0
@@ -44,7 +44,7 @@ comm = spyro.utils.mpi_init(model)
 
 ## Output file for saving data
 date = datetime.today().strftime('%Y_%m_%d')
-text_file = open("output_heterogeneous_pointsourceitselfreference_NOFILTER_correctError"+date+".txt", "w")
+text_file = open("output_heterogeneous_immersedSourceSigma500itselfreference_NOFILTER_correctError"+date+".txt", "w")
 text_file.write('Heterogeneous and KMV \n')
 
 ## Generating csv file for visualizing receiver and source position in paraview
