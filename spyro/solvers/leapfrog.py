@@ -186,11 +186,7 @@ def Leapfrog(
 
     cutoff = freq_bands[freq_index] if "inversion" in model else None
     RW = FullRickerWavelet(dt, tf, freq, amp=amp, cutoff=cutoff)
-
-    excitation = excitations[source_num]
-    ricker = Constant(0)
-    f = excitation * ricker
-    ricker.assign(RW[0])
+    
     # -------------------------------------------------------
     m1 = ((u - 2.0 * u_n + u_nm1) / Constant(dt ** 2)) * v * dx(rule=qr_x)
     a = c * c * dot(grad(u_n), grad(v)) * dx(rule=qr_x)  # explicit
@@ -200,7 +196,7 @@ def Leapfrog(
     else:
         nf = 0
 
-    FF = m1 + a + nf - f * v * dx(rule=qr_x)
+    FF = m1 + a + nf
 
     if PML:
         X = Function(W)
@@ -262,16 +258,18 @@ def Leapfrog(
 
     assembly_callable = create_assembly_callable(rhs_, tensor=B)
 
+    rhs_forcing = Function(V)
+
     for IT in range(nt):
 
-        if IT < dstep:
-            ricker.assign(RW[IT])
-        elif IT == dstep:
-            ricker.assign(0.0)
-
-        # AX=B --> solve for X = B/Aˆ-1
-        # B = assemble(rhs_, tensor=B)
         assembly_callable()
+        if IT < dstep:
+            f = excitations.apply_source(rhs_forcing, RW[IT])
+            B.sub(0).dat.data[:] += f.dat.data[:]
+            
+        elif IT == dstep:
+            f = excitations.apply_source(rhs_forcing, 0.0)
+            B.sub(0).dat.data[:] += f.dat.data[:]
 
         solver.solve(X, B)
         if PML:
@@ -318,3 +316,4 @@ def Leapfrog(
         )
 
     return usol, usol_recv
+
