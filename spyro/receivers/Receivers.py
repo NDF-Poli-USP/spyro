@@ -346,7 +346,7 @@ class Receivers:
 
         return cell_tabulations
     
-    def apply_source_receivers(self, rhs_forcing,value, is_local):
+    def apply_source_receivers(self, rhs_forcing, residual, IT, is_local):
         """ Applies source in a assembled right hand side.
         """
 
