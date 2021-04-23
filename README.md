@@ -1,3 +1,4 @@
+[![DOI](https://zenodo.org/badge/318542339.svg)](https://zenodo.org/badge/latestdoi/318542339)
 [![CircleCI](https://img.shields.io/circleci/project/github/krober10nd/spyro/main.svg?style=flat-square)](https://circleci.com/gh/krober10nd/spyro/tree/main)
 [![CodeCov](https://codecov.io/gh/krober10nd/spyro/branch/main/graph/badge.svg)](https://codecov.io/gh/krober10nd/spyro)
 
@@ -27,7 +28,10 @@ Using this functionality, short Python scripts can written that perform Full Wav
 Performance
 ===========
 
-TODO
+Strong scaling on both Intel Xeon processors and AMD processors is quite good. This test was performed with an 11 M DoF 3D tetrahedral mesh adapted to the Overthrust3D model. A 1 second wave simulation was executed with a 750-m PML on all sides but the free surface: 
+
+![ScalingAmdIntel](https://user-images.githubusercontent.com/18619644/111385935-41a6ee80-868a-11eb-8da3-256274bf1c0f.png)
+
 
 A worked example
 =================
