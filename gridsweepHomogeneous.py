@@ -29,8 +29,8 @@ def saving_source_and_receiver_location_in_csv(model):
 G_reference = 15
 
 # Degrees and Gs for sweep
-Gs = [8, 9, 10, 11, 12]
-degrees = [2,3,4,5]
+Gs = [8, 9, 10]#, 11, 12]
+degrees = [5]#,3,4]#,5]
 
 # Experiment parameters
 experiment_type = 'homogeneous'
@@ -44,7 +44,7 @@ comm = spyro.utils.mpi_init(model)
 
 ## Output file for saving data
 date = datetime.today().strftime('%Y_%m_%d')
-text_file = open("output_homogeneous_pointsourceitselfreference_NOFILTER_correctError"+date+".txt", "w")
+text_file = open("output_homogeneous5_itselfreference_NOFILTER_NoImmersedDisk_correctError"+date+".txt", "w")
 text_file.write('Homogeneous and KMV \n')
 
 ## Generating csv file for visualizing receiver and source position in paraview
