@@ -44,8 +44,7 @@ def create_model_for_grid_point_calculation(frequency, degree, method, minimum_m
         source_coordinates = [(source_z, source_x)] #Source at the center. If this is changes receiver's bin has to also be changed.
         padz = pad
         padx = pad
-
-    if experiment_type == 'heterogenous':
+    elif experiment_type == 'heterogeneous':
         #using the BP2004 velocity model
         
         Lz = 12000.0/1000.
@@ -59,12 +58,15 @@ def create_model_for_grid_point_calculation(frequency, degree, method, minimum_m
         SeismicMesh.write_velocity_model('vel_z6.25m_x12.5m_exact.segy', ofname = 'velocity_models/bp2004')
         padz = pad
         padx = pad
+    else: 
+        raise ValueError('Experiment type not recognized')
+
     
     if receiver_type == 'near' and experiment_type == 'homogeneous':
 
         # time calculations
         tmin = 1./frequency
-        final_time = 2*10*tmin #should be 35
+        final_time = 25*tmin #should be 35
 
         # receiver calculations
 
@@ -91,11 +93,11 @@ def create_model_for_grid_point_calculation(frequency, degree, method, minimum_m
 
         receiver_quantity = 2*receiver_quantity_in_bin
 
-    if receiver_type == 'near' and experiment_type == 'heterogenous':
+    if receiver_type == 'near' and experiment_type == 'heterogeneous':
 
         # time calculations
         tmin = 1./frequency
-        final_time = 2*10*tmin #should be 35
+        final_time = 25*tmin #should be 35
 
         # receiver calculations
 
@@ -159,7 +161,7 @@ def create_model_for_grid_point_calculation(frequency, degree, method, minimum_m
         "source_type": "Ricker",
         "num_sources": 1,
         "source_pos": source_coordinates,
-        "source_mesh_point": True,
+        "source_mesh_point": False,
         "source_point_dof": False,
         "frequency": frequency,
         "delay": 1.0,
@@ -183,7 +185,8 @@ def create_model_for_grid_point_calculation(frequency, degree, method, minimum_m
         'experiment_type': experiment_type,
         'minimum_mesh_velocity': minimum_mesh_velocity,
         'pml_fraction': padz/Lz,
-        'receiver_type': receiver_type
+        'receiver_type': receiver_type,
+        'source_mesh': None#'immersed_disk'
     }
 
     # print(source_coordinates)
