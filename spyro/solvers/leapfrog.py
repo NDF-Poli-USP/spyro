@@ -20,7 +20,6 @@ def Leapfrog(
     source_num=0,
     freq_index=0,
     output=False,
-    G=1.0 #Added G only for debugging, will remove later
 ):
     """Secord-order in time fully-explicit Leapfrog scheme
     with implementation of a Perfectly Matched Layer (PML) using
@@ -96,10 +95,8 @@ def Leapfrog(
 
     if method == "KMV":
         params = {"ksp_type": "preonly", "pc_type": "jacobi"}
-    elif method == "CG" and mesh.ufl_cell() != quadrilateral and mesh.ufl_cell() != hexahedron :
+    elif method == "CG":
         params = {"ksp_type": "cg", "pc_type": "jacobi"}
-    elif method == "CG" and (mesh.ufl_cell() == quadrilateral or mesh.ufl_cell() == hexahedron ):
-        params = {"ksp_type": "preonly", "pc_type": "jacobi"}
     else:
         raise ValueError("method is not yet supported")
 
@@ -180,13 +177,17 @@ def Leapfrog(
 
     is_local = helpers.receivers_local(mesh, dim, receivers.receiver_locations)
 
-    outfile = helpers.create_output_file("Leapfrog_G"+str(G)+".pvd", comm, source_num)
+    outfile = helpers.create_output_file("Leapfrog.pvd", comm, source_num)
 
     t = 0.0
 
     cutoff = freq_bands[freq_index] if "inversion" in model else None
     RW = FullRickerWavelet(dt, tf, freq, amp=amp, cutoff=cutoff)
-    
+
+    excitation = excitations[source_num]
+    ricker = Constant(0)
+    f = excitation * ricker
+    ricker.assign(RW[0])
     # -------------------------------------------------------
     m1 = ((u - 2.0 * u_n + u_nm1) / Constant(dt ** 2)) * v * dx(rule=qr_x)
     a = c * c * dot(grad(u_n), grad(v)) * dx(rule=qr_x)  # explicit
@@ -196,7 +197,7 @@ def Leapfrog(
     else:
         nf = 0
 
-    FF = m1 + a + nf
+    FF = m1 + a + nf - f * v * dx(rule=qr_x)
 
     if PML:
         X = Function(W)
@@ -258,18 +259,16 @@ def Leapfrog(
 
     assembly_callable = create_assembly_callable(rhs_, tensor=B)
 
-    rhs_forcing = Function(V)
-
     for IT in range(nt):
 
-        assembly_callable()
         if IT < dstep:
-            f = excitations.apply_source(rhs_forcing, RW[IT])
-            B.sub(0).dat.data[:] += f.dat.data[:]
-            
+            ricker.assign(RW[IT])
         elif IT == dstep:
-            f = excitations.apply_source(rhs_forcing, 0.0)
-            B.sub(0).dat.data[:] += f.dat.data[:]
+            ricker.assign(0.0)
+
+        # AX=B --> solve for X = B/Aˆ-1
+        # B = assemble(rhs_, tensor=B)
+        assembly_callable()
 
         solver.solve(X, B)
         if PML:
@@ -316,4 +315,3 @@ def Leapfrog(
         )
 
     return usol, usol_recv
-
