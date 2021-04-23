@@ -16,7 +16,7 @@ set_log_level(ERROR)
 __all__ = ["Leapfrog_adjoint"]
 
 
-def Leapfrog_adjoint(model, mesh, comm, c, guess, residual):
+def Leapfrog_adjoint(model, mesh, comm, c, receivers, guess, residual):
     """Discrete adjoint for secord-order in time fully-explicit Leapfrog scheme
     with implementation of a Perfectly Matched Layer (PML) using
     CG FEM with or without higher order mass lumping (KMV type elements).
@@ -290,7 +290,7 @@ def Leapfrog_adjoint(model, mesh, comm, c, guess, residual):
         # B = assemble(rhs_, tensor=B)
         assembly_callable()
 
-        f = receivers.apply_source(rhs_forcing, residual, IT, is_local)
+        f = receivers.apply_source_receivers(rhs_forcing, residual, IT, is_local)
         # add forcing term to solve scalar pressure
         B.sub(0).dat.data[:] += f.dat.data[:]
 
