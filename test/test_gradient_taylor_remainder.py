@@ -97,7 +97,7 @@ def test_gradient_talyor_remainder():
     J.append(_compute_functional(model, mesh, comm, misfit))
 
     delta_m = Function(V).assign(0.50)
-    step = 0.50  #
+    step = 0.5  #
 
     remainder = []
     for i in range(3):
