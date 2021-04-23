@@ -345,6 +345,18 @@ class Receivers:
                 cell_tabulations[receiver_id, :] = phi_tab.transpose()
 
         return cell_tabulations
+    
+    def apply_source_receivers(self, rhs_forcing, residual, IT, is_local):
+        """ Applies source in a assembled right hand side.
+        """
+
+        for source_id in range(self.num_receivers):
+            if is_local[source_id]:
+                for i in range(len(self.cellNodeMaps[source_id])):
+                    value = residual[IT][source_id]
+                    rhs_forcing.dat.data[int(self.cellNodeMaps[source_id][i])] = value * self.cell_tabulations[source_id][i]
+
+        return rhs_forcing
 
 
 ## Some helper functions
