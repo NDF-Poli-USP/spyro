@@ -290,7 +290,7 @@ def Leapfrog_adjoint(model, mesh, comm, c, guess, residual):
         # B = assemble(rhs_, tensor=B)
         assembly_callable()
 
-        f = _adjoint_update_rhs(rhs_forcing, sparse_excitations, residual, IT, is_local)
+        f = receivers.apply_source(rhs_forcing, residual, IT, is_local)
         # add forcing term to solve scalar pressure
         B.sub(0).dat.data[:] += f.dat.data[:]
 
@@ -337,12 +337,3 @@ def Leapfrog_adjoint(model, mesh, comm, c, guess, residual):
 
     return dJdC_local
 
-
-def _adjoint_update_rhs(rhs_forcing, excitations, residual, IT, is_local):
-    """Builds assembled forcing function f for adjoint for a given time_step
-    given a number of receivers
-    """
-    recs = [recv for recv in range(excitations.shape[1]) if is_local[recv]]
-    rhs_forcing.dat.data[:] = excitations[:, recs].dot(residual[IT][recs])
-
-    return rhs_forcing
