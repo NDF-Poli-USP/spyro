@@ -6,7 +6,7 @@ import SeismicMesh
 import time
 
 import sys
-sys.path.append('/home/alexandre/Development/Spyro-3workingBranch')
+sys.path.append('/home/alexandre/Development/Spyro-new_source')
 import spyro
 
 def create_model_for_grid_point_calculation(frequency, degree, method, minimum_mesh_velocity= 1.0, experiment_type = 'homogeneous', receiver_type = 'near'):
@@ -153,7 +153,7 @@ def create_model_for_grid_point_calculation(frequency, degree, method, minimum_m
         "source_type": "Ricker",
         "num_sources": 1,
         "source_pos": source_coordinates,
-        "source_mesh_point": True,
+        "source_mesh_point": False,
         "source_point_dof": False,
         "frequency": frequency,
         "delay": 1.0,
@@ -293,13 +293,14 @@ def wave_solver(model, G, comm = False):
             flush=True,
         )
 
-    sources = spyro.Sources(model, mesh, V, comm).create()
+    #sources = spyro.Sources(model, mesh, V, comm).create()
+    sources = spyro.Updated_sources(model, mesh, V, comm).create()
     receivers = spyro.Receivers(model, mesh, V, comm).create()
 
     for sn in range(model["acquisition"]["num_sources"]):
         if spyro.io.is_owner(comm, sn):
             t1 = time.time()
-            p_field, p_recv = spyro.solvers.Leapfrog(
+            p_field, p_recv = spyro.solvers.Old_Leapfrog(
                 model, mesh, comm, vp_exact, sources, receivers, source_num=sn, output= True, G = G
             )
             print(time.time() - t1)
@@ -309,11 +310,11 @@ def wave_solver(model, G, comm = False):
 frequency = 5.0
 degree = 2
 method = 'KMV'
-G=10.0
+G=9.0
 
 model = create_model_for_grid_point_calculation(frequency,degree,method)
 
 # Create the computational environment
 comm = spyro.utils.mpi_init(model)
 
-p_rec = wave_solver(model,G,comm=comm)
+p_rec = spyro.tools.wave_solver(model,G,comm=comm)
