@@ -6,7 +6,7 @@ import SeismicMesh
 import time
 
 import sys
-sys.path.append('/home/alexandre/Development/Spyro-3workingBranch')
+sys.path.append('/home/alexandre/Development/Spyro-new_source')
 import spyro
 
 def saving_source_and_receiver_location_in_csv(model):
@@ -91,7 +91,7 @@ def create_model_for_grid_point_calculation(frequency, degree, method, minimum_m
 
         # time calculations
         tmin = 1./frequency
-        final_time = 10*tmin #should be 35
+        final_time = 35*tmin #should be 35
 
         # receiver calculations
 
@@ -104,7 +104,6 @@ def create_model_for_grid_point_calculation(frequency, degree, method, minimum_m
         bin1_startX = source_x - receiver_bin_width/2.
         bin1_endX   = source_x + receiver_bin_width/2.
         receiver_coordinates = spyro.create_2d_grid(bin1_startZ, bin1_endZ, bin1_startX, bin1_endX, int(np.sqrt(receiver_quantity)))
-
 
     if receiver_type == 'near' and experiment_type == 'heterogenous':
 
@@ -174,7 +173,7 @@ def create_model_for_grid_point_calculation(frequency, degree, method, minimum_m
         "source_type": "Ricker",
         "num_sources": 1,
         "source_pos": source_coordinates,
-        "source_mesh_point": True,
+        "source_mesh_point": False,
         "source_point_dof": False,
         "frequency": frequency,
         "delay": 1.0,
@@ -293,6 +292,83 @@ def generate_mesh(model,G, comm):
 
     return mesh
 
+def generate_mesh_immersed_disk(model,G, comm):
+    
+    print('Entering mesh generation', flush = True)
+    M = spyro.tools.grid_point_to_mesh_point_converter_for_seismicmesh(model, G)
+    disk_M = spyro.tools.grid_point_to_mesh_point_converter_for_seismicmesh(model, 15)
+    method = model["opts"]["method"]
+    minimum_mesh_velocity = model['testing_parameters']['minimum_mesh_velocity']
+    frequency = model["acquisition"]['frequency']
+    lbda = minimum_mesh_velocity/frequency
+
+    Lz = model["mesh"]['Lz']
+    lz = model['PML']['lz']
+    Lx = model["mesh"]['Lx']
+    lx = model['PML']['lx']
+    pml_fraction = lx/Lx
+
+    Real_Lz = Lz + lz
+    Real_Lx = Lx + 2*lx
+    edge_length = lbda/M
+
+    bbox = (0.0, Real_Lz, 0.0, Real_Lx)
+    disk = SeismicMesh.Disk([Real_Lz/2, Real_Lx/2], lbda)
+    rec = SeismicMesh.Rectangle(bbox)
+
+    if comm.comm.rank == 0:
+        #creating disk around source
+        
+        if model['acquisition']['source_mesh_point']:
+            source_position = model['acquisition']['source_pos']
+            fixed_points = np.append(disk_points,source_position, axis=0)
+        else:
+            fixed_points = None
+
+        # Creating rectangular mesh
+        points, cells = SeismicMesh.generate_mesh(
+        domain=rec, 
+        edge_length=edge_length, 
+        mesh_improvement = False,
+        comm = comm.ensemble_comm,
+        subdomains = [disk] ,
+        pfix = fixed_points ,
+        verbose = 0
+        )
+        print('entering spatial rank 0 after mesh generation')
+        
+        points, cells = SeismicMesh.geometry.delete_boundary_entities(points, cells, min_qual= 0.6)
+        a=np.amin(SeismicMesh.geometry.simp_qual(points, cells))
+        if model['testing_parameters']['experiment_type'] == 'heterogenous':
+            points, cells = SeismicMesh.geometry.laplacian2(points, cells)
+        meshio.write_points_cells("meshes/homogeneous"+str(G)+".msh",
+            points,[("triangle", cells)],
+            file_format="gmsh22", 
+            binary = False
+            )
+        meshio.write_points_cells("meshes/IMMERSEDhomogeneous"+str(G)+".vtk",
+            points,[("triangle", cells)],
+            file_format="vtk"
+            )
+
+    comm.comm.barrier()
+    if method == "CG" or method == "KMV":
+        mesh = fire.Mesh(
+            "meshes/homogeneous"+str(G)+".msh",
+            distribution_parameters={
+                "overlap_type": (fire.DistributedMeshOverlapType.NONE, 0)
+            },
+        )
+
+    if model['acquisition']['source_mesh_point']== True:
+        element = spyro.domains.space.FE_method(mesh, model["opts"]["method"], model["opts"]["degree"])
+        V = fire.FunctionSpace(mesh, element)
+
+
+    print('Finishing mesh generation', flush = True)
+
+    return mesh
+
 def wave_solver(model, G, comm = False):
     minimum_mesh_velocity = model['testing_parameters']['minimum_mesh_velocity']
 
@@ -334,7 +410,7 @@ def wave_solver(model, G, comm = False):
 frequency = 5.0
 degree = 2
 method = 'KMV'
-G=10.0
+G=9.0
 
 model = spyro.tools.create_model_for_grid_point_calculation(frequency,degree,method,  minimum_mesh_velocity= 1.429, experiment_type= 'heterogeneous')
 
