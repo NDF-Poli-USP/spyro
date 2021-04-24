@@ -114,9 +114,7 @@ def test_gradient_talyor_remainder():
         # compute the functional (again)
         J.append(_compute_functional(model, mesh, comm, misfit))
         # compute the second-order Taylor remainder
-        remainder.append(
-            J[i + 1] - J[0] - step * np.dot(grad.dat.data[:], delta_m.dat.data[:])
-        )
+        remainder.append(J[i + 1] - J[0] - step * assemble(grad * delta_m * dx))
         # assemble(grad * delta_m * dx))
         # halve the step and repeat
         step /= 2.0
