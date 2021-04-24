@@ -100,9 +100,9 @@ def test_gradient_talyor_remainder():
     J.append(_compute_functional(model, mesh, comm, misfit))
 
     delta_m = Function(V)
-    delta_m.vector()[:] = rand(delta_m.dof_dset.size)
+    delta_m.vector()[:] = 0.5 #rand(delta_m.dof_dset.size)
 
-    step = 0.01
+    step = 0.50
 
     remainder = []
     for i in range(3):
@@ -128,7 +128,8 @@ def test_gradient_talyor_remainder():
     l2conv = np.log2(remainder[:-1] / remainder[1:])
     # print(remainder)
     print(l2conv)
-    assert (l2conv > 1.8).all()
+    print(remainder)
+    assert l2conv.min() > 1.8
 
 
 if __name__ == "__main__":

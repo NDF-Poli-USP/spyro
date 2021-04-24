@@ -60,7 +60,7 @@ timeaxis = {
     "t0": 0.0,  #  Initial time for event
     "tf": 1.0,  # Final time for event
     "dt": 0.001,  # timestep size
-    "nspool": 20,  # how frequently to output solution to pvds
+    "nspool": 100,  # how frequently to output solution to pvds
     "fspool": 1,  # how frequently to save solution to RAM
 }  # how freq. to output to files and screen
 
