@@ -1,15 +1,10 @@
-import os
-import numpy as np
-from numpy.random import rand
-
 from firedrake import *
+from ROL.firedrake_vector import FiredrakeVector as FeVector
+import ROL
 
 import spyro
 
 from .inputfiles.Model1_Leapfrog_adjoint_2d import model
-
-
-outfile_total_gradient = File(os.getcwd() + "/results/Gradient.pvd")
 
 
 def _make_vp_exact(V, mesh):
@@ -30,50 +25,10 @@ def _make_vp_guess(V, mesh):
     return vp_guess
 
 
-def _simulate_exact(model, mesh, comm, vp_exact, sources, receivers):
-    """Simulate the observed data"""
-    p_exact, p_exact_recv = spyro.solvers.Leapfrog(
-        model, mesh, comm, vp_exact, sources, receivers, output=False
-    )
-    return p_exact, p_exact_recv
-
-
-def _simulate_guess(model, mesh, comm, vp_guess, sources, receivers):
-    """Simulate the guess data"""
-    p_guess, p_guess_recv = spyro.solvers.Leapfrog(
-        model, mesh, comm, vp_guess, sources, receivers, output=False
-    )
-    return p_guess, p_guess_recv
-
-
-def _compute_misfit(model, mesh, comm, guess, exact):
-    """Compute the residual"""
-    misfit = spyro.utils.evaluate_misfit(model, comm, guess, exact)
-    return misfit
-
-
-def _compute_functional(model, mesh, comm, misfit):
-    """Compute the L2 norm functional"""
-    J = spyro.utils.compute_functional(model, comm, misfit)
-    return J
-
-
-def _compute_gradient(model, mesh, comm, vp_guess, receivers, misfit, p_guess):
-    """"Compute the gradient of the functional and the functional"""
-    grad = spyro.solvers.Leapfrog_adjoint(
-        model, mesh, comm, vp_guess, receivers, p_guess, misfit
-    )
-    outfile_total_gradient.write(grad, name="TotalGradient")
-    return grad
-
-
 def test_gradient_talyor_remainder():
-
     comm = spyro.utils.mpi_init(model)
 
     mesh, V = spyro.io.read_mesh(model, comm)
-
-    vp_exact = _make_vp_exact(V, mesh)
 
     vp_guess = _make_vp_guess(V, mesh)
 
@@ -81,55 +36,91 @@ def test_gradient_talyor_remainder():
 
     receivers = spyro.Receivers(model, mesh, V, comm).create()
 
-    # simulate the exact model
-    _, p_exact_recv = _simulate_exact(model, mesh, comm, vp_exact, sources, receivers)
+    vp_exact = _make_vp_exact(V, mesh)
 
-    # simulate the guess model
-    p_guess, p_guess_recv = _simulate_guess(
-        model, mesh, comm, vp_guess, sources, receivers
+    _, p_exact_recv = spyro.solvers.Leapfrog(
+        model,
+        mesh,
+        comm,
+        vp_exact,
+        sources,
+        receivers,
     )
 
-    # compute the misfit
-    misfit = _compute_misfit(model, mesh, comm, p_guess_recv, p_exact_recv)
+    qr_x, _, _ = spyro.domains.quadrature.quadrature_rules(V)
 
-    # compute the gradient of the control (to be verified)
-    grad = _compute_gradient(model, mesh, comm, vp_guess, receivers, misfit, p_guess)
+    class L2Inner(object):
+        def __init__(self):
+            self.A = assemble(
+                TrialFunction(V) * TestFunction(V) * dx(rule=qr_x), mat_type="matfree"
+            )
+            self.Ap = as_backend_type(self.A).mat()
 
-    # compute the functional
-    J = []
-    J.append(_compute_functional(model, mesh, comm, misfit))
+        def eval(self, _u, _v):
+            upet = as_backend_type(_u).vec()
+            vpet = as_backend_type(_v).vec()
+            A_u = self.Ap.createVecLeft()
+            self.Ap.mult(upet, A_u)
+            return vpet.dot(A_u)
 
-    delta_m = Function(V)
-    delta_m.vector()[:] = 0.5 #rand(delta_m.dof_dset.size)
+    class Objective(ROL.Objective):
+        def __init__(self, inner_product):
+            ROL.Objective.__init__(self)
+            self.inner_product = inner_product
+            self.p_guess = None
+            self.misfit = None
 
-    step = 0.50
+        def value(self, x, tol):
+            """Compute the functional"""
+            self.p_guess, p_guess_recv = spyro.solvers.Leapfrog(
+                model,
+                mesh,
+                comm,
+                vp_guess,
+                sources,
+                receivers,
+            )
+            self.misfit = spyro.utils.evaluate_misfit(
+                model, comm, p_guess_recv, p_exact_recv
+            )
+            J = spyro.utils.compute_functional(model, comm, self.misfit)
+            return J
 
-    remainder = []
-    for i in range(3):
-        vp_guess = _make_vp_guess(V, mesh)
-        # perturb the model and calculate the functional (again)
-        # J(m + delta_m*h)
-        vp_guess += delta_m * step
-        # simulate the guess model with the new vp_guess
-        _, p_guess_recv = _simulate_guess(
-            model, mesh, comm, vp_guess, sources, receivers
-        )
-        # misfit calculation
-        misfit = _compute_misfit(model, mesh, comm, p_guess_recv, p_exact_recv)
-        # compute the functional (again)
-        J.append(_compute_functional(model, mesh, comm, misfit))
-        # compute the second-order Taylor remainder
-        remainder.append(J[i + 1] - J[0] - step * assemble(delta_m * grad * dx))
-        # halve the step and repeat
-        step /= 2.0
+        def gradient(self, g, x, tol):
+            dJ = spyro.solvers.Leapfrog_adjoint(
+                model,
+                mesh,
+                comm,
+                vp_guess,
+                receivers,
+                self.p_guess,
+                self.misfit,
+            )
+            g.scale(0)
+            g.vec += dJ
 
-    # remainder should decrease at a second order rate
-    remainder = np.array(np.abs(remainder))
-    l2conv = np.log2(remainder[:-1] / remainder[1:])
-    # print(remainder)
-    print(l2conv)
-    print(remainder)
-    assert l2conv.min() > 1.8
+        def update(self, x, flag, iteration):
+            vp_guess.assign(Function(V, x.vec, name="velocity"))
+
+    paramsDict = {
+        "Step": {
+            "Line Search": {"Descent Method": {"Type": "Quasi-Newton Method"}},
+            "Type": "Line Search",
+        },
+        "Status Test": {"Gradient Tolerance": 1e-12, "Iteration Limit": 20},
+    }
+    params = ROL.ParameterList(paramsDict, "Parameters")
+
+    inner_product = L2Inner()
+    obj = Objective(inner_product)
+    u = Function(V).assign(vp_guess)
+    opt = FeVector(u.vector(), inner_product)
+    d = Function(V)
+    d.vector()[:] = 0.5
+
+    d = FeVector(d.vector(), inner_product)
+    # check the gradient using d model pertubation 4 iterations and 2nd order test
+    obj.checkGradient(opt, d, 4, 3)
 
 
 if __name__ == "__main__":
