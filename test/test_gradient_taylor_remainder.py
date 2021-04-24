@@ -1,5 +1,6 @@
 import os
 import numpy as np
+from numpy.random import rand
 
 from firedrake import *
 
@@ -59,7 +60,9 @@ def _compute_functional(model, mesh, comm, misfit):
 
 def _compute_gradient(model, mesh, comm, vp_guess, receivers, misfit, p_guess):
     """"Compute the gradient of the functional and the functional"""
-    grad = spyro.solvers.Leapfrog_adjoint(model, mesh, comm, vp_guess, receivers, p_guess, misfit)
+    grad = spyro.solvers.Leapfrog_adjoint(
+        model, mesh, comm, vp_guess, receivers, p_guess, misfit
+    )
     outfile_total_gradient.write(grad, name="TotalGradient")
     return grad
 
@@ -96,15 +99,17 @@ def test_gradient_talyor_remainder():
     J = []
     J.append(_compute_functional(model, mesh, comm, misfit))
 
-    delta_m = Function(V).assign(0.50)
-    step = 0.5  #
+    delta_m = Function(V)
+    delta_m.vector()[:] = rand(delta_m.dof_dset.size)
+
+    step = 0.01
 
     remainder = []
     for i in range(3):
         vp_guess = _make_vp_guess(V, mesh)
         # perturb the model and calculate the functional (again)
         # J(m + delta_m*h)
-        vp_guess.dat.data[:] += step * delta_m.dat.data[:]
+        vp_guess += delta_m * step
         # simulate the guess model with the new vp_guess
         _, p_guess_recv = _simulate_guess(
             model, mesh, comm, vp_guess, sources, receivers
@@ -114,8 +119,7 @@ def test_gradient_talyor_remainder():
         # compute the functional (again)
         J.append(_compute_functional(model, mesh, comm, misfit))
         # compute the second-order Taylor remainder
-        remainder.append(J[i + 1] - J[0] - step * assemble(grad * delta_m * dx))
-        # assemble(grad * delta_m * dx))
+        remainder.append(J[i + 1] - J[0] - step * assemble(delta_m * grad * dx))
         # halve the step and repeat
         step /= 2.0
 

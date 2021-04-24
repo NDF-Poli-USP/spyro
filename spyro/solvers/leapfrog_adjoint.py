@@ -4,11 +4,8 @@ import numpy as np
 from firedrake import *
 from firedrake.assemble import create_assembly_callable
 
-from scipy.sparse import csc_matrix
-
 from ..domains import quadrature, space
 from ..pml import damping
-from ..sources import delta_expr, delta_expr_3d
 from . import helpers
 
 set_log_level(ERROR)
@@ -16,7 +13,7 @@ set_log_level(ERROR)
 __all__ = ["Leapfrog_adjoint"]
 
 
-def Leapfrog_adjoint(model, mesh, comm, c, receivers, guess, residual):
+def Leapfrog_adjoint(model, mesh, comm, c, receivers, guess, residual, output=False):
     """Discrete adjoint for secord-order in time fully-explicit Leapfrog scheme
     with implementation of a Perfectly Matched Layer (PML) using
     CG FEM with or without higher order mass lumping (KMV type elements).
@@ -85,10 +82,9 @@ def Leapfrog_adjoint(model, mesh, comm, c, receivers, guess, residual):
     qr_x, qr_s, _ = quadrature.quadrature_rules(V)
 
     nt = int(tf / dt)  # number of timesteps
-    timeaxis = np.linspace(model["timeaxis"]["t0"], model["timeaxis"]["tf"], nt)
 
     receiver_locations = model["acquisition"]["receiver_locations"]
-        
+
     if dim == 2:
         is_local = [mesh.locate_cell([z, x]) for z, x in receiver_locations]
     elif dim == 3:
@@ -160,7 +156,8 @@ def Leapfrog_adjoint(model, mesh, comm, c, receivers, guess, residual):
         u_n = Function(V)
         u_np1 = Function(V)
 
-    outfile = helpers.create_output_file("Leapfrog_adjoint.pvd", comm, 0)
+    if output:
+        outfile = helpers.create_output_file("Leapfrog_adjoint.pvd", comm, 0)
 
     t = 0.0
 
@@ -261,6 +258,9 @@ def Leapfrog_adjoint(model, mesh, comm, c, receivers, guess, residual):
     assembly_callable = create_assembly_callable(rhs_, tensor=B)
 
     rhs_forcing = Function(V)  # forcing term
+    tmp = []
+    time_integrate_grad = False
+    gradi_list = []
     for IT in range(nt - 1, -1, -1):
         t = IT * float(dt)
 
@@ -296,15 +296,24 @@ def Leapfrog_adjoint(model, mesh, comm, c, receivers, guess, residual):
 
         # only compute for snaps that were saved
         if IT % fspool == 0:
-            gradi.assign = 0.0
+
             uufor.assign(guess.pop())
 
             grad_solv.solve()
-            dJdC_local += gradi
+
+            gradi_list.append(gradi)
+
+            if time_integrate_grad:
+                # integrate in time (trapezoidal rule)
+                dJdC_local += 0.5 * (gradi_list[0] + gradi_list[1]) * float(fspool * dt)
+                gradi_list = []
+                time_integrate_grad = False
+            else:
+                time_integrate_grad = True
 
         if IT % nspool == 0:
-            # if output:
-            #    outfile.write(u_n, time=t)
+            if output:
+                outfile.write(u_n, time=t)
             helpers.display_progress(comm, t)
 
     if comm.ensemble_comm.rank == 0 and comm.comm.rank == 0:
@@ -314,4 +323,3 @@ def Leapfrog_adjoint(model, mesh, comm, c, receivers, guess, residual):
         )
 
     return dJdC_local
-
