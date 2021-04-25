@@ -20,7 +20,6 @@ def Leapfrog(
     source_num=0,
     freq_index=0,
     output=False,
-    G=1.0,  # Added G only for debugging, will remove later
 ):
     """Secord-order in time fully-explicit scheme
     with implementation of a Perfectly Matched Layer (PML) using
@@ -186,9 +185,7 @@ def Leapfrog(
 
     is_local = helpers.receivers_local(mesh, dim, receivers.receiver_locations)
 
-    outfile = helpers.create_output_file(
-        "Leapfrog_G" + str(G) + ".pvd", comm, source_num
-    )
+    outfile = helpers.create_output_file("Forward.pvd", comm, source_num)
 
     t = 0.0
 
@@ -241,8 +238,6 @@ def Leapfrog(
             mm2 = inner(dot(Gamma_1, pp_n), qq) * dx(rule=qr_x)
             dd1 = c * c * inner(grad(u_n), dot(Gamma_2, qq)) * dx(rule=qr_x)
             dd2 = -c * c * inner(grad(psi_n), dot(Gamma_3, qq)) * dx(rule=qr_x)
-            # dd1 = 1 * inner(grad(u_n), dot(Gamma_2, qq)) * dx(rule=qr_x)
-            # dd2 = -1 * inner(grad(psi_n), dot(Gamma_3, qq)) * dx(rule=qr_x)
 
             FF += mm1 + mm2 + dd1 + dd2
             # -------------------------------------------------------
@@ -266,6 +261,10 @@ def Leapfrog(
 
     assembly_callable = create_assembly_callable(rhs_, tensor=B)
 
+    # use Reuben's point interpolation
+    # point_cloud = VertexOnlyMesh(mesh, receivers.receiver_locations)
+    # P = FunctionSpace(point_cloud, "DG", 0)
+
     rhs_forcing = Function(V)
 
     for IT in range(nt):
@@ -273,13 +272,10 @@ def Leapfrog(
         assembly_callable()
         if IT < dstep:
             f = excitations.apply_source(rhs_forcing, RW[IT])
-            f *= c * c
-            B.sub(0).dat.data[:] += f.dat.data[:]
         elif IT == dstep:
             f = excitations.apply_source(rhs_forcing, 0.0)
-            f *= c * c
-            B.sub(0).dat.data[:] += f.dat.data[:]
-
+        f *= c * c
+        B.sub(0).dat.data[:] += f.dat.data[:]
         solver.solve(X, B)
         if PML:
             if dim == 2:

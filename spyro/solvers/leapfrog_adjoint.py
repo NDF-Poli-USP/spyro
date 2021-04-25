@@ -226,15 +226,12 @@ def Leapfrog_adjoint(model, mesh, comm, c, receivers, guess, residual, output=Fa
     solver = LinearSolver(A, solver_parameters=params)
 
     # Define gradient problem
-    g_u = TrialFunction(V)
-    g_v = TestFunction(V)
-
-    mgrad = g_u * g_v * dx(rule=qr_x)
+    mgrad = u * v * dx(rule=qr_x)
 
     uuadj = Function(V)  # auxiliarly function for the gradient compt.
     uufor = Function(V)  # auxiliarly function for the gradient compt.
 
-    ffG = 2.0 * c * Constant(dt) * dot(grad(uuadj), grad(uufor)) * g_v * dx(rule=qr_x)
+    ffG = 2.0 * c * dt * dot(grad(uuadj), grad(uufor)) * v * dx(rule=qr_x)
 
     G = mgrad - ffG
     lhsG, rhsG = lhs(G), rhs(G)
@@ -288,18 +285,17 @@ def Leapfrog_adjoint(model, mesh, comm, c, receivers, guess, residual, output=Fa
         else:
             u_np1.assign(X)
 
-        u_nm1.assign(u_n)
-        u_n.assign(u_np1)
-
-        # compute the gradient increment
-        uuadj.assign(u_n)
-
         # only compute for snaps that were saved
         if IT % fspool == 0:
+            # compute the gradient increment
+            uuadj.assign(u_np1)
             uufor.assign(guess.pop())
 
             grad_solv.solve()
             dJdC_local += gradi
+
+        u_nm1.assign(u_n)
+        u_n.assign(u_np1)
 
         if IT % nspool == 0:
             if output:
