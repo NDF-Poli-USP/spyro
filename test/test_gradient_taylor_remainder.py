@@ -59,7 +59,9 @@ def _compute_functional(model, mesh, comm, misfit):
 
 def _compute_gradient(model, mesh, comm, vp_guess, receivers, misfit, p_guess):
     """"Compute the gradient of the functional and the functional"""
-    grad = spyro.solvers.Leapfrog_adjoint(model, mesh, comm, vp_guess, receivers, p_guess, misfit)
+    grad = spyro.solvers.Leapfrog_adjoint(
+        model, mesh, comm, vp_guess, receivers, p_guess, misfit
+    )
     outfile_total_gradient.write(grad, name="TotalGradient")
     return grad
 
@@ -97,7 +99,7 @@ def test_gradient_talyor_remainder():
     J.append(_compute_functional(model, mesh, comm, misfit))
 
     delta_m = Function(V).assign(0.50)
-    step = 0.5  #
+    step = 0.01  #
 
     remainder = []
     for i in range(3):

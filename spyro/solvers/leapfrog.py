@@ -20,9 +20,9 @@ def Leapfrog(
     source_num=0,
     freq_index=0,
     output=False,
-    G=1.0 #Added G only for debugging, will remove later
+    G=1.0,  # Added G only for debugging, will remove later
 ):
-    """Secord-order in time fully-explicit Leapfrog scheme
+    """Secord-order in time fully-explicit scheme
     with implementation of a Perfectly Matched Layer (PML) using
     CG FEM with or without higher order mass lumping (KMV type elements).
 
@@ -39,7 +39,7 @@ def Leapfrog(
     excitations: A list Firedrake.Functions
         Each function contains an interpolated space function
         emulated a Dirac delta at the location of source `source_num`
-    receivers: A :class:`Spyro.Receivers` object.
+    receivers: A :class:`spyro.Receivers` object.
         Contains the receiver locations and sparse interpolation methods.
     source_num: `int`, optional
         The source number you wish to simulate
@@ -96,9 +96,15 @@ def Leapfrog(
 
     if method == "KMV":
         params = {"ksp_type": "preonly", "pc_type": "jacobi"}
-    elif method == "CG" and mesh.ufl_cell() != quadrilateral and mesh.ufl_cell() != hexahedron :
+    elif (
+        method == "CG"
+        and mesh.ufl_cell() != quadrilateral
+        and mesh.ufl_cell() != hexahedron
+    ):
         params = {"ksp_type": "cg", "pc_type": "jacobi"}
-    elif method == "CG" and (mesh.ufl_cell() == quadrilateral or mesh.ufl_cell() == hexahedron ):
+    elif method == "CG" and (
+        mesh.ufl_cell() == quadrilateral or mesh.ufl_cell() == hexahedron
+    ):
         params = {"ksp_type": "preonly", "pc_type": "jacobi"}
     else:
         raise ValueError("method is not yet supported")
@@ -180,13 +186,15 @@ def Leapfrog(
 
     is_local = helpers.receivers_local(mesh, dim, receivers.receiver_locations)
 
-    outfile = helpers.create_output_file("Leapfrog_G"+str(G)+".pvd", comm, source_num)
+    outfile = helpers.create_output_file(
+        "Leapfrog_G" + str(G) + ".pvd", comm, source_num
+    )
 
     t = 0.0
 
     cutoff = freq_bands[freq_index] if "inversion" in model else None
     RW = FullRickerWavelet(dt, tf, freq, amp=amp, cutoff=cutoff)
-    
+
     # -------------------------------------------------------
     m1 = ((u - 2.0 * u_n + u_nm1) / Constant(dt ** 2)) * v * dx(rule=qr_x)
     a = c * c * dot(grad(u_n), grad(v)) * dx(rule=qr_x)  # explicit
@@ -265,10 +273,11 @@ def Leapfrog(
         assembly_callable()
         if IT < dstep:
             f = excitations.apply_source(rhs_forcing, RW[IT])
+            f *= c * c
             B.sub(0).dat.data[:] += f.dat.data[:]
-            
         elif IT == dstep:
             f = excitations.apply_source(rhs_forcing, 0.0)
+            f *= c * c
             B.sub(0).dat.data[:] += f.dat.data[:]
 
         solver.solve(X, B)
@@ -289,7 +298,6 @@ def Leapfrog(
         u_nm1.assign(u_n)
         u_n.assign(u_np1)
 
-        
         usol_recv.append(receivers.interpolate(u_n.dat.data_ro_with_halos[:], is_local))
 
         if IT % fspool == 0:
@@ -298,7 +306,7 @@ def Leapfrog(
 
         if IT % nspool == 0:
             assert (
-                 norm(u_n) < 1
+                norm(u_n) < 1
             ), "Numerical instability. Try reducing dt or building the mesh differently"
             if output:
                 outfile.write(u_n, time=t, name="Pressure")
@@ -316,4 +324,3 @@ def Leapfrog(
         )
 
     return usol, usol_recv
-
