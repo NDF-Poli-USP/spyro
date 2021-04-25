@@ -62,7 +62,7 @@ def compute_functional(model, comm, residual):
     for ti in range(nt):
         Jtemp = 0.0
         for rn in range(num_receivers):
-            Jtemp += 0.5 * (residual[ti][rn] ** 2)
+            Jtemp += residual[ti][rn] ** 2
         Jlist.append(Jtemp)
     # Integrate in time (trapezoidal rule)
     for i in range(1, nt - 1):
