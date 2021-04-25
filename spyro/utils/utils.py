@@ -57,12 +57,10 @@ def compute_functional(model, comm, residual):
     if comm.comm.rank == 0 and comm.ensemble_comm.rank == 0:
         print("Computing the functional...", flush=True)
 
-    
     J = 0.0
-    Jtemp = 0.0
     Jlist = []
     for ti in range(nt):
-        
+        Jtemp = 0.0
         for rn in range(num_receivers):
             Jtemp += 0.5 * (residual[ti][rn] ** 2)
         Jlist.append(Jtemp)
@@ -84,7 +82,7 @@ def evaluate_misfit(model, my_ensemble, guess, exact):
 
     if my_ensemble.comm.rank == 0 and my_ensemble.ensemble_comm.rank == 0:
         print("Computing the misfit...", flush=True)
-    l = int(exact.shape[0]/skip)
+    l = int(exact.shape[0] / skip)
     ds_exact = exact[::skip]
     return ds_exact[:l] - guess
 
