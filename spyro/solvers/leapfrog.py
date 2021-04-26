@@ -261,10 +261,6 @@ def Leapfrog(
 
     assembly_callable = create_assembly_callable(rhs_, tensor=B)
 
-    # use Reuben's point interpolation
-    # point_cloud = VertexOnlyMesh(mesh, receivers.receiver_locations)
-    # P = FunctionSpace(point_cloud, "DG", 0)
-
     rhs_forcing = Function(V)
 
     for IT in range(nt):
@@ -274,8 +270,9 @@ def Leapfrog(
             f = excitations.apply_source(rhs_forcing, RW[IT])
         elif IT == dstep:
             f = excitations.apply_source(rhs_forcing, 0.0)
-        f *= c * c
-        B.sub(0).dat.data[:] += f.dat.data[:]
+        # f *= c * c
+        B0 = B.sub(0)
+        B0 += f
         solver.solve(X, B)
         if PML:
             if dim == 2:
@@ -291,13 +288,12 @@ def Leapfrog(
         else:
             u_np1.assign(X)
 
-        u_nm1.assign(u_n)
-        u_n.assign(u_np1)
-
-        usol_recv.append(receivers.interpolate(u_n.dat.data_ro_with_halos[:], is_local))
+        usol_recv.append(
+            receivers.interpolate(u_np1.dat.data_ro_with_halos[:], is_local)
+        )
 
         if IT % fspool == 0:
-            usol[saveIT].assign(u_n)
+            usol[saveIT].assign(u_np1)
             saveIT += 1
 
         if IT % nspool == 0:
@@ -307,6 +303,9 @@ def Leapfrog(
             if output:
                 outfile.write(u_n, time=t, name="Pressure")
             helpers.display_progress(comm, t)
+
+        u_nm1.assign(u_n)
+        u_n.assign(u_np1)
 
         t = IT * float(dt)
 
