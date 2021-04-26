@@ -4,11 +4,8 @@ import numpy as np
 from firedrake import *
 from firedrake.assemble import create_assembly_callable
 
-from scipy.sparse import csc_matrix
-
 from ..domains import quadrature, space
 from ..pml import damping
-from ..sources import delta_expr, delta_expr_3d
 from . import helpers
 
 set_log_level(ERROR)
@@ -16,8 +13,8 @@ set_log_level(ERROR)
 __all__ = ["Leapfrog_adjoint"]
 
 
-def Leapfrog_adjoint(model, mesh, comm, c, guess, residual):
-    """Discrete adjoint for secord-order in time fully-explicit Leapfrog scheme
+def Leapfrog_adjoint(model, mesh, comm, c, receivers, guess, residual, output=False):
+    """Discrete adjoint with secord-order in time fully-explicit scheme
     with implementation of a Perfectly Matched Layer (PML) using
     CG FEM with or without higher order mass lumping (KMV type elements).
 
@@ -31,6 +28,8 @@ def Leapfrog_adjoint(model, mesh, comm, c, guess, residual):
         The MPI communicator for parallelism
        c: Firedrake.Function
         The velocity model interpolated onto the mesh nodes.
+    receivers: A :class:`spyro.Receivers` object.
+        Contains the receiver locations and sparse interpolation methods.
     guess: A list of Firedrake functions
         Contains the forward wavefield at a set of timesteps
     residual: array-like
@@ -84,20 +83,10 @@ def Leapfrog_adjoint(model, mesh, comm, c, guess, residual):
 
     qr_x, qr_s, _ = quadrature.quadrature_rules(V)
 
-    # Prepare receiver forcing terms
-    if dim == 2:
-        z, x = SpatialCoordinate(mesh)
-        receiver = Constant([0, 0])
-        delta = Interpolator(delta_expr(receiver, z, x), V)
-    elif dim == 3:
-        z, x, y = SpatialCoordinate(mesh)
-        receiver = Constant([0, 0, 0])
-        delta = Interpolator(delta_expr_3d(receiver, z, x, y), V)
-
-    receiver_locations = model["acquisition"]["receiver_locations"]
-
     nt = int(tf / dt)  # number of timesteps
     timeaxis = np.linspace(model["timeaxis"]["t0"], model["timeaxis"]["tf"], nt)
+
+    receiver_locations = model["acquisition"]["receiver_locations"]
 
     if dim == 2:
         is_local = [mesh.locate_cell([z, x]) for z, x in receiver_locations]
@@ -105,18 +94,6 @@ def Leapfrog_adjoint(model, mesh, comm, c, guess, residual):
         is_local = [mesh.locate_cell([z, x, y]) for z, x, y in receiver_locations]
 
     dJdC_local = Function(V)
-
-    # receivers are forced through sparse matrix vec multiplication
-    sparse_excitations = csc_matrix((len(dJdC_local.dat.data), numrecs))
-    for r, x0 in enumerate(receiver_locations):
-        receiver.assign(x0)
-        exct = delta.interpolate().dat.data_ro.copy()
-        row = exct.nonzero()[0]
-        col = np.repeat(r, len(row))
-        sparse_exct = csc_matrix(
-            (exct[row], (row, col)), shape=sparse_excitations.shape
-        )
-        sparse_excitations += sparse_exct
 
     # if using the PML
     if PML:
@@ -182,7 +159,8 @@ def Leapfrog_adjoint(model, mesh, comm, c, guess, residual):
         u_n = Function(V)
         u_np1 = Function(V)
 
-    outfile = helpers.create_output_file("Leapfrog_adjoint.pvd", comm, 0)
+    if output:
+        outfile = helpers.create_output_file("Leapfrog_adjoint.pvd", comm, 0)
 
     t = 0.0
 
@@ -248,15 +226,12 @@ def Leapfrog_adjoint(model, mesh, comm, c, guess, residual):
     solver = LinearSolver(A, solver_parameters=params)
 
     # Define gradient problem
-    g_u = TrialFunction(V)
-    g_v = TestFunction(V)
-
-    mgrad = g_u * g_v * dx(rule=qr_x)
+    mgrad = u * v * dx(rule=qr_x)
 
     uuadj = Function(V)  # auxiliarly function for the gradient compt.
     uufor = Function(V)  # auxiliarly function for the gradient compt.
 
-    ffG = 2.0 * c * Constant(dt) * dot(grad(uuadj), grad(uufor)) * g_v * dx(rule=qr_x)
+    ffG = 2.0 * c * dt * dot(grad(uuadj), grad(uufor)) * v * dx(rule=qr_x)
 
     G = mgrad - ffG
     lhsG, rhsG = lhs(G), rhs(G)
@@ -290,7 +265,7 @@ def Leapfrog_adjoint(model, mesh, comm, c, guess, residual):
         # B = assemble(rhs_, tensor=B)
         assembly_callable()
 
-        f = receivers.apply_source(rhs_forcing, residual, IT, is_local)
+        f = receivers.apply_source_receivers(rhs_forcing, residual, IT, is_local)
         # add forcing term to solve scalar pressure
         B.sub(0).dat.data[:] += f.dat.data[:]
 
@@ -310,23 +285,21 @@ def Leapfrog_adjoint(model, mesh, comm, c, guess, residual):
         else:
             u_np1.assign(X)
 
-        u_nm1.assign(u_n)
-        u_n.assign(u_np1)
-
-        # compute the gradient increment
-        uuadj.assign(u_n)
-
         # only compute for snaps that were saved
         if IT % fspool == 0:
-            gradi.assign = 0.0
+            # compute the gradient increment
+            uuadj.assign(u_np1)
             uufor.assign(guess.pop())
 
             grad_solv.solve()
             dJdC_local += gradi
 
+        u_nm1.assign(u_n)
+        u_n.assign(u_np1)
+
         if IT % nspool == 0:
-            # if output:
-            #    outfile.write(u_n, time=t)
+            if output:
+                outfile.write(u_n, time=t)
             helpers.display_progress(comm, t)
 
     if comm.ensemble_comm.rank == 0 and comm.comm.rank == 0:
@@ -336,4 +309,3 @@ def Leapfrog_adjoint(model, mesh, comm, c, guess, residual):
         )
 
     return dJdC_local
-
