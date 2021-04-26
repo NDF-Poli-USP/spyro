@@ -57,6 +57,12 @@ def compute_functional(model, comm, residual):
     if comm.comm.rank == 0 and comm.ensemble_comm.rank == 0:
         print("Computing the functional...", flush=True)
 
+    # J = 0.0
+    # for ti in range(nt):
+    #    for rn in range(num_receivers):
+    #        J += residual[ti][rn] ** 2
+    # J *= 0.5
+
     J = 0.0
     Jlist = []
     for ti in range(nt):

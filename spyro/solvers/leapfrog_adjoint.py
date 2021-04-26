@@ -160,7 +160,7 @@ def Leapfrog_adjoint(model, mesh, comm, c, receivers, guess, residual, output=Fa
         u_np1 = Function(V)
 
     if output:
-        outfile = helpers.create_output_file("Leapfrog_adjoint.pvd", comm, 0)
+        outfile = helpers.create_output_file("Backward.pvd", comm, 0)
 
     t = 0.0
 
@@ -231,7 +231,7 @@ def Leapfrog_adjoint(model, mesh, comm, c, receivers, guess, residual, output=Fa
     uuadj = Function(V)  # auxiliarly function for the gradient compt.
     uufor = Function(V)  # auxiliarly function for the gradient compt.
 
-    ffG = 2.0 * c * dt * dot(grad(uuadj), grad(uufor)) * v * dx(rule=qr_x)
+    ffG = 2.0 * c * Constant(dt) * dot(grad(uuadj), grad(uufor)) * v * dx(rule=qr_x)
 
     G = mgrad - ffG
     lhsG, rhsG = lhs(G), rhs(G)
@@ -239,7 +239,7 @@ def Leapfrog_adjoint(model, mesh, comm, c, receivers, guess, residual, output=Fa
     gradi = Function(V)
     grad_prob = LinearVariationalProblem(lhsG, rhsG, gradi)
     if method == "KMV":
-        grad_solv = LinearVariationalSolver(
+        grad_solver = LinearVariationalSolver(
             grad_prob,
             solver_parameters={
                 "ksp_type": "preonly",
@@ -248,7 +248,7 @@ def Leapfrog_adjoint(model, mesh, comm, c, receivers, guess, residual, output=Fa
             },
         )
     elif method == "CG":
-        grad_solv = LinearVariationalSolver(
+        grad_solver = LinearVariationalSolver(
             grad_prob,
             solver_parameters={
                 "mat_type": "matfree",
@@ -267,7 +267,7 @@ def Leapfrog_adjoint(model, mesh, comm, c, receivers, guess, residual, output=Fa
 
         f = receivers.apply_source_receivers(rhs_forcing, residual, IT, is_local)
         # add forcing term to solve scalar pressure
-        B.sub(0).dat.data[:] += f.dat.data[:]
+        B0 += f
 
         # AX=B --> solve for X = B/Aˆ-1
         solver.solve(X, B)
@@ -291,7 +291,7 @@ def Leapfrog_adjoint(model, mesh, comm, c, receivers, guess, residual, output=Fa
             uuadj.assign(u_np1)
             uufor.assign(guess.pop())
 
-            grad_solv.solve()
+            grad_solver.solve()
             dJdC_local += gradi
 
         u_nm1.assign(u_n)
