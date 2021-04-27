@@ -293,7 +293,7 @@ def Leapfrog_adjoint(model, mesh, comm, c, receivers, guess, residual, output=Fa
             uufor.assign(guess.pop())
 
             grad_solver.solve()
-            dJdC_local += gradi*1e2
+            dJdC_local += gradi
 
         u_nm1.assign(u_n)
         u_n.assign(u_np1)
