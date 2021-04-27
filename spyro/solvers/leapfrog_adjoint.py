@@ -231,7 +231,7 @@ def Leapfrog_adjoint(model, mesh, comm, c, receivers, guess, residual, output=Fa
     uuadj = Function(V)  # auxiliarly function for the gradient compt.
     uufor = Function(V)  # auxiliarly function for the gradient compt.
 
-    ffG = 2.0 * c * Constant(dt) * dot(grad(uuadj), grad(uufor)) * v * dx(rule=qr_x)
+    ffG = 2.0 * c * 1.0 * dot(grad(uuadj), grad(uufor)) * v * dx(rule=qr_x)
 
     G = mgrad - ffG
     lhsG, rhsG = lhs(G), rhs(G)
@@ -258,6 +258,8 @@ def Leapfrog_adjoint(model, mesh, comm, c, receivers, guess, residual, output=Fa
     assembly_callable = create_assembly_callable(rhs_, tensor=B)
 
     rhs_forcing = Function(V)  # forcing term
+    time_integrate_grad = False
+    gradi_list = []
     for IT in range(nt - 1, -1, -1):
         t = IT * float(dt)
 
@@ -293,7 +295,16 @@ def Leapfrog_adjoint(model, mesh, comm, c, receivers, guess, residual, output=Fa
             uufor.assign(guess.pop())
 
             grad_solver.solve()
-            dJdC_local += gradi
+
+            gradi_list.append(gradi)
+
+            if time_integrate_grad:
+                # integrate in time (trapezoidal rule)
+                dJdC_local += 0.5 * (gradi_list[0] + gradi_list[1]) * float(fspool * dt)
+                gradi_list = []
+                time_integrate_grad = False
+            else:
+                time_integrate_grad = True
 
         u_nm1.assign(u_n)
         u_n.assign(u_np1)
