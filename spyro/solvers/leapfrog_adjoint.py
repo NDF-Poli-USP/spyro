@@ -267,6 +267,7 @@ def Leapfrog_adjoint(model, mesh, comm, c, receivers, guess, residual, output=Fa
 
         f = receivers.apply_source_receivers(rhs_forcing, residual, IT, is_local)
         # add forcing term to solve scalar pressure
+        B0 = B.sub(0)
         B0 += f
 
         # AX=B --> solve for X = B/Aˆ-1
@@ -292,7 +293,7 @@ def Leapfrog_adjoint(model, mesh, comm, c, receivers, guess, residual, output=Fa
             uufor.assign(guess.pop())
 
             grad_solver.solve()
-            dJdC_local += gradi
+            dJdC_local += gradi*1e2
 
         u_nm1.assign(u_n)
         u_n.assign(u_np1)
