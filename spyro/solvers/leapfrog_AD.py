@@ -10,7 +10,7 @@ from . import helpers
 set_log_level(ERROR)
 
 
-def Leapfrog_AD(
+def forward_AD(
     model,
     mesh,
     comm,
