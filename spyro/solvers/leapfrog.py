@@ -185,7 +185,8 @@ def Leapfrog(
 
     is_local = helpers.receivers_local(mesh, dim, receivers.receiver_locations)
 
-    outfile = helpers.create_output_file("Forward.pvd", comm, source_num)
+    if output:
+        outfile = helpers.create_output_file("Forward.pvd", comm, source_num)
 
     t = 0.0
 
