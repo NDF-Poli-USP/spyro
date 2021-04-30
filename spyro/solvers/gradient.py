@@ -55,12 +55,12 @@ def gradient(
     tf = model["timeaxis"]["tf"]
     nspool = model["timeaxis"]["nspool"]
     fspool = model["timeaxis"]["fspool"]
-    PML = model["PML"]["status"]
+    PML = model["BCs"]["status"]
     if PML:
         Lx = model["mesh"]["Lx"]
         Lz = model["mesh"]["Lz"]
-        lx = model["PML"]["lx"]
-        lz = model["PML"]["lz"]
+        lx = model["BCs"]["lx"]
+        lz = model["BCs"]["lz"]
         x1 = 0.0
         x2 = Lx
         a_pml = lx
@@ -69,7 +69,7 @@ def gradient(
         c_pml = lz
         if dim == 3:
             Ly = model["mesh"]["Ly"]
-            ly = model["PML"]["ly"]
+            ly = model["BCs"]["ly"]
             y1 = 0.0
             y2 = Ly
             b_pml = ly
@@ -91,7 +91,7 @@ def gradient(
 
     receiver_locations = model["acquisition"]["receiver_locations"]
 
-    is_local = receivers_local(mesh, dim, receiver_locations)
+    is_local = helpers.receivers_local(mesh, dim, receiver_locations)
 
     dJ = Function(V, name="gradient")
 
@@ -165,10 +165,9 @@ def gradient(
     m1 = ((u - 2.0 * u_n + u_nm1) / Constant(dt ** 2)) * v * dx(rule=qr_x)
     a = c * c * dot(grad(u_n), grad(v)) * dx(rule=qr_x)  # explicit
 
-    if model["PML"]["outer_bc"] == "non-reflective":
+    nf = 0
+    if model["BCs"]["outer_bc"] == "non-reflective":
         nf = c * ((u_n - u_nm1) / dt) * v * ds(rule=qr_s)
-    else:
-        nf = 0
 
     FF = m1 + a + nf
 

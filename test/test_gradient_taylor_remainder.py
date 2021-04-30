@@ -9,7 +9,7 @@ from .inputfiles.Model1_gradient_2d import model
 
 # outfile_total_gradient = File(os.getcwd() + "/results/Gradient.pvd")
 
-forward = spyro.solvers.forwrd
+forward = spyro.solvers.forward
 gradient = spyro.solvers.gradient
 functional = spyro.utils.compute_functional
 
@@ -47,7 +47,7 @@ def test_gradient_talyor_remainder():
 
     receivers = spyro.Receivers(model, mesh, V, comm).create()
 
-    wavelet = spyro.sources.FullRickerWavelet(
+    wavelet = spyro.full_ricker_wavelet(
         model["timeaxis"]["dt"],
         model["timeaxis"]["tf"],
         model["acquisition"]["frequency"],
@@ -77,7 +77,7 @@ def test_gradient_talyor_remainder():
 
     misfit = p_exact_recv - p_guess_recv
 
-    Jm = functional(model, comm, misfit)
+    Jm = functional(model, misfit)
 
     # compute the gradient of the control (to be verified)
     dJ = gradient(model, mesh, comm, vp_guess, receivers, p_guess, misfit)
@@ -99,7 +99,7 @@ def test_gradient_talyor_remainder():
         _, p_guess_recv = forward(
             model, mesh, comm, vp_guess, sources, wavelet, receivers
         )
-        Jp = functional(model, comm, p_exact_recv - p_guess_recv)
+        Jp = functional(model, p_exact_recv - p_guess_recv)
         # compute the second-order Taylor remainder
         remainder = np.abs(Jp - Jm - step * np.dot(dJ.vector(), delta_m.vector()))
         remainders.append(remainder)
