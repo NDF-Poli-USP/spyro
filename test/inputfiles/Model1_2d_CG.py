@@ -26,7 +26,7 @@ opts = {
 parallelism = {
     "type": "automatic", # options: automatic, custom, off
     "custom_cores_per_shot": [], # only if the user wants a different number of cores for every shot.
-    # input is a list of integers with the length of the number of shots. 
+    # input is a list of integers with the length of the number of shots.
     }
 
 mesh = {
@@ -38,7 +38,7 @@ mesh = {
     "truemodel": truemodel + ".hdf5",
 }
 
-PML = {
+BCs = {
     "status": False,  # True,  # True or false
     "outer_bc": "non-reflective",  #  neumann, non-reflective (outer boundary condition)
     "damping_type": "polynomial",  # polynomial. hyperbolic, shifted_hyperbolic
@@ -78,7 +78,7 @@ model = {
     "self": None,
     "inversion": inversion,
     "opts": opts,
-    "PML": PML,
+    "BCs": PML,
     "parallelism": parallelism,
     "mesh": mesh,
     "acquisition": acquisition,
