@@ -1,13 +1,9 @@
 from firedrake import *
-from firedrake.assemble import create_assembly_callable
 
-from .. import utils
 from ..domains import quadrature, space
 from ..pml import damping
-from ..sources import FullRickerWavelet, delta_expr
+from ..sources import full_ricker_wavelet, delta_expr
 from . import helpers
-
-set_log_level(ERROR)
 
 
 def forward_AD(
@@ -199,11 +195,11 @@ def forward_AD(
         nf = c * ((u_n - u_nm1) / dt) * v * ds(rule=qr_s)
     else:
         nf = 0
-    RW = FullRickerWavelet(dt, tf, freq, amp=amp, cutoff=None)
-   
-    f, ricker = external_forcing(RW,mesh, model, source_num,V)
+    RW = full_ricker_wavelet(dt, tf, freq, amp=amp, cutoff=None)
+
+    f, ricker = external_forcing(RW, mesh, model, source_num, V)
     # FF = m1 + a + nf
-    FF = m1 + a + nf - c*c*f * v * dx(rule=qr_x)
+    FF = m1 + a + nf - c * c * f * v * dx(rule=qr_x)
 
     if PML:
         X = Function(W)
@@ -262,11 +258,11 @@ def forward_AD(
 
     # assembly_callable = create_assembly_callable(rhs_, tensor=B)
     problem = LinearVariationalProblem(lhs_, rhs_, X)
-    solver  = LinearVariationalSolver(problem, solver_parameters=params)
-    
+    solver = LinearVariationalSolver(problem, solver_parameters=params)
+
     rhs_forcing = Function(V)
     point_cloud = VertexOnlyMesh(mesh, rec_position)
-    P           = FunctionSpace(point_cloud, 'DG', 0)
+    P = FunctionSpace(point_cloud, "DG", 0)
     obj_func = 0
     for IT in range(nt):
 
@@ -290,10 +286,10 @@ def forward_AD(
         else:
             u_np1.assign(X)
 
-        rec  = interpolate(u_np1, P)
+        rec = interpolate(u_np1, P)
         usol_recv.append(rec.dat.data)
-        
-        obj_func  += assemble(dt*0.25*inner(rec, rec)*dx) 
+
+        obj_func += assemble(dt * 0.25 * inner(rec, rec) * dx)
 
         if IT % nspool == 0:
             assert (
@@ -319,15 +315,16 @@ def forward_AD(
 
     return obj_func, usol_recv
 
+
 # ----------------------------------------#
 # external forcing
-def external_forcing(RW,mesh,model,source_num,V):
+def external_forcing(RW, mesh, model, source_num, V):
 
-    pos    = model["acquisition"]["source_pos"]
-    z, x = SpatialCoordinate(mesh) 
+    pos = model["acquisition"]["source_pos"]
+    z, x = SpatialCoordinate(mesh)
     sigma_x = Constant(2000)
-    source  = Constant(pos[source_num])
-    delta   = Interpolator(delta_expr(source, z, x, sigma_x), V)
+    source = Constant(pos[source_num])
+    delta = Interpolator(delta_expr(source, z, x, sigma_x), V)
     excitation = Function(delta.interpolate())
 
     ricker = Constant(0)
@@ -335,4 +332,6 @@ def external_forcing(RW,mesh,model,source_num,V):
     ricker.assign(RW[0], annotate=True)
 
     return f, ricker
+
+
 # ----------------------------------------#

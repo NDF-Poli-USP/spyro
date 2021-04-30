@@ -4,13 +4,13 @@ from firedrake import *
 
 import spyro
 
-from .inputfiles.Model1_Leapfrog_adjoint_2d import model
+from .inputfiles.Model1_gradient_2d import model
 
 
 # outfile_total_gradient = File(os.getcwd() + "/results/Gradient.pvd")
 
-forward = spyro.solvers.Leapfrog
-adjoint = spyro.solvers.Leapfrog_adjoint
+forward = spyro.solvers.forward
+gradient = spyro.solvers.gradient
 functional = spyro.utils.compute_functional
 
 
@@ -47,6 +47,12 @@ def test_gradient_talyor_remainder():
 
     receivers = spyro.Receivers(model, mesh, V, comm).create()
 
+    wavelet = spyro.full_ricker_wavelet(
+        model["timeaxis"]["dt"],
+        model["timeaxis"]["tf"],
+        model["acquisition"]["frequency"],
+    )
+
     # simulate the exact model
     p_exact, p_exact_recv = forward(
         model,
@@ -54,6 +60,7 @@ def test_gradient_talyor_remainder():
         comm,
         vp_exact,
         sources,
+        wavelet,
         receivers,
     )
 
@@ -64,15 +71,16 @@ def test_gradient_talyor_remainder():
         comm,
         vp_guess,
         sources,
+        wavelet,
         receivers,
     )
 
     misfit = p_exact_recv - p_guess_recv
 
-    Jm = functional(model, comm, misfit)
+    Jm = functional(model, misfit)
 
     # compute the gradient of the control (to be verified)
-    dJ = adjoint(model, mesh, comm, vp_guess, receivers, p_guess, misfit)
+    dJ = gradient(model, mesh, comm, vp_guess, receivers, p_guess, misfit)
 
     step = 0.01  # step length
 
@@ -88,8 +96,10 @@ def test_gradient_talyor_remainder():
         # perturb the model and calculate the functional (again)
         # J(m + delta_m*h)
         vp_guess = vp_original + step * delta_m
-        _, p_guess_recv = forward(model, mesh, comm, vp_guess, sources, receivers)
-        Jp = functional(model, comm, p_exact_recv - p_guess_recv)
+        _, p_guess_recv = forward(
+            model, mesh, comm, vp_guess, sources, wavelet, receivers
+        )
+        Jp = functional(model, p_exact_recv - p_guess_recv)
         # compute the second-order Taylor remainder
         remainder = np.abs(Jp - Jm - step * np.dot(dJ.vector(), delta_m.vector()))
         remainders.append(remainder)

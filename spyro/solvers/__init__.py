@@ -1,11 +1,11 @@
-from .leapfrog import Leapfrog
+from .forward import forward
 from .forward_AD import forward_AD
-from .leapfrog_adjoint import Leapfrog_adjoint
+from .gradient import gradient
 from .ssprk3 import SSPRK3
 
 __all__ = [
-    "Leapfrog",    #forward solver adapted for Discrete Adjoint
-    "forward_AD", #forward solver adapted for Automatic Differentiation
-    "Leapfrog_adjoint",
+    "forward",  # forward solver adapted for discrete adjoint
+    "forward_AD",  # forward solver adapted for Automatic Differentiation
+    "gradient",
     "SSPRK3",
 ]

@@ -1,6 +1,3 @@
-from __future__ import print_function
-
-import numpy as np
 from firedrake import *
 from firedrake.assemble import create_assembly_callable
 
@@ -8,13 +5,16 @@ from ..domains import quadrature, space
 from ..pml import damping
 from . import helpers
 
+# Note this turns off non-fatal warnings
 set_log_level(ERROR)
 
-__all__ = ["Leapfrog_adjoint"]
+__all__ = ["gradient"]
 
 
-def Leapfrog_adjoint(model, mesh, comm, c, receivers, guess, residual, output=False):
-    """Discrete adjoint with secord-order in time fully-explicit scheme
+def gradient(
+    model, mesh, comm, c, receivers, guess, residual, output=False, save_adjoint=False
+):
+    """Discrete adjoint with secord-order in time fully-explicit timestepping scheme
     with implementation of a Perfectly Matched Layer (PML) using
     CG FEM with or without higher order mass lumping (KMV type elements).
 
@@ -32,18 +32,22 @@ def Leapfrog_adjoint(model, mesh, comm, c, receivers, guess, residual, output=Fa
         Contains the receiver locations and sparse interpolation methods.
     guess: A list of Firedrake functions
         Contains the forward wavefield at a set of timesteps
-    residual: array-like
+    residual: array-like [timesteps][receivers]
         The difference between the observed and modeled data at
         the receivers
+    output: boolean
+        optional, write the adjoint to disk (only for debugging)
+    save_adjoint: A list of Firedrake functions
+        Contains the adjoint at all timesteps
 
     Returns
     -------
     dJdc_local: A Firedrake.Function containing the gradient of
                 the functional w.r.t. `c`
+    adjoint: Optional, a list of Firedrake functions containing the adjoint
 
     """
 
-    numrecs = model["acquisition"]["num_receivers"]
     method = model["opts"]["method"]
     degree = model["opts"]["degree"]
     dim = model["opts"]["dimension"]
@@ -51,12 +55,12 @@ def Leapfrog_adjoint(model, mesh, comm, c, receivers, guess, residual, output=Fa
     tf = model["timeaxis"]["tf"]
     nspool = model["timeaxis"]["nspool"]
     fspool = model["timeaxis"]["fspool"]
-    PML = model["PML"]["status"]
+    PML = model["BCs"]["status"]
     if PML:
         Lx = model["mesh"]["Lx"]
         Lz = model["mesh"]["Lz"]
-        lx = model["PML"]["lx"]
-        lz = model["PML"]["lz"]
+        lx = model["BCs"]["lx"]
+        lz = model["BCs"]["lz"]
         x1 = 0.0
         x2 = Lx
         a_pml = lx
@@ -65,7 +69,7 @@ def Leapfrog_adjoint(model, mesh, comm, c, receivers, guess, residual, output=Fa
         c_pml = lz
         if dim == 3:
             Ly = model["mesh"]["Ly"]
-            ly = model["PML"]["ly"]
+            ly = model["BCs"]["ly"]
             y1 = 0.0
             y2 = Ly
             b_pml = ly
@@ -84,18 +88,13 @@ def Leapfrog_adjoint(model, mesh, comm, c, receivers, guess, residual, output=Fa
     qr_x, qr_s, _ = quadrature.quadrature_rules(V)
 
     nt = int(tf / dt)  # number of timesteps
-    timeaxis = np.linspace(model["timeaxis"]["t0"], model["timeaxis"]["tf"], nt)
 
     receiver_locations = model["acquisition"]["receiver_locations"]
 
-    if dim == 2:
-        is_local = [mesh.locate_cell([z, x]) for z, x in receiver_locations]
-    elif dim == 3:
-        is_local = [mesh.locate_cell([z, x, y]) for z, x, y in receiver_locations]
+    is_local = helpers.receivers_local(mesh, dim, receiver_locations)
 
-    dJdC_local = Function(V)
+    dJ = Function(V, name="gradient")
 
-    # if using the PML
     if PML:
         Z = VectorFunctionSpace(V.ufl_domain(), V.ufl_element())
         if dim == 2:
@@ -116,7 +115,6 @@ def Leapfrog_adjoint(model, mesh, comm, c, receivers, guess, residual, output=Fa
             u_n, psi_n, pp_n = Function(W).split()
             u_nm1, psi_nm1, pp_nm1 = Function(W).split()
 
-        # in 2d
         if dim == 2:
             (sigma_x, sigma_z) = damping.functions(
                 model, V, dim, x, x1, x2, a_pml, z, z1, z2, c_pml
@@ -128,7 +126,6 @@ def Leapfrog_adjoint(model, mesh, comm, c, receivers, guess, residual, output=Fa
                 * v
                 * dx(rule=qr_x)
             )
-        # in 3d
         elif dim == 3:
 
             sigma_x, sigma_y, sigma_z = damping.functions(
@@ -160,7 +157,7 @@ def Leapfrog_adjoint(model, mesh, comm, c, receivers, guess, residual, output=Fa
         u_np1 = Function(V)
 
     if output:
-        outfile = helpers.create_output_file("Backward.pvd", comm, 0)
+        outfile = helpers.create_output_file("adjoint.pvd", comm, 0)
 
     t = 0.0
 
@@ -168,10 +165,9 @@ def Leapfrog_adjoint(model, mesh, comm, c, receivers, guess, residual, output=Fa
     m1 = ((u - 2.0 * u_n + u_nm1) / Constant(dt ** 2)) * v * dx(rule=qr_x)
     a = c * c * dot(grad(u_n), grad(v)) * dx(rule=qr_x)  # explicit
 
-    if model["PML"]["outer_bc"] == "non-reflective":
+    nf = 0
+    if model["BCs"]["outer_bc"] == "non-reflective":
         nf = c * ((u_n - u_nm1) / dt) * v * ds(rule=qr_s)
-    else:
-        nf = 0
 
     FF = m1 + a + nf
 
@@ -260,14 +256,16 @@ def Leapfrog_adjoint(model, mesh, comm, c, receivers, guess, residual, output=Fa
     rhs_forcing = Function(V)  # forcing term
     time_integrate_grad = False
     gradi_list = []
-    for IT in range(nt - 1, -1, -1):
-        t = IT * float(dt)
+    if save_adjoint:
+        adjoint = [Function(V, name="adjoint_pressure") for t in range(nt)]
+    for step in range(nt - 1, -1, -1):
+        t = step * float(dt)
 
         # Solver - main equation - (I)
         # B = assemble(rhs_, tensor=B)
         assembly_callable()
 
-        f = receivers.apply_source_receivers(rhs_forcing, residual, IT, is_local)
+        f = receivers.apply_source_receivers(rhs_forcing, residual, step, is_local)
         # add forcing term to solve scalar pressure
         B0 = B.sub(0)
         B0 += f
@@ -289,7 +287,7 @@ def Leapfrog_adjoint(model, mesh, comm, c, receivers, guess, residual, output=Fa
             u_np1.assign(X)
 
         # only compute for snaps that were saved
-        if IT % fspool == 0:
+        if step % fspool == 0:
             # compute the gradient increment
             uuadj.assign(u_np1)
             uufor.assign(guess.pop())
@@ -300,7 +298,7 @@ def Leapfrog_adjoint(model, mesh, comm, c, receivers, guess, residual, output=Fa
 
             if time_integrate_grad:
                 # integrate in time (trapezoidal rule)
-                dJdC_local += 0.5 * (gradi_list[0] + gradi_list[1]) * float(fspool * dt)
+                dJ += 0.5 * (gradi_list[0] + gradi_list[1]) * float(fspool * dt)
                 gradi_list = []
                 time_integrate_grad = False
             else:
@@ -309,15 +307,14 @@ def Leapfrog_adjoint(model, mesh, comm, c, receivers, guess, residual, output=Fa
         u_nm1.assign(u_n)
         u_n.assign(u_np1)
 
-        if IT % nspool == 0:
+        if step % nspool == 0:
             if output:
                 outfile.write(u_n, time=t)
+            if save_adjoint:
+                adjoint.append(u_n)
             helpers.display_progress(comm, t)
 
-    if comm.ensemble_comm.rank == 0 and comm.comm.rank == 0:
-        print(
-            "---------------------------------------------------------------",
-            flush=True,
-        )
-
-    return dJdC_local
+    if save_adjoint:
+        return dJ, adjoint
+    else:
+        return dJ
