@@ -165,9 +165,7 @@ for index, freq_band in enumerate(model["inversion"]["freq_bands"]):
                     self.misfit = spyro.utils.evaluate_misfit(
                         model, comm, p_guess_recv, self.p_exact_recv
                     )
-                    J_total[0] += spyro.utils.compute_functional(
-                        model, comm, self.misfit
-                    )
+                    J_total[0] += spyro.utils.compute_functional(model, self.misfit)
             # reduce over all cores
             J_total = COMM_WORLD.allreduce(J_total, op=MPI.SUM)
             J_total[0] /= comm.ensemble_comm.size
