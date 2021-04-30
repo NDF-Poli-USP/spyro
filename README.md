@@ -70,9 +70,7 @@ model["opts"] = {
 # Number of cores for the shot. For simplicity, we keep things serial.
 # spyro however supports both spatial parallelism and "shot" parallelism.
 model["parallelism"] = {
-    "type": "off",  # options: automatic (same number of cores for evey processor), custom, off.
-    "custom_cores_per_shot": [],  # only if the user wants a different number of cores for every shot.
-    # input is a list of integers with the length of the number of shots.
+    "type": "spatial",  # options: automatic (same number of cores for evey processor) or spatial
 }
 
 # Define the domain size without the PML. Here we'll assume a 0.75 x 1.50 km
@@ -88,7 +86,7 @@ model["mesh"] = {
 }
 
 # Specify a 250-m PML on the three sides of the domain to damp outgoing waves.
-model["PML"] = {
+model["BCs"] = {
     "status": True,  # True or false
     "outer_bc": "non-reflective",  #  None or non-reflective (outer boundary condition)
     "damping_type": "polynomial",  # polynomial, hyperbolic, shifted_hyperbolic
@@ -164,11 +162,13 @@ sources = spyro.Sources(model, mesh, V, comm).create()
 
 receivers = spyro.Receivers(model, mesh, V, comm).create()
 
-# And now we simulate the shot using a Leapfrog time-stepping scheme
-# Other time-stepping options are available (see the documentation).
-# Note: simulation results are stored in the folder `results/`
-p_field, p_at_recv = spyro.solvers.Leapfrog(
-    model, mesh, comm, vp, sources, receivers
+# Create a wavelet to force the simulation
+wavelet = spyro.full_ricker_wavelet(dt=0.0005, tf=2.0, freq=8.0)
+
+# And now we simulate the shot using a 2nd order central time-stepping scheme
+# Note: simulation results are stored in the folder `~/results/` by default
+p_field, p_at_recv = spyro.solvers.forward(
+    model, mesh, comm, vp, sources, wavelet, receivers
 )
 
 # Visualize the shot record
