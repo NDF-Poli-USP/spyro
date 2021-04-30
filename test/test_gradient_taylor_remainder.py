@@ -4,13 +4,13 @@ from firedrake import *
 
 import spyro
 
-from .inputfiles.Model1_Leapfrog_adjoint_2d import model
+from .inputfiles.Model1_gradient_2d import model
 
 
 # outfile_total_gradient = File(os.getcwd() + "/results/Gradient.pvd")
 
-forward = spyro.solvers.Leapfrog
-adjoint = spyro.solvers.Leapfrog_adjoint
+forward = spyro.solvers.forwrd
+gradient = spyro.solvers.gradient
 functional = spyro.utils.compute_functional
 
 
@@ -80,7 +80,7 @@ def test_gradient_talyor_remainder():
     Jm = functional(model, comm, misfit)
 
     # compute the gradient of the control (to be verified)
-    dJ = adjoint(model, mesh, comm, vp_guess, receivers, p_guess, misfit)
+    dJ = gradient(model, mesh, comm, vp_guess, receivers, p_guess, misfit)
 
     step = 0.01  # step length
 
