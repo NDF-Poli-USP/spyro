@@ -78,7 +78,7 @@ model = {
     "self": None,
     "inversion": inversion,
     "opts": opts,
-    "BCs": PML,
+    "BCs": BCs,
     "parallelism": parallelism,
     "mesh": mesh,
     "acquisition": acquisition,
