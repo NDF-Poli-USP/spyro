@@ -6,7 +6,7 @@ import ROL
 import spyro
 from mpi4py import MPI
 
-import gc 
+import gc
 
 
 outdir = "testing_fwi/"
@@ -36,7 +36,7 @@ model["mesh"] = {
 }
 # Use a Perfectly Matched Layer to damp reflected waves.
 # Note here, it's built to be 0.5 km thick on three sides of the domain
-model["PML"] = {
+model["BCs"] = {
     "status": True,  # True or false
     "outer_bc": "non-reflective",  #  neumann, non-reflective (outer boundary condition)
     "damping_type": "polynomial",  # polynomial. hyperbolic, shifted_hyperbolic
@@ -71,9 +71,7 @@ model["timeaxis"] = {
 }
 # Use one core per shot.
 model["parallelism"] = {
-    "type": "automatic",  # options: automatic (same number of cores for evey processor), custom, off
-    "custom_cores_per_shot": [],  # only if the user wants a different number of cores for every shot.
-    # input is a list of integers with the length of the number of shots.
+    "type": "automatic",  # options: automatic (same number of cores for evey processor) or spatial
 }
 
 model["inversion"] = {"freq_bands": [2.0]}
@@ -100,12 +98,20 @@ for index, freq_band in enumerate(model["inversion"]["freq_bands"]):
             + " Hz...",
             flush=True,
         )
+
+    # create wavelet (low-passed according to freq_band)
+    wavelet = spyro.full_ricker_wavelet(dt=0.0005, tf=3.0, freq=10, cutoff=freq_band)
+
     def _load_exact_shot(freq_band):
         for sn in range(model["acquisition"]["num_sources"]):
             if spyro.io.is_owner(comm, sn):
-                shot = spyro.io.load_shots("shots/mm_exact_" + str(10.0) + "_Hz_source_" + str(sn) + ".dat")
+                shot = spyro.io.load_shots(
+                    "shots/mm_exact_" + str(10.0) + "_Hz_source_" + str(sn) + ".dat"
+                )
                 # low-pass filter the shot record for the current frequency band.
-                return spyro.utils.butter_lowpass_filter(shot, freq_band, 1.0 / model["timeaxis"]["dt"])
+                return spyro.utils.butter_lowpass_filter(
+                    shot, freq_band, 1.0 / model["timeaxis"]["dt"]
+                )
 
     if comm.ensemble_comm.rank == 0:
         control_file = File(
@@ -145,12 +151,13 @@ for index, freq_band in enumerate(model["inversion"]["freq_bands"]):
             J_total = np.zeros((1))
             for sn in range(model["acquisition"]["num_sources"]):
                 if spyro.io.is_owner(comm, sn):
-                    self.p_guess, p_guess_recv = spyro.solvers.Leapfrog(
+                    self.p_guess, p_guess_recv = spyro.solvers.forward(
                         model,
                         mesh,
                         comm,
                         vp_guess,
                         sources,
+                        wavelet,
                         receivers,
                         source_num=sn,
                         lp_freq_index=index,
@@ -158,11 +165,11 @@ for index, freq_band in enumerate(model["inversion"]["freq_bands"]):
                     self.misfit = spyro.utils.evaluate_misfit(
                         model, comm, p_guess_recv, self.p_exact_recv
                     )
-                    J_total[0] += spyro.utils.compute_functional(model, comm, self.misfit)
+                    J_total[0] += spyro.utils.compute_functional(model, self.misfit)
             # reduce over all cores
             J_total = COMM_WORLD.allreduce(J_total, op=MPI.SUM)
             J_total[0] /= comm.ensemble_comm.size
-            if comm.comm.size > 1: 
+            if comm.comm.size > 1:
                 J_total[0] /= comm.comm.size
             gc.collect()
             return J_total[0]
@@ -170,10 +177,10 @@ for index, freq_band in enumerate(model["inversion"]["freq_bands"]):
         def gradient(self, g, x, tol):
             """Compute the gradient of the functional"""
             gc.collect()
-            dJ_local = Function(V, name='total_gradient')
+            dJ_local = Function(V, name="total_gradient")
             for sn in range(model["acquisition"]["num_sources"]):
                 if spyro.io.is_owner(comm, sn):
-                    dJ = spyro.solvers.Leapfrog_adjoint(
+                    dJ = spyro.solvers.gradient(
                         model,
                         mesh,
                         comm,
@@ -189,17 +196,17 @@ for index, freq_band in enumerate(model["inversion"]["freq_bands"]):
                 dJ_local.dat.data[:], op=MPI.SUM
             )
             # mask the water layer
-            dJ_local.dat.data[water]=0.0
+            dJ_local.dat.data[water] = 0.0
             if comm.ensemble_comm.rank == 0:
                 grad_file.write(dJ_local)
-            
+
             gc.collect()
-            
+
             g.scale(0)
             g.vec += dJ_local
             # switch order of misfit calculation to switch this
-            #g.vec *= -1
-            
+            # g.vec *= -1
+
         def update(self, x, flag, iteration):
             """Update the control"""
             vp_guess.assign(Function(V, x.vec, name="velocity"))
@@ -233,22 +240,23 @@ for index, freq_band in enumerate(model["inversion"]["freq_bands"]):
     u = Function(V, name="velocity").assign(vp_guess)
     opt = FeVector(u.vector(), inner_product)
 
-#     xlo = Function(V)
-#     xlo.interpolate(Constant(1.0))
-#     x_lo = FeVector(xlo.vector(), inner_product)
+    # Add control bounds to the problem (uses more RAM)
+    #     xlo = Function(V)
+    #     xlo.interpolate(Constant(1.0))
+    #     x_lo = FeVector(xlo.vector(), inner_product)
 
-#     xup = Function(V)
-#     xup.interpolate(Constant(5.0))
-#     x_up = FeVector(xup.vector(), inner_product)
+    #     xup = Function(V)
+    #     xup.interpolate(Constant(5.0))
+    #     x_up = FeVector(xup.vector(), inner_product)
 
-#     bnd = ROL.Bounds(x_lo, x_up, 1.0)
+    #     bnd = ROL.Bounds(x_lo, x_up, 1.0)
 
     algo = ROL.Algorithm("Line Search", params)
 
-    algo.run(opt, obj) #, bnd)
+    algo.run(opt, obj)  # , bnd)
 
     if comm.ensemble_comm.rank == 0:
         File("res" + str(freq_band) + ".pvd", comm=comm.comm).write(obj.vp_guess)
 
     # important: update the control for the next frequency band to start!
-    vp_guess = Function(V, opt.vec)                                                                            
+    vp_guess = Function(V, opt.vec)

@@ -10,7 +10,7 @@ def plot_shotrecords(
     model,
     arr,
     appear=False,
-    name="MODEL",
+    name="shot_record",
     vmin=-1e-5,
     vmax=1e-5,
     ft="PDF",
@@ -78,7 +78,9 @@ def plot_shotrecords(
     return None
 
 
-def plot_shotrecords_difference(model, arr1, arr2, appear=False, name="DIFF", ft="PDF"):
+def plot_shotrecords_difference(
+    model, arr1, arr2, appear=False, name="difference", ft="PDF"
+):
     """Plot the difference (e.g., arr1-arr2) between two shot records
 
     Parameters

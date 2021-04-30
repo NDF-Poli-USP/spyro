@@ -47,7 +47,7 @@ def spatial_method(method_type):
     return method_type
 
 
-@pytest.fixture(params=["leapfrog", "ssprk"])
+@pytest.fixture(params=["central", "ssprk"])
 def timestep_method_type(request):
     return request.param
 
@@ -79,11 +79,14 @@ def run_solve(timestep_method, method, model, mesh, expr):
     V = FunctionSpace(mesh, element)
 
     excitation = spyro.Sources(testmodel, mesh, V, comm).create()
+
+    wavelet = spyro.full_ricker_wavelet(dt=0.001, tf=1.0, freq=2.0)
+
     receivers = spyro.Receivers(testmodel, mesh, V, comm).create()
 
-    if timestep_method == "leapfrog":
-        p, _ = spyro.solvers.Leapfrog(
-            testmodel, mesh, comm, Constant(1.0), excitation, receivers
+    if timestep_method == "central":
+        p, _ = spyro.solvers.forward(
+            testmodel, mesh, comm, Constant(1.0), excitation, wavelet, receivers
         )
     elif timestep_method == "ssprk":
         p, _ = spyro.solvers.SSPRK3(

@@ -8,7 +8,7 @@ import h5py
 import numpy as np
 from scipy.interpolate import RegularGridInterpolator
 from scipy.interpolate import griddata
-import segyio 
+import segyio
 
 from .. import domains
 
@@ -153,13 +153,13 @@ def interpolate(model, mesh, V, guess=False):
     """
     sd = V.mesh().geometric_dimension()
     m = V.ufl_domain()
-    if model["PML"]["status"]:
-        minz = -model["mesh"]["Lz"] - model["PML"]["lz"]
+    if model["BCs"]["status"]:
+        minz = -model["mesh"]["Lz"] - model["BCs"]["lz"]
         maxz = 0.0
-        minx = 0.0 - model["PML"]["lx"]
-        maxx = model["mesh"]["Lx"] + model["PML"]["lx"]
-        miny = 0.0 - model["PML"]["ly"]
-        maxy = model["mesh"]["Ly"] + model["PML"]["ly"]
+        minx = 0.0 - model["BCs"]["lx"]
+        maxx = model["mesh"]["Lx"] + model["BCs"]["lx"]
+        miny = 0.0 - model["BCs"]["ly"]
+        maxy = model["mesh"]["Ly"] + model["BCs"]["ly"]
     else:
         minz = -model["mesh"]["Lz"]
         maxz = 0.0
