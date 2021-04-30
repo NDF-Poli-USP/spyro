@@ -6,8 +6,8 @@ spyro: Acoustic wave modeling in Firedrake
 ============================================
 
 spyro is a Python library for modeling acoustic waves. The main
-functionality is a set of forward and discrete adjoint wave propagators for solving the acoustic wave equation in the time domain.
-These wave propagators can be used to form complete Full Waveform Inversion or Reverse Time Migration applications. See the [demos](https://github.com/krober10nd/spyro/tree/main/demos).
+functionality is a set of forward and adjoint wave propagators for solving the acoustic wave equation in the time domain.
+These wave propagators can be used to form complete full waveform inversion (FWI) applications. See the [demos](https://github.com/krober10nd/spyro/tree/main/demos).
 To implement these solvers, spyro uses the finite element package [Firedrake](https://www.firedrakeproject.org/index.html).
 
 To use Spyro, you'll need to have some knowledge of Python and some basic concepts in inverse modeling relevant to active-sourcce seismology.
@@ -15,20 +15,19 @@ To use Spyro, you'll need to have some knowledge of Python and some basic concep
 Functionality
 =============
 
-* Finite Element discretizations for scalar wave equation in 2D and 3D using triangular and tetrahedral meshes.
+* Finite element discretizations for scalar wave equation in 2D and 3D using triangular and tetrahedral meshes.
     * Continuous Galerkin with arbitrary spatial order and stable and accurate higher-order mass lumping up to p = 5.
 * Spatial and ensemble (*shot*) parallelism for source simulations.
 * Central and Strong Stability Preserving Runga-Kutta (SSPRK) time-stepping schemes (up to 4th order accurate in time).
-* Perfectly Matched Layer to absorb reflected waves in both 2D and 3D.
-* Mesh-independent functional gradient for central and SSPRK time-stepping methods using the discrete adjoint method.
+* Perfectly Matched Layer (PML) to absorb reflected waves in both 2D and 3D.
+* Mesh-independent functional gradient for central and SSPRK time-stepping methods using the optimize-then-discretize method.
 * Sparse interpolation and injection.
 
-Using this functionality, short Python scripts can written that perform Full Waveform Inversion (FWI) type algorithms using well-developed numerical optimization algorithms such as L-BFGS from the ROL package. See the notebooks folder for an FWI example.
 
 Performance
 ===========
 
-Higher-order mass lumping yields perfect strong scaling on both Intel Xeon processors and AMD processors. This benefits both the adjoint and gradient calculation as well. This simple test was performed with an 11 M DoF 3D tetrahedral mesh adapted to the Overthrust3D model (see the folder benchmarks). A 1 second wave simulation was executed with a 750-m PML on all sides but the free surface:
+Higher-order mass lumping yields near perfect strong scaling on both Intel Xeon processors and AMD processors. The usage of higher-order elements thus benefits both the adjoint and gradient calculation in addition to the forward calculation making it possible to perform FWI with simplex elements. The following benchmark was performed with an 11 M DoF 3D tetrahedral mesh adapted to the Overthrust3D model (see the folder benchmarks). A 1 second wave simulation was executed with a 750-m PML on all sides but the free surface:
 
 ![ScalingAmdIntel](https://user-images.githubusercontent.com/18619644/111385935-41a6ee80-868a-11eb-8da3-256274bf1c0f.png)
 
@@ -36,7 +35,7 @@ Higher-order mass lumping yields perfect strong scaling on both Intel Xeon proce
 A worked example
 =================
 
-A simple example of a forward simulation in 2D on a rectangle with a uniform triangular mesh and using the Perfectly Matched Layer is like the following below. Note here we first specify the input file and build a uniform mesh using the meshing capabilities provided by Firedrake. However, more complex meshes for realistic problems can be generated via [SeismicMesh](https://github.com/krober10nd/SeismicMesh).
+A first example of a forward simulation in 2D on a rectangle with a uniform triangular mesh and using the Perfectly Matched Layer is shown in the following below. Note here we first specify the input file and build a uniform mesh using the meshing capabilities provided by Firedrake. However, more complex (i.e., non-structured) triangular meshes for realistic problems can be generated via [SeismicMesh](https://github.com/krober10nd/SeismicMesh).
 
 
 See the demos folder for an FWI example (this requires some other dependencies pyrol and ROLtrilinos).
