@@ -15,8 +15,6 @@ model["opts"] = {
     "beta": 0.0,  # for Newmark time integration only
     "gamma": 0.5,  # for Newmark time integration only
 }
-
-
 model["mesh"] = {
     "Lz": 3.0,  # depth in km - always positive
     "Lx": 17.0,  # width in km - always positive
@@ -25,9 +23,7 @@ model["mesh"] = {
     "initmodel": "demos/mm_init.hdf5",
     "truemodel": "demos/mm_exact.hdf5",
 }
-
-
-model["PML"] = {
+model["BCs"] = {
     "status": True,  # True or false
     "outer_bc": "non-reflective",  #  neumann, non-reflective (outer boundary condition)
     "damping_type": "polynomial",  # polynomial. hyperbolic, shifted_hyperbolic
@@ -38,7 +34,6 @@ model["PML"] = {
     "lx": 0.5,  # thickness of the pml in the x-direction (km) - always positive
     "ly": 0.0,  # thickness of the pml in the y-direction (km) - always positive
 }
-
 model["acquisition"] = {
     "source_type": "Ricker",
     "num_sources": 40,
@@ -50,9 +45,6 @@ model["acquisition"] = {
         (-0.15, 0.1), (-0.15, 16.9), 301
     ),
 }
-
-
-# Perform each simulation for 2 seconds.
 model["timeaxis"] = {
     "t0": 0.0,  #  Initial time for event
     "tf": 3.0,  # Final time for event
@@ -60,7 +52,6 @@ model["timeaxis"] = {
     "nspool": 200,  # how frequently to output solution to pvds
     "fspool": 100,  # how frequently to save solution to RAM
 }  # how freq. to output to files and screen
-
 
 # Use one core per shot.
 model["parallelism"] = {"num_cores_per_shot": 1}
@@ -74,14 +65,16 @@ vp_exact = spyro.io.interpolate(model, mesh, V, guess=False)
 File("vp_exact.pvd").write(vp_exact)
 
 sources = spyro.Sources(model, mesh, V, comm).create()
+
 receivers = spyro.Receivers(model, mesh, V, comm).create()
 
+wavelet = spyro.full_ricker_wavelet(dt=0.001, tf=3.0, freq=10.0)
 
 for sn in range(model["acquisition"]["num_sources"]):
     if spyro.io.is_owner(comm, sn):
         t1 = time.time()
-        p_field, p_exact_recv = spyro.solvers.Leapfrog(
-            model, mesh, comm, vp_exact, sources, receivers, source_num=sn
+        p_field, p_exact_recv = spyro.solvers.forward(
+            model, mesh, comm, vp_exact, sources, wavelet, receivers, source_num=sn
         )
         print(time.time() - t1)
 
