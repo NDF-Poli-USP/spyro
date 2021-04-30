@@ -47,6 +47,12 @@ def test_gradient_talyor_remainder():
 
     receivers = spyro.Receivers(model, mesh, V, comm).create()
 
+    wavelet = spyro.sources.FullRickerWavelet(
+        model["timeaxis"]["dt"],
+        model["timeaxis"]["tf"],
+        model["acquisition"]["frequency"],
+    )
+
     # simulate the exact model
     p_exact, p_exact_recv = forward(
         model,
@@ -54,6 +60,7 @@ def test_gradient_talyor_remainder():
         comm,
         vp_exact,
         sources,
+        wavelet,
         receivers,
     )
 
@@ -64,6 +71,7 @@ def test_gradient_talyor_remainder():
         comm,
         vp_guess,
         sources,
+        wavelet,
         receivers,
     )
 
@@ -88,7 +96,9 @@ def test_gradient_talyor_remainder():
         # perturb the model and calculate the functional (again)
         # J(m + delta_m*h)
         vp_guess = vp_original + step * delta_m
-        _, p_guess_recv = forward(model, mesh, comm, vp_guess, sources, receivers)
+        _, p_guess_recv = forward(
+            model, mesh, comm, vp_guess, sources, wavelet, receivers
+        )
         Jp = functional(model, comm, p_exact_recv - p_guess_recv)
         # compute the second-order Taylor remainder
         remainder = np.abs(Jp - Jm - step * np.dot(dJ.vector(), delta_m.vector()))

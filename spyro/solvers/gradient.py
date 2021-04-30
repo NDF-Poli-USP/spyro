@@ -1,27 +1,20 @@
 from firedrake import *
 from firedrake.assemble import create_assembly_callable
 
-from .. import utils
 from ..domains import quadrature, space
 from ..pml import damping
-from ..sources import FullRickerWavelet
 from . import helpers
 
+# Note this turns off non-fatal warnings
 set_log_level(ERROR)
 
+__all__ = ["gradient"]
 
-def Leapfrog(
-    model,
-    mesh,
-    comm,
-    c,
-    excitations,
-    receivers,
-    source_num=0,
-    freq_index=0,
-    output=False,
+
+def gradient(
+    model, mesh, comm, c, receivers, guess, residual, output=False, save_adjoint=False
 ):
-    """Secord-order in time fully-explicit scheme
+    """Discrete adjoint with secord-order in time fully-explicit timestepping scheme
     with implementation of a Perfectly Matched Layer (PML) using
     CG FEM with or without higher order mass lumping (KMV type elements).
 
@@ -34,41 +27,32 @@ def Leapfrog(
     comm: Firedrake.ensemble_communicator
         The MPI communicator for parallelism
        c: Firedrake.Function
-        The velocity model interpolated onto the mesh.
-    excitations: A list Firedrake.Functions
-        Each function contains an interpolated space function
-        emulated a Dirac delta at the location of source `source_num`
+        The velocity model interpolated onto the mesh nodes.
     receivers: A :class:`spyro.Receivers` object.
         Contains the receiver locations and sparse interpolation methods.
-    source_num: `int`, optional
-        The source number you wish to simulate
-    freq_index: `int`, optional
-        The index in the list of low-pass cutoff values
-    output: `boolean`, optional
-        Whether or not to write results to pvd files.
+    guess: A list of Firedrake functions
+        Contains the forward wavefield at a set of timesteps
+    residual: array-like [timesteps][receivers]
+        The difference between the observed and modeled data at
+        the receivers
+    output: boolean
+        optional, write the adjoint to disk (only for debugging)
+    save_adjoint: A list of Firedrake functions
+        Contains the adjoint at all timesteps
 
     Returns
     -------
-    usol: list of Firedrake.Functions
-        The full field solution at `fspool` timesteps
-    usol_recv: array-like
-        The solution interpolated to the receivers at all timesteps
+    dJdc_local: A Firedrake.Function containing the gradient of
+                the functional w.r.t. `c`
+    adjoint: Optional, a list of Firedrake functions containing the adjoint
 
     """
 
-    if "amplitude" in model["acquisition"]:
-        amp = model["acquisition"]["amplitude"]
-    else:
-        amp = 1
-    freq = model["acquisition"]["frequency"]
-    if "inversion" in model:
-        freq_bands = model["inversion"]["freq_bands"]
     method = model["opts"]["method"]
     degree = model["opts"]["degree"]
     dim = model["opts"]["dimension"]
     dt = model["timeaxis"]["dt"]
     tf = model["timeaxis"]["tf"]
-    delay = model["acquisition"]["delay"]
     nspool = model["timeaxis"]["nspool"]
     fspool = model["timeaxis"]["fspool"]
     PML = model["PML"]["status"]
@@ -90,21 +74,10 @@ def Leapfrog(
             y2 = Ly
             b_pml = ly
 
-    nt = int(tf / dt)  # number of timesteps
-    dstep = int(delay / dt)  # number of timesteps with source
-
     if method == "KMV":
         params = {"ksp_type": "preonly", "pc_type": "jacobi"}
-    elif (
-        method == "CG"
-        and mesh.ufl_cell() != quadrilateral
-        and mesh.ufl_cell() != hexahedron
-    ):
+    elif method == "CG":
         params = {"ksp_type": "cg", "pc_type": "jacobi"}
-    elif method == "CG" and (
-        mesh.ufl_cell() == quadrilateral or mesh.ufl_cell() == hexahedron
-    ):
-        params = {"ksp_type": "preonly", "pc_type": "jacobi"}
     else:
         raise ValueError("method is not yet supported")
 
@@ -114,12 +87,14 @@ def Leapfrog(
 
     qr_x, qr_s, _ = quadrature.quadrature_rules(V)
 
-    if dim == 2:
-        z, x = SpatialCoordinate(mesh)
-    elif dim == 3:
-        z, x, y = SpatialCoordinate(mesh)
+    nt = int(tf / dt)  # number of timesteps
 
-    # if using the PML
+    receiver_locations = model["acquisition"]["receiver_locations"]
+
+    is_local = receivers_local(mesh, dim, receiver_locations)
+
+    dJ = Function(V, name="gradient")
+
     if PML:
         Z = VectorFunctionSpace(V.ufl_domain(), V.ufl_element())
         if dim == 2:
@@ -140,19 +115,17 @@ def Leapfrog(
             u_n, psi_n, pp_n = Function(W).split()
             u_nm1, psi_nm1, pp_nm1 = Function(W).split()
 
-        # in 2d
         if dim == 2:
-            sigma_x, sigma_z = damping.functions(
+            (sigma_x, sigma_z) = damping.functions(
                 model, V, dim, x, x1, x2, a_pml, z, z1, z2, c_pml
             )
-            Gamma_1, Gamma_2 = damping.matrices_2D(sigma_z, sigma_x)
+            (Gamma_1, Gamma_2) = damping.matrices_2D(sigma_z, sigma_x)
             pml1 = (
                 (sigma_x + sigma_z)
-                * ((u - u_nm1) / Constant(2.0 * dt))
+                * ((u - u_nm1) / (2.0 * Constant(dt)))
                 * v
                 * dx(rule=qr_x)
             )
-        # in 3d
         elif dim == 3:
 
             sigma_x, sigma_y, sigma_z = damping.functions(
@@ -183,15 +156,10 @@ def Leapfrog(
         u_n = Function(V)
         u_np1 = Function(V)
 
-    is_local = helpers.receivers_local(mesh, dim, receivers.receiver_locations)
-
     if output:
-        outfile = helpers.create_output_file("Forward.pvd", comm, source_num)
+        outfile = helpers.create_output_file("adjoint.pvd", comm, 0)
 
     t = 0.0
-
-    cutoff = freq_bands[freq_index] if "inversion" in model else None
-    RW = FullRickerWavelet(dt, tf, freq, amp=amp, cutoff=cutoff)
 
     # -------------------------------------------------------
     m1 = ((u - 2.0 * u_n + u_nm1) / Constant(dt ** 2)) * v * dx(rule=qr_x)
@@ -209,43 +177,41 @@ def Leapfrog(
         B = Function(W)
 
         if dim == 2:
+            pml1 = (sigma_x + sigma_z) * ((u - u_n) / dt) * v * dx(rule=qr_x)
             pml2 = sigma_x * sigma_z * u_n * v * dx(rule=qr_x)
-            pml3 = inner(pp_n, grad(v)) * dx(rule=qr_x)
+            pml3 = c * c * inner(grad(v), dot(Gamma_2, pp_n)) * dx(rule=qr_x)
+
             FF += pml1 + pml2 + pml3
             # -------------------------------------------------------
             mm1 = (dot((pp - pp_n), qq) / Constant(dt)) * dx(rule=qr_x)
             mm2 = inner(dot(Gamma_1, pp_n), qq) * dx(rule=qr_x)
-            dd = c * c * inner(grad(u_n), dot(Gamma_2, qq)) * dx(rule=qr_x)
+            dd = inner(qq, grad(u_n)) * dx(rule=qr_x)
+
             FF += mm1 + mm2 + dd
         elif dim == 3:
-            pml1 = (
-                (sigma_x + sigma_y + sigma_z)
-                * ((u - u_n) / Constant(dt))
-                * v
-                * dx(rule=qr_x)
-            )
+            pml1 = (sigma_x + sigma_y + sigma_z) * ((u - u_n) / dt) * v * dx(rule=qr_x)
+            uuu1 = (-v * psi_n) * dx(rule=qr_x)
             pml2 = (
                 (sigma_x * sigma_y + sigma_x * sigma_z + sigma_y * sigma_z)
                 * u_n
                 * v
                 * dx(rule=qr_x)
             )
-            pml3 = (sigma_x * sigma_y * sigma_z) * psi_n * v * dx(rule=qr_x)
-            pml4 = inner(pp_n, grad(v)) * dx(rule=qr_x)
+            dd1 = c * c * inner(grad(v), dot(Gamma_2, pp_n)) * dx(rule=qr_x)
 
-            FF += pml1 + pml2 + pml3 + pml4
+            FF += pml1 + pml2 + dd1 + uuu1
             # -------------------------------------------------------
-            mm1 = (dot((pp - pp_n), qq) / Constant(dt)) * dx(rule=qr_x)
+            mm1 = (dot((pp - pp_n), qq) / dt) * dx(rule=qr_x)
             mm2 = inner(dot(Gamma_1, pp_n), qq) * dx(rule=qr_x)
-            dd1 = c * c * inner(grad(u_n), dot(Gamma_2, qq)) * dx(rule=qr_x)
-            dd2 = -c * c * inner(grad(psi_n), dot(Gamma_3, qq)) * dx(rule=qr_x)
+            pml4 = inner(qq, grad(u_n)) * dx(rule=qr_x)
 
-            FF += mm1 + mm2 + dd1 + dd2
+            FF += mm1 + mm2 + pml4
             # -------------------------------------------------------
-            mmm1 = (dot((psi - psi_n), phi) / Constant(dt)) * dx(rule=qr_x)
-            uuu1 = (-u_n * phi) * dx(rule=qr_x)
+            pml3 = (sigma_x * sigma_y * sigma_z) * phi * u_n * dx(rule=qr_x)
+            mmm1 = (dot((psi - psi_n), phi) / dt) * dx(rule=qr_x)
+            mmm2 = -c * c * inner(grad(phi), dot(Gamma_3, pp_n)) * dx(rule=qr_x)
 
-            FF += mmm1 + uuu1
+            FF += mmm1 + mmm2 + pml3
     else:
         X = Function(V)
         B = Function(V)
@@ -256,24 +222,56 @@ def Leapfrog(
     A = assemble(lhs_, mat_type="matfree")
     solver = LinearSolver(A, solver_parameters=params)
 
-    usol = [Function(V, name="pressure") for t in range(nt) if t % fspool == 0]
-    usol_recv = []
-    saveIT = 0
+    # Define gradient problem
+    mgrad = u * v * dx(rule=qr_x)
+
+    uuadj = Function(V)  # auxiliarly function for the gradient compt.
+    uufor = Function(V)  # auxiliarly function for the gradient compt.
+
+    ffG = 2.0 * c * 1.0 * dot(grad(uuadj), grad(uufor)) * v * dx(rule=qr_x)
+
+    G = mgrad - ffG
+    lhsG, rhsG = lhs(G), rhs(G)
+
+    gradi = Function(V)
+    grad_prob = LinearVariationalProblem(lhsG, rhsG, gradi)
+    if method == "KMV":
+        grad_solver = LinearVariationalSolver(
+            grad_prob,
+            solver_parameters={
+                "ksp_type": "preonly",
+                "pc_type": "jacobi",
+                "mat_type": "matfree",
+            },
+        )
+    elif method == "CG":
+        grad_solver = LinearVariationalSolver(
+            grad_prob,
+            solver_parameters={
+                "mat_type": "matfree",
+            },
+        )
 
     assembly_callable = create_assembly_callable(rhs_, tensor=B)
 
-    rhs_forcing = Function(V)
+    rhs_forcing = Function(V)  # forcing term
+    time_integrate_grad = False
+    gradi_list = []
+    if save_adjoint:
+        adjoint = [Function(V, name="adjoint_pressure") for t in range(nt)]
+    for step in range(nt - 1, -1, -1):
+        t = step * float(dt)
 
-    for IT in range(nt):
-
+        # Solver - main equation - (I)
+        # B = assemble(rhs_, tensor=B)
         assembly_callable()
-        if IT < dstep:
-            f = excitations.apply_source(rhs_forcing, RW[IT])
-        elif IT == dstep:
-            f = excitations.apply_source(rhs_forcing, 0.0)
-        # f *= c * c
+
+        f = receivers.apply_source_receivers(rhs_forcing, residual, step, is_local)
+        # add forcing term to solve scalar pressure
         B0 = B.sub(0)
         B0 += f
+
+        # AX=B --> solve for X = B/Aˆ-1
         solver.solve(X, B)
         if PML:
             if dim == 2:
@@ -289,34 +287,35 @@ def Leapfrog(
         else:
             u_np1.assign(X)
 
-        usol_recv.append(
-            receivers.interpolate(u_np1.dat.data_ro_with_halos[:], is_local)
-        )
+        # only compute for snaps that were saved
+        if step % fspool == 0:
+            # compute the gradient increment
+            uuadj.assign(u_np1)
+            uufor.assign(guess.pop())
 
-        if IT % fspool == 0:
-            usol[saveIT].assign(u_np1)
-            saveIT += 1
+            grad_solver.solve()
 
-        if IT % nspool == 0:
-            assert (
-                norm(u_n) < 1
-            ), "Numerical instability. Try reducing dt or building the mesh differently"
-            if output:
-                outfile.write(u_n, time=t, name="Pressure")
-            helpers.display_progress(comm, t)
+            gradi_list.append(gradi)
+
+            if time_integrate_grad:
+                # integrate in time (trapezoidal rule)
+                dJ += 0.5 * (gradi_list[0] + gradi_list[1]) * float(fspool * dt)
+                gradi_list = []
+                time_integrate_grad = False
+            else:
+                time_integrate_grad = True
 
         u_nm1.assign(u_n)
         u_n.assign(u_np1)
 
-        t = IT * float(dt)
+        if step % nspool == 0:
+            if output:
+                outfile.write(u_n, time=t)
+            if save_adjoint:
+                adjoint.append(u_n)
+            helpers.display_progress(comm, t)
 
-    usol_recv = helpers.fill(usol_recv, is_local, nt, receivers.num_receivers)
-    usol_recv = utils.communicate(usol_recv, comm)
-
-    if comm.ensemble_comm.rank == 0 and comm.comm.rank == 0:
-        print(
-            "---------------------------------------------------------------",
-            flush=True,
-        )
-
-    return usol, usol_recv
+    if save_adjoint:
+        return dJ, adjoint
+    else:
+        return dJ

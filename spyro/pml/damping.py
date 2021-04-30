@@ -22,11 +22,11 @@ def functions(
 ):
     """ Damping functions for the perfect matched layer for 2D and 3D"""
 
-    damping_type = model["PML"]["damping_type"]
+    damping_type = model["BCs"]["damping_type"]
     if damping_type == "polynomial":
-        ps = model["PML"]["exponent"]  # polynomial scaling
-    cmax = model["PML"]["cmax"]  # maximum acoustic wave velocity
-    R = model["PML"]["R"]  # theoretical reclection coefficient
+        ps = model["BCs"]["exponent"]  # polynomial scaling
+    cmax = model["BCs"]["cmax"]  # maximum acoustic wave velocity
+    R = model["BCs"]["R"]  # theoretical reclection coefficient
 
     bar_sigma = ((3.0 * cmax) / (2.0 * a_pml)) * math.log10(1.0 / R)
     aux1 = Function(V)
