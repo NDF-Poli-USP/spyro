@@ -227,12 +227,14 @@ def gradient(
     solver = LinearSolver(A, solver_parameters=params)
 
     # Define gradient problem
-    mgrad = u * v * dx(rule=qr_x)
+    m_u = TrialFunction(V)
+    m_v = TestFunction(V)
+    mgrad = m_u * m_v * dx(rule=qr_x)
 
     uuadj = Function(V)  # auxiliarly function for the gradient compt.
     uufor = Function(V)  # auxiliarly function for the gradient compt.
 
-    ffG = 2.0 * c * 1.0 * dot(grad(uuadj), grad(uufor)) * v * dx(rule=qr_x)
+    ffG = 2.0 * c * 1.0 * dot(grad(uuadj), grad(uufor)) * m_v * dx(rule=qr_x)
 
     G = mgrad - ffG
     lhsG, rhsG = lhs(G), rhs(G)
