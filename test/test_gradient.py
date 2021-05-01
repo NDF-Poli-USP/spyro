@@ -144,4 +144,4 @@ def _test_gradient(options):
 
 
 if __name__ == "__main__":
-    test_gradient(model)
+    test_gradient(model_pml)
