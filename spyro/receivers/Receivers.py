@@ -203,13 +203,10 @@ class Receivers:
             return udat[0]  # junk receiver isn't local
 
         phis = self.cell_tabulations[receiver_id, :]
-        at = 0
 
-        for i in range(len(u)):
+        at = phis.T @ u
 
-            at += phis[i] * u[i]
-
-        return float(at)
+        return at
 
     def __func_node_locations_2D(self):
         """Function that returns a list which includes a numpy matrix
@@ -345,16 +342,27 @@ class Receivers:
                 cell_tabulations[receiver_id, :] = phi_tab.transpose()
 
         return cell_tabulations
-    
+
     def apply_source_receivers(self, rhs_forcing, residual, IT, is_local):
-        """ Applies source in a assembled right hand side.
+        """
+        The adjoint operation of interpolation (injection)
         """
 
-        for source_id in range(self.num_receivers):
-            if is_local[source_id]:
-                for i in range(len(self.cellNodeMaps[source_id])):
-                    value = residual[IT][source_id]
-                    rhs_forcing.dat.data[int(self.cellNodeMaps[source_id][i])] = value * self.cell_tabulations[source_id][i]
+        # rhs_forcing_dummy = rhs_forcing.copy(deepcopy=True)
+        # for source_id in range(self.num_receivers):
+        #    if is_local[source_id]:
+        #        for i in range(len(self.cellNodeMaps[source_id])):
+        #            value = residual[IT][source_id]
+        #            rhs_forcing_dummy.dat.data[int(self.cellNodeMaps[source_id][i])] = (
+        #                value * self.cell_tabulations[source_id][i]
+        #            )
+        for rid in range(self.num_receivers):
+            value = residual[IT][rid]
+            if is_local[rid]:
+                idx = np.int_(self.cellNodeMaps[rid])
+                phis = self.cell_tabulations[rid]
+                tmp = np.dot(phis, value)
+                rhs_forcing.dat.data[idx] = tmp
 
         return rhs_forcing
 

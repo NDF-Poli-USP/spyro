@@ -46,13 +46,13 @@ BCs = {
 
 acquisition = {
     "source_type": "Ricker",
-    "frequency": 2.0,
+    "frequency": 1.0,
     "delay": 1.0,
     "num_sources": 1,
     "source_pos": [(1.5, -0.5)],
     "amplitude": 1.0,
-    "num_receivers": 501,
-    "receiver_locations": create_transect((0.1, -2.90), (2.9, -2.90), 501),
+    "num_receivers": 10,
+    "receiver_locations": create_transect((0.1, -2.90), (2.9, -2.90), 10),
 }
 
 timeaxis = {
