@@ -1,8 +1,5 @@
 import pytest
 from firedrake import *
-from ROL.firedrake_vector import FiredrakeVector as FeVector
-import ROL
-
 import spyro
 
 from .inputfiles.Model1_gradient_2d import model
@@ -35,6 +32,10 @@ wavelet = spyro.sources.full_ricker_wavelet(
 
 @pytest.mark.skip(reason="no way of currently testing this")
 def test_gradient_talyor_remainder_v2():
+    from ROL.firedrake_vector import FiredrakeVector as FeVector
+    import ROL
+
+
     comm = spyro.utils.mpi_init(model)
 
     mesh, V = spyro.io.read_mesh(model, comm)
