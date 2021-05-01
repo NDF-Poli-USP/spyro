@@ -95,6 +95,11 @@ def gradient(
 
     dJ = Function(V, name="gradient")
 
+    if dim == 2:
+        z, x = SpatialCoordinate(mesh)
+    elif dim == 3:
+        z, x, y = SpatialCoordinate(mesh)
+
     if PML:
         Z = VectorFunctionSpace(V.ufl_domain(), V.ufl_element())
         if dim == 2:
