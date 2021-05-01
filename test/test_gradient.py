@@ -6,7 +6,7 @@ import spyro
 from spyro.domains import quadrature
 
 from .inputfiles.Model1_gradient_2d import model
-from .inputfiles.Model1_gradient_2d_pml import model as model_pml
+from .inputfiles.Model1_gradient_2d_pml import model_pml
 
 
 # outfile_total_gradient = File(os.getcwd() + "/results/Gradient.pvd")
@@ -28,6 +28,15 @@ def _make_vp_exact(V, mesh):
     return vp_exact
 
 
+def _make_vp_exact_pml(V, mesh):
+    """Create a half space"""
+    z, x = SpatialCoordinate(mesh)
+    velocity = conditional(z > -0.5, 1.5, 4.0)
+    vp_exact = Function(V, name="vp").interpolate(velocity)
+    File("exact_vel.pvd").write(vp_exact)
+    return vp_exact
+
+
 def _make_vp_guess(V, mesh):
     """The guess is a uniform velocity of 4.0 km/s"""
     z, x = SpatialCoordinate(mesh)
@@ -37,18 +46,20 @@ def _make_vp_guess(V, mesh):
 
 
 def test_gradient():
-    inputs = [model, model_pml]
-    for d in inputs:
-        _test_gradient(d)
+    # _test_gradient(model)
+    _test_gradient(model_pml, pml=True)
 
 
-def _test_gradient(options):
+def _test_gradient(options, pml=False):
 
     comm = spyro.utils.mpi_init(options)
 
     mesh, V = spyro.io.read_mesh(options, comm)
 
-    vp_exact = _make_vp_exact(V, mesh)
+    if pml:
+        vp_exact = _make_vp_exact_pml(V, mesh)
+    else:
+        vp_exact = _make_vp_exact(V, mesh)
 
     vp_guess = _make_vp_guess(V, mesh)
 
@@ -117,10 +128,10 @@ def _test_gradient(options):
             vp_guess,
             sources,
             wavelet,
-            receivers,  # True
+            receivers,
         )
 
-        Jp = functional(model, p_exact_recv - p_guess_recv)
+        Jp = functional(options, p_exact_recv - p_guess_recv)
         projnorm = assemble(dJ * delta_m * dx(rule=qr_x))
         fd_grad = (Jp - Jm) / step
         print(
@@ -128,9 +139,9 @@ def _test_gradient(options):
             + str(step)
             + " : "
             + str(Jp)
-            + ", percent. var.: "
+            + ", fd approx.: "
             + str(fd_grad)
-            + ", theor. value : "
+            + ", grad'*dir : "
             + str(projnorm)
             + " \n ",
         )
@@ -144,4 +155,4 @@ def _test_gradient(options):
 
 
 if __name__ == "__main__":
-    test_gradient(model_pml)
+    test_gradient(model)
