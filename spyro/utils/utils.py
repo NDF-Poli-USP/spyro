@@ -28,16 +28,10 @@ def compute_functional(model, residual):
     nt = int(tf / dt)  # number of timesteps
 
     J = 0.0
-    Jlist = []
     for ti in range(nt):
-        Jtemp = 0.0
         for rn in range(num_receivers):
-            Jtemp += residual[ti][rn] ** 2
-        Jlist.append(Jtemp)
-    # Integrate in time (trapezoidal rule)
-    for i in range(1, nt - 1):
-        J += 0.5 * (Jlist[i - 1] + Jlist[i]) * float(dt)
-    J = 0.5 * float(J)
+            J += residual[ti][rn] ** 2
+    J *= 0.5
     return J
 
 

@@ -3,6 +3,7 @@ import numpy as np
 from firedrake import *
 
 import spyro
+from spyro.domains import quadrature
 
 from .inputfiles.Model1_gradient_2d import model
 
@@ -18,7 +19,9 @@ def _make_vp_exact(V, mesh):
     """Create a circle with higher velocity in the center"""
     z, x = SpatialCoordinate(mesh)
     vp_exact = Function(V).interpolate(
-        4.0 + 1.0 * tanh(10.0 * (0.5 - sqrt((z - 1.5) ** 2 + (x + 1.5) ** 2)))
+        4.0
+        + 1.0 * tanh(10.0 * (0.5 - sqrt((z - 1.5) ** 2 + (x + 1.5) ** 2)))
+        # 5.0 + 0.5 * tanh(10.0 * (0.5 - sqrt((z - 1.5) ** 2 + (x + 1.5) ** 2)))
     )
     File("exact_vel.pvd").write(vp_exact)
     return vp_exact
@@ -32,8 +35,7 @@ def _make_vp_guess(V, mesh):
     return vp_guess
 
 
-def test_gradient_talyor_remainder():
-    """2nd order Taylor remainder test"""
+def test_gradient():
 
     comm = spyro.utils.mpi_init(model)
 
@@ -77,46 +79,67 @@ def test_gradient_talyor_remainder():
 
     misfit = p_exact_recv - p_guess_recv
 
+    qr_x, _, _ = quadrature.quadrature_rules(V)
+
     Jm = functional(model, misfit)
+    print("\n Cost functional at fixed point : " + str(Jm) + " \n ")
 
     # compute the gradient of the control (to be verified)
     dJ = gradient(model, mesh, comm, vp_guess, receivers, p_guess, misfit)
+    File("gradient.pvd").write(dJ)
 
     step = 0.01  # step length
 
     delta_m = Function(V)  # model direction (random)
-    delta_m.vector()[:] = np.random.rand(V.dim())
+    delta_m.vector()[:] = 0.2  # np.random.rand(V.dim())
 
-    remainders = []
-    steps = []
     # this deepcopy is important otherwise pertubations accumulate
     vp_original = vp_guess.copy(deepcopy=True)
+
+    steps = []
+    errors = []
     for i in range(4):
         steps.append(step)
         # perturb the model and calculate the functional (again)
         # J(m + delta_m*h)
         vp_guess = vp_original + step * delta_m
         _, p_guess_recv = forward(
-            model, mesh, comm, vp_guess, sources, wavelet, receivers
+            model,
+            mesh,
+            comm,
+            vp_guess,
+            sources,
+            wavelet,
+            receivers,  # True
         )
-        Jp = functional(model, p_exact_recv - p_guess_recv)
-        # compute the second-order Taylor remainder
-        remainder = np.abs(Jp - Jm - step * np.dot(dJ.vector(), delta_m.vector()))
-        remainders.append(remainder)
-        # halve the step and repeat
-        step /= 2.0
 
-    # remainder should decrease at a second order rate
-    remainders = np.array(remainders)
-    print(remainders)
-    r = []
-    for i in range(1, len(steps)):
-        r.append(
-            np.log(remainders[i] / remainders[i - 1]) / np.log(steps[i] / steps[i - 1])
+        Jp = functional(model, p_exact_recv - p_guess_recv)
+        projnorm = assemble(dJ * delta_m * dx(rule=qr_x))
+        fd_grad = (Jp - Jm) / step
+        print(
+            "\n Cost functional for step "
+            + str(step)
+            + " : "
+            + str(Jp)
+            + ", percent. var.: "
+            + str(fd_grad)
+            + ", theor. value : "
+            + str(projnorm)
+            + " \n ",
         )
-    print("Computed convergence rates: {}".format(r))
-    assert r[-1] > 1.8
+
+        errors.append(100 * ((fd_grad - projnorm) / projnorm))
+        step /= 2
+
+    # percent errors
+    # r = []
+    # for i in range(1, len(steps)):
+    #    r.append(np.log(errors[i] / errors[i - 1]) / np.log(steps[i] / steps[i - 1]))
+
+    # all errors less than 1 %
+    errors = np.array(errors)
+    assert (np.abs(errors) < 1.0).all()
 
 
 if __name__ == "__main__":
-    test_gradient_talyor_remainder()
+    test_gradient()

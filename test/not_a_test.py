@@ -30,7 +30,7 @@ wavelet = spyro.sources.full_ricker_wavelet(
 )
 
 
-@pytest.mark.skip(reason="no way of currently testing this")
+#@pytest.mark.skip(reason="no way of currently testing this")
 def test_gradient_talyor_remainder_v2():
     from ROL.firedrake_vector import FiredrakeVector as FeVector
     import ROL
@@ -124,6 +124,7 @@ def test_gradient_talyor_remainder_v2():
 
     x, y = SpatialCoordinate(mesh)
     d.interpolate(sin(x * pi) * sin(y * pi))
+    #d.assign(0.1)
     d = FeVector(d.vector(), inner_product)
     # check the gradient using d model pertubation 4 iterations and 2nd order test
     obj.checkGradient(opt, d, 4, 2)
