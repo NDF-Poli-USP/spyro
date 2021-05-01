@@ -5,26 +5,30 @@ fname = os.path.join(os.path.dirname(__file__), "../meshes/Uniform2D")
 
 model = {}
 
+# Define mesh file to be used:
+meshfile = fname
+
+# Define initial velocity model:
+truemodel = "not_used"
+initmodel = "not_used"
+
 opts = {
     "method": "KMV",  # either CG or KMV
     "quadratrue": "KMV",  # Equi or KMV
     "degree": 1,  # p order
     "dimension": 2,  # dimension
 }
-
 parallelism = {
-    "type": "off",
+    "type": "automatic",
 }
-
 mesh = {
     "Lz": 0.75,  # depth in km - always positive
     "Lx": 1.5,  # width in km - always positive
     "Ly": 0.0,  # thickness in km - always positive
-    "meshfile": "not_used.msh",
-    "initmodel": "not_used.hdf5",
-    "truemodel": "not_used.hdf5",
+    "meshfile": meshfile + ".msh",
+    "initmodel": initmodel + ".hdf5",
+    "truemodel": truemodel + ".hdf5",
 }
-
 BCs = {
     "status": True,  # True or false
     "outer_bc": "non-reflective",  #  None or non-reflective (outer boundary condition)
@@ -41,18 +45,17 @@ acquisition = {
     "source_type": "Ricker",
     "num_sources": 1,
     "source_pos": [(-0.1, 0.75)],
-    "frequency": 10.0,
+    "frequency": 1.0,
     "delay": 1.0,
-    "num_receivers": 500,
-    "receiver_locations": spyro.create_transect((-0.10, 0.1), (-0.10, 1.4), 500),
+    "num_receivers": 10,
+    "receiver_locations": spyro.create_transect((-0.65, 0.1), (-0.65, 1.4), 10),
 }
-
 timeaxis = {
     "t0": 0.0,  #  Initial time for event
     "tf": 2.00,  # Final time for event
-    "dt": 0.0005,  # timestep size
+    "dt": 0.0001,  # timestep size
     "amplitude": 1,  # the Ricker has an amplitude of 1.
-    "nspool": 100,  # how frequently to output solution to pvds
+    "nspool": 99999,  # how frequently to output solution to pvds
     "fspool": 1,  # how frequently to save solution to RAM
 }
 
