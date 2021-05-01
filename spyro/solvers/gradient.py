@@ -254,8 +254,6 @@ def gradient(
     assembly_callable = create_assembly_callable(rhs_, tensor=B)
 
     rhs_forcing = Function(V)  # forcing term
-    time_integrate_grad = False
-    gradi_list = []
     if save_adjoint:
         adjoint = [Function(V, name="adjoint_pressure") for t in range(nt)]
     for step in range(nt - 1, -1, -1):
@@ -293,16 +291,7 @@ def gradient(
             uufor.assign(guess.pop())
 
             grad_solver.solve()
-
-            gradi_list.append(gradi)
-
-            if time_integrate_grad:
-                # integrate in time (trapezoidal rule)
-                dJ += 0.5 * (gradi_list[0] + gradi_list[1]) * float(fspool * dt)
-                gradi_list = []
-                time_integrate_grad = False
-            else:
-                time_integrate_grad = True
+            dJ += gradi
 
         u_nm1.assign(u_n)
         u_n.assign(u_np1)
