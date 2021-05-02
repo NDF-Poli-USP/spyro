@@ -55,7 +55,8 @@ def Leapfrog_adjoint(
     else:
         raise ValueError("method is not yet supported")
 
-    V = c.function_space()
+    # V = c.function_space()
+    V = guess[0].function_space()
 
     element = V.ufl_element()
 
@@ -81,10 +82,10 @@ def Leapfrog_adjoint(
     elif dim == 3:
         is_local = [mesh.locate_cell([z, x, y]) for z, x, y in receiver_locations]
 
-    dJdC_local = Function(V)
+    dJdC_local = Function(c.function_space())
 
     # receivers are forced through sparse matrix vec multiplication
-    sparse_excitations = csc_matrix((len(dJdC_local.dat.data), numrecs))
+    sparse_excitations = csc_matrix((len(guess[0].dat.data), numrecs))
     for r, x0 in enumerate(receiver_locations):
         receiver.assign(x0)
         exct = delta.interpolate().dat.data_ro.copy()
@@ -237,7 +238,7 @@ def Leapfrog_adjoint(
         # Define gradient problem
         g_u = TrialFunction(V)
         g_v = TestFunction(V)
-        dvp = Function(V)
+        dvp = Function(c.function_space())
 
         if "material" in model:
             if model["material"]["type"] == "simp":
@@ -351,7 +352,7 @@ def Leapfrog_adjoint(
                 uufor.assign(guess.pop())
 
                 grad_solv.solve()
-                dJdC_local += gradi
+                dJdC_local += project(gradi, c.function_space())
 
             if IT % nspool == 0:
                 outfile.write(u_n, time=t)

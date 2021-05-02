@@ -88,11 +88,12 @@ def Leapfrog(
         raise ValueError("method is not yet supported")
 
     if isinstance(c, function.Function):
-        V = c.function_space()
+        # V = c.function_space()
+        V = excitations[0].function_space()
         element = V.ufl_element()
-    elif isinstance(c, constant.Constant):
-        element = space.FE_method(mesh, method, degree)
-        V = FunctionSpace(mesh, element)
+    # elif isinstance(c, constant.Constant):
+        # element = space.FE_method(mesh, method, degree)
+        # V = FunctionSpace(mesh, element)
 
     qr_x, qr_s, _ = quadrature.quadrature_rules(V)
 
