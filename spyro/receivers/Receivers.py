@@ -347,22 +347,13 @@ class Receivers:
         """
         The adjoint operation of interpolation (injection)
         """
-
-        # rhs_forcing_dummy = rhs_forcing.copy(deepcopy=True)
-        # for source_id in range(self.num_receivers):
-        #    if is_local[source_id]:
-        #        for i in range(len(self.cellNodeMaps[source_id])):
-        #            value = residual[IT][source_id]
-        #            rhs_forcing_dummy.dat.data[int(self.cellNodeMaps[source_id][i])] = (
-        #                value * self.cell_tabulations[source_id][i]
-        #            )
         for rid in range(self.num_receivers):
             value = residual[IT][rid]
             if is_local[rid]:
                 idx = np.int_(self.cellNodeMaps[rid])
                 phis = self.cell_tabulations[rid]
                 tmp = np.dot(phis, value)
-                rhs_forcing.dat.data[idx] = tmp
+                rhs_forcing.dat.data[idx] += tmp
 
         return rhs_forcing
 

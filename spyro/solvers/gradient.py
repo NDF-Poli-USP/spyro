@@ -95,6 +95,11 @@ def gradient(
 
     dJ = Function(V, name="gradient")
 
+    if dim == 2:
+        z, x = SpatialCoordinate(mesh)
+    elif dim == 3:
+        z, x, y = SpatialCoordinate(mesh)
+
     if PML:
         Z = VectorFunctionSpace(V.ufl_domain(), V.ufl_element())
         if dim == 2:
@@ -222,12 +227,14 @@ def gradient(
     solver = LinearSolver(A, solver_parameters=params)
 
     # Define gradient problem
-    mgrad = u * v * dx(rule=qr_x)
+    m_u = TrialFunction(V)
+    m_v = TestFunction(V)
+    mgrad = m_u * m_v * dx(rule=qr_x)
 
     uuadj = Function(V)  # auxiliarly function for the gradient compt.
     uufor = Function(V)  # auxiliarly function for the gradient compt.
 
-    ffG = 2.0 * c * 1.0 * dot(grad(uuadj), grad(uufor)) * v * dx(rule=qr_x)
+    ffG = 2.0 * c * 1.0 * dot(grad(uuadj), grad(uufor)) * m_v * dx(rule=qr_x)
 
     G = mgrad - ffG
     lhsG, rhsG = lhs(G), rhs(G)
@@ -258,7 +265,7 @@ def gradient(
         adjoint = [Function(V, name="adjoint_pressure") for t in range(nt)]
     for step in range(nt - 1, -1, -1):
         t = step * float(dt)
-
+        rhs_forcing.assign(0.0)
         # Solver - main equation - (I)
         # B = assemble(rhs_, tensor=B)
         assembly_callable()

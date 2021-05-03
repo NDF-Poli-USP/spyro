@@ -6,6 +6,7 @@ import spyro
 from spyro.domains import quadrature
 
 from .inputfiles.Model1_gradient_2d import model
+from .inputfiles.Model1_gradient_2d_pml import model_pml
 
 
 # outfile_total_gradient = File(os.getcwd() + "/results/Gradient.pvd")
@@ -27,6 +28,15 @@ def _make_vp_exact(V, mesh):
     return vp_exact
 
 
+def _make_vp_exact_pml(V, mesh):
+    """Create a half space"""
+    z, x = SpatialCoordinate(mesh)
+    velocity = conditional(z > -0.5, 1.5, 4.0)
+    vp_exact = Function(V, name="vp").interpolate(velocity)
+    File("exact_vel.pvd").write(vp_exact)
+    return vp_exact
+
+
 def _make_vp_guess(V, mesh):
     """The guess is a uniform velocity of 4.0 km/s"""
     z, x = SpatialCoordinate(mesh)
@@ -36,28 +46,36 @@ def _make_vp_guess(V, mesh):
 
 
 def test_gradient():
+    _test_gradient(model)
+    _test_gradient(model_pml, pml=True)
 
-    comm = spyro.utils.mpi_init(model)
 
-    mesh, V = spyro.io.read_mesh(model, comm)
+def _test_gradient(options, pml=False):
 
-    vp_exact = _make_vp_exact(V, mesh)
+    comm = spyro.utils.mpi_init(options)
+
+    mesh, V = spyro.io.read_mesh(options, comm)
+
+    if pml:
+        vp_exact = _make_vp_exact_pml(V, mesh)
+    else:
+        vp_exact = _make_vp_exact(V, mesh)
 
     vp_guess = _make_vp_guess(V, mesh)
 
-    sources = spyro.Sources(model, mesh, V, comm).create()
+    sources = spyro.Sources(options, mesh, V, comm).create()
 
-    receivers = spyro.Receivers(model, mesh, V, comm).create()
+    receivers = spyro.Receivers(options, mesh, V, comm).create()
 
     wavelet = spyro.full_ricker_wavelet(
-        model["timeaxis"]["dt"],
-        model["timeaxis"]["tf"],
-        model["acquisition"]["frequency"],
+        options["timeaxis"]["dt"],
+        options["timeaxis"]["tf"],
+        options["acquisition"]["frequency"],
     )
 
     # simulate the exact model
     p_exact, p_exact_recv = forward(
-        model,
+        options,
         mesh,
         comm,
         vp_exact,
@@ -68,7 +86,7 @@ def test_gradient():
 
     # simulate the guess model
     p_guess, p_guess_recv = forward(
-        model,
+        options,
         mesh,
         comm,
         vp_guess,
@@ -81,11 +99,11 @@ def test_gradient():
 
     qr_x, _, _ = quadrature.quadrature_rules(V)
 
-    Jm = functional(model, misfit)
+    Jm = functional(options, misfit)
     print("\n Cost functional at fixed point : " + str(Jm) + " \n ")
 
     # compute the gradient of the control (to be verified)
-    dJ = gradient(model, mesh, comm, vp_guess, receivers, p_guess, misfit)
+    dJ = gradient(options, mesh, comm, vp_guess, receivers, p_guess, misfit)
     File("gradient.pvd").write(dJ)
 
     step = 0.01  # step length
@@ -104,16 +122,16 @@ def test_gradient():
         # J(m + delta_m*h)
         vp_guess = vp_original + step * delta_m
         _, p_guess_recv = forward(
-            model,
+            options,
             mesh,
             comm,
             vp_guess,
             sources,
             wavelet,
-            receivers,  # True
+            receivers,
         )
 
-        Jp = functional(model, p_exact_recv - p_guess_recv)
+        Jp = functional(options, p_exact_recv - p_guess_recv)
         projnorm = assemble(dJ * delta_m * dx(rule=qr_x))
         fd_grad = (Jp - Jm) / step
         print(
@@ -121,9 +139,9 @@ def test_gradient():
             + str(step)
             + " : "
             + str(Jp)
-            + ", percent. var.: "
+            + ", fd approx.: "
             + str(fd_grad)
-            + ", theor. value : "
+            + ", grad'*dir : "
             + str(projnorm)
             + " \n ",
         )
@@ -131,15 +149,10 @@ def test_gradient():
         errors.append(100 * ((fd_grad - projnorm) / projnorm))
         step /= 2
 
-    # percent errors
-    # r = []
-    # for i in range(1, len(steps)):
-    #    r.append(np.log(errors[i] / errors[i - 1]) / np.log(steps[i] / steps[i - 1]))
-
     # all errors less than 1 %
     errors = np.array(errors)
     assert (np.abs(errors) < 1.0).all()
 
 
 if __name__ == "__main__":
-    test_gradient()
+    test_gradient(model)
