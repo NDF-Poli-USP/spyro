@@ -265,7 +265,7 @@ def gradient(
         adjoint = [Function(V, name="adjoint_pressure") for t in range(nt)]
     for step in range(nt - 1, -1, -1):
         t = step * float(dt)
-
+        rhs_forcing.assign(0.0)
         # Solver - main equation - (I)
         # B = assemble(rhs_, tensor=B)
         assembly_callable()
