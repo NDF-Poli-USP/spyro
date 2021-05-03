@@ -1,5 +1,7 @@
 # from scipy.io import savemat
 import matplotlib.pyplot as plt
+from mpl_toolkits.axes_grid1  import make_axes_locatable
+from matplotlib               import ticker
 
 import numpy as np
 
@@ -16,6 +18,9 @@ def plot_shotrecords(
     ft="PDF",
     start_index=0,
     end_index=0,
+    legend=False,
+    cmap="gray",
+    save=True
 ):
     """Plot a shot record and save it to disk.
 
@@ -39,7 +44,12 @@ def plot_shotrecords(
         The index of the first receiver to plot
     end_index: integer, optional
         The index of the last receiver to plot
-
+    legend: `boolean`, optional
+        Would you like to add the legend?
+    cmap: string, optional
+        Would you like to chane cmap?
+    save: `boolean`, optional
+        Would you like to chane cmap?
     Returns
     -------
     None
@@ -60,8 +70,8 @@ def plot_shotrecords(
     t_rec = np.linspace(0.0, tf, nt)
     X, Y = np.meshgrid(x_rec, t_rec)
 
-    cmap = plt.get_cmap("gray")
-    plt.contourf(X, Y, arr, cmap=cmap, vmin=vmin, vmax=vmax)
+    cmap = plt.get_cmap(cmap)
+    fig  = plt.contourf(X, Y, arr, cmap=cmap, vmin=vmin, vmax=vmax)
     # savemat("test.mat", {"mydata": arr})
     plt.xlabel("receiver number", fontsize=18)
     plt.ylabel("time (s)", fontsize=18)
@@ -70,8 +80,25 @@ def plot_shotrecords(
     plt.xlim(start_index, end_index)
     plt.ylim(tf, 0)
     plt.subplots_adjust(left=0.18, right=0.95, bottom=0.14, top=0.95)
-    plt.savefig("shot_number_" + name + "." + ft, format=ft)
+    if save:
+        plt.savefig("shot_number_" + name + "." + ft, format=ft)
     # plt.axis("image")
+    if legend:
+        ax = plt.gca()
+        ax.xaxis.set_major_locator(plt.MaxNLocator(4))
+        ax.yaxis.set_major_locator(plt.MaxNLocator(4))
+        divider = make_axes_locatable(ax)
+        cax = divider.append_axes("right", size="5%", pad=0.05)
+        cbar = plt.colorbar(fig, cax=cax, format='%.e')
+        tick_locator = ticker.MaxNLocator(nbins=5)
+    
+        cbar.locator = tick_locator
+    
+        cbar.update_ticks()
+        plt.tick_params(labelsize=18)
+    
+        plt.draw()
+
     if appear:
         plt.show()
     plt.close()
