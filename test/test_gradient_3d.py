@@ -1,4 +1,5 @@
 import numpy as np
+import pytest 
 
 from firedrake import *
 
@@ -30,8 +31,8 @@ def _make_vp_guess(V, mesh):
     File("guess_vel.pvd").write(vp_guess)
     return vp_guess
 
-
-def test_gradient():
+@pytest.mark.skip(reason="no way of currently testing this")
+def test_gradient_3d():
     _test_gradient(model_pml, pml=True)
 
 def _test_gradient(options, pml=False):
@@ -160,4 +161,4 @@ def _test_gradient(options, pml=False):
 
 
 if __name__ == "__main__":
-    test_gradient(model)
+    test_gradient_3d(model)
