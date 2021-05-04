@@ -46,7 +46,9 @@ def _make_vp_guess(V, mesh):
 
 
 def test_gradient():
-    #_test_gradient(model)
+    _test_gradient(model)
+    
+def test_gradient_pml():
     _test_gradient(model_pml, pml=True)
 
 
