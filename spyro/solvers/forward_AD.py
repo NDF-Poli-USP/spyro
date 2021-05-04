@@ -10,7 +10,7 @@ def forward_AD(
     model,
     mesh,
     comm,
-    c,
+    m0,
     excitations,
     rec_position,
     source_num=0,
@@ -67,12 +67,12 @@ def forward_AD(
     delay = model["acquisition"]["delay"]
     nspool = model["timeaxis"]["nspool"]
     fspool = model["timeaxis"]["fspool"]
-    PML = model["PML"]["status"]
+    PML = model["BCs"]["status"]
     if PML:
         Lx = model["mesh"]["Lx"]
         Lz = model["mesh"]["Lz"]
-        lx = model["PML"]["lx"]
-        lz = model["PML"]["lz"]
+        lx = model["BCs"]["lx"]
+        lz = model["BCs"]["lz"]
         x1 = 0.0
         x2 = Lx
         a_pml = lx
@@ -81,7 +81,7 @@ def forward_AD(
         c_pml = lz
         if dim == 3:
             Ly = model["mesh"]["Ly"]
-            ly = model["PML"]["ly"]
+            ly = model["BCs"]["ly"]
             y1 = 0.0
             y2 = Ly
             b_pml = ly
@@ -185,20 +185,20 @@ def forward_AD(
     t = 0.0
 
     cutoff = freq_bands[freq_index] if "inversion" in model else None
-
+   
     # -------------------------------------------------------
     m1 = ((u - 2.0 * u_n + u_nm1) / Constant(dt ** 2)) * v * dx(rule=qr_x)
-    a = c * c * dot(grad(u_n), grad(v)) * dx(rule=qr_x)  # explicit
+    a = (1/m0) * dot(grad(u_n), grad(v)) * dx(rule=qr_x)  # explicit
 
-    if model["PML"]["outer_bc"] == "non-reflective":
-        nf = c * ((u_n - u_nm1) / dt) * v * ds(rule=qr_s)
+    if model["BCs"]["outer_bc"] == "non-reflective":
+        nf = (1/m0)* ((u_n - u_nm1) / dt) * v * ds(rule=qr_s)
     else:
         nf = 0
     RW = full_ricker_wavelet(dt, tf, freq, amp=amp, cutoff=None)
 
     f, ricker = external_forcing(RW, mesh, model, source_num, V)
     # FF = m1 + a + nf
-    FF = m1 + a + nf - c * c * f * v * dx(rule=qr_x)
+    FF = m1 + a + nf - (1/m0) * f * v * dx(rule=qr_x)
 
     if PML:
         X = Function(W)
@@ -211,7 +211,7 @@ def forward_AD(
             # -------------------------------------------------------
             mm1 = (dot((pp - pp_n), qq) / Constant(dt)) * dx(rule=qr_x)
             mm2 = inner(dot(Gamma_1, pp_n), qq) * dx(rule=qr_x)
-            dd = c * c * inner(grad(u_n), dot(Gamma_2, qq)) * dx(rule=qr_x)
+            dd = (1/m0) * inner(grad(u_n), dot(Gamma_2, qq)) * dx(rule=qr_x)
             FF += mm1 + mm2 + dd
         elif dim == 3:
             pml1 = (
@@ -233,8 +233,8 @@ def forward_AD(
             # -------------------------------------------------------
             mm1 = (dot((pp - pp_n), qq) / Constant(dt)) * dx(rule=qr_x)
             mm2 = inner(dot(Gamma_1, pp_n), qq) * dx(rule=qr_x)
-            dd1 = c * c * inner(grad(u_n), dot(Gamma_2, qq)) * dx(rule=qr_x)
-            dd2 = -c * c * inner(grad(psi_n), dot(Gamma_3, qq)) * dx(rule=qr_x)
+            dd1 = (1/m0) * inner(grad(u_n), dot(Gamma_2, qq)) * dx(rule=qr_x)
+            dd2 = -(1/m0) * inner(grad(psi_n), dot(Gamma_3, qq)) * dx(rule=qr_x)
 
             FF += mm1 + mm2 + dd1 + dd2
             # -------------------------------------------------------
