@@ -18,10 +18,10 @@ Functionality
 * Finite element discretizations for scalar wave equation in 2D and 3D using triangular and tetrahedral meshes.
     * Continuous Galerkin with arbitrary spatial order and stable and accurate higher-order mass lumping up to p = 5.
 * Spatial and ensemble (*shot*) parallelism for source simulations.
-* Central and Strong Stability Preserving Runga-Kutta (SSPRK) time-stepping schemes (up to 4th order accurate in time).
+* Central (2nd order accurate in time)
 * Perfectly Matched Layer (PML) to absorb reflected waves in both 2D and 3D.
-* Mesh-independent functional gradient for central and SSPRK time-stepping methods using the optimize-then-discretize method.
-* Sparse interpolation and injection.
+* Mesh-independent functional gradient for central time-stepping method using the optimize-then-discretize method.
+* Sparse interpolation and injection using point sources.
 
 
 Performance
