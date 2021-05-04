@@ -20,7 +20,7 @@ Functionality
 * Spatial and ensemble (*shot*) parallelism for source simulations.
 * Central (2nd order accurate in time)
 * Perfectly Matched Layer (PML) to absorb reflected waves in both 2D and 3D.
-* Mesh-independent functional gradient for central time-stepping method using the optimize-then-discretize method.
+* Mesh-independent functional gradient using the optimize-then-discretize method.
 * Sparse interpolation and injection using point sources.
 
 
