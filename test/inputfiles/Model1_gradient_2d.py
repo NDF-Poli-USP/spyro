@@ -15,7 +15,7 @@ initmodel = "not_used"
 opts = {
     "method": "KMV",
     "quadrature": "KMV",
-    "degree": 1,  # p order
+    "degree": 2,  # p order
     "dimension": 2,  # dimension
 }
 
@@ -46,19 +46,19 @@ BCs = {
 
 acquisition = {
     "source_type": "Ricker",
-    "frequency": 1.0,
+    "frequency": 5.0,
     "delay": 1.0,
     "num_sources": 1,
     "source_pos": [(1.5, -0.5)],
     "amplitude": 1.0,
-    "num_receivers": 10,
-    "receiver_locations": create_transect((0.1, -2.90), (2.9, -2.90), 10),
+    "num_receivers": 100,
+    "receiver_locations": create_transect((0.1, -2.90), (2.9, -2.90), 100),
 }
 
 timeaxis = {
     "t0": 0.0,  #  Initial time for event
-    "tf": 2.0,  # Final time for event
-    "dt": 0.001,  # timestep size
+    "tf": 1.0,  # Final time for event
+    "dt": 0.0005,  # timestep size
     "nspool": 9999,  # how frequently to output solution to pvds
     "fspool": 1,  # how frequently to save solution to RAM
 }  # how freq. to output to files and screen
