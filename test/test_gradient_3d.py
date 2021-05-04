@@ -5,9 +5,7 @@ from firedrake import *
 import spyro
 from spyro.domains import quadrature
 
-from .inputfiles.Model1_gradient_2d import model
-from .inputfiles.Model1_gradient_2d_pml import model_pml
-
+from .inputfiles.Model1_gradient_3d_pml import model_pml
 
 # outfile_total_gradient = File(os.getcwd() + "/results/Gradient.pvd")
 
@@ -16,21 +14,9 @@ gradient = spyro.solvers.gradient
 functional = spyro.utils.compute_functional
 
 
-def _make_vp_exact(V, mesh):
-    """Create a circle with higher velocity in the center"""
-    z, x = SpatialCoordinate(mesh)
-    vp_exact = Function(V).interpolate(
-        4.0
-        + 1.0 * tanh(10.0 * (0.5 - sqrt((z - 1.5) ** 2 + (x + 1.5) ** 2)))
-        # 5.0 + 0.5 * tanh(10.0 * (0.5 - sqrt((z - 1.5) ** 2 + (x + 1.5) ** 2)))
-    )
-    File("exact_vel.pvd").write(vp_exact)
-    return vp_exact
-
-
 def _make_vp_exact_pml(V, mesh):
     """Create a half space"""
-    z, x = SpatialCoordinate(mesh)
+    z, x, y = SpatialCoordinate(mesh)
     velocity = conditional(z > -0.5, 1.5, 4.0)
     vp_exact = Function(V, name="vp").interpolate(velocity)
     File("exact_vel.pvd").write(vp_exact)
@@ -39,16 +25,14 @@ def _make_vp_exact_pml(V, mesh):
 
 def _make_vp_guess(V, mesh):
     """The guess is a uniform velocity of 4.0 km/s"""
-    z, x = SpatialCoordinate(mesh)
+    z, x, y = SpatialCoordinate(mesh)
     vp_guess = Function(V).interpolate(4.0 + 0.0 * x)
     File("guess_vel.pvd").write(vp_guess)
     return vp_guess
 
 
 def test_gradient():
-    #_test_gradient(model)
     _test_gradient(model_pml, pml=True)
-
 
 def _test_gradient(options, pml=False):
 
@@ -56,26 +40,31 @@ def _test_gradient(options, pml=False):
 
     mesh, V = spyro.io.read_mesh(options, comm)
 
-    if pml:
-        vp_exact = _make_vp_exact_pml(V, mesh)
-        z, x = SpatialCoordinate(mesh)
-        Lx = model_pml["mesh"]["Lx"]
-        Lz = model_pml["mesh"]["Lz"]
-        x1 = 0.0
-        x2 = Lx
-        z1 = 0.0
-        z2 = -Lz
-        boxx1     = Function(V).interpolate(conditional(x>x1 ,1.0,0.0))
-        boxx2     = Function(V).interpolate( conditional(x<Lx,1.0,0.0) )
-        boxz1     = Function(V).interpolate( conditional(z>z2,1.0,0.0) )
-        box1      = Function(V).interpolate( boxx1 * boxx2 * boxz1  )
-        File("inner-product-energy.pvd").write(box1)
 
+    vp_exact = _make_vp_exact_pml(V, mesh)
 
-    else:
-        vp_exact = _make_vp_exact(V, mesh)
+    #dt = spyro.estimate_timestep(mesh, V, vp_exact)
+    #print(dt, flush=True)
 
-        box1 = Function(V).assign(1.0)
+    z, x, y = SpatialCoordinate(mesh)
+    Lx = model_pml["mesh"]["Lx"]
+    Lz = model_pml["mesh"]["Lz"]
+    Ly = model_pml["mesh"]["Ly"]
+    x1 = 0.0
+    x2 = Lx
+    z1 = 0.0
+    z2 = -Lz
+    y1 = 0.0 
+    y2 = Ly 
+    boxx1     = Function(V).interpolate(conditional(x>x1 ,1.0,0.0))
+    boxx2     = Function(V).interpolate( conditional(x<Lx,1.0,0.0) )
+
+    boxy1     = Function(V).interpolate(conditional(y>y1 ,1.0,0.0))
+    boxy2     = Function(V).interpolate( conditional(y<Ly,1.0,0.0) )
+
+    boxz1     = Function(V).interpolate( conditional(z>z2,1.0,0.0) )
+    box1      = Function(V).interpolate( boxx1 * boxx2 * boxz1 * boxy1 * boxy2 )
+    File("inner-product-energy.pvd").write(box1)
 
     vp_guess = _make_vp_guess(V, mesh)
 
