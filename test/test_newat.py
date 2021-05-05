@@ -111,13 +111,13 @@ def test_correct_at_value2D():
 
     u1 = Function(V).interpolate(x + z)
     test1 = math.isclose(
-        (pz+px), receivers._Receivers__new_at(u1.dat.data[:], 0, True), rel_tol=1e-09
+        (pz+px), receivers._Receivers__new_at(u1.dat.data[:], 0), rel_tol=1e-09
     )
 
     u1 = Function(V).interpolate(sin(x) * z * 2)
     test2 = math.isclose(
         sin(px) * pz * 2,
-        receivers._Receivers__new_at(u1.dat.data[:], 0, True),
+        receivers._Receivers__new_at(u1.dat.data[:], 0),
         rel_tol=1e-05,
     )
 
