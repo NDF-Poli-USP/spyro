@@ -53,7 +53,7 @@ class Sources(spyro.receivers.Receivers.Receivers):
                     value * self.cell_tabulations[source_id][i]
                 )
 
-        return rhs_forcing
+    
 
 
 def timedependentSource(model, t, freq=None, amp=1, delay=1.5):
