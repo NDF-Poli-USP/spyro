@@ -56,7 +56,7 @@ class Sources(spyro.receivers.Receivers.Receivers):
                     )
             else: 
                 for i in range(len(self.cellNodeMaps[source_id])):
-                    tmp = rhs.forcing.dat.data_with_halos[0]
+                    tmp = rhs_forcing.dat.data_with_halos[0]
 
         return rhs_forcing
 
