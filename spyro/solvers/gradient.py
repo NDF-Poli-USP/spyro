@@ -91,8 +91,6 @@ def gradient(
 
     receiver_locations = model["acquisition"]["receiver_locations"]
 
-    is_local = helpers.receivers_local(mesh, dim, receiver_locations)
-
     dJ = Function(V, name="gradient")
 
     if dim == 2:
@@ -270,7 +268,7 @@ def gradient(
         # B = assemble(rhs_, tensor=B)
         assembly_callable()
 
-        f = receivers.apply_source_receivers(rhs_forcing, residual, step, is_local)
+        f = receivers.apply_source_receivers(rhs_forcing, residual, step)
         # add forcing term to solve scalar pressure
         B0 = B.sub(0)
         B0 += f
