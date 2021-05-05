@@ -169,7 +169,8 @@ def forward(
         u_n = Function(V)
         u_np1 = Function(V)
 
-    is_local = helpers.receivers_local(mesh, dim, receivers.receiver_locations)
+    is_local_r = helpers.receivers_local(mesh, dim, receivers.receiver_locations)
+    is_local_s = helpers.receivers_local(mesh, dim, excitations.receiver_locations)
 
     if output:
         outfile = helpers.create_output_file("forward.pvd", comm, source_num)
@@ -249,7 +250,7 @@ def forward(
     for step in range(nt):
         rhs_forcing.assign(0.0)
         assembly_callable()
-        f = excitations.apply_source(rhs_forcing, wavelet[step])
+        f = excitations.apply_source(rhs_forcing, wavelet[step], is_local_s)
         B0 = B.sub(0)
         B0 += f
         solver.solve(X, B)
@@ -268,7 +269,7 @@ def forward(
             u_np1.assign(X)
 
         usol_recv.append(
-            receivers.interpolate(u_np1.dat.data_ro_with_halos[:], is_local)
+            receivers.interpolate(u_np1.dat.data_ro_with_halos[:], is_local_r)
         )
 
         if step % fspool == 0:
@@ -289,7 +290,7 @@ def forward(
 
         t = step * float(dt)
 
-    usol_recv = helpers.fill(usol_recv, is_local, nt, receivers.num_receivers)
+    usol_recv = helpers.fill(usol_recv, is_local_r, nt, receivers.num_receivers)
     usol_recv = utils.communicate(usol_recv, comm)
 
     return usol, usol_recv
