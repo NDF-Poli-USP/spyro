@@ -255,13 +255,13 @@ def test_correct_at_value3D():
     u1 = Function(V).interpolate(x + z + y)
     realvalue = x_real + y_real + z_real
     test1 = math.isclose(
-        realvalue, receivers._Receivers__new_at(u1.dat.data[:], 0, True), rel_tol=1e-09
+        realvalue, receivers._Receivers__new_at(u1.dat.data[:], 0), rel_tol=1e-09
     )
 
     u1 = Function(V).interpolate(sin(x) * (z + 1) ** 2 * cos(y))
     realvalue = sin(x_real) * (z_real + 1) ** 2 * cos(y_real)
     test2 = math.isclose(
-        realvalue, receivers._Receivers__new_at(u1.dat.data[:], 0, True), rel_tol=1e-05
+        realvalue, receivers._Receivers__new_at(u1.dat.data[:], 0), rel_tol=1e-05
     )
 
     assert all([test1, test2])
