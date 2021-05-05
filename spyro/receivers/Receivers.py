@@ -350,7 +350,9 @@ class Receivers:
                 idx = np.int_(self.cellNodeMaps[rid])
                 phis = self.cell_tabulations[rid]
                 tmp = np.dot(phis, value)
-                rhs_forcing.dat.data[idx] += tmp
+                rhs_forcing.dat.data_with_halos[idx] += tmp
+            else:
+                tmp = rhs_forcing.dat.data_with_halos[0]
 
         return rhs_forcing
 
