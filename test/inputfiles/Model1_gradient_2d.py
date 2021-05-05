@@ -15,7 +15,7 @@ initmodel = "not_used"
 opts = {
     "method": "KMV",
     "quadrature": "KMV",
-    "degree": 2,  # p order
+    "degree": 1,  # p order
     "dimension": 2,  # dimension
 }
 
@@ -58,7 +58,7 @@ acquisition = {
 timeaxis = {
     "t0": 0.0,  #  Initial time for event
     "tf": 1.0,  # Final time for event
-    "dt": 0.0005,  # timestep size
+    "dt": 0.001,  # timestep size
     "nspool": 9999,  # how frequently to output solution to pvds
     "fspool": 1,  # how frequently to save solution to RAM
 }  # how freq. to output to files and screen
