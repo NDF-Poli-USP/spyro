@@ -10,8 +10,9 @@ def forward_AD(
     model,
     mesh,
     comm,
-    m0,
+    c,
     excitations,
+    wavelet,
     rec_position,
     source_num=0,
     freq_index=0,
@@ -185,20 +186,19 @@ def forward_AD(
     t = 0.0
 
     cutoff = freq_bands[freq_index] if "inversion" in model else None
-   
+    
     # -------------------------------------------------------
     m1 = ((u - 2.0 * u_n + u_nm1) / Constant(dt ** 2)) * v * dx(rule=qr_x)
-    a = (1/m0) * dot(grad(u_n), grad(v)) * dx(rule=qr_x)  # explicit
+    a = c * c * dot(grad(u_n), grad(v)) * dx(rule=qr_x)  # explicit
 
+
+    nf = 0
     if model["BCs"]["outer_bc"] == "non-reflective":
-        nf = (1/m0)* ((u_n - u_nm1) / dt) * v * ds(rule=qr_s)
-    else:
-        nf = 0
-    RW = full_ricker_wavelet(dt, tf, freq, amp=amp, cutoff=None)
+        nf = c * ((u_n - u_nm1) / dt) * v * ds(rule=qr_s)
 
-    f, ricker = external_forcing(RW, mesh, model, source_num, V)
-    # FF = m1 + a + nf
-    FF = m1 + a + nf - (1/m0) * f * v * dx(rule=qr_x)
+    
+    f  = Function(V)
+    FF = m1 + a + nf - f * v * dx(rule=qr_x)
 
     if PML:
         X = Function(W)
@@ -211,7 +211,7 @@ def forward_AD(
             # -------------------------------------------------------
             mm1 = (dot((pp - pp_n), qq) / Constant(dt)) * dx(rule=qr_x)
             mm2 = inner(dot(Gamma_1, pp_n), qq) * dx(rule=qr_x)
-            dd = (1/m0) * inner(grad(u_n), dot(Gamma_2, qq)) * dx(rule=qr_x)
+            dd = c * c * inner(grad(u_n), dot(Gamma_2, qq)) * dx(rule=qr_x)
             FF += mm1 + mm2 + dd
         elif dim == 3:
             pml1 = (
@@ -233,8 +233,8 @@ def forward_AD(
             # -------------------------------------------------------
             mm1 = (dot((pp - pp_n), qq) / Constant(dt)) * dx(rule=qr_x)
             mm2 = inner(dot(Gamma_1, pp_n), qq) * dx(rule=qr_x)
-            dd1 = (1/m0) * inner(grad(u_n), dot(Gamma_2, qq)) * dx(rule=qr_x)
-            dd2 = -(1/m0) * inner(grad(psi_n), dot(Gamma_3, qq)) * dx(rule=qr_x)
+            dd1 = c * c * inner(grad(u_n), dot(Gamma_2, qq)) * dx(rule=qr_x)
+            dd2 = -c * c * inner(grad(psi_n), dot(Gamma_3, qq)) * dx(rule=qr_x)
 
             FF += mm1 + mm2 + dd1 + dd2
             # -------------------------------------------------------
@@ -259,16 +259,12 @@ def forward_AD(
     problem = LinearVariationalProblem(lhs_, rhs_, X)
     solver = LinearVariationalSolver(problem, solver_parameters=params)
 
-    rhs_forcing = Function(V)
     point_cloud = VertexOnlyMesh(mesh, rec_position)
     P = FunctionSpace(point_cloud, "DG", 0)
     obj_func = 0
     for IT in range(nt):
-
-        if IT < dstep:
-            ricker.assign(RW[IT])
-        elif IT == dstep:
-            ricker.assign(0.0)
+        f.assign(0.0)
+        excitations.apply_source(f, wavelet[IT])
 
         solver.solve()
         if PML:

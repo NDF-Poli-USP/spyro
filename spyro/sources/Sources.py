@@ -61,7 +61,7 @@ class Sources(spyro.receivers.Receivers.Receivers):
                 for i in range(len(self.cellNodeMaps[source_id])):
                     tmp = rhs_forcing.dat.data_with_halos[0]
 
-        return rhs_forcing
+    
 
 
 def timedependentSource(model, t, freq=None, amp=1, delay=1.5):
