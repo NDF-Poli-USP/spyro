@@ -50,9 +50,12 @@ class Sources(spyro.receivers.Receivers.Receivers):
         for source_id in range(self.num_receivers):
             if is_local[source_id]:
                 for i in range(len(self.cellNodeMaps[source_id])):
-                    rhs_forcing.dat.data[int(self.cellNodeMaps[source_id][i])] = (
+                    rhs_forcing.dat.data_with_halos[int(self.cellNodeMaps[source_id][i])] = (
                         value * self.cell_tabulations[source_id][i]
                     )
+            else: 
+                for i in range(len(self.cellNodeMaps[source_id])):
+                    tmp = rhs.forcing.dat.data_with_halos[0]
 
         return rhs_forcing
 
