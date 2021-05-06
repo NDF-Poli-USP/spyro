@@ -42,7 +42,7 @@ class Receivers:
 
         self.num_receivers = model["acquisition"]["num_receivers"]
         self.receiver_locations = model["acquisition"]["receiver_locations"]
-
+        assert self.num_receivers == len(self.receiver_locations), "number of probing points DNE number of locations"
         self.cellIDs = None
         self.cellVertices = None
         self.cell_tabulations = None
