@@ -97,7 +97,7 @@ def run_solve(timestep_method, method, model, mesh, expr):
 
 
 def test_method(mesh, timestep_method, spatial_method, interpolation_expr):
-    if spatial_method == "KMV" and timestep_method == "ssprk":
+    if timestep_method == "ssprk":
         pytest.skip("KMV is not yet supported in ssprk")
     error = run_solve(
         timestep_method, spatial_method, model, mesh(3), interpolation_expr

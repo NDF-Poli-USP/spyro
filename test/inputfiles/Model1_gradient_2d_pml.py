@@ -15,7 +15,7 @@ initmodel = "not_used"
 opts = {
     "method": "KMV",  # either CG or KMV
     "quadratrue": "KMV",  # Equi or KMV
-    "degree": 2,  # p order
+    "degree": 1,  # p order
     "dimension": 2,  # dimension
 }
 parallelism = {
@@ -47,13 +47,13 @@ acquisition = {
     "source_pos": [(-0.1, 0.5)],
     "frequency": 5.0,
     "delay": 1.0,
-    "num_receivers": 10,
-    "receiver_locations": spyro.create_transect((-0.95, 0.1), (-0.95, 0.9), 10),
+    "num_receivers": 100,
+    "receiver_locations": spyro.create_transect((-0.95, 0.1), (-0.95, 0.9), 100),
 }
 timeaxis = {
     "t0": 0.0,  #  Initial time for event
-    "tf": 0.50,  # Final time for event
-    "dt": 0.0005,  # timestep size
+    "tf": 1.0,  # Final time for event
+    "dt": 0.001,  # timestep size
     "amplitude": 1,  # the Ricker has an amplitude of 1.
     "nspool": 99999,  # how frequently to output solution to pvds
     "fspool": 1,  # how frequently to save solution to RAM
