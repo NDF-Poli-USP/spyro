@@ -40,15 +40,17 @@ class Receivers:
         self.dimension = model["opts"]["dimension"]
         self.degree = model["opts"]["degree"]
 
-        self.num_receivers = model["acquisition"]["num_receivers"]
         self.receiver_locations = model["acquisition"]["receiver_locations"]
-        assert self.num_receivers == len(self.receiver_locations), "number of probing points DNE number of locations"
+        self.num_receivers = len(self.receiver_locations)
+
         self.cellIDs = None
         self.cellVertices = None
         self.cell_tabulations = None
         self.cellNodeMaps = None
         self.nodes_per_cell = None
         self.is_local = [0]*self.num_receivers
+ 
+        self.build_maps()
 
     @property
     def num_receivers(self):
@@ -60,8 +62,12 @@ class Receivers:
             raise ValueError("No receivers specified")
         self.__num_receivers = value
 
-    def create(self):
-        """Initialzies maps used in point interpolation"""
+
+    def build_maps(self):
+        for rid in range(self.num_receivers):
+            receiver_z, receiver_x = self.receiver_locations[rid]
+            cell_id = self.mesh.locate_cell([receiver_z, receiver_x], tolerance=1e-6)
+            self.is_local[rid] = cell_id
 
         (
             self.cellIDs,
@@ -69,11 +75,8 @@ class Receivers:
             self.cellNodeMaps,
         ) = self.__func_receiver_locator()
         self.cell_tabulations = self.__func_build_cell_tabulations()
-        # __build_local_nodes()
 
         self.num_receivers = len(self.receiver_locations)
-
-        return self
 
     def interpolate(self, field):
         """Interpolate the solution to the receiver coordinates for
@@ -94,6 +97,23 @@ class Receivers:
         return [
             self.__new_at(field, rn) for rn in range(self.num_receivers)
         ]
+
+    def apply_receivers_as_source(self, rhs_forcing, residual, IT):
+        """
+        The adjoint operation of interpolation (injection)
+        """
+        for rid in range(self.num_receivers):
+            value = residual[IT][rid]
+            if self.is_local[rid]:
+                idx = np.int_(self.cellNodeMaps[rid])
+                phis = self.cell_tabulations[rid]
+                tmp = np.dot(phis, value)
+                rhs_forcing.dat.data_with_halos[idx] += tmp
+            else:
+                tmp = rhs_forcing.dat.data_with_halos[0]
+
+        return rhs_forcing
+
 
     def __func_receiver_locator(self):
         """Function that returns a list of tuples and a matrix
@@ -156,10 +176,7 @@ class Receivers:
         cellVertices = []
 
         for receiver_id in range(num_recv):
-            (receiver_z, receiver_x) = self.receiver_locations[receiver_id]
-
-            cell_id = self.mesh.locate_cell([receiver_z, receiver_x], tolerance=0.0100)
-            self.is_local[receiver_id] = cell_id
+            cell_id = self.is_local[receiver_id]
 
             cellVertices.append([])
 
@@ -243,12 +260,7 @@ class Receivers:
         cellVertices = []
 
         for receiver_id in range(num_recv):
-            (receiver_z, receiver_x, receiver_y) = self.receiver_locations[receiver_id]
-
-            cell_id = self.mesh.locate_cell(
-                [receiver_z, receiver_x, receiver_y], tolerance=0.0100
-            )
-            self.is_local[receiver_id] = cell_id
+            cell_id = self.is_local[receiver_id]
             cellVertices.append([])
             if cell_id is not None:
                 cellId_maps[receiver_id] = cell_id
@@ -295,9 +307,7 @@ class Receivers:
         cell_tabulations = np.zeros((self.num_receivers, self.nodes_per_cell))
 
         for receiver_id in range(self.num_receivers):
-            (receiver_z, receiver_x) = self.receiver_locations[receiver_id]
-            cell_id = self.mesh.locate_cell([receiver_z, receiver_x], tolerance=0.0100)
-
+            cell_id = self.is_local[receiver_id]
             if cell_id is not None:
                 # getting coordinates to change to reference element
                 p = self.receiver_locations[receiver_id]
@@ -319,11 +329,7 @@ class Receivers:
         cell_tabulations = np.zeros((self.num_receivers, self.nodes_per_cell))
 
         for receiver_id in range(self.num_receivers):
-            (receiver_z, receiver_x, receiver_y) = self.receiver_locations[receiver_id]
-            cell_id = self.mesh.locate_cell(
-                [receiver_z, receiver_x, receiver_y], tolerance=0.0100
-            )
-
+            cell_id = self.is_local[receiver_id]
             if cell_id is not None:
                 # getting coordinates to change to reference element
                 p = self.receiver_locations[receiver_id]
@@ -339,23 +345,6 @@ class Receivers:
                 cell_tabulations[receiver_id, :] = phi_tab.transpose()
 
         return cell_tabulations
-
-    def apply_source_receivers(self, rhs_forcing, residual, IT):
-        """
-        The adjoint operation of interpolation (injection)
-        """
-        for rid in range(self.num_receivers):
-            value = residual[IT][rid]
-            if self.is_local[rid]:
-                idx = np.int_(self.cellNodeMaps[rid])
-                phis = self.cell_tabulations[rid]
-                tmp = np.dot(phis, value)
-                rhs_forcing.dat.data_with_halos[idx] += tmp
-            else:
-                tmp = rhs_forcing.dat.data_with_halos[0]
-
-        return rhs_forcing
-
 
 ## Some helper functions
 

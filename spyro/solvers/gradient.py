@@ -268,7 +268,7 @@ def gradient(
         # B = assemble(rhs_, tensor=B)
         assembly_callable()
 
-        f = receivers.apply_source_receivers(rhs_forcing, residual, step)
+        f = receivers.apply_receivers_as_source(rhs_forcing, residual, step)
         # add forcing term to solve scalar pressure
         B0 = B.sub(0)
         B0 += f

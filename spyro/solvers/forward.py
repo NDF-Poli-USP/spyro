@@ -265,9 +265,7 @@ def forward(
         else:
             u_np1.assign(X)
 
-        usol_recv.append(
-            receivers.interpolate(u_np1.dat.data_ro_with_halos[:])
-        )
+        usol_recv.append(receivers.interpolate(u_np1.dat.data_ro_with_halos[:]))
 
         if step % fspool == 0:
             usol[save_step].assign(u_np1)
