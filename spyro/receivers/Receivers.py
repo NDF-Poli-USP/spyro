@@ -48,8 +48,8 @@ class Receivers:
         self.cell_tabulations = None
         self.cellNodeMaps = None
         self.nodes_per_cell = None
-        self.is_local = [0]*self.num_receivers
- 
+        self.is_local = [0] * self.num_receivers
+
         self.build_maps()
 
     @property
@@ -62,10 +62,12 @@ class Receivers:
             raise ValueError("No receivers specified")
         self.__num_receivers = value
 
-
     def build_maps(self):
         for rid in range(self.num_receivers):
-            receiver_z, receiver_x = self.receiver_locations[rid]
+            if self.dimension == 2:
+                receiver_z, receiver_x = self.receiver_locations[rid]
+            elif self.dimension == 3:
+                receiver_z, receiver_x, receiver_y = self.receiver_locations[rid]
             cell_id = self.mesh.locate_cell([receiver_z, receiver_x], tolerance=1e-6)
             self.is_local[rid] = cell_id
 
@@ -94,9 +96,7 @@ class Receivers:
             for the given timestep.
 
         """
-        return [
-            self.__new_at(field, rn) for rn in range(self.num_receivers)
-        ]
+        return [self.__new_at(field, rn) for rn in range(self.num_receivers)]
 
     def apply_receivers_as_source(self, rhs_forcing, residual, IT):
         """
@@ -113,7 +113,6 @@ class Receivers:
                 tmp = rhs_forcing.dat.data_with_halos[0]
 
         return rhs_forcing
-
 
     def __func_receiver_locator(self):
         """Function that returns a list of tuples and a matrix
@@ -345,6 +344,7 @@ class Receivers:
                 cell_tabulations[receiver_id, :] = phi_tab.transpose()
 
         return cell_tabulations
+
 
 ## Some helper functions
 
