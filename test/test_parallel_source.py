@@ -1,5 +1,5 @@
 import os
-import pytest 
+import pytest
 
 import numpy as np
 
@@ -24,9 +24,9 @@ def test_parallel_source():
 
     vp = Function(V).assign(1.0)
 
-    sources = spyro.Sources(options, mesh, V, comm).create()
+    sources = spyro.Sources(options, mesh, V, comm)
 
-    receivers = spyro.Receivers(options, mesh, V, comm).create()
+    receivers = spyro.Receivers(options, mesh, V, comm)
 
     wavelet = spyro.full_ricker_wavelet(
         options["timeaxis"]["dt"],
