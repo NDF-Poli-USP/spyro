@@ -62,6 +62,7 @@ def forward(
     nspool = model["timeaxis"]["nspool"]
     fspool = model["timeaxis"]["fspool"]
     PML = model["BCs"]["status"]
+    excitations.current_source = source_num
     if PML:
         Lx = model["mesh"]["Lx"]
         Lz = model["mesh"]["Lz"]
