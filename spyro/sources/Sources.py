@@ -45,9 +45,18 @@ class Sources(spyro.receivers.Receivers.Receivers):
         self.cellNodeMaps = None
         self.nodes_per_cell = None
 
-    def apply_source(self, rhs_forcing, value):
+    def apply_source(self, rhs_forcing, value, all_shots=True, **kwargs):
         """Applies source in a assembled right hand side."""
-        for source_id in range(self.num_receivers):
+
+        if all_shots:
+            for source_id in range(self.num_receivers):
+                for i in range(len(self.cellNodeMaps[source_id])):
+                    rhs_forcing.dat.data[int(self.cellNodeMaps[source_id][i])] = (
+                        value * self.cell_tabulations[source_id][i]
+                    )
+        else:
+            source_id = kwargs.get("source_id")
+            
             for i in range(len(self.cellNodeMaps[source_id])):
                 rhs_forcing.dat.data[int(self.cellNodeMaps[source_id][i])] = (
                     value * self.cell_tabulations[source_id][i]
