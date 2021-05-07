@@ -169,8 +169,6 @@ def forward(
         u_n = Function(V)
         u_np1 = Function(V)
 
-    is_local = helpers.receivers_local(mesh, dim, receivers.receiver_locations)
-
     if output:
         outfile = helpers.create_output_file("forward.pvd", comm, source_num)
 
@@ -267,9 +265,7 @@ def forward(
         else:
             u_np1.assign(X)
 
-        usol_recv.append(
-            receivers.interpolate(u_np1.dat.data_ro_with_halos[:], is_local)
-        )
+        usol_recv.append(receivers.interpolate(u_np1.dat.data_ro_with_halos[:]))
 
         if step % fspool == 0:
             usol[save_step].assign(u_np1)
@@ -289,7 +285,7 @@ def forward(
 
         t = step * float(dt)
 
-    usol_recv = helpers.fill(usol_recv, is_local, nt, receivers.num_receivers)
+    usol_recv = helpers.fill(usol_recv, receivers.is_local, nt, receivers.num_receivers)
     usol_recv = utils.communicate(usol_recv, comm)
 
     return usol, usol_recv

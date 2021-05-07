@@ -35,16 +35,15 @@ def test_gradient_talyor_remainder_v2():
     from ROL.firedrake_vector import FiredrakeVector as FeVector
     import ROL
 
-
     comm = spyro.utils.mpi_init(model)
 
     mesh, V = spyro.io.read_mesh(model, comm)
 
     vp_guess = _make_vp_guess(V, mesh)
 
-    sources = spyro.Sources(model, mesh, V, comm).create()
+    sources = spyro.Sources(model, mesh, V, comm)
 
-    receivers = spyro.Receivers(model, mesh, V, comm).create()
+    receivers = spyro.Receivers(model, mesh, V, comm)
 
     vp_exact = _make_vp_exact(V, mesh)
 
@@ -123,9 +122,9 @@ def test_gradient_talyor_remainder_v2():
     d = Function(V)
 
     x, y = SpatialCoordinate(mesh)
-    #d.interpolate(sin(x * pi) * sin(y * pi))
+    # d.interpolate(sin(x * pi) * sin(y * pi))
     d.vector()[:] = np.random.rand(V.dim())
-    #d.assign(0.1)
+    # d.assign(0.1)
     d = FeVector(d.vector(), inner_product)
     # check the gradient using d model pertubation 4 iterations and 2nd order test
     obj.checkGradient(opt, d, 4, 2)
