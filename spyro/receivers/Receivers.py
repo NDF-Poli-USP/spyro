@@ -64,11 +64,13 @@ class Receivers:
 
     def build_maps(self):
         for rid in range(self.num_receivers):
+            tolerance = 1e-6
             if self.dimension == 2:
                 receiver_z, receiver_x = self.receiver_locations[rid]
+                cell_id = self.mesh.locate_cell([receiver_z, receiver_x], tolerance=tolerance )
             elif self.dimension == 3:
                 receiver_z, receiver_x, receiver_y = self.receiver_locations[rid]
-            cell_id = self.mesh.locate_cell([receiver_z, receiver_x], tolerance=1e-6)
+                cell_id = self.mesh.locate_cell([receiver_z, receiver_x, receiver_y], tolerance=tolerance )
             self.is_local[rid] = cell_id
 
         (
