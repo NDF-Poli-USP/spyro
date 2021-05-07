@@ -49,7 +49,7 @@ class Sources(spyro.receivers.Receivers.Receivers):
         super().build_maps()
 
 
-    def apply_source(self, rhs_forcing, value):
+    def apply_source(self, rhs_forcing, value, all_shots=True, **kwargs):
         """Applies source in a assembled right hand side."""
         for source_id in range(self.num_receivers):
             if self.is_local[source_id] and source_id==self.current_source:
