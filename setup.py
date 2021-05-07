@@ -8,5 +8,5 @@ setup(
     author="Keith J. Roberts, Alexandre F. G. Olender, Lucas Franceschini",
     url="https://github.com/krober10nd/spyro",
     packages=find_packages(),
-    install_requires=["numpy", "scipy", "matplotlib", "exdown==0.0.7", "segyio"],
+    install_requires=["numpy", "scipy", "matplotlib", "exdown==0.7.0", "segyio"],
 )
