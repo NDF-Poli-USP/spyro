@@ -246,7 +246,6 @@ def forward(
     rhs_forcing = Function(V)
 
     for step in range(nt):
-        rhs_forcing.assign(0.0)
         assembly_callable()
         f = excitations.apply_source(rhs_forcing, wavelet[step])
         B0 = B.sub(0)
