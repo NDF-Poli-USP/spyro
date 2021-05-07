@@ -44,6 +44,7 @@ class Sources(spyro.receivers.Receivers.Receivers):
         self.cellNodeMaps = None
         self.nodes_per_cell = None
         self.is_local = [0]*self.num_receivers
+        self.current_source = None
 
         super().build_maps()
 
@@ -51,7 +52,7 @@ class Sources(spyro.receivers.Receivers.Receivers):
     def apply_source(self, rhs_forcing, value):
         """Applies source in a assembled right hand side."""
         for source_id in range(self.num_receivers):
-            if self.is_local[source_id]:
+            if self.is_local[source_id] and source_id==self.current_source:
                 for i in range(len(self.cellNodeMaps[source_id])):
                     rhs_forcing.dat.data_with_halos[int(self.cellNodeMaps[source_id][i])] = (
                         value * self.cell_tabulations[source_id][i]
