@@ -265,7 +265,7 @@ def forward_AD(
     obj_func = 0
     for IT in range(nt):
         f.assign(0.0)
-        excitations.apply_source(f, wavelet[IT])
+        excitations.apply_source(f, wavelet[IT], all_shots=False, source_id=source_num)
 
         solver.solve()
         if PML:
