@@ -18,7 +18,7 @@ def forward(
     excitations,
     wavelet,
     receivers,
-    source_num=0,
+    source_num=[0],
     output=False,
 ):
     """Secord-order in time fully-explicit scheme

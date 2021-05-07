@@ -55,7 +55,7 @@ class Sources(spyro.receivers.Receivers.Receivers):
         """Applies source in a assembled right hand side."""
         rhs_forcing.assign(0.0)
         for source_id in range(self.num_receivers):
-            if self.is_local[source_id] and source_id in self.current_sources:
+            if self.is_local[source_id] and (source_id in self.current_sources):
                 for i in range(len(self.cellNodeMaps[source_id])):
                     tmp = (
                         value * self.cell_tabulations[source_id][i]
