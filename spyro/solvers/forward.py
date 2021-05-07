@@ -59,6 +59,7 @@ def forward(
     dim = model["opts"]["dimension"]
     dt = model["timeaxis"]["dt"]
     tf = model["timeaxis"]["tf"]
+    excitations.current_sources = source_num
     nspool = model["timeaxis"]["nspool"]
     fspool = model["timeaxis"]["fspool"]
     PML = model["BCs"]["status"]
