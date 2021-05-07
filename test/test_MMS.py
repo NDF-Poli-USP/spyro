@@ -78,11 +78,11 @@ def run_solve(timestep_method, method, model, mesh, expr):
     element = FiniteElement(method, mesh.ufl_cell(), degree=1, variant=variant)
     V = FunctionSpace(mesh, element)
 
-    excitation = spyro.Sources(testmodel, mesh, V, comm).create()
+    excitation = spyro.Sources(testmodel, mesh, V, comm)
 
     wavelet = spyro.full_ricker_wavelet(dt=0.001, tf=1.0, freq=2.0)
 
-    receivers = spyro.Receivers(testmodel, mesh, V, comm).create()
+    receivers = spyro.Receivers(testmodel, mesh, V, comm)
 
     if timestep_method == "central":
         p, _ = spyro.solvers.forward(

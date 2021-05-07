@@ -157,9 +157,9 @@ File("simple_velocity_model.pvd").write(vp)
 
 
 # Now we instantiate both the receivers and source objects.
-sources = spyro.Sources(model, mesh, V, comm).create()
+sources = spyro.Sources(model, mesh, V, comm)
 
-receivers = spyro.Receivers(model, mesh, V, comm).create()
+receivers = spyro.Receivers(model, mesh, V, comm)
 
 # Create a wavelet to force the simulation
 wavelet = spyro.full_ricker_wavelet(dt=0.0005, tf=2.0, freq=8.0)

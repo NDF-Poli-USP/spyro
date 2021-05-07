@@ -80,9 +80,9 @@ def _test_gradient(options, pml=False):
 
     vp_guess = _make_vp_guess(V, mesh)
 
-    sources = spyro.Sources(options, mesh, V, comm).create()
+    sources = spyro.Sources(options, mesh, V, comm)
 
-    receivers = spyro.Receivers(options, mesh, V, comm).create()
+    receivers = spyro.Receivers(options, mesh, V, comm)
 
     wavelet = spyro.full_ricker_wavelet(
         options["timeaxis"]["dt"],
