@@ -1,4 +1,5 @@
 import math
+import warnings
 
 from firedrake import *
 
@@ -32,84 +33,38 @@ def functions(
     aux1 = Function(V)
     aux2 = Function(V)
 
+    if damping_type != "polynomial":
+        warnings.warn("Warning: only polynomial damping functions supported!")
+
     # Sigma X
-    if damping_type == "polynomial":
-        sigma_max_x = bar_sigma  # Max damping
-        aux1.interpolate(
-            conditional(
-                And((x >= x1 - a_pml), x < x1),
-                ((abs(x - x1) ** (ps)) / (a_pml ** (ps))) * sigma_max_x,
-                0.0,
-            )
+    sigma_max_x = bar_sigma  # Max damping
+    aux1.interpolate(
+        conditional(
+            And((x >= x1 - a_pml), x < x1),
+            ((abs(x - x1) ** (ps)) / (a_pml ** (ps))) * sigma_max_x,
+            0.0,
         )
-        aux2.interpolate(
-            conditional(
-                And(x > x2, (x <= x2 + a_pml)),
-                ((abs(x - x2) ** (ps)) / (a_pml ** (ps))) * sigma_max_x,
-                0.0,
-            )
+    )
+    aux2.interpolate(
+        conditional(
+            And(x > x2, (x <= x2 + a_pml)),
+            ((abs(x - x2) ** (ps)) / (a_pml ** (ps))) * sigma_max_x,
+            0.0,
         )
-    elif damping_type == "hyperbolic":
-        tol = 1e-2
-        aux1.interpolate(
-            conditional(
-                And((x >= x1 - a_pml + tol), x < x1),
-                (cmax / (a_pml - abs(x - x1))),
-                0.0,
-            )
-        )
-        aux2.interpolate(
-            conditional(
-                And(x > x2, (x <= x2 + a_pml - tol)),
-                (cmax / (a_pml - abs(x - x2))),
-                0.0,
-            )
-        )
-    elif damping_type == "shifted_hyperbolic":
-        tol = 1e-2
-        aux1.interpolate(
-            conditional(
-                And((x >= x1 - a_pml + tol), x < x1),
-                (cmax / (a_pml - abs(x - x1))) - (cmax / a_pml),
-                0.0,
-            )
-        )
-        aux2.interpolate(
-            conditional(
-                And(x > x2, (x <= x2 + a_pml - tol)),
-                (cmax / (a_pml - abs(x - x2))) - (cmax / a_pml),
-                0.0,
-            )
-        )
-    sigma_x = Function(V, name="sigma_x").interpolate(aux1 + aux2)
+    )
 
     # Sigma Z
-    if damping_type == "polynomial":
-        tol_z = 1.000001
-        sigma_max_z = bar_sigma  # Max damping
-        aux1.interpolate(
-            conditional(
-                And(z < z2, (z >= z2 - tol_z * c_pml)),
-                ((abs(z - z2) ** (ps)) / (c_pml ** (ps))) * sigma_max_z,
-                0.0,
-            )
+    tol_z = 1.000001
+    sigma_max_z = bar_sigma  # Max damping
+    aux1.interpolate(
+        conditional(
+            And(z < z2, (z >= z2 - tol_z * c_pml)),
+            ((abs(z - z2) ** (ps)) / (c_pml ** (ps))) * sigma_max_z,
+            0.0,
         )
-    elif damping_type == "hyperbolic":
-        aux1.interpolate(
-            conditional(
-                And(z < z2, (z >= z2 - c_pml + tol)),
-                (cmax / (c_pml - abs(z - z2))),
-                0.0,
-            )
-        )
-    elif damping_type == "shifted_hyperbolic":
-        aux1.interpolate(
-            conditional(
-                And(z < z2, (z >= z2 - c_pml + tol)),
-                (cmax / (a_pml - abs(z - z2))) - (cmax / a_pml),
-                0.0,
-            )
-        )
+    )
+
+    sigma_x = Function(V, name="sigma_x").interpolate(aux1 + aux2)
     sigma_z = Function(V, name="sigma_z").interpolate(aux1)
 
     # sgm_x = File("pmlField/sigma_x.pvd")  # , target_degree=1, target_continuity=H1
@@ -123,52 +78,21 @@ def functions(
 
     elif dimension == 3:
         # Sigma Y
-        if damping_type == "polynomial":
-            sigma_max_y = bar_sigma  # Max damping
-            aux1.interpolate(
-                conditional(
-                    And((y >= y1 - b_pml), y < y1),
-                    ((abs(y - y1) ** (ps)) / (b_pml ** (ps))) * sigma_max_y,
-                    0.0,
-                )
+        sigma_max_y = bar_sigma  # Max damping
+        aux1.interpolate(
+            conditional(
+                And((y >= y1 - b_pml), y < y1),
+                ((abs(y - y1) ** (ps)) / (b_pml ** (ps))) * sigma_max_y,
+                0.0,
             )
-            aux2.interpolate(
-                conditional(
-                    And(y > y2, (y <= y2 + b_pml)),
-                    ((abs(y - y2) ** (ps)) / (b_pml ** (ps))) * sigma_max_y,
-                    0.0,
-                )
+        )
+        aux2.interpolate(
+            conditional(
+                And(y > y2, (y <= y2 + b_pml)),
+                ((abs(y - y2) ** (ps)) / (b_pml ** (ps))) * sigma_max_y,
+                0.0,
             )
-        elif damping_type == "hyperbolic":
-            aux1.interpolate(
-                conditional(
-                    And((y >= y1 - b_pml + tol), y < y1),
-                    (cmax / (b_pml - abs(y - y1))),
-                    0.0,
-                )
-            )
-            aux2.interpolate(
-                conditional(
-                    And(y > y2, (y <= y2 + b_pml - tol)),
-                    (cmax / (b_pml - abs(y - y2))),
-                    0.0,
-                )
-            )
-        elif damping_type == "shifted_hyperbolic":
-            aux1.interpolate(
-                conditional(
-                    And((y >= y1 - b_pml + tol), y < y1),
-                    (cmax / (b_pml - abs(y - y1))) - (cmax / b_pml),
-                    0.0,
-                )
-            )
-            aux2.interpolate(
-                conditional(
-                    And(y > y2, (y <= y2 + b_pml - tol)),
-                    (cmax / (b_pml - abs(y - y2))) - (cmax / b_pml),
-                    0.0,
-                )
-            )
+        )
         sigma_y = Function(V, name="sigma_y").interpolate(aux1 + aux2)
 
         # sgm_y = File("pmlField/sigma_y.pvd")
