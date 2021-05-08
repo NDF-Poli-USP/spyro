@@ -5,9 +5,12 @@ import h5py
 import copy
 from mpi4py import MPI
 import numpy as np
+import numpy.linalg as la
 import math
+import scipy.sparse as sp
 from scipy.signal import butter, filtfilt
 from scipy.interpolate import NearestNDInterpolator
+from scipy.spatial.distance import cdist
 
 from ..domains import quadrature
 
@@ -20,13 +23,39 @@ def helmholtz_filter(u, r_min):
     s = Function(V)
     u_ = TrialFunction(V)
     v = TestFunction(V)
-    a = r_min**2*inner(grad(u_), grad(v))*dx(rule=qr_x) + u_*v*dx(rule=qr_x)
-    L = u*v*dx(rule=qr_x) 
+    a = r_min**2*inner(grad(u_), grad(v))*dx + u_*v*dx
+    L = u*v*dx
     parameters = {'kse_type': 'preonly', 'pctype': 'lu'}
-    solve(a == L, s, solver_parameters=parameters)
+    solve(a == L, s)
 
     return s
 
+def build_filter(rmin, midpoint):
+    """Build linear filter"""
+    
+    indptr = [0]
+    indices = []
+    data = []
+
+    for point in midpoint:
+        # get values and location
+        wi = np.maximum(0, rmin - la.norm(point - midpoint, axis=1))
+        cols = wi.nonzero()[0]
+
+        # store info
+        indptr.append(indptr[-1] + cols.size)
+        indices += list(cols)
+        data += list(wi[wi != 0] / wi.sum())
+
+    return sp.csr_matrix((data, indices, indptr), shape=(len(midpoint), len(midpoint)))
+
+def linear_filter(u, weights):
+    """Smooth scalar field"""
+
+    # Get coordinate space
+    s = Function(u.function_space(), val = weights @ u.dat.data)
+
+    return s
 
 def butter_lowpass_filter(shot, cutoff, fs, order=2):
     """Low-pass filter the shot record with sampling-rate fs Hz
