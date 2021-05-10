@@ -21,7 +21,7 @@ def ensemble_load_save(func):
         _comm = args[1]
         custom_file_name = kwargs.get('file_name')
         for snum in range(num):
-            if is_owner(_comm, snum) and comm.comm.rank == 0:
+            if is_owner(_comm, snum) and _comm.comm.rank == 0:
                 if custom_file_name is None:
                     func(*args, **dict(kwargs, file_name = "shots/shot_record_"+str(snum+1)+".dat"))
                 else:
