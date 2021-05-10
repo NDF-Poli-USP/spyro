@@ -174,7 +174,10 @@ p_field, p_at_recv = spyro.solvers.forward(
 spyro.plots.plot_shots(model, comm, p_at_recv)
 
 # Save the shot (a Numpy array) as a pickle for other use.
-spyro.io.save_shots("example_shot.dat", p_at_recv)
+spyro.io.save_shots(model, comm, p_at_recv)
+
+# can be loaded back via
+my_shot = spyro.io.load_shots(model, comm)
 ```
 
 ### Testing
