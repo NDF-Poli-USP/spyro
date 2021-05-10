@@ -12,7 +12,6 @@ import segyio
 
 from .. import domains
 
-__all__ = ["write_function_to_grid", "create_segy", "is_owner", "save_shots", "load_shots", "read_mesh", "interpolate"]
 
 
 
@@ -119,6 +118,39 @@ def is_owner(ens_comm, rank):
 
     """
     return ens_comm.ensemble_comm.rank == (rank % ens_comm.ensemble_comm.size)
+
+
+def ensemble_forward(func):
+    """Decorator for forward to distribute shots for ensemble parallelism"""
+    def wrapper(*args, **kwargs):
+        acq = args[0].get("acquisition")
+        num = acq["num_sources"]
+        _comm = args[2]
+        for snum in range(num):
+            if is_owner(_comm, snum):
+                u, u_r = func(*args, **dict(kwargs, source_num=snum))
+                return u, u_r
+
+    return wrapper
+
+def ensemble_gradient(func):
+    """Decorator for gradient to distribute shots for ensemble parallelism"""
+    def wrapper(*args, **kwargs):
+        acq = args[0].get("acquisition")
+        save_adjoint = kwargs.get("save_adjoint")
+        num = acq["num_sources"]
+        _comm = args[2]
+        for snum in range(num):
+            if is_owner(_comm, snum):
+                if save_adjoint:
+                    grad, u_adj = func(*args, **kwargs)
+                    return grad, u_adj
+                else:
+                    grad = func(*args, **kwargs)
+                    return grad
+
+    return wrapper
+
 
 
 def _check_units(c):
