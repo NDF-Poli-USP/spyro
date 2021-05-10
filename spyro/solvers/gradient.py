@@ -3,6 +3,7 @@ from firedrake.assemble import create_assembly_callable
 
 from ..domains import quadrature, space
 from ..pml import damping
+from ..io import ensemble_gradient
 from . import helpers
 
 # Note this turns off non-fatal warnings
@@ -11,6 +12,7 @@ set_log_level(ERROR)
 __all__ = ["gradient"]
 
 
+@ensemble_gradient
 def gradient(
     model, mesh, comm, c, receivers, guess, residual, output=False, save_adjoint=False
 ):
