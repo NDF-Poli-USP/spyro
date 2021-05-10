@@ -171,7 +171,7 @@ p_field, p_at_recv = spyro.solvers.forward(
 )
 
 # Visualize the shot record
-spyro.plots.plot_shotrecords(model, p_at_recv, "example_shot", vmin=-1e-5, vmax=1e-5)
+spyro.plots.plot_shots(model, comm, p_at_recv)
 
 # Save the shot (a Numpy array) as a pickle for other use.
 spyro.io.save_shots("example_shot.dat", p_at_recv)
