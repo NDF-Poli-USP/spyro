@@ -42,6 +42,7 @@ def ensemble_load(func):
                     values = func(*args, **dict(kwargs, file_name = "shots/shot_record_"+str(snum+1)+".dat"))
                 else:
                     values = func(*args, **dict(kwargs, file_name = custom_file_name))
+                return values 
     return wrapper
 
 
