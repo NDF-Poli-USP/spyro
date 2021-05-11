@@ -13,7 +13,7 @@ import segyio
 from .. import domains
 
 
-def ensemble_load_save(func):
+def ensemble_save(func):
     """Decorator for read and write shots for ensemble parallelism"""
     def wrapper(*args, **kwargs):
         acq = args[0].get("acquisition")
@@ -26,6 +26,22 @@ def ensemble_load_save(func):
                     func(*args, **dict(kwargs, file_name = "shots/shot_record_"+str(snum+1)+".dat"))
                 else:
                     func(*args, **dict(kwargs, file_name = custom_file_name))
+    return wrapper
+
+
+def ensemble_load(func):
+    """Decorator for read and write shots for ensemble parallelism"""
+    def wrapper(*args, **kwargs):
+        acq = args[0].get("acquisition")
+        num = acq["num_sources"]
+        _comm = args[1]
+        custom_file_name = kwargs.get('file_name')
+        for snum in range(num):
+            if is_owner(_comm, snum):
+                if custom_file_name is None:
+                    values = func(*args, **dict(kwargs, file_name = "shots/shot_record_"+str(snum+1)+".dat"))
+                else:
+                    values = func(*args, **dict(kwargs, file_name = custom_file_name))
     return wrapper
 
 
@@ -121,7 +137,7 @@ def create_segy(velocity, filename):
             f.trace[tr] = velocity[:, tr]
 
 
-@ensemble_load_save
+@ensemble_save
 def save_shots(model, comm, array, file_name=None):
     """Save a `numpy.ndarray` to a `pickle`.
 
@@ -142,7 +158,7 @@ def save_shots(model, comm, array, file_name=None):
     return None
 
 
-@ensemble_load_save
+@ensemble_load
 def load_shots(model, comm, file_name=None):
     """Load a `pickle` to a `numpy.ndarray`.
 
