@@ -18,18 +18,20 @@ Functionality
 * Finite element discretizations for scalar wave equation in 2D and 3D using triangular and tetrahedral meshes.
     * Continuous Galerkin with arbitrary spatial order and stable and accurate higher-order mass lumping up to p = 5.
 * Spatial and ensemble (*shot*) parallelism for source simulations.
-* Central (2nd order accurate in time)
+* Central explicit scheme (2nd order accurate) in time.
 * Perfectly Matched Layer (PML) to absorb reflected waves in both 2D and 3D.
-* Mesh-independent functional gradient using the optimize-then-discretize method.
-* Sparse interpolation and injection using point sources.
+* Mesh-independent functional gradient using the optimize-then-discretize approach.
+* Sparse interpolation and injection with point sources or force sources. 
 
 
 Performance
 ===========
 
-Higher-order mass lumping yields near perfect strong scaling on both Intel Xeon processors and AMD processors. The usage of higher-order elements thus benefits both the adjoint and gradient calculation in addition to the forward calculation making it possible to perform FWI with simplex elements. The following benchmark was performed with an 11 M DoF 3D tetrahedral mesh adapted to the Overthrust3D model (see the folder benchmarks). A 1 second wave simulation was executed with a 750-m PML on all sides but the free surface:
+The performance of the `forward.py` wave propagator was assessed in the following benchmar with an 11 M DoF 3D tetrahedral mesh adapted to the Overthrust3D model (see the folder benchmarks). A 1 second wave simulation was executed with a 750-m PML on all sides but the free surface:
 
 ![ScalingAmdIntel](https://user-images.githubusercontent.com/18619644/111385935-41a6ee80-868a-11eb-8da3-256274bf1c0f.png)
+
+As one can see, higher-order mass lumping yields excellent strong scaling on both Intel Xeon processors and AMD processors for a moderate sized 3D problem. The usage of higher-order elements benefits both the adjoint and gradient calculation in addition to the forward calculation, which makes it possible to perform FWI with simplex elements.
 
 
 A worked example
