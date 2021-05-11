@@ -3,7 +3,6 @@ import numpy as np
 import finat
 from ROL.firedrake_vector import FiredrakeVector as FeVector
 import ROL
-import spyro
 from mpi4py import MPI
 
 import spyro
