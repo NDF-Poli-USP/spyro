@@ -180,7 +180,6 @@ def forward_AD(
         u_n = Function(V)
         u_np1 = Function(V)
 
-    is_local = helpers.receivers_local(mesh, dim, rec_position)
 
     outfile = helpers.create_output_file("Forward.pvd", comm, source_num)
 

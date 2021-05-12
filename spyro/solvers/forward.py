@@ -1,6 +1,6 @@
 from firedrake import *
 from firedrake.assemble import create_assembly_callable
-
+from ..io import ensemble_forward
 from .. import utils
 from ..domains import quadrature, space
 from ..pml import damping
@@ -9,7 +9,7 @@ from . import helpers
 # Note this turns off non-fatal warnings
 set_log_level(ERROR)
 
-
+@ensemble_forward
 def forward(
     model,
     mesh,
@@ -257,7 +257,7 @@ def forward(
         # B0 = B.sub(0)
         # B0 += f
         solver.solve(X, B)
-        # solver.solve()
+       
         if PML:
             if dim == 2:
                 u_np1, pp_np1 = X.split()

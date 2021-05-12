@@ -5,41 +5,49 @@ from matplotlib               import ticker
 
 import numpy as np
 
-__all__ = ["plot_shotrecords", "plot_shotrecords_difference"]
+from ..io import ensemble_plot
+
+__all__ = ["plot_shots"]
 
 
-def plot_shotrecords(
+@ensemble_plot
+def plot_shots(
     model,
+    comm,
     arr,
-    appear=False,
-    name="shot_record",
+    show=False,
+    file_name="1",
     vmin=-1e-5,
     vmax=1e-5,
-    ft="PDF",
+    file_format="pdf",
     start_index=0,
     end_index=0,
     legend=False,
     cmap="gray",
     save=True
 ):
-    """Plot a shot record and save it to disk.
+    """Plot a shot record and save the image to disk. Note that
+    this automatically will rename shots when ensmeble paralleism is
+    activated.
 
     Parameters
     ----------
     model: `dictionary`
         Contains model parameters and options.
+    comm:A Firedrake commmunicator
+        The communicator you get from calling spyro.utils.mpi_init()
     arr: array-like
-        An array in which rows are intervals in time and columns and receivers
-    appear: `boolean`, optional
+        An array in which rows are intervals in time and columns are receivers
+    show: `boolean`, optional
         Should the images appear on screen?
-    name: string, optional
-        The name of the saved PDF
+    file_name: string, optional
+        The name of the saved image
     vmin: float, optional
         The minimum value to plot on the colorscale
     vmax: float, optional
         The maximum value to plot on the colorscale
-    ft: string, optional
-        File format, PDF or png
+    file_format: string, optional
+        File format, pdf or png
     start_index: integer, optional
         The index of the first receiver to plot
     end_index: integer, optional
