@@ -259,7 +259,7 @@ def forward_AD(
     # assembly_callable = create_assembly_callable(rhs_, tensor=B)
     problem = LinearVariationalProblem(lhs_, rhs_, X)
     solver = LinearVariationalSolver(problem, solver_parameters=params)
-
+    
     point_cloud = VertexOnlyMesh(mesh, rec_position)
     P = FunctionSpace(point_cloud, "DG", 0)
     obj_func = 0
