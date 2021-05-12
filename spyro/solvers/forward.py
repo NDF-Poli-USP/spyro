@@ -183,8 +183,9 @@ def forward(
     nf = 0
     if model["BCs"]["outer_bc"] == "non-reflective":
         nf = c * ((u_n - u_nm1) / dt) * v * ds(rule=qr_s)
-
-    FF = m1 + a + nf
+    
+    f  = Function(V)
+    FF = m1 + a + nf - f * v * dx(rule=qr_x)
 
     if PML:
         X = Function(W)
@@ -237,6 +238,8 @@ def forward(
 
     A = assemble(lhs_, mat_type="matfree")
     solver = LinearSolver(A, solver_parameters=params)
+    # problem = LinearVariationalProblem(lhs_, rhs_, X)
+    # solver = LinearVariationalSolver(problem, solver_parameters=params)
 
     usol = [Function(V, name="pressure") for t in range(nt) if t % fspool == 0]
     usol_recv = []
@@ -244,15 +247,17 @@ def forward(
 
     assembly_callable = create_assembly_callable(rhs_, tensor=B)
 
-    f = Function(V)
+    # f = Function(V)
 
     for step in range(nt):
         f.assign(0.0)
-        assembly_callable()
+        # assembly_callable()
         excitations.apply_source(f, wavelet[step])
-        B0 = B.sub(0)
-        B0 += f
+        assembly_callable()
+        # B0 = B.sub(0)
+        # B0 += f
         solver.solve(X, B)
+        # solver.solve()
         if PML:
             if dim == 2:
                 u_np1, pp_np1 = X.split()
