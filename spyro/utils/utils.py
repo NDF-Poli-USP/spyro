@@ -5,6 +5,7 @@ from mpi4py import MPI
 from scipy.signal import butter, filtfilt
 
 
+
 def butter_lowpass_filter(shot, cutoff, fs, order=2):
     """Low-pass filter the shot record with sampling-rate fs Hz
     and cutoff freq. Hz

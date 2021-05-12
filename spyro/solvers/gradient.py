@@ -3,6 +3,7 @@ from firedrake.assemble import create_assembly_callable
 
 from ..domains import quadrature, space
 from ..pml import damping
+from ..io import ensemble_gradient
 from . import helpers
 
 # Note this turns off non-fatal warnings
@@ -11,6 +12,7 @@ set_log_level(ERROR)
 __all__ = ["gradient"]
 
 
+@ensemble_gradient
 def gradient(
     model, mesh, comm, c, receivers, guess, residual, output=False, save_adjoint=False
 ):
@@ -90,8 +92,6 @@ def gradient(
     nt = int(tf / dt)  # number of timesteps
 
     receiver_locations = model["acquisition"]["receiver_locations"]
-
-    is_local = helpers.receivers_local(mesh, dim, receiver_locations)
 
     dJ = Function(V, name="gradient")
 
@@ -270,7 +270,7 @@ def gradient(
         # B = assemble(rhs_, tensor=B)
         assembly_callable()
 
-        f = receivers.apply_source_receivers(rhs_forcing, residual, step, is_local)
+        f = receivers.apply_receivers_as_source(rhs_forcing, residual, step)
         # add forcing term to solve scalar pressure
         B0 = B.sub(0)
         B0 += f
