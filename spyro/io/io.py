@@ -268,8 +268,9 @@ def interpolate(model, mesh, V, guess=False):
         fname = model["mesh"]["truemodel"]
 
     with h5py.File(fname, "r") as f:
+        print(f.get("velocity_model")[()])
         Z = np.asarray(f.get("velocity_model")[()])
-
+        
         if sd == 2:
             nrow, ncol = Z.shape
             z = np.linspace(minz, maxz, nrow)

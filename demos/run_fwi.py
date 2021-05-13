@@ -51,6 +51,10 @@ model["acquisition"] = {
     "num_receivers": 500,
     "receiver_locations": spyro.create_transect((-0.10, 0.1), (-0.10, 17.0), 500),
 }
+model["automatic-dif"] ={
+    "status": "True", #True or False
+
+}
 model["timeaxis"] = {
     "t0": 0.0,  #  Initial time for event
     "tf": 6.00,  # Final time for event
@@ -59,6 +63,11 @@ model["timeaxis"] = {
     "nspool": 1000,  # how frequently to output solution to pvds
     "fspool": 10,  # how frequently to save solution to RAM
 }
+
+automatic_dif = model["automatic-dif"]["status"]
+if automatic_dif:
+    from firedrake_adjoint import *
+
 comm = spyro.utils.mpi_init(model)
 # if comm.comm.rank == 0 and comm.ensemble_comm.rank == 0:
 #    fil = open("FUNCTIONAL_FWI_P5.txt", "w")
@@ -67,7 +76,8 @@ vp = spyro.io.interpolate(model, mesh, V, guess=True)
 if comm.ensemble_comm.rank == 0:
     File("guess_velocity.pvd", comm=comm.comm).write(vp)
 sources = spyro.Sources(model, mesh, V, comm)
-receivers = spyro.Receivers(model, mesh, V, comm)
+if model["gradientcompute"]["type"]=="discrete-adj":
+    receivers = spyro.Receivers(model, mesh, V, comm)
 wavelet = spyro.full_ricker_wavelet(
     dt=model["timeaxis"]["dt"],
     tf=model["timeaxis"]["tf"],
@@ -115,19 +125,29 @@ class Objective(ROL.Objective):
     def value(self, x, tol):
         """Compute the functional"""
         J_total = np.zeros((1))
-        self.p_guess, p_guess_recv = spyro.solvers.forward(
-            model,
-            mesh,
-            comm,
-            vp,
-            sources,
-            wavelet,
-            receivers,
-        )
-        self.misfit = spyro.utils.evaluate_misfit(
-            model, p_guess_recv, self.p_exact_recv
-        )
-        J_total[0] += spyro.utils.compute_functional(model, self.misfit)
+        if automatic_dif:
+            dJdm = Function(V)
+            solver  = spyro.solver_AD(self.p_exact_recv)
+            solver.obj_func = 0.
+            p_guess_recv  = solver.forward_AD(model, mesh, comm, vp, sources, wavelet, xs)
+            J = solver.obj_func
+            J_total[0] += J
+            
+
+        else:
+            self.p_guess, p_guess_recv = spyro.solvers.forward(
+                model,
+                mesh,
+                comm,
+                vp,
+                sources,
+                wavelet,
+                receivers,
+            )
+            self.misfit = spyro.utils.evaluate_misfit(
+                model, p_guess_recv, self.p_exact_recv
+            )
+            J_total[0] += spyro.utils.compute_functional(model, self.misfit)
         J_total = COMM_WORLD.allreduce(J_total, op=MPI.SUM)
         J_total[0] /= comm.ensemble_comm.size
         if comm.comm.size > 1:
@@ -137,15 +157,18 @@ class Objective(ROL.Objective):
     def gradient(self, g, x, tol):
         """Compute the gradient of the functional"""
         dJ = Function(V, name="gradient")
-        dJ_local = spyro.solvers.gradient(
-            model,
-            mesh,
-            comm,
-            vp,
-            receivers,
-            self.p_guess,
-            self.misfit,
-        )
+        if automatic_dif:
+            dJ_local = compute_gradient(J, control)
+        else:
+            dJ_local = spyro.solvers.gradient(
+                model,
+                mesh,
+                comm,
+                vp,
+                receivers,
+                self.p_guess,
+                self.misfit,
+            )
         if comm.ensemble_comm.size > 1:
             comm.allreduce(dJ_local, dJ)
         else:

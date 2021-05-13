@@ -107,7 +107,7 @@ def plot_shots(
     
         plt.draw()
 
-    if appear:
+    if show:
         plt.show()
     plt.close()
     return None

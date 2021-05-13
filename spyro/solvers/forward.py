@@ -252,7 +252,8 @@ def forward(
     for step in range(nt):
         f.assign(0.0)
         # assembly_callable()
-        excitations.apply_source(f, wavelet[step])
+        excitations.apply_source(f, wavelet[step], all_shots=False, source_id=source_num)
+        print(source_num)
         assembly_callable()
         # B0 = B.sub(0)
         # B0 += f
@@ -273,7 +274,7 @@ def forward(
             u_np1.assign(X)
 
         usol_recv.append(
-            receivers.interpolate(u_np1.dat.data_ro_with_halos[:], is_local)
+            receivers.interpolate(u_np1.dat.data_ro_with_halos[:])
         )
 
         if step % fspool == 0:
