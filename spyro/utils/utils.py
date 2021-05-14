@@ -5,7 +5,6 @@ from mpi4py import MPI
 from scipy.signal import butter, filtfilt
 
 
-
 def butter_lowpass_filter(shot, cutoff, fs, order=2):
     """Low-pass filter the shot record with sampling-rate fs Hz
     and cutoff freq. Hz
@@ -21,18 +20,29 @@ def butter_lowpass_filter(shot, cutoff, fs, order=2):
     return filtered_shot
 
 
-def compute_functional(model, residual):
-    """ Compute the functional to be optimized """
+def compute_functional(model, residual, velocity=None):
+    """Compute the functional to be optimized.
+    Accepts the velocity optionally and uses
+    it if regularization is enabled
+    """
     num_receivers = model["acquisition"]["num_receivers"]
     dt = model["timeaxis"]["dt"]
     tf = model["timeaxis"]["tf"]
     nt = int(tf / dt)  # number of timesteps
+    if model["opts"]["regularization"]:
+        gamma = model["opt"]["gamma"]
+        Ns = model["acquisition"]["num_sources"]
+        gamma /= Ns
 
     J = 0.0
     for ti in range(nt):
         for rn in range(num_receivers):
             J += residual[ti][rn] ** 2
     J *= 0.5
+
+    if model["opts"]["regularization"]:
+        Jreg = assemble(0.5 * gamma * dot(grad(vp), grad(vp)) * dx)
+        J += Jreg
     return J
 
 
@@ -59,7 +69,7 @@ def mysize(COMM=COMM_SELF):
 
 
 def mpi_init(model):
-    """ Initialize computing environment """
+    """Initialize computing environment"""
     rank = myrank()
     size = mysize()
     available_cores = COMM_WORLD.size
