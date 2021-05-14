@@ -19,6 +19,8 @@ model["opts"] = {
     "quadratrue": "KMV",  # Equi or KMV
     "degree": 5,  # p order
     "dimension": 2,  # dimension
+    "regularization": True,  # regularization is on?
+    "gamma": 1.0, # regularization parameter
 }
 model["parallelism"] = {
     "type": "automatic",
@@ -104,6 +106,29 @@ class L2Inner(object):
 kount = 0
 
 
+def regularize_gradient(vp, dJ)
+    """Tikhonov regularization"""
+    m_u = TrialFunction(V)
+    m_v = TestFunction(V)
+    mgrad = m_u * m_v * dx(rule=qr_x)
+    ffG = dot(grad(vp), grad(m_v)) * dx(rule=qr_x)
+    G = mgrad - ffG
+    lhsG, rhsG = lhs(G), rhs(G)
+    gradreg = Function(V)
+    grad_prob = LinearVariationalProblem(lhsG, rhsG, gradreg)
+    grad_solver = LinearVariationalSolver(
+        grad_prob,
+        solver_parameters={
+            "ksp_type": "preonly",
+            "pc_type": "jacobi",
+            "mat_type": "matfree",
+        },
+    )
+    grad_solver.solve()
+    dJ += gradreg
+    return dJ
+
+
 class Objective(ROL.Objective):
     def __init__(self, inner_product):
         ROL.Objective.__init__(self)
@@ -127,7 +152,7 @@ class Objective(ROL.Objective):
         self.misfit = spyro.utils.evaluate_misfit(
             model, p_guess_recv, self.p_exact_recv
         )
-        J_total[0] += spyro.utils.compute_functional(model, self.misfit)
+        J_total[0] += spyro.utils.compute_functional(model, self.misfit, velocity=vp)
         J_total = COMM_WORLD.allreduce(J_total, op=MPI.SUM)
         J_total[0] /= comm.ensemble_comm.size
         if comm.comm.size > 1:
@@ -153,6 +178,9 @@ class Objective(ROL.Objective):
         dJ /= comm.ensemble_comm.size
         if comm.comm.size > 1:
             dJ /= comm.comm.size
+        # regularize the gradient if asked.
+        if model['opts']['regularization']:
+            dJ = regularize_gradient(vp, dJ)
         # mask the water layer
         dJ.dat.data[water] = 0.0
         # Visualize
