@@ -107,7 +107,7 @@ kount = 0
 
 
 def regularize_gradient(vp, dJ)
-    """Tinhokov regularization"""
+    """Tikhonov regularization"""
     m_u = TrialFunction(V)
     m_v = TestFunction(V)
     mgrad = m_u * m_v * dx(rule=qr_x)
