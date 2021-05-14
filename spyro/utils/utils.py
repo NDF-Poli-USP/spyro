@@ -29,7 +29,12 @@ def compute_functional(model, residual, velocity=None):
     dt = model["timeaxis"]["dt"]
     tf = model["timeaxis"]["tf"]
     nt = int(tf / dt)  # number of timesteps
-    if model["opts"]["regularization"]:
+    if "regularization" in model["opts"]:
+        regularize = model["opts"]["regularization"]
+    else:
+        regularize = False
+
+    if regularize:
         gamma = model["opt"]["gamma"]
         Ns = model["acquisition"]["num_sources"]
         gamma /= Ns
