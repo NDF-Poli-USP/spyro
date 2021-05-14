@@ -45,7 +45,7 @@ def compute_functional(model, residual, velocity=None):
             J += residual[ti][rn] ** 2
     J *= 0.5
 
-    if model["opts"]["regularization"]:
+    if regularize:
         Jreg = assemble(0.5 * gamma * dot(grad(vp), grad(vp)) * dx)
         J += Jreg
     return J
