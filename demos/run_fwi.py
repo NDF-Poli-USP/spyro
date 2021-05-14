@@ -106,7 +106,7 @@ class L2Inner(object):
 kount = 0
 
 
-def regularize_gradient(vp, dJ)
+def regularize_gradient(vp, dJ):
     """Tikhonov regularization"""
     m_u = TrialFunction(V)
     m_v = TestFunction(V)
