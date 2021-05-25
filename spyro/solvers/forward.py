@@ -1,6 +1,7 @@
 from firedrake import *
 from firedrake.assemble import create_assembly_callable
 from ..io import ensemble_forward
+from ..sources import full_ricker_wavelet, delta_expr
 from .. import utils
 from ..domains import quadrature, space
 from ..pml import damping
@@ -59,8 +60,14 @@ def forward(
     dim = model["opts"]["dimension"]
     dt = model["timeaxis"]["dt"]
     tf = model["timeaxis"]["tf"]
+    delay = model["acquisition"]["delay"]
     nspool = model["timeaxis"]["nspool"]
     fspool = model["timeaxis"]["fspool"]
+    freq = model["acquisition"]["frequency"]
+    if "amplitude" in model["acquisition"]:
+        amp = model["acquisition"]["amplitude"]
+    else:
+        amp = 1
     PML = model["BCs"]["status"]
     if PML:
         Lx = model["mesh"]["Lx"]
@@ -80,7 +87,8 @@ def forward(
             y2 = Ly
             b_pml = ly
 
-    nt = int(tf / dt)  # number of timesteps
+    nt    = int(tf / dt)  # number of timesteps
+    dstep = int(delay / dt)  # number of timesteps with source
 
     if method == "KMV":
         params = {"ksp_type": "preonly", "pc_type": "jacobi"}
@@ -175,7 +183,8 @@ def forward(
         outfile = helpers.create_output_file("forward.pvd", comm, source_num)
 
     t = 0.0
-
+    cutoff = freq_bands[freq_index] if "inversion" in model else None
+        
     # -------------------------------------------------------
     m1 = ((u - 2.0 * u_n + u_nm1) / Constant(dt ** 2)) * v * dx(rule=qr_x)
     a = c * c * dot(grad(u_n), grad(v)) * dx(rule=qr_x)  # explicit
@@ -184,8 +193,10 @@ def forward(
     if model["BCs"]["outer_bc"] == "non-reflective":
         nf = c * ((u_n - u_nm1) / dt) * v * ds(rule=qr_s)
     
-    f  = Function(V)
-    FF = m1 + a + nf - f * v * dx(rule=qr_x)
+    RW = full_ricker_wavelet(dt, tf, freq, amp=amp, cutoff=cutoff)
+    f, ricker = external_forcing(RW, mesh, model, source_num, V)
+    # f  = Function(V)
+    FF = m1 + a + nf - c*c*f * v * dx(rule=qr_x)
 
     if PML:
         X = Function(W)
@@ -250,10 +261,14 @@ def forward(
     # f = Function(V)
 
     for step in range(nt):
-        f.assign(0.0)
+        # f.assign(0.0)
         # assembly_callable()
-        excitations.apply_source(f, wavelet[step], all_shots=False, source_id=source_num)
-        print(source_num)
+        # excitations.apply_source(f, wavelet[step], all_shots=False, source_id=source_num)
+        if step < dstep:
+            ricker.assign(RW[step])
+        elif step == dstep:
+            ricker.assign(0.0)
+
         assembly_callable()
         # B0 = B.sub(0)
         # B0 += f
@@ -299,3 +314,18 @@ def forward(
     usol_recv = utils.communicate(usol_recv, comm)
 
     return usol, usol_recv
+
+def external_forcing(RW, mesh, model, source_num, V):
+
+    pos = model["acquisition"]["source_pos"]
+    z, x = SpatialCoordinate(mesh)
+    sigma_x = Constant(2000)
+    source = Constant(pos[source_num])
+    delta = Interpolator(delta_expr(source, z, x, sigma_x), V)
+    excitation = Function(delta.interpolate())
+
+    ricker = Constant(0)
+    f = excitation * ricker
+    ricker.assign(RW[0], annotate=True)
+
+    return f, ricker
