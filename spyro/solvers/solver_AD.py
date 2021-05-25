@@ -6,10 +6,10 @@ from ..sources import full_ricker_wavelet, delta_expr
 from . import helpers
 
 class solver_AD():
-    def __init__(self,p_true_rec=None,fwi=False):
+    def __init__(self,p_true_rec=None,Calc_Jfunctional=False):
         self.p_true_rec = p_true_rec
         self.obj_func = 0
-        self.fwi = fwi
+        self.Calc_Jfunctional = Calc_Jfunctional
         self.misfit_tot = []
     
     def forward_AD(self,
@@ -202,9 +202,10 @@ class solver_AD():
         if model["BCs"]["outer_bc"] == "non-reflective":
             nf = c * ((u_n - u_nm1) / dt) * v * ds(rule=qr_s)
 
+
         RW = full_ricker_wavelet(dt, tf, freq, amp=amp, cutoff=cutoff)
         f, ricker = self.external_forcing(RW, mesh, model, source_num, V)
-        FF = m1 + a + nf - f * v * dx(rule=qr_x)
+        FF = m1 + a + nf - c*c*f * v * dx(rule=qr_x)
 
         if PML:
             X = Function(W)
@@ -292,7 +293,7 @@ class solver_AD():
 
             rec = interpolate(u_np1,P)
             usol_recv.append(rec.dat.data)
-            if self.fwi:
+            if self.Calc_Jfunctional:
                 self.objective_func(rec,IT,dt,P)
             
             # rec = 0
@@ -324,8 +325,9 @@ class solver_AD():
     def objective_func(self, p_rec, IT, dt,P):
         true_rec = Function(P)
         true_rec.dat.data[:] = self.p_true_rec[IT]
-        self.obj_func += assemble(0.5 * inner(true_rec-p_rec, true_rec-p_rec) * dx)
+        self.obj_func += 0.5 * assemble( inner(true_rec-p_rec, true_rec-p_rec) * dx)
         self.misfit_tot.append(true_rec.dat.data-p_rec.dat.data)
+        
 
     # ----------------------------------------#
     # external forcing - older versions
