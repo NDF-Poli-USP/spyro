@@ -12,7 +12,5 @@
 *.segy
 *.xdmf
 *.h5
-*forward*
-*fwi*
 *.tar.xz
 *.log
