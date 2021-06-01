@@ -10,6 +10,7 @@ import firedrake as fire
 from scipy.interpolate import RegularGridInterpolator
 import pickle
 import numpy as np
+import matplotlib.pyplot as plt
 import h5py
 
 from .. import domains
@@ -69,6 +70,12 @@ class Callback:
             if vp:
                 self.vp_file.write(vp)
 
+def save_image(field, fname=None, cmap="seismic", format=None):
+    """save firedrake.Function as imagefile"""
+    fname = field.name() if not fname else fname
+    fig, axes = plt.subplots()
+    fire.tripcolor(field, axes=axes, cmap=cmap); axes.set_aspect("equal")
+    fig.savefig(fname, format=format)
 
 def save_shots(filename, array):
     """Save a `numpy.ndarray` to a `pickle`.
@@ -295,6 +302,9 @@ def load_model(jsonfile=None):
         "-i", "--input-field",type=str, required=False, help="hdf5 file with initial guess"
     )
     parser.add_argument(
+        "-e", "--exact-field",type=str, required=False, help="hdf5 file with exact field"
+    )
+    parser.add_argument(
         "-o", "--output-field",type=str, required=False, help="hdf5 file where result is stored"
     )
     parser.add_argument(
@@ -304,6 +314,7 @@ def load_model(jsonfile=None):
     file = parser.parse_args().config_file if not jsonfile else jsonfile
     inputfile = parser.parse_args().input_field
     outputfile = parser.parse_args().output_field
+    exactfile = parser.parse_args().exact_field
     optimizer = parser.parse_args().optimizer
 
     with open(file, "r") if file else StringIO('{}') as f:
@@ -314,6 +325,11 @@ def load_model(jsonfile=None):
             model["data"]["initfile"] = inputfile
         else:
             model["data"] = {"initfile": inputfile}
+    if exactfile:
+        if "data" in model:
+            model["data"]["exactfile"] = exactfile
+        else:
+            model["data"] = {"exactfile": exactfile}
     if outputfile:
         if "data" in model:
             model["data"]["resultfile"] = outputfile

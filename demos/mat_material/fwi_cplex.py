@@ -228,7 +228,7 @@ if comm.comm.rank == 0 and comm.ensemble_comm.rank == 0:
 
                 # update beta
         beta = spyro.optimizers.update_flip_limits( beta, counter, mul_beta,
-                change, xi, mode='couter')
+                change, xi, mode='counter')
         # update rmin
         model['opts']['rmin'] = spyro.optimizers.update_rmin(
                 model['opts']['rmin'], counter, lim_rmin, mul_rmin)
