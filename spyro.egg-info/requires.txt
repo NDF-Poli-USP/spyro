@@ -1,0 +1,5 @@
+exdown==0.7.0
+matplotlib
+numpy
+scipy
+segyio
