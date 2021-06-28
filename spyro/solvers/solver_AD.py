@@ -125,13 +125,22 @@ class solver_AD():
         if PML:
             Z = VectorFunctionSpace(V.ufl_domain(), V.ufl_element())
             if dim == 2:
-                W = V * Z
-                u, pp = TrialFunctions(W)
-                v, qq = TestFunctions(W)
+                if model["BCs"]["method"] == "damping":
+                    u = TrialFunction(V)
+                    v = TestFunction(V)
 
-                u_np1, pp_np1 = Function(W).split()
-                u_n, pp_n = Function(W).split()
-                u_nm1, pp_nm1 = Function(W).split()
+                    u_nm1 = Function(V)
+                    u_n   = Function(V)
+                    u_np1 = Function(V)
+
+                else:
+                    W = V * Z
+                    u, pp = TrialFunctions(W)
+                    v, qq = TestFunctions(W)
+
+                    u_np1, pp_np1 = Function(W).split()
+                    u_n, pp_n = Function(W).split()
+                    u_nm1, pp_nm1 = Function(W).split()
 
             elif dim == 3:
                 W = V * V * Z
@@ -144,16 +153,27 @@ class solver_AD():
 
             # in 2d
             if dim == 2:
-                sigma_x, sigma_z = damping.functions(
+                if model["BCs"]["method"] == "damping":
+                    sigma_x, sigma_z = damping.functions(
                     model, V, dim, x, x1, x2, a_pml, z, z1, z2, c_pml
-                )
-                Gamma_1, Gamma_2 = damping.matrices_2D(sigma_z, sigma_x)
-                pml1 = (
-                    (sigma_x + sigma_z)
-                    * ((u - u_nm1) / Constant(2.0 * dt))
-                    * v
-                    * dx(rule=qr_x)
-                )
+                    )
+                    pml1 = (
+                        (sigma_x + sigma_z)
+                        * ((u - u_nm1) / Constant(2.0 * dt))
+                        * v
+                        * dx(rule=qr_x)
+                    )
+                else:
+                    sigma_x, sigma_z = damping.functions(
+                        model, V, dim, x, x1, x2, a_pml, z, z1, z2, c_pml
+                    )
+                    Gamma_1, Gamma_2 = damping.matrices_2D(sigma_z, sigma_x)
+                    pml1 = (
+                        (sigma_x + sigma_z)
+                        * ((u - u_nm1) / Constant(2.0 * dt))
+                        * v
+                        * dx(rule=qr_x)
+                    )
             # in 3d
             elif dim == 3:
 
@@ -207,18 +227,24 @@ class solver_AD():
         FF = m1 + a + nf - c*c*f * v * dx(rule=qr_x)
 
         if PML:
-            X = Function(W)
+            if model["BCs"]["method"] == "damping":
+                X = Function(V)
+            else:
+                X = Function(W)
             # B = Function(W)
 
             if dim == 2:
-                pml2 = sigma_x * sigma_z * u_n * v * dx(rule=qr_x)
-                pml3 = inner(pp_n, grad(v)) * dx(rule=qr_x)
-                FF += pml1 + pml2 + pml3
-                # -------------------------------------------------------
-                mm1 = (dot((pp - pp_n), qq) / Constant(dt)) * dx(rule=qr_x)
-                mm2 = inner(dot(Gamma_1, pp_n), qq) * dx(rule=qr_x)
-                dd = c * c * inner(grad(u_n), dot(Gamma_2, qq)) * dx(rule=qr_x)
-                FF += mm1 + mm2 + dd
+                if model["BCs"]["method"] == "damping":
+                    FF += pml1 
+                else:
+                    pml2 = sigma_x * sigma_z * u_n * v * dx(rule=qr_x)
+                    pml3 = inner(pp_n, grad(v)) * dx(rule=qr_x)
+                    FF += pml1 + pml2 + pml3
+                    # -------------------------------------------------------
+                    mm1 = (dot((pp - pp_n), qq) / Constant(dt)) * dx(rule=qr_x)
+                    mm2 = inner(dot(Gamma_1, pp_n), qq) * dx(rule=qr_x)
+                    dd = c * c * inner(grad(u_n), dot(Gamma_2, qq)) * dx(rule=qr_x)
+                    FF += mm1 + mm2 + dd
             elif dim == 3:
                 pml1 = (
                     (sigma_x + sigma_y + sigma_z)
@@ -276,17 +302,20 @@ class solver_AD():
             elif IT == dstep:
                 ricker.assign(0.0)
             solver.solve()
-            if PML:
+            if PML:            
                 if dim == 2:
-                    u_np1, pp_np1 = X.split()
+                    if model["BCs"]["method"] == "damping":
+                        u_np1.assign(X)
+                    else:
+                        u_np1, pp_np1 = X.split()
                 elif dim == 3:
                     u_np1, psi_np1, pp_np1 = X.split()
 
                     psi_nm1.assign(psi_n)
                     psi_n.assign(psi_np1)
 
-                pp_nm1.assign(pp_n)
-                pp_n.assign(pp_np1)
+                # pp_nm1.assign(pp_n)
+                # pp_n.assign(pp_np1)
             else:
                 u_np1.assign(X)
 
