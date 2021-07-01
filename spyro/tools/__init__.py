@@ -4,6 +4,7 @@ from .input_models import create_model_for_grid_point_calculation
 from .grid_point_calculator import time_interpolation
 from .grid_point_calculator import p_filter
 from .grid_point_calculator import grid_point_to_mesh_point_converter_for_seismicmesh
+from .grid_point_calculator import error_calc_line
 
 __all__ = [
     "wave_solver",
@@ -13,5 +14,6 @@ __all__ = [
     'minimum_grid_point_calculator',
     'time_interpolation',
     'p_filter',
-    'grid_point_to_mesh_point_converter_for_seismicmesh'
+    'grid_point_to_mesh_point_converter_for_seismicmesh',
+    'error_calc_line'
 ]
