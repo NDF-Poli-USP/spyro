@@ -8,7 +8,7 @@ import time
 import copy
 import spyro
 
-def minimum_grid_point_calculator(frequency, method, degree, experient_type = 'homogeneous', TOL = 0.2, G_init = 12, receiver_type = 'near'):
+def minimum_grid_point_calculator(frequency, method, degree, experiment_type = 'homogeneous', TOL = 0.2, G_init = 12, receiver_type = 'near'):
     """ Function to calculate necessary grid point density.
 
     Parameters
@@ -39,12 +39,12 @@ def minimum_grid_point_calculator(frequency, method, degree, experient_type = 'h
     start_time= time.time()
     print("Starting initial method check", flush = True)
 
-    if experient_type == 'homogeneous':
+    if experiment_type == 'homogeneous':
         minimum_mesh_velocity = 1.429
-    elif experient_type == 'heterogenous':
+    elif experiment_type == 'heterogenous':
         minimum_mesh_velocity = False # This variable isnt needed in heterogenous models because of seismicmesh
 
-    model = spyro.tools.create_model_for_grid_point_calculation(frequency, degree, method, minimum_mesh_velocity, experiment_type = experient_type, receiver_type = 'near')
+    model = spyro.tools.create_model_for_grid_point_calculation(frequency, degree, method, minimum_mesh_velocity, experiment_type = experiment_type, receiver_type = 'near')
     #print("Model built at time "+str(time.time()-start_time), flush = True)
     comm = spyro.utils.mpi_init(model)
     #print("Comm built at time "+str(time.time()-start_time), flush = True)
