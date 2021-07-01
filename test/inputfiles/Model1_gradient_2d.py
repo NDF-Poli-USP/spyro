@@ -20,9 +20,7 @@ opts = {
 }
 
 parallelism = {
-    "type": "automatic",  # options: automatic, custom, off
-    "custom_cores_per_shot": [],  # only if the user wants a different number of cores for every shot.
-    # input is a list of integers with the length of the number of shots.
+    "type": "automatic",
 }
 
 mesh = {
@@ -34,7 +32,7 @@ mesh = {
     "truemodel": truemodel + ".hdf5",
 }
 
-PML = {
+BCs = {
     "status": False,  # True,  # True or false
     "outer_bc": "None",  # "non-reflective",  #  neumann, non-reflective (outer boundary condition)
     "damping_type": "polynomial",  # polynomial. hyperbolic, shifted_hyperbolic
@@ -52,15 +50,16 @@ acquisition = {
     "delay": 1.0,
     "num_sources": 1,
     "source_pos": [(1.5, -0.5)],
-    "num_receivers": 501,
-    "receiver_locations": create_transect((0.1, -2.90), (2.9, -2.90), 501),
+    "amplitude": 1.0,
+    "num_receivers": 100,
+    "receiver_locations": create_transect((0.1, -2.90), (2.9, -2.90), 100),
 }
 
 timeaxis = {
     "t0": 0.0,  #  Initial time for event
     "tf": 1.0,  # Final time for event
     "dt": 0.001,  # timestep size
-    "nspool": 20,  # how frequently to output solution to pvds
+    "nspool": 9999,  # how frequently to output solution to pvds
     "fspool": 1,  # how frequently to save solution to RAM
 }  # how freq. to output to files and screen
 
@@ -74,7 +73,7 @@ model = {
     "self": None,
     "inversion": inversion,
     "opts": opts,
-    "PML": PML,
+    "BCs": BCs,
     "parallelism": parallelism,
     "mesh": mesh,
     "acquisition": acquisition,

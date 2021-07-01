@@ -41,7 +41,7 @@ def minimum_grid_point_calculator(frequency, method, degree, experient_type = 'h
 
     if experient_type == 'homogeneous':
         minimum_mesh_velocity = 1.429
-    elif experiment_type == 'heterogenous':
+    elif experient_type == 'heterogenous':
         minimum_mesh_velocity = False # This variable isnt needed in heterogenous models because of seismicmesh
 
     model = spyro.tools.create_model_for_grid_point_calculation(frequency, degree, method, minimum_mesh_velocity, experiment_type = experient_type, receiver_type = 'near')

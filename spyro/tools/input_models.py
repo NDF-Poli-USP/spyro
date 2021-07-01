@@ -114,6 +114,9 @@ def create_model_for_grid_point_calculation(frequency, degree, method, minimum_m
         SeismicMesh.write_velocity_model('vel_z6.25m_x12.5m_exact.segy', ofname = 'velocity_models/bp2004')
         padz = pad
         padx = pad
+    else: 
+        raise ValueError('Experiment type not recognized')
+
     
     if receiver_type == 'near' and experiment_type == 'homogeneous' and dimension == 2:
 
@@ -127,10 +130,7 @@ def create_model_for_grid_point_calculation(frequency, degree, method, minimum_m
         receiver_bin_width = 5*lbda#15*lbda
         receiver_quantity = 36#2500 # 50 squared
 
-        bin1_startZ = source_z + receiver_bin_center1 - receiver_bin_width/2.
-        bin1_endZ   = source_z + receiver_bin_center1 + receiver_bin_width/2.
-        bin1_startX = source_x - receiver_bin_width/2.
-        bin1_endX   = source_x + receiver_bin_width/2.
+        receiver_coordinates = spyro.create_2d_grid(bin1_startZ, bin1_endZ, bin1_startX, bin1_endX, int(np.sqrt(receiver_quantity_in_bin)))
 
         receiver_coordinates = spyro.create_2d_grid(bin1_startZ, bin1_endZ, bin1_startX, bin1_endX, int(np.sqrt(receiver_quantity)))
 
@@ -159,7 +159,7 @@ def create_model_for_grid_point_calculation(frequency, degree, method, minimum_m
 
         # time calculations
         tmin = 1./frequency
-        final_time = 2*10*tmin #should be 35
+        final_time = 25*tmin #should be 35
 
         # receiver calculations
 
@@ -244,7 +244,7 @@ def create_model_for_grid_point_calculation(frequency, degree, method, minimum_m
         "source_type": "Ricker",
         "num_sources": 1,
         "source_pos": source_coordinates,
-        "source_mesh_point": True,
+        "source_mesh_point": False,
         "source_point_dof": False,
         "frequency": frequency,
         "delay": 1.0,
@@ -268,7 +268,8 @@ def create_model_for_grid_point_calculation(frequency, degree, method, minimum_m
         'experiment_type': experiment_type,
         'minimum_mesh_velocity': minimum_mesh_velocity,
         'pml_fraction': padz/Lz,
-        'receiver_type': receiver_type
+        'receiver_type': receiver_type,
+        'source_mesh': None#'immersed_disk'
     }
 
     # print(source_coordinates)

@@ -1,8 +1,8 @@
 from . import Sources
 from .Sources import (
-    FullRickerWavelet,
+    full_ricker_wavelet,
     MMS_time,
-    RickerWavelet,
+    ricker_wavelet,
     delta_expr,
     delta_expr_3d,
     timedependentSource,
@@ -11,8 +11,8 @@ from .Sources import (
 
 __all__ = [
     "Sources",
-    "RickerWavelet",
-    "FullRickerWavelet",
+    "ricker_wavelet",
+    "full_ricker_wavelet",
     "delta_expr",
     "delta_expr_3d",
     "MMS_time",
