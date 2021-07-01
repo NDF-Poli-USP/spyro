@@ -8,12 +8,88 @@ import h5py
 import numpy as np
 from scipy.interpolate import RegularGridInterpolator
 from scipy.interpolate import griddata
-import segyio 
+import segyio
 
 from .. import domains
 
-__all__ = ["write_function_to_grid", "create_segy", "is_owner", "save_shots", "load_shots", "read_mesh", "interpolate"]
 
+def ensemble_save(func):
+    """Decorator for read and write shots for ensemble parallelism"""
+    def wrapper(*args, **kwargs):
+        acq = args[0].get("acquisition")
+        num = acq["num_sources"]
+        _comm = args[1]
+        custom_file_name = kwargs.get('file_name')
+        for snum in range(num):
+            if is_owner(_comm, snum) and _comm.comm.rank == 0:
+                if custom_file_name is None:
+                    func(*args, **dict(kwargs, file_name = "shots/shot_record_"+str(snum+1)+".dat"))
+                else:
+                    func(*args, **dict(kwargs, file_name = custom_file_name))
+    return wrapper
+
+
+def ensemble_load(func):
+    """Decorator for read and write shots for ensemble parallelism"""
+    def wrapper(*args, **kwargs):
+        acq = args[0].get("acquisition")
+        num = acq["num_sources"]
+        _comm = args[1]
+        custom_file_name = kwargs.get('file_name')
+        for snum in range(num):
+            if is_owner(_comm, snum):
+                if custom_file_name is None:
+                    values = func(*args, **dict(kwargs, file_name = "shots/shot_record_"+str(snum+1)+".dat"))
+                else:
+                    values = func(*args, **dict(kwargs, file_name = custom_file_name))
+                return values 
+    return wrapper
+
+
+
+def ensemble_plot(func):
+    """Decorator for `plot_shots` to distribute shots for ensemble parallelism"""
+    def wrapper(*args, **kwargs):
+        acq = args[0].get("acquisition")
+        num = acq["num_sources"]
+        _comm = args[1]
+        for snum in range(num):
+            if is_owner(_comm, snum) and _comm.comm.rank == 0:
+                func(*args, **dict(kwargs, file_name = str(snum+1)))
+
+    return wrapper
+
+
+def ensemble_forward(func):
+    """Decorator for forward to distribute shots for ensemble parallelism"""
+    def wrapper(*args, **kwargs):
+        acq = args[0].get("acquisition")
+        num = acq["num_sources"]
+        _comm = args[2]
+        for snum in range(num):
+            if is_owner(_comm, snum):
+                u, u_r = func(*args, **dict(kwargs, source_num=snum))
+                return u, u_r
+
+    return wrapper
+
+def ensemble_gradient(func):
+    """Decorator for gradient to distribute shots for ensemble parallelism"""
+    def wrapper(*args, **kwargs):
+        acq = args[0].get("acquisition")
+        save_adjoint = kwargs.get("save_adjoint")
+        num = acq["num_sources"]
+        _comm = args[2]
+        for snum in range(num):
+            if is_owner(_comm, snum):
+                if save_adjoint:
+                    grad, u_adj = func(*args, **kwargs)
+                    return grad, u_adj
+                else:
+                    grad = func(*args, **kwargs)
+                    return grad
+
+    return wrapper
 
 
 def write_function_to_grid(function, V, grid_spacing):
@@ -62,12 +138,13 @@ def create_segy(velocity, filename):
             f.trace[tr] = velocity[:, tr]
 
 
-def save_shots(filename, array):
+@ensemble_save
+def save_shots(model, comm, array, file_name=None):
     """Save a `numpy.ndarray` to a `pickle`.
 
     Parameters
     ----------
-    filename: str
+    filename: str, optional by default shot_number_#.dat
         The filename to save the data as a `pickle`
     array: `numpy.ndarray`
         The data to save a pickle (e.g., a shot)
@@ -77,17 +154,18 @@ def save_shots(filename, array):
     None
 
     """
-    with open(filename, "wb") as f:
+    with open(file_name, "wb") as f:
         pickle.dump(array, f)
     return None
 
 
-def load_shots(filename):
+@ensemble_load
+def load_shots(model, comm, file_name=None):
     """Load a `pickle` to a `numpy.ndarray`.
 
     Parameters
     ----------
-    filename: str
+    filename: str, optional by default shot_number_#.dat
         The filename to save the data as a `pickle`
 
     Returns
@@ -97,7 +175,7 @@ def load_shots(filename):
 
     """
 
-    with open(filename, "rb") as f:
+    with open(file_name, "rb") as f:
         array = np.asarray(pickle.load(f), dtype=float)
     return array
 
@@ -119,6 +197,8 @@ def is_owner(ens_comm, rank):
 
     """
     return ens_comm.ensemble_comm.rank == (rank % ens_comm.ensemble_comm.size)
+
+
 
 
 def _check_units(c):
@@ -153,13 +233,13 @@ def interpolate(model, mesh, V, guess=False):
     """
     sd = V.mesh().geometric_dimension()
     m = V.ufl_domain()
-    if model["PML"]["status"]:
-        minz = -model["mesh"]["Lz"] - model["PML"]["lz"]
+    if model["BCs"]["status"]:
+        minz = -model["mesh"]["Lz"] - model["BCs"]["lz"]
         maxz = 0.0
-        minx = 0.0 - model["PML"]["lx"]
-        maxx = model["mesh"]["Lx"] + model["PML"]["lx"]
-        miny = 0.0 - model["PML"]["ly"]
-        maxy = model["mesh"]["Ly"] + model["PML"]["ly"]
+        minx = 0.0 - model["BCs"]["lx"]
+        maxx = model["mesh"]["Lx"] + model["BCs"]["lx"]
+        miny = 0.0 - model["BCs"]["ly"]
+        maxy = model["mesh"]["Ly"] + model["BCs"]["ly"]
     else:
         minz = -model["mesh"]["Lz"]
         maxz = 0.0

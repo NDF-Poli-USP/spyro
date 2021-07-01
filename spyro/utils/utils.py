@@ -1,9 +1,6 @@
 import copy
-import math
-
-import numpy as np
 from firedrake import *
-from firedrake.petsc import PETSc
+import numpy as np
 from mpi4py import MPI
 from scipy.signal import butter, filtfilt
 
@@ -23,68 +20,49 @@ def butter_lowpass_filter(shot, cutoff, fs, order=2):
     return filtered_shot
 
 
-def pml_error(model, p_pml, p_ref):
-    """ Erro with PML for a each shot (source) ..."""
-
-    num_sources = model["acquisition"]["num_sources"]
-    num_receivers = model["acquisition"]["num_receivers"]
-    dt = model["timeaxis"]["dt"]
-    tf = model["timeaxis"]["tf"]
-
-    nt = int(tf / dt)  # number of timesteps
-    error = []
-
-    for sn in range(num_sources):
-        error.append([])
-        for ti in range(nt):
-            soma = 0
-            for rn in range(num_receivers):
-                soma += (p_pml[sn][rn][ti] - p_ref[sn][rn][ti]) * (
-                    p_pml[sn][rn][ti] - p_ref[sn][rn][ti]
-                )
-            error[sn].append(math.sqrt(soma / num_receivers))
-
-    return error
-
-
-def compute_functional(model, comm, residual):
-    """ Compute the functional to be optimized """
+def compute_functional(model, residual, velocity=None):
+    """Compute the functional to be optimized.
+    Accepts the velocity optionally and uses
+    it if regularization is enabled
+    """
     num_receivers = model["acquisition"]["num_receivers"]
     dt = model["timeaxis"]["dt"]
     tf = model["timeaxis"]["tf"]
     nt = int(tf / dt)  # number of timesteps
+    if "regularization" in model["opts"]:
+        regularize = model["opts"]["regularization"]
+    else:
+        regularize = False
 
-    if comm.comm.rank == 0 and comm.ensemble_comm.rank == 0:
-        print("Computing the functional...", flush=True)
+    if regularize:
+        gamma = model["opt"]["gamma"]
+        Ns = model["acquisition"]["num_sources"]
+        gamma /= Ns
 
-    Jtemp = 0.0
     J = 0.0
-    Jlist = []
     for ti in range(nt):
         for rn in range(num_receivers):
-            Jtemp += 0.5 * (residual[ti][rn] ** 2)
-        Jlist.append(Jtemp)
-    # Integrate in time (trapezoidal rule)
-    for i in range(1, nt - 1):
-        J += 0.5 * (Jlist[i - 1] + Jlist[i]) * float(dt)
-    J = 0.5 * float(J)
+            J += residual[ti][rn] ** 2
+    J *= 0.5
+
+    if regularize:
+        Jreg = assemble(0.5 * gamma * dot(grad(vp), grad(vp)) * dx)
+        J += Jreg
     return J
 
 
-def evaluate_misfit(model, my_ensemble, guess, exact):
+def evaluate_misfit(model, guess, exact):
     """Compute the difference between the guess and exact
-    at the receiver locations"""
+    at the receiver locations given downsampling"""
 
     if "skip" in model["timeaxis"]:
         skip = model["timeaxis"]["skip"]
     else:
         skip = 1
 
-    if my_ensemble.comm.rank == 0 and my_ensemble.ensemble_comm.rank == 0:
-        print("Computing the misfit...", flush=True)
-    l = int(exact.shape[0]/skip)
+    ll = int(exact.shape[0] / skip)
     ds_exact = exact[::skip]
-    return ds_exact[:l] - guess
+    return ds_exact[:ll] - guess
 
 
 def myrank(COMM=COMM_SELF):
@@ -96,7 +74,7 @@ def mysize(COMM=COMM_SELF):
 
 
 def mpi_init(model):
-    """ Initialize computing environment """
+    """Initialize computing environment"""
     rank = myrank()
     size = mysize()
     available_cores = COMM_WORLD.size
@@ -107,8 +85,7 @@ def mpi_init(model):
             raise ValueError(
                 "Available cores cannot be divided between sources equally."
             )
-
-    elif model["parallelism"]["type"] == "off":
+    elif model["parallelism"]["type"] == "spatial":
         num_cores_per_shot = available_cores
     elif model["parallelism"]["type"] == "custom":
         raise ValueError("Custom parallelism not yet implemented")

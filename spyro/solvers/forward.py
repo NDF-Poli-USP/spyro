@@ -4,25 +4,26 @@ from firedrake.assemble import create_assembly_callable
 from .. import utils
 from ..domains import quadrature, space
 from ..pml import damping
-from ..sources import FullRickerWavelet
+from ..io import ensemble_forward
 from . import helpers
 
+# Note this turns off non-fatal warnings
 set_log_level(ERROR)
 
 
-def Leapfrog(
+@ensemble_forward
+def forward(
     model,
     mesh,
     comm,
     c,
     excitations,
+    wavelet,
     receivers,
     source_num=0,
-    freq_index=0,
     output=False,
-    G=1.0 #Added G only for debugging, will remove later
 ):
-    """Secord-order in time fully-explicit Leapfrog scheme
+    """Secord-order in time fully-explicit scheme
     with implementation of a Perfectly Matched Layer (PML) using
     CG FEM with or without higher order mass lumping (KMV type elements).
 
@@ -37,14 +38,12 @@ def Leapfrog(
        c: Firedrake.Function
         The velocity model interpolated onto the mesh.
     excitations: A list Firedrake.Functions
-        Each function contains an interpolated space function
-        emulated a Dirac delta at the location of source `source_num`
-    receivers: A :class:`Spyro.Receivers` object.
+    wavelet: array-like
+        Time series data that's injected at the source location.
+    receivers: A :class:`spyro.Receivers` object.
         Contains the receiver locations and sparse interpolation methods.
     source_num: `int`, optional
         The source number you wish to simulate
-    freq_index: `int`, optional
-        The index in the list of low-pass cutoff values
     output: `boolean`, optional
         Whether or not to write results to pvd files.
 
@@ -57,27 +56,20 @@ def Leapfrog(
 
     """
 
-    if "amplitude" in model["acquisition"]:
-        amp = model["acquisition"]["amplitude"]
-    else:
-        amp = 1
-    freq = model["acquisition"]["frequency"]
-    if "inversion" in model:
-        freq_bands = model["inversion"]["freq_bands"]
     method = model["opts"]["method"]
     degree = model["opts"]["degree"]
     dim = model["opts"]["dimension"]
     dt = model["timeaxis"]["dt"]
     tf = model["timeaxis"]["tf"]
-    delay = model["acquisition"]["delay"]
     nspool = model["timeaxis"]["nspool"]
     fspool = model["timeaxis"]["fspool"]
-    PML = model["PML"]["status"]
+    PML = model["BCs"]["status"]
+    excitations.current_source = source_num
     if PML:
         Lx = model["mesh"]["Lx"]
         Lz = model["mesh"]["Lz"]
-        lx = model["PML"]["lx"]
-        lz = model["PML"]["lz"]
+        lx = model["BCs"]["lx"]
+        lz = model["BCs"]["lz"]
         x1 = 0.0
         x2 = Lx
         a_pml = lx
@@ -86,19 +78,24 @@ def Leapfrog(
         c_pml = lz
         if dim == 3:
             Ly = model["mesh"]["Ly"]
-            ly = model["PML"]["ly"]
+            ly = model["BCs"]["ly"]
             y1 = 0.0
             y2 = Ly
             b_pml = ly
 
     nt = int(tf / dt)  # number of timesteps
-    dstep = int(delay / dt)  # number of timesteps with source
 
     if method == "KMV":
         params = {"ksp_type": "preonly", "pc_type": "jacobi"}
-    elif method == "CG" and mesh.ufl_cell() != quadrilateral and mesh.ufl_cell() != hexahedron :
+    elif (
+        method == "CG"
+        and mesh.ufl_cell() != quadrilateral
+        and mesh.ufl_cell() != hexahedron
+    ):
         params = {"ksp_type": "cg", "pc_type": "jacobi"}
-    elif method == "CG" and (mesh.ufl_cell() == quadrilateral or mesh.ufl_cell() == hexahedron ):
+    elif method == "CG" and (
+        mesh.ufl_cell() == quadrilateral or mesh.ufl_cell() == hexahedron
+    ):
         params = {"ksp_type": "preonly", "pc_type": "jacobi"}
     else:
         raise ValueError("method is not yet supported")
@@ -114,7 +111,6 @@ def Leapfrog(
     elif dim == 3:
         z, x, y = SpatialCoordinate(mesh)
 
-    # if using the PML
     if PML:
         Z = VectorFunctionSpace(V.ufl_domain(), V.ufl_element())
         if dim == 2:
@@ -135,7 +131,6 @@ def Leapfrog(
             u_n, psi_n, pp_n = Function(W).split()
             u_nm1, psi_nm1, pp_nm1 = Function(W).split()
 
-        # in 2d
         if dim == 2:
             sigma_x, sigma_z = damping.functions(
                 model, V, dim, x, x1, x2, a_pml, z, z1, z2, c_pml
@@ -147,7 +142,6 @@ def Leapfrog(
                 * v
                 * dx(rule=qr_x)
             )
-        # in 3d
         elif dim == 3:
 
             sigma_x, sigma_y, sigma_z = damping.functions(
@@ -169,7 +163,7 @@ def Leapfrog(
             )
             Gamma_1, Gamma_2, Gamma_3 = damping.matrices_3D(sigma_x, sigma_y, sigma_z)
 
-    # typical CG in N-d
+    # typical CG FEM in 2d/3d
     else:
         u = TrialFunction(V)
         v = TestFunction(V)
@@ -178,23 +172,18 @@ def Leapfrog(
         u_n = Function(V)
         u_np1 = Function(V)
 
-    is_local = helpers.receivers_local(mesh, dim, receivers.receiver_locations)
-
-    outfile = helpers.create_output_file("Leapfrog_G"+str(G)+".pvd", comm, source_num)
+    if output:
+        outfile = helpers.create_output_file("forward.pvd", comm, source_num)
 
     t = 0.0
 
-    cutoff = freq_bands[freq_index] if "inversion" in model else None
-    RW = FullRickerWavelet(dt, tf, freq, amp=amp, cutoff=cutoff)
-    
     # -------------------------------------------------------
     m1 = ((u - 2.0 * u_n + u_nm1) / Constant(dt ** 2)) * v * dx(rule=qr_x)
     a = c * c * dot(grad(u_n), grad(v)) * dx(rule=qr_x)  # explicit
 
-    if model["PML"]["outer_bc"] == "non-reflective":
+    nf = 0
+    if model["BCs"]["outer_bc"] == "non-reflective":
         nf = c * ((u_n - u_nm1) / dt) * v * ds(rule=qr_s)
-    else:
-        nf = 0
 
     FF = m1 + a + nf
 
@@ -233,8 +222,6 @@ def Leapfrog(
             mm2 = inner(dot(Gamma_1, pp_n), qq) * dx(rule=qr_x)
             dd1 = c * c * inner(grad(u_n), dot(Gamma_2, qq)) * dx(rule=qr_x)
             dd2 = -c * c * inner(grad(psi_n), dot(Gamma_3, qq)) * dx(rule=qr_x)
-            # dd1 = 1 * inner(grad(u_n), dot(Gamma_2, qq)) * dx(rule=qr_x)
-            # dd2 = -1 * inner(grad(psi_n), dot(Gamma_3, qq)) * dx(rule=qr_x)
 
             FF += mm1 + mm2 + dd1 + dd2
             # -------------------------------------------------------
@@ -254,23 +241,18 @@ def Leapfrog(
 
     usol = [Function(V, name="pressure") for t in range(nt) if t % fspool == 0]
     usol_recv = []
-    saveIT = 0
+    save_step = 0
 
     assembly_callable = create_assembly_callable(rhs_, tensor=B)
 
     rhs_forcing = Function(V)
 
-    for IT in range(nt):
-
+    for step in range(nt):
+        rhs_forcing.assign(0.0)
         assembly_callable()
-        if IT < dstep:
-            f = excitations.apply_source(rhs_forcing, RW[IT])
-            B.sub(0).dat.data[:] += f.dat.data[:]
-            
-        elif IT == dstep:
-            f = excitations.apply_source(rhs_forcing, 0.0)
-            B.sub(0).dat.data[:] += f.dat.data[:]
-
+        f = excitations.apply_source(rhs_forcing, wavelet[step])
+        B0 = B.sub(0)
+        B0 += f
         solver.solve(X, B)
         if PML:
             if dim == 2:
@@ -286,34 +268,27 @@ def Leapfrog(
         else:
             u_np1.assign(X)
 
-        u_nm1.assign(u_n)
-        u_n.assign(u_np1)
+        usol_recv.append(receivers.interpolate(u_np1.dat.data_ro_with_halos[:]))
 
-        
-        usol_recv.append(receivers.interpolate(u_n.dat.data_ro_with_halos[:], is_local))
+        if step % fspool == 0:
+            usol[save_step].assign(u_np1)
+            save_step += 1
 
-        if IT % fspool == 0:
-            usol[saveIT].assign(u_n)
-            saveIT += 1
-
-        if IT % nspool == 0:
+        if step % nspool == 0:
             assert (
-                 norm(u_n) < 1
+                norm(u_n) < 1
             ), "Numerical instability. Try reducing dt or building the mesh differently"
             if output:
                 outfile.write(u_n, time=t, name="Pressure")
-            helpers.display_progress(comm, t)
+            if t > 0:
+                helpers.display_progress(comm, t)
 
-        t = IT * float(dt)
+        u_nm1.assign(u_n)
+        u_n.assign(u_np1)
 
-    usol_recv = helpers.fill(usol_recv, is_local, nt, receivers.num_receivers)
+        t = step * float(dt)
+
+    usol_recv = helpers.fill(usol_recv, receivers.is_local, nt, receivers.num_receivers)
     usol_recv = utils.communicate(usol_recv, comm)
 
-    if comm.ensemble_comm.rank == 0 and comm.comm.rank == 0:
-        print(
-            "---------------------------------------------------------------",
-            flush=True,
-        )
-
     return usol, usol_recv
-

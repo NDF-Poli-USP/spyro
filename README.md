@@ -6,8 +6,8 @@ spyro: Acoustic wave modeling in Firedrake
 ============================================
 
 spyro is a Python library for modeling acoustic waves. The main
-functionality is a set of forward and discrete adjoint wave propagators for solving the acoustic wave equation in the time domain.
-These wave propagators can be used to form complete Full Waveform Inversion or Reverse Time Migration applications. See the [demos](https://github.com/krober10nd/spyro/tree/main/demos).
+functionality is a set of forward and adjoint wave propagators for solving the acoustic wave equation in the time domain.
+These wave propagators can be used to form complete full waveform inversion (FWI) applications. See the [demos](https://github.com/krober10nd/spyro/tree/main/demos).
 To implement these solvers, spyro uses the finite element package [Firedrake](https://www.firedrakeproject.org/index.html).
 
 To use Spyro, you'll need to have some knowledge of Python and some basic concepts in inverse modeling relevant to active-sourcce seismology.
@@ -15,28 +15,29 @@ To use Spyro, you'll need to have some knowledge of Python and some basic concep
 Functionality
 =============
 
-* Finite Element discretizations for scalar wave equation in 2D and 3D using triangular and tetrahedral meshes.
+* Finite element discretizations for scalar wave equation in 2D and 3D using triangular and tetrahedral meshes.
     * Continuous Galerkin with arbitrary spatial order and stable and accurate higher-order mass lumping up to p = 5.
 * Spatial and ensemble (*shot*) parallelism for source simulations.
-* Leapfrog and Strong Stability Preserving Runga-Kutta (SSPRK) time-stepping schemes (up to 4th order accurate in time).
-* Perfectly Matched Layer to absorb reflected waves in both 2D and 3D.
-* Mesh-independent functional gradient for Leapfrog and SSPRK time-stepping methods using the discrete adjoint method.
-* Sparse interpolation and injection.
+* Central explicit scheme (2nd order accurate) in time.
+* Perfectly Matched Layer (PML) to absorb reflected waves in both 2D and 3D.
+* Mesh-independent functional gradient using the optimize-then-discretize approach.
+* Sparse interpolation and injection with point sources or force sources. 
 
-Using this functionality, short Python scripts can written that perform Full Waveform Inversion (FWI) type algorithms using well-developed numerical optimization algorithms such as L-BFGS from the SciPy package. See the notebooks folder for an FWI example.
 
 Performance
 ===========
 
-Strong scaling on both Intel Xeon processors and AMD processors is quite good. This test was performed with an 11 M DoF 3D tetrahedral mesh adapted to the Overthrust3D model. A 1 second wave simulation was executed with a 750-m PML on all sides but the free surface: 
+The performance of the `forward.py` wave propagator was assessed in the following benchmar with an 11 M DoF 3D tetrahedral mesh adapted to the Overthrust3D model (see the folder benchmarks). A 1 second wave simulation was executed with a 750-m PML on all sides but the free surface:
 
 ![ScalingAmdIntel](https://user-images.githubusercontent.com/18619644/111385935-41a6ee80-868a-11eb-8da3-256274bf1c0f.png)
+
+As one can see, higher-order mass lumping yields excellent strong scaling on both Intel Xeon processors and AMD processors for a moderate sized 3D problem. The usage of higher-order elements benefits both the adjoint and gradient calculation in addition to the forward calculation, which makes it possible to perform FWI with simplex elements.
 
 
 A worked example
 =================
 
-A simple example of a forward simulation in 2D on a rectangle with a uniform triangular mesh and using the Perfectly Matched Layer is like the following below. Note here we first specify the input file and build a uniform mesh using the meshing capabilities provided by Firedrake. However, more complex meshes for realistic problems can be generated via [SeismicMesh](https://github.com/krober10nd/SeismicMesh).
+A first example of a forward simulation in 2D on a rectangle with a uniform triangular mesh and using the Perfectly Matched Layer is shown in the following below. Note here we first specify the input file and build a uniform mesh using the meshing capabilities provided by Firedrake. However, more complex (i.e., non-structured) triangular meshes for realistic problems can be generated via [SeismicMesh](https://github.com/krober10nd/SeismicMesh).
 
 
 See the demos folder for an FWI example (this requires some other dependencies pyrol and ROLtrilinos).
@@ -70,9 +71,7 @@ model["opts"] = {
 # Number of cores for the shot. For simplicity, we keep things serial.
 # spyro however supports both spatial parallelism and "shot" parallelism.
 model["parallelism"] = {
-    "type": "off",  # options: automatic (same number of cores for evey processor), custom, off.
-    "custom_cores_per_shot": [],  # only if the user wants a different number of cores for every shot.
-    # input is a list of integers with the length of the number of shots.
+    "type": "spatial",  # options: automatic (same number of cores for evey processor) or spatial
 }
 
 # Define the domain size without the PML. Here we'll assume a 0.75 x 1.50 km
@@ -88,7 +87,7 @@ model["mesh"] = {
 }
 
 # Specify a 250-m PML on the three sides of the domain to damp outgoing waves.
-model["PML"] = {
+model["BCs"] = {
     "status": True,  # True or false
     "outer_bc": "non-reflective",  #  None or non-reflective (outer boundary condition)
     "damping_type": "polynomial",  # polynomial, hyperbolic, shifted_hyperbolic
@@ -160,22 +159,27 @@ File("simple_velocity_model.pvd").write(vp)
 
 
 # Now we instantiate both the receivers and source objects.
-sources = spyro.Sources(model, mesh, V, comm).create()
+sources = spyro.Sources(model, mesh, V, comm)
 
-receivers = spyro.Receivers(model, mesh, V, comm).create()
+receivers = spyro.Receivers(model, mesh, V, comm)
 
-# And now we simulate the shot using a Leapfrog time-stepping scheme
-# Other time-stepping options are available (see the documentation).
-# Note: simulation results are stored in the folder `results/`
-p_field, p_at_recv = spyro.solvers.Leapfrog(
-    model, mesh, comm, vp, sources, receivers
+# Create a wavelet to force the simulation
+wavelet = spyro.full_ricker_wavelet(dt=0.0005, tf=2.0, freq=8.0)
+
+# And now we simulate the shot using a 2nd order central time-stepping scheme
+# Note: simulation results are stored in the folder `~/results/` by default
+p_field, p_at_recv = spyro.solvers.forward(
+    model, mesh, comm, vp, sources, wavelet, receivers
 )
 
 # Visualize the shot record
-spyro.plots.plot_shotrecords(model, p_at_recv, "example_shot", vmin=-1e-5, vmax=1e-5)
+spyro.plots.plot_shots(model, comm, p_at_recv)
 
 # Save the shot (a Numpy array) as a pickle for other use.
-spyro.io.save_shots("example_shot.dat", p_at_recv)
+spyro.io.save_shots(model, comm, p_at_recv)
+
+# can be loaded back via
+my_shot = spyro.io.load_shots(model, comm)
 ```
 
 ### Testing

@@ -1,5 +1,4 @@
 import math
-
 import numpy as np
 from firedrake import *
 from scipy.signal import butter, filtfilt
@@ -36,37 +35,45 @@ class Sources(spyro.receivers.Receivers.Receivers):
         self.dimension = model["opts"]["dimension"]
         self.degree = model["opts"]["degree"]
 
-        self.num_receivers = model["acquisition"]["num_sources"]
         self.receiver_locations = model["acquisition"]["source_pos"]
-        self.source_type = model["acquisition"]["source_type"]
+        self.num_receivers = len(self.receiver_locations)
 
         self.cellIDs = None
         self.cellVertices = None
         self.cell_tabulations = None
         self.cellNodeMaps = None
         self.nodes_per_cell = None
+        self.is_local = [0]*self.num_receivers
+        self.current_source = None
 
-    def apply_source(self, rhs_forcing,value):
-        """ Applies source in a assembled right hand side.
-        """
+        super().build_maps()
+
+
+    def apply_source(self, rhs_forcing, value):
+        """Applies source in a assembled right hand side."""
         for source_id in range(self.num_receivers):
-            for i in range(len(self.cellNodeMaps[source_id])):
-                rhs_forcing.dat.data[int(self.cellNodeMaps[source_id][i])] = value * self.cell_tabulations[source_id][i]
+            if self.is_local[source_id] and source_id==self.current_source:
+                for i in range(len(self.cellNodeMaps[source_id])):
+                    rhs_forcing.dat.data_with_halos[int(self.cellNodeMaps[source_id][i])] = (
+                        value * self.cell_tabulations[source_id][i]
+                    )
+            else: 
+                for i in range(len(self.cellNodeMaps[source_id])):
+                    tmp = rhs_forcing.dat.data_with_halos[0]
 
         return rhs_forcing
-    
 
 
 def timedependentSource(model, t, freq=None, amp=1, delay=1.5):
     if model["acquisition"]["source_type"] == "Ricker":
-        return RickerWavelet(t, freq, amp, delay=delay)
+        return ricker_wavelet(t, freq, amp, delay=delay)
     elif model["acquisition"]["source_type"] == "MMS":
         return MMS_time(t)
     else:
         raise ValueError("source not implemented")
 
 
-def RickerWavelet(t, freq, amp=1.0, delay=1.5):
+def ricker_wavelet(t, freq, amp=1.0, delay=1.5):
     """Creates a Ricker source function with a
     delay in term of multiples of the distance
     between the minimums.
@@ -95,15 +102,15 @@ def MMS_space_3d(x0, z, x, y):
     return sin(pi * z) * sin(pi * x) * sin(pi * y) * Constant(1.0)
 
 
-def FullRickerWavelet(dt, tf, freq, amp=1.0, cutoff=None):
-    """Compute the full Ricker wavelet and apply low-pass filtering
-    using cutoff frequency in hz
+def full_ricker_wavelet(dt, tf, freq, amp=1.0, cutoff=None):
+    """Compute the Ricker wavelet optionally applying low-pass filtering
+    using cutoff frequency in Hertz.
     """
     nt = int(tf / dt)  # number of timesteps
     time = 0.0
-    FullWavelet = np.zeros((nt,))
+    full_wavelet = np.zeros((nt,))
     for t in range(nt):
-        FullWavelet[t] = RickerWavelet(time, freq, amp)
+        full_wavelet[t] = ricker_wavelet(time, freq, amp)
         time += dt
     if cutoff is not None:
         fs = 1.0 / dt
@@ -112,18 +119,19 @@ def FullRickerWavelet(dt, tf, freq, amp=1.0, cutoff=None):
         normal_cutoff = cutoff / nyq
         # Get the filter coefficients
         b, a = butter(order, normal_cutoff, btype="low", analog=False)
-        FullWavelet = filtfilt(b, a, FullWavelet)
-    return FullWavelet
+        full_wavelet = filtfilt(b, a, full_wavelet)
+    return full_wavelet
 
-def source_dof_finder(space,  model):
+
+def source_dof_finder(space, model):
 
     # getting 1 source position
-    source_positions = model["acquisition"]['source_pos']
+    source_positions = model["acquisition"]["source_pos"]
     if len(source_positions) != 1:
-        raise ValueError('Not yet implemented for more then 1 source.')
-    
+        raise ValueError("Not yet implemented for more then 1 source.")
+
     mesh = space.mesh()
-    source_z , source_x = source_positions[0]
+    source_z, source_x = source_positions[0]
 
     # Getting mesh coordinates
     z, x = SpatialCoordinate(mesh)
@@ -140,18 +148,18 @@ def source_dof_finder(space,  model):
     cell_node_map = fdrake_cell_node_map.values_with_halo
 
     # finding cell where the source is located
-    cell_id = mesh.locate_cell( [source_z, source_x], tolerance = 0.01 )
+    cell_id = mesh.locate_cell([source_z, source_x], tolerance=0.01)
 
     # finding dof where the source is located
     for dof in cell_node_map[cell_id]:
-        if np.isclose(dataz[dof], source_z, rtol = 1e-8) and np.isclose(datax[dof], source_x, rtol = 1e-8):
-            model['acquisition']['source_point_dof'] = dof
+        if np.isclose(dataz[dof], source_z, rtol=1e-8) and np.isclose(
+            datax[dof], source_x, rtol=1e-8
+        ):
+            model["acquisition"]["source_point_dof"] = dof
 
-    if model['acquisition']['source_point_dof'] == False:
-        print('Warning not using point source')
-    print("test")
+    if model["acquisition"]["source_point_dof"] == False:
+        print("Warning not using point source")
     return False
-
 
 
 def delta_expr(x0, z, x, sigma_x=500.0):
