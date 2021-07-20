@@ -22,11 +22,36 @@ def saving_source_and_receiver_location_in_csv(model):
 
     return None
 
+def save_pickle(filename, array):
+    """Save a `numpy.ndarray` to a `pickle`.
+
+    Parameters
+    ----------
+    filename: str
+        The filename to save the data as a `pickle`
+    array: `numpy.ndarray`
+        The data to save a pickle (e.g., a shot)
+
+    Returns
+    -------
+    None
+
+    """
+    with open(filename, "wb") as f:
+        pickle.dump(array, f)
+    return None
+
+def load_pickle(filename):
+    with open(filename, "rb") as f:
+        array = np.asarray(pickle.load(f), dtype=float)
+    return array
+
 def executing_gridsweep(sweep_parameters):
     
     # IO parameters
     mesh_generation   = sweep_parameters['IO']['generate_meshes']
     saving_results    = sweep_parameters['IO']['output_pickle_of_wave_propagator_results']
+    loading_results   = sweep_parameters['IO']['load_existing_pickle_of_wave_propagator_results']
     loading_reference = sweep_parameters['IO']['use_precomputed_reference_case']
     filenameprefix    = sweep_parameters['IO']['grid_sweep_data_filename_prefix']
     save_receiver_location = sweep_parameters['IO']['save_receiver_location']
@@ -67,26 +92,32 @@ def executing_gridsweep(sweep_parameters):
         model = spyro.tools.create_model_for_grid_point_calculation(frequency, P_reference, method, minimum_mesh_velocity, experiment_type = experiment_type, receiver_type = receiver_type)
         print('Calculating reference solution of G = '+str(G_reference)+' and p = '+str(P_reference), flush = True)
         p_exact = spyro.tools.wave_solver(model, G =G_reference, comm = comm)
-        spyro.io.save_shots("experiment/heterogeneous_reference_p"+str(P_reference)+"g"+str(G_reference)+"line.pck", p_exact)
+        save_pickle("experiment/"+filenameprefix+"_heterogeneous_reference_p"+str(P_reference)+"g"+str(G_reference)+".pck", p_exact)
     else:
-        p_exact = spyro.io.load_shots("experiment/heterogeneous_reference_p"+str(P_reference)+"g"+str(G_reference)+"line.pck")
+        p_exact = load_pickle("experiment/"+filenameprefix+"_heterogeneous_reference_p"+str(P_reference)+"g"+str(G_reference)+".pck")
 
     ## Starting sweep
     for degree in degrees:
         print('\nFor p of '+str(degree), flush = True)
         text_file.write('For p of '+str(degree)+'\n')
         print('Starting sweep:', flush = True)
-        ## Calculating reference solution with p=5 and g=15:
         comm.comm.barrier()
-        #p_exact=spyro.io.load_shots('experiment/p_'+str(degree)+'CG_reference.pck')
         text_file.write('\tG\t\tError \n')
         for G in Gs:
             model = spyro.tools.create_model_for_grid_point_calculation(frequency, degree, method, minimum_mesh_velocity, experiment_type = experiment_type, receiver_type = receiver_type)
             print('G of '+str(G), flush = True)
-            p_0 = spyro.tools.wave_solver(model, G =G, comm = comm)
+
+            if loading_results == True:
+                p_0 = load_pickle("experiment/"+filenameprefix+"_heterogeneous_p"+str(P_reference)+"g"+str(G_reference)+".pck")
+            elif loading_results == False:
+                p_0 = spyro.tools.wave_solver(model, G =G, comm = comm)
+            
+            if saving_results == True:
+                save_pickle("experiment/"+filenameprefix+"_heterogeneous_p"+str(P_reference)+"g"+str(G_reference)+".pck", p_0)
+
+            comm.comm.barrier()
             error = spyro.tools.error_calc(p_exact, p_0, model, comm = comm)
             print('With P of '+ str(degree) +' and G of '+str(G)+' Error = '+str(error), flush = True)
             text_file.write('\t'+ str(G) +'\t\t'+str(error)+' \n')
-            #spyro.plots.plot_receiver_difference(model, p_exact, p_0, 1, appear=True)
 
     text_file.close()
