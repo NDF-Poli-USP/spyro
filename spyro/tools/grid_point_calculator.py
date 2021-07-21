@@ -72,33 +72,15 @@ def minimum_grid_point_calculator(frequency, method, degree, experiment_type = '
 def wave_solver(model, G, comm = False, mesh_generation = True):
     minimum_mesh_velocity = model['testing_parameters']['minimum_mesh_velocity']
 
-    if mesh_generation == True:
-        mesh = generate_mesh(model, G, comm)
-    elif mesh_generation == 'only':
-        mesh = generate_mesh(model, G, comm)
-        return 0.0
-    elif mesh_generation == False:
-        mesh = fire.Mesh(
-                "meshes/"+model['testing_parameters']['experiment_type']+str(G)+".msh",
-                distribution_parameters={
-                    "overlap_type": (fire.DistributedMeshOverlapType.NONE, 0)
-                },
-            )
-    
+    mesh = generate_mesh(model, G, comm)
+
     element = spyro.domains.space.FE_method(mesh, model["opts"]["method"], model["opts"]["degree"])
     V = fire.FunctionSpace(mesh, element)
-
-    #spyro.sources.source_dof_finder(V, model)
 
     if model['testing_parameters']['experiment_type'] == 'homogeneous':
         vp_exact = fire.Constant(minimum_mesh_velocity)
     elif model['testing_parameters']['experiment_type'] == 'heterogeneous':
         vp_exact = spyro.io.interpolate(model, mesh, V, guess=False)
-        #vpfile = fire.File("BP2004_velocity.pvd")
-        #vpfile.write(vp_exact)
-    
-    # if model['testing_parameters']['smooth'] == True:
-    #     vp_exact = vp_exact*
 
     if model["opts"]["method"] == 'KMV':
         estimate_max_eigenvalue=True
@@ -119,15 +101,19 @@ def wave_solver(model, G, comm = False, mesh_generation = True):
             flush=True,
         )
 
-    sources = spyro.Sources(model, mesh, V, comm).create()
-    receivers = spyro.Receivers(model, mesh, V, comm).create()
+    sources = spyro.Sources(model, mesh, V, comm)
+    receivers = spyro.Receivers(model, mesh, V, comm)
+    wavelet = spyro.full_ricker_wavelet(
+                                        dt=model["timeaxis"]["dt"],
+                                        tf=model["timeaxis"]["tf"],
+                                        freq=model["acquisition"]["frequency"],
+                                    )
 
     for sn in range(model["acquisition"]["num_sources"]):
         if spyro.io.is_owner(comm, sn):
             t1 = time.time()
-            p_field, p_recv = spyro.solvers.Leapfrog(
-                model, mesh, comm, vp_exact, sources, receivers, source_num=sn, output= False, G = G
-            )
+            p_field, p_recv = spyro.solvers.forward(
+                model, mesh, comm, vp_exact, sources, wavelet, receivers, source_num=sn, output= False)
             print(time.time() - t1)
 
     return p_recv
@@ -370,15 +356,6 @@ def time_interpolation_line(p_old, p_exact, model):
     p = np.zeros((times,))
     f = interpolate.interp1d(time_vector_old[0,:], p_old[:] )
     p[:] = f(time_vector_new[0,:])
-
-    return p
-
-def p_filter(p, tol=1e-20):
-    times, receivers = p.shape
-    for ti in range(times):
-        for r in range(receivers):
-            if abs(p[ti,r])< tol:
-                p[ti,r] = 0.0
 
     return p
 
