@@ -8,7 +8,7 @@ import time
 import copy
 import spyro
 
-def minimum_grid_point_calculator(frequency, method, degree, experiment_type = 'homogeneous', TOL = 0.2, G_init = 12, receiver_type = 'near'):
+def minimum_grid_point_calculator(frequency, method, degree, experiment_type = 'homogeneous', TOL = 0.2, G_initial=5, G_reference = 12, receiver_type = 'near'):
     """ Function to calculate necessary grid point density.
 
     Parameters
@@ -23,8 +23,10 @@ def minimum_grid_point_calculator(frequency, method, degree, experiment_type = '
         Only options are `homogenous` or `heterogenous`
     TOL: `float`
         Error threshold permited on minimum grid density
-    G_init: `float`
-        Initial grid density value to begin search
+    G_initial: `float`
+        Grid density value to start search
+    G_reference: `float`
+        Grid density value to take as a reference in error calculations
 
     Returns
     -------
@@ -34,38 +36,19 @@ def minimum_grid_point_calculator(frequency, method, degree, experiment_type = '
         
     """
     
-    ## Chossing parameters
+    minimum_mesh_velocity = 1.429
 
-    start_time= time.time()
-    print("Starting initial method check", flush = True)
-
-    if experiment_type == 'homogeneous':
-        minimum_mesh_velocity = 1.429
-    elif experiment_type == 'heterogenous':
-        minimum_mesh_velocity = False # This variable isnt needed in heterogenous models because of seismicmesh
-
-    model = spyro.tools.create_model_for_grid_point_calculation(frequency, degree, method, minimum_mesh_velocity, experiment_type = experiment_type, receiver_type = 'near')
+    model = spyro.tools.create_model_for_grid_point_calculation(frequency, degree, method, minimum_mesh_velocity, experiment_type = experiment_type, receiver_type = receiver_type)
     #print("Model built at time "+str(time.time()-start_time), flush = True)
     comm = spyro.utils.mpi_init(model)
     #print("Comm built at time "+str(time.time()-start_time), flush = True)
-    
-    p_exact = wave_solver(model, G =G_init, comm = comm)
-    print("p_exact finished at time "+str(time.time()-start_time), flush = True)
-    p_0 = wave_solver(model, G =G_init - 0.2*G_init, comm = comm)
-    print("p_0 finished at time "+str(time.time()-start_time), flush = True)
-    #quit()
+    print("Entering search", flush = True)
+    p_exact = wave_solver(model, G =G_reference, comm = comm)
+    print("p_exact calculation finished"), flush = True)
 
     comm.comm.barrier()
-    error = error_calc(p_exact, p_0, model, comm = comm)
-    print("error calc at time "+str(time.time()-start_time), flush = True)
 
-    if error > TOL:
-        print(error)
-        raise ValueError('There might be something wrong with the simulation since G = 10 fails with the defined error.')
-
-    print("Entering search at time "+str(time.time()-start_time), flush = True)
-    #print("Searching for minimum")
-    G = searching_for_minimum(model, p_exact, TOL, starting_G=G_init - 0.2*G_init, comm = comm)
+    G = searching_for_minimum(model, p_exact, TOL, starting_G=G_initial, comm = comm)
 
     return G
 
@@ -127,40 +110,36 @@ def generate_mesh(model,G, comm):
         raise ValueError("Wrong dimension in input model.")
     return mesh
 
-def searching_for_minimum(model, p_exact, TOL, accuracy = 0.1, starting_G = 10.0, comm=False):
-    print("Search began, time reset", flush = True)
-    start_time = time.time()
-    error = 0.0
+def searching_for_minimum(model, p_exact, TOL, accuracy = 0.1, starting_G = 7.0, comm=False):
+    error = 100.0
     G = starting_G
 
     # fast loop
-    print("Entering fast loop at time "+str(time.time()-start_time), flush = True)
-    while error < TOL:
-        dif = max(G*0.1, accuracy)
-        G = G - dif
+    print("Entering fast loop", flush = True)
+    while error > TOL:
+        dif = max(G*0.05, accuracy)
+        G = G + dif
         print('With G equal to '+str(G) )
-        print("Entering wave solver at time "+str(time.time()-start_time), flush = True)
+        print("Entering wave solver", flush = True)
         p0 = wave_solver(model,G, comm)
-        print("Entering error calc at time "+str(time.time()-start_time), flush = True)
         error = error_calc(p_exact, p0, model, comm = comm)
         print('Error of '+str(error))
 
-    G += dif
+    G -= dif
     # slow loop
-    print("Entering slow loop at time "+str(time.time()-start_time), flush = True)
     if dif > accuracy :
-        error = 0.0
+        print("Entering slow loop", flush = True)
+        error = 100.0
         while error < TOL:
             dif = accuracy
-            G = G - dif
+            G = G + dif
             print('With G equal to '+str(G) )
-            print("Entering wave solver at time "+str(time.time()-start_time), flush = True)
+            print("Entering wave solver", flush = True)
             p0 = wave_solver(model,G, comm )
-            print("Entering error calc at time "+str(time.time()-start_time), flush = True)
             error = error_calc(p_exact, p0, model, comm = comm)
             print('Error of '+str(error))
 
-        G+= dif
+        G-= dif
 
     return G
 

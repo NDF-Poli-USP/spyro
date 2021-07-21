@@ -1,5 +1,4 @@
 import numpy as np
-from numpy.lib.function_base import _DIMENSION_NAME
 import spyro
 import SeismicMesh
 
