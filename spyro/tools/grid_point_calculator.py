@@ -109,7 +109,7 @@ def searching_for_minimum(model, p_exact, TOL, accuracy = 0.1, starting_G = 7.0,
     # fast loop
     print("Entering fast loop", flush = True)
     while error > TOL:
-        dif = max(G*0.05, accuracy)
+        dif = max(G*0.1, accuracy)
         G = G + dif
         print('With G equal to '+str(G) )
         print("Entering wave solver", flush = True)
@@ -118,6 +118,7 @@ def searching_for_minimum(model, p_exact, TOL, accuracy = 0.1, starting_G = 7.0,
         print('Error of '+str(error))
 
     G -= dif
+    G = np.round(G,1)-accuracy
     # slow loop
     if dif > accuracy :
         print("Entering slow loop", flush = True)
@@ -150,28 +151,30 @@ def grid_point_to_mesh_point_converter_for_seismicmesh(model, G):
             M = 0.20231237605867816*G/0.9381929803311276
 
     if model["opts"]["method"] == 'CG':
-        if degree == 1:
-            M = G
-        if degree == 2:
-            M = 0.5*G
-        if degree == 3:
-            M = 0.333333333333333*G
-        if degree == 4:
-            M = 0.25*G
-        if degree == 5:
-            M = 0.2*G
+        raise ValueError("Correct M to G conversion to be inputed for CG")
+        # if degree == 1:
+        #     M = G
+        # if degree == 2:
+        #     M = 0.5*G
+        # if degree == 3:
+        #     M = 0.333333333333333*G
+        # if degree == 4:
+        #     M = 0.25*G
+        # if degree == 5:
+        #     M = 0.2*G
 
     if model["opts"]["method"] == 'spectral':
-        if degree == 1:
-            M = G
-        if degree == 2:
-            M = 0.5*G
-        if degree == 3:
-            M = 0.27639320225002106*G
-        if degree == 4:
-            M = 0.32732683535398854*G
-        if degree == 5:
-            M = 0.23991190372440996*G
+        raise ValueError("Correct M to G conversion to be inputed for spectral")
+        # if degree == 1:
+        #     M = G
+        # if degree == 2:
+        #     M = 0.5*G
+        # if degree == 3:
+        #     M = 0.27639320225002106*G
+        # if degree == 4:
+        #     M = 0.32732683535398854*G
+        # if degree == 5:
+        #     M = 0.23991190372440996*G
 
     return M
 
