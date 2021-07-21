@@ -2,10 +2,9 @@
 import matplotlib.pyplot as plt
 
 import numpy as np
-import spyro
 
 from ..io import ensemble_plot
-__all__ = ["plot_shots", "plot_receiver_difference"]
+__all__ = ["plot_shots"]
 
 
 
@@ -86,7 +85,7 @@ def plot_shots(
     plt.close()
     return None
 
-def plot_receiver_difference(model, p_receiver0, p_receiver1, id, appear = False, name = 'Receivers', ft = 'PDF'):
+
     """Plots two receivers in time
 
     Parameters
