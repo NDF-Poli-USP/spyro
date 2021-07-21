@@ -69,7 +69,7 @@ def minimum_grid_point_calculator(frequency, method, degree, experiment_type = '
 
     return G
 
-def wave_solver(model, G, comm = False, mesh_generation = True):
+def wave_solver(model, G, comm = False):
     minimum_mesh_velocity = model['testing_parameters']['minimum_mesh_velocity']
 
     mesh = generate_mesh(model, G, comm)
@@ -164,7 +164,6 @@ def searching_for_minimum(model, p_exact, TOL, accuracy = 0.1, starting_G = 10.0
 
     return G
 
-#UPDATE THIS
 def grid_point_to_mesh_point_converter_for_seismicmesh(model, G):
     degree = model["opts"]['degree']
     if model["opts"]["method"] == 'KMV':
