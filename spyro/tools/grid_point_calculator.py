@@ -164,6 +164,7 @@ def searching_for_minimum(model, p_exact, TOL, accuracy = 0.1, starting_G = 10.0
 
     return G
 
+#UPDATE THIS
 def grid_point_to_mesh_point_converter_for_seismicmesh(model, G):
     degree = model["opts"]['degree']
     if model["opts"]["method"] == 'KMV':
@@ -367,9 +368,9 @@ def generate_mesh2D(model,G, comm):
     method = model["opts"]["method"]
 
     Lz = model["mesh"]['Lz']
-    lz = model['PML']['lz']
+    lz = model['BCs']['lz']
     Lx = model["mesh"]['Lx']
-    lx = model['PML']['lx']
+    lx = model['BCs']['lx']
 
     Real_Lz = Lz + lz
     Real_Lx = Lx + 2*lx
@@ -379,36 +380,14 @@ def generate_mesh2D(model,G, comm):
         frequency = model["acquisition"]['frequency']
         lbda = minimum_mesh_velocity/frequency
 
-        Lz = model["mesh"]['Lz']
-        lz = model['PML']['lz']
-        Lx = model["mesh"]['Lx']
-        lx = model['PML']['lx']
-        pml_fraction = lx/Lx
-
         Real_Lz = Lz + lz
         Real_Lx = Lx + 2*lx
         edge_length = lbda/M
-        #print(Real_Lz)
 
-        bbox = (-Real_Lz, 0.0, 0.0, Real_Lx)
+        bbox = (-Real_Lz, 0.0, -lx, Real_Lx-lx)
         rec = SeismicMesh.Rectangle(bbox)
 
         if comm.comm.rank == 0:
-            #creating disk around source
-            # if model['acquisition']['source_mesh_point']:
-            #     source_position = model['acquisition']['source_pos']
-            #     fixed_points = source_position
-            # elif model['acquisition']['source_mesh_point'] == False:
-            #     disk_M = grid_point_to_mesh_point_converter_for_seismicmesh(model, 15)
-            #     disk = SeismicMesh.Disk([Real_Lz/2, Real_Lx/2], lbda)
-            #     fixed_points, disk_cells = SeismicMesh.generate_mesh(
-            #         domain=disk,
-            #         edge_length=lbda/disk_M,
-            #         mesh_improvement = False,
-            #         comm = comm.ensemble_comm,
-            #         verbose = 0
-            #     )
-
             # Creating rectangular mesh
             points, cells = SeismicMesh.generate_mesh(
             domain=rec, 
@@ -422,12 +401,12 @@ def generate_mesh2D(model,G, comm):
             points, cells = SeismicMesh.geometry.delete_boundary_entities(points, cells, min_qual= 0.6)
             a=np.amin(SeismicMesh.geometry.simp_qual(points, cells))
 
-            meshio.write_points_cells("meshes/homogeneous"+str(G)+".msh",
+            meshio.write_points_cells("meshes/2Dhomogeneous"+str(G)+".msh",
                 points,[("triangle", cells)],
                 file_format="gmsh22", 
                 binary = False
                 )
-            meshio.write_points_cells("meshes/homogeneous"+str(G)+".vtk",
+            meshio.write_points_cells("meshes/2Dhomogeneous"+str(G)+".vtk",
                 points,[("triangle", cells)],
                 file_format="vtk"
                 )
@@ -435,7 +414,7 @@ def generate_mesh2D(model,G, comm):
         comm.comm.barrier()
         if method == "CG" or method == "KMV":
             mesh = fire.Mesh(
-                "meshes/homogeneous"+str(G)+".msh",
+                "meshes/2Dhomogeneous"+str(G)+".msh",
                 distribution_parameters={
                     "overlap_type": (fire.DistributedMeshOverlapType.NONE, 0)
                 },
@@ -462,19 +441,18 @@ def generate_mesh2D(model,G, comm):
             wl=M,
             freq=5.0,
             grade=0.15,
-            domain_pad=model["PML"]["lz"],
+            domain_pad=model["BCs"]["lz"],
             pad_style="edge",
         )
 
         points, cells = SeismicMesh.generate_mesh(domain=rectangle, edge_length=ef, verbose = 0, mesh_improvement=False )
 
-        #points, cells = SeismicMesh.geometry.laplacian2(points, cells)
-        meshio.write_points_cells("meshes/heterogeneous"+str(G)+".msh",
+        meshio.write_points_cells("meshes/2Dheterogeneous"+str(G)+".msh",
             points/1000,[("triangle", cells)],
             file_format="gmsh22", 
             binary = False
             )
-        meshio.write_points_cells("meshes/heterogeneous"+str(G)+".vtk",
+        meshio.write_points_cells("meshes/2Dheterogeneous"+str(G)+".vtk",
                 points/1000,[("triangle", cells)],
                 file_format="vtk"
                 )
@@ -482,7 +460,7 @@ def generate_mesh2D(model,G, comm):
         comm.comm.barrier()
         if method == "CG" or method == "KMV":
             mesh = fire.Mesh(
-                "meshes/heterogeneous"+str(G)+".msh",
+                "meshes/2Dheterogeneous"+str(G)+".msh",
                 distribution_parameters={
                     "overlap_type": (fire.DistributedMeshOverlapType.NONE, 0)
                 },
@@ -490,138 +468,68 @@ def generate_mesh2D(model,G, comm):
     print('Finishing mesh generation', flush = True)
     return mesh
 
-def generate_mesh3D(model,G, comm):
+def generate_mesh3D(model, G, comm):
 
     print('Entering mesh generation', flush = True)
     M = grid_point_to_mesh_point_converter_for_seismicmesh(model, G)
-    disk_M = grid_point_to_mesh_point_converter_for_seismicmesh(model, 15)
     method = model["opts"]["method"]
 
     Lz = model["mesh"]['Lz']
-    lz = model['PML']['lz']
+    lz = model['BCs']['lz']
     Lx = model["mesh"]['Lx']
-    lx = model['PML']['lx']
+    lx = model['BCs']['lx']
     Ly = model["mesh"]['Ly']
-    ly= model['PML']['ly']
+    ly= model['BCs']['ly']
 
     Real_Lz = Lz + lz
     Real_Lx = Lx + 2*lx
     Real_Ly = Ly + 2*ly
 
-    if model['testing_parameters']['experiment_type']== 'homogeneous':
-        minimum_mesh_velocity = model['testing_parameters']['minimum_mesh_velocity']
-        frequency = model["acquisition"]['frequency']
-        lbda = minimum_mesh_velocity/frequency
+    minimum_mesh_velocity = model['testing_parameters']['minimum_mesh_velocity']
+    frequency = model["acquisition"]['frequency']
+    lbda = minimum_mesh_velocity/frequency
 
-        Lz = model["mesh"]['Lz']
-        lz = model['PML']['lz']
-        Lx = model["mesh"]['Lx']
-        lx = model['PML']['lx']
+    edge_length = lbda/M
+    #print(Real_Lz)
 
-        Real_Lz = Lz + lz
-        Real_Lx = Lx + 2*lx
-        edge_length = lbda/M
-        #print(Real_Lz)
+    bbox = (-Real_Lz, 0.0, -lx, Real_Lx-lx, -ly, Real_Ly-ly)
+    cube = SeismicMesh.Cube(bbox)
 
-        bbox = (-Real_Lz, 0.0, 0.0, Real_Lx, 0.0, Real_Ly)
-        cube = SeismicMesh.Cube(bbox)
+    if comm.comm.rank == 0:
+        # Creating rectangular mesh
+        points, cells = SeismicMesh.generate_mesh(
+        domain=cube, 
+        edge_length=edge_length, 
+        mesh_improvement = False,
+        max_iter = 75,
+        comm = comm.ensemble_comm,
+        verbose = 0
+        )
 
-        if comm.comm.rank == 0:
-            #creating disk around source
-            # if model['acquisition']['source_mesh_point']:
-            #     source_position = model['acquisition']['source_pos']
-            #     fixed_points = source_position
-            # elif model['acquisition']['source_mesh_point'] == False:
-            #     disk_M = grid_point_to_mesh_point_converter_for_seismicmesh(model, 15)
-            #     disk = SeismicMesh.Disk([Real_Lz/2, Real_Lx/2], lbda)
-            #     fixed_points, disk_cells = SeismicMesh.generate_mesh(
-            #         domain=disk,
-            #         edge_length=lbda/disk_M,
-            #         mesh_improvement = False,
-            #         comm = comm.ensemble_comm,
-            #         verbose = 0
-            #     )
-
-            # Creating rectangular mesh
-            points, cells = SeismicMesh.generate_mesh(
-            domain=cube, 
-            edge_length=edge_length, 
-            mesh_improvement = False,
-            max_iter = 75,
-            comm = comm.ensemble_comm,
-            verbose = 0
+        points, cells = SeismicMesh.sliver_removal(points=points, bbox=bbox, domain=cube, edge_length=edge_length, preserve=True, max_iter=200)
+    
+        print('entering spatial rank 0 after mesh generation')
+        
+        meshio.write_points_cells("meshes/3Dhomogeneous"+str(G)+".msh",
+            points,[("tetra", cells)],
+            file_format="gmsh22", 
+            binary = False
             )
-            print('entering spatial rank 0 after mesh generation')
-            
-            points, cells = SeismicMesh.geometry.delete_boundary_entities(points, cells, min_qual= 0.6)
-            a=np.amin(SeismicMesh.geometry.simp_qual(points, cells))
-
-            meshio.write_points_cells("meshes/homogeneous"+str(G)+".msh",
-                points,[("triangle", cells)],
-                file_format="gmsh22", 
-                binary = False
-                )
-            meshio.write_points_cells("meshes/homogeneous"+str(G)+".vtk",
-                points,[("triangle", cells)],
-                file_format="vtk"
-                )
-
-        comm.comm.barrier()
-        if method == "CG" or method == "KMV":
-            mesh = fire.Mesh(
-                "meshes/homogeneous"+str(G)+".msh",
-                distribution_parameters={
-                    "overlap_type": (fire.DistributedMeshOverlapType.NONE, 0)
-                },
+        meshio.write_points_cells("meshes/3Dhomogeneous"+str(G)+".vtk",
+            points,[("tetra", cells)],
+            file_format="vtk"
             )
 
-    elif model['testing_parameters']['experiment_type']== 'heterogeneous':
-        raise ValueError('Not yet set up for 3D model because of computational restraints.')
-        # # Name of SEG-Y file containg velocity model.
-        # fname = "vel_z6.25m_x12.5m_exact.segy"
+    comm.comm.barrier()
+    if method == "CG" or method == "KMV":
+        mesh = fire.Mesh(
+            "meshes/3Dhomogeneous"+str(G)+".msh",
+            distribution_parameters={
+                "overlap_type": (fire.DistributedMeshOverlapType.NONE, 0)
+            },
+        )
 
-        # # Bounding box describing domain extents (corner coordinates)
-        # bbox = (-Real_Lz, 0.0, 0.0, Real_Lx, 0.0, Real_Ly)
-
-        # rectangle =SeismicMesh.Rectangle(bbox)
-
-        # # Desired minimum mesh size in domain
-        # frequency = model["acquisition"]['frequency']
-        # hmin = 1429.0/(M*frequency)
-
-        # # Construct mesh sizing object from velocity model
-        # ef = SeismicMesh.get_sizing_function_from_segy(
-        #     fname,
-        #     bbox,
-        #     hmin=hmin,
-        #     wl=M,
-        #     freq=5.0,
-        #     grade=0.15,
-        #     domain_pad=model["PML"]["lz"],
-        #     pad_style="edge",
-        # )
-
-        # points, cells = SeismicMesh.generate_mesh(domain=rectangle, edge_length=ef, verbose = 0, mesh_improvement=False )
-
-        # #points, cells = SeismicMesh.geometry.laplacian2(points, cells)
-        # meshio.write_points_cells("meshes/heterogeneous"+str(G)+".msh",
-        #     points/1000,[("triangle", cells)],
-        #     file_format="gmsh22", 
-        #     binary = False
-        #     )
-        # meshio.write_points_cells("meshes/heterogeneous"+str(G)+".vtk",
-        #         points/1000,[("triangle", cells)],
-        #         file_format="vtk"
-        #         )
-
-        # comm.comm.barrier()
-        # if method == "CG" or method == "KMV":
-        #     mesh = fire.Mesh(
-        #         "meshes/heterogeneous"+str(G)+".msh",
-        #         distribution_parameters={
-        #             "overlap_type": (fire.DistributedMeshOverlapType.NONE, 0)
-        #         },
-        #     )
+    
     print('Finishing mesh generation', flush = True)
     return mesh
 
