@@ -102,7 +102,7 @@ def create_model_2D_homogeneous(grid_point_calculator_parameters, degree):
         "dimension": dimension,  # dimension
     }
 
-    model["PML"] = {
+    model["BCs"] = {
         "status": True,  # True or false
         "outer_bc": "non-reflective",  #  neumann, non-reflective (outer boundary condition)
         "damping_type": "polynomial",  # polynomial. hyperbolic, shifted_hyperbolic
@@ -143,14 +143,15 @@ def create_model_2D_homogeneous(grid_point_calculator_parameters, degree):
         "fspool": 100,  # how frequently to save solution to RAM
     }  
     model["parallelism"] = {
-    "type": "off",  # options: automatic (same number of cores for evey processor), custom, off.
+    "type": "spatial",  # options: automatic (same number of cores for evey processor), custom, off.
     "custom_cores_per_shot": [],  # only if the user wants a different number of cores for every shot.
     # input is a list of integers with the length of the number of shots.
     }
     model['testing_parameters'] = {
         'minimum_mesh_velocity': minimum_mesh_velocity,
         'pml_fraction': padz/Lz,
-        'receiver_type': receiver_type
+        'receiver_type': receiver_type,
+        'experiment_type': 'homogeneous'
     }
 
     return model
@@ -271,7 +272,7 @@ def create_model_2D_heterogeneous(grid_point_calculator_parameters, degree):
         "dimension": dimension,  # dimension
     }
 
-    model["PML"] = {
+    model["BCs"] = {
         "status": True,  # True or false
         "outer_bc": "non-reflective",  #  neumann, non-reflective (outer boundary condition)
         "damping_type": "polynomial",  # polynomial. hyperbolic, shifted_hyperbolic
@@ -427,7 +428,7 @@ def create_model_3D_homogeneous(grid_point_calculator_parameters, degree):
     # print(receiver_coordinates)
     return model
 
-def create_model_for_grid_point_calculations(grid_point_calculator_parameters, degree):
+def create_model_for_grid_point_calculation(grid_point_calculator_parameters, degree):
     ''' Creates models  with the correct parameters for for grid point calculation experiments
     on the 2D homogeneous case with a grid of receivers near the source.
     
