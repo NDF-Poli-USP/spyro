@@ -428,6 +428,20 @@ def create_model_3D_homogeneous(grid_point_calculator_parameters, degree):
     return model
 
 def create_model_for_grid_point_calculations(grid_point_calculator_parameters, degree):
+    ''' Creates models  with the correct parameters for for grid point calculation experiments
+    on the 2D homogeneous case with a grid of receivers near the source.
+    
+    Parameters
+    ----------
+    grid_point_calculator_parameters: Python 'dictionary'
+
+    Returns
+    -------
+    model: Python `dictionary`
+        Contains model options and parameters for use in Spyro
+        
+
+    '''
     dimension = grid_point_calculator_parameters['dimension']
     experiment_type = grid_point_calculator_parameters['velocity_profile_type']
     if   dimension == 2 and experiment_type == 'homogeneous':
