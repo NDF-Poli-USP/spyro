@@ -327,10 +327,15 @@ def create_model_2D_heterogeneous(grid_point_calculator_parameters, degree):
     return model
 
 def create_model_3D_homogeneous(grid_point_calculator_parameters, degree):
+    minimum_mesh_velocity = grid_point_calculator_parameters['minimum_velocity_in_the_domain']
+    frequency = grid_point_calculator_parameters['source_frequency']
+    dimension = grid_point_calculator_parameters['dimension']
+    receiver_type = grid_point_calculator_parameters['receiver_setup']
+
+    method = grid_point_calculator_parameters['FEM_method_to_evaluate']
     
     model = {}
-    frequency = 5.0
-    minimum_mesh_velocity = 1.429
+
     lbda = minimum_mesh_velocity/frequency
     pad = lbda
     Lz = 15*lbda#100*lbda
@@ -371,12 +376,12 @@ def create_model_3D_homogeneous(grid_point_calculator_parameters, degree):
     receiver_coordinates = create_3d_grid( (bin1_startZ,bin1_startX,bin1_startY)  , (bin1_endZ,bin1_endX,bin1_endY)   , 6)
     # Choose method and parameters
     model["opts"] = {
-        "method": 'KMV',
+        "method": method,
         "variant": None,
         "element": "tetra",  # tria or tetra
         'quadrature': 'KMV',
         "degree": degree,  # p order
-        "dimension": 3,  # dimension
+        "dimension": dimension,  # dimension
     }
 
     model["BCs"] = {
