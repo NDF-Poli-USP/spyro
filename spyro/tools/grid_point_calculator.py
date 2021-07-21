@@ -139,15 +139,15 @@ def grid_point_to_mesh_point_converter_for_seismicmesh(model, G):
     degree = model["opts"]['degree']
     if model["opts"]["method"] == 'KMV':
         if degree == 1:
-            M = G
+            M = G/0.707813887967734
         if degree == 2:
-            M = 0.5*G
+            M = 0.5*G/0.8663141029672784
         if degree == 3:
-            M = 0.2934695559090401*G
+            M = 0.2934695559090401*G/0.7483761673104953
         if degree == 4:
-            M = 0.21132486540518713*G
+            M = 0.21132486540518713*G/0.7010127254535244
         if degree == 5:
-            M = 0.20231237605867816*G
+            M = 0.20231237605867816*G/0.9381929803311276
 
     if model["opts"]["method"] == 'CG':
         if degree == 1:
@@ -334,7 +334,6 @@ def generate_mesh2D(model,G, comm):
 
     print('Entering mesh generation', flush = True)
     M = grid_point_to_mesh_point_converter_for_seismicmesh(model, G)
-    disk_M = grid_point_to_mesh_point_converter_for_seismicmesh(model, 15)
     method = model["opts"]["method"]
 
     Lz = model["mesh"]['Lz']
