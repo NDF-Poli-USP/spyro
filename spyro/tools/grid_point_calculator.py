@@ -122,7 +122,7 @@ def searching_for_minimum(model, p_exact, TOL, accuracy = 0.1, starting_G = 7.0,
     if dif > accuracy :
         print("Entering slow loop", flush = True)
         error = 100.0
-        while error < TOL:
+        while error > TOL:
             dif = accuracy
             G = G + dif
             print('With G equal to '+str(G) )
