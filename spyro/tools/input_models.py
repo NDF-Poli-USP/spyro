@@ -186,6 +186,7 @@ def create_model_2D_heterogeneous(grid_point_calculator_parameters, degree):
     receiver_type = grid_point_calculator_parameters['receiver_setup']
 
     method = grid_point_calculator_parameters['FEM_method_to_evaluate']
+    velocity_model = grid_point_calculator_parameters['velocity_model_file_name']
     model = {}
 
     if minimum_mesh_velocity > 500:
@@ -204,7 +205,7 @@ def create_model_2D_heterogeneous(grid_point_calculator_parameters, degree):
     source_z = -1.0
     source_x = Real_Lx/2.
     source_coordinates = [(source_z,source_x)]
-    SeismicMesh.write_velocity_model('vel_z6.25m_x12.5m_exact.segy', ofname = 'velocity_models/bp2004')
+    SeismicMesh.write_velocity_model(velocity_model, ofname = 'velocity_models/gridsweepcalc')
     padz = pad
     padx = pad
     
@@ -287,8 +288,8 @@ def create_model_2D_heterogeneous(grid_point_calculator_parameters, degree):
         "Lx": Lx,  # width in km - always positive
         "Ly": Ly,  # thickness in km - always positive
         "meshfile": "demos/mm_exact.msh",
-        "initmodel": "velocity_models/bp2004.hdf5",
-        "truemodel": "velocity_models/bp2004.hdf5",
+        "initmodel": "velocity_models/gridsweepcalc.hdf5",
+        "truemodel": "velocity_models/gridsweepcalc.hdf5",
     }
 
     model["acquisition"] = {

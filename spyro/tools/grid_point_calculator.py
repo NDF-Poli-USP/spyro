@@ -8,25 +8,13 @@ import time
 import copy
 import spyro
 
-def minimum_grid_point_calculator(frequency, method, degree, experiment_type = 'homogeneous', TOL = 0.2, G_initial=5, G_reference = 12, receiver_type = 'near'):
+def minimum_grid_point_calculator(grid_point_calculator_parameters):
     """ Function to calculate necessary grid point density.
 
     Parameters
     ----------
-    frequency: `float`
-        Source frequency to use in calculation
-    method: `string`
-        The finite element method choosen
-    degree: `int`
-        Polynomial degree of finite element space
-    experiment_type: `string`
-        Only options are `homogenous` or `heterogenous`
-    TOL: `float`
-        Error threshold permited on minimum grid density
-    G_initial: `float`
-        Grid density value to start search
-    G_reference: `float`
-        Grid density value to take as a reference in error calculations
+    grid_point_calculator_parameters: Python 'dictionary'
+        Has all parameters related to the experiment. An example is provided in the demo file.
 
     Returns
     -------
@@ -35,19 +23,23 @@ def minimum_grid_point_calculator(frequency, method, degree, experiment_type = '
         the degree and method specified within the specified error tolerance
         
     """
-    
-    minimum_mesh_velocity = 1.429
+    G_reference = grid_point_calculator_parameters['G_reference']
+    degree_reference = grid_point_calculator_parameters['reference_degree']
+    G_initial = grid_point_calculator_parameters['G_initial']
+    desired_degree = grid_point_calculator_parameters['desired_degree']
+    TOL = grid_point_calculator_parameters['accepted_error_threshold']
 
-    model = spyro.tools.create_model_for_grid_point_calculation(frequency, degree, method, minimum_mesh_velocity, experiment_type = experiment_type, receiver_type = receiver_type)
+    model = spyro.tools.create_model_for_grid_point_calculation(grid_point_calculator_parameters, degree_reference)
     #print("Model built at time "+str(time.time()-start_time), flush = True)
     comm = spyro.utils.mpi_init(model)
     #print("Comm built at time "+str(time.time()-start_time), flush = True)
     print("Entering search", flush = True)
     p_exact = wave_solver(model, G =G_reference, comm = comm)
-    print("p_exact calculation finished"), flush = True)
+    print("p_exact calculation finished", flush = True)
 
     comm.comm.barrier()
 
+    model = spyro.tools.create_model_for_grid_point_calculation(grid_point_calculator_parameters, desired_degree)
     G = searching_for_minimum(model, p_exact, TOL, starting_G=G_initial, comm = comm)
 
     return G
