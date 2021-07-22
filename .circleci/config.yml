@@ -10,6 +10,7 @@ commands:
       - run: sudo apt-get install -y libcgal-dev
       - run: pip3 install meshio
       - run: pip3 install pyamg
+      - run: pip3 install h5py
       - run: pip3 install --no-dependencies -U SeismicMesh[io]
   test:
     steps:
