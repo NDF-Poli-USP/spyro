@@ -23,6 +23,5 @@ grid_point_calculator_parameters = {
     'g_accuracy': 1e-1
     }
 
-
 G = spyro.tools.minimum_grid_point_calculator(grid_point_calculator_parameters)
 
