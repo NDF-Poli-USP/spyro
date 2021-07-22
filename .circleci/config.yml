@@ -11,11 +11,11 @@ commands:
       - run: pip3 install meshio
       - run: pip3 install pyamg
       - run: pip3 install h5py
-      - run: pip3 install --no-dependencies -U SeismicMesh[io]
-      - run: pip3 install .
       - run: pip3 install pytest-cov
       - run: sudo apt-get update -y
       - run: sudo apt-get install -y libcgal-dev
+      - run: pip3 install --no-dependencies -U SeismicMesh[io]
+      - run: pip3 install .
 
   test:
     steps:
