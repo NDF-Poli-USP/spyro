@@ -4,6 +4,7 @@ commands:
   build:
     steps:
       - checkout
+      - run: . /home/firedrake/firedrake/bin/activate
       - run: pip3 install .
       - run: pip3 install pytest-cov
       - run: sudo apt-get update -y
