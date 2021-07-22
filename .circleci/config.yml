@@ -32,9 +32,3 @@ workflows:
   tests:
     jobs:
       - python36
-
-workflows:
-  version: 2
-  tests:
-    jobs:
-      - python36
