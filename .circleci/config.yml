@@ -4,6 +4,10 @@ commands:
   build:
     steps:
       - checkout
+      - run: pip3 install segyio
+      - run: pip3 install scipy
+      - run: pip3 install matplotlib
+      - run: pip3 install pytest_codeblocks
       - run: pip3 install meshio
       - run: pip3 install pyamg
       - run: pip3 install h5py
