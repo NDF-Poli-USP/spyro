@@ -6,6 +6,8 @@ commands:
       - checkout
       - run: pip3 install .
       - run: pip3 install pytest-cov
+      - run: sudo apt-get install libcgal-dev
+      - run: pip3 install -U SeismicMesh[io]
   test:
     steps:
       - run: . /home/firedrake/firedrake/bin/activate &&  pip3 install . && pip3 install pytest-cov &&  pytest --cov-report=xml --cov=spyro test/
