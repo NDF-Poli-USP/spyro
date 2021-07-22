@@ -45,13 +45,14 @@ def test_grid_calc2d():
         'G_reference': 8.0, # grid point density to use in the reference case (float)
         'desired_degree': 4, # degree we are calculating G for. (int)
         'G_initial': 7.0, # Initial G for line search (float)
-        'accepted_error_threshold': 0.05, 
+        'accepted_error_threshold': 0.07, 
         'g_accuracy': 1e-1
         }
 
 
     G = spyro.tools.minimum_grid_point_calculator(grid_point_calculator_parameters)
-    inside = (7.0> G and G<8.0)
+    inside = (6.9< G and G<8.0)
+    print(G)
     assert inside
 
 def test_input_models_receivers():
@@ -76,7 +77,7 @@ def test_input_models_receivers():
         'accepted_error_threshold': 0.05, 
         'g_accuracy': 1e-1
         }
-    model = spyro.tools.create_model_for_grid_point_calculation(grid_point_calculator_parameters)
+    model = spyro.tools.create_model_for_grid_point_calculation(grid_point_calculator_parameters, 4)
 
     Lz = model["mesh"]['Lz']
     lz = model['BCs']['lz']
@@ -123,7 +124,7 @@ def test_input_models_receivers():
         'accepted_error_threshold': 0.05, 
         'g_accuracy': 1e-1
         }
-    model = spyro.tools.create_model_for_grid_point_calculation(grid_point_calculator_parameters)
+    model = spyro.tools.create_model_for_grid_point_calculation(grid_point_calculator_parameters,4)
 
     # FInish volume test later
     # Lz = model["mesh"]['Lz']

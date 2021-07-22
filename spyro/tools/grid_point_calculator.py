@@ -132,8 +132,6 @@ def searching_for_minimum(model, p_exact, TOL, accuracy = 0.1, starting_G = 7.0,
             error = error_calc(p_exact, p0, model, comm = comm)
             print('Error of '+str(error))
 
-        G-= dif
-
     return G
 
 def grid_point_to_mesh_point_converter_for_seismicmesh(model, G):
