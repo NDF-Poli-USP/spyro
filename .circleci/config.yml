@@ -6,8 +6,8 @@ commands:
       - checkout
       - run: pip3 install .
       - run: pip3 install pytest-cov
-      - run: sudo apt-get update
-      - run: sudo apt-get install libcgal-dev
+      - run: sudo apt-get update -y
+      - run: sudo apt-get install -y libcgal-dev
       - run: pip3 install -U SeismicMesh[io]
   test:
     steps:
