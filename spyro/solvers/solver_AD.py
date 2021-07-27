@@ -293,7 +293,7 @@ class solver_AD():
         
         point_cloud = VertexOnlyMesh(mesh, rec_position)
         P = FunctionSpace(point_cloud, "DG", 0)
-        
+        interpolator = Interpolator(u_np1, P)
         for IT in range(nt):
             # f.assign(0.0)
             # excitations.apply_source(f, wavelet[IT], all_shots=False, source_id=source_num)
@@ -318,8 +318,9 @@ class solver_AD():
                 # pp_n.assign(pp_np1)
             else:
                 u_np1.assign(X)
-
-            rec = interpolate(u_np1,P)
+            
+            rec = Function(P)
+            interpolator.interpolate(output=rec)
             usol_recv.append(rec.dat.data)
             if self.Calc_Jfunctional:
                 self.objective_func(rec,IT,dt,P,V)
