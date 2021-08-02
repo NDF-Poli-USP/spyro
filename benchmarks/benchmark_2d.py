@@ -85,7 +85,7 @@ Lx = model["mesh"]["Lx"]
 pad = model["BCs"]["lz"]
 
 bbox = (-Real_Lz, 0.0,-pad, Lx+pad)
-rec = SeismicMesh.Cube(bbox)
+rec = SeismicMesh.Rectangle(bbox)
 if comm.comm.rank == 0:
     points, cells = SeismicMesh.generate_mesh(
         domain=rec, 
@@ -97,7 +97,7 @@ if comm.comm.rank == 0:
     points, cells = SeismicMesh.geometry.delete_boundary_entities(points, cells, min_qual= 0.6)
         
     meshio.write_points_cells("meshes/benchmark_2d.msh",
-        points,[("tetra", cells)],
+        points,[("triangle", cells)],
         file_format="gmsh22", 
         binary = False
         )
