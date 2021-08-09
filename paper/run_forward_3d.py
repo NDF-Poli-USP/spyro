@@ -46,8 +46,8 @@ model["BCs"] = {
 }
 model["acquisition"] = {
     "source_type": "Ricker",
-    "num_sources": 2,  # len(sources),
-    "source_pos": sources[:2],
+    "num_sources": len(sources),
+    "source_pos": sources,
     "frequency": 5.0,
     "delay": 1.0,
     "num_receivers": len(receivers),
