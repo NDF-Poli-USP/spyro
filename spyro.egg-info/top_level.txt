@@ -1,3 +1,0 @@
-inputfiles
-spyro
-test
