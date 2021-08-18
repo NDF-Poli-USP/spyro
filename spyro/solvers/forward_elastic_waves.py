@@ -152,7 +152,7 @@ def forward_elastic_waves(
     for step in range(nt):
         rhs_forcing.assign(0.0)
         assembly_callable()
-        f = excitations.apply_source(rhs_forcing, wavelet[step])
+        f = excitations.apply_source(rhs_forcing, wavelet[step]) #FIXME
         #B0 = B.sub(0) # FIXME check this
         #B0 += f
         
