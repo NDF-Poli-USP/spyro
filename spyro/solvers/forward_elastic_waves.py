@@ -16,7 +16,8 @@ def forward_elastic_waves(
     model,
     mesh,
     comm,
-    c,
+    lamb,
+    mu,
     excitations,
     wavelet,
     receivers,
@@ -35,8 +36,10 @@ def forward_elastic_waves(
         The 2D/3D triangular mesh
     comm: Firedrake.ensemble_communicator
         The MPI communicator for parallelism
-       c: Firedrake.Function
-        The velocity model interpolated onto the mesh.
+    lamb: Firedrake.Function
+        The lambda value interpolated onto the mesh
+      mu: Firedrake.Function
+        The mu value interpolated onto the mesh
     excitations: A list Firedrake.Functions
     wavelet: array-like
         Time series data that's injected at the source location.
@@ -114,19 +117,20 @@ def forward_elastic_waves(
         return 0.5 * (grad(w) + grad(w).T)
 
     # mass matrix 
+    # FIXME rho not used yet
     m = (inner((u - 2.0 * u_n + u_nm1),v) / Constant(dt ** 2)) * dx(rule=qr_x) # explicit
     # stiffness matrix
-    lamb = Constant(1.5) # FIXME
-    mu = Constant(0.15)  # FIXME
     a = lamb * div(u_n) * div(v) * dx + 2.0 * mu * inner(D(u_n),D(v)) * dx(rule=qr_x)
 
     nf = 0
     #if model["BCs"]["outer_bc"] == "non-reflective": FIXME
     #    nf = c * ((u_n - u_nm1) / dt) * v * ds(rule=qr_s)
     
-    # F=0
-    F = m + a + nf
-    
+    # the weak formulation written as F=0
+    #F = m + a + nf
+    f = Function(V)
+    F = m + a - inner(f,v)*dx(rule=qr_x) # FIXME define the external forcing term better
+
     # retrieve the lhs and rhs from F
     lhs_ = lhs(F)
     rhs_ = rhs(F)
@@ -136,10 +140,10 @@ def forward_elastic_waves(
     B = Function(V)
     A = assemble(lhs_, mat_type="matfree")
     
-    # set the linear solver
+    # set the linear solver for A
     solver = LinearSolver(A, solver_parameters=params)
     
-    assembly_callable = create_assembly_callable(rhs_, tensor=B)
+    #assembly_callable = create_assembly_callable(rhs_, tensor=B)
     
     rhs_forcing = Function(V)
 
@@ -149,12 +153,27 @@ def forward_elastic_waves(
     usol = [Function(V, name="Displacement") for t in range(nt) if t % fspool == 0]
     usol_recv = []
 
+    #outfile1 = File("./rhs_forcing_before_apply_source.pvd")
+    #outfile2 = File("./rhs_forcing_after_apply_source.pvd")
+    #outfile3 = File("./B.pvd")
+
     for step in range(nt):
-        rhs_forcing.assign(0.0)
-        assembly_callable()
-        f = excitations.apply_source(rhs_forcing, wavelet[step]) #FIXME
+        #rhs_forcing.assign(0.0)
+        #assembly_callable()
+        B = assemble(rhs_, tensor=B)
+        #outfile1.write(rhs_forcing, time=t)
+        #f = excitations.apply_source(rhs_forcing, wavelet[step]) #FIXME # rhs_forcing is changing here
+        #f = excitations.apply_source(f.sub(0), wavelet[step]) #FIXME # this works only for x (sub(0))
+        
+        # only in the x-direction for now
+        excitations.apply_source(f.sub(0), -1.*wavelet[step]) #FIXME # this works for x and y
+        #excitations.apply_source(f.sub(1), wavelet[step]) #FIXME # this works for x and y
+        
+        # f is equal to rhs_forcing
+        #outfile2.write(f, time=t)
         #B0 = B.sub(0) # FIXME check this
-        #B0 += f
+        #outfile3.write(B0, time=t)
+        #B0 += f # FIXME just to break
         
         # solve and assign X onto solution u 
         solver.solve(X, B)
