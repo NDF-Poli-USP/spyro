@@ -10,19 +10,19 @@ from . import helpers
 # Note this turns off non-fatal warnings
 set_log_level(ERROR)
 
-
 @ensemble_forward
 def forward_elastic_waves(
     model,
     mesh,
     comm,
+    rho,
     lamb,
     mu,
     excitations,
     wavelet,
     receivers,
     source_num=0,
-    output=True, # FIXME it was false
+    output=False, 
 ):
     """Secord-order in time fully-explicit scheme
     with implementation of simple absorbing boundary conditions using
@@ -37,9 +37,11 @@ def forward_elastic_waves(
     comm: Firedrake.ensemble_communicator
         The MPI communicator for parallelism
     lamb: Firedrake.Function
-        The lambda value interpolated onto the mesh
+        The rho value (density) interpolated onto the mesh
+    lamb: Firedrake.Function
+        The lambda value (1st Lame parameter) interpolated onto the mesh
       mu: Firedrake.Function
-        The mu value interpolated onto the mesh
+        The mu value (2nd Lame parameter) interpolated onto the mesh
     excitations: A list Firedrake.Functions
     wavelet: array-like
         Time series data that's injected at the source location.
@@ -96,56 +98,51 @@ def forward_elastic_waves(
         z, x = SpatialCoordinate(mesh)
     elif dim == 3:
         z, x, y = SpatialCoordinate(mesh)
+    
+    # if requested, set the output file
+    if output:
+        outfile = helpers.create_output_file("forward_elastic_waves.pvd", comm, source_num)
 
-    # typical CG FEM in 2d/3d
+    # create the trial and test functions for typical CG/KMV FEM in 2d/3d
     u = TrialFunction(V)
     v = TestFunction(V)
-
+    # create the external forcing function (vector-valued function)
+    f = Function(V)
+    
+    # values of u at different timesteps
     u_nm1 = Function(V) # timestep n-1
     u_n = Function(V)   # timestep n
     u_np1 = Function(V) # timestep n+1
 
-    if output:
-        outfile = helpers.create_output_file("forward_elastic_waves.pvd", comm, source_num)
-
-
-    # -------------------------------------------------------
-    #m1 = ((u - 2.0 * u_n + u_nm1) / Constant(dt ** 2)) * v * dx(rule=qr_x)
-    #a = c * c * dot(grad(u_n), grad(v)) * dx(rule=qr_x)  # explicit
-   
-    def D(w):   # strain tensor
+    # strain tensor
+    def D(w):   
         return 0.5 * (grad(w) + grad(w).T)
 
     # mass matrix 
-    # FIXME rho not used yet
-    m = (inner((u - 2.0 * u_n + u_nm1),v) / Constant(dt ** 2)) * dx(rule=qr_x) # explicit
+    m = (rho * inner((u - 2.0 * u_n + u_nm1),v) / Constant(dt ** 2)) * dx(rule=qr_x) # explicit
     # stiffness matrix
-    a = lamb * div(u_n) * div(v) * dx + 2.0 * mu * inner(D(u_n),D(v)) * dx(rule=qr_x)
-
-    nf = 0
-    #if model["BCs"]["outer_bc"] == "non-reflective": FIXME
+    a = lamb * tr(D(u_n)) * tr(D(v)) * dx + 2.0 * mu * inner(D(u_n),D(v)) * dx(rule=qr_x)
+    # external forcing form 
+    l = inner(f,v) * dx(rule=qr_x) 
+    
+    #nf = 0 FIXME BC
+    #if model["BCs"]["outer_bc"] == "non-reflective":
     #    nf = c * ((u_n - u_nm1) / dt) * v * ds(rule=qr_s)
     
     # the weak formulation written as F=0
-    #F = m + a + nf
-    f = Function(V)
-    F = m + a - inner(f,v)*dx(rule=qr_x) # FIXME define the external forcing term better
+    F = m + a - l 
 
-    # retrieve the lhs and rhs from F
+    # retrieve the lhs and rhs terms from F
     lhs_ = lhs(F)
     rhs_ = rhs(F)
 
-    # create functions such that we solve for X in AX=B
+    # create functions such that we solve for X in A X = B
     X = Function(V)
     B = Function(V)
     A = assemble(lhs_, mat_type="matfree")
     
     # set the linear solver for A
     solver = LinearSolver(A, solver_parameters=params)
-    
-    #assembly_callable = create_assembly_callable(rhs_, tensor=B)
-    
-    rhs_forcing = Function(V)
 
     # define the output solution over the entire domain (usol) and at the receivers (usol_recv)
     t = 0.0
@@ -153,34 +150,21 @@ def forward_elastic_waves(
     usol = [Function(V, name="Displacement") for t in range(nt) if t % fspool == 0]
     usol_recv = []
 
-    #outfile1 = File("./rhs_forcing_before_apply_source.pvd")
-    #outfile2 = File("./rhs_forcing_after_apply_source.pvd")
-    #outfile3 = File("./B.pvd")
-
+    # run forward in time
     for step in range(nt):
-        #rhs_forcing.assign(0.0)
-        #assembly_callable()
+        # assemble the rhs term to update the forcing FIXME assemble here or after apply source?
         B = assemble(rhs_, tensor=B)
-        #outfile1.write(rhs_forcing, time=t)
-        #f = excitations.apply_source(rhs_forcing, wavelet[step]) #FIXME # rhs_forcing is changing here
-        #f = excitations.apply_source(f.sub(0), wavelet[step]) #FIXME # this works only for x (sub(0))
         
-        # only in the x-direction for now
-        excitations.apply_source(f.sub(0), -1.*wavelet[step]) #FIXME # this works for x and y
-        #excitations.apply_source(f.sub(1), wavelet[step]) #FIXME # this works for x and y
-        
-        # f is equal to rhs_forcing
-        #outfile2.write(f, time=t)
-        #B0 = B.sub(0) # FIXME check this
-        #outfile3.write(B0, time=t)
-        #B0 += f # FIXME just to break
+        # apply source only in the x-direction for now 
+        excitations.apply_source(f.sub(0), -1.*wavelet[step]) # x FIXME check the sign (-1)
+        #excitations.apply_source(f.sub(1), wavelet[step]) # y FIXME check this in the future
         
         # solve and assign X onto solution u 
         solver.solve(X, B)
         u_np1.assign(X)
 
         # interpolate the solution at the receiver points
-        usol_recv.append(receivers.interpolate(u_np1.dat.data_ro_with_halos[:]))
+        usol_recv.append(receivers.interpolate(u_np1.dat.data_ro_with_halos[:])) # FIXME check this
 
         # save the solution if requested for this time step
         if step % fspool == 0:
@@ -192,7 +176,8 @@ def forward_elastic_waves(
                 norm(u_n) < 1 # FIXME why u_n and not u_np1?
             ), "Numerical instability. Try reducing dt or building the mesh differently"
             if output:
-                outfile.write(u_n, time=t, name="Displacement")
+                u_n.rename("Displacement")
+                outfile.write(u_n, time=t)
             if t > 0:
                 helpers.display_progress(comm, t)
 
