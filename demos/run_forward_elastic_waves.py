@@ -10,6 +10,8 @@ from firedrake import (
 
 import spyro
 
+import time
+
 model = {}
 
 # Choose method and parameters
@@ -109,6 +111,7 @@ File("simple_velocity_model.pvd").write(vp)
 # FIXME rho not defined yet
 lamb = Constant(1.5) # FIXME
 mu = Constant(1.5)  # FIXME
+rho = Constant(1.)  # FIXME
 
 # Now we instantiate both the receivers and source objects.
 sources = spyro.Sources(model, mesh, V, comm)
@@ -121,9 +124,12 @@ wavelet = spyro.full_ricker_wavelet(dt=0.0005, tf=2.0, freq=8.0)
 # And now we simulate the shot using a 2nd order central time-stepping scheme
 # Note: simulation results are stored in the folder `~/results/` by default
 #p_field, p_at_recv = spyro.solvers.forward(
+start = time.time()
 p_field, p_at_recv = spyro.solvers.forward_elastic_waves(
-    model, mesh, comm, lamb, mu, sources, wavelet, receivers
+    model, mesh, comm, rho, lamb, mu, sources, wavelet, receivers, output=True
 )
+end = time.time()
+print(end - start)
 
 # Visualize the shot record
 #spyro.plots.plot_shots(model, comm, p_at_recv)
