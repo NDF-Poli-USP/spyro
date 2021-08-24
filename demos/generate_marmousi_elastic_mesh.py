@@ -9,7 +9,7 @@ from SeismicMesh import get_sizing_function_from_segy, generate_mesh, Rectangle
 comm = MPI.COMM_WORLD
 
 """
-Build a mesh of the BP2004 benchmark velocity model in serial or parallel
+Build a mesh of the Marmousi elastic benchmark velocity model in serial or parallel
 Takes roughly 1 minute with 2 processors and less than 1 GB of RAM.
 """
 
@@ -19,10 +19,11 @@ Takes roughly 1 minute with 2 processors and less than 1 GB of RAM.
 fname = "./velocity_models/elastic-marmousi-model/model/MODEL_DENSITY_1.25m.segy"
 
 # Bounding box describing domain extents (corner coordinates)
-bbox = (-3500.0, 0.0, 0.0, 17000.0)
+#bbox = (-3500.0, 0.0, 0.0, 17000.0) # this includes a 450-m thick water layer
+bbox = (-3500.0, -450.0, 0.0, 17000.0) # removing water layer
 
 # Desired minimum mesh size in domain
-hmin = 250.0
+hmin = 50.0
 
 rectangle = Rectangle(bbox)
 
@@ -60,14 +61,14 @@ if comm.rank == 0:
     # NOTE: SeismicMesh outputs assumes the domain is (z,x) so for visualization
     # in ParaView, we swap the axes so it appears as in the (x,z) plane.
     meshio.write_points_cells(
-        "marmousi_elastic.msh",
+        "meshes/marmousi_elastic.msh",
         points[:] / 1000, # do not swap here
         [("triangle", cells)],
         file_format="gmsh22",
         binary=False
     )
     meshio.write_points_cells(
-        "marmousi_elastic.vtk",
+        "meshes/marmousi_elastic.vtk",
         points[:, [1, 0]] / 1000,
         [("triangle", cells)],
         file_format="vtk",

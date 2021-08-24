@@ -1,4 +1,5 @@
 from firedrake import File
+from firedrake import Function
 import spyro
 import sys
 
@@ -21,6 +22,9 @@ model["mesh"] = {
     "initmodel": "not_used.hdf5",
     "truemodel": "velocity_models/elastic-marmousi-model/model/MODEL_S-WAVE_VELOCITY_1.25m.segy.hdf5",
 }
+    #"truemodel": "velocity_models/elastic-marmousi-model/model/MODEL_S-WAVE_VELOCITY_1.25m.segy.hdf5",
+    #"truemodel": "velocity_models/elastic-marmousi-model/model/MODEL_P-WAVE_VELOCITY_1.25m.segy.hdf5",
+    #"truemodel": "velocity_models/elastic-marmousi-model/model/MODEL_DENSITY_1.25m.segy.hdf5",
 model["BCs"] = {
     "status": False,  # True or false
     "outer_bc": "non-reflective",  #  None or non-reflective (outer boundary condition)
@@ -35,7 +39,7 @@ model["BCs"] = {
 model["acquisition"] = {
     "source_type": "Ricker",
     "num_sources": 1,
-    "source_pos": [(0.0, 0.0)],
+    "source_pos": [(-0.45, 5.0)], # Z and X
     "frequency": 5.0,
     "delay": 1.0,
     "num_receivers": 10,
@@ -43,7 +47,7 @@ model["acquisition"] = {
 }
 model["timeaxis"] = {
     "t0": 0.0,  #  Initial time for event
-    "tf": 1.00,  # Final time for event
+    "tf": 3.00,  # Final time for event
     "dt": 0.00025,
     "amplitude": 1,  # the Ricker has an amplitude of 1.
     "nspool": 100,  # how frequently to output solution to pvds
@@ -51,11 +55,34 @@ model["timeaxis"] = {
 }
 comm = spyro.utils.mpi_init(model)
 mesh, V = spyro.io.read_mesh(model, comm)
+
+# interpolate Vs, Vp, and Density onto the mesh FIXME check the units or create a new interpolation method
+model["mesh"]["truemodel"] = "velocity_models/elastic-marmousi-model/model/MODEL_S-WAVE_VELOCITY_1.25m.segy.hdf5" 
+vs = spyro.io.interpolate(model, mesh, V, guess=False)
+model["mesh"]["truemodel"] = "velocity_models/elastic-marmousi-model/model/MODEL_P-WAVE_VELOCITY_1.25m.segy.hdf5" 
 vp = spyro.io.interpolate(model, mesh, V, guess=False)
-if comm.ensemble_comm.rank == 0:
-    #File("density.pvd", comm=comm.comm).write(vp)
-    #File("p-wave_velocity.pvd", comm=comm.comm).write(vp)
-    File("s-wave_velocity.pvd", comm=comm.comm).write(vp)
+model["mesh"]["truemodel"] = "velocity_models/elastic-marmousi-model/model/MODEL_DENSITY_1.25m.segy.hdf5" 
+rho = spyro.io.interpolate(model, mesh, V, guess=False)
+
+vs.dat.data[:] = vs.dat.data[:] / 1000. # only vs needs unit recast for now
+# vs and vp in km/s
+# rho in 1000 x Gt/km3
+
+mu = Function(V, name="mu").interpolate(rho * vs ** 2)
+lamb = Function(V, name="lamb").interpolate(vp ** 2 - 2 * vs ** 2)
+#mu = rho * vs ** 2
+#lamb = rho * (vp ** 2 - 2 * vs ** 2)
+
+write_files=0
+if comm.ensemble_comm.rank == 0 and write_files==1:
+    File("density.pvd", comm=comm.comm).write(rho)
+    File("p-wave_velocity.pvd", comm=comm.comm).write(vp)
+    File("s-wave_velocity.pvd", comm=comm.comm).write(vs)
+    File("lambda.pvd", comm=comm.comm).write(lamb)
+    File("mu.pvd", comm=comm.comm).write(mu)
+
+#sys.exit("Exit without running")
+
 sources = spyro.Sources(model, mesh, V, comm)
 receivers = spyro.Receivers(model, mesh, V, comm)
 wavelet = spyro.full_ricker_wavelet(
@@ -64,8 +91,13 @@ wavelet = spyro.full_ricker_wavelet(
     freq=model["acquisition"]["frequency"],
 )
 
-sys.exit("Exit without running")
+#sys.exit("Exit without running")
 
-p, p_r = spyro.solvers.forward(model, mesh, comm, vp, sources, wavelet, receivers)
+p, p_r = spyro.solvers.forward_elastic_waves(
+    model, mesh, comm, rho, lamb, mu, sources, wavelet, receivers, output=True
+)
+
+sys.exit("Exit without plotting shots")
+
 spyro.plots.plot_shots(model, comm, p_r, vmin=-1e-3, vmax=1e-3)
 spyro.io.save_shots(model, comm, p_r)
