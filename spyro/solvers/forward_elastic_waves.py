@@ -124,13 +124,71 @@ def forward_elastic_waves(
     a = lamb * tr(D(u_n)) * tr(D(v)) * dx + 2.0 * mu * inner(D(u_n),D(v)) * dx(rule=qr_x)
     # external forcing form 
     l = inner(f,v) * dx(rule=qr_x) 
+   
+    # absorbing boundary conditions
+    nf = 0 # it enters as a Neumann BC
+    if model["BCs"]["status"]: # to turn on any type of BC
+        bc_defined = False
+        x1 = 0.0                 # z-x origin
+        z1 = 0.0                 # z-x origin
+        x2 = model["mesh"]["Lx"] # effective width of the domain, excluding the absorbing layers
+        z2 =-model["mesh"]["Lz"] # effective depth of the domain, excluding the absorbing layers
+        lx = model["BCs"]["lx"]  # width of the absorbing layer
+        lz = model["BCs"]["lz"]  # depth of the absorbing layer
     
-    #nf = 0 FIXME BC
-    #if model["BCs"]["outer_bc"] == "non-reflective":
-    #    nf = c * ((u_n - u_nm1) / dt) * v * ds(rule=qr_s)
-    
-    # the weak formulation written as F=0
-    F = m + a - l 
+        # damping at outer boundaries (-x,+x,-z)
+        if model["BCs"]["outer_bc"] == "non-reflective" and model["BCs"]["abl_bc"] != "alid":
+            cmax = Constant(1.0) # FIXME define cmax
+            tol = 0.000001
+            g = conditional(x < x1-lx+tol, 1.0, 0.0) # assuming that all x<x1 belongs to abs layer
+            g = conditional(x > x2+lx-tol, 1.0, g)   # assuming that all x>x2 belongs to abs layer
+            g = conditional(z < z2-lz+tol, 1.0, g)   # assuming that all z<z2 belongs to abs layer
+            G = FunctionSpace(mesh, element)
+            c = Function(G, name="Damping_coefficient").interpolate(g)
+            if output:
+                File("damping_coefficient_outer_bc.pvd").write(c)
+            nf = cmax * c * inner( ((u_n - u_nm1) / dt) , v ) * ds(rule=qr_s)
+            bc_defined = True
+        else:
+            if model["BCs"]["outer_bc"] == "non-reflective" and model["BCs"]["abl_bc"] == "alid":
+                print("WARNING: [BCs][outer_bc] = non-reflectie AND [BCs][abl_bc] = alid. Ignoring [BCs][outer_bc].")
+
+        # absorbing layer with increasing damping (ALID)
+        if model["BCs"]["abl_bc"] == "alid":
+            cmax = Constant(100.0) # FIXME define cmax
+            p = 3 # FIXME define p
+            g = conditional(x < x1, (abs(x1-x)/lx)**p, 0.0) # assuming that all x<x1 belongs to abs layer
+            g = conditional(x > x2, (abs(x2-x)/lx)**p, g)   # assuming that all x>x2 belongs to abs layer
+            g = conditional(z < z2, (abs(z2-z)/lz)**p, g)   # assuming that all z<z2 belongs to abs layer
+            g = conditional(And(x < x1, z < z2), ( (((x1-x)**2.0+(z2-z)**2.0)**0.5)/min(lx,lz) )**p, g)
+            g = conditional(And(x > x2, z < z2), ( (((x2-x)**2.0+(z2-z)**2.0)**0.5)/min(lx,lz) )**p, g)
+            G = FunctionSpace(mesh, element)
+            c = Function(G, name="Damping_coefficient").interpolate(g)
+            if output:
+                File("damping_coefficient_alid.pvd").write(c)
+            nf = cmax * c * inner( ((u_n - u_nm1) / dt) , v ) * dx(rule=qr_s) # FIXME check if it should be unp1-un
+            bc_defined = True
+        # absorbing layer with Gaussian taper 
+        elif model["BCs"]["abl_bc"] == "gaussian-taper": 
+            gamma = 2.               # FIXME define gamma
+            g = conditional(x < x1, exp(-((x1-x)/gamma)**2.0), 1.0) # assuming that all x<x1 belongs to abs layer
+            g = conditional(x > x2, exp(-((x2-x)/gamma)**2.0), g)   # assuming that all x>x2 belongs to abs layer
+            g = conditional(z < z2, exp(-((z2-z)/gamma)**2.0), g)   # assuming that all z<z2 belongs to abs layer
+            g = conditional(And(x < x1, z < z2), exp(-((x1-x)/gamma)**2.0 -((z2-z)/gamma)**2.0), g)
+            g = conditional(And(x > x2, z < z2), exp(-((x2-x)/gamma)**2.0 -((z2-z)/gamma)**2.0), g)
+            G = FunctionSpace(mesh, element)
+            gp = Function(G, name="Gaussian_taper").interpolate(g)
+            if output:
+                File("gaussian_taper.pvd").write(gp)
+            bc_defined = True
+        else:
+            print("WARNING: absorbing boundary layer not defined ([BCs][abl_bc] = none).")
+        
+        if bc_defined == False:
+            print("WARNING: [BCs][status] = True, but no boundary condition defined. Check your [BCs]")
+
+    # weak formulation written as F=0
+    F = m + a - l + nf 
 
     # retrieve the lhs and rhs terms from F
     lhs_ = lhs(F)
@@ -162,6 +220,16 @@ def forward_elastic_waves(
         # solve and assign X onto solution u 
         solver.solve(X, B)
         u_np1.assign(X)
+
+        # deal with absorbing boundary layers
+        if model["BCs"]["status"] and model["BCs"]["abl_bc"] == "gaussian-taper":
+            # FIXME check if all these terms are needed
+            u_np1.sub(0).assign(u_np1.sub(0)*gp) 
+            u_np1.sub(1).assign(u_np1.sub(1)*gp)
+            u_nm1.sub(0).assign(u_nm1.sub(0)*gp)
+            u_nm1.sub(1).assign(u_nm1.sub(1)*gp)
+            u_n.sub(0).assign(u_n.sub(0)*gp)
+            u_n.sub(1).assign(u_n.sub(1)*gp)
 
         # interpolate the solution at the receiver points
         usol_recv.append(receivers.interpolate(u_np1.dat.data_ro_with_halos[:])) # FIXME check this
