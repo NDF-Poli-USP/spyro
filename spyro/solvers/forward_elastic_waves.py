@@ -7,6 +7,9 @@ from ..pml import damping
 from ..io import ensemble_forward
 from . import helpers
 
+import sys
+import time
+
 # Note this turns off non-fatal warnings
 set_log_level(ERROR)
 
@@ -68,7 +71,6 @@ def forward_elastic_waves(
     tf = model["timeaxis"]["tf"]
     nspool = model["timeaxis"]["nspool"]
     fspool = model["timeaxis"]["fspool"]
-    #PML = model["BCs"]["status"] FIXME
     excitations.current_source = source_num
 
     nt = int(tf / dt)  # number of timesteps
@@ -208,15 +210,43 @@ def forward_elastic_waves(
     usol = [Function(V, name="Displacement") for t in range(nt) if t % fspool == 0]
     usol_recv = []
 
+    def delta_expr(xs, zs, x, z, sigma_x=500):
+        sigma_x = Constant(sigma_x)
+        return exp(-sigma_x * ((x - xs) ** 2 + (z - zs) ** 2))
+
+    radial_source=0
+    if radial_source==1: # FIXME keeping this old code here for now
+        xs = model["acquisition"]["source_pos"][0][1]       
+        zs = model["acquisition"]["source_pos"][0][0]       
+        S = FunctionSpace(mesh, element)
+        tol = 0.00001
+        source_x = Function(S, name="source_x").interpolate(
+                            delta_expr(xs, zs, x, z) * (x-xs)/(tol + ((x-xs)**2.+(z-zs)**2.)**0.5)
+                            )
+        source_z = Function(S, name="source_z").interpolate(
+                            delta_expr(xs, zs, x, z) * (z-zs)/(tol + ((x-xs)**2.+(z-zs)**2.)**0.5)
+                            )
+        File("source_x.pvd", comm=comm.comm).write(source_x)
+        File("source_z.pvd", comm=comm.comm).write(source_z)
+        sys.exit("Exit without running")
+
     # run forward in time
     for step in range(nt):
         # assemble the rhs term to update the forcing FIXME assemble here or after apply source?
         B = assemble(rhs_, tensor=B)
-        
-        # apply source only in the x-direction for now 
-        excitations.apply_source(f.sub(0), -1.*wavelet[step]) # x FIXME check the sign (-1)
-        #excitations.apply_source(f.sub(1), wavelet[step]) # y FIXME check this in the future
-        
+    
+        #start = time.time()
+        if radial_source==1: # FIXME testing a radial source here for now
+            f.sub(0).assign(wavelet[step]*source_z)
+            f.sub(1).assign(wavelet[step]*source_x)
+        else:
+            #FIXME let the user decide which approach will be used 
+            #excitations.apply_source(f.sub(0), -1.*wavelet[step]) # z 
+            #excitations.apply_source(f.sub(1), wavelet[step]) # x 
+            excitations.apply_radial_source(f, wavelet[step])
+        #end = time.time()
+        #print(end - start)
+
         # solve and assign X onto solution u 
         solver.solve(X, B)
         u_np1.assign(X)
@@ -246,8 +276,8 @@ def forward_elastic_waves(
             if output:
                 u_n.rename("Displacement")
                 outfile.write(u_n, time=t)
-            if t > 0:
-                helpers.display_progress(comm, t)
+            if t > 0: 
+                helpers.display_progress(comm, t) 
 
         # update u^(n-1) and u^(n)
         u_nm1.assign(u_n)

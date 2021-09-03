@@ -44,10 +44,12 @@ class Receivers:
         self.num_receivers = len(self.receiver_locations)
 
         self.cellIDs = None
-        self.cellVertices = None
+        self.cellVertices = None # vertex locations
+        self.cellNodes = None    # node locations
         self.cell_tabulations = None
         self.cellNodeMaps = None
         self.nodes_per_cell = None
+        self.node_locations = None
         self.is_local = [0] * self.num_receivers
 
         self.build_maps()
@@ -76,6 +78,7 @@ class Receivers:
         (
             self.cellIDs,
             self.cellVertices,
+            self.cellNodes,
             self.cellNodeMaps,
         ) = self.__func_receiver_locator()
         self.cell_tabulations = self.__func_build_cell_tabulations()
@@ -170,16 +173,19 @@ class Receivers:
         cell_node_map = fdrake_cell_node_map.values_with_halo
         (num_cells, nodes_per_cell) = cell_node_map.shape
         node_locations = self.__func_node_locations()
-        self.nodes_per_cell = nodes_per_cell
+        self.nodes_per_cell = nodes_per_cell #FIXME maybe this could be returned from the function
+        self.node_locations = node_locations #FIXME maybe this could be returned from the function
 
         cellId_maps = np.zeros((num_recv, 1))
         cellNodeMaps = np.zeros((num_recv, nodes_per_cell))
         cellVertices = []
+        cellNodes = []
 
         for receiver_id in range(num_recv):
             cell_id = self.is_local[receiver_id]
 
             cellVertices.append([])
+            cellNodes.append([])
 
             if cell_id is not None:
                 cellId_maps[receiver_id] = cell_id
@@ -189,8 +195,13 @@ class Receivers:
                     z = node_locations[cell_node_map[cell_id, vertex_number], 0]
                     x = node_locations[cell_node_map[cell_id, vertex_number], 1]
                     cellVertices[receiver_id][vertex_number] = (z, x)
+                for node_number in range(nodes_per_cell):
+                    cellNodes[receiver_id].append([])
+                    z = node_locations[cell_node_map[cell_id, node_number], 0]
+                    x = node_locations[cell_node_map[cell_id, node_number], 1]
+                    cellNodes[receiver_id][node_number] = (z, x)
 
-        return cellId_maps, cellVertices, cellNodeMaps
+        return cellId_maps, cellVertices, cellNodes, cellNodeMaps
 
     def __new_at(self, udat, receiver_id):
         """Function that evaluates the receiver value given its id.
@@ -259,10 +270,12 @@ class Receivers:
         cellId_maps = np.zeros((num_recv, 1))
         cellNodeMaps = np.zeros((num_recv, nodes_per_cell))
         cellVertices = []
+        cellNodes = []
 
         for receiver_id in range(num_recv):
             cell_id = self.is_local[receiver_id]
             cellVertices.append([])
+            cellNodes.append([])
             if cell_id is not None:
                 cellId_maps[receiver_id] = cell_id
                 cellNodeMaps[receiver_id, :] = cell_node_map[cell_id, :]
@@ -272,8 +285,14 @@ class Receivers:
                     x = node_locations[cell_node_map[cell_id, vertex_number], 1]
                     y = node_locations[cell_node_map[cell_id, vertex_number], 2]
                     cellVertices[receiver_id][vertex_number] = (z, x, y)
+                for node_number in range(nodes_per_cell):
+                    cellNodes[receiver_id].append([])
+                    z = node_locations[cell_node_map[cell_id, node_number], 0]
+                    x = node_locations[cell_node_map[cell_id, node_number], 1]
+                    y = node_locations[cell_node_map[cell_id, node_number], 2]
+                    cellNodes[receiver_id][node_number] = (z, x, y)
 
-        return cellId_maps, cellVertices, cellNodeMaps
+        return cellId_maps, cellVertices, cellNodes, cellNodeMaps
 
     def __func_node_locations_3D(self):
         """Function that returns a list which includes a numpy matrix

@@ -2,6 +2,7 @@ from firedrake import File
 from firedrake import Function
 import spyro
 import sys
+import time
 
 model = {}
 
@@ -22,19 +23,18 @@ model["mesh"] = {
     "initmodel": "not_used.hdf5",
     "truemodel": "velocity_models/elastic-marmousi-model/model/MODEL_S-WAVE_VELOCITY_1.25m.segy.hdf5",
 }
+    #"meshfile": "meshes/marmousi_elastic.msh",
+    #"meshfile": "meshes/marmousi_elastic_with_water_layer.msh",
     #"truemodel": "velocity_models/elastic-marmousi-model/model/MODEL_S-WAVE_VELOCITY_1.25m.segy.hdf5",
     #"truemodel": "velocity_models/elastic-marmousi-model/model/MODEL_P-WAVE_VELOCITY_1.25m.segy.hdf5",
     #"truemodel": "velocity_models/elastic-marmousi-model/model/MODEL_DENSITY_1.25m.segy.hdf5",
 model["BCs"] = {
     "status": False,  # True or false
     "outer_bc": "non-reflective",  #  None or non-reflective (outer boundary condition)
-    "damping_type": "polynomial",  # polynomial, hyperbolic, shifted_hyperbolic
-    "exponent": 2,  # damping layer has a exponent variation
-    "cmax": 4.5,  # maximum acoustic wave velocity in PML - km/s
-    "R": 1e-6,  # theoretical reflection coefficient
-    "lz": 0.9,  # thickness of the PML in the z-direction (km) - always positive
-    "lx": 0.9,  # thickness of the PML in the x-direction (km) - always positive
-    "ly": 0.0,  # thickness of the PML in the y-direction (km) - always positive
+    "abl_bc": "gaussian-taper",  # none, gaussian-taper, or alid
+    "lz": 0.9,  # thickness of the ABL in the z-direction (km) - always positive
+    "lx": 0.9,  # thickness of the ABL in the x-direction (km) - always positive
+    "ly": 0.0,  # thickness of the ABL in the y-direction (km) - always positive
 }
 model["acquisition"] = {
     "source_type": "Ricker",
@@ -45,9 +45,11 @@ model["acquisition"] = {
     "num_receivers": 10,
     "receiver_locations": spyro.create_transect((-0.10, 0.1), (-0.10, 17.0), 500),
 }
+    #"source_pos": [(-0.45, 5.0)], # Z and X
+    #"source_pos": [(0.0, 5.0)], # Z and X
 model["timeaxis"] = {
     "t0": 0.0,  #  Initial time for event
-    "tf": 3.00,  # Final time for event
+    "tf": 1.5,  # Final time for event
     "dt": 0.00025,
     "amplitude": 1,  # the Ricker has an amplitude of 1.
     "nspool": 100,  # how frequently to output solution to pvds
@@ -68,20 +70,22 @@ vs.dat.data[:] = vs.dat.data[:] / 1000. # only vs needs unit recast for now
 # vs and vp in km/s
 # rho in 1000 x Gt/km3
 
-mu = Function(V, name="mu").interpolate(rho * vs ** 2)
-lamb = Function(V, name="lamb").interpolate(vp ** 2 - 2 * vs ** 2)
-#mu = rho * vs ** 2
-#lamb = rho * (vp ** 2 - 2 * vs ** 2)
+mu = Function(V, name="mu").interpolate(rho * vs ** 2.)
+lamb = Function(V, name="lamb").interpolate(rho * (vp ** 2. - 2. * vs ** 2.))
 
-write_files=0
+write_files=1
 if comm.ensemble_comm.rank == 0 and write_files==1:
+    rho.rename("rho")
+    vp.rename("p-wave vel")
+    vs.rename("s-wave vel")
+    lamb.rename("lambda")
+    mu.rename("mu")
     File("density.pvd", comm=comm.comm).write(rho)
     File("p-wave_velocity.pvd", comm=comm.comm).write(vp)
     File("s-wave_velocity.pvd", comm=comm.comm).write(vs)
     File("lambda.pvd", comm=comm.comm).write(lamb)
     File("mu.pvd", comm=comm.comm).write(mu)
-
-#sys.exit("Exit without running")
+    sys.exit("Exit without running")
 
 sources = spyro.Sources(model, mesh, V, comm)
 receivers = spyro.Receivers(model, mesh, V, comm)
@@ -92,10 +96,12 @@ wavelet = spyro.full_ricker_wavelet(
 )
 
 #sys.exit("Exit without running")
-
+start = time.time()
 p, p_r = spyro.solvers.forward_elastic_waves(
     model, mesh, comm, rho, lamb, mu, sources, wavelet, receivers, output=True
 )
+end = time.time()
+print(end - start)
 
 sys.exit("Exit without plotting shots")
 
