@@ -1,7 +1,3 @@
-.. spyro documentation master file, created by
-   sphinx-quickstart on Wed Sep  8 10:37:23 2021.
-   You can adapt this file completely to your liking, but it should at least
-   contain the root `toctree` directive.
 
 Spyro
 =================================
@@ -16,10 +12,28 @@ You can get instructions on how to download and install spyro
 :doc:`here </download>
 
 To learn how to effectively use it for wave simulation and full waveform inversion, read our :doc:`notebooks </notebooks>`
+
 .. toctree::
    :maxdepth: 2
    :caption: Contents:
 
+Discussion and support
+----------------------
+
+Join our slack channel at:
++ Slack workspace:
+
+Development
+-----------
+
+Hosted at github:
+
+Citations
+---------
+
+
+Acknowledgments
+---------------
 
 
 Indices and tables
