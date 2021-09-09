@@ -9,13 +9,17 @@ Getting started
 ---------------
 
 You can get instructions on how to download and install spyro
-:doc:`here </download>
+:doc:`here </download>`
 
 To learn how to effectively use it for wave simulation and full waveform inversion, read our :doc:`notebooks </notebooks>`
 
 .. toctree::
    :maxdepth: 2
    :caption: Contents:
+   introduction
+   installation
+   tutorials
+   
 
 Discussion and support
 ----------------------
