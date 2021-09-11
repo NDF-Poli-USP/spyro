@@ -207,8 +207,11 @@ def forward_elastic_waves(
     # define the output solution over the entire domain (usol) and at the receivers (usol_recv)
     t = 0.0
     save_step = 0
-    usol = [Function(V, name="Displacement") for t in range(nt) if t % fspool == 0]
-    usol_recv = []
+    usol = [Function(V, name="Displacement") for t in range(nt) if t % fspool == 0] # vectorized, includes uz, ux, and uy
+    uzsol_recv = [] # u along the z direction
+    uxsol_recv = [] # u along the x direction
+    if dim == 3:
+        uysol_recv = [] # u along the y direction
 
     def delta_expr(xs, zs, x, z, sigma_x=500):
         sigma_x = Constant(sigma_x)
@@ -229,6 +232,11 @@ def forward_elastic_waves(
         File("source_x.pvd", comm=comm.comm).write(source_x)
         File("source_z.pvd", comm=comm.comm).write(source_z)
         sys.exit("Exit without running")
+
+    # FIXME testing
+    outfile2 = helpers.create_output_file("p-wave.pvd", comm, source_num)
+    outfile3 = helpers.create_output_file("s-wave.pvd", comm, source_num)
+    S = FunctionSpace(mesh, element)
 
     # run forward in time
     for step in range(nt):
@@ -253,7 +261,7 @@ def forward_elastic_waves(
 
         # deal with absorbing boundary layers
         if model["BCs"]["status"] and model["BCs"]["abl_bc"] == "gaussian-taper":
-            # FIXME check if all these terms are needed
+            # FIXME check if all these terms are needed and if dim==3
             u_np1.sub(0).assign(u_np1.sub(0)*gp) 
             u_np1.sub(1).assign(u_np1.sub(1)*gp)
             u_nm1.sub(0).assign(u_nm1.sub(0)*gp)
@@ -262,7 +270,10 @@ def forward_elastic_waves(
             u_n.sub(1).assign(u_n.sub(1)*gp)
 
         # interpolate the solution at the receiver points
-        usol_recv.append(receivers.interpolate(u_np1.dat.data_ro_with_halos[:])) # FIXME check this
+        uzsol_recv.append(receivers.interpolate(u_np1.sub(0).dat.data_ro_with_halos[:])) # z direction
+        uxsol_recv.append(receivers.interpolate(u_np1.sub(1).dat.data_ro_with_halos[:])) # x direction
+        if dim==3:
+            uysol_recv.append(receivers.interpolate(u_np1.sub(2).dat.data_ro_with_halos[:])) # y direction
 
         # save the solution if requested for this time step
         if step % fspool == 0:
@@ -276,6 +287,11 @@ def forward_elastic_waves(
             if output:
                 u_n.rename("Displacement")
                 outfile.write(u_n, time=t)
+                #FIXME testing
+                p_n = Function(S, name="p-wave").interpolate(tr(D(u_n)))
+                s_n = Function(S, name="s-wave").interpolate(curl(u_n)) #FIXME not sure this is right
+                outfile2.write(p_n, time=t)
+                outfile3.write(s_n, time=t)
             if t > 0: 
                 helpers.display_progress(comm, t) 
 
@@ -286,7 +302,16 @@ def forward_elastic_waves(
         t = step * float(dt)
 
     # prepare to return
-    usol_recv = helpers.fill(usol_recv, receivers.is_local, nt, receivers.num_receivers)
-    usol_recv = utils.communicate(usol_recv, comm)
+    uzsol_recv = helpers.fill(uzsol_recv, receivers.is_local, nt, receivers.num_receivers)
+    uxsol_recv = helpers.fill(uxsol_recv, receivers.is_local, nt, receivers.num_receivers)
+    uzsol_recv = utils.communicate(uzsol_recv, comm)
+    uxsol_recv = utils.communicate(uxsol_recv, comm)
+    if dim==3:
+        uysol_recv = helpers.fill(uysol_recv, receivers.is_local, nt, receivers.num_receivers)
+        uysol_recv = utils.communicate(uysol_recv, comm)
+        usol_recv = (uxsol_recv**2. + uysol_recv**2. + uzsol_recv**2.)**0.5
+    else:
+        usol_recv = (uxsol_recv**2. + uzsol_recv**2.)**0.5
 
+    #FIXME define if ux and uz will all be returned
     return usol, usol_recv
