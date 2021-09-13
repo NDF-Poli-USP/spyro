@@ -12,19 +12,6 @@ You can get instructions on how to download and install spyro
 :doc:`here <installation>`
 
 To learn how to effectively use it for wave simulation and full waveform inversion, read our :doc:`notebooks <notebooks>`
-
-.. toctree::
-   :maxdepth: 2
-   :caption: Contents:
-
-   introduction
-   installation
-   tutorials
-   notebooks
-
-.. Local Variables:
-.. mode: rst
-.. End:
    
 
 Discussion and support
@@ -48,6 +35,20 @@ Citations
 Acknowledgments
 ---------------
 
+Contents
+========
+
+.. toctree::
+   :maxdepth: 2
+
+   introduction
+   installation
+   tutorials
+   notebooks
+
+.. Local Variables:
+.. mode: rst
+.. End:
 
 Indices and tables
 ==================
