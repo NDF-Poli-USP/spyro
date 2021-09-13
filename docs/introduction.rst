@@ -11,7 +11,7 @@ To use Spyro, you'll need to have some knowledge of Python and some basic concep
 Discussions about development take place on our Slack channel. Everyone is invited to join using the link: https://join.slack.com/t/spyroworkspace/shared_invite/zt-u87ih28m-2h9JobfkdArs4ku3a1wLLQ
 
 Functionality
-=============
+-------------
 
 * Finite element discretizations for scalar wave equation in 2D and 3D using triangular and tetrahedral meshes.
     * Continuous Galerkin with arbitrary spatial order and stable and accurate higher-order mass lumping up to p = 5.
@@ -23,7 +23,7 @@ Functionality
 
 
 Performance
-===========
+-----------
 
 The performance of the `forward.py` wave propagator was assessed in the following benchmark 2D triangular (a) and 3D tetrahedral meshes (b), where the ideal strong scaling line for each KMV element is represented as dashed and the number of degrees of freedom per core is annotated. For the 2D benchmark, the domain spans a physical space of 110 km by 85 km. A domain of 8 km by 8 km by 8 km was used in the 3D case. Both had a 0.287 km wide PML included on all sides of the domain except the free surface and a uniform velocity of 1.43 km/s (see the folder benchmarks).
 
@@ -32,7 +32,7 @@ As one can see, higher-order mass lumping yields excellent strong scaling on Int
 
 
 A worked example
-=================
+----------------
 
 A first example of a forward simulation in 2D on a rectangle with a uniform triangular mesh and using the Perfectly Matched Layer is shown in the following below. Note here we first specify the input file and build a uniform mesh using the meshing capabilities provided by Firedrake. However, more complex (i.e., non-structured) triangular meshes for realistic problems can be generated via [SeismicMesh](https://github.com/krober10nd/SeismicMesh).
 
