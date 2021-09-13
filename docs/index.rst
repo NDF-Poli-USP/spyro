@@ -45,6 +45,7 @@ Contents
    installation
    tutorials
    notebooks
+   team
 
 .. Local Variables:
 .. mode: rst
