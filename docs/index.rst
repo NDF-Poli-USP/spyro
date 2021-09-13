@@ -2,7 +2,7 @@
 Spyro
 =================================
 
-Welcome to spyro's documentation!
+Welcome to spyro's documentation! TESTE
 spyro is a Python library for modeling acoustic waves. The main functionality is a set of forward and adjoint wave propagators for solving the acoustic wave equation in the time domain. 
 
 Getting started
