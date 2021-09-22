@@ -12,10 +12,12 @@ In order to install Firedrake you should follow instructions on https://www.fire
     curl -O https://raw.githubusercontent.com/firedrakeproject/firedrake/master/scripts/firedrake-install
     python3 firedrake-install
 
-Before using spyro you have to active the Firedrake venv ::
+Before using spyro you have to active the Firedrake venv 
+::
     source firedrake/bin/activate
 
 In order to install SeismicMesh you should follow the instructions on https://seismicmesh.readthedocs.io/en/par3d/install.html
 
-After all the requirements are installed and running on the Firedrake venv you can just run::
+After all the requirements are installed and running on the Firedrake venv you can just run
+::
     pip install .
