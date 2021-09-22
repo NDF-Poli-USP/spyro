@@ -39,6 +39,7 @@ A first example of a forward simulation in 2D on a rectangle with a uniform tria
 
 
 See the demos folder for an FWI example (this requires some other dependencies pyrol and ROLtrilinos).
+
 .. image:: intro_image.png
 
 ::
