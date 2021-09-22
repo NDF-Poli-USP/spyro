@@ -28,6 +28,7 @@ Performance
 The performance of the `forward.py` wave propagator was assessed in the following benchmark 2D triangular (a) and 3D tetrahedral meshes (b), where the ideal strong scaling line for each KMV element is represented as dashed and the number of degrees of freedom per core is annotated. For the 2D benchmark, the domain spans a physical space of 110 km by 85 km. A domain of 8 km by 8 km by 8 km was used in the 3D case. Both had a 0.287 km wide PML included on all sides of the domain except the free surface and a uniform velocity of 1.43 km/s (see the folder benchmarks).
 
 .. image:: strongscalling.png
+
 As one can see, higher-order mass lumping yields excellent strong scaling on Intel Xeon processors for a moderate sized 3D problem. The usage of higher-order elements benefits both the adjoint and gradient calculation in addition to the forward calculation, which makes it possible to perform FWI with simplex elements.
 
 
@@ -38,10 +39,8 @@ A first example of a forward simulation in 2D on a rectangle with a uniform tria
 
 
 See the demos folder for an FWI example (this requires some other dependencies pyrol and ROLtrilinos).
+.. image:: intro_image.png
 
-
-
-![Above shows the simulation at two timesteps in ParaView that results from running the code below](https://user-images.githubusercontent.com/18619644/94087976-7e81df00-fde5-11ea-96c0-474348286091.png)
 ::
 
     from firedrake import (
@@ -123,70 +122,71 @@ See the demos folder for an FWI example (this requires some other dependencies p
     }
 
 
-# Create a simple mesh of a rectangle ∈ [1 x 2] km with ~100 m sized elements
-# and then create a function space for P=1 Continuous Galerkin FEM
-mesh = RectangleMesh(100, 200, 1.0, 2.0)
+    # Create a simple mesh of a rectangle ∈ [1 x 2] km with ~100 m sized elements
+    # and then create a function space for P=1 Continuous Galerkin FEM
+    mesh = RectangleMesh(100, 200, 1.0, 2.0)
 
-# We edit the coordinates of the mesh so that it's in the (z, x) plane
-# and has a domain padding of 250 m on three sides, which will be used later to show
-# the Perfectly Matched Layer (PML). More complex 2D/3D meshes can be automatically generated with
-# SeismicMesh https://github.com/krober10nd/SeismicMesh
-mesh.coordinates.dat.data[:, 0] -= 1.0
-mesh.coordinates.dat.data[:, 1] -= 0.25
-
-
-# Create the computational environment
-comm = spyro.utils.mpi_init(model)
-
-element = spyro.domains.space.FE_method(
-    mesh, model["opts"]["method"], model["opts"]["degree"]
-)
-V = FunctionSpace(mesh, element)
-
-# Manually create a simple two layer seismic velocity model `vp`.
-# Note: the user can specify their own velocity model in a HDF5 file format
-# in the above two lines using SeismicMesh.
-# If so, the HDF5 file has to contain an array with
-# the velocity data and it is linearly interpolated onto the mesh nodes at run-time.
-x, y = SpatialCoordinate(mesh)
-velocity = conditional(x > -0.35, 1.5, 3.0)
-vp = Function(V, name="velocity").interpolate(velocity)
-# These pvd files can be easily visualized in ParaView!
-File("simple_velocity_model.pvd").write(vp)
+    # We edit the coordinates of the mesh so that it's in the (z, x) plane
+    # and has a domain padding of 250 m on three sides, which will be used later to show
+    # the Perfectly Matched Layer (PML). More complex 2D/3D meshes can be automatically generated with
+    # SeismicMesh https://github.com/krober10nd/SeismicMesh
+    mesh.coordinates.dat.data[:, 0] -= 1.0
+    mesh.coordinates.dat.data[:, 1] -= 0.25
 
 
-# Now we instantiate both the receivers and source objects.
-sources = spyro.Sources(model, mesh, V, comm)
+    # Create the computational environment
+    comm = spyro.utils.mpi_init(model)
 
-receivers = spyro.Receivers(model, mesh, V, comm)
+    element = spyro.domains.space.FE_method(
+        mesh, model["opts"]["method"], model["opts"]["degree"]
+    )
+    V = FunctionSpace(mesh, element)
 
-# Create a wavelet to force the simulation
-wavelet = spyro.full_ricker_wavelet(dt=0.0005, tf=2.0, freq=8.0)
-
-# And now we simulate the shot using a 2nd order central time-stepping scheme
-# Note: simulation results are stored in the folder `~/results/` by default
-p_field, p_at_recv = spyro.solvers.forward(
-    model, mesh, comm, vp, sources, wavelet, receivers
-)
-
-# Visualize the shot record
-spyro.plots.plot_shots(model, comm, p_at_recv)
-
-# Save the shot (a Numpy array) as a pickle for other use.
-spyro.io.save_shots(model, comm, p_at_recv)
-
-# can be loaded back via
-my_shot = spyro.io.load_shots(model, comm)
-```
-
-### Testing
-
-To run the spyro unit tests (and turn off plots), check out this repository and type
-```
-MPLBACKEND=Agg pytest --maxfail=1
-```
+    # Manually create a simple two layer seismic velocity model `vp`.
+    # Note: the user can specify their own velocity model in a HDF5 file format
+    # in the above two lines using SeismicMesh.
+    # If so, the HDF5 file has to contain an array with
+    # the velocity data and it is linearly interpolated onto the mesh nodes at run-time.
+    x, y = SpatialCoordinate(mesh)
+    velocity = conditional(x > -0.35, 1.5, 3.0)
+    vp = Function(V, name="velocity").interpolate(velocity)
+    # These pvd files can be easily visualized in ParaView!
+    File("simple_velocity_model.pvd").write(vp)
 
 
-### License
+    # Now we instantiate both the receivers and source objects.
+    sources = spyro.Sources(model, mesh, V, comm)
+
+    receivers = spyro.Receivers(model, mesh, V, comm)
+
+    # Create a wavelet to force the simulation
+    wavelet = spyro.full_ricker_wavelet(dt=0.0005, tf=2.0, freq=8.0)
+
+    # And now we simulate the shot using a 2nd order central time-stepping scheme
+    # Note: simulation results are stored in the folder `~/results/` by default
+    p_field, p_at_recv = spyro.solvers.forward(
+        model, mesh, comm, vp, sources, wavelet, receivers
+    )
+
+    # Visualize the shot record
+    spyro.plots.plot_shots(model, comm, p_at_recv)
+
+    # Save the shot (a Numpy array) as a pickle for other use.
+    spyro.io.save_shots(model, comm, p_at_recv)
+
+    # can be loaded back via
+    my_shot = spyro.io.load_shots(model, comm)
+
+
+Testing
+-------
+
+To run the spyro unit tests (and turn off plots), check out this repository and type ::
+
+    MPLBACKEND=Agg pytest --maxfail=1
+
+
+License
+-------
 
 This software is published under the [GPLv3 license](https://www.gnu.org/licenses/gpl-3.0.en.html)
