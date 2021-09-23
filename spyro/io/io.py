@@ -267,32 +267,34 @@ def interpolate(model, Z, mesh, V, guess=False):
     else:
         fname = model["mesh"]["truemodel"]
 
-    
-                
-    if sd == 2:
-        nrow, ncol = Z.shape
-        z = np.linspace(minz, maxz, nrow)
-        x = np.linspace(minx, maxx, ncol)
+    with h5py.File(fname, "r") as f:
+        print(f.get("velocity_model")[()])
+        Z = np.asarray(f.get("velocity_model")[()])
+        
+        if sd == 2:
+            nrow, ncol = Z.shape
+            z = np.linspace(minz, maxz, nrow)
+            x = np.linspace(minx, maxx, ncol)
 
-        # make sure no out-of-bounds
-        qp_z2 = [minz if z < minz else maxz if z > maxz else z for z in qp_z]
-        qp_x2 = [minx if x < minx else maxx if x > maxx else x for x in qp_x]
+            # make sure no out-of-bounds
+            qp_z2 = [minz if z < minz else maxz if z > maxz else z for z in qp_z]
+            qp_x2 = [minx if x < minx else maxx if x > maxx else x for x in qp_x]
 
-        interpolant = RegularGridInterpolator((z, x), Z)
-        tmp = interpolant((qp_z2, qp_x2))
-    elif sd == 3:
-        nrow, ncol, ncol2 = Z.shape
-        z = np.linspace(minz, maxz, nrow)
-        x = np.linspace(minx, maxx, ncol)
-        y = np.linspace(miny, maxy, ncol2)
+            interpolant = RegularGridInterpolator((z, x), Z)
+            tmp = interpolant((qp_z2, qp_x2))
+        elif sd == 3:
+            nrow, ncol, ncol2 = Z.shape
+            z = np.linspace(minz, maxz, nrow)
+            x = np.linspace(minx, maxx, ncol)
+            y = np.linspace(miny, maxy, ncol2)
 
-        # make sure no out-of-bounds
-        qp_z2 = [minz if z < minz else maxz if z > maxz else z for z in qp_z]
-        qp_x2 = [minx if x < minx else maxx if x > maxx else x for x in qp_x]
-        qp_y2 = [miny if y < miny else maxy if y > maxy else y for y in qp_y]
+            # make sure no out-of-bounds
+            qp_z2 = [minz if z < minz else maxz if z > maxz else z for z in qp_z]
+            qp_x2 = [minx if x < minx else maxx if x > maxx else x for x in qp_x]
+            qp_y2 = [miny if y < miny else maxy if y > maxy else y for y in qp_y]
 
-        interpolant = RegularGridInterpolator((z, x, y), Z)
-        tmp = interpolant((qp_z2, qp_x2, qp_y2))
+            interpolant = RegularGridInterpolator((z, x, y), Z)
+            tmp = interpolant((qp_z2, qp_x2, qp_y2))
 
     c = fire.Function(V)
     c.dat.data[:] = tmp
