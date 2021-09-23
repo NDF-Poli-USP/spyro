@@ -1,4 +1,3 @@
-from copy import copy
 from firedrake import *
 
 from ..domains import quadrature, space

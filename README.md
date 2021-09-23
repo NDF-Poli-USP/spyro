@@ -12,6 +12,8 @@ To implement these solvers, spyro uses the finite element package [Firedrake](ht
 
 To use Spyro, you'll need to have some knowledge of Python and some basic concepts in inverse modeling relevant to active-sourcce seismology.
 
+Discussions about development take place on our Slack channel. Everyone is invited to join using the link: https://join.slack.com/t/spyroworkspace/shared_invite/zt-u87ih28m-2h9JobfkdArs4ku3a1wLLQ
+
 Functionality
 =============
 
@@ -27,11 +29,11 @@ Functionality
 Performance
 ===========
 
-The performance of the `forward.py` wave propagator was assessed in the following benchmar with an 11 M DoF 3D tetrahedral mesh adapted to the Overthrust3D model (see the folder benchmarks). A 1 second wave simulation was executed with a 750-m PML on all sides but the free surface:
+The performance of the `forward.py` wave propagator was assessed in the following benchmark 2D triangular (a) and 3D tetrahedral meshes (b), where the ideal strong scaling line for each KMV element is represented as dashed and the number of degrees of freedom per core is annotated. For the 2D benchmark, the domain spans a physical space of 110 km by 85 km. A domain of 8 km by 8 km by 8 km was used in the 3D case. Both had a 0.287 km wide PML included on all sides of the domain except the free surface and a uniform velocity of 1.43 km/s (see the folder benchmarks).
 
-![ScalingAmdIntel](https://user-images.githubusercontent.com/18619644/111385935-41a6ee80-868a-11eb-8da3-256274bf1c0f.png)
+![scaling2dand3d](https://user-images.githubusercontent.com/45005909/127859352-f9fac860-c9db-4585-8416-45b7fa002eed.png)
 
-As one can see, higher-order mass lumping yields excellent strong scaling on both Intel Xeon processors and AMD processors for a moderate sized 3D problem. The usage of higher-order elements benefits both the adjoint and gradient calculation in addition to the forward calculation, which makes it possible to perform FWI with simplex elements.
+As one can see, higher-order mass lumping yields excellent strong scaling on Intel Xeon processors for a moderate sized 3D problem. The usage of higher-order elements benefits both the adjoint and gradient calculation in addition to the forward calculation, which makes it possible to perform FWI with simplex elements.
 
 
 A worked example

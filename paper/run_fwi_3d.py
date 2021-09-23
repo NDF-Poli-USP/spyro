@@ -7,89 +7,111 @@ from mpi4py import MPI
 
 import spyro
 
-# import gc
+# import gc; gc.disable()
+import psutil
+import os
 
-outdir = "fwi_p5/"
+# if continuing a calculation, set this to 1
+RESTART = 0
 
+line1 = spyro.create_transect((0.25, 0.25), (0.25, 7.25), 4)
+line2 = spyro.create_transect((2.0, 0.25), (2.0, 7.25), 4)
+line3 = spyro.create_transect((3.75, 0.25), (3.75, 7.25), 4)
+line4 = spyro.create_transect((5.5, 0.25), (5.25, 7.25), 4)
+line5 = spyro.create_transect((7.25, 0.25), (7.25, 7.25), 4)
+lines = np.concatenate((line1, line2, line3, line4, line5))
+
+sources = spyro.insert_fixed_value(lines, -0.10, 0)
+
+receivers = spyro.create_2d_grid(0.25, 7.25, 0.25, 7.25, 30)
+receivers = spyro.insert_fixed_value(receivers, -0.15, 0)
+
+
+def get_memory_usage():
+    """Return the memory usage in Mo."""
+    process = psutil.Process(os.getpid())
+    mem = process.memory_info()[0] / float(2 ** 20)
+    return mem
+
+
+outdir = "fwi_3d_p3/"
+if COMM_WORLD.rank == 0:
+    mem = open(outdir + "mem.txt", "w")
+    func = open(outdir + "func.txt", "w")
 
 model = {}
-
 model["opts"] = {
     "method": "KMV",  # either CG or KMV
     "quadratrue": "KMV",  # Equi or KMV
-    "degree": 5,  # p order
-    "dimension": 2,  # dimension
-    "regularization": True,  # regularization is on?
-    "gamma": 1.0, # regularization parameter
+    "degree": 3,  # p order
+    "dimension": 3,  # dimension
+    "regularization": False,  # regularization is on?
+    "gamma": 1.0,  # regularization parameter
 }
 model["parallelism"] = {
     "type": "automatic",
 }
 model["mesh"] = {
-    "Lz": 3.5,  # depth in km - always positive
-    "Lx": 17.0,  # width in km - always positive
-    "Ly": 0.0,  # thickness in km - always positive
-    "meshfile": "meshes/marmousi_guess.msh",
-    "initmodel": "velocity_models/marmousi_guess.hdf5",
-    "truemodel": "not_used.hdf5",
+    "Lz": 5.175,  # depth in km - always positive
+    "Lx": 7.50,  # width in km - always positive
+    "Ly": 7.50,  # thickness in km - always positive
+    "meshfile": "meshes/overthrust3D_guess_model.msh",
+    "initmodel": "velocity_models/overthrust_3D_guess_model.hdf5",
+    "truemodel": "velocity_models/overthrust_3D_true_model.hdf5",
 }
 model["BCs"] = {
     "status": True,  # True or false
     "outer_bc": "non-reflective",  #  None or non-reflective (outer boundary condition)
     "damping_type": "polynomial",  # polynomial, hyperbolic, shifted_hyperbolic
     "exponent": 2,  # damping layer has a exponent variation
-    "cmax": 4.5,  # maximum acoustic wave velocity in PML - km/s
+    "cmax": 6.0,  # maximum acoustic wave velocity in PML - km/s
     "R": 1e-6,  # theoretical reflection coefficient
-    "lz": 0.9,  # thickness of the PML in the z-direction (km) - always positive
-    "lx": 0.9,  # thickness of the PML in the x-direction (km) - always positive
-    "ly": 0.0,  # thickness of the PML in the y-direction (km) - always positive
+    "lz": 0.75,  # thickness of the PML in the z-direction (km) - always positive
+    "lx": 0.75,  # thickness of the PML in the x-direction (km) - always positive
+    "ly": 0.75,  # thickness of the PML in the y-direction (km) - always positive
 }
 model["acquisition"] = {
     "source_type": "Ricker",
-    "num_sources": 40,
-    "source_pos": spyro.create_transect((-0.01, 1.0), (-0.01, 15.0), 40),
+    "num_sources": len(sources),
+    "source_pos": sources,
     "frequency": 5.0,
     "delay": 1.0,
-    "num_receivers": 500,
-    "receiver_locations": spyro.create_transect((-0.10, 0.1), (-0.10, 17.0), 500),
-}
-model["automatic-dif"] ={
-    "status": "True", #True or False
-
+    "num_receivers": len(receivers),
+    "receiver_locations": receivers,
 }
 model["timeaxis"] = {
     "t0": 0.0,  #  Initial time for event
-    "tf": 6.00,  # Final time for event
-    "dt": 0.001,
+    "tf": 4.00,  # Final time for event
+    "dt": 0.00075,
     "amplitude": 1,  # the Ricker has an amplitude of 1.
-    "nspool": 1000,  # how frequently to output solution to pvds
+    "nspool": 50,  # how frequently to output solution to pvds
     "fspool": 10,  # how frequently to save solution to RAM
+    "skip": 1,
 }
 
-automatic_dif = model["automatic-dif"]["status"]
-if automatic_dif:
-    from firedrake_adjoint import *
-
 comm = spyro.utils.mpi_init(model)
-# if comm.comm.rank == 0 and comm.ensemble_comm.rank == 0:
-#    fil = open("FUNCTIONAL_FWI_P5.txt", "w")
 mesh, V = spyro.io.read_mesh(model, comm)
+print(f"The mesh has {V.dim()} degrees of freedom", flush=True)
 vp = spyro.io.interpolate(model, mesh, V, guess=True)
 if comm.ensemble_comm.rank == 0:
     File("guess_velocity.pvd", comm=comm.comm).write(vp)
+
+chk = DumbCheckpoint(
+    "save_vp_" + str(comm.ensemble_comm.rank), mode=FILE_UPDATE, comm=comm.comm
+)
+if RESTART:
+    chk.load(vp)
+
 sources = spyro.Sources(model, mesh, V, comm)
-if model["gradientcompute"]["type"]=="discrete-adj":
-    receivers = spyro.Receivers(model, mesh, V, comm)
+receivers = spyro.Receivers(model, mesh, V, comm)
 wavelet = spyro.full_ricker_wavelet(
     dt=model["timeaxis"]["dt"],
     tf=model["timeaxis"]["tf"],
     freq=model["acquisition"]["frequency"],
 )
-
 if comm.ensemble_comm.rank == 0:
     control_file = File(outdir + "control.pvd", comm=comm.comm)
     grad_file = File(outdir + "grad.pvd", comm=comm.comm)
-
 quad_rule = finat.quadrature.make_quadrature(
     V.finat_element.cell, V.ufl_element().degree(), "KMV"
 )
@@ -111,9 +133,6 @@ class L2Inner(object):
         A_u = self.Ap.createVecLeft()
         self.Ap.mult(upet, A_u)
         return vpet.dot(A_u)
-
-
-kount = 0
 
 
 def regularize_gradient(vp, dJ):
@@ -150,50 +169,47 @@ class Objective(ROL.Objective):
     def value(self, x, tol):
         """Compute the functional"""
         J_total = np.zeros((1))
-        if automatic_dif:
-            dJdm = Function(V)
-            solver  = spyro.solver_AD(self.p_exact_recv)
-            solver.obj_func = 0.
-            p_guess_recv  = solver.forward_AD(model, mesh, comm, vp, sources, wavelet, xs)
-            J = solver.obj_func
-            J_total[0] += J
-            
-
-        else:
-            self.p_guess, p_guess_recv = spyro.solvers.forward(
-                model,
-                mesh,
-                comm,
-                vp,
-                sources,
-                wavelet,
-                receivers,
-            )
-            self.misfit = spyro.utils.evaluate_misfit(
-                model, p_guess_recv, self.p_exact_recv
-            )
-            J_total[0] += spyro.utils.compute_functional(model, self.misfit)
+        # print('about to start timestepping...',flush=True)
+        self.p_guess, p_guess_recv = spyro.solvers.forward(
+            model,
+            mesh,
+            comm,
+            vp,
+            sources,
+            wavelet,
+            receivers,
+        )
+        self.misfit = spyro.utils.evaluate_misfit(
+            model, p_guess_recv, self.p_exact_recv
+        )
+        J_total[0] += spyro.utils.compute_functional(model, self.misfit, velocity=vp)
         J_total = COMM_WORLD.allreduce(J_total, op=MPI.SUM)
         J_total[0] /= comm.ensemble_comm.size
         if comm.comm.size > 1:
             J_total[0] /= comm.comm.size
+
+        if COMM_WORLD.rank == 0:
+            mem.write(str(get_memory_usage()))
+            func.write(str(J_total[0]))
+            mem.write("\n")
+            func.write("\n")
+
+        # gc.collect()
+
         return J_total[0]
 
     def gradient(self, g, x, tol):
         """Compute the gradient of the functional"""
         dJ = Function(V, name="gradient")
-        if automatic_dif:
-            dJ_local = compute_gradient(J, control)
-        else:
-            dJ_local = spyro.solvers.gradient(
-                model,
-                mesh,
-                comm,
-                vp,
-                receivers,
-                self.p_guess,
-                self.misfit,
-            )
+        dJ_local = spyro.solvers.gradient(
+            model,
+            mesh,
+            comm,
+            vp,
+            receivers,
+            self.p_guess,
+            self.misfit,
+        )
         if comm.ensemble_comm.size > 1:
             comm.allreduce(dJ_local, dJ)
         else:
@@ -202,7 +218,7 @@ class Objective(ROL.Objective):
         if comm.comm.size > 1:
             dJ /= comm.comm.size
         # regularize the gradient if asked.
-        if model['opts']['regularization']:
+        if model["opts"]["regularization"]:
             dJ = regularize_gradient(vp, dJ)
         # mask the water layer
         dJ.dat.data[water] = 0.0
@@ -212,8 +228,11 @@ class Objective(ROL.Objective):
         g.scale(0)
         g.vec += dJ
 
+        # gc.collect()
+
     def update(self, x, flag, iteration):
         vp.assign(Function(V, x.vec, name="velocity"))
+        chk.store(vp)
         # If iteration reduces functional, save it.
         if iteration >= 0:
             if comm.ensemble_comm.rank == 0:
@@ -245,23 +264,26 @@ obj = Objective(inner_product)
 
 u = Function(V, name="velocity").assign(vp)
 opt = FeVector(u.vector(), inner_product)
+
 # Add control bounds to the problem (uses more RAM)
 xlo = Function(V)
 xlo.interpolate(Constant(1.0))
 x_lo = FeVector(xlo.vector(), inner_product)
 
 xup = Function(V)
-xup.interpolate(Constant(5.0))
+xup.interpolate(Constant(6.0))
 x_up = FeVector(xup.vector(), inner_product)
 
 bnd = ROL.Bounds(x_lo, x_up, 1.0)
 
-# Set up the line search
 algo = ROL.Algorithm("Line Search", params)
 
 algo.run(opt, obj, bnd)
 
 if comm.ensemble_comm.rank == 0:
-    File("res.pvd", comm=comm.comm).write(obj.vp)
+    File("res.pvd", comm=comm.comm).write(vp)
 
-# fil.close()
+
+if COMM_WORLD.rank == 0:
+    func.close()
+    mem.close()
