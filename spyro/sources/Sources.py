@@ -163,6 +163,10 @@ def delta_expr(x0, z, x, sigma_x=500.0):
     sigma_x = Constant(sigma_x)
     return exp(-sigma_x * ((z - x0[0]) ** 2 + (x - x0[1]) ** 2))
 
+def delta_expr_adj(x0, z, x, coef, sigma_x=500.0):
+    sigma_x = Constant(sigma_x)
+    return coef*exp(-sigma_x * ((z - x0[0]) ** 2 + (x - x0[1]) ** 2))
+
 
 def delta_expr_3d(x0, z, x, y, sigma_x=2000.0):
     sigma_x = Constant(sigma_x)

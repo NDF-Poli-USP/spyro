@@ -27,16 +27,7 @@ def _make_vp_exact(V, mesh):
         + 1.0 * tanh(10.0 * (0.5 - sqrt((z - 1.5) ** 2 + (x + 1.5) ** 2)))
         # 5.0 + 0.5 * tanh(10.0 * (0.5 - sqrt((z - 1.5) ** 2 + (x + 1.5) ** 2)))
     )
-    File("exact_vel.pvd").write(vp_exact)
-    return vp_exact
-
-
-def _make_vp_exact_damping(V, mesh):
-    """Create a half space"""
-    z, x = SpatialCoordinate(mesh)
-    velocity = conditional(z > -0.5, 2, 4)
-    vp_exact = Function(V, name="vp").interpolate(velocity)
-    File("exact_vel.pvd").write(vp_exact)
+    # File("exact_vel.pvd").write(vp_exact)
     return vp_exact
 
 
@@ -44,51 +35,51 @@ def _make_vp_guess(V, mesh):
     """The guess is a uniform velocity of 4.0 km/s"""
     z, x = SpatialCoordinate(mesh)
     vp_guess = Function(V).interpolate(4.0 + 0.0 * x)
-    File("guess_vel.pvd").write(vp_guess)
+    # File("guess_vel.pvd").write(vp_guess)
     return vp_guess
-    
+
+def createPointCloud(model,mesh):
+    num_rec = model["acquisition"]["num_receivers"]
+    x0 = model["acquisition"]["receiver_locations"][0,0]
+    xn = model["acquisition"]["receiver_locations"][num_rec-1,0]
+    δs = np.linspace(x0, xn, num_rec)
+    X, Y = np.meshgrid(-0.2, δs)
+    xs = np.vstack((X.flatten(), Y.flatten())).T
+
+    point_cloud = VertexOnlyMesh(mesh, xs) 
+    P = FunctionSpace(point_cloud, "DG", 0)  
+    return P
+
 
 def test_gradient():
     _test_gradient(model)
 
 
-def test_gradient_damping():
-    _test_gradient(model_pml, damping=True)
+def _test_gradient(options):
 
-
-def _test_gradient(options, damping=False):
-    with stop_annotating():
-        comm = spyro.utils.mpi_init(options)
-
-        mesh, V = spyro.io.read_mesh(options, comm)
-        num_rec = options["acquisition"]["num_receivers"]
-        if damping:
-            vp_exact = _make_vp_exact_damping(V, mesh)
-            δs = np.linspace(0.1, 0.9, num_rec)
-            X, Y = np.meshgrid(-0.1, δs)
-        else:
-            vp_exact = _make_vp_exact(V, mesh)
-            # create_transect((0.1, -2.90), (2.9, -2.90), 100)
-            δs = np.linspace(0.1, 2.9, num_rec)
-            X, Y = np.meshgrid(δs,-2.90)
-
-        xs = np.vstack((X.flatten(), Y.flatten())).T
-           
-        sources = spyro.Sources(options, mesh, V, comm)  
-        solver  = spyro.solver_AD()
+    comm = spyro.utils.mpi_init(model)
+    mesh, V = spyro.io.read_mesh(model, comm)
+    vp_exact = _make_vp_exact(V, mesh)
     
-        # simulate the exact options
-        solver.p_true_rec = solver.forward_AD(options, mesh, comm,
-                                vp_exact, sources, xs)
+    P = createPointCloud(model,mesh)
+    source_pos =  model["acquisition"]["source_pos"]
+    with stop_annotating(): 
+        solver  = spyro.solver_AD(Aut_Dif=False)
+    
+        i=0
+        rec = []
+        for sn in source_pos:
+            rec.append(solver.wave_propagation(model,mesh,comm,vp_exact,P,sn))
+            i+=1
 
     
     vp_guess = _make_vp_guess(V, mesh)
-    control = Control(vp_guess)
-    solver.Calc_Jfunctional = True
-    p_rec_guess = solver.forward_AD(options, mesh, comm,
-                               vp_guess, sources, xs)
-     
-    J  = solver.obj_func
+    control  = Control(vp_guess)
+
+    solver  = spyro.solver_AD(fwi=True,Aut_Dif=True)
+    J       = 0
+    p_rec,J = solver.wave_propagation(model,mesh,comm,vp_guess,P,source_pos[0],p_true_rec=rec[0],obj_func=J)
+
     
     dJ   = compute_gradient(J, control)
     Jhat = ReducedFunctional(J, control) 
@@ -96,13 +87,10 @@ def _test_gradient(options, damping=False):
     with stop_annotating():
         Jm = copy.deepcopy(J)
 
-        qr_x, _, _ = quadrature.quadrature_rules(V)
-
         print("\n Cost functional at fixed point : " + str(Jm) + " \n ")
 
-        File("gradient.pvd").write(dJ)
-
-        steps = [1e-3] #, 1e-4, 1e-5]  # , 1e-6]  # step length
+        # File("gradient.pvd").write(dJ)
+        steps = [1e-3, 1e-4, 1e-5]  # , 1e-6]  # step length
 
 
         delta_m = Function(V)  # model direction (random)
@@ -117,14 +105,14 @@ def _test_gradient(options, damping=False):
 
         errors = []
         for step in steps:  # range(3):
-            
-            solver.obj_func   = 0.
             # J(m + delta_m*h)
             vp_guess = vp_original + step*delta_m
-            p_rec_guess = solver.forward_AD(options, mesh, comm,
-                                vp_guess, sources, xs)  
-            Jp = solver.obj_func
+            J = 0.
+            p_rec, Jp = solver.wave_propagation(model,mesh,comm,
+                        vp_guess,P,source_pos[0],p_true_rec=rec[0],obj_func=J)
+ 
             fd_grad = (Jp - Jm) / step
+            
             print(
                 "\n Cost functional for step "
                 + str(step)
@@ -149,5 +137,3 @@ def _test_gradient(options, damping=False):
 
 if __name__ == "__main__":
     test_gradient() 
-    #or test_gradient_damping() #when the damping is employed
-

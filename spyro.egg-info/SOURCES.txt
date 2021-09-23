@@ -5,6 +5,8 @@ inputfiles/Model1_2d_DG.py
 inputfiles/Model1_3d_CG.py
 inputfiles/Model1_3d_DG.py
 inputfiles/Model1_gradient_2d.py
+inputfiles/Model1_gradient_2d1.py
+inputfiles/Model1_gradient_2d_damp.py
 inputfiles/Model1_gradient_2d_pml.py
 inputfiles/Model1_gradient_3d.py
 inputfiles/Model1_gradient_3d_pml.py
@@ -45,11 +47,11 @@ spyro/utils/utils.py
 test/__init__.py
 test/model.py
 test/not_a_test.py
-test/test_Keith.py
 test/test_MMS.py
 test/test_README.py
 test/test_gradient.py
 test/test_gradient_3d.py
+test/test_gradient_AD.py
 test/test_newat.py
 test/test_parallel_source.py
 test/test_readmesh.py
