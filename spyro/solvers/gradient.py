@@ -125,12 +125,6 @@ def gradient(
                 model, V, dim, x, x1, x2, a_pml, z, z1, z2, c_pml
             )
             (Gamma_1, Gamma_2) = damping.matrices_2D(sigma_z, sigma_x)
-            pml1 = (
-                (sigma_x + sigma_z)
-                * ((u - u_nm1) / (2.0 * Constant(dt)))
-                * v
-                * dx(rule=qr_x)
-            )
         elif dim == 3:
 
             sigma_x, sigma_y, sigma_z = damping.functions(
@@ -234,7 +228,7 @@ def gradient(
     uuadj = Function(V)  # auxiliarly function for the gradient compt.
     uufor = Function(V)  # auxiliarly function for the gradient compt.
 
-    ffG = 2.0 * c * 1.0 * dot(grad(uuadj), grad(uufor)) * m_v * dx(rule=qr_x)
+    ffG = 2.0 * c * dot(grad(uuadj), grad(uufor)) * m_v * dx(rule=qr_x)
 
     G = mgrad - ffG
     lhsG, rhsG = lhs(G), rhs(G)

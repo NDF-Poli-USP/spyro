@@ -6,8 +6,8 @@ from matplotlib               import ticker
 import numpy as np
 
 from ..io import ensemble_plot
-
 __all__ = ["plot_shots"]
+
 
 
 @ensemble_plot

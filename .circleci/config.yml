@@ -4,11 +4,19 @@ commands:
   build:
     steps:
       - checkout
+      - run: . /home/firedrake/firedrake/bin/activate
       - run: pip3 install .
       - run: pip3 install pytest-cov
+      - run: sudo apt-get update -y
+      - run: sudo apt-get install -y libcgal-dev
+      - run: pip3 install meshio
+      - run: pip3 install pyamg
+      - run: pip3 install h5py
+      - run: pip3 install --no-dependencies SeismicMesh[io]
+
   test:
     steps:
-      - run: . /home/firedrake/firedrake/bin/activate &&  pip3 install . && pip3 install pytest-cov &&  pytest --cov-report=xml --cov=spyro test/
+      - run: . /home/firedrake/firedrake/bin/activate &&  pip3 install . && pip3 install pytest-cov && sudo apt-get update -y && sudo apt-get install -y libcgal-dev && pip3 install meshio && pip3 install pyamg && pip3 install h5py && pip3 install --no-dependencies SeismicMesh[io] && pytest --cov-report=xml --cov=spyro test/
       - run: export CODECOV_TOKEN="51300caa-4c44-4982-a086-8ea580a7c828" && bash <(curl -s https://codecov.io/bash)
 jobs:
   python36:
