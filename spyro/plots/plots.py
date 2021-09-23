@@ -66,7 +66,7 @@ def plot_shots(
     X, Y = np.meshgrid(x_rec, t_rec)
 
     cmap = plt.get_cmap("gray")
-    plt.contourf(X, Y, arr, cmap=cmap, vmin=vmin, vmax=vmax)
+    plt.contourf(X, Y, arr, cmap=cmap)
     # savemat("test.mat", {"mydata": arr})
     plt.xlabel("receiver number", fontsize=18)
     plt.ylabel("time (s)", fontsize=18)

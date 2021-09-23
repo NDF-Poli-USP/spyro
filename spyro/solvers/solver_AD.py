@@ -1,27 +1,28 @@
+from copy import copy
 from firedrake import *
 
 from ..domains import quadrature, space
 from ..pml import damping
-from ..sources import full_ricker_wavelet, delta_expr
+from .. import utils
+from ..sources import full_ricker_wavelet, delta_expr, delta_expr_adj
 from . import helpers
 
 class solver_AD():
-    def __init__(self,p_true_rec=None,Calc_Jfunctional=False):
-        self.p_true_rec = p_true_rec
-        self.obj_func = 0
-        self.Calc_Jfunctional = Calc_Jfunctional
-        self.misfit_tot = []
-    
-    def forward_AD(self,
+    def __init__(self,fwi=False, Aut_Dif=True):
+        self.Aut_Dif = Aut_Dif
+        self.fwi=fwi
+        
+    def wave_propagation(self,
         model,
         mesh,
         comm,
         c,
-        excitations,
-        rec_position,
-        source_num=0,
+        point_cloud,
+        position_source,
         freq_index=0,
+        type="forward",
         output=False,
+        **kwargs
     ):
         """Secord-order in time fully-explicit scheme
         with implementation of a Perfectly Matched Layer (PML) using
@@ -31,31 +32,18 @@ class solver_AD():
         ----------
         model: Python `dictionary`
             Contains model options and parameters
-        mesh: Firedrake.mesh object
-            The 2D/3D triangular mesh
         comm: Firedrake.ensemble_communicator
             The MPI communicator for parallelism
         c: Firedrake.Function
             The velocity model interpolated onto the mesh.
-        excitations: A list Firedrake.Functions
-            Each function contains an interpolated space function
-            emulated a Dirac delta at the location of source `source_num`
-        receivers: A :class:`spyro.Receivers` object.
-            Contains the receiver locations and sparse interpolation methods.
-        source_num: `int`, optional
-            The source number you wish to simulate
+        point_cloud: Firedrake.Function
+            space function relating to the receivers points
+        position_source: array 
+            Source position
         freq_index: `int`, optional
             The index in the list of low-pass cutoff values
-        output: `boolean`, optional
-            Whether or not to write results to pvd files.
-
-        Returns
-        -------
-        usol: list of Firedrake.Functions
-            The full field solution at `fspool` timesteps
-        usol_recv: array-like
-            The solution interpolated to the receivers at all timesteps
-
+        type: either "forwward" or "adjoint"
+            Type o wave equation.
         """
 
         if "amplitude" in model["acquisition"]:
@@ -67,31 +55,13 @@ class solver_AD():
             freq_bands = model["inversion"]["freq_bands"]
         method = model["opts"]["method"]
         degree = model["opts"]["degree"]
-        dim = model["opts"]["dimension"]
-        dt = model["timeaxis"]["dt"]
-        tf = model["timeaxis"]["tf"]
-        delay = model["acquisition"]["delay"]
+        dim    = model["opts"]["dimension"]
+        dt     = model["timeaxis"]["dt"]
+        tf     = model["timeaxis"]["tf"]
+        delay  = model["acquisition"]["delay"]
         nspool = model["timeaxis"]["nspool"]
         fspool = model["timeaxis"]["fspool"]
-        PML = model["BCs"]["status"]
-        if PML:
-            Lx = model["mesh"]["Lx"]
-            Lz = model["mesh"]["Lz"]
-            lx = model["BCs"]["lx"]
-            lz = model["BCs"]["lz"]
-            x1 = 0.0
-            x2 = Lx
-            a_pml = lx
-            z1 = 0.0
-            z2 = -Lz
-            c_pml = lz
-            if dim == 3:
-                Ly = model["mesh"]["Ly"]
-                ly = model["BCs"]["ly"]
-                y1 = 0.0
-                y2 = Ly
-                b_pml = ly
-
+      
         nt = int(tf / dt)  # number of timesteps
         dstep = int(delay / dt)  # number of timesteps with source
 
@@ -121,260 +91,196 @@ class solver_AD():
         elif dim == 3:
             z, x, y = SpatialCoordinate(mesh)
 
-        # if using the PML
-        if PML:
-            Z = VectorFunctionSpace(V.ufl_domain(), V.ufl_element())
-            if dim == 2:
-                if model["BCs"]["method"] == "damping":
-                    u = TrialFunction(V)
-                    v = TestFunction(V)
 
-                    u_nm1 = Function(V)
-                    u_n   = Function(V)
-                    u_np1 = Function(V)
+        u = TrialFunction(V)
+        v = TestFunction(V)
 
-                else:
-                    W = V * Z
-                    u, pp = TrialFunctions(W)
-                    v, qq = TestFunctions(W)
-
-                    u_np1, pp_np1 = Function(W).split()
-                    u_n, pp_n = Function(W).split()
-                    u_nm1, pp_nm1 = Function(W).split()
-
-            elif dim == 3:
-                W = V * V * Z
-                u, psi, pp = TrialFunctions(W)
-                v, phi, qq = TestFunctions(W)
-
-                u_np1, psi_np1, pp_np1 = Function(W).split()
-                u_n, psi_n, pp_n = Function(W).split()
-                u_nm1, psi_nm1, pp_nm1 = Function(W).split()
-
-            # in 2d
-            if dim == 2:
-                if model["BCs"]["method"] == "damping":
-                    sigma_x, sigma_z = damping.functions(
-                    model, V, dim, x, x1, x2, a_pml, z, z1, z2, c_pml
-                    )
-                    pml1 = (
-                        (sigma_x + sigma_z)
-                        * ((u - u_nm1) / Constant(2.0 * dt))
-                        * v
-                        * dx(rule=qr_x)
-                    )
-                else:
-                    sigma_x, sigma_z = damping.functions(
-                        model, V, dim, x, x1, x2, a_pml, z, z1, z2, c_pml
-                    )
-                    Gamma_1, Gamma_2 = damping.matrices_2D(sigma_z, sigma_x)
-                    pml1 = (
-                        (sigma_x + sigma_z)
-                        * ((u - u_nm1) / Constant(2.0 * dt))
-                        * v
-                        * dx(rule=qr_x)
-                    )
-            # in 3d
-            elif dim == 3:
-
-                sigma_x, sigma_y, sigma_z = damping.functions(
-                    model,
-                    V,
-                    dim,
-                    x,
-                    x1,
-                    x2,
-                    a_pml,
-                    z,
-                    z1,
-                    z2,
-                    c_pml,
-                    y,
-                    y1,
-                    y2,
-                    b_pml,
-                )
-                Gamma_1, Gamma_2, Gamma_3 = damping.matrices_3D(sigma_x, sigma_y, sigma_z)
-
-        # typical CG in N-d
-        else:
-            u = TrialFunction(V)
-            v = TestFunction(V)
-
-            u_nm1 = Function(V)
-            u_n = Function(V)
-            u_np1 = Function(V)
-
-
-        outfile = helpers.create_output_file("Forward.pvd", comm, source_num)
+        u_nm1 = Function(V)
+        u_n   = Function(V)
+        u_np1 = Function(V)
 
         t = 0.0
 
         cutoff = freq_bands[freq_index] if "inversion" in model else None
         
-        # -------------------------------------------------------
-        m1 = ((u - 2.0 * u_n + u_nm1) / Constant(dt ** 2)) * v * dx(rule=qr_x)
-        a = c * c * dot(grad(u_n), grad(v)) * dx(rule=qr_x)  # explicit
-
+        u_tt = ((u - 2.0 * u_n + u_nm1) / Constant(dt ** 2))
+        m1   =  u_tt * v * dx(rule=qr_x)
+        a    = c * c * dot(grad(u_n), grad(v)) * dx(rule=qr_x)  # explicit
 
         nf = 0
         if model["BCs"]["outer_bc"] == "non-reflective":
             nf = c * ((u_n - u_nm1) / dt) * v * ds(rule=qr_s)
 
-
-        RW = full_ricker_wavelet(dt, tf, freq, amp=amp, cutoff=cutoff)
-        f, ricker = self.external_forcing(RW, mesh, model, source_num, V)
-        FF = m1 + a + nf - c*c*f * v * dx(rule=qr_x)
-
-        if PML:
-            if model["BCs"]["method"] == "damping":
-                X = Function(V)
-            else:
-                X = Function(W)
-            # B = Function(W)
-
-            if dim == 2:
-                if model["BCs"]["method"] == "damping":
-                    FF += pml1 
-                else:
-                    pml2 = sigma_x * sigma_z * u_n * v * dx(rule=qr_x)
-                    pml3 = inner(pp_n, grad(v)) * dx(rule=qr_x)
-                    FF += pml1 + pml2 + pml3
-                    # -------------------------------------------------------
-                    mm1 = (dot((pp - pp_n), qq) / Constant(dt)) * dx(rule=qr_x)
-                    mm2 = inner(dot(Gamma_1, pp_n), qq) * dx(rule=qr_x)
-                    dd = c * c * inner(grad(u_n), dot(Gamma_2, qq)) * dx(rule=qr_x)
-                    FF += mm1 + mm2 + dd
-            elif dim == 3:
-                pml1 = (
-                    (sigma_x + sigma_y + sigma_z)
-                    * ((u - u_n) / Constant(dt))
-                    * v
-                    * dx(rule=qr_x)
-                )
-                pml2 = (
-                    (sigma_x * sigma_y + sigma_x * sigma_z + sigma_y * sigma_z)
-                    * u_n
-                    * v
-                    * dx(rule=qr_x)
-                )
-                pml3 = (sigma_x * sigma_y * sigma_z) * psi_n * v * dx(rule=qr_x)
-                pml4 = inner(pp_n, grad(v)) * dx(rule=qr_x)
-
-                FF += pml1 + pml2 + pml3 + pml4
-                # -------------------------------------------------------
-                mm1 = (dot((pp - pp_n), qq) / Constant(dt)) * dx(rule=qr_x)
-                mm2 = inner(dot(Gamma_1, pp_n), qq) * dx(rule=qr_x)
-                dd1 = c * c * inner(grad(u_n), dot(Gamma_2, qq)) * dx(rule=qr_x)
-                dd2 = -c * c * inner(grad(psi_n), dot(Gamma_3, qq)) * dx(rule=qr_x)
-
-                FF += mm1 + mm2 + dd1 + dd2
-                # -------------------------------------------------------
-                mmm1 = (dot((psi - psi_n), phi) / Constant(dt)) * dx(rule=qr_x)
-                uuu1 = (-u_n * phi) * dx(rule=qr_x)
-
-                FF += mmm1 + uuu1
-        else:
-            X = Function(V)
-            # B = Function(V)
+        if type=="forward":
+            RW = full_ricker_wavelet(dt, tf, freq, amp=amp, cutoff=cutoff)
+            f, ricker = self.external_forcing(RW,mesh,position_source,V)
+            
+            
+        if type=="adjoint":
+            # position_rec = model["acquisition"]["receiver_locations"]
+            # f, misfit = self.external_forcing(mesh, position_rec , V) 
+            f = Function(V)
+            num_rec = len(position_source)
+            excitation = []
+            for i in range(num_rec):
+                delta = Interpolator(delta_expr(position_source[i], z, x,sigma_x=2000), V)
+                aux = Function(delta.interpolate())
+                
+                # aux0 = copy.deepcopy(aux.dat.dat[:])
+                excitation.append(aux.dat.data[:])
+            
+        FF = m1 + a + nf - f * v * dx(rule=qr_x)  
+        X  = Function(V)
 
         lhs_ = lhs(FF)
         rhs_ = rhs(FF)
-
-        # A = assemble(lhs_, mat_type="matfree")
-        # solver = LinearSolver(A, solver_parameters=params)
-
+        
+        if not self.Aut_Dif:
+            usol = [Function(V, name="pressure") for t in range(nt) if t % fspool == 0]
         usol_recv = []
         saveIT = 0
 
         # assembly_callable = create_assembly_callable(rhs_, tensor=B)
         problem = LinearVariationalProblem(lhs_, rhs_, X)
-        solver = LinearVariationalSolver(problem, solver_parameters=params)
+        solver  = LinearVariationalSolver(problem, solver_parameters=params)
         
-        point_cloud = VertexOnlyMesh(mesh, rec_position)
-        P = FunctionSpace(point_cloud, "DG", 0)
-        interpolator = Interpolator(u_np1, P)
+                
+        if type=="adjoint":
+            # Define gradient problem
+            m_u = TrialFunction(V)
+            m_v = TestFunction(V)
+            mgrad = m_u * m_v * dx(rule=qr_x)
+
+            uuadj = Function(V)  # auxiliarly function for the gradient compt.
+            uufor = Function(V)  # auxiliarly function for the gradient compt.
+            ffG = dot(grad(uuadj), grad(uufor)) * m_v * dx(rule=qr_x)
+
+            G = mgrad - ffG
+            lhsG, rhsG = lhs(G), rhs(G)
+
+            gradi = Function(V)
+            grad_prob = LinearVariationalProblem(lhsG, rhsG, gradi)
+            if method == "KMV":
+                grad_solver = LinearVariationalSolver(
+                    grad_prob,
+                    solver_parameters={
+                        "ksp_type": "preonly",
+                        "pc_type": "jacobi",
+                        "mat_type": "matfree",
+                    },
+                )
+            elif method == "CG":
+                grad_solver = LinearVariationalSolver(
+                grad_prob,
+                solver_parameters={
+                    "mat_type": "matfree",
+                },
+                )
+            t = tf
+            dJ = Function(V, name="gradient")
+
+
+        if type=="forward":
+            interpolator = Interpolator(u_np1, point_cloud)
+            t = 0
+            if self.fwi:
+                obj_func   = kwargs.get("obj_func")
+                p_true_rec = kwargs.get("p_true_rec")
+                misfit=[]
+            
+        
         for IT in range(nt):
-            # f.assign(0.0)
-            # excitations.apply_source(f, wavelet[IT], all_shots=False, source_id=source_num)
-            if IT < dstep:
-                ricker.assign(RW[IT])
-            elif IT == dstep:
-                ricker.assign(0.0)
+
+            if type=="forward":
+                t += float(dt)
+                if IT < dstep:
+                    ricker.assign(RW[IT]*2000)
+                elif IT == dstep:
+                    ricker.assign(0.0)
+            
+            if type=="adjoint":
+                misfit = kwargs.get("misfit")
+                IT_adj = nt-1 - IT 
+            
+                rec_value = 0
+                for i in range(num_rec):
+                    
+                    rec_value+=misfit[IT_adj][i]*excitation[i]
+
+                f.dat.data[:] = rec_value
+
+                
             solver.solve()
-            if PML:            
-                if dim == 2:
-                    if model["BCs"]["method"] == "damping":
-                        u_np1.assign(X)
-                    else:
-                        u_np1, pp_np1 = X.split()
-                elif dim == 3:
-                    u_np1, psi_np1, pp_np1 = X.split()
+            u_np1.assign(X)
 
-                    psi_nm1.assign(psi_n)
-                    psi_n.assign(psi_np1)
-
-                # pp_nm1.assign(pp_n)
-                # pp_n.assign(pp_np1)
-            else:
-                u_np1.assign(X)
+            if not self.Aut_Dif:
+                usol[IT].assign(u_np1)   
+              
+            if type=="forward":
+               
+                rec = Function(point_cloud)
+                interpolator.interpolate(output=rec)
+                usol_recv.append(rec.dat.data)
             
-            rec = Function(P)
-            interpolator.interpolate(output=rec)
-            usol_recv.append(rec.dat.data)
-            if self.Calc_Jfunctional:
-                self.objective_func(rec,IT,dt,P,V)
-            
-            # rec = 0
-            
+                if self.fwi:
+                    
+                    obj_func += self.objective_func(rec,p_true_rec[IT],IT,dt,point_cloud,misfit)
+                    
             if IT % nspool == 0:
                 assert (
                     norm(u_n) < 1
                 ), "Numerical instability. Try reducing dt or building the mesh differently"
-                if output:
-                    outfile.write(u_n, time=t, name="Pressure")
-                helpers.display_progress(comm, t)
-
+                
             u_nm1.assign(u_n)
             u_n.assign(u_np1)
 
-            t = IT * float(dt)
+            if type=="adjoint":
+                guess=kwargs.get("guess")
+                # compute the gradient increment
+                uuadj.assign(u_np1)
+                
+                uufor.assign(guess.pop())
 
-        # usol_recv = helpers.fill(usol_recv, is_local, nt, len(rec_position))
-        # usol_recv = utils.communicate(usol_recv, comm)
-
+                grad_solver.solve()
+                dJ += gradi
+    
         if comm.ensemble_comm.rank == 0 and comm.comm.rank == 0:
             print(
                 "---------------------------------------------------------------",
                 flush=True,
             )
-
-        return usol_recv
-
-    def objective_func(self, p_rec, IT, dt,P,V):
-        qr_x, _, _ = quadrature.quadrature_rules(V)
-        true_rec = Function(P)
-        true_rec.dat.data[:] = self.p_true_rec[IT]
-        self.obj_func += 0.5 * assemble( inner(true_rec-p_rec, true_rec-p_rec) * dx)
-        self.misfit_tot.append(true_rec.dat.data-p_rec.dat.data)
         
+        if type=="forward":
+            if not self.Aut_Dif and self.fwi==True:
+                return usol, misfit,obj_func
+            elif self.Aut_Dif and self.fwi==True:
+                return usol_recv,obj_func
+            else:
+                return usol_recv
+        
+        if type=="adjoint":
+            return dJ
 
-    # ----------------------------------------#
+    def objective_func(self, p_rec,p_true_rec, IT, dt,P,misfit):
+        true_rec = Function(P)
+        true_rec.dat.data[:] = p_true_rec
+        J = 0.5 * assemble(inner(true_rec-p_rec, true_rec-p_rec) * dx)
+        misfit.append(true_rec.dat.data[:]-p_rec.dat.data[:])
+        return J
+
     # external forcing - older versions
-    def external_forcing(self,RW, mesh, model, source_num, V):
-
-        pos = model["acquisition"]["source_pos"]
+    def external_forcing(self,RW, mesh,position_source,V):
         z, x = SpatialCoordinate(mesh)
-        sigma_x = Constant(2000)
-        source = Constant(pos[source_num])
-        delta = Interpolator(delta_expr(source, z, x, sigma_x), V)
+
+        source = Constant(position_source)
+        delta  = Interpolator(delta_expr(source, z, x,sigma_x=2000), V)
         excitation = Function(delta.interpolate())
 
         ricker = Constant(0)
         f = excitation * ricker
         ricker.assign(RW[0], annotate=True)
 
+
         return f, ricker
 
 
-# ----------------------------------------#

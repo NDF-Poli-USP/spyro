@@ -86,6 +86,7 @@ def _make_vp_exact(V, mesh):
 vp_exact = _make_vp_exact(V,mesh)
 
 sources = spyro.Sources(model, mesh, V, comm)
+print(sources)
 
 solver  = spyro.solver_AD()
 
