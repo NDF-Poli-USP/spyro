@@ -7,8 +7,8 @@ from firedrake import *
 import spyro
 from spyro.domains import quadrature
 from firedrake_adjoint import *
-from inputfiles.Model1_gradient_2d import model
-from inputfiles.Model1_gradient_2d_pml import model_pml
+from .inputfiles.Model1_gradient_2d import model
+from .inputfiles.Model1_gradient_2d_pml import model_pml
 
 
 import copy
