@@ -164,7 +164,7 @@ class Sources(spyro.receivers.Receivers.Receivers):
         return (cell_tabulations*cell_tabulations_zdir,cell_tabulations*cell_tabulations_xdir)
 
 
-def directional_amplitudes_2D(x0, z, x, tol=1e-6):
+def directional_amplitudes_2D(x0, z, x, tol=1e-10):
     # x0[0] -> z
     # x0[1] -> x
     r = ((x-x0[1])**2.+(z-x0[0])**2.)**0.5

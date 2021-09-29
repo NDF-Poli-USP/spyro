@@ -83,6 +83,7 @@ def forward_elastic_waves(
         and mesh.ufl_cell() != hexahedron
     ):
         params = {"ksp_type": "cg", "pc_type": "jacobi"}
+        #params = {"ksp_type": "preonly", "pc_type": "lu"} # for direct solver
     elif method == "CG" and (
         mesh.ufl_cell() == quadrilateral or mesh.ufl_cell() == hexahedron
     ):
@@ -128,7 +129,7 @@ def forward_elastic_waves(
     l = inner(f,v) * dx(rule=qr_x) 
    
     # absorbing boundary conditions
-    nf = 0 # it enters as a Neumann BC
+    nf = 0 # it enters as a Neumann-type BC
     if model["BCs"]["status"]: # to turn on any type of BC
         bc_defined = False
         x1 = 0.0                 # z-x origin
@@ -138,26 +139,37 @@ def forward_elastic_waves(
         lx = model["BCs"]["lx"]  # width of the absorbing layer
         lz = model["BCs"]["lz"]  # depth of the absorbing layer
     
-        # damping at outer boundaries (-x,+x,-z)
+        # damping at outer boundaries (-x,+x,-z,+z)
         if model["BCs"]["outer_bc"] == "non-reflective" and model["BCs"]["abl_bc"] != "alid":
-            cmax = Constant(1.0) # FIXME define cmax
-            tol = 0.000001
-            g = conditional(x < x1-lx+tol, 1.0, 0.0) # assuming that all x<x1 belongs to abs layer
-            g = conditional(x > x2+lx-tol, 1.0, g)   # assuming that all x>x2 belongs to abs layer
-            g = conditional(z < z2-lz+tol, 1.0, g)   # assuming that all z<z2 belongs to abs layer
-            G = FunctionSpace(mesh, element)
-            c = Function(G, name="Damping_coefficient").interpolate(g)
-            if output:
-                File("damping_coefficient_outer_bc.pvd").write(c)
-            nf = cmax * c * inner( ((u_n - u_nm1) / dt) , v ) * ds(rule=qr_s)
+            # old code, keeping here for now
+            #cmax = ((lamb + 2*mu)/rho)**0.5 
+            #tol = 0.000001
+            #g = conditional(x < x1-lx+tol, 1.0, 0.0) # assuming that all x<x1 belongs to abs layer
+            #g = conditional(x > x2+lx-tol, 1.0, g)   # assuming that all x>x2 belongs to abs layer
+            #g = conditional(z < z2-lz+tol, 1.0, g)   # assuming that all z<z2 belongs to abs layer
+            #G = FunctionSpace(mesh, element)
+            #c = Function(G, name="Damping_coefficient").interpolate(g)
+            #if output:
+            #    File("damping_coefficient_outer_bc.pvd").write(c)
+            #nf = cmax * c * inner( ((u_n - u_nm1) / dt) , v ) * ds(rule=qr_s)
+           
+            # to get the normal vector
+            #n = firedrake.FacetNormal(mesh)
+            #print(assemble(inner(v, n) * ds))
+
+            # FIXME keeping c_p for now, but it should be changed to a matrix form
+            c_p = ((lamb + 2.*mu)/rho)**0.5
+            #c_s = (mu/rho)**0.5
+            nf = rho * c_p * inner( ((u_n - u_nm1) / dt) , v ) * ds(rule=qr_s) # backward-difference scheme 
             bc_defined = True
         else:
             if model["BCs"]["outer_bc"] == "non-reflective" and model["BCs"]["abl_bc"] == "alid":
                 print("WARNING: [BCs][outer_bc] = non-reflectie AND [BCs][abl_bc] = alid. Ignoring [BCs][outer_bc].")
 
-        # absorbing layer with increasing damping (ALID)
+        # absorbing layer with increasing damping (ALID) (-x,+x,-z)
         if model["BCs"]["abl_bc"] == "alid":
-            cmax = Constant(100.0) # FIXME define cmax
+            cmax = 10*((lamb + 2*mu)/rho)**0.5 # FIXME testing c_p
+            #cmax = (mu/rho)**0.5 # FIXME testing c_s
             p = 3 # FIXME define p
             g = conditional(x < x1, (abs(x1-x)/lx)**p, 0.0) # assuming that all x<x1 belongs to abs layer
             g = conditional(x > x2, (abs(x2-x)/lx)**p, g)   # assuming that all x>x2 belongs to abs layer
@@ -165,10 +177,11 @@ def forward_elastic_waves(
             g = conditional(And(x < x1, z < z2), ( (((x1-x)**2.0+(z2-z)**2.0)**0.5)/min(lx,lz) )**p, g)
             g = conditional(And(x > x2, z < z2), ( (((x2-x)**2.0+(z2-z)**2.0)**0.5)/min(lx,lz) )**p, g)
             G = FunctionSpace(mesh, element)
-            c = Function(G, name="Damping_coefficient").interpolate(g)
+            alid_mask = Function(G, name="Damping_coefficient").interpolate(g)
             if output:
-                File("damping_coefficient_alid.pvd").write(c)
-            nf = cmax * c * inner( ((u_n - u_nm1) / dt) , v ) * dx(rule=qr_s) # FIXME check if it should be unp1-un
+                File("damping_coefficient_alid.pvd").write(alid_mask)
+            nf = alid_mask * cmax * inner( ((u_n - u_nm1) / dt) , v ) * dx(rule=qr_x) #FIXME check if it should be unp1-un
+            #nf = alid_mask * cmax * inner( ((u - u_n) / dt) , v ) * dx(rule=qr_x) #FIXME it produces the same result 
             bc_defined = True
         # absorbing layer with Gaussian taper 
         elif model["BCs"]["abl_bc"] == "gaussian-taper": 
@@ -195,11 +208,16 @@ def forward_elastic_waves(
     # retrieve the lhs and rhs terms from F
     lhs_ = lhs(F)
     rhs_ = rhs(F)
+    
+    # FIXME DirichletBC does not help prevent oscilations when mu=0
+    #bc = DirichletBC(V.sub(0), 0., (1,2,3,4) )
+    #bc = DirichletBC(V, (0.,0.), (1,2,3,4) )
 
     # create functions such that we solve for X in A X = B
     X = Function(V)
     B = Function(V)
     A = assemble(lhs_, mat_type="matfree")
+    #A = assemble(lhs_) # for direct solver
     
     # set the linear solver for A
     solver = LinearSolver(A, solver_parameters=params)
@@ -234,15 +252,16 @@ def forward_elastic_waves(
         sys.exit("Exit without running")
 
     # FIXME testing
-    outfile2 = helpers.create_output_file("p-wave.pvd", comm, source_num)
-    outfile3 = helpers.create_output_file("s-wave.pvd", comm, source_num)
-    S = FunctionSpace(mesh, element)
+    #outfile2 = helpers.create_output_file("p-wave.pvd", comm, source_num)
+    #outfile3 = helpers.create_output_file("s-wave.pvd", comm, source_num)
+    #S = FunctionSpace(mesh, element)
 
     # run forward in time
     for step in range(nt):
         # assemble the rhs term to update the forcing FIXME assemble here or after apply source?
         B = assemble(rhs_, tensor=B)
-    
+        #bc.apply(B) #FIXME for Dirichlet BC
+
         #start = time.time()
         if radial_source==1: # FIXME testing a radial source here for now
             f.sub(0).assign(wavelet[step]*source_z)
@@ -252,6 +271,7 @@ def forward_elastic_waves(
             #excitations.apply_source(f.sub(0), -1.*wavelet[step]) # z 
             #excitations.apply_source(f.sub(1), wavelet[step]) # x 
             excitations.apply_radial_source(f, wavelet[step])
+            #f.sub(1).assign(Function(S).interpolate(sin(x))) # only P-wave
         #end = time.time()
         #print(end - start)
 
@@ -288,10 +308,10 @@ def forward_elastic_waves(
                 u_n.rename("Displacement")
                 outfile.write(u_n, time=t)
                 #FIXME testing
-                p_n = Function(S, name="p-wave").interpolate(tr(D(u_n)))
-                s_n = Function(S, name="s-wave").interpolate(curl(u_n)) #FIXME not sure this is right
-                outfile2.write(p_n, time=t)
-                outfile3.write(s_n, time=t)
+                #p_n = Function(S, name="p-wave").interpolate(tr(D(u_n)))
+                #s_n = Function(S, name="s-wave").interpolate(curl(u_n)) #FIXME not sure this is right
+                #outfile2.write(p_n, time=t)
+                #outfile3.write(s_n, time=t)
             if t > 0: 
                 helpers.display_progress(comm, t) 
 
