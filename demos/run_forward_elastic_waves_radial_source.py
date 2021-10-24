@@ -1,4 +1,4 @@
-# script used in tests 1 and 2 (p-extension analysis)
+# script used in tests 1 and 2 and mu=0 (p-extension analysis)
 
 from firedrake import (
     RectangleMesh,
@@ -18,12 +18,14 @@ import matplotlib.pyplot as plt
 import numpy as np
 import meshio
 import SeismicMesh
+import dmsh
+import random
 
 model = {}
 
 model["opts"] = {
-    "method": "CG",  # either CG or KMV
-    "quadratrue": "CG", # Equi or KMV
+    "method": "KMV",  # either CG or KMV
+    "quadratrue": "KMV", # Equi or KMV
     "degree": 2,  # p order
     "dimension": 2,  # dimension
 }
@@ -64,7 +66,7 @@ model["acquisition"] = {
 
 model["timeaxis"] = {
     "t0": 0.0,  #  Initial time for event
-    "tf": 0.0005*1600,  # Final time for event
+    "tf": 0.0005*1600, #1600 # Final time for event
     "dt": 0.00050,  # timestep size
     "amplitude": 1,  # the Ricker has an amplitude of 1.
     "nspool":  20,  # how frequently to output solution to pvds
@@ -72,17 +74,20 @@ model["timeaxis"] = {
 }
 comm = spyro.utils.mpi_init(model)
 
-mesher="FM" # either SM (SeismicMesh) or FM (Firedrake mesher) 
+mesher="RM" # either FM (Firedrake mesher), SM (SeismicMesh), DM (DMSH), or RM (read an existing mesh) 
 if mesher=="FM":
-    mesh = RectangleMesh(30, 30, 1.5, 1.5, diagonal="crossed")
+    #mesh = RectangleMesh(30, 30, 1.5, 1.5)
+    mesh = RectangleMesh(85, 85, 1.5, 1.5) # to test water layer (oscillations)
+    #mesh = RectangleMesh(30, 30, 1.5, 1.5, diagonal="crossed") # use this to run test cases
     #mesh = RectangleMesh(60, 60, 1.5, 1.5, diagonal="crossed") # reference mesh 1
     #mesh = RectangleMesh(120, 120, 1.5, 1.5, diagonal="crossed") # reference mesh 2 only to test KMV
     #mesh = RectangleMesh(50, 50, 1.5, 1.5)
 elif mesher=="SM":
     bbox = (0.0, 1.5, 0.0, 1.5)
     rect = SeismicMesh.Rectangle(bbox)
+    #points, cells = SeismicMesh.generate_mesh(domain=rect, edge_length=0.025, max_iter=1, mesh_improvement=False)
     points, cells = SeismicMesh.generate_mesh(domain=rect, edge_length=0.025)
-    mshname = "meshes/test_mu=0.msh"
+    #mshname = "meshes/test_mu=0_unstructured.msh" do not use this for unstrucured mesh. Use DM instead
     meshio.write_points_cells(
         mshname,
         points[:], # do not swap here
@@ -90,6 +95,26 @@ elif mesher=="SM":
         file_format="gmsh22",
         binary=False
     )
+    mesh = Mesh(mshname)
+elif mesher=="DM":
+    geo = dmsh.Rectangle(0.0, 1.5, 0.0, 1.5)
+    p1 = dmsh.Path([[0.7, 0.8], [0.8, 0.7]])
+    def edge_size(x):
+        #return 0.01 + 0.01 * p1.dist(x)
+        #return 0.02 + random.uniform(0.00001, 0.02) * p1.dist(x)
+        return 0.017 + 0.0017 * np.random.rand(x.shape[1])
+    X, cells = dmsh.generate(geo, edge_size, tol=1.0e-10, flip_tol=1.0e-10 ,max_steps=100, random_seed=1)
+    mshname = "meshes/test_mu=0_unstructured.msh"
+    meshio.write_points_cells(
+        mshname,
+        X[:], # do not swap here
+        [("triangle", cells)],
+        file_format="gmsh22",
+        binary=False
+    )
+    mesh = Mesh(mshname)
+elif mesher=="RM":
+    mshname = "meshes/test_mu=0_unstructured.msh"
     mesh = Mesh(mshname)
 else:
     raise ValueError("mesher not yet supported")    
@@ -104,10 +129,13 @@ element = spyro.domains.space.FE_method(
 V = FunctionSpace(mesh, element)
 #print(V.dof_count*2)
 
-lamb = Constant(1./2.) 
-mu = Constant(1./4.)  
-#lamb = Constant(1.) 
-#mu = Constant(0.)  
+water_layer=1
+if water_layer==0:
+    lamb = Constant(1./2.) 
+    mu = Constant(1./4.)  
+else:
+    lamb = Constant(1.) # to test water layer
+    mu = Constant(0.)   # to test water layer
 rho = Constant(1.) 
 #sys.exit("exiting without running")
 
@@ -117,9 +145,9 @@ wavelet = spyro.full_ricker_wavelet(
                         dt=model["timeaxis"]["dt"], tf=model["timeaxis"]["tf"], freq=model["acquisition"]["frequency"]
                         )
 
-post_process=True
-vtkfiles=False
-shotfiles=False
+post_process=False
+vtkfiles=True
+shotfiles=True
 if post_process==False:
     start = time.time()
     u_field, u_at_recv = spyro.solvers.forward_elastic_waves(
@@ -135,8 +163,8 @@ if post_process==False:
 
         #filename="./shots/test_1/test_1_cg_p5_h25m.dat"
         #filename="./shots/test_1/test_1_kmv_p5_h25m.dat"
-        filename="./shots/test_1/test_1_kmv_p5.dat"
-        spyro.io.save_shots(model, comm, u_at_recv, file_name=filename)
+        #filename="./shots/test_1/test_1_kmv_p5.dat"
+        #spyro.io.save_shots(model, comm, u_at_recv, file_name=filename)
 
 else:
     tn="test_1"
