@@ -47,12 +47,16 @@ class Receivers:
         self.cellVertices = None # vertex locations
         self.cellNodes = None    # node locations
         self.cell_tabulations = None
+        self.cell_tabulations_xdir = None # tabulations for radial source, x direction
+        self.cell_tabulations_zdir = None # tabulations for radial source, z direction
+        self.cell_tabulations_ydir = None # tabulations for radial source, y direction
         self.cellNodeMaps = None
         self.nodes_per_cell = None
         self.node_locations = None
         self.is_local = [0] * self.num_receivers
 
         self.build_maps()
+        (self.cell_tabulations_zdir,self.cell_tabulations_xdir) = self.__func_build_cell_tabulations_zxydir()
 
     @property
     def num_receivers(self):
@@ -118,6 +122,67 @@ class Receivers:
                 tmp = rhs_forcing.dat.data_with_halos[0]
 
         return rhs_forcing
+
+    def apply_receivers_as_radial_source(self, rhs_forcing, residual_z, residual_x, residual_y, IT):
+        """
+        The adjoint operation of interpolation (injection) for elastic waves simulation
+        """
+        #rid = 1
+        #rhs_forcing.sub(0).dat.data_with_halos[:] = self.cell_tabulations_zdir[rid][:]
+        #rhs_forcing.sub(1).dat.data_with_halos[:] = self.cell_tabulations_xdir[rid][:]
+        #return rhs_forcing
+        for rid in range(self.num_receivers):
+            # the residual values provide the direction (sign)
+            value_z = residual_z[IT][rid]
+            value_x = residual_x[IT][rid]
+            if self.dimension == 3:
+                value_y = residual_y[IT][rid]
+            
+            if self.is_local[rid]:
+                # z direction
+                rhs_forcing.sub(0).dat.data_with_halos[:] += (
+                        value_z * self.cell_tabulations_zdir[rid][:]
+                )
+                # x direction
+                rhs_forcing.sub(1).dat.data_with_halos[:] += (
+                        value_x * self.cell_tabulations_xdir[rid][:]
+                )
+                if self.dimension == 3:
+                    # y direction
+                    rhs_forcing.sub(2).dat.data_with_halos[:] += (
+                            value_y * self.cell_tabulations_ydir[rid][:] 
+                    )
+            else:
+                pass # nothing here
+
+        return rhs_forcing
+
+    def __func_build_cell_tabulations_zxydir(self):
+        if self.dimension == 2:
+            return self.__func_build_cell_tabulations_zxydir_continuous_source()
+        elif self.dimension == 3:
+            raise ValueError("Build_cell_tabulations for 3D meshes not supported yet")
+        else:
+            raise ValueError("Dimension not supported yet")
+
+    def __func_build_cell_tabulations_zxydir_continuous_source(self):
+        """Create tabulations over cells (actually nodes) considering
+        a continuous source described by a Gaussian function.
+        """
+        num_nodes = self.node_locations.shape[0]
+        cell_tabulations_xdir = np.zeros((self.num_receivers, num_nodes))
+        cell_tabulations_zdir = np.zeros((self.num_receivers, num_nodes))
+
+        nz = self.node_locations[:, 0]
+        nx = self.node_locations[:, 1]
+
+        for receiver_id in range(self.num_receivers): 
+            p = self.receiver_locations[receiver_id]
+            # the direction (positive or negative) is defined by residual_z and residual_x
+            cell_tabulations_xdir[receiver_id, :] = delta_expr(p, nz, nx)  
+            cell_tabulations_zdir[receiver_id, :] = delta_expr(p, nz, nx)
+
+        return (cell_tabulations_zdir,cell_tabulations_xdir)
 
     def __func_receiver_locator(self):
         """Function that returns a list of tuples and a matrix
@@ -368,6 +433,8 @@ class Receivers:
 
 
 ## Some helper functions
+def delta_expr(x0, z, x, sigma_x=500.0):
+    return np.exp(-sigma_x * ((z - x0[0]) ** 2 + (x - x0[1]) ** 2))
 
 
 def choosing_element(V, degree):

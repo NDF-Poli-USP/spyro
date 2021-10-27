@@ -46,7 +46,6 @@ def ensemble_load(func):
     return wrapper
 
 
-
 def ensemble_plot(func):
     """Decorator for `plot_shots` to distribute shots for ensemble parallelism"""
     def wrapper(*args, **kwargs):
@@ -73,6 +72,21 @@ def ensemble_forward(func):
 
     return wrapper
 
+
+def ensemble_forward_elastic_waves(func):
+    """Decorator for forward elastic waves to distribute shots for ensemble parallelism"""
+    def wrapper(*args, **kwargs):
+        acq = args[0].get("acquisition")
+        num = acq["num_sources"]
+        _comm = args[2]
+        for snum in range(num):
+            if is_owner(_comm, snum):
+                u, uz_r, ux_r, uy_r = func(*args, **dict(kwargs, source_num=snum))
+                return u, uz_r, ux_r, uy_r
+
+    return wrapper
+
+
 def ensemble_gradient(func):
     """Decorator for gradient to distribute shots for ensemble parallelism"""
     def wrapper(*args, **kwargs):
@@ -88,6 +102,25 @@ def ensemble_gradient(func):
                 else:
                     grad = func(*args, **kwargs)
                     return grad
+
+    return wrapper
+
+
+def ensemble_gradient_elastic_waves(func):
+    """Decorator for gradient (elastic waves) to distribute shots for ensemble parallelism"""
+    def wrapper(*args, **kwargs):
+        acq = args[0].get("acquisition")
+        save_adjoint = kwargs.get("save_adjoint")
+        num = acq["num_sources"]
+        _comm = args[2]
+        for snum in range(num):
+            if is_owner(_comm, snum):
+                if save_adjoint:
+                    grad_lambda, grad_mu, u_adj = func(*args, **kwargs)
+                    return grad_lambda, grad_mu, u_adj
+                else:
+                    grad_lambda, grad_mu = func(*args, **kwargs)
+                    return grad_lambda, grad_mu
 
     return wrapper
 

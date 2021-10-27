@@ -1,4 +1,4 @@
-# script used in tests 3, 4, and 5 (BC tests), and 7 (mu=0 and different rho)
+# script used to test the gradient and adjoint problems (elastic waves)
 
 from firedrake import (
     RectangleMesh,
@@ -9,7 +9,9 @@ from firedrake import (
     File,
     Constant,
     Mesh,
-    exp
+    exp,
+    DumbCheckpoint,
+    FILE_CREATE
 )
 import spyro
 import time
@@ -58,9 +60,11 @@ model["acquisition"] = {
     "source_pos": [(-0.75, 0.75)],
     "frequency": 10.0,
     "delay": 1.0,
-    "num_receivers": 100,
+    "num_receivers": 2,
     "receiver_locations": spyro.create_transect(
-        (-1.25, -0.25), (-1.25, 1.75), 100
+        (-0.4, 0.375), (-0.4, 1.125), 2
+       # (-1.1, 0.375), (-1.1, 1.125), 2
+       # (-1.25, -0.25), (-1.25, 1.75), 100 for the case with ABL
     ),
 }
 
@@ -115,24 +119,13 @@ V = FunctionSpace(mesh, element)
 
 z, x = SpatialCoordinate(mesh) 
 
-water_layer=1 # for test 7
-if water_layer==0:
-    lamb = Constant(1./2.)
+run_guess=1 
+if run_guess:
+    lamb = Constant(1./3.) # guess
     mu = Constant(1./4.)
 else:
-    lambfield = conditional(z <= -1.05, 1./2., 1.)
-    mufield   = conditional(z <= -1.05, 1./4., 0.)
-    
-    element0 = spyro.domains.space.FE_method(
-                    mesh, "DG", 0)
-    V0 = FunctionSpace(mesh, element0)
-    
-    #lamb = Function(V, name="lamb").interpolate(lambfield)
-    #mu   = Function(V, name="mu").interpolate(mufield)
-    lamb = Function(V0, name="lamb").interpolate(lambfield)
-    mu   = Function(V0, name="mu").interpolate(mufield)
-    File("lamb.pvd").write(lamb)
-    File("mu.pvd").write(mu)
+    lamb = Constant(1./2.) # exact
+    mu = Constant(1./4.)
 
 if 1:
     rho = Constant(1.) # for test 3 and 7 (constant cp and cd)
@@ -141,37 +134,72 @@ else:
     rho = Function(V, name="rho").interpolate(rhofield) # for test 4 (discontinuity in cp and cs)
     File("rho.pvd").write(rho)
 
-#sys.exit("exiting without running")
-
 sources = spyro.Sources(model, mesh, V, comm)
 receivers = spyro.Receivers(model, mesh, V, comm)
 wavelet = spyro.full_ricker_wavelet(
-                        dt=model["timeaxis"]["dt"], tf=model["timeaxis"]["tf"], freq=model["acquisition"]["frequency"]
-                        )
+                dt=model["timeaxis"]["dt"], tf=model["timeaxis"]["tf"], freq=model["acquisition"]["frequency"]
+            )
 
-post_process=False
-vtkfiles=True
-shotfiles=False
-if post_process==False:
+run_forward = 1
+if run_forward:
+    print("Starting forward computation")
     start = time.time()
     u_field, uz_at_recv, ux_at_recv, uy_at_recv = spyro.solvers.forward_elastic_waves(
-        model, mesh, comm, rho, lamb, mu, sources, wavelet, receivers, output=vtkfiles
+        model, mesh, comm, rho, lamb, mu, sources, wavelet, receivers, output=False
     )
     end = time.time()
     print(round(end - start,2))
-    
-    u_at_recv = (uz_at_recv**2. + ux_at_recv**2.)**0.5
-    if shotfiles==True:
+
+    if 0:
         cmin=-1e-4
         cmax=1e-4
+        u_at_recv = (uz_at_recv**2. + ux_at_recv**2.)**0.5
         spyro.plots.plot_shots(model, comm, u_at_recv, show=True, vmin=cmin, vmax=cmax)
 
-        #filename="./shots/test_4/test_4_kmv_p3_cp.dat"
-        #spyro.io.save_shots(model, comm, u_at_recv, file_name=filename)
-else:
-    tn="test_4"
-    u_kmv = spyro.io.load_shots(model, comm, file_name="./shots/"+tn+"/"+tn+"_kmv_p3_nobc.dat")
-    cmin=-1e-4
-    cmax=1e-4
-    spyro.plots.plot_shots(model, comm, u_kmv, show=True, vmin=cmin, vmax=cmax)
-    #spyro.plots.plot_shots(model, comm, u_kmv, show=True)
+
+    if run_guess:
+        spyro.io.save_shots(model, comm, uz_at_recv, file_name="./shots/test_grad/uz_at_recv_guess.dat")
+        spyro.io.save_shots(model, comm, ux_at_recv, file_name="./shots/test_grad/ux_at_recv_guess.dat")
+    else:
+        spyro.io.save_shots(model, comm, uz_at_recv, file_name="./shots/test_grad/uz_at_recv_exact.dat")
+        spyro.io.save_shots(model, comm, ux_at_recv, file_name="./shots/test_grad/ux_at_recv_exact.dat")
+        sys.exit("exiting without running gradient")
+    
+    #chk = DumbCheckpoint("dump", mode=FILE_CREATE)
+    #chk.store(u_field) $ u_field is a list of firedrake functions, checkpoint only saves functions
+    
+uz_exact = spyro.io.load_shots(model, comm, file_name="./shots/test_grad/uz_at_recv_exact.dat")
+ux_exact = spyro.io.load_shots(model, comm, file_name="./shots/test_grad/ux_at_recv_exact.dat")
+uz_guess = spyro.io.load_shots(model, comm, file_name="./shots/test_grad/uz_at_recv_guess.dat")
+ux_guess = spyro.io.load_shots(model, comm, file_name="./shots/test_grad/ux_at_recv_guess.dat")
+    
+residual_z = spyro.utils.evaluate_misfit(model, uz_guess, uz_exact)
+residual_x = spyro.utils.evaluate_misfit(model, ux_guess, ux_exact)
+residual_y = []
+
+if 0:
+    if 1:
+        plt.title("u_z")
+        plt.plot(uz_exact,label='exact')
+        plt.plot(uz_guess,label='guess')
+        plt.plot(uz_exact-uz_guess,label='exact - guess',marker="+")
+        plt.plot(residual_z,label='residual')
+    else:
+        plt.title("u_x")
+        plt.plot(ux_exact,label='exact')
+        plt.plot(ux_guess,label='guess')
+        plt.plot(ux_exact-ux_guess,label='exact - guess',marker="+")
+        plt.plot(residual_x,label='residual')
+    plt.legend()
+    plt.show()
+    sys.exit("exiting without running gradient")
+
+print("Starting gradient computation")
+start = time.time()
+dJdl, dJdm = spyro.solvers.gradient_elastic_waves(
+    model, mesh, comm, rho, lamb, mu, receivers, u_field, residual_z, residual_x, residual_y, output=True
+)
+end = time.time()
+print(round(end - start,2))
+File("dJdl.pvd").write(dJdl)
+File("dJdm.pvd").write(dJdm)

@@ -3,8 +3,9 @@ from firedrake.assemble import create_assembly_callable
 
 from ..domains import quadrature, space
 from ..pml import damping
-from ..io import ensemble_gradient
+from ..io import ensemble_gradient_elastic_waves 
 from . import helpers
+import sys
 
 # Note this turns off non-fatal warnings
 set_log_level(ERROR)
@@ -12,9 +13,9 @@ set_log_level(ERROR)
 __all__ = ["gradient"] #FIXME check this
 
 
-@ensemble_gradient
+@ensemble_gradient_elastic_waves
 def gradient_elastic_waves(
-    model, mesh, comm, rho, lamb, mu, receivers, guess, residual, output=False, save_adjoint=False
+    model, mesh, comm, rho, lamb, mu, receivers, guess, residual_z, residual_x, residual_y, output=False, save_adjoint=False
 ):
     """Discrete adjoint with secord-order in time fully-explicit timestepping scheme
     with implementation of simple absorbing boundary conditions using 
@@ -39,9 +40,11 @@ def gradient_elastic_waves(
         Contains the receiver locations and sparse interpolation methods.
     guess: A list of Firedrake functions
         Contains the forward wavefield at a set of timesteps
-    residual: array-like [timesteps][receivers]
+    residual_z: array-like [timesteps][receivers]
+    residual_x: array-like [timesteps][receivers]
+    residual_y: array-like [timesteps][receivers]
         The difference between the observed and modeled data at
-        the receivers
+        the receivers, for each direction
     output: boolean
         optional, write the adjoint to disk (only for debugging)
     save_adjoint: A list of Firedrake functions
@@ -74,9 +77,9 @@ def gradient_elastic_waves(
     else:
         raise ValueError("method is not yet supported")
 
-    element = space.FE_method(mesh, method, degree)
-
     #--------- start defintion of the adjoint problem ---------
+    element = space.FE_method(mesh, method, degree)
+    
     V = VectorFunctionSpace(mesh, element) # for adjoint approximation
 
     qr_x, qr_s, _ = quadrature.quadrature_rules(V)
@@ -100,7 +103,7 @@ def gradient_elastic_waves(
 
     # values of u (adjoint, vector-valued function) at different timesteps
     u_nm1 = Function(V) # timestep n-1
-    u_n = Function(V)   # timestep n
+    u_n = Function(V, name="Adjoint")   # timestep n
     u_np1 = Function(V) # timestep n+1
 
     # strain tensor
@@ -110,11 +113,12 @@ def gradient_elastic_waves(
     # mass matrix (adjoint problem)
     m = (rho * inner((u - 2.0 * u_n + u_nm1),v) / Constant(dt ** 2)) * dx(rule=qr_x) # explicit
     # stiffness matrix (adjoint problem)
-    a = lamb * tr(D(u_n)) * tr(D(v)) * dx + 2.0 * mu * inner(D(u_n),D(v)) * dx(rule=qr_x)
+    a = lamb * tr(D(u_n)) * tr(D(v)) * dx(rule=qr_x) + 2.0 * mu * inner(D(u_n), D(v)) * dx(rule=qr_x)
     # external forcing form (adjoint problem)
     l = inner(f,v) * dx(rule=qr_x)
 
     # absorbing boundary conditions (adjoint problem)
+    #FIXME check the Neumann BC because the adjoint formulation requires Null Neumann BC
     nf = 0 # it enters as a Neumann-type BC
     if model["BCs"]["status"]: # to turn on any type of BC
         bc_defined = False
@@ -127,18 +131,6 @@ def gradient_elastic_waves(
         
         # damping at outer boundaries (-x,+x,-z,+z)
         if model["BCs"]["outer_bc"] == "non-reflective" and model["BCs"]["abl_bc"] != "alid":
-            # old code, keeping here for now
-            #cmax = ((lamb + 2*mu)/rho)**0.5 
-            #tol = 0.000001
-            #g = conditional(x < x1-lx+tol, 1.0, 0.0) # assuming that all x<x1 belongs to abs layer
-            #g = conditional(x > x2+lx-tol, 1.0, g)   # assuming that all x>x2 belongs to abs layer
-            #g = conditional(z < z2-lz+tol, 1.0, g)   # assuming that all z<z2 belongs to abs layer
-            #G = FunctionSpace(mesh, element)
-            #c = Function(G, name="Damping_coefficient").interpolate(g)
-            #if output:
-            #    File("damping_coefficient_outer_bc.pvd").write(c)
-            #nf = cmax * c * inner( ((u_n - u_nm1) / dt) , v ) * ds(rule=qr_s)
-
             # to get the normal vector
             #n = firedrake.FacetNormal(mesh)
             #print(assemble(inner(v, n) * ds))
@@ -197,7 +189,7 @@ def gradient_elastic_waves(
 
     # FIXME DirichletBC does not help prevent oscilations when mu=0
     #bc = DirichletBC(V.sub(0), 0., (1,2,3,4) )
-    #bc = DirichletBC(V, (0.,0.), (1,2,3,4) )
+    bc = DirichletBC(V, (0.,0.), (1,2,3,4) )
 
     # create functions such that we solve for X in A X = B (adjoint problem)
     X = Function(V)
@@ -222,10 +214,10 @@ def gradient_elastic_waves(
     ug = TrialFunction(H)
     vg = TestFunction(H)
     
-    ufor = Function(V)  # forward, auxiliarly function for the gradient computation by L2 projection
-    uadj = Function(V)  # adjoint, auxiliarly function for the gradient computation by L2 projection
+    ufor = Function(V)  # forward, auxiliarly function for the gradient computation by L2 inner product 
+    uadj = Function(V)  # adjoint, auxiliarly function for the gradient computation by L2 inner product
     
-    # mass matrix (gradient computation by L2 projection)
+    # mass matrix (gradient computation by L2 inner product)
     mg = ug * vg * dx(rule=qr_x)
     # gradient 
     agl = tr(D(ufor)) * tr(D(uadj)) * vg * dx(rule=qr_x) # w.r.t. lambda
@@ -281,47 +273,45 @@ def gradient_elastic_waves(
         )
     #--------- end defintion of the gradient problem ---------
 
-    assembly_callable = create_assembly_callable(rhs_, tensor=B)
-
-    t = 0.0
-    rhs_forcing = Function(V)  # forcing term
-    
+    # run backward in time
     for step in range(nt - 1, -1, -1):
         t = step * float(dt)
-        rhs_forcing.assign(0.0)
-        # Solver - main equation - (I)
-        # B = assemble(rhs_, tensor=B)
-        assembly_callable()
+        
+        # assemble the rhs term to update the forcing FIXME assemble here or after apply source?
+        B = assemble(rhs_, tensor=B)
+        bc.apply(B) #FIXME for Dirichlet BC
 
-        f = receivers.apply_receivers_as_source(rhs_forcing, residual, step)
-        # add forcing term to solve scalar pressure
-        B0 = B.sub(0)
-        B0 += f
+        # apply the residual evaluated at the receivers as external forcing (sources)
+        #FIXME check the sign of f / residuals
+        f = receivers.apply_receivers_as_radial_source(f, residual_z, residual_x, residual_y, step)
+        #File("f.pvd").write(f)
+        #sys.exit("exiting")
 
-        # AX=B --> solve for X = B/Aˆ-1
+        # solve and assign X onto solution u 
         solver.solve(X, B)
         u_np1.assign(X)
 
-        # only compute for snaps that were saved
+        # gradient computation: only compute for snaps that were saved
         if step % fspool == 0:
             # compute the gradient increment
             uadj.assign(u_np1)
             ufor.assign(guess.pop())
-            # solve the L2 projection 
+            # solve the L2 inner product 
             dJdl_solver.solve()
             dJdm_solver.solve()
             # add to the gradient
             dJdl += dJdl_inc
             dJdm += dJdm_inc
 
+        # update u^(n-1) and u^(n) FIXME check if the assign is here or after output write (also check the forward prob.)
         u_nm1.assign(u_n)
         u_n.assign(u_np1)
 
         if step % nspool == 0:
             if output:
                 outfile.write(u_n, time=t)
-            if save_adjoint:
-                adjoint.append(u_n)
+            if save_adjoint: 
+                adjoint.append(u_n) 
             helpers.display_progress(comm, t)
 
     if save_adjoint:

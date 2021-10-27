@@ -4,7 +4,7 @@ from firedrake.assemble import create_assembly_callable
 from .. import utils
 from ..domains import quadrature, space
 from ..pml import damping
-from ..io import ensemble_forward
+from ..io import ensemble_forward_elastic_waves
 from . import helpers
 
 import sys
@@ -13,7 +13,7 @@ import time
 # Note this turns off non-fatal warnings
 set_log_level(ERROR)
 
-@ensemble_forward
+@ensemble_forward_elastic_waves
 def forward_elastic_waves(
     model,
     mesh,
@@ -58,9 +58,11 @@ def forward_elastic_waves(
     Returns
     -------
     usol: list of Firedrake.Functions
-        The full field solution at `fspool` timesteps
-    usol_recv: array-like
-        The solution interpolated to the receivers at all timesteps
+        The full field solution (displacements) at `fspool` timesteps
+    uzsol_recv: array-like
+    uxsol_recv: array-like
+    uysol_recv: array-like
+        The solution (displacement at each direction) interpolated to the receivers at all timesteps
 
     """
 
@@ -154,8 +156,12 @@ def forward_elastic_waves(
             #nf = cmax * c * inner( ((u_n - u_nm1) / dt) , v ) * ds(rule=qr_s)
            
             # to get the normal vector
-            #n = firedrake.FacetNormal(mesh)
+            n = firedrake.FacetNormal(mesh)
+            #n = FacetNormal(mesh)
+            #t = ufl.perp(n)
+            t = firedrake.perp(n)
             #print(assemble(inner(v, n) * ds))
+            print(assemble(inner(v, t) * ds))
 
             # FIXME keeping c_p for now, but it should be changed to a matrix form
             c_p = ((lamb + 2.*mu)/rho)**0.5
@@ -202,6 +208,12 @@ def forward_elastic_waves(
         if bc_defined == False:
             print("WARNING: [BCs][status] = True, but no boundary condition defined. Check your [BCs]")
 
+    #n = firedrake.FacetNormal(mesh)
+    #t = firedrake.perp(n)
+    #print(assemble(inner(v, n) * ds))
+    #print(assemble(inner(v, t) * ds))
+    #https://fenicsproject.discourse.group/t/integrate-over-edges/1140/8
+
     # weak formulation written as F=0
     F = m + a - l + nf 
 
@@ -228,8 +240,7 @@ def forward_elastic_waves(
     usol = [Function(V, name="Displacement") for t in range(nt) if t % fspool == 0] # vectorized, includes uz, ux, and uy
     uzsol_recv = [] # u along the z direction
     uxsol_recv = [] # u along the x direction
-    if dim == 3:
-        uysol_recv = [] # u along the y direction
+    uysol_recv = [] # u along the y direction
 
     def delta_expr(xs, zs, x, z, sigma_x=500):
         sigma_x = Constant(sigma_x)
@@ -270,7 +281,7 @@ def forward_elastic_waves(
             #FIXME let the user decide which approach will be used 
             #excitations.apply_source(f.sub(0), -1.*wavelet[step]) # z 
             #excitations.apply_source(f.sub(1), wavelet[step]) # x 
-            excitations.apply_radial_source(f, wavelet[step])
+            f = excitations.apply_radial_source(f, wavelet[step])
             #f.sub(1).assign(Function(S).interpolate(sin(x))) # only P-wave
         #end = time.time()
         #print(end - start)
@@ -329,9 +340,5 @@ def forward_elastic_waves(
     if dim==3:
         uysol_recv = helpers.fill(uysol_recv, receivers.is_local, nt, receivers.num_receivers)
         uysol_recv = utils.communicate(uysol_recv, comm)
-        usol_recv = (uxsol_recv**2. + uysol_recv**2. + uzsol_recv**2.)**0.5
-    else:
-        usol_recv = (uxsol_recv**2. + uzsol_recv**2.)**0.5
 
-    #FIXME define if ux and uz will all be returned
-    return usol, usol_recv
+    return usol, uzsol_recv, uxsol_recv, uysol_recv
