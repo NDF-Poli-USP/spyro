@@ -1,3 +1,4 @@
+import h5py
 from firedrake import *
 import numpy as np
 import finat
@@ -29,8 +30,8 @@ model["mesh"] = {
     "Lz": 3.5,  # depth in km - always positive
     "Lx": 17.0,  # width in km - always positive
     "Ly": 0.0,  # thickness in km - always positive
-    "meshfile": "meshes/marmousi_guess.msh",
-    "initmodel": "velocity_models/marmousi_guess.hdf5",
+    "meshfile": "meshes/initialmesh.msh",
+    "initmodel": "velocity_models/vp_guess.hdf5",
     "truemodel": "not_used.hdf5",
 }
 model["BCs"] = {
@@ -61,6 +62,12 @@ model["timeaxis"] = {
     "nspool": 1000,  # how frequently to output solution to pvds
     "fspool": 10,  # how frequently to save solution to RAM
 }
+
+
+with h5py.File(fname, "r") as f:
+    Z = np.asarray(f.get("velocity_model")[()])
+    from   scipy.ndimage     import gaussian_filter
+    Z = gaussian_filter(Z,sigma=100)
 
 comm = spyro.utils.mpi_init(model)
 # if comm.comm.rank == 0 and comm.ensemble_comm.rank == 0:

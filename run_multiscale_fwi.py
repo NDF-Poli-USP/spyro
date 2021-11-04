@@ -1,76 +1,102 @@
 from firedrake import *
+from firedrake import mesh
 import numpy as np
 import finat
 from ROL.firedrake_vector import FiredrakeVector as FeVector
 import ROL
 from mpi4py import MPI
+from pyop2.exceptions import ModeValueError
 
 import spyro
 
-# import gc
-
-outdir = "fwi_p5/"
-
-
-model = {}
-
-model["opts"] = {
-    "method": "KMV",  # either CG or KMV
-    "quadratrue": "KMV",  # Equi or KMV
-    "degree": 4,  # p order
-    "dimension": 2,  # dimension
-    "regularization": True,  # regularization is on?
-    "gamma": 1.0, # regularization parameter
-}
-model["parallelism"] = {
-    "type": "automatic",
-}
-model["mesh"] = {
-    "Lz": 3.5,  # depth in km - always positive
-    "Lx": 17.0,  # width in km - always positive
-    "Ly": 0.0,  # thickness in km - always positive
-    "meshfile": "meshes/marmousi_guess.msh",
-    "initmodel": "velocity_models/marmousi_guess.hdf5",
-    "truemodel": "not_used.hdf5",
-}
-model["BCs"] = {
-    "status": True,  # True or false
-    "outer_bc": "non-reflective",  #  None or non-reflective (outer boundary condition)
-    "damping_type": "polynomial",  # polynomial, hyperbolic, shifted_hyperbolic
-    "exponent": 2,  # damping layer has a exponent variation
-    "cmax": 4.5,  # maximum acoustic wave velocity in PML - km/s
-    "R": 1e-6,  # theoretical reflection coefficient
-    "lz": 0.9,  # thickness of the PML in the z-direction (km) - always positive
-    "lx": 0.9,  # thickness of the PML in the x-direction (km) - always positive
-    "ly": 0.0,  # thickness of the PML in the y-direction (km) - always positive
-}
-model["acquisition"] = {
-    "source_type": "Ricker",
-    "num_sources": 40,
-    "source_pos": spyro.create_transect((-0.01, 1.0), (-0.01, 15.0), 40),
-    "frequency": 5.0,
-    "delay": 1.0,
-    "num_receivers": 500,
-    "receiver_locations": spyro.create_transect((-0.10, 0.1), (-0.10, 17.0), 500),
-}
-model["timeaxis"] = {
-    "t0": 0.0,  #  Initial time for event
-    "tf": 6.00,  # Final time for event
-    "dt": 0.001,
-    "amplitude": 1,  # the Ricker has an amplitude of 1.
-    "nspool": 1000,  # how frequently to output solution to pvds
-    "fspool": 10,  # how frequently to save solution to RAM
+multiscale_fwi_parameters = {
+    "frequency_cycle": [2.0, 4.0, 6.0, 8.0],
+    'iterations_per_frequency' : 10,
+    "true_velocity": '',
+    "degree_of_forward_model": '',
 }
 
+def read_true_velocity(multiscale_fwi_parameters):
+    return vp_true
+
+def smooth_model(vp):
+    return vp
+
+def make_initial__mesh(vp, frequency):
+    return None
+
+def remesh()
+
+def make_input_model(multiscale_fwi_parameters):
+    model = {}
+
+    model["opts"] = {
+        "method": "KMV",  # either CG or KMV
+        "quadratrue": "KMV",  # Equi or KMV
+        "degree": 4,  # p order
+        "dimension": 2,  # dimension
+        "regularization": True,  # regularization is on?
+        "gamma": 1.0, # regularization parameter
+    }
+    model["parallelism"] = {
+        "type": "automatic",
+    }
+    model["mesh"] = {
+        #"Lz": 3.5,  # depth in km - always positive
+        #"Lx": 17.0,  # width in km - always positive
+        "Ly": 0.0,  # thickness in km - always positive
+        #"meshfile": "meshes/marmousi_guess.msh",
+        #"initmodel": "velocity_models/marmousi_guess.hdf5",
+        #"truemodel": "not_used.hdf5",
+    }
+    model["BCs"] = {
+        "status": True,  # True or false
+        "outer_bc": "non-reflective",  #  None or non-reflective (outer boundary condition)
+        "damping_type": "polynomial",  # polynomial, hyperbolic, shifted_hyperbolic
+        "exponent": 2,  # damping layer has a exponent variation
+        "cmax": 4.5,  # maximum acoustic wave velocity in PML - km/s
+        "R": 1e-6,  # theoretical reflection coefficient
+        #"lz": 0.9,  # thickness of the PML in the z-direction (km) - always positive
+        #"lx": 0.9,  # thickness of the PML in the x-direction (km) - always positive
+        "ly": 0.0,  # thickness of the PML in the y-direction (km) - always positive
+    }
+    model["acquisition"] = {
+        "source_type": "Ricker",
+        #"num_sources": 40,
+        #"source_pos": spyro.create_transect((-0.01, 1.0), (-0.01, 15.0), 40),
+        #"frequency": 5.0,
+        #"delay": 1.0,
+        #"num_receivers": 500,
+        #"receiver_locations": spyro.create_transect((-0.10, 0.1), (-0.10, 17.0), 500),
+    }
+    model["timeaxis"] = {
+        #"t0": 0.0,  #  Initial time for event
+        #"tf": 6.00,  # Final time for event
+        #"dt": 0.001,
+        #"amplitude": 1,  # the Ricker has an amplitude of 1.
+        #"nspool": 1000,  # how frequently to output solution to pvds
+        #"fspool": 10,  # how frequently to save solution to RAM
+    }
+    return model
+
+
+## Making inital guess velocity model and mesh
+vp_true = read_true_velocity(multiscale_fwi_parameters)
+vp = smooth_model(vp_true)
+
+starting_frequency = multiscale_fwi_parameters["frequency_cycle"][0]
+make_initial__mesh(vp_true, starting_frequency)
+
+## Starting up spyro
+outdir = "multiscaleFWI/"
+model = make_input_model
 comm = spyro.utils.mpi_init(model)
-# if comm.comm.rank == 0 and comm.ensemble_comm.rank == 0:
-#    fil = open("FUNCTIONAL_FWI_P5.txt", "w")
-
 mesh, V = spyro.io.read_mesh(model, comm)
 vp = spyro.io.interpolate(model, mesh, V, guess=True)
-
 if comm.ensemble_comm.rank == 0:
-    File("guess_velocity.pvd", comm=comm.comm).write(vp)
+    File(outdir+"initial_guess_velocity.pvd", comm=comm.comm).write(vp)
+
+
 sources = spyro.Sources(model, mesh, V, comm)
 receivers = spyro.Receivers(model, mesh, V, comm)
 wavelet = spyro.full_ricker_wavelet(
@@ -88,8 +114,8 @@ quad_rule = finat.quadrature.make_quadrature(
 )
 dxlump = dx(rule=quad_rule)
 
+# Making masking water layer
 water = np.where(vp.dat.data[:] < 1.51)
-
 
 class L2Inner(object):
     def __init__(self):
@@ -105,9 +131,7 @@ class L2Inner(object):
         self.Ap.mult(upet, A_u)
         return vpet.dot(A_u)
 
-
 kount = 0
-
 
 def regularize_gradient(vp, dJ):
     """Tikhonov regularization"""
@@ -130,7 +154,6 @@ def regularize_gradient(vp, dJ):
     grad_solver.solve()
     dJ += gradreg
     return dJ
-
 
 class Objective(ROL.Objective):
     def __init__(self, inner_product):
@@ -199,7 +222,6 @@ class Objective(ROL.Objective):
             if comm.ensemble_comm.rank == 0:
                 control_file.write(vp)
 
-
 paramsDict = {
     "General": {"Secant": {"Type": "Limited-Memory BFGS", "Maximum Storage": 10}},
     "Step": {
@@ -212,7 +234,7 @@ paramsDict = {
     },
     "Status Test": {
         "Gradient Tolerance": 1e-16,
-        "Iteration Limit": 100,
+        "Iteration Limit": multiscale_fwi_parameters["iterations_per_frequency"],
         "Step Tolerance": 1.0e-16,
     },
 }
@@ -244,4 +266,4 @@ algo.run(opt, obj, bnd)
 if comm.ensemble_comm.rank == 0:
     File("res.pvd", comm=comm.comm).write(obj.vp)
 
-# fil.close()
+

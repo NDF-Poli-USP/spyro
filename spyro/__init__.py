@@ -6,6 +6,7 @@ from .sources.Sources import Sources, ricker_wavelet, full_ricker_wavelet
 from .utils import utils
 from .utils.geometry_creation import create_transect, create_2d_grid, insert_fixed_value, create_3d_grid
 from .utils.estimate_timestep import estimate_timestep
+from .utils.mesh_utils import build_mesh
 from .io import io
 from . import solvers
 from .import tools
@@ -27,4 +28,5 @@ __all__ = [
     "solvers",
     "plots",
     "tools",
+    "build_mesh",
 ]
