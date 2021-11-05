@@ -64,7 +64,9 @@ class FWI():
         
         self.inner = self.Inner(inner_product = inner_product)
         
-        vp = self.run_FWI()
+        self.vp = spyro.io.interpolate(model, mesh, V, guess=False)
+
+        self.vp = self.run_FWI()
 
     class Inner(object):
         def __init__(self,inner_product='L2'):
@@ -235,6 +237,79 @@ class FWI():
 
 
     
+class syntheticFWI(FWI):
+    def __init__(self, model, comm = None, iteration_limit = 100, params = None):
+        inner_product = 'L2'
+        self.current_iteration = 0 
+        self.iteration_limit = iteration_limit
+        self.model = model
+        self.dimension = model["opts"]["dimension"]
+        self.method = model["opts"]["method"]
+        self.degree = model["opts"]["degree"]
+        self.comm = spyro.utils.mpi_init(model)
+        self.shot_record = spyro.io.load_shots(model, self.comm)
+        self.output_directory = "results/full_waveform_inversion/"
+
+        if params == None:
+            params = {
+                "General": {"Secant": {"Type": "Limited-Memory BFGS", "Maximum Storage": 10}},
+                "Step": {
+                    "Type": "Augmented Lagrangian",
+                    "Augmented Lagrangian": {
+                        "Subproblem Step Type": "Line Search",
+                        "Subproblem Iteration Limit": 5.0,
+                    },
+                    "Line Search": {"Descent Method": {"Type": "Quasi-Newton Step"}},
+                },
+                "Status Test": {
+                    "Gradient Tolerance": 1e-16,
+                    "Iteration Limit": iteration_limit,
+                    "Step Tolerance": 1.0e-16,
+                },
+            }
+        
+        if comm == None:
+            self.comm = spyro.utils.mpi_init(model)
+        else:
+            self.comm = comm
+
+        self.parameters = params
+        if model["mesh"]["meshfile"] != None:
+            mesh, V = spyro.io.read_mesh(model, self.comm)
+            self.mesh = mesh
+            self.space = V
+        else:
+            mesh, V = self._build_initial_mesh()
+            self.mesh = mesh
+            self.space = V
+
+        self.sources, self.receivers, self.wavelet = self._get_acquisition_geometry()
+        
+        self.inner = self.Inner(inner_product = inner_product)
+
+        if model['inversion']['shot_record'] == False:
+            self._generate_shot_record()
+        if model['inversion']['initial_guess'] == False:
+            self._smooth_and_save_vp_guess()  
+
+        self.vp = spyro.io.interpolate(model, mesh, V, guess=False)
+        
+        self.vp = self.run_FWI()
+
+    def _generate_shot_record(self):
+        model = self.model
+        mesh = self.mesh
+        V = self.space
+        comm = self.comm 
+        vp = spyro.io.interpolate(model, mesh, V, guess=False)
+
+        p, p_r = spyro.solvers.forward(model, mesh, comm, vp, self.sources, self.wavelet, self.receivers)
+
+        spyro.io.save_shots(model, comm)
+
+    def _smooth_and_save(self):
+
+
 
     
 
