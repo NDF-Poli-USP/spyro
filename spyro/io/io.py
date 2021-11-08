@@ -46,7 +46,6 @@ def ensemble_load(func):
     return wrapper
 
 
-
 def ensemble_plot(func):
     """Decorator for `plot_shots` to distribute shots for ensemble parallelism"""
     def wrapper(*args, **kwargs):
@@ -72,6 +71,7 @@ def ensemble_forward(func):
                 return u, u_r
 
     return wrapper
+
 
 def ensemble_gradient(func):
     """Decorator for gradient to distribute shots for ensemble parallelism"""
@@ -197,8 +197,6 @@ def is_owner(ens_comm, rank):
 
     """
     return ens_comm.ensemble_comm.rank == (rank % ens_comm.ensemble_comm.size)
-
-
 
 
 def _check_units(c):
