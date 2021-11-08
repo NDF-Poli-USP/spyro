@@ -236,7 +236,6 @@ class FWI():
         self.vp = vp
 
 
-    
 class syntheticFWI(FWI):
     def __init__(self, model, comm = None, iteration_limit = 100, params = None):
         inner_product = 'L2'
