@@ -1,3 +1,4 @@
+import os
 from numpy.lib.shape_base import vsplit
 from firedrake import *
 import numpy as np
@@ -307,6 +308,14 @@ class syntheticFWI(FWI):
         spyro.io.save_shots(model, comm)
 
     def _smooth_and_save(self):
+        true_model = self.model['mesh']['true_model']
+        filename, filetype = os.path.splitext(true_model)
+        guess_model = filename+'_smooth_guess' + filetype
+
+        spyro.utils.synthetic.smooth_field(true_model, guess_model)
+        self.model['mesh']['initmodel'] = guess_model
+        
+        
 
 
 
