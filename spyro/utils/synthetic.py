@@ -6,6 +6,8 @@ import matplotlib.pyplot as plt
 import firedrake as fire
 import copy
 import spyro
+from spyro.utils.mesh_utils import cells_per_wavelength, build_mesh
+from spyro.domains.space import FE_method
 
 def smooth_field(input_filename, output_filename, show = False):
     f, filetype = os.path.splitext(input_filename)
@@ -59,8 +61,8 @@ def create_shot_record(old_model, comm, show = False):
 
     print('Entering mesh generation', flush = True)
     M = cells_per_wavelength(model)
-    mesh = build_mesh(model, vp = 'default', comm)
-    element = domains.space.FE_method(mesh, method, degree)
+    mesh = build_mesh(model, comm)
+    element = FE_method(mesh, method, degree)
     V = fire.FunctionSpace(mesh, element)
     vp = spyro.io.interpolate(model, mesh, V, guess=False)
     sources = spyro.Sources(model, mesh, V, comm)
