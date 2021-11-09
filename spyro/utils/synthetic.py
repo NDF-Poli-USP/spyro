@@ -4,6 +4,8 @@ import segyio
 import numpy as np
 import matplotlib.pyplot as plt
 import firedrake as fire
+import copy
+import spyro
 
 def smooth_field(input_filename, output_filename, show = False):
     f, filetype = os.path.splitext(input_filename)
@@ -49,6 +51,29 @@ def smooth_field(input_filename, output_filename, show = False):
 
     return None
 
-# def create_shot_record():
-#     return outputfile
+def create_shot_record(old_model, comm, show = False):
+    model = copy.deepcopy(old_model)
+    if model["mesh"]["truemodel"] == None:
+        raise ValueError('Please insert a true model for shot record creation.')
+    model["mesh"]["initmodel"] = model["mesh"]["truemodel"]
+
+    print('Entering mesh generation', flush = True)
+    M = cells_per_wavelength(model)
+    mesh = build_mesh(model, vp = 'default', comm)
+    element = domains.space.FE_method(mesh, method, degree)
+    V = fire.FunctionSpace(mesh, element)
+    vp = spyro.io.interpolate(model, mesh, V, guess=False)
+    sources = spyro.Sources(model, mesh, V, comm)
+    receivers = spyro.Receivers(model, mesh, V, comm)
+    wavelet = spyro.full_ricker_wavelet(
+        dt=model["timeaxis"]["dt"],
+        tf=model["timeaxis"]["tf"],
+        freq=model["acquisition"]["frequency"],
+    )
+    p, p_r = spyro.solvers.forward(model, mesh, comm, vp, sources, wavelet, receivers)
+    spyro.io.save_shots(model, comm, p_r)
+    if show == True:
+        spyro.plots.plot_shots(model, comm, p_r, vmin=-1e-3, vmax=1e-3)
+
+    return shot_record
 
