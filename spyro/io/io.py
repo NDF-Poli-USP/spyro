@@ -12,6 +12,9 @@ import segyio
 
 from .. import domains
 
+def print_oc(string, comm):
+    if comm.ensemble_comm.rank == 0 and comm.comm.rank == 0:
+        print(string, flush=True)
 
 def ensemble_save(func):
     """Decorator for read and write shots for ensemble parallelism"""
