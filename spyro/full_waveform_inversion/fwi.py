@@ -9,7 +9,6 @@ from mpi4py import MPI
 
 import meshio
 import SeismicMesh
-from run_fwi import Objective
 
 import spyro
 
@@ -247,7 +246,11 @@ class syntheticFWI(FWI):
         self.method = model["opts"]["method"]
         self.degree = model["opts"]["degree"]
         self.comm = spyro.utils.mpi_init(model)
-        self.shot_record = spyro.io.load_shots(model, self.comm)
+        try:
+            self.shot_record = spyro.io.load_shots(model, self.comm)
+        except:
+            self.shot_record = spyro.utils.synthetic.create_shot_record(model, self.comm)
+            self.shot_record = spyro.io.load_shots(model, self.comm)
         self.output_directory = "results/full_waveform_inversion/"
 
         if params == None:
