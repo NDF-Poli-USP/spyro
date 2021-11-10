@@ -58,12 +58,17 @@ def create_shot_record(old_model, comm, show = False):
     if model["mesh"]["truemodel"] == None:
         raise ValueError('Please insert a true model for shot record creation.')
     model["mesh"]["initmodel"] = model["mesh"]["truemodel"]
-
-    print('Entering mesh generation', flush = True)
-    M = cells_per_wavelength(model)
-    mesh = build_mesh(model, comm)
-    element = FE_method(mesh, method, degree)
-    V = fire.FunctionSpace(mesh, element)
+    
+    if model["mesh"]["meshfile"] == None:
+        model["mesh"]["meshfile"] = 'meshes/temp_synthetic_truemodel_mesh.msh'
+        print('Entering mesh generation', flush = True)
+        M = cells_per_wavelength(model["opts"]['method'],model["opts"]['degree'],model["opts"]['dimension'])
+        mesh = build_mesh(model, comm, 'meshes/temp_synthetic_truemodel_mesh.msh', model["mesh"]["initmodel"])
+        element = FE_method(mesh, model["opts"]['method'], model["opts"]['degree'])
+        V = fire.FunctionSpace(mesh, element)
+    else:
+        mesh, V = spyro.io.read_mesh(model, comm)
+    
     vp = spyro.io.interpolate(model, mesh, V, guess=False)
     sources = spyro.Sources(model, mesh, V, comm)
     receivers = spyro.Receivers(model, mesh, V, comm)
