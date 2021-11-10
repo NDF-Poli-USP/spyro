@@ -249,7 +249,7 @@ class syntheticFWI(FWI):
         try:
             self.shot_record = spyro.io.load_shots(model, self.comm)
         except:
-            self.shot_record = spyro.utils.synthetic.create_shot_record(model, self.comm)
+            self.shot_record = spyro.synthetic.create_shot_record(model, self.comm)
             self.shot_record = spyro.io.load_shots(model, self.comm)
         self.output_directory = "results/full_waveform_inversion/"
 
@@ -315,7 +315,7 @@ class syntheticFWI(FWI):
         filename, filetype = os.path.splitext(true_model)
         guess_model = filename+'_smooth_guess' + filetype
 
-        spyro.utils.synthetic.smooth_field(true_model, guess_model)
+        spyro.synthetic.smooth_field(true_model, guess_model)
         self.model['mesh']['initmodel'] = guess_model
         
         
