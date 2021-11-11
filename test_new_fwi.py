@@ -18,6 +18,7 @@ model["inversion"] = {
     "cost_functional_regularization" : True,
     "gamma" : 1e-4,
     "gradient_regularization" : False,
+    "shot_record" : False,
 }
 model["mesh"] = {
     "Lz": 3.5,   # depth in km - always positive
