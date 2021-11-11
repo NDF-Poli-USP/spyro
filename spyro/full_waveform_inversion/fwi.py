@@ -237,16 +237,14 @@ class FWI():
             File(vp_output+"initial_guess.pvd", comm=comm.comm).write(vp)
         
         if comm.ensemble_comm.rank == 0:
-            control_file = File(outdir + "control.pvd", comm=comm.comm)
-            grad_file = File(outdir + "grad.pvd", comm=comm.comm)
-
-        
+            control_file = File(self.output_directory + "control.pvd", comm=comm.comm)
+            grad_file = File(self.output_directory + "grad.pvd", comm=comm.comm)
 
         water = np.where(vp.dat.data[:] < 1.51)
 
         cont = 0
 
-        inner_product = self.inner
+        inner_product = L2Inner()
         obj = Objective(inner_product)
 
         u = Function(V, name="velocity").assign(vp)
@@ -334,8 +332,8 @@ class syntheticFWI(FWI):
         self.vp = spyro.io.interpolate(model, mesh, V, guess=True)
         self.sources, self.receivers, self.wavelet = self._get_acquisition_geometry()
         
-        if model['inversion']['shot_record'] == False:
-            self._generate_shot_record() 
+        # if model['inversion']['shot_record'] == False:
+        #     self._generate_shot_record() 
         
         self.vp = self.run_FWI()
 
@@ -356,7 +354,7 @@ class syntheticFWI(FWI):
         guess_model = filename+'_smooth_guess' + filetype
 
         spyro.synthetic.smooth_field(true_model, guess_model)
-        self.modelmodel["inversion"]['initial_model'] = guess_model
+        self.model["inversion"]['initial_guess'] = guess_model
         
         
 
