@@ -98,13 +98,13 @@ def build_mesh(model, comm, output_filename, vp_filename, units = 'km-s', see_me
 
         print('entering spatial rank 0 after mesh generation')
 
-        meshio.write_points_cells(output_filename,
+        meshio.write_points_cells(output_filename+".msh",
             points/ 1000,[("triangle", cells)],
             file_format="gmsh22", 
             binary = False
         )
         
-        meshfname = copy.deepcopy(output_filename)
+        meshfname = copy.deepcopy(output_filename+".msh")
         
         if see_mesh == True:
             output_filename =output_filename[:-4]

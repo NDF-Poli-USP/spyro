@@ -8,6 +8,8 @@ import copy
 import spyro
 from spyro.utils.mesh_utils import cells_per_wavelength, build_mesh
 from spyro.domains.space import FE_method
+from SeismicMesh import write_velocity_model
+
 
 def smooth_field(input_filename, output_filename, show = False):
     f, filetype = os.path.splitext(input_filename)
@@ -55,6 +57,8 @@ def smooth_field(input_filename, output_filename, show = False):
 
 def create_shot_record(old_model, comm, show = False):
     model = copy.deepcopy(old_model)
+    
+    # Creating forward model inputs
     if model["mesh"]["truemodel"] == None:
         raise ValueError('Please insert a true model for shot record creation.')
     model["mesh"]["initmodel"] = model["mesh"]["truemodel"]
@@ -69,6 +73,15 @@ def create_shot_record(old_model, comm, show = False):
     else:
         mesh, V = spyro.io.read_mesh(model, comm)
     
+    vpfile = model["mesh"]["truemodel"]
+    vp_filename, vp_filetype = os.path.splitext(vpfile)
+
+    if vp_filetype == '.segy':
+        write_velocity_model(vpfile, ofname = vp_filename)
+        new_vpfile = vp_filename+'.hdf5'
+        model["mesh"]["truemodel"] = new_vpfile
+
+    
     vp = spyro.io.interpolate(model, mesh, V, guess=False)
     sources = spyro.Sources(model, mesh, V, comm)
     receivers = spyro.Receivers(model, mesh, V, comm)
@@ -81,6 +94,8 @@ def create_shot_record(old_model, comm, show = False):
     spyro.io.save_shots(model, comm, p_r)
     if show == True:
         spyro.plots.plot_shots(model, comm, p_r, vmin=-1e-3, vmax=1e-3)
+
+    shot_record = spyro.io.load_shots(model, comm)
 
     return shot_record
 

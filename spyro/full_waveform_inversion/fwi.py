@@ -9,8 +9,11 @@ from mpi4py import MPI
 
 import meshio
 import SeismicMesh
+from SeismicMesh import write_velocity_model
 
 import spyro
+from spyro import receivers
+from spyro.utils.mesh_utils import build_mesh
 
 class FWI():
     """Runs a standart FWI gradient based optimization.
@@ -18,6 +21,7 @@ class FWI():
     def __init__(self, model, comm = None, iteration_limit = 100, params = None):
         inner_product = 'L2'
         self.current_iteration = 0 
+        self.mesh_iteration = 0
         self.iteration_limit = iteration_limit
         self.model = model
         self.dimension = model["opts"]["dimension"]
@@ -60,6 +64,12 @@ class FWI():
             self.mesh = mesh
             self.space = V
 
+        quad_rule = finat.quadrature.make_quadrature(
+            V.finat_element.cell, V.ufl_element().degree(), "KMV"
+        )
+        dxlump = dx(rule=quad_rule)
+        self.quadrule = dxlump
+
         self.sources, self.receivers, self.wavelet = self._get_acquisition_geometry()
         
         self.inner = self.Inner(inner_product = inner_product)
@@ -67,120 +77,150 @@ class FWI():
         self.vp = spyro.io.interpolate(model, mesh, V, guess=False)
 
         self.vp = self.run_FWI()
+    
+    def _build_inital_mesh(self):
+        vp_filename, vp_filetype = os.path.splitext(self.model["mesh"]["initmodel"])
+        if vp_filetype == '.segy':
+            write_velocity_model(self.model["mesh"]["initmodel"], ofname = vp_filename)
+            new_vpfile = vp_filename+'.hdf5'
+            self.model["mesh"]["initmodel"] = new_vpfile
+        
+        print('Entering mesh generation', flush = True)
+        mesh_filename = "fwi_mesh_"+str(self.mesh_iteration)
+        self.model["mesh"]["meshfile"] = mesh_filename +".msh"
+        mesh = build_mesh(self.model, self.comm, mesh_filename, vp_filename+'.segy' )
+        element = spyro.domains.space.FE_method(mesh, self.model["opts"]["method"], self.model["opts"]["degree"])
+        space = FunctionSpace(mesh, element)
+        return mesh, space
 
-    class Inner(object):
-        def __init__(self,inner_product='L2'):
-            if inner_product == 'L2':
+    def _get_acquisition_geometry(self):
+        comm = self.comm
+        mesh = self.mesh
+        V = self.space
+        vp = self.vp
+        sources = spyro.Sources(self.model, mesh, V, comm)
+        receivers = spyro.Receivers(self.model, mesh, V, comm)
+        wavelet = spyro.full_ricker_wavelet(
+            dt=self.model["timeaxis"]["dt"],
+            tf=self.model["timeaxis"]["tf"],
+            freq=self.model["acquisition"]["frequency"],
+        )
+        return sources, receivers, wavelet
+
+    def run_FWI(self, continuation = False, iterations = None):
+
+        V = self.space
+        dxlump = self.quadrule
+        model = self.model
+        mesh = self.mesh
+        comm = self.comm
+        vp = self.vp
+        sources = self.sources
+        wavelet = self.wavelet
+        receivers = self.receivers
+        
+        def regularize_gradient(vp, dJ):
+            """Tikhonov regularization"""
+            m_u = TrialFunction(V)
+            m_v = TestFunction(V)
+            mgrad = m_u * m_v * dxlump
+            ffG = dot(grad(vp), grad(m_v)) * dxlump
+            G = mgrad - ffG
+            lhsG, rhsG = lhs(G), rhs(G)
+            gradreg = Function(V)
+            grad_prob = LinearVariationalProblem(lhsG, rhsG, gradreg)
+            grad_solver = LinearVariationalSolver(
+                grad_prob,
+                solver_parameters={
+                    "ksp_type": "preonly",
+                    "pc_type": "jacobi",
+                    "mat_type": "matfree",
+                },
+            )
+            grad_solver.solve()
+            dJ += gradreg
+            return dJ
+
+        class Objective(ROL.Objective):
+            def __init__(self, inner_product):
+                ROL.Objective.__init__(self)
+                self.inner_product = inner_product
+                self.p_guess = None
+                self.misfit = 0.0
+                self.p_exact_recv = spyro.io.load_shots(model, comm)
+
+            def value(self, x, tol):
+                """Compute the functional"""
+                J_total = np.zeros((1))
+                self.p_guess, p_guess_recv = spyro.solvers.forward(
+                    model,
+                    mesh,
+                    comm,
+                    vp,
+                    sources,
+                    wavelet,
+                    receivers,
+                )
+                self.misfit = spyro.utils.evaluate_misfit(
+                    model, p_guess_recv, self.p_exact_recv
+                )
+                J_total[0] += spyro.utils.compute_functional(model, self.misfit, velocity=vp)
+                J_total = COMM_WORLD.allreduce(J_total, op=MPI.SUM)
+                J_total[0] /= comm.ensemble_comm.size
+                if comm.comm.size > 1:
+                    J_total[0] /= comm.comm.size
+                return J_total[0]
+
+            def gradient(self, g, x, tol):
+                """Compute the gradient of the functional"""
+                dJ = Function(V, name="gradient")
+                dJ_local = spyro.solvers.gradient(
+                    model,
+                    mesh,
+                    comm,
+                    vp,
+                    receivers,
+                    self.p_guess,
+                    self.misfit,
+                )
+                if comm.ensemble_comm.size > 1:
+                    comm.allreduce(dJ_local, dJ)
+                else:
+                    dJ = dJ_local
+                dJ /= comm.ensemble_comm.size
+                if comm.comm.size > 1:
+                    dJ /= comm.comm.size
+                # regularize the gradient if asked.
+                if model['opts']['regularization']:
+                    dJ = regularize_gradient(vp, dJ)
+                # mask the water layer
+                dJ.dat.data[water] = 0.0
+                # Visualize
+                if comm.ensemble_comm.rank == 0:
+                    grad_file.write(dJ)
+                g.scale(0)
+                g.vec += dJ
+
+            def update(self, x, flag, iteration):
+                vp.assign(Function(V, x.vec, name="velocity"))
+                # If iteration reduces functional, save it.
+                if iteration >= 0:
+                    if comm.ensemble_comm.rank == 0:
+                        control_file.write(vp)
+        class L2Inner(object):
+            def __init__(self):
                 self.A = assemble(
                     TrialFunction(V) * TestFunction(V) * dxlump, mat_type="matfree"
                 )
-            self.Ap = as_backend_type(self.A).mat()
+                self.Ap = as_backend_type(self.A).mat()
 
-        def eval(self, _u, _v):
-            upet = as_backend_type(_u).vec()
-            vpet = as_backend_type(_v).vec()
-            A_u = self.Ap.createVecLeft()
-            self.Ap.mult(upet, A_u)
-            return vpet.dot(A_u)
-    
-    def regularize_gradient(vp, dJ):
-        """Tikhonov regularization"""
-        m_u = TrialFunction(V)
-        m_v = TestFunction(V)
-        mgrad = m_u * m_v * dx(rule=qr_x)
-        ffG = dot(grad(vp), grad(m_v)) * dx(rule=qr_x)
-        G = mgrad - ffG
-        lhsG, rhsG = lhs(G), rhs(G)
-        gradreg = Function(V)
-        grad_prob = LinearVariationalProblem(lhsG, rhsG, gradreg)
-        grad_solver = LinearVariationalSolver(
-            grad_prob,
-            solver_parameters={
-                "ksp_type": "preonly",
-                "pc_type": "jacobi",
-                "mat_type": "matfree",
-            },
-        )
-        grad_solver.solve()
-        dJ += gradreg
-        return dJ
+            def eval(self, _u, _v):
+                upet = as_backend_type(_u).vec()
+                vpet = as_backend_type(_v).vec()
+                A_u = self.Ap.createVecLeft()
+                self.Ap.mult(upet, A_u)
+                return vpet.dot(A_u)
 
-    class Objective(ROL.Objective):
-        def __init__(self, inner_product):
-            ROL.Objective.__init__(self)
-            self.inner_product = inner_product
-            self.p_guess = None
-            self.misfit = 0.0
-            self.p_exact_recv = spyro.io.load_shots(model, comm)
-
-        def value(self, x, tol):
-            """Compute the functional"""
-            J_total = np.zeros((1))
-            self.p_guess, p_guess_recv = spyro.solvers.forward(
-                model,
-                mesh,
-                comm,
-                vp,
-                sources,
-                wavelet,
-                receivers,
-            )
-            self.misfit = spyro.utils.evaluate_misfit(
-                model, p_guess_recv, self.p_exact_recv
-            )
-            J_total[0] += spyro.utils.compute_functional(model, self.misfit, velocity=vp)
-            J_total = COMM_WORLD.allreduce(J_total, op=MPI.SUM)
-            J_total[0] /= comm.ensemble_comm.size
-            if comm.comm.size > 1:
-                J_total[0] /= comm.comm.size
-            return J_total[0]
-
-        def gradient(self, g, x, tol):
-            """Compute the gradient of the functional"""
-            dJ = Function(V, name="gradient")
-            dJ_local = spyro.solvers.gradient(
-                model,
-                mesh,
-                comm,
-                vp,
-                receivers,
-                self.p_guess,
-                self.misfit,
-            )
-            if comm.ensemble_comm.size > 1:
-                comm.allreduce(dJ_local, dJ)
-            else:
-                dJ = dJ_local
-            dJ /= comm.ensemble_comm.size
-            if comm.comm.size > 1:
-                dJ /= comm.comm.size
-            # regularize the gradient if asked.
-            if model['opts']['regularization']:
-                dJ = regularize_gradient(vp, dJ)
-            # mask the water layer
-            dJ.dat.data[water] = 0.0
-            # Visualize
-            if comm.ensemble_comm.rank == 0:
-                grad_file.write(dJ)
-            g.scale(0)
-            g.vec += dJ
-
-        def update(self, x, flag, iteration):
-            vp.assign(Function(V, x.vec, name="velocity"))
-            # If iteration reduces functional, save it.
-            if iteration >= 0:
-                if comm.ensemble_comm.rank == 0:
-                    control_file.write(vp)
-
-    def _build_inital_mesh(self):
-        print('Entering mesh generation', flush = True)
-        M = cells_per_wavelength(self.model)
-        mesh = build_mesh(model, vp = 'default')
-        element = domains.space.FE_method(mesh, method, degree)
-        space = fire.FunctionSpace(mesh, element)
-        return mesh, space
-
-    def run_FWI(self, continuation = False, iterations = None):
         if continuation == True:
             self.iteration_limit = iterations
             self.parameters['Status Test']['Iteration Limit'] = iterations
@@ -200,10 +240,7 @@ class FWI():
             control_file = File(outdir + "control.pvd", comm=comm.comm)
             grad_file = File(outdir + "grad.pvd", comm=comm.comm)
 
-        quad_rule = finat.quadrature.make_quadrature(
-            V.finat_element.cell, V.ufl_element().degree(), "KMV"
-        )
-        dxlump = dx(rule=quad_rule)
+        
 
         water = np.where(vp.dat.data[:] < 1.51)
 
@@ -240,6 +277,7 @@ class syntheticFWI(FWI):
     def __init__(self, model, comm = None, iteration_limit = 100, params = None):
         inner_product = 'L2'
         self.current_iteration = 0 
+        self.mesh_iteration = 0
         self.iteration_limit = iteration_limit
         self.model = model
         self.dimension = model["opts"]["dimension"]
@@ -250,7 +288,6 @@ class syntheticFWI(FWI):
             self.shot_record = spyro.io.load_shots(model, self.comm)
         except:
             self.shot_record = spyro.synthetic.create_shot_record(model, self.comm)
-            self.shot_record = spyro.io.load_shots(model, self.comm)
         self.output_directory = "results/full_waveform_inversion/"
 
         if params == None:
@@ -277,25 +314,32 @@ class syntheticFWI(FWI):
             self.comm = comm
 
         self.parameters = params
+        if model['mesh']['initmodel'] == None:
+            self._smooth_and_save() 
         if model["mesh"]["meshfile"] != None:
             mesh, V = spyro.io.read_mesh(model, self.comm)
             self.mesh = mesh
             self.space = V
         else:
-            mesh, V = self._build_initial_mesh()
+            mesh, V = self._build_inital_mesh()
             self.mesh = mesh
             self.space = V
 
+        quad_rule = finat.quadrature.make_quadrature(
+            V.finat_element.cell, V.ufl_element().degree(), "KMV"
+        )
+        dxlump = dx(rule=quad_rule)
+        self.quadrule = dxlump
+
+        self.vp = spyro.io.interpolate(model, mesh, V, guess=True)
         self.sources, self.receivers, self.wavelet = self._get_acquisition_geometry()
         
         self.inner = self.Inner(inner_product = inner_product)
 
         if model['inversion']['shot_record'] == False:
-            self._generate_shot_record()
-        if model['inversion']['initial_guess'] == False:
-            self._smooth_and_save_vp_guess()  
+            self._generate_shot_record() 
 
-        self.vp = spyro.io.interpolate(model, mesh, V, guess=False)
+        
         
         self.vp = self.run_FWI()
 
@@ -311,7 +355,7 @@ class syntheticFWI(FWI):
         spyro.io.save_shots(model, comm)
 
     def _smooth_and_save(self):
-        true_model = self.model['mesh']['true_model']
+        true_model = self.model['mesh']['truemodel']
         filename, filetype = os.path.splitext(true_model)
         guess_model = filename+'_smooth_guess' + filetype
 
