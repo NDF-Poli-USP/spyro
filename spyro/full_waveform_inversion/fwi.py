@@ -79,11 +79,11 @@ class FWI():
         self.vp = self.run_FWI()
     
     def _build_inital_mesh(self):
-        vp_filename, vp_filetype = os.path.splitext(self.model["mesh"]["initmodel"])
+        vp_filename, vp_filetype = os.path.splitext(self.model["inversion"]["initial_guess"])
         if vp_filetype == '.segy':
-            write_velocity_model(self.model["mesh"]["initmodel"], ofname = vp_filename)
+            write_velocity_model(self.model["inversion"]["initial_guess"], ofname = vp_filename)
             new_vpfile = vp_filename+'.hdf5'
-            self.model["mesh"]["initmodel"] = new_vpfile
+            self.model["inversion"]["initial_guess"] = new_vpfile
         
         print('Entering mesh generation', flush = True)
         mesh_filename = "fwi_mesh_"+str(self.mesh_iteration)
@@ -275,7 +275,7 @@ class FWI():
 
 class syntheticFWI(FWI):
     def __init__(self, model, comm = None, iteration_limit = 100, params = None):
-        inner_product = 'L2'
+        self.inner_product = 'L2'
         self.current_iteration = 0 
         self.mesh_iteration = 0
         self.iteration_limit = iteration_limit
@@ -314,7 +314,7 @@ class syntheticFWI(FWI):
             self.comm = comm
 
         self.parameters = params
-        if model['mesh']['initmodel'] == None:
+        if model['inversion']['initial_guess'] == None:
             self._smooth_and_save() 
         if model["mesh"]["meshfile"] != None:
             mesh, V = spyro.io.read_mesh(model, self.comm)
@@ -334,12 +334,8 @@ class syntheticFWI(FWI):
         self.vp = spyro.io.interpolate(model, mesh, V, guess=True)
         self.sources, self.receivers, self.wavelet = self._get_acquisition_geometry()
         
-        self.inner = self.Inner(inner_product = inner_product)
-
         if model['inversion']['shot_record'] == False:
             self._generate_shot_record() 
-
-        
         
         self.vp = self.run_FWI()
 
@@ -355,12 +351,12 @@ class syntheticFWI(FWI):
         spyro.io.save_shots(model, comm)
 
     def _smooth_and_save(self):
-        true_model = self.model['mesh']['truemodel']
+        true_model = self.model['inversion']['true_model']
         filename, filetype = os.path.splitext(true_model)
         guess_model = filename+'_smooth_guess' + filetype
 
         spyro.synthetic.smooth_field(true_model, guess_model)
-        self.model['mesh']['initmodel'] = guess_model
+        self.modelmodel["inversion"]['initial_model'] = guess_model
         
         
 

@@ -59,9 +59,9 @@ def create_shot_record(old_model, comm, show = False):
     model = copy.deepcopy(old_model)
     
     # Creating forward model inputs
-    if model["mesh"]["truemodel"] == None:
+    if model["inversion"]["true_model"] == None:
         raise ValueError('Please insert a true model for shot record creation.')
-    model["mesh"]["initmodel"] = model["mesh"]["truemodel"]
+    model["inversion"]["initial_guess"] = model["inversion"]["true_model"]
     
     if model["mesh"]["meshfile"] == None:
         model["mesh"]["meshfile"] = 'meshes/temp_synthetic_truemodel_mesh.msh'
@@ -73,13 +73,13 @@ def create_shot_record(old_model, comm, show = False):
     else:
         mesh, V = spyro.io.read_mesh(model, comm)
     
-    vpfile = model["mesh"]["truemodel"]
+    vpfile = model["inversion"]["true_model"]
     vp_filename, vp_filetype = os.path.splitext(vpfile)
 
     if vp_filetype == '.segy':
         write_velocity_model(vpfile, ofname = vp_filename)
         new_vpfile = vp_filename+'.hdf5'
-        model["mesh"]["truemodel"] = new_vpfile
+        model["inversion"]["true_model"] = new_vpfile
 
     
     vp = spyro.io.interpolate(model, mesh, V, guess=False)

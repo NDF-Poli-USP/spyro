@@ -12,13 +12,18 @@ model["opts"] = {
 model["parallelism"] = {
     "type": "spatial",
 }
+model["inversion"] = {
+    "initial_guess" : None,
+    "true_model" : "velocity_models/vp_marmousi-ii.segy",
+    "cost_functional_regularization" : True,
+    "gamma" : 1e-4,
+    "gradient_regularization" : False,
+}
 model["mesh"] = {
     "Lz": 3.5,   # depth in km - always positive
     "Lx": 17.0,  # width in km - always positive
     "Ly": 0.0,   # thickness in km - always positive
     "meshfile": None,
-    "initmodel": None,
-    "truemodel": "velocity_models/vp_marmousi-ii.segy",
 }
 model["BCs"] = {
     "status": True,  # True or false
