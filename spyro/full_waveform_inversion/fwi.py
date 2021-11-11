@@ -143,6 +143,7 @@ class FWI():
 
         class Objective(ROL.Objective):
             def __init__(self, inner_product):
+                self.vp = vp
                 ROL.Objective.__init__(self)
                 self.inner_product = inner_product
                 self.p_guess = None
@@ -191,7 +192,7 @@ class FWI():
                 if comm.comm.size > 1:
                     dJ /= comm.comm.size
                 # regularize the gradient if asked.
-                if model['opts']['regularization']:
+                if model['inversion']['gradient_regularization']:
                     dJ = regularize_gradient(vp, dJ)
                 # mask the water layer
                 dJ.dat.data[water] = 0.0
