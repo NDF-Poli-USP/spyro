@@ -15,9 +15,10 @@ model["parallelism"] = {
 model["inversion"] = {
     "initial_guess" : None,
     "true_model" : "velocity_models/vp_marmousi-ii.segy",
-    "cost_functional_regularization" : True,
+    "regularization" : True,
     "gamma" : 1e-4,
-    "gradient_regularization" : False,
+    "gradient_smoothing" : False,
+    "gamma2": None,
     "shot_record" : False,
 }
 model["mesh"] = {
