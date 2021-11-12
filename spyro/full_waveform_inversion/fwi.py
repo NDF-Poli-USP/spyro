@@ -1,11 +1,13 @@
 import os
 from numpy.lib.shape_base import vsplit
+import matplotlib.pyplot as plt
 from firedrake import *
 import numpy as np
 import finat
 from ROL.firedrake_vector import FiredrakeVector as FeVector
 import ROL
 from mpi4py import MPI
+import copy
 
 import meshio
 import SeismicMesh
@@ -143,7 +145,7 @@ class FWI():
 
         class Objective(ROL.Objective):
             def __init__(self, inner_product):
-                self.vp = vp
+                self.vp = Function(V)
                 ROL.Objective.__init__(self)
                 self.inner_product = inner_product
                 self.p_guess = None
@@ -153,19 +155,32 @@ class FWI():
             def value(self, x, tol):
                 """Compute the functional"""
                 J_total = np.zeros((1))
+                self.vp.dat.data[:] = x[:]
                 self.p_guess, p_guess_recv = spyro.solvers.forward(
                     model,
                     mesh,
                     comm,
-                    vp,
+                    self.vp,
                     sources,
                     wavelet,
                     receivers,
                 )
+                if True:
+                #     spyro.plots.plot_shots(model, comm, p_r, vmin=-1e-3, vmax=1e-3)
+                    ue=[]
+                    nt = int(model["timeaxis"]["tf"] / model["timeaxis"]["dt"])
+                    rn = 0
+                    for ti in range(nt):
+                        ue.append(p_guess_recv[ti][rn])
+                    plt.title("u_z")
+                    plt.plot(ue,label='guess')
+                    plt.legend()
+                    plt.savefig('FWI_acoustic_guess.png')
+                    plt.close()
                 self.misfit = spyro.utils.evaluate_misfit(
                     model, p_guess_recv, self.p_exact_recv
                 )
-                J_total[0] += spyro.utils.compute_functional(model, self.misfit, velocity=vp)
+                J_total[0] += spyro.utils.compute_functional(model, self.misfit, velocity=self.vp)
                 J_total = COMM_WORLD.allreduce(J_total, op=MPI.SUM)
                 J_total[0] /= comm.ensemble_comm.size
                 if comm.comm.size > 1:
@@ -175,11 +190,12 @@ class FWI():
             def gradient(self, g, x, tol):
                 """Compute the gradient of the functional"""
                 dJ = Function(V, name="gradient")
+                self.vp.dat.data[:] = x[:]
                 dJ_local = spyro.solvers.gradient(
                     model,
                     mesh,
                     comm,
-                    vp,
+                    self.vp,
                     receivers,
                     self.p_guess,
                     self.misfit,
@@ -195,7 +211,7 @@ class FWI():
                 if model['inversion']['gradient_regularization']:
                     dJ = regularize_gradient(vp, dJ)
                 # mask the water layer
-                dJ.dat.data[water] = 0.0
+                #dJ.dat.data[water] = 0.0
                 # Visualize
                 if comm.ensemble_comm.rank == 0:
                     grad_file.write(dJ)
@@ -241,7 +257,7 @@ class FWI():
             control_file = File(self.output_directory + "control.pvd", comm=comm.comm)
             grad_file = File(self.output_directory + "grad.pvd", comm=comm.comm)
 
-        water = np.where(vp.dat.data[:] < 1.51)
+        #water = np.where(vp.dat.data[:] < 1.51)
 
         cont = 0
 
@@ -252,11 +268,11 @@ class FWI():
         opt = FeVector(u.vector(), inner_product)
         # Add control bounds to the problem (uses more RAM)
         xlo = Function(V)
-        xlo.interpolate(Constant(1.0))
+        xlo.interpolate(Constant(0.1))
         x_lo = FeVector(xlo.vector(), inner_product)
 
         xup = Function(V)
-        xup.interpolate(Constant(5.0))
+        xup.interpolate(Constant(3.0))
         x_up = FeVector(xup.vector(), inner_product)
 
         bnd = ROL.Bounds(x_lo, x_up, 1.0)
@@ -358,6 +374,88 @@ class syntheticFWI(FWI):
         self.model["inversion"]['initial_guess'] = guess_model
         
         
+class simpleFWI(syntheticFWI):
+    def __init__(self, model, iteration_limit, mesh, vp_initial, vp_true, generate_shot = False, params = None):
+        self.inner_product = 'L2'
+        self.current_iteration = 0 
+        self.mesh_iteration = 0
+        self.iteration_limit = iteration_limit
+        self.model = model
+        self.dimension = model["opts"]["dimension"]
+        self.method = model["opts"]["method"]
+        self.degree = model["opts"]["degree"]
+        self.comm = spyro.utils.mpi_init(model)
+        self.mesh = mesh
+
+        element = spyro.domains.space.FE_method(mesh, self.model["opts"]["method"], self.model["opts"]["degree"])
+        V = FunctionSpace(mesh, element)
+        self.space = V
+
+        quad_rule = finat.quadrature.make_quadrature(
+            V.finat_element.cell, V.ufl_element().degree(), "KMV"
+        )
+        dxlump = dx(rule=quad_rule)
+        self.quadrule = dxlump
+
+        self.vp = vp_initial
+        self.sources, self.receivers, self.wavelet = self._get_acquisition_geometry()
+
+        if generate_shot == False:
+            self.shot_record = spyro.io.load_shots(model, self.comm)
+        else:
+            self.shot_record = self._generate_shot_record(model, vp_true, show = True)
+        self.output_directory = "results/simple_full_waveform_inversion/"
+
+        if params == None:
+            params = {
+                "General": {"Secant": {"Type": "Limited-Memory BFGS", "Maximum Storage": 10}},
+                "Step": {
+                    "Type": "Augmented Lagrangian",
+                    "Augmented Lagrangian": {
+                        "Subproblem Step Type": "Line Search",
+                        "Subproblem Iteration Limit": 5.0,
+                    },
+                    "Line Search": {"Descent Method": {"Type": "Quasi-Newton Step"}},
+                },
+                "Status Test": {
+                    "Gradient Tolerance": 1e-16,
+                    "Iteration Limit": iteration_limit,
+                    "Step Tolerance": 1.0e-16,
+                },
+            }
+
+        self.parameters = params
+        
+        
+        
+        self.vp = self.run_FWI()
+    
+    def _generate_shot_record(self, old_model, vp, show = False):
+        comm = self.comm
+        model = copy.deepcopy(old_model)
+        mesh = self.mesh
+        V = self.space
+        
+        sources = self.sources
+        receivers = self.receivers
+        wavelet = self.wavelet
+        p, p_r = spyro.solvers.forward(model, mesh, comm, vp, sources, wavelet, receivers, output = show)
+        spyro.io.save_shots(model, comm, p_r)
+        if show == True:
+        #     spyro.plots.plot_shots(model, comm, p_r, vmin=-1e-3, vmax=1e-3)
+            ue=[]
+            nt = int(model["timeaxis"]["tf"] / model["timeaxis"]["dt"])
+            rn = 0
+            for ti in range(nt):
+                ue.append(p_r[ti][rn])
+            plt.title("u_z")
+            plt.plot(ue,label='exact')
+            plt.legend()
+            plt.savefig('FWI_acoustic.png')
+            plt.close()
+        shot_record = spyro.io.load_shots(model, comm)
+
+        return shot_record
 
 
 
