@@ -67,7 +67,7 @@ def create_shot_record(old_model, comm, show = False):
         model["mesh"]["meshfile"] = 'meshes/temp_synthetic_truemodel_mesh.msh'
         print('Entering mesh generation', flush = True)
         M = cells_per_wavelength(model["opts"]['method'],model["opts"]['degree'],model["opts"]['dimension'])
-        mesh = build_mesh(model, comm, 'meshes/temp_synthetic_truemodel_mesh.msh', model["mesh"]["initmodel"])
+        mesh = build_mesh(model, comm, 'meshes/temp_synthetic_truemodel_mesh.msh', model["inversion"]["initial_guess"])
         element = FE_method(mesh, model["opts"]['method'], model["opts"]['degree'])
         V = fire.FunctionSpace(mesh, element)
     else:

@@ -37,12 +37,12 @@ model["BCs"] = {
 }
 model["acquisition"] = {
     "source_type": "Ricker",
-    "num_sources": 1,
-    "source_pos": [(0.5,0.5)],
+    "num_sources": 3,
+    "source_pos": [(0.4,0.5),(0.5,0.5),(0.6,0.5)],
     "frequency": 5.0,
     "delay": 1.0,
-    "num_receivers": 1,
-    "receiver_locations": [(0.2, 0.2)],
+    "num_receivers": 10,
+    "receiver_locations": spyro.create_transect((0.2, 0.2), (0.8, 0.2),10),
 }
 model["timeaxis"] = {
     "t0": 0.0,  #  Initial time for event
@@ -62,6 +62,6 @@ V = fire.FunctionSpace(mesh, element)
 vp_initial = fire.Function(V).interpolate(fire.Constant(0.9))
 
 vp_true = fire.Function(V).interpolate(fire.Constant(1.0))
-iteration_limit = 10
+iteration_limit = 50
 vp = simpleFWI(model, iteration_limit, mesh, vp_initial, vp_true, generate_shot= True)
 

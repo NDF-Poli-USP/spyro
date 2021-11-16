@@ -53,7 +53,7 @@ model["timeaxis"] = {
     "dt": 0.001,
     "amplitude": 1,  # the Ricker has an amplitude of 1.
     "nspool": 100,  # how frequently to output solution to pvds
-    "fspool": 99999,  # how frequently to save solution to RAM
+    "fspool": 200,  # how frequently to save solution to RAM
 }
 
 vp = syntheticFWI(model)

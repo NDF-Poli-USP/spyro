@@ -165,18 +165,18 @@ class FWI():
                     wavelet,
                     receivers,
                 )
-                if True:
-                #     spyro.plots.plot_shots(model, comm, p_r, vmin=-1e-3, vmax=1e-3)
-                    ue=[]
-                    nt = int(model["timeaxis"]["tf"] / model["timeaxis"]["dt"])
-                    rn = 0
-                    for ti in range(nt):
-                        ue.append(p_guess_recv[ti][rn])
-                    plt.title("u_z")
-                    plt.plot(ue,label='guess')
-                    plt.legend()
-                    plt.savefig('FWI_acoustic_guess.png')
-                    plt.close()
+                # if True:
+                # #     spyro.plots.plot_shots(model, comm, p_r, vmin=-1e-3, vmax=1e-3)
+                #     ue=[]
+                #     nt = int(model["timeaxis"]["tf"] / model["timeaxis"]["dt"])
+                #     rn = 0
+                #     for ti in range(nt):
+                #         ue.append(p_guess_recv[ti][rn])
+                #     plt.title("u_z")
+                #     plt.plot(ue,label='guess')
+                #     plt.legend()
+                #     plt.savefig('FWI_acoustic_guess.png')
+                #     plt.close()
                 self.misfit = spyro.utils.evaluate_misfit(
                     model, p_guess_recv, self.p_exact_recv
                 )
@@ -208,7 +208,7 @@ class FWI():
                 if comm.comm.size > 1:
                     dJ /= comm.comm.size
                 # regularize the gradient if asked.
-                if model['inversion']['gradient_regularization']:
+                if model['inversion']['regularization']:
                     dJ = regularize_gradient(vp, dJ)
                 # mask the water layer
                 #dJ.dat.data[water] = 0.0
@@ -459,8 +459,4 @@ class simpleFWI(syntheticFWI):
 
 
 
-    
-
-
-        
 
