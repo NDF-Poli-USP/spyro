@@ -88,7 +88,7 @@ class FWI():
             self.model["inversion"]["initial_guess"] = new_vpfile
         
         print('Entering mesh generation', flush = True)
-        mesh_filename = "fwi_mesh_"+str(self.mesh_iteration)
+        mesh_filename = "meshes/fwi_mesh_"+str(self.mesh_iteration)
         self.model["mesh"]["meshfile"] = mesh_filename +".msh"
         mesh = build_mesh(self.model, self.comm, mesh_filename, vp_filename+'.segy' )
         element = spyro.domains.space.FE_method(mesh, self.model["opts"]["method"], self.model["opts"]["degree"])
@@ -224,6 +224,7 @@ class FWI():
                 if iteration >= 0:
                     if comm.ensemble_comm.rank == 0:
                         control_file.write(vp)
+        
         class L2Inner(object):
             def __init__(self):
                 self.A = assemble(
@@ -268,11 +269,11 @@ class FWI():
         opt = FeVector(u.vector(), inner_product)
         # Add control bounds to the problem (uses more RAM)
         xlo = Function(V)
-        xlo.interpolate(Constant(0.1))
+        xlo.interpolate(Constant(0.5))
         x_lo = FeVector(xlo.vector(), inner_product)
 
         xup = Function(V)
-        xup.interpolate(Constant(3.0))
+        xup.interpolate(Constant(3.5))
         x_up = FeVector(xup.vector(), inner_product)
 
         bnd = ROL.Bounds(x_lo, x_up, 1.0)
@@ -430,7 +431,7 @@ class simpleFWI(syntheticFWI):
         
         self.vp = self.run_FWI()
     
-    def _generate_shot_record(self, old_model, vp, show = False):
+    def _generate_shot_record(self, old_model, vp, show = True):
         comm = self.comm
         model = copy.deepcopy(old_model)
         mesh = self.mesh
@@ -441,18 +442,18 @@ class simpleFWI(syntheticFWI):
         wavelet = self.wavelet
         p, p_r = spyro.solvers.forward(model, mesh, comm, vp, sources, wavelet, receivers, output = show)
         spyro.io.save_shots(model, comm, p_r)
-        if show == True:
+        # if show == True:
         #     spyro.plots.plot_shots(model, comm, p_r, vmin=-1e-3, vmax=1e-3)
-            ue=[]
-            nt = int(model["timeaxis"]["tf"] / model["timeaxis"]["dt"])
-            rn = 0
-            for ti in range(nt):
-                ue.append(p_r[ti][rn])
-            plt.title("u_z")
-            plt.plot(ue,label='exact')
-            plt.legend()
-            plt.savefig('FWI_acoustic.png')
-            plt.close()
+            # ue=[]
+            # nt = int(model["timeaxis"]["tf"] / model["timeaxis"]["dt"])
+            # rn = 0
+            # for ti in range(nt):
+            #     ue.append(p_r[ti][rn])
+            # plt.title("u_z")
+            # plt.plot(ue,label='exact')
+            # plt.legend()
+            # plt.savefig('FWI_acoustic.png')
+            # plt.close()
         shot_record = spyro.io.load_shots(model, comm)
 
         return shot_record

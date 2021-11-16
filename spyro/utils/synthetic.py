@@ -63,15 +63,13 @@ def create_shot_record(old_model, comm, show = False):
         raise ValueError('Please insert a true model for shot record creation.')
     model["inversion"]["initial_guess"] = model["inversion"]["true_model"]
     
-    if model["mesh"]["meshfile"] == None:
-        model["mesh"]["meshfile"] = 'meshes/temp_synthetic_truemodel_mesh.msh'
-        print('Entering mesh generation', flush = True)
-        M = cells_per_wavelength(model["opts"]['method'],model["opts"]['degree'],model["opts"]['dimension'])
-        mesh = build_mesh(model, comm, 'meshes/temp_synthetic_truemodel_mesh.msh', model["inversion"]["initial_guess"])
-        element = FE_method(mesh, model["opts"]['method'], model["opts"]['degree'])
-        V = fire.FunctionSpace(mesh, element)
-    else:
-        mesh, V = spyro.io.read_mesh(model, comm)
+    model["mesh"]["meshfile"] = 'meshes/temp_synthetic_truemodel_mesh.msh'
+    print('Entering mesh generation', flush = True)
+    M = cells_per_wavelength(model["opts"]['method'],model["opts"]['degree'],model["opts"]['dimension'])
+    mesh = build_mesh(model, comm, 'meshes/temp_synthetic_truemodel_mesh', model["inversion"]["initial_guess"])
+    element = FE_method(mesh, model["opts"]['method'], model["opts"]['degree'])
+    V = fire.FunctionSpace(mesh, element)
+
     
     vpfile = model["inversion"]["true_model"]
     vp_filename, vp_filetype = os.path.splitext(vpfile)
@@ -90,7 +88,7 @@ def create_shot_record(old_model, comm, show = False):
         tf=model["timeaxis"]["tf"],
         freq=model["acquisition"]["frequency"],
     )
-    p, p_r = spyro.solvers.forward(model, mesh, comm, vp, sources, wavelet, receivers)
+    p, p_r = spyro.solvers.forward(model, mesh, comm, vp, sources, wavelet, receivers, output = True)
     spyro.io.save_shots(model, comm, p_r)
     if show == True:
         spyro.plots.plot_shots(model, comm, p_r, vmin=-1e-3, vmax=1e-3)

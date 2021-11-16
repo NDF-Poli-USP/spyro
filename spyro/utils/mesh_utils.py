@@ -107,7 +107,6 @@ def build_mesh(model, comm, output_filename, vp_filename, units = 'km-s', see_me
         meshfname = copy.deepcopy(output_filename+".msh")
         
         if see_mesh == True:
-            output_filename =output_filename[:-4]
             meshio.write_points_cells(output_filename+".vtk",
                 points/ 1000,[("triangle", cells)],
                 file_format="vtk"
