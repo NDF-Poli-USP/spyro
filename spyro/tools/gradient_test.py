@@ -140,7 +140,7 @@ def gradient_test_elastic(model, mesh, V, comm, rho, lamb_exact, mu_exact, lamb_
         model, mesh, comm, rho, lamb_guess, mu_exact, sources, wavelet, receivers, output=False #FIXME
     )
     
-    if True:
+    if False:
         ue=[]
         ug=[]
         nt = int(model["timeaxis"]["tf"] / model["timeaxis"]["dt"])
@@ -162,7 +162,7 @@ def gradient_test_elastic(model, mesh, V, comm, rho, lamb_exact, mu_exact, lamb_
     else:
         misfit_uy = []
     
-    if True:
+    if False:
         plt.title("misfits (uz, ux)")
         plt.plot(uz_exact_recv-uz_guess_recv,label='misfit uz 1')
         plt.plot(misfit_uz,label='misfit uz 2',linestyle='--')
@@ -186,7 +186,7 @@ def gradient_test_elastic(model, mesh, V, comm, rho, lamb_exact, mu_exact, lamb_
     # compute the gradient of the control (to be verified)
     print('######## Computing the gradient by adjoint method ########')
     dJdl, dJdm = gradient_elastic_waves(
-        model, mesh, comm, rho, lamb_guess, mu_guess, receivers, u_guess, misfit_uz, misfit_ux, misfit_uy, output=True
+        model, mesh, comm, rho, lamb_guess, mu_guess, receivers, u_guess, misfit_uz, misfit_ux, misfit_uy, output=False
     )
     #sys.exit("sys.exit called")
     if mask: # water mask 
