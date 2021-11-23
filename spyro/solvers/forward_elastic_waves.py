@@ -143,30 +143,15 @@ def forward_elastic_waves(
     
         # damping at outer boundaries (-x,+x,-z,+z)
         if model["BCs"]["outer_bc"] == "non-reflective" and model["BCs"]["abl_bc"] != "alid":
-            # old code, keeping here for now
-            #cmax = ((lamb + 2*mu)/rho)**0.5 
-            #tol = 0.000001
-            #g = conditional(x < x1-lx+tol, 1.0, 0.0) # assuming that all x<x1 belongs to abs layer
-            #g = conditional(x > x2+lx-tol, 1.0, g)   # assuming that all x>x2 belongs to abs layer
-            #g = conditional(z < z2-lz+tol, 1.0, g)   # assuming that all z<z2 belongs to abs layer
-            #G = FunctionSpace(mesh, element)
-            #c = Function(G, name="Damping_coefficient").interpolate(g)
-            #if output:
-            #    File("damping_coefficient_outer_bc.pvd").write(c)
-            #nf = cmax * c * inner( ((u_n - u_nm1) / dt) , v ) * ds(rule=qr_s)
-           
-            # to get the normal vector
+            # get normal and tangent vectors 
             n = firedrake.FacetNormal(mesh)
-            #n = FacetNormal(mesh)
-            #t = ufl.perp(n)
             t = firedrake.perp(n)
-            #print(assemble(inner(v, n) * ds))
-            print(assemble(inner(v, t) * ds))
 
-            # FIXME keeping c_p for now, but it should be changed to a matrix form
             c_p = ((lamb + 2.*mu)/rho)**0.5
-            #c_s = (mu/rho)**0.5
-            nf = rho * c_p * inner( ((u_n - u_nm1) / dt) , v ) * ds(rule=qr_s) # backward-difference scheme 
+            c_s = (mu/rho)**0.5
+            C = c_p * outer(n,n) + c_s * outer(t,t)
+            
+            nf = rho * inner( C * ((u_n - u_nm1) / dt), v ) * ds(rule=qr_s) # backward-difference scheme 
             bc_defined = True
         else:
             if model["BCs"]["outer_bc"] == "non-reflective" and model["BCs"]["abl_bc"] == "alid":
@@ -323,8 +308,8 @@ def forward_elastic_waves(
                 #s_n = Function(S, name="s-wave").interpolate(curl(u_n)) #FIXME not sure this is right
                 #outfile2.write(p_n, time=t)
                 #outfile3.write(s_n, time=t)
-            if t > 0: 
-                helpers.display_progress(comm, t) 
+            #if t > 0: 
+                # helpers.display_progress(comm, t) FIXME uncomment it
 
         # update u^(n-1) and u^(n)
         u_nm1.assign(u_n)

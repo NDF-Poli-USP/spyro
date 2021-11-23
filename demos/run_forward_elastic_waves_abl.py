@@ -44,7 +44,7 @@ model["mesh"] = {
 
 # Specify a 250-m Absorbing Boundary Layer (ABL) on the three sides of the domain to damp outgoing waves.
 model["BCs"] = {
-    "status": False,  # True or False, used to turn on any type of BC 
+    "status": True,  # True or False, used to turn on any type of BC 
     "outer_bc": "non-reflective", #  none or non-reflective (outer boundary condition)
     "abl_bc": "none",  # none, gaussian-taper, or alid
     "lz": 0.25,  # thickness of the ABL in the z-direction (km) - always positive
@@ -66,8 +66,8 @@ model["acquisition"] = {
 
 model["timeaxis"] = {
     "t0": 0.0,  #  Initial time for event
-    #"tf": 0.0005*4000,  # Final time for event
-    "tf": 0.0005*1600,  # Final time for event (for test 7)
+    "tf": 0.0005*4000,  # Final time for event
+    #"tf": 0.0005*1600,  # Final time for event (for test 7)
     "dt": 0.00050,  # timestep size (divided by 2 in the test 4. dt for test 3 is 0.00050)
     "amplitude": 1,  # the Ricker has an amplitude of 1.
     "nspool":  20,  # (20 for dt=0.00050) how frequently to output solution to pvds
@@ -78,9 +78,9 @@ comm = spyro.utils.mpi_init(model)
 mesher="FM" # either SM (SeismicMesh), FM (Firedrake mesher), or RM (read an existing mesh)
 if mesher=="FM":
     #                            (X     Y)  ->  (Z  X) in spyro
-    #mesh = RectangleMesh(30, 30, 1.75, 2.0, diagonal="crossed")
+    mesh = RectangleMesh(30, 30, 1.75, 2.0, diagonal="crossed")
     #mesh = RectangleMesh(85, 85, 1.5, 1.5, diagonal="crossed") # to test water layer
-    mesh = RectangleMesh(80, 80, 1.5, 1.5, diagonal="crossed") # to test water layer, mesh aligned with interface
+    #mesh = RectangleMesh(80, 80, 1.5, 1.5, diagonal="crossed") # to test water layer, mesh aligned with interface
 elif mesher=="SM":
     raise ValueError("check this first")
     bbox = (0.0, 1.5, 0.0, 1.5)
@@ -115,7 +115,7 @@ V = FunctionSpace(mesh, element)
 
 z, x = SpatialCoordinate(mesh) 
 
-water_layer=1 # for test 7
+water_layer=0 # for test 7
 if water_layer==0:
     lamb = Constant(1./2.)
     mu = Constant(1./4.)
@@ -134,7 +134,7 @@ else:
     File("lamb.pvd").write(lamb)
     File("mu.pvd").write(mu)
 
-if 1:
+if 0:
     rho = Constant(1.) # for test 3 and 7 (constant cp and cd)
 else:
     rhofield = conditional(z <= -1.05, 0.25, 1.0)
@@ -151,7 +151,7 @@ wavelet = spyro.full_ricker_wavelet(
 
 post_process=False
 vtkfiles=True
-shotfiles=False
+shotfiles=True
 if post_process==False:
     start = time.time()
     u_field, uz_at_recv, ux_at_recv, uy_at_recv = spyro.solvers.forward_elastic_waves(

@@ -60,10 +60,11 @@ model["acquisition"] = {
     "source_pos": [(-0.75, 0.75)],
     "frequency": 10.0,
     "delay": 1.0,
-    "num_receivers": 2,
+    "num_receivers": 3,
     "receiver_locations": spyro.create_transect(
-        (-0.4, 0.375), (-0.4, 1.125), 2
+       # (-0.4, 0.375), (-0.4, 1.125), 2
        # (-1.1, 0.375), (-1.1, 1.125), 2
+       (-1.1, 0.375), (-1.1, 1.125), 3
        # (-1.25, -0.25), (-1.25, 1.75), 100 for the case with ABL
     ),
 }
@@ -127,12 +128,7 @@ else:
     lamb = Constant(1./2.) # exact
     mu = Constant(1./4.)
 
-if 1:
-    rho = Constant(1.) # for test 3 and 7 (constant cp and cd)
-else:
-    rhofield = conditional(z <= -1.05, 0.25, 1.0)
-    rho = Function(V, name="rho").interpolate(rhofield) # for test 4 (discontinuity in cp and cs)
-    File("rho.pvd").write(rho)
+rho = Constant(1.) # for test 3 and 7 (constant cp and cd)
 
 sources = spyro.Sources(model, mesh, V, comm)
 receivers = spyro.Receivers(model, mesh, V, comm)
@@ -155,7 +151,7 @@ if run_forward:
         cmax=1e-4
         u_at_recv = (uz_at_recv**2. + ux_at_recv**2.)**0.5
         spyro.plots.plot_shots(model, comm, u_at_recv, show=True, vmin=cmin, vmax=cmax)
-
+        sys.exit("exiting without running gradient")
 
     if run_guess:
         spyro.io.save_shots(model, comm, uz_at_recv, file_name="./shots/test_grad/uz_at_recv_guess.dat")

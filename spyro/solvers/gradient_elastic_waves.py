@@ -15,8 +15,7 @@ __all__ = ["gradient"] #FIXME check this
 
 @ensemble_gradient_elastic_waves
 def gradient_elastic_waves(
-    model, mesh, comm, rho, lamb, mu, receivers, guess, residual_z, residual_x, residual_y, output=False, save_adjoint=False
-):
+    model, mesh, comm, rho, lamb, mu, receivers, guess, residual_z, residual_x, residual_y, output=False, save_adjoint=False, excitations=False, wavelet=False):
     """Discrete adjoint with secord-order in time fully-explicit timestepping scheme
     with implementation of simple absorbing boundary conditions using 
     CG FEM with or without higher order mass lumping (KMV type elements).
@@ -49,6 +48,9 @@ def gradient_elastic_waves(
         optional, write the adjoint to disk (only for debugging)
     save_adjoint: A list of Firedrake functions
         Contains the adjoint at all timesteps
+    excitations: A list Firedrake.Functions (use to debug only - adjoint test)
+    wavelet: array-like (to debug only - adoint)
+        Time series data that's injected at the source location.
 
     Returns
     -------
@@ -77,7 +79,7 @@ def gradient_elastic_waves(
     else:
         raise ValueError("method is not yet supported")
 
-    #--------- start defintion of the adjoint problem ---------
+    #--------- start defintion of the adjoint problem --------- {{{
     element = space.FE_method(mesh, method, degree)
     
     V = VectorFunctionSpace(mesh, element) # for adjoint approximation
@@ -115,7 +117,7 @@ def gradient_elastic_waves(
     # stiffness matrix (adjoint problem)
     a = lamb * tr(D(u_n)) * tr(D(v)) * dx(rule=qr_x) + 2.0 * mu * inner(D(u_n), D(v)) * dx(rule=qr_x)
     # external forcing form (adjoint problem)
-    l = inner(f,v) * dx(rule=qr_x)
+    l = inner(f,v) * dx(rule=qr_x) # f = residual = u_exact - u_guess
 
     # absorbing boundary conditions (adjoint problem)
     #FIXME check the Neumann BC because the adjoint formulation requires Null Neumann BC
@@ -131,14 +133,15 @@ def gradient_elastic_waves(
         
         # damping at outer boundaries (-x,+x,-z,+z)
         if model["BCs"]["outer_bc"] == "non-reflective" and model["BCs"]["abl_bc"] != "alid":
-            # to get the normal vector
-            #n = firedrake.FacetNormal(mesh)
-            #print(assemble(inner(v, n) * ds))
-
-            # FIXME keeping c_p for now, but it should be changed to a matrix form
+            # get normal and tangent vectors
+            n = firedrake.FacetNormal(mesh)
+            t = firedrake.perp(n)
+            
             c_p = ((lamb + 2.*mu)/rho)**0.5
-            #c_s = (mu/rho)**0.5
-            nf = rho * c_p * inner( ((u_n - u_nm1) / dt) , v ) * ds(rule=qr_s) # backward-difference scheme 
+            c_s = (mu/rho)**0.5
+            C = c_p * outer(n,n) + c_s * outer(t,t)
+            
+            nf = rho * inner( C * ((u_n - u_nm1) / dt), v ) * ds(rule=qr_s) # backward-difference scheme 
             bc_defined = True
         else:
             if model["BCs"]["outer_bc"] == "non-reflective" and model["BCs"]["abl_bc"] == "alid":
@@ -186,10 +189,10 @@ def gradient_elastic_waves(
     # retrieve the lhs and rhs terms from F
     lhs_ = lhs(F)
     rhs_ = rhs(F)
-
-    # FIXME DirichletBC does not help prevent oscilations when mu=0
-    #bc = DirichletBC(V.sub(0), 0., (1,2,3,4) )
-    bc = DirichletBC(V, (0.,0.), (1,2,3,4) )
+    
+    if not excitations:
+        # FIXME check for 3D model
+        bc = DirichletBC(V, (0.,0.), (1,2,3,4) )
 
     # create functions such that we solve for X in A X = B (adjoint problem)
     X = Function(V)
@@ -204,8 +207,8 @@ def gradient_elastic_waves(
         adjoint = [Function(V, name="adjoint_elastic_waves") for t in range(nt)]
 
     #--------- end defintion of the adjoint problem ---------
-
-    #--------- start defintion of the gradient problem ---------
+    #}}}
+    #--------- start defintion of the gradient problem --------- {{{
     H = FunctionSpace(mesh, element) # scalar space for gradient approximation
     
     dJdl = Function(H, name="gradient_lambda")
@@ -227,7 +230,7 @@ def gradient_elastic_waves(
     Fgl = mg - agl  # for dJdl (gradient w.r.t. lambda)
     Fgm = mg - agm  # for dJdm (gradient w.r.t. mu)
    
-    # retrieve the lhs and rhs terms from F
+    # retrieve the lhs and rhs terms from F FIXME maybe simply this
     lhsFgl, rhsFgl = lhs(Fgl), rhs(Fgl)
     lhsFgm, rhsFgm = lhs(Fgm), rhs(Fgm)
 
@@ -272,6 +275,7 @@ def gradient_elastic_waves(
             },
         )
     #--------- end defintion of the gradient problem ---------
+    #}}}
 
     # run backward in time
     for step in range(nt - 1, -1, -1):
@@ -279,13 +283,18 @@ def gradient_elastic_waves(
         
         # assemble the rhs term to update the forcing FIXME assemble here or after apply source?
         B = assemble(rhs_, tensor=B)
-        bc.apply(B) #FIXME for Dirichlet BC
-
-        # apply the residual evaluated at the receivers as external forcing (sources)
-        #FIXME check the sign of f / residuals
-        f = receivers.apply_receivers_as_radial_source(f, residual_z, residual_x, residual_y, step)
-        #File("f.pvd").write(f)
-        #sys.exit("exiting")
+        if not excitations:
+            bc.apply(B) #FIXME for Dirichlet BC
+        
+        if not excitations:
+            # apply the residual evaluated at the receivers as external forcing (sources)
+            # f = residual = u_exact - u_guess
+            f = receivers.apply_receivers_as_radial_source(f, residual_z, residual_x, residual_y, step)
+            #File("f.pvd").write(f)
+            #sys.exit("exiting")
+        else:
+            # apply the given wavelt as a source (to debug - test adjoint)
+            f = excitations.apply_radial_source(f, wavelet[step])
 
         # solve and assign X onto solution u 
         solver.solve(X, B)
@@ -300,8 +309,10 @@ def gradient_elastic_waves(
             dJdl_solver.solve()
             dJdm_solver.solve()
             # add to the gradient
-            dJdl += dJdl_inc
-            dJdm += dJdm_inc
+            dJdl += dJdl_inc # this one for pyrol
+            dJdm += dJdm_inc # this one for pyrol
+            #dJdl -= dJdl_inc # FIXME testing for scipy
+            #dJdm -= dJdm_inc # FIXME testing for scipy
 
         # update u^(n-1) and u^(n) FIXME check if the assign is here or after output write (also check the forward prob.)
         u_nm1.assign(u_n)
@@ -312,7 +323,7 @@ def gradient_elastic_waves(
                 outfile.write(u_n, time=t)
             if save_adjoint: 
                 adjoint.append(u_n) 
-            helpers.display_progress(comm, t)
+            #helpers.display_progress(comm, t) FIXME uncomment it
 
     if save_adjoint:
         return dJdl, dJdm, adjoint

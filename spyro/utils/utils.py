@@ -20,7 +20,7 @@ def butter_lowpass_filter(shot, cutoff, fs, order=2):
     return filtered_shot
 
 
-def compute_functional(model, residual, velocity=None):
+def compute_functional(model, residual, vp=None):
     """Compute the functional to be optimized.
     Accepts the velocity optionally and uses
     it if regularization is enabled
@@ -35,7 +35,7 @@ def compute_functional(model, residual, velocity=None):
         regularize = False
 
     if regularize:
-        gamma = model["opt"]["gamma"]
+        gamma = model["opts"]["gamma"]
         Ns = model["acquisition"]["num_sources"]
         gamma /= Ns
 
@@ -47,6 +47,7 @@ def compute_functional(model, residual, velocity=None):
 
     if regularize:
         Jreg = assemble(0.5 * gamma * dot(grad(vp), grad(vp)) * dx)
+        print(">>>>>> VALUE OF GRAD REGULATIZATION = ", Jreg)
         J += Jreg
     return J
 

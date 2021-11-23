@@ -4,6 +4,8 @@ from .input_models import create_model_for_grid_point_calculation
 from .grid_point_calculator import time_interpolation
 from .grid_point_calculator import grid_point_to_mesh_point_converter_for_seismicmesh
 from .grid_point_calculator import error_calc_line
+from .gradient_test import gradient_test_acoustic
+from .gradient_test import gradient_test_elastic
 
 __all__ = [
     "wave_solver",
@@ -13,5 +15,7 @@ __all__ = [
     'minimum_grid_point_calculator',
     'time_interpolation',
     'grid_point_to_mesh_point_converter_for_seismicmesh',
-    'error_calc_line'
+    'error_calc_line',
+    'gradient_test_acoustic',
+    'gradient_test_elastic'
 ]
