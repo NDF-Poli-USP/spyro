@@ -125,6 +125,7 @@ def gradient_test_elastic(model, mesh, V, comm, rho, lamb_exact, mu_exact, lamb_
         model["timeaxis"]["dt"],
         model["timeaxis"]["tf"],
         model["acquisition"]["frequency"],
+        amp=model["timeaxis"]["amplitude"]
     )
 
     # simulate the exact model
@@ -161,7 +162,7 @@ def gradient_test_elastic(model, mesh, V, comm, rho, lamb_exact, mu_exact, lamb_
     else:
         misfit_uy = []
     
-    if False:
+    if True:
         plt.title("misfits (uz, ux)")
         plt.plot(uz_exact_recv-uz_guess_recv,label='misfit uz 1')
         plt.plot(misfit_uz,label='misfit uz 2',linestyle='--')
@@ -170,7 +171,6 @@ def gradient_test_elastic(model, mesh, V, comm, rho, lamb_exact, mu_exact, lamb_
         plt.legend()
         plt.savefig('/home/santos/Desktop/grad_test_elastic_misfit.png')
         plt.close()
-        sys.exit("sys.exit called")
     
     qr_x, _, _ = quadrature.quadrature_rules(V)
 
@@ -188,7 +188,7 @@ def gradient_test_elastic(model, mesh, V, comm, rho, lamb_exact, mu_exact, lamb_
     dJdl, dJdm = gradient_elastic_waves(
         model, mesh, comm, rho, lamb_guess, mu_guess, receivers, u_guess, misfit_uz, misfit_ux, misfit_uy, output=True
     )
-    sys.exit("sys.exit called")
+    #sys.exit("sys.exit called")
     if mask: # water mask 
         dJdl *= mask
         dJdm *= mask
