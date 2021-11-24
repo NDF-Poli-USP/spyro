@@ -51,15 +51,6 @@ def plot_shots(
         The index of the first receiver to plot
     end_index: integer, optional
         The index of the last receiver to plot
-<<<<<<< HEAD
-=======
-    legend: `boolean`, optional
-        Would you like to add the legend?
-    cmap: string, optional
-        Would you like to chane cmap?
-    save: `boolean`, optional
-        Would you like to chane cmap?
->>>>>>> b43efc6a27fb3301a83e9e3328211c9b439abed1
     Returns
     -------
     None

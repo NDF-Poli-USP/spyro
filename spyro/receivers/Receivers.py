@@ -333,7 +333,21 @@ class Receivers:
 
         return cell_tabulations
 
-
+    def setPointCloudRec(self, comm, paralel_z=True):
+        #2D only
+        rec_position = self.receiver_locations
+        num_rec      = len(rec_position)
+        if paralel_z:
+            δs       = np.linspace(rec_position[0,0], rec_position[num_rec-1,0], num_rec)
+            X, Y     = np.meshgrid(δs, rec_position[0,1])
+        else:
+            δs       = np.linspace(rec_position[0,1], rec_position[num_rec-1,1], num_rec)
+            X, Y     = np.meshgrid(rec_position[0,0],δs)
+        
+        xs          = np.vstack((X.flatten(), Y.flatten())).T
+        point_cloud = VertexOnlyMesh(self.mesh, xs)
+        
+        return point_cloud
 ## Some helper functions
 
 
@@ -664,3 +678,4 @@ def change_to_reference_tetrahedron(p, a, b, c, d):
     pnz = px * a31 + py * a32 + pz * a33 + a34
 
     return (pnx, pny, pnz)
+

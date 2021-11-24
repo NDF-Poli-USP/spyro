@@ -2,22 +2,27 @@ from firedrake import *
 
 from ..domains import quadrature, space
 from ..pml import damping
+from ..io import ensemble_forward
 from .. import utils
 from ..sources import full_ricker_wavelet, delta_expr, delta_expr_adj
 from . import helpers
 
+import numpy as np
+import copy
+
+from mpi4py import MPI
 class solver_AD():
     def __init__(self,fwi=False, Aut_Dif=True):
         self.Aut_Dif = Aut_Dif
         self.fwi=fwi
-        
+ 
     def wave_propagation(self,
         model,
         mesh,
         comm,
         c,
         point_cloud,
-        position_source,
+        position_source, 
         freq_index=0,
         type="forward",
         output=False,
@@ -36,7 +41,7 @@ class solver_AD():
         c: Firedrake.Function
             The velocity model interpolated onto the mesh.
         point_cloud: Firedrake.Function
-            space function relating to the receivers points
+            space function built with the receivers points
         position_source: array 
             Source position
         freq_index: `int`, optional
@@ -50,6 +55,7 @@ class solver_AD():
         else:
             amp = 1
         freq = model["acquisition"]["frequency"]
+
         if "inversion" in model:
             freq_bands = model["inversion"]["freq_bands"]
         method = model["opts"]["method"]
@@ -61,8 +67,8 @@ class solver_AD():
         nspool = model["timeaxis"]["nspool"]
         fspool = model["timeaxis"]["fspool"]
       
-        nt = int(tf / dt)  # number of timesteps
-        dstep = int(delay / dt)  # number of timesteps with source
+        nt     = int(tf / dt)  # number of timesteps
+        dstep  = int(delay / dt)  # number of timesteps with source
 
         if method == "KMV":
             params = {"ksp_type": "preonly", "pc_type": "jacobi"}
@@ -79,33 +85,30 @@ class solver_AD():
         else:
             raise ValueError("method is not yet supported")
 
+       
         element = space.FE_method(mesh, method, degree)
+        V       = FunctionSpace(mesh, element)
 
-        V = FunctionSpace(mesh, element)
 
         qr_x, qr_s, _ = quadrature.quadrature_rules(V)
-
         if dim == 2:
             z, x = SpatialCoordinate(mesh)
         elif dim == 3:
             z, x, y = SpatialCoordinate(mesh)
 
-
-        u = TrialFunction(V)
-        v = TestFunction(V)
-
+        u     = TrialFunction(V)
+        v     = TestFunction(V)
         u_nm1 = Function(V)
         u_n   = Function(V)
         u_np1 = Function(V)
 
-        t = 0.0
-
-        cutoff = freq_bands[freq_index] if "inversion" in model else None
+        cutoff   = freq_bands[freq_index] if "inversion" in model else None
         
         u_tt = ((u - 2.0 * u_n + u_nm1) / Constant(dt ** 2))
         m1   =  u_tt * v * dx(rule=qr_x)
         a    = c * c * dot(grad(u_n), grad(v)) * dx(rule=qr_x)  # explicit
-
+        
+        t = 0.0
         nf = 0
         if model["BCs"]["outer_bc"] == "non-reflective":
             nf = c * ((u_n - u_nm1) / dt) * v * ds(rule=qr_s)
@@ -113,37 +116,31 @@ class solver_AD():
         if type=="forward":
             RW = full_ricker_wavelet(dt, tf, freq, amp=amp, cutoff=cutoff)
             f, ricker = self.external_forcing(RW,mesh,position_source,V)
-            
-            
+                 
         if type=="adjoint":
-            # position_rec = model["acquisition"]["receiver_locations"]
-            # f, misfit = self.external_forcing(mesh, position_rec , V) 
             f = Function(V)
             num_rec = len(position_source)
             excitation = []
             for i in range(num_rec):
                 delta = Interpolator(delta_expr(position_source[i], z, x,sigma_x=2000), V)
-                aux = Function(delta.interpolate())
-                
-                # aux0 = copy.deepcopy(aux.dat.dat[:])
+                aux   = Function(delta.interpolate())
                 excitation.append(aux.dat.data[:])
             
-        FF = m1 + a + nf - f * v * dx(rule=qr_x)  
-        X  = Function(V)
-
+        FF   = m1 + a + nf - f * v * dx(rule=qr_x)  
+        X    = Function(V)
         lhs_ = lhs(FF)
         rhs_ = rhs(FF)
         
         if not self.Aut_Dif:
-            usol = [Function(V, name="pressure") for t in range(nt) if t % fspool == 0]
+            usol  = [Function(V, name="pressure") for t in range(nt) if t % fspool == 0]
+        
+        num_rec   = len(point_cloud.coordinates.dat.data_ro)
         usol_recv = []
-        saveIT = 0
 
-        # assembly_callable = create_assembly_callable(rhs_, tensor=B)
+        saveIT  = 0
         problem = LinearVariationalProblem(lhs_, rhs_, X)
         solver  = LinearVariationalSolver(problem, solver_parameters=params)
-        
-                
+              
         if type=="adjoint":
             # Define gradient problem
             m_u = TrialFunction(V)
@@ -178,22 +175,21 @@ class solver_AD():
             t = tf
             dJ = Function(V, name="gradient")
 
-
         if type=="forward":
-            interpolator = Interpolator(u_np1, point_cloud)
+            P              = FunctionSpace(point_cloud, "DG", 0)
+            interpolator   = Interpolator(u_np1, P)
+            usol_recv      = []
             t = 0
             if self.fwi:
                 obj_func   = kwargs.get("obj_func")
                 p_true_rec = kwargs.get("p_true_rec")
-                misfit=[]
-            
+                misfit=[]   
         
         for IT in range(nt):
-
             if type=="forward":
                 t += float(dt)
                 if IT < dstep:
-                    ricker.assign(RW[IT]*2000)
+                    ricker.assign(RW[IT]*20000)
                 elif IT == dstep:
                     ricker.assign(0.0)
             
@@ -203,58 +199,62 @@ class solver_AD():
             
                 rec_value = 0
                 for i in range(num_rec):
-                    
                     rec_value+=misfit[IT_adj][i]*excitation[i]
 
                 f.dat.data[:] = rec_value
-
-                
+      
             solver.solve()
             u_np1.assign(X)
 
             if not self.Aut_Dif:
                 usol[IT].assign(u_np1)   
               
-            if type=="forward":
-               
-                rec = Function(point_cloud)
+            if type=="forward" and num_rec>0:
+                rec = Function(P)
                 interpolator.interpolate(output=rec)
-                usol_recv.append(rec.dat.data)
-            
+                usol_recv.append(rec.dat.data) 
+
                 if self.fwi:
-                    
-                    obj_func += self.objective_func(rec,p_true_rec[IT],IT,dt,point_cloud,misfit)
-                    
+                    obj_func += self.objective_func(
+                        rec,
+                        p_true_rec[IT],
+                        IT,
+                        dt,
+                        P,
+                        misfit)
+                 
             if IT % nspool == 0:
                 assert (
-                    norm(u_n) < 1
+                norm(u_n) < 1
                 ), "Numerical instability. Try reducing dt or building the mesh differently"
-                
+
+                if t > 0:
+                    helpers.display_progress(comm, t)
+
             u_nm1.assign(u_n)
-            u_n.assign(u_np1)
+            u_n  .assign(u_np1)
 
             if type=="adjoint":
                 guess=kwargs.get("guess")
                 # compute the gradient increment
                 uuadj.assign(u_np1)
-                
                 uufor.assign(guess.pop())
 
                 grad_solver.solve()
                 dJ += gradi
-    
+         
         if comm.ensemble_comm.rank == 0 and comm.comm.rank == 0:
             print(
                 "---------------------------------------------------------------",
                 flush=True,
             )
-        
+        File("disp.pvd").write(u_n)
         if type=="forward":
             if not self.Aut_Dif and self.fwi==True:
                 return usol, misfit,obj_func
             elif self.Aut_Dif and self.fwi==True:
-                return usol_recv,obj_func
-            else:
+                return obj_func
+            else:  
                 return usol_recv
         
         if type=="adjoint":
@@ -269,16 +269,14 @@ class solver_AD():
 
     # external forcing - older versions
     def external_forcing(self,RW, mesh,position_source,V):
-        z, x = SpatialCoordinate(mesh)
 
-        source = Constant(position_source)
-        delta  = Interpolator(delta_expr(source, z, x,sigma_x=2000), V)
+        z, x       = SpatialCoordinate(mesh)
+        source     = Constant(position_source)
+        delta      = Interpolator(delta_expr(source, z, x,sigma_x=2000), V)
         excitation = Function(delta.interpolate())
-
-        ricker = Constant(0)
-        f = excitation * ricker
+        ricker     = Constant(0)
+        f          = excitation * ricker
         ricker.assign(RW[0], annotate=True)
-
 
         return f, ricker
 

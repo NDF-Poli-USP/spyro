@@ -54,18 +54,21 @@ def forward(
 
     method = model["opts"]["method"]
     degree = model["opts"]["degree"]
-    dim = model["opts"]["dimension"]
-    dt = model["timeaxis"]["dt"]
-    tf = model["timeaxis"]["tf"]
-    delay = model["acquisition"]["delay"]
+    dim    = model["opts"]["dimension"]
+    dt     = model["timeaxis"]["dt"]
+    tf     = model["timeaxis"]["tf"]
+    delay  = model["acquisition"]["delay"]
     nspool = model["timeaxis"]["nspool"]
     fspool = model["timeaxis"]["fspool"]
-    freq = model["acquisition"]["frequency"]
+    freq   = model["acquisition"]["frequency"]
+
     if "amplitude" in model["acquisition"]:
         amp = model["acquisition"]["amplitude"]
     else:
         amp = 1
+
     PML = model["BCs"]["status"]
+
     if PML:
         Lx = model["mesh"]["Lx"]
         Lz = model["mesh"]["Lz"]
@@ -77,6 +80,7 @@ def forward(
         z1 = 0.0
         z2 = -Lz
         c_pml = lz
+
         if dim == 3:
             Ly = model["mesh"]["Ly"]
             ly = model["BCs"]["ly"]
@@ -103,9 +107,7 @@ def forward(
         raise ValueError("method is not yet supported")
 
     element = space.FE_method(mesh, method, degree)
-
     V = FunctionSpace(mesh, element)
-
     qr_x, qr_s, _ = quadrature.quadrature_rules(V)
 
     if dim == 2:
