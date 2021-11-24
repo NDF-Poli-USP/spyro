@@ -251,6 +251,12 @@ def forward_elastic_waves(
     #outfile2 = helpers.create_output_file("p-wave.pvd", comm, source_num)
     #outfile3 = helpers.create_output_file("s-wave.pvd", comm, source_num)
     #S = FunctionSpace(mesh, element)
+    AD = True
+    if AD:
+        J            = 0.0
+        P            = FunctionSpace(point_cloud, "DG", 0)
+        interpolator = Interpolator(u_np1, P)
+
 
     # run forward in time
     for step in range(nt):
@@ -286,10 +292,19 @@ def forward_elastic_waves(
             u_n.sub(1).assign(u_n.sub(1)*gp)
 
         # interpolate the solution at the receiver points
-        uzsol_recv.append(receivers.interpolate(u_np1.sub(0).dat.data_ro_with_halos[:])) # z direction
-        uxsol_recv.append(receivers.interpolate(u_np1.sub(1).dat.data_ro_with_halos[:])) # x direction
-        if dim==3:
-            uysol_recv.append(receivers.interpolate(u_np1.sub(2).dat.data_ro_with_halos[:])) # y direction
+        if AD: # 2D por enquanto
+            rec = Function(P)
+            interpolator.interpolate(output=rec)
+            uzsol_recv.append(rec.sub(0).dat.data) 
+            uxsol_recv.append(rec.sub(1).dat.data) 
+            rec0             = Function(P)
+            rec0.dat.data[:] = true_rec
+            J += 0.5 * assemble(inner(rec0-rec.sub(0), rec0-rec.sub(0)) * dx)
+        else:   
+            uzsol_recv.append(receivers.interpolate(u_np1.sub(0).dat.data_ro_with_halos[:])) # z direction
+            uxsol_recv.append(receivers.interpolate(u_np1.sub(1).dat.data_ro_with_halos[:])) # x direction
+            if dim==3:
+                uysol_recv.append(receivers.interpolate(u_np1.sub(2).dat.data_ro_with_halos[:])) # y direction
 
         # save the solution if requested for this time step
         if step % fspool == 0:
@@ -326,4 +341,4 @@ def forward_elastic_waves(
         uysol_recv = helpers.fill(uysol_recv, receivers.is_local, nt, receivers.num_receivers)
         uysol_recv = utils.communicate(uysol_recv, comm)
 
-    return usol, uzsol_recv, uxsol_recv, uysol_recv
+    return usol, uzsol_recv, uxsol_recv, uysol_recv, J
