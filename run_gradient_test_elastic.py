@@ -17,7 +17,7 @@ model = {}
 model["opts"] = {
     "method": "KMV",  # either CG or KMV
     "quadratrue": "KMV", # Equi or KMV
-    "degree": 2,  # p order
+    "degree": 1,  # p order
     "dimension": 2,  # dimension
     "regularization": False,  # regularization is on?
     "gamma": 1e-5, # regularization parameter
@@ -53,10 +53,10 @@ model["acquisition"] = {
     "source_pos": [(-0.75, 0.75)],
     "frequency": 10.0,
     "delay": 1.0,
-    "num_receivers": 10,
+    "num_receivers": 1,
     "receiver_locations": spyro.create_transect(
        #(-0.9, 0.375), (-0.9, 1.125), 1
-       (-0.9, 0.75), (-0.9, 0.75), 10
+       (-0.9, 0.75), (-0.9, 0.75), 1
     ),
 }
 
@@ -71,7 +71,7 @@ model["timeaxis"] = {
 
 comm = spyro.utils.mpi_init(model)
 
-mesh = RectangleMesh(100, 100, 1.5, 1.5, diagonal="crossed") # to test FWI, mesh aligned with interface
+mesh = RectangleMesh(100, 100, 1.5, 1.5) # to test FWI, mesh aligned with interface
 mesh.coordinates.dat.data[:, 0] -= 1.5
 mesh.coordinates.dat.data[:, 1] -= 0.0
 
@@ -82,10 +82,10 @@ element = spyro.domains.space.FE_method(
 V = FunctionSpace(mesh, element)
 
 lamb_exact = Function(V).interpolate(Constant(1./2))  # exact
-mu_exact = Function(V).interpolate(Constant(1./4.))
+mu_exact   = Function(V).interpolate(Constant(1./4.))
 
 lamb_guess = Function(V).interpolate(Constant(1.)) # guess
-mu_guess = Function(V).interpolate(Constant(1./4.))
+mu_guess   = Function(V).interpolate(Constant(1./4.))
 
 rho = Constant(1.) 
 

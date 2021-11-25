@@ -132,7 +132,9 @@ rho = Constant(1.) # for test 3 and 7 (constant cp and cd)
 
 sources     = spyro.Sources(model, mesh, V, comm)
 receivers   = spyro.Receivers(model, mesh, V, comm)
-point_cloud = receivers.setPointCloudRec(comm,paralel_z=False)
+AD = True
+if AD:
+    point_cloud = receivers.setPointCloudRec(comm,paralel_z=True)
 
 wavelet = spyro.full_ricker_wavelet(
                 dt=model["timeaxis"]["dt"], tf=model["timeaxis"]["tf"], freq=model["acquisition"]["frequency"]

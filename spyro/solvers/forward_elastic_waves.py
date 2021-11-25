@@ -26,6 +26,7 @@ def forward_elastic_waves(
     receivers,
     source_num=0,
     output=False, 
+    **kwargs
 ):
     """Secord-order in time fully-explicit scheme
     with implementation of simple absorbing boundary conditions using
@@ -253,10 +254,10 @@ def forward_elastic_waves(
     #S = FunctionSpace(mesh, element)
     AD = True
     if AD:
-        J            = 0.0
-        P            = FunctionSpace(point_cloud, "DG", 0)
-        interpolator = Interpolator(u_np1, P)
-
+        J0           = 0.0
+        J1           = 0.0
+        P            = FunctionSpace(receivers, "DG", 0)
+        interpolator = Interpolator(u_np1.sub(0), P)
 
     # run forward in time
     for step in range(nt):
@@ -295,11 +296,22 @@ def forward_elastic_waves(
         if AD: # 2D por enquanto
             rec = Function(P)
             interpolator.interpolate(output=rec)
+            
+            print(rec.dat.data_ro)
+            quit()
             uzsol_recv.append(rec.sub(0).dat.data) 
-            uxsol_recv.append(rec.sub(1).dat.data) 
-            rec0             = Function(P)
-            rec0.dat.data[:] = true_rec
-            J += 0.5 * assemble(inner(rec0-rec.sub(0), rec0-rec.sub(0)) * dx)
+            uxsol_recv.append(rec.sub(1).dat.data)
+           
+            # fwi = kwargs.get("fwi")
+
+            # if fwi:    
+            #     true_rec = kwargs.get("true_rec")
+            #     rec0             = Function(P)
+            #     rec1             = Function(P)
+            #     rec0.dat.data[:] = true_rec[0]
+            #     rec1.dat.data[:] = true_rec[1]
+            #     J0 += 0.5 * assemble(inner(rec0-rec.sub(0), rec0-rec.sub(0)) * dx)
+            #     J1 += 0.5 * assemble(inner(rec1-rec.sub(0), rec0-rec.sub(0)) * dx)
         else:   
             uzsol_recv.append(receivers.interpolate(u_np1.sub(0).dat.data_ro_with_halos[:])) # z direction
             uxsol_recv.append(receivers.interpolate(u_np1.sub(1).dat.data_ro_with_halos[:])) # x direction
@@ -331,14 +343,18 @@ def forward_elastic_waves(
         u_n.assign(u_np1)
 
         t = step * float(dt)
-
+    
     # prepare to return
-    uzsol_recv = helpers.fill(uzsol_recv, receivers.is_local, nt, receivers.num_receivers)
-    uxsol_recv = helpers.fill(uxsol_recv, receivers.is_local, nt, receivers.num_receivers)
-    uzsol_recv = utils.communicate(uzsol_recv, comm)
-    uxsol_recv = utils.communicate(uxsol_recv, comm)
+    # uzsol_recv = helpers.fill(uzsol_recv, receivers.is_local, nt, receivers.num_receivers)
+    # uxsol_recv = helpers.fill(uxsol_recv, receivers.is_local, nt, receivers.num_receivers)
+    # uzsol_recv = utils.communicate(uzsol_recv, comm)
+    # uxsol_recv = utils.communicate(uxsol_recv, comm)
     if dim==3:
         uysol_recv = helpers.fill(uysol_recv, receivers.is_local, nt, receivers.num_receivers)
         uysol_recv = utils.communicate(uysol_recv, comm)
-
-    return usol, uzsol_recv, uxsol_recv, uysol_recv, J
+    fwi=False
+    if fwi:
+        J = [J0, J1]
+        return usol, uzsol_recv, uxsol_recv, uysol_recv, J
+    else:
+        return usol, uzsol_recv, uxsol_recv, uysol_recv

@@ -120,7 +120,10 @@ def gradient_test_elastic(model, mesh, V, comm, rho, lamb_exact, mu_exact, lamb_
     dim = model["opts"]["dimension"]
     sources = spyro.Sources(model, mesh, V, comm)
     receivers = spyro.Receivers(model, mesh, V, comm)
-
+    AD = True
+    if AD:
+        point_cloud = receivers.setPointCloudRec(comm,paralel_z=True)
+    
     wavelet = spyro.full_ricker_wavelet(
         model["timeaxis"]["dt"],
         model["timeaxis"]["tf"],
@@ -131,9 +134,12 @@ def gradient_test_elastic(model, mesh, V, comm, rho, lamb_exact, mu_exact, lamb_
     # simulate the exact model
     print('######## Running the exact model ########')
     u_exact, uz_exact_recv, ux_exact_recv, uy_exact_recv = forward_elastic_waves(
-        model, mesh, comm, rho, lamb_exact, mu_exact, sources, wavelet, receivers, output=False
+        model, mesh, comm, rho, lamb_exact, mu_exact, sources, wavelet, point_cloud, output=False
     )
+    print(ux_exact_recv)
+    spyro.plots.plot_shots(model,comm, ux_exact_recv,show=True)
     
+    quit()
     # simulate the guess model
     print('######## Running the guess model ########')
     u_guess, uz_guess_recv, ux_guess_recv, uy_guess_recv = forward_elastic_waves(

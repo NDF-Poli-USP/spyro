@@ -431,7 +431,22 @@ class Receivers:
 
         return cell_tabulations
 
-
+    def setPointCloudRec(self, comm, paralel_z=True):
+        #2D only
+        rec_position = self.receiver_locations
+        num_rec      = len(rec_position)
+        if paralel_z:
+            δs       = np.linspace(rec_position[0,0], rec_position[num_rec-1,0], num_rec)
+            X, Y     = np.meshgrid(δs, rec_position[0,1])
+        else:
+            δs       = np.linspace(rec_position[0,1], rec_position[num_rec-1,1], num_rec)
+            X, Y     = np.meshgrid(rec_position[0,0],δs)
+        
+        xs          = np.vstack((X.flatten(), Y.flatten())).T
+        print(xs)
+        point_cloud = VertexOnlyMesh(self.mesh, xs, missing_points_behaviour="warn")
+        
+        return point_cloud
 ## Some helper functions
 def delta_expr(x0, z, x, sigma_x=500.0):
     return np.exp(-sigma_x * ((z - x0[0]) ** 2 + (x - x0[1]) ** 2))
