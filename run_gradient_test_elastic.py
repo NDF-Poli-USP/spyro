@@ -50,13 +50,13 @@ model["BCs"] = {
 model["acquisition"] = {
     "source_type": "Ricker",
     "num_sources": 1,
-    "source_pos": [(-0.75, 0.75)],
+    "source_pos": [(0.75, 0.75)],
     "frequency": 10.0,
     "delay": 1.0,
     "num_receivers": 1,
     "receiver_locations": spyro.create_transect(
        #(-0.9, 0.375), (-0.9, 1.125), 1
-       (-0.9, 0.75), (-0.9, 0.75), 1
+       (0.9, 0.75), (0.9, 0.75), 1
     ),
 }
 
@@ -72,8 +72,8 @@ model["timeaxis"] = {
 comm = spyro.utils.mpi_init(model)
 
 mesh = RectangleMesh(100, 100, 1.5, 1.5) # to test FWI, mesh aligned with interface
-mesh.coordinates.dat.data[:, 0] -= 1.5
-mesh.coordinates.dat.data[:, 1] -= 0.0
+# mesh.coordinates.dat.data[:, 0] -= 1.5
+# mesh.coordinates.dat.data[:, 1] -= 0.0
 
 element = spyro.domains.space.FE_method(
     mesh, model["opts"]["method"], model["opts"]["degree"]

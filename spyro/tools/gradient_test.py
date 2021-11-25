@@ -136,16 +136,14 @@ def gradient_test_elastic(model, mesh, V, comm, rho, lamb_exact, mu_exact, lamb_
     u_exact, uz_exact_recv, ux_exact_recv, uy_exact_recv = forward_elastic_waves(
         model, mesh, comm, rho, lamb_exact, mu_exact, sources, wavelet, point_cloud, output=False
     )
-    print(ux_exact_recv)
-    spyro.plots.plot_shots(model,comm, ux_exact_recv,show=True)
-    
-    quit()
+    true_rec = [uz_exact_recv, ux_exact_recv]
     # simulate the guess model
     print('######## Running the guess model ########')
-    u_guess, uz_guess_recv, ux_guess_recv, uy_guess_recv = forward_elastic_waves(
-        model, mesh, comm, rho, lamb_guess, mu_exact, sources, wavelet, receivers, output=False #FIXME
+    u_guess, uz_guess_recv, ux_guess_recv, uy_guess_recv, J = forward_elastic_waves(
+        model, mesh, comm, rho, lamb_guess, mu_exact, sources, wavelet, point_cloud, output=False, 
+        true_rec=true_rec, fwi=True
     )
-    
+   
     if False:
         ue=[]
         ug=[]
@@ -161,12 +159,12 @@ def gradient_test_elastic(model, mesh, V, comm, rho, lamb_exact, mu_exact, lamb_
         plt.savefig('/home/santos/Desktop/grad_test_elastic.png')
         plt.close()
     
-    misfit_uz = calc_misfit(model, uz_guess_recv, uz_exact_recv) # exact - guess
-    misfit_ux = calc_misfit(model, ux_guess_recv, ux_exact_recv) # exact - guess
-    if dim==3:
-        misfit_uy = calc_misfit(model, uy_guess_recv, uy_exact_recv) # exact - guess
-    else:
-        misfit_uy = []
+    # misfit_uz = calc_misfit(model, uz_guess_recv, uz_exact_recv) # exact - guess
+    # misfit_ux = calc_misfit(model, ux_guess_recv, ux_exact_recv) # exact - guess
+    # if dim==3:
+    #     misfit_uy = calc_misfit(model, uy_guess_recv, uy_exact_recv) # exact - guess
+    # else:
+    #     misfit_uy = []
     
     if False:
         plt.title("misfits (uz, ux)")
@@ -180,20 +178,20 @@ def gradient_test_elastic(model, mesh, V, comm, rho, lamb_exact, mu_exact, lamb_
     
     qr_x, _, _ = quadrature.quadrature_rules(V)
 
-    Jm = np.zeros((1))
-    Jm[0] += functional(model, misfit_uz)
-    Jm[0] += functional(model, misfit_ux)
-    if dim==3:
-        Jm[0] += functional(model, misfit_uy)
+    # Jm = np.zeros((1))
+    # Jm[0] += functional(model, misfit_uz)
+    # Jm[0] += functional(model, misfit_ux)
+    # if dim==3:
+    #     Jm[0] += functional(model, misfit_uy)
     
     print("\n Cost functional at fixed point : " + str(Jm) + " \n ")
     #sys.exit("sys.exit called")
 
     # compute the gradient of the control (to be verified)
     print('######## Computing the gradient by adjoint method ########')
-    dJdl, dJdm = gradient_elastic_waves(
-        model, mesh, comm, rho, lamb_guess, mu_guess, receivers, u_guess, misfit_uz, misfit_ux, misfit_uy, output=False
-    )
+    # dJdl, dJdm = gradient_elastic_waves(
+    #     model, mesh, comm, rho, lamb_guess, mu_guess, receivers, u_guess, misfit_uz, misfit_ux, misfit_uy, output=False
+    # )
     #sys.exit("sys.exit called")
     if mask: # water mask 
         dJdl *= mask

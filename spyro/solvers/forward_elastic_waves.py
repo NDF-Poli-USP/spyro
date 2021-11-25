@@ -13,7 +13,7 @@ import time
 # Note this turns off non-fatal warnings
 set_log_level(ERROR)
 
-@ensemble_forward_elastic_waves
+# @ensemble_forward_elastic_waves
 def forward_elastic_waves(
     model,
     mesh,
@@ -256,8 +256,8 @@ def forward_elastic_waves(
     if AD:
         J0           = 0.0
         J1           = 0.0
-        P            = FunctionSpace(receivers, "DG", 0)
-        interpolator = Interpolator(u_np1.sub(0), P)
+        P            = VectorFunctionSpace(receivers, "DG", 0)
+        interpolator = Interpolator(u_np1, P)
 
     # run forward in time
     for step in range(nt):
@@ -291,27 +291,24 @@ def forward_elastic_waves(
             u_nm1.sub(1).assign(u_nm1.sub(1)*gp)
             u_n.sub(0).assign(u_n.sub(0)*gp)
             u_n.sub(1).assign(u_n.sub(1)*gp)
-
+        fwi = kwargs.get("fwi")
         # interpolate the solution at the receiver points
         if AD: # 2D por enquanto
             rec = Function(P)
             interpolator.interpolate(output=rec)
             
-            print(rec.dat.data_ro)
-            quit()
+            # print(rec.sub(0).dat.data)
+            
             uzsol_recv.append(rec.sub(0).dat.data) 
             uxsol_recv.append(rec.sub(1).dat.data)
            
-            # fwi = kwargs.get("fwi")
-
-            # if fwi:    
-            #     true_rec = kwargs.get("true_rec")
-            #     rec0             = Function(P)
-            #     rec1             = Function(P)
-            #     rec0.dat.data[:] = true_rec[0]
-            #     rec1.dat.data[:] = true_rec[1]
-            #     J0 += 0.5 * assemble(inner(rec0-rec.sub(0), rec0-rec.sub(0)) * dx)
-            #     J1 += 0.5 * assemble(inner(rec1-rec.sub(0), rec0-rec.sub(0)) * dx)
+            if fwi:    
+                true_rec = kwargs.get("true_rec")
+                rec0             = Function(P)
+                rec0.sub(0).dat.data[:] = true_rec[0][step]
+                rec0.sub(1).dat.data[:] = true_rec[1][step]
+                J0 += 0.5 * assemble(inner(rec0.sub(0)-rec.sub(0), rec0.sub(0)-rec.sub(0)) * dx)
+                J1 += 0.5 * assemble(inner(rec0.sub(1)-rec.sub(1), rec0.sub(1)-rec.sub(1)) * dx)
         else:   
             uzsol_recv.append(receivers.interpolate(u_np1.sub(0).dat.data_ro_with_halos[:])) # z direction
             uxsol_recv.append(receivers.interpolate(u_np1.sub(1).dat.data_ro_with_halos[:])) # x direction
@@ -352,9 +349,10 @@ def forward_elastic_waves(
     if dim==3:
         uysol_recv = helpers.fill(uysol_recv, receivers.is_local, nt, receivers.num_receivers)
         uysol_recv = utils.communicate(uysol_recv, comm)
-    fwi=False
+    
     if fwi:
         J = [J0, J1]
         return usol, uzsol_recv, uxsol_recv, uysol_recv, J
     else:
+        print("aqui")
         return usol, uzsol_recv, uxsol_recv, uysol_recv
