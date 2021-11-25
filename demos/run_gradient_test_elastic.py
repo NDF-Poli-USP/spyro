@@ -53,10 +53,10 @@ model["acquisition"] = {
     "source_pos": [(-0.75, 0.75)],
     "frequency": 10.0,
     "delay": 1.0,
-    "num_receivers": 10,
+    "num_receivers": 1,
     "receiver_locations": spyro.create_transect(
        #(-0.9, 0.375), (-0.9, 1.125), 1
-       (-0.9, 0.75), (-0.9, 0.75), 10
+       (-0.9, 0.75), (-0.9, 0.75), 1
     ),
 }
 

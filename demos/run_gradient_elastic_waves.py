@@ -130,12 +130,8 @@ else:
 
 rho = Constant(1.) # for test 3 and 7 (constant cp and cd)
 
-sources     = spyro.Sources(model, mesh, V, comm)
-receivers   = spyro.Receivers(model, mesh, V, comm)
-AD = True
-if AD:
-    point_cloud = receivers.setPointCloudRec(comm,paralel_z=True)
-
+sources = spyro.Sources(model, mesh, V, comm)
+receivers = spyro.Receivers(model, mesh, V, comm)
 wavelet = spyro.full_ricker_wavelet(
                 dt=model["timeaxis"]["dt"], tf=model["timeaxis"]["tf"], freq=model["acquisition"]["frequency"]
             )
@@ -144,11 +140,8 @@ run_forward = 1
 if run_forward:
     print("Starting forward computation")
     start = time.time()
-    uz_exact = spyro.io.load_shots(model, comm, file_name="./shots/test_grad/uz_at_recv_exact.dat")
-    ux_exact = spyro.io.load_shots(model, comm, file_name="./shots/test_grad/ux_at_recv_exact.dat")
-    true_rec = [uz_exact, ux_exact]
-    u_field, uz_at_recv, ux_at_recv, uy_at_recv, J = spyro.solvers.forward_elastic_waves(
-        model, mesh, comm, rho, lamb, mu, sources, wavelet, receivers, true_rec, output=False
+    u_field, uz_at_recv, ux_at_recv, uy_at_recv = spyro.solvers.forward_elastic_waves(
+        model, mesh, comm, rho, lamb, mu, sources, wavelet, receivers, output=False
     )
     end = time.time()
     print(round(end - start,2))
@@ -171,6 +164,8 @@ if run_forward:
     #chk = DumbCheckpoint("dump", mode=FILE_CREATE)
     #chk.store(u_field) $ u_field is a list of firedrake functions, checkpoint only saves functions
     
+uz_exact = spyro.io.load_shots(model, comm, file_name="./shots/test_grad/uz_at_recv_exact.dat")
+ux_exact = spyro.io.load_shots(model, comm, file_name="./shots/test_grad/ux_at_recv_exact.dat")
 uz_guess = spyro.io.load_shots(model, comm, file_name="./shots/test_grad/uz_at_recv_guess.dat")
 ux_guess = spyro.io.load_shots(model, comm, file_name="./shots/test_grad/ux_at_recv_guess.dat")
     
@@ -196,7 +191,7 @@ if 0:
     sys.exit("exiting without running gradient")
 
 print("Starting gradient computation")
-start      = time.time()
+start = time.time()
 dJdl, dJdm = spyro.solvers.gradient_elastic_waves(
     model, mesh, comm, rho, lamb, mu, receivers, u_field, residual_z, residual_x, residual_y, output=True
 )

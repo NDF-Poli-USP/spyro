@@ -6,6 +6,7 @@ from .grid_point_calculator import grid_point_to_mesh_point_converter_for_seismi
 from .grid_point_calculator import error_calc_line
 from .gradient_test import gradient_test_acoustic
 from .gradient_test import gradient_test_elastic
+from .gradient_test_ad import gradient_test_elastic as gradient_test_elastic_ad
 
 __all__ = [
     "wave_solver",
@@ -17,5 +18,6 @@ __all__ = [
     'grid_point_to_mesh_point_converter_for_seismicmesh',
     'error_calc_line',
     'gradient_test_acoustic',
-    'gradient_test_elastic'
+    'gradient_test_elastic',
+    'gradient_test_elastic_ad'
 ]

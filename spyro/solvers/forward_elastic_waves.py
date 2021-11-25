@@ -252,12 +252,12 @@ def forward_elastic_waves(
     #outfile2 = helpers.create_output_file("p-wave.pvd", comm, source_num)
     #outfile3 = helpers.create_output_file("s-wave.pvd", comm, source_num)
     #S = FunctionSpace(mesh, element)
-    AD = True
+    AD = model["Aut_Dif"]["status"]
     if AD:
-        J0           = 0.0
-        J1           = 0.0
-        P            = VectorFunctionSpace(receivers, "DG", 0)
-        interpolator = Interpolator(u_np1, P)
+        J0            = 0.0
+        J1            = 0.0
+        P             = VectorFunctionSpace(receivers, "DG", 0)
+        interpolator  = Interpolator(u_np1, P)
 
     # run forward in time
     for step in range(nt):
@@ -296,19 +296,17 @@ def forward_elastic_waves(
         if AD: # 2D por enquanto
             rec = Function(P)
             interpolator.interpolate(output=rec)
-            
-            # print(rec.sub(0).dat.data)
-            
-            uzsol_recv.append(rec.sub(0).dat.data) 
-            uxsol_recv.append(rec.sub(1).dat.data)
            
             if fwi:    
                 true_rec = kwargs.get("true_rec")
-                rec0             = Function(P)
+                rec0     = Function(P)
                 rec0.sub(0).dat.data[:] = true_rec[0][step]
                 rec0.sub(1).dat.data[:] = true_rec[1][step]
-                J0 += 0.5 * assemble(inner(rec0.sub(0)-rec.sub(0), rec0.sub(0)-rec.sub(0)) * dx)
-                J1 += 0.5 * assemble(inner(rec0.sub(1)-rec.sub(1), rec0.sub(1)-rec.sub(1)) * dx)
+                J0 += 0.5 * assemble(inner(rec0-rec, rec0-rec) * dx) 
+
+            uzsol_recv.append(rec.sub(0).dat.data) 
+            uxsol_recv.append(rec.sub(1).dat.data)
+        
         else:   
             uzsol_recv.append(receivers.interpolate(u_np1.sub(0).dat.data_ro_with_halos[:])) # z direction
             uxsol_recv.append(receivers.interpolate(u_np1.sub(1).dat.data_ro_with_halos[:])) # x direction
@@ -340,19 +338,17 @@ def forward_elastic_waves(
         u_n.assign(u_np1)
 
         t = step * float(dt)
-    
-    # prepare to return
-    # uzsol_recv = helpers.fill(uzsol_recv, receivers.is_local, nt, receivers.num_receivers)
-    # uxsol_recv = helpers.fill(uxsol_recv, receivers.is_local, nt, receivers.num_receivers)
-    # uzsol_recv = utils.communicate(uzsol_recv, comm)
-    # uxsol_recv = utils.communicate(uxsol_recv, comm)
-    if dim==3:
-        uysol_recv = helpers.fill(uysol_recv, receivers.is_local, nt, receivers.num_receivers)
-        uysol_recv = utils.communicate(uysol_recv, comm)
-    
+    if not AD:
+        # prepare to return
+        uzsol_recv = helpers.fill(uzsol_recv, receivers.is_local, nt, receivers.num_receivers)
+        uxsol_recv = helpers.fill(uxsol_recv, receivers.is_local, nt, receivers.num_receivers)
+        uzsol_recv = utils.communicate(uzsol_recv, comm)
+        uxsol_recv = utils.communicate(uxsol_recv, comm)
+        if dim==3:
+            uysol_recv = helpers.fill(uysol_recv, receivers.is_local, nt, receivers.num_receivers)
+            uysol_recv = utils.communicate(uysol_recv, comm)
+        
     if fwi:
-        J = [J0, J1]
-        return usol, uzsol_recv, uxsol_recv, uysol_recv, J
+        return usol, uzsol_recv, uxsol_recv, uysol_recv, J0
     else:
-        print("aqui")
         return usol, uzsol_recv, uxsol_recv, uysol_recv

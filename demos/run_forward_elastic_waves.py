@@ -108,7 +108,6 @@ velocity = conditional(x > -0.35, 1.5, 3.0)
 vp = Function(V, name="velocity").interpolate(velocity)
 # These pvd files can be easily visualized in ParaView!
 File("simple_velocity_model.pvd").write(vp)
-quit()
 # FIXME rho not defined yet
 lamb = Constant(1.5) # FIXME
 mu = Constant(1.5)  # FIXME

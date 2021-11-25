@@ -1,5 +1,7 @@
 import numpy as np
 from firedrake import *
+from firedrake_adjoint import *
+from pyadjoint import enlisting
 import spyro
 from spyro.domains import quadrature
 import matplotlib.pyplot as plt
@@ -120,26 +122,30 @@ def gradient_test_elastic(model, mesh, V, comm, rho, lamb_exact, mu_exact, lamb_
     dim = model["opts"]["dimension"]
     sources = spyro.Sources(model, mesh, V, comm)
     receivers = spyro.Receivers(model, mesh, V, comm)
-
+    # Automatic Differentiation status
+  
+    point_cloud = receivers.setPointCloudRec(comm,paralel_z=True)
+    
     wavelet = spyro.full_ricker_wavelet(
         model["timeaxis"]["dt"],
         model["timeaxis"]["tf"],
         model["acquisition"]["frequency"],
         amp=model["timeaxis"]["amplitude"]
     )
-
-    # simulate the exact model
-    print('######## Running the exact model ########')
-    u_exact, uz_exact_recv, ux_exact_recv, uy_exact_recv = forward_elastic_waves(
-        model, mesh, comm, rho, lamb_exact, mu_exact, sources, wavelet, receivers, output=False
-    )
-    
+    with stop_annotating():
+        # simulate the exact model
+        print('######## Running the exact model ########')
+        u_exact, uz_exact_recv, ux_exact_recv, uy_exact_recv = forward_elastic_waves(
+            model, mesh, comm, rho, lamb_exact, mu_exact, sources, wavelet, point_cloud, output=False
+        )
+        true_rec = [uz_exact_recv, ux_exact_recv]
     # simulate the guess model
     print('######## Running the guess model ########')
-    u_guess, uz_guess_recv, ux_guess_recv, uy_guess_recv = forward_elastic_waves(
-        model, mesh, comm, rho, lamb_guess, mu_exact, sources, wavelet, receivers, output=False #FIXME
+    u_guess, uz_guess_recv, ux_guess_recv, uy_guess_recv, Jm = forward_elastic_waves(
+        model, mesh, comm, rho, lamb_guess, mu_exact, sources, wavelet, point_cloud, output=False, 
+        true_rec=true_rec, fwi=True
     )
-    
+   
     if False:
         ue=[]
         ug=[]
@@ -154,13 +160,7 @@ def gradient_test_elastic(model, mesh, V, comm, rho, lamb_exact, mu_exact, lamb_
         plt.legend()
         plt.savefig('/home/santos/Desktop/grad_test_elastic.png')
         plt.close()
-    
-    misfit_uz = calc_misfit(model, uz_guess_recv, uz_exact_recv) # exact - guess
-    misfit_ux = calc_misfit(model, ux_guess_recv, ux_exact_recv) # exact - guess
-    if dim==3:
-        misfit_uy = calc_misfit(model, uy_guess_recv, uy_exact_recv) # exact - guess
-    else:
-        misfit_uy = []
+
     
     if False:
         plt.title("misfits (uz, ux)")
@@ -174,89 +174,97 @@ def gradient_test_elastic(model, mesh, V, comm, rho, lamb_exact, mu_exact, lamb_
     
     qr_x, _, _ = quadrature.quadrature_rules(V)
 
-    Jm = np.zeros((1))
-    Jm[0] += functional(model, misfit_uz)
-    Jm[0] += functional(model, misfit_ux)
-    if dim==3:
-        Jm[0] += functional(model, misfit_uy)
     
     print("\n Cost functional at fixed point : " + str(Jm) + " \n ")
     #sys.exit("sys.exit called")
 
     # compute the gradient of the control (to be verified)
     print('######## Computing the gradient by adjoint method ########')
-    dJdl, dJdm = gradient_elastic_waves(
-        model, mesh, comm, rho, lamb_guess, mu_guess, receivers, u_guess, misfit_uz, misfit_ux, misfit_uy, output=False
-    )
-    #sys.exit("sys.exit called")
-    if mask: # water mask 
-        dJdl *= mask
-        dJdm *= mask
+
+    control_l  = Control(lamb_guess)
+    dJdl       = compute_gradient(Jm, control_l)
+ 
+    control_m  = Control(mu_guess) 
+    dJdm       = compute_gradient(Jm, control_m)
     
-    File("dJdl.pvd").write(dJdl)
-    File("dJdm.pvd").write(dJdm)
-
-    #steps = [1e-3, 1e-4, 1e-5, 1e-6]  # step length
-    steps = [1e-4, 1e-5, 1e-6]  # step length
-
-    delta_l = Function(V)  # model direction (random)
-    delta_l.assign(dJdl)
-    delta_m = Function(V)  # model direction (random)
-    delta_m.assign(dJdm)
-
-    # this deepcopy is important otherwise pertubations accumulate
-    lamb_original = lamb_guess.copy(deepcopy=True)
-    mu_original = mu_guess.copy(deepcopy=True)
-
-    print('######## Computing the gradient by finite diferences ########')
-    errors = []
-    for step in steps:  # range(3):
-        # steps.append(step)
-        # perturb the model and calculate the functional (again)
-        # J(m + delta_m*h)
-        lamb_guess = lamb_original + step * delta_l
-        mu_guess = mu_original #+ step * delta_m FIXME
+    Jhat_l     = ReducedFunctional(Jm, control_l) 
+    Jhat_m     = ReducedFunctional(Jm, control_m) 
+    with stop_annotating():
+        #sys.exit("sys.exit called")
+        if mask: # water mask 
+            dJdl *= mask
+            dJdm *= mask
         
-        _, uz_guess_recv, ux_guess_recv, uy_guess_recv = forward_elastic_waves(
-            model, mesh, comm, rho, lamb_guess, mu_guess, sources, wavelet, receivers,
-        )
-        
-        misfit_uz = calc_misfit(model, uz_guess_recv, uz_exact_recv) # exact - guess
-        misfit_ux = calc_misfit(model, ux_guess_recv, ux_exact_recv) # exact - guess
-        if dim==3:
-            misfit_uy = calc_misfit(model, uy_guess_recv, uy_exact_recv) # exact - guess
-        
-        Jp = np.zeros((1))
-        Jp[0] += functional(model, misfit_uz)
-        Jp[0] += functional(model, misfit_ux)
-        if dim==3:
-            Jp[0] += functional(model, misfit_uy)
-        
-        if mask:
-            projnorm_m = assemble(mask * dJdm * delta_m * dx(rule=qr_x))
-        else:
-            projnorm_lamb = assemble(dJdl * delta_l * dx(rule=qr_x))
-            projnorm_mu = assemble(dJdm * delta_m * dx(rule=qr_x))
-        
-        fd_grad = (Jp - Jm) / step
-        print(
-            "\n Cost functional for step "
-            + str(step)
-            + " : "
-            + str(Jp)
-            + ", fd approx.: "
-            + str(fd_grad)
-            + ", grad'*dir (lambda) : "
-            + str(projnorm_lamb)
-            + ", grad'*dir (mu) : "
-            + str(projnorm_mu)
-            + " \n ",
-        )
+        File("dJdl.pvd").write(dJdl)
+        File("dJdm.pvd").write(dJdm)
 
-        #errors.append(100 * ((fd_grad - projnorm) / projnorm))
-        # step /= 2
+        #steps = [1e-3, 1e-4, 1e-5, 1e-6]  # step length
+        steps = [1e-4, 1e-5, 1e-6]  # step length
 
-    # all errors less than 1 %
-    errors = np.array(errors)
-    #assert (np.abs(errors) < 5.0).all()
+        delta_l = Function(V)  # model direction (random)
+        delta_l.assign(dJdl)
+        delta_m = Function(V)  # model direction (random)
+        delta_m.assign(dJdm)
+        derivative_l = enlisting.Enlist(Jhat_l.derivative())
+        derivative_m = enlisting.Enlist(Jhat_m.derivative())
+        hs_l = enlisting.Enlist(delta_l)
+        hs_m = enlisting.Enlist(delta_m)
+
+        projnorm_lamb = sum(hi._ad_dot(di) for hi, di in zip(hs_l, derivative_l))
+        projnorm_mu   = sum(hi._ad_dot(di) for hi, di in zip(hs_m, derivative_m))
+        # this deepcopy is important otherwise pertubations accumulate
+        lamb_original = lamb_guess.copy(deepcopy=True)
+        mu_original   = mu_guess.copy(deepcopy=True)
+
+        print('######## Computing the gradient by finite diferences ########')
+        errors = []
+        for step in steps:  # range(3):
+            # steps.append(step)
+            # perturb the model and calculate the functional (again)
+            # J(m + delta_m*h)
+            lamb_guess = lamb_original + step * delta_l
+            mu_guess = mu_original #+ step * delta_m FIXME
+            
+            _, uz_guess_recv, ux_guess_recv, uy_guess_recv = forward_elastic_waves(
+                model, mesh, comm, rho, lamb_guess, mu_guess, sources, wavelet, receivers,
+            )
+            
+            misfit_uz = calc_misfit(model, uz_guess_recv, uz_exact_recv) # exact - guess
+            misfit_ux = calc_misfit(model, ux_guess_recv, ux_exact_recv) # exact - guess
+            if dim==3:
+                misfit_uy = calc_misfit(model, uy_guess_recv, uy_exact_recv) # exact - guess
+            
+            Jp = np.zeros((1))
+            Jp[0] += functional(model, misfit_uz)
+            Jp[0] += functional(model, misfit_ux)
+            if dim==3:
+                Jp[0] += functional(model, misfit_uy)
+            
+            if mask:
+                projnorm_m = assemble(mask * dJdm * delta_m * dx(rule=qr_x))
+            else:
+                projnorm_lamb = assemble(dJdl * delta_l * dx(rule=qr_x))
+                projnorm_mu = assemble(dJdm * delta_m * dx(rule=qr_x))
+            
+            fd_grad = (Jp - Jm) / step
+            print(
+                "\n Cost functional for step "
+                + str(step)
+                + " : "
+                + str(Jp)
+                + ", fd approx.: "
+                + str(fd_grad)
+                + ", grad'*dir (lambda) : "
+                + str(projnorm_lamb)
+                + ", grad'*dir (mu) : "
+                + str(projnorm_mu)
+                + " \n ",
+            )
+
+            #errors.append(100 * ((fd_grad - projnorm) / projnorm))
+            # step /= 2
+
+        # all errors less than 1 %
+        errors = np.array(errors)
+        #assert (np.abs(errors) < 5.0).all()
 #}}}

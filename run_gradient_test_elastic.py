@@ -68,6 +68,9 @@ model["timeaxis"] = {
     "nspool":  20,  # (20 for dt=0.00050) how frequently to output solution to pvds
     "fspool": 1,  # how frequently to save solution to RAM
 }
+model["Aut_Dif"] = {
+    "status": False, 
+}
 
 comm = spyro.utils.mpi_init(model)
 
@@ -88,5 +91,9 @@ lamb_guess = Function(V).interpolate(Constant(1.)) # guess
 mu_guess   = Function(V).interpolate(Constant(1./4.))
 
 rho = Constant(1.) 
-
-spyro.tools.gradient_test_elastic(model, mesh, V, comm, rho, lamb_exact, mu_exact, lamb_guess, mu_guess)
+# Automatic Differentiation status
+AD = model["Aut_Dif"]["status"] 
+if AD:
+    spyro.tools.gradient_test_elastic_ad(model, mesh, V, comm, rho, lamb_exact, mu_exact, lamb_guess, mu_guess)
+else:
+    spyro.tools.gradient_test_elastic(model, mesh, V, comm, rho, lamb_exact, mu_exact, lamb_guess, mu_guess)
