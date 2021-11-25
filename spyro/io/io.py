@@ -29,7 +29,7 @@ def ensemble_save(func):
                 if custom_file_name is None:
                     func(*args, **dict(kwargs, file_name = "shots/shot_record_"+str(snum+1)+".dat"))
                 else:
-                    func(*args, **dict(kwargs, file_name = custom_file_name))
+                    func(*args, **dict(kwargs, file_name = custom_file_name+str(snum+1)+".dat"))
     return wrapper
 
 

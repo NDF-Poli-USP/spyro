@@ -112,6 +112,7 @@ def build_mesh(model, comm, output_filename, vp_filename, units = 'km-s', see_me
                 file_format="vtk"
             )
 
+    comm.comm.barrier()
     mesh = fire.Mesh(
             meshfname,
             comm=comm.comm,

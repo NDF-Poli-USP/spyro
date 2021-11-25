@@ -82,6 +82,7 @@ class FWI():
     
     def _build_inital_mesh(self):
         vp_filename, vp_filetype = os.path.splitext(self.model["inversion"]["initial_guess"])
+        
         if vp_filetype == '.segy':
             write_velocity_model(self.model["inversion"]["initial_guess"], ofname = vp_filename)
             new_vpfile = vp_filename+'.hdf5'
