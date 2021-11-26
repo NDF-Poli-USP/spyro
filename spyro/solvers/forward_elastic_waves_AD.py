@@ -6,14 +6,14 @@ from ..domains import quadrature, space
 from ..pml import damping
 from ..io import ensemble_forward_elastic_waves
 from . import helpers
-
+from ..sources import full_ricker_wavelet, delta_expr
 import sys
 import time
 
 # Note this turns off non-fatal warnings
 set_log_level(ERROR)
 
-@ensemble_forward_elastic_waves
+# @ensemble_forward_elastic_waves
 def forward_elastic_waves(
     model,
     mesh,
@@ -26,6 +26,7 @@ def forward_elastic_waves(
     receivers,
     source_num=0,
     output=False, 
+    **kwargs
 ):
     """Secord-order in time fully-explicit scheme
     with implementation of simple absorbing boundary conditions using
@@ -74,7 +75,8 @@ def forward_elastic_waves(
     nspool = model["timeaxis"]["nspool"]
     fspool = model["timeaxis"]["fspool"]
     excitations.current_source = source_num
-
+    delay  = model["acquisition"]["delay"]
+    dstep  = int(delay / dt)  # number of timesteps with source
     nt = int(tf / dt)  # number of timesteps
 
     if method == "KMV":
@@ -198,9 +200,9 @@ def forward_elastic_waves(
     #print(assemble(inner(v, n) * ds))
     #print(assemble(inner(v, t) * ds))
     #https://fenicsproject.discourse.group/t/integrate-over-edges/1140/8
-
+    
     # weak formulation written as F=0
-    F = m + a - l + nf 
+    F = m + a - l
 
     # retrieve the lhs and rhs terms from F
     lhs_ = lhs(F)
@@ -212,67 +214,48 @@ def forward_elastic_waves(
 
     # create functions such that we solve for X in A X = B
     X = Function(V)
-    B = Function(V)
-    A = assemble(lhs_, mat_type="matfree")
-    #A = assemble(lhs_) # for direct solver
-    
-    # set the linear solver for A
-    solver = LinearSolver(A, solver_parameters=params)
+    # B = Function(V)
+    problem = LinearVariationalProblem(lhs_, rhs_, X)
+    solver  = LinearVariationalSolver(problem, solver_parameters=params)            
 
     # define the output solution over the entire domain (usol) and at the receivers (usol_recv)
     t = 0.0
     save_step = 0
-    usol = [Function(V, name="Displacement") for t in range(nt) if t % fspool == 0] # vectorized, includes uz, ux, and uy
     uzsol_recv = [] # u along the z direction
     uxsol_recv = [] # u along the x direction
     uysol_recv = [] # u along the y direction
+
+    J0            = 0.0
+    J1            = 0.0
+    P             = VectorFunctionSpace(receivers, "DG", 0)
+    interpolator  = Interpolator(u_np1, P)
 
     def delta_expr(xs, zs, x, z, sigma_x=500):
         sigma_x = Constant(sigma_x)
         return exp(-sigma_x * ((x - xs) ** 2 + (z - zs) ** 2))
 
-    radial_source=0
-    if radial_source==1: # FIXME keeping this old code here for now
-        xs = model["acquisition"]["source_pos"][0][1]       
-        zs = model["acquisition"]["source_pos"][0][0]       
-        S = FunctionSpace(mesh, element)
-        tol = 0.00001
-        source_x = Function(S, name="source_x").interpolate(
-                            delta_expr(xs, zs, x, z) * (x-xs)/(tol + ((x-xs)**2.+(z-zs)**2.)**0.5)
-                            )
-        source_z = Function(S, name="source_z").interpolate(
-                            delta_expr(xs, zs, x, z) * (z-zs)/(tol + ((x-xs)**2.+(z-zs)**2.)**0.5)
-                            )
-        File("source_x.pvd", comm=comm.comm).write(source_x)
-        File("source_z.pvd", comm=comm.comm).write(source_z)
-        sys.exit("Exit without running")
-
-    # FIXME testing
-    #outfile2 = helpers.create_output_file("p-wave.pvd", comm, source_num)
-    #outfile3 = helpers.create_output_file("s-wave.pvd", comm, source_num)
-    #S = FunctionSpace(mesh, element)
-
-    # run forward in time
+    xs = model["acquisition"]["source_pos"][0][1]       
+    zs = model["acquisition"]["source_pos"][0][0]       
+    tol = 0.00001
+    source = Function(V, name="source_x").interpolate(as_vector([
+                        delta_expr(xs, zs, x, z) * (x-xs)/(tol + ((x-xs)**2.+(z-zs)**2.)**0.5)
+                        ,
+                        delta_expr(xs, zs, x, z) * (z-zs)/(tol + ((x-xs)**2.+(z-zs)**2.)**0.5)
+                        ]))
+    
+    ricker = Constant(0) 
+    # source.sub(0).assign(source_x*ricker)
+    # source.sub(1).assign(source_z*ricker)
+    ricker.assign(wavelet[0])
     for step in range(nt):
-        # assemble the rhs term to update the forcing FIXME assemble here or after apply source?
-        B = assemble(rhs_, tensor=B)
-        #bc.apply(B) #FIXME for Dirichlet BC
+        if step < dstep:
+            ricker.assign(wavelet[step])
+            f.assign(source*ricker)
+        elif step == dstep:
+            f.assign(0)
 
-        #start = time.time()
-        if radial_source==1: # FIXME testing a radial source here for now
-            f.sub(0).assign(wavelet[step]*source_z)
-            f.sub(1).assign(wavelet[step]*source_x)
-        else:
-            #FIXME let the user decide which approach will be used 
-            #excitations.apply_source(f.sub(0), -1.*wavelet[step]) # z 
-            #excitations.apply_source(f.sub(1), wavelet[step]) # x 
-            f = excitations.apply_radial_source(f, wavelet[step])
-            #f.sub(1).assign(Function(S).interpolate(sin(x))) # only P-wave
-        #end = time.time()
-        #print(end - start)
+        solver.solve()
 
-        # solve and assign X onto solution u 
-        solver.solve(X, B)
         u_np1.assign(X)
 
         # deal with absorbing boundary layers
@@ -284,17 +267,23 @@ def forward_elastic_waves(
             u_nm1.sub(1).assign(u_nm1.sub(1)*gp)
             u_n.sub(0).assign(u_n.sub(0)*gp)
             u_n.sub(1).assign(u_n.sub(1)*gp)
-
+        fwi = kwargs.get("fwi")
         # interpolate the solution at the receiver points
-        uzsol_recv.append(receivers.interpolate(u_np1.sub(0).dat.data_ro_with_halos[:])) # z direction
-        uxsol_recv.append(receivers.interpolate(u_np1.sub(1).dat.data_ro_with_halos[:])) # x direction
-        if dim==3:
-            uysol_recv.append(receivers.interpolate(u_np1.sub(2).dat.data_ro_with_halos[:])) # y direction
+        rec = Function(P)
+        interpolator.interpolate(output=rec)
+        
+        if fwi:
+            p_true_rec = kwargs.get("true_rec")
+            J0 += objective_func(
+                rec,
+                p_true_rec,
+                step,
+                dt,
+                P)
 
-        # save the solution if requested for this time step
-        if step % fspool == 0:
-            usol[save_step].assign(u_np1)
-            save_step += 1
+        uzsol_recv.append(rec.sub(0).dat.data) 
+        uxsol_recv.append(rec.sub(1).dat.data)
+    
 
         if step % nspool == 0:
             assert (
@@ -308,8 +297,9 @@ def forward_elastic_waves(
                 #s_n = Function(S, name="s-wave").interpolate(curl(u_n)) #FIXME not sure this is right
                 #outfile2.write(p_n, time=t)
                 #outfile3.write(s_n, time=t)
-            #if t > 0: 
-                # helpers.display_progress(comm, t) FIXME uncomment it
+            if t > 0: 
+                helpers.display_progress(comm, t)
+                #  FIXME uncomment it
 
         # update u^(n-1) and u^(n)
         u_nm1.assign(u_n)
@@ -317,13 +307,16 @@ def forward_elastic_waves(
 
         t = step * float(dt)
 
-    # prepare to return
-    uzsol_recv = helpers.fill(uzsol_recv, receivers.is_local, nt, receivers.num_receivers)
-    uxsol_recv = helpers.fill(uxsol_recv, receivers.is_local, nt, receivers.num_receivers)
-    uzsol_recv = utils.communicate(uzsol_recv, comm)
-    uxsol_recv = utils.communicate(uxsol_recv, comm)
-    if dim==3:
-        uysol_recv = helpers.fill(uysol_recv, receivers.is_local, nt, receivers.num_receivers)
-        uysol_recv = utils.communicate(uysol_recv, comm)
+    if fwi:
+        return uzsol_recv, uxsol_recv, uysol_recv, J0
+    else:
+        return uzsol_recv, uxsol_recv, uysol_recv
 
-    return usol, uzsol_recv, uxsol_recv, uysol_recv
+
+
+def objective_func(p_rec,p_true_rec, IT, dt,P):
+    true_rec = Function(P)
+    true_rec.sub(0).dat.data[:] = p_true_rec[0][IT]
+    true_rec.sub(1).dat.data[:] = p_true_rec[1][IT]
+    J = 0.5 * assemble(inner(true_rec-p_rec, true_rec-p_rec) * dx)
+    return J

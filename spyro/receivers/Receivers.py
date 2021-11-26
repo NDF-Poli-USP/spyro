@@ -443,7 +443,7 @@ class Receivers:
             X, Y     = np.meshgrid(rec_position[0,0],δs)
         
         xs          = np.vstack((X.flatten(), Y.flatten())).T
-        print(xs)
+        
         point_cloud = VertexOnlyMesh(self.mesh, xs, missing_points_behaviour="warn")
         
         return point_cloud

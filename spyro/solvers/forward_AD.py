@@ -1,21 +1,29 @@
 from firedrake import *
+from firedrake.assemble import create_assembly_callable
 
+from .. import utils
 from ..domains import quadrature, space
 from ..pml import damping
-from ..sources import full_ricker_wavelet, delta_expr
+from ..io import ensemble_forward
 from . import helpers
+from ..sources import full_ricker_wavelet, delta_expr
+
+# Note this turns off non-fatal warnings
+set_log_level(ERROR)
 
 
-def forward_AD(
+# @ensemble_forward
+def forward(
     model,
     mesh,
     comm,
     c,
     excitations,
-    rec_position,
+    wavelet,
+    receivers,
     source_num=0,
-    freq_index=0,
     output=False,
+    **kwargs
 ):
     """Secord-order in time fully-explicit scheme
     with implementation of a Perfectly Matched Layer (PML) using
@@ -32,14 +40,12 @@ def forward_AD(
        c: Firedrake.Function
         The velocity model interpolated onto the mesh.
     excitations: A list Firedrake.Functions
-        Each function contains an interpolated space function
-        emulated a Dirac delta at the location of source `source_num`
+    wavelet: array-like
+        Time series data that's injected at the source location.
     receivers: A :class:`spyro.Receivers` object.
         Contains the receiver locations and sparse interpolation methods.
     source_num: `int`, optional
         The source number you wish to simulate
-    freq_index: `int`, optional
-        The index in the list of low-pass cutoff values
     output: `boolean`, optional
         Whether or not to write results to pvd files.
 
@@ -52,27 +58,22 @@ def forward_AD(
 
     """
 
-    if "amplitude" in model["acquisition"]:
-        amp = model["acquisition"]["amplitude"]
-    else:
-        amp = 1
-    freq = model["acquisition"]["frequency"]
-    if "inversion" in model:
-        freq_bands = model["inversion"]["freq_bands"]
     method = model["opts"]["method"]
     degree = model["opts"]["degree"]
     dim = model["opts"]["dimension"]
     dt = model["timeaxis"]["dt"]
     tf = model["timeaxis"]["tf"]
-    delay = model["acquisition"]["delay"]
     nspool = model["timeaxis"]["nspool"]
     fspool = model["timeaxis"]["fspool"]
-    PML = model["PML"]["status"]
+    delay  = model["acquisition"]["delay"]
+    dstep  = int(delay / dt)  # number of timesteps with source
+    PML = model["BCs"]["status"]
+    excitations.current_source = source_num
     if PML:
         Lx = model["mesh"]["Lx"]
         Lz = model["mesh"]["Lz"]
-        lx = model["PML"]["lx"]
-        lz = model["PML"]["lz"]
+        lx = model["BCs"]["lx"]
+        lz = model["BCs"]["lz"]
         x1 = 0.0
         x2 = Lx
         a_pml = lx
@@ -81,13 +82,12 @@ def forward_AD(
         c_pml = lz
         if dim == 3:
             Ly = model["mesh"]["Ly"]
-            ly = model["PML"]["ly"]
+            ly = model["BCs"]["ly"]
             y1 = 0.0
             y2 = Ly
             b_pml = ly
 
     nt = int(tf / dt)  # number of timesteps
-    dstep = int(delay / dt)  # number of timesteps with source
 
     if method == "KMV":
         params = {"ksp_type": "preonly", "pc_type": "jacobi"}
@@ -115,7 +115,6 @@ def forward_AD(
     elif dim == 3:
         z, x, y = SpatialCoordinate(mesh)
 
-    # if using the PML
     if PML:
         Z = VectorFunctionSpace(V.ufl_domain(), V.ufl_element())
         if dim == 2:
@@ -136,7 +135,6 @@ def forward_AD(
             u_n, psi_n, pp_n = Function(W).split()
             u_nm1, psi_nm1, pp_nm1 = Function(W).split()
 
-        # in 2d
         if dim == 2:
             sigma_x, sigma_z = damping.functions(
                 model, V, dim, x, x1, x2, a_pml, z, z1, z2, c_pml
@@ -148,7 +146,6 @@ def forward_AD(
                 * v
                 * dx(rule=qr_x)
             )
-        # in 3d
         elif dim == 3:
 
             sigma_x, sigma_y, sigma_z = damping.functions(
@@ -170,7 +167,7 @@ def forward_AD(
             )
             Gamma_1, Gamma_2, Gamma_3 = damping.matrices_3D(sigma_x, sigma_y, sigma_z)
 
-    # typical CG in N-d
+    # typical CG FEM in 2d/3d
     else:
         u = TrialFunction(V)
         v = TestFunction(V)
@@ -179,30 +176,29 @@ def forward_AD(
         u_n = Function(V)
         u_np1 = Function(V)
 
-
-    outfile = helpers.create_output_file("Forward.pvd", comm, source_num)
+    if output:
+        outfile = helpers.create_output_file("forward.pvd", comm, source_num)
 
     t = 0.0
-
-    cutoff = freq_bands[freq_index] if "inversion" in model else None
 
     # -------------------------------------------------------
     m1 = ((u - 2.0 * u_n + u_nm1) / Constant(dt ** 2)) * v * dx(rule=qr_x)
     a = c * c * dot(grad(u_n), grad(v)) * dx(rule=qr_x)  # explicit
 
-    if model["PML"]["outer_bc"] == "non-reflective":
+    position_source = model["acquisition"]["source_pos"][0]
+    freq = model["acquisition"]["frequency"]
+    RW   = full_ricker_wavelet(dt, tf, freq)
+    f, ricker = external_forcing(RW,mesh,position_source,V)
+        
+    nf = 0
+    if model["BCs"]["outer_bc"] == "non-reflective":
         nf = c * ((u_n - u_nm1) / dt) * v * ds(rule=qr_s)
-    else:
-        nf = 0
-    RW = full_ricker_wavelet(dt, tf, freq, amp=amp, cutoff=None)
 
-    f, ricker = external_forcing(RW, mesh, model, source_num, V)
-    # FF = m1 + a + nf
-    FF = m1 + a + nf - c * c * f * v * dx(rule=qr_x)
+    FF = m1 + a + nf - f * v * dx(rule=qr_x) 
 
     if PML:
         X = Function(W)
-        # B = Function(W)
+        B = Function(W)
 
         if dim == 2:
             pml2 = sigma_x * sigma_z * u_n * v * dx(rule=qr_x)
@@ -244,33 +240,29 @@ def forward_AD(
             FF += mmm1 + uuu1
     else:
         X = Function(V)
-        # B = Function(V)
+        B = Function(V)
 
     lhs_ = lhs(FF)
     rhs_ = rhs(FF)
 
-    # A = assemble(lhs_, mat_type="matfree")
-    # solver = LinearSolver(A, solver_parameters=params)
+    problem = LinearVariationalProblem(lhs_, rhs_, X)
+    solver  = LinearVariationalSolver(problem, solver_parameters=params)            
 
     usol_recv = []
-    saveIT = 0
-
-    # assembly_callable = create_assembly_callable(rhs_, tensor=B)
-    problem = LinearVariationalProblem(lhs_, rhs_, X)
-    solver = LinearVariationalSolver(problem, solver_parameters=params)
-
-    rhs_forcing = Function(V)
-    point_cloud = VertexOnlyMesh(mesh, rec_position)
-    P = FunctionSpace(point_cloud, "DG", 0)
-    obj_func = 0
-    for IT in range(nt):
-
-        if IT < dstep:
-            ricker.assign(RW[IT])
-        elif IT == dstep:
+    save_step = 0
+    
+    P            = FunctionSpace(receivers, "DG", 0)
+    interpolator = Interpolator(u_np1, P)
+    J0           = 0.0
+        
+    for step in range(nt):
+        if step < dstep:
+            ricker.assign(RW[step]*2000)
+        elif step == dstep:
             ricker.assign(0.0)
 
         solver.solve()
+        u_np1.assign(X)
         if PML:
             if dim == 2:
                 u_np1, pp_np1 = X.split()
@@ -285,52 +277,55 @@ def forward_AD(
         else:
             u_np1.assign(X)
 
-        rec = interpolate(u_np1, P)
-        usol_recv.append(rec.dat.data)
+        rec = Function(P)
+        interpolator.interpolate(output=rec)
+        
+        fwi        = kwargs.get("fwi")
+        p_true_rec = kwargs.get("true_rec")
+        
+        usol_recv.append(rec.dat.data) 
 
-        obj_func += assemble(dt * 0.25 * inner(rec, rec) * dx)
+        if fwi:
+            J0 += objective_func(
+                rec,
+                p_true_rec[step],
+                step,
+                dt,
+                P)
 
-        if IT % nspool == 0:
+        if step % nspool == 0:
             assert (
                 norm(u_n) < 1
             ), "Numerical instability. Try reducing dt or building the mesh differently"
             if output:
                 outfile.write(u_n, time=t, name="Pressure")
-            helpers.display_progress(comm, t)
+            if t > 0:
+                helpers.display_progress(comm, t)
 
         u_nm1.assign(u_n)
         u_n.assign(u_np1)
 
-        t = IT * float(dt)
+        t = step * float(dt)
 
-    # usol_recv = helpers.fill(usol_recv, is_local, nt, len(rec_position))
-    # usol_recv = utils.communicate(usol_recv, comm)
+    if fwi:
+        return usol_recv, J0
+    else:
+        return usol_recv
 
-    if comm.ensemble_comm.rank == 0 and comm.comm.rank == 0:
-        print(
-            "---------------------------------------------------------------",
-            flush=True,
-        )
-
-    return obj_func, usol_recv
-
-
-# ----------------------------------------#
-# external forcing
-def external_forcing(RW, mesh, model, source_num, V):
-
-    pos = model["acquisition"]["source_pos"]
-    z, x = SpatialCoordinate(mesh)
-    sigma_x = Constant(2000)
-    source = Constant(pos[source_num])
-    delta = Interpolator(delta_expr(source, z, x, sigma_x), V)
+def external_forcing(RW, mesh,position_source,V):
+    print(position_source)
+    z, x       = SpatialCoordinate(mesh)
+    source     = Constant(position_source)
+    delta      = Interpolator(delta_expr(source, z, x,sigma_x=2000), V)
     excitation = Function(delta.interpolate())
-
-    ricker = Constant(0)
-    f = excitation * ricker
+    ricker     = Constant(0)
+    f          = excitation * ricker
     ricker.assign(RW[0], annotate=True)
 
     return f, ricker
 
-
-# ----------------------------------------#
+def objective_func(p_rec,p_true_rec, IT, dt,P):
+    true_rec = Function(P)
+    true_rec.dat.data[:] = p_true_rec
+    J = 0.5 * assemble(inner(true_rec-p_rec, true_rec-p_rec) * dx)
+    return J

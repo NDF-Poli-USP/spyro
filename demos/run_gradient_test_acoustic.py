@@ -17,7 +17,7 @@ model = {}
 model["opts"] = {
     "method": "KMV",  # either CG or KMV
     "quadratrue": "KMV", # Equi or KMV
-    "degree": 2,  # p order
+    "degree": 1,  # p order
     "dimension": 2,  # dimension
     "regularization": False,  # regularization is on?
     "gamma": 1e-5, # regularization parameter
@@ -50,19 +50,22 @@ model["BCs"] = {
 model["acquisition"] = {
     "source_type": "Ricker",
     "num_sources": 1,
-    "source_pos": [(-0.75, 0.75)],
+    "source_pos": [(0.75, 0.75)],
     "frequency": 10.0,
     "delay": 1.0,
     "num_receivers": 1,
     "receiver_locations": spyro.create_transect(
-       (-0.9, 0.75), (-0.9, 0.75), 1
+       (0.9, 0.75), (0.9, 0.75), 1
     ),
+}
+model["Aut_Dif"] = {
+    "status": False, 
 }
 
 model["timeaxis"] = {
     "t0": 0.0,  #  Initial time for event
-    "tf": 0.0005*1600,  # Final time for event (for test 7)
-    "dt": 0.00050,  # timestep size (divided by 2 in the test 4. dt for test 3 is 0.00050)
+    "tf": 0.001*800,  # Final time for event (for test 7)
+    "dt": 0.0010,  # timestep size (divided by 2 in the test 4. dt for test 3 is 0.00050)
     "amplitude": 1,  # the Ricker has an amplitude of 1.
     "nspool":  20,  # (20 for dt=0.00050) how frequently to output solution to pvds
     "fspool": 1,  # how frequently to save solution to RAM
@@ -71,8 +74,8 @@ model["timeaxis"] = {
 comm = spyro.utils.mpi_init(model)
 
 mesh = RectangleMesh(100, 100, 1.5, 1.5, diagonal="crossed") # to test FWI, mesh aligned with interface
-mesh.coordinates.dat.data[:, 0] -= 1.5
-mesh.coordinates.dat.data[:, 1] -= 0.0
+# mesh.coordinates.dat.data[:, 0] -= 1.5
+# mesh.coordinates.dat.data[:, 1] -= 0.0
 
 element = spyro.domains.space.FE_method(
     mesh, model["opts"]["method"], model["opts"]["degree"]
@@ -85,5 +88,9 @@ lamb_guess = Constant(0.9) # guess
 rho = Constant(1.)  
 vp_exact = Function(V).interpolate( (lamb_exact / rho) ** 0.5 )
 vp_guess = Function(V).interpolate( (lamb_guess / rho) ** 0.5 )
+AD = model["Aut_Dif"]["status"] 
+if AD:
+    spyro.tools.gradient_test_acoustic_ad(model, mesh, V, comm, vp_exact, vp_guess)
 
-spyro.tools.gradient_test_acoustic(model, mesh, V, comm, vp_exact, vp_guess)
+else:
+    spyro.tools.gradient_test_acoustic(model, mesh, V, comm, vp_exact, vp_guess)

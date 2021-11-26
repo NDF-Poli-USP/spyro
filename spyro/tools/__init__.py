@@ -7,7 +7,7 @@ from .grid_point_calculator import error_calc_line
 from .gradient_test import gradient_test_acoustic
 from .gradient_test import gradient_test_elastic
 from .gradient_test_ad import gradient_test_elastic as gradient_test_elastic_ad
-
+from .gradient_test_ad import gradient_test_acoustic as gradient_test_acoustic_ad
 __all__ = [
     "wave_solver",
     "generate_mesh",
@@ -19,5 +19,6 @@ __all__ = [
     'error_calc_line',
     'gradient_test_acoustic',
     'gradient_test_elastic',
-    'gradient_test_elastic_ad'
+    'gradient_test_elastic_ad',
+    'gradient_test_acoustic_ad'
 ]
