@@ -11,7 +11,7 @@ from spyro.domains.space import FE_method
 from SeismicMesh import write_velocity_model
 
 
-def smooth_field(input_filename, output_filename, show = False):
+def smooth_field(input_filename, output_filename, show = False, sigma = 100):
     f, filetype = os.path.splitext(input_filename)
 
     if filetype == ".segy":
@@ -21,7 +21,6 @@ def smooth_field(input_filename, output_filename, show = False):
             for index, trace in enumerate(f.trace):
                 vp[:, index] = trace
 
-    sigma = 100
     vp_smooth = gaussian_filter(vp, sigma)
 
     spec = segyio.spec()
@@ -66,6 +65,7 @@ def create_shot_record(old_model, comm, show = False):
     model["mesh"]["meshfile"] = 'meshes/temp_synthetic_truemodel_mesh.msh'
     print('Entering mesh generation', flush = True)
     M = cells_per_wavelength(model["opts"]['method'],model["opts"]['degree'],model["opts"]['dimension'])
+    print("Generating true model mesh")
     mesh = build_mesh(model, comm, 'meshes/temp_synthetic_truemodel_mesh', model["inversion"]["initial_guess"])
     element = FE_method(mesh, model["opts"]['method'], model["opts"]['degree'])
     V = fire.FunctionSpace(mesh, element)
@@ -88,6 +88,7 @@ def create_shot_record(old_model, comm, show = False):
         tf=model["timeaxis"]["tf"],
         freq=model["acquisition"]["frequency"],
     )
+    print("Running true model shot record to save.")
     p, p_r = spyro.solvers.forward(model, mesh, comm, vp, sources, wavelet, receivers, output = True)
     spyro.io.save_shots(model, comm, p_r)
     if show == True:

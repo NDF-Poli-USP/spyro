@@ -5,19 +5,26 @@ model = {}
 model["opts"] = {
     "method": "KMV",  # either CG or KMV
     "quadratrue": "KMV",  # Equi or KMV
-    "degree": 5,  # p order
+    "degree": 4,  # p order
     "dimension": 2,  # dimension
 }
 model["parallelism"] = {
-    "type": "automatic",
+    "type": "spatial",
+}
+model["inversion"] = {
+    "initial_guess" : "velocity_models/vp_marmousi-ii_smooth_guess.hdf5",
+    "true_model" : "velocity_models/vp_marmousi-ii.hdf5",
+    "regularization" : True,
+    "gamma" : 1e-4,
+    "gradient_smoothing" : False,
+    "gamma2": None,
+    "shot_record" : False,
 }
 model["mesh"] = {
-    "Lz": 3.5,  # depth in km - always positive
+    "Lz": 3.5,   # depth in km - always positive
     "Lx": 17.0,  # width in km - always positive
-    "Ly": 0.0,  # thickness in km - always positive
-    "meshfile": "meshes/marmousi_exact.msh",
-    "initmodel": "not_used.hdf5",
-    "truemodel": "velocity_models/marmousi_exact.hdf5",
+    "Ly": 0.0,   # thickness in km - always positive
+    "meshfile": "meshes/fwi_mesh_0.msh",
 }
 model["BCs"] = {
     "status": True,  # True or false
@@ -32,8 +39,8 @@ model["BCs"] = {
 }
 model["acquisition"] = {
     "source_type": "Ricker",
-    "num_sources": 40,
-    "source_pos": spyro.create_transect((-0.01, 1.0), (-0.01, 15.0), 40),
+    "num_sources": 6,
+    "source_pos": spyro.create_transect((-0.01, 1.0), (-0.01, 15.0), 8),
     "frequency": 5.0,
     "delay": 1.0,
     "num_receivers": 500,
@@ -45,7 +52,7 @@ model["timeaxis"] = {
     "dt": 0.001,
     "amplitude": 1,  # the Ricker has an amplitude of 1.
     "nspool": 100,  # how frequently to output solution to pvds
-    "fspool": 99999,  # how frequently to save solution to RAM
+    "fspool": 200,  # how frequently to save solution to RAM
 }
 comm = spyro.utils.mpi_init(model)
 mesh, V = spyro.io.read_mesh(model, comm)

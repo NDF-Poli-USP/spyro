@@ -13,7 +13,7 @@ model["parallelism"] = {
     "type": "spatial",
 }
 model["inversion"] = {
-    "initial_guess" : None,
+    "initial_guess" : "velocity_models/vp_marmousi-ii_smooth_guess.hdf5",
     "true_model" : "velocity_models/vp_marmousi-ii.segy",
     "regularization" : True,
     "gamma" : 1e-4,
@@ -25,7 +25,7 @@ model["mesh"] = {
     "Lz": 3.5,   # depth in km - always positive
     "Lx": 17.0,  # width in km - always positive
     "Ly": 0.0,   # thickness in km - always positive
-    "meshfile": None,
+    "meshfile": "meshes/fwi_mesh_0.msh",
 }
 model["BCs"] = {
     "status": True,  # True or false
@@ -40,12 +40,12 @@ model["BCs"] = {
 }
 model["acquisition"] = {
     "source_type": "Ricker",
-    "num_sources": 4,
-    "source_pos": spyro.create_transect((-0.01, 1.0), (-0.01, 15.0), 4),
+    "num_sources": 6,
+    "source_pos": spyro.create_transect((-0.01, 1.0), (-0.01, 15.0), 8),
     "frequency": 5.0,
     "delay": 1.0,
-    "num_receivers": 100,
-    "receiver_locations": spyro.create_transect((-0.10, 0.1), (-0.10, 17.0), 100),
+    "num_receivers": 500,
+    "receiver_locations": spyro.create_transect((-0.10, 0.1), (-0.10, 17.0), 500),
 }
 model["timeaxis"] = {
     "t0": 0.0,  #  Initial time for event
@@ -53,7 +53,8 @@ model["timeaxis"] = {
     "dt": 0.001,
     "amplitude": 1,  # the Ricker has an amplitude of 1.
     "nspool": 100,  # how frequently to output solution to pvds
-    "fspool": 200,  # how frequently to save solution to RAM
+    "fspool": 10,  # how frequently to save solution to RAM
+    "skip": 4,
 }
 
 vp = syntheticFWI(model)
