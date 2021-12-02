@@ -59,7 +59,7 @@ model["acquisition"] = {
     ),
 }
 model["Aut_Dif"] = {
-    "status": False, 
+    "status": True, 
 }
 
 model["timeaxis"] = {

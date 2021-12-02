@@ -122,7 +122,7 @@ def gradient_test_elastic(model, mesh, V, comm, rho, lamb_exact, mu_exact, lamb_
         receivers = spyro.Receivers(model, mesh, V, comm)
         # Automatic Differentiation status
     
-        point_cloud = receivers.setPointCloudRec(comm,paralel_z=True)
+        point_cloud = receivers.setPointCloudRec(comm, paralel_z=True)
         
         wavelet = spyro.full_ricker_wavelet(
             model["timeaxis"]["dt"],
@@ -134,9 +134,10 @@ def gradient_test_elastic(model, mesh, V, comm, rho, lamb_exact, mu_exact, lamb_
         # simulate the exact model
         print('######## Running the exact model ########')
         uz_exact_recv, ux_exact_recv, uy_exact_recv = forward_elastic_waves(
-            model, mesh, comm, rho, lamb_exact, mu_exact, sources, wavelet, point_cloud, output=False
+            model, mesh, comm, rho, lamb_exact, mu_exact, sources, wavelet, point_cloud, output=True
         )
         true_rec = [uz_exact_recv, ux_exact_recv]
+    
     # simulate the guess model
     print('######## Running the guess model ########')
     uz_guess_recv, ux_guess_recv, uy_guess_recv, Jm = forward_elastic_waves(
@@ -144,7 +145,7 @@ def gradient_test_elastic(model, mesh, V, comm, rho, lamb_exact, mu_exact, lamb_
         true_rec=true_rec, fwi=True
     )
    
-    if False:
+    if True:
         ue=[]
         ug=[]
         nt = int(model["timeaxis"]["tf"] / model["timeaxis"]["dt"])
@@ -156,31 +157,19 @@ def gradient_test_elastic(model, mesh, V, comm, rho, lamb_exact, mu_exact, lamb_
         plt.plot(ue,label='exact')
         plt.plot(ug,label='guess')
         plt.legend()
-        plt.savefig('/home/santos/Desktop/grad_test_elastic.png')
-        plt.close()
-
-    
-    if False:
-        plt.title("misfits (uz, ux)")
-        plt.plot(uz_exact_recv-uz_guess_recv,label='misfit uz 1')
-        plt.plot(misfit_uz,label='misfit uz 2',linestyle='--')
-        plt.plot(ux_exact_recv-ux_guess_recv,label='misfit ux 1')
-        plt.plot(misfit_ux,label='misfit ux 2',linestyle='--')
-        plt.legend()
-        plt.savefig('/home/santos/Desktop/grad_test_elastic_misfit.png')
+        plt.savefig('/home/santos/Desktop/grad_test_elastic_AD.png')
         plt.close()
     
     qr_x, _, _ = quadrature.quadrature_rules(V)
-
     
     print("\n Cost functional at fixed point : " + str(Jm) + " \n ")
     #sys.exit("sys.exit called")
 
     # compute the gradient of the control (to be verified)
-    print('######## Computing the gradient by adjoint method ########')
+    print('######## Computing the gradient by automatic differentiation ########')
 
     control_l  = Control(lamb_guess)
-    dJdl       = compute_gradient(Jm, control_l)
+    dJdl       = compute_gradient(Jm, control_l, options={"riesz_representation": "L2"})
  
     # control_m  = Control(mu_guess) 
     # dJdm       = compute_gradient(Jm, control_m)
@@ -189,15 +178,12 @@ def gradient_test_elastic(model, mesh, V, comm, rho, lamb_exact, mu_exact, lamb_
     # Jhat_m     = ReducedFunctional(Jm, control_m) 
     with stop_annotating():
         #sys.exit("sys.exit called")
-        if mask: # water mask 
-            dJdl *= mask
-            # dJdm *= mask
         
-        File("dJdl.pvd").write(dJdl)
-        # File("dJdm.pvd").write(dJdm)
+        File("dJdl_AD.pvd").write(dJdl)
+        #File("dJdm_AD.pvd").write(dJdm)
 
         #steps = [1e-3, 1e-4, 1e-5, 1e-6]  # step length
-        steps = [1e-4, 1e-5, 1e-6]  # step length
+        steps = [1e-3, 1e-4]  # step length
 
         delta_l = Function(V)  # model direction (random)
         delta_l.assign(dJdl)
@@ -227,7 +213,6 @@ def gradient_test_elastic(model, mesh, V, comm, rho, lamb_exact, mu_exact, lamb_
                 model, mesh, comm, rho, lamb_guess, mu_guess, sources, wavelet, point_cloud,
                 true_rec=true_rec, fwi=True
             )
-            
                                    
             fd_grad = (Jp - Jm) / step
             print(

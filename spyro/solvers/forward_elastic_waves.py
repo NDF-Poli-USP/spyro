@@ -130,7 +130,7 @@ def forward_elastic_waves(
     # external forcing form 
     l = inner(f,v) * dx(rule=qr_x) 
    
-    # absorbing boundary conditions
+    # absorbing boundary conditions {{{
     nf = 0 # it enters as a Neumann-type BC
     if model["BCs"]["status"]: # to turn on any type of BC
         bc_defined = False
@@ -198,6 +198,7 @@ def forward_elastic_waves(
     #print(assemble(inner(v, n) * ds))
     #print(assemble(inner(v, t) * ds))
     #https://fenicsproject.discourse.group/t/integrate-over-edges/1140/8
+    #}}}
 
     # weak formulation written as F=0
     F = m + a - l + nf 
@@ -252,6 +253,11 @@ def forward_elastic_waves(
     #outfile3 = helpers.create_output_file("s-wave.pvd", comm, source_num)
     #S = FunctionSpace(mesh, element)
 
+    use_AD_type_interp = True
+    if use_AD_type_interp:
+        P = VectorFunctionSpace(receivers, "DG", 0)
+        interpolator = Interpolator(u_np1, P)
+
     # run forward in time
     for step in range(nt):
         # assemble the rhs term to update the forcing FIXME assemble here or after apply source?
@@ -286,10 +292,16 @@ def forward_elastic_waves(
             u_n.sub(1).assign(u_n.sub(1)*gp)
 
         # interpolate the solution at the receiver points
-        uzsol_recv.append(receivers.interpolate(u_np1.sub(0).dat.data_ro_with_halos[:])) # z direction
-        uxsol_recv.append(receivers.interpolate(u_np1.sub(1).dat.data_ro_with_halos[:])) # x direction
-        if dim==3:
-            uysol_recv.append(receivers.interpolate(u_np1.sub(2).dat.data_ro_with_halos[:])) # y direction
+        if use_AD_type_interp==False: # these lines use the default spyro interpolation
+            uzsol_recv.append(receivers.interpolate(u_np1.sub(0).dat.data_ro_with_halos[:])) # z direction
+            uxsol_recv.append(receivers.interpolate(u_np1.sub(1).dat.data_ro_with_halos[:])) # x direction
+            if dim==3:
+                uysol_recv.append(receivers.interpolate(u_np1.sub(2).dat.data_ro_with_halos[:])) # y direction
+        else:
+            rec = Function(P)
+            interpolator.interpolate(output=rec)
+            uzsol_recv.append(rec.sub(0).dat.data)
+            uxsol_recv.append(rec.sub(1).dat.data)
 
         # save the solution if requested for this time step
         if step % fspool == 0:
@@ -318,12 +330,13 @@ def forward_elastic_waves(
         t = step * float(dt)
 
     # prepare to return
-    uzsol_recv = helpers.fill(uzsol_recv, receivers.is_local, nt, receivers.num_receivers)
-    uxsol_recv = helpers.fill(uxsol_recv, receivers.is_local, nt, receivers.num_receivers)
-    uzsol_recv = utils.communicate(uzsol_recv, comm)
-    uxsol_recv = utils.communicate(uxsol_recv, comm)
-    if dim==3:
-        uysol_recv = helpers.fill(uysol_recv, receivers.is_local, nt, receivers.num_receivers)
-        uysol_recv = utils.communicate(uysol_recv, comm)
+    if use_AD_type_interp==False:
+        uzsol_recv = helpers.fill(uzsol_recv, receivers.is_local, nt, receivers.num_receivers)
+        uxsol_recv = helpers.fill(uxsol_recv, receivers.is_local, nt, receivers.num_receivers)
+        uzsol_recv = utils.communicate(uzsol_recv, comm)
+        uxsol_recv = utils.communicate(uxsol_recv, comm)
+        if dim==3:
+            uysol_recv = helpers.fill(uysol_recv, receivers.is_local, nt, receivers.num_receivers)
+            uysol_recv = utils.communicate(uysol_recv, comm)
 
     return usol, uzsol_recv, uxsol_recv, uysol_recv
