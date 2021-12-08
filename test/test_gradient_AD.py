@@ -91,8 +91,7 @@ def _test_gradient(options):
 
         # File("gradient.pvd").write(dJ)
         steps = [1e-3, 1e-4, 1e-5]  # , 1e-6]  # step length
-
-
+        
         delta_m = Function(V)  # model direction (random)
         delta_m.assign(dJ)
         derivative = enlisting.Enlist(Jhat.derivative())
