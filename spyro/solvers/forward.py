@@ -1,14 +1,15 @@
 from firedrake import *
 from firedrake.assemble import create_assembly_callable
-from ..io import ensemble_forward
-from ..sources import full_ricker_wavelet, delta_expr
+
 from .. import utils
 from ..domains import quadrature, space
 from ..pml import damping
+from ..io import ensemble_forward
 from . import helpers
 
 # Note this turns off non-fatal warnings
 set_log_level(ERROR)
+
 
 @ensemble_forward
 def forward(
@@ -60,15 +61,10 @@ def forward(
     dim = model["opts"]["dimension"]
     dt = model["timeaxis"]["dt"]
     tf = model["timeaxis"]["tf"]
-    delay = model["acquisition"]["delay"]
     nspool = model["timeaxis"]["nspool"]
     fspool = model["timeaxis"]["fspool"]
-    freq = model["acquisition"]["frequency"]
-    if "amplitude" in model["acquisition"]:
-        amp = model["acquisition"]["amplitude"]
-    else:
-        amp = 1
     PML = model["BCs"]["status"]
+    excitations.current_source = source_num
     if PML:
         Lx = model["mesh"]["Lx"]
         Lz = model["mesh"]["Lz"]
@@ -87,8 +83,7 @@ def forward(
             y2 = Ly
             b_pml = ly
 
-    nt    = int(tf / dt)  # number of timesteps
-    dstep = int(delay / dt)  # number of timesteps with source
+    nt = int(tf / dt)  # number of timesteps
 
     if method == "KMV":
         params = {"ksp_type": "preonly", "pc_type": "jacobi"}
@@ -177,14 +172,11 @@ def forward(
         u_n = Function(V)
         u_np1 = Function(V)
 
-    is_local = helpers.receivers_local(mesh, dim, receivers.receiver_locations)
-
     if output:
         outfile = helpers.create_output_file("forward.pvd", comm, source_num)
 
     t = 0.0
-    cutoff = freq_bands[freq_index] if "inversion" in model else None
-        
+
     # -------------------------------------------------------
     m1 = ((u - 2.0 * u_n + u_nm1) / Constant(dt ** 2)) * v * dx(rule=qr_x)
     a = c * c * dot(grad(u_n), grad(v)) * dx(rule=qr_x)  # explicit
@@ -192,11 +184,8 @@ def forward(
     nf = 0
     if model["BCs"]["outer_bc"] == "non-reflective":
         nf = c * ((u_n - u_nm1) / dt) * v * ds(rule=qr_s)
-    
-    RW = full_ricker_wavelet(dt, tf, freq, amp=amp, cutoff=cutoff)
-    f, ricker = external_forcing(RW, mesh, model, source_num, V)
-    # f  = Function(V)
-    FF = m1 + a + nf - c*c*f * v * dx(rule=qr_x)
+
+    FF = m1 + a + nf
 
     if PML:
         X = Function(W)
@@ -249,8 +238,6 @@ def forward(
 
     A = assemble(lhs_, mat_type="matfree")
     solver = LinearSolver(A, solver_parameters=params)
-    # problem = LinearVariationalProblem(lhs_, rhs_, X)
-    # solver = LinearVariationalSolver(problem, solver_parameters=params)
 
     usol = [Function(V, name="pressure") for t in range(nt) if t % fspool == 0]
     usol_recv = []
@@ -258,22 +245,15 @@ def forward(
 
     assembly_callable = create_assembly_callable(rhs_, tensor=B)
 
-    # f = Function(V)
+    rhs_forcing = Function(V)
 
     for step in range(nt):
-        # f.assign(0.0)
-        # assembly_callable()
-        # excitations.apply_source(f, wavelet[step], all_shots=False, source_id=source_num)
-        if step < dstep:
-            ricker.assign(RW[step])
-        elif step == dstep:
-            ricker.assign(0.0)
-
+        rhs_forcing.assign(0.0)
         assembly_callable()
-        # B0 = B.sub(0)
-        # B0 += f
+        f = excitations.apply_source(rhs_forcing, wavelet[step])
+        B0 = B.sub(0)
+        B0 += f
         solver.solve(X, B)
-       
         if PML:
             if dim == 2:
                 u_np1, pp_np1 = X.split()
@@ -288,9 +268,7 @@ def forward(
         else:
             u_np1.assign(X)
 
-        usol_recv.append(
-            receivers.interpolate(u_np1.dat.data_ro_with_halos[:])
-        )
+        usol_recv.append(receivers.interpolate(u_np1.dat.data_ro_with_halos[:]))
 
         if step % fspool == 0:
             usol[save_step].assign(u_np1)
@@ -310,22 +288,7 @@ def forward(
 
         t = step * float(dt)
 
-    usol_recv = helpers.fill(usol_recv, is_local, nt, receivers.num_receivers)
+    usol_recv = helpers.fill(usol_recv, receivers.is_local, nt, receivers.num_receivers)
     usol_recv = utils.communicate(usol_recv, comm)
 
     return usol, usol_recv
-
-def external_forcing(RW, mesh, model, source_num, V):
-
-    pos = model["acquisition"]["source_pos"]
-    z, x = SpatialCoordinate(mesh)
-    sigma_x = Constant(2000)
-    source = Constant(pos[source_num])
-    delta = Interpolator(delta_expr(source, z, x, sigma_x), V)
-    excitation = Function(delta.interpolate())
-
-    ricker = Constant(0)
-    f = excitation * ricker
-    ricker.assign(RW[0], annotate=True)
-
-    return f, ricker
