@@ -49,24 +49,19 @@ class Sources(spyro.receivers.Receivers.Receivers):
         super().build_maps()
 
 
-    def apply_source(self, rhs_forcing, value, all_shots=True, **kwargs):
+    def apply_source(self, rhs_forcing, value):
         """Applies source in a assembled right hand side."""
-
-        if all_shots:
-            for source_id in range(self.num_receivers):
+        for source_id in range(self.num_receivers):
+            if self.is_local[source_id] and source_id==self.current_source:
                 for i in range(len(self.cellNodeMaps[source_id])):
-                    rhs_forcing.dat.data[int(self.cellNodeMaps[source_id][i])] = (
+                    rhs_forcing.dat.data_with_halos[int(self.cellNodeMaps[source_id][i])] = (
                         value * self.cell_tabulations[source_id][i]
                     )
-        else:
-            source_id = kwargs.get("source_id")
-            
-            for i in range(len(self.cellNodeMaps[source_id])):
-                rhs_forcing.dat.data[int(self.cellNodeMaps[source_id][i])] = (
-                    value * self.cell_tabulations[source_id][i]
-                )
+            else: 
+                for i in range(len(self.cellNodeMaps[source_id])):
+                    tmp = rhs_forcing.dat.data_with_halos[0]
 
-    
+        return rhs_forcing
 
 
 def timedependentSource(model, t, freq=None, amp=1, delay=1.5):
