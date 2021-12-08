@@ -20,7 +20,7 @@ model["opts"] = {
     "degree": 5,  # p order
     "dimension": 2,  # dimension
     "regularization": True,  # regularization is on?
-    "gamma": 1.0, # regularization parameter
+    "gamma": 1.e-6, # regularization parameter
 }
 model["parallelism"] = {
     "type": "automatic",
@@ -116,7 +116,7 @@ class L2Inner(object):
 kount = 0
 
 
-def regularize_gradient(vp, dJ):
+def regularize_gradient(vp, dJ, gamma):
     """Tikhonov regularization"""
     m_u = TrialFunction(V)
     m_v = TestFunction(V)
@@ -135,7 +135,7 @@ def regularize_gradient(vp, dJ):
         },
     )
     grad_solver.solve()
-    dJ += gradreg
+    dJ += gamma * gradreg
     return dJ
 
 
@@ -203,7 +203,8 @@ class Objective(ROL.Objective):
             dJ /= comm.comm.size
         # regularize the gradient if asked.
         if model['opts']['regularization']:
-            dJ = regularize_gradient(vp, dJ)
+            gamma = model['opts']['gamma']
+            dJ = regularize_gradient(vp, dJ, gamma)
         # mask the water layer
         dJ.dat.data[water] = 0.0
         # Visualize
