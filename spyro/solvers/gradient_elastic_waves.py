@@ -1,6 +1,6 @@
 from firedrake import *
 from firedrake.assemble import create_assembly_callable
-
+from firedrake.mesh import *
 from ..domains import quadrature, space
 from ..pml import damping
 from ..io import ensemble_gradient_elastic_waves 
@@ -15,7 +15,24 @@ __all__ = ["gradient"] #FIXME check this
 
 @ensemble_gradient_elastic_waves
 def gradient_elastic_waves(
-    model, mesh, comm, rho, lamb, mu, receivers, guess, residual_z, residual_x, residual_y, output=False, save_adjoint=False, excitations=False, wavelet=False):
+    model, 
+    mesh, 
+    comm, 
+    rho, 
+    lamb, 
+    mu, 
+    receivers, 
+    guess, 
+    residual_z, 
+    residual_x, 
+    residual_y, 
+    output=False, 
+    save_adjoint=False, 
+    excitations=False, 
+    wavelet=False,
+    exact=False, # the vector field, used just to debug
+    guess_rec=False # the vector field, used just to debug
+):
     """Discrete adjoint with secord-order in time fully-explicit timestepping scheme
     with implementation of simple absorbing boundary conditions using 
     CG FEM with or without higher order mass lumping (KMV type elements).
@@ -54,9 +71,9 @@ def gradient_elastic_waves(
 
     Returns
     -------
-    dJdl_local: A Firedrake.Function containing the gradient of
+    dJdl: A Firedrake.Function containing the gradient of
                 the functional w.r.t. `lambda`
-    dJdm_local: A Firedrake.Function containing the gradient of
+    dJdm: A Firedrake.Function containing the gradient of
                 the functional w.r.t. `mu`
     adjoint: Optional, a list of Firedrake functions containing the adjoint
 
@@ -119,7 +136,7 @@ def gradient_elastic_waves(
     # external forcing form (adjoint problem)
     l = inner(f,v) * dx(rule=qr_x) # f = residual = u_exact - u_guess
 
-    # absorbing boundary conditions (adjoint problem)
+    # absorbing boundary conditions (adjoint problem) {{{
     #FIXME check the Neumann BC because the adjoint formulation requires Null Neumann BC
     nf = 0 # it enters as a Neumann-type BC
     if model["BCs"]["status"]: # to turn on any type of BC
@@ -182,6 +199,7 @@ def gradient_elastic_waves(
 
         if bc_defined == False:
             print("WARNING: [BCs][status] = True, but no boundary condition defined. Check your [BCs]")
+    #}}}
 
     # weak formulation written as F=0 (adjoint problem)
     F = m + a - l + nf
@@ -226,75 +244,67 @@ def gradient_elastic_waves(
     agl = tr(D(ufor)) * tr(D(uadj)) * vg * dx(rule=qr_x) # w.r.t. lambda
     agm = 2.0 * inner(D(ufor), D(uadj)) * vg * dx(rule=qr_x) # w.r.t. mu
 
-    # weak formulationd written as F=0 (gradient problem)
-    Fgl = mg - agl  # for dJdl (gradient w.r.t. lambda)
-    Fgm = mg - agm  # for dJdm (gradient w.r.t. mu)
-   
-    # retrieve the lhs and rhs terms from F FIXME maybe simply this
-    lhsFgl, rhsFgl = lhs(Fgl), rhs(Fgl)
-    lhsFgm, rhsFgm = lhs(Fgm), rhs(Fgm)
-
     dJdl_inc = Function(H) # increment of dJdl
     dJdm_inc = Function(H) # increment of dJdm
     
-    dJdl_prob = LinearVariationalProblem(lhsFgl, rhsFgl, dJdl_inc) 
-    dJdm_prob = LinearVariationalProblem(lhsFgm, rhsFgm, dJdm_inc)
+    dJdl_prob = LinearVariationalProblem(mg, agl, dJdl_inc) 
+    dJdm_prob = LinearVariationalProblem(mg, agm, dJdm_inc)
     
     if method == "KMV":
         # to solve for dJdl
         dJdl_solver = LinearVariationalSolver(
             dJdl_prob,
-            solver_parameters={
-                "ksp_type": "preonly",
-                "pc_type": "jacobi",
-                "mat_type": "matfree",
-            },
+            solver_parameters={"ksp_type": "preonly", "pc_type": "jacobi", "mat_type": "matfree"},
         )
         # to solve for dJdm
         dJdm_solver = LinearVariationalSolver(
             dJdm_prob,
-            solver_parameters={
-                "ksp_type": "preonly",
-                "pc_type": "jacobi",
-                "mat_type": "matfree",
-            },
+            solver_parameters={"ksp_type": "preonly", "pc_type": "jacobi","mat_type": "matfree"},
         )
     elif method == "CG":
         # to solve for dJdl
         dJdl_solver = LinearVariationalSolver(
             dJdl_prob,
-            solver_parameters={
-                "mat_type": "matfree",
-            },
+            solver_parameters={"mat_type": "matfree"},
+            #solver_parameters={"ksp_type": "preonly", "pc_type": "lu"}, #FIXME testing
         )
         # to solve for dJdm
         dJdm_solver = LinearVariationalSolver(
             dJdm_prob,
-            solver_parameters={
-                "mat_type": "matfree",
-            },
+            solver_parameters={"mat_type": "matfree"},
+            #solver_parameters={"ksp_type": "preonly", "pc_type": "lu"}, #FIXME testing
         )
     #--------- end defintion of the gradient problem ---------
     #}}}
+
+    #if exact:
+        #guess_copy = guess.copy()
+
+    #outfile2 = helpers.create_output_file("dJdl_adj_time.pvd", comm, 0)
 
     # run backward in time
     for step in range(nt - 1, -1, -1):
         t = step * float(dt)
         
         # assemble the rhs term to update the forcing FIXME assemble here or after apply source?
-        B = assemble(rhs_, tensor=B)
-        if not excitations:
+        B = assemble(rhs_, tensor=B) 
+        if not excitations and not exact:
             bc.apply(B) #FIXME for Dirichlet BC
         
-        if not excitations:
+        if not excitations and not exact:
             # apply the residual evaluated at the receivers as external forcing (sources)
             # f = residual = u_exact - u_guess
             f = receivers.apply_receivers_as_radial_source(f, residual_z, residual_x, residual_y, step)
             #File("f.pvd").write(f)
             #sys.exit("exiting")
-        else:
-            # apply the given wavelt as a source (to debug - test adjoint)
+        elif excitations and not exact:
+            # apply the given wavelet as a source (to debug - test adjoint)
             f = excitations.apply_radial_source(f, wavelet[step])
+        elif exact:
+            # apply a body force: misfit over the entire domain (used to compare with AD)
+            f.assign(exact.pop(step) - guess_rec.pop()) 
+        else:
+            pass
 
         # solve and assign X onto solution u 
         solver.solve(X, B)
@@ -304,15 +314,14 @@ def gradient_elastic_waves(
         if step % fspool == 0:
             # compute the gradient increment
             uadj.assign(u_np1)
-            ufor.assign(guess.pop())
+            ufor.assign(guess.pop()) # return the last guess solution and remove it from the list (guess)
             # solve the L2 inner product 
             dJdl_solver.solve()
             dJdm_solver.solve()
             # add to the gradient
-            dJdl += dJdl_inc # this one for pyrol
-            dJdm += dJdm_inc # this one for pyrol
-            #dJdl -= dJdl_inc # FIXME testing for scipy
-            #dJdm -= dJdm_inc # FIXME testing for scipy
+            dJdl += dJdl_inc 
+            dJdm += dJdm_inc 
+            #outfile2.write(dJdl, time=t)
 
         # update u^(n-1) and u^(n) FIXME check if the assign is here or after output write (also check the forward prob.)
         u_nm1.assign(u_n)

@@ -443,10 +443,11 @@ class Receivers:
             X, Y     = np.meshgrid(rec_position[0,0],δs)
         
         xs          = np.vstack((X.flatten(), Y.flatten())).T
-        
+
         point_cloud = VertexOnlyMesh(self.mesh, xs, missing_points_behaviour="warn")
         
         return point_cloud
+
 ## Some helper functions
 def delta_expr(x0, z, x, sigma_x=500.0):
     return np.exp(-sigma_x * ((z - x0[0]) ** 2 + (x - x0[1]) ** 2))

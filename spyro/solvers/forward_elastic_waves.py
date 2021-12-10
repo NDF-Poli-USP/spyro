@@ -25,7 +25,8 @@ def forward_elastic_waves(
     wavelet,
     receivers,
     source_num=0,
-    output=False, 
+    output=False,
+    use_AD_type_interp=False # used to debug
 ):
     """Secord-order in time fully-explicit scheme
     with implementation of simple absorbing boundary conditions using
@@ -216,9 +217,13 @@ def forward_elastic_waves(
     B = Function(V)
     A = assemble(lhs_, mat_type="matfree")
     #A = assemble(lhs_) # for direct solver
-    
-    # set the linear solver for A
-    solver = LinearSolver(A, solver_parameters=params)
+   
+    if use_AD_type_interp==False:
+        # set the linear solver for A
+        solver = LinearSolver(A, solver_parameters=params)
+    else: # to compare with AD problem
+        problem = LinearVariationalProblem(lhs_, rhs_, X) # FIXME this is slower than previous one (check it in AD)
+        solver  = LinearVariationalSolver(problem, solver_parameters=params)
 
     # define the output solution over the entire domain (usol) and at the receivers (usol_recv)
     t = 0.0
@@ -228,57 +233,30 @@ def forward_elastic_waves(
     uxsol_recv = [] # u along the x direction
     uysol_recv = [] # u along the y direction
 
-    def delta_expr(xs, zs, x, z, sigma_x=500):
-        sigma_x = Constant(sigma_x)
-        return exp(-sigma_x * ((x - xs) ** 2 + (z - zs) ** 2))
-
-    radial_source=0
-    if radial_source==1: # FIXME keeping this old code here for now
-        xs = model["acquisition"]["source_pos"][0][1]       
-        zs = model["acquisition"]["source_pos"][0][0]       
-        S = FunctionSpace(mesh, element)
-        tol = 0.00001
-        source_x = Function(S, name="source_x").interpolate(
-                            delta_expr(xs, zs, x, z) * (x-xs)/(tol + ((x-xs)**2.+(z-zs)**2.)**0.5)
-                            )
-        source_z = Function(S, name="source_z").interpolate(
-                            delta_expr(xs, zs, x, z) * (z-zs)/(tol + ((x-xs)**2.+(z-zs)**2.)**0.5)
-                            )
-        File("source_x.pvd", comm=comm.comm).write(source_x)
-        File("source_z.pvd", comm=comm.comm).write(source_z)
-        sys.exit("Exit without running")
-
     # FIXME testing
     #outfile2 = helpers.create_output_file("p-wave.pvd", comm, source_num)
     #outfile3 = helpers.create_output_file("s-wave.pvd", comm, source_num)
     #S = FunctionSpace(mesh, element)
 
-    use_AD_type_interp = True
     if use_AD_type_interp:
         P = VectorFunctionSpace(receivers, "DG", 0)
         interpolator = Interpolator(u_np1, P)
 
     # run forward in time
     for step in range(nt):
-        # assemble the rhs term to update the forcing FIXME assemble here or after apply source?
-        B = assemble(rhs_, tensor=B)
-        #bc.apply(B) #FIXME for Dirichlet BC
+        if use_AD_type_interp==False:
+            # assemble the rhs term to update the forcing FIXME assemble here or after apply source?
+            B = assemble(rhs_, tensor=B) # this is faster 
+            #bc.apply(B) #FIXME for Dirichlet BC
+        else: # to compare with AD problem
+            solver.solve() 
 
-        #start = time.time()
-        if radial_source==1: # FIXME testing a radial source here for now
-            f.sub(0).assign(wavelet[step]*source_z)
-            f.sub(1).assign(wavelet[step]*source_x)
-        else:
-            #FIXME let the user decide which approach will be used 
-            #excitations.apply_source(f.sub(0), -1.*wavelet[step]) # z 
-            #excitations.apply_source(f.sub(1), wavelet[step]) # x 
-            f = excitations.apply_radial_source(f, wavelet[step])
-            #f.sub(1).assign(Function(S).interpolate(sin(x))) # only P-wave
-        #end = time.time()
-        #print(end - start)
+        f = excitations.apply_radial_source(f, wavelet[step])
 
         # solve and assign X onto solution u 
-        solver.solve(X, B)
+        if use_AD_type_interp==False:
+            solver.solve(X, B)
+        
         u_np1.assign(X)
 
         # deal with absorbing boundary layers

@@ -218,32 +218,15 @@ def forward_elastic_waves(
     # define the output solution over the entire domain (usol) and at the receivers (usol_recv)
     t = 0.0
     save_step = 0
+    usol = [Function(V, name="Displacement") for t in range(nt) if t % fspool == 0] # vectorized, includes uz, ux, and uy
     uzsol_recv = [] # u along the z direction
     uxsol_recv = [] # u along the x direction
     uysol_recv = [] # u along the y direction
 
     J0            = 0.0
-    J1            = 0.0
     P             = VectorFunctionSpace(receivers, "DG", 0)
     interpolator  = Interpolator(u_np1, P)
 
-    def delta_expr(xs, zs, x, z, sigma_x=500):
-        sigma_x = Constant(sigma_x)
-        return exp(-sigma_x * ((x - xs) ** 2 + (z - zs) ** 2))
-
-    xs = model["acquisition"]["source_pos"][0][1]       
-    zs = model["acquisition"]["source_pos"][0][0]       
-    tol = 0.00001
-    source = Function(V, name="source_x").interpolate(as_vector([
-                        delta_expr(xs, zs, x, z) * (x-xs)/(tol + ((x-xs)**2.+(z-zs)**2.)**0.5)
-                        ,
-                        delta_expr(xs, zs, x, z) * (z-zs)/(tol + ((x-xs)**2.+(z-zs)**2.)**0.5)
-                        ]))
-    
-    ricker = Constant(0) 
-    # source.sub(0).assign(source_x*ricker)
-    # source.sub(1).assign(source_z*ricker)
-    ricker.assign(wavelet[0])
     for step in range(nt):
         #if step < dstep:
         #ricker.assign(wavelet[step])
@@ -287,6 +270,11 @@ def forward_elastic_waves(
 
         uzsol_recv.append(rec.sub(0).dat.data) 
         uxsol_recv.append(rec.sub(1).dat.data)
+        
+        # save the solution if requested for this time step
+        if step % fspool == 0:
+            usol[save_step].assign(u_np1)
+            save_step += 1
 
         if step % nspool == 0:
             assert (
@@ -310,9 +298,9 @@ def forward_elastic_waves(
         t = step * float(dt)
 
     if fwi:
-        return uzsol_recv, uxsol_recv, uysol_recv, J0
+        return usol, uzsol_recv, uxsol_recv, uysol_recv, J0
     else:
-        return uzsol_recv, uxsol_recv, uysol_recv
+        return usol, uzsol_recv, uxsol_recv, uysol_recv
 
 
 def objective_func(p_rec, p_true_rec, IT, dt, P):

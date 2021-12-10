@@ -145,7 +145,7 @@ wavelet = spyro.full_ricker_wavelet(
                         dt=model["timeaxis"]["dt"], tf=model["timeaxis"]["tf"], freq=model["acquisition"]["frequency"]
                         )
 
-post_process=False
+post_process=True
 vtkfiles=True
 shotfiles=True
 if post_process==False:
@@ -167,7 +167,7 @@ if post_process==False:
         #spyro.io.save_shots(model, comm, u_at_recv, file_name=filename)
 
 else:
-    tn="test_1"
+    tn="test_2"
     u_cg_ref = spyro.io.load_shots(model, comm, file_name="./shots/"+tn+"/"+tn+"_cg_p5_h25m.dat")
     u_kmv_ref = spyro.io.load_shots(model, comm, file_name="./shots/"+tn+"/"+tn+"_kmv_p5_h25m.dat")
    
@@ -225,23 +225,31 @@ else:
     p = np.array([2, 3, 4, 5])
 
     plt.plot(dof_cg, L2_cg, label='Lagrange', marker="o")
-    plt.plot(dof_kmv, L2_kmv, label='KMV', marker="o")
+    plt.plot(dof_kmv, L2_kmv, label='ML', marker="o")
     plt.yscale('log')
     plt.xscale('log')
     plt.ylabel("relative L2 norm (%)", fontsize=14)
     plt.xlabel("DOFs", fontsize=14)
-    plt.title("Lagrange x KMV elements", fontsize=16)
+    plt.title("Lagrange x ML elements", fontsize=16)
     plt.legend()
     plt.grid(b=True, which='major')
     plt.grid(b=True, which='minor')
+    plt.annotate(" p=2", (dof_cg[0], L2_cg[0]), color='tab:blue', fontsize=14)
+    plt.annotate(" 3", (dof_cg[1], L2_cg[1]), color='tab:blue', fontsize=14)
+    plt.annotate(" 4", (dof_cg[2], L2_cg[2]), color='tab:blue', fontsize=14)
+    plt.annotate(" 5", (dof_cg[3], L2_cg[3]), color='tab:blue', fontsize=14)
+    plt.annotate(" p=2", (dof_kmv[0], L2_kmv[0]), color='tab:orange', fontsize=14)
+    plt.annotate(" 3", (dof_kmv[1], L2_kmv[1]), color='tab:orange', fontsize=14)
+    plt.annotate(" 4", (dof_kmv[2], L2_kmv[2]), color='tab:orange', fontsize=14)
+    plt.annotate(" 5", (dof_kmv[3], L2_kmv[3]), color='tab:orange', fontsize=14)
     plt.show()
 
     
     plt.plot(p, L2_cg, label='Lagrange',marker="o")
-    plt.plot(p, L2_kmv, label='KMV',marker="o")
+    plt.plot(p, L2_kmv, label='ML',marker="o")
     plt.ylabel("relative L2 norm (%)", fontsize=14)
     plt.xlabel("polynomial order", fontsize=14)
-    plt.title("Lagrange x KMV elements", fontsize=16)
+    plt.title("Lagrange x ML elements", fontsize=16)
     plt.legend()
     plt.grid(b=True, which='major')
     plt.grid(b=True, which='minor')
@@ -249,13 +257,21 @@ else:
     
     
     plt.plot(dof_cg, t_cg, label='Lagrange',marker="o")
-    plt.plot(dof_kmv, t_kmv, label='KMV',marker="o")
+    plt.plot(dof_kmv, t_kmv, label='ML',marker="o")
     plt.yscale('log')
     plt.xscale('log')
     plt.ylabel("simulation time (s)",fontsize=14)
     plt.xlabel("DOFs", fontsize=14)
-    plt.title("Lagrange x KMV elements", fontsize=16)
-    plt.legend()
+    plt.title("Lagrange x ML elements", fontsize=16)
+    plt.legend(loc='lower right')
     plt.grid(b=True, which='major')
     plt.grid(b=True, which='minor')
+    plt.annotate(" p=2", (dof_cg[0], 0.8*t_cg[0]), color='tab:blue', fontsize=14)
+    plt.annotate(" 3", (dof_cg[1], 0.8*t_cg[1]), color='tab:blue', fontsize=14)
+    plt.annotate(" 4", (dof_cg[2], 0.8*t_cg[2]), color='tab:blue', fontsize=14)
+    plt.annotate(" 5", (dof_cg[3], 0.8*t_cg[3]), color='tab:blue', fontsize=14)
+    plt.annotate("p=2", (dof_kmv[0], 1.2*t_kmv[0]), color='tab:orange', fontsize=14)
+    plt.annotate(" 3", (dof_kmv[1], 0.8*t_kmv[1]), color='tab:orange', fontsize=14)
+    plt.annotate(" 4", (dof_kmv[2], 0.8*t_kmv[2]), color='tab:orange', fontsize=14)
+    plt.annotate(" 5", (dof_kmv[3], 0.8*t_kmv[3]), color='tab:orange', fontsize=14)
     plt.show()
