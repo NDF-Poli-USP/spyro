@@ -65,6 +65,7 @@ def _test_gradient(options):
         p_exact_recv = forward(
             model, mesh, comm, vp_exact, sources, wavelet, point_cloud
         )
+        print(p_exact_recv)
     # simulate the guess model
     print('######## Running the guess model ########')
     p_guess_recv, J = forward(

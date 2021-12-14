@@ -11,7 +11,7 @@ from . import helpers
 set_log_level(ERROR)
 
 
-@ensemble_forward
+# @ensemble_forward
 def forward(
     model,
     mesh,
@@ -22,6 +22,7 @@ def forward(
     receivers,
     source_num=0,
     output=False,
+    **kwargs
 ):
     """Secord-order in time fully-explicit scheme
     with implementation of a Perfectly Matched Layer (PML) using
@@ -63,6 +64,8 @@ def forward(
     tf = model["timeaxis"]["tf"]
     nspool = model["timeaxis"]["nspool"]
     fspool = model["timeaxis"]["fspool"]
+    delay  = model["acquisition"]["delay"]
+    dstep  = int(delay / dt)  # number of timesteps with source
     PML = model["BCs"]["status"]
     excitations.current_source = source_num
     if PML:
@@ -176,17 +179,21 @@ def forward(
         outfile = helpers.create_output_file("forward.pvd", comm, source_num)
 
     t = 0.0
-
+    m = 1/(c*c)
     # -------------------------------------------------------
-    m1 = ((u - 2.0 * u_n + u_nm1) / Constant(dt ** 2)) * v * dx(rule=qr_x)
-    a = c * c * dot(grad(u_n), grad(v)) * dx(rule=qr_x)  # explicit
+    m1 = m*((u - 2.0 * u_n + u_nm1) / Constant(dt ** 2)) * v * dx(rule=qr_x)
+    a = dot(grad(u_n), grad(v)) * dx(rule=qr_x)  # explicit
 
+    position_source = model["acquisition"]["source_pos"][0]
+    freq = model["acquisition"]["frequency"]
+    
+    f = Function(V)
     nf = 0
     if model["BCs"]["outer_bc"] == "non-reflective":
         nf = c * ((u_n - u_nm1) / dt) * v * ds(rule=qr_s)
 
-    FF = m1 + a + nf
-
+    FF = m1 + a + nf - Constant(100000)*f * v * dx(rule=qr_x) 
+    
     if PML:
         X = Function(W)
         B = Function(W)
@@ -236,24 +243,25 @@ def forward(
     lhs_ = lhs(FF)
     rhs_ = rhs(FF)
 
-    A = assemble(lhs_, mat_type="matfree")
-    solver = LinearSolver(A, solver_parameters=params)
+    problem = LinearVariationalProblem(lhs_, rhs_, X)
+    solver  = LinearVariationalSolver(problem, solver_parameters=params)            
 
-    usol = [Function(V, name="pressure") for t in range(nt) if t % fspool == 0]
     usol_recv = []
     save_step = 0
-
-    assembly_callable = create_assembly_callable(rhs_, tensor=B)
-
-    rhs_forcing = Function(V)
-
+    
+    P            = FunctionSpace(receivers, "DG", 0)
+    interpolator = Interpolator(u_np1, P)
+    J0           = 0.0
+        
     for step in range(nt):
-        rhs_forcing.assign(0.0)
-        assembly_callable()
-        f = excitations.apply_source(rhs_forcing, wavelet[step])
-        B0 = B.sub(0)
-        B0 += f
-        solver.solve(X, B)
+        
+        excitations.apply_source(f, wavelet[step])
+        
+        solver.solve()
+        u_np1.assign(X)
+        if step==nt-1:
+            File("ricker.pvd").write(u_np1)
+            
         if PML:
             if dim == 2:
                 u_np1, pp_np1 = X.split()
@@ -268,11 +276,21 @@ def forward(
         else:
             u_np1.assign(X)
 
-        usol_recv.append(receivers.interpolate(u_np1.dat.data_ro_with_halos[:]))
+        rec = Function(P)
+        interpolator.interpolate(output=rec)
+        
+        fwi        = kwargs.get("fwi")
+        p_true_rec = kwargs.get("true_rec")
+        
+        usol_recv.append(rec.dat.data) 
 
-        if step % fspool == 0:
-            usol[save_step].assign(u_np1)
-            save_step += 1
+        if fwi:
+            J0 += objective_func(
+                rec,
+                p_true_rec[step],
+                step,
+                dt,
+                P)
 
         if step % nspool == 0:
             assert (
@@ -287,8 +305,26 @@ def forward(
         u_n.assign(u_np1)
 
         t = step * float(dt)
+    
+    if fwi:
+        return usol_recv, J0
+    else:
+        return usol_recv
 
-    usol_recv = helpers.fill(usol_recv, receivers.is_local, nt, receivers.num_receivers)
-    usol_recv = utils.communicate(usol_recv, comm)
 
-    return usol, usol_recv
+def objective_func(p_rec,p_true_rec, IT, dt,P):
+    true_rec = Function(P)
+    true_rec.dat.data[:] = p_true_rec
+    J = 0.5 * assemble(inner(true_rec-p_rec, true_rec-p_rec) * dx)
+    return J
+
+
+    # outfile = File("ricker.pvd")   
+    # for step in range(nt):
+    #     excitations.apply_source(f, wavelet[step])
+
+    #     solver.solve()
+    #     u_np1.assign(X)
+    #     if step==nt-1:
+            
+    #         outfile.write(u_np1)
