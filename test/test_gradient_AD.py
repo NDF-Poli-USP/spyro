@@ -14,10 +14,7 @@ from .inputfiles.Model1_gradient_2d_pml import model_pml
 import copy
 # outfile_total_gradient = File(os.getcwd() + "/results/Gradient.pvd")
 OMP_NUM_THREADS=1
-forward = spyro.solvers.forward
-gradient = spyro.solvers.gradient
-functional = spyro.utils.compute_functional
-
+forward = spyro.solvers.forward_AD
 
 def _make_vp_exact(V, mesh):
     """Create a circle with higher velocity in the center"""
@@ -38,18 +35,6 @@ def _make_vp_guess(V, mesh):
     # File("guess_vel.pvd").write(vp_guess)
     return vp_guess
 
-def createPointCloud(model,mesh):
-    num_rec = model["acquisition"]["num_receivers"]
-    x0 = model["acquisition"]["receiver_locations"][0,0]
-    xn = model["acquisition"]["receiver_locations"][num_rec-1,0]
-    δs = np.linspace(x0, xn, num_rec)
-    X, Y = np.meshgrid(-0.2, δs)
-    xs = np.vstack((X.flatten(), Y.flatten())).T
-
-    point_cloud = VertexOnlyMesh(mesh, xs) 
-    P = FunctionSpace(point_cloud, "DG", 0)  
-    return P
-
 
 def test_gradient():
     _test_gradient(model)
@@ -57,33 +42,41 @@ def test_gradient():
 
 def _test_gradient(options):
 
-    comm = spyro.utils.mpi_init(model)
-    mesh, V = spyro.io.read_mesh(model, comm)
+    comm     = spyro.utils.mpi_init(model)
+    mesh, V  = spyro.io.read_mesh(model, comm)
     vp_exact = _make_vp_exact(V, mesh)
-    
-    P = createPointCloud(model,mesh)
-    source_pos =  model["acquisition"]["source_pos"]
-    with stop_annotating(): 
-        solver  = spyro.solver_AD(Aut_Dif=False)
-    
-        i=0
-        rec = []
-        for sn in source_pos:
-            rec.append(solver.wave_propagation(model,mesh,comm,vp_exact,P,sn))
-            i+=1
-
-    
     vp_guess = _make_vp_guess(V, mesh)
-    control  = Control(vp_guess)
+    with stop_annotating():
+        print('######## Starting gradient test ########')
 
-    solver  = spyro.solver_AD(fwi=True,Aut_Dif=True)
-    J       = 0
-    p_rec,J = solver.wave_propagation(model,mesh,comm,vp_guess,P,source_pos[0],p_true_rec=rec[0],obj_func=J)
+        sources   = spyro.Sources(model, mesh, V, comm)
+        receivers = spyro.Receivers(model, mesh, V, comm)
 
+        wavelet = spyro.full_ricker_wavelet(
+            model["timeaxis"]["dt"],
+            model["timeaxis"]["tf"],
+            model["acquisition"]["frequency"],
+        )
+
+        point_cloud = receivers.setPointCloudRec(comm,paralel_z=True)
+
+        # simulate the exact model
+        print('######## Running the exact model ########')
+        p_exact_recv = forward(
+            model, mesh, comm, vp_exact, sources, wavelet, point_cloud
+        )
+    # simulate the guess model
+    print('######## Running the guess model ########')
+    p_guess_recv, J = forward(
+        model, mesh, comm, vp_guess, sources, wavelet, 
+        point_cloud, fwi=True, true_rec=p_exact_recv
+    )
     
+    control  = Control(vp_guess)
+    print('######## Computing the gradient ########')
     dJ   = compute_gradient(J, control)
     Jhat = ReducedFunctional(J, control) 
-
+    # File("gradient.pvd").write(dJ)
     with stop_annotating():
         Jm = copy.deepcopy(J)
 
@@ -105,10 +98,11 @@ def _test_gradient(options):
         errors = []
         for step in steps:  # range(3):
             # J(m + delta_m*h)
-            vp_guess = vp_original + step*delta_m
-            J = 0.
-            p_rec, Jp = solver.wave_propagation(model,mesh,comm,
-                        vp_guess,P,source_pos[0],p_true_rec=rec[0],obj_func=J)
+            vp_guess = vp_original + step * delta_m
+            p_guess_recv, Jp = forward(
+                model, mesh, comm, vp_guess, sources, wavelet, 
+                point_cloud, fwi=True, true_rec=p_exact_recv
+            )
  
             fd_grad = (Jp - Jm) / step
             

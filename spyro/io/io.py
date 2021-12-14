@@ -46,7 +46,6 @@ def ensemble_load(func):
     return wrapper
 
 
-
 def ensemble_plot(func):
     """Decorator for `plot_shots` to distribute shots for ensemble parallelism"""
     def wrapper(*args, **kwargs):
@@ -73,6 +72,37 @@ def ensemble_forward(func):
 
     return wrapper
 
+def ensemble_forward_ad(func):
+    """Decorator for forward to distribute shots for ensemble parallelism"""
+    def wrapper(*args, **kwargs):
+        acq = args[0].get("acquisition")
+        num = acq["num_sources"]
+        fwi = kwargs.get("fwi")
+        _comm = args[2]
+        for snum in range(num):
+            if is_owner(_comm, snum):
+                if fwi:
+                    u_r, J = func(*args, **dict(kwargs, source_num=snum))
+                    return u_r, J
+                else:
+                    u_r = func(*args, **dict(kwargs, source_num=snum))
+
+    return wrapper
+
+def ensemble_forward_elastic_waves(func):
+    """Decorator for forward elastic waves to distribute shots for ensemble parallelism"""
+    def wrapper(*args, **kwargs):
+        acq = args[0].get("acquisition")
+        num = acq["num_sources"]
+        _comm = args[2]
+        for snum in range(num):
+            if is_owner(_comm, snum):
+                u, uz_r, ux_r, uy_r = func(*args, **dict(kwargs, source_num=snum))
+                return u, uz_r, ux_r, uy_r
+
+    return wrapper
+
+
 def ensemble_gradient(func):
     """Decorator for gradient to distribute shots for ensemble parallelism"""
     def wrapper(*args, **kwargs):
@@ -88,6 +118,25 @@ def ensemble_gradient(func):
                 else:
                     grad = func(*args, **kwargs)
                     return grad
+
+    return wrapper
+
+
+def ensemble_gradient_elastic_waves(func):
+    """Decorator for gradient (elastic waves) to distribute shots for ensemble parallelism"""
+    def wrapper(*args, **kwargs):
+        acq = args[0].get("acquisition")
+        save_adjoint = kwargs.get("save_adjoint")
+        num = acq["num_sources"]
+        _comm = args[2]
+        for snum in range(num):
+            if is_owner(_comm, snum):
+                if save_adjoint:
+                    grad_lambda, grad_mu, u_adj = func(*args, **kwargs)
+                    return grad_lambda, grad_mu, u_adj
+                else:
+                    grad_lambda, grad_mu = func(*args, **kwargs)
+                    return grad_lambda, grad_mu
 
     return wrapper
 
@@ -210,7 +259,7 @@ def _check_units(c):
     return c
 
 
-def interpolate(model, Z, mesh, V, guess=False):
+def interpolate(model, mesh, V, guess=False):
     """Read and interpolate a seismic velocity model stored
     in a HDF5 file onto the nodes of a finite element space.
 
@@ -236,9 +285,8 @@ def interpolate(model, Z, mesh, V, guess=False):
     if model["BCs"]["status"]:
         minz = -model["mesh"]["Lz"] - model["BCs"]["lz"]
         maxz = 0.0
-        minx = 0.0
+        minx = 0.0 - model["BCs"]["lx"]
         maxx = model["mesh"]["Lx"] + model["BCs"]["lx"]
-        
         miny = 0.0 - model["BCs"]["ly"]
         maxy = model["mesh"]["Ly"] + model["BCs"]["ly"]
     else:
@@ -268,41 +316,38 @@ def interpolate(model, Z, mesh, V, guess=False):
     else:
         fname = model["mesh"]["truemodel"]
 
-    # with h5py.File(fname, "r") as f:
-        # print(f.get("velocity_model")[()])
-        # Z = np.asarray(f.get("velocity_model")[()])
-        
-    if sd == 2:
-        nrow, ncol = Z.shape
-        z = np.linspace(minz, maxz, nrow)
-        x = np.linspace(minx, maxx, ncol)
+    with h5py.File(fname, "r") as f:
+        Z = np.asarray(f.get("velocity_model")[()])
 
-        # make sure no out-of-bounds
-        qp_z2 = [minz if z < minz else maxz if z > maxz else z for z in qp_z]
-        qp_x2 = [minx if x < minx else maxx if x > maxx else x for x in qp_x]
+        if sd == 2:
+            nrow, ncol = Z.shape
+            z = np.linspace(minz, maxz, nrow)
+            x = np.linspace(minx, maxx, ncol)
 
-        interpolant = RegularGridInterpolator((z, x), Z)
-        tmp = interpolant((qp_z2, qp_x2))
-    elif sd == 3:
-        nrow, ncol, ncol2 = Z.shape
-        z = np.linspace(minz, maxz, nrow)
-        x = np.linspace(minx, maxx, ncol)
-        y = np.linspace(miny, maxy, ncol2)
+            # make sure no out-of-bounds
+            qp_z2 = [minz if z < minz else maxz if z > maxz else z for z in qp_z]
+            qp_x2 = [minx if x < minx else maxx if x > maxx else x for x in qp_x]
 
-        # make sure no out-of-bounds
-        qp_z2 = [minz if z < minz else maxz if z > maxz else z for z in qp_z]
-        qp_x2 = [minx if x < minx else maxx if x > maxx else x for x in qp_x]
-        qp_y2 = [miny if y < miny else maxy if y > maxy else y for y in qp_y]
+            interpolant = RegularGridInterpolator((z, x), Z)
+            tmp = interpolant((qp_z2, qp_x2))
+        elif sd == 3:
+            nrow, ncol, ncol2 = Z.shape
+            z = np.linspace(minz, maxz, nrow)
+            x = np.linspace(minx, maxx, ncol)
+            y = np.linspace(miny, maxy, ncol2)
 
-        interpolant = RegularGridInterpolator((z, x, y), Z)
-        tmp = interpolant((qp_z2, qp_x2, qp_y2))
+            # make sure no out-of-bounds
+            qp_z2 = [minz if z < minz else maxz if z > maxz else z for z in qp_z]
+            qp_x2 = [minx if x < minx else maxx if x > maxx else x for x in qp_x]
+            qp_y2 = [miny if y < miny else maxy if y > maxy else y for y in qp_y]
+
+            interpolant = RegularGridInterpolator((z, x, y), Z)
+            tmp = interpolant((qp_z2, qp_x2, qp_y2))
 
     c = fire.Function(V)
     c.dat.data[:] = tmp
     c = _check_units(c)
     return c
-
-
 
 
 def read_mesh(model, ens_comm):

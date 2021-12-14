@@ -4,7 +4,6 @@ import finat
 from ROL.firedrake_vector import FiredrakeVector as FeVector
 import ROL
 from mpi4py import MPI
-import argparse
 
 import spyro
 
@@ -12,11 +11,7 @@ import spyro
 
 outdir = "fwi_p5/"
 
-parser = argparse.ArgumentParser(description='Args used in the mesh update for the multi-frequency approach.')
-parser.add_argument('--freq_cut',  type=float, 
-                        help='Cut frequency')
-args     = parser.parse_args()
-freq_cut = args.freq_cut
+
 model = {}
 
 model["opts"] = {
@@ -34,9 +29,9 @@ model["mesh"] = {
     "Lz": 3.5,  # depth in km - always positive
     "Lx": 17.0,  # width in km - always positive
     "Ly": 0.0,  # thickness in km - always positive
-    "meshfile": "meshes/marmousi_guess_f" + str(freq_cut)+".msh",
-    "initmodel": "velocity_models/marmousi_guess_f" + str(freq_cut)+".hdf5",
-    "truemodel": "marmousi_true.hdf5",
+    "meshfile": "meshes/marmousi_guess.msh",
+    "initmodel": "velocity_models/marmousi_guess.hdf5",
+    "truemodel": "not_used.hdf5",
 }
 model["BCs"] = {
     "status": True,  # True or false
@@ -75,15 +70,10 @@ if comm.ensemble_comm.rank == 0:
     File("guess_velocity.pvd", comm=comm.comm).write(vp)
 sources = spyro.Sources(model, mesh, V, comm)
 receivers = spyro.Receivers(model, mesh, V, comm)
-
-
-
-
 wavelet = spyro.full_ricker_wavelet(
     dt=model["timeaxis"]["dt"],
     tf=model["timeaxis"]["tf"],
     freq=model["acquisition"]["frequency"],
-    cutoff=freq_cut
 )
 
 if comm.ensemble_comm.rank == 0:
@@ -250,3 +240,5 @@ algo.run(opt, obj, bnd)
 
 if comm.ensemble_comm.rank == 0:
     File("res.pvd", comm=comm.comm).write(obj.vp)
+
+# fil.close()
