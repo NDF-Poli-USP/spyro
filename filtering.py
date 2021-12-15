@@ -7,7 +7,7 @@ import os
 input = "velocity_models/vp_marmousi-ii.segy"
 output = "velocity_models/vp_marmousi-ii_smoother_guess.segy"
 
-smooth_field(input, output, show = True, sigma =500)
+smooth_field(input, output, show = True, sigma =400)
 
 vp_filename, vp_filetype = os.path.splitext(output)
 

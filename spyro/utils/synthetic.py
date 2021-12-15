@@ -22,6 +22,11 @@ def smooth_field(input_filename, output_filename, show = False, sigma = 100):
                 vp[:, index] = trace
 
     vp_smooth = gaussian_filter(vp, sigma)
+    ni, nj = np.shape(vp_smooth)
+    for i in range(ni):
+        for j in range(nj):
+            if vp[i,j]==1.5:
+                vp_smooth[i,j] = 1.5
 
     spec = segyio.spec()
     spec.sorting = 2 # not sure what this means
