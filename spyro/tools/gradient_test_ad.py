@@ -113,6 +113,11 @@ def gradient_test_acoustic(model, mesh, V, comm, vp_exact, vp_guess, mask=None):
     assert (np.abs(errors) < 5.0).all()
 #}}}
 def gradient_test_elastic(model, mesh, V, comm, rho, lamb_exact, mu_exact, lamb_guess, mu_guess, mask=None): #{{{
+    
+    # FIXME check the difference when sigma_x>500
+
+    apply_gaussian_func = True # apply a Gaussian function to compute the misfit and the functional (used to compare)
+
     with stop_annotating():
         print('######## Starting gradient test ########')
 
@@ -178,9 +183,8 @@ def gradient_test_elastic(model, mesh, V, comm, rho, lamb_exact, mu_exact, lamb_
         File("dJdl_AD.pvd").write(dJdl)    
         sys.exit("sys.exit called")
     #}}}
-    if True: # testing J as computed by u_exact-u_guess over a receiver modeled by Gaussian function {{{
+    if False: # testing J as computed by u_exact-u_guess over a receiver modeled by Gaussian function {{{
         # this generates result similar to adjoint method
-        J_new = 0
         nt = int(model["timeaxis"]["tf"] / model["timeaxis"]["dt"])
         element = spyro.domains.space.FE_method(
             mesh, model["opts"]["method"], model["opts"]["degree"]
@@ -201,6 +205,48 @@ def gradient_test_elastic(model, mesh, V, comm, rho, lamb_exact, mu_exact, lamb_
         #gaussian_mask.dat.data[:] = 0.5 #FIXME testing
        
         #File("u_exact_AD.pvd").write(gaussian_mask * u_exact[-1])
+        J_lamb=0
+        for step in range(nt): 
+            u_guess_rec = gaussian_mask * u_guess_lamb[step]
+            u_exact_rec = gaussian_mask * u_exact[step]
+            J_lamb += assemble( (0.5 * inner(u_guess_rec-u_exact_rec, u_guess_rec-u_exact_rec)) * dx)
+        
+        J_mu=0
+        for step in range(nt): 
+            u_guess_rec = gaussian_mask * u_guess_mu[step]
+            u_exact_rec = gaussian_mask * u_exact[step]
+            J_mu += assemble( (0.5 * inner(u_guess_rec-u_exact_rec, u_guess_rec-u_exact_rec)) * dx)
+        
+        print("J_lamb (AD)="+str(J_lamb))
+        print("J_mu (AD)="+str(J_mu))
+        control_lamb = Control(lamb_guess)
+        control_mu   = Control(mu_guess)
+        dJdl         = compute_gradient(J_lamb, control_lamb, options={"riesz_representation": "L2"})
+        dJdm         = compute_gradient(J_mu, control_mu, options={"riesz_representation": "L2"})
+        
+        File("dJdl_AD.pvd").write(dJdl)    
+        File("dJdm_AD.pvd").write(dJdm)    
+        sys.exit("sys.exit called")
+    #}}}
+       
+    if apply_gaussian_func:
+        element = spyro.domains.space.FE_method(
+            mesh, model["opts"]["method"], model["opts"]["degree"]
+        )
+        V2 = VectorFunctionSpace(mesh, element)
+        u_guess_rec = Function(V2)
+        u_exact_rec = Function(V2)
+        gaussian_mask = Function(V)
+        
+        def delta_expr(x0, z, x, sigma_x=20000.0):
+            return np.exp(-sigma_x * ((z - x0[0]) ** 2 + (x - x0[1]) ** 2))
+
+        p  = receivers.receiver_locations[0]
+        nz = receivers.node_locations[:, 0]
+        nx = receivers.node_locations[:, 1]
+        gaussian_mask.dat.data[:] = delta_expr(p, nz, nx)
+       
+        nt = int(model["timeaxis"]["tf"] / model["timeaxis"]["dt"])
         J_l=0
         for step in range(nt): 
             u_guess_rec = gaussian_mask * u_guess_lamb[step]
@@ -212,19 +258,7 @@ def gradient_test_elastic(model, mesh, V, comm, rho, lamb_exact, mu_exact, lamb_
             u_guess_rec = gaussian_mask * u_guess_mu[step]
             u_exact_rec = gaussian_mask * u_exact[step]
             J_m += assemble( (0.5 * inner(u_guess_rec-u_exact_rec, u_guess_rec-u_exact_rec)) * dx)
-        
-        print("J_l (AD)="+str(J_l))
-        print("J_m (AD)="+str(J_m))
-        control_l  = Control(lamb_guess)
-        control_m  = Control(mu_guess)
-        dJdl       = compute_gradient(J_l, control_l, options={"riesz_representation": "L2"})
-        dJdm       = compute_gradient(J_m, control_m, options={"riesz_representation": "L2"})
-        
-        File("dJdl_AD.pvd").write(dJdl)    
-        File("dJdm_AD.pvd").write(dJdm)    
-        sys.exit("sys.exit called")
-    #}}}
-        
+
     qr_x, _, _ = quadrature.quadrature_rules(V)
     #sys.exit("sys.exit called")
 
@@ -242,9 +276,7 @@ def gradient_test_elastic(model, mesh, V, comm, rho, lamb_exact, mu_exact, lamb_
         if True:
             File("dJdl_AD.pvd").write(dJdl)
             File("dJdm_AD.pvd").write(dJdm)
-            sys.exit("sys.exit called")
-
-        steps = [1e-3, 1e-4, 1e-5]  # step length
+            #sys.exit("sys.exit called")
 
         delta_l = Function(V)  # model direction (random)
         delta_l.assign(dJdl)
@@ -264,26 +296,41 @@ def gradient_test_elastic(model, mesh, V, comm, rho, lamb_exact, mu_exact, lamb_
         print('######## Computing the gradient by finite diferences ########')
         errors_lamb = []
         errors_mu   = []
-        for step in steps:  # range(3):
+        
+        h_steps = [1e-3, 1e-4, 1e-5]  # step length
+        for h in h_steps:
             # perturb the model and calculate the functional (again)
             # J(m + delta_m*h)
-            lamb_guess = lamb_original + step * delta_l
-            mu_guess   = mu_original + step * delta_m 
+            lamb_guess = lamb_original + h * delta_l
+            mu_guess   = mu_original + h * delta_m 
             
-            _, _, _, Jp_l = forward_elastic_waves(
+            u_guess_lamb, _, _, _, Jp_l = forward_elastic_waves(
                 model, mesh, comm, rho, lamb_guess, mu_exact, sources, wavelet, point_cloud,
                 true_rec=true_rec, fwi=True
             )
             
-            _, _, _, Jp_m = forward_elastic_waves(
+            u_guess_mu, _, _, _, Jp_m = forward_elastic_waves(
                 model, mesh, comm, rho, lamb_exact, mu_guess, sources, wavelet, point_cloud,
                 true_rec=true_rec, fwi=True
             )
                                    
-            fd_grad_lamb = (Jp_l - J_l) / step
-            fd_grad_mu   = (Jp_m - J_m) / step
+            if apply_gaussian_func:
+                Jp_l=0
+                for step in range(nt):
+                    u_guess_rec = gaussian_mask * u_guess_lamb[step]
+                    u_exact_rec = gaussian_mask * u_exact[step]
+                    Jp_l += assemble( (0.5 * inner(u_guess_rec-u_exact_rec, u_guess_rec-u_exact_rec)) * dx)
+
+                Jp_m=0
+                for step in range(nt):
+                    u_guess_rec = gaussian_mask * u_guess_mu[step]
+                    u_exact_rec = gaussian_mask * u_exact[step]
+                    Jp_m += assemble( (0.5 * inner(u_guess_rec-u_exact_rec, u_guess_rec-u_exact_rec)) * dx)
+            
+            fd_grad_lamb = (Jp_l - J_l) / h
+            fd_grad_mu   = (Jp_m - J_m) / h
             print(
-            "\n Step " + str(step) + "\n"
+            "\n Step " + str(h) + "\n"
             + "\t lambda:\n"
             + "\t cost functional (exact):\t" + str(J_l) + "\n"
             + "\t cost functional (FD):\t\t" + str(Jp_l) + "\n"

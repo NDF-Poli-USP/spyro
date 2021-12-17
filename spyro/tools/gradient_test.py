@@ -114,11 +114,14 @@ def gradient_test_acoustic(model, mesh, V, comm, vp_exact, vp_guess, mask=None):
     assert (np.abs(errors) < 5.0).all()
 #}}}
 def gradient_test_elastic(model, mesh, V, comm, rho, lamb_exact, mu_exact, lamb_guess, mu_guess, mask=None): #{{{
-   
+  
+    #FIXME check the difference when sigma_x>500
+
     #J_scale = sqrt(1.e10) #FIXME set it as input
     J_scale = sqrt(1.) #FIXME set it as input
 
     use_AD_type_interp = True
+    apply_gaussian_func = True # apply a Gaussian function to compute the misfit and the functional (used to compare)
 
     print('######## Starting gradient test ########')
 
@@ -192,10 +195,8 @@ def gradient_test_elastic(model, mesh, V, comm, rho, lamb_exact, mu_exact, lamb_
         File("dJdl_adj.pvd").write(dJdl)
         sys.exit("sys.exit called")
     #}}}
-    if True: # testing J as computed by u_exact-u_guess over a receiver modeled by a gaussian function {{{
-        J_new = 0
+    if False: # testing J as computed by u_exact-u_guess over a receiver modeled by a gaussian function {{{
         nt = int(model["timeaxis"]["tf"] / model["timeaxis"]["dt"])
-        
         element = spyro.domains.space.FE_method(
             mesh, model["opts"]["method"], model["opts"]["degree"]
         )
@@ -215,58 +216,71 @@ def gradient_test_elastic(model, mesh, V, comm, rho, lamb_exact, mu_exact, lamb_
         #gaussian_mask.dat.data[:] = 0.5 #FIXME testing
  
         #File("u_exact_adj.pvd").write(u_exact[-1])
+        J_lamb = 0
         for step in range(nt): 
             u_guess_rec = gaussian_mask * u_guess_lamb[step]
             u_exact_rec = gaussian_mask * u_exact[step]
-            J_new += assemble( (0.5 * inner(u_guess_rec-u_exact_rec, u_guess_rec-u_exact_rec)) * dx)
+            J_lamb += assemble( (0.5 * inner(u_guess_rec-u_exact_rec, u_guess_rec-u_exact_rec)) * dx)
        
         step=0
         u_guess_copy = [Function(V2) for t in range(nt)]
         u_exact_copy = [Function(V2) for t in range(nt)]
-        J2=0
+        residual = [Function(V2) for t in range(nt)]
+        J_lamb2=0
         for step in range(nt):
             u_guess_copy[step].sub(0).dat.data[:] = (gaussian_mask.dat.data[:]**2) * u_guess_lamb[step].sub(0).dat.data[:]
             u_guess_copy[step].sub(1).dat.data[:] = (gaussian_mask.dat.data[:]**2) * u_guess_lamb[step].sub(1).dat.data[:]
             u_exact_copy[step].sub(0).dat.data[:] = (gaussian_mask.dat.data[:]**2) * u_exact[step].sub(0).dat.data[:]
             u_exact_copy[step].sub(1).dat.data[:] = (gaussian_mask.dat.data[:]**2) * u_exact[step].sub(1).dat.data[:]
-            J2 += assemble((0.5 * inner(u_guess_copy[step]-u_exact_copy[step],u_guess_copy[step]-u_exact_copy[step]))*dx)
-
-        File("u_exact_adj.pvd").write(u_exact_copy[-1])
+            residual[step] = u_exact_copy[step] - u_guess_copy[step]
+            #residual[step] = (gaussian_mask**2) * (u_exact[step] - u_guess_lamb[step]) it returns an error
+            J_lamb2+=assemble(
+                    (gaussian_mask**2)*(0.5*inner(u_guess_lamb[step]-u_exact[step],u_guess_lamb[step]-u_exact[step]))*dx
+                    )
     
-        print("J_new (adj)="+str(J_new))
-        print("J2 (adj)="+str(J2))
+        print("J_lamb (adj)="+str(J_lamb))
+        print("J_lamb2 (adj)="+str(J_lamb2))
         misfit_uz_lamb = []
         misfit_ux_lamb = []
         misfit_uy_lamb = []
         dJdl, _ = gradient_elastic_waves(
             model, mesh, comm, rho, lamb_guess, mu_exact, receivers,
             u_guess_lamb, misfit_uz_lamb, misfit_ux_lamb, misfit_uy_lamb, output=False,
-            exact=u_exact_copy, guess_rec=u_guess_copy # to debug
+            residual=residual # to debug
+            #exact=u_exact_copy, guess_rec=u_guess_copy # to debug
         )
-        
+        del residual
+
         step=0
-        J2=0
+        J_mu2=0
         u_guess_copy2 = [Function(V2) for t in range(nt)]
         u_exact_copy2 = [Function(V2) for t in range(nt)]
+        residual = [Function(V2) for t in range(nt)]
         for step in range(nt):
             u_guess_copy2[step].sub(0).dat.data[:] = (gaussian_mask.dat.data[:]**2) * u_guess_mu[step].sub(0).dat.data[:]
             u_guess_copy2[step].sub(1).dat.data[:] = (gaussian_mask.dat.data[:]**2) * u_guess_mu[step].sub(1).dat.data[:]
             u_exact_copy2[step].sub(0).dat.data[:] = (gaussian_mask.dat.data[:]**2) * u_exact[step].sub(0).dat.data[:]
             u_exact_copy2[step].sub(1).dat.data[:] = (gaussian_mask.dat.data[:]**2) * u_exact[step].sub(1).dat.data[:]
-            J2 += assemble((0.5 * inner(u_guess_copy2[step]-u_exact_copy2[step],u_guess_copy2[step]-u_exact_copy2[step]))*dx)
+            residual[step] = u_exact_copy2[step] - u_guess_copy2[step]
+            J_mu2+=assemble(
+                   (gaussian_mask**2)*(0.5*inner(u_guess_mu[step]-u_exact[step],u_guess_mu[step]-u_exact[step]))*dx
+                   )
         
         _, dJdm = gradient_elastic_waves(
             model, mesh, comm, rho, lamb_exact, mu_guess, receivers,
             u_guess_mu, misfit_uz_lamb, misfit_ux_lamb, misfit_uy_lamb, output=False,
-            exact=u_exact_copy2, guess_rec=u_guess_copy2 # to debug
+            residual=residual # to debug
+            #exact=u_exact_copy2, guess_rec=u_guess_copy2 # to debug
         )
+        
+        print("J_mu2 (adj)="+str(J_mu2))
         
         File("dJdl_adj.pvd").write(dJdl)
         File("dJdm_adj.pvd").write(dJdm)
         sys.exit("sys.exit called")
     #}}}
 
-    if use_AD_type_interp: # using functional employed in AD
+    if use_AD_type_interp: # using functional employed in AD {{{
         p_true_rec = [uz_exact_recv, ux_exact_recv]
         p_rec      = [uz_guess_recv_lamb, ux_guess_recv_lamb]
         #p_rec      = [uz_guess_recv_mu, ux_guess_recv_mu]
@@ -287,133 +301,218 @@ def gradient_test_elastic(model, mesh, V, comm, rho, lamb_exact, mu_exact, lamb_
         print("J="+str(J))
         #sys.exit("sys.exit called")
 
-    if use_AD_type_interp:
         uz_guess_recv_lamb = np.array(uz_guess_recv_lamb)
         uz_exact_recv = np.array(uz_exact_recv)
         ux_guess_recv_lamb = np.array(ux_guess_recv_lamb)
         ux_exact_recv = np.array(ux_exact_recv)
-     
-    misfit_uz_lamb = J_scale * calc_misfit(model, uz_guess_recv_lamb, uz_exact_recv) # exact - guess
-    misfit_ux_lamb = J_scale * calc_misfit(model, ux_guess_recv_lamb, ux_exact_recv) # exact - guess
-    misfit_uz_mu   = J_scale * calc_misfit(model, uz_guess_recv_mu, uz_exact_recv) # exact - guess
-    misfit_ux_mu   = J_scale * calc_misfit(model, ux_guess_recv_mu, ux_exact_recv) # exact - guess
-    if dim==3:
-        misfit_uy_lamb = J_scale * calc_misfit(model, uy_guess_recv_lamb, uy_exact_recv) # exact - guess
-        misfit_uy_mu   = J_scale * calc_misfit(model, uy_guess_recv_mu, uy_exact_recv) # exact - guess
-    else:
+    #}}}
+
+    J_lamb = 0 
+    J_mu   = 0
+    if apply_gaussian_func:
+        nt = int(model["timeaxis"]["tf"] / model["timeaxis"]["dt"])
+        element = spyro.domains.space.FE_method(
+            mesh, model["opts"]["method"], model["opts"]["degree"]
+        )
+        V2 = VectorFunctionSpace(mesh, element)
+        u_guess_rec = Function(V2)
+        u_exact_rec = Function(V2)
+        gaussian_mask = Function(V)
+    
+        def delta_expr(x0, z, x, sigma_x=20000.0):
+            return np.exp(-sigma_x * ((z - x0[0]) ** 2 + (x - x0[1]) ** 2))
+        
+        receivers = spyro.Receivers(model, mesh, V, comm)
+        p  = receivers.receiver_locations[0]
+        nz = receivers.node_locations[:, 0]
+        nx = receivers.node_locations[:, 1]
+        gaussian_mask.dat.data[:] = delta_expr(p, nz, nx)
+        
+        u_guess_copy = [Function(V2) for t in range(nt)]
+        u_exact_copy = [Function(V2) for t in range(nt)]
+        residual = [Function(V2) for t in range(nt)]
+        for step in range(nt):
+            u_guess_copy[step].sub(0).dat.data[:] = (gaussian_mask.dat.data[:]**2) * u_guess_lamb[step].sub(0).dat.data[:]
+            u_guess_copy[step].sub(1).dat.data[:] = (gaussian_mask.dat.data[:]**2) * u_guess_lamb[step].sub(1).dat.data[:]
+            u_exact_copy[step].sub(0).dat.data[:] = (gaussian_mask.dat.data[:]**2) * u_exact[step].sub(0).dat.data[:]
+            u_exact_copy[step].sub(1).dat.data[:] = (gaussian_mask.dat.data[:]**2) * u_exact[step].sub(1).dat.data[:]
+            residual[step] = u_exact_copy[step] - u_guess_copy[step]
+            #residual[step] = (gaussian_mask**2) * (u_exact[step] - u_guess_lamb[step]) it returns an error
+            J_lamb+=assemble(
+                    (gaussian_mask**2)*(0.5*inner(u_guess_lamb[step]-u_exact[step],u_guess_lamb[step]-u_exact[step]))*dx
+                    )
+
+        misfit_uz_lamb = []
+        misfit_ux_lamb = []
         misfit_uy_lamb = []
-        misfit_uy_mu   = []
-    
-    qr_x, _, _ = quadrature.quadrature_rules(V)
+        print('######## Computing the gradient by adjoint method (lambda) ########')
+        dJdl, _ = gradient_elastic_waves(
+            model, mesh, comm, rho, lamb_guess, mu_exact, receivers,
+            u_guess_lamb, misfit_uz_lamb, misfit_ux_lamb, misfit_uy_lamb, output=False,
+            residual=residual 
+        )
+        del residual
+        del u_guess_copy
+        del u_exact_copy
 
-    J_lamb = np.zeros((1))
-    J_mu   = np.zeros((1))
-    J_lamb[0] += functional(model, misfit_uz_lamb) # J_scale is already imposed in the misfit
-    J_lamb[0] += functional(model, misfit_ux_lamb) # J_scale is already imposed in the misfit
-    J_mu[0]   += functional(model, misfit_uz_mu) # J_scale is already imposed in the misfit
-    J_mu[0]   += functional(model, misfit_ux_mu) # J_scale is already imposed in the misfit
-    if dim==3:
-        J_lamb[0] += functional(model, misfit_uy_lamb) # J_scale is already imposed in the misfit
-        J_mu[0]   += functional(model, misfit_uy_mu) # J_scale is already imposed in the misfit
+        u_guess_copy = [Function(V2) for t in range(nt)]
+        u_exact_copy = [Function(V2) for t in range(nt)]
+        residual = [Function(V2) for t in range(nt)]
+        for step in range(nt):
+            u_guess_copy[step].sub(0).dat.data[:] = (gaussian_mask.dat.data[:]**2) * u_guess_mu[step].sub(0).dat.data[:]
+            u_guess_copy[step].sub(1).dat.data[:] = (gaussian_mask.dat.data[:]**2) * u_guess_mu[step].sub(1).dat.data[:]
+            u_exact_copy[step].sub(0).dat.data[:] = (gaussian_mask.dat.data[:]**2) * u_exact[step].sub(0).dat.data[:]
+            u_exact_copy[step].sub(1).dat.data[:] = (gaussian_mask.dat.data[:]**2) * u_exact[step].sub(1).dat.data[:]
+            residual[step] = u_exact_copy[step] - u_guess_copy[step]
+            J_mu+=assemble(
+                   (gaussian_mask**2)*(0.5*inner(u_guess_mu[step]-u_exact[step],u_guess_mu[step]-u_exact[step]))*dx
+                   )
+
+        print('######## Computing the gradient by adjoint method (mu) ########')
+        _, dJdm = gradient_elastic_waves(
+            model, mesh, comm, rho, lamb_exact, mu_guess, receivers,
+            u_guess_mu, misfit_uz_lamb, misfit_ux_lamb, misfit_uy_lamb, output=False,
+            residual=residual
+        )
+    
+        if use_AD_type_interp:
+            receivers = receivers.setPointCloudRec(comm, paralel_z=True)
+
+    else:
+        misfit_uz_lamb = J_scale * calc_misfit(model, uz_guess_recv_lamb, uz_exact_recv) # exact - guess
+        misfit_ux_lamb = J_scale * calc_misfit(model, ux_guess_recv_lamb, ux_exact_recv) # exact - guess
+        misfit_uz_mu   = J_scale * calc_misfit(model, uz_guess_recv_mu, uz_exact_recv) # exact - guess
+        misfit_ux_mu   = J_scale * calc_misfit(model, ux_guess_recv_mu, ux_exact_recv) # exact - guess
+        if dim==3:
+            misfit_uy_lamb = J_scale * calc_misfit(model, uy_guess_recv_lamb, uy_exact_recv) # exact - guess
+            misfit_uy_mu   = J_scale * calc_misfit(model, uy_guess_recv_mu, uy_exact_recv) # exact - guess
+        else:
+            misfit_uy_lamb = []
+            misfit_uy_mu   = []
+        
+
+        J_lamb += functional(model, misfit_uz_lamb) # J_scale is already imposed in the misfit
+        J_lamb += functional(model, misfit_ux_lamb) # J_scale is already imposed in the misfit
+        J_mu   += functional(model, misfit_uz_mu) # J_scale is already imposed in the misfit
+        J_mu   += functional(model, misfit_ux_mu) # J_scale is already imposed in the misfit
+        if dim==3:
+            J_lamb += functional(model, misfit_uy_lamb) # J_scale is already imposed in the misfit
+            J_mu   += functional(model, misfit_uy_mu) # J_scale is already imposed in the misfit
    
-    print("J_lamb[0]=" + str(J_lamb[0])) 
-    print("J_mu[0]=" + str(J_mu[0])) 
-    #sys.exit("sys.exit called")
-
-    # compute the gradient of the control (to be verified)
-    print('######## Computing the gradient by adjoint method (lambda) ########')
-    dJdl, _ = gradient_elastic_waves(
-        model, mesh, comm, rho, lamb_guess, mu_exact, receivers, 
-        u_guess_lamb, misfit_uz_lamb, misfit_ux_lamb, misfit_uy_lamb, output=True
-    )
+        # compute the gradient of the control (to be verified)
+        print('######## Computing the gradient by adjoint method (lambda) ########')
+        dJdl, _ = gradient_elastic_waves(
+            model, mesh, comm, rho, lamb_guess, mu_exact, receivers, 
+            u_guess_lamb, misfit_uz_lamb, misfit_ux_lamb, misfit_uy_lamb, output=True
+        )
+        
+        print('######## Computing the gradient by adjoint method (mu) ########')
+        _, dJdm = gradient_elastic_waves(
+            model, mesh, comm, rho, lamb_exact, mu_guess, receivers, 
+            u_guess_mu, misfit_uz_mu, misfit_ux_mu, misfit_uy_mu, output=False
+        )
     
-    print('######## Computing the gradient by adjoint method (mu) ########')
-    _, dJdm = gradient_elastic_waves(
-        model, mesh, comm, rho, lamb_exact, mu_guess, receivers, 
-        u_guess_mu, misfit_uz_mu, misfit_ux_mu, misfit_uy_mu, output=False
-    )
+    if False:
+        print("J_lamb=" + str(J_lamb)) 
+        print("J_mu=" + str(J_mu)) 
+        sys.exit("sys.exit called")
     
     if True:
         File("dJdl_adj.pvd").write(dJdl)
         File("dJdm_adj.pvd").write(dJdm)
-        sys.exit("sys.exit called")
+        #sys.exit("sys.exit called")
 
-    #steps = [1e-3, 1e-4, 1e-5, 1e-6]  # step length
-    steps = [1e-3, 1e-4]  # step length
-
-    delta_lamb = Function(V)
-    delta_mu   = Function(V)
-    delta_lamb.assign(lamb_guess)
-    delta_mu.assign(mu_guess)
+    delta_lamb = Function(V) # model direction (random)
+    delta_lamb.assign(dJdl)
+    delta_mu = Function(V)   # model direction (random)
+    delta_mu.assign(dJdm)
         
-    projnorm_dJdl_lamb = assemble(dJdl * delta_lamb * dx(rule=qr_x))
-    projnorm_dJdm_mu   = assemble(dJdm * delta_mu * dx(rule=qr_x))
+    qr_x, _, _ = quadrature.quadrature_rules(V)
+        
+    projnorm_lamb = assemble(dJdl * delta_lamb * dx(rule=qr_x))
+    projnorm_mu   = assemble(dJdm * delta_mu * dx(rule=qr_x))
 
     # this deepcopy is important otherwise pertubations accumulate
     lamb_original = lamb_guess.copy(deepcopy=True)
     mu_original   = mu_guess.copy(deepcopy=True)
 
+
     print('######## Computing the gradient by finite diferences ########')
-    errors = []
-    for step in steps: 
+    errors_lamb = []
+    errors_mu   = []
+
+    h_steps = [1e-3, 1e-4, 1e-5]  # step length
+    for h in h_steps: 
         # perturb the model and calculate the functional (again)
         # J(m + delta_m*h)
-        lamb_guess = lamb_original + step * delta_lamb
-        mu_guess   = mu_original + step * delta_mu 
+        lamb_guess = lamb_original + h * delta_lamb
+        mu_guess   = mu_original + h * delta_mu 
         
-        _, uz_fd_recv_lamb, ux_fd_recv_lamb, uy_fd_recv_lamb = forward_elastic_waves(
+        u_guess_lamb, uz_fd_recv_lamb, ux_fd_recv_lamb, uy_fd_recv_lamb = forward_elastic_waves(
             model, mesh, comm, rho, lamb_guess, mu_exact, sources, wavelet, receivers,
             use_AD_type_interp=use_AD_type_interp # use to debug
         )
         
-        _, uz_fd_recv_mu, ux_fd_recv_mu, uy_fd_recv_mu = forward_elastic_waves(
+        u_guess_mu, uz_fd_recv_mu, ux_fd_recv_mu, uy_fd_recv_mu = forward_elastic_waves(
             model, mesh, comm, rho, lamb_exact, mu_guess, sources, wavelet, receivers,
             use_AD_type_interp=use_AD_type_interp # use to debug
         )
-        
-        misfit_uz_lamb = J_scale * calc_misfit(model, uz_fd_recv_lamb, uz_exact_recv) # exact - guess
-        misfit_ux_lamb = J_scale * calc_misfit(model, ux_fd_recv_lamb, ux_exact_recv) # exact - guess
-        misfit_uz_mu   = J_scale * calc_misfit(model, uz_fd_recv_mu, uz_exact_recv) # exact - guess
-        misfit_ux_mu   = J_scale * calc_misfit(model, ux_fd_recv_mu, ux_exact_recv) # exact - guess
-        if dim==3:
-            misfit_uy_lamb = J_scale * calc_misfit(model, uy_fd_recv_lamb, uy_exact_recv) # exact - guess
-            misfit_uy_mu   = J_scale * calc_misfit(model, uy_fd_recv_mu, uy_exact_recv) # exact - guess
+       
+        Jp_lamb = 0
+        Jp_mu   = 0
+        if apply_gaussian_func:
+            for step in range(nt):
+                Jp_lamb+=assemble(
+                    (gaussian_mask**2)*(0.5*inner(u_guess_lamb[step]-u_exact[step],u_guess_lamb[step]-u_exact[step]))*dx
+                    )
+                Jp_mu+=assemble(
+                    (gaussian_mask**2)*(0.5*inner(u_guess_mu[step]-u_exact[step],u_guess_mu[step]-u_exact[step]))*dx
+                    )
         else:
-            misfit_uy_lamb = []
-            misfit_uy_mu   = []
-        
-        Jp_lamb = np.zeros((1))
-        Jp_mu   = np.zeros((1))
-        Jp_lamb[0] += functional(model, misfit_uz_lamb) # J_scale is already imposed in the misfit
-        Jp_lamb[0] += functional(model, misfit_ux_lamb) # J_scale is already imposed in the misfit
-        Jp_mu[0]   += functional(model, misfit_uz_mu) # J_scale is already imposed in the misfit
-        Jp_mu[0]   += functional(model, misfit_ux_mu) # J_scale is already imposed in the misfit
-        if dim==3:
-            Jp_lamb[0] += functional(model, misfit_uy_lamb) # J_scale is already imposed in the misfit
-            Jp_mu[0]   += functional(model, misfit_uy_mu) # J_scale is already imposed in the misfit
+            misfit_uz_lamb = J_scale * calc_misfit(model, uz_fd_recv_lamb, uz_exact_recv) # exact - guess
+            misfit_ux_lamb = J_scale * calc_misfit(model, ux_fd_recv_lamb, ux_exact_recv) # exact - guess
+            misfit_uz_mu   = J_scale * calc_misfit(model, uz_fd_recv_mu, uz_exact_recv) # exact - guess
+            misfit_ux_mu   = J_scale * calc_misfit(model, ux_fd_recv_mu, ux_exact_recv) # exact - guess
+            if dim==3:
+                misfit_uy_lamb = J_scale * calc_misfit(model, uy_fd_recv_lamb, uy_exact_recv) # exact - guess
+                misfit_uy_mu   = J_scale * calc_misfit(model, uy_fd_recv_mu, uy_exact_recv) # exact - guess
+            else:
+                misfit_uy_lamb = []
+                misfit_uy_mu   = []
+            
+            Jp_lamb += functional(model, misfit_uz_lamb) # J_scale is already imposed in the misfit
+            Jp_lamb += functional(model, misfit_ux_lamb) # J_scale is already imposed in the misfit
+            Jp_mu   += functional(model, misfit_uz_mu) # J_scale is already imposed in the misfit
+            Jp_mu   += functional(model, misfit_ux_mu) # J_scale is already imposed in the misfit
+            if dim==3:
+                Jp_lamb += functional(model, misfit_uy_lamb) # J_scale is already imposed in the misfit
+                Jp_mu   += functional(model, misfit_uy_mu) # J_scale is already imposed in the misfit
 
-        fd_grad_lamb = (Jp_lamb - J_lamb) / step
-        fd_grad_mu   = (Jp_mu - J_mu) / step
+        fd_grad_lamb = (Jp_lamb - J_lamb) / h
+        fd_grad_mu   = (Jp_mu - J_mu) / h
        
         print(
-            "\n Step " + str(step) + "\n"
+            "\n Step " + str(h) + "\n"
             + "\t lambda:\n"
-            + "\t cost functional (exact):\t" + str(J_lamb[0]) + "\n"
-            + "\t cost functional (FD):\t\t" + str(Jp_lamb[0]) + "\n"
-            + "\t grad'*dir (adj):\t\t" + str(projnorm_dJdl_lamb) + "\n"
-            + "\t grad'*dir (FD):\t\t" + str(fd_grad_lamb[0]) + "\n"
+            + "\t cost functional (exact):\t" + str(J_lamb) + "\n"
+            + "\t cost functional (FD):\t\t" + str(Jp_lamb) + "\n"
+            + "\t grad'*dir (adj):\t\t" + str(projnorm_lamb) + "\n"
+            + "\t grad'*dir (FD):\t\t" + str(fd_grad_lamb) + "\n"
             + "\n"
             + "\t mu:\n"
-            + "\t cost functional (exact):\t" + str(J_mu[0]) + "\n"
-            + "\t cost functional (FD):\t\t" + str(Jp_mu[0]) + "\n"
-            + "\t grad'*dir (adj):\t\t" + str(projnorm_dJdm_mu) + "\n"
-            + "\t grad'*dir (FD):\t\t" + str(fd_grad_mu[0]) + "\n"
+            + "\t cost functional (exact):\t" + str(J_mu) + "\n"
+            + "\t cost functional (FD):\t\t" + str(Jp_mu) + "\n"
+            + "\t grad'*dir (adj):\t\t" + str(projnorm_mu) + "\n"
+            + "\t grad'*dir (FD):\t\t" + str(fd_grad_mu) + "\n"
         )
     
-        #errors.append(100 * ((fd_grad - projnorm) / projnorm))
-        # step /= 2
+        errors_lamb.append(100 * ((fd_grad_lamb - projnorm_lamb) / projnorm_lamb))
+        errors_mu.append(100 * ((fd_grad_mu - projnorm_mu) / projnorm_mu))
 
-    # all errors less than 1 %
-    errors = np.array(errors)
-    #assert (np.abs(errors) < 5.0).all()
+    # all errors less than 5 %
+    errors_lamb = np.array(errors_lamb)
+    errors_mu   = np.array(errors_mu)
+    assert (np.abs(errors_lamb) < 5.0).all()
+    assert (np.abs(errors_mu) < 5.0).all()
+
 #}}}

@@ -213,7 +213,6 @@ class ObjectiveElastic(ROL.Objective): #{{{
 
     def value(self, x, tol):
         """Compute the functional"""
-        #self.lamb.dat.data[:] = x[:] # update lambda
         self.s_guess = solve_elastic_problem(self.lamb, self.mu, self.f, self.bcs)
         self.misfit = J_scale * (self.s_exact - self.s_guess)
         J = J_scale * assemble( (0.5 * inner(self.s_guess-self.s_exact, self.s_guess-self.s_exact)) * dx) 
@@ -221,8 +220,6 @@ class ObjectiveElastic(ROL.Objective): #{{{
 
     def gradient(self, g, x, tol):
         """Compute the gradient of the functional"""
-        dJ = Function(V, name="gradient")
-        #self.lamb.dat.data[:] = x[:] # update lambda
         s_adjoint = solve_elastic_problem(self.lamb, self.mu, self.misfit, self.bcs) 
         
         dJdl_adj, dJdm_adj = compute_gradient_via_adjoint(self.s_guess, s_adjoint)

@@ -30,6 +30,7 @@ def gradient_elastic_waves(
     save_adjoint=False, 
     excitations=False, 
     wavelet=False,
+    residual=False, # the 3d residual vector field, used just to debug
     exact=False, # the vector field, used just to debug
     guess_rec=False # the vector field, used just to debug
 ):
@@ -288,21 +289,22 @@ def gradient_elastic_waves(
         
         # assemble the rhs term to update the forcing FIXME assemble here or after apply source?
         B = assemble(rhs_, tensor=B) 
-        if not excitations and not exact:
+        if not excitations and not residual:
             bc.apply(B) #FIXME for Dirichlet BC
         
-        if not excitations and not exact:
+        if not excitations and not residual:
             # apply the residual evaluated at the receivers as external forcing (sources)
             # f = residual = u_exact - u_guess
             f = receivers.apply_receivers_as_radial_source(f, residual_z, residual_x, residual_y, step)
             #File("f.pvd").write(f)
             #sys.exit("exiting")
-        elif excitations and not exact:
+        elif excitations and not residual:
             # apply the given wavelet as a source (to debug - test adjoint)
             f = excitations.apply_radial_source(f, wavelet[step])
-        elif exact:
+        elif residual:
             # apply a body force: misfit over the entire domain (used to compare with AD)
-            f.assign(exact.pop(step) - guess_rec.pop()) 
+            #f.assign(exact.pop(step) - guess_rec.pop()) 
+            f.assign(residual.pop()) 
         else:
             pass
 
