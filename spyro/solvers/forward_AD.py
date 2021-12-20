@@ -299,8 +299,8 @@ def forward(
             ), "Numerical instability. Try reducing dt or building the mesh differently"
             if output:
                 outfile.write(u_n, time=t, name="Pressure")
-            if t > 0:
-                helpers.display_progress(comm, t)
+            #if t > 0:
+                #helpers.display_progress(comm, t) FIXME uncoment it
 
         u_nm1.assign(u_n)
         u_n.assign(u_np1)
