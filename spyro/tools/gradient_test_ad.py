@@ -7,8 +7,8 @@ from spyro.domains import quadrature
 import matplotlib.pyplot as plt
 import sys
 
-forward = spyro.solvers.forward_AD
-forward_elastic_waves = spyro.solvers.forward_elastic_waves_AD
+forward_AD = spyro.solvers.forward_AD
+forward_elastic_waves_AD = spyro.solvers.forward_elastic_waves_AD
 
 def gradient_test_acoustic(model, mesh, V, comm, vp_exact, vp_guess, mask=None): #{{{
     with stop_annotating():
@@ -25,13 +25,13 @@ def gradient_test_acoustic(model, mesh, V, comm, vp_exact, vp_guess, mask=None):
         point_cloud = receivers.setPointCloudRec(comm,paralel_z=True)
         # simulate the exact model
         print('######## Running the exact model ########')
-        p_exact_recv = forward(
+        p_exact_recv = forward_AD(
             model, mesh, comm, vp_exact, sources, wavelet, point_cloud
         )
 
     # simulate the guess model
     print('######## Running the guess model ########')
-    p_guess_recv, Jm = forward(
+    p_guess_recv, Jm = forward_AD(
         model, mesh, comm, vp_guess, sources, wavelet, 
         point_cloud, fwi=True, true_rec=p_exact_recv
     )
@@ -88,7 +88,7 @@ def gradient_test_acoustic(model, mesh, V, comm, vp_exact, vp_guess, mask=None):
             # perturb the model and calculate the functional (again)
             # J(m + delta_m*h)
             vp_guess = vp_original + step * delta_m
-            p_guess_recv, Jp = forward(
+            p_guess_recv, Jp = forward_AD(
                 model, mesh, comm, vp_guess, sources, wavelet, 
                 point_cloud, fwi=True, true_rec=p_exact_recv
             )
@@ -136,20 +136,20 @@ def gradient_test_elastic(model, mesh, V, comm, rho, lamb_exact, mu_exact, lamb_
 
         # simulate the exact model
         print('######## Running the exact model ########')
-        u_exact, uz_exact_recv, ux_exact_recv, uy_exact_recv = forward_elastic_waves(
+        u_exact, uz_exact_recv, ux_exact_recv, uy_exact_recv = forward_elastic_waves_AD(
             model, mesh, comm, rho, lamb_exact, mu_exact, sources, wavelet, point_cloud, output=True
         )
         true_rec = [uz_exact_recv, ux_exact_recv]
          
     # simulate the guess model
     print('######## Running the guess model (lambda) ########')
-    u_guess_lamb, uz_guess_recv, ux_guess_recv, uy_guess_recv, J_l = forward_elastic_waves(
+    u_guess_lamb, uz_guess_recv, ux_guess_recv, uy_guess_recv, J_l = forward_elastic_waves_AD(
         model, mesh, comm, rho, lamb_guess, mu_exact, sources, wavelet, point_cloud, output=False, 
         true_rec=true_rec, fwi=True
     )
     
     print('######## Running the guess model (mu) ########')
-    u_guess_mu, _, _, _, J_m = forward_elastic_waves(
+    u_guess_mu, _, _, _, J_m = forward_elastic_waves_AD(
         model, mesh, comm, rho, lamb_exact, mu_guess, sources, wavelet, point_cloud, output=False, 
         true_rec=true_rec, fwi=True
     )
@@ -304,12 +304,12 @@ def gradient_test_elastic(model, mesh, V, comm, rho, lamb_exact, mu_exact, lamb_
             lamb_guess = lamb_original + h * delta_l
             mu_guess   = mu_original + h * delta_m 
             
-            u_guess_lamb, _, _, _, Jp_l = forward_elastic_waves(
+            u_guess_lamb, _, _, _, Jp_l = forward_elastic_waves_AD(
                 model, mesh, comm, rho, lamb_guess, mu_exact, sources, wavelet, point_cloud,
                 true_rec=true_rec, fwi=True
             )
             
-            u_guess_mu, _, _, _, Jp_m = forward_elastic_waves(
+            u_guess_mu, _, _, _, Jp_m = forward_elastic_waves_AD(
                 model, mesh, comm, rho, lamb_exact, mu_guess, sources, wavelet, point_cloud,
                 true_rec=true_rec, fwi=True
             )

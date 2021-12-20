@@ -11,5 +11,5 @@ __all__ = [
     "forward_elastic_waves",  # forward solver adapted for elastic waves and discrete adjoint
     "forward_elastic_waves_AD",  # forward solver adapted for Automatic Differentiation
     "gradient",
-    "gradient_elastic_waves", 
+    "gradient_elastic_waves"
 ]
