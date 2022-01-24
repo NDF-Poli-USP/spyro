@@ -36,22 +36,6 @@ def gradient_test_acoustic(model, mesh, V, comm, vp_exact, vp_guess, mask=None):
         point_cloud, fwi=True, true_rec=p_exact_recv
     )
 
-    if False:
-        ue=[]
-        ug=[]
-        nt = int(model["timeaxis"]["tf"] / model["timeaxis"]["dt"])
-        rn = 0
-        for ti in range(nt):
-            ue.append(p_exact_recv[ti][rn])
-            ug.append(p_guess_recv[ti][rn])
-        plt.title("p")
-        plt.plot(ue,label='exact')
-        plt.plot(ug,label='guess')
-        plt.legend()
-        plt.savefig('/home/santos/Desktop/grad_test_acoustic.png')
-        plt.close()
-
-
     qr_x, _, _ = quadrature.quadrature_rules(V)
 
     print("\n Cost functional at fixed point : " + str(Jm) + " \n ")
@@ -63,7 +47,7 @@ def gradient_test_acoustic(model, mesh, V, comm, vp_exact, vp_guess, mask=None):
     if mask:
         dJ *= mask
     
-    File("gradient.pvd").write(dJ)
+    # File("gradient.pvd").write(dJ)
 
     #steps = [1e-3, 1e-4, 1e-5, 1e-6, 1e-7]  # step length
     #steps = [1e-4, 1e-5, 1e-6, 1e-7]  # step length

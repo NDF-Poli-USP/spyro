@@ -11,6 +11,7 @@ class Sources(spyro.receivers.Receivers.Receivers):
     def __init__(self, model, mesh, V, my_ensemble):
         """Initializes class and gets all receiver parameters from
         input file.
+
         Parameters
         ----------
         model: `dictionary`
@@ -21,9 +22,11 @@ class Sources(spyro.receivers.Receivers.Receivers):
             The space of the finite elements
         my_ensemble: Firedrake.ensemble_communicator
             An ensemble communicator
+
         Returns
         -------
         Receivers: :class: 'Receiver' object
+
         """
 
         self.mesh = mesh
@@ -46,24 +49,19 @@ class Sources(spyro.receivers.Receivers.Receivers):
         super().build_maps()
 
 
-    def apply_source(self, rhs_forcing, value, all_shots=True, **kwargs):
+    def apply_source(self, rhs_forcing, value):
         """Applies source in a assembled right hand side."""
-
-        if all_shots:
-            for source_id in range(self.num_receivers):
+        for source_id in range(self.num_receivers):
+            if self.is_local[source_id] and source_id==self.current_source:
                 for i in range(len(self.cellNodeMaps[source_id])):
-                    rhs_forcing.dat.data[int(self.cellNodeMaps[source_id][i])] = (
+                    rhs_forcing.dat.data_with_halos[int(self.cellNodeMaps[source_id][i])] = (
                         value * self.cell_tabulations[source_id][i]
                     )
-        else:
-            source_id = kwargs.get("source_id")
-            
-            for i in range(len(self.cellNodeMaps[source_id])):
-                rhs_forcing.dat.data[int(self.cellNodeMaps[source_id][i])] = (
-                    value * self.cell_tabulations[source_id][i]
-                )
+            else: 
+                for i in range(len(self.cellNodeMaps[source_id])):
+                    tmp = rhs_forcing.dat.data_with_halos[0]
 
-    
+        return rhs_forcing
 
 
 def timedependentSource(model, t, freq=None, amp=1, delay=1.5):
@@ -167,10 +165,6 @@ def source_dof_finder(space, model):
 def delta_expr(x0, z, x, sigma_x=500.0):
     sigma_x = Constant(sigma_x)
     return exp(-sigma_x * ((z - x0[0]) ** 2 + (x - x0[1]) ** 2))
-
-def delta_expr_adj(x0, z, x, coef, sigma_x=500.0):
-    sigma_x = Constant(sigma_x)
-    return coef*exp(-sigma_x * ((z - x0[0]) ** 2 + (x - x0[1]) ** 2))
 
 
 def delta_expr_3d(x0, z, x, y, sigma_x=2000.0):
