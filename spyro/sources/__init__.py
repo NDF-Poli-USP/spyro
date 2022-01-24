@@ -5,7 +5,6 @@ from .Sources import (
     ricker_wavelet,
     delta_expr,
     delta_expr_3d,
-    delta_expr_adj,
     timedependentSource,
     source_dof_finder,
 )
@@ -16,7 +15,6 @@ __all__ = [
     "full_ricker_wavelet",
     "delta_expr",
     "delta_expr_3d",
-    "delta_expr_adj",
     "MMS_time",
     "timedependentSource",
     "source_dof_finder",
