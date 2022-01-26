@@ -333,7 +333,7 @@ class Receivers:
 
         return cell_tabulations
 
-    def setPointCloudRec(self, comm, paralel_z=True):
+    def set_point_cloud(self, comm, paralel_z=True):
         #2D only
         rec_position = self.receiver_locations
         num_rec      = len(rec_position)
@@ -348,6 +348,7 @@ class Receivers:
         point_cloud = VertexOnlyMesh(self.mesh, xs)
         
         return point_cloud
+
 ## Some helper functions
 
 

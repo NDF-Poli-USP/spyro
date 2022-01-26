@@ -21,7 +21,7 @@ def gradient_test_acoustic(model, mesh, V, comm, vp_exact, vp_guess, mask=None):
             model["timeaxis"]["tf"],
             model["acquisition"]["frequency"],
         )
-        point_cloud = receivers.setPointCloudRec(comm,paralel_z=True)
+        point_cloud = receivers.set_point_cloud(comm,paralel_z=True)
         # simulate the exact model
         print('######## Running the exact model ########')
         p_exact_recv = forward(
