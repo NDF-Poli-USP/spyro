@@ -72,7 +72,6 @@ model["timeaxis"] = {
 }
 
 comm = spyro.utils.mpi_init(model)
-
 mesh = RectangleMesh(100, 100, 1.5, 1.5) # to test FWI, mesh aligned with interface
 
 element = spyro.domains.space.FE_method(
