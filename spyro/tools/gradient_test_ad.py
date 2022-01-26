@@ -21,13 +21,13 @@ def gradient_test_acoustic(model, mesh, V, comm, vp_exact, vp_guess, mask=None):
             model["timeaxis"]["tf"],
             model["acquisition"]["frequency"],
         )
-        point_cloud = receivers.set_point_cloud(comm,paralel_z=True)
+        point_cloud = receivers.set_point_cloud(comm)
         # simulate the exact model
         print('######## Running the exact model ########')
         p_exact_recv = forward(
             model, mesh, comm, vp_exact, sources, wavelet, point_cloud
         )
-    
+        
 
     # simulate the guess model
     print('######## Running the guess model ########')
@@ -35,8 +35,6 @@ def gradient_test_acoustic(model, mesh, V, comm, vp_exact, vp_guess, mask=None):
         model, mesh, comm, vp_guess, sources, wavelet, 
         point_cloud, fwi=True, true_rec=p_exact_recv
     )
-
-    qr_x, _, _ = quadrature.quadrature_rules(V)
 
     print("\n Cost functional at fixed point : " + str(Jm) + " \n ")
 
