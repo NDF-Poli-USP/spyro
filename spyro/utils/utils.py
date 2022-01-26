@@ -80,11 +80,7 @@ def mpi_init(model):
     available_cores = COMM_WORLD.size
     print(available_cores)
     if model["parallelism"]["type"] == "automatic":
-<<<<<<< HEAD
-        num_cores_per_shot = available_cores/model["acquisition"]["num_sources"]
-=======
         num_cores_per_shot = available_cores / model["acquisition"]["num_sources"]
->>>>>>> main
         if available_cores % model["acquisition"]["num_sources"] != 0:
             raise ValueError(
                 "Available cores cannot be divided between sources equally."
