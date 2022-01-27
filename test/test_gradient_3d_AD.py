@@ -32,7 +32,7 @@ model["mesh"] = {
     "Lz": 1.0,  # depth in km - always positive
     "Lx": 1.0,  # width in km - always positive
     "Ly": 1.0,  # thickness in km - always positive
-    "meshfile": "test/meshes/Uniform3D.msh",
+    "meshfile": "meshes/Uniform3D.msh",
     "initmodel": "not_used.hdf5",
     "truemodel": "not_used.hdf5",
 }
@@ -55,10 +55,10 @@ model["acquisition"] = {
     "frequency": 10.0,
     "delay": 1.0,
     "num_rec_x_columns": 5,
-    "num_rec_y_columns": 5,
+    "num_rec_y_columns": 1,
     "num_rec_z_columns": 1,
-    # first and final points of the receivers columns
-    "receiver_locations": [(-0.1, 0.1, 0.1), (-0.1, 0.9, 0.9)],
+    # first and final points of the receivers columns (z, x, y)
+    "receiver_locations": [(-0.1, 0.1, 0.5), (-0.1, 0.9, 0.5)],
 }
 model["Aut_Dif"] = {
     "status": True, 

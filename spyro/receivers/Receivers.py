@@ -341,23 +341,27 @@ class Receivers:
         return cell_tabulations
 
     def set_point_cloud(self, comm):
+        # Receivers always parallel to z-axis
+
         rec_pos = self.receiver_locations
        
-        # 2D
+        # 2D -- 
         if self.dimension==2:
             num_rec = self.num_receivers
-            δx   = np.linspace(rec_pos[0,0], rec_pos[num_rec-1,0], num_rec)
-            δz   = np.linspace(rec_pos[0,1], rec_pos[num_rec-1,1], num_rec)
-            X, Z = np.meshgrid(δx,δz)
-            xs   = np.vstack((X.flatten(), Z.flatten())).T
+            δz   = np.linspace(rec_pos[0,0], rec_pos[num_rec-1,0], 1) 
+            δx   = np.linspace(rec_pos[0,1], rec_pos[num_rec-1,1], num_rec)
+            
+            Z, X = np.meshgrid(δz,δx)
+            xs   = np.vstack((Z.flatten(), X.flatten())).T
+        
         #3D   
         elif self.dimension==3:
             δz   = np.linspace(rec_pos[0][0], rec_pos[1][0], self.column_z)
             δx   = np.linspace(rec_pos[0][1], rec_pos[1][1], self.column_x)
             δy   = np.linspace(rec_pos[0][2], rec_pos[1][2], self.column_y)
 
-            X, Y, Z = np.meshgrid(δx,δy,δz)
-            xs      = np.vstack((X.flatten(), Y.flatten(), Z.flatten())).T
+            Z, X, Y = np.meshgrid(δz,δx,δy)
+            xs      = np.vstack((Z.flatten(),X.flatten(), Y.flatten())).T
         else:
             print("This dimension is not accepted.")  
             quit() 

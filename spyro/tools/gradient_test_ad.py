@@ -39,7 +39,7 @@ def gradient_test_acoustic(model, mesh, V, comm, vp_exact, vp_guess, mask=None):
     print("\n Cost functional at fixed point : " + str(Jm) + " \n ")
 
     # compute the gradient of the control (to be verified)
-    print('######## Computing the gradient by adjoint method ########')
+    print('######## Computing the gradient by automatic differentiation ########')
     control = Control(vp_guess)
     dJ      = compute_gradient(Jm, control)
     if mask:

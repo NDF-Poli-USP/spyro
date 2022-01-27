@@ -156,7 +156,6 @@ def forward(
 
         t = step * float(dt)
     
-    File("guess_vel_mm.pvd").write(u_n)
     if fwi:
         return usol_recv, J0
     else:
