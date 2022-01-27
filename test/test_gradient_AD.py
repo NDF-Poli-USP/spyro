@@ -8,8 +8,7 @@ import numpy as np
 import meshio
 import SeismicMesh
 import finat
-from ROL.firedrake_vector import FiredrakeVector as FeVector
-import ROL
+
 #from ..domains import quadrature, space
 
 model = {}
