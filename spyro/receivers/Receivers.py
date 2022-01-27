@@ -31,6 +31,11 @@ class Receivers:
         Receivers: :class: 'Receiver' object
         """
 
+        if "Aut_Dif" in model:
+            self.automatic_adjoint = True
+        else:
+            self.automatic_adjoint = False
+
         self.mesh = mesh
         self.space = V
         self.my_ensemble = my_ensemble
@@ -38,7 +43,7 @@ class Receivers:
         self.degree = model["opts"]["degree"]
         self.receiver_locations = model["acquisition"]["receiver_locations"]
         
-        if self.dimension==3 and model["Aut_Dif"]['status']:
+        if self.dimension==3 and self.automatic_adjoint:
             self.column_x = model["acquisition"]["num_rec_x_columns"]
             self.column_y = model["acquisition"]["num_rec_y_columns"]
             self.column_z = model["acquisition"]["num_rec_z_columns"]
@@ -53,7 +58,7 @@ class Receivers:
         self.cellNodeMaps = None
         self.nodes_per_cell = None
         self.is_local = [0] * self.num_receivers
-        if not model["Aut_Dif"]['status']:
+        if not self.automatic_adjoint:
             self.build_maps()
 
     @property
