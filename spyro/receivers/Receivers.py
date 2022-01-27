@@ -36,9 +36,16 @@ class Receivers:
         self.my_ensemble = my_ensemble
         self.dimension = model["opts"]["dimension"]
         self.degree = model["opts"]["degree"]
-
         self.receiver_locations = model["acquisition"]["receiver_locations"]
-        self.num_receivers = len(self.receiver_locations)
+        
+        if self.dimension==3 and model["Aut_Dif"]['status']:
+            self.column_x = model["acquisition"]["num_rec_x_columns"]
+            self.column_y = model["acquisition"]["num_rec_y_columns"]
+            self.column_z = model["acquisition"]["num_rec_z_columns"]
+            self.num_receivers = self.column_x*self.column_y
+       
+        else:
+            self.num_receivers = len(self.receiver_locations)
 
         self.cellIDs = None
         self.cellVertices = None
@@ -46,8 +53,8 @@ class Receivers:
         self.cellNodeMaps = None
         self.nodes_per_cell = None
         self.is_local = [0] * self.num_receivers
-
-        self.build_maps()
+        if not model["Aut_Dif"]['status']:
+            self.build_maps()
 
     @property
     def num_receivers(self):
@@ -333,20 +340,34 @@ class Receivers:
 
         return cell_tabulations
 
-    def set_point_cloud(self, comm, paralel_z=True):
-        #2D only
-        rec_position = self.receiver_locations
-        num_rec      = len(rec_position)
-        if paralel_z:
-            δs       = np.linspace(rec_position[0,0], rec_position[num_rec-1,0], num_rec)
-            X, Y     = np.meshgrid(δs, rec_position[0,1])
+    def set_point_cloud(self, comm):
+        # Receivers always parallel to z-axis
+
+        rec_pos = self.receiver_locations
+       
+        # 2D -- 
+        if self.dimension==2:
+            num_rec = self.num_receivers
+            δz   = np.linspace(rec_pos[0,0], rec_pos[num_rec-1,0], 1) 
+            δx   = np.linspace(rec_pos[0,1], rec_pos[num_rec-1,1], num_rec)
+            
+            Z, X = np.meshgrid(δz,δx)
+            xs   = np.vstack((Z.flatten(), X.flatten())).T
+        
+        #3D   
+        elif self.dimension==3:
+            δz   = np.linspace(rec_pos[0][0], rec_pos[1][0], self.column_z)
+            δx   = np.linspace(rec_pos[0][1], rec_pos[1][1], self.column_x)
+            δy   = np.linspace(rec_pos[0][2], rec_pos[1][2], self.column_y)
+
+            Z, X, Y = np.meshgrid(δz,δx,δy)
+            xs      = np.vstack((Z.flatten(),X.flatten(), Y.flatten())).T
         else:
-            δs       = np.linspace(rec_position[0,1], rec_position[num_rec-1,1], num_rec)
-            X, Y     = np.meshgrid(rec_position[0,0],δs)
+            print("This dimension is not accepted.")  
+            quit() 
         
-        xs          = np.vstack((X.flatten(), Y.flatten())).T
-        point_cloud = VertexOnlyMesh(self.mesh, xs)
-        
+        point_cloud = VertexOnlyMesh(self.mesh, xs)   
+    
         return point_cloud
 
 ## Some helper functions
