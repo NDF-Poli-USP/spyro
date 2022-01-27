@@ -31,7 +31,7 @@ model["mesh"] = {
     "Lz": 1.0,  # depth in km - always positive
     "Lx": 1.0,  # width in km - always positive
     "Ly": 1.0,  # thickness in km - always positive
-    "meshfile": "meshes/Uniform3D.msh",
+    "meshfile": "test/meshes/Uniform3D.msh",
     "initmodel": "not_used.hdf5",
     "truemodel": "not_used.hdf5",
 }
