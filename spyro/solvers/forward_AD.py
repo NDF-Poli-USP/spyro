@@ -69,7 +69,7 @@ def forward(
     PML    = model["BCs"]["status"]
     nt     = int(tf / dt)  # number of timesteps
     excitations.current_source = source_num
-    params  = set_params(method)
+    params  = setParams(method)
     element = space.FE_method(mesh, method, degree)
 
     V = FunctionSpace(mesh, element)
@@ -118,9 +118,8 @@ def forward(
     P            = FunctionSpace(receivers, "DG", 0)
     interpolator = Interpolator(u_np1, P)
     J0           = 0.0 
-    
     for step in range(nt):
-
+        
         excitations.apply_source(f, wavelet[step])
         
         solver.solve()
@@ -135,7 +134,7 @@ def forward(
         usol_recv.append(rec.dat.data) 
 
         if fwi:
-            J0 += calc_objective_func(
+            J0 += objective_func(
                 rec,
                 p_true_rec[step],
                 step,
@@ -162,13 +161,13 @@ def forward(
         return usol_recv
 
 
-def calc_objective_func(p_rec,p_true_rec, IT, dt,P):
-    true_rec             = Function(P)
+def objective_func(p_rec,p_true_rec, IT, dt,P):
+    true_rec = Function(P)
     true_rec.dat.data[:] = p_true_rec
     J = 0.5 * assemble(inner(true_rec-p_rec, true_rec-p_rec) * dx)
     return J
 
-def set_params(method):
+def setParams(method):
     if method == "KMV":
         params = {"ksp_type": "preonly", "pc_type": "jacobi"}
     elif (
