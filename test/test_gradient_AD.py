@@ -8,8 +8,7 @@ import numpy as np
 import meshio
 import SeismicMesh
 import finat
-from ROL.firedrake_vector import FiredrakeVector as FeVector
-import ROL
+
 #from ..domains import quadrature, space
 
 model = {}
@@ -53,9 +52,9 @@ model["acquisition"] = {
     "source_pos": [(0.75, 0.75)],
     "frequency": 10.0,
     "delay": 1.0,
-    "num_receivers": 1,
+    "num_receivers": 10,
     "receiver_locations": spyro.create_transect(
-       (0.9, 0.75), (0.9, 0.75), 1
+       (0.9, 0.2), (0.9, 0.8), 10
     ),
 }
 model["Aut_Dif"] = {
@@ -72,7 +71,6 @@ model["timeaxis"] = {
 }
 
 comm = spyro.utils.mpi_init(model)
-
 mesh = RectangleMesh(100, 100, 1.5, 1.5) # to test FWI, mesh aligned with interface
 
 element = spyro.domains.space.FE_method(
