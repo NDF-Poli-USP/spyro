@@ -1,5 +1,5 @@
 from .forward import forward
-from .forward_AD import forward_AD
+from .forward_AD import forward as forward_AD
 from .gradient import gradient
 
 __all__ = [
