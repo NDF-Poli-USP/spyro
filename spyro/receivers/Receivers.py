@@ -16,7 +16,6 @@ class Receivers:
     def __init__(self, model, mesh, V, my_ensemble):
         """Initializes class and gets all receiver parameters from
         input file.
-
         Parameters
         ----------
         model: `dictionary`
@@ -27,11 +26,9 @@ class Receivers:
             The space of the finite elements
         my_ensemble: Firedrake.ensemble_communicator
             An ensemble communicator
-
         Returns
         -------
         Receivers: :class: 'Receiver' object
-
         """
 
         self.mesh = mesh
@@ -85,18 +82,15 @@ class Receivers:
     def interpolate(self, field):
         """Interpolate the solution to the receiver coordinates for
         one simulation timestep.
-
         Parameters
         ----------
         field: array-like
             An array of the solution at a given timestep at all nodes
-
         Returns
         -------
         solution_at_receivers: list
             Solution interpolated to the list of receiver coordinates
             for the given timestep.
-
         """
         return [self.__new_at(field, rn) for rn in range(self.num_receivers)]
 
@@ -109,11 +103,12 @@ class Receivers:
             if self.is_local[rid]:
                 idx = np.int_(self.cellNodeMaps[rid])
                 phis = self.cell_tabulations[rid]
+               
                 tmp = np.dot(phis, value)
                 rhs_forcing.dat.data_with_halos[idx] += tmp
             else:
                 tmp = rhs_forcing.dat.data_with_halos[0]
-
+       
         return rhs_forcing
 
     def __func_receiver_locator(self):
@@ -121,10 +116,8 @@ class Receivers:
         the list of tuples has in line n the receiver position
         and the position of the nodes in the element that contains
         the receiver.
-
         The matrix has the deegres of freedom of the nodes inside
         same element as the receiver.
-
         """
         if self.dimension == 2:
             return self.__func_receiver_locator_2D()
@@ -159,10 +152,8 @@ class Receivers:
         the list of tuples has in line n the receiver position
         and the position of the nodes in the element that contains
         the receiver.
-
         The matrix has the deegres of freedom of the nodes inside
         same element as the receiver.
-
         """
         num_recv = self.num_receivers
 
@@ -195,7 +186,6 @@ class Receivers:
     def __new_at(self, udat, receiver_id):
         """Function that evaluates the receiver value given its id.
         For 2D simplices only.
-
         Parameters
         ----------
         udat: array-like
@@ -203,10 +193,8 @@ class Receivers:
         receiver_id: a list of integers
             A list of receiver ids, ranging from 0 to total receivers
             minus one.
-
         Returns
         -------
-
         at: Function value at given receiver
         """
 
@@ -243,10 +231,8 @@ class Receivers:
         the list of tuples has in line n the receiver position
         and the position of the nodes in the element that contains
         the receiver.
-
         The matrix has the deegres of freedom of the nodes inside
         same element as the receiver.
-
         """
         num_recv = self.num_receivers
 
@@ -347,6 +333,21 @@ class Receivers:
 
         return cell_tabulations
 
+    def set_point_cloud(self, comm, paralel_z=True):
+        #2D only
+        rec_position = self.receiver_locations
+        num_rec      = len(rec_position)
+        if paralel_z:
+            δs       = np.linspace(rec_position[0,0], rec_position[num_rec-1,0], num_rec)
+            X, Y     = np.meshgrid(δs, rec_position[0,1])
+        else:
+            δs       = np.linspace(rec_position[0,1], rec_position[num_rec-1,1], num_rec)
+            X, Y     = np.meshgrid(rec_position[0,0],δs)
+        
+        xs          = np.vstack((X.flatten(), Y.flatten())).T
+        point_cloud = VertexOnlyMesh(self.mesh, xs)
+        
+        return point_cloud
 
 ## Some helper functions
 
@@ -678,3 +679,4 @@ def change_to_reference_tetrahedron(p, a, b, c, d):
     pnz = px * a31 + py * a32 + pz * a33 + a34
 
     return (pnx, pny, pnz)
+

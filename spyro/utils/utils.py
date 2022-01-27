@@ -78,7 +78,7 @@ def mpi_init(model):
     rank = myrank()
     size = mysize()
     available_cores = COMM_WORLD.size
-
+    print(available_cores)
     if model["parallelism"]["type"] == "automatic":
         num_cores_per_shot = available_cores / model["acquisition"]["num_sources"]
         if available_cores % model["acquisition"]["num_sources"] != 0:
@@ -113,10 +113,12 @@ def communicate(array, my_ensemble):
 
     """
     array_reduced = copy.copy(array)
+    
     if my_ensemble.comm.size > 1:
         if my_ensemble.comm.rank == 0 and my_ensemble.ensemble_comm.rank == 0:
             print("Spatial parallelism, reducing to comm 0", flush=True)
         my_ensemble.comm.Allreduce(array, array_reduced, op=MPI.MAX)
+    # print(array_reduced,array)
     return array_reduced
 
 
