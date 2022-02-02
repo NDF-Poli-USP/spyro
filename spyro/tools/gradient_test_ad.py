@@ -1,6 +1,5 @@
 import numpy as np
 from firedrake import *
-#from firedrake_adjoint import *
 from pyadjoint import enlisting
 import spyro
 from spyro.domains import quadrature
@@ -10,7 +9,8 @@ import sys
 forward = spyro.solvers.forward_AD
 
 def gradient_test_acoustic(model, mesh, V, comm, vp_exact, vp_guess, mask=None): #{{{
-    with stop_annotating():
+    import firedrake_adjoint as fire_adj
+    with fire_adj.stop_annotating():
         print('######## Starting gradient test ########')
 
         sources = spyro.Sources(model, mesh, V, comm)
@@ -40,8 +40,8 @@ def gradient_test_acoustic(model, mesh, V, comm, vp_exact, vp_guess, mask=None):
 
     # compute the gradient of the control (to be verified)
     print('######## Computing the gradient by automatic differentiation ########')
-    control = Control(vp_guess)
-    dJ      = compute_gradient(Jm, control)
+    control = fire_adj.Control(vp_guess)
+    dJ      = fire_adj.compute_gradient(Jm, control)
     if mask:
         dJ *= mask
     
@@ -50,10 +50,10 @@ def gradient_test_acoustic(model, mesh, V, comm, vp_exact, vp_guess, mask=None):
     #steps = [1e-3, 1e-4, 1e-5, 1e-6, 1e-7]  # step length
     #steps = [1e-4, 1e-5, 1e-6, 1e-7]  # step length
     steps = [1e-5, 1e-6, 1e-7, 1e-8]  # step length
-    with stop_annotating():
+    with fire_adj.stop_annotating():
         delta_m = Function(V)  # model direction (random)
         delta_m.assign(dJ)
-        Jhat    = ReducedFunctional(Jm, control) 
+        Jhat    = fire_adj.ReducedFunctional(Jm, control) 
         derivative = enlisting.Enlist(Jhat.derivative())
         hs = enlisting.Enlist(delta_m)
      
@@ -89,6 +89,9 @@ def gradient_test_acoustic(model, mesh, V, comm, vp_exact, vp_guess, mask=None):
             )
 
             errors.append(100 * ((fd_grad - projnorm) / projnorm))
+    
+    
+    fire_adj.get_working_tape().clear_tape()
 
     # all errors less than 1 %
     errors = np.array(errors)
