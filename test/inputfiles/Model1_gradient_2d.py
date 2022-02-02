@@ -67,7 +67,9 @@ inversion = {
     "freq_bands": [None]
 }  # cutoff frequencies (Hz) for Ricker source and to low-pass the observed shot record
 
-
+aut_dif = {
+    "status": False, 
+}
 # Create your model with all the options
 model = {
     "self": None,
@@ -78,4 +80,5 @@ model = {
     "mesh": mesh,
     "acquisition": acquisition,
     "timeaxis": timeaxis,
+    "aut_dif": aut_dif,
 }

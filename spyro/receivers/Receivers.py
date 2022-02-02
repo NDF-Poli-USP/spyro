@@ -43,11 +43,7 @@ class Receivers:
         self.degree = model["opts"]["degree"]
         self.receiver_locations = model["acquisition"]["receiver_locations"]
         
-<<<<<<< HEAD
         if self.dimension==3 and model["aut_dif"]['status']:
-=======
-        if self.dimension==3 and self.automatic_adjoint:
->>>>>>> main
             self.column_x = model["acquisition"]["num_rec_x_columns"]
             self.column_y = model["acquisition"]["num_rec_y_columns"]
             self.column_z = model["acquisition"]["num_rec_z_columns"]
@@ -56,22 +52,12 @@ class Receivers:
         else:
             self.num_receivers = len(self.receiver_locations)
 
-<<<<<<< HEAD
             self.cellIDs = None
             self.cellVertices = None
             self.cell_tabulations = None
             self.cellNodeMaps = None
             self.nodes_per_cell = None
             self.is_local = [0] * self.num_receivers
-=======
-        self.cellIDs = None
-        self.cellVertices = None
-        self.cell_tabulations = None
-        self.cellNodeMaps = None
-        self.nodes_per_cell = None
-        self.is_local = [0] * self.num_receivers
-        if not self.automatic_adjoint:
->>>>>>> main
             self.build_maps()
 
     @property

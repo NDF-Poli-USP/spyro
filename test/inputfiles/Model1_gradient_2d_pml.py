@@ -59,6 +59,10 @@ timeaxis = {
     "fspool": 1,  # how frequently to save solution to RAM
 }
 
+aut_dif = {
+    "status": False, 
+}
+
 model_pml = {
     "self": None,
     "opts": opts,
@@ -67,4 +71,5 @@ model_pml = {
     "mesh": mesh,
     "acquisition": acquisition,
     "timeaxis": timeaxis,
+    "aut_dif": aut_dif,
 }
