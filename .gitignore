@@ -7,4 +7,5 @@
 *.hdf5
 *.msh
 *.segy
-spyro/build/*
+
+**/build/*
