@@ -113,7 +113,8 @@ def gradient_elastic_waves(
     
     # if requested, set the output file
     if output:
-        outfile = helpers.create_output_file("adjoint_elastic_waves.pvd", comm, 0)
+        #outfile = helpers.create_output_file("adjoint_elastic_waves.pvd", comm, 0)
+        outfile = helpers.create_output_file("adjoint_elastic_waves.pvd", comm, comm.ensemble_comm.rank)
 
     # create the trial and test functions for typical CG/KMV FEM in 2d/3d
     u = TrialFunction(V) # adjoint problem
@@ -152,8 +153,8 @@ def gradient_elastic_waves(
         # damping at outer boundaries (-x,+x,-z,+z)
         if model["BCs"]["outer_bc"] == "non-reflective" and model["BCs"]["abl_bc"] != "alid":
             # get normal and tangent vectors
-            n = firedrake.FacetNormal(mesh)
-            t = firedrake.perp(n)
+            n = FacetNormal(mesh)
+            t = perp(n)
             
             c_p = ((lamb + 2.*mu)/rho)**0.5
             c_s = (mu/rho)**0.5
@@ -282,7 +283,7 @@ def gradient_elastic_waves(
         #guess_copy = guess.copy()
 
     #outfile2 = helpers.create_output_file("dJdl_adj_time.pvd", comm, 0)
-
+    rhs_forcing = Function(V)
     # run backward in time
     for step in range(nt - 1, -1, -1):
         t = step * float(dt)
@@ -295,7 +296,19 @@ def gradient_elastic_waves(
         if not excitations and not residual:
             # apply the residual evaluated at the receivers as external forcing (sources)
             # f = residual = u_exact - u_guess
+            
+            # gaussian function that is integrated into the rhs
             f = receivers.apply_receivers_as_radial_source(f, residual_z, residual_x, residual_y, step)
+            
+            # point source integrated, i.e., it is added to the already integrated rhs
+            # FIXME testing
+            #rhs_forcing.assign(0.0)
+            #fext = receivers.apply_receivers_as_point_source(rhs_forcing, residual_z, residual_x, residual_y, step) 
+            #B0 = B.sub(0)
+            #B1 = B.sub(1)
+            #B0 += fext.sub(0)
+            #B1 += fext.sub(1)
+
             #File("f.pvd").write(f)
             #sys.exit("exiting")
         elif excitations and not residual:

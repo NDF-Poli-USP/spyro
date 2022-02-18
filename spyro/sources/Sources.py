@@ -55,7 +55,7 @@ class Sources(spyro.receivers.Receivers.Receivers):
         (self.cell_tabulations_zdir,self.cell_tabulations_xdir) = self.__func_build_cell_tabulations_zxydir()
 
     def apply_source(self, rhs_forcing, value):
-        """Applies source in a assembled right hand side."""
+        """Applies source in a assembled right hand side for acoustic waves simulation."""
         for source_id in range(self.num_receivers):
             if self.is_local[source_id] and source_id==self.current_source:
                 for i in range(len(self.cellNodeMaps[source_id])):
@@ -63,28 +63,27 @@ class Sources(spyro.receivers.Receivers.Receivers):
                         value * self.cell_tabulations[source_id][i]
                     )
             else: 
-                for i in range(len(self.cellNodeMaps[source_id])):
-                    tmp = rhs_forcing.dat.data_with_halos[0]
+                pass
+
+        return rhs_forcing
+    
+    def apply_gaussian_source(self, rhs_forcing, value): # used ONLY to debug and compare
+        """Applies source in a assembled right hand side for acoustic waves simulation."""
+        for source_id in range(self.num_receivers):
+            if self.is_local[source_id] and source_id==self.current_source:
+                raise ValueError("cell_tabulations_zdir must be modified before calling this function")
+                rhs_forcing.dat.data_with_halos[:] = value * self.cell_tabulations_zdir[source_id][:]
+            else: 
+                pass # nothing here
 
         return rhs_forcing
     
     def apply_radial_source(self, rhs_forcing, value):
-        # FIXME maybe use value_x and value_z instead of just one value
         # FIXME improve for 3d simulations
-        """Applies radial sources in a assembled right hand side for elastic waves simulation"""
+        """Applies radial sources using Gaussian function in a assembled right hand side for elastic waves simulation"""
         # loop over the number of sources
         for source_id in range(self.num_receivers): # here, num_receivers means num_sources 
             if self.is_local[source_id] and source_id==self.current_source:
-                #FIXME maybe use a flag to decide which one
-                # loop over the nodes of the element that contains the source (FIXME maybe delete this) 
-                #for i in range(len(self.cellNodeMaps[source_id])): 
-                    # set the nodal values according to the wavelet (value) and the shape functions evaluated on each node
-                #    rhs_forcing.sub(0).dat.data_with_halos[int(self.cellNodeMaps[source_id][i])] = (
-                #        value * self.cell_tabulations_zdir[source_id][i]
-                #    )
-                #    rhs_forcing.sub(1).dat.data_with_halos[int(self.cellNodeMaps[source_id][i])] = (
-                #        value * self.cell_tabulations_xdir[source_id][i]
-                #    )
                 # z direction
                 rhs_forcing.sub(0).dat.data_with_halos[:] = (
                         value * self.cell_tabulations_zdir[source_id][:]
@@ -93,7 +92,27 @@ class Sources(spyro.receivers.Receivers.Receivers):
                 rhs_forcing.sub(1).dat.data_with_halos[:] = (
                         value * self.cell_tabulations_xdir[source_id][:]
                 )
-            
+            else: 
+                pass
+
+        return rhs_forcing
+    
+    def apply_point_source(self, rhs_forcing, value):
+        # FIXME improve for 3d simulations
+        """Applies point sources in a assembled right hand side for elastic waves simulation"""
+        # loop over the number of sources
+        #raise ValueError("__func_build_cell_tabulations_zxydir must be modified before calling this function")
+        for source_id in range(self.num_receivers): # here, num_receivers means num_sources 
+            if self.is_local[source_id] and source_id==self.current_source:
+                # loop over the nodes of the element that contains the source 
+                for i in range(len(self.cellNodeMaps[source_id])): 
+                    # set the nodal values according to the wavelet (value) and shape functions evaluated on each node
+                    rhs_forcing.sub(0).dat.data_with_halos[int(self.cellNodeMaps[source_id][i])] = (
+                        value * self.cell_tabulations_zdir[source_id][i]
+                    )
+                    rhs_forcing.sub(1).dat.data_with_halos[int(self.cellNodeMaps[source_id][i])] = (
+                        value * self.cell_tabulations_xdir[source_id][i]
+                    )
             else: 
                 pass
 
@@ -101,8 +120,10 @@ class Sources(spyro.receivers.Receivers.Receivers):
 
     def __func_build_cell_tabulations_zxydir(self):
         if self.dimension == 2:
-            #return self.__func_build_cell_tabulations_zxdir_point_source() #FIXME maybe use a flag to decide which one
-            return self.__func_build_cell_tabulations_zxdir_continuous_source()
+            if 0: #default is 0. FIXME improve this flag 
+                return self.__func_build_cell_tabulations_zxdir_point_source() # used to test and debug only
+            else:
+                return self.__func_build_cell_tabulations_zxdir_continuous_source()
         elif self.dimension == 3:
             raise ValueError("Point interpolation for 3D meshes not supported yet")
         else:
@@ -274,7 +295,7 @@ def source_dof_finder(space, model):
     return False
 
 
-def delta_expr2(x0, z, x, sigma_x=500.0):
+def delta_expr2(x0, z, x, sigma_x=2000.0): # FIXME 500 was the original value, but 1000 and 2000 seems better for FWI
     return np.exp(-sigma_x * ((z - x0[0]) ** 2 + (x - x0[1]) ** 2))
 
 

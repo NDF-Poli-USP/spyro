@@ -119,7 +119,20 @@ class Receivers:
                 tmp = np.dot(phis, value)
                 rhs_forcing.dat.data_with_halos[idx] += tmp
             else:
-                tmp = rhs_forcing.dat.data_with_halos[0]
+                pass # nothing here 
+
+        return rhs_forcing
+    
+    def apply_receivers_as_gaussian_source(self, rhs_forcing, residual, IT): # used to debub and compare
+        """
+        The adjoint operation of interpolation (injection)
+        """
+        for rid in range(self.num_receivers):
+            value = residual[IT][rid]
+            if self.is_local[rid]:
+                rhs_forcing.dat.data_with_halos[:] += value * self.cell_tabulations_zdir[rid][:]
+            else:
+                pass # nothing here 
 
         return rhs_forcing
 
@@ -155,6 +168,30 @@ class Receivers:
             else:
                 pass # nothing here
 
+        return rhs_forcing
+    
+    def apply_receivers_as_point_source(self, rhs_forcing, residual_z, residual_x, residual_y, IT):#used to debug
+        """
+        The adjoint operation of interpolation (injection) for elastic waves simulation
+        """
+        for rid in range(self.num_receivers):
+            # the residual values provide the direction (sign)
+            value_z = residual_z[IT][rid]
+            value_x = residual_x[IT][rid]
+            if self.dimension == 3:
+                value_y = residual_y[IT][rid]
+            
+            if self.is_local[rid]:
+                idx = np.int_(self.cellNodeMaps[rid])
+                phis = self.cell_tabulations[rid]
+                rhs_forcing.sub(0).dat.data_with_halos[idx] += np.dot(phis, value_z)
+                rhs_forcing.sub(1).dat.data_with_halos[idx] += np.dot(phis, value_x)
+                if self.dimension == 3:
+                    rhs_forcing.sub(2).dat.data_with_halos[idx] += np.dot(phis, value_y)
+            
+            else:
+                pass # nothing here 
+        
         return rhs_forcing
 
     def __func_build_cell_tabulations_zxydir(self):
@@ -443,13 +480,14 @@ class Receivers:
             X, Y     = np.meshgrid(rec_position[0,0],δs)
         
         xs          = np.vstack((X.flatten(), Y.flatten())).T
-
+        print(δs)
+        print(xs)
         point_cloud = VertexOnlyMesh(self.mesh, xs, missing_points_behaviour="warn")
         
         return point_cloud
 
 ## Some helper functions
-def delta_expr(x0, z, x, sigma_x=500.0):
+def delta_expr(x0, z, x, sigma_x=2000.0): # FIXME it was 500 
     return np.exp(-sigma_x * ((z - x0[0]) ** 2 + (x - x0[1]) ** 2))
 
 

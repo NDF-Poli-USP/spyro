@@ -15,8 +15,8 @@ import ROL
 model = {}
 
 model["opts"] = {
-    "method": "CG",  # either CG or KMV
-    "quadratrue": "CG", # Equi or KMV
+    "method": "KMV",  # either CG or KMV
+    "quadratrue": "KMV", # Equi or KMV
     "degree": 1,  # p order
     "dimension": 2,  # dimension
     "regularization": False,  # regularization is on?
@@ -59,7 +59,7 @@ model["acquisition"] = {
 
 model["timeaxis"] = {
     "t0": 0.0,  #  Initial time for event
-    "tf": 0.001*400,  # Final time for event (for test 7)
+    "tf": 0.001*400, # Final time for event (for test 7)
     "dt": 0.0010,  # timestep size (divided by 2 in the test 4. dt for test 3 is 0.00050)
     "amplitude": 1,  # the Ricker has an amplitude of 1.
     "nspool":  20,  # (20 for dt=0.00050) how frequently to output solution to pvds
@@ -67,7 +67,7 @@ model["timeaxis"] = {
 }
 comm = spyro.utils.mpi_init(model)
 
-mesh = RectangleMesh(50, 50, model["mesh"]["Lz"], model["mesh"]["Lx"], diagonal="crossed")
+mesh = RectangleMesh(85, 85, model["mesh"]["Lz"], model["mesh"]["Lx"], diagonal="crossed")
 
 element = spyro.domains.space.FE_method(
     mesh, model["opts"]["method"], model["opts"]["degree"]
@@ -81,12 +81,29 @@ z, x = SpatialCoordinate(mesh)
 
 mu_exact    = 1./4.
 lamb_exact  = 1./2.
-mu_guess    = 0.5 * mu_exact 
-lamb_guess  = 0.5 * lamb_exact
 rho_exact   = 1.0
 
-lamb = Constant(lamb_exact) # exact
-mu = Constant(mu_exact)
+# FWI works well when sigma_x>500 (e.g., 1000 or 2000)
+
+is_circle = 1 
+
+if is_circle:
+    z, x = SpatialCoordinate(mesh)
+    lamb = Function(H).interpolate(
+        lamb_exact + 0.5
+        + 0.5 * tanh(100.0 * (0.1 - sqrt((z - 0.4) ** 2 + (x - 0.4) ** 2)))
+    )
+    mu = Function(H).interpolate(
+        mu_exact + 0.5
+        + 0.5 * tanh(100.0 * (0.1 - sqrt((z - 0.4) ** 2 + (x - 0.4) ** 2)))
+    )
+    File("exact_lamb.pvd").write(lamb)
+    File("exact_mu.pvd").write(mu)
+    #sys.exit('exit')
+else: # constant case
+    lamb = Constant(lamb_exact) # exact
+    mu = Constant(mu_exact)
+
 rho = Constant(rho_exact) 
 
 sources = spyro.Sources(model, mesh, H, comm)
@@ -103,6 +120,7 @@ u_exact, _, _, _ = spyro.solvers.forward_elastic_waves(
 end = time.time()
 print(round(end - start,2))
 #sys.exit("exit")
+File("u_exact.pvd").write(u_exact[-1])
 
 class L2Inner(object): #{{{
     def __init__(self):
@@ -157,6 +175,7 @@ class ObjectiveElastic(ROL.Objective): #{{{
                     (0.5*inner(self.u_guess[step]-self.u_exact[step],self.u_guess[step]-self.u_exact[step]))*dx
                     )
         self.misfit = residual
+        File("u_guess.pvd").write(self.u_guess[-1])
         return J
 
     def gradient(self, g, x, tol):
@@ -183,7 +202,7 @@ class ObjectiveElastic(ROL.Objective): #{{{
 # ROL parameters definition {{{
 paramsDict = {
     "General": {
-        "Secant": {"Type": "Limited-Memory BFGS", "Maximum Storage": 3}#25}
+        "Secant": {"Type": "Limited-Memory BFGS", "Maximum Storage": 25}
     },
     "Step": {
         "Type": "Augmented Lagrangian",
@@ -204,15 +223,15 @@ paramsDict = {
             'Feasibility Tolerance Decrease Exponent' : 0.9,
             'Print Intermediate Optimization History' : True,
             "Subproblem Step Type": "Line Search",
-            "Subproblem Iteration Limit": 2,#10,
+            "Subproblem Iteration Limit": 20,
         },
     },
     "Status Test": {
         "Gradient Tolerance": 1e-15,
         'Relative Gradient Tolerance': 1e-10,
-        "Step Tolerance": 1.0e-15,
-        'Relative Step Tolerance': 1e-15,
-        "Iteration Limit": 30
+        "Step Tolerance": 1.0e-17,
+        'Relative Step Tolerance': 1e-17,
+        "Iteration Limit": 100
     },
 }
 #}}}
@@ -224,14 +243,24 @@ x0 = Function(P)
 xlo = Function(P)
 xup = Function(P)
 
-x0.dat.data[:,0] = lamb_guess # lambda
-x0.dat.data[:,1] = mu_guess # mu
-
-xlo.dat.data[:,0] = 0.3 * lamb_exact
-xlo.dat.data[:,1] = 0.3 * mu_exact
-
-xup.dat.data[:,0] = 2.0 * lamb_exact
-xup.dat.data[:,1] = 2.0 * mu_exact
+if is_circle:
+    x0.dat.data[:,0] = lamb_exact # lambda
+    x0.dat.data[:,1] = mu_exact # mu
+    
+    xlo.dat.data[:,0] = 0.7 * lamb_exact
+    xlo.dat.data[:,1] = 0.7 * mu_exact
+    
+    xup.dat.data[:,0] = 5 * lamb_exact
+    xup.dat.data[:,1] = 5 * mu_exact
+else:
+    x0.dat.data[:,0] = 0.9 * lamb_exact # lambda
+    x0.dat.data[:,1] = 0.9 * mu_exact # mu
+    
+    xlo.dat.data[:,0] = 0.8 * lamb_exact
+    xlo.dat.data[:,1] = 0.8 * mu_exact
+    
+    xup.dat.data[:,0] = 1.2 * lamb_exact
+    xup.dat.data[:,1] = 1.2 * mu_exact
 
 opt = FeVector(x0.vector(), inner_product)
 x_lo = FeVector(xlo.vector(), inner_product)
@@ -239,11 +268,12 @@ x_up = FeVector(xup.vector(), inner_product)
 
 bnd = ROL.Bounds(x_lo, x_up, 1.0)
 
+# works well with sigma_x=1000 (or 2000)
+
 obj = ObjectiveElastic(inner_product)
 algo = ROL.Algorithm("Line Search", params)
 algo.run(opt, obj, bnd)
 
 File("final_lamb_elastic.pvd").write(obj.lamb)
 File("final_mu_elastic.pvd").write(obj.mu)
-
 

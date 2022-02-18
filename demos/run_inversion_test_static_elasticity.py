@@ -191,8 +191,8 @@ class L2Inner(object): #{{{
         self.vmp.dat.data[:] = v.dat.data[:,1] # mu
         ulpet = as_backend_type(self.ulp.vector()).vec() # lambda
         vlpet = as_backend_type(self.vlp.vector()).vec() # lambda
-        umpet = as_backend_type(self.ulp.vector()).vec() # mu
-        vmpet = as_backend_type(self.vlp.vector()).vec() # mu
+        umpet = as_backend_type(self.ump.vector()).vec() # mu
+        vmpet = as_backend_type(self.vmp.vector()).vec() # mu
         A_ul = self.Ap.createVecLeft() # lambda
         A_um = self.Ap.createVecLeft() # mu
         self.Ap.mult(ulpet, A_ul) # lambda

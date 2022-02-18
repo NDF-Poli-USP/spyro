@@ -25,7 +25,7 @@ def compute_functional(model, residual, vp=None):
     Accepts the velocity optionally and uses
     it if regularization is enabled
     """
-    num_receivers = model["acquisition"]["num_receivers"]
+    num_receivers = model["acquisition"]["num_receivers"] #FIXME this should be equal to len(self.receiver_locations)
     dt = model["timeaxis"]["dt"]
     tf = model["timeaxis"]["tf"]
     nt = int(tf / dt)  # number of timesteps
@@ -79,7 +79,7 @@ def mpi_init(model):
     rank = myrank()
     size = mysize()
     available_cores = COMM_WORLD.size
-
+   
     if model["parallelism"]["type"] == "automatic":
         num_cores_per_shot = available_cores / model["acquisition"]["num_sources"]
         if available_cores % model["acquisition"]["num_sources"] != 0:

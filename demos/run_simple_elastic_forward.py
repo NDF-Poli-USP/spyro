@@ -9,6 +9,7 @@ from firedrake import (
 
 import spyro
 import time
+import sys
 
 # from Spyro website
 
@@ -106,11 +107,17 @@ V = FunctionSpace(mesh, element)
 # If so, the HDF5 file has to contain an array with
 # the velocity data and it is linearly interpolated onto the mesh nodes at run-time.
 x, y = SpatialCoordinate(mesh)
-velocity = conditional(x > -0.35, 1.5, 3.0)
-vp = Function(V, name="velocity").interpolate(velocity)
+rho_cond = conditional(x > -0.35, 4.0, 1.0)
+# cp = 1.5 for x > -0.35
+# cp = 3.0 for x < -0.35
+rho = Function(V, name="rho").interpolate(rho_cond)
 # These pvd files can be easily visualized in ParaView!
-File("simple_velocity_model.pvd").write(vp)
-
+File("simple_rho_model.pvd").write(rho)
+lamb = Function(V, name="lamb").interpolate(4.5 + 0*x)
+mu = Function(V, name="mu").interpolate(2.25 + 0*x)
+cp = Function(V, name="cp").assign( ((lamb+2*mu)/rho)**0.5 )
+File("simple_cp_model.pvd").write(cp)
+#sys.exit('exit')
 
 # Now we instantiate both the receivers and source objects.
 sources = spyro.Sources(model, mesh, V, comm)
@@ -123,17 +130,17 @@ wavelet = spyro.full_ricker_wavelet(dt=0.0005, tf=2.0, freq=8.0)
 # And now we simulate the shot using a 2nd order central time-stepping scheme
 # Note: simulation results are stored in the folder `~/results/` by default
 start = time.time()
-p_field, p_at_recv = spyro.solvers.forward(
-    model, mesh, comm, vp, sources, wavelet, receivers, output=False
+u_exact, uz_exact, ux_exact, uy_exact = spyro.solvers.forward_elastic_waves(
+    model, mesh, comm, rho, lamb, mu, sources, wavelet, receivers, output=False
 )
 end = time.time()
 print(round(end - start,2),flush=True)
 
 # Visualize the shot record
-spyro.plots.plot_shots(model, comm, p_at_recv)
+spyro.plots.plot_shots(model, comm, ux_exact)
 
 # Save the shot (a Numpy array) as a pickle for other use.
-spyro.io.save_shots(model, comm, p_at_recv)
+spyro.io.save_shots(model, comm, ux_exact)
 
 # can be loaded back via
 my_shot = spyro.io.load_shots(model, comm)

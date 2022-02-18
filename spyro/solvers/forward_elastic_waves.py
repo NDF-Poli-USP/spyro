@@ -145,8 +145,8 @@ def forward_elastic_waves(
         # damping at outer boundaries (-x,+x,-z,+z)
         if model["BCs"]["outer_bc"] == "non-reflective" and model["BCs"]["abl_bc"] != "alid":
             # get normal and tangent vectors 
-            n = firedrake.FacetNormal(mesh)
-            t = firedrake.perp(n)
+            n = FacetNormal(mesh)
+            t = perp(n)
 
             c_p = ((lamb + 2.*mu)/rho)**0.5
             c_s = (mu/rho)**0.5
@@ -203,6 +203,7 @@ def forward_elastic_waves(
 
     # weak formulation written as F=0
     F = m + a - l + nf 
+    #F = m + a + nf 
 
     # retrieve the lhs and rhs terms from F
     lhs_ = lhs(F)
@@ -242,6 +243,7 @@ def forward_elastic_waves(
         P = VectorFunctionSpace(receivers, "DG", 0)
         interpolator = Interpolator(u_np1, P)
 
+    rhs_forcing = Function(V)
     # run forward in time
     for step in range(nt):
         if use_AD_type_interp==False:
@@ -250,8 +252,16 @@ def forward_elastic_waves(
             #bc.apply(B) #FIXME for Dirichlet BC
         else: # to compare with AD problem
             solver.solve() 
-
-        f = excitations.apply_radial_source(f, wavelet[step])
+        
+        f = excitations.apply_radial_source(f, wavelet[step]) # f is a Gaussian function that is integrated into the rhs
+        
+        # FIXME testing it
+        #rhs_forcing.assign(0.0)
+        #fext = excitations.apply_point_source(rhs_forcing, wavelet[step]) # fext is an already integrated rhs
+        #B0 = B.sub(0)
+        #B1 = B.sub(1)
+        #B0 += fext.sub(0)
+        #B1 += fext.sub(1)
 
         # solve and assign X onto solution u 
         if use_AD_type_interp==False:

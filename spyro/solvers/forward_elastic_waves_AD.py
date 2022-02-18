@@ -146,8 +146,8 @@ def forward_elastic_waves(
         # damping at outer boundaries (-x,+x,-z,+z)
         if model["BCs"]["outer_bc"] == "non-reflective" and model["BCs"]["abl_bc"] != "alid":
             # get normal and tangent vectors 
-            n = firedrake.FacetNormal(mesh)
-            t = firedrake.perp(n)
+            n = FacetNormal(mesh)
+            t = perp(n)
 
             c_p = ((lamb + 2.*mu)/rho)**0.5
             c_s = (mu/rho)**0.5
