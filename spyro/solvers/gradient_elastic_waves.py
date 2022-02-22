@@ -290,24 +290,24 @@ def gradient_elastic_waves(
         
         # assemble the rhs term to update the forcing FIXME assemble here or after apply source?
         B = assemble(rhs_, tensor=B) 
-        if not excitations and not residual:
-            bc.apply(B) #FIXME for Dirichlet BC
+        #if not excitations and not residual: # FIXME uncomment it
+            #bc.apply(B) #FIXME for Dirichlet BC
         
         if not excitations and not residual:
             # apply the residual evaluated at the receivers as external forcing (sources)
             # f = residual = u_exact - u_guess
             
             # gaussian function that is integrated into the rhs
-            f = receivers.apply_receivers_as_radial_source(f, residual_z, residual_x, residual_y, step)
+            #f = receivers.apply_receivers_as_radial_source(f, residual_z, residual_x, residual_y, step)
             
             # point source integrated, i.e., it is added to the already integrated rhs
             # FIXME testing
-            #rhs_forcing.assign(0.0)
-            #fext = receivers.apply_receivers_as_point_source(rhs_forcing, residual_z, residual_x, residual_y, step) 
-            #B0 = B.sub(0)
-            #B1 = B.sub(1)
-            #B0 += fext.sub(0)
-            #B1 += fext.sub(1)
+            rhs_forcing.assign(0.0)
+            fext = receivers.apply_receivers_as_point_source(rhs_forcing, residual_z, residual_x, residual_y, step) 
+            B0 = B.sub(0)
+            B1 = B.sub(1)
+            B0 += fext.sub(0)
+            B1 += fext.sub(1)
 
             #File("f.pvd").write(f)
             #sys.exit("exiting")

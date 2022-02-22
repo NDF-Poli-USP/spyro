@@ -203,7 +203,6 @@ def forward_elastic_waves(
 
     # weak formulation written as F=0
     F = m + a - l + nf 
-    #F = m + a + nf 
 
     # retrieve the lhs and rhs terms from F
     lhs_ = lhs(F)

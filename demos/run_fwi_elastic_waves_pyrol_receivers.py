@@ -72,7 +72,7 @@ model["timeaxis"] = {
 comm = spyro.utils.mpi_init(model)
 
 # build or read a mesh {{{
-if 1:
+if 0:
     mesh = RectangleMesh(45, 45, model["mesh"]["Lx"], model["mesh"]["Lz"]-0.5, diagonal="crossed", comm=comm.comm)
     mesh.coordinates.dat.data[:, 0] -= 0.0 # PML size
     mesh.coordinates.dat.data[:, 1] -= model["mesh"]["Lz"]-0.5
@@ -97,11 +97,11 @@ def _make_elastic_parameters(H, mesh, guess=False):
     _cp = 1.5
     _cs = 1.
     _rho = 1. 
-    _mu = (_cs**2)*_rho # for cp=1.5, cs=1.0
+    _mu = (_cs**2)*_rho 
     _lamb = (_cp**2)*_rho-2*_mu
-    _cp = 3.5 
-    _cs = 2.
-    _mu_max = (_cs**2)*_rho # for cp=3.5, cs=2.0
+    _cp = 2.5 # cp=3.5 
+    _cs = 1.5  # cs=2.0
+    _mu_max = (_cs**2)*_rho 
     _lamb_max = (_cp**2)*_rho-2*_mu_max
     if guess:
         lamb = Function(H).interpolate(_lamb + 0.0 * x)
@@ -110,12 +110,12 @@ def _make_elastic_parameters(H, mesh, guess=False):
         File("guess_mu.pvd").write(mu)
     else:
         lamb  = Function(H).interpolate(
-            2.25
-            + 2. * tanh(20 * (0.125 - sqrt(( x - 1) ** 2 + (z + 0.5) ** 2)))
+            0.5*(_lamb_max+_lamb)
+            + 0.5*(_lamb_max-_lamb) * tanh(20 * (0.125 - sqrt(( x - 1) ** 2 + (z + 0.5) ** 2)))
         )
         mu  = Function(H).interpolate(
-            2.5
-            + 1.5 * tanh(20 * (0.125 - sqrt(( x - 1) ** 2 + (z + 0.5) ** 2)))
+            0.5*(_mu_max+_mu)
+            + 0.5*(_mu_max-_mu) * tanh(20 * (0.125 - sqrt(( x - 1) ** 2 + (z + 0.5) ** 2)))
         )
         File("exact_lamb.pvd").write(lamb)
         File("exact_mu.pvd").write(mu)
@@ -142,7 +142,8 @@ u_exact, uz_exact, ux_exact, uy_exact = spyro.solvers.forward_elastic_waves(
 )
 end = time.time()
 print(round(end - start,2), flush=True)
-#sys.exit("exit")
+print("FIXME: check why gnorm in the first step (ite=0) is different",flush=True)
+sys.exit("exit")
 File("u_exact.pvd").write(u_exact[-1])
 if 0: # print initial guess {{{
     u_initial_guess, _, _, _ = spyro.solvers.forward_elastic_waves(
@@ -238,7 +239,7 @@ class ObjectiveElastic(ROL.Objective): #{{{
         dJdm = Function(H, name="dJdm")
         dJdl_local, dJdm_local = spyro.solvers.gradient_elastic_waves(
             model, mesh, comm, rho, self.lamb, self.mu, 
-            receivers, self.u_guess, self.misfit_uz, self.misfit_ux, misfit_uy, output=True,
+            receivers, self.u_guess, self.misfit_uz, self.misfit_ux, misfit_uy, output=False,
         )
         if comm.ensemble_comm.size > 1:
             comm.allreduce(dJdl_local, dJdl)
@@ -344,7 +345,7 @@ paramsDict = {
         'Relative Gradient Tolerance': 1e-10,
         "Step Tolerance": 1.0e-15,
         'Relative Step Tolerance': 1e-15,
-        "Iteration Limit": 150
+        "Iteration Limit": 200
     },
 }
 #}}}
