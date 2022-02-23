@@ -44,8 +44,10 @@ model["acquisition"] = {
 }
 model["timeaxis"] = {
     "t0": 0.0,  #  Initial time for event
-    "tf": 1.6,  # Final time for event
-    "dt": 0.00025,
+    #"tf": 1.6,  # Final time for event (used to reach the bottom of the domain)
+    "tf": 0.100,  # Final time for event (used to measure the time)
+    #"dt": 0.00025,
+    "dt": 0.0001, # needs for P=5
     "amplitude": 1,  # the Ricker has an amplitude of 1.
     "nspool": 100,  # how frequently to output solution to pvds
     "fspool": 99999,  # how frequently to save solution to RAM
@@ -100,8 +102,9 @@ if 0:
 print("Starting forward computation",flush=True)
 start = time.time()
 u, uz_rec, ux_rec, uy_rec = spyro.solvers.forward_elastic_waves(
-    model, mesh, comm, rho, lamb, mu, sources, wavelet, receivers, output=True
+    model, mesh, comm, rho, lamb, mu, sources, wavelet, receivers, output=False
 )
 end = time.time()
 print(round(end - start,2), flush=True)
 
+sys.exit("Exit after running")
