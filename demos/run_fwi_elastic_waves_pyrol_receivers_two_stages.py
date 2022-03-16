@@ -6,7 +6,7 @@ import sys
 import matplotlib.pyplot as plt
 import numpy as np
 import meshio
-import SeismicMesh
+#import SeismicMesh
 import finat
 from ROL.firedrake_vector import FiredrakeVector as FeVector
 import ROL
@@ -18,9 +18,9 @@ from mpi4py import MPI
 model = {}
 
 model["opts"] = {
-    "method": "CG",  # either CG or KMV
-    "quadratrue": "CG", # Equi or KMV #FIXME it will be removed
-    "degree": 1,  # p order
+    "method": "KMV",  # either CG or KMV
+    "quadratrue": "KMV", # Equi or KMV #FIXME it will be removed
+    "degree": 4,  # p order
     "dimension": 2,  # dimension
     "regularization": False,  # regularization is on?
     "gamma": 1e-5, # regularization parameter
@@ -64,8 +64,9 @@ model["acquisition"] = {
 
 model["timeaxis"] = {
     "t0": 0.0,  #  Initial time for event
-    "tf": 1.0, # Final time for event 
-    "dt": 0.001,  # timestep size 
+    #"tf": 1.0, # Final time for event 
+    "tf": 1.2, # Final time for event 
+    "dt": 0.0005,  # timestep size 
     "nspool":  20,  # (20 for dt=0.00050) how frequently to output solution to pvds
     "fspool": 1,  # how frequently to save solution to RAM
 }
@@ -104,18 +105,28 @@ def _make_elastic_parameters(H, mesh, guess=False):
     _mu_max = (_cs**2)*_rho 
     _lamb_max = (_cp**2)*_rho-2*_mu_max
     if guess:
-        lamb = Function(H).interpolate(_lamb + 0.0 * x)
-        mu   = Function(H).interpolate(_mu + 0.0 * x)
+        #lamb = Function(H).interpolate(_lamb + 0.0 * x)
+        #mu   = Function(H).interpolate(_mu + 0.0 * x)
+        lamb  = Function(H).interpolate(
+            0.5*(_lamb_max+_lamb)
+            + 0.5*(_lamb_max-_lamb) * tanh(10 * (0.125 - sqrt(( x - 1) ** 2 + (z + 0.5) ** 2)))
+        )
+        mu  = Function(H).interpolate(
+            0.5*(_mu_max+_mu)
+            + 0.5*(_mu_max-_mu) * tanh(10 * (0.125 - sqrt(( x - 1) ** 2 + (z + 0.5) ** 2)))
+        )
         File("guess_lamb.pvd").write(lamb)
         File("guess_mu.pvd").write(mu)
     else:
         lamb  = Function(H).interpolate(
             0.5*(_lamb_max+_lamb)
-            + 0.5*(_lamb_max-_lamb) * tanh(20 * (0.125 - sqrt(( x - 1) ** 2 + (z + 0.5) ** 2)))
+            #+ 0.5*(_lamb_max-_lamb) * tanh(20 * (0.125 - sqrt(( x - 1) ** 2 + (z + 0.5) ** 2)))
+            + 0.5*(_lamb_max-_lamb) * tanh(100 * (0.125 - sqrt(( x - 1) ** 2 + (z + 0.5) ** 2)))
         )
         mu  = Function(H).interpolate(
             0.5*(_mu_max+_mu)
-            + 0.5*(_mu_max-_mu) * tanh(20 * (0.125 - sqrt(( x - 1) ** 2 + (z + 0.5) ** 2)))
+            #+ 0.5*(_mu_max-_mu) * tanh(20 * (0.125 - sqrt(( x - 1) ** 2 + (z + 0.5) ** 2)))
+            + 0.5*(_mu_max-_mu) * tanh(100 * (0.125 - sqrt(( x - 1) ** 2 + (z + 0.5) ** 2)))
         )
         File("exact_lamb.pvd").write(lamb)
         File("exact_mu.pvd").write(mu)
@@ -144,6 +155,8 @@ end = time.time()
 print(round(end - start,2), flush=True)
 #sys.exit("exit")
 File("u_exact.pvd").write(u_exact[-1])
+J_global = []
+
 if 0: # print initial guess {{{
     u_initial_guess, _, _, _ = spyro.solvers.forward_elastic_waves(
         model, mesh, comm, rho, lamb_guess, mu_guess, sources, wavelet, receivers, output=False
@@ -212,10 +225,12 @@ class ObjectiveElastic(ROL.Objective): #{{{
         plt.plot(ue,label='exact')
         plt.plot(ug,label='guess')
         plt.legend()
-        plt.savefig('/home/santos/Desktop/FWI.png')
+        plt.savefig('/home/tdsantos/FWI.png')
         plt.close()
 
         File("u_guess.pvd").write(self.u_guess[-1])
+        J_global.append(J_total[0])
+        
         return J_total[0]
 
     def gradient(self, g, x, tol):
@@ -374,7 +389,7 @@ bnd_mu = ROL.Bounds(xlo_mu, xup_mu, 1.0)
 lamb0.dat.data[:] = lamb_guess.dat.data[:]
 mu0.dat.data[:] = mu_guess.dat.data[:]
 
-for i in range(5):
+for i in range(200):
     # invert for lambda 
     print("Inverting for lambda",flush=True)
     obj_lamb = ObjectiveElastic(inner_product, 0, lamb0, mu0)
@@ -395,5 +410,14 @@ for i in range(5):
     lamb0.dat.data[:] = lamb1.dat.data[:]
     mu0.dat.data[:] = mu1.dat.data[:]
 
+rho = 1.
+cp_final = Function(H).assign( ( (lamb0+2.*mu0)/rho )**0.5 )
+cs_final = Function(H).assign( ( mu0/rho ) ** 0.5 )
+File("final_vp.pvd").write(cp_final)
+File("final_vs.pvd").write(cs_final)
 File("final_lamb_elastic.pvd").write(lamb0)
 File("final_mu_elastic.pvd").write(mu0)
+
+print(J_global)
+print("J (initial)="+str(J_global[0]))
+print("J (final)="+str(J_global[-1]))
