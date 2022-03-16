@@ -124,7 +124,7 @@ def forward_elastic_waves(
     def D(w):   
         return 0.5 * (grad(w) + grad(w).T)
 
-    # mass matrix 
+    # mass matrix FIXME if rho varies over X, the mass matrix could be wrong 
     m = (rho * inner((u - 2.0 * u_n + u_nm1),v) / Constant(dt ** 2)) * dx(rule=qr_x) # explicit
     # stiffness matrix
     a = lamb * tr(D(u_n)) * tr(D(v)) * dx(rule=qr_x) + 2.0 * mu * inner(D(u_n), D(v)) * dx(rule=qr_x)
@@ -251,7 +251,6 @@ def forward_elastic_waves(
             #bc.apply(B) #FIXME for Dirichlet BC
         else: # to compare with AD problem
             solver.solve() 
-        
         f = excitations.apply_radial_source(f, wavelet[step]) # f is a Gaussian function that is integrated into the rhs
         
         # FIXME testing it
@@ -261,10 +260,13 @@ def forward_elastic_waves(
         #B1 = B.sub(1)
         #B0 += fext.sub(0)
         #B1 += fext.sub(1)
-
         # solve and assign X onto solution u 
         if use_AD_type_interp==False:
+            start = time.time()
+            #print("before solver",flush=True)
             solver.solve(X, B)
+            end = time.time()
+            #print(round(1000000*(end - start),2), flush=True)
         
         u_np1.assign(X)
 

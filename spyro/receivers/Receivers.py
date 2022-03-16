@@ -119,7 +119,7 @@ class Receivers:
                 tmp = np.dot(phis, value)
                 rhs_forcing.dat.data_with_halos[idx] += tmp
             else:
-                pass # nothing here 
+                tmp = rhs_forcing.dat.data_with_halos[0] 
 
         return rhs_forcing
     
@@ -132,7 +132,7 @@ class Receivers:
             if self.is_local[rid]:
                 rhs_forcing.dat.data_with_halos[:] += value * self.cell_tabulations_zdir[rid][:]
             else:
-                pass # nothing here 
+                tmp = rhs_forcing.dat.data_with_halos[0] 
 
         return rhs_forcing
 
@@ -140,10 +140,6 @@ class Receivers:
         """
         The adjoint operation of interpolation (injection) for elastic waves simulation
         """
-        #rid = 1
-        #rhs_forcing.sub(0).dat.data_with_halos[:] = self.cell_tabulations_zdir[rid][:]
-        #rhs_forcing.sub(1).dat.data_with_halos[:] = self.cell_tabulations_xdir[rid][:]
-        #return rhs_forcing
         for rid in range(self.num_receivers):
             # the residual values provide the direction (sign)
             value_z = residual_z[IT][rid]
@@ -166,7 +162,8 @@ class Receivers:
                             value_y * self.cell_tabulations_ydir[rid][:] 
                     )
             else:
-                pass # nothing here
+                tmp = rhs_forcing.sub(0).dat.data_with_halos[0]
+                tmp = rhs_forcing.sub(1).dat.data_with_halos[0]
 
         return rhs_forcing
     
@@ -190,7 +187,8 @@ class Receivers:
                     rhs_forcing.sub(2).dat.data_with_halos[idx] += np.dot(phis, value_y)
             
             else:
-                pass # nothing here 
+                tmp = rhs_forcing.sub(0).dat.data_with_halos[0]
+                tmp = rhs_forcing.sub(1).dat.data_with_halos[0]
         
         return rhs_forcing
 
@@ -486,7 +484,7 @@ class Receivers:
         return point_cloud
 
 ## Some helper functions
-def delta_expr(x0, z, x, sigma_x=2000.0): # FIXME it was 500 
+def delta_expr(x0, z, x, sigma_x=500): 
     return np.exp(-sigma_x * ((z - x0[0]) ** 2 + (x - x0[1]) ** 2))
 
 

@@ -18,6 +18,10 @@ fname = "./velocity_models/elastic-marmousi-model/model/MODEL_S-WAVE_VELOCITY_1.
 #fname = "./velocity_models/elastic-marmousi-model/model/MODEL_P-WAVE_VELOCITY_1.25m.segy"  # in m/s
 #fname = "./velocity_models/elastic-marmousi-model/model/MODEL_DENSITY_1.25m.segy"          # in g/cm3
 
+# smoothed fields
+#fname = "./velocity_models/elastic-marmousi-model/model/MODEL_S-WAVE_VELOCITY_1.25m.segy.smoothed.segy"   # in m/s
+#fname = "./velocity_models/elastic-marmousi-model/model/MODEL_P-WAVE_VELOCITY_1.25m.segy.smoothed.segy"  # in m/s
+
 # Bounding box describing domain extents (corner coordinates)
 bbox = (-3500.0, 0.0, 0.0, 17000.0) # this includes a 450-m thick water layer
 #bbox = (-3500.0, -450.0, 0.0, 17000.0) # removing water layer
@@ -33,7 +37,8 @@ if write_vel_mod==1:
 mesh_adapted=1
 if mesh_adapted==1:
     # with or without pad
-    hmin = 25.0
+    #hmin = 25.0 # default
+    hmin = 10.0 # for refined
     # FIXME forcing units=m/s because of a "np.amin(vp) < 1000.0" assumption in SeismicMesh 
     ef = get_sizing_function_from_segy(
         fname,
@@ -67,14 +72,16 @@ if comm.rank == 0:
     # NOTE: SeismicMesh outputs assumes the domain is (z,x) so for visualization
     # in ParaView, we swap the axes so it appears as in the (x,z) plane.
     meshio.write_points_cells(
-        "meshes/marmousi_elastic_with_water_layer_adapted.msh",
+        #"meshes/marmousi_elastic_with_water_layer_adapted.msh",
+        "meshes/marmousi_elastic_with_water_layer_adapted_refined.msh",
         points[:] / 1000, # do not swap here
         [("triangle", cells)],
         file_format="gmsh22",
         binary=False
     )
     meshio.write_points_cells(
-        "meshes/marmousi_elastic_with_water_layer_adapted.vtk",
+        #"meshes/marmousi_elastic_with_water_layer_adapted.vtk",
+        "meshes/marmousi_elastic_with_water_layer_adapted_refined.vtk",
         points[:, [1, 0]] / 1000,
         [("triangle", cells)],
         file_format="vtk",

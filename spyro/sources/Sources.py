@@ -42,9 +42,9 @@ class Sources(spyro.receivers.Receivers.Receivers):
         self.cellVertices = None
         self.cellNodes = None
         self.cell_tabulations = None
-        self.cell_tabulations_xdir = None # tabulations for radial source, x direction
-        self.cell_tabulations_zdir = None # tabulations for radial source, z direction
-        self.cell_tabulations_ydir = None # tabulations for radial source, y direction
+        self.cell_tabulations_xdir = None # tabulations for radial source, x direction, over the nodes of each partition
+        self.cell_tabulations_zdir = None # tabulations for radial source, z direction, over the nodes of each partition
+        self.cell_tabulations_ydir = None # tabulations for radial source, y direction, over the nodes of each partition
         self.cellNodeMaps = None
         self.nodes_per_cell = None
         self.node_locations = None
@@ -63,7 +63,8 @@ class Sources(spyro.receivers.Receivers.Receivers):
                         value * self.cell_tabulations[source_id][i]
                     )
             else: 
-                pass
+                for i in range(len(self.cellNodeMaps[source_id])):
+                    tmp = rhs_forcing.dat.data_with_halos[0]
 
         return rhs_forcing
     
@@ -73,8 +74,9 @@ class Sources(spyro.receivers.Receivers.Receivers):
             if self.is_local[source_id] and source_id==self.current_source:
                 raise ValueError("cell_tabulations_zdir must be modified before calling this function")
                 rhs_forcing.dat.data_with_halos[:] = value * self.cell_tabulations_zdir[source_id][:]
-            else: 
-                pass # nothing here
+            else:
+                # it must be quite similar to the previous one to avoit MPI communication issues
+                tmp = rhs_forcing.dat.data_with_halos[0] 
 
         return rhs_forcing
     
@@ -92,8 +94,10 @@ class Sources(spyro.receivers.Receivers.Receivers):
                 rhs_forcing.sub(1).dat.data_with_halos[:] = (
                         value * self.cell_tabulations_xdir[source_id][:]
                 )
-            else: 
-                pass
+            else:
+                # it must be quite similar to the previous one to avoit MPI communication issues
+                tmp = rhs_forcing.sub(0).dat.data_with_halos[0] 
+                tmp = rhs_forcing.sub(1).dat.data_with_halos[0]
 
         return rhs_forcing
     
@@ -101,7 +105,7 @@ class Sources(spyro.receivers.Receivers.Receivers):
         # FIXME improve for 3d simulations
         """Applies point sources in a assembled right hand side for elastic waves simulation"""
         # loop over the number of sources
-        #raise ValueError("__func_build_cell_tabulations_zxydir must be modified before calling this function")
+        raise ValueError("__func_build_cell_tabulations_zxydir must be modified before calling this function")
         for source_id in range(self.num_receivers): # here, num_receivers means num_sources 
             if self.is_local[source_id] and source_id==self.current_source:
                 # loop over the nodes of the element that contains the source 
@@ -113,8 +117,11 @@ class Sources(spyro.receivers.Receivers.Receivers):
                     rhs_forcing.sub(1).dat.data_with_halos[int(self.cellNodeMaps[source_id][i])] = (
                         value * self.cell_tabulations_xdir[source_id][i]
                     )
-            else: 
-                pass
+            else:
+                # it must be quite similar to the previous one to avoit MPI communication issues
+                for i in range(len(self.cellNodeMaps[source_id])):
+                    tmp = rhs_forcing.sub(0).dat.data_with_halos[0]
+                    tmp = rhs_forcing.sub(1).dat.data_with_halos[0]
 
         return rhs_forcing
 
@@ -133,7 +140,7 @@ class Sources(spyro.receivers.Receivers.Receivers):
         """Create tabulations over cells (actually nodes) considering
         a continuous source described by a Gaussian function.
         """
-        num_nodes = self.node_locations.shape[0]
+        num_nodes = self.node_locations.shape[0] # num of nodes of each partition
         cell_tabulations_xdir = np.zeros((self.num_receivers, num_nodes))
         cell_tabulations_zdir = np.zeros((self.num_receivers, num_nodes))
 
@@ -295,7 +302,7 @@ def source_dof_finder(space, model):
     return False
 
 
-def delta_expr2(x0, z, x, sigma_x=2000.0): # FIXME 500 was the original value, but 1000 and 2000 seems better for FWI
+def delta_expr2(x0, z, x, sigma_x=2000.0): # 500 was the original value, but 1000 and 2000 seems better for FWI
     return np.exp(-sigma_x * ((z - x0[0]) ** 2 + (x - x0[1]) ** 2))
 
 

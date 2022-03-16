@@ -16,7 +16,8 @@ model["opts"] = {
     "dimension": 2,  # dimension
 }
 model["parallelism"] = {
-    "type": "automatic",
+    #"type": "automatic",
+    "type": "spatial",
 }
 model["mesh"] = {
     "Lz": 3.5,  # depth in km - always positive
