@@ -135,6 +135,12 @@ def _make_elastic_parameters(H, mesh, guess=False):
     return lamb, mu, rho
 #}}}
 
+if 1:
+    V2 = FunctionSpace(mesh, element)
+    print("DOF: "+str(V2.dof_count),flush=True)
+    print("Cells: "+str(mesh.num_cells()),flush=True)
+    sys.exit("Exit without running")
+
 # FWI better well when sigma_x>500 (e.g., 1000 or 2000) (sigma_x defines the source and receivers)
 lamb_guess, mu_guess, rho = _make_elastic_parameters(H, mesh, guess=True) 
 lamb_exact, mu_exact, _ = _make_elastic_parameters(H, mesh, guess=False) 
