@@ -1,4 +1,3 @@
-import SeismicMesh
 import meshio
 import firedrake as fire
 import spyro
@@ -55,55 +54,60 @@ model["acquisition"] = {
 # Simulate for 1.0 seconds.
 model["timeaxis"] = {
     "t0": 0.0,  #  Initial time for event
-    "tf": 4.0,  # Final time for event
+    #"tf": 4.0,  # Final time for event
+    "tf": 0.05,  # Final time for event
     "dt": 0.0005,  # timestep size
     "amplitude": 1,  # the Ricker has an amplitude of 1.
-    "nspool": 400,  # how frequently to output solution to pvds
-    "fspool": 99999,  # how frequently to save solution to RAM
+    "nspool": 9999999,  # how frequently to output solution to pvds
+    "fspool": 9999999,  # how frequently to save solution to RAM
 }
 
 comm = spyro.utils.mpi_init(model)
 
-## Starting meshing procedure with seismic mesh. This can be done seperately in order to not have to
-# when testing multiple cores.
+if 0: # mesh generation with SeismicMesh {{{
+    import SeismicMesh
+    ## Starting meshing procedure with seismic mesh. This can be done seperately in order to not have to
+    # when testing multiple cores.
 
-print('Entering mesh generation', flush = True)
-if model['opts']['degree']   == 2:
-    M = 5.85
-elif model['opts']['degree'] == 3:
-    M = 3.08
-elif model['opts']['degree'] == 4:
-    M = 2.22
-elif model['opts']['degree'] == 5:
-    M = 1.69
+    print('Entering mesh generation', flush = True)
+    if model['opts']['degree']   == 2:
+        M = 5.85
+    elif model['opts']['degree'] == 3:
+        M = 3.08
+    elif model['opts']['degree'] == 4:
+        M = 2.22
+    elif model['opts']['degree'] == 5:
+        M = 1.69
 
-edge_length = 0.286/M
-Real_Lz = model["mesh"]["Lz"] + model["BCs"]["lz"]
-Lx = model["mesh"]["Lx"]
-pad = model["BCs"]["lz"]
+    edge_length = 0.286/M
+    Real_Lz = model["mesh"]["Lz"] + model["BCs"]["lz"]
+    Lx = model["mesh"]["Lx"]
+    pad = model["BCs"]["lz"]
 
-bbox = (-Real_Lz, 0.0,-pad, Lx+pad)
-rec = SeismicMesh.Rectangle(bbox)
-if comm.comm.rank == 0:
-    points, cells = SeismicMesh.generate_mesh(
-        domain=rec, 
-        edge_length=edge_length, 
-        comm = comm.ensemble_comm,
-        verbose = 0
-        )
+    bbox = (-Real_Lz, 0.0,-pad, Lx+pad)
+    rec = SeismicMesh.Rectangle(bbox)
+    if comm.comm.rank == 0:
+        points, cells = SeismicMesh.generate_mesh(
+            domain=rec, 
+            edge_length=edge_length, 
+            comm = comm.ensemble_comm,
+            verbose = 0
+            )
 
-    points, cells = SeismicMesh.geometry.delete_boundary_entities(points, cells, min_qual= 0.6)
-        
-    meshio.write_points_cells("meshes/benchmark_2d_elastic_waves.msh",
-        points,[("triangle", cells)],
-        file_format="gmsh22", 
-        binary = False
-        )
+        points, cells = SeismicMesh.geometry.delete_boundary_entities(points, cells, min_qual= 0.6)
+            
+        meshio.write_points_cells("meshes/benchmark_2d_elastic_waves_P" + str(model['opts']['degree']) + ".msh",
+            points,[("triangle", cells)],
+            file_format="gmsh22", 
+            binary = False
+            )
 
-## Mesh generation finishes here.
+    sys.exit("exit without running")
+    ## Mesh generation finishes here.
+#}}}
 
 mesh = fire.Mesh(
-    "meshes/benchmark_2d_elastic_waves.msh",
+    "meshes/benchmark_2d_elastic_waves_P" + str(model['opts']['degree']) + ".msh",
     distribution_parameters={
         "overlap_type": (fire.DistributedMeshOverlapType.NONE, 0)
     },
@@ -125,11 +129,12 @@ rho = fire.Constant(1.0)
 mu = rho * vs ** 2.
 lamb = rho * vp ** 2. - 2 * mu
 
-if 1: # print mu and lamb {{{
-    lamb = Function(V0, name="lamb").interpolate(lambfield)
-    mu   = Function(V0, name="mu").interpolate(mufield)
-    File("lamb.pvd").write(lamb)
-    File("mu.pvd").write(mu)
+if 0: # print mu and lamb {{{
+    V2 = fire.VectorFunctionSpace(mesh, element)
+    print("DOF: "+str(V2.dof_count),flush=True)
+    print("Cells: "+str(mesh.num_cells()),flush=True)
+    #fire.File("lamb.pvd").write( fire.Function(V, name="lamb").interpolate(lamb) )
+    #fire.File("mu.pvd").write( fire.Function(V, name="mu").interpolate(mu) )
     sys.exit("exit without running")
 #}}}
 
