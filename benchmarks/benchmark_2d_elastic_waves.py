@@ -154,5 +154,7 @@ wavelet = spyro.full_ricker_wavelet(
 )
 
 t1 = time.time()
-p, p_r = spyro.solvers.forward(model, mesh, comm, vp, sources, wavelet, receivers)
+u, uz, ux, uy = spyro.solvers.forward_elastic_waves(
+    model, mesh, comm, rho, lamb, mu, sources, wavelet, receivers, output=False
+)
 print(time.time() - t1, flush=True)
