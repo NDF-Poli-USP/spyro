@@ -66,9 +66,8 @@ vs = spyro.io.interpolate(model, mesh, V, guess=False)
 model["mesh"]["truemodel"] = "velocity_models/elastic-marmousi-model/model/MODEL_P-WAVE_VELOCITY_1.25m.segy.smoothed.segy.hdf5"# m/s
 vp = spyro.io.interpolate(model, mesh, V, guess=False)
 model["mesh"]["truemodel"] = "velocity_models/elastic-marmousi-model/model/MODEL_DENSITY_1.25m.segy.hdf5"       # g/cm3
-rho = spyro.io.interpolate(model, mesh, V, guess=False)
+rho = spyro.io.interpolate(model, mesh, V, guess=False, field="velocity_model") #FIXME change it in SeismicMesh
 
-vs.dat.data[:] = vs.dat.data[:] / 1000. # only vs needs unit recast for now
 # vs and vp in km/s
 # rho in g/cm3 == Gt/km3
 # lambda and mu in GPa

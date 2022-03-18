@@ -235,7 +235,8 @@ def is_owner(ens_comm, rank):
 
 
 def _check_units(c):
-    if min(c.dat.data[:]) > 100.0:
+    #if min(c.dat.data[:]) > 100.0:
+    if max(c.dat.data[:]) > 1000.0: # FIXME check with Alexandre
         # data is in m/s but must be in km/s
         if fire.COMM_WORLD.rank == 0:
             print("INFO: converting from m/s to km/s", flush=True)
@@ -243,8 +244,8 @@ def _check_units(c):
     return c
 
 
-def interpolate(model, mesh, V, guess=False):
-    """Read and interpolate a seismic velocity model stored
+def interpolate(model, mesh, V, guess=False, field="velocity_model"):
+    """Read and interpolate a seismic velocity or density model stored
     in a HDF5 file onto the nodes of a finite element space.
 
     Parameters
@@ -257,11 +258,13 @@ def interpolate(model, mesh, V, guess=False):
         The space of the finite elements.
     guess: boolean, optinal
         Is it a guess model or a `exact` model?
+    field: string
+        velocity_model (default) or density_model
 
     Returns
     -------
     c: Firedrake.Function
-        P-wave seismic velocity interpolated onto the nodes of the finite elements.
+        P-wave (or S-wave) seismic velocity or density model interpolated onto the nodes of the finite elements.
 
     """
     sd = V.mesh().geometric_dimension()
@@ -301,7 +304,7 @@ def interpolate(model, mesh, V, guess=False):
         fname = model["mesh"]["truemodel"]
 
     with h5py.File(fname, "r") as f:
-        Z = np.asarray(f.get("velocity_model")[()])
+        Z = np.asarray(f.get(field)[()])
 
         if sd == 2:
             nrow, ncol = Z.shape
@@ -330,7 +333,8 @@ def interpolate(model, mesh, V, guess=False):
 
     c = fire.Function(V)
     c.dat.data[:] = tmp
-    c = _check_units(c)
+    if field=="velocity_model":
+        c = _check_units(c)
     return c
 
 
