@@ -41,11 +41,11 @@ def forward_elastic_waves(
     comm: Firedrake.ensemble_communicator
         The MPI communicator for parallelism
      rho: Firedrake.Function
-        The rho value (density) interpolated onto the mesh
+        The rho value (density) interpolated onto the mesh (in g/cc == Gt/km3)
     lamb: Firedrake.Function
-        The lambda value (1st Lame parameter) interpolated onto the mesh
+        The lambda value (1st Lame parameter) interpolated onto the mesh (in GPa)
       mu: Firedrake.Function
-        The mu value (2nd Lame parameter) interpolated onto the mesh
+        The mu value (2nd Lame parameter) interpolated onto the mesh (in GPa)
     excitations: A list Firedrake.Functions
     wavelet: array-like
         Time series data that's injected at the source location.

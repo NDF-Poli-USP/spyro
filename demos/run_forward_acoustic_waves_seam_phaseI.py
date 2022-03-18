@@ -17,7 +17,8 @@ model["parallelism"] = {
 }
 model["mesh"] = {
     "Lz": 15.0,  # depth in km - always positive
-    "Lx": 35.0,  # width in km - always positive
+    #"Lx": 35.0,  # width in km - always positive
+    "Lx": 40.0,  # width in km - always positive
     "Ly": 0.0,  # thickness in km - always positive
     "meshfile": "not_used.msh",
     "initmodel": "not_used.hdf5",

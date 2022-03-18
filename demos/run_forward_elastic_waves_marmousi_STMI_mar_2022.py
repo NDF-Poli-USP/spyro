@@ -70,12 +70,13 @@ rho = spyro.io.interpolate(model, mesh, V, guess=False)
 
 vs.dat.data[:] = vs.dat.data[:] / 1000. # only vs needs unit recast for now
 # vs and vp in km/s
-# rho in 1000 x Gt/km3
+# rho in g/cm3 == Gt/km3
+# lambda and mu in GPa
 
 mu = Function(V, name="mu").interpolate(rho * vs ** 2.)
 lamb = Function(V, name="lamb").interpolate(rho * (vp ** 2. - 2. * vs ** 2.))
 
-write_files=0
+write_files=1
 if comm.ensemble_comm.rank == 0 and write_files==1: #{{{
     rho.rename("rho")
     vp.rename("p-wave vel")
