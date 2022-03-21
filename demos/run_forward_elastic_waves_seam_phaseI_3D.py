@@ -2,6 +2,8 @@ from firedrake import *
 import spyro
 import sys
 import time
+import SeismicMesh
+import meshio
 
 model = {}
 
@@ -53,17 +55,41 @@ model["timeaxis"] = {
 
 comm = spyro.utils.mpi_init(model)
 
-edge_length = 1.
-bbox = (-model["mesh"]["Lz"], 0.0, 0.0, model["mesh"]["Lx"], 0.0, model["mesh"]["Ly"])
-cube = SeismicMesh.Cube(bbox)
-points, cells = SeismicMesh.generate_mesh(
-    domain=cube,
-    edge_length=edge_length,
-    max_iter = 80,
-    comm = comm.ensemble_comm,
-    verbose = 2
+if 0: # save mesh? {{{
+    edge_length = 1.
+    bbox = (-model["mesh"]["Lz"], 0.0, 0.0, model["mesh"]["Lx"], 0.0, model["mesh"]["Ly"])
+    cube = SeismicMesh.Cube(bbox)
+    points, cells = SeismicMesh.generate_mesh(
+        domain=cube,
+        edge_length=edge_length,
+        max_iter = 80,
+        comm = comm.ensemble_comm,
+        verbose = 2
+        )
+    
+    points, cells = SeismicMesh.sliver_removal(points=points, bbox=bbox, max_iter=100, domain=cube, edge_length=edge_length, preserve=True)
+    
+    meshio.write_points_cells("meshes/test_seam_phaseI_3D.msh",
+        points,[("tetra", cells)],
+        file_format="gmsh22",
+        binary = False
+    )
+    meshio.write_points_cells("meshes/test_seam_phaseI_3D.vtk",
+        points,
+        [("tetra", cells)],
+        file_format="vtk",
+        binary=False
     )
 
+    sys.exit("Exit called after saving mesh")
+#}}}
+
+mesh = Mesh(
+    "meshes/test_seam_phaseI_3D.msh",
+    distribution_parameters={
+        "overlap_type": (DistributedMeshOverlapType.NONE, 0)
+    },
+)
 
 element = spyro.domains.space.FE_method(
                 mesh, model["opts"]["method"], model["opts"]["degree"]
@@ -71,10 +97,10 @@ element = spyro.domains.space.FE_method(
 
 V = FunctionSpace(mesh, element)
 
-model["mesh"]["truemodel"] = "velocity_models/seam/Vp.hdf5"# m/s
+#model["mesh"]["truemodel"] = "velocity_models/seam/Vp_3D.hdf5"# m/s
 
-vp = spyro.io.interpolate(model, mesh, V, guess=False)
-File("seam_vp.pvd").write(vp)
+#vp = spyro.io.interpolate(model, mesh, V, guess=False)
+#File("seam_vp_3D.pvd").write(vp)
 
 
 
