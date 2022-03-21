@@ -34,10 +34,11 @@ import h5py
 
 # FIXME test 3D
 
-save_3D = 0     # 1 or 0. 1: save full 3D fields (do just once); 0: save a 2D slice
+save_3D = 1     # 1 or 0. 1: save full 3D fields (do just once); 0: save a 2D slice
 axis_slice = 2  # 1 or 2. 1: slice over the x axis (x fixed); 2: slice over the y axis (y fixed)
 dist_slice = 20 # slice position (in km) between x (or y) min and x (or y) max (xmax=35 km, ymax=40 km)
-output_path = '/home/thiago.santos/SEAM/' 
+#output_path = '/home/thiago.santos/SEAM/' 
+output_path = '/home/thiago.santos/spyro/velocity_models/seam/' 
 
 # input path and file names
 path = '/home/public/SEAM/PHASE-I/SM1-006-mod-all/GL20130225-04899/SEAM_Elastic_Sim/'
@@ -47,7 +48,7 @@ rho_file= path+'Den.swab'
 
 # output file names
 if save_3D:
-	label = '3D'
+	label = '_3D'
 elif axis_slice==1: # slice at a given x
 	label = '_at_x='+str(dist_slice)+'km'
 elif axis_slice==2: # slice at a given y
@@ -80,35 +81,46 @@ zmax = (nz-1)*dz
 print("Reading vp...")
 vp = np.fromfile(vp_file, dtype=np.float32)
 print("Reading vs...")
-vs = np.fromfile(vs_file, dtype=np.float32)
+#vs = np.fromfile(vs_file, dtype=np.float32)
 print("Reading rho...")
-rho= np.fromfile(rho_file, dtype=np.float32)
+#rho= np.fromfile(rho_file, dtype=np.float32)
 
 # save full 3D fields?
 if save_3D: # FIXME not tested {{{
 	print("Saving 3D vp...")	
-	with h5py.File(output_vp_file, "w") as f:
-		Ct = np.flipud(C.T)
-		#Ct = C.T
-		f.create_dataset("velocity_model", data=Ct, dtype="f")
-		f.attrs["shape"] = Ct.shape
-		f.attrs["units"] = "m/s"
+	axes = [nz, nx, ny]
+	axes_order = (0, 1, 2)
+	axes_order_sort = "F"
+	ix = np.argsort(axes_order)
+	axes = [axes[o] for o in ix]
 	
+	#vs  = vs.reshape(*axes, order=axes_order_sort)
+	#rho = rho.reshape(*axes, order=axes_order_sort)
+
+	with h5py.File(output_vp_file, "w") as fp:
+		vp  = vp.reshape(*axes, order=axes_order_sort)
+		vpt = np.flipud(vp.transpose((*axes_order,)))
+		fp.create_dataset("velocity_model", data=vpt, dtype="f")
+		fp.attrs["shape"] = vpt.shape
+		fp.attrs["units"] = "m/s"
+
 	print("Saving 3D vs...")	
-	with h5py.File(output_vs_file, "w") as f:
-		Ct = np.flipud(C.T)
-		#Ct = C.T
-		f.create_dataset("velocity_model", data=Ct, dtype="f") # FIXME check this in Spyro and SeismicMesh
-		f.attrs["shape"] = Ct.shape
-		f.attrs["units"] = "m/s"
+	#with h5py.File(output_vs_file, "w") as f:
+	#	Ct = np.flipud(C.T)
+	#	#Ct = C.T
+	#	f.create_dataset("velocity_model", data=Ct, dtype="f") # FIXME check this in Spyro and SeismicMesh
+	#	f.attrs["shape"] = Ct.shape
+	#	f.attrs["units"] = "m/s"
 	
 	print("Saving 3D rho...")	
-	with h5py.File(output_rho_file, "w") as f:
-		Ct = np.flipud(C.T)
+	#with h5py.File(output_rho_file, "w") as f:
+	#	Ct = np.flipud(C.T)
 		#Ct = C.T
-		f.create_dataset("density_model", data=Ct, dtype="f") # FIXME check this in Spyro and SeismicMesh
-		f.attrs["shape"] = Ct.shape
-		f.attrs["units"] = "m/s"
+	#	f.create_dataset("density_model", data=Ct, dtype="f") # FIXME check this in Spyro and SeismicMesh
+	#	f.attrs["shape"] = Ct.shape
+	#	f.attrs["units"] = "m/s"
+	
+	sys.exit("exit")
 #}}}
 
 # slice over x or y axes

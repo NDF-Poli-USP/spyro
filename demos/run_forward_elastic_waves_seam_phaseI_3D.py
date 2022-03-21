@@ -8,9 +8,9 @@ import meshio
 model = {}
 
 model["opts"] = {
-    "method": "KMV",  # either CG or KMV
-    "quadratrue": "KMV",  # Equi or KMV
-    "degree": 2,  # p order
+    "method": "CG",  # either CG or KMV
+    "quadratrue": "CG",  # Equi or KMV
+    "degree": 1,  # p order
     "dimension": 3,  # dimension
 }
 model["parallelism"] = {
@@ -97,10 +97,10 @@ element = spyro.domains.space.FE_method(
 
 V = FunctionSpace(mesh, element)
 
-#model["mesh"]["truemodel"] = "velocity_models/seam/Vp_3D.hdf5"# m/s
+model["mesh"]["truemodel"] = "velocity_models/seam/Vp_3D.hdf5"# m/s
 
-#vp = spyro.io.interpolate(model, mesh, V, guess=False)
-#File("seam_vp_3D.pvd").write(vp)
+vp = spyro.io.interpolate(model, mesh, V, guess=False)
+File("seam_vp_3D.pvd").write(vp)
 
 
 
