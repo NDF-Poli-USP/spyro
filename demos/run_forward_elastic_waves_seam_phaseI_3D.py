@@ -4,13 +4,15 @@ import sys
 import time
 import SeismicMesh
 import meshio
+import h5py
+import numpy as np
 
 model = {}
 
 model["opts"] = {
-    "method": "CG",  # either CG or KMV
-    "quadratrue": "CG",  # Equi or KMV
-    "degree": 1,  # p order
+    "method": "KMV",  # either CG or KMV
+    "quadratrue": "KMV",  # Equi or KMV
+    "degree": 2,  # p order
     "dimension": 3,  # dimension
 }
 model["parallelism"] = {
@@ -56,7 +58,7 @@ model["timeaxis"] = {
 comm = spyro.utils.mpi_init(model)
 
 if 0: # save mesh? {{{
-    edge_length = 1.
+    edge_length = 1./2.
     bbox = (-model["mesh"]["Lz"], 0.0, 0.0, model["mesh"]["Lx"], 0.0, model["mesh"]["Ly"])
     cube = SeismicMesh.Cube(bbox)
     points, cells = SeismicMesh.generate_mesh(
@@ -81,7 +83,7 @@ if 0: # save mesh? {{{
         binary=False
     )
 
-    sys.exit("Exit called after saving mesh")
+    #sys.exit("Exit called after saving mesh")
 #}}}
 
 mesh = Mesh(
@@ -99,8 +101,26 @@ V = FunctionSpace(mesh, element)
 
 model["mesh"]["truemodel"] = "velocity_models/seam/Vp_3D.hdf5"# m/s
 
+with h5py.File(model["mesh"]["truemodel"], "r") as f:
+	Z = np.asarray(f.get("velocity_model")[()])
+	nrow, ncol, ncol2 = Z.shape
+	print(nrow)
+	print(ncol)
+	print(ncol2)
+
+#sys.exit("exit")
+
+model["mesh"]["truemodel"] = "velocity_models/seam/Vp_3D.hdf5"# m/s
 vp = spyro.io.interpolate(model, mesh, V, guess=False)
 File("seam_vp_3D.pvd").write(vp)
+
+model["mesh"]["truemodel"] = "velocity_models/seam/Vs_3D.hdf5"# m/s
+vs = spyro.io.interpolate(model, mesh, V, guess=False)
+File("seam_vs_3D.pvd").write(vs)
+
+model["mesh"]["truemodel"] = "velocity_models/seam/rho_3D.hdf5"# m/s
+rho = spyro.io.interpolate(model, mesh, V, guess=False, field="density_model")
+File("seam_rho_3D.pvd").write(rho)
 
 
 
