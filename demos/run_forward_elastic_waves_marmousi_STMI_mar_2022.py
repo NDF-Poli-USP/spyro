@@ -58,7 +58,7 @@ model["timeaxis"] = {
 comm = spyro.utils.mpi_init(model)
 mesh, V = spyro.io.read_mesh(model, comm)
 
-# interpolate Vs, Vp, and Density onto the mesh FIXME check the units or create a new interpolation method
+# interpolate Vs, Vp, and Density onto the mesh 
 #model["mesh"]["truemodel"] = "velocity_models/elastic-marmousi-model/model/MODEL_S-WAVE_VELOCITY_1.25m.segy.hdf5"# m/s 
 model["mesh"]["truemodel"] = "velocity_models/elastic-marmousi-model/model/MODEL_S-WAVE_VELOCITY_1.25m.segy.smoothed.segy.hdf5"# m/s 
 vs = spyro.io.interpolate(model, mesh, V, guess=False)
