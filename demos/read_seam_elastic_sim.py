@@ -32,12 +32,12 @@ import sys
 import matplotlib.pyplot as plt
 import h5py
 
-# FIXME test 3D
-
 save_3D = 0     # 1 or 0. 1: save full 3D fields (do just once); 0: save a 2D slice
-axis_slice = 2  # 1 or 2. 1: slice over the x axis (x fixed); 2: slice over the y axis (y fixed)
-dist_slice = 20 # slice position (in km) between x (or y) min and x (or y) max (xmax=35 km, ymax=40 km)
-output_path = '/home/thiago.santos/SEAM/' 
+axis_slice = 1  # 1 or 2. 1: slice over the x axis (x fixed); 2: slice over the y axis (y fixed)
+dist_slice = 16 # slice position (in km) between x (or y) min and x (or y) max (xmax=35 km, ymax=40 km)
+#output_path = '/home/thiago.santos/SEAM/' 
+#output_path = '/home/thiago.santos/spyro/velocity_models/seam/' 
+output_path = '/home/public/SEAM_phaseI_hdf5/' 
 
 # input path and file names
 path = '/home/public/SEAM/PHASE-I/SM1-006-mod-all/GL20130225-04899/SEAM_Elastic_Sim/'
@@ -47,7 +47,7 @@ rho_file= path+'Den.swab'
 
 # output file names
 if save_3D:
-	label = '3D'
+	label = '_3D'
 elif axis_slice==1: # slice at a given x
 	label = '_at_x='+str(dist_slice)+'km'
 elif axis_slice==2: # slice at a given y
@@ -85,30 +85,39 @@ print("Reading rho...")
 rho= np.fromfile(rho_file, dtype=np.float32)
 
 # save full 3D fields?
-if save_3D: # FIXME not tested {{{
+if save_3D: # {{{
+	axes = [nx, ny, nz] # original order
+	axes_order = (0, 1, 2) # # original order: x, y, z == 0, 1, 2
+	axes_order_sort = "F" # Fortran style
+
 	print("Saving 3D vp...")	
-	with h5py.File(output_vp_file, "w") as f:
-		Ct = np.flipud(C.T)
-		#Ct = C.T
-		f.create_dataset("velocity_model", data=Ct, dtype="f")
-		f.attrs["shape"] = Ct.shape
-		f.attrs["units"] = "m/s"
-	
+	with h5py.File(output_vp_file, "w") as fp:
+		vp = vp.reshape(*axes, order=axes_order_sort) # original order: x, y, z == 0, 1, 2
+		axes_order = (2, 0, 1) # changing to z, x , y (order expected in Spyro)
+		vpt = np.flipud(vp.transpose((*axes_order,))) # Reverse the order of elements along axis 0 (up/down).
+		fp.create_dataset("velocity_model", data=vpt, dtype="f")
+		fp.attrs["shape"] = vpt.shape
+		fp.attrs["units"] = "m/s"
+
 	print("Saving 3D vs...")	
-	with h5py.File(output_vs_file, "w") as f:
-		Ct = np.flipud(C.T)
-		#Ct = C.T
-		f.create_dataset("velocity_model", data=Ct, dtype="f") # FIXME check this in Spyro and SeismicMesh
-		f.attrs["shape"] = Ct.shape
-		f.attrs["units"] = "m/s"
+	with h5py.File(output_vs_file, "w") as fs:
+		vs = vs.reshape(*axes, order=axes_order_sort) # original order: x, y, z == 0, 1, 2
+		axes_order = (2, 0, 1) # changing to z, x , y (order expected in Spyro)
+		vst = np.flipud(vs.transpose((*axes_order,))) # Reverse the order of elements along axis 0 (up/down).
+		fs.create_dataset("velocity_model", data=vst, dtype="f") 
+		fs.attrs["shape"] = vst.shape
+		fs.attrs["units"] = "m/s"
 	
 	print("Saving 3D rho...")	
-	with h5py.File(output_rho_file, "w") as f:
-		Ct = np.flipud(C.T)
-		#Ct = C.T
-		f.create_dataset("density_model", data=Ct, dtype="f") # FIXME check this in Spyro and SeismicMesh
-		f.attrs["shape"] = Ct.shape
-		f.attrs["units"] = "m/s"
+	with h5py.File(output_rho_file, "w") as fr:
+		rho = rho.reshape(*axes, order=axes_order_sort) # original order: x, y, z == 0, 1, 2
+		axes_order = (2, 0, 1) # changing to z, x , y (order expected in Spyro)
+		rhot = np.flipud(rho.transpose((*axes_order,))) # Reverse the order of elements along axis 0 (up/down).
+		fr.create_dataset("density_model", data=rhot, dtype="f")
+		fr.attrs["shape"] = rhot.shape
+		fr.attrs["units"] = "g/cc" # == Gt/km3
+	
+	sys.exit("exit")
 #}}}
 
 # slice over x or y axes
@@ -154,7 +163,7 @@ with h5py.File(output_vs_file, "w") as fs:
 
 with h5py.File(output_rho_file, "w") as fr:
 	rhot = np.flipud(rho_slice.T)
-	fr.create_dataset("density_model", data=vst, dtype="f") # FIXME check it
+	fr.create_dataset("density_model", data=rhot, dtype="f")
 	fr.attrs["shape"] = rhot.shape
 	fr.attrs["units"] = "g/cc" # == Gt/km3 
 
