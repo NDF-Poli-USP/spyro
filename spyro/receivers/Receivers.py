@@ -423,7 +423,7 @@ def choosing_element(V, degree):
     cell_geometry = V.mesh().ufl_cell()
     if cell_geometry == quadrilateral:
         T = UFCQuadrilateral()
-        raise ValueError("Point interpolation not yet implemented for quads")
+        raise ValueError("Point interpolation for quads implemented somewhere else.")
 
     elif cell_geometry == triangle:
         T = UFCTriangle()
