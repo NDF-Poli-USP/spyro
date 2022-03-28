@@ -312,9 +312,9 @@ def interpolate(model, mesh, V, guess=False):
         raise NotImplementedError
 
     if guess:
-        fname = model["mesh"]["initmodel"]
+        fname = model["inversion"]["initial_guess"]
     else:
-        fname = model["mesh"]["truemodel"]
+        fname = model["inversion"]["true_model"]
 
     with h5py.File(fname, "r") as f:
         Z = np.asarray(f.get("velocity_model")[()])
