@@ -9,6 +9,10 @@ import spyro
 import psutil
 import os
 
+def s_print(str, comm):
+    if comm.ensemble_comm.rank == 0 and comm.comm.rank == 0:
+        print(str, flush = True)
+
 def forward_solver(model, comm, output_pdf = False, guess = False, save_shots=False):
     mesh, V = spyro.io.read_mesh(model, comm)
     vp = spyro.io.interpolate(model, mesh, V, guess=guess)
@@ -34,20 +38,22 @@ def get_memory_usage():
 
 def fwi_solver(model, comm, number_of_iterations = 20):
     ## My parameters:
+
     frequency = model["acquisition"]["frequency"]
 
     outdir = "FWI/"+str(int(frequency))+"Hz_"
+
     if COMM_WORLD.rank == 0:
         mem = open(outdir + "mem.txt", "w")
         func = open(outdir + "func.txt", "w")
 
-    
     mesh, V = spyro.io.read_mesh(model, comm)
-    if COMM_WORLD.rank == 0:
-        print(f"The mesh has {V.dim()} degrees of freedom")
+
     vp = spyro.io.interpolate(model, mesh, V, guess=True)
+
     if comm.ensemble_comm.rank == 0:
         File("guess_velocity.pvd", comm=comm.comm).write(vp)
+
     sources = spyro.Sources(model, mesh, V, comm)
     receivers = spyro.Receivers(model, mesh, V, comm)
     wavelet = spyro.full_ricker_wavelet(
@@ -55,12 +61,14 @@ def fwi_solver(model, comm, number_of_iterations = 20):
         tf=model["timeaxis"]["tf"],
         freq=model["acquisition"]["frequency"],
     )
+
     if comm.ensemble_comm.rank == 0:
         control_file = File(outdir + "control.pvd", comm=comm.comm)
         grad_file = File(outdir + "grad.pvd", comm=comm.comm)
     quad_rule = finat.quadrature.make_quadrature(
         V.finat_element.cell, V.ufl_element().degree(), "KMV"
     )
+
     dxlump = dx(rule=quad_rule)
 
     water = np.where(vp.dat.data[:] < 1.51)

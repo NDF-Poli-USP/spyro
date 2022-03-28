@@ -26,6 +26,7 @@ def get_file_type(str):
     return file_name, file_type
 
 def create_model():
+    num_sources = 10
 
     model = {}
     model["opts"] = {
@@ -69,8 +70,8 @@ def create_model():
     }
     model["acquisition"] = {
         "source_type": "Ricker",
-        "num_sources": 1,
-        "source_pos": spyro.create_transect((-0.01, 0.5), (-0.01, 8.0), 1),
+        "num_sources": num_sources,
+        "source_pos": spyro.create_transect((-0.01, 0.5), (-0.01, 8.0), num_sources),
         "frequency": None,
         "delay": 1.0,
         "num_receivers": 500,
@@ -133,15 +134,6 @@ def build_mesh(model, frequency, output_filename, vp_filename, comm, units = 'km
     degree = 4
     domain_pad = 0.05*model["BCs"]["lz"]
 
-    #Splitting up communicators
-    print("Creating new comm", flush = True)
-    # size = comm.size
-    # color = comm.rank/size
-    # row_comm = MPI.COMM_WORLD.Split(color,comm.rank)
-    # print(row_comm.size, flush = True)
-    print("Finish creating new comm", flush = True)
-
-
     if units == 'km-s':
         minimum_mesh_velocity = 1.429
     else:
@@ -150,56 +142,54 @@ def build_mesh(model, frequency, output_filename, vp_filename, comm, units = 'km
     C = cells_per_wavelength(method, degree, dimension)
     hmin = minimum_mesh_velocity/(C*frequency)
 
-    domain, bbox = get_domain(model, units = units)
-    
-    if units == 'km-s':
-        hmin *= 1000
-        domain_pad *= 1000
-
-    print("Entering sizing function", flush = True)
-    ef = SeismicMesh.get_sizing_function_from_segy(
-        vp_filename,
-        bbox,
-        hmin=hmin,
-        wl=C,
-        freq=frequency,
-        grade=0.15,
-        domain_pad=domain_pad,
-        pad_style="edge",
-        units = units,
-    )
-
-    # Creating rectangular mesh
-    print("Generating mesh", flush = True)
     meshfname = copy.deepcopy(output_filename+".msh")
 
-    if comm.comm.rank == 0:
+    if comm.ensemble_comm.rank ==0:
+
+        domain, bbox = get_domain(model, units = units)
+    
+        if units == 'km-s':
+            hmin *= 1000
+            domain_pad *= 1000
+
+        ef = SeismicMesh.get_sizing_function_from_segy(
+            vp_filename,
+            bbox,
+            hmin=hmin,
+            wl=C,
+            freq=frequency,
+            grade=0.15,
+            domain_pad=domain_pad,
+            pad_style="edge",
+            units = units,
+            comm=comm.comm
+        )
 
         points, cells = SeismicMesh.generate_mesh(
             domain=domain, 
             edge_length=ef, 
             verbose = 0, 
             mesh_improvement=False,
-            comm=comm.ensemble_comm,
+            comm=comm.comm,
             )
 
-        print('entering spatial rank 0 after mesh generation')
+        s_print('entering spatial rank 0 after mesh generation',comm )
+        if comm.comm.rank == 0:
 
-        meshio.write_points_cells(output_filename+".msh",
-            points/ 1000,[("triangle", cells)],
-            file_format="gmsh22", 
-            binary = False
-        )
-        
-        if see_mesh == True:
-            meshio.write_points_cells(output_filename+".vtk",
+            meshio.write_points_cells(output_filename+".msh",
                 points/ 1000,[("triangle", cells)],
-                file_format="vtk"
+                file_format="gmsh22", 
+                binary = False
             )
+            
+            if see_mesh == True:
+                meshio.write_points_cells(output_filename+".vtk",
+                    points/ 1000,[("triangle", cells)],
+                    file_format="vtk"
+                )
 
     comm.comm.barrier()
-    print("Load mesh", flush = True)
-    comm.comm.barrier()
+    comm.ensemble_comm.barrier()
     mesh = fire.Mesh(
             meshfname,
             distribution_parameters={
@@ -208,14 +198,6 @@ def build_mesh(model, frequency, output_filename, vp_filename, comm, units = 'km
         )
     
     return mesh
-
-def build_smaller_comm(comm, size = 1):
-    # old_size = comm.comm.size
-    # old_group = list(range(old_size))
-    # new_comm = comm.comm.group.Excl(old_group[size:])
-    new_comm = comm
-    return new_comm
-
 
 def meshing(frequency, model_data, comm, out_name = 'fwi', input_model_name=None):
     # try 100:
@@ -249,13 +231,11 @@ def meshing(frequency, model_data, comm, out_name = 'fwi', input_model_name=None
     write_velocity_model(input_vp_model, ofname = vp_filename)
     new_vpfile = vp_filename+'.hdf5'
 
-    new_comm = build_smaller_comm(comm, size = 1)
-
-    print('Entering mesh generation', flush = True)
+    s_print('Entering mesh generation', comm)
 
     mesh_filename = output_mesh_name
 
-    mesh = build_mesh(model, frequency, mesh_filename, vp_filename+'.segy', new_comm )
+    mesh = build_mesh(model, frequency, mesh_filename, vp_filename+'.segy', comm )
 
     show = True
     if show == True:
@@ -283,7 +263,7 @@ number_of_iterations=2
 
 real_model = "velocity_models/cut_marmousi.hdf5"
 initial_guess = "velocity_models/cut_marmousi_400.hdf5"
-building_real_meshes = True
+building_real_meshes = False
 
 model = create_model()
 comm = spyro.utils.mpi_init(model)
@@ -311,6 +291,7 @@ for frequency in frequencies:
     s_print("Generating shot record.",comm)
     model["mesh"]['meshfile'] = 'meshes/real_'+str(int(frequency))+'Hz.msh'
     comm.comm.barrier()
+    comm.ensemble_comm.barrier()
     p_r = forward_solver(model, comm, save_shots = True,guess=False)
 
     ## Runing FWI
@@ -318,6 +299,7 @@ for frequency in frequencies:
     model["mesh"]['meshfile'] = 'meshes/fwi_'+str(int(frequency))+'Hz.msh'
 
     comm.comm.barrier()
+    comm.ensemble_comm.barrier()
     segy_fname=fwi_solver(model, comm, number_of_iterations=number_of_iterations)
     initial_guess_current = segy_fname
     cont+=1
