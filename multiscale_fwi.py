@@ -210,9 +210,10 @@ def build_mesh(model, frequency, output_filename, vp_filename, comm, units = 'km
     return mesh
 
 def build_smaller_comm(comm, size = 1):
-    old_size = comm.comm.size
-    old_group = list(range(old_size))
-    new_comm = comm.group.Excl(old_group[size:])
+    # old_size = comm.comm.size
+    # old_group = list(range(old_size))
+    # new_comm = comm.comm.group.Excl(old_group[size:])
+    new_comm = comm
     return new_comm
 
 
@@ -289,9 +290,6 @@ comm = spyro.utils.mpi_init(model)
 
 model['inversion']['true_model'] = real_model
 if building_real_meshes == True:
-    print("a", flush = True)
-
-    print(comm.comm.rank, flush = True)
     meshes_for_real_shots(frequencies, model, comm)
 
 comm.comm.barrier()
