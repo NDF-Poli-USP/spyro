@@ -29,15 +29,15 @@ def compute_functional(model, residual, velocity=None):
     dt = model["timeaxis"]["dt"]
     tf = model["timeaxis"]["tf"]
     nt = int(tf / dt)  # number of timesteps
-    if "regularization" in model["opts"]:
-        regularize = model["opts"]["regularization"]
-    else:
-        regularize = False
+    # if "regularization" in model["opts"]:
+    #     regularize = model["opts"]["regularization"]
+    # else:
+    #     regularize = False
 
-    if regularize:
-        gamma = model["opt"]["gamma"]
-        Ns = model["acquisition"]["num_sources"]
-        gamma /= Ns
+    # if regularize:
+    #     gamma = model["opt"]["gamma"]
+    #     Ns = model["acquisition"]["num_sources"]
+    #     gamma /= Ns
 
     J = 0.0
     for ti in range(nt):
@@ -45,9 +45,9 @@ def compute_functional(model, residual, velocity=None):
             J += residual[ti][rn] ** 2
     J *= 0.5
 
-    if regularize:
-        Jreg = assemble(0.5 * gamma * dot(grad(vp), grad(vp)) * dx)
-        J += Jreg
+    # if regularize:
+    #     Jreg = assemble(0.5 * gamma * dot(grad(vp), grad(vp)) * dx)
+    #     J += Jreg
     return J
 
 
