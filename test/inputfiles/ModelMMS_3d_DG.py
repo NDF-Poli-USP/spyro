@@ -13,6 +13,7 @@ initmodel = fname
 # Choose method and parameters
 opts = {
     "method": "DG",
+    "quadrature": None,
     "variant": None,
     "type": "SIP",  # for DG only - SIP, NIP and IIP
     "degree": 1,  # p order
