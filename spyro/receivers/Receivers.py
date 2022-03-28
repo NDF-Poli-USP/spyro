@@ -198,8 +198,8 @@ class Receivers:
                 cellNodeMaps[receiver_id, :] = cell_node_map[cell_id, :]
                 for vertex_number in range(0, end_vertex_id):
                     cellVertices[receiver_id].append([])
-                    z = node_locations[cell_node_map[cell_id, vertex_number], 0]
-                    x = node_locations[cell_node_map[cell_id, vertex_number], 1]
+                    z = node_locations[cell_node_map[cell_id, cell_ends[vertex_number]], 0]
+                    x = node_locations[cell_node_map[cell_id, cell_ends[vertex_number]], 1]
                     cellVertices[receiver_id][vertex_number] = (z, x)
 
         return cellId_maps, cellVertices, cellNodeMaps
