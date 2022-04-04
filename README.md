@@ -107,11 +107,9 @@ model["BCs"] = {
 # This transect of receivers is created with the helper function `create_transect`.
 model["acquisition"] = {
     "source_type": "Ricker",
-    "num_sources": 1,
     "source_pos": [(-0.1, 0.75)],
     "frequency": 8.0,
     "delay": 1.0,
-    "num_receivers": 100,
     "receiver_locations": spyro.create_transect(
         (-0.10, 0.1), (-0.10, 1.4), 100
     ),

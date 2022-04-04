@@ -46,11 +46,9 @@ print(len(receivers))
 
 acquisition = {
     "source_type": "Ricker",
-    "num_sources": 1,
     "source_pos": [(-0.1, 0.5, 0.5)],
     "frequency": 5.0,
     "delay": 1.0,
-    "num_receivers": 100,
     "receiver_locations": receivers, 
 }
 timeaxis = {

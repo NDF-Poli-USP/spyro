@@ -52,11 +52,9 @@ PML = {
 
 acquisition = {
     "source_type": "Ricker",
-    "num_sources": 1,
     "frequency": 2.0,
     "delay": 1.0,
     "source_pos": [(-0.5, 0.5, 0.5)],  # z,x,y
-    "num_receivers": 256,
     "receiver_locations":[()],
 }  # equi-spaced for now
 
