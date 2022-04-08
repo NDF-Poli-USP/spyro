@@ -20,5 +20,5 @@ jobs:
     steps:
     - name: Set up environment
       run: |
-          ./opt/firedrake/bin/activate
+          source /opt/firedrake/bin/activate
           pytest --cov-report=xml --cov=spyro test/
