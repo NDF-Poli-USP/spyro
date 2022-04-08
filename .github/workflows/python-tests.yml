@@ -19,7 +19,7 @@ jobs:
 
     steps:
     - uses: actions/checkout@v3
-    - name: Set up environment
+    - name: Running tests in serial
       run: |
           source /opt/firedrake/bin/activate
           pytest --cov-report=xml --cov=spyro test/
