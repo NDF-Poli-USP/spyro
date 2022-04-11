@@ -96,6 +96,7 @@ def create_model_2D_homogeneous(grid_point_calculator_parameters, degree):
     # Choose method and parameters
     model["opts"] = {
         "method": method,
+        "quadrature": "KMV",
         "variant": None,
         "element": "tria",  # tria or tetra
         "degree": degree,  # p order

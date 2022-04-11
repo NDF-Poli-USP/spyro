@@ -14,7 +14,7 @@ initmodel = "not_used"
 
 opts = {
     "method": "KMV",  # either CG or KMV
-    "quadratrue": "KMV",  # Equi or KMV
+    "quadrature": "KMV",  # Equi or KMV
     "degree": 1,  # p order
     "dimension": 2,  # dimension
 }
