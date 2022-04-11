@@ -30,6 +30,7 @@ def mesh(mesh_type):
             (0.0, 0.0, 0.0), (0.0, 0.0, 1.0), 256
         )
         model["acquisition"]["source_pos"] = [(-0.05, 1.5, 1.5)]
+
     return {
         "square": lambda n: UnitSquareMesh(2 ** n, 2 ** n),
         "cube": lambda n: UnitCubeMesh(2 ** n, 2 ** n, 2 ** n),

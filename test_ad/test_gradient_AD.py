@@ -11,7 +11,7 @@ import finat
 import pytest
 
 #from ..domains import quadrature, space
-@pytest.mark.skip(reason="no way of currently testing this")
+# @pytest.mark.skip(reason="no way of currently testing this")
 def test_gradient_AD():
     model = {}
 
@@ -59,7 +59,7 @@ def test_gradient_AD():
         (0.9, 0.2), (0.9, 0.8), 10
         ),
     }
-    model["Aut_Dif"] = {
+    model["aut_dif"] = {
         "status": True, 
     }
 
