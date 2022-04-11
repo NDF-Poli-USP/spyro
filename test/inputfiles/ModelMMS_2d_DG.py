@@ -13,6 +13,7 @@ initmodel = fname
 # Choose method and parameters
 opts = {
     "method": "DG",
+    "quadrature": None,
     "variant": None,
     "type": "SIP",  # for DG only - SIP, NIP and IIP
     "degree": 1,  # p order
@@ -51,11 +52,9 @@ PML = {
 
 acquisition = {
     "source_type": "MMS",
-    "num_sources": 1,
     "frequency": 2.0,
     "delay": 1.0,
     "source_pos": [(-0.05, 1.5)],
-    "num_receivers": 256,
     "receiver_locations": [()],
 }
 

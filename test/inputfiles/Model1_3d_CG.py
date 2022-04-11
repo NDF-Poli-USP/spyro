@@ -14,6 +14,7 @@ initmodel = vname
 # Choose method and parameters
 opts = {
     "method": "CG",
+    "quadrature": 'KMV',
     "variant": None,
     "type": "SIP",  # for DG only - SIP, NIP and IIP
     "degree": 1,  # p order
@@ -52,11 +53,9 @@ BCs = {
 
 acquisition = {
     "source_type": "Ricker",
-    "num_sources": 1,
     "frequency": 2.0,
     "delay": 1.0,
     "source_pos": [(-0.5, 0.5, 0.5)],  # z,x,y
-    "num_receivers": 256,
     "receiver_locations":[()],
 }  # equi-spaced for now
 
