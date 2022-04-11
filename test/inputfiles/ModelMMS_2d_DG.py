@@ -52,11 +52,9 @@ PML = {
 
 acquisition = {
     "source_type": "MMS",
-    "num_sources": 1,
     "frequency": 2.0,
     "delay": 1.0,
     "source_pos": [(-0.05, 1.5)],
-    "num_receivers": 256,
     "receiver_locations": [()],
 }
 
