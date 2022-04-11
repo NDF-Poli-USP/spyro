@@ -61,7 +61,7 @@ def test_gradient_3d_AD():
         # first and final points of the receivers columns (z, x, y)
         "receiver_locations": [(-0.1, 0.1, 0.5), (-0.1, 0.9, 0.5)],
     }
-    model["Aut_Dif"] = {
+    model["aut_dif"] = {
         "status": True, 
     }
 
@@ -97,3 +97,4 @@ def test_gradient_3d_AD():
                                 vp_guess)
 
 
+# test_gradient_3d_AD()

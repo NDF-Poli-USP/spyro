@@ -43,7 +43,7 @@ class Receivers:
         self.degree = model["opts"]["degree"]
         self.receiver_locations = model["acquisition"]["receiver_locations"]
         
-        if self.dimension==3 and self.automatic_adjoint:
+        if self.dimension==3 and model["aut_dif"]['status']:
             self.column_x = model["acquisition"]["num_rec_x_columns"]
             self.column_y = model["acquisition"]["num_rec_y_columns"]
             self.column_z = model["acquisition"]["num_rec_z_columns"]
