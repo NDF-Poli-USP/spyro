@@ -202,7 +202,7 @@ def forward_elastic_waves(
     #}}}
 
     # weak formulation written as F=0
-    F = m + a - l + nf 
+    F = m + a - l + nf
 
     # retrieve the lhs and rhs terms from F
     lhs_ = lhs(F)
@@ -262,10 +262,10 @@ def forward_elastic_waves(
         #B1 += fext.sub(1)
         # solve and assign X onto solution u 
         if use_AD_type_interp==False:
-            start = time.time()
+            #start = time.time()
             #print("before solver",flush=True)
             solver.solve(X, B)
-            end = time.time()
+            #end = time.time()
             #print(round(1000000*(end - start),2), flush=True)
         
         u_np1.assign(X)
