@@ -52,9 +52,7 @@ acquisition = {
     "source_type": "Ricker",
     "frequency": 10.0,
     "delay": 1.0,
-    "num_sources": 1,
     "source_pos": [(-0.10, 0.25, 0.25)],
-    "num_receivers": len(recvs),
     "receiver_locations": recvs,
 }
 
