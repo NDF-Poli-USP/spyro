@@ -22,7 +22,7 @@ jobs:
     - name: Running parallel tests
       run: |
           source /opt/firedrake/bin/activate
-          mpiexec -n 10 pytest --with-mpi test/
+          mpiexec -n 10 pytest --with-mpi test/ test_ad/
 
 
           
