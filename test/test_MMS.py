@@ -1,13 +1,10 @@
 import math
 from copy import deepcopy
-
 import pytest
 from firedrake import *
-
 import spyro
 
 from .model import model
-
 
 @pytest.fixture(params=["square", "cube"])
 def mesh_type(request):
@@ -95,7 +92,7 @@ def run_solve(timestep_method, method, model, mesh, expr):
     expr = expr(*SpatialCoordinate(mesh))
     return errornorm(interpolate(expr, V), p[-1])
 
-
+@pytest.mark.mpi_skip()
 def test_method(mesh, timestep_method, spatial_method, interpolation_expr):
     if timestep_method == "ssprk":
         pytest.skip("KMV is not yet supported in ssprk")

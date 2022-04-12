@@ -1,4 +1,5 @@
 from numbers import Real
+import pytest
 import numpy as np
 import math
 import spyro
@@ -26,6 +27,7 @@ def triangle_area(p1, p2, p3):
 
     return abs(x1 * (y2 - y3) + x2 * (y3 - y1) + x3 * (y1 - y2)) / 2
 
+@pytest.mark.mpi_skip()
 def test_mesh_generation_for_grid_calc():
     grid_point_calculator_parameters = {
         ## Experiment parameters
