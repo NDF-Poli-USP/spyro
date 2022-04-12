@@ -19,5 +19,7 @@ jobs:
       run: |
           source /opt/firedrake/bin/activate
           pytest -n 10 --cov-report=xml --cov=spyro test/
+          mpiexec pytest --cov-report=xml --cov=spyro test/
+
 
           
