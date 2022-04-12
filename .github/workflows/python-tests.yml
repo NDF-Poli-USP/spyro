@@ -20,7 +20,9 @@ jobs:
           source /opt/firedrake/bin/activate
           pytest -n 10 --cov-report=xml --cov=spyro test/
     - name: Running parallel tests
-      run: mpiexec -n 10 pytest --with-mpi test/
+      run: |
+          source /opt/firedrake/bin/activate
+          mpiexec -n 10 pytest --with-mpi test/
 
 
           
