@@ -54,6 +54,9 @@ def display_progress(comm, t):
     if comm.ensemble_comm.rank == 0 and comm.comm.rank == 0:
         print(f"Simulation time is: {t:{10}.{4}} seconds", flush=True)
 
+def parallel_print(string, comm):
+    if comm.ensemble_comm.rank == 0 and comm.comm.rank == 0:
+        print(string, flush = True)
 
 def receivers_local(mesh, dimension, receiver_locations):
     if dimension == 2:
