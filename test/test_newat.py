@@ -1,9 +1,8 @@
 import math
 import numpy as np
 from copy import deepcopy
-
+import pytest
 from firedrake import *
-
 import spyro
 
 from .inputfiles.Model1_2d_CG import model
@@ -18,7 +17,7 @@ def triangle_area(p1, p2, p3):
 
     return abs(x1 * (y2 - y3) + x2 * (y3 - y1) + x3 * (y1 - y2)) / 2
 
-
+@pytest.mark.mpi_skip()
 def test_correct_receiver_location_generation2D():
     """Tests if receiver locations where generated correctly"""
     comm = spyro.utils.mpi_init(model)
@@ -29,7 +28,7 @@ def test_correct_receiver_location_generation2D():
 
     assert np.allclose(receivers, answer)
 
-
+@pytest.mark.mpi_skip()
 def test_correct_receiver_to_cell_location2D():
     """Tests if the receivers where located in the correct cell"""
     comm = spyro.utils.mpi_init(model)
@@ -89,7 +88,7 @@ def test_correct_receiver_to_cell_location2D():
 
     assert all([test1, test2, test3])
 
-
+@pytest.mark.mpi_skip()
 def test_correct_at_value2D():
     comm = spyro.utils.mpi_init(model)
     model["opts"]["degree"] = 3
@@ -121,6 +120,7 @@ def test_correct_at_value2D():
 
     assert all([test1, test2])
 
+@pytest.mark.mpi_skip()
 def test_correct_at_value2D_quad():
     model_quad = deepcopy(model)
     comm = spyro.utils.mpi_init(model_quad)
@@ -169,7 +169,7 @@ def tetrahedral_volume(p1, p2, p3, p4):
 
     return volume
 
-
+@pytest.mark.mpi_skip()
 def test_correct_receiver_location_generation3D():
     """Tests if receiver locations where generated correctly"""
 
@@ -184,7 +184,7 @@ def test_correct_receiver_location_generation3D():
 
     assert np.allclose(receivers.receiver_locations, answer)
 
-
+@pytest.mark.mpi_skip()
 def test_correct_receiver_to_cell_location3D():
     """Tests if the receivers where located in the correct cell"""
 
@@ -258,7 +258,7 @@ def test_correct_receiver_to_cell_location3D():
 
     assert all([test1, test2, test3])
 
-
+@pytest.mark.mpi_skip()
 def test_correct_at_value3D():
     test_model2 = deepcopy(model3D)
     test_model2["acquisition"]["num_receivers"] = 3

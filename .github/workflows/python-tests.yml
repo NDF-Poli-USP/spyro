@@ -3,11 +3,7 @@
 
 name: Python tests
 
-on:
-  push:
-    branches: [ main ]
-  pull_request:
-    branches: [ main ]
+on: [push, pull_request]
 
 permissions:
   contents: read
@@ -19,7 +15,14 @@ jobs:
 
     steps:
     - uses: actions/checkout@v3
-    - name: Running tests in serial
+    - name: Running serial tests in parallel (only one test per core)
       run: |
           source /opt/firedrake/bin/activate
-          pytest --cov-report=xml --cov=spyro test/
+          pytest -n 10 --cov-report=xml --cov=spyro test/
+    - name: Running parallel tests
+      run: |
+          source /opt/firedrake/bin/activate
+          mpiexec -n 10 pytest --with-mpi test/
+
+
+          
