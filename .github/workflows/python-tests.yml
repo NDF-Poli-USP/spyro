@@ -18,7 +18,7 @@ jobs:
     - name: Running serial tests in parallel (only one test per core)
       run: |
           source /opt/firedrake/bin/activate
-          pytest -n 10 --cov-report=xml --cov=spyro test/
+          pytest -n 10 --cov-report=xml --cov=spyro test/ test_ad/
     - name: Running parallel tests
       run: |
           source /opt/firedrake/bin/activate
