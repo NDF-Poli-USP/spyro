@@ -17,7 +17,7 @@ def test_gradient_AD():
 
     model["opts"] = {
         "method": "KMV",  # either CG or KMV
-        "quadratrue": "KMV", # Equi or KMV
+        "quadrature": "KMV", # Equi or KMV
         "degree": 1,  # p order
         "dimension": 2,  # dimension
         "regularization": False,  # regularization is on?
@@ -25,7 +25,7 @@ def test_gradient_AD():
     }
 
     model["parallelism"] = {
-        "type": "spatial",  # options: automatic (same number of cores for evey processor) or spatial
+        "type": "automatic",  # options: automatic (same number of cores for evey processor) or spatial
     }
 
     # Define the domain size without the ABL.
@@ -50,11 +50,9 @@ def test_gradient_AD():
 
     model["acquisition"] = {
         "source_type": "Ricker",
-        "num_sources": 1,
         "source_pos": [(0.75, 0.75)],
         "frequency": 10.0,
         "delay": 1.0,
-        "num_receivers": 10,
         "receiver_locations": spyro.create_transect(
         (0.9, 0.2), (0.9, 0.8), 10
         ),
