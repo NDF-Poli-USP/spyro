@@ -1,5 +1,5 @@
 [![DOI](https://zenodo.org/badge/318542339.svg)](https://zenodo.org/badge/latestdoi/318542339)
-[![CircleCI](https://img.shields.io/circleci/project/github/krober10nd/spyro/main.svg?style=flat-square)](https://circleci.com/gh/krober10nd/spyro/tree/main)
+[![Python tests](https://github.com/NDF-Poli-USP/spyro/actions/workflows/python-tests.yml/badge.svg)](https://github.com/NDF-Poli-USP/spyro/actions/workflows/python-tests.yml)
 [![codecov](https://codecov.io/gh/NDF-Poli-USP/spyro/branch/main/graph/badge.svg?token=8NM4N4N7YW)](https://codecov.io/gh/NDF-Poli-USP/spyro)
 
 spyro: Acoustic wave modeling in Firedrake
