@@ -210,7 +210,7 @@ def test_input_models_receivers_heterogeneous():
         #chosen be careful to have the desired velocity model below.
         'FEM_method_to_evaluate' : 'KMV', # FEM to evaluate such as `KMV` or `spectral` (GLL nodes on quads and hexas)
         'dimension' : 2, # Domain dimension. Either 2 or 3.
-        'receiver_type' : 'bins', #Either near or line. Near defines a receiver grid near to the source,
+        'receiver_setup' : 'bins', #Either near or line. Near defines a receiver grid near to the source,
         # line defines a line of point receivers with pre-established near and far offsets.
 
         ## Line search parameters
@@ -257,7 +257,7 @@ def test_input_models_receivers_heterogeneous():
         #chosen be careful to have the desired velocity model below.
         'FEM_method_to_evaluate' : 'KMV', # FEM to evaluate such as `KMV` or `spectral` (GLL nodes on quads and hexas)
         'dimension' : 2, # Domain dimension. Either 2 or 3.
-        'receiver_type' : 'bins', #Either near or line. Near defines a receiver grid near to the source,
+        'receiver_setup' : 'line', #Either near or line. Near defines a receiver grid near to the source,
         # line defines a line of point receivers with pre-established near and far offsets.
 
         ## Line search parameters
