@@ -46,7 +46,7 @@ def compare_velocity(p_r, receiver_in_source_index, receiver_comparison_index, m
     time1 = np.argmax(receiver_1)*dt
     x0 = pos[receiver_in_source_index,1]
     x1 = pos[receiver_comparison_index,1]
-    measured_velocity = np.abs(x1-x0)/(time1-time0)
+    measured_velocity = (x1-x0)/(time1-time0)
     minimum_velocity = 1.5
     error_percent = 100*np.abs(measured_velocity-minimum_velocity)/minimum_velocity
     print(f"Velocity error of {error_percent}%.", flush = True)
