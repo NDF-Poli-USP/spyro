@@ -68,8 +68,8 @@ class Sources(spyro.receivers.Receivers.Receivers):
 def timedependentSource(model, t, freq=None, amp=1, delay=1.5):
     if model["acquisition"]["source_type"] == "Ricker":
         return ricker_wavelet(t, freq, amp, delay=delay)
-    elif model["acquisition"]["source_type"] == "MMS":
-        return MMS_time(t)
+    # elif model["acquisition"]["source_type"] == "MMS":
+    #     return MMS_time(t)
     else:
         raise ValueError("source not implemented")
 
@@ -87,20 +87,6 @@ def ricker_wavelet(t, freq, amp=1.0, delay=1.5):
             (-1.0 / 4.0) * (2.0 * math.pi * freq) * (2.0 * math.pi * freq) * t * t
         )
     )
-
-
-def MMS_time(t):
-    return 2 * t + 2 * math.pi ** 2 * t ** 3 / 3.0
-
-
-def MMS_space(x0, z, x):
-    """ Mesh variable part of the MMS """
-    return sin(pi * z) * sin(pi * x) * Constant(1.0)
-
-
-def MMS_space_3d(x0, z, x, y):
-    """ Mesh variable part of the MMS """
-    return sin(pi * z) * sin(pi * x) * sin(pi * y) * Constant(1.0)
 
 
 def full_ricker_wavelet(dt, tf, freq, amp=1.0, cutoff=None):
@@ -124,50 +110,63 @@ def full_ricker_wavelet(dt, tf, freq, amp=1.0, cutoff=None):
     return full_wavelet
 
 
-def source_dof_finder(space, model):
-
-    # getting 1 source position
-    source_positions = model["acquisition"]["source_pos"]
-    if len(source_positions) != 1:
-        raise ValueError("Not yet implemented for more then 1 source.")
-
-    mesh = space.mesh()
-    source_z, source_x = source_positions[0]
-
-    # Getting mesh coordinates
-    z, x = SpatialCoordinate(mesh)
-    ux = Function(space).interpolate(x)
-    uz = Function(space).interpolate(z)
-    datax = ux.dat.data_ro_with_halos[:]
-    dataz = uz.dat.data_ro_with_halos[:]
-    node_locations = np.zeros((len(datax), 2))
-    node_locations[:, 0] = dataz
-    node_locations[:, 1] = datax
-
-    # generating cell node map
-    fdrake_cell_node_map = space.cell_node_map()
-    cell_node_map = fdrake_cell_node_map.values_with_halo
-
-    # finding cell where the source is located
-    cell_id = mesh.locate_cell([source_z, source_x], tolerance=0.01)
-
-    # finding dof where the source is located
-    for dof in cell_node_map[cell_id]:
-        if np.isclose(dataz[dof], source_z, rtol=1e-8) and np.isclose(
-            datax[dof], source_x, rtol=1e-8
-        ):
-            model["acquisition"]["source_point_dof"] = dof
-
-    if model["acquisition"]["source_point_dof"] == False:
-        print("Warning not using point source")
-    return False
+# def MMS_time(t):
+#     return 2 * t + 2 * math.pi ** 2 * t ** 3 / 3.0
 
 
-def delta_expr(x0, z, x, sigma_x=500.0):
-    sigma_x = Constant(sigma_x)
-    return exp(-sigma_x * ((z - x0[0]) ** 2 + (x - x0[1]) ** 2))
+# def MMS_space(x0, z, x):
+#     """ Mesh variable part of the MMS """
+#     return sin(pi * z) * sin(pi * x) * Constant(1.0)
 
 
-def delta_expr_3d(x0, z, x, y, sigma_x=2000.0):
-    sigma_x = Constant(sigma_x)
-    return exp(-sigma_x * ((z - x0[0]) ** 2 + (x - x0[1]) ** 2 + (y - x0[2]) ** 2))
+# def MMS_space_3d(x0, z, x, y):
+#     """ Mesh variable part of the MMS """
+#     return sin(pi * z) * sin(pi * x) * sin(pi * y) * Constant(1.0)
+
+# def source_dof_finder(space, model):
+
+#     # getting 1 source position
+#     source_positions = model["acquisition"]["source_pos"]
+#     if len(source_positions) != 1:
+#         raise ValueError("Not yet implemented for more then 1 source.")
+
+#     mesh = space.mesh()
+#     source_z, source_x = source_positions[0]
+
+#     # Getting mesh coordinates
+#     z, x = SpatialCoordinate(mesh)
+#     ux = Function(space).interpolate(x)
+#     uz = Function(space).interpolate(z)
+#     datax = ux.dat.data_ro_with_halos[:]
+#     dataz = uz.dat.data_ro_with_halos[:]
+#     node_locations = np.zeros((len(datax), 2))
+#     node_locations[:, 0] = dataz
+#     node_locations[:, 1] = datax
+
+#     # generating cell node map
+#     fdrake_cell_node_map = space.cell_node_map()
+#     cell_node_map = fdrake_cell_node_map.values_with_halo
+
+#     # finding cell where the source is located
+#     cell_id = mesh.locate_cell([source_z, source_x], tolerance=0.01)
+
+#     # finding dof where the source is located
+#     for dof in cell_node_map[cell_id]:
+#         if np.isclose(dataz[dof], source_z, rtol=1e-8) and np.isclose(
+#             datax[dof], source_x, rtol=1e-8
+#         ):
+#             model["acquisition"]["source_point_dof"] = dof
+
+#     if model["acquisition"]["source_point_dof"] == False:
+#         print("Warning not using point source")
+#     return False
+
+
+# def delta_expr(x0, z, x, sigma_x=500.0):
+#     sigma_x = Constant(sigma_x)
+#     return exp(-sigma_x * ((z - x0[0]) ** 2 + (x - x0[1]) ** 2))
+
+
+# def delta_expr_3d(x0, z, x, y, sigma_x=2000.0):
+#     sigma_x = Constant(sigma_x)
+#     return exp(-sigma_x * ((z - x0[0]) ** 2 + (x - x0[1]) ** 2 + (y - x0[2]) ** 2))
