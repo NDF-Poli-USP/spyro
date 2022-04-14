@@ -208,7 +208,7 @@ def test_input_models_receivers_heterogeneous():
         # if an homogeneous test case is used this velocity will be defined in the whole domain.
         'velocity_profile_type': 'heterogeneous', # Either or heterogeneous. If heterogeneous is 
         #chosen be careful to have the desired velocity model below.
-        'velocity_model_file_name':"test.segy",
+        'velocity_model_file_name':"test.hdf5",
         'FEM_method_to_evaluate' : 'KMV', # FEM to evaluate such as `KMV` or `spectral` (GLL nodes on quads and hexas)
         'dimension' : 2, # Domain dimension. Either 2 or 3.
         'receiver_setup' : 'bins', #Either near or line. Near defines a receiver grid near to the source,
@@ -256,7 +256,7 @@ def test_input_models_receivers_heterogeneous():
         # if an homogeneous test case is used this velocity will be defined in the whole domain.
         'velocity_profile_type': 'heterogeneous', # Either or heterogeneous. If heterogeneous is 
         #chosen be careful to have the desired velocity model below.
-        'velocity_model_file_name':"test.segy",
+        'velocity_model_file_name':"test.hdf5",
         'FEM_method_to_evaluate' : 'KMV', # FEM to evaluate such as `KMV` or `spectral` (GLL nodes on quads and hexas)
         'dimension' : 2, # Domain dimension. Either 2 or 3.
         'receiver_setup' : 'line', #Either near or line. Near defines a receiver grid near to the source,
