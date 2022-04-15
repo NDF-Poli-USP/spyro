@@ -30,6 +30,13 @@ jobs:
           cp /home/olender/Testing_files/meshes/* meshes/
           export COVERAGE_FILE=.coverage
           mpiexec -n 10 pytest --cov-report=xml --cov-append --cov=spyro --with-mpi test/
+    - name: Running parallel 3D forward test
+      run: |
+          source /opt/firedrake/bin/activate
+          cp /home/olender/Testing_files/velocity_models/* velocity_models/
+          cp /home/olender/Testing_files/meshes/* meshes/
+          export COVERAGE_FILE=.coverage
+          mpiexec -n 15 pytest --cov-report=xml --cov-append --cov=spyro --with-mpi test_3d/
     - name: Uploading coverage to Codecov
       run: export CODECOV_TOKEN="6cd21147-54f7-4b77-94ad-4b138053401d" && bash <(curl -s https://codecov.io/bash)
 
