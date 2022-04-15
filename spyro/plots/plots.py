@@ -51,7 +51,7 @@ def plot_shots(
     None
     """
 
-    num_recvs = model["acquisition"]["num_receivers"]
+    num_recvs = len(model["acquisition"]["receiver_locations"])
 
     dt = model["timeaxis"]["dt"]
     tf = model["timeaxis"]["tf"]

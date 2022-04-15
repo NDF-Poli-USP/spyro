@@ -1,0 +1,28 @@
+# This workflow will install Python dependencies, run tests and lint with a single version of Python
+# For more information see: https://help.github.com/actions/language-and-framework-guides/using-python-with-github-actions
+
+name: Python tests
+
+on: [push, pull_request]
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+
+    runs-on: self-hosted
+
+    steps:
+    - uses: actions/checkout@v3
+    - name: Running serial tests in parallel (only one test per core)
+      run: |
+          source /opt/firedrake/bin/activate
+          pytest -n 10 --cov-report=xml --cov=spyro test/ test_ad/
+    - name: Running parallel tests
+      run: |
+          source /opt/firedrake/bin/activate
+          cp /home/olender/Testing_files/velocity_models/* velocity_models/
+          cp /home/olender/Testing_files/meshes/* meshes/
+          mpiexec -n 10 pytest --cov-report=xml --cov=spyro --with-mpi test/
+

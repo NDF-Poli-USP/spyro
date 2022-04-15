@@ -14,7 +14,7 @@ initmodel = "not_used"
 
 opts = {
     "method": "KMV",  # either CG or KMV
-    "quadratrue": "KMV",  # Equi or KMV
+    "quadrature": "KMV",  # Equi or KMV
     "degree": 2,  # p order
     "dimension": 3,  # dimension
 }
@@ -46,11 +46,9 @@ print(len(receivers))
 
 acquisition = {
     "source_type": "Ricker",
-    "num_sources": 1,
     "source_pos": [(-0.1, 0.5, 0.5)],
     "frequency": 5.0,
     "delay": 1.0,
-    "num_receivers": 100,
     "receiver_locations": receivers, 
 }
 timeaxis = {
@@ -62,6 +60,10 @@ timeaxis = {
     "fspool": 1,  # how frequently to save solution to RAM
 }
 
+aut_dif = {
+    "status": False, 
+}
+
 model_pml = {
     "self": None,
     "opts": opts,
@@ -70,4 +72,5 @@ model_pml = {
     "mesh": mesh,
     "acquisition": acquisition,
     "timeaxis": timeaxis,
+    "aut_dif": aut_dif,
 }

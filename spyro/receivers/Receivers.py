@@ -1,5 +1,5 @@
 from firedrake import *
-from FIAT.reference_element import UFCTriangle, UFCTetrahedron
+from FIAT.reference_element import UFCTriangle, UFCTetrahedron, UFCQuadrilateral
 from FIAT.kong_mulder_veldhuizen import KongMulderVeldhuizen as KMV
 from FIAT.lagrange import Lagrange as CG
 from FIAT.discontinuous_lagrange import DiscontinuousLagrange as DG
@@ -43,7 +43,7 @@ class Receivers:
         self.degree = model["opts"]["degree"]
         self.receiver_locations = model["acquisition"]["receiver_locations"]
         
-        if self.dimension==3 and self.automatic_adjoint:
+        if self.dimension==3 and model["aut_dif"]['status']:
             self.column_x = model["acquisition"]["num_rec_x_columns"]
             self.column_y = model["acquisition"]["num_rec_y_columns"]
             self.column_z = model["acquisition"]["num_rec_z_columns"]
@@ -57,6 +57,7 @@ class Receivers:
         self.cell_tabulations = None
         self.cellNodeMaps = None
         self.nodes_per_cell = None
+        self.quadrilateral = (model["opts"]['quadrature']=='GLL')
         self.is_local = [0] * self.num_receivers
         if not self.automatic_adjoint:
             self.build_maps()
@@ -179,6 +180,14 @@ class Receivers:
         cellNodeMaps = np.zeros((num_recv, nodes_per_cell))
         cellVertices = []
 
+        if self.quadrilateral == True:
+            end_vertex_id = 4
+            degree = self.degree
+            cell_ends = [0, (degree+1)*(degree+1)-degree-1,  (degree+1)*(degree+1)-1, degree]
+        else:
+            end_vertex_id = 3
+            cell_ends = [0, 1, 2]
+
         for receiver_id in range(num_recv):
             cell_id = self.is_local[receiver_id]
 
@@ -187,10 +196,10 @@ class Receivers:
             if cell_id is not None:
                 cellId_maps[receiver_id] = cell_id
                 cellNodeMaps[receiver_id, :] = cell_node_map[cell_id, :]
-                for vertex_number in range(0, 3):
+                for vertex_number in range(0, end_vertex_id):
                     cellVertices[receiver_id].append([])
-                    z = node_locations[cell_node_map[cell_id, vertex_number], 0]
-                    x = node_locations[cell_node_map[cell_id, vertex_number], 1]
+                    z = node_locations[cell_node_map[cell_id, cell_ends[vertex_number]], 0]
+                    x = node_locations[cell_node_map[cell_id, cell_ends[vertex_number]], 1]
                     cellVertices[receiver_id][vertex_number] = (z, x)
 
         return cellId_maps, cellVertices, cellNodeMaps
@@ -292,10 +301,14 @@ class Receivers:
         return node_locations
 
     def __func_build_cell_tabulations(self):
-        if self.dimension == 2:
+        if self.dimension == 2   and self.quadrilateral == False:
             return self.__func_build_cell_tabulations_2D()
-        elif self.dimension == 3:
+        elif self.dimension == 3 and self.quadrilateral == False:
             return self.__func_build_cell_tabulations_3D()
+        elif self.dimension == 2 and self.quadrilateral == True:
+            return self.__func_build_cell_tabulations_2D_quad()
+        elif self.dimension == 3 and self.quadrilateral == True:
+            raise ValueError('3D GLL hexas not yet supported.')
         else:
             raise ValueError
 
@@ -345,6 +358,34 @@ class Receivers:
 
         return cell_tabulations
 
+    def __func_build_cell_tabulations_2D_quad(self):
+        finatelement = FiniteElement('CG', self.mesh.ufl_cell(), degree=self.degree, variant='spectral')
+        V = FunctionSpace(self.mesh, finatelement)
+        u = TrialFunction(V)
+        Q=u.function_space()
+        element = Q.finat_element.fiat_equivalent
+
+        cell_tabulations = np.zeros((self.num_receivers, self.nodes_per_cell))
+
+        for receiver_id in range(self.num_receivers):
+            cell_id = self.is_local[receiver_id]
+            if cell_id is not None:
+                # getting coordinates to change to reference element
+                p  = self.receiver_locations[receiver_id]
+                v0 = self.cellVertices[receiver_id][0]
+                v1 = self.cellVertices[receiver_id][1]
+                v2 = self.cellVertices[receiver_id][2]
+                v3 = self.cellVertices[receiver_id][3]
+
+                p_reference = change_to_reference_quad(p, v0, v1, v2, v3)
+                initial_tab = element.tabulate(0, [p_reference])
+                phi_tab = initial_tab[(0, 0)]
+
+                cell_tabulations[receiver_id, :] = phi_tab.transpose()
+
+
+        return cell_tabulations
+    
     def set_point_cloud(self, comm):
         # Receivers always parallel to z-axis
 
@@ -382,7 +423,7 @@ def choosing_element(V, degree):
     cell_geometry = V.mesh().ufl_cell()
     if cell_geometry == quadrilateral:
         T = UFCQuadrilateral()
-        raise ValueError("Point interpolation not yet implemented for quads")
+        raise ValueError("Point interpolation for quads implemented somewhere else.")
 
     elif cell_geometry == triangle:
         T = UFCTriangle()
@@ -706,3 +747,66 @@ def change_to_reference_tetrahedron(p, a, b, c, d):
 
     return (pnx, pny, pnz)
 
+def change_to_reference_quad(p, v0, v1, v2, v3):
+    (px, py) = p
+    # Irregular quad
+    (x0, y0) = v0
+    (x1, y1) = v1
+    (x2, y2) = v2
+    (x3, y3) = v3
+
+    # Reference quad
+    # xn0 = 0.0
+    # yn0 = 0.0
+    # xn1 = 1.0
+    # yn1 = 0.0
+    # xn2 = 1.0
+    # yn2 = 1.0
+    # xn3 = 0.0
+    # yn3 = 1.0
+
+    dx1 = x1 - x2
+    dx2 = x3 - x2
+    dy1 = y1 - y2
+    dy2 = y3 - y2
+    sumx = x0 - x1 + x2 - x3
+    sumy = y0 - y1 + y2 - y3
+
+    gover = np.array([[sumx, dx2],
+                    [sumy, dy2]])
+
+    g_under= np.array([[dx1, dx2 ],
+                    [dy1, dy2 ]])
+
+    gunder = np.linalg.det(g_under)
+                    
+    hover = np.array([[dx1, sumx],
+                    [dy1, sumy]])
+
+    hunder= gunder
+
+    g = np.linalg.det(gover)/gunder
+    h = np.linalg.det(hover)/hunder
+    i = 1.0
+
+    a = x1 - x0 + g*x1
+    b = x3 - x0 + h*x3
+    c = x0
+    d = y1 - y0 + g*y1
+    e = y3 - y0 + h*y3
+    f = y0
+
+    A = e*i - f*h
+    B = c*h - b*i
+    C = b*f - c*e
+    D = f*g - d*i
+    E = a*i - c*g
+    F = c*d - a*f
+    G = d*h - e*g
+    H = b*g - a*h
+    I = a*e - b*d
+
+    pnx = (A*px + B*py + C)/(G*px + H*py + I)
+    pny = (D*px + E*py + F)/(G*px + H*py + I)
+
+    return (pnx, pny)

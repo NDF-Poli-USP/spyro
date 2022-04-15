@@ -1,6 +1,6 @@
 [![DOI](https://zenodo.org/badge/318542339.svg)](https://zenodo.org/badge/latestdoi/318542339)
-[![CircleCI](https://img.shields.io/circleci/project/github/krober10nd/spyro/main.svg?style=flat-square)](https://circleci.com/gh/krober10nd/spyro/tree/main)
-[![CodeCov](https://codecov.io/gh/krober10nd/spyro/branch/main/graph/badge.svg)](https://codecov.io/gh/krober10nd/spyro)
+[![Python tests](https://github.com/NDF-Poli-USP/spyro/actions/workflows/python-tests.yml/badge.svg)](https://github.com/NDF-Poli-USP/spyro/actions/workflows/python-tests.yml)
+[![codecov](https://codecov.io/gh/NDF-Poli-USP/spyro/branch/main/graph/badge.svg?token=8NM4N4N7YW)](https://codecov.io/gh/NDF-Poli-USP/spyro)
 
 spyro: Acoustic wave modeling in Firedrake
 ============================================
@@ -107,11 +107,9 @@ model["BCs"] = {
 # This transect of receivers is created with the helper function `create_transect`.
 model["acquisition"] = {
     "source_type": "Ricker",
-    "num_sources": 1,
     "source_pos": [(-0.1, 0.75)],
     "frequency": 8.0,
     "delay": 1.0,
-    "num_receivers": 100,
     "receiver_locations": spyro.create_transect(
         (-0.10, 0.1), (-0.10, 1.4), 100
     ),

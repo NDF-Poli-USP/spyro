@@ -1,5 +1,6 @@
 from firedrake import *
 from scipy.optimize import *
+import pytest
 import spyro
 import time
 import sys
@@ -11,29 +12,30 @@ import finat
 import pytest
 
 #from ..domains import quadrature, space
-@pytest.mark.skip(reason="no way of currently testing this with cicleCI resources")
-def test_gradient_3d_AD():
+# @pytest.mark.skip(reason="no way of currently testing this")
+@pytest.mark.mpi_skip()
+def test_gradient_AD():
     model = {}
 
     model["opts"] = {
         "method": "KMV",  # either CG or KMV
-        "quadratrue": "KMV", # Equi or KMV
-        "degree": 2,  # p order
-        "dimension": 3,  # dimension
+        "quadrature": "KMV", # Equi or KMV
+        "degree": 1,  # p order
+        "dimension": 2,  # dimension
         "regularization": False,  # regularization is on?
         "gamma": 1e-5, # regularization parameter
     }
 
     model["parallelism"] = {
-        "type": "spatial",  # options: automatic (same number of cores for evey processor) or spatial
+        "type": "automatic",  # options: automatic (same number of cores for evey processor) or spatial
     }
 
     # Define the domain size without the ABL.
     model["mesh"] = {
-        "Lz": 1.0,  # depth in km - always positive
-        "Lx": 1.0,  # width in km - always positive
-        "Ly": 1.0,  # thickness in km - always positive
-        "meshfile": "test/meshes/Uniform3D.msh",
+        "Lz": 1.5,  # depth in km - always positive
+        "Lx": 1.5,  # width in km - always positive
+        "Ly": 0.0,  # thickness in km - always positive
+        "meshfile": "not_used.msh",
         "initmodel": "not_used.hdf5",
         "truemodel": "not_used.hdf5",
     }
@@ -45,23 +47,19 @@ def test_gradient_3d_AD():
         "abl_bc": "none",  # none, gaussian-taper, or alid
         "lz": 0.25,  # thickness of the ABL in the z-direction (km) - always positive
         "lx": 0.25,  # thickness of the ABL in the x-direction (km) - always positive
-        "ly": 0.25,  # thickness of the ABL in the y-direction (km) - always positive
+        "ly": 0.0,  # thickness of the ABL in the y-direction (km) - always positive
     }
-    # receivers = spyro.insert_fixed_value(spyro.create_2d_grid(0.1,0.9,0.1,0.9,2),-0.9, 0)
 
     model["acquisition"] = {
         "source_type": "Ricker",
-        "num_sources": 1,
-        "source_pos": [(-0.5, 0.5, 0.5)],
+        "source_pos": [(0.75, 0.75)],
         "frequency": 10.0,
         "delay": 1.0,
-        "num_rec_x_columns": 5,
-        "num_rec_y_columns": 1,
-        "num_rec_z_columns": 1,
-        # first and final points of the receivers columns (z, x, y)
-        "receiver_locations": [(-0.1, 0.1, 0.5), (-0.1, 0.9, 0.5)],
+        "receiver_locations": spyro.create_transect(
+        (0.9, 0.2), (0.9, 0.8), 10
+        ),
     }
-    model["Aut_Dif"] = {
+    model["aut_dif"] = {
         "status": True, 
     }
 
@@ -74,19 +72,18 @@ def test_gradient_3d_AD():
         "fspool": 1,  # how frequently to save solution to RAM
     }
 
-    comm    = spyro.utils.mpi_init(model)
-    mesh, V = spyro.io.read_mesh(model, comm)
+    comm = spyro.utils.mpi_init(model)
+    mesh = RectangleMesh(100, 100, 1.5, 1.5) # to test FWI, mesh aligned with interface
 
     element = spyro.domains.space.FE_method(
         mesh, model["opts"]["method"], model["opts"]["degree"]
     )
 
-    V       = FunctionSpace(mesh, element)
-    z, x, y = SpatialCoordinate(mesh)
+    V    = FunctionSpace(mesh, element)
+    z, x = SpatialCoordinate(mesh)
 
     vp_exact = Function(V).interpolate( 1.0 + 0.0*x)
     vp_guess = Function(V).interpolate( 0.8 + 0.0*x)
-
 
     spyro.tools.gradient_test_acoustic_ad(
                                 model, 
@@ -95,5 +92,4 @@ def test_gradient_3d_AD():
                                 comm, 
                                 vp_exact, 
                                 vp_guess)
-
 

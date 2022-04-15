@@ -17,7 +17,7 @@ def ensemble_save(func):
     """Decorator for read and write shots for ensemble parallelism"""
     def wrapper(*args, **kwargs):
         acq = args[0].get("acquisition")
-        num = acq["num_sources"]
+        num = len(acq["source_pos"])
         _comm = args[1]
         custom_file_name = kwargs.get('file_name')
         for snum in range(num):
@@ -33,7 +33,7 @@ def ensemble_load(func):
     """Decorator for read and write shots for ensemble parallelism"""
     def wrapper(*args, **kwargs):
         acq = args[0].get("acquisition")
-        num = acq["num_sources"]
+        num = len(acq["source_pos"])
         _comm = args[1]
         custom_file_name = kwargs.get('file_name')
         for snum in range(num):
@@ -50,7 +50,7 @@ def ensemble_plot(func):
     """Decorator for `plot_shots` to distribute shots for ensemble parallelism"""
     def wrapper(*args, **kwargs):
         acq = args[0].get("acquisition")
-        num = acq["num_sources"]
+        num = len(acq["source_pos"])
         _comm = args[1]
         for snum in range(num):
             if is_owner(_comm, snum) and _comm.comm.rank == 0:
@@ -63,7 +63,7 @@ def ensemble_forward(func):
     """Decorator for forward to distribute shots for ensemble parallelism"""
     def wrapper(*args, **kwargs):
         acq = args[0].get("acquisition")
-        num = acq["num_sources"]
+        num = len(acq["source_pos"])
         _comm = args[2]
         for snum in range(num):
             if is_owner(_comm, snum):
@@ -76,7 +76,7 @@ def ensemble_forward_ad(func):
     """Decorator for forward to distribute shots for ensemble parallelism"""
     def wrapper(*args, **kwargs):
         acq = args[0].get("acquisition")
-        num = acq["num_sources"]
+        num = len(acq["source_pos"])
         fwi = kwargs.get("fwi")
         _comm = args[2]
         for snum in range(num):
@@ -93,7 +93,7 @@ def ensemble_forward_elastic_waves(func):
     """Decorator for forward elastic waves to distribute shots for ensemble parallelism"""
     def wrapper(*args, **kwargs):
         acq = args[0].get("acquisition")
-        num = acq["num_sources"]
+        num = len(acq["source_pos"])
         _comm = args[2]
         for snum in range(num):
             if is_owner(_comm, snum):
@@ -108,7 +108,7 @@ def ensemble_gradient(func):
     def wrapper(*args, **kwargs):
         acq = args[0].get("acquisition")
         save_adjoint = kwargs.get("save_adjoint")
-        num = acq["num_sources"]
+        num = len(acq["source_pos"])
         _comm = args[2]
         for snum in range(num):
             if is_owner(_comm, snum):
@@ -127,7 +127,7 @@ def ensemble_gradient_elastic_waves(func):
     def wrapper(*args, **kwargs):
         acq = args[0].get("acquisition")
         save_adjoint = kwargs.get("save_adjoint")
-        num = acq["num_sources"]
+        num = len(acq["source_pos"])
         _comm = args[2]
         for snum in range(num):
             if is_owner(_comm, snum):
@@ -145,8 +145,8 @@ def write_function_to_grid(function, V, grid_spacing):
     """Interpolate a Firedrake function to a structured grid"""
     # get DoF coordinates
     m = V.ufl_domain()
-    W = VectorFunctionSpace(m, V.ufl_element())
-    coords = interpolate(m.coordinates, W)
+    W = fire.VectorFunctionSpace(m, V.ufl_element())
+    coords = fire.interpolate(m.coordinates, W)
     x, y = coords.dat.data[:, 0], coords.dat.data[:, 1]
 
     # add buffer to avoid NaN when calling griddata
@@ -372,7 +372,7 @@ def read_mesh(model, ens_comm):
     method = model["opts"]["method"]
     degree = model["opts"]["degree"]
 
-    num_sources = model["acquisition"]["num_sources"]
+    num_sources = len(model["acquisition"]["source_pos"])
     mshname = model["mesh"]["meshfile"]
 
     if method == "CG" or method == "KMV":
