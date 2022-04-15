@@ -24,7 +24,7 @@ jobs:
           source /opt/firedrake/bin/activate
           cp /home/olender/Testing_files/velocity_models/* velocity_models/
           cp /home/olender/Testing_files/meshes/* meshes/
-          mpiexec -n 10 pytest --cov-report=xml --cov=spyro --with-mpi test/
+          mpiexec -n 10 pytest --with-mpi test/
     - name: Uploading coverage to Codecov
       run: export CODECOV_TOKEN="6cd21147-54f7-4b77-94ad-4b138053401d" && bash <(curl -s https://codecov.io/bash)
 
