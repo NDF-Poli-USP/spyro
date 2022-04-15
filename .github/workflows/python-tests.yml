@@ -22,7 +22,7 @@ jobs:
     - name: Running serial tests for adjoint
       run: |
           source /opt/firedrake/bin/activate
-          pytest -n 10 --cov-report=xml --cov=spyro test_ad/
+          pytest -n 10 --cov-report=xml --cov-append --cov=spyro test_ad/
     - name: Running parallel tests
       run: |
           source /opt/firedrake/bin/activate
