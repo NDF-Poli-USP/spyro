@@ -1,10 +1,7 @@
 import os
 import pytest
-
 import numpy as np
-
 from firedrake import *
-
 import spyro
 
 from .inputfiles.Model1_parallel_2d import model as options
@@ -48,7 +45,6 @@ def test_parallel_source():
     #spyro.io.save_shots('serial_shot.dat', r)
     r_s = spyro.io.load_shots(os.getcwd()+'/test/serial_shot.dat')
     assert np.amax(np.abs(r - r_s)) < 1e-16
-
 
 if __name__ == "__main__":
     test_parallel_source()
