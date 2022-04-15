@@ -24,5 +24,5 @@ jobs:
           source /opt/firedrake/bin/activate
           cp /home/olender/Testing_files/velocity_models/* velocity_models/
           cp /home/olender/Testing_files/meshes/* meshes/
-          mpiexec -n 10 pytest --with-mpi test/
+          mpiexec -n 10 pytest --cov-report=xml --cov=spyro --with-mpi test/
 
