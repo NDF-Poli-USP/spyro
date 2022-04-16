@@ -27,7 +27,6 @@ def triangle_area(p1, p2, p3):
 
     return abs(x1 * (y2 - y3) + x2 * (y3 - y1) + x3 * (y1 - y2)) / 2
 
-
 def test_grid_calc2d():
     grid_point_calculator_parameters = {
         ## Experiment parameters
@@ -56,7 +55,3 @@ def test_grid_calc2d():
     inside = (6.9< G and G<8.0)
     print(G)
     assert inside
-
-
-if __name__ == "__main__":
-    test_grid_calc2d()
