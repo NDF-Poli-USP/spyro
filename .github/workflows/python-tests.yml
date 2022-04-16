@@ -29,7 +29,6 @@ jobs:
           cp /home/olender/Testing_files/velocity_models/* velocity_models/
           cp /home/olender/Testing_files/meshes/* meshes/
           mpiexec -n 10 pytest --cov-report=xml --cov-append --cov=spyro test_parallel/test_forward.py
-          mpiexec -n 10 pytest --cov-report=xml --cov-append --cov=spyro test_parallel/test_tools_grid_calc.py
     - name: Running parallel 3D forward test
       run: |
           source /opt/firedrake/bin/activate
