@@ -4,7 +4,7 @@ import numpy as np
 import math
 import spyro
 import pytest
-from test_forward_3d import test_forward_3d
+from .test_forward_3d import test_forward_3d
 
 
 def test_forward_3d_coverage():
