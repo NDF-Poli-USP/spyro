@@ -24,7 +24,6 @@ def compare_velocity(p_r, receiver_in_source_index, receiver_comparison_index, m
     return error_percent
 
 
-@pytest.mark.mpi(min_size=15)
 def test_forward_3d():
     model = {}
 
