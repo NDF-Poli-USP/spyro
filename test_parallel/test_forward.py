@@ -148,3 +148,6 @@ def test_forward_5shots():
     spyro.plots.plot_shots(model, comm, p_r, vmin=-1e-3, vmax=1e-3)
     spyro.io.save_shots(model, comm, p_r)
     assert pass_error_test
+
+if __name__ == "__main__":
+    test_forward_5shots()

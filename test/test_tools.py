@@ -58,7 +58,6 @@ def test_mesh_generation_for_grid_calc():
         model["mesh"]["meshfile"] = "meshes/2Dhomogeneous"+str(G)+".msh"
         model = spyro.tools.generate_mesh(model, G, comm)
 
-
 def test_input_models_receivers():
     test1 = True #testing if 2D receivers are inside the domain on an homogeneous case
     grid_point_calculator_parameters = {
