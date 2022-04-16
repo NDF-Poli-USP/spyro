@@ -66,7 +66,6 @@ def get_receiver_in_source_location(source_id, model):
 
 
 
-@pytest.mark.mpi(min_size=5)
 def test_forward_5shots():
     model = {}
 

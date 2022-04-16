@@ -104,7 +104,6 @@ def run_solve(timestep_method, method, model, mesh, expr):
     expr = expr(*SpatialCoordinate(mesh))
     return errornorm(interpolate(expr, V), p[-1])
 
-@pytest.mark.mpi_skip()
 def test_method(mesh, timestep_method, spatial_method, interpolation_expr):
     if mesh(3).ufl_cell() == quadrilateral and spatial_method == "KMV":
         pytest.skip("KMV isn't possible in quadrilaterals.")

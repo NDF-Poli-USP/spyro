@@ -5,7 +5,6 @@ import spyro
 
 """Read in an external mesh and interpolate velocity to it"""
 
-@pytest.mark.mpi_skip()
 def test_readmesh2():
     from .inputfiles.Model1_2d_CG import model
 
@@ -17,7 +16,6 @@ def test_readmesh2():
 
     assert not np.isnan(np.min(vp.dat.data[:]))
 
-@pytest.mark.mpi_skip()
 def test_readmesh3():
     from .inputfiles.Model1_3d_CG import model
 
