@@ -43,15 +43,12 @@ def _make_vp_guess(V, mesh):
     File("guess_vel.pvd").write(vp_guess)
     return vp_guess
 
-@pytest.mark.mpi_skip()
 def test_gradient():
     _test_gradient(model)
 
-@pytest.mark.mpi_skip()
 def test_gradient_pml():
     _test_gradient(model_pml, pml=True)
 
-@pytest.mark.mpi_skip()
 def _test_gradient(options, pml=False):
 
     comm = spyro.utils.mpi_init(options)
