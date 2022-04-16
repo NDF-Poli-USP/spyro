@@ -24,7 +24,7 @@ def compare_velocity(p_r, receiver_in_source_index, receiver_comparison_index, m
     return error_percent
 
 
-def test_forward_3d():
+def test_forward_3d(tf = 0.6):
     model = {}
 
     model["opts"] = {
@@ -65,7 +65,7 @@ def test_forward_3d():
     }
     model["timeaxis"] = {
         "t0": 0.0,  #  Initial time for event
-        "tf": 0.6,  # Final time for event
+        "tf": tf,  # Final time for event
         "dt": 0.00075,
         "amplitude": 1,  # the Ricker has an amplitude of 1.
         "nspool": 100,  # how frequently to output solution to pvds
@@ -90,7 +90,6 @@ def test_forward_3d():
     p, p_r = spyro.solvers.forward(
         model, mesh, comm, vp, sources, wavelet, receivers, output=False
     )
-
 
     dt=model["timeaxis"]["dt"]
     final_time=model["timeaxis"]["tf"]
