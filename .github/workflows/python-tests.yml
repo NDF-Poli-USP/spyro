@@ -15,10 +15,6 @@ jobs:
 
     steps:
     - uses: actions/checkout@v3
-    - name: Running serial tests in parallel (only one test per core)
-      run: |
-          source /opt/firedrake/bin/activate
-          pytest -n 10 --cov-report=xml --cov=spyro test/
     # - name: Running serial tests for adjoint
     #   run: |
     #       source /opt/firedrake/bin/activate
@@ -28,7 +24,11 @@ jobs:
           source /opt/firedrake/bin/activate
           cp /home/olender/Testing_files/velocity_models/* velocity_models/
           cp /home/olender/Testing_files/meshes/* meshes/
-          mpiexec -n 10 pytest --cov-report=xml --cov-append --cov=spyro test_parallel/
+          mpiexec -n 10 pytest --cov-report=xml --cov=spyro test_parallel/
+    - name: Running serial tests in parallel (only one test per core)
+      run: |
+          source /opt/firedrake/bin/activate
+          pytest -n 10 --cov-report=xml --cov-append --cov=spyro test/
     - name: Running parallel 3D forward test
       run: |
           source /opt/firedrake/bin/activate
