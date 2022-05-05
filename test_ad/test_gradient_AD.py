@@ -13,7 +13,6 @@ import pytest
 
 #from ..domains import quadrature, space
 # @pytest.mark.skip(reason="no way of currently testing this")
-@pytest.mark.mpi_skip()
 def test_gradient_AD():
     model = {}
 
