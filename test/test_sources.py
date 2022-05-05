@@ -10,7 +10,6 @@ import spyro
 """Read in an external mesh and interpolate velocity to it"""
 from .inputfiles.Model1_2d_CG import model as model
 
-@pytest.mark.mpi_skip()
 def test_ricker_varies_in_time():
     """This test ricker time variation when applied to a time-
     dependent PDE (acoustic wave second order in pressure) in
