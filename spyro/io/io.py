@@ -129,8 +129,8 @@ def write_function_to_grid(function, V, grid_spacing):
     """Interpolate a Firedrake function to a structured grid"""
     # get DoF coordinates
     m = V.ufl_domain()
-    W = VectorFunctionSpace(m, V.ufl_element())
-    coords = interpolate(m.coordinates, W)
+    W = fire.VectorFunctionSpace(m, V.ufl_element())
+    coords = fire.interpolate(m.coordinates, W)
     x, y = coords.dat.data[:, 0], coords.dat.data[:, 1]
 
     # add buffer to avoid NaN when calling griddata
@@ -139,7 +139,8 @@ def write_function_to_grid(function, V, grid_spacing):
     min_y = np.amin(y) + 0.01
     max_y = np.amax(y) - 0.01
 
-    z = function.dat.data[:] * 1000.0  # convert from km/s to m/s
+    #z = function.dat.data[:] * 1000.0  # convert from km/s to m/s
+    z = function.dat.data[:] 
 
     # target grid to interpolate to
     xi = np.arange(min_x, max_x, grid_spacing)

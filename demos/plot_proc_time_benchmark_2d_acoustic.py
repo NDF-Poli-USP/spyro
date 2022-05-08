@@ -1,3 +1,5 @@
+# strong scaling analysis performed on Intel10 (NDF/Poli)
+
 import matplotlib.pyplot as plt
 import numpy as np
 
