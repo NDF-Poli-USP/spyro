@@ -82,9 +82,9 @@ def test_forward_3d(tf = 0.6):
     sources = spyro.Sources(model, mesh, V, comm)
     receivers = spyro.Receivers(model, mesh, V, comm)
     wavelet = spyro.full_ricker_wavelet(
-        dt=model["timeaxis"]["dt"],
-        tf=model["timeaxis"]["tf"],
-        freq=model["acquisition"]["frequency"],
+        model["timeaxis"]["dt"],
+        model["timeaxis"]["tf"],
+        model["acquisition"]["frequency"],
     )
 
     p, p_r = spyro.solvers.forward(

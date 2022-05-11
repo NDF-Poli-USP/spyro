@@ -126,9 +126,9 @@ def test_forward_5shots():
     sources = spyro.Sources(model, mesh, V, comm)
     receivers = spyro.Receivers(model, mesh, V, comm)
     wavelet = spyro.full_ricker_wavelet(
-        dt=model["timeaxis"]["dt"],
-        tf=model["timeaxis"]["tf"],
-        freq=model["acquisition"]["frequency"],
+        model["timeaxis"]["dt"],
+        model["timeaxis"]["tf"],
+        model["acquisition"]["frequency"],
     )
     p, p_r = spyro.solvers.forward(model, mesh, comm, vp, sources, wavelet, receivers)
 
