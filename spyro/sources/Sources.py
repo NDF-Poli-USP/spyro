@@ -1,5 +1,6 @@
 import math
 import numpy as np
+from numpy.fft import fft, ifft, rfft
 from firedrake import *
 from scipy.signal import butter, filtfilt
 import spyro
@@ -88,8 +89,19 @@ def ricker_wavelet(t, freq, amp=1.0, delay=1.5):
         )
     )
 
+def weiner_filter(source, filter_frequency, dt, final_time):
+    e = 0.001
+    target = spyro.full_ricker_wavelet(dt,final_time,filter_frequency)
+    source_f = fft(source)
+    target_f = fft(target)
 
-def full_ricker_wavelet(dt, final_time, frequency, amplitude=1.0, cutoff=None):
+    f = target_f * np.conjugate(source_f) / ( np.abs(source_f)**2  +e**2 )
+    new_source_f = f*source_f
+    new_source = ifft(new_source_f)
+
+    return new_source
+
+def full_ricker_wavelet(dt, final_time, frequency, amplitude=1.0, cutoff=None, filter = 'weiner'):
     """Compute the Ricker wavelet optionally applying low-pass filtering
     using cutoff frequency in Hertz.
     """
@@ -99,7 +111,7 @@ def full_ricker_wavelet(dt, final_time, frequency, amplitude=1.0, cutoff=None):
     for t in range(nt):
         full_wavelet[t] = ricker_wavelet(time, frequency, amplitude)
         time += dt
-    if cutoff is not None:
+    if cutoff is not None and filter == 'butter':
         fs = 1.0 / dt
         order = 2
         nyq = 0.5 * fs  # Nyquist Frequency
@@ -107,6 +119,8 @@ def full_ricker_wavelet(dt, final_time, frequency, amplitude=1.0, cutoff=None):
         # Get the filter coefficients
         b, a = butter(order, normal_cutoff, btype="low", analog=False)
         full_wavelet = filtfilt(b, a, full_wavelet)
+    if cutoff is not None and filter == 'weiner':
+        full_wavelet = weiner_filter(full_wavelet, cutoff, dt, final_time)
     return full_wavelet
 
 
