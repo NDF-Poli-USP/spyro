@@ -4,6 +4,22 @@ import numpy as np
 from mpi4py import MPI
 from scipy.signal import butter, filtfilt
 
+def weiner_filter_shot(shot, desired_frequency, dt, final_time):
+    nr, nc = np.shape(shot)
+    filtered_shot = np.zeros((nr, nc))
+    target = spyro.full_ricker_wavelet(dt,final_time,filter_frequency)
+    target_f = fft(target)
+    for rec, ts in enumerate(shot.T):
+        source = copy.deepcopy(shot[:, rec])
+        
+        e = 0.001
+        source_f = fft(source)
+        f = target_f * np.conjugate(source_f) / ( np.abs(source_f)**2  +e**2 )
+        new_source_f = f*source_f
+        new_source = ifft(new_source_f)
+        filtered_shot[:, rec] = new_source
+
+    return filtered_shot
 
 def butter_lowpass_filter(shot, cutoff, fs, order=2):
     """Low-pass filter the shot record with sampling-rate fs Hz
