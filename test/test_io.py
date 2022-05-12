@@ -4,7 +4,6 @@ import pytest
 import spyro
 from SeismicMesh import write_velocity_model
 
-@pytest.mark.mpi_skip()
 def test_read_and_write_segy():
     vp_name = "velocity_models/test"
     segy_file = vp_name+".segy"
