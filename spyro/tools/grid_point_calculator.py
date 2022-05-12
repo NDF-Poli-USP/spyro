@@ -84,8 +84,8 @@ def wave_solver(model, G, comm = False):
     receivers = spyro.Receivers(model, mesh, V, comm)
     wavelet = spyro.full_ricker_wavelet(
                                         dt=model["timeaxis"]["dt"],
-                                        tf=model["timeaxis"]["tf"],
-                                        freq=model["acquisition"]["frequency"],
+                                        final_time=model["timeaxis"]["tf"],
+                                        frequency=model["acquisition"]["frequency"],
                                     )
 
     for sn in range(model["acquisition"]["num_sources"]):

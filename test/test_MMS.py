@@ -89,7 +89,7 @@ def run_solve(timestep_method, method, model, mesh, expr):
 
     excitation = spyro.Sources(testmodel, mesh, V, comm)
 
-    wavelet = spyro.full_ricker_wavelet(dt=0.001, tf=1.0, freq=2.0)
+    wavelet = spyro.full_ricker_wavelet(dt=0.001, final_time=1.0, frequency=2.0)
 
     receivers = spyro.Receivers(testmodel, mesh, V, comm)
 
