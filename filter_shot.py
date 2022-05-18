@@ -29,7 +29,7 @@ def butter_lowpass_filter_source(wavelet, cutoff, fs, order=2):
     sos = zpk2sos(z, p, k)
 
     firstpass = sosfilt(sos,wavelet )
-    filtered_shot = sosfilt(sos, firstpass[::-1])[::-1]*7.4
+    filtered_shot = sosfilt(sos, firstpass[::-1])[::-1]
         
     return filtered_shot
 
