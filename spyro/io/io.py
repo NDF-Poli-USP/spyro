@@ -193,7 +193,7 @@ def save_shots(model, comm, array, file_name=None):
 
     Parameters
     ----------
-    filename: str, optional by default shot_number_#.dat
+    file_name: str, optional by default shot_number_#.dat
         The filename to save the data as a `pickle`
     array: `numpy.ndarray`
         The data to save a pickle (e.g., a shot)
