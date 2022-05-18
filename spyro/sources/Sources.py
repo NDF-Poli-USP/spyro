@@ -75,7 +75,7 @@ def timedependentSource(model, t, freq=None, amp=1, delay=1.5):
         raise ValueError("source not implemented")
 
 
-def ricker_wavelet(t, freq, amp=1.0, delay=1.5):
+def ricker_wavelet(t, freq, amp=1.0, delay=5.0):
     """Creates a Ricker source function with a
     delay in term of multiples of the distance
     between the minimums.
