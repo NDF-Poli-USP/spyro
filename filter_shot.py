@@ -33,7 +33,26 @@ def butter_lowpass_filter_source(wavelet, cutoff, fs, order=2):
         
     return filtered_shot
 
-def plot_receivers(p_exact_1,p_exact_2,p_filter, final_time, dt):
+def plot_receivers(p_exact_1,p_filter, final_time, dt):
+    nt = int(final_time/ dt)  # number of timesteps
+    times = np.linspace(0.0, final_time, nt)
+
+    plt.plot(times, p_exact_1, label='not filtered 10Hz')
+    plt.plot(times, p_filter, label = 'filtered')
+    plt.legend()
+
+    plt.xlabel("time (s)", fontsize=18)
+    plt.ylabel("amplitude", fontsize=18)
+    plt.xticks(fontsize=18)
+    plt.yticks(fontsize=18)
+    # plt.xlim(start_index, end_index)
+    # plt.ylim(tf, 0)
+
+    plt.show()
+    plt.close()
+    return None
+
+def plot_source(p_exact_1,p_exact_2,p_filter, final_time, dt):
     nt = int(final_time/ dt)  # number of timesteps
     times = np.linspace(0.0, final_time, nt)
 
@@ -63,6 +82,7 @@ def plot_shot_record(
     vmax=1e-2,
     start_index=0,
     end_index=0,
+    name = None,
 ):
     """Plot a shot record and save the image to disk. Note that
     this automatically will rename shots when ensmeble paralleism is
@@ -131,6 +151,8 @@ def plot_shot_record(
     plt.ylim(tf, 0)
     plt.subplots_adjust(left=0.18, right=0.95, bottom=0.14, top=0.95)
     # plt.axis("image")
+    if name != None:
+        plt.title(name)
     plt.show()
     plt.close()
     return None
@@ -267,24 +289,25 @@ wavelet5 = spyro.full_ricker_wavelet(
 )
 
 ## Loads 10 Hz and 5Hz shot records
-#p = spyro.io.load_shots(model, comm)
-#p5 = spyro.io.load_shots(model, comm, file_name='shots/5Hz.dat')
+p = spyro.io.load_shots(model, comm)
+p5 = spyro.io.load_shots(model, comm, file_name='shots/5Hz.dat')
 
 
 ## Applies a filter
 #p_filter= weiner_filter_shot(p, 5.0, 0.00025, 5.0)
-#p_filter = butter_filter(p, 5.0, 1/0.00025)
+p_filter = butter_filter(p, 5.0, 1/0.00025)
 #p_filter = butter_lowpass_filter(p, 5.0, 1./0.00025, order=2)
 
 ## Plot_receivers can be used to plot a recording from one receiver or a wavelet
-#receiver_id = 100
-#plot_receivers(p[:,receiver_id], p_filter[:,receiver_id], 5.0, 0.00025)
-plot_receivers(wavelet, wavelet5,butter_lowpass_filter_source(wavelet, 5.0, 1/0.00025, order=2), 5.0, 0.00025)
+receiver_id = 100
+plot_receivers(p[:,receiver_id], p_filter[:,receiver_id], 5.0, 0.00025)
+
+plot_source(wavelet, wavelet5,butter_lowpass_filter_source(wavelet, 5.0, 1/0.00025, order=2), 5.0, 0.00025)
 
 
 ## Plot shot records 
-#plot_shot_record(model, comm, p, p5, vmin=-1e-2, vmax=1e-2)
+plot_shot_record(model, comm, p, p5, vmin=-1e-2, vmax=1e-2, name="Comparison of unfiltered 10Hz and 5Hz shots")
 #plot_shot_record(model, comm, p, p_filter, vmin=-1e-2, vmax=1e-2)
-#plot_shot_record(model, comm, p5, p_filter, vmin=-1e-2, vmax=1e-2)
+plot_shot_record(model, comm, p5, p_filter, vmin=-1e-2, vmax=1e-2, name = "Comparison of unfiltered and filtered 5Hz")
 #plot_shot_record(model, comm, p_filter, vmin=-1e-2, vmax=1e-2)
 
