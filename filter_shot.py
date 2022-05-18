@@ -121,7 +121,7 @@ def plot_shot_record(
     plt.subplots_adjust(left=0.18, right=0.95, bottom=0.14, top=0.95)
 
     plt.subplot(1,2,2)
-    plt.contourf(X, Y, p2, levels =100, vmin=vmin/10, vmax=vmax/10)
+    plt.contourf(X, Y, p2, levels =100, vmin=vmin, vmax=vmax)
     # savemat("test.mat", {"mydata": arr})
     plt.xlabel("receiver number", fontsize=18)
     plt.ylabel("time (s)", fontsize=18)
@@ -252,10 +252,12 @@ model["timeaxis"] = {
     "fspool": 99999,  # how frequently to save solution to RAM
 }
 comm = spyro.utils.mpi_init(model)
+
+## Creates a 10Hz and 5Hz source wavelet
 wavelet = spyro.full_ricker_wavelet(
     dt=model["timeaxis"]["dt"],
     final_time=model["timeaxis"]["tf"],
-    frequency=model["acquisition"]["frequency"],
+    frequency=10.0,
 )
 
 wavelet5 = spyro.full_ricker_wavelet(
@@ -264,19 +266,23 @@ wavelet5 = spyro.full_ricker_wavelet(
     frequency=5.0,
 )
 
-
+## Loads 10 Hz and 5Hz shot records
 #p = spyro.io.load_shots(model, comm)
 #p5 = spyro.io.load_shots(model, comm, file_name='shots/5Hz.dat')
-#plot_shot(model, comm, p, vmin=-1e-2, vmax=1e-2)
 
+
+## Applies a filter
 #p_filter= weiner_filter_shot(p, 5.0, 0.00025, 5.0)
 #p_filter = butter_filter(p, 5.0, 1/0.00025)
 #p_filter = butter_lowpass_filter(p, 5.0, 1./0.00025, order=2)
 
+## Plot_receivers can be used to plot a recording from one receiver or a wavelet
 #receiver_id = 100
 #plot_receivers(p[:,receiver_id], p_filter[:,receiver_id], 5.0, 0.00025)
 plot_receivers(wavelet, wavelet5,butter_lowpass_filter_source(wavelet, 5.0, 1/0.00025, order=2), 5.0, 0.00025)
 
+
+## Plot shot records 
 #plot_shot_record(model, comm, p, p5, vmin=-1e-2, vmax=1e-2)
 #plot_shot_record(model, comm, p, p_filter, vmin=-1e-2, vmax=1e-2)
 #plot_shot_record(model, comm, p5, p_filter, vmin=-1e-2, vmax=1e-2)
