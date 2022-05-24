@@ -79,7 +79,7 @@ model["timeaxis"] = {
 }
 
 comm = spyro.utils.mpi_init(model)
-mesh, V = spyro.io.read_mesh(model, comm)
+mesh_x, V_x = spyro.io.read_mesh(model, comm) # mesh that will be adapted
 
 # make vp {{{
 def _make_vp(V, mesh, vp_guess=False):
@@ -98,20 +98,21 @@ def _make_vp(V, mesh, vp_guess=False):
     return vp
 #}}}
 
-sources = spyro.Sources(model, mesh, V, comm)
-receivers = spyro.Receivers(model, mesh, V, comm)
+sources = spyro.Sources(model, mesh_x, V_x, comm)
+receivers = spyro.Receivers(model, mesh_x, V_x, comm)
 wavelet = spyro.full_ricker_wavelet(
                 dt=model["timeaxis"]["dt"], tf=model["timeaxis"]["tf"], freq=model["acquisition"]["frequency"]
             )
 
-vp_exact = _make_vp(V,mesh,vp_guess=False)
-vp_guess = _make_vp(V,mesh,vp_guess=True)
+vp_exact = _make_vp(V_x, mesh_x, vp_guess=False)
+vp_guess = _make_vp(V_x, mesh_x, vp_guess=True)
 #sys.exit("exit")
 
-print("Starting forward computation",flush=True)
+# FIXME this should be computed using a fixed mesh
+print("Starting forward computation",flush=True) 
 start = time.time()
 p_exact, p_exact_at_recv = spyro.solvers.forward(
-    model, mesh, comm, vp_exact, sources, wavelet, receivers, output=True
+    model, mesh_x, comm, vp_exact, sources, wavelet, receivers, output=True
 )
 end = time.time()
 print(round(end - start,2),flush=True)
@@ -120,7 +121,7 @@ File("p_exact.pvd").write(p_exact[-1])
 class L2Inner(object): #{{{
     # used in the gradient norm computation
     def __init__(self):
-        self.A = assemble( TrialFunction(V) * TestFunction(V) * dx, mat_type="matfree")
+        self.A = assemble( TrialFunction(V_x) * TestFunction(V_x) * dx, mat_type="matfree")
         self.Ap = as_backend_type(self.A).mat()
 
     def eval(self, u, v):
@@ -136,14 +137,22 @@ class Objective(ROL.Objective):
         ROL.Objective.__init__(self)
         self.inner_product = inner_product
         self.p_guess = None
-        self.vp = Function(V)
+        self.vp = Function(V_x)
         self.misfit = 0.0
         self.p_exact_recv = p_exact_at_recv 
+        self.sources = sources
+        self.receivers = receivers
 
     def value(self, x, tol):
         """Compute the functional"""
         J_total = np.zeros((1))
-        self.p_guess, p_guess_recv = spyro.solvers.forward(model,mesh,comm,self.vp,sources,wavelet,receivers)
+        self.p_guess, p_guess_recv = spyro.solvers.forward(model, 
+                                                           mesh_x, 
+                                                           comm, 
+                                                           self.vp, 
+                                                           self.sources, 
+                                                           wavelet, 
+                                                           self.receivers)
         self.misfit = spyro.utils.evaluate_misfit(model, p_guess_recv, self.p_exact_recv)
         J_total[0] += spyro.utils.compute_functional(model, self.misfit, vp=self.vp)
         J_total = COMM_WORLD.allreduce(J_total, op=MPI.SUM)
@@ -169,8 +178,14 @@ class Objective(ROL.Objective):
 
     def gradient(self, g, x, tol):
         """Compute the gradient of the functional"""
-        dJ = Function(V, name="gradient")
-        dJ_local = spyro.solvers.gradient(model,mesh,comm,self.vp,receivers,self.p_guess,self.misfit)
+        dJ = Function(V_x, name="gradient")
+        dJ_local = spyro.solvers.gradient(model, 
+                                          mesh_x, 
+                                          comm, 
+                                          self.vp, 
+                                          self.receivers, 
+                                          self.p_guess, 
+                                          self.misfit)
         if comm.ensemble_comm.size > 1:
             comm.allreduce(dJ_local, dJ)
         else:
@@ -187,7 +202,7 @@ class Objective(ROL.Objective):
         g.vec += dJ
 
     def update(self, x, flag, iteration):
-        self.vp.assign(Function(V, x.vec, name="vp"))
+        self.vp.assign(Function(V_x, x.vec, name="vp"))
 
 #}}}
 # ROL parameters definition {{{
@@ -228,75 +243,79 @@ paramsDict = {
     },
 }
 #}}}
-# prepare to run FWI, set guess add control bounds to the problem (uses more RAM)
+# prepare to run FWI, set guess add control bounds to the problem (uses more RAM) {{{
 params = ROL.ParameterList(paramsDict, "Parameters")
 inner_product = L2Inner()
 
-x0 = Function(V)
-xlo = Function(V)
-xup = Function(V)
+xig = Function(V_x) # initial guess
+xlo = Function(V_x) # lower bound
+xup = Function(V_x) # upper bound
 
-x0.dat.data[:]  = vp_guess.dat.data[:] 
+xig.dat.data[:] = vp_guess.dat.data[:] 
 xlo.dat.data[:] = min(vp_exact.dat.data[:])
 xup.dat.data[:] = max(vp_exact.dat.data[:])
 
-opt = FeVector(x0.vector(), inner_product)
 x_lo = FeVector(xlo.vector(), inner_product)
 x_up = FeVector(xup.vector(), inner_product)
 
 bnd = ROL.Bounds(x_lo, x_up, 1.0)
 obj = Objective(inner_product)
+#}}}
+# prepare monitor function {{{
+mesh_xi, V_xi = spyro.io.read_mesh(model, comm) # computational mesh
 
-M = Function(V) 
-vp0 = Function(V)
-vp0.dat.data[:] = x0.dat.data[:]
-obj.vp.dat.data[:] = x0.dat.data[:]
+vpi_xi = Function(V_xi) # to keep vp before minimizer
+vpf_xi = Function(V_xi) # to keep vp after minimizer (inverted vp)
+M_xi = Function(V_xi)   # monitor function using vpi_xi and vpf_xi
 
-#FIXME define better old_mesh
-old_mesh, V_old_mesh = spyro.io.read_mesh(model, comm)
-vp_old_mesh = Function(V_old_mesh)
-
-def monitor(mesh):
-    return M
+# parameters for Monge-Ampere solver
+method = "quasi_newton"
+tol = 1.0e-03
+#}}}
 
 outfile = File("final_vp.pvd")
 for i in range(15):
-    print("FWI iteration="+str(i), flush=True) 
+    print("Loop iteration="+str(i), flush=True) 
+   
+    # at this moment, mesh_x=mesh_xi
+    obj.vp.dat.data[:] = xig.dat.data[:] # initial guess (mesh_x)
+    vpi_xi.dat.data[:] = xig.dat.data[:] # initial guess (mesh_xi)
     outfile.write(obj.vp,time=i)
     
-    print("   Starting ROL solver...", flush=True)
-    problem = ROL.OptimizationProblem(obj, opt, bnd=bnd)
+    print("   Minimize: starting ROL solver...", flush=True)
+    problem = ROL.OptimizationProblem(obj, FeVector(xig.vector(), inner_product), bnd=bnd)
     solver = ROL.OptimizationSolver(problem, params)
     solver.solve()
     
-    print("   Keep inverted vp on previous mesh...", flush=True)
     #FIXME here and elsewhere: use dat.data_ro_with_halos
-    vp_old_mesh.dat.data[:] = obj.vp.dat.data[:] # they have the same space/mesh
+    vpf_xi.dat.data[:] = obj.vp.dat.data[:] # inverted field (mesh_xi)
 
-    print("   Define monitor function...", flush=True)
-    M.dat.data[:] = vp0.dat.data[:] / obj.vp.dat.data[:] # they have the same space/mesh 
-    File("monitor.pvd").write(M)
+    M_xi.dat.data[:] = vpi_xi.dat.data[:] / vpf_xi.dat.data[:] # (mesh_xi) 
+    File("monitor.pvd").write(M_xi)
     #sys.exit("exit")
-    
-    if max(abs(M.dat.data[:]-1)) > 0.15: # FIXME define this limit better
-        print("   monitor diff="+str(max(abs(M.dat.data[:]-1))))
-
-        print("   Starting moving mesh...", flush=True)
-        method = "quasi_newton"
-        tol = 1.0e-03
-        mover = MongeAmpereMover(mesh, monitor, method=method, rtol=tol)
-        mover.move() 
-    
-        print("   Project vp from previous mesh onto the new one...", flush=True)
-        #File("vp_old.pvd").write(vp_old_mesh)
-        # FIXME if the mesh does not move, it will restart from vp_old
-        x0.project(vp_old_mesh) 
-        #File("x0.pvd").write(x0)
-        #sys.exit("exit")
-        
-        vp0.dat.data[:] = x0.dat.data[:] # here they all have the same space/mesh
-    else:
-        x0.dat.data[:] = obj.vp.dat.data[:] # no mesh movement, therefore they have the same space/mesh
    
-    opt = FeVector(x0.vector(), inner_product)
+    # ok, let's adapt mesh_x
+    if max(abs(M_xi.dat.data[:]-1)) > 0.15: # FIXME define this limit better
+        print("   Starting moving mesh...", flush=True)
+        print("   monitor diff="+str(max(abs(M_xi.dat.data[:]-1))))
+        
+        def monitor_function(mesh, M_xi=M_xi):
+            # project onto "mesh" that is being adapted (i.e., mesh_x)
+            P1 = FunctionSpace(mesh, "CG", 1)
+            M_x = Function(P1)
+            M_x.project(M_xi)
+            return M_x
+        
+        mover = MongeAmpereMover(mesh_x, monitor_function, method=method, rtol=tol)
+        mover.move() # mesh_x will be adapted, so space V_x
+        #FIXME check if the mesh has changed
+        
+        xig.project(vpf_xi) # project inverted vp onto the new mesh such this could be used as initial guess for next i 
+        mesh_xi.coordinates.dat.data[:] = mesh_x.coordinates.dat.data[:] # update mesh_xi FIXME improve this
+       
+        # FIXME maybe there is another way to update the tabulatins of the source and the receivers
+        obj.receivers = spyro.Receivers(model, mesh_x, V_x, comm)
+        obj.sources = spyro.Sources(model, mesh_x, V_x, comm) 
+    else:
+        xig.dat.data[:] = obj.vp.dat.data[:] # no mesh movement, therefore they have the same space/mesh (mesh_x=mesh_xi)
 
