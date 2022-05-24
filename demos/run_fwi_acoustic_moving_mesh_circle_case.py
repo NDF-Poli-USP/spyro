@@ -224,7 +224,7 @@ paramsDict = {
         'Relative Gradient Tolerance': 1e-10,
         "Step Tolerance": 1.0e-15,
         'Relative Step Tolerance': 1e-15,
-        "Iteration Limit": 10
+        "Iteration Limit": 15
     },
 }
 #}}}
@@ -260,7 +260,7 @@ def monitor(mesh):
     return M
 
 outfile = File("final_vp.pvd")
-for i in range(10):
+for i in range(15):
     print("FWI iteration="+str(i), flush=True) 
     outfile.write(obj.vp,time=i)
     
@@ -270,6 +270,7 @@ for i in range(10):
     solver.solve()
     
     print("   Keep inverted vp on previous mesh...", flush=True)
+    #FIXME here and elsewhere: use dat.data_ro_with_halos
     vp_old_mesh.dat.data[:] = obj.vp.dat.data[:] # they have the same space/mesh
 
     print("   Define monitor function...", flush=True)

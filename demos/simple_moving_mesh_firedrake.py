@@ -1,7 +1,8 @@
 from firedrake import *
 import sys
 
-mesh = RectangleMesh(14, 14, 1, 1, diagonal="crossed")
+n = 20
+mesh = RectangleMesh(n, n, 1, 1, diagonal="crossed")
 #mesh = RectangleMesh(200, 200, 1, 1, diagonal="crossed") # plot the analytical solution
 
 V = FunctionSpace(mesh, "CG", 2)

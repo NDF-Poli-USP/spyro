@@ -13,8 +13,8 @@ Build a mesh of the Marmousi elastic benchmark velocity model in serial or paral
 Takes roughly 1 minute with 2 processors and less than 1 GB of RAM.
 """
 
-use_vs = True 
-smooth = False
+use_vs = False 
+smooth = True
 write_vel_mod = False
 mesh_adapted  = True
 
@@ -28,7 +28,10 @@ else:
     if smooth==False:
         fname = "./velocity_models/elastic-marmousi-model/model/MODEL_P-WAVE_VELOCITY_1.25m.segy"  # in m/s
     else:
-        fname = "./velocity_models/elastic-marmousi-model/model/MODEL_P-WAVE_VELOCITY_1.25m.segy.smoothed.segy"  # in m/s
+        #for sigma=100, use freq=5 Hz
+        #for sigma=300, use freq=3 Hz
+        #fname = "./velocity_models/elastic-marmousi-model/model/MODEL_P-WAVE_VELOCITY_1.25m.segy.smoothed.segy"  # in m/s
+        fname = "./velocity_models/elastic-marmousi-model/model/MODEL_P-WAVE_VELOCITY_1.25m.segy.smoothed_sigma=300.segy"  # in m/s
 
 #fname = "./velocity_models/elastic-marmousi-model/model/MODEL_DENSITY_1.25m.segy"          # in g/cm3
 
@@ -53,7 +56,8 @@ if mesh_adapted:
         hmin=hmin,          # minimum edge length in the domain 
         units="m-s",        # the units of the seismic velocity model (forcing m/s because of a <1000 assumption) FIXME 
         wl=5,               # number of cells per wavelength for a given f_max
-        freq=5,             # f_max in hertz for which to estimate wl
+        #freq=5,             # f_max in hertz for which to estimate wl
+        freq=3,             # f_max in hertz for which to estimate wl
         dt=0.001,           # theoretical maximum stable timestep in seconds given Courant number Cr
         #grade=0.15,         # maximum allowable variation in mesh size in decimal percent
         grade=1.0,         # maximum allowable variation in mesh size in decimal percent
@@ -75,7 +79,7 @@ else:
     )
 
 print("ef="+str(ef.eval((-200,1000))))
-assert ef.eval((-200,1000)) == 60
+#assert ef.eval((-200,1000)) == 60
 
 #sys.exit("exit")
 #plot_sizing_function(ef)
@@ -96,16 +100,17 @@ if comm.rank == 0:
     # Write the mesh in a vtk format for visualization in ParaView
     # NOTE: SeismicMesh outputs assumes the domain is (z,x) so for visualization
     # in ParaView, we swap the axes so it appears as in the (x,z) plane.
+    smooth_str = ""
+    if smooth:
+        #smooth_str = "_smoothed_" 
+        smooth_str = "_smoothed_sigma=300" 
+    
     if use_vs:
-        #gmsh_file = "meshes/marmousi_elastic_with_water_layer_adapted_using_vs.msh"
-        #vtk_file  = "meshes/marmousi_elastic_with_water_layer_adapted_using_vs.vtk"
-        gmsh_file = "marmousi_elastic_with_water_layer_adapted_using_vs.msh"
-        vtk_file  = "marmousi_elastic_with_water_layer_adapted_using_vs2.vtk"
+        gmsh_file = "meshes/marmousi_elastic_with_water_layer_adapted_using_vs" + smooth_str + ".msh"
+        vtk_file  = "meshes/marmousi_elastic_with_water_layer_adapted_using_vs" + smooth_str + ".vtk"
     else:
-        #gmsh_file = "meshes/marmousi_elastic_with_water_layer_adapted_using_vp.msh"
-        #vtk_file  = "meshes/marmousi_elastic_with_water_layer_adapted_using_vp.vtk"
-        gmsh_file = "marmousi_elastic_with_water_layer_adapted_using_vp.msh"
-        vtk_file  = "marmousi_elastic_with_water_layer_adapted_using_vp2.vtk"
+        gmsh_file = "meshes/marmousi_elastic_with_water_layer_adapted_using_vp" + smooth_str + ".msh"
+        vtk_file  = "meshes/marmousi_elastic_with_water_layer_adapted_using_vp" + smooth_str + ".vtk"
 
     meshio.write_points_cells(
         gmsh_file, 
