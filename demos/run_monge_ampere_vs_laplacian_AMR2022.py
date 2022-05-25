@@ -5,11 +5,17 @@ import spyro
 import sys
 import time
 
-# from cao etal 2002 p. 131 {{{
+# ring, from cao etal 2002 p. 131 {{{
 den_ring = lambda t, x, y: 1 + t * 5 * exp(-50 * abs( (x-0.5)**2 + (y-0.5)**2 - (0.25)**2 ) )
 #}}}
-# from Spyro run_fwi_acoustic_moving_mesh_circle_case.py {{{
+# circle, from Spyro run_fwi_acoustic_moving_mesh_circle_case.py {{{
 den_circle = lambda t, x, y: 2.5 + t * tanh(20 * (0.125 - sqrt(( x - 0.5) ** 2 + (y - 0.5) ** 2)))
+#}}}
+# circle 2, from Spyro run_fwi_acoustic_moving_mesh_circle_case.py {{{
+den_circle2 = lambda t, x, y: 1.5 / (2.5 + t * tanh(20 * (0.125 - sqrt(( x - 0.5) ** 2 + (y - 0.5) ** 2))))
+#}}}
+# circle 3, from Spyro run_fwi_acoustic_moving_mesh_circle_case.py {{{
+den_circle3 = lambda t, x, y: 1.5 / (2.5 + t * tanh(200 * (0.125 - sqrt(( x - 0.5) ** 2 + (y - 0.5) ** 2))))
 #}}}
 # from Marmousi model {{{
 model = {}
@@ -82,6 +88,14 @@ def monitor_function_ring(mesh, t=1):
 def monitor_function_circle(mesh, t=1):
     x,y = SpatialCoordinate(mesh)
     return den_circle(t,x,y)
+
+def monitor_function_circle2(mesh, t=1):
+    x,y = SpatialCoordinate(mesh)
+    return den_circle2(t,x,y)
+
+def monitor_function_circle3(mesh, t=1):
+    x,y = SpatialCoordinate(mesh)
+    return den_circle3(t,x,y)
 
 def monitor_function_marmousi(mesh, t=1):
     # project onto "mesh" that is being adapted
@@ -206,7 +220,7 @@ mesh_laplacian = UnitSquareMesh(n, n, diagonal="crossed")
 file_monitor_mongeampere = File("monitor_mongeampere.pvd")
 file_monitor_laplacian   = File("monitor_laplacian.pvd")
 
-monitor_type = 3
+monitor_type = 4
 # call the moving mesh solvers
 if monitor_type==1: # ring (analytic)
     run_moving_mesh_mongeampere(mesh_mongeampere, monitor_function_ring, method, tol, file_monitor_mongeampere)
@@ -214,7 +228,13 @@ if monitor_type==1: # ring (analytic)
 elif monitor_type==2: # circle (analytic)
     run_moving_mesh_mongeampere(mesh_mongeampere, monitor_function_circle, method, tol, file_monitor_mongeampere)
     run_moving_mesh_laplacian_2(mesh_laplacian, den_circle, dt, num_timesteps, file_monitor_laplacian)
-elif monitor_type==3: # marmousi (discrete)
+elif monitor_type==3: # circle 2 (analytic)
+    run_moving_mesh_mongeampere(mesh_mongeampere, monitor_function_circle2, method, tol, file_monitor_mongeampere)
+    run_moving_mesh_laplacian_2(mesh_laplacian, den_circle2, dt, num_timesteps, file_monitor_laplacian)
+elif monitor_type==4: # circle 3 (analytic)
+    run_moving_mesh_mongeampere(mesh_mongeampere, monitor_function_circle3, method, tol, file_monitor_mongeampere)
+    run_moving_mesh_laplacian_2(mesh_laplacian, den_circle3, dt, num_timesteps, file_monitor_laplacian)
+elif monitor_type==5: # marmousi (discrete)
     model["mesh"]["meshfile"] = "meshes/marmousi_elastic_with_water_layer_adapted_using_vp_smoothed_sigma=300.msh"
     model["mesh"]["truemodel"] = model_path+"MODEL_P-WAVE_VELOCITY_1.25m.segy.smoothed_sigma=300.segy.hdf5"# m/s
     # read meshes for marmousi model

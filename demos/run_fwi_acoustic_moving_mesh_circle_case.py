@@ -18,7 +18,7 @@ from scipy.interpolate import griddata
 from spyro.io import write_function_to_grid
 #from ..domains import quadrature, space
 
-#parameters from Daiane
+# define the model parameters using Daiane's setup (minor changes are annotated) {{{
 model = {}
 
 model["opts"] = {
@@ -73,15 +73,12 @@ model["acquisition"] = {
 model["timeaxis"] = {
     "t0": 0.0,  #  Initial time for event
     "tf": 1.0, # Final time for event 
-    "dt": 0.001,  # timestep size 
+    "dt": 0.0005,  # timestep size 
     "nspool":  20,  # (20 for dt=0.00050) how frequently to output solution to pvds
     "fspool": 1,  # how frequently to save solution to RAM
 }
-
-comm = spyro.utils.mpi_init(model)
-mesh_x, V_x = spyro.io.read_mesh(model, comm) # mesh that will be adapted
-
-# make vp {{{
+#}}}
+# make vp according to Daiane's setup (minor chanegs aare annotated) {{{
 def _make_vp(V, mesh, vp_guess=False):
     """creating velocity models"""
     x,z = SpatialCoordinate(mesh)
@@ -91,33 +88,50 @@ def _make_vp(V, mesh, vp_guess=False):
     else:
         vp  = Function(V).interpolate(
             2.5
-            + 1 * tanh(20 * (0.125 - sqrt(( x - 1) ** 2 + (z + 0.5) ** 2)))
+            #+ 1 * tanh(20 * (0.125 - sqrt(( x - 1) ** 2 + (z + 0.5) ** 2))) # original one
+            + 1 * tanh(200 * (0.125 - sqrt(( x - 1) ** 2 + (z + 0.5) ** 2)))
         )
         File("exact_vp.pvd").write(vp)
 
     return vp
 #}}}
 
+comm = spyro.utils.mpi_init(model)
+
+# run exact model with a finer mesh {{{
+mesh_x = RectangleMesh(45, 45, model["mesh"]["Lx"], model["mesh"]["Lz"]-0.5, diagonal="crossed", comm=comm.comm)
+mesh_x.coordinates.dat.data[:, 0] -= 0.0 # PML size
+mesh_x.coordinates.dat.data[:, 1] -= model["mesh"]["Lz"]-0.5
+
+element = spyro.domains.space.FE_method(mesh_x, model["opts"]["method"], model["opts"]["degree"])
+V_x = FunctionSpace(mesh_x, element)
+
 sources = spyro.Sources(model, mesh_x, V_x, comm)
 receivers = spyro.Receivers(model, mesh_x, V_x, comm)
-wavelet = spyro.full_ricker_wavelet(
-                dt=model["timeaxis"]["dt"], tf=model["timeaxis"]["tf"], freq=model["acquisition"]["frequency"]
-            )
+wavelet = spyro.full_ricker_wavelet(dt=model["timeaxis"]["dt"], tf=model["timeaxis"]["tf"], freq=model["acquisition"]["frequency"])
 
 vp_exact = _make_vp(V_x, mesh_x, vp_guess=False)
-vp_guess = _make_vp(V_x, mesh_x, vp_guess=True)
-#sys.exit("exit")
 
-# FIXME this should be computed using a fixed mesh
-print("Starting forward computation",flush=True) 
+print("Starting forward computation of the exact model",flush=True) 
 start = time.time()
 p_exact, p_exact_at_recv = spyro.solvers.forward(
-    model, mesh_x, comm, vp_exact, sources, wavelet, receivers, output=True
+    model, mesh_x, comm, vp_exact, sources, wavelet, receivers, output=False
 )
 end = time.time()
 print(round(end - start,2),flush=True)
 File("p_exact.pvd").write(p_exact[-1])
 #sys.exit("exit")
+#}}}
+
+# now, prepare to run the FWI with a coarser mesh
+mesh_x, V_x = spyro.io.read_mesh(model, comm) # mesh that will be adapted
+sources = spyro.Sources(model, mesh_x, V_x, comm)
+receivers = spyro.Receivers(model, mesh_x, V_x, comm)
+wavelet = spyro.full_ricker_wavelet(dt=model["timeaxis"]["dt"], tf=model["timeaxis"]["tf"], freq=model["acquisition"]["frequency"])
+
+vp_guess = _make_vp(V_x, mesh_x, vp_guess=True)
+#sys.exit("exit")
+
 class L2Inner(object): #{{{
     # used in the gradient norm computation
     def __init__(self):
@@ -292,7 +306,8 @@ for i in range(15):
 
     M_xi.dat.data[:] = vpi_xi.dat.data[:] / vpf_xi.dat.data[:] # (mesh_xi) 
     File("monitor.pvd").write(M_xi)
-    #sys.exit("exit")
+    outfile.write(obj.vp,time=i+1) # FIXME
+    sys.exit("exit")
    
     # ok, let's adapt mesh_x
     if max(abs(M_xi.dat.data[:]-1)) > 0.15: # FIXME define this limit better
