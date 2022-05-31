@@ -7,7 +7,7 @@ import sys
 import matplotlib.pyplot as plt
 import numpy as np
 import meshio
-import SeismicMesh
+#import SeismicMesh
 import finat
 from ROL.firedrake_vector import FiredrakeVector as FeVector
 import ROL
@@ -23,7 +23,7 @@ model = {}
 
 model["opts"] = {
     "method": "KMV",  # either CG or KMV
-    "quadratrue": "KMV", # Equi or KMV #FIXME it will be removed
+    "quadrature": "KMV", # Equi or KMV #FIXME it will be removed
     "degree": 3,  # p order
     "dimension": 2,  # dimension
     "regularization": False,  # regularization is on?
@@ -88,8 +88,8 @@ def _make_vp(V, mesh, vp_guess=False):
     else:
         vp  = Function(V).interpolate(
             2.5
-            #+ 1 * tanh(20 * (0.125 - sqrt(( x - 1) ** 2 + (z + 0.5) ** 2))) # original one
-            + 1 * tanh(200 * (0.125 - sqrt(( x - 1) ** 2 + (z + 0.5) ** 2)))
+            + 1 * tanh(20 * (0.125 - sqrt(( x - 1) ** 2 + (z + 0.5) ** 2))) # original one
+            #+ 1 * tanh(200 * (0.125 - sqrt(( x - 1) ** 2 + (z + 0.5) ** 2)))
         )
         File("exact_vp.pvd").write(vp)
 
@@ -125,6 +125,35 @@ File("p_exact.pvd").write(p_exact[-1])
 
 # now, prepare to run the FWI with a coarser mesh
 mesh_x, V_x = spyro.io.read_mesh(model, comm) # mesh that will be adapted
+# adapt the mesh using the exact vp, if requested {{{
+if True:
+  
+    _mesh_xi, _V_xi = spyro.io.read_mesh(model, comm) # computational mesh
+    _vpi_xi = _make_vp(_V_xi, _mesh_xi, vp_guess=True)
+    _vpf_xi = _make_vp(_V_xi, _mesh_xi, vp_guess=False)
+    _M_xi   = Function(_V_xi)   # monitor function using vpi_xi and vpf_xi
+
+    alpha = 1.
+    _M_xi.dat.data[:] = (_vpi_xi.dat.data[:] / _vpf_xi.dat.data[:])**alpha # (mesh_xi) 
+    
+    def monitor_function(mesh, M_xi=_M_xi):
+        # project onto "mesh" that is being adapted (i.e., mesh_x)
+        P1 = FunctionSpace(mesh, "CG", 1)
+        M_x = Function(P1)
+        M_x.project(M_xi) # Project from computational mesh (mesh_xi) onto physical mesh (mesh_x)
+        return M_x
+
+    method = "quasi_newton"
+    tol = 1.0e-03
+    mover = MongeAmpereMover(mesh_x, monitor_function, method=method, rtol=tol)
+    step  = mover.move() # mesh_x will be adapted, so space V_x
+
+    print("mesh_x adapted in "+str(step)+" steps")
+
+    _vp_guess = _make_vp(V_x, mesh_x, vp_guess=True)
+    File("adapted_mesh.pvd").write(_vp_guess)
+    #sys.exit("exit")
+#}}}
 sources = spyro.Sources(model, mesh_x, V_x, comm)
 receivers = spyro.Receivers(model, mesh_x, V_x, comm)
 wavelet = spyro.full_ricker_wavelet(dt=model["timeaxis"]["dt"], tf=model["timeaxis"]["tf"], freq=model["acquisition"]["frequency"])
@@ -153,6 +182,7 @@ class Objective(ROL.Objective):
         self.p_guess = None
         self.vp = Function(V_x)
         self.misfit = 0.0
+        self.J = 0.0
         self.p_exact_recv = p_exact_at_recv 
         self.sources = sources
         self.receivers = receivers
@@ -185,9 +215,10 @@ class Objective(ROL.Objective):
         plt.plot(pe,label='exact')
         plt.plot(pg,label='guess')
         plt.legend()
-        plt.savefig('/home/santos/Desktop/FWI_acoustic.png')
+        #plt.savefig('/home/santos/Desktop/FWI_acoustic.png')
         plt.close()
-
+        
+        self.J = J_total[0]
         return J_total[0]
 
     def gradient(self, g, x, tol):
@@ -287,13 +318,18 @@ method = "quasi_newton"
 tol = 1.0e-03
 #}}}
 
+Ji=[]
+ii=[]
+adapt_mesh = False
+mesh_moved = True
 outfile = File("final_vp.pvd")
-for i in range(15):
+for i in range(10): #FIXME define it better
     print("Loop iteration="+str(i), flush=True) 
    
     # at this moment, mesh_x=mesh_xi
+    if mesh_moved:
+        vpi_xi.dat.data[:] = xig.dat.data[:] # initial guess (mesh_xi) # vpi_xi is updated only if mesh has changed
     obj.vp.dat.data[:] = xig.dat.data[:] # initial guess (mesh_x)
-    vpi_xi.dat.data[:] = xig.dat.data[:] # initial guess (mesh_xi)
     outfile.write(obj.vp,time=i)
     
     print("   Minimize: starting ROL solver...", flush=True)
@@ -304,13 +340,15 @@ for i in range(15):
     #FIXME here and elsewhere: use dat.data_ro_with_halos
     vpf_xi.dat.data[:] = obj.vp.dat.data[:] # inverted field (mesh_xi)
 
-    M_xi.dat.data[:] = vpi_xi.dat.data[:] / vpf_xi.dat.data[:] # (mesh_xi) 
+    alpha = 1. 
+    M_xi.dat.data[:] = (vpi_xi.dat.data[:] / vpf_xi.dat.data[:])**alpha # (mesh_xi) 
     File("monitor.pvd").write(M_xi)
-    outfile.write(obj.vp,time=i+1) # FIXME
-    sys.exit("exit")
-   
+    #outfile.write(obj.vp,time=i+1) # FIXME
+    #sys.exit("exit")
+  
+    # FIXME maybe do not adapt the last step
     # ok, let's adapt mesh_x
-    if max(abs(M_xi.dat.data[:]-1)) > 0.15: # FIXME define this limit better
+    if adapt_mesh: #and max(abs(M_xi.dat.data[:]-1)) > 0.15 # FIXME define this limit better, or remove it
         print("   Starting moving mesh...", flush=True)
         print("   monitor diff="+str(max(abs(M_xi.dat.data[:]-1))))
         
@@ -322,15 +360,32 @@ for i in range(15):
             return M_x
         
         mover = MongeAmpereMover(mesh_x, monitor_function, method=method, rtol=tol)
-        mover.move() # mesh_x will be adapted, so space V_x
-        #FIXME check if the mesh has changed
-        
+        step  = mover.move() # mesh_x will be adapted, so space V_x
+        if step>0: 
+            # ok, we have mesh movement, update vpi_xi
+            print("OK, mesh has changed!")
+            mesh_moved = True
+        else:
+            print("Mesh is the same")
+            mesh_moved = False
+            dif = (mesh_xi.coordinates.dat.data[:] - mesh_x.coordinates.dat.data[:])
+
         xig.project(vpf_xi) # project inverted vp onto the new mesh such this could be used as initial guess for next i 
         mesh_xi.coordinates.dat.data[:] = mesh_x.coordinates.dat.data[:] # update mesh_xi FIXME improve this
        
-        # FIXME maybe there is another way to update the tabulatins of the source and the receivers
+        # FIXME maybe there is another way to update the tabulations of the source and the receivers
         obj.receivers = spyro.Receivers(model, mesh_x, V_x, comm)
         obj.sources = spyro.Sources(model, mesh_x, V_x, comm) 
     else:
         xig.dat.data[:] = obj.vp.dat.data[:] # no mesh movement, therefore they have the same space/mesh (mesh_x=mesh_xi)
 
+    ii.append(i)
+    Ji.append(obj.J)
+
+if COMM_WORLD.rank == 0:
+    with open(r'J.txt', 'w') as fp:
+        for j in Ji:
+            # write each item on a new line
+            fp.write("%s\n" % str(j))
+        print('Done')
+  
