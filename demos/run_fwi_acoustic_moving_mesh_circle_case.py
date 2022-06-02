@@ -24,7 +24,7 @@ model = {}
 model["opts"] = {
     "method": "KMV",  # either CG or KMV
     "quadrature": "KMV", # Equi or KMV #FIXME it will be removed
-    "degree": 3,  # p order
+    "degree": 2,  # p order
     "dimension": 2,  # dimension
     "regularization": False,  # regularization is on?
     "gamma": 1e-5, # regularization parameter
@@ -233,7 +233,7 @@ if True:
     # ok, reset to the original order
     model["opts"]["degree"] = p
     print(model["opts"]["degree"])
-    sys.exit("exit")
+    #sys.exit("exit")
 #}}}
 
 # now, prepare to run the FWI with a coarser mesh
@@ -242,7 +242,7 @@ p = model["opts"]["degree"]
 model["mesh"]["meshfile"] = "./meshes/fwi_amr_circle_p=" + str(p) + ".msh" 
 mesh_x, V_x = spyro.io.read_mesh(model, comm) # mesh that will be adapted
 # adapt the mesh using the exact vp, if requested {{{
-if True:
+if False:
   
     _mesh_xi, _V_xi = spyro.io.read_mesh(model, comm) # computational mesh
     _vpi_xi = _make_vp(_V_xi, _mesh_xi, vp_guess=True)
