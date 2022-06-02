@@ -15,7 +15,7 @@ from scipy.ndimage import gaussian_filter
 from mpi4py import MPI
 from scipy.interpolate import RegularGridInterpolator
 from scipy.interpolate import griddata
-from spyro.io import write_function_to_grid
+from spyro.io import write_function_to_grid, create_segy
 #from ..domains import quadrature, space
 
 # define the model parameters using Daiane's setup (minor changes are annotated) {{{
@@ -83,13 +83,17 @@ def _make_vp(V, mesh, vp_guess=False):
     """creating velocity models"""
     x,z = SpatialCoordinate(mesh)
     if vp_guess:
-        vp   = Function(V).interpolate(1.5 + 0.0 * x)
+        vp   = Function(V).interpolate(1.5 + 0.0 * x) # original one (constant)
+        #vp   = Function(V).interpolate(
+        #    2.5
+        #    + 1 * tanh(2 * (0.125 - sqrt(( x - 1) ** 2 + (z + 0.5) ** 2))) # initial guess
+        #)
         File("guess_vp.pvd").write(vp)
     else:
         vp  = Function(V).interpolate(
             2.5
-            + 1 * tanh(20 * (0.125 - sqrt(( x - 1) ** 2 + (z + 0.5) ** 2))) # original one
-            #+ 1 * tanh(200 * (0.125 - sqrt(( x - 1) ** 2 + (z + 0.5) ** 2)))
+            #+ 1 * tanh(20 * (0.125 - sqrt(( x - 1) ** 2 + (z + 0.5) ** 2))) # original one (smoother)
+            + 1 * tanh(100 * (0.125 - sqrt(( x - 1) ** 2 + (z + 0.5) ** 2))) # sharper
         )
         File("exact_vp.pvd").write(vp)
 
@@ -97,33 +101,145 @@ def _make_vp(V, mesh, vp_guess=False):
 #}}}
 
 comm = spyro.utils.mpi_init(model)
+# generate mesh with SeismicMesh, if requested {{{
+if False:
+    from SeismicMesh import get_sizing_function_from_segy, generate_mesh, Rectangle, plot_sizing_function
+    from scipy.ndimage import gaussian_filter
+    import segyio
+
+    # number of cells per wavelenght, from Roberts et al., 2021 (GMD)
+    # Heterogeneous case
+    if model['opts']['degree']   == 2:
+        M = 6.70
+    elif model['opts']['degree'] == 3:
+        M = 3.55
+    elif model['opts']['degree'] == 4:
+        M = 2.41
+    elif model['opts']['degree'] == 5:
+        M = 1.84 
+
+    mesh_x = RectangleMesh(45, 45, model["mesh"]["Lx"], model["mesh"]["Lz"]-0.5, diagonal="crossed", comm=comm.comm)
+    mesh_x.coordinates.dat.data[:, 0] -= 0.0 # PML size
+    mesh_x.coordinates.dat.data[:, 1] -= model["mesh"]["Lz"]-0.5
+    element = spyro.domains.space.FE_method(mesh_x, model["opts"]["method"], model["opts"]["degree"])
+    V_x = FunctionSpace(mesh_x, element)
+
+    _vp = _make_vp(V_x, mesh_x, vp_guess=True)
+
+    xg, yg, vg = write_function_to_grid(_vp, V_x, 0.005)
+    
+    if False:
+        sigma = 250
+        vg_smooth = gaussian_filter(vg, sigma) 
+    
+    fname = "./velocity_models/fwi_amr_circle.segy"
+    create_segy(vg, fname)
+        
+    if True: # plot vg? {{{
+        with segyio.open(fname, ignore_geometry=True) as f:
+            nz, nx = len(f.samples), len(f.trace)
+            show_vp = np.zeros(shape=(nz, nx))
+            for index, trace in enumerate(f.trace):
+                show_vp[:, index] = trace
+
+        fig, ax = plt.subplots()
+        plt.pcolormesh(show_vp, shading="auto")
+        plt.title("Guess model")
+        plt.colorbar(label="P-wave velocity (km/s)")
+        plt.xlabel("x-direction (m)")
+        plt.ylabel("z-direction (m)")
+        ax.axis("equal")
+        plt.show()
+    #}}}
+
+    bbox = (0.0, 2000.0, -1500.0, 0.0)
+    rectangle = Rectangle(bbox)
+    
+    hmin = 25.0 # default
+    freq = model["acquisition"]["frequency"]
+    dt = model["timeaxis"]["dt"]
+    ef = get_sizing_function_from_segy(
+        fname,
+        bbox=bbox,
+        hmin=hmin,          # minimum edge length in the domain 
+        units="km-s",        # the units of the seismic velocity model (forcing m/s because of a <1000 assumption) FIXME 
+        wl=M,               # number of cells per wavelength for a given f_max
+        freq=freq,           # f_max in hertz for which to estimate wl
+        dt=dt,           # theoretical maximum stable timestep in seconds given Courant number Cr
+        grade=1.0,         # maximum allowable variation in mesh size in decimal percent
+        domain_pad=0.,      # the width of the domain pad in -z, +x, -x, +y, -y directions
+        pad_style="edge",   # the method (`edge`, `linear_ramp`, `constant`) to pad velocity in the domain pad region
+    )
+    #plot_sizing_function(ef, comm)
+    points, cells = generate_mesh(domain=rectangle,
+                              edge_length=ef,
+                              mesh_improvement=True,
+                              perform_checks=False,
+                              verbose=10,
+                              max_iter=50,
+                              r0m_is_h0=True,
+                             )
+    
+    if comm.comm.rank == 0:
+        p = model["opts"]["degree"]
+        vtk_file = "./meshes/fwi_amr_circle_p=" + str(p) + ".vtk"
+        meshio.write_points_cells(
+            vtk_file,
+            #points[:, [1, 0]] / 1000,
+            points[:] / 1000, # do not swap here
+            [("triangle", cells)],
+            file_format="vtk",
+            binary=False
+        )
+        gmsh_file = "./meshes/fwi_amr_circle_p=" + str(p) + ".msh"
+        meshio.write_points_cells(
+            gmsh_file,
+            points[:] / 1000, # do not swap here
+            [("triangle", cells)],
+            file_format="gmsh22",
+            binary=False
+        )
+ 
+    sys.exit("exit")
+#}}}
 
 # run exact model with a finer mesh {{{
-mesh_x = RectangleMesh(45, 45, model["mesh"]["Lx"], model["mesh"]["Lz"]-0.5, diagonal="crossed", comm=comm.comm)
-mesh_x.coordinates.dat.data[:, 0] -= 0.0 # PML size
-mesh_x.coordinates.dat.data[:, 1] -= model["mesh"]["Lz"]-0.5
+if True:
+    mesh_x = RectangleMesh(40, 30, model["mesh"]["Lx"], model["mesh"]["Lz"]-0.5, diagonal="crossed", comm=comm.comm)
+    mesh_x.coordinates.dat.data[:, 0] -= 0.0 # PML size
+    mesh_x.coordinates.dat.data[:, 1] -= model["mesh"]["Lz"]-0.5
 
-element = spyro.domains.space.FE_method(mesh_x, model["opts"]["method"], model["opts"]["degree"])
-V_x = FunctionSpace(mesh_x, element)
+    # for the exact model, use a higher-order element
+    p = model["opts"]["degree"] # to keep the order defined by the user
+    model["opts"]["degree"] = 4
+    element = spyro.domains.space.FE_method(mesh_x, model["opts"]["method"], model["opts"]["degree"])
+    V_x = FunctionSpace(mesh_x, element)
 
-sources = spyro.Sources(model, mesh_x, V_x, comm)
-receivers = spyro.Receivers(model, mesh_x, V_x, comm)
-wavelet = spyro.full_ricker_wavelet(dt=model["timeaxis"]["dt"], tf=model["timeaxis"]["tf"], freq=model["acquisition"]["frequency"])
+    sources = spyro.Sources(model, mesh_x, V_x, comm)
+    receivers = spyro.Receivers(model, mesh_x, V_x, comm)
+    wavelet = spyro.full_ricker_wavelet(dt=model["timeaxis"]["dt"], tf=model["timeaxis"]["tf"], freq=model["acquisition"]["frequency"])
 
-vp_exact = _make_vp(V_x, mesh_x, vp_guess=False)
+    vp_exact = _make_vp(V_x, mesh_x, vp_guess=False)
 
-print("Starting forward computation of the exact model",flush=True) 
-start = time.time()
-p_exact, p_exact_at_recv = spyro.solvers.forward(
-    model, mesh_x, comm, vp_exact, sources, wavelet, receivers, output=False
-)
-end = time.time()
-print(round(end - start,2),flush=True)
-File("p_exact.pvd").write(p_exact[-1])
-#sys.exit("exit")
+    print("Starting forward computation of the exact model",flush=True) 
+    start = time.time()
+    p_exact, p_exact_at_recv = spyro.solvers.forward(
+        model, mesh_x, comm, vp_exact, sources, wavelet, receivers, output=False
+    )
+    end = time.time()
+    print(round(end - start,2),flush=True)
+    File("p_exact.pvd").write(p_exact[-1])
+
+    # ok, reset to the original order
+    model["opts"]["degree"] = p
+    print(model["opts"]["degree"])
+    sys.exit("exit")
 #}}}
 
 # now, prepare to run the FWI with a coarser mesh
+
+p = model["opts"]["degree"]
+model["mesh"]["meshfile"] = "./meshes/fwi_amr_circle_p=" + str(p) + ".msh" 
 mesh_x, V_x = spyro.io.read_mesh(model, comm) # mesh that will be adapted
 # adapt the mesh using the exact vp, if requested {{{
 if True:
@@ -150,9 +266,9 @@ if True:
 
     print("mesh_x adapted in "+str(step)+" steps")
 
-    _vp_guess = _make_vp(V_x, mesh_x, vp_guess=True)
-    File("adapted_mesh.pvd").write(_vp_guess)
-    #sys.exit("exit")
+    _vp_exact = _make_vp(V_x, mesh_x, vp_guess=False)
+    File("adapted_mesh.pvd").write(_vp_exact)
+    sys.exit("exit")
 #}}}
 sources = spyro.Sources(model, mesh_x, V_x, comm)
 receivers = spyro.Receivers(model, mesh_x, V_x, comm)
@@ -343,8 +459,6 @@ for i in range(10): #FIXME define it better
     alpha = 1. 
     M_xi.dat.data[:] = (vpi_xi.dat.data[:] / vpf_xi.dat.data[:])**alpha # (mesh_xi) 
     File("monitor.pvd").write(M_xi)
-    #outfile.write(obj.vp,time=i+1) # FIXME
-    #sys.exit("exit")
   
     # FIXME maybe do not adapt the last step
     # ok, let's adapt mesh_x
@@ -365,17 +479,17 @@ for i in range(10): #FIXME define it better
             # ok, we have mesh movement, update vpi_xi
             print("OK, mesh has changed!")
             mesh_moved = True
+            xig.project(vpf_xi)# project vp onto the new mesh such this could be used as initial guess for next i 
+            mesh_xi.coordinates.dat.data[:] = mesh_x.coordinates.dat.data[:] # update mesh_xi FIXME improve this
+            
+            # FIXME maybe there is another way to update the tabulations of the source and the receivers
+            obj.receivers = spyro.Receivers(model, mesh_x, V_x, comm)
+            obj.sources = spyro.Sources(model, mesh_x, V_x, comm) 
         else:
             print("Mesh is the same")
             mesh_moved = False
-            dif = (mesh_xi.coordinates.dat.data[:] - mesh_x.coordinates.dat.data[:])
-
-        xig.project(vpf_xi) # project inverted vp onto the new mesh such this could be used as initial guess for next i 
-        mesh_xi.coordinates.dat.data[:] = mesh_x.coordinates.dat.data[:] # update mesh_xi FIXME improve this
+            xig.dat.data[:] = obj.vp.dat.data[:] # no mesh movement, therefore mesh_x=mesh_xi
        
-        # FIXME maybe there is another way to update the tabulations of the source and the receivers
-        obj.receivers = spyro.Receivers(model, mesh_x, V_x, comm)
-        obj.sources = spyro.Sources(model, mesh_x, V_x, comm) 
     else:
         xig.dat.data[:] = obj.vp.dat.data[:] # no mesh movement, therefore they have the same space/mesh (mesh_x=mesh_xi)
 
