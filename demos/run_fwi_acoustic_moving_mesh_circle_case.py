@@ -8,6 +8,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 import meshio
 #import SeismicMesh
+import weakref
 import finat
 from ROL.firedrake_vector import FiredrakeVector as FeVector
 import ROL
@@ -24,7 +25,7 @@ model = {}
 model["opts"] = {
     "method": "KMV",  # either CG or KMV
     "quadrature": "KMV", # Equi or KMV #FIXME it will be removed
-    "degree": 2,  # p order
+    "degree": 3,  # p order
     "dimension": 2,  # dimension
     "regularization": False,  # regularization is on?
     "gamma": 1e-5, # regularization parameter
@@ -63,8 +64,8 @@ model["acquisition"] = {
     "source_type": "Ricker",
     "frequency": 7.0, 
     "delay": 1.0, # FIXME check this
-    "num_sources": 4, #FIXME not used (remove it, and update an example script)
-    "source_pos": spyro.create_transect((0.6, -0.1), (1.4, -0.1), 4),
+    "num_sources": 1, #FIXME not used (remove it, and update an example script)
+    "source_pos": spyro.create_transect((0.6, -0.1), (1.4, -0.1), 1),
     "amplitude": 1.0, #FIXME check this
     "num_receivers": 10, #FIXME not used (remove it, and update an example script)
     "receiver_locations": spyro.create_transect((0.6, -0.2), (1.4, -0.2), 10),
@@ -204,7 +205,7 @@ if False:
 #}}}
 
 # run exact model with a finer mesh {{{
-if True:
+if False:
     mesh_x = RectangleMesh(40, 30, model["mesh"]["Lx"], model["mesh"]["Lz"]-0.5, diagonal="crossed", comm=comm.comm)
     mesh_x.coordinates.dat.data[:, 0] -= 0.0 # PML size
     mesh_x.coordinates.dat.data[:, 1] -= model["mesh"]["Lz"]-0.5
@@ -242,16 +243,22 @@ p = model["opts"]["degree"]
 model["mesh"]["meshfile"] = "./meshes/fwi_amr_circle_p=" + str(p) + ".msh" 
 mesh_x, V_x = spyro.io.read_mesh(model, comm) # mesh that will be adapted
 # adapt the mesh using the exact vp, if requested {{{
-if False:
-  
+if True:
+ 
     _mesh_xi, _V_xi = spyro.io.read_mesh(model, comm) # computational mesh
     _vpi_xi = _make_vp(_V_xi, _mesh_xi, vp_guess=True)
     _vpf_xi = _make_vp(_V_xi, _mesh_xi, vp_guess=False)
     _M_xi   = Function(_V_xi)   # monitor function using vpi_xi and vpf_xi
 
     alpha = 1.
-    _M_xi.dat.data[:] = (_vpi_xi.dat.data[:] / _vpf_xi.dat.data[:])**alpha # (mesh_xi) 
+    _M_xi.dat.data_with_halos[:] = (_vpi_xi.dat.data_ro_with_halos[:] / _vpf_xi.dat.data_ro_with_halos[:])**alpha 
+    mesh_x._parallel_compatible = {weakref.ref(_mesh_xi)}
+    #print(mesh_x._parallel_compatible)
+    #print(_mesh_xi._parallel_compatible)
+    #sys.exit("exit")
     
+    expect = assemble(_vpf_xi*dx)
+
     def monitor_function(mesh, M_xi=_M_xi):
         # project onto "mesh" that is being adapted (i.e., mesh_x)
         P1 = FunctionSpace(mesh, "CG", 1)
@@ -266,16 +273,29 @@ if False:
 
     print("mesh_x adapted in "+str(step)+" steps")
 
-    _vp_exact = _make_vp(V_x, mesh_x, vp_guess=False)
-    File("adapted_mesh.pvd").write(_vp_exact)
+    # ATTENTION: to projection work properly in parallel, set distribution parameters in io.read_mesh as:
+    # distribution_parameters={
+    #            "partition": True,
+    #            "overlap_type": (fire.DistributedMeshOverlapType.VERTEX, 20)
+    #        },
+    _vpf_x = project(_vpf_xi, V_x)
+
+    actual = assemble(_vpf_x*dx)
+   
+    print(expect)
+    print(actual)
+
+    File("adapted_mesh.pvd").write(_vpf_x)
+    File("original_mesh.pvd").write(_vpf_xi)
     sys.exit("exit")
 #}}}
 sources = spyro.Sources(model, mesh_x, V_x, comm)
 receivers = spyro.Receivers(model, mesh_x, V_x, comm)
 wavelet = spyro.full_ricker_wavelet(dt=model["timeaxis"]["dt"], tf=model["timeaxis"]["tf"], freq=model["acquisition"]["frequency"])
 
+# FIXME come back to make it parallel
 vp_guess = _make_vp(V_x, mesh_x, vp_guess=True)
-#sys.exit("exit")
+sys.exit("exit")
 
 class L2Inner(object): #{{{
     # used in the gradient norm computation

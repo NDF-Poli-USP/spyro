@@ -339,7 +339,7 @@ def interpolate(model, mesh, V, guess=False, field="velocity_model"):
     return c
 
 
-def read_mesh(model, ens_comm):
+def read_mesh(model, ens_comm, distribution_parameters=None):
     """Reads in an external mesh and scatters it between cores.
 
     Parameters
@@ -364,13 +364,14 @@ def read_mesh(model, ens_comm):
     num_sources = model["acquisition"]["num_sources"]
     mshname = model["mesh"]["meshfile"]
 
+    if distribution_parameters == None:
+        distribution_parameters = {"overlap_type": (fire.DistributedMeshOverlapType.NONE, 0)}
+
     if method == "CG" or method == "KMV":
         mesh = fire.Mesh(
             mshname,
             comm=ens_comm.comm,
-            distribution_parameters={
-                "overlap_type": (fire.DistributedMeshOverlapType.NONE, 0)
-            },
+            distribution_parameters=distribution_parameters,
         )
     else:
         mesh = fire.Mesh(mshname, comm=ens_comm.comm)

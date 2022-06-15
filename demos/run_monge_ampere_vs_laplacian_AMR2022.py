@@ -69,9 +69,12 @@ model["mesh"]["truemodel"] = model_path+"MODEL_P-WAVE_VELOCITY_1.25m.segy.hdf5"#
 _vp1 = spyro.io.interpolate(model, mesh_0, _V, guess=False) # vp1 is computed over mesh_0
 
 _M = Function(_V) # create monitor function computed over mesh_0
-_alpha=1.0
+_alpha=2.0
 _M.dat.data[:] = (_vp0.dat.data[:] / _vp1.dat.data[:])**_alpha # over mesh_0
 File("monitor_mongeampere_mesh_0.pvd").write(_M)
+#File("vp0_mesh_0.pvd").write(_vp0)
+#File("vp1_mesh_0.pvd").write(_vp1)
+#sys.exit("exit")
 
 if False:
     model["mesh"]["meshfile"] = "meshes/marmousi_elastic_with_water_layer_adapted_using_vp.msh"
@@ -220,7 +223,7 @@ mesh_laplacian = UnitSquareMesh(n, n, diagonal="crossed")
 file_monitor_mongeampere = File("monitor_mongeampere.pvd")
 file_monitor_laplacian   = File("monitor_laplacian.pvd")
 
-monitor_type = 4
+monitor_type = 5
 # call the moving mesh solvers
 if monitor_type==1: # ring (analytic)
     run_moving_mesh_mongeampere(mesh_mongeampere, monitor_function_ring, method, tol, file_monitor_mongeampere)
@@ -235,12 +238,17 @@ elif monitor_type==4: # circle 3 (analytic)
     run_moving_mesh_mongeampere(mesh_mongeampere, monitor_function_circle3, method, tol, file_monitor_mongeampere)
     run_moving_mesh_laplacian_2(mesh_laplacian, den_circle3, dt, num_timesteps, file_monitor_laplacian)
 elif monitor_type==5: # marmousi (discrete)
-    model["mesh"]["meshfile"] = "meshes/marmousi_elastic_with_water_layer_adapted_using_vp_smoothed_sigma=300.msh"
+    model["mesh"]["meshfile"] = "meshes/marmousi_elastic_with_water_layer_adapted_using_vp_smoothed_sigma=300.msh" # using 5 Hz is better to illustrate
     model["mesh"]["truemodel"] = model_path+"MODEL_P-WAVE_VELOCITY_1.25m.segy.smoothed_sigma=300.segy.hdf5"# m/s
     # read meshes for marmousi model
-    mesh_mongeampere, _ = spyro.io.read_mesh(model, comm) # the mesh that will be adapted following the discrete monitor
+    mesh_mongeampere, _Vm = spyro.io.read_mesh(model, comm) # the mesh that will be adapted following the discrete monitor
 
     run_moving_mesh_mongeampere(mesh_mongeampere, monitor_function_marmousi, method, tol, file_monitor_mongeampere)
+    if False:
+        model["mesh"]["truemodel"] = model_path+"MODEL_P-WAVE_VELOCITY_1.25m.segy.hdf5"# m/s
+        _vp0 = spyro.io.interpolate(model, mesh_mongeampere, _Vm, guess=False) # just to save on disk
+        File("vp0_mesh_0.pvd").write(_vp0) # just to illustrate, maybe another file name 
+    
     #run_moving_mesh_laplacian_2(mesh_laplacian, den_marmousi, dt, num_timesteps, file_monitor_laplacian)
 else:
     pass        

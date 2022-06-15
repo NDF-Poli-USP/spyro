@@ -1,0 +1,41 @@
+# results obtained with demos/run_fwi_acoustic_moving_mesh_circle_case.py
+
+import matplotlib.pyplot as plt
+import numpy as np
+
+it_freq15 = np.arange(11)
+
+J_no_amr_p3 = np.array([8.071565e-02, 0.0018408770824220313, 0.0004816639125315367, 0.0002632943580017845, 0.0001852239480922392, 0.00013913753287873122, 0.0001132015254731047, 8.25978200191695e-05, 6.812298036860671e-05, 5.014411150077183e-05, 4.048153135539899e-05 ])
+
+J_amr_freq15_p3 = np.array([8.071565e-02, 0.0018408770824220313, 0.0004917247636222421, 0.00025727569999803155, 0.000166181728312453, 0.00012942554183032802, 0.0001034498632735299, 8.926253544382777e-05, 6.758904894327381e-05, 5.611542198924134e-05, 5.0130093630315336e-05])
+
+J_amr_freq45_p3 = np.array([8.071565e-02, 0.0018408770824220313, 0.0004816639125315367, 0.0002632943580017845, 0.0001834875313985658, 0.00013235456263122004, 0.00010667488043431043, 9.18129495516921e-05, 7.793393361909629e-05, 6.621534055434818e-05, 5.711590821321183e-05])
+
+J_amr_freq75_p3 = np.array([8.071565e-02, 0.0018408770824220313, 0.0004816639125315367, 0.0002632943580017845, 0.0001852239480922392, 0.00013913753287873122, 0.00011428541319782092, 9.349813785057817e-05, 7.653201640340638e-05, 6.242571011526988e-05, 5.1657321413060484e-05
+])
+
+J_amr_freq15_p3_alpha4_M3_96 = np.array([8.525404e-02, 0.006026896661019094, 0.0047397280719928755, 0.004538082034640574, 0.004442794094074113, 0.00440193041376198, 0.004381828408217606, 0.004379475176460897, 0.004361559427458415, 0.004365239580234829, 0.004356410911450734])
+
+J_no_amr_p3_alpha4_M3_96 = np.array([8.525404e-02, 0.006026896661019094, 0.004650216620721735, 0.004407003150382769, 0.004324889178709394, 0.004287862667217916, 0.004266639121773848, 0.004245198314941643, 0.004231214885347596, 0.0042231573548006055, 0.004216236572651827])
+
+#plt.plot(it, J_no_amr_sharp_p2, label='no AMR, p=2',marker="o", linestyle='-', color='tab:blue')
+plt.plot(it_freq15*15, J_no_amr_p3, label='no AMR, p=3',marker="o", linestyle='-', color='tab:orange')
+plt.plot(it_freq15*15, J_amr_freq15_p3, label='AMR freq=15, p=3',marker="o", linestyle='--', color='tab:orange')
+plt.plot(it_freq15*15, J_amr_freq45_p3, label='AMR freq=45, p=3',marker="o", linestyle=':', color='tab:orange')
+plt.plot(it_freq15*15, J_amr_freq75_p3, label='AMR freq=75, p=3',marker="o", linestyle='-.', color='tab:orange')
+plt.plot(it_freq15*15, J_amr_freq15_p3_alpha4_M3_96, label='AMR freq=15, p=3, alpha=4',marker="o", linestyle='--', color='tab:orange')
+plt.plot(it_freq15*15, J_no_amr_p3_alpha4_M3_96, label='AMR freq=15, p=3, alpha=4',marker="o", linestyle='-', color='tab:orange')
+#plt.plot(it, J_no_amr_sharp_p4, label='no AMR, p=4',marker="o", linestyle='-', color='tab:green')
+#plt.plot(it, J_amr_sharp_p2, label='AMR, p=2',marker="o", linestyle='--', color='tab:blue')
+
+plt.ylabel("J total",fontsize=14)
+plt.xlabel("FWI iteration", fontsize=14)
+plt.yscale('log')
+plt.title("FWI with AMR (Marmousi)", fontsize=16)
+plt.legend(loc='upper right')
+plt.grid(b=True, which='major')
+plt.grid(b=True, which='minor')
+
+plt.show()
+
+

@@ -56,8 +56,8 @@ if mesh_adapted:
         hmin=hmin,          # minimum edge length in the domain 
         units="m-s",        # the units of the seismic velocity model (forcing m/s because of a <1000 assumption) FIXME 
         wl=5,               # number of cells per wavelength for a given f_max
-        #freq=5,             # f_max in hertz for which to estimate wl
-        freq=3,             # f_max in hertz for which to estimate wl
+        freq=5,             # f_max in hertz for which to estimate wl
+        #freq=3,             # f_max in hertz for which to estimate wl
         dt=0.001,           # theoretical maximum stable timestep in seconds given Courant number Cr
         #grade=0.15,         # maximum allowable variation in mesh size in decimal percent
         grade=1.0,         # maximum allowable variation in mesh size in decimal percent

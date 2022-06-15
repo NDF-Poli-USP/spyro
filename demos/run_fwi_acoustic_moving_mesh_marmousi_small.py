@@ -26,7 +26,7 @@ model = {}
 model["opts"] = {
     "method": "KMV",  # either CG or KMV
     "quadrature": "KMV", # Equi or KMV #FIXME it will be removed
-    "degree": 4,  # p order
+    "degree": 3,  # p order
     "dimension": 2,  # dimension
     "regularization": False,  # regularization is on?
     "gamma": 1e-5, # regularization parameter
@@ -40,8 +40,10 @@ model["parallelism"] = {
 }
 
 model["mesh"] = {
-    "Lz": 1.5,  # depth in km - always positive
-    "Lx": 2.0,  # width in km - always positive
+    #"Lz": 1.5,  # depth in km - always positive
+    "Lz": 2.0,  # depth in km - always positive
+    #"Lx": 2.0,  # width in km - always positive
+    "Lx": 4.0,  # width in km - always positive
     "Ly": 0.0,  # thickness in km - always positive
     "meshfile": "not_used.msh",
     "initmodel": "not_used.hdf5",
@@ -65,40 +67,53 @@ model["acquisition"] = {
     "source_type": "Ricker",
     "frequency": 3.0, # 3 Hz for sigma=300, 5 Hz for sigma=100 
     "delay": 1.0, # FIXME check this
-    "num_sources": 1, #FIXME not used (remove it, and update an example script)
-    "source_pos": spyro.create_transect((0.6, -0.1), (1.4, -0.1), 1),
+    "num_sources": 4, #FIXME not used (remove it, and update an example script)
+    "source_pos": spyro.create_transect((0.5, -0.01), (3.5, -0.01), 4),
     "amplitude": 1.0, #FIXME check this
-    "num_receivers": 10, #FIXME not used (remove it, and update an example script)
-    "receiver_locations": spyro.create_transect((0.6, -0.2), (1.4, -0.2), 10),
+    "num_receivers": 100, #FIXME not used (remove it, and update an example script)
+    "receiver_locations": spyro.create_transect((0.1, -0.10), (3.9, -0.10), 100),
 }
 
 model["timeaxis"] = {
     "t0": 0.0,  #  Initial time for event
-    "tf": 1.0, # Final time for event 
+    "tf": 2.5, # Final time for event 
     "dt": 0.0005,  # timestep size 
     "nspool":  20,  # (20 for dt=0.00050) how frequently to output solution to pvds
-    "fspool": 1,  # how frequently to save solution to RAM
+    "fspool": 10,  # how frequently to save solution to RAM
 }
 #}}}
 # make vp {{{
-def _make_vp(V, mesh, vp_guess=False):
-    """creating velocity models"""
-    x,z = SpatialCoordinate(mesh)
+def _make_vp(model, mesh, V, vp_guess=False, field="velocity_model"):
+    
+    path = "./velocity_models/elastic-marmousi-model/model/"
     if vp_guess: # interpolate from a smoothed field
-        vp   = Function(V).interpolate(1.5 + 0.0 * x) # original one (constant)
-        #vp   = Function(V).interpolate(
-        #    2.5
-        #    + 1 * tanh(2 * (0.125 - sqrt(( x - 1) ** 2 + (z + 0.5) ** 2))) # initial guess
-        #)
-        File("guess_vp.pvd").write(vp)
+        fname = path + "MODEL_P-WAVE_VELOCITY_1.25m_small_domain_smoothed_sigma=300.segy.hdf5" 
     else: # interpolate from the exact field
-        vp  = Function(V).interpolate(
-            2.5
-            #+ 1 * tanh(20 * (0.125 - sqrt(( x - 1) ** 2 + (z + 0.5) ** 2))) # original one (smoother)
-            + 1 * tanh(100 * (0.125 - sqrt(( x - 1) ** 2 + (z + 0.5) ** 2))) # sharper
-        )
-        File("exact_vp.pvd").write(vp)
+        fname = path + "MODEL_P-WAVE_VELOCITY_1.25m_small_domain.segy.hdf5" 
+        
+    with h5py.File(fname, "r") as f:
+        Zo = np.asarray(f.get(field)[()]) # original Marmousi data/domain
+        nrow, ncol = Zo.shape
+        Lz = model["mesh"]["Lz"]
+        Lx = model["mesh"]["Lx"] 
+        zo = np.linspace(-Lz, 0.0, nrow) # original Marmousi data/domain
+        xo = np.linspace(0.0,  Lx, ncol) # original Marmousi data/domain
+        interpolant = RegularGridInterpolator((xo, zo), np.transpose(Zo))
 
+        m = V.ufl_domain()
+        W = VectorFunctionSpace(m, V.ufl_element())
+        coords = interpolate(m.coordinates, W)
+        xq, zq = coords.dat.data[:, 0], coords.dat.data[:, 1]
+
+        _vp = interpolant((xq, zq))
+        vp = Function(V)
+        vp.dat.data[:] = _vp / 1000 # m/s -> km/s
+
+        if vp_guess:
+            File("guess_vp.pvd").write(vp)
+        else:
+            File("exact_vp.pvd").write(vp)
+    
     return vp
 #}}}
 # cut a small domain from the original Marmousi model {{{
@@ -145,7 +160,14 @@ def _cut_marmousi(minz, maxz, minx, maxx, smooth=False, field="velocity_model"):
         # save to segy format
         create_segy(Zq, fname)
         # save to hdf5 format
-        write_velocity_model(fname)
+        #write_velocity_model(fname)
+        hfname = fname +".hdf5"
+        print(f"Writing velocity model: {hfname}", flush=True)
+        with h5py.File(hfname, "w") as fh:
+            fh.create_dataset("velocity_model", data=Zq, dtype="f")
+            fh.attrs["shape"] = Zq.shape
+            fh.attrs["units"] = "m/s"
+
     
     if True: # plot vg? {{{
         with segyio.open(fname, ignore_geometry=True) as f:
@@ -164,38 +186,44 @@ def _cut_marmousi(minz, maxz, minx, maxx, smooth=False, field="velocity_model"):
         plt.show()
     #}}}
 
-if True:
-    #minz = -3.0 
-    #maxz = -1.5
-    #minx = 1.0
-    #maxx = 3.0
-    minz = -1.95 
-    maxz = -0.45
-    minx = 8.5
-    maxx = 10.5
+if False:
+    # 4x2 middle of the domain
+    minz = -2.0 
+    maxz =  0.0
+    minx = 7.5
+    maxx = 11.5
+    # 2x1.5 middle of the domain
+    #minz = -1.95 
+    #maxz = -0.45
+    #minx = 8.5
+    #maxx = 10.5
     _cut_marmousi(minz, maxz, minx, maxx, smooth=False)
     _cut_marmousi(minz, maxz, minx, maxx, smooth=True)
     #sys.exit("exit")
 
 #}}}
 comm = spyro.utils.mpi_init(model)
+distribution_parameters={"partition": True,
+                         "overlap_type": (DistributedMeshOverlapType.VERTEX, 20)}
 # generate mesh with SeismicMesh, if requested {{{
+# number of cells per wavelenght, from Roberts et al., 2021 (GMD)
+# Homegeneous case x 1.20 (see Table 3 from Roberts et al., 2021 (GMD))
+# multiplying by n because we want the cells show the features
+n = 1
+if model['opts']['degree']   == 2:
+    M = 7.02 * n
+elif model['opts']['degree'] == 3:
+    M = 3.96 * n
+elif model['opts']['degree'] == 4:
+    M = 2.67 * n
+elif model['opts']['degree'] == 5:
+    M = 2.03 * n 
+
 if False:
     from SeismicMesh import get_sizing_function_from_segy, generate_mesh, Rectangle, plot_sizing_function
     from scipy.ndimage import gaussian_filter
     import segyio
 
-    # number of cells per wavelenght, from Roberts et al., 2021 (GMD)
-    # Homegeneous case x 1.20 (see Table 3 from Roberts et al., 2021 (GMD))
-    # multiplying by 4 because we want the cells show the features
-    if model['opts']['degree']   == 2:
-        M = 7.02 * 4
-    elif model['opts']['degree'] == 3:
-        M = 3.96 * 4
-    elif model['opts']['degree'] == 4:
-        M = 2.67 * 4
-    elif model['opts']['degree'] == 5:
-        M = 2.03 * 4 
     
     if model["acquisition"]["frequency"] != 3:
         sys.exit("mesh not generated, check the .segy file for 5 Hz")
@@ -208,7 +236,7 @@ if False:
     else:
         fname = path + "MODEL_P-WAVE_VELOCITY_1.25m_small_domain.segy"
 
-    bbox = (0.0, 2000.0, -1500.0, 0.0)
+    bbox = (0.0, model["mesh"]["Lx"]*1000, -model["mesh"]["Lz"]*1000.0, 0.0)
     rectangle = Rectangle(bbox)
     
     hmin = 15.0 
@@ -238,7 +266,7 @@ if False:
     
     if comm.comm.rank == 0:
         p = model["opts"]["degree"]
-        vtk_file = "./meshes/fwi_amr_marmousi_small_p=" + str(p) + ".vtk"
+        vtk_file = "./meshes/fwi_amr_marmousi_small_p=" + str(p) + "_M=" + str(M) + ".vtk"
         meshio.write_points_cells(
             vtk_file,
             #points[:, [1, 0]] / 1000,
@@ -247,7 +275,7 @@ if False:
             file_format="vtk",
             binary=False
         )
-        gmsh_file = "./meshes/fwi_amr_marmousi_small_p=" + str(p) + ".msh"
+        gmsh_file = "./meshes/fwi_amr_marmousi_small_p=" + str(p) + "_M=" + str(M) + ".msh"
         meshio.write_points_cells(
             gmsh_file,
             points[:] / 1000, # do not swap here
@@ -258,10 +286,10 @@ if False:
  
     sys.exit("exit")
 #}}}
-
 # run exact model with a finer mesh {{{
-if False:
-    mesh_x = RectangleMesh(40, 30, model["mesh"]["Lx"], model["mesh"]["Lz"], diagonal="crossed", comm=comm.comm)
+if True:
+    mesh_x = RectangleMesh(50, 25, model["mesh"]["Lx"], model["mesh"]["Lz"], diagonal="crossed", comm=comm.comm,
+                            distribution_parameters=distribution_parameters)
     mesh_x.coordinates.dat.data[:, 0] -= 0.0 
     mesh_x.coordinates.dat.data[:, 1] -= model["mesh"]["Lz"]
 
@@ -275,9 +303,7 @@ if False:
     receivers = spyro.Receivers(model, mesh_x, V_x, comm)
     wavelet = spyro.full_ricker_wavelet(dt=model["timeaxis"]["dt"], tf=model["timeaxis"]["tf"], freq=model["acquisition"]["frequency"])
 
-    # FIXME COME BACK HERE
-    vp_exact = _make_vp(V_x, mesh_x, vp_guess=False)
-
+    vp_exact = _make_vp(model, mesh_x, V_x, vp_guess=False)
     print("Starting forward computation of the exact model",flush=True) 
     start = time.time()
     p_exact, p_exact_at_recv = spyro.solvers.forward(
@@ -292,21 +318,19 @@ if False:
     print(model["opts"]["degree"])
     #sys.exit("exit")
 #}}}
-
 # now, prepare to run the FWI with a coarser mesh
-
 p = model["opts"]["degree"]
-model["mesh"]["meshfile"] = "./meshes/marmousi_amr_small_p=" + str(p) + ".msh" 
-mesh_x, V_x = spyro.io.read_mesh(model, comm) # mesh that will be adapted
+model["mesh"]["meshfile"] = "./meshes/fwi_amr_marmousi_small_p=" + str(p) + "_M=" + str(M) + ".msh" 
+mesh_x, V_x = spyro.io.read_mesh(model, comm, distribution_parameters=distribution_parameters)# mesh that will be adapted
+
 # adapt the mesh using the exact vp, if requested {{{
 if False:
-    # FIXME come back here 
-    _mesh_xi, _V_xi = spyro.io.read_mesh(model, comm) # computational mesh
-    _vpi_xi = _make_vp(_V_xi, _mesh_xi, vp_guess=True)
-    _vpf_xi = _make_vp(_V_xi, _mesh_xi, vp_guess=False)
+    _mesh_xi, _V_xi = spyro.io.read_mesh(model, comm, distribution_parameters=distribution_parameters)# computational mesh
+    _vpi_xi = _make_vp(model, _mesh_xi, _V_xi, vp_guess=True)
+    _vpf_xi = _make_vp(model, _mesh_xi, _V_xi, vp_guess=False)
     _M_xi   = Function(_V_xi)   # monitor function using vpi_xi and vpf_xi
 
-    alpha = 1.
+    alpha = 4.
     _M_xi.dat.data_with_halos[:] = (_vpi_xi.dat.data_ro_with_halos[:] / _vpf_xi.dat.data_ro_with_halos[:])**alpha 
     mesh_x._parallel_compatible = {weakref.ref(_mesh_xi)}
     #print(mesh_x._parallel_compatible)
@@ -317,8 +341,14 @@ if False:
         # project onto "mesh" that is being adapted (i.e., mesh_x)
         P1 = FunctionSpace(mesh, "CG", 1)
         M_x = Function(P1)
-        M_x.project(M_xi) # Project from computational mesh (mesh_xi) onto physical mesh (mesh_x)
+        #M_x.project(M_xi) # Project from computational mesh (mesh_xi) onto physical mesh (mesh_x)
+        spyro.mesh_to_mesh_projection(M_xi, M_x)
         return M_x
+
+    receiver_z = 0.44545454545454544
+    receiver_x = -0.1
+    tolerance = 1e-2
+    expect = mesh_x.locate_cell([receiver_z, receiver_x], tolerance=tolerance)
 
     method = "quasi_newton"
     tol = 1.0e-03
@@ -327,15 +357,26 @@ if False:
 
     print("mesh_x adapted in "+str(step)+" steps")
 
-    _vp_exact = _make_vp(V_x, mesh_x, vp_guess=False)
+    actual = mesh_x.locate_cell([receiver_z, receiver_x], tolerance=tolerance)
+    
+    print("expect="+str(expect)+", actual="+str(actual)) 
+    
+    _vp_exact = Function(V_x).interpolate(Constant(1.)) 
     File("adapted_mesh.pvd").write(_vp_exact)
+
+    # testing in parallel
+    _mesh_xi.coordinates.dat.data_with_halos[:] = mesh_x.coordinates.dat.data_ro_with_halos[:] # update mesh_xi 
+    _vp_exact_2 = Function(_V_xi).interpolate(Constant(1.)) 
+    File("adapted_mesh_xi.pvd").write(_vp_exact_2)
+    
     sys.exit("exit")
 #}}}
 sources = spyro.Sources(model, mesh_x, V_x, comm)
 receivers = spyro.Receivers(model, mesh_x, V_x, comm)
 wavelet = spyro.full_ricker_wavelet(dt=model["timeaxis"]["dt"], tf=model["timeaxis"]["tf"], freq=model["acquisition"]["frequency"])
 
-vp_guess = _make_vp(V_x, mesh_x, vp_guess=True)
+vp_guess = _make_vp(model, mesh_x, V_x, vp_guess=True)
+water = np.where(vp_guess.dat.data[:] < 1.51)
 #sys.exit("exit")
 
 class L2Inner(object): #{{{
@@ -374,6 +415,7 @@ class Objective(ROL.Objective):
                                                            self.sources, 
                                                            wavelet, 
                                                            self.receivers)
+
         self.misfit = spyro.utils.evaluate_misfit(model, p_guess_recv, self.p_exact_recv)
         J_total[0] += spyro.utils.compute_functional(model, self.misfit, vp=self.vp)
         J_total = COMM_WORLD.allreduce(J_total, op=MPI.SUM)
@@ -392,10 +434,11 @@ class Objective(ROL.Objective):
         plt.plot(pe,label='exact')
         plt.plot(pg,label='guess')
         plt.legend()
-        #plt.savefig('/home/santos/Desktop/FWI_acoustic.png')
+        plt.savefig('/home/santos/Desktop/FWI_acoustic.png')
         plt.close()
         
         self.J = J_total[0]
+
         return J_total[0]
 
     def gradient(self, g, x, tol):
@@ -416,10 +459,8 @@ class Objective(ROL.Objective):
         if comm.comm.size > 1:
             dJ /= comm.comm.size
 
-        #File("dJ_acoustic_gaussian_all.pvd").write(dJ)
-        #File("dJ_acoustic_gaussian.pvd").write(dJ)
+        dJ.dat.data[water] = 0.0
         File("dJ_acoustic_original.pvd").write(dJ)
-        #sys.exit("exit")
         g.scale(0)
         g.vec += dJ
 
@@ -432,7 +473,7 @@ paramsDict = {
     'General': {
         'Secant': {
             'Type': 'Limited-Memory BFGS', # Line Search Quasi-Newton Method 
-            'Maximum Storage': 5, #(20==10)
+            'Maximum Storage': 10, #(20==10)
         }
     },
     'Step': {
@@ -448,8 +489,8 @@ paramsDict = {
                 'Type': 'Cubic Interpolation', # default
             },
             'Descent Method': {
-                #'Type': 'Quasi-Newton Method' # works fine, but it could be better (must use L-BFGS)
-                'Type': 'Steepest descent' # it worked better than Quasi-Newton Method (it ignores L-BFGS)
+                'Type': 'Quasi-Newton Method' # works fine, but it could be better (must use L-BFGS)
+                #'Type': 'Steepest descent' # it worked better than Quasi-Newton Method (it ignores L-BFGS)
             },
             'Curvature Condition': {
                 'Type': 'Strong Wolfe Conditions', # works fine
@@ -484,8 +525,7 @@ bnd = ROL.Bounds(x_lo, x_up, 1.0)
 obj = Objective(inner_product)
 #}}}
 # prepare monitor function {{{
-mesh_xi, V_xi = spyro.io.read_mesh(model, comm) # computational mesh
-
+mesh_xi, V_xi = spyro.io.read_mesh(model, comm, distribution_parameters=distribution_parameters)# computational mesh
 vpi_xi = Function(V_xi) # to keep vp before minimizer
 vpf_xi = Function(V_xi) # to keep vp after minimizer (inverted vp)
 M_xi = Function(V_xi)   # monitor function using vpi_xi and vpf_xi
@@ -497,16 +537,24 @@ tol = 1.0e-03
 
 Ji=[]
 ii=[]
-adapt_mesh = False
+adapt_mesh = False 
 mesh_moved = True
 outfile = File("final_vp.pvd")
-for i in range(10): #FIXME define it better
-    print("Loop iteration="+str(i), flush=True) 
+max_loop_it = 10 # the number of iteration here depends on the max iteration of ROL
+max_rol_it = 15
+amr_freq = 15 # 15, 45, 75 
+degree = None
+if model["opts"]["method"]=="KMV" and model["opts"]["degree"] == 2:
+    degree = 6 # alias to solve Firedrake projection
+
+for i in range(max_loop_it):
+    print("###### Loop iteration ="+str(i), flush=True) 
+    print("###### FWI iteration performed ="+str(i*max_rol_it), flush=True) 
    
     # at this moment, mesh_x=mesh_xi
-    if mesh_moved:
-        vpi_xi.dat.data[:] = xig.dat.data[:] # initial guess (mesh_xi) # vpi_xi is updated only if mesh has changed
-    obj.vp.dat.data[:] = xig.dat.data[:] # initial guess (mesh_x)
+    if mesh_moved: # vpi_xi is updated only if mesh has changed
+        vpi_xi.dat.data_with_halos[:] = xig.dat.data_ro_with_halos[:] # initial guess (mesh_xi) 
+    obj.vp.dat.data_with_halos[:] = xig.dat.data_ro_with_halos[:] # initial guess (mesh_x)
     outfile.write(obj.vp,time=i)
     
     print("   Minimize: starting ROL solver...", flush=True)
@@ -514,45 +562,42 @@ for i in range(10): #FIXME define it better
     solver = ROL.OptimizationSolver(problem, params)
     solver.solve()
     
-    #FIXME here and elsewhere: use dat.data_ro_with_halos
-    vpf_xi.dat.data[:] = obj.vp.dat.data[:] # inverted field (mesh_xi)
+    vpf_xi.dat.data_with_halos[:] = obj.vp.dat.data_ro_with_halos[:] # inverted field (mesh_xi)
 
-    alpha = 1. 
-    M_xi.dat.data[:] = (vpi_xi.dat.data[:] / vpf_xi.dat.data[:])**alpha # (mesh_xi) 
+    alpha = 4. 
+    M_xi.dat.data_with_halos[:] = (vpi_xi.dat.data_ro_with_halos[:] / vpf_xi.dat.data_ro_with_halos[:])**alpha # (mesh_xi) 
     File("monitor.pvd").write(M_xi)
   
-    # FIXME maybe do not adapt the last step
     # ok, let's adapt mesh_x
-    if adapt_mesh: #and max(abs(M_xi.dat.data[:]-1)) > 0.15 # FIXME define this limit better, or remove it
+    if adapt_mesh and i < (max_loop_it-1) and ((i+1)*max_rol_it)%amr_freq == 0: # do not adapt in the last step
         print("   Starting moving mesh...", flush=True)
-        print("   monitor diff="+str(max(abs(M_xi.dat.data[:]-1))))
         
         def monitor_function(mesh, M_xi=M_xi):
             # project onto "mesh" that is being adapted (i.e., mesh_x)
             P1 = FunctionSpace(mesh, "CG", 1)
             M_x = Function(P1)
-            M_x.project(M_xi)
+            #M_x.project(M_xi) 
+            spyro.mesh_to_mesh_projection(M_xi, M_x) # If using higher-order elements here, maybe use higher degree
             return M_x
         
-        mover = MongeAmpereMover(mesh_x, monitor_function, method=method, rtol=tol)
+        mover = MongeAmpereMover(mesh_x, monitor_function, method=method, rtol=tol, fix_boundary_nodes=True)
         step  = mover.move() # mesh_x will be adapted, so space V_x
         if step>0: 
             # ok, we have mesh movement, update vpi_xi
             print("OK, mesh has changed!")
             mesh_moved = True
-            xig.project(vpf_xi)# project vp onto the new mesh such this could be used as initial guess for next i 
-            mesh_xi.coordinates.dat.data[:] = mesh_x.coordinates.dat.data[:] # update mesh_xi FIXME improve this
-            
-            # FIXME maybe there is another way to update the tabulations of the source and the receivers
-            obj.receivers = spyro.Receivers(model, mesh_x, V_x, comm)
-            obj.sources = spyro.Sources(model, mesh_x, V_x, comm) 
+            #xig.project(vpf_xi)# project vp onto the new mesh such this could be used as initial guess for next i 
+            spyro.mesh_to_mesh_projection(vpf_xi, xig, degree=degree)
+            mesh_xi.coordinates.dat.data_with_halos[:] = mesh_x.coordinates.dat.data_ro_with_halos[:] # update mesh_xi 
         else:
             print("Mesh is the same")
             mesh_moved = False
-            xig.dat.data[:] = obj.vp.dat.data[:] # no mesh movement, therefore mesh_x=mesh_xi
+            xig.dat.data_with_halos[:] = obj.vp.dat.data_ro_with_halos[:] # no mesh movement, therefore mesh_x=mesh_xi
        
     else:
-        xig.dat.data[:] = obj.vp.dat.data[:] # no mesh movement, therefore they have the same space/mesh (mesh_x=mesh_xi)
+        print("Mesh is the same")
+        mesh_moved = False
+        xig.dat.data_with_halos[:] = obj.vp.dat.data_ro_with_halos[:] # no mesh movement, therefore mesh_x=mesh_xi
 
     ii.append(i)
     Ji.append(obj.J)
