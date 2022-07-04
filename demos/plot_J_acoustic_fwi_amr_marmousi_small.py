@@ -18,13 +18,22 @@ J_amr_freq15_p3_alpha4_M3_96 = np.array([8.525404e-02, 0.006026896661019094, 0.0
 
 J_no_amr_p3_alpha4_M3_96 = np.array([8.525404e-02, 0.006026896661019094, 0.004650216620721735, 0.004407003150382769, 0.004324889178709394, 0.004287862667217916, 0.004266639121773848, 0.004245198314941643, 0.004231214885347596, 0.0042231573548006055, 0.004216236572651827])
 
+J_amr_freq15_p2_alpha3_M7_02 = np.array([8.164095e-02, 0.0023829776038075457, 0.0011616316626153122, 0.00090669651557801, 0.0007626823410885463, 0.0007153416771096587, 0.0006919306491403006, 0.0006743078032208779, 0.0006659405737487394, 0.0006601572794567062, 0.0006558871074665515])
+
+J_no_amr_p2_alpha3_M7_02 = np.array([8.164095e-02, 0.0023829776038075457, 0.0009897033359869444, 0.0007903482095700386, 0.0007113933192067966, 0.000670669048461122, 0.0006445007530061868, 0.0006184760075136027, 0.0006031214427157823, 0.0005884626585418537, 0.0005761813757183146])
+
+J_amr_freq75_p2_L2sq_M7_02 = np.array([8.164095e-02,0.0023829776038075457, 0.0009897033359869444, 0.0007903482095700386, 0.0007113933192067966, 0.000670669048461122, 0.0007323555353518017, 0.0006983971527710351, 0.0006798874511551403, 0.0006633631826861347, 0.0006531257592814504])
+
 #plt.plot(it, J_no_amr_sharp_p2, label='no AMR, p=2',marker="o", linestyle='-', color='tab:blue')
-plt.plot(it_freq15*15, J_no_amr_p3, label='no AMR, p=3',marker="o", linestyle='-', color='tab:orange')
-plt.plot(it_freq15*15, J_amr_freq15_p3, label='AMR freq=15, p=3',marker="o", linestyle='--', color='tab:orange')
-plt.plot(it_freq15*15, J_amr_freq45_p3, label='AMR freq=45, p=3',marker="o", linestyle=':', color='tab:orange')
-plt.plot(it_freq15*15, J_amr_freq75_p3, label='AMR freq=75, p=3',marker="o", linestyle='-.', color='tab:orange')
-plt.plot(it_freq15*15, J_amr_freq15_p3_alpha4_M3_96, label='AMR freq=15, p=3, alpha=4',marker="o", linestyle='--', color='tab:orange')
-plt.plot(it_freq15*15, J_no_amr_p3_alpha4_M3_96, label='AMR freq=15, p=3, alpha=4',marker="o", linestyle='-', color='tab:orange')
+plt.plot(it_freq15*15, J_no_amr_p3, label='no AMR, p=3, M=7.92',marker="", linestyle='-', color='tab:orange')
+plt.plot(it_freq15*15, J_amr_freq15_p3, label='AMR freq=15, p=3, M=7.92',marker="", linestyle='--', color='tab:orange')
+plt.plot(it_freq15*15, J_amr_freq45_p3, label='AMR freq=45, p=3, M=7.92',marker="", linestyle=':', color='tab:orange')
+plt.plot(it_freq15*15, J_amr_freq75_p3, label='AMR freq=75, p=3, M=7.92',marker="", linestyle='-.', color='tab:orange')
+plt.plot(it_freq15*15, J_no_amr_p3_alpha4_M3_96, label='no AMR, p=3, M=3.96',marker="", linestyle='-', color='tab:green')
+plt.plot(it_freq15*15, J_amr_freq15_p3_alpha4_M3_96, label='AMR freq=15, p=3, M=3.96, alpha=4',marker="", linestyle='--', color='tab:green')
+plt.plot(it_freq15*15, J_no_amr_p2_alpha3_M7_02, label='AMR no AMR, p=2, M=7.02, alpha=3',marker="", linestyle='-', color='tab:blue')
+plt.plot(it_freq15*15, J_amr_freq15_p2_alpha3_M7_02, label='AMR freq=15, p=2, M=7.02, alpha=3',marker="", linestyle='--', color='tab:blue')
+plt.plot(it_freq15*15, J_amr_freq75_p2_L2sq_M7_02, label='AMR freq=75, p=2, M=7.02, L2sq',marker="", linestyle=':', color='tab:blue')
 #plt.plot(it, J_no_amr_sharp_p4, label='no AMR, p=4',marker="o", linestyle='-', color='tab:green')
 #plt.plot(it, J_amr_sharp_p2, label='AMR, p=2',marker="o", linestyle='--', color='tab:blue')
 

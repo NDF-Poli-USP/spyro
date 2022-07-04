@@ -26,7 +26,7 @@ model = {}
 model["opts"] = {
     "method": "KMV",  # either CG or KMV
     "quadrature": "KMV", # Equi or KMV #FIXME it will be removed
-    "degree": 3,  # p order
+    "degree": 2,  # p order
     "dimension": 2,  # dimension
     "regularization": False,  # regularization is on?
     "gamma": 1e-5, # regularization parameter
@@ -329,13 +329,23 @@ if False:
     _vpi_xi = _make_vp(model, _mesh_xi, _V_xi, vp_guess=True)
     _vpf_xi = _make_vp(model, _mesh_xi, _V_xi, vp_guess=False)
     _M_xi   = Function(_V_xi)   # monitor function using vpi_xi and vpf_xi
-
-    alpha = 4.
-    _M_xi.dat.data_with_halos[:] = (_vpi_xi.dat.data_ro_with_halos[:] / _vpf_xi.dat.data_ro_with_halos[:])**alpha 
+    
     mesh_x._parallel_compatible = {weakref.ref(_mesh_xi)}
-    #print(mesh_x._parallel_compatible)
-    #print(_mesh_xi._parallel_compatible)
-    #sys.exit("exit")
+
+    mtype = 2
+    if mtype==1:
+        alpha = 4.
+        _M_xi.dat.data_with_halos[:] = (_vpi_xi.dat.data_ro_with_halos[:] / _vpf_xi.dat.data_ro_with_halos[:])**alpha 
+    elif mtype==2:
+        max_grad_vp = norm(grad(_vpf_xi - _vpi_xi), norm_type="L2") 
+        print(max_grad_vp, flush=True)
+        alpha = 1/(max_grad_vp**2)
+        #_M_xi.interpolate( sqrt( 1 + alpha*inner(grad(_vpf_xi),grad(_vpf_xi)) ) )
+        
+        _f = _vpf_xi - _vpi_xi
+        _M_xi.interpolate( sqrt( 1 + alpha*inner(grad(_f),grad(_f)) ) )
+        
+        File("monitor.pvd").write(_M_xi)
 
     def monitor_function(mesh, M_xi=_M_xi):
         # project onto "mesh" that is being adapted (i.e., mesh_x)
@@ -361,14 +371,29 @@ if False:
     
     print("expect="+str(expect)+", actual="+str(actual)) 
     
-    _vp_exact = Function(V_x).interpolate(Constant(1.)) 
+    #_vp_exact = Function(V_x).interpolate(Constant(1.)) 
+    _vp_exact = _make_vp(model, mesh_x, V_x, vp_guess=False)
     File("adapted_mesh.pvd").write(_vp_exact)
 
     # testing in parallel
-    _mesh_xi.coordinates.dat.data_with_halos[:] = mesh_x.coordinates.dat.data_ro_with_halos[:] # update mesh_xi 
-    _vp_exact_2 = Function(_V_xi).interpolate(Constant(1.)) 
-    File("adapted_mesh_xi.pvd").write(_vp_exact_2)
-    
+    #_mesh_xi.coordinates.dat.data_with_halos[:] = mesh_x.coordinates.dat.data_ro_with_halos[:] # update mesh_xi 
+    _vp_exact_2 = _make_vp(model, _mesh_xi, _V_xi, vp_guess=False)
+    File("original_mesh.pvd").write(_vp_exact_2)
+
+
+    mesh_fine = RectangleMesh(60, 35, model["mesh"]["Lx"], model["mesh"]["Lz"], diagonal="crossed", comm=comm.comm,
+                            distribution_parameters=distribution_parameters)
+    mesh_fine.coordinates.dat.data[:, 0] -= 0.0 
+    mesh_fine.coordinates.dat.data[:, 1] -= model["mesh"]["Lz"]
+
+    # for the exact model, use a higher-order element
+    model["opts"]["degree"] = 4
+    element = spyro.domains.space.FE_method(mesh_x, model["opts"]["method"], model["opts"]["degree"])
+    V_fine = FunctionSpace(mesh_fine, element)
+
+    _vp_exact_3 = _make_vp(model, mesh_fine, V_fine, vp_guess=False)
+    File("fine_mesh.pvd").write(_vp_exact_3)
+
     sys.exit("exit")
 #}}}
 sources = spyro.Sources(model, mesh_x, V_x, comm)
@@ -414,8 +439,9 @@ class Objective(ROL.Objective):
                                                            self.vp, 
                                                            self.sources, 
                                                            wavelet, 
-                                                           self.receivers)
-
+                                                           self.receivers,
+                                                           output=False)
+        
         self.misfit = spyro.utils.evaluate_misfit(model, p_guess_recv, self.p_exact_recv)
         J_total[0] += spyro.utils.compute_functional(model, self.misfit, vp=self.vp)
         J_total = COMM_WORLD.allreduce(J_total, op=MPI.SUM)
@@ -537,12 +563,13 @@ tol = 1.0e-03
 
 Ji=[]
 ii=[]
-adapt_mesh = False 
+m_type = 2 # monitor type
+adapt_mesh = True 
 mesh_moved = True
 outfile = File("final_vp.pvd")
 max_loop_it = 10 # the number of iteration here depends on the max iteration of ROL
 max_rol_it = 15
-amr_freq = 15 # 15, 45, 75 
+amr_freq = 75 # 15, 45, 75 
 degree = None
 if model["opts"]["method"]=="KMV" and model["opts"]["degree"] == 2:
     degree = 6 # alias to solve Firedrake projection
@@ -564,8 +591,17 @@ for i in range(max_loop_it):
     
     vpf_xi.dat.data_with_halos[:] = obj.vp.dat.data_ro_with_halos[:] # inverted field (mesh_xi)
 
-    alpha = 4. 
-    M_xi.dat.data_with_halos[:] = (vpi_xi.dat.data_ro_with_halos[:] / vpf_xi.dat.data_ro_with_halos[:])**alpha # (mesh_xi) 
+    if m_type==1:
+        alpha = 3. # 4 for P2 and original dt generates numerical instabilities 
+        M_xi.dat.data_with_halos[:] = (vpi_xi.dat.data_ro_with_halos[:] / vpf_xi.dat.data_ro_with_halos[:])**alpha # (mesh_xi)
+    elif m_type==2:
+        #e = vpf_xi - vpi_xi
+        e = vpf_xi
+        ne = norm(grad(e), norm_type="L2") 
+        alpha = 1/(ne**2+1.e-6)
+        #alpha = 1/(ne+1.e-6) # too much mesh distortion! L20
+        M_xi.interpolate( sqrt( 1 + alpha*inner(grad(e), grad(e)) ) )
+    
     File("monitor.pvd").write(M_xi)
   
     # ok, let's adapt mesh_x
