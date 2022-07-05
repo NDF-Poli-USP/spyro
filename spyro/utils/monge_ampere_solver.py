@@ -230,6 +230,7 @@ def monge_ampere_solver(mesh, monitor_function,
         return x
     #}}}
     # Update monitor function
+    l2_projector_solver = l2_projector()
     def update_monitor(cursol): # {{{
         """
         Callback for updating the monitor function.
@@ -237,7 +238,7 @@ def monge_ampere_solver(mesh, monitor_function,
         # using global variables because this is called inside the NonlinearSolver
         with phisigma_old.dat.vec as v:
             cursol.copy(v)
-        l2_projector().solve() # update grad_phi_proj 
+        l2_projector_solver.solve() # update grad_phi_proj 
         mesh.coordinates.assign(update_x()) # update x = xi + grad_phi  # FIXME check if the spaces are changed here
         monitor.interpolate(monitor_function(mesh)) # update monitor function FIXME check if should be done in xi 
         mesh.coordinates.assign(xi) # FIXME check if the spaces are changed here
@@ -306,7 +307,11 @@ def monge_ampere_solver(mesh, monitor_function,
 
     # Solve the Monge-Ampere using Quasi-Newton method
     try:
+        import time
+        ti=time.time()
         equidistributor.solve()
+        tf=time.time()
+        print("time equidistributor solver="+str(tf-ti))
         i = snes.getIterationNumber()
         PETSc.Sys.Print(f"Converged in {i} iterations.")
     except firedrake.ConvergenceError:
@@ -315,4 +320,3 @@ def monge_ampere_solver(mesh, monitor_function,
     
     mesh.coordinates.assign(update_x()) #FIXME maybe return only the coordinates x
     return i
-
