@@ -307,11 +307,7 @@ def monge_ampere_solver(mesh, monitor_function,
 
     # Solve the Monge-Ampere using Quasi-Newton method
     try:
-        import time
-        ti=time.time()
         equidistributor.solve()
-        tf=time.time()
-        print("time equidistributor solver="+str(tf-ti))
         i = snes.getIterationNumber()
         PETSc.Sys.Print(f"Converged in {i} iterations.")
     except firedrake.ConvergenceError:
