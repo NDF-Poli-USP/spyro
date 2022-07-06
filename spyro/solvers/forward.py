@@ -96,10 +96,6 @@ def forward(
     qr_x = gauss_lobatto_legendre_cube_rule(dimension=dimension, degree=degree)
     qr_s = gauss_lobatto_legendre_cube_rule(dimension=(dimension - 1), degree=degree)
 
-    if dimension == 2:
-        z, x = fire.SpatialCoordinate(mesh)
-    elif dimension == 3:
-        z, x, y = fire.SpatialCoordinate(mesh)
 
     # typical CG FEM in 2d/3d
     u = fire.TrialFunction(V)
