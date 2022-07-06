@@ -86,15 +86,7 @@ def gradient(
 
     nt = int(tf / dt)  # number of timesteps
 
-    receiver_locations = model["acquisition"]["receiver_locations"]
-
     dJ = fire.Function(V, name="gradient")
-
-    if dimension == 2:
-        z, x = fire.SpatialCoordinate(mesh)
-    elif dimension == 3:
-        z, x, y = fire.SpatialCoordinate(mesh)
-
 
     # typical CG in N-d
     u = fire.TrialFunction(V)
@@ -113,7 +105,6 @@ def gradient(
     m1 = ((u - 2.0 * u_n + u_nm1) / Constant(dt ** 2)) * v * dx(rule=qr_x)
     a = c * c * dot(grad(u_n), grad(v)) * dx(rule=qr_x)  # explicit
 
-    FF = m1 + a
     lhs1 = m1
     rhs1 = -a
 
@@ -133,7 +124,6 @@ def gradient(
 
     ffG = 2.0 * c * dot(grad(uuadj), grad(uufor)) * m_v * dx(rule=qr_x)
 
-    G = mgrad - ffG
     lhsG = mgrad
     rhsG = ffG
 
