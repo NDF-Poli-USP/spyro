@@ -76,7 +76,6 @@ def forward(
 
     method = model["opts"]["method"]
     degree = model["opts"]["degree"]
-    dimension = model["opts"]["dimension"]
     dt = model["timeaxis"]["dt"]
     final_time = model["timeaxis"]["tf"]
     nspool = model["timeaxis"]["nspool"]
@@ -85,7 +84,6 @@ def forward(
 
     nt = int(final_time / dt)  # number of timesteps
 
-    params = {"ksp_type": "preonly", "pc_type": "jacobi"}
 
     element = fire.FiniteElement(method, mesh.ufl_cell(), degree=degree)
 
@@ -115,8 +113,8 @@ def forward(
     lhs = m1
     rhs = -a
 
-    A = fire.assemble(lhs, mat_type="matfree")
-    solver = fire.LinearSolver(A, solver_parameters=params)
+    A = fire.assemble(lhs)
+    solver = fire.LinearSolver(A)
 
     usol = [fire.Function(V, name="pressure") for t in range(nt) if t % fspool == 0]
     usol_recv = []
