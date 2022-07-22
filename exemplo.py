@@ -48,7 +48,7 @@ model["timeaxis"] = {
     "fspool": 99999,  # how frequently to save solution to RAM
 }
 comm = spyro.utils.mpi_init(model)
-mesh = fire.RectangleMesh(1000,3000,3.0,7.0,quadrilateral = True)
+mesh = fire.RectangleMesh(60,140,3.0,7.0,quadrilateral = True)
 z,x = fire.SpatialCoordinate(mesh)
 mesh.coordinates.dat.data[:,0] *= -1.0
 V = fire.FunctionSpace(mesh,model["opts"]["method"],model["opts"]["degree"])
