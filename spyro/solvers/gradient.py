@@ -8,7 +8,7 @@ from ..io import ensemble_gradient
 from . import helpers
 
 # Note this turns off non-fatal warnings
-set_log_level(ERROR)
+#set_log_level(ERROR)
 
 __all__ = ["gradient"]
 

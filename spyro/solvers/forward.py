@@ -10,8 +10,6 @@ from ..pml import damping
 from ..io import ensemble_forward
 from . import helpers
 
-# Note this turns off non-fatal warnings
-set_log_level(ERROR)
 
 def gauss_lobatto_legendre_line_rule(degree):
     fiat_make_rule = FIAT.quadrature.GaussLobattoLegendreQuadratureLineRule
