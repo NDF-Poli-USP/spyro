@@ -89,12 +89,9 @@ def forward(
 
     params = {"ksp_type": "preonly", "pc_type": "jacobi"}
 
-    element = element = fire.FiniteElement(method, mesh.ufl_cell(), degree=degree, variant="spectral")
+    element = fire.FiniteElement(method, mesh.ufl_cell(), degree=degree)
 
     V = fire.FunctionSpace(mesh, element)
-
-    qr_x = gauss_lobatto_legendre_cube_rule(dimension=dimension, degree=degree)
-    qr_s = gauss_lobatto_legendre_cube_rule(dimension=(dimension - 1), degree=degree)
 
 
     # typical CG FEM in 2d/3d
@@ -111,8 +108,8 @@ def forward(
     t = 0.0
 
     # -------------------------------------------------------
-    m1 = ((u - 2.0 * u_n + u_nm1) / Constant(dt ** 2)) * v * dx(rule=qr_x)
-    a = c * c * dot(grad(u_n), grad(v)) * dx(rule=qr_x)  # explicit
+    m1 = ((u ) / Constant(dt ** 2)) * v * dx
+    a = c * c * dot(grad(u_n), grad(v)) * dx +((- 2.0 * u_n + u_nm1) / Constant(dt ** 2)) * v * dx# explicit
 
     X = fire.Function(V)
     B = fire.Function(V)
