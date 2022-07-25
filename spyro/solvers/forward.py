@@ -95,7 +95,7 @@ def forward(
     v = fire.TestFunction(V)
 
     u_nm1 = fire.Function(V)
-    u_n = fire.Function(V)
+    u_n = fire.Function(V, name = "pressure")
     u_np1 = fire.Function(V)
 
     if output:
