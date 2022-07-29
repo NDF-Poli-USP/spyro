@@ -5,9 +5,23 @@ from firedrake import Constant, dx, dot, inner, grad, ds
 import FIAT
 import finat
 from warnings import warn
+import spyro
+from . import helpers
+from .. import utils
+from utils import estimate_timestep
 
 class wave():
-    def __init__(self, model_parameters = None):
+    def __init__(self, comm, model_parameters = None):
+        """Wave object solver. Contains both the forward solver 
+        and gradient calculator methods.
+
+        Parameters:
+        -----------
+        comm: MPI communicator
+
+        model_parameters: Python object
+            Contains model parameters
+        """
         self.mesh = model_parameters.get_mesh()
         self.method = model_parameters.method
         self.degree = model_parameters.degree
@@ -20,14 +34,28 @@ class wave():
         self.current_time = 0.0
         self.solver_parameters = model_parameters.solver_parameters
         self.c = self.initial_velocity_model
-        
-    def matrix_building(self):
+        self.comm = comm
+
+        self._build_function_space()
+        self.matrix_building()
+        self.sources = spyro.Sources(model_parameters, self.mesh, self.function_space, comm)
+        self.receivers = spyro.Receivers(model_parameters, self.mesh, self.function_space, comm)
+
+
+        #
+    def _build_function_space(self):
         if self.method == 'SEM':
             element = fire.FiniteElement(self.method, self.mesh.ufl_cell(), degree=self.degree, variant="spectral")
         else:
             element = fire.FiniteElement(self.method, self.mesh.ufl_cell(), degree=self.degree)
         V = fire.FunctionSpace(self.mesh, element)
         self.function_space = V
+
+    def matrix_building(self):
+        """ Builds solver operators. Doesn't create mass matrices if matrix_free option is on,
+        which it is by default.
+        """
+        V = self.function_space
 
         # typical CG FEM in 2d/3d
         u = fire.TrialFunction(V)
@@ -56,12 +84,30 @@ class wave():
         self.rhs_assembly_callable = create_assembly_callable(rhs, tensor=B)
         self.B = B
     
-    def wave_propagator(self, final_time = None):
+    def wave_propagator(self, dt = None, final_time = None):
+        """ Propagates the wave forward in time.
+        Currently uses central differences.
+
+        Parameters:
+        -----------
+        dt: Python 'float' (optional)
+            Time step to be used explicitly. If not mentioned uses the default,
+            that was estabilished in the model_parameters.
+        final_time: Python 'float' (optional)
+            Time which simulation ends. If not mentioned uses the default,
+            that was estabilished in the model_parameters.
+        """
+        excitations = self.sources
+        receivers = self.receivers
+        comm = self.comm
+
         X = fire.Function(self.function_space)
         if final_time == None:
             final_time = self.final_time
+        if dt == None:
+            dt = self.dt
         t = self.current_time
-        nt = int( (final_time-t) / self.dt)  # number of timesteps
+        nt = int( (final_time-t) / dt)  # number of timesteps
 
         u_nm1 = fire.Function(self.function_space)
         u_n = fire.Function(self.function_space)
@@ -73,7 +119,7 @@ class wave():
         for step in range(nt):
             rhs_forcing.assign(0.0)
             self.rhs_assembly_callable()
-            f = self.excitations.apply_source(rhs_forcing, self.wavelet[step])
+            f = excitations.apply_source(rhs_forcing, self.wavelet[step])
             B0 = self.B.sub(0)
             B0 += f
             self.solver.solve(X, self.B)
@@ -98,7 +144,7 @@ class wave():
             u_nm1.assign(u_n)
             u_n.assign(u_np1)
 
-            t = step * float(self.dt)
+            t = step * float(dt)
 
         self.current_time = t
         usol_recv = helpers.fill(usol_recv, receivers.is_local, nt, receivers.num_receivers)
@@ -106,6 +152,16 @@ class wave():
 
         return usol, usol_recv
 
+    def get_and_set_maximum_dt(self, fraction = 1.0):
+        if self.method == 'KMV' or (self.method == 'CG' and self.mesh.ufl_cell() == fire.quadrilateral):
+            estimate_max_eigenvalue = True
+        else:
+            estimate_max_eigenvalue = False
+
+        dt = estimate_timestep(self.mesh, self.function_space, self.c, estimate_max_eigenvalue=estimate_max_eigenvalue)
+        dt *= fraction
+        self.dt = dt
+        return dt
 
 
 
