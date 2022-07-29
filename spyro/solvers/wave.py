@@ -41,7 +41,6 @@ class wave():
         self.sources = spyro.Sources(model_parameters, self.mesh, self.function_space, comm)
         self.receivers = spyro.Receivers(model_parameters, self.mesh, self.function_space, comm)
 
-
         #
     def _build_function_space(self):
         if self.method == 'SEM':
