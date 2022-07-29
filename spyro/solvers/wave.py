@@ -6,12 +6,13 @@ import FIAT
 import finat
 from warnings import warn
 import spyro
+from spyro.io.model_parameters import model_parameters
 from . import helpers
 from .. import utils
 from utils import estimate_timestep
 
 class wave():
-    def __init__(self, comm, model_parameters = None):
+    def __init__(self, comm, model_dictionary = None):
         """Wave object solver. Contains both the forward solver 
         and gradient calculator methods.
 
@@ -22,6 +23,7 @@ class wave():
         model_parameters: Python object
             Contains model parameters
         """
+        model_parameters = spyro.io.model_parameters(model_dictionary)
         self.mesh = model_parameters.get_mesh()
         self.method = model_parameters.method
         self.degree = model_parameters.degree
@@ -40,6 +42,7 @@ class wave():
         self.matrix_building()
         self.sources = spyro.Sources(model_parameters, self.mesh, self.function_space, comm)
         self.receivers = spyro.Receivers(model_parameters, self.mesh, self.function_space, comm)
+        self.wavelet = model_parameters.get_wavelet()
 
         #
     def _build_function_space(self):
