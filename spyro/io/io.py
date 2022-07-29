@@ -409,3 +409,7 @@ def read_mesh(model, ens_comm):
     element = domains.space.FE_method(mesh, method, degree)
     # Space of problem
     return mesh, fire.FunctionSpace(mesh, element)
+
+def parallel_print(string, comm):
+    if comm.ensemble_comm.rank == 0 and comm.comm.rank == 0:
+        print(string, flush = True)
