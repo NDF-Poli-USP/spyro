@@ -120,21 +120,21 @@ class model_parameters:
             self.fwi_output_folder = 'fwi/'
             self.control_output_file = self.fwi_output_folder+'control'
             self.gradient_output_file = self.fwi_output_folder+'gradient'
-            self.c = self.initial_velocity_model
             self.optimization_parameters = dictionary["inversion"]["optimization_parameters"]
         else:
-            self.c = dictionary["synthetic_data"]["real_velocity_file"]
+            self.initial_velocity_model = dictionary["synthetic_data"]["real_velocity_file"]
+
         self.function_space = None
         self.foward_output_file = 'results/forward_output.pvd'
         self.current_time = 0.0
         
-    def __convert_old_dictionary(old_dictionary):
+    def __convert_old_dictionary(self,old_dictionary):
         new_dictionary = {}
         new_dictionary["options"] = {
             "method": old_dictionary["opts"]["method"],
             "variant": old_dictionary["opts"]["quadrature"],
             "degree":old_dictionary["opts"]["degree"],
-            "dimension":old_dictionary["opts"]["dimesion"],
+            "dimension":old_dictionary["opts"]["dimension"],
         }
         new_dictionary["parallelism"] = {
             "type": old_dictionary["parallelism"]["type"],  # options: automatic (same number of cores for evey processor) or spatial
