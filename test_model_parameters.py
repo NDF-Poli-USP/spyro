@@ -200,4 +200,8 @@ def test_cell_type_reader():
     assert all([test1, test2, test3, test4, test5, test6])
 
 
+if __name__ == "__main__":
+    test_method_reader()
+    test_cell_type_reader()
+
 print('END')
