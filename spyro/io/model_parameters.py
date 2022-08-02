@@ -1,4 +1,3 @@
-from types import CellType
 import warnings
 import spyro
 
@@ -90,12 +89,6 @@ default_dictionary["time_axis"] = {
     "fspool": 100,  # how frequently to save solution to RAM
 }
 
-def check_method(method, cell_type, variant):
-    if method != None and cell_type != None and variant != None:
-        # Check if the three settings are compatible:
-        warnings.warn("There is no need to specify a cell type with variant and a method at the same time.")
-        if cell_type == ''
-
 class model_parameters:
     def __init__(self, dictionary=default_dictionary):
         self.input_dictionary = dictionary
@@ -115,90 +108,93 @@ class model_parameters:
         self.solver_parameters = model_parameters.solver_parameters
         self.c = self.initial_velocity_model
                 
-        def __unify_method_input(self):
-            unified_method = None
-            method = self.method
-            if method == 'KMV' or method == 'MLT' or method == 'mass_lumped_triangles' or method == 'mass_lumped_tetrahedra':
-                unified_method = 'MLT'
-            elif method == 'spectral' or method == 'SEM' or method == 'spectral_quadrilateral':
-                unified_method = 'spectral_quadrilateral'
-            elif method == 'DG_triangle':
-                unified_method = method
-            elif method == 'DG_quadrilatral':
-                unified_method = method
-            elif method == 'CG':
-                unified_method = method
-            else:
-                warnings.warn(f"Method of {method} not accepted.")
-            self.method = unified_method
+    def __unify_method_input(self):
+        unified_method = None
+        method = self.method
+        if method == 'KMV' or method == 'MLT' or method == 'mass_lumped_triangle' or method == 'mass_lumped_tetrahedra':
+            unified_method = 'mass_lumped_triangle'
+        elif method == 'spectral' or method == 'SEM' or method == 'spectral_quadrilateral':
+            unified_method = 'spectral_quadrilateral'
+        elif method == 'DG_triangle':
+            unified_method = method
+        elif method == 'DG_quadrilatral':
+            unified_method = method
+        elif method == 'CG':
+            unified_method = method
+        else:
+            warnings.warn(f"Method of {method} not accepted.")
+        self.method = unified_method
 
-        def __unify_cell_type_input(self):
+    def __unify_cell_type_input(self):
+        unified_cell_type = None
+        dimension = self.dimension
+        cell_type = self.cell_type
+        if cell_type == 'T' or cell_type == 'triangles' or cell_type == 'triangle' or cell_type == 'tetrahedron' or cell_type == 'tetrahedra':
+            unified_cell_type = 'triangle'
+        elif cell_type == 'Q' or cell_type == 'quadrilateral' or cell_type == 'quadrilaterals' or cell_type == 'hexahedron' or cell_type == 'hexahedra':
+            unified_cell_type = 'quadrilateral'
+        elif cell_type == None:
             unified_cell_type = None
-            dimension = self.dimension
-            cell_type = self.cell_type
-            if cell_type == 'T' or cell_type == 'triangles' or cell_type == 'triangle' or cell_type == 'tetrahedron' or cell_type == 'tetrahedra':
-                unified_cell_type = 'triangle'
-            elif cell_type == 'Q' or cell_type == 'quadrilateral' or cell_type == 'quadrilaterals' or cell_type == 'hexahedron' or cell_type == 'hexahedra':
-                unified_cell_type = 'quadrilateral'
-            elif cell_type == None:
-                unified_cell_type = None
-            else:
-                warnings.warn(f"Cell type of {cell_type} not accepted.")
-            self.cell_type = unified_cell_type
+        else:
+            warnings.warn(f"Cell type of {cell_type} not accepted.")
+        self.cell_type = unified_cell_type
 
-        def __unify_variant_input(self):
-            unified_variant = None
-            variant = self.variant
+    def __unify_variant_input(self):
+        unified_variant = None
+        variant = self.variant
 
-            if variant == 'spectral' or variant == 'GLL' or variant == 'SEM' or variant == 'lumped' or variant == 'KMV' :
-                unified_variant = 'lumped'
-            elif variant == 'equispaced' or variant == 'equis':
-                unified_variant = 'equispaced'
-            elif variant == 'DG' or variant == 'discontinuous_galerkin':
-                unified_variant = 'DG'
-            else:
-                warnings.warn(f"Variant of {variant} not accepted.")
-            self.method = unified_variant
+        if variant == 'spectral' or variant == 'GLL' or variant == 'SEM' or variant == 'lumped' or variant == 'KMV' :
+            unified_variant = 'lumped'
+        elif variant == 'equispaced' or variant == 'equis':
+            unified_variant = 'equispaced'
+        elif variant == 'DG' or variant == 'discontinuous_galerkin':
+            unified_variant = 'DG'
+        else:
+            warnings.warn(f"Variant of {variant} not accepted.")
+        self.method = unified_variant
 
-        def __get_method_from_cell_type(self):
-            cell_type = self.cell_type
-            variant = self.variant
-            dimension = self.dimension
-            method = None
-            if cell_type == 'triangle':
-                if   variant == 'lumped':
-                    method = 'MLT'
-                elif variant == 'equispaced':
-                    method = 'CG_triangle'
-                elif variant == 'DG':
-                    method = 'DG_triangle'
-            elif cell_type == 'quadrilateral':
-                if   variant == 'lumped':
-                    method = 'spectral_quadrilateral'
-                elif variant == 'equispaced':
-                    method = 'CG_quadrilateral'
-                elif variant == 'DG':
-                    method = 'DG_quadrilateral'
+    def __get_method_from_cell_type(self):
+        cell_type = self.cell_type
+        variant = self.variant
+        dimension = self.dimension
+        method = None
+        if cell_type == 'triangle':
+            if   variant == 'lumped':
+                method = 'mass_lumped_triangle'
+            elif variant == 'equispaced':
+                method = 'CG_triangle'
+            elif variant == 'DG':
+                method = 'DG_triangle'
+        elif cell_type == 'quadrilateral':
+            if   variant == 'lumped':
+                method = 'spectral_quadrilateral'
+            elif variant == 'equispaced':
+                method = 'CG_quadrilateral'
+            elif variant == 'DG':
+                method = 'DG_quadrilateral'
 
-        def __get_method(self):
-            dictionary = self.dictionary
-            if "method" in dictionary["options"]:
-                if dictionary["options"]["method"] != None:
-                    self.method = dictionary["options"]["method"]
-                    self.__unify_method_input()
-                    # For backwards compatibility
-                    if "variant" in dictionary["options"]:
-                        if dictionary["options"]["variant"] == 'spectral' or dictionary["options"]["variant"] == 'GLL' and self.method == 'CG':
-                            self.method = 'spectral_quadrilateral'
-                    
-            elif ("cell_type" in dictionary["options"]) and ("variant" in dictionary["options"]):
-                self.cell_type = dictionary["options"]["cell_type"]
-                self.__unify_cell_type_input()
-                self.variant   = dictionary["options"]["variant"]
-                self.__unify_variant_input()
-                self.__get_method_from_cell_type()
-            else:
-                raise ValueError("Missing options inputs.")
+    def __get_method(self):
+        dictionary = self.dictionary
+        # Checking if method/cell_type + variant specified twice:
+        if "method" in dictionary["options"] and ("cell_type" in dictionary["options"]) and ("variant" in dictionary["options"]):
+            warnings.warn("Both methods of specifying method and cell_type with variant used. Method specification taking priority.")
+        if "method" in dictionary["options"]:
+            if dictionary["options"]["method"] != None:
+                self.method = dictionary["options"]["method"]
+                self.__unify_method_input()
+                # For backwards compatibility
+                if "variant" in dictionary["options"]:
+                    if dictionary["options"]["variant"] == 'spectral' or dictionary["options"]["variant"] == 'GLL' and self.method == 'CG':
+                        self.method = 'spectral_quadrilateral'
+                
+        elif ("cell_type" in dictionary["options"]) and ("variant" in dictionary["options"]):
+            self.cell_type = dictionary["options"]["cell_type"]
+            self.__unify_cell_type_input()
+            self.variant   = dictionary["options"]["variant"]
+            self.__unify_variant_input()
+            self.__get_method_from_cell_type()
+        else:
+            raise ValueError("Missing options inputs.")
 
         
         
