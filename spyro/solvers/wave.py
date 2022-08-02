@@ -9,7 +9,7 @@ import spyro
 from spyro.io.model_parameters import model_parameters
 from . import helpers
 from .. import utils
-from utils import estimate_timestep
+from spyro.utils import estimate_timestep
 
 class wave():
     def __init__(self, comm, model_dictionary = None):
