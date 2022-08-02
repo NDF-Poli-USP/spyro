@@ -230,7 +230,7 @@ class model_parameters:
             unified_method = 'spectral_quadrilateral'
         elif method == 'DG_triangle':
             unified_method = method
-        elif method == 'DG_quadrilatral':
+        elif method == 'DG_quadrilateral':
             unified_method = method
         elif method == 'CG':
             unified_method = method
@@ -288,17 +288,17 @@ class model_parameters:
         dictionary = self.input_dictionary
         # Checking if method/cell_type + variant specified twice:
         if "method" in dictionary["options"] and ("cell_type" in dictionary["options"]) and ("variant" in dictionary["options"]):
-            warnings.warn("Both methods of specifying method and cell_type with variant used. Method specification taking priority.")
-        if "method" in dictionary["options"]:
-            if dictionary["options"]["method"] != None:
-                self.method = dictionary["options"]["method"]
-                self.__unify_method_input()
-                # For backwards compatibility
-                if "variant" in dictionary["options"]:
-                    if dictionary["options"]["variant"] == 'spectral' or dictionary["options"]["variant"] == 'GLL' and self.method == 'CG':
-                        self.method = 'spectral_quadrilateral'
+            if dictionary["options"]["method"] != None and dictionary["options"]["cell_type"] != None:
+                warnings.warn("Both methods of specifying method and cell_type with variant used. Method specification taking priority.")
+        if "method" in dictionary["options"] and dictionary["options"]["method"] != None:
+            self.method = dictionary["options"]["method"]
+            self.__unify_method_input()
+            # For backwards compatibility
+            if "variant" in dictionary["options"]:
+                if dictionary["options"]["variant"] == 'spectral' or dictionary["options"]["variant"] == 'GLL' and self.method == 'CG':
+                    self.method = 'spectral_quadrilateral'
                 
-        elif ("cell_type" in dictionary["options"]) and ("variant" in dictionary["options"]):
+        elif ("cell_type" in dictionary["options"]) and ("variant" in dictionary["options"]) and dictionary["options"]["cell_type"] != None:
             self.cell_type = dictionary["options"]["cell_type"]
             self.__unify_cell_type_input()
             self.variant   = dictionary["options"]["variant"]
