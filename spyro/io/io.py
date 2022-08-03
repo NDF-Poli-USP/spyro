@@ -350,7 +350,7 @@ def interpolate(model, mesh, V, guess=False):
     return c
 
 
-def read_mesh(model, ens_comm):
+def read_mesh(model_parameters):
     """Reads in an external mesh and scatters it between cores.
 
     Parameters
@@ -364,18 +364,15 @@ def read_mesh(model, ens_comm):
     -------
     mesh: Firedrake.Mesh object
         The distributed mesh across `ens_comm`.
-    V: Firedrake.FunctionSpace object
-        The space of the finite elements
-
     """
 
-    method = model["opts"]["method"]
-    degree = model["opts"]["degree"]
+    method = model_parameters.method
+    ens_comm = model_parameters.comm
 
-    num_sources = len(model["acquisition"]["source_pos"])
-    mshname = model["mesh"]["meshfile"]
+    num_sources = model_parameters.number_of_sources
+    mshname = model_parameters.mesh_file
 
-    if method == "CG" or method == "KMV":
+    if method == "CG_triangle" or method == "mass_lumped_triangle":
         mesh = fire.Mesh(
             mshname,
             comm=ens_comm.comm,
@@ -405,10 +402,8 @@ def read_mesh(model, ens_comm):
         ),
         flush=True,
     )
-    # Element type
-    element = domains.space.FE_method(mesh, method, degree)
-    # Space of problem
-    return mesh, fire.FunctionSpace(mesh, element)
+
+    return mesh
 
 def parallel_print(string, comm):
     if comm.ensemble_comm.rank == 0 and comm.comm.rank == 0:
