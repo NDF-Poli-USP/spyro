@@ -329,44 +329,7 @@ class model_parameters:
             The distributed mesh across `ens_comm`
         """
         
-        method = self.method
-        ens_comm = self.comm
-
-        num_sources = self.number_of_sources
-        mshname = self.mesh_file
-
-        if method == "CG_triangle" or method == 'mass_lumped_triangle':
-            mesh = fire.Mesh(
-                mshname,
-                comm=ens_comm.comm,
-                distribution_parameters={
-                    "overlap_type": (fire.DistributedMeshOverlapType.NONE, 0)
-                },
-            )
-        else:
-            mesh = fire.Mesh(mshname, comm=ens_comm.comm)
-        if ens_comm.comm.rank == 0 and ens_comm.ensemble_comm.rank == 0:
-            print(
-                "INFO: Distributing %d shot(s) across %d core(s). Each shot is using %d cores"
-                % (
-                    num_sources,
-                    fire.COMM_WORLD.size,
-                    fire.COMM_WORLD.size / ens_comm.ensemble_comm.size,
-                ),
-                flush=True,
-            )
-        print(
-            "  rank %d on ensemble %d owns %d elements and can access %d vertices"
-            % (
-                mesh.comm.rank,
-                ens_comm.ensemble_comm.rank,
-                mesh.num_cells(),
-                mesh.num_vertices(),
-            ),
-            flush=True,
-        )
-        # Space of problem
-        return mesh
+        return spyro.io.read_mesh(self)
         
         
 
