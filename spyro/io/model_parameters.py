@@ -1,5 +1,4 @@
 from genericpath import exists
-from hashlib import new
 import warnings
 import spyro
 import firedrake as fire
@@ -95,7 +94,7 @@ default_dictionary["time_axis"] = {
 }
 
 class model_parameters:
-    def __init__(self, dictionary=default_dictionary):
+    def __init__(self, dictionary=default_dictionary, comm = None):
         if 'opts' in dictionary:
             warnings.warn("Old deprecated dictionary style in usage.")
             dictionary = self.__convert_old_dictionary(dictionary)
@@ -127,6 +126,13 @@ class model_parameters:
         self.function_space = None
         self.foward_output_file = 'results/forward_output.pvd'
         self.current_time = 0.0
+        self.number_of_sources = len(dictionary["acquisition"]["source_locations"])
+        self.number_of_receivers = len(dictionary["acquisition"]["receiver_locations"])
+
+        self.mesh_file = dictionary["mesh"]
+        if self.mesh_file == 'not_used.msh':
+            self.mesh_file = None
+        
         
     def __convert_old_dictionary(self,old_dictionary):
         new_dictionary = {}
@@ -307,6 +313,60 @@ class model_parameters:
         else:
             raise ValueError("Missing options inputs.")
 
+    def get_mesh(self):
+        """Reads in an external mesh and scatters it between cores.
+
+        Parameters
+        ----------
+        model: `dictionary`
+            Model options and parameters.
+        ens_comm: Firedrake.ensemble_communicator
+            An ensemble communicator
+
+        Returns
+        -------
+        mesh: Firedrake.Mesh object
+            The distributed mesh across `ens_comm`
+        """
+        
+        method = self.method
+        ens_comm = self.comm
+
+        num_sources = self.number_of_sources
+        mshname = self.mesh_file
+
+        if method == "CG_triangle" or method == 'mass_lumped_triangle':
+            mesh = fire.Mesh(
+                mshname,
+                comm=ens_comm.comm,
+                distribution_parameters={
+                    "overlap_type": (fire.DistributedMeshOverlapType.NONE, 0)
+                },
+            )
+        else:
+            mesh = fire.Mesh(mshname, comm=ens_comm.comm)
+        if ens_comm.comm.rank == 0 and ens_comm.ensemble_comm.rank == 0:
+            print(
+                "INFO: Distributing %d shot(s) across %d core(s). Each shot is using %d cores"
+                % (
+                    num_sources,
+                    fire.COMM_WORLD.size,
+                    fire.COMM_WORLD.size / ens_comm.ensemble_comm.size,
+                ),
+                flush=True,
+            )
+        print(
+            "  rank %d on ensemble %d owns %d elements and can access %d vertices"
+            % (
+                mesh.comm.rank,
+                ens_comm.ensemble_comm.rank,
+                mesh.num_cells(),
+                mesh.num_vertices(),
+            ),
+            flush=True,
+        )
+        # Space of problem
+        return mesh
         
         
 
