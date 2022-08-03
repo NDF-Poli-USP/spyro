@@ -129,9 +129,18 @@ class model_parameters:
         self.number_of_sources = len(dictionary["acquisition"]["source_locations"])
         self.number_of_receivers = len(dictionary["acquisition"]["receiver_locations"])
 
-        self.mesh_file = dictionary["mesh"]
+        self.mesh_file = dictionary["mesh"]["mesh_file"]
+        if "user_mesh" in dictionary["mesh"]:
+            if dictionary["mesh"]["user_mesh"]:
+                self.user_mesh = dictionary["mesh"]["user_mesh"]
+            else:
+                self.user_mesh = False
+        else:
+            self.user_mesh = False
+
         if self.mesh_file == 'not_used.msh':
             self.mesh_file = None
+
         
         
     def __convert_old_dictionary(self,old_dictionary):
@@ -328,8 +337,11 @@ class model_parameters:
         mesh: Firedrake.Mesh object
             The distributed mesh across `ens_comm`
         """
-        
-        return spyro.io.read_mesh(self)
+        if self.mesh_file != None:
+            return spyro.io.read_mesh(self)
+        elif self.mesh_type == 'user_mesh':
+            return self.user_mesh
+
         
         
 
