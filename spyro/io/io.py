@@ -259,7 +259,7 @@ def _check_units(c):
     return c
 
 
-def interpolate(model, mesh, V, guess=False):
+def interpolate(Model, mesh, V, guess=False):
     """Read and interpolate a seismic velocity model stored
     in a HDF5 file onto the nodes of a finite element space.
 
@@ -282,7 +282,7 @@ def interpolate(model, mesh, V, guess=False):
     """
     sd = V.mesh().geometric_dimension()
     m = V.ufl_domain()
-    if model["BCs"]["status"]:
+    if Model.abs:
         minz = -model["mesh"]["Lz"] - model["BCs"]["lz"]
         maxz = 0.0
         minx = 0.0 - model["BCs"]["lx"]

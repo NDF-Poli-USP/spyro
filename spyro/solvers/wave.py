@@ -1,4 +1,5 @@
 from operator import methodcaller
+import os
 import firedrake as fire
 from firedrake.assemble import create_assembly_callable
 from firedrake import Constant, dx, dot, inner, grad, ds
@@ -6,12 +7,14 @@ import FIAT
 import finat
 from warnings import warn
 import spyro
-from spyro.io.model_parameters import model_parameters
+from spyro.io.model_parameters import Model_parameters
 from . import helpers
 from .. import utils
 from spyro.utils import estimate_timestep
+fire.set_log_level(fire.ERROR)
 
-class wave():
+
+class Wave():
     def __init__(self, model_parameters = None, comm = None, model_dictionary = None):
         """Wave object solver. Contains both the forward solver 
         and gradient calculator methods.
@@ -26,7 +29,7 @@ class wave():
         if comm != None:
             self.comm = comm
         if model_parameters == None:
-            model_parameters = spyro.io.model_parameters(dictionary=model_dictionary, comm = comm)
+            model_parameters = Model_parameters(dictionary=model_dictionary, comm = comm)
         self.model_parameters = model_parameters
         self.mesh = model_parameters.get_mesh()
         self.method = model_parameters.method
@@ -34,7 +37,6 @@ class wave():
         self.dimension = model_parameters.dimension
         self.final_time = model_parameters.final_time
         self.dt = model_parameters.dt
-        self.initial_velocity_model = model_parameters.get_initial_velocity_model()
         self.function_space = None
         self.foward_output_file = 'forward_output.pvd'
         self.current_time = 0.0
@@ -43,12 +45,26 @@ class wave():
         self.comm = model_parameters.comm
 
         self._build_function_space()
+        self._get_initial_velocity_model()
         self.matrix_building()
         self.sources = spyro.Sources(self)
         self.receivers = spyro.Receivers(self)
         self.wavelet = model_parameters.get_wavelet()
 
         #
+    def _get_initial_velocity_model(self):
+        V = self.function_space.sub(0)
+        if self.mesh_file.endswith('.segy'):
+            vp_filename, vp_filetype = os.path.splitext(self.mesh_file)
+            spyro.io.write_velocity_model(self.mesh_file, ofname = vp_filename)
+            self.mesh_file = vp_filename+'.hdf5'
+
+        if self.mesh_file != None and self.mesh_file.endswith('.hdf5'):
+            return spyro.io.interpolate(self.model_parameters, self.mesh, self.function_space.sub(0))
+
+        if 
+
+
     def _build_function_space(self):
         if self.method == 'SEM':
             element = fire.FiniteElement(self.method, self.mesh.ufl_cell(), degree=self.degree, variant="spectral")
