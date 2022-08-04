@@ -28,6 +28,7 @@ default_dictionary["options"] = {
     "method": "MLT", # (MLT/spectral_quadrilateral/DG_triangle/DG_quadrilateral) You can either specify a cell_type+variant or a method
     "degree": 4,  # p order
     "dimension": 2,  # dimension
+    "automatic_adjoint": False,
 }
 
 # Number of cores for the shot. For simplicity, we keep things serial.
@@ -40,12 +41,12 @@ default_dictionary["parallelism"] = {
 # domain and reserve the remaining 250 m for the Perfectly Matched Layer (PML) to absorb
 # outgoing waves on three sides (eg., -z, +-x sides) of the domain.
 default_dictionary["mesh"] = {
-    "Lz": 1.0,  # depth in km - always positive
+    "Lz": 1.0,  # depth in km - always positive   # Como ver isso sem ler a malha?
     "Lx": 1.0,  # width in km - always positive
     "Ly": 0.0,  # thickness in km - always positive
     "mesh_file": None,
 }
-default_dictionary["synthetic_data"] = {    #For use only if you are using a synthetic test model or a forward only simulation
+default_dictionary["synthetic_data"] = {    #For use only if you are using a synthetic test model or a forward only simulation -adicionar discrição para modelo direto
     "real_mesh_file": None,
     "real_velocity_file": None,
 }
@@ -89,8 +90,8 @@ default_dictionary["time_axis"] = {
     "final_time": 2.00,  # Final time for event
     "dt": 0.001,  # timestep size
     "amplitude": 1,  # the Ricker has an amplitude of 1.
-    "nspool": 100,  # how frequently to output solution to pvds
-    "fspool": 100,  # how frequently to save solution to RAM
+    "output_frequency": 100,  # how frequently to output solution to pvds - Perguntar Daiane ''post_processing_frequnecy'
+    "gradient_sampling_frequency": 100,  # how frequently to save solution to RAM    - Perguntar Daiane 'gradient_sampling_frequency'
 }
 
 class model_parameters:
@@ -160,7 +161,7 @@ class model_parameters:
 
         if self.mesh_file == 'not_used.msh':
             self.mesh_file = None
-        self.__check_mesh()
+        self.__check_mesh() #Olhar objeto do Firedrake - assumir retangular sempre -só warning se z nao for negativo
 
         # Checking source and receiver inputs
         self.number_of_sources = len(dictionary["acquisition"]["source_locations"])
