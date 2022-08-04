@@ -87,6 +87,7 @@ class wave():
         A = fire.assemble(lhs, mat_type="matfree")
         self.solver = fire.LinearSolver(A, solver_parameters=self.solver_parameters)
 
+        #lterar para como o thiago fez
         self.rhs_assembly_callable = create_assembly_callable(rhs, tensor=B)
         self.B = B
     
