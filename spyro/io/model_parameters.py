@@ -95,21 +95,44 @@ default_dictionary["time_axis"] = {
 
 class model_parameters:
     def __init__(self, dictionary=default_dictionary, comm = None):
+        '''Initializes class that reads and sanitizes input parameters.
+        A dictionary can be used.
+
+        Parameters
+        ----------
+        dictionary: 'dictionary' (optional)
+            Contains all input parameters already organized based on examples from github.
+        comm: MPI communicator (optional)
+            MPI comunicator. If None is given model_parameters creates one.
+
+        Returns
+        -------
+        model_parameters: :class: 'model_parameters' object
+        '''
+        # Converts old dictionary to new one. Deprecated feature
         if 'opts' in dictionary:
             warnings.warn("Old deprecated dictionary style in usage.")
             dictionary = self.__convert_old_dictionary(dictionary)
+        # Saves inout_dictionary internally
         self.input_dictionary = dictionary
+
+        #Sanitizes method or cell_type+variant inputs
         self.cell_type = None
         self.method = None
         self.variant = None
         self.__get_method()
         
+        #Checks if degree is valid
         self.degree = dictionary["options"]["degree"]
         self.dimension = dictionary["options"]["dimension"]
+        self.__check_degree()
+
+        #Checks time inputs
         self.final_time = dictionary["time_axis"]["final_time"]
         self.dt = dictionary["time_axis"]['dt']
+        self.__check_time()
 
-        # Check if we are doing a FWI
+        # Check if we are doing a FWI and sorting output locations and velocity model inputs
         self.running_fwi = False
         if "inversion" in dictionary:
             if dictionary["inversion"]["perform_fwi"]:
@@ -123,12 +146,9 @@ class model_parameters:
         else:
             self.initial_velocity_model = dictionary["synthetic_data"]["real_velocity_file"]
 
-        self.function_space = None
         self.foward_output_file = 'results/forward_output.pvd'
-        self.current_time = 0.0
-        self.number_of_sources = len(dictionary["acquisition"]["source_locations"])
-        self.number_of_receivers = len(dictionary["acquisition"]["receiver_locations"])
 
+        # Checking mesh_parameters
         self.mesh_file = dictionary["mesh"]["mesh_file"]
         if "user_mesh" in dictionary["mesh"]:
             if dictionary["mesh"]["user_mesh"]:
@@ -140,8 +160,60 @@ class model_parameters:
 
         if self.mesh_file == 'not_used.msh':
             self.mesh_file = None
+        self.__check_mesh()
 
+        # Checking source and receiver inputs
+        self.number_of_sources = len(dictionary["acquisition"]["source_locations"])
+        self.source_locations = dictionary["acquisition"]["source_locations"]
+        self.number_of_receivers = len(dictionary["acquisition"]["receiver_locations"])
+        self.receiver_locations = dictionary["acquisition"]["receiver_locations"]
+        self.__check_acquisition()
+
+    # def __check_mesh(self):
         
+
+    def __check_acquisition(self):
+        min_z = -self.length_z
+        max_z = 0.0
+        min_x = 0.0
+        max_x = self.length_x
+        if self.dimension == 3:
+            min_y = 0.0
+            max_y = self.length_y
+        for source in self.source_locations:
+            if self.dimension == 2:
+                source_z, source_x = source
+                source_y = 0.0
+            elif self.dimension == 3:
+                source_z, source_x, source_y = source
+            else:
+                raise ValueError('Source input type not supported')
+            if min_z > source_z or source_z > max_z:
+                raise ValueError(f'Source of ({source_z},{source_x}, {source_y}) not located inside the mesh.')
+            if min_x > source_x or source_x > max_x:
+                raise ValueError(f'Source of ({source_z},{source_x}, {source_y}) not located inside the mesh.')
+            if (min_y > source_y or source_y > max_y) and self.dimension == 3:
+                raise ValueError(f'Source of ({source_z},{source_x}, {source_y}) not located inside the mesh.')
+
+    def __check_time(self):
+        if self.final_time < 0.0:
+            raise ValueError(f'Negative time of {self.final_time} not valid.')
+        if self.dt > 1.0:
+            warnings.warn(f'Time step of {self.dt} too big.')
+        if self.dt == None:
+            warnings.warn('Timestep not given. Will calculate internally when user attemps to propagate wave.')
+
+    def __check_degree(self):
+        if self.method == 'mass_lumped_triangle':
+            if self.dimension == 2:
+                if self.degree > 5:
+                    raise ValueError(f'Degree of {self.degree} not supported by {self.dimension}D {self.method}.')
+            if self.dimension == 3:
+                if self.degree > 4:
+                    raise ValueError(f'Degree of {self.degree} not supported by {self.dimension}D {self.method}.')
+            if self.dimension == 3:
+                if self.degree == 4:
+                    warnings.warn(f'Degree of {self.degree} not supported by {self.dimension}D {self.method} in main firedrake.')
         
     def __convert_old_dictionary(self,old_dictionary):
         new_dictionary = {}
@@ -321,6 +393,10 @@ class model_parameters:
             self.__get_method_from_cell_type()
         else:
             raise ValueError("Missing options inputs.")
+
+    # def get_wavelet(self):
+    #     dictionary = self.input_dictionary
+    #     source_type = dictionary["acquisition"]
 
     def get_mesh(self):
         """Reads in an external mesh and scatters it between cores.
