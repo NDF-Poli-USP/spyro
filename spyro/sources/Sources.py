@@ -8,7 +8,7 @@ import spyro
 class Sources(spyro.receivers.Receivers.Receivers):
     """Methods that inject a wavelet into a mesh"""
 
-    def __init__(self, model, mesh, V, my_ensemble):
+    def __init__(self, wave_object):
         """Initializes class and gets all receiver parameters from
         input file.
 
@@ -28,15 +28,17 @@ class Sources(spyro.receivers.Receivers.Receivers):
         Receivers: :class: 'Receiver' object
 
         """
+        my_ensemble = wave_object.comm
 
-        self.mesh = mesh
-        self.space = V
+        self.mesh  = wave_object.mesh
+        self.space = wave_object.function_space.sub(0)
         self.my_ensemble = my_ensemble
-        self.dimension = model["opts"]["dimension"]
-        self.degree = model["opts"]["degree"]
+        self.dimension = wave_object.dimension
+        self.degree = wave_object.degree
+        parameters = wave_object.model_parameters
 
-        self.receiver_locations = model["acquisition"]["source_pos"]
-        self.num_receivers = len(self.receiver_locations)
+        self.receiver_locations = parameters.receiver_locations
+        self.num_receivers = parameters.number_of_receivers
 
         self.cellIDs = None
         self.cellVertices = None
@@ -45,7 +47,10 @@ class Sources(spyro.receivers.Receivers.Receivers):
         self.nodes_per_cell = None
         self.is_local = [0]*self.num_receivers
         self.current_source = None
-        self.quadrilateral = (model["opts"]['quadrature']=='GLL')
+        if parameters.cell_type == 'quadrilateral':
+            self.quadrilateral = True
+        else:
+            self.quadrilateral = False
 
         super().build_maps()
 
