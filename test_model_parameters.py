@@ -1,4 +1,5 @@
 import spyro
+import pytest
 from spyro.io.model_parameters import model_parameters
 from copy import deepcopy
 
@@ -335,7 +336,7 @@ def test_dictionary_conversion():
     same = True
     if model_from_new.method != model_from_old.method:
         same = False
-    if model_from_new.current_time != model_from_old.current_time:
+    if model_from_new.initial_time != model_from_old.initial_time:
         same = False
     if model_from_new.degree != model_from_old.degree:
         same = False
@@ -361,10 +362,46 @@ def test_dictionary_conversion():
 
     assert same
 
+def test_degree_exception_2d():
+    ex_dictionary = deepcopy(dictionary)
+    with pytest.raises(Exception):
+        ex_dictionary["options"]["dimension"] = 2
+        ex_dictionary["options"]["degree"] = 6
+        model = model_parameters(dictionary=ex_dictionary)
+
+def test_degree_exception_3d():
+    ex_dictionary = deepcopy(dictionary)
+    with pytest.raises(Exception):
+        ex_dictionary["options"]["dimension"] = 3
+        ex_dictionary["options"]["degree"] = 5
+        model = model_parameters(dictionary=ex_dictionary)
+
+def test_time_exception():
+    ex_dictionary = deepcopy(dictionary)
+    with pytest.raises(Exception):
+        ex_dictionary["time_axis"]["final_time"] = -0.5
+        model = model_parameters(dictionary=ex_dictionary)
+
+def test_source_exception():
+    ex_dictionary = deepcopy(dictionary)
+    with pytest.raises(Exception):
+        ex_dictionary["acquistion"]["source_locations"] = [(-0.1, 0.5), (1.0,0.5)]
+        model = model_parameters(dictionary=ex_dictionary)
+
+def test_receiver_exception():
+    ex_dictionary = deepcopy(dictionary)
+    with pytest.raises(Exception):
+        ex_dictionary["acquistion"]["receiver_locations"] = [(-0.1, 0.5), (1.0,0.5)]
+        model = model_parameters(dictionary=ex_dictionary)
 
 if __name__ == "__main__":
     test_method_reader()
     test_cell_type_reader()
     test_dictionary_conversion()
+    test_degree_exception_2d()
+    test_degree_exception_3d()
+    test_time_exception()
+    test_source_exception()
+    test_receiver_exception()
 
-print('END')
+    print('END')
