@@ -131,6 +131,10 @@ class model_parameters:
         #Checks time inputs
         self.final_time = dictionary["time_axis"]["final_time"]
         self.dt = dictionary["time_axis"]['dt']
+        if "initial_time" in dictionary["time_axis"]:
+            self.initial_time = dictionary["time_axis"]["initial_time"]
+        else:
+            self.initial_time = 0.0
         self.__check_time()
 
         # Check if we are doing a FWI and sorting output locations and velocity model inputs
@@ -161,7 +165,10 @@ class model_parameters:
 
         if self.mesh_file == 'not_used.msh':
             self.mesh_file = None
-        self.__check_mesh() #Olhar objeto do Firedrake - assumir retangular sempre -só warning se z nao for negativo
+        self.length_z = dictionary["mesh"]["Lz"]
+        self.length_x = dictionary["mesh"]["Lx"]
+        self.length_y = dictionary["mesh"]["Ly"]
+        #self.__check_mesh() #Olhar objeto do Firedrake - assumir retangular sempre -só warning se z nao for negativo
 
         # Checking source and receiver inputs
         self.number_of_sources = len(dictionary["acquisition"]["source_locations"])
@@ -193,8 +200,9 @@ class model_parameters:
                 raise ValueError(f'Source of ({source_z},{source_x}, {source_y}) not located inside the mesh.')
             if min_x > source_x or source_x > max_x:
                 raise ValueError(f'Source of ({source_z},{source_x}, {source_y}) not located inside the mesh.')
-            if (min_y > source_y or source_y > max_y) and self.dimension == 3:
-                raise ValueError(f'Source of ({source_z},{source_x}, {source_y}) not located inside the mesh.')
+            if self.dimension == 3:
+                if (min_y > source_y or source_y > max_y):
+                    raise ValueError(f'Source of ({source_z},{source_x}, {source_y}) not located inside the mesh.')
 
     def __check_time(self):
         if self.final_time < 0.0:
