@@ -1,51 +1,62 @@
-from firedrake import File
-import firedrake as fire
 import spyro
+from firedrake import RectangleMesh
 
-model = {}
+from spyro.io.model_parameters import Model_parameters
 
-model["opts"] = {
-    "method": "CG",  # either CG or KMV
-    "quadrature": "GLL",
+user_mesh = RectangleMesh(10,10,1.0,1.0)
+user_mesh.coordinates.dat.data[:,0] *= -1.0
+
+dictionary = {}
+dictionary["options"] = {
+    "cell_type": "T",  # simplexes such as triangles or tetrahedra (T) or quadrilaterals (Q)
+    "variant": 'lumped', # lumped, equispaced or DG, default is lumped "method":"MLT", # (MLT/spectral_quadrilateral/DG_triangle/DG_quadrilateral) You can either specify a cell_type+variant or a method
     "degree": 4,  # p order
     "dimension": 2,  # dimension
 }
-model["parallelism"] = {
-    "type": "automatic",
+
+# Number of cores for the shot. For simplicity, we keep things serial.
+# spyro however supports both spatial parallelism and "shot" parallelism.
+dictionary["parallelism"] = {
+    "type": "automatic",  # options: automatic (same number of cores for evey processor) or spatial
 }
-model["mesh"] = {
-    "Lz": 3.0,  # depth in km - always positive
-    "Lx": 7.0,  # width in km - always positive
+
+# Define the domain size without the PML. Here we'll assume a 1.00 x 1.00 km
+# domain and reserve the remaining 250 m for the Perfectly Matched Layer (PML) to absorb
+# outgoing waves on three sides (eg., -z, +-x sides) of the domain.
+dictionary["mesh"] = {
+    "Lz": 1.0,  # depth in km - always positive
+    "Lx": 1.0,  # width in km - always positive
     "Ly": 0.0,  # thickness in km - always positive
-    "meshfile": None,
-    "initmodel": None,
-    "truemodel": None,
+    "mesh_file": None,
+    "user_mesh": user_mesh,
 }
-model["BCs"] = {
-    "status": False,  # True or false
-    "outer_bc": None,  #  None or non-reflective (outer boundary condition)
-    "damping_type": "polynomial",  # polynomial, hyperbolic, shifted_hyperbolic
-    "exponent": 2,  # damping layer has a exponent variation
-    "cmax": 4.5,  # maximum acoustic wave velocity in PML - km/s
-    "R": 1e-6,  # theoretical reflection coefficient
-    "lz": 0.9,  # thickness of the PML in the z-direction (km) - always positive
-    "lx": 0.9,  # thickness of the PML in the x-direction (km) - always positive
-    "ly": 0.0,  # thickness of the PML in the y-direction (km) - always positive
-}
-model["acquisition"] = {
-    "source_type": "Ricker",
-    "source_pos": [(-0.1,3.5)],
+
+# Create a source injection operator. Here we use a single source with a
+# Ricker wavelet that has a peak frequency of 5 Hz injected at the center of the mesh.
+# We also specify to record the solution at a microphone near the top of the domain.
+# This transect of receivers is created with the helper function `create_transect`.
+dictionary["acquisition"] = {
+    "source_type": "ricker",
+    "source_locations": [(-0.1, 0.5)],
     "frequency": 5.0,
     "delay": 1.0,
-    "receiver_locations": spyro.create_transect((-0.10, 0.1), (-0.10, 7.0), 20),
+    "receiver_locations": spyro.create_transect(
+        (-0.10, 0.1), (-0.10, 0.9), 20
+    ),
 }
-model["timeaxis"] = {
-    "t0": 0.0,  #  Initial time for event
-    "tf": 1.00,  # Final time for event
-    "dt": 0.00025,
+
+# Simulate for 2.0 seconds.
+dictionary["time_axis"] = {
+    "initial_time": 0.0,  #  Initial time for event
+    "final_time": 2.00,  # Final time for event
+    "dt": 0.001,  # timestep size
     "amplitude": 1,  # the Ricker has an amplitude of 1.
     "nspool": 100,  # how frequently to output solution to pvds
-    "fspool": 99999,  # how frequently to save solution to RAM
+    "fspool": 100,  # how frequently to save solution to RAM
 }
-comm = spyro.utils.mpi_init(model)
+
+Parameters = Model_parameters(dictionary=dictionary)
+
+#wave_object = spyro.Wave(model_dictionary=dictionary)
+
 
