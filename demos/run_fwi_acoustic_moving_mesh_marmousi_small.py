@@ -287,7 +287,7 @@ if False:
     sys.exit("exit")
 #}}}
 # run exact model with a finer mesh {{{
-if True:
+if False:
     mesh_x = RectangleMesh(50, 25, model["mesh"]["Lx"], model["mesh"]["Lz"], diagonal="crossed", comm=comm.comm,
                             distribution_parameters=distribution_parameters)
     mesh_x.coordinates.dat.data[:, 0] -= 0.0 
@@ -324,22 +324,39 @@ model["mesh"]["meshfile"] = "./meshes/fwi_amr_marmousi_small_p=" + str(p) + "_M=
 mesh_x, V_x = spyro.io.read_mesh(model, comm, distribution_parameters=distribution_parameters)# mesh that will be adapted
 
 # adapt the mesh using the exact vp, if requested {{{
-if False:
-    _mesh_xi, _V_xi = spyro.io.read_mesh(model, comm, distribution_parameters=distribution_parameters)# computational mesh
+if True:
+    #_mesh_xi, _V_xi = spyro.io.read_mesh(model, comm, distribution_parameters=distribution_parameters)# computational mesh
+    mesh_x = RectangleMesh(45, 25, model["mesh"]["Lx"], model["mesh"]["Lz"], diagonal="crossed", comm=comm.comm,
+                            distribution_parameters=distribution_parameters)
+    mesh_x.coordinates.dat.data[:, 0] -= 0.0 
+    mesh_x.coordinates.dat.data[:, 1] -= model["mesh"]["Lz"]
+    element = spyro.domains.space.FE_method(mesh_x, model["opts"]["method"], model["opts"]["degree"])
+    V_x = FunctionSpace(mesh_x, element)
+   
+
+    _mesh_xi = RectangleMesh(45, 25, model["mesh"]["Lx"], model["mesh"]["Lz"], diagonal="crossed", comm=comm.comm,
+                            distribution_parameters=distribution_parameters)
+    _mesh_xi.coordinates.dat.data[:, 0] -= 0.0 
+    _mesh_xi.coordinates.dat.data[:, 1] -= model["mesh"]["Lz"]
+    element = spyro.domains.space.FE_method(_mesh_xi, model["opts"]["method"], model["opts"]["degree"])
+    _V_xi = FunctionSpace(_mesh_xi, element)
+
+    
     _vpi_xi = _make_vp(model, _mesh_xi, _V_xi, vp_guess=True)
     _vpf_xi = _make_vp(model, _mesh_xi, _V_xi, vp_guess=False)
     _M_xi   = Function(_V_xi)   # monitor function using vpi_xi and vpf_xi
     
     mesh_x._parallel_compatible = {weakref.ref(_mesh_xi)}
 
-    mtype = 2
+    mtype = 1
     if mtype==1:
         alpha = 4.
         _M_xi.dat.data_with_halos[:] = (_vpi_xi.dat.data_ro_with_halos[:] / _vpf_xi.dat.data_ro_with_halos[:])**alpha 
     elif mtype==2:
         max_grad_vp = norm(grad(_vpf_xi - _vpi_xi), norm_type="L2") 
         print(max_grad_vp, flush=True)
-        alpha = 1/(max_grad_vp**2)
+        #alpha = 1/(max_grad_vp**2)
+        alpha = 5/(max_grad_vp**2)
         #_M_xi.interpolate( sqrt( 1 + alpha*inner(grad(_vpf_xi),grad(_vpf_xi)) ) )
         
         _f = _vpf_xi - _vpi_xi
@@ -349,7 +366,7 @@ if False:
 
     def monitor_function(mesh, M_xi=_M_xi):
         # project onto "mesh" that is being adapted (i.e., mesh_x)
-        P1 = FunctionSpace(mesh, "CG", 1)
+        P1 = FunctionSpace(mesh, "CG", 2)
         M_x = Function(P1)
         #M_x.project(M_xi) # Project from computational mesh (mesh_xi) onto physical mesh (mesh_x)
         spyro.mesh_to_mesh_projection(M_xi, M_x)
@@ -362,8 +379,10 @@ if False:
 
     method = "quasi_newton"
     tol = 1.0e-03
-    mover = MongeAmpereMover(mesh_x, monitor_function, method=method, rtol=tol)
-    step  = mover.move() # mesh_x will be adapted, so space V_x
+    #mover = MongeAmpereMover(mesh_x, monitor_function, method=method, rtol=tol)
+    #step  = mover.move() # mesh_x will be adapted, so space V_x
+    step = spyro.monge_ampere_solver(mesh_x, monitor_function, p=2, rtol=tol) 
+
 
     print("mesh_x adapted in "+str(step)+" steps")
 

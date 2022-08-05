@@ -97,13 +97,20 @@ def monge_ampere_solver(mesh, monitor_function,
                         p = 2, 
                         rtol = 1.0e-03, 
                         maxiter = 1000, 
-                        fix_boundary_nodes = False, 
+                        mask = None,
+                        fix_boundary_nodes = False,
+                        print_solution = False,
                         **kwargs):
     
     # Only works for two-dimensional meshes
     dim = mesh.topological_dimension()
     if dim != 2:
         raise NotImplementedError(f"Dimension {dim} has not been considered yet")
+    
+    # Mask used to update x in x = ξ + mask*grad(φ) at the end of the solver.
+    # It is usefull when some vertices/elements should keep fixed.
+    if mask is None:
+        mask = lambda mesh: firedrake.Constant(1.0)
 
     # Measures
     degree = kwargs.get('quadrature_degree')
@@ -111,19 +118,20 @@ def monge_ampere_solver(mesh, monitor_function,
     ds = firedrake.ds(domain=mesh, degree=degree)
 
     # Mesh coordinate functions
-    x  = firedrake.Function(mesh.coordinates, name="Physical coordinates")
-    xi = firedrake.Function(mesh.coordinates, name="Computational coordinates")
+    x  = firedrake.Function(mesh.coordinates, name="Physical coordinates") # used to evaluate the monitor function
+    xi = firedrake.Function(mesh.coordinates, name="Computational coordinates") # used to solve the Monge-Ampere eq.
     
     # Create function spaces
-    P  = firedrake.FunctionSpace(mesh, "CG", p) # to describe the solutions
+    P  = firedrake.FunctionSpace(mesh, "CG", p) # to describe the solution (phi)
     P0 = firedrake.FunctionSpace(mesh, "DG", 0) # to compute element area/volume 
-    P_ten  = firedrake.TensorFunctionSpace(mesh, "CG", p) # to describe the solutions
+    P1  = firedrake.FunctionSpace(mesh,"CG", 1) # to describe the monitor function (it is better than P)
+    P_ten  = firedrake.TensorFunctionSpace(mesh, "CG", p) # to describe the solution (sigma)
     P1_vec = firedrake.VectorFunctionSpace(mesh, "CG", 1) # to describe the mesh space
     V = P*P_ten # for solutions: phi and sigma=H(phi) (H is the Hessian)
 
     # Create variables used during the mesh movement
     theta = firedrake.Constant(0.0)
-    monitor = firedrake.Function(P, name="Monitor function") 
+    monitor = firedrake.Function(P1, name="Monitor function") # using P1 generates a better mesh behaviour
     monitor.interpolate(monitor_function(mesh)) # initialize the monitor function
     volume = firedrake.Function(P0, name="Mesh volume")
     volume.interpolate(ufl.CellVolume(mesh))
@@ -135,25 +143,24 @@ def monge_ampere_solver(mesh, monitor_function,
 
     # Create functions to the weak formulation
     phisigma = firedrake.Function(V)
-    phi, sigma = phisigma.split()
+    phi, sigma = firedrake.split(phisigma) 
     phisigma_old = firedrake.Function(V)
-    phi_old, sigma_old = phisigma_old.split()
+    phi_old, sigma_old = firedrake.split(phisigma_old) 
     psi, tau = firedrake.TestFunctions(V)
 
     # Define n and I
     n = ufl.FacetNormal(mesh)
     I = ufl.Identity(dim)
 
-    # Setup residuals used in the diagnostic FIXME it could be simplified
+    # Setup residuals used in the diagnostic 
     theta_form = monitor*ufl.det(I + sigma_old)*dx
     residual = monitor*ufl.det(I + sigma_old) - theta
     residual_l2_form = psi*residual*dx
     norm_l2_form = psi*theta*dx
 
     # Set the equidistributor 
-    phi, sigma = firedrake.split(phisigma) # FIXME testing
     F = ufl.inner(tau, sigma)*dx \
-        + ufl.dot(ufl.div(tau), ufl.grad(phi))*dx \
+        + ufl.inner(ufl.div(tau), ufl.grad(phi))*dx \
         - (tau[0, 1]*n[1]*phi.dx(0) + tau[1, 0]*n[0]*phi.dx(1))*ds \
         - psi*(monitor*ufl.det(I + sigma) - theta)*dx
   
@@ -212,12 +219,12 @@ def monge_ampere_solver(mesh, monitor_function,
             # TODO force regions of receivers/sources to be fixed
 
         # Create solver
-        problem = firedrake.LinearVariationalProblem(a, L, grad_phi_proj, bcs=bcs)
+        problem = firedrake.LinearVariationalProblem(a, L, grad_phi_proj, bcs=bcs) 
 
         return firedrake.LinearVariationalSolver(problem, solver_parameters=_cg)
     #}}}
     # Update x
-    def update_x(): # {{{
+    def update_x(mask=None): # {{{
         """
         Update the coordinate :class:`Function` using
         the recovered gradienti (grad_phi_proj).
@@ -226,7 +233,14 @@ def monge_ampere_solver(mesh, monitor_function,
             grad_phi_mesh.assign(grad_phi_proj)
         except Exception:
             grad_phi_mesh.interpolate(grad_phi_proj)
-        x.assign(xi + grad_phi_mesh)  # x = ξ + grad(φ)
+
+        if mask is None: # apply mask only at the end of the solver to avoid feedback between mask and phi-sigma
+            x.assign(xi + grad_phi_mesh)  # x = ξ + grad(φ) 
+        else:
+            try:
+                x.assign(xi + mask(mesh) * grad_phi_mesh)  # x = ξ + grad(φ) (in mask(mesh), mesh is based on xi)
+            except Exception:
+                x.interpolate(xi + mask(mesh) * grad_phi_mesh)  # x = ξ + grad(φ) (in mask(mesh), mesh is based on xi)
         return x
     #}}}
     # Update monitor function
@@ -239,24 +253,27 @@ def monge_ampere_solver(mesh, monitor_function,
         with phisigma_old.dat.vec as v:
             cursol.copy(v)
         l2_projector_solver.solve() # update grad_phi_proj 
-        mesh.coordinates.assign(update_x()) # update x = xi + grad_phi  # FIXME check if the spaces are changed here
-        monitor.interpolate(monitor_function(mesh)) # update monitor function FIXME check if should be done in xi 
-        mesh.coordinates.assign(xi) # FIXME check if the spaces are changed here
+        mesh.coordinates.assign(update_x()) # update x = xi + grad_phi 
+        monitor.interpolate(monitor_function(mesh)) # update monitor function (monitor function is defined over x) 
+        mesh.coordinates.assign(xi) # come back to xi (computational space)
         theta.assign(firedrake.assemble(theta_form)*total_volume**(-1))
    #}}} 
 
     # Custom preconditioner
-    phi, sigma = firedrake.TrialFunctions(V) # phi and sigma here are trial functions
+    phi, sigma = firedrake.TrialFunctions(V) # here, phi and sigma are trial functions
     Jp = ufl.inner(tau, sigma)*dx \
         + phi*psi*dx \
         + ufl.inner(ufl.grad(phi), ufl.grad(psi))*dx
 
     # Setup the variational problem
-    problem = firedrake.NonlinearVariationalProblem(F, phisigma, Jp=Jp)
+    # No Dirichlet BC is imposed, so the resulting system is singular.
+    # To make the system solvable, we remove the nullspace of of the right hand side, b (Ax=b).
+    problem = firedrake.NonlinearVariationalProblem(F, phisigma, Jp=Jp, bcs=None) 
     nullspace = firedrake.MixedVectorSpaceBasis(V, [firedrake.VectorSpaceBasis(constant=True), V.sub(1)])
     sp = _serial_qn if firedrake.COMM_WORLD.size == 1 else _parallel_qn
     sp['snes_atol'] = rtol
     sp['snes_max_it'] = maxiter
+   
     equidistributor = firedrake.NonlinearVariationalSolver(problem,
                                                            nullspace=nullspace,
                                                            transpose_nullspace=nullspace,
@@ -291,7 +308,7 @@ def monge_ampere_solver(mesh, monitor_function,
     def print_solver_progress(snes, i, rnorm): # {{{
         cursol = snes.getSolution()
         update_monitor(cursol)
-        mesh.coordinates.assign(update_x()) # FIXME check if it should be xi, and if this changes the space
+        mesh.coordinates.assign(update_x())
         firedrake.assemble(L_P0, tensor=volume)
         volume.assign(volume/original_volume)
         mesh.coordinates.assign(xi) 
@@ -308,11 +325,17 @@ def monge_ampere_solver(mesh, monitor_function,
     # Solve the Monge-Ampere using Quasi-Newton method
     try:
         equidistributor.solve()
+        if print_solution:
+            phi_sol, sigma_sol = phisigma.split()
+            firedrake.File("phi.pvd").write(phi_sol)
+            firedrake.File("sigma.pvd").write(sigma_sol)
+        
         i = snes.getIterationNumber()
         PETSc.Sys.Print(f"Converged in {i} iterations.")
     except firedrake.ConvergenceError:
         i = snes.getIterationNumber()
         raise firedrake.ConvergenceError(f"Failed to converge in {i} iterations.")
-    
-    mesh.coordinates.assign(update_x()) #FIXME maybe return only the coordinates x
+   
+    # Update x considering the given mask
+    mesh.coordinates.assign(update_x(mask=mask)) #FIXME maybe return only the coordinates x?
     return i
