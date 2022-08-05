@@ -54,6 +54,7 @@ class Wave():
         #
     def _get_initial_velocity_model(self):
         V = self.function_space.sub(0)
+
         if self.mesh_file.endswith('.segy'):
             vp_filename, vp_filetype = os.path.splitext(self.mesh_file)
             spyro.io.write_velocity_model(self.mesh_file, ofname = vp_filename)
@@ -62,7 +63,7 @@ class Wave():
         if self.mesh_file != None and self.mesh_file.endswith('.hdf5'):
             return spyro.io.interpolate(self.model_parameters, self.mesh, self.function_space.sub(0))
 
-        if 
+        if self.
 
 
     def _build_function_space(self):
