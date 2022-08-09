@@ -138,8 +138,6 @@ class Model_parameters:
         # Check automatic adjoint
         self._sanitize_automatic_adjoint()
 
-    # def __check_mesh(self):
-
     def get_wavelet(self,source_num= False):
         if self.source_type == 'ricker':
             wavelet = spyro.full_ricker_wavelet(
@@ -235,7 +233,6 @@ class Model_parameters:
 
         self.foward_output_file = 'results/forward_output.pvd'
         
-
     def _sanitize_time_inputs(self):
         dictionary = self.input_dictionary
         self.final_time = dictionary["time_axis"]["final_time"]
