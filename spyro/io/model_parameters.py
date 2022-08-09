@@ -140,6 +140,20 @@ class Model_parameters:
 
     # def __check_mesh(self):
 
+    def get_wavelet(self,source_num= False):
+        if self.source_type == 'ricker':
+            wavelet = spyro.full_ricker_wavelet(
+                        dt=self.dt,
+                        final_time=self.final_time,
+                        frequency=self.frequency,
+                        delay = self.delay,
+                        amplitude = self.amplitude,
+                        )
+        else:
+            raise ValueError(f"Source type of {self.source_type} not yet implemented.")
+        
+        return wavelet
+
     def _sanitize_automatic_adjoint(self):
         dictionary = self.input_dictionary
         if "automatic_adjoint" in dictionary:
@@ -161,15 +175,24 @@ class Model_parameters:
             self.comm = comm
 
     def _sanitize_acquisition(self):
-        dictionary = self.input_dictionary
-        self.number_of_sources = len(dictionary["acquisition"]["source_locations"])
-        self.source_locations = dictionary["acquisition"]["source_locations"]
-        self.number_of_receivers = len(dictionary["acquisition"]["receiver_locations"])
-        self.receiver_locations = dictionary["acquisition"]["receiver_locations"]
+        dictionary = self.input_dictionary["acquisition"]
+        self.number_of_sources = len(dictionary["source_locations"])
+        self.source_locations = dictionary["source_locations"]
+        self.number_of_receivers = len(dictionary["receiver_locations"])
+        self.receiver_locations = dictionary["receiver_locations"]
+        self.frequency = dictionary["frequency"]
+        if "amplitude" in dictionary:
+            self.amplitude = dictionary["amplitude"]
+        else:
+            self.amplitude = 1.0
+        if "delay" in dictionary:
+            self.delay = dictionary["delay"]
+        else:
+            self.delay = 1.5
         self.__check_acquisition()
 
         # Check ricker source:
-        self.source_type = dictionary["acquisition"]["source_type"]
+        self.source_type = dictionary["source_type"]
 
     def _sanitize_mesh(self):
         dictionary = self.input_dictionary
