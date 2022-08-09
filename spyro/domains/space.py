@@ -2,30 +2,17 @@ from firedrake import *
 
 
 def FE_method(mesh, method, degree):
-    """Define the finite element method:
-    Space discretization - Continuous
-    or Discontinuous Galerkin methods"""
-    cell_geometry = mesh.ufl_cell()
-    if method == "CG" or method == 'spectral':
-        # CG - Continuous Galerkin
-        if cell_geometry == quadrilateral or cell_geometry == hexahedron:
-            element = FiniteElement(
-                method, mesh.ufl_cell(), degree=degree, variant="spectral"
-            )
-        else:
-            element = FiniteElement(
-                method, mesh.ufl_cell(), degree=degree, variant="equispaced"
-            )
-    elif method == "DG":
-        if cell_geometry == quadrilateral or cell_geometry == hexahedron:
-            element = FiniteElement(
-                method, mesh.ufl_cell(), degree=degree, variant="spectral"
-            )
-        else:
-            element = FiniteElement(
-                method, mesh.ufl_cell(), degree=degree, variant="equispaced"
-            )
-    elif method == "KMV":
-        # CG- with KMV elements
-        element = FiniteElement(method, mesh.ufl_cell(), degree=degree, variant="KMV")
-    return element
+    """Define the finite element space:
+    """
+
+    if method == 'mass_lumped_triangle':
+        element = FiniteElement('KMV', mesh.ufl_cell(), degree=degree, variant="KMV")
+    elif method == 'spectral_quadrilateral':
+        element = FiniteElement('CG', mesh.ufl_cell(), degree=degree, variant="spectral")
+    elif method == 'DG_triangle' or 'DG_quadrilateral' or 'DG':
+        element = FiniteElement("DG", mesh.ufl_cell(), degree=degree)
+    elif method == 'CG_triangle' or 'CG_quadrilateral' or 'CG':
+        element = FiniteElement("CG", mesh.ufl_cell(), degree=degree)
+    
+    function_space = FunctionSpace(mesh, element)
+    return function_space

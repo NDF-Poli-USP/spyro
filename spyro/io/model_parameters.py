@@ -182,6 +182,19 @@ class Model_parameters:
         self.receiver_locations = dictionary["acquisition"]["receiver_locations"]
         self.__check_acquisition()
 
+        #Setting up MPI communicator and checking parallelism:
+        if "parallelism" in dictionary:
+            self.parallelism_type = dictionary["parallelism"]["type"]
+        else:
+            warnings.warn("No paralellism type listed. Assuming automatic")
+            self.parallelism_type = "automatic"
+
+        if comm == None:
+            self.comm = spyro.utils.mpi_init(self)
+        else:
+            self.comm = comm
+
+
     # def __check_mesh(self):
         
 

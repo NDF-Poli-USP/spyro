@@ -37,8 +37,8 @@ class Sources(spyro.receivers.Receivers.Receivers):
         self.degree = wave_object.degree
         parameters = wave_object.model_parameters
 
-        self.receiver_locations = parameters.receiver_locations
-        self.num_receivers = parameters.number_of_receivers
+        self.receiver_locations = parameters.source_locations
+        self.num_receivers = parameters.number_of_sources
 
         self.cellIDs = None
         self.cellVertices = None
