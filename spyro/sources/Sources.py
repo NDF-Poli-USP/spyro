@@ -94,15 +94,15 @@ def ricker_wavelet(t, freq, amp=1.0, delay=1.5):
     )
 
 
-def full_ricker_wavelet(dt, tf, freq, amp=1.0, cutoff=None):
+def full_ricker_wavelet(dt, final_time, frequency, amplitude=1.0, cutoff=None, delay = 1.5):
     """Compute the Ricker wavelet optionally applying low-pass filtering
     using cutoff frequency in Hertz.
     """
-    nt = int(tf / dt)  # number of timesteps
+    nt = int(final_time / dt)  # number of timesteps
     time = 0.0
     full_wavelet = np.zeros((nt,))
     for t in range(nt):
-        full_wavelet[t] = ricker_wavelet(time, freq, amp)
+        full_wavelet[t] = ricker_wavelet(time, frequency, amplitude, delay = delay)
         time += dt
     if cutoff is not None:
         fs = 1.0 / dt
