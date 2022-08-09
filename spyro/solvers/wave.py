@@ -34,6 +34,7 @@ class Wave():
         self.model_parameters = model_parameters
         self.mesh = model_parameters.get_mesh()
         self.method = model_parameters.method
+        self.cell_type = model_parameters.cell_type
         self.degree = model_parameters.degree
         self.dimension = model_parameters.dimension
         self.final_time = model_parameters.final_time
@@ -41,6 +42,7 @@ class Wave():
         self.function_space = None
         self.foward_output_file = 'forward_output.pvd'
         self.current_time = 0.0
+        self.automatic_adjoint = model_parameters.automatic_adjoint
 
         self.comm = model_parameters.comm
 
