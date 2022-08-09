@@ -118,45 +118,61 @@ class Model_parameters:
         self.input_dictionary = dictionary
 
         #Sanitizes method or cell_type+variant inputs
-        self.cell_type = None
-        self.method = None
-        self.variant = None
-        self.__get_method()
-        
-        #Checks if degree is valid
-        self.degree = dictionary["options"]["degree"]
-        self.dimension = dictionary["options"]["dimension"]
-        self.__check_degree()
+        self._sanitize_method()
 
         #Checks time inputs
-        self.final_time = dictionary["time_axis"]["final_time"]
-        self.dt = dictionary["time_axis"]['dt']
-        if "initial_time" in dictionary["time_axis"]:
-            self.initial_time = dictionary["time_axis"]["initial_time"]
-        else:
-            self.initial_time = 0.0
-        self.__check_time()
+        self._sanitize_time_inputs()
 
-        # Check if we are doing a FWI and sorting output locations and velocity model inputs
-        self.running_fwi = False
-        if "inversion" in dictionary:
-            if dictionary["inversion"]["perform_fwi"]:
-                self.running_fwi = True
-        if self.running_fwi:
-            self.initial_velocity_model = dictionary["inversion"]["initial_velocity_model"]
-            self.fwi_output_folder = 'fwi/'
-            self.control_output_file = self.fwi_output_folder+'control'
-            self.gradient_output_file = self.fwi_output_folder+'gradient'
-            self.optimization_parameters = dictionary["inversion"]["optimization_parameters"]
-        else:
-            if "synthetic_data" in dictionary:
-                self.initial_velocity_model = dictionary["synthetic_data"]["real_velocity_file"]
-            else:
-                self.initial_velocity_model = None
-
-        self.foward_output_file = 'results/forward_output.pvd'
+        # Checks inversion variables, FWI and velocity model inputs and outputs
+        self._sanitize_optimization_and_velocity()
 
         # Checking mesh_parameters
+        self._sanitize_mesh()
+
+        # Checking source and receiver inputs
+        self._sanitize_acquisition()
+
+        #Setting up MPI communicator and checking parallelism:
+        self._sanitize_comm(comm)
+
+        # Check automatic adjoint
+        self._sanitize_automatic_adjoint()
+
+    # def __check_mesh(self):
+
+    def _sanitize_automatic_adjoint(self):
+        dictionary = self.input_dictionary
+        if "automatic_adjoint" in dictionary:
+            self.automatic_adjoint = True
+        else:
+            self.automatic_adjoint = False
+
+    def _sanitize_comm(self,comm):
+        dictionary = self.input_dictionary
+        if "parallelism" in dictionary:
+            self.parallelism_type = dictionary["parallelism"]["type"]
+        else:
+            warnings.warn("No paralellism type listed. Assuming automatic")
+            self.parallelism_type = "automatic"
+
+        if comm == None:
+            self.comm = spyro.utils.mpi_init(self)
+        else:
+            self.comm = comm
+
+    def _sanitize_acquisition(self):
+        dictionary = self.input_dictionary
+        self.number_of_sources = len(dictionary["acquisition"]["source_locations"])
+        self.source_locations = dictionary["acquisition"]["source_locations"]
+        self.number_of_receivers = len(dictionary["acquisition"]["receiver_locations"])
+        self.receiver_locations = dictionary["acquisition"]["receiver_locations"]
+        self.__check_acquisition()
+
+        # Check ricker source:
+        self.source_type = dictionary["acquisition"]["source_type"]
+
+    def _sanitize_mesh(self):
+        dictionary = self.input_dictionary
         self.mesh_file = dictionary["mesh"]["mesh_file"]
         if "user_mesh" in dictionary["mesh"]:
             if dictionary["mesh"]["user_mesh"]:
@@ -175,29 +191,50 @@ class Model_parameters:
             self.mesh_type = 'user_mesh'
         #self.__check_mesh() #Olhar objeto do Firedrake - assumir retangular sempre -só warning se z nao for negativo
 
-        # Checking source and receiver inputs
-        self.number_of_sources = len(dictionary["acquisition"]["source_locations"])
-        self.source_locations = dictionary["acquisition"]["source_locations"]
-        self.number_of_receivers = len(dictionary["acquisition"]["receiver_locations"])
-        self.receiver_locations = dictionary["acquisition"]["receiver_locations"]
-        self.__check_acquisition()
-
-        #Setting up MPI communicator and checking parallelism:
-        if "parallelism" in dictionary:
-            self.parallelism_type = dictionary["parallelism"]["type"]
+    def _sanitize_optimization_and_velocity(self):
+        dictionary = self.input_dictionary
+        # Check if we are doing a FWI and sorting output locations and velocity model inputs
+        self.running_fwi = False
+        if "inversion" in dictionary:
+            if dictionary["inversion"]["perform_fwi"]:
+                self.running_fwi = True
+        if self.running_fwi:
+            self.initial_velocity_model = dictionary["inversion"]["initial_velocity_model"]
+            self.fwi_output_folder = 'fwi/'
+            self.control_output_file = self.fwi_output_folder+'control'
+            self.gradient_output_file = self.fwi_output_folder+'gradient'
+            self.optimization_parameters = dictionary["inversion"]["optimization_parameters"]
         else:
-            warnings.warn("No paralellism type listed. Assuming automatic")
-            self.parallelism_type = "automatic"
+            if "synthetic_data" in dictionary:
+                self.initial_velocity_model = dictionary["synthetic_data"]["real_velocity_file"]
+            else:
+                self.initial_velocity_model = None
 
-        if comm == None:
-            self.comm = spyro.utils.mpi_init(self)
-        else:
-            self.comm = comm
-
-
-    # def __check_mesh(self):
+        self.foward_output_file = 'results/forward_output.pvd'
         
 
+    def _sanitize_time_inputs(self):
+        dictionary = self.input_dictionary
+        self.final_time = dictionary["time_axis"]["final_time"]
+        self.dt = dictionary["time_axis"]['dt']
+        if "initial_time" in dictionary["time_axis"]:
+            self.initial_time = dictionary["time_axis"]["initial_time"]
+        else:
+            self.initial_time = 0.0
+        self.__check_time()
+
+    def _sanitize_method(self):
+        dictionary = self.input_dictionary
+        self.cell_type = None
+        self.method = None
+        self.variant = None
+        self.__get_method()
+        
+        #Checks if degree is valid
+        self.degree = dictionary["options"]["degree"]
+        self.dimension = dictionary["options"]["dimension"]
+        self.__check_degree()
+        
     def __check_acquisition(self):
         min_z = -self.length_z
         max_z = 0.0
