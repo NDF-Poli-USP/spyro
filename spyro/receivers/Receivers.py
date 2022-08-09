@@ -59,7 +59,10 @@ class Receivers:
         self.cell_tabulations = None
         self.cellNodeMaps = None
         self.nodes_per_cell = None
-        self.quadrilateral = wave_object.quadrilateral
+        if wave_object.cell_type == "quadrilateral":
+            self.quadrilateral = True
+        else:
+            self.quadrilateral = False
         self.is_local = [0] * self.num_receivers
         if not self.automatic_adjoint:
             self.build_maps()
