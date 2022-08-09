@@ -57,6 +57,10 @@ dictionary["time_axis"] = {
 
 Parameters = Model_parameters(dictionary=dictionary)
 
-wave_object = spyro.Wave(model_parameters=Parameters)
+Wave = spyro.Wave(model_parameters=Parameters)
+
+Wave.forward_solve()
+
+print("END")
 
 
