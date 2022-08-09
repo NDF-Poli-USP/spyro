@@ -1,3 +1,4 @@
+from logging import warning
 from operator import methodcaller
 import os
 import firedrake as fire
@@ -40,39 +41,79 @@ class Wave():
         self.function_space = None
         self.foward_output_file = 'forward_output.pvd'
         self.current_time = 0.0
-        self.solver_parameters = model_parameters.solver_parameters
 
         self.comm = model_parameters.comm
 
         self._build_function_space()
-        self._get_initial_velocity_model()
-        self.matrix_building()
         self.sources = spyro.Sources(self)
         self.receivers = spyro.Receivers(self)
         self.wavelet = model_parameters.get_wavelet()
 
-        #
+    def get_spatial_coordinates(self):
+        if self.dimension == 2:
+            x, y = fire.SpatialCoordinate(self.mesh)
+            return x, y
+        elif self.dimension == 3:
+            x, y, z = fire.SpatialCoordinate(self.mesh)
+            return x, y, z
+    
+    def set_initial_velocity_model(self, conditional= None, velocity_model_function = None, expression = None, new_file = None):
+        """Method to define new user velocity model or file. It is optional.
+
+        Parameters:
+        -----------
+        conditional:  (optional)
+
+        velocity_model_functional:  (optional)
+
+        expression:  (optional)
+
+        new_file:  (optional)
+        """
+        #Resseting old velocity model
+        self.initial_velocity_model = None
+        self.initial_velocity_model_file = None
+
+        if conditional != None:
+            V = self.function_space
+            vp = fire.Function(V)
+            vp.interpolate(conditional)
+            self.initial_velocity_model = vp
+        elif expression != None:
+            V = self.function_space
+            vp = fire.Function(V)
+            vp.interpolate(expression)
+            self.initial_velocity_model = vp
+        elif velocity_model_function != None:
+            self.initial_velocity_model = velocity_model_function
+        elif new_file != None:
+            self.initial_velocity_model_file = new_file
+        else:
+            raise ValueError("Please specify either a conditional, expression, firedrake function or new file name (segy or hdf5).")
+    
+    def forward_solve(self):
+        self._get_initial_velocity_model()
+        self.matrix_building()
+        self.wave_propagator()
+
     def _get_initial_velocity_model(self):
-        V = self.function_space.sub(0)
+        if self.initial_velocity_model != None:
+            return None
+        
+        if self.initial_velocity_model_file == None:
+            raise ValueError("No velocity model or velocity file to load.")
 
-        if self.mesh_file.endswith('.segy'):
-            vp_filename, vp_filetype = os.path.splitext(self.mesh_file)
-            spyro.io.write_velocity_model(self.mesh_file, ofname = vp_filename)
-            self.mesh_file = vp_filename+'.hdf5'
+        if self.initial_velocity_model_file.endswith('.segy'):
+            vp_filename, vp_filetype = os.path.splitext(self.initial_velocity_model_file)
+            warning.warn("Converting segy file to hdf5")
+            spyro.io.write_velocity_model(self.initial_velocity_model_file, ofname = vp_filename)
+            self.initial_velocity_model_file = vp_filename+'.hdf5'
 
-        if self.mesh_file != None and self.mesh_file.endswith('.hdf5'):
-            return spyro.io.interpolate(self.model_parameters, self.mesh, self.function_space.sub(0))
-
-        if self.
-
+        if self.initial_velocity_model_file.endswith('.hdf5'):
+            return spyro.io.interpolate(self.model_parameters, self.initial_velocity_model_file, self.function_space.sub(0))
 
     def _build_function_space(self):
-        if self.method == 'SEM':
-            element = fire.FiniteElement(self.method, self.mesh.ufl_cell(), degree=self.degree, variant="spectral")
-        else:
-            element = fire.FiniteElement(self.method, self.mesh.ufl_cell(), degree=self.degree)
-        V = fire.FunctionSpace(self.mesh, element)
-        self.function_space = V
+        self.function_space = spyro.domains.space.FE_method(self.mesh,self.method,self.degree)
 
     def matrix_building(self):
         """ Builds solver operators. Doesn't create mass matrices if matrix_free option is on,

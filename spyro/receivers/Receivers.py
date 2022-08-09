@@ -13,7 +13,7 @@ class Receivers:
     using Lagrange interpolation.
     """
 
-    def __init__(self, model, mesh, V, my_ensemble):
+    def __init__(self, wave_object):
         """Initializes class and gets all receiver parameters from
         input file.
         Parameters
@@ -30,34 +30,36 @@ class Receivers:
         -------
         Receivers: :class: 'Receiver' object
         """
-
-        if "Aut_Dif" in model:
+        my_ensemble = wave_object.comm
+        if wave_object.automatic_adjoint:
             self.automatic_adjoint = True
         else:
             self.automatic_adjoint = False
 
-        self.mesh = mesh
-        self.space = V
+        self.mesh = wave_object.mesh
+        self.space = wave_object.function_space.sub(0)
         self.my_ensemble = my_ensemble
-        self.dimension = model["opts"]["dimension"]
-        self.degree = model["opts"]["degree"]
-        self.receiver_locations = model["acquisition"]["receiver_locations"]
+        self.dimension = wave_object.dimension
+        self.degree = wave_object.degree
+        parameters = wave_object.model_parameters
+        self.receiver_locations = parameters.receiver_locations
         
-        if self.dimension==3 and model["aut_dif"]['status']:
-            self.column_x = model["acquisition"]["num_rec_x_columns"]
-            self.column_y = model["acquisition"]["num_rec_y_columns"]
-            self.column_z = model["acquisition"]["num_rec_z_columns"]
-            self.num_receivers = self.column_x*self.column_y
+        if self.dimension==3 and wave_object.automatic_adjoint:
+            # self.column_x = model["acquisition"]["num_rec_x_columns"]
+            # self.column_y = model["acquisition"]["num_rec_y_columns"]
+            # self.column_z = model["acquisition"]["num_rec_z_columns"]
+            # self.num_receivers = self.column_x*self.column_y
+            raise ValueError("Implement this later")
        
         else:
-            self.num_receivers = len(self.receiver_locations)
+            self.num_receivers = parameters.number_of_sources
 
         self.cellIDs = None
         self.cellVertices = None
         self.cell_tabulations = None
         self.cellNodeMaps = None
         self.nodes_per_cell = None
-        self.quadrilateral = (model["opts"]['quadrature']=='GLL')
+        self.quadrilateral = wave_object.quadrilateral
         self.is_local = [0] * self.num_receivers
         if not self.automatic_adjoint:
             self.build_maps()
