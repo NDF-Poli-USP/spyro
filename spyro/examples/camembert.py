@@ -1,4 +1,7 @@
-from spyro import model_parameters
+from spyro import Model_parameters
+from spyro import create_transect
+from spyro.examples.example_model import Example_model
+import firedrake as fire
 
 camembert_optimization_parameters = {
     "General": {"Secant": {"Type": "Limited-Memory BFGS", "Maximum Storage": 10}},
@@ -75,7 +78,7 @@ camembert_dictionary["acquisition"] = {
     "source_locations": [(-0.1, 0.5)],
     "frequency": 5.0,
     "delay": 1.0,
-    "receiver_locations": spyro.create_transect(
+    "receiver_locations": create_transect(
         (-0.10, 0.1), (-0.10, 0.9), 20
     ),
 }
@@ -91,6 +94,34 @@ camembert_dictionary["time_axis"] = {
 }
 
 
-class Camembert(model_parameters):
+class Camembert(Example_model):
     def __init__(self, dictionary=None, example_dictionary= camembert_dictionary, comm = None):
+        super().__init__(dictionary=dictionary,default_dictionary=example_dictionary,comm=comm)
+        self._camembert_mesh()
+        self._camembert_velocity_model()
+    
+    def _camembert_mesh(self):
+        nz = 100
+        nx = 100
+        Lz = self.Lz
+        Lx = self.Lx
+        if self.cell_type == 'quadrilateral':
+            quadrilateral = True
+        else:
+            quadrilateral = False
+        self.user_mesh = fire.RectangleMesh(nz, nx, Lz, Lx, quadrilateral=quadrilateral)
+    
+    def _camembert_velocity_model(self):
+        x, y = fire.SpatialCoordinate(self.mesh)
+        xc = 0.5
+        yc = 0.5
+        rc = 0.5
+        c_salt = 4.6
+        c_not_salt = 1.6
+        cond = fire.conditional( (x-xc)**2 + (y-yc)**2 < rc**2 ,  c_salt , c_not_salt)
+        return cond
+    
+
         
+
+
