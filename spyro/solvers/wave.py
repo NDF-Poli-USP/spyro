@@ -95,6 +95,7 @@ class Wave():
     
     def forward_solve(self):
         self._get_initial_velocity_model()
+        self.c = self.initial_velocity_model
         self.matrix_building()
         self.wave_propagator()
 

@@ -1,5 +1,5 @@
 import spyro
-from firedrake import RectangleMesh
+from firedrake import RectangleMesh, conditional
 
 from spyro.io.model_parameters import Model_parameters
 
@@ -58,6 +58,9 @@ dictionary["time_axis"] = {
 Parameters = Model_parameters(dictionary=dictionary)
 
 Wave = spyro.Wave(model_parameters=Parameters)
+
+x,y = Wave.get_spatial_coordinates()
+Wave.set_initial_velocity_model(conditional = conditional(x < -0.5 ,3.0 ,1.5 ))
 
 Wave.forward_solve()
 
