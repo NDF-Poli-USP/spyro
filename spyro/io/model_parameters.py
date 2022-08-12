@@ -230,6 +230,9 @@ class Model_parameters:
                 self.initial_velocity_model = dictionary["synthetic_data"]["real_velocity_file"]
             else:
                 self.initial_velocity_model = None
+        
+        if self.initial_velocity_model == None:
+            warnings.warn("No velocity model set initially. If using user defined conditional or expression, please input it in the Wave object.")
 
         self.foward_output_file = 'results/forward_output.pvd'
         

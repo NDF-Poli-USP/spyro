@@ -40,8 +40,8 @@ cut_marmousi_dictionary["parallelism"] = {
 # domain and reserve the remaining 250 m for the Perfectly Matched Layer (PML) to absorb
 # outgoing waves on three sides (eg., -z, +-x sides) of the domain.
 cut_marmousi_dictionary["mesh"] = {
-    "Lz": 1.0,  # depth in km - always positive   # Como ver isso sem ler a malha?
-    "Lx": 1.0,  # width in km - always positive
+    "Lz": 2.0,  # depth in km - always positive   # Como ver isso sem ler a malha?
+    "Lx": 4.0,  # width in km - always positive
     "Ly": 0.0,  # thickness in km - always positive
     "mesh_file": None,
 }
@@ -75,22 +75,20 @@ cut_marmousi_dictionary["absorving_boundary_conditions"] = {
 # This transect of receivers is created with the helper function `create_transect`.
 cut_marmousi_dictionary["acquisition"] = {
     "source_type": "ricker",
-    "source_locations": [(-0.1, 0.5)],
-    "frequency": 5.0,
+    "source_locations": create_transect((0.5, -0.01), (3.5, -0.01), 4),
+    "frequency": 3.0,
+    "amplitude": 1.0,
     "delay": 1.0,
-    "receiver_locations": create_transect(
-        (-0.10, 0.1), (-0.10, 0.9), 20
-    ),
+    "receiver_locations": create_transect((0.1, -0.10), (3.9, -0.10), 100),
 }
 
 # Simulate for 2.0 seconds.
 cut_marmousi_dictionary["time_axis"] = {
     "initial_time": 0.0,  #  Initial time for event
-    "final_time": 2.00,  # Final time for event
-    "dt": 0.001,  # timestep size
-    "amplitude": 1,  # the Ricker has an amplitude of 1.
-    "output_frequency": 100,  # how frequently to output solution to pvds - Perguntar Daiane ''post_processing_frequnecy'
-    "gradient_sampling_frequency": 100,  # how frequently to save solution to RAM    - Perguntar Daiane 'gradient_sampling_frequency'
+    "final_time": 2.5,  # Final time for event
+    "dt": 0.00025,  # timestep size
+    "output_frequency": 20,  # how frequently to output solution to pvds - Perguntar Daiane ''post_processing_frequnecy'
+    "gradient_sampling_frequency": 10,  # how frequently to save solution to RAM    - Perguntar Daiane 'gradient_sampling_frequency'
 }
 
 
