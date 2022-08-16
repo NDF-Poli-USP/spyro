@@ -32,27 +32,38 @@ class Wave():
         if model_parameters == None:
             model_parameters = Model_parameters(dictionary=model_dictionary, comm = comm)
         self.model_parameters = model_parameters
+        self._unpack_parameters(model_parameters)
         self.mesh = model_parameters.get_mesh()
-        self.method = model_parameters.method
-        self.cell_type = model_parameters.cell_type
-        self.degree = model_parameters.degree
-        self.dimension = model_parameters.dimension
-        self.final_time = model_parameters.final_time
-        self.dt = model_parameters.dt
-        self.output_frequency = model_parameters.output_frequency
-        self.gradient_sampling_frequency = model_parameters.gradient_sampling_frequency
         self.function_space = None
-        self.foward_output_file = 'forward_output.pvd'
         self.current_time = 0.0
-        self.automatic_adjoint = model_parameters.automatic_adjoint
         self.set_solver_parameters()
-
-        self.comm = model_parameters.comm
-
+        
         self._build_function_space()
         self.sources = spyro.Sources(self)
         self.receivers = spyro.Receivers(self)
         self.wavelet = model_parameters.get_wavelet()
+
+    def _unpack_parameters(self, model_parameters):
+        self.method = model_parameters.method
+        self.cell_type = model_parameters.cell_type
+        self.degree = model_parameters.degree
+        self.dimension = model_parameters.dimension
+
+        self.final_time = model_parameters.final_time
+        self.dt = model_parameters.dt
+
+        self.output_frequency = model_parameters.output_frequency
+        self.gradient_sampling_frequency = model_parameters.gradient_sampling_frequency
+        
+        self.automatic_adjoint = model_parameters.automatic_adjoint
+        
+        self.forward_output = model_parameters.forward_output
+        self.fwi_velocity_model_output = model_parameters.fwi_velocity_model_output
+        self.gradient_output = model_parameters.gradient_output
+
+        self.foward_output_file = model_parameters.foward_output_file
+        self.fwi_velocity_model_output_file = model_parameters.fwi_velocity_model_output_file
+        self.gradient_output_file = model_parameters.gradient_output_file
 
     def set_solver_parameters(self, parameters = None):
         if   parameters != None:
