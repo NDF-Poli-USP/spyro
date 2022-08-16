@@ -43,6 +43,7 @@ class Wave():
         self.foward_output_file = 'forward_output.pvd'
         self.current_time = 0.0
         self.automatic_adjoint = model_parameters.automatic_adjoint
+        self.set_solver_parameters()
 
         self.comm = model_parameters.comm
 
@@ -50,6 +51,20 @@ class Wave():
         self.sources = spyro.Sources(self)
         self.receivers = spyro.Receivers(self)
         self.wavelet = model_parameters.get_wavelet()
+
+    def set_solver_parameters(self, parameters = None):
+        if   parameters != None:
+            self.solver_parameters = parameters
+        elif parameters == None:
+            if   self.method == 'mass_lumped_triangle':
+                self.solver_parameters = {"ksp_type": "preonly", "pc_type": "jacobi"}
+            elif self.method == 'spectral_quadrilateral':
+                self.solver_parameters = {"ksp_type": "preonly", "pc_type": "jacobi"}
+            else:
+                self.solver_parameters = None
+
+            
+
 
     def get_spatial_coordinates(self):
         if self.dimension == 2:
