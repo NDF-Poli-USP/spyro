@@ -93,6 +93,14 @@ import os.path
 #     "output_frequency": 100,  # how frequently to output solution to pvds - Perguntar Daiane ''post_processing_frequnecy'
 #     "gradient_sampling_frequency": 100,  # how frequently to save solution to RAM    - Perguntar Daiane 'gradient_sampling_frequency'
 # }
+# default_dictionary["visualization"] = {
+#     "forward_output" : True,
+#     "output_filename": "results/forward_output.pvd",
+#     "fwi_velocity_model_output": False,
+#     "velocity_model_filename": None,
+#     "gradient_output": False,
+#     "gradient_filename": None,
+# }
 
 class Model_parameters:
     def __init__(self, dictionary=None, comm = None):
@@ -137,6 +145,64 @@ class Model_parameters:
 
         # Check automatic adjoint
         self._sanitize_automatic_adjoint()
+
+        # Sanitize output files
+        self._sanitize_output()
+    
+    def _sanitize_output(self):
+#         default_dictionary["visualization"] = {
+#     "forward_output" : True,
+#     "forward_output_filename": "results/forward.pvd",
+#     "fwi_velocity_model_output": False,
+#     "velocity_model_filename": None,
+#     "gradient_output": False,
+#     "gradient_filename": None,
+# }
+        # Checking if any output should be saved
+        if "visualization" in self.input_dictionary:
+            dictionary = self.input_dictionary["visualization"]
+        else:
+            dictionary = {
+                "forward_output" : False,
+                "fwi_velocity_model_output": False,
+                "gradient_output": False,
+            }
+        
+        self.forward_output = dictionary["forward_output"]
+
+        if "fwi_velocity_model_output" in dictionary:
+            self.fwi_velocity_model_output = dictionary["fwi_velocity_model_output"]
+        else:
+            self.fwi_velocity_model_output = False
+        
+        if "gradient_output" in dictionary:
+            self.gradient_output = dictionary["gradient_output"]
+        else:
+            self.gradient_output = False
+        
+        # Estabilishing forward output file and setting a default        
+        if "forward_output_filename" not in dictionary:
+            self.foward_output_file = "results/forward.pvd"
+        elif dictionary["forward_output_filename"] != None:
+            self.foward_output_file = dictionary["forward_output_filename"]
+        else:
+            self.foward_output_file = "results/forward.pvd"
+        
+        # Estabilishing velocity model file and setting a default        
+        if "fwi_velocity_model_output" not in dictionary:
+            self.fwi_velocity_model_output_file = "results/fwi_velocity_model.pvd"
+        elif dictionary["velocity_model_filename"] != None:
+            self.fwi_velocity_model_output_file = dictionary["velocity_model_filename"]
+        else:
+            self.fwi_velocity_model_output_file = "results/fwi_velocity_model.pvd"
+        
+        # Estabilishing gradient file and setting a default        
+        if "gradient_output" not in dictionary:
+            self.gradient_output_file = "results/gradient.pvd"
+        elif dictionary["gradient_filename"] != None:
+            self.gradient_output_file = dictionary["gradient_filename"]
+        else:
+            self.gradient_output_file = "results/gradient.pvd"
 
     def get_wavelet(self,source_num= False):
         if self.source_type == 'ricker':
@@ -237,13 +303,16 @@ class Model_parameters:
         self.foward_output_file = 'results/forward_output.pvd'
         
     def _sanitize_time_inputs(self):
-        dictionary = self.input_dictionary
-        self.final_time = dictionary["time_axis"]["final_time"]
-        self.dt = dictionary["time_axis"]['dt']
-        if "initial_time" in dictionary["time_axis"]:
-            self.initial_time = dictionary["time_axis"]["initial_time"]
+        dictionary = self.input_dictionary["time_axis"]
+        self.final_time = dictionary["final_time"]
+        self.dt = dictionary['dt']
+        if "initial_time" in dictionary:
+            self.initial_time = dictionary["initial_time"]
         else:
             self.initial_time = 0.0
+        self.output_frequency = dictionary["output_frequency"]
+        self.gradient_sampling_frequency = dictionary["gradient_sampling_frequency"]
+
         self.__check_time()
 
     def _sanitize_method(self):
@@ -389,8 +458,8 @@ class Model_parameters:
             "initial_time": old_dictionary["timeaxis"]["t0"],  #  Initial time for event
             "final_time": old_dictionary["timeaxis"]["tf"],  # Final time for event
             "dt": old_dictionary["timeaxis"]["dt"],  # timestep size
-            "nspool": old_dictionary["timeaxis"]["nspool"],  # how frequently to output solution to pvds
-            "fspool": old_dictionary["timeaxis"]["fspool"],  # how frequently to save solution to RAM
+            "output_frequency": old_dictionary["timeaxis"]["nspool"],  # how frequently to output solution to pvds
+            "gradient_sampling_frequency": old_dictionary["timeaxis"]["fspool"],  # how frequently to save solution to RAM
         }
 
         return new_dictionary
