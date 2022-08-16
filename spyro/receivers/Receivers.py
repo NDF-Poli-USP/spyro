@@ -52,7 +52,7 @@ class Receivers:
             raise ValueError("Implement this later")
        
         else:
-            self.num_receivers = parameters.number_of_sources
+            self.num_receivers = parameters.number_of_receivers
 
         self.cellIDs = None
         self.cellVertices = None

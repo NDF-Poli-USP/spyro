@@ -39,6 +39,8 @@ class Wave():
         self.dimension = model_parameters.dimension
         self.final_time = model_parameters.final_time
         self.dt = model_parameters.dt
+        self.output_frequency = model_parameters.output_frequency
+        self.gradient_sampling_frequency = model_parameters.gradient_sampling_frequency
         self.function_space = None
         self.foward_output_file = 'forward_output.pvd'
         self.current_time = 0.0
@@ -62,9 +64,6 @@ class Wave():
                 self.solver_parameters = {"ksp_type": "preonly", "pc_type": "jacobi"}
             else:
                 self.solver_parameters = None
-
-            
-
 
     def get_spatial_coordinates(self):
         if self.dimension == 2:
@@ -138,6 +137,7 @@ class Wave():
         which it is by default.
         """
         V = self.function_space
+        quad_rule, k_rule, s_rule = spyro.domains.quadrature.quadrature_rules(V)
 
         # typical CG FEM in 2d/3d
         u = fire.TrialFunction(V)
@@ -152,13 +152,14 @@ class Wave():
         dt = self.dt
 
         # -------------------------------------------------------
-        m1 = ((u - 2.0 * u_n + u_nm1) / Constant(dt ** 2)) * v * dx
-        a = self.c * self.c * dot(grad(u_n), grad(v)) * dx  # explicit
+        m1 = ((u - 2.0 * u_n + u_nm1) / Constant(dt ** 2)) * v * dx(rule = quad_rule)
+        a = self.c * self.c * dot(grad(u_n), grad(v)) * dx(rule = quad_rule)  # explicit
 
         B = fire.Function(V)
 
-        lhs = m1
-        rhs = -a
+        form = m1 + a
+        lhs = fire.lhs(form)
+        rhs = fire.rhs(form)
 
         A = fire.assemble(lhs, mat_type="matfree")
         self.solver = fire.LinearSolver(A, solver_parameters=self.solver_parameters)
@@ -197,7 +198,9 @@ class Wave():
         u_np1 = fire.Function(self.function_space)
 
         rhs_forcing = fire.Function(self.function_space)
-        usol = [fire.Function(self.function_space, name="pressure") for t in range(nt) if t % self.fspool == 0]
+        usol = [fire.Function(self.function_space, name="pressure") for t in range(nt) if t % self.gradient_sampling_frequency == 0]
+        usol_recv = []
+        save_step = 0
 
         for step in range(nt):
             rhs_forcing.assign(0.0)
@@ -211,11 +214,11 @@ class Wave():
 
             usol_recv.append(self.receivers.interpolate(u_np1.dat.data_ro_with_halos[:]))
 
-            if step % self.fspool == 0:
+            if step % self.gradient_sampling_frequency == 0:
                 usol[save_step].assign(u_np1)
                 save_step += 1
 
-            if step % self.nspool == 0:
+            if step % self.output_frequency == 0:
                 assert (
                     fire.norm(u_n) < 1
                 ), "Numerical instability. Try reducing dt or building the mesh differently"
