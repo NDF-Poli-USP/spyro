@@ -51,8 +51,8 @@ dictionary["time_axis"] = {
     "final_time": 2.00,  # Final time for event
     "dt": 0.001,  # timestep size
     "amplitude": 1,  # the Ricker has an amplitude of 1.
-    "nspool": 100,  # how frequently to output solution to pvds
-    "fspool": 100,  # how frequently to save solution to RAM
+    "output_frequency": 100,  # how frequently to output solution to pvds
+    "gradient_sampling_frequency": 100,  # how frequently to save solution to RAM
 }
 
 Parameters = Model_parameters(dictionary=dictionary)
