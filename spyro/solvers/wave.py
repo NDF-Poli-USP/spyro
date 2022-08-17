@@ -1,18 +1,19 @@
-from logging import warning
-from operator import methodcaller
 import os
-from turtle import forward
+import warnings
 import firedrake as fire
 from firedrake.assemble import create_assembly_callable
 from firedrake import Constant, dx, dot, inner, grad, ds
-import FIAT
-import finat
 from warnings import warn
-import spyro
-from spyro.io.model_parameters import Model_parameters
+from SeismicMesh import write_velocity_model
+
+from ..io import Model_parameters, interpolate
 from . import helpers
 from .. import utils
-from spyro.utils import estimate_timestep
+from ..receivers import Receivers
+from ..sources import Sources
+from ..domains.space import FE_method
+from ..domains.quadrature import quadrature_rules
+
 fire.set_log_level(fire.ERROR)
 
 
@@ -40,8 +41,8 @@ class Wave():
         self.set_solver_parameters()
         
         self._build_function_space()
-        self.sources = spyro.Sources(self)
-        self.receivers = spyro.Receivers(self)
+        self.sources = Sources(self)
+        self.receivers = Receivers(self)
         self.wavelet = model_parameters.get_wavelet()
 
     def _unpack_parameters(self, model_parameters):
@@ -135,22 +136,22 @@ class Wave():
 
         if self.initial_velocity_model_file.endswith('.segy'):
             vp_filename, vp_filetype = os.path.splitext(self.initial_velocity_model_file)
-            warning.warn("Converting segy file to hdf5")
-            spyro.io.write_velocity_model(self.initial_velocity_model_file, ofname = vp_filename)
+            warnings.warn("Converting segy file to hdf5")
+            write_velocity_model(self.initial_velocity_model_file, ofname = vp_filename)
             self.initial_velocity_model_file = vp_filename+'.hdf5'
 
         if self.initial_velocity_model_file.endswith('.hdf5'):
-            return spyro.io.interpolate(self.model_parameters, self.initial_velocity_model_file, self.function_space.sub(0))
+            return interpolate(self.model_parameters, self.initial_velocity_model_file, self.function_space.sub(0))
 
     def _build_function_space(self):
-        self.function_space = spyro.domains.space.FE_method(self.mesh,self.method,self.degree)
+        self.function_space = FE_method(self.mesh,self.method,self.degree)
 
     def matrix_building(self):
         """ Builds solver operators. Doesn't create mass matrices if matrix_free option is on,
         which it is by default.
         """
         V = self.function_space
-        quad_rule, k_rule, s_rule = spyro.domains.quadrature.quadrature_rules(V)
+        quad_rule, k_rule, s_rule = quadrature_rules(V)
 
         # typical CG FEM in 2d/3d
         u = fire.TrialFunction(V)
@@ -257,7 +258,7 @@ class Wave():
         else:
             estimate_max_eigenvalue = False
 
-        dt = estimate_timestep(self.mesh, self.function_space, self.c, estimate_max_eigenvalue=estimate_max_eigenvalue)
+        dt = utils.estimate_timestep(self.mesh, self.function_space, self.c, estimate_max_eigenvalue=estimate_max_eigenvalue)
         dt *= fraction
         self.dt = dt
         return dt
