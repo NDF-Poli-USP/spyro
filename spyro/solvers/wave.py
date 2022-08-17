@@ -1,6 +1,7 @@
 from logging import warning
 from operator import methodcaller
 import os
+from turtle import forward
 import firedrake as fire
 from firedrake.assemble import create_assembly_callable
 from firedrake import Constant, dx, dot, inner, grad, ds
@@ -44,6 +45,7 @@ class Wave():
         self.wavelet = model_parameters.get_wavelet()
 
     def _unpack_parameters(self, model_parameters):
+        self.comm = model_parameters.comm
         self.method = model_parameters.method
         self.cell_type = model_parameters.cell_type
         self.degree = model_parameters.degree
@@ -61,7 +63,7 @@ class Wave():
         self.fwi_velocity_model_output = model_parameters.fwi_velocity_model_output
         self.gradient_output = model_parameters.gradient_output
 
-        self.foward_output_file = model_parameters.foward_output_file
+        self.forward_output_file = model_parameters.forward_output_file
         self.fwi_velocity_model_output_file = model_parameters.fwi_velocity_model_output_file
         self.gradient_output_file = model_parameters.gradient_output_file
 
@@ -157,8 +159,6 @@ class Wave():
         u_nm1 = fire.Function(V)
         u_n = fire.Function(V)
 
-        output = fire.File(self.foward_output_file)
-
         self.current_time = 0.0
         dt = self.dt
 
@@ -195,6 +195,8 @@ class Wave():
         excitations = self.sources
         receivers = self.receivers
         comm = self.comm
+
+        output = fire.File(self.forward_output_file)
 
         X = fire.Function(self.function_space)
         if final_time == None:
@@ -233,8 +235,8 @@ class Wave():
                 assert (
                     fire.norm(u_n) < 1
                 ), "Numerical instability. Try reducing dt or building the mesh differently"
-                if self.output:
-                    self.outfile.write(u_n, time=t, name="Pressure")
+                if self.forward_output:
+                    output.write(u_n, time=t, name="Pressure")
                 if t > 0:
                     helpers.display_progress(self.comm, t)
 
