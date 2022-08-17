@@ -182,14 +182,14 @@ class Model_parameters:
         
         # Estabilishing forward output file and setting a default        
         if "forward_output_filename" not in dictionary:
-            self.foward_output_file = "results/forward.pvd"
+            self.forward_output_file = "results/forward.pvd"
         elif dictionary["forward_output_filename"] != None:
-            self.foward_output_file = dictionary["forward_output_filename"]
+            self.forward_output_file = dictionary["forward_output_filename"]
         else:
-            self.foward_output_file = "results/forward.pvd"
+            self.forward_output_file = "results/forward.pvd"
         
         # Estabilishing velocity model file and setting a default        
-        if "fwi_velocity_model_output" not in dictionary:
+        if "velocity_model_filename" not in dictionary:
             self.fwi_velocity_model_output_file = "results/fwi_velocity_model.pvd"
         elif dictionary["velocity_model_filename"] != None:
             self.fwi_velocity_model_output_file = dictionary["velocity_model_filename"]
@@ -197,7 +197,7 @@ class Model_parameters:
             self.fwi_velocity_model_output_file = "results/fwi_velocity_model.pvd"
         
         # Estabilishing gradient file and setting a default        
-        if "gradient_output" not in dictionary:
+        if "gradient_filename" not in dictionary:
             self.gradient_output_file = "results/gradient.pvd"
         elif dictionary["gradient_filename"] != None:
             self.gradient_output_file = dictionary["gradient_filename"]
