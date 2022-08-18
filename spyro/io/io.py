@@ -72,6 +72,18 @@ def ensemble_forward(func):
 
     return wrapper
 
+def ensemble_propagator(func):
+    """Decorator for forward to distribute shots for ensemble parallelism"""
+    def wrapper(*args, **kwargs):
+        num = args[0].number_of_sources
+        _comm = args[0].comm
+        for snum in range(num):
+            if is_owner(_comm, snum):
+                u, u_r = func(*args, **dict(kwargs, source_num=snum))
+                return u, u_r
+
+    return wrapper
+
 def ensemble_forward_ad(func):
     """Decorator for forward to distribute shots for ensemble parallelism"""
     def wrapper(*args, **kwargs):
