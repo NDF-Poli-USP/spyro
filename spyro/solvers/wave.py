@@ -6,11 +6,13 @@ from firedrake import Constant, dx, dot, inner, grad, ds
 from warnings import warn
 from SeismicMesh import write_velocity_model
 
+from ..io.io import ensemble_propagator
+
 from ..io import Model_parameters, interpolate
 from . import helpers
 from .. import utils
-from ..receivers import Receivers
-from ..sources import Sources
+from ..receivers.Receivers import Receivers
+from ..sources.Sources import Sources
 from ..domains.space import FE_method
 from ..domains.quadrature import quadrature_rules
 
@@ -67,6 +69,8 @@ class Wave():
         self.forward_output_file = model_parameters.forward_output_file
         self.fwi_velocity_model_output_file = model_parameters.fwi_velocity_model_output_file
         self.gradient_output_file = model_parameters.gradient_output_file
+
+        self.number_of_sources = model_parameters.number_of_sources
 
     def set_solver_parameters(self, parameters = None):
         if   parameters != None:
@@ -159,6 +163,8 @@ class Wave():
 
         u_nm1 = fire.Function(V)
         u_n = fire.Function(V)
+        self.u_nm1 = u_nm1
+        self.u_n = u_n
 
         self.current_time = 0.0
         dt = self.dt
@@ -177,10 +183,11 @@ class Wave():
         self.solver = fire.LinearSolver(A, solver_parameters=self.solver_parameters)
 
         #lterar para como o thiago fez
-        self.rhs_assembly_callable = create_assembly_callable(rhs, tensor=B)
+        self.rhs = rhs
         self.B = B
     
-    def wave_propagator(self, dt = None, final_time = None):
+    @ensemble_propagator
+    def wave_propagator(self, dt = None, final_time = None, source_num = 0):
         """ Propagates the wave forward in time.
         Currently uses central differences.
 
@@ -194,6 +201,7 @@ class Wave():
             that was estabilished in the model_parameters.
         """
         excitations = self.sources
+        excitations.current_source = source_num
         receivers = self.receivers
         comm = self.comm
 
@@ -207,22 +215,26 @@ class Wave():
         t = self.current_time
         nt = int( (final_time-t) / dt)  # number of timesteps
 
-        u_nm1 = fire.Function(self.function_space)
-        u_n = fire.Function(self.function_space)
+        u_nm1 = self.u_nm1
+        u_n = self.u_n
         u_np1 = fire.Function(self.function_space)
 
         rhs_forcing = fire.Function(self.function_space)
         usol = [fire.Function(self.function_space, name="pressure") for t in range(nt) if t % self.gradient_sampling_frequency == 0]
         usol_recv = []
         save_step = 0
+        B = self.B
+        rhs = self.rhs
+
+        #assembly_callable = create_assembly_callable(rhs, tensor=B)
 
         for step in range(nt):
             rhs_forcing.assign(0.0)
-            self.rhs_assembly_callable()
+            B = fire.assemble(rhs, tensor=B)
             f = excitations.apply_source(rhs_forcing, self.wavelet[step])
-            B0 = self.B.sub(0)
+            B0 = B.sub(0)
             B0 += f
-            self.solver.solve(X, self.B)
+            self.solver.solve(X, B)
 
             u_np1.assign(X)
 
@@ -248,7 +260,7 @@ class Wave():
 
         self.current_time = t
         usol_recv = helpers.fill(usol_recv, receivers.is_local, nt, receivers.num_receivers)
-        usol_recv = utils.communicate(usol_recv, comm)
+        usol_recv = utils.utils.communicate(usol_recv, comm)
 
         return usol, usol_recv
 
