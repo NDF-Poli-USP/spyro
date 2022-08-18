@@ -3,12 +3,12 @@ from firedrake import RectangleMesh, conditional
 
 from spyro.io.model_parameters import Model_parameters
 
-user_mesh = RectangleMesh(10,10,1.0,1.0)
+user_mesh = RectangleMesh(10,10,1.0,1.0, quadrilateral = True)
 user_mesh.coordinates.dat.data[:,0] *= -1.0
 
 dictionary = {}
 dictionary["options"] = {
-    "cell_type": "T",  # simplexes such as triangles or tetrahedra (T) or quadrilaterals (Q)
+    "cell_type": "Q",  # simplexes such as triangles or tetrahedra (T) or quadrilaterals (Q)
     "variant": 'lumped', # lumped, equispaced or DG, default is lumped "method":"MLT", # (MLT/spectral_quadrilateral/DG_triangle/DG_quadrilateral) You can either specify a cell_type+variant or a method
     "degree": 4,  # p order
     "dimension": 2,  # dimension
@@ -39,7 +39,7 @@ dictionary["acquisition"] = {
     "source_type": "ricker",
     "source_locations": [(-0.1, 0.5)],
     "frequency": 5.0,
-    "delay": 1.0,
+    "delay": 1.5,
     "receiver_locations": spyro.create_transect(
         (-0.10, 0.1), (-0.10, 0.9), 20
     ),
@@ -55,9 +55,16 @@ dictionary["time_axis"] = {
     "gradient_sampling_frequency": 100,  # how frequently to save solution to RAM
 }
 
-Parameters = Model_parameters(dictionary=dictionary)
+dictionary["visualization"] = {
+    "forward_output" : True,
+    "output_filename": "results/forward_output.pvd",
+    "fwi_velocity_model_output": False,
+    "velocity_model_filename": None,
+    "gradient_output": False,
+    "gradient_filename": None,
+}
 
-Wave = spyro.Wave(model_parameters=Parameters)
+Wave = spyro.Wave(model_dictionary=dictionary)
 
 x,y = Wave.get_spatial_coordinates()
 Wave.set_initial_velocity_model(conditional = conditional(x < -0.5 ,3.0 ,1.5 ))
