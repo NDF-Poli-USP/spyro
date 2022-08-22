@@ -41,9 +41,6 @@ class Wave():
         self.function_space = None
         self.current_time = 0.0
         self.set_solver_parameters()
-
-        if self.velocity_model_type == 'conditional':
-            self.set_initial_velocity_model(conditional=self.velocity_conditional)
         
         self._build_function_space()
         self.sources = Sources(self)
@@ -137,6 +134,9 @@ class Wave():
         self.wave_propagator()
 
     def _get_initial_velocity_model(self):
+        if self.velocity_model_type == 'conditional':
+            self.set_initial_velocity_model(conditional=self.model_parameters.velocity_conditional)
+
         if self.initial_velocity_model != None:
             return None
         

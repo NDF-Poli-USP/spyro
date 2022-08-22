@@ -1,4 +1,3 @@
-from spyro import Model_parameters
 from spyro import create_transect
 from spyro.examples.example_model import Example_model
 import firedrake as fire
