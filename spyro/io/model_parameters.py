@@ -276,6 +276,8 @@ class Model_parameters:
         self.length_y = dictionary["mesh"]["Ly"]
         if "user_mesh" in dictionary["mesh"] and self.mesh_file == None:
             self.mesh_type = 'user_mesh'
+        if self.user_mesh == None and self.mesh_file == None:
+            warnings.warn("No mesh yet provided.")
         #self.__check_mesh() #Olhar objeto do Firedrake - assumir retangular sempre -só warning se z nao for negativo
 
     def _sanitize_optimization_and_velocity(self):
@@ -553,6 +555,50 @@ class Model_parameters:
     # def get_wavelet(self):
     #     dictionary = self.input_dictionary
     #     source_type = dictionary["acquisition"]
+
+    def set_mesh(self, user_mesh = None, mesh_file = None, length_z = None, length_x = None, length_y = None):
+        # dictionary = self.input_dictionary
+        # self.mesh_file = dictionary["mesh"]["mesh_file"]
+        # if "user_mesh" in dictionary["mesh"]:
+        #     if dictionary["mesh"]["user_mesh"]:
+        #         self.user_mesh = dictionary["mesh"]["user_mesh"]
+        #     else:
+        #         self.user_mesh = False
+        # else:
+        #     self.user_mesh = False
+
+        # if self.mesh_file == 'not_used.msh':
+        #     self.mesh_file = None
+        # self.length_z = dictionary["mesh"]["Lz"]
+        # self.length_x = dictionary["mesh"]["Lx"]
+        # self.length_y = dictionary["mesh"]["Ly"]
+        # if "user_mesh" in dictionary["mesh"] and self.mesh_file == None:
+        #     self.mesh_type = 'user_mesh'
+        # if self.user_mesh == None and self.mesh_file == None:
+        #     warnings.warn("No mesh yet provided.")
+        # #self.__check_mesh() #Olhar objeto do Firedrake
+
+
+        if user_mesh != None:
+            self.user_mesh = user_mesh
+            self.mesh_type = 'user_mesh'
+        elif mesh_file != None:
+            self.mesh_file = mesh_file
+        
+        if length_z== None or length_x==None or (length_y == None and self.dimension==2):
+            warnings.warn("Mesh dimensions not completely reset from initial dictionary")
+        else:
+            if length_z != None:
+                self.length_z = length_z
+            if length_x != None:
+                self.length_x = length_x
+            if length_y != None:
+                self.length_y = length_y
+            
+
+        
+        
+
 
     def get_mesh(self):
         """Reads in an external mesh and scatters it between cores.
