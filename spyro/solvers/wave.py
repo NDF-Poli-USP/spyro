@@ -41,6 +41,9 @@ class Wave():
         self.function_space = None
         self.current_time = 0.0
         self.set_solver_parameters()
+
+        if self.velocity_model_type == 'conditional':
+            self.set_initial_velocity_model(conditional=self.velocity_conditional)
         
         self._build_function_space()
         self.sources = Sources(self)
@@ -53,6 +56,8 @@ class Wave():
         self.cell_type = model_parameters.cell_type
         self.degree = model_parameters.degree
         self.dimension = model_parameters.dimension
+
+        self.velocity_model_type = model_parameters.velocity_model_type
 
         self.final_time = model_parameters.final_time
         self.dt = model_parameters.dt
@@ -204,8 +209,12 @@ class Wave():
         excitations.current_source = source_num
         receivers = self.receivers
         comm = self.comm
+        temp_filename = self.forward_output_file
+        filename, file_extension = temp_filename.split(".")
+        output_filename = filename+str(source_num)+"."+file_extension
+        print(output_filename, flush = True)
 
-        output = fire.File(self.forward_output_file)
+        output = fire.File(output_filename)
 
         X = fire.Function(self.function_space)
         if final_time == None:

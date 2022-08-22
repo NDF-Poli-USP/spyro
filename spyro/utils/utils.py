@@ -92,6 +92,21 @@ def mpi_init(model):
     comm_ens = Ensemble(COMM_WORLD, num_cores_per_shot)
     return comm_ens
 
+def mpi_init_simple(number_of_sources):
+    """Initialize computing environment"""
+    rank = myrank()
+    size = mysize()
+    available_cores = COMM_WORLD.size
+
+    num_cores_per_shot = available_cores / number_of_sources
+    if available_cores % number_of_sources != 0:
+        raise ValueError(
+            "Available cores cannot be divided between sources equally."
+        )
+        
+    comm_ens = Ensemble(COMM_WORLD, num_cores_per_shot)
+    return comm_ens
+
 
 def communicate(array, my_ensemble):
     """Communicate shot record to all processors

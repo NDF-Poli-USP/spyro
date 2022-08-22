@@ -34,7 +34,7 @@ dictionary["mesh"] = {
 # This transect of receivers is created with the helper function `create_transect`.
 dictionary["acquisition"] = {
     "source_type": "ricker",
-    "source_locations": [(-0.1, 0.3),(-0.5, 0.6)],
+    "source_locations": [(-0.1, 0.3)],
     "frequency": 5.0,
     "delay": 1.5,
     "receiver_locations": spyro.create_transect(
@@ -65,6 +65,7 @@ Model = Model_parameters(dictionary=dictionary)
 
 user_mesh = RectangleMesh(10,10,1.0,1.0, quadrilateral = True,comm=Model.comm.comm)
 user_mesh.coordinates.dat.data[:,0] *= -1.0
+Model.set_mesh(user_mesh=user_mesh)
 
 Wave = spyro.Wave(model_parameters=Model)
 
