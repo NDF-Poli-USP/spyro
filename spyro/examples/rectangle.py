@@ -103,33 +103,49 @@ rectangle_dictionary["visualization"] = {
     "gradient_filename": None,
 }
 
+rectangle_dictionary["example_specific_options"]={
+    "elements_in_z": 10,
+    "elements_in_x": 10,
+    "fault_depth": -0.5,
+    "c_salt":4.6,
+    "c_not_salt":1.6,
+}
 
 class Rectangle_parameters(Example_model):
     def __init__(self, dictionary=None, example_dictionary= rectangle_dictionary, comm = None):
         super().__init__(dictionary=dictionary,default_dictionary=example_dictionary,comm=comm)
+
+        specific_dictionary = self.input_dictionary["example_specific_options"]
+        self.nz = specific_dictionary["elements_in_z"]
+        self.nx = specific_dictionary["elements_in_x"]
+        self.depth = specific_dictionary["fault_depth"]
+        self.c_salt = specific_dictionary["c_salt"]
+        self.c_not_salt = specific_dictionary["c_not_salt"]
+        
         self._rectangle_mesh()
         self._rectangle_velocity_model()
         self.velocity_model_type = "conditional"
     
     def _rectangle_mesh(self):
-        nz = 100
-        nx = 100
-        Lz = self.Lz
-        Lx = self.Lx
+        nz = self.nz
+        nx = self.nx
+        Lz = self.length_z
+        Lx = self.length_x
         if self.cell_type == 'quadrilateral':
             quadrilateral = True
         else:
             quadrilateral = False
-        self.user_mesh = fire.RectangleMesh(nz, nx, Lz, Lx, quadrilateral=quadrilateral)
+        
+        user_mesh = fire.RectangleMesh(nz,nx,Lz,Lx, quadrilateral = quadrilateral, comm=self.comm.comm)
+        user_mesh.coordinates.dat.data[:,0] *= -1.0
+        self.user_mesh = user_mesh
     
     def _rectangle_velocity_model(self):
-        x, y = fire.SpatialCoordinate(self.mesh)
-        xc = 0.5
-        yc = 0.5
-        rc = 0.5
-        c_salt = 4.6
-        c_not_salt = 1.6
-        cond = fire.conditional( (x-xc)**2 + (y-yc)**2 < rc**2 ,  c_salt , c_not_salt)
+        x, y = fire.SpatialCoordinate(self.user_mesh)
+        c_salt = self.c_salt
+        c_not_salt = self.c_not_salt
+        depth = self.depth
+        cond = fire.conditional( x < depth ,  c_salt , c_not_salt)
         self.velocity_conditional=cond
 
 class Rectangle(Wave):

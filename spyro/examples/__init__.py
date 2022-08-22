@@ -1,11 +1,11 @@
-from .camembert import camembert
-from .marmousi import marmousi
+from .camembert import Camembert
+from .marmousi import Marmousi
 from .example_model import Example_model
 from .rectangle import Rectangle
 
 __all__ = [
-    "camembert",
-    "marmousi",
+    "Camembert",
+    "Marmousi",
     "Example_model",
     "Rectangle",
 ]

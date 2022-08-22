@@ -1,4 +1,4 @@
-from spyro import Model_parameters
+from spyro.io import Model_parameters
 from copy import deepcopy
 
 def get_list(dictionary):
