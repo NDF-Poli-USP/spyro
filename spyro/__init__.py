@@ -9,7 +9,8 @@ from .utils.geometry_creation import create_transect, create_2d_grid, insert_fix
 from .utils.estimate_timestep import estimate_timestep
 from .io import io
 from . import solvers
-from .import tools
+from . import tools
+from . import examples
 
 __all__ = [
     "io",
@@ -29,4 +30,5 @@ __all__ = [
     "plots",
     "tools",
     "Wave",
+    "examples",
 ]

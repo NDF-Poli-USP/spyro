@@ -282,6 +282,7 @@ class Model_parameters:
 
     def _sanitize_optimization_and_velocity(self):
         dictionary = self.input_dictionary
+        self.velocity_model_type = "file"
         # Check if we are doing a FWI and sorting output locations and velocity model inputs
         self.running_fwi = False
         if "inversion" in dictionary:
@@ -300,7 +301,14 @@ class Model_parameters:
                 self.initial_velocity_model = None
         
         if self.initial_velocity_model == None:
-            warnings.warn("No velocity model set initially. If using user defined conditional or expression, please input it in the Wave object.")
+            if "velocity_conditional" not in dictionary["synthetic_data"]:
+                self.velocity_model_type = None
+                warnings.warn("No velocity model set initially. If using user defined conditional or expression, please input it in the Wave object.")
+        
+        if "velocity_conditional" in dictionary["synthetic_data"]:
+            self.velocity_model_type = "conditional"
+            self.velocity_conditional = dictionary["synthetic_data"]["velocity_conditional"]
+
 
         self.foward_output_file = 'results/forward_output.pvd'
         
