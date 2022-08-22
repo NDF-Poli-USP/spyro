@@ -3,9 +3,6 @@ from firedrake import RectangleMesh, conditional
 
 from spyro.io.model_parameters import Model_parameters
 
-user_mesh = RectangleMesh(10,10,1.0,1.0, quadrilateral = True)
-user_mesh.coordinates.dat.data[:,0] *= -1.0
-
 dictionary = {}
 dictionary["options"] = {
     "cell_type": "Q",  # simplexes such as triangles or tetrahedra (T) or quadrilaterals (Q)
@@ -28,7 +25,7 @@ dictionary["mesh"] = {
     "Lx": 1.0,  # width in km - always positive
     "Ly": 0.0,  # thickness in km - always positive
     "mesh_file": None,
-    "user_mesh": user_mesh,
+    "user_mesh": None,
 }
 
 # Create a source injection operator. Here we use a single source with a
@@ -37,7 +34,7 @@ dictionary["mesh"] = {
 # This transect of receivers is created with the helper function `create_transect`.
 dictionary["acquisition"] = {
     "source_type": "ricker",
-    "source_locations": [(-0.1, 0.5)],
+    "source_locations": [(-0.1, 0.3),(-0.5, 0.6)],
     "frequency": 5.0,
     "delay": 1.5,
     "receiver_locations": spyro.create_transect(
@@ -64,7 +61,12 @@ dictionary["visualization"] = {
     "gradient_filename": None,
 }
 
-Wave = spyro.Wave(model_dictionary=dictionary)
+Model = Model_parameters(dictionary=dictionary) 
+
+user_mesh = RectangleMesh(10,10,1.0,1.0, quadrilateral = True,comm=Model.comm.comm)
+user_mesh.coordinates.dat.data[:,0] *= -1.0
+
+Wave = spyro.Wave(model_parameters=Model)
 
 x,y = Wave.get_spatial_coordinates()
 Wave.set_initial_velocity_model(conditional = conditional(x < -0.5 ,3.0 ,1.5 ))
