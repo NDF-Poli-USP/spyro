@@ -9,9 +9,7 @@ import numpy as np
 from scipy.interpolate import RegularGridInterpolator
 from scipy.interpolate import griddata
 import segyio
-
 from .. import domains
-
 
 def ensemble_save(func):
     """Decorator for read and write shots for ensemble parallelism"""
@@ -27,7 +25,6 @@ def ensemble_save(func):
                 else:
                     func(*args, **dict(kwargs, file_name = custom_file_name))
     return wrapper
-
 
 def ensemble_load(func):
     """Decorator for read and write shots for ensemble parallelism"""
@@ -45,7 +42,6 @@ def ensemble_load(func):
                 return values 
     return wrapper
 
-
 def ensemble_plot(func):
     """Decorator for `plot_shots` to distribute shots for ensemble parallelism"""
     def wrapper(*args, **kwargs):
@@ -57,7 +53,6 @@ def ensemble_plot(func):
                 func(*args, **dict(kwargs, file_name = str(snum+1)))
 
     return wrapper
-
 
 def ensemble_forward(func):
     """Decorator for forward to distribute shots for ensemble parallelism"""
@@ -114,7 +109,6 @@ def ensemble_forward_elastic_waves(func):
 
     return wrapper
 
-
 def ensemble_gradient(func):
     """Decorator for gradient to distribute shots for ensemble parallelism"""
     def wrapper(*args, **kwargs):
@@ -133,7 +127,6 @@ def ensemble_gradient(func):
 
     return wrapper
 
-
 def ensemble_gradient_elastic_waves(func):
     """Decorator for gradient (elastic waves) to distribute shots for ensemble parallelism"""
     def wrapper(*args, **kwargs):
@@ -151,7 +144,6 @@ def ensemble_gradient_elastic_waves(func):
                     return grad_lambda, grad_mu
 
     return wrapper
-
 
 def write_function_to_grid(function, V, grid_spacing):
     """Interpolate a Firedrake function to a structured grid"""
@@ -179,7 +171,6 @@ def write_function_to_grid(function, V, grid_spacing):
 
     return xi, yi, zi
 
-
 def create_segy(velocity, filename):
     """Write the velocity data into a segy file named filename"""
     spec = segyio.spec()
@@ -197,7 +188,6 @@ def create_segy(velocity, filename):
     with segyio.create(filename, spec) as f:
         for tr, il in enumerate(spec.ilines):
             f.trace[tr] = velocity[:, tr]
-
 
 @ensemble_save
 def save_shots(model, comm, array, file_name=None):
@@ -219,7 +209,6 @@ def save_shots(model, comm, array, file_name=None):
         pickle.dump(array, f)
     return None
 
-
 @ensemble_load
 def load_shots(model, comm, file_name=None):
     """Load a `pickle` to a `numpy.ndarray`.
@@ -240,7 +229,6 @@ def load_shots(model, comm, file_name=None):
         array = np.asarray(pickle.load(f), dtype=float)
     return array
 
-
 def is_owner(ens_comm, rank):
     """Distribute shots between processors in using a modulus operator
 
@@ -259,9 +247,6 @@ def is_owner(ens_comm, rank):
     """
     return ens_comm.ensemble_comm.rank == (rank % ens_comm.ensemble_comm.size)
 
-
-
-
 def _check_units(c):
     if min(c.dat.data[:]) > 100.0:
         # data is in m/s but must be in km/s
@@ -269,7 +254,6 @@ def _check_units(c):
             print("INFO: converting from m/s to km/s", flush=True)
         c.assign(c / 1000.0)  # meters to kilometers
     return c
-
 
 def interpolate(Model, mesh, V, guess=False):
     """Read and interpolate a seismic velocity model stored
@@ -360,7 +344,6 @@ def interpolate(Model, mesh, V, guess=False):
     c.dat.data[:] = tmp
     c = _check_units(c)
     return c
-
 
 def read_mesh(model_parameters):
     """Reads in an external mesh and scatters it between cores.
