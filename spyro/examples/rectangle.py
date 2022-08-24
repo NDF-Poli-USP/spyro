@@ -1,6 +1,6 @@
 from spyro import create_transect
 from spyro.examples.example_model import Example_model
-from spyro import Wave
+from spyro import AcousticWave
 import firedrake as fire
 
 rectangle_optimization_parameters = {
@@ -148,12 +148,7 @@ class Rectangle_parameters(Example_model):
         cond = fire.conditional( x < depth ,  c_salt , c_not_salt)
         self.velocity_conditional=cond
 
-class Rectangle(Wave):
+class Rectangle(AcousticWave):
     def __init__(self, model_dictionary = None, comm = None):     
         model_parameters = Rectangle_parameters(dictionary=model_dictionary, comm = comm)
         super().__init__(model_parameters = model_parameters, comm = comm)
-
-
-
-
-
