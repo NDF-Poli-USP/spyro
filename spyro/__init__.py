@@ -4,6 +4,7 @@ from . import pml
 from .receivers.Receivers import Receivers
 from .sources.Sources import Sources, ricker_wavelet, full_ricker_wavelet
 from .solvers.wave import Wave
+from .solvers.CG_acoustic import AcousticWave
 from .utils import utils
 from .utils.geometry_creation import create_transect, create_2d_grid, insert_fixed_value, create_3d_grid
 from .utils.estimate_timestep import estimate_timestep
@@ -31,4 +32,5 @@ __all__ = [
     "tools",
     "Wave",
     "examples",
+    "AcousticWave",
 ]

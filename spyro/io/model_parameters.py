@@ -298,6 +298,7 @@ class Model_parameters:
             if "synthetic_data" in dictionary:
                 self.initial_velocity_model = dictionary["synthetic_data"]["real_velocity_file"]
             else:
+                dictionary["synthetic_data"]={"real_velocity_file": None}
                 self.initial_velocity_model = None
         
         if self.initial_velocity_model == None:
