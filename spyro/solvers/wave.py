@@ -258,7 +258,7 @@ class Wave():
                     fire.norm(u_n) < 1
                 ), "Numerical instability. Try reducing dt or building the mesh differently"
                 if self.forward_output:
-                    output.write(u_n, time=t, name="Pressure")
+                    output.write(u_n, time=t, name="Pressure") #Salvar só o dat.data do u_n
                 if t > 0:
                     helpers.display_progress(self.comm, t)
 

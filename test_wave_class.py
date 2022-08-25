@@ -5,7 +5,7 @@ from spyro.io.model_parameters import Model_parameters
 
 dictionary = {}
 dictionary["options"] = {
-    "cell_type": "Q",  # simplexes such as triangles or tetrahedra (T) or quadrilaterals (Q)
+    "cell_type": "T",  # simplexes such as triangles or tetrahedra (T) or quadrilaterals (Q)
     "variant": 'lumped', # lumped, equispaced or DG, default is lumped "method":"MLT", # (MLT/spectral_quadrilateral/DG_triangle/DG_quadrilateral) You can either specify a cell_type+variant or a method
     "degree": 4,  # p order
     "dimension": 2,  # dimension
@@ -63,7 +63,7 @@ dictionary["visualization"] = {
 
 Model = Model_parameters(dictionary=dictionary) 
 
-user_mesh = RectangleMesh(10,10,1.0,1.0, quadrilateral = True,comm=Model.comm.comm)
+user_mesh = RectangleMesh(10,10,1.0,1.0, quadrilateral = False,comm=Model.comm.comm)
 user_mesh.coordinates.dat.data[:,0] *= -1.0
 Model.set_mesh(user_mesh=user_mesh)
 

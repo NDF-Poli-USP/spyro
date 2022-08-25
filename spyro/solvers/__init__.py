@@ -7,5 +7,6 @@ __all__ = [
     "forward",  # forward solver adapted for discrete adjoint
     "forward_AD",  # forward solver adapted for Automatic Differentiation
     "gradient",
-    "Wave"
+    "Wave",
+    "DG_Wave",
 ]
