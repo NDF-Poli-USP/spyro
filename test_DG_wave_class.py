@@ -5,9 +5,8 @@ from spyro.io.model_parameters import Model_parameters
 
 dictionary = {}
 dictionary["options"] = {
-    "cell_type": "T",  # simplexes such as triangles or tetrahedra (T) or quadrilaterals (Q)
-    "variant": 'lumped', # lumped, equispaced or DG, default is lumped "method":"MLT", # (MLT/spectral_quadrilateral/DG_triangle/DG_quadrilateral) You can either specify a cell_type+variant or a method
-    "degree": 4,  # p order
+    "method": "DG_triangle",  # simplexes such as triangles or tetrahedra (T) or quadrilaterals (Q)
+    "degree": 2,  # p order
     "dimension": 2,  # dimension
 }
 
@@ -46,7 +45,7 @@ dictionary["acquisition"] = {
 dictionary["time_axis"] = {
     "initial_time": 0.0,  #  Initial time for event
     "final_time": 2.00,  # Final time for event
-    "dt": 0.001,  # timestep size
+    "dt": 0.0001,  # timestep size
     "amplitude": 1,  # the Ricker has an amplitude of 1.
     "output_frequency": 100,  # how frequently to output solution to pvds
     "gradient_sampling_frequency": 100,  # how frequently to save solution to RAM
@@ -67,7 +66,7 @@ user_mesh = RectangleMesh(10,10,1.0,1.0, quadrilateral = False,comm=Model.comm.c
 user_mesh.coordinates.dat.data[:,0] *= -1.0
 Model.set_mesh(user_mesh=user_mesh)
 
-Wave = spyro.Wave(model_parameters=Model)
+Wave = spyro.DG_Wave(model_parameters=Model)
 
 x,y = Wave.get_spatial_coordinates()
 Wave.set_initial_velocity_model(conditional = conditional(x < -0.5 ,3.0 ,1.5 ))
