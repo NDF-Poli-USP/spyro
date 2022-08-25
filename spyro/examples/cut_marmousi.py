@@ -1,7 +1,9 @@
-from spyro import Model_parameters
 from spyro import create_transect
 from spyro.examples.example_model import Example_model
+from spyro import AcousticWave
 import firedrake as fire
+
+from spyro.solvers.CG_acoustic import AcousticWave
 
 cut_marmousi_optimization_parameters = {
     "General": {"Secant": {"Type": "Limited-Memory BFGS", "Maximum Storage": 10}},
@@ -24,7 +26,6 @@ cut_marmousi_dictionary = {}
 cut_marmousi_dictionary["options"] = {
     "cell_type": "T",  # simplexes such as triangles or tetrahedra (T) or quadrilaterals (Q)
     "variant": 'lumped', # lumped, equispaced or DG, default is lumped
-    "method": "MLT", # (MLT/spectral_quadrilateral/DG_triangle/DG_quadrilateral) You can either specify a cell_type+variant or a method
     "degree": 4,  # p order
     "dimension": 2,  # dimension
     "automatic_adjoint": False,
@@ -44,10 +45,11 @@ cut_marmousi_dictionary["mesh"] = {
     "Lx": 4.0,  # width in km - always positive
     "Ly": 0.0,  # thickness in km - always positive
     "mesh_file": None,
+    ""
 }
 cut_marmousi_dictionary["synthetic_data"] = {    #For use only if you are using a synthetic test model or a forward only simulation -adicionar discrição para modelo direto
-    "real_mesh_file": None,
-    "real_velocity_file": None,
+    "real_mesh_file": "meshes/cut_marmousi_small_p=2_M=7.02.msh",
+    "real_velocity_file": "velocity_models/MODEL_P-WAVE_VELOCITY_1.25m_small_domain.hdf5",
 }
 cut_marmousi_dictionary["inversion"] = {
     "perform_fwi": False, # switch to true to make a FWI
@@ -59,7 +61,7 @@ cut_marmousi_dictionary["inversion"] = {
 # Specify a 250-m PML on the three sides of the domain to damp outgoing waves.
 cut_marmousi_dictionary["absorving_boundary_conditions"] = {
     "status": False,  # True or false
-    "outer_bc": "non-reflective",  #  None or non-reflective (outer boundary condition)
+    "outer_bc": False,  #  None or non-reflective (outer boundary condition)
     "damping_type": "polynomial",  # polynomial, hyperbolic, shifted_hyperbolic
     "exponent": 2,  # damping layer has a exponent variation
     "cmax": 4.7,  # maximum acoustic wave velocity in PML - km/s
@@ -75,7 +77,7 @@ cut_marmousi_dictionary["absorving_boundary_conditions"] = {
 # This transect of receivers is created with the helper function `create_transect`.
 cut_marmousi_dictionary["acquisition"] = {
     "source_type": "ricker",
-    "source_locations": create_transect((0.5, -0.01), (3.5, -0.01), 4),
+    "source_locations": [(2.0, -0.01)],
     "frequency": 3.0,
     "amplitude": 1.0,
     "delay": 1.0,
@@ -92,9 +94,12 @@ cut_marmousi_dictionary["time_axis"] = {
 }
 
 
-class Cut_marmousi(Example_model):
+class Cut_marmousi_parameters(Example_model):
     def __init__(self, dictionary=None, example_dictionary= cut_marmousi_dictionary, comm = None):
         super().__init__(dictionary=dictionary,default_dictionary=example_dictionary,comm=comm)
 
-    
+class Cut_marmousi_acoustic(AcousticWave):
+    def __init__(self, model_dictionary = None, comm = None):     
+        model_parameters = Cut_marmousi_parameters(dictionary=model_dictionary, comm = comm)
+        super().__init__(model_parameters = model_parameters, comm = comm)
     
