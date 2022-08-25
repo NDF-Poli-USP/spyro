@@ -4,6 +4,7 @@ from . import pml
 from .receivers.Receivers import Receivers
 from .sources.Sources import Sources, ricker_wavelet, full_ricker_wavelet
 from .solvers.wave import Wave
+from .solvers.CG_acoustic import AcousticWave
 from .solvers.dg_wave import DG_Wave
 from .utils import utils
 from .utils.geometry_creation import create_transect, create_2d_grid, insert_fixed_value, create_3d_grid
@@ -33,4 +34,5 @@ __all__ = [
     "Wave",
     "DG_Wave",
     "examples",
+    "AcousticWave",
 ]

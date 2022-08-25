@@ -67,7 +67,7 @@ user_mesh = RectangleMesh(10,10,1.0,1.0, quadrilateral = False,comm=Model.comm.c
 user_mesh.coordinates.dat.data[:,0] *= -1.0
 Model.set_mesh(user_mesh=user_mesh)
 
-Wave = spyro.Wave(model_parameters=Model)
+Wave = spyro.AcousticWave(model_parameters=Model)
 
 x,y = Wave.get_spatial_coordinates()
 Wave.set_initial_velocity_model(conditional = conditional(x < -0.5 ,3.0 ,1.5 ))
