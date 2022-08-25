@@ -9,6 +9,6 @@ __all__ = [
     "forward_AD",  # forward solver adapted for Automatic Differentiation
     "gradient",
     "Wave",
-    "AcousticWave",,
+    "AcousticWave",
     "DG_Wave",
 ]
