@@ -44,11 +44,9 @@ cut_marmousi_dictionary["mesh"] = {
     "Lz": 2.0,  # depth in km - always positive   # Como ver isso sem ler a malha?
     "Lx": 4.0,  # width in km - always positive
     "Ly": 0.0,  # thickness in km - always positive
-    "mesh_file": None,
-    ""
+    "mesh_file": "meshes/cut_marmousi_small_p=2_M=7.02.msh",
 }
 cut_marmousi_dictionary["synthetic_data"] = {    #For use only if you are using a synthetic test model or a forward only simulation -adicionar discrição para modelo direto
-    "real_mesh_file": "meshes/cut_marmousi_small_p=2_M=7.02.msh",
     "real_velocity_file": "velocity_models/MODEL_P-WAVE_VELOCITY_1.25m_small_domain.hdf5",
 }
 cut_marmousi_dictionary["inversion"] = {

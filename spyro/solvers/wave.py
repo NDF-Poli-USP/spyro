@@ -29,6 +29,7 @@ class Wave():
         if model_parameters == None:
             model_parameters = Model_parameters(dictionary=model_dictionary, comm = comm)
         self.model_parameters = model_parameters
+        self.initial_velocity_model = None
         self._unpack_parameters(model_parameters)
         self.mesh = model_parameters.get_mesh()
         self.function_space = None
@@ -47,7 +48,18 @@ class Wave():
         self.degree = model_parameters.degree
         self.dimension = model_parameters.dimension
 
+        self.abc_status = model_parameters.abc_status
+        self.outer_bc = model_parameters.abc_outer_bc
+        self.abc_damping_type = model_parameters.abc_damping_type
+        self.abc_exponent = model_parameters.abc_exponent
+        self.abc_cmax = model_parameters.abc_cmax
+        self.abc_R = model_parameters.abc_R
+        self.abc_lz = model_parameters.abc_lz
+        self.abc_lx = model_parameters.abc_lx
+        self.abc_ly = model_parameters.abc_ly
+
         self.velocity_model_type = model_parameters.velocity_model_type
+        self.initial_velocity_model_file = model_parameters.initial_velocity_model_file
 
         self.final_time = model_parameters.final_time
         self.dt = model_parameters.dt
@@ -137,7 +149,7 @@ class Wave():
             self.initial_velocity_model_file = vp_filename+'.hdf5'
 
         if self.initial_velocity_model_file.endswith('.hdf5'):
-            return interpolate(self.model_parameters, self.initial_velocity_model_file, self.function_space.sub(0))
+            self.initial_velocity_model = interpolate(self.model_parameters, self.initial_velocity_model_file, self.function_space.sub(0))
 
     def _build_function_space(self):
         self.function_space = FE_method(self.mesh,self.method,self.degree)

@@ -137,6 +137,9 @@ class Model_parameters:
         # Checking mesh_parameters
         self._sanitize_mesh()
 
+        # Checking absorving boundary condition parameters
+        self._sanitize_absorving_boundary_condition()
+
         # Checking source and receiver inputs
         self._sanitize_acquisition()
 
@@ -148,7 +151,46 @@ class Model_parameters:
 
         # Sanitize output files
         self._sanitize_output()
-    
+    # default_dictionary["absorving_boundary_conditions"] = {
+#     "status": False,  # True or false
+#     "outer_bc": "non-reflective",  #  None or non-reflective (outer boundary condition)
+#     "damping_type": "polynomial",  # polynomial, hyperbolic, shifted_hyperbolic
+#     "exponent": 2,  # damping layer has a exponent variation
+#     "cmax": 4.7,  # maximum acoustic wave velocity in PML - km/s
+#     "R": 1e-6,  # theoretical reflection coefficient
+#     "lz": 0.25,  # thickness of the PML in the z-direction (km) - always positive
+#     "lx": 0.25,  # thickness of the PML in the x-direction (km) - always positive
+#     "ly": 0.0,  # thickness of the PML in the y-direction (km) - always positive
+# }
+    def _sanitize_absorving_boundary_condition(self):
+        if "absorving_boundary_conditions" in self.input_dictionary:
+            dictionary = self.input_dictionary["absorving_boundary_conditions"]
+        else:
+            dictionary = {"status": False}
+        self.abc_status = dictionary["status"]
+
+        if "outer_bc" in dictionary:
+            self.abc_outer_bc = dictionary["outer_bc"]
+        else:
+            self.abc_outer_bc = None
+
+        if self.abc_status:
+            self.abc_damping_type = dictionary["damping_type"]
+            self.abc_exponent = dictionary["exponent"]
+            self.abc_cmax = dictionary["cmax"]
+            self.abc_R = dictionary["R"]
+            self.abc_lz = dictionary["lz"]
+            self.abc_lx = dictionary["lx"]
+            self.abc_ly = dictionary["ly"]
+        else:
+            self.abc_damping_type = None
+            self.abc_exponent = None
+            self.abc_cmax = None
+            self.abc_R = None
+            self.abc_lz = 0.0
+            self.abc_lx = 0.0
+            self.abc_ly = 0.0
+
     def _sanitize_output(self):
 #         default_dictionary["visualization"] = {
 #     "forward_output" : True,
@@ -268,6 +310,7 @@ class Model_parameters:
                 self.user_mesh = False
         else:
             self.user_mesh = False
+            self.mesh_type = 'file'
 
         if self.mesh_file == 'not_used.msh':
             self.mesh_file = None
@@ -289,19 +332,19 @@ class Model_parameters:
             if dictionary["inversion"]["perform_fwi"]:
                 self.running_fwi = True
         if self.running_fwi:
-            self.initial_velocity_model = dictionary["inversion"]["initial_velocity_model"]
+            self.initial_velocity_model_file = dictionary["inversion"]["initial_velocity_model"]
             self.fwi_output_folder = 'fwi/'
             self.control_output_file = self.fwi_output_folder+'control'
             self.gradient_output_file = self.fwi_output_folder+'gradient'
             self.optimization_parameters = dictionary["inversion"]["optimization_parameters"]
         else:
             if "synthetic_data" in dictionary:
-                self.initial_velocity_model = dictionary["synthetic_data"]["real_velocity_file"]
+                self.initial_velocity_model_file = dictionary["synthetic_data"]["real_velocity_file"]
             else:
                 dictionary["synthetic_data"] = {"real_velocity_file": None}
-                self.initial_velocity_model = None
+                self.initial_velocity_model_file = None
         
-        if self.initial_velocity_model == None:
+        if self.initial_velocity_model_file == None:
             if "velocity_conditional" not in dictionary["synthetic_data"]:
                 self.velocity_model_type = None
                 warnings.warn("No velocity model set initially. If using user defined conditional or expression, please input it in the Wave object.")
@@ -354,13 +397,13 @@ class Model_parameters:
                 source_z, source_x, source_y = source
             else:
                 raise ValueError('Source input type not supported')
-            if min_z > source_z or source_z > max_z:
-                raise ValueError(f'Source of ({source_z},{source_x}, {source_y}) not located inside the mesh.')
-            if min_x > source_x or source_x > max_x:
-                raise ValueError(f'Source of ({source_z},{source_x}, {source_y}) not located inside the mesh.')
-            if self.dimension == 3:
-                if (min_y > source_y or source_y > max_y):
-                    raise ValueError(f'Source of ({source_z},{source_x}, {source_y}) not located inside the mesh.')
+            # if min_z > source_z or source_z > max_z:
+            #     raise ValueError(f'Source of ({source_z},{source_x}, {source_y}) not located inside the mesh.')
+            # if min_x > source_x or source_x > max_x:
+            #     raise ValueError(f'Source of ({source_z},{source_x}, {source_y}) not located inside the mesh.')
+            # if self.dimension == 3:
+            #     if (min_y > source_y or source_y > max_y):
+            #         raise ValueError(f'Source of ({source_z},{source_x}, {source_y}) not located inside the mesh.')
 
     def __check_time(self):
         if self.final_time < 0.0:
@@ -593,6 +636,7 @@ class Model_parameters:
             self.mesh_type = 'user_mesh'
         elif mesh_file != None:
             self.mesh_file = mesh_file
+            self.mesh_type = 'file'
         
         if length_z== None or length_x==None or (length_y == None and self.dimension==2):
             warnings.warn("Mesh dimensions not completely reset from initial dictionary")
@@ -603,11 +647,6 @@ class Model_parameters:
                 self.length_x = length_x
             if length_y != None:
                 self.length_y = length_y
-            
-
-        
-        
-
 
     def get_mesh(self):
         """Reads in an external mesh and scatters it between cores.

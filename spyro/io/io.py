@@ -278,20 +278,20 @@ def interpolate(Model, mesh, V, guess=False):
     """
     sd = V.mesh().geometric_dimension()
     m = V.ufl_domain()
-    if Model.abs:
-        minz = -model["mesh"]["Lz"] - model["BCs"]["lz"]
+    if Model.abc_status:
+        minz = -Model.length_z - Model.abc_lz
         maxz = 0.0
-        minx = 0.0 - model["BCs"]["lx"]
-        maxx = model["mesh"]["Lx"] + model["BCs"]["lx"]
-        miny = 0.0 - model["BCs"]["ly"]
-        maxy = model["mesh"]["Ly"] + model["BCs"]["ly"]
+        minx = 0.0 - Model.abc_lx
+        maxx = Model.length_x + Model.abc_lx
+        miny = 0.0 - Model.abc_ly
+        maxy = Model.length_y + Model.abc_ly
     else:
-        minz = -model["mesh"]["Lz"]
+        minz = -Model.length_z
         maxz = 0.0
         minx = 0.0
-        maxx = model["mesh"]["Lx"]
+        maxx = Model.length_x
         miny = 0.0
-        maxy = model["mesh"]["Ly"]
+        maxy = Model.length_y
 
     W = fire.VectorFunctionSpace(m, V.ufl_element())
     coords = fire.interpolate(m.coordinates, W)
