@@ -255,7 +255,7 @@ def _check_units(c):
         c.assign(c / 1000.0)  # meters to kilometers
     return c
 
-def interpolate(Model, mesh, V, guess=False):
+def interpolate(Model, fname, V):
     """Read and interpolate a seismic velocity model stored
     in a HDF5 file onto the nodes of a finite element space.
 
@@ -306,11 +306,6 @@ def interpolate(Model, mesh, V, guess=False):
         )
     else:
         raise NotImplementedError
-
-    if guess:
-        fname = model["mesh"]["initmodel"]
-    else:
-        fname = model["mesh"]["truemodel"]
 
     with h5py.File(fname, "r") as f:
         Z = np.asarray(f.get("velocity_model")[()])
