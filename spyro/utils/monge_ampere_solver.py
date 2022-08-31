@@ -253,7 +253,7 @@ def monge_ampere_solver(mesh, monitor_function,
         with phisigma_old.dat.vec as v:
             cursol.copy(v)
         l2_projector_solver.solve() # update grad_phi_proj 
-        mesh.coordinates.assign(update_x()) # update x = xi + grad_phi 
+        mesh.coordinates.assign(update_x(mask=mask)) # update x = xi + grad_phi #FIXME maybe mask here should not be none 
         monitor.interpolate(monitor_function(mesh)) # update monitor function (monitor function is defined over x) 
         mesh.coordinates.assign(xi) # come back to xi (computational space)
         theta.assign(firedrake.assemble(theta_form)*total_volume**(-1))
