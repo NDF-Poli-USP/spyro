@@ -125,9 +125,13 @@ def _cut_marmousi(minz, maxz, minx, maxx, smooth=False, field="velocity_model"):
 
     path = "./velocity_models/elastic-marmousi-model/model/"
     if smooth:
-        fname_marmousi = path + "MODEL_P-WAVE_VELOCITY_1.25m.segy.smoothed_sigma=300.segy.hdf5"
+        #fname_marmousi = path + "MODEL_P-WAVE_VELOCITY_1.25m.segy.smoothed_sigma=300.segy.hdf5"
+        #fname_marmousi = path + "MODEL_S-WAVE_VELOCITY_1.25m.segy.smoothed_sigma=300.segy.hdf5"
+        fname_marmousi = path + "MODEL_DENSITY_1.25m.segy.smoothed_sigma=300.segy.hdf5"
     else:
-        fname_marmousi = path + "MODEL_P-WAVE_VELOCITY_1.25m.segy.hdf5"
+        #fname_marmousi = path + "MODEL_P-WAVE_VELOCITY_1.25m.segy.hdf5"
+        #fname_marmousi = path + "MODEL_S-WAVE_VELOCITY_1.25m.segy.hdf5"
+        fname_marmousi = path + "MODEL_DENSITY_1.25m.segy.hdf5"
 
     with h5py.File(fname_marmousi, "r") as f:
         Zo = np.asarray(f.get(field)[()]) # original Marmousi data/domain
@@ -153,9 +157,13 @@ def _cut_marmousi(minz, maxz, minx, maxx, smooth=False, field="velocity_model"):
         Zq = interpolant((xq, zq))
 
         if smooth:
-            fname = path + "MODEL_P-WAVE_VELOCITY_1.25m_small_domain_smoothed_sigma=300.segy"
+            #fname = path + "MODEL_P-WAVE_VELOCITY_1.25m_small_domain_smoothed_sigma=300.segy"
+            #fname = path + "MODEL_S-WAVE_VELOCITY_1.25m_small_domain_smoothed_sigma=300.segy"
+            fname = path + "MODEL_DENSITY_1.25m_small_domain_smoothed_sigma=300.segy"
         else:
-            fname = path + "MODEL_P-WAVE_VELOCITY_1.25m_small_domain.segy"
+            #fname = path + "MODEL_P-WAVE_VELOCITY_1.25m_small_domain.segy"
+            #fname = path + "MODEL_S-WAVE_VELOCITY_1.25m_small_domain.segy"
+            fname = path + "MODEL_DENSITY_1.25m_small_domain.segy"
         
         # save to segy format
         create_segy(Zq, fname)
@@ -164,9 +172,11 @@ def _cut_marmousi(minz, maxz, minx, maxx, smooth=False, field="velocity_model"):
         hfname = fname +".hdf5"
         print(f"Writing velocity model: {hfname}", flush=True)
         with h5py.File(hfname, "w") as fh:
-            fh.create_dataset("velocity_model", data=Zq, dtype="f")
+            #fh.create_dataset("velocity_model", data=Zq, dtype="f")
+            fh.create_dataset("density", data=Zq, dtype="f")
             fh.attrs["shape"] = Zq.shape
-            fh.attrs["units"] = "m/s"
+            #fh.attrs["units"] = "m/s"
+            fh.attrs["units"] = "g/cm3"
 
     
     if True: # plot vg? {{{
@@ -186,7 +196,7 @@ def _cut_marmousi(minz, maxz, minx, maxx, smooth=False, field="velocity_model"):
         plt.show()
     #}}}
 
-if False:
+if True:
     # 4x2 middle of the domain
     minz = -2.0 
     maxz =  0.0
@@ -198,8 +208,8 @@ if False:
     #minx = 8.5
     #maxx = 10.5
     _cut_marmousi(minz, maxz, minx, maxx, smooth=False)
-    _cut_marmousi(minz, maxz, minx, maxx, smooth=True)
-    #sys.exit("exit")
+    #_cut_marmousi(minz, maxz, minx, maxx, smooth=True)
+    sys.exit("exit")
 
 #}}}
 comm = spyro.utils.mpi_init(model)

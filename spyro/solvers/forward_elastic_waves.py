@@ -156,7 +156,7 @@ def forward_elastic_waves(
             bc_defined = True
         else:
             if model["BCs"]["outer_bc"] == "non-reflective" and model["BCs"]["abl_bc"] == "alid":
-                print("WARNING: [BCs][outer_bc] = non-reflectie AND [BCs][abl_bc] = alid. Ignoring [BCs][outer_bc].")
+                print("WARNING: [BCs][outer_bc] = non-reflectie AND [BCs][abl_bc] = alid. Ignoring [BCs][outer_bc].",flush=True)
 
         # absorbing layer with increasing damping (ALID) (-x,+x,-z)
         if model["BCs"]["abl_bc"] == "alid":
@@ -189,15 +189,15 @@ def forward_elastic_waves(
                 File("gaussian_taper.pvd").write(gp)
             bc_defined = True
         else:
-            print("WARNING: absorbing boundary layer not defined ([BCs][abl_bc] = none).")
+            print("WARNING: absorbing boundary layer not defined ([BCs][abl_bc] = none).",flush=True)
         
         if bc_defined == False:
-            print("WARNING: [BCs][status] = True, but no boundary condition defined. Check your [BCs]")
+            print("WARNING: [BCs][status] = True, but no boundary condition defined. Check your [BCs]",flush=True)
 
-    #n = firedrake.FacetNormal(mesh)
-    #t = firedrake.perp(n)
-    #print(assemble(inner(v, n) * ds))
-    #print(assemble(inner(v, t) * ds))
+    #n = FacetNormal(mesh)
+    #t = perp(n)
+    #print(assemble(inner(v, n) * ds),flush=True)
+    #print(assemble(inner(v, t) * ds),flush=True)
     #https://fenicsproject.discourse.group/t/integrate-over-edges/1140/8
     #}}}
 
