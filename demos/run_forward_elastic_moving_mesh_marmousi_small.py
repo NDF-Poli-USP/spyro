@@ -141,7 +141,7 @@ comm = spyro.utils.mpi_init(model)
 distribution_parameters={"partition": True,
                          "overlap_type": (DistributedMeshOverlapType.VERTEX, 20)}
 
-REF = 1
+REF = 0
 # run reference model {{{
 if REF:
     nx = 200
@@ -162,7 +162,7 @@ if REF:
     receivers = spyro.Receivers(model, mesh_ref, V_ref, comm)
     wavelet = spyro.full_ricker_wavelet(dt=model["timeaxis"]["dt"], tf=model["timeaxis"]["tf"], freq=model["acquisition"]["frequency"])
 
-    # generate the Lamé parameters
+    # generate the Lamé parameter
     vp_ref  = _make_field(V_DG, guess=False, field="vp")
     vs_ref  = _make_field(V_DG, guess=False, field="vs")
     rho_ref = _make_field(V_DG, guess=False, field="rho")
@@ -184,8 +184,14 @@ if REF:
     print(round(end - start,2),flush=True)
     File("u_ref.pvd").write(u_ref[-1])
 
+    spyro.io.save_shots(model, comm, uz_ref, file_name="./shots/uz_ref_recv1")
+    spyro.io.save_shots(model, comm, ux_ref, file_name="./shots/ux_ref_recv1")
+
 #}}}
 #sys.exit("exit")
+if REF==0: 
+    uz_ref = spyro.io.load_shots(model, comm, file_name="./shots/uz_ref_recv1")
+    ux_ref = spyro.io.load_shots(model, comm, file_name="./shots/ux_ref_recv1")
 
 # now, prepare to run with different mesh resolutions
 FIREMESH = 1
@@ -193,8 +199,8 @@ FIREMESH = 1
 if FIREMESH: 
     nx = 200
     ny = math.ceil( 100*(model["mesh"]["Lz"]-0.45)/model["mesh"]["Lz"] ) # (Lz-0.45)/Lz
-    nx = 150 # FIXME
-    ny = 54
+    nx = 180 # FIXME
+    ny = 64
     mesh = RectangleMesh(nx, ny, model["mesh"]["Lx"], model["mesh"]["Lz"], diagonal="crossed", comm=comm.comm,
                             distribution_parameters=distribution_parameters)
     mesh.coordinates.dat.data[:, 0] -= 0.0 
@@ -212,7 +218,7 @@ else:
     mesh, V = spyro.io.read_mesh(model, comm, distribution_parameters=distribution_parameters)
 #}}}
 
-AMR = 0
+AMR = 1
 # adapt the mesh using the exact vp, if requested {{{
 if AMR:
     nx = 200
@@ -342,7 +348,7 @@ if AMR:
     _vs = _make_field(V_DG, guess=False, field="vs")
     File("vp_after_amr.pvd").write(_vs)
 #}}}
-#sys.exit("exit")
+sys.exit("exit")
 
 sources = spyro.Sources(model, mesh, V, comm)
 receivers = spyro.Receivers(model, mesh, V, comm)
