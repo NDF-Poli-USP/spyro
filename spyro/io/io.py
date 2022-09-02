@@ -25,7 +25,7 @@ def ensemble_save(func):
                 if custom_file_name is None:
                     func(*args, **dict(kwargs, file_name = "shots/shot_record_"+str(snum+1)+".dat"))
                 else:
-                    func(*args, **dict(kwargs, file_name = custom_file_name))
+                    func(*args, **dict(kwargs, file_name = custom_file_name+"_"+str(snum+1)+".dat"))
     return wrapper
 
 
@@ -41,7 +41,7 @@ def ensemble_load(func):
                 if custom_file_name is None:
                     values = func(*args, **dict(kwargs, file_name = "shots/shot_record_"+str(snum+1)+".dat"))
                 else:
-                    values = func(*args, **dict(kwargs, file_name = custom_file_name))
+                    values = func(*args, **dict(kwargs, file_name = custom_file_name+"_"+str(snum+1)+".dat"))
                 return values 
     return wrapper
 

@@ -125,11 +125,12 @@ comm = spyro.utils.mpi_init(model)
 distribution_parameters={"partition": True,
                          "overlap_type": (DistributedMeshOverlapType.VERTEX, 20)}
 
-REF = 1
+REF = 0
 # run reference model {{{
 if REF:
     nx = 200
     ny = math.ceil( 100*(model["mesh"]["Lz"]-0.45)/model["mesh"]["Lz"] ) # (Lz-0.45)/Lz
+    
     mesh_ref = RectangleMesh(nx, ny, model["mesh"]["Lx"], model["mesh"]["Lz"], diagonal="crossed", comm=comm.comm,
                             distribution_parameters=distribution_parameters)
     mesh_ref.coordinates.dat.data[:, 0] -= 0.0 
@@ -159,12 +160,14 @@ if REF:
     print(round(end - start,2),flush=True)
     File("p_ref.pvd").write(p_ref[-1])
 
+    spyro.io.save_shots(model, comm, p_ref_recv, file_name="./shots/acoustic_forward_marmousi_small/p_ref_recv2")
     # ok, reset to the original order
     #model["opts"]["degree"] = p
     #print(model["opts"]["degree"])
     #sys.exit("exit")
 #}}}
 #sys.exit("exit")
+p_ref_recv = spyro.io.load_shots(model, comm, file_name="./shots/acoustic_forward_marmousi_small/p_ref_recv2")
 
 # now, prepare to run with different mesh resolutions
 FIREMESH = 0
@@ -188,7 +191,7 @@ else:
     mesh, V = spyro.io.read_mesh(model, comm, distribution_parameters=distribution_parameters)
 #}}}
 
-AMR = 1
+AMR = 0
 # adapt the mesh using the exact vp, if requested {{{
 if AMR:
     nx = 200
@@ -336,8 +339,8 @@ J_total = np.zeros((1))
 _, p_recv = spyro.solvers.forward(model, mesh, comm, vp, sources, wavelet, receivers, output=True)
         
 misfit = spyro.utils.evaluate_misfit(model, p_recv, p_ref_recv) # ds_exact[:ll] - guess
-J_total[0] += spyro.utils.compute_functional(model, misfit, vp=vp) # J += residual[ti][rn] ** 2 (and J *= 0.5)
-J_total[0] /= spyro.utils.compute_functional(model, p_ref_recv, vp=vp) # J += p_ref_recv[ti][rn] ** 2 (and J *= 0.5)
+J_total[0] += spyro.utils.compute_functional(model, misfit) # J += residual[ti][rn] ** 2 (and J *= 0.5)
+J_total[0] /= spyro.utils.compute_functional(model, p_ref_recv) # J += p_ref_recv[ti][rn] ** 2 (and J *= 0.5)
 J_total = COMM_WORLD.allreduce(J_total, op=MPI.SUM)
 J_total[0] /= comm.ensemble_comm.size # ensemble parallelism (sources)
 if comm.comm.size > 1: 
