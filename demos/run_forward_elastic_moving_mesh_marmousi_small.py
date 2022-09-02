@@ -141,7 +141,7 @@ comm = spyro.utils.mpi_init(model)
 distribution_parameters={"partition": True,
                          "overlap_type": (DistributedMeshOverlapType.VERTEX, 20)}
 
-REF = 0
+REF = 1
 # run reference model {{{
 if REF:
     nx = 200
@@ -188,11 +188,14 @@ if REF:
 #sys.exit("exit")
 
 # now, prepare to run with different mesh resolutions
-FIREMESH = 0
+FIREMESH = 1
 # generate or read a mesh {{{
 if FIREMESH: 
-
-    mesh = RectangleMesh(25, 12, model["mesh"]["Lx"], model["mesh"]["Lz"], diagonal="crossed", comm=comm.comm,
+    nx = 200
+    ny = math.ceil( 100*(model["mesh"]["Lz"]-0.45)/model["mesh"]["Lz"] ) # (Lz-0.45)/Lz
+    nx = 150 # FIXME
+    ny = 54
+    mesh = RectangleMesh(nx, ny, model["mesh"]["Lx"], model["mesh"]["Lz"], diagonal="crossed", comm=comm.comm,
                             distribution_parameters=distribution_parameters)
     mesh.coordinates.dat.data[:, 0] -= 0.0 
     mesh.coordinates.dat.data[:, 1] -= model["mesh"]["Lz"] + 0.45 # waterbottom at z=-0.450 km
@@ -209,7 +212,7 @@ else:
     mesh, V = spyro.io.read_mesh(model, comm, distribution_parameters=distribution_parameters)
 #}}}
 
-AMR = 1
+AMR = 0
 # adapt the mesh using the exact vp, if requested {{{
 if AMR:
     nx = 200
@@ -359,19 +362,20 @@ u, uz, ux, uy = spyro.solvers.forward_elastic_waves(
 )
         
 J_scale = sqrt(1.e14)
-misfit_uz = J_scale * spyro.utils.evaluate_misfit(model, uz, uz_ref)# ds_exact[:ll] - guess
-misfit_ux = J_scale * spyro.utils.evaluate_misfit(model, ux, ux_ref)# ds_exact[:ll] - guess
-
+misfit_uz = spyro.utils.evaluate_misfit(model, uz, uz_ref)# ds_exact[:ll] - guess
+misfit_ux = spyro.utils.evaluate_misfit(model, ux, ux_ref)# ds_exact[:ll] - guess
 
 J_total = np.zeros((1))
 J_ref   = np.zeros((1))
-J_total[0] += spyro.utils.compute_functional(model, misfit_uz) # J += residual[ti][rn] ** 2 (and J *= 0.5))
-J_total[0] += spyro.utils.compute_functional(model, misfit_ux) # J += residual[ti][rn] ** 2 (and J *= 0.5)
+J_total[0] += spyro.utils.compute_functional(model, J_scale * misfit_uz) # J += residual[ti][rn] ** 2 (and J *= 0.5))
+J_total[0] += spyro.utils.compute_functional(model, J_scale * misfit_ux) # J += residual[ti][rn] ** 2 (and J *= 0.5)
 
 print(J_total[0],flush=True)
 
-J_ref[0]   += spyro.utils.compute_functional(model, uz_ref) # J += p_ref_recv[ti][rn] ** 2 (and J *= 0.5)
-J_ref[0]   += spyro.utils.compute_functional(model, ux_ref) # J += p_ref_recv[ti][rn] ** 2 (and J *= 0.5)
+J_ref[0]   += spyro.utils.compute_functional(model, J_scale * uz_ref) # J += p_ref_recv[ti][rn] ** 2 (and J *= 0.5)
+J_ref[0]   += spyro.utils.compute_functional(model, J_scale * ux_ref) # J += p_ref_recv[ti][rn] ** 2 (and J *= 0.5)
+
+# divide
 J_total[0] /= J_ref[0]
 
 J_total = COMM_WORLD.allreduce(J_total, op=MPI.SUM)
@@ -382,6 +386,20 @@ if comm.comm.size > 1:
 E = sqrt(J_total[0]) # relative error as defined in Spyro paper
 print(E, flush=True)
 
-
+write_files=1
+if comm.ensemble_comm.rank == 1 and write_files==1:
+    uz_rec_ref = []
+    uz_rec = []
+    nt = int(model["timeaxis"]["tf"] / model["timeaxis"]["dt"])
+    rn = 0
+    for ti in range(nt):
+        uz_rec_ref.append(uz_ref[ti][rn])
+        uz_rec.append(uz[ti][rn])
+    plt.title("uz at receiver")
+    plt.plot(uz_rec_ref,label='uz ref')
+    plt.plot(uz_rec,label='uz')
+    plt.legend()
+    plt.savefig('/home/tdsantos/uz_rec_1.png')
+    plt.close()
 
   
