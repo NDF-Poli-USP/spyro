@@ -70,7 +70,7 @@ class AcousticWave(Wave):
         comm = self.comm
         temp_filename = self.forward_output_file
         filename, file_extension = temp_filename.split(".")
-        output_filename = filename+str(source_num)+"."+file_extension
+        output_filename = filename+'sn'+str(source_num)+"."+file_extension
         print(output_filename, flush = True)
 
         output = fire.File(output_filename)
