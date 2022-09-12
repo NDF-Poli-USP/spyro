@@ -307,11 +307,11 @@ if AMR:
         g = conditional(_x > 3.99, 0, g)
         return g
     
-    def mask_dumb(mesh):
+    def mask_dummy(mesh):
         return Constant(1.)
 
     #fix_boundary_nodes = False
-    mask = mask_dumb
+    mask = mask_dummy
     #if FIREMESH==0:
     #    fix_boundary_nodes = True
     #    mask = mask_receivers
