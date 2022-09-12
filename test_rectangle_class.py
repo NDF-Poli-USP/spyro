@@ -1,6 +1,11 @@
 import spyro
 
-Wave = spyro.examples.Rectangle()
+dictionary = {}
+dictionary["acquisition"] = {
+    "source_locations": [(-0.1, 0.3)],
+}
+
+Wave = spyro.examples.Rectangle(model_dictionary=dictionary)
 
 Wave.forward_solve()
 
