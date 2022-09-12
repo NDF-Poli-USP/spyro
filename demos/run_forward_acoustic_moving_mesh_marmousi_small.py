@@ -74,8 +74,8 @@ model["acquisition"] = {
     "source_pos": spyro.create_transect((0.5, -0.01-0.45), (3.5, -0.01-0.45), 4), # waterbottom at z=-0.45 km
     "amplitude": 1.0, #FIXME check this
     "num_receivers": 100, #FIXME not used (remove it, and update an example script)
-    #"receiver_locations": spyro.create_transect((0.1, -0.10-0.45), (3.9, -0.10-0.45), 100), # waterbottom at z=-0.45 km REC1
-    "receiver_locations": spyro.create_transect((0.1, -1.9), (3.9, -1.9), 100), # receivers at the bottom of the domain (z=-1.9 km) REC2 
+    "receiver_locations": spyro.create_transect((0.1, -0.10-0.45), (3.9, -0.10-0.45), 100), # waterbottom at z=-0.45 km REC1
+    #"receiver_locations": spyro.create_transect((0.1, -1.9), (3.9, -1.9), 100), # receivers at the bottom of the domain (z=-1.9 km) REC2 
     #"receiver_locations": spyro.create_2d_grid(1, 3, -1.4, -1, 10) # 10^2 points REC3
 }
 
@@ -125,7 +125,7 @@ comm = spyro.utils.mpi_init(model)
 distribution_parameters={"partition": True,
                          "overlap_type": (DistributedMeshOverlapType.VERTEX, 20)}
 
-REF = 0
+REF = 1
 # run reference model {{{
 if REF:
     nx = 200
@@ -186,12 +186,12 @@ else:
     M = 7.02
     #model["mesh"]["meshfile"] = "./meshes/fwi_amr_marmousi_small_p=" + str(p) + "_M=" + str(M) + ".msh"
     #model["mesh"]["meshfile"] = "./meshes/marmousi_small_no_water_h_150m.msh"
-    model["mesh"]["meshfile"] = "./meshes/marmousi_small_no_water_h_100m.msh"
-    #model["mesh"]["meshfile"] = "./meshes/marmousi_small_no_water_h_50m.msh"
+    #model["mesh"]["meshfile"] = "./meshes/marmousi_small_no_water_h_100m.msh"
+    model["mesh"]["meshfile"] = "./meshes/marmousi_small_no_water_h_50m.msh"
     mesh, V = spyro.io.read_mesh(model, comm, distribution_parameters=distribution_parameters)
 #}}}
 
-AMR = 0
+AMR = 1
 # adapt the mesh using the exact vp, if requested {{{
 if AMR:
     nx = 200
@@ -233,7 +233,8 @@ if AMR:
 
     #beta = 0.5 # (0, 1) # for E1
     E = E1
-    beta = 0.5 # (0, 1) # for E2
+    #beta = 0.5 # (0, 1) # for E2 + smooth
+    beta = 0.10 # (0, 1) # for E2 w/n smooth
     phi = sqrt( 1 + E*E ) - 1
     phi_hat = assemble(phi*dx(domain=mesh_grid)) / assemble(Constant(1.0)*dx(domain=mesh_grid))
     alpha = beta / ( phi_hat * ( 1 - beta ) )
@@ -242,21 +243,22 @@ if AMR:
    
 
     E = E2
-    beta = 0.5 # (0, 1) # for E2
+    #beta = 0.5 # (0, 1) # for E2 + smooth
+    beta = 0.3 # (0, 1) # for E2 w/n smooth
     phi = sqrt( 1 + E*E ) - 1
     phi_hat = assemble(phi*dx(domain=mesh_grid)) / assemble(Constant(1.0)*dx(domain=mesh_grid))
     alpha = beta / ( phi_hat * ( 1 - beta ) )
     M2 = 1 + alpha * phi
 
     M = max_value(M1,M2)
-
+    #M = M2
 
     # Define the monitor function to be projected onto the adapted mesh
     Mfunc = Function(V_grid)
     Mfunc.interpolate(M)
 
     # smooth the monitor function
-    if 1: # {{{
+    if 0: # {{{
         lamb = 0.005
 
         u = TrialFunction(V_grid)
@@ -333,6 +335,7 @@ receivers = spyro.Receivers(model, mesh, V, comm)
 wavelet = spyro.full_ricker_wavelet(dt=model["timeaxis"]["dt"], tf=model["timeaxis"]["tf"], freq=model["acquisition"]["frequency"])
 
 V_DG = FunctionSpace(mesh, "DG", 2)
+#V_DG = FunctionSpace(mesh, "DG", 0) #FIXME testing it
 vp = _make_vp(V_DG, vp_guess=False)
 
 J_total = np.zeros((1))
