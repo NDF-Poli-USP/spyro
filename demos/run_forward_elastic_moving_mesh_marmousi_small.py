@@ -1,6 +1,6 @@
 from firedrake import *
 from scipy.optimize import * 
-from movement import *
+#from movement import *
 import spyro
 import time
 import sys
@@ -86,7 +86,7 @@ model["timeaxis"] = {
 # make vp, vs or rho {{{
 def _make_field(V, guess=False, field="vp"):
     
-    path = "./velocity_models/elastic-marmousi-model/model/"
+    path = "/share/tdsantos/velocity_models/elastic-marmousi-model/model/"
     if guess: # interpolate from a smoothed field
         sys.exit("not implemented yet")
         fname = path + "MODEL_P-WAVE_VELOCITY_1.25m_small_domain_smoothed_sigma=300.segy.hdf5" # domain 4 x 2 km2 (x, y) 
@@ -139,7 +139,7 @@ def _make_field(V, guess=False, field="vp"):
 #}}}
 comm = spyro.utils.mpi_init(model)
 distribution_parameters={"partition": True,
-                         "overlap_type": (DistributedMeshOverlapType.VERTEX, 20)}
+                         "overlap_type": (DistributedMeshOverlapType.VERTEX, 60)}
 
 REF = 0
 # run reference model {{{
@@ -190,11 +190,11 @@ if REF:
 #}}}
 #sys.exit("exit")
 if REF==0: 
-    uz_ref = spyro.io.load_shots(model, comm, file_name="./shots/uz_ref_recv1")
-    ux_ref = spyro.io.load_shots(model, comm, file_name="./shots/ux_ref_recv1")
+    uz_ref = spyro.io.load_shots(model, comm, file_name="/share/tdsantos/shots/uz_ref_recv1")
+    ux_ref = spyro.io.load_shots(model, comm, file_name="/share/tdsantos/shots/ux_ref_recv1")
 
 # now, prepare to run with different mesh resolutions
-FIREMESH = 1
+FIREMESH = 0
 # generate or read a mesh {{{
 if FIREMESH: 
     nx = 200
@@ -211,10 +211,10 @@ if FIREMESH:
 else:
     p = 2
     M = 7.02
-    #model["mesh"]["meshfile"] = "./meshes/fwi_amr_marmousi_small_p=" + str(p) + "_M=" + str(M) + ".msh"
-    #model["mesh"]["meshfile"] = "./meshes/marmousi_small_no_water_h_150m.msh"
-    model["mesh"]["meshfile"] = "./meshes/marmousi_small_no_water_h_100m.msh"
-    #model["mesh"]["meshfile"] = "./meshes/marmousi_small_no_water_h_50m.msh"
+    #model["mesh"]["meshfile"] = "/share/tdsantos/meshes/fwi_amr_marmousi_small_p=" + str(p) + "_M=" + str(M) + ".msh"
+    #model["mesh"]["meshfile"] = "/share/tdsantos/meshes/marmousi_small_no_water_h_150m.msh"
+    #model["mesh"]["meshfile"] = "/share/tdsantos/meshes/marmousi_small_no_water_h_100m.msh"
+    model["mesh"]["meshfile"] = "/share/tdsantos/meshes/marmousi_small_no_water_h_50m.msh"
     mesh, V = spyro.io.read_mesh(model, comm, distribution_parameters=distribution_parameters)
 #}}}
 
@@ -252,8 +252,7 @@ if AMR:
 
     # Huang type monitor function
     E1 = sqrt( inner( grad_vs_grid, grad_vs_grid ) ) # gradient based estimate
-    E2 = vs_grid.dat.data.max() / vs_grid - 1 # a priori error estimate (it starts on 1, so it could be better)
-
+    E2 = vs_grid.vector().gather().max() / vs_grid - 1 # a priori error estimate (it starts on 1, so it could be better)
 
     #beta = 0.5 # (0, 1) # for E1
     E = E1
@@ -263,7 +262,6 @@ if AMR:
     alpha = beta / ( phi_hat * ( 1 - beta ) )
     M1 = 1 + alpha * phi
    
-
     E = E2
     beta = 0.5 # (0, 1) # for E2
     phi = sqrt( 1 + E*E ) - 1
@@ -333,17 +331,20 @@ if AMR:
         g = conditional(_x > 3.99, 0, g)
         return g
     
-    def mask_dumb(mesh):
+    def mask_dummy(mesh):
         return Constant(1.)
 
     #fix_boundary_nodes = False
-    mask = mask_dumb
+    mask = mask_dummy
     #if FIREMESH==0:
     #    fix_boundary_nodes = True
     #    mask = mask_receivers
 
     mesh._parallel_compatible = {weakref.ref(mesh_grid)}
+    start = time.time()
     step = spyro.monge_ampere_solver(mesh, monitor_function, p=1, mask=mask) #fix_boundary_nodes=fix_boundary_nodes) 
+    end = time.time()
+    print(round(end - start,2),flush=True)
 
     _vs = _make_field(V_DG, guess=False, field="vs")
     File("vp_after_amr.pvd").write(_vs)
