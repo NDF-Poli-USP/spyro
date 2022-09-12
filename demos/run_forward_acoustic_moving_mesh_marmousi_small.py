@@ -71,6 +71,7 @@ model["acquisition"] = {
     #"frequency": 7.0, # 3 Hz for sigma=300, 5 Hz for sigma=100 
     "delay": 1.0, # FIXME check this
     "num_sources": 4, #FIXME not used (remove it, and update an example script)
+    #"source_pos": spyro.create_transect((0.5, -0.01-0.45), (3.5, -0.01-0.45), 1), # FIXME testing it waterbottom at z=-0.45 km
     "source_pos": spyro.create_transect((0.5, -0.01-0.45), (3.5, -0.01-0.45), 4), # waterbottom at z=-0.45 km
     "amplitude": 1.0, #FIXME check this
     "num_receivers": 100, #FIXME not used (remove it, and update an example script)
@@ -123,9 +124,9 @@ def _make_vp(V, vp_guess=False, field="velocity_model"):
 #}}}
 comm = spyro.utils.mpi_init(model)
 distribution_parameters={"partition": True,
-                         "overlap_type": (DistributedMeshOverlapType.VERTEX, 20)}
+                         "overlap_type": (DistributedMeshOverlapType.VERTEX, 60)}
 
-REF = 1
+REF = 0
 # run reference model {{{
 if REF:
     nx = 200
@@ -225,23 +226,16 @@ if AMR:
 
     # Huang type monitor function
     E1 = sqrt( inner( grad_vp_grid, grad_vp_grid ) ) # gradient based estimate
-    E2 = vp_grid.dat.data.max() / vp_grid - 1 # a priori error estimate (it starts on 1, so it could be better)
+    E2 = vp_grid.vector().gather().max() / vp_grid - 1 # a priori error estimate (it starts on 1, so it could be better)
 
-    #E = E1
-    #E = E2
-    #E = max_value(E1,E2)
-
-    #beta = 0.5 # (0, 1) # for E1
     E = E1
     #beta = 0.5 # (0, 1) # for E2 + smooth
     beta = 0.10 # (0, 1) # for E2 w/n smooth
     phi = sqrt( 1 + E*E ) - 1
     phi_hat = assemble(phi*dx(domain=mesh_grid)) / assemble(Constant(1.0)*dx(domain=mesh_grid))
     alpha = beta / ( phi_hat * ( 1 - beta ) )
-    #M = 1 + alpha * phi
     M1 = 1 + alpha * phi
    
-
     E = E2
     #beta = 0.5 # (0, 1) # for E2 + smooth
     beta = 0.3 # (0, 1) # for E2 w/n smooth
@@ -251,7 +245,6 @@ if AMR:
     M2 = 1 + alpha * phi
 
     M = max_value(M1,M2)
-    #M = M2
 
     # Define the monitor function to be projected onto the adapted mesh
     Mfunc = Function(V_grid)
@@ -328,7 +321,7 @@ if AMR:
     _vp = _make_vp(V_DG, vp_guess=False)
     File("vp_after_amr.pvd").write(_vp)
 #}}}
-#sys.exit("exit")
+sys.exit("exit")
 
 sources = spyro.Sources(model, mesh, V, comm)
 receivers = spyro.Receivers(model, mesh, V, comm)
