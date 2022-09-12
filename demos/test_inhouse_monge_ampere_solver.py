@@ -37,7 +37,7 @@ def mask_receivers(mesh):
     g = conditional(y <= 0.8, 1, g)
     return g
 
-def mask_dumb(mesh):
+def mask_dummy(mesh):
     return Constant(1.)
 
 V = FunctionSpace(mesh, "CG", 3)
@@ -57,7 +57,7 @@ if 1:
     if 1:
         #spyro.monge_ampere_solver(mesh, monitor_function_ring, p=p, rtol=tol)
         #spyro.monge_ampere_solver(mesh, monitor_function_ring2, p=p, rtol=tol, mask=None)
-        spyro.monge_ampere_solver(mesh, monitor_function_ring2, p=p, rtol=tol, mask=mask_dumb)
+        spyro.monge_ampere_solver(mesh, monitor_function_ring2, p=p, rtol=tol, mask=mask_dummy)
         #spyro.monge_ampere_solver(mesh, monitor_function_ring2, p=p, rtol=tol, mask=mask_receivers)
     
     tf=time.time()
