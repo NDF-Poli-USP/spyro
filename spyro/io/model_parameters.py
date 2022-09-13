@@ -277,6 +277,7 @@ class Model_parameters:
 
         if comm == None:
             self.comm = spyro.utils.mpi_init(self)
+            self.comm.comm.barrier()
         else:
             self.comm = comm
 

@@ -73,7 +73,8 @@ class AcousticWave(Wave):
         output_filename = filename+'sn'+str(source_num)+"."+file_extension
         print(output_filename, flush = True)
 
-        output = fire.File(output_filename)
+        output = fire.File(output_filename, comm=comm.comm)
+        comm.comm.barrier()
 
         X = fire.Function(self.function_space)
         if final_time == None:
