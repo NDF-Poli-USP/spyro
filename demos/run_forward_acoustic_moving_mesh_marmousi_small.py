@@ -71,13 +71,12 @@ model["acquisition"] = {
     #"frequency": 7.0, # 3 Hz for sigma=300, 5 Hz for sigma=100 
     "delay": 1.0, # FIXME check this
     "num_sources": 4, #FIXME not used (remove it, and update an example script)
-    #"source_pos": spyro.create_transect((0.5, -0.01-0.45), (3.5, -0.01-0.45), 1), # FIXME testing it waterbottom at z=-0.45 km
     "source_pos": spyro.create_transect((0.5, -0.01-0.45), (3.5, -0.01-0.45), 4), # waterbottom at z=-0.45 km
     "amplitude": 1.0, #FIXME check this
     "num_receivers": 100, #FIXME not used (remove it, and update an example script)
-    "receiver_locations": spyro.create_transect((0.1, -0.10-0.45), (3.9, -0.10-0.45), 100), # waterbottom at z=-0.45 km REC1
+    #"receiver_locations": spyro.create_transect((0.1, -0.10-0.45), (3.9, -0.10-0.45), 100), # waterbottom at z=-0.45 km REC1
     #"receiver_locations": spyro.create_transect((0.1, -1.9), (3.9, -1.9), 100), # receivers at the bottom of the domain (z=-1.9 km) REC2 
-    #"receiver_locations": spyro.create_2d_grid(1, 3, -1.4, -1, 10) # 10^2 points REC3
+    "receiver_locations": spyro.create_2d_grid(1, 3, -1.4, -1, 10) # 10^2 points REC3
 }
 
 model["timeaxis"] = {
@@ -126,7 +125,7 @@ comm = spyro.utils.mpi_init(model)
 distribution_parameters={"partition": True,
                          "overlap_type": (DistributedMeshOverlapType.VERTEX, 60)}
 
-REF = 0
+REF = 1
 # run reference model {{{
 if REF:
     nx = 200
@@ -161,14 +160,17 @@ if REF:
     print(round(end - start,2),flush=True)
     File("p_ref.pvd").write(p_ref[-1])
 
-    spyro.io.save_shots(model, comm, p_ref_recv, file_name="./shots/acoustic_forward_marmousi_small/p_ref_recv2")
+    spyro.io.save_shots(model, comm, p_ref_recv, file_name="./shots/acoustic_forward_marmousi_small/p_ref_recv3")
     # ok, reset to the original order
     #model["opts"]["degree"] = p
     #print(model["opts"]["degree"])
     #sys.exit("exit")
 #}}}
 #sys.exit("exit")
-p_ref_recv = spyro.io.load_shots(model, comm, file_name="./shots/acoustic_forward_marmousi_small/p_ref_recv2")
+if REF==0:
+    #p_ref_recv = spyro.io.load_shots(model, comm, file_name="./shots/acoustic_forward_marmousi_small/p_ref_recv1")
+    #p_ref_recv = spyro.io.load_shots(model, comm, file_name="./shots/acoustic_forward_marmousi_small/p_ref_recv2")
+    p_ref_recv = spyro.io.load_shots(model, comm, file_name="./shots/acoustic_forward_marmousi_small/p_ref_recv3")
 
 # now, prepare to run with different mesh resolutions
 FIREMESH = 0
@@ -321,7 +323,7 @@ if AMR:
     _vp = _make_vp(V_DG, vp_guess=False)
     File("vp_after_amr.pvd").write(_vp)
 #}}}
-sys.exit("exit")
+#sys.exit("exit")
 
 sources = spyro.Sources(model, mesh, V, comm)
 receivers = spyro.Receivers(model, mesh, V, comm)
