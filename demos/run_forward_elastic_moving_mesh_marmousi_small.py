@@ -1,6 +1,6 @@
 from firedrake import *
 from scipy.optimize import * 
-from movement import *
+#from movement import *
 import spyro
 import time
 import sys
@@ -60,6 +60,12 @@ model["BCs"] = {
     "ly": 0.0,  # thickness of the ABL in the y-direction (km) - always positive
 }
 
+# Receiver locations
+rec1=spyro.create_transect((0.1, -0.10-0.45), (3.9, -0.10-0.45), 100) # waterbottom at z=-0.45 km REC1)
+rec2=spyro.create_transect((0.1, -1.9), (3.9, -1.9), 100) # receivers at the bottom of the domain (z=-1.9 km) REC2
+rec3=np.array(spyro.create_2d_grid(1, 3, -1.4, -1, 10)) # receivers at the middle of the domain
+rec = np.concatenate((rec1,rec2,rec3))
+
 model["acquisition"] = {
     "source_type": "Ricker",
     "frequency": 3.0, # 3 Hz for sigma=300, 5 Hz for sigma=100 
@@ -69,15 +75,14 @@ model["acquisition"] = {
     "num_sources": 4, #FIXME not used (remove it, and update an example script)
     "source_pos": spyro.create_transect((0.5, -0.01-0.45), (3.5, -0.01-0.45), 4), # waterbottom at z=-0.45 km
     "amplitude": 1.0, #FIXME check this
-    "num_receivers": 100, #FIXME not used (remove it, and update an example script)
-    "receiver_locations": spyro.create_transect((0.1, -0.10-0.45), (3.9, -0.10-0.45), 100), # waterbottom at z=-0.45 km REC1
-    #"receiver_locations": spyro.create_transect((0.1, -1.9), (3.9, -1.9), 100), # receivers at the bottom of the domain (z=-1.9 km) REC2 
-    #"receiver_locations": spyro.create_2d_grid(1, 3, -1.4, -1, 10) # 10^2 points REC3
+    "num_receivers": len(rec), #FIXME not used (remove it, and update an example script)
+    "receiver_locations": rec, 
 }
 
 model["timeaxis"] = {
     "t0": 0.0,  #  Initial time for event
-    "tf": 2.5, # Final time for event 
+    "tf": 0.00050, # Final time for event 
+    #"tf": 2.5, # Final time for event 
     "dt": 0.00025,  # timestep size 
     "nspool":  20,  # (20 for dt=0.00050) how frequently to output solution to pvds
     "fspool": 10,  # how frequently to save solution to RAM
@@ -86,7 +91,7 @@ model["timeaxis"] = {
 # make vp, vs or rho {{{
 def _make_field(V, guess=False, field="vp"):
     
-    path = "./velocity_models/elastic-marmousi-model/model/"
+    path = "/share/tdsantos/velocity_models/elastic-marmousi-model/model/"
     if guess: # interpolate from a smoothed field
         sys.exit("not implemented yet")
         fname = path + "MODEL_P-WAVE_VELOCITY_1.25m_small_domain_smoothed_sigma=300.segy.hdf5" # domain 4 x 2 km2 (x, y) 
@@ -139,13 +144,13 @@ def _make_field(V, guess=False, field="vp"):
 #}}}
 comm = spyro.utils.mpi_init(model)
 distribution_parameters={"partition": True,
-                         "overlap_type": (DistributedMeshOverlapType.VERTEX, 20)}
+                         "overlap_type": (DistributedMeshOverlapType.VERTEX, 60)}
 
-REF = 0
+REF = 1
 # run reference model {{{
 if REF:
-    nx = 200
-    ny = math.ceil( 100*(model["mesh"]["Lz"]-0.45)/model["mesh"]["Lz"] ) # (Lz-0.45)/Lz
+    nx = 500  # nx=500 => dx = dz = 8 m => N = min(vs)/(dx * max(f)) => N = 5.36 = 300/(8 * 7)  
+    ny = math.ceil( nx*model["mesh"]["Lz"]/model["mesh"]["Lx"] ) # nx * Lz/Lx, Delta x = Delta z
     mesh_ref = RectangleMesh(nx, ny, model["mesh"]["Lx"], model["mesh"]["Lz"], diagonal="crossed", comm=comm.comm,
                             distribution_parameters=distribution_parameters)
     mesh_ref.coordinates.dat.data[:, 0] -= 0.0 
@@ -153,7 +158,14 @@ if REF:
 
     # for the exact model, use a higher-order element
     element = spyro.domains.space.FE_method(mesh_ref, model["opts"]["method"], model["opts"]["degree"])
-    V_ref = FunctionSpace(mesh_ref, element) # FIXME come back here
+    V_ref = FunctionSpace(mesh_ref, element)
+
+    if 0:
+        print("Nx="+str(nx),flush=True)
+        print("Ny="+str(ny),flush=True)
+        print("Cells: "+str(mesh_ref.num_cells()),flush=True)
+        print("DOF: "+str(V_ref.dof_count),flush=True)
+        sys.exit("exit")
 
     element_DG = spyro.domains.space.FE_method(mesh_ref, "DG", 2) # here, it could be 2 too
     V_DG = FunctionSpace(mesh_ref, element_DG)
@@ -184,17 +196,17 @@ if REF:
     print(round(end - start,2),flush=True)
     File("u_ref.pvd").write(u_ref[-1])
 
-    spyro.io.save_shots(model, comm, uz_ref, file_name="./shots/uz_ref_recv1")
-    spyro.io.save_shots(model, comm, ux_ref, file_name="./shots/ux_ref_recv1")
+    spyro.io.save_shots(model, comm, uz_ref, file_name="/share/tdsantos/shots/elastic_waves_moving_mesh_marmousi_small/uz_ref_recv1") 
+    spyro.io.save_shots(model, comm, ux_ref, file_name="/share/tdsantos/shots/elastic_waves_moving_mesh_marmousi_small/ux_ref_recv1")
 
 #}}}
-#sys.exit("exit")
+sys.exit("exit")
 if REF==0: 
-    uz_ref = spyro.io.load_shots(model, comm, file_name="./shots/uz_ref_recv1")
-    ux_ref = spyro.io.load_shots(model, comm, file_name="./shots/ux_ref_recv1")
+    uz_ref = spyro.io.load_shots(model, comm, file_name="/share/tdsantos/shots/elastic_waves_moving_mesh_marmousi_small/uz_ref_recv1")
+    ux_ref = spyro.io.load_shots(model, comm, file_name="/share/tdsantos/shots/elastic_waves_moving_mesh_marmousi_small/ux_ref_recv1")
 
 # now, prepare to run with different mesh resolutions
-FIREMESH = 1
+FIREMESH = 0
 # generate or read a mesh {{{
 if FIREMESH: 
     nx = 200
@@ -211,10 +223,10 @@ if FIREMESH:
 else:
     p = 2
     M = 7.02
-    #model["mesh"]["meshfile"] = "./meshes/fwi_amr_marmousi_small_p=" + str(p) + "_M=" + str(M) + ".msh"
-    #model["mesh"]["meshfile"] = "./meshes/marmousi_small_no_water_h_150m.msh"
-    model["mesh"]["meshfile"] = "./meshes/marmousi_small_no_water_h_100m.msh"
-    #model["mesh"]["meshfile"] = "./meshes/marmousi_small_no_water_h_50m.msh"
+    #model["mesh"]["meshfile"] = "/share/tdsantos/meshes/fwi_amr_marmousi_small_p=" + str(p) + "_M=" + str(M) + ".msh"
+    #model["mesh"]["meshfile"] = "/share/tdsantos/meshes/marmousi_small_no_water_h_150m.msh"
+    #model["mesh"]["meshfile"] = "/share/tdsantos/meshes/marmousi_small_no_water_h_100m.msh"
+    model["mesh"]["meshfile"] = "/share/tdsantos/meshes/marmousi_small_no_water_h_50m.msh"
     mesh, V = spyro.io.read_mesh(model, comm, distribution_parameters=distribution_parameters)
 #}}}
 
@@ -252,8 +264,7 @@ if AMR:
 
     # Huang type monitor function
     E1 = sqrt( inner( grad_vs_grid, grad_vs_grid ) ) # gradient based estimate
-    E2 = vs_grid.dat.data.max() / vs_grid - 1 # a priori error estimate (it starts on 1, so it could be better)
-
+    E2 = vs_grid.vector().gather().max() / vs_grid - 1 # a priori error estimate (it starts on 1, so it could be better)
 
     #beta = 0.5 # (0, 1) # for E1
     E = E1
@@ -263,7 +274,6 @@ if AMR:
     alpha = beta / ( phi_hat * ( 1 - beta ) )
     M1 = 1 + alpha * phi
    
-
     E = E2
     beta = 0.5 # (0, 1) # for E2
     phi = sqrt( 1 + E*E ) - 1
@@ -333,17 +343,20 @@ if AMR:
         g = conditional(_x > 3.99, 0, g)
         return g
     
-    def mask_dumb(mesh):
+    def mask_dummy(mesh):
         return Constant(1.)
 
     #fix_boundary_nodes = False
-    mask = mask_dumb
+    mask = mask_dummy
     #if FIREMESH==0:
     #    fix_boundary_nodes = True
     #    mask = mask_receivers
 
     mesh._parallel_compatible = {weakref.ref(mesh_grid)}
+    start = time.time()
     step = spyro.monge_ampere_solver(mesh, monitor_function, p=1, mask=mask) #fix_boundary_nodes=fix_boundary_nodes) 
+    end = time.time()
+    print(round(end - start,2),flush=True)
 
     _vs = _make_field(V_DG, guess=False, field="vs")
     File("vp_after_amr.pvd").write(_vs)
