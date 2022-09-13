@@ -28,6 +28,10 @@ class Wave():
             self.comm = comm
         if model_parameters == None:
             model_parameters = Model_parameters(dictionary=model_dictionary, comm = comm)
+        if model_parameters.comm != None:
+            self.comm = model_parameters.comm
+        if self.comm != None:
+            self.comm.comm.barrier()
         self.model_parameters = model_parameters
         self.initial_velocity_model = None
         self._unpack_parameters(model_parameters)
