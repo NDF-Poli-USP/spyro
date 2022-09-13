@@ -196,8 +196,8 @@ if REF:
     print(round(end - start,2),flush=True)
     File("u_ref.pvd").write(u_ref[-1])
 
-    spyro.io.save_shots(model, comm, uz_ref, file_name="/share/tdsantos/shots/elastic_waves_moving_mesh_marmousi_small/uz_ref_recv1") 
-    spyro.io.save_shots(model, comm, ux_ref, file_name="/share/tdsantos/shots/elastic_waves_moving_mesh_marmousi_small/ux_ref_recv1")
+    #spyro.io.save_shots(model, comm, uz_ref, file_name="/share/tdsantos/shots/elastic_waves_moving_mesh_marmousi_small/uz_ref_recv1") 
+    #spyro.io.save_shots(model, comm, ux_ref, file_name="/share/tdsantos/shots/elastic_waves_moving_mesh_marmousi_small/ux_ref_recv1")
 
 #}}}
 sys.exit("exit")
@@ -379,7 +379,9 @@ lamb = Function(V_DG).interpolate(rho * (vp ** 2. - 2. * vs ** 2.))
 u, uz, ux, uy = spyro.solvers.forward_elastic_waves(
     model, mesh, comm, rho, lamb, mu, sources, wavelet, receivers, output=False
 )
-        
+    
+#FIXME select the receivers first before computing the error 
+
 J_scale = sqrt(1.e14)
 misfit_uz = spyro.utils.evaluate_misfit(model, uz, uz_ref)# ds_exact[:ll] - guess
 misfit_ux = spyro.utils.evaluate_misfit(model, ux, ux_ref)# ds_exact[:ll] - guess
