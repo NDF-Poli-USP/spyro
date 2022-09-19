@@ -33,9 +33,11 @@ def minimum_grid_point_calculator(grid_point_calculator_parameters):
     #print("Model built at time "+str(time.time()-start_time), flush = True)
     comm = spyro.utils.mpi_init(model)
     #print("Comm built at time "+str(time.time()-start_time), flush = True)
-    print("Entering search", flush = True)
+    if comm.comm.rank == 0:
+        print("Entering search", flush = True)
     p_exact = wave_solver(model, G =G_reference, comm = comm)
-    print("p_exact calculation finished", flush = True)
+    if comm.comm.rank == 0:
+        print("p_exact calculation finished", flush = True)
 
     comm.comm.barrier()
 
@@ -46,11 +48,12 @@ def minimum_grid_point_calculator(grid_point_calculator_parameters):
 
 def wave_solver(model, G, comm = False):
     minimum_mesh_velocity = model['testing_parameters']['minimum_mesh_velocity']
-
-    mesh = generate_mesh(model, G, comm)
-
-    element = spyro.domains.space.FE_method(mesh, model["opts"]["method"], model["opts"]["degree"])
-    V = fire.FunctionSpace(mesh, element)
+    model["mesh"]["meshfile"] = "meshes/2Dhomogeneous"+str(G)+".msh"
+    try:
+        mesh, V = spyro.io.read_mesh(model, comm)
+    except:
+        model = generate_mesh(model, G, comm)
+        mesh, V = spyro.io.read_mesh(model, comm)
 
     if model['testing_parameters']['experiment_type'] == 'homogeneous':
         vp_exact = fire.Constant(minimum_mesh_velocity)
@@ -64,15 +67,16 @@ def wave_solver(model, G, comm = False):
     new_dt = 0.2*spyro.estimate_timestep(mesh, V, vp_exact,estimate_max_eigenvalue=estimate_max_eigenvalue)
 
     model['timeaxis']['dt'] = comm.comm.allreduce(new_dt, op=MPI.MIN)
+    if comm.comm.rank == 0:
+        print(
+            f"Maximum stable timestep is: {model['timeaxis']['dt']} seconds",
+            flush=True,
+        )
     if model['timeaxis']['dt'] > 0.001:
         model['timeaxis']['dt'] = 0.001
     if comm.comm.rank == 0:
         print(
-            f"Maximum stable timestep is: {comm.comm.allreduce(new_dt, op=MPI.MIN)} seconds",
-            flush=True,
-        )
-        print(
-            f"Maximum stable timestep used is: {model['timeaxis']['dt']} seconds",
+            f"Timestep used is: {model['timeaxis']['dt']} seconds",
             flush=True,
         )
 
@@ -333,7 +337,8 @@ def time_interpolation_line(p_old, p_exact, model):
 
 def generate_mesh2D(model,G, comm):
 
-    print('Entering mesh generation', flush = True)
+    if comm.comm.rank == 0:
+        print('Entering mesh generation', flush = True)
     M = grid_point_to_mesh_point_converter_for_seismicmesh(model, G)
     method = model["opts"]["method"]
 
@@ -346,6 +351,7 @@ def generate_mesh2D(model,G, comm):
     Real_Lx = Lx + 2*lx
 
     if model['testing_parameters']['experiment_type']== 'homogeneous':
+    
         minimum_mesh_velocity = model['testing_parameters']['minimum_mesh_velocity']
         frequency = model["acquisition"]['frequency']
         lbda = minimum_mesh_velocity/frequency
@@ -381,14 +387,8 @@ def generate_mesh2D(model,G, comm):
                 file_format="vtk"
                 )
 
-        comm.comm.barrier()
-        if method == "CG" or method == "KMV":
-            mesh = fire.Mesh(
-                "meshes/2Dhomogeneous"+str(G)+".msh",
-                distribution_parameters={
-                    "overlap_type": (fire.DistributedMeshOverlapType.NONE, 0)
-                },
-            )
+        if comm.comm.rank == 0:
+            print('Finishing mesh generation', flush = True)
 
     elif model['testing_parameters']['experiment_type']== 'heterogeneous':
         # Name of SEG-Y file containg velocity model.
@@ -435,8 +435,8 @@ def generate_mesh2D(model,G, comm):
                     "overlap_type": (fire.DistributedMeshOverlapType.NONE, 0)
                 },
             )
-    print('Finishing mesh generation', flush = True)
-    return mesh
+    
+    return model
 
 def generate_mesh3D(model, G, comm):
 

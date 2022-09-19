@@ -1,9 +1,8 @@
 import math
 import numpy as np
 from copy import deepcopy
-
+import pytest
 from firedrake import *
-
 import spyro
 
 from .inputfiles.Model1_2d_CG import model
@@ -18,7 +17,6 @@ def triangle_area(p1, p2, p3):
 
     return abs(x1 * (y2 - y3) + x2 * (y3 - y1) + x3 * (y1 - y2)) / 2
 
-
 def test_correct_receiver_location_generation2D():
     """Tests if receiver locations where generated correctly"""
     comm = spyro.utils.mpi_init(model)
@@ -28,7 +26,6 @@ def test_correct_receiver_location_generation2D():
     answer = np.array([[-0.1, 0.3], [-0.1, 0.6], [-0.1, 0.9]])
 
     assert np.allclose(receivers, answer)
-
 
 def test_correct_receiver_to_cell_location2D():
     """Tests if the receivers where located in the correct cell"""
@@ -88,7 +85,6 @@ def test_correct_receiver_to_cell_location2D():
     test3 = math.isclose((area1 + area2 + area3), areaT, rel_tol=1e-09)
 
     assert all([test1, test2, test3])
-
 
 def test_correct_at_value2D():
     comm = spyro.utils.mpi_init(model)
@@ -169,7 +165,6 @@ def tetrahedral_volume(p1, p2, p3, p4):
 
     return volume
 
-
 def test_correct_receiver_location_generation3D():
     """Tests if receiver locations where generated correctly"""
 
@@ -183,7 +178,6 @@ def test_correct_receiver_location_generation3D():
     answer = np.array([[-0.05, 0.3, 0.5], [-0.05, 0.6, 0.5], [-0.05, 0.9, 0.5]])
 
     assert np.allclose(receivers.receiver_locations, answer)
-
 
 def test_correct_receiver_to_cell_location3D():
     """Tests if the receivers where located in the correct cell"""
@@ -258,7 +252,6 @@ def test_correct_receiver_to_cell_location3D():
 
     assert all([test1, test2, test3])
 
-
 def test_correct_at_value3D():
     test_model2 = deepcopy(model3D)
     test_model2["acquisition"]["num_receivers"] = 3
@@ -299,7 +292,7 @@ if __name__ == "__main__":
     test_correct_receiver_location_generation2D()
     test_correct_receiver_to_cell_location2D()
     test_correct_at_value2D()
-    test_correct_at_value2d_quad()
+    test_correct_at_value2D_quad()
     test_correct_receiver_location_generation3D()
     test_correct_receiver_to_cell_location3D()
     test_correct_at_value3D()

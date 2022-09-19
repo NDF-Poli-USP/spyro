@@ -5,7 +5,7 @@ model = {}
 
 model["opts"] = {
     "method": "KMV",  # either CG or KMV
-    "quadratrue": "KMV",  # Equi or KMV
+    "quadrature": "KMV",  # Equi or KMV
     "degree": 5,  # p order
     "dimension": 2,  # dimension
 }
