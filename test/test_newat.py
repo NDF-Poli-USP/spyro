@@ -121,6 +121,38 @@ def test_correct_at_value2D():
 
     assert all([test1, test2])
 
+def test_correct_at_value2D_quad():
+    model_quad = deepcopy(model)
+    comm = spyro.utils.mpi_init(model_quad)
+    model_quad["opts"]["degree"] = 3
+    model_quad["opts"]["degree"] = 3
+    mesh, V = spyro.io.read_mesh(model_quad, comm)
+    pz = -0.1
+    px = 0.3
+    recvs = spyro.create_transect((pz, px), (pz, px), 3)
+    # recvs = spyro.create_transect(
+    #    (-0.00935421,  3.25160664), (-0.00935421,  3.25160664), 3
+    # )
+    model_quad["acquisition"]["receiver_locations"] = recvs
+    model_quad["acquisition"]["num_receivers"] = 3
+
+    receivers = spyro.Receivers(model_quad, mesh, V, comm)
+    V = receivers.space
+    z, x = SpatialCoordinate(mesh)
+
+    u1 = Function(V).interpolate(x + z)
+    test1 = math.isclose(
+        (pz + px), receivers._Receivers__new_at(u1.dat.data[:], 0), rel_tol=1e-09
+    )
+
+    u1 = Function(V).interpolate(sin(x) * z * 2)
+    test2 = math.isclose(
+        sin(px) * pz * 2,
+        receivers._Receivers__new_at(u1.dat.data[:], 0),
+        rel_tol=1e-05,
+    )
+
+    assert all([test1, test2])
 
 def tetrahedral_volume(p1, p2, p3, p4):
     (x1, y1, z1) = p1
@@ -267,6 +299,7 @@ if __name__ == "__main__":
     test_correct_receiver_location_generation2D()
     test_correct_receiver_to_cell_location2D()
     test_correct_at_value2D()
+    test_correct_at_value2d_quad()
     test_correct_receiver_location_generation3D()
     test_correct_receiver_to_cell_location3D()
     test_correct_at_value3D()

@@ -14,6 +14,7 @@ initmodel = vname
 # Choose method and parameters
 opts = {
     "method": "CG",
+    "quadrature": None,
     "variant": None,
     "type": "SIP",  # for DG only - SIP, NIP and IIP
     "degree": 1,  # p order
@@ -52,11 +53,9 @@ PML = {
 
 acquisition = {
     "source_type": "Ricker",
-    "num_sources": 1,
     "frequency": 2.0,
     "delay": 1.0,
     "source_pos": [(-0.05, 1.5)],
-    "num_receivers": 256,
     "receiver_locations": [()],
 }  # equi-spaced for now
 
@@ -72,6 +71,9 @@ inversion = {
     "freq_bands": [None]
 }  # cutoff frequencies (Hz) for Ricker source and to low-pass the observed shot record
 
+aut_dif = {
+    "status": False, 
+}
 
 # Create your model with all the options
 model = {
@@ -83,4 +85,5 @@ model = {
     "mesh": mesh,
     "acquisition": acquisition,
     "timeaxis": timeaxis,
+    "aut_dif": aut_dif,
 }

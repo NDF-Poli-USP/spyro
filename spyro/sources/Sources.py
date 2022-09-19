@@ -50,6 +50,7 @@ class Sources(spyro.receivers.Receivers.Receivers):
         self.node_locations = None
         self.is_local = [0] * self.num_receivers
         self.current_source = None
+        self.quadrilateral = (model["opts"]['quadrature']=='GLL')
 
         super().build_maps()
         (self.cell_tabulations_zdir,self.cell_tabulations_xdir) = self.__func_build_cell_tabulations_zxydir()

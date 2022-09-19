@@ -1,5 +1,5 @@
 from firedrake import *
-from FIAT.reference_element import UFCTriangle, UFCTetrahedron
+from FIAT.reference_element import UFCTriangle, UFCTetrahedron, UFCQuadrilateral
 from FIAT.kong_mulder_veldhuizen import KongMulderVeldhuizen as KMV
 from FIAT.lagrange import Lagrange as CG
 from FIAT.discontinuous_lagrange import DiscontinuousLagrange as DG
@@ -16,7 +16,6 @@ class Receivers:
     def __init__(self, model, mesh, V, my_ensemble):
         """Initializes class and gets all receiver parameters from
         input file.
-
         Parameters
         ----------
         model: `dictionary`
@@ -27,21 +26,31 @@ class Receivers:
             The space of the finite elements
         my_ensemble: Firedrake.ensemble_communicator
             An ensemble communicator
-
         Returns
         -------
         Receivers: :class: 'Receiver' object
-
         """
+
+        if "Aut_Dif" in model:
+            self.automatic_adjoint = True
+        else:
+            self.automatic_adjoint = False
 
         self.mesh = mesh
         self.space = V
         self.my_ensemble = my_ensemble
         self.dimension = model["opts"]["dimension"]
         self.degree = model["opts"]["degree"]
-
         self.receiver_locations = model["acquisition"]["receiver_locations"]
-        self.num_receivers = len(self.receiver_locations)
+        
+        if self.dimension==3 and model["aut_dif"]['status']:
+            self.column_x = model["acquisition"]["num_rec_x_columns"]
+            self.column_y = model["acquisition"]["num_rec_y_columns"]
+            self.column_z = model["acquisition"]["num_rec_z_columns"]
+            self.num_receivers = self.column_x*self.column_y
+       
+        else:
+            self.num_receivers = len(self.receiver_locations)
 
         self.cellIDs = None
         self.cellVertices = None # vertex locations
@@ -53,10 +62,11 @@ class Receivers:
         self.cellNodeMaps = None
         self.nodes_per_cell = None
         self.node_locations = None
+        self.quadrilateral = (model["opts"]['quadrature']=='GLL')
         self.is_local = [0] * self.num_receivers
-
-        self.build_maps()
-        (self.cell_tabulations_zdir,self.cell_tabulations_xdir) = self.__func_build_cell_tabulations_zxydir()
+        if not self.automatic_adjoint:
+            self.build_maps()
+            (self.cell_tabulations_zdir,self.cell_tabulations_xdir) = self.__func_build_cell_tabulations_zxydir()
 
     @property
     def num_receivers(self):
@@ -92,18 +102,15 @@ class Receivers:
     def interpolate(self, field):
         """Interpolate the solution to the receiver coordinates for
         one simulation timestep.
-
         Parameters
         ----------
         field: array-like
             An array of the solution at a given timestep at all nodes
-
         Returns
         -------
         solution_at_receivers: list
             Solution interpolated to the list of receiver coordinates
             for the given timestep.
-
         """
         return [self.__new_at(field, rn) for rn in range(self.num_receivers)]
 
@@ -116,11 +123,12 @@ class Receivers:
             if self.is_local[rid]:
                 idx = np.int_(self.cellNodeMaps[rid])
                 phis = self.cell_tabulations[rid]
+               
                 tmp = np.dot(phis, value)
                 rhs_forcing.dat.data_with_halos[idx] += tmp
             else:
                 tmp = rhs_forcing.dat.data_with_halos[0] 
-
+       
         return rhs_forcing
     
     def apply_receivers_as_gaussian_source(self, rhs_forcing, residual, IT): # used to debub and compare
@@ -224,10 +232,8 @@ class Receivers:
         the list of tuples has in line n the receiver position
         and the position of the nodes in the element that contains
         the receiver.
-
         The matrix has the deegres of freedom of the nodes inside
         same element as the receiver.
-
         """
         if self.dimension == 2:
             return self.__func_receiver_locator_2D()
@@ -262,10 +268,8 @@ class Receivers:
         the list of tuples has in line n the receiver position
         and the position of the nodes in the element that contains
         the receiver.
-
         The matrix has the deegres of freedom of the nodes inside
         same element as the receiver.
-
         """
         num_recv = self.num_receivers
 
@@ -281,6 +285,14 @@ class Receivers:
         cellVertices = []
         cellNodes = []
 
+        if self.quadrilateral == True:
+            end_vertex_id = 4
+            degree = self.degree
+            cell_ends = [0, (degree+1)*(degree+1)-degree-1,  (degree+1)*(degree+1)-1, degree]
+        else:
+            end_vertex_id = 3
+            cell_ends = [0, 1, 2]
+
         for receiver_id in range(num_recv):
             cell_id = self.is_local[receiver_id]
 
@@ -290,10 +302,10 @@ class Receivers:
             if cell_id is not None:
                 cellId_maps[receiver_id] = cell_id
                 cellNodeMaps[receiver_id, :] = cell_node_map[cell_id, :]
-                for vertex_number in range(0, 3):
+                for vertex_number in range(0, end_vertex_id):
                     cellVertices[receiver_id].append([])
-                    z = node_locations[cell_node_map[cell_id, vertex_number], 0]
-                    x = node_locations[cell_node_map[cell_id, vertex_number], 1]
+                    z = node_locations[cell_node_map[cell_id, cell_ends[vertex_number]], 0]
+                    x = node_locations[cell_node_map[cell_id, cell_ends[vertex_number]], 1]
                     cellVertices[receiver_id][vertex_number] = (z, x)
                 for node_number in range(nodes_per_cell):
                     cellNodes[receiver_id].append([])
@@ -306,7 +318,6 @@ class Receivers:
     def __new_at(self, udat, receiver_id):
         """Function that evaluates the receiver value given its id.
         For 2D simplices only.
-
         Parameters
         ----------
         udat: array-like
@@ -314,10 +325,8 @@ class Receivers:
         receiver_id: a list of integers
             A list of receiver ids, ranging from 0 to total receivers
             minus one.
-
         Returns
         -------
-
         at: Function value at given receiver
         """
 
@@ -354,10 +363,8 @@ class Receivers:
         the list of tuples has in line n the receiver position
         and the position of the nodes in the element that contains
         the receiver.
-
         The matrix has the deegres of freedom of the nodes inside
         same element as the receiver.
-
         """
         num_recv = self.num_receivers
 
@@ -413,10 +420,14 @@ class Receivers:
         return node_locations
 
     def __func_build_cell_tabulations(self):
-        if self.dimension == 2:
+        if self.dimension == 2   and self.quadrilateral == False:
             return self.__func_build_cell_tabulations_2D()
-        elif self.dimension == 3:
+        elif self.dimension == 3 and self.quadrilateral == False:
             return self.__func_build_cell_tabulations_3D()
+        elif self.dimension == 2 and self.quadrilateral == True:
+            return self.__func_build_cell_tabulations_2D_quad()
+        elif self.dimension == 3 and self.quadrilateral == True:
+            raise ValueError('3D GLL hexas not yet supported.')
         else:
             raise ValueError
 
@@ -466,21 +477,62 @@ class Receivers:
 
         return cell_tabulations
 
-    def setPointCloudRec(self, comm, paralel_z=True):
-        #2D only
-        rec_position = self.receiver_locations
-        num_rec      = len(rec_position)
-        if paralel_z:
-            δs       = np.linspace(rec_position[0,0], rec_position[num_rec-1,0], num_rec)
-            X, Y     = np.meshgrid(δs, rec_position[0,1])
+    def __func_build_cell_tabulations_2D_quad(self):
+        finatelement = FiniteElement('CG', self.mesh.ufl_cell(), degree=self.degree, variant='spectral')
+        V = FunctionSpace(self.mesh, finatelement)
+        u = TrialFunction(V)
+        Q=u.function_space()
+        element = Q.finat_element.fiat_equivalent
+
+        cell_tabulations = np.zeros((self.num_receivers, self.nodes_per_cell))
+
+        for receiver_id in range(self.num_receivers):
+            cell_id = self.is_local[receiver_id]
+            if cell_id is not None:
+                # getting coordinates to change to reference element
+                p  = self.receiver_locations[receiver_id]
+                v0 = self.cellVertices[receiver_id][0]
+                v1 = self.cellVertices[receiver_id][1]
+                v2 = self.cellVertices[receiver_id][2]
+                v3 = self.cellVertices[receiver_id][3]
+
+                p_reference = change_to_reference_quad(p, v0, v1, v2, v3)
+                initial_tab = element.tabulate(0, [p_reference])
+                phi_tab = initial_tab[(0, 0)]
+
+                cell_tabulations[receiver_id, :] = phi_tab.transpose()
+
+
+        return cell_tabulations
+    
+    def set_point_cloud(self, comm):
+        # Receivers always parallel to z-axis
+
+        rec_pos = self.receiver_locations
+       
+        # 2D -- 
+        if self.dimension==2:
+            num_rec = self.num_receivers
+            δz   = np.linspace(rec_pos[0,0], rec_pos[num_rec-1,0], 1) 
+            δx   = np.linspace(rec_pos[0,1], rec_pos[num_rec-1,1], num_rec)
+            
+            Z, X = np.meshgrid(δz,δx)
+            xs   = np.vstack((Z.flatten(), X.flatten())).T
+        
+        #3D   
+        elif self.dimension==3:
+            δz   = np.linspace(rec_pos[0][0], rec_pos[1][0], self.column_z)
+            δx   = np.linspace(rec_pos[0][1], rec_pos[1][1], self.column_x)
+            δy   = np.linspace(rec_pos[0][2], rec_pos[1][2], self.column_y)
+
+            Z, X, Y = np.meshgrid(δz,δx,δy)
+            xs      = np.vstack((Z.flatten(),X.flatten(), Y.flatten())).T
         else:
-            δs       = np.linspace(rec_position[0,1], rec_position[num_rec-1,1], num_rec)
-            X, Y     = np.meshgrid(rec_position[0,0],δs)
+            print("This dimension is not accepted.")  
+            quit() 
         
-        xs          = np.vstack((X.flatten(), Y.flatten())).T
-        
-        point_cloud = VertexOnlyMesh(self.mesh, xs, missing_points_behaviour="warn")
-        
+        point_cloud = VertexOnlyMesh(self.mesh, xs)   
+    
         return point_cloud
 
 ## Some helper functions
@@ -492,7 +544,7 @@ def choosing_element(V, degree):
     cell_geometry = V.mesh().ufl_cell()
     if cell_geometry == quadrilateral:
         T = UFCQuadrilateral()
-        raise ValueError("Point interpolation not yet implemented for quads")
+        raise ValueError("Point interpolation for quads implemented somewhere else.")
 
     elif cell_geometry == triangle:
         T = UFCTriangle()
@@ -815,3 +867,67 @@ def change_to_reference_tetrahedron(p, a, b, c, d):
     pnz = px * a31 + py * a32 + pz * a33 + a34
 
     return (pnx, pny, pnz)
+
+def change_to_reference_quad(p, v0, v1, v2, v3):
+    (px, py) = p
+    # Irregular quad
+    (x0, y0) = v0
+    (x1, y1) = v1
+    (x2, y2) = v2
+    (x3, y3) = v3
+
+    # Reference quad
+    # xn0 = 0.0
+    # yn0 = 0.0
+    # xn1 = 1.0
+    # yn1 = 0.0
+    # xn2 = 1.0
+    # yn2 = 1.0
+    # xn3 = 0.0
+    # yn3 = 1.0
+
+    dx1 = x1 - x2
+    dx2 = x3 - x2
+    dy1 = y1 - y2
+    dy2 = y3 - y2
+    sumx = x0 - x1 + x2 - x3
+    sumy = y0 - y1 + y2 - y3
+
+    gover = np.array([[sumx, dx2],
+                    [sumy, dy2]])
+
+    g_under= np.array([[dx1, dx2 ],
+                    [dy1, dy2 ]])
+
+    gunder = np.linalg.det(g_under)
+                    
+    hover = np.array([[dx1, sumx],
+                    [dy1, sumy]])
+
+    hunder= gunder
+
+    g = np.linalg.det(gover)/gunder
+    h = np.linalg.det(hover)/hunder
+    i = 1.0
+
+    a = x1 - x0 + g*x1
+    b = x3 - x0 + h*x3
+    c = x0
+    d = y1 - y0 + g*y1
+    e = y3 - y0 + h*y3
+    f = y0
+
+    A = e*i - f*h
+    B = c*h - b*i
+    C = b*f - c*e
+    D = f*g - d*i
+    E = a*i - c*g
+    F = c*d - a*f
+    G = d*h - e*g
+    H = b*g - a*h
+    I = a*e - b*d
+
+    pnx = (A*px + B*py + C)/(G*px + H*py + I)
+    pny = (D*px + E*py + F)/(G*px + H*py + I)
+
+    return (pnx, pny)

@@ -60,35 +60,116 @@ def forward(
 
     method = model["opts"]["method"]
     degree = model["opts"]["degree"]
-    dim = model["opts"]["dimension"]
-    dt = model["timeaxis"]["dt"]
-    tf = model["timeaxis"]["tf"]
+    dim    = model["opts"]["dimension"]
+    dt     = model["timeaxis"]["dt"]
+    tf     = model["timeaxis"]["tf"]
     nspool = model["timeaxis"]["nspool"]
     fspool = model["timeaxis"]["fspool"]
     delay  = model["acquisition"]["delay"]
     dstep  = int(delay / dt)  # number of timesteps with source
-    PML = model["BCs"]["status"]
+    PML    = model["BCs"]["status"]
+    nt     = int(tf / dt)  # number of timesteps
     excitations.current_source = source_num
-    if PML:
-        Lx = model["mesh"]["Lx"]
-        Lz = model["mesh"]["Lz"]
-        lx = model["BCs"]["lx"]
-        lz = model["BCs"]["lz"]
-        x1 = 0.0
-        x2 = Lx
-        a_pml = lx
-        z1 = 0.0
-        z2 = -Lz
-        c_pml = lz
-        if dim == 3:
-            Ly = model["mesh"]["Ly"]
-            ly = model["BCs"]["ly"]
-            y1 = 0.0
-            y2 = Ly
-            b_pml = ly
+    params  = set_params(method)
+    element = space.FE_method(mesh, method, degree)
 
-    nt = int(tf / dt)  # number of timesteps
+    V = FunctionSpace(mesh, element)
 
+    qr_x, qr_s, _ = quadrature.quadrature_rules(V)
+
+    if dim == 2:
+        z, x = SpatialCoordinate(mesh)
+    elif dim == 3:
+        z, x, y = SpatialCoordinate(mesh)
+
+    u = TrialFunction(V)
+    v = TestFunction(V)
+
+    u_nm1 = Function(V)
+    u_n = Function(V)
+    u_np1 = Function(V)
+
+    if output:
+        outfile = helpers.create_output_file("forward.pvd", comm, source_num)
+
+    t  = 0.0
+    m  = 1/(c*c)
+    m1 = m*((u - 2.0 * u_n + u_nm1) / Constant(dt ** 2)) * v * dx(rule=qr_x)
+    a  = dot(grad(u_n), grad(v)) * dx(rule=qr_x)  # explicit
+    f  = Function(V)
+    nf = 0
+
+    if model["BCs"]["outer_bc"] == "non-reflective":
+        nf = c * ((u_n - u_nm1) / dt) * v * ds(rule=qr_s)
+  
+    h  = CellSize(mesh)
+    FF = m1 + a + nf - (1/(h/degree*h/degree))*f * v * dx(rule=qr_x) 
+    X  = Function(V)
+    B  = Function(V)
+
+    lhs_ = lhs(FF)
+    rhs_ = rhs(FF)
+
+    problem = LinearVariationalProblem(lhs_, rhs_, X)
+    solver  = LinearVariationalSolver(problem, solver_parameters=params)            
+
+    usol_recv = []
+    save_step = 0
+    
+    P            = FunctionSpace(receivers, "DG", 0)
+    interpolator = Interpolator(u_np1, P)
+    J0           = 0.0 
+    
+    for step in range(nt):
+
+        excitations.apply_source(f, wavelet[step])
+        
+        solver.solve()
+        u_np1.assign(X)
+
+        rec = Function(P)
+        interpolator.interpolate(output=rec)
+        
+        fwi        = kwargs.get("fwi")
+        p_true_rec = kwargs.get("true_rec")
+        
+        usol_recv.append(rec.dat.data) 
+
+        if fwi:
+            J0 += calc_objective_func(
+                rec,
+                p_true_rec[step],
+                step,
+                dt,
+                P)
+
+        if step % nspool == 0:
+            assert (
+                norm(u_n) < 1
+            ), "Numerical instability. Try reducing dt or building the mesh differently"
+            if output:
+                outfile.write(u_n, time=t, name="Pressure")
+            if t > 0:
+                helpers.display_progress(comm, t)
+
+        u_nm1.assign(u_n)
+        u_n.assign(u_np1)
+
+        t = step * float(dt)
+    
+    if fwi:
+        return usol_recv, J0
+    else:
+        return usol_recv
+
+
+def calc_objective_func(p_rec,p_true_rec, IT, dt,P):
+    true_rec             = Function(P)
+    true_rec.dat.data[:] = p_true_rec
+    J = 0.5 * assemble(inner(true_rec-p_rec, true_rec-p_rec) * dx)
+    return J
+
+def set_params(method):
     if method == "KMV":
         params = {"ksp_type": "preonly", "pc_type": "jacobi"}
     elif (
@@ -103,229 +184,5 @@ def forward(
         params = {"ksp_type": "preonly", "pc_type": "jacobi"}
     else:
         raise ValueError("method is not yet supported")
-
-    element = space.FE_method(mesh, method, degree)
-
-    V = FunctionSpace(mesh, element)
-
-    qr_x, qr_s, _ = quadrature.quadrature_rules(V)
-
-    if dim == 2:
-        z, x = SpatialCoordinate(mesh)
-    elif dim == 3:
-        z, x, y = SpatialCoordinate(mesh)
-
-    if PML:
-        Z = VectorFunctionSpace(V.ufl_domain(), V.ufl_element())
-        if dim == 2:
-            W = V * Z
-            u, pp = TrialFunctions(W)
-            v, qq = TestFunctions(W)
-
-            u_np1, pp_np1 = Function(W).split()
-            u_n, pp_n = Function(W).split()
-            u_nm1, pp_nm1 = Function(W).split()
-
-        elif dim == 3:
-            W = V * V * Z
-            u, psi, pp = TrialFunctions(W)
-            v, phi, qq = TestFunctions(W)
-
-            u_np1, psi_np1, pp_np1 = Function(W).split()
-            u_n, psi_n, pp_n = Function(W).split()
-            u_nm1, psi_nm1, pp_nm1 = Function(W).split()
-
-        if dim == 2:
-            sigma_x, sigma_z = damping.functions(
-                model, V, dim, x, x1, x2, a_pml, z, z1, z2, c_pml
-            )
-            Gamma_1, Gamma_2 = damping.matrices_2D(sigma_z, sigma_x)
-            pml1 = (
-                (sigma_x + sigma_z)
-                * ((u - u_nm1) / Constant(2.0 * dt))
-                * v
-                * dx(rule=qr_x)
-            )
-        elif dim == 3:
-
-            sigma_x, sigma_y, sigma_z = damping.functions(
-                model,
-                V,
-                dim,
-                x,
-                x1,
-                x2,
-                a_pml,
-                z,
-                z1,
-                z2,
-                c_pml,
-                y,
-                y1,
-                y2,
-                b_pml,
-            )
-            Gamma_1, Gamma_2, Gamma_3 = damping.matrices_3D(sigma_x, sigma_y, sigma_z)
-
-    # typical CG FEM in 2d/3d
-    else:
-        u = TrialFunction(V)
-        v = TestFunction(V)
-
-        u_nm1 = Function(V)
-        u_n = Function(V)
-        u_np1 = Function(V)
-
-    if output:
-        outfile = helpers.create_output_file("forward.pvd", comm, source_num)
-
-    t = 0.0
-
-    # -------------------------------------------------------
-    m1 = ((u - 2.0 * u_n + u_nm1) / Constant(dt ** 2)) * v * dx(rule=qr_x)
-    a = c * c * dot(grad(u_n), grad(v)) * dx(rule=qr_x)  # explicit
-
-    position_source = model["acquisition"]["source_pos"][0]
-    freq = model["acquisition"]["frequency"]
-    RW   = full_ricker_wavelet(dt, tf, freq)
-    f, ricker = external_forcing(RW,mesh,position_source,V)
-        
-    nf = 0
-    if model["BCs"]["outer_bc"] == "non-reflective":
-        nf = c * ((u_n - u_nm1) / dt) * v * ds(rule=qr_s)
-
-    FF = m1 + a + nf - f * v * dx(rule=qr_x) 
-
-    if PML:
-        X = Function(W)
-        B = Function(W)
-
-        if dim == 2:
-            pml2 = sigma_x * sigma_z * u_n * v * dx(rule=qr_x)
-            pml3 = inner(pp_n, grad(v)) * dx(rule=qr_x)
-            FF += pml1 + pml2 + pml3
-            # -------------------------------------------------------
-            mm1 = (dot((pp - pp_n), qq) / Constant(dt)) * dx(rule=qr_x)
-            mm2 = inner(dot(Gamma_1, pp_n), qq) * dx(rule=qr_x)
-            dd = c * c * inner(grad(u_n), dot(Gamma_2, qq)) * dx(rule=qr_x)
-            FF += mm1 + mm2 + dd
-        elif dim == 3:
-            pml1 = (
-                (sigma_x + sigma_y + sigma_z)
-                * ((u - u_n) / Constant(dt))
-                * v
-                * dx(rule=qr_x)
-            )
-            pml2 = (
-                (sigma_x * sigma_y + sigma_x * sigma_z + sigma_y * sigma_z)
-                * u_n
-                * v
-                * dx(rule=qr_x)
-            )
-            pml3 = (sigma_x * sigma_y * sigma_z) * psi_n * v * dx(rule=qr_x)
-            pml4 = inner(pp_n, grad(v)) * dx(rule=qr_x)
-
-            FF += pml1 + pml2 + pml3 + pml4
-            # -------------------------------------------------------
-            mm1 = (dot((pp - pp_n), qq) / Constant(dt)) * dx(rule=qr_x)
-            mm2 = inner(dot(Gamma_1, pp_n), qq) * dx(rule=qr_x)
-            dd1 = c * c * inner(grad(u_n), dot(Gamma_2, qq)) * dx(rule=qr_x)
-            dd2 = -c * c * inner(grad(psi_n), dot(Gamma_3, qq)) * dx(rule=qr_x)
-
-            FF += mm1 + mm2 + dd1 + dd2
-            # -------------------------------------------------------
-            mmm1 = (dot((psi - psi_n), phi) / Constant(dt)) * dx(rule=qr_x)
-            uuu1 = (-u_n * phi) * dx(rule=qr_x)
-
-            FF += mmm1 + uuu1
-    else:
-        X = Function(V)
-        B = Function(V)
-
-    lhs_ = lhs(FF)
-    rhs_ = rhs(FF)
-
-    problem = LinearVariationalProblem(lhs_, rhs_, X)
-    solver  = LinearVariationalSolver(problem, solver_parameters=params)            
-
-    usol_recv = []
-    save_step = 0
     
-    P            = FunctionSpace(receivers, "DG", 0)
-    interpolator = Interpolator(u_np1, P)
-    J0           = 0.0
-        
-    for step in range(nt):
-        if step < dstep:
-            ricker.assign(RW[step]*2000)
-        elif step == dstep:
-            ricker.assign(0.0)
-
-        solver.solve()
-        u_np1.assign(X)
-        if PML:
-            if dim == 2:
-                u_np1, pp_np1 = X.split()
-            elif dim == 3:
-                u_np1, psi_np1, pp_np1 = X.split()
-
-                psi_nm1.assign(psi_n)
-                psi_n.assign(psi_np1)
-
-            pp_nm1.assign(pp_n)
-            pp_n.assign(pp_np1)
-        else:
-            u_np1.assign(X)
-
-        rec = Function(P)
-        interpolator.interpolate(output=rec)
-        
-        fwi        = kwargs.get("fwi")
-        p_true_rec = kwargs.get("true_rec")
-        
-        usol_recv.append(rec.dat.data) 
-
-        if fwi:
-            J0 += objective_func(
-                rec,
-                p_true_rec[step],
-                step,
-                dt,
-                P)
-
-        if step % nspool == 0:
-            assert (
-                norm(u_n) < 1
-            ), "Numerical instability. Try reducing dt or building the mesh differently"
-            if output:
-                outfile.write(u_n, time=t, name="Pressure")
-            #if t > 0:
-                #helpers.display_progress(comm, t) FIXME uncoment it
-
-        u_nm1.assign(u_n)
-        u_n.assign(u_np1)
-
-        t = step * float(dt)
-
-    if fwi:
-        return usol_recv, J0
-    else:
-        return usol_recv
-
-def external_forcing(RW, mesh,position_source,V):
-    print(position_source)
-    z, x       = SpatialCoordinate(mesh)
-    source     = Constant(position_source)
-    delta      = Interpolator(delta_expr(source, z, x,sigma_x=2000), V)
-    excitation = Function(delta.interpolate())
-    ricker     = Constant(0)
-    f          = excitation * ricker
-    ricker.assign(RW[0], annotate=True)
-
-    return f, ricker
-
-def objective_func(p_rec,p_true_rec, IT, dt,P):
-    true_rec = Function(P)
-    true_rec.dat.data[:] = p_true_rec
-    J = 0.5 * assemble(inner(true_rec-p_rec, true_rec-p_rec) * dx)
-    return J
+    return params

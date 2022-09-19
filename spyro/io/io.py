@@ -17,7 +17,7 @@ def ensemble_save(func):
     """Decorator for read and write shots for ensemble parallelism"""
     def wrapper(*args, **kwargs):
         acq = args[0].get("acquisition")
-        num = acq["num_sources"]
+        num = len(acq["source_pos"])
         _comm = args[1]
         custom_file_name = kwargs.get('file_name')
         for snum in range(num):
@@ -33,7 +33,7 @@ def ensemble_load(func):
     """Decorator for read and write shots for ensemble parallelism"""
     def wrapper(*args, **kwargs):
         acq = args[0].get("acquisition")
-        num = acq["num_sources"]
+        num = len(acq["source_pos"])
         _comm = args[1]
         custom_file_name = kwargs.get('file_name')
         for snum in range(num):
@@ -50,7 +50,7 @@ def ensemble_plot(func):
     """Decorator for `plot_shots` to distribute shots for ensemble parallelism"""
     def wrapper(*args, **kwargs):
         acq = args[0].get("acquisition")
-        num = acq["num_sources"]
+        num = len(acq["source_pos"])
         _comm = args[1]
         for snum in range(num):
             if is_owner(_comm, snum) and _comm.comm.rank == 0:
@@ -63,7 +63,7 @@ def ensemble_forward(func):
     """Decorator for forward to distribute shots for ensemble parallelism"""
     def wrapper(*args, **kwargs):
         acq = args[0].get("acquisition")
-        num = acq["num_sources"]
+        num = len(acq["source_pos"])
         _comm = args[2]
         for snum in range(num):
             if is_owner(_comm, snum):
@@ -73,11 +73,29 @@ def ensemble_forward(func):
     return wrapper
 
 
+def ensemble_forward_ad(func):
+    """Decorator for forward to distribute shots for ensemble parallelism"""
+    def wrapper(*args, **kwargs):
+        acq = args[0].get("acquisition")
+        num = len(acq["source_pos"])
+        fwi = kwargs.get("fwi")
+        _comm = args[2]
+        for snum in range(num):
+            if is_owner(_comm, snum):
+                if fwi:
+                    u_r, J = func(*args, **dict(kwargs, source_num=snum))
+                    return u_r, J
+                else:
+                    u_r = func(*args, **dict(kwargs, source_num=snum))
+
+    return wrapper
+
+
 def ensemble_forward_elastic_waves(func):
     """Decorator for forward elastic waves to distribute shots for ensemble parallelism"""
     def wrapper(*args, **kwargs):
         acq = args[0].get("acquisition")
-        num = acq["num_sources"]
+        num = len(acq["source_pos"])
         _comm = args[2]
         for snum in range(num):
             if is_owner(_comm, snum):
@@ -92,7 +110,7 @@ def ensemble_gradient(func):
     def wrapper(*args, **kwargs):
         acq = args[0].get("acquisition")
         save_adjoint = kwargs.get("save_adjoint")
-        num = acq["num_sources"]
+        num = len(acq["source_pos"])
         _comm = args[2]
         for snum in range(num):
             if is_owner(_comm, snum):
@@ -111,7 +129,7 @@ def ensemble_gradient_elastic_waves(func):
     def wrapper(*args, **kwargs):
         acq = args[0].get("acquisition")
         save_adjoint = kwargs.get("save_adjoint")
-        num = acq["num_sources"]
+        num = len(acq["source_pos"])
         _comm = args[2]
         for snum in range(num):
             if is_owner(_comm, snum):
@@ -361,7 +379,7 @@ def read_mesh(model, ens_comm, distribution_parameters=None):
     method = model["opts"]["method"]
     degree = model["opts"]["degree"]
 
-    num_sources = model["acquisition"]["num_sources"]
+    num_sources = len(model["acquisition"]["source_pos"])
     mshname = model["mesh"]["meshfile"]
 
     if distribution_parameters == None:

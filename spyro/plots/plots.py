@@ -24,7 +24,6 @@ def plot_shots(
     """Plot a shot record and save the image to disk. Note that
     this automatically will rename shots when ensmeble paralleism is
     activated.
-
     Parameters
     ----------
     model: `dictionary`
@@ -47,11 +46,9 @@ def plot_shots(
         The index of the first receiver to plot
     end_index: integer, optional
         The index of the last receiver to plot
-
     Returns
     -------
     None
-
     """
 
     num_recvs = model["acquisition"]["num_receivers"]
