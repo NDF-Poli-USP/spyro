@@ -1,5 +1,6 @@
 import numpy as np
 import spyro
+import shutil
 import SeismicMesh
 
 def create_3d_grid(start, end, num):
@@ -96,6 +97,7 @@ def create_model_2D_homogeneous(grid_point_calculator_parameters, degree):
     # Choose method and parameters
     model["opts"] = {
         "method": method,
+        "quadrature": "KMV",
         "variant": None,
         "element": "tria",  # tria or tetra
         "degree": degree,  # p order
@@ -206,7 +208,15 @@ def create_model_2D_heterogeneous(grid_point_calculator_parameters, degree):
     source_z = -1.0
     source_x = Real_Lx/2.
     source_coordinates = [(source_z,source_x)]
-    SeismicMesh.write_velocity_model(velocity_model, ofname = 'velocity_models/gridsweepcalc')
+    if velocity_model != None:
+        if velocity_model[-4:] == "segy":
+            SeismicMesh.write_velocity_model(velocity_model, ofname = 'velocity_models/gridsweepcalc')
+        elif velocity_model[-4:] == "hdf5":
+            shutil.copy(velocity_model,'velocity_models/gridsweepcalc.hdf5' )
+        else:
+            raise ValueError("Velocity model filetype not recognized.")
+    else:
+        print("Warning: running without a velocity model is suitable for testing purposes only.", flush = True)
     padz = pad
     padx = pad
     

@@ -1,7 +1,6 @@
 from .forward import forward
 from .forward_AD import forward as forward_AD
 from .forward_elastic_waves import forward_elastic_waves
-from .forward_elastic_waves_AD import forward_elastic_waves as forward_elastic_waves_AD
 from .gradient import gradient
 from .gradient_elastic_waves import gradient_elastic_waves
 

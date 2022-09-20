@@ -48,10 +48,8 @@ acquisition = {
     "source_type": "Ricker",
     "frequency": 5.0,
     "delay": 1.0,
-    "num_sources": 1,
     "source_pos": [(1.5, -0.5)],
     "amplitude": 1.0,
-    "num_receivers": 100,
     "receiver_locations": create_transect((0.1, -2.90), (2.9, -2.90), 100),
 }
 
@@ -67,6 +65,9 @@ inversion = {
     "freq_bands": [None]
 }  # cutoff frequencies (Hz) for Ricker source and to low-pass the observed shot record
 
+aut_dif = {
+    "status": False, 
+}
 
 # Create your model with all the options
 model = {
@@ -78,4 +79,5 @@ model = {
     "mesh": mesh,
     "acquisition": acquisition,
     "timeaxis": timeaxis,
+    "aut_dif": aut_dif,
 }

@@ -52,6 +52,7 @@ def functions(
             0.0,
         )
     )
+    sigma_x = Function(V, name="sigma_x").interpolate(aux1 + aux2)
 
     # Sigma Z
     tol_z = 1.000001
@@ -64,7 +65,6 @@ def functions(
         )
     )
 
-    sigma_x = Function(V, name="sigma_x").interpolate(aux1 + aux2)
     sigma_z = Function(V, name="sigma_z").interpolate(aux1)
 
     # sgm_x = File("pmlField/sigma_x.pvd")  # , target_degree=1, target_continuity=H1
@@ -95,11 +95,11 @@ def functions(
         )
         sigma_y = Function(V, name="sigma_y").interpolate(aux1 + aux2)
 
+        
         # sgm_y = File("pmlField/sigma_y.pvd")
         # sgm_y.write(sigma_y)
 
         return (sigma_x, sigma_y, sigma_z)
-
 
 def matrices_2D(sigma_x, sigma_y):
     """Damping matrices for a two-dimensional problem"""

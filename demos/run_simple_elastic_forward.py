@@ -18,7 +18,7 @@ model = {}
 # Choose method and parameters
 model["opts"] = {
     "method": "KMV",  # either CG or KMV
-    "quadratrue": "KMV", # Equi or KMV
+    "quadrature": "KMV", # Equi or KMV
     "degree": 1,  # p order
     "dimension": 2,  # dimension
 }
@@ -131,7 +131,7 @@ wavelet = spyro.full_ricker_wavelet(dt=0.0005, tf=2.0, freq=8.0)
 # Note: simulation results are stored in the folder `~/results/` by default
 start = time.time()
 u_exact, uz_exact, ux_exact, uy_exact = spyro.solvers.forward_elastic_waves(
-    model, mesh, comm, rho, lamb, mu, sources, wavelet, receivers, output=False
+    model, mesh, comm, rho, lamb, mu, sources, wavelet, receivers, output=True
 )
 end = time.time()
 print(round(end - start,2),flush=True)

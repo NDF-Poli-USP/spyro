@@ -1,6 +1,6 @@
 import math
 from copy import deepcopy
-
+import pytest
 import firedrake as fire
 import numpy as np
 from firedrake import Constant, dot, dx, grad
@@ -9,7 +9,6 @@ import spyro
 
 """Read in an external mesh and interpolate velocity to it"""
 from .inputfiles.Model1_2d_CG import model as model
-
 
 def test_ricker_varies_in_time():
     """This test ricker time variation when applied to a time-

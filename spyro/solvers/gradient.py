@@ -235,6 +235,7 @@ def gradient(
 
     gradi = Function(V)
     grad_prob = LinearVariationalProblem(lhsG, rhsG, gradi)
+    
     if method == "KMV":
         grad_solver = LinearVariationalSolver(
             grad_prob,
@@ -278,10 +279,10 @@ def gradient(
                 u_np1, psi_np1, pp_np1 = X.split()
 
                 psi_nm1.assign(psi_n)
-                psi_n.assign(psi_np1)
+                psi_n  .assign(psi_np1)
 
             pp_nm1.assign(pp_n)
-            pp_n.assign(pp_np1)
+            pp_n  .assign(pp_np1)
         else:
             u_np1.assign(X)
 
