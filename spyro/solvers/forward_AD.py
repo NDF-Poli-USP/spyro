@@ -6,7 +6,6 @@ from ..domains import quadrature, space
 from ..pml import damping
 from ..io import ensemble_forward
 from . import helpers
-from ..sources import full_ricker_wavelet, delta_expr
 
 # Note this turns off non-fatal warnings
 set_log_level(ERROR)
