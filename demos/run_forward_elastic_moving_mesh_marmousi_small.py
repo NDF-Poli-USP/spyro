@@ -81,11 +81,13 @@ model["acquisition"] = {
 
 model["timeaxis"] = {
     "t0": 0.0,  #  Initial time for event
-    "tf": 0.00050, # Final time for event 
-    #"tf": 2.5, # Final time for event 
-    "dt": 0.00025,  # timestep size 
+    #"tf": 0.00050, # Final time for event 
+    "tf": 2.5, # Final time for event 
+    #"dt": 0.00025,  # timestep size 
+    "dt": 0.000125,  # timestep size 
     "nspool":  20,  # (20 for dt=0.00050) how frequently to output solution to pvds
-    "fspool": 10,  # how frequently to save solution to RAM
+    #"fspool": 10,  # how frequently to save solution to RAM
+    "fspool": 100000,  # how frequently to save solution to RAM
 }
 #}}}
 # make vp, vs or rho {{{
@@ -146,7 +148,7 @@ comm = spyro.utils.mpi_init(model)
 distribution_parameters={"partition": True,
                          "overlap_type": (DistributedMeshOverlapType.VERTEX, 60)}
 
-REF = 1
+REF = 0
 # run reference model {{{
 if REF:
     nx = 500  # nx=500 => dx = dz = 8 m => N = min(vs)/(dx * max(f)) => N = 5.36 = 300/(8 * 7)  
@@ -194,25 +196,24 @@ if REF:
     )
     end = time.time()
     print(round(end - start,2),flush=True)
-    File("u_ref.pvd").write(u_ref[-1])
+    if len(u_ref)>0:
+        File("u_ref.pvd").write(u_ref[-1])
 
-    #spyro.io.save_shots(model, comm, uz_ref, file_name="/share/tdsantos/shots/elastic_waves_moving_mesh_marmousi_small/uz_ref_recv1") 
-    #spyro.io.save_shots(model, comm, ux_ref, file_name="/share/tdsantos/shots/elastic_waves_moving_mesh_marmousi_small/ux_ref_recv1")
+    spyro.io.save_shots(model, comm, uz_ref, file_name="/share/tdsantos/shots/elastic_waves_moving_mesh_marmousi_small/uz_ref_recv1") 
+    spyro.io.save_shots(model, comm, ux_ref, file_name="/share/tdsantos/shots/elastic_waves_moving_mesh_marmousi_small/ux_ref_recv1")
 
 #}}}
-sys.exit("exit")
+#sys.exit("exit")
 if REF==0: 
     uz_ref = spyro.io.load_shots(model, comm, file_name="/share/tdsantos/shots/elastic_waves_moving_mesh_marmousi_small/uz_ref_recv1")
     ux_ref = spyro.io.load_shots(model, comm, file_name="/share/tdsantos/shots/elastic_waves_moving_mesh_marmousi_small/ux_ref_recv1")
 
 # now, prepare to run with different mesh resolutions
-FIREMESH = 0
+FIREMESH = 1
 # generate or read a mesh {{{
 if FIREMESH: 
     nx = 200
     ny = math.ceil( 100*(model["mesh"]["Lz"]-0.45)/model["mesh"]["Lz"] ) # (Lz-0.45)/Lz
-    nx = 180 # FIXME
-    ny = 64
     mesh = RectangleMesh(nx, ny, model["mesh"]["Lx"], model["mesh"]["Lz"], diagonal="crossed", comm=comm.comm,
                             distribution_parameters=distribution_parameters)
     mesh.coordinates.dat.data[:, 0] -= 0.0 
@@ -230,7 +231,7 @@ else:
     mesh, V = spyro.io.read_mesh(model, comm, distribution_parameters=distribution_parameters)
 #}}}
 
-AMR = 1
+AMR = 0
 # adapt the mesh using the exact vp, if requested {{{
 if AMR:
     nx = 200
@@ -361,7 +362,7 @@ if AMR:
     _vs = _make_field(V_DG, guess=False, field="vs")
     File("vp_after_amr.pvd").write(_vs)
 #}}}
-sys.exit("exit")
+#sys.exit("exit")
 
 sources = spyro.Sources(model, mesh, V, comm)
 receivers = spyro.Receivers(model, mesh, V, comm)
@@ -381,31 +382,32 @@ u, uz, ux, uy = spyro.solvers.forward_elastic_waves(
 )
     
 #FIXME select the receivers first before computing the error 
+if 0:
 
-J_scale = sqrt(1.e14)
-misfit_uz = spyro.utils.evaluate_misfit(model, uz, uz_ref)# ds_exact[:ll] - guess
-misfit_ux = spyro.utils.evaluate_misfit(model, ux, ux_ref)# ds_exact[:ll] - guess
+    J_scale = sqrt(1.e14)
+    misfit_uz = spyro.utils.evaluate_misfit(model, uz, uz_ref)# ds_exact[:ll] - guess
+    misfit_ux = spyro.utils.evaluate_misfit(model, ux, ux_ref)# ds_exact[:ll] - guess
 
-J_total = np.zeros((1))
-J_ref   = np.zeros((1))
-J_total[0] += spyro.utils.compute_functional(model, J_scale * misfit_uz) # J += residual[ti][rn] ** 2 (and J *= 0.5))
-J_total[0] += spyro.utils.compute_functional(model, J_scale * misfit_ux) # J += residual[ti][rn] ** 2 (and J *= 0.5)
+    J_total = np.zeros((1))
+    J_ref   = np.zeros((1))
+    J_total[0] += spyro.utils.compute_functional(model, J_scale * misfit_uz) # J += residual[ti][rn] ** 2 (and J *= 0.5))
+    J_total[0] += spyro.utils.compute_functional(model, J_scale * misfit_ux) # J += residual[ti][rn] ** 2 (and J *= 0.5)
 
-print(J_total[0],flush=True)
+    print(J_total[0],flush=True)
 
-J_ref[0]   += spyro.utils.compute_functional(model, J_scale * uz_ref) # J += p_ref_recv[ti][rn] ** 2 (and J *= 0.5)
-J_ref[0]   += spyro.utils.compute_functional(model, J_scale * ux_ref) # J += p_ref_recv[ti][rn] ** 2 (and J *= 0.5)
+    J_ref[0]   += spyro.utils.compute_functional(model, J_scale * uz_ref) # J += p_ref_recv[ti][rn] ** 2 (and J *= 0.5)
+    J_ref[0]   += spyro.utils.compute_functional(model, J_scale * ux_ref) # J += p_ref_recv[ti][rn] ** 2 (and J *= 0.5)
 
-# divide
-J_total[0] /= J_ref[0]
+    # divide
+    J_total[0] /= J_ref[0]
 
-J_total = COMM_WORLD.allreduce(J_total, op=MPI.SUM)
-J_total[0] /= comm.ensemble_comm.size # paralelismo ensemble (fontes)
-if comm.comm.size > 1:
-    J_total[0] /= comm.comm.size # paralelismo espacial
+    J_total = COMM_WORLD.allreduce(J_total, op=MPI.SUM)
+    J_total[0] /= comm.ensemble_comm.size # paralelismo ensemble (fontes)
+    if comm.comm.size > 1:
+        J_total[0] /= comm.comm.size # paralelismo espacial
 
-E = sqrt(J_total[0]) # relative error as defined in Spyro paper
-print(E, flush=True)
+    E = sqrt(J_total[0]) # relative error as defined in Spyro paper
+    print(E, flush=True)
 
 write_files=1
 if comm.ensemble_comm.rank == 1 and write_files==1:
