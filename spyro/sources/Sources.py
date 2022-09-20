@@ -265,17 +265,10 @@ def full_ricker_wavelet(dt, tf, freq, amp=1.0, cutoff=None):
 
 # def source_dof_finder(space, model):
 
-<<<<<<< HEAD
-    # getting 1 source position
-    source_positions = model["acquisition"]["source_pos"]
-    if len(source_positions) != 1:
-        raise ValueError("Not yet implemented for more than 1 source.")
-=======
 #     # getting 1 source position
 #     source_positions = model["acquisition"]["source_pos"]
 #     if len(source_positions) != 1:
 #         raise ValueError("Not yet implemented for more then 1 source.")
->>>>>>> main
 
 #     mesh = space.mesh()
 #     source_z, source_x = source_positions[0]
@@ -309,7 +302,6 @@ def full_ricker_wavelet(dt, tf, freq, amp=1.0, cutoff=None):
 #     return False
 
 
-<<<<<<< HEAD
 def delta_expr2(x0, z, x, sigma_x=2000.0): # 500 was the original value, but 1000 and 2000 seems better for FWI
     return np.exp(-sigma_x * ((z - x0[0]) ** 2 + (x - x0[1]) ** 2))
 
@@ -317,11 +309,6 @@ def delta_expr2(x0, z, x, sigma_x=2000.0): # 500 was the original value, but 100
 def delta_expr(x0, z, x, sigma_x=500.0):
     sigma_x = Constant(sigma_x)
     return exp(-sigma_x * ((z - x0[0]) ** 2 + (x - x0[1]) ** 2))
-=======
-# def delta_expr(x0, z, x, sigma_x=500.0):
-#     sigma_x = Constant(sigma_x)
-#     return exp(-sigma_x * ((z - x0[0]) ** 2 + (x - x0[1]) ** 2))
->>>>>>> main
 
 
 # def delta_expr_3d(x0, z, x, y, sigma_x=2000.0):
