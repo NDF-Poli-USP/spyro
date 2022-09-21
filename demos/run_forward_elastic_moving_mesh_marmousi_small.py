@@ -146,7 +146,7 @@ def _make_field(V, guess=False, field="vp"):
 #}}}
 comm = spyro.utils.mpi_init(model)
 distribution_parameters={"partition": True,
-                         "overlap_type": (DistributedMeshOverlapType.VERTEX, 60)}
+                         "overlap_type": (DistributedMeshOverlapType.VERTEX, 120)} #60 works for structured mesh
 
 REF = 0
 # run reference model {{{
@@ -209,11 +209,12 @@ if REF==0:
     ux_ref = spyro.io.load_shots(model, comm, file_name="/share/tdsantos/shots/elastic_waves_moving_mesh_marmousi_small/ux_ref_recv1")
 
 # now, prepare to run with different mesh resolutions
-FIREMESH = 1
+FIREMESH = 0
 # generate or read a mesh {{{
 if FIREMESH: 
-    nx = 200
-    ny = math.ceil( 100*(model["mesh"]["Lz"]-0.45)/model["mesh"]["Lz"] ) # (Lz-0.45)/Lz
+    #nx = 200 # nx=200 => dx = dz = 20 m
+    nx = 100 # nx=100 => dx = dz = 40 m
+    ny = math.ceil( nx*model["mesh"]["Lz"]/model["mesh"]["Lx"] ) # nx * Lz/Lx, Delta x = Delta z
     mesh = RectangleMesh(nx, ny, model["mesh"]["Lx"], model["mesh"]["Lz"], diagonal="crossed", comm=comm.comm,
                             distribution_parameters=distribution_parameters)
     mesh.coordinates.dat.data[:, 0] -= 0.0 
@@ -222,20 +223,16 @@ if FIREMESH:
     element = spyro.domains.space.FE_method(mesh, model["opts"]["method"], model["opts"]["degree"])
     V = FunctionSpace(mesh, element)
 else:
-    p = 2
-    M = 7.02
-    #model["mesh"]["meshfile"] = "/share/tdsantos/meshes/fwi_amr_marmousi_small_p=" + str(p) + "_M=" + str(M) + ".msh"
-    #model["mesh"]["meshfile"] = "/share/tdsantos/meshes/marmousi_small_no_water_h_150m.msh"
-    #model["mesh"]["meshfile"] = "/share/tdsantos/meshes/marmousi_small_no_water_h_100m.msh"
-    model["mesh"]["meshfile"] = "/share/tdsantos/meshes/marmousi_small_no_water_h_50m.msh"
+    model["mesh"]["meshfile"] = "/share/tdsantos/meshes/marmousi_small_no_water_h_20m.msh"
+    #model["mesh"]["meshfile"] = "/share/tdsantos/meshes/marmousi_small_no_water_h_40m.msh"
     mesh, V = spyro.io.read_mesh(model, comm, distribution_parameters=distribution_parameters)
 #}}}
 
-AMR = 0
+AMR = 1
 # adapt the mesh using the exact vp, if requested {{{
 if AMR:
     nx = 200
-    ny = math.ceil( 100*(model["mesh"]["Lz"]-0.45)/model["mesh"]["Lz"] ) # (Lz-0.45)/Lz
+    ny = math.ceil( nx*model["mesh"]["Lz"]/model["mesh"]["Lx"] ) # nx * Lz/Lx, Delta x = Delta z
     mesh_grid = RectangleMesh(nx, ny, model["mesh"]["Lx"], model["mesh"]["Lz"], diagonal="crossed", comm=comm.comm,
                             distribution_parameters=distribution_parameters)
     mesh_grid.coordinates.dat.data[:, 0] -= 0.0 
@@ -290,7 +287,7 @@ if AMR:
 
     # smooth the monitor function
     if 1: # {{{
-        lamb = 0.005
+        lamb = 0.0009
 
         u = TrialFunction(V_grid)
         v = TestFunction(V_grid)
@@ -377,14 +374,25 @@ rho = _make_field(V_DG, guess=False, field="rho")
 mu   = Function(V_DG).interpolate(rho * vs ** 2.)
 lamb = Function(V_DG).interpolate(rho * (vp ** 2. - 2. * vs ** 2.))
 
+start = time.time()
 u, uz, ux, uy = spyro.solvers.forward_elastic_waves(
     model, mesh, comm, rho, lamb, mu, sources, wavelet, receivers, output=False
 )
-    
-#FIXME select the receivers first before computing the error 
-if 0:
+end = time.time()
+print(round(end - start,2),flush=True)
+   
 
+#if comm.ensemble_comm.rank == 0 and comm.comm.rank == 0: 
+#    print(uz.shape)
+#    a = uz[:,199:299]
+#    print(a.shape)
+#    print(a)
+
+#sys.exit("exit")
+
+def compute_relative_error(uz, ux, uz_ref, ux_ref):
     J_scale = sqrt(1.e14)
+
     misfit_uz = spyro.utils.evaluate_misfit(model, uz, uz_ref)# ds_exact[:ll] - guess
     misfit_ux = spyro.utils.evaluate_misfit(model, ux, ux_ref)# ds_exact[:ll] - guess
 
@@ -393,11 +401,9 @@ if 0:
     J_total[0] += spyro.utils.compute_functional(model, J_scale * misfit_uz) # J += residual[ti][rn] ** 2 (and J *= 0.5))
     J_total[0] += spyro.utils.compute_functional(model, J_scale * misfit_ux) # J += residual[ti][rn] ** 2 (and J *= 0.5)
 
-    print(J_total[0],flush=True)
-
     J_ref[0]   += spyro.utils.compute_functional(model, J_scale * uz_ref) # J += p_ref_recv[ti][rn] ** 2 (and J *= 0.5)
     J_ref[0]   += spyro.utils.compute_functional(model, J_scale * ux_ref) # J += p_ref_recv[ti][rn] ** 2 (and J *= 0.5)
-
+    
     # divide
     J_total[0] /= J_ref[0]
 
@@ -407,10 +413,54 @@ if 0:
         J_total[0] /= comm.comm.size # paralelismo espacial
 
     E = sqrt(J_total[0]) # relative error as defined in Spyro paper
-    print(E, flush=True)
+
+    return E
+
+# retrieve UZ on the receivers
+uz_rec1 = uz[:,0:100] 
+uz_rec2 = uz[:,100:200] 
+uz_rec3 = uz[:,200:300] 
+uz_ref_rec1 = uz_ref[:,0:100] 
+uz_ref_rec2 = uz_ref[:,100:200] 
+uz_ref_rec3 = uz_ref[:,200:300] 
+
+# retrieve UX on the receivers
+ux_rec1 = ux[:,0:100]
+ux_rec2 = ux[:,100:200]
+ux_rec3 = ux[:,200:300]
+ux_ref_rec1 = ux_ref[:,0:100]
+ux_ref_rec2 = ux_ref[:,100:200]
+ux_ref_rec3 = ux_ref[:,200:300]
+
+#if comm.ensemble_comm.rank == 0 and comm.comm.rank == 0: 
+#    print(uz_rec1.shape)
+#    print(uz_ref_rec1.shape)
+#sys.exit("exit")
+
+# compute the relative errors on each set of receivers 
+# FIXME maybe modify it on utils.compute_functional
+model["acquisition"]["receiver_locations"] = rec1
+E_rec1 = compute_relative_error(uz_rec1, ux_rec1, uz_ref_rec1, ux_ref_rec1)
+
+model["acquisition"]["receiver_locations"] = rec2
+E_rec2 = compute_relative_error(uz_rec2, ux_rec2, uz_ref_rec2, ux_ref_rec2)
+
+model["acquisition"]["receiver_locations"] = rec3
+E_rec3 = compute_relative_error(uz_rec3, ux_rec3, uz_ref_rec3, ux_ref_rec3)
+
+model["acquisition"]["receiver_locations"] = rec
+E_total = compute_relative_error(uz, ux, uz_ref, ux_ref)
+        
+   
+if comm.ensemble_comm.rank == 1:
+    print("E total (%) = " + str(round(E_total*100,2)), flush=True)
+    print("E rec1 (%) = "  + str(round(E_rec1*100,2)), flush=True)
+    print("E rec2 (%) = "  + str(round(E_rec2*100,2)), flush=True)
+    print("E rec3 (%) = "  + str(round(E_rec3*100,2)), flush=True)
+    
 
 write_files=1
-if comm.ensemble_comm.rank == 1 and write_files==1:
+if comm.ensemble_comm.rank == 0 and write_files==1:
     uz_rec_ref = []
     uz_rec = []
     nt = int(model["timeaxis"]["tf"] / model["timeaxis"]["dt"])
