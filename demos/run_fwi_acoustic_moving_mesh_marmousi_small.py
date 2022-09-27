@@ -196,7 +196,7 @@ def _cut_marmousi(minz, maxz, minx, maxx, smooth=False, field="velocity_model"):
         plt.show()
     #}}}
 
-if True:
+if False:
     # 4x2 middle of the domain
     minz = -2.0 
     maxz =  0.0
@@ -297,7 +297,7 @@ if False:
     sys.exit("exit")
 #}}}
 # run exact model with a finer mesh {{{
-if False:
+if True:
     mesh_x = RectangleMesh(50, 25, model["mesh"]["Lx"], model["mesh"]["Lz"], diagonal="crossed", comm=comm.comm,
                             distribution_parameters=distribution_parameters)
     mesh_x.coordinates.dat.data[:, 0] -= 0.0 
@@ -334,7 +334,7 @@ model["mesh"]["meshfile"] = "./meshes/fwi_amr_marmousi_small_p=" + str(p) + "_M=
 mesh_x, V_x = spyro.io.read_mesh(model, comm, distribution_parameters=distribution_parameters)# mesh that will be adapted
 
 # adapt the mesh using the exact vp, if requested {{{
-if True:
+if False:
     #_mesh_xi, _V_xi = spyro.io.read_mesh(model, comm, distribution_parameters=distribution_parameters)# computational mesh
     mesh_x = RectangleMesh(45, 25, model["mesh"]["Lx"], model["mesh"]["Lz"], diagonal="crossed", comm=comm.comm,
                             distribution_parameters=distribution_parameters)
@@ -593,7 +593,7 @@ tol = 1.0e-03
 Ji=[]
 ii=[]
 m_type = 2 # monitor type
-adapt_mesh = True 
+adapt_mesh = False 
 mesh_moved = True
 outfile = File("final_vp.pvd")
 max_loop_it = 10 # the number of iteration here depends on the max iteration of ROL
