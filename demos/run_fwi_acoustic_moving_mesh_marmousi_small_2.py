@@ -1,6 +1,5 @@
 from firedrake import *
 from scipy.optimize import * 
-from movement import *
 import spyro
 import time
 import sys
@@ -88,7 +87,8 @@ model["timeaxis"] = {
 # make vp {{{
 def _make_vp(V, vp_guess=False, field="velocity_model"):
     
-    path = "./velocity_models/elastic-marmousi-model/model/"
+    #path = "./velocity_models/elastic-marmousi-model/model/"
+    path = "/share/tdsantos/velocity_models/elastic-marmousi-model/model/"
     if vp_guess: # interpolate from a smoothed field
         fname = path + "MODEL_P-WAVE_VELOCITY_1.25m_small_domain_smoothed_sigma=300.segy.hdf5" # domain 4 x 2 km2 (x, y) 
     else: # interpolate from the exact field
@@ -179,7 +179,8 @@ if FIREMESH:
 else:
     #model["mesh"]["meshfile"] = "./meshes/marmousi_small_no_water_h_150m.msh"
     #model["mesh"]["meshfile"] = "./meshes/marmousi_small_no_water_h_100m.msh"
-    model["mesh"]["meshfile"] = "./meshes/marmousi_small_no_water_h_50m.msh"
+    #model["mesh"]["meshfile"] = "./meshes/marmousi_small_no_water_h_50m.msh"
+    model["mesh"]["meshfile"] = "/share/tdsantos/meshes/marmousi_small_no_water_h_50m.msh"
     mesh, V = spyro.io.read_mesh(model, comm, distribution_parameters=distribution_parameters)
 #}}}
 
@@ -220,7 +221,7 @@ if AMR:
     E2 = vp_grid.vector().gather().max() / vp_grid - 1 # a priori error estimate (it starts on 1, so it could be better)
 
     E = E1
-    beta = 0.4 # (0, 1) # for E2 + smooth
+    beta = 0.5 # (0, 1) # for E2 + smooth
     phi = sqrt( 1 + E*E ) - 1
     phi_hat = assemble(phi*dx(domain=mesh_grid)) / assemble(Constant(1.0)*dx(domain=mesh_grid))
     alpha = beta / ( phi_hat * ( 1 - beta ) )
@@ -377,19 +378,20 @@ class Objective(ROL.Objective):
         if comm.comm.size > 1:
             J_total[0] /= comm.comm.size # paralelismo espacial
 
-        pe=[]
-        pg=[]
-        nt = int(model["timeaxis"]["tf"] / model["timeaxis"]["dt"])
-        rn = 5
-        for ti in range(nt):
-            pe.append(self.p_exact_recv[ti][rn])
-            pg.append(p_guess_recv[ti][rn])
-        plt.title("p")
-        plt.plot(pe,label='exact')
-        plt.plot(pg,label='guess')
-        plt.legend()
-        plt.savefig('/home/santos/Desktop/FWI_acoustic.png')
-        plt.close()
+        if 0:
+            pe=[]
+            pg=[]
+            nt = int(model["timeaxis"]["tf"] / model["timeaxis"]["dt"])
+            rn = 5
+            for ti in range(nt):
+                pe.append(self.p_exact_recv[ti][rn])
+                pg.append(p_guess_recv[ti][rn])
+            plt.title("p")
+            plt.plot(pe,label='exact')
+            plt.plot(pg,label='guess')
+            plt.legend()
+            plt.savefig('/home/santos/Desktop/FWI_acoustic.png')
+            plt.close()
 
         self.J = J_total[0]
 
@@ -484,8 +486,8 @@ obj = Objective(inner_product)
 Ji=[]
 ii=[]
 outfile = File("final_vp.pvd")
-max_loop_it = 1 # the number of iteration here depends on the max iteration of ROL
-max_rol_it = 15
+max_loop_it = 5 # the number of iteration here depends on the max iteration of ROL
+max_rol_it = 10
 
 for i in range(max_loop_it):
     print("###### Loop iteration ="+str(i), flush=True)
@@ -508,7 +510,8 @@ for i in range(max_loop_it):
 
 outfile.write(obj.vp,time=i)
 if COMM_WORLD.rank == 0:
-    with open(r'J.txt', 'w') as fp:
+    with open(r'J_with_amr.txt', 'w') as fp:
+    #with open(r'J_no_amr.txt', 'w') as fp:
         for j in Ji:
             # write each item on a new line
             fp.write("%s\n" % str(j))
