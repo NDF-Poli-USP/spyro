@@ -179,12 +179,13 @@ if REF:
 
     spyro.io.save_shots(model, comm, p_ref_recv, file_name=path+file_name) 
 
+    _h = round(1000*model["mesh"]["Lx"]/_nx)
     if comm.ensemble_comm.rank == 1:
         print("Reference model:", flush=True)
         print("p = " + str(model["opts"]["degree"]))
-        print("h = " + str(h) + " m")
-        print("DOF = " + str(V.dof_count), flush=True)
-        print("Nelem = " + str(mesh.num_cells()), flush=True) 
+        print("h = " + str(_h) + " m")
+        print("DOF = " + str(V_ref.dof_count), flush=True)
+        print("Nelem = " + str(mesh_ref.num_cells()), flush=True) 
 
     sys.exit("Reference model finished!")
 
