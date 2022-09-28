@@ -1,3 +1,4 @@
+# run_forward_acoustic_moving_mesh_marmousi_small.py
 from firedrake import *
 from scipy.optimize import * 
 from movement import *
@@ -20,6 +21,7 @@ from scipy.interpolate import RegularGridInterpolator
 from scipy.interpolate import griddata
 from spyro.io import write_function_to_grid, create_segy
 #from ..domains import quadrature, space
+import platform
 
 # define the model parameters {{{
 model = {}
@@ -28,6 +30,8 @@ model["opts"] = {
     "method": "KMV",  # either CG or KMV
     "quadrature": "KMV", # Equi or KMV #FIXME it will be removed
     "degree": 2,  # p order
+    #"degree": 3,  # p order
+    #"degree": 4,  # p order
     "dimension": 2,  # dimension
     "regularization": False,  # regularization is on?
     "gamma": 1e-5, # regularization parameter
@@ -64,19 +68,21 @@ model["BCs"] = {
     "ly": 0.0,  # thickness of the pml in the y-direction (km) - always positive
 }
 
+# Receiver locations
+rec1=spyro.create_transect((0.1, -0.10-0.45), (3.9, -0.10-0.45), 100) # waterbottom at z=-0.45 km REC1)
+rec2=spyro.create_transect((0.1, -1.9), (3.9, -1.9), 100) # receivers at the bottom of the domain (z=-1.9 km) REC2
+rec3=np.array(spyro.create_2d_grid(1, 3, -1.4, -1, 10)) # receivers at the middle of the domain
+rec = np.concatenate((rec1,rec2,rec3))
+
 model["acquisition"] = {
     "source_type": "Ricker",
-    "frequency": 3.0, # 3 Hz for sigma=300, 5 Hz for sigma=100 
-    #"frequency": 5.0, # 3 Hz for sigma=300, 5 Hz for sigma=100 
-    #"frequency": 7.0, # 3 Hz for sigma=300, 5 Hz for sigma=100 
+    "frequency": 6.0, # freq peak = 6 Hz, max freq = 15 Hz (see Jaquet's  Thesis) 
     "delay": 1.0, # FIXME check this
     "num_sources": 4, #FIXME not used (remove it, and update an example script)
     "source_pos": spyro.create_transect((0.5, -0.01-0.45), (3.5, -0.01-0.45), 4), # waterbottom at z=-0.45 km
     "amplitude": 1.0, #FIXME check this
-    "num_receivers": 100, #FIXME not used (remove it, and update an example script)
-    #"receiver_locations": spyro.create_transect((0.1, -0.10-0.45), (3.9, -0.10-0.45), 100), # waterbottom at z=-0.45 km REC1
-    #"receiver_locations": spyro.create_transect((0.1, -1.9), (3.9, -1.9), 100), # receivers at the bottom of the domain (z=-1.9 km) REC2 
-    "receiver_locations": spyro.create_2d_grid(1, 3, -1.4, -1, 10) # 10^2 points REC3
+    "num_receivers": len(rec), #FIXME not used (remove it, and update an example script)
+    "receiver_locations": rec, 
 }
 
 model["timeaxis"] = {
@@ -84,13 +90,17 @@ model["timeaxis"] = {
     "tf": 2.5, # Final time for event 
     "dt": 0.00025,  # timestep size 
     "nspool":  20,  # (20 for dt=0.00050) how frequently to output solution to pvds
-    "fspool": 10,  # how frequently to save solution to RAM
+    "fspool": 10000000,  # how frequently to save solution to RAM
 }
 #}}}
 # make vp {{{
 def _make_vp(V, vp_guess=False, field="velocity_model"):
+   
+    if platform.node()=='recruta':
+        path = "./velocity_models/elastic-marmousi-model/model/"
+    else:
+        path = "/share/tdsantos/velocity_models/elastic-marmousi-model/model/"
     
-    path = "./velocity_models/elastic-marmousi-model/model/"
     if vp_guess: # interpolate from a smoothed field
         fname = path + "MODEL_P-WAVE_VELOCITY_1.25m_small_domain_smoothed_sigma=300.segy.hdf5" # domain 4 x 2 km2 (x, y) 
     else: # interpolate from the exact field
@@ -125,12 +135,18 @@ comm = spyro.utils.mpi_init(model)
 distribution_parameters={"partition": True,
                          "overlap_type": (DistributedMeshOverlapType.VERTEX, 60)}
 
+file_name = "p_ref_recv_freq_"+str(model["acquisition"]["frequency"])
+if platform.node()=='recruta':
+    path = "./shots/acoustic_forward_marmousi_small/" 
+else:
+    path = "/share/tdsantos/shots/acoustic_forward_marmousi_small/"
+
 REF = 0
 # run reference model {{{
 if REF:
-    nx = 200
-    ny = math.ceil( 100*(model["mesh"]["Lz"]-0.45)/model["mesh"]["Lz"] ) # (Lz-0.45)/Lz
-    
+    nx = 200  # nx=200  => dx = dz = 20 m
+    ny = math.ceil( nx*model["mesh"]["Lz"]/model["mesh"]["Lx"] ) # nx * Lz/Lx, Delta x = Delta z
+
     mesh_ref = RectangleMesh(nx, ny, model["mesh"]["Lx"], model["mesh"]["Lz"], diagonal="crossed", comm=comm.comm,
                             distribution_parameters=distribution_parameters)
     mesh_ref.coordinates.dat.data[:, 0] -= 0.0 
@@ -138,18 +154,19 @@ if REF:
 
     # for the exact model, use a higher-order element
     #p = model["opts"]["degree"] # to keep the order defined by the user
-    #model["opts"]["degree"] = 4
+    model["opts"]["degree"] = 5
     element = spyro.domains.space.FE_method(mesh_ref, model["opts"]["method"], model["opts"]["degree"])
     V_ref = FunctionSpace(mesh_ref, element)
 
-    element_DG = spyro.domains.space.FE_method(mesh_ref, "DG", 2) # here, it could be 2 too
-    V_DG = FunctionSpace(mesh_ref, element_DG)
+    #element_DG = spyro.domains.space.FE_method(mesh_ref, "DG", 2) # here, it could be 2 too
+    #V_DG = FunctionSpace(mesh_ref, element_DG)
 
     sources = spyro.Sources(model, mesh_ref, V_ref, comm)
     receivers = spyro.Receivers(model, mesh_ref, V_ref, comm)
     wavelet = spyro.full_ricker_wavelet(dt=model["timeaxis"]["dt"], tf=model["timeaxis"]["tf"], freq=model["acquisition"]["frequency"])
 
-    vp_ref = _make_vp(V_DG, vp_guess=False)
+    #vp_ref = _make_vp(V_DG, vp_guess=False)
+    vp_ref = _make_vp(V_ref, vp_guess=False) 
     #sys.exit("exit")
     print("Starting forward computation of the exact model",flush=True) 
     start = time.time()
@@ -158,26 +175,37 @@ if REF:
     )
     end = time.time()
     print(round(end - start,2),flush=True)
-    File("p_ref.pvd").write(p_ref[-1])
+    if 0:
+        File("p_ref.pvd").write(p_ref[-1])
 
-    spyro.io.save_shots(model, comm, p_ref_recv, file_name="./shots/acoustic_forward_marmousi_small/p_ref_recv3")
-    # ok, reset to the original order
-    #model["opts"]["degree"] = p
-    #print(model["opts"]["degree"])
-    #sys.exit("exit")
+    spyro.io.save_shots(model, comm, p_ref_recv, file_name=path+file_name) 
+
+    if comm.ensemble_comm.rank == 1:
+        print("Reference model:", flush=True)
+        print("p = " + str(model["opts"]["degree"]))
+        print("h = " + str(h) + " m")
+        print("DOF = " + str(V.dof_count), flush=True)
+        print("Nelem = " + str(mesh.num_cells()), flush=True) 
+
+    sys.exit("Reference model finished!")
+
+elif REF==0: 
+    print("reading reference model",flush=True)
+    p_ref_recv = spyro.io.load_shots(model, comm, file_name=path+file_name)
 #}}}
-#sys.exit("exit")
-#if REF==0: #FIXME
-    #p_ref_recv = spyro.io.load_shots(model, comm, file_name="./shots/acoustic_forward_marmousi_small/p_ref_recv1")
-    #p_ref_recv = spyro.io.load_shots(model, comm, file_name="./shots/acoustic_forward_marmousi_small/p_ref_recv2")
-    #p_ref_recv = spyro.io.load_shots(model, comm, file_name="./shots/acoustic_forward_marmousi_small/p_ref_recv3")
 
 # now, prepare to run with different mesh resolutions
-FIREMESH = 0
+FIREMESH = 1
+#nx = 400 # nx=400 => dx = dz = 10 m  # not need
+#nx = 200 # nx=200 => dx = dz = 20 m  # Reference model with p=5
+#nx = 100 # nx=100 => dx = dz = 40 m
+#nx = 80  # nx=80  => dx = dz = 50 m
+#nx = 40  # nx=40  => dx = dz = 100 m
+nx = 20  # nx=20  => dx = dz = 200 m
+ny = math.ceil( nx*model["mesh"]["Lz"]/model["mesh"]["Lx"] ) # nx * Lz/Lx, Delta x = Delta z
 # generate or read a mesh {{{
 if FIREMESH: 
-
-    mesh = RectangleMesh(25, 12, model["mesh"]["Lx"], model["mesh"]["Lz"], diagonal="crossed", comm=comm.comm,
+    mesh = RectangleMesh(nx, ny, model["mesh"]["Lx"], model["mesh"]["Lz"], diagonal="crossed", comm=comm.comm,
                             distribution_parameters=distribution_parameters)
     mesh.coordinates.dat.data[:, 0] -= 0.0 
     mesh.coordinates.dat.data[:, 1] -= model["mesh"]["Lz"] + 0.45 # waterbottom at z=-0.450 km
@@ -185,29 +213,29 @@ if FIREMESH:
     element = spyro.domains.space.FE_method(mesh, model["opts"]["method"], model["opts"]["degree"])
     V = FunctionSpace(mesh, element)
 else:
-    p = 2
-    M = 7.02
-    #model["mesh"]["meshfile"] = "./meshes/fwi_amr_marmousi_small_p=" + str(p) + "_M=" + str(M) + ".msh"
+    sys.exit("Running with unstructured mesh? make sure you set up the path correctly")
     #model["mesh"]["meshfile"] = "./meshes/marmousi_small_no_water_h_150m.msh"
     #model["mesh"]["meshfile"] = "./meshes/marmousi_small_no_water_h_100m.msh"
-    model["mesh"]["meshfile"] = "./meshes/marmousi_small_no_water_h_50m.msh"
+    #model["mesh"]["meshfile"] = "./meshes/marmousi_small_no_water_h_50m.msh"
     mesh, V = spyro.io.read_mesh(model, comm, distribution_parameters=distribution_parameters)
 #}}}
 
 AMR = 0
 # adapt the mesh using the exact vp, if requested {{{
 if AMR:
+    # This mesh-grid is used to compute the monitor function
+    # Alternatively, a point cloud scheme could be used instead (see Jaquet's thesis)
     nx = 200
-    ny = math.ceil( 100*(model["mesh"]["Lz"]-0.45)/model["mesh"]["Lz"] ) # (Lz-0.45)/Lz
+    ny = math.ceil( nx*model["mesh"]["Lz"]/model["mesh"]["Lx"] ) # nx * Lz/Lx, Delta x = Delta z
     mesh_grid = RectangleMesh(nx, ny, model["mesh"]["Lx"], model["mesh"]["Lz"], diagonal="crossed", comm=comm.comm,
                             distribution_parameters=distribution_parameters)
     mesh_grid.coordinates.dat.data[:, 0] -= 0.0 
     mesh_grid.coordinates.dat.data[:, 1] -= model["mesh"]["Lz"] + 0.45 # waterbottom at z=-0.45 km
-    V_grid = FunctionSpace(mesh_grid, "CG", 2)
-    V_grid_DG = FunctionSpace(mesh_grid, "DG", 2)
+    V_grid = FunctionSpace(mesh_grid, "CG", 2) 
+    #V_grid_DG = FunctionSpace(mesh_grid, "DG", 2) # DG will be similar to CG
     V_vec_grid = VectorFunctionSpace(mesh_grid, "CG", 2)
   
-    vp_grid = _make_vp(V_grid_DG, vp_guess=False)
+    vp_grid = _make_vp(V_grid, vp_guess=False)
     grad_vp_grid = Function(V_vec_grid)
 
     u_cts = TrialFunction(V_vec_grid)
@@ -231,16 +259,16 @@ if AMR:
     E2 = vp_grid.vector().gather().max() / vp_grid - 1 # a priori error estimate (it starts on 1, so it could be better)
 
     E = E1
-    #beta = 0.5 # (0, 1) # for E2 + smooth
-    beta = 0.10 # (0, 1) # for E2 w/n smooth
+    beta = 0.5 # (0, 1) # for E2 + smooth
+    #beta = 0.10 # (0, 1) # for E2 w/n smooth
     phi = sqrt( 1 + E*E ) - 1
     phi_hat = assemble(phi*dx(domain=mesh_grid)) / assemble(Constant(1.0)*dx(domain=mesh_grid))
     alpha = beta / ( phi_hat * ( 1 - beta ) )
     M1 = 1 + alpha * phi
    
     E = E2
-    #beta = 0.5 # (0, 1) # for E2 + smooth
-    beta = 0.3 # (0, 1) # for E2 w/n smooth
+    beta = 0.5 # (0, 1) # for E2 + smooth
+    #beta = 0.3 # (0, 1) # for E2 w/n smooth
     phi = sqrt( 1 + E*E ) - 1
     phi_hat = assemble(phi*dx(domain=mesh_grid)) / assemble(Constant(1.0)*dx(domain=mesh_grid))
     alpha = beta / ( phi_hat * ( 1 - beta ) )
@@ -253,8 +281,8 @@ if AMR:
     Mfunc.interpolate(M)
 
     # smooth the monitor function
-    if 0: # {{{
-        lamb = 0.005
+    if 1: # {{{
+        lamb = 0.0010
 
         u = TrialFunction(V_grid)
         v = TestFunction(V_grid)
@@ -289,14 +317,14 @@ if AMR:
 
     def monitor_function(mesh): # here, mesh is the physical doman, i.e., x (=xi+Grad phi)
         # project onto "mesh" that is being adapted (i.e., mesh_x)
-        _P1 = FunctionSpace(mesh, "CG", 1) 
+        _P1 = FunctionSpace(mesh, "CG", 1) # P1 works better here 
         _M = Function(_P1)
-        spyro.mesh_to_mesh_projection(Mfunc, _M, degree=5)
+        spyro.mesh_to_mesh_projection(Mfunc, _M, degree=6)
         File("Mfunc_x.pvd").write(_M)
         return _M
     
-    V_DG = FunctionSpace(mesh, "DG", 2)
-    _vp = _make_vp(V_DG, vp_guess=False)
+    _V = FunctionSpace(mesh, "CG", 2)
+    _vp = _make_vp(_V, vp_guess=False)
     File("vp_before_amr.pvd").write(_vp)
     #sys.exit("exit")
         
@@ -318,9 +346,9 @@ if AMR:
     #    mask = mask_receivers
 
     mesh._parallel_compatible = {weakref.ref(mesh_grid)}
-    step = spyro.monge_ampere_solver(mesh, monitor_function, p=1, mask=mask) #fix_boundary_nodes=fix_boundary_nodes) 
+    step = spyro.monge_ampere_solver(mesh, monitor_function, p=2, mask=mask) #fix_boundary_nodes=fix_boundary_nodes) 
 
-    _vp = _make_vp(V_DG, vp_guess=False)
+    _vp = _make_vp(_V, vp_guess=False)
     File("vp_after_amr.pvd").write(_vp)
 #}}}
 #sys.exit("exit")
@@ -330,22 +358,63 @@ receivers = spyro.Receivers(model, mesh, V, comm)
 wavelet = spyro.full_ricker_wavelet(dt=model["timeaxis"]["dt"], tf=model["timeaxis"]["tf"], freq=model["acquisition"]["frequency"])
 
 V_DG = FunctionSpace(mesh, "DG", 2)
-vp = _make_vp(V_DG, vp_guess=False)
+#vp = _make_vp(V_DG, vp_guess=False)
+vp = _make_vp(V, vp_guess=False) # FIXME testing vp in ML
 
-J_total = np.zeros((1))
+start = time.time()
 _, p_recv = spyro.solvers.forward(model, mesh, comm, vp, sources, wavelet, receivers, output=True)
-        
-misfit = spyro.utils.evaluate_misfit(model, p_recv, p_ref_recv) # ds_exact[:ll] - guess
-J_total[0] += spyro.utils.compute_functional(model, misfit) # J += residual[ti][rn] ** 2 (and J *= 0.5)
-J_total[0] /= spyro.utils.compute_functional(model, p_ref_recv) # J += p_ref_recv[ti][rn] ** 2 (and J *= 0.5)
-J_total = COMM_WORLD.allreduce(J_total, op=MPI.SUM)
-J_total[0] /= comm.ensemble_comm.size # ensemble parallelism (sources)
-if comm.comm.size > 1: 
-    J_total[0] /= comm.comm.size # spatial parallelism
+end = time.time()
+print(round(end - start,2),flush=True)
 
-E = sqrt(J_total[0]) # relative error as defined in Spyro paper
-print(E, flush=True)
+def compute_relative_error(p_recv, p_ref_recv):
 
+    misfit = spyro.utils.evaluate_misfit(model, p_recv, p_ref_recv) # ds_exact[:ll] - guess
+    
+    J_total = np.zeros((1))
+    J_total[0] += spyro.utils.compute_functional(model, misfit) # J += residual[ti][rn] ** 2 (and J *= 0.5)
+    J_total[0] /= spyro.utils.compute_functional(model, p_ref_recv) # J += p_ref_recv[ti][rn] ** 2 (and J *= 0.5)
+    J_total = COMM_WORLD.allreduce(J_total, op=MPI.SUM)
+    J_total[0] /= comm.ensemble_comm.size # ensemble parallelism (sources)
+    if comm.comm.size > 1: 
+        J_total[0] /= comm.comm.size # spatial parallelism
 
+    E = sqrt(J_total[0]) # relative error as defined in Spyro paper
 
-  
+    return E
+
+# retrieve P on the receivers
+p_rec1 = p_recv[:,0:100]
+p_rec2 = p_recv[:,100:200]
+p_rec3 = p_recv[:,200:300]
+p_ref_rec1 = p_ref_recv[:,0:100]
+p_ref_rec2 = p_ref_recv[:,100:200]
+p_ref_rec3 = p_ref_recv[:,200:300]
+
+# compute the relative errors on each set of receivers 
+# FIXME maybe modify it on utils.compute_functional
+model["acquisition"]["receiver_locations"] = rec1
+E_rec1 = compute_relative_error(p_rec1, p_ref_rec1)
+
+model["acquisition"]["receiver_locations"] = rec2
+E_rec2 = compute_relative_error(p_rec2, p_ref_rec2)
+
+model["acquisition"]["receiver_locations"] = rec3
+E_rec3 = compute_relative_error(p_rec3, p_ref_rec3)
+
+model["acquisition"]["receiver_locations"] = rec
+E_total = compute_relative_error(p_recv, p_ref_recv)
+
+# save shots
+h = round(1000*model["mesh"]["Lx"]/nx)
+file_name = "p_recv_AMR_" + str(AMR) + "_p_" + str(model["opts"]["degree"]) + "_h_" + str(h) + "m_freq_" + str(model["acquisition"]["frequency"])
+spyro.io.save_shots(model, comm, p_ref_recv, file_name=path+file_name)
+
+if comm.ensemble_comm.rank == 1:
+    print("E rec1 (%) = "  + str(round(E_rec1*100,2)), flush=True)
+    print("E rec2 (%) = "  + str(round(E_rec2*100,2)), flush=True)
+    print("E rec3 (%) = "  + str(round(E_rec3*100,2)), flush=True)
+    print("E total (%) = " + str(round(E_total*100,2)), flush=True)
+    print("p = " + str(model["opts"]["degree"]))
+    print("h = " + str(h) + " m")
+    print("DOF = " + str(V.dof_count), flush=True)
+    print("Nelem = " + str(mesh.num_cells()), flush=True) 
