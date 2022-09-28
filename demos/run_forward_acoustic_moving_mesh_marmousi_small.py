@@ -140,11 +140,14 @@ if platform.node()=='recruta':
 else:
     path = "/share/tdsantos/shots/acoustic_forward_marmousi_small/"
 
-REF = 0
+REF = 1
 # run reference model {{{
 if REF:
     _nx = 200  # nx=200  => dx = dz = 20 m
     _ny = math.ceil( _nx*model["mesh"]["Lz"]/model["mesh"]["Lx"] ) # nx * Lz/Lx, Delta x = Delta z
+
+    # here, we do not need overlaping vertices
+    distribution_parameters = {"overlap_type": (DistributedMeshOverlapType.NONE, 0)}
 
     mesh_ref = RectangleMesh(_nx, _ny, model["mesh"]["Lx"], model["mesh"]["Lz"], diagonal="crossed", comm=comm.comm,
                             distribution_parameters=distribution_parameters)
@@ -202,7 +205,7 @@ FIREMESH = 1
 #nx = 80  # nx=80  => dx = dz = 50 m
 #nx = 50  # nx=50  => dx = dz = 80 m
 #nx = 40  # nx=40  => dx = dz = 100 m
-#nx = 20  # nx=20  => dx = dz = 200 m
+nx = 20  # nx=20  => dx = dz = 200 m
 ny = math.ceil( nx*model["mesh"]["Lz"]/model["mesh"]["Lx"] ) # nx * Lz/Lx, Delta x = Delta z
 # generate or read a mesh, and create space V {{{
 if FIREMESH: 
