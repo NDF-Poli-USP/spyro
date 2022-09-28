@@ -1,7 +1,6 @@
 # run_forward_acoustic_moving_mesh_marmousi_small.py
 from firedrake import *
 from scipy.optimize import * 
-from movement import *
 import spyro
 import time
 import sys
@@ -141,7 +140,7 @@ if platform.node()=='recruta':
 else:
     path = "/share/tdsantos/shots/acoustic_forward_marmousi_small/"
 
-REF = 0
+REF = 1
 # run reference model {{{
 if REF:
     nx = 200  # nx=200  => dx = dz = 20 m
