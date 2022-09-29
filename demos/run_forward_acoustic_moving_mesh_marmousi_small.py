@@ -9,7 +9,6 @@ import matplotlib.pyplot as plt
 import numpy as np
 import h5py
 import meshio
-#import SeismicMesh
 import weakref
 import finat
 from ROL.firedrake_vector import FiredrakeVector as FeVector
@@ -28,8 +27,8 @@ model = {}
 model["opts"] = {
     "method": "KMV",  # either CG or KMV
     "quadrature": "KMV", # Equi or KMV #FIXME it will be removed
-    "degree": 2,  # p order
-    #"degree": 3,  # p order
+    #"degree": 2,  # p order
+    "degree": 3,  # p order
     #"degree": 4,  # p order
     "dimension": 2,  # dimension
     "regularization": False,  # regularization is on?
@@ -140,7 +139,7 @@ if platform.node()=='recruta':
 else:
     path = "/share/tdsantos/shots/acoustic_forward_marmousi_small/"
 
-REF = 1
+REF = 0
 # run reference model {{{
 if REF:
     _nx = 200  # nx=200  => dx = dz = 20 m
@@ -203,9 +202,10 @@ FIREMESH = 1
 #nx = 200 # nx=200 => dx = dz = 20 m  # Reference model with p=5
 #nx = 100 # nx=100 => dx = dz = 40 m
 #nx = 80  # nx=80  => dx = dz = 50 m
-#nx = 50  # nx=50  => dx = dz = 80 m
+nx = 50  # nx=50  => dx = dz = 80 m
 #nx = 40  # nx=40  => dx = dz = 100 m
-nx = 20  # nx=20  => dx = dz = 200 m
+#nx = 25  # nx=25  => dx = dz = 160 m
+#nx = 20  # nx=20  => dx = dz = 200 m
 ny = math.ceil( nx*model["mesh"]["Lz"]/model["mesh"]["Lx"] ) # nx * Lz/Lx, Delta x = Delta z
 # generate or read a mesh, and create space V {{{
 if FIREMESH: 
