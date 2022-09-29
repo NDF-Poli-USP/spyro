@@ -25,11 +25,11 @@ import platform
 model = {}
 
 model["opts"] = {
-    "method": "KMV",  # either CG or KMV
+    "method": "KMV",  # either CG or KMV or spectral
     "quadrature": "KMV", # Equi or KMV #FIXME it will be removed
     #"degree": 2,  # p order
-    "degree": 3,  # p order
-    #"degree": 4,  # p order
+    #"degree": 3,  # p order
+    "degree": 4,  # p order
     "dimension": 2,  # dimension
     "regularization": False,  # regularization is on?
     "gamma": 1e-5, # regularization parameter
@@ -129,9 +129,17 @@ def _make_vp(V, vp_guess=False, field="velocity_model"):
     
     return vp
 #}}}
+
+QUAD = 1
+if QUAD==1:
+    model["opts"]["method"] = "CG"
+    model["opts"]["quadrature"] = "GLL"
+    model["opts"]["degree"] = 4
+    #model["opts"]["degree"] = 8
+
 comm = spyro.utils.mpi_init(model)
 distribution_parameters={"partition": True,
-                         "overlap_type": (DistributedMeshOverlapType.VERTEX, 60)}
+                         "overlap_type": (DistributedMeshOverlapType.VERTEX, 60)} # FIXME if "at" will be the default scheme, then we could remove overlap
 
 file_name = "p_ref_recv_freq_"+str(model["acquisition"]["frequency"])
 if platform.node()=='recruta':
@@ -201,16 +209,21 @@ FIREMESH = 1
 #nx = 400 # nx=400 => dx = dz = 10 m  # no need
 #nx = 200 # nx=200 => dx = dz = 20 m  # Reference model with p=5
 #nx = 100 # nx=100 => dx = dz = 40 m
-#nx = 80  # nx=80  => dx = dz = 50 m
-nx = 50  # nx=50  => dx = dz = 80 m
+nx = 80  # nx=80  => dx = dz = 50 m
+#nx = 50  # nx=50  => dx = dz = 80 m
 #nx = 40  # nx=40  => dx = dz = 100 m
 #nx = 25  # nx=25  => dx = dz = 160 m
 #nx = 20  # nx=20  => dx = dz = 200 m
 ny = math.ceil( nx*model["mesh"]["Lz"]/model["mesh"]["Lx"] ) # nx * Lz/Lx, Delta x = Delta z
 # generate or read a mesh, and create space V {{{
 if FIREMESH: 
-    mesh = RectangleMesh(nx, ny, model["mesh"]["Lx"], model["mesh"]["Lz"], diagonal="crossed", comm=comm.comm,
-                            distribution_parameters=distribution_parameters)
+    if QUAD==0:
+        mesh = RectangleMesh(nx, ny, model["mesh"]["Lx"], model["mesh"]["Lz"], diagonal="crossed", comm=comm.comm,
+                                distribution_parameters=distribution_parameters)
+    elif QUAD==1:
+        mesh = RectangleMesh(nx, ny, model["mesh"]["Lx"], model["mesh"]["Lz"], quadrilateral=True, comm=comm.comm,
+                                distribution_parameters=distribution_parameters)
+    
     mesh.coordinates.dat.data[:, 0] -= 0.0 
     mesh.coordinates.dat.data[:, 1] -= model["mesh"]["Lz"] + 0.45 # waterbottom at z=-0.450 km
 
@@ -323,7 +336,16 @@ if AMR:
         # project onto "mesh" that is being adapted (i.e., mesh_x)
         _P1 = FunctionSpace(mesh, "CG", 1) # P1 works better here 
         _M = Function(_P1)
-        spyro.mesh_to_mesh_projection(Mfunc, _M, degree=6)
+        
+        #FIXME use projection for spatial parallel until we solve the issue with "at"
+        #spyro.mesh_to_mesh_projection(Mfunc, _M, degree=6)
+        
+        # it works for serial so far
+        _m = _P1.ufl_domain() # quads
+        _W = VectorFunctionSpace(_m, _P1.ufl_element())
+        _X = interpolate(_m.coordinates, _W)
+        _M.dat.data[:] = Mfunc.at(_X.dat.data_ro, dont_raise=True, tolerance=0.001)
+        
         File("Mfunc_x.pvd").write(_M)
         return _M
     

@@ -486,7 +486,7 @@ obj = Objective(inner_product)
 Ji=[]
 ii=[]
 outfile = File("final_vp.pvd")
-max_loop_it = 5 # the number of iteration here depends on the max iteration of ROL
+max_loop_it = 5 # the number of iteration here depends on the max iteration of ROL (IT CAN NOT BE SMALLER THAN 'Maximum Storage')
 max_rol_it = 10
 
 for i in range(max_loop_it):
