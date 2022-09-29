@@ -209,8 +209,8 @@ FIREMESH = 1
 #nx = 400 # nx=400 => dx = dz = 10 m  # no need
 #nx = 200 # nx=200 => dx = dz = 20 m  # Reference model with p=5
 #nx = 100 # nx=100 => dx = dz = 40 m
-nx = 80  # nx=80  => dx = dz = 50 m
-#nx = 50  # nx=50  => dx = dz = 80 m
+#nx = 80  # nx=80  => dx = dz = 50 m
+nx = 50  # nx=50  => dx = dz = 80 m
 #nx = 40  # nx=40  => dx = dz = 100 m
 #nx = 25  # nx=25  => dx = dz = 160 m
 #nx = 20  # nx=20  => dx = dz = 200 m
