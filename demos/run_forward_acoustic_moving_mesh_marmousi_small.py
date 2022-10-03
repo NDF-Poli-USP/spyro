@@ -27,9 +27,9 @@ model = {}
 model["opts"] = {
     "method": "KMV",  # either CG or KMV or spectral
     "quadrature": "KMV", # Equi or KMV #FIXME it will be removed
-    #"degree": 2,  # p order
+    "degree": 2,  # p order
     #"degree": 3,  # p order
-    "degree": 4,  # p order
+    #"degree": 4,  # p order
     "dimension": 2,  # dimension
     "regularization": False,  # regularization is on?
     "gamma": 1e-5, # regularization parameter
@@ -130,7 +130,7 @@ def _make_vp(V, vp_guess=False, field="velocity_model"):
     return vp
 #}}}
 
-QUAD = 1
+QUAD = 0
 if QUAD==1:
     model["opts"]["method"] = "CG"
     model["opts"]["quadrature"] = "GLL"
@@ -141,7 +141,9 @@ comm = spyro.utils.mpi_init(model)
 distribution_parameters={"partition": True,
                          "overlap_type": (DistributedMeshOverlapType.VERTEX, 60)} # FIXME if "at" will be the default scheme, then we could remove overlap
 
-file_name = "p_ref_recv_freq_"+str(model["acquisition"]["frequency"])
+# set the reference file name
+#file_name = "p_ref_recv_freq_"+str(model["acquisition"]["frequency"])   # with P=5
+file_name = "p_ref_p4_recv_freq_"+str(model["acquisition"]["frequency"]) # with P=4
 if platform.node()=='recruta':
     path = "./shots/acoustic_forward_marmousi_small/" 
 else:
@@ -210,10 +212,12 @@ FIREMESH = 1
 #nx = 200 # nx=200 => dx = dz = 20 m  # Reference model with p=5
 #nx = 100 # nx=100 => dx = dz = 40 m
 #nx = 80  # nx=80  => dx = dz = 50 m
-nx = 50  # nx=50  => dx = dz = 80 m
+#nx = 50  # nx=50  => dx = dz = 80 m
 #nx = 40  # nx=40  => dx = dz = 100 m
 #nx = 25  # nx=25  => dx = dz = 160 m
-#nx = 20  # nx=20  => dx = dz = 200 m
+nx = 20  # nx=20  => dx = dz = 200 m
+#nx = 16  # nx=16  => dx = dz = 250 m
+#nx = 14  # nx=14  => dx = dz = 285.71 m
 #nx = 10  # nx=10  => dx = dz = 400 m
 ny = math.ceil( nx*model["mesh"]["Lz"]/model["mesh"]["Lx"] ) # nx * Lz/Lx, Delta x = Delta z
 # generate or read a mesh, and create space V {{{
@@ -382,20 +386,38 @@ if AMR:
 #}}}
 #sys.exit("exit")
 
-sources = spyro.Sources(model, mesh, V, comm)
-receivers = spyro.Receivers(model, mesh, V, comm)
-wavelet = spyro.full_ricker_wavelet(dt=model["timeaxis"]["dt"], tf=model["timeaxis"]["tf"], freq=model["acquisition"]["frequency"])
+# set the file name
+h = round(1000*model["mesh"]["Lx"]/nx)
+if QUAD==1:
+    file_name = "p_recv_QUAD_AMR_" + str(AMR) + "_p_" + str(model["opts"]["degree"]) + "_h_" + str(h) + "m_freq_" + str(model["acquisition"]["frequency"])
+else:
+    file_name = "p_recv_AMR_" + str(AMR) + "_p_" + str(model["opts"]["degree"]) + "_h_" + str(h) + "m_freq_" + str(model["acquisition"]["frequency"])
 
-#V_DG = FunctionSpace(mesh, "DG", 2)
-#vp = _make_vp(V_DG, vp_guess=False)
-vp = _make_vp(V, vp_guess=False) 
+GUESS = 0
+# run the guess model with a given mesh {{{
+if GUESS==1:
+    sources = spyro.Sources(model, mesh, V, comm)
+    receivers = spyro.Receivers(model, mesh, V, comm)
+    wavelet = spyro.full_ricker_wavelet(dt=model["timeaxis"]["dt"], tf=model["timeaxis"]["tf"], freq=model["acquisition"]["frequency"])
 
-start = time.time()
-_, p_recv = spyro.solvers.forward(model, mesh, comm, vp, sources, wavelet, receivers, output=True)
-end = time.time()
-print(round(end - start,2),flush=True)
+    #V_DG = FunctionSpace(mesh, "DG", 2)
+    #vp = _make_vp(V_DG, vp_guess=False)
+    vp = _make_vp(V, vp_guess=False) 
 
-def compute_relative_error(p_recv, p_ref_recv):
+    start = time.time()
+    _, p_recv = spyro.solvers.forward(model, mesh, comm, vp, sources, wavelet, receivers, output=True)
+    end = time.time()
+    print(round(end - start,2),flush=True)
+
+    # save shots
+    spyro.io.save_shots(model, comm, p_recv, file_name=path+file_name)
+
+elif GUESS==0:
+    print("reading guess model",flush=True)
+    p_recv = spyro.io.load_shots(model, comm, file_name=path+file_name)
+#}}}
+
+def compute_relative_error(p_recv, p_ref_recv): #{{{
 
     misfit = spyro.utils.evaluate_misfit(model, p_recv, p_ref_recv) # ds_exact[:ll] - guess
     
@@ -410,6 +432,7 @@ def compute_relative_error(p_recv, p_ref_recv):
     E = sqrt(J_total[0]) # relative error as defined in Spyro paper
 
     return E
+#}}}
 
 # retrieve P on the receivers
 p_rec1 = p_recv[:,0:100]
@@ -432,11 +455,6 @@ E_rec3 = compute_relative_error(p_rec3, p_ref_rec3)
 
 model["acquisition"]["receiver_locations"] = rec
 E_total = compute_relative_error(p_recv, p_ref_recv)
-
-# save shots
-h = round(1000*model["mesh"]["Lx"]/nx)
-file_name = "p_recv_AMR_" + str(AMR) + "_p_" + str(model["opts"]["degree"]) + "_h_" + str(h) + "m_freq_" + str(model["acquisition"]["frequency"])
-spyro.io.save_shots(model, comm, p_recv, file_name=path+file_name)
 
 if comm.ensemble_comm.rank == 1:
     print("E rec1 (%) = "  + str(round(E_rec1*100,2)), flush=True)
