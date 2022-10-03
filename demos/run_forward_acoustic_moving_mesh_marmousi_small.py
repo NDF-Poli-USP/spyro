@@ -163,7 +163,7 @@ if REF:
 
     # for the exact model, use a higher-order element
     #p = model["opts"]["degree"] # to keep the order defined by the user
-    model["opts"]["degree"] = 5
+    model["opts"]["degree"] = 4 # it was 5 before
     element = spyro.domains.space.FE_method(mesh_ref, model["opts"]["method"], model["opts"]["degree"])
     V_ref = FunctionSpace(mesh_ref, element)
 
@@ -214,6 +214,7 @@ nx = 80  # nx=80  => dx = dz = 50 m
 #nx = 40  # nx=40  => dx = dz = 100 m
 #nx = 25  # nx=25  => dx = dz = 160 m
 #nx = 20  # nx=20  => dx = dz = 200 m
+#nx = 10  # nx=10  => dx = dz = 400 m
 ny = math.ceil( nx*model["mesh"]["Lz"]/model["mesh"]["Lx"] ) # nx * Lz/Lx, Delta x = Delta z
 # generate or read a mesh, and create space V {{{
 if FIREMESH: 
