@@ -214,10 +214,11 @@ FIREMESH = 1
 #nx = 80  # nx=80  => dx = dz = 50 m
 #nx = 50  # nx=50  => dx = dz = 80 m
 #nx = 40  # nx=40  => dx = dz = 100 m
-#nx = 25  # nx=25  => dx = dz = 160 m
-nx = 20  # nx=20  => dx = dz = 200 m
+nx = 25  # nx=25  => dx = dz = 160 m
+#nx = 20  # nx=20  => dx = dz = 200 m
 #nx = 16  # nx=16  => dx = dz = 250 m
 #nx = 14  # nx=14  => dx = dz = 285.71 m
+#nx = 12  # nx=12 => dx = dz = 333.33 m 
 #nx = 10  # nx=10  => dx = dz = 400 m
 ny = math.ceil( nx*model["mesh"]["Lz"]/model["mesh"]["Lx"] ) # nx * Lz/Lx, Delta x = Delta z
 # generate or read a mesh, and create space V {{{
@@ -242,7 +243,11 @@ else:
     mesh, V = spyro.io.read_mesh(model, comm, distribution_parameters=distribution_parameters)
 #}}}
 
-AMR = 0
+#print("DOF = " + str(V.dof_count), flush=True)
+#print("Nelem = " + str(mesh.num_cells()), flush=True) 
+#sys.exit("exit")
+
+AMR = 1
 # adapt the mesh using the exact vp, if requested {{{
 if AMR:
     # This mesh-grid is used to compute the monitor function
@@ -339,7 +344,7 @@ if AMR:
 
     def monitor_function(mesh): # here, mesh is the physical doman, i.e., x (=xi+Grad phi)
         # project onto "mesh" that is being adapted (i.e., mesh_x)
-        _P1 = FunctionSpace(mesh, "CG", 1) # P1 works better here 
+        _P1 = FunctionSpace(mesh, "CG", 1) # P1 works better here (even p>1 does not improve when coarse meshes are employed) 
         _M = Function(_P1)
         
         #FIXME use projection for spatial parallel until we solve the issue with "at"
@@ -393,7 +398,7 @@ if QUAD==1:
 else:
     file_name = "p_recv_AMR_" + str(AMR) + "_p_" + str(model["opts"]["degree"]) + "_h_" + str(h) + "m_freq_" + str(model["acquisition"]["frequency"])
 
-GUESS = 0
+GUESS = 1
 # run the guess model with a given mesh {{{
 if GUESS==1:
     sources = spyro.Sources(model, mesh, V, comm)
