@@ -15,7 +15,7 @@ Takes roughly 1 minute with 2 processors and less than 1 GB of RAM.
 
 use_vs = False 
 smooth = True
-write_vel_mod = False
+write_vel_mod = True
 mesh_adapted  = True
 
 # Name of SEG-Y file containg velocity model (P or S-wave speed)
@@ -33,7 +33,9 @@ else:
         #fname = "./velocity_models/elastic-marmousi-model/model/MODEL_P-WAVE_VELOCITY_1.25m.segy.smoothed.segy"  # in m/s
         fname = "./velocity_models/elastic-marmousi-model/model/MODEL_P-WAVE_VELOCITY_1.25m.segy.smoothed_sigma=300.segy"  # in m/s
 
-#fname = "./velocity_models/elastic-marmousi-model/model/MODEL_DENSITY_1.25m.segy"          # in g/cm3
+#fname = "./velocity_models/elastic-marmousi-model/model/MODEL_P-WAVE_VELOCITY_1.25m.segy.smoothed_sigma=300.segy.hdf5"          # in m/s
+#fname = "./velocity_models/elastic-marmousi-model/model/MODEL_S-WAVE_VELOCITY_1.25m.segy.smoothed_sigma=300.segy"  # in m/s
+fname = "./velocity_models/elastic-marmousi-model/model/MODEL_DENSITY_1.25m.segy.smoothed_sigma=300.segy"  # in g/cm3
 
 # Bounding box describing domain extents (corner coordinates)
 bbox = (-3500.0, 0.0, 0.0, 17000.0) # this includes a 450-m thick water layer

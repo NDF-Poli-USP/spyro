@@ -55,12 +55,13 @@ def smooth_field(input_filename, output_filename, show = False, sigma = 100, v_w
     return None
 #}}}
 
-fname = "./velocity_models/elastic-marmousi-model/model/MODEL_P-WAVE_VELOCITY_1.25m.segy"  # in m/s
+#fname = "./velocity_models/elastic-marmousi-model/model/MODEL_P-WAVE_VELOCITY_1.25m.segy"  # in m/s
 #fname = "./velocity_models/elastic-marmousi-model/model/MODEL_S-WAVE_VELOCITY_1.25m.segy"   # in m/s
-#fname = "./velocity_models/elastic-marmousi-model/model/MODEL_DENSITY_1.25m.segy"          # in g/cm3
+fname = "./velocity_models/elastic-marmousi-model/model/MODEL_DENSITY_1.25m.segy"          # in g/cm3
 
-v_water = 1500.1 # for Vp (m/s)
+#v_water = 1500.1 # for Vp (m/s)
 #v_water = 0.1 # for Vs (m/s)
+v_water = 1.01001 # for rho (g/cm3)
 
 show=True
 sigma=300
