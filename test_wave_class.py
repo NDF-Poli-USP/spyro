@@ -1,5 +1,6 @@
 import spyro
 from firedrake import RectangleMesh, conditional
+from spyro.HABC import Eikonal
 
 from spyro.io.model_parameters import Model_parameters
 
@@ -71,6 +72,10 @@ Wave = spyro.AcousticWave(model_parameters=Model)
 
 x,y = Wave.get_spatial_coordinates()
 Wave.set_initial_velocity_model(conditional = conditional(x < -0.5 ,3.0 ,1.5 ))
+Wave._get_initial_velocity_model()
+Wave.c = Wave.initial_velocity_model
+
+Eikonal(Wave)
 
 Wave.forward_solve()
 
