@@ -2,7 +2,6 @@ import spyro
 from firedrake import RectangleMesh, conditional
 from spyro.HABC import Eikonal
 
-
 from spyro.io.model_parameters import Model_parameters
 
 dictionary = {}

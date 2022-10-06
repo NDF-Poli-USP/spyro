@@ -110,19 +110,19 @@ parameters['ghost_mode'] = 'shared_facet'
 #     return dx, bcs
 
 
-def AssembleEikonal(c, yp, vy, weak_bc, mesh, u):
+def AssembleEikonal(c, yp, vy, mesh, u):
     '''
     Eikonal with stabilizer term
     '''
     f = Constant(1.0)
     eps = CellDiameter(mesh)  # Stabilizer
-    F = (sqrt(inner(grad(yp), grad(yp)))*vy*dx - f / c*vy*dx
-         + eps*inner(grad(yp), grad(vy))*dx) + weak_bc
+    F = (sqrt(inner(grad(u), grad(u)))*vy*dx - f / c*vy*dx
+         + eps*inner(grad(u), grad(vy))*dx)
 
     return F
 
 
-def SolveEikonal(c, yp_final, F, Eik, mesh, weak_bc, u,annotate=False):
+def SolveEikonal(c, yp_final, F, Eik, mesh, sources, u,annotate=False):
     '''
     Solve for Eikonal
     '''
@@ -132,11 +132,18 @@ def SolveEikonal(c, yp_final, F, Eik, mesh, weak_bc, u,annotate=False):
 
     print('Solve Pre-Eikonal')
     f = Constant(1.0)
-    F1 = inner(grad(u), grad(vy))*dx - f/c*vy*dx + weak_bc
+    F1 = inner(grad(u), grad(vy))*dx - f/c*vy*dx
+    A = fire.assemble(lhs(F1))
+    
+    B = fire.Function(Eik)
+    B = fire.assemble(rhs(F1), tensor=B)
+    rhs_forcing = fire.Function(Eik)
+    rhs_forcing = sources.apply_source(rhs_forcing, 0.0)
+    B += rhs_forcing
 
-    solve(lhs(F1) == rhs(F1), yp)
+    solve(A,yp,B)
 
-    F = AssembleEikonal(c, yp, vy, weak_bc, mesh, u)
+    F = AssembleEikonal(c, yp, vy, mesh, u)
 
     print('Solve Post-Eikonal')
     # Solver Parameters
@@ -180,8 +187,14 @@ def SolveEikonal(c, yp_final, F, Eik, mesh, weak_bc, u,annotate=False):
     #                     'pc_type': 'lu',
     #                     'nonlinear_solver': 'snes',
     #                     }
+    mask = Function(Eik)
+    mask = sources.make_mask(mask)
 
-    solve(F == 0, yp_final)
+    k = Constant(1.0)
+    weak_bc = mask * k * inner(u, vy) * dx
+
+
+    solve(F+weak_bc == 0, yp_final)
 
     return yp_final
 
@@ -279,11 +292,11 @@ def Eikonal(Wave):
     mask = Wave.sources.make_mask(mask)
 
     k = Constant(1.0e20)
-    weak_bc = mask*k * inner(u, vy) * dx
+    weak_bc = mask * k * inner(u, vy) * dx
 
-    Feik = AssembleEikonal(c_eik, yp, vy, weak_bc, mesh, u)
+    Feik = AssembleEikonal(c_eik, yp, vy, mesh, u)
     yp.assign(SolveEikonal(c_eik, yp, Feik,
-                            V, mesh, weak_bc, u, annotate=False))
+                            V, mesh, Wave.sources, u, annotate=False))
     eikonal_file = File('out/Eik.pvd')
     eikonal_file.write(yp)
 
