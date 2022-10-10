@@ -203,18 +203,18 @@ if REF:
 
 elif REF==0: 
     print("reading reference model",flush=True)
-    p_ref_recv = spyro.io.load_shots(model, comm, file_name=path+file_name)
+    #p_ref_recv = spyro.io.load_shots(model, comm, file_name=path+file_name)
 #}}}
 
 # now, prepare to run with different mesh resolutions
 FIREMESH = 1
 #nx = 400 # nx=400 => dx = dz = 10 m  # no need
 #nx = 200 # nx=200 => dx = dz = 20 m  # Reference model with p=5
-#nx = 100 # nx=100 => dx = dz = 40 m
+nx = 100 # nx=100 => dx = dz = 40 m
 #nx = 80  # nx=80  => dx = dz = 50 m
 #nx = 50  # nx=50  => dx = dz = 80 m
 #nx = 40  # nx=40  => dx = dz = 100 m
-nx = 25  # nx=25  => dx = dz = 160 m
+#nx = 25  # nx=25  => dx = dz = 160 m
 #nx = 20  # nx=20  => dx = dz = 200 m
 #nx = 16  # nx=16  => dx = dz = 250 m
 #nx = 14  # nx=14  => dx = dz = 285.71 m
@@ -389,7 +389,7 @@ if AMR:
     _vp = _make_vp(V, vp_guess=False) # V is the original space of mesh
     File("vp_after_amr.pvd").write(_vp)
 #}}}
-#sys.exit("exit")
+sys.exit("exit")
 
 # set the file name
 h = round(1000*model["mesh"]["Lx"]/nx)
