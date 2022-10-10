@@ -153,14 +153,14 @@ comm = spyro.utils.mpi_init(model)
     
 distribution_parameters = {"overlap_type": (DistributedMeshOverlapType.NONE, 0)}
 
-file_name_uz = "uz_ref_recv_freq_"+str(model["acquisition"]["frequency"])
-file_name_ux = "ux_ref_recv_freq_"+str(model["acquisition"]["frequency"])
+file_name_uz = "uz_ref_p4_h40m_recv_freq_"+str(model["acquisition"]["frequency"])
+file_name_ux = "ux_ref_p4_h40m_recv_freq_"+str(model["acquisition"]["frequency"])
 if platform.node()=='recruta':
     path = "./shots/elastic_fwi_marmousi_small/"
 else:   
     path = "/share/tdsantos/shots/elastic_fwi_marmousi_small/"
 
-REF = 1
+REF = 0
 # run reference model {{{
 if REF:
     _nx = 100  # nx=500 => dx = dz = 8 m => N = min(vs)/(dx * max(f)) => N = 5.36 = 300/(8 * 7)  
@@ -175,7 +175,7 @@ if REF:
     mesh_ref.coordinates.dat.data[:, 1] -= model["mesh"]["Lz"] + 0.45 # waterbottom at z=-0.450 km
 
     # for the exact model, use a higher-order element
-    model["opts"]["degree"] = 2
+    model["opts"]["degree"] = 4
     element = spyro.domains.space.FE_method(mesh_ref, model["opts"]["method"], model["opts"]["degree"])
     V_ref = FunctionSpace(mesh_ref, element)
 
@@ -227,11 +227,12 @@ elif REF==0:
 FIREMESH = 1
 #nx = 400 # nx=400 => dx = dz = 10 m  # no need
 #nx = 200 # nx=200 => dx = dz = 20 m  # Reference model with p=5
-nx = 100 # nx=100 => dx = dz = 40 m
+#nx = 100 # nx=100 => dx = dz = 40 m
 #nx = 80  # nx=80  => dx = dz = 50 m
 #nx = 50  # nx=50  => dx = dz = 80 m
-#nx = 40  # nx=40  => dx = dz = 100 m
+nx = 40  # nx=40  => dx = dz = 100 m
 #nx = 20  # nx=20  => dx = dz = 200 m
+#nx = 16  # nx=16  => dx = dz = 250 m
 ny = math.ceil( nx*model["mesh"]["Lz"]/model["mesh"]["Lx"] ) # nx * Lz/Lx, Delta x = Delta z
 # generate or read a mesh, and create space V {{{
 if FIREMESH: 
@@ -407,7 +408,15 @@ lamb_exact = Function(V).interpolate(rho_exact * (vp_exact ** 2. - 2. * vs_exact
 #u, uz, ux, uy = spyro.solvers.forward_elastic_waves(model, mesh, comm, rho, lamb, mu, sources, wavelet, receivers, output=False)
 #end = time.time()
 #print(round(end - start,2),flush=True)
-   
+  
+model["timeaxis"]["fspool"] = 10  # how frequently to save solution to RAM
+J_global = []
+
+m = V.ufl_domain()
+W = VectorFunctionSpace(m, V.ufl_element())
+X = interpolate(m.coordinates, W)
+source_mask = np.where(X.sub(1).dat.data[:] > -0.60)
+
 class L2Inner(object): #{{{
     def __init__(self):
         self.A = assemble( TrialFunction(V) * TestFunction(V) * dx, mat_type="matfree")
@@ -439,8 +448,8 @@ class ObjectiveElastic(ROL.Objective): #{{{
         self.u_guess = None # Z,X displacements, entire domain
         self.uz_guess = None
         self.ux_guess = None
-        self.uz_exact = uz_exact # Z displacements, receiver
-        self.ux_exact = ux_exact # X displacements, receiver
+        self.uz_exact = uz_ref # Z displacements, receiver
+        self.ux_exact = ux_ref # X displacements, receiver
         self.misfit_uz = None
         self.misfit_ux = None
         self.lamb = Function(V)
@@ -448,6 +457,7 @@ class ObjectiveElastic(ROL.Objective): #{{{
         self.rho = rho_exact # FIXME not sure what to do with rho
 
     def run_forward(self):
+        print("Starting forward computation - elastic waves",flush=True)
         J_scale = sqrt(1.e14)
         self.u_guess, self.uz_guess, self.ux_guess, _ = spyro.solvers.forward_elastic_waves(
             model, mesh, comm, self.rho, self.lamb, self.mu, sources, wavelet, receivers, output=False
@@ -468,7 +478,7 @@ class ObjectiveElastic(ROL.Objective): #{{{
         if comm.comm.size > 1:
             J_total[0] /= comm.comm.size # paralelismo espacial
 
-        if 1: # plot? {{{
+        if 0: # plot? {{{
             ue=[]
             ug=[]
             nt = int(model["timeaxis"]["tf"] / model["timeaxis"]["dt"])
@@ -491,10 +501,10 @@ class ObjectiveElastic(ROL.Objective): #{{{
         return J_total[0]
 
     def gradient(self, g, x, tol):
-        #print("Starting gradient computation - elastic waves")
+        print("Starting gradient computation - elastic waves",flush=True)
         """Compute the gradient of the functional"""
-        if not type(self.misfit_uz)==list:
-            self.run_forward()
+        #if not type(self.misfit_uz)==list:
+        #    self.run_forward()
 
         misfit_uy = []
         dJdl = Function(V, name="dJdl")
@@ -503,6 +513,7 @@ class ObjectiveElastic(ROL.Objective): #{{{
             model, mesh, comm, self.rho, self.lamb, self.mu,
             receivers, self.u_guess, self.misfit_uz, self.misfit_ux, misfit_uy, output=False,
         )
+        print("Finished gradient computation - elastic waves",flush=True)
         if comm.ensemble_comm.size > 1:
             comm.allreduce(dJdl_local, dJdl)
             comm.allreduce(dJdm_local, dJdm)
@@ -520,6 +531,14 @@ class ObjectiveElastic(ROL.Objective): #{{{
         #File("dJdl_elastic_pointsource.pvd").write(dJdl)
         #File("dJdm_elastic_pointsource.pvd").write(dJdm)
         #sys.exit("stop")
+        
+        # mask the source layer
+        dJdl.dat.data[source_mask] = 0.0
+        dJdm.dat.data[source_mask] = 0.0
+        
+        File("dJdl_elastic.pvd").write(dJdl)
+        File("dJdm_elastic.pvd").write(dJdm)
+
         g.scale(0)
         g.vec.dat.data[:,0] += dJdl.dat.data[:] # FIXME - is employed for gaussian function
         g.vec.dat.data[:,1] += dJdm.dat.data[:] # FIXME - is emploued for gaussian function
@@ -644,7 +663,10 @@ obj = ObjectiveElastic(inner_product)
 #Line Search: Cubic Interpolation satisfying Strong Wolfe Conditions (must define "line search" in params)
 problem = ROL.OptimizationProblem(obj, opt, bnd=bnd)
 solver = ROL.OptimizationSolver(problem, params)
+
+print("Starting FWI loop",flush=True)
 solver.solve()
+
 vp_final = Function(V).assign( ( (obj.lamb+2.*obj.mu)/obj.rho )**0.5 )
 vs_final = Function(V).assign( ( obj.mu/obj.rho ) ** 0.5 )
 File("final_vp.pvd").write(vp_final)

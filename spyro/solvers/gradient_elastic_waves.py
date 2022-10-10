@@ -318,8 +318,6 @@ def gradient_elastic_waves(
             # apply a body force: misfit over the entire domain (used to compare with AD)
             #f.assign(exact.pop(step) - guess_rec.pop()) 
             f.assign(residual.pop()) 
-        else:
-            pass
 
         # solve and assign X onto solution u 
         solver.solve(X, B)

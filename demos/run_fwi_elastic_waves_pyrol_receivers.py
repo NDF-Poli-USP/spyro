@@ -12,14 +12,15 @@ from ROL.firedrake_vector import FiredrakeVector as FeVector
 import ROL
 from scipy.ndimage import gaussian_filter
 from mpi4py import MPI
+import platform
 #from ..domains import quadrature, space
 
-#parameters from Daiane
+#parameters from Daiane {{{
 model = {}
 
 model["opts"] = {
     "method": "KMV",  # either CG or KMV
-    "quadratrue": "KMV", # Equi or KMV #FIXME it will be removed
+    "quadrature": "KMV", # Equi or KMV #FIXME it will be removed
     "degree": 4,  # p order
     "dimension": 2,  # dimension
     "regularization": False,  # regularization is on?
@@ -70,7 +71,14 @@ model["timeaxis"] = {
     "nspool":  20,  # (20 for dt=0.00050) how frequently to output solution to pvds
     "fspool": 1,  # how frequently to save solution to RAM
 }
+#}}}
+
 comm = spyro.utils.mpi_init(model)
+
+if platform.node()=='recruta':
+    model["mesh"]["meshfile"] = "meshes/square.msh"
+else:
+    model["mesh"]["meshfile"] = "/share/tdsantos/meshes/square.msh"
 
 # build or read a mesh {{{
 if 0:
@@ -135,7 +143,7 @@ def _make_elastic_parameters(H, mesh, guess=False):
     return lamb, mu, rho
 #}}}
 
-if 1:
+if 0:
     V2 = FunctionSpace(mesh, element)
     print("DOF: "+str(V2.dof_count),flush=True)
     print("Cells: "+str(mesh.num_cells()),flush=True)
