@@ -109,26 +109,21 @@ parameters['ghost_mode'] = 'shared_facet'
 
 #     return dx, bcs
 
-
-def AssembleEikonal(c, yp, vy, mesh, u):
-    '''
-    Eikonal with stabilizer term
-    '''
-    f = Constant(1.0)
-    eps = CellDiameter(mesh)  # Stabilizer
-    F = (sqrt(inner(grad(u), grad(u)))*vy*dx - f / c*vy*dx
-         + eps*inner(grad(u), grad(vy))*dx)
-
-    return F
-
-
-def SolveEikonal(c, yp_final, F, Eik, mesh, sources, u,annotate=False):
+def SolveEikonal(c, Eik, mesh, sources, annotate=False):
     '''
     Solve for Eikonal
     '''
+    sources.current_source = 0
     
-    yp = yp_final
+    yp = Function(Eik)
     vy = TestFunction(Eik)
+    u = TrialFunction(Eik)
+
+    mask = Function(Eik)
+    # mask = sources.make_mask(mask)
+
+    k = Constant(1.0e2)
+    # weak_bc = mask * k * inner(u, vy) * dx
 
     print('Solve Pre-Eikonal')
     f = Constant(1.0)
@@ -137,13 +132,29 @@ def SolveEikonal(c, yp_final, F, Eik, mesh, sources, u,annotate=False):
     
     B = fire.Function(Eik)
     B = fire.assemble(rhs(F1), tensor=B)
-    rhs_forcing = fire.Function(Eik)
-    rhs_forcing = sources.apply_source(rhs_forcing, 0.0)
-    B += rhs_forcing
+    B_data = B.dat.data[:]
+    print(np.min(B_data))
+    print(np.max(B_data))
+    
+    B = sources.apply_source(B, 0.0)
+
+
+    B_data = B.dat.data[:]
+    print(np.min(B_data))
+    print(np.max(B_data))
 
     solve(A,yp,B)
+    output = File('linear.pvd')
+    output.write(yp)
 
-    F = AssembleEikonal(c, yp, vy, mesh, u)
+    '''
+    Eikonal with stabilizer term
+    '''
+    f = Constant(1.0)
+    eps = CellDiameter(mesh)  # Stabilizer
+    F = sqrt(inner(grad(u), grad(u)))*vy*dx #- f / c*vy*dx
+         #+ eps*inner(grad(u), grad(vy))*dx)
+    L = f / c*vy*dx
 
     print('Solve Post-Eikonal')
     # Solver Parameters
@@ -187,16 +198,18 @@ def SolveEikonal(c, yp_final, F, Eik, mesh, sources, u,annotate=False):
     #                     'pc_type': 'lu',
     #                     'nonlinear_solver': 'snes',
     #                     }
-    mask = Function(Eik)
-    mask = sources.make_mask(mask)
+    # mask = Function(Eik)
 
-    k = Constant(1.0)
-    weak_bc = mask * k * inner(u, vy) * dx
+    # mask = sources.make_mask(mask)
+
+    # k = Constant(1.0)
+    # weak_bc = mask * k * inner(u, vy) * dx
 
 
-    solve(F+weak_bc == 0, yp_final)
+    #solve(F == L, yp)
+    # solve(F == L, yp, solver_parameters={"newton_solver": {"relative_tolerance": 1e-6}})
 
-    return yp_final
+    return yp
 
 
 def vel_bound(boundmesh, c_eik, Lx, Ly):
@@ -285,23 +298,18 @@ def Eikonal(Wave):
     # dx, bcs_eik = DefineBoundaries(possou, mesh, V, lmin)
     # Solving Eikonal
     yp = Function(V, name='Eikonal (Time [ms])')
-    vy = TestFunction(V)
-    u = TrialFunction(V)
 
-    mask = Function(V)
-    mask = Wave.sources.make_mask(mask)
-
-    k = Constant(1.0e20)
-    weak_bc = mask * k * inner(u, vy) * dx
-
-    Feik = AssembleEikonal(c_eik, yp, vy, mesh, u)
-    yp.assign(SolveEikonal(c_eik, yp, Feik,
-                            V, mesh, Wave.sources, u, annotate=False))
+    yp.assign(SolveEikonal(c_eik, V, mesh, Wave.sources, annotate=False))
     eikonal_file = File('out/Eik.pvd')
     eikonal_file.write(yp)
 
     # Mesh coordinates
-    mesh_coord = V.tabulate_dof_coordinates()
+    # xmesh,ymesh = SpatialCoordinate(mesh)
+    # ux = Function(V).interpolate(xmesh)
+    # uy = Function(V).interpolate(ymesh)
+    # ux_data = ux.dat.data[:]
+    # uy_data = uy.dat.data[:]
+    # mesh_coord = V.tabulate_dof_coordinates()
     # Velocity profile and coordinates at boundary
     cbound, bcoord = bcMesh(mesh, c_eik, Lx, Ly)
 
