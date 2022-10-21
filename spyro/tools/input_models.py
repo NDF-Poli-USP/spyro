@@ -1,7 +1,7 @@
 import numpy as np
 import spyro
 import shutil
-import SeismicMesh
+
 
 def create_3d_grid(start, end, num):
     """Create a 3d grid of `num**3` points between `start1`
@@ -22,7 +22,7 @@ def create_3d_grid(start, end, num):
 
     """
     (start1, start2, start3) = start
-    (end1, end2, end3)  = end
+    (end1, end2, end3) = end
     x = np.linspace(start1, end1, num)
     y = np.linspace(start2, end2, num)
     z = np.linspace(start3, end3, num)
@@ -30,8 +30,10 @@ def create_3d_grid(start, end, num):
     points = np.vstack((X.flatten(), Y.flatten(), Z.flatten())).T
     return [tuple(point) for point in points]
 
+
 def create_model_2D_homogeneous(grid_point_calculator_parameters, degree):
-    ''' Creates models  with the correct parameters for for grid point calculation experiments
+    ''' Creates models  with the correct parameters for for grid point
+    calculation experiments
     on the 2D homogeneous case with a grid of receivers near the source.
     
     Parameters
@@ -45,7 +47,9 @@ def create_model_2D_homogeneous(grid_point_calculator_parameters, degree):
         
 
     '''
-    minimum_mesh_velocity = grid_point_calculator_parameters['minimum_velocity_in_the_domain']
+    minimum_mesh_velocity = grid_point_calculator_parameters[
+        'minimum_velocity_in_the_domain'
+        ]
     frequency = grid_point_calculator_parameters['source_frequency']
     dimension = grid_point_calculator_parameters['dimension']
     receiver_type = grid_point_calculator_parameters['receiver_setup']
@@ -61,38 +65,45 @@ def create_model_2D_homogeneous(grid_point_calculator_parameters, degree):
     Ly = 0.0
 
     lbda = minimum_mesh_velocity/frequency
-    pml_fraction = lbda
     pad = lbda
-    Lz = 40*lbda#100*lbda
-    Real_Lz = Lz+ pad
-    #print(Real_Lz)
-    Lx = 30*lbda#90*lbda
-    Real_Lx = Lx+ 2*pad
+    Lz = 40*lbda  # 100*lbda
+    Real_Lz = Lz + pad
+    # print(Real_Lz)
+    Lx = 30*lbda  # 90*lbda
+    Real_Lx = Lx + 2*pad
 
     # source location
-    source_z = -Real_Lz/2.#1.0
-    #print(source_z)
+    source_z = -Real_Lz/2.  # 1.0
+    # print(source_z)
     source_x = Real_Lx/2.
-    source_coordinates = [(source_z, source_x)] #Source at the center. If this is changes receiver's bin has to also be changed.
+    # Source at the center. If this is changes receiver's bin has to also be
+    # changed.
+    source_coordinates = [(source_z, source_x)]
     padz = pad
     padx = pad
 
     # time calculations
     tmin = 1./frequency
-    final_time = 20*tmin #should be 35
+    final_time = 20*tmin  # Should be 35
 
     # receiver calculations
 
-    receiver_bin_center1 = 10*lbda#20*lbda
-    receiver_bin_width = 5*lbda#15*lbda
-    receiver_quantity = 36#2500 # 50 squared
+    receiver_bin_center1 = 10*lbda  # 20*lbda
+    receiver_bin_width = 5*lbda  # 15*lbda
+    receiver_quantity = 36  # 2500 # 50 squared
 
     bin1_startZ = source_z + receiver_bin_center1 - receiver_bin_width/2.
-    bin1_endZ   = source_z + receiver_bin_center1 + receiver_bin_width/2.
+    bin1_endZ = source_z + receiver_bin_center1 + receiver_bin_width/2.
     bin1_startX = source_x - receiver_bin_width/2.
-    bin1_endX   = source_x + receiver_bin_width/2.
+    bin1_endX = source_x + receiver_bin_width/2.
 
-    receiver_coordinates = spyro.create_2d_grid(bin1_startZ, bin1_endZ, bin1_startX, bin1_endX, int(np.sqrt(receiver_quantity)))
+    receiver_coordinates = spyro.create_2d_grid(
+        bin1_startZ,
+        bin1_endZ,
+        bin1_startX,
+        bin1_endX,
+        int(np.sqrt(receiver_quantity))
+        )
     
     # Choose method and parameters
     model["opts"] = {
@@ -138,7 +149,7 @@ def create_model_2D_homogeneous(grid_point_calculator_parameters, degree):
     }
 
     model["timeaxis"] = {
-        "t0": 0.0,  #  Initial time for event
+        "t0": 0.0,  # Initial time for event
         "tf": final_time,  # Final time for event
         "dt": 0.001,  # timestep size
         "nspool": 200,  # how frequently to output solution to pvds
@@ -183,6 +194,8 @@ def create_model_2D_heterogeneous(grid_point_calculator_parameters, degree):
         
 
     '''
+    import SeismicMesh
+
     minimum_mesh_velocity = grid_point_calculator_parameters['minimum_velocity_in_the_domain']
     frequency = grid_point_calculator_parameters['source_frequency']
     dimension = grid_point_calculator_parameters['dimension']

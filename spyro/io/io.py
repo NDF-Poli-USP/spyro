@@ -1,6 +1,4 @@
 from __future__ import with_statement
-
-import os
 import pickle
 
 import firedrake as fire
@@ -54,7 +52,7 @@ def ensemble_plot(func):
         _comm = args[1]
         for snum in range(num):
             if is_owner(_comm, snum) and _comm.comm.rank == 0:
-                func(*args, **dict(kwargs, file_name = str(snum+1)))
+                func(*args, **dict(kwargs, file_name=str(snum+1)))
 
     return wrapper
 
