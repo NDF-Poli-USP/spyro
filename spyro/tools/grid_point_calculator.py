@@ -2,11 +2,11 @@ from mpi4py import MPI
 import numpy as np
 from scipy import interpolate
 import meshio
-import SeismicMesh
 import firedrake as fire
 import time
 import copy
 import spyro
+
 
 def minimum_grid_point_calculator(grid_point_calculator_parameters):
     """ Function to calculate necessary grid point density.
@@ -336,6 +336,7 @@ def time_interpolation_line(p_old, p_exact, model):
     return p
 
 def generate_mesh2D(model,G, comm):
+    import SeismicMesh
 
     if comm.comm.rank == 0:
         print('Entering mesh generation', flush = True)
@@ -439,6 +440,7 @@ def generate_mesh2D(model,G, comm):
     return model
 
 def generate_mesh3D(model, G, comm):
+    import SeismicMesh
 
     print('Entering mesh generation', flush = True)
     M = grid_point_to_mesh_point_converter_for_seismicmesh(model, G)
