@@ -73,7 +73,7 @@ class Sources(spyro.receivers.Receivers.Receivers):
         for source_id in range(self.num_receivers):
             if self.is_local[source_id] and source_id==self.current_source:
                 for i in range(len(self.cellNodeMaps[source_id])):
-                    campo.dat.data_with_halos[int(self.cellNodeMaps[source_id][i])] = 1.0
+                    campo.dat.data_with_halos[int(self.cellNodeMaps[source_id][i])] = 1.0* self.cell_tabulations[source_id][i]
             else: 
                 for i in range(len(self.cellNodeMaps[source_id])):
                     tmp = campo.dat.data_with_halos[0]

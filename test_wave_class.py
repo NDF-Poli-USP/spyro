@@ -1,13 +1,15 @@
+from pyclbr import Function
 import spyro
-from firedrake import RectangleMesh, conditional
+from firedrake import RectangleMesh, conditional, UnitSquareMesh
 from spyro.HABC import Eikonal
+import firedrake as fire
 
 from spyro.io.model_parameters import Model_parameters
 
 dictionary = {}
 dictionary["options"] = {
     "cell_type": "T",  # simplexes such as triangles or tetrahedra (T) or quadrilaterals (Q)
-    "variant": 'equispaced', # lumped, equispaced or DG, default is lumped "method":"MLT", # (MLT/spectral_quadrilateral/DG_triangle/DG_quadrilateral) You can either specify a cell_type+variant or a method
+    "variant": 'lumped', # lumped, equispaced or DG, default is lumped "method":"MLT", # (MLT/spectral_quadrilateral/DG_triangle/DG_quadrilateral) You can either specify a cell_type+variant or a method
     "degree": 1,  # p order
     "dimension": 2,  # dimension
 }
@@ -64,14 +66,26 @@ dictionary["visualization"] = {
 
 Model = Model_parameters(dictionary=dictionary) 
 
-user_mesh = RectangleMesh(10,10,1.0,1.0, quadrilateral = False,comm=Model.comm.comm)
+user_mesh = UnitSquareMesh(100,100)
 user_mesh.coordinates.dat.data[:,0] *= -1.0
 Model.set_mesh(user_mesh=user_mesh)
 
 Wave = spyro.AcousticWave(model_parameters=Model)
 
 x,y = Wave.get_spatial_coordinates()
-Wave.set_initial_velocity_model(conditional = conditional(x < -0.5 ,3.0 ,1.5 ))
+# V = fire.FunctionSpace(Wave.mesh, 'CG',1)
+# ux = fire.Function(V).interpolate(x)
+# uy = fire.Function(V).interpolate(y)
+# print(ux.dat.data[:])
+# print(uy.dat.data[:])
+
+sources = Wave.sources
+print(sources.receiver_locations)
+print(sources.cellIDs)
+print(sources.cellNodeMaps)
+
+
+Wave.set_initial_velocity_model(conditional = conditional(x < -0.5 ,3.0,3.0 ))
 Wave._get_initial_velocity_model()
 Wave.c = Wave.initial_velocity_model
 

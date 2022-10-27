@@ -120,23 +120,20 @@ def SolveEikonal(c, Eik, mesh, sources, annotate=False):
     u = TrialFunction(Eik)
 
     mask = Function(Eik)
-    # mask = sources.make_mask(mask)
+    mask = sources.make_mask(mask)
 
-    k = Constant(1.0e2)
-    # weak_bc = mask * k * inner(u, vy) * dx
+    k = Constant(1e5)
 
     print('Solve Pre-Eikonal')
     f = Constant(1.0)
-    F1 = inner(grad(u), grad(vy))*dx - f/c*vy*dx
+    F1 = inner(grad(u), grad(vy))*dx - f/c*vy*dx + mask * k * inner(u - 1e-12, vy) * dx
     A = fire.assemble(lhs(F1))
     
     B = fire.Function(Eik)
     B = fire.assemble(rhs(F1), tensor=B)
-    B_data = B.dat.data[:]
-    print(np.min(B_data))
-    print(np.max(B_data))
-    
-    B = sources.apply_source(B, 0.0)
+
+    output = File('linear.pvd')
+    output.write(yp)
 
 
     B_data = B.dat.data[:]
@@ -152,9 +149,15 @@ def SolveEikonal(c, Eik, mesh, sources, annotate=False):
     '''
     f = Constant(1.0)
     eps = CellDiameter(mesh)  # Stabilizer
-    F = sqrt(inner(grad(u), grad(u)))*vy*dx #- f / c*vy*dx
-         #+ eps*inner(grad(u), grad(vy))*dx)
-    L = f / c*vy*dx
+    mask = Function(Eik)
+
+    mask = sources.make_mask(mask)
+    output = File('mask.pvd')
+    output.write(mask)
+
+    weak_bc = mask * k * inner(yp-1e-12, vy) * dx
+    F = inner(sqrt(inner(grad(yp), grad(yp))),vy) *dx + eps*inner(grad(yp), grad(vy))*dx - f / c*vy*dx + weak_bc
+    L = 0
 
     print('Solve Post-Eikonal')
     # Solver Parameters
@@ -186,28 +189,23 @@ def SolveEikonal(c, Eik, mesh, sources, annotate=False):
     # # redistribute svd gamg kaczmarz hypre pfmg syspfmg tfs bddc python
     # PETScOptions.set('pc_type', 'lu')
 
-    # solver_parameters = {'snes_type': 'vinewtonssls',
-    #                     "snes_max_it": 1000,
-    #                     "snes_atol": 5e-6,
-    #                     "snes_rtol": 1e-20,
-    #                     'snes_linesearch_type': 'l2',  # basic bt nleqerr cp l2
-    #                     "snes_linesearch_damping": 1.00, # for basic,l2,cp
-    #                     "snes_linesearch_maxstep": 0.50,  # bt,l2,cp
-    #                     'snes_linesearch_order': 2,  # for newtonls com bt
-    #                     'ksp_type': 'gmres',
-    #                     'pc_type': 'lu',
-    #                     'nonlinear_solver': 'snes',
-    #                     }
-    # mask = Function(Eik)
-
-    # mask = sources.make_mask(mask)
-
-    # k = Constant(1.0)
-    # weak_bc = mask * k * inner(u, vy) * dx
+    solver_parameters = {'snes_type': 'vinewtonssls',
+                        "snes_max_it": 1000,
+                        "snes_atol": 5e-6,
+                        "snes_rtol": 1e-20,
+                        'snes_linesearch_type': 'l2',  # basic bt nleqerr cp l2
+                        "snes_linesearch_damping": 1.00, # for basic,l2,cp
+                        "snes_linesearch_maxstep": 0.50,  # bt,l2,cp
+                        'snes_linesearch_order': 2,  # for newtonls com bt
+                        'ksp_type': 'gmres',
+                        'pc_type': 'lu',
+                        'nonlinear_solver': 'snes',
+                        }
+    
 
 
-    #solve(F == L, yp)
-    # solve(F == L, yp, solver_parameters={"newton_solver": {"relative_tolerance": 1e-6}})
+    # solve(F == L, yp)
+    solve(F == L, yp, solver_parameters=solver_parameters)#{"newton_solver": {"relative_tolerance": 1e-6}})
 
     return yp
 
@@ -283,6 +281,7 @@ def Eikonal(Wave):
     '''
     mesh = Wave.mesh
     c_eik = Wave.c # somente o dominio 
+    print(type(c_eik))
     # Create and define function space for current mesh
     # BCs for eikonal
     print('Defining Eikonal Boundaries')
@@ -292,12 +291,14 @@ def Eikonal(Wave):
         x,y = source
         xs.append(x)
         ys.append(y)
+    print(xs)
+    print(ys)
 
     possou = [xs, ys]
-    V = FunctionSpace(mesh, 'CG', 1)
+    V = Wave.function_space
     # dx, bcs_eik = DefineBoundaries(possou, mesh, V, lmin)
     # Solving Eikonal
-    yp = Function(V, name='Eikonal (Time [ms])')
+    yp = Function(V, name='Eikonal (Time [s])')
 
     yp.assign(SolveEikonal(c_eik, V, mesh, Wave.sources, annotate=False))
     eikonal_file = File('out/Eik.pvd')
@@ -311,7 +312,7 @@ def Eikonal(Wave):
     # uy_data = uy.dat.data[:]
     # mesh_coord = V.tabulate_dof_coordinates()
     # Velocity profile and coordinates at boundary
-    cbound, bcoord = bcMesh(mesh, c_eik, Lx, Ly)
+    cbound, bcoord = bcMesh(mesh, c_eik, Wave.length_z, Wave.length_x)
 
     # Defining critical points for vertical and horizontal boundaries
     yp.set_allow_extrapolation(True)
