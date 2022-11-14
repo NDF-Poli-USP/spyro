@@ -321,7 +321,7 @@ def Eikonal(Wave):
     for i, coord in enumerate(bcoord):
         xc = coord[0]
         yc = coord[1]
-        if xc <= 0.0 or xc >= Lx and yc > 0.0:
+        if xc <= 0.0 or xc >= Wave.length_z and yc > 0.0:
             ref0 = yp(xc, yc)
             if refx == 0 or ref0 < refx:
                 refx = ref0

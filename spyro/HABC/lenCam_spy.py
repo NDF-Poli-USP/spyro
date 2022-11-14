@@ -1,4 +1,3 @@
-from fenics import pi, cos, sin
 import numpy as np
 from scipy.fft import fft
 import sys
@@ -34,22 +33,22 @@ def detLref(posCrit, possou):
 def F(x, a, m=1, s=0.999, typ='FL'):
     '''
     Function whose zeros are solution for layer size
-    Zeros for s = 0.999, a = 0.25, Z = 1.5/(1.2*5) without rounding
+    Zeros for s = 0.999, a = c/(lref*fref) = Z/fref = 0.25 = 1.5/(1.2*5) without rounding
     Expected: F_L1=0.1917, F_L2=0.2682, F_L3=0.2981, F_L4=0.4130, F_L5=0.4244
     Tol 1e-2: F_L1=0.1917, F_L2=0.2682, F_L3=0.2981, F_L4=0.4130, F_L5=0.4244
     Tol 1e-3: F_L1=0.1917, F_L2=0.2682, F_L3=0.2981, F_L4=0.4130, F_L5=0.4244
     Tol 1e-4: F_L1=0.1917, F_L2=0.2682, F_L3=0.2981, F_L4=0.4130, F_L5=0.4244
 
-    Zeros for s = 0.999, a = 0.25, Z = 1.5/(1.2*2.25) without rounding
+    Zeros for s = 0.999, a = c/(lref*fref) = 0.555 = 1.5/(1.2*2.25) without rounding
     Expected: F_L1=0.4267, F_L2=0.5971, F_L3=0.6637, F_L4=0.9197, F_L5=0.9450
     Tol 1e-4: F_L1=0.4268, F_L2=0.5971, F_L3=0.6638, F_L4=0.9197, F_L5=0.9450
     '''
     # Reflection coefficient
     CR = abs(s**2 / (s**2 + (4 * x / (m * a))**2))
-    ax0 = m * pi * (1 + (1 / 8) * (s * m * a / x)**2)
+    ax0 = m * np.pi * (1 + (1 / 8) * (s * m * a / x)**2)
     ax1 = (1 - s**2)**0.5
     ax2 = s / ax1
-    ax3 = (2 * pi * x / a) * (1 + (1 / 8) * (s * m * a / x)**2)
+    ax3 = (2 * np.pi * x / a) * (1 + (1 / 8) * (s * m * a / x)**2)
     # Attenuation coefficient
     RF = abs(np.exp(-s * ax0) * (np.cos(ax1 * ax0) +
                                  ax2 * np.sin(ax1 * ax0)) * np.cos(ax3))
@@ -147,7 +146,7 @@ def CalcFL(TipLay, Lx, Ly, fref, lmin, lref, Z, nexp, nz=5, crtCR=0):
     a = Z / fref  # print(a, Z,fref)
     FLpos = []
     crtCR = min(crtCR, nz-1)  # Position in CRpos. Default: 0
-    FLmin = 2 * lmin / lref
+    FLmin = 2 * lmin / lref # passar lmin da camada de agua
     x = FLmin
     for i in range(1, nz + 1):
         x = calcZero(x, a, i)
@@ -174,8 +173,8 @@ def CalcFL(TipLay, Lx, Ly, fref, lmin, lref, Z, nexp, nz=5, crtCR=0):
     if not TipLay == 'REC':
         pmlRect = F_L * lref
         bdom = Lx + 2 * pmlRect
-        elif TipLay == 'HYP':
-            hdom = Ly + 2 * pmlRect
+    elif TipLay == 'HYP':
+        hdom = Ly + 2 * pmlRect
 
         a = bdom / 2
         b = hdom / 2
@@ -228,7 +227,7 @@ def detFref(histPcrit, f0, it_fwi):
     Determines the reference frequency for a new layer length
     histPcrit: Transient response in at critical coordinates "posCrit"
     f0: Theorical central Ricker source frequency
-    it_fwi: Iteration unmber of inversion process
+    it_fwi: Iteration number of inversion process
     '''
 
    if it_fwi > 0:
@@ -253,7 +252,7 @@ def detFref(histPcrit, f0, it_fwi):
     return fref
 
 
-def pmlSize(Lx, Ly, posCrit, possou, histPcrit, f0, it_fwi, lmin, Z, TipLay='REC', nexp=np.nan):
+def habc_size(Lx, Ly, posCrit, possou, f0, it_fwi, lmin, Z, histPcrit=None, TipLay='REC', nexp=np.nan):
     '''
     Determines the size of the absorbing layer
     Lx, Ly: Original domain dimensions
