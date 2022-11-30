@@ -156,22 +156,22 @@ if platform.node()=='recruta':
 else:   
     path = "/share/tdsantos/shots/elastic_forward_marmousi_small/"
 
-REF = 0
+REF = 1
 # run reference model {{{
 if REF:
-    _nx = 500  # nx=500 => dx = dz = 8 m => N = min(vs)/(dx * max(f)) => N = 5.36 = 300/(8 * 7)  
+    _nx = 200  # nx=200 => dx = dz = 20 m => N = min(vs)/(dx * max(f)) => N = 2.5 = 300/(20 * 6)  
     _ny = math.ceil( _nx*model["mesh"]["Lz"]/model["mesh"]["Lx"] ) # nx * Lz/Lx, Delta x = Delta z
    
     # here, we do not need overlaping vertices
     distribution_parameters = {"overlap_type": (DistributedMeshOverlapType.NONE, 0)}
 
-    mesh_ref = RectangleMesh(nx, ny, model["mesh"]["Lx"], model["mesh"]["Lz"], diagonal="crossed", comm=comm.comm,
+    mesh_ref = RectangleMesh(_nx, _ny, model["mesh"]["Lx"], model["mesh"]["Lz"], diagonal="crossed", comm=comm.comm,
                             distribution_parameters=distribution_parameters)
     mesh_ref.coordinates.dat.data[:, 0] -= 0.0 
     mesh_ref.coordinates.dat.data[:, 1] -= model["mesh"]["Lz"] + 0.45 # waterbottom at z=-0.450 km
 
     # for the exact model, use a higher-order element
-    model["opts"]["degree"] = 5
+    model["opts"]["degree"] = 4
     element = spyro.domains.space.FE_method(mesh_ref, model["opts"]["method"], model["opts"]["degree"])
     V_ref = FunctionSpace(mesh_ref, element)
 
@@ -225,8 +225,7 @@ elif REF==0:
 
 # now, prepare to run with different mesh resolutions
 FIREMESH = 0
-#nx = 400 # nx=400 => dx = dz = 10 m  # no need
-#nx = 200 # nx=200 => dx = dz = 20 m  # Reference model with p=5
+#nx = 200 # nx=200 => dx = dz = 20 m  # Reference model with p=4
 #nx = 100 # nx=100 => dx = dz = 40 m
 #nx = 80  # nx=80  => dx = dz = 50 m
 #nx = 50  # nx=50  => dx = dz = 80 m
