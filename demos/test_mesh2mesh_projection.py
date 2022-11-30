@@ -9,8 +9,8 @@ m2._parallel_compatible = {weakref.ref(m1)}
 
 # the projection works for P1, P3, P4, P5 (max degree of KMV elements) but fails for P2
 P = 2
-V1 = FunctionSpace(m1, 'CG', P)
-V2 = FunctionSpace(m2, 'CG', P)
+V1 = FunctionSpace(m1, 'KMV', P)
+V2 = FunctionSpace(m2, 'KMV', P)
 
 x, y = SpatialCoordinate(m1)
 #f1 = Function(V1).interpolate(sin(5*x)*cos(5*y))
@@ -23,3 +23,8 @@ f2.project(f1)
 # f2 should be numerically equal to f1
 File("f1.pvd").write(f1)
 File("f2.pvd").write(f2)
+
+f1_integrated = assemble(f1*dx)
+f2_integrated = assemble(f2*dx)
+print("<f1> = " + str(f1_integrated) )
+print("<f2> = " + str(f2_integrated) )

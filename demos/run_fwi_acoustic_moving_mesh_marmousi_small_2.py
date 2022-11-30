@@ -317,7 +317,7 @@ sources = spyro.Sources(model, mesh, V, comm)
 receivers = spyro.Receivers(model, mesh, V, comm)
 wavelet = spyro.full_ricker_wavelet(dt=model["timeaxis"]["dt"], tf=model["timeaxis"]["tf"], freq=model["acquisition"]["frequency"])
 
-V_DG = FunctionSpace(mesh, "DG", 2) # FIXME test the forward model with vp in CG
+#V_DG = FunctionSpace(mesh, "DG", 2) # FIXME test the forward model with vp in CG
 vp_guess = _make_vp(V, vp_guess=True) 
 vp_exact = _make_vp(V, vp_guess=False)
 
@@ -483,8 +483,17 @@ bnd = ROL.Bounds(x_lo, x_up, 1.0)
 obj = Objective(inner_product)
 #}}}
 
+# function to adapt the mesh {{{
+def adapt_mesh()
+    # compute the monitor function
+
+    # call monge-ampere solver
+
+    # return the adapted mesh
+
+#}}}
+
 Ji=[]
-ii=[]
 outfile = File("final_vp.pvd")
 max_loop_it = 5 # the number of iteration here depends on the max iteration of ROL (IT CAN NOT BE SMALLER THAN 'Maximum Storage')
 max_rol_it = 10
@@ -502,10 +511,8 @@ for i in range(max_loop_it):
     solver = ROL.OptimizationSolver(problem, params)
     solver.solve()
 
-    mesh_moved = False
     xig.dat.data_with_halos[:] = obj.vp.dat.data_ro_with_halos[:] # no mesh movement, therefore mesh_x=mesh_xi
 
-    ii.append(i)
     Ji.append(obj.J)
 
 outfile.write(obj.vp,time=i)

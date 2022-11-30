@@ -132,7 +132,8 @@ def monge_ampere_solver(mesh, monitor_function,
     # Create variables used during the mesh movement
     theta = firedrake.Constant(0.0)
     monitor = firedrake.Function(P1, name="Monitor function") # using P1 generates a better mesh behaviour
-    monitor.interpolate(monitor_function(mesh)) # initialize the monitor function
+    monitor.assign(monitor_function(mesh)) # initialize the monitor function 
+    #FIXME maybe it can be changed to monitor.data.dat[:] = monitor_function(x)
     volume = firedrake.Function(P0, name="Mesh volume")
     volume.interpolate(ufl.CellVolume(mesh))
     original_volume = firedrake.Function(volume) # initial cell volumes
@@ -254,7 +255,7 @@ def monge_ampere_solver(mesh, monitor_function,
             cursol.copy(v)
         l2_projector_solver.solve() # update grad_phi_proj 
         mesh.coordinates.assign(update_x(mask=mask)) # update x = xi + grad_phi #FIXME maybe mask here should not be none 
-        monitor.interpolate(monitor_function(mesh)) # update monitor function (monitor function is defined over x) 
+        monitor.assign(monitor_function(mesh)) # update monitor function (monitor function is defined over x) 
         mesh.coordinates.assign(xi) # come back to xi (computational space)
         theta.assign(firedrake.assemble(theta_form)*total_volume**(-1))
    #}}} 
@@ -271,7 +272,7 @@ def monge_ampere_solver(mesh, monitor_function,
     problem = firedrake.NonlinearVariationalProblem(F, phisigma, Jp=Jp, bcs=None) 
     nullspace = firedrake.MixedVectorSpaceBasis(V, [firedrake.VectorSpaceBasis(constant=True), V.sub(1)])
     sp = _serial_qn if firedrake.COMM_WORLD.size == 1 else _parallel_qn
-    sp['snes_atol'] = rtol
+    sp['snes_atol'] = rtol # FIXME check this
     sp['snes_max_it'] = maxiter
    
     equidistributor = firedrake.NonlinearVariationalSolver(problem,

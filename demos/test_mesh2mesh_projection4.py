@@ -29,7 +29,7 @@ f1_integrated = assemble(f1*dx)
 
 f2 = Function(V2)
 
-interpolation_scheme = 3
+interpolation_scheme = 1
 if interpolation_scheme==1: # inhouse projection
     degree=None
     if V2.ufl_element().family() == "Kong-Mulder-Veldhuizen" and P == 2:

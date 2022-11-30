@@ -117,11 +117,11 @@ def gradient_test_elastic(model, mesh, V, comm, rho, lamb_exact, mu_exact, lamb_
   
     #FIXME check the difference when sigma_x>500
 
-    #J_scale = sqrt(1.e10) #FIXME set it as input
-    J_scale = sqrt(1.) #FIXME set it as input
+    J_scale = sqrt(1.e10) #FIXME set it as input
+    #J_scale = sqrt(1.) #FIXME set it as input
 
-    use_AD_type_interp = True
-    apply_gaussian_func = True # apply a Gaussian function to compute the misfit and the functional (used to compare)
+    use_AD_type_interp = False
+    apply_gaussian_func = False # apply a Gaussian function to compute the misfit and the functional (used to compare)
 
     print('######## Starting gradient test ########')
 
@@ -429,8 +429,8 @@ def gradient_test_elastic(model, mesh, V, comm, rho, lamb_exact, mu_exact, lamb_
         
     qr_x, _, _ = quadrature.quadrature_rules(V)
         
-    projnorm_lamb = assemble(dJdl * delta_lamb * dx(rule=qr_x))
-    projnorm_mu   = assemble(dJdm * delta_mu * dx(rule=qr_x))
+    projnorm_lamb = assemble(J_scale * dJdl * delta_lamb * dx(rule=qr_x))
+    projnorm_mu   = assemble(J_scale * dJdm * delta_mu * dx(rule=qr_x))
 
     # this deepcopy is important otherwise pertubations accumulate
     lamb_original = lamb_guess.copy(deepcopy=True)
@@ -441,7 +441,9 @@ def gradient_test_elastic(model, mesh, V, comm, rho, lamb_exact, mu_exact, lamb_
     errors_lamb = []
     errors_mu   = []
 
-    h_steps = [1e-3, 1e-4, 1e-5]  # step length
+    #h_steps = [1e-3, 1e-4, 1e-5]  # step length
+    #h_steps = [1e-2, 1e-3, 1e-4, 1e-5, 1e-6]  # step length
+    h_steps = [1e-3, 1e-4, 1e-5, 1e-6]  # step length
     for h in h_steps: 
         # perturb the model and calculate the functional (again)
         # J(m + delta_m*h)
@@ -494,16 +496,18 @@ def gradient_test_elastic(model, mesh, V, comm, rho, lamb_exact, mu_exact, lamb_
         print(
             "\n Step " + str(h) + "\n"
             + "\t lambda:\n"
-            + "\t cost functional (exact):\t" + str(J_lamb) + "\n"
-            + "\t cost functional (FD):\t\t" + str(Jp_lamb) + "\n"
-            + "\t grad'*dir (adj):\t\t" + str(projnorm_lamb) + "\n"
-            + "\t grad'*dir (FD):\t\t" + str(fd_grad_lamb) + "\n"
+            + "\t cost functional (exact):\t" + str(round(J_lamb,1)) + "\n"
+            + "\t cost functional (FD):\t\t" + str(round(Jp_lamb,1)) + "\n"
+            + "\t grad'*dir (adj):\t\t" + str(round(projnorm_lamb,1)) + "\n"
+            + "\t grad'*dir (FD):\t\t" + str(round(fd_grad_lamb,1)) + "\n"
+            + "\t grad error:\t\t" + str(round(100*(projnorm_lamb/fd_grad_lamb-1),2)) + "\n"
             + "\n"
             + "\t mu:\n"
-            + "\t cost functional (exact):\t" + str(J_mu) + "\n"
-            + "\t cost functional (FD):\t\t" + str(Jp_mu) + "\n"
-            + "\t grad'*dir (adj):\t\t" + str(projnorm_mu) + "\n"
-            + "\t grad'*dir (FD):\t\t" + str(fd_grad_mu) + "\n"
+            + "\t cost functional (exact):\t" + str(round(J_mu,1)) + "\n"
+            + "\t cost functional (FD):\t\t" + str(round(Jp_mu,1)) + "\n"
+            + "\t grad'*dir (adj):\t\t" + str(round(projnorm_mu,1)) + "\n"
+            + "\t grad'*dir (FD):\t\t" + str(round(fd_grad_mu,1)) + "\n"
+            + "\t grad error:\t\t" + str(round(100*(projnorm_mu/fd_grad_mu-1),2)) + "\n"
         )
     
         errors_lamb.append(100 * ((fd_grad_lamb - projnorm_lamb) / projnorm_lamb))
