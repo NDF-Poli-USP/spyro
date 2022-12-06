@@ -26,7 +26,8 @@ def forward_elastic_waves(
     receivers,
     source_num=0,
     output=False,
-    use_AD_type_interp=False # used to debug
+    use_AD_type_interp=False, # used to debug
+    use_Neumann_BC_as_source=False
 ):
     """Secord-order in time fully-explicit scheme
     with implementation of simple absorbing boundary conditions using
@@ -201,6 +202,12 @@ def forward_elastic_waves(
     #https://fenicsproject.discourse.group/t/integrate-over-edges/1140/8
     #}}}
 
+    # using a Neumann BC as source term (only to compare meshes)
+    if use_Neumann_BC_as_source:
+        source_surface = Function(V)
+        nf = inner(source_surface, v) * ds(4,rule=qr_s) + nf
+        #bc = DirichletBC(V.sub(0), 0., (1,2) ) #FIXME it depends on the axis directions. Use it only if no ABS is used
+
     # weak formulation written as F=0
     F = m + a - l + nf
 
@@ -208,7 +215,7 @@ def forward_elastic_waves(
     lhs_ = lhs(F)
     rhs_ = rhs(F)
     
-    # FIXME DirichletBC does not help prevent oscilations when mu=0
+    # DirichletBC does not help prevent oscilations when mu=0
     #bc = DirichletBC(V.sub(0), 0., (1,2,3,4) )
     #bc = DirichletBC(V, (0.,0.), (1,2,3,4) )
 
@@ -248,11 +255,15 @@ def forward_elastic_waves(
         if use_AD_type_interp==False:
             # assemble the rhs term to update the forcing FIXME assemble here or after apply source?
             B = assemble(rhs_, tensor=B) # this is faster 
-            #bc.apply(B) #FIXME for Dirichlet BC
+            #bc.apply(B) # Dirichlet BC
         else: # to compare with AD problem
             solver.solve() 
         f = excitations.apply_radial_source(f, wavelet[step]) # f is a Gaussian function that is integrated into the rhs
-        
+
+        # testing Neumann BC as source
+        if use_Neumann_BC_as_source:
+            source_surface.sub(1).dat.data_with_halos[:] = wavelet[step] # FIXME it depends on the axis direction
+
         # FIXME testing it
         #rhs_forcing.assign(0.0)
         #fext = excitations.apply_point_source(rhs_forcing, wavelet[step]) # fext is an already integrated rhs
