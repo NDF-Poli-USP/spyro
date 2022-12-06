@@ -1,9 +1,8 @@
 from .forward import forward
-from .forward_AD import forward as forward_AD
 from .gradient import gradient
-
+from . import solver_ad
 __all__ = [
     "forward",  # forward solver adapted for discrete adjoint
-    "forward_AD",  # forward solver adapted for Automatic Differentiation
     "gradient",
+    "solver_ad",
 ]

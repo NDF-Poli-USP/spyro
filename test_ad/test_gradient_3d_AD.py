@@ -1,17 +1,10 @@
-from firedrake import *
-from scipy.optimize import *
+import firedrake as fire
 import spyro
-import time
-import sys
-import matplotlib.pyplot as plt
-import numpy as np
-import meshio
-import SeismicMesh
-import finat
-import pytest
 
 #from ..domains import quadrature, space
-@pytest.mark.skip(reason="no way of currently testing this with cicleCI resources")
+# @pytest.mark.skip(reason="no way of currently testing this with cicleCI resources")
+
+
 def test_gradient_3d_AD():
     model = {}
 
@@ -80,16 +73,17 @@ def test_gradient_3d_AD():
         mesh, model["opts"]["method"], model["opts"]["degree"]
     )
 
-    V       = FunctionSpace(mesh, element)
-    z, x, y = SpatialCoordinate(mesh)
+    V       = fire.FunctionSpace(mesh, element)
+    z, x, y = fire.SpatialCoordinate(mesh)
 
-    vp_exact = Function(V).interpolate( 1.0 + 0.0*x)
-    vp_guess = Function(V).interpolate( 0.8 + 0.0*x)
+    vp_exact = fire.Function(V).interpolate( 1.0 + 0.0*x)
+    vp_guess = fire.Function(V).interpolate( 0.8 + 0.0*x)
 
 
-    spyro.tools.gradient_test_acoustic_ad(
+    grad_ad.gradient_test_acoustic(
                                 model, 
                                 mesh, 
+                                element,
                                 V, 
                                 comm, 
                                 vp_exact, 

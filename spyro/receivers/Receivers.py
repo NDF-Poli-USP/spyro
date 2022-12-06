@@ -30,12 +30,6 @@ class Receivers:
         -------
         Receivers: :class: 'Receiver' object
         """
-
-        if "Aut_Dif" in model:
-            self.automatic_adjoint = True
-        else:
-            self.automatic_adjoint = False
-
         self.mesh = mesh
         self.space = V
         self.my_ensemble = my_ensemble
@@ -59,8 +53,7 @@ class Receivers:
         self.nodes_per_cell = None
         self.quadrilateral = (model["opts"]['quadrature']=='GLL')
         self.is_local = [0] * self.num_receivers
-        if not self.automatic_adjoint:
-            self.build_maps()
+        self.build_maps()
 
     @property
     def num_receivers(self):
@@ -82,14 +75,12 @@ class Receivers:
                 receiver_z, receiver_x, receiver_y = self.receiver_locations[rid]
                 cell_id = self.mesh.locate_cell([receiver_z, receiver_x, receiver_y], tolerance=tolerance )
             self.is_local[rid] = cell_id
-
         (
             self.cellIDs,
             self.cellVertices,
             self.cellNodeMaps,
         ) = self.__func_receiver_locator()
         self.cell_tabulations = self.__func_build_cell_tabulations()
-
         self.num_receivers = len(self.receiver_locations)
 
     def interpolate(self, field):
@@ -106,6 +97,21 @@ class Receivers:
             for the given timestep.
         """
         return [self.__new_at(field, rn) for rn in range(self.num_receivers)]
+    
+    def vertex_only_mesh_interpolator(self, solution):
+        mesh_rec = VertexOnlyMesh(self.mesh, self.receiver_locations)
+        P = FunctionSpace(mesh_rec, "DG", 0)
+
+        return Interpolator(solution, P), P
+
+    def local_receiver_id(self):
+        index_rec = []
+        for rid in range(self.num_receivers):
+            if self.is_local[rid] is not None:
+                index_rec.append(rid)
+      
+        return index_rec
+        
 
     def apply_receivers_as_source(self, rhs_forcing, residual, IT):
         """
@@ -201,7 +207,6 @@ class Receivers:
                     z = node_locations[cell_node_map[cell_id, cell_ends[vertex_number]], 0]
                     x = node_locations[cell_node_map[cell_id, cell_ends[vertex_number]], 1]
                     cellVertices[receiver_id][vertex_number] = (z, x)
-
         return cellId_maps, cellVertices, cellNodeMaps
 
     def __new_at(self, udat, receiver_id):
@@ -244,7 +249,6 @@ class Receivers:
         node_locations = np.zeros((len(datax), 2))
         node_locations[:, 0] = dataz
         node_locations[:, 1] = datax
-
         return node_locations
 
     def __func_receiver_locator_3D(self):
@@ -386,38 +390,8 @@ class Receivers:
 
         return cell_tabulations
     
-    def set_point_cloud(self, comm):
-        # Receivers always parallel to z-axis
-
-        rec_pos = self.receiver_locations
-       
-        # 2D -- 
-        if self.dimension==2:
-            num_rec = self.num_receivers
-            δz   = np.linspace(rec_pos[0,0], rec_pos[num_rec-1,0], 1) 
-            δx   = np.linspace(rec_pos[0,1], rec_pos[num_rec-1,1], num_rec)
-            
-            Z, X = np.meshgrid(δz,δx)
-            xs   = np.vstack((Z.flatten(), X.flatten())).T
-        
-        #3D   
-        elif self.dimension==3:
-            δz   = np.linspace(rec_pos[0][0], rec_pos[1][0], self.column_z)
-            δx   = np.linspace(rec_pos[0][1], rec_pos[1][1], self.column_x)
-            δy   = np.linspace(rec_pos[0][2], rec_pos[1][2], self.column_y)
-
-            Z, X, Y = np.meshgrid(δz,δx,δy)
-            xs      = np.vstack((Z.flatten(),X.flatten(), Y.flatten())).T
-        else:
-            print("This dimension is not accepted.")  
-            quit() 
-        
-        point_cloud = VertexOnlyMesh(self.mesh, xs)   
-    
-        return point_cloud
 
 ## Some helper functions
-
 
 def choosing_element(V, degree):
     cell_geometry = V.mesh().ufl_cell()

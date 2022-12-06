@@ -1,7 +1,7 @@
 import os
 
 import numpy as np
-from firedrake import File
+from firedrake import File, norm
 
 from .. import io
 
@@ -11,8 +11,8 @@ __all__ = [
     "display_progress",
     "receivers_local",
     "fill",
+    "verify_stability",
 ]
-
 
 
 def fill(usol_recv, is_local, nt, nr):
@@ -60,6 +60,13 @@ def parallel_print(string, comm):
 
 def receivers_local(mesh, dimension, receiver_locations):
     if dimension == 2:
-        return [mesh.locate_cell([z, x],tolerance=0.01) for z, x in receiver_locations]
+        return [mesh.locate_cell([z, x], tolerance=0.01) for z, x in receiver_locations]
     elif dimension == 3:
-        return [mesh.locate_cell([z, x, y],tolerance=0.01) for z, x, y in receiver_locations]
+        return [mesh.locate_cell([z, x, y], tolerance=0.01) for z, x, y in receiver_locations]
+
+
+def verify_stability(u_n):
+    assert (
+                norm(u_n) < 1
+            ), "Numerical instability. Try reducing dt or building the mesh differently"
+    

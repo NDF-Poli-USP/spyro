@@ -20,7 +20,42 @@ def butter_lowpass_filter(shot, cutoff, fs, order=2):
     return filtered_shot
 
 
-def compute_functional(model, residual, velocity=None):
+def compute_functional_ad(p_rec, p_true_rec, P, comm, local_rec_index):
+    """Compute the functional to be optimized.
+    This function computes the misfit at the time t,
+    and must be used when automatic differention 
+    is employed
+
+    Parameters
+    ----------
+    p_rec: Firedrake.interpolator 
+        Solution stored at the receivers at the time t
+        and interpolated onto the VertexOnlyMesh
+    p_true_rec:  numpy data
+        Receiver data related to the True velocity model
+    P: Firedrake.FunctionSpace
+        DG0 Function Space
+    comm: Firedrake.ensemble_communicator
+        The MPI communicator for parallelism
+    local_rec_index: python list
+        List of the local receiver index 
+
+    Returns
+    -------
+    J: float
+        Cost function
+    misfit_data: numpy data
+        Misfit function
+    """
+    true_rec = scatter_data_function(
+                        p_true_rec, P, comm,
+                        local_rec_index, name="true_rec"
+                        )
+    J = assemble(0.5*inner(p_rec-true_rec, p_rec-true_rec) * dx)   
+    misfit_data = p_rec.dat.data[:] - true_rec.dat.data[:]
+    return J, misfit_data
+    
+def compute_functional(model, residual, vp=None):
     """Compute the functional to be optimized.
     Accepts the velocity optionally and uses
     it if regularization is enabled
@@ -88,7 +123,7 @@ def mpi_init(model):
         num_cores_per_shot = available_cores
     elif model["parallelism"]["type"] == "custom":
         raise ValueError("Custom parallelism not yet implemented")
-
+    
     comm_ens = Ensemble(COMM_WORLD, num_cores_per_shot)
     return comm_ens
 
@@ -117,7 +152,7 @@ def communicate(array, my_ensemble):
         if my_ensemble.comm.rank == 0 and my_ensemble.ensemble_comm.rank == 0:
             print("Spatial parallelism, reducing to comm 0", flush=True)
         my_ensemble.comm.Allreduce(array, array_reduced, op=MPI.MAX)
-    # print(array_reduced,array)
+    # print(array_reduced, array)
     return array_reduced
 
 
@@ -127,3 +162,18 @@ def analytical_solution_for_pressure_based_on_MMS(model, mesh, time):
     z, x = SpatialCoordinate(mesh)
     p = Function(V).interpolate((time ** 2) * sin(pi * z) * sin(pi * x))
     return p
+
+
+def scatter_data_function(arr, space_f, comm, local_index, name=None):
+
+    # if comm.ensemble_comm.rank == 0:
+    f = Function(space_f, name=name)
+    n = len(f.dat.data[:])
+
+    if len(local_index) > 0:
+        index_0 = local_index[0]
+        
+        f.dat.data[:] = arr[index_0:(index_0+n)]
+
+    return f
+

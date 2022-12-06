@@ -72,21 +72,23 @@ def ensemble_forward(func):
 
     return wrapper
 
-def ensemble_forward_ad(func):
-    """Decorator for forward to distribute shots for ensemble parallelism"""
+
+def ensemble_solvers_ad(func):
+    """Decorator for fwi to distribute shots for ensemble parallelism"""
     def wrapper(*args, **kwargs):
-        acq = args[0].get("acquisition")
-        num = len(acq["source_pos"])
-        fwi = kwargs.get("fwi")
+        solver_type = args[0]
+        num = args[1]
         _comm = args[2]
         for snum in range(num):
             if is_owner(_comm, snum):
-                if fwi:
-                    u_r, J = func(*args, **dict(kwargs, source_num=snum))
-                    return u_r, J
+                if solver_type == "fwi":
+                    Jm, dm0 = func(*args, **dict(kwargs, sn=snum))
+                    return Jm, dm0
+                elif solver_type == "fwd":
+                    func(*args, **dict(kwargs, sn=snum))
                 else:
-                    u_r = func(*args, **dict(kwargs, source_num=snum))
-
+                    assert (), "This solver_type is not avaiable"
+               
     return wrapper
 
 def ensemble_forward_elastic_waves(func):
