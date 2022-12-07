@@ -27,8 +27,8 @@ model = {}
 model["opts"] = {
     "method": "KMV",  # either CG or KMV
     "quadrature": "KMV", # Equi or KMV #FIXME it will be removed
-    #"degree": 2,  # p order
-    "degree": 3,  # p order
+    "degree": 2,  # p order
+    #"degree": 3,  # p order
     #"degree": 4,  # p order
     "dimension": 2,  # dimension
     "regularization": False,  # regularization is on?
@@ -146,6 +146,14 @@ def _make_field(V, guess=False, field="vp"):
     
     return fd
 #}}}
+
+QUAD = 0
+if QUAD==1:
+    model["opts"]["method"] = "CG"
+    model["opts"]["quadrature"] = "GLL"
+    model["opts"]["degree"] = 4
+    #model["opts"]["degree"] = 8
+
 comm = spyro.utils.mpi_init(model)
 distribution_parameters={"partition": True,
                          "overlap_type": (DistributedMeshOverlapType.VERTEX, 60)} #60 works for structured mesh, 120 for unstructured mesh
@@ -245,18 +253,23 @@ FIREMESH = 1
 #nx = 133 # nx=133 => dx = dz = 30.075
 #nx = 114 # nx=114 => dx = dz = 35.088
 #nx = 100 # nx=100 => dx = dz = 40 m
-#nx = 80  # nx=80  => dx = dz = 50 m
+nx = 80  # nx=80  => dx = dz = 50 m
 #nx = 60  # nx=60  => dx = dz = 66.67 m
 #nx = 50  # nx=50  => dx = dz = 80 m
 #nx = 40  # nx=40  => dx = dz = 100 m
-nx = 32  # nx=32  => dx = dz = 125 m
+#nx = 32  # nx=32  => dx = dz = 125 m
 #nx = 25  # nx=25  => dx = dz = 160 m
 #nx = 20  # nx=20  => dx = dz = 200 m
 ny = math.ceil( nx*model["mesh"]["Lz"]/model["mesh"]["Lx"] ) # nx * Lz/Lx, Delta x = Delta z
 # generate or read a mesh, and create space V {{{
 if FIREMESH: 
-    mesh = RectangleMesh(nx, ny, model["mesh"]["Lx"], model["mesh"]["Lz"], diagonal="crossed", comm=comm.comm,
-                            distribution_parameters=distribution_parameters)
+    if QUAD==0:
+        mesh = RectangleMesh(nx, ny, model["mesh"]["Lx"], model["mesh"]["Lz"], diagonal="crossed", comm=comm.comm,
+                                distribution_parameters=distribution_parameters)
+    elif QUAD==1:
+        mesh = RectangleMesh(nx, ny, model["mesh"]["Lx"], model["mesh"]["Lz"], quadrilateral=True, comm=comm.comm,
+                                distribution_parameters=distribution_parameters)
+
     mesh.coordinates.dat.data[:, 0] -= 0.0 
     mesh.coordinates.dat.data[:, 1] -= model["mesh"]["Lz"] + 0.45 # waterbottom at z=-0.450 km
 
@@ -270,7 +283,7 @@ else:
 #}}}
 
 GUESS = 1
-AMR = 0
+AMR = 1
 
 # adapt the mesh using the exact vp, if requested {{{
 if AMR and GUESS:
@@ -406,8 +419,12 @@ if AMR and GUESS:
 
 # set the file names
 h = round(1000*model["mesh"]["Lx"]/nx)
-file_name_uz = "uz_recv_AMR_" + str(AMR) + "_p_" + str(model["opts"]["degree"]) + "_h_" + str(h) + "m_freq_" + str(model["acquisition"]["frequency"])
-file_name_ux = "ux_recv_AMR_" + str(AMR) + "_p_" + str(model["opts"]["degree"]) + "_h_" + str(h) + "m_freq_" + str(model["acquisition"]["frequency"])
+if QUAD==1:
+    file_name_uz = "uz_recv_QUAD_AMR_" + str(AMR) + "_p_" + str(model["opts"]["degree"]) + "_h_" + str(h) + "m_freq_" + str(model["acquisition"]["frequency"])
+    file_name_ux = "ux_recv_QUAD_AMR_" + str(AMR) + "_p_" + str(model["opts"]["degree"]) + "_h_" + str(h) + "m_freq_" + str(model["acquisition"]["frequency"])
+else:
+    file_name_uz = "uz_recv_AMR_" + str(AMR) + "_p_" + str(model["opts"]["degree"]) + "_h_" + str(h) + "m_freq_" + str(model["acquisition"]["frequency"])
+    file_name_ux = "ux_recv_AMR_" + str(AMR) + "_p_" + str(model["opts"]["degree"]) + "_h_" + str(h) + "m_freq_" + str(model["acquisition"]["frequency"])
 
 # run guess model with a given mesh and save shots {{{
 if GUESS==1:
