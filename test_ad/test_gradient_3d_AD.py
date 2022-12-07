@@ -79,7 +79,6 @@ def test_gradient_3d_AD():
     vp_exact = fire.Function(V).interpolate( 1.0 + 0.0*x)
     vp_guess = fire.Function(V).interpolate( 0.8 + 0.0*x)
 
-
     grad_ad.gradient_test_acoustic(
                                 model, 
                                 mesh, 

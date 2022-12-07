@@ -1,6 +1,5 @@
 import numpy as np
 import firedrake as fire
-import firedrake_adjoint as fire_adj
 from pyadjoint import enlisting
 import spyro
 
@@ -19,25 +18,36 @@ def gradient_test_acoustic_ad(
         model["acquisition"]["frequency"],
     )
 
-    point_cloud = receivers.set_point_cloud(comm)
-
     from spyro.solvers.solver_ad import solver_ad
-    solver_ad = solver_ad(
-            model, mesh, sources, point_cloud, wavelet, V
-            )
-
+    # solver_ad = solver_ad(
+    #         model, mesh, sources, point_cloud, wavelet, V
+    #         )
+    solver_ad = solver_ad(model, mesh, V)
+    solver_ad.source_num = 0
+    wp = solver_ad.wave_propagate
     # simulate the exact model
     print('######## Running the exact model ########')
-    solver_ad.ad = False
-    p_exact_recv = solver_ad.wave_propagate(comm, vp_exact)
+    solver_ad.model["aut_dif"]["status"] = False
+    output = wp(
+                comm, vp_exact, sources, receivers, wavelet,
+                save_rec_data=True
+                )
+    p_exact_recv = output[0]
+    # p_exact_recv = solver_ad.wave_propagate(comm, vp_exact)
 
     # simulate the guess model
     print('######## Running the guess model ########')
-    solver_ad.ad = True
-    Jm = solver_ad.wave_propagate(
-                    comm, vp_guess, source_num=0,
-                    calc_misfit=True, true_rec=p_exact_recv
-                    )
+    solver_ad.model["aut_dif"]["status"] = True
+    import firedrake_adjoint as fire_adj
+    out = wp(
+            comm, vp_guess, sources, receivers, wavelet,
+            calc_functional=True, true_rec=p_exact_recv,
+            )
+    Jm = out[0]
+    # Jm = solver_ad.wave_propagate(
+    #                 comm, vp_guess, source_num=0,
+    #                 calc_misfit=True, true_rec=p_exact_recv
+    #                 )
     print("\n Cost functional at fixed point : " + str(Jm) + " \n ")
 
     # compute the gradient of the control (to be verified)
@@ -70,11 +80,15 @@ def gradient_test_acoustic_ad(
             # perturb the model and calculate the functional (again)
             # J(m + delta_m*h)
             vp_guess = vp_original + step * delta_m
-            model["aut_dif"]["status"] = True
-            Jp = solver_ad.wave_propagate(
-                                comm, vp_guess, source_num=0,
-                                calc_misfit=True, true_rec=p_exact_recv
-                                )
+            out = wp(
+                    comm, vp_guess, sources, receivers, wavelet,
+                    calc_functional=True, true_rec=p_exact_recv,
+                    )
+            Jp = out[0]
+            # Jp = solver_ad.wave_propagate(
+            #                     comm, vp_guess, source_num=0,
+            #                     calc_misfit=True, true_rec=p_exact_recv
+            #                     )
             
             fd_grad = (Jp - Jm) / step
             print(
