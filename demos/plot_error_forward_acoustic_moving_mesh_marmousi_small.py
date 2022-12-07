@@ -39,6 +39,16 @@ p4_dofs     = np.array([1817,  3777,  7153, 11141, 28385, 44281])
 p4_cells    = np.array([160,   336,   640,  1000, 2560,  4000])
 p4_h        = np.array([400,   286,   200,  160, 100,   80])
 
+# for p-extension (p2, p3, p4)
+h200_E_no_amr = np.array([48.31, 22.53,  8.10])
+h200_E_wi_amr = np.array([52.05, 20.42,  7.35])
+h200_dofs     = np.array([1977,  4245,   7153])
+
+h100_E_no_amr = np.array([14.99, 3.46,  1.99])
+h100_E_wi_amr = np.array([14.11, 2.56,  1.61])
+h100_dofs     = np.array([7793,  16809, 28385])
+
+
 #running with nx = 14  # nx=14  => dx = dz = 285.71 m
 
 # recomputed
@@ -48,6 +58,8 @@ p4_quad_dofs     = np.array([1425,  2673,  4141,  10465, 16281, 40125])
 p4_quad_cells    = np.array([84,    160,   250,   640,   1000,  2480])
 p4_quad_h        = np.array([286,   200,   160,   100,   80,    50])
 
+##########################################################################
+# E X DOFs
 plt.plot(p2_dofs, p2_E_no_amr, label="p=2 (no AMR)",marker="o", linestyle="-", color='tab:green')
 plt.plot(p2_dofs, p2_E_wi_amr, label="p=2 (w/ AMR)",marker="o", linestyle="--", color='tab:green')
 
@@ -60,7 +72,13 @@ plt.plot(p4_dofs, p4_E_wi_amr, label="p=4 (w/ AMR)",marker="o", linestyle="--", 
 plt.plot(p4_quad_dofs, p4_quad_E_no_amr, label="p=4 quad (no AMR)",marker="o", linestyle="-", color='tab:red')
 plt.plot(p4_quad_dofs, p4_quad_E_wi_amr, label="p=4 quad (w/ AMR)",marker="o", linestyle="--", color='tab:red')
 
-# E X DOFs
+# E x DOFs (p-extension)
+plt.plot(h200_dofs, h200_E_no_amr, label="h=200 m (no AMR)",marker="o", linestyle="-", color='darkgray')
+plt.plot(h200_dofs, h200_E_wi_amr, label="h=200 m (w/ AMR)",marker="o", linestyle="--", color='darkgray')
+
+plt.plot(h100_dofs, h100_E_no_amr, label="h=100 m (no AMR)",marker="o", linestyle="-", color='lightgray')
+plt.plot(h100_dofs, h100_E_wi_amr, label="h=100 m (w/ AMR)",marker="o", linestyle="--", color='lightgray')
+
 plt.ylabel("E (%)",fontsize=14)
 plt.xlabel("DOFs", fontsize=14)
 plt.yscale('log')
@@ -72,6 +90,7 @@ plt.grid(b=True, which='minor')
 
 plt.show()
 
+##########################################################################
 # E X Nelem
 plt.plot(p2_cells, p2_E_no_amr, label="p=2 (no AMR)",marker="o", linestyle="-", color='tab:green')
 plt.plot(p2_cells, p2_E_wi_amr, label="p=2 (w/ AMR)",marker="o", linestyle="--", color='tab:green')
@@ -95,3 +114,5 @@ plt.grid(b=True, which='major')
 plt.grid(b=True, which='minor')
 
 plt.show()
+
+
