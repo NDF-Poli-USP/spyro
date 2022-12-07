@@ -27,8 +27,8 @@ model = {}
 model["opts"] = {
     "method": "KMV",  # either CG or KMV
     "quadrature": "KMV", # Equi or KMV #FIXME it will be removed
-    "degree": 2,  # p order
-    #"degree": 3,  # p order
+    #"degree": 2,  # p order
+    "degree": 3,  # p order
     #"degree": 4,  # p order
     "dimension": 2,  # dimension
     "regularization": False,  # regularization is on?
@@ -63,8 +63,8 @@ model["BCs"] = {
 }
 
 # Receiver locations
-rec1=spyro.create_transect((0.1, -0.10-0.45), (3.9, -0.10-0.45), 100) # waterbottom at z=-0.45 km REC1)
-rec2=spyro.create_transect((0.1, -1.9), (3.9, -1.9), 100) # receivers at the bottom of the domain (z=-1.9 km) REC2
+rec1=spyro.create_transect((0.3, -0.10-0.45), (3.7, -0.10-0.45), 100) # waterbottom at z=-0.45 km REC1)
+rec2=spyro.create_transect((0.3, -1.9), (3.7, -1.9), 100) # receivers at the bottom of the domain (z=-1.9 km) REC2
 rec3=np.array(spyro.create_2d_grid(1, 3, -1.4, -1, 10)) # receivers at the middle of the domain
 rec = np.concatenate((rec1,rec2,rec3))
 
@@ -72,8 +72,9 @@ model["acquisition"] = {
     "source_type": "Ricker",
     "frequency": 6.0, # freq peak = 6 Hz, max freq = 15 Hz (see Jaquet's  Thesis) 
     "delay": 1.0, # FIXME check this
-    "num_sources": 4, #FIXME not used (remove it, and update an example script)
-    "source_pos": spyro.create_transect((0.5, -0.01-0.45), (3.5, -0.01-0.45), 4), # waterbottom at z=-0.45 km
+    "num_sources": 1, #FIXME not used (remove it, and update an example script)
+    #"source_pos": spyro.create_transect((0.5, -0.01-0.45), (3.5, -0.01-0.45), 1), # waterbottom at z=-0.45 km
+    "source_pos": spyro.create_transect((0.5, 0), (3.5, 0), 1), # waterbottom at z=-0.45 km # out of domain, only to run with some source
     "amplitude": 1.0, #FIXME check this
     "num_receivers": len(rec), #FIXME not used (remove it, and update an example script)
     "receiver_locations": rec, 
@@ -81,8 +82,8 @@ model["acquisition"] = {
 
 model["timeaxis"] = {
     "t0": 0.0,  #  Initial time for event
-    "tf": 2.5, # Final time for event 
-    "dt": 0.00025/5,  # timestep size 
+    "tf": 1.0, # Final time for event (1.0 sec is enough to reach the bottom of the domain)
+    "dt": 0.00025/4,  # timestep size 
     "nspool":  20,  # (20 for dt=0.00050) how frequently to output solution to pvds
     "fspool": 10000000,  # how frequently to save solution to RAM
 }
@@ -147,7 +148,7 @@ def _make_field(V, guess=False, field="vp"):
 #}}}
 comm = spyro.utils.mpi_init(model)
 distribution_parameters={"partition": True,
-                         "overlap_type": (DistributedMeshOverlapType.VERTEX, 120)} #60 works for structured mesh
+                         "overlap_type": (DistributedMeshOverlapType.VERTEX, 60)} #60 works for structured mesh, 120 for unstructured mesh
 
 file_name_uz = "uz_ref_recv_freq_"+str(model["acquisition"]["frequency"])
 file_name_ux = "ux_ref_recv_freq_"+str(model["acquisition"]["frequency"])
@@ -156,7 +157,7 @@ if platform.node()=='recruta':
 else:   
     path = "/share/tdsantos/shots/elastic_forward_marmousi_small/"
 
-REF = 1
+REF = 0
 # run reference model {{{
 if REF:
     _nx = 200  # nx=200 => dx = dz = 20 m => N = min(vs)/(dx * max(f)) => N = 2.5 = 300/(20 * 6)  
@@ -197,7 +198,7 @@ if REF:
     print("Starting forward computation of the exact model",flush=True) 
     start = time.time()
     u_ref, uz_ref, ux_ref, uy_ref = spyro.solvers.forward_elastic_waves(
-        model, mesh_ref, comm, rho_ref, lamb_ref, mu_ref, sources, wavelet, receivers, output=False
+        model, mesh_ref, comm, rho_ref, lamb_ref, mu_ref, sources, wavelet, receivers, output=False, use_Neumann_BC_as_source=True
     )
     end = time.time()
     print(round(end - start,2),flush=True)
@@ -215,22 +216,42 @@ if REF:
         print("DOF = " + str(V_ref.dof_count*2), flush=True) # ux and uz
         print("Nelem = " + str(mesh_ref.num_cells()), flush=True)
 
+   
+    if 1:
+        uz=[]
+        nt = int(model["timeaxis"]["tf"] / model["timeaxis"]["dt"])
+        rn = 5
+        for ti in range(nt):
+            uz.append(uz_ref[ti][rn])
+        plt.title("uz")
+        plt.plot(uz,label='uz')
+        plt.legend()
+        plt.savefig('/home/tdsantos/spyro/test_elastic_waves.png')
+        plt.close()
+
+
     sys.exit("Reference model finished!")
 
 elif REF==0:
     print("reading reference model",flush=True)
     uz_ref = spyro.io.load_shots(model, comm, file_name=path+file_name_uz)
     ux_ref = spyro.io.load_shots(model, comm, file_name=path+file_name_ux)
+    print("done",flush=True)
 #}}}
 
 # now, prepare to run with different mesh resolutions
-FIREMESH = 0
+FIREMESH = 1
 #nx = 200 # nx=200 => dx = dz = 20 m  # Reference model with p=4
+#nx = 133 # nx=133 => dx = dz = 30.075
+#nx = 114 # nx=114 => dx = dz = 35.088
 #nx = 100 # nx=100 => dx = dz = 40 m
 #nx = 80  # nx=80  => dx = dz = 50 m
+#nx = 60  # nx=60  => dx = dz = 66.67 m
 #nx = 50  # nx=50  => dx = dz = 80 m
 #nx = 40  # nx=40  => dx = dz = 100 m
-nx = 20  # nx=20  => dx = dz = 200 m
+nx = 32  # nx=32  => dx = dz = 125 m
+#nx = 25  # nx=25  => dx = dz = 160 m
+#nx = 20  # nx=20  => dx = dz = 200 m
 ny = math.ceil( nx*model["mesh"]["Lz"]/model["mesh"]["Lx"] ) # nx * Lz/Lx, Delta x = Delta z
 # generate or read a mesh, and create space V {{{
 if FIREMESH: 
@@ -248,9 +269,11 @@ else:
     mesh, V = spyro.io.read_mesh(model, comm, distribution_parameters=distribution_parameters)
 #}}}
 
-AMR = 1
+GUESS = 1
+AMR = 0
+
 # adapt the mesh using the exact vp, if requested {{{
-if AMR:
+if AMR and GUESS:
     # This mesh-grid is used to compute the monitor function
     # Alternatively, a point cloud scheme could be used instead (see Jaquet's thesis)
     _nx = 200
@@ -263,7 +286,7 @@ if AMR:
     #V_grid_DG = FunctionSpace(mesh_grid, "DG", 2) # DG will be similar to CG
     V_vec_grid = VectorFunctionSpace(mesh_grid, "CG", 2)
   
-    vs_grid = _make_field(V_grid_DG, guess=False, field="vs")
+    vs_grid = _make_field(V_grid, guess=False, field="vs")
     grad_vs_grid = Function(V_vec_grid)
 
     u_cts = TrialFunction(V_vec_grid)
@@ -308,7 +331,7 @@ if AMR:
 
     # smooth the monitor function
     if 1: # {{{
-        lamb = 0.005
+        lamb = 0.003
 
         u = TrialFunction(V_grid)
         v = TestFunction(V_grid)
@@ -381,25 +404,43 @@ if AMR:
 #}}}
 #sys.exit("exit")
 
-sources = spyro.Sources(model, mesh, V, comm)
-receivers = spyro.Receivers(model, mesh, V, comm)
-wavelet = spyro.full_ricker_wavelet(dt=model["timeaxis"]["dt"], tf=model["timeaxis"]["tf"], freq=model["acquisition"]["frequency"])
+# set the file names
+h = round(1000*model["mesh"]["Lx"]/nx)
+file_name_uz = "uz_recv_AMR_" + str(AMR) + "_p_" + str(model["opts"]["degree"]) + "_h_" + str(h) + "m_freq_" + str(model["acquisition"]["frequency"])
+file_name_ux = "ux_recv_AMR_" + str(AMR) + "_p_" + str(model["opts"]["degree"]) + "_h_" + str(h) + "m_freq_" + str(model["acquisition"]["frequency"])
 
-#V_DG = FunctionSpace(mesh, "DG", 2)
-# generate the Lamé parameters
-vp  = _make_field(V, guess=False, field="vp")
-vs  = _make_field(V, guess=False, field="vs")
-rho = _make_field(V, guess=False, field="rho")
+# run guess model with a given mesh and save shots {{{
+if GUESS==1:
+    sources = spyro.Sources(model, mesh, V, comm)
+    receivers = spyro.Receivers(model, mesh, V, comm)
+    wavelet = spyro.full_ricker_wavelet(dt=model["timeaxis"]["dt"], tf=model["timeaxis"]["tf"], freq=model["acquisition"]["frequency"])
 
-mu   = Function(V).interpolate(rho * vs ** 2.)
-lamb = Function(V).interpolate(rho * (vp ** 2. - 2. * vs ** 2.))
+    #V_DG = FunctionSpace(mesh, "DG", 2)
+    # generate the Lamé parameters
+    vp  = _make_field(V, guess=False, field="vp")
+    vs  = _make_field(V, guess=False, field="vs")
+    rho = _make_field(V, guess=False, field="rho")
 
-start = time.time()
-u, uz, ux, uy = spyro.solvers.forward_elastic_waves(model, mesh, comm, rho, lamb, mu, sources, wavelet, receivers, output=False)
-end = time.time()
-print(round(end - start,2),flush=True)
-   
-def compute_relative_error(uz, ux, uz_ref, ux_ref):
+    mu   = Function(V).interpolate(rho * vs ** 2.)
+    lamb = Function(V).interpolate(rho * (vp ** 2. - 2. * vs ** 2.))
+
+    start = time.time()
+    u, uz, ux, uy = spyro.solvers.forward_elastic_waves(model, mesh, comm, rho, lamb, mu, sources, wavelet, receivers, output=False, use_Neumann_BC_as_source=True)
+    end = time.time()
+    print(round(end - start,2),flush=True)
+
+    # save shots
+    spyro.io.save_shots(model, comm, uz, file_name=path+file_name_uz)
+    spyro.io.save_shots(model, comm, ux, file_name=path+file_name_ux)
+  
+elif GUESS==0:
+    print("reading guess model",flush=True)
+    uz = spyro.io.load_shots(model, comm, file_name=path+file_name_uz)
+    ux = spyro.io.load_shots(model, comm, file_name=path+file_name_ux)
+    print("done",flush=True)
+#}}}
+
+def compute_relative_error(uz, ux, uz_ref, ux_ref): # {{{
     J_scale = sqrt(1.e14)
 
     misfit_uz = spyro.utils.evaluate_misfit(model, uz, uz_ref)# uz_ref[i] - uz[i] (vector)
@@ -424,6 +465,7 @@ def compute_relative_error(uz, ux, uz_ref, ux_ref):
     E = sqrt(J_total[0]) # relative error as defined in Spyro paper
 
     return E
+#}}}
 
 # retrieve UZ on the receivers
 uz_rec1 = uz[:,0:100] 
@@ -455,14 +497,7 @@ E_rec3 = compute_relative_error(uz_rec3, ux_rec3, uz_ref_rec3, ux_ref_rec3)
 model["acquisition"]["receiver_locations"] = rec
 E_total = compute_relative_error(uz, ux, uz_ref, ux_ref)
 
-# save shots
-h = round(1000*model["mesh"]["Lx"]/nx)
-file_name_uz = "uz_recv_AMR_" + str(AMR) + "_p_" + str(model["opts"]["degree"]) + "_h_" + str(h) + "m_freq_" + str(model["acquisition"]["frequency"])
-file_name_ux = "ux_recv_AMR_" + str(AMR) + "_p_" + str(model["opts"]["degree"]) + "_h_" + str(h) + "m_freq_" + str(model["acquisition"]["frequency"])
-spyro.io.save_shots(model, comm, uz, file_name=path+file_name_uz)
-spyro.io.save_shots(model, comm, ux, file_name=path+file_name_ux)
-
-if comm.ensemble_comm.rank == 1:
+if comm.ensemble_comm.rank == 0:
     print("E rec1 (%) = "  + str(round(E_rec1*100,2)), flush=True)
     print("E rec2 (%) = "  + str(round(E_rec2*100,2)), flush=True)
     print("E rec3 (%) = "  + str(round(E_rec3*100,2)), flush=True)
@@ -471,5 +506,20 @@ if comm.ensemble_comm.rank == 1:
     print("h = " + str(h) + " m")
     print("DOF = " + str(V.dof_count), flush=True)
     print("Nelem = " + str(mesh.num_cells()), flush=True)
+    
+    if 1:
+        uz_rec=[]
+        uz_rec_ref=[]
+        nt = int(model["timeaxis"]["tf"] / model["timeaxis"]["dt"])
+        rn = 50
+        for ti in range(nt):
+            uz_rec_ref.append(uz_ref[ti][rn])
+            uz_rec.append(uz[ti][rn])
+        plt.title("uz_ref vs uz")
+        plt.plot(uz_rec_ref,label='uz_ref')
+        plt.plot(uz_rec,label='uz')
+        plt.legend()
+        plt.savefig('/home/tdsantos/uz_vs_uz_ref_elastic_waves.png')
+        plt.close()
 
   
