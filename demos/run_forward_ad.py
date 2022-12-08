@@ -55,4 +55,5 @@ def run_forward_true(solver_type, tot_source_num, comm, sn=0):
 
 
 solver_type = "fwd"
-run_forward_true(solver_type, sources.num_receivers, comm)
+for i in range(10):
+    run_forward_true(solver_type, sources.num_receivers, comm)

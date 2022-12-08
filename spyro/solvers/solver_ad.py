@@ -6,7 +6,7 @@ from ..domains import quadrature
 from ..pml import damping, aux_equations
 from . import helpers
 from .. import tools
-
+import copy
 # Note this turns off non-fatal warnings
 fire.set_log_level(fire.ERROR)
 
@@ -25,11 +25,6 @@ class solver_ad():
             Contains model options and parameters
         mesh: Firedrake.mesh object
             The 2D/3D triangular mesh
-        excitations: A list Firedrake.Functions
-        receivers: A :class:`spyro.Receivers` object.
-            Contains the receiver locations and sparse interpolation method fire.
-        wavelet: array-like
-            Time series data that's injected at the source location.
         """
         self.mesh = mesh
         self.model = model
@@ -43,7 +38,7 @@ class solver_ad():
                                             self.V,
                                             rec_loc)
         self.h_min = fire.COMM_WORLD.allreduce(self.h_min, op=MPI.MIN)
-        
+       
     def wave_propagate(
                         self, comm, c, excitation, receivers,
                         wavelet, output=False, **kwargs
@@ -56,8 +51,12 @@ class solver_ad():
             The MPI communicator for parallelism
         c: Firedrake.Function
             The velocity model interpolated onto the mesh.
-        source_num: `int`, optional
-            The source number you wish to simulate
+        excitations: A list Firedrake.Functions
+        receivers: A :class:`spyro.Receivers` object.
+            Contains the receiver locations and sparse 
+            interpolation method fire.
+        wavelet: array-like
+            Time series data that's injected at the source location.
         output: `boolean`, optional
             Whether or not to write results to pvd files.
 
@@ -83,16 +82,18 @@ class solver_ad():
         bc = model["BCs"]["status"]
         V = self.V
         aut_dif = self.model["aut_dif"]["status"]
+        
+        # kwargs
         save_misfit = kwargs.get("save_misfit")
         calc_functional = kwargs.get("calc_functional")
         save_rec_data = kwargs.get("save_rec_data")
         p_true_rec = kwargs.get("true_rec")
         save_p = kwargs.get("save_p")
-        excitation.current_source = self.source_num
 
+        excitation.current_source = self.source_num
+        
         params = self.set_params(method)
         qr_x, qr_s, _ = quadrature.quadrature_rules(V)
-        
         if output:
             outfile = helpers.create_output_file(
                                         "forward.pvd", comm, self.source_num
@@ -100,15 +101,11 @@ class solver_ad():
         if dim == 2:
             z, x = fire.SpatialCoordinate(self.mesh)
             if bc:
-                sigma_x, sigma_z = self.set_bc_params(dim, x, z)
-                                    
+                sigma_x, sigma_z = self.set_bc_params(dim, x, z)                          
         elif dim == 3:
             z, x, y = fire.SpatialCoordinate(self.mesh)
-
             if bc:
-                sigma_x, sigma_y, sigma_z = self.set_bc_params(
-                                        dim, x, z, y)
-                 
+                sigma_x, sigma_y, sigma_z = self.set_bc_params(dim, x, z, y)   
         u = fire.TrialFunction(V)
         v = fire.TestFunction(V)  # Test Function
         f = fire.Function(V, name="f")
@@ -118,20 +115,20 @@ class solver_ad():
 
         du2_dt2 = ((u - 2.0 * u_n + u_nm1) / fire.Constant(dt ** 2))
         t_term = du2_dt2 * v * fire.dx(rule=qr_x)
-        l_term = c * c * fire.dot(fire.grad(u_n), fire.grad(v)) * fire.dx(rule=qr_x) 
+        l_term = c * c * fire.dot(fire.grad(u_n), fire.grad(v)) * fire.dx(rule=qr_x)
         f_term = f * v * fire.dx(rule=qr_x)
         nf = 0
         if model["BCs"]["outer_bc"] == "non-reflective":
-            nf = c * ((u_n - u_nm1) / dt) * v * fire.ds(rule=qr_s)     
+            nf = c * ((u_n - u_nm1) / dt) * v * fire.ds(rule=qr_s)    
         FF = t_term + l_term - f_term + nf
-
+        
         if bc:
             if dim == 2:
                 FF += (
                         (sigma_x + sigma_z)
                         * ((u - u_nm1) / fire.Constant(2.0 * dt))
                         * v * fire.dx(rule=qr_x)
-                )
+                    )
 
                 if model["BCs"]["method"] == 'PML':
                     sigma = [sigma_x, sigma_z]
@@ -155,10 +152,10 @@ class solver_ad():
                                                                 v, FF, c, dt,
                                                                 qr_x, dim,
                                                                 params
-                                                                ) 
+                                                                )
                     pp_n, pp_nm1, pp_np1 = pp_v[0], pp_v[1], pp_v[2] 
                     psi_n, psi_nm1, psi_np1 = psi_v[0], psi_v[1], psi_v[2] 
-           
+          
         lhs_ = fire.lhs(FF)
         rhs_ = fire.rhs(FF)
 
@@ -167,10 +164,10 @@ class solver_ad():
                                     problem, solver_parameters=params
                                     )
         usol_recv = []
-        # usol = [] 
+        usol = [] 
         misfit = []
         save_step = 0
-        usol = [fire.Function(V, name="pressure") for t in range(nt) if t % fspool == 0]
+        # usol = [fire.Function(V, name="pressure") for t in range(nt) if t % fspool == 0]
         if self.solver == "bwd":
             misfit = kwargs.get("misfit")
             dJ = fire.Function(V, name="gradient")
@@ -179,7 +176,7 @@ class solver_ad():
                                                 )
         else:
             interpolator, P = receivers.vertex_only_mesh_interpolator(u_nm1)
-            receivers_local_index = receivers.local_receiver_id() 
+            receivers_local_index = receivers.local_receiver_id()
         
         J0 = 0.0
         for step in range(nt):
@@ -194,7 +191,6 @@ class solver_ad():
                 excitation.apply_source(
                         f, wavelet[step]/(self.h_min * self.h_min)
                         )
-            
             solver.solve()
             u_nm1.assign(u_n)
             u_n.assign(X)
@@ -204,7 +200,6 @@ class solver_ad():
                 interpolator.interpolate(output=rec)
                 if save_rec_data:
                     usol_recv.append(rec.vector().gather())
-
                 if calc_functional:
                     J, misfit_t = utils.compute_functional_ad(
                             rec, p_true_rec[step], P,
@@ -223,30 +218,27 @@ class solver_ad():
                     psi_np1.assign(X1)
                     psi_nm1.assign(psi_n)
                     psi_n.assign(psi_np1)
-                
+
             if self.solver == "bwd":
                 guess = kwargs.get("p_guess")
                 uuadj.assign(X)
                 uufor.dat.data[:] = guess[len(guess)-1]
                 del guess[len(guess)-1]
-                # .assign(guess.pop())   
-             
                 grad_solver.solve()
                 dJ += gradi
 
             if save_p and step % fspool == 0:
-                usol[save_step].assign(X)
-                # usol.append(copy.deepcopy(X.dat.data[:]))
+                # usol[save_step].assign(X)
+                usol.append(copy.deepcopy(X.dat.data[:]))
                 save_step += 1
-
             if step % nspool == 0:
                 time = step*dt
-                if aut_dif:
-                    from firedrake_adjoint import stop_annotating
-                    with stop_annotating():
-                        helpers.verify_stability(u_n)
-                else:
-                    helpers.verify_stability(u_n)
+                # if aut_dif:
+                #     from firedrake_adjoint import stop_annotating
+                #     with stop_annotating():
+                #         helpers.verify_stability(u_n)
+                # else:
+                #     helpers.verify_stability(u_n)
                 
                 if output:
                     outfile.write(u_n, time=time, name="Pressure")
@@ -263,7 +255,6 @@ class solver_ad():
             out.append(np.asarray(usol_recv))
         if self.solver == "bwd":
             out.append(dJ)
-
         return out
         
     def set_params(self, method):
@@ -274,7 +265,7 @@ class solver_ad():
                     }
         elif (
             method == "CG"
-            and fire.mesh.ufl_cell() != fire.quadrilateralcd 
+            and fire.mesh.ufl_cell() != fire.quadrilateral
             and fire.mesh.ufl_cell() != fire.hexahedron
         ):
             params = {
@@ -290,8 +281,7 @@ class solver_ad():
                     "pc_type": "jacobi"
                     }
         else:
-            raise ValueError("method is not yet supported")
-        
+            raise ValueError("method is not yet supported")  
         return params
         
     def set_bc_params(self, dim, x, z, y=None):

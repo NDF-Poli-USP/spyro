@@ -96,8 +96,8 @@ def run_source(xi):
     J_total = fire.COMM_WORLD.allreduce(Jm, op=MPI.SUM)
     # dJ /= comm.ensemble_comm.size
 
-    if comm.ensemble_comm.rank == 0:
-        grad_file.write(dJ)
+    # if comm.ensemble_comm.rank == 0:
+    #     grad_file.write(dJ)
 
     return J_total, dJ.dat.data
 

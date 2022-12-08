@@ -71,9 +71,9 @@ def model_settings(vel_model):
             "source_type": "Ricker",
             "frequency": 7.0, 
             "delay": 1.0,  # FIXME check this
-            "num_sources": 2,  # FIXME not used (remove it, and update an example script)
+            "num_sources": 1,  # FIXME not used (remove it, and update an example script)
             # "source_pos": [(-0.11, 0.5)],
-            "source_pos": spyro.create_transect((-0.11, 0.2), (-0.11, 0.8), 2),
+            "source_pos": spyro.create_transect((-0.11, 0.2), (-0.11, 0.8), 1),
             "amplitude": 1.0,  # FIXME check this
             "receiver_locations": spyro.create_transect((-0.15, 0.2), (-0.15, 0.8), 10),
         }
