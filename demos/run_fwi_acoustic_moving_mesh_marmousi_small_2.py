@@ -19,6 +19,7 @@ from scipy.interpolate import RegularGridInterpolator
 from scipy.interpolate import griddata
 from spyro.io import write_function_to_grid, create_segy
 #from ..domains import quadrature, space
+import platform
 
 # define the model parameters {{{
 model = {}
@@ -79,7 +80,7 @@ model["acquisition"] = {
 model["timeaxis"] = {
     "t0": 0.0,  #  Initial time for event
     "tf": 2.5, # Final time for event 
-    "dt": 0.00025,  # timestep size 
+    "dt": 0.00025/2,  # timestep size 
     "nspool":  20,  # (20 for dt=0.00050) how frequently to output solution to pvds
     "fspool": 10,  # how frequently to save solution to RAM
 }
@@ -177,10 +178,10 @@ if REF:
 
     sys.exit("Reference model finished!")
 
-#}}}
 if REF==0:
     print("reading reference model",flush=True)
     p_ref_recv = spyro.io.load_shots(model, comm, file_name=path+file_name)
+#}}}
 
 # now, prepare to run with different mesh resolutions
 FIREMESH = 1
@@ -501,7 +502,7 @@ obj = Objective(inner_product)
 #}}}
 
 # function to adapt the mesh {{{
-def adapt_mesh()
+#def adapt_mesh()
     # compute the monitor function
 
     # call monge-ampere solver
