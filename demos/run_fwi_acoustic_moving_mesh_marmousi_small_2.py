@@ -131,7 +131,7 @@ if platform.node()=='recruta':
 else:
     path = "/share/tdsantos/shots/acoustic_fwi_moving_mesh_marmousi_small/"
 
-REF = 1
+REF = 0
 # run reference model {{{
 if REF:
     _nx = 200
@@ -185,7 +185,7 @@ if REF==0:
 
 # now, prepare to run with different mesh resolutions
 FIREMESH = 1
-# generate or read a mesh {{{
+# generate or read the initial mesh and space V on which vp is defined {{{
 if FIREMESH: 
 
     mesh = RectangleMesh(25, 12, model["mesh"]["Lx"], model["mesh"]["Lz"], diagonal="crossed", comm=comm.comm,
@@ -203,157 +203,24 @@ else:
     mesh, V = spyro.io.read_mesh(model, comm, distribution_parameters=distribution_parameters)
 #}}}
 
-AMR = 1
-# adapt the mesh using the exact vp, if requested {{{
-if AMR:
-    nx = 200
-    ny = math.ceil( 100*(model["mesh"]["Lz"]-0.45)/model["mesh"]["Lz"] ) # (Lz-0.45)/Lz
-    mesh_grid = RectangleMesh(nx, ny, model["mesh"]["Lx"], model["mesh"]["Lz"], diagonal="crossed", comm=comm.comm,
-                            distribution_parameters=distribution_parameters)
-    mesh_grid.coordinates.dat.data[:, 0] -= 0.0 
-    mesh_grid.coordinates.dat.data[:, 1] -= model["mesh"]["Lz"] + 0.45 # waterbottom at z=-0.45 km
-    V_grid = FunctionSpace(mesh_grid, "CG", 2)
-    V_grid_DG = FunctionSpace(mesh_grid, "DG", 2)
-    V_vec_grid = VectorFunctionSpace(mesh_grid, "CG", 2)
-  
-    vp_grid = _make_vp(V_grid_DG, vp_guess=False)
-    grad_vp_grid = Function(V_vec_grid)
-
-    u_cts = TrialFunction(V_vec_grid)
-    v_cts = TestFunction(V_vec_grid)
-    a = inner(v_cts, u_cts)*dx
-    L = inner(v_cts, grad(vp_grid))*dx
-    _cg = {
-        "ksp_type": "cg",
-        "pc_type": "bjacobi",
-        "pc_sub_type": "ilu",
-    }
-    _problem = LinearVariationalProblem(a, L, grad_vp_grid, bcs=None)
-    _solver = LinearVariationalSolver(_problem, solver_parameters=_cg) 
-    _solver.solve()
-
-    File("grad_vp_grid.pvd").write(grad_vp_grid)
-    File("vp_grid.pvd").write(vp_grid)
-
-    # Huang type monitor function
-    E1 = sqrt( inner( grad_vp_grid, grad_vp_grid ) ) # gradient based estimate
-    E2 = vp_grid.vector().gather().max() / vp_grid - 1 # a priori error estimate (it starts on 1, so it could be better)
-
-    E = E1
-    beta = 0.5 # (0, 1) # for E2 + smooth
-    phi = sqrt( 1 + E*E ) - 1
-    phi_hat = assemble(phi*dx(domain=mesh_grid)) / assemble(Constant(1.0)*dx(domain=mesh_grid))
-    alpha = beta / ( phi_hat * ( 1 - beta ) )
-    M1 = 1 + alpha * phi
-   
-    E = E2
-    beta = 0.5 # (0, 1) # for E2 + smooth
-    phi = sqrt( 1 + E*E ) - 1
-    phi_hat = assemble(phi*dx(domain=mesh_grid)) / assemble(Constant(1.0)*dx(domain=mesh_grid))
-    alpha = beta / ( phi_hat * ( 1 - beta ) )
-    M2 = 1 + alpha * phi
-
-    M = max_value(M1,M2)
-
-    # Define the monitor function to be projected onto the adapted mesh
-    Mfunc = Function(V_grid)
-    Mfunc.interpolate(M)
-
-    # smooth the monitor function
-    if 1: # {{{
-        lamb = 0.001
-
-        u = TrialFunction(V_grid)
-        v = TestFunction(V_grid)
-        u_n = Function(V_grid)
-
-        m = inner((u - u_n), v) * dx 
-        a = lamb * inner(grad(u), grad(v)) * dx # implicit
-        F = m + a
-
-        lhs_ = lhs(F)
-        rhs_ = rhs(F)
-
-        X = Function(V_grid)
-        B = Function(V_grid)
-        A = assemble(lhs_)
-
-        params = {"ksp_type": "preonly", "pc_type": "lu"}
-        solver = LinearSolver(A, solver_parameters=params)
-
-        u_n.assign(Mfunc)
-        nt = 1
-        for step in range(nt):
-            B = assemble(rhs_, tensor=B)
-            solver.solve(X, B)
-            u_n.assign(X)
-
-        Mfunc.assign(u_n)
-    #}}}
-
-    File("Mfunc.pvd").write(Mfunc)
-    #sys.exit("exit")
-
-    def monitor_function(mesh): # here, mesh is the physical doman, i.e., x (=xi+Grad phi)
-        # project onto "mesh" that is being adapted (i.e., mesh_x)
-        _P1 = FunctionSpace(mesh, "CG", 1) 
-        _M = Function(_P1)
-        spyro.mesh_to_mesh_projection(Mfunc, _M, degree=5)
-        File("Mfunc_x.pvd").write(_M)
-        return _M
-    
-    V_DG = FunctionSpace(mesh, "DG", 2)
-    _vp = _make_vp(V_DG, vp_guess=False)
-    File("vp_before_amr.pvd").write(_vp)
-    #sys.exit("exit")
-        
-    def mask_receivers(mesh):
-        _x,_y = mesh.coordinates
-        g = conditional(_y < -1.99, 0, 1) # 0 apply BC
-        g = conditional(_y > -0.01, 0, g)
-        g = conditional(_x < 0.01, 0, g)
-        g = conditional(_x > 3.99, 0, g)
-        return g
-    
-    def mask_dummy(mesh):
-        return Constant(1.)
-
-    #fix_boundary_nodes = False
-    mask = mask_dummy
-    #if FIREMESH==0:
-    #    fix_boundary_nodes = True
-    #    mask = mask_receivers
-
-    mesh._parallel_compatible = {weakref.ref(mesh_grid)}
-    step = spyro.monge_ampere_solver(mesh, monitor_function, p=1, mask=mask) #fix_boundary_nodes=fix_boundary_nodes) 
-
-    _vp = _make_vp(V_DG, vp_guess=False)
-    File("vp_after_amr.pvd").write(_vp)
-#}}}
-#sys.exit("exit")
-
-sources = spyro.Sources(model, mesh, V, comm)
-receivers = spyro.Receivers(model, mesh, V, comm)
+# define the source wave function
 wavelet = spyro.full_ricker_wavelet(dt=model["timeaxis"]["dt"], tf=model["timeaxis"]["tf"], freq=model["acquisition"]["frequency"])
 
-vp_guess = _make_vp(V, vp_guess=True) 
+# define max and min values of vp (used in ROL)
 vp_exact = _make_vp(V, vp_guess=False)
+min_vp = vp_exact.vector().gather().min()
+max_vp = vp_exatc.vector().gather().max()
 
-# now, starts the FWI computation
-m = V.ufl_domain()
-W = VectorFunctionSpace(m, V.ufl_element())
-X = interpolate(m.coordinates, W)
-source_mask = np.where(X.sub(1).dat.data[:] > -0.50)
-
-#ft = Function(V).interpolate(Constant(1.0))
-#ft.dat.data[source_mask] = 0.0
-#File("ft.pvd").write(ft)
-#print(source_mask)
-#sys.exit("exit")
+# controls
+Ji=[]
+outfile = File("final_vp.pvd")
+max_loop_it = 5 # the number of iteration here depends on the max iteration of ROL (IT CAN NOT BE SMALLER THAN 'Maximum Storage')
+max_rol_it = 10
+AMR = 0
 
 class L2Inner(object): #{{{
     # used in the gradient norm computation
-    def __init__(self):
+    def __init__(self, V):
         self.A = assemble( TrialFunction(V) * TestFunction(V) * dx, mat_type="matfree")
         self.Ap = as_backend_type(self.A).mat()
 
@@ -366,11 +233,12 @@ class L2Inner(object): #{{{
 #}}}
 # Objective {{{
 class Objective(ROL.Objective):
-    def __init__(self, inner_product):
+    def __init__(self, V, inner_product, p_ref_recv, sources, receivers):
         ROL.Objective.__init__(self)
+        self.V = V
         self.inner_product = inner_product
         self.p_guess = None
-        self.vp = Function(V)
+        self.vp = Function(self.V)
         self.misfit = 0.0
         self.J = 0.0
         self.p_exact_recv = p_ref_recv
@@ -417,7 +285,7 @@ class Objective(ROL.Objective):
 
     def gradient(self, g, x, tol):
         """Compute the gradient of the functional"""
-        dJ = Function(V, name="gradient")
+        dJ = Function(self.V, name="gradient")
         dJ_local = spyro.solvers.gradient(model,
                                           mesh,
                                           comm,
@@ -434,14 +302,14 @@ class Objective(ROL.Objective):
             dJ /= comm.comm.size
 
         # mask the source layer
-        dJ.dat.data[source_mask] = 0.0
+        #dJ.dat.data[source_mask] = 0.0
         File("dJ_acoustic_original.pvd").write(dJ)
         
         g.scale(0)
         g.vec += dJ
 
     def update(self, x, flag, iteration):
-        self.vp.assign(Function(V, x.vec, name="vp"))
+        self.vp.assign(Function(self.V, x.vec, name="vp"))
 
 #}}}
 # ROL parameters definition {{{
@@ -478,61 +346,162 @@ paramsDict = {
         'Relative Gradient Tolerance': 1e-10,
         "Step Tolerance": 1.0e-15,
         'Relative Step Tolerance': 1e-15,
-        "Iteration Limit": 15
+        "Iteration Limit": max_rol_it
     },  
 }       
 #}}}
-# prepare to run FWI, set guess add control bounds to the problem (uses more RAM) {{{
-params = ROL.ParameterList(paramsDict, "Parameters")
-inner_product = L2Inner()
-
-xig = Function(V) # initial guess
-xlo = Function(V) # lower bound
-xup = Function(V) # upper bound
-
-xig.dat.data[:] = vp_guess.dat.data[:]
-xlo.dat.data[:] = min(vp_exact.dat.data[:])
-xup.dat.data[:] = max(vp_exact.dat.data[:])
-
-x_lo = FeVector(xlo.vector(), inner_product)
-x_up = FeVector(xup.vector(), inner_product)
-    
-bnd = ROL.Bounds(x_lo, x_up, 1.0)
-obj = Objective(inner_product)
+# create grid/mesh to interpolate inverted field {{{
+nx = 200
+ny = math.ceil( nx*model["mesh"]["Lz"]/model["mesh"]["Lx"] ) # nx * Lz/Lx, Delta x = Delta z
+mesh_grid = RectangleMesh(nx, ny, model["mesh"]["Lx"], model["mesh"]["Lz"], diagonal="crossed", comm=comm.comm,
+                        distribution_parameters=distribution_parameters)
+mesh_grid.coordinates.dat.data[:, 0] -= 0.0 
+mesh_grid.coordinates.dat.data[:, 1] -= model["mesh"]["Lz"] + 0.45 # waterbottom at z=-0.45 km
+V_grid = FunctionSpace(mesh_grid, "CG", 2)
+V_vec_grid = VectorFunctionSpace(mesh_grid, "CG", 2)
 #}}}
 
-# function to adapt the mesh {{{
-#def adapt_mesh()
-    # compute the monitor function
-
-    # call monge-ampere solver
-
-    # return the adapted mesh
-
-#}}}
-
-Ji=[]
-outfile = File("final_vp.pvd")
-max_loop_it = 5 # the number of iteration here depends on the max iteration of ROL (IT CAN NOT BE SMALLER THAN 'Maximum Storage')
-max_rol_it = 10
-
-for i in range(max_loop_it):
+# FWI loop with or without mesh adaptation important: (if mesh changes, V changes too)
+for i in range(max_loop_it): # it should be thought as re-mesh
+ 
     print("###### Loop iteration ="+str(i), flush=True)
     print("###### FWI iteration performed ="+str(i*max_rol_it), flush=True)
 
-    # at this moment, mesh_x=mesh_xi
-    obj.vp.dat.data_with_halos[:] = xig.dat.data_ro_with_halos[:] # initial guess (mesh_x)
+    # create sources and receivers for a given mesh and space V
+    sources = spyro.Sources(model, mesh, V, comm)
+    receivers = spyro.Receivers(model, mesh, V, comm)
+    if i==0:
+        vp_guess = _make_vp(V, vp_guess=True) # only in the beginning 
+
+# prepare to run FWI, set guess add control bounds to the problem {{{
+    params = ROL.ParameterList(paramsDict, "Parameters")
+    inner_product = L2Inner(V) # if mesh changes, V changes also
+
+    xlo = Function(V) # lower bound
+    xup = Function(V) # upper bound
+
+    xlo.dat.data_with_halos[:] = min_vp
+    xup.dat.data_with_halos[:] = max_vp
+
+    x_lo = FeVector(xlo.vector(), inner_product)
+    x_up = FeVector(xup.vector(), inner_product)
+        
+    bnd = ROL.Bounds(x_lo, x_up, 1.0)
+    obj = Objective(V, inner_product, p_ref_recv, sources, receivers)
+#}}}
+
+    obj.vp.dat.data_with_halos[:] = vp_guess.dat.data_ro_with_halos[:] # initial guess 
     outfile.write(obj.vp,time=i)
 
     print("   Minimize: starting ROL solver...", flush=True)
-    problem = ROL.OptimizationProblem(obj, FeVector(xig.vector(), inner_product), bnd=bnd)
+    
+    problem = ROL.OptimizationProblem(obj, FeVector(vp_guess.vector(), inner_product), bnd=bnd)
     solver = ROL.OptimizationSolver(problem, params)
     solver.solve()
 
-    xig.dat.data_with_halos[:] = obj.vp.dat.data_ro_with_halos[:] # no mesh movement, therefore mesh_x=mesh_xi
+    # interpolate the inverted field on the grid/mesh
+    vp_grid = Function(V_grid).interpolate(obj.vp)
+    grad_vp_grid = Function(V_vec_grid)
+
+# adapt the mesh using inverted vp, if requested {{{
+    if AMR:
+        print("   Adapt mesh: starting Monge-Ampere solver...", flush=True)
+
+        u_cts = TrialFunction(V_vec_grid)
+        v_cts = TestFunction(V_vec_grid)
+        a = inner(v_cts, u_cts)*dx
+        L = inner(v_cts, grad(vp_grid))*dx
+        _cg = {
+            "ksp_type": "cg",
+            "pc_type": "bjacobi",
+            "pc_sub_type": "ilu",
+        }
+        _problem = LinearVariationalProblem(a, L, grad_vp_grid, bcs=None)
+        _solver = LinearVariationalSolver(_problem, solver_parameters=_cg) 
+        _solver.solve()
+
+        File("grad_vp_grid.pvd").write(grad_vp_grid)
+        File("vp_grid.pvd").write(vp_grid)
+
+        # Huang type monitor function
+        E1 = sqrt( inner( grad_vp_grid, grad_vp_grid ) ) # gradient based estimate
+        E2 = vp_grid.vector().gather().max() / vp_grid - 1 # a priori error estimate (it starts on 1, so it could be better)
+
+        E = E1
+        beta = 0.5 # (0, 1) # for E2 + smooth
+        phi = sqrt( 1 + E*E ) - 1
+        phi_hat = assemble(phi*dx(domain=mesh_grid)) / assemble(Constant(1.0)*dx(domain=mesh_grid))
+        alpha = beta / ( phi_hat * ( 1 - beta ) )
+        M1 = 1 + alpha * phi
+   
+        E = E2
+        beta = 0.5 # (0, 1) # for E2 + smooth
+        phi = sqrt( 1 + E*E ) - 1
+        phi_hat = assemble(phi*dx(domain=mesh_grid)) / assemble(Constant(1.0)*dx(domain=mesh_grid))
+        alpha = beta / ( phi_hat * ( 1 - beta ) )
+        M2 = 1 + alpha * phi
+
+        M = max_value(M1,M2)
+
+        # Define the monitor function to be projected onto the adapted mesh
+        Mfunc = Function(V_grid).interpolate(M)
+
+        # smooth the monitor function
+        if 1: # {{{
+            lamb = 0.001
+
+            u = TrialFunction(V_grid)
+            v = TestFunction(V_grid)
+            u_n = Function(V_grid)
+
+            m = inner((u - u_n), v) * dx 
+            a = lamb * inner(grad(u), grad(v)) * dx # implicit
+            F = m + a
+
+            lhs_ = lhs(F)
+            rhs_ = rhs(F)
+
+            X = Function(V_grid)
+            B = Function(V_grid)
+            A = assemble(lhs_)
+
+            params = {"ksp_type": "preonly", "pc_type": "lu"}
+            solver = LinearSolver(A, solver_parameters=params)
+
+            u_n.assign(Mfunc)
+            nt = 1
+            for step in range(nt):
+                B = assemble(rhs_, tensor=B)
+                solver.solve(X, B)
+                u_n.assign(X)
+
+            Mfunc.assign(u_n)
+        #}}}
+
+        File("Mfunc.pvd").write(Mfunc)
+        #sys.exit("exit")
+
+        def monitor_function(mesh): # here, mesh is the physical doman, i.e., x (=xi+Grad phi)
+            # project onto "mesh" that is being adapted (i.e., mesh_x)
+            _P1 = FunctionSpace(mesh, "CG", 1) 
+            _M = Function(_P1)
+            spyro.mesh_to_mesh_projection(Mfunc, _M, degree=5)
+            File("Mfunc_x.pvd").write(_M)
+            return _M
+            
+        def mask_dummy(mesh):
+            return Constant(1.)
+
+        mesh._parallel_compatible = {weakref.ref(mesh_grid)}
+        step = spyro.monge_ampere_solver(mesh, monitor_function, p=2, mask=mask_dummy) #fix_boundary_nodes=fix_boundary_nodes) 
+#}}}
+
+    # now, interpolate the inverted field on the initial guess fuction (defined now in the adpated or non-adapted mesh)
+    vp_guess.interpolate(vp_grid) # vp_guess is a function of V, so it will be changed according to mesh
 
     Ji.append(obj.J)
 
+# write final solution and J
 outfile.write(obj.vp,time=i)
 if COMM_WORLD.rank == 0:
     with open(r'J_with_amr.txt', 'w') as fp:
