@@ -123,31 +123,37 @@ comm = spyro.utils.mpi_init(model)
 distribution_parameters={"partition": True,
                          "overlap_type": (DistributedMeshOverlapType.VERTEX, 60)}
 
-REF = 0
+# set the reference file name
+file_name = "p_ref_p4_recv_freq_"+str(model["acquisition"]["frequency"]) # with P=4
+if platform.node()=='recruta':
+    path = "./shots/acoustic_fwi_moving_mesh_marmousi_small/"
+else:
+    path = "/share/tdsantos/shots/acoustic_fwi_moving_mesh_marmousi_small/"
+
+REF = 1
 # run reference model {{{
 if REF:
-    nx = 200
-    ny = math.ceil( 100*(model["mesh"]["Lz"]-0.45)/model["mesh"]["Lz"] ) # (Lz-0.45)/Lz
-    
-    mesh_ref = RectangleMesh(nx, ny, model["mesh"]["Lx"], model["mesh"]["Lz"], diagonal="crossed", comm=comm.comm,
+    _nx = 200
+    _ny = math.ceil( 100*(model["mesh"]["Lz"]-0.45)/model["mesh"]["Lz"] ) # (Lz-0.45)/Lz
+   
+    # here, we do not need overlaping vertices
+    distribution_parameters = {"overlap_type": (DistributedMeshOverlapType.NONE, 0)}
+
+    mesh_ref = RectangleMesh(_nx, _ny, model["mesh"]["Lx"], model["mesh"]["Lz"], diagonal="crossed", comm=comm.comm,
                             distribution_parameters=distribution_parameters)
     mesh_ref.coordinates.dat.data[:, 0] -= 0.0 
     mesh_ref.coordinates.dat.data[:, 1] -= model["mesh"]["Lz"] + 0.45 # waterbottom at z=-0.450 km
 
     # for the exact model, use a higher-order element
-    #p = model["opts"]["degree"] # to keep the order defined by the user
-    #model["opts"]["degree"] = 4
+    model["opts"]["degree"] = 4
     element = spyro.domains.space.FE_method(mesh_ref, model["opts"]["method"], model["opts"]["degree"])
     V_ref = FunctionSpace(mesh_ref, element)
-
-    element_DG = spyro.domains.space.FE_method(mesh_ref, "DG", 2) # here, it could be 2 too
-    V_DG = FunctionSpace(mesh_ref, element_DG)
 
     sources = spyro.Sources(model, mesh_ref, V_ref, comm)
     receivers = spyro.Receivers(model, mesh_ref, V_ref, comm)
     wavelet = spyro.full_ricker_wavelet(dt=model["timeaxis"]["dt"], tf=model["timeaxis"]["tf"], freq=model["acquisition"]["frequency"])
 
-    vp_ref = _make_vp(V_DG, vp_guess=False)
+    vp_ref = _make_vp(V_ref, vp_guess=False)
     #sys.exit("exit")
     print("Starting forward computation of the exact model",flush=True) 
     start = time.time()
@@ -156,16 +162,28 @@ if REF:
     )
     end = time.time()
     print(round(end - start,2),flush=True)
-    File("p_ref.pvd").write(p_ref[-1])
+    if 0:
+        File("p_ref.pvd").write(p_ref[-1])
 
-    spyro.io.save_shots(model, comm, p_ref_recv, file_name="./shots/acoustic_fwi_marmousi_small/p_ref_recv")
+    spyro.io.save_shots(model, comm, p_ref_recv, file_name=path+file_name)
+    
+    _h = round(1000*model["mesh"]["Lx"]/_nx)
+    if comm.ensemble_comm.rank == 1:
+        print("Reference model:", flush=True)
+        print("p = " + str(model["opts"]["degree"]))
+        print("h = " + str(_h) + " m")
+        print("DOF = " + str(V_ref.dof_count), flush=True)
+        print("Nelem = " + str(mesh_ref.num_cells()), flush=True)
+
+    sys.exit("Reference model finished!")
+
 #}}}
-#sys.exit("exit")
 if REF==0:
-    p_ref_recv = spyro.io.load_shots(model, comm, file_name="./shots/acoustic_fwi_marmousi_small/p_ref_recv")
+    print("reading reference model",flush=True)
+    p_ref_recv = spyro.io.load_shots(model, comm, file_name=path+file_name)
 
 # now, prepare to run with different mesh resolutions
-FIREMESH = 0
+FIREMESH = 1
 # generate or read a mesh {{{
 if FIREMESH: 
 
@@ -317,7 +335,6 @@ sources = spyro.Sources(model, mesh, V, comm)
 receivers = spyro.Receivers(model, mesh, V, comm)
 wavelet = spyro.full_ricker_wavelet(dt=model["timeaxis"]["dt"], tf=model["timeaxis"]["tf"], freq=model["acquisition"]["frequency"])
 
-#V_DG = FunctionSpace(mesh, "DG", 2) # FIXME test the forward model with vp in CG
 vp_guess = _make_vp(V, vp_guess=True) 
 vp_exact = _make_vp(V, vp_guess=False)
 
