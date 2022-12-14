@@ -17,6 +17,7 @@ from scipy.ndimage import gaussian_filter
 from mpi4py import MPI
 from scipy.interpolate import RegularGridInterpolator
 from scipy.interpolate import griddata
+from scipy.interpolate import interp1d
 from spyro.io import write_function_to_grid, create_segy
 #from ..domains import quadrature, space
 import platform
@@ -80,7 +81,8 @@ model["acquisition"] = {
 model["timeaxis"] = {
     "t0": 0.0,  #  Initial time for event
     "tf": 2.5, # Final time for event 
-    "dt": 0.00025/2,  # timestep size 
+    "dt": 0.00050,  # timestep size for guess model
+    #"dt": 0.00050/4,  # timestep size 0.00050/4 for reference model with nx = 200 
     "nspool":  20,  # (20 for dt=0.00050) how frequently to output solution to pvds
     "fspool": 10,  # how frequently to save solution to RAM
 }
@@ -129,13 +131,14 @@ file_name = "p_ref_p4_recv_freq_"+str(model["acquisition"]["frequency"]) # with 
 if platform.node()=='recruta':
     path = "./shots/acoustic_fwi_moving_mesh_marmousi_small/"
 else:
-    path = "/share/tdsantos/shots/acoustic_fwi_moving_mesh_marmousi_small/"
+    #path = "/share/tdsantos/shots/acoustic_fwi_moving_mesh_marmousi_small/"
+    path = "/share/tdsantos/shots/acoustic_fwi_moving_mesh_marmousi_small_h20_m_TOO_SLOW/" # nx=200 (ref model)
 
 REF = 0
 # run reference model {{{
 if REF:
-    _nx = 200
-    _ny = math.ceil( 100*(model["mesh"]["Lz"]-0.45)/model["mesh"]["Lz"] ) # (Lz-0.45)/Lz
+    _nx = 200 # 200 is the original, 50 is to speed-up
+    _ny = math.ceil( _nx*model["mesh"]["Lz"]/model["mesh"]["Lx"] )
    
     # here, we do not need overlaping vertices
     distribution_parameters = {"overlap_type": (DistributedMeshOverlapType.NONE, 0)}
@@ -180,15 +183,49 @@ if REF:
 
 if REF==0:
     print("reading reference model",flush=True)
-    p_ref_recv = spyro.io.load_shots(model, comm, file_name=path+file_name)
+    p_ref_recv_original = spyro.io.load_shots(model, comm, file_name=path+file_name)
+    
+    print("interpolating p_ref_recv on the time points of the guess model",flush=True)
+    n_t, n_rec = p_ref_recv_original.shape
+    dt = model["timeaxis"]['tf']/n_t
+
+    time_vector_ref = np.zeros((1,n_t)) 
+    for ite in range(n_t):
+        time_vector_ref[0,ite] = dt*ite
+
+    dt = model["timeaxis"]['dt'] # guess
+    n_t = int(model["timeaxis"]['tf']/dt) # guess
+
+    time_vector_guess = np.zeros((1,n_t))
+    for ite in range(n_t):
+        time_vector_guess[0,ite] = dt*ite
+
+    p_ref_recv = np.zeros((n_t, n_rec)) # size of the guess model
+    for rec in range(n_rec):
+        f = interp1d(time_vector_ref[0,:], p_ref_recv_original[:,rec] )
+        p_ref_recv[:,rec] = f(time_vector_guess[0,:])
+
+    if 0:
+        plt.title("p")
+        rec = 99
+        plt.plot(time_vector_ref[0,:],p_ref_recv_original[:,rec],label='exact')
+        plt.plot(time_vector_guess[0,:],p_ref_recv[:,rec],label='guess')
+        plt.legend()
+        plt.savefig('/home/tdsantos/test_acoustic.png')
+        plt.close()
+
+    #sys.exit("exit")
 #}}}
 
 # now, prepare to run with different mesh resolutions
 FIREMESH = 1
 # generate or read the initial mesh and space V on which vp is defined {{{
 if FIREMESH: 
+    #_nx = 25 # too coarse
+    _nx = 50 # h=80m
+    _ny = math.ceil( _nx*model["mesh"]["Lz"]/model["mesh"]["Lx"] )
 
-    mesh = RectangleMesh(25, 12, model["mesh"]["Lx"], model["mesh"]["Lz"], diagonal="crossed", comm=comm.comm,
+    mesh = RectangleMesh(_nx, _ny, model["mesh"]["Lx"], model["mesh"]["Lz"], diagonal="crossed", comm=comm.comm,
                             distribution_parameters=distribution_parameters)
     mesh.coordinates.dat.data[:, 0] -= 0.0 
     mesh.coordinates.dat.data[:, 1] -= model["mesh"]["Lz"] + 0.45 # waterbottom at z=-0.450 km
@@ -208,15 +245,32 @@ wavelet = spyro.full_ricker_wavelet(dt=model["timeaxis"]["dt"], tf=model["timeax
 
 # define max and min values of vp (used in ROL)
 vp_exact = _make_vp(V, vp_guess=False)
+vp_guess = _make_vp(V, vp_guess=True)  
 min_vp = vp_exact.vector().gather().min()
-max_vp = vp_exatc.vector().gather().max()
+max_vp = vp_exact.vector().gather().max()
+
+# keep the original coordinates (computational mesh) to be used during the mesh adaption, if requested
+xi = Function(mesh.coordinates, name="Computational coordinates")
+
+# define mask to be applied over the source region (it will avoid high gradient values over there)
+#m = V.ufl_domain()
+#W = VectorFunctionSpace(m, V.ufl_element())
+#X = interpolate(m.coordinates, W)
+#source_mask = np.where(X.sub(1).dat.data[:] > -0.53)
+#if 0:
+#    ft = Function(V).interpolate(Constant(1.0))
+#    ft.dat.data[source_mask] = 0.0
+#    File("ft.pvd").write(ft)
+#    print(source_mask)
+#    sys.exit("exit")
 
 # controls
 Ji=[]
 outfile = File("final_vp.pvd")
-max_loop_it = 5 # the number of iteration here depends on the max iteration of ROL (IT CAN NOT BE SMALLER THAN 'Maximum Storage')
-max_rol_it = 10
-AMR = 0
+max_loop_it = 4 # the number of iteration here depends on the max iteration of ROL (IT CAN NOT BE SMALLER THAN 'Maximum Storage')
+max_rol_it = 20 
+#max_rol_it = 2 # FIXME to debug
+AMR = 1
 
 class L2Inner(object): #{{{
     # used in the gradient norm computation
@@ -233,7 +287,7 @@ class L2Inner(object): #{{{
 #}}}
 # Objective {{{
 class Objective(ROL.Objective):
-    def __init__(self, V, inner_product, p_ref_recv, sources, receivers):
+    def __init__(self, V, inner_product, p_ref_recv, sources, receivers, source_mask):
         ROL.Objective.__init__(self)
         self.V = V
         self.inner_product = inner_product
@@ -244,6 +298,7 @@ class Objective(ROL.Objective):
         self.p_exact_recv = p_ref_recv
         self.sources = sources
         self.receivers = receivers
+        self.source_mask = source_mask
 
     def value(self, x, tol):
         """Compute the functional"""
@@ -258,6 +313,27 @@ class Objective(ROL.Objective):
                                                            output=False)
 
         self.misfit = spyro.utils.evaluate_misfit(model, p_guess_recv, self.p_exact_recv)
+        if 1:
+            num_receivers = len(model["acquisition"]["receiver_locations"])
+            dt = model["timeaxis"]["dt"]
+            tf = model["timeaxis"]["tf"]
+            nt = int(tf / dt)  # number of timesteps
+            for ti in range(nt):
+                for rn in range(num_receivers):
+                    if self.misfit[ti][rn] > 1:
+                        print("receiver with error: "+str(rn),flush=True)
+                        pg=[]
+                        for ti in range(nt):
+                            pg.append(p_guess_recv[ti][rn])
+                        plt.title("p")
+                        plt.plot(pg,label='guess')
+                        plt.legend()
+                        plt.savefig('/home/tdsantos/receiver_with_error.png')
+                        plt.close()
+                        #sys.exit("close")
+
+
+
         J_total[0] += spyro.utils.compute_functional(model, self.misfit, vp=self.vp)
         J_total = COMM_WORLD.allreduce(J_total, op=MPI.SUM)
         J_total[0] /= comm.ensemble_comm.size # paralelismo ensemble (fontes)
@@ -301,8 +377,8 @@ class Objective(ROL.Objective):
         if comm.comm.size > 1:
             dJ /= comm.comm.size
 
-        # mask the source layer
-        #dJ.dat.data[source_mask] = 0.0
+        # mask the source layer to avoid higher gradient values over there
+        dJ.dat.data[self.source_mask] = 0.0
         File("dJ_acoustic_original.pvd").write(dJ)
         
         g.scale(0)
@@ -370,8 +446,19 @@ for i in range(max_loop_it): # it should be thought as re-mesh
     # create sources and receivers for a given mesh and space V
     sources = spyro.Sources(model, mesh, V, comm)
     receivers = spyro.Receivers(model, mesh, V, comm)
-    if i==0:
-        vp_guess = _make_vp(V, vp_guess=True) # only in the beginning 
+
+    # update source mask
+    m = V.ufl_domain()
+    W = VectorFunctionSpace(m, V.ufl_element())
+    X = interpolate(m.coordinates, W)
+    source_mask = np.where(X.sub(1).dat.data[:] > -0.53)
+    if 0: # {{{
+        ft = Function(V).interpolate(Constant(1.0))
+        ft.dat.data[source_mask] = 0.0
+        File("ft.pvd").write(ft)
+        print(source_mask)
+    #    sys.exit("exit")
+    #}}}
 
 # prepare to run FWI, set guess add control bounds to the problem {{{
     params = ROL.ParameterList(paramsDict, "Parameters")
@@ -387,11 +474,11 @@ for i in range(max_loop_it): # it should be thought as re-mesh
     x_up = FeVector(xup.vector(), inner_product)
         
     bnd = ROL.Bounds(x_lo, x_up, 1.0)
-    obj = Objective(V, inner_product, p_ref_recv, sources, receivers)
+    obj = Objective(V, inner_product, p_ref_recv, sources, receivers, source_mask)
 #}}}
 
     obj.vp.dat.data_with_halos[:] = vp_guess.dat.data_ro_with_halos[:] # initial guess 
-    outfile.write(obj.vp,time=i)
+    outfile.write(vp_guess,time=i)
 
     print("   Minimize: starting ROL solver...", flush=True)
     
@@ -400,7 +487,8 @@ for i in range(max_loop_it): # it should be thought as re-mesh
     solver.solve()
 
     # interpolate the inverted field on the grid/mesh
-    vp_grid = Function(V_grid).interpolate(obj.vp)
+    vp_grid = Function(V_grid)
+    spyro.mesh_to_mesh_projection(obj.vp, vp_grid, degree=5)
     grad_vp_grid = Function(V_vec_grid)
 
 # adapt the mesh using inverted vp, if requested {{{
@@ -422,6 +510,7 @@ for i in range(max_loop_it): # it should be thought as re-mesh
 
         File("grad_vp_grid.pvd").write(grad_vp_grid)
         File("vp_grid.pvd").write(vp_grid)
+        #sys.exit("exit")
 
         # Huang type monitor function
         E1 = sqrt( inner( grad_vp_grid, grad_vp_grid ) ) # gradient based estimate
@@ -482,7 +571,7 @@ for i in range(max_loop_it): # it should be thought as re-mesh
         #sys.exit("exit")
 
         def monitor_function(mesh): # here, mesh is the physical doman, i.e., x (=xi+Grad phi)
-            # project onto "mesh" that is being adapted (i.e., mesh_x)
+            # project onto "mesh" that is being adapted (i.e., mesh(x))
             _P1 = FunctionSpace(mesh, "CG", 1) 
             _M = Function(_P1)
             spyro.mesh_to_mesh_projection(Mfunc, _M, degree=5)
@@ -492,17 +581,26 @@ for i in range(max_loop_it): # it should be thought as re-mesh
         def mask_dummy(mesh):
             return Constant(1.)
 
+        # change the mesh coordinates to the original ones (computational mesh)
+        mesh.coordinates.assign(xi)
+
+        # make mesh and mesh_grid parallel compatible (to perform mesh-to-mesh interpolation via projection)
         mesh._parallel_compatible = {weakref.ref(mesh_grid)}
+        
+        # ok, adapt the mesh according to the monitor function
         step = spyro.monge_ampere_solver(mesh, monitor_function, p=2, mask=mask_dummy) #fix_boundary_nodes=fix_boundary_nodes) 
+        
+        # now, clear spatial index
+        mesh.clear_spatial_index()
 #}}}
 
     # now, interpolate the inverted field on the initial guess fuction (defined now in the adpated or non-adapted mesh)
-    vp_guess.interpolate(vp_grid) # vp_guess is a function of V, so it will be changed according to mesh
-
+    spyro.mesh_to_mesh_projection(vp_grid, vp_guess, degree=5)
+    
     Ji.append(obj.J)
 
 # write final solution and J
-outfile.write(obj.vp,time=i)
+outfile.write(vp_guess,time=i)
 if COMM_WORLD.rank == 0:
     with open(r'J_with_amr.txt', 'w') as fp:
     #with open(r'J_no_amr.txt', 'w') as fp:
