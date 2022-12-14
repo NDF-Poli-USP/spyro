@@ -251,9 +251,9 @@ elif REF==0:
 FIREMESH = 1
 #nx = 200 # nx=200 => dx = dz = 20 m  # Reference model with p=4
 #nx = 133 # nx=133 => dx = dz = 30.075
-#nx = 114 # nx=114 => dx = dz = 35.088
+nx = 114 # nx=114 => dx = dz = 35.088
 #nx = 100 # nx=100 => dx = dz = 40 m
-nx = 80  # nx=80  => dx = dz = 50 m
+#nx = 80  # nx=80  => dx = dz = 50 m
 #nx = 60  # nx=60  => dx = dz = 66.67 m
 #nx = 50  # nx=50  => dx = dz = 80 m
 #nx = 40  # nx=40  => dx = dz = 100 m
@@ -409,6 +409,9 @@ if AMR and GUESS:
     mesh._parallel_compatible = {weakref.ref(mesh_grid)}
     start = time.time()
     step = spyro.monge_ampere_solver(mesh, monitor_function, p=2, mask=mask) #fix_boundary_nodes=fix_boundary_nodes) 
+    # since coordinates were chanegd, clear spatial index
+    mesh.clear_spatial_index()
+
     end = time.time()
     print(round(end - start,2),flush=True)
 
