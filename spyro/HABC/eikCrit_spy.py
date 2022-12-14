@@ -257,14 +257,17 @@ def mapBound(yp, mesh, Lx, Ly):
     xbound = xcoord[ref_bound]
     ybound = ycoord[ref_bound]
 
-    max_value = 0.0
     boundary_points = []
     minv = minh = np.inf
+    print(ybound)
+    tol = 1e-2
 
-    for i in enumerate(xbound):
-        point = (xbound[i],ybound[i]) 
+    for i,_ in enumerate(xbound):
+        point = (np.sign(xbound[i])*(abs(xbound[i])-tol),np.sign(ybound[i])*(abs(ybound[i])-tol)) 
         boundary_points.append(point)
         value = yp.at(point) 
+
+# sign(x)*(abs(x)-e)
 
         if ybound[i] >= Ly:
             if value < minh:
