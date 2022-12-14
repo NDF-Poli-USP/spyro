@@ -245,6 +245,52 @@ def vel_bound(boundmesh, c_eik, Lx, Ly):
     return cbound
 
 
+def mapBound(yp, mesh, Lx, Ly):
+    '''
+    Mapping of positions inside of absorbing layer
+    '''
+    xcoord = mesh.coordinates.dat.data[:,0]
+    ycoord = mesh.coordinates.dat.data[:,1]
+
+    ref_bound = (xcoord >= Lx) | (ycoord <= 0) | (ycoord >= Ly)
+
+    xbound = xcoord[ref_bound]
+    ybound = ycoord[ref_bound]
+
+    max_value = 0.0
+    boundary_points = []
+    minv = minh = np.inf
+
+    for i in enumerate(xbound):
+        point = (xbound[i],ybound[i]) 
+        boundary_points.append(point)
+        value = yp.at(point) 
+
+        if ybound[i] >= Ly:
+            if value < minh:
+                minh = value
+                ih = i
+        else:
+            if value < minv:
+                minv = value
+                iv = i
+            
+    list_min = [minh, minv]
+    list_ind = [ih, iv]
+    min_value = min(list_min)
+    sec_value = max(list_min)
+    min_indice = np.argmin(list_min)
+    sec_indice = np.argmax(list_min)
+    
+    min_x = xbound[list_ind[min_indice]]
+    min_y = ybound[list_ind[min_indice]]
+    
+    sec_x = xbound[list_ind[sec_indice]]
+    sec_y = ybound[list_ind[sec_indice]]
+
+    return min_value, (min_x, min_y), sec_value, (sec_x, sec_y)
+
+
 def bcMesh(mesh, c_eik, Lx, Ly, CamComp=False):
     '''
     Extract boundary from original domain
@@ -312,32 +358,39 @@ def Eikonal(Wave):
     # uy_data = uy.dat.data[:]
     # mesh_coord = V.tabulate_dof_coordinates()
     # Velocity profile and coordinates at boundary
-    cbound, bcoord = bcMesh(mesh, c_eik, Wave.length_z, Wave.length_x)
+    # cbound, bcoord = bcMesh(mesh, c_eik, Wave.length_z, Wave.length_x)
+    min_value, min_point, sec_value, sec_point = mapBound(yp, mesh, Wave.length_z, Wave.length_x)
+    # eik_max, posCrit = mapBound(yp, mesh, Wave.length_z, Wave.length_x)
+    
 
     # Defining critical points for vertical and horizontal boundaries
-    yp.set_allow_extrapolation(True)
+    # yp.set_allow_extrapolation(True)
     coordCritEik = np.empty([2, 4])
-    refx = refy = ref0 = ref1 = 0
-    for i, coord in enumerate(bcoord):
-        xc = coord[0]
-        yc = coord[1]
-        if xc <= 0.0 or xc >= Wave.length_z and yc > 0.0:
-            ref0 = yp(xc, yc)
-            if refx == 0 or ref0 < refx:
-                refx = ref0
-                coordCritEik[0, :] = [xc, yc, cbound(xc, yc), refx]
-        else:
-            ref1 = yp(xc, yc)
-            if refy == 0 or ref1 < refy:
-                refy = ref1
-                coordCritEik[1, :] = [xc, yc, cbound(xc, yc), refy]
+    # refx = refy = ref0 = ref1 = 0
+    # for i, coord in enumerate(bcoord):
+    #     xc = coord[0]
+    #     yc = coord[1]
+    #     if xc <= 0.0 or xc >= Wave.length_z and yc > 0.0:
+    #         ref0 = yp(xc, yc)
+    #         if refx == 0 or ref0 < refx:
+    #             refx = ref0
+    #             coordCritEik[0, :] = [xc, yc, cbound(xc, yc), refx]
+    #     else:
+    #         ref1 = yp(xc, yc)
+    #         if refy == 0 or ref1 < refy:
+    #             refy = ref1
+    #             coordCritEik[1, :] = [xc, yc, cbound(xc, yc), refy]
     del yp
+    min_px, min_py = min_point
+    sec_px, sec_py = sec_point
+    coordCritEik[0, :] = [min_px, min_py, c_eik.at(min_point), min_value]
+    coordCritEik[1, :] = [sec_px, sec_py, c_eik.at(sec_point), sec_value]
     np.savetxt('/out/Eik.txt', coordCritEik, delimiter='\t')
     # Minimum eikonal at boundaries
-    eik0cr = np.argmin(coordCritEik[:, -1])
-    posCrit = np.array([coordCritEik[eik0cr, 0], coordCritEik[eik0cr, 1]])
+    # eik0cr = np.argmin(coordCritEik[:, -1])
+    # posCrit = np.array([coordCritEik[eik0cr, 0], coordCritEik[eik0cr, 1]])
     # Inverse of minimum Eikonal (For approximating c_bound/lref)
-    Z = 1 / min(coordCritEik[:, -1])
-    cref = coordCritEik[eik0cr, 2]
+    Z = 1 / min_value
+    cref = c_eik.at(min_point)
 
-    return Z, posCrit, cref
+    return Z, min_point, cref

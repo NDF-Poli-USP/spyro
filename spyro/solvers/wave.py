@@ -51,6 +51,8 @@ class Wave():
         self.cell_type = model_parameters.cell_type
         self.degree = model_parameters.degree
         self.dimension = model_parameters.dimension
+        self.length_z = model_parameters.length_z
+        self.length_x = model_parameters.length_x
 
         self.abc_status = model_parameters.abc_status
         self.outer_bc = model_parameters.abc_outer_bc
