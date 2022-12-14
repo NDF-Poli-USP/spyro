@@ -383,6 +383,10 @@ if AMR:
     mesh._parallel_compatible = {weakref.ref(mesh_grid)}
     start = time.time()
     step = spyro.monge_ampere_solver(mesh, monitor_function, p=2, mask=mask) #fix_boundary_nodes=fix_boundary_nodes) 
+    
+    # since coordinates were chanegd, clear spatial index
+    mesh.clear_spatial_index()
+
     end = time.time()
     print(round(end - start,2),flush=True)
     
