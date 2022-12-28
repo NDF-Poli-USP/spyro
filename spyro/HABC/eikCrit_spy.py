@@ -245,78 +245,126 @@ def vel_bound(boundmesh, c_eik, Lx, Ly):
     return cbound
 
 
+# def pot_arr(dim, nel, pot_usu=13):
+#     '''
+#     Return the value of the rounding power to avoid numerical errors in 
+#     bidimensional problems
+
+#     Args:
+#         dim (dict): Domain dimensions
+#         nel (dict): Mesh size
+#         pot_usu (int): User-supplied initialization power
+
+#     Returns:
+#         pot (int): Rounding power
+#     '''
+#     def iter_pot(dim_i, nel_i, pot_usu):
+#         '''
+#         Args:
+#             dim_i (float): Dimension in the i-th direction
+#             nel_i (int): Number of elements in the i-th direction
+
+#         Returns:
+#             pot (int): Rounding power
+#         '''
+#         pot = int(pot_usu)
+#         while dim_i * 10**pot % 2 * nel_i != 0:
+#             pot += 1
+
+#         return pot
+
+#     pot1 = iter_pot(dim['b'], nel['nb'], pot_usu)
+#     pot2 = iter_pot(dim['h'], nel['nh'], pot_usu)
+
+#     return max([pot1, pot2])
+
+
 def mapBound(yp, mesh, Lx, Ly):
     '''
     Mapping of positions inside of absorbing layer
     '''
+    Lx = -Lx
     xcoord = mesh.coordinates.dat.data[:,0]
     ycoord = mesh.coordinates.dat.data[:,1]
 
-    ref_bound = (xcoord >= Lx) | (ycoord <= 0) | (ycoord >= Ly)
+    # np.finfo(float).eps
+    eps = 1e-14
+    ref_bound = (xcoord >= Lx-eps) | (ycoord <= 0+eps) | (ycoord >= Ly-eps)
 
-    xbound = xcoord[ref_bound]
-    ybound = ycoord[ref_bound]
+    x_boundary = xcoord[ref_bound]
+    y_boundary = ycoord[ref_bound]
 
     boundary_points = []
-    minv = minh = np.inf
-    print(ybound)
+    min_vertical = min_horizontal = np.inf
+    print(y_boundary)
     tol = 1e-2
 
-    for i,_ in enumerate(xbound):
-        point = (np.sign(xbound[i])*(abs(xbound[i])-tol),np.sign(ybound[i])*(abs(ybound[i])-tol)) 
+    for i,_ in enumerate(x_boundary):
+        # point = (np.sign(xbound[i])*(abs(xbound[i])-tol),np.sign(ybound[i])*(abs(ybound[i])-tol)
+        point_x = x_boundary[i]
+        point_y = y_boundary[i]
+        if abs(point_x-Lx)<=eps:
+            point_x += eps
+        if abs(point_x-0) <= eps:
+            point_x -= eps
+        if abs(point_y-0) <= eps:
+            point_y += eps
+        if abs(point_y-Ly) <= eps:
+            point_y -= eps
+
+        point = (point_x, point_y)
         boundary_points.append(point)
+
         value = yp.at(point) 
 
-# sign(x)*(abs(x)-e)
-
-        if ybound[i] >= Ly:
-            if value < minh:
-                minh = value
+        if y_boundary[i] >= Ly:
+            if value < min_horizontal:
+                min_horizontal = value
                 ih = i
+                point_h = point
         else:
-            if value < minv:
-                minv = value
+            if value < min_vertical:
+                min_vertical = value
                 iv = i
-            
-    list_min = [minh, minv]
-    list_ind = [ih, iv]
-    min_value = min(list_min)
-    sec_value = max(list_min)
-    min_indice = np.argmin(list_min)
-    sec_indice = np.argmax(list_min)
-    
-    min_x = xbound[list_ind[min_indice]]
-    min_y = ybound[list_ind[min_indice]]
-    
-    sec_x = xbound[list_ind[sec_indice]]
-    sec_y = ybound[list_ind[sec_indice]]
+                point_v = point
 
-    return min_value, (min_x, min_y), sec_value, (sec_x, sec_y)
+    if min_horizontal < min_vertical:
+        min_value = min_horizontal
+        min_point = point_h
+        sec_value = min_vertical
+        sec_point = point_v 
+    else:
+        min_value = min_vertical
+        min_point = point_v
+        sec_value = min_horizontal
+        sec_point = point_h
+
+    return min_value, min_point, sec_value, sec_point
 
 
-def bcMesh(mesh, c_eik, Lx, Ly, CamComp=False):
-    '''
-    Extract boundary from original domain
-    mesh: Mesh without layer
-    c_eik: Velocity profile without layer
-    Lx, Ly: Original domain dimensions
-    CamComp: False for top free surface
-    '''
-    boundmesh = BoundaryMesh(mesh, 'exterior')
+# def bcMesh(mesh, c_eik, Lx, Ly, CamComp=False):
+#     '''
+#     Extract boundary from original domain
+#     mesh: Mesh without layer
+#     c_eik: Velocity profile without layer
+#     Lx, Ly: Original domain dimensions
+#     CamComp: False for top free surface
+#     '''
+#     boundmesh = BoundaryMesh(mesh, 'exterior')
 
-    if not CamComp:
-        dom_cut = CompiledSubDomain('(x[0] == x1 && x[1] >= y1 && \
-            x[1] <= y2) || (x[0] == x2 && x[1] >= y1 && x[1] <= y2) || \
-            (x[1] == y1 && x[0] >= x1 && x[0] <= x2)', x1=0, x2=Lx, y1=0, y2=Ly)
-        boundmesh = SubMesh(boundmesh, dom_cut)
-    # File('/out/boundmesh.pvd') << boundmesh
-    # Coordinates of boundary mesh
-    bcoord = boundmesh.coordinates()
-    del boundmesh
-    # Velocitiy profile in boundary mesh
-    cbound = vel_bound(boundmesh, c_eik, Lx, Ly)
-    cbound.set_allow_extrapolation(True)
-    return cbound, bcoord
+#     if not CamComp:
+#         dom_cut = CompiledSubDomain('(x[0] == x1 && x[1] >= y1 && \
+#             x[1] <= y2) || (x[0] == x2 && x[1] >= y1 && x[1] <= y2) || \
+#             (x[1] == y1 && x[0] >= x1 && x[0] <= x2)', x1=0, x2=Lx, y1=0, y2=Ly)
+#         boundmesh = SubMesh(boundmesh, dom_cut)
+#     # File('/out/boundmesh.pvd') << boundmesh
+#     # Coordinates of boundary mesh
+#     bcoord = boundmesh.coordinates()
+#     del boundmesh
+#     # Velocitiy profile in boundary mesh
+#     cbound = vel_bound(boundmesh, c_eik, Lx, Ly)
+#     cbound.set_allow_extrapolation(True)
+#     return cbound, bcoord
 
 
 # def Eikonal(mesh, c_eik, possou, lmin, Lx, Ly):
