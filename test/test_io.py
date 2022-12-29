@@ -9,7 +9,7 @@ except ImportError:
     seismic_mesh = False
 
 
-@pytest.mark.skipif(not seismic_mesh)
+@pytest.mark.skipif(not seismic_mesh, reason="No SeismicMesh")
 def test_read_and_write_segy():
     vp_name = "velocity_models/test"
     segy_file = vp_name+".segy"
