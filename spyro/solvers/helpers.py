@@ -14,7 +14,6 @@ __all__ = [
 ]
 
 
-
 def fill(usol_recv, is_local, nt, nr):
     usol_recv = np.asarray(usol_recv)
     for ti in range(nt):
@@ -54,12 +53,14 @@ def display_progress(comm, t):
     if comm.ensemble_comm.rank == 0 and comm.comm.rank == 0:
         print(f"Simulation time is: {t:{10}.{4}} seconds", flush=True)
 
+
 def parallel_print(string, comm):
     if comm.ensemble_comm.rank == 0 and comm.comm.rank == 0:
-        print(string, flush = True)
+        print(string, flush=True)
+
 
 def receivers_local(mesh, dimension, receiver_locations):
     if dimension == 2:
-        return [mesh.locate_cell([z, x],tolerance=0.01) for z, x in receiver_locations]
+        return [mesh.locate_cell([z, x], tolerance=0.01) for z, x in receiver_locations]
     elif dimension == 3:
-        return [mesh.locate_cell([z, x, y],tolerance=0.01) for z, x, y in receiver_locations]
+        return [mesh.locate_cell([z, x, y], tolerance=0.01) for z, x, y in receiver_locations]

@@ -21,9 +21,9 @@ def ensemble_save(func):
         for snum in range(num):
             if is_owner(_comm, snum) and _comm.comm.rank == 0:
                 if custom_file_name is None:
-                    func(*args, **dict(kwargs, file_name = "shots/shot_record_"+str(snum+1)+".dat"))
+                    func(*args, **dict(kwargs, file_name="shots/shot_record_"+str(snum+1)+".dat"))
                 else:
-                    func(*args, **dict(kwargs, file_name = custom_file_name))
+                    func(*args, **dict(kwargs, file_name=custom_file_name))
     return wrapper
 
 
@@ -37,10 +37,10 @@ def ensemble_load(func):
         for snum in range(num):
             if is_owner(_comm, snum):
                 if custom_file_name is None:
-                    values = func(*args, **dict(kwargs, file_name = "shots/shot_record_"+str(snum+1)+".dat"))
+                    values = func(*args, **dict(kwargs, file_name="shots/shot_record_"+str(snum+1)+".dat"))
                 else:
-                    values = func(*args, **dict(kwargs, file_name = custom_file_name))
-                return values 
+                    values = func(*args, **dict(kwargs, file_name=custom_file_name))
+                return values
     return wrapper
 
 
@@ -70,6 +70,7 @@ def ensemble_forward(func):
 
     return wrapper
 
+
 def ensemble_forward_ad(func):
     """Decorator for forward to distribute shots for ensemble parallelism"""
     def wrapper(*args, **kwargs):
@@ -86,6 +87,7 @@ def ensemble_forward_ad(func):
                     u_r = func(*args, **dict(kwargs, source_num=snum))
 
     return wrapper
+
 
 def ensemble_forward_elastic_waves(func):
     """Decorator for forward elastic waves to distribute shots for ensemble parallelism"""
@@ -172,8 +174,8 @@ def create_segy(velocity, filename):
 
     velocity = np.flipud(velocity.T)
 
-    spec.sorting = 2 # not sure what this means
-    spec.format = 1 # not sure what this means
+    spec.sorting = 2  # not sure what this means
+    spec.format = 1  # not sure what this means
     spec.samples = range(velocity.shape[0])
     spec.ilines = range(velocity.shape[1])
     spec.xlines = range(velocity.shape[0])
@@ -244,8 +246,6 @@ def is_owner(ens_comm, rank):
 
     """
     return ens_comm.ensemble_comm.rank == (rank % ens_comm.ensemble_comm.size)
-
-
 
 
 def _check_units(c):

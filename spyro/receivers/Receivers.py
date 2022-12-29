@@ -42,13 +42,13 @@ class Receivers:
         self.dimension = model["opts"]["dimension"]
         self.degree = model["opts"]["degree"]
         self.receiver_locations = model["acquisition"]["receiver_locations"]
-        
-        if self.dimension==3 and model["aut_dif"]['status']:
+
+        if self.dimension == 3 and model["aut_dif"]['status']:
             self.column_x = model["acquisition"]["num_rec_x_columns"]
             self.column_y = model["acquisition"]["num_rec_y_columns"]
             self.column_z = model["acquisition"]["num_rec_z_columns"]
             self.num_receivers = self.column_x*self.column_y
-       
+
         else:
             self.num_receivers = len(self.receiver_locations)
 
@@ -57,7 +57,7 @@ class Receivers:
         self.cell_tabulations = None
         self.cellNodeMaps = None
         self.nodes_per_cell = None
-        self.quadrilateral = (model["opts"]['quadrature']=='GLL')
+        self.quadrilateral = (model["opts"]['quadrature'] == 'GLL')
         self.is_local = [0] * self.num_receivers
         if not self.automatic_adjoint:
             self.build_maps()
@@ -77,10 +77,10 @@ class Receivers:
             tolerance = 1e-6
             if self.dimension == 2:
                 receiver_z, receiver_x = self.receiver_locations[rid]
-                cell_id = self.mesh.locate_cell([receiver_z, receiver_x], tolerance=tolerance )
+                cell_id = self.mesh.locate_cell([receiver_z, receiver_x], tolerance=tolerance)
             elif self.dimension == 3:
                 receiver_z, receiver_x, receiver_y = self.receiver_locations[rid]
-                cell_id = self.mesh.locate_cell([receiver_z, receiver_x, receiver_y], tolerance=tolerance )
+                cell_id = self.mesh.locate_cell([receiver_z, receiver_x, receiver_y], tolerance=tolerance)
             self.is_local[rid] = cell_id
 
         (
@@ -116,12 +116,12 @@ class Receivers:
             if self.is_local[rid]:
                 idx = np.int_(self.cellNodeMaps[rid])
                 phis = self.cell_tabulations[rid]
-               
+
                 tmp = np.dot(phis, value)
                 rhs_forcing.dat.data_with_halos[idx] += tmp
             else:
                 tmp = rhs_forcing.dat.data_with_halos[0]
-       
+
         return rhs_forcing
 
     def __func_receiver_locator(self):
@@ -180,10 +180,10 @@ class Receivers:
         cellNodeMaps = np.zeros((num_recv, nodes_per_cell))
         cellVertices = []
 
-        if self.quadrilateral == True:
+        if self.quadrilateral is True:
             end_vertex_id = 4
             degree = self.degree
-            cell_ends = [0, (degree+1)*(degree+1)-degree-1,  (degree+1)*(degree+1)-1, degree]
+            cell_ends = [0, (degree+1)*(degree+1)-degree-1, (degree+1)*(degree+1)-1, degree]
         else:
             end_vertex_id = 3
             cell_ends = [0, 1, 2]
@@ -301,13 +301,13 @@ class Receivers:
         return node_locations
 
     def __func_build_cell_tabulations(self):
-        if self.dimension == 2   and self.quadrilateral == False:
+        if self.dimension == 2 and self.quadrilateral is False:
             return self.__func_build_cell_tabulations_2D()
-        elif self.dimension == 3 and self.quadrilateral == False:
+        elif self.dimension == 3 and self.quadrilateral is False:
             return self.__func_build_cell_tabulations_3D()
-        elif self.dimension == 2 and self.quadrilateral == True:
+        elif self.dimension == 2 and self.quadrilateral is True:
             return self.__func_build_cell_tabulations_2D_quad()
-        elif self.dimension == 3 and self.quadrilateral == True:
+        elif self.dimension == 3 and self.quadrilateral is True:
             raise ValueError('3D GLL hexas not yet supported.')
         else:
             raise ValueError
@@ -362,7 +362,7 @@ class Receivers:
         finatelement = FiniteElement('CG', self.mesh.ufl_cell(), degree=self.degree, variant='spectral')
         V = FunctionSpace(self.mesh, finatelement)
         u = TrialFunction(V)
-        Q=u.function_space()
+        Q = u.function_space()
         element = Q.finat_element.fiat_equivalent
 
         cell_tabulations = np.zeros((self.num_receivers, self.nodes_per_cell))
@@ -371,7 +371,7 @@ class Receivers:
             cell_id = self.is_local[receiver_id]
             if cell_id is not None:
                 # getting coordinates to change to reference element
-                p  = self.receiver_locations[receiver_id]
+                p = self.receiver_locations[receiver_id]
                 v0 = self.cellVertices[receiver_id][0]
                 v1 = self.cellVertices[receiver_id][1]
                 v2 = self.cellVertices[receiver_id][2]
@@ -383,40 +383,39 @@ class Receivers:
 
                 cell_tabulations[receiver_id, :] = phi_tab.transpose()
 
-
         return cell_tabulations
-    
+
     def set_point_cloud(self, comm):
         # Receivers always parallel to z-axis
 
         rec_pos = self.receiver_locations
-       
-        # 2D -- 
-        if self.dimension==2:
-            num_rec = self.num_receivers
-            δz   = np.linspace(rec_pos[0,0], rec_pos[num_rec-1,0], 1) 
-            δx   = np.linspace(rec_pos[0,1], rec_pos[num_rec-1,1], num_rec)
-            
-            Z, X = np.meshgrid(δz,δx)
-            xs   = np.vstack((Z.flatten(), X.flatten())).T
-        
-        #3D   
-        elif self.dimension==3:
-            δz   = np.linspace(rec_pos[0][0], rec_pos[1][0], self.column_z)
-            δx   = np.linspace(rec_pos[0][1], rec_pos[1][1], self.column_x)
-            δy   = np.linspace(rec_pos[0][2], rec_pos[1][2], self.column_y)
 
-            Z, X, Y = np.meshgrid(δz,δx,δy)
-            xs      = np.vstack((Z.flatten(),X.flatten(), Y.flatten())).T
+        # 2D --
+        if self.dimension == 2:
+            num_rec = self.num_receivers
+            δz = np.linspace(rec_pos[0, 0], rec_pos[num_rec-1, 0], 1)
+            δx = np.linspace(rec_pos[0, 1], rec_pos[num_rec-1, 1], num_rec)
+            
+            Z, X = np.meshgrid(δz, δx)
+            xs = np.vstack((Z.flatten(), X.flatten())).T
+
+        # 3D
+        elif self.dimension == 3:
+            δz = np.linspace(rec_pos[0][0], rec_pos[1][0], self.column_z)
+            δx = np.linspace(rec_pos[0][1], rec_pos[1][1], self.column_x)
+            δy = np.linspace(rec_pos[0][2], rec_pos[1][2], self.column_y)
+
+            Z, X, Y = np.meshgrid(δz, δx, δy)
+            xs = np.vstack((Z.flatten(), X.flatten(), Y.flatten())).T
         else:
-            print("This dimension is not accepted.")  
-            quit() 
-        
-        point_cloud = VertexOnlyMesh(self.mesh, xs)   
-    
+            print("This dimension is not accepted.")
+            quit()
+
+        point_cloud = VertexOnlyMesh(self.mesh, xs)
+
         return point_cloud
 
-## Some helper functions
+# Some helper functions
 
 
 def choosing_element(V, degree):
@@ -747,6 +746,7 @@ def change_to_reference_tetrahedron(p, a, b, c, d):
 
     return (pnx, pny, pnz)
 
+
 def change_to_reference_quad(p, v0, v1, v2, v3):
     (px, py) = p
     # Irregular quad
@@ -773,17 +773,17 @@ def change_to_reference_quad(p, v0, v1, v2, v3):
     sumy = y0 - y1 + y2 - y3
 
     gover = np.array([[sumx, dx2],
-                    [sumy, dy2]])
+                     [sumy, dy2]])
 
-    g_under= np.array([[dx1, dx2 ],
-                    [dy1, dy2 ]])
+    g_under = np.array([[dx1, dx2],
+                       [dy1, dy2]])
 
     gunder = np.linalg.det(g_under)
-                    
-    hover = np.array([[dx1, sumx],
-                    [dy1, sumy]])
 
-    hunder= gunder
+    hover = np.array([[dx1, sumx],
+                      [dy1, sumy]])
+
+    hunder = gunder
 
     g = np.linalg.det(gover)/gunder
     h = np.linalg.det(hover)/hunder

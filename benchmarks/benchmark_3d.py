@@ -95,7 +95,7 @@ points, cells = SeismicMesh.generate_mesh(
     max_iter=80,
     comm=comm.ensemble_comm,
     verbose=2
-    )
+)
 
 points, cells = SeismicMesh.sliver_removal(
     points=points,
@@ -104,7 +104,7 @@ points, cells = SeismicMesh.sliver_removal(
     domain=cube,
     edge_length=edge_length,
     preserve=True
-    )
+)
 
 meshio.write_points_cells(
     "meshes/benchmark_3d.msh",
@@ -112,7 +112,7 @@ meshio.write_points_cells(
     [("tetra", cells)],
     file_format="gmsh22",
     binary=False
-    )
+)
 
 # Mesh generation finishes here.
 
@@ -134,7 +134,7 @@ element = fire.FiniteElement(
     mesh.ufl_cell(),
     degree=degree,
     variant="KMV"
-    )
+)
 
 V = fire.FunctionSpace(mesh, element)
 
@@ -164,5 +164,5 @@ p, p_r = spyro.solvers.forward(
     sources,
     wavelet,
     receivers
-    )
+)
 print(time.time() - t1, flush=True)

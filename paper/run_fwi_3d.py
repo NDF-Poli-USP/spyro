@@ -61,7 +61,7 @@ model["mesh"] = {
 }
 model["BCs"] = {
     "status": True,  # True or false
-    "outer_bc": "non-reflective",  #  None or non-reflective (outer boundary condition)
+    "outer_bc": "non-reflective",  # None or non-reflective (outer boundary condition)
     "damping_type": "polynomial",  # polynomial, hyperbolic, shifted_hyperbolic
     "exponent": 2,  # damping layer has a exponent variation
     "cmax": 6.0,  # maximum acoustic wave velocity in PML - km/s
@@ -80,7 +80,7 @@ model["acquisition"] = {
     "receiver_locations": receivers,
 }
 model["timeaxis"] = {
-    "t0": 0.0,  #  Initial time for event
+    "t0": 0.0,  # Initial time for event
     "tf": 4.00,  # Final time for event
     "dt": 0.00075,
     "amplitude": 1,  # the Ricker has an amplitude of 1.

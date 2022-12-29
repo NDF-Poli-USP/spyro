@@ -91,7 +91,7 @@ def gradient(
 
     nt = int(tf / dt)  # number of timesteps
 
-    receiver_locations = model["acquisition"]["receiver_locations"]
+    # receiver_locations = model["acquisition"]["receiver_locations"]
 
     dJ = Function(V, name="gradient")
 
