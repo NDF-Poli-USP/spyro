@@ -32,7 +32,7 @@ model["mesh"] = {
 
 model["PML"] = {
     "status": True,  # True or false
-    "outer_bc": "non-reflective",  #  None or non-reflective (outer boundary condition)
+    "outer_bc": "non-reflective",  # None or non-reflective (outer boundary condition)
     "damping_type": "polynomial",  # polynomial, hyperbolic, shifted_hyperbolic
     "exponent": 2,  # damping layer has a exponent variation
     "cmax": 1.0,  # maximum acoustic wave velocity in PML - km/s
@@ -41,6 +41,7 @@ model["PML"] = {
     "lx": 1.0,  # thickness of the PML in the x-direction (km) - always positive
     "ly": 1.0,  # thickness of the PML in the y-direction (km) - always positive
 }
+
 
 model["acquisition"] = {
     "source_type": "Ricker",
@@ -56,7 +57,7 @@ model["acquisition"] = {
 
 # Simulate for 1.0 seconds.
 model["timeaxis"] = {
-    "t0": 0.0,  #  Initial time for event
+    "t0": 0.0,  # Initial time for event
     "tf": 1.0,  # Final time for event
     "dt": 0.0005,  # timestep size
     "amplitude": 1,  # the Ricker has an amplitude of 1.

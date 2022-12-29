@@ -54,7 +54,7 @@ model["acquisition"] = {
     "delay": 1.0,
     "num_receivers": 15,
     "receiver_locations": spyro.create_transect(
-        (-5.72,  6.29),
+        (-5.72, 6.29),
         (-5.72, 14.29),
         15),
 }
@@ -98,20 +98,20 @@ if comm.comm.rank == 0:
         edge_length=edge_length,
         comm=comm.ensemble_comm,
         verbose=0
-        )
+    )
 
     points, cells = SeismicMesh.geometry.delete_boundary_entities(
         points,
         cells,
         min_qual=0.6,
-        )
+    )
 
     meshio.write_points_cells(
         "meshes/benchmark_2d.msh",
         points, [("triangle", cells)],
         file_format="gmsh22",
         binary=False
-        )
+    )
 
 # Mesh generation finishes here.
 
@@ -133,7 +133,7 @@ element = fire.FiniteElement(
     mesh.ufl_cell(),
     degree=degree,
     variant="KMV"
-    )
+)
 
 V = fire.FunctionSpace(mesh, element)
 
@@ -163,5 +163,5 @@ p, p_r = spyro.solvers.forward(
     sources,
     wavelet,
     receivers
-    )
+)
 print(time.time() - t1, flush=True)

@@ -45,22 +45,21 @@ class Sources(spyro.receivers.Receivers.Receivers):
         self.nodes_per_cell = None
         self.is_local = [0]*self.num_receivers
         self.current_source = None
-        self.quadrilateral = (model["opts"]['quadrature']=='GLL')
+        self.quadrilateral = (model["opts"]['quadrature'] == 'GLL')
 
         super().build_maps()
-
 
     def apply_source(self, rhs_forcing, value):
         """Applies source in a assembled right hand side."""
         for source_id in range(self.num_receivers):
-            if self.is_local[source_id] and source_id==self.current_source:
+            if self.is_local[source_id] and source_id == self.current_source:
                 for i in range(len(self.cellNodeMaps[source_id])):
                     rhs_forcing.dat.data_with_halos[int(self.cellNodeMaps[source_id][i])] = (
                         value * self.cell_tabulations[source_id][i]
                     )
-            else: 
+            else:
                 for i in range(len(self.cellNodeMaps[source_id])):
-                    tmp = rhs_forcing.dat.data_with_halos[0]
+                    tmp = rhs_forcing.dat.data_with_halos[0]  # noqa: E841
 
         return rhs_forcing
 
