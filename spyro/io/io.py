@@ -28,7 +28,7 @@ def ensemble_save(func):
 
 
 def ensemble_load(func):
-    """Decorator for read and write shots for ensemble parallelism"""
+    """Decorator for loading shots for ensemble parallelism"""
     def wrapper(*args, **kwargs):
         acq = args[0].get("acquisition")
         num = len(acq["source_pos"])
@@ -72,7 +72,7 @@ def ensemble_forward(func):
 
 
 def ensemble_forward_ad(func):
-    """Decorator for forward to distribute shots for ensemble parallelism"""
+    """Decorator for forward_ad to distribute shots for ensemble parallelism"""
     def wrapper(*args, **kwargs):
         acq = args[0].get("acquisition")
         num = len(acq["source_pos"])
@@ -249,6 +249,7 @@ def is_owner(ens_comm, rank):
 
 
 def _check_units(c):
+    """Checks if velocity is in m/s or km/s"""
     if min(c.dat.data[:]) > 100.0:
         # data is in m/s but must be in km/s
         if fire.COMM_WORLD.rank == 0:
