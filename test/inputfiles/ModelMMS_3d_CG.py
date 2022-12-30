@@ -27,7 +27,7 @@ parallelism = {
     "type": "automatic",  # options: automatic, custom, off
     "custom_cores_per_shot": [],  # only if the user wants a different number of cores for every shot.
     # input is a list of integers with the length of the number of shots.
-    }
+}
 
 mesh = {
     "Lz": 2.000,  # depth in km - always positive

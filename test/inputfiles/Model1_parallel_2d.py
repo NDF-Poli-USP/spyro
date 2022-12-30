@@ -66,7 +66,7 @@ inversion = {
 }  # cutoff frequencies (Hz) for Ricker source and to low-pass the observed shot record
 
 aut_dif = {
-    "status": False, 
+    "status": False,
 }
 
 # Create your model with all the options
