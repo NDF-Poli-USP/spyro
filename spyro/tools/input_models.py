@@ -217,7 +217,6 @@ def create_model_2D_heterogeneous(grid_point_calculator_parameters, degree):
     Lz = 12000.0/1000.
     Lx = 67000.0/1000.
     pad = 1000./1000.
-    Real_Lz = Lz + pad
     Real_Lx = Lx + 2*pad
     source_z = -1.0
     source_x = Real_Lx/2.
@@ -261,7 +260,7 @@ def create_model_2D_heterogeneous(grid_point_calculator_parameters, degree):
         bin2_startX = source_x + receiver_bin_center2 - receiver_bin_width/2.
         bin2_endX = source_x + receiver_bin_center2 + receiver_bin_width/2.
 
-        receiver_coordinates = receiver_coordinates + spyro.create_2d_grid(bin2_startZ, bin2_endZ, bin2_startX, bin2_endX, int(np.sqrt(receiver_quantity_in_bin))) 
+        receiver_coordinates = receiver_coordinates + spyro.create_2d_grid(bin2_startZ, bin2_endZ, bin2_startX, bin2_endX, int(np.sqrt(receiver_quantity_in_bin)))
 
         receiver_quantity = 2*receiver_quantity_in_bin
 
@@ -353,7 +352,6 @@ def create_model_3D_homogeneous(grid_point_calculator_parameters, degree):
     minimum_mesh_velocity = grid_point_calculator_parameters['minimum_velocity_in_the_domain']
     frequency = grid_point_calculator_parameters['source_frequency']
     dimension = grid_point_calculator_parameters['dimension']
-    receiver_type = grid_point_calculator_parameters['receiver_setup']
 
     method = grid_point_calculator_parameters['FEM_method_to_evaluate']
 
@@ -365,7 +363,6 @@ def create_model_3D_homogeneous(grid_point_calculator_parameters, degree):
     Real_Lz = Lz + pad
     # print(Real_Lz)
     Lx = 30*lbda  # 90*lbda
-    Real_Lx = Lx + 2*pad
     Ly = Lx
     Real_Ly = Ly + 2*pad
 
@@ -436,7 +433,7 @@ def create_model_3D_homogeneous(grid_point_calculator_parameters, degree):
     }
 
     model["timeaxis"] = {
-        "t0": 0.0,  #  Initial time for event
+        "t0": 0.0,  # Initial time for event
         "tf": final_time,  # Final time for event
         "dt": 0.0002,  # timestep size
         "nspool": 200,  # how frequently to output solution to pvds

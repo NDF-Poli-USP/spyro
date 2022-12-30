@@ -1,11 +1,9 @@
 # from scipy.io import savemat
 import matplotlib.pyplot as plt
-
 import numpy as np
-
 from ..io import ensemble_plot
-__all__ = ["plot_shots"]
 
+__all__ = ["plot_shots"]
 
 
 @ensemble_plot

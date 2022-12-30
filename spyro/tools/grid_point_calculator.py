@@ -92,7 +92,7 @@ def wave_solver(model, G, comm=False):
         if spyro.io.is_owner(comm, sn):
             t1 = time.time()
             p_field, p_recv = spyro.solvers.forward(
-                model, mesh, comm, vp_exact, sources, wavelet, receivers, source_num=sn, output= False)
+                model, mesh, comm, vp_exact, sources, wavelet, receivers, source_num=sn, output=False)
             print(time.time() - t1)
 
     return p_recv
@@ -189,8 +189,8 @@ def error_calc(p_exact, p, model, comm=False):
     # therefore we have to interpolate the missing points
     # to have them at the same length
     # testing shape
-    times_p_exact, r_p_exact = p_exact.shape
-    times_p, r_p = p.shape
+    times_p_exact, _ = p_exact.shape
+    times_p, _ = p.shape
     if times_p_exact > times_p:  # then we interpolate p_exact
         times, receivers = p.shape
         dt = model["timeaxis"]['tf']/times
@@ -204,7 +204,6 @@ def error_calc(p_exact, p, model, comm=False):
         dt = model["timeaxis"]['tf']/times
     # p = time_interpolation(p, p_exact, model)
 
-    p_diff = p_exact-p
     max_absolute_diff = 0.0
     max_percentage_diff = 0.0
 
@@ -355,7 +354,7 @@ def generate_mesh2D(model, G, comm):
     Real_Lx = Lx + 2*lx
 
     if model['testing_parameters']['experiment_type'] == 'homogeneous':
-    
+
         minimum_mesh_velocity = model['testing_parameters']['minimum_mesh_velocity']
         frequency = model["acquisition"]['frequency']
         lbda = minimum_mesh_velocity/frequency
@@ -379,7 +378,6 @@ def generate_mesh2D(model, G, comm):
             print('entering spatial rank 0 after mesh generation')
 
             points, cells = SeismicMesh.geometry.delete_boundary_entities(points, cells, min_qual=0.6)
-            a = np.amin(SeismicMesh.geometry.simp_qual(points, cells))
 
             meshio.write_points_cells(
                 "meshes/2Dhomogeneous"+str(G)+".msh",
@@ -436,13 +434,6 @@ def generate_mesh2D(model, G, comm):
         )
 
         comm.comm.barrier()
-        if method == "CG" or method == "KMV":
-            mesh = fire.Mesh(
-                "meshes/2Dheterogeneous"+str(G)+".msh",
-                distribution_parameters={
-                    "overlap_type": (fire.DistributedMeshOverlapType.NONE, 0)
-                },
-            )
 
     return model
 
@@ -517,6 +508,6 @@ def generate_mesh3D(model, G, comm):
 
 def mesh_generation(model, Gs, comm):
     for G in Gs:
-        mesh = generate_mesh(model, G, comm)
+        _ = generate_mesh(model, G, comm)
 
     return True

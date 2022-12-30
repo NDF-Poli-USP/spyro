@@ -1,7 +1,6 @@
 import math
 import numpy as np
 from copy import deepcopy
-import pytest
 from firedrake import *
 import spyro
 

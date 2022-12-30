@@ -1,9 +1,6 @@
 from firedrake import File
-import matplotlib.pyplot as plt
 import numpy as np
-import math
 import spyro
-import pytest
 
 
 def compare_velocity(p_r, receiver_in_source_index, receiver_comparison_index, model, dt):
@@ -93,7 +90,6 @@ def test_forward_3d(tf=0.6):
     )
 
     dt = model["timeaxis"]["dt"]
-    final_time = model["timeaxis"]["tf"]
 
     pass_error_test = True
 

@@ -3,7 +3,6 @@ import matplotlib.pyplot as plt
 import numpy as np
 import math
 import spyro
-import pytest
 
 
 def plot_receiver(
@@ -14,7 +13,7 @@ def plot_receiver(
     show=False,
     file_format="pdf",
 ):
-    """Plot a 
+    """Plot a
 
     Returns
     -------
@@ -116,7 +115,6 @@ def test_forward_5shots():
     }
 
     dt = model["timeaxis"]["dt"]
-    final_time = model["timeaxis"]["tf"]
 
     comm = spyro.utils.mpi_init(model)
 
