@@ -5,7 +5,42 @@ import spyro
 
 
 class Sources(spyro.receivers.Receivers.Receivers):
-    """Methods that inject a wavelet into a mesh"""
+    """Methods that inject a wavelet into a mesh
+    
+    ...
+
+    Attributes
+    ----------
+    mesh : Firedrake.mesh
+        mesh where receivers are located
+    V: Firedrake.FunctionSpace object
+        The space of the finite elements
+    my_ensemble: Firedrake.ensemble_communicator
+        An ensemble communicator
+    dimension: int
+        The dimension of the space
+    degree: int
+        Degree of the function space
+    source_locations: list
+        List of tuples containing all source locations
+    num_sources: int
+        Number of sources
+    quadrilateral: boolean
+        Boolean that specifies if cells are quadrilateral
+    is_local: list of booleans
+        List that checks if sources are present in cores
+        spatial paralelism
+
+    Methods
+    -------
+    build_maps()
+        Calculates and stores tabulations for interpolation
+    interpolate(field)
+        Interpolates field value at receiver locations
+    apply_source(rhs_forcing, value)
+        Applies value at source locations in rhs_forcing operator
+    """
+
 
     def __init__(self, model, mesh, V, my_ensemble):
         """Initializes class and gets all receiver parameters from
@@ -24,7 +59,7 @@ class Sources(spyro.receivers.Receivers.Receivers):
 
         Returns
         -------
-        Receivers: :class: 'Receiver' object
+        Sources: :class: 'Source' object
 
         """
 
