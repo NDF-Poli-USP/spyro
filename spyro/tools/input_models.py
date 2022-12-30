@@ -35,7 +35,7 @@ def create_model_2D_homogeneous(grid_point_calculator_parameters, degree):
     ''' Creates models  with the correct parameters for for grid point
     calculation experiments
     on the 2D homogeneous case with a grid of receivers near the source.
-    
+
     Parameters
     ----------
     grid_point_calculator_parameters: Python 'dictionary'
@@ -44,12 +44,12 @@ def create_model_2D_homogeneous(grid_point_calculator_parameters, degree):
     -------
     model: Python `dictionary`
         Contains model options and parameters for use in Spyro
-        
+
 
     '''
     minimum_mesh_velocity = grid_point_calculator_parameters[
         'minimum_velocity_in_the_domain'
-        ]
+    ]
     frequency = grid_point_calculator_parameters['source_frequency']
     dimension = grid_point_calculator_parameters['dimension']
     receiver_type = grid_point_calculator_parameters['receiver_setup']
@@ -59,7 +59,7 @@ def create_model_2D_homogeneous(grid_point_calculator_parameters, degree):
     model = {}
 
     if minimum_mesh_velocity > 500:
-        print("Warning: minimum mesh velocity seems to be in m/s, input should be in km/s", flush = True)
+        print("Warning: minimum mesh velocity seems to be in m/s, input should be in km/s", flush=True)
     # domain calculations
     pady = 0.0
     Ly = 0.0
@@ -103,8 +103,8 @@ def create_model_2D_homogeneous(grid_point_calculator_parameters, degree):
         bin1_startX,
         bin1_endX,
         int(np.sqrt(receiver_quantity))
-        )
-    
+    )
+
     # Choose method and parameters
     model["opts"] = {
         "method": method,
@@ -117,7 +117,7 @@ def create_model_2D_homogeneous(grid_point_calculator_parameters, degree):
 
     model["BCs"] = {
         "status": True,  # True or false
-        "outer_bc": "non-reflective",  #  neumann, non-reflective (outer boundary condition)
+        "outer_bc": "non-reflective",  # neumann, non-reflective (outer boundary condition)
         "damping_type": "polynomial",  # polynomial. hyperbolic, shifted_hyperbolic
         "exponent": 1,
         "cmax": 4.7,  # maximum acoustic wave velocity in PML - km/s
@@ -154,11 +154,11 @@ def create_model_2D_homogeneous(grid_point_calculator_parameters, degree):
         "dt": 0.001,  # timestep size
         "nspool": 200,  # how frequently to output solution to pvds
         "fspool": 100,  # how frequently to save solution to RAM
-    }  
+    }
     model["parallelism"] = {
-    "type": "spatial",  # options: automatic (same number of cores for evey processor), custom, off.
-    "custom_cores_per_shot": [],  # only if the user wants a different number of cores for every shot.
-    # input is a list of integers with the length of the number of shots.
+        "type": "spatial",  # options: automatic (same number of cores for evey processor), custom, off.
+        "custom_cores_per_shot": [],  # only if the user wants a different number of cores for every shot.
+        # input is a list of integers with the length of the number of shots.
     }
     model['testing_parameters'] = {
         'minimum_mesh_velocity': minimum_mesh_velocity,
@@ -169,9 +169,10 @@ def create_model_2D_homogeneous(grid_point_calculator_parameters, degree):
 
     return model
 
+
 def create_model_2D_heterogeneous(grid_point_calculator_parameters, degree):
     ''' Creates models  with the correct parameters for for grid point calculation experiments.
-    
+
     Parameters
     ----------
     frequency: `float`
@@ -191,7 +192,7 @@ def create_model_2D_heterogeneous(grid_point_calculator_parameters, degree):
     -------
     model: Python `dictionary`
         Contains model options and parameters for use in Spyro
-        
+
 
     '''
     import SeismicMesh
@@ -206,50 +207,49 @@ def create_model_2D_heterogeneous(grid_point_calculator_parameters, degree):
     model = {}
 
     if minimum_mesh_velocity > 500:
-        print("Warning: minimum mesh velocity seems to be in m/s, input should be in km/s", flush = True)
+        print("Warning: minimum mesh velocity seems to be in m/s, input should be in km/s", flush=True)
     # domain calculations
     pady = 0.0
     Ly = 0.0
 
-    #using the BP2004 velocity model
-    
+    # using the BP2004 velocity model
+
     Lz = 12000.0/1000.
     Lx = 67000.0/1000.
     pad = 1000./1000.
-    Real_Lz = Lz+ pad
-    Real_Lx = Lx+ 2*pad
+    Real_Lz = Lz + pad
+    Real_Lx = Lx + 2*pad
     source_z = -1.0
     source_x = Real_Lx/2.
-    source_coordinates = [(source_z,source_x)]
-    if velocity_model != None:
+    source_coordinates = [(source_z, source_x)]
+    if velocity_model is not None:
         if velocity_model[-4:] == "segy":
-            SeismicMesh.write_velocity_model(velocity_model, ofname = 'velocity_models/gridsweepcalc')
+            SeismicMesh.write_velocity_model(velocity_model, ofname='velocity_models/gridsweepcalc')
         elif velocity_model[-4:] == "hdf5":
-            shutil.copy(velocity_model,'velocity_models/gridsweepcalc.hdf5' )
+            shutil.copy(velocity_model, 'velocity_models/gridsweepcalc.hdf5')
         else:
             raise ValueError("Velocity model filetype not recognized.")
     else:
-        print("Warning: running without a velocity model is suitable for testing purposes only.", flush = True)
+        print("Warning: running without a velocity model is suitable for testing purposes only.", flush=True)
     padz = pad
     padx = pad
-    
 
     if receiver_type == 'bins':
 
         # time calculations
         tmin = 1./frequency
-        final_time = 25*tmin #should be 35
+        final_time = 25*tmin  # should be 35
 
         # receiver calculations
 
         receiver_bin_center1 = 2.5*750.0/1000
         receiver_bin_width = 500.0/1000
-        receiver_quantity_in_bin = 100#2500 # 50 squared
+        receiver_quantity_in_bin = 100  # 2500 # 50 squared
 
         bin1_startZ = source_z - receiver_bin_width/2.
-        bin1_endZ   = source_z + receiver_bin_width/2.
+        bin1_endZ = source_z + receiver_bin_width/2.
         bin1_startX = source_x + receiver_bin_center1 - receiver_bin_width/2.
-        bin1_endX   = source_x + receiver_bin_center1 + receiver_bin_width/2.
+        bin1_endX = source_x + receiver_bin_center1 + receiver_bin_width/2.
 
         receiver_coordinates = spyro.create_2d_grid(bin1_startZ, bin1_endZ, bin1_startX, bin1_endX, int(np.sqrt(receiver_quantity_in_bin)))
 
@@ -257,20 +257,19 @@ def create_model_2D_heterogeneous(grid_point_calculator_parameters, degree):
         receiver_bin_width = 500.0/1000
 
         bin2_startZ = source_z - receiver_bin_width/2.
-        bin2_endZ   = source_z + receiver_bin_width/2.
+        bin2_endZ = source_z + receiver_bin_width/2.
         bin2_startX = source_x + receiver_bin_center2 - receiver_bin_width/2.
-        bin2_endX   = source_x + receiver_bin_center2 + receiver_bin_width/2.
+        bin2_endX = source_x + receiver_bin_center2 + receiver_bin_width/2.
 
-        receiver_coordinates= receiver_coordinates + spyro.create_2d_grid(bin2_startZ, bin2_endZ, bin2_startX, bin2_endX, int(np.sqrt(receiver_quantity_in_bin))) 
+        receiver_coordinates = receiver_coordinates + spyro.create_2d_grid(bin2_startZ, bin2_endZ, bin2_startX, bin2_endX, int(np.sqrt(receiver_quantity_in_bin))) 
 
         receiver_quantity = 2*receiver_quantity_in_bin
 
-    
     if receiver_type == 'line':
 
         # time calculations
         tmin = 1./frequency
-        final_time = 2*10*tmin + 5.0 #should be 35
+        final_time = 2*10*tmin + 5.0  # should be 35
 
         # receiver calculations
 
@@ -278,14 +277,13 @@ def create_model_2D_heterogeneous(grid_point_calculator_parameters, degree):
         receiver_bin_center2 = 10000.0/1000
         receiver_quantity = 500
 
-        bin1_startZ = source_z 
-        bin1_endZ   = source_z 
+        bin1_startZ = source_z
+        bin1_endZ = source_z
         bin1_startX = source_x + receiver_bin_center1
-        bin1_endX   = source_x + receiver_bin_center2
+        bin1_endX = source_x + receiver_bin_center2
 
-        receiver_coordinates = spyro.create_transect( (bin1_startZ, bin1_startX), (bin1_endZ, bin1_endX), receiver_quantity)
+        receiver_coordinates = spyro.create_transect((bin1_startZ, bin1_startX), (bin1_endZ, bin1_endX), receiver_quantity)
 
-    
     # Choose method and parameters
     model["opts"] = {
         "method": method,
@@ -297,7 +295,7 @@ def create_model_2D_heterogeneous(grid_point_calculator_parameters, degree):
 
     model["BCs"] = {
         "status": True,  # True or false
-        "outer_bc": "non-reflective",  #  neumann, non-reflective (outer boundary condition)
+        "outer_bc": "non-reflective",  # neumann, non-reflective (outer boundary condition)
         "damping_type": "polynomial",  # polynomial. hyperbolic, shifted_hyperbolic
         "exponent": 1,
         "cmax": 4.7,  # maximum acoustic wave velocity in PML - km/s
@@ -329,16 +327,16 @@ def create_model_2D_heterogeneous(grid_point_calculator_parameters, degree):
     }
 
     model["timeaxis"] = {
-        "t0": 0.0,  #  Initial time for event
+        "t0": 0.0,  # Initial time for event
         "tf": final_time,  # Final time for event
         "dt": 0.001,  # timestep size
         "nspool": 200,  # how frequently to output solution to pvds
         "fspool": 100,  # how frequently to save solution to RAM
-    }  
+    }
     model["parallelism"] = {
-    "type": "off",  # options: automatic (same number of cores for evey processor), custom, off.
-    "custom_cores_per_shot": [],  # only if the user wants a different number of cores for every shot.
-    # input is a list of integers with the length of the number of shots.
+        "type": "off",  # options: automatic (same number of cores for evey processor), custom, off.
+        "custom_cores_per_shot": [],  # only if the user wants a different number of cores for every shot.
+        # input is a list of integers with the length of the number of shots.
     }
     model['testing_parameters'] = {
         'minimum_mesh_velocity': minimum_mesh_velocity,
@@ -350,6 +348,7 @@ def create_model_2D_heterogeneous(grid_point_calculator_parameters, degree):
     # print(receiver_coordinates)
     return model
 
+
 def create_model_3D_homogeneous(grid_point_calculator_parameters, degree):
     minimum_mesh_velocity = grid_point_calculator_parameters['minimum_velocity_in_the_domain']
     frequency = grid_point_calculator_parameters['source_frequency']
@@ -357,47 +356,47 @@ def create_model_3D_homogeneous(grid_point_calculator_parameters, degree):
     receiver_type = grid_point_calculator_parameters['receiver_setup']
 
     method = grid_point_calculator_parameters['FEM_method_to_evaluate']
-    
+
     model = {}
 
     lbda = minimum_mesh_velocity/frequency
     pad = lbda
-    Lz = 15*lbda#100*lbda
-    Real_Lz = Lz+ pad
-    #print(Real_Lz)
-    Lx = 30*lbda#90*lbda
-    Real_Lx = Lx+ 2*pad
+    Lz = 15*lbda  # 100*lbda
+    Real_Lz = Lz + pad
+    # print(Real_Lz)
+    Lx = 30*lbda  # 90*lbda
+    Real_Lx = Lx + 2*pad
     Ly = Lx
     Real_Ly = Ly + 2*pad
 
     # source location
-    source_z = -Real_Lz/2.#1.0
-    #print(source_z)
+    source_z = -Real_Lz/2.  # 1.0
+    # print(source_z)
     source_x = lbda*1.5
     source_y = Real_Ly/2.0
-    source_coordinates = [(source_z, source_x, source_y)] #Source at the center. If this is changes receiver's bin has to also be changed.
+    source_coordinates = [(source_z, source_x, source_y)]  # Source at the center. If this is changes receiver's bin has to also be changed.
     padz = pad
     padx = pad
     pady = pad
 
     # time calculations
     tmin = 1./frequency
-    final_time = 20*tmin #should be 35
+    final_time = 20*tmin  # should be 35
 
     # receiver calculations
 
-    receiver_bin_center1 = 10*lbda#20*lbda
-    receiver_bin_width = 5*lbda#15*lbda
-    receiver_quantity = 36#2500 # 50 squared
+    receiver_bin_center1 = 10*lbda  # 20*lbda
+    receiver_bin_width = 5*lbda  # 15*lbda
+    receiver_quantity = 36  # 2500 # 50 squared
 
     bin1_startZ = source_z - receiver_bin_width/2.
-    bin1_endZ   = source_z + receiver_bin_width/2.
+    bin1_endZ = source_z + receiver_bin_width/2.
     bin1_startX = source_x + receiver_bin_center1 - receiver_bin_width/2.
-    bin1_endX   = source_x + receiver_bin_center1 + receiver_bin_width/2.
+    bin1_endX = source_x + receiver_bin_center1 + receiver_bin_width/2.
     bin1_startY = source_y - receiver_bin_width/2.
-    bin1_endY   = source_y + receiver_bin_width/2.
+    bin1_endY = source_y + receiver_bin_width/2.
 
-    receiver_coordinates = create_3d_grid( (bin1_startZ,bin1_startX,bin1_startY)  , (bin1_endZ,bin1_endX,bin1_endY)   , 6)
+    receiver_coordinates = create_3d_grid((bin1_startZ, bin1_startX, bin1_startY), (bin1_endZ, bin1_endX, bin1_endY), 6)
     # Choose method and parameters
     model["opts"] = {
         "method": method,
@@ -410,7 +409,7 @@ def create_model_3D_homogeneous(grid_point_calculator_parameters, degree):
 
     model["BCs"] = {
         "status": True,  # True or false
-        "outer_bc": "non-reflective",  #  neumann, non-reflective (outer boundary condition)
+        "outer_bc": "non-reflective",  # neumann, non-reflective (outer boundary condition)
         "damping_type": "polynomial",  # polynomial. hyperbolic, shifted_hyperbolic
         "exponent": 1,
         "cmax": 4.7,  # maximum acoustic wave velocity in PML - km/s
@@ -442,19 +441,20 @@ def create_model_3D_homogeneous(grid_point_calculator_parameters, degree):
         "dt": 0.0002,  # timestep size
         "nspool": 200,  # how frequently to output solution to pvds
         "fspool": 100,  # how frequently to save solution to RAM
-    }  
+    }
     model["parallelism"] = {
-    "type": "spatial", 
+        "type": "spatial",
     }
 
     # print(source_coordinates)
     # print(receiver_coordinates)
     return model
 
+
 def create_model_for_grid_point_calculation(grid_point_calculator_parameters, degree):
     ''' Creates models  with the correct parameters for for grid point calculation experiments
     on the 2D homogeneous case with a grid of receivers near the source.
-    
+
     Parameters
     ----------
     grid_point_calculator_parameters: Python 'dictionary'
@@ -463,16 +463,16 @@ def create_model_for_grid_point_calculation(grid_point_calculator_parameters, de
     -------
     model: Python `dictionary`
         Contains model options and parameters for use in Spyro
-        
+
 
     '''
     dimension = grid_point_calculator_parameters['dimension']
     experiment_type = grid_point_calculator_parameters['velocity_profile_type']
-    if   dimension == 2 and experiment_type == 'homogeneous':
+    if dimension == 2 and experiment_type == 'homogeneous':
         model = create_model_2D_homogeneous(grid_point_calculator_parameters, degree)
     elif dimension == 2 and experiment_type == 'heterogeneous':
         model = create_model_2D_heterogeneous(grid_point_calculator_parameters, degree)
     elif dimension == 3:
         model = create_model_3D_homogeneous(grid_point_calculator_parameters, degree)
-    
+
     return model
