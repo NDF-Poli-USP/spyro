@@ -11,6 +11,43 @@ class Receivers:
     """Interpolate data defined on a triangular mesh to a
     set of 2D/3D coordinates for variable spatial order
     using Lagrange interpolation.
+
+    Can interpolatereceiveir values that do not coincide with 
+    mesh or DOF points
+
+    ...
+
+    Attributes
+    ----------
+    mesh : Firedrake.mesh
+        mesh where receivers are located
+    V: Firedrake.FunctionSpace object
+        The space of the finite elements
+    my_ensemble: Firedrake.ensemble_communicator
+        An ensemble communicator
+    dimension: int
+        The dimension of the space
+    degree: int
+        Degree of the function space
+    receiver_locations: list
+        List of tuples containing all receiver locations
+    num_receivers: int
+        Number of receivers
+    quadrilateral: boolean
+        Boolean that specifies if cells are quadrilateral
+    is_local: list of booleans
+        List that checks if receivers are present in cores
+        spatial paralelism
+
+    Methods
+    -------
+    build_maps()
+        Calculates and stores tabulations for interpolation
+    interpolate(field)
+        Interpolates field value at receiver locations
+    apply_receivers_as_source(rhs_forcing, residual, IT)
+        Applies receivers as source with values from residual
+        in timestep IT, for usage with adjoint propagation
     """
 
     def __init__(self, model, mesh, V, my_ensemble):
@@ -73,6 +110,13 @@ class Receivers:
         self.__num_receivers = value
 
     def build_maps(self):
+        """ Calculates and stores tabulations for interpolation
+
+        Is always automatticaly called when initializing the class,
+        therefore should only be called again if a mesh related attribute
+        changes.
+        """
+
         for rid in range(self.num_receivers):
             tolerance = 1e-6
             if self.dimension == 2:
@@ -108,8 +152,25 @@ class Receivers:
         return [self.__new_at(field, rn) for rn in range(self.num_receivers)]
 
     def apply_receivers_as_source(self, rhs_forcing, residual, IT):
-        """
-        The adjoint operation of interpolation (injection)
+        """The adjoint operation of interpolation (injection)
+
+        Injects residual, and timestep IT, at receiver locations
+        as source and stores their value in the right hand side
+        operator rhs_forcing.
+
+        Parameters
+        ----------
+        rhs_forcing: object
+            Firedrake assembled right hand side operator to store values
+        residual: list
+            List of residual values at different receiver locations
+            and timesteps
+        IT: int
+            Desired time step number to get residual value from
+        Returns
+        -------
+        rhs_forcing: object
+            Firedrake assembled right hand side operator with injected values
         """
         for rid in range(self.num_receivers):
             value = residual[IT][rid]
@@ -419,6 +480,7 @@ class Receivers:
 
 
 def choosing_element(V, degree):
+    """ Chooses UFL element based on desired function space"""
     cell_geometry = V.mesh().ufl_cell()
     if cell_geometry == quadrilateral:
         T = UFCQuadrilateral()
@@ -446,6 +508,7 @@ def choosing_element(V, degree):
 
 
 def change_to_reference_triangle(p, a, b, c):
+    """Changes variables to reference triangle"""
     (xa, ya) = a
     (xb, yb) = b
     (xc, yc) = c
@@ -487,6 +550,7 @@ def change_to_reference_triangle(p, a, b, c):
 
 
 def change_to_reference_tetrahedron(p, a, b, c, d):
+    """Changes variables to reference tetrahedron"""
     (xa, ya, za) = a
     (xb, yb, zb) = b
     (xc, yc, zc) = c
@@ -748,6 +812,7 @@ def change_to_reference_tetrahedron(p, a, b, c, d):
 
 
 def change_to_reference_quad(p, v0, v1, v2, v3):
+    """Changes varibales to reference quadrilateral"""
     (px, py) = p
     # Irregular quad
     (x0, y0) = v0
