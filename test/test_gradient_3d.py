@@ -53,11 +53,8 @@ def _test_gradient(options, pml=False):
     Lz = model_pml["mesh"]["Lz"]
     Ly = model_pml["mesh"]["Ly"]
     x1 = 0.0
-    x2 = Lx
-    z1 = 0.0
     z2 = -Lz
     y1 = 0.0
-    y2 = Ly
     boxx1 = Function(V).interpolate(conditional(x > x1, 1.0, 0.0))
     boxx2 = Function(V).interpolate(conditional(x < Lx, 1.0, 0.0))
 
@@ -161,5 +158,5 @@ def _test_gradient(options, pml=False):
     assert (np.abs(errors) < 1.0).all()
 
 
-if __name__ == "__main__":
-    test_gradient_3d(model)
+# if __name__ == "__main__":
+#     test_gradient_3d(model)

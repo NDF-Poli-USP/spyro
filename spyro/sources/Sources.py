@@ -1,6 +1,5 @@
 import math
 import numpy as np
-from firedrake import *
 from scipy.signal import butter, filtfilt
 import spyro
 

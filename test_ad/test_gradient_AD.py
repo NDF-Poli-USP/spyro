@@ -1,15 +1,6 @@
 from firedrake import *
 from scipy.optimize import *
-import pytest
 import spyro
-import time
-import sys
-import matplotlib.pyplot as plt
-import numpy as np
-import meshio
-import SeismicMesh
-import finat
-import pytest
 
 
 # from ..domains import quadrature, space

@@ -1,9 +1,5 @@
 import math
 from copy import deepcopy
-import pytest
-import firedrake as fire
-import numpy as np
-from firedrake import Constant, dot, dx, grad
 
 import spyro
 

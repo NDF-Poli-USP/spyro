@@ -235,7 +235,7 @@ def gradient(
 
     gradi = Function(V)
     grad_prob = LinearVariationalProblem(lhsG, rhsG, gradi)
-    
+
     if method == "KMV":
         grad_solver = LinearVariationalSolver(
             grad_prob,

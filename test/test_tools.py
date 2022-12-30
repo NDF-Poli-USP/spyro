@@ -1,5 +1,3 @@
-from numbers import Real
-import pytest
 import numpy as np
 import math
 import spyro

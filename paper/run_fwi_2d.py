@@ -117,8 +117,8 @@ def regularize_gradient(vp, dJ):
     """Tikhonov regularization"""
     m_u = TrialFunction(V)
     m_v = TestFunction(V)
-    mgrad = m_u * m_v * dx(rule=qr_x)
-    ffG = dot(grad(vp), grad(m_v)) * dx(rule=qr_x)
+    mgrad = m_u * m_v * dx(rule=quad_rule)
+    ffG = dot(grad(vp), grad(m_v)) * dx(rule=quad_rule)
     G = mgrad - ffG
     lhsG, rhsG = lhs(G), rhs(G)
     gradreg = Function(V)

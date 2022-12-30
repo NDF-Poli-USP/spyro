@@ -7,7 +7,7 @@ import spyro
 from .model import model
 
 
-@pytest.fixture(params=["triangle", "tetrahedral","square"])
+@pytest.fixture(params=["triangle", "tetrahedral", "square"])
 def mesh_type(request):
     return request.param
 

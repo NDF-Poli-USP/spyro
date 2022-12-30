@@ -2,9 +2,6 @@ import numpy as np
 from firedrake import *
 from pyadjoint import enlisting
 import spyro
-from spyro.domains import quadrature
-import matplotlib.pyplot as plt
-import sys
 
 forward = spyro.solvers.forward_AD
 

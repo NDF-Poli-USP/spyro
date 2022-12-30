@@ -395,7 +395,7 @@ class Receivers:
             num_rec = self.num_receivers
             δz = np.linspace(rec_pos[0, 0], rec_pos[num_rec-1, 0], 1)
             δx = np.linspace(rec_pos[0, 1], rec_pos[num_rec-1, 1], num_rec)
-            
+
             Z, X = np.meshgrid(δz, δx)
             xs = np.vstack((Z.flatten(), X.flatten())).T
 

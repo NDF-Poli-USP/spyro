@@ -1,13 +1,6 @@
 from firedrake import *
 from scipy.optimize import *
 import spyro
-import time
-import sys
-import matplotlib.pyplot as plt
-import numpy as np
-import meshio
-import SeismicMesh
-import finat
 import pytest
 
 
