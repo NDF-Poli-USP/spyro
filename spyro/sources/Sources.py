@@ -92,7 +92,7 @@ class Sources(spyro.receivers.Receivers.Receivers):
                     )
             else:
                 for i in range(len(self.cellNodeMaps[source_id])):
-                    tmp = rhs_forcing.dat.data_with_halos[0]  # noqa: E841
+                    tmp = rhs_forcing.dat.data_with_halos[0]  # noqa: F841
 
         return rhs_forcing
 
