@@ -24,10 +24,10 @@ opts = {
 }
 
 parallelism = {
-    "type": "automatic", # options: automatic, custom, off
-    "custom_cores_per_shot": [], # only if the user wants a different number of cores for every shot.
-    # input is a list of integers with the length of the number of shots. 
-    }
+    "type": "automatic",  # options: automatic, custom, off
+    "custom_cores_per_shot": [],  # only if the user wants a different number of cores for every shot.
+    # input is a list of integers with the length of the number of shots.
+}
 
 mesh = {
     "Lz": 2.000,  # depth in km - always positive
@@ -40,7 +40,7 @@ mesh = {
 
 PML = {
     "status": False,  # True or false
-    "outer_bc": "dirichlet",  #  neumann, non-reflective (outer boundary condition)
+    "outer_bc": "dirichlet",  # neumann, non-reflective (outer boundary condition)
     "damping_type": "polynomial",  # polynomial. hyperbolic, shifted_hyperbolic
     "exponent": 1,
     "cmax": 4.7,  # maximum acoustic wave velocity in PML - km/s
@@ -59,7 +59,7 @@ acquisition = {
 }  # equi-spaced for now
 
 timeaxis = {
-    "t0": 0.0,  #  Initial time for event
+    "t0": 0.0,  # Initial time for event
     "tf": 0.4,  # Final time for event
     "dt": 0.001,  # timestep size
     "nspool": 20,  # how frequently to output solution to pvds
@@ -71,7 +71,7 @@ inversion = {
 }  # cutoff frequencies (Hz) for Ricker source and to low-pass the observed shot record
 
 aut_dif = {
-    "status": False, 
+    "status": False,
 }
 
 # Create your model with all the options

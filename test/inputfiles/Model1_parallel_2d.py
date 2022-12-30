@@ -54,7 +54,7 @@ acquisition = {
 }
 
 timeaxis = {
-    "t0": 0.0,  #  Initial time for event
+    "t0": 0.0,  # Initial time for event
     "tf": 2.0,  # Final time for event
     "dt": 0.001,  # timestep size
     "nspool": 9999,  # how frequently to output solution to pvds
