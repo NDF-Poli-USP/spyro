@@ -1,10 +1,9 @@
 from firedrake import *
-from firedrake.assemble import create_assembly_callable
 
-from .. import utils
+# from .. import utils
 from ..domains import quadrature, space
-from ..pml import damping
-from ..io import ensemble_forward
+# from ..pml import damping
+# from ..io import ensemble_forward
 from . import helpers
 
 # Note this turns off non-fatal warnings
@@ -63,7 +62,6 @@ def forward(
     dt = model["timeaxis"]["dt"]
     tf = model["timeaxis"]["tf"]
     nspool = model["timeaxis"]["nspool"]
-    PML = model["BCs"]["status"]
     nt = int(tf / dt)  # number of timesteps
     excitations.current_source = source_num
     params = set_params(method)
@@ -101,7 +99,6 @@ def forward(
     h = CellSize(mesh)
     FF = m1 + a + nf - (1/(h/degree*h/degree))*f * v * dx(rule=qr_x)
     X = Function(V)
-    B = Function(V)
 
     lhs_ = lhs(FF)
     rhs_ = rhs(FF)
@@ -110,7 +107,6 @@ def forward(
     solver = LinearVariationalSolver(problem, solver_parameters=params)
 
     usol_recv = []
-    save_step = 0
 
     P = FunctionSpace(receivers, "DG", 0)
     interpolator = Interpolator(u_np1, P)
