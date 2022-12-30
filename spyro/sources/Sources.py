@@ -6,7 +6,7 @@ import spyro
 
 class Sources(spyro.receivers.Receivers.Receivers):
     """Methods that inject a wavelet into a mesh
-    
+
     ...
 
     Attributes
@@ -40,7 +40,6 @@ class Sources(spyro.receivers.Receivers.Receivers):
     apply_source(rhs_forcing, value)
         Applies value at source locations in rhs_forcing operator
     """
-
 
     def __init__(self, model, mesh, V, my_ensemble):
         """Initializes class and gets all receiver parameters from

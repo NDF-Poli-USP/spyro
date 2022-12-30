@@ -51,7 +51,7 @@ def wave_solver(model, G, comm=False):
     model["mesh"]["meshfile"] = "meshes/2Dhomogeneous"+str(G)+".msh"
     try:
         mesh, V = spyro.io.read_mesh(model, comm)
-    except:
+    except:  # noqa E722
         model = generate_mesh(model, G, comm)
         mesh, V = spyro.io.read_mesh(model, comm)
 
@@ -343,7 +343,6 @@ def generate_mesh2D(model, G, comm):
     if comm.comm.rank == 0:
         print('Entering mesh generation', flush=True)
     M = grid_point_to_mesh_point_converter_for_seismicmesh(model, G)
-    method = model["opts"]["method"]
 
     Lz = model["mesh"]['Lz']
     lz = model['BCs']['lz']
