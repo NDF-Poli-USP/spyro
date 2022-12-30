@@ -12,7 +12,7 @@ class Receivers:
     set of 2D/3D coordinates for variable spatial order
     using Lagrange interpolation.
 
-    Can interpolatereceiveir values that do not coincide with 
+    Can interpolate receiveir values that do not coincide with
     mesh or DOF points
 
     ...
