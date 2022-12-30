@@ -10,13 +10,14 @@ import spyro
 """Read in an external mesh and interpolate velocity to it"""
 from .inputfiles.Model1_2d_CG import model as model
 
+
 def test_ricker_varies_in_time():
     """This test ricker time variation when applied to a time-
     dependent PDE (acoustic wave second order in pressure) in
     firedrake. It tests if the right hand side varies in time
     and if the applied ricker function behaves correctly
     """
-    ### initial ricker tests
+    # initial ricker tests
     modelRicker = deepcopy(model)
     frequency = 2
     amplitude = 3

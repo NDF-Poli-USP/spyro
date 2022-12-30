@@ -44,8 +44,8 @@ def test_parallel_source():
         receivers,
     )
 
-    #print(np.amax(np.abs(r)))
-    #spyro.io.save_shots('serial_shot.dat', r)
+    # print(np.amax(np.abs(r)))
+    # spyro.io.save_shots('serial_shot.dat', r)
     r_s = spyro.io.load_shots(os.getcwd()+'/test/serial_shot.dat')
     assert np.amax(np.abs(r - r_s)) < 1e-16
 
