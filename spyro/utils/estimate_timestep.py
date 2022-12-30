@@ -51,11 +51,11 @@ def estimate_timestep(mesh, V, c, estimate_max_eigenvalue=True):
 
     # print(max_eigval)
     if np.sqrt(max_eigval) > 0.0:
-    	max_dt = np.float(2 / np.sqrt(max_eigval))
+        max_dt = np.float(2 / np.sqrt(max_eigval))
     else:
         max_dt = 100000000
-    #print(
+    # print(
     #    f"Maximum stable timestep should be about: {np.float(2 / np.sqrt(max_eigval))} seconds",
     #    flush=True,
-    #)
+    # )
     return max_dt
