@@ -6,7 +6,7 @@ def FE_method(mesh, method, degree):
     Space discretization - Continuous
     or Discontinuous Galerkin methods"""
     cell_geometry = mesh.ufl_cell()
-    if method == "CG" or method == 'spectral':
+    if method == "CG" or method == "spectral":
         # CG - Continuous Galerkin
         if cell_geometry == quadrilateral or cell_geometry == hexahedron:
             element = FiniteElement(

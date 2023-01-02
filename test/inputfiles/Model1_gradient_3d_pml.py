@@ -41,7 +41,9 @@ BCs = {
     "ly": 0.20,  # thickness of the PML in the y-direction (km) - always positive
 }
 
-receivers = spyro.insert_fixed_value(spyro.create_2d_grid(0.1, 0.9, 0.1, 0.9, 10), -0.9, 0)
+receivers = spyro.insert_fixed_value(
+    spyro.create_2d_grid(0.1, 0.9, 0.1, 0.9, 10), -0.9, 0
+)
 print(len(receivers))
 
 acquisition = {

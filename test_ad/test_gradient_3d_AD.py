@@ -77,17 +77,10 @@ def test_gradient_3d_AD():
     V = FunctionSpace(mesh, element)
     z, x, y = SpatialCoordinate(mesh)
 
-    vp_exact = Function(V).interpolate(1.0 + 0.0*x)
-    vp_guess = Function(V).interpolate(0.8 + 0.0*x)
+    vp_exact = Function(V).interpolate(1.0 + 0.0 * x)
+    vp_guess = Function(V).interpolate(0.8 + 0.0 * x)
 
-    spyro.tools.gradient_test_acoustic_ad(
-        model,
-        mesh,
-        V,
-        comm,
-        vp_exact,
-        vp_guess
-    )
+    spyro.tools.gradient_test_acoustic_ad(model, mesh, V, comm, vp_exact, vp_guess)
 
 
 # test_gradient_3d_AD()

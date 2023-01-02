@@ -4,7 +4,7 @@ from firedrake import *
 
 
 def quadrature_rules(V):
-    """ Returns quadrature rule - Gauss-Lobatto-Legendre, Gauss-Legendre and Equi-spaced, KMV
+    """Returns quadrature rule - Gauss-Lobatto-Legendre, Gauss-Legendre and Equi-spaced, KMV
 
     Returns quadradure rule to use with UFL's dx object when integrating
 

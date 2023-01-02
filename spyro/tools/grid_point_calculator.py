@@ -9,7 +9,7 @@ import spyro
 
 
 def minimum_grid_point_calculator(grid_point_calculator_parameters):
-    """ Function to calculate necessary grid point density.
+    """Function to calculate necessary grid point density.
 
     Parameters
     ----------
@@ -22,13 +22,15 @@ def minimum_grid_point_calculator(grid_point_calculator_parameters):
         Minimum grid point density necessary for a `experiment_type` mesh with a FEM whith
         the degree and method specified within the specified error tolerance
     """
-    G_reference = grid_point_calculator_parameters['G_reference']
-    degree_reference = grid_point_calculator_parameters['reference_degree']
-    G_initial = grid_point_calculator_parameters['G_initial']
-    desired_degree = grid_point_calculator_parameters['desired_degree']
-    TOL = grid_point_calculator_parameters['accepted_error_threshold']
+    G_reference = grid_point_calculator_parameters["G_reference"]
+    degree_reference = grid_point_calculator_parameters["reference_degree"]
+    G_initial = grid_point_calculator_parameters["G_initial"]
+    desired_degree = grid_point_calculator_parameters["desired_degree"]
+    TOL = grid_point_calculator_parameters["accepted_error_threshold"]
 
-    model = spyro.tools.create_model_for_grid_point_calculation(grid_point_calculator_parameters, degree_reference)
+    model = spyro.tools.create_model_for_grid_point_calculation(
+        grid_point_calculator_parameters, degree_reference
+    )
     # print("Model built at time "+str(time.time()-start_time), flush = True)
     comm = spyro.utils.mpi_init(model)
     # print("Comm built at time "+str(time.time()-start_time), flush = True)
@@ -40,40 +42,44 @@ def minimum_grid_point_calculator(grid_point_calculator_parameters):
 
     comm.comm.barrier()
 
-    model = spyro.tools.create_model_for_grid_point_calculation(grid_point_calculator_parameters, desired_degree)
+    model = spyro.tools.create_model_for_grid_point_calculation(
+        grid_point_calculator_parameters, desired_degree
+    )
     G = searching_for_minimum(model, p_exact, TOL, starting_G=G_initial, comm=comm)
 
     return G
 
 
 def wave_solver(model, G, comm=False):
-    minimum_mesh_velocity = model['testing_parameters']['minimum_mesh_velocity']
-    model["mesh"]["meshfile"] = "meshes/2Dhomogeneous"+str(G)+".msh"
+    minimum_mesh_velocity = model["testing_parameters"]["minimum_mesh_velocity"]
+    model["mesh"]["meshfile"] = "meshes/2Dhomogeneous" + str(G) + ".msh"
     try:
         mesh, V = spyro.io.read_mesh(model, comm)
     except:  # noqa E722
         model = generate_mesh(model, G, comm)
         mesh, V = spyro.io.read_mesh(model, comm)
 
-    if model['testing_parameters']['experiment_type'] == 'homogeneous':
+    if model["testing_parameters"]["experiment_type"] == "homogeneous":
         vp_exact = fire.Constant(minimum_mesh_velocity)
-    elif model['testing_parameters']['experiment_type'] == 'heterogeneous':
+    elif model["testing_parameters"]["experiment_type"] == "heterogeneous":
         vp_exact = spyro.io.interpolate(model, mesh, V, guess=False)
 
-    if model["opts"]["method"] == 'KMV':
+    if model["opts"]["method"] == "KMV":
         estimate_max_eigenvalue = True
     else:
         estimate_max_eigenvalue = False
-    new_dt = 0.2*spyro.estimate_timestep(mesh, V, vp_exact, estimate_max_eigenvalue=estimate_max_eigenvalue)
+    new_dt = 0.2 * spyro.estimate_timestep(
+        mesh, V, vp_exact, estimate_max_eigenvalue=estimate_max_eigenvalue
+    )
 
-    model['timeaxis']['dt'] = comm.comm.allreduce(new_dt, op=MPI.MIN)
+    model["timeaxis"]["dt"] = comm.comm.allreduce(new_dt, op=MPI.MIN)
     if comm.comm.rank == 0:
         print(
             f"Maximum stable timestep is: {model['timeaxis']['dt']} seconds",
             flush=True,
         )
-    if model['timeaxis']['dt'] > 0.001:
-        model['timeaxis']['dt'] = 0.001
+    if model["timeaxis"]["dt"] > 0.001:
+        model["timeaxis"]["dt"] = 0.001
     if comm.comm.rank == 0:
         print(
             f"Timestep used is: {model['timeaxis']['dt']} seconds",
@@ -92,7 +98,16 @@ def wave_solver(model, G, comm=False):
         if spyro.io.is_owner(comm, sn):
             t1 = time.time()
             p_field, p_recv = spyro.solvers.forward(
-                model, mesh, comm, vp_exact, sources, wavelet, receivers, source_num=sn, output=False)
+                model,
+                mesh,
+                comm,
+                vp_exact,
+                sources,
+                wavelet,
+                receivers,
+                source_num=sn,
+                output=False,
+            )
             print(time.time() - t1)
 
     return p_recv
@@ -108,23 +123,25 @@ def generate_mesh(model, G, comm):
     return mesh
 
 
-def searching_for_minimum(model, p_exact, TOL, accuracy=0.1, starting_G=7.0, comm=False):
+def searching_for_minimum(
+    model, p_exact, TOL, accuracy=0.1, starting_G=7.0, comm=False
+):
     error = 100.0
     G = starting_G
 
     # fast loop
     print("Entering fast loop", flush=True)
     while error > TOL:
-        dif = max(G*0.1, accuracy)
+        dif = max(G * 0.1, accuracy)
         G = G + dif
-        print('With G equal to '+str(G))
+        print("With G equal to " + str(G))
         print("Entering wave solver", flush=True)
         p0 = wave_solver(model, G, comm)
         error = error_calc(p_exact, p0, model, comm=comm)
-        print('Error of '+str(error))
+        print("Error of " + str(error))
 
     G -= dif
-    G = np.round(G, 1)-accuracy
+    G = np.round(G, 1) - accuracy
     # slow loop
     if dif > accuracy:
         print("Entering slow loop", flush=True)
@@ -132,30 +149,30 @@ def searching_for_minimum(model, p_exact, TOL, accuracy=0.1, starting_G=7.0, com
         while error > TOL:
             dif = accuracy
             G = G + dif
-            print('With G equal to '+str(G))
+            print("With G equal to " + str(G))
             print("Entering wave solver", flush=True)
             p0 = wave_solver(model, G, comm)
             error = error_calc(p_exact, p0, model, comm=comm)
-            print('Error of '+str(error))
+            print("Error of " + str(error))
 
     return G
 
 
 def grid_point_to_mesh_point_converter_for_seismicmesh(model, G):
-    degree = model["opts"]['degree']
-    if model["opts"]["method"] == 'KMV':
+    degree = model["opts"]["degree"]
+    if model["opts"]["method"] == "KMV":
         if degree == 1:
-            M = G/0.707813887967734
+            M = G / 0.707813887967734
         if degree == 2:
-            M = 0.5*G/0.8663141029672784
+            M = 0.5 * G / 0.8663141029672784
         if degree == 3:
-            M = 0.2934695559090401*G/0.7483761673104953
+            M = 0.2934695559090401 * G / 0.7483761673104953
         if degree == 4:
-            M = 0.21132486540518713*G/0.7010127254535244
+            M = 0.21132486540518713 * G / 0.7010127254535244
         if degree == 5:
-            M = 0.20231237605867816*G/0.9381929803311276
+            M = 0.20231237605867816 * G / 0.9381929803311276
 
-    if model["opts"]["method"] == 'CG':
+    if model["opts"]["method"] == "CG":
         raise ValueError("Correct M to G conversion to be inputed for CG")
         # if degree == 1:
         #     M = G
@@ -168,7 +185,7 @@ def grid_point_to_mesh_point_converter_for_seismicmesh(model, G):
         # if degree == 5:
         #     M = 0.2*G
 
-    if model["opts"]["method"] == 'spectral':
+    if model["opts"]["method"] == "spectral":
         raise ValueError("Correct M to G conversion to be inputed for spectral")
         # if degree == 1:
         #     M = G
@@ -193,15 +210,15 @@ def error_calc(p_exact, p, model, comm=False):
     times_p, _ = p.shape
     if times_p_exact > times_p:  # then we interpolate p_exact
         times, receivers = p.shape
-        dt = model["timeaxis"]['tf']/times
+        dt = model["timeaxis"]["tf"] / times
         p_exact = time_interpolation(p_exact, p, model)
     elif times_p_exact < times_p:  # then we interpolate p
         times, receivers = p_exact.shape
-        dt = model["timeaxis"]['tf']/times
+        dt = model["timeaxis"]["tf"] / times
         p = time_interpolation(p, p_exact, model)
     else:  # then we dont need to interpolate
         times, receivers = p.shape
-        dt = model["timeaxis"]['tf']/times
+        dt = model["timeaxis"]["tf"] / times
     # p = time_interpolation(p, p_exact, model)
 
     max_absolute_diff = 0.0
@@ -213,21 +230,21 @@ def error_calc(p_exact, p, model, comm=False):
         for receiver in range(receivers):
             numerator_time_int = 0.0
             denominator_time_int = 0.0
-            for t in range(times-1):
-                top_integration = (p_exact[t, receiver]-p[t, receiver])**2*dt
-                bot_integration = (p_exact[t, receiver])**2*dt
+            for t in range(times - 1):
+                top_integration = (p_exact[t, receiver] - p[t, receiver]) ** 2 * dt
+                bot_integration = (p_exact[t, receiver]) ** 2 * dt
 
                 # Adding 1e-25 filter to receivers to eliminate noise
                 numerator_time_int += top_integration
 
                 denominator_time_int += bot_integration
 
-                diff = p_exact[t, receiver]-p[t, receiver]
+                diff = p_exact[t, receiver] - p[t, receiver]
                 if abs(diff) > 1e-15 and abs(diff) > max_absolute_diff:
                     max_absolute_diff = copy.deepcopy(diff)
 
                 if abs(diff) > 1e-15 and abs(p_exact[t, receiver]) > 1e-15:
-                    percentage_diff = abs(diff/p_exact[t, receiver])*100
+                    percentage_diff = abs(diff / p_exact[t, receiver]) * 100
                     if percentage_diff > max_percentage_diff:
                         max_percentage_diff = copy.deepcopy(percentage_diff)
 
@@ -235,7 +252,7 @@ def error_calc(p_exact, p, model, comm=False):
             denominator += denominator_time_int
 
     if denominator > 1e-15:
-        error = np.sqrt(numerator/denominator)
+        error = np.sqrt(numerator / denominator)
 
     # if numerator < 1e-15:
     #     print('Warning: error too small to measure correctly.', flush = True)
@@ -258,34 +275,36 @@ def error_calc_line(p_exact, p, model, comm=False):
     # therefore we have to interpolate the missing points
     # to have them at the same length
     # testing shape
-    times_p_exact, = p_exact.shape
-    times_p, = p.shape
+    (times_p_exact,) = p_exact.shape
+    (times_p,) = p.shape
     if times_p_exact > times_p:  # then we interpolate p_exact
-        times, = p.shape
-        dt = model["timeaxis"]['tf']/times
+        (times,) = p.shape
+        dt = model["timeaxis"]["tf"] / times
         p_exact = time_interpolation_line(p_exact, p, model)
     elif times_p_exact < times_p:  # then we interpolate p
-        times, = p_exact.shape
-        dt = model["timeaxis"]['tf']/times
+        (times,) = p_exact.shape
+        dt = model["timeaxis"]["tf"] / times
         p = time_interpolation_line(p, p_exact, model)
     else:  # then we dont need to interpolate
-        times, = p.shape
-        dt = model["timeaxis"]['tf']/times
+        (times,) = p.shape
+        dt = model["timeaxis"]["tf"] / times
 
     if comm.ensemble_comm.rank == 0:
         numerator_time_int = 0.0
         denominator_time_int = 0.0
         # Integrating with trapezoidal rule
-        for t in range(times-1):
-            numerator_time_int += (p_exact[t]-p[t])**2
-            denominator_time_int += (p_exact[t])**2
-        numerator_time_int -= ((p_exact[0]-p[0])**2 + (p_exact[times-1]-p[times-1])**2)/2
+        for t in range(times - 1):
+            numerator_time_int += (p_exact[t] - p[t]) ** 2
+            denominator_time_int += (p_exact[t]) ** 2
+        numerator_time_int -= (
+            (p_exact[0] - p[0]) ** 2 + (p_exact[times - 1] - p[times - 1]) ** 2
+        ) / 2
         numerator_time_int *= dt
-        denominator_time_int -= (p_exact[0]**2+p_exact[times-1]**2)/2
+        denominator_time_int -= (p_exact[0] ** 2 + p_exact[times - 1] ** 2) / 2
         denominator_time_int *= dt
 
         # if denominator_time_int > 1e-15:
-        error = np.sqrt(numerator_time_int/denominator_time_int)
+        error = np.sqrt(numerator_time_int / denominator_time_int)
 
         if denominator_time_int < 1e-15:
             print("Warning: receivers don't appear to register a shot.", flush=True)
@@ -296,17 +315,17 @@ def error_calc_line(p_exact, p, model, comm=False):
 
 def time_interpolation(p_old, p_exact, model):
     times, receivers = p_exact.shape
-    dt = model["timeaxis"]['tf']/times
+    dt = model["timeaxis"]["tf"] / times
 
     times_old, rec = p_old.shape
-    dt_old = model["timeaxis"]['tf']/times_old
+    dt_old = model["timeaxis"]["tf"] / times_old
     time_vector_old = np.zeros((1, times_old))
     for ite in range(times_old):
-        time_vector_old[0, ite] = dt_old*ite
+        time_vector_old[0, ite] = dt_old * ite
 
     time_vector_new = np.zeros((1, times))
     for ite in range(times):
-        time_vector_new[0, ite] = dt*ite
+        time_vector_new[0, ite] = dt * ite
 
     p = np.zeros((times, receivers))
     for receiver in range(receivers):
@@ -317,18 +336,18 @@ def time_interpolation(p_old, p_exact, model):
 
 
 def time_interpolation_line(p_old, p_exact, model):
-    times, = p_exact.shape
-    dt = model["timeaxis"]['tf']/times
+    (times,) = p_exact.shape
+    dt = model["timeaxis"]["tf"] / times
 
-    times_old, = p_old.shape
-    dt_old = model["timeaxis"]['tf']/times_old
+    (times_old,) = p_old.shape
+    dt_old = model["timeaxis"]["tf"] / times_old
     time_vector_old = np.zeros((1, times_old))
     for ite in range(times_old):
-        time_vector_old[0, ite] = dt_old*ite
+        time_vector_old[0, ite] = dt_old * ite
 
     time_vector_new = np.zeros((1, times))
     for ite in range(times):
-        time_vector_new[0, ite] = dt*ite
+        time_vector_new[0, ite] = dt * ite
 
     p = np.zeros((times,))
     f = interpolate.interp1d(time_vector_old[0, :], p_old[:])
@@ -341,28 +360,28 @@ def generate_mesh2D(model, G, comm):
     import SeismicMesh
 
     if comm.comm.rank == 0:
-        print('Entering mesh generation', flush=True)
+        print("Entering mesh generation", flush=True)
     M = grid_point_to_mesh_point_converter_for_seismicmesh(model, G)
 
-    Lz = model["mesh"]['Lz']
-    lz = model['BCs']['lz']
-    Lx = model["mesh"]['Lx']
-    lx = model['BCs']['lx']
+    Lz = model["mesh"]["Lz"]
+    lz = model["BCs"]["lz"]
+    Lx = model["mesh"]["Lx"]
+    lx = model["BCs"]["lx"]
 
     Real_Lz = Lz + lz
-    Real_Lx = Lx + 2*lx
+    Real_Lx = Lx + 2 * lx
 
-    if model['testing_parameters']['experiment_type'] == 'homogeneous':
+    if model["testing_parameters"]["experiment_type"] == "homogeneous":
 
-        minimum_mesh_velocity = model['testing_parameters']['minimum_mesh_velocity']
-        frequency = model["acquisition"]['frequency']
-        lbda = minimum_mesh_velocity/frequency
+        minimum_mesh_velocity = model["testing_parameters"]["minimum_mesh_velocity"]
+        frequency = model["acquisition"]["frequency"]
+        lbda = minimum_mesh_velocity / frequency
 
         Real_Lz = Lz + lz
-        Real_Lx = Lx + 2*lx
-        edge_length = lbda/M
+        Real_Lx = Lx + 2 * lx
+        edge_length = lbda / M
 
-        bbox = (-Real_Lz, 0.0, -lx, Real_Lx-lx)
+        bbox = (-Real_Lz, 0.0, -lx, Real_Lx - lx)
         rec = SeismicMesh.Rectangle(bbox)
 
         if comm.comm.rank == 0:
@@ -372,28 +391,32 @@ def generate_mesh2D(model, G, comm):
                 edge_length=edge_length,
                 mesh_improvement=False,
                 comm=comm.ensemble_comm,
-                verbose=0
+                verbose=0,
             )
-            print('entering spatial rank 0 after mesh generation')
+            print("entering spatial rank 0 after mesh generation")
 
-            points, cells = SeismicMesh.geometry.delete_boundary_entities(points, cells, min_qual=0.6)
+            points, cells = SeismicMesh.geometry.delete_boundary_entities(
+                points, cells, min_qual=0.6
+            )
 
             meshio.write_points_cells(
-                "meshes/2Dhomogeneous"+str(G)+".msh",
-                points, [("triangle", cells)],
+                "meshes/2Dhomogeneous" + str(G) + ".msh",
+                points,
+                [("triangle", cells)],
                 file_format="gmsh22",
-                binary=False
+                binary=False,
             )
             meshio.write_points_cells(
-                "meshes/2Dhomogeneous"+str(G)+".vtk",
-                points, [("triangle", cells)],
-                file_format="vtk"
+                "meshes/2Dhomogeneous" + str(G) + ".vtk",
+                points,
+                [("triangle", cells)],
+                file_format="vtk",
             )
 
         if comm.comm.rank == 0:
-            print('Finishing mesh generation', flush=True)
+            print("Finishing mesh generation", flush=True)
 
-    elif model['testing_parameters']['experiment_type'] == 'heterogeneous':
+    elif model["testing_parameters"]["experiment_type"] == "heterogeneous":
         # Name of SEG-Y file containg velocity model.
         fname = "vel_z6.25m_x12.5m_exact.segy"
 
@@ -403,8 +426,8 @@ def generate_mesh2D(model, G, comm):
         rectangle = SeismicMesh.Rectangle(bbox)
 
         # Desired minimum mesh size in domain
-        frequency = model["acquisition"]['frequency']
-        hmin = 1429.0/(M*frequency)
+        frequency = model["acquisition"]["frequency"]
+        hmin = 1429.0 / (M * frequency)
 
         # Construct mesh sizing object from velocity model
         ef = SeismicMesh.get_sizing_function_from_segy(
@@ -418,18 +441,22 @@ def generate_mesh2D(model, G, comm):
             pad_style="edge",
         )
 
-        points, cells = SeismicMesh.generate_mesh(domain=rectangle, edge_length=ef, verbose=0, mesh_improvement=False)
+        points, cells = SeismicMesh.generate_mesh(
+            domain=rectangle, edge_length=ef, verbose=0, mesh_improvement=False
+        )
 
         meshio.write_points_cells(
-            "meshes/2Dheterogeneous"+str(G)+".msh",
-            points/1000, [("triangle", cells)],
+            "meshes/2Dheterogeneous" + str(G) + ".msh",
+            points / 1000,
+            [("triangle", cells)],
             file_format="gmsh22",
-            binary=False
+            binary=False,
         )
         meshio.write_points_cells(
-            "meshes/2Dheterogeneous"+str(G)+".vtk",
-            points/1000, [("triangle", cells)],
-            file_format="vtk"
+            "meshes/2Dheterogeneous" + str(G) + ".vtk",
+            points / 1000,
+            [("triangle", cells)],
+            file_format="vtk",
         )
 
         comm.comm.barrier()
@@ -440,29 +467,29 @@ def generate_mesh2D(model, G, comm):
 def generate_mesh3D(model, G, comm):
     import SeismicMesh
 
-    print('Entering mesh generation', flush=True)
+    print("Entering mesh generation", flush=True)
     M = grid_point_to_mesh_point_converter_for_seismicmesh(model, G)
     method = model["opts"]["method"]
 
-    Lz = model["mesh"]['Lz']
-    lz = model['BCs']['lz']
-    Lx = model["mesh"]['Lx']
-    lx = model['BCs']['lx']
-    Ly = model["mesh"]['Ly']
-    ly = model['BCs']['ly']
+    Lz = model["mesh"]["Lz"]
+    lz = model["BCs"]["lz"]
+    Lx = model["mesh"]["Lx"]
+    lx = model["BCs"]["lx"]
+    Ly = model["mesh"]["Ly"]
+    ly = model["BCs"]["ly"]
 
     Real_Lz = Lz + lz
-    Real_Lx = Lx + 2*lx
-    Real_Ly = Ly + 2*ly
+    Real_Lx = Lx + 2 * lx
+    Real_Ly = Ly + 2 * ly
 
-    minimum_mesh_velocity = model['testing_parameters']['minimum_mesh_velocity']
-    frequency = model["acquisition"]['frequency']
-    lbda = minimum_mesh_velocity/frequency
+    minimum_mesh_velocity = model["testing_parameters"]["minimum_mesh_velocity"]
+    frequency = model["acquisition"]["frequency"]
+    lbda = minimum_mesh_velocity / frequency
 
-    edge_length = lbda/M
+    edge_length = lbda / M
     # print(Real_Lz)
 
-    bbox = (-Real_Lz, 0.0, -lx, Real_Lx-lx, -ly, Real_Ly-ly)
+    bbox = (-Real_Lz, 0.0, -lx, Real_Lx - lx, -ly, Real_Ly - ly)
     cube = SeismicMesh.Cube(bbox)
 
     if comm.comm.rank == 0:
@@ -473,35 +500,44 @@ def generate_mesh3D(model, G, comm):
             mesh_improvement=False,
             max_iter=75,
             comm=comm.ensemble_comm,
-            verbose=0
+            verbose=0,
         )
 
-        points, cells = SeismicMesh.sliver_removal(points=points, bbox=bbox, domain=cube, edge_length=edge_length, preserve=True, max_iter=200)
+        points, cells = SeismicMesh.sliver_removal(
+            points=points,
+            bbox=bbox,
+            domain=cube,
+            edge_length=edge_length,
+            preserve=True,
+            max_iter=200,
+        )
 
-        print('entering spatial rank 0 after mesh generation')
+        print("entering spatial rank 0 after mesh generation")
 
         meshio.write_points_cells(
-            "meshes/3Dhomogeneous"+str(G)+".msh",
-            points, [("tetra", cells)],
+            "meshes/3Dhomogeneous" + str(G) + ".msh",
+            points,
+            [("tetra", cells)],
             file_format="gmsh22",
-            binary=False
+            binary=False,
         )
         meshio.write_points_cells(
-            "meshes/3Dhomogeneous"+str(G)+".vtk",
-            points, [("tetra", cells)],
-            file_format="vtk"
+            "meshes/3Dhomogeneous" + str(G) + ".vtk",
+            points,
+            [("tetra", cells)],
+            file_format="vtk",
         )
 
     comm.comm.barrier()
     if method == "CG" or method == "KMV":
         mesh = fire.Mesh(
-            "meshes/3Dhomogeneous"+str(G)+".msh",
+            "meshes/3Dhomogeneous" + str(G) + ".msh",
             distribution_parameters={
                 "overlap_type": (fire.DistributedMeshOverlapType.NONE, 0)
             },
         )
 
-    print('Finishing mesh generation', flush=True)
+    print("Finishing mesh generation", flush=True)
     return mesh
 
 

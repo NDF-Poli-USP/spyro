@@ -9,7 +9,7 @@ from .utils.geometry_creation import insert_fixed_value, create_3d_grid
 from .utils.estimate_timestep import estimate_timestep
 from .io import io
 from . import solvers
-from .import tools
+from . import tools
 
 __all__ = [
     "io",
