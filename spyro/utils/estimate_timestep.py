@@ -31,7 +31,7 @@ def estimate_timestep(mesh, V, c, estimate_max_eigenvalue=True):
     Asp = scipy.sparse.csr_matrix((av, aj, ai))
     Asp_inv = scipy.sparse.csr_matrix((av_inv, aj, ai))
 
-    K = fd.assemble(c*c*dot(grad(u), grad(v)) * dxlump)
+    K = fd.assemble(c * c * dot(grad(u), grad(v)) * dxlump)
     ai, aj, av = K.petscmat.getValuesCSR()
     Ksp = scipy.sparse.csr_matrix((av, aj, ai))
 

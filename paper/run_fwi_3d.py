@@ -30,7 +30,7 @@ receivers = spyro.insert_fixed_value(receivers, -0.15, 0)
 def get_memory_usage():
     """Return the memory usage in Mo."""
     process = psutil.Process(os.getpid())
-    mem = process.memory_info()[0] / float(2 ** 20)
+    mem = process.memory_info()[0] / float(2**20)
     return mem
 
 

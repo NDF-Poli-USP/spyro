@@ -125,5 +125,5 @@ def analytical_solution_for_pressure_based_on_MMS(model, mesh, time):
     degree = model["opts"]["degree"]
     V = FunctionSpace(mesh, "CG", degree)
     z, x = SpatialCoordinate(mesh)
-    p = Function(V).interpolate((time ** 2) * sin(pi * z) * sin(pi * x))
+    p = Function(V).interpolate((time**2) * sin(pi * z) * sin(pi * x))
     return p

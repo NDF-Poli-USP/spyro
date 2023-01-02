@@ -3,22 +3,26 @@ import numpy as np
 import spyro
 
 
-def compare_velocity(p_r, receiver_in_source_index, receiver_comparison_index, model, dt):
+def compare_velocity(
+    p_r, receiver_in_source_index, receiver_comparison_index, model, dt
+):
     receiver_0 = p_r[:, receiver_in_source_index]
     receiver_1 = p_r[:, receiver_comparison_index]
 
     pos = model["acquisition"]["receiver_locations"]
 
-    time0 = np.argmax(receiver_0)*dt
-    time1 = np.argmax(receiver_1)*dt
+    time0 = np.argmax(receiver_0) * dt
+    time1 = np.argmax(receiver_1) * dt
 
     x0 = pos[receiver_in_source_index][1]
     x1 = pos[receiver_comparison_index][1]
 
-    measured_velocity = np.abs(x1-x0)/(time1-time0)
+    measured_velocity = np.abs(x1 - x0) / (time1 - time0)
     minimum_velocity = 1.5
 
-    error_percent = 100*np.abs(measured_velocity-minimum_velocity)/minimum_velocity
+    error_percent = (
+        100 * np.abs(measured_velocity - minimum_velocity) / minimum_velocity
+    )
     return error_percent
 
 
@@ -56,11 +60,18 @@ def test_forward_3d(tf=0.6):
         "source_pos": [(-0.15, 0.25, 0.25)],
         "frequency": 5.0,
         "delay": 1.0,
-        "receiver_locations": [(-0.15, 0.25, 0.25), (-0.15, 0.3, 0.25), (-0.15, 0.35, 0.25), (-0.15, 0.4, 0.25), (-0.15, 0.45, 0.25), (-0.15, 0.5, 0.25), (-0.15, 0.55, 0.25), (-0.15, 0.6, 0.25)],
+        "receiver_locations": [
+            (-0.15, 0.25, 0.25),
+            (-0.15, 0.3, 0.25),
+            (-0.15, 0.35, 0.25),
+            (-0.15, 0.4, 0.25),
+            (-0.15, 0.45, 0.25),
+            (-0.15, 0.5, 0.25),
+            (-0.15, 0.55, 0.25),
+            (-0.15, 0.6, 0.25),
+        ],
     }
-    model["aut_dif"] = {
-        "status": False
-    }
+    model["aut_dif"] = {"status": False}
     model["timeaxis"] = {
         "t0": 0.0,  # Initial time for event
         "tf": tf,  # Final time for event

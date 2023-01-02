@@ -80,11 +80,11 @@ class Receivers:
         self.degree = model["opts"]["degree"]
         self.receiver_locations = model["acquisition"]["receiver_locations"]
 
-        if self.dimension == 3 and model["aut_dif"]['status']:
+        if self.dimension == 3 and model["aut_dif"]["status"]:
             self.column_x = model["acquisition"]["num_rec_x_columns"]
             self.column_y = model["acquisition"]["num_rec_y_columns"]
             self.column_z = model["acquisition"]["num_rec_z_columns"]
-            self.num_receivers = self.column_x*self.column_y
+            self.num_receivers = self.column_x * self.column_y
 
         else:
             self.num_receivers = len(self.receiver_locations)
@@ -94,7 +94,7 @@ class Receivers:
         self.cell_tabulations = None
         self.cellNodeMaps = None
         self.nodes_per_cell = None
-        self.quadrilateral = (model["opts"]['quadrature'] == 'GLL')
+        self.quadrilateral = model["opts"]["quadrature"] == "GLL"
         self.is_local = [0] * self.num_receivers
         if not self.automatic_adjoint:
             self.build_maps()
@@ -110,7 +110,7 @@ class Receivers:
         self.__num_receivers = value
 
     def build_maps(self):
-        """ Calculates and stores tabulations for interpolation
+        """Calculates and stores tabulations for interpolation
 
         Is always automatticaly called when initializing the class,
         therefore should only be called again if a mesh related attribute
@@ -121,10 +121,14 @@ class Receivers:
             tolerance = 1e-6
             if self.dimension == 2:
                 receiver_z, receiver_x = self.receiver_locations[rid]
-                cell_id = self.mesh.locate_cell([receiver_z, receiver_x], tolerance=tolerance)
+                cell_id = self.mesh.locate_cell(
+                    [receiver_z, receiver_x], tolerance=tolerance
+                )
             elif self.dimension == 3:
                 receiver_z, receiver_x, receiver_y = self.receiver_locations[rid]
-                cell_id = self.mesh.locate_cell([receiver_z, receiver_x, receiver_y], tolerance=tolerance)
+                cell_id = self.mesh.locate_cell(
+                    [receiver_z, receiver_x, receiver_y], tolerance=tolerance
+                )
             self.is_local[rid] = cell_id
 
         (
@@ -244,7 +248,12 @@ class Receivers:
         if self.quadrilateral is True:
             end_vertex_id = 4
             degree = self.degree
-            cell_ends = [0, (degree+1)*(degree+1)-degree-1, (degree+1)*(degree+1)-1, degree]
+            cell_ends = [
+                0,
+                (degree + 1) * (degree + 1) - degree - 1,
+                (degree + 1) * (degree + 1) - 1,
+                degree,
+            ]
         else:
             end_vertex_id = 3
             cell_ends = [0, 1, 2]
@@ -259,8 +268,12 @@ class Receivers:
                 cellNodeMaps[receiver_id, :] = cell_node_map[cell_id, :]
                 for vertex_number in range(0, end_vertex_id):
                     cellVertices[receiver_id].append([])
-                    z = node_locations[cell_node_map[cell_id, cell_ends[vertex_number]], 0]
-                    x = node_locations[cell_node_map[cell_id, cell_ends[vertex_number]], 1]
+                    z = node_locations[
+                        cell_node_map[cell_id, cell_ends[vertex_number]], 0
+                    ]
+                    x = node_locations[
+                        cell_node_map[cell_id, cell_ends[vertex_number]], 1
+                    ]
                     cellVertices[receiver_id][vertex_number] = (z, x)
 
         return cellId_maps, cellVertices, cellNodeMaps
@@ -369,7 +382,7 @@ class Receivers:
         elif self.dimension == 2 and self.quadrilateral is True:
             return self.__func_build_cell_tabulations_2D_quad()
         elif self.dimension == 3 and self.quadrilateral is True:
-            raise ValueError('3D GLL hexas not yet supported.')
+            raise ValueError("3D GLL hexas not yet supported.")
         else:
             raise ValueError
 
@@ -420,7 +433,9 @@ class Receivers:
         return cell_tabulations
 
     def __func_build_cell_tabulations_2D_quad(self):
-        finatelement = FiniteElement('CG', self.mesh.ufl_cell(), degree=self.degree, variant='spectral')
+        finatelement = FiniteElement(
+            "CG", self.mesh.ufl_cell(), degree=self.degree, variant="spectral"
+        )
         V = FunctionSpace(self.mesh, finatelement)
         u = TrialFunction(V)
         Q = u.function_space()
@@ -454,8 +469,8 @@ class Receivers:
         # 2D --
         if self.dimension == 2:
             num_rec = self.num_receivers
-            δz = np.linspace(rec_pos[0, 0], rec_pos[num_rec-1, 0], 1)
-            δx = np.linspace(rec_pos[0, 1], rec_pos[num_rec-1, 1], num_rec)
+            δz = np.linspace(rec_pos[0, 0], rec_pos[num_rec - 1, 0], 1)
+            δx = np.linspace(rec_pos[0, 1], rec_pos[num_rec - 1, 1], num_rec)
 
             Z, X = np.meshgrid(δz, δx)
             xs = np.vstack((Z.flatten(), X.flatten())).T
@@ -476,11 +491,12 @@ class Receivers:
 
         return point_cloud
 
+
 # Some helper functions
 
 
 def choosing_element(V, degree):
-    """ Chooses UFL element based on desired function space"""
+    """Chooses UFL element based on desired function space"""
     cell_geometry = V.mesh().ufl_cell()
     if cell_geometry == quadrilateral:
         T = UFCQuadrilateral()
@@ -837,41 +853,38 @@ def change_to_reference_quad(p, v0, v1, v2, v3):
     sumx = x0 - x1 + x2 - x3
     sumy = y0 - y1 + y2 - y3
 
-    gover = np.array([[sumx, dx2],
-                     [sumy, dy2]])
+    gover = np.array([[sumx, dx2], [sumy, dy2]])
 
-    g_under = np.array([[dx1, dx2],
-                       [dy1, dy2]])
+    g_under = np.array([[dx1, dx2], [dy1, dy2]])
 
     gunder = np.linalg.det(g_under)
 
-    hover = np.array([[dx1, sumx],
-                      [dy1, sumy]])
+    hover = np.array([[dx1, sumx], [dy1, sumy]])
 
     hunder = gunder
 
-    g = np.linalg.det(gover)/gunder
-    h = np.linalg.det(hover)/hunder
+    g = np.linalg.det(gover) / gunder
+    h = np.linalg.det(hover) / hunder
     i = 1.0
 
-    a = x1 - x0 + g*x1
-    b = x3 - x0 + h*x3
+    a = x1 - x0 + g * x1
+    b = x3 - x0 + h * x3
     c = x0
-    d = y1 - y0 + g*y1
-    e = y3 - y0 + h*y3
+    d = y1 - y0 + g * y1
+    e = y3 - y0 + h * y3
     f = y0
 
-    A = e*i - f*h
-    B = c*h - b*i
-    C = b*f - c*e
-    D = f*g - d*i
-    E = a*i - c*g
-    F = c*d - a*f
-    G = d*h - e*g
-    H = b*g - a*h
-    I = a*e - b*d
+    A = e * i - f * h
+    B = c * h - b * i
+    C = b * f - c * e
+    D = f * g - d * i
+    E = a * i - c * g
+    F = c * d - a * f
+    G = d * h - e * g
+    H = b * g - a * h
+    I = a * e - b * d
 
-    pnx = (A*px + B*py + C)/(G*px + H*py + I)
-    pny = (D*px + E*py + F)/(G*px + H*py + I)
+    pnx = (A * px + B * py + C) / (G * px + H * py + I)
+    pny = (D * px + E * py + F) / (G * px + H * py + I)
 
     return (pnx, pny)

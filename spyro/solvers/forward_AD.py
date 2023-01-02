@@ -2,6 +2,7 @@ from firedrake import *
 
 # from .. import utils
 from ..domains import quadrature, space
+
 # from ..pml import damping
 # from ..io import ensemble_forward
 from . import helpers
@@ -87,8 +88,8 @@ def forward(
         outfile = helpers.create_output_file("forward.pvd", comm, source_num)
 
     t = 0.0
-    m = 1/(c*c)
-    m1 = m*((u - 2.0 * u_n + u_nm1) / Constant(dt ** 2)) * v * dx(rule=qr_x)
+    m = 1 / (c * c)
+    m1 = m * ((u - 2.0 * u_n + u_nm1) / Constant(dt**2)) * v * dx(rule=qr_x)
     a = dot(grad(u_n), grad(v)) * dx(rule=qr_x)  # explicit
     f = Function(V)
     nf = 0
@@ -97,7 +98,7 @@ def forward(
         nf = c * ((u_n - u_nm1) / dt) * v * ds(rule=qr_s)
 
     h = CellSize(mesh)
-    FF = m1 + a + nf - (1/(h/degree*h/degree))*f * v * dx(rule=qr_x)
+    FF = m1 + a + nf - (1 / (h / degree * h / degree)) * f * v * dx(rule=qr_x)
     X = Function(V)
 
     lhs_ = lhs(FF)
@@ -128,12 +129,7 @@ def forward(
         usol_recv.append(rec.dat.data)
 
         if fwi:
-            J0 += calc_objective_func(
-                rec,
-                p_true_rec[step],
-                step,
-                dt,
-                P)
+            J0 += calc_objective_func(rec, p_true_rec[step], step, dt, P)
 
         if step % nspool == 0:
             assert (
@@ -158,7 +154,7 @@ def forward(
 def calc_objective_func(p_rec, p_true_rec, IT, dt, P):
     true_rec = Function(P)
     true_rec.dat.data[:] = p_true_rec
-    J = 0.5 * assemble(inner(true_rec-p_rec, true_rec-p_rec) * dx)
+    J = 0.5 * assemble(inner(true_rec - p_rec, true_rec - p_rec) * dx)
     return J
 
 

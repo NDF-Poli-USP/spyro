@@ -21,7 +21,7 @@ def functions(
     y2=None,
     b_pml=None,
 ):
-    """ Damping functions for the perfect matched layer for 2D and 3D"""
+    """Damping functions for the perfect matched layer for 2D and 3D"""
 
     damping_type = model["BCs"]["damping_type"]
     if damping_type == "polynomial":

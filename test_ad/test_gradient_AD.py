@@ -46,9 +46,7 @@ def test_gradient_AD():
         "source_pos": [(0.75, 0.75)],
         "frequency": 10.0,
         "delay": 1.0,
-        "receiver_locations": spyro.create_transect(
-            (0.9, 0.2), (0.9, 0.8), 10
-        ),
+        "receiver_locations": spyro.create_transect((0.9, 0.2), (0.9, 0.8), 10),
     }
     model["aut_dif"] = {
         "status": True,
@@ -73,14 +71,7 @@ def test_gradient_AD():
     V = FunctionSpace(mesh, element)
     z, x = SpatialCoordinate(mesh)
 
-    vp_exact = Function(V).interpolate(1.0 + 0.0*x)
-    vp_guess = Function(V).interpolate(0.8 + 0.0*x)
+    vp_exact = Function(V).interpolate(1.0 + 0.0 * x)
+    vp_guess = Function(V).interpolate(0.8 + 0.0 * x)
 
-    spyro.tools.gradient_test_acoustic_ad(
-        model,
-        mesh,
-        V,
-        comm,
-        vp_exact,
-        vp_guess
-    )
+    spyro.tools.gradient_test_acoustic_ad(model, mesh, V, comm, vp_exact, vp_guess)

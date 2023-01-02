@@ -20,7 +20,7 @@ model["opts"] = {
     "degree": 5,  # p order
     "dimension": 2,  # dimension
     "regularization": True,  # regularization is on?
-    "gamma": 1.e-6,  # regularization parameter
+    "gamma": 1.0e-6,  # regularization parameter
 }
 model["parallelism"] = {
     "type": "automatic",
@@ -179,8 +179,8 @@ class Objective(ROL.Objective):
         if comm.comm.size > 1:
             dJ /= comm.comm.size
         # regularize the gradient if asked.
-        if model['opts']['regularization']:
-            gamma = model['opts']['gamma']
+        if model["opts"]["regularization"]:
+            gamma = model["opts"]["gamma"]
             dJ = regularize_gradient(vp, dJ, gamma)
         # mask the water layer
         dJ.dat.data[water] = 0.0

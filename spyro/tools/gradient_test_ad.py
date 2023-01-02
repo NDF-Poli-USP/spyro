@@ -8,9 +8,10 @@ forward = spyro.solvers.forward_AD
 
 def gradient_test_acoustic(model, mesh, V, comm, vp_exact, vp_guess, mask=None):
     import firedrake_adjoint as fire_adj
+
     with fire_adj.stop_annotating():
         if comm.comm.rank == 0:
-            print('######## Starting gradient test ########', flush=True)
+            print("######## Starting gradient test ########", flush=True)
 
         sources = spyro.Sources(model, mesh, V, comm)
         receivers = spyro.Receivers(model, mesh, V, comm)
@@ -23,25 +24,34 @@ def gradient_test_acoustic(model, mesh, V, comm, vp_exact, vp_guess, mask=None):
         point_cloud = receivers.set_point_cloud(comm)
         # simulate the exact model
         if comm.comm.rank == 0:
-            print('######## Running the exact model ########', flush=True)
+            print("######## Running the exact model ########", flush=True)
         p_exact_recv = forward(
             model, mesh, comm, vp_exact, sources, wavelet, point_cloud
         )
 
-
-# simulate the guess model
+    # simulate the guess model
     if comm.comm.rank == 0:
-        print('######## Running the guess model ########', flush=True)
+        print("######## Running the guess model ########", flush=True)
     p_guess_recv, Jm = forward(
-        model, mesh, comm, vp_guess, sources, wavelet,
-        point_cloud, fwi=True, true_rec=p_exact_recv
+        model,
+        mesh,
+        comm,
+        vp_guess,
+        sources,
+        wavelet,
+        point_cloud,
+        fwi=True,
+        true_rec=p_exact_recv,
     )
     if comm.comm.rank == 0:
         print("\n Cost functional at fixed point : " + str(Jm) + " \n ", flush=True)
 
     # compute the gradient of the control (to be verified)
     if comm.comm.rank == 0:
-        print('######## Computing the gradient by automatic differentiation ########', flush=True)
+        print(
+            "######## Computing the gradient by automatic differentiation ########",
+            flush=True,
+        )
     control = fire_adj.Control(vp_guess)
     dJ = fire_adj.compute_gradient(Jm, control)
     if mask:
@@ -65,7 +75,10 @@ def gradient_test_acoustic(model, mesh, V, comm, vp_exact, vp_guess, mask=None):
         vp_original = vp_guess.copy(deepcopy=True)
 
         if comm.comm.rank == 0:
-            print('######## Computing the gradient by finite diferences ########', flush=True)
+            print(
+                "######## Computing the gradient by finite diferences ########",
+                flush=True,
+            )
         errors = []
         for step in steps:  # range(3):
             # steps.append(step)
@@ -73,8 +86,15 @@ def gradient_test_acoustic(model, mesh, V, comm, vp_exact, vp_guess, mask=None):
             # J(m + delta_m*h)
             vp_guess = vp_original + step * delta_m
             p_guess_recv, Jp = forward(
-                model, mesh, comm, vp_guess, sources, wavelet,
-                point_cloud, fwi=True, true_rec=p_exact_recv
+                model,
+                mesh,
+                comm,
+                vp_guess,
+                sources,
+                wavelet,
+                point_cloud,
+                fwi=True,
+                true_rec=p_exact_recv,
             )
 
             fd_grad = (Jp - Jm) / step
@@ -88,7 +108,8 @@ def gradient_test_acoustic(model, mesh, V, comm, vp_exact, vp_guess, mask=None):
                     + str(fd_grad)
                     + ", grad'*dir : "
                     + str(projnorm)
-                    + " \n ", flush=True
+                    + " \n ",
+                    flush=True,
                 )
 
             errors.append(100 * ((fd_grad - projnorm) / projnorm))

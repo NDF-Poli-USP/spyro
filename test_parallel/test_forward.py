@@ -32,24 +32,28 @@ def plot_receiver(
     plt.yticks(fontsize=18)
     # plt.xlim(start_index, end_index)
     # plt.ylim(tf, 0)
-    plt.savefig("receiver"+str(receiver_id) + "." + file_format, format=file_format)
+    plt.savefig("receiver" + str(receiver_id) + "." + file_format, format=file_format)
     if show:
         plt.show()
     plt.close()
     return None
 
 
-def compare_velocity(p_r, receiver_in_source_index, receiver_comparison_index, model, dt):
+def compare_velocity(
+    p_r, receiver_in_source_index, receiver_comparison_index, model, dt
+):
     receiver_0 = p_r[:, receiver_in_source_index]
     receiver_1 = p_r[:, receiver_comparison_index]
     pos = model["acquisition"]["receiver_locations"]
-    time0 = np.argmax(receiver_0)*dt
-    time1 = np.argmax(receiver_1)*dt
+    time0 = np.argmax(receiver_0) * dt
+    time1 = np.argmax(receiver_1) * dt
     x0 = pos[receiver_in_source_index, 1]
     x1 = pos[receiver_comparison_index, 1]
-    measured_velocity = np.abs(x1-x0)/(time1-time0)
+    measured_velocity = np.abs(x1 - x0) / (time1 - time0)
     minimum_velocity = 1.5
-    error_percent = 100*np.abs(measured_velocity-minimum_velocity)/minimum_velocity
+    error_percent = (
+        100 * np.abs(measured_velocity - minimum_velocity) / minimum_velocity
+    )
     print(f"Velocity error of {error_percent}%.", flush=True)
     return error_percent
 
@@ -64,7 +68,9 @@ def get_receiver_in_source_location(source_id, model):
         if math.isclose(source_x, receiver_location[1]):
             return cont
         cont += 1
-    return ValueError("Couldn't find a receiver whose location coincides with a source within the standard tolerance.")
+    return ValueError(
+        "Couldn't find a receiver whose location coincides with a source within the standard tolerance."
+    )
 
 
 def test_forward_5shots():
@@ -136,11 +142,16 @@ def test_forward_5shots():
     for source_id in range(len(model["acquisition"]["source_pos"])):
         if comm.ensemble_comm.rank == (source_id % comm.ensemble_comm.size):
             receiver_in_source_index = get_receiver_in_source_location(source_id, model)
-            if source_id != len(model["acquisition"]["source_pos"])-1 or source_id == 0:
+            if (
+                source_id != len(model["acquisition"]["source_pos"]) - 1
+                or source_id == 0
+            ):
                 receiver_comparison_index = receiver_in_source_index + 1
             else:
                 receiver_comparison_index = receiver_in_source_index - 1
-            error_percent = compare_velocity(p_r, receiver_in_source_index, receiver_comparison_index, model, dt)
+            error_percent = compare_velocity(
+                p_r, receiver_in_source_index, receiver_comparison_index, model, dt
+            )
             if error_percent < 5:
                 pass_error_test = True
             print(f"For source = {source_id}: test = {pass_error_test}", flush=True)
