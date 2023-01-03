@@ -76,8 +76,10 @@ model["acquisition"] = {
     "source_type": "Ricker",
     "frequency": 6.0, # freq peak = 6 Hz, max freq = 15 Hz (see Jaquet's  Thesis) 
     "delay": 1.0, # FIXME check this
-    "num_sources": 4, #FIXME not used (remove it, and update an example script)
-    "source_pos": spyro.create_transect((0.5, -0.01-0.45), (3.5, -0.01-0.45), 4), # waterbottom at z=-0.45 km
+    #"num_sources": 4, #FIXME not used (remove it, and update an example script) TO RUN WITH POINT SOURCES
+    "num_sources": 1,#4, #FIXME not used (remove it, and update an example script)
+    #"source_pos": spyro.create_transect((0.5, -0.01-0.45), (3.5, -0.01-0.45), 4), # waterbottom at z=-0.45 km TO RUN WITH POINT SOURCES
+    "source_pos": spyro.create_transect((0.5, 0), (3.5, 0), 1), # waterbottom at z=-0.45 km # out of domain, only to run with some source
     "amplitude": 1.0, #FIXME check this
     "num_receivers": len(rec), #FIXME not used (remove it, and update an example script)
     "receiver_locations": rec, 
@@ -85,8 +87,10 @@ model["acquisition"] = {
 
 model["timeaxis"] = {
     "t0": 0.0,  #  Initial time for event
-    "tf": 2.5, # Final time for event 
-    "dt": 0.00025/5,  # timestep size 
+    #"tf": 2.5, # Final time for event TO RUN WITH POINT SOURCES
+    "tf": 1.0, # Final time for event TO RUN WITH NEUMANN-TYPE SOURCE 
+    #"dt": 0.00025/5,  # timestep size TO RUN WITH POINT SOURCES
+    "dt": 0.00025/4,  # timestep size TO RUN WITH NEUMANN-TYPE SOURCE
     "nspool":  20,  # (20 for dt=0.00050) how frequently to output solution to pvds
     "fspool": 10000000,  # how frequently to save solution to RAM
 }
@@ -130,7 +134,7 @@ def _make_vp(V, vp_guess=False, field="velocity_model"):
     return vp
 #}}}
 
-QUAD = 1
+QUAD = 0
 if QUAD==1:
     model["opts"]["method"] = "CG"
     model["opts"]["quadrature"] = "GLL"
@@ -164,7 +168,6 @@ if REF:
     mesh_ref.coordinates.dat.data[:, 1] -= model["mesh"]["Lz"] + 0.45 # waterbottom at z=-0.450 km
 
     # for the exact model, use a higher-order element
-    #p = model["opts"]["degree"] # to keep the order defined by the user
     model["opts"]["degree"] = 4 # it was 5 before
     element = spyro.domains.space.FE_method(mesh_ref, model["opts"]["method"], model["opts"]["degree"])
     V_ref = FunctionSpace(mesh_ref, element)
@@ -182,7 +185,7 @@ if REF:
     print("Starting forward computation of the exact model",flush=True) 
     start = time.time()
     p_ref, p_ref_recv = spyro.solvers.forward(
-        model, mesh_ref, comm, vp_ref, sources, wavelet, receivers, output=False
+        model, mesh_ref, comm, vp_ref, sources, wavelet, receivers, output=False, use_Neumann_BC_as_source=True
     )
     end = time.time()
     print(round(end - start,2),flush=True)
@@ -203,16 +206,36 @@ if REF:
 
 elif REF==0: 
     print("reading reference model",flush=True)
-    #p_ref_recv = spyro.io.load_shots(model, comm, file_name=path+file_name)
+    #FIXME uncomment it p_ref_recv = spyro.io.load_shots(model, comm, file_name=path+file_name)
 #}}}
 
 # now, prepare to run with different mesh resolutions
 FIREMESH = 1
+
+def switch(iii): # switch definition (iii comes from sys.argv) {{{
+    if iii == 0:
+        return 80  # nx=80  => dx = dz = 50 m 
+    elif iii == 1:
+        return 50  # nx=50  => dx = dz = 80 m
+    elif iii == 2:
+        return 40  # nx=40  => dx = dz = 100 m
+    elif iii == 3:
+        return 25  # nx=25  => dx = dz = 160 m
+    elif iii == 4:
+        return 20  # nx=20  => dx = dz = 200 m
+    elif iii == 5:
+        return 14  # nx=14  => dx = dz = 285.71 m
+    elif iii == 6:
+        return 10  # nx=10  => dx = dz = 400 m
+    else:
+        sys.exit("iii not found! Exiting...")
+#}}}
+# some nx and related dx - for reference {{{
 #nx = 400 # nx=400 => dx = dz = 10 m  # no need
 #nx = 200 # nx=200 => dx = dz = 20 m  # Reference model with p=5
 #nx = 100 # nx=100 => dx = dz = 40 m
 #nx = 80  # nx=80  => dx = dz = 50 m
-nx = 50  # nx=50  => dx = dz = 80 m
+#nx = 50  # nx=50  => dx = dz = 80 m
 #nx = 40  # nx=40  => dx = dz = 100 m
 #nx = 25  # nx=25  => dx = dz = 160 m
 #nx = 20  # nx=20  => dx = dz = 200 m
@@ -220,7 +243,23 @@ nx = 50  # nx=50  => dx = dz = 80 m
 #nx = 14  # nx=14  => dx = dz = 285.71 m
 #nx = 12  # nx=12 => dx = dz = 333.33 m 
 #nx = 10  # nx=10  => dx = dz = 400 m
+#}}}
+
+# read or define degree and nx/ny
+if len(sys.argv)==3:
+    ppp=int(sys.argv[1])
+    iii=int(sys.argv[2])
+else:
+    ppp=2
+    iii=1
+
+nx = switch(iii)
 ny = math.ceil( nx*model["mesh"]["Lz"]/model["mesh"]["Lx"] ) # nx * Lz/Lx, Delta x = Delta z
+model["opts"]["degree"] = ppp
+
+print("Running with degree = " + str(ppp) + " and nx = " + str(nx), flush=True)
+sys.exit("exit")
+
 # generate or read a mesh, and create space V {{{
 if FIREMESH: 
     if QUAD==0:
@@ -393,7 +432,7 @@ if AMR:
     _vp = _make_vp(V, vp_guess=False) # V is the original space of mesh
     File("vp_after_amr.pvd").write(_vp)
 #}}}
-sys.exit("exit")
+#sys.exit("exit")
 
 # set the file name
 h = round(1000*model["mesh"]["Lx"]/nx)
@@ -414,7 +453,7 @@ if GUESS==1:
     vp = _make_vp(V, vp_guess=False) 
 
     start = time.time()
-    _, p_recv = spyro.solvers.forward(model, mesh, comm, vp, sources, wavelet, receivers, output=True)
+    _, p_recv = spyro.solvers.forward(model, mesh, comm, vp, sources, wavelet, receivers, output=True, use_Neumann_BC_as_source=True)
     end = time.time()
     print(round(end - start,2),flush=True)
 
