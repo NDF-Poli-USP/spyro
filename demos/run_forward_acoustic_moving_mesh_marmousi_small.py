@@ -88,7 +88,8 @@ model["acquisition"] = {
 model["timeaxis"] = {
     "t0": 0.0,  #  Initial time for event
     #"tf": 2.5, # Final time for event TO RUN WITH POINT SOURCES
-    "tf": 1.0, # Final time for event TO RUN WITH NEUMANN-TYPE SOURCE 
+    #FIXME use it "tf": 1.0, # Final time for event TO RUN WITH NEUMANN-TYPE SOURCE 
+    "tf": 0.00025, # Final time for event TO RUN WITH NEUMANN-TYPE SOURCE 
     #"dt": 0.00025/5,  # timestep size TO RUN WITH POINT SOURCES
     "dt": 0.00025/4,  # timestep size TO RUN WITH NEUMANN-TYPE SOURCE
     "nspool":  20,  # (20 for dt=0.00050) how frequently to output solution to pvds
@@ -257,8 +258,8 @@ nx = switch(iii)
 ny = math.ceil( nx*model["mesh"]["Lz"]/model["mesh"]["Lx"] ) # nx * Lz/Lx, Delta x = Delta z
 model["opts"]["degree"] = ppp
 
-print("Running with degree = " + str(ppp) + " and nx = " + str(nx), flush=True)
-sys.exit("exit")
+print("\n Running with degree = " + str(ppp) + " and nx = " + str(nx) + "\n", flush=True)
+#sys.exit("exit")
 
 # generate or read a mesh, and create space V {{{
 if FIREMESH: 
@@ -286,7 +287,7 @@ else:
 #print("Nelem = " + str(mesh.num_cells()), flush=True) 
 #sys.exit("exit")
 
-AMR = 1
+AMR = 0
 # adapt the mesh using the exact vp, if requested {{{
 if AMR:
     # This mesh-grid is used to compute the monitor function
@@ -458,7 +459,8 @@ if GUESS==1:
     print(round(end - start,2),flush=True)
 
     # save shots
-    spyro.io.save_shots(model, comm, p_recv, file_name=path+file_name)
+    # FIXME uncomment it spyro.io.save_shots(model, comm, p_recv, file_name=path+file_name)
+    sys.exit("exit") # FIXME remove it
 
 elif GUESS==0:
     print("reading guess model",flush=True)
