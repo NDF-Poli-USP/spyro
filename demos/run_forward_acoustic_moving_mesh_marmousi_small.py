@@ -88,8 +88,8 @@ model["acquisition"] = {
 model["timeaxis"] = {
     "t0": 0.0,  #  Initial time for event
     #"tf": 2.5, # Final time for event TO RUN WITH POINT SOURCES
-    #FIXME use it "tf": 1.0, # Final time for event TO RUN WITH NEUMANN-TYPE SOURCE 
-    "tf": 0.00025, # Final time for event TO RUN WITH NEUMANN-TYPE SOURCE 
+    "tf": 1.0, # Final time for event TO RUN WITH NEUMANN-TYPE SOURCE 
+    #"tf": 0.00025, # Final time for event FIXME to debug only 
     #"dt": 0.00025/5,  # timestep size TO RUN WITH POINT SOURCES
     "dt": 0.00025/4,  # timestep size TO RUN WITH NEUMANN-TYPE SOURCE
     "nspool":  20,  # (20 for dt=0.00050) how frequently to output solution to pvds
@@ -147,14 +147,18 @@ distribution_parameters={"partition": True,
                          "overlap_type": (DistributedMeshOverlapType.VERTEX, 60)} # FIXME if "at" will be the default scheme, then we could remove overlap
 
 # set the reference file name
-#file_name = "p_ref_recv_freq_"+str(model["acquisition"]["frequency"])   # with P=5
 file_name = "p_ref_p4_recv_freq_"+str(model["acquisition"]["frequency"]) # with P=4
 if platform.node()=='recruta':
     path = "./shots/acoustic_forward_marmousi_small/" 
 else:
     path = "/share/tdsantos/shots/acoustic_forward_marmousi_small/"
 
-REF = 0
+# controls
+FIREMESH = 1 # keep it 1
+AMR = 1      # should adapt the mesh?
+GUESS = 0    # if 1, run the guess model; otherwise (=0), read results
+REF = 0      # if 1, run the reference model; otherwise (=0), read results
+
 # run reference model {{{
 if REF:
     _nx = 200  # nx=200  => dx = dz = 20 m
@@ -174,7 +178,7 @@ if REF:
     V_ref = FunctionSpace(mesh_ref, element)
 
     #element_DG = spyro.domains.space.FE_method(mesh_ref, "DG", 2) # here, it could be 2 too
-    #V_DG = FunctionSpace(mesh_ref, element_DG)
+    #V_DG = FunctionSpace(mesh_ref, element_DG) DG space is better to represent data, but it is not currently possible to use it during FWI
 
     sources = spyro.Sources(model, mesh_ref, V_ref, comm)
     receivers = spyro.Receivers(model, mesh_ref, V_ref, comm)
@@ -207,12 +211,10 @@ if REF:
 
 elif REF==0: 
     print("reading reference model",flush=True)
-    #FIXME uncomment it p_ref_recv = spyro.io.load_shots(model, comm, file_name=path+file_name)
+    p_ref_recv = spyro.io.load_shots(model, comm, file_name=path+file_name)
 #}}}
 
 # now, prepare to run with different mesh resolutions
-FIREMESH = 1
-
 def switch(iii): # switch definition (iii comes from sys.argv) {{{
     if iii == 0:
         return 80  # nx=80  => dx = dz = 50 m 
@@ -230,8 +232,8 @@ def switch(iii): # switch definition (iii comes from sys.argv) {{{
         return 10  # nx=10  => dx = dz = 400 m
     else:
         sys.exit("iii not found! Exiting...")
-#}}}
-# some nx and related dx - for reference {{{
+
+# some nx and related dx - for reference
 #nx = 400 # nx=400 => dx = dz = 10 m  # no need
 #nx = 200 # nx=200 => dx = dz = 20 m  # Reference model with p=5
 #nx = 100 # nx=100 => dx = dz = 40 m
@@ -252,7 +254,7 @@ if len(sys.argv)==3:
     iii=int(sys.argv[2])
 else:
     ppp=2
-    iii=1
+    iii=2
 
 nx = switch(iii)
 ny = math.ceil( nx*model["mesh"]["Lz"]/model["mesh"]["Lx"] ) # nx * Lz/Lx, Delta x = Delta z
@@ -287,9 +289,8 @@ else:
 #print("Nelem = " + str(mesh.num_cells()), flush=True) 
 #sys.exit("exit")
 
-AMR = 0
 # adapt the mesh using the exact vp, if requested {{{
-if AMR:
+if AMR==1 and GUESS==1:
     # This mesh-grid is used to compute the monitor function
     # Alternatively, a point cloud scheme could be used instead (see Jaquet's thesis)
     _nx = 200
@@ -442,7 +443,6 @@ if QUAD==1:
 else:
     file_name = "p_recv_AMR_" + str(AMR) + "_p_" + str(model["opts"]["degree"]) + "_h_" + str(h) + "m_freq_" + str(model["acquisition"]["frequency"])
 
-GUESS = 1
 # run the guess model with a given mesh {{{
 if GUESS==1:
     sources = spyro.Sources(model, mesh, V, comm)
@@ -459,8 +459,7 @@ if GUESS==1:
     print(round(end - start,2),flush=True)
 
     # save shots
-    # FIXME uncomment it spyro.io.save_shots(model, comm, p_recv, file_name=path+file_name)
-    sys.exit("exit") # FIXME remove it
+    spyro.io.save_shots(model, comm, p_recv, file_name=path+file_name)
 
 elif GUESS==0:
     print("reading guess model",flush=True)
@@ -506,7 +505,7 @@ E_rec3 = compute_relative_error(p_rec3, p_ref_rec3)
 model["acquisition"]["receiver_locations"] = rec
 E_total = compute_relative_error(p_recv, p_ref_recv)
 
-if comm.ensemble_comm.rank == 1:
+if comm.ensemble_comm.rank == 0:
     print("E rec1 (%) = "  + str(round(E_rec1*100,2)), flush=True)
     print("E rec2 (%) = "  + str(round(E_rec2*100,2)), flush=True)
     print("E rec3 (%) = "  + str(round(E_rec3*100,2)), flush=True)
