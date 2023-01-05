@@ -135,7 +135,13 @@ def _make_vp(V, vp_guess=False, field="velocity_model"):
     return vp
 #}}}
 
-QUAD = 0
+# controls
+FIREMESH = 1 # keep it 1
+AMR = 1      # should adapt the mesh?
+GUESS = 1    # if 1, run the guess model; otherwise (=0), read results
+REF = 0      # if 1, run the reference model; otherwise (=0), read results
+QUAD = 1     # if 1, run with quadrilateral elements; otherwise (=0), run with triangles
+
 if QUAD==1:
     model["opts"]["method"] = "CG"
     model["opts"]["quadrature"] = "GLL"
@@ -152,12 +158,6 @@ if platform.node()=='recruta':
     path = "./shots/acoustic_forward_marmousi_small/" 
 else:
     path = "/share/tdsantos/shots/acoustic_forward_marmousi_small/"
-
-# controls
-FIREMESH = 1 # keep it 1
-AMR = 1      # should adapt the mesh?
-GUESS = 0    # if 1, run the guess model; otherwise (=0), read results
-REF = 0      # if 1, run the reference model; otherwise (=0), read results
 
 # run reference model {{{
 if REF:
@@ -252,6 +252,8 @@ def switch(iii): # switch definition (iii comes from sys.argv) {{{
 if len(sys.argv)==3:
     ppp=int(sys.argv[1])
     iii=int(sys.argv[2])
+    if QUAD==1 and ppp!=4:
+        sys.exit("QUAD=1, but degree not equal to 4. Skipping run...")
 else:
     ppp=2
     iii=2
@@ -454,7 +456,7 @@ if GUESS==1:
     vp = _make_vp(V, vp_guess=False) 
 
     start = time.time()
-    _, p_recv = spyro.solvers.forward(model, mesh, comm, vp, sources, wavelet, receivers, output=True, use_Neumann_BC_as_source=True)
+    _, p_recv = spyro.solvers.forward(model, mesh, comm, vp, sources, wavelet, receivers, output=False, use_Neumann_BC_as_source=True)
     end = time.time()
     print(round(end - start,2),flush=True)
 
