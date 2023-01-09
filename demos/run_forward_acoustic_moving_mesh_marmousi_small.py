@@ -56,6 +56,7 @@ model["mesh"] = {
 model["BCs"] = {
     "status": False,  # True or False, used to turn on any type of BC 
     "outer_bc": "non-reflective", #  none or non-reflective (outer boundary condition)
+    #"outer_bc": "none", # FIXME testing it none or non-reflective (outer boundary condition)
     "damping_type": "polynomial",  # polynomial. hyperbolic, shifted_hyperbolic
     "method": "damping", # damping, pml
     "exponent": 2,
@@ -140,7 +141,8 @@ FIREMESH = 1 # keep it 1
 AMR = 1      # should adapt the mesh?
 GUESS = 1    # if 1, run the guess model; otherwise (=0), read results
 REF = 0      # if 1, run the reference model; otherwise (=0), read results
-QUAD = 1     # if 1, run with quadrilateral elements; otherwise (=0), run with triangles
+QUAD = 0     # if 1, run with quadrilateral elements; otherwise (=0), run with triangles
+CONST_VP = 1 # if 1, run with a uniform vp = 2 km/s (it is employed to check convergence rate and wheter adapted mesh introduces errors)
 
 if QUAD==1:
     model["opts"]["method"] = "CG"
@@ -157,7 +159,9 @@ file_name = "p_ref_p4_recv_freq_"+str(model["acquisition"]["frequency"]) # with 
 if platform.node()=='recruta':
     path = "./shots/acoustic_forward_marmousi_small/" 
 else:
-    path = "/share/tdsantos/shots/acoustic_forward_marmousi_small/"
+    path = "/share/tdsantos/shots/acoustic_forward_marmousi_small_vp_cte/"
+    #path = "/share/tdsantos/shots/acoustic_forward_marmousi_small/"
+    #path = "/share/tdsantos/shots/acoustic_forward_marmousi_small_testing_without_ABS/"
 
 # run reference model {{{
 if REF:
@@ -186,6 +190,10 @@ if REF:
 
     #vp_ref = _make_vp(V_DG, vp_guess=False)
     vp_ref = _make_vp(V_ref, vp_guess=False) 
+    
+    if CONST_VP:
+        vp_ref.dat.data_with_halos[:] = 2.0 
+
     #sys.exit("exit")
     print("Starting forward computation of the exact model",flush=True) 
     start = time.time()
@@ -255,8 +263,8 @@ if len(sys.argv)==3:
     if QUAD==1 and ppp!=4:
         sys.exit("QUAD=1, but degree not equal to 4. Skipping run...")
 else:
-    ppp=2
-    iii=2
+    ppp=3
+    iii=3
 
 nx = switch(iii)
 ny = math.ceil( nx*model["mesh"]["Lz"]/model["mesh"]["Lx"] ) # nx * Lz/Lx, Delta x = Delta z
@@ -455,6 +463,9 @@ if GUESS==1:
     #vp = _make_vp(V_DG, vp_guess=False)
     vp = _make_vp(V, vp_guess=False) 
 
+    if CONST_VP:
+        vp.dat.data_with_halos[:] = 2.0 
+
     start = time.time()
     _, p_recv = spyro.solvers.forward(model, mesh, comm, vp, sources, wavelet, receivers, output=False, use_Neumann_BC_as_source=True)
     end = time.time()
@@ -508,10 +519,10 @@ model["acquisition"]["receiver_locations"] = rec
 E_total = compute_relative_error(p_recv, p_ref_recv)
 
 if comm.ensemble_comm.rank == 0:
-    print("E rec1 (%) = "  + str(round(E_rec1*100,2)), flush=True)
-    print("E rec2 (%) = "  + str(round(E_rec2*100,2)), flush=True)
-    print("E rec3 (%) = "  + str(round(E_rec3*100,2)), flush=True)
-    print("E total (%) = " + str(round(E_total*100,2)), flush=True)
+    print("E rec1 (%) = "  + str(round(E_rec1*100,4)), flush=True)
+    print("E rec2 (%) = "  + str(round(E_rec2*100,4)), flush=True)
+    print("E rec3 (%) = "  + str(round(E_rec3*100,4)), flush=True)
+    print("E total (%) = " + str(round(E_total*100,4)), flush=True)
     print("p = " + str(model["opts"]["degree"]))
     print("h = " + str(h) + " m")
     print("DOF = " + str(V.dof_count), flush=True)
