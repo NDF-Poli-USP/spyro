@@ -137,12 +137,13 @@ def _make_vp(V, vp_guess=False, field="velocity_model"):
 #}}}
 
 # controls
-FIREMESH = 1 # keep it 1
-AMR = 1      # should adapt the mesh?
-GUESS = 1    # if 1, run the guess model; otherwise (=0), read results
-REF = 0      # if 1, run the reference model; otherwise (=0), read results
-QUAD = 0     # if 1, run with quadrilateral elements; otherwise (=0), run with triangles
-CONST_VP = 1 # if 1, run with a uniform vp = 2 km/s (it is employed to check convergence rate and wheter adapted mesh introduces errors)
+FIREMESH = 1    # keep it 1
+AMR = 0         # should adapt the mesh?
+GUESS = 0       # if 1, run the guess model; otherwise (=0), read results
+REF = 0         # if 1, run the reference model; otherwise (=0), read results
+QUAD = 0        # if 1, run with quadrilateral elements; otherwise (=0), run with triangles
+CONST_VP = 1    # if 1, run with a uniform vp = 2 km/s (it is employed to check convergence rate and wheter adapted mesh introduces errors)
+PLOT_AT_REC = 1 # if 1, plot the pressure over time at one receiver
 
 if QUAD==1:
     model["opts"]["method"] = "CG"
@@ -263,7 +264,7 @@ if len(sys.argv)==3:
     if QUAD==1 and ppp!=4:
         sys.exit("QUAD=1, but degree not equal to 4. Skipping run...")
 else:
-    ppp=3
+    ppp=4
     iii=3
 
 nx = switch(iii)
@@ -527,3 +528,21 @@ if comm.ensemble_comm.rank == 0:
     print("h = " + str(h) + " m")
     print("DOF = " + str(V.dof_count), flush=True)
     print("Nelem = " + str(mesh.num_cells()), flush=True) 
+
+if comm.ensemble_comm.rank == 0 and PLOT_AT_REC:
+    #nrec = 10
+    #pe = p_ref_rec3[:,nrec]
+    #pg = p_rec3[:,nrec]
+    nrec = 50
+    pe = p_ref_rec1[:,nrec]
+    pg = p_rec1[:,nrec]
+    plt.title("p")
+    plt.plot(pe,label='exact')
+    plt.plot(pg,label='guess') 
+    plt.legend()
+    if AMR==1:
+        plt.savefig('/home/tdsantos/p_at_rec_wi_amr.png')
+    else:
+        plt.savefig('/home/tdsantos/p_at_rec_no_amr.png')
+    plt.close()
+
