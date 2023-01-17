@@ -178,7 +178,7 @@ def forward(
     t = 0.0
 
     # -------------------------------------------------------
-    m1 = ((u - 2.0 * u_n + u_nm1) / Constant(dt ** 2)) * v * dx(rule=qr_x)
+    m1 = ((u - 2.0 * u_n + u_nm1) / Constant(dt**2)) * v * dx(rule=qr_x)
     a = c * c * dot(grad(u_n), grad(v)) * dx(rule=qr_x)  # explicit
 
     nf = 0

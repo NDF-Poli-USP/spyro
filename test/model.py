@@ -9,7 +9,7 @@ initmodel = "blah"
 # Choose method and parameters
 opts = {
     "method": "DG",
-    "quadrature": 'KMV',
+    "quadrature": "KMV",
     "variant": None,
     "type": "SIP",  # for DG only - SIP, NIP and IIP
     "degree": 1,  # p order
@@ -34,7 +34,7 @@ mesh = {
 
 BCs = {
     "status": False,  # True or false
-    "outer_bc": "non-reflective",  #  neumann, non-reflective (outer boundary condition)
+    "outer_bc": "non-reflective",  # neumann, non-reflective (outer boundary condition)
     "damping_type": "polynomial",  # polynomial. hyperbolic, shifted_hyperbolic
     "exponent": 1,
     "cmax": 4.7,  # maximum acoustic wave velocity in PML - km/s
@@ -55,7 +55,7 @@ acquisition = {
 }
 
 timeaxis = {
-    "t0": 0.0,  #  Initial time for event
+    "t0": 0.0,  # Initial time for event
     "tf": 0.4,  # Final time for event
     "dt": 0.001,  # timestep size
     "nspool": 20,  # how frequently to output solution to pvds
@@ -67,7 +67,7 @@ inversion = {
 }  # cutoff frequencies (Hz) for Ricker source and to low-pass the observed shot record
 
 aut_dif = {
-    "status": False, 
+    "status": False,
 }
 
 

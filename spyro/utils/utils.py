@@ -45,9 +45,9 @@ def compute_functional(model, residual, velocity=None):
             J += residual[ti][rn] ** 2
     J *= 0.5
 
-    if regularize:
-        Jreg = assemble(0.5 * gamma * dot(grad(vp), grad(vp)) * dx)
-        J += Jreg
+    # if regularize:
+    #     Jreg = assemble(0.5 * gamma * dot(grad(vp), grad(vp)) * dx)
+    #     J += Jreg
     return J
 
 
@@ -75,8 +75,8 @@ def mysize(COMM=COMM_SELF):
 
 def mpi_init(model):
     """Initialize computing environment"""
-    rank = myrank()
-    size = mysize()
+    # rank = myrank()
+    # size = mysize()
     available_cores = COMM_WORLD.size
     if model["parallelism"]["type"] == "automatic":
         num_cores_per_shot = available_cores / len(model["acquisition"]["source_pos"])
@@ -112,7 +112,7 @@ def communicate(array, my_ensemble):
 
     """
     array_reduced = copy.copy(array)
-    
+
     if my_ensemble.comm.size > 1:
         if my_ensemble.comm.rank == 0 and my_ensemble.ensemble_comm.rank == 0:
             print("Spatial parallelism, reducing to comm 0", flush=True)
@@ -125,5 +125,5 @@ def analytical_solution_for_pressure_based_on_MMS(model, mesh, time):
     degree = model["opts"]["degree"]
     V = FunctionSpace(mesh, "CG", degree)
     z, x = SpatialCoordinate(mesh)
-    p = Function(V).interpolate((time ** 2) * sin(pi * z) * sin(pi * x))
+    p = Function(V).interpolate((time**2) * sin(pi * z) * sin(pi * x))
     return p

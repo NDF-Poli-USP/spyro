@@ -1,9 +1,9 @@
 import numpy as np
-import pytest
 
 import spyro
 
 """Read in an external mesh and interpolate velocity to it"""
+
 
 def test_readmesh2():
     from .inputfiles.Model1_2d_CG import model
@@ -15,6 +15,7 @@ def test_readmesh2():
     vp = spyro.io.interpolate(model, mesh, V)
 
     assert not np.isnan(np.min(vp.dat.data[:]))
+
 
 def test_readmesh3():
     from .inputfiles.Model1_3d_CG import model

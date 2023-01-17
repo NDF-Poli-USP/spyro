@@ -1,6 +1,4 @@
 from __future__ import with_statement
-
-import os
 import pickle
 
 import firedrake as fire
@@ -15,52 +13,70 @@ from .. import domains
 
 def ensemble_save(func):
     """Decorator for read and write shots for ensemble parallelism"""
+
     def wrapper(*args, **kwargs):
         acq = args[0].get("acquisition")
         num = len(acq["source_pos"])
         _comm = args[1]
-        custom_file_name = kwargs.get('file_name')
+        custom_file_name = kwargs.get("file_name")
         for snum in range(num):
             if is_owner(_comm, snum) and _comm.comm.rank == 0:
                 if custom_file_name is None:
-                    func(*args, **dict(kwargs, file_name = "shots/shot_record_"+str(snum+1)+".dat"))
+                    func(
+                        *args,
+                        **dict(
+                            kwargs,
+                            file_name="shots/shot_record_" + str(snum + 1) + ".dat",
+                        )
+                    )
                 else:
-                    func(*args, **dict(kwargs, file_name = custom_file_name))
+                    func(*args, **dict(kwargs, file_name=custom_file_name))
+
     return wrapper
 
 
 def ensemble_load(func):
-    """Decorator for read and write shots for ensemble parallelism"""
+    """Decorator for loading shots for ensemble parallelism"""
+
     def wrapper(*args, **kwargs):
         acq = args[0].get("acquisition")
         num = len(acq["source_pos"])
         _comm = args[1]
-        custom_file_name = kwargs.get('file_name')
+        custom_file_name = kwargs.get("file_name")
         for snum in range(num):
             if is_owner(_comm, snum):
                 if custom_file_name is None:
-                    values = func(*args, **dict(kwargs, file_name = "shots/shot_record_"+str(snum+1)+".dat"))
+                    values = func(
+                        *args,
+                        **dict(
+                            kwargs,
+                            file_name="shots/shot_record_" + str(snum + 1) + ".dat",
+                        )
+                    )
                 else:
-                    values = func(*args, **dict(kwargs, file_name = custom_file_name))
-                return values 
+                    values = func(*args, **dict(kwargs, file_name=custom_file_name))
+                return values
+
     return wrapper
 
 
 def ensemble_plot(func):
     """Decorator for `plot_shots` to distribute shots for ensemble parallelism"""
+
     def wrapper(*args, **kwargs):
         acq = args[0].get("acquisition")
         num = len(acq["source_pos"])
         _comm = args[1]
         for snum in range(num):
             if is_owner(_comm, snum) and _comm.comm.rank == 0:
-                func(*args, **dict(kwargs, file_name = str(snum+1)))
+                func(*args, **dict(kwargs, file_name=str(snum + 1)))
 
     return wrapper
 
 
 def ensemble_forward(func):
     """Decorator for forward to distribute shots for ensemble parallelism"""
+
     def wrapper(*args, **kwargs):
         acq = args[0].get("acquisition")
         num = len(acq["source_pos"])
@@ -72,8 +88,10 @@ def ensemble_forward(func):
 
     return wrapper
 
+
 def ensemble_forward_ad(func):
-    """Decorator for forward to distribute shots for ensemble parallelism"""
+    """Decorator for forward_ad to distribute shots for ensemble parallelism"""
+
     def wrapper(*args, **kwargs):
         acq = args[0].get("acquisition")
         num = len(acq["source_pos"])
@@ -89,8 +107,10 @@ def ensemble_forward_ad(func):
 
     return wrapper
 
+
 def ensemble_forward_elastic_waves(func):
     """Decorator for forward elastic waves to distribute shots for ensemble parallelism"""
+
     def wrapper(*args, **kwargs):
         acq = args[0].get("acquisition")
         num = len(acq["source_pos"])
@@ -105,6 +125,7 @@ def ensemble_forward_elastic_waves(func):
 
 def ensemble_gradient(func):
     """Decorator for gradient to distribute shots for ensemble parallelism"""
+
     def wrapper(*args, **kwargs):
         acq = args[0].get("acquisition")
         save_adjoint = kwargs.get("save_adjoint")
@@ -124,6 +145,7 @@ def ensemble_gradient(func):
 
 def ensemble_gradient_elastic_waves(func):
     """Decorator for gradient (elastic waves) to distribute shots for ensemble parallelism"""
+
     def wrapper(*args, **kwargs):
         acq = args[0].get("acquisition")
         save_adjoint = kwargs.get("save_adjoint")
@@ -174,8 +196,8 @@ def create_segy(velocity, filename):
 
     velocity = np.flipud(velocity.T)
 
-    spec.sorting = 2 # not sure what this means
-    spec.format = 1 # not sure what this means
+    spec.sorting = 2  # not sure what this means
+    spec.format = 1  # not sure what this means
     spec.samples = range(velocity.shape[0])
     spec.ilines = range(velocity.shape[1])
     spec.xlines = range(velocity.shape[0])
@@ -248,9 +270,8 @@ def is_owner(ens_comm, rank):
     return ens_comm.ensemble_comm.rank == (rank % ens_comm.ensemble_comm.size)
 
 
-
-
 def _check_units(c):
+    """Checks if velocity is in m/s or km/s"""
     if min(c.dat.data[:]) > 100.0:
         # data is in m/s but must be in km/s
         if fire.COMM_WORLD.rank == 0:

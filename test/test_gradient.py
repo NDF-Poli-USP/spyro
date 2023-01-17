@@ -1,5 +1,4 @@
 import numpy as np
-import pytest
 from firedrake import *
 import spyro
 from spyro.domains import quadrature
@@ -43,11 +42,14 @@ def _make_vp_guess(V, mesh):
     File("guess_vel.pvd").write(vp_guess)
     return vp_guess
 
+
 def test_gradient():
     _test_gradient(model)
 
+
 def test_gradient_pml():
     _test_gradient(model_pml, pml=True)
+
 
 def _test_gradient(options, pml=False):
 
@@ -61,8 +63,6 @@ def _test_gradient(options, pml=False):
         Lx = model_pml["mesh"]["Lx"]
         Lz = model_pml["mesh"]["Lz"]
         x1 = 0.0
-        x2 = Lx
-        z1 = 0.0
         z2 = -Lz
         boxx1 = Function(V).interpolate(conditional(x > x1, 1.0, 0.0))
         boxx2 = Function(V).interpolate(conditional(x < Lx, 1.0, 0.0))

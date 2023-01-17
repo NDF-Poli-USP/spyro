@@ -4,7 +4,21 @@ from firedrake import *
 
 
 def quadrature_rules(V):
-    """ Quadrature rule - Gauss-Lobatto-Legendre, Gauss-Legendre and Equi-spaced, KMV"""
+    """Returns quadrature rule - Gauss-Lobatto-Legendre, Gauss-Legendre and Equi-spaced, KMV
+
+    Returns quadradure rule to use with UFL's dx object when integrating
+
+    Parameters
+    ----------
+    V : obj
+        UFL Function Space
+
+    Returns
+    -------
+    qr_x, qr_s, qr_k : obj
+        quadrature rules for Firedrake to use
+    """
+
     degree = V.ufl_element().degree()
     dimension = V.mesh().geometric_dimension()
     cell_geometry = V.mesh().ufl_cell()
@@ -59,6 +73,7 @@ def quadrature_rules(V):
 # Spectral method - Gauss-Lobatto-Legendre rule
 # 1D
 def gauss_lobatto_legendre_line_rule(degree):
+    """Returns GLL quad rule for a given degree in a line"""
     fiat_make_rule = FIAT.quadrature.GaussLobattoLegendreQuadratureLineRule
     fiat_rule = fiat_make_rule(FIAT.ufc_simplex(1), degree + 1)
     finat_ps = finat.point_set.GaussLobattoLegendrePointSet
@@ -68,6 +83,7 @@ def gauss_lobatto_legendre_line_rule(degree):
 
 # 3D
 def gauss_lobatto_legendre_cube_rule(dimension, degree):
+    """Returns GLL quad rule for a given degree in a multidimensional space"""
     make_tensor_rule = finat.quadrature.TensorProductQuadratureRule
     result = gauss_lobatto_legendre_line_rule(degree)
     for _ in range(1, dimension):
