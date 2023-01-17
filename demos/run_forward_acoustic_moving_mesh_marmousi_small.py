@@ -140,9 +140,10 @@ def _make_vp(V, vp_guess=False, field="velocity_model"):
 FIREMESH = 1    # keep it 1
 AMR = 0         # should adapt the mesh?
 GUESS = 0       # if 1, run the guess model; otherwise (=0), read results
-REF = 0         # if 1, run the reference model; otherwise (=0), read results
+REF = 1         # if 1, run the reference model; otherwise (=0), read results
 QUAD = 0        # if 1, run with quadrilateral elements; otherwise (=0), run with triangles
-CONST_VP = 1    # if 1, run with a uniform vp = 2 km/s (it is employed to check convergence rate and wheter adapted mesh introduces errors)
+DG_VP = 1       # if 1, vp is defined on a Discontinuous space (L2 instead of an H1 space)
+CONST_VP = 0    # if 1, run with a uniform vp = 2 km/s (it is employed to check convergence rate and wheter adapted mesh introduces errors)
 PLOT_AT_REC = 1 # if 1, plot the pressure over time at one receiver
 
 if QUAD==1:
@@ -160,8 +161,9 @@ file_name = "p_ref_p4_recv_freq_"+str(model["acquisition"]["frequency"]) # with 
 if platform.node()=='recruta':
     path = "./shots/acoustic_forward_marmousi_small/" 
 else:
-    path = "/share/tdsantos/shots/acoustic_forward_marmousi_small_vp_cte/"
     #path = "/share/tdsantos/shots/acoustic_forward_marmousi_small/"
+    path = "/share/tdsantos/shots/acoustic_forward_marmousi_small_VP_DG/"
+    #path = "/share/tdsantos/shots/acoustic_forward_marmousi_small_vp_cte/"
     #path = "/share/tdsantos/shots/acoustic_forward_marmousi_small_testing_without_ABS/"
 
 # run reference model {{{
@@ -179,17 +181,18 @@ if REF:
 
     # for the exact model, use a higher-order element
     model["opts"]["degree"] = 4 # it was 5 before
-    element = spyro.domains.space.FE_method(mesh_ref, model["opts"]["method"], model["opts"]["degree"])
-    V_ref = FunctionSpace(mesh_ref, element)
 
-    #element_DG = spyro.domains.space.FE_method(mesh_ref, "DG", 2) # here, it could be 2 too
-    #V_DG = FunctionSpace(mesh_ref, element_DG) DG space is better to represent data, but it is not currently possible to use it during FWI
+    if DG_VP==1:# DG space is better to represent data, but it is not currently possible to use it during FWI
+        element = spyro.domains.space.FE_method(mesh_ref, "DG", model["opts"]["degree"]) 
+    else:
+        element = spyro.domains.space.FE_method(mesh_ref, model["opts"]["method"], model["opts"]["degree"])
 
+    V_ref = FunctionSpace(mesh_ref, element) 
+    
     sources = spyro.Sources(model, mesh_ref, V_ref, comm)
     receivers = spyro.Receivers(model, mesh_ref, V_ref, comm)
     wavelet = spyro.full_ricker_wavelet(dt=model["timeaxis"]["dt"], tf=model["timeaxis"]["tf"], freq=model["acquisition"]["frequency"])
 
-    #vp_ref = _make_vp(V_DG, vp_guess=False)
     vp_ref = _make_vp(V_ref, vp_guess=False) 
     
     if CONST_VP:
@@ -285,8 +288,12 @@ if FIREMESH:
     
     mesh.coordinates.dat.data[:, 0] -= 0.0 
     mesh.coordinates.dat.data[:, 1] -= model["mesh"]["Lz"] + 0.45 # waterbottom at z=-0.450 km
+    mesh.clear_spatial_index()
 
-    element = spyro.domains.space.FE_method(mesh, model["opts"]["method"], model["opts"]["degree"])
+    if DG_VP==1:
+        element = spyro.domains.space.FE_method(mesh, "DG", model["opts"]["degree"])
+    else:
+        element = spyro.domains.space.FE_method(mesh, model["opts"]["method"], model["opts"]["degree"])
     V = FunctionSpace(mesh, element)
 else:
     sys.exit("Running with unstructured mesh? make sure you set up the path correctly")
@@ -526,7 +533,7 @@ if comm.ensemble_comm.rank == 0:
     print("E total (%) = " + str(round(E_total*100,4)), flush=True)
     print("p = " + str(model["opts"]["degree"]))
     print("h = " + str(h) + " m")
-    print("DOF = " + str(V.dof_count), flush=True)
+    print("DOF = " + str(V.dof_count), flush=True) # only works for CG not DG (since the pressure is defined on CG)
     print("Nelem = " + str(mesh.num_cells()), flush=True) 
 
 if comm.ensemble_comm.rank == 0 and PLOT_AT_REC:

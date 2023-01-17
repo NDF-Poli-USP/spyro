@@ -88,7 +88,7 @@ model["timeaxis"] = {
 }
 #}}}
 # make vp {{{
-def _make_vp(V, vp_guess=False, field="velocity_model"):
+def _make_vp(V, vp_guess=False, field="velocity_model", apply_exact_vp_over_source_line=False):
     
     #path = "./velocity_models/elastic-marmousi-model/model/"
     path = "/share/tdsantos/velocity_models/elastic-marmousi-model/model/"
@@ -114,6 +114,14 @@ def _make_vp(V, vp_guess=False, field="velocity_model"):
         _vp = interpolant((xq, zq))
         vp = Function(V)
         vp.dat.data[:] = _vp / 1000 # m/s -> km/s
+    
+        if vp_guess==True and apply_exact_vp_over_source_line==True: # use exact vp for z>-0.53 (see source_mask definition) 
+            _vp_exact = _make_vp(V, vp_guess=False)
+            _m = V.ufl_domain()
+            _W = VectorFunctionSpace(_m, V.ufl_element())
+            _X = interpolate(_m.coordinates, _W)
+            _source_mask = np.where(_X.sub(1).dat.data[:] > -0.53)
+            vp.dat.data[_source_mask] = _vp_exact.dat.data[_source_mask] 
 
         if vp_guess:
             File("guess_vp.pvd").write(vp)
@@ -122,6 +130,20 @@ def _make_vp(V, vp_guess=False, field="velocity_model"):
     
     return vp
 #}}}
+
+# controls
+AMR = 0
+REF = 0
+QUAD = 1
+FIREMESH = 1
+ADAPT_MESH_FOR_GUESS_VP = 1 # adapt the mesh using the initial guess (vp)
+
+if QUAD==1:
+    model["opts"]["method"] = "CG"
+    model["opts"]["quadrature"] = "GLL"
+    model["opts"]["degree"] = 4
+    #model["opts"]["degree"] = 8
+
 comm = spyro.utils.mpi_init(model)
 distribution_parameters={"partition": True,
                          "overlap_type": (DistributedMeshOverlapType.VERTEX, 60)}
@@ -134,7 +156,6 @@ else:
     #path = "/share/tdsantos/shots/acoustic_fwi_moving_mesh_marmousi_small/"
     path = "/share/tdsantos/shots/acoustic_fwi_moving_mesh_marmousi_small_h20_m_TOO_SLOW/" # nx=200 (ref model)
 
-REF = 0
 # run reference model {{{
 if REF:
     _nx = 200 # 200 is the original, 50 is to speed-up
@@ -147,6 +168,7 @@ if REF:
                             distribution_parameters=distribution_parameters)
     mesh_ref.coordinates.dat.data[:, 0] -= 0.0 
     mesh_ref.coordinates.dat.data[:, 1] -= model["mesh"]["Lz"] + 0.45 # waterbottom at z=-0.450 km
+    mesh_ref.clear_spatial_index()
 
     # for the exact model, use a higher-order element
     model["opts"]["degree"] = 4
@@ -218,21 +240,28 @@ if REF==0:
 #}}}
 
 # now, prepare to run with different mesh resolutions
-FIREMESH = 1
 # generate or read the initial mesh and space V on which vp is defined {{{
 if FIREMESH: 
     #_nx = 25 # too coarse
     _nx = 50 # h=80m
     _ny = math.ceil( _nx*model["mesh"]["Lz"]/model["mesh"]["Lx"] )
 
-    mesh = RectangleMesh(_nx, _ny, model["mesh"]["Lx"], model["mesh"]["Lz"], diagonal="crossed", comm=comm.comm,
+    if QUAD==0:
+        mesh = RectangleMesh(_nx, _ny, model["mesh"]["Lx"], model["mesh"]["Lz"], diagonal="crossed", comm=comm.comm,
                             distribution_parameters=distribution_parameters)
+    elif QUAD==1:
+        mesh = RectangleMesh(_nx, _ny, model["mesh"]["Lx"], model["mesh"]["Lz"], quadrilateral=True, comm=comm.comm,
+                            distribution_parameters=distribution_parameters)
+
     mesh.coordinates.dat.data[:, 0] -= 0.0 
     mesh.coordinates.dat.data[:, 1] -= model["mesh"]["Lz"] + 0.45 # waterbottom at z=-0.450 km
+    mesh.clear_spatial_index()
 
     element = spyro.domains.space.FE_method(mesh, model["opts"]["method"], model["opts"]["degree"])
     V = FunctionSpace(mesh, element)
 else:
+    if QUAD==1:
+        sys.exit("QUAD=1, but FIREMESH=0, exiting")
     #model["mesh"]["meshfile"] = "./meshes/marmousi_small_no_water_h_150m.msh"
     #model["mesh"]["meshfile"] = "./meshes/marmousi_small_no_water_h_100m.msh"
     #model["mesh"]["meshfile"] = "./meshes/marmousi_small_no_water_h_50m.msh"
@@ -245,7 +274,7 @@ wavelet = spyro.full_ricker_wavelet(dt=model["timeaxis"]["dt"], tf=model["timeax
 
 # define max and min values of vp (used in ROL)
 vp_exact = _make_vp(V, vp_guess=False)
-vp_guess = _make_vp(V, vp_guess=True)  
+#vp_guess = _make_vp(V, vp_guess=True)  
 min_vp = vp_exact.vector().gather().min()
 max_vp = vp_exact.vector().gather().max()
 
@@ -268,9 +297,8 @@ xi = Function(mesh.coordinates, name="Computational coordinates")
 Ji=[]
 outfile = File("final_vp.pvd")
 max_loop_it = 4 # the number of iteration here depends on the max iteration of ROL (IT CAN NOT BE SMALLER THAN 'Maximum Storage')
-max_rol_it = 20 
-#max_rol_it = 2 # FIXME to debug
-AMR = 1
+#max_rol_it = 20 
+max_rol_it = 0 # FIXME to debug
 
 class L2Inner(object): #{{{
     # used in the gradient norm computation
@@ -429,13 +457,159 @@ paramsDict = {
 # create grid/mesh to interpolate inverted field {{{
 nx = 200
 ny = math.ceil( nx*model["mesh"]["Lz"]/model["mesh"]["Lx"] ) # nx * Lz/Lx, Delta x = Delta z
-mesh_grid = RectangleMesh(nx, ny, model["mesh"]["Lx"], model["mesh"]["Lz"], diagonal="crossed", comm=comm.comm,
+
+if QUAD==0:
+    mesh_grid = RectangleMesh(nx, ny, model["mesh"]["Lx"], model["mesh"]["Lz"], diagonal="crossed", comm=comm.comm,
                         distribution_parameters=distribution_parameters)
-mesh_grid.coordinates.dat.data[:, 0] -= 0.0 
-mesh_grid.coordinates.dat.data[:, 1] -= model["mesh"]["Lz"] + 0.45 # waterbottom at z=-0.45 km
+elif QUAD==1:
+    pad = 1 #FIXME testing a larger grid domain COME BACK HERE fix the issue with at and quad
+    mesh_grid = RectangleMesh(nx, ny, model["mesh"]["Lx"]+pad, model["mesh"]["Lz"]+pad, quadrilateral=True, comm=comm.comm,
+                        distribution_parameters=distribution_parameters)
+
+mesh_grid.coordinates.dat.data[:, 0] -= 0.0 + pad/2 
+mesh_grid.coordinates.dat.data[:, 1] -= model["mesh"]["Lz"] + 0.45 + pad/2 # waterbottom at z=-0.45 km
+mesh_grid.clear_spatial_index()
+
 V_grid = FunctionSpace(mesh_grid, "CG", 2)
 V_vec_grid = VectorFunctionSpace(mesh_grid, "CG", 2)
 #}}}
+# function to transfer data from one mesh to another {{{
+def _mesh_to_mesh_interpolation(data_in, data_out): 
+    if QUAD==0: # ok, use mesh projection
+        spyro.mesh_to_mesh_projection(data_in, data_out, degree=5) # from data_in to data_out
+    elif QUAD==1: # quadrilateral elements
+        # it works for serial so far
+        _m = data_out.ufl_domain() # quads
+        _W = VectorFunctionSpace(_m, data_out.ufl_element())
+        _X = interpolate(_m.coordinates, _W)
+        data_out.dat.data[:] = data_in.at(_X.dat.data_ro, dont_raise=True, tolerance=0.001) 
+#}}}
+# function to adapt the mesh {{{
+def adapt_mesh(vp_grid, grad_vp_grid, mesh):
+    print("   Adapt mesh: starting Monge-Ampere solver...", flush=True)
+
+    u_cts = TrialFunction(V_vec_grid)
+    v_cts = TestFunction(V_vec_grid)
+    a = inner(v_cts, u_cts)*dx
+    L = inner(v_cts, grad(vp_grid))*dx
+    _cg = {
+        "ksp_type": "cg",
+        "pc_type": "bjacobi",
+        "pc_sub_type": "ilu",
+    }
+    _problem = LinearVariationalProblem(a, L, grad_vp_grid, bcs=None)
+    _solver = LinearVariationalSolver(_problem, solver_parameters=_cg) 
+    _solver.solve()
+
+    File("grad_vp_grid.pvd").write(grad_vp_grid)
+    File("vp_grid.pvd").write(vp_grid)
+    #sys.exit("exit")
+
+    # Huang type monitor function
+    E1 = sqrt( inner( grad_vp_grid, grad_vp_grid ) ) # gradient based estimate
+    E2 = vp_grid.vector().gather().max() / vp_grid - 1 # a priori error estimate (it starts on 1, so it could be better)
+
+    E = E1
+    beta = 0.5 # (0, 1) # for E2 + smooth
+    phi = sqrt( 1 + E*E ) - 1
+    phi_hat = assemble(phi*dx(domain=mesh_grid)) / assemble(Constant(1.0)*dx(domain=mesh_grid))
+    alpha = beta / ( phi_hat * ( 1 - beta ) )
+    M1 = 1 + alpha * phi
+
+    E = E2
+    beta = 0.5 # (0, 1) # for E2 + smooth
+    phi = sqrt( 1 + E*E ) - 1
+    phi_hat = assemble(phi*dx(domain=mesh_grid)) / assemble(Constant(1.0)*dx(domain=mesh_grid))
+    alpha = beta / ( phi_hat * ( 1 - beta ) )
+    M2 = 1 + alpha * phi
+
+    M = max_value(M1,M2)
+    # Define the monitor function to be projected onto the adapted mesh
+    Mfunc = Function(V_grid).interpolate(M)
+
+    # smooth the monitor function
+    if 1: # {{{
+        lamb = 0.001
+
+        u = TrialFunction(V_grid)
+        v = TestFunction(V_grid)
+        u_n = Function(V_grid)
+
+        m = inner((u - u_n), v) * dx 
+        a = lamb * inner(grad(u), grad(v)) * dx # implicit
+        F = m + a
+
+        lhs_ = lhs(F)
+        rhs_ = rhs(F)
+
+        X = Function(V_grid)
+        B = Function(V_grid)
+        A = assemble(lhs_)
+
+        params = {"ksp_type": "preonly", "pc_type": "lu"}
+        solver = LinearSolver(A, solver_parameters=params)
+
+        u_n.assign(Mfunc)
+        nt = 1
+        for step in range(nt):
+            B = assemble(rhs_, tensor=B)
+            solver.solve(X, B)
+            u_n.assign(X)
+
+        Mfunc.assign(u_n)
+    #}}}
+
+    File("Mfunc.pvd").write(Mfunc)
+    #sys.exit("exit")
+    
+    def monitor_function(mesh): # here, mesh is the physical doman, i.e., x (=xi+Grad phi)
+        # project onto "mesh" that is being adapted (i.e., mesh(x))
+        _P1 = FunctionSpace(mesh, "CG", 1) 
+        _M = Function(_P1)
+        #spyro.mesh_to_mesh_projection(Mfunc, _M, degree=5)
+        _mesh_to_mesh_interpolation(Mfunc, _M) 
+        File("Mfunc_x.pvd").write(_M)
+        return _M
+        
+    def mask_dummy(mesh):
+        return Constant(1.)
+
+    # change the mesh coordinates to the original ones (computational mesh)
+    mesh.coordinates.assign(xi)
+
+    # make mesh and mesh_grid parallel compatible (to perform mesh-to-mesh interpolation via projection)
+    mesh._parallel_compatible = {weakref.ref(mesh_grid)}
+    
+    # ok, adapt the mesh according to the monitor function
+    step = spyro.monge_ampere_solver(mesh, monitor_function, p=2, mask=mask_dummy) #fix_boundary_nodes=fix_boundary_nodes) 
+    
+    # now, clear spatial index
+    mesh.clear_spatial_index()
+# }}}
+
+# adapt the mesh using initial vp, if requested {{{
+if AMR and ADAPT_MESH_FOR_GUESS_VP: # testing the mesh adaptation before starting the FWI
+    # interpolate the inverted field on the grid/mesh
+    _vp_guess = _make_vp(V, vp_guess=True) # source line is not filled with exact vp (the idea is to generate smooth monitor function)
+    
+    _vp_guess.dat.data[np.where(_vp_guess.dat.data[:] < 1.7)] = 1.7
+
+    _vp_grid = Function(V_grid)
+    
+    #spyro.mesh_to_mesh_projection(_vp_guess, _vp_grid, degree=5) # from _vp_guess to _vp_grid
+    _mesh_to_mesh_interpolation(_vp_guess, _vp_grid)
+
+    _grad_vp_grid = Function(V_vec_grid) 
+    adapt_mesh(_vp_grid, _grad_vp_grid, mesh) 
+    
+    #spyro.mesh_to_mesh_projection(_vp_grid, _vp_guess, degree=5)
+    #File("vp_guess_after_inital_adaptation.pvd").write(_vp_guess)
+    #sys.exit("exit")
+#}}}
+
+# set the initial guess (vp)
+vp_guess = _make_vp(V, vp_guess=True, apply_exact_vp_over_source_line=True)  
+#sys.exit("exit")
 
 # FWI loop with or without mesh adaptation important: (if mesh changes, V changes too)
 for i in range(max_loop_it): # it should be thought as re-mesh
@@ -485,127 +659,49 @@ for i in range(max_loop_it): # it should be thought as re-mesh
     problem = ROL.OptimizationProblem(obj, FeVector(vp_guess.vector(), inner_product), bnd=bnd)
     solver = ROL.OptimizationSolver(problem, params)
     solver.solve()
+    
+    #FIXME remove it
+    File("inverted_vp.pvd").write(obj.vp)
+    #sys.exit("exit")
 
     # interpolate the inverted field on the grid/mesh
     vp_grid = Function(V_grid)
-    spyro.mesh_to_mesh_projection(obj.vp, vp_grid, degree=5)
+    #spyro.mesh_to_mesh_projection(obj.vp, vp_grid, degree=5)
+    _mesh_to_mesh_interpolation(obj.vp, vp_grid)
     grad_vp_grid = Function(V_vec_grid)
+    
+    #FIXME remove it
+    #File("vp_grid_after_interp.pvd").write(vp_grid) ok 
 
 # adapt the mesh using inverted vp, if requested {{{
-    if AMR:
-        print("   Adapt mesh: starting Monge-Ampere solver...", flush=True)
-
-        u_cts = TrialFunction(V_vec_grid)
-        v_cts = TestFunction(V_vec_grid)
-        a = inner(v_cts, u_cts)*dx
-        L = inner(v_cts, grad(vp_grid))*dx
-        _cg = {
-            "ksp_type": "cg",
-            "pc_type": "bjacobi",
-            "pc_sub_type": "ilu",
-        }
-        _problem = LinearVariationalProblem(a, L, grad_vp_grid, bcs=None)
-        _solver = LinearVariationalSolver(_problem, solver_parameters=_cg) 
-        _solver.solve()
-
-        File("grad_vp_grid.pvd").write(grad_vp_grid)
-        File("vp_grid.pvd").write(vp_grid)
-        #sys.exit("exit")
-
-        # Huang type monitor function
-        E1 = sqrt( inner( grad_vp_grid, grad_vp_grid ) ) # gradient based estimate
-        E2 = vp_grid.vector().gather().max() / vp_grid - 1 # a priori error estimate (it starts on 1, so it could be better)
-
-        E = E1
-        beta = 0.5 # (0, 1) # for E2 + smooth
-        phi = sqrt( 1 + E*E ) - 1
-        phi_hat = assemble(phi*dx(domain=mesh_grid)) / assemble(Constant(1.0)*dx(domain=mesh_grid))
-        alpha = beta / ( phi_hat * ( 1 - beta ) )
-        M1 = 1 + alpha * phi
-   
-        E = E2
-        beta = 0.5 # (0, 1) # for E2 + smooth
-        phi = sqrt( 1 + E*E ) - 1
-        phi_hat = assemble(phi*dx(domain=mesh_grid)) / assemble(Constant(1.0)*dx(domain=mesh_grid))
-        alpha = beta / ( phi_hat * ( 1 - beta ) )
-        M2 = 1 + alpha * phi
-
-        M = max_value(M1,M2)
-
-        # Define the monitor function to be projected onto the adapted mesh
-        Mfunc = Function(V_grid).interpolate(M)
-
-        # smooth the monitor function
-        if 1: # {{{
-            lamb = 0.001
-
-            u = TrialFunction(V_grid)
-            v = TestFunction(V_grid)
-            u_n = Function(V_grid)
-
-            m = inner((u - u_n), v) * dx 
-            a = lamb * inner(grad(u), grad(v)) * dx # implicit
-            F = m + a
-
-            lhs_ = lhs(F)
-            rhs_ = rhs(F)
-
-            X = Function(V_grid)
-            B = Function(V_grid)
-            A = assemble(lhs_)
-
-            params = {"ksp_type": "preonly", "pc_type": "lu"}
-            solver = LinearSolver(A, solver_parameters=params)
-
-            u_n.assign(Mfunc)
-            nt = 1
-            for step in range(nt):
-                B = assemble(rhs_, tensor=B)
-                solver.solve(X, B)
-                u_n.assign(X)
-
-            Mfunc.assign(u_n)
-        #}}}
-
-        File("Mfunc.pvd").write(Mfunc)
-        #sys.exit("exit")
-
-        def monitor_function(mesh): # here, mesh is the physical doman, i.e., x (=xi+Grad phi)
-            # project onto "mesh" that is being adapted (i.e., mesh(x))
-            _P1 = FunctionSpace(mesh, "CG", 1) 
-            _M = Function(_P1)
-            spyro.mesh_to_mesh_projection(Mfunc, _M, degree=5)
-            File("Mfunc_x.pvd").write(_M)
-            return _M
-            
-        def mask_dummy(mesh):
-            return Constant(1.)
-
-        # change the mesh coordinates to the original ones (computational mesh)
-        mesh.coordinates.assign(xi)
-
-        # make mesh and mesh_grid parallel compatible (to perform mesh-to-mesh interpolation via projection)
-        mesh._parallel_compatible = {weakref.ref(mesh_grid)}
-        
-        # ok, adapt the mesh according to the monitor function
-        step = spyro.monge_ampere_solver(mesh, monitor_function, p=2, mask=mask_dummy) #fix_boundary_nodes=fix_boundary_nodes) 
-        
-        # now, clear spatial index
-        mesh.clear_spatial_index()
+    if AMR and i<max_loop_it-1: # no need to adapt the last FWI loop
+       adapt_mesh(vp_grid, grad_vp_grid, mesh) 
 #}}}
 
     # now, interpolate the inverted field on the initial guess fuction (defined now in the adpated or non-adapted mesh)
-    spyro.mesh_to_mesh_projection(vp_grid, vp_guess, degree=5)
-    
+    #spyro.mesh_to_mesh_projection(vp_grid, vp_guess, degree=5)
+    _mesh_to_mesh_interpolation(vp_grid, vp_guess)
+   
+    #FIXME remove it
+    File("vp_grid_after_interp.pvd").write(vp_grid) 
+    File("vp_guess_after_interp.pvd").write(vp_guess)
+    sys.exit("exit")
+
     Ji.append(obj.J)
 
 # write final solution and J
 outfile.write(vp_guess,time=i)
 if COMM_WORLD.rank == 0:
-    with open(r'J_with_amr.txt', 'w') as fp:
-    #with open(r'J_no_amr.txt', 'w') as fp:
-        for j in Ji:
-            # write each item on a new line
-            fp.write("%s\n" % str(j))
+    if AMR:
+        with open(r'J_with_amr.txt', 'w') as fp:
+            for j in Ji:
+                # write each item on a new line
+                fp.write("%s\n" % str(j))
+        print('Done')
+    else:
+        with open(r'J_no_amr.txt', 'w') as fp:
+            for j in Ji:
+                # write each item on a new line
+                fp.write("%s\n" % str(j))
         print('Done')
 
