@@ -1,4 +1,4 @@
-# run_forward_acoustic_moving_mesh_marmousi_small.py
+# run_forward_acoustic_moving_mesh_camembert.py
 from firedrake import *
 from scipy.optimize import * 
 import spyro
@@ -99,7 +99,23 @@ model["timeaxis"] = {
 #}}}
 # make vp {{{
 def _make_vp(V, vp_guess=False, field="velocity_model"):
-   
+  
+    m = V.ufl_domain()
+    W = VectorFunctionSpace(m, V.ufl_element())
+    coords = interpolate(m.coordinates, W)
+    xq, zq = coords.dat.data[:, 0], coords.dat.data[:, 1]
+    
+    vp = Function(V)
+    vp.dat.data[:] = _vp / 1000 # m/s -> km/s
+
+    if vp_guess:
+        File("guess_vp.pvd").write(vp)
+    else:
+        File("exact_vp.pvd").write(vp)
+
+return vp
+    
+
     if platform.node()=='recruta':
         path = "./velocity_models/elastic-marmousi-model/model/"
     else:
