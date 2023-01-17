@@ -3,7 +3,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 import math
 import spyro
-import pytest
+
 
 def plot_receiver(
     receiver,
@@ -13,15 +13,15 @@ def plot_receiver(
     show=False,
     file_format="pdf",
 ):
-    """Plot a 
+    """Plot a
 
     Returns
     -------
     None
     """
-    receiver_data = receiver[:,receiver_id]
+    receiver_data = receiver[:, receiver_id]
 
-    nt = int(final_time/ dt)  # number of timesteps
+    nt = int(final_time / dt)  # number of timesteps
     times = np.linspace(0.0, final_time, nt)
 
     plt.plot(times, receiver_data)
@@ -32,38 +32,45 @@ def plot_receiver(
     plt.yticks(fontsize=18)
     # plt.xlim(start_index, end_index)
     # plt.ylim(tf, 0)
-    plt.savefig("receiver"+str(receiver_id) + "." + file_format, format=file_format)
+    plt.savefig("receiver" + str(receiver_id) + "." + file_format, format=file_format)
     if show:
         plt.show()
     plt.close()
     return None
 
-def compare_velocity(p_r, receiver_in_source_index, receiver_comparison_index, model,dt):
-    receiver_0 = p_r[:,receiver_in_source_index]
-    receiver_1 = p_r[:,receiver_comparison_index]
+
+def compare_velocity(
+    p_r, receiver_in_source_index, receiver_comparison_index, model, dt
+):
+    receiver_0 = p_r[:, receiver_in_source_index]
+    receiver_1 = p_r[:, receiver_comparison_index]
     pos = model["acquisition"]["receiver_locations"]
-    time0 = np.argmax(receiver_0)*dt
-    time1 = np.argmax(receiver_1)*dt
-    x0 = pos[receiver_in_source_index,1]
-    x1 = pos[receiver_comparison_index,1]
-    measured_velocity = np.abs(x1-x0)/(time1-time0)
+    time0 = np.argmax(receiver_0) * dt
+    time1 = np.argmax(receiver_1) * dt
+    x0 = pos[receiver_in_source_index, 1]
+    x1 = pos[receiver_comparison_index, 1]
+    measured_velocity = np.abs(x1 - x0) / (time1 - time0)
     minimum_velocity = 1.5
-    error_percent = 100*np.abs(measured_velocity-minimum_velocity)/minimum_velocity
-    print(f"Velocity error of {error_percent}%.", flush = True)
+    error_percent = (
+        100 * np.abs(measured_velocity - minimum_velocity) / minimum_velocity
+    )
+    print(f"Velocity error of {error_percent}%.", flush=True)
     return error_percent
+
 
 def get_receiver_in_source_location(source_id, model):
     receiver_locations = model["acquisition"]["receiver_locations"]
     source_locations = model["acquisition"]["source_pos"]
-    source_x = source_locations[source_id,1]
+    source_x = source_locations[source_id, 1]
 
     cont = 0
     for receiver_location in receiver_locations:
         if math.isclose(source_x, receiver_location[1]):
             return cont
         cont += 1
-    return ValueError("Couldn't find a receiver whose location coincides with a source within the standard tolerance.")
-
+    return ValueError(
+        "Couldn't find a receiver whose location coincides with a source within the standard tolerance."
+    )
 
 
 def test_forward_5shots():
@@ -88,7 +95,7 @@ def test_forward_5shots():
     }
     model["BCs"] = {
         "status": True,  # True or false
-        "outer_bc": "non-reflective",  #  None or non-reflective (outer boundary condition)
+        "outer_bc": "non-reflective",  # None or non-reflective (outer boundary condition)
         "damping_type": "polynomial",  # polynomial, hyperbolic, shifted_hyperbolic
         "exponent": 2,  # damping layer has a exponent variation
         "cmax": 4.5,  # maximum acoustic wave velocity in PML - km/s
@@ -102,10 +109,10 @@ def test_forward_5shots():
         "source_pos": spyro.create_transect((-0.1, 1.0), (-0.1, 15.0), 5),
         "frequency": 5.0,
         "delay": 1.0,
-        "receiver_locations": spyro.create_transect((-0.1, 1.0), (-0.1, 15.0),13),
+        "receiver_locations": spyro.create_transect((-0.1, 1.0), (-0.1, 15.0), 13),
     }
     model["timeaxis"] = {
-        "t0": 0.0,  #  Initial time for event
+        "t0": 0.0,  # Initial time for event
         "tf": 3.00,  # Final time for event
         "dt": 0.001,
         "amplitude": 1,  # the Ricker has an amplitude of 1.
@@ -113,8 +120,7 @@ def test_forward_5shots():
         "fspool": 99999,  # how frequently to save solution to RAM
     }
 
-    dt=model["timeaxis"]["dt"]
-    final_time=model["timeaxis"]["tf"]
+    dt = model["timeaxis"]["dt"]
 
     comm = spyro.utils.mpi_init(model)
 
@@ -135,19 +141,25 @@ def test_forward_5shots():
     pass_error_test = False
     for source_id in range(len(model["acquisition"]["source_pos"])):
         if comm.ensemble_comm.rank == (source_id % comm.ensemble_comm.size):
-            receiver_in_source_index= get_receiver_in_source_location(source_id, model)
-            if source_id != len(model["acquisition"]["source_pos"])-1 or source_id == 0:
+            receiver_in_source_index = get_receiver_in_source_location(source_id, model)
+            if (
+                source_id != len(model["acquisition"]["source_pos"]) - 1
+                or source_id == 0
+            ):
                 receiver_comparison_index = receiver_in_source_index + 1
             else:
                 receiver_comparison_index = receiver_in_source_index - 1
-            error_percent = compare_velocity(p_r, receiver_in_source_index, receiver_comparison_index, model,dt)
+            error_percent = compare_velocity(
+                p_r, receiver_in_source_index, receiver_comparison_index, model, dt
+            )
             if error_percent < 5:
                 pass_error_test = True
-            print(f"For source = {source_id}: test = {pass_error_test}", flush = True)
+            print(f"For source = {source_id}: test = {pass_error_test}", flush=True)
 
     spyro.plots.plot_shots(model, comm, p_r, vmin=-1e-3, vmax=1e-3)
     spyro.io.save_shots(model, comm, p_r)
     assert pass_error_test
+
 
 if __name__ == "__main__":
     test_forward_5shots()

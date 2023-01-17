@@ -91,7 +91,7 @@ def gradient(
 
     nt = int(tf / dt)  # number of timesteps
 
-    receiver_locations = model["acquisition"]["receiver_locations"]
+    # receiver_locations = model["acquisition"]["receiver_locations"]
 
     dJ = Function(V, name="gradient")
 
@@ -161,7 +161,7 @@ def gradient(
     t = 0.0
 
     # -------------------------------------------------------
-    m1 = ((u - 2.0 * u_n + u_nm1) / Constant(dt ** 2)) * v * dx(rule=qr_x)
+    m1 = ((u - 2.0 * u_n + u_nm1) / Constant(dt**2)) * v * dx(rule=qr_x)
     a = c * c * dot(grad(u_n), grad(v)) * dx(rule=qr_x)  # explicit
 
     nf = 0
@@ -235,7 +235,7 @@ def gradient(
 
     gradi = Function(V)
     grad_prob = LinearVariationalProblem(lhsG, rhsG, gradi)
-    
+
     if method == "KMV":
         grad_solver = LinearVariationalSolver(
             grad_prob,
@@ -279,10 +279,10 @@ def gradient(
                 u_np1, psi_np1, pp_np1 = X.split()
 
                 psi_nm1.assign(psi_n)
-                psi_n  .assign(psi_np1)
+                psi_n.assign(psi_np1)
 
             pp_nm1.assign(pp_n)
-            pp_n  .assign(pp_np1)
+            pp_n.assign(pp_np1)
         else:
             u_np1.assign(X)
 

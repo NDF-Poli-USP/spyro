@@ -31,7 +31,7 @@ mesh = {
 }
 BCs = {
     "status": True,  # True or false
-    "outer_bc": "non-reflective",  #  None or non-reflective (outer boundary condition)
+    "outer_bc": "non-reflective",  # None or non-reflective (outer boundary condition)
     "damping_type": "polynomial",  # polynomial, hyperbolic, shifted_hyperbolic
     "exponent": 2,  # damping layer has a exponent variation
     "cmax": 4.0,  # maximum acoustic wave velocity in PML - km/s
@@ -41,7 +41,9 @@ BCs = {
     "ly": 0.20,  # thickness of the PML in the y-direction (km) - always positive
 }
 
-receivers = spyro.insert_fixed_value(spyro.create_2d_grid(0.1,0.9,0.1,0.9,10),-0.9, 0)
+receivers = spyro.insert_fixed_value(
+    spyro.create_2d_grid(0.1, 0.9, 0.1, 0.9, 10), -0.9, 0
+)
 print(len(receivers))
 
 acquisition = {
@@ -49,10 +51,10 @@ acquisition = {
     "source_pos": [(-0.1, 0.5, 0.5)],
     "frequency": 5.0,
     "delay": 1.0,
-    "receiver_locations": receivers, 
+    "receiver_locations": receivers,
 }
 timeaxis = {
-    "t0": 0.0,  #  Initial time for event
+    "t0": 0.0,  # Initial time for event
     "tf": 1.00,  # Final time for event
     "dt": 0.0001,  # timestep size
     "amplitude": 1,  # the Ricker has an amplitude of 1.
@@ -61,7 +63,7 @@ timeaxis = {
 }
 
 aut_dif = {
-    "status": False, 
+    "status": False,
 }
 
 model_pml = {

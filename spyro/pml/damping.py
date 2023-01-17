@@ -21,7 +21,7 @@ def functions(
     y2=None,
     b_pml=None,
 ):
-    """ Damping functions for the perfect matched layer for 2D and 3D"""
+    """Damping functions for the perfect matched layer for 2D and 3D"""
 
     damping_type = model["BCs"]["damping_type"]
     if damping_type == "polynomial":
@@ -94,12 +94,11 @@ def functions(
             )
         )
         sigma_y = Function(V, name="sigma_y").interpolate(aux1 + aux2)
-
-        
         # sgm_y = File("pmlField/sigma_y.pvd")
         # sgm_y.write(sigma_y)
 
         return (sigma_x, sigma_y, sigma_z)
+
 
 def matrices_2D(sigma_x, sigma_y):
     """Damping matrices for a two-dimensional problem"""
