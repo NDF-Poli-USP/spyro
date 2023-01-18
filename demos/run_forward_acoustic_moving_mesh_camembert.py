@@ -67,16 +67,21 @@ model["BCs"] = {
 
 # Receiver locations
 rec1=spyro.create_transect((0.1, 0.99), (0.9, 0.99), 11) # receivers at the top of the domain (REC1)
-rec2=spyro.create_transect((0.1, 0.01), (0.9, 0.99), 11) # receivers at the bottom of the domain (REC2)
+rec2=spyro.create_transect((0.1, 0.01), (0.9, 0.01), 11) # receivers at the bottom of the domain (REC2)
 rec = np.concatenate((rec1,rec2))
+
+#print(spyro.create_transect((0.1, 0.9), (0.9, 0.9), 4))
+#print(rec)
+#sys.exit("exit")
 
 model["acquisition"] = {
     "source_type": "Ricker",
-    "frequency": 6.0, # freq peak = 6 Hz, max freq = 15 Hz (see Jaquet's  Thesis) 
+    #"frequency": 6.0, # freq peak = 6 Hz, max freq = 15 Hz (see Jaquet's  Thesis) 
+    #"frequency": 10.0, # freq peak = 10 Hz, max freq = ? Hz 
+    "frequency": 15.0, # freq peak = 15 Hz, max freq = ? Hz 
     "delay": 1.0, # FIXME check this
-    #"num_sources": 4, #FIXME not used (remove it, and update an example script) TO RUN WITH POINT SOURCES
-    "num_sources": 1,#4, #FIXME not used (remove it, and update an example script)
-    "source_pos": spyro.create_transect((0.5, 0.9), (0.5, 0.9), 1), # waterbottom at z=-0.45 km # out of domain, only to run with some source
+    "num_sources": 4, #FIXME not used (remove it, and update an example script)
+    "source_pos": spyro.create_transect((0.1, 0.9), (0.9, 0.9), 4), # waterbottom at z=-0.45 km # out of domain, only to run with some source
     "amplitude": 1.0, #FIXME check this
     "num_receivers": len(rec), #FIXME not used (remove it, and update an example script)
     "receiver_locations": rec, 
@@ -102,7 +107,7 @@ def _make_vp(V):
     x, y = SpatialCoordinate(m)
 
     v0 = 2.5 # background vp (km/s)
-    dv = 0.3*v0 # 10% of perturbation
+    dv = 0.3*v0 # 30% of perturbation
     
     vp_cond = conditional((x-0.5)**2 + (y-0.5)**2 <= 0.250**2, v0+dv, v0)
     vp = Function(V).interpolate(vp_cond)
@@ -140,7 +145,10 @@ if platform.node()=='recruta':
     path = ""
     sys.exit("path not defined")
 else:
-    path = "/share/tdsantos/shots/acoustic_forward_camembert/" 
+    #path = "/share/tdsantos/shots/acoustic_forward_camembert_6Hz/" 
+    #path = "/share/tdsantos/shots/acoustic_forward_camembert_10Hz/" 
+    #path = "/share/tdsantos/shots/acoustic_forward_camembert_15Hz/" 
+    path = "/share/tdsantos/shots/acoustic_forward_camembert_15Hz_4_sources/" 
 
 # run reference model {{{
 if REF:
@@ -246,7 +254,7 @@ if len(sys.argv)==3:
         sys.exit("QUAD=1, but degree not equal to 4. Skipping run...")
 else:
     ppp=2
-    iii=5
+    iii=2
 
 nx = switch(iii)
 ny = math.ceil( nx*model["mesh"]["Lz"]/model["mesh"]["Lx"] ) # nx * Lz/Lx, Delta x = Delta z
@@ -316,7 +324,8 @@ if AMR==1 and GUESS==1:
 
     E = E1
     #beta = 0.5 # (0, 1) # for E2 + smooth
-    beta = 0.10 # (0, 1) # for E2 w/n smooth
+    #beta = 0.10 # (0, 1) # for E2 w/n smooth
+    beta = 0.20 # (0, 1) # for E2 w/n smooth
     phi = sqrt( 1 + E*E ) - 1
     phi_hat = assemble(phi*dx(domain=mesh_grid)) / assemble(Constant(1.0)*dx(domain=mesh_grid))
     alpha = beta / ( phi_hat * ( 1 - beta ) )
