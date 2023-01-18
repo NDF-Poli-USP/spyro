@@ -84,9 +84,9 @@ model["acquisition"] = {
 
 model["timeaxis"] = {
     "t0": 0.0,  #  Initial time for event
-    "tf": 1.0, # Final time for event  
-    "dt": 0.00025, # timestep size  
-    #"dt": 0.00025/4,  # timestep size 
+    "tf": 0.8, # Final time for event  
+    #"dt": 0.00025, # timestep size  
+    "dt": 0.00025/4,  # timestep size 
     "nspool":  20,  # (20 for dt=0.00050) how frequently to output solution to pvds
     "fspool": 10000000,  # how frequently to save solution to RAM
 }
@@ -114,14 +114,14 @@ def _make_vp(V):
 
 # controls
 FIREMESH = 1    # keep it 1
-AMR = 0         # should adapt the mesh?
-GUESS = 0       # if 1, run the guess model; otherwise (=0), read results
-REF = 1         # if 1, run the reference model; otherwise (=0), read results
+AMR = 1         # should adapt the mesh?
+GUESS = 1       # if 1, run the guess model; otherwise (=0), read results
+REF = 0         # if 1, run the reference model; otherwise (=0), read results
 QUAD = 0        # if 1, run with quadrilateral elements; otherwise (=0), run with triangles
 DG_VP = 1       # if 1, vp is defined on a Discontinuous space (L2 instead of an H1 space)
 CONST_VP = 0    # if 1, run with a uniform vp = 2 km/s (it is employed to check convergence rate and wheter adapted mesh introduces errors)
 PLOT_AT_REC = 1 # if 1, plot the pressure over time at one receiver
-print_vtk = True
+print_vtk = False
 use_Neumann_BC_as_source = False 
 
 if QUAD==1:
@@ -144,7 +144,7 @@ else:
 
 # run reference model {{{
 if REF:
-    _nx = 200  # nx=200  => dx = dz = 20 m
+    _nx = 100  # nx=200  => dx = dz = 20 m
     _ny = math.ceil( _nx*model["mesh"]["Lz"]/model["mesh"]["Lx"] ) # nx * Lz/Lx, Delta x = Delta z
 
     # here, we do not need overlaping vertices
@@ -246,7 +246,7 @@ if len(sys.argv)==3:
         sys.exit("QUAD=1, but degree not equal to 4. Skipping run...")
 else:
     ppp=2
-    iii=2
+    iii=5
 
 nx = switch(iii)
 ny = math.ceil( nx*model["mesh"]["Lz"]/model["mesh"]["Lx"] ) # nx * Lz/Lx, Delta x = Delta z
@@ -312,11 +312,11 @@ if AMR==1 and GUESS==1:
 
     # Huang type monitor function
     E1 = sqrt( inner( grad_vp_grid, grad_vp_grid ) ) # gradient based estimate
-    E2 = vp_grid.vector().gather().max() / vp_grid - 1 # a priori error estimate (it starts on 1, so it could be better)
+    E2 = vp_grid.vector().gather().max() / vp_grid - 1 # a priori error estimate (it starts on 1, so it is better)
 
     E = E1
-    beta = 0.5 # (0, 1) # for E2 + smooth
-    #beta = 0.10 # (0, 1) # for E2 w/n smooth
+    #beta = 0.5 # (0, 1) # for E2 + smooth
+    beta = 0.10 # (0, 1) # for E2 w/n smooth
     phi = sqrt( 1 + E*E ) - 1
     phi_hat = assemble(phi*dx(domain=mesh_grid)) / assemble(Constant(1.0)*dx(domain=mesh_grid))
     alpha = beta / ( phi_hat * ( 1 - beta ) )
@@ -516,8 +516,10 @@ if comm.ensemble_comm.rank == 0:
 
 if comm.ensemble_comm.rank == 0 and PLOT_AT_REC:
     nrec = 6 # middle
-    pe = p_ref_rec1[:,nrec]
-    pg = p_rec1[:,nrec]
+    #pe = p_ref_rec1[:,nrec]
+    #pg = p_rec1[:,nrec]
+    pe = p_ref_rec2[:,nrec]
+    pg = p_rec2[:,nrec]
     plt.title("p")
     plt.plot(pe,label='exact')
     plt.plot(pg,label='guess') 
