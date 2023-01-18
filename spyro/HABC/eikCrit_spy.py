@@ -283,13 +283,16 @@ def mapBound(yp, mesh, Lx, Ly):
     '''
     Mapping of positions inside of absorbing layer
     '''
+    print(Lx)
     Lx = -Lx
+    print(Lx)
     xcoord = mesh.coordinates.dat.data[:,0]
     ycoord = mesh.coordinates.dat.data[:,1]
 
     # np.finfo(float).eps
     eps = 1e-14
-    ref_bound = (xcoord >= Lx-eps) | (ycoord <= 0+eps) | (ycoord >= Ly-eps)
+    ref_bound = ((xcoord <= 0-eps) & ((ycoord <= 0+eps) | (ycoord >= Ly-eps))) |  \
+        ((ycoord >= 0 - eps) & (xcoord <= Lx + eps) )
 
     x_boundary = xcoord[ref_bound]
     y_boundary = ycoord[ref_bound]
@@ -317,15 +320,13 @@ def mapBound(yp, mesh, Lx, Ly):
 
         value = yp.at(point) 
 
-        if y_boundary[i] >= Ly:
+        if y_boundary[i] >= Ly-eps or y_boundary[i] <= 0+eps :
             if value < min_horizontal:
                 min_horizontal = value
-                ih = i
                 point_h = point
         else:
             if value < min_vertical:
                 min_vertical = value
-                iv = i
                 point_v = point
 
     if min_horizontal < min_vertical:
@@ -436,7 +437,7 @@ def Eikonal(Wave):
     sec_px, sec_py = sec_point
     coordCritEik[0, :] = [min_px, min_py, c_eik.at(min_point), min_value]
     coordCritEik[1, :] = [sec_px, sec_py, c_eik.at(sec_point), sec_value]
-    np.savetxt('/out/Eik.txt', coordCritEik, delimiter='\t')
+    np.savetxt('out/Eik.txt', coordCritEik, delimiter='\t')
     # Minimum eikonal at boundaries
     # eik0cr = np.argmin(coordCritEik[:, -1])
     # posCrit = np.array([coordCritEik[eik0cr, 0], coordCritEik[eik0cr, 1]])
