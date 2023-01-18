@@ -43,10 +43,8 @@ model["parallelism"] = {
 }
 
 model["mesh"] = {
-    #"Lz": 1.5,  # depth in km - always positive
-    "Lz": 2.00-.45,  # depth in km - always positive (waterbottom at z=-0.45 km)
-    #"Lx": 2.0,  # width in km - always positive
-    "Lx": 4.0,  # width in km - always positive
+    "Lz": 1.0,  # depth in km - always positive
+    "Lx": 1.0,  # width in km - always positive
     "Ly": 0.0,  # thickness in km - always positive
     "meshfile": "not_used.msh",
     "initmodel": "not_used.hdf5",
@@ -68,10 +66,9 @@ model["BCs"] = {
 }
 
 # Receiver locations
-rec1=spyro.create_transect((0.1, -0.10-0.45), (3.9, -0.10-0.45), 100) # waterbottom at z=-0.45 km REC1)
-rec2=spyro.create_transect((0.1, -1.9), (3.9, -1.9), 100) # receivers at the bottom of the domain (z=-1.9 km) REC2
-rec3=np.array(spyro.create_2d_grid(1, 3, -1.4, -1, 10)) # receivers at the middle of the domain
-rec = np.concatenate((rec1,rec2,rec3))
+rec1=spyro.create_transect((0.1, 0.99), (0.9, 0.99), 11) # receivers at the top of the domain (REC1)
+rec2=spyro.create_transect((0.1, 0.01), (0.9, 0.99), 11) # receivers at the bottom of the domain (REC2)
+rec = np.concatenate((rec1,rec2))
 
 model["acquisition"] = {
     "source_type": "Ricker",
@@ -79,8 +76,7 @@ model["acquisition"] = {
     "delay": 1.0, # FIXME check this
     #"num_sources": 4, #FIXME not used (remove it, and update an example script) TO RUN WITH POINT SOURCES
     "num_sources": 1,#4, #FIXME not used (remove it, and update an example script)
-    #"source_pos": spyro.create_transect((0.5, -0.01-0.45), (3.5, -0.01-0.45), 4), # waterbottom at z=-0.45 km TO RUN WITH POINT SOURCES
-    "source_pos": spyro.create_transect((0.5, 0), (3.5, 0), 1), # waterbottom at z=-0.45 km # out of domain, only to run with some source
+    "source_pos": spyro.create_transect((0.5, 0.9), (0.5, 0.9), 1), # waterbottom at z=-0.45 km # out of domain, only to run with some source
     "amplitude": 1.0, #FIXME check this
     "num_receivers": len(rec), #FIXME not used (remove it, and update an example script)
     "receiver_locations": rec, 
@@ -88,81 +84,45 @@ model["acquisition"] = {
 
 model["timeaxis"] = {
     "t0": 0.0,  #  Initial time for event
-    #"tf": 2.5, # Final time for event TO RUN WITH POINT SOURCES
-    "tf": 1.0, # Final time for event TO RUN WITH NEUMANN-TYPE SOURCE 
-    #"tf": 0.00025, # Final time for event FIXME to debug only 
-    #"dt": 0.00025/5,  # timestep size TO RUN WITH POINT SOURCES
-    "dt": 0.00025/4,  # timestep size TO RUN WITH NEUMANN-TYPE SOURCE
+    "tf": 1.0, # Final time for event  
+    "dt": 0.00025, # timestep size  
+    #"dt": 0.00025/4,  # timestep size 
     "nspool":  20,  # (20 for dt=0.00050) how frequently to output solution to pvds
     "fspool": 10000000,  # how frequently to save solution to RAM
 }
 #}}}
 # make vp {{{
-def _make_vp(V, vp_guess=False, field="velocity_model"):
+def _make_vp(V):
   
     m = V.ufl_domain()
     W = VectorFunctionSpace(m, V.ufl_element())
     coords = interpolate(m.coordinates, W)
     xq, zq = coords.dat.data[:, 0], coords.dat.data[:, 1]
+
+    x, y = SpatialCoordinate(m)
+
+    v0 = 2.5 # background vp (km/s)
+    dv = 0.3*v0 # 10% of perturbation
     
-    vp = Function(V)
-    vp.dat.data[:] = _vp / 1000 # m/s -> km/s
+    vp_cond = conditional((x-0.5)**2 + (y-0.5)**2 <= 0.250**2, v0+dv, v0)
+    vp = Function(V).interpolate(vp_cond)
 
-    if vp_guess:
-        File("guess_vp.pvd").write(vp)
-    else:
-        File("exact_vp.pvd").write(vp)
+    File("exact_vp.pvd").write(vp)
 
-return vp
-    
-
-    if platform.node()=='recruta':
-        path = "./velocity_models/elastic-marmousi-model/model/"
-    else:
-        path = "/share/tdsantos/velocity_models/elastic-marmousi-model/model/"
-    
-    if vp_guess: # interpolate from a smoothed field
-        fname = path + "MODEL_P-WAVE_VELOCITY_1.25m_small_domain_smoothed_sigma=300.segy.hdf5" # domain 4 x 2 km2 (x, y) 
-    else: # interpolate from the exact field
-        fname = path + "MODEL_P-WAVE_VELOCITY_1.25m_small_domain.segy.hdf5" # domain 4 x 2 km2 (x, y) 
-        
-    with h5py.File(fname, "r") as f:
-        Zo = np.asarray(f.get(field)[()]) # original Marmousi data/domain
-        nrow, ncol = Zo.shape
-        Lz = 2 # Value defined by the velocity model
-        Lx = 4 # Value defined by the velocity model
-        zo = np.linspace(-Lz, 0.0, nrow) # original Marmousi data/domain
-        xo = np.linspace(0.0,  Lx, ncol) # original Marmousi data/domain
-        interpolant = RegularGridInterpolator((xo, zo), np.transpose(Zo))
-
-        m = V.ufl_domain()
-        W = VectorFunctionSpace(m, V.ufl_element())
-        coords = interpolate(m.coordinates, W)
-        xq, zq = coords.dat.data[:, 0], coords.dat.data[:, 1]
-
-        _vp = interpolant((xq, zq))
-        vp = Function(V)
-        vp.dat.data[:] = _vp / 1000 # m/s -> km/s
-
-        if vp_guess:
-            File("guess_vp.pvd").write(vp)
-        else:
-            File("exact_vp.pvd").write(vp)
-    
     return vp
 #}}}
 
 # controls
 FIREMESH = 1    # keep it 1
-AMR = 1         # should adapt the mesh?
-GUESS = 1       # if 1, run the guess model; otherwise (=0), read results
-REF = 0         # if 1, run the reference model; otherwise (=0), read results
+AMR = 0         # should adapt the mesh?
+GUESS = 0       # if 1, run the guess model; otherwise (=0), read results
+REF = 1         # if 1, run the reference model; otherwise (=0), read results
 QUAD = 0        # if 1, run with quadrilateral elements; otherwise (=0), run with triangles
 DG_VP = 1       # if 1, vp is defined on a Discontinuous space (L2 instead of an H1 space)
 CONST_VP = 0    # if 1, run with a uniform vp = 2 km/s (it is employed to check convergence rate and wheter adapted mesh introduces errors)
 PLOT_AT_REC = 1 # if 1, plot the pressure over time at one receiver
-print_vtk = False
-use_Neumann_BC_as_source = True 
+print_vtk = True
+use_Neumann_BC_as_source = False 
 
 if QUAD==1:
     model["opts"]["method"] = "CG"
@@ -177,12 +137,10 @@ distribution_parameters={"partition": True,
 # set the reference file name
 file_name = "p_ref_p4_recv_freq_"+str(model["acquisition"]["frequency"]) # with P=4
 if platform.node()=='recruta':
-    path = "./shots/acoustic_forward_marmousi_small/" 
+    path = ""
+    sys.exit("path not defined")
 else:
-    #path = "/share/tdsantos/shots/acoustic_forward_marmousi_small/"
-    path = "/share/tdsantos/shots/acoustic_forward_marmousi_small_VP_DG/"
-    #path = "/share/tdsantos/shots/acoustic_forward_marmousi_small_vp_cte/"
-    #path = "/share/tdsantos/shots/acoustic_forward_marmousi_small_testing_without_ABS/"
+    path = "/share/tdsantos/shots/acoustic_forward_camembert/" 
 
 # run reference model {{{
 if REF:
@@ -194,8 +152,6 @@ if REF:
 
     mesh_ref = RectangleMesh(_nx, _ny, model["mesh"]["Lx"], model["mesh"]["Lz"], diagonal="crossed", comm=comm.comm,
                             distribution_parameters=distribution_parameters)
-    mesh_ref.coordinates.dat.data[:, 0] -= 0.0 
-    mesh_ref.coordinates.dat.data[:, 1] -= model["mesh"]["Lz"] + 0.45 # waterbottom at z=-0.450 km
 
     # for the exact model, use a higher-order element
     model["opts"]["degree"] = 4 # it was 5 before
@@ -203,17 +159,17 @@ if REF:
     V_ref = FunctionSpace(mesh_ref, element) 
 
     if DG_VP==1:# DG space is better to represent data, but it is not currently possible to use it during FWI
-        element_DG = spyro.domains.space.FE_method(mesh_ref, "DG", model["opts"]["degree"]) 
+        element_DG = spyro.domains.space.FE_method(mesh_ref, "DG", 0) # model["opts"]["degree"]) 
         V_ref_DG = FunctionSpace(mesh_ref, element_DG)
-        vp_ref = _make_vp(V_ref_DG, vp_guess=False) 
+        vp_ref = _make_vp(V_ref_DG) 
     else:
-        vp_ref = _make_vp(V_ref, vp_guess=False)
+        vp_ref = _make_vp(V_ref)
     
+    #sys.exit("exit")
+
     sources = spyro.Sources(model, mesh_ref, V_ref, comm)
     receivers = spyro.Receivers(model, mesh_ref, V_ref, comm)
     wavelet = spyro.full_ricker_wavelet(dt=model["timeaxis"]["dt"], tf=model["timeaxis"]["tf"], freq=model["acquisition"]["frequency"])
-
-    #vp_ref = _make_vp(V_ref, vp_guess=False) 
     
     if CONST_VP:
         vp_ref.dat.data_with_halos[:] = 2.0 
@@ -226,6 +182,8 @@ if REF:
     )
     end = time.time()
     print(round(end - start,2),flush=True)
+    #sys.exit("exit") # FIXME
+    
     if 0:
         File("p_ref.pvd").write(p_ref[-1])
 
@@ -288,7 +246,7 @@ if len(sys.argv)==3:
         sys.exit("QUAD=1, but degree not equal to 4. Skipping run...")
 else:
     ppp=2
-    iii=0
+    iii=2
 
 nx = switch(iii)
 ny = math.ceil( nx*model["mesh"]["Lz"]/model["mesh"]["Lx"] ) # nx * Lz/Lx, Delta x = Delta z
@@ -306,10 +264,6 @@ if FIREMESH:
         mesh = RectangleMesh(nx, ny, model["mesh"]["Lx"], model["mesh"]["Lz"], quadrilateral=True, comm=comm.comm,
                                 distribution_parameters=distribution_parameters)
     
-    mesh.coordinates.dat.data[:, 0] -= 0.0 
-    mesh.coordinates.dat.data[:, 1] -= model["mesh"]["Lz"] + 0.45 # waterbottom at z=-0.450 km
-    mesh.clear_spatial_index()
-
     element = spyro.domains.space.FE_method(mesh, model["opts"]["method"], model["opts"]["degree"])
     V = FunctionSpace(mesh, element)
 else:
@@ -332,13 +286,12 @@ if AMR==1 and GUESS==1:
     _ny = math.ceil( _nx*model["mesh"]["Lz"]/model["mesh"]["Lx"] ) # nx * Lz/Lx, Delta x = Delta z
     mesh_grid = RectangleMesh(_nx, _ny, model["mesh"]["Lx"], model["mesh"]["Lz"], diagonal="crossed", comm=comm.comm,
                             distribution_parameters=distribution_parameters)
-    mesh_grid.coordinates.dat.data[:, 0] -= 0.0 
-    mesh_grid.coordinates.dat.data[:, 1] -= model["mesh"]["Lz"] + 0.45 # waterbottom at z=-0.45 km
+    
     V_grid = FunctionSpace(mesh_grid, "CG", 2) 
     #V_grid_DG = FunctionSpace(mesh_grid, "DG", 2) # DG will be similar to CG
     V_vec_grid = VectorFunctionSpace(mesh_grid, "CG", 2)
   
-    vp_grid = _make_vp(V_grid, vp_guess=False)
+    vp_grid = _make_vp(V_grid)
     grad_vp_grid = Function(V_vec_grid)
 
     u_cts = TrialFunction(V_vec_grid)
@@ -438,9 +391,9 @@ if AMR==1 and GUESS==1:
     if DG_VP==1:
         element_DG = spyro.domains.space.FE_method(mesh, "DG", 0) #FIXME model["opts"]["degree"])
         V_DG = FunctionSpace(mesh, element_DG)
-        _vp = _make_vp(V_DG, vp_guess=False)
+        _vp = _make_vp(V_DG)
     else: 
-        _vp = _make_vp(V, vp_guess=False) # V is the original space of mesh
+        _vp = _make_vp(V) # V is the original space of mesh
 
     File("vp_before_amr.pvd").write(_vp)
     #sys.exit("exit")
@@ -475,9 +428,9 @@ if AMR==1 and GUESS==1:
     if DG_VP==1:
         element_DG = spyro.domains.space.FE_method(mesh, "DG", 0) #FIXME model["opts"]["degree"])
         V_DG = FunctionSpace(mesh, element_DG)
-        _vp = _make_vp(V_DG, vp_guess=False)
+        _vp = _make_vp(V_DG)
     else: 
-        _vp = _make_vp(V, vp_guess=False) # V is the original space of mesh
+        _vp = _make_vp(V) # V is the original space of mesh
     File("vp_after_amr.pvd").write(_vp)
 #}}}
 #sys.exit("exit")
@@ -498,9 +451,9 @@ if GUESS==1:
     if DG_VP==1:
         element_DG = spyro.domains.space.FE_method(mesh, "DG", 0) #FIXME model["opts"]["degree"])
         V_DG = FunctionSpace(mesh, element_DG)
-        vp = _make_vp(V_DG, vp_guess=False)
+        vp = _make_vp(V_DG)
     else: 
-        vp = _make_vp(V, vp_guess=False) 
+        vp = _make_vp(V) 
 
     if CONST_VP:
         vp.dat.data_with_halos[:] = 2.0 
@@ -536,12 +489,10 @@ def compute_relative_error(p_recv, p_ref_recv): #{{{
 #}}}
 
 # retrieve P on the receivers
-p_rec1 = p_recv[:,0:100]
-p_rec2 = p_recv[:,100:200]
-p_rec3 = p_recv[:,200:300]
-p_ref_rec1 = p_ref_recv[:,0:100]
-p_ref_rec2 = p_ref_recv[:,100:200]
-p_ref_rec3 = p_ref_recv[:,200:300]
+p_rec1 = p_recv[:,0:11]
+p_rec2 = p_recv[:,11:22]
+p_ref_rec1 = p_ref_recv[:,0:11]
+p_ref_rec2 = p_ref_recv[:,11:22]
 
 # compute the relative errors on each set of receivers 
 # FIXME maybe modify it on utils.compute_functional
@@ -551,16 +502,12 @@ E_rec1 = compute_relative_error(p_rec1, p_ref_rec1)
 model["acquisition"]["receiver_locations"] = rec2
 E_rec2 = compute_relative_error(p_rec2, p_ref_rec2)
 
-model["acquisition"]["receiver_locations"] = rec3
-E_rec3 = compute_relative_error(p_rec3, p_ref_rec3)
-
 model["acquisition"]["receiver_locations"] = rec
 E_total = compute_relative_error(p_recv, p_ref_recv)
 
 if comm.ensemble_comm.rank == 0:
     print("E rec1 (%) = "  + str(round(E_rec1*100,4)), flush=True)
     print("E rec2 (%) = "  + str(round(E_rec2*100,4)), flush=True)
-    print("E rec3 (%) = "  + str(round(E_rec3*100,4)), flush=True)
     print("E total (%) = " + str(round(E_total*100,4)), flush=True)
     print("p = " + str(model["opts"]["degree"]))
     print("h = " + str(h) + " m")
@@ -568,10 +515,7 @@ if comm.ensemble_comm.rank == 0:
     print("Nelem = " + str(mesh.num_cells()), flush=True) 
 
 if comm.ensemble_comm.rank == 0 and PLOT_AT_REC:
-    #nrec = 10
-    #pe = p_ref_rec3[:,nrec]
-    #pg = p_rec3[:,nrec]
-    nrec = 50
+    nrec = 6 # middle
     pe = p_ref_rec1[:,nrec]
     pg = p_rec1[:,nrec]
     plt.title("p")
