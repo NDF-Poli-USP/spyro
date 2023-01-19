@@ -1,4 +1,4 @@
-# run_forward_acoustic_moving_mesh_camembert_with_layers.py
+# run_forward_acoustic_moving_mesh_three_layers.py
 from firedrake import *
 from scipy.optimize import * 
 import spyro
@@ -113,7 +113,6 @@ def _make_vp(V):
    
     vp_cond = conditional(y >= 0.7, vu, v0)
     vp_cond = conditional(y <= 0.5 - 0.2*x, vl, vp_cond)
-    vp_cond = conditional((x-0.5)**2 + (y-0.5)**2 <= 0.250**2, v0+dv, vp_cond)
     vp = Function(V).interpolate(vp_cond)
 
     File("exact_vp.pvd").write(vp)
@@ -149,7 +148,7 @@ if platform.node()=='recruta':
     path = ""
     sys.exit("path not defined")
 else:
-    path = "/share/tdsantos/shots/acoustic_forward_camembert_with_layers_15Hz_4_sources/" 
+    path = "/share/tdsantos/shots/acoustic_forward_three_layers_15Hz_4_sources/" 
 
 # run reference model {{{
 if REF:

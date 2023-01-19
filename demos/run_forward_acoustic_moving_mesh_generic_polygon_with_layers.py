@@ -1,4 +1,4 @@
-# run_forward_acoustic_moving_mesh_camembert_with_layers.py
+# run_forward_acoustic_moving_mesh_generic_polygon_with_layers.py
 from firedrake import *
 from scipy.optimize import * 
 import spyro
@@ -96,6 +96,50 @@ model["timeaxis"] = {
     "fspool": 10000000,  # how frequently to save solution to RAM
 }
 #}}}
+# check if a point is inside a polygon by computing the Winding Number {{{
+# codes from here: https://github.com/sasamil/PointInPolygon_Py/blob/master/pointInside.py
+
+# another cool source: https://codegolf.stackexchange.com/questions/70600/compute-the-winding-number
+
+# the representation of a point will be a tuple (x,y)
+# the representation of a polygon wil be a list of points [(x1,y1), (x2,y2), (x3,y3), ... ]
+
+# it is assumed that polygon is regular i.e. lines don't intersect each other (otherwise, it is questionable whether it is a polygon)
+
+# isLeft(): tests if a point is Left|On|Right of an infinite line.
+#    Input:  three points P0, P1, and P2
+#    Return: >0 for P2 left of the line through P0 and P1
+#            =0 for P2  on the line
+#            <0 for P2  right of the line
+def isLeft(P0, P1, P2):
+    return ((P1[0] - P0[0]) * (P2[1] - P0[1]) - (P2[0] - P0[0]) * (P1[1] - P0[1]))
+
+# wn_PnPoly(): winding number test for a point in a polygon
+#      Input:   P = a point,
+#               V[] = vertex points of a polygon V[n+1] with V[n]=V[0]
+#      Return:  wn = the winding number (=0 only when P is outside)
+# Taken from: http://geomalgorithms.com/a03-_inclusion.html
+def wn_PnPoly(P, V):
+    n = len(V)-1
+    wn = 0;    # the  winding number counter
+    i = 0
+
+    # loop through all edges of the polygon
+    while i<n:   # edge from V[i] to  V[i+1]
+        if V[i][1] <= P[1]:         # start y <= P.y
+            if V[i+1][1]  > P[1]:      # an upward crossing
+                if isLeft(V[i], V[i+1], P) > 0:  # P left of  edge
+                    wn += 1            # have  a valid up intersect
+        else:                        # start y > P.y (no test needed)
+            if V[i+1][1] <= P[1]:     # a downward crossing
+                if isLeft(V[i], V[i+1], P) < 0:  # P right of  edge
+                    wn -= 1            # have  a valid down intersect
+
+        i += 1
+
+    #print(str(wn))
+    return wn;
+#}}}
 # make vp {{{
 def _make_vp(V):
   
@@ -110,15 +154,46 @@ def _make_vp(V):
     vu = 2.5 - 0.5 # upper layer (km/s)
     vl = 2.5 + 0.5 # lower layer (km/s)
     dv = 0.3*v0 # 30% of perturbation
-   
+  
+    n_list = 10
+    pol_list = []
+    d_theta = 2*pi/n_list
+    for i in range(n_list+1):
+        theta = 0 + i*d_theta
+        r = 0.7*( exp(sin(theta))*sin(2*theta)**2 + exp(cos(theta))*cos(2*theta)**2 ) / 3
+        xp = r * cos(theta)
+        yp = r * sin(theta)
+        pol_list.append((x,y))
+
     vp_cond = conditional(y >= 0.7, vu, v0)
     vp_cond = conditional(y <= 0.5 - 0.2*x, vl, vp_cond)
-    vp_cond = conditional((x-0.5)**2 + (y-0.5)**2 <= 0.250**2, v0+dv, vp_cond)
+    
+    vp_cond = conditional( 300*((x-0.5)*(y-0.5))**2 + ((x-0.5)+(y-0.5))**2 <= 0.300**2, v0+dv, vp_cond)
+    
     vp = Function(V).interpolate(vp_cond)
 
     File("exact_vp.pvd").write(vp)
 
     return vp
+#}}}
+# simple test of winding number {{{
+if 0:
+    test_polygon2 = [ (0,1), (1,1), (1,2), (2,2), (2,3), (3,3), (3,2), (4,0), (5,9), (6,0), 
+                  (7,2), (8,0), (8,-2), (7,-3), (6,-2), (5,-2), (4,-2), (3,-1), (2,-2), (1,-2), 
+                  (0,-3), (-2,-3), (-3,-4), (-4,-3), (-5,-3), (-5,-2), (-4,-2), (-4,.5), (-5,.5), (-5,1), 
+                  (-4,1), (-4,2), (-4,4), (-3,4), (-3,2), (-2,2), (-2,0), (-1,1), (0,1) ]
+
+    import random
+    random.seed(1389)
+    i = 0
+    t = time.perf_counter()
+    while i < 500:
+        testpoint = (0.1*random.randrange(-50, 80), 0.1*random.randrange(-40, 40))
+        wn_PnPoly(testpoint, test_polygon2)
+        i += 1
+
+    print("wn_PnPoly() - execution time: " + str(time.perf_counter() - t))
+    sys.exit("exit")
 #}}}
 
 # controls
@@ -126,7 +201,7 @@ FIREMESH = 1    # keep it 1
 AMR = 1         # should adapt the mesh?
 GUESS = 1       # if 1, run the guess model; otherwise (=0), read results
 REF = 0         # if 1, run the reference model; otherwise (=0), read results
-QUAD = 0        # if 1, run with quadrilateral elements; otherwise (=0), run with triangles
+QUAD = 1        # if 1, run with quadrilateral elements; otherwise (=0), run with triangles
 DG_VP = 1       # if 1, vp is defined on a Discontinuous space (L2 instead of an H1 space)
 CONST_VP = 0    # if 1, run with a uniform vp = 2 km/s (it is employed to check convergence rate and wheter adapted mesh introduces errors)
 PLOT_AT_REC = 1 # if 1, plot the pressure over time at one receiver
@@ -149,7 +224,7 @@ if platform.node()=='recruta':
     path = ""
     sys.exit("path not defined")
 else:
-    path = "/share/tdsantos/shots/acoustic_forward_camembert_with_layers_15Hz_4_sources/" 
+    path = "/share/tdsantos/shots/acoustic_forward_generic_polygon_with_layers_15Hz_4_sources/" 
 
 # run reference model {{{
 if REF:
