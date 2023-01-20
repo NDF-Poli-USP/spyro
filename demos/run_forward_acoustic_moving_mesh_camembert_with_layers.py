@@ -66,8 +66,8 @@ model["BCs"] = {
 }
 
 # Receiver locations
-rec1=spyro.create_transect((0.1, 0.99), (0.9, 0.99), 11) # receivers at the top of the domain (REC1)
-rec2=spyro.create_transect((0.1, 0.01), (0.9, 0.01), 11) # receivers at the bottom of the domain (REC2)
+rec1=spyro.create_transect((0.15, 0.85), (0.85, 0.85), 20) # receivers at the top of the domain (REC1)
+rec2=spyro.create_transect((0.15, 0.15), (0.85, 0.15), 20) # receivers at the bottom of the domain (REC2)
 rec = np.concatenate((rec1,rec2))
 
 #print(spyro.create_transect((0.1, 0.9), (0.9, 0.9), 4))
@@ -91,7 +91,7 @@ model["timeaxis"] = {
     "t0": 0.0,  #  Initial time for event
     "tf": 0.8, # Final time for event  
     #"dt": 0.00025, # timestep size  
-    "dt": 0.00025/4,  # timestep size 
+    "dt": 0.00025/6,  # timestep size 
     "nspool":  20,  # (20 for dt=0.00050) how frequently to output solution to pvds
     "fspool": 10000000,  # how frequently to save solution to RAM
 }
@@ -123,11 +123,11 @@ def _make_vp(V):
 
 # controls
 FIREMESH = 1    # keep it 1
-AMR = 1         # should adapt the mesh?
-GUESS = 1       # if 1, run the guess model; otherwise (=0), read results
-REF = 0         # if 1, run the reference model; otherwise (=0), read results
+AMR = 0         # should adapt the mesh?
+GUESS = 0       # if 1, run the guess model; otherwise (=0), read results
+REF = 1         # if 1, run the reference model; otherwise (=0), read results
 QUAD = 0        # if 1, run with quadrilateral elements; otherwise (=0), run with triangles
-DG_VP = 1       # if 1, vp is defined on a Discontinuous space (L2 instead of an H1 space)
+DG_VP = 0       # if 1, vp is defined on a Discontinuous space (L2 instead of an H1 space)
 CONST_VP = 0    # if 1, run with a uniform vp = 2 km/s (it is employed to check convergence rate and wheter adapted mesh introduces errors)
 PLOT_AT_REC = 1 # if 1, plot the pressure over time at one receiver
 print_vtk = False
@@ -144,7 +144,7 @@ distribution_parameters={"partition": True,
                          "overlap_type": (DistributedMeshOverlapType.VERTEX, 60)} # FIXME if "at" will be the default scheme, then we could remove overlap
 
 # set the reference file name
-file_name = "p_ref_p4_recv_freq_"+str(model["acquisition"]["frequency"]) # with P=4
+file_name = "p_ref_p5_recv_freq_"+str(model["acquisition"]["frequency"]) # with P=5
 if platform.node()=='recruta':
     path = ""
     sys.exit("path not defined")
@@ -153,7 +153,7 @@ else:
 
 # run reference model {{{
 if REF:
-    _nx = 100  # nx=200  => dx = dz = 20 m
+    _nx = 100  # nx=100  => dx = dz = 10 m
     _ny = math.ceil( _nx*model["mesh"]["Lz"]/model["mesh"]["Lx"] ) # nx * Lz/Lx, Delta x = Delta z
 
     # here, we do not need overlaping vertices
@@ -163,7 +163,7 @@ if REF:
                             distribution_parameters=distribution_parameters)
 
     # for the exact model, use a higher-order element
-    model["opts"]["degree"] = 4 # it was 5 before
+    model["opts"]["degree"] = 5 # it was 5 before
     element = spyro.domains.space.FE_method(mesh_ref, model["opts"]["method"], model["opts"]["degree"])
     V_ref = FunctionSpace(mesh_ref, element) 
 
@@ -499,10 +499,10 @@ def compute_relative_error(p_recv, p_ref_recv): #{{{
 #}}}
 
 # retrieve P on the receivers
-p_rec1 = p_recv[:,0:11]
-p_rec2 = p_recv[:,11:22]
-p_ref_rec1 = p_ref_recv[:,0:11]
-p_ref_rec2 = p_ref_recv[:,11:22]
+p_rec1 = p_recv[:,0:20]
+p_rec2 = p_recv[:,20:40]
+p_ref_rec1 = p_ref_recv[:,0:20]
+p_ref_rec2 = p_ref_recv[:,20:40]
 
 # compute the relative errors on each set of receivers 
 # FIXME maybe modify it on utils.compute_functional
@@ -525,7 +525,7 @@ if comm.ensemble_comm.rank == 0:
     print("Nelem = " + str(mesh.num_cells()), flush=True) 
 
 if comm.ensemble_comm.rank == 0 and PLOT_AT_REC:
-    nrec = 6 # middle
+    nrec = 10 # middle
     #pe = p_ref_rec1[:,nrec]
     #pg = p_rec1[:,nrec]
     pe = p_ref_rec2[:,nrec]
