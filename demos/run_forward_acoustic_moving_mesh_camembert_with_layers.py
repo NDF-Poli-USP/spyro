@@ -216,35 +216,21 @@ elif REF==0:
 # now, prepare to run with different mesh resolutions
 def switch(iii): # switch definition (iii comes from sys.argv) {{{
     if iii == 0:
-        return 80  # nx=80  => dx = dz = 50 m 
+        return 80  # nx=80  => dx = dz = 12.5 m 
     elif iii == 1:
-        return 50  # nx=50  => dx = dz = 80 m
+        return 50  # nx=50  => dx = dz = 20 m
     elif iii == 2:
-        return 40  # nx=40  => dx = dz = 100 m
+        return 40  # nx=40  => dx = dz = 25 m
     elif iii == 3:
-        return 25  # nx=25  => dx = dz = 160 m
+        return 25  # nx=25  => dx = dz = 40 m
     elif iii == 4:
-        return 20  # nx=20  => dx = dz = 200 m
+        return 20  # nx=20  => dx = dz = 50 m
     elif iii == 5:
-        return 14  # nx=14  => dx = dz = 285.71 m
+        return 14  # nx=14  => dx = dz = 71.43 m
     elif iii == 6:
-        return 10  # nx=10  => dx = dz = 400 m
+        return 10  # nx=10  => dx = dz = 100 m
     else:
         sys.exit("iii not found! Exiting...")
-
-# some nx and related dx - for reference
-#nx = 400 # nx=400 => dx = dz = 10 m  # no need
-#nx = 200 # nx=200 => dx = dz = 20 m  # Reference model with p=5
-#nx = 100 # nx=100 => dx = dz = 40 m
-#nx = 80  # nx=80  => dx = dz = 50 m
-#nx = 50  # nx=50  => dx = dz = 80 m
-#nx = 40  # nx=40  => dx = dz = 100 m
-#nx = 25  # nx=25  => dx = dz = 160 m
-#nx = 20  # nx=20  => dx = dz = 200 m
-#nx = 16  # nx=16  => dx = dz = 250 m
-#nx = 14  # nx=14  => dx = dz = 285.71 m
-#nx = 12  # nx=12 => dx = dz = 333.33 m 
-#nx = 10  # nx=10  => dx = dz = 400 m
 #}}}
 
 # read or define degree and nx/ny

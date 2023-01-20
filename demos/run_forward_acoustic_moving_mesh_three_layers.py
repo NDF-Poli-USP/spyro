@@ -229,7 +229,6 @@ def switch(iii): # switch definition (iii comes from sys.argv) {{{
         return 10  # nx=10  => dx = dz = 100 m
     else:
         sys.exit("iii not found! Exiting...")
-
 #}}}
 
 # read or define degree and nx/ny
