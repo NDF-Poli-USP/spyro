@@ -199,8 +199,8 @@ if 0:
 # controls
 FIREMESH = 1    # keep it 1
 AMR = 0         # should adapt the mesh?
-GUESS = 0       # if 1, run the guess model; otherwise (=0), read results
-REF = 1         # if 1, run the reference model; otherwise (=0), read results
+GUESS = 1       # if 1, run the guess model; otherwise (=0), read results
+REF = 0         # if 1, run the reference model; otherwise (=0), read results
 QUAD = 0        # if 1, run with quadrilateral elements; otherwise (=0), run with triangles
 DG_VP = 0       # if 1, vp is defined on a Discontinuous space (L2 instead of an H1 space)
 CONST_VP = 0    # if 1, run with a uniform vp = 2 km/s (it is employed to check convergence rate and wheter adapted mesh introduces errors)
@@ -208,11 +208,6 @@ PLOT_AT_REC = 1 # if 1, plot the pressure over time at one receiver
 print_vtk = False
 use_Neumann_BC_as_source = False 
 
-if QUAD==1:
-    model["opts"]["method"] = "CG"
-    model["opts"]["quadrature"] = "GLL"
-    model["opts"]["degree"] = 4
-    #model["opts"]["degree"] = 8
 
 comm = spyro.utils.mpi_init(model)
 distribution_parameters={"partition": True,
@@ -228,6 +223,7 @@ else:
 
 # run reference model {{{
 if REF:
+    sys.exit("exit")
     _nx = 100  # nx=100  => dx = dz = 10 m
     _ny = math.ceil( _nx*model["mesh"]["Lz"]/model["mesh"]["Lx"] ) # nx * Lz/Lx, Delta x = Delta z
 
@@ -309,20 +305,30 @@ def switch(iii): # switch definition (iii comes from sys.argv) {{{
 #}}}
 
 # read or define degree and nx/ny
-if len(sys.argv)==3:
+if len(sys.argv)==6:
     ppp=int(sys.argv[1])
     iii=int(sys.argv[2])
+    AMR=int(sys.argv[3])
+    DG_VP=int(sys.argv[4])
+    QUAD=int(sys.argv[5])
+    print("ok, it worked")
     if QUAD==1 and ppp!=4:
         sys.exit("QUAD=1, but degree not equal to 4. Skipping run...")
 else:
     ppp=2
     iii=1
 
+if QUAD==1:
+    model["opts"]["method"] = "CG"
+    model["opts"]["quadrature"] = "GLL"
+    model["opts"]["degree"] = 4
+    #model["opts"]["degree"] = 8
+
 nx = switch(iii)
 ny = math.ceil( nx*model["mesh"]["Lz"]/model["mesh"]["Lx"] ) # nx * Lz/Lx, Delta x = Delta z
 model["opts"]["degree"] = ppp
 
-print("\n Running with degree = " + str(ppp) + " and nx = " + str(nx) + "\n", flush=True)
+print("\n Degree = " + str(ppp) + ", nx = " + str(nx) + ", AMR = " + str(AMR) +  ", DG_VP = " + str(DG_VP) + ", QUAD = " + str(QUAD) + "\n", flush=True)
 #sys.exit("exit")
 
 # generate or read a mesh, and create space V {{{
