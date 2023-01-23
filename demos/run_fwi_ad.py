@@ -42,8 +42,9 @@ if comm.ensemble_comm.rank == 0:
     grad_file = fire.File(outdir + "grad.pvd", comm=comm.comm)
 
 solver_ad = spyro.solvers.solver_ad.solver_ad(model, mesh, V)
+wp = solver_ad.wave_propagate
 
-@ensemble_solvers_ad
+
 def runfwi(solver_type, tot_source_num, comm, xi, sn=0):
     solver_ad.source_num = sn
     aut_dif = model["aut_dif"]["status"]
@@ -57,7 +58,7 @@ def runfwi(solver_type, tot_source_num, comm, xi, sn=0):
         # fire.File("guess_br_ad.pvd", comm=comm.comm).write(vp_guess)
     
     print('######## Running the guess model ########')
-    wp = solver_ad.wave_propagate
+    
     if aut_dif:
         out = wp(
                 comm, vp_guess, sources, receivers, wavelet,
@@ -65,10 +66,15 @@ def runfwi(solver_type, tot_source_num, comm, xi, sn=0):
                 output=True
                 )
         Jm = out[0]
-        comp_grad = fire_adj.compute_gradient
+        # quit()
         control = fire_adj.Control(vp_guess)
-        dJ = comp_grad(Jm, control, "riesz_representation" == "L2")
-        fire_adj.get_working_tape().clear_tape()
+        J_hat = fire_adj.ReducedFunctional(Jm, control)
+        fire_adj.minimize(J_hat, options={'disp': True})
+
+        # comp_grad = fire_adj.compute_gradient
+        
+        # dJ = comp_grad(Jm, control, "riesz_representation" == "L2")
+        # fire_adj.get_working_tape().clear_tape()
 
     else:
         out = wp(
@@ -85,36 +91,40 @@ def runfwi(solver_type, tot_source_num, comm, xi, sn=0):
     return Jm, dJ
 
 
-def run_source(xi):
-    solver_type = "fwi"
-    Jm, dJ_local = runfwi(solver_type, sources.num_receivers, comm, xi)
-    dJ = fire.Function(V, name="gradient")
-    if comm.ensemble_comm.size > 1:
-        comm.allreduce(dJ_local, dJ)
-    else:
-        dJ = dJ_local
-    J_total = fire.COMM_WORLD.allreduce(Jm, op=MPI.SUM)
-    # dJ /= comm.ensemble_comm.size
+# def run_source(xi):
+#     solver_type = "fwi"
+#     Jm, dJ_local = runfwi(solver_type, sources.num_receivers, comm, xi)
+#     dJ = fire.Function(V, name="gradient")
+#     if comm.ensemble_comm.size > 1:
+#         comm.allreduce(dJ_local, dJ)
+#     else:
+#         dJ = dJ_local
+#     J_total = fire.COMM_WORLD.allreduce(Jm, op=MPI.SUM)
+#     # dJ /= comm.ensemble_comm.size
 
-    # if comm.ensemble_comm.rank == 0:
-    #     grad_file.write(dJ)
+#     # if comm.ensemble_comm.rank == 0:
+#     #     grad_file.write(dJ)
 
-    return J_total, dJ.dat.data
+#     return J_total, dJ.dat.data
 
 
-if __name__ == "__main__":  
-    p_exact_recv = spyro.io.load_shots(model, comm)
-                                
-    vmax = 3.5
-    vmin = 1.5
-    m0 = vp_guess.vector().gather()
-    bounds = [(vmin, vmax) for _ in range(len(m0))]
-    start = tm.time()
-    result_da = optimize.minimize(
-                    run_source, m0, method='L-BFGS-B',
-                    jac=True, tol=1e-15, bounds=bounds,
-                    options={"disp": True, "eps": 1e-15, "gtol": 1e-15, "maxiter": 100}
-                )
+# if __name__ == "__main__":  
+p_exact_recv = spyro.io.load_shots(model, comm)
+                            
+vmax = 3.5
+vmin = 1.5
+m0 = vp_guess.vector().gather()
+bounds = [(vmin, vmax) for _ in range(len(m0))]
+
+solver_type = "fwi"
+runfwi(solver_type, sources.num_receivers, comm, m0, sn=0)
+
+# start = tm.time()
+# result_da = optimize.minimize(
+#                 run_source, m0, method='L-BFGS-B',
+#                 jac=True, tol=1e-15, bounds=bounds,
+#                 options={"disp": True, "eps": 1e-15, "gtol": 1e-15, "maxiter": 100}
+#             )
 
     # rank = comm.comm.rank
     # size = comm.comm.size

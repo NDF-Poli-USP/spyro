@@ -5,6 +5,7 @@ rm *.png
 rm *.vtu
 rm *.pvtu
 rm *.pvd
+rm *.dat
 rm results/*.vtu
 rm results/*.pvd
 rm results/*.pvtu

@@ -67,7 +67,7 @@ class Receivers:
 
     def build_maps(self):
         for rid in range(self.num_receivers):
-            tolerance = 1e-6
+            tolerance = 1e-2
             if self.dimension == 2:
                 receiver_z, receiver_x = self.receiver_locations[rid]
                 cell_id = self.mesh.locate_cell([receiver_z, receiver_x], tolerance=tolerance )

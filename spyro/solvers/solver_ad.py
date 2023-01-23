@@ -187,10 +187,12 @@ class solver_ad():
                                     )
                 f.assign(fn)
             else:
-                f.dat.data[:] = 0.0
+                f_temp = fire.Function(V)
+                f.dat.data[:] = 1.0
                 excitation.apply_source(
-                        f, wavelet[step]/(self.h_min * self.h_min)
-                        )
+                        f_temp, wavelet[step]/(self.h_min * self.h_min))
+                f.interpolate(f_temp)
+
             solver.solve()
             u_nm1.assign(u_n)
             u_n.assign(X)
