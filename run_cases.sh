@@ -1,6 +1,6 @@
 #!/bin/bash
 for quad in {0..1}; do
-	for dg in {0..1}; do
+	for dg in {0..1}; do 
 		for amr in {0..1}; do
 			for p in {4..4}; do
 				for i in {0..4}; do

@@ -129,7 +129,6 @@ PLOT_AT_REC = 1 # if 1, plot the pressure over time at one receiver
 print_vtk = False
 use_Neumann_BC_as_source = False 
 
-
 comm = spyro.utils.mpi_init(model)
 distribution_parameters={"partition": True,
                          "overlap_type": (DistributedMeshOverlapType.VERTEX, 60)} # FIXME if "at" will be the default scheme, then we could remove overlap
@@ -239,8 +238,8 @@ if len(sys.argv)==6:
     if QUAD==1 and ppp!=4:
         sys.exit("QUAD=1, but degree not equal to 4. Skipping run...")
 else:
-    ppp=2
-    iii=2
+    ppp=4
+    iii=0
 
 if QUAD==1:
     model["opts"]["method"] = "CG"
@@ -439,9 +438,9 @@ if AMR==1 and GUESS==1:
 # set the file name
 h = round(1000*model["mesh"]["Lx"]/nx)
 if QUAD==1:
-    file_name = "p_recv_QUAD_AMR_" + str(AMR) + "_p_" + str(model["opts"]["degree"]) + "_h_" + str(h) + "m_freq_" + str(model["acquisition"]["frequency"])
+    file_name = "p_recv_QUAD_AMR_" + str(AMR) + "_DGVP_" + str(DG_VP) + "_p_" + str(model["opts"]["degree"]) + "_h_" + str(h) + "m_freq_" + str(model["acquisition"]["frequency"])
 else:
-    file_name = "p_recv_AMR_" + str(AMR) + "_p_" + str(model["opts"]["degree"]) + "_h_" + str(h) + "m_freq_" + str(model["acquisition"]["frequency"])
+    file_name = "p_recv_AMR_" + str(AMR) + "_DGVP_" + str(DG_VP) + "_p_" + str(model["opts"]["degree"]) + "_h_" + str(h) + "m_freq_" + str(model["acquisition"]["frequency"])
 
 # run the guess model with a given mesh {{{
 if GUESS==1:

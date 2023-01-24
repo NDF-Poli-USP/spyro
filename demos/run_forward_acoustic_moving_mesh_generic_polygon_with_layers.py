@@ -199,7 +199,7 @@ if 0:
 # controls
 FIREMESH = 1    # keep it 1
 AMR = 0         # should adapt the mesh?
-GUESS = 1       # if 1, run the guess model; otherwise (=0), read results
+GUESS = 0       # if 1, run the guess model; otherwise (=0), read results
 REF = 0         # if 1, run the reference model; otherwise (=0), read results
 QUAD = 0        # if 1, run with quadrilateral elements; otherwise (=0), run with triangles
 DG_VP = 0       # if 1, vp is defined on a Discontinuous space (L2 instead of an H1 space)
@@ -315,8 +315,8 @@ if len(sys.argv)==6:
     if QUAD==1 and ppp!=4:
         sys.exit("QUAD=1, but degree not equal to 4. Skipping run...")
 else:
-    ppp=2
-    iii=1
+    ppp=4
+    iii=0
 
 if QUAD==1:
     model["opts"]["method"] = "CG"
@@ -515,9 +515,9 @@ if AMR==1 and GUESS==1:
 # set the file name
 h = round(1000*model["mesh"]["Lx"]/nx)
 if QUAD==1:
-    file_name = "p_recv_QUAD_AMR_" + str(AMR) + "_p_" + str(model["opts"]["degree"]) + "_h_" + str(h) + "m_freq_" + str(model["acquisition"]["frequency"])
+    file_name = "p_recv_QUAD_AMR_" + str(AMR) + "_DGVP_" + str(DG_VP) + "_p_" + str(model["opts"]["degree"]) + "_h_" + str(h) + "m_freq_" + str(model["acquisition"]["frequency"])
 else:
-    file_name = "p_recv_AMR_" + str(AMR) + "_p_" + str(model["opts"]["degree"]) + "_h_" + str(h) + "m_freq_" + str(model["acquisition"]["frequency"])
+    file_name = "p_recv_AMR_" + str(AMR) + "_DGVP_" + str(DG_VP) + "_p_" + str(model["opts"]["degree"]) + "_h_" + str(h) + "m_freq_" + str(model["acquisition"]["frequency"])
 
 # run the guess model with a given mesh {{{
 if GUESS==1:
