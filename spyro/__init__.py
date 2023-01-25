@@ -13,7 +13,7 @@ from .io import io
 from . import solvers
 from . import tools
 from . import examples
-from . import HABC
+from . import habc
 
 __all__ = [
     "io",
@@ -36,5 +36,5 @@ __all__ = [
     "DG_Wave",
     "examples",
     "AcousticWave",
-    "HABC",
+    "habc",
 ]

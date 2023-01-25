@@ -98,26 +98,26 @@ def calcp(x_rel, a, b, lim, pmax=20):
     h = max(int(np.ceil(np.log(
         0.5) / np.log((1 / a + 1 / b) / (1 / x_rel[0] + 1 / x_rel[1])))), 2)
     rh = abs(x_rel[0] / a)**h + abs(x_rel[1] / b)**h
-    mp.my_print('Superness "Harm" - r:{:5.4f} - p:{}*'.format(rh, h))
+    print('Superness "Harm" - r:{:5.4f} - p:{}*'.format(rh, h))
     s = max(
         int(np.ceil(np.log(0.25) / np.log(x_rel[0] * x_rel[1] / (a * b)))), 2)
     rs = abs(x_rel[0] / a)**s + abs(x_rel[1] / b)**s
-    mp.my_print('Superness "Geom" - r:{:5.4f} - p:{}*'.format(rs, s))
+    print('Superness "Geom" - r:{:5.4f} - p:{}*'.format(rs, s))
     z = max(
         int(np.ceil(np.log(0.5) / np.log((x_rel[0] + x_rel[1]) / (a + b)))), 2)
     rz = abs(x_rel[0] / a)**z + abs(x_rel[1] / b)**z
-    mp.my_print('Superness "Arit" - r:{:5.4f} - p:{}*'.format(rz, z))
+    print('Superness "Arit" - r:{:5.4f} - p:{}*'.format(rz, z))
     r = p = 1
     while r >= 1 and p <= pmax:
         p += 1
         r = abs(x_rel[0] / a)**p + abs(x_rel[1] / b)**p
-        # mp.my_print('ParHypEll - r:{:5.4f} - p:{}'.format(r, p))
-    mp.my_print('ParHypEll - r:{:5.4f} - p:{}'.format(r, p))
-    mp.my_print('a(km):{:5.3f} - b(km):{:5.3f}'.format(a / 1e3, b / 1e3))
-    mp.my_print(
+        # print('ParHypEll - r:{:5.4f} - p:{}'.format(r, p))
+    print('ParHypEll - r:{:5.4f} - p:{}'.format(r, p))
+    print('a(km):{:5.3f} - b(km):{:5.3f}'.format(a / 1e3, b / 1e3))
+    print(
         'x0(km):{:5.3f} - y0(km):{:5.3f}'.format(x_rel[0] / 1e3,
                                                  x_rel[1] / 1e3))
-    mp.my_print('************************************')
+    print('************************************')
     if lim == 'MIN':
         if rs < r:
             s = p
@@ -187,14 +187,14 @@ def CalcFL(TipLay, Lx, Ly, fref, lmin, lref, Z, nexp, nz=5, crtCR=0):
         x_pml = [0.5 * Lx + pmlRect *
                  np.cos(theta), 0.5 * Ly + pmlRect * np.sin(theta)]
         rf = abs(x_pml[0] / a)**nexp + abs(x_pml[1] / b)**nexp
-        mp.my_print(
+        print(
             'HypEll Limits: p:{}-r:{:3.4f}-rf:{:3.4f}'.format(nexp, r, rf))
 
         # Verification of hyperellipse exponent
-        mp.my_print('************************************')
-        mp.my_print('Minimum Exponent for Hyperellipse')
+        print('************************************')
+        print('Minimum Exponent for Hyperellipse')
         p = calcp(x_rel, a, b, 'MIN')
-        mp.my_print('Maximum Exponent for Hyperellipse')
+        print('Maximum Exponent for Hyperellipse')
         pf = calcp(x_pml, a, b, 'MAX')
         if pf == p:
             pf += 1
@@ -202,19 +202,19 @@ def CalcFL(TipLay, Lx, Ly, fref, lmin, lref, Z, nexp, nz=5, crtCR=0):
         condB = nexp >= p and nexp > pf
 
         if condA or condB:
-            mp.my_print('Current Exponent: {}'.format(nexp))
-            mp.my_print('Minimum Exponent for Hyperellipse: {}'.format(p))
-            mp.my_print('Maximum Exponent for Hyperellipse: {}'.format(pf))
+            print('Current Exponent: {}'.format(nexp))
+            print('Minimum Exponent for Hyperellipse: {}'.format(p))
+            print('Maximum Exponent for Hyperellipse: {}'.format(pf))
             if condA:
                 sys.exit('Low Exponent for Hyperellipse')
             elif condB:
                 sys.exit('High Exponent for Hyperellipse')
         else:
-            mp.my_print('Minimum Exponent for Hyperellipse: {}'.format(p))
-            mp.my_print('Current Exponent: {}'.format(nexp))
-            mp.my_print('Maximum Exponent for Hyperellipse: {}'.format(pf))
+            print('Minimum Exponent for Hyperellipse: {}'.format(p))
+            print('Current Exponent: {}'.format(nexp))
+            print('Maximum Exponent for Hyperellipse: {}'.format(pf))
 
-        mp.my_print('************************************')
+        print('************************************')
 
     # Size of damping layer
     pml = F_L * lref
@@ -222,7 +222,7 @@ def CalcFL(TipLay, Lx, Ly, fref, lmin, lref, Z, nexp, nz=5, crtCR=0):
     return F_L, pml
 
 
-def detFref(histPcrit, f0, it_fwi):
+def detFref(histPcrit, f0, it_fwi, dt):
     '''
     Determines the reference frequency for a new layer length
     histPcrit: Transient response in at critical coordinates "posCrit"
@@ -230,7 +230,7 @@ def detFref(histPcrit, f0, it_fwi):
     it_fwi: Iteration number of inversion process
     '''
 
-   if it_fwi > 0:
+    if it_fwi > 0:
         # Zero Padding for increasing smoothing in FFT
         y = np.concatenate([np.zeros(4*len(histPcrit)), histPcrit])
         # Number of sample points
@@ -252,7 +252,7 @@ def detFref(histPcrit, f0, it_fwi):
     return fref
 
 
-def habc_size(Lx, Ly, posCrit, possou, f0, it_fwi, lmin, Z, histPcrit=None, TipLay='REC', nexp=np.nan):
+def habc_size(HABC):
     '''
     Determines the size of the absorbing layer
     Lx, Ly: Original domain dimensions
@@ -266,16 +266,24 @@ def habc_size(Lx, Ly, posCrit, possou, f0, it_fwi, lmin, Z, histPcrit=None, TipL
     TipLay: Layer damping type (Rectangular: 'REC' or Hyperelliptical: 'HYP')
     nexp: Hyperellipse exponent for damping layer. nexp = NaN for rectangular layers
     '''
+
+    Lx = HABC.Lz
+    Ly = HABC.Lx
+    posCrit = HABC.posCrit
+    possou = HABC.possou
+    f0 = HABC.initial_frequency
+    it_fwi = HABC.it_fwi
+    lmin = HABC.h_min
     # Critical position for reference
     lref = detLref(posCrit, possou)
     # Determining the reference frequency
-    fref = detFref(histPcrit, f0, it_fwi)
+    # fref = detFref(histPcrit, f0, it_fwi, dt)
     
-    # Absorbing layer size
-    F_L, pml = CalcFL(TipLay, Lx, Ly, fref, lmin, lref, Z, nexp)
+    # # Absorbing layer size
+    # F_L, pml = CalcFL(TipLay, Lx, Ly, fref, lmin, lref, Z, nexp)
 
-    ###############
-    # Remesh of the domain adding the distance "pml" according to the case
-    ##############
+    # ###############
+    # # Remesh of the domain adding the distance "pml" according to the case
+    # ##############
 
-    return fref, F_L, pml
+    # return fref, F_L, pml

@@ -1,7 +1,7 @@
 from pyclbr import Function
 import spyro
 from firedrake import RectangleMesh, conditional, UnitSquareMesh
-from spyro.habc import eikonal
+from spyro.habc import HABC
 import firedrake as fire
 
 from spyro.io.model_parameters import Model_parameters
@@ -65,32 +65,23 @@ dictionary["visualization"] = {
 }
 
 Model = Model_parameters(dictionary=dictionary) 
-
-user_mesh = UnitSquareMesh(100,100)
+n=100
+user_mesh = UnitSquareMesh(n,n)
+h_min = 1/n
 user_mesh.coordinates.dat.data[:,0] *= -1.0
 Model.set_mesh(user_mesh=user_mesh)
 
 Wave = spyro.AcousticWave(model_parameters=Model)
 
 x,y = Wave.get_spatial_coordinates()
-# V = fire.FunctionSpace(Wave.mesh, 'CG',1)
-# ux = fire.Function(V).interpolate(x)
-# uy = fire.Function(V).interpolate(y)
-# print(ux.dat.data[:])
-# print(uy.dat.data[:])
-
 sources = Wave.sources
-print(sources.receiver_locations)
-print(sources.cellIDs)
-print(sources.cellNodeMaps)
 
 
 Wave.set_initial_velocity_model(conditional = conditional(x < -0.5 ,3.0,3.0 ))
 Wave._get_initial_velocity_model()
 Wave.c = Wave.initial_velocity_model
 
-eikonal(Wave)
-
+HABC(Wave, h_min = h_min)
 
 Wave.forward_solve()
 

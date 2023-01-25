@@ -53,6 +53,7 @@ class Wave():
         self.dimension = model_parameters.dimension
         self.length_z = model_parameters.length_z
         self.length_x = model_parameters.length_x
+        self.frequency = model_parameters.frequency
 
         self.abc_status = model_parameters.abc_status
         self.outer_bc = model_parameters.abc_outer_bc

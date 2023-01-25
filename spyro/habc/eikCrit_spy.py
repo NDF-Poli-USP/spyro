@@ -137,8 +137,6 @@ def SolveEikonal(c, Eik, mesh, sources, annotate=False):
 
 
     B_data = B.dat.data[:]
-    print(np.min(B_data))
-    print(np.max(B_data))
 
     solve(A,yp,B)
     output = File('linear.pvd')
@@ -210,39 +208,39 @@ def SolveEikonal(c, Eik, mesh, sources, annotate=False):
     return yp
 
 
-def vel_bound(boundmesh, c_eik, Lx, Ly):
-    '''
-    Velocity profile at boundary
-    boundmesh: Boundary Mesh
-    c_eik: Velocity profile without layer
-    Lx, Ly: Original domain dimensions
-    '''
-    print('Mapping Propagation Speed Boundary')
-    name = 'VelBound (km/s)'
+# def vel_bound(boundmesh, c_eik, Lx, Ly):
+#     '''
+#     Velocity profile at boundary
+#     boundmesh: Boundary Mesh
+#     c_eik: Velocity profile without layer
+#     Lx, Ly: Original domain dimensions
+#     '''
+#     print('Mapping Propagation Speed Boundary')
+#     name = 'VelBound (km/s)'
 
-    # Create and define function space for boundary mesh
-    B = FunctionSpace(boundmesh, 'CG', 1)
-    cbound = Function(B, name=name)
+#     # Create and define function space for boundary mesh
+#     B = FunctionSpace(boundmesh, 'CG', 1)
+#     cbound = Function(B, name=name)
 
-    c_coords = cbound.function_space().tabulate_dof_coordinates()
-    # Loop for identifying properties
-    cb_array = cbound.vector().get_local()
-    c_eik.set_allow_extrapolation(True)
-    for dof, coord in enumerate(c_coords):
-        xc = coord[0]
-        yc = coord[1]
-        if xc >= 0 and xc <= Lx and yc >= 0 and yc <= Ly:
-            # print(xc, yc, Lx, Ly)
-            cb_array[dof] = c_eik(xc, yc)
+#     c_coords = cbound.function_space().tabulate_dof_coordinates()
+#     # Loop for identifying properties
+#     cb_array = cbound.vector().get_local()
+#     c_eik.set_allow_extrapolation(True)
+#     for dof, coord in enumerate(c_coords):
+#         xc = coord[0]
+#         yc = coord[1]
+#         if xc >= 0 and xc <= Lx and yc >= 0 and yc <= Ly:
+#             # print(xc, yc, Lx, Ly)
+#             cb_array[dof] = c_eik(xc, yc)
 
-    cbound.vector().set_local(cb_array)
-    cbound.vector().apply('insert')
-    del cb_array
+#     cbound.vector().set_local(cb_array)
+#     cbound.vector().apply('insert')
+#     del cb_array
 
-    velp_file = File('/out/VelpBound.pvd')
-    velp_file << cbound
+#     velp_file = File('/out/VelpBound.pvd')
+#     velp_file << cbound
 
-    return cbound
+#     return cbound
 
 
 # def pot_arr(dim, nel, pot_usu=13):
@@ -283,9 +281,8 @@ def mapBound(yp, mesh, Lx, Ly):
     '''
     Mapping of positions inside of absorbing layer
     '''
-    print(Lx)
+
     Lx = -Lx
-    print(Lx)
     xcoord = mesh.coordinates.dat.data[:,0]
     ycoord = mesh.coordinates.dat.data[:,1]
 
@@ -299,7 +296,6 @@ def mapBound(yp, mesh, Lx, Ly):
 
     boundary_points = []
     min_vertical = min_horizontal = np.inf
-    print(y_boundary)
     tol = 1e-2
 
     for i,_ in enumerate(x_boundary):
@@ -369,7 +365,7 @@ def mapBound(yp, mesh, Lx, Ly):
 
 
 # def Eikonal(mesh, c_eik, possou, lmin, Lx, Ly):
-def Eikonal(Wave):
+def eikonal(Wave):
     '''
     Solving eikonal for defining critical points from original domain
     mesh: Mesh without layer
@@ -379,7 +375,6 @@ def Eikonal(Wave):
     '''
     mesh = Wave.mesh
     c_eik = Wave.c # somente o dominio 
-    print(type(c_eik))
     # Create and define function space for current mesh
     # BCs for eikonal
     print('Defining Eikonal Boundaries')
@@ -389,8 +384,6 @@ def Eikonal(Wave):
         x,y = source
         xs.append(x)
         ys.append(y)
-    print(xs)
-    print(ys)
 
     possou = [xs, ys]
     V = Wave.function_space
