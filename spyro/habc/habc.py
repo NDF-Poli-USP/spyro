@@ -4,6 +4,7 @@ from . import lenCam_spy
 import firedrake as fire
 from copy import deepcopy
 from ..receivers import Receivers
+import spyro
 
 # Work from Ruben Andres Salas,
 # Andre Luis Ferreira da Silva,
@@ -75,7 +76,9 @@ class HABC:
         if h_min is not None:
             self.h_min = h_min
 
-        temp_wave_object = deepcopy(self.Wave)
+        temp_wave_object = spyro.AcousticWave(
+            model_parameters=self.Wave.model_parameters
+            )
         x, y = self.posCrit
         temp_wave_object.model_parameters.receiver_locations = [(x, y)]
         temp_wave_object.model_parameters.number_of_receivers = 1

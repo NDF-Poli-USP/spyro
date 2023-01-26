@@ -277,7 +277,7 @@ def habc_size(HABC):
     lmin = HABC.h_min
     dt = HABC.dt
     Z = HABC.Z
-    nexp = self.nexp
+    nexp = HABC.nexp
 
     # Critical position for reference
     lref = detLref(posCrit, possou)

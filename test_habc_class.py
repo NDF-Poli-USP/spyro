@@ -9,7 +9,7 @@ from spyro.io.model_parameters import Model_parameters
 dictionary = {}
 dictionary["options"] = {
     "cell_type": "T",  # simplexes such as triangles or tetrahedra (T) or quadrilaterals (Q)
-    "variant": 'lumped', # lumped, equispaced or DG, default is lumped "method":"MLT", # (MLT/spectral_quadrilateral/DG_triangle/DG_quadrilateral) You can either specify a cell_type+variant or a method
+    "variant": 'lumped',  # lumped, equispaced or DG, default is lumped "method":"MLT", # (MLT/spectral_quadrilateral/DG_triangle/DG_quadrilateral) You can either specify a cell_type+variant or a method
     "degree": 1,  # p order
     "dimension": 2,  # dimension
 }
@@ -47,7 +47,7 @@ dictionary["acquisition"] = {
 
 # Simulate for 2.0 seconds.
 dictionary["time_axis"] = {
-    "initial_time": 0.0,  #  Initial time for event
+    "initial_time": 0.0,  # Initial time for event
     "final_time": 2.00,  # Final time for event
     "dt": 0.001,  # timestep size
     "amplitude": 1,  # the Ricker has an amplitude of 1.
@@ -64,24 +64,24 @@ dictionary["visualization"] = {
     "gradient_filename": None,
 }
 
-Model = Model_parameters(dictionary=dictionary) 
-n=100
-user_mesh = UnitSquareMesh(n,n)
+Model = Model_parameters(dictionary=dictionary)
+n = 100
+user_mesh = UnitSquareMesh(n, n)
 h_min = 1/n
-user_mesh.coordinates.dat.data[:,0] *= -1.0
+user_mesh.coordinates.dat.data[:, 0] *= -1.0
 Model.set_mesh(user_mesh=user_mesh)
 
 Wave = spyro.AcousticWave(model_parameters=Model)
 
-x,y = Wave.get_spatial_coordinates()
+x, y = Wave.get_spatial_coordinates()
 sources = Wave.sources
 
 
-Wave.set_initial_velocity_model(conditional = conditional(x < -0.5 ,3.0,3.0 ))
+Wave.set_initial_velocity_model(conditional=conditional(x < -0.5, 3.0, 3.0))
 Wave._get_initial_velocity_model()
 Wave.c = Wave.initial_velocity_model
 
-HABC(Wave, h_min = h_min)
+HABC(Wave, h_min=h_min)
 
 Wave.forward_solve()
 
