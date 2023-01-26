@@ -2,6 +2,8 @@ import numpy as np
 from . import eikCrit_spy
 from . import lenCam_spy
 import firedrake as fire
+from copy import deepcopy
+from ..receivers import Receivers
 
 # Work from Ruben Andres Salas,
 # Andre Luis Ferreira da Silva,
@@ -20,7 +22,7 @@ class HABC:
         ----------
         Wave_object: `dictionary`
             Contains simulation parameters and options.
-        
+
         histPcrit: numpy array
             Pressure value history in critical point
 
@@ -29,7 +31,7 @@ class HABC:
 
         it_fwi: int
             Current FWI iteration
-        
+
 
         Returns
         -------
@@ -39,27 +41,46 @@ class HABC:
 
         # TODO: ajust weak implementation of boundary condition
 
-        possou =[]
+        possou = []
 
         for source in Wave_object.model_parameters.source_locations:
-            z,x = source
+            z, x = source
             possou.append(np.asarray([z, x]))
 
         self.Lz = Wave_object.length_z
         self.Lx = Wave_object.length_x
         self.possou = possou
         self.Wave = Wave_object
+        self.dt = Wave_object.dt
         self.eikonal()
-        self.TipLay = 'REC'
-        self.nexp = np.nan
-        if h_min == None:
+        self.TipLay = 'rectangular'
+        if self.TipLay == 'rectangular':
+            self.nexp = np.nan
+        elif self.TipLay == 'hyperelliptical':
+            self.nexp = 2
+        else:
+            UserWarning(f"Please use 'rectangular' or \
+                'hyperelliptical', f{self.TipLay} not supported.")
+        if h_min is None:
             h_min = self._minimum_h_calc()
         self.h_min = h_min
         self.it_fwi = it_fwi
         self.initial_frequency = Wave_object.frequency
         self.habc_size()
-        
-    
+        self.reset_mesh()
+
+    def reset_mesh(self, mesh=None, h_min=None):
+        """ Reset mesh dependent variables
+        """
+        if h_min is not None:
+            self.h_min = h_min
+
+        temp_wave_object = deepcopy(self.Wave)
+        x, y = self.posCrit
+        temp_wave_object.model_parameters.receiver_locations = [(x, y)]
+        temp_wave_object.model_parameters.number_of_receivers = 1
+        self.Receivers = Receivers(temp_wave_object)
+
     def _minimum_h_calc(self):
         # diameters = fire.CellDiameter(self.mesh)
         # fdrake_cell_node_map = self.Wave.function_space.cell_node_map()
@@ -75,9 +96,18 @@ class HABC:
         self.Z = Z
         self.cref = cref
 
-
     def habc_size(self):
         fref, F_L, pad_length = lenCam_spy.habc_size(self)
 
-        # fref, F_L, pad_length = habc_size(Lz, Lx, posCrit, possou, initial_frequency, it_fwi, lmin, Z, histPcrit=None, TipLay='REC', nexp=np.nan)
+        # fref, F_L, pad_length = habc_size(Lz, Lx, posCrit, possou, 
+        # initial_frequency, it_fwi, lmin, Z, histPcrit=None, TipLay='REC',
+        # nexp=np.nan)
 
+    def get_histPcrit(self):
+        '''
+        Returns pressure value at critical point
+        '''
+        if self.it_fwi == 0:
+            return None
+        else:
+            return self.Receivers.interpolate(self.Wave.u_n)

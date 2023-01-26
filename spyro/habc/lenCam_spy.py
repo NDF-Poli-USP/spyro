@@ -134,7 +134,7 @@ def calcp(x_rel, a, b, lim, pmax=20):
 def CalcFL(TipLay, Lx, Ly, fref, lmin, lref, Z, nexp, nz=5, crtCR=0):
     '''
     Calculate the lenght of absorption layer
-    TipLay: Layer damping type (Rectangular: 'REC' or Hyperelliptical: 'HYP')
+    TipLay: Layer damping type ('rectangular' or 'hyperelliptical')
     fref: Reference frequency
     lmin: Minimal dimension of finite element
     lref: Reference length for the size of the absorbing layer
@@ -170,10 +170,10 @@ def CalcFL(TipLay, Lx, Ly, fref, lmin, lref, Z, nexp, nz=5, crtCR=0):
           [round(x, 4) for x in FLpos])
     print('Options for CR:', CRpos)
 
-    if not TipLay == 'REC':
+    if not TipLay == 'rectangular':
         pmlRect = F_L * lref
         bdom = Lx + 2 * pmlRect
-    elif TipLay == 'HYP':
+    elif TipLay == 'hyperelliptical':
         hdom = Ly + 2 * pmlRect
 
         a = bdom / 2
@@ -231,6 +231,7 @@ def detFref(histPcrit, f0, it_fwi, dt):
     '''
 
     if it_fwi > 0:
+
         # Zero Padding for increasing smoothing in FFT
         y = np.concatenate([np.zeros(4*len(histPcrit)), histPcrit])
         # Number of sample points
@@ -263,7 +264,7 @@ def habc_size(HABC):
     it_fwi: Iteration unmber of inversion process
     lmin: Minimal dimension of finite element
     Z: Inverse of minimum Eikonal
-    TipLay: Layer damping type (Rectangular: 'REC' or Hyperelliptical: 'HYP')
+    TipLay: Layer damping type ('rectangular' or 'hyperelliptical')
     nexp: Hyperellipse exponent for damping layer. nexp = NaN for rectangular layers
     '''
 
@@ -274,16 +275,20 @@ def habc_size(HABC):
     f0 = HABC.initial_frequency
     it_fwi = HABC.it_fwi
     lmin = HABC.h_min
+    dt = HABC.dt
+    Z = HABC.Z
+    nexp = self.nexp
+
     # Critical position for reference
     lref = detLref(posCrit, possou)
     # Determining the reference frequency
-    # fref = detFref(histPcrit, f0, it_fwi, dt)
+    fref = detFref(HABC.get_histPcrit(), f0, it_fwi, dt)
     
-    # # Absorbing layer size
-    # F_L, pml = CalcFL(TipLay, Lx, Ly, fref, lmin, lref, Z, nexp)
+    # Absorbing layer size
+    F_L, pml = CalcFL(HABC.TipLay, Lx, Ly, fref, lmin, lref, Z, nexp)
 
-    # ###############
-    # # Remesh of the domain adding the distance "pml" according to the case
-    # ##############
+    ###############
+    # Remesh of the domain adding the distance "pml" according to the case
+    ##############
 
-    # return fref, F_L, pml
+    return fref, F_L, pml
