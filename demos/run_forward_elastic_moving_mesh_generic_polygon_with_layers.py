@@ -1,4 +1,4 @@
-# run_forward_elastic_moving_mesh_camembert.py 
+# run_forward_elastic_moving_mesh_generic_polygon_with_layers.py 
 from firedrake import *
 from scipy.optimize import * 
 import spyro
@@ -102,9 +102,25 @@ def _make_vp(V):
     x, y = SpatialCoordinate(m)
 
     v0 = 2.5 # background vp (km/s)
+    vu = 2.5 - 0.5 # upper layer (km/s)
+    vl = 2.5 + 0.5 # lower layer (km/s)
     dv = 0.3*v0 # 30% of perturbation
-    
-    vp_cond = conditional((x-0.5)**2 + (y-0.5)**2 <= 0.250**2, v0+dv, v0)
+
+    n_list = 10
+    pol_list = []
+    d_theta = 2*pi/n_list
+    for i in range(n_list+1):
+        theta = 0 + i*d_theta
+        r = 0.7*( exp(sin(theta))*sin(2*theta)**2 + exp(cos(theta))*cos(2*theta)**2 ) / 3
+        xp = r * cos(theta)
+        yp = r * sin(theta)
+        pol_list.append((x,y))
+
+    vp_cond = conditional(y >= 0.7, vu, v0)
+    vp_cond = conditional(y <= 0.5 - 0.2*x, vl, vp_cond)
+
+    vp_cond = conditional( 300*((x-0.5)*(y-0.5))**2 + ((x-0.5)+(y-0.5))**2 <= 0.300**2, v0+dv, vp_cond)
+
     vp = Function(V).interpolate(vp_cond)
 
     vs = Function(V)
@@ -142,7 +158,7 @@ if platform.node()=='recruta':
     path = ""
     sys.exit("path not defined") 
 else:
-    path = "/share/tdsantos/shots/elastic_forward_camembert_15Hz_Neumann_BC_as_source/" 
+    path = "/share/tdsantos/shots/elastic_forward_generic_polygon_with_layers_15Hz_Neumann_BC_as_source/" 
 
 # run reference model {{{
 if REF:
@@ -245,7 +261,7 @@ if len(sys.argv)==6:
         sys.exit("QUAD=1, but degree not equal to 4. Skipping run...")
 else:
     ppp=4
-    iii=6
+    iii=0
 
 if QUAD==1:
     model["opts"]["method"] = "CG"
@@ -321,16 +337,16 @@ if AMR==1 and GUESS==1:
 
     E = E1
     #beta = 0.5 # (0, 1) # for E2 + smooth
-    #beta = 0.10 # (0, 1) # for E2 w/n smooth
     beta = 0.20 # (0, 1) # for E2 w/n smooth
+    #beta = 0.30 # (0, 1) # for E2 w/n smooth
     phi = sqrt( 1 + E*E ) - 1
     phi_hat = assemble(phi*dx(domain=mesh_grid)) / assemble(Constant(1.0)*dx(domain=mesh_grid))
     alpha = beta / ( phi_hat * ( 1 - beta ) )
     M1 = 1 + alpha * phi
    
     E = E2
-    beta = 0.5 # (0, 1) # for E2 + smooth
-    #beta = 0.3 # (0, 1) # for E2 w/n smooth
+    #beta = 0.5 # (0, 1) # for E2 + smooth
+    beta = 0.3 # (0, 1) # for E2 w/n smooth
     phi = sqrt( 1 + E*E ) - 1
     phi_hat = assemble(phi*dx(domain=mesh_grid)) / assemble(Constant(1.0)*dx(domain=mesh_grid))
     alpha = beta / ( phi_hat * ( 1 - beta ) )
@@ -486,9 +502,6 @@ elif GUESS==0:
 #}}}
 
 def compute_relative_error(uz, ux, uz_ref, ux_ref): # {{{
-    #print(model["acquisition"]["receiver_locations"])
-    #sys.exit("exit")
-
     J_scale = sqrt(1.e14)
 
     misfit_uz = spyro.utils.evaluate_misfit(model, uz, uz_ref)# uz_ref[i] - uz[i] (vector)
