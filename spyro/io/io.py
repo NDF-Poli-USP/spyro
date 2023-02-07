@@ -30,8 +30,13 @@ def ensemble_save(func):
                         )
                     )
                 else:
-                    func(*args, **dict(kwargs, file_name=custom_file_name))
-
+                    func(
+                        *args,
+                        **dict(
+                            kwargs,
+                            file_name=custom_file_name+"shot_record_" + str(snum + 1) + ".dat"
+                            )
+                        )
     return wrapper
 
 
@@ -54,7 +59,13 @@ def ensemble_load(func):
                         )
                     )
                 else:
-                    values = func(*args, **dict(kwargs, file_name=custom_file_name))
+                    values = func(
+                                *args,
+                                **dict(
+                                    kwargs,
+                                    file_name=custom_file_name+"shot_record_" + str(snum + 1) + ".dat"
+                                    )
+                                )
                 return values
 
     return wrapper
@@ -67,9 +78,13 @@ def ensemble_plot(func):
         acq = args[0].get("acquisition")
         num = len(acq["source_pos"])
         _comm = args[1]
+        custom_file_name = kwargs.get("file_name")
         for snum in range(num):
             if is_owner(_comm, snum) and _comm.comm.rank == 0:
-                func(*args, **dict(kwargs, file_name=str(snum + 1)))
+                if custom_file_name is None:
+                    func(*args, **dict(kwargs, file_name="shot_number_" + str(snum + 1)))
+                else:
+                    func(*args, **dict(kwargs, file_name=custom_file_name + str(snum + 1)))
 
     return wrapper
 
@@ -215,7 +230,7 @@ def save_shots(model, comm, array, file_name=None):
 
     Parameters
     ----------
-    filename: str, optional by default shot_number_#.dat
+    file_name: str, optional by default shot_record_#.dat
         The filename to save the data as a `pickle`
     array: `numpy.ndarray`
         The data to save a pickle (e.g., a shot)
