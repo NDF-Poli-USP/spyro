@@ -122,7 +122,7 @@ def SolveEikonal(c, Eik, mesh, sources, annotate=False):
     mask = Function(Eik)
     mask = sources.make_mask(mask)
 
-    k = Constant(1e5)
+    k = Constant(1e9)
 
     print('Solve Pre-Eikonal')
     f = Constant(1.0)
@@ -365,7 +365,7 @@ def mapBound(yp, mesh, Lx, Ly):
 
 
 # def Eikonal(mesh, c_eik, possou, lmin, Lx, Ly):
-def eikonal(Wave):
+def eikonal(HABC):
     '''
     Solving eikonal for defining critical points from original domain
     mesh: Mesh without layer
@@ -373,20 +373,20 @@ def eikonal(Wave):
     possou: Positions of sources
     Lx, Ly: Original domain dimensions
     '''
-    mesh = Wave.mesh
-    c_eik = Wave.c # somente o dominio 
+    mesh = HABC.mesh_without_habc
+    c_eik = HABC.c_without_habc # somente o dominio 
     # Create and define function space for current mesh
     # BCs for eikonal
     print('Defining Eikonal Boundaries')
     xs =[]
     ys = []
-    for source in Wave.model_parameters.source_locations:
+    for source in HABC.Wave.model_parameters.source_locations:
         x,y = source
         xs.append(x)
         ys.append(y)
 
     possou = [xs, ys]
-    V = Wave.function_space
+    V = HABC.function_space_without_HABC
     # dx, bcs_eik = DefineBoundaries(possou, mesh, V, lmin)
     # Solving Eikonal
     yp = Function(V, name='Eikonal (Time [s])')

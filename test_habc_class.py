@@ -3,6 +3,7 @@ import spyro
 from firedrake import RectangleMesh, conditional, UnitSquareMesh
 from spyro.habc import HABC
 import firedrake as fire
+import numpy as np
 
 from spyro.io.model_parameters import Model_parameters
 
@@ -65,9 +66,12 @@ dictionary["visualization"] = {
 }
 
 Model = Model_parameters(dictionary=dictionary)
-n = 100
-user_mesh = UnitSquareMesh(n, n)
+n = 80
+# user_mesh = UnitSquareMesh(n, n)
 h_min = 1/n
+user_mesh = UnitSquareMesh(n, n, diagonal="crossed")
+# h_min = 1/n*np.sqrt(2)/2
+print(h_min)
 user_mesh.coordinates.dat.data[:, 0] *= -1.0
 Model.set_mesh(user_mesh=user_mesh)
 
@@ -83,7 +87,7 @@ Wave.c = Wave.initial_velocity_model
 
 HABC(Wave, h_min=h_min)
 
-Wave.forward_solve()
+# Wave.forward_solve()
 
 
 print("END")

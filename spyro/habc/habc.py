@@ -67,8 +67,18 @@ class HABC:
         self.h_min = h_min
         self.it_fwi = it_fwi
         self.initial_frequency = Wave_object.frequency
+        print("Assuming initial mesh without pad")
+        self._store_data_without_HABC()
         self.habc_size()
         self.reset_mesh()
+
+    def _store_data_without_HABC(self):
+        """
+        """
+        self.mesh_without_habc = deepcopy(self.Wave_object.mesh)
+        self.c_without_habc = deepcopy(self.Wave_object.c)
+        self.function_space_without_habc = deepcopy(self.Wave_object.function_space) 
+        self.sources_without_habc = deepcopy(self.Wave_object.sources)
 
     def reset_mesh(self, mesh=None, h_min=None):
         """ Reset mesh dependent variables
@@ -93,18 +103,36 @@ class HABC:
         pass
 
     def eikonal(self):
-        Z, posCrit, cref = eikCrit_spy.eikonal(self.Wave)
+        Z, posCrit, cref = eikCrit_spy.eikonal(self)
         posCrit_x, posCrit_y = posCrit
         self.posCrit = np.asarray([posCrit_x, posCrit_y])
         self.Z = Z
         self.cref = cref
 
     def habc_size(self):
-        fref, F_L, pad_length = lenCam_spy.habc_size(self)
+        fref, F_L, pad_length, lref = lenCam_spy.habc_size(self)
+        print(f"L ref = {lref}")
+        self.pad_length = pad_length
 
         # fref, F_L, pad_length = habc_size(Lz, Lx, posCrit, possou, 
         # initial_frequency, it_fwi, lmin, Z, histPcrit=None, TipLay='REC',
         # nexp=np.nan)
+
+    def get_mesh_with_pml(self):
+        """ 
+        Creates a new mesh with the calculated PML length
+        """
+        h_min = self.h_min
+        pad_length = self.pad_length
+
+        Lz = self.Lz + pad_length
+        Lx = self.Lx + 2*pad_length
+        nz = int(self.Ly / h_min) + int(pad_length / h_min)
+        nx = int(self.Lx / h_min) + int(2 * pad_length / h_min)
+        nx = nx + nx % 2
+        mesh = fire.RectangleMesh(nz, nx, Lz, Lx, diagonal="crossed")
+        mesh.coordinates.dat.data[:, 0] *= -1.0
+        return mesh
 
     def get_histPcrit(self):
         '''

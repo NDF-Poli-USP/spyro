@@ -64,6 +64,8 @@ def calcZero(xini, a, nz=1):
     Loop for calculating layer sizes
     '''
     f_tol = 1e-4
+    if xini >= 1.0:
+        f_tol = 1e-3
     if nz == 1:
         x = f_tol * round(xini / f_tol)
     else:
@@ -291,4 +293,4 @@ def habc_size(HABC):
     # Remesh of the domain adding the distance "pml" according to the case
     ##############
 
-    return fref, F_L, pml
+    return fref, F_L, pml, lref
