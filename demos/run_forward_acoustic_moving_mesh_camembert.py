@@ -119,13 +119,14 @@ def _make_vp(V):
 
 # controls
 FIREMESH = 1    # keep it 1
-AMR = 0         # should adapt the mesh?
+AMR = 1         # should adapt the mesh?
 GUESS = 1       # if 1, run the guess model; otherwise (=0), read results
 REF = 0         # if 1, run the reference model; otherwise (=0), read results
-QUAD = 0        # if 1, run with quadrilateral elements; otherwise (=0), run with triangles
-DG_VP = 0       # if 1, vp is defined on a Discontinuous space (L2 instead of an H1 space)
+QUAD = 1        # if 1, run with quadrilateral elements; otherwise (=0), run with triangles
+DG_VP = 1       # if 1, vp is defined on a Discontinuous space (L2 instead of an H1 space)
 CONST_VP = 0    # if 1, run with a uniform vp = 2 km/s (it is employed to check convergence rate and wheter adapted mesh introduces errors)
 PLOT_AT_REC = 1 # if 1, plot the pressure over time at one receiver
+MFUNC = 1       # if 1, M1; if 2, M2; if 3, M3 (default is M3, therefore MFUNC = 3)
 print_vtk = False
 use_Neumann_BC_as_source = False 
 
@@ -239,7 +240,7 @@ if len(sys.argv)==6:
         sys.exit("QUAD=1, but degree not equal to 4. Skipping run...")
 else:
     ppp=4
-    iii=0
+    iii=1
 
 if QUAD==1:
     model["opts"]["method"] = "CG"
@@ -330,7 +331,14 @@ if AMR==1 and GUESS==1:
     alpha = beta / ( phi_hat * ( 1 - beta ) )
     M2 = 1 + alpha * phi
 
-    M = max_value(M1,M2)
+    if MFUNC==1:
+        M = M1
+    elif MFUNC==2:
+        M = M2
+    elif MFUNC==3:
+        M = max_value(M1,M2)
+    else:
+        sys.exit("MFUNC not defined!")
 
     # Define the monitor function to be projected onto the adapted mesh
     Mfunc = Function(V_grid)
@@ -437,10 +445,18 @@ if AMR==1 and GUESS==1:
 
 # set the file name
 h = round(1000*model["mesh"]["Lx"]/nx)
-if QUAD==1:
-    file_name = "p_recv_QUAD_AMR_" + str(AMR) + "_DGVP_" + str(DG_VP) + "_p_" + str(model["opts"]["degree"]) + "_h_" + str(h) + "m_freq_" + str(model["acquisition"]["frequency"])
+if MFUNC==3:
+    sys.exit("exit")
+    if QUAD==1:
+        file_name = "p_recv_QUAD_AMR_" + str(AMR) + "_DGVP_" + str(DG_VP) + "_p_" + str(model["opts"]["degree"]) + "_h_" + str(h) + "m_freq_" + str(model["acquisition"]["frequency"])
+    else:
+        file_name = "p_recv_AMR_" + str(AMR) + "_DGVP_" + str(DG_VP) + "_p_" + str(model["opts"]["degree"]) + "_h_" + str(h) + "m_freq_" + str(model["acquisition"]["frequency"])
 else:
-    file_name = "p_recv_AMR_" + str(AMR) + "_DGVP_" + str(DG_VP) + "_p_" + str(model["opts"]["degree"]) + "_h_" + str(h) + "m_freq_" + str(model["acquisition"]["frequency"])
+    if QUAD==1:
+        file_name = "p_recv_QUAD_AMR_" + str(AMR) + "_MFUNC_" + str(MFUNC) + "_DGVP_" + str(DG_VP) + "_p_" + str(model["opts"]["degree"]) + "_h_" + str(h) + "m_freq_" + str(model["acquisition"]["frequency"])
+    else:
+        file_name = "p_recv_AMR_" + str(AMR) + "_MFUNC_" + str(MFUNC) + "_DGVP_" + str(DG_VP) + "_p_" + str(model["opts"]["degree"]) + "_h_" + str(h) + "m_freq_" + str(model["acquisition"]["frequency"])
+
 
 # run the guess model with a given mesh {{{
 if GUESS==1:
