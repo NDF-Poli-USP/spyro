@@ -386,12 +386,12 @@ def eikonal(HABC):
         ys.append(y)
 
     possou = [xs, ys]
-    V = HABC.function_space_without_HABC
+    V = HABC.function_space_without_habc
     # dx, bcs_eik = DefineBoundaries(possou, mesh, V, lmin)
     # Solving Eikonal
     yp = Function(V, name='Eikonal (Time [s])')
 
-    yp.assign(SolveEikonal(c_eik, V, mesh, Wave.sources, annotate=False))
+    yp.assign(SolveEikonal(c_eik, V, mesh, HABC.Wave.sources, annotate=False))
     eikonal_file = File('out/Eik.pvd')
     eikonal_file.write(yp)
 
@@ -404,7 +404,7 @@ def eikonal(HABC):
     # mesh_coord = V.tabulate_dof_coordinates()
     # Velocity profile and coordinates at boundary
     # cbound, bcoord = bcMesh(mesh, c_eik, Wave.length_z, Wave.length_x)
-    min_value, min_point, sec_value, sec_point = mapBound(yp, mesh, Wave.length_z, Wave.length_x)
+    min_value, min_point, sec_value, sec_point = mapBound(yp, mesh, HABC.Wave.length_z, HABC.Wave.length_x)
     # eik_max, posCrit = mapBound(yp, mesh, Wave.length_z, Wave.length_x)
     
 

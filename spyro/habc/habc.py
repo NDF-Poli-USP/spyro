@@ -5,6 +5,7 @@ import firedrake as fire
 from copy import deepcopy
 from ..receivers import Receivers
 import spyro
+import pickle
 
 # Work from Ruben Andres Salas,
 # Andre Luis Ferreira da Silva,
@@ -53,7 +54,6 @@ class HABC:
         self.possou = possou
         self.Wave = Wave_object
         self.dt = Wave_object.dt
-        self.eikonal()
         self.TipLay = 'rectangular'
         if self.TipLay == 'rectangular':
             self.nexp = np.nan
@@ -69,30 +69,31 @@ class HABC:
         self.initial_frequency = Wave_object.frequency
         print("Assuming initial mesh without pad")
         self._store_data_without_HABC()
+        self.eikonal()
+
         self.habc_size()
-        self.reset_mesh()
+        # self.reset_mesh()
+        # self.get_mesh_with_pad()
 
     def _store_data_without_HABC(self):
-        """
-        """
-        self.mesh_without_habc = deepcopy(self.Wave_object.mesh)
-        self.c_without_habc = deepcopy(self.Wave_object.c)
-        self.function_space_without_habc = deepcopy(self.Wave_object.function_space) 
-        self.sources_without_habc = deepcopy(self.Wave_object.sources)
+        self.mesh_without_habc = self.Wave.mesh
+        self.c_without_habc = self.Wave.c
+        self.function_space_without_habc = self.Wave.function_space
+        self.sources_without_habc = self.Wave.sources
 
-    def reset_mesh(self, mesh=None, h_min=None):
-        """ Reset mesh dependent variables
-        """
-        if h_min is not None:
-            self.h_min = h_min
+    # def reset_mesh(self, mesh=None, h_min=None):
+    #     """ Reset mesh dependent variables
+    #     """
+    #     if h_min is not None:
+    #         self.h_min = h_min
 
-        temp_wave_object = spyro.AcousticWave(
-            model_parameters=self.Wave.model_parameters
-            )
-        x, y = self.posCrit
-        temp_wave_object.model_parameters.receiver_locations = [(x, y)]
-        temp_wave_object.model_parameters.number_of_receivers = 1
-        self.Receivers = Receivers(temp_wave_object)
+    #     temp_wave_object = spyro.AcousticWave(
+    #         model_parameters=self.Wave.model_parameters
+    #         )
+    #     x, y = self.posCrit
+    #     temp_wave_object.model_parameters.receiver_locations = [(x, y)]
+    #     temp_wave_object.model_parameters.number_of_receivers = 1
+    #     self.Receivers = Receivers(temp_wave_object)
 
     def _minimum_h_calc(self):
         # diameters = fire.CellDiameter(self.mesh)
@@ -118,7 +119,7 @@ class HABC:
         # initial_frequency, it_fwi, lmin, Z, histPcrit=None, TipLay='REC',
         # nexp=np.nan)
 
-    def get_mesh_with_pml(self):
+    def get_mesh_with_pad(self):
         """ 
         Creates a new mesh with the calculated PML length
         """
@@ -127,7 +128,7 @@ class HABC:
 
         Lz = self.Lz + pad_length
         Lx = self.Lx + 2*pad_length
-        nz = int(self.Ly / h_min) + int(pad_length / h_min)
+        nz = int(self.Lz / h_min) + int(pad_length / h_min)
         nx = int(self.Lx / h_min) + int(2 * pad_length / h_min)
         nx = nx + nx % 2
         mesh = fire.RectangleMesh(nz, nx, Lz, Lx, diagonal="crossed")
