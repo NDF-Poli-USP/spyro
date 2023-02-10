@@ -106,14 +106,14 @@ def test_gradient_talyor_remainder_v2():
         def update(self, x, flag, iteration):
             vp_guess.assign(Function(V, x.vec, name="velocity"))
 
-    paramsDict = {
-        "Step": {
-            "Line Search": {"Descent Method": {"Type": "Quasi-Newton Method"}},
-            "Type": "Line Search",
-        },
-        "Status Test": {"Gradient Tolerance": 1e-12, "Iteration Limit": 20},
-    }
-    params = ROL.ParameterList(paramsDict, "Parameters")
+    # paramsDict = {
+    #     "Step": {
+    #         "Line Search": {"Descent Method": {"Type": "Quasi-Newton Method"}},
+    #         "Type": "Line Search",
+    #     },
+    #     "Status Test": {"Gradient Tolerance": 1e-12, "Iteration Limit": 20},
+    # }
+    # params = ROL.ParameterList(paramsDict, "Parameters")
 
     inner_product = L2Inner()
     obj = Objective(inner_product)

@@ -20,7 +20,7 @@ model["opts"] = {
     "degree": 5,  # p order
     "dimension": 2,  # dimension
     "regularization": True,  # regularization is on?
-    "gamma": 1.e-6, # regularization parameter
+    "gamma": 1.0e-6,  # regularization parameter
 }
 model["parallelism"] = {
     "type": "automatic",
@@ -35,7 +35,7 @@ model["mesh"] = {
 }
 model["BCs"] = {
     "status": True,  # True or false
-    "outer_bc": "non-reflective",  #  None or non-reflective (outer boundary condition)
+    "outer_bc": "non-reflective",  # None or non-reflective (outer boundary condition)
     "damping_type": "polynomial",  # polynomial, hyperbolic, shifted_hyperbolic
     "exponent": 2,  # damping layer has a exponent variation
     "cmax": 4.5,  # maximum acoustic wave velocity in PML - km/s
@@ -54,7 +54,7 @@ model["acquisition"] = {
     "receiver_locations": spyro.create_transect((-0.10, 0.1), (-0.10, 17.0), 500),
 }
 model["timeaxis"] = {
-    "t0": 0.0,  #  Initial time for event
+    "t0": 0.0,  # Initial time for event
     "tf": 6.00,  # Final time for event
     "dt": 0.001,
     "amplitude": 1,  # the Ricker has an amplitude of 1.
@@ -179,8 +179,8 @@ class Objective(ROL.Objective):
         if comm.comm.size > 1:
             dJ /= comm.comm.size
         # regularize the gradient if asked.
-        if model['opts']['regularization']:
-            gamma = model['opts']['gamma']
+        if model["opts"]["regularization"]:
+            gamma = model["opts"]["gamma"]
             dJ = regularize_gradient(vp, dJ, gamma)
         # mask the water layer
         dJ.dat.data[water] = 0.0

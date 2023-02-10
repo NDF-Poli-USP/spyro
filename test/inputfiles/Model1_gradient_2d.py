@@ -54,7 +54,7 @@ acquisition = {
 }
 
 timeaxis = {
-    "t0": 0.0,  #  Initial time for event
+    "t0": 0.0,  # Initial time for event
     "tf": 1.0,  # Final time for event
     "dt": 0.001,  # timestep size
     "nspool": 9999,  # how frequently to output solution to pvds
@@ -66,7 +66,7 @@ inversion = {
 }  # cutoff frequencies (Hz) for Ricker source and to low-pass the observed shot record
 
 aut_dif = {
-    "status": False, 
+    "status": False,
 }
 # Create your model with all the options
 model = {

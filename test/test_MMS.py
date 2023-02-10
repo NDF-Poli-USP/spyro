@@ -6,7 +6,8 @@ import spyro
 
 from .model import model
 
-@pytest.fixture(params=["triangle", "tetrahedral","square"])
+
+@pytest.fixture(params=["triangle", "tetrahedral", "square"])
 def mesh_type(request):
     return request.param
 
@@ -20,7 +21,7 @@ def mesh(mesh_type):
         )
         model["acquisition"]["source_pos"] = [(-0.05, 1.5)]
     elif mesh_type == "square":
-        model["opts"]['quadrature']=='GLL'
+        model["opts"]["quadrature"] == "GLL"
         model["opts"]["dimension"] = 2
         model["acquisition"]["receiver_locations"] = spyro.create_transect(
             (0.0, 1.0), (0.0, 0.9), 256
@@ -34,9 +35,9 @@ def mesh(mesh_type):
         model["acquisition"]["source_pos"] = [(-0.05, 1.5, 1.5)]
 
     return {
-        "triangle": lambda n: UnitSquareMesh(2 ** n, 2 ** n),
-        "tetrahedral": lambda n: UnitCubeMesh(2 ** n, 2 ** n, 2 ** n),
-        "square": lambda n: UnitSquareMesh(2 ** n, 2 ** n, quadrilateral = True),
+        "triangle": lambda n: UnitSquareMesh(2**n, 2**n),
+        "tetrahedral": lambda n: UnitCubeMesh(2**n, 2**n, 2**n),
+        "square": lambda n: UnitSquareMesh(2**n, 2**n, quadrilateral=True),
     }[mesh_type]
 
 
@@ -64,21 +65,24 @@ def timestep_method(timestep_method_type):
 @pytest.fixture
 def interpolation_expr(mesh_type):
     return {
-        "square": lambda x, y: (0.10 ** 2) * sin(pi * x) * sin(pi * y),
-        "triangle": lambda x, y: (0.10 ** 2) * sin(pi * x) * sin(pi * y),
-        "tetrahedral": lambda x, y, z: (0.10 ** 2) * sin(pi * x) * sin(pi * y) * sin(pi * z),
+        "square": lambda x, y: (0.10**2) * sin(pi * x) * sin(pi * y),
+        "triangle": lambda x, y: (0.10**2) * sin(pi * x) * sin(pi * y),
+        "tetrahedral": lambda x, y, z: (0.10**2)
+        * sin(pi * x)
+        * sin(pi * y)
+        * sin(pi * z),
     }[mesh_type]
 
 
 def run_solve(timestep_method, method, model, mesh, expr):
     testmodel = deepcopy(model)
     cell_geometry = mesh.ufl_cell()
-    if method =="CG" or method == 'spectral':
+    if method == "CG" or method == "spectral":
         if cell_geometry == quadrilateral or cell_geometry == hexahedron:
-            variant="spectral"
-            testmodel["opts"]["quadrature"]="GLL"
+            variant = "spectral"
+            testmodel["opts"]["quadrature"] = "GLL"
         else:
-            variant="equispaced"
+            variant = "equispaced"
     elif method == "KMV":
         variant = "KMV"
 
@@ -103,6 +107,7 @@ def run_solve(timestep_method, method, model, mesh, expr):
         )
     expr = expr(*SpatialCoordinate(mesh))
     return errornorm(interpolate(expr, V), p[-1])
+
 
 def test_method(mesh, timestep_method, spatial_method, interpolation_expr):
     if mesh(3).ufl_cell() == quadrilateral and spatial_method == "KMV":

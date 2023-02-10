@@ -1,12 +1,45 @@
 import math
 import numpy as np
-from firedrake import *
 from scipy.signal import butter, filtfilt
 import spyro
 from spyro.receivers.Receivers import *
 
 class Sources(spyro.receivers.Receivers.Receivers):
-    """Methods that inject a wavelet into a mesh"""
+    """Methods that inject a wavelet into a mesh
+
+    ...
+
+    Attributes
+    ----------
+    mesh : Firedrake.mesh
+        mesh where receivers are located
+    V: Firedrake.FunctionSpace object
+        The space of the finite elements
+    my_ensemble: Firedrake.ensemble_communicator
+        An ensemble communicator
+    dimension: int
+        The dimension of the space
+    degree: int
+        Degree of the function space
+    source_locations: list
+        List of tuples containing all source locations
+    num_sources: int
+        Number of sources
+    quadrilateral: boolean
+        Boolean that specifies if cells are quadrilateral
+    is_local: list of booleans
+        List that checks if sources are present in cores
+        spatial paralelism
+
+    Methods
+    -------
+    build_maps()
+        Calculates and stores tabulations for interpolation
+    interpolate(field)
+        Interpolates field value at receiver locations
+    apply_source(rhs_forcing, value)
+        Applies value at source locations in rhs_forcing operator
+    """
 
     def __init__(self, model, mesh, V, my_ensemble):
         """Initializes class and gets all receiver parameters from
@@ -25,7 +58,7 @@ class Sources(spyro.receivers.Receivers.Receivers):
 
         Returns
         -------
-        Receivers: :class: 'Receiver' object
+        Sources: :class: 'Source' object
 
         """
 
@@ -50,7 +83,7 @@ class Sources(spyro.receivers.Receivers.Receivers):
         self.node_locations = None
         self.is_local = [0] * self.num_receivers
         self.current_source = None
-        self.quadrilateral = (model["opts"]['quadrature']=='GLL')
+        self.quadrilateral = model["opts"]["quadrature"] == "GLL"
 
         super().build_maps()
         (self.cell_tabulations_zdir,self.cell_tabulations_xdir) = self.__func_build_cell_tabulations_zxydir()
@@ -58,14 +91,14 @@ class Sources(spyro.receivers.Receivers.Receivers):
     def apply_source(self, rhs_forcing, value):
         """Applies source in a assembled right hand side for acoustic waves simulation."""
         for source_id in range(self.num_receivers):
-            if self.is_local[source_id] and source_id==self.current_source:
+            if self.is_local[source_id] and source_id == self.current_source:
                 for i in range(len(self.cellNodeMaps[source_id])):
-                    rhs_forcing.dat.data_with_halos[int(self.cellNodeMaps[source_id][i])] = (
-                        value * self.cell_tabulations[source_id][i]
-                    )
-            else: 
+                    rhs_forcing.dat.data_with_halos[
+                        int(self.cellNodeMaps[source_id][i])
+                    ] = (value * self.cell_tabulations[source_id][i])
+            else:
                 for i in range(len(self.cellNodeMaps[source_id])):
-                    tmp = rhs_forcing.dat.data_with_halos[0]
+                    tmp = rhs_forcing.dat.data_with_halos[0]  # noqa: F841
 
         return rhs_forcing
     
