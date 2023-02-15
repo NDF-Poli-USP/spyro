@@ -1,6 +1,6 @@
 #!/bin/bash
-#SBATCH --nodes=1
-#SBATCH --ntasks-per-node=40
+#SBATCH --nodes=2
+#SBATCH --ntasks-per-node=20
 #SBATCH --partition=intel_large
 #SBATCH --time=1-24:00:00
 #SBATCH --job-name=amd_strong_scalling/intel_test1_overthurst
