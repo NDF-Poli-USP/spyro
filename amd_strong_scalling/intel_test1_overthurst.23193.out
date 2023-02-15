@@ -1,0 +1,324 @@
+
+## Job started at 15-02-2023 as 10:34:30 #####################
+
+
+## Jobs activated by olender: 
+
+             JOBID PARTITION     NAME     USER ST       TIME  NODES NODELIST(REASON)
+             23187 amd_large amd_stro  olender PD       0:00      1 (Resources)
+             23188 amd_large amd_stro  olender PD       0:00      1 (Priority)
+             23189 amd_large amd_stro  olender PD       0:00      1 (Priority)
+             23190 amd_large amd_stro  olender PD       0:00      1 (Priority)
+             23193 intel_lar amd_stro  olender  R       0:01      1 n02
+             23192 intel_lar amd_stro  olender  R       0:18      1 n05
+             23186 amd_large amd_stro  olender  R      49:48      1 n14
+             23191 intel_lar amd_stro  olender  R      55:23      1 n10
+
+## Execution node:         n02 
+
+
+## Number of tasks per job: 40 
+
+
+## Diretorio de submissao do job:   /home/olender/cse23/spyro 
+
+  rank 39 on ensemble 0 owns 10910 elements and can access 2331 vertices
+  rank 14 on ensemble 0 owns 10910 elements and can access 2347 vertices
+  rank 37 on ensemble 0 owns 10910 elements and can access 2445 vertices
+  rank 16 on ensemble 0 owns 10910 elements and can access 2330 vertices
+  rank 32 on ensemble 0 owns 10910 elements and can access 2389 vertices
+  rank 20 on ensemble 0 owns 10911 elements and can access 2320 vertices
+  rank 2 on ensemble 0 owns 10910 elements and can access 2325 vertices
+  rank 1 on ensemble 0 owns 10910 elements and can access 2341 vertices
+  rank 33 on ensemble 0 owns 10910 elements and can access 2384 vertices
+  rank 36 on ensemble 0 owns 10911 elements and can access 2321 vertices
+  rank 15 on ensemble 0 owns 10910 elements and can access 2333 vertices
+  rank 7 on ensemble 0 owns 10910 elements and can access 2372 vertices
+  rank 5 on ensemble 0 owns 10911 elements and can access 2345 vertices
+  rank 13 on ensemble 0 owns 10910 elements and can access 2364 vertices
+  rank 24 on ensemble 0 owns 10910 elements and can access 2411 vertices
+  rank 29 on ensemble 0 owns 10910 elements and can access 2328 vertices
+  rank 6 on ensemble 0 owns 10910 elements and can access 2305 vertices
+  rank 23 on ensemble 0 owns 10910 elements and can access 2347 vertices
+  rank 18 on ensemble 0 owns 10910 elements and can access 2335 vertices
+  rank 19 on ensemble 0 owns 10910 elements and can access 2319 vertices
+  rank 17 on ensemble 0 owns 10910 elements and can access 2336 vertices
+  rank 30 on ensemble 0 owns 10910 elements and can access 2412 vertices
+  rank 3 on ensemble 0 owns 10910 elements and can access 2298 vertices
+  rank 27 on ensemble 0 owns 10910 elements and can access 2275 vertices
+  rank 8 on ensemble 0 owns 10910 elements and can access 2322 vertices
+  rank 26 on ensemble 0 owns 10910 elements and can access 2337 vertices
+  rank 38 on ensemble 0 owns 10910 elements and can access 2307 vertices
+  rank 31 on ensemble 0 owns 10910 elements and can access 2363 vertices
+  rank 22 on ensemble 0 owns 10910 elements and can access 2337 vertices
+  rank 35 on ensemble 0 owns 10910 elements and can access 2320 vertices
+  rank 11 on ensemble 0 owns 10911 elements and can access 2344 vertices
+  rank 10 on ensemble 0 owns 10910 elements and can access 2377 vertices
+  rank 4 on ensemble 0 owns 10910 elements and can access 2355 vertices
+  rank 9 on ensemble 0 owns 10910 elements and can access 2310 vertices
+  rank 21 on ensemble 0 owns 10910 elements and can access 2352 vertices
+  rank 12 on ensemble 0 owns 10910 elements and can access 2376 vertices
+INFO: Distributing 1 shot(s) across 40 core(s). Each shot is using 40 cores
+  rank 0 on ensemble 0 owns 10911 elements and can access 2303 vertices
+  rank 25 on ensemble 0 owns 10910 elements and can access 2397 vertices
+  rank 28 on ensemble 0 owns 10910 elements and can access 2326 vertices
+  rank 34 on ensemble 0 owns 10910 elements and can access 2300 vertices
+INFO: converting from m/s to km/s
+Simulation time is:    0.07425 seconds
+Simulation time is:     0.1492 seconds
+Simulation time is:     0.2243 seconds
+Simulation time is:     0.2993 seconds
+Simulation time is:     0.3743 seconds
+Simulation time is:     0.4492 seconds
+Simulation time is:     0.5242 seconds
+Simulation time is:     0.5993 seconds
+Simulation time is:     0.6743 seconds
+Simulation time is:     0.7492 seconds
+Simulation time is:     0.8243 seconds
+Simulation time is:     0.8992 seconds
+Simulation time is:     0.9743 seconds
+Simulation time is:      1.049 seconds
+Simulation time is:      1.124 seconds
+Simulation time is:      1.199 seconds
+Simulation time is:      1.274 seconds
+Simulation time is:      1.349 seconds
+Simulation time is:      1.424 seconds
+Simulation time is:      1.499 seconds
+Simulation time is:      1.574 seconds
+Simulation time is:      1.649 seconds
+Simulation time is:      1.724 seconds
+Simulation time is:      1.799 seconds
+Simulation time is:      1.874 seconds
+Simulation time is:      1.949 seconds
+Simulation time is:      2.024 seconds
+Simulation time is:      2.099 seconds
+Simulation time is:      2.174 seconds
+Simulation time is:      2.249 seconds
+Simulation time is:      2.324 seconds
+Simulation time is:      2.399 seconds
+Simulation time is:      2.474 seconds
+Simulation time is:      2.549 seconds
+Simulation time is:      2.624 seconds
+Simulation time is:      2.699 seconds
+Simulation time is:      2.774 seconds
+Simulation time is:      2.849 seconds
+Simulation time is:      2.924 seconds
+Simulation time is:      2.999 seconds
+Simulation time is:      3.074 seconds
+Simulation time is:      3.149 seconds
+Simulation time is:      3.224 seconds
+Simulation time is:      3.299 seconds
+Simulation time is:      3.374 seconds
+Simulation time is:      3.449 seconds
+Simulation time is:      3.524 seconds
+Simulation time is:      3.599 seconds
+Simulation time is:      3.674 seconds
+Simulation time is:      3.749 seconds
+Simulation time is:      3.824 seconds
+Simulation time is:      3.899 seconds
+Simulation time is:      3.974 seconds
+Spatial parallelism, reducing to comm 0
+820.315304517746
+820.3156490325928
+820.3156070709229
+820.3161752223969
+820.3174693584442
+820.3176271915436
+820.3194966316223
+820.3197348117828
+820.3200845718384
+820.3201310634613
+820.3205523490906
+820.3209774494171
+820.3243777751923
+820.3250632286072
+820.325332403183
+820.3255264759064
+820.3259329795837
+820.3267557621002
+820.3288540840149
+820.329231262207
+820.3293282985687
+820.3291914463043
+820.3296020030975
+820.3298518657684
+820.3301537036896
+820.330726146698
+820.3307030200958
+820.3313302993774
+820.3336169719696
+820.3341472148895
+820.3399667739868
+820.3406162261963
+820.3408751487732
+820.3410315513611
+820.3434734344482
+820.3447332382202
+820.3466506004333
+820.347179889679
+820.3474609851837
+820.3477535247803
+  rank 9 on ensemble 0 owns 14546 elements and can access 3117 vertices
+  rank 1 on ensemble 0 owns 14547 elements and can access 3019 vertices
+  rank 2 on ensemble 0 owns 14546 elements and can access 3080 vertices
+  rank 6 on ensemble 0 owns 14547 elements and can access 3026 vertices
+  rank 10 on ensemble 0 owns 14547 elements and can access 3045 vertices
+  rank 12 on ensemble 0 owns 14547 elements and can access 3063 vertices
+  rank 13 on ensemble 0 owns 14547 elements and can access 3021 vertices
+  rank 17 on ensemble 0 owns 14546 elements and can access 3054 vertices
+  rank 18 on ensemble 0 owns 14547 elements and can access 2992 vertices
+  rank 24 on ensemble 0 owns 14547 elements and can access 3061 vertices
+  rank 27 on ensemble 0 owns 14547 elements and can access 3116 vertices
+  rank 4 on ensemble 0 owns 14547 elements and can access 3010 vertices
+  rank 5 on ensemble 0 owns 14547 elements and can access 3069 vertices
+  rank 7 on ensemble 0 owns 14547 elements and can access 3073 vertices
+  rank 19 on ensemble 0 owns 14547 elements and can access 3139 vertices
+  rank 22 on ensemble 0 owns 14547 elements and can access 3063 vertices
+  rank 23 on ensemble 0 owns 14547 elements and can access 3082 vertices
+  rank 26 on ensemble 0 owns 14546 elements and can access 3051 vertices
+  rank 11 on ensemble 0 owns 14547 elements and can access 3074 vertices
+  rank 14 on ensemble 0 owns 14547 elements and can access 3091 vertices
+  rank 15 on ensemble 0 owns 14547 elements and can access 3059 vertices
+  rank 16 on ensemble 0 owns 14547 elements and can access 3030 vertices
+  rank 20 on ensemble 0 owns 14546 elements and can access 3016 vertices
+  rank 21 on ensemble 0 owns 14547 elements and can access 3014 vertices
+INFO: Distributing 1 shot(s) across 30 core(s). Each shot is using 30 cores
+  rank 0 on ensemble 0 owns 14547 elements and can access 3023 vertices
+  rank 3 on ensemble 0 owns 14547 elements and can access 3088 vertices
+  rank 25 on ensemble 0 owns 14547 elements and can access 3070 vertices
+  rank 29 on ensemble 0 owns 14547 elements and can access 3035 vertices
+  rank 28 on ensemble 0 owns 14547 elements and can access 3093 vertices
+  rank 8 on ensemble 0 owns 14547 elements and can access 3065 vertices
+INFO: converting from m/s to km/s
+Simulation time is:    0.07425 seconds
+Simulation time is:     0.1492 seconds
+Simulation time is:     0.2243 seconds
+Simulation time is:     0.2993 seconds
+Simulation time is:     0.3743 seconds
+Simulation time is:     0.4492 seconds
+Simulation time is:     0.5242 seconds
+Simulation time is:     0.5993 seconds
+Simulation time is:     0.6743 seconds
+Simulation time is:     0.7492 seconds
+Simulation time is:     0.8243 seconds
+Simulation time is:     0.8992 seconds
+Simulation time is:     0.9743 seconds
+Simulation time is:      1.049 seconds
+Simulation time is:      1.124 seconds
+Simulation time is:      1.199 seconds
+Simulation time is:      1.274 seconds
+Simulation time is:      1.349 seconds
+Simulation time is:      1.424 seconds
+Simulation time is:      1.499 seconds
+Simulation time is:      1.574 seconds
+Simulation time is:      1.649 seconds
+Simulation time is:      1.724 seconds
+Simulation time is:      1.799 seconds
+Simulation time is:      1.874 seconds
+Simulation time is:      1.949 seconds
+Simulation time is:      2.024 seconds
+Simulation time is:      2.099 seconds
+Simulation time is:      2.174 seconds
+Simulation time is:      2.249 seconds
+Simulation time is:      2.324 seconds
+Simulation time is:      2.399 seconds
+Simulation time is:      2.474 seconds
+Simulation time is:      2.549 seconds
+Simulation time is:      2.624 seconds
+Simulation time is:      2.699 seconds
+Simulation time is:      2.774 seconds
+Simulation time is:      2.849 seconds
+Simulation time is:      2.924 seconds
+Simulation time is:      2.999 seconds
+Simulation time is:      3.074 seconds
+Simulation time is:      3.149 seconds
+Simulation time is:      3.224 seconds
+Simulation time is:      3.299 seconds
+Simulation time is:      3.374 seconds
+Simulation time is:      3.449 seconds
+Simulation time is:      3.524 seconds
+Simulation time is:      3.599 seconds
+Simulation time is:      3.674 seconds
+Simulation time is:      3.749 seconds
+Simulation time is:      3.824 seconds
+Simulation time is:      3.899 seconds
+Simulation time is:      3.974 seconds
+Spatial parallelism, reducing to comm 0
+942.1797490119934
+942.1804070472717
+942.1806108951569
+942.1808471679688
+942.1811950206757
+942.1811935901642
+942.1812212467194
+942.1812226772308
+942.1870532035828
+942.1872990131378
+942.1875531673431
+942.1877045631409
+942.1881368160248
+942.1881659030914
+942.1921417713165
+942.1929774284363
+942.1949007511139
+942.1953690052032
+942.1954226493835
+942.1956179141998
+942.1965281963348
+942.1968400478363
+942.1969878673553
+942.1972460746765
+942.1973221302032
+942.1976270675659
+942.2051918506622
+942.205283164978
+942.2063167095184
+942.2069041728973
+  rank 1 on ensemble 0 owns 21820 elements and can access 4450 vertices
+  rank 2 on ensemble 0 owns 21820 elements and can access 4413 vertices
+  rank 3 on ensemble 0 owns 21821 elements and can access 4466 vertices
+  rank 10 on ensemble 0 owns 21820 elements and can access 4403 vertices
+  rank 12 on ensemble 0 owns 21820 elements and can access 4465 vertices
+  rank 14 on ensemble 0 owns 21820 elements and can access 4455 vertices
+INFO: Distributing 1 shot(s) across 20 core(s). Each shot is using 20 cores
+  rank 0 on ensemble 0 owns 21821 elements and can access 4450 vertices
+  rank 5 on ensemble 0 owns 21820 elements and can access 4462 vertices
+  rank 7 on ensemble 0 owns 21820 elements and can access 4451 vertices
+  rank 11 on ensemble 0 owns 21821 elements and can access 4438 vertices
+  rank 15 on ensemble 0 owns 21821 elements and can access 4620 vertices
+  rank 16 on ensemble 0 owns 21820 elements and can access 4438 vertices
+  rank 18 on ensemble 0 owns 21820 elements and can access 4551 vertices
+  rank 13 on ensemble 0 owns 21820 elements and can access 4396 vertices
+  rank 17 on ensemble 0 owns 21820 elements and can access 4491 vertices
+  rank 8 on ensemble 0 owns 21820 elements and can access 4391 vertices
+  rank 6 on ensemble 0 owns 21821 elements and can access 4436 vertices
+  rank 9 on ensemble 0 owns 21820 elements and can access 4442 vertices
+  rank 4 on ensemble 0 owns 21820 elements and can access 4532 vertices
+  rank 19 on ensemble 0 owns 21820 elements and can access 4454 vertices
+INFO: converting from m/s to km/s
+Simulation time is:    0.07425 seconds
+Simulation time is:     0.1492 seconds
+Simulation time is:     0.2243 seconds
+Simulation time is:     0.2993 seconds
+Simulation time is:     0.3743 seconds
+Simulation time is:     0.4492 seconds
+Simulation time is:     0.5242 seconds
+Simulation time is:     0.5993 seconds
+Simulation time is:     0.6743 seconds
+Simulation time is:     0.7492 seconds
+Simulation time is:     0.8243 seconds
+Simulation time is:     0.8992 seconds
+Simulation time is:     0.9743 seconds
+Simulation time is:      1.049 seconds
+Simulation time is:      1.124 seconds
+Simulation time is:      1.199 seconds
+Simulation time is:      1.274 seconds
+Simulation time is:      1.349 seconds
+Simulation time is:      1.424 seconds
+Simulation time is:      1.499 seconds
+Simulation time is:      1.574 seconds
+Simulation time is:      1.649 seconds
+Simulation time is:      1.724 seconds
+Simulation time is:      1.799 seconds
+Simulation time is:      1.874 seconds
+Simulation time is:      1.949 seconds

@@ -38,7 +38,7 @@ for file in $folder/*; do
     if [ -f "$file" ]; then
 
         # Run the Python script on the file
-        python your_python_script.py "$file"
+        python get_test_data.py "$file"
 
     fi
 
