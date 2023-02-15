@@ -586,3 +586,19 @@ Simulation time is:      3.149 seconds
 Simulation time is:      3.224 seconds
 Simulation time is:      3.299 seconds
 Simulation time is:      3.374 seconds
+Simulation time is:      3.449 seconds
+Simulation time is:      3.524 seconds
+Simulation time is:      3.599 seconds
+Simulation time is:      3.674 seconds
+Simulation time is:      3.749 seconds
+Simulation time is:      3.824 seconds
+Simulation time is:      3.899 seconds
+Simulation time is:      3.974 seconds
+Spatial parallelism, reducing to comm 0
+6678.223926067352
+6678.231187105179
+6678.231198310852
+6678.242749452591
+6678.2429938316345
+
+## Job finished on 15-02-2023 as 09:44:34 ###################
