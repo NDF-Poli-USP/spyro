@@ -48,16 +48,15 @@ wp = solver_ad.wave_propagate
 def runfwi(solver_type, tot_source_num, comm, xi, sn=0):
     solver_ad.source_num = sn
     aut_dif = model["aut_dif"]["status"]
+    if aut_dif:
+        import firedrake_adjoint as fire_adj
     
     local_mesh_index = mesh.coordinates.node_set.halo.local_to_global_numbering
-    
     vp_guess = spyro.utils.scatter_data_function(xi, V, comm, local_mesh_index, name="vp_guess")
     if comm.ensemble_comm.rank == 0:
         control_file.write(vp_guess)
         # fire.File("guess_br_ad.pvd", comm=comm.comm).write(vp_guess)
-        
-    if aut_dif:
-        import firedrake_adjoint as fire_adj
+    
     print('######## Running the guess model ########')
     
     if aut_dif:
@@ -67,9 +66,8 @@ def runfwi(solver_type, tot_source_num, comm, xi, sn=0):
                 output=True
                 )
         Jm = out[0]
-        tape = fire_adj.get_working_tape()
-        tape.visualise(output="visualise.dot")
-        quit()
+        # quit()
+        
         control = fire_adj.Control(vp_guess)
         # J_hat = fire_adj.ReducedFunctional(Jm, control)
         # fire_adj.minimize(J_hat, options={'disp': True, "maxiter": 5})
@@ -77,10 +75,7 @@ def runfwi(solver_type, tot_source_num, comm, xi, sn=0):
         comp_grad = fire_adj.compute_gradient
         
         dJ = comp_grad(Jm, control, "riesz_representation" == "L2")
-        
-        
         fire_adj.get_working_tape().clear_tape()
-
 
     else:
         out = wp(

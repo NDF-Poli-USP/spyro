@@ -244,7 +244,7 @@ class solver_ad():
                 if output:
                     outfile.write(u_n, time=time, name="Pressure")
                     helpers.display_progress(comm, time)
-        
+        fire.File("u.pvd").write(X)
         out = []
         if save_p:
             out.append(usol)

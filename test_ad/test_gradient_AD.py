@@ -37,7 +37,7 @@ def test_gradient_AD():
         fire.File("exact_vel.pvd").write(vp_exact)
         fire.File("exact_guess.pvd").write(vp_guess)
       
-    grad_ad.gradient_test_acoustic_ad(
+    grad_ad.gradient_test_acoustic(
                                 model, mesh, 
                                 V, comm, vp_exact, 
                                 vp_guess

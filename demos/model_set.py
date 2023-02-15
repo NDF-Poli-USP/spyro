@@ -55,7 +55,7 @@ def model_settings(vel_model):
 
     # Specify a 250-m Absorbing Boundary Layer (ABL) on the three sides of the domain to damp outgoing waves.
     model["BCs"] = {
-        "status": True,  # True or False, used to turn on any type of BC
+        "status": False,  # True or False, used to turn on any type of BC
         "method": "Damping", # either PML or Damping, used to turn on any type of BC
         "outer_bc": "non-reflective", #  none or non-reflective (outer boundary condition)
         "damping_type": "polynomial",  # polynomial, hyperbolic, shifted_hyperbolic
@@ -96,8 +96,8 @@ def model_settings(vel_model):
 
     model["timeaxis"] = {
         "t0": 0.0,  # Initial time for event
-        "tf": 0.001,  # Final time for event (for test 7)
-        "dt": 0.003,  # timestep size (divided by 2 in the test 4. dt for test 3 is 0.00050)
+        "tf": 1.0,  # Final time for event (for test 7)
+        "dt": 0.001,  # timestep size (divided by 2 in the test 4. dt for test 3 is 0.00050)
         "amplitude": 1,  # the Ricker has an amplitude of 1.
         "nspool":  200,  # (20 for dt=0.00050) how frequently to output solution to pvds
         "fspool": 1,  # how frequently to save solution to RAM

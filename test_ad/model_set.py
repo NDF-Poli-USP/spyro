@@ -33,10 +33,10 @@ def model_settings(vel_model):
     if vel_model == "marmousi":
         model["mesh"] = {
             "Lz": 3.5,  # depth in km - always positive
-            "Lx": 17.,  # width in km - always positive
+            "Lx": 10.,  # width in km - always positive
             "Ly": 0.0,  # thickness in km - always positive
             "meshfile": "meshes/mm.msh",
-            #     "initmodel": initmodel + ".hdf5",
+            "initmodel": "velocity_models/mm_guess.hdf5",
             "truemodel": "velocity_models/mm.hdf5",
         }
     if vel_model == "br_model":
@@ -45,33 +45,33 @@ def model_settings(vel_model):
             "Lx": 17.312,  # width in km - always positive
             "Ly": 0.0,  # thickness in km - always positive
             "meshfile": "meshes/gm.msh",
-            #     "initmodel": initmodel + ".hdf5",
+                "initmodel": initmodel + ".hdf5",
             "truemodel": "velocity_models/gm_2020.hdf5",
         }
           
     # Specify a 250-m Absorbing Boundary Layer (ABL) on the three sides of the domain to damp outgoing waves.
     model["BCs"] = {
-        "status": True,  # True or False, used to turn on any type of BC
-        "method": "PML",  # either PML or Damping, used to turn on any type of BC
-        "outer_bc": "non-reflective",  # none or non-reflective (outer boundary condition)
+        "status": False,  # True or False, used to turn on any type of BC
+        "method": "Damping", # either PML or Damping, used to turn on any type of BC
+        "outer_bc": "none", #  none or non-reflective (outer boundary condition)
         "damping_type": "polynomial",  # polynomial, hyperbolic, shifted_hyperbolic
         "exponent": 2,  # damping layer has a exponent variation
         "cmax": 1.5,  # maximum acoustic wave velocity in PML - km/s
         "R": 1e-6,  # theoretical reflection coefficient
-        "lz": 0.7,  # thickness of the PML in the z-direction (km) - always positive
-        "lx": 0.7,  # thickness of the PML in the x-direction (km) - always positive
+        "lz": 1.0,  # thickness of the PML in the z-direction (km) - always positive
+        "lx": 1.0,  # thickness of the PML in the x-direction (km) - always positive
         "ly": 0.0,  # thickness of the PML in the y-direction (km) - always positive
     }
     if vel_model == "horizont_layers":
         model["acquisition"] = {
             "source_type": "Ricker",
             "num_sources": 1,
-            "source_pos": [(0.2, 0.5)],
+            "source_pos": [(1.0, 0.5)],
             "frequency": 10.0,
             "delay": 1.0,
             "num_receivers": 10,
             "receiver_locations": spyro.create_transect(
-                (0.25, 0.2), (0.25, 0.8), 10
+                (0.5, 0.2), (0.5, 0.8), 10
             ),
         }
     if vel_model == "marmousi" or vel_model == "br_model":
@@ -81,10 +81,10 @@ def model_settings(vel_model):
             "delay": 1.0,
             # "num_sources": 1,
             "num_sources": 1,
-            "source_pos": [(-0.125, 8.5)],
+            "source_pos": [(-0.125, 5.0)],
             "amplitude": 1.0,
-            "num_receivers": 800,
-            "receiver_locations": spyro.create_transect((-0.225, 0.2), (-0.225, 16.8), 800),
+            "num_receivers": 400,
+            "receiver_locations": spyro.create_transect((-0.225, 0.2), (-0.225, 9.8), 400),
             }
     
     model["aut_dif"] = {
@@ -136,6 +136,5 @@ def _make_vp_pml(V, mesh, v0=1.5, v1=3.5):
     z, x = fire.SpatialCoordinate(mesh)
     velocity = fire.conditional(z < 0.5, v0, v1)
     vp = fire.Function(V, name="vp").interpolate(velocity)
-    fire.File("exact_vel.pvd").write(vp)
-
+    
     return vp
