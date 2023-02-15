@@ -32,7 +32,7 @@ echo -e "\n## Diretorio de submissao do job:   $SLURM_SUBMIT_DIR \n"
 folder="amd_strong_scalling"
 
 # Loop over every file in the folder
-for file in $folder/*; do
+for file in $folder/*.out; do
 
     # Check if the file is a regular file (not a directory)
     if [ -f "$file" ]; then
