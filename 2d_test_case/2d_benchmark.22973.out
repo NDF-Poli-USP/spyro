@@ -1,0 +1,23 @@
+
+## Job started at 01-02-2023 as 10:29:57 #####################
+
+
+## Jobs activated by olender: 
+
+             JOBID PARTITION     NAME     USER ST       TIME  NODES NODELIST(REASON)
+             22973 intel_lar 2d_test_  olender  R       0:03      1 n02
+
+## Execution node:         n02 
+
+
+## Number of tasks per job: 40 
+
+
+## Diretorio de submissao do job:   /home/olender/cse23/spyro 
+
+  rank 0 on ensemble 2 owns 11321 elements and can access 5883 vertices
+  rank 0 on ensemble 4 owns 11321 elements and can access 5883 vertices
+  rank 0 on ensemble 1 owns 11321 elements and can access 5883 vertices
+  rank 0 on ensemble 3 owns 11321 elements and can access 5883 vertices
+INFO: Distributing 5 shot(s) across 5 core(s). Each shot is using 1 cores
+  rank 0 on ensemble 0 owns 11321 elements and can access 5883 vertices

@@ -1,0 +1,372 @@
+
+## Job started at 13-02-2023 as 15:45:53 #####################
+
+
+## Jobs activated by olender: 
+
+             JOBID PARTITION     NAME     USER ST       TIME  NODES NODELIST(REASON)
+             23169 intel_lar 3d_test_  olender  R       0:01      3 n[06-08]
+
+## Execution node:         n06 
+
+
+## Number of tasks per job: 120 
+
+
+## Diretorio de submissao do job:   /home/olender/cse23/spyro 
+
+  rank 0 on ensemble 15 owns 72735 elements and can access 14073 vertices
+  rank 2 on ensemble 15 owns 72734 elements and can access 13919 vertices
+  rank 4 on ensemble 15 owns 72734 elements and can access 13940 vertices
+  rank 3 on ensemble 15 owns 72734 elements and can access 14250 vertices
+  rank 1 on ensemble 15 owns 72734 elements and can access 13877 vertices
+  rank 5 on ensemble 15 owns 72734 elements and can access 14023 vertices
+  rank 2 on ensemble 18 owns 72734 elements and can access 13919 vertices
+  rank 3 on ensemble 18 owns 72734 elements and can access 14250 vertices
+  rank 0 on ensemble 18 owns 72735 elements and can access 14073 vertices
+  rank 4 on ensemble 18 owns 72734 elements and can access 13940 vertices
+  rank 1 on ensemble 18 owns 72734 elements and can access 13877 vertices
+  rank 5 on ensemble 18 owns 72734 elements and can access 14023 vertices
+  rank 5 on ensemble 7 owns 72734 elements and can access 14023 vertices
+  rank 0 on ensemble 7 owns 72735 elements and can access 14073 vertices
+  rank 1 on ensemble 7 owns 72734 elements and can access 13877 vertices
+  rank 2 on ensemble 7 owns 72734 elements and can access 13919 vertices
+  rank 3 on ensemble 7 owns 72734 elements and can access 14250 vertices
+  rank 4 on ensemble 7 owns 72734 elements and can access 13940 vertices
+  rank 1 on ensemble 4 owns 72734 elements and can access 13877 vertices
+  rank 2 on ensemble 4 owns 72734 elements and can access 13919 vertices
+  rank 0 on ensemble 4 owns 72735 elements and can access 14073 vertices
+  rank 3 on ensemble 4 owns 72734 elements and can access 14250 vertices
+  rank 4 on ensemble 4 owns 72734 elements and can access 13940 vertices
+  rank 5 on ensemble 4 owns 72734 elements and can access 14023 vertices
+  rank 1 on ensemble 9 owns 72734 elements and can access 13877 vertices
+  rank 2 on ensemble 9 owns 72734 elements and can access 13919 vertices
+  rank 5 on ensemble 9 owns 72734 elements and can access 14023 vertices
+  rank 3 on ensemble 9 owns 72734 elements and can access 14250 vertices
+  rank 0 on ensemble 9 owns 72735 elements and can access 14073 vertices
+  rank 4 on ensemble 9 owns 72734 elements and can access 13940 vertices
+  rank 0 on ensemble 8 owns 72735 elements and can access 14073 vertices
+  rank 1 on ensemble 8 owns 72734 elements and can access 13877 vertices
+  rank 4 on ensemble 8 owns 72734 elements and can access 13940 vertices
+  rank 2 on ensemble 8 owns 72734 elements and can access 13919 vertices
+  rank 3 on ensemble 8 owns 72734 elements and can access 14250 vertices
+  rank 5 on ensemble 8 owns 72734 elements and can access 14023 vertices
+  rank 1 on ensemble 10 owns 72734 elements and can access 13877 vertices
+  rank 4 on ensemble 10 owns 72734 elements and can access 13940 vertices
+  rank 5 on ensemble 10 owns 72734 elements and can access 14023 vertices
+  rank 2 on ensemble 10 owns 72734 elements and can access 13919 vertices
+  rank 0 on ensemble 10 owns 72735 elements and can access 14073 vertices
+  rank 3 on ensemble 10 owns 72734 elements and can access 14250 vertices
+  rank 0 on ensemble 14 owns 72735 elements and can access 14073 vertices
+  rank 1 on ensemble 14 owns 72734 elements and can access 13877 vertices
+  rank 2 on ensemble 14 owns 72734 elements and can access 13919 vertices
+  rank 3 on ensemble 14 owns 72734 elements and can access 14250 vertices
+  rank 5 on ensemble 14 owns 72734 elements and can access 14023 vertices
+  rank 4 on ensemble 14 owns 72734 elements and can access 13940 vertices
+  rank 2 on ensemble 16 owns 72734 elements and can access 13919 vertices
+  rank 0 on ensemble 16 owns 72735 elements and can access 14073 vertices
+  rank 3 on ensemble 16 owns 72734 elements and can access 14250 vertices
+  rank 1 on ensemble 16 owns 72734 elements and can access 13877 vertices
+  rank 5 on ensemble 16 owns 72734 elements and can access 14023 vertices
+  rank 4 on ensemble 16 owns 72734 elements and can access 13940 vertices
+  rank 3 on ensemble 5 owns 72734 elements and can access 14250 vertices
+  rank 0 on ensemble 5 owns 72735 elements and can access 14073 vertices
+  rank 2 on ensemble 5 owns 72734 elements and can access 13919 vertices
+  rank 1 on ensemble 5 owns 72734 elements and can access 13877 vertices
+  rank 5 on ensemble 5 owns 72734 elements and can access 14023 vertices
+  rank 4 on ensemble 5 owns 72734 elements and can access 13940 vertices
+  rank 2 on ensemble 1 owns 72734 elements and can access 13919 vertices
+  rank 1 on ensemble 1 owns 72734 elements and can access 13877 vertices
+  rank 3 on ensemble 1 owns 72734 elements and can access 14250 vertices
+  rank 4 on ensemble 1 owns 72734 elements and can access 13940 vertices
+  rank 0 on ensemble 1 owns 72735 elements and can access 14073 vertices
+  rank 5 on ensemble 1 owns 72734 elements and can access 14023 vertices
+  rank 5 on ensemble 11 owns 72734 elements and can access 14023 vertices
+  rank 4 on ensemble 11 owns 72734 elements and can access 13940 vertices
+  rank 1 on ensemble 11 owns 72734 elements and can access 13877 vertices
+  rank 0 on ensemble 11 owns 72735 elements and can access 14073 vertices
+  rank 3 on ensemble 11 owns 72734 elements and can access 14250 vertices
+  rank 2 on ensemble 11 owns 72734 elements and can access 13919 vertices
+  rank 1 on ensemble 12 owns 72734 elements and can access 13877 vertices
+  rank 2 on ensemble 12 owns 72734 elements and can access 13919 vertices
+  rank 0 on ensemble 12 owns 72735 elements and can access 14073 vertices
+  rank 3 on ensemble 12 owns 72734 elements and can access 14250 vertices
+  rank 5 on ensemble 12 owns 72734 elements and can access 14023 vertices
+  rank 4 on ensemble 12 owns 72734 elements and can access 13940 vertices
+  rank 4 on ensemble 6 owns 72734 elements and can access 13940 vertices
+  rank 5 on ensemble 6 owns 72734 elements and can access 14023 vertices
+  rank 1 on ensemble 6 owns 72734 elements and can access 13877 vertices
+  rank 0 on ensemble 6 owns 72735 elements and can access 14073 vertices
+  rank 3 on ensemble 6 owns 72734 elements and can access 14250 vertices
+  rank 2 on ensemble 6 owns 72734 elements and can access 13919 vertices
+  rank 2 on ensemble 0 owns 72734 elements and can access 13919 vertices
+  rank 1 on ensemble 0 owns 72734 elements and can access 13877 vertices
+  rank 4 on ensemble 0 owns 72734 elements and can access 13940 vertices
+  rank 3 on ensemble 0 owns 72734 elements and can access 14250 vertices
+  rank 5 on ensemble 0 owns 72734 elements and can access 14023 vertices
+INFO: Distributing 20 shot(s) across 120 core(s). Each shot is using 6 cores
+  rank 0 on ensemble 0 owns 72735 elements and can access 14073 vertices
+  rank 0 on ensemble 13 owns 72735 elements and can access 14073 vertices
+  rank 4 on ensemble 13 owns 72734 elements and can access 13940 vertices
+  rank 1 on ensemble 13 owns 72734 elements and can access 13877 vertices
+  rank 5 on ensemble 13 owns 72734 elements and can access 14023 vertices
+  rank 2 on ensemble 13 owns 72734 elements and can access 13919 vertices
+  rank 3 on ensemble 13 owns 72734 elements and can access 14250 vertices
+  rank 2 on ensemble 3 owns 72734 elements and can access 13919 vertices
+  rank 4 on ensemble 3 owns 72734 elements and can access 13940 vertices
+  rank 0 on ensemble 3 owns 72735 elements and can access 14073 vertices
+  rank 1 on ensemble 3 owns 72734 elements and can access 13877 vertices
+  rank 5 on ensemble 3 owns 72734 elements and can access 14023 vertices
+  rank 3 on ensemble 3 owns 72734 elements and can access 14250 vertices
+  rank 2 on ensemble 2 owns 72734 elements and can access 13919 vertices
+  rank 1 on ensemble 2 owns 72734 elements and can access 13877 vertices
+  rank 3 on ensemble 2 owns 72734 elements and can access 14250 vertices
+  rank 5 on ensemble 2 owns 72734 elements and can access 14023 vertices
+  rank 0 on ensemble 2 owns 72735 elements and can access 14073 vertices
+  rank 4 on ensemble 2 owns 72734 elements and can access 13940 vertices
+  rank 0 on ensemble 19 owns 72735 elements and can access 14073 vertices
+  rank 2 on ensemble 19 owns 72734 elements and can access 13919 vertices
+  rank 5 on ensemble 19 owns 72734 elements and can access 14023 vertices
+  rank 3 on ensemble 19 owns 72734 elements and can access 14250 vertices
+  rank 1 on ensemble 19 owns 72734 elements and can access 13877 vertices
+  rank 4 on ensemble 19 owns 72734 elements and can access 13940 vertices
+  rank 0 on ensemble 17 owns 72735 elements and can access 14073 vertices
+  rank 2 on ensemble 17 owns 72734 elements and can access 13919 vertices
+  rank 4 on ensemble 17 owns 72734 elements and can access 13940 vertices
+  rank 1 on ensemble 17 owns 72734 elements and can access 13877 vertices
+  rank 3 on ensemble 17 owns 72734 elements and can access 14250 vertices
+  rank 5 on ensemble 17 owns 72734 elements and can access 14023 vertices
+The mesh has 5538429 degrees of freedom
+The mesh has 5538429 degrees of freedom
+The mesh has 5538429 degrees of freedom
+The mesh has 5538429 degrees of freedom
+The mesh has 5538429 degrees of freedom
+The mesh has 5538429 degrees of freedom
+The mesh has 5538429 degrees of freedom
+The mesh has 5538429 degrees of freedom
+The mesh has 5538429 degrees of freedom
+The mesh has 5538429 degrees of freedom
+The mesh has 5538429 degrees of freedom
+The mesh has 5538429 degrees of freedom
+The mesh has 5538429 degrees of freedom
+The mesh has 5538429 degrees of freedom
+The mesh has 5538429 degrees of freedom
+The mesh has 5538429 degrees of freedom
+The mesh has 5538429 degrees of freedom
+The mesh has 5538429 degrees of freedom
+The mesh has 5538429 degrees of freedom
+The mesh has 5538429 degrees of freedom
+The mesh has 5538429 degrees of freedom
+The mesh has 5538429 degrees of freedom
+The mesh has 5538429 degrees of freedom
+The mesh has 5538429 degrees of freedom
+The mesh has 5538429 degrees of freedom
+The mesh has 5538429 degrees of freedom
+The mesh has 5538429 degrees of freedom
+The mesh has 5538429 degrees of freedom
+The mesh has 5538429 degrees of freedom
+The mesh has 5538429 degrees of freedom
+The mesh has 5538429 degrees of freedom
+The mesh has 5538429 degrees of freedom
+The mesh has 5538429 degrees of freedom
+The mesh has 5538429 degrees of freedom
+The mesh has 5538429 degrees of freedom
+The mesh has 5538429 degrees of freedom
+The mesh has 5538429 degrees of freedom
+The mesh has 5538429 degrees of freedom
+The mesh has 5538429 degrees of freedom
+The mesh has 5538429 degrees of freedom
+The mesh has 5538429 degrees of freedom
+The mesh has 5538429 degrees of freedom
+The mesh has 5538429 degrees of freedom
+The mesh has 5538429 degrees of freedom
+The mesh has 5538429 degrees of freedom
+The mesh has 5538429 degrees of freedom
+The mesh has 5538429 degrees of freedom
+The mesh has 5538429 degrees of freedom
+The mesh has 5538429 degrees of freedom
+The mesh has 5538429 degrees of freedom
+The mesh has 5538429 degrees of freedom
+The mesh has 5538429 degrees of freedom
+The mesh has 5538429 degrees of freedom
+The mesh has 5538429 degrees of freedom
+The mesh has 5538429 degrees of freedom
+The mesh has 5538429 degrees of freedom
+The mesh has 5538429 degrees of freedom
+The mesh has 5538429 degrees of freedom
+The mesh has 5538429 degrees of freedom
+The mesh has 5538429 degrees of freedom
+The mesh has 5538429 degrees of freedom
+The mesh has 5538429 degrees of freedom
+The mesh has 5538429 degrees of freedom
+The mesh has 5538429 degrees of freedom
+The mesh has 5538429 degrees of freedom
+The mesh has 5538429 degrees of freedom
+The mesh has 5538429 degrees of freedom
+The mesh has 5538429 degrees of freedom
+The mesh has 5538429 degrees of freedom
+The mesh has 5538429 degrees of freedom
+The mesh has 5538429 degrees of freedom
+The mesh has 5538429 degrees of freedom
+The mesh has 5538429 degrees of freedom
+The mesh has 5538429 degrees of freedom
+The mesh has 5538429 degrees of freedom
+The mesh has 5538429 degrees of freedom
+The mesh has 5538429 degrees of freedom
+The mesh has 5538429 degrees of freedom
+The mesh has 5538429 degrees of freedom
+The mesh has 5538429 degrees of freedom
+The mesh has 5538429 degrees of freedom
+The mesh has 5538429 degrees of freedom
+The mesh has 5538429 degrees of freedom
+The mesh has 5538429 degrees of freedom
+The mesh has 5538429 degrees of freedom
+The mesh has 5538429 degrees of freedom
+The mesh has 5538429 degrees of freedom
+The mesh has 5538429 degrees of freedom
+The mesh has 5538429 degrees of freedom
+The mesh has 5538429 degrees of freedom
+The mesh has 5538429 degrees of freedom
+The mesh has 5538429 degrees of freedom
+The mesh has 5538429 degrees of freedom
+The mesh has 5538429 degrees of freedom
+The mesh has 5538429 degrees of freedom
+The mesh has 5538429 degrees of freedom
+The mesh has 5538429 degrees of freedom
+The mesh has 5538429 degrees of freedom
+The mesh has 5538429 degrees of freedom
+The mesh has 5538429 degrees of freedom
+The mesh has 5538429 degrees of freedom
+The mesh has 5538429 degrees of freedom
+The mesh has 5538429 degrees of freedom
+The mesh has 5538429 degrees of freedom
+The mesh has 5538429 degrees of freedom
+The mesh has 5538429 degrees of freedom
+The mesh has 5538429 degrees of freedom
+The mesh has 5538429 degrees of freedom
+The mesh has 5538429 degrees of freedom
+The mesh has 5538429 degrees of freedom
+The mesh has 5538429 degrees of freedom
+The mesh has 5538429 degrees of freedom
+The mesh has 5538429 degrees of freedom
+The mesh has 5538429 degrees of freedom
+The mesh has 5538429 degrees of freedom
+The mesh has 5538429 degrees of freedom
+The mesh has 5538429 degrees of freedom
+The mesh has 5538429 degrees of freedom
+The mesh has 5538429 degrees of freedom
+The mesh has 5538429 degrees of freedom
+INFO: converting from m/s to km/s
+Simulation time is:    0.03675 seconds
+Simulation time is:    0.07425 seconds
+Simulation time is:     0.1118 seconds
+Simulation time is:     0.1492 seconds
+Simulation time is:     0.1867 seconds
+Simulation time is:     0.2243 seconds
+Simulation time is:     0.2617 seconds
+Simulation time is:     0.2993 seconds
+Simulation time is:     0.3367 seconds
+Simulation time is:     0.3743 seconds
+Simulation time is:     0.4118 seconds
+Simulation time is:     0.4492 seconds
+Simulation time is:     0.4868 seconds
+Simulation time is:     0.5242 seconds
+Simulation time is:     0.5617 seconds
+Simulation time is:     0.5993 seconds
+Simulation time is:     0.6368 seconds
+Simulation time is:     0.6743 seconds
+Simulation time is:     0.7117 seconds
+Simulation time is:     0.7492 seconds
+Simulation time is:     0.7868 seconds
+Simulation time is:     0.8243 seconds
+Simulation time is:     0.8618 seconds
+Simulation time is:     0.8992 seconds
+Simulation time is:     0.9367 seconds
+Simulation time is:     0.9743 seconds
+Simulation time is:      1.012 seconds
+Simulation time is:      1.049 seconds
+Simulation time is:      1.087 seconds
+Simulation time is:      1.124 seconds
+Simulation time is:      1.162 seconds
+Simulation time is:      1.199 seconds
+Simulation time is:      1.237 seconds
+Simulation time is:      1.274 seconds
+Simulation time is:      1.312 seconds
+Simulation time is:      1.349 seconds
+Simulation time is:      1.387 seconds
+Simulation time is:      1.424 seconds
+Simulation time is:      1.462 seconds
+Simulation time is:      1.499 seconds
+Simulation time is:      1.537 seconds
+Simulation time is:      1.574 seconds
+Simulation time is:      1.612 seconds
+Simulation time is:      1.649 seconds
+Simulation time is:      1.687 seconds
+Simulation time is:      1.724 seconds
+Simulation time is:      1.762 seconds
+Simulation time is:      1.799 seconds
+Simulation time is:      1.837 seconds
+Simulation time is:      1.874 seconds
+Simulation time is:      1.912 seconds
+Simulation time is:      1.949 seconds
+Simulation time is:      1.987 seconds
+Simulation time is:      2.024 seconds
+Simulation time is:      2.062 seconds
+Simulation time is:      2.099 seconds
+Simulation time is:      2.137 seconds
+Simulation time is:      2.174 seconds
+Simulation time is:      2.212 seconds
+Simulation time is:      2.249 seconds
+Simulation time is:      2.287 seconds
+Simulation time is:      2.324 seconds
+Simulation time is:      2.362 seconds
+Simulation time is:      2.399 seconds
+Simulation time is:      2.437 seconds
+Simulation time is:      2.474 seconds
+Simulation time is:      2.512 seconds
+Simulation time is:      2.549 seconds
+Simulation time is:      2.587 seconds
+Simulation time is:      2.624 seconds
+Simulation time is:      2.662 seconds
+Simulation time is:      2.699 seconds
+Simulation time is:      2.737 seconds
+Simulation time is:      2.774 seconds
+Simulation time is:      2.812 seconds
+Simulation time is:      2.849 seconds
+Simulation time is:      2.887 seconds
+Simulation time is:      2.924 seconds
+Simulation time is:      2.962 seconds
+Simulation time is:      2.999 seconds
+Simulation time is:      3.037 seconds
+Simulation time is:      3.074 seconds
+Simulation time is:      3.112 seconds
+Simulation time is:      3.149 seconds
+Simulation time is:      3.187 seconds
+Simulation time is:      3.224 seconds
+Simulation time is:      3.262 seconds
+Simulation time is:      3.299 seconds
+Simulation time is:      3.337 seconds
+Simulation time is:      3.374 seconds
+Simulation time is:      3.412 seconds
+Simulation time is:      3.449 seconds
+Simulation time is:      3.487 seconds
+Simulation time is:      3.524 seconds
+Simulation time is:      3.562 seconds
+Simulation time is:      3.599 seconds
+Simulation time is:      3.637 seconds
+Simulation time is:      3.674 seconds
+Simulation time is:      3.712 seconds
+Simulation time is:      3.749 seconds
+Simulation time is:      3.787 seconds
+Simulation time is:      3.824 seconds
+Simulation time is:      3.862 seconds
+
+===================================================================================
+=   BAD TERMINATION OF ONE OF YOUR APPLICATION PROCESSES
+=   PID 91046 RUNNING AT n08
+=   EXIT CODE: 9
+=   CLEANING UP REMAINING PROCESSES
+=   YOU CAN IGNORE THE BELOW CLEANUP MESSAGES
+===================================================================================
+
+## Job finished on 13-02-2023 as 17:04:49 ###################

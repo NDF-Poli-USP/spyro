@@ -1,0 +1,73 @@
+
+## Job started at 01-02-2023 as 09:49:13 #####################
+
+
+## Jobs activated by olender: 
+
+             JOBID PARTITION     NAME     USER ST       TIME  NODES NODELIST(REASON)
+             22972 intel_lar 2d_test_  olender  R       0:01      1 n02
+
+## Execution node:         n02 
+
+
+## Number of tasks per job: 40 
+
+
+## Diretorio de submissao do job:   /home/olender/cse23/spyro 
+
+  rank 0 on ensemble 4 owns 11321 elements and can access 5883 vertices
+INFO: Distributing 5 shot(s) across 5 core(s). Each shot is using 1 cores
+  rank 0 on ensemble 0 owns 11321 elements and can access 5883 vertices
+  rank 0 on ensemble 2 owns 11321 elements and can access 5883 vertices
+  rank 0 on ensemble 3 owns 11321 elements and can access 5883 vertices
+  rank 0 on ensemble 1 owns 11321 elements and can access 5883 vertices
+  rank 0 on ensemble 3 owns 5660 elements and can access 2968 vertices
+  rank 1 on ensemble 3 owns 5661 elements and can access 2954 vertices
+INFO: Distributing 5 shot(s) across 10 core(s). Each shot is using 2 cores
+  rank 0 on ensemble 0 owns 5660 elements and can access 2968 vertices
+  rank 1 on ensemble 0 owns 5661 elements and can access 2954 vertices
+  rank 0 on ensemble 2 owns 5660 elements and can access 2968 vertices
+  rank 1 on ensemble 4 owns 5661 elements and can access 2954 vertices
+  rank 0 on ensemble 4 owns 5660 elements and can access 2968 vertices
+  rank 1 on ensemble 2 owns 5661 elements and can access 2954 vertices
+  rank 1 on ensemble 1 owns 5661 elements and can access 2954 vertices
+  rank 0 on ensemble 1 owns 5660 elements and can access 2968 vertices
+  rank 1 on ensemble 2 owns 3774 elements and can access 1988 vertices
+  rank 2 on ensemble 2 owns 3774 elements and can access 1991 vertices
+  rank 0 on ensemble 2 owns 3773 elements and can access 1981 vertices
+  rank 1 on ensemble 0 owns 3774 elements and can access 1988 vertices
+INFO: Distributing 5 shot(s) across 15 core(s). Each shot is using 3 cores
+  rank 0 on ensemble 0 owns 3773 elements and can access 1981 vertices
+  rank 2 on ensemble 0 owns 3774 elements and can access 1991 vertices
+  rank 1 on ensemble 1 owns 3774 elements and can access 1988 vertices
+  rank 2 on ensemble 1 owns 3774 elements and can access 1991 vertices
+  rank 0 on ensemble 1 owns 3773 elements and can access 1981 vertices
+  rank 2 on ensemble 4 owns 3774 elements and can access 1991 vertices
+  rank 0 on ensemble 4 owns 3773 elements and can access 1981 vertices
+  rank 0 on ensemble 3 owns 3773 elements and can access 1981 vertices
+  rank 1 on ensemble 3 owns 3774 elements and can access 1988 vertices
+  rank 1 on ensemble 4 owns 3774 elements and can access 1988 vertices
+  rank 2 on ensemble 3 owns 3774 elements and can access 1991 vertices
+  rank 0 on ensemble 2 owns 2830 elements and can access 1500 vertices
+  rank 1 on ensemble 2 owns 2830 elements and can access 1505 vertices
+  rank 3 on ensemble 2 owns 2831 elements and can access 1495 vertices
+  rank 2 on ensemble 2 owns 2830 elements and can access 1501 vertices
+  rank 0 on ensemble 1 owns 2830 elements and can access 1500 vertices
+  rank 1 on ensemble 1 owns 2830 elements and can access 1505 vertices
+  rank 2 on ensemble 1 owns 2830 elements and can access 1501 vertices
+  rank 3 on ensemble 1 owns 2831 elements and can access 1495 vertices
+  rank 0 on ensemble 3 owns 2830 elements and can access 1500 vertices
+  rank 2 on ensemble 3 owns 2830 elements and can access 1501 vertices
+  rank 1 on ensemble 0 owns 2830 elements and can access 1505 vertices
+  rank 2 on ensemble 0 owns 2830 elements and can access 1501 vertices
+INFO: Distributing 5 shot(s) across 20 core(s). Each shot is using 4 cores
+  rank 0 on ensemble 0 owns 2830 elements and can access 1500 vertices
+  rank 1 on ensemble 3 owns 2830 elements and can access 1505 vertices
+  rank 3 on ensemble 0 owns 2831 elements and can access 1495 vertices
+  rank 3 on ensemble 3 owns 2831 elements and can access 1495 vertices
+  rank 2 on ensemble 4 owns 2830 elements and can access 1501 vertices
+  rank 3 on ensemble 4 owns 2831 elements and can access 1495 vertices
+  rank 0 on ensemble 4 owns 2830 elements and can access 1500 vertices
+  rank 1 on ensemble 4 owns 2830 elements and can access 1505 vertices
+
+## Job finished on 01-02-2023 as 09:57:41 ###################

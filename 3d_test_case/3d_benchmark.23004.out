@@ -1,0 +1,61 @@
+
+## Job started at 03-02-2023 as 11:14:22 #####################
+
+
+## Jobs activated by olender: 
+
+             JOBID PARTITION     NAME     USER ST       TIME  NODES NODELIST(REASON)
+             23000 intel_lar 3d_test_  olender PD       0:00      1 (Resources)
+             23004 amd_large 3d_test_  olender  R       0:00      1 n14
+
+## Execution node:         n14 
+
+
+## Number of tasks per job: 40 
+
+
+## Diretorio de submissao do job:   /home/olender/cse23/spyro 
+
+  rank 1 on ensemble 0 owns 218202 elements and can access 40435 vertices
+INFO: Distributing 20 shot(s) across 40 core(s). Each shot is using 2 cores
+  rank 0 on ensemble 0 owns 218203 elements and can access 40274 vertices
+  rank 1 on ensemble 1 owns 218202 elements and can access 40435 vertices
+  rank 0 on ensemble 1 owns 218203 elements and can access 40274 vertices
+  rank 0 on ensemble 12 owns 218203 elements and can access 40274 vertices
+  rank 1 on ensemble 12 owns 218202 elements and can access 40435 vertices
+  rank 1 on ensemble 18 owns 218202 elements and can access 40435 vertices
+  rank 0 on ensemble 18 owns 218203 elements and can access 40274 vertices
+  rank 1 on ensemble 2 owns 218202 elements and can access 40435 vertices
+  rank 0 on ensemble 2 owns 218203 elements and can access 40274 vertices
+  rank 0 on ensemble 11 owns 218203 elements and can access 40274 vertices
+  rank 1 on ensemble 11 owns 218202 elements and can access 40435 vertices
+  rank 0 on ensemble 17 owns 218203 elements and can access 40274 vertices
+  rank 1 on ensemble 17 owns 218202 elements and can access 40435 vertices
+  rank 1 on ensemble 5 owns 218202 elements and can access 40435 vertices
+  rank 0 on ensemble 5 owns 218203 elements and can access 40274 vertices
+  rank 0 on ensemble 13 owns 218203 elements and can access 40274 vertices
+  rank 1 on ensemble 13 owns 218202 elements and can access 40435 vertices
+  rank 0 on ensemble 7 owns 218203 elements and can access 40274 vertices
+  rank 1 on ensemble 7 owns 218202 elements and can access 40435 vertices
+  rank 1 on ensemble 19 owns 218202 elements and can access 40435 vertices
+  rank 0 on ensemble 19 owns 218203 elements and can access 40274 vertices
+  rank 1 on ensemble 8 owns 218202 elements and can access 40435 vertices
+  rank 0 on ensemble 8 owns 218203 elements and can access 40274 vertices
+  rank 1 on ensemble 6 owns 218202 elements and can access 40435 vertices
+  rank 0 on ensemble 6 owns 218203 elements and can access 40274 vertices
+  rank 1 on ensemble 16 owns 218202 elements and can access 40435 vertices
+  rank 0 on ensemble 16 owns 218203 elements and can access 40274 vertices
+  rank 1 on ensemble 14 owns 218202 elements and can access 40435 vertices
+  rank 0 on ensemble 14 owns 218203 elements and can access 40274 vertices
+  rank 1 on ensemble 3 owns 218202 elements and can access 40435 vertices
+  rank 0 on ensemble 3 owns 218203 elements and can access 40274 vertices
+  rank 0 on ensemble 10 owns 218203 elements and can access 40274 vertices
+  rank 1 on ensemble 10 owns 218202 elements and can access 40435 vertices
+  rank 1 on ensemble 9 owns 218202 elements and can access 40435 vertices
+  rank 0 on ensemble 9 owns 218203 elements and can access 40274 vertices
+  rank 1 on ensemble 15 owns 218202 elements and can access 40435 vertices
+  rank 0 on ensemble 15 owns 218203 elements and can access 40274 vertices
+  rank 1 on ensemble 4 owns 218202 elements and can access 40435 vertices
+  rank 0 on ensemble 4 owns 218203 elements and can access 40274 vertices
+INFO: converting from m/s to km/s
+Simulation time is:    0.07425 seconds

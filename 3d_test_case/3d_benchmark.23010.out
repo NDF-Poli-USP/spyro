@@ -1,0 +1,43 @@
+
+## Job started at 03-02-2023 as 14:26:41 #####################
+
+
+## Jobs activated by olender: 
+
+             JOBID PARTITION     NAME     USER ST       TIME  NODES NODELIST(REASON)
+             23008 intel_lar 3d_test_  olender PD       0:00      1 (Resources)
+             23010 amd_large 3d_test_  olender  R       0:00      1 n14
+
+## Execution node:         n14 
+
+
+## Number of tasks per job: 40 
+
+
+## Diretorio de submissao do job:   /home/olender/cse23/spyro 
+
+  rank 0 on ensemble 4 owns 436405 elements and can access 79132 vertices
+  rank 0 on ensemble 1 owns 436405 elements and can access 79132 vertices
+  rank 0 on ensemble 3 owns 436405 elements and can access 79132 vertices
+  rank 0 on ensemble 2 owns 436405 elements and can access 79132 vertices
+INFO: Distributing 5 shot(s) across 5 core(s). Each shot is using 1 cores
+  rank 0 on ensemble 0 owns 436405 elements and can access 79132 vertices
+INFO: converting from m/s to km/s
+Simulation time is:    0.07425 seconds
+Simulation time is:     0.1492 seconds
+Simulation time is:     0.2243 seconds
+Simulation time is:     0.2993 seconds
+Simulation time is:     0.3743 seconds
+Simulation time is:     0.4492 seconds
+Simulation time is:     0.5242 seconds
+Simulation time is:     0.5993 seconds
+Simulation time is:     0.6743 seconds
+Simulation time is:     0.7492 seconds
+Simulation time is:     0.8243 seconds
+Simulation time is:     0.8992 seconds
+Simulation time is:     0.9743 seconds
+Simulation time is:      1.049 seconds
+Simulation time is:      1.124 seconds
+Simulation time is:      1.199 seconds
+Simulation time is:      1.274 seconds
+Simulation time is:      1.349 seconds

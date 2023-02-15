@@ -1,0 +1,31 @@
+Traceback (most recent call last):
+  File "strong_scalling_2d.py", line 66, in <module>
+    sources = spyro.Sources(model, mesh, V, comm)
+  File "/home/olender/cse23/spyro/spyro/sources/Sources.py", line 81, in __init__
+    self.quadrilateral = model["opts"]["quadrature"] == "GLL"
+KeyError: 'quadrature'
+application called MPI_Abort(MPI_COMM_WORLD, 1) - process 2
+Traceback (most recent call last):
+  File "strong_scalling_2d.py", line 66, in <module>
+    sources = spyro.Sources(model, mesh, V, comm)
+  File "/home/olender/cse23/spyro/spyro/sources/Sources.py", line 81, in __init__
+    self.quadrilateral = model["opts"]["quadrature"] == "GLL"
+KeyError: 'quadrature'
+application called MPI_Abort(MPI_COMM_WORLD, 1) - process 4
+Traceback (most recent call last):
+  File "strong_scalling_2d.py", line 66, in <module>
+    sources = spyro.Sources(model, mesh, V, comm)
+  File "/home/olender/cse23/spyro/spyro/sources/Sources.py", line 81, in __init__
+    self.quadrilateral = model["opts"]["quadrature"] == "GLL"
+KeyError: 'quadrature'
+application called MPI_Abort(MPI_COMM_WORLD, 1) - process 3
+Traceback (most recent call last):
+  File "strong_scalling_2d.py", line 66, in <module>
+    sources = spyro.Sources(model, mesh, V, comm)
+  File "/home/olender/cse23/spyro/spyro/sources/Sources.py", line 81, in __init__
+    self.quadrilateral = model["opts"]["quadrature"] == "GLL"
+KeyError: 'quadrature'
+application called MPI_Abort(MPI_COMM_WORLD, 1) - process 1
+srun: Job step aborted: Waiting up to 32 seconds for job step to finish.
+slurmstepd: error: *** STEP 22973.2 ON n02 CANCELLED AT 2023-02-01T10:37:56 ***
+slurmstepd: error: *** JOB 22973 ON n02 CANCELLED AT 2023-02-01T10:37:56 ***

@@ -1,0 +1,1080 @@
+Traceback (most recent call last):
+  File "/home/public/app/firedrake_gnu_042022/firedrake/src/firedrake/firedrake/interpolation.py", line 115, in interpolate
+    assembled_interpolator = self.frozen_assembled_interpolator
+AttributeError: 'Interpolator' object has no attribute 'frozen_assembled_interpolator'
+
+During handling of the above exception, another exception occurred:
+
+Traceback (most recent call last):
+  File "/home/public/app/firedrake_gnu_042022/firedrake/src/PyOP2/pyop2/global_kernel.py", line 288, in __call__
+    func = self._func_cache[key]
+KeyError: 47423739730768
+
+During handling of the above exception, another exception occurred:
+
+Traceback (most recent call last):
+  File "/home/public/app/firedrake_gnu_042022/firedrake/src/PyOP2/pyop2/compilation.py", line 368, in get_so
+    return ctypes.CDLL(soname)
+  File "/opt/spack/opt/spack/linux-centos7-x86_64/gcc-8.3.0/python-3.8.11-fq4lolmvzcgu5zm25rnbnzsdghdkc55v/lib/python3.8/ctypes/__init__.py", line 373, in __init__
+    self._handle = _dlopen(self._name, mode)
+OSError: /home/olender/tmp_amd7/95/e45c5a92565b02de20a4199ac9399d.so: cannot open shared object file: No such file or directory
+
+During handling of the above exception, another exception occurred:
+
+Traceback (most recent call last):
+  File "/home/public/app/firedrake_gnu_042022/firedrake/src/PyOP2/pyop2/compilation.py", line 398, in get_so
+    subprocess.check_call(cc, stderr=err, stdout=log)
+  File "/opt/spack/opt/spack/linux-centos7-x86_64/gcc-8.3.0/python-3.8.11-fq4lolmvzcgu5zm25rnbnzsdghdkc55v/lib/python3.8/subprocess.py", line 364, in check_call
+    raise CalledProcessError(retcode, cmd)
+subprocess.CalledProcessError: Command '('mpicc', '-fPIC', '-Wall', '-std=gnu11', '-I/home/public/app/firedrake_gnu_042022/firedrake/src/petsc/include', '-I/home/public/app/firedrake_gnu_042022/firedrake/src/petsc/default/include', '-I/home/public/app/firedrake_gnu_042022/firedrake/src/PyOP2/pyop2', '-fno-ivopts', '-march=native', '-O3', '-ffast-math', '-o', '/home/olender/tmp_amd7/95/e45c5a92565b02de20a4199ac9399d_p191193.so.tmp', '/home/olender/tmp_amd7/95/e45c5a92565b02de20a4199ac9399d_p191193.c', '-shared', '-L/home/public/app/firedrake_gnu_042022/firedrake/src/petsc/lib', '-L/home/public/app/firedrake_gnu_042022/firedrake/src/petsc/default/lib', '-Wl,-rpath,/home/public/app/firedrake_gnu_042022/firedrake/src/petsc/lib', '-Wl,-rpath,/home/public/app/firedrake_gnu_042022/firedrake/src/petsc/default/lib', '-lpetsc', '-lm')' returned non-zero exit status 1.
+
+During handling of the above exception, another exception occurred:
+
+Traceback (most recent call last):
+  File "strong_scalling_2d.py", line 63, in <module>
+    vp = spyro.io.interpolate(model, mesh, V, guess=False)
+  File "/home/olender/cse23/spyro/spyro/io/io.py", line 322, in interpolate
+    coords = fire.interpolate(m.coordinates, W)
+  File "PETSc/Log.pyx", line 115, in petsc4py.PETSc.Log.EventDecorator.decorator.wrapped_func
+  File "PETSc/Log.pyx", line 116, in petsc4py.PETSc.Log.EventDecorator.decorator.wrapped_func
+  File "/home/public/app/firedrake_gnu_042022/firedrake/src/firedrake/firedrake/interpolation.py", line 61, in interpolate
+    return Interpolator(expr, V, subset=subset, access=access).interpolate(ad_block_tag=ad_block_tag)
+  File "PETSc/Log.pyx", line 115, in petsc4py.PETSc.Log.EventDecorator.decorator.wrapped_func
+  File "PETSc/Log.pyx", line 116, in petsc4py.PETSc.Log.EventDecorator.decorator.wrapped_func
+  File "/home/public/app/firedrake_gnu_042022/firedrake/src/firedrake/firedrake/adjoint/interpolate.py", line 22, in wrapper
+    output = interpolate(interpolator, *function, **kwargs)
+  File "/home/public/app/firedrake_gnu_042022/firedrake/src/firedrake/firedrake/interpolation.py", line 118, in interpolate
+    assembled_interpolator = self.callable()
+  File "/home/public/app/firedrake_gnu_042022/firedrake/src/firedrake/firedrake/interpolation.py", line 222, in callable
+    l()
+  File "/home/public/app/firedrake_gnu_042022/firedrake/src/PyOP2/pyop2/parloop.py", line 201, in compute
+    self()
+  File "PETSc/Log.pyx", line 115, in petsc4py.PETSc.Log.EventDecorator.decorator.wrapped_func
+  File "PETSc/Log.pyx", line 116, in petsc4py.PETSc.Log.EventDecorator.decorator.wrapped_func
+  File "/home/public/app/firedrake_gnu_042022/firedrake/src/PyOP2/pyop2/parloop.py", line 210, in __call__
+    self._compute(self.iterset.core_part)
+  File "/home/public/app/firedrake_gnu_042022/firedrake/src/PyOP2/pyop2/parloop.py", line 192, in _compute
+    self.global_kernel(self.comm, part.offset, part.offset+part.size, *self.arglist)
+  File "/home/public/app/firedrake_gnu_042022/firedrake/src/PyOP2/pyop2/global_kernel.py", line 290, in __call__
+    func = self.compile(comm)
+  File "PETSc/Log.pyx", line 115, in petsc4py.PETSc.Log.EventDecorator.decorator.wrapped_func
+  File "PETSc/Log.pyx", line 116, in petsc4py.PETSc.Log.EventDecorator.decorator.wrapped_func
+  File "/home/public/app/firedrake_gnu_042022/firedrake/src/PyOP2/pyop2/global_kernel.py", line 360, in compile
+    return compilation.load(self, extension, self.name,
+  File "/home/public/app/firedrake_gnu_042022/firedrake/src/PyOP2/pyop2/compilation.py", line 634, in load
+    dll = compiler(cppargs, ldargs, cpp=cpp, comm=comm).get_so(code, extension)
+  File "/home/public/app/firedrake_gnu_042022/firedrake/src/PyOP2/pyop2/compilation.py", line 400, in get_so
+    raise CompilationError(
+pyop2.exceptions.CompilationError: Command "('mpicc', '-fPIC', '-Wall', '-std=gnu11', '-I/home/public/app/firedrake_gnu_042022/firedrake/src/petsc/include', '-I/home/public/app/firedrake_gnu_042022/firedrake/src/petsc/default/include', '-I/home/public/app/firedrake_gnu_042022/firedrake/src/PyOP2/pyop2', '-fno-ivopts', '-march=native', '-O3', '-ffast-math', '-o', '/home/olender/tmp_amd7/95/e45c5a92565b02de20a4199ac9399d_p191193.so.tmp', '/home/olender/tmp_amd7/95/e45c5a92565b02de20a4199ac9399d_p191193.c', '-shared', '-L/home/public/app/firedrake_gnu_042022/firedrake/src/petsc/lib', '-L/home/public/app/firedrake_gnu_042022/firedrake/src/petsc/default/lib', '-Wl,-rpath,/home/public/app/firedrake_gnu_042022/firedrake/src/petsc/lib', '-Wl,-rpath,/home/public/app/firedrake_gnu_042022/firedrake/src/petsc/default/lib', '-lpetsc', '-lm')" return error status 1.
+Unable to compile code
+Compile log in /home/olender/tmp_amd7/95/e45c5a92565b02de20a4199ac9399d_p191193.log
+Compile errors in /home/olender/tmp_amd7/95/e45c5a92565b02de20a4199ac9399d_p191193.err
+application called MPI_Abort(MPI_COMM_WORLD, 1) - process 1
+Traceback (most recent call last):
+  File "/home/public/app/firedrake_gnu_042022/firedrake/src/firedrake/firedrake/interpolation.py", line 115, in interpolate
+    assembled_interpolator = self.frozen_assembled_interpolator
+AttributeError: 'Interpolator' object has no attribute 'frozen_assembled_interpolator'
+
+During handling of the above exception, another exception occurred:
+
+Traceback (most recent call last):
+  File "/home/public/app/firedrake_gnu_042022/firedrake/src/PyOP2/pyop2/global_kernel.py", line 288, in __call__
+    func = self._func_cache[key]
+KeyError: 47858870631760
+
+During handling of the above exception, another exception occurred:
+
+Traceback (most recent call last):
+  File "/home/public/app/firedrake_gnu_042022/firedrake/src/PyOP2/pyop2/compilation.py", line 368, in get_so
+    return ctypes.CDLL(soname)
+  File "/opt/spack/opt/spack/linux-centos7-x86_64/gcc-8.3.0/python-3.8.11-fq4lolmvzcgu5zm25rnbnzsdghdkc55v/lib/python3.8/ctypes/__init__.py", line 373, in __init__
+    self._handle = _dlopen(self._name, mode)
+OSError: /home/olender/tmp_amd7/95/e45c5a92565b02de20a4199ac9399d.so: cannot open shared object file: No such file or directory
+
+During handling of the above exception, another exception occurred:
+
+Traceback (most recent call last):
+  File "/home/public/app/firedrake_gnu_042022/firedrake/src/PyOP2/pyop2/compilation.py", line 398, in get_so
+    subprocess.check_call(cc, stderr=err, stdout=log)
+  File "/opt/spack/opt/spack/linux-centos7-x86_64/gcc-8.3.0/python-3.8.11-fq4lolmvzcgu5zm25rnbnzsdghdkc55v/lib/python3.8/subprocess.py", line 364, in check_call
+    raise CalledProcessError(retcode, cmd)
+subprocess.CalledProcessError: Command '('mpicc', '-fPIC', '-Wall', '-std=gnu11', '-I/home/public/app/firedrake_gnu_042022/firedrake/src/petsc/include', '-I/home/public/app/firedrake_gnu_042022/firedrake/src/petsc/default/include', '-I/home/public/app/firedrake_gnu_042022/firedrake/src/PyOP2/pyop2', '-fno-ivopts', '-march=native', '-O3', '-ffast-math', '-o', '/home/olender/tmp_amd7/95/e45c5a92565b02de20a4199ac9399d_p191195.so.tmp', '/home/olender/tmp_amd7/95/e45c5a92565b02de20a4199ac9399d_p191195.c', '-shared', '-L/home/public/app/firedrake_gnu_042022/firedrake/src/petsc/lib', '-L/home/public/app/firedrake_gnu_042022/firedrake/src/petsc/default/lib', '-Wl,-rpath,/home/public/app/firedrake_gnu_042022/firedrake/src/petsc/lib', '-Wl,-rpath,/home/public/app/firedrake_gnu_042022/firedrake/src/petsc/default/lib', '-lpetsc', '-lm')' returned non-zero exit status 1.
+
+During handling of the above exception, another exception occurred:
+
+Traceback (most recent call last):
+  File "strong_scalling_2d.py", line 63, in <module>
+    vp = spyro.io.interpolate(model, mesh, V, guess=False)
+  File "/home/olender/cse23/spyro/spyro/io/io.py", line 322, in interpolate
+    coords = fire.interpolate(m.coordinates, W)
+  File "PETSc/Log.pyx", line 115, in petsc4py.PETSc.Log.EventDecorator.decorator.wrapped_func
+  File "PETSc/Log.pyx", line 116, in petsc4py.PETSc.Log.EventDecorator.decorator.wrapped_func
+  File "/home/public/app/firedrake_gnu_042022/firedrake/src/firedrake/firedrake/interpolation.py", line 61, in interpolate
+    return Interpolator(expr, V, subset=subset, access=access).interpolate(ad_block_tag=ad_block_tag)
+  File "PETSc/Log.pyx", line 115, in petsc4py.PETSc.Log.EventDecorator.decorator.wrapped_func
+  File "PETSc/Log.pyx", line 116, in petsc4py.PETSc.Log.EventDecorator.decorator.wrapped_func
+  File "/home/public/app/firedrake_gnu_042022/firedrake/src/firedrake/firedrake/adjoint/interpolate.py", line 22, in wrapper
+    output = interpolate(interpolator, *function, **kwargs)
+  File "/home/public/app/firedrake_gnu_042022/firedrake/src/firedrake/firedrake/interpolation.py", line 118, in interpolate
+    assembled_interpolator = self.callable()
+  File "/home/public/app/firedrake_gnu_042022/firedrake/src/firedrake/firedrake/interpolation.py", line 222, in callable
+    l()
+  File "/home/public/app/firedrake_gnu_042022/firedrake/src/PyOP2/pyop2/parloop.py", line 201, in compute
+    self()
+  File "PETSc/Log.pyx", line 115, in petsc4py.PETSc.Log.EventDecorator.decorator.wrapped_func
+  File "PETSc/Log.pyx", line 116, in petsc4py.PETSc.Log.EventDecorator.decorator.wrapped_func
+  File "/home/public/app/firedrake_gnu_042022/firedrake/src/PyOP2/pyop2/parloop.py", line 210, in __call__
+    self._compute(self.iterset.core_part)
+  File "/home/public/app/firedrake_gnu_042022/firedrake/src/PyOP2/pyop2/parloop.py", line 192, in _compute
+    self.global_kernel(self.comm, part.offset, part.offset+part.size, *self.arglist)
+  File "/home/public/app/firedrake_gnu_042022/firedrake/src/PyOP2/pyop2/global_kernel.py", line 290, in __call__
+    func = self.compile(comm)
+  File "PETSc/Log.pyx", line 115, in petsc4py.PETSc.Log.EventDecorator.decorator.wrapped_func
+  File "PETSc/Log.pyx", line 116, in petsc4py.PETSc.Log.EventDecorator.decorator.wrapped_func
+  File "/home/public/app/firedrake_gnu_042022/firedrake/src/PyOP2/pyop2/global_kernel.py", line 360, in compile
+    return compilation.load(self, extension, self.name,
+  File "/home/public/app/firedrake_gnu_042022/firedrake/src/PyOP2/pyop2/compilation.py", line 634, in load
+    dll = compiler(cppargs, ldargs, cpp=cpp, comm=comm).get_so(code, extension)
+  File "/home/public/app/firedrake_gnu_042022/firedrake/src/PyOP2/pyop2/compilation.py", line 400, in get_so
+    raise CompilationError(
+pyop2.exceptions.CompilationError: Command "('mpicc', '-fPIC', '-Wall', '-std=gnu11', '-I/home/public/app/firedrake_gnu_042022/firedrake/src/petsc/include', '-I/home/public/app/firedrake_gnu_042022/firedrake/src/petsc/default/include', '-I/home/public/app/firedrake_gnu_042022/firedrake/src/PyOP2/pyop2', '-fno-ivopts', '-march=native', '-O3', '-ffast-math', '-o', '/home/olender/tmp_amd7/95/e45c5a92565b02de20a4199ac9399d_p191195.so.tmp', '/home/olender/tmp_amd7/95/e45c5a92565b02de20a4199ac9399d_p191195.c', '-shared', '-L/home/public/app/firedrake_gnu_042022/firedrake/src/petsc/lib', '-L/home/public/app/firedrake_gnu_042022/firedrake/src/petsc/default/lib', '-Wl,-rpath,/home/public/app/firedrake_gnu_042022/firedrake/src/petsc/lib', '-Wl,-rpath,/home/public/app/firedrake_gnu_042022/firedrake/src/petsc/default/lib', '-lpetsc', '-lm')" return error status 1.
+Unable to compile code
+Compile log in /home/olender/tmp_amd7/95/e45c5a92565b02de20a4199ac9399d_p191195.log
+Compile errors in /home/olender/tmp_amd7/95/e45c5a92565b02de20a4199ac9399d_p191195.err
+application called MPI_Abort(MPI_COMM_WORLD, 1) - process 3
+Traceback (most recent call last):
+  File "/home/public/app/firedrake_gnu_042022/firedrake/src/firedrake/firedrake/interpolation.py", line 115, in interpolate
+    assembled_interpolator = self.frozen_assembled_interpolator
+AttributeError: 'Interpolator' object has no attribute 'frozen_assembled_interpolator'
+
+During handling of the above exception, another exception occurred:
+
+Traceback (most recent call last):
+  File "/home/public/app/firedrake_gnu_042022/firedrake/src/PyOP2/pyop2/global_kernel.py", line 288, in __call__
+    func = self._func_cache[key]
+KeyError: 47073254525776
+
+During handling of the above exception, another exception occurred:
+
+Traceback (most recent call last):
+  File "/home/public/app/firedrake_gnu_042022/firedrake/src/PyOP2/pyop2/compilation.py", line 368, in get_so
+    return ctypes.CDLL(soname)
+  File "/opt/spack/opt/spack/linux-centos7-x86_64/gcc-8.3.0/python-3.8.11-fq4lolmvzcgu5zm25rnbnzsdghdkc55v/lib/python3.8/ctypes/__init__.py", line 373, in __init__
+    self._handle = _dlopen(self._name, mode)
+OSError: /home/olender/tmp_amd7/95/e45c5a92565b02de20a4199ac9399d.so: cannot open shared object file: No such file or directory
+
+During handling of the above exception, another exception occurred:
+
+Traceback (most recent call last):
+  File "/home/public/app/firedrake_gnu_042022/firedrake/src/PyOP2/pyop2/compilation.py", line 398, in get_so
+    subprocess.check_call(cc, stderr=err, stdout=log)
+  File "/opt/spack/opt/spack/linux-centos7-x86_64/gcc-8.3.0/python-3.8.11-fq4lolmvzcgu5zm25rnbnzsdghdkc55v/lib/python3.8/subprocess.py", line 364, in check_call
+    raise CalledProcessError(retcode, cmd)
+subprocess.CalledProcessError: Command '('mpicc', '-fPIC', '-Wall', '-std=gnu11', '-I/home/public/app/firedrake_gnu_042022/firedrake/src/petsc/include', '-I/home/public/app/firedrake_gnu_042022/firedrake/src/petsc/default/include', '-I/home/public/app/firedrake_gnu_042022/firedrake/src/PyOP2/pyop2', '-fno-ivopts', '-march=native', '-O3', '-ffast-math', '-o', '/home/olender/tmp_amd7/95/e45c5a92565b02de20a4199ac9399d_p191192.so.tmp', '/home/olender/tmp_amd7/95/e45c5a92565b02de20a4199ac9399d_p191192.c', '-shared', '-L/home/public/app/firedrake_gnu_042022/firedrake/src/petsc/lib', '-L/home/public/app/firedrake_gnu_042022/firedrake/src/petsc/default/lib', '-Wl,-rpath,/home/public/app/firedrake_gnu_042022/firedrake/src/petsc/lib', '-Wl,-rpath,/home/public/app/firedrake_gnu_042022/firedrake/src/petsc/default/lib', '-lpetsc', '-lm')' returned non-zero exit status 1.
+
+During handling of the above exception, another exception occurred:
+
+Traceback (most recent call last):
+  File "strong_scalling_2d.py", line 63, in <module>
+    vp = spyro.io.interpolate(model, mesh, V, guess=False)
+  File "/home/olender/cse23/spyro/spyro/io/io.py", line 322, in interpolate
+    coords = fire.interpolate(m.coordinates, W)
+  File "PETSc/Log.pyx", line 115, in petsc4py.PETSc.Log.EventDecorator.decorator.wrapped_func
+  File "PETSc/Log.pyx", line 116, in petsc4py.PETSc.Log.EventDecorator.decorator.wrapped_func
+  File "/home/public/app/firedrake_gnu_042022/firedrake/src/firedrake/firedrake/interpolation.py", line 61, in interpolate
+    return Interpolator(expr, V, subset=subset, access=access).interpolate(ad_block_tag=ad_block_tag)
+  File "PETSc/Log.pyx", line 115, in petsc4py.PETSc.Log.EventDecorator.decorator.wrapped_func
+  File "PETSc/Log.pyx", line 116, in petsc4py.PETSc.Log.EventDecorator.decorator.wrapped_func
+  File "/home/public/app/firedrake_gnu_042022/firedrake/src/firedrake/firedrake/adjoint/interpolate.py", line 22, in wrapper
+    output = interpolate(interpolator, *function, **kwargs)
+  File "/home/public/app/firedrake_gnu_042022/firedrake/src/firedrake/firedrake/interpolation.py", line 118, in interpolate
+    assembled_interpolator = self.callable()
+  File "/home/public/app/firedrake_gnu_042022/firedrake/src/firedrake/firedrake/interpolation.py", line 222, in callable
+    l()
+  File "/home/public/app/firedrake_gnu_042022/firedrake/src/PyOP2/pyop2/parloop.py", line 201, in compute
+    self()
+  File "PETSc/Log.pyx", line 115, in petsc4py.PETSc.Log.EventDecorator.decorator.wrapped_func
+  File "PETSc/Log.pyx", line 116, in petsc4py.PETSc.Log.EventDecorator.decorator.wrapped_func
+  File "/home/public/app/firedrake_gnu_042022/firedrake/src/PyOP2/pyop2/parloop.py", line 210, in __call__
+    self._compute(self.iterset.core_part)
+  File "/home/public/app/firedrake_gnu_042022/firedrake/src/PyOP2/pyop2/parloop.py", line 192, in _compute
+    self.global_kernel(self.comm, part.offset, part.offset+part.size, *self.arglist)
+  File "/home/public/app/firedrake_gnu_042022/firedrake/src/PyOP2/pyop2/global_kernel.py", line 290, in __call__
+    func = self.compile(comm)
+  File "PETSc/Log.pyx", line 115, in petsc4py.PETSc.Log.EventDecorator.decorator.wrapped_func
+  File "PETSc/Log.pyx", line 116, in petsc4py.PETSc.Log.EventDecorator.decorator.wrapped_func
+  File "/home/public/app/firedrake_gnu_042022/firedrake/src/PyOP2/pyop2/global_kernel.py", line 360, in compile
+    return compilation.load(self, extension, self.name,
+  File "/home/public/app/firedrake_gnu_042022/firedrake/src/PyOP2/pyop2/compilation.py", line 634, in load
+    dll = compiler(cppargs, ldargs, cpp=cpp, comm=comm).get_so(code, extension)
+  File "/home/public/app/firedrake_gnu_042022/firedrake/src/PyOP2/pyop2/compilation.py", line 400, in get_so
+    raise CompilationError(
+pyop2.exceptions.CompilationError: Command "('mpicc', '-fPIC', '-Wall', '-std=gnu11', '-I/home/public/app/firedrake_gnu_042022/firedrake/src/petsc/include', '-I/home/public/app/firedrake_gnu_042022/firedrake/src/petsc/default/include', '-I/home/public/app/firedrake_gnu_042022/firedrake/src/PyOP2/pyop2', '-fno-ivopts', '-march=native', '-O3', '-ffast-math', '-o', '/home/olender/tmp_amd7/95/e45c5a92565b02de20a4199ac9399d_p191192.so.tmp', '/home/olender/tmp_amd7/95/e45c5a92565b02de20a4199ac9399d_p191192.c', '-shared', '-L/home/public/app/firedrake_gnu_042022/firedrake/src/petsc/lib', '-L/home/public/app/firedrake_gnu_042022/firedrake/src/petsc/default/lib', '-Wl,-rpath,/home/public/app/firedrake_gnu_042022/firedrake/src/petsc/lib', '-Wl,-rpath,/home/public/app/firedrake_gnu_042022/firedrake/src/petsc/default/lib', '-lpetsc', '-lm')" return error status 1.
+Unable to compile code
+Compile log in /home/olender/tmp_amd7/95/e45c5a92565b02de20a4199ac9399d_p191192.log
+Compile errors in /home/olender/tmp_amd7/95/e45c5a92565b02de20a4199ac9399d_p191192.err
+application called MPI_Abort(MPI_COMM_WORLD, 1) - process 0
+Traceback (most recent call last):
+  File "/home/public/app/firedrake_gnu_042022/firedrake/src/firedrake/firedrake/interpolation.py", line 115, in interpolate
+    assembled_interpolator = self.frozen_assembled_interpolator
+AttributeError: 'Interpolator' object has no attribute 'frozen_assembled_interpolator'
+
+During handling of the above exception, another exception occurred:
+
+Traceback (most recent call last):
+  File "/home/public/app/firedrake_gnu_042022/firedrake/src/PyOP2/pyop2/global_kernel.py", line 288, in __call__
+    func = self._func_cache[key]
+KeyError: 47823329336080
+
+During handling of the above exception, another exception occurred:
+
+Traceback (most recent call last):
+  File "/home/public/app/firedrake_gnu_042022/firedrake/src/PyOP2/pyop2/compilation.py", line 368, in get_so
+    return ctypes.CDLL(soname)
+  File "/opt/spack/opt/spack/linux-centos7-x86_64/gcc-8.3.0/python-3.8.11-fq4lolmvzcgu5zm25rnbnzsdghdkc55v/lib/python3.8/ctypes/__init__.py", line 373, in __init__
+    self._handle = _dlopen(self._name, mode)
+OSError: /home/olender/tmp_amd7/95/e45c5a92565b02de20a4199ac9399d.so: cannot open shared object file: No such file or directory
+
+During handling of the above exception, another exception occurred:
+
+Traceback (most recent call last):
+  File "/home/public/app/firedrake_gnu_042022/firedrake/src/PyOP2/pyop2/compilation.py", line 398, in get_so
+    subprocess.check_call(cc, stderr=err, stdout=log)
+  File "/opt/spack/opt/spack/linux-centos7-x86_64/gcc-8.3.0/python-3.8.11-fq4lolmvzcgu5zm25rnbnzsdghdkc55v/lib/python3.8/subprocess.py", line 364, in check_call
+    raise CalledProcessError(retcode, cmd)
+subprocess.CalledProcessError: Command '('mpicc', '-fPIC', '-Wall', '-std=gnu11', '-I/home/public/app/firedrake_gnu_042022/firedrake/src/petsc/include', '-I/home/public/app/firedrake_gnu_042022/firedrake/src/petsc/default/include', '-I/home/public/app/firedrake_gnu_042022/firedrake/src/PyOP2/pyop2', '-fno-ivopts', '-march=native', '-O3', '-ffast-math', '-o', '/home/olender/tmp_amd7/95/e45c5a92565b02de20a4199ac9399d_p191194.so.tmp', '/home/olender/tmp_amd7/95/e45c5a92565b02de20a4199ac9399d_p191194.c', '-shared', '-L/home/public/app/firedrake_gnu_042022/firedrake/src/petsc/lib', '-L/home/public/app/firedrake_gnu_042022/firedrake/src/petsc/default/lib', '-Wl,-rpath,/home/public/app/firedrake_gnu_042022/firedrake/src/petsc/lib', '-Wl,-rpath,/home/public/app/firedrake_gnu_042022/firedrake/src/petsc/default/lib', '-lpetsc', '-lm')' returned non-zero exit status 1.
+
+During handling of the above exception, another exception occurred:
+
+Traceback (most recent call last):
+  File "strong_scalling_2d.py", line 63, in <module>
+    vp = spyro.io.interpolate(model, mesh, V, guess=False)
+  File "/home/olender/cse23/spyro/spyro/io/io.py", line 322, in interpolate
+    coords = fire.interpolate(m.coordinates, W)
+  File "PETSc/Log.pyx", line 115, in petsc4py.PETSc.Log.EventDecorator.decorator.wrapped_func
+  File "PETSc/Log.pyx", line 116, in petsc4py.PETSc.Log.EventDecorator.decorator.wrapped_func
+  File "/home/public/app/firedrake_gnu_042022/firedrake/src/firedrake/firedrake/interpolation.py", line 61, in interpolate
+    return Interpolator(expr, V, subset=subset, access=access).interpolate(ad_block_tag=ad_block_tag)
+  File "PETSc/Log.pyx", line 115, in petsc4py.PETSc.Log.EventDecorator.decorator.wrapped_func
+  File "PETSc/Log.pyx", line 116, in petsc4py.PETSc.Log.EventDecorator.decorator.wrapped_func
+  File "/home/public/app/firedrake_gnu_042022/firedrake/src/firedrake/firedrake/adjoint/interpolate.py", line 22, in wrapper
+    output = interpolate(interpolator, *function, **kwargs)
+  File "/home/public/app/firedrake_gnu_042022/firedrake/src/firedrake/firedrake/interpolation.py", line 118, in interpolate
+    assembled_interpolator = self.callable()
+  File "/home/public/app/firedrake_gnu_042022/firedrake/src/firedrake/firedrake/interpolation.py", line 222, in callable
+    l()
+  File "/home/public/app/firedrake_gnu_042022/firedrake/src/PyOP2/pyop2/parloop.py", line 201, in compute
+    self()
+  File "PETSc/Log.pyx", line 115, in petsc4py.PETSc.Log.EventDecorator.decorator.wrapped_func
+  File "PETSc/Log.pyx", line 116, in petsc4py.PETSc.Log.EventDecorator.decorator.wrapped_func
+  File "/home/public/app/firedrake_gnu_042022/firedrake/src/PyOP2/pyop2/parloop.py", line 210, in __call__
+    self._compute(self.iterset.core_part)
+  File "/home/public/app/firedrake_gnu_042022/firedrake/src/PyOP2/pyop2/parloop.py", line 192, in _compute
+    self.global_kernel(self.comm, part.offset, part.offset+part.size, *self.arglist)
+  File "/home/public/app/firedrake_gnu_042022/firedrake/src/PyOP2/pyop2/global_kernel.py", line 290, in __call__
+    func = self.compile(comm)
+  File "PETSc/Log.pyx", line 115, in petsc4py.PETSc.Log.EventDecorator.decorator.wrapped_func
+  File "PETSc/Log.pyx", line 116, in petsc4py.PETSc.Log.EventDecorator.decorator.wrapped_func
+  File "/home/public/app/firedrake_gnu_042022/firedrake/src/PyOP2/pyop2/global_kernel.py", line 360, in compile
+    return compilation.load(self, extension, self.name,
+  File "/home/public/app/firedrake_gnu_042022/firedrake/src/PyOP2/pyop2/compilation.py", line 634, in load
+    dll = compiler(cppargs, ldargs, cpp=cpp, comm=comm).get_so(code, extension)
+  File "/home/public/app/firedrake_gnu_042022/firedrake/src/PyOP2/pyop2/compilation.py", line 400, in get_so
+    raise CompilationError(
+pyop2.exceptions.CompilationError: Command "('mpicc', '-fPIC', '-Wall', '-std=gnu11', '-I/home/public/app/firedrake_gnu_042022/firedrake/src/petsc/include', '-I/home/public/app/firedrake_gnu_042022/firedrake/src/petsc/default/include', '-I/home/public/app/firedrake_gnu_042022/firedrake/src/PyOP2/pyop2', '-fno-ivopts', '-march=native', '-O3', '-ffast-math', '-o', '/home/olender/tmp_amd7/95/e45c5a92565b02de20a4199ac9399d_p191194.so.tmp', '/home/olender/tmp_amd7/95/e45c5a92565b02de20a4199ac9399d_p191194.c', '-shared', '-L/home/public/app/firedrake_gnu_042022/firedrake/src/petsc/lib', '-L/home/public/app/firedrake_gnu_042022/firedrake/src/petsc/default/lib', '-Wl,-rpath,/home/public/app/firedrake_gnu_042022/firedrake/src/petsc/lib', '-Wl,-rpath,/home/public/app/firedrake_gnu_042022/firedrake/src/petsc/default/lib', '-lpetsc', '-lm')" return error status 1.
+Unable to compile code
+Compile log in /home/olender/tmp_amd7/95/e45c5a92565b02de20a4199ac9399d_p191194.log
+Compile errors in /home/olender/tmp_amd7/95/e45c5a92565b02de20a4199ac9399d_p191194.err
+application called MPI_Abort(MPI_COMM_WORLD, 1) - process 2
+Traceback (most recent call last):
+  File "/home/public/app/firedrake_gnu_042022/firedrake/src/firedrake/firedrake/interpolation.py", line 115, in interpolate
+    assembled_interpolator = self.frozen_assembled_interpolator
+AttributeError: 'Interpolator' object has no attribute 'frozen_assembled_interpolator'
+
+During handling of the above exception, another exception occurred:
+
+Traceback (most recent call last):
+  File "/home/public/app/firedrake_gnu_042022/firedrake/src/PyOP2/pyop2/global_kernel.py", line 288, in __call__
+    func = self._func_cache[key]
+KeyError: 47970879327152
+
+During handling of the above exception, another exception occurred:
+
+Traceback (most recent call last):
+  File "/home/public/app/firedrake_gnu_042022/firedrake/src/PyOP2/pyop2/compilation.py", line 368, in get_so
+    return ctypes.CDLL(soname)
+  File "/opt/spack/opt/spack/linux-centos7-x86_64/gcc-8.3.0/python-3.8.11-fq4lolmvzcgu5zm25rnbnzsdghdkc55v/lib/python3.8/ctypes/__init__.py", line 373, in __init__
+    self._handle = _dlopen(self._name, mode)
+OSError: /home/olender/tmp_amd7/95/e45c5a92565b02de20a4199ac9399d.so: cannot open shared object file: No such file or directory
+
+During handling of the above exception, another exception occurred:
+
+Traceback (most recent call last):
+  File "/home/public/app/firedrake_gnu_042022/firedrake/src/PyOP2/pyop2/compilation.py", line 398, in get_so
+    subprocess.check_call(cc, stderr=err, stdout=log)
+  File "/opt/spack/opt/spack/linux-centos7-x86_64/gcc-8.3.0/python-3.8.11-fq4lolmvzcgu5zm25rnbnzsdghdkc55v/lib/python3.8/subprocess.py", line 364, in check_call
+    raise CalledProcessError(retcode, cmd)
+subprocess.CalledProcessError: Command '('mpicc', '-fPIC', '-Wall', '-std=gnu11', '-I/home/public/app/firedrake_gnu_042022/firedrake/src/petsc/include', '-I/home/public/app/firedrake_gnu_042022/firedrake/src/petsc/default/include', '-I/home/public/app/firedrake_gnu_042022/firedrake/src/PyOP2/pyop2', '-fno-ivopts', '-march=native', '-O3', '-ffast-math', '-o', '/home/olender/tmp_amd7/95/e45c5a92565b02de20a4199ac9399d_p191196.so.tmp', '/home/olender/tmp_amd7/95/e45c5a92565b02de20a4199ac9399d_p191196.c', '-shared', '-L/home/public/app/firedrake_gnu_042022/firedrake/src/petsc/lib', '-L/home/public/app/firedrake_gnu_042022/firedrake/src/petsc/default/lib', '-Wl,-rpath,/home/public/app/firedrake_gnu_042022/firedrake/src/petsc/lib', '-Wl,-rpath,/home/public/app/firedrake_gnu_042022/firedrake/src/petsc/default/lib', '-lpetsc', '-lm')' returned non-zero exit status 1.
+
+During handling of the above exception, another exception occurred:
+
+Traceback (most recent call last):
+  File "strong_scalling_2d.py", line 63, in <module>
+    vp = spyro.io.interpolate(model, mesh, V, guess=False)
+  File "/home/olender/cse23/spyro/spyro/io/io.py", line 322, in interpolate
+    coords = fire.interpolate(m.coordinates, W)
+  File "PETSc/Log.pyx", line 115, in petsc4py.PETSc.Log.EventDecorator.decorator.wrapped_func
+  File "PETSc/Log.pyx", line 116, in petsc4py.PETSc.Log.EventDecorator.decorator.wrapped_func
+  File "/home/public/app/firedrake_gnu_042022/firedrake/src/firedrake/firedrake/interpolation.py", line 61, in interpolate
+    return Interpolator(expr, V, subset=subset, access=access).interpolate(ad_block_tag=ad_block_tag)
+  File "PETSc/Log.pyx", line 115, in petsc4py.PETSc.Log.EventDecorator.decorator.wrapped_func
+  File "PETSc/Log.pyx", line 116, in petsc4py.PETSc.Log.EventDecorator.decorator.wrapped_func
+  File "/home/public/app/firedrake_gnu_042022/firedrake/src/firedrake/firedrake/adjoint/interpolate.py", line 22, in wrapper
+    output = interpolate(interpolator, *function, **kwargs)
+  File "/home/public/app/firedrake_gnu_042022/firedrake/src/firedrake/firedrake/interpolation.py", line 118, in interpolate
+    assembled_interpolator = self.callable()
+  File "/home/public/app/firedrake_gnu_042022/firedrake/src/firedrake/firedrake/interpolation.py", line 222, in callable
+    l()
+  File "/home/public/app/firedrake_gnu_042022/firedrake/src/PyOP2/pyop2/parloop.py", line 201, in compute
+    self()
+  File "PETSc/Log.pyx", line 115, in petsc4py.PETSc.Log.EventDecorator.decorator.wrapped_func
+  File "PETSc/Log.pyx", line 116, in petsc4py.PETSc.Log.EventDecorator.decorator.wrapped_func
+  File "/home/public/app/firedrake_gnu_042022/firedrake/src/PyOP2/pyop2/parloop.py", line 210, in __call__
+    self._compute(self.iterset.core_part)
+  File "/home/public/app/firedrake_gnu_042022/firedrake/src/PyOP2/pyop2/parloop.py", line 192, in _compute
+    self.global_kernel(self.comm, part.offset, part.offset+part.size, *self.arglist)
+  File "/home/public/app/firedrake_gnu_042022/firedrake/src/PyOP2/pyop2/global_kernel.py", line 290, in __call__
+    func = self.compile(comm)
+  File "PETSc/Log.pyx", line 115, in petsc4py.PETSc.Log.EventDecorator.decorator.wrapped_func
+  File "PETSc/Log.pyx", line 116, in petsc4py.PETSc.Log.EventDecorator.decorator.wrapped_func
+  File "/home/public/app/firedrake_gnu_042022/firedrake/src/PyOP2/pyop2/global_kernel.py", line 360, in compile
+    return compilation.load(self, extension, self.name,
+  File "/home/public/app/firedrake_gnu_042022/firedrake/src/PyOP2/pyop2/compilation.py", line 634, in load
+    dll = compiler(cppargs, ldargs, cpp=cpp, comm=comm).get_so(code, extension)
+  File "/home/public/app/firedrake_gnu_042022/firedrake/src/PyOP2/pyop2/compilation.py", line 400, in get_so
+    raise CompilationError(
+pyop2.exceptions.CompilationError: Command "('mpicc', '-fPIC', '-Wall', '-std=gnu11', '-I/home/public/app/firedrake_gnu_042022/firedrake/src/petsc/include', '-I/home/public/app/firedrake_gnu_042022/firedrake/src/petsc/default/include', '-I/home/public/app/firedrake_gnu_042022/firedrake/src/PyOP2/pyop2', '-fno-ivopts', '-march=native', '-O3', '-ffast-math', '-o', '/home/olender/tmp_amd7/95/e45c5a92565b02de20a4199ac9399d_p191196.so.tmp', '/home/olender/tmp_amd7/95/e45c5a92565b02de20a4199ac9399d_p191196.c', '-shared', '-L/home/public/app/firedrake_gnu_042022/firedrake/src/petsc/lib', '-L/home/public/app/firedrake_gnu_042022/firedrake/src/petsc/default/lib', '-Wl,-rpath,/home/public/app/firedrake_gnu_042022/firedrake/src/petsc/lib', '-Wl,-rpath,/home/public/app/firedrake_gnu_042022/firedrake/src/petsc/default/lib', '-lpetsc', '-lm')" return error status 1.
+Unable to compile code
+Compile log in /home/olender/tmp_amd7/95/e45c5a92565b02de20a4199ac9399d_p191196.log
+Compile errors in /home/olender/tmp_amd7/95/e45c5a92565b02de20a4199ac9399d_p191196.err
+application called MPI_Abort(MPI_COMM_WORLD, 1) - process 4
+Traceback (most recent call last):
+  File "/home/public/app/firedrake_gnu_042022/firedrake/src/firedrake/firedrake/interpolation.py", line 115, in interpolate
+    assembled_interpolator = self.frozen_assembled_interpolator
+AttributeError: 'Interpolator' object has no attribute 'frozen_assembled_interpolator'
+
+During handling of the above exception, another exception occurred:
+
+Traceback (most recent call last):
+  File "/home/public/app/firedrake_gnu_042022/firedrake/src/PyOP2/pyop2/global_kernel.py", line 288, in __call__
+    func = self._func_cache[key]
+KeyError: 47336123050512
+
+During handling of the above exception, another exception occurred:
+
+Traceback (most recent call last):
+  File "/home/public/app/firedrake_gnu_042022/firedrake/src/PyOP2/pyop2/compilation.py", line 368, in get_so
+    return ctypes.CDLL(soname)
+  File "/opt/spack/opt/spack/linux-centos7-x86_64/gcc-8.3.0/python-3.8.11-fq4lolmvzcgu5zm25rnbnzsdghdkc55v/lib/python3.8/ctypes/__init__.py", line 373, in __init__
+    self._handle = _dlopen(self._name, mode)
+OSError: /home/olender/tmp_amd7/95/e45c5a92565b02de20a4199ac9399d.so: cannot open shared object file: No such file or directory
+
+During handling of the above exception, another exception occurred:
+
+Traceback (most recent call last):
+  File "/home/public/app/firedrake_gnu_042022/firedrake/src/PyOP2/pyop2/compilation.py", line 398, in get_so
+    subprocess.check_call(cc, stderr=err, stdout=log)
+  File "/opt/spack/opt/spack/linux-centos7-x86_64/gcc-8.3.0/python-3.8.11-fq4lolmvzcgu5zm25rnbnzsdghdkc55v/lib/python3.8/subprocess.py", line 364, in check_call
+    raise CalledProcessError(retcode, cmd)
+subprocess.CalledProcessError: Command '('mpicc', '-fPIC', '-Wall', '-std=gnu11', '-I/home/public/app/firedrake_gnu_042022/firedrake/src/petsc/include', '-I/home/public/app/firedrake_gnu_042022/firedrake/src/petsc/default/include', '-I/home/public/app/firedrake_gnu_042022/firedrake/src/PyOP2/pyop2', '-fno-ivopts', '-march=native', '-O3', '-ffast-math', '-o', '/home/olender/tmp_amd7/95/e45c5a92565b02de20a4199ac9399d_p191536.so.tmp', '/home/olender/tmp_amd7/95/e45c5a92565b02de20a4199ac9399d_p191536.c', '-shared', '-L/home/public/app/firedrake_gnu_042022/firedrake/src/petsc/lib', '-L/home/public/app/firedrake_gnu_042022/firedrake/src/petsc/default/lib', '-Wl,-rpath,/home/public/app/firedrake_gnu_042022/firedrake/src/petsc/lib', '-Wl,-rpath,/home/public/app/firedrake_gnu_042022/firedrake/src/petsc/default/lib', '-lpetsc', '-lm')' returned non-zero exit status 1.
+
+During handling of the above exception, another exception occurred:
+
+Traceback (most recent call last):
+  File "strong_scalling_2d.py", line 63, in <module>
+    vp = spyro.io.interpolate(model, mesh, V, guess=False)
+  File "/home/olender/cse23/spyro/spyro/io/io.py", line 322, in interpolate
+    coords = fire.interpolate(m.coordinates, W)
+  File "PETSc/Log.pyx", line 115, in petsc4py.PETSc.Log.EventDecorator.decorator.wrapped_func
+  File "PETSc/Log.pyx", line 116, in petsc4py.PETSc.Log.EventDecorator.decorator.wrapped_func
+  File "/home/public/app/firedrake_gnu_042022/firedrake/src/firedrake/firedrake/interpolation.py", line 61, in interpolate
+    return Interpolator(expr, V, subset=subset, access=access).interpolate(ad_block_tag=ad_block_tag)
+  File "PETSc/Log.pyx", line 115, in petsc4py.PETSc.Log.EventDecorator.decorator.wrapped_func
+  File "PETSc/Log.pyx", line 116, in petsc4py.PETSc.Log.EventDecorator.decorator.wrapped_func
+  File "/home/public/app/firedrake_gnu_042022/firedrake/src/firedrake/firedrake/adjoint/interpolate.py", line 22, in wrapper
+    output = interpolate(interpolator, *function, **kwargs)
+  File "/home/public/app/firedrake_gnu_042022/firedrake/src/firedrake/firedrake/interpolation.py", line 118, in interpolate
+    assembled_interpolator = self.callable()
+  File "/home/public/app/firedrake_gnu_042022/firedrake/src/firedrake/firedrake/interpolation.py", line 222, in callable
+    l()
+  File "/home/public/app/firedrake_gnu_042022/firedrake/src/PyOP2/pyop2/parloop.py", line 201, in compute
+    self()
+  File "PETSc/Log.pyx", line 115, in petsc4py.PETSc.Log.EventDecorator.decorator.wrapped_func
+  File "PETSc/Log.pyx", line 116, in petsc4py.PETSc.Log.EventDecorator.decorator.wrapped_func
+  File "/home/public/app/firedrake_gnu_042022/firedrake/src/PyOP2/pyop2/parloop.py", line 210, in __call__
+    self._compute(self.iterset.core_part)
+  File "/home/public/app/firedrake_gnu_042022/firedrake/src/PyOP2/pyop2/parloop.py", line 192, in _compute
+    self.global_kernel(self.comm, part.offset, part.offset+part.size, *self.arglist)
+  File "/home/public/app/firedrake_gnu_042022/firedrake/src/PyOP2/pyop2/global_kernel.py", line 290, in __call__
+    func = self.compile(comm)
+  File "PETSc/Log.pyx", line 115, in petsc4py.PETSc.Log.EventDecorator.decorator.wrapped_func
+  File "PETSc/Log.pyx", line 116, in petsc4py.PETSc.Log.EventDecorator.decorator.wrapped_func
+  File "/home/public/app/firedrake_gnu_042022/firedrake/src/PyOP2/pyop2/global_kernel.py", line 360, in compile
+    return compilation.load(self, extension, self.name,
+  File "/home/public/app/firedrake_gnu_042022/firedrake/src/PyOP2/pyop2/compilation.py", line 634, in load
+    dll = compiler(cppargs, ldargs, cpp=cpp, comm=comm).get_so(code, extension)
+  File "/home/public/app/firedrake_gnu_042022/firedrake/src/PyOP2/pyop2/compilation.py", line 400, in get_so
+    raise CompilationError(
+pyop2.exceptions.CompilationError: Command "('mpicc', '-fPIC', '-Wall', '-std=gnu11', '-I/home/public/app/firedrake_gnu_042022/firedrake/src/petsc/include', '-I/home/public/app/firedrake_gnu_042022/firedrake/src/petsc/default/include', '-I/home/public/app/firedrake_gnu_042022/firedrake/src/PyOP2/pyop2', '-fno-ivopts', '-march=native', '-O3', '-ffast-math', '-o', '/home/olender/tmp_amd7/95/e45c5a92565b02de20a4199ac9399d_p191536.so.tmp', '/home/olender/tmp_amd7/95/e45c5a92565b02de20a4199ac9399d_p191536.c', '-shared', '-L/home/public/app/firedrake_gnu_042022/firedrake/src/petsc/lib', '-L/home/public/app/firedrake_gnu_042022/firedrake/src/petsc/default/lib', '-Wl,-rpath,/home/public/app/firedrake_gnu_042022/firedrake/src/petsc/lib', '-Wl,-rpath,/home/public/app/firedrake_gnu_042022/firedrake/src/petsc/default/lib', '-lpetsc', '-lm')" return error status 1.
+Unable to compile code
+Compile log in /home/olender/tmp_amd7/95/e45c5a92565b02de20a4199ac9399d_p191536.log
+Compile errors in /home/olender/tmp_amd7/95/e45c5a92565b02de20a4199ac9399d_p191536.err
+application called MPI_Abort(MPI_COMM_WORLD, 1) - process 8
+Traceback (most recent call last):
+  File "/home/public/app/firedrake_gnu_042022/firedrake/src/firedrake/firedrake/interpolation.py", line 115, in interpolate
+    assembled_interpolator = self.frozen_assembled_interpolator
+AttributeError: 'Interpolator' object has no attribute 'frozen_assembled_interpolator'
+
+During handling of the above exception, another exception occurred:
+
+Traceback (most recent call last):
+  File "/home/public/app/firedrake_gnu_042022/firedrake/src/PyOP2/pyop2/global_kernel.py", line 288, in __call__
+    func = self._func_cache[key]
+KeyError: 47498827332464
+
+During handling of the above exception, another exception occurred:
+
+Traceback (most recent call last):
+  File "/home/public/app/firedrake_gnu_042022/firedrake/src/PyOP2/pyop2/compilation.py", line 368, in get_so
+    return ctypes.CDLL(soname)
+  File "/opt/spack/opt/spack/linux-centos7-x86_64/gcc-8.3.0/python-3.8.11-fq4lolmvzcgu5zm25rnbnzsdghdkc55v/lib/python3.8/ctypes/__init__.py", line 373, in __init__
+    self._handle = _dlopen(self._name, mode)
+OSError: /home/olender/tmp_amd7/95/e45c5a92565b02de20a4199ac9399d.so: cannot open shared object file: No such file or directory
+
+During handling of the above exception, another exception occurred:
+
+Traceback (most recent call last):
+  File "/home/public/app/firedrake_gnu_042022/firedrake/src/PyOP2/pyop2/compilation.py", line 398, in get_so
+    subprocess.check_call(cc, stderr=err, stdout=log)
+  File "/opt/spack/opt/spack/linux-centos7-x86_64/gcc-8.3.0/python-3.8.11-fq4lolmvzcgu5zm25rnbnzsdghdkc55v/lib/python3.8/subprocess.py", line 364, in check_call
+    raise CalledProcessError(retcode, cmd)
+subprocess.CalledProcessError: Command '('mpicc', '-fPIC', '-Wall', '-std=gnu11', '-I/home/public/app/firedrake_gnu_042022/firedrake/src/petsc/include', '-I/home/public/app/firedrake_gnu_042022/firedrake/src/petsc/default/include', '-I/home/public/app/firedrake_gnu_042022/firedrake/src/PyOP2/pyop2', '-fno-ivopts', '-march=native', '-O3', '-ffast-math', '-o', '/home/olender/tmp_amd7/95/e45c5a92565b02de20a4199ac9399d_p191530.so.tmp', '/home/olender/tmp_amd7/95/e45c5a92565b02de20a4199ac9399d_p191530.c', '-shared', '-L/home/public/app/firedrake_gnu_042022/firedrake/src/petsc/lib', '-L/home/public/app/firedrake_gnu_042022/firedrake/src/petsc/default/lib', '-Wl,-rpath,/home/public/app/firedrake_gnu_042022/firedrake/src/petsc/lib', '-Wl,-rpath,/home/public/app/firedrake_gnu_042022/firedrake/src/petsc/default/lib', '-lpetsc', '-lm')' returned non-zero exit status 1.
+
+During handling of the above exception, another exception occurred:
+
+Traceback (most recent call last):
+  File "strong_scalling_2d.py", line 63, in <module>
+    vp = spyro.io.interpolate(model, mesh, V, guess=False)
+  File "/home/olender/cse23/spyro/spyro/io/io.py", line 322, in interpolate
+    coords = fire.interpolate(m.coordinates, W)
+  File "PETSc/Log.pyx", line 115, in petsc4py.PETSc.Log.EventDecorator.decorator.wrapped_func
+  File "PETSc/Log.pyx", line 116, in petsc4py.PETSc.Log.EventDecorator.decorator.wrapped_func
+  File "/home/public/app/firedrake_gnu_042022/firedrake/src/firedrake/firedrake/interpolation.py", line 61, in interpolate
+    return Interpolator(expr, V, subset=subset, access=access).interpolate(ad_block_tag=ad_block_tag)
+  File "PETSc/Log.pyx", line 115, in petsc4py.PETSc.Log.EventDecorator.decorator.wrapped_func
+  File "PETSc/Log.pyx", line 116, in petsc4py.PETSc.Log.EventDecorator.decorator.wrapped_func
+  File "/home/public/app/firedrake_gnu_042022/firedrake/src/firedrake/firedrake/adjoint/interpolate.py", line 22, in wrapper
+    output = interpolate(interpolator, *function, **kwargs)
+  File "/home/public/app/firedrake_gnu_042022/firedrake/src/firedrake/firedrake/interpolation.py", line 118, in interpolate
+    assembled_interpolator = self.callable()
+  File "/home/public/app/firedrake_gnu_042022/firedrake/src/firedrake/firedrake/interpolation.py", line 222, in callable
+    l()
+  File "/home/public/app/firedrake_gnu_042022/firedrake/src/PyOP2/pyop2/parloop.py", line 201, in compute
+    self()
+  File "PETSc/Log.pyx", line 115, in petsc4py.PETSc.Log.EventDecorator.decorator.wrapped_func
+  File "PETSc/Log.pyx", line 116, in petsc4py.PETSc.Log.EventDecorator.decorator.wrapped_func
+  File "/home/public/app/firedrake_gnu_042022/firedrake/src/PyOP2/pyop2/parloop.py", line 210, in __call__
+    self._compute(self.iterset.core_part)
+  File "/home/public/app/firedrake_gnu_042022/firedrake/src/PyOP2/pyop2/parloop.py", line 192, in _compute
+    self.global_kernel(self.comm, part.offset, part.offset+part.size, *self.arglist)
+  File "/home/public/app/firedrake_gnu_042022/firedrake/src/PyOP2/pyop2/global_kernel.py", line 290, in __call__
+    func = self.compile(comm)
+  File "PETSc/Log.pyx", line 115, in petsc4py.PETSc.Log.EventDecorator.decorator.wrapped_func
+  File "PETSc/Log.pyx", line 116, in petsc4py.PETSc.Log.EventDecorator.decorator.wrapped_func
+  File "/home/public/app/firedrake_gnu_042022/firedrake/src/PyOP2/pyop2/global_kernel.py", line 360, in compile
+    return compilation.load(self, extension, self.name,
+  File "/home/public/app/firedrake_gnu_042022/firedrake/src/PyOP2/pyop2/compilation.py", line 634, in load
+    dll = compiler(cppargs, ldargs, cpp=cpp, comm=comm).get_so(code, extension)
+  File "/home/public/app/firedrake_gnu_042022/firedrake/src/PyOP2/pyop2/compilation.py", line 400, in get_so
+    raise CompilationError(
+pyop2.exceptions.CompilationError: Command "('mpicc', '-fPIC', '-Wall', '-std=gnu11', '-I/home/public/app/firedrake_gnu_042022/firedrake/src/petsc/include', '-I/home/public/app/firedrake_gnu_042022/firedrake/src/petsc/default/include', '-I/home/public/app/firedrake_gnu_042022/firedrake/src/PyOP2/pyop2', '-fno-ivopts', '-march=native', '-O3', '-ffast-math', '-o', '/home/olender/tmp_amd7/95/e45c5a92565b02de20a4199ac9399d_p191530.so.tmp', '/home/olender/tmp_amd7/95/e45c5a92565b02de20a4199ac9399d_p191530.c', '-shared', '-L/home/public/app/firedrake_gnu_042022/firedrake/src/petsc/lib', '-L/home/public/app/firedrake_gnu_042022/firedrake/src/petsc/default/lib', '-Wl,-rpath,/home/public/app/firedrake_gnu_042022/firedrake/src/petsc/lib', '-Wl,-rpath,/home/public/app/firedrake_gnu_042022/firedrake/src/petsc/default/lib', '-lpetsc', '-lm')" return error status 1.
+Unable to compile code
+Compile log in /home/olender/tmp_amd7/95/e45c5a92565b02de20a4199ac9399d_p191530.log
+Compile errors in /home/olender/tmp_amd7/95/e45c5a92565b02de20a4199ac9399d_p191530.err
+application called MPI_Abort(MPI_COMM_WORLD, 1) - process 2
+Traceback (most recent call last):
+  File "/home/public/app/firedrake_gnu_042022/firedrake/src/firedrake/firedrake/interpolation.py", line 115, in interpolate
+    assembled_interpolator = self.frozen_assembled_interpolator
+AttributeError: 'Interpolator' object has no attribute 'frozen_assembled_interpolator'
+
+During handling of the above exception, another exception occurred:
+
+Traceback (most recent call last):
+  File "/home/public/app/firedrake_gnu_042022/firedrake/src/PyOP2/pyop2/global_kernel.py", line 288, in __call__
+    func = self._func_cache[key]
+KeyError: 47685592205936
+
+During handling of the above exception, another exception occurred:
+
+Traceback (most recent call last):
+  File "/home/public/app/firedrake_gnu_042022/firedrake/src/PyOP2/pyop2/compilation.py", line 368, in get_so
+    return ctypes.CDLL(soname)
+  File "/opt/spack/opt/spack/linux-centos7-x86_64/gcc-8.3.0/python-3.8.11-fq4lolmvzcgu5zm25rnbnzsdghdkc55v/lib/python3.8/ctypes/__init__.py", line 373, in __init__
+    self._handle = _dlopen(self._name, mode)
+OSError: /home/olender/tmp_amd7/95/e45c5a92565b02de20a4199ac9399d.so: cannot open shared object file: No such file or directory
+
+During handling of the above exception, another exception occurred:
+
+Traceback (most recent call last):
+  File "/home/public/app/firedrake_gnu_042022/firedrake/src/PyOP2/pyop2/compilation.py", line 398, in get_so
+    subprocess.check_call(cc, stderr=err, stdout=log)
+  File "/opt/spack/opt/spack/linux-centos7-x86_64/gcc-8.3.0/python-3.8.11-fq4lolmvzcgu5zm25rnbnzsdghdkc55v/lib/python3.8/subprocess.py", line 364, in check_call
+    raise CalledProcessError(retcode, cmd)
+subprocess.CalledProcessError: Command '('mpicc', '-fPIC', '-Wall', '-std=gnu11', '-I/home/public/app/firedrake_gnu_042022/firedrake/src/petsc/include', '-I/home/public/app/firedrake_gnu_042022/firedrake/src/petsc/default/include', '-I/home/public/app/firedrake_gnu_042022/firedrake/src/PyOP2/pyop2', '-fno-ivopts', '-march=native', '-O3', '-ffast-math', '-o', '/home/olender/tmp_amd7/95/e45c5a92565b02de20a4199ac9399d_p191528.so.tmp', '/home/olender/tmp_amd7/95/e45c5a92565b02de20a4199ac9399d_p191528.c', '-shared', '-L/home/public/app/firedrake_gnu_042022/firedrake/src/petsc/lib', '-L/home/public/app/firedrake_gnu_042022/firedrake/src/petsc/default/lib', '-Wl,-rpath,/home/public/app/firedrake_gnu_042022/firedrake/src/petsc/lib', '-Wl,-rpath,/home/public/app/firedrake_gnu_042022/firedrake/src/petsc/default/lib', '-lpetsc', '-lm')' returned non-zero exit status 1.
+
+During handling of the above exception, another exception occurred:
+
+Traceback (most recent call last):
+  File "strong_scalling_2d.py", line 63, in <module>
+    vp = spyro.io.interpolate(model, mesh, V, guess=False)
+  File "/home/olender/cse23/spyro/spyro/io/io.py", line 322, in interpolate
+    coords = fire.interpolate(m.coordinates, W)
+  File "PETSc/Log.pyx", line 115, in petsc4py.PETSc.Log.EventDecorator.decorator.wrapped_func
+  File "PETSc/Log.pyx", line 116, in petsc4py.PETSc.Log.EventDecorator.decorator.wrapped_func
+  File "/home/public/app/firedrake_gnu_042022/firedrake/src/firedrake/firedrake/interpolation.py", line 61, in interpolate
+    return Interpolator(expr, V, subset=subset, access=access).interpolate(ad_block_tag=ad_block_tag)
+  File "PETSc/Log.pyx", line 115, in petsc4py.PETSc.Log.EventDecorator.decorator.wrapped_func
+  File "PETSc/Log.pyx", line 116, in petsc4py.PETSc.Log.EventDecorator.decorator.wrapped_func
+  File "/home/public/app/firedrake_gnu_042022/firedrake/src/firedrake/firedrake/adjoint/interpolate.py", line 22, in wrapper
+    output = interpolate(interpolator, *function, **kwargs)
+  File "/home/public/app/firedrake_gnu_042022/firedrake/src/firedrake/firedrake/interpolation.py", line 118, in interpolate
+    assembled_interpolator = self.callable()
+  File "/home/public/app/firedrake_gnu_042022/firedrake/src/firedrake/firedrake/interpolation.py", line 222, in callable
+    l()
+  File "/home/public/app/firedrake_gnu_042022/firedrake/src/PyOP2/pyop2/parloop.py", line 201, in compute
+    self()
+  File "PETSc/Log.pyx", line 115, in petsc4py.PETSc.Log.EventDecorator.decorator.wrapped_func
+  File "PETSc/Log.pyx", line 116, in petsc4py.PETSc.Log.EventDecorator.decorator.wrapped_func
+  File "/home/public/app/firedrake_gnu_042022/firedrake/src/PyOP2/pyop2/parloop.py", line 210, in __call__
+    self._compute(self.iterset.core_part)
+  File "/home/public/app/firedrake_gnu_042022/firedrake/src/PyOP2/pyop2/parloop.py", line 192, in _compute
+    self.global_kernel(self.comm, part.offset, part.offset+part.size, *self.arglist)
+  File "/home/public/app/firedrake_gnu_042022/firedrake/src/PyOP2/pyop2/global_kernel.py", line 290, in __call__
+    func = self.compile(comm)
+  File "PETSc/Log.pyx", line 115, in petsc4py.PETSc.Log.EventDecorator.decorator.wrapped_func
+  File "PETSc/Log.pyx", line 116, in petsc4py.PETSc.Log.EventDecorator.decorator.wrapped_func
+  File "/home/public/app/firedrake_gnu_042022/firedrake/src/PyOP2/pyop2/global_kernel.py", line 360, in compile
+    return compilation.load(self, extension, self.name,
+  File "/home/public/app/firedrake_gnu_042022/firedrake/src/PyOP2/pyop2/compilation.py", line 634, in load
+    dll = compiler(cppargs, ldargs, cpp=cpp, comm=comm).get_so(code, extension)
+  File "/home/public/app/firedrake_gnu_042022/firedrake/src/PyOP2/pyop2/compilation.py", line 400, in get_so
+    raise CompilationError(
+pyop2.exceptions.CompilationError: Command "('mpicc', '-fPIC', '-Wall', '-std=gnu11', '-I/home/public/app/firedrake_gnu_042022/firedrake/src/petsc/include', '-I/home/public/app/firedrake_gnu_042022/firedrake/src/petsc/default/include', '-I/home/public/app/firedrake_gnu_042022/firedrake/src/PyOP2/pyop2', '-fno-ivopts', '-march=native', '-O3', '-ffast-math', '-o', '/home/olender/tmp_amd7/95/e45c5a92565b02de20a4199ac9399d_p191528.so.tmp', '/home/olender/tmp_amd7/95/e45c5a92565b02de20a4199ac9399d_p191528.c', '-shared', '-L/home/public/app/firedrake_gnu_042022/firedrake/src/petsc/lib', '-L/home/public/app/firedrake_gnu_042022/firedrake/src/petsc/default/lib', '-Wl,-rpath,/home/public/app/firedrake_gnu_042022/firedrake/src/petsc/lib', '-Wl,-rpath,/home/public/app/firedrake_gnu_042022/firedrake/src/petsc/default/lib', '-lpetsc', '-lm')" return error status 1.
+Unable to compile code
+Compile log in /home/olender/tmp_amd7/95/e45c5a92565b02de20a4199ac9399d_p191528.log
+Compile errors in /home/olender/tmp_amd7/95/e45c5a92565b02de20a4199ac9399d_p191528.err
+application called MPI_Abort(MPI_COMM_WORLD, 1) - process 0
+Traceback (most recent call last):
+  File "/home/public/app/firedrake_gnu_042022/firedrake/src/firedrake/firedrake/interpolation.py", line 115, in interpolate
+    assembled_interpolator = self.frozen_assembled_interpolator
+AttributeError: 'Interpolator' object has no attribute 'frozen_assembled_interpolator'
+
+During handling of the above exception, another exception occurred:
+
+Traceback (most recent call last):
+  File "/home/public/app/firedrake_gnu_042022/firedrake/src/PyOP2/pyop2/global_kernel.py", line 288, in __call__
+    func = self._func_cache[key]
+KeyError: 47240790002864
+
+During handling of the above exception, another exception occurred:
+
+Traceback (most recent call last):
+  File "/home/public/app/firedrake_gnu_042022/firedrake/src/PyOP2/pyop2/compilation.py", line 368, in get_so
+    return ctypes.CDLL(soname)
+  File "/opt/spack/opt/spack/linux-centos7-x86_64/gcc-8.3.0/python-3.8.11-fq4lolmvzcgu5zm25rnbnzsdghdkc55v/lib/python3.8/ctypes/__init__.py", line 373, in __init__
+    self._handle = _dlopen(self._name, mode)
+OSError: /home/olender/tmp_amd7/95/e45c5a92565b02de20a4199ac9399d.so: cannot open shared object file: No such file or directory
+
+During handling of the above exception, another exception occurred:
+
+Traceback (most recent call last):
+  File "/home/public/app/firedrake_gnu_042022/firedrake/src/PyOP2/pyop2/compilation.py", line 398, in get_so
+    subprocess.check_call(cc, stderr=err, stdout=log)
+  File "/opt/spack/opt/spack/linux-centos7-x86_64/gcc-8.3.0/python-3.8.11-fq4lolmvzcgu5zm25rnbnzsdghdkc55v/lib/python3.8/subprocess.py", line 364, in check_call
+    raise CalledProcessError(retcode, cmd)
+subprocess.CalledProcessError: Command '('mpicc', '-fPIC', '-Wall', '-std=gnu11', '-I/home/public/app/firedrake_gnu_042022/firedrake/src/petsc/include', '-I/home/public/app/firedrake_gnu_042022/firedrake/src/petsc/default/include', '-I/home/public/app/firedrake_gnu_042022/firedrake/src/PyOP2/pyop2', '-fno-ivopts', '-march=native', '-O3', '-ffast-math', '-o', '/home/olender/tmp_amd7/95/e45c5a92565b02de20a4199ac9399d_p191534.so.tmp', '/home/olender/tmp_amd7/95/e45c5a92565b02de20a4199ac9399d_p191534.c', '-shared', '-L/home/public/app/firedrake_gnu_042022/firedrake/src/petsc/lib', '-L/home/public/app/firedrake_gnu_042022/firedrake/src/petsc/default/lib', '-Wl,-rpath,/home/public/app/firedrake_gnu_042022/firedrake/src/petsc/lib', '-Wl,-rpath,/home/public/app/firedrake_gnu_042022/firedrake/src/petsc/default/lib', '-lpetsc', '-lm')' returned non-zero exit status 1.
+
+During handling of the above exception, another exception occurred:
+
+Traceback (most recent call last):
+  File "strong_scalling_2d.py", line 63, in <module>
+    vp = spyro.io.interpolate(model, mesh, V, guess=False)
+  File "/home/olender/cse23/spyro/spyro/io/io.py", line 322, in interpolate
+    coords = fire.interpolate(m.coordinates, W)
+  File "PETSc/Log.pyx", line 115, in petsc4py.PETSc.Log.EventDecorator.decorator.wrapped_func
+  File "PETSc/Log.pyx", line 116, in petsc4py.PETSc.Log.EventDecorator.decorator.wrapped_func
+  File "/home/public/app/firedrake_gnu_042022/firedrake/src/firedrake/firedrake/interpolation.py", line 61, in interpolate
+    return Interpolator(expr, V, subset=subset, access=access).interpolate(ad_block_tag=ad_block_tag)
+  File "PETSc/Log.pyx", line 115, in petsc4py.PETSc.Log.EventDecorator.decorator.wrapped_func
+  File "PETSc/Log.pyx", line 116, in petsc4py.PETSc.Log.EventDecorator.decorator.wrapped_func
+  File "/home/public/app/firedrake_gnu_042022/firedrake/src/firedrake/firedrake/adjoint/interpolate.py", line 22, in wrapper
+    output = interpolate(interpolator, *function, **kwargs)
+  File "/home/public/app/firedrake_gnu_042022/firedrake/src/firedrake/firedrake/interpolation.py", line 118, in interpolate
+    assembled_interpolator = self.callable()
+  File "/home/public/app/firedrake_gnu_042022/firedrake/src/firedrake/firedrake/interpolation.py", line 222, in callable
+    l()
+  File "/home/public/app/firedrake_gnu_042022/firedrake/src/PyOP2/pyop2/parloop.py", line 201, in compute
+    self()
+  File "PETSc/Log.pyx", line 115, in petsc4py.PETSc.Log.EventDecorator.decorator.wrapped_func
+  File "PETSc/Log.pyx", line 116, in petsc4py.PETSc.Log.EventDecorator.decorator.wrapped_func
+  File "/home/public/app/firedrake_gnu_042022/firedrake/src/PyOP2/pyop2/parloop.py", line 210, in __call__
+    self._compute(self.iterset.core_part)
+  File "/home/public/app/firedrake_gnu_042022/firedrake/src/PyOP2/pyop2/parloop.py", line 192, in _compute
+    self.global_kernel(self.comm, part.offset, part.offset+part.size, *self.arglist)
+  File "/home/public/app/firedrake_gnu_042022/firedrake/src/PyOP2/pyop2/global_kernel.py", line 290, in __call__
+    func = self.compile(comm)
+  File "PETSc/Log.pyx", line 115, in petsc4py.PETSc.Log.EventDecorator.decorator.wrapped_func
+  File "PETSc/Log.pyx", line 116, in petsc4py.PETSc.Log.EventDecorator.decorator.wrapped_func
+  File "/home/public/app/firedrake_gnu_042022/firedrake/src/PyOP2/pyop2/global_kernel.py", line 360, in compile
+    return compilation.load(self, extension, self.name,
+  File "/home/public/app/firedrake_gnu_042022/firedrake/src/PyOP2/pyop2/compilation.py", line 634, in load
+    dll = compiler(cppargs, ldargs, cpp=cpp, comm=comm).get_so(code, extension)
+  File "/home/public/app/firedrake_gnu_042022/firedrake/src/PyOP2/pyop2/compilation.py", line 400, in get_so
+    raise CompilationError(
+pyop2.exceptions.CompilationError: Command "('mpicc', '-fPIC', '-Wall', '-std=gnu11', '-I/home/public/app/firedrake_gnu_042022/firedrake/src/petsc/include', '-I/home/public/app/firedrake_gnu_042022/firedrake/src/petsc/default/include', '-I/home/public/app/firedrake_gnu_042022/firedrake/src/PyOP2/pyop2', '-fno-ivopts', '-march=native', '-O3', '-ffast-math', '-o', '/home/olender/tmp_amd7/95/e45c5a92565b02de20a4199ac9399d_p191534.so.tmp', '/home/olender/tmp_amd7/95/e45c5a92565b02de20a4199ac9399d_p191534.c', '-shared', '-L/home/public/app/firedrake_gnu_042022/firedrake/src/petsc/lib', '-L/home/public/app/firedrake_gnu_042022/firedrake/src/petsc/default/lib', '-Wl,-rpath,/home/public/app/firedrake_gnu_042022/firedrake/src/petsc/lib', '-Wl,-rpath,/home/public/app/firedrake_gnu_042022/firedrake/src/petsc/default/lib', '-lpetsc', '-lm')" return error status 1.
+Unable to compile code
+Compile log in /home/olender/tmp_amd7/95/e45c5a92565b02de20a4199ac9399d_p191534.log
+Compile errors in /home/olender/tmp_amd7/95/e45c5a92565b02de20a4199ac9399d_p191534.err
+Traceback (most recent call last):
+  File "/home/public/app/firedrake_gnu_042022/firedrake/src/firedrake/firedrake/interpolation.py", line 115, in interpolate
+    assembled_interpolator = self.frozen_assembled_interpolator
+AttributeError: 'Interpolator' object has no attribute 'frozen_assembled_interpolator'
+
+During handling of the above exception, another exception occurred:
+
+Traceback (most recent call last):
+  File "/home/public/app/firedrake_gnu_042022/firedrake/src/PyOP2/pyop2/global_kernel.py", line 288, in __call__
+    func = self._func_cache[key]
+KeyError: 47917419748144
+
+During handling of the above exception, another exception occurred:
+
+Traceback (most recent call last):
+  File "/home/public/app/firedrake_gnu_042022/firedrake/src/PyOP2/pyop2/compilation.py", line 368, in get_so
+    return ctypes.CDLL(soname)
+  File "/opt/spack/opt/spack/linux-centos7-x86_64/gcc-8.3.0/python-3.8.11-fq4lolmvzcgu5zm25rnbnzsdghdkc55v/lib/python3.8/ctypes/__init__.py", line 373, in __init__
+    self._handle = _dlopen(self._name, mode)
+OSError: /home/olender/tmp_amd7/95/e45c5a92565b02de20a4199ac9399d.so: cannot open shared object file: No such file or directory
+
+During handling of the above exception, another exception occurred:
+
+Traceback (most recent call last):
+  File "/home/public/app/firedrake_gnu_042022/firedrake/src/PyOP2/pyop2/compilation.py", line 398, in get_so
+    subprocess.check_call(cc, stderr=err, stdout=log)
+  File "/opt/spack/opt/spack/linux-centos7-x86_64/gcc-8.3.0/python-3.8.11-fq4lolmvzcgu5zm25rnbnzsdghdkc55v/lib/python3.8/subprocess.py", line 364, in check_call
+    raise CalledProcessError(retcode, cmd)
+subprocess.CalledProcessError: Command '('mpicc', '-fPIC', '-Wall', '-std=gnu11', '-I/home/public/app/firedrake_gnu_042022/firedrake/src/petsc/include', '-I/home/public/app/firedrake_gnu_042022/firedrake/src/petsc/default/include', '-I/home/public/app/firedrake_gnu_042022/firedrake/src/PyOP2/pyop2', '-fno-ivopts', '-march=native', '-O3', '-ffast-math', '-o', '/home/olender/tmp_amd7/95/e45c5a92565b02de20a4199ac9399d_p191532.so.tmp', '/home/olender/tmp_amd7/95/e45c5a92565b02de20a4199ac9399d_p191532.c', '-shared', '-L/home/public/app/firedrake_gnu_042022/firedrake/src/petsc/lib', '-L/home/public/app/firedrake_gnu_042022/firedrake/src/petsc/default/lib', '-Wl,-rpath,/home/public/app/firedrake_gnu_042022/firedrake/src/petsc/lib', '-Wl,-rpath,/home/public/app/firedrake_gnu_042022/firedrake/src/petsc/default/lib', '-lpetsc', '-lm')' returned non-zero exit status 1.
+
+During handling of the above exception, another exception occurred:
+
+Traceback (most recent call last):
+  File "strong_scalling_2d.py", line 63, in <module>
+    vp = spyro.io.interpolate(model, mesh, V, guess=False)
+  File "/home/olender/cse23/spyro/spyro/io/io.py", line 322, in interpolate
+    coords = fire.interpolate(m.coordinates, W)
+  File "PETSc/Log.pyx", line 115, in petsc4py.PETSc.Log.EventDecorator.decorator.wrapped_func
+  File "PETSc/Log.pyx", line 116, in petsc4py.PETSc.Log.EventDecorator.decorator.wrapped_func
+  File "/home/public/app/firedrake_gnu_042022/firedrake/src/firedrake/firedrake/interpolation.py", line 61, in interpolate
+    return Interpolator(expr, V, subset=subset, access=access).interpolate(ad_block_tag=ad_block_tag)
+  File "PETSc/Log.pyx", line 115, in petsc4py.PETSc.Log.EventDecorator.decorator.wrapped_func
+  File "PETSc/Log.pyx", line 116, in petsc4py.PETSc.Log.EventDecorator.decorator.wrapped_func
+  File "/home/public/app/firedrake_gnu_042022/firedrake/src/firedrake/firedrake/adjoint/interpolate.py", line 22, in wrapper
+    output = interpolate(interpolator, *function, **kwargs)
+  File "/home/public/app/firedrake_gnu_042022/firedrake/src/firedrake/firedrake/interpolation.py", line 118, in interpolate
+    assembled_interpolator = self.callable()
+  File "/home/public/app/firedrake_gnu_042022/firedrake/src/firedrake/firedrake/interpolation.py", line 222, in callable
+    l()
+  File "/home/public/app/firedrake_gnu_042022/firedrake/src/PyOP2/pyop2/parloop.py", line 201, in compute
+    self()
+  File "PETSc/Log.pyx", line 115, in petsc4py.PETSc.Log.EventDecorator.decorator.wrapped_func
+  File "PETSc/Log.pyx", line 116, in petsc4py.PETSc.Log.EventDecorator.decorator.wrapped_func
+  File "/home/public/app/firedrake_gnu_042022/firedrake/src/PyOP2/pyop2/parloop.py", line 210, in __call__
+    self._compute(self.iterset.core_part)
+  File "/home/public/app/firedrake_gnu_042022/firedrake/src/PyOP2/pyop2/parloop.py", line 192, in _compute
+    self.global_kernel(self.comm, part.offset, part.offset+part.size, *self.arglist)
+  File "/home/public/app/firedrake_gnu_042022/firedrake/src/PyOP2/pyop2/global_kernel.py", line 290, in __call__
+    func = self.compile(comm)
+  File "PETSc/Log.pyx", line 115, in petsc4py.PETSc.Log.EventDecorator.decorator.wrapped_func
+  File "PETSc/Log.pyx", line 116, in petsc4py.PETSc.Log.EventDecorator.decorator.wrapped_func
+  File "/home/public/app/firedrake_gnu_042022/firedrake/src/PyOP2/pyop2/global_kernel.py", line 360, in compile
+    return compilation.load(self, extension, self.name,
+  File "/home/public/app/firedrake_gnu_042022/firedrake/src/PyOP2/pyop2/compilation.py", line 634, in load
+    dll = compiler(cppargs, ldargs, cpp=cpp, comm=comm).get_so(code, extension)
+  File "/home/public/app/firedrake_gnu_042022/firedrake/src/PyOP2/pyop2/compilation.py", line 400, in get_so
+    raise CompilationError(
+pyop2.exceptions.CompilationError: Command "('mpicc', '-fPIC', '-Wall', '-std=gnu11', '-I/home/public/app/firedrake_gnu_042022/firedrake/src/petsc/include', '-I/home/public/app/firedrake_gnu_042022/firedrake/src/petsc/default/include', '-I/home/public/app/firedrake_gnu_042022/firedrake/src/PyOP2/pyop2', '-fno-ivopts', '-march=native', '-O3', '-ffast-math', '-o', '/home/olender/tmp_amd7/95/e45c5a92565b02de20a4199ac9399d_p191532.so.tmp', '/home/olender/tmp_amd7/95/e45c5a92565b02de20a4199ac9399d_p191532.c', '-shared', '-L/home/public/app/firedrake_gnu_042022/firedrake/src/petsc/lib', '-L/home/public/app/firedrake_gnu_042022/firedrake/src/petsc/default/lib', '-Wl,-rpath,/home/public/app/firedrake_gnu_042022/firedrake/src/petsc/lib', '-Wl,-rpath,/home/public/app/firedrake_gnu_042022/firedrake/src/petsc/default/lib', '-lpetsc', '-lm')" return error status 1.
+Unable to compile code
+Compile log in /home/olender/tmp_amd7/95/e45c5a92565b02de20a4199ac9399d_p191532.log
+Compile errors in /home/olender/tmp_amd7/95/e45c5a92565b02de20a4199ac9399d_p191532.err
+application called MPI_Abort(MPI_COMM_WORLD, 1) - process 4
+application called MPI_Abort(MPI_COMM_WORLD, 1) - process 6
+Traceback (most recent call last):
+  File "/home/public/app/firedrake_gnu_042022/firedrake/src/firedrake/firedrake/interpolation.py", line 115, in interpolate
+    assembled_interpolator = self.frozen_assembled_interpolator
+AttributeError: 'Interpolator' object has no attribute 'frozen_assembled_interpolator'
+
+During handling of the above exception, another exception occurred:
+
+Traceback (most recent call last):
+  File "/home/public/app/firedrake_gnu_042022/firedrake/src/PyOP2/pyop2/global_kernel.py", line 288, in __call__
+    func = self._func_cache[key]
+KeyError: 47547927796752
+
+During handling of the above exception, another exception occurred:
+
+Traceback (most recent call last):
+  File "/home/public/app/firedrake_gnu_042022/firedrake/src/PyOP2/pyop2/compilation.py", line 368, in get_so
+    return ctypes.CDLL(soname)
+  File "/opt/spack/opt/spack/linux-centos7-x86_64/gcc-8.3.0/python-3.8.11-fq4lolmvzcgu5zm25rnbnzsdghdkc55v/lib/python3.8/ctypes/__init__.py", line 373, in __init__
+    self._handle = _dlopen(self._name, mode)
+OSError: /home/olender/tmp_amd7/95/e45c5a92565b02de20a4199ac9399d.so: cannot open shared object file: No such file or directory
+
+During handling of the above exception, another exception occurred:
+
+Traceback (most recent call last):
+  File "/home/public/app/firedrake_gnu_042022/firedrake/src/PyOP2/pyop2/compilation.py", line 398, in get_so
+    subprocess.check_call(cc, stderr=err, stdout=log)
+  File "/opt/spack/opt/spack/linux-centos7-x86_64/gcc-8.3.0/python-3.8.11-fq4lolmvzcgu5zm25rnbnzsdghdkc55v/lib/python3.8/subprocess.py", line 364, in check_call
+    raise CalledProcessError(retcode, cmd)
+subprocess.CalledProcessError: Command '('mpicc', '-fPIC', '-Wall', '-std=gnu11', '-I/home/public/app/firedrake_gnu_042022/firedrake/src/petsc/include', '-I/home/public/app/firedrake_gnu_042022/firedrake/src/petsc/default/include', '-I/home/public/app/firedrake_gnu_042022/firedrake/src/PyOP2/pyop2', '-fno-ivopts', '-march=native', '-O3', '-ffast-math', '-o', '/home/olender/tmp_amd7/95/e45c5a92565b02de20a4199ac9399d_p191894.so.tmp', '/home/olender/tmp_amd7/95/e45c5a92565b02de20a4199ac9399d_p191894.c', '-shared', '-L/home/public/app/firedrake_gnu_042022/firedrake/src/petsc/lib', '-L/home/public/app/firedrake_gnu_042022/firedrake/src/petsc/default/lib', '-Wl,-rpath,/home/public/app/firedrake_gnu_042022/firedrake/src/petsc/lib', '-Wl,-rpath,/home/public/app/firedrake_gnu_042022/firedrake/src/petsc/default/lib', '-lpetsc', '-lm')' returned non-zero exit status 1.
+
+During handling of the above exception, another exception occurred:
+
+Traceback (most recent call last):
+  File "strong_scalling_2d.py", line 63, in <module>
+    vp = spyro.io.interpolate(model, mesh, V, guess=False)
+  File "/home/olender/cse23/spyro/spyro/io/io.py", line 322, in interpolate
+    coords = fire.interpolate(m.coordinates, W)
+  File "PETSc/Log.pyx", line 115, in petsc4py.PETSc.Log.EventDecorator.decorator.wrapped_func
+  File "PETSc/Log.pyx", line 116, in petsc4py.PETSc.Log.EventDecorator.decorator.wrapped_func
+  File "/home/public/app/firedrake_gnu_042022/firedrake/src/firedrake/firedrake/interpolation.py", line 61, in interpolate
+    return Interpolator(expr, V, subset=subset, access=access).interpolate(ad_block_tag=ad_block_tag)
+  File "PETSc/Log.pyx", line 115, in petsc4py.PETSc.Log.EventDecorator.decorator.wrapped_func
+  File "PETSc/Log.pyx", line 116, in petsc4py.PETSc.Log.EventDecorator.decorator.wrapped_func
+  File "/home/public/app/firedrake_gnu_042022/firedrake/src/firedrake/firedrake/adjoint/interpolate.py", line 22, in wrapper
+    output = interpolate(interpolator, *function, **kwargs)
+  File "/home/public/app/firedrake_gnu_042022/firedrake/src/firedrake/firedrake/interpolation.py", line 118, in interpolate
+    assembled_interpolator = self.callable()
+  File "/home/public/app/firedrake_gnu_042022/firedrake/src/firedrake/firedrake/interpolation.py", line 222, in callable
+    l()
+  File "/home/public/app/firedrake_gnu_042022/firedrake/src/PyOP2/pyop2/parloop.py", line 201, in compute
+    self()
+  File "PETSc/Log.pyx", line 115, in petsc4py.PETSc.Log.EventDecorator.decorator.wrapped_func
+  File "PETSc/Log.pyx", line 116, in petsc4py.PETSc.Log.EventDecorator.decorator.wrapped_func
+  File "/home/public/app/firedrake_gnu_042022/firedrake/src/PyOP2/pyop2/parloop.py", line 210, in __call__
+    self._compute(self.iterset.core_part)
+  File "/home/public/app/firedrake_gnu_042022/firedrake/src/PyOP2/pyop2/parloop.py", line 192, in _compute
+    self.global_kernel(self.comm, part.offset, part.offset+part.size, *self.arglist)
+  File "/home/public/app/firedrake_gnu_042022/firedrake/src/PyOP2/pyop2/global_kernel.py", line 290, in __call__
+    func = self.compile(comm)
+  File "PETSc/Log.pyx", line 115, in petsc4py.PETSc.Log.EventDecorator.decorator.wrapped_func
+  File "PETSc/Log.pyx", line 116, in petsc4py.PETSc.Log.EventDecorator.decorator.wrapped_func
+  File "/home/public/app/firedrake_gnu_042022/firedrake/src/PyOP2/pyop2/global_kernel.py", line 360, in compile
+    return compilation.load(self, extension, self.name,
+  File "/home/public/app/firedrake_gnu_042022/firedrake/src/PyOP2/pyop2/compilation.py", line 634, in load
+    dll = compiler(cppargs, ldargs, cpp=cpp, comm=comm).get_so(code, extension)
+  File "/home/public/app/firedrake_gnu_042022/firedrake/src/PyOP2/pyop2/compilation.py", line 400, in get_so
+    raise CompilationError(
+pyop2.exceptions.CompilationError: Command "('mpicc', '-fPIC', '-Wall', '-std=gnu11', '-I/home/public/app/firedrake_gnu_042022/firedrake/src/petsc/include', '-I/home/public/app/firedrake_gnu_042022/firedrake/src/petsc/default/include', '-I/home/public/app/firedrake_gnu_042022/firedrake/src/PyOP2/pyop2', '-fno-ivopts', '-march=native', '-O3', '-ffast-math', '-o', '/home/olender/tmp_amd7/95/e45c5a92565b02de20a4199ac9399d_p191894.so.tmp', '/home/olender/tmp_amd7/95/e45c5a92565b02de20a4199ac9399d_p191894.c', '-shared', '-L/home/public/app/firedrake_gnu_042022/firedrake/src/petsc/lib', '-L/home/public/app/firedrake_gnu_042022/firedrake/src/petsc/default/lib', '-Wl,-rpath,/home/public/app/firedrake_gnu_042022/firedrake/src/petsc/lib', '-Wl,-rpath,/home/public/app/firedrake_gnu_042022/firedrake/src/petsc/default/lib', '-lpetsc', '-lm')" return error status 1.
+Unable to compile code
+Compile log in /home/olender/tmp_amd7/95/e45c5a92565b02de20a4199ac9399d_p191894.log
+Compile errors in /home/olender/tmp_amd7/95/e45c5a92565b02de20a4199ac9399d_p191894.err
+application called MPI_Abort(MPI_COMM_WORLD, 1) - process 9
+Traceback (most recent call last):
+  File "/home/public/app/firedrake_gnu_042022/firedrake/src/firedrake/firedrake/interpolation.py", line 115, in interpolate
+    assembled_interpolator = self.frozen_assembled_interpolator
+AttributeError: 'Interpolator' object has no attribute 'frozen_assembled_interpolator'
+
+During handling of the above exception, another exception occurred:
+
+Traceback (most recent call last):
+  File "/home/public/app/firedrake_gnu_042022/firedrake/src/PyOP2/pyop2/global_kernel.py", line 288, in __call__
+    func = self._func_cache[key]
+KeyError: 47251918502640
+
+During handling of the above exception, another exception occurred:
+
+Traceback (most recent call last):
+  File "/home/public/app/firedrake_gnu_042022/firedrake/src/PyOP2/pyop2/compilation.py", line 368, in get_so
+    return ctypes.CDLL(soname)
+  File "/opt/spack/opt/spack/linux-centos7-x86_64/gcc-8.3.0/python-3.8.11-fq4lolmvzcgu5zm25rnbnzsdghdkc55v/lib/python3.8/ctypes/__init__.py", line 373, in __init__
+    self._handle = _dlopen(self._name, mode)
+OSError: /home/olender/tmp_amd7/95/e45c5a92565b02de20a4199ac9399d.so: cannot open shared object file: No such file or directory
+
+During handling of the above exception, another exception occurred:
+
+Traceback (most recent call last):
+  File "/home/public/app/firedrake_gnu_042022/firedrake/src/PyOP2/pyop2/compilation.py", line 398, in get_so
+    subprocess.check_call(cc, stderr=err, stdout=log)
+  File "/opt/spack/opt/spack/linux-centos7-x86_64/gcc-8.3.0/python-3.8.11-fq4lolmvzcgu5zm25rnbnzsdghdkc55v/lib/python3.8/subprocess.py", line 364, in check_call
+    raise CalledProcessError(retcode, cmd)
+subprocess.CalledProcessError: Command '('mpicc', '-fPIC', '-Wall', '-std=gnu11', '-I/home/public/app/firedrake_gnu_042022/firedrake/src/petsc/include', '-I/home/public/app/firedrake_gnu_042022/firedrake/src/petsc/default/include', '-I/home/public/app/firedrake_gnu_042022/firedrake/src/PyOP2/pyop2', '-fno-ivopts', '-march=native', '-O3', '-ffast-math', '-o', '/home/olender/tmp_amd7/95/e45c5a92565b02de20a4199ac9399d_p191897.so.tmp', '/home/olender/tmp_amd7/95/e45c5a92565b02de20a4199ac9399d_p191897.c', '-shared', '-L/home/public/app/firedrake_gnu_042022/firedrake/src/petsc/lib', '-L/home/public/app/firedrake_gnu_042022/firedrake/src/petsc/default/lib', '-Wl,-rpath,/home/public/app/firedrake_gnu_042022/firedrake/src/petsc/lib', '-Wl,-rpath,/home/public/app/firedrake_gnu_042022/firedrake/src/petsc/default/lib', '-lpetsc', '-lm')' returned non-zero exit status 1.
+
+During handling of the above exception, another exception occurred:
+
+Traceback (most recent call last):
+  File "strong_scalling_2d.py", line 63, in <module>
+    vp = spyro.io.interpolate(model, mesh, V, guess=False)
+  File "/home/olender/cse23/spyro/spyro/io/io.py", line 322, in interpolate
+    coords = fire.interpolate(m.coordinates, W)
+  File "PETSc/Log.pyx", line 115, in petsc4py.PETSc.Log.EventDecorator.decorator.wrapped_func
+  File "PETSc/Log.pyx", line 116, in petsc4py.PETSc.Log.EventDecorator.decorator.wrapped_func
+  File "/home/public/app/firedrake_gnu_042022/firedrake/src/firedrake/firedrake/interpolation.py", line 61, in interpolate
+    return Interpolator(expr, V, subset=subset, access=access).interpolate(ad_block_tag=ad_block_tag)
+  File "PETSc/Log.pyx", line 115, in petsc4py.PETSc.Log.EventDecorator.decorator.wrapped_func
+  File "PETSc/Log.pyx", line 116, in petsc4py.PETSc.Log.EventDecorator.decorator.wrapped_func
+  File "/home/public/app/firedrake_gnu_042022/firedrake/src/firedrake/firedrake/adjoint/interpolate.py", line 22, in wrapper
+    output = interpolate(interpolator, *function, **kwargs)
+  File "/home/public/app/firedrake_gnu_042022/firedrake/src/firedrake/firedrake/interpolation.py", line 118, in interpolate
+    assembled_interpolator = self.callable()
+  File "/home/public/app/firedrake_gnu_042022/firedrake/src/firedrake/firedrake/interpolation.py", line 222, in callable
+    l()
+  File "/home/public/app/firedrake_gnu_042022/firedrake/src/PyOP2/pyop2/parloop.py", line 201, in compute
+    self()
+  File "PETSc/Log.pyx", line 115, in petsc4py.PETSc.Log.EventDecorator.decorator.wrapped_func
+  File "PETSc/Log.pyx", line 116, in petsc4py.PETSc.Log.EventDecorator.decorator.wrapped_func
+  File "/home/public/app/firedrake_gnu_042022/firedrake/src/PyOP2/pyop2/parloop.py", line 210, in __call__
+    self._compute(self.iterset.core_part)
+  File "/home/public/app/firedrake_gnu_042022/firedrake/src/PyOP2/pyop2/parloop.py", line 192, in _compute
+    self.global_kernel(self.comm, part.offset, part.offset+part.size, *self.arglist)
+  File "/home/public/app/firedrake_gnu_042022/firedrake/src/PyOP2/pyop2/global_kernel.py", line 290, in __call__
+    func = self.compile(comm)
+  File "PETSc/Log.pyx", line 115, in petsc4py.PETSc.Log.EventDecorator.decorator.wrapped_func
+  File "PETSc/Log.pyx", line 116, in petsc4py.PETSc.Log.EventDecorator.decorator.wrapped_func
+  File "/home/public/app/firedrake_gnu_042022/firedrake/src/PyOP2/pyop2/global_kernel.py", line 360, in compile
+    return compilation.load(self, extension, self.name,
+  File "/home/public/app/firedrake_gnu_042022/firedrake/src/PyOP2/pyop2/compilation.py", line 634, in load
+    dll = compiler(cppargs, ldargs, cpp=cpp, comm=comm).get_so(code, extension)
+  File "/home/public/app/firedrake_gnu_042022/firedrake/src/PyOP2/pyop2/compilation.py", line 400, in get_so
+    raise CompilationError(
+pyop2.exceptions.CompilationError: Command "('mpicc', '-fPIC', '-Wall', '-std=gnu11', '-I/home/public/app/firedrake_gnu_042022/firedrake/src/petsc/include', '-I/home/public/app/firedrake_gnu_042022/firedrake/src/petsc/default/include', '-I/home/public/app/firedrake_gnu_042022/firedrake/src/PyOP2/pyop2', '-fno-ivopts', '-march=native', '-O3', '-ffast-math', '-o', '/home/olender/tmp_amd7/95/e45c5a92565b02de20a4199ac9399d_p191897.so.tmp', '/home/olender/tmp_amd7/95/e45c5a92565b02de20a4199ac9399d_p191897.c', '-shared', '-L/home/public/app/firedrake_gnu_042022/firedrake/src/petsc/lib', '-L/home/public/app/firedrake_gnu_042022/firedrake/src/petsc/default/lib', '-Wl,-rpath,/home/public/app/firedrake_gnu_042022/firedrake/src/petsc/lib', '-Wl,-rpath,/home/public/app/firedrake_gnu_042022/firedrake/src/petsc/default/lib', '-lpetsc', '-lm')" return error status 1.
+Unable to compile code
+Compile log in /home/olender/tmp_amd7/95/e45c5a92565b02de20a4199ac9399d_p191897.log
+Compile errors in /home/olender/tmp_amd7/95/e45c5a92565b02de20a4199ac9399d_p191897.err
+application called MPI_Abort(MPI_COMM_WORLD, 1) - process 12
+Traceback (most recent call last):
+  File "/home/public/app/firedrake_gnu_042022/firedrake/src/firedrake/firedrake/interpolation.py", line 115, in interpolate
+    assembled_interpolator = self.frozen_assembled_interpolator
+AttributeError: 'Interpolator' object has no attribute 'frozen_assembled_interpolator'
+
+During handling of the above exception, another exception occurred:
+
+Traceback (most recent call last):
+  File "/home/public/app/firedrake_gnu_042022/firedrake/src/PyOP2/pyop2/global_kernel.py", line 288, in __call__
+    func = self._func_cache[key]
+KeyError: 47240389725040
+
+During handling of the above exception, another exception occurred:
+
+Traceback (most recent call last):
+  File "/home/public/app/firedrake_gnu_042022/firedrake/src/PyOP2/pyop2/compilation.py", line 368, in get_so
+    return ctypes.CDLL(soname)
+  File "/opt/spack/opt/spack/linux-centos7-x86_64/gcc-8.3.0/python-3.8.11-fq4lolmvzcgu5zm25rnbnzsdghdkc55v/lib/python3.8/ctypes/__init__.py", line 373, in __init__
+    self._handle = _dlopen(self._name, mode)
+OSError: /home/olender/tmp_amd7/95/e45c5a92565b02de20a4199ac9399d.so: cannot open shared object file: No such file or directory
+
+During handling of the above exception, another exception occurred:
+
+Traceback (most recent call last):
+  File "/home/public/app/firedrake_gnu_042022/firedrake/src/PyOP2/pyop2/compilation.py", line 398, in get_so
+    subprocess.check_call(cc, stderr=err, stdout=log)
+  File "/opt/spack/opt/spack/linux-centos7-x86_64/gcc-8.3.0/python-3.8.11-fq4lolmvzcgu5zm25rnbnzsdghdkc55v/lib/python3.8/subprocess.py", line 364, in check_call
+    raise CalledProcessError(retcode, cmd)
+subprocess.CalledProcessError: Command '('mpicc', '-fPIC', '-Wall', '-std=gnu11', '-I/home/public/app/firedrake_gnu_042022/firedrake/src/petsc/include', '-I/home/public/app/firedrake_gnu_042022/firedrake/src/petsc/default/include', '-I/home/public/app/firedrake_gnu_042022/firedrake/src/PyOP2/pyop2', '-fno-ivopts', '-march=native', '-O3', '-ffast-math', '-o', '/home/olender/tmp_amd7/95/e45c5a92565b02de20a4199ac9399d_p191885.so.tmp', '/home/olender/tmp_amd7/95/e45c5a92565b02de20a4199ac9399d_p191885.c', '-shared', '-L/home/public/app/firedrake_gnu_042022/firedrake/src/petsc/lib', '-L/home/public/app/firedrake_gnu_042022/firedrake/src/petsc/default/lib', '-Wl,-rpath,/home/public/app/firedrake_gnu_042022/firedrake/src/petsc/lib', '-Wl,-rpath,/home/public/app/firedrake_gnu_042022/firedrake/src/petsc/default/lib', '-lpetsc', '-lm')' returned non-zero exit status 1.
+
+During handling of the above exception, another exception occurred:
+
+Traceback (most recent call last):
+  File "strong_scalling_2d.py", line 63, in <module>
+    vp = spyro.io.interpolate(model, mesh, V, guess=False)
+  File "/home/olender/cse23/spyro/spyro/io/io.py", line 322, in interpolate
+    coords = fire.interpolate(m.coordinates, W)
+  File "PETSc/Log.pyx", line 115, in petsc4py.PETSc.Log.EventDecorator.decorator.wrapped_func
+  File "PETSc/Log.pyx", line 116, in petsc4py.PETSc.Log.EventDecorator.decorator.wrapped_func
+  File "/home/public/app/firedrake_gnu_042022/firedrake/src/firedrake/firedrake/interpolation.py", line 61, in interpolate
+    return Interpolator(expr, V, subset=subset, access=access).interpolate(ad_block_tag=ad_block_tag)
+  File "PETSc/Log.pyx", line 115, in petsc4py.PETSc.Log.EventDecorator.decorator.wrapped_func
+  File "PETSc/Log.pyx", line 116, in petsc4py.PETSc.Log.EventDecorator.decorator.wrapped_func
+  File "/home/public/app/firedrake_gnu_042022/firedrake/src/firedrake/firedrake/adjoint/interpolate.py", line 22, in wrapper
+    output = interpolate(interpolator, *function, **kwargs)
+  File "/home/public/app/firedrake_gnu_042022/firedrake/src/firedrake/firedrake/interpolation.py", line 118, in interpolate
+    assembled_interpolator = self.callable()
+  File "/home/public/app/firedrake_gnu_042022/firedrake/src/firedrake/firedrake/interpolation.py", line 222, in callable
+    l()
+  File "/home/public/app/firedrake_gnu_042022/firedrake/src/PyOP2/pyop2/parloop.py", line 201, in compute
+    self()
+  File "PETSc/Log.pyx", line 115, in petsc4py.PETSc.Log.EventDecorator.decorator.wrapped_func
+  File "PETSc/Log.pyx", line 116, in petsc4py.PETSc.Log.EventDecorator.decorator.wrapped_func
+  File "/home/public/app/firedrake_gnu_042022/firedrake/src/PyOP2/pyop2/parloop.py", line 210, in __call__
+    self._compute(self.iterset.core_part)
+  File "/home/public/app/firedrake_gnu_042022/firedrake/src/PyOP2/pyop2/parloop.py", line 192, in _compute
+    self.global_kernel(self.comm, part.offset, part.offset+part.size, *self.arglist)
+  File "/home/public/app/firedrake_gnu_042022/firedrake/src/PyOP2/pyop2/global_kernel.py", line 290, in __call__
+    func = self.compile(comm)
+  File "PETSc/Log.pyx", line 115, in petsc4py.PETSc.Log.EventDecorator.decorator.wrapped_func
+  File "PETSc/Log.pyx", line 116, in petsc4py.PETSc.Log.EventDecorator.decorator.wrapped_func
+  File "/home/public/app/firedrake_gnu_042022/firedrake/src/PyOP2/pyop2/global_kernel.py", line 360, in compile
+    return compilation.load(self, extension, self.name,
+  File "/home/public/app/firedrake_gnu_042022/firedrake/src/PyOP2/pyop2/compilation.py", line 634, in load
+    dll = compiler(cppargs, ldargs, cpp=cpp, comm=comm).get_so(code, extension)
+  File "/home/public/app/firedrake_gnu_042022/firedrake/src/PyOP2/pyop2/compilation.py", line 400, in get_so
+    raise CompilationError(
+pyop2.exceptions.CompilationError: Command "('mpicc', '-fPIC', '-Wall', '-std=gnu11', '-I/home/public/app/firedrake_gnu_042022/firedrake/src/petsc/include', '-I/home/public/app/firedrake_gnu_042022/firedrake/src/petsc/default/include', '-I/home/public/app/firedrake_gnu_042022/firedrake/src/PyOP2/pyop2', '-fno-ivopts', '-march=native', '-O3', '-ffast-math', '-o', '/home/olender/tmp_amd7/95/e45c5a92565b02de20a4199ac9399d_p191885.so.tmp', '/home/olender/tmp_amd7/95/e45c5a92565b02de20a4199ac9399d_p191885.c', '-shared', '-L/home/public/app/firedrake_gnu_042022/firedrake/src/petsc/lib', '-L/home/public/app/firedrake_gnu_042022/firedrake/src/petsc/default/lib', '-Wl,-rpath,/home/public/app/firedrake_gnu_042022/firedrake/src/petsc/lib', '-Wl,-rpath,/home/public/app/firedrake_gnu_042022/firedrake/src/petsc/default/lib', '-lpetsc', '-lm')" return error status 1.
+Unable to compile code
+Compile log in /home/olender/tmp_amd7/95/e45c5a92565b02de20a4199ac9399d_p191885.log
+Compile errors in /home/olender/tmp_amd7/95/e45c5a92565b02de20a4199ac9399d_p191885.err
+application called MPI_Abort(MPI_COMM_WORLD, 1) - process 0
+Traceback (most recent call last):
+  File "/home/public/app/firedrake_gnu_042022/firedrake/src/firedrake/firedrake/interpolation.py", line 115, in interpolate
+    assembled_interpolator = self.frozen_assembled_interpolator
+AttributeError: 'Interpolator' object has no attribute 'frozen_assembled_interpolator'
+
+During handling of the above exception, another exception occurred:
+
+Traceback (most recent call last):
+  File "/home/public/app/firedrake_gnu_042022/firedrake/src/PyOP2/pyop2/global_kernel.py", line 288, in __call__
+    func = self._func_cache[key]
+KeyError: 47616591494256
+
+During handling of the above exception, another exception occurred:
+
+Traceback (most recent call last):
+  File "/home/public/app/firedrake_gnu_042022/firedrake/src/PyOP2/pyop2/compilation.py", line 368, in get_so
+    return ctypes.CDLL(soname)
+  File "/opt/spack/opt/spack/linux-centos7-x86_64/gcc-8.3.0/python-3.8.11-fq4lolmvzcgu5zm25rnbnzsdghdkc55v/lib/python3.8/ctypes/__init__.py", line 373, in __init__
+    self._handle = _dlopen(self._name, mode)
+OSError: /home/olender/tmp_amd7/95/e45c5a92565b02de20a4199ac9399d.so: cannot open shared object file: No such file or directory
+
+During handling of the above exception, another exception occurred:
+
+Traceback (most recent call last):
+  File "/home/public/app/firedrake_gnu_042022/firedrake/src/PyOP2/pyop2/compilation.py", line 398, in get_so
+    subprocess.check_call(cc, stderr=err, stdout=log)
+  File "/opt/spack/opt/spack/linux-centos7-x86_64/gcc-8.3.0/python-3.8.11-fq4lolmvzcgu5zm25rnbnzsdghdkc55v/lib/python3.8/subprocess.py", line 364, in check_call
+    raise CalledProcessError(retcode, cmd)
+subprocess.CalledProcessError: Command '('mpicc', '-fPIC', '-Wall', '-std=gnu11', '-I/home/public/app/firedrake_gnu_042022/firedrake/src/petsc/include', '-I/home/public/app/firedrake_gnu_042022/firedrake/src/petsc/default/include', '-I/home/public/app/firedrake_gnu_042022/firedrake/src/PyOP2/pyop2', '-fno-ivopts', '-march=native', '-O3', '-ffast-math', '-o', '/home/olender/tmp_amd7/95/e45c5a92565b02de20a4199ac9399d_p191891.so.tmp', '/home/olender/tmp_amd7/95/e45c5a92565b02de20a4199ac9399d_p191891.c', '-shared', '-L/home/public/app/firedrake_gnu_042022/firedrake/src/petsc/lib', '-L/home/public/app/firedrake_gnu_042022/firedrake/src/petsc/default/lib', '-Wl,-rpath,/home/public/app/firedrake_gnu_042022/firedrake/src/petsc/lib', '-Wl,-rpath,/home/public/app/firedrake_gnu_042022/firedrake/src/petsc/default/lib', '-lpetsc', '-lm')' returned non-zero exit status 1.
+
+During handling of the above exception, another exception occurred:
+
+Traceback (most recent call last):
+  File "strong_scalling_2d.py", line 63, in <module>
+    vp = spyro.io.interpolate(model, mesh, V, guess=False)
+  File "/home/olender/cse23/spyro/spyro/io/io.py", line 322, in interpolate
+    coords = fire.interpolate(m.coordinates, W)
+  File "PETSc/Log.pyx", line 115, in petsc4py.PETSc.Log.EventDecorator.decorator.wrapped_func
+  File "PETSc/Log.pyx", line 116, in petsc4py.PETSc.Log.EventDecorator.decorator.wrapped_func
+  File "/home/public/app/firedrake_gnu_042022/firedrake/src/firedrake/firedrake/interpolation.py", line 61, in interpolate
+    return Interpolator(expr, V, subset=subset, access=access).interpolate(ad_block_tag=ad_block_tag)
+  File "PETSc/Log.pyx", line 115, in petsc4py.PETSc.Log.EventDecorator.decorator.wrapped_func
+  File "PETSc/Log.pyx", line 116, in petsc4py.PETSc.Log.EventDecorator.decorator.wrapped_func
+  File "/home/public/app/firedrake_gnu_042022/firedrake/src/firedrake/firedrake/adjoint/interpolate.py", line 22, in wrapper
+    output = interpolate(interpolator, *function, **kwargs)
+  File "/home/public/app/firedrake_gnu_042022/firedrake/src/firedrake/firedrake/interpolation.py", line 118, in interpolate
+    assembled_interpolator = self.callable()
+  File "/home/public/app/firedrake_gnu_042022/firedrake/src/firedrake/firedrake/interpolation.py", line 222, in callable
+    l()
+  File "/home/public/app/firedrake_gnu_042022/firedrake/src/PyOP2/pyop2/parloop.py", line 201, in compute
+    self()
+  File "PETSc/Log.pyx", line 115, in petsc4py.PETSc.Log.EventDecorator.decorator.wrapped_func
+  File "PETSc/Log.pyx", line 116, in petsc4py.PETSc.Log.EventDecorator.decorator.wrapped_func
+  File "/home/public/app/firedrake_gnu_042022/firedrake/src/PyOP2/pyop2/parloop.py", line 210, in __call__
+    self._compute(self.iterset.core_part)
+  File "/home/public/app/firedrake_gnu_042022/firedrake/src/PyOP2/pyop2/parloop.py", line 192, in _compute
+    self.global_kernel(self.comm, part.offset, part.offset+part.size, *self.arglist)
+  File "/home/public/app/firedrake_gnu_042022/firedrake/src/PyOP2/pyop2/global_kernel.py", line 290, in __call__
+    func = self.compile(comm)
+  File "PETSc/Log.pyx", line 115, in petsc4py.PETSc.Log.EventDecorator.decorator.wrapped_func
+  File "PETSc/Log.pyx", line 116, in petsc4py.PETSc.Log.EventDecorator.decorator.wrapped_func
+  File "/home/public/app/firedrake_gnu_042022/firedrake/src/PyOP2/pyop2/global_kernel.py", line 360, in compile
+    return compilation.load(self, extension, self.name,
+  File "/home/public/app/firedrake_gnu_042022/firedrake/src/PyOP2/pyop2/compilation.py", line 634, in load
+    dll = compiler(cppargs, ldargs, cpp=cpp, comm=comm).get_so(code, extension)
+  File "/home/public/app/firedrake_gnu_042022/firedrake/src/PyOP2/pyop2/compilation.py", line 400, in get_so
+    raise CompilationError(
+pyop2.exceptions.CompilationError: Command "('mpicc', '-fPIC', '-Wall', '-std=gnu11', '-I/home/public/app/firedrake_gnu_042022/firedrake/src/petsc/include', '-I/home/public/app/firedrake_gnu_042022/firedrake/src/petsc/default/include', '-I/home/public/app/firedrake_gnu_042022/firedrake/src/PyOP2/pyop2', '-fno-ivopts', '-march=native', '-O3', '-ffast-math', '-o', '/home/olender/tmp_amd7/95/e45c5a92565b02de20a4199ac9399d_p191891.so.tmp', '/home/olender/tmp_amd7/95/e45c5a92565b02de20a4199ac9399d_p191891.c', '-shared', '-L/home/public/app/firedrake_gnu_042022/firedrake/src/petsc/lib', '-L/home/public/app/firedrake_gnu_042022/firedrake/src/petsc/default/lib', '-Wl,-rpath,/home/public/app/firedrake_gnu_042022/firedrake/src/petsc/lib', '-Wl,-rpath,/home/public/app/firedrake_gnu_042022/firedrake/src/petsc/default/lib', '-lpetsc', '-lm')" return error status 1.
+Unable to compile code
+Compile log in /home/olender/tmp_amd7/95/e45c5a92565b02de20a4199ac9399d_p191891.log
+Compile errors in /home/olender/tmp_amd7/95/e45c5a92565b02de20a4199ac9399d_p191891.err
+application called MPI_Abort(MPI_COMM_WORLD, 1) - process 6
+Traceback (most recent call last):
+  File "/home/public/app/firedrake_gnu_042022/firedrake/src/firedrake/firedrake/interpolation.py", line 115, in interpolate
+    assembled_interpolator = self.frozen_assembled_interpolator
+AttributeError: 'Interpolator' object has no attribute 'frozen_assembled_interpolator'
+
+During handling of the above exception, another exception occurred:
+
+Traceback (most recent call last):
+  File "/home/public/app/firedrake_gnu_042022/firedrake/src/PyOP2/pyop2/global_kernel.py", line 288, in __call__
+    func = self._func_cache[key]
+KeyError: 47906418892848
+
+During handling of the above exception, another exception occurred:
+
+Traceback (most recent call last):
+  File "/home/public/app/firedrake_gnu_042022/firedrake/src/PyOP2/pyop2/compilation.py", line 368, in get_so
+    return ctypes.CDLL(soname)
+  File "/opt/spack/opt/spack/linux-centos7-x86_64/gcc-8.3.0/python-3.8.11-fq4lolmvzcgu5zm25rnbnzsdghdkc55v/lib/python3.8/ctypes/__init__.py", line 373, in __init__
+    self._handle = _dlopen(self._name, mode)
+OSError: /home/olender/tmp_amd7/95/e45c5a92565b02de20a4199ac9399d.so: cannot open shared object file: No such file or directory
+
+During handling of the above exception, another exception occurred:
+
+Traceback (most recent call last):
+  File "/home/public/app/firedrake_gnu_042022/firedrake/src/PyOP2/pyop2/compilation.py", line 398, in get_so
+    subprocess.check_call(cc, stderr=err, stdout=log)
+  File "/opt/spack/opt/spack/linux-centos7-x86_64/gcc-8.3.0/python-3.8.11-fq4lolmvzcgu5zm25rnbnzsdghdkc55v/lib/python3.8/subprocess.py", line 364, in check_call
+    raise CalledProcessError(retcode, cmd)
+subprocess.CalledProcessError: Command '('mpicc', '-fPIC', '-Wall', '-std=gnu11', '-I/home/public/app/firedrake_gnu_042022/firedrake/src/petsc/include', '-I/home/public/app/firedrake_gnu_042022/firedrake/src/petsc/default/include', '-I/home/public/app/firedrake_gnu_042022/firedrake/src/PyOP2/pyop2', '-fno-ivopts', '-march=native', '-O3', '-ffast-math', '-o', '/home/olender/tmp_amd7/95/e45c5a92565b02de20a4199ac9399d_p192331.so.tmp', '/home/olender/tmp_amd7/95/e45c5a92565b02de20a4199ac9399d_p192331.c', '-shared', '-L/home/public/app/firedrake_gnu_042022/firedrake/src/petsc/lib', '-L/home/public/app/firedrake_gnu_042022/firedrake/src/petsc/default/lib', '-Wl,-rpath,/home/public/app/firedrake_gnu_042022/firedrake/src/petsc/lib', '-Wl,-rpath,/home/public/app/firedrake_gnu_042022/firedrake/src/petsc/default/lib', '-lpetsc', '-lm')' returned non-zero exit status 1.
+
+During handling of the above exception, another exception occurred:
+
+Traceback (most recent call last):
+  File "strong_scalling_2d.py", line 63, in <module>
+    vp = spyro.io.interpolate(model, mesh, V, guess=False)
+  File "/home/olender/cse23/spyro/spyro/io/io.py", line 322, in interpolate
+    coords = fire.interpolate(m.coordinates, W)
+  File "PETSc/Log.pyx", line 115, in petsc4py.PETSc.Log.EventDecorator.decorator.wrapped_func
+  File "PETSc/Log.pyx", line 116, in petsc4py.PETSc.Log.EventDecorator.decorator.wrapped_func
+  File "/home/public/app/firedrake_gnu_042022/firedrake/src/firedrake/firedrake/interpolation.py", line 61, in interpolate
+    return Interpolator(expr, V, subset=subset, access=access).interpolate(ad_block_tag=ad_block_tag)
+  File "PETSc/Log.pyx", line 115, in petsc4py.PETSc.Log.EventDecorator.decorator.wrapped_func
+  File "PETSc/Log.pyx", line 116, in petsc4py.PETSc.Log.EventDecorator.decorator.wrapped_func
+  File "/home/public/app/firedrake_gnu_042022/firedrake/src/firedrake/firedrake/adjoint/interpolate.py", line 22, in wrapper
+    output = interpolate(interpolator, *function, **kwargs)
+  File "/home/public/app/firedrake_gnu_042022/firedrake/src/firedrake/firedrake/interpolation.py", line 118, in interpolate
+    assembled_interpolator = self.callable()
+  File "/home/public/app/firedrake_gnu_042022/firedrake/src/firedrake/firedrake/interpolation.py", line 222, in callable
+    l()
+  File "/home/public/app/firedrake_gnu_042022/firedrake/src/PyOP2/pyop2/parloop.py", line 201, in compute
+    self()
+  File "PETSc/Log.pyx", line 115, in petsc4py.PETSc.Log.EventDecorator.decorator.wrapped_func
+  File "PETSc/Log.pyx", line 116, in petsc4py.PETSc.Log.EventDecorator.decorator.wrapped_func
+  File "/home/public/app/firedrake_gnu_042022/firedrake/src/PyOP2/pyop2/parloop.py", line 210, in __call__
+    self._compute(self.iterset.core_part)
+  File "/home/public/app/firedrake_gnu_042022/firedrake/src/PyOP2/pyop2/parloop.py", line 192, in _compute
+    self.global_kernel(self.comm, part.offset, part.offset+part.size, *self.arglist)
+  File "/home/public/app/firedrake_gnu_042022/firedrake/src/PyOP2/pyop2/global_kernel.py", line 290, in __call__
+    func = self.compile(comm)
+  File "PETSc/Log.pyx", line 115, in petsc4py.PETSc.Log.EventDecorator.decorator.wrapped_func
+  File "PETSc/Log.pyx", line 116, in petsc4py.PETSc.Log.EventDecorator.decorator.wrapped_func
+  File "/home/public/app/firedrake_gnu_042022/firedrake/src/PyOP2/pyop2/global_kernel.py", line 360, in compile
+    return compilation.load(self, extension, self.name,
+  File "/home/public/app/firedrake_gnu_042022/firedrake/src/PyOP2/pyop2/compilation.py", line 634, in load
+    dll = compiler(cppargs, ldargs, cpp=cpp, comm=comm).get_so(code, extension)
+  File "/home/public/app/firedrake_gnu_042022/firedrake/src/PyOP2/pyop2/compilation.py", line 400, in get_so
+    raise CompilationError(
+pyop2.exceptions.CompilationError: Command "('mpicc', '-fPIC', '-Wall', '-std=gnu11', '-I/home/public/app/firedrake_gnu_042022/firedrake/src/petsc/include', '-I/home/public/app/firedrake_gnu_042022/firedrake/src/petsc/default/include', '-I/home/public/app/firedrake_gnu_042022/firedrake/src/PyOP2/pyop2', '-fno-ivopts', '-march=native', '-O3', '-ffast-math', '-o', '/home/olender/tmp_amd7/95/e45c5a92565b02de20a4199ac9399d_p192331.so.tmp', '/home/olender/tmp_amd7/95/e45c5a92565b02de20a4199ac9399d_p192331.c', '-shared', '-L/home/public/app/firedrake_gnu_042022/firedrake/src/petsc/lib', '-L/home/public/app/firedrake_gnu_042022/firedrake/src/petsc/default/lib', '-Wl,-rpath,/home/public/app/firedrake_gnu_042022/firedrake/src/petsc/lib', '-Wl,-rpath,/home/public/app/firedrake_gnu_042022/firedrake/src/petsc/default/lib', '-lpetsc', '-lm')" return error status 1.
+Unable to compile code
+Compile log in /home/olender/tmp_amd7/95/e45c5a92565b02de20a4199ac9399d_p192331.log
+Compile errors in /home/olender/tmp_amd7/95/e45c5a92565b02de20a4199ac9399d_p192331.err
+application called MPI_Abort(MPI_COMM_WORLD, 1) - process 8

@@ -1,0 +1,475 @@
+
+## Job started at 07-02-2023 as 17:59:40 #####################
+
+
+## Jobs activated by olender: 
+
+             JOBID PARTITION     NAME     USER ST       TIME  NODES NODELIST(REASON)
+             23029 intel_lar 3d_test_  olender  R       0:00      5 n[01-05]
+
+## Execution node:         n01 
+
+
+## Number of tasks per job: 200 
+
+
+## Diretorio de submissao do job:   /home/olender/cse23/spyro 
+
+  rank 1 on ensemble 16 owns 43640 elements and can access 8727 vertices
+  rank 7 on ensemble 16 owns 43640 elements and can access 8595 vertices
+  rank 8 on ensemble 16 owns 43641 elements and can access 8645 vertices
+  rank 0 on ensemble 16 owns 43641 elements and can access 8603 vertices
+  rank 4 on ensemble 16 owns 43641 elements and can access 8580 vertices
+  rank 2 on ensemble 16 owns 43641 elements and can access 8556 vertices
+  rank 9 on ensemble 16 owns 43640 elements and can access 8516 vertices
+  rank 6 on ensemble 16 owns 43640 elements and can access 8655 vertices
+  rank 5 on ensemble 16 owns 43641 elements and can access 8557 vertices
+  rank 3 on ensemble 16 owns 43640 elements and can access 8584 vertices
+  rank 5 on ensemble 5 owns 43641 elements and can access 8557 vertices
+  rank 9 on ensemble 5 owns 43640 elements and can access 8516 vertices
+  rank 7 on ensemble 5 owns 43640 elements and can access 8595 vertices
+  rank 8 on ensemble 5 owns 43641 elements and can access 8645 vertices
+  rank 6 on ensemble 5 owns 43640 elements and can access 8655 vertices
+  rank 2 on ensemble 5 owns 43641 elements and can access 8556 vertices
+  rank 0 on ensemble 5 owns 43641 elements and can access 8603 vertices
+  rank 4 on ensemble 5 owns 43641 elements and can access 8580 vertices
+  rank 1 on ensemble 5 owns 43640 elements and can access 8727 vertices
+  rank 3 on ensemble 5 owns 43640 elements and can access 8584 vertices
+  rank 0 on ensemble 1 owns 43641 elements and can access 8603 vertices
+  rank 9 on ensemble 1 owns 43640 elements and can access 8516 vertices
+  rank 1 on ensemble 1 owns 43640 elements and can access 8727 vertices
+  rank 5 on ensemble 1 owns 43641 elements and can access 8557 vertices
+  rank 4 on ensemble 1 owns 43641 elements and can access 8580 vertices
+  rank 2 on ensemble 1 owns 43641 elements and can access 8556 vertices
+  rank 7 on ensemble 1 owns 43640 elements and can access 8595 vertices
+  rank 3 on ensemble 1 owns 43640 elements and can access 8584 vertices
+  rank 6 on ensemble 1 owns 43640 elements and can access 8655 vertices
+  rank 8 on ensemble 1 owns 43641 elements and can access 8645 vertices
+  rank 3 on ensemble 19 owns 43640 elements and can access 8584 vertices
+  rank 8 on ensemble 19 owns 43641 elements and can access 8645 vertices
+  rank 2 on ensemble 19 owns 43641 elements and can access 8556 vertices
+  rank 5 on ensemble 19 owns 43641 elements and can access 8557 vertices
+  rank 7 on ensemble 19 owns 43640 elements and can access 8595 vertices
+  rank 0 on ensemble 19 owns 43641 elements and can access 8603 vertices
+  rank 4 on ensemble 19 owns 43641 elements and can access 8580 vertices
+  rank 6 on ensemble 19 owns 43640 elements and can access 8655 vertices
+  rank 1 on ensemble 19 owns 43640 elements and can access 8727 vertices
+  rank 9 on ensemble 19 owns 43640 elements and can access 8516 vertices
+  rank 9 on ensemble 18 owns 43640 elements and can access 8516 vertices
+  rank 3 on ensemble 18 owns 43640 elements and can access 8584 vertices
+  rank 7 on ensemble 18 owns 43640 elements and can access 8595 vertices
+  rank 8 on ensemble 18 owns 43641 elements and can access 8645 vertices
+  rank 2 on ensemble 18 owns 43641 elements and can access 8556 vertices
+  rank 1 on ensemble 18 owns 43640 elements and can access 8727 vertices
+  rank 6 on ensemble 18 owns 43640 elements and can access 8655 vertices
+  rank 0 on ensemble 18 owns 43641 elements and can access 8603 vertices
+  rank 5 on ensemble 18 owns 43641 elements and can access 8557 vertices
+  rank 4 on ensemble 18 owns 43641 elements and can access 8580 vertices
+  rank 6 on ensemble 6 owns 43640 elements and can access 8655 vertices
+  rank 9 on ensemble 6 owns 43640 elements and can access 8516 vertices
+  rank 4 on ensemble 6 owns 43641 elements and can access 8580 vertices
+  rank 2 on ensemble 6 owns 43641 elements and can access 8556 vertices
+  rank 3 on ensemble 6 owns 43640 elements and can access 8584 vertices
+  rank 7 on ensemble 6 owns 43640 elements and can access 8595 vertices
+  rank 1 on ensemble 6 owns 43640 elements and can access 8727 vertices
+  rank 0 on ensemble 6 owns 43641 elements and can access 8603 vertices
+  rank 8 on ensemble 6 owns 43641 elements and can access 8645 vertices
+  rank 5 on ensemble 6 owns 43641 elements and can access 8557 vertices
+  rank 9 on ensemble 17 owns 43640 elements and can access 8516 vertices
+  rank 0 on ensemble 17 owns 43641 elements and can access 8603 vertices
+  rank 4 on ensemble 17 owns 43641 elements and can access 8580 vertices
+  rank 6 on ensemble 17 owns 43640 elements and can access 8655 vertices
+  rank 5 on ensemble 17 owns 43641 elements and can access 8557 vertices
+  rank 8 on ensemble 17 owns 43641 elements and can access 8645 vertices
+  rank 7 on ensemble 17 owns 43640 elements and can access 8595 vertices
+  rank 1 on ensemble 17 owns 43640 elements and can access 8727 vertices
+  rank 2 on ensemble 17 owns 43641 elements and can access 8556 vertices
+  rank 3 on ensemble 17 owns 43640 elements and can access 8584 vertices
+  rank 2 on ensemble 13 owns 43641 elements and can access 8556 vertices
+  rank 9 on ensemble 13 owns 43640 elements and can access 8516 vertices
+  rank 4 on ensemble 13 owns 43641 elements and can access 8580 vertices
+  rank 7 on ensemble 13 owns 43640 elements and can access 8595 vertices
+  rank 8 on ensemble 13 owns 43641 elements and can access 8645 vertices
+  rank 6 on ensemble 13 owns 43640 elements and can access 8655 vertices
+  rank 5 on ensemble 13 owns 43641 elements and can access 8557 vertices
+  rank 1 on ensemble 13 owns 43640 elements and can access 8727 vertices
+  rank 0 on ensemble 13 owns 43641 elements and can access 8603 vertices
+  rank 3 on ensemble 13 owns 43640 elements and can access 8584 vertices
+  rank 4 on ensemble 2 owns 43641 elements and can access 8580 vertices
+  rank 8 on ensemble 2 owns 43641 elements and can access 8645 vertices
+  rank 6 on ensemble 2 owns 43640 elements and can access 8655 vertices
+  rank 3 on ensemble 2 owns 43640 elements and can access 8584 vertices
+  rank 9 on ensemble 2 owns 43640 elements and can access 8516 vertices
+  rank 1 on ensemble 2 owns 43640 elements and can access 8727 vertices
+  rank 5 on ensemble 2 owns 43641 elements and can access 8557 vertices
+  rank 0 on ensemble 2 owns 43641 elements and can access 8603 vertices
+  rank 2 on ensemble 2 owns 43641 elements and can access 8556 vertices
+  rank 7 on ensemble 2 owns 43640 elements and can access 8595 vertices
+  rank 5 on ensemble 12 owns 43641 elements and can access 8557 vertices
+  rank 1 on ensemble 12 owns 43640 elements and can access 8727 vertices
+  rank 8 on ensemble 12 owns 43641 elements and can access 8645 vertices
+  rank 3 on ensemble 12 owns 43640 elements and can access 8584 vertices
+  rank 0 on ensemble 12 owns 43641 elements and can access 8603 vertices
+  rank 2 on ensemble 12 owns 43641 elements and can access 8556 vertices
+  rank 6 on ensemble 12 owns 43640 elements and can access 8655 vertices
+  rank 7 on ensemble 12 owns 43640 elements and can access 8595 vertices
+  rank 9 on ensemble 12 owns 43640 elements and can access 8516 vertices
+  rank 4 on ensemble 12 owns 43641 elements and can access 8580 vertices
+  rank 2 on ensemble 7 owns 43641 elements and can access 8556 vertices
+  rank 0 on ensemble 7 owns 43641 elements and can access 8603 vertices
+  rank 1 on ensemble 7 owns 43640 elements and can access 8727 vertices
+  rank 4 on ensemble 7 owns 43641 elements and can access 8580 vertices
+  rank 6 on ensemble 7 owns 43640 elements and can access 8655 vertices
+  rank 8 on ensemble 7 owns 43641 elements and can access 8645 vertices
+  rank 9 on ensemble 7 owns 43640 elements and can access 8516 vertices
+  rank 3 on ensemble 7 owns 43640 elements and can access 8584 vertices
+  rank 7 on ensemble 7 owns 43640 elements and can access 8595 vertices
+  rank 5 on ensemble 7 owns 43641 elements and can access 8557 vertices
+  rank 3 on ensemble 4 owns 43640 elements and can access 8584 vertices
+  rank 4 on ensemble 4 owns 43641 elements and can access 8580 vertices
+  rank 8 on ensemble 4 owns 43641 elements and can access 8645 vertices
+  rank 2 on ensemble 4 owns 43641 elements and can access 8556 vertices
+  rank 0 on ensemble 4 owns 43641 elements and can access 8603 vertices
+  rank 5 on ensemble 4 owns 43641 elements and can access 8557 vertices
+  rank 6 on ensemble 4 owns 43640 elements and can access 8655 vertices
+  rank 7 on ensemble 4 owns 43640 elements and can access 8595 vertices
+  rank 1 on ensemble 4 owns 43640 elements and can access 8727 vertices
+  rank 9 on ensemble 4 owns 43640 elements and can access 8516 vertices
+  rank 4 on ensemble 0 owns 43641 elements and can access 8580 vertices
+  rank 3 on ensemble 0 owns 43640 elements and can access 8584 vertices
+INFO: Distributing 20 shot(s) across 200 core(s). Each shot is using 10 cores
+  rank 0 on ensemble 0 owns 43641 elements and can access 8603 vertices
+  rank 9 on ensemble 0 owns 43640 elements and can access 8516 vertices
+  rank 8 on ensemble 0 owns 43641 elements and can access 8645 vertices
+  rank 6 on ensemble 0 owns 43640 elements and can access 8655 vertices
+  rank 5 on ensemble 0 owns 43641 elements and can access 8557 vertices
+  rank 1 on ensemble 0 owns 43640 elements and can access 8727 vertices
+  rank 7 on ensemble 0 owns 43640 elements and can access 8595 vertices
+  rank 2 on ensemble 0 owns 43641 elements and can access 8556 vertices
+  rank 2 on ensemble 3 owns 43641 elements and can access 8556 vertices
+  rank 5 on ensemble 3 owns 43641 elements and can access 8557 vertices
+  rank 4 on ensemble 3 owns 43641 elements and can access 8580 vertices
+  rank 0 on ensemble 3 owns 43641 elements and can access 8603 vertices
+  rank 9 on ensemble 3 owns 43640 elements and can access 8516 vertices
+  rank 7 on ensemble 3 owns 43640 elements and can access 8595 vertices
+  rank 1 on ensemble 3 owns 43640 elements and can access 8727 vertices
+  rank 3 on ensemble 3 owns 43640 elements and can access 8584 vertices
+  rank 6 on ensemble 3 owns 43640 elements and can access 8655 vertices
+  rank 8 on ensemble 3 owns 43641 elements and can access 8645 vertices
+  rank 2 on ensemble 15 owns 43641 elements and can access 8556 vertices
+  rank 4 on ensemble 15 owns 43641 elements and can access 8580 vertices
+  rank 6 on ensemble 15 owns 43640 elements and can access 8655 vertices
+  rank 9 on ensemble 15 owns 43640 elements and can access 8516 vertices
+  rank 5 on ensemble 15 owns 43641 elements and can access 8557 vertices
+  rank 7 on ensemble 15 owns 43640 elements and can access 8595 vertices
+  rank 1 on ensemble 15 owns 43640 elements and can access 8727 vertices
+  rank 3 on ensemble 15 owns 43640 elements and can access 8584 vertices
+  rank 8 on ensemble 15 owns 43641 elements and can access 8645 vertices
+  rank 0 on ensemble 15 owns 43641 elements and can access 8603 vertices
+  rank 9 on ensemble 14 owns 43640 elements and can access 8516 vertices
+  rank 8 on ensemble 14 owns 43641 elements and can access 8645 vertices
+  rank 1 on ensemble 14 owns 43640 elements and can access 8727 vertices
+  rank 3 on ensemble 14 owns 43640 elements and can access 8584 vertices
+  rank 6 on ensemble 14 owns 43640 elements and can access 8655 vertices
+  rank 0 on ensemble 14 owns 43641 elements and can access 8603 vertices
+  rank 4 on ensemble 14 owns 43641 elements and can access 8580 vertices
+  rank 5 on ensemble 14 owns 43641 elements and can access 8557 vertices
+  rank 7 on ensemble 14 owns 43640 elements and can access 8595 vertices
+  rank 2 on ensemble 14 owns 43641 elements and can access 8556 vertices
+  rank 8 on ensemble 10 owns 43641 elements and can access 8645 vertices
+  rank 0 on ensemble 10 owns 43641 elements and can access 8603 vertices
+  rank 3 on ensemble 10 owns 43640 elements and can access 8584 vertices
+  rank 7 on ensemble 10 owns 43640 elements and can access 8595 vertices
+  rank 4 on ensemble 10 owns 43641 elements and can access 8580 vertices
+  rank 6 on ensemble 10 owns 43640 elements and can access 8655 vertices
+  rank 1 on ensemble 10 owns 43640 elements and can access 8727 vertices
+  rank 5 on ensemble 10 owns 43641 elements and can access 8557 vertices
+  rank 9 on ensemble 10 owns 43640 elements and can access 8516 vertices
+  rank 2 on ensemble 10 owns 43641 elements and can access 8556 vertices
+  rank 1 on ensemble 8 owns 43640 elements and can access 8727 vertices
+  rank 2 on ensemble 8 owns 43641 elements and can access 8556 vertices
+  rank 9 on ensemble 8 owns 43640 elements and can access 8516 vertices
+  rank 0 on ensemble 8 owns 43641 elements and can access 8603 vertices
+  rank 8 on ensemble 8 owns 43641 elements and can access 8645 vertices
+  rank 7 on ensemble 8 owns 43640 elements and can access 8595 vertices
+  rank 4 on ensemble 8 owns 43641 elements and can access 8580 vertices
+  rank 6 on ensemble 8 owns 43640 elements and can access 8655 vertices
+  rank 5 on ensemble 8 owns 43641 elements and can access 8557 vertices
+  rank 3 on ensemble 8 owns 43640 elements and can access 8584 vertices
+  rank 4 on ensemble 11 owns 43641 elements and can access 8580 vertices
+  rank 8 on ensemble 11 owns 43641 elements and can access 8645 vertices
+  rank 1 on ensemble 11 owns 43640 elements and can access 8727 vertices
+  rank 9 on ensemble 11 owns 43640 elements and can access 8516 vertices
+  rank 5 on ensemble 11 owns 43641 elements and can access 8557 vertices
+  rank 0 on ensemble 11 owns 43641 elements and can access 8603 vertices
+  rank 2 on ensemble 11 owns 43641 elements and can access 8556 vertices
+  rank 7 on ensemble 11 owns 43640 elements and can access 8595 vertices
+  rank 3 on ensemble 11 owns 43640 elements and can access 8584 vertices
+  rank 6 on ensemble 11 owns 43640 elements and can access 8655 vertices
+  rank 4 on ensemble 9 owns 43641 elements and can access 8580 vertices
+  rank 0 on ensemble 9 owns 43641 elements and can access 8603 vertices
+  rank 5 on ensemble 9 owns 43641 elements and can access 8557 vertices
+  rank 3 on ensemble 9 owns 43640 elements and can access 8584 vertices
+  rank 1 on ensemble 9 owns 43640 elements and can access 8727 vertices
+  rank 7 on ensemble 9 owns 43640 elements and can access 8595 vertices
+  rank 8 on ensemble 9 owns 43641 elements and can access 8645 vertices
+  rank 9 on ensemble 9 owns 43640 elements and can access 8516 vertices
+  rank 2 on ensemble 9 owns 43641 elements and can access 8556 vertices
+  rank 6 on ensemble 9 owns 43640 elements and can access 8655 vertices
+INFO: converting from m/s to km/s
+Simulation time is:    0.07425 seconds
+Simulation time is:     0.1492 seconds
+Simulation time is:     0.2243 seconds
+Simulation time is:     0.2993 seconds
+Simulation time is:     0.3743 seconds
+Simulation time is:     0.4492 seconds
+Simulation time is:     0.5242 seconds
+Simulation time is:     0.5993 seconds
+Simulation time is:     0.6743 seconds
+Simulation time is:     0.7492 seconds
+Simulation time is:     0.8243 seconds
+Simulation time is:     0.8992 seconds
+Simulation time is:     0.9743 seconds
+Simulation time is:      1.049 seconds
+Simulation time is:      1.124 seconds
+Simulation time is:      1.199 seconds
+Simulation time is:      1.274 seconds
+Simulation time is:      1.349 seconds
+Simulation time is:      1.424 seconds
+Simulation time is:      1.499 seconds
+Simulation time is:      1.574 seconds
+Simulation time is:      1.649 seconds
+Simulation time is:      1.724 seconds
+Simulation time is:      1.799 seconds
+Simulation time is:      1.874 seconds
+Simulation time is:      1.949 seconds
+Simulation time is:      2.024 seconds
+Simulation time is:      2.099 seconds
+Simulation time is:      2.174 seconds
+Simulation time is:      2.249 seconds
+Simulation time is:      2.324 seconds
+Simulation time is:      2.399 seconds
+Simulation time is:      2.474 seconds
+Simulation time is:      2.549 seconds
+Simulation time is:      2.624 seconds
+Simulation time is:      2.699 seconds
+Simulation time is:      2.774 seconds
+Simulation time is:      2.849 seconds
+Simulation time is:      2.924 seconds
+Simulation time is:      2.999 seconds
+Simulation time is:      3.074 seconds
+Simulation time is:      3.149 seconds
+Simulation time is:      3.224 seconds
+Simulation time is:      3.299 seconds
+Simulation time is:      3.374 seconds
+Simulation time is:      3.449 seconds
+Simulation time is:      3.524 seconds
+Simulation time is:      3.599 seconds
+Simulation time is:      3.674 seconds
+Simulation time is:      3.749 seconds
+Simulation time is:      3.824 seconds
+Simulation time is:      3.899 seconds
+2887.5671904087067
+2887.506259202957
+2887.4325861930847
+2887.549818754196
+2887.5511145591736
+2887.666218519211
+2887.4674954414368
+2887.4989352226257
+2887.582575559616
+2887.4897451400757
+2893.777666091919
+2893.7478597164154
+2893.7583146095276
+2893.77348279953
+2893.7665803432465
+2893.6661610603333
+2893.641528606415
+2893.779641389847
+2893.750517129898
+2893.7280402183533
+2896.6513826847076
+2896.5787358283997
+2896.7015874385834
+2896.449469566345
+2896.7173335552216
+2896.727115392685
+2896.6254942417145
+2896.5779485702515
+2896.6193261146545
+2896.627206802368
+2903.6937634944916
+2903.758056163788
+2903.70810341835
+2903.5052485466003
+2903.5121309757233
+2903.357176542282
+2903.412121772766
+2903.5552639961243
+2903.5527057647705
+2903.301103115082
+2907.4597840309143
+2907.464039325714
+2907.1432609558105
+2907.374952316284
+2907.457065343857
+2907.4372658729553
+2907.483108997345
+2907.1765978336334
+2907.2991106510162
+2907.3998787403107
+2909.216944694519
+2909.249519586563
+2909.130312681198
+2909.1506123542786
+2909.0406045913696
+2909.157922267914
+2909.1551871299744
+2909.1145033836365
+2909.142430782318
+2909.193012237549
+Simulation time is:      3.974 seconds
+2914.4967954158783
+2914.4366221427917
+2914.5294332504272
+2914.559506893158
+2914.5677235126495
+2914.5833990573883
+2914.463240146637
+2914.5467092990875
+2914.499978542328
+2914.4648110866547
+2921.3165028095245
+2921.1171696186066
+2921.3212881088257
+2921.2427747249603
+2921.227331161499
+2921.149982690811
+2921.3481550216675
+2921.2734458446503
+2921.132591485977
+2921.23122382164
+2922.9811041355133
+2922.890116214752
+2922.976169347763
+2922.8866307735443
+2922.847939491272
+2922.984917640686
+2922.8335559368134
+2922.95965719223
+2923.010807991028
+2922.7945141792297
+2923.44655251503
+2923.5000727176666
+2923.476684331894
+2923.415276288986
+2923.5326623916626
+2923.540210723877
+2923.4961388111115
+2923.4070904254913
+2923.4315123558044
+2923.4954755306244
+Spatial parallelism, reducing to comm 0
+2928.7791426181793
+2928.755586385727
+2928.7286052703857
+2928.5947268009186
+2928.6673934459686
+2928.7551794052124
+2928.6691710948944
+2928.7213654518127
+2928.6890819072723
+2928.715704202652
+2930.773428440094
+2930.7385909557343
+2930.8448984622955
+2930.7174932956696
+2930.7245898246765
+2930.898225545883
+2930.1547033786774
+2930.8762035369873
+2930.778830051422
+2929.6360363960266
+2935.8994410037994
+2936.102690219879
+2936.0232520103455
+2935.9925684928894
+2936.0042510032654
+2935.989189386368
+2935.8801929950714
+2935.959774017334
+2936.0233001708984
+2935.9270009994507
+2938.259027481079
+2937.957831144333
+2937.9983479976654
+2938.0928950309753
+2938.0443530082703
+2938.22972035408
+2937.9658658504486
+2938.254983663559
+2938.0838735103607
+2938.1041827201843
+2940.231043100357
+2940.0520865917206
+2940.1857051849365
+2940.214087486267
+2940.06573843956
+2940.215579509735
+2940.2184550762177
+2940.14004945755
+2940.100997209549
+2940.132579803467
+2941.504587173462
+2941.410270690918
+2941.4748678207397
+2941.5713045597076
+2941.4746038913727
+2941.5296659469604
+2941.5661861896515
+2941.4609558582306
+2941.5082643032074
+2941.528063774109
+2943.081682443619
+2943.0382328033447
+2943.168475627899
+2943.0786945819855
+2943.2739114761353
+2943.184551715851
+2943.1629288196564
+2943.059240579605
+2943.048442840576
+2943.180187702179
+2946.5505871772766
+2946.608077287674
+2946.584141731262
+2946.562382221222
+2946.66246676445
+2946.4879829883575
+2946.5007803440094
+2946.6287825107574
+2946.6372146606445
+2946.566308259964
+2946.9114315509796
+2946.819747209549
+2946.6823012828827
+2946.692459344864
+2946.7988016605377
+2946.59011054039
+2946.7513620853424
+2946.813708782196
+2946.800516843796
+2946.7080748081207
+2960.8197770118713
+2960.8017325401306
+2960.7935919761658
+2960.766023874283
+2960.7945239543915
+2960.7328794002533
+2960.7174088954926
+2960.836573600769
+2960.6999423503876
+2960.832131624222
+
+## Job finished on 07-02-2023 as 18:50:19 ###################

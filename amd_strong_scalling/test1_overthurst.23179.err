@@ -1,0 +1,59 @@
+Traceback (most recent call last):
+  File "benchmark_3d_overthrust.py", line 69, in <module>
+    sources = spyro.Sources(model, mesh, V, comm)
+  File "/home/olender/cse23/spyro/spyro/sources/Sources.py", line 81, in __init__
+    self.quadrilateral = model["opts"]["quadrature"] == "GLL"
+KeyError: 'quadrature'
+application called MPI_Abort(MPI_COMM_WORLD, 1) - process 4
+Traceback (most recent call last):
+  File "benchmark_3d_overthrust.py", line 69, in <module>
+    sources = spyro.Sources(model, mesh, V, comm)
+  File "/home/olender/cse23/spyro/spyro/sources/Sources.py", line 81, in __init__
+    self.quadrilateral = model["opts"]["quadrature"] == "GLL"
+KeyError: 'quadrature'
+application called MPI_Abort(MPI_COMM_WORLD, 1) - process 27
+Traceback (most recent call last):
+  File "benchmark_3d_overthrust.py", line 69, in <module>
+    sources = spyro.Sources(model, mesh, V, comm)
+  File "/home/olender/cse23/spyro/spyro/sources/Sources.py", line 81, in __init__
+    self.quadrilateral = model["opts"]["quadrature"] == "GLL"
+KeyError: 'quadrature'
+application called MPI_Abort(MPI_COMM_WORLD, 1) - process 32
+Traceback (most recent call last):
+  File "benchmark_3d_overthrust.py", line 69, in <module>
+    sources = spyro.Sources(model, mesh, V, comm)
+  File "/home/olender/cse23/spyro/spyro/sources/Sources.py", line 81, in __init__
+    self.quadrilateral = model["opts"]["quadrature"] == "GLL"
+KeyError: 'quadrature'
+application called MPI_Abort(MPI_COMM_WORLD, 1) - process 39
+Traceback (most recent call last):
+  File "benchmark_3d_overthrust.py", line 69, in <module>
+    sources = spyro.Sources(model, mesh, V, comm)
+  File "/home/olender/cse23/spyro/spyro/sources/Sources.py", line 81, in __init__
+    self.quadrilateral = model["opts"]["quadrature"] == "GLL"
+KeyError: 'quadrature'
+application called MPI_Abort(MPI_COMM_WORLD, 1) - process 16
+Traceback (most recent call last):
+  File "benchmark_3d_overthrust.py", line 69, in <module>
+    sources = spyro.Sources(model, mesh, V, comm)
+  File "/home/olender/cse23/spyro/spyro/sources/Sources.py", line 81, in __init__
+    self.quadrilateral = model["opts"]["quadrature"] == "GLL"
+KeyError: 'quadrature'
+application called MPI_Abort(MPI_COMM_WORLD, 1) - process 1
+Traceback (most recent call last):
+  File "benchmark_3d_overthrust.py", line 69, in <module>
+    sources = spyro.Sources(model, mesh, V, comm)
+  File "/home/olender/cse23/spyro/spyro/sources/Sources.py", line 81, in __init__
+    self.quadrilateral = model["opts"]["quadrature"] == "GLL"
+KeyError: 'quadrature'
+application called MPI_Abort(MPI_COMM_WORLD, 1) - process 12
+Traceback (most recent call last):
+  File "benchmark_3d_overthrust.py", line 69, in <module>
+    sources = spyro.Sources(model, mesh, V, comm)
+  File "/home/olender/cse23/spyro/spyro/sources/Sources.py", line 81, in __init__
+    self.quadrilateral = model["opts"]["quadrature"] == "GLL"
+KeyError: 'quadrature'
+application called MPI_Abort(MPI_COMM_WORLD, 1) - process 8
+srun: Job step aborted: Waiting up to 32 seconds for job step to finish.
+slurmstepd: error: *** STEP 23179.2 ON n14 CANCELLED AT 2023-02-14T16:32:17 ***
+slurmstepd: error: *** JOB 23179 ON n14 CANCELLED AT 2023-02-14T16:32:17 ***

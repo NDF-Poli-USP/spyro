@@ -1,0 +1,198 @@
+
+## Job started at 03-02-2023 as 12:25:49 #####################
+
+
+## Jobs activated by olender: 
+
+             JOBID PARTITION     NAME     USER ST       TIME  NODES NODELIST(REASON)
+             23008 intel_lar 3d_test_  olender PD       0:00      1 (Resources)
+             23009 amd_large 3d_test_  olender  R       0:00      1 n14
+
+## Execution node:         n14 
+
+
+## Number of tasks per job: 40 
+
+
+## Diretorio de submissao do job:   /home/olender/cse23/spyro 
+
+  rank 0 on ensemble 2 owns 87281 elements and can access 16614 vertices
+  rank 3 on ensemble 2 owns 87281 elements and can access 16575 vertices
+  rank 1 on ensemble 2 owns 87281 elements and can access 16797 vertices
+  rank 2 on ensemble 2 owns 87281 elements and can access 16633 vertices
+  rank 4 on ensemble 2 owns 87281 elements and can access 16628 vertices
+  rank 1 on ensemble 3 owns 87281 elements and can access 16797 vertices
+  rank 0 on ensemble 3 owns 87281 elements and can access 16614 vertices
+  rank 3 on ensemble 3 owns 87281 elements and can access 16575 vertices
+  rank 2 on ensemble 3 owns 87281 elements and can access 16633 vertices
+  rank 4 on ensemble 3 owns 87281 elements and can access 16628 vertices
+  rank 0 on ensemble 1 owns 87281 elements and can access 16614 vertices
+  rank 4 on ensemble 1 owns 87281 elements and can access 16628 vertices
+  rank 1 on ensemble 1 owns 87281 elements and can access 16797 vertices
+  rank 2 on ensemble 1 owns 87281 elements and can access 16633 vertices
+  rank 3 on ensemble 1 owns 87281 elements and can access 16575 vertices
+  rank 1 on ensemble 0 owns 87281 elements and can access 16797 vertices
+  rank 3 on ensemble 0 owns 87281 elements and can access 16575 vertices
+  rank 2 on ensemble 0 owns 87281 elements and can access 16633 vertices
+INFO: Distributing 4 shot(s) across 20 core(s). Each shot is using 5 cores
+  rank 0 on ensemble 0 owns 87281 elements and can access 16614 vertices
+  rank 4 on ensemble 0 owns 87281 elements and can access 16628 vertices
+INFO: converting from m/s to km/s
+Simulation time is:    0.07425 seconds
+Simulation time is:     0.1492 seconds
+Simulation time is:     0.2243 seconds
+Simulation time is:     0.2993 seconds
+Simulation time is:     0.3743 seconds
+Simulation time is:     0.4492 seconds
+Simulation time is:     0.5242 seconds
+Simulation time is:     0.5993 seconds
+Simulation time is:     0.6743 seconds
+Simulation time is:     0.7492 seconds
+Simulation time is:     0.8243 seconds
+Simulation time is:     0.8992 seconds
+Simulation time is:     0.9743 seconds
+Simulation time is:      1.049 seconds
+Simulation time is:      1.124 seconds
+Simulation time is:      1.199 seconds
+Simulation time is:      1.274 seconds
+Simulation time is:      1.349 seconds
+Simulation time is:      1.424 seconds
+Simulation time is:      1.499 seconds
+Simulation time is:      1.574 seconds
+Simulation time is:      1.649 seconds
+Simulation time is:      1.724 seconds
+Simulation time is:      1.799 seconds
+Simulation time is:      1.874 seconds
+Simulation time is:      1.949 seconds
+3194.9266583919525
+3194.753785133362
+3194.7388002872467
+3194.7789466381073
+3194.709977388382
+3210.0837049484253
+3210.44304561615
+3210.4827978610992
+3210.314070701599
+3210.194318294525
+Spatial parallelism, reducing to comm 0
+3220.985731124878
+3221.134624004364
+3221.168163537979
+3221.0687766075134
+3221.267158508301
+3233.394751548767
+3233.453018426895
+3233.6785066127777
+3233.7030639648438
+3233.5958976745605
+  rank 4 on ensemble 0 owns 43641 elements and can access 8580 vertices
+  rank 1 on ensemble 0 owns 43640 elements and can access 8727 vertices
+  rank 3 on ensemble 0 owns 43640 elements and can access 8584 vertices
+  rank 7 on ensemble 0 owns 43640 elements and can access 8595 vertices
+  rank 8 on ensemble 0 owns 43641 elements and can access 8645 vertices
+  rank 5 on ensemble 0 owns 43641 elements and can access 8557 vertices
+INFO: Distributing 4 shot(s) across 40 core(s). Each shot is using 10 cores
+  rank 0 on ensemble 0 owns 43641 elements and can access 8603 vertices
+  rank 9 on ensemble 0 owns 43640 elements and can access 8516 vertices
+  rank 6 on ensemble 0 owns 43640 elements and can access 8655 vertices
+  rank 2 on ensemble 0 owns 43641 elements and can access 8556 vertices
+  rank 0 on ensemble 3 owns 43641 elements and can access 8603 vertices
+  rank 7 on ensemble 3 owns 43640 elements and can access 8595 vertices
+  rank 1 on ensemble 3 owns 43640 elements and can access 8727 vertices
+  rank 2 on ensemble 3 owns 43641 elements and can access 8556 vertices
+  rank 8 on ensemble 3 owns 43641 elements and can access 8645 vertices
+  rank 9 on ensemble 3 owns 43640 elements and can access 8516 vertices
+  rank 4 on ensemble 3 owns 43641 elements and can access 8580 vertices
+  rank 5 on ensemble 3 owns 43641 elements and can access 8557 vertices
+  rank 3 on ensemble 3 owns 43640 elements and can access 8584 vertices
+  rank 6 on ensemble 3 owns 43640 elements and can access 8655 vertices
+  rank 1 on ensemble 1 owns 43640 elements and can access 8727 vertices
+  rank 2 on ensemble 1 owns 43641 elements and can access 8556 vertices
+  rank 4 on ensemble 1 owns 43641 elements and can access 8580 vertices
+  rank 5 on ensemble 1 owns 43641 elements and can access 8557 vertices
+  rank 6 on ensemble 1 owns 43640 elements and can access 8655 vertices
+  rank 7 on ensemble 1 owns 43640 elements and can access 8595 vertices
+  rank 8 on ensemble 1 owns 43641 elements and can access 8645 vertices
+  rank 9 on ensemble 1 owns 43640 elements and can access 8516 vertices
+  rank 0 on ensemble 1 owns 43641 elements and can access 8603 vertices
+  rank 3 on ensemble 1 owns 43640 elements and can access 8584 vertices
+  rank 2 on ensemble 2 owns 43641 elements and can access 8556 vertices
+  rank 4 on ensemble 2 owns 43641 elements and can access 8580 vertices
+  rank 6 on ensemble 2 owns 43640 elements and can access 8655 vertices
+  rank 8 on ensemble 2 owns 43641 elements and can access 8645 vertices
+  rank 1 on ensemble 2 owns 43640 elements and can access 8727 vertices
+  rank 5 on ensemble 2 owns 43641 elements and can access 8557 vertices
+  rank 9 on ensemble 2 owns 43640 elements and can access 8516 vertices
+  rank 3 on ensemble 2 owns 43640 elements and can access 8584 vertices
+  rank 7 on ensemble 2 owns 43640 elements and can access 8595 vertices
+  rank 0 on ensemble 2 owns 43641 elements and can access 8603 vertices
+INFO: converting from m/s to km/s
+Simulation time is:    0.07425 seconds
+Simulation time is:     0.1492 seconds
+Simulation time is:     0.2243 seconds
+Simulation time is:     0.2993 seconds
+Simulation time is:     0.3743 seconds
+Simulation time is:     0.4492 seconds
+Simulation time is:     0.5242 seconds
+Simulation time is:     0.5993 seconds
+Simulation time is:     0.6743 seconds
+Simulation time is:     0.7492 seconds
+Simulation time is:     0.8243 seconds
+Simulation time is:     0.8992 seconds
+Simulation time is:     0.9743 seconds
+Simulation time is:      1.049 seconds
+Simulation time is:      1.124 seconds
+Simulation time is:      1.199 seconds
+Simulation time is:      1.274 seconds
+Simulation time is:      1.349 seconds
+Simulation time is:      1.424 seconds
+Simulation time is:      1.499 seconds
+Simulation time is:      1.574 seconds
+Simulation time is:      1.649 seconds
+Simulation time is:      1.724 seconds
+Simulation time is:      1.799 seconds
+Simulation time is:      1.874 seconds
+Simulation time is:      1.949 seconds
+1669.5975768566132
+1669.5596749782562
+1669.59428358078
+1669.3727495670319
+1669.7880346775055
+1669.7091431617737
+1669.3764684200287
+1669.3812537193298
+1669.438274383545
+1669.434960603714
+Spatial parallelism, reducing to comm 0
+1671.880536556244
+1672.0289454460144
+1671.8033668994904
+1671.870299577713
+1671.995088338852
+1671.953198671341
+1671.8174540996552
+1672.079107761383
+1671.9221787452698
+1671.8474593162537
+1718.1905844211578
+1718.1454045772552
+1718.4541192054749
+1717.9661452770233
+1718.166482925415
+1718.042673110962
+1718.036209344864
+1718.1518909931183
+1718.239536523819
+1717.9629456996918
+1744.3159897327423
+1744.430608510971
+1744.4318978786469
+1744.6260969638824
+1744.4888212680817
+1744.5060114860535
+1744.4168043136597
+1744.3662753105164
+1744.5124504566193
+1744.478167772293
+
+## Job finished on 03-02-2023 as 13:53:14 ###################
