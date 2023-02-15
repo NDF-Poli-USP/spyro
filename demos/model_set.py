@@ -8,7 +8,7 @@ def model_settings(vel_model):
     model["opts"] = {
         "method": "KMV",  # either CG or KMV
         "quadrature": "KMV",  # Equi or KMV
-        "degree": 1,  # p order
+        "degree": 4,  # p order
         "dimension": 2,  # dimension
         "regularization": False,  # regularization is on?
         "gamma": 1e-5,  # regularization parameter

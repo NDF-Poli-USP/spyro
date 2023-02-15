@@ -51,7 +51,7 @@ def model_settings(vel_model):
           
     # Specify a 250-m Absorbing Boundary Layer (ABL) on the three sides of the domain to damp outgoing waves.
     model["BCs"] = {
-        "status": False,  # True or False, used to turn on any type of BC
+        "status": True,  # True or False, used to turn on any type of BC
         "method": "Damping", # either PML or Damping, used to turn on any type of BC
         "outer_bc": "none", #  none or non-reflective (outer boundary condition)
         "damping_type": "polynomial",  # polynomial, hyperbolic, shifted_hyperbolic

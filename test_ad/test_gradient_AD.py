@@ -17,9 +17,7 @@ def test_gradient_AD():
  
         vp_exact = spyro.io.interpolate(model, mesh, V)          
         vp_guess = spyro.io.interpolate(
-                            model, mesh, V, 
-                            smooth_vel=True, sigma=100
-                            )    
+                            model, mesh, V, guess=True)    
     
         fire.File("exact_vel.pvd").write(vp_exact)
         fire.File("guess_vel.pvd").write(vp_guess)
