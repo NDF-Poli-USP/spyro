@@ -1,0 +1,31 @@
+
+## Job started at 16-02-2023 as 13:07:45 #####################
+
+
+## Jobs activated by olender: 
+
+             JOBID PARTITION     NAME     USER ST       TIME  NODES NODELIST(REASON)
+             23238 intel_lar amd_stro  olender PD       0:00      2 (QOSMaxNodePerUserLimit)
+             23239 intel_lar amd_stro  olender PD       0:00      2 (QOSMaxNodePerUserLimit)
+             23240 intel_lar amd_stro  olender PD       0:00      2 (QOSMaxNodePerUserLimit)
+             23241 intel_lar amd_stro  olender PD       0:00      2 (QOSMaxNodePerUserLimit)
+             23232 intel_lar amd_stro  olender  R    1:32:41      2 n[05-06]
+             23233 intel_lar amd_stro  olender  R    1:32:41      2 n[07-08]
+             23243 intel_sma meshing/  olender  R       0:00      1 n18
+
+## Execution node:         n18 
+
+
+## Number of tasks per job: 1 
+
+
+## Diretorio de submissao do job:   /home/olender/cse23/spyro 
+
+Meshing with M=3.6
+Entering mesh generation
+Will attempt 200 iterations to bound the dihedral angles...
+Enforcing a min. dihedral bound of: 10.0 degrees...
+Enforcing a max. dihedral bound of: 180.0 degrees...
+Commencing sliver removal with 773689 vertices on rank 0.
+On rank: 0 There are 7642 slivers...
+On rank: 0 There are 2341 slivers...
