@@ -152,6 +152,9 @@ def CalcFL(TipLay, Lx, Ly, fref, lmin, lref, Z, nexp, nz=5, crtCR=0):
     x = FLmin
     for i in range(1, nz + 1):
         x = calcZero(x, a, i)
+        xred = redFL(x, lmin, lref)
+        if i > 1 and xred == FLpos[i - 2]:
+            x = calcZero(xred, a, i)
         FLpos += [redFL(x, lmin, lref)]
         # print('********')
         # print('Possible FL')
