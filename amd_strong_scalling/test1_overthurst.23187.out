@@ -511,3 +511,107 @@ INFO: Distributing 1 shot(s) across 10 core(s). Each shot is using 10 cores
   rank 1 on ensemble 0 owns 43640 elements and can access 8727 vertices
   rank 3 on ensemble 0 owns 43640 elements and can access 8584 vertices
   rank 8 on ensemble 0 owns 43641 elements and can access 8645 vertices
+INFO: converting from m/s to km/s
+Simulation time is:    0.07425 seconds
+Simulation time is:     0.1492 seconds
+Simulation time is:     0.2243 seconds
+Simulation time is:     0.2993 seconds
+Simulation time is:     0.3743 seconds
+Simulation time is:     0.4492 seconds
+Simulation time is:     0.5242 seconds
+Simulation time is:     0.5993 seconds
+Simulation time is:     0.6743 seconds
+Simulation time is:     0.7492 seconds
+Simulation time is:     0.8243 seconds
+Simulation time is:     0.8992 seconds
+Simulation time is:     0.9743 seconds
+Simulation time is:      1.049 seconds
+Simulation time is:      1.124 seconds
+Simulation time is:      1.199 seconds
+Simulation time is:      1.274 seconds
+Simulation time is:      1.349 seconds
+Simulation time is:      1.424 seconds
+Simulation time is:      1.499 seconds
+Simulation time is:      1.574 seconds
+Simulation time is:      1.649 seconds
+Simulation time is:      1.724 seconds
+Simulation time is:      1.799 seconds
+Simulation time is:      1.874 seconds
+Simulation time is:      1.949 seconds
+Simulation time is:      2.024 seconds
+Simulation time is:      2.099 seconds
+Simulation time is:      2.174 seconds
+Simulation time is:      2.249 seconds
+Simulation time is:      2.324 seconds
+Simulation time is:      2.399 seconds
+Simulation time is:      2.474 seconds
+Simulation time is:      2.549 seconds
+Simulation time is:      2.624 seconds
+Simulation time is:      2.699 seconds
+Simulation time is:      2.774 seconds
+Simulation time is:      2.849 seconds
+Simulation time is:      2.924 seconds
+Simulation time is:      2.999 seconds
+Simulation time is:      3.074 seconds
+Simulation time is:      3.149 seconds
+Simulation time is:      3.224 seconds
+Simulation time is:      3.299 seconds
+Simulation time is:      3.374 seconds
+Simulation time is:      3.449 seconds
+Simulation time is:      3.524 seconds
+Simulation time is:      3.599 seconds
+Simulation time is:      3.674 seconds
+Simulation time is:      3.749 seconds
+Simulation time is:      3.824 seconds
+Simulation time is:      3.899 seconds
+Simulation time is:      3.974 seconds
+Spatial parallelism, reducing to comm 0
+Time without forward problem: 65.31029415130615
+Time with only forward problem: 3242.5165450572968
+Total time problem: 3307.826839208603
+END of forward problem
+Time without forward problem: 65.36439967155457
+Time with only forward problem: 3242.462832212448
+Total time problem: 3307.8272318840027
+END of forward problem
+Time without forward problem: 65.21699237823486
+Time with only forward problem: 3242.6105482578278
+Total time problem: 3307.8275406360626
+END of forward problem
+Time without forward problem: 65.22014570236206
+Time with only forward problem: 3242.6078493595123
+Total time problem: 3307.8279950618744
+END of forward problem
+Time without forward problem: 65.26789164543152
+Time with only forward problem: 3242.5603744983673
+Total time problem: 3307.828266143799
+END of forward problem
+Time without forward problem: 65.37356543540955
+Time with only forward problem: 3242.454942703247
+Total time problem: 3307.8285081386566
+END of forward problem
+Time without forward problem: 65.21588921546936
+Time with only forward problem: 3242.6319708824158
+Total time problem: 3307.847860097885
+END of forward problem
+Time without forward problem: 65.46074748039246
+Time with only forward problem: 3242.3872032165527
+Total time problem: 3307.847950696945
+END of forward problem
+Time without forward problem: 65.21538996696472
+Time with only forward problem: 3242.633041858673
+Total time problem: 3307.848431825638
+END of forward problem
+Time without forward problem: 65.41431736946106
+Time with only forward problem: 3242.434774160385
+Total time problem: 3307.849091529846
+END of forward problem
+  rank 4 on ensemble 0 owns 87281 elements and can access 16628 vertices
+  rank 2 on ensemble 0 owns 87281 elements and can access 16633 vertices
+  rank 1 on ensemble 0 owns 87281 elements and can access 16797 vertices
+INFO: Distributing 1 shot(s) across 5 core(s). Each shot is using 5 cores
+  rank 0 on ensemble 0 owns 87281 elements and can access 16614 vertices
+  rank 3 on ensemble 0 owns 87281 elements and can access 16575 vertices
+INFO: converting from m/s to km/s
+
+## Job finished on 15-02-2023 as 17:03:12 ###################
