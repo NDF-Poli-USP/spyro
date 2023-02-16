@@ -589,3 +589,14 @@ Simulation time is:      3.524 seconds
 Simulation time is:      3.599 seconds
 Simulation time is:      3.674 seconds
 Simulation time is:      3.749 seconds
+Simulation time is:      3.824 seconds
+Simulation time is:      3.899 seconds
+Simulation time is:      3.974 seconds
+Spatial parallelism, reducing to comm 0
+4305.214008808136
+4305.222121715546
+4305.222123146057
+4305.22346830368
+4305.224514722824
+
+## Job finished on 15-02-2023 as 16:11:49 ###################
