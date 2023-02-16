@@ -108,16 +108,16 @@ def _make_elastic_parameters(H, mesh, guess=False):
             File("guess_mu.pvd").write(mu)
         else:
 
-            lamb = Function(H).interpolate(_lamb/2 + 0.0 * x)
-            mu = Function(H).interpolate(_mu/2 + 0.0 * x)
-            # lamb  = Function(H).interpolate(
-            #     2.25
-            #     + 2. * tanh(20 * (0.125 - sqrt(( x + 1) ** 2 + (z - 0.5) ** 2)))
-            # )
-            # mu  = Function(H).interpolate(
-            #     2.5
-            #     + 1.5 * tanh(20 * (0.125 - sqrt(( x + 1) ** 2 + (z - 0.5) ** 2)))
-            # )
+            # lamb = Function(H).interpolate(_lamb/2 + 0.0 * x)
+            # mu = Function(H).interpolate(_mu/2 + 0.0 * x)
+            lamb  = Function(H).interpolate(
+                2.25
+                + 2. * tanh(20 * (0.125 - sqrt(( x + 0.5) ** 2 + (z - 0.5) ** 2)))
+            )
+            mu  = Function(H).interpolate(
+                2.5
+                + 1.5 * tanh(20 * (0.125 - sqrt(( x + 0.5) ** 2 + (z - 0.5) ** 2)))
+            )
             File("exact_lamb.pvd").write(lamb)
             File("exact_mu.pvd").write(mu)
         
@@ -220,6 +220,10 @@ with stop_annotating():
         fd_grad = (Jp - J) / step
         print(
             "\n Cost functional for step "
+            + str(step)
+            + " : "
+            + str(Jp)
+            + ", fd approx.: "
             + str(fd_grad)
             + ", grad'*dir (lambda) : "
             + str(projnorm_lamb)
