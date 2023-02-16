@@ -2,15 +2,15 @@ import sys
 import re
 import csv
 
-# # Open the input and output files
-# if len(sys.argv) < 2:
-#     print("Please provide input file name as command line argument")
-#     sys.exit()
+# Open the input and output files
+if len(sys.argv) < 2:
+    print("Please provide input file name as command line argument")
+    sys.exit()
 
-# # Get input file name from command line argument
-# input_file = sys.argv[1]
+# Get input file name from command line argument
+input_file = sys.argv[1]
 
-input_file = "amd_strong_scalling/intel_test1_overthurst.23210.out"
+# input_file = "amd_strong_scalling/intel_test1_overthurst.23211.out"
 
 core_count = []
 runtimes_total = []
