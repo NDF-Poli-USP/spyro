@@ -36,6 +36,7 @@ with open(input_file, 'r') as f:
             max_runtime_total = 0
             max_runtime_no_forward = 0
             max_runtime_forward = 0
+            first_loop = False
         
         # Check if the line contains the biggest number
         if 'Time with only forward problem:' in line:
@@ -53,6 +54,7 @@ with open(input_file, 'r') as f:
             runtime_total = float(match.group())
             if runtime_total > max_runtime_total:
                 max_runtime_total = runtime_total
+        
     
     # Getting last loop data
     runtimes_forward.append(max_runtime_forward)
