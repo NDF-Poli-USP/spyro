@@ -55,6 +55,7 @@ def compute_functional_ad(p_rec, p_true_rec, P, comm, local_rec_index):
     misfit_data = p_rec.dat.data[:] - true_rec.dat.data[:]
     return J, misfit_data
     
+    
 def compute_functional(model, residual, vp=None):
     """Compute the functional to be optimized.
     Accepts the velocity optionally and uses
@@ -70,7 +71,7 @@ def compute_functional(model, residual, vp=None):
         regularize = False
 
     if regularize:
-        gamma = model["opt"]["gamma"]
+        gamma = model["opts"]["gamma"]
         Ns = model["acquisition"]["num_sources"]
         gamma /= Ns
 
@@ -82,6 +83,7 @@ def compute_functional(model, residual, vp=None):
 
     if regularize:
         Jreg = assemble(0.5 * gamma * dot(grad(vp), grad(vp)) * dx)
+        print(">>>>>> VALUE OF GRAD REGULATIZATION = ", Jreg)
         J += Jreg
     return J
 

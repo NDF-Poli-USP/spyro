@@ -47,10 +47,15 @@ class Receivers:
             self.num_receivers = len(self.receiver_locations)
 
         self.cellIDs = None
-        self.cellVertices = None
+        self.cellVertices = None # vertex locations
+        self.cellNodes = None    # node locations
         self.cell_tabulations = None
+        self.cell_tabulations_xdir = None # tabulations for radial source, x direction
+        self.cell_tabulations_zdir = None # tabulations for radial source, z direction
+        self.cell_tabulations_ydir = None # tabulations for radial source, y direction
         self.cellNodeMaps = None
         self.nodes_per_cell = None
+        self.node_locations = None
         self.quadrilateral = (model["opts"]['quadrature']=='GLL')
         self.is_local = [0] * self.num_receivers
         self.build_maps()
@@ -78,6 +83,7 @@ class Receivers:
         (
             self.cellIDs,
             self.cellVertices,
+            self.cellNodes,
             self.cellNodeMaps,
         ) = self.__func_receiver_locator()
         self.cell_tabulations = self.__func_build_cell_tabulations()
@@ -126,9 +132,105 @@ class Receivers:
                 tmp = np.dot(phis, value)
                 rhs_forcing.dat.data_with_halos[idx] += tmp
             else:
-                tmp = rhs_forcing.dat.data_with_halos[0]
+                tmp = rhs_forcing.dat.data_with_halos[0] 
        
         return rhs_forcing
+    
+    def apply_receivers_as_gaussian_source(self, rhs_forcing, residual, IT): # used to debub and compare
+        """
+        The adjoint operation of interpolation (injection)
+        """
+        for rid in range(self.num_receivers):
+            value = residual[IT][rid]
+            if self.is_local[rid]:
+                rhs_forcing.dat.data_with_halos[:] += value * self.cell_tabulations_zdir[rid][:]
+            else:
+                tmp = rhs_forcing.dat.data_with_halos[0] 
+
+        return rhs_forcing
+
+    def apply_receivers_as_radial_source(self, rhs_forcing, residual_z, residual_x, residual_y, IT):
+        """
+        The adjoint operation of interpolation (injection) for elastic waves simulation
+        """
+        for rid in range(self.num_receivers):
+            # the residual values provide the direction (sign)
+            value_z = residual_z[IT][rid]
+            value_x = residual_x[IT][rid]
+            if self.dimension == 3:
+                value_y = residual_y[IT][rid]
+            
+            if self.is_local[rid]:
+                # z direction
+                rhs_forcing.sub(0).dat.data_with_halos[:] += (
+                        value_z * self.cell_tabulations_zdir[rid][:]
+                )
+                # x direction
+                rhs_forcing.sub(1).dat.data_with_halos[:] += (
+                        value_x * self.cell_tabulations_xdir[rid][:]
+                )
+                if self.dimension == 3:
+                    # y direction
+                    rhs_forcing.sub(2).dat.data_with_halos[:] += (
+                            value_y * self.cell_tabulations_ydir[rid][:] 
+                    )
+            else:
+                tmp = rhs_forcing.sub(0).dat.data_with_halos[0]
+                tmp = rhs_forcing.sub(1).dat.data_with_halos[0]
+
+        return rhs_forcing
+    
+    def apply_receivers_as_point_source(self, rhs_forcing, residual_z, residual_x, residual_y, IT):#used to debug
+        """
+        The adjoint operation of interpolation (injection) for elastic waves simulation
+        """
+        for rid in range(self.num_receivers):
+            # the residual values provide the direction (sign)
+            value_z = residual_z[IT][rid]
+            value_x = residual_x[IT][rid]
+            if self.dimension == 3:
+                value_y = residual_y[IT][rid]
+            
+            if self.is_local[rid]:
+                idx = np.int_(self.cellNodeMaps[rid])
+                phis = self.cell_tabulations[rid]
+                rhs_forcing.sub(0).dat.data_with_halos[idx] += np.dot(phis, value_z)
+                rhs_forcing.sub(1).dat.data_with_halos[idx] += np.dot(phis, value_x)
+                if self.dimension == 3:
+                    rhs_forcing.sub(2).dat.data_with_halos[idx] += np.dot(phis, value_y)
+            
+            else:
+                tmp = rhs_forcing.sub(0).dat.data_with_halos[0]
+                tmp = rhs_forcing.sub(1).dat.data_with_halos[0]
+        
+        return rhs_forcing
+
+    def __func_build_cell_tabulations_zxydir(self):
+        if self.dimension == 2:
+            return self.__func_build_cell_tabulations_zxydir_continuous_source()
+        elif self.dimension == 3:
+            raise ValueError("Build_cell_tabulations for 3D meshes not supported yet")
+        else:
+            raise ValueError("Dimension not supported yet")
+
+    def __func_build_cell_tabulations_zxydir_continuous_source(self):
+        """Create tabulations over cells (actually nodes) considering
+        a continuous source described by a Gaussian function.
+        """
+        num_nodes = self.node_locations.shape[0]
+        cell_tabulations_xdir = np.zeros((self.num_receivers, num_nodes))
+        cell_tabulations_zdir = np.zeros((self.num_receivers, num_nodes))
+
+        nz = self.node_locations[:, 0]
+        nx = self.node_locations[:, 1]
+
+        for receiver_id in range(self.num_receivers): 
+            p = self.receiver_locations[receiver_id]
+            # the direction (positive or negative) is defined by residual_z and residual_x
+            cell_tabulations_xdir[receiver_id, :] = delta_expr(p, nz, nx)  
+            cell_tabulations_zdir[receiver_id, :] = delta_expr(p, nz, nx)
+
+        return (cell_tabulations_zdir,cell_tabulations_xdir)
 
     def __func_receiver_locator(self):
         """Function that returns a list of tuples and a matrix
@@ -180,11 +282,13 @@ class Receivers:
         cell_node_map = fdrake_cell_node_map.values_with_halo
         (num_cells, nodes_per_cell) = cell_node_map.shape
         node_locations = self.__func_node_locations()
-        self.nodes_per_cell = nodes_per_cell
+        self.nodes_per_cell = nodes_per_cell #FIXME maybe this could be returned from the function
+        self.node_locations = node_locations #FIXME maybe this could be returned from the function
 
         cellId_maps = np.zeros((num_recv, 1))
         cellNodeMaps = np.zeros((num_recv, nodes_per_cell))
         cellVertices = []
+        cellNodes = []
 
         if self.quadrilateral == True:
             end_vertex_id = 4
@@ -198,6 +302,7 @@ class Receivers:
             cell_id = self.is_local[receiver_id]
 
             cellVertices.append([])
+            cellNodes.append([])
 
             if cell_id is not None:
                 cellId_maps[receiver_id] = cell_id
@@ -207,7 +312,13 @@ class Receivers:
                     z = node_locations[cell_node_map[cell_id, cell_ends[vertex_number]], 0]
                     x = node_locations[cell_node_map[cell_id, cell_ends[vertex_number]], 1]
                     cellVertices[receiver_id][vertex_number] = (z, x)
-        return cellId_maps, cellVertices, cellNodeMaps
+                for node_number in range(nodes_per_cell):
+                    cellNodes[receiver_id].append([])
+                    z = node_locations[cell_node_map[cell_id, node_number], 0]
+                    x = node_locations[cell_node_map[cell_id, node_number], 1]
+                    cellNodes[receiver_id][node_number] = (z, x)
+
+        return cellId_maps, cellVertices, cellNodes, cellNodeMaps
 
     def __new_at(self, udat, receiver_id):
         """Function that evaluates the receiver value given its id.
@@ -270,10 +381,12 @@ class Receivers:
         cellId_maps = np.zeros((num_recv, 1))
         cellNodeMaps = np.zeros((num_recv, nodes_per_cell))
         cellVertices = []
+        cellNodes = []
 
         for receiver_id in range(num_recv):
             cell_id = self.is_local[receiver_id]
             cellVertices.append([])
+            cellNodes.append([])
             if cell_id is not None:
                 cellId_maps[receiver_id] = cell_id
                 cellNodeMaps[receiver_id, :] = cell_node_map[cell_id, :]
@@ -283,8 +396,14 @@ class Receivers:
                     x = node_locations[cell_node_map[cell_id, vertex_number], 1]
                     y = node_locations[cell_node_map[cell_id, vertex_number], 2]
                     cellVertices[receiver_id][vertex_number] = (z, x, y)
+                for node_number in range(nodes_per_cell):
+                    cellNodes[receiver_id].append([])
+                    z = node_locations[cell_node_map[cell_id, node_number], 0]
+                    x = node_locations[cell_node_map[cell_id, node_number], 1]
+                    y = node_locations[cell_node_map[cell_id, node_number], 2]
+                    cellNodes[receiver_id][node_number] = (z, x, y)
 
-        return cellId_maps, cellVertices, cellNodeMaps
+        return cellId_maps, cellVertices, cellNodes, cellNodeMaps
 
     def __func_node_locations_3D(self):
         """Function that returns a list which includes a numpy matrix
@@ -392,6 +511,8 @@ class Receivers:
     
 
 ## Some helper functions
+def delta_expr(x0, z, x, sigma_x=500): 
+    return np.exp(-sigma_x * ((z - x0[0]) ** 2 + (x - x0[1]) ** 2))
 
 def choosing_element(V, degree):
     cell_geometry = V.mesh().ufl_cell()

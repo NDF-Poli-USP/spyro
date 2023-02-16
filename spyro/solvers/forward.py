@@ -22,6 +22,7 @@ def forward(
     receivers,
     source_num=0,
     output=False,
+    use_Neumann_BC_as_source=False
 ):
     """Secord-order in time fully-explicit scheme
     with implementation of a Perfectly Matched Layer (PML) using
@@ -185,6 +186,11 @@ def forward(
     if model["BCs"]["outer_bc"] == "non-reflective":
         nf = c * ((u_n - u_nm1) / dt) * v * ds(rule=qr_s)
 
+    # using a Neumann BC as source term (only to compare meshes)
+    if use_Neumann_BC_as_source:
+        source_surface = Function(V)
+        nf = inner(source_surface, v) * ds(4,rule=qr_s) + nf
+
     FF = m1 + a + nf
 
     if PML:
@@ -253,6 +259,11 @@ def forward(
         f = excitations.apply_source(rhs_forcing, wavelet[step])
         B0 = B.sub(0)
         B0 += f
+        
+        # testing Neumann BC as source
+        if use_Neumann_BC_as_source:
+            source_surface.dat.data_with_halos[:] = wavelet[step]
+        
         solver.solve(X, B)
         if PML:
             if dim == 2:
@@ -280,8 +291,8 @@ def forward(
             ), "Numerical instability. Try reducing dt or building the mesh differently"
             if output:
                 outfile.write(u_n, time=t, name="Pressure")
-            if t > 0:
-                helpers.display_progress(comm, t)
+            #if t > 0:
+            #    helpers.display_progress(comm, t)
 
         u_nm1.assign(u_n)
         u_n.assign(u_np1)
