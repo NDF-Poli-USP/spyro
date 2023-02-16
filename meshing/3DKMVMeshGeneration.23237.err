@@ -1,0 +1,4 @@
+Traceback (most recent call last):
+  File "mesh_generation_3d.py", line 254, in <module>
+    model = create_model_for_grid_point_calculation()
+TypeError: create_model_for_grid_point_calculation() missing 1 required positional argument: 'scale'

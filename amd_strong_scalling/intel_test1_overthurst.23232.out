@@ -1,0 +1,731 @@
+
+## Job started at 16-02-2023 as 11:35:04 #####################
+
+
+## Jobs activated by olender: 
+
+             JOBID PARTITION     NAME     USER ST       TIME  NODES NODELIST(REASON)
+             23232 intel_lar amd_stro  olender  R       0:00      2 n[05-06]
+             23233 intel_lar amd_stro  olender  R       0:00      2 n[07-08]
+             23235 intel_sma meshing/  olender  R      19:09      1 n18
+
+## Execution node:         n05 
+
+
+## Number of tasks per job: 40 
+
+
+## Diretorio de submissao do job:   /home/olender/cse23/spyro 
+
+  rank 3 on ensemble 0 owns 10910 elements and can access 2298 vertices
+  rank 28 on ensemble 0 owns 10910 elements and can access 2326 vertices
+  rank 12 on ensemble 0 owns 10910 elements and can access 2376 vertices
+  rank 38 on ensemble 0 owns 10910 elements and can access 2307 vertices
+  rank 10 on ensemble 0 owns 10910 elements and can access 2377 vertices
+  rank 20 on ensemble 0 owns 10911 elements and can access 2320 vertices
+  rank 14 on ensemble 0 owns 10910 elements and can access 2347 vertices
+  rank 21 on ensemble 0 owns 10910 elements and can access 2352 vertices
+  rank 6 on ensemble 0 owns 10910 elements and can access 2305 vertices
+  rank 24 on ensemble 0 owns 10910 elements and can access 2411 vertices
+  rank 15 on ensemble 0 owns 10910 elements and can access 2333 vertices
+  rank 16 on ensemble 0 owns 10910 elements and can access 2330 vertices
+  rank 11 on ensemble 0 owns 10911 elements and can access 2344 vertices
+  rank 27 on ensemble 0 owns 10910 elements and can access 2275 vertices
+  rank 18 on ensemble 0 owns 10910 elements and can access 2335 vertices
+  rank 39 on ensemble 0 owns 10910 elements and can access 2331 vertices
+  rank 13 on ensemble 0 owns 10910 elements and can access 2364 vertices
+  rank 22 on ensemble 0 owns 10910 elements and can access 2337 vertices
+  rank 2 on ensemble 0 owns 10910 elements and can access 2325 vertices
+  rank 30 on ensemble 0 owns 10910 elements and can access 2412 vertices
+  rank 1 on ensemble 0 owns 10910 elements and can access 2341 vertices
+  rank 29 on ensemble 0 owns 10910 elements and can access 2328 vertices
+  rank 9 on ensemble 0 owns 10910 elements and can access 2310 vertices
+  rank 34 on ensemble 0 owns 10910 elements and can access 2300 vertices
+  rank 31 on ensemble 0 owns 10910 elements and can access 2363 vertices
+  rank 23 on ensemble 0 owns 10910 elements and can access 2347 vertices
+  rank 7 on ensemble 0 owns 10910 elements and can access 2372 vertices
+  rank 33 on ensemble 0 owns 10910 elements and can access 2384 vertices
+  rank 35 on ensemble 0 owns 10910 elements and can access 2320 vertices
+  rank 37 on ensemble 0 owns 10910 elements and can access 2445 vertices
+  rank 26 on ensemble 0 owns 10910 elements and can access 2337 vertices
+  rank 36 on ensemble 0 owns 10911 elements and can access 2321 vertices
+  rank 32 on ensemble 0 owns 10910 elements and can access 2389 vertices
+  rank 17 on ensemble 0 owns 10910 elements and can access 2336 vertices
+  rank 4 on ensemble 0 owns 10910 elements and can access 2355 vertices
+  rank 25 on ensemble 0 owns 10910 elements and can access 2397 vertices
+  rank 8 on ensemble 0 owns 10910 elements and can access 2322 vertices
+  rank 5 on ensemble 0 owns 10911 elements and can access 2345 vertices
+  rank 19 on ensemble 0 owns 10910 elements and can access 2319 vertices
+INFO: Distributing 1 shot(s) across 40 core(s). Each shot is using 40 cores
+  rank 0 on ensemble 0 owns 10911 elements and can access 2303 vertices
+INFO: converting from m/s to km/s
+Simulation time is:    0.07425 seconds
+Simulation time is:     0.1492 seconds
+Simulation time is:     0.2243 seconds
+Simulation time is:     0.2993 seconds
+Simulation time is:     0.3743 seconds
+Simulation time is:     0.4492 seconds
+Simulation time is:     0.5242 seconds
+Simulation time is:     0.5993 seconds
+Simulation time is:     0.6743 seconds
+Simulation time is:     0.7492 seconds
+Simulation time is:     0.8243 seconds
+Simulation time is:     0.8992 seconds
+Simulation time is:     0.9743 seconds
+Simulation time is:      1.049 seconds
+Simulation time is:      1.124 seconds
+Simulation time is:      1.199 seconds
+Simulation time is:      1.274 seconds
+Simulation time is:      1.349 seconds
+Simulation time is:      1.424 seconds
+Simulation time is:      1.499 seconds
+Simulation time is:      1.574 seconds
+Simulation time is:      1.649 seconds
+Simulation time is:      1.724 seconds
+Simulation time is:      1.799 seconds
+Simulation time is:      1.874 seconds
+Simulation time is:      1.949 seconds
+Simulation time is:      2.024 seconds
+Simulation time is:      2.099 seconds
+Simulation time is:      2.174 seconds
+Simulation time is:      2.249 seconds
+Simulation time is:      2.324 seconds
+Simulation time is:      2.399 seconds
+Simulation time is:      2.474 seconds
+Simulation time is:      2.549 seconds
+Simulation time is:      2.624 seconds
+Simulation time is:      2.699 seconds
+Simulation time is:      2.774 seconds
+Simulation time is:      2.849 seconds
+Simulation time is:      2.924 seconds
+Simulation time is:      2.999 seconds
+Simulation time is:      3.074 seconds
+Simulation time is:      3.149 seconds
+Simulation time is:      3.224 seconds
+Simulation time is:      3.299 seconds
+Simulation time is:      3.374 seconds
+Simulation time is:      3.449 seconds
+Simulation time is:      3.524 seconds
+Simulation time is:      3.599 seconds
+Simulation time is:      3.674 seconds
+Simulation time is:      3.749 seconds
+Simulation time is:      3.824 seconds
+Simulation time is:      3.899 seconds
+Simulation time is:      3.974 seconds
+Spatial parallelism, reducing to comm 0
+Time without forward problem: 42.68763542175293
+Time with only forward problem: 674.0419359207153
+Total time problem: 716.7295713424683
+Time without forward problem: 42.76762580871582
+Time with only forward problem: 673.9621822834015
+Total time problem: 716.7298080921173
+Time without forward problem: 42.80081486701965
+Time with only forward problem: 673.929806470871
+Total time problem: 716.7306213378906
+Time without forward problem: 42.73877549171448
+Time with only forward problem: 673.9919173717499
+Total time problem: 716.7306928634644
+Time without forward problem: 42.7764105796814
+Time with only forward problem: 673.9599952697754
+Total time problem: 716.7364058494568
+Time without forward problem: 42.80706572532654
+Time with only forward problem: 673.9295539855957
+Total time problem: 716.7366197109222
+Time without forward problem: 42.731902837753296
+Time with only forward problem: 674.0048778057098
+Total time problem: 716.7367806434631
+Time without forward problem: 42.73442578315735
+Time with only forward problem: 674.0025293827057
+Total time problem: 716.736955165863
+Time without forward problem: 43.07710576057434
+Time with only forward problem: 673.661917924881
+Total time problem: 716.7390236854553
+Time without forward problem: 42.72112417221069
+Time with only forward problem: 674.0179936885834
+Total time problem: 716.7391178607941
+Time without forward problem: 42.63051462173462
+Time with only forward problem: 674.1085889339447
+Total time problem: 716.7391035556793
+Time without forward problem: 42.92275524139404
+Time with only forward problem: 673.8165819644928
+Total time problem: 716.7393372058868
+Time without forward problem: 42.799254179000854
+Time with only forward problem: 673.9437263011932
+Total time problem: 716.7429804801941
+Time without forward problem: 42.84726643562317
+Time with only forward problem: 673.8959012031555
+Total time problem: 716.7431676387787
+Time without forward problem: 42.80891251564026
+Time with only forward problem: 673.9345080852509
+Total time problem: 716.7434206008911
+Time without forward problem: 42.839479207992554
+Time with only forward problem: 673.903947353363
+Total time problem: 716.7434265613556
+Time without forward problem: 42.39415168762207
+Time with only forward problem: 674.3516538143158
+Total time problem: 716.7458055019379
+Time without forward problem: 42.324007987976074
+Time with only forward problem: 674.4219326972961
+Total time problem: 716.7459406852722
+Time without forward problem: 42.822227001190186
+Time with only forward problem: 673.9251506328583
+Total time problem: 716.7473776340485
+Time without forward problem: 42.88356852531433
+Time with only forward problem: 673.8640413284302
+Total time problem: 716.7476098537445
+Time without forward problem: 42.88652038574219
+Time with only forward problem: 673.8612027168274
+Total time problem: 716.7477231025696
+Time without forward problem: 42.39215660095215
+Time with only forward problem: 674.3556973934174
+Total time problem: 716.7478539943695
+Time without forward problem: 42.380446910858154
+Time with only forward problem: 674.3674304485321
+Total time problem: 716.7478773593903
+Time without forward problem: 42.88161087036133
+Time with only forward problem: 673.8664979934692
+Total time problem: 716.7481088638306
+Time without forward problem: 42.94533061981201
+Time with only forward problem: 673.8028695583344
+Total time problem: 716.7482001781464
+Time without forward problem: 42.82686257362366
+Time with only forward problem: 673.9213325977325
+Total time problem: 716.7481951713562
+Time without forward problem: 42.85857558250427
+Time with only forward problem: 673.8912122249603
+Total time problem: 716.7497878074646
+Time without forward problem: 42.93976354598999
+Time with only forward problem: 673.8100452423096
+Total time problem: 716.7498087882996
+Time without forward problem: 42.91848564147949
+Time with only forward problem: 673.8320565223694
+Total time problem: 716.7505421638489
+Time without forward problem: 42.95073056221008
+Time with only forward problem: 673.8000767230988
+Total time problem: 716.7508072853088
+Time without forward problem: 42.66605281829834
+Time with only forward problem: 674.0887188911438
+Total time problem: 716.7547717094421
+Time without forward problem: 42.885658502578735
+Time with only forward problem: 673.869348526001
+Total time problem: 716.7550070285797
+Time without forward problem: 42.71630859375
+Time with only forward problem: 674.0388436317444
+Total time problem: 716.7551522254944
+Time without forward problem: 42.42634916305542
+Time with only forward problem: 674.3289837837219
+Total time problem: 716.7553329467773
+Time without forward problem: 42.953145027160645
+Time with only forward problem: 673.8023738861084
+Total time problem: 716.755518913269
+Time without forward problem: 42.90220022201538
+Time with only forward problem: 673.8535583019257
+Total time problem: 716.755758523941
+Time without forward problem: 42.85530161857605
+Time with only forward problem: 673.9014317989349
+Total time problem: 716.756733417511
+Time without forward problem: 42.7533814907074
+Time with only forward problem: 674.0035514831543
+Total time problem: 716.7569329738617
+Time without forward problem: 42.7901074886322
+Time with only forward problem: 673.9750549793243
+Total time problem: 716.7651624679565
+Time without forward problem: 42.84757137298584
+Time with only forward problem: 673.9179728031158
+Total time problem: 716.7655441761017
+END of forward problem
+INFO: Distributing 1 shot(s) across 30 core(s). Each shot is using 30 cores
+  rank 0 on ensemble 0 owns 14547 elements and can access 3023 vertices
+  rank 25 on ensemble 0 owns 14547 elements and can access 3070 vertices
+  rank 3 on ensemble 0 owns 14547 elements and can access 3088 vertices
+  rank 27 on ensemble 0 owns 14547 elements and can access 3116 vertices
+  rank 10 on ensemble 0 owns 14547 elements and can access 3045 vertices
+  rank 22 on ensemble 0 owns 14547 elements and can access 3063 vertices
+  rank 2 on ensemble 0 owns 14546 elements and can access 3080 vertices
+  rank 24 on ensemble 0 owns 14547 elements and can access 3061 vertices
+  rank 6 on ensemble 0 owns 14547 elements and can access 3026 vertices
+  rank 26 on ensemble 0 owns 14546 elements and can access 3051 vertices
+  rank 11 on ensemble 0 owns 14547 elements and can access 3074 vertices
+  rank 28 on ensemble 0 owns 14547 elements and can access 3093 vertices
+  rank 12 on ensemble 0 owns 14547 elements and can access 3063 vertices
+  rank 4 on ensemble 0 owns 14547 elements and can access 3010 vertices
+  rank 16 on ensemble 0 owns 14547 elements and can access 3030 vertices
+  rank 20 on ensemble 0 owns 14546 elements and can access 3016 vertices
+  rank 1 on ensemble 0 owns 14547 elements and can access 3019 vertices
+  rank 23 on ensemble 0 owns 14547 elements and can access 3082 vertices
+  rank 5 on ensemble 0 owns 14547 elements and can access 3069 vertices
+  rank 21 on ensemble 0 owns 14547 elements and can access 3014 vertices
+  rank 18 on ensemble 0 owns 14547 elements and can access 2992 vertices
+  rank 19 on ensemble 0 owns 14547 elements and can access 3139 vertices
+  rank 8 on ensemble 0 owns 14547 elements and can access 3065 vertices
+  rank 13 on ensemble 0 owns 14547 elements and can access 3021 vertices
+  rank 29 on ensemble 0 owns 14547 elements and can access 3035 vertices
+  rank 14 on ensemble 0 owns 14547 elements and can access 3091 vertices
+  rank 15 on ensemble 0 owns 14547 elements and can access 3059 vertices
+  rank 9 on ensemble 0 owns 14546 elements and can access 3117 vertices
+  rank 17 on ensemble 0 owns 14546 elements and can access 3054 vertices
+  rank 7 on ensemble 0 owns 14547 elements and can access 3073 vertices
+INFO: converting from m/s to km/s
+Simulation time is:    0.07425 seconds
+Simulation time is:     0.1492 seconds
+Simulation time is:     0.2243 seconds
+Simulation time is:     0.2993 seconds
+Simulation time is:     0.3743 seconds
+Simulation time is:     0.4492 seconds
+Simulation time is:     0.5242 seconds
+Simulation time is:     0.5993 seconds
+Simulation time is:     0.6743 seconds
+Simulation time is:     0.7492 seconds
+Simulation time is:     0.8243 seconds
+Simulation time is:     0.8992 seconds
+Simulation time is:     0.9743 seconds
+Simulation time is:      1.049 seconds
+Simulation time is:      1.124 seconds
+Simulation time is:      1.199 seconds
+Simulation time is:      1.274 seconds
+Simulation time is:      1.349 seconds
+Simulation time is:      1.424 seconds
+Simulation time is:      1.499 seconds
+Simulation time is:      1.574 seconds
+Simulation time is:      1.649 seconds
+Simulation time is:      1.724 seconds
+Simulation time is:      1.799 seconds
+Simulation time is:      1.874 seconds
+Simulation time is:      1.949 seconds
+Simulation time is:      2.024 seconds
+Simulation time is:      2.099 seconds
+Simulation time is:      2.174 seconds
+Simulation time is:      2.249 seconds
+Simulation time is:      2.324 seconds
+Simulation time is:      2.399 seconds
+Simulation time is:      2.474 seconds
+Simulation time is:      2.549 seconds
+Simulation time is:      2.624 seconds
+Simulation time is:      2.699 seconds
+Simulation time is:      2.774 seconds
+Simulation time is:      2.849 seconds
+Simulation time is:      2.924 seconds
+Simulation time is:      2.999 seconds
+Simulation time is:      3.074 seconds
+Simulation time is:      3.149 seconds
+Simulation time is:      3.224 seconds
+Simulation time is:      3.299 seconds
+Simulation time is:      3.374 seconds
+Simulation time is:      3.449 seconds
+Simulation time is:      3.524 seconds
+Simulation time is:      3.599 seconds
+Simulation time is:      3.674 seconds
+Simulation time is:      3.749 seconds
+Simulation time is:      3.824 seconds
+Simulation time is:      3.899 seconds
+Simulation time is:      3.974 seconds
+Spatial parallelism, reducing to comm 0
+Time without forward problem: 35.75289988517761
+Time with only forward problem: 809.5893449783325
+Total time problem: 845.3422448635101
+Time without forward problem: 35.737257957458496
+Time with only forward problem: 809.6050779819489
+Total time problem: 845.3423359394073
+Time without forward problem: 35.721906423568726
+Time with only forward problem: 809.6320290565491
+Total time problem: 845.3539354801178
+Time without forward problem: 35.8921582698822
+Time with only forward problem: 809.4618246555328
+Total time problem: 845.353982925415
+Time without forward problem: 36.70777249336243
+Time with only forward problem: 808.6484839916229
+Total time problem: 845.3562564849854
+Time without forward problem: 36.769307374954224
+Time with only forward problem: 808.5874135494232
+Total time problem: 845.3567209243774
+Time without forward problem: 36.56323003768921
+Time with only forward problem: 808.7938439846039
+Total time problem: 845.3570740222931
+Time without forward problem: 36.453155279159546
+Time with only forward problem: 808.9039053916931
+Total time problem: 845.3570606708527
+Time without forward problem: 36.42838716506958
+Time with only forward problem: 808.9289665222168
+Total time problem: 845.3573536872864
+Time without forward problem: 36.48605179786682
+Time with only forward problem: 808.8714413642883
+Total time problem: 845.3574931621552
+Time without forward problem: 36.801435708999634
+Time with only forward problem: 808.557286977768
+Total time problem: 845.3587226867676
+Time without forward problem: 36.61229753494263
+Time with only forward problem: 808.7467648983002
+Total time problem: 845.3590624332428
+Time without forward problem: 36.459118604660034
+Time with only forward problem: 808.9000267982483
+Total time problem: 845.3591454029083
+Time without forward problem: 36.66496753692627
+Time with only forward problem: 808.694267988205
+Total time problem: 845.3592355251312
+Time without forward problem: 36.52961254119873
+Time with only forward problem: 808.8300838470459
+Total time problem: 845.3596963882446
+Time without forward problem: 36.51058912277222
+Time with only forward problem: 808.8491694927216
+Total time problem: 845.3597586154938
+Time without forward problem: 36.62527847290039
+Time with only forward problem: 808.7347202301025
+Total time problem: 845.3599987030029
+Time without forward problem: 36.63473892211914
+Time with only forward problem: 808.7252900600433
+Total time problem: 845.3600289821625
+Time without forward problem: 35.60550665855408
+Time with only forward problem: 809.7585949897766
+Total time problem: 845.3641016483307
+Time without forward problem: 35.773088455200195
+Time with only forward problem: 809.5911448001862
+Total time problem: 845.3642332553864
+Time without forward problem: 36.56479096412659
+Time with only forward problem: 808.8011813163757
+Total time problem: 845.3659722805023
+Time without forward problem: 36.846848249435425
+Time with only forward problem: 808.5193371772766
+Total time problem: 845.366185426712
+Time without forward problem: 36.69290900230408
+Time with only forward problem: 808.6743109226227
+Total time problem: 845.3672199249268
+Time without forward problem: 36.6951470375061
+Time with only forward problem: 808.6722373962402
+Total time problem: 845.3673844337463
+Time without forward problem: 35.83605718612671
+Time with only forward problem: 809.540723323822
+Total time problem: 845.3767805099487
+Time without forward problem: 35.84230375289917
+Time with only forward problem: 809.5346627235413
+Total time problem: 845.3769664764404
+Time without forward problem: 35.85616898536682
+Time with only forward problem: 809.5207874774933
+Total time problem: 845.3769564628601
+Time without forward problem: 36.45520281791687
+Time with only forward problem: 808.92160820961
+Total time problem: 845.3768110275269
+Time without forward problem: 36.64941716194153
+Time with only forward problem: 808.7276339530945
+Total time problem: 845.377051115036
+Time without forward problem: 35.84782338142395
+Time with only forward problem: 809.5294678211212
+Total time problem: 845.3772912025452
+END of forward problem
+  rank 2 on ensemble 0 owns 21820 elements and can access 4413 vertices
+  rank 8 on ensemble 0 owns 21820 elements and can access 4391 vertices
+  rank 9 on ensemble 0 owns 21820 elements and can access 4442 vertices
+  rank 11 on ensemble 0 owns 21821 elements and can access 4438 vertices
+  rank 15 on ensemble 0 owns 21821 elements and can access 4620 vertices
+  rank 16 on ensemble 0 owns 21820 elements and can access 4438 vertices
+  rank 1 on ensemble 0 owns 21820 elements and can access 4450 vertices
+  rank 3 on ensemble 0 owns 21821 elements and can access 4466 vertices
+  rank 5 on ensemble 0 owns 21820 elements and can access 4462 vertices
+  rank 7 on ensemble 0 owns 21820 elements and can access 4451 vertices
+  rank 12 on ensemble 0 owns 21820 elements and can access 4465 vertices
+  rank 13 on ensemble 0 owns 21820 elements and can access 4396 vertices
+  rank 17 on ensemble 0 owns 21820 elements and can access 4491 vertices
+  rank 18 on ensemble 0 owns 21820 elements and can access 4551 vertices
+  rank 19 on ensemble 0 owns 21820 elements and can access 4454 vertices
+  rank 6 on ensemble 0 owns 21821 elements and can access 4436 vertices
+  rank 14 on ensemble 0 owns 21820 elements and can access 4455 vertices
+  rank 10 on ensemble 0 owns 21820 elements and can access 4403 vertices
+INFO: Distributing 1 shot(s) across 20 core(s). Each shot is using 20 cores
+  rank 0 on ensemble 0 owns 21821 elements and can access 4450 vertices
+  rank 4 on ensemble 0 owns 21820 elements and can access 4532 vertices
+INFO: converting from m/s to km/s
+Simulation time is:    0.07425 seconds
+Simulation time is:     0.1492 seconds
+Simulation time is:     0.2243 seconds
+Simulation time is:     0.2993 seconds
+Simulation time is:     0.3743 seconds
+Simulation time is:     0.4492 seconds
+Simulation time is:     0.5242 seconds
+Simulation time is:     0.5993 seconds
+Simulation time is:     0.6743 seconds
+Simulation time is:     0.7492 seconds
+Simulation time is:     0.8243 seconds
+Simulation time is:     0.8992 seconds
+Simulation time is:     0.9743 seconds
+Simulation time is:      1.049 seconds
+Simulation time is:      1.124 seconds
+Simulation time is:      1.199 seconds
+Simulation time is:      1.274 seconds
+Simulation time is:      1.349 seconds
+Simulation time is:      1.424 seconds
+Simulation time is:      1.499 seconds
+Simulation time is:      1.574 seconds
+Simulation time is:      1.649 seconds
+Simulation time is:      1.724 seconds
+Simulation time is:      1.799 seconds
+Simulation time is:      1.874 seconds
+Simulation time is:      1.949 seconds
+Simulation time is:      2.024 seconds
+Simulation time is:      2.099 seconds
+Simulation time is:      2.174 seconds
+Simulation time is:      2.249 seconds
+Simulation time is:      2.324 seconds
+Simulation time is:      2.399 seconds
+Simulation time is:      2.474 seconds
+Simulation time is:      2.549 seconds
+Simulation time is:      2.624 seconds
+Simulation time is:      2.699 seconds
+Simulation time is:      2.774 seconds
+Simulation time is:      2.849 seconds
+Simulation time is:      2.924 seconds
+Simulation time is:      2.999 seconds
+Simulation time is:      3.074 seconds
+Simulation time is:      3.149 seconds
+Simulation time is:      3.224 seconds
+Simulation time is:      3.299 seconds
+Simulation time is:      3.374 seconds
+Simulation time is:      3.449 seconds
+Simulation time is:      3.524 seconds
+Simulation time is:      3.599 seconds
+Simulation time is:      3.674 seconds
+Simulation time is:      3.749 seconds
+Simulation time is:      3.824 seconds
+Simulation time is:      3.899 seconds
+Simulation time is:      3.974 seconds
+Spatial parallelism, reducing to comm 0
+Time without forward problem: 37.23981952667236
+Time with only forward problem: 1161.9508602619171
+Total time problem: 1199.1906797885895
+Time without forward problem: 37.25402760505676
+Time with only forward problem: 1161.936770439148
+Total time problem: 1199.1907980442047
+Time without forward problem: 37.10894703865051
+Time with only forward problem: 1162.0872883796692
+Total time problem: 1199.1962354183197
+Time without forward problem: 37.20084619522095
+Time with only forward problem: 1161.995789051056
+Total time problem: 1199.1966352462769
+Time without forward problem: 37.29910469055176
+Time with only forward problem: 1161.8976109027863
+Total time problem: 1199.196715593338
+Time without forward problem: 37.20697832107544
+Time with only forward problem: 1161.9898340702057
+Total time problem: 1199.1968123912811
+Time without forward problem: 37.127031326293945
+Time with only forward problem: 1162.0707886219025
+Total time problem: 1199.1978199481964
+Time without forward problem: 37.312742948532104
+Time with only forward problem: 1161.8851072788239
+Total time problem: 1199.197850227356
+Time without forward problem: 37.25775933265686
+Time with only forward problem: 1161.9400823116302
+Total time problem: 1199.197841644287
+Time without forward problem: 37.25055980682373
+Time with only forward problem: 1161.9473657608032
+Total time problem: 1199.197925567627
+Time without forward problem: 37.27467751502991
+Time with only forward problem: 1161.9264788627625
+Total time problem: 1199.2011563777924
+Time without forward problem: 37.2492299079895
+Time with only forward problem: 1161.9524002075195
+Total time problem: 1199.201630115509
+Time without forward problem: 37.236995697021484
+Time with only forward problem: 1161.9650893211365
+Total time problem: 1199.202085018158
+Time without forward problem: 37.24242901802063
+Time with only forward problem: 1161.9596862792969
+Total time problem: 1199.2021152973175
+Time without forward problem: 37.24232220649719
+Time with only forward problem: 1161.9666485786438
+Total time problem: 1199.208970785141
+Time without forward problem: 37.25481390953064
+Time with only forward problem: 1161.9543879032135
+Total time problem: 1199.2092018127441
+Time without forward problem: 37.26784062385559
+Time with only forward problem: 1161.941561460495
+Total time problem: 1199.2094020843506
+Time without forward problem: 37.300090074539185
+Time with only forward problem: 1161.909513950348
+Total time problem: 1199.209604024887
+Time without forward problem: 37.27436661720276
+Time with only forward problem: 1161.936441898346
+Total time problem: 1199.2108085155487
+Time without forward problem: 37.190061807632446
+Time with only forward problem: 1162.0211448669434
+Total time problem: 1199.2112066745758
+END of forward problem
+INFO: Distributing 1 shot(s) across 15 core(s). Each shot is using 15 cores
+  rank 0 on ensemble 0 owns 29093 elements and can access 5828 vertices
+  rank 5 on ensemble 0 owns 29093 elements and can access 5817 vertices
+  rank 11 on ensemble 0 owns 29094 elements and can access 5809 vertices
+  rank 12 on ensemble 0 owns 29093 elements and can access 5818 vertices
+  rank 13 on ensemble 0 owns 29094 elements and can access 5907 vertices
+  rank 14 on ensemble 0 owns 29094 elements and can access 5836 vertices
+  rank 1 on ensemble 0 owns 29094 elements and can access 5809 vertices
+  rank 3 on ensemble 0 owns 29093 elements and can access 5959 vertices
+  rank 9 on ensemble 0 owns 29093 elements and can access 5794 vertices
+  rank 10 on ensemble 0 owns 29094 elements and can access 5836 vertices
+  rank 4 on ensemble 0 owns 29094 elements and can access 5804 vertices
+  rank 2 on ensemble 0 owns 29094 elements and can access 5847 vertices
+  rank 8 on ensemble 0 owns 29094 elements and can access 5957 vertices
+  rank 7 on ensemble 0 owns 29094 elements and can access 5812 vertices
+  rank 6 on ensemble 0 owns 29094 elements and can access 5904 vertices
+INFO: converting from m/s to km/s
+Simulation time is:    0.07425 seconds
+Simulation time is:     0.1492 seconds
+Simulation time is:     0.2243 seconds
+Simulation time is:     0.2993 seconds
+Simulation time is:     0.3743 seconds
+Simulation time is:     0.4492 seconds
+Simulation time is:     0.5242 seconds
+Simulation time is:     0.5993 seconds
+Simulation time is:     0.6743 seconds
+Simulation time is:     0.7492 seconds
+Simulation time is:     0.8243 seconds
+Simulation time is:     0.8992 seconds
+Simulation time is:     0.9743 seconds
+Simulation time is:      1.049 seconds
+Simulation time is:      1.124 seconds
+Simulation time is:      1.199 seconds
+Simulation time is:      1.274 seconds
+Simulation time is:      1.349 seconds
+Simulation time is:      1.424 seconds
+Simulation time is:      1.499 seconds
+Simulation time is:      1.574 seconds
+Simulation time is:      1.649 seconds
+Simulation time is:      1.724 seconds
+Simulation time is:      1.799 seconds
+Simulation time is:      1.874 seconds
+Simulation time is:      1.949 seconds
+Simulation time is:      2.024 seconds
+Simulation time is:      2.099 seconds
+Simulation time is:      2.174 seconds
+Simulation time is:      2.249 seconds
+Simulation time is:      2.324 seconds
+Simulation time is:      2.399 seconds
+Simulation time is:      2.474 seconds
+Simulation time is:      2.549 seconds
+Simulation time is:      2.624 seconds
+Simulation time is:      2.699 seconds
+Simulation time is:      2.774 seconds
+Simulation time is:      2.849 seconds
+Simulation time is:      2.924 seconds
+Simulation time is:      2.999 seconds
+Simulation time is:      3.074 seconds
+Simulation time is:      3.149 seconds
+Simulation time is:      3.224 seconds
+Simulation time is:      3.299 seconds
+Simulation time is:      3.374 seconds
+Simulation time is:      3.449 seconds
+Simulation time is:      3.524 seconds
+Simulation time is:      3.599 seconds
+Simulation time is:      3.674 seconds
+Simulation time is:      3.749 seconds
+Simulation time is:      3.824 seconds
+Simulation time is:      3.899 seconds
+Simulation time is:      3.974 seconds
+Spatial parallelism, reducing to comm 0
+Time without forward problem: 38.177096128463745
+Time with only forward problem: 1540.7178802490234
+Total time problem: 1578.8949763774872
+Time without forward problem: 38.2249858379364
+Time with only forward problem: 1540.6703388690948
+Total time problem: 1578.8953247070312
+Time without forward problem: 38.554096937179565
+Time with only forward problem: 1540.3413367271423
+Total time problem: 1578.895433664322
+Time without forward problem: 38.02468156814575
+Time with only forward problem: 1540.8709268569946
+Total time problem: 1578.8956084251404
+Time without forward problem: 38.25979733467102
+Time with only forward problem: 1540.6364188194275
+Total time problem: 1578.8962161540985
+Time without forward problem: 37.91470646858215
+Time with only forward problem: 1540.9893901348114
+Total time problem: 1578.9040966033936
+Time without forward problem: 38.28300142288208
+Time with only forward problem: 1540.6211845874786
+Total time problem: 1578.9041860103607
+Time without forward problem: 37.6977059841156
+Time with only forward problem: 1541.2067024707794
+Total time problem: 1578.904408454895
+Time without forward problem: 38.03440546989441
+Time with only forward problem: 1540.87069773674
+Total time problem: 1578.9051032066345
+Time without forward problem: 38.47334361076355
+Time with only forward problem: 1540.432915687561
+Total time problem: 1578.9062592983246
+Time without forward problem: 38.25051760673523
+Time with only forward problem: 1540.6560792922974
+Total time problem: 1578.9065968990326
+Time without forward problem: 38.1380820274353
+Time with only forward problem: 1540.76855301857
+Total time problem: 1578.9066350460052
+Time without forward problem: 38.096940994262695
+Time with only forward problem: 1540.8099112510681
+Total time problem: 1578.9068522453308
+Time without forward problem: 38.31593203544617
+Time with only forward problem: 1540.59543800354
+Total time problem: 1578.9113700389862
+Time without forward problem: 38.03138327598572
+Time with only forward problem: 1540.8802049160004
+Total time problem: 1578.911588191986
+END of forward problem
+INFO: Distributing 1 shot(s) across 10 core(s). Each shot is using 10 cores
+  rank 0 on ensemble 0 owns 43641 elements and can access 8603 vertices
+  rank 2 on ensemble 0 owns 43641 elements and can access 8556 vertices
+  rank 8 on ensemble 0 owns 43641 elements and can access 8645 vertices
+  rank 9 on ensemble 0 owns 43640 elements and can access 8516 vertices
+  rank 5 on ensemble 0 owns 43641 elements and can access 8557 vertices
+  rank 6 on ensemble 0 owns 43640 elements and can access 8655 vertices
+  rank 7 on ensemble 0 owns 43640 elements and can access 8595 vertices
+  rank 4 on ensemble 0 owns 43641 elements and can access 8580 vertices
+  rank 1 on ensemble 0 owns 43640 elements and can access 8727 vertices
+  rank 3 on ensemble 0 owns 43640 elements and can access 8584 vertices
+INFO: converting from m/s to km/s
+Simulation time is:    0.07425 seconds
+Simulation time is:     0.1492 seconds
+Simulation time is:     0.2243 seconds
+Simulation time is:     0.2993 seconds
+Simulation time is:     0.3743 seconds
+Simulation time is:     0.4492 seconds
+Simulation time is:     0.5242 seconds
+Simulation time is:     0.5993 seconds
+Simulation time is:     0.6743 seconds
+Simulation time is:     0.7492 seconds
+Simulation time is:     0.8243 seconds
+Simulation time is:     0.8992 seconds
+Simulation time is:     0.9743 seconds
+Simulation time is:      1.049 seconds
+Simulation time is:      1.124 seconds
+Simulation time is:      1.199 seconds
+Simulation time is:      1.274 seconds
+Simulation time is:      1.349 seconds
+Simulation time is:      1.424 seconds
+Simulation time is:      1.499 seconds
+Simulation time is:      1.574 seconds
+Simulation time is:      1.649 seconds
+Simulation time is:      1.724 seconds
+Simulation time is:      1.799 seconds
+Simulation time is:      1.874 seconds
+Simulation time is:      1.949 seconds
+Simulation time is:      2.024 seconds
+Simulation time is:      2.099 seconds
+Simulation time is:      2.174 seconds
+Simulation time is:      2.249 seconds
+Simulation time is:      2.324 seconds
+Simulation time is:      2.399 seconds
+Simulation time is:      2.474 seconds
+Simulation time is:      2.549 seconds
+Simulation time is:      2.624 seconds
+Simulation time is:      2.699 seconds
+Simulation time is:      2.774 seconds
+Simulation time is:      2.849 seconds
+Simulation time is:      2.924 seconds
+Simulation time is:      2.999 seconds
+Simulation time is:      3.074 seconds
+Simulation time is:      3.149 seconds
+Simulation time is:      3.224 seconds
+Simulation time is:      3.299 seconds
+Simulation time is:      3.374 seconds
+Simulation time is:      3.449 seconds
+Simulation time is:      3.524 seconds
+Simulation time is:      3.599 seconds
+Simulation time is:      3.674 seconds
+Simulation time is:      3.749 seconds
+Simulation time is:      3.824 seconds
+Simulation time is:      3.899 seconds
