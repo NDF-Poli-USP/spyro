@@ -122,6 +122,7 @@ def _make_elastic_parameters(H, mesh, guess=False):
         return lamb, mu, rho
 #}}}
 
+
 lamb_guess, mu_guess, rho = _make_elastic_parameters(H, mesh, guess=True)
 lamb_exact, mu_exact, _ = _make_elastic_parameters(H, mesh, guess=False)
 
@@ -133,18 +134,18 @@ wavelet = spyro.full_ricker_wavelet(
 point_cloud = receivers.set_point_cloud(comm)
 #sys.exit("exit")
 
-print("Run exact model",flush=True)
+print("Run exact model", flush=True)
 u_exact, uz_exact, ux_exact, uy_exact = spyro.solvers.forward_elastic_waves_AD(
     model, mesh, comm, rho, lamb_exact, mu_exact, sources, wavelet, point_cloud, output=False
 )
 u_exact_rec = [uz_exact, ux_exact]
 
-print("Run guess model",flush=True)
+print("Run guess model", flush=True)
 u_guess, uz_guess, ux_guess, uy_guess, J = spyro.solvers.forward_elastic_waves_AD(
     model, mesh, comm, rho, lamb_guess, mu_guess, sources, wavelet, point_cloud, output=False,
     true_rec=u_exact_rec, fwi=True
 )
-print(J)
+
 File("u_exact.pvd").write(u_exact[-1])
 File("u_guess.pvd").write(u_guess[-1])
 #sys.exit("exit")

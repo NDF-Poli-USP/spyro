@@ -14,7 +14,7 @@ import time
 set_log_level(ERROR)
 
 # @ensemble_forward_elastic_waves
-def forward_elastic_waves(
+def forward_elastic_waves_AD(
     model,
     mesh,
     comm,
@@ -246,6 +246,7 @@ def forward_elastic_waves(
         
         if fwi:
             p_true_rec = kwargs.get("true_rec")
+            # print(rec.sub(0).dat.data[:])
             J0 += objective_func(
                 rec,
                 p_true_rec,

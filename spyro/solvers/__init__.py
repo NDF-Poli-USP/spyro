@@ -3,6 +3,7 @@ from .forward_AD import forward as forward_AD
 from .forward_elastic_waves import forward_elastic_waves
 from .gradient import gradient
 from .gradient_elastic_waves import gradient_elastic_waves
+from .forward_elastic_waves_AD import forward_elastic_waves_AD
 
 __all__ = [
     "forward",  # forward solver adapted for discrete adjoint
