@@ -1,1 +1,3 @@
-Cores Used,Runtime
+Cores Used,Runtime pre forward,Runtime forward,Runtime total
+40,43.0334267616272,677.5232017040253,719.9584984779358
+30,0,0,0
