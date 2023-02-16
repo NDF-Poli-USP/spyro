@@ -21,8 +21,8 @@ def gauss_lobatto_legendre_cube_rule(dimension, degree):
 
 
 
-m1 = RectangleMesh(250, 250, 1, 1,quadrilateral=True)
-m2 = RectangleMesh(100, 100, 1, 1,quadrilateral=True)
+m1 = RectangleMesh(100, 100, 1, 1,quadrilateral=True)
+m2 = RectangleMesh(250, 250, 1, 1,quadrilateral=True)
 
 # to run project in parallel
 m2._parallel_compatible = {weakref.ref(m1)}
@@ -46,7 +46,7 @@ f2 = Function(V2)
 m = V2.ufl_domain() 
 W = VectorFunctionSpace(m, V2.ufl_element()) 
 X = interpolate(m.coordinates, W) 
-f2.dat.data[:] = f1.at(X.dat.data_ro)
+f2.dat.data[:] = f1.at(X.dat.data_ro, tolerance=0.001)
 
 print(len(X.dat.data_ro))
 
