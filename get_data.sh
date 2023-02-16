@@ -32,13 +32,13 @@ echo -e "\n## Diretorio de submissao do job:   $SLURM_SUBMIT_DIR \n"
 folder="amd_strong_scalling"
 
 # Loop over every file in the folder
-for file in $folder/*.out; do
+for file in $folder/intel_test1_overthurst.2322*.out; do
 
     # Check if the file is a regular file (not a directory)
     if [ -f "$file" ]; then
 
         # Run the Python script on the file
-        python get_test_data.py "$file"
+        python get_test_data_separated.py "$file"
 
     fi
 
