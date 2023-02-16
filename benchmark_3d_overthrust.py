@@ -83,5 +83,8 @@ t3 = time.time()
 print(f"Time without forward problem: {t2-t1}", flush = True)
 print(f"Time with only forward problem: {t3-t2}", flush = True)
 print(f"Total time problem: {t3-t1}", flush = True)
-print(f"END of forward problem", flush = True)
+
+comm.comm.barrier()
+if comm.ensemble_comm.rank == 0 and comm.comm.rank == 0:
+    print(f"END of forward problem", flush = True)
 spyro.plots.plot_shots(model, comm, p_r, vmin=-1e-3, vmax=1e-3)
