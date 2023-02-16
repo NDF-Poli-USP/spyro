@@ -60,7 +60,7 @@ model["acquisition"] = {
 
 model["timeaxis"] = {
     "t0": 0.0,  #  Initial time for event
-    "tf": 0.5, # Final time for event
+    "tf": 1.0, # Final time for event
     "dt": 0.001,  # timestep size
     "nspool":  20,  # (20 for dt=0.00050) how frequently to output solution to pvds
     "fspool": 1,  # how frequently to save solution to RAM
@@ -107,14 +107,17 @@ def _make_elastic_parameters(H, mesh, guess=False):
             File("guess_lamb.pvd").write(lamb)
             File("guess_mu.pvd").write(mu)
         else:
-            lamb  = Function(H).interpolate(
-                2.25
-                + 2. * tanh(20 * (0.125 - sqrt(( x + 1) ** 2 + (z - 0.5) ** 2)))
-            )
-            mu  = Function(H).interpolate(
-                2.5
-                + 1.5 * tanh(20 * (0.125 - sqrt(( x + 1) ** 2 + (z - 0.5) ** 2)))
-            )
+
+            lamb = Function(H).interpolate(_lamb/2 + 0.0 * x)
+            mu = Function(H).interpolate(_mu/2 + 0.0 * x)
+            # lamb  = Function(H).interpolate(
+            #     2.25
+            #     + 2. * tanh(20 * (0.125 - sqrt(( x + 1) ** 2 + (z - 0.5) ** 2)))
+            # )
+            # mu  = Function(H).interpolate(
+            #     2.5
+            #     + 1.5 * tanh(20 * (0.125 - sqrt(( x + 1) ** 2 + (z - 0.5) ** 2)))
+            # )
             File("exact_lamb.pvd").write(lamb)
             File("exact_mu.pvd").write(mu)
         
@@ -154,11 +157,14 @@ print("Compute the gradient using AD",flush=True)
 control_lamb  = Control(lamb_guess)
 control_mu    = Control(mu_guess)
 
+
 dJdl_local = compute_gradient(J, control_lamb, options={"riesz_representation": "L2"})
 dJdm_local = compute_gradient(J, control_mu, options={"riesz_representation": "L2"})
 
 dJdl = Function(H, name="dJdl")
 dJdm = Function(H, name="dJdm")
+
+
 if comm.ensemble_comm.size > 1:
     comm.allreduce(dJdl_local, dJdl)
     comm.allreduce(dJdm_local, dJdm)
@@ -170,7 +176,57 @@ dJdm /= comm.ensemble_comm.size
 if comm.comm.size > 1:
     dJdl /= comm.comm.size
     dJdm /= comm.comm.size
+Jhat_l     = ReducedFunctional(J, control_lamb) 
+Jhat_m     = ReducedFunctional(J, control_mu) 
 
-File("dJdl_elastic_AD.pvd").write(dJdl)
-File("dJdm_elastic_AD.pvd").write(dJdm)
+with stop_annotating():
+
+    steps = [1e-4, 1e-5, 1e-6]  # step length
+
+    delta_l = Function(H)  # model direction (random)
+    delta_l.assign(dJdl)
+    delta_m = Function(H)  # model direction (random)
+    delta_m.assign(dJdm)
+    # delta_m = Function(V)  # model direction (random)
+    # delta_m.assign(dJdm)
+    derivative_l = enlisting.Enlist(Jhat_l.derivative())
+    derivative_m = enlisting.Enlist(Jhat_m.derivative())
+    # derivative_m = enlisting.Enlist(Jhat_m.derivative())
+    hs_l = enlisting.Enlist(delta_l)
+    hs_m = enlisting.Enlist(delta_m)
+    # hs_m = enlisting.Enlist(delta_m)
+
+    projnorm_lamb = sum(hi._ad_dot(di) for hi, di in zip(hs_l, derivative_l))
+    projnorm_mu   = sum(hi._ad_dot(di) for hi, di in zip(hs_m, derivative_m))
+    # projnorm_mu   = sum(hi._ad_dot(di) for hi, di in zip(hs_m, derivative_m))
+    # this deepcopy is important otherwise pertubations accumulate
+    lamb_original = lamb_guess.copy(deepcopy=True)
+    mu_original   = mu_guess.copy(deepcopy=True)
+    # mu_original   = mu_guess.copy(deepcopy=True)
+
+    print('######## Computing the gradient by finite diferences ########')
+    errors = []
+    for step in steps:  # range(3):
+        lamb_guess = lamb_original + step * delta_l
+        mu_guess = mu_original #+ step * delta_m FIXME
+        # mu_guess   = mu_original #+ step * delta_m FIXME
+
+        u_guess, uz_guess, ux_guess, uy_guess, Jp = spyro.solvers.forward_elastic_waves_AD(
+            model, mesh, comm, rho, lamb_guess, mu_guess, sources, wavelet, point_cloud, output=False,
+            true_rec=u_exact_rec, fwi=True
+            )
+
+
+        fd_grad = (Jp - J) / step
+        print(
+            "\n Cost functional for step "
+            + str(fd_grad)
+            + ", grad'*dir (lambda) : "
+            + str(projnorm_lamb)
+            + ", grad'*dir (mu) : "
+            + str(projnorm_mu)
+            # + ", grad'*dir (mu) : "
+            # + str(projnorm_mu)
+            + " \n ",
+        )
 
