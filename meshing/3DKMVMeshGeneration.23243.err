@@ -1,0 +1,7 @@
+WARNING:root:Appending zeros to replace the missing physical tag data.
+WARNING:root:Appending zeros to replace the missing geometrical tag data.
+WARNING:root:Appending zeros to replace the missing physical tag data.
+WARNING:root:Appending zeros to replace the missing geometrical tag data.
+srun: Job step aborted: Waiting up to 32 seconds for job step to finish.
+slurmstepd: error: *** STEP 23243.1 ON n18 CANCELLED AT 2023-02-16T21:07:45 DUE TO TIME LIMIT ***
+slurmstepd: error: *** JOB 23243 ON n18 CANCELLED AT 2023-02-16T21:07:45 DUE TO TIME LIMIT ***

@@ -17,7 +17,6 @@ def create_3d_grid(start, end, num):
         ending position coordinate
     num: integer
         number of receivers between `start` and `end`
-
     Returns
     -------
     receiver_locations: a list of tuples
@@ -121,7 +120,7 @@ def create_model_for_grid_point_calculation(scale):
         "fspool": 100,  # how frequently to save solution to RAM
     }  
     model["parallelism"] = {
-    "type": "spatial", 
+    "type": "automatic", 
     }
 
     # print(source_coordinates)
@@ -248,7 +247,8 @@ mesh_generation = True
 # Ms = [6.45]
 # Ms = [7.0, 8.0, 9.0, 10.0, 11.0, 12.0]
 M = 3.6
-scales = [1, 2, 3, 4, 5, 6]
+# scales = [3, 4, 5, 6]
+scales = [0.5, 1.5, 2.5]
 
 for scale in scales:
     model = create_model_for_grid_point_calculation(scale)

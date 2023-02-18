@@ -1,8 +1,8 @@
 #!/bin/bash
 #SBATCH --nodes=1
 #SBATCH --ntasks-per-node=1
-#SBATCH --partition=intel_small
-#SBATCH --time=08:00:00
+#SBATCH --partition=intel_large
+#SBATCH --time=2-20:00:00
 #SBATCH --job-name=meshing/3DKMVMeshGeneration
 #SBATCH --output=%x.%j.out
 #SBATCH --error=%x.%j.err

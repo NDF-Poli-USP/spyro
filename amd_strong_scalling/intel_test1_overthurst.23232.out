@@ -729,3 +729,115 @@ Simulation time is:      3.674 seconds
 Simulation time is:      3.749 seconds
 Simulation time is:      3.824 seconds
 Simulation time is:      3.899 seconds
+Simulation time is:      3.974 seconds
+Spatial parallelism, reducing to comm 0
+Time without forward problem: 38.544020891189575
+Time with only forward problem: 2113.480823278427
+Total time problem: 2152.0248441696167
+Time without forward problem: 38.47183036804199
+Time with only forward problem: 2113.553129196167
+Total time problem: 2152.024959564209
+Time without forward problem: 38.440603256225586
+Time with only forward problem: 2113.585493326187
+Total time problem: 2152.0260965824127
+Time without forward problem: 38.489749908447266
+Time with only forward problem: 2113.536520719528
+Total time problem: 2152.0262706279755
+Time without forward problem: 38.46056890487671
+Time with only forward problem: 2113.5722856521606
+Total time problem: 2152.0328545570374
+Time without forward problem: 38.501102924346924
+Time with only forward problem: 2113.5316848754883
+Total time problem: 2152.032787799835
+Time without forward problem: 38.437421798706055
+Time with only forward problem: 2113.6054725646973
+Total time problem: 2152.0428943634033
+Time without forward problem: 38.7047016620636
+Time with only forward problem: 2113.3384346961975
+Total time problem: 2152.043136358261
+Time without forward problem: 38.810569286346436
+Time with only forward problem: 2113.2327909469604
+Total time problem: 2152.043360233307
+Time without forward problem: 38.42394685745239
+Time with only forward problem: 2113.619621038437
+Total time problem: 2152.0435678958893
+END of forward problem
+  rank 4 on ensemble 0 owns 87281 elements and can access 16628 vertices
+  rank 2 on ensemble 0 owns 87281 elements and can access 16633 vertices
+  rank 1 on ensemble 0 owns 87281 elements and can access 16797 vertices
+INFO: Distributing 1 shot(s) across 5 core(s). Each shot is using 5 cores
+  rank 0 on ensemble 0 owns 87281 elements and can access 16614 vertices
+  rank 3 on ensemble 0 owns 87281 elements and can access 16575 vertices
+INFO: converting from m/s to km/s
+Simulation time is:    0.07425 seconds
+Simulation time is:     0.1492 seconds
+Simulation time is:     0.2243 seconds
+Simulation time is:     0.2993 seconds
+Simulation time is:     0.3743 seconds
+Simulation time is:     0.4492 seconds
+Simulation time is:     0.5242 seconds
+Simulation time is:     0.5993 seconds
+Simulation time is:     0.6743 seconds
+Simulation time is:     0.7492 seconds
+Simulation time is:     0.8243 seconds
+Simulation time is:     0.8992 seconds
+Simulation time is:     0.9743 seconds
+Simulation time is:      1.049 seconds
+Simulation time is:      1.124 seconds
+Simulation time is:      1.199 seconds
+Simulation time is:      1.274 seconds
+Simulation time is:      1.349 seconds
+Simulation time is:      1.424 seconds
+Simulation time is:      1.499 seconds
+Simulation time is:      1.574 seconds
+Simulation time is:      1.649 seconds
+Simulation time is:      1.724 seconds
+Simulation time is:      1.799 seconds
+Simulation time is:      1.874 seconds
+Simulation time is:      1.949 seconds
+Simulation time is:      2.024 seconds
+Simulation time is:      2.099 seconds
+Simulation time is:      2.174 seconds
+Simulation time is:      2.249 seconds
+Simulation time is:      2.324 seconds
+Simulation time is:      2.399 seconds
+Simulation time is:      2.474 seconds
+Simulation time is:      2.549 seconds
+Simulation time is:      2.624 seconds
+Simulation time is:      2.699 seconds
+Simulation time is:      2.774 seconds
+Simulation time is:      2.849 seconds
+Simulation time is:      2.924 seconds
+Simulation time is:      2.999 seconds
+Simulation time is:      3.074 seconds
+Simulation time is:      3.149 seconds
+Simulation time is:      3.224 seconds
+Simulation time is:      3.299 seconds
+Simulation time is:      3.374 seconds
+Simulation time is:      3.449 seconds
+Simulation time is:      3.524 seconds
+Simulation time is:      3.599 seconds
+Simulation time is:      3.674 seconds
+Simulation time is:      3.749 seconds
+Simulation time is:      3.824 seconds
+Simulation time is:      3.899 seconds
+Simulation time is:      3.974 seconds
+Spatial parallelism, reducing to comm 0
+Time without forward problem: 44.89316010475159
+Time with only forward problem: 4069.953446626663
+Total time problem: 4114.846606731415
+Time without forward problem: 44.443963289260864
+Time with only forward problem: 4070.405625104904
+Total time problem: 4114.849588394165
+Time without forward problem: 44.44861650466919
+Time with only forward problem: 4070.4011809825897
+Total time problem: 4114.849797487259
+Time without forward problem: 45.01977896690369
+Time with only forward problem: 4069.8360154628754
+Total time problem: 4114.855794429779
+END of forward problem
+Time without forward problem: 44.913732290267944
+Time with only forward problem: 4069.9420261383057
+Total time problem: 4114.855758428574
+
+## Job finished on 16-02-2023 as 14:33:32 ###################
