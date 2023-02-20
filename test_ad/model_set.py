@@ -10,7 +10,7 @@ def model_settings(vel_model):
     model["opts"] = {
         "method": "KMV",  # either CG or KMV
         "quadrature": "KMV",  # Equi or KMV
-        "degree": 1,  # p order
+        "degree": 4,  # p order
         "dimension": 2,  # dimension
         "regularization": False,  # regularization is on?
         "gamma": 1e-5,  # regularization parameter
@@ -93,7 +93,7 @@ def model_settings(vel_model):
 
     model["timeaxis"] = {
         "t0": 0.0,  # Initial time for event
-        "tf": 0.5,  # Final time for event (for test 7)
+        "tf": 0.1,  # Final time for event (for test 7)
         "dt": 0.001,  # timestep size (divided by 2 in the test 4. dt for test 3 is 0.00050)
         "amplitude": 1,  # the Ricker has an amplitude of 1.
         "nspool":  20,  # (20 for dt=0.00050) how frequently to output solution to pvds

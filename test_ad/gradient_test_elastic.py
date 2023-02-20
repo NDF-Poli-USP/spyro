@@ -134,18 +134,18 @@ receivers = spyro.Receivers(model, mesh, H, comm)
 wavelet = spyro.full_ricker_wavelet(
             dt=model["timeaxis"]["dt"], tf=model["timeaxis"]["tf"], freq=model["acquisition"]["frequency"]
           )
-point_cloud = receivers.set_point_cloud(comm)
+
 #sys.exit("exit")
 
 print("Run exact model", flush=True)
 u_exact, uz_exact, ux_exact, uy_exact = spyro.solvers.forward_elastic_waves_AD(
-    model, mesh, comm, rho, lamb_exact, mu_exact, sources, wavelet, point_cloud, output=False
+    model, mesh, comm, rho, lamb_exact, mu_exact, sources, wavelet, receivers, output=False
 )
 u_exact_rec = [uz_exact, ux_exact]
 
 print("Run guess model", flush=True)
 u_guess, uz_guess, ux_guess, uy_guess, J = spyro.solvers.forward_elastic_waves_AD(
-    model, mesh, comm, rho, lamb_guess, mu_guess, sources, wavelet, point_cloud, output=False,
+    model, mesh, comm, rho, lamb_guess, mu_guess, sources, wavelet, receivers, output=False,
     true_rec=u_exact_rec, fwi=True
 )
 
@@ -212,7 +212,7 @@ with stop_annotating():
         # mu_guess   = mu_original #+ step * delta_m FIXME
 
         u_guess, uz_guess, ux_guess, uy_guess, Jp = spyro.solvers.forward_elastic_waves_AD(
-            model, mesh, comm, rho, lamb_guess, mu_guess, sources, wavelet, point_cloud, output=False,
+            model, mesh, comm, rho, lamb_guess, mu_guess, sources, wavelet, receivers, output=False,
             true_rec=u_exact_rec, fwi=True
             )
 

@@ -2,25 +2,35 @@ import firedrake as fire
 import spyro
 import gradient_test_ad as grad_ad
 import model_set
+import numpy as np
 OMP_NUM_THREADS = 1
 # from ..domains import quadrature, space
 # @pytest.mark.skip(reason="no way of currently testing this")
 
 
 def test_gradient_AD():
-    vel_model = "horizont_layers"
+    vel_model = "marmousi"
     model = model_set.model_settings(vel_model)
     comm = spyro.utils.mpi_init(model)
   
     if vel_model == "marmousi":
         mesh, V = spyro.io.read_mesh(model, comm)
  
-        vp_exact = spyro.io.interpolate(model, mesh, V)          
-        vp_guess = spyro.io.interpolate(
-                            model, mesh, V, guess=True)    
-    
-        fire.File("exact_vel.pvd").write(vp_exact)
-        fire.File("guess_vel.pvd").write(vp_guess)
+        # vp_exact = spyro.io.interpolate(model, mesh, V)          
+        # vp_guess = spyro.io.interpolate(
+        #                     model, mesh, V, guess=True)    
+        
+        vp_exact = fire.Function(V)
+        vp_guess = fire.Function(V)
+        vp_exact.dat.data[:] = np.load("mm_exact.npy")
+        vp_guess.dat.data[:] = np.load("mm_guess.npy")
+
+        # fire.File("exact_vel.pvd").write(vp_exact)
+        # fire.File("guess_vel.pvd").write(vp_guess)
+
+        # with fire.CheckpointFile("mm.h5", 'w') as afile:
+        #     afile.save_function(vp_exact)  # optional
+        #     afile.save_function(vp_guess)
 
     if vel_model == "horizont_layers":
         mesh = model_set.meshing(model)

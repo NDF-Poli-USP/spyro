@@ -104,9 +104,13 @@ class Receivers:
         """
         return [self.__new_at(field, rn) for rn in range(self.num_receivers)]
     
-    def vertex_only_mesh_interpolator(self, solution):
+    def vertex_only_mesh_interpolator(self, solution, elastic=False):
         mesh_rec = VertexOnlyMesh(self.mesh, self.receiver_locations)
-        P = FunctionSpace(mesh_rec, "DG", 0)
+        
+        if elastic:
+            P = VectorFunctionSpace(mesh_rec, "DG", 0)
+        else:
+            P = FunctionSpace(mesh_rec, "DG", 0)
 
         return Interpolator(solution, P), P
 

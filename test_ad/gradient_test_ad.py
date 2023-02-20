@@ -10,7 +10,7 @@ def gradient_test_acoustic(model, mesh, V, comm, vp_exact, vp_guess, mask=None):
     wp = solver_ad.wave_propagate
     with fire_adj.stop_annotating():
         if comm.comm.rank == 0:
-            print('######## Starting gradient test ########', flush = True)
+            print('######## Starting gradient test ########', flush=True)
 
         sources = spyro.Sources(model, mesh, V, comm)
         receivers = spyro.Receivers(model, mesh, V, comm)
