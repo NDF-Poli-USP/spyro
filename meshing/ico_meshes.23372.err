@@ -1,0 +1,4 @@
+  File "ico_meshes.py", line 319
+    def generate_mesh(model, comm), scale:
+                                  ^
+SyntaxError: invalid syntax

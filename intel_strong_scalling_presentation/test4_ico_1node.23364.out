@@ -1,0 +1,91 @@
+
+## Job started at 22-02-2023 as 15:30:42 #####################
+
+
+## Jobs activated by olender: 
+
+             JOBID PARTITION     NAME     USER ST       TIME  NODES NODELIST(REASON)
+             23298 intel_lar amd_stro  olender PD       0:00      5 (QOSMaxNodePerUserLimit)
+             23299 intel_lar amd_stro  olender PD       0:00      5 (QOSMaxNodePerUserLimit)
+             23300 intel_lar amd_stro  olender PD       0:00      5 (QOSMaxNodePerUserLimit)
+             23301 intel_lar amd_stro  olender PD       0:00      5 (QOSMaxNodePerUserLimit)
+             23302 intel_lar amd_stro  olender PD       0:00      5 (QOSMaxNodePerUserLimit)
+             23303 intel_lar amd_stro  olender PD       0:00      5 (QOSMaxNodePerUserLimit)
+             23304 intel_lar amd_stro  olender PD       0:00      5 (QOSMaxNodePerUserLimit)
+             23305 intel_lar amd_stro  olender PD       0:00      5 (QOSMaxNodePerUserLimit)
+             23306 intel_lar amd_stro  olender PD       0:00      5 (QOSMaxNodePerUserLimit)
+             23307 intel_lar amd_stro  olender PD       0:00      5 (QOSMaxNodePerUserLimit)
+             23308 intel_lar amd_stro  olender PD       0:00      5 (QOSMaxNodePerUserLimit)
+             23309 intel_lar amd_stro  olender PD       0:00      5 (QOSMaxNodePerUserLimit)
+             23310 intel_lar amd_stro  olender PD       0:00      5 (QOSMaxNodePerUserLimit)
+             23311 intel_lar amd_stro  olender PD       0:00      5 (QOSMaxNodePerUserLimit)
+             23312 intel_lar amd_stro  olender PD       0:00      5 (QOSMaxNodePerUserLimit)
+             23362 intel_lar 3D/paper  olender PD       0:00      4 (QOSMaxNodePerUserLimit)
+             23363 intel_lar intel_st  olender PD       0:00      3 (QOSMaxNodePerUserLimit)
+             23364 intel_lar intel_st  olender  R       0:01      1 n10
+             23361 intel_lar intel_st  olender  R      40:22      3 n[06-08]
+
+## Execution node:         n10 
+
+
+## Number of tasks per job: 15 
+
+
+## Diretorio de submissao do job:   /home/olender/cse23/spyro 
+
+Reading mesh
+Starting simulation
+Total time in time loop:817.298261642456
+Total time spent on RHS assembly only:753.838681936264.
+Total time in time loop:817.3007121086121
+Total time spent on RHS assembly only:753.8616271018982.
+Total time in time loop:817.3009376525879
+Total time spent on RHS assembly only:753.6172597408295.
+Total time in time loop:817.3012118339539
+Total time spent on RHS assembly only:753.6239414215088.
+Total time in time loop:817.3017258644104
+Total time spent on RHS assembly only:753.5145587921143.
+Total time in time loop:817.3017144203186
+Total time spent on RHS assembly only:753.5512979030609.
+Total time in time loop:817.3018310070038
+Total time spent on RHS assembly only:753.6350708007812.
+Total time in time loop:817.3021957874298
+Total time spent on RHS assembly only:753.5629255771637.
+Total time in time loop:817.3023729324341
+Total time spent on RHS assembly only:753.4358048439026.
+Total time in time loop:817.3022878170013
+Total time spent on RHS assembly only:753.4611792564392.
+Spatial parallelism, reducing to comm 0
+Time without forward problem: 80.56271457672119
+Time with only forward problem: 824.7641751766205
+Total time problem: 905.3268897533417
+Time without forward problem: 80.57099342346191
+Time with only forward problem: 824.7559177875519
+Total time problem: 905.3269112110138
+Time without forward problem: 80.51780772209167
+Time with only forward problem: 824.8092126846313
+Total time problem: 905.327020406723
+Time without forward problem: 80.61548018455505
+Time with only forward problem: 824.7117085456848
+Total time problem: 905.3271887302399
+Time without forward problem: 80.54702568054199
+Time with only forward problem: 824.7801654338837
+Total time problem: 905.3271911144257
+Time without forward problem: 80.55828166007996
+Time with only forward problem: 824.7689023017883
+Total time problem: 905.3271839618683
+Time without forward problem: 80.65902543067932
+Time with only forward problem: 824.6682696342468
+Total time problem: 905.3272950649261
+Time without forward problem: 80.5754702091217
+Time with only forward problem: 824.7517318725586
+Total time problem: 905.3272020816803
+Time without forward problem: 80.57356858253479
+Time with only forward problem: 824.7537140846252
+Total time problem: 905.32728266716
+Time without forward problem: 80.55797600746155
+Time with only forward problem: 824.7692506313324
+Total time problem: 905.327226638794
+END of forward problem
+
+## Job finished on 22-02-2023 as 15:48:02 ###################

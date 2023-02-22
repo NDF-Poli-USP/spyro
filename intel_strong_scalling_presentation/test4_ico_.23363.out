@@ -1,0 +1,627 @@
+
+## Job started at 22-02-2023 as 18:16:00 #####################
+
+
+## Jobs activated by olender: 
+
+             JOBID PARTITION     NAME     USER ST       TIME  NODES NODELIST(REASON)
+             23298 intel_lar amd_stro  olender PD       0:00      5 (Resources)
+             23299 intel_lar amd_stro  olender PD       0:00      5 (Priority)
+             23300 intel_lar amd_stro  olender PD       0:00      5 (Priority)
+             23301 intel_lar amd_stro  olender PD       0:00      5 (Priority)
+             23302 intel_lar amd_stro  olender PD       0:00      5 (Priority)
+             23303 intel_lar amd_stro  olender PD       0:00      5 (Priority)
+             23304 intel_lar amd_stro  olender PD       0:00      5 (Priority)
+             23305 intel_lar amd_stro  olender PD       0:00      5 (Priority)
+             23306 intel_lar amd_stro  olender PD       0:00      5 (Priority)
+             23307 intel_lar amd_stro  olender PD       0:00      5 (Priority)
+             23308 intel_lar amd_stro  olender PD       0:00      5 (Priority)
+             23309 intel_lar amd_stro  olender PD       0:00      5 (Priority)
+             23310 intel_lar amd_stro  olender PD       0:00      5 (Priority)
+             23311 intel_lar amd_stro  olender PD       0:00      5 (Priority)
+             23312 intel_lar amd_stro  olender PD       0:00      5 (Priority)
+             23368 intel_lar intel_st  olender PD       0:00      3 (Priority)
+             23371 intel_lar intel_st  olender PD       0:00      3 (Priority)
+             23363 intel_lar intel_st  olender  R       0:01      3 n[06-08]
+
+## Execution node:         n06 
+
+
+## Number of tasks per job: 45 
+
+
+## Diretorio de submissao do job:   /home/olender/cse23/spyro 
+
+Reading mesh
+Starting simulation
+Total time in time loop:218.7300465106964
+Total time spent on RHS assembly only:201.85130095481873.
+Total time in time loop:218.73004412651062
+Total time spent on RHS assembly only:201.7937171459198.
+Total time in time loop:218.73312902450562
+Total time spent on RHS assembly only:201.86370015144348.
+Total time in time loop:218.73300743103027
+Total time spent on RHS assembly only:202.01531171798706.
+Total time in time loop:218.7335696220398
+Total time spent on RHS assembly only:201.6584711074829.
+Total time in time loop:218.73372650146484
+Total time spent on RHS assembly only:201.61377096176147.
+Total time in time loop:218.733802318573
+Total time spent on RHS assembly only:201.4041109085083.
+Total time in time loop:218.73403525352478
+Total time spent on RHS assembly only:200.9852752685547.
+Total time in time loop:218.73417282104492
+Total time spent on RHS assembly only:201.73579597473145.
+Total time in time loop:218.73424339294434
+Total time spent on RHS assembly only:201.6680645942688.
+Total time in time loop:218.73440313339233
+Total time spent on RHS assembly only:201.61666202545166.
+Total time in time loop:218.73433566093445
+Total time spent on RHS assembly only:200.99909281730652.
+Total time in time loop:218.73431420326233
+Total time spent on RHS assembly only:201.0184555053711.
+Total time in time loop:218.7348792552948
+Total time spent on RHS assembly only:201.494731426239.
+Total time in time loop:218.7349338531494
+Total time spent on RHS assembly only:201.43453311920166.
+Total time in time loop:218.73502659797668
+Total time spent on RHS assembly only:201.5539903640747.
+Total time in time loop:218.73500895500183
+Total time spent on RHS assembly only:201.72400784492493.
+Total time in time loop:218.73493719100952
+Total time spent on RHS assembly only:201.36255621910095.
+Total time in time loop:218.73534965515137
+Total time spent on RHS assembly only:201.5601623058319.
+Total time in time loop:218.73374223709106
+Total time spent on RHS assembly only:200.87341237068176.
+Total time in time loop:218.73541975021362
+Total time spent on RHS assembly only:201.52247381210327.
+Total time in time loop:218.73341846466064
+Total time spent on RHS assembly only:201.961364030838.
+Total time in time loop:218.73553156852722
+Total time spent on RHS assembly only:201.1555688381195.
+Total time in time loop:218.73608088493347
+Total time spent on RHS assembly only:201.99174427986145.
+Total time in time loop:218.73609066009521
+Total time spent on RHS assembly only:201.67637991905212.
+Total time in time loop:218.73640155792236
+Total time spent on RHS assembly only:201.79198050498962.
+Total time in time loop:218.73868823051453
+Total time spent on RHS assembly only:202.17169451713562.
+Total time in time loop:218.73903346061707
+Total time spent on RHS assembly only:201.79279470443726.
+Total time in time loop:218.73945927619934
+Total time spent on RHS assembly only:201.61814999580383.
+Total time in time loop:218.7395269870758
+Total time spent on RHS assembly only:201.81346201896667.
+Total time in time loop:218.73952507972717
+Total time spent on RHS assembly only:201.62824058532715.
+Total time in time loop:218.73994612693787
+Total time spent on RHS assembly only:201.60158514976501.
+Total time in time loop:218.73835587501526
+Total time spent on RHS assembly only:201.3340883255005.
+Total time in time loop:218.74017071723938
+Total time spent on RHS assembly only:201.451584815979.
+Total time in time loop:218.74388432502747
+Total time spent on RHS assembly only:201.38116645812988.
+Total time in time loop:218.7437665462494
+Total time spent on RHS assembly only:201.91150903701782.
+Total time in time loop:218.74385523796082
+Total time spent on RHS assembly only:201.93890523910522.
+Total time in time loop:218.74395418167114
+Total time spent on RHS assembly only:201.48707365989685.
+Total time in time loop:218.74407649040222
+Total time spent on RHS assembly only:201.4485011100769.
+Total time in time loop:218.74479293823242
+Total time spent on RHS assembly only:201.29141855239868.
+Total time in time loop:218.74502301216125
+Total time spent on RHS assembly only:201.56963181495667.
+Total time in time loop:218.74505257606506
+Total time spent on RHS assembly only:201.1315495967865.
+Total time in time loop:218.74540400505066
+Total time spent on RHS assembly only:201.4294753074646.
+Total time in time loop:218.74556469917297
+Total time spent on RHS assembly only:201.23782992362976.
+Total time in time loop:218.74628067016602
+Total time spent on RHS assembly only:200.98984098434448.
+Spatial parallelism, reducing to comm 0
+Time without forward problem: 38.95037055015564
+Time with only forward problem: 221.1343650817871
+Total time problem: 260.08473563194275
+Time without forward problem: 39.18899345397949
+Time with only forward problem: 220.89574813842773
+Total time problem: 260.0847415924072
+Time without forward problem: 39.150001525878906
+Time with only forward problem: 220.93497586250305
+Total time problem: 260.08497738838196
+Time without forward problem: 39.1277117729187
+Time with only forward problem: 220.95713019371033
+Total time problem: 260.084841966629
+Time without forward problem: 38.97365736961365
+Time with only forward problem: 221.1113624572754
+Total time problem: 260.08501982688904
+Time without forward problem: 39.18130922317505
+Time with only forward problem: 220.90353918075562
+Total time problem: 260.08484840393066
+Time without forward problem: 39.178168296813965
+Time with only forward problem: 220.90692687034607
+Time without forward problem: 39.04434108734131
+Time with only forward problem: 221.0404851436615
+Total time problem: 260.0848262310028
+Total time problem: 260.08509516716003
+Time without forward problem: 39.08079242706299
+Time with only forward problem: 221.0040566921234
+Total time problem: 260.0848491191864
+Time without forward problem: 39.153595209121704
+Time with only forward problem: 220.93157696723938
+Total time problem: 260.0851721763611
+Time without forward problem: 38.89249849319458
+Time with only forward problem: 221.19229412078857
+Total time problem: 260.08479261398315
+Time without forward problem: 39.157331705093384
+Time with only forward problem: 220.9278416633606
+Total time problem: 260.085173368454
+Time without forward problem: 39.03146171569824
+Time with only forward problem: 221.05351996421814
+Total time problem: 260.0849816799164
+Time without forward problem: 39.06184506416321
+Time with only forward problem: 221.02337765693665
+Total time problem: 260.08522272109985
+Time without forward problem: 38.993518352508545
+Time with only forward problem: 221.09166169166565
+Total time problem: 260.0851800441742
+Time without forward problem: 39.1167778968811
+Time with only forward problem: 220.96810150146484
+Total time problem: 260.08487939834595
+Time without forward problem: 39.13671922683716
+Time with only forward problem: 220.94867277145386
+Total time problem: 260.085391998291
+Time without forward problem: 39.11295962333679
+Time with only forward problem: 220.9724247455597
+Total time problem: 260.0853843688965
+Time without forward problem: 39.00668168067932
+Time with only forward problem: 221.07857394218445
+Time without forward problem: 39.241499185562134
+Time with only forward problem: 220.84389185905457
+Total time problem: 260.0853910446167
+Time without forward problem: 39.14025115966797
+Time with only forward problem: 220.94493627548218
+Total time problem: 260.08518743515015
+Time without forward problem: 39.042781591415405
+Time with only forward problem: 221.04256677627563
+Total time problem: 260.08534836769104
+Time without forward problem: 39.410990715026855
+Time with only forward problem: 220.67424702644348
+Total time problem: 260.08523774147034
+Time without forward problem: 39.05536770820618
+Time with only forward problem: 221.0299985408783
+Total time problem: 260.0853662490845
+Time without forward problem: 39.030956745147705
+Time with only forward problem: 221.05425643920898
+Total time problem: 260.0852131843567
+Time without forward problem: 39.19912767410278
+Time with only forward problem: 220.88628435134888
+Total time problem: 260.08541202545166
+Time without forward problem: 39.06252670288086
+Time with only forward problem: 221.02268075942993
+Total time problem: 260.0852074623108
+Time without forward problem: 39.10095548629761
+Time with only forward problem: 220.98448300361633
+Total time problem: 260.08543848991394
+Time without forward problem: 39.150211334228516
+Time with only forward problem: 220.93534016609192
+Total time problem: 260.08555150032043
+Total time problem: 260.08525562286377
+Time without forward problem: 39.19039750099182
+Time with only forward problem: 220.89519715309143
+Total time problem: 260.08559465408325
+Time without forward problem: 39.057127714157104
+Time with only forward problem: 221.02863264083862
+Total time problem: 260.0857603549957
+Time without forward problem: 39.02440524101257
+Time with only forward problem: 221.06142234802246
+Total time problem: 260.08582758903503
+Time without forward problem: 39.12264084815979
+Time with only forward problem: 220.9630868434906
+Total time problem: 260.0857276916504
+Time without forward problem: 39.9313006401062
+Time with only forward problem: 220.15464997291565
+Total time problem: 260.08595061302185
+Time without forward problem: 39.113824129104614
+Time with only forward problem: 220.97211909294128
+Total time problem: 260.0859432220459
+Time without forward problem: 39.16234612464905
+Time with only forward problem: 220.92369484901428
+Total time problem: 260.08604097366333
+Time without forward problem: 39.033198595047
+Time with only forward problem: 221.05298519134521
+Total time problem: 260.0861837863922
+Time without forward problem: 39.051591634750366
+Time with only forward problem: 221.03472781181335
+Total time problem: 260.0863194465637
+Time without forward problem: 39.24153470993042
+Time with only forward problem: 220.84499645233154
+Total time problem: 260.08653116226196
+Time without forward problem: 39.17472457885742
+Time with only forward problem: 220.9118685722351
+Total time problem: 260.08659315109253
+Time without forward problem: 39.141844034194946
+Time with only forward problem: 220.94508981704712
+Total time problem: 260.08693385124207
+Time without forward problem: 39.13619256019592
+Time with only forward problem: 220.95084190368652
+Total time problem: 260.08703446388245
+Time without forward problem: 39.23543667793274
+Time with only forward problem: 220.85247206687927
+Total time problem: 260.087908744812
+Time without forward problem: 38.98280739784241
+Time with only forward problem: 221.1060426235199
+Total time problem: 260.0888500213623
+Time without forward problem: 39.079463958740234
+Time with only forward problem: 221.01064491271973
+Total time problem: 260.09010887145996
+END of forward problem
+Reading mesh
+Starting simulation
+Total time in time loop:239.20727396011353
+Total time spent on RHS assembly only:223.01929330825806.
+Total time in time loop:239.2075698375702
+Total time spent on RHS assembly only:222.98694276809692.
+Total time in time loop:239.22184586524963
+Total time spent on RHS assembly only:222.39620733261108.
+Total time in time loop:239.22159624099731
+Total time spent on RHS assembly only:222.322172164917.
+Total time in time loop:239.22162008285522
+Total time spent on RHS assembly only:222.24493598937988.
+Total time in time loop:239.2470245361328
+Total time spent on RHS assembly only:222.79878401756287.
+Total time in time loop:239.24978709220886
+Total time spent on RHS assembly only:223.03600215911865.
+Total time in time loop:239.25017547607422
+Total time spent on RHS assembly only:222.66463899612427.
+Total time in time loop:239.25021505355835
+Total time spent on RHS assembly only:222.77183032035828.
+Total time in time loop:239.25042533874512
+Total time spent on RHS assembly only:222.56930661201477.
+Total time in time loop:239.26634216308594
+Total time spent on RHS assembly only:220.58570408821106.
+Total time in time loop:239.2678301334381
+Total time spent on RHS assembly only:219.68651342391968.
+Total time in time loop:239.2668478488922
+Total time spent on RHS assembly only:220.5222291946411.
+Total time in time loop:239.26845288276672
+Total time spent on RHS assembly only:220.57868432998657.
+Total time in time loop:239.26850390434265
+Total time spent on RHS assembly only:220.73698449134827.
+Total time in time loop:239.26872181892395
+Total time spent on RHS assembly only:220.38604617118835.
+Total time in time loop:239.26867842674255
+Total time spent on RHS assembly only:220.3406081199646.
+Total time in time loop:239.26860666275024
+Total time spent on RHS assembly only:219.6626718044281.
+Total time in time loop:239.26873755455017
+Total time spent on RHS assembly only:219.63210582733154.
+Total time in time loop:239.2689504623413
+Total time spent on RHS assembly only:220.31794118881226.
+Total time in time loop:239.27564430236816
+Total time spent on RHS assembly only:220.06240606307983.
+Total time in time loop:239.27561497688293
+Total time spent on RHS assembly only:220.2070243358612.
+Total time in time loop:239.27587890625
+Total time spent on RHS assembly only:220.02523183822632.
+Total time in time loop:239.2759997844696
+Total time spent on RHS assembly only:220.1284694671631.
+Total time in time loop:239.2759714126587
+Total time spent on RHS assembly only:219.88073468208313.
+Total time in time loop:239.27601623535156
+Total time spent on RHS assembly only:220.68056559562683.
+Total time in time loop:239.27636289596558
+Total time spent on RHS assembly only:220.68589568138123.
+Total time in time loop:239.27627229690552
+Total time spent on RHS assembly only:220.62048077583313.
+Total time in time loop:239.27652287483215
+Total time spent on RHS assembly only:220.07606506347656.
+Total time in time loop:239.27648091316223
+Total time spent on RHS assembly only:219.94855499267578.
+Total time in time loop:239.276704788208
+Total time spent on RHS assembly only:220.16633701324463.
+Total time in time loop:239.2769012451172
+Total time spent on RHS assembly only:220.0331552028656.
+Total time in time loop:239.2766489982605
+Total time spent on RHS assembly only:220.100270986557.
+Total time in time loop:239.2770540714264
+Total time spent on RHS assembly only:220.03893852233887.
+Total time in time loop:239.27636313438416
+Total time spent on RHS assembly only:219.5055832862854.
+Total time in time loop:239.27811741828918
+Total time spent on RHS assembly only:220.60154557228088.
+Total time in time loop:239.2780830860138
+Total time spent on RHS assembly only:219.66827487945557.
+Total time in time loop:239.2786989212036
+Total time spent on RHS assembly only:219.83749294281006.
+Total time in time loop:239.27876591682434
+Total time spent on RHS assembly only:219.31286478042603.
+Total time in time loop:239.2790448665619
+Total time spent on RHS assembly only:219.69108176231384.
+Spatial parallelism, reducing to comm 0
+Time without forward problem: 40.54813289642334
+Time with only forward problem: 241.29746413230896
+Total time problem: 281.8455970287323
+Time without forward problem: 40.90197730064392
+Time with only forward problem: 240.94359183311462
+Total time problem: 281.84556913375854
+Time without forward problem: 40.59152626991272
+Time with only forward problem: 241.2539849281311
+Total time problem: 281.8455111980438
+Time without forward problem: 40.86230969429016
+Time with only forward problem: 240.98338150978088
+Total time problem: 281.84569120407104
+Time without forward problem: 40.403960943222046
+Time with only forward problem: 241.4417486190796
+Total time problem: 281.84570956230164
+Time without forward problem: 40.36044883728027
+Time with only forward problem: 241.48529958724976
+Total time problem: 281.84574842453003
+Time without forward problem: 40.59776544570923
+Time with only forward problem: 241.24800753593445
+Total time problem: 281.8457729816437
+Time without forward problem: 40.3511266708374
+Time with only forward problem: 241.49468231201172
+Total time problem: 281.8458089828491
+Time without forward problem: 40.69418120384216
+Time with only forward problem: 241.1516489982605
+Total time problem: 281.84583020210266
+Time without forward problem: 40.56913757324219
+Time with only forward problem: 241.2768235206604
+Total time problem: 281.8459610939026
+Time without forward problem: 40.43812870979309
+Time with only forward problem: 241.40761923789978
+Total time problem: 281.84574794769287
+Time without forward problem: 40.64100241661072
+Time with only forward problem: 241.20484828948975
+Total time problem: 281.84585070610046
+Time without forward problem: 40.41891050338745
+Time with only forward problem: 241.42693376541138
+Total time problem: 281.8458442687988
+Time without forward problem: 41.062517166137695
+Time with only forward problem: 240.78337788581848
+Total time problem: 281.8458950519562
+Time without forward problem: 40.42683553695679
+Time with only forward problem: 241.41899943351746
+Total time problem: 281.84583497047424
+Time without forward problem: 40.88497447967529
+Time with only forward problem: 240.96102333068848
+Total time problem: 281.84599781036377
+Time without forward problem: 40.62990641593933
+Time with only forward problem: 241.2161943912506
+Total time problem: 281.84610080718994
+Time without forward problem: 40.33605456352234
+Time with only forward problem: 241.50982785224915
+Total time problem: 281.8458824157715
+Time without forward problem: 40.82756948471069
+Time with only forward problem: 241.0184245109558
+Total time problem: 281.8459939956665
+Time without forward problem: 40.59404492378235
+Time with only forward problem: 241.25206589698792
+Total time problem: 281.84611082077026
+Time without forward problem: 40.429423332214355
+Time with only forward problem: 241.41658067703247
+Total time problem: 281.8460040092468
+Time without forward problem: 40.93211793899536
+Time with only forward problem: 240.91389441490173
+Total time problem: 281.8460123538971
+Time without forward problem: 40.65856218338013
+Time with only forward problem: 241.1876926422119
+Total time problem: 281.84625482559204
+Time without forward problem: 40.5905225276947
+Time with only forward problem: 241.25581669807434
+Total time problem: 281.84633922576904
+Time without forward problem: 40.35620331764221
+Time with only forward problem: 241.4901144504547
+Total time problem: 281.8463177680969
+Time without forward problem: 40.61639666557312
+Time with only forward problem: 241.22988104820251
+Total time problem: 281.84627771377563
+Time without forward problem: 40.63489580154419
+Time with only forward problem: 241.2115273475647
+Total time problem: 281.8464231491089
+Time without forward problem: 40.82780480384827
+Time with only forward problem: 241.01848769187927
+Total time problem: 281.84629249572754
+Time without forward problem: 40.65904474258423
+Time with only forward problem: 241.18739914894104
+Total time problem: 281.84644389152527
+Time without forward problem: 40.649704933166504
+Time with only forward problem: 241.19681453704834
+Total time problem: 281.84651947021484
+Time without forward problem: 40.36380434036255
+Time with only forward problem: 241.482656955719
+Total time problem: 281.84646129608154
+Time without forward problem: 40.824373722076416
+Time with only forward problem: 241.0221815109253
+Total time problem: 281.8465552330017
+Time without forward problem: 40.793787479400635
+Time with only forward problem: 241.05286717414856
+Total time problem: 281.8466546535492
+Time without forward problem: 40.66164422035217
+Time with only forward problem: 241.1850254535675
+Total time problem: 281.8466696739197
+Time without forward problem: 40.6841983795166
+Time with only forward problem: 241.16257429122925
+Total time problem: 281.84677267074585
+Time without forward problem: 40.6748526096344
+Time with only forward problem: 241.17311334609985
+Total time problem: 281.84796595573425
+Time without forward problem: 40.66162586212158
+Time with only forward problem: 241.1865246295929
+Total time problem: 281.8481504917145
+Time without forward problem: 40.799116373062134
+Time with only forward problem: 241.04896998405457
+Total time problem: 281.8480863571167
+Time without forward problem: 40.59905982017517
+Time with only forward problem: 241.25301098823547
+Total time problem: 281.85207080841064
+Time without forward problem: 40.657926082611084
+Time with only forward problem: 241.1958487033844
+Total time problem: 281.8537747859955
+END of forward problem
+Reading mesh
+Starting simulation
+Total time in time loop:454.9595522880554
+Total time spent on RHS assembly only:423.33358812332153.
+Total time in time loop:454.9602327346802
+Total time spent on RHS assembly only:423.3215744495392.
+Total time in time loop:454.960520029068
+Total time spent on RHS assembly only:423.25824642181396.
+Total time in time loop:454.95977663993835
+Total time spent on RHS assembly only:423.3279368877411.
+Total time in time loop:454.9751811027527
+Total time spent on RHS assembly only:419.0940189361572.
+Total time in time loop:454.97620964050293
+Total time spent on RHS assembly only:418.8149485588074.
+Total time in time loop:454.9747226238251
+Total time spent on RHS assembly only:418.6947009563446.
+Total time in time loop:454.9759557247162
+Total time spent on RHS assembly only:418.61858773231506.
+Total time in time loop:454.9770917892456
+Total time spent on RHS assembly only:418.44458055496216.
+Total time in time loop:454.9776122570038
+Total time spent on RHS assembly only:418.3409049510956.
+Total time in time loop:454.97800636291504
+Total time spent on RHS assembly only:418.60646319389343.
+Total time in time loop:454.9784550666809
+Total time spent on RHS assembly only:417.9239583015442.
+Total time in time loop:454.97645926475525
+Total time spent on RHS assembly only:418.08622694015503.
+Spatial parallelism, reducing to comm 0
+Total time in time loop:454.9908525943756
+Total time spent on RHS assembly only:417.75900769233704.
+Total time in time loop:454.9910066127777
+Total time spent on RHS assembly only:417.1594467163086.
+Total time in time loop:454.9912989139557
+Total time spent on RHS assembly only:417.4407241344452.
+Total time in time loop:454.9915928840637
+Total time spent on RHS assembly only:417.07643032073975.
+Total time in time loop:454.99152135849
+Total time spent on RHS assembly only:417.51728987693787.
+Total time in time loop:454.991779088974
+Total time spent on RHS assembly only:417.77734637260437.
+Total time in time loop:454.99196767807007
+Total time spent on RHS assembly only:417.4217746257782.
+Time without forward problem: 54.16637992858887
+Time with only forward problem: 457.40655040740967
+Total time problem: 511.57293033599854
+Time without forward problem: 53.191046714782715
+Time with only forward problem: 458.38228583335876
+Total time problem: 511.5733325481415
+Time without forward problem: 54.25349235534668
+Time with only forward problem: 457.31984543800354
+Total time problem: 511.5733377933502
+Time without forward problem: 54.18109345436096
+Time with only forward problem: 457.3924217224121
+Total time problem: 511.57351517677307
+Time without forward problem: 54.47323441505432
+Time with only forward problem: 457.10064363479614
+Total time problem: 511.57387804985046
+Time without forward problem: 54.593262910842896
+Time with only forward problem: 456.9805908203125
+Total time problem: 511.5738537311554
+Time without forward problem: 54.63932418823242
+Time with only forward problem: 456.9346809387207
+Total time problem: 511.5740051269531
+Time without forward problem: 54.423752784729004
+Time with only forward problem: 457.15031814575195
+Total time problem: 511.57407093048096
+Time without forward problem: 54.61727952957153
+Time with only forward problem: 456.95672821998596
+Total time problem: 511.5740077495575
+Time without forward problem: 54.503761768341064
+Time with only forward problem: 457.07038474082947
+Total time problem: 511.57414650917053
+Time without forward problem: 54.61366391181946
+Time with only forward problem: 456.96047711372375
+Total time problem: 511.5741410255432
+Time without forward problem: 54.600996255874634
+Time with only forward problem: 456.97310423851013
+Total time problem: 511.57410049438477
+Time without forward problem: 54.616299867630005
+Time with only forward problem: 456.95788836479187
+Total time problem: 511.5741882324219
+Time without forward problem: 54.52916121482849
+Time with only forward problem: 457.04506492614746
+Total time problem: 511.57422614097595
+Time without forward problem: 54.43084716796875
+Time with only forward problem: 457.14346718788147
+Total time problem: 511.5743143558502
+Time without forward problem: 54.60126996040344
+Time with only forward problem: 456.97323632240295
+Total time problem: 511.5745062828064
+Time without forward problem: 54.750776290893555
+Time with only forward problem: 456.82372212409973
+Total time problem: 511.5744984149933
+Time without forward problem: 54.592841386795044
+Time with only forward problem: 456.98181319236755
+Total time problem: 511.5746545791626
+Time without forward problem: 54.435709953308105
+Time with only forward problem: 457.14082956314087
+Total time problem: 511.576539516449
+END of forward problem
+Time without forward problem: 54.468605756759644
+Time with only forward problem: 457.108154296875
+Total time problem: 511.57676005363464
+Reading mesh
+Starting simulation
+Total time in time loop:818.1884984970093
+Total time spent on RHS assembly only:756.2882821559906.
+Total time in time loop:818.188467502594
+Total time spent on RHS assembly only:756.0889670848846.
+Total time in time loop:818.1886355876923
+Total time spent on RHS assembly only:756.0533411502838.
+Total time in time loop:818.188711643219
+Total time spent on RHS assembly only:756.056158542633.
+Total time in time loop:818.1905238628387
+Total time spent on RHS assembly only:755.7021913528442.
+Total time in time loop:818.1908414363861
+Total time spent on RHS assembly only:755.7874591350555.
+Total time in time loop:818.1911389827728
+Total time spent on RHS assembly only:755.5137557983398.
+Total time in time loop:818.1912245750427
+Total time spent on RHS assembly only:755.4663183689117.
+Total time in time loop:818.1913523674011
+Total time spent on RHS assembly only:755.4312160015106.
+Total time in time loop:818.1918201446533
+Total time spent on RHS assembly only:755.3809635639191.
+Spatial parallelism, reducing to comm 0
+Time without forward problem: 80.77405190467834
+Time with only forward problem: 820.6636307239532
+Total time problem: 901.4376826286316
+Time without forward problem: 80.93083930015564
+Time with only forward problem: 820.5070407390594
+Total time problem: 901.4378800392151
+Time without forward problem: 80.8806643486023
+Time with only forward problem: 820.557294845581
+Total time problem: 901.4379591941833
+Time without forward problem: 80.81327080726624
+Time with only forward problem: 820.6246855258942
+Total time problem: 901.4379563331604
+Time without forward problem: 80.82698464393616
+Time with only forward problem: 820.6110904216766
+Total time problem: 901.4380750656128
+Time without forward problem: 80.83519196510315
+Time with only forward problem: 820.602826833725
+Total time problem: 901.4380187988281
+Time without forward problem: 80.83606481552124
+Time with only forward problem: 820.6020572185516
+Total time problem: 901.4381220340729
+Time without forward problem: 80.79377937316895
+Time with only forward problem: 820.6443445682526
+Total time problem: 901.4381239414215
+Time without forward problem: 80.82825040817261
+Time with only forward problem: 820.6098389625549
+Total time problem: 901.4380893707275
+END of forward problem
+Time without forward problem: 80.79998755455017
+Time with only forward problem: 820.6381981372833
+Total time problem: 901.4381856918335
+
+## Job finished on 22-02-2023 as 18:55:08 ###################

@@ -1,0 +1,41 @@
+
+## Job started at 22-02-2023 as 19:31:51 #####################
+
+
+## Jobs activated by olender: 
+
+             JOBID PARTITION     NAME     USER ST       TIME  NODES NODELIST(REASON)
+             23298 intel_lar amd_stro  olender PD       0:00      5 (QOSMaxNodePerUserLimit)
+             23299 intel_lar amd_stro  olender PD       0:00      5 (QOSMaxNodePerUserLimit)
+             23300 intel_lar amd_stro  olender PD       0:00      5 (QOSMaxNodePerUserLimit)
+             23301 intel_lar amd_stro  olender PD       0:00      5 (QOSMaxNodePerUserLimit)
+             23302 intel_lar amd_stro  olender PD       0:00      5 (QOSMaxNodePerUserLimit)
+             23303 intel_lar amd_stro  olender PD       0:00      5 (QOSMaxNodePerUserLimit)
+             23304 intel_lar amd_stro  olender PD       0:00      5 (QOSMaxNodePerUserLimit)
+             23305 intel_lar amd_stro  olender PD       0:00      5 (QOSMaxNodePerUserLimit)
+             23306 intel_lar amd_stro  olender PD       0:00      5 (QOSMaxNodePerUserLimit)
+             23307 intel_lar amd_stro  olender PD       0:00      5 (QOSMaxNodePerUserLimit)
+             23308 intel_lar amd_stro  olender PD       0:00      5 (QOSMaxNodePerUserLimit)
+             23309 intel_lar amd_stro  olender PD       0:00      5 (QOSMaxNodePerUserLimit)
+             23310 intel_lar amd_stro  olender PD       0:00      5 (QOSMaxNodePerUserLimit)
+             23311 intel_lar amd_stro  olender PD       0:00      5 (QOSMaxNodePerUserLimit)
+             23312 intel_lar amd_stro  olender PD       0:00      5 (QOSMaxNodePerUserLimit)
+             23371 intel_lar intel_st  olender PD       0:00      3 (QOSMaxNodePerUserLimit)
+             23368 intel_lar intel_st  olender  R      36:22      3 n[06-08]
+             23373 amd_large meshing/  olender  R       0:00      1 n13
+
+## Execution node:         n13 
+
+
+## Number of tasks per job: 1 
+
+
+## Diretorio de submissao do job:   /home/olender/cse23/spyro 
+
+Meshing with scale div 100=10
+Entering mesh generation
+(-0.8285800000000001, 0.0, -0.02858, 8.02858, -0.02858, 8.02858)
+0.009219354838709677
+Starting seismic mesh
+Constraining 8 fixed points..
+Commencing mesh generation with 68827553 vertices on rank 0.

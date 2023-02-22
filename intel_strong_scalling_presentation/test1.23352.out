@@ -909,3 +909,70 @@ Total time problem: 1297.8073716163635
 Reading mesh
 Starting simulation
 Simulation time is:      0.199 seconds
+Simulation time is:      0.399 seconds
+Simulation time is:      0.599 seconds
+Simulation time is:      0.799 seconds
+Spatial parallelism, reducing to comm 0
+Time without forward problem: 52.81512904167175
+Time with only forward problem: 2168.209017276764
+Total time problem: 2221.0241463184357
+Time without forward problem: 52.82993030548096
+Time with only forward problem: 2168.194382429123
+Total time problem: 2221.024312734604
+Time without forward problem: 52.81434988975525
+Time with only forward problem: 2168.2102241516113
+Total time problem: 2221.0245740413666
+Time without forward problem: 52.8607394695282
+Time with only forward problem: 2168.1638984680176
+Total time problem: 2221.024637937546
+Time without forward problem: 52.85546088218689
+Time with only forward problem: 2168.1692848205566
+Total time problem: 2221.0247457027435
+Time without forward problem: 52.83017325401306
+Time with only forward problem: 2168.194631576538
+Total time problem: 2221.024804830551
+Time without forward problem: 52.827964305877686
+Time with only forward problem: 2168.1969344615936
+Total time problem: 2221.0248987674713
+Time without forward problem: 52.788487672805786
+Time with only forward problem: 2168.236472606659
+Total time problem: 2221.0249602794647
+Time without forward problem: 52.77972722053528
+Time with only forward problem: 2168.245215654373
+Total time problem: 2221.0249428749084
+Time without forward problem: 52.85371518135071
+Time with only forward problem: 2168.1713423728943
+Total time problem: 2221.025057554245
+Time without forward problem: 52.76925587654114
+Time with only forward problem: 2168.2558755874634
+Total time problem: 2221.0251314640045
+Time without forward problem: 52.82451272010803
+Time with only forward problem: 2168.200605869293
+Total time problem: 2221.0251185894012
+Time without forward problem: 52.84120321273804
+Time with only forward problem: 2168.1839621067047
+Total time problem: 2221.0251653194427
+Time without forward problem: 52.8800585269928
+Time with only forward problem: 2168.1450424194336
+Total time problem: 2221.0251009464264
+Time without forward problem: 52.8139123916626
+Time with only forward problem: 2168.211310148239
+Total time problem: 2221.0252225399017
+Time without forward problem: 52.82926678657532
+Time with only forward problem: 2168.196031332016
+Total time problem: 2221.0252981185913
+Time without forward problem: 52.78704047203064
+Time with only forward problem: 2168.238327026367
+Total time problem: 2221.025367498398
+Time without forward problem: 52.85885787010193
+Time with only forward problem: 2168.166478872299
+Total time problem: 2221.025336742401
+Time without forward problem: 52.94940209388733
+Time with only forward problem: 2168.07594704628
+Total time problem: 2221.0253491401672
+END of forward problem
+Time without forward problem: 52.80737662315369
+Time with only forward problem: 2168.2180252075195
+Total time problem: 2221.025401830673
+Reading mesh
+Starting simulation

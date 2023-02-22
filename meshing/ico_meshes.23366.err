@@ -1,0 +1,25 @@
+WARNING:root:Appending zeros to replace the missing physical tag data.
+WARNING:root:Appending zeros to replace the missing geometrical tag data.
+Traceback (most recent call last):
+  File "ico_meshes.py", line 354, in <module>
+    mesh = generate_mesh(model,comm)
+  File "ico_meshes.py", line 318, in generate_mesh
+    return generate_mesh3D(model, comm)
+  File "ico_meshes.py", line 328, in generate_mesh3D
+    return generate_mesh3D_tri(model, comm)
+  File "ico_meshes.py", line 310, in generate_mesh3D_tri
+    "overlap_type": (fire.DistributedMeshOverlapType.NONE, 0)
+  File "/home/public/app/firedrake_gnu_042021/firedrake/lib/python3.6/site-packages/decorator.py", line 232, in fun
+    return caller(func, *(extras + args), **kw)
+  File "/home/public/app/firedrake_gnu_042021/firedrake/src/PyOP2/pyop2/profiling.py", line 60, in wrapper
+    return f(*args, **kwargs)
+  File "/home/public/app/firedrake_gnu_042021/firedrake/src/firedrake/firedrake/mesh.py", line 1702, in Mesh
+    plex = _from_gmsh(meshfile, comm)
+  File "/home/public/app/firedrake_gnu_042021/firedrake/src/firedrake/firedrake/mesh.py", line 217, in _from_gmsh
+    gmsh_viewer.setFileName(filename)
+  File "PETSc/Viewer.pyx", line 333, in petsc4py.PETSc.Viewer.setFileName
+petsc4py.PETSc.Error: error code 65
+[0] PetscViewerFileSetName() line 660 in /home/public/app/firedrake_gnu_042021/firedrake/src/petsc/src/sys/classes/viewer/impls/ascii/filev.c
+[0] PetscViewerFileSetName_ASCII() line 765 in /home/public/app/firedrake_gnu_042021/firedrake/src/petsc/src/sys/classes/viewer/impls/ascii/filev.c
+[0] Unable to open file
+[0] Cannot open PetscViewer file: meshes/ico_3D_scale1000by100.msh

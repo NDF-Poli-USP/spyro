@@ -1,0 +1,214 @@
+
+## Job started at 22-02-2023 as 15:47:20 #####################
+
+
+## Jobs activated by olender: 
+
+             JOBID PARTITION     NAME     USER ST       TIME  NODES NODELIST(REASON)
+             23298 intel_lar amd_stro  olender PD       0:00      5 (QOSMaxNodePerUserLimit)
+             23299 intel_lar amd_stro  olender PD       0:00      5 (QOSMaxNodePerUserLimit)
+             23300 intel_lar amd_stro  olender PD       0:00      5 (QOSMaxNodePerUserLimit)
+             23301 intel_lar amd_stro  olender PD       0:00      5 (QOSMaxNodePerUserLimit)
+             23302 intel_lar amd_stro  olender PD       0:00      5 (QOSMaxNodePerUserLimit)
+             23303 intel_lar amd_stro  olender PD       0:00      5 (QOSMaxNodePerUserLimit)
+             23304 intel_lar amd_stro  olender PD       0:00      5 (QOSMaxNodePerUserLimit)
+             23305 intel_lar amd_stro  olender PD       0:00      5 (QOSMaxNodePerUserLimit)
+             23306 intel_lar amd_stro  olender PD       0:00      5 (QOSMaxNodePerUserLimit)
+             23307 intel_lar amd_stro  olender PD       0:00      5 (QOSMaxNodePerUserLimit)
+             23308 intel_lar amd_stro  olender PD       0:00      5 (QOSMaxNodePerUserLimit)
+             23309 intel_lar amd_stro  olender PD       0:00      5 (QOSMaxNodePerUserLimit)
+             23310 intel_lar amd_stro  olender PD       0:00      5 (QOSMaxNodePerUserLimit)
+             23311 intel_lar amd_stro  olender PD       0:00      5 (QOSMaxNodePerUserLimit)
+             23312 intel_lar amd_stro  olender PD       0:00      5 (QOSMaxNodePerUserLimit)
+             23362 intel_lar 3D/paper  olender PD       0:00      4 (QOSMaxNodePerUserLimit)
+             23363 intel_lar intel_st  olender PD       0:00      3 (QOSMaxNodePerUserLimit)
+             23366 amd_large meshing/  olender  R       0:00      1 n13
+             23364 intel_lar intel_st  olender  R      16:39      1 n10
+             23361 intel_lar intel_st  olender  R      57:00      3 n[06-08]
+
+## Execution node:         n13 
+
+
+## Number of tasks per job: 1 
+
+
+## Diretorio de submissao do job:   /home/olender/cse23/spyro 
+
+Meshing with scale div 100=10
+Entering mesh generation
+(-8.2858, 0.0, -0.2858, 8.2858, -0.2858, 8.2858)
+0.09219354838709677
+Starting seismic mesh
+Constraining 8 fixed points..
+Commencing mesh generation with 786833 vertices on rank 0.
+Iteration #1, max movement is 0.464442, there are 786832 vertices and 4619506 cells
+     Elapsed wall-clock time 25.208838 : 
+Iteration #2, max movement is 0.032077, there are 786832 vertices and 4587878 cells
+     Elapsed wall-clock time 18.927371 : 
+Iteration #3, max movement is 0.065158, there are 786832 vertices and 4582918 cells
+     Elapsed wall-clock time 18.971905 : 
+Iteration #4, max movement is 0.037324, there are 786832 vertices and 4589926 cells
+     Elapsed wall-clock time 18.837104 : 
+Iteration #5, max movement is 0.057912, there are 786832 vertices and 4585410 cells
+     Elapsed wall-clock time 18.772797 : 
+Iteration #6, max movement is 0.036822, there are 786832 vertices and 4590681 cells
+     Elapsed wall-clock time 18.470163 : 
+Iteration #7, max movement is 0.039929, there are 786832 vertices and 4589256 cells
+     Elapsed wall-clock time 18.146408 : 
+Iteration #8, max movement is 0.037266, there are 786832 vertices and 4589964 cells
+     Elapsed wall-clock time 17.687443 : 
+Iteration #9, max movement is 0.039388, there are 786832 vertices and 4590210 cells
+     Elapsed wall-clock time 17.374238 : 
+Iteration #10, max movement is 0.035116, there are 786832 vertices and 4588279 cells
+     Elapsed wall-clock time 16.884341 : 
+Iteration #11, max movement is 0.039354, there are 786832 vertices and 4590428 cells
+     Elapsed wall-clock time 16.565084 : 
+Iteration #12, max movement is 0.034783, there are 786832 vertices and 4594851 cells
+     Elapsed wall-clock time 16.311300 : 
+Iteration #13, max movement is 0.028576, there are 786832 vertices and 4601837 cells
+     Elapsed wall-clock time 16.145358 : 
+Iteration #14, max movement is 0.032526, there are 786832 vertices and 4612516 cells
+     Elapsed wall-clock time 15.871646 : 
+Iteration #15, max movement is 0.036924, there are 786832 vertices and 4628921 cells
+     Elapsed wall-clock time 15.761921 : 
+Iteration #16, max movement is 0.041994, there are 786832 vertices and 4648754 cells
+     Elapsed wall-clock time 15.620574 : 
+Iteration #17, max movement is 0.032963, there are 786832 vertices and 4674339 cells
+     Elapsed wall-clock time 15.530185 : 
+Iteration #18, max movement is 0.035889, there are 786832 vertices and 4693983 cells
+     Elapsed wall-clock time 15.483462 : 
+Iteration #19, max movement is 0.026811, there are 786832 vertices and 4716028 cells
+     Elapsed wall-clock time 15.451132 : 
+Iteration #20, max movement is 0.038069, there are 786832 vertices and 4733343 cells
+     Elapsed wall-clock time 15.384490 : 
+Iteration #21, max movement is 0.036145, there are 786832 vertices and 4748102 cells
+     Elapsed wall-clock time 15.403421 : 
+Iteration #22, max movement is 0.027225, there are 786832 vertices and 4758257 cells
+     Elapsed wall-clock time 15.360812 : 
+Iteration #23, max movement is 0.027361, there are 786832 vertices and 4767704 cells
+     Elapsed wall-clock time 15.400324 : 
+Iteration #24, max movement is 0.027503, there are 786832 vertices and 4762183 cells
+     Elapsed wall-clock time 15.322564 : 
+Iteration #25, max movement is 0.027612, there are 786832 vertices and 4756158 cells
+     Elapsed wall-clock time 15.338736 : 
+Iteration #26, max movement is 0.028111, there are 786832 vertices and 4747966 cells
+     Elapsed wall-clock time 15.128235 : 
+Iteration #27, max movement is 0.028031, there are 786832 vertices and 4747139 cells
+     Elapsed wall-clock time 15.063094 : 
+Iteration #28, max movement is 0.030268, there are 786832 vertices and 4742959 cells
+     Elapsed wall-clock time 15.121276 : 
+Iteration #29, max movement is 0.028276, there are 786832 vertices and 4738529 cells
+     Elapsed wall-clock time 15.064096 : 
+Iteration #30, max movement is 0.028664, there are 786832 vertices and 4732727 cells
+     Elapsed wall-clock time 15.084295 : 
+Iteration #31, max movement is 0.028556, there are 786832 vertices and 4723975 cells
+     Elapsed wall-clock time 15.070769 : 
+Iteration #32, max movement is 0.028940, there are 786832 vertices and 4718094 cells
+     Elapsed wall-clock time 15.016462 : 
+Iteration #33, max movement is 0.028826, there are 786832 vertices and 4714629 cells
+     Elapsed wall-clock time 15.015951 : 
+Iteration #34, max movement is 0.028895, there are 786832 vertices and 4709509 cells
+     Elapsed wall-clock time 15.019823 : 
+Iteration #35, max movement is 0.029339, there are 786832 vertices and 4708308 cells
+     Elapsed wall-clock time 15.028838 : 
+Iteration #36, max movement is 0.029692, there are 786832 vertices and 4706122 cells
+     Elapsed wall-clock time 14.985958 : 
+Iteration #37, max movement is 0.029888, there are 786832 vertices and 4703505 cells
+     Elapsed wall-clock time 14.972329 : 
+Iteration #38, max movement is 0.030133, there are 786832 vertices and 4696258 cells
+     Elapsed wall-clock time 14.978074 : 
+Iteration #39, max movement is 0.029959, there are 786832 vertices and 4689529 cells
+     Elapsed wall-clock time 14.963151 : 
+Iteration #40, max movement is 0.029588, there are 786832 vertices and 4682456 cells
+     Elapsed wall-clock time 14.942064 : 
+Iteration #41, max movement is 0.029738, there are 786832 vertices and 4677467 cells
+     Elapsed wall-clock time 14.928051 : 
+Iteration #42, max movement is 0.029971, there are 786832 vertices and 4671389 cells
+     Elapsed wall-clock time 14.929458 : 
+Iteration #43, max movement is 0.029695, there are 786832 vertices and 4667201 cells
+     Elapsed wall-clock time 14.914456 : 
+Iteration #44, max movement is 0.030041, there are 786832 vertices and 4659403 cells
+     Elapsed wall-clock time 14.926268 : 
+Iteration #45, max movement is 0.038632, there are 786832 vertices and 4653036 cells
+     Elapsed wall-clock time 14.946546 : 
+Iteration #46, max movement is 0.031802, there are 786832 vertices and 4644935 cells
+     Elapsed wall-clock time 14.907738 : 
+Iteration #47, max movement is 0.030324, there are 786832 vertices and 4607838 cells
+     Elapsed wall-clock time 14.837976 : 
+Iteration #48, max movement is 0.030649, there are 786832 vertices and 4589735 cells
+     Elapsed wall-clock time 14.737531 : 
+Iteration #49, max movement is 0.030714, there are 786832 vertices and 4583777 cells
+     Elapsed wall-clock time 14.756557 : 
+Iteration #50, max movement is 0.031001, there are 786832 vertices and 4584535 cells
+     Elapsed wall-clock time 14.885096 : 
+Iteration #51, max movement is 0.031429, there are 786832 vertices and 4585590 cells
+     Elapsed wall-clock time 15.075486 : 
+Iteration #52, max movement is 0.031483, there are 786832 vertices and 4585370 cells
+     Elapsed wall-clock time 15.028982 : 
+Iteration #53, max movement is 0.031633, there are 786832 vertices and 4587298 cells
+     Elapsed wall-clock time 14.979808 : 
+Iteration #54, max movement is 0.031314, there are 786832 vertices and 4587015 cells
+     Elapsed wall-clock time 14.945636 : 
+Iteration #55, max movement is 0.031573, there are 786832 vertices and 4589156 cells
+     Elapsed wall-clock time 14.952208 : 
+Iteration #56, max movement is 0.031125, there are 786832 vertices and 4589107 cells
+     Elapsed wall-clock time 14.783277 : 
+Iteration #57, max movement is 0.030997, there are 786832 vertices and 4591550 cells
+     Elapsed wall-clock time 14.773197 : 
+Iteration #58, max movement is 0.031113, there are 786832 vertices and 4590630 cells
+     Elapsed wall-clock time 14.758042 : 
+Iteration #59, max movement is 0.031324, there are 786832 vertices and 4592538 cells
+     Elapsed wall-clock time 14.721349 : 
+Iteration #60, max movement is 0.031279, there are 786832 vertices and 4592685 cells
+     Elapsed wall-clock time 14.735129 : 
+Iteration #61, max movement is 0.031394, there are 786832 vertices and 4594708 cells
+     Elapsed wall-clock time 14.733005 : 
+Iteration #62, max movement is 0.031724, there are 786832 vertices and 4594933 cells
+     Elapsed wall-clock time 14.746915 : 
+Iteration #63, max movement is 0.042933, there are 786832 vertices and 4597253 cells
+     Elapsed wall-clock time 14.761083 : 
+Iteration #64, max movement is 0.032262, there are 786832 vertices and 4597040 cells
+     Elapsed wall-clock time 14.785235 : 
+Iteration #65, max movement is 0.031673, there are 786832 vertices and 4599175 cells
+     Elapsed wall-clock time 14.788929 : 
+Iteration #66, max movement is 0.031608, there are 786832 vertices and 4598859 cells
+     Elapsed wall-clock time 14.755015 : 
+Iteration #67, max movement is 0.031548, there are 786832 vertices and 4601018 cells
+     Elapsed wall-clock time 14.818013 : 
+Iteration #68, max movement is 0.031840, there are 786832 vertices and 4600451 cells
+     Elapsed wall-clock time 15.117476 : 
+Iteration #69, max movement is 0.038444, there are 786832 vertices and 4602009 cells
+     Elapsed wall-clock time 15.155831 : 
+Iteration #70, max movement is 0.032748, there are 786832 vertices and 4602150 cells
+     Elapsed wall-clock time 14.968057 : 
+Iteration #71, max movement is 0.031552, there are 786832 vertices and 4604045 cells
+     Elapsed wall-clock time 14.964580 : 
+Iteration #72, max movement is 0.031679, there are 786832 vertices and 4604041 cells
+     Elapsed wall-clock time 14.976300 : 
+Iteration #73, max movement is 0.032219, there are 786832 vertices and 4605604 cells
+     Elapsed wall-clock time 15.007334 : 
+Iteration #74, max movement is 0.031634, there are 786832 vertices and 4605848 cells
+     Elapsed wall-clock time 14.878027 : 
+Termination reached...maximum number of iterations reached.
+Will attempt 50 iterations to bound the dihedral angles...
+Enforcing a min. dihedral bound of: 10.0 degrees...
+Enforcing a max. dihedral bound of: 180.0 degrees...
+Commencing sliver removal with 786627 vertices on rank 0.
+On rank: 0 There are 20654 slivers...
+On rank: 0 There are 7394 slivers...
+On rank: 0 There are 2659 slivers...
+On rank: 0 There are 1000 slivers...
+On rank: 0 There are 437 slivers...
+On rank: 0 There are 189 slivers...
+On rank: 0 There are 76 slivers...
+On rank: 0 There are 37 slivers...
+On rank: 0 There are 10 slivers...
+On rank: 0 There are 4 slivers...
+On rank: 0 There are 1 slivers...
+On rank: 0 There are 1 slivers...
+On rank: 0 There are 1 slivers...
+On rank: 0 There are 0 slivers...
+Termination reached in 13 iterations...no slivers detected!
+entering spatial rank 0 after mesh generation
+
+## Job finished on 22-02-2023 as 16:14:34 ###################
