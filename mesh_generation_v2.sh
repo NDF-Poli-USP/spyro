@@ -1,7 +1,7 @@
 #!/bin/bash
 #SBATCH --nodes=1
 #SBATCH --ntasks-per-node=1
-#SBATCH --partition=intel_large
+#SBATCH --partition=amd_large
 #SBATCH --time=2-20:00:00
 #SBATCH --job-name=meshing/3DMeshGeneration_v2
 #SBATCH --output=%x.%j.out

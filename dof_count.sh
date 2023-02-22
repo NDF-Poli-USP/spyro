@@ -3,7 +3,7 @@
 #SBATCH --ntasks-per-node=20
 #SBATCH --partition=intel_large
 #SBATCH --time=1-24:00:00
-#SBATCH --job-name=amd_strong_scalling/dof_count
+#SBATCH --job-name=intel_strong_scalling_presentation/dof_count
 #SBATCH --output=%x.%j.out
 #SBATCH --error=%x.%j.err
 #SBATCH --exclusive

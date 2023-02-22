@@ -1,0 +1,105 @@
+
+## Job started at 22-02-2023 as 08:40:17 #####################
+
+
+## Jobs activated by olender: 
+
+             JOBID PARTITION     NAME     USER ST       TIME  NODES NODELIST(REASON)
+             23296 intel_lar amd_stro  olender PD       0:00      5 (QOSMaxNodePerUserLimit)
+             23297 intel_lar amd_stro  olender PD       0:00      5 (QOSMaxNodePerUserLimit)
+             23298 intel_lar amd_stro  olender PD       0:00      5 (QOSMaxNodePerUserLimit)
+             23299 intel_lar amd_stro  olender PD       0:00      5 (QOSMaxNodePerUserLimit)
+             23300 intel_lar amd_stro  olender PD       0:00      5 (QOSMaxNodePerUserLimit)
+             23301 intel_lar amd_stro  olender PD       0:00      5 (QOSMaxNodePerUserLimit)
+             23302 intel_lar amd_stro  olender PD       0:00      5 (QOSMaxNodePerUserLimit)
+             23303 intel_lar amd_stro  olender PD       0:00      5 (QOSMaxNodePerUserLimit)
+             23304 intel_lar amd_stro  olender PD       0:00      5 (QOSMaxNodePerUserLimit)
+             23305 intel_lar amd_stro  olender PD       0:00      5 (QOSMaxNodePerUserLimit)
+             23306 intel_lar amd_stro  olender PD       0:00      5 (QOSMaxNodePerUserLimit)
+             23307 intel_lar amd_stro  olender PD       0:00      5 (QOSMaxNodePerUserLimit)
+             23308 intel_lar amd_stro  olender PD       0:00      5 (QOSMaxNodePerUserLimit)
+             23309 intel_lar amd_stro  olender PD       0:00      5 (QOSMaxNodePerUserLimit)
+             23310 intel_lar amd_stro  olender PD       0:00      5 (QOSMaxNodePerUserLimit)
+             23311 intel_lar amd_stro  olender PD       0:00      5 (QOSMaxNodePerUserLimit)
+             23312 intel_lar amd_stro  olender PD       0:00      5 (QOSMaxNodePerUserLimit)
+             23315 intel_lar amd_stro  olender PD       0:00      4 (QOSMaxNodePerUserLimit)
+             23316 intel_lar amd_stro  olender PD       0:00      4 (QOSMaxNodePerUserLimit)
+             23317 intel_lar amd_stro  olender PD       0:00      4 (QOSMaxNodePerUserLimit)
+             23318 intel_lar amd_stro  olender PD       0:00      4 (QOSMaxNodePerUserLimit)
+             23319 intel_lar amd_stro  olender PD       0:00      4 (QOSMaxNodePerUserLimit)
+             23320 intel_lar amd_stro  olender PD       0:00      4 (QOSMaxNodePerUserLimit)
+             23321 intel_lar amd_stro  olender PD       0:00      4 (QOSMaxNodePerUserLimit)
+             23322 intel_lar amd_stro  olender PD       0:00      4 (QOSMaxNodePerUserLimit)
+             23323 intel_lar amd_stro  olender PD       0:00      4 (QOSMaxNodePerUserLimit)
+             23324 intel_lar amd_stro  olender PD       0:00      4 (QOSMaxNodePerUserLimit)
+             23325 intel_lar amd_stro  olender PD       0:00      4 (QOSMaxNodePerUserLimit)
+             23326 intel_lar amd_stro  olender PD       0:00      4 (QOSMaxNodePerUserLimit)
+             23327 intel_lar amd_stro  olender PD       0:00      4 (QOSMaxNodePerUserLimit)
+             23331 intel_lar intel_st  olender PD       0:00      1 (QOSMaxNodePerUserLimit)
+             23314 intel_lar amd_stro  olender  R    4:03:38      4 n[06-08,10]
+             23337 amd_large meshing/  olender  R       0:00      1 n13
+
+## Execution node:         n13 
+
+
+## Number of tasks per job: 1 
+
+
+## Diretorio de submissao do job:   /home/olender/cse23/spyro 
+
+Meshing with scale div 100=21
+Entering mesh generation
+Will attempt 200 iterations to bound the dihedral angles...
+Enforcing a min. dihedral bound of: 10.0 degrees...
+Enforcing a max. dihedral bound of: 180.0 degrees...
+Commencing sliver removal with 7832 vertices on rank 0.
+On rank: 0 There are 150 slivers...
+On rank: 0 There are 29 slivers...
+On rank: 0 There are 5 slivers...
+On rank: 0 There are 1 slivers...
+On rank: 0 There are 0 slivers...
+Termination reached in 4 iterations...no slivers detected!
+entering spatial rank 0 after mesh generation
+Finishing mesh generation
+Meshing with scale div 100=22
+Entering mesh generation
+Will attempt 200 iterations to bound the dihedral angles...
+Enforcing a min. dihedral bound of: 10.0 degrees...
+Enforcing a max. dihedral bound of: 180.0 degrees...
+Commencing sliver removal with 8480 vertices on rank 0.
+On rank: 0 There are 127 slivers...
+On rank: 0 There are 9 slivers...
+On rank: 0 There are 0 slivers...
+Termination reached in 2 iterations...no slivers detected!
+entering spatial rank 0 after mesh generation
+Finishing mesh generation
+Meshing with scale div 100=23
+Entering mesh generation
+Will attempt 200 iterations to bound the dihedral angles...
+Enforcing a min. dihedral bound of: 10.0 degrees...
+Enforcing a max. dihedral bound of: 180.0 degrees...
+Commencing sliver removal with 10206 vertices on rank 0.
+On rank: 0 There are 77 slivers...
+On rank: 0 There are 10 slivers...
+On rank: 0 There are 4 slivers...
+On rank: 0 There are 2 slivers...
+On rank: 0 There are 1 slivers...
+On rank: 0 There are 0 slivers...
+Termination reached in 5 iterations...no slivers detected!
+entering spatial rank 0 after mesh generation
+Finishing mesh generation
+Meshing with scale div 100=24
+Entering mesh generation
+Will attempt 200 iterations to bound the dihedral angles...
+Enforcing a min. dihedral bound of: 10.0 degrees...
+Enforcing a max. dihedral bound of: 180.0 degrees...
+Commencing sliver removal with 10975 vertices on rank 0.
+On rank: 0 There are 152 slivers...
+On rank: 0 There are 14 slivers...
+On rank: 0 There are 1 slivers...
+On rank: 0 There are 0 slivers...
+Termination reached in 3 iterations...no slivers detected!
+entering spatial rank 0 after mesh generation
+Finishing mesh generation
+Meshing with scale div 100=26
+Entering mesh generation

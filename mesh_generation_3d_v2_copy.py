@@ -250,7 +250,8 @@ M = 3.6
 # scales = [3, 4, 5, 6]
 # scales = [0.5, 1.5, 2.5]
 # scales = [10, 20, 30, 40, 50, 60, 70, 80, 90, 130, 160, 180]
-scales = [42, 44, 46, 48]
+# scales = [42, 44, 46, 48]
+scales = [21, 22, 23, 24, 26, 28]
 
 for scale in scales:
     model = create_model_for_grid_point_calculation(scale/100.)

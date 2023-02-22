@@ -5,7 +5,8 @@ import spyro
 
 # scales = [1,2,3]
 # scales = [50, 60, 70, 80, 90, 130]#, 160, 180]
-scales = [100, 150, 200]
+# scales = [100, 150, 200]
+scales = [160, 180, 200]
 comm = spyro.utils.mpi_init(model(scales[0]))
 for scale in scales:
     if comm.comm.rank == 0:

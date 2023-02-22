@@ -3,7 +3,7 @@
 #SBATCH --ntasks-per-node=1
 #SBATCH --partition=amd_large
 #SBATCH --time=2-20:00:00
-#SBATCH --job-name=meshing/3DKMVMeshGeneration
+#SBATCH --job-name=meshing/3DMeshGeneration_v2
 #SBATCH --output=%x.%j.out
 #SBATCH --error=%x.%j.err
 echo -e "\n## Job started at $(date +'%d-%m-%Y as %T') #####################\n"
@@ -54,7 +54,7 @@ export OMP_NUM_THREADS=1
 srun hostname > $HOSTFILE
 ## Information about the entry and exit of the job
 echo -e "\n## Diretorio de submissao do job:   $SLURM_SUBMIT_DIR \n"
-mpiexec -n 1  python mesh_generation_3d.py
+mpiexec -n 1  python mesh_generation_3d_v2_copy.py
 
 echo -e "\n## Job finished on $(date +'%d-%m-%Y as %T') ###################"
 rm $HOSTFILE
