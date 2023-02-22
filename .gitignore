@@ -8,4 +8,5 @@
 *.msh
 *.segy
 *.vtk
+*.sif
 host*
