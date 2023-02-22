@@ -1,5 +1,6 @@
 from firedrake import *
 from firedrake.assemble import create_assembly_callable
+import time
 
 from .. import utils
 from ..domains import quadrature, space
@@ -246,13 +247,18 @@ def forward(
     assembly_callable = create_assembly_callable(rhs_, tensor=B)
 
     rhs_forcing = Function(V)
+    t1_total_init = time.time()
+    t2_rhs = 0.0
 
     for step in range(nt):
         rhs_forcing.assign(0.0)
+        t2_rhs0 = time.time()
         assembly_callable()
         f = excitations.apply_source(rhs_forcing, wavelet[step])
         B0 = B.sub(0)
         B0 += f
+        t2_rhs1 = time.time()
+        t2_rhs += (t2_rhs1-t2_rhs0)
         solver.solve(X, B)
         if PML:
             if dim == 2:
@@ -287,6 +293,9 @@ def forward(
         u_n.assign(u_np1)
 
         t = step * float(dt)
+    
+    print(f"Total time in time loop:{time.time() - t1_total_init}", flush = True)
+    print(f"Total time spent on RHS assembly only:{t2_rhs}.", flush = True)
 
     usol_recv = helpers.fill(usol_recv, receivers.is_local, nt, receivers.num_receivers)
     usol_recv = utils.communicate(usol_recv, comm)
