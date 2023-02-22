@@ -1,0 +1,392 @@
+
+## Job started at 22-02-2023 as 12:15:57 #####################
+
+
+## Jobs activated by olender: 
+
+             JOBID PARTITION     NAME     USER ST       TIME  NODES NODELIST(REASON)
+             23296 intel_lar amd_stro  olender PD       0:00      5 (Resources)
+             23297 intel_lar amd_stro  olender PD       0:00      5 (Priority)
+             23298 intel_lar amd_stro  olender PD       0:00      5 (Priority)
+             23299 intel_lar amd_stro  olender PD       0:00      5 (Priority)
+             23300 intel_lar amd_stro  olender PD       0:00      5 (Priority)
+             23301 intel_lar amd_stro  olender PD       0:00      5 (Priority)
+             23302 intel_lar amd_stro  olender PD       0:00      5 (Priority)
+             23303 intel_lar amd_stro  olender PD       0:00      5 (Priority)
+             23304 intel_lar amd_stro  olender PD       0:00      5 (Priority)
+             23305 intel_lar amd_stro  olender PD       0:00      5 (Priority)
+             23306 intel_lar amd_stro  olender PD       0:00      5 (Priority)
+             23307 intel_lar amd_stro  olender PD       0:00      5 (Priority)
+             23308 intel_lar amd_stro  olender PD       0:00      5 (Priority)
+             23309 intel_lar amd_stro  olender PD       0:00      5 (Priority)
+             23310 intel_lar amd_stro  olender PD       0:00      5 (Priority)
+             23311 intel_lar amd_stro  olender PD       0:00      5 (Priority)
+             23312 intel_lar amd_stro  olender PD       0:00      5 (Priority)
+             23351 intel_lar intel_we  olender  R       0:00      4 n[06-08,10]
+
+## Execution node:         n06 
+
+
+## Number of tasks per job: 100 
+
+
+## Diretorio de submissao do job:   /home/olender/cse23/spyro 
+
+Reading mesh
+Starting simulation
+Simulation time is:      0.199 seconds
+Simulation time is:      0.399 seconds
+Simulation time is:      0.599 seconds
+Simulation time is:      0.799 seconds
+Spatial parallelism, reducing to comm 0
+Time without forward problem: 30.215789794921875
+Time with only forward problem: 389.56516098976135
+Total time problem: 419.7809507846832
+Time without forward problem: 30.12334370613098
+Time with only forward problem: 389.65774965286255
+Total time problem: 419.78109335899353
+Time without forward problem: 30.18198323249817
+Time with only forward problem: 389.5990948677063
+Total time problem: 419.78107810020447
+Time without forward problem: 30.08890986442566
+Time with only forward problem: 389.6922492980957
+Total time problem: 419.78115916252136
+Time without forward problem: 30.28084635734558
+Time with only forward problem: 389.5004255771637
+Total time problem: 419.7812719345093
+Time without forward problem: 30.20704197883606
+Time with only forward problem: 389.5743598937988
+Total time problem: 419.7814018726349
+Time without forward problem: 30.17209243774414
+Time with only forward problem: 389.60963106155396
+Total time problem: 419.7817234992981
+Time without forward problem: 30.16856098175049
+Time with only forward problem: 389.613272190094
+Total time problem: 419.7818331718445
+Time without forward problem: 30.164015293121338
+Time with only forward problem: 389.6178891658783
+Total time problem: 419.78190445899963
+Time without forward problem: 30.06537175178528
+Time with only forward problem: 389.7165491580963
+Total time problem: 419.7819209098816
+END of forward problem
+Reading mesh
+Starting simulation
+Simulation time is:      0.199 seconds
+Simulation time is:      0.399 seconds
+Simulation time is:      0.599 seconds
+Simulation time is:      0.799 seconds
+Spatial parallelism, reducing to comm 0
+Time without forward problem: 38.343127489089966
+Time with only forward problem: 545.2891221046448
+Total time problem: 583.6322495937347
+Time without forward problem: 38.370415449142456
+Time with only forward problem: 545.261789560318
+Total time problem: 583.6322050094604
+Time without forward problem: 38.05779433250427
+Time with only forward problem: 545.5743823051453
+Total time problem: 583.6321766376495
+Time without forward problem: 38.203123569488525
+Time with only forward problem: 545.4290361404419
+Total time problem: 583.6321597099304
+Time without forward problem: 38.3520073890686
+Time with only forward problem: 545.2804384231567
+Total time problem: 583.6324458122253
+Time without forward problem: 38.46502709388733
+Time with only forward problem: 545.1674168109894
+Total time problem: 583.6324439048767
+Time without forward problem: 38.315043210983276
+Time with only forward problem: 545.3172965049744
+Total time problem: 583.6323397159576
+Time without forward problem: 38.34719705581665
+Time with only forward problem: 545.285088300705
+Total time problem: 583.6322853565216
+Time without forward problem: 38.28085923194885
+Time with only forward problem: 545.3515191078186
+Total time problem: 583.6323783397675
+Time without forward problem: 38.32734298706055
+Time with only forward problem: 545.3051164150238
+Total time problem: 583.6324594020844
+Time without forward problem: 38.41083550453186
+Time with only forward problem: 545.2216329574585
+Total time problem: 583.6324684619904
+Time without forward problem: 38.38364386558533
+Time with only forward problem: 545.2489104270935
+Total time problem: 583.6325542926788
+Time without forward problem: 37.948657274246216
+Time with only forward problem: 545.6838591098785
+Total time problem: 583.6325163841248
+Time without forward problem: 38.35371541976929
+Time with only forward problem: 545.2788257598877
+Total time problem: 583.632541179657
+Time without forward problem: 38.347877740859985
+Time with only forward problem: 545.2846121788025
+Total time problem: 583.6324899196625
+Time without forward problem: 38.76524257659912
+Time with only forward problem: 544.8674342632294
+Total time problem: 583.6326768398285
+Time without forward problem: 38.36864709854126
+Time with only forward problem: 545.2640693187714
+Total time problem: 583.6327164173126
+Time without forward problem: 38.13105344772339
+Time with only forward problem: 545.5019109249115
+Total time problem: 583.6329643726349
+Time without forward problem: 38.377325773239136
+Time with only forward problem: 545.2556841373444
+Total time problem: 583.6330099105835
+Time without forward problem: 38.26894235610962
+Time with only forward problem: 545.3640582561493
+Total time problem: 583.6330006122589
+Time without forward problem: 38.34526824951172
+Time with only forward problem: 545.2877752780914
+Total time problem: 583.6330435276031
+Time without forward problem: 38.262805223464966
+Time with only forward problem: 545.3704857826233
+Total time problem: 583.6332910060883
+Time without forward problem: 38.30900764465332
+Time with only forward problem: 545.3243026733398
+Total time problem: 583.6333103179932
+Time without forward problem: 38.23071098327637
+Time with only forward problem: 545.4026098251343
+Total time problem: 583.6333208084106
+Time without forward problem: 38.3626070022583
+Time with only forward problem: 545.2708189487457
+Total time problem: 583.633425951004
+Time without forward problem: 37.98248100280762
+Time with only forward problem: 545.650931596756
+Total time problem: 583.6334125995636
+Time without forward problem: 38.11536622047424
+Time with only forward problem: 545.5179669857025
+Total time problem: 583.6333332061768
+Time without forward problem: 38.144355058670044
+Time with only forward problem: 545.4892141819
+Total time problem: 583.6335692405701
+Time without forward problem: 38.13517355918884
+Time with only forward problem: 545.4983975887299
+Total time problem: 583.6335711479187
+Time without forward problem: 37.91702485084534
+Time with only forward problem: 545.7166249752045
+Total time problem: 583.6336498260498
+Time without forward problem: 38.07457399368286
+Time with only forward problem: 545.5590915679932
+Total time problem: 583.633665561676
+Time without forward problem: 38.295671701431274
+Time with only forward problem: 545.33797955513
+Total time problem: 583.6336512565613
+Time without forward problem: 38.473556995391846
+Time with only forward problem: 545.1599752902985
+Total time problem: 583.6335322856903
+Time without forward problem: 38.10580849647522
+Time with only forward problem: 545.5279002189636
+Total time problem: 583.6337087154388
+Time without forward problem: 38.40604496002197
+Time with only forward problem: 545.2274754047394
+Total time problem: 583.6335203647614
+Time without forward problem: 38.27575421333313
+Time with only forward problem: 545.3580207824707
+Total time problem: 583.6337749958038
+Time without forward problem: 38.14456748962402
+Time with only forward problem: 545.489027261734
+Total time problem: 583.633594751358
+Time without forward problem: 38.195653676986694
+Time with only forward problem: 545.4381725788116
+Total time problem: 583.6338262557983
+Time without forward problem: 38.17506790161133
+Time with only forward problem: 545.4587333202362
+Total time problem: 583.6338012218475
+Time without forward problem: 38.199289321899414
+Time with only forward problem: 545.4345707893372
+Total time problem: 583.6338601112366
+Time without forward problem: 38.183006286621094
+Time with only forward problem: 545.4509315490723
+Total time problem: 583.6339378356934
+Time without forward problem: 38.17719340324402
+Time with only forward problem: 545.4567401409149
+Total time problem: 583.6339335441589
+Time without forward problem: 38.155813455581665
+Time with only forward problem: 545.4780294895172
+Total time problem: 583.6338429450989
+Time without forward problem: 38.540555477142334
+Time with only forward problem: 545.0933034420013
+Total time problem: 583.6338589191437
+Time without forward problem: 38.62720251083374
+Time with only forward problem: 545.006626367569
+Total time problem: 583.6338288784027
+Time without forward problem: 38.403786182403564
+Time with only forward problem: 545.2303042411804
+Total time problem: 583.634090423584
+Time without forward problem: 38.70198178291321
+Time with only forward problem: 544.932208776474
+Total time problem: 583.6341905593872
+Time without forward problem: 38.07145810127258
+Time with only forward problem: 545.5625495910645
+Total time problem: 583.634007692337
+Time without forward problem: 38.33068799972534
+Time with only forward problem: 545.3034470081329
+Total time problem: 583.6341350078583
+Time without forward problem: 38.17429232597351
+Time with only forward problem: 545.4600584506989
+Total time problem: 583.6343507766724
+Time without forward problem: 38.19535732269287
+Time with only forward problem: 545.4389617443085
+Total time problem: 583.6343190670013
+Time without forward problem: 38.69954705238342
+Time with only forward problem: 544.9348571300507
+Total time problem: 583.6344041824341
+Time without forward problem: 38.18568301200867
+Time with only forward problem: 545.4486968517303
+Total time problem: 583.634379863739
+Time without forward problem: 38.183021783828735
+Time with only forward problem: 545.4513392448425
+Total time problem: 583.6343610286713
+Time without forward problem: 38.4315881729126
+Time with only forward problem: 545.2028388977051
+Total time problem: 583.6344270706177
+Time without forward problem: 38.2901713848114
+Time with only forward problem: 545.3442833423615
+Total time problem: 583.6344547271729
+Time without forward problem: 38.124938011169434
+Time with only forward problem: 545.509482383728
+Total time problem: 583.6344203948975
+Time without forward problem: 38.44658637046814
+Time with only forward problem: 545.187826871872
+Total time problem: 583.6344132423401
+Time without forward problem: 38.11701989173889
+Time with only forward problem: 545.517383813858
+Total time problem: 583.6344037055969
+Time without forward problem: 38.25907588005066
+Time with only forward problem: 545.3753538131714
+Total time problem: 583.634429693222
+Time without forward problem: 38.11587047576904
+Time with only forward problem: 545.5187408924103
+Total time problem: 583.6346113681793
+Time without forward problem: 38.39328932762146
+Time with only forward problem: 545.241242647171
+Total time problem: 583.6345319747925
+Time without forward problem: 38.23128843307495
+Time with only forward problem: 545.403359413147
+Total time problem: 583.6346478462219
+Time without forward problem: 38.55683994293213
+Time with only forward problem: 545.0778505802155
+Total time problem: 583.6346905231476
+Time without forward problem: 38.116212368011475
+Time with only forward problem: 545.5182642936707
+Total time problem: 583.6344766616821
+Time without forward problem: 38.15371084213257
+Time with only forward problem: 545.4811058044434
+Total time problem: 583.6348166465759
+Time without forward problem: 38.46334385871887
+Time with only forward problem: 545.171183347702
+Total time problem: 583.6345272064209
+Time without forward problem: 38.19160318374634
+Time with only forward problem: 545.4429523944855
+Total time problem: 583.6345555782318
+Time without forward problem: 38.6074013710022
+Time with only forward problem: 545.0274586677551
+Total time problem: 583.6348600387573
+Time without forward problem: 38.56682062149048
+Time with only forward problem: 545.0677840709686
+Total time problem: 583.6346046924591
+Time without forward problem: 38.185675382614136
+Time with only forward problem: 545.4492557048798
+Total time problem: 583.6349310874939
+Time without forward problem: 38.5279598236084
+Time with only forward problem: 545.1069233417511
+Total time problem: 583.6348831653595
+Time without forward problem: 38.52838945388794
+Time with only forward problem: 545.1061692237854
+Total time problem: 583.6345586776733
+Time without forward problem: 38.23238778114319
+Time with only forward problem: 545.4024477005005
+Total time problem: 583.6348354816437
+Time without forward problem: 38.42714977264404
+Time with only forward problem: 545.2074129581451
+Total time problem: 583.6345627307892
+Time without forward problem: 38.5335795879364
+Time with only forward problem: 545.1012663841248
+Total time problem: 583.6348459720612
+Time without forward problem: 38.08489227294922
+Time with only forward problem: 545.549791097641
+Total time problem: 583.6346833705902
+Time without forward problem: 38.20893311500549
+Time with only forward problem: 545.4261345863342
+Total time problem: 583.6350677013397
+Time without forward problem: 38.2653329372406
+Time with only forward problem: 545.3694822788239
+Total time problem: 583.6348152160645
+Time without forward problem: 38.21990704536438
+Time with only forward problem: 545.4152047634125
+Total time problem: 583.6351118087769
+Time without forward problem: 38.35352182388306
+Time with only forward problem: 545.2813994884491
+Total time problem: 583.6349213123322
+Time without forward problem: 38.200594663619995
+Time with only forward problem: 545.434574842453
+Total time problem: 583.635169506073
+Time without forward problem: 38.203431129455566
+Time with only forward problem: 545.4317691326141
+Total time problem: 583.6352002620697
+Time without forward problem: 38.223994731903076
+Time with only forward problem: 545.411301612854
+Total time problem: 583.6352963447571
+Time without forward problem: 38.38337755203247
+Time with only forward problem: 545.2519330978394
+Total time problem: 583.6353106498718
+Time without forward problem: 38.17721676826477
+Time with only forward problem: 545.458113193512
+Total time problem: 583.6353299617767
+Time without forward problem: 38.29124927520752
+Time with only forward problem: 545.3440918922424
+Total time problem: 583.63534116745
+Time without forward problem: 37.75296497344971
+Time with only forward problem: 545.8824460506439
+Total time problem: 583.6354110240936
+Time without forward problem: 38.59254240989685
+Time with only forward problem: 545.046174287796
+Total time problem: 583.6387166976929
+Time without forward problem: 38.68024468421936
+Time with only forward problem: 544.9585220813751
+Total time problem: 583.6387667655945
+Time without forward problem: 38.609487533569336
+Time with only forward problem: 545.0293776988983
+Total time problem: 583.6388652324677
+Time without forward problem: 38.24144673347473
+Time with only forward problem: 545.3973433971405
+Total time problem: 583.6387901306152
+Time without forward problem: 37.943692207336426
+Time with only forward problem: 545.6956400871277
+Total time problem: 583.6393322944641
+Time without forward problem: 38.850852727890015
+Time with only forward problem: 544.7885572910309
+Total time problem: 583.6394100189209
+Time without forward problem: 38.01534175872803
+Time with only forward problem: 545.6291933059692
+Total time problem: 583.6445350646973
+Time without forward problem: 38.15873622894287
+Time with only forward problem: 545.4858953952789
+Total time problem: 583.6446316242218
+Time without forward problem: 38.36692237854004
+Time with only forward problem: 545.2782323360443
+Total time problem: 583.6451547145844
+Time without forward problem: 38.23798155784607
+Time with only forward problem: 545.4076540470123
+Total time problem: 583.6456356048584
+Time without forward problem: 38.642019748687744
+Time with only forward problem: 545.0038623809814
+Total time problem: 583.6458821296692
+Time without forward problem: 37.92686343193054
+Time with only forward problem: 545.7198541164398
+Total time problem: 583.6467175483704
+END of forward problem
+Reading mesh
+Starting simulation
+Simulation time is:      0.199 seconds
+Simulation time is:      0.399 seconds
+Simulation time is:      0.599 seconds
+Simulation time is:      0.799 seconds
+Time without forward problem: 26.537604331970215
+Time with only forward problem: 323.47871565818787
+Total time problem: 350.0163199901581
+END of forward problem
+
+## Job finished on 22-02-2023 as 12:40:26 ###################
