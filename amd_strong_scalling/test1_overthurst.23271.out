@@ -1,0 +1,18 @@
+
+## Job started at 18-02-2023 as 08:53:31 #####################
+
+
+## Jobs activated by olender: 
+
+             JOBID PARTITION     NAME     USER ST       TIME  NODES NODELIST(REASON)
+             23271 amd_large amd_stro  olender  R       0:01      2 n[13-14]
+             23269 intel_lar meshing/  olender  R      15:10      1 n05
+
+## Execution node:         n13 
+
+
+## Number of tasks per job: 40 
+
+
+## Diretorio de submissao do job:   /home/olender/cse23/spyro 
+

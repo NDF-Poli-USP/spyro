@@ -1,0 +1,32 @@
+
+## Job started at 18-02-2023 as 08:51:32 #####################
+
+
+## Jobs activated by olender: 
+
+             JOBID PARTITION     NAME     USER ST       TIME  NODES NODELIST(REASON)
+             23262 amd_large amd_stro  olender  R      27:16      2 n[13-14]
+             23270 intel_lar meshing/  olender  R       0:01      1 n06
+             23269 intel_lar meshing/  olender  R      13:11      1 n05
+
+## Execution node:         n06 
+
+
+## Number of tasks per job: 1 
+
+
+## Diretorio de submissao do job:   /home/olender/cse23/spyro 
+
+Meshing with scale div 100=10
+Entering mesh generation
+Will attempt 200 iterations to bound the dihedral angles...
+Enforcing a min. dihedral bound of: 10.0 degrees...
+Enforcing a max. dihedral bound of: 180.0 degrees...
+Commencing sliver removal with 869 vertices on rank 0.
+On rank: 0 There are 24 slivers...
+On rank: 0 There are 1 slivers...
+On rank: 0 There are 0 slivers...
+Termination reached in 2 iterations...no slivers detected!
+entering spatial rank 0 after mesh generation
+
+## Job finished on 18-02-2023 as 08:51:46 ###################

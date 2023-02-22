@@ -1,6 +1,6 @@
 #!/bin/bash
-#SBATCH --nodes=3
-#SBATCH --ntasks-per-node=20
+#SBATCH --nodes=5
+#SBATCH --ntasks-per-node=15
 #SBATCH --partition=intel_large
 #SBATCH --time=1-24:00:00
 #SBATCH --job-name=amd_strong_scalling/intel_test1_overthurst
@@ -56,13 +56,15 @@ srun hostname > $HOSTFILE
 ## Information about the entry and exit of the job
 echo -e "\n## Diretorio de submissao do job:   $SLURM_SUBMIT_DIR \n"
 
-mpiexec -n 60 python benchmark_3d_overthrust.py
+mpiexec -n 45 python benchmark_3d_overthrust.py
 mpiexec -n 40 python benchmark_3d_overthrust.py
 mpiexec -n 30 python benchmark_3d_overthrust.py
 mpiexec -n 20 python benchmark_3d_overthrust.py
 mpiexec -n 15 python benchmark_3d_overthrust.py
 mpiexec -n 10 python benchmark_3d_overthrust.py
 mpiexec -n  5 python benchmark_3d_overthrust.py
+mpiexec -n  2 python benchmark_3d_overthrust.py
+mpiexec -n 60 python benchmark_3d_overthrust.py
 
 
 echo -e "\n## Job finished on $(date +'%d-%m-%Y as %T') ###################"

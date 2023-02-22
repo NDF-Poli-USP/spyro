@@ -1,9 +1,9 @@
 #!/bin/bash
-#SBATCH --nodes=2
-#SBATCH --ntasks-per-node=30
-#SBATCH --partition=amd_large
+#SBATCH --nodes=1
+#SBATCH --ntasks-per-node=20
+#SBATCH --partition=intel_large
 #SBATCH --time=1-24:00:00
-#SBATCH --job-name=amd_strong_scalling/test1_overthurst
+#SBATCH --job-name=amd_strong_scalling/dof_count
 #SBATCH --output=%x.%j.out
 #SBATCH --error=%x.%j.err
 #SBATCH --exclusive
@@ -56,13 +56,7 @@ srun hostname > $HOSTFILE
 ## Information about the entry and exit of the job
 echo -e "\n## Diretorio de submissao do job:   $SLURM_SUBMIT_DIR \n"
 
-mpiexec -n 60 python benchmark_3d_overthrust.py
-mpiexec -n 40 python benchmark_3d_overthrust.py
-mpiexec -n 30 python benchmark_3d_overthrust.py
-mpiexec -n 20 python benchmark_3d_overthrust.py
-mpiexec -n 15 python benchmark_3d_overthrust.py
-mpiexec -n 10 python benchmark_3d_overthrust.py
-mpiexec -n  5 python benchmark_3d_overthrust.py
+mpiexec -n 20 python calculate_dofs.py
 
 
 echo -e "\n## Job finished on $(date +'%d-%m-%Y as %T') ###################"
