@@ -80,16 +80,16 @@ x,y = Wave.get_spatial_coordinates()
 # print(uy.dat.data[:])
 
 sources = Wave.sources
-print(sources.receiver_locations)
-print(sources.cellIDs)
-print(sources.cellNodeMaps)
+# print(sources.receiver_locations)
+# print(sources.cellIDs)
+# print(sources.cellNodeMaps)
 
 
-Wave.set_initial_velocity_model(conditional = conditional(x < -0.5 ,3.0,3.0 ))
+Wave.set_initial_velocity_model(conditional = conditional(x < -0.5 ,1.5,3.0 ))
 Wave._get_initial_velocity_model()
 Wave.c = Wave.initial_velocity_model
 
-eikonal(Wave)
+# eikonal(Wave)
 
 
 Wave.forward_solve()
