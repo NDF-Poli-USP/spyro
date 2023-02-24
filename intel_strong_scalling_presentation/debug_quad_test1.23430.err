@@ -1,0 +1,21 @@
+Traceback (most recent call last):
+  File "ico_benchmark_forward_3d.py", line 169, in <module>
+    p, p_r = spyro.solvers.forward(
+  File "/home/olender/cse23/spyroSEM/spyro/solvers/forward.py", line 64, in forward
+    excitations.current_source = source_num
+NameError: name 'source_num' is not defined
+application called MPI_Abort(MPI_COMM_WORLD, 1) - process 2
+Traceback (most recent call last):
+  File "ico_benchmark_forward_3d.py", line 169, in <module>
+    p, p_r = spyro.solvers.forward(
+  File "/home/olender/cse23/spyroSEM/spyro/solvers/forward.py", line 64, in forward
+    excitations.current_source = source_num
+NameError: name 'source_num' is not defined
+application called MPI_Abort(MPI_COMM_WORLD, 1) - process 5
+Traceback (most recent call last):
+  File "ico_benchmark_forward_3d.py", line 169, in <module>
+    p, p_r = spyro.solvers.forward(
+  File "/home/olender/cse23/spyroSEM/spyro/solvers/forward.py", line 64, in forward
+    excitations.current_source = source_num
+NameError: name 'source_num' is not defined
+application called MPI_Abort(MPI_COMM_WORLD, 1) - process 6

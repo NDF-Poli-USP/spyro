@@ -1,0 +1,35 @@
+
+## Job started at 24-02-2023 as 08:57:26 #####################
+
+
+## Jobs activated by olender: 
+
+             JOBID PARTITION     NAME     USER ST       TIME  NODES NODELIST(REASON)
+             23301 intel_lar amd_stro  olender PD       0:00      5 (Priority)
+             23300 intel_lar amd_stro  olender PD       0:00      5 (Resources)
+             23302 intel_lar amd_stro  olender PD       0:00      5 (Priority)
+             23303 intel_lar amd_stro  olender PD       0:00      5 (Priority)
+             23304 intel_lar amd_stro  olender PD       0:00      5 (Priority)
+             23305 intel_lar amd_stro  olender PD       0:00      5 (Priority)
+             23306 intel_lar amd_stro  olender PD       0:00      5 (Priority)
+             23307 intel_lar amd_stro  olender PD       0:00      5 (Priority)
+             23308 intel_lar amd_stro  olender PD       0:00      5 (Priority)
+             23309 intel_lar amd_stro  olender PD       0:00      5 (Priority)
+             23310 intel_lar amd_stro  olender PD       0:00      5 (Priority)
+             23311 intel_lar amd_stro  olender PD       0:00      5 (Priority)
+             23312 intel_lar amd_stro  olender PD       0:00      5 (Priority)
+             23431 intel_lar intel_st  olender PD       0:00      1 (Priority)
+             23432 amd_large intel_st  olender  R       0:00      1 n13
+
+## Execution node:         n13 
+
+
+## Number of tasks per job: 15 
+
+
+## Diretorio de submissao do job:   /home/olender/cse23/spyroSEM 
+
+Reading mesh
+Starting simulation
+
+## Job finished on 24-02-2023 as 08:57:39 ###################

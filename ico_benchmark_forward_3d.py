@@ -33,8 +33,8 @@ def create_3d_grid(start, end, num):
 
 def create_model(scale):
     degree = 3
-    method = "KMV"
-    quadrature = "KMV"
+    method = "CG"
+    quadrature = "GLL"
 
     lbda = 1.429/5.0
     pad = lbda
@@ -73,8 +73,8 @@ def create_model(scale):
     
     model = {}
     model["opts"] = {
-        "method": "KMV",  # either CG or KMV
-        "quadrature": "KMV",  # Equi or KMV
+        "method": "CG",  # either CG or KMV
+        "quadrature": "GLL",  # Equi or KMV
         "degree": 3,  # p order use 2 or 3 here
         "dimension": 3,  # dimension
     }
@@ -132,27 +132,31 @@ model = create_model(scale)
 
 
 comm = spyro.utils.mpi_init(model)
+lbda = 1.429/5.0
+pad = lbda
+Lz = 8.
+Real_Lz = Lz+ pad
+Lx = 8.
+Real_Lx = Lx+ 2*pad
+Ly = 8.
+Real_Ly = Ly + 2*pad
 
 comm.comm.barrier()
 if comm.ensemble_comm.rank == 0 and comm.comm.rank == 0:
     print("Reading mesh", flush=True)
 
-mesh = fire.Mesh(
-            "meshes/ico_scaling_mesh.msh",
-            distribution_parameters={
-                "overlap_type": (fire.DistributedMeshOverlapType.NONE, 0)
-            },
-        )
+mesh = fire.ExtrudedMesh(fire.RectangleMesh(90,90, Real_Lz, Real_Lx, quadrilateral = True, comm=comm.comm), 90, Real_Ly )
+
 comm.comm.barrier()
 
 
 t1 = time.time()
-element = fire.FiniteElement(model["opts"]["method"], mesh.ufl_cell(), degree=model["opts"]["degree"], variant="KMV")
+element = fire.FiniteElement(model["opts"]["method"], mesh.ufl_cell(), degree=model["opts"]["degree"], variant="spectral")
 V = fire.FunctionSpace(mesh, element)
 vp = fire.Constant(1.429)
 
-sources = spyro.Sources(model, mesh, V, comm)
-receivers = spyro.Receivers(model, mesh, V, comm)
+# sources = spyro.Sources(model, mesh, V, comm)
+# receivers = spyro.Receivers(model, mesh, V, comm)
 wavelet = spyro.full_ricker_wavelet(
     dt=model["timeaxis"]["dt"],
     tf=model["timeaxis"]["tf"],
@@ -163,7 +167,7 @@ if comm.ensemble_comm.rank == 0 and comm.comm.rank == 0:
 
 t2 = time.time()
 p, p_r = spyro.solvers.forward(
-    model, mesh, comm, vp, sources, wavelet, receivers, output=False
+    model, mesh, comm, vp, wavelet, output=False
 )
 t3 = time.time()
 

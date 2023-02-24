@@ -1,0 +1,27 @@
+Traceback (most recent call last):
+  File "ico_benchmark_forward_3d.py", line 169, in <module>
+    p, p_r = spyro.solvers.forward(
+  File "/home/olender/cse23/spyroSEM/spyro/solvers/forward.py", line 104, in forward
+    qr_x, qr_s, _ = quadrature.quadrature_rules(V)
+  File "/home/olender/cse23/spyroSEM/spyro/domains/quadrature.py", line 68, in quadrature_rules
+    raise ValueError("Unrecognized quadrature scheme")
+ValueError: Unrecognized quadrature scheme
+application called MPI_Abort(MPI_COMM_WORLD, 1) - process 0
+Traceback (most recent call last):
+  File "ico_benchmark_forward_3d.py", line 169, in <module>
+    p, p_r = spyro.solvers.forward(
+  File "/home/olender/cse23/spyroSEM/spyro/solvers/forward.py", line 104, in forward
+    qr_x, qr_s, _ = quadrature.quadrature_rules(V)
+  File "/home/olender/cse23/spyroSEM/spyro/domains/quadrature.py", line 68, in quadrature_rules
+    raise ValueError("Unrecognized quadrature scheme")
+ValueError: Unrecognized quadrature scheme
+application called MPI_Abort(MPI_COMM_WORLD, 1) - process 14
+Traceback (most recent call last):
+  File "ico_benchmark_forward_3d.py", line 169, in <module>
+    p, p_r = spyro.solvers.forward(
+  File "/home/olender/cse23/spyroSEM/spyro/solvers/forward.py", line 104, in forward
+    qr_x, qr_s, _ = quadrature.quadrature_rules(V)
+  File "/home/olender/cse23/spyroSEM/spyro/domains/quadrature.py", line 68, in quadrature_rules
+    raise ValueError("Unrecognized quadrature scheme")
+ValueError: Unrecognized quadrature scheme
+application called MPI_Abort(MPI_COMM_WORLD, 1) - process 7

@@ -1,4 +1,0 @@
-Traceback (most recent call last):
-  File "ico_meshes.py", line 348, in <module>
-    model = create_model_for_grid_point_calculation(scale/100.)
-NameError: name 'create_model_for_grid_point_calculation' is not defined

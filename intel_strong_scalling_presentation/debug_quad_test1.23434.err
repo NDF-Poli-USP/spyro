@@ -1,0 +1,52 @@
+Traceback (most recent call last):
+  File "ico_benchmark_forward_3d.py", line 169, in <module>
+    p, p_r = spyro.solvers.forward(
+  File "/home/olender/cse23/spyroSEM/spyro/solvers/forward.py", line 104, in forward
+    qr_x, qr_s, _ = quadrature.quadrature_rules(V)
+  File "/home/olender/cse23/spyroSEM/spyro/domains/quadrature.py", line 68, in quadrature_rules
+    qr_x = gauss_lobatto_legendre_cube_rule(dimension=dimension, degree=degree)
+  File "/home/olender/cse23/spyroSEM/spyro/domains/quadrature.py", line 92, in gauss_lobatto_legendre_cube_rule
+    result = gauss_lobatto_legendre_line_rule(degree)
+  File "/home/olender/cse23/spyroSEM/spyro/domains/quadrature.py", line 82, in gauss_lobatto_legendre_line_rule
+    fiat_rule = fiat_make_rule(FIAT.ufc_simplex(1), degree + 1)
+TypeError: can only concatenate tuple (not "int") to tuple
+Traceback (most recent call last):
+  File "ico_benchmark_forward_3d.py", line 169, in <module>
+    p, p_r = spyro.solvers.forward(
+  File "/home/olender/cse23/spyroSEM/spyro/solvers/forward.py", line 104, in forward
+    qr_x, qr_s, _ = quadrature.quadrature_rules(V)
+  File "/home/olender/cse23/spyroSEM/spyro/domains/quadrature.py", line 68, in quadrature_rules
+    qr_x = gauss_lobatto_legendre_cube_rule(dimension=dimension, degree=degree)
+  File "/home/olender/cse23/spyroSEM/spyro/domains/quadrature.py", line 92, in gauss_lobatto_legendre_cube_rule
+    result = gauss_lobatto_legendre_line_rule(degree)
+  File "/home/olender/cse23/spyroSEM/spyro/domains/quadrature.py", line 82, in gauss_lobatto_legendre_line_rule
+    fiat_rule = fiat_make_rule(FIAT.ufc_simplex(1), degree + 1)
+TypeError: can only concatenate tuple (not "int") to tuple
+application called MPI_Abort(MPI_COMM_WORLD, 1) - process 0
+Traceback (most recent call last):
+  File "ico_benchmark_forward_3d.py", line 169, in <module>
+    p, p_r = spyro.solvers.forward(
+  File "/home/olender/cse23/spyroSEM/spyro/solvers/forward.py", line 104, in forward
+    qr_x, qr_s, _ = quadrature.quadrature_rules(V)
+  File "/home/olender/cse23/spyroSEM/spyro/domains/quadrature.py", line 68, in quadrature_rules
+    qr_x = gauss_lobatto_legendre_cube_rule(dimension=dimension, degree=degree)
+  File "/home/olender/cse23/spyroSEM/spyro/domains/quadrature.py", line 92, in gauss_lobatto_legendre_cube_rule
+    result = gauss_lobatto_legendre_line_rule(degree)
+  File "/home/olender/cse23/spyroSEM/spyro/domains/quadrature.py", line 82, in gauss_lobatto_legendre_line_rule
+    fiat_rule = fiat_make_rule(FIAT.ufc_simplex(1), degree + 1)
+TypeError: can only concatenate tuple (not "int") to tuple
+application called MPI_Abort(MPI_COMM_WORLD, 1) - process 3
+Traceback (most recent call last):
+  File "ico_benchmark_forward_3d.py", line 169, in <module>
+    p, p_r = spyro.solvers.forward(
+  File "/home/olender/cse23/spyroSEM/spyro/solvers/forward.py", line 104, in forward
+    qr_x, qr_s, _ = quadrature.quadrature_rules(V)
+  File "/home/olender/cse23/spyroSEM/spyro/domains/quadrature.py", line 68, in quadrature_rules
+    qr_x = gauss_lobatto_legendre_cube_rule(dimension=dimension, degree=degree)
+  File "/home/olender/cse23/spyroSEM/spyro/domains/quadrature.py", line 92, in gauss_lobatto_legendre_cube_rule
+    result = gauss_lobatto_legendre_line_rule(degree)
+  File "/home/olender/cse23/spyroSEM/spyro/domains/quadrature.py", line 82, in gauss_lobatto_legendre_line_rule
+    fiat_rule = fiat_make_rule(FIAT.ufc_simplex(1), degree + 1)
+TypeError: can only concatenate tuple (not "int") to tuple
+application called MPI_Abort(MPI_COMM_WORLD, 1) - process 10
+application called MPI_Abort(MPI_COMM_WORLD, 1) - process 11

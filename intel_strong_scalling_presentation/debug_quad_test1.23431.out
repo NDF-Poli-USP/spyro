@@ -1,0 +1,35 @@
+
+## Job started at 24-02-2023 as 08:57:33 #####################
+
+
+## Jobs activated by olender: 
+
+             JOBID PARTITION     NAME     USER ST       TIME  NODES NODELIST(REASON)
+             23300 intel_lar amd_stro  olender PD       0:00      5 (QOSMaxNodePerUserLimit)
+             23301 intel_lar amd_stro  olender PD       0:00      5 (QOSMaxNodePerUserLimit)
+             23302 intel_lar amd_stro  olender PD       0:00      5 (QOSMaxNodePerUserLimit)
+             23303 intel_lar amd_stro  olender PD       0:00      5 (QOSMaxNodePerUserLimit)
+             23304 intel_lar amd_stro  olender PD       0:00      5 (QOSMaxNodePerUserLimit)
+             23305 intel_lar amd_stro  olender PD       0:00      5 (QOSMaxNodePerUserLimit)
+             23306 intel_lar amd_stro  olender PD       0:00      5 (QOSMaxNodePerUserLimit)
+             23307 intel_lar amd_stro  olender PD       0:00      5 (QOSMaxNodePerUserLimit)
+             23308 intel_lar amd_stro  olender PD       0:00      5 (QOSMaxNodePerUserLimit)
+             23309 intel_lar amd_stro  olender PD       0:00      5 (QOSMaxNodePerUserLimit)
+             23310 intel_lar amd_stro  olender PD       0:00      5 (QOSMaxNodePerUserLimit)
+             23311 intel_lar amd_stro  olender PD       0:00      5 (QOSMaxNodePerUserLimit)
+             23312 intel_lar amd_stro  olender PD       0:00      5 (QOSMaxNodePerUserLimit)
+             23431 intel_lar intel_st  olender  R       0:00      1 n10
+             23432 amd_large intel_st  olender  R       0:07      1 n13
+
+## Execution node:         n10 
+
+
+## Number of tasks per job: 15 
+
+
+## Diretorio de submissao do job:   /home/olender/cse23/spyroSEM 
+
+Reading mesh
+Starting simulation
+
+## Job finished on 24-02-2023 as 08:57:41 ###################

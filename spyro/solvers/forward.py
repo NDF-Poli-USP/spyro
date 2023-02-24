@@ -12,16 +12,12 @@ from . import helpers
 set_log_level(ERROR)
 
 
-@ensemble_forward
 def forward(
     model,
     mesh,
     comm,
     c,
-    excitations,
     wavelet,
-    receivers,
-    source_num=0,
     output=False,
 ):
     """Secord-order in time fully-explicit scheme
@@ -65,7 +61,7 @@ def forward(
     nspool = model["timeaxis"]["nspool"]
     fspool = model["timeaxis"]["fspool"]
     PML = model["BCs"]["status"]
-    excitations.current_source = source_num
+
     if PML:
         Lx = model["mesh"]["Lx"]
         Lz = model["mesh"]["Lz"]
@@ -254,7 +250,7 @@ def forward(
         rhs_forcing.assign(0.0)
         t2_rhs0 = time.time()
         assembly_callable()
-        f = excitations.apply_source(rhs_forcing, wavelet[step])
+        f.dat.data_ro_with_halos[1000] = wavelet[step]
         B0 = B.sub(0)
         B0 += f
         t2_rhs1 = time.time()

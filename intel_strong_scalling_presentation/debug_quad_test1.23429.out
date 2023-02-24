@@ -1,0 +1,34 @@
+
+## Job started at 24-02-2023 as 08:55:16 #####################
+
+
+## Jobs activated by olender: 
+
+             JOBID PARTITION     NAME     USER ST       TIME  NODES NODELIST(REASON)
+             23299 intel_lar amd_stro  olender PD       0:00      5 (QOSMaxNodePerUserLimit)
+             23300 intel_lar amd_stro  olender PD       0:00      5 (QOSMaxNodePerUserLimit)
+             23301 intel_lar amd_stro  olender PD       0:00      5 (QOSMaxNodePerUserLimit)
+             23302 intel_lar amd_stro  olender PD       0:00      5 (QOSMaxNodePerUserLimit)
+             23303 intel_lar amd_stro  olender PD       0:00      5 (QOSMaxNodePerUserLimit)
+             23304 intel_lar amd_stro  olender PD       0:00      5 (QOSMaxNodePerUserLimit)
+             23305 intel_lar amd_stro  olender PD       0:00      5 (QOSMaxNodePerUserLimit)
+             23306 intel_lar amd_stro  olender PD       0:00      5 (QOSMaxNodePerUserLimit)
+             23307 intel_lar amd_stro  olender PD       0:00      5 (QOSMaxNodePerUserLimit)
+             23308 intel_lar amd_stro  olender PD       0:00      5 (QOSMaxNodePerUserLimit)
+             23309 intel_lar amd_stro  olender PD       0:00      5 (QOSMaxNodePerUserLimit)
+             23310 intel_lar amd_stro  olender PD       0:00      5 (QOSMaxNodePerUserLimit)
+             23311 intel_lar amd_stro  olender PD       0:00      5 (QOSMaxNodePerUserLimit)
+             23312 intel_lar amd_stro  olender PD       0:00      5 (QOSMaxNodePerUserLimit)
+             23413 amd_large intel_st  olender  R       1:43      1 n13
+             23429 intel_lar intel_st  olender  R       0:01      1 n10
+
+## Execution node:         n10 
+
+
+## Number of tasks per job: 15 
+
+
+## Diretorio de submissao do job:   /home/olender/cse23/spyroSEM 
+
+
+## Job finished on 24-02-2023 as 08:55:19 ###################
