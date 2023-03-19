@@ -48,9 +48,8 @@ def gradient_test_acoustic(model, mesh, V, comm, vp_exact, vp_guess, mask=None):
         print('######## Computing the gradient by automatic differentiation ########', flush = True)
     control = fire_adj.Control(vp_guess)
 
-    z, x = fire.SpatialCoordinate(mesh)
     h = fire.Function(V)
-    h.assign(0.01)
+    h.assign(0.05)
     Jhat = fire_adj.ReducedFunctional(Jm, control)
     conv_rate = fire_adj.taylor_test(Jhat, vp_guess, h)
     # # all errors less than 1 %

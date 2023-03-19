@@ -32,12 +32,12 @@ def model_settings(vel_model):
         }
     if vel_model == "marmousi":
         model["mesh"] = {
-            "Lz": 3.5,  # depth in km - always positive
-            "Lx": 10.,  # width in km - always positive
+            "Lz": 2.5,  # depth in km - always positive
+            "Lx": 10,  # width in km - always positive
             "Ly": 0.0,  # thickness in km - always positive
             "meshfile": "meshes/mm.msh",
-            "initmodel": "velocity_models/mm_guess.hdf5",
-            "truemodel": "velocity_models/mm.hdf5",
+            "initmodel": "velocity_models/mm_vp_guess.hdf5",
+            "truemodel": "velocity_models/mm_vp.hdf5",
         }
     if vel_model == "br_model":
         model["mesh"] = {
@@ -53,7 +53,7 @@ def model_settings(vel_model):
     model["BCs"] = {
         "status": True,  # True or False, used to turn on any type of BC
         "method": "Damping", # either PML or Damping, used to turn on any type of BC
-        "outer_bc": "none", #  none or non-reflective (outer boundary condition)
+        "outer_bc": "non-reflective", #  none or non-reflective (outer boundary condition)
         "damping_type": "polynomial",  # polynomial, hyperbolic, shifted_hyperbolic
         "exponent": 2,  # damping layer has a exponent variation
         "cmax": 1.5,  # maximum acoustic wave velocity in PML - km/s
@@ -62,6 +62,7 @@ def model_settings(vel_model):
         "lx": 1.0,  # thickness of the PML in the x-direction (km) - always positive
         "ly": 0.0,  # thickness of the PML in the y-direction (km) - always positive
     }
+
     if vel_model == "horizont_layers":
         model["acquisition"] = {
             "source_type": "Ricker",
@@ -93,7 +94,7 @@ def model_settings(vel_model):
 
     model["timeaxis"] = {
         "t0": 0.0,  # Initial time for event
-        "tf": 0.1,  # Final time for event (for test 7)
+        "tf": 0.2,  # Final time for event (for test 7)
         "dt": 0.001,  # timestep size (divided by 2 in the test 4. dt for test 3 is 0.00050)
         "amplitude": 1,  # the Ricker has an amplitude of 1.
         "nspool":  20,  # (20 for dt=0.00050) how frequently to output solution to pvds

@@ -3,7 +3,8 @@ import spyro
 import model_set
 from spyro.io import ensemble_solvers_ad
 from spyro.solvers.solver_ad import solver_ad
-
+import time as tm
+import numpy as np
 OMP_NUM_THREADS = 1
 # from spyro.solvers.forward_AD import solver_ad
 
@@ -28,7 +29,14 @@ wavelet = spyro.full_ricker_wavelet(
 if vel_model == "circle":
     vp_exact = model_set._make_vp_circle(V, mesh, vp_guess=False)  # exact  
 elif (vel_model == "marmousi" or vel_model == "br_model"):
-    vp_exact = spyro.io.interpolate(model, mesh, V)
+    # vp_exact =  spyro.io.interpolate(model, mesh, V)
+    vp_exact = spyro.io.interpolate(model["mesh"]["initmodel"], model, mesh, V)  
+    np.save("mm_exact.npy", vp_exact.dat.data[:])
+    # print("aqui")
+    # quit()
+    vp_exact = fire.Function(V)
+    vp_exact.dat.data[:] = np.load("mm_exact.npy")
+    # quit()
 else:
     AssertionError("It is necessary to define the velocity field")              
 
@@ -53,7 +61,13 @@ def run_forward_true(solver_type, tot_source_num, comm, sn=0):
                     model, comm, p_exact_recv
                     )
 
+import firedrake_adjoint as fire_adj
+
+start = tm.time()
 
 solver_type = "fwd"
 for i in range(sources.num_receivers):
     run_forward_true(solver_type, sources.num_receivers, comm, sn=i)
+
+end = tm.time()
+print(end-start)

@@ -91,20 +91,13 @@ class solver_ad():
 
         excitation.current_source = self.source_num
         
-        params = self.set_params(method)
+        params = self.set_params()
         qr_x, qr_s, _ = quadrature.quadrature_rules(V)
         if output:
             outfile = helpers.create_output_file(
                                         "forward.pvd", comm, self.source_num
                                         )
-        if dim == 2:
-            z, x = fire.SpatialCoordinate(self.mesh)
-            if bc:
-                sigma_x, sigma_z = self.set_bc_params(dim, x, z)                          
-        elif dim == 3:
-            z, x, y = fire.SpatialCoordinate(self.mesh)
-            if bc:
-                sigma_x, sigma_y, sigma_z = self.set_bc_params(dim, x, z, y)   
+           
         u = fire.TrialFunction(V)
         v = fire.TestFunction(V)  # Test Function
         f = fire.Function(V, name="f")
@@ -122,39 +115,28 @@ class solver_ad():
         FF = t_term + l_term - f_term + nf
         
         if bc:
+            set_bc = self.set_boundary_conditions
             if dim == 2:
-                FF += (
-                        (sigma_x + sigma_z)
-                        * ((u - u_nm1) / fire.Constant(2.0 * dt))
-                        * v * fire.dx(rule=qr_x)
-                    )
-
-                if model["BCs"]["method"] == 'PML':
-                    sigma = [sigma_x, sigma_z]
-                    aux_pml = aux_equations.set_pml_aux_eq
-                    solver0, pp_v, X0 = aux_pml(V, sigma, u_n, v, FF, c, dt,
-                                                qr_x, dim, params
-                                                )                      
+                if self.model["BCs"]["method"] == 'PML':
+                    solver0, pp_v, X0 = set_bc(
+                                                FF, dim, c, u_n, u_nm1,
+                                                v, u, qr_s, qr_x
+                                                )
                     pp_n, pp_nm1, pp_np1 = pp_v[0], pp_v[1], pp_v[2]
-
+                else:
+                    set_bc(FF, dim, c, u_n, u_nm1, v, u, qr_s, qr_x)
             if dim == 3:
-                FF += (
-                        (sigma_x + sigma_y + sigma_z)
-                        * ((u - u_n) / fire.Constant(dt))
-                        * v * fire.dx(rule=qr_x)
-                      )
-
-                if model["BCs"]["method"] == 'PML':
-                    sigma = [sigma_x, sigma_z, sigma_y]
-                    solver0, solver1, pp_v, psi_v, X1 = aux_pml(
-                                                                V, sigma, u_n,
-                                                                v, FF, c, dt,
-                                                                qr_x, dim,
-                                                                params
+                if self.model["BCs"]["method"] == 'PML':
+                    solver0, solver1, pp_v, psi_v, X1 = set_bc(
+                                                                FF, dim, c, u_n,
+                                                                u_nm1, v, u, qr_s,
+                                                                qr_x
                                                                 )
-                    pp_n, pp_nm1, pp_np1 = pp_v[0], pp_v[1], pp_v[2] 
-                    psi_n, psi_nm1, psi_np1 = psi_v[0], psi_v[1], psi_v[2] 
-          
+                    pp_n, pp_nm1, pp_np1 = pp_v[0], pp_v[1], pp_v[2]
+                    psi_n, psi_nm1, psi_np1 = psi_v[0], psi_v[1], psi_v[2]
+                else:
+                    set_bc(FF, dim, c, u_n, u_nm1, v, u, qr_s, qr_x)
+
         lhs_ = fire.lhs(FF)
         rhs_ = fire.rhs(FF)
 
@@ -163,7 +145,7 @@ class solver_ad():
                                     problem, solver_parameters=params
                                     )
         usol_recv = []
-        usol = [] 
+        usol = []
         misfit = []
         save_step = 0
         # usol = [fire.Function(V, name="pressure") for t in range(nt) if t % fspool == 0]
@@ -207,7 +189,7 @@ class solver_ad():
                             comm, receivers_local_index)
                     J0 += J
                     if save_misfit:
-                        misfit.apppend(misfit_t)
+                        misfit.append(misfit_t)
 
             if bc and model["BCs"]["method"] == 'PML':
                 solver0.solve()
@@ -257,8 +239,10 @@ class solver_ad():
         if self.solver == "bwd":
             out.append(dJ)
         return out
+    
+    def set_params(self):
         
-    def set_params(self, method):
+        method = self.model["opts"]["method"]
         if method == "KMV":
             params = {
                     "mat_type": "matfree", "ksp_type": 
@@ -285,7 +269,7 @@ class solver_ad():
             raise ValueError("method is not yet supported")  
         return params
         
-    def set_bc_params(self, dim, x, z, y=None):
+    def set_boundary_conditions(self, FF, dim, c, u_n, u_nm1, v, u, qr_s, qr_x):
         model = self.model
         Lx = model["mesh"]["Lx"]
         Lz = model["mesh"]["Lz"]
@@ -295,20 +279,47 @@ class solver_ad():
         x2 = Lx
         z1 = 0.0
         z2 = -Lz
-
+        params = self.set_params()
+        dt = self.model["timeaxis"]["dt"]
         if dim == 2:
-            return damping.functions(
+            z, x = fire.SpatialCoordinate(self.mesh)
+            sigma_x, sigma_z = damping.functions(
                 model, self.V, dim, x, x1, x2, lx, z, z1, z2, lz
             )
+            FF += (
+                    (sigma_x + sigma_z)
+                    * ((u - u_nm1) / fire.Constant(2.0 * dt))
+                    * v * fire.dx(rule=qr_x)
+                )
+
+            if self.model["BCs"]["method"] == 'PML':
+                sigma = [sigma_x, sigma_z]
+                aux_pml = aux_equations.set_pml_aux_eq
+                return aux_pml(
+                            self.V, sigma, u_n, v, FF, c, dt,
+                            qr_x, dim, params
+                            )   
         elif dim == 3:
             Ly = model["mesh"]["Ly"]
             ly = model["BCs"]["ly"]
             y1 = 0.0
             y2 = Ly
+            z, x, y = fire.SpatialCoordinate(self.mesh)
 
-            return damping.functions(
+            sigma_x, sigma_y, sigma_z = damping.functions(
                 model, self.V, dim, x, x1, x2, lx, z, z1, z2, lz, y, y1, y2, ly
             )
+            FF += (
+                    (sigma_x + sigma_y + sigma_z)
+                    * ((u - u_n) / fire.Constant(dt))
+                    * v * fire.dx(rule=qr_x)
+                    )
+
+            if self.model["BCs"]["method"] == 'PML':
+                sigma = [sigma_x, sigma_z, sigma_y]
+                return aux_pml(self.V, sigma, u_n, v, FF, c, dt,
+                               qr_x, dim, params
+                               )
 
     def set_grad_solver(self, c, qr_x, method):
         # Define gradient problem

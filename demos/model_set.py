@@ -8,7 +8,7 @@ def model_settings(vel_model):
     model["opts"] = {
         "method": "KMV",  # either CG or KMV
         "quadrature": "KMV",  # Equi or KMV
-        "degree": 4,  # p order
+        "degree": 1,  # p order
         "dimension": 2,  # dimension
         "regularization": False,  # regularization is on?
         "gamma": 1e-5,  # regularization parameter
@@ -32,15 +32,11 @@ def model_settings(vel_model):
         }
     if vel_model == "marmousi":
         model["mesh"] = {
-            "x0": 0.0,
-            "x1": 17.0,
-            "z0": 0.0,
-            "z1": 3.5,
-            "Lz": 4.2,  # depth in km - always positive
-            "Lx": 18.4,  # width in km - always positive
+            "Lz": 3.5,  # depth in km - always positive
+            "Lx": 10.,  # width in km - always positive
             "Ly": 0.0,  # thickness in km - always positive
             "meshfile": "meshes/mm.msh",
-            #     "initmodel": initmodel + ".hdf5",
+            "initmodel": "velocity_models/mm_guess.hdf5",
             "truemodel": "velocity_models/mm.hdf5",
         }
     if vel_model == "br_model":
@@ -56,8 +52,8 @@ def model_settings(vel_model):
     # Specify a 250-m Absorbing Boundary Layer (ABL) on the three sides of the domain to damp outgoing waves.
     model["BCs"] = {
         "status": False,  # True or False, used to turn on any type of BC
-        "method": "Damping", # either PML or Damping, used to turn on any type of BC
-        "outer_bc": "non-reflective", #  none or non-reflective (outer boundary condition)
+        "method": "Damping",  # either PML or Damping, used to turn on any type of BC
+        "outer_bc": "non-reflective",  # none or non-reflective (outer boundary condition)
         "damping_type": "polynomial",  # polynomial, hyperbolic, shifted_hyperbolic
         "exponent": 2,  # damping layer has a exponent variation
         "cmax": 1.5,  # maximum acoustic wave velocity in PML - km/s
@@ -69,7 +65,7 @@ def model_settings(vel_model):
     if vel_model == "horizont_layers" or vel_model == "circle":
         model["acquisition"] = {
             "source_type": "Ricker",
-            "frequency": 7.0, 
+            "frequency": 7.0,
             "delay": 1.0,  # FIXME check this
             "num_sources": 1,  # FIXME not used (remove it, and update an example script)
             # "source_pos": [(-0.11, 0.5)],
@@ -79,15 +75,15 @@ def model_settings(vel_model):
         }
     if vel_model == "marmousi" or vel_model == "br_model":
         model["acquisition"] = {
-            "source_type": "Ricker",
-            "frequency": 7.0,
-            "delay": 1.0,
-            "num_sources": 1,
-            "num_sources": 25,
-            "source_pos": spyro.create_transect((-0.125, 0.2), (-0.125, 16.), 25),
-            "amplitude": 1.0,
-            "num_receivers": 500,
-            "receiver_locations": spyro.create_transect((-0.225, 1.0), (-0.225, 16.), 500),
+        "source_type": "Ricker",
+        "frequency": 7.0,
+        "delay": 1.0,
+        # "num_sources": 1,
+        "num_sources": 1,
+        "source_pos": [(-0.125, 5.0)],
+        "amplitude": 1.0,
+        "num_receivers": 400,
+        "receiver_locations": spyro.create_transect((-0.225, 0.2), (-0.225, 9.8), 400),
         }
     
     model["aut_dif"] = {
@@ -97,9 +93,9 @@ def model_settings(vel_model):
     model["timeaxis"] = {
         "t0": 0.0,  # Initial time for event
         "tf": 1.0,  # Final time for event (for test 7)
-        "dt": 0.001,  # timestep size (divided by 2 in the test 4. dt for test 3 is 0.00050)
+        "dt": 0.0005,  # timestep size (divided by 2 in the test 4. dt for test 3 is 0.00050)
         "amplitude": 1,  # the Ricker has an amplitude of 1.
-        "nspool":  200,  # (20 for dt=0.00050) how frequently to output solution to pvds
+        "nspool": 200,  # (20 for dt=0.00050) how frequently to output solution to pvds
         "fspool": 1,  # how frequently to save solution to RAM
     }
     return model

@@ -55,14 +55,23 @@ class Sources(spyro.receivers.Receivers.Receivers):
         super().build_maps()
         (self.cell_tabulations_zdir,self.cell_tabulations_xdir) = self.__func_build_cell_tabulations_zxydir()
 
-    def apply_source(self, rhs_forcing, value):
+    def apply_source(self, rhs_forcing, value, elastic=False):
         """Applies source in a assembled right hand side for acoustic waves simulation."""
         for source_id in range(self.num_receivers):
             if self.is_local[source_id] and source_id==self.current_source:
                 for i in range(len(self.cellNodeMaps[source_id])):
-                    rhs_forcing.dat.data_with_halos[int(self.cellNodeMaps[source_id][i])] = (
-                        value * self.cell_tabulations[source_id][i]
-                    )
+                    if elastic:
+                        rhs_forcing.sub(0).dat.data_with_halos[int(self.cellNodeMaps[source_id][i])] = (
+                            value * self.cell_tabulations[source_id][i]
+                        )
+                        rhs_forcing.sub(1).dat.data_with_halos[int(self.cellNodeMaps[source_id][i])] = (
+                            value * self.cell_tabulations[source_id][i]
+                        )
+                    else:
+
+                        rhs_forcing.dat.data_with_halos[int(self.cellNodeMaps[source_id][i])] = (
+                            value * self.cell_tabulations[source_id][i]
+                        )
             else: 
                 for i in range(len(self.cellNodeMaps[source_id])):
                     tmp = rhs_forcing.dat.data_with_halos[0]

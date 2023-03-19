@@ -16,17 +16,18 @@ def test_gradient_AD():
     if vel_model == "marmousi":
         mesh, V = spyro.io.read_mesh(model, comm)
  
-        # vp_exact = spyro.io.interpolate(model, mesh, V)          
-        # vp_guess = spyro.io.interpolate(
-        #                     model, mesh, V, guess=True)    
+        vp_exact = spyro.io.interpolate(model["mesh"]["truemodel"], model, mesh, V)    
+        vp_guess = spyro.io.interpolate(model["mesh"]["initmodel"], model, mesh, V, guess=True)    
         
-        vp_exact = fire.Function(V)
-        vp_guess = fire.Function(V)
-        vp_exact.dat.data[:] = np.load("mm_exact.npy")
-        vp_guess.dat.data[:] = np.load("mm_guess.npy")
+        # vp_exact = fire.Function(V)
+        # vp_guess = fire.Function(V)
+        # vp_exact.dat.data[:] = np.load("mm_exact.npy")
+        # vp_guess.dat.data[:] = np.load("mm_guess.npy")
 
-        # fire.File("exact_vel.pvd").write(vp_exact)
-        # fire.File("guess_vel.pvd").write(vp_guess)
+        fire.File("exact_vel.pvd").write(vp_exact)
+        fire.File("guess_vel.pvd").write(vp_guess)
+        # quit()
+        
 
         # with fire.CheckpointFile("mm.h5", 'w') as afile:
         #     afile.save_function(vp_exact)  # optional
@@ -46,8 +47,8 @@ def test_gradient_AD():
         fire.File("exact_guess.pvd").write(vp_guess)
       
     grad_ad.gradient_test_acoustic(
-                                model, mesh, 
-                                V, comm, vp_exact, 
+                                model, mesh,
+                                V, comm, vp_exact,
                                 vp_guess
                                 )
 
