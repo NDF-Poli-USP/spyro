@@ -5,6 +5,7 @@ import firedrake as fire
 import numpy as np
 
 from spyro.io.model_parameters import Model_parameters
+from get_paper_velocity_model import get_velocity_model
 
 dictionary = {}
 dictionary["options"] = {
@@ -72,17 +73,13 @@ Wave_no_habc = spyro.AcousticWave(model_parameters=Model)
 
 x, y = Wave_no_habc.get_spatial_coordinates()
 
-Wave_no_habc.set_initial_velocity_model(conditional=conditional(x < -0.5, 1.5, 3.0))
+c = get_velocity_model(Wave_no_habc.function_space)
+Wave_no_habc.set_initial_velocity_model( velocity_model_function = c)
 Wave_no_habc._get_initial_velocity_model()
 Wave_no_habc.c = Wave_no_habc.initial_velocity_model
 
-habc = HABC(Wave_no_habc, h_min=h_min)
+habc = HABC(Wave_no_habc)
 mesh = habc.get_mesh_with_pad()
-
-V = FunctionSpace(mesh,"CG",1)
-u = Function(V)
-File("mesh.pvd").write(u)
-
 
 Model_new = Model_parameters(dictionary=dictionary)
 Model_new.set_mesh(user_mesh=mesh)
