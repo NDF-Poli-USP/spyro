@@ -40,6 +40,7 @@ def generate_mesh2D(wave_object, pad=0.0, comm = None):
     """
 
     import SeismicMesh # ADD TRY EXCEPT
+    import meshio
 
     parprint('Entering mesh generation')
 

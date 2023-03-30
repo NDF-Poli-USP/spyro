@@ -23,7 +23,7 @@ class HABC:
         Parameters
         ----------
         Wave_object: `dictionary`
-            Contains simulation parameters and options.
+            Contains simulation parameters and options without a pad.
 
         histPcrit: numpy array
             Pressure value history in critical point
