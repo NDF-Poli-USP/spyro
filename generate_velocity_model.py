@@ -1,9 +1,10 @@
 import firedrake as fire
 from firedrake import And, conditional, File
+from copy import deepcopy
 import numpy as np
 
 def apply_box(mesh, c, x1, y1, x2, y2, value):
-    x, y = fire.SpatialCoordinate(mesh)
+    y, x = fire.SpatialCoordinate(mesh)
     box = fire.conditional(And(And(x1<=x, x<=x2), And(y1<=y, y<=y2)), value, c)
     print("a")
     c.interpolate(box)
@@ -19,10 +20,11 @@ def apply_box(mesh, c, x1, y1, x2, y2, value):
 #     return c
 
 def apply_slope(mesh, c, x1, y1, x3, y3, value):
-    x, y = fire.SpatialCoordinate(mesh)
+    y, x = fire.SpatialCoordinate(mesh)
     slope = (y3-y1)/(x3-x1)
     print(slope)
-    slope = fire.conditional(And( (y-y1)/(x-x1) <= slope, x >= x1 ), value, c)
+    slope = fire.conditional(And( (y-y1)/(x-x1) <= slope, y <= y1 ), value, c)
+    # slope = fire.conditional((y-y1)/(x-x1) <= slope, value, c)
     c.interpolate(slope)
     return c
 
@@ -58,18 +60,26 @@ velmat.append([0.85, 0.80, 0.90, 0.95, 3.6])
 velmat.append([0.90, 0.65, 1.00, 1.00, 3.6])
 velmat.append([0.00, 0.00, 0.00, 0.00, 1.5])  
 
+vel_rotated = []
+for vel in velmat:
+    new_vel = deepcopy(vel)
+    new_vel[0] = -vel[1]
+    new_vel[1] = vel[0]
+    vel_rotated.append(new_vel)
+
 Lx = 4.8
-Ly = 2.4
-mesh = fire.RectangleMesh(480,240,Lx,Ly, diagonal="crossed")
+Lz = 2.4
+mesh = fire.RectangleMesh(240,480,Lz,Lx, diagonal="crossed")
+mesh.coordinates.dat.data[:, 0] *= -1.0
 V = fire.FunctionSpace(mesh,"CG", 1)
 c = fire.Function(V)
 
 c.dat.data[:] = 1.5
 
-c = apply_slope(mesh, c, 0.4*Lx, 0.3*Ly, 0.75*Lx, 0.65*Ly, 3.3)
-c = apply_vs_from_list(velmat, mesh, Lx, Ly, c)
+c = apply_slope(mesh, c, 0.4*Lx, -0.3*Lz, 0.75*Lx, -0.65*Lz, 3.3)
+c = apply_vs_from_list(velmat, mesh, Lz, Lx, c)
 
-File("testingvelmodel.pvd").write(c)
+File("testing2.pvd").write(c)
 
 # c = apply_slope(mesh, c, x1, y1, x3, y3, value)
 

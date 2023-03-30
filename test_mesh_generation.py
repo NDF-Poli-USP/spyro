@@ -66,6 +66,8 @@ dictionary["visualization"] = {
 }
 
 Model = Model_parameters(dictionary=dictionary)
+mesh = spyro.tools.generate_mesh2D(Model, "test_mesh1", output_pvd=True)
+
 
 
 

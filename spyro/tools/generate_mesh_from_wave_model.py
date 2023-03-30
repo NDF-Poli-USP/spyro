@@ -1,10 +1,10 @@
 from firedrake.petsc import PETSc
 parprint = PETSc.Sys.Print
 
-def get_domain(wave_object, units):
+def get_domain(wave_model, units):
     import SeismicMesh
-    Lz = wave_object.length_z
-    Lx = wave_object.length_x
+    Lz = wave_model.length_z
+    Lx = wave_model.length_x
 
     if units == 'km-s':
         Lz *= 1000
@@ -34,7 +34,7 @@ def cells_per_wavelength(method, degree, dimension):
     
     return cell_per_wavelength_dictionary.get(key)
 
-def generate_mesh2D(wave_object, pad=0.0, comm = None):
+def generate_mesh2D(wave_model, mesh_filename, output_pvd = False, comm = None):
     """ Generates a wave form adapted mesh using parameters from
     the wave object
     """
@@ -45,17 +45,15 @@ def generate_mesh2D(wave_object, pad=0.0, comm = None):
     parprint('Entering mesh generation')
 
     C = cells_per_wavelength(
-        wave_object.method,
-        wave_object.degree,
-        wave_object.dimension
+        wave_model.method,
+        wave_model.degree,
+        wave_model.dimension
     )
-
-    domain_pad = pad
 
     fname = "vel_z6.25m_x12.5m_exact.segy"
 
     # Bounding box describing domain extents (corner coordinates)
-    domain, bbox = get_domain(wave_object)
+    domain, bbox = get_domain(wave_model)
 
     # Desired minimum mesh size in domain
     frequency = model["acquisition"]['frequency']
