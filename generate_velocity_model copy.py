@@ -60,11 +60,11 @@ velmat.append([0.00, 0.00, 0.00, 0.00, 1.5])
 
 Lx = 4.8
 Ly = 2.4
-mesh = fire.RectangleMesh(480,240,Lx,Ly, diagonal="crossed")
+mesh = fire.RectangleMesh(120,60,Lx,Ly, diagonal="crossed")
 V = fire.FunctionSpace(mesh,"CG", 1)
 c = fire.Function(V)
 
-c.dat.data[:] = 1.5
+c.dat.data[:] = 1500
 
 c = apply_slope(mesh, c, 0.4*Lx, 0.3*Ly, 0.75*Lx, 0.65*Ly, 3.3)
 c = apply_vs_from_list(velmat, mesh, Lx, Ly, c)
