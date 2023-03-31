@@ -6,6 +6,9 @@ from .grid_point_calculator import grid_point_to_mesh_point_converter_for_seismi
 from .grid_point_calculator import error_calc_line
 from .gradient_test_ad import gradient_test_acoustic as gradient_test_acoustic_ad
 from .generate_mesh_from_wave_model import generate_mesh2D
+from .saving_segy import saving_segy_from_function
+from .get_pvd_from_segy import interpolate_to_pvd
+
 __all__ = [
     "wave_solver",
     "generate_mesh",
@@ -17,4 +20,6 @@ __all__ = [
     'error_calc_line',
     'gradient_test_acoustic_ad',
     'generate_mesh2D',
+    'saving_segy_from_function',
+    'interpolate_to_pvd',
 ]
