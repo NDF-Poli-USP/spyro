@@ -121,6 +121,7 @@ def SolveEikonal(c, Eik, mesh, sources, annotate=False):
 
     mask = Function(Eik)
     mask = sources.make_mask(mask)
+    File('mask_test.pvd').write(mask)
 
     k = Constant(1e9)
 

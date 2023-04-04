@@ -8,6 +8,7 @@ from .gradient_test_ad import gradient_test_acoustic as gradient_test_acoustic_a
 from .generate_mesh_from_wave_model import generate_mesh2D
 from .saving_segy import saving_segy_from_function
 from .get_pvd_from_segy import interpolate_to_pvd
+from .get_pvd_from_segy import project_to_pvd
 
 __all__ = [
     "wave_solver",
@@ -22,4 +23,5 @@ __all__ = [
     'generate_mesh2D',
     'saving_segy_from_function',
     'interpolate_to_pvd',
+    "project_to_pvd",
 ]
