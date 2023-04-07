@@ -30,7 +30,7 @@ DBG       = 10  // sundry
 To turn of logging completely, use
 set_log_active(False)
 '''
-set_log_level(20)
+set_log_level(13)
 parameters['std_out_all_processes'] = True
 parameters['form_compiler']['optimize'] = True
 parameters['form_compiler']['cpp_optimize'] = True
@@ -122,24 +122,78 @@ def SolveEikonal(c, Eik, mesh, sources, annotate=False):
     mask = Function(Eik)
     mask = sources.make_mask(mask)
     File('mask_test.pvd').write(mask)
+    File('c_test.pvd').write(c)
 
     k = Constant(1e9)
+    u0 = Constant(1.)
+    # k2 = Constant(1e-3)
 
     print('Solve Pre-Eikonal')
     f = Constant(1.0)
-    F1 = inner(grad(u), grad(vy))*dx - f/c*vy*dx + mask * k * inner(u - 1e-12, vy) * dx
+    F1 = inner(grad(u), grad(vy))*dx - f/c*vy*dx + mask * k * inner(u - u0, vy) * dx
     A = fire.assemble(lhs(F1))
     
     B = fire.Function(Eik)
     B = fire.assemble(rhs(F1), tensor=B)
 
-    output = File('linear.pvd')
+    output = File('linear-a.pvd')
     output.write(yp)
 
 
     B_data = B.dat.data[:]
+    # solver_parameters = {
+    #     'snes_type': 'vinewtonrsls',
+    #     'snes_max_it': 1000,
+    #     'snes_atol': 1e-6,
+    #     'snes_rtol': 1e-6,
+    #     'snes_monitor': None,
+    #     'snes_converged_reason': None,
+    #     'pc_type': 'lu',
+    #     'ksp_type':'gmres',
+    #     'linear_ksp_monitor':None,
+    #     "ksp_monitor": None,
+    #     'snes_linesearch_type':'l2',
+    #     'snes_linesearch_damping':1.0,
+    #     'snes_linesearch_maxstep':0.5,
+    #     'snes_linesearch_order':2,
+    #     'snes_linesearch_monitor':None,
+    #     'ksp_converged_reason': None,
+    #     'ksp_monitor_true_residual': None,
+    # }
+    # solver_parameters = {
+    #     'snes_monitor': None,
+    #     'snes_converged_reason': None,
+    #     'linear_ksp_monitor':None,
+    #     'ksp_monitor': None,
+    #     'snes_linesearch_monitor':None,
+    #     'ksp_converged_reason': None,
+    #     'ksp_monitor_true_residual': None,
+    # }
+    solver_parameters = {
+    "ksp_type": "cg",
+    "pc_type": "gamg",
+    "ksp_rtol": 1e-8,
+    "ksp_max_it": 1000,
+    'ksp_converged_reason': None,
+}
+    # solver_parameters = {"ksp_max_it": 100, "ksp_type": "cg", "pc_type": "none"}
+    # solver_parameters = {"ksp_max_it": 100, 
+    #                     "pc_type": "gamg",
+    #                     "mat_type": "aij",
+    #                     }
 
-    solve(A,yp,B)
+    solve(A, yp, B, solver_parameters=solver_parameters)
+    # converged_reason = solver.snes.ksp.getConvergedReason()
+    # if converged_reason < 0:
+    #     reason_string = KSPConvergedReasons[converged_reason]
+    #     print(f"Linear solver failed to converge: {reason_string}")
+    # else:
+    #     reason_string = KSPConvergedReasons[converged_reason]
+    #     print(f"Linear solver converged successfully: {reason_string}"
+
+    # solve(k2*lhs(F1) == k2*rhs(F1), yp, solver_parameters=solver_parameters)
+    # solve(k2*F1 == 0., yp, solver_parameters=solver_parameters)
+
     output = File('linear.pvd')
     output.write(yp)
 
@@ -154,7 +208,7 @@ def SolveEikonal(c, Eik, mesh, sources, annotate=False):
     output = File('mask.pvd')
     output.write(mask)
 
-    weak_bc = mask * k * inner(yp-1e-12, vy) * dx
+    weak_bc = mask * k * inner(yp - u0, vy) * dx
     F = inner(sqrt(inner(grad(yp), grad(yp))),vy) *dx + eps*inner(grad(yp), grad(vy))*dx - f / c*vy*dx + weak_bc
     L = 0
 

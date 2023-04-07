@@ -7,6 +7,8 @@ import SeismicMesh
 import meshio
 
 
+
+
 def apply_box(mesh, c, x1, y1, x2, y2, value):
     y1 = 2.4 - y1
     y2 = 2.4 - y2
@@ -84,7 +86,7 @@ c.dat.data[:] = 1.5*1000
 c = apply_slope(mesh, c, 0.4*Lx, 0.3*Ly, 0.75*Lx, 0.65*Ly, 3.3*1000)
 c = apply_vs_from_list(velmat, mesh, Lx, Ly, c)
 
-File("just_slope_after.pvd").write(c)
+File("before_interpolation.pvd").write(c)
 
 spyro.tools.saving_segy_from_function(c, V, 'first_segy.segy')
 write_velocity_model('first_segy.segy', ofname = 'first_segy')
@@ -92,60 +94,104 @@ write_velocity_model('first_segy.segy', ofname = 'first_segy')
 # # Creating seismicmeshmesh
 
 
-# Lz = Ly
+Lz = Ly
 
-# bbox = (-Lz, 0.0, 0.0, Lx)
-# domain = SeismicMesh.Rectangle(bbox)
+bbox = (-Lz*1000, 0.0, 0.0, Lx*1000)
+domain = SeismicMesh.Rectangle(bbox)
 
-# C = 5.0
-
-
-# print('Entering mesh generation')
+C = 2.5
 
 
-# fname = 'first_segy.segy'
+print('Entering mesh generation')
 
 
-# # Desired minimum mesh size in domain
-
-# hmin = 1.4290/(C*5.0)
-
-# # Construct mesh sizing object from velocity model
-# print('a')
-# ef = SeismicMesh.get_sizing_function_from_segy(
-#     fname,
-#     bbox,
-#     hmin=hmin,
-#     wl=C,
-#     freq=5.0,
-#     grade=0.15,
-#     units='km-s',
-# )
-# print('b')
-
-# points, cells = SeismicMesh.generate_mesh(domain=domain, edge_length=ef, verbose = 2, mesh_improvement=False )
-
-# meshio.write_points_cells("meshes/test1.msh",
-#     points/1000,[("triangle", cells)],
-#     file_format="gmsh22", 
-#     binary = False
-#     )
-# meshio.write_points_cells("meshes/test1.vtk",
-#         points/1000,[("triangle", cells)],
-#         file_format="vtk"
-#         )
+fname = 'first_segy.segy'
 
 
-# mesh = fire.Mesh(
-#     "meshes/test1.msh",
-#     distribution_parameters={
-#         "overlap_type": (fire.DistributedMeshOverlapType.NONE, 0)
-#     },
-# )
+# Desired minimum mesh size in domain
+
+hmin = 1429.0/(C*5.0)
+
+# Construct mesh sizing object from velocity model
+print('a')
+ef = SeismicMesh.get_sizing_function_from_segy(
+    fname,
+    bbox,
+    hmin=hmin,
+    wl=C,
+    freq=5.0,
+    grade=0.15,
+)
+print('b')
+
+points, cells = SeismicMesh.generate_mesh(domain=domain, edge_length=ef, verbose = 2, mesh_improvement=False )
+
+meshio.write_points_cells("meshes/test1.msh",
+    points/1000,[("triangle", cells)],
+    file_format="gmsh22", 
+    binary = False
+    )
+meshio.write_points_cells("meshes/test1.vtk",
+        points/1000,[("triangle", cells)],
+        file_format="vtk"
+        )
 
 
+mesh = fire.Mesh(
+    "meshes/test1.msh",
+    distribution_parameters={
+        "overlap_type": (fire.DistributedMeshOverlapType.NONE, 0)
+    },
+)
 
-# spyro.tools.interpolate_to_pvd('first_segy.hdf5',V,'test.pvd')
+V = fire.FunctionSpace(mesh, 'KMV', 4)
+
+spyro.tools.interpolate_to_pvd(
+    'first_segy.hdf5',
+    V,
+    'after_interpolation_with_waveformed.pvd'
+    )
+
+# set_log_level(20)
+# parameters['std_out_all_processes'] = True
+# parameters['form_compiler']['optimize'] = True
+# parameters['form_compiler']['cpp_optimize'] = True
+# # parameters['form_compiler']['cpp_optimize_flags'] = '-O2'
+# parameters['form_compiler'][
+#     'cpp_optimize_flags'] = '-O3 -ffast-math -march=native'
+# parameters['form_compiler']['representation'] = 'uflacs'
+# parameters['form_compiler']['quadrature_degree'] = 5
+# parameters['ghost_mode'] = 'shared_facet'
 
 
-# c = apply_slope(mesh, c, x1, y1, x3, y3, value)
+#     mp.my_print('Solve Post-Eikonal')
+#     # Solver Parameters
+#     # https://petsc.org/release/docs/manualpages/KSP/KSPSetFromOptions.html
+#     # https://petsc.org/release/docs/manualpages/SNES/SNESSetFromOptions.html
+#     # Solver Parameters
+#     # PETScOptions.set("help")
+#     # newtonls newtontr test nrichardson ksponly vinewtonrsls vinewtonssls
+#     # ngmres qn shell ngs ncg fas ms nasm anderson aspin composite python
+#     PETScOptions.set('snes_type', 'vinewtonssls')
+#     PETScOptions.set("snes_max_it", 1000)
+#     PETScOptions.set("snes_atol", 5e-6)
+#     PETScOptions.set("snes_rtol", 1e-20)
+
+#     # Newton LS
+#     PETScOptions.set('snes_linesearch_type', 'l2')  # basic bt nleqerr cp l2
+#     PETScOptions.set("snes_linesearch_damping", 1.00)  # for basic,l2,cp
+#     PETScOptions.set("snes_linesearch_maxstep", 0.50)  # bt,l2,cp
+#     PETScOptions.set('snes_linesearch_order', 2)  # for newtonls com bt
+
+#     # damp 0.50 maxstep 1.00 64 it
+#     # damp 0.50 maxstep 0.50 64 it
+#     # damp 0.75 maxstep 1.00 32 it
+#     # damp 0.75 maxstep 1.00 32 it
+#     # damp 1.00 maxstep 1.00 08 it
+#     # damp 1.00 maxstep 0.50 08 it
+
+#     PETScOptions.set('ksp_type', 'gmres')
+#     # jacobi pbjacobi bjacobi sor lu shell mg eisenstat ilu icc cholesky asm
+#     # gasm ksp composite redundant nn mat fieldsplit galerkin exotic cp lsc
+#     # redistribute svd gamg kaczmarz hypre pfmg syspfmg tfs bddc python
+#     PETScOptions.set('pc_type', 'lu')

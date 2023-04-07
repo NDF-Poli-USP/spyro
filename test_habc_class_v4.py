@@ -69,7 +69,7 @@ Model = Model_parameters(dictionary=dictionary)
 
 Lx = 4.8
 Lz = 2.4
-user_mesh = fire.RectangleMesh(96, 192, Lz, Lx, diagonal="crossed")
+user_mesh = fire.RectangleMesh(48, 96, Lz, Lx, diagonal="crossed")
 user_mesh.coordinates.dat.data[:, 0] *= -1.0
 
 Model.set_mesh(user_mesh=user_mesh)
