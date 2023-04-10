@@ -59,6 +59,17 @@ p4_quad_cells    = np.array([400,   625,      1600,    2500,    6400])
 p4_quad_h        = np.array([50,    40,       25,      20,      12.5])
 
 
+# errors not in %
+# elastic waves, triangles - just some cases: h = 40, 20, 12,5
+p4_E_no_amr_rec1_vpDG_elastic = np.array([4.65E-02, 1.71E-02, 8.81E-03])
+p4_E_wi_amr_rec1_vpDG_elastic = np.array([2.36E-02, 6.50E-03, 4.28E-03])
+
+# elastic waves, quadrilaterals - just some cases: h = 40, 20, 12,5
+p4_quad_E_no_amr_rec1_vpDG_elastic = np.array([8.29E-02, 4.10E-02, 1.61E-02])
+p4_quad_E_wi_amr_rec1_vpDG_elastic = np.array([4.11E-02, 1.44E-02, 8.26E-03])
+
+
+
 ##########################################################################
 # E X DOFs
 # REC1, CG/VP

@@ -10,18 +10,21 @@ max_J = 2.303198e-01
 
 fwi_it = np.array([0, 20, 40, 60, 80])
 
-plt.plot(fwi_it, p2_J_no_amr/max_J, label="p=2 (no AMR)",marker="^", linestyle="-", color='tab:red')
-plt.plot(fwi_it, p2_J_amr_1/max_J, label="p=2 (AMR 1)",marker=">", linestyle="-", color='tab:green')
-plt.plot(fwi_it, p2_J_amr_2/max_J, label="p=2 (AMR 2)",marker="o", linestyle="-", color='tab:blue')
+plt.plot(fwi_it, p2_J_no_amr/max_J, label="uniform mesh",marker="^", markersize=10, linestyle="-", linewidth=2.5, color='tab:red')
+plt.plot(fwi_it, p2_J_amr_1/max_J, label="mesh adaptation 1",marker=">", markersize=10, linestyle="-", linewidth=2.5, color='tab:olive')
+plt.plot(fwi_it, p2_J_amr_2/max_J, label="mesh adaptation 2",marker="o", markersize=10, linestyle="-", linewidth=2.5, color='tab:blue')
 
-plt.ylabel("J",fontsize=14)
+plt.ylabel("J (normalized)",fontsize=14)
 plt.xlabel("# FWI ", fontsize=14)
 plt.yscale('log')
 #plt.xscale('log')
-plt.title("Acoustic FWI with AMR (Marmousi)", fontsize=16)
+plt.title("Acoustic FWI - Marmousi", fontsize=16)
 plt.legend(loc='upper right')
 plt.grid(b=True, which='major')
 plt.grid(b=True, which='minor')
+
+#plt.ylim([10**-3, 10**-2])
+#plt.xlim([38, 82])
 
 plt.show()
 
