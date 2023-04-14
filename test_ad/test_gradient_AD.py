@@ -9,7 +9,7 @@ OMP_NUM_THREADS = 1
 
 
 def test_gradient_AD():
-    vel_model = "marmousi"
+    vel_model = "circle"
     model = model_set.model_settings(vel_model)
     comm = spyro.utils.mpi_init(model)
   
