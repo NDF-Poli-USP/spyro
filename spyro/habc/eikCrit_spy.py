@@ -124,13 +124,17 @@ def SolveEikonal(c, Eik, mesh, sources, annotate=False):
     File('mask_test.pvd').write(mask)
     File('c_test.pvd').write(c)
 
-    k = Constant(1)
-    u0 = Constant(1.)
+    k = Constant(1e4)
+    u0 = Constant(0.)
     # k2 = Constant(1e-3)
 
+    print('-------------------------------------------')
     print('Solve Pre-Eikonal')
+    print('-------------------------------------------')
     f = Constant(1.0)
-    F1 = inner(grad(u), grad(vy))*dx - f/c*vy*dx + mask * k * inner(u - u0, vy) * dx
+    F1 = inner(grad(u), grad(vy))*dx - f/c*vy*dx  + mask * k * inner(u - u0, vy) * dx
+    # F1 = inner(grad(u), grad(vy))*dx - f/c*vy*dx + mask * k * inner(u - u0, vy) * dx
+
     A = fire.assemble(lhs(F1))
     
     B = fire.Function(Eik)
@@ -141,6 +145,10 @@ def SolveEikonal(c, Eik, mesh, sources, annotate=False):
 
 
     B_data = B.dat.data[:]
+   
+
+   
+    
     # solver_parameters = {
     #     'ksp_type': 'bcgs',
     #     'snes_monitor': None,
@@ -156,6 +164,7 @@ def SolveEikonal(c, Eik, mesh, sources, annotate=False):
         'ksp_monitor_true_residual': None,
         "ksp_max_it": 20,
     }
+
     # solver_parameters = {
     #     'snes_monitor': None,
     #     'snes_converged_reason': None,
@@ -181,8 +190,10 @@ def SolveEikonal(c, Eik, mesh, sources, annotate=False):
     # with open('A.pkl', 'wb') as f:
     #     pickle.dump(A, f)
 
-    solve(A, yp, B, solver_parameters=solver_parameters)
+    solve(A, yp, B)#, solver_parameters=solver_parameters)
+    print('-------------------------------------------')
     print('Solved pre-eikonal')
+    print('-------------------------------------------')
     # converged_reason = solver.snes.ksp.getConvergedReason()
     # if converged_reason < 0:
     #     reason_string = KSPConvergedReasons[converged_reason]
@@ -259,6 +270,9 @@ def SolveEikonal(c, Eik, mesh, sources, annotate=False):
 
     # solve(F == L, yp)
     solve(F == L, yp, solver_parameters=solver_parameters)#{"newton_solver": {"relative_tolerance": 1e-6}})
+    output = File('nonlinear.pvd')
+    output.write(yp)
+
 
     return yp
 

@@ -86,6 +86,8 @@ def mpi_init(model):
             )
     elif model.parallelism_type == "spatial":
         num_cores_per_shot = available_cores
+    elif model.parallelism_type == "serial":
+        return Ensemble(COMM_WORLD, 1)
     elif model.parallelism_type == "custom":
         raise ValueError("Custom parallelism not yet implemented")
 
