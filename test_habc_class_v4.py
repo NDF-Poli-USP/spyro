@@ -10,7 +10,7 @@ from generate_velocity_model_from_paper import get_paper_velocity
 dictionary = {}
 dictionary["options"] = {
     "cell_type": "T",  # simplexes such as triangles or tetrahedra (T) or quadrilaterals (Q)
-    "variant": 'equispaced',  # lumped, equispaced or DG, default is lumped "method":"MLT", # (MLT/spectral_quadrilateral/DG_triangle/DG_quadrilateral) You can either specify a cell_type+variant or a method
+    "variant": 'DG',  # lumped, equispaced or DG, default is lumped "method":"MLT", # (MLT/spectral_quadrilateral/DG_triangle/DG_quadrilateral) You can either specify a cell_type+variant or a method
     "degree": 1,  # p order
     "dimension": 2,  # dimension
 }
