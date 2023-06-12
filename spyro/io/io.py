@@ -256,25 +256,21 @@ def _check_units(c):
     return c
 
 def interpolate(Model, fname, V):
-    """Read and interpolate a seismic velocity model stored
-    in a HDF5 file onto the nodes of a finite element space.
+    """Interpolate a function from a file to a Firedrake function space
 
     Parameters
     ----------
-    model: `dictionary`
-        Model options and parameters.
-    mesh: Firedrake.mesh object
-        A mesh object read in by Firedrake.
-    V: Firedrake.FunctionSpace object
-        The space of the finite elements.
-    guess: boolean, optinal
-        Is it a guess model or a `exact` model?
+    Model: Firedrake.Model
+        The model
+    fname: str
+        The filename of the function to interpolate
+    V: Firedrake.FunctionSpace
+        The function space to interpolate to
 
     Returns
     -------
     c: Firedrake.Function
-        P-wave seismic velocity interpolated onto the nodes of the finite elements.
-
+        The interpolated function
     """
     sd = V.mesh().geometric_dimension()
     m = V.ufl_domain()
