@@ -140,14 +140,7 @@ def SolveEikonal(c, Eik, mesh, sources, annotate=False):
     B = fire.Function(Eik)
     B = fire.assemble(rhs(F1), tensor=B)
 
-    output = File('linear-a.pvd')
-    output.write(yp)
-
-
     B_data = B.dat.data[:]
-   
-
-   
     
     # solver_parameters = {
     #     'ksp_type': 'bcgs',
@@ -264,11 +257,8 @@ def SolveEikonal(c, Eik, mesh, sources, annotate=False):
                         'ksp_type': 'gmres',
                         'pc_type': 'lu',
                         'nonlinear_solver': 'snes',
-                        }
-    
+                        } 
 
-
-    # solve(F == L, yp)
     solve(F == L, yp, solver_parameters=solver_parameters)#{"newton_solver": {"relative_tolerance": 1e-6}})
     output = File('nonlinear.pvd')
     output.write(yp)

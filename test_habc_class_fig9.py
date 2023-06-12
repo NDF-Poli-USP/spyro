@@ -25,8 +25,8 @@ dictionary["parallelism"] = {
 # domain and reserve the remaining 250 m for the Perfectly Matched Layer (PML) to absorb
 # outgoing waves on three sides (eg., -z, +-x sides) of the domain.
 dictionary["mesh"] = {
-    "Lz": 1.0,  # depth in km - always positive
-    "Lx": 1.0,  # width in km - always positive
+    "Lz": 4.8,  # depth in km - always positive
+    "Lx": 2.4,  # width in km - always positive
     "Ly": 0.0,  # thickness in km - always positive
     "mesh_file": None,
     "user_mesh": None,
@@ -38,11 +38,11 @@ dictionary["mesh"] = {
 # This transect of receivers is created with the helper function `create_transect`.
 dictionary["acquisition"] = {
     "source_type": "ricker",
-    "source_locations": [(-0.5, 0.25)],#, (-0.605, 1.7), (-0.61, 1.7), (-0.615, 1.7)],#, (-0.1, 1.5), (-0.1, 2.0), (-0.1, 2.5), (-0.1, 3.0)],
+    "source_locations": [(-0.6, 4.8-1.68)],#, (-0.605, 1.7), (-0.61, 1.7), (-0.615, 1.7)],#, (-0.1, 1.5), (-0.1, 2.0), (-0.1, 2.5), (-0.1, 3.0)],
     "frequency": 5.0,
     "delay": 1.5,
     "receiver_locations": spyro.create_transect(
-        (-0.10, 0.1), (-0.10, 0.9), 20
+        (-0.10, 0.1), (-0.10, 4.0), 20
     ),
 }
 
@@ -67,13 +67,22 @@ dictionary["visualization"] = {
 
 Model = Model_parameters(dictionary=dictionary)
 
-Lx = 1
-Lz = 1
-user_mesh = fire.RectangleMesh(60, 60, Lz, Lx, diagonal="crossed")
+Lx = 4.8
+Lz = 2.4
+user_mesh = fire.RectangleMesh(48*2, 96*2, Lz, Lx, diagonal="crossed")
 user_mesh.coordinates.dat.data[:, 0] *= -1.0
-z, x = fire.SpatialCoordinate(user_mesh)
 
-cond = fire.conditional(x < 0.5, fire.conditional(x < 0.25, 6.0, 3.0), 1.5)
+# coordinates_z = user_mesh.coordinates.dat.data[:,0]
+# coordinates_x = user_mesh.coordinates.dat.data[:,1]
+# TOL = 1e-2
+# for i in range(len(coordinates_z)):
+#     if abs(coordinates_z[i] - (-0.6)) < TOL:
+#         for j in range(len(coordinates_x)):
+#             if abs(coordinates_x[j] - (1.68)) < TOL:
+#                 zdata = user_mesh.coordinates.dat.data[i,0]
+#                 xdata = user_mesh.coordinates.dat.data[j,1]
+#                 print(f"z = {zdata}")
+#                 print(f"x = {xdata}")
         
 
 Model.set_mesh(user_mesh=user_mesh)
@@ -81,12 +90,30 @@ Model.set_mesh(user_mesh=user_mesh)
 Wave_no_habc = spyro.AcousticWave(model_parameters=Model)
 
 V = Wave_no_habc.function_space
-Wave_no_habc.set_initial_velocity_model(conditional=cond)
-Wave_no_habc._get_initial_velocity_model()
+x, y = Wave_no_habc.get_spatial_coordinates()
+c = get_paper_velocity(user_mesh,V)
+fire.File("velocity_model.pvd").write(c)
 
+Wave_no_habc.set_initial_velocity_model(velocity_model_function=c)
+Wave_no_habc._get_initial_velocity_model()
 Wave_no_habc.c = Wave_no_habc.initial_velocity_model
 
 habc = HABC(Wave_no_habc)
+
+
+
+# mesh = habc.get_mesh_with_pad()
+
+# Model_new = Model_parameters(dictionary=dictionary)
+# Model_new.set_mesh(user_mesh=mesh)
+# Wave = spyro.AcousticWave(model_parameters=Model)
+
+# x, y = Wave.get_spatial_coordinates()
+# Wave.set_initial_velocity_model(conditional=conditional(x < -0.5, 1.5, 3.0))
+# Wave._get_initial_velocity_model()
+# Wave.c = Wave.initial_velocity_model
+# Wave.forward_solve()
+
 
 print("END")
 

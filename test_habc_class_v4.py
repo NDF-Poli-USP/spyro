@@ -10,7 +10,7 @@ from generate_velocity_model_from_paper import get_paper_velocity
 dictionary = {}
 dictionary["options"] = {
     "cell_type": "T",  # simplexes such as triangles or tetrahedra (T) or quadrilaterals (Q)
-    "variant": 'DG',  # lumped, equispaced or DG, default is lumped "method":"MLT", # (MLT/spectral_quadrilateral/DG_triangle/DG_quadrilateral) You can either specify a cell_type+variant or a method
+    "variant": 'lumped',  # lumped, equispaced or DG, default is lumped "method":"MLT", # (MLT/spectral_quadrilateral/DG_triangle/DG_quadrilateral) You can either specify a cell_type+variant or a method
     "degree": 1,  # p order
     "dimension": 2,  # dimension
 }
@@ -90,9 +90,9 @@ Model.set_mesh(user_mesh=user_mesh)
 Wave_no_habc = spyro.AcousticWave(model_parameters=Model)
 
 V = Wave_no_habc.function_space
-c = get_paper_velocity(user_mesh, FunctionSpace(user_mesh, 'DG', 1), output=True)
+x, y = Wave_no_habc.get_spatial_coordinates()
 
-Wave_no_habc.set_initial_velocity_model( velocity_model_function = c)
+Wave_no_habc.set_initial_velocity_model( conditional=conditional(x < -0.5, 1.5, 3.0))
 Wave_no_habc._get_initial_velocity_model()
 Wave_no_habc.c = Wave_no_habc.initial_velocity_model
 

@@ -5,7 +5,6 @@ import firedrake as fire
 import numpy as np
 
 from spyro.io.model_parameters import Model_parameters
-from generate_velocity_model_from_paper import get_paper_velocity
 
 dictionary = {}
 dictionary["options"] = {
@@ -25,11 +24,13 @@ dictionary["parallelism"] = {
 # domain and reserve the remaining 250 m for the Perfectly Matched Layer (PML) to absorb
 # outgoing waves on three sides (eg., -z, +-x sides) of the domain.
 dictionary["mesh"] = {
-    "Lz": 1.0,  # depth in km - always positive
-    "Lx": 1.0,  # width in km - always positive
+    "Lz": 3.5,  # depth in km - always positive
+    "Lx": 17.0,  # width in km - always positive
     "Ly": 0.0,  # thickness in km - always positive
-    "mesh_file": None,
-    "user_mesh": None,
+    "mesh_file": None,  # if you want to use a mesh file, specify it here
+}
+dictionary["synthetic_data"] = {    #For use only if you are using a synthetic test model or a forward only simulation -adicionar discrição para modelo direto
+    "real_velocity_file": "/media/alexandre/Extreme SSD/vp_marmousi-ii.hdf5",
 }
 
 # Create a source injection operator. Here we use a single source with a
@@ -38,11 +39,11 @@ dictionary["mesh"] = {
 # This transect of receivers is created with the helper function `create_transect`.
 dictionary["acquisition"] = {
     "source_type": "ricker",
-    "source_locations": [(-0.5, 0.25)],#, (-0.605, 1.7), (-0.61, 1.7), (-0.615, 1.7)],#, (-0.1, 1.5), (-0.1, 2.0), (-0.1, 2.5), (-0.1, 3.0)],
+    "source_locations": [(-0.6, 4.8-1.68)],#, (-0.605, 1.7), (-0.61, 1.7), (-0.615, 1.7)],#, (-0.1, 1.5), (-0.1, 2.0), (-0.1, 2.5), (-0.1, 3.0)],
     "frequency": 5.0,
     "delay": 1.5,
     "receiver_locations": spyro.create_transect(
-        (-0.10, 0.1), (-0.10, 0.9), 20
+        (-0.10, 0.1), (-0.10, 4.0), 20
     ),
 }
 
@@ -54,7 +55,7 @@ dictionary["time_axis"] = {
     "amplitude": 1,  # the Ricker has an amplitude of 1.
     "output_frequency": 100,  # how frequently to output solution to pvds
     "gradient_sampling_frequency": 100,  # how frequently to save solution to RAM
-}
+}#342 9.2x742km 12,5m
 
 dictionary["visualization"] = {
     "forward_output" : True,
@@ -67,26 +68,10 @@ dictionary["visualization"] = {
 
 Model = Model_parameters(dictionary=dictionary)
 
-Lx = 1
-Lz = 1
-user_mesh = fire.RectangleMesh(60, 60, Lz, Lx, diagonal="crossed")
-user_mesh.coordinates.dat.data[:, 0] *= -1.0
-z, x = fire.SpatialCoordinate(user_mesh)
-
-cond = fire.conditional(x < 0.5, fire.conditional(x < 0.25, 6.0, 3.0), 1.5)
-        
-
-Model.set_mesh(user_mesh=user_mesh)
-
 Wave_no_habc = spyro.AcousticWave(model_parameters=Model)
 
-V = Wave_no_habc.function_space
-Wave_no_habc.set_initial_velocity_model(conditional=cond)
-Wave_no_habc._get_initial_velocity_model()
-
-Wave_no_habc.c = Wave_no_habc.initial_velocity_model
-
 habc = HABC(Wave_no_habc)
+
 
 print("END")
 

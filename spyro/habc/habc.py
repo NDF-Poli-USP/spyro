@@ -2,11 +2,13 @@ import numpy as np
 from . import eikCrit_spy
 from . import lenCam_spy
 import firedrake as fire
+from firedrake import dot, grad, dx
 from copy import deepcopy
 from ..receivers import Receivers
 import spyro
 import pickle
-
+import finat
+import scipy
 # Work from Ruben Andres Salas,
 # Andre Luis Ferreira da Silva,
 # Luis Fernando Nogueira de Sá, Emilio Carlos Nelli Silva, Hybrid absorbing scheme based on hyperel-
@@ -17,7 +19,7 @@ import pickle
 class HABC:
     """ class HABC that determines absorbing layer size and parameters to be used
     """
-    def __init__(self, Wave_object, h_min=None, it_fwi=0):
+    def __init__(self, Wave_object, h_min=None, it_fwi=0, skip_eikonal=False):
         """Initializes class and gets a wave object as an input.
 
         Parameters
@@ -69,11 +71,45 @@ class HABC:
         self.initial_frequency = Wave_object.frequency
         print("Assuming initial mesh without pad")
         self._store_data_without_HABC()
+        # if not skip_eikonal:
         self.eikonal()
+        # elif:
+        #     self._fundamental_frequency()
 
         self.habc_size()
         # self.reset_mesh()
         # self.get_mesh_with_pad()
+
+    def _fundamental_frequency(self):
+        V = self.Wave.function_space
+        c = self.Wave.c
+        quad_rule = finat.quadrature.make_quadrature(
+            V.finat_element.cell, V.ufl_element().degree(), "KMV"
+        )
+        dxlump = fire.dx(rule=quad_rule)
+        u, v = fire.TrialFunction(V), fire.TestFunction(V)
+        A = fire.assemble(u * v * dxlump)
+        ai, aj, av = A.petscmat.getValuesCSR()
+        Asp = scipy.sparse.csr_matrix((av, aj, ai))
+        av_inv = []
+        for value in av:
+            if value == 0:
+                av_inv.append(0.0)
+            else:
+                av_inv.append(1 / value)
+        Asp_inv = scipy.sparse.csr_matrix((av_inv, aj, ai))
+        K = fire.assemble(c * c * dot(grad(u), grad(v)) * dxlump)
+        ai, aj, av = K.petscmat.getValuesCSR()
+        Ksp = scipy.sparse.csr_matrix((av, aj, ai))
+
+        # operator
+        Lsp = Asp_inv.multiply(Ksp)
+        min_eigval = np.amin(np.abs(Lsp.diagonal()))
+
+        self.fundamental_freq = np.sqrt(min_eigval) / (2 * np.pi)
+
+        return None
+
 
     def _store_data_without_HABC(self):
         self.mesh_without_habc = self.Wave.mesh
