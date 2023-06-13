@@ -182,8 +182,8 @@ def SolveEikonal(c, Eik, mesh, sources, annotate=False):
     # import pickle
     # with open('A.pkl', 'wb') as f:
     #     pickle.dump(A, f)
-
-    solve(A, yp, B)#, solver_parameters=solver_parameters)
+    # bcs = [DirichletBC(yp, Constant(0.0), 1)]
+    solve(A, yp, B)#, bcs = bcs)#, solver_parameters=solver_parameters)
     print('-------------------------------------------')
     print('Solved pre-eikonal')
     print('-------------------------------------------')

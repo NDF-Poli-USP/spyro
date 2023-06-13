@@ -10,7 +10,7 @@ dictionary = {}
 dictionary["options"] = {
     "cell_type": "T",  # simplexes such as triangles or tetrahedra (T) or quadrilaterals (Q)
     "variant": 'lumped',  # lumped, equispaced or DG, default is lumped "method":"MLT", # (MLT/spectral_quadrilateral/DG_triangle/DG_quadrilateral) You can either specify a cell_type+variant or a method
-    "degree": 1,  # p order
+    "degree": 4,  # p order
     "dimension": 2,  # dimension
 }
 
@@ -27,10 +27,10 @@ dictionary["mesh"] = {
     "Lz": 3.5,  # depth in km - always positive
     "Lx": 17.0,  # width in km - always positive
     "Ly": 0.0,  # thickness in km - always positive
-    "mesh_file": None,  # if you want to use a mesh file, specify it here
+    "mesh_file": "meshes/marmousi_f5.0_degree4_pad0.0.msh",  # if you want to use a mesh file, specify it here
 }
 dictionary["synthetic_data"] = {    #For use only if you are using a synthetic test model or a forward only simulation -adicionar discrição para modelo direto
-    "real_velocity_file": "/media/alexandre/Extreme SSD/vp_marmousi-ii.hdf5",
+    "real_velocity_file": "/media/alexandre/Extreme SSD/common_files/velocity_models/vp_marmousi-ii.hdf5",
 }
 
 # Create a source injection operator. Here we use a single source with a
@@ -51,7 +51,7 @@ dictionary["acquisition"] = {
 dictionary["time_axis"] = {
     "initial_time": 0.0,  # Initial time for event
     "final_time": 2.00,  # Final time for event
-    "dt": 0.001,  # timestep size
+    "dt": 0.0003,  # timestep size
     "amplitude": 1,  # the Ricker has an amplitude of 1.
     "output_frequency": 100,  # how frequently to output solution to pvds
     "gradient_sampling_frequency": 100,  # how frequently to save solution to RAM
@@ -70,6 +70,10 @@ Model = Model_parameters(dictionary=dictionary)
 
 Wave_no_habc = spyro.AcousticWave(model_parameters=Model)
 
+# Wave_no_habc.forward_solve()
+
+Wave_no_habc._get_initial_velocity_model()
+Wave_no_habc.c = Wave_no_habc.initial_velocity_model
 habc = HABC(Wave_no_habc)
 
 
