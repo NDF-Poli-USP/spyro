@@ -24,18 +24,18 @@ import matplotlib.pyplot as plt
 # ]
 
 analytical_files =[
-    # "analytical_solution_dt_5e-05.npy",
-    # "analytical_solution_dt_0.0001.npy",
+    "analytical_solution_dt_5e-05.npy",
+    "analytical_solution_dt_0.0001.npy",
     "analytical_solution_dt_0.0005.npy",
 ]
 numerical_files = [
-    # "rec_out5e-05.npy",
-    # "rec_out0.0001.npy",
-    "periodic_rec_out0.0005.npy",
+    "periodic_quads_rec_out5e-05.npy",
+    "periodic_quads_rec_out0.0001.npy",
+    "periodic_quads_rec_out0.0005.npy",
 ]
 dts = [
-    # 5e-05,
-    # 0.0001,
+    5e-05,
+    0.0001,
     0.0005,
 ]
 
@@ -53,7 +53,8 @@ for i in range(len(analytical_files)):
     nt = len(time)
     error_time = np.linalg.norm(p_analytical - p_numerical, 2) / np.sqrt(nt)
     errors.append(error_time)
-    print(error_time)
+    print(f"dt = {dts[i]}")
+    print(f"Error = {error_time}")
 
 plt.loglog(dts, errors)
 

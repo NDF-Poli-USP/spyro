@@ -11,7 +11,7 @@ dt = float(sys.argv[1])
 
 dictionary = {}
 dictionary["options"] = {
-    "cell_type": "T",  # simplexes such as triangles or tetrahedra (T) or quadrilaterals (Q)
+    "cell_type": "Q",  # simplexes such as triangles or tetrahedra (T) or quadrilaterals (Q)
     "variant": 'lumped',  # lumped, equispaced or DG, default is lumped "method":"MLT", # (MLT/spectral_quadrilateral/DG_triangle/DG_quadrilateral) You can either specify a cell_type+variant or a method
     "degree": 4,  # p order
     "dimension": 2,  # dimension
@@ -69,7 +69,7 @@ Model = Model_parameters(dictionary=dictionary)
 
 Lx = 3
 Lz = 3
-user_mesh = fire.RectangleMesh(160, 160, Lz, Lx, diagonal="left")
+user_mesh = fire.PeriodicRectangleMesh(160, 160, Lz, Lx, quadrilateral=True)
 user_mesh.coordinates.dat.data[:, 0] *= -1.0
 z, x = fire.SpatialCoordinate(user_mesh)
 
@@ -86,7 +86,7 @@ Wave_obj.forward_solve()
 time = np.linspace(0.0, 1.0, int(1.0/dt))
 
 rec_out = Wave_obj.receivers_output
-np.save("rec_out"+str(dt)+".npy", rec_out)
+np.save("periodic_quads_rec_out"+str(dt)+".npy", rec_out)
 
 plt.plot(time, Wave_obj.receivers_output)
 plt.show()
