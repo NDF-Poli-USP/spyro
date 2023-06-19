@@ -4,7 +4,22 @@ from firedrake import *
 def FE_method(mesh, method, degree):
     """Define the finite element method:
     Space discretization - Continuous
-    or Discontinuous Galerkin methods"""
+    or Discontinuous Galerkin methods
+
+    Parameters
+    ----------
+    mesh : obj
+        Firedrake mesh
+    method : str
+        Finite element method
+    degree : int
+        Degree of the finite element method
+    
+    Returns
+    -------
+    element : obj
+        Firedrake finite element
+    """
     cell_geometry = mesh.ufl_cell()
     if method == "CG" or method == "spectral":
         # CG - Continuous Galerkin

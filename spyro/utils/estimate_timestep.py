@@ -13,6 +13,7 @@ def estimate_timestep(mesh, V, c, estimate_max_eigenvalue=True):
     generalized eigenvalue exactly
 
     ONLY WORKS WITH KMV ELEMENTS
+
     """
 
     u, v = fd.TrialFunction(V), fd.TestFunction(V)
