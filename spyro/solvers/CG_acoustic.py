@@ -130,5 +130,6 @@ class AcousticWave(Wave):
         self.current_time = t
         usol_recv = helpers.fill(usol_recv, receivers.is_local, nt, receivers.num_receivers)
         usol_recv = utils.utils.communicate(usol_recv, comm)
+        self.receivers_output = usol_recv
 
         return usol, usol_recv

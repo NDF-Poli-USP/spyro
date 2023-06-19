@@ -3,6 +3,11 @@ from firedrake import RectangleMesh, conditional, UnitSquareMesh, Function, Func
 import firedrake as fire
 import numpy as np
 from spyro.io.model_parameters import Model_parameters
+import matplotlib.pyplot as plt
+import sys
+
+
+dt = float(sys.argv[1])
 
 dictionary = {}
 dictionary["options"] = {
@@ -22,8 +27,8 @@ dictionary["parallelism"] = {
 # domain and reserve the remaining 250 m for the Perfectly Matched Layer (PML) to absorb
 # outgoing waves on three sides (eg., -z, +-x sides) of the domain.
 dictionary["mesh"] = {
-    "Lz": 1.0,  # depth in km - always positive
-    "Lx": 1.0,  # width in km - always positive
+    "Lz": 3.0,  # depth in km - always positive
+    "Lx": 3.0,  # width in km - always positive
     "Ly": 0.0,  # thickness in km - always positive
     "mesh_file": None,
     "user_mesh": None,
@@ -35,19 +40,17 @@ dictionary["mesh"] = {
 # This transect of receivers is created with the helper function `create_transect`.
 dictionary["acquisition"] = {
     "source_type": "ricker",
-    "source_locations": [(-0.5, 0.5)],#, (-0.605, 1.7), (-0.61, 1.7), (-0.615, 1.7)],#, (-0.1, 1.5), (-0.1, 2.0), (-0.1, 2.5), (-0.1, 3.0)],
+    "source_locations": [(-1.0, 1.0)],#, (-0.605, 1.7), (-0.61, 1.7), (-0.615, 1.7)],#, (-0.1, 1.5), (-0.1, 2.0), (-0.1, 2.5), (-0.1, 3.0)],
     "frequency": 5.0,
     "delay": 1.5,
-    "receiver_locations": spyro.create_transect(
-        (-0.10, 0.1), (-0.10, 0.9), 20
-    ),
+    "receiver_locations": [(-1.0, 1.5)],
 }
 
 # Simulate for 2.0 seconds.
 dictionary["time_axis"] = {
     "initial_time": 0.0,  # Initial time for event
-    "final_time": 2.00,  # Final time for event
-    "dt": 0.0005,  # timestep size
+    "final_time": 1.00,  # Final time for event
+    "dt": dt,  # timestep size
     "amplitude": 1,  # the Ricker has an amplitude of 1.
     "output_frequency": 100,  # how frequently to output solution to pvds
     "gradient_sampling_frequency": 100,  # how frequently to save solution to RAM
@@ -64,9 +67,9 @@ dictionary["visualization"] = {
 
 Model = Model_parameters(dictionary=dictionary)
 
-Lx = 1
-Lz = 1
-user_mesh = fire.RectangleMesh(60, 60, Lz, Lx, diagonal="left")
+Lx = 3
+Lz = 3
+user_mesh = fire.RectangleMesh(160, 160, Lz, Lx, diagonal="left")
 user_mesh.coordinates.dat.data[:, 0] *= -1.0
 z, x = fire.SpatialCoordinate(user_mesh)
 
@@ -79,11 +82,14 @@ Wave_obj = spyro.AcousticWave(model_parameters=Model)
 
 Wave_obj.set_initial_velocity_model(conditional=cond)
 Wave_obj.forward_solve()
-# Wave_obj._get_initial_velocity_model()
 
-# Wave_obj.c = Wave_obj.initial_velocity_model
+time = np.linspace(0.0, 1.0, int(1.0/dt))
 
-# habc = HABC(Wave_obj)
+rec_out = Wave_obj.receivers_output
+np.save("rec_out"+str(dt)+".npy", rec_out)
+
+plt.plot(time, Wave_obj.receivers_output)
+plt.show()
 
 print("END")
 
