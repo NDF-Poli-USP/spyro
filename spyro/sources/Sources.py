@@ -84,12 +84,13 @@ def ricker_wavelet(t, freq, amp=1.0, delay=1.5):
     delay in term of multiples of the distance
     between the minimums.
     """
-    t = t - delay * math.sqrt(6.0) / (math.pi * freq)
+    # t = t - delay * math.sqrt(6.0) / (math.pi * freq)
+    t = t - delay / freq
     return (
         amp
-        * (1.0 - (1.0 / 2.0) * (2.0 * math.pi * freq) * (2.0 * math.pi * freq) * t * t)
+        * (1.0 - (2.0) * (math.pi * freq) * (math.pi * freq) * t * t)
         * math.exp(
-            (-1.0 / 4.0) * (2.0 * math.pi * freq) * (2.0 * math.pi * freq) * t * t
+            (-1.0 ) * (math.pi * freq) * (math.pi * freq) * t * t
         )
     )
 

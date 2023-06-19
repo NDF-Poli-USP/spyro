@@ -1,5 +1,5 @@
 import spyro
-from firedrake import RectangleMesh, conditional, UnitSquareMesh, Function, FunctionSpace, File
+from firedrake import PeriodicRectangleMesh, conditional, UnitSquareMesh, Function, FunctionSpace, File
 import firedrake as fire
 import numpy as np
 from spyro.io.model_parameters import Model_parameters
@@ -69,7 +69,7 @@ Model = Model_parameters(dictionary=dictionary)
 
 Lx = 3
 Lz = 3
-user_mesh = fire.RectangleMesh(160, 160, Lz, Lx, diagonal="left")
+user_mesh = fire.PeriodicRectangleMesh(160, 160, Lz, Lx, diagonal="left")
 user_mesh.coordinates.dat.data[:, 0] *= -1.0
 z, x = fire.SpatialCoordinate(user_mesh)
 
@@ -86,7 +86,7 @@ Wave_obj.forward_solve()
 time = np.linspace(0.0, 1.0, int(1.0/dt))
 
 rec_out = Wave_obj.receivers_output
-np.save("rec_out"+str(dt)+".npy", rec_out)
+np.save("periodic_rec_out"+str(dt)+".npy", rec_out)
 
 plt.plot(time, Wave_obj.receivers_output)
 plt.show()
