@@ -51,6 +51,23 @@ def minimum_grid_point_calculator(grid_point_calculator_parameters):
 
 
 def wave_solver(model, G, comm=False):
+    """Forward solver for the acoustic wave equation
+
+    Parameters
+    ----------
+    model : `dictionary`
+        Contains simulation parameters and options.
+    G : `float`
+        Grid point density
+    comm : Firedrake.ensemble_communicator, optional
+        An ensemble communicator
+
+    Returns
+    -------
+    p_recv :
+        The pressure field at the receivers
+
+    """
     minimum_mesh_velocity = model["testing_parameters"]["minimum_mesh_velocity"]
     model["mesh"]["meshfile"] = "meshes/2Dhomogeneous" + str(G) + ".msh"
     try:
@@ -114,6 +131,22 @@ def wave_solver(model, G, comm=False):
 
 
 def generate_mesh(model, G, comm):
+    """Function to generate a mesh
+
+    Parameters
+    ----------
+    model : `dictionary`
+        Contains simulation parameters and options.
+    G : `float`
+        Grid point density
+    comm : Firedrake.ensemble_communicator
+        An ensemble communicator
+
+    Returns
+    -------
+    mesh : `firedrake.mesh`
+        The mesh
+    """
     if model["opts"]["dimension"] == 2:
         mesh = generate_mesh2D(model, G, comm)
     elif model["opts"]["dimension"] == 3:
@@ -126,6 +159,29 @@ def generate_mesh(model, G, comm):
 def searching_for_minimum(
     model, p_exact, TOL, accuracy=0.1, starting_G=7.0, comm=False
 ):
+    """Function to find the minimum grid point density for a given error
+
+    Parameters
+    ----------
+    model : `dictionary`
+        Contains simulation parameters and options.
+    p_exact : `firedrake.Function`
+        The exact pressure field
+    TOL : `float`
+        The accepted error threshold
+    accuracy : `float`, optional
+        The accuracy of the search
+    starting_G : `float`, optional
+        The starting grid point density
+    comm : Firedrake.ensemble_communicator, optional
+        An ensemble communicator
+
+    Returns
+    -------
+    G : `float`
+        The minimum grid point density
+    
+    """
     error = 100.0
     G = starting_G
 
@@ -202,6 +258,25 @@ def grid_point_to_mesh_point_converter_for_seismicmesh(model, G):
 
 
 def error_calc(p_exact, p, model, comm=False):
+    """ Calculates the error between the exact and the numerical solution
+
+    Parameters
+    ----------
+    p_exact : `firedrake.Function`
+        The exact pressure field
+    p : `firedrake.Function`
+        The numerical pressure field
+    model : `dictionary`
+        Contains simulation parameters and options.
+    comm : Firedrake.ensemble_communicator, optional
+        An ensemble communicator
+
+    Returns
+    -------
+    error : `float`
+        The error between the exact and the numerical solution
+    
+    """
     # p0 doesn't necessarily have the same dt as p_exact
     # therefore we have to interpolate the missing points
     # to have them at the same length
@@ -357,6 +432,16 @@ def time_interpolation_line(p_old, p_exact, model):
 
 
 def generate_mesh2D(model, G, comm):
+    """Generates 2D mesh using seismicmesh
+    Parameters
+    ----------
+    model : dict
+        Dictionary containing the model parameters
+    G : float
+        Grid points per wavelength
+    comm : object
+        MPI communicator
+    """
     import SeismicMesh
 
     if comm.comm.rank == 0:
@@ -465,6 +550,16 @@ def generate_mesh2D(model, G, comm):
 
 
 def generate_mesh3D(model, G, comm):
+    """Generates 3D mesh using seismicmesh
+    Parameters
+    ----------
+    model : dict
+        Dictionary containing the model parameters
+    G : float
+        Grid points per wavelength
+    comm : object
+        MPI communicator
+    """
     import SeismicMesh
 
     print("Entering mesh generation", flush=True)

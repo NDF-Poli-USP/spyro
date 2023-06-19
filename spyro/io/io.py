@@ -12,7 +12,18 @@ from .. import domains
 
 
 def ensemble_save(func):
-    """Decorator for read and write shots for ensemble parallelism"""
+    """Decorator for read and write shots for ensemble parallelism
+    
+    Parameters
+    ----------
+    func : function
+        Function to be decorated
+        
+    Returns
+    -------
+    wrapper : function
+        Decorated function
+    """
 
     def wrapper(*args, **kwargs):
         acq = args[0].get("acquisition")
@@ -179,7 +190,26 @@ def ensemble_gradient_elastic_waves(func):
 
 
 def write_function_to_grid(function, V, grid_spacing):
-    """Interpolate a Firedrake function to a structured grid"""
+    """Interpolate a Firedrake function to a structured grid
+    
+    Parameters
+    ----------
+    function : firedrake.Function
+        Function to interpolate
+    V : firedrake.FunctionSpace
+        Function space of function
+    grid_spacing : float
+        Spacing of grid points in metres
+
+    Returns
+    -------
+    x : numpy.ndarray
+        x coordinates of grid points
+    y : numpy.ndarray
+        y coordinates of grid points
+    z : numpy.ndarray
+        z coordinates of grid points
+    """
     # get DoF coordinates
     m = V.ufl_domain()
     W = fire.VectorFunctionSpace(m, V.ufl_element())
@@ -206,7 +236,20 @@ def write_function_to_grid(function, V, grid_spacing):
 
 
 def create_segy(velocity, filename):
-    """Write the velocity data into a segy file named filename"""
+    """Write the velocity data into a segy file named filename
+    
+    Parameters
+    ----------
+    velocity : firedrake.Function
+        Velocity in a firedrake function
+    filename : str
+        Name of the segy file to write
+
+    Returns
+    -------
+    None
+    
+    """
     spec = segyio.spec()
 
     velocity = np.flipud(velocity.T)
@@ -223,6 +266,7 @@ def create_segy(velocity, filename):
         for tr, il in enumerate(spec.ilines):
             f.trace[tr] = velocity[:, tr]
 
+    return None
 
 @ensemble_save
 def save_shots(model, comm, array, file_name=None):

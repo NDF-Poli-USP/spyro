@@ -115,6 +115,17 @@ class Receivers:
         Is always automatticaly called when initializing the class,
         therefore should only be called again if a mesh related attribute
         changes.
+
+        Returns
+        -------
+        cellIDs: list
+            List of cell IDs for each receiver
+        cellVertices: list
+            List of vertices for each receiver
+        cellNodeMaps: list
+            List of node maps for each receiver
+        cell_tabulations: list
+            List of tabulations for each receiver
         """
 
         for rid in range(self.num_receivers):
@@ -143,10 +154,12 @@ class Receivers:
     def interpolate(self, field):
         """Interpolate the solution to the receiver coordinates for
         one simulation timestep.
+
         Parameters
         ----------
         field: array-like
             An array of the solution at a given timestep at all nodes
+        
         Returns
         -------
         solution_at_receivers: list
@@ -171,6 +184,7 @@ class Receivers:
             and timesteps
         IT: int
             Desired time step number to get residual value from
+        
         Returns
         -------
         rhs_forcing: object
@@ -288,6 +302,7 @@ class Receivers:
         receiver_id: a list of integers
             A list of receiver ids, ranging from 0 to total receivers
             minus one.
+        
         Returns
         -------
         at: Function value at given receiver
@@ -328,6 +343,7 @@ class Receivers:
         the receiver.
         The matrix has the deegres of freedom of the nodes inside
         same element as the receiver.
+        
         """
         num_recv = self.num_receivers
 
@@ -360,6 +376,7 @@ class Receivers:
         """Function that returns a list which includes a numpy matrix
         where line n has the x and y values of the nth degree of freedom,
         and a numpy matrix of the vertex coordinates.
+        
         """
         x, y, z = SpatialCoordinate(self.mesh)
         ux = Function(self.space).interpolate(x)
@@ -496,7 +513,21 @@ class Receivers:
 
 
 def choosing_element(V, degree):
-    """Chooses UFL element based on desired function space"""
+    """Chooses UFL element based on desired function space
+    and degree of interpolation.
+    
+    Parameters
+    ----------
+    V : firedrake.FunctionSpace
+        Function space to be used.
+    degree : int
+        Degree of interpolation.
+
+    Returns
+    -------
+    element : UFL element
+        UFL element to be used in the interpolation.    
+    """
     cell_geometry = V.mesh().ufl_cell()
     if cell_geometry == quadrilateral:
         T = UFCQuadrilateral()

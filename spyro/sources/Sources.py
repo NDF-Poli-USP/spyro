@@ -83,7 +83,20 @@ class Sources(spyro.receivers.Receivers.Receivers):
         super().build_maps()
 
     def apply_source(self, rhs_forcing, value):
-        """Applies source in a assembled right hand side."""
+        """Applies source in a assembled right hand side.
+        
+        Parameters
+        ----------
+        rhs_forcing: Firedrake.Function
+            The right hand side of the equation
+        value: float
+            The value to be applied at the source location
+
+        Returns
+        -------
+        rhs_forcing: Firedrake.Function
+            The right hand side of the equation with the source applied
+        """
         for source_id in range(self.num_receivers):
             if self.is_local[source_id] and source_id == self.current_source:
                 for i in range(len(self.cellNodeMaps[source_id])):
@@ -110,6 +123,23 @@ def ricker_wavelet(t, freq, amp=1.0, delay=1.5):
     """Creates a Ricker source function with a
     delay in term of multiples of the distance
     between the minimums.
+
+    Parameters
+    ----------
+    t: float
+        Time
+    freq: float
+        Frequency of the wavelet
+    amp: float
+        Amplitude of the wavelet
+    delay: float
+        Delay in term of multiples of the distance
+        between the minimums
+
+    Returns
+    -------
+    float
+        Value of the wavelet at time t
     """
     t = t - delay * math.sqrt(6.0) / (math.pi * freq)
     return (
@@ -124,6 +154,24 @@ def ricker_wavelet(t, freq, amp=1.0, delay=1.5):
 def full_ricker_wavelet(dt, tf, freq, amp=1.0, cutoff=None):
     """Compute the Ricker wavelet optionally applying low-pass filtering
     using cutoff frequency in Hertz.
+
+    Parameters
+    ----------
+    dt: float
+        Time step
+    tf: float
+        Final time
+    freq: float
+        Frequency of the wavelet
+    amp: float
+        Amplitude of the wavelet
+    cutoff: float
+        Cutoff frequency in Hertz
+
+    Returns
+    -------
+    full_wavelet: numpy array
+        Array containing the wavelet values at each time step
     """
     nt = int(tf / dt)  # number of timesteps
     time = 0.0

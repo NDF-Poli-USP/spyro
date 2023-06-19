@@ -73,7 +73,18 @@ def quadrature_rules(V):
 # Spectral method - Gauss-Lobatto-Legendre rule
 # 1D
 def gauss_lobatto_legendre_line_rule(degree):
-    """Returns GLL quad rule for a given degree in a line"""
+    """Returns GLL quad rule for a given degree in a line
+
+    Parameters
+    ----------
+    degree : int
+        degree of the polynomial
+    
+    Returns
+    -------
+    result : obj
+        quadrature rule
+    """
     fiat_make_rule = FIAT.quadrature.GaussLobattoLegendreQuadratureLineRule
     fiat_rule = fiat_make_rule(FIAT.ufc_simplex(1), degree + 1)
     finat_ps = finat.point_set.GaussLobattoLegendrePointSet
@@ -83,7 +94,20 @@ def gauss_lobatto_legendre_line_rule(degree):
 
 # 3D
 def gauss_lobatto_legendre_cube_rule(dimension, degree):
-    """Returns GLL quad rule for a given degree in a multidimensional space"""
+    """Returns GLL quad rule for a given degree in a multidimensional space
+
+    Parameters
+    ----------
+    dimension : int
+        dimension of the space
+    degree : int
+        degree of the polynomial
+    
+    Returns
+    -------
+    result : obj
+        quadrature rule
+    """
     make_tensor_rule = finat.quadrature.TensorProductQuadratureRule
     result = gauss_lobatto_legendre_line_rule(degree)
     for _ in range(1, dimension):
