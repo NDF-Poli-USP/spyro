@@ -1,6 +1,6 @@
 import spyro
 import pytest
-from spyro.io.model_parameters import model_parameters
+from spyro.io import Model_parameters
 from copy import deepcopy
 
 dictionary = {}
@@ -86,59 +86,59 @@ def test_method_reader():
     # Trying out different method entries and seeing if all of them work for MLT
     test1 = False
     test_dictionary["options"]["method"] = 'MLT'
-    model = model_parameters(dictionary=test_dictionary)
+    model = Model_parameters(dictionary=test_dictionary)
     if model.method == 'mass_lumped_triangle':
         test1 = True
 
     test2 = False
     test_dictionary["options"]["method"] = 'KMV'
-    model = model_parameters(dictionary=test_dictionary)
+    model = Model_parameters(dictionary=test_dictionary)
     if model.method == 'mass_lumped_triangle':
         test2 = True
 
     test3 = False
     test_dictionary["options"]["method"] = 'mass_lumped_triangle'
-    model = model_parameters(dictionary=test_dictionary)
+    model = Model_parameters(dictionary=test_dictionary)
     if model.method == 'mass_lumped_triangle':
         test3 = True
 
     # Trying out different method entries for spectral quads
     test4 = False
     test_dictionary["options"]["method"] = 'spectral_quadrilateral'
-    model = model_parameters(dictionary=test_dictionary)
+    model = Model_parameters(dictionary=test_dictionary)
     if model.method == 'spectral_quadrilateral':
         test4 = True
 
     test5 = False
     test_dictionary["options"]["method"] = 'CG'
     test_dictionary["options"]["variant"] = 'GLL'
-    model = model_parameters(dictionary=test_dictionary)
+    model = Model_parameters(dictionary=test_dictionary)
     if model.method == 'spectral_quadrilateral':
         test5 = True
     
     test6 = False
     test_dictionary["options"]["method"] = 'SEM'
-    model = model_parameters(dictionary=test_dictionary)
+    model = Model_parameters(dictionary=test_dictionary)
     if model.method == 'spectral_quadrilateral':
         test6 = True
     
     #Trying out some entries for other less used methods
     test7 = False
     test_dictionary["options"]["method"] = 'DG_triangle'
-    model = model_parameters(dictionary=test_dictionary)
+    model = Model_parameters(dictionary=test_dictionary)
     if model.method == 'DG_triangle':
         test7 = True
     
     test8 = False
     test_dictionary["options"]["method"] = 'DG_quadrilateral'
-    model = model_parameters(dictionary=test_dictionary)
+    model = Model_parameters(dictionary=test_dictionary)
     if model.method == 'DG_quadrilateral':
         test8 = True
     
     test9 = False
     test_dictionary["options"]["method"] = 'CG'
     test_dictionary["options"]["variant"] = None
-    model = model_parameters(dictionary=test_dictionary)
+    model = Model_parameters(dictionary=test_dictionary)
     if model.method == 'CG':
         test9 = True
     
@@ -158,13 +158,13 @@ def test_cell_type_reader():
 
     test1 = False
     ct_dictionary["options"]["cell_type"] = 'triangle'
-    model = model_parameters(dictionary=ct_dictionary)
+    model = Model_parameters(dictionary=ct_dictionary)
     if model.method == 'mass_lumped_triangle':
         test1 = True
     
     test2 = False
     ct_dictionary["options"]["cell_type"] = 'quadrilateral'
-    model = model_parameters(dictionary=ct_dictionary)
+    model = Model_parameters(dictionary=ct_dictionary)
     if model.method == 'spectral_quadrilateral':
         test2 = True
     
@@ -173,13 +173,13 @@ def test_cell_type_reader():
 
     test3 = False
     ct_dictionary["options"]["cell_type"] = 'triangle'
-    model = model_parameters(dictionary=ct_dictionary)
+    model = Model_parameters(dictionary=ct_dictionary)
     if model.method == 'CG_triangle':
         test3 = True
     
     test4 = False
     ct_dictionary["options"]["cell_type"] = 'quadrilateral'
-    model = model_parameters(dictionary=ct_dictionary)
+    model = Model_parameters(dictionary=ct_dictionary)
     if model.method == 'CG_quadrilateral':
         test4 = True
     
@@ -188,13 +188,13 @@ def test_cell_type_reader():
 
     test5 = False
     ct_dictionary["options"]["cell_type"] = 'triangle'
-    model = model_parameters(dictionary=ct_dictionary)
+    model = Model_parameters(dictionary=ct_dictionary)
     if model.method == 'DG_triangle':
         test5 = True
     
     test6 = False
     ct_dictionary["options"]["cell_type"] = 'quadrilateral'
-    model = model_parameters(dictionary=ct_dictionary)
+    model = Model_parameters(dictionary=ct_dictionary)
     if model.method == 'DG_quadrilateral':
         test6 = True
     
@@ -329,8 +329,8 @@ def test_dictionary_conversion():
         "nspool": 100,  # how frequently to output solution to pvds
         "fspool": 100,  # how frequently to save solution to RAM
     }
-    model_from_old = model_parameters(dictionary=old_dictionary)
-    model_from_new = model_parameters(dictionary=new_dictionary)
+    model_from_old = Model_parameters(dictionary=old_dictionary)
+    model_from_new = Model_parameters(dictionary=new_dictionary)
 
     # checking relevant information from models
     same = True
@@ -367,32 +367,32 @@ def test_degree_exception_2d():
     with pytest.raises(Exception):
         ex_dictionary["options"]["dimension"] = 2
         ex_dictionary["options"]["degree"] = 6
-        model = model_parameters(dictionary=ex_dictionary)
+        model = Model_parameters(dictionary=ex_dictionary)
 
 def test_degree_exception_3d():
     ex_dictionary = deepcopy(dictionary)
     with pytest.raises(Exception):
         ex_dictionary["options"]["dimension"] = 3
         ex_dictionary["options"]["degree"] = 5
-        model = model_parameters(dictionary=ex_dictionary)
+        model = Model_parameters(dictionary=ex_dictionary)
 
 def test_time_exception():
     ex_dictionary = deepcopy(dictionary)
     with pytest.raises(Exception):
         ex_dictionary["time_axis"]["final_time"] = -0.5
-        model = model_parameters(dictionary=ex_dictionary)
+        model = Model_parameters(dictionary=ex_dictionary)
 
 def test_source_exception():
     ex_dictionary = deepcopy(dictionary)
     with pytest.raises(Exception):
         ex_dictionary["acquistion"]["source_locations"] = [(-0.1, 0.5), (1.0,0.5)]
-        model = model_parameters(dictionary=ex_dictionary)
+        model = Model_parameters(dictionary=ex_dictionary)
 
 def test_receiver_exception():
     ex_dictionary = deepcopy(dictionary)
     with pytest.raises(Exception):
         ex_dictionary["acquistion"]["receiver_locations"] = [(-0.1, 0.5), (1.0,0.5)]
-        model = model_parameters(dictionary=ex_dictionary)
+        model = Model_parameters(dictionary=ex_dictionary)
 
 if __name__ == "__main__":
     test_method_reader()

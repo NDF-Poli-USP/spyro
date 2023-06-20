@@ -1,55 +1,13 @@
 import firedrake as fire
 from firedrake import Constant, dx, dot, grad
 
-from .wave import Wave
+from .CG_acoustic import AcousticWave
 from ..io.io import ensemble_propagator
 from . import helpers
 from .. import utils
 from ..domains.quadrature import quadrature_rules
 
-class AcousticWave(Wave):
-    def forward_solve(self):
-        self._get_initial_velocity_model()
-        self.c = self.initial_velocity_model
-        self.matrix_building()
-        self.wave_propagator()
-    
-    def matrix_building(self):
-        """ Builds solver operators. Doesn't create mass matrices if matrix_free option is on,
-        which it is by default.
-        """
-        V = self.function_space
-        quad_rule, k_rule, s_rule = quadrature_rules(V)
-
-        # typical CG FEM in 2d/3d
-        u = fire.TrialFunction(V)
-        v = fire.TestFunction(V)
-
-        u_nm1 = fire.Function(V)
-        u_n = fire.Function(V)
-        self.u_nm1 = u_nm1
-        self.u_n = u_n
-
-        self.current_time = 0.0
-        dt = self.dt
-
-        # -------------------------------------------------------
-        m1 = ((u - 2.0 * u_n + u_nm1) / Constant(dt ** 2)) * v * dx(scheme = quad_rule)
-        a = self.c * self.c * dot(grad(u_n), grad(v)) * dx(scheme = quad_rule)  # explicit
-
-        B = fire.Function(V)
-
-        form = m1 + a
-        lhs = fire.lhs(form)
-        rhs = fire.rhs(form)
-
-        A = fire.assemble(lhs, mat_type="matfree")
-        self.solver = fire.LinearSolver(A, solver_parameters=self.solver_parameters)
-
-        #lterar para como o thiago fez
-        self.rhs = rhs
-        self.B = B
-    
+class AcousticNodalPropagation(AcousticWave):
     @ensemble_propagator
     def wave_propagator(self, dt = None, final_time = None, source_num = 0):
         """ Propagates the wave forward in time.
