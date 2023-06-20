@@ -52,6 +52,9 @@ class Sources(spyro.receivers.Receivers.Receivers):
         else:
             self.quadrilateral = False
 
+        self.build_maps()
+    
+    def build_maps(self):
         super().build_maps()
 
 
@@ -99,7 +102,7 @@ def full_ricker_wavelet(dt, final_time, frequency, amplitude=1.0, cutoff=None, d
     """Compute the Ricker wavelet optionally applying low-pass filtering
     using cutoff frequency in Hertz.
     """
-    nt = int(final_time / dt)  # number of timesteps
+    nt = int(final_time / dt) + 1 # number of timesteps
     time = 0.0
     full_wavelet = np.zeros((nt,))
     for t in range(nt):

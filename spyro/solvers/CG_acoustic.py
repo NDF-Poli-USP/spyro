@@ -34,8 +34,8 @@ class AcousticWave(Wave):
         dt = self.dt
 
         # -------------------------------------------------------
-        m1 = ((u - 2.0 * u_n + u_nm1) / Constant(dt ** 2)) * v * dx(rule = quad_rule)
-        a = self.c * self.c * dot(grad(u_n), grad(v)) * dx(rule = quad_rule)  # explicit
+        m1 = ((u - 2.0 * u_n + u_nm1) / Constant(dt ** 2)) * v * dx(scheme = quad_rule)
+        a = self.c * self.c * dot(grad(u_n), grad(v)) * dx(scheme = quad_rule)  # explicit
 
         B = fire.Function(V)
 
@@ -82,7 +82,7 @@ class AcousticWave(Wave):
         if dt == None:
             dt = self.dt
         t = self.current_time
-        nt = int( (final_time-t) / dt)  # number of timesteps
+        nt = int( (final_time-t) / dt) +1# number of timesteps
 
         u_nm1 = self.u_nm1
         u_n = self.u_n
@@ -113,7 +113,7 @@ class AcousticWave(Wave):
                 usol[save_step].assign(u_np1)
                 save_step += 1
 
-            if step % self.output_frequency == 0:
+            if (step-1) % self.output_frequency == 0:
                 assert (
                     fire.norm(u_n) < 1
                 ), "Numerical instability. Try reducing dt or building the mesh differently"
@@ -128,6 +128,8 @@ class AcousticWave(Wave):
             t = step * float(dt)
 
         self.current_time = t
+        helpers.display_progress(self.comm, t)
+
         usol_recv = helpers.fill(usol_recv, receivers.is_local, nt, receivers.num_receivers)
         usol_recv = utils.utils.communicate(usol_recv, comm)
         self.receivers_output = usol_recv
