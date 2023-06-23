@@ -4,13 +4,18 @@ import matplotlib.pyplot as plt
 import sys
 
 dt = float(sys.argv[1])
+# p_numerical = np.load("test_quads_rec_out5e-05.npy")
+# dt = 0.1
+t_final = 1.0
+nnt = (np.divide(t_final, dt) + 1).astype(int)
 
-sx, sz = (1.0, 1.0)
-rx, rz = (1.0, 1.5)
+sx, sz = (1.5, 1.5)
+rx, rz = (1.5, 2.0)
 c0 = 1.5
 
 def ricker(t_initial, t_final, dt, f):
-    t = np.linspace(-t_initial, t_final-t_initial, int((t_final)/dt))
+    t = np.linspace(-t_initial, t_final-t_initial, int((t_final)/dt)+1)
+    t = t + dt
     tt = (np.pi**2) * (f**2) * (t**2)
     y = (1.0 - 2.0 * tt) * np.exp(- tt)
     # y = zero_ricker(t_initial, t_final, dt, y)
@@ -24,9 +29,8 @@ def ricker(t_initial, t_final, dt, f):
 #     return ricker
 
 
-def analytical(dt, t_final, f0):
+def analytical(nt, dt, t_final, f0):
     # Fourier constants
-    nt = int((t_final)/dt)
     nf = int(nt/2 + 1)
     fnyq = 1. / (2 * dt)
     df = 1.0 / t_final
@@ -55,24 +59,23 @@ def analytical(dt, t_final, f0):
     return np.real(U_t)/c0**2
 
 # t_initial = 0.5
-t_final = 20.0
 f0 = 5
 
 # r = ricker(1.5/f0, t_final, dt, f0)
 
 # plt.plot(x, r)
 # plt.show()
-
-p = analytical(dt, t_final, f0)
+time1 = np.linspace(0.0, 20*t_final, 20*(nnt-1)+1 )
+p = analytical(20*(nnt-1)+1, time1[1]-time1[0], 20*t_final, f0)
 print(np.shape(p))
 
-t_final = t_final/20.0
-nt = int((t_final)/dt)
-x = np.linspace(0.0, t_final, int((t_final)/dt))
+t_final = t_final
+nt = int((t_final)/dt)+1
+x = np.linspace(0.0, t_final, int((t_final)/dt)+1)
 p = p[0:nt]
 
-# plt.plot(x, p)
-# plt.show()
+plt.plot(x, p)
+plt.show()
 
 np.save("analytical_solution_dt_"+str(dt)+".npy", p)
 # U_t = analytical(t_initial, dt, t_final, f0)
