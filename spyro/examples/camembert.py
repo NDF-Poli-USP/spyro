@@ -94,6 +94,16 @@ camembert_dictionary["time_axis"] = {
 
 
 class Camembert(Example_model):
+    """Camembert model.
+    This class is a child of the Example_model class.
+    It is used to create a dictionary with the parameters of the Camembert model.
+    
+    Parameters
+    ----------
+    dictionary : dict, optional
+        Dictionary with the parameters of the model that are different from the default Camembert model. The default is None.
+    
+    """
     def __init__(self, dictionary=None, example_dictionary= camembert_dictionary, comm = None):
         super().__init__(dictionary=dictionary,default_dictionary=example_dictionary,comm=comm)
         self._camembert_mesh()

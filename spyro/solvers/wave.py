@@ -45,7 +45,7 @@ class Wave(Model_parameters):
     
     def set_mesh(self, dx=None, user_mesh=None, mesh_file=None, length_z=None, length_x=None, length_y=None, periodic=False):
         super().set_mesh(dx=dx, user_mesh=user_mesh, mesh_file=mesh_file, length_z=length_z, length_x=length_x, length_y=length_y, periodic=periodic)
-        print("DEBUG")
+
         self.mesh = self.get_mesh()
         self._build_function_space()
         if self.source_type == 'ricker':

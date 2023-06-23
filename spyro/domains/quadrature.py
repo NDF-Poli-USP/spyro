@@ -4,7 +4,22 @@ from firedrake import *
 
 
 def quadrature_rules(V):
-    """ Quadrature rule - Gauss-Lobatto-Legendre, Gauss-Legendre and Equi-spaced, KMV"""
+    """ Quadrature rule - Gauss-Lobatto-Legendre, Gauss-Legendre and Equi-spaced, KMV
+    
+    Parameters:
+    -----------
+    V: Firedrake FunctionSpace
+        Function space to be used in the quadrature rule.
+
+    Returns:
+    --------
+    qr_x: FIAT quadrature rule
+        Quadrature rule for the spatial domain.
+    qr_s: FIAT quadrature rule
+        Quadrature rule for the boundary of the spatial domain.
+    qr_k: FIAT quadrature rule
+        Quadrature rule for the spatial domain stiffness matrix.
+    """
     degree = V.ufl_element().degree()
     dimension = V.mesh().geometric_dimension()
     cell_geometry = V.mesh().ufl_cell()

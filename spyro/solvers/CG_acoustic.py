@@ -36,8 +36,8 @@ class AcousticWave(Wave):
         dt = self.dt
 
         # -------------------------------------------------------
-        m1 = ((u - 2.0 * u_n + u_nm1) / Constant(dt ** 2)) * v * dx(scheme = quad_rule)
-        a = self.c * self.c * dot(grad(u_n), grad(v)) * dx(scheme = quad_rule)  # explicit
+        m1 = (1/(self.c * self.c)) * ((u - 2.0 * u_n + u_nm1) / Constant(dt ** 2)) * v * dx(scheme = quad_rule)
+        a = dot(grad(u_n), grad(v)) * dx(scheme = quad_rule)  # explicit
 
         B = fire.Function(V)
 
@@ -61,10 +61,17 @@ class AcousticWave(Wave):
         -----------
         dt: Python 'float' (optional)
             Time step to be used explicitly. If not mentioned uses the default,
-            that was estabilished in the model_parameters.
+            that was estabilished in the wave object.
         final_time: Python 'float' (optional)
             Time which simulation ends. If not mentioned uses the default,
-            that was estabilished in the model_parameters.
+            that was estabilished in the wave object.
+
+        Returns:
+        --------
+        usol: Firedrake 'Function'
+            Pressure wavefield at the final time.
+        u_rec: numpy array
+            Pressure wavefield at the receivers across the timesteps.
         """
         excitations = self.sources
         excitations.current_source = source_num

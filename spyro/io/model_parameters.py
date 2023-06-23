@@ -247,6 +247,13 @@ class Model_parameters:
             self.gradient_output_file = "results/gradient.pvd"
 
     def get_wavelet(self):
+        """Returns a wavelet based on the source type.
+
+        Returns
+        -------
+        wavelet : numpy.ndarray
+            Wavelet values in each time step to be used in the simulation.
+        """
         if self.source_type == 'ricker':
             wavelet = spyro.full_ricker_wavelet(
                         dt=self.dt,
@@ -625,6 +632,25 @@ class Model_parameters:
     #     source_type = dictionary["acquisition"]
 
     def set_mesh(self, dx = None, user_mesh = None, mesh_file = None, length_z = None, length_x = None, length_y = None, periodic=False):
+        """
+
+        Parameters
+        ----------
+        dx : float, optional
+            The desired mesh spacing. The default is None.
+        user_mesh : spyro.Mesh, optional
+            The desired mesh. The default is None.
+        mesh_file : str, optional
+            The path to the desired mesh file. The default is None.
+        length_z : float, optional
+            The length of the domain in the z-direction. The default is None.
+        length_x : float, optional
+            The length of the domain in the x-direction. The default is None.
+        length_y : float, optional
+            The length of the domain in the y-direction. The default is None.
+        periodic : bool, optional
+            Whether the domain is periodic. The default is False.
+        """
 
         if user_mesh != None:
             self.user_mesh = user_mesh
@@ -655,17 +681,9 @@ class Model_parameters:
             if length_y != None:
                 self.length_y = length_y
         
-        print("DEBUG")
 
     def get_mesh(self):
         """Reads in an external mesh and scatters it between cores.
-
-        Parameters
-        ----------
-        model: `dictionary`
-            Model options and parameters.
-        ens_comm: Firedrake.ensemble_communicator
-            An ensemble communicator
 
         Returns
         -------
