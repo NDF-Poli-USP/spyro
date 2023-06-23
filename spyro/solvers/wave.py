@@ -12,8 +12,8 @@ from ..domains.space import FE_method
 fire.set_log_level(fire.ERROR)
 
 
-class Wave():
-    def __init__(self, model_parameters = None, comm = None, model_dictionary = None):
+class Wave(Model_parameters):
+    def __init__(self, dictionary= None, comm = None):
         """Wave object solver. Contains both the forward solver 
         and gradient calculator methods.
 
@@ -24,64 +24,35 @@ class Wave():
         model_parameters: Python object
             Contains model parameters
         """
-        if comm != None:
-            self.comm = comm
-        if model_parameters == None:
-            model_parameters = Model_parameters(dictionary=model_dictionary, comm = comm)
-        if model_parameters.comm != None:
-            self.comm = model_parameters.comm
-        if self.comm != None:
-            self.comm.comm.barrier()
-        self.model_parameters = model_parameters
+        super().__init__(dictionary=dictionary, comm=comm)
         self.initial_velocity_model = None
-        self._unpack_parameters(model_parameters)
-        self.mesh = model_parameters.get_mesh()
+
         self.function_space = None
         self.current_time = 0.0
         self.set_solver_parameters()
         
+        self.wavelet = self.get_wavelet()
+        self.mesh = self.get_mesh()
+        if self.mesh != None and self.mesh != False:
+            self._build_function_space()
+            if self.source_type == 'ricker':
+                self.sources = Sources(self)
+            else:
+                self.sources = None
+            self.receivers = Receivers(self)
+        else:
+            warnings.warn('No mesh found. Please define a mesh.')
+    
+    def set_mesh(self, dx=None, user_mesh=None, mesh_file=None, length_z=None, length_x=None, length_y=None, periodic=False):
+        super().set_mesh(dx=dx, user_mesh=user_mesh, mesh_file=mesh_file, length_z=length_z, length_x=length_x, length_y=length_y, periodic=periodic)
+        print("DEBUG")
+        self.mesh = self.get_mesh()
         self._build_function_space()
-        self.sources = Sources(self)
+        if self.source_type == 'ricker':
+            self.sources = Sources(self)
+        else:
+            self.sources = None
         self.receivers = Receivers(self)
-        self.wavelet = model_parameters.get_wavelet()
-
-    def _unpack_parameters(self, model_parameters):
-        self.comm = model_parameters.comm
-        self.method = model_parameters.method
-        self.cell_type = model_parameters.cell_type
-        self.degree = model_parameters.degree
-        self.dimension = model_parameters.dimension
-
-        self.abc_status = model_parameters.abc_status
-        self.outer_bc = model_parameters.abc_outer_bc
-        self.abc_damping_type = model_parameters.abc_damping_type
-        self.abc_exponent = model_parameters.abc_exponent
-        self.abc_cmax = model_parameters.abc_cmax
-        self.abc_R = model_parameters.abc_R
-        self.abc_lz = model_parameters.abc_lz
-        self.abc_lx = model_parameters.abc_lx
-        self.abc_ly = model_parameters.abc_ly
-
-        self.velocity_model_type = model_parameters.velocity_model_type
-        self.initial_velocity_model_file = model_parameters.initial_velocity_model_file
-
-        self.final_time = model_parameters.final_time
-        self.dt = model_parameters.dt
-
-        self.output_frequency = model_parameters.output_frequency
-        self.gradient_sampling_frequency = model_parameters.gradient_sampling_frequency
-        
-        self.automatic_adjoint = model_parameters.automatic_adjoint
-        
-        self.forward_output = model_parameters.forward_output
-        self.fwi_velocity_model_output = model_parameters.fwi_velocity_model_output
-        self.gradient_output = model_parameters.gradient_output
-
-        self.forward_output_file = model_parameters.forward_output_file
-        self.fwi_velocity_model_output_file = model_parameters.fwi_velocity_model_output_file
-        self.gradient_output_file = model_parameters.gradient_output_file
-
-        self.number_of_sources = model_parameters.number_of_sources
 
     def set_solver_parameters(self, parameters = None):
         if   parameters != None:
@@ -102,7 +73,7 @@ class Wave():
             x, y, z = fire.SpatialCoordinate(self.mesh)
             return x, y, z
     
-    def set_initial_velocity_model(self, conditional= None, velocity_model_function = None, expression = None, new_file = None):
+    def set_initial_velocity_model(self, constant=None, conditional= None, velocity_model_function = None, expression = None, new_file = None):
         """Method to define new user velocity model or file. It is optional.
 
         Parameters:
@@ -133,6 +104,11 @@ class Wave():
             self.initial_velocity_model = velocity_model_function
         elif new_file != None:
             self.initial_velocity_model_file = new_file
+        elif constant != None:
+            V = self.function_space
+            vp = fire.Function(V)
+            vp.interpolate(fire.Constant(constant))
+            self.initial_velocity_model = vp
         else:
             raise ValueError("Please specify either a conditional, expression, firedrake function or new file name (segy or hdf5).")
     
