@@ -246,7 +246,7 @@ class Model_parameters:
         else:
             self.gradient_output_file = "results/gradient.pvd"
 
-    def get_wavelet(self,source_num= False):
+    def get_wavelet(self):
         if self.source_type == 'ricker':
             wavelet = spyro.full_ricker_wavelet(
                         dt=self.dt,
@@ -255,6 +255,8 @@ class Model_parameters:
                         delay = self.delay,
                         amplitude = self.amplitude,
                         )
+        elif self.source_type == 'mms_source':
+            wavelet = None
         else:
             raise ValueError(f"Source type of {self.source_type} not yet implemented.")
         
@@ -304,6 +306,11 @@ class Model_parameters:
     def _sanitize_mesh(self):
         dictionary = self.input_dictionary
         self.mesh_file = dictionary["mesh"]["mesh_file"]
+        if "mesh_type" in dictionary["mesh"]:
+            self.mesh_type = dictionary["mesh"]["mesh_type"]
+        else:
+            self.mesh_type = None
+        
         if "user_mesh" in dictionary["mesh"]:
             if dictionary["mesh"]["user_mesh"]:
                 self.user_mesh = dictionary["mesh"]["user_mesh"]
@@ -311,7 +318,12 @@ class Model_parameters:
                 self.user_mesh = False
         else:
             self.user_mesh = False
-            self.mesh_type = 'file'
+        
+        if "firedrake_mesh" in dictionary["mesh"] or self.mesh_type == 'firedrake_mesh':
+            self.firedrake_mesh = True
+            self.mesh_type = 'firedrake_mesh'
+        else:
+            self.firedrake_mesh = False
 
         if self.mesh_file == 'not_used.msh':
             self.mesh_file = None
@@ -322,6 +334,9 @@ class Model_parameters:
             self.mesh_type = 'user_mesh'
         if self.user_mesh == None and self.mesh_file == None:
             warnings.warn("No mesh yet provided.")
+        
+        if self.mesh_file != None:
+            self.mesh_type = 'file'
         #self.__check_mesh() #Olhar objeto do Firedrake - assumir retangular sempre -só warning se z nao for negativo
 
     def _sanitize_optimization_and_velocity(self):
@@ -609,28 +624,7 @@ class Model_parameters:
     #     dictionary = self.input_dictionary
     #     source_type = dictionary["acquisition"]
 
-    def set_mesh(self, user_mesh = None, mesh_file = None, length_z = None, length_x = None, length_y = None):
-        # dictionary = self.input_dictionary
-        # self.mesh_file = dictionary["mesh"]["mesh_file"]
-        # if "user_mesh" in dictionary["mesh"]:
-        #     if dictionary["mesh"]["user_mesh"]:
-        #         self.user_mesh = dictionary["mesh"]["user_mesh"]
-        #     else:
-        #         self.user_mesh = False
-        # else:
-        #     self.user_mesh = False
-
-        # if self.mesh_file == 'not_used.msh':
-        #     self.mesh_file = None
-        # self.length_z = dictionary["mesh"]["Lz"]
-        # self.length_x = dictionary["mesh"]["Lx"]
-        # self.length_y = dictionary["mesh"]["Ly"]
-        # if "user_mesh" in dictionary["mesh"] and self.mesh_file == None:
-        #     self.mesh_type = 'user_mesh'
-        # if self.user_mesh == None and self.mesh_file == None:
-        #     warnings.warn("No mesh yet provided.")
-        # #self.__check_mesh() #Olhar objeto do Firedrake
-
+    def set_mesh(self, dx = None, user_mesh = None, mesh_file = None, length_z = None, length_x = None, length_y = None, periodic=False):
 
         if user_mesh != None:
             self.user_mesh = user_mesh
@@ -638,7 +632,20 @@ class Model_parameters:
         elif mesh_file != None:
             self.mesh_file = mesh_file
             self.mesh_type = 'file'
-        
+        elif dx != None and self.mesh_type == 'firedrake_mesh':
+            nx = int(self.length_x/dx)
+            nz = int(self.length_z/dx)
+            if self.cell_type == 'quadrilateral':
+                quadrilateral = True
+            else:
+                quadrilateral = False
+            print("DEBUG")
+            if periodic:
+                self.user_mesh = spyro.PeriodicRectangleMesh(nz, nx, self.length_z, self.length_x, quadrilateral=quadrilateral)
+            else:
+                self.user_mesh = spyro.RectangleMesh(nz, nx, self.length_z, self.length_x, quadrilateral=quadrilateral)
+            print("DEBUG")
+            
         if length_z== None or length_x==None or (length_y == None and self.dimension==2):
             warnings.warn("Mesh dimensions not completely reset from initial dictionary")
         else:
@@ -648,6 +655,8 @@ class Model_parameters:
                 self.length_x = length_x
             if length_y != None:
                 self.length_y = length_y
+        
+        print("DEBUG")
 
     def get_mesh(self):
         """Reads in an external mesh and scatters it between cores.
@@ -666,7 +675,7 @@ class Model_parameters:
         """
         if self.mesh_file != None:
             return spyro.io.read_mesh(self)
-        elif self.mesh_type == 'user_mesh':
+        elif self.mesh_type == 'user_mesh' or self.mesh_type == 'firedrake_mesh':
             return self.user_mesh
 
         

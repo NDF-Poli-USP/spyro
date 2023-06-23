@@ -41,8 +41,7 @@ class Receivers:
         self.my_ensemble = my_ensemble
         self.dimension = wave_object.dimension
         self.degree = wave_object.degree
-        parameters = wave_object.model_parameters
-        self.receiver_locations = parameters.receiver_locations
+        self.receiver_locations = wave_object.receiver_locations
         
         if self.dimension==3 and wave_object.automatic_adjoint:
             # self.column_x = model["acquisition"]["num_rec_x_columns"]
@@ -52,7 +51,7 @@ class Receivers:
             raise ValueError("Implement this later")
        
         else:
-            self.num_receivers = parameters.number_of_receivers
+            self.num_receivers = wave_object.number_of_receivers
 
         self.cellIDs = None
         self.cellVertices = None

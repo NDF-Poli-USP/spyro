@@ -35,10 +35,9 @@ class Sources(spyro.receivers.Receivers.Receivers):
         self.my_ensemble = my_ensemble
         self.dimension = wave_object.dimension
         self.degree = wave_object.degree
-        parameters = wave_object.model_parameters
 
-        self.receiver_locations = parameters.source_locations
-        self.num_receivers = parameters.number_of_sources
+        self.receiver_locations = wave_object.source_locations
+        self.num_receivers = wave_object.number_of_sources
 
         self.cellIDs = None
         self.cellVertices = None
@@ -47,7 +46,7 @@ class Sources(spyro.receivers.Receivers.Receivers):
         self.nodes_per_cell = None
         self.is_local = [0]*self.num_receivers
         self.current_source = None
-        if parameters.cell_type == 'quadrilateral':
+        if wave_object.cell_type == 'quadrilateral':
             self.quadrilateral = True
         else:
             self.quadrilateral = False

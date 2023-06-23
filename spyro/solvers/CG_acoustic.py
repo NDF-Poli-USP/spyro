@@ -20,9 +20,11 @@ class AcousticWave(Wave):
         """
         V = self.function_space
         quad_rule, k_rule, s_rule = quadrature_rules(V)
+        self.quadrature_rule = quad_rule
 
         # typical CG FEM in 2d/3d
         u = fire.TrialFunction(V)
+        self.trial_function = u
         v = fire.TestFunction(V)
 
         u_nm1 = fire.Function(V)

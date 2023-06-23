@@ -3,6 +3,7 @@ from .forward_AD import forward as forward_AD
 from .gradient import gradient
 from .wave import Wave
 from .CG_acoustic import AcousticWave
+from .mms_acoustic import AcousticWaveMMS
 
 __all__ = [
     "forward",  # forward solver adapted for discrete adjoint
@@ -11,4 +12,5 @@ __all__ = [
     "Wave",
     "AcousticWave",
     "DG_Wave",
+    "AcousticWaveMMS",
 ]
