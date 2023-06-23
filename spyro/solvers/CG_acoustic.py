@@ -26,7 +26,7 @@ class AcousticWave(Wave):
         v = fire.TestFunction(V)
 
         u_nm1 = fire.Function(V)
-        u_n = fire.Function(V)
+        u_n = fire.Function(V,  name="pressure")
         self.u_nm1 = u_nm1
         self.u_n = u_n
 
