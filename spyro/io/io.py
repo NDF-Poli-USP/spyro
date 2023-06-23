@@ -146,7 +146,26 @@ def ensemble_gradient_elastic_waves(func):
     return wrapper
 
 def write_function_to_grid(function, V, grid_spacing):
-    """Interpolate a Firedrake function to a structured grid"""
+    """Interpolate a Firedrake function to a structured grid
+    
+    Parameters
+    ----------
+    function : firedrake.Function
+        Function to interpolate
+    V : firedrake.FunctionSpace
+        Function space of function
+    grid_spacing : float
+        Spacing of grid points in metres
+
+    Returns
+    -------
+    xi : numpy.ndarray
+        x coordinates of grid points
+    yi : numpy.ndarray
+        y coordinates of grid points
+    zi : numpy.ndarray
+        Interpolated values on grid points
+    """
     # get DoF coordinates
     m = V.ufl_domain()
     W = fire.VectorFunctionSpace(m, V.ufl_element())
@@ -172,7 +191,19 @@ def write_function_to_grid(function, V, grid_spacing):
     return xi, yi, zi
 
 def create_segy(velocity, filename):
-    """Write the velocity data into a segy file named filename"""
+    """Write the velocity data into a segy file named filename
+    
+    Parameters
+    ----------
+    velocity:
+        Firedrake function representing the values of the velocity model to save
+    filename: str
+        Name of the segy file to save
+    
+    Returns
+    -------
+    None
+    """
     spec = segyio.spec()
 
     velocity = np.flipud(velocity.T)
@@ -195,10 +226,14 @@ def save_shots(model, comm, array, file_name=None):
 
     Parameters
     ----------
-    filename: str, optional by default shot_number_#.dat
-        The filename to save the data as a `pickle`
+    model:
+
+    comm:
+    
     array: `numpy.ndarray`
         The data to save a pickle (e.g., a shot)
+    filename: str, optional by default shot_number_#.dat
+        The filename to save the data as a `pickle`
 
     Returns
     -------
