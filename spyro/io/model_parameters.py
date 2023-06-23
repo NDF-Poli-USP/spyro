@@ -639,12 +639,11 @@ class Model_parameters:
                 quadrilateral = True
             else:
                 quadrilateral = False
-            print("DEBUG")
+
             if periodic:
                 self.user_mesh = spyro.PeriodicRectangleMesh(nz, nx, self.length_z, self.length_x, quadrilateral=quadrilateral)
             else:
                 self.user_mesh = spyro.RectangleMesh(nz, nx, self.length_z, self.length_x, quadrilateral=quadrilateral)
-            print("DEBUG")
             
         if length_z== None or length_x==None or (length_y == None and self.dimension==2):
             warnings.warn("Mesh dimensions not completely reset from initial dictionary")
