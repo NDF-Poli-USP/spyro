@@ -5,7 +5,7 @@ x, y, z, t, c, pi = symbols("x y z t c pi")
 
 # Define the velocity model
 c = 1 + sin(pi*x)*sin(pi*y)
-u= x*(x-1)*y*(y-1)*sin(3*t)
+u= x*(x-1)*y*(y-1)*t
 
 dudt = diff(u, t)
 du2dt2 = diff(dudt, t)
@@ -15,9 +15,9 @@ du2dx2 = diff(dudx, x)
 dudy = diff(u, y)
 du2dy2 = diff(dudy, y) 
 
-f = 1/c**2 *du2dt2 - (du2dx2 + du2dy2)
+f = (1/c**2) *du2dt2 - (du2dx2 + du2dy2)
 
 print(simplify(f))
 
-a = f-(-(9*x*y*(x - 1)*(y - 1) + 2*(x*(x - 1) + y*(y - 1))*(sin(pi*x)*sin(pi*y) + 1)**2)/(sin(pi*x)*sin(pi*y) + 1)**2 )*sin(3*t)
-print(simplify(a))
+# a = f-((sin(3*t))*(-(9*x*y*(x - 1)*(y - 1) + 2*(x*(x - 1) + y*(y - 1))*(sin(pi*x)*sin(pi*y) + 1)**2)/(sin(pi*x)*sin(pi*y) + 1)**2 ))
+# print(simplify(a))

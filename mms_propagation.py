@@ -7,7 +7,7 @@ import sys
 
 # dt = float(sys.argv[1])
 dt = 0.0001
-final_time = 1.0
+final_time = 0.5
 
 dictionary = {}
 dictionary["options"] = {
@@ -68,7 +68,7 @@ dictionary["visualization"] = {
 Wave_obj = spyro.AcousticWaveMMS(dictionary=dictionary)
 Wave_obj.set_mesh(dx=0.02)
 
-Wave_obj.set_initial_velocity_model(expression="(1+sin(pi*-z)*sin(pi*x))")
+Wave_obj.set_initial_velocity_model(constant = 1.0)
 Wave_obj.forward_solve()
 
 time = np.linspace(0.0, final_time, int(final_time/dt)+1)

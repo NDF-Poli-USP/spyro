@@ -58,7 +58,20 @@ class Sources(spyro.receivers.Receivers.Receivers):
 
 
     def apply_source(self, rhs_forcing, value):
-        """Applies source in a assembled right hand side."""
+        """Applies source in a assembled right hand side.
+        
+        Parameters
+        ----------
+        rhs_forcing: Firedrake.Function
+            The right hand side of the wave equation
+        value: float
+            The value of the source
+            
+        Returns
+        -------
+        rhs_forcing: Firedrake.Function
+            The right hand side of the wave equation with the source applied
+                """
         for source_id in range(self.num_receivers):
             if self.is_local[source_id] and source_id==self.current_source:
                 for i in range(len(self.cellNodeMaps[source_id])):
