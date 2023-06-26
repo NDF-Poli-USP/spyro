@@ -44,6 +44,7 @@ class AcousticWave(Wave):
         form = m1 + a
         lhs = fire.lhs(form)
         rhs = fire.rhs(form)
+        self.lhs = lhs
 
         A = fire.assemble(lhs, mat_type="matfree")
         self.solver = fire.LinearSolver(A, solver_parameters=self.solver_parameters)

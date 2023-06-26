@@ -3,6 +3,31 @@ import SeismicMesh as sm
 import numpy as np
 
 def RectangleMesh(Lx, Ly, nx, ny, pad = None, comm=None, quadrilateral=False):
+    """Create a rectangle mesh based on the Firedrake mesh.
+    First axis is negative, second axis is positive. If there is a pad, both axis are dislocated by the pad.
+    
+    Parameters
+    ----------
+    Lx : float
+        Length of the domain in the x direction.
+    Ly : float
+        Length of the domain in the y direction.
+    nx : int
+        Number of elements in the x direction.
+    ny : int
+        Number of elements in the y direction.
+    pad : float, optional
+        Padding to be added to the domain. The default is None.
+    comm : MPI communicator, optional
+        MPI communicator. The default is None.
+    quadrilateral : bool, optional
+        If True, the mesh is quadrilateral. The default is False.
+
+    Returns
+    -------
+    mesh : Firedrake Mesh
+        Mesh
+    """
     if pad != None:
         Lx += pad
         Ly += 2*pad
@@ -15,6 +40,32 @@ def RectangleMesh(Lx, Ly, nx, ny, pad = None, comm=None, quadrilateral=False):
     return mesh
 
 def PeriodicRectangleMesh(Lx, Ly, nx, ny, pad = None, comm=None, quadrilateral=False):
+    """Create a periodic rectangle mesh based on the Firedrake mesh.
+    First axis is negative, second axis is positive. If there is a pad, both axis are dislocated by the pad.
+
+    Parameters
+    ----------
+    Lx : float
+        Length of the domain in the x direction.
+    Ly : float
+        Length of the domain in the y direction.
+    nx : int
+        Number of elements in the x direction.
+    ny : int
+        Number of elements in the y direction.
+    pad : float, optional
+        Padding to be added to the domain. The default is None.
+    comm : MPI communicator, optional
+        MPI communicator. The default is None.
+    quadrilateral : bool, optional
+        If True, the mesh is quadrilateral. The default is False.
+
+    Returns
+    -------
+    mesh : Firedrake Mesh
+        Mesh
+    
+    """
     if pad != None:
         Lx += pad
         Ly += 2*pad

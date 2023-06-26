@@ -1,39 +1,27 @@
 import firedrake as fire
 from firedrake import Constant, dx, dot, grad, sin
+import numpy as np
 from .CG_acoustic import AcousticWave
 from ..io.io import ensemble_propagator
 from . import helpers
 from .. import utils
 
 class AcousticWaveMMS(AcousticWave):
-    def __init__(self, model_parameters=None, comm=None, model_dictionary=None, nz=100):
-        super().__init__(model_parameters, comm, model_dictionary)
-        self.mesh = self.get_mesh(n=nz)
-    
-    def get_mesh(self, n=100):
-        """ Creates a mesh for the domain.
-        """
-        quadrilateral = self.model_parameters["quadrilateral"]
-        mesh = fire.UnitSquareMesh(n, n, quadrilateral=quadrilateral)
-        mesh.coordinates.dat.data[:, 0] *= -1
-        return mesh
 
-    def forward_solve(self):
-        z,x = fire.SpatialCoordinate(self.mesh)
-        self.mesh_z = z
-        self.mesh_x = x
-        self._get_initial_velocity_model()
-        self.c = self.initial_velocity_model
-        self.matrix_building()
-        self.wave_propagator()
+    def matrix_building(self):
+        super().matrix_building()
+        lhs = self.lhs
+        bcs = fire.DirichletBC(self.function_space, 0.0, "on_boundary")
+        A = fire.assemble(lhs, bcs=bcs, mat_type="matfree")
+        self.solver = fire.LinearSolver(A, solver_parameters=self.solver_parameters)
     
     def mms_source(self, t):
-        x = self.mesh_z
+        x = -self.mesh_z
         y = self.mesh_x
-        return sin(3*t)*( -9*x*(x-1)*y*(y-1)-2*x*(x-1)-2*y*(y-1) )
+        return fire.Constant(sin(3*t))*(-(9*x*y*(x - 1)*(y - 1) + 2*(x*(x - 1) + y*(y - 1))*(sin(np.pi*x)*sin(np.pi*y) + 1)**2)/(sin(np.pi*x)*sin(np.pi*y) + 1)**2 )
     
     @ensemble_propagator
-    def wave_propagator(self, dt = None, final_time = None):
+    def wave_propagator(self, dt = None, final_time = None, source_num=None):
         """ Propagates the wave forward in time.
         Currently uses central differences.
 
