@@ -1,6 +1,7 @@
 import os
 import warnings
 import firedrake as fire
+from firedrake import sin, pi
 from SeismicMesh import write_velocity_model
 
 from ..io import Model_parameters, interpolate
@@ -53,6 +54,9 @@ class Wave(Model_parameters):
         else:
             self.sources = None
         self.receivers = Receivers(self)
+        z, x = fire.SpatialCoordinate(self.mesh)
+        self.mesh_z = z
+        self.mesh_x = x
 
     def set_solver_parameters(self, parameters = None):
         if   parameters != None:
@@ -82,7 +86,8 @@ class Wave(Model_parameters):
 
         velocity_model_functional:  (optional)
 
-        expression:  (optional)
+        expression:  str (optional)
+            If you use an expression, you can use the following variables: x, y, z, pi
 
         new_file:  (optional)
         """
@@ -96,9 +101,13 @@ class Wave(Model_parameters):
             vp.interpolate(conditional)
             self.initial_velocity_model = vp
         elif expression != None:
+            z = self.mesh_z
+            x = self.mesh_x
+            expression = eval(expression)
             V = self.function_space
             vp = fire.Function(V)
             vp.interpolate(expression)
+            fire.File('initial_velocity_model.pvd').write(vp)
             self.initial_velocity_model = vp
         elif velocity_model_function != None:
             self.initial_velocity_model = velocity_model_function
