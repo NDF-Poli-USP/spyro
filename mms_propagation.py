@@ -4,7 +4,10 @@ import numpy as np
 import matplotlib.pyplot as plt
 import sys
 
-
+def error_norm(u, u_an):
+    L2 = fire.assemble((u-u_an)**2*fire.dx) #L2 norm
+    L2_initial = fire.assemble(u_an**2*fire.dx)
+    return np.sqrt(L2/L2_initial)
 # dt = float(sys.argv[1])
 dt = 0.0001
 final_time = 0.5
@@ -76,8 +79,12 @@ time = np.linspace(0.0, final_time, int(final_time/dt)+1)
 rec_out = Wave_obj.receivers_output
 np.save("mms_quads_rec_out"+str(dt)+".npy", rec_out)
 
-plt.plot(time, Wave_obj.receivers_output)
-plt.show()
+# plt.plot(time, Wave_obj.receivers_output)
+# plt.show()
+
+u_an = Wave_obj.analytical
+
+print(f"Error norm: {error_norm(Wave_obj.u_n, u_an)}")
 
 print("END")
 
