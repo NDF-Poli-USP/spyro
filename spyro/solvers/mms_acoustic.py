@@ -1,34 +1,36 @@
 import firedrake as fire
 from firedrake import Constant, dx, dot, grad, sin
-import numpy as np
 from .CG_acoustic import AcousticWave
 from ..io.io import ensemble_propagator
 from . import helpers
 from .. import utils
 
 class AcousticWaveMMS(AcousticWave):
+    """ Class for solving the acoustic wave equation in 2D or 3D using
+    the finite element method. This class inherits from the AcousticWave class
+    and overwrites the matrix_building method to use source propagated along
+    the whole domain, which generates a known solution for comparison.
+    """
 
     def matrix_building(self):
         super().matrix_building()
         lhs = self.lhs
         bcs = fire.DirichletBC(self.function_space, 0.0, "on_boundary")
         A = fire.assemble(lhs, bcs=bcs, mat_type="matfree")
-        self.analytical = fire.Function(self.function_space)
         self.solver = fire.LinearSolver(A, solver_parameters=self.solver_parameters)
     
     def mms_source(self, t):
         x = -self.mesh_z
         y = self.mesh_x
-        return fire.Constant(sin(3*t))*(-9*x*(x - 1)*y*(y - 1) - 2*x*(x - 1) - 2*y*(y - 1))
+        return fire.Constant(sin(3*t))*( -9*x*(x-1)*y*(y-1)-2*x*(x-1)-2*y*(y-1) )
     
-    def analytical_solution(self):
-        t = self.current_time
+    def analytical_solution(self, t):
+        self.analytical = fire.Function(self.function_space)
         x = -self.mesh_z
         y = self.mesh_x
-        u_an = self.analytical
-        u_an.interpolate(x*(x-1)*y*(y-1)*sin(3*t))
-        return None
 
+        return fire.Constant(sin(3*t))*x*(x-1)*y*(y-1)
+    
     @ensemble_propagator
     def wave_propagator(self, dt = None, final_time = None, source_num=None):
         """ Propagates the wave forward in time.
@@ -78,9 +80,9 @@ class AcousticWaveMMS(AcousticWave):
 
         for step in range(nt):
             q = self.mms_source(t)
-            m1 = ((u - 2.0 * u_n + u_nm1) / Constant(dt ** 2)) * v * dx(scheme = quad_rule)
-            a = self.c * self.c * dot(grad(u_n), grad(v)) * dx(scheme = quad_rule)
-            l = self.c * self.c * q * v * dx(scheme = quad_rule)
+            m1 = 1/(self.c * self.c) * ((u - 2.0 * u_n + u_nm1) / Constant(dt ** 2)) * v * dx(scheme = quad_rule)
+            a = dot(grad(u_n), grad(v)) * dx(scheme = quad_rule)
+            l = q * v * dx(scheme = quad_rule)
 
             form = m1 + a - l
             rhs = fire.rhs(form)
@@ -113,6 +115,7 @@ class AcousticWaveMMS(AcousticWave):
 
         self.current_time = t
         helpers.display_progress(self.comm, t)
+        self.analytical_solution(t)
 
         usol_recv = helpers.fill(usol_recv, receivers.is_local, nt, receivers.num_receivers)
         usol_recv = utils.utils.communicate(usol_recv, comm)

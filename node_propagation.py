@@ -1,13 +1,13 @@
 import spyro
-from firedrake import RectangleMesh, conditional, UnitSquareMesh, Function, FunctionSpace, File
 import firedrake as fire
 import numpy as np
-from spyro.io.model_parameters import Model_parameters
 import matplotlib.pyplot as plt
 import sys
 
 
-dt = float(sys.argv[1])
+# dt = float(sys.argv[1])
+dt = 0.0005
+final_time = 1.0
 
 dictionary = {}
 dictionary["options"] = {
@@ -30,8 +30,8 @@ dictionary["mesh"] = {
     "Lz": 3.0,  # depth in km - always positive
     "Lx": 3.0,  # width in km - always positive
     "Ly": 0.0,  # thickness in km - always positive
-    "mesh_file": None,
-    "user_mesh": None,
+    "mesh_type": "firedrake_mesh",  # options: firedrake_mesh or user_mesh
+    "mesh_file": None,  # specify the mesh file
 }
 
 # Create a source injection operator. Here we use a single source with a
@@ -49,7 +49,7 @@ dictionary["acquisition"] = {
 # Simulate for 2.0 seconds.
 dictionary["time_axis"] = {
     "initial_time": 0.0,  # Initial time for event
-    "final_time": 1.00,  # Final time for event
+    "final_time": final_time,  # Final time for event
     "dt": dt,  # timestep size
     "amplitude": 1,  # the Ricker has an amplitude of 1.
     "output_frequency": 100,  # how frequently to output solution to pvds
@@ -65,28 +65,16 @@ dictionary["visualization"] = {
     "gradient_filename": None,
 }
 
-Model = Model_parameters(dictionary=dictionary)
+Wave_obj = spyro.AcousticWave(dictionary=dictionary)
+Wave_obj.set_mesh(dx=0.02, periodic=True)
 
-Lx = 3
-Lz = 3
-user_mesh = fire.PeriodicRectangleMesh(160, 160, Lz, Lx, quadrilateral=True)
-user_mesh.coordinates.dat.data[:, 0] *= -1.0
-z, x = fire.SpatialCoordinate(user_mesh)
-
-cond = fire.conditional(x < 0.5, 1.5, 1.5)
-        
-
-Model.set_mesh(user_mesh=user_mesh)
-
-Wave_obj = spyro.AcousticWave(model_parameters=Model)
-
-Wave_obj.set_initial_velocity_model(conditional=cond)
+Wave_obj.set_initial_velocity_model(constant=1.5)
 Wave_obj.forward_solve()
 
-time = np.linspace(0.0, 1.0, int(1.0/dt))
+time = np.linspace(0.0, final_time, int(final_time/dt)+1)
 
 rec_out = Wave_obj.receivers_output
-np.save("periodic_quads_rec_out"+str(dt)+".npy", rec_out)
+np.save("c2_quads_rec_out"+str(dt)+".npy", rec_out)
 
 plt.plot(time, Wave_obj.receivers_output)
 plt.show()

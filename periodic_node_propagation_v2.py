@@ -1,16 +1,13 @@
 import spyro
+from firedrake import PeriodicRectangleMesh, conditional, UnitSquareMesh, Function, FunctionSpace, File
 import firedrake as fire
 import numpy as np
 import matplotlib.pyplot as plt
 import sys
 
-def error_norm(u, u_an):
-    L2 = fire.assemble((u-u_an)**2*fire.dx) #L2 norm
-    L2_initial = fire.assemble(u_an**2*fire.dx)
-    return np.sqrt(L2/L2_initial)
+
 # dt = float(sys.argv[1])
-dt = 0.0001
-final_time = 0.5
+dt = 0.0005
 
 dictionary = {}
 dictionary["options"] = {
@@ -30,11 +27,11 @@ dictionary["parallelism"] = {
 # domain and reserve the remaining 250 m for the Perfectly Matched Layer (PML) to absorb
 # outgoing waves on three sides (eg., -z, +-x sides) of the domain.
 dictionary["mesh"] = {
-    "Lz": 1.0,  # depth in km - always positive
-    "Lx": 1.0,  # width in km - always positive
+    "Lz": 3.0,  # depth in km - always positive
+    "Lx": 3.0,  # width in km - always positive
     "Ly": 0.0,  # thickness in km - always positive
-    "mesh_type": "firedrake_mesh",  # options: firedrake_mesh or user_mesh
-    "mesh_file": None,  # specify the mesh file
+    "mesh_type": "firedrake_mesh",
+    "mesh_file": None,
 }
 
 # Create a source injection operator. Here we use a single source with a
@@ -46,13 +43,13 @@ dictionary["acquisition"] = {
     "source_locations": [(-1.0, 1.0)],#, (-0.605, 1.7), (-0.61, 1.7), (-0.615, 1.7)],#, (-0.1, 1.5), (-0.1, 2.0), (-0.1, 2.5), (-0.1, 3.0)],
     "frequency": 5.0,
     "delay": 1.5,
-    "receiver_locations": [(-0.0, 0.5)],
+    "receiver_locations": [(-1.0, 1.5)],
 }
 
 # Simulate for 2.0 seconds.
 dictionary["time_axis"] = {
     "initial_time": 0.0,  # Initial time for event
-    "final_time": final_time,  # Final time for event
+    "final_time": 1.00,  # Final time for event
     "dt": dt,  # timestep size
     "amplitude": 1,  # the Ricker has an amplitude of 1.
     "output_frequency": 100,  # how frequently to output solution to pvds
@@ -68,23 +65,20 @@ dictionary["visualization"] = {
     "gradient_filename": None,
 }
 
-Wave_obj = spyro.AcousticWaveMMS(dictionary=dictionary)
-Wave_obj.set_mesh(dx=0.02)
+Wave_obj = spyro.AcousticWave(dictionary=dictionary)
+Wave_obj.set_mesh(dx=0.02, periodic=True)
 
-Wave_obj.set_initial_velocity_model(constant = 1.0)
+Wave_obj.set_initial_velocity_model(constant=1.5)
 Wave_obj.forward_solve()
 
-time = np.linspace(0.0, final_time, int(final_time/dt)+1)
+time = np.linspace(0.0, 1.0, int(1.0/dt)+1)
 
 rec_out = Wave_obj.receivers_output
-np.save("mms_quads_rec_out"+str(dt)+".npy", rec_out)
+np.save("new_periodic_rec_out"+str(dt)+".npy", rec_out)
 
-# plt.plot(time, Wave_obj.receivers_output)
-# plt.show()
-
-u_an = Wave_obj.analytical
-
-print(f"Error norm: {error_norm(Wave_obj.u_n, u_an)}")
+plt.plot(time, Wave_obj.receivers_output)
+plt.show()
 
 print("END")
+
 
