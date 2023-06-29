@@ -161,12 +161,12 @@ def gradient(
     t = 0.0
 
     # -------------------------------------------------------
-    m1 = ((u - 2.0 * u_n + u_nm1) / Constant(dt**2)) * v * dx(rule=qr_x)
-    a = c * c * dot(grad(u_n), grad(v)) * dx(rule=qr_x)  # explicit
+    m1 = ((u - 2.0 * u_n + u_nm1) / Constant(dt**2)) * v * dx(scheme=qr_x)
+    a = c * c * dot(grad(u_n), grad(v)) * dx(scheme=qr_x)  # explicit
 
     nf = 0
     if model["BCs"]["outer_bc"] == "non-reflective":
-        nf = c * ((u_n - u_nm1) / dt) * v * ds(rule=qr_s)
+        nf = c * ((u_n - u_nm1) / dt) * v * ds(scheme=qr_s)
 
     FF = m1 + a + nf
 
@@ -175,39 +175,39 @@ def gradient(
         B = Function(W)
 
         if dim == 2:
-            pml1 = (sigma_x + sigma_z) * ((u - u_n) / dt) * v * dx(rule=qr_x)
-            pml2 = sigma_x * sigma_z * u_n * v * dx(rule=qr_x)
-            pml3 = c * c * inner(grad(v), dot(Gamma_2, pp_n)) * dx(rule=qr_x)
+            pml1 = (sigma_x + sigma_z) * ((u - u_n) / dt) * v * dx(scheme=qr_x)
+            pml2 = sigma_x * sigma_z * u_n * v * dx(scheme=qr_x)
+            pml3 = c * c * inner(grad(v), dot(Gamma_2, pp_n)) * dx(scheme=qr_x)
 
             FF += pml1 + pml2 + pml3
             # -------------------------------------------------------
-            mm1 = (dot((pp - pp_n), qq) / Constant(dt)) * dx(rule=qr_x)
-            mm2 = inner(dot(Gamma_1, pp_n), qq) * dx(rule=qr_x)
-            dd = inner(qq, grad(u_n)) * dx(rule=qr_x)
+            mm1 = (dot((pp - pp_n), qq) / Constant(dt)) * dx(scheme=qr_x)
+            mm2 = inner(dot(Gamma_1, pp_n), qq) * dx(scheme=qr_x)
+            dd = inner(qq, grad(u_n)) * dx(scheme=qr_x)
 
             FF += mm1 + mm2 + dd
         elif dim == 3:
-            pml1 = (sigma_x + sigma_y + sigma_z) * ((u - u_n) / dt) * v * dx(rule=qr_x)
-            uuu1 = (-v * psi_n) * dx(rule=qr_x)
+            pml1 = (sigma_x + sigma_y + sigma_z) * ((u - u_n) / dt) * v * dx(scheme=qr_x)
+            uuu1 = (-v * psi_n) * dx(scheme=qr_x)
             pml2 = (
                 (sigma_x * sigma_y + sigma_x * sigma_z + sigma_y * sigma_z)
                 * u_n
                 * v
-                * dx(rule=qr_x)
+                * dx(scheme=qr_x)
             )
-            dd1 = c * c * inner(grad(v), dot(Gamma_2, pp_n)) * dx(rule=qr_x)
+            dd1 = c * c * inner(grad(v), dot(Gamma_2, pp_n)) * dx(scheme=qr_x)
 
             FF += pml1 + pml2 + dd1 + uuu1
             # -------------------------------------------------------
-            mm1 = (dot((pp - pp_n), qq) / dt) * dx(rule=qr_x)
-            mm2 = inner(dot(Gamma_1, pp_n), qq) * dx(rule=qr_x)
-            pml4 = inner(qq, grad(u_n)) * dx(rule=qr_x)
+            mm1 = (dot((pp - pp_n), qq) / dt) * dx(scheme=qr_x)
+            mm2 = inner(dot(Gamma_1, pp_n), qq) * dx(scheme=qr_x)
+            pml4 = inner(qq, grad(u_n)) * dx(scheme=qr_x)
 
             FF += mm1 + mm2 + pml4
             # -------------------------------------------------------
-            pml3 = (sigma_x * sigma_y * sigma_z) * phi * u_n * dx(rule=qr_x)
-            mmm1 = (dot((psi - psi_n), phi) / dt) * dx(rule=qr_x)
-            mmm2 = -c * c * inner(grad(phi), dot(Gamma_3, pp_n)) * dx(rule=qr_x)
+            pml3 = (sigma_x * sigma_y * sigma_z) * phi * u_n * dx(scheme=qr_x)
+            mmm1 = (dot((psi - psi_n), phi) / dt) * dx(scheme=qr_x)
+            mmm2 = -c * c * inner(grad(phi), dot(Gamma_3, pp_n)) * dx(scheme=qr_x)
 
             FF += mmm1 + mmm2 + pml3
     else:
@@ -223,12 +223,12 @@ def gradient(
     # Define gradient problem
     m_u = TrialFunction(V)
     m_v = TestFunction(V)
-    mgrad = m_u * m_v * dx(rule=qr_x)
+    mgrad = m_u * m_v * dx(scheme=qr_x)
 
     uuadj = Function(V)  # auxiliarly function for the gradient compt.
     uufor = Function(V)  # auxiliarly function for the gradient compt.
 
-    ffG = 2.0 * c * dot(grad(uuadj), grad(uufor)) * m_v * dx(rule=qr_x)
+    ffG = 2.0 * c * dot(grad(uuadj), grad(uufor)) * m_v * dx(scheme=qr_x)
 
     G = mgrad - ffG
     lhsG, rhsG = lhs(G), rhs(G)

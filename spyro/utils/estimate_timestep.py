@@ -19,7 +19,7 @@ def estimate_timestep(mesh, V, c, estimate_max_eigenvalue=True):
     quad_rule = finat.quadrature.make_quadrature(
         V.finat_element.cell, V.ufl_element().degree(), "KMV"
     )
-    dxlump = fd.dx(rule=quad_rule)
+    dxlump = fd.dx(scheme=quad_rule)
     A = fd.assemble(u * v * dxlump)
     ai, aj, av = A.petscmat.getValuesCSR()
     av_inv = []

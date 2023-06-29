@@ -56,7 +56,7 @@ def test_gradient_talyor_remainder_v2():
     class L2Inner(object):
         def __init__(self):
             self.A = assemble(
-                TrialFunction(V) * TestFunction(V) * dx(rule=qr_x), mat_type="matfree"
+                TrialFunction(V) * TestFunction(V) * dx(scheme=qr_x), mat_type="matfree"
             )
             self.Ap = as_backend_type(self.A).mat()
 
