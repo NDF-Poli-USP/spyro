@@ -24,19 +24,19 @@ import matplotlib.pyplot as plt
 # ]
 
 analytical_files =[
-    "analytical_solution_dt_1e-05.npy",
+    # "analytical_solution_dt_1e-05.npy",
     "analytical_solution_dt_5e-05.npy",
     "analytical_solution_dt_0.0001.npy",
     "analytical_solution_dt_0.0005.npy",
 ]
 numerical_files = [
-    "interior_quads_rec_out1e-05.npy",
+    # "interior_quads_rec_out1e-05.npy",
     "interior_quads_rec_out5e-05.npy",
     "interior_quads_rec_out0.0001.npy",
     "interior_quads_rec_out0.0005.npy",
 ]
 dts = [
-    1e-5,
+    # 1e-5,
     5e-05,
     0.0001,
     0.0005,
@@ -53,14 +53,14 @@ for i in range(len(analytical_files)):
     p_numerical = np.load(numerical_files[i])
     p_numerical = p_numerical.flatten()
     time = np.linspace(0.0, 1.0, int(1.0/dts[i])+1)
-    # plt.plot(time, p_numerical, label="Numerical", color="red")
-    # plt.plot(time, p_analytical, label="Analytical", color="black", linestyle="--")
-    # plt.title(f"dt = {dts[i]}")
-    # plt.legend()
-    # # plt.plot(time, -(p_analytical - p_numerical))
-    # plt.xlabel("Time (s)")
-    # plt.ylabel("Pressure (Pa)")
-    # plt.show()
+    plt.plot(time, p_numerical, label="Numerical", color="red")
+    plt.plot(time, p_analytical, label="Analytical", color="black", linestyle="--")
+    plt.title(f"dt = {dts[i]}")
+    plt.legend()
+    # plt.plot(time, -(p_analytical - p_numerical))
+    plt.xlabel("Time (s)")
+    plt.ylabel("Pressure (Pa)")
+    plt.show()
     nt = len(time)
     error_time = np.linalg.norm(p_analytical - p_numerical, 2) / np.sqrt(nt)
     errors.append(error_time)

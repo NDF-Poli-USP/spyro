@@ -18,18 +18,24 @@ class AcousticWaveMMS(AcousticWave):
         bcs = fire.DirichletBC(self.function_space, 0.0, "on_boundary")
         A = fire.assemble(lhs, bcs=bcs, mat_type="matfree")
         self.solver = fire.LinearSolver(A, solver_parameters=self.solver_parameters)
-    
-    def mms_source(self, t):
-        x = -self.mesh_z
+
+    def mms_source_in_space(self):
+        V = self.function_space
+        self.q_xy = fire.Function(V)
+        x = self.mesh_z
         y = self.mesh_x
-        return fire.Constant(sin(3*t))*( -9*x*(x-1)*y*(y-1)-2*x*(x-1)-2*y*(y-1) )
+        self.q_xy.interpolate(2*x*(x-1)*y*(y-1))
+    
+    def mms_source_in_time(self, t):
+        return fire.Constant(2*t)
     
     def analytical_solution(self, t):
         self.analytical = fire.Function(self.function_space)
-        x = -self.mesh_z
+        x = self.mesh_z
         y = self.mesh_x
+        self.analytical.interpolate(fire.Constant(t)*x*(x-1)*y*(y-1))
 
-        return fire.Constant(sin(3*t))*x*(x-1)*y*(y-1)
+        return self. analytical
     
     @ensemble_propagator
     def wave_propagator(self, dt = None, final_time = None, source_num=None):
