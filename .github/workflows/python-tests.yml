@@ -41,14 +41,14 @@ jobs:
           source /home/olender/Firedrakes/main/firedrake/bin/activate
           cp /home/olender/Testing_files/velocity_models/* velocity_models/
           cp /home/olender/Testing_files/meshes/* meshes/
-          mpiexec -n 15 pytest test_3d/test_forward_3d.py 
+          mpiexec -n 10 pytest test_3d/test_forward_3d.py 
     - name: Covering parallel 3D forward test
       continue-on-error: true
       run: |
           source /home/olender/Firedrakes/main/firedrake/bin/activate
           cp /home/olender/Testing_files/velocity_models/* velocity_models/
           cp /home/olender/Testing_files/meshes/* meshes/
-          mpiexec -n 15 pytest --cov-report=xml --cov-append --cov=spyro test_3d/test_forward_3d.py 
+          mpiexec -n 10 pytest --cov-report=xml --cov-append --cov=spyro test_3d/test_forward_3d.py 
     - name: Uploading coverage to Codecov
       run: export CODECOV_TOKEN="6cd21147-54f7-4b77-94ad-4b138053401d" && bash <(curl -s https://codecov.io/bash)
 
