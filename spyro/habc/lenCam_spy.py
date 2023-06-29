@@ -25,7 +25,11 @@ def detLref(posCrit, possou):
     # Reference length for the size of the absorbing layer
     print('Defining Reference Length')
     lsrx = abs(posCrit[0] - souCrit[0])
-    lsry = abs(posCrit[0] - souCrit[1])
+    print(f'lsrx = {lsrx}')
+    lsry = abs(posCrit[1] - souCrit[1])
+    print(f'posCrit1 = {posCrit[1]}')
+    print(f'souCrit1 = {souCrit[1]}')
+    print(f'lsry = {lsry}')
     lref = np.linalg.norm(np.array([lsrx, lsry]))
     return lref
 
@@ -63,7 +67,9 @@ def calcZero(xini, a, nz=1):
     '''
     Loop for calculating layer sizes
     '''
-    f_tol = 1e-4
+    print(f'xini = {xini}')
+    print('CalcZero')
+    f_tol = 1e-5
     if xini >= 1.0:
         f_tol = 1e-3
     if nz == 1:
@@ -81,6 +87,7 @@ def calcZero(xini, a, nz=1):
         if f_tol < 1e-16:
             break
 
+    print('CalcZero fim')
     return x
 
 
@@ -146,8 +153,11 @@ def CalcFL(TipLay, Lx, Ly, fref, lmin, lref, Z, nexp, nz=5, crtCR=0):
     crtCR: Position in CRpos. Default: 0
     '''
     a = Z / fref  # print(a, Z,fref)
+    print(f"a = {a}")
+    print(f"fref = {fref}")
     FLpos = []
     crtCR = min(crtCR, nz-1)  # Position in CRpos. Default: 0
+    print(f"lmin: {lmin}, lref: {lref}")
     FLmin = 2 * lmin / lref # passar lmin da camada de agua
     x = FLmin
     for i in range(1, nz + 1):
@@ -156,9 +166,9 @@ def CalcFL(TipLay, Lx, Ly, fref, lmin, lref, Z, nexp, nz=5, crtCR=0):
         if i > 1 and xred == FLpos[i - 2]:
             x = calcZero(xred, a, i)
         FLpos += [redFL(x, lmin, lref)]
-        # print('********')
-        # print('Possible FL')
-        # print(x, F(x, a))
+        print('********')
+        print('Possible FL')
+        print(x, F(x, a))
     CRpos = np.array([round(abs(F(x, a, typ='CR')), 4) for x in FLpos])
     indCR = np.array([crtCR])
     indFL = np.where(np.array(FLpos) < 1)[0]
@@ -277,7 +287,7 @@ def habc_size(HABC):
     Ly = HABC.Lx
     posCrit = HABC.posCrit
     possou = HABC.possou
-    f0 = HABC.initial_frequency
+    f0 = 3.37#HABC.initial_frequency
     it_fwi = HABC.it_fwi
     lmin = HABC.h_min
     dt = HABC.dt

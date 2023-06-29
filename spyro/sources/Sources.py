@@ -78,6 +78,16 @@ class Sources(spyro.receivers.Receivers.Receivers):
                 for i in range(len(self.cellNodeMaps[source_id])):
                     tmp = campo.dat.data_with_halos[0]
         return campo
+    
+    def make_mask_element(self,campo):
+        for source_id in range(self.num_receivers):
+            if self.is_local[source_id] and source_id==self.current_source:
+                for i in range(len(self.cellNodeMaps[source_id])):
+                    campo.dat.data_with_halos[int(self.cellNodeMaps[source_id][i])] = 1.0
+            else: 
+                for i in range(len(self.cellNodeMaps[source_id])):
+                    tmp = campo.dat.data_with_halos[0]
+        return campo
 
 def timedependentSource(model, t, freq=None, amp=1, delay=1.5):
     if model["acquisition"]["source_type"] == "Ricker":

@@ -10,7 +10,7 @@ dictionary = {}
 dictionary["options"] = {
     "cell_type": "T",  # simplexes such as triangles or tetrahedra (T) or quadrilaterals (Q)
     "variant": 'lumped',  # lumped, equispaced or DG, default is lumped "method":"MLT", # (MLT/spectral_quadrilateral/DG_triangle/DG_quadrilateral) You can either specify a cell_type+variant or a method
-    "degree": 4,  # p order
+    "degree": 1,  # p order
     "dimension": 2,  # dimension
 }
 
@@ -24,13 +24,15 @@ dictionary["parallelism"] = {
 # domain and reserve the remaining 250 m for the Perfectly Matched Layer (PML) to absorb
 # outgoing waves on three sides (eg., -z, +-x sides) of the domain.
 dictionary["mesh"] = {
-    "Lz": 3.5,  # depth in km - always positive
-    "Lx": 17.0,  # width in km - always positive
+    "Lz": 3.,  # depth in km - always positive
+    "Lx": 9.2,  # width in km - always positive
     "Ly": 0.0,  # thickness in km - always positive
-    "mesh_file": "meshes/marmousi_f5.0_degree4_pad0.0.msh",  # if you want to use a mesh file, specify it here
+    "mesh_file": None,
+    "user_mesh": None,
+    # "mesh_file": "meshes/marmousi_f5.0_degree4_pad0.0.msh",  # if you want to use a mesh file, specify it here
 }
 dictionary["synthetic_data"] = {    #For use only if you are using a synthetic test model or a forward only simulation -adicionar discrição para modelo direto
-    "real_velocity_file": "/media/alexandre/Extreme SSD/common_files/velocity_models/vp_marmousi-ii.hdf5",
+    "real_velocity_file": "velmodel.segy",
 }
 
 # Create a source injection operator. Here we use a single source with a
@@ -39,7 +41,7 @@ dictionary["synthetic_data"] = {    #For use only if you are using a synthetic t
 # This transect of receivers is created with the helper function `create_transect`.
 dictionary["acquisition"] = {
     "source_type": "ricker",
-    "source_locations": [(-0.6, 4.8-1.68)],#, (-0.605, 1.7), (-0.61, 1.7), (-0.615, 1.7)],#, (-0.1, 1.5), (-0.1, 2.0), (-0.1, 2.5), (-0.1, 3.0)],
+    "source_locations": [(-0.025,9.2-5.65)],# (-0.025, 2.0)],#[(-0.6, 4.8-1.68)],#, (-0.605, 1.7), (-0.61, 1.7), (-0.615, 1.7)],#, (-0.1, 1.5), (-0.1, 2.0), (-0.1, 2.5), (-0.1, 3.0)],
     "frequency": 5.0,
     "delay": 1.5,
     "receiver_locations": spyro.create_transect(
@@ -68,13 +70,18 @@ dictionary["visualization"] = {
 
 Model = Model_parameters(dictionary=dictionary)
 
-Wave_no_habc = spyro.AcousticWave(model_parameters=Model)
 
+Lx = 9.2
+Lz = 3.0
+user_mesh = fire.RectangleMesh(int(Lz*12), int(Lx*12), Lz, Lx, diagonal="crossed")
+user_mesh.coordinates.dat.data[:, 0] *= -1.0
+Model.set_mesh(user_mesh=user_mesh)
 # Wave_no_habc.forward_solve()
 
+Wave_no_habc = spyro.AcousticWave(model_parameters=Model)
 Wave_no_habc._get_initial_velocity_model()
 Wave_no_habc.c = Wave_no_habc.initial_velocity_model
-habc = HABC(Wave_no_habc)
+habc = HABC(Wave_no_habc, h_min=0.0125)
 
 
 print("END")

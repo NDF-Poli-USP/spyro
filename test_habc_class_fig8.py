@@ -86,7 +86,9 @@ Wave_no_habc._get_initial_velocity_model()
 
 Wave_no_habc.c = Wave_no_habc.initial_velocity_model
 
-habc = HABC(Wave_no_habc)
+habc = HABC(Wave_no_habc, h_min=0.00833)
+
+# Verificar valores das distancias como lref e velocidades
 
 print("END")
 

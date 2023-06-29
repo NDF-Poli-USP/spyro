@@ -64,8 +64,10 @@ class HABC:
         else:
             UserWarning(f"Please use 'rectangular' or \
                 'hyperelliptical', f{self.TipLay} not supported.")
+        print(f"h_min = {h_min}")
         if h_min is None:
             h_min = self._minimum_h_calc()
+        print(f"h_min = {h_min}")
         self.h_min = h_min
         self.it_fwi = it_fwi
         self.initial_frequency = Wave_object.frequency
@@ -145,6 +147,9 @@ class HABC:
         self.posCrit = np.asarray([posCrit_x, posCrit_y])
         self.Z = Z
         self.cref = cref
+        print(f"1/Z = {1/Z}")
+        print(f"posCrit = {posCrit}")
+        print(f"cref = {cref}")
 
     def habc_size(self):
         fref, F_L, pad_length, lref = lenCam_spy.habc_size(self)

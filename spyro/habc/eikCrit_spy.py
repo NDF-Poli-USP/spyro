@@ -125,7 +125,7 @@ def SolveEikonal(c, Eik, mesh, sources, annotate=False):
     File('c_test.pvd').write(c)
 
     k = Constant(1e4)
-    u0 = Constant(0.)
+    u0 = Constant(1e-3)
     # k2 = Constant(1e-3)
 
     print('-------------------------------------------')
@@ -135,7 +135,8 @@ def SolveEikonal(c, Eik, mesh, sources, annotate=False):
     F1 = inner(grad(u), grad(vy))*dx - f/c*vy*dx  + mask * k * inner(u - u0, vy) * dx
     # F1 = inner(grad(u), grad(vy))*dx - f/c*vy*dx + mask * k * inner(u - u0, vy) * dx
 
-    A = fire.assemble(lhs(F1))
+    # bcs = [DirichletBC(Eik, Constant(0.0), 1)]
+    A = fire.assemble(lhs(F1))#, bcs=bcs)
     
     B = fire.Function(Eik)
     B = fire.assemble(rhs(F1), tensor=B)
@@ -182,7 +183,6 @@ def SolveEikonal(c, Eik, mesh, sources, annotate=False):
     # import pickle
     # with open('A.pkl', 'wb') as f:
     #     pickle.dump(A, f)
-    # bcs = [DirichletBC(yp, Constant(0.0), 1)]
     solve(A, yp, B)#, bcs = bcs)#, solver_parameters=solver_parameters)
     print('-------------------------------------------')
     print('Solved pre-eikonal')
@@ -208,6 +208,7 @@ def SolveEikonal(c, Eik, mesh, sources, annotate=False):
     eps = CellDiameter(mesh)  # Stabilizer
     mask = Function(Eik)
 
+    # mask = sources.make_mask_element(mask)
     mask = sources.make_mask(mask)
     output = File('mask.pvd')
     output.write(mask)
@@ -346,7 +347,7 @@ def mapBound(yp, mesh, Lx, Ly):
     ycoord = mesh.coordinates.dat.data[:,1]
 
     # np.finfo(float).eps
-    eps = 1e-14
+    eps = 1e-10
     ref_bound = ((xcoord <= 0-eps) & ((ycoord <= 0+eps) | (ycoord >= Ly-eps))) |  \
         ((ycoord >= 0 - eps) & (xcoord <= Lx + eps) )
 
