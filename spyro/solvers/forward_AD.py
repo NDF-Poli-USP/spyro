@@ -89,16 +89,16 @@ def forward(
 
     t = 0.0
     m = 1 / (c * c)
-    m1 = m * ((u - 2.0 * u_n + u_nm1) / Constant(dt**2)) * v * dx(rule=qr_x)
-    a = dot(grad(u_n), grad(v)) * dx(rule=qr_x)  # explicit
+    m1 = m * ((u - 2.0 * u_n + u_nm1) / Constant(dt**2)) * v * dx(scheme=qr_x)
+    a = dot(grad(u_n), grad(v)) * dx(scheme=qr_x)  # explicit
     f = Function(V)
     nf = 0
 
     if model["BCs"]["outer_bc"] == "non-reflective":
-        nf = c * ((u_n - u_nm1) / dt) * v * ds(rule=qr_s)
+        nf = c * ((u_n - u_nm1) / dt) * v * ds(scheme=qr_s)
 
     h = CellSize(mesh)
-    FF = m1 + a + nf - (1 / (h / degree * h / degree)) * f * v * dx(rule=qr_x)
+    FF = m1 + a + nf - (1 / (h / degree * h / degree)) * f * v * dx(scheme=qr_x)
     X = Function(V)
 
     lhs_ = lhs(FF)
