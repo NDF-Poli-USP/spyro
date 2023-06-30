@@ -4,9 +4,9 @@ from sympy import *
 x, y, z, t, c, pi = symbols("x y z t c pi")
 
 # Define the velocity model
-c = 1 #+ sin(pi*x)*sin(pi*y)
-# u= x*(x-1)*y*(y-1)*t
-u = sin(pi*x)*sin(pi*y)*t**2
+c = 1 + sin(pi*(-x))*sin(pi*y)
+u= x*(x+1)*y*(y-1)*t
+# u = sin(pi*x)*sin(pi*y)*t**2
 
 dudt = diff(u, t)
 du2dt2 = diff(dudt, t)
@@ -22,3 +22,4 @@ print(simplify(f))
 
 # a = f-((sin(3*t))*(-(9*x*y*(x - 1)*(y - 1) + 2*(x*(x - 1) + y*(y - 1))*(sin(pi*x)*sin(pi*y) + 1)**2)/(sin(pi*x)*sin(pi*y) + 1)**2 ))
 # print(simplify(a))
+2*pi**2*t**2*sin(pi*x)*sin(pi*y) + 2*sin(pi*x)*sin(pi*y)/(sin(pi*x)*sin(pi*y) + 1)**2

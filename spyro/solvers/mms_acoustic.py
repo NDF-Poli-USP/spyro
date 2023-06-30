@@ -26,19 +26,23 @@ class AcousticWaveMMS(AcousticWave):
         self.q_xy = fire.Function(V)
         x = self.mesh_z
         y = self.mesh_x
-        xy = fire.project(sin(pi*x)*sin(pi*y), V)
+        # xy = fire.project(sin(pi*x)*sin(pi*y), V)
+        # self.q_xy.assign(xy)
+        xy = fire.project((-x**2 - x - y**2 + y), V)
         self.q_xy.assign(xy)
         # self.q_xy.interpolate(sin(pi*x)*sin(pi*y))
     
     def mms_source_in_time(self, t):
-        return fire.Constant(2*pi**2*t**2 + 2.0)
+        # return fire.Constant(2*pi**2*t**2 + 2.0)
+        return fire.Constant(2*t)
     
     def analytical_solution(self, t):
         self.analytical = fire.Function(self.function_space)
         x = self.mesh_z
         y = self.mesh_x
         # analytical = fire.project(sin(pi*x)*sin(pi*y)*t**2, self.function_space)
-        self.analytical.interpolate(sin(pi*x)*sin(pi*y)*t**2)
+        # self.analytical.interpolate(sin(pi*x)*sin(pi*y)*t**2)
+        self.analytical.interpolate(x*(x+1)*y*(y-1)*t)
         # self.analytical.assign(analytical)
 
         return self. analytical

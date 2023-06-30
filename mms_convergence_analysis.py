@@ -4,8 +4,12 @@ import matplotlib.pyplot as plt
 
 
 dts = [
+    # 0.002,
+    # 0.0015,
     0.001,
+    0.0008,
     0.0005,
+    0.0003,
     0.0001,
 ]
 
@@ -28,9 +32,11 @@ dts = [
 # ]
 
 errors = [
-    4.287914887554447e-09,
-    5.363542490228256e-10,
-    1.0802242342626882e-10,
+    6.571055897782474e-06,
+    4.202313854769875e-06,
+    1.6396740420349448e-06,
+    5.896733733594498e-07,
+    6.553467342767596e-08,
 ]
 
 
@@ -39,12 +45,15 @@ plt.loglog(dts, errors)
 theory = [t**2 for t in dts]
 theory = [errors[0]*th/theory[0] for th in theory]
 
-plt.loglog(dts, theory, '--')
+plt.loglog(dts, theory, '--', label='theoretical 2nd order in time')
+plt.legend()
+plt.title(f"Convergence with central difference in time scheme")
+plt.show()
 
-theory = [t**3 for t in dts]
-theory = [errors[0]*th/theory[0] for th in theory]
+# theory = [t**3 for t in dts]
+# theory = [errors[0]*th/theory[0] for th in theory]
 
-plt.loglog(dts, theory, '-.')
+# plt.loglog(dts, theory, '-.')
 
 plt.show()
 

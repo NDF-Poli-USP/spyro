@@ -72,9 +72,10 @@ def get_error(dt):
     }
 
     Wave_obj = spyro.AcousticWaveMMS(dictionary=dictionary)
-    Wave_obj.set_mesh(dx=0.05)
+    Wave_obj.set_mesh(dx=0.02)
 
-    Wave_obj.set_initial_velocity_model(constant = 1.0)
+    # Wave_obj.set_initial_velocity_model(constant = 1.0)
+    Wave_obj.set_initial_velocity_model(expression = "1 + sin(pi*-z)*sin(pi*x)")
     Wave_obj.forward_solve()
 
     time = np.linspace(0.0, final_time, int(final_time/dt)+1)
@@ -98,35 +99,38 @@ def get_error(dt):
     return error
 
 dts = [
-    0.002,
-    0.0015,
+    # 0.002,
+    # 0.0015,
     0.001,
     0.0008,
     0.0005,
-    # 0.0003,
-    # 0.0001,
+    0.0003,
+    0.0001,
 ]
 
 errors = []
 for dt in dts:
     errors.append(get_error(dt))
 
+for dt in dts:
+    print(f"dt = {dt}, error = {errors[dts.index(dt)]}")
+
 plt.loglog(dts, errors)
 
-theory = [t for t in dts]
-theory = [errors[0]*th/theory[0] for th in theory]
+# theory = [t for t in dts]
+# theory = [errors[0]*th/theory[0] for th in theory]
 
-plt.loglog(dts, theory, '-.', label='1st order in time')
+# plt.loglog(dts, theory, '-.', label='1st order in time')
 
 theory = [t**2 for t in dts]
 theory = [errors[0]*th/theory[0] for th in theory]
 
 plt.loglog(dts, theory, '--', label='2nd order in time')
 
-theory = [t**3 for t in dts]
-theory = [errors[0]*th/theory[0] for th in theory]
+# theory = [t**3 for t in dts]
+# theory = [errors[0]*th/theory[0] for th in theory]
 
-plt.loglog(dts, theory, '-.', label='3rd order in time')
+# plt.loglog(dts, theory, '-.', label='3rd order in time')
 plt.legend()
 plt.title(f"Convergence for quads with final time = {final_time}")
 plt.show()
