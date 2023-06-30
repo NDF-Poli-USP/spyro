@@ -1,5 +1,6 @@
 import firedrake as fire
 from firedrake import Constant, dx, dot, grad, sin
+from numpy import pi
 from .CG_acoustic import AcousticWave
 from ..io.io import ensemble_propagator
 from . import helpers
@@ -17,6 +18,7 @@ class AcousticWaveMMS(AcousticWave):
         lhs = self.lhs
         bcs = fire.DirichletBC(self.function_space, 0.0, "on_boundary")
         A = fire.assemble(lhs, bcs=bcs, mat_type="matfree")
+        self.mms_source_in_space()
         self.solver = fire.LinearSolver(A, solver_parameters=self.solver_parameters)
 
     def mms_source_in_space(self):
@@ -24,16 +26,20 @@ class AcousticWaveMMS(AcousticWave):
         self.q_xy = fire.Function(V)
         x = self.mesh_z
         y = self.mesh_x
-        self.q_xy.interpolate(2*x*(x-1)*y*(y-1))
+        xy = fire.project(sin(pi*x)*sin(pi*y), V)
+        self.q_xy.assign(xy)
+        # self.q_xy.interpolate(sin(pi*x)*sin(pi*y))
     
     def mms_source_in_time(self, t):
-        return fire.Constant(2*t)
+        return fire.Constant(2*pi**2*t**2 + 2.0)
     
     def analytical_solution(self, t):
         self.analytical = fire.Function(self.function_space)
         x = self.mesh_z
         y = self.mesh_x
-        self.analytical.interpolate(fire.Constant(t)*x*(x-1)*y*(y-1))
+        # analytical = fire.project(sin(pi*x)*sin(pi*y)*t**2, self.function_space)
+        self.analytical.interpolate(sin(pi*x)*sin(pi*y)*t**2)
+        # self.analytical.assign(analytical)
 
         return self. analytical
     
@@ -71,6 +77,8 @@ class AcousticWaveMMS(AcousticWave):
 
         u_nm1 = self.u_nm1
         u_n = self.u_n
+        u_nm1.assign(self.analytical_solution(t-2*dt))
+        u_n.assign(self.analytical_solution(t-dt))
         u_np1 = fire.Function(self.function_space)
         u = self.trial_function
         v = fire.TestFunction(self.function_space)
@@ -83,9 +91,10 @@ class AcousticWaveMMS(AcousticWave):
         quad_rule = self.quadrature_rule
 
         #assembly_callable = create_assembly_callable(rhs, tensor=B)
+        q_xy = self.q_xy
 
         for step in range(nt):
-            q = self.mms_source(t)
+            q = q_xy*self.mms_source_in_time(t)
             m1 = 1/(self.c * self.c) * ((u - 2.0 * u_n + u_nm1) / Constant(dt ** 2)) * v * dx(scheme = quad_rule)
             a = dot(grad(u_n), grad(v)) * dx(scheme = quad_rule)
             l = q * v * dx(scheme = quad_rule)

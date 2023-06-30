@@ -4,8 +4,9 @@ from sympy import *
 x, y, z, t, c, pi = symbols("x y z t c pi")
 
 # Define the velocity model
-c = 1 + sin(pi*x)*sin(pi*y)
-u= x*(x-1)*y*(y-1)*t
+c = 1 #+ sin(pi*x)*sin(pi*y)
+# u= x*(x-1)*y*(y-1)*t
+u = sin(pi*x)*sin(pi*y)*t**2
 
 dudt = diff(u, t)
 du2dt2 = diff(dudt, t)
