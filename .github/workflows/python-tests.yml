@@ -17,38 +17,38 @@ jobs:
     - uses: actions/checkout@v3
     - name: Running serial tests in parallel (only one test per core)
       run: |
-          source /opt/firedrake/bin/activate
+          source /home/olender/Firedrakes/main/firedrake/bin/activate
           pytest -n 10 --cov-report=xml --cov=spyro test/
     - name: Running serial tests for adjoint
       run: |
-          source /opt/firedrake/bin/activate
+          source /home/olender/Firedrakes/main/firedrake/bin/activate
           pytest -n 10 --cov-report=xml --cov-append --cov=spyro test_ad/
     - name: Running parallel tests
       run: |
-          source /opt/firedrake/bin/activate
+          source /home/olender/Firedrakes/main/firedrake/bin/activate
           cp /home/olender/Testing_files/velocity_models/* velocity_models/
           cp /home/olender/Testing_files/meshes/* meshes/
           mpiexec -n 10 pytest test_parallel/test_forward.py
     - name: Covering parallel tests
       continue-on-error: true
       run: |
-          source /opt/firedrake/bin/activate
+          source /home/olender/Firedrakes/main/firedrake/bin/activate
           cp /home/olender/Testing_files/velocity_models/* velocity_models/
           cp /home/olender/Testing_files/meshes/* meshes/
           mpiexec -n 10 pytest --cov-report=xml --cov-append --cov=spyro test_parallel/test_forward.py
     - name: Running parallel 3D forward test
       run: |
-          source /opt/firedrake/bin/activate
+          source /home/olender/Firedrakes/main/firedrake/bin/activate
           cp /home/olender/Testing_files/velocity_models/* velocity_models/
           cp /home/olender/Testing_files/meshes/* meshes/
-          mpiexec -n 15 pytest test_3d/test_forward_3d.py 
+          mpiexec -n 10 pytest test_3d/test_forward_3d.py 
     - name: Covering parallel 3D forward test
       continue-on-error: true
       run: |
-          source /opt/firedrake/bin/activate
+          source /home/olender/Firedrakes/main/firedrake/bin/activate
           cp /home/olender/Testing_files/velocity_models/* velocity_models/
           cp /home/olender/Testing_files/meshes/* meshes/
-          mpiexec -n 15 pytest --cov-report=xml --cov-append --cov=spyro test_3d/test_forward_3d.py 
+          mpiexec -n 10 pytest --cov-report=xml --cov-append --cov=spyro test_3d/test_forward_3d.py 
     - name: Uploading coverage to Codecov
       run: export CODECOV_TOKEN="6cd21147-54f7-4b77-94ad-4b138053401d" && bash <(curl -s https://codecov.io/bash)
 
