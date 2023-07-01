@@ -40,14 +40,20 @@ errors = [
 ]
 
 
-plt.loglog(dts, errors)
+plt.loglog(dts, errors, '-o', label='numerical error')
 
 theory = [t**2 for t in dts]
 theory = [errors[0]*th/theory[0] for th in theory]
 
-plt.loglog(dts, theory, '--', label='theoretical 2nd order in time')
+plt.loglog(dts, theory, '--^', label='theoretical 2nd order in time')
+for x, y, a in zip([t for t in dts], theory, [('dt = {:.0e} s'.format(t)) for t in dts]):
+            plt.annotate(a, xy=(x, y), xytext=(4, 2),
+                         textcoords='offset points',
+                         horizontalalignment='left', verticalalignment='top')
 plt.legend()
 plt.title(f"Convergence with central difference in time scheme")
+plt.xlabel("dt [s]")
+plt.ylabel(r'error $\frac{{|u_{num} - u_{an}|}}{{|u_{an}|}}$')
 plt.show()
 
 # theory = [t**3 for t in dts]
