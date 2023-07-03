@@ -53,7 +53,7 @@ for x, y, a in zip([t for t in dts], theory, [('dt = {:.0e} s'.format(t)) for t 
 plt.legend()
 plt.title(f"Convergence with central difference in time scheme")
 plt.xlabel("dt [s]")
-plt.ylabel(r'error $\frac{{|u_{num} - u_{an}|}}{{|u_{an}|}}$')
+plt.ylabel(r'error $\frac{{||u_{num} - u_{an}||_2}}{{||u_{an}||_2}}$')
 plt.show()
 
 # theory = [t**3 for t in dts]
