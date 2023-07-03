@@ -1,1 +1,0 @@
-f = open("meshes/cut_marmousi_small_p=2_M=7.02.msh")
