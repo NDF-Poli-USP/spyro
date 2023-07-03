@@ -8,6 +8,22 @@ from scipy.signal import butter, filtfilt
 def butter_lowpass_filter(shot, cutoff, fs, order=2):
     """Low-pass filter the shot record with sampling-rate fs Hz
     and cutoff freq. Hz
+
+    Parameters
+    ----------
+    shot : numpy array
+        Shot record
+    cutoff : float
+        Cutoff frequency in Hertz
+    fs : float
+        Sampling rate in Hertz
+    order : int
+        Order of the filter
+
+    Returns
+    -------
+    filtered_shot : numpy array
+        Filtered shot record
     """
     nyq = 0.5 * fs  # Nyquist Frequency
     normal_cutoff = cutoff / nyq
