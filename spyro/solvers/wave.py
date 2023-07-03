@@ -97,7 +97,7 @@ class Wave(Model_parameters):
 
         if conditional != None:
             V = self.function_space
-            vp = fire.Function(V)
+            vp = fire.Function(V, name='velocity')
             vp.interpolate(conditional)
             self.initial_velocity_model = vp
         elif expression != None:
@@ -105,9 +105,9 @@ class Wave(Model_parameters):
             x = self.mesh_x
             expression = eval(expression)
             V = self.function_space
-            vp = fire.Function(V)
+            vp = fire.Function(V, name='velocity')
             vp.interpolate(expression)
-            fire.File('initial_velocity_model.pvd').write(vp)
+            fire.File('initial_velocity_model.pvd').write(vp, name='velocity')
             self.initial_velocity_model = vp
         elif velocity_model_function != None:
             self.initial_velocity_model = velocity_model_function
@@ -115,7 +115,7 @@ class Wave(Model_parameters):
             self.initial_velocity_model_file = new_file
         elif constant != None:
             V = self.function_space
-            vp = fire.Function(V)
+            vp = fire.Function(V, name='velocity')
             vp.interpolate(fire.Constant(constant))
             self.initial_velocity_model = vp
         else:
