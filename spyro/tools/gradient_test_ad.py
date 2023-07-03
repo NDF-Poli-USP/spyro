@@ -7,6 +7,29 @@ forward = spyro.solvers.forward_AD
 
 
 def gradient_test_acoustic(model, mesh, V, comm, vp_exact, vp_guess, mask=None):
+    """Gradient test for the acoustic FWI problem
+    
+    Parameters
+    ----------
+    model : `dictionary`
+        Contains simulation parameters and options.
+    mesh : a Firedrake.mesh
+        2D/3D simplicial mesh read in by Firedrake.Mesh
+    V : Firedrake.FunctionSpace object
+        The space of the finite elements
+    comm : Firedrake.ensemble_communicator
+        An ensemble communicator
+    vp_exact : Firedrake.Function
+        The exact velocity model
+    vp_guess : Firedrake.Function
+        The guess velocity model
+    mask : Firedrake.Function, optional
+        A mask for the gradient test
+
+    Returns
+    -------
+    None
+    """
     import firedrake_adjoint as fire_adj
 
     with fire_adj.stop_annotating():
