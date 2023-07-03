@@ -3,10 +3,8 @@ from scipy.special import hankel2
 import matplotlib.pyplot as plt
 import sys
 
-# dt = float(sys.argv[1])
-dt = 0.0005
-# p_analytical_previous = np.load("analytical_solution_dt_"+str(dt)+".npy")
-# p_numerical = np.load("interior_quads_rec_out"+str(dt)+".npy")
+dt = float(sys.argv[1])
+# dt = 0.0005
 # p_numerical = np.load("test_quads_rec_out5e-05.npy")
 # dt = 0.1
 t_final = 1.0
@@ -64,10 +62,9 @@ def analytical(nt, dt, t_final, f0):
 
 # t_initial = 0.5
 f0 = 5
-n_extra = 3000
 
-time1 = np.linspace(0.0, n_extra*t_final, n_extra*(nnt-1)+1 )
-p = analytical(n_extra*(nnt-1)+1, time1[1]-time1[0], n_extra*t_final, f0)
+time1 = np.linspace(0.0, 20*t_final, 20*(nnt-1)+1 )
+p = analytical(20*(nnt-1)+1, time1[1]-time1[0], 20*t_final, f0)
 print(np.shape(p))
 
 t_final = t_final
@@ -76,15 +73,6 @@ p = p[0:nt]
 x = np.linspace(0.0, t_final, int((t_final)/dt)+1)
 
 r = ricker(1.5/f0, t_final, dt, f0)
-
-# error_norm = np.linalg.norm(p_analytical_previous - p_numerical, 2)/np.linalg.norm(p, 2)
-# print(f"Numerical error with n_extra=20, E = {error_norm}")
-
-# error_norm = np.linalg.norm(p - p_analytical_previous, 2)/np.linalg.norm(p, 2)
-# print(f"Analytical error compared n_extra = {n_extra} with n_extra=20, E = {error_norm}")
-
-# error_norm = np.linalg.norm(p - p_numerical, 2)/np.linalg.norm(p, 2)
-# print(f"Numerical error compared n_extra = {n_extra}, E = {error_norm}")
 
 # plt.plot(x, r)
 # plt.show()
