@@ -83,7 +83,7 @@ class AcousticWaveMMS(AcousticWave):
         u_n = self.u_n
         u_nm1.assign(self.analytical_solution(t-2*dt))
         u_n.assign(self.analytical_solution(t-dt))
-        u_np1 = fire.Function(self.function_space)
+        u_np1 = fire.Function(self.function_space, name="pressure t +dt")
         u = self.trial_function
         v = fire.TestFunction(self.function_space)
 
