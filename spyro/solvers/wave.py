@@ -117,6 +117,7 @@ class Wave(Model_parameters):
             V = self.function_space
             vp = fire.Function(V, name='velocity')
             vp.interpolate(fire.Constant(constant))
+            fire.File('initial_velocity_model.pvd').write(vp, name='velocity')
             self.initial_velocity_model = vp
         else:
             raise ValueError("Please specify either a conditional, expression, firedrake function or new file name (segy or hdf5).")
