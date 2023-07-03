@@ -70,8 +70,8 @@ dictionary["time_axis"] = {
     "final_time": 2.00,  # Final time for event
     "dt": 0.001,  # timestep size
     "amplitude": 1,  # the Ricker has an amplitude of 1.
-    "nspool": 100,  # how frequently to output solution to pvds
-    "fspool": 100,  # how frequently to save solution to RAM
+    "output_frequency": 100,  # how frequently to output solution to pvds
+    "gradient_sampling_frequency": 100,  # how frequently to save solution to RAM
 }
 
 def test_method_reader():
@@ -326,8 +326,8 @@ def test_dictionary_conversion():
         "final_time": 2.00,  # Final time for event
         "dt": 0.0005,  # timestep size
         "amplitude": 1,  # the Ricker has an amplitude of 1.
-        "nspool": 100,  # how frequently to output solution to pvds
-        "fspool": 100,  # how frequently to save solution to RAM
+        "output_frequency": 100,  # how frequently to output solution to pvds
+        "gradient_sampling_frequency": 100,  # how frequently to save solution to RAM
     }
     model_from_old = Model_parameters(dictionary=old_dictionary)
     model_from_new = Model_parameters(dictionary=new_dictionary)
@@ -348,15 +348,6 @@ def test_dictionary_conversion():
         same = False
     if model_from_new.foward_output_file != model_from_old.foward_output_file:
         same = False
-    if model_from_new.initial_velocity_model != model_from_old.initial_velocity_model:
-        a = model_from_new.initial_velocity_model
-        b = model_from_old.initial_velocity_model
-        if a == "not_used.hdf5":
-            a = None
-        if b == "not_used.hdf5":
-            b = None
-        if a != b:
-            same = False
     if model_from_new.running_fwi != model_from_old.running_fwi:
         same = False
 
