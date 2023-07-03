@@ -117,7 +117,7 @@ def _test_gradient(options, pml=False):
 
     # compute the gradient of the control (to be verified)
     dJ = gradient(options, mesh, comm, vp_guess, receivers, p_guess, misfit)
-    dJ *= mask
+    dJ.dat.data[:] = dJ.dat.data[:]*mask.dat.data[:]
     File("gradient.pvd").write(dJ)
 
     steps = [1e-3, 1e-4, 1e-5]  # , 1e-6]  # step length
@@ -145,7 +145,7 @@ def _test_gradient(options, pml=False):
         )
 
         Jp = functional(options, p_exact_recv - p_guess_recv)
-        projnorm = assemble(mask * dJ * delta_m * dx(rule=qr_x))
+        projnorm = assemble(mask * dJ * delta_m * dx(scheme=qr_x))
         fd_grad = (Jp - Jm) / step
         print(
             "\n Cost functional for step "
