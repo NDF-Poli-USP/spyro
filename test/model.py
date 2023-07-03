@@ -1,85 +1,57 @@
-# Define mesh file to be used:
-meshfile = "blah"
-
-# Define initial velocity model:
-truemodel = "blah"
-initmodel = "blah"
 
 
-# Choose method and parameters
-opts = {
-    "method": "DG",
-    "quadrature": 'KMV',
-    "variant": None,
-    "type": "SIP",  # for DG only - SIP, NIP and IIP
-    "degree": 1,  # p order
-    "dimension": 3,  # dimension
-    "mesh_size": 0.005,  # h
-    "beta": 0.0,  # for Newmark only
-    "gamma": 0.5,  # for Newmark only
+dictionary = {}
+dictionary["options"] = {
+    "cell_type": "Q",  # simplexes such as triangles or tetrahedra (T) or quadrilaterals (Q)
+    "variant": 'lumped',  # lumped, equispaced or DG, default is lumped "method":"MLT", # (MLT/spectral_quadrilateral/DG_triangle/DG_quadrilateral) You can either specify a cell_type+variant or a method
+    "degree": 4,  # p order
+    "dimension": 2,  # dimension
 }
 
-parallelism = {
-    "type": "automatic",  # options: automatic, custom, off
+# Number of cores for the shot. For simplicity, we keep things serial.
+# spyro however supports both spatial parallelism and "shot" parallelism.
+dictionary["parallelism"] = {
+    "type": "automatic",  # options: automatic (same number of cores for evey processor) or spatial
 }
 
-mesh = {
-    "Lz": 2.000,  # depth in km - always positive
-    "Lx": 3.00000,  # width in km - always positive
+# Define the domain size without the PML. Here we'll assume a 1.00 x 1.00 km
+# domain and reserve the remaining 250 m for the Perfectly Matched Layer (PML) to absorb
+# outgoing waves on three sides (eg., -z, +-x sides) of the domain.
+dictionary["mesh"] = {
+    "Lz": 1.0,  # depth in km - always positive
+    "Lx": 1.0,  # width in km - always positive
     "Ly": 0.0,  # thickness in km - always positive
-    "meshfile": meshfile + ".msh",
-    "initmodel": initmodel + ".hdf5",
-    "truemodel": truemodel + ".hdf5",
+    "mesh_type": "firedrake_mesh",  # options: firedrake_mesh or user_mesh
+    "mesh_file": None,  # specify the mesh file
 }
 
-BCs = {
-    "status": False,  # True or false
-    "outer_bc": "non-reflective",  #  neumann, non-reflective (outer boundary condition)
-    "damping_type": "polynomial",  # polynomial. hyperbolic, shifted_hyperbolic
-    "exponent": 1,
-    "cmax": 4.7,  # maximum acoustic wave velocity in PML - km/s
-    "R": 0.001,  # theoretical reflection coefficient
-    "lz": 0.250,  # thickness of the pml in the z-direction (km) - always positive
-    "lx": 0.250,  # thickness of the pml in the x-direction (km) - always positive
-    "ly": 0.0,  # thickness of the pml in the y-direction (km) - always positive
+# Create a source injection operator. Here we use a single source with a
+# Ricker wavelet that has a peak frequency of 5 Hz injected at the center of the mesh.
+# We also specify to record the solution at a microphone near the top of the domain.
+# This transect of receivers is created with the helper function `create_transect`.
+dictionary["acquisition"] = {
+    "source_type": "ricker",
+    "source_locations": [(-1.0, 1.0)],#, (-0.605, 1.7), (-0.61, 1.7), (-0.615, 1.7)],#, (-0.1, 1.5), (-0.1, 2.0), (-0.1, 2.5), (-0.1, 3.0)],
+    "frequency": 5.0,
+    "delay": 1.5,
+    "receiver_locations": [(-0.0, 0.5)],
 }
 
-acquisition = {
-    "source_type": "MMS",
-    "num_sources": 1,
-    "frequency": 2.0,
-    "delay": 1.0,
-    "source_pos": [()],
-    "num_receivers": 256,
-    "receiver_locations": [()],
+# Simulate for 2.0 seconds.
+dictionary["time_axis"] = {
+    "initial_time": 0.0,  # Initial time for event
+    "final_time": 1.0,  # Final time for event
+    "dt": 0.0005,  # timestep size
+    "amplitude": 1,  # the Ricker has an amplitude of 1.
+    "output_frequency": 100,  # how frequently to output solution to pvds
+    "gradient_sampling_frequency": 1,  # how frequently to save solution to RAM
 }
 
-timeaxis = {
-    "t0": 0.0,  #  Initial time for event
-    "tf": 0.4,  # Final time for event
-    "dt": 0.001,  # timestep size
-    "nspool": 20,  # how frequently to output solution to pvds
-    "fspool": 10,  # how frequently to save solution to RAM
-}  # how freq. to output to files and screen
-
-inversion = {
-    "freq_bands": [None]
-}  # cutoff frequencies (Hz) for Ricker source and to low-pass the observed shot record
-
-aut_dif = {
-    "status": False, 
-}
-
-
-# Create your model with all the options
-model = {
-    "self": None,
-    "inversion": inversion,
-    "opts": opts,
-    "BCs": BCs,
-    "parallelism": parallelism,
-    "mesh": mesh,
-    "acquisition": acquisition,
-    "timeaxis": timeaxis,
-    "aut_dif": aut_dif,
+dictionary["visualization"] = {
+    "forward_output" : False,
+    "output_filename": "results/forward_output.pvd",
+    "fwi_velocity_model_output": False,
+    "velocity_model_filename": None,
+    "gradient_output": False,
+    "gradient_filename": None,
 }
