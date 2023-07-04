@@ -23,15 +23,27 @@ import matplotlib.pyplot as plt
 #     0.001,
 # ]
 
+def error_calc(p_numerical, p_analytical, nt):
+    norm = np.linalg.norm(p_numerical, 2) / np.sqrt(nt)
+    error_time = np.linalg.norm(p_analytical - p_numerical, 2) / np.sqrt(nt)
+    div_error_time = error_time / norm
+    return div_error_time
+        
+
 analytical_files =[
     "analytical_solution_dt_5e-05.npy",
     "analytical_solution_dt_0.0001.npy",
     "analytical_solution_dt_0.0005.npy",
 ]
-numerical_files = [
+numerical_dof_files = [
     "dof_quads_rec_out5e-05.npy",
     "dof_quads_rec_out0.0001.npy",
     "dof_quads_rec_out0.0005.npy",
+]
+numerical_interior_files = [
+    "interior_quads_rec_out5e-05.npy",
+    "interior_quads_rec_out0.0001.npy",
+    "interior_quads_rec_out0.0005.npy",
 ]
 dts = [
     5e-05,
@@ -40,36 +52,49 @@ dts = [
 ]
 
 analytical_files.reverse()
-numerical_files.reverse()
+numerical_dof_files.reverse()
+numerical_interior_files.reverse()
 dts.reverse()
 
-errors = []
+errors_dof = []
+errors_interior = []
+errors_between = []
 
 for i in range(len(analytical_files)):
     p_analytical = np.load(analytical_files[i])
-    p_numerical = np.load(numerical_files[i])
-    p_numerical = p_numerical.flatten()
+    p_numerical_dof = np.load(numerical_dof_files[i])
+    p_numerical_interior = np.load(numerical_interior_files[i])
+    p_numerical_dof = p_numerical_dof.flatten()
+    p_numerical_interior = p_numerical_interior.flatten()
     time = np.linspace(0.0, 1.0, int(1.0/dts[i])+1)
-    # plt.plot(time, p_numerical, label="Numerical", color="red")
-    # plt.plot(time, p_analytical, label="Analytical", color="black", linestyle="--")
-    # plt.title(f"dt = {dts[i]}")
-    # plt.legend()
-    # # plt.plot(time, -(p_analytical - p_numerical))
-    # plt.xlabel("Time (s)")
-    # plt.ylabel("Pressure (Pa)")
-    # plt.show()
+    plt.plot(time, p_numerical_dof, label="Numerical DoF propagation", color="red")
+    plt.plot(time, p_numerical_interior, '-.', label="Numerical Interior propagation", color="blue")
+    plt.plot(time, p_analytical, label="Analytical", color="black", linestyle="--")
+    plt.title(f"dt = {dts[i]}")
+    plt.legend()
+    # plt.plot(time, -(p_analytical - p_numerical))
+    plt.xlabel("Time (s)")
+    plt.ylabel("Pressure (Pa)")
+    plt.show()
     nt = len(time)
-    norm = np.linalg.norm(p_numerical, 2) / np.sqrt(nt)
-    error_time = np.linalg.norm(p_analytical - p_numerical, 2) / np.sqrt(nt)
-    div_error_time = error_time / norm
-    errors.append(div_error_time)
-    print(f"dt = {dts[i]}")
-    print(f"Error = {div_error_time}")
+    error_dof = error_calc(p_numerical_dof, p_analytical, nt)
+    error_interior = error_calc(p_numerical_interior, p_analytical, nt)
+    error_between = error_calc(p_numerical_interior, p_numerical_dof, nt)
 
-plt.loglog(dts, errors, '-o', label='numerical error')
+    errors_dof.append(error_dof)
+    errors_interior.append(error_interior)
+    errors_between.append(error_between)
+
+    print(f"dt = {dts[i]}")
+    print("Error DOF = {:.4e}".format(error_dof))
+    print("Error interior = {:.4e}".format(error_interior))
+    print("Error between = {:.4e}".format(error_between))
+
+plt.loglog(dts, errors_dof, '-o', label='numerical dof propagation')
+plt.loglog(dts, errors_interior, '-.*', label='numerical interior propagation')
 
 theory = [t**2 for t in dts]
-theory = [errors[0]*th/theory[0] for th in theory]
+theory = [errors_dof[0]*th/theory[0] for th in theory]
 
 plt.loglog(dts, theory, '--^', label='theoretical 2nd order in time')
 for x, y, a in zip([t for t in dts], theory, [('dt = {:.0e} s'.format(t)) for t in dts]):
