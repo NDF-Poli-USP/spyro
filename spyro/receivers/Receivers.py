@@ -869,43 +869,266 @@ def change_to_reference_quad(p, v0, v1, v2, v3):
 def change_to_reference_hexa(p, v0, v1, v2, v3, v4, v5, v6, v7):
     (px, py, pz) = p
     # Irregular hexa
-    (x0, y0, z0) = v0
-    (x1, y1, z1) = v1
-    (x2, y2, z2) = v2
-    (x3, y3, z3) = v3
-    (x4, y4, z4) = v4
-    (x5, y5, z5) = v5
-    (x6, y6, z6) = v6
-    (x7, y7, z7) = v7
+    a = v0
+    b = v1
+    c = v2
+    d = v4
 
-    pnx = 0.0
-    pny = 0.0
-    pnz = 0.0
+    (xa, ya, za) = a
+    (xb, yb, zb) = b
+    (xc, yc, zc) = c
+    (xd, yd, zd) = d
+    (px, py, pz) = p
 
-    # Reference hexa
-    # xn0 = 0.0
-    # yn0 = 0.0
-    # zn0 = 0.0
-    # xn1 = 1.0
-    # yn1 = 0.0
-    # zn1 = 0.0
-    # xn2 = 1.0
-    # yn2 = 1.0
-    # zn2 = 0.0
-    # xn3 = 0.0
-    # yn3 = 1.0
-    # zn3 = 0.0
-    # xn4 = 0.0
-    # yn4 = 0.0
-    # zn4 = 1.0
-    # xn5 = 1.0
-    # yn5 = 0.0
-    # zn5 = 1.0
-    # xn6 = 1.0
-    # yn6 = 1.0
-    # zn6 = 1.0
-    # xn7 = 0.0
-    # yn7 = 1.0
-    # zn7 = 1.0
+    xna = 0.0
+    yna = 0.0
+    zna = 0.0
+
+    xnb = 0.0
+    ynb = 0.0
+    znb = 1.0
+
+    xnc = 0.0
+    ync = 1.0
+    znc = 0.0
+
+    xnd = 1.0
+    ynd = 0.0
+    znd = 0.0
+
+    det = (
+        xa * yb * zc
+        - xa * yc * zb
+        - xb * ya * zc
+        + xb * yc * za
+        + xc * ya * zb
+        - xc * yb * za
+        - xa * yb * zd
+        + xa * yd * zb
+        + xb * ya * zd
+        - xb * yd * za
+        - xd * ya * zb
+        + xd * yb * za
+        + xa * yc * zd
+        - xa * yd * zc
+        - xc * ya * zd
+        + xc * yd * za
+        + xd * ya * zc
+        - xd * yc * za
+        - xb * yc * zd
+        + xb * yd * zc
+        + xc * yb * zd
+        - xc * yd * zb
+        - xd * yb * zc
+        + xd * yc * zb
+    )
+    a11 = (
+        (xnc * (ya * zb - yb * za - ya * zd + yd * za + yb * zd - yd * zb)) / det
+        - (xnd * (ya * zb - yb * za - ya * zc + yc * za + yb * zc - yc * zb)) / det
+        - (xnb * (ya * zc - yc * za - ya * zd + yd * za + yc * zd - yd * zc)) / det
+        + (xna * (yb * zc - yc * zb - yb * zd + yd * zb + yc * zd - yd * zc)) / det
+    )
+    a12 = (
+        (xnd * (xa * zb - xb * za - xa * zc + xc * za + xb * zc - xc * zb)) / det
+        - (xnc * (xa * zb - xb * za - xa * zd + xd * za + xb * zd - xd * zb)) / det
+        + (xnb * (xa * zc - xc * za - xa * zd + xd * za + xc * zd - xd * zc)) / det
+        - (xna * (xb * zc - xc * zb - xb * zd + xd * zb + xc * zd - xd * zc)) / det
+    )
+    a13 = (
+        (xnc * (xa * yb - xb * ya - xa * yd + xd * ya + xb * yd - xd * yb)) / det
+        - (xnd * (xa * yb - xb * ya - xa * yc + xc * ya + xb * yc - xc * yb)) / det
+        - (xnb * (xa * yc - xc * ya - xa * yd + xd * ya + xc * yd - xd * yc)) / det
+        + (xna * (xb * yc - xc * yb - xb * yd + xd * yb + xc * yd - xd * yc)) / det
+    )
+    a14 = (
+        (
+            xnd
+            * (
+                xa * yb * zc
+                - xa * yc * zb
+                - xb * ya * zc
+                + xb * yc * za
+                + xc * ya * zb
+                - xc * yb * za
+            )
+        )
+        / det
+        - (
+            xnc
+            * (
+                xa * yb * zd
+                - xa * yd * zb
+                - xb * ya * zd
+                + xb * yd * za
+                + xd * ya * zb
+                - xd * yb * za
+            )
+        )
+        / det
+        + (
+            xnb
+            * (
+                xa * yc * zd
+                - xa * yd * zc
+                - xc * ya * zd
+                + xc * yd * za
+                + xd * ya * zc
+                - xd * yc * za
+            )
+        )
+        / det
+        - (
+            xna
+            * (
+                xb * yc * zd
+                - xb * yd * zc
+                - xc * yb * zd
+                + xc * yd * zb
+                + xd * yb * zc
+                - xd * yc * zb
+            )
+        )
+        / det
+    )
+    a21 = (
+        (ync * (ya * zb - yb * za - ya * zd + yd * za + yb * zd - yd * zb)) / det
+        - (ynd * (ya * zb - yb * za - ya * zc + yc * za + yb * zc - yc * zb)) / det
+        - (ynb * (ya * zc - yc * za - ya * zd + yd * za + yc * zd - yd * zc)) / det
+        + (yna * (yb * zc - yc * zb - yb * zd + yd * zb + yc * zd - yd * zc)) / det
+    )
+    a22 = (
+        (ynd * (xa * zb - xb * za - xa * zc + xc * za + xb * zc - xc * zb)) / det
+        - (ync * (xa * zb - xb * za - xa * zd + xd * za + xb * zd - xd * zb)) / det
+        + (ynb * (xa * zc - xc * za - xa * zd + xd * za + xc * zd - xd * zc)) / det
+        - (yna * (xb * zc - xc * zb - xb * zd + xd * zb + xc * zd - xd * zc)) / det
+    )
+    a23 = (
+        (ync * (xa * yb - xb * ya - xa * yd + xd * ya + xb * yd - xd * yb)) / det
+        - (ynd * (xa * yb - xb * ya - xa * yc + xc * ya + xb * yc - xc * yb)) / det
+        - (ynb * (xa * yc - xc * ya - xa * yd + xd * ya + xc * yd - xd * yc)) / det
+        + (yna * (xb * yc - xc * yb - xb * yd + xd * yb + xc * yd - xd * yc)) / det
+    )
+    a24 = (
+        (
+            ynd
+            * (
+                xa * yb * zc
+                - xa * yc * zb
+                - xb * ya * zc
+                + xb * yc * za
+                + xc * ya * zb
+                - xc * yb * za
+            )
+        )
+        / det
+        - (
+            ync
+            * (
+                xa * yb * zd
+                - xa * yd * zb
+                - xb * ya * zd
+                + xb * yd * za
+                + xd * ya * zb
+                - xd * yb * za
+            )
+        )
+        / det
+        + (
+            ynb
+            * (
+                xa * yc * zd
+                - xa * yd * zc
+                - xc * ya * zd
+                + xc * yd * za
+                + xd * ya * zc
+                - xd * yc * za
+            )
+        )
+        / det
+        - (
+            yna
+            * (
+                xb * yc * zd
+                - xb * yd * zc
+                - xc * yb * zd
+                + xc * yd * zb
+                + xd * yb * zc
+                - xd * yc * zb
+            )
+        )
+        / det
+    )
+    a31 = (
+        (znc * (ya * zb - yb * za - ya * zd + yd * za + yb * zd - yd * zb)) / det
+        - (znd * (ya * zb - yb * za - ya * zc + yc * za + yb * zc - yc * zb)) / det
+        - (znb * (ya * zc - yc * za - ya * zd + yd * za + yc * zd - yd * zc)) / det
+        + (zna * (yb * zc - yc * zb - yb * zd + yd * zb + yc * zd - yd * zc)) / det
+    )
+    a32 = (
+        (znd * (xa * zb - xb * za - xa * zc + xc * za + xb * zc - xc * zb)) / det
+        - (znc * (xa * zb - xb * za - xa * zd + xd * za + xb * zd - xd * zb)) / det
+        + (znb * (xa * zc - xc * za - xa * zd + xd * za + xc * zd - xd * zc)) / det
+        - (zna * (xb * zc - xc * zb - xb * zd + xd * zb + xc * zd - xd * zc)) / det
+    )
+    a33 = (
+        (znc * (xa * yb - xb * ya - xa * yd + xd * ya + xb * yd - xd * yb)) / det
+        - (znd * (xa * yb - xb * ya - xa * yc + xc * ya + xb * yc - xc * yb)) / det
+        - (znb * (xa * yc - xc * ya - xa * yd + xd * ya + xc * yd - xd * yc)) / det
+        + (zna * (xb * yc - xc * yb - xb * yd + xd * yb + xc * yd - xd * yc)) / det
+    )
+    a34 = (
+        (
+            znd
+            * (
+                xa * yb * zc
+                - xa * yc * zb
+                - xb * ya * zc
+                + xb * yc * za
+                + xc * ya * zb
+                - xc * yb * za
+            )
+        )
+        / det
+        - (
+            znc
+            * (
+                xa * yb * zd
+                - xa * yd * zb
+                - xb * ya * zd
+                + xb * yd * za
+                + xd * ya * zb
+                - xd * yb * za
+            )
+        )
+        / det
+        + (
+            znb
+            * (
+                xa * yc * zd
+                - xa * yd * zc
+                - xc * ya * zd
+                + xc * yd * za
+                + xd * ya * zc
+                - xd * yc * za
+            )
+        )
+        / det
+        - (
+            zna
+            * (
+                xb * yc * zd
+                - xb * yd * zc
+                - xc * yb * zd
+                + xc * yd * zb
+                + xd * yb * zc
+                - xd * yc * zb
+            )
+        )
+        / det
+    )
+
+    pnx = px * a11 + py * a12 + pz * a13 + a14
+    pny = px * a21 + py * a22 + pz * a23 + a24
+    pnz = px * a31 + py * a32 + pz * a33 + a34
 
     return (pnx, pny, pnz)
