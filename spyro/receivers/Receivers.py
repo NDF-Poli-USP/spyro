@@ -1,5 +1,8 @@
 from firedrake import *
 from FIAT.reference_element import UFCTriangle, UFCTetrahedron, UFCQuadrilateral
+from FIAT.reference_element import UFCHexahedron, UFCInterval
+from FIAT import GaussLobattoLegendre as GLLelement
+from FIAT.tensor_product import TensorProductElement
 from FIAT.kong_mulder_veldhuizen import KongMulderVeldhuizen as KMV
 from FIAT.lagrange import Lagrange as CG
 from FIAT.discontinuous_lagrange import DiscontinuousLagrange as DG
@@ -271,17 +274,35 @@ class Receivers:
         cellNodeMaps = np.zeros((num_recv, nodes_per_cell))
         cellVertices = []
 
+        if self.quadrilateral is True:
+            end_vertex = 8
+            p = self.degree
+            vertex_ids = [
+                0,
+                p,
+                (p+1)*p,
+                (p+1)*p + p,
+                (p+1)*(p+1)*p,
+                (p+1)*(p+1)*p+p,
+                (p+1)*(p+1)*p+(p+1)*p,
+                (p+1)**3 -1
+            ]
+        else:
+            end_vertex = 4
+            vertex_ids = [0, 1, 2, 3]
+
         for receiver_id in range(num_recv):
             cell_id = self.is_local[receiver_id]
             cellVertices.append([])
             if cell_id is not None:
                 cellId_maps[receiver_id] = cell_id
                 cellNodeMaps[receiver_id, :] = cell_node_map[cell_id, :]
-                for vertex_number in range(0, 4):
+                for vertex_number in range(0, end_vertex):
+                    vertex_id = vertex_ids[vertex_number]
                     cellVertices[receiver_id].append([])
-                    z = node_locations[cell_node_map[cell_id, vertex_number], 0]
-                    x = node_locations[cell_node_map[cell_id, vertex_number], 1]
-                    y = node_locations[cell_node_map[cell_id, vertex_number], 2]
+                    z = node_locations[cell_node_map[cell_id, vertex_id], 0]
+                    x = node_locations[cell_node_map[cell_id, vertex_id], 1]
+                    y = node_locations[cell_node_map[cell_id, vertex_id], 2]
                     cellVertices[receiver_id][vertex_number] = (z, x, y)
 
         return cellId_maps, cellVertices, cellNodeMaps
@@ -312,7 +333,7 @@ class Receivers:
         elif self.dimension == 2 and self.quadrilateral == True:
             return self.__func_build_cell_tabulations_2D_quad()
         elif self.dimension == 3 and self.quadrilateral == True:
-            raise ValueError('3D GLL hexas not yet supported.')
+            return self.__func_build_cell_tabulations_3D_quad()
         else:
             raise ValueError
 
@@ -363,11 +384,10 @@ class Receivers:
         return cell_tabulations
 
     def __func_build_cell_tabulations_2D_quad(self):
-        finatelement = FiniteElement('CG', self.mesh.ufl_cell(), degree=self.degree, variant='spectral')
-        V = FunctionSpace(self.mesh, finatelement)
-        u = TrialFunction(V)
-        Q=u.function_space()
-        element = Q.finat_element.fiat_equivalent
+        # finatelement = FiniteElement('CG', self.mesh.ufl_cell(), degree=self.degree, variant='spectral')
+        V = self.space
+
+        element = V.finat_element.fiat_equivalent
 
         cell_tabulations = np.zeros((self.num_receivers, self.nodes_per_cell))
 
@@ -390,6 +410,37 @@ class Receivers:
 
         return cell_tabulations
     
+    def __func_build_cell_tabulations_3D_quad(self):
+        I = UFCInterval()
+        An = GLLelement(I, self.degree)
+        Bn = GLLelement(I, self.degree)
+        Cn = GLLelement(I, self.degree)
+        Dn = TensorProductElement(An, Bn)
+        element = TensorProductElement(Dn, Cn)
+
+        cell_tabulations = np.zeros((self.num_receivers, self.nodes_per_cell))
+
+        for receiver_id in range(self.num_receivers):
+            cell_id = self.is_local[receiver_id]
+            if cell_id is not None:
+                # getting coordinates to change to reference element
+                p  = self.receiver_locations[receiver_id]
+                v0 = self.cellVertices[receiver_id][0]
+                v1 = self.cellVertices[receiver_id][1]
+                v2 = self.cellVertices[receiver_id][2]
+                v3 = self.cellVertices[receiver_id][3]
+                v4 = self.cellVertices[receiver_id][4]
+                v5 = self.cellVertices[receiver_id][5]
+                v6 = self.cellVertices[receiver_id][6]
+                v7 = self.cellVertices[receiver_id][7]
+
+                p_reference = change_to_reference_hexa(p, v0, v1, v2, v3, v4, v5, v6, v7)
+                initial_tab = element.tabulate(0, [p_reference])
+                phi_tab = initial_tab[(0, 0)]
+
+                cell_tabulations[receiver_id, :] = phi_tab.transpose()
+                
+
     def set_point_cloud(self, comm):
         # Receivers always parallel to z-axis
 
@@ -814,3 +865,47 @@ def change_to_reference_quad(p, v0, v1, v2, v3):
     pny = (D*px + E*py + F)/(G*px + H*py + I)
 
     return (pnx, pny)
+
+def change_to_reference_hexa(p, v0, v1, v2, v3, v4, v5, v6, v7):
+    (px, py, pz) = p
+    # Irregular hexa
+    (x0, y0, z0) = v0
+    (x1, y1, z1) = v1
+    (x2, y2, z2) = v2
+    (x3, y3, z3) = v3
+    (x4, y4, z4) = v4
+    (x5, y5, z5) = v5
+    (x6, y6, z6) = v6
+    (x7, y7, z7) = v7
+
+    pnx = 0.0
+    pny = 0.0
+    pnz = 0.0
+
+    # Reference hexa
+    # xn0 = 0.0
+    # yn0 = 0.0
+    # zn0 = 0.0
+    # xn1 = 1.0
+    # yn1 = 0.0
+    # zn1 = 0.0
+    # xn2 = 1.0
+    # yn2 = 1.0
+    # zn2 = 0.0
+    # xn3 = 0.0
+    # yn3 = 1.0
+    # zn3 = 0.0
+    # xn4 = 0.0
+    # yn4 = 0.0
+    # zn4 = 1.0
+    # xn5 = 1.0
+    # yn5 = 0.0
+    # zn5 = 1.0
+    # xn6 = 1.0
+    # yn6 = 1.0
+    # zn6 = 1.0
+    # xn7 = 0.0
+    # yn7 = 1.0
+    # zn7 = 1.0
+
+    return (pnx, pny, pnz)

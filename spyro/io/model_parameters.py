@@ -658,7 +658,7 @@ class Model_parameters:
         elif mesh_file != None:
             self.mesh_file = mesh_file
             self.mesh_type = 'file'
-        elif dx != None and self.mesh_type == 'firedrake_mesh':
+        elif dx != None and self.mesh_type == 'firedrake_mesh' and self.dimension == 2:
             nx = int(self.length_x/dx)
             nz = int(self.length_z/dx)
             if self.cell_type == 'quadrilateral':
@@ -670,6 +670,16 @@ class Model_parameters:
                 self.user_mesh = spyro.PeriodicRectangleMesh(nz, nx, self.length_z, self.length_x, quadrilateral=quadrilateral)
             else:
                 self.user_mesh = spyro.RectangleMesh(nz, nx, self.length_z, self.length_x, quadrilateral=quadrilateral)
+        elif dx != None and self.mesh_type == 'firedrake_mesh' and self.dimension == 3:
+            nx = int(self.length_x/dx)
+            nz = int(self.length_z/dx)
+            ny = int(self.length_y/dx)
+            if self.cell_type == 'quadrilateral':
+                quadrilateral = True
+            else:
+                quadrilateral = False
+            
+            self.user_mesh = spyro.BoxMesh(nz, nx, ny, self.length_z, self.length_x, self.length_y, quadrilateral=quadrilateral)
             
         if length_z== None or length_x==None or (length_y == None and self.dimension==2):
             warnings.warn("Mesh dimensions not completely reset from initial dictionary")

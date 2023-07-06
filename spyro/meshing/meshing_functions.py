@@ -82,7 +82,10 @@ def UnitSquareMesh(nx, ny, quadrilateral=False, comm=None):
     mesh.coordinates.dat.data[:, 0] *= -1.0
     return mesh
 
-
+def BoxMesh(nx, ny, nz, Lx, Ly, Lz, quadrilateral=False):
+    mesh = fire.BoxMesh(nx, ny, nz, Lx, Ly, Lz, hexahedral=quadrilateral)
+    mesh.coordinates.dat.data[:, 0] *= -1.0
+    return mesh
 
 
 
