@@ -65,6 +65,14 @@ def quadrature_rules(V):
         )
         qr_s = None
         qr_k = None
+    elif dimension == 3 and cell_geometry == TensorProductCell(quadrilateral, interval):
+        # In this case, for the spectral element method we use GLL quadrature
+        degree, _ = degree 
+        qr_x = gauss_lobatto_legendre_cube_rule(dimension=dimension, degree=degree)
+        qr_k = qr_x
+        qr_s = gauss_lobatto_legendre_cube_rule(
+            dimension=(dimension - 1), degree=degree
+        )
     else:
         raise ValueError("Unrecognized quadrature scheme")
     return qr_x, qr_s, qr_k
