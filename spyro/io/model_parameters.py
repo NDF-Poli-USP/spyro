@@ -224,11 +224,11 @@ class Model_parameters:
         
         # Estabilishing forward output file and setting a default        
         if "forward_output_filename" not in dictionary:
-            self.forward_output_file = "results/forward.pvd"
+            self.forward_output_file = "results/forward_propogation.pvd"
         elif dictionary["forward_output_filename"] != None:
             self.forward_output_file = dictionary["forward_output_filename"]
         else:
-            self.forward_output_file = "results/forward.pvd"
+            self.forward_output_file = "results/forward_propagation.pvd"
         
         # Estabilishing velocity model file and setting a default        
         if "velocity_model_filename" not in dictionary:

@@ -262,10 +262,13 @@ class Receivers:
         The matrix has the deegres of freedom of the nodes inside
         same element as the receiver.
         """
+        print("start func_receiver_locator", flush = True)
         num_recv = self.num_receivers
 
         fdrake_cell_node_map = self.space.cell_node_map()
         cell_node_map = fdrake_cell_node_map.values_with_halo
+        if self.quadrilateral is True:
+            cell_node_map  = get_hexa_real_cell_node_map(self.space, self.mesh)
         (num_cells, nodes_per_cell) = cell_node_map.shape
         node_locations = self.__func_node_locations()
         self.nodes_per_cell = nodes_per_cell
@@ -305,6 +308,7 @@ class Receivers:
                     y = node_locations[cell_node_map[cell_id, vertex_id], 2]
                     cellVertices[receiver_id][vertex_number] = (z, x, y)
 
+        print("end func_receiver_locator", flush = True)
         return cellId_maps, cellVertices, cellNodeMaps
 
     def __func_node_locations_3D(self):
@@ -436,9 +440,11 @@ class Receivers:
 
                 p_reference = change_to_reference_hexa(p, v0, v1, v2, v3, v4, v5, v6, v7)
                 initial_tab = element.tabulate(0, [p_reference])
-                phi_tab = initial_tab[(0, 0)]
+                phi_tab = initial_tab[(0, 0, 0)]
 
                 cell_tabulations[receiver_id, :] = phi_tab.transpose()
+        
+        return cell_tabulations
                 
 
     def set_point_cloud(self, comm):
@@ -1132,3 +1138,25 @@ def change_to_reference_hexa(p, v0, v1, v2, v3, v4, v5, v6, v7):
     pnz = px * a31 + py * a32 + pz * a33 + a34
 
     return (pnx, pny, pnz)
+
+
+def get_hexa_real_cell_node_map(V, mesh):
+    weird_cnm_func = V.cell_node_map()
+    weird_cnm = weird_cnm_func.values_with_halo
+    cells_per_layer, nodes_per_cell = np.shape(weird_cnm)
+    layers = mesh.cell_set.layers - 1
+    ufl_element = V.ufl_element()
+    _, p = ufl_element.degree()
+
+    cell_node_map = np.zeros((layers*cells_per_layer, nodes_per_cell), dtype=int)
+    print(f"cnm size : {np.shape(cell_node_map)}", flush = True)
+
+    for layer in range(layers):
+        print(f"layer : {layer} of {layers}", flush = True)
+        for cell in range(cells_per_layer):
+            cnm_base = weird_cnm[cell]
+            cell_id = layer + layers*cell
+            cell_node_map[cell_id] = [item+layer*(p) for item in cnm_base]
+    
+    return cell_node_map
+

@@ -2,7 +2,7 @@ import firedrake as fire
 import SeismicMesh as sm
 import numpy as np
 
-def RectangleMesh(Lx, Ly, nx, ny, pad = None, comm=None, quadrilateral=False):
+def RectangleMesh(nx, ny, Lx, Ly, pad = None, comm=None, quadrilateral=False):
     """Create a rectangle mesh based on the Firedrake mesh.
     First axis is negative, second axis is positive. If there is a pad, both axis are dislocated by the pad.
     
@@ -33,13 +33,13 @@ def RectangleMesh(Lx, Ly, nx, ny, pad = None, comm=None, quadrilateral=False):
         Ly += 2*pad
     else:
         pad = 0
-    mesh = fire.RectangleMesh(Lx, Ly, nx, ny, quadrilateral=quadrilateral)
+    mesh = fire.RectangleMesh(nx, ny, Lx, Ly, quadrilateral=quadrilateral)
     mesh.coordinates.dat.data[:, 0] *= -1.0
     mesh.coordinates.dat.data[:, 1] -= pad
 
     return mesh
 
-def PeriodicRectangleMesh(Lx, Ly, nx, ny, pad = None, comm=None, quadrilateral=False):
+def PeriodicRectangleMesh(nx, ny, Lx, Ly, pad = None, comm=None, quadrilateral=False):
     """Create a periodic rectangle mesh based on the Firedrake mesh.
     First axis is negative, second axis is positive. If there is a pad, both axis are dislocated by the pad.
 
@@ -71,7 +71,7 @@ def PeriodicRectangleMesh(Lx, Ly, nx, ny, pad = None, comm=None, quadrilateral=F
         Ly += 2*pad
     else:
         pad = 0
-    mesh = fire.PeriodicRectangleMesh(Lx, Ly, nx, ny, quadrilateral=quadrilateral)
+    mesh = fire.PeriodicRectangleMesh(nx, ny, Lx, Ly, quadrilateral=quadrilateral)
     mesh.coordinates.dat.data[:, 0] *= -1.0
     mesh.coordinates.dat.data[:, 1] -= pad
 
@@ -82,9 +82,19 @@ def UnitSquareMesh(nx, ny, quadrilateral=False, comm=None):
     mesh.coordinates.dat.data[:, 0] *= -1.0
     return mesh
 
-def BoxMesh(nx, ny, nz, Lx, Ly, Lz, quadrilateral=False):
-    mesh = fire.BoxMesh(nx, ny, nz, Lx, Ly, Lz, hexahedral=quadrilateral)
-    mesh.coordinates.dat.data[:, 0] *= -1.0
+def BoxMesh(nx, ny, nz, Lx, Ly, Lz, pad=None, quadrilateral=False):
+    if pad != None:
+        Lx += pad
+        Ly += 2*pad
+        Lz += 2*pad
+    else:
+        pad = 0
+    quad_mesh = fire.RectangleMesh(nx, ny, Lx, Ly, quadrilateral=quadrilateral)
+    quad_mesh.coordinates.dat.data[:, 0] *= -1.0
+    quad_mesh.coordinates.dat.data[:, 1] -= pad
+    layer_height = Lz/nz
+    mesh = fire.ExtrudedMesh(quad_mesh, nz, layer_height=layer_height)
+    
     return mesh
 
 

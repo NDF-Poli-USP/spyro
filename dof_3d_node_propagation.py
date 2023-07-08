@@ -6,12 +6,12 @@ from spyro.io.model_parameters import Model_parameters
 import matplotlib.pyplot as plt
 import sys
 
-dt = 0.005
+dt = 0.0005
 # dt = float(sys.argv[1])
 
 final_time = 1.0
-dx = 0.006546536707079771
-# dx = 0.0
+# dx = 0.006546536707079771
+dx = 0.0
 
 dictionary = {}
 dictionary["options"] = {
@@ -31,7 +31,7 @@ dictionary["parallelism"] = {
 # domain and reserve the remaining 250 m for the Perfectly Matched Layer (PML) to absorb
 # outgoing waves on three sides (eg., -z, +-x sides) of the domain.
 dictionary["mesh"] = {
-    "Lz": 1.0,  # depth in km - always positive
+    "Lz": 3.0,  # depth in km - always positive
     "Lx": 1.0,  # width in km - always positive
     "Ly": 1.0,  # thickness in km - always positive
     "mesh_file": None,
@@ -44,10 +44,10 @@ dictionary["mesh"] = {
 # This transect of receivers is created with the helper function `create_transect`.
 dictionary["acquisition"] = {
     "source_type": "ricker",
-    "source_locations": [(-0.5-dx, 0.5, 0.5)],#, (-0.605, 1.7), (-0.61, 1.7), (-0.615, 1.7)],#, (-0.1, 1.5), (-0.1, 2.0), (-0.1, 2.5), (-0.1, 3.0)],
+    "source_locations": [(-1.5-dx, 0.5, 0.5)],#, (-0.605, 1.7), (-0.61, 1.7), (-0.615, 1.7)],#, (-0.1, 1.5), (-0.1, 2.0), (-0.1, 2.5), (-0.1, 3.0)],
     "frequency": 5.0,
     "delay": 1.5,
-    "receiver_locations": [(-0.7, 0.5, 0.5)],
+    "receiver_locations": [(-2.0, 0.5, 0.5)],
 }
 
 # Simulate for 2.0 seconds.
@@ -62,7 +62,7 @@ dictionary["time_axis"] = {
 
 dictionary["visualization"] = {
     "forward_output" : True,
-    "output_filename": "results/forward_3d_output.pvd",
+    "forward_output_filename": "results/forward_3d_output3by3by3.pvd",
     "fwi_velocity_model_output": False,
     "velocity_model_filename": None,
     "gradient_output": False,
@@ -76,13 +76,13 @@ Wave_obj.set_mesh(dx=0.02, periodic=True)
 Wave_obj.set_initial_velocity_model(constant=1.5)
 Wave_obj.forward_solve()
 
-# time = np.linspace(0.0, final_time, int(final_time/dt)+1)
+time = np.linspace(0.0, final_time, int(final_time/dt)+1)
 
 rec_out = Wave_obj.receivers_output
 np.save("dofs_3D_quads_rec_out"+str(dt)+".npy", rec_out)
 
-# plt.plot(time, Wave_obj.receivers_output)
-# plt.show()
+plt.plot(time, Wave_obj.receivers_output)
+plt.show()
 
 print("END")
 

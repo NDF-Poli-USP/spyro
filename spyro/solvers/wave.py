@@ -54,9 +54,15 @@ class Wave(Model_parameters):
         else:
             self.sources = None
         self.receivers = Receivers(self)
-        z, x = fire.SpatialCoordinate(self.mesh)
-        self.mesh_z = z
-        self.mesh_x = x
+        if self.dimension == 2:
+            z, x = fire.SpatialCoordinate(self.mesh)
+            self.mesh_z = z
+            self.mesh_x = x
+        elif self.dimension ==3:
+            z, x, y = fire.SpatialCoordinate(self.mesh)
+            self.mesh_z = z
+            self.mesh_x = x
+            self.mesh_y = y
 
     def set_solver_parameters(self, parameters = None):
         if   parameters != None:
