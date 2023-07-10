@@ -109,11 +109,13 @@ class Wave(Model_parameters):
         elif expression != None:
             z = self.mesh_z
             x = self.mesh_x
+            if self.dimension == 3:
+                y = self.mesh_y
             expression = eval(expression)
             V = self.function_space
             vp = fire.Function(V, name='velocity')
             vp.interpolate(expression)
-            fire.File('initial_velocity_model.pvd').write(vp, name='velocity')
+            fire.File('initial_velocity_model_3d.pvd').write(vp, name='velocity')
             self.initial_velocity_model = vp
         elif velocity_model_function != None:
             self.initial_velocity_model = velocity_model_function
