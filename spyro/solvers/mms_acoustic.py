@@ -26,10 +26,18 @@ class AcousticWaveMMS(AcousticWave):
         self.q_xy = fire.Function(V)
         x = self.mesh_z
         y = self.mesh_x
-        # xy = fire.project(sin(pi*x)*sin(pi*y), V)
-        # self.q_xy.assign(xy)
-        xy = fire.project((-x**2 - x - y**2 + y), V)
-        self.q_xy.assign(xy)
+        if self.dimension == 2:
+            # xy = fire.project(sin(pi*x)*sin(pi*y), V)
+            # self.q_xy.assign(xy)
+            xy = fire.project((-x**2 - x - y**2 + y), V)
+            self.q_xy.assign(xy)
+        elif self.dimension == 3:
+            z = self.mesh_y
+            # xyz = fire.project(sin(pi*x)*sin(pi*y)*sin(pi*z), V)
+            # self.q_xy.assign(xyz)
+            xyz = fire.project((-x*y*(x + 1)*(y - 1) - x*z*(x + 1)*(z - 1) - y*z*(y - 1)*(z - 1)), V)
+            self.q_xy.assign(xyz)
+            
         # self.q_xy.interpolate(sin(pi*x)*sin(pi*y))
     
     def mms_source_in_time(self, t):
@@ -42,10 +50,14 @@ class AcousticWaveMMS(AcousticWave):
         y = self.mesh_x
         # analytical = fire.project(sin(pi*x)*sin(pi*y)*t**2, self.function_space)
         # self.analytical.interpolate(sin(pi*x)*sin(pi*y)*t**2)
-        self.analytical.interpolate(x*(x+1)*y*(y-1)*t)
+        if self.dimension == 2:
+            self.analytical.interpolate(x*(x+1)*y*(y-1)*t)
+        elif self.dimension == 3:
+            z = self.mesh_y
+            self.analytical.interpolate(x*(x+1)*y*(y-1)*z*(z-1)*t)
         # self.analytical.assign(analytical)
 
-        return self. analytical
+        return self.analytical
     
     @ensemble_propagator
     def wave_propagator(self, dt = None, final_time = None, source_num=None):
