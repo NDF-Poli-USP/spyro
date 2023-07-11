@@ -21,6 +21,20 @@ def gauss_lobatto_legendre_line_rule(degree):
 
 # 3D
 def gauss_lobatto_legendre_cube_rule(dimension, degree):
+    """Returns GLL integration rule
+
+    Parameters
+    ----------
+    dimension: `int`
+        The dimension of the mesh
+    degree: `int`
+        The degree of the function space
+
+    Returns
+    -------
+    result: `finat.quadrature.QuadratureRule`
+        The GLL integration rule
+    """
     make_tensor_rule = finat.quadrature.TensorProductQuadratureRule
     result = gauss_lobatto_legendre_line_rule(degree)
     for _ in range(1, dimension):

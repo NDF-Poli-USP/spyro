@@ -361,12 +361,17 @@ class Model_parameters:
             Wavelet values in each time step to be used in the simulation.
         """
         if self.source_type == 'ricker':
+            if "delay_type" in self.input_dictionary["acquisition"]:
+                delay_type = self.input_dictionary["acquisition"]["delay_type"]
+            else:
+                delay_type = "multiples_of_minimun"
             wavelet = spyro.full_ricker_wavelet(
                         dt=self.dt,
                         final_time=self.final_time,
                         frequency=self.frequency,
                         delay = self.delay,
                         amplitude = self.amplitude,
+                        delay_type = delay_type,
                         )
         elif self.source_type == 'mms_source':
             wavelet = None

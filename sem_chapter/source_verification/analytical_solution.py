@@ -64,7 +64,7 @@ def analytical(nt, dt, t_final, f0):
 
 # t_initial = 0.5
 f0 = 5
-n_extra = 3000
+n_extra = 5000
 
 time1 = np.linspace(0.0, n_extra*t_final, n_extra*(nnt-1)+1 )
 p = analytical(n_extra*(nnt-1)+1, time1[1]-time1[0], n_extra*t_final, f0)
