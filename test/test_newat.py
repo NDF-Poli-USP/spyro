@@ -5,11 +5,8 @@ import pytest
 from firedrake import *
 import spyro
 
-from inputfiles.Model1_2d_CG import model as oldmodel
-from inputfiles.Model1_3d_CG import model as oldmodel3D
-
-model = spyro.io.Model_parameters(oldmodel)
-model3D = spyro.io.Model_parameters(oldmodel3D)
+from .inputfiles.Model1_2d_CG import model as oldmodel
+from .inputfiles.Model1_3d_CG import model as oldmodel3D
 
 def triangle_area(p1, p2, p3):
     """Simple function to calculate triangle area based on its 3 vertices."""
