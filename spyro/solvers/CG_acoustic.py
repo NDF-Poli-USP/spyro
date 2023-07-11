@@ -2,7 +2,7 @@ import firedrake as fire
 from firedrake import Constant, dx, dot, grad
 
 from .wave import Wave
-from ..io.io import ensemble_propagator
+from ..io.basicio import ensemble_propagator
 from . import helpers
 from .. import utils
 from ..domains.quadrature import quadrature_rules

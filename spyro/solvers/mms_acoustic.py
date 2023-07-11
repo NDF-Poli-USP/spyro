@@ -2,7 +2,7 @@ import firedrake as fire
 from firedrake import Constant, dx, dot, grad, sin
 from numpy import pi
 from .CG_acoustic import AcousticWave
-from ..io.io import ensemble_propagator
+from ..io.basicio import ensemble_propagator
 from . import helpers
 from .. import utils
 
