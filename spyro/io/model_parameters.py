@@ -415,6 +415,8 @@ class Model_parameters:
 
         # Check ricker source:
         self.source_type = dictionary["source_type"]
+        if self.source_type == 'Ricker':
+            self.source_type = 'ricker'
 
     def _sanitize_mesh(self):
         dictionary = self.input_dictionary
@@ -461,7 +463,7 @@ class Model_parameters:
             if dictionary["inversion"]["perform_fwi"]:
                 self.running_fwi = True
         if self.running_fwi:
-            self.initial_velocity_model_file = dictionary["inversion"]["initial_velocity_model"]
+            self.initial_velocity_model_file = dictionary["inversion"]["initial_guess_model_file"]
             self.fwi_output_folder = 'fwi/'
             self.control_output_file = self.fwi_output_folder+'control'
             self.gradient_output_file = self.fwi_output_folder+'gradient'
@@ -715,6 +717,8 @@ class Model_parameters:
         # Checking if method/cell_type + variant specified twice:
         if "method" in dictionary["options"] and ("cell_type" in dictionary["options"]) and ("variant" in dictionary["options"]):
             if dictionary["options"]["method"] != None and dictionary["options"]["cell_type"] != None:
+                self.cell_type = dictionary["options"]["cell_type"]
+                self.__unify_cell_type_input()
                 warnings.warn("Both methods of specifying method and cell_type with variant used. Method specification taking priority.")
         if "method" in dictionary["options"] and dictionary["options"]["method"] != None:
             self.method = dictionary["options"]["method"]
@@ -807,7 +811,7 @@ class Model_parameters:
             The distributed mesh across `ens_comm`
         """
         if self.mesh_file != None:
-            return spyro.basicio.read_mesh(self)
+            return spyro.io.read_mesh(self)
         elif self.mesh_type == 'user_mesh' or self.mesh_type == 'firedrake_mesh':
             return self.user_mesh
 
