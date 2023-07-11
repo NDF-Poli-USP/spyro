@@ -9,6 +9,16 @@ from ..domains.quadrature import quadrature_rules
 
 class AcousticWave(Wave):
     def forward_solve(self):
+        """ Solves the forward problem.
+
+        Parameters:
+        -----------
+        None
+
+        Returns:
+        --------
+        None
+        """
         self._get_initial_velocity_model()
         self.c = self.initial_velocity_model
         self.matrix_building()
