@@ -8,7 +8,8 @@ from .solvers.CG_acoustic import AcousticWave
 from .solvers.dg_wave import DG_Wave
 from .solvers.mms_acoustic import AcousticWaveMMS
 from .utils import utils
-from .utils.geometry_creation import create_transect, create_2d_grid, insert_fixed_value, create_3d_grid
+from .utils.geometry_creation import create_transect, create_2d_grid
+from .utils.geometry_creation import insert_fixed_value, create_3d_grid
 from .utils.estimate_timestep import estimate_timestep
 from . import io
 from . import solvers

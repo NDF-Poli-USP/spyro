@@ -14,6 +14,43 @@ class Receivers:
     """Interpolate data defined on a triangular mesh to a
     set of 2D/3D coordinates for variable spatial order
     using Lagrange interpolation.
+
+    Can interpolate receiveir values that do not coincide with
+    mesh or DOF points
+
+    ...
+
+    Attributes
+    ----------
+    mesh : Firedrake.mesh
+        mesh where receivers are located
+    V: Firedrake.FunctionSpace object
+        The space of the finite elements
+    my_ensemble: Firedrake.ensemble_communicator
+        An ensemble communicator
+    dimension: int
+        The dimension of the space
+    degree: int
+        Degree of the function space
+    receiver_locations: list
+        List of tuples containing all receiver locations
+    num_receivers: int
+        Number of receivers
+    quadrilateral: boolean
+        Boolean that specifies if cells are quadrilateral
+    is_local: list of booleans
+        List that checks if receivers are present in cores
+        spatial paralelism
+
+    Methods
+    -------
+    build_maps()
+        Calculates and stores tabulations for interpolation
+    interpolate(field)
+        Interpolates field value at receiver locations
+    apply_receivers_as_source(rhs_forcing, residual, IT)
+        Applies receivers as source with values from residual
+        in timestep IT, for usage with adjoint propagation
     """
 
     def __init__(self, wave_object):
@@ -80,14 +117,36 @@ class Receivers:
         self.__num_receivers = value
 
     def build_maps(self):
+        """Calculates and stores tabulations for interpolation
+
+        Is always automatticaly called when initializing the class,
+        therefore should only be called again if a mesh related attribute
+        changes.
+
+        Returns
+        -------
+        cellIDs: list
+            List of cell IDs for each receiver
+        cellVertices: list
+            List of vertices for each receiver
+        cellNodeMaps: list
+            List of node maps for each receiver
+        cell_tabulations: list
+            List of tabulations for each receiver
+        """
+
         for rid in range(self.num_receivers):
             tolerance = 1e-6
             if self.dimension == 2:
                 receiver_z, receiver_x = self.receiver_locations[rid]
-                cell_id = self.mesh.locate_cell([receiver_z, receiver_x], tolerance=tolerance )
+                cell_id = self.mesh.locate_cell(
+                    [receiver_z, receiver_x], tolerance=tolerance
+                )
             elif self.dimension == 3:
                 receiver_z, receiver_x, receiver_y = self.receiver_locations[rid]
-                cell_id = self.mesh.locate_cell([receiver_z, receiver_x, receiver_y], tolerance=tolerance )
+                cell_id = self.mesh.locate_cell(
+                    [receiver_z, receiver_x, receiver_y], tolerance=tolerance
+                )
             self.is_local[rid] = cell_id
 
         (
@@ -102,10 +161,12 @@ class Receivers:
     def interpolate(self, field):
         """Interpolate the solution to the receiver coordinates for
         one simulation timestep.
+
         Parameters
         ----------
         field: array-like
             An array of the solution at a given timestep at all nodes
+        
         Returns
         -------
         solution_at_receivers: list
@@ -115,20 +176,38 @@ class Receivers:
         return [self.__new_at(field, rn) for rn in range(self.num_receivers)]
 
     def apply_receivers_as_source(self, rhs_forcing, residual, IT):
-        """
-        The adjoint operation of interpolation (injection)
+        """The adjoint operation of interpolation (injection)
+
+        Injects residual, and timestep IT, at receiver locations
+        as source and stores their value in the right hand side
+        operator rhs_forcing.
+
+        Parameters
+        ----------
+        rhs_forcing: object
+            Firedrake assembled right hand side operator to store values
+        residual: list
+            List of residual values at different receiver locations
+            and timesteps
+        IT: int
+            Desired time step number to get residual value from
+        
+        Returns
+        -------
+        rhs_forcing: object
+            Firedrake assembled right hand side operator with injected values
         """
         for rid in range(self.num_receivers):
             value = residual[IT][rid]
             if self.is_local[rid]:
                 idx = np.int_(self.cellNodeMaps[rid])
                 phis = self.cell_tabulations[rid]
-               
+
                 tmp = np.dot(phis, value)
                 rhs_forcing.dat.data_with_halos[idx] += tmp
             else:
                 tmp = rhs_forcing.dat.data_with_halos[0]
-       
+
         return rhs_forcing
 
     def __func_receiver_locator(self):
@@ -187,10 +266,15 @@ class Receivers:
         cellNodeMaps = np.zeros((num_recv, nodes_per_cell))
         cellVertices = []
 
-        if self.quadrilateral == True:
+        if self.quadrilateral is True:
             end_vertex_id = 4
             degree = self.degree
-            cell_ends = [0, (degree+1)*(degree+1)-degree-1,  (degree+1)*(degree+1)-1, degree]
+            cell_ends = [
+                0,
+                (degree + 1) * (degree + 1) - degree - 1,
+                (degree + 1) * (degree + 1) - 1,
+                degree,
+            ]
         else:
             end_vertex_id = 3
             cell_ends = [0, 1, 2]
@@ -205,8 +289,12 @@ class Receivers:
                 cellNodeMaps[receiver_id, :] = cell_node_map[cell_id, :]
                 for vertex_number in range(0, end_vertex_id):
                     cellVertices[receiver_id].append([])
-                    z = node_locations[cell_node_map[cell_id, cell_ends[vertex_number]], 0]
-                    x = node_locations[cell_node_map[cell_id, cell_ends[vertex_number]], 1]
+                    z = node_locations[
+                        cell_node_map[cell_id, cell_ends[vertex_number]], 0
+                    ]
+                    x = node_locations[
+                        cell_node_map[cell_id, cell_ends[vertex_number]], 1
+                    ]
                     cellVertices[receiver_id][vertex_number] = (z, x)
 
         return cellId_maps, cellVertices, cellNodeMaps
@@ -221,6 +309,7 @@ class Receivers:
         receiver_id: a list of integers
             A list of receiver ids, ranging from 0 to total receivers
             minus one.
+        
         Returns
         -------
         at: Function value at given receiver
@@ -261,6 +350,7 @@ class Receivers:
         the receiver.
         The matrix has the deegres of freedom of the nodes inside
         same element as the receiver.
+        
         """
         print("start func_receiver_locator", flush = True)
         num_recv = self.num_receivers
@@ -315,6 +405,7 @@ class Receivers:
         """Function that returns a list which includes a numpy matrix
         where line n has the x and y values of the nth degree of freedom,
         and a numpy matrix of the vertex coordinates.
+        
         """
         x, y, z = SpatialCoordinate(self.mesh)
         ux = Function(self.space).interpolate(x)
@@ -330,11 +421,11 @@ class Receivers:
         return node_locations
 
     def __func_build_cell_tabulations(self):
-        if self.dimension == 2   and self.quadrilateral == False:
+        if self.dimension == 2 and self.quadrilateral is False:
             return self.__func_build_cell_tabulations_2D()
-        elif self.dimension == 3 and self.quadrilateral == False:
+        elif self.dimension == 3 and self.quadrilateral is False:
             return self.__func_build_cell_tabulations_3D()
-        elif self.dimension == 2 and self.quadrilateral == True:
+        elif self.dimension == 2 and self.quadrilateral is True:
             return self.__func_build_cell_tabulations_2D_quad()
         elif self.dimension == 3 and self.quadrilateral == True:
             return self.__func_build_cell_tabulations_3D_quad()
@@ -399,7 +490,7 @@ class Receivers:
             cell_id = self.is_local[receiver_id]
             if cell_id is not None:
                 # getting coordinates to change to reference element
-                p  = self.receiver_locations[receiver_id]
+                p = self.receiver_locations[receiver_id]
                 v0 = self.cellVertices[receiver_id][0]
                 v1 = self.cellVertices[receiver_id][1]
                 v2 = self.cellVertices[receiver_id][2]
@@ -410,7 +501,6 @@ class Receivers:
                 phi_tab = initial_tab[(0, 0)]
 
                 cell_tabulations[receiver_id, :] = phi_tab.transpose()
-
 
         return cell_tabulations
     
@@ -451,36 +541,52 @@ class Receivers:
         # Receivers always parallel to z-axis
 
         rec_pos = self.receiver_locations
-       
-        # 2D -- 
-        if self.dimension==2:
-            num_rec = self.num_receivers
-            δz   = np.linspace(rec_pos[0,0], rec_pos[num_rec-1,0], 1) 
-            δx   = np.linspace(rec_pos[0,1], rec_pos[num_rec-1,1], num_rec)
-            
-            Z, X = np.meshgrid(δz,δx)
-            xs   = np.vstack((Z.flatten(), X.flatten())).T
-        
-        #3D   
-        elif self.dimension==3:
-            δz   = np.linspace(rec_pos[0][0], rec_pos[1][0], self.column_z)
-            δx   = np.linspace(rec_pos[0][1], rec_pos[1][1], self.column_x)
-            δy   = np.linspace(rec_pos[0][2], rec_pos[1][2], self.column_y)
 
-            Z, X, Y = np.meshgrid(δz,δx,δy)
-            xs      = np.vstack((Z.flatten(),X.flatten(), Y.flatten())).T
+        # 2D --
+        if self.dimension == 2:
+            num_rec = self.num_receivers
+            δz = np.linspace(rec_pos[0, 0], rec_pos[num_rec - 1, 0], 1)
+            δx = np.linspace(rec_pos[0, 1], rec_pos[num_rec - 1, 1], num_rec)
+
+            Z, X = np.meshgrid(δz, δx)
+            xs = np.vstack((Z.flatten(), X.flatten())).T
+
+        # 3D
+        elif self.dimension == 3:
+            δz = np.linspace(rec_pos[0][0], rec_pos[1][0], self.column_z)
+            δx = np.linspace(rec_pos[0][1], rec_pos[1][1], self.column_x)
+            δy = np.linspace(rec_pos[0][2], rec_pos[1][2], self.column_y)
+
+            Z, X, Y = np.meshgrid(δz, δx, δy)
+            xs = np.vstack((Z.flatten(), X.flatten(), Y.flatten())).T
         else:
-            print("This dimension is not accepted.")  
-            quit() 
-        
-        point_cloud = VertexOnlyMesh(self.mesh, xs)   
-    
+            print("This dimension is not accepted.")
+            quit()
+
+        point_cloud = VertexOnlyMesh(self.mesh, xs)
+
         return point_cloud
 
-## Some helper functions
+
+# Some helper functions
 
 
 def choosing_element(V, degree):
+    """Chooses UFL element based on desired function space
+    and degree of interpolation.
+    
+    Parameters
+    ----------
+    V : firedrake.FunctionSpace
+        Function space to be used.
+    degree : int
+        Degree of interpolation.
+
+    Returns
+    -------
+    element : UFL element
+        UFL element to be used in the interpolation.    
+    """
     cell_geometry = V.mesh().ufl_cell()
     if cell_geometry == quadrilateral:
         T = UFCQuadrilateral()
@@ -508,6 +614,7 @@ def choosing_element(V, degree):
 
 
 def change_to_reference_triangle(p, a, b, c):
+    """Changes variables to reference triangle"""
     (xa, ya) = a
     (xb, yb) = b
     (xc, yc) = c
@@ -549,6 +656,7 @@ def change_to_reference_triangle(p, a, b, c):
 
 
 def change_to_reference_tetrahedron(p, a, b, c, d):
+    """Changes variables to reference tetrahedron"""
     (xa, ya, za) = a
     (xb, yb, zb) = b
     (xc, yc, zc) = c
@@ -808,7 +916,9 @@ def change_to_reference_tetrahedron(p, a, b, c, d):
 
     return (pnx, pny, pnz)
 
+
 def change_to_reference_quad(p, v0, v1, v2, v3):
+    """Changes varibales to reference quadrilateral"""
     (px, py) = p
     # Irregular quad
     (x0, y0) = v0
@@ -833,42 +943,39 @@ def change_to_reference_quad(p, v0, v1, v2, v3):
     sumx = x0 - x1 + x2 - x3
     sumy = y0 - y1 + y2 - y3
 
-    gover = np.array([[sumx, dx2],
-                    [sumy, dy2]])
+    gover = np.array([[sumx, dx2], [sumy, dy2]])
 
-    g_under= np.array([[dx1, dx2 ],
-                    [dy1, dy2 ]])
+    g_under = np.array([[dx1, dx2], [dy1, dy2]])
 
     gunder = np.linalg.det(g_under)
-                    
-    hover = np.array([[dx1, sumx],
-                    [dy1, sumy]])
 
-    hunder= gunder
+    hover = np.array([[dx1, sumx], [dy1, sumy]])
 
-    g = np.linalg.det(gover)/gunder
-    h = np.linalg.det(hover)/hunder
+    hunder = gunder
+
+    g = np.linalg.det(gover) / gunder
+    h = np.linalg.det(hover) / hunder
     i = 1.0
 
-    a = x1 - x0 + g*x1
-    b = x3 - x0 + h*x3
+    a = x1 - x0 + g * x1
+    b = x3 - x0 + h * x3
     c = x0
-    d = y1 - y0 + g*y1
-    e = y3 - y0 + h*y3
+    d = y1 - y0 + g * y1
+    e = y3 - y0 + h * y3
     f = y0
 
-    A = e*i - f*h
-    B = c*h - b*i
-    C = b*f - c*e
-    D = f*g - d*i
-    E = a*i - c*g
-    F = c*d - a*f
-    G = d*h - e*g
-    H = b*g - a*h
-    I = a*e - b*d
+    A = e * i - f * h
+    B = c * h - b * i
+    C = b * f - c * e
+    D = f * g - d * i
+    E = a * i - c * g
+    F = c * d - a * f
+    G = d * h - e * g
+    H = b * g - a * h
+    I = a * e - b * d
 
-    pnx = (A*px + B*py + C)/(G*px + H*py + I)
-    pny = (D*px + E*py + F)/(G*px + H*py + I)
+    pnx = (A * px + B * py + C) / (G * px + H * py + I)
+    pny = (D * px + E * py + F) / (G * px + H * py + I)
 
     return (pnx, pny)
 

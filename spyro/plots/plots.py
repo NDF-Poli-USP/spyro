@@ -1,11 +1,9 @@
 # from scipy.io import savemat
 import matplotlib.pyplot as plt
-
 import numpy as np
-
 from ..io import ensemble_plot
-__all__ = ["plot_shots"]
 
+__all__ = ["plot_shots"]
 
 
 @ensemble_plot
@@ -75,7 +73,7 @@ def plot_shots(
     plt.xlim(start_index, end_index)
     plt.ylim(tf, 0)
     plt.subplots_adjust(left=0.18, right=0.95, bottom=0.14, top=0.95)
-    plt.savefig("shot_number_" + file_name + "." + file_format, format=file_format)
+    plt.savefig(file_name + "." + file_format, format=file_format)
     # plt.axis("image")
     if show:
         plt.show()

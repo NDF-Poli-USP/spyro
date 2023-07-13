@@ -35,7 +35,7 @@ mesh = {
 
 BCs = {
     "status": True,  # True,  # True or false
-    "outer_bc": "none",  #  neumann, non-reflective (outer boundary condition)
+    "outer_bc": "none",  # neumann, non-reflective (outer boundary condition)
     "damping_type": "polynomial",  # polynomial. hyperbolic, shifted_hyperbolic
     "exponent": 2,
     "cmax": 3.0,  # maximum acoustic wave velocity in PML - km/s
@@ -57,7 +57,7 @@ acquisition = {
 }
 
 timeaxis = {
-    "t0": 0.0,  #  Initial time for event
+    "t0": 0.0,  # Initial time for event
     "tf": 0.5,  # Final time for event
     "dt": 0.0005,  # timestep size
     "nspool": 20,  # how frequently to output solution to pvds
@@ -69,7 +69,7 @@ inversion = {
 }  # cutoff frequencies (Hz) for Ricker source and to low-pass the observed shot record
 
 aut_dif = {
-    "status": False, 
+    "status": False,
 }
 
 # Create your model with all the options

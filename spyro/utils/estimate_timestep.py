@@ -13,13 +13,14 @@ def estimate_timestep(mesh, V, c, estimate_max_eigenvalue=True):
     generalized eigenvalue exactly
 
     ONLY WORKS WITH KMV ELEMENTS
+
     """
 
     u, v = fd.TrialFunction(V), fd.TestFunction(V)
     quad_rule = finat.quadrature.make_quadrature(
         V.finat_element.cell, V.ufl_element().degree(), "KMV"
     )
-    dxlump = fd.dx(rule=quad_rule)
+    dxlump = fd.dx(scheme=quad_rule)
     A = fd.assemble(u * v * dxlump)
     ai, aj, av = A.petscmat.getValuesCSR()
     av_inv = []
@@ -31,7 +32,7 @@ def estimate_timestep(mesh, V, c, estimate_max_eigenvalue=True):
     Asp = scipy.sparse.csr_matrix((av, aj, ai))
     Asp_inv = scipy.sparse.csr_matrix((av_inv, aj, ai))
 
-    K = fd.assemble(c*c*dot(grad(u), grad(v)) * dxlump)
+    K = fd.assemble(c * c * dot(grad(u), grad(v)) * dxlump)
     ai, aj, av = K.petscmat.getValuesCSR()
     Ksp = scipy.sparse.csr_matrix((av, aj, ai))
 
@@ -51,11 +52,11 @@ def estimate_timestep(mesh, V, c, estimate_max_eigenvalue=True):
 
     # print(max_eigval)
     if np.sqrt(max_eigval) > 0.0:
-    	max_dt = np.float(2 / np.sqrt(max_eigval))
+        max_dt = float(2 / np.sqrt(max_eigval))
     else:
         max_dt = 100000000
-    #print(
+    # print(
     #    f"Maximum stable timestep should be about: {np.float(2 / np.sqrt(max_eigval))} seconds",
     #    flush=True,
-    #)
+    # )
     return max_dt

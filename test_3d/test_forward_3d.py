@@ -1,30 +1,32 @@
 from firedrake import File
-import matplotlib.pyplot as plt
 import numpy as np
-import math
 import spyro
-import pytest
 
-def compare_velocity(p_r, receiver_in_source_index, receiver_comparison_index, model,dt):
-    receiver_0 = p_r[:,receiver_in_source_index]
-    receiver_1 = p_r[:,receiver_comparison_index]
+
+def compare_velocity(
+    p_r, receiver_in_source_index, receiver_comparison_index, model, dt
+):
+    receiver_0 = p_r[:, receiver_in_source_index]
+    receiver_1 = p_r[:, receiver_comparison_index]
 
     pos = model["acquisition"]["receiver_locations"]
 
-    time0 = np.argmax(receiver_0)*dt
-    time1 = np.argmax(receiver_1)*dt
+    time0 = np.argmax(receiver_0) * dt
+    time1 = np.argmax(receiver_1) * dt
 
     x0 = pos[receiver_in_source_index][1]
     x1 = pos[receiver_comparison_index][1]
 
-    measured_velocity = np.abs(x1-x0)/(time1-time0)
+    measured_velocity = np.abs(x1 - x0) / (time1 - time0)
     minimum_velocity = 1.5
 
-    error_percent = 100*np.abs(measured_velocity-minimum_velocity)/minimum_velocity
+    error_percent = (
+        100 * np.abs(measured_velocity - minimum_velocity) / minimum_velocity
+    )
     return error_percent
 
 
-def test_forward_3d(tf = 0.6):
+def test_forward_3d(tf=0.6):
     model = {}
 
     model["opts"] = {
@@ -44,7 +46,7 @@ def test_forward_3d(tf = 0.6):
     }
     model["BCs"] = {
         "status": True,  # True or false
-        "outer_bc": "non-reflective",  #  None or non-reflective (outer boundary condition)
+        "outer_bc": "non-reflective",  # None or non-reflective (outer boundary condition)
         "damping_type": "polynomial",  # polynomial, hyperbolic, shifted_hyperbolic
         "exponent": 2,  # damping layer has a exponent variation
         "cmax": 6.0,  # maximum acoustic wave velocity in PML - km/s
@@ -58,13 +60,20 @@ def test_forward_3d(tf = 0.6):
         "source_pos": [(-0.15, 0.25, 0.25)],
         "frequency": 5.0,
         "delay": 1.0,
-        "receiver_locations": [(-0.15, 0.25, 0.25), (-0.15, 0.3, 0.25), (-0.15, 0.35, 0.25), (-0.15, 0.4, 0.25), (-0.15, 0.45, 0.25), (-0.15, 0.5, 0.25), (-0.15, 0.55, 0.25), (-0.15, 0.6, 0.25)],
+        "receiver_locations": [
+            (-0.15, 0.25, 0.25),
+            (-0.15, 0.3, 0.25),
+            (-0.15, 0.35, 0.25),
+            (-0.15, 0.4, 0.25),
+            (-0.15, 0.45, 0.25),
+            (-0.15, 0.5, 0.25),
+            (-0.15, 0.55, 0.25),
+            (-0.15, 0.6, 0.25),
+        ],
     }
-    model["aut_dif"] ={
-        "status": False
-    }
+    model["aut_dif"] = {"status": False}
     model["timeaxis"] = {
-        "t0": 0.0,  #  Initial time for event
+        "t0": 0.0,  # Initial time for event
         "tf": tf,  # Final time for event
         "dt": 0.00075,
         "amplitude": 1,  # the Ricker has an amplitude of 1.
@@ -91,16 +100,15 @@ def test_forward_3d(tf = 0.6):
         model, mesh, comm, vp, sources, wavelet, receivers, output=False
     )
 
-    dt=model["timeaxis"]["dt"]
-    final_time=model["timeaxis"]["tf"]
+    dt = model["timeaxis"]["dt"]
 
     pass_error_test = True
 
     if comm.comm.rank == 0:
-        error_percent = compare_velocity(p_r, 0, 7, model,dt)
+        error_percent = compare_velocity(p_r, 0, 7, model, dt)
         if error_percent < 5:
             pass_error_test = True
         else:
             pass_error_test = False
-    
+
     assert pass_error_test

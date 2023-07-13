@@ -22,7 +22,7 @@ model["mesh"] = {
 }
 model["BCs"] = {
     "status": True,  # True or false
-    "outer_bc": "non-reflective",  #  None or non-reflective (outer boundary condition)
+    "outer_bc": "non-reflective",  # None or non-reflective (outer boundary condition)
     "damping_type": "polynomial",  # polynomial, hyperbolic, shifted_hyperbolic
     "exponent": 2,  # damping layer has a exponent variation
     "cmax": 4.5,  # maximum acoustic wave velocity in PML - km/s
@@ -41,7 +41,7 @@ model["acquisition"] = {
     "receiver_locations": spyro.create_transect((-0.10, 0.1), (-0.10, 17.0), 500),
 }
 model["timeaxis"] = {
-    "t0": 0.0,  #  Initial time for event
+    "t0": 0.0,  # Initial time for event
     "tf": 5.00,  # Final time for event
     "dt": 0.00025,
     "amplitude": 1,  # the Ricker has an amplitude of 1.

@@ -21,7 +21,51 @@ def functions(
     y2=None,
     b_pml=None,
 ):
-    """ Damping functions for the perfect matched layer for 2D and 3D"""
+    """Damping functions for the perfect matched layer for 2D and 3D
+    
+    Parameters
+    ----------
+    model : dict
+        Dictionary with the model parameters
+    V : obj
+        Firedrake function space
+    dimension : int
+        Dimension of the problem
+    x : obj
+        Firedrake spatial coordinate
+    x1 : float
+        x coordinate of the left boundary of the PML
+    x2 : float
+        x coordinate of the right boundary of the PML
+    a_pml : float
+        Width of the PML in the x direction
+    z : obj
+        Firedrake spatial coordinate
+    z1 : float
+        z coordinate of the bottom boundary of the PML
+    z2 : float
+        z coordinate of the top boundary of the PML
+    c_pml : float
+        Width of the PML in the z direction
+    y : obj, optional
+        Firedrake spatial coordinate, by default None
+    y1 : float, optional
+        y coordinate of the back boundary of the PML, by default None
+    y2 : float, optional
+        y coordinate of the front boundary of the PML, by default None
+    b_pml : float, optional
+        Width of the PML in the y direction, by default None
+
+    Returns
+    -------
+    sigma_x : obj
+        Firedrake function with the damping function in the x direction
+    sigma_z : obj
+        Firedrake function with the damping function in the z direction
+    sigma_y : obj
+        Firedrake function with the damping function in the y direction
+    
+    """
 
     damping_type = model["BCs"]["damping_type"]
     if damping_type == "polynomial":
@@ -94,12 +138,11 @@ def functions(
             )
         )
         sigma_y = Function(V, name="sigma_y").interpolate(aux1 + aux2)
-
-        
         # sgm_y = File("pmlField/sigma_y.pvd")
         # sgm_y.write(sigma_y)
 
         return (sigma_x, sigma_y, sigma_z)
+
 
 def matrices_2D(sigma_x, sigma_y):
     """Damping matrices for a two-dimensional problem"""
