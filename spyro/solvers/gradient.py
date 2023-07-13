@@ -102,8 +102,8 @@ def gradient(
     t = 0.0
 
     # -------------------------------------------------------
-    m1 = ((u - 2.0 * u_n + u_nm1) / Constant(dt ** 2)) * v * dx(rule=qr_x)
-    a = c * c * dot(grad(u_n), grad(v)) * dx(rule=qr_x)  # explicit
+    m1 = ((u - 2.0 * u_n + u_nm1) / Constant(dt**2)) * v * dx(scheme=qr_x)
+    a = c * c * dot(grad(u_n), grad(v)) * dx(scheme=qr_x)  # explicit
 
     lhs1 = m1
     rhs1 = -a
@@ -122,7 +122,7 @@ def gradient(
     uuadj = fire.Function(V)  # auxiliarly function for the gradient compt.
     uufor = fire.Function(V)  # auxiliarly function for the gradient compt.
 
-    ffG = 2.0 * c * dot(grad(uuadj), grad(uufor)) * m_v * dx(rule=qr_x)
+    ffG = 2.0 * c * dot(grad(uuadj), grad(uufor)) * m_v * dx(scheme=qr_x)
 
     lhsG = mgrad
     rhsG = ffG

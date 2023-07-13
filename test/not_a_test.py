@@ -56,7 +56,7 @@ def test_gradient_talyor_remainder_v2():
     class L2Inner(object):
         def __init__(self):
             self.A = assemble(
-                TrialFunction(V) * TestFunction(V) * dx(rule=qr_x), mat_type="matfree"
+                TrialFunction(V) * TestFunction(V) * dx(scheme=qr_x), mat_type="matfree"
             )
             self.Ap = as_backend_type(self.A).mat()
 
@@ -106,14 +106,14 @@ def test_gradient_talyor_remainder_v2():
         def update(self, x, flag, iteration):
             vp_guess.assign(Function(V, x.vec, name="velocity"))
 
-    paramsDict = {
-        "Step": {
-            "Line Search": {"Descent Method": {"Type": "Quasi-Newton Method"}},
-            "Type": "Line Search",
-        },
-        "Status Test": {"Gradient Tolerance": 1e-12, "Iteration Limit": 20},
-    }
-    params = ROL.ParameterList(paramsDict, "Parameters")
+    # paramsDict = {
+    #     "Step": {
+    #         "Line Search": {"Descent Method": {"Type": "Quasi-Newton Method"}},
+    #         "Type": "Line Search",
+    #     },
+    #     "Status Test": {"Gradient Tolerance": 1e-12, "Iteration Limit": 20},
+    # }
+    # params = ROL.ParameterList(paramsDict, "Parameters")
 
     inner_product = L2Inner()
     obj = Objective(inner_product)

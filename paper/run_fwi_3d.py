@@ -30,7 +30,7 @@ receivers = spyro.insert_fixed_value(receivers, -0.15, 0)
 def get_memory_usage():
     """Return the memory usage in Mo."""
     process = psutil.Process(os.getpid())
-    mem = process.memory_info()[0] / float(2 ** 20)
+    mem = process.memory_info()[0] / float(2**20)
     return mem
 
 
@@ -61,7 +61,7 @@ model["mesh"] = {
 }
 model["BCs"] = {
     "status": True,  # True or false
-    "outer_bc": "non-reflective",  #  None or non-reflective (outer boundary condition)
+    "outer_bc": "non-reflective",  # None or non-reflective (outer boundary condition)
     "damping_type": "polynomial",  # polynomial, hyperbolic, shifted_hyperbolic
     "exponent": 2,  # damping layer has a exponent variation
     "cmax": 6.0,  # maximum acoustic wave velocity in PML - km/s
@@ -80,7 +80,7 @@ model["acquisition"] = {
     "receiver_locations": receivers,
 }
 model["timeaxis"] = {
-    "t0": 0.0,  #  Initial time for event
+    "t0": 0.0,  # Initial time for event
     "tf": 4.00,  # Final time for event
     "dt": 0.00075,
     "amplitude": 1,  # the Ricker has an amplitude of 1.
@@ -115,7 +115,7 @@ if comm.ensemble_comm.rank == 0:
 quad_rule = finat.quadrature.make_quadrature(
     V.finat_element.cell, V.ufl_element().degree(), "KMV"
 )
-dxlump = dx(rule=quad_rule)
+dxlump = dx(scheme=quad_rule)
 
 water = np.where(vp.dat.data[:] < 1.51)
 
@@ -139,8 +139,8 @@ def regularize_gradient(vp, dJ):
     """Tikhonov regularization"""
     m_u = TrialFunction(V)
     m_v = TestFunction(V)
-    mgrad = m_u * m_v * dx(rule=qr_x)
-    ffG = dot(grad(vp), grad(m_v)) * dx(rule=qr_x)
+    mgrad = m_u * m_v * dx(scheme=quad_rule)
+    ffG = dot(grad(vp), grad(m_v)) * dx(scheme=quad_rule)
     G = mgrad - ffG
     lhsG, rhsG = lhs(G), rhs(G)
     gradreg = Function(V)
