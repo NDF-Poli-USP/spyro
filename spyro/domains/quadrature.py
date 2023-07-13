@@ -4,21 +4,22 @@ from firedrake import *
 
 
 def quadrature_rules(V):
-    """Returns quadrature rule - Gauss-Lobatto-Legendre, Gauss-Legendre and Equi-spaced, KMV
+    """ Quadrature rule - Gauss-Lobatto-Legendre, Gauss-Legendre and Equi-spaced, KMV
+    
+    Parameters:
+    -----------
+    V: Firedrake FunctionSpace
+        Function space to be used in the quadrature rule.
 
-    Returns quadradure rule to use with UFL's dx object when integrating
-
-    Parameters
-    ----------
-    V : obj
-        UFL Function Space
-
-    Returns
-    -------
-    qr_x, qr_s, qr_k : obj
-        quadrature rules for Firedrake to use
+    Returns:
+    --------
+    qr_x: FIAT quadrature rule
+        Quadrature rule for the spatial domain.
+    qr_s: FIAT quadrature rule
+        Quadrature rule for the boundary of the spatial domain.
+    qr_k: FIAT quadrature rule
+        Quadrature rule for the spatial domain stiffness matrix.
     """
-
     degree = V.ufl_element().degree()
     dimension = V.mesh().geometric_dimension()
     cell_geometry = V.mesh().ufl_cell()
@@ -64,6 +65,14 @@ def quadrature_rules(V):
         )
         qr_s = None
         qr_k = None
+    elif dimension == 3 and cell_geometry == TensorProductCell(quadrilateral, interval):
+        # In this case, for the spectral element method we use GLL quadrature
+        degree, _ = degree 
+        qr_x = gauss_lobatto_legendre_cube_rule(dimension=dimension, degree=degree)
+        qr_k = qr_x
+        qr_s = gauss_lobatto_legendre_cube_rule(
+            dimension=(dimension - 1), degree=degree
+        )
     else:
         raise ValueError("Unrecognized quadrature scheme")
     return qr_x, qr_s, qr_k

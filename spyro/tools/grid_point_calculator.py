@@ -71,15 +71,15 @@ def wave_solver(model, G, comm=False):
     minimum_mesh_velocity = model["testing_parameters"]["minimum_mesh_velocity"]
     model["mesh"]["meshfile"] = "meshes/2Dhomogeneous" + str(G) + ".msh"
     try:
-        mesh, V = spyro.io.read_mesh(model, comm)
-    except:  # noqa E722
+        mesh, V = spyro.basicio.read_mesh(model, comm)
+    except:
         model = generate_mesh(model, G, comm)
-        mesh, V = spyro.io.read_mesh(model, comm)
+        mesh, V = spyro.basicio.read_mesh(model, comm)
 
     if model["testing_parameters"]["experiment_type"] == "homogeneous":
         vp_exact = fire.Constant(minimum_mesh_velocity)
-    elif model["testing_parameters"]["experiment_type"] == "heterogeneous":
-        vp_exact = spyro.io.interpolate(model, mesh, V, guess=False)
+    elif model['testing_parameters']['experiment_type'] == 'heterogeneous':
+        vp_exact = spyro.basicio.interpolate(model, mesh, V, guess=False)
 
     if model["opts"]["method"] == "KMV":
         estimate_max_eigenvalue = True
@@ -112,7 +112,7 @@ def wave_solver(model, G, comm=False):
     )
 
     for sn in range(model["acquisition"]["num_sources"]):
-        if spyro.io.is_owner(comm, sn):
+        if spyro.basicio.is_owner(comm, sn):
             t1 = time.time()
             p_field, p_recv = spyro.solvers.forward(
                 model,

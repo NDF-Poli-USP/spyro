@@ -37,9 +37,9 @@ def test_read_and_write_segy():
 
     model = {}
 
-    model["opts"] = {
-        "method": "CG",  # either CG or KMV
-        "quadrature": "CG",  # Equi or KMV
+    model["options"] = {
+        "cell_type": "T",  # simplexes such as triangles or tetrahedra (T) or quadrilaterals (Q)
+        "variant": 'equispaced',  # lumped, equispaced or DG, default is lumped "method":"MLT", # (MLT/spectral_quadrilateral/DG_triangle/DG_quadrilateral) You can either specify a cell_type+variant or a method
         "degree": 3,  # p order
         "dimension": 2,  # dimension
     }
@@ -47,15 +47,31 @@ def test_read_and_write_segy():
         "Lz": 1.0,  # depth in km - always positive
         "Lx": 1.0,  # width in km - always positive
         "Ly": 0.0,  # thickness in km - always positive
-        "meshfile": None,
-        "initmodel": None,
-        "truemodel": hdf5_file,
+        "user_mesh": mesh,  
+        "mesh_file": None,  # specify the mesh file
     }
     model["BCs"] = {
         "status": False,
     }
+    model["time_axis"] = {
+        "initial_time": 0.0,  # Initial time for event
+        "final_time": 1.0,  # Final time for event
+        "dt": 0.0005,  # timestep size
+        "amplitude": 1,  # the Ricker has an amplitude of 1.
+        "output_frequency": 100,  # how frequently to output solution to pvds
+        "gradient_sampling_frequency": 1,  # how frequently to save solution to RAM
+    }
+    model["acquisition"] = {
+        "source_type": "ricker",
+        "source_locations": [(-1.0, 1.0)],#, (-0.605, 1.7), (-0.61, 1.7), (-0.615, 1.7)],#, (-0.1, 1.5), (-0.1, 2.0), (-0.1, 2.5), (-0.1, 3.0)],
+        "frequency": 5.0,
+        "delay": 1.5,
+        "receiver_locations": [(-0.0, 0.5)],
+    }
 
-    vp_read = spyro.io.interpolate(model, mesh, V, guess=False)
+    Wave_obj = spyro.AcousticWave(dictionary=model)
+
+    vp_read = spyro.io.interpolate(Wave_obj, hdf5_file, Wave_obj.function_space)
 
     fire.File("velocity_models/test.pvd").write(vp_read)
 
