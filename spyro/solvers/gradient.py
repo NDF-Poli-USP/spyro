@@ -1,4 +1,5 @@
-from firedrake import *
+import firedrake as fire
+from firedrake import dx, ds, Constant, grad, inner, dot
 from firedrake.assemble import create_assembly_callable
 
 from ..domains import quadrature, space
@@ -7,10 +8,26 @@ from ..io import ensemble_gradient
 from . import helpers
 
 # Note this turns off non-fatal warnings
-set_log_level(ERROR)
+#set_log_level(ERROR)
 
 __all__ = ["gradient"]
 
+def gauss_lobatto_legendre_line_rule(degree):
+    fiat_make_rule = FIAT.quadrature.GaussLobattoLegendreQuadratureLineRule
+    fiat_rule = fiat_make_rule(FIAT.ufc_simplex(1), degree + 1)
+    finat_ps = finat.point_set.GaussLobattoLegendrePointSet
+    finat_qr = finat.quadrature.QuadratureRule
+    return finat_qr(finat_ps(fiat_rule.get_points()), fiat_rule.get_weights())
+
+
+# 3D
+def gauss_lobatto_legendre_cube_rule(dimension, degree):
+    make_tensor_rule = finat.quadrature.TensorProductQuadratureRule
+    result = gauss_lobatto_legendre_line_rule(degree)
+    for _ in range(1, dimension):
+        line_rule = gauss_lobatto_legendre_line_rule(degree)
+        result = make_tensor_rule([result, line_rule])
+    return result
 
 @ensemble_gradient
 def gradient(
@@ -52,108 +69,32 @@ def gradient(
 
     method = model["opts"]["method"]
     degree = model["opts"]["degree"]
-    dim = model["opts"]["dimension"]
+    dimension = model["opts"]["dimension"]
     dt = model["timeaxis"]["dt"]
     tf = model["timeaxis"]["tf"]
     nspool = model["timeaxis"]["nspool"]
     fspool = model["timeaxis"]["fspool"]
-    PML = model["BCs"]["status"]
-    if PML:
-        Lx = model["mesh"]["Lx"]
-        Lz = model["mesh"]["Lz"]
-        lx = model["BCs"]["lx"]
-        lz = model["BCs"]["lz"]
-        x1 = 0.0
-        x2 = Lx
-        a_pml = lx
-        z1 = 0.0
-        z2 = -Lz
-        c_pml = lz
-        if dim == 3:
-            Ly = model["mesh"]["Ly"]
-            ly = model["BCs"]["ly"]
-            y1 = 0.0
-            y2 = Ly
-            b_pml = ly
 
-    if method == "KMV":
-        params = {"ksp_type": "preonly", "pc_type": "jacobi"}
-    elif method == "CG":
-        params = {"ksp_type": "cg", "pc_type": "jacobi"}
-    else:
-        raise ValueError("method is not yet supported")
+    params = {"ksp_type": "cg", "pc_type": "jacobi"}
 
-    element = space.FE_method(mesh, method, degree)
+    element = fire.FiniteElement(method, mesh.ufl_cell(), degree=degree, variant="spectral")
 
-    V = FunctionSpace(mesh, element)
+    V = fire.FunctionSpace(mesh, element)
 
-    qr_x, qr_s, _ = quadrature.quadrature_rules(V)
+    qr_x = gauss_lobatto_legendre_cube_rule(dimension=dimension, degree=degree)
+    qr_s = gauss_lobatto_legendre_cube_rule(dimension=(dimension - 1), degree=degree)
 
     nt = int(tf / dt)  # number of timesteps
 
-    # receiver_locations = model["acquisition"]["receiver_locations"]
-
-    dJ = Function(V, name="gradient")
-
-    if dim == 2:
-        z, x = SpatialCoordinate(mesh)
-    elif dim == 3:
-        z, x, y = SpatialCoordinate(mesh)
-
-    if PML:
-        Z = VectorFunctionSpace(V.ufl_domain(), V.ufl_element())
-        if dim == 2:
-            W = V * Z
-            u, pp = TrialFunctions(W)
-            v, qq = TestFunctions(W)
-
-            u_np1, pp_np1 = Function(W).split()
-            u_n, pp_n = Function(W).split()
-            u_nm1, pp_nm1 = Function(W).split()
-
-        elif dim == 3:
-            W = V * V * Z
-            u, psi, pp = TrialFunctions(W)
-            v, phi, qq = TestFunctions(W)
-
-            u_np1, psi_np1, pp_np1 = Function(W).split()
-            u_n, psi_n, pp_n = Function(W).split()
-            u_nm1, psi_nm1, pp_nm1 = Function(W).split()
-
-        if dim == 2:
-            (sigma_x, sigma_z) = damping.functions(
-                model, V, dim, x, x1, x2, a_pml, z, z1, z2, c_pml
-            )
-            (Gamma_1, Gamma_2) = damping.matrices_2D(sigma_z, sigma_x)
-        elif dim == 3:
-
-            sigma_x, sigma_y, sigma_z = damping.functions(
-                model,
-                V,
-                dim,
-                x,
-                x1,
-                x2,
-                a_pml,
-                z,
-                z1,
-                z2,
-                c_pml,
-                y,
-                y1,
-                y2,
-                b_pml,
-            )
-            Gamma_1, Gamma_2, Gamma_3 = damping.matrices_3D(sigma_x, sigma_y, sigma_z)
+    dJ = fire.Function(V, name="gradient")
 
     # typical CG in N-d
-    else:
-        u = TrialFunction(V)
-        v = TestFunction(V)
+    u = fire.TrialFunction(V)
+    v = fire.TestFunction(V)
 
-        u_nm1 = Function(V)
-        u_n = Function(V)
-        u_np1 = Function(V)
+    u_nm1 = fire.Function(V)
+    u_n = fire.Function(V)
+    u_np1 = fire.Function(V)
 
     if output:
         outfile = helpers.create_output_file("adjoint.pvd", comm, 0)
@@ -164,80 +105,33 @@ def gradient(
     m1 = ((u - 2.0 * u_n + u_nm1) / Constant(dt**2)) * v * dx(scheme=qr_x)
     a = c * c * dot(grad(u_n), grad(v)) * dx(scheme=qr_x)  # explicit
 
-    nf = 0
-    if model["BCs"]["outer_bc"] == "non-reflective":
-        nf = c * ((u_n - u_nm1) / dt) * v * ds(scheme=qr_s)
+    lhs1 = m1
+    rhs1 = -a
 
-    FF = m1 + a + nf
+    X = fire.Function(V)
+    B = fire.Function(V)
 
-    if PML:
-        X = Function(W)
-        B = Function(W)
-
-        if dim == 2:
-            pml1 = (sigma_x + sigma_z) * ((u - u_n) / dt) * v * dx(scheme=qr_x)
-            pml2 = sigma_x * sigma_z * u_n * v * dx(scheme=qr_x)
-            pml3 = c * c * inner(grad(v), dot(Gamma_2, pp_n)) * dx(scheme=qr_x)
-
-            FF += pml1 + pml2 + pml3
-            # -------------------------------------------------------
-            mm1 = (dot((pp - pp_n), qq) / Constant(dt)) * dx(scheme=qr_x)
-            mm2 = inner(dot(Gamma_1, pp_n), qq) * dx(scheme=qr_x)
-            dd = inner(qq, grad(u_n)) * dx(scheme=qr_x)
-
-            FF += mm1 + mm2 + dd
-        elif dim == 3:
-            pml1 = (sigma_x + sigma_y + sigma_z) * ((u - u_n) / dt) * v * dx(scheme=qr_x)
-            uuu1 = (-v * psi_n) * dx(scheme=qr_x)
-            pml2 = (
-                (sigma_x * sigma_y + sigma_x * sigma_z + sigma_y * sigma_z)
-                * u_n
-                * v
-                * dx(scheme=qr_x)
-            )
-            dd1 = c * c * inner(grad(v), dot(Gamma_2, pp_n)) * dx(scheme=qr_x)
-
-            FF += pml1 + pml2 + dd1 + uuu1
-            # -------------------------------------------------------
-            mm1 = (dot((pp - pp_n), qq) / dt) * dx(scheme=qr_x)
-            mm2 = inner(dot(Gamma_1, pp_n), qq) * dx(scheme=qr_x)
-            pml4 = inner(qq, grad(u_n)) * dx(scheme=qr_x)
-
-            FF += mm1 + mm2 + pml4
-            # -------------------------------------------------------
-            pml3 = (sigma_x * sigma_y * sigma_z) * phi * u_n * dx(scheme=qr_x)
-            mmm1 = (dot((psi - psi_n), phi) / dt) * dx(scheme=qr_x)
-            mmm2 = -c * c * inner(grad(phi), dot(Gamma_3, pp_n)) * dx(scheme=qr_x)
-
-            FF += mmm1 + mmm2 + pml3
-    else:
-        X = Function(V)
-        B = Function(V)
-
-    lhs_ = lhs(FF)
-    rhs_ = rhs(FF)
-
-    A = assemble(lhs_, mat_type="matfree")
-    solver = LinearSolver(A, solver_parameters=params)
+    A = fire.assemble(lhs1, mat_type="matfree")
+    solver = fire.LinearSolver(A, solver_parameters=params)
 
     # Define gradient problem
-    m_u = TrialFunction(V)
-    m_v = TestFunction(V)
-    mgrad = m_u * m_v * dx(scheme=qr_x)
+    m_u = fire.TrialFunction(V)
+    m_v = fire.TestFunction(V)
+    mgrad = m_u * m_v * dx(rule=qr_x)
 
-    uuadj = Function(V)  # auxiliarly function for the gradient compt.
-    uufor = Function(V)  # auxiliarly function for the gradient compt.
+    uuadj = fire.Function(V)  # auxiliarly function for the gradient compt.
+    uufor = fire.Function(V)  # auxiliarly function for the gradient compt.
 
     ffG = 2.0 * c * dot(grad(uuadj), grad(uufor)) * m_v * dx(scheme=qr_x)
 
-    G = mgrad - ffG
-    lhsG, rhsG = lhs(G), rhs(G)
+    lhsG = mgrad
+    rhsG = ffG
 
-    gradi = Function(V)
-    grad_prob = LinearVariationalProblem(lhsG, rhsG, gradi)
-
+    gradi = fire.Function(V)
+    grad_prob = fire.LinearVariationalProblem(lhsG, rhsG, gradi)
+    
     if method == "KMV":
-        grad_solver = LinearVariationalSolver(
+        grad_solver = fire.LinearVariationalSolver(
             grad_prob,
             solver_parameters={
                 "ksp_type": "preonly",
@@ -246,18 +140,18 @@ def gradient(
             },
         )
     elif method == "CG":
-        grad_solver = LinearVariationalSolver(
+        grad_solver = fire.LinearVariationalSolver(
             grad_prob,
             solver_parameters={
                 "mat_type": "matfree",
             },
         )
 
-    assembly_callable = create_assembly_callable(rhs_, tensor=B)
+    assembly_callable = create_assembly_callable(rhs1, tensor=B)
 
-    rhs_forcing = Function(V)  # forcing term
+    rhs_forcing = fire.Function(V)  # forcing term
     if save_adjoint:
-        adjoint = [Function(V, name="adjoint_pressure") for t in range(nt)]
+        adjoint = [fire.Function(V, name="adjoint_pressure") for t in range(nt)]
     for step in range(nt - 1, -1, -1):
         t = step * float(dt)
         rhs_forcing.assign(0.0)
@@ -272,19 +166,8 @@ def gradient(
 
         # AX=B --> solve for X = B/Aˆ-1
         solver.solve(X, B)
-        if PML:
-            if dim == 2:
-                u_np1, pp_np1 = X.split()
-            elif dim == 3:
-                u_np1, psi_np1, pp_np1 = X.split()
 
-                psi_nm1.assign(psi_n)
-                psi_n.assign(psi_np1)
-
-            pp_nm1.assign(pp_n)
-            pp_n.assign(pp_np1)
-        else:
-            u_np1.assign(X)
+        u_np1.assign(X)
 
         # only compute for snaps that were saved
         if step % fspool == 0:

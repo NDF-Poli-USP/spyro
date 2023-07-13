@@ -68,14 +68,14 @@ model = {}
 model["opts"] = {
     "method": "KMV",  # either CG or KMV
     "quadratrue": "KMV", # Equi or KMV
-    "degree": 1,  # p order
+    "degree": 4,  # p order
     "dimension": 2,  # dimension
 }
 
 # Number of cores for the shot. For simplicity, we keep things serial.
 # spyro however supports both spatial parallelism and "shot" parallelism.
 model["parallelism"] = {
-    "type": "spatial",  # options: automatic (same number of cores for evey processor) or spatial
+    "type": "automatic",  # options: automatic (same number of cores for evey processor) or spatial
 }
 
 # Define the domain size without the PML. Here we'll assume a 0.75 x 1.50 km

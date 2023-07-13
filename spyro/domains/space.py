@@ -2,45 +2,31 @@ from firedrake import *
 
 
 def FE_method(mesh, method, degree):
-    """Define the finite element method:
-    Space discretization - Continuous
-    or Discontinuous Galerkin methods
+    """Define the finite element space:
 
-    Parameters
-    ----------
-    mesh : obj
-        Firedrake mesh
-    method : str
-        Finite element method
-    degree : int
-        Degree of the finite element method
-    
-    Returns
-    -------
-    element : obj
-        Firedrake finite element
+    Parameters:
+    -----------
+    mesh: Firedrake Mesh
+        Mesh to be used in the finite element space.
+    method: str
+        Method to be used for the finite element space.
+    degree: int
+        Degree of the finite element space.
+
+    Returns:
+    --------
+    function_space: Firedrake FunctionSpace
+        Function space.
     """
-    cell_geometry = mesh.ufl_cell()
-    if method == "CG" or method == "spectral":
-        # CG - Continuous Galerkin
-        if cell_geometry == quadrilateral or cell_geometry == hexahedron:
-            element = FiniteElement(
-                method, mesh.ufl_cell(), degree=degree, variant="spectral"
-            )
-        else:
-            element = FiniteElement(
-                method, mesh.ufl_cell(), degree=degree, variant="equispaced"
-            )
-    elif method == "DG":
-        if cell_geometry == quadrilateral or cell_geometry == hexahedron:
-            element = FiniteElement(
-                method, mesh.ufl_cell(), degree=degree, variant="spectral"
-            )
-        else:
-            element = FiniteElement(
-                method, mesh.ufl_cell(), degree=degree, variant="equispaced"
-            )
-    elif method == "KMV":
-        # CG- with KMV elements
-        element = FiniteElement(method, mesh.ufl_cell(), degree=degree, variant="KMV")
-    return element
+
+    if method == 'mass_lumped_triangle':
+        element = FiniteElement('KMV', mesh.ufl_cell(), degree=degree, variant="KMV")
+    elif method == 'spectral_quadrilateral':
+        element = FiniteElement('CG', mesh.ufl_cell(), degree=degree, variant="spectral")
+    elif method == 'DG_triangle' or 'DG_quadrilateral' or 'DG':
+        element = FiniteElement("DG", mesh.ufl_cell(), degree=degree)
+    elif method == 'CG_triangle' or 'CG_quadrilateral' or 'CG':
+        element = FiniteElement("CG", mesh.ufl_cell(), degree=degree)
+    
+    function_space = FunctionSpace(mesh, element)
+    return function_space

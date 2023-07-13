@@ -1,5 +1,8 @@
 from firedrake import *
 from FIAT.reference_element import UFCTriangle, UFCTetrahedron, UFCQuadrilateral
+from FIAT.reference_element import UFCHexahedron, UFCInterval
+from FIAT import GaussLobattoLegendre as GLLelement
+from FIAT.tensor_product import TensorProductElement
 from FIAT.kong_mulder_veldhuizen import KongMulderVeldhuizen as KMV
 from FIAT.lagrange import Lagrange as CG
 from FIAT.discontinuous_lagrange import DiscontinuousLagrange as DG
@@ -50,7 +53,7 @@ class Receivers:
         in timestep IT, for usage with adjoint propagation
     """
 
-    def __init__(self, model, mesh, V, my_ensemble):
+    def __init__(self, wave_object):
         """Initializes class and gets all receiver parameters from
         input file.
         Parameters
@@ -67,34 +70,38 @@ class Receivers:
         -------
         Receivers: :class: 'Receiver' object
         """
-
-        if "Aut_Dif" in model:
+        my_ensemble = wave_object.comm
+        if wave_object.automatic_adjoint:
             self.automatic_adjoint = True
         else:
             self.automatic_adjoint = False
 
-        self.mesh = mesh
-        self.space = V
+        self.mesh = wave_object.mesh
+        self.space = wave_object.function_space.sub(0)
         self.my_ensemble = my_ensemble
-        self.dimension = model["opts"]["dimension"]
-        self.degree = model["opts"]["degree"]
-        self.receiver_locations = model["acquisition"]["receiver_locations"]
-
-        if self.dimension == 3 and model["aut_dif"]["status"]:
-            self.column_x = model["acquisition"]["num_rec_x_columns"]
-            self.column_y = model["acquisition"]["num_rec_y_columns"]
-            self.column_z = model["acquisition"]["num_rec_z_columns"]
-            self.num_receivers = self.column_x * self.column_y
-
+        self.dimension = wave_object.dimension
+        self.degree = wave_object.degree
+        self.receiver_locations = wave_object.receiver_locations
+        
+        if self.dimension==3 and wave_object.automatic_adjoint:
+            # self.column_x = model["acquisition"]["num_rec_x_columns"]
+            # self.column_y = model["acquisition"]["num_rec_y_columns"]
+            # self.column_z = model["acquisition"]["num_rec_z_columns"]
+            # self.num_receivers = self.column_x*self.column_y
+            raise ValueError("Implement this later")
+       
         else:
-            self.num_receivers = len(self.receiver_locations)
+            self.num_receivers = wave_object.number_of_receivers
 
         self.cellIDs = None
         self.cellVertices = None
         self.cell_tabulations = None
         self.cellNodeMaps = None
         self.nodes_per_cell = None
-        self.quadrilateral = model["opts"]["quadrature"] == "GLL"
+        if wave_object.cell_type == "quadrilateral":
+            self.quadrilateral = True
+        else:
+            self.quadrilateral = False
         self.is_local = [0] * self.num_receivers
         if not self.automatic_adjoint:
             self.build_maps()
@@ -345,10 +352,13 @@ class Receivers:
         same element as the receiver.
         
         """
+        print("start func_receiver_locator", flush = True)
         num_recv = self.num_receivers
 
         fdrake_cell_node_map = self.space.cell_node_map()
         cell_node_map = fdrake_cell_node_map.values_with_halo
+        if self.quadrilateral is True:
+            cell_node_map  = get_hexa_real_cell_node_map(self.space, self.mesh)
         (num_cells, nodes_per_cell) = cell_node_map.shape
         node_locations = self.__func_node_locations()
         self.nodes_per_cell = nodes_per_cell
@@ -357,19 +367,38 @@ class Receivers:
         cellNodeMaps = np.zeros((num_recv, nodes_per_cell))
         cellVertices = []
 
+        if self.quadrilateral is True:
+            end_vertex = 8
+            p = self.degree
+            vertex_ids = [
+                0,
+                p,
+                (p+1)*p,
+                (p+1)*p + p,
+                (p+1)*(p+1)*p,
+                (p+1)*(p+1)*p+p,
+                (p+1)*(p+1)*p+(p+1)*p,
+                (p+1)**3 -1
+            ]
+        else:
+            end_vertex = 4
+            vertex_ids = [0, 1, 2, 3]
+
         for receiver_id in range(num_recv):
             cell_id = self.is_local[receiver_id]
             cellVertices.append([])
             if cell_id is not None:
                 cellId_maps[receiver_id] = cell_id
                 cellNodeMaps[receiver_id, :] = cell_node_map[cell_id, :]
-                for vertex_number in range(0, 4):
+                for vertex_number in range(0, end_vertex):
+                    vertex_id = vertex_ids[vertex_number]
                     cellVertices[receiver_id].append([])
-                    z = node_locations[cell_node_map[cell_id, vertex_number], 0]
-                    x = node_locations[cell_node_map[cell_id, vertex_number], 1]
-                    y = node_locations[cell_node_map[cell_id, vertex_number], 2]
+                    z = node_locations[cell_node_map[cell_id, vertex_id], 0]
+                    x = node_locations[cell_node_map[cell_id, vertex_id], 1]
+                    y = node_locations[cell_node_map[cell_id, vertex_id], 2]
                     cellVertices[receiver_id][vertex_number] = (z, x, y)
 
+        print("end func_receiver_locator", flush = True)
         return cellId_maps, cellVertices, cellNodeMaps
 
     def __func_node_locations_3D(self):
@@ -398,8 +427,8 @@ class Receivers:
             return self.__func_build_cell_tabulations_3D()
         elif self.dimension == 2 and self.quadrilateral is True:
             return self.__func_build_cell_tabulations_2D_quad()
-        elif self.dimension == 3 and self.quadrilateral is True:
-            raise ValueError("3D GLL hexas not yet supported.")
+        elif self.dimension == 3 and self.quadrilateral == True:
+            return self.__func_build_cell_tabulations_3D_quad()
         else:
             raise ValueError
 
@@ -450,13 +479,10 @@ class Receivers:
         return cell_tabulations
 
     def __func_build_cell_tabulations_2D_quad(self):
-        finatelement = FiniteElement(
-            "CG", self.mesh.ufl_cell(), degree=self.degree, variant="spectral"
-        )
-        V = FunctionSpace(self.mesh, finatelement)
-        u = TrialFunction(V)
-        Q = u.function_space()
-        element = Q.finat_element.fiat_equivalent
+        # finatelement = FiniteElement('CG', self.mesh.ufl_cell(), degree=self.degree, variant='spectral')
+        V = self.space
+
+        element = V.finat_element.fiat_equivalent
 
         cell_tabulations = np.zeros((self.num_receivers, self.nodes_per_cell))
 
@@ -477,6 +503,39 @@ class Receivers:
                 cell_tabulations[receiver_id, :] = phi_tab.transpose()
 
         return cell_tabulations
+    
+    def __func_build_cell_tabulations_3D_quad(self):
+        I = UFCInterval()
+        An = GLLelement(I, self.degree)
+        Bn = GLLelement(I, self.degree)
+        Cn = GLLelement(I, self.degree)
+        Dn = TensorProductElement(An, Bn)
+        element = TensorProductElement(Dn, Cn)
+
+        cell_tabulations = np.zeros((self.num_receivers, self.nodes_per_cell))
+
+        for receiver_id in range(self.num_receivers):
+            cell_id = self.is_local[receiver_id]
+            if cell_id is not None:
+                # getting coordinates to change to reference element
+                p  = self.receiver_locations[receiver_id]
+                v0 = self.cellVertices[receiver_id][0]
+                v1 = self.cellVertices[receiver_id][1]
+                v2 = self.cellVertices[receiver_id][2]
+                v3 = self.cellVertices[receiver_id][3]
+                v4 = self.cellVertices[receiver_id][4]
+                v5 = self.cellVertices[receiver_id][5]
+                v6 = self.cellVertices[receiver_id][6]
+                v7 = self.cellVertices[receiver_id][7]
+
+                p_reference = change_to_reference_hexa(p, v0, v1, v2, v3, v4, v5, v6, v7)
+                initial_tab = element.tabulate(0, [p_reference])
+                phi_tab = initial_tab[(0, 0, 0)]
+
+                cell_tabulations[receiver_id, :] = phi_tab.transpose()
+        
+        return cell_tabulations
+                
 
     def set_point_cloud(self, comm):
         # Receivers always parallel to z-axis
@@ -919,3 +978,292 @@ def change_to_reference_quad(p, v0, v1, v2, v3):
     pny = (D * px + E * py + F) / (G * px + H * py + I)
 
     return (pnx, pny)
+
+def change_to_reference_hexa(p, v0, v1, v2, v3, v4, v5, v6, v7):
+    (px, py, pz) = p
+    # Irregular hexa
+    a = v0
+    b = v1
+    c = v2
+    d = v4
+
+    (xa, ya, za) = a
+    (xb, yb, zb) = b
+    (xc, yc, zc) = c
+    (xd, yd, zd) = d
+    (px, py, pz) = p
+
+    xna = 0.0
+    yna = 0.0
+    zna = 0.0
+
+    xnb = 0.0
+    ynb = 0.0
+    znb = 1.0
+
+    xnc = 0.0
+    ync = 1.0
+    znc = 0.0
+
+    xnd = 1.0
+    ynd = 0.0
+    znd = 0.0
+
+    det = (
+        xa * yb * zc
+        - xa * yc * zb
+        - xb * ya * zc
+        + xb * yc * za
+        + xc * ya * zb
+        - xc * yb * za
+        - xa * yb * zd
+        + xa * yd * zb
+        + xb * ya * zd
+        - xb * yd * za
+        - xd * ya * zb
+        + xd * yb * za
+        + xa * yc * zd
+        - xa * yd * zc
+        - xc * ya * zd
+        + xc * yd * za
+        + xd * ya * zc
+        - xd * yc * za
+        - xb * yc * zd
+        + xb * yd * zc
+        + xc * yb * zd
+        - xc * yd * zb
+        - xd * yb * zc
+        + xd * yc * zb
+    )
+    a11 = (
+        (xnc * (ya * zb - yb * za - ya * zd + yd * za + yb * zd - yd * zb)) / det
+        - (xnd * (ya * zb - yb * za - ya * zc + yc * za + yb * zc - yc * zb)) / det
+        - (xnb * (ya * zc - yc * za - ya * zd + yd * za + yc * zd - yd * zc)) / det
+        + (xna * (yb * zc - yc * zb - yb * zd + yd * zb + yc * zd - yd * zc)) / det
+    )
+    a12 = (
+        (xnd * (xa * zb - xb * za - xa * zc + xc * za + xb * zc - xc * zb)) / det
+        - (xnc * (xa * zb - xb * za - xa * zd + xd * za + xb * zd - xd * zb)) / det
+        + (xnb * (xa * zc - xc * za - xa * zd + xd * za + xc * zd - xd * zc)) / det
+        - (xna * (xb * zc - xc * zb - xb * zd + xd * zb + xc * zd - xd * zc)) / det
+    )
+    a13 = (
+        (xnc * (xa * yb - xb * ya - xa * yd + xd * ya + xb * yd - xd * yb)) / det
+        - (xnd * (xa * yb - xb * ya - xa * yc + xc * ya + xb * yc - xc * yb)) / det
+        - (xnb * (xa * yc - xc * ya - xa * yd + xd * ya + xc * yd - xd * yc)) / det
+        + (xna * (xb * yc - xc * yb - xb * yd + xd * yb + xc * yd - xd * yc)) / det
+    )
+    a14 = (
+        (
+            xnd
+            * (
+                xa * yb * zc
+                - xa * yc * zb
+                - xb * ya * zc
+                + xb * yc * za
+                + xc * ya * zb
+                - xc * yb * za
+            )
+        )
+        / det
+        - (
+            xnc
+            * (
+                xa * yb * zd
+                - xa * yd * zb
+                - xb * ya * zd
+                + xb * yd * za
+                + xd * ya * zb
+                - xd * yb * za
+            )
+        )
+        / det
+        + (
+            xnb
+            * (
+                xa * yc * zd
+                - xa * yd * zc
+                - xc * ya * zd
+                + xc * yd * za
+                + xd * ya * zc
+                - xd * yc * za
+            )
+        )
+        / det
+        - (
+            xna
+            * (
+                xb * yc * zd
+                - xb * yd * zc
+                - xc * yb * zd
+                + xc * yd * zb
+                + xd * yb * zc
+                - xd * yc * zb
+            )
+        )
+        / det
+    )
+    a21 = (
+        (ync * (ya * zb - yb * za - ya * zd + yd * za + yb * zd - yd * zb)) / det
+        - (ynd * (ya * zb - yb * za - ya * zc + yc * za + yb * zc - yc * zb)) / det
+        - (ynb * (ya * zc - yc * za - ya * zd + yd * za + yc * zd - yd * zc)) / det
+        + (yna * (yb * zc - yc * zb - yb * zd + yd * zb + yc * zd - yd * zc)) / det
+    )
+    a22 = (
+        (ynd * (xa * zb - xb * za - xa * zc + xc * za + xb * zc - xc * zb)) / det
+        - (ync * (xa * zb - xb * za - xa * zd + xd * za + xb * zd - xd * zb)) / det
+        + (ynb * (xa * zc - xc * za - xa * zd + xd * za + xc * zd - xd * zc)) / det
+        - (yna * (xb * zc - xc * zb - xb * zd + xd * zb + xc * zd - xd * zc)) / det
+    )
+    a23 = (
+        (ync * (xa * yb - xb * ya - xa * yd + xd * ya + xb * yd - xd * yb)) / det
+        - (ynd * (xa * yb - xb * ya - xa * yc + xc * ya + xb * yc - xc * yb)) / det
+        - (ynb * (xa * yc - xc * ya - xa * yd + xd * ya + xc * yd - xd * yc)) / det
+        + (yna * (xb * yc - xc * yb - xb * yd + xd * yb + xc * yd - xd * yc)) / det
+    )
+    a24 = (
+        (
+            ynd
+            * (
+                xa * yb * zc
+                - xa * yc * zb
+                - xb * ya * zc
+                + xb * yc * za
+                + xc * ya * zb
+                - xc * yb * za
+            )
+        )
+        / det
+        - (
+            ync
+            * (
+                xa * yb * zd
+                - xa * yd * zb
+                - xb * ya * zd
+                + xb * yd * za
+                + xd * ya * zb
+                - xd * yb * za
+            )
+        )
+        / det
+        + (
+            ynb
+            * (
+                xa * yc * zd
+                - xa * yd * zc
+                - xc * ya * zd
+                + xc * yd * za
+                + xd * ya * zc
+                - xd * yc * za
+            )
+        )
+        / det
+        - (
+            yna
+            * (
+                xb * yc * zd
+                - xb * yd * zc
+                - xc * yb * zd
+                + xc * yd * zb
+                + xd * yb * zc
+                - xd * yc * zb
+            )
+        )
+        / det
+    )
+    a31 = (
+        (znc * (ya * zb - yb * za - ya * zd + yd * za + yb * zd - yd * zb)) / det
+        - (znd * (ya * zb - yb * za - ya * zc + yc * za + yb * zc - yc * zb)) / det
+        - (znb * (ya * zc - yc * za - ya * zd + yd * za + yc * zd - yd * zc)) / det
+        + (zna * (yb * zc - yc * zb - yb * zd + yd * zb + yc * zd - yd * zc)) / det
+    )
+    a32 = (
+        (znd * (xa * zb - xb * za - xa * zc + xc * za + xb * zc - xc * zb)) / det
+        - (znc * (xa * zb - xb * za - xa * zd + xd * za + xb * zd - xd * zb)) / det
+        + (znb * (xa * zc - xc * za - xa * zd + xd * za + xc * zd - xd * zc)) / det
+        - (zna * (xb * zc - xc * zb - xb * zd + xd * zb + xc * zd - xd * zc)) / det
+    )
+    a33 = (
+        (znc * (xa * yb - xb * ya - xa * yd + xd * ya + xb * yd - xd * yb)) / det
+        - (znd * (xa * yb - xb * ya - xa * yc + xc * ya + xb * yc - xc * yb)) / det
+        - (znb * (xa * yc - xc * ya - xa * yd + xd * ya + xc * yd - xd * yc)) / det
+        + (zna * (xb * yc - xc * yb - xb * yd + xd * yb + xc * yd - xd * yc)) / det
+    )
+    a34 = (
+        (
+            znd
+            * (
+                xa * yb * zc
+                - xa * yc * zb
+                - xb * ya * zc
+                + xb * yc * za
+                + xc * ya * zb
+                - xc * yb * za
+            )
+        )
+        / det
+        - (
+            znc
+            * (
+                xa * yb * zd
+                - xa * yd * zb
+                - xb * ya * zd
+                + xb * yd * za
+                + xd * ya * zb
+                - xd * yb * za
+            )
+        )
+        / det
+        + (
+            znb
+            * (
+                xa * yc * zd
+                - xa * yd * zc
+                - xc * ya * zd
+                + xc * yd * za
+                + xd * ya * zc
+                - xd * yc * za
+            )
+        )
+        / det
+        - (
+            zna
+            * (
+                xb * yc * zd
+                - xb * yd * zc
+                - xc * yb * zd
+                + xc * yd * zb
+                + xd * yb * zc
+                - xd * yc * zb
+            )
+        )
+        / det
+    )
+
+    pnx = px * a11 + py * a12 + pz * a13 + a14
+    pny = px * a21 + py * a22 + pz * a23 + a24
+    pnz = px * a31 + py * a32 + pz * a33 + a34
+
+    return (pnx, pny, pnz)
+
+
+def get_hexa_real_cell_node_map(V, mesh):
+    weird_cnm_func = V.cell_node_map()
+    weird_cnm = weird_cnm_func.values_with_halo
+    cells_per_layer, nodes_per_cell = np.shape(weird_cnm)
+    layers = mesh.cell_set.layers - 1
+    ufl_element = V.ufl_element()
+    _, p = ufl_element.degree()
+
+    cell_node_map = np.zeros((layers*cells_per_layer, nodes_per_cell), dtype=int)
+    print(f"cnm size : {np.shape(cell_node_map)}", flush = True)
+
+    for layer in range(layers):
+        print(f"layer : {layer} of {layers}", flush = True)
+        for cell in range(cells_per_layer):
+            cnm_base = weird_cnm[cell]
+            cell_id = layer + layers*cell
+            cell_node_map[cell_id] = [item+layer*(p) for item in cnm_base]
+    
+    return cell_node_map
+

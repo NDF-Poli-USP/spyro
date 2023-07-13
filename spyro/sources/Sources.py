@@ -41,7 +41,7 @@ class Sources(spyro.receivers.Receivers.Receivers):
         Applies value at source locations in rhs_forcing operator
     """
 
-    def __init__(self, model, mesh, V, my_ensemble):
+    def __init__(self, wave_object):
         """Initializes class and gets all receiver parameters from
         input file.
 
@@ -61,15 +61,16 @@ class Sources(spyro.receivers.Receivers.Receivers):
         Sources: :class: 'Source' object
 
         """
+        my_ensemble = wave_object.comm
 
-        self.mesh = mesh
-        self.space = V
+        self.mesh  = wave_object.mesh
+        self.space = wave_object.function_space.sub(0)
         self.my_ensemble = my_ensemble
-        self.dimension = model["opts"]["dimension"]
-        self.degree = model["opts"]["degree"]
+        self.dimension = wave_object.dimension
+        self.degree = wave_object.degree
 
-        self.receiver_locations = model["acquisition"]["source_pos"]
-        self.num_receivers = len(self.receiver_locations)
+        self.receiver_locations = wave_object.source_locations
+        self.num_receivers = wave_object.number_of_sources
 
         self.cellIDs = None
         self.cellVertices = None
@@ -78,8 +79,14 @@ class Sources(spyro.receivers.Receivers.Receivers):
         self.nodes_per_cell = None
         self.is_local = [0] * self.num_receivers
         self.current_source = None
-        self.quadrilateral = model["opts"]["quadrature"] == "GLL"
+        if wave_object.cell_type == 'quadrilateral':
+            self.quadrilateral = True
+        else:
+            self.quadrilateral = False
 
+        self.build_maps()
+    
+    def build_maps(self):
         super().build_maps()
 
     def apply_source(self, rhs_forcing, value):
@@ -88,15 +95,15 @@ class Sources(spyro.receivers.Receivers.Receivers):
         Parameters
         ----------
         rhs_forcing: Firedrake.Function
-            The right hand side of the equation
+            The right hand side of the wave equation
         value: float
-            The value to be applied at the source location
-
+            The value of the source
+            
         Returns
         -------
         rhs_forcing: Firedrake.Function
-            The right hand side of the equation with the source applied
-        """
+            The right hand side of the wave equation with the source applied
+                """
         for source_id in range(self.num_receivers):
             if self.is_local[source_id] and source_id == self.current_source:
                 for i in range(len(self.cellNodeMaps[source_id])):
@@ -119,7 +126,7 @@ def timedependentSource(model, t, freq=None, amp=1, delay=1.5):
         raise ValueError("source not implemented")
 
 
-def ricker_wavelet(t, freq, amp=1.0, delay=1.5):
+def ricker_wavelet(t, freq, amp=1.0, delay=1.5, delay_type="multiples_of_minimun"):
     """Creates a Ricker source function with a
     delay in term of multiples of the distance
     between the minimums.
@@ -134,24 +141,33 @@ def ricker_wavelet(t, freq, amp=1.0, delay=1.5):
         Amplitude of the wavelet
     delay: float
         Delay in term of multiples of the distance
-        between the minimums
+        between the minimums.
+    delay_type: string
+        Type of delay. Options are:
+        - multiples_of_minimun
+        - time
 
     Returns
     -------
     float
         Value of the wavelet at time t
     """
-    t = t - delay * math.sqrt(6.0) / (math.pi * freq)
+    if delay_type == "multiples_of_minimun":
+        time_delay = delay * math.sqrt(6.0) / (math.pi * freq)
+    elif delay_type == "time":
+        time_delay = delay
+    t = t - time_delay
+    # t = t - delay / freq
     return (
         amp
-        * (1.0 - (1.0 / 2.0) * (2.0 * math.pi * freq) * (2.0 * math.pi * freq) * t * t)
+        * (1.0 - (2.0) * (math.pi * freq) * (math.pi * freq) * t * t)
         * math.exp(
-            (-1.0 / 4.0) * (2.0 * math.pi * freq) * (2.0 * math.pi * freq) * t * t
+            (-1.0 ) * (math.pi * freq) * (math.pi * freq) * t * t
         )
     )
 
 
-def full_ricker_wavelet(dt, tf, freq, amp=1.0, cutoff=None):
+def full_ricker_wavelet(dt, final_time, frequency, amplitude=1.0, cutoff=None, delay = 1.5, delay_type="multiples_of_minimun"):
     """Compute the Ricker wavelet optionally applying low-pass filtering
     using cutoff frequency in Hertz.
 
@@ -159,25 +175,32 @@ def full_ricker_wavelet(dt, tf, freq, amp=1.0, cutoff=None):
     ----------
     dt: float
         Time step
-    tf: float
+    final_time: float
         Final time
-    freq: float
+    frequency: float
         Frequency of the wavelet
-    amp: float
+    amplitude: float
         Amplitude of the wavelet
     cutoff: float
         Cutoff frequency in Hertz
+    delay: float
+        Delay in term of multiples of the distance
+        between the minimums.
+    delay_type: string
+        Type of delay. Options are:
+        - multiples_of_minimun
+        - time
 
     Returns
     -------
-    full_wavelet: numpy array
-        Array containing the wavelet values at each time step
+    list of float
+        list of ricker values at each time step
     """
-    nt = int(tf / dt)  # number of timesteps
+    nt = int(final_time / dt) + 1 # number of timesteps
     time = 0.0
     full_wavelet = np.zeros((nt,))
     for t in range(nt):
-        full_wavelet[t] = ricker_wavelet(time, freq, amp)
+        full_wavelet[t] = ricker_wavelet(time, frequency, amplitude, delay=delay, delay_type=delay_type)
         time += dt
     if cutoff is not None:
         fs = 1.0 / dt
@@ -188,65 +211,3 @@ def full_ricker_wavelet(dt, tf, freq, amp=1.0, cutoff=None):
         b, a = butter(order, normal_cutoff, btype="low", analog=False)
         full_wavelet = filtfilt(b, a, full_wavelet)
     return full_wavelet
-
-
-# def MMS_time(t):
-#     return 2 * t + 2 * math.pi ** 2 * t ** 3 / 3.0
-
-
-# def MMS_space(x0, z, x):
-#     """ Mesh variable part of the MMS """
-#     return sin(pi * z) * sin(pi * x) * Constant(1.0)
-
-
-# def MMS_space_3d(x0, z, x, y):
-#     """ Mesh variable part of the MMS """
-#     return sin(pi * z) * sin(pi * x) * sin(pi * y) * Constant(1.0)
-
-# def source_dof_finder(space, model):
-
-#     # getting 1 source position
-#     source_positions = model["acquisition"]["source_pos"]
-#     if len(source_positions) != 1:
-#         raise ValueError("Not yet implemented for more then 1 source.")
-
-#     mesh = space.mesh()
-#     source_z, source_x = source_positions[0]
-
-#     # Getting mesh coordinates
-#     z, x = SpatialCoordinate(mesh)
-#     ux = Function(space).interpolate(x)
-#     uz = Function(space).interpolate(z)
-#     datax = ux.dat.data_ro_with_halos[:]
-#     dataz = uz.dat.data_ro_with_halos[:]
-#     node_locations = np.zeros((len(datax), 2))
-#     node_locations[:, 0] = dataz
-#     node_locations[:, 1] = datax
-
-#     # generating cell node map
-#     fdrake_cell_node_map = space.cell_node_map()
-#     cell_node_map = fdrake_cell_node_map.values_with_halo
-
-#     # finding cell where the source is located
-#     cell_id = mesh.locate_cell([source_z, source_x], tolerance=0.01)
-
-#     # finding dof where the source is located
-#     for dof in cell_node_map[cell_id]:
-#         if np.isclose(dataz[dof], source_z, rtol=1e-8) and np.isclose(
-#             datax[dof], source_x, rtol=1e-8
-#         ):
-#             model["acquisition"]["source_point_dof"] = dof
-
-#     if model["acquisition"]["source_point_dof"] == False:
-#         print("Warning not using point source")
-#     return False
-
-
-# def delta_expr(x0, z, x, sigma_x=500.0):
-#     sigma_x = Constant(sigma_x)
-#     return exp(-sigma_x * ((z - x0[0]) ** 2 + (x - x0[1]) ** 2))
-
-
-# def delta_expr_3d(x0, z, x, y, sigma_x=2000.0):
-#     sigma_x = Constant(sigma_x)
-#     return exp(-sigma_x * ((z - x0[0]) ** 2 + (x - x0[1]) ** 2 + (y - x0[2]) ** 2))

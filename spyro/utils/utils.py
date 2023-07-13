@@ -94,17 +94,32 @@ def mpi_init(model):
     # rank = myrank()
     # size = mysize()
     available_cores = COMM_WORLD.size
-    if model["parallelism"]["type"] == "automatic":
-        num_cores_per_shot = available_cores / len(model["acquisition"]["source_pos"])
-        if available_cores % len(model["acquisition"]["source_pos"]) != 0:
+    if model.parallelism_type == "automatic":
+        num_cores_per_shot = available_cores / model.number_of_sources
+        if available_cores % model.number_of_sources != 0:
             raise ValueError(
                 "Available cores cannot be divided between sources equally."
             )
-    elif model["parallelism"]["type"] == "spatial":
+    elif model.parallelism_type == "spatial":
         num_cores_per_shot = available_cores
-    elif model["parallelism"]["type"] == "custom":
+    elif model.parallelism_type == "custom":
         raise ValueError("Custom parallelism not yet implemented")
 
+    comm_ens = Ensemble(COMM_WORLD, num_cores_per_shot)
+    return comm_ens
+
+def mpi_init_simple(number_of_sources):
+    """Initialize computing environment"""
+    rank = myrank()
+    size = mysize()
+    available_cores = COMM_WORLD.size
+
+    num_cores_per_shot = available_cores / number_of_sources
+    if available_cores % number_of_sources != 0:
+        raise ValueError(
+            "Available cores cannot be divided between sources equally."
+        )
+        
     comm_ens = Ensemble(COMM_WORLD, num_cores_per_shot)
     return comm_ens
 

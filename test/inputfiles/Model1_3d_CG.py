@@ -65,6 +65,7 @@ timeaxis = {
     "dt": 0.001,  # timestep size
     "nspool": 20,  # how frequently to output solution to pvds
     "fspool": 10,  # how frequently to save solution to RAM
+    "amplitude": 1,  # the Ricker has an amplitude of 1.
 }  # how freq. to output to files and screen
 
 inversion = {

@@ -1,4 +1,6 @@
 from __future__ import with_statement
+
+import os
 import pickle
 
 import firedrake as fire
@@ -7,102 +9,53 @@ import numpy as np
 from scipy.interpolate import RegularGridInterpolator
 from scipy.interpolate import griddata
 import segyio
-
 from .. import domains
 
-
 def ensemble_save(func):
-    """Decorator for read and write shots for ensemble parallelism
-    
-    Parameters
-    ----------
-    func : function
-        Function to be decorated
-        
-    Returns
-    -------
-    wrapper : function
-        Decorated function
-    """
-
+    """Decorator for read and write shots for ensemble parallelism"""
     def wrapper(*args, **kwargs):
         acq = args[0].get("acquisition")
         num = len(acq["source_pos"])
         _comm = args[1]
-        custom_file_name = kwargs.get("file_name")
+        custom_file_name = kwargs.get('file_name')
         for snum in range(num):
             if is_owner(_comm, snum) and _comm.comm.rank == 0:
                 if custom_file_name is None:
-                    func(
-                        *args,
-                        **dict(
-                            kwargs,
-                            file_name="shots/shot_record_" + str(snum + 1) + ".dat",
-                        )
-                    )
+                    func(*args, **dict(kwargs, file_name = "shots/shot_record_"+str(snum+1)+".dat"))
                 else:
-                    func(
-                        *args,
-                        **dict(
-                            kwargs,
-                            file_name=custom_file_name+"shot_record_" + str(snum + 1) + ".dat"
-                            )
-                        )
+                    func(*args, **dict(kwargs, file_name = custom_file_name))
     return wrapper
 
-
 def ensemble_load(func):
-    """Decorator for loading shots for ensemble parallelism"""
-
+    """Decorator for read and write shots for ensemble parallelism"""
     def wrapper(*args, **kwargs):
         acq = args[0].get("acquisition")
         num = len(acq["source_pos"])
         _comm = args[1]
-        custom_file_name = kwargs.get("file_name")
+        custom_file_name = kwargs.get('file_name')
         for snum in range(num):
             if is_owner(_comm, snum):
                 if custom_file_name is None:
-                    values = func(
-                        *args,
-                        **dict(
-                            kwargs,
-                            file_name="shots/shot_record_" + str(snum + 1) + ".dat",
-                        )
-                    )
+                    values = func(*args, **dict(kwargs, file_name = "shots/shot_record_"+str(snum+1)+".dat"))
                 else:
-                    values = func(
-                                *args,
-                                **dict(
-                                    kwargs,
-                                    file_name=custom_file_name+"shot_record_" + str(snum + 1) + ".dat"
-                                    )
-                                )
-                return values
-
+                    values = func(*args, **dict(kwargs, file_name = custom_file_name))
+                return values 
     return wrapper
-
 
 def ensemble_plot(func):
     """Decorator for `plot_shots` to distribute shots for ensemble parallelism"""
-
     def wrapper(*args, **kwargs):
         acq = args[0].get("acquisition")
         num = len(acq["source_pos"])
         _comm = args[1]
-        custom_file_name = kwargs.get("file_name")
         for snum in range(num):
             if is_owner(_comm, snum) and _comm.comm.rank == 0:
-                if custom_file_name is None:
-                    func(*args, **dict(kwargs, file_name="shot_number_" + str(snum + 1)))
-                else:
-                    func(*args, **dict(kwargs, file_name=custom_file_name + str(snum + 1)))
+                func(*args, **dict(kwargs, file_name = str(snum+1)))
 
     return wrapper
 
-
 def ensemble_forward(func):
     """Decorator for forward to distribute shots for ensemble parallelism"""
-
     def wrapper(*args, **kwargs):
         acq = args[0].get("acquisition")
         num = len(acq["source_pos"])
@@ -114,10 +67,20 @@ def ensemble_forward(func):
 
     return wrapper
 
+def ensemble_propagator(func):
+    """Decorator for forward to distribute shots for ensemble parallelism"""
+    def wrapper(*args, **kwargs):
+        num = args[0].number_of_sources
+        _comm = args[0].comm
+        for snum in range(num):
+            if is_owner(_comm, snum):
+                u, u_r = func(*args, **dict(kwargs, source_num=snum))
+                return u, u_r
+
+    return wrapper
 
 def ensemble_forward_ad(func):
-    """Decorator for forward_ad to distribute shots for ensemble parallelism"""
-
+    """Decorator for forward to distribute shots for ensemble parallelism"""
     def wrapper(*args, **kwargs):
         acq = args[0].get("acquisition")
         num = len(acq["source_pos"])
@@ -133,10 +96,8 @@ def ensemble_forward_ad(func):
 
     return wrapper
 
-
 def ensemble_forward_elastic_waves(func):
     """Decorator for forward elastic waves to distribute shots for ensemble parallelism"""
-
     def wrapper(*args, **kwargs):
         acq = args[0].get("acquisition")
         num = len(acq["source_pos"])
@@ -148,10 +109,8 @@ def ensemble_forward_elastic_waves(func):
 
     return wrapper
 
-
 def ensemble_gradient(func):
     """Decorator for gradient to distribute shots for ensemble parallelism"""
-
     def wrapper(*args, **kwargs):
         acq = args[0].get("acquisition")
         save_adjoint = kwargs.get("save_adjoint")
@@ -168,10 +127,8 @@ def ensemble_gradient(func):
 
     return wrapper
 
-
 def ensemble_gradient_elastic_waves(func):
     """Decorator for gradient (elastic waves) to distribute shots for ensemble parallelism"""
-
     def wrapper(*args, **kwargs):
         acq = args[0].get("acquisition")
         save_adjoint = kwargs.get("save_adjoint")
@@ -188,7 +145,6 @@ def ensemble_gradient_elastic_waves(func):
 
     return wrapper
 
-
 def write_function_to_grid(function, V, grid_spacing):
     """Interpolate a Firedrake function to a structured grid
     
@@ -203,12 +159,12 @@ def write_function_to_grid(function, V, grid_spacing):
 
     Returns
     -------
-    x : numpy.ndarray
+    xi : numpy.ndarray
         x coordinates of grid points
-    y : numpy.ndarray
+    yi : numpy.ndarray
         y coordinates of grid points
-    z : numpy.ndarray
-        z coordinates of grid points
+    zi : numpy.ndarray
+        Interpolated values on grid points
     """
     # get DoF coordinates
     m = V.ufl_domain()
@@ -234,28 +190,26 @@ def write_function_to_grid(function, V, grid_spacing):
 
     return xi, yi, zi
 
-
 def create_segy(velocity, filename):
     """Write the velocity data into a segy file named filename
     
     Parameters
     ----------
-    velocity : firedrake.Function
-        Velocity in a firedrake function
-    filename : str
-        Name of the segy file to write
-
+    velocity:
+        Firedrake function representing the values of the velocity model to save
+    filename: str
+        Name of the segy file to save
+    
     Returns
     -------
     None
-    
     """
     spec = segyio.spec()
 
     velocity = np.flipud(velocity.T)
 
-    spec.sorting = 2  # not sure what this means
-    spec.format = 1  # not sure what this means
+    spec.sorting = 2 # not sure what this means
+    spec.format = 1 # not sure what this means
     spec.samples = range(velocity.shape[0])
     spec.ilines = range(velocity.shape[1])
     spec.xlines = range(velocity.shape[0])
@@ -266,18 +220,20 @@ def create_segy(velocity, filename):
         for tr, il in enumerate(spec.ilines):
             f.trace[tr] = velocity[:, tr]
 
-    return None
-
 @ensemble_save
 def save_shots(model, comm, array, file_name=None):
     """Save a `numpy.ndarray` to a `pickle`.
 
     Parameters
     ----------
-    file_name: str, optional by default shot_record_#.dat
-        The filename to save the data as a `pickle`
+    model:
+
+    comm:
+    
     array: `numpy.ndarray`
         The data to save a pickle (e.g., a shot)
+    filename: str, optional by default shot_number_#.dat
+        The filename to save the data as a `pickle`
 
     Returns
     -------
@@ -287,7 +243,6 @@ def save_shots(model, comm, array, file_name=None):
     with open(file_name, "wb") as f:
         pickle.dump(array, f)
     return None
-
 
 @ensemble_load
 def load_shots(model, comm, file_name=None):
@@ -309,7 +264,6 @@ def load_shots(model, comm, file_name=None):
         array = np.asarray(pickle.load(f), dtype=float)
     return array
 
-
 def is_owner(ens_comm, rank):
     """Distribute shots between processors in using a modulus operator
 
@@ -328,9 +282,7 @@ def is_owner(ens_comm, rank):
     """
     return ens_comm.ensemble_comm.rank == (rank % ens_comm.ensemble_comm.size)
 
-
 def _check_units(c):
-    """Checks if velocity is in m/s or km/s"""
     if min(c.dat.data[:]) > 100.0:
         # data is in m/s but must be in km/s
         if fire.COMM_WORLD.rank == 0:
@@ -338,8 +290,7 @@ def _check_units(c):
         c.assign(c / 1000.0)  # meters to kilometers
     return c
 
-
-def interpolate(model, mesh, V, guess=False):
+def interpolate(Model, fname, V):
     """Read and interpolate a seismic velocity model stored
     in a HDF5 file onto the nodes of a finite element space.
 
@@ -362,20 +313,20 @@ def interpolate(model, mesh, V, guess=False):
     """
     sd = V.mesh().geometric_dimension()
     m = V.ufl_domain()
-    if model["BCs"]["status"]:
-        minz = -model["mesh"]["Lz"] - model["BCs"]["lz"]
+    if Model.abc_status:
+        minz = -Model.length_z - Model.abc_lz
         maxz = 0.0
-        minx = 0.0 - model["BCs"]["lx"]
-        maxx = model["mesh"]["Lx"] + model["BCs"]["lx"]
-        miny = 0.0 - model["BCs"]["ly"]
-        maxy = model["mesh"]["Ly"] + model["BCs"]["ly"]
+        minx = 0.0 - Model.abc_lx
+        maxx = Model.length_x + Model.abc_lx
+        miny = 0.0 - Model.abc_ly
+        maxy = Model.length_y + Model.abc_ly
     else:
-        minz = -model["mesh"]["Lz"]
+        minz = -Model.length_z
         maxz = 0.0
         minx = 0.0
-        maxx = model["mesh"]["Lx"]
+        maxx = Model.length_x
         miny = 0.0
-        maxy = model["mesh"]["Ly"]
+        maxy = Model.length_y
 
     W = fire.VectorFunctionSpace(m, V.ufl_element())
     coords = fire.interpolate(m.coordinates, W)
@@ -390,11 +341,6 @@ def interpolate(model, mesh, V, guess=False):
         )
     else:
         raise NotImplementedError
-
-    if guess:
-        fname = model["mesh"]["initmodel"]
-    else:
-        fname = model["mesh"]["truemodel"]
 
     with h5py.File(fname, "r") as f:
         Z = np.asarray(f.get("velocity_model")[()])
@@ -429,8 +375,7 @@ def interpolate(model, mesh, V, guess=False):
     c = _check_units(c)
     return c
 
-
-def read_mesh(model, ens_comm):
+def read_mesh(model_parameters):
     """Reads in an external mesh and scatters it between cores.
 
     Parameters
@@ -444,18 +389,15 @@ def read_mesh(model, ens_comm):
     -------
     mesh: Firedrake.Mesh object
         The distributed mesh across `ens_comm`.
-    V: Firedrake.FunctionSpace object
-        The space of the finite elements
-
     """
 
-    method = model["opts"]["method"]
-    degree = model["opts"]["degree"]
+    method = model_parameters.method
+    ens_comm = model_parameters.comm
 
-    num_sources = len(model["acquisition"]["source_pos"])
-    mshname = model["mesh"]["meshfile"]
+    num_sources = model_parameters.number_of_sources
+    mshname = model_parameters.mesh_file
 
-    if method == "CG" or method == "KMV":
+    if method == "CG_triangle" or method == "mass_lumped_triangle":
         mesh = fire.Mesh(
             mshname,
             comm=ens_comm.comm,
@@ -485,7 +427,9 @@ def read_mesh(model, ens_comm):
         ),
         flush=True,
     )
-    # Element type
-    element = domains.space.FE_method(mesh, method, degree)
-    # Space of problem
-    return mesh, fire.FunctionSpace(mesh, element)
+
+    return mesh
+
+def parallel_print(string, comm):
+    if comm.ensemble_comm.rank == 0 and comm.comm.rank == 0:
+        print(string, flush = True)

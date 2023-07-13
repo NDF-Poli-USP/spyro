@@ -109,12 +109,6 @@ def display_progress(comm, t):
         print(f"Simulation time is: {t:{10}.{4}} seconds", flush=True)
 
 
-def parallel_print(string, comm):
-    """Prints in parallel"""
-    if comm.ensemble_comm.rank == 0 and comm.comm.rank == 0:
-        print(string, flush=True)
-
-
 def receivers_local(mesh, dimension, receiver_locations):
     """Locates receivers in cells
     

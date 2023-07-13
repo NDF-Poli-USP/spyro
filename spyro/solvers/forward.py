@@ -1,5 +1,8 @@
-from firedrake import *
+import firedrake as fire
 from firedrake.assemble import create_assembly_callable
+from firedrake import Constant, dx, dot, inner, grad, ds
+import FIAT
+import finat
 
 from .. import utils
 from ..domains import quadrature, space
@@ -7,8 +10,37 @@ from ..pml import damping
 from ..io import ensemble_forward
 from . import helpers
 
-# Note this turns off non-fatal warnings
-set_log_level(ERROR)
+
+def gauss_lobatto_legendre_line_rule(degree):
+    fiat_make_rule = FIAT.quadrature.GaussLobattoLegendreQuadratureLineRule
+    fiat_rule = fiat_make_rule(FIAT.ufc_simplex(1), degree + 1)
+    finat_ps = finat.point_set.GaussLobattoLegendrePointSet
+    finat_qr = finat.quadrature.QuadratureRule
+    return finat_qr(finat_ps(fiat_rule.get_points()), fiat_rule.get_weights())
+
+
+# 3D
+def gauss_lobatto_legendre_cube_rule(dimension, degree):
+    """Returns GLL integration rule
+
+    Parameters
+    ----------
+    dimension: `int`
+        The dimension of the mesh
+    degree: `int`
+        The degree of the function space
+
+    Returns
+    -------
+    result: `finat.quadrature.QuadratureRule`
+        The GLL integration rule
+    """
+    make_tensor_rule = finat.quadrature.TensorProductQuadratureRule
+    result = gauss_lobatto_legendre_line_rule(degree)
+    for _ in range(1, dimension):
+        line_rule = gauss_lobatto_legendre_line_rule(degree)
+        result = make_tensor_rule([result, line_rule])
+    return result
 
 
 @ensemble_forward
@@ -58,119 +90,27 @@ def forward(
 
     method = model["opts"]["method"]
     degree = model["opts"]["degree"]
-    dim = model["opts"]["dimension"]
     dt = model["timeaxis"]["dt"]
-    tf = model["timeaxis"]["tf"]
+    final_time = model["timeaxis"]["tf"]
     nspool = model["timeaxis"]["nspool"]
     fspool = model["timeaxis"]["fspool"]
-    PML = model["BCs"]["status"]
     excitations.current_source = source_num
-    if PML:
-        Lx = model["mesh"]["Lx"]
-        Lz = model["mesh"]["Lz"]
-        lx = model["BCs"]["lx"]
-        lz = model["BCs"]["lz"]
-        x1 = 0.0
-        x2 = Lx
-        a_pml = lx
-        z1 = 0.0
-        z2 = -Lz
-        c_pml = lz
-        if dim == 3:
-            Ly = model["mesh"]["Ly"]
-            ly = model["BCs"]["ly"]
-            y1 = 0.0
-            y2 = Ly
-            b_pml = ly
 
-    nt = int(tf / dt)  # number of timesteps
+    nt = int(final_time / dt)  # number of timesteps
 
-    if method == "KMV":
-        params = {"ksp_type": "preonly", "pc_type": "jacobi"}
-    elif (
-        method == "CG"
-        and mesh.ufl_cell() != quadrilateral
-        and mesh.ufl_cell() != hexahedron
-    ):
-        params = {"ksp_type": "cg", "pc_type": "jacobi"}
-    elif method == "CG" and (
-        mesh.ufl_cell() == quadrilateral or mesh.ufl_cell() == hexahedron
-    ):
-        params = {"ksp_type": "preonly", "pc_type": "jacobi"}
-    else:
-        raise ValueError("method is not yet supported")
 
-    element = space.FE_method(mesh, method, degree)
+    element = fire.FiniteElement(method, mesh.ufl_cell(), degree=degree)
 
-    V = FunctionSpace(mesh, element)
+    V = fire.FunctionSpace(mesh, element)
 
-    qr_x, qr_s, _ = quadrature.quadrature_rules(V)
-
-    if dim == 2:
-        z, x = SpatialCoordinate(mesh)
-    elif dim == 3:
-        z, x, y = SpatialCoordinate(mesh)
-
-    if PML:
-        Z = VectorFunctionSpace(V.ufl_domain(), V.ufl_element())
-        if dim == 2:
-            W = V * Z
-            u, pp = TrialFunctions(W)
-            v, qq = TestFunctions(W)
-
-            u_np1, pp_np1 = Function(W).split()
-            u_n, pp_n = Function(W).split()
-            u_nm1, pp_nm1 = Function(W).split()
-
-        elif dim == 3:
-            W = V * V * Z
-            u, psi, pp = TrialFunctions(W)
-            v, phi, qq = TestFunctions(W)
-
-            u_np1, psi_np1, pp_np1 = Function(W).split()
-            u_n, psi_n, pp_n = Function(W).split()
-            u_nm1, psi_nm1, pp_nm1 = Function(W).split()
-
-        if dim == 2:
-            sigma_x, sigma_z = damping.functions(
-                model, V, dim, x, x1, x2, a_pml, z, z1, z2, c_pml
-            )
-            Gamma_1, Gamma_2 = damping.matrices_2D(sigma_z, sigma_x)
-            pml1 = (
-                (sigma_x + sigma_z)
-                * ((u - u_nm1) / Constant(2.0 * dt))
-                * v
-                * dx(scheme=qr_x)
-            )
-        elif dim == 3:
-
-            sigma_x, sigma_y, sigma_z = damping.functions(
-                model,
-                V,
-                dim,
-                x,
-                x1,
-                x2,
-                a_pml,
-                z,
-                z1,
-                z2,
-                c_pml,
-                y,
-                y1,
-                y2,
-                b_pml,
-            )
-            Gamma_1, Gamma_2, Gamma_3 = damping.matrices_3D(sigma_x, sigma_y, sigma_z)
 
     # typical CG FEM in 2d/3d
-    else:
-        u = TrialFunction(V)
-        v = TestFunction(V)
+    u = fire.TrialFunction(V)
+    v = fire.TestFunction(V)
 
-        u_nm1 = Function(V)
-        u_n = Function(V)
-        u_np1 = Function(V)
+    u_nm1 = fire.Function(V)
+    u_n = fire.Function(V, name = "pressure")
+    u_np1 = fire.Function(V)
 
     if output:
         outfile = helpers.create_output_file("forward.pvd", comm, source_num)
@@ -178,74 +118,25 @@ def forward(
     t = 0.0
 
     # -------------------------------------------------------
-    m1 = ((u - 2.0 * u_n + u_nm1) / Constant(dt**2)) * v * dx(scheme=qr_x)
-    a = c * c * dot(grad(u_n), grad(v)) * dx(scheme=qr_x)  # explicit
+    m1 = ((u ) / Constant(dt ** 2)) * v * dx
+    a = c * c * dot(grad(u_n), grad(v)) * dx +((- 2.0 * u_n + u_nm1) / Constant(dt ** 2)) * v * dx# explicit
 
-    nf = 0
-    if model["BCs"]["outer_bc"] == "non-reflective":
-        nf = c * ((u_n - u_nm1) / dt) * v * ds(scheme=qr_s)
+    X = fire.Function(V)
+    B = fire.Function(V)
 
-    FF = m1 + a + nf
+    lhs = m1
+    rhs = -a
 
-    if PML:
-        X = Function(W)
-        B = Function(W)
+    A = fire.assemble(lhs)
+    solver = fire.LinearSolver(A)
 
-        if dim == 2:
-            pml2 = sigma_x * sigma_z * u_n * v * dx(scheme=qr_x)
-            pml3 = inner(pp_n, grad(v)) * dx(scheme=qr_x)
-            FF += pml1 + pml2 + pml3
-            # -------------------------------------------------------
-            mm1 = (dot((pp - pp_n), qq) / Constant(dt)) * dx(scheme=qr_x)
-            mm2 = inner(dot(Gamma_1, pp_n), qq) * dx(scheme=qr_x)
-            dd = c * c * inner(grad(u_n), dot(Gamma_2, qq)) * dx(scheme=qr_x)
-            FF += mm1 + mm2 + dd
-        elif dim == 3:
-            pml1 = (
-                (sigma_x + sigma_y + sigma_z)
-                * ((u - u_n) / Constant(dt))
-                * v
-                * dx(scheme=qr_x)
-            )
-            pml2 = (
-                (sigma_x * sigma_y + sigma_x * sigma_z + sigma_y * sigma_z)
-                * u_n
-                * v
-                * dx(scheme=qr_x)
-            )
-            pml3 = (sigma_x * sigma_y * sigma_z) * psi_n * v * dx(scheme=qr_x)
-            pml4 = inner(pp_n, grad(v)) * dx(scheme=qr_x)
-
-            FF += pml1 + pml2 + pml3 + pml4
-            # -------------------------------------------------------
-            mm1 = (dot((pp - pp_n), qq) / Constant(dt)) * dx(scheme=qr_x)
-            mm2 = inner(dot(Gamma_1, pp_n), qq) * dx(scheme=qr_x)
-            dd1 = c * c * inner(grad(u_n), dot(Gamma_2, qq)) * dx(scheme=qr_x)
-            dd2 = -c * c * inner(grad(psi_n), dot(Gamma_3, qq)) * dx(scheme=qr_x)
-
-            FF += mm1 + mm2 + dd1 + dd2
-            # -------------------------------------------------------
-            mmm1 = (dot((psi - psi_n), phi) / Constant(dt)) * dx(scheme=qr_x)
-            uuu1 = (-u_n * phi) * dx(scheme=qr_x)
-
-            FF += mmm1 + uuu1
-    else:
-        X = Function(V)
-        B = Function(V)
-
-    lhs_ = lhs(FF)
-    rhs_ = rhs(FF)
-
-    A = assemble(lhs_, mat_type="matfree")
-    solver = LinearSolver(A, solver_parameters=params)
-
-    usol = [Function(V, name="pressure") for t in range(nt) if t % fspool == 0]
+    usol = [fire.Function(V, name="pressure") for t in range(nt) if t % fspool == 0]
     usol_recv = []
     save_step = 0
 
-    assembly_callable = create_assembly_callable(rhs_, tensor=B)
+    assembly_callable = create_assembly_callable(rhs, tensor=B)
 
-    rhs_forcing = Function(V)
+    rhs_forcing = fire.Function(V)
 
     for step in range(nt):
         rhs_forcing.assign(0.0)
@@ -254,19 +145,8 @@ def forward(
         B0 = B.sub(0)
         B0 += f
         solver.solve(X, B)
-        if PML:
-            if dim == 2:
-                u_np1, pp_np1 = X.split()
-            elif dim == 3:
-                u_np1, psi_np1, pp_np1 = X.split()
 
-                psi_nm1.assign(psi_n)
-                psi_n.assign(psi_np1)
-
-            pp_nm1.assign(pp_n)
-            pp_n.assign(pp_np1)
-        else:
-            u_np1.assign(X)
+        u_np1.assign(X)
 
         usol_recv.append(receivers.interpolate(u_np1.dat.data_ro_with_halos[:]))
 
@@ -276,7 +156,7 @@ def forward(
 
         if step % nspool == 0:
             assert (
-                norm(u_n) < 1
+                fire.norm(u_n) < 1
             ), "Numerical instability. Try reducing dt or building the mesh differently"
             if output:
                 outfile.write(u_n, time=t, name="Pressure")
