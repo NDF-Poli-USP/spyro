@@ -796,7 +796,7 @@ class Model_parameters:
             
             self.user_mesh = spyro.BoxMesh(nz, nx, ny, self.length_z, self.length_x, self.length_y, quadrilateral=quadrilateral)
             
-        if length_z== None or length_x==None or (length_y == None and self.dimension==2):
+        if (length_z== None or length_x==None or (length_y == None and self.dimension==2)) and self.mesh_type != 'firedrake_mesh':
             warnings.warn("Mesh dimensions not completely reset from initial dictionary")
         else:
             if length_z != None:

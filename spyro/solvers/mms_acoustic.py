@@ -78,7 +78,8 @@ class AcousticWaveMMS(AcousticWave):
         temp_filename = self.forward_output_file
         filename, file_extension = temp_filename.split(".")
         output_filename = filename+"sn_mms_"+"."+file_extension
-        print(output_filename, flush = True)
+        if self.forward_output:
+            print(f'Saving output in: {output_filename}', flush = True)
 
         output = fire.File(output_filename, comm=comm.comm)
         comm.comm.barrier()
