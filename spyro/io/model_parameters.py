@@ -100,6 +100,8 @@ import os.path
 #     "velocity_model_filename": None,
 #     "gradient_output": False,
 #     "gradient_filename": None,
+#     "adjoint_output": False,
+#     "adjoint_filename": None,
 # }
 
 def convert_old_dictionary(old_dictionary):
@@ -305,6 +307,8 @@ class Model_parameters:
 #     "velocity_model_filename": None,
 #     "gradient_output": False,
 #     "gradient_filename": None,
+#     "adjoint_output": False,
+#     "adjoint_filename": None,
 # }
         # Checking if any output should be saved
         if "visualization" in self.input_dictionary:
@@ -314,6 +318,7 @@ class Model_parameters:
                 "forward_output" : False,
                 "fwi_velocity_model_output": False,
                 "gradient_output": False,
+                "adjoint_output": False,
             }
         
         self.forward_output = dictionary["forward_output"]
@@ -327,6 +332,11 @@ class Model_parameters:
             self.gradient_output = dictionary["gradient_output"]
         else:
             self.gradient_output = False
+        
+        if "adjoint_output" in dictionary:
+            self.adjoint_output = dictionary["adjoint_output"]
+        else:
+            self.adjoint_output = False
         
         # Estabilishing forward output file and setting a default        
         if "forward_output_filename" not in dictionary:
@@ -351,6 +361,14 @@ class Model_parameters:
             self.gradient_output_file = dictionary["gradient_filename"]
         else:
             self.gradient_output_file = "results/gradient.pvd"
+        
+        # Estabilishing adjoint file and setting a default
+        if "adjoint_filename" not in dictionary:
+            self.adjoint_output_file = "results/adjoint.pvd"
+        elif dictionary["adjoint_filename"] != None:
+            self.adjoint_output_file = dictionary["adjoint_filename"]
+        else:
+            self.adjoint_output_file = "results/adjoint.pvd"
 
     def get_wavelet(self):
         """Returns a wavelet based on the source type.
