@@ -41,6 +41,8 @@ class Wave(Model_parameters):
             else:
                 self.sources = None
             self.receivers = Receivers(self)
+        elif self.mesh_type == 'firedrake_mesh':
+            warnings.warn('No mesh file, Firedrake mesh will be automatically generated.')   
         else:
             warnings.warn('No mesh found. Please define a mesh.')
     
