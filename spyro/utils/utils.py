@@ -36,24 +36,15 @@ def butter_lowpass_filter(shot, cutoff, fs, order=2):
     return filtered_shot
 
 
-def compute_functional(model, residual, velocity=None):
+def compute_functional(Wave_object, residual):
     """Compute the functional to be optimized.
     Accepts the velocity optionally and uses
     it if regularization is enabled
     """
-    num_receivers = len(model["acquisition"]["receiver_locations"])
-    dt = model["timeaxis"]["dt"]
-    tf = model["timeaxis"]["tf"]
-    nt = int(tf / dt)  # number of timesteps
-    if "regularization" in model["opts"]:
-        regularize = model["opts"]["regularization"]
-    else:
-        regularize = False
-
-    if regularize:
-        gamma = model["opt"]["gamma"]
-        Ns = model["acquisition"]["num_sources"]
-        gamma /= Ns
+    num_receivers = Wave_object.number_of_receivers
+    dt = Wave_object.dt
+    tf = Wave_object.final_time
+    nt = int(tf / dt) + 1 # number of timesteps
 
     J = 0.0
     for ti in range(nt):
@@ -61,9 +52,6 @@ def compute_functional(model, residual, velocity=None):
             J += residual[ti][rn] ** 2
     J *= 0.5
 
-    # if regularize:
-    #     Jreg = assemble(0.5 * gamma * dot(grad(vp), grad(vp)) * dx)
-    #     J += Jreg
     return J
 
 

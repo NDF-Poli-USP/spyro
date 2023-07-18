@@ -92,7 +92,7 @@ class Wave(Model_parameters):
         -----------
         conditional:  (optional)
 
-        velocity_model_functional:  (optional)
+        velocity_model_function:  (optional)
 
         expression:  str (optional)
             If you use an expression, you can use the following variables: x, y, z, pi

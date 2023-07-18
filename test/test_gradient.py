@@ -8,7 +8,89 @@ from .inputfiles.Model1_gradient_2d import model
 from .inputfiles.Model1_gradient_2d_pml import model_pml
 
 
-# outfile_total_gradient = File(os.getcwd() + "/results/Gradient.pvd")
+dictionary = {}
+dictionary["options"] = {
+    "cell_type": "T",  # simplexes such as triangles or tetrahedra (T) or quadrilaterals (Q)
+    "variant": 'lumped', # lumped, equispaced or DG, default is lumped
+    "method": "MLT", # (MLT/spectral_quadrilateral/DG_triangle/DG_quadrilateral) You can either specify a cell_type+variant or a method
+    "degree": 4,  # p order
+    "dimension": 2,  # dimension
+    "automatic_adjoint": False,
+}
+
+# Number of cores for the shot. For simplicity, we keep things serial.
+# spyro however supports both spatial parallelism and "shot" parallelism.
+dictionary["parallelism"] = {
+    "type": "automatic",  # options: automatic (same number of cores for evey processor) or spatial
+}
+
+# Define the domain size without the PML. Here we'll assume a 0.75 x 1.50 km
+# domain and reserve the remaining 250 m for the Perfectly Matched Layer (PML) to absorb
+# outgoing waves on three sides (eg., -z, +-x sides) of the domain.
+dictionary["mesh"] = {
+    "Lz": 1.0,  # depth in km - always positive   # Como ver isso sem ler a malha?
+    "Lx": 1.0,  # width in km - always positive
+    "Ly": 0.0,  # thickness in km - always positive
+    "mesh_file": None,
+}
+dictionary["synthetic_data"] = {    #For use only if you are using a synthetic test model or a forward only simulation -adicionar discrição para modelo direto
+    "real_mesh_file": None,
+    "real_velocity_file": None,
+}
+dictionary["inversion"] = {
+    "perform_fwi": False, # switch to true to make a FWI
+    "initial_guess_model_file": None,
+    "shot_record_file": None,
+    "optimization_parameters": None,
+}
+
+# Specify a 250-m PML on the three sides of the domain to damp outgoing waves.
+dictionary["absorving_boundary_conditions"] = {
+    "status": False,  # True or false
+    "outer_bc": "non-reflective",  #  None or non-reflective (outer boundary condition)
+    "damping_type": "polynomial",  # polynomial, hyperbolic, shifted_hyperbolic
+    "exponent": 2,  # damping layer has a exponent variation
+    "cmax": 4.7,  # maximum acoustic wave velocity in PML - km/s
+    "R": 1e-6,  # theoretical reflection coefficient
+    "lz": 0.25,  # thickness of the PML in the z-direction (km) - always positive
+    "lx": 0.25,  # thickness of the PML in the x-direction (km) - always positive
+    "ly": 0.0,  # thickness of the PML in the y-direction (km) - always positive
+}
+
+# Create a source injection operator. Here we use a single source with a
+# Ricker wavelet that has a peak frequency of 8 Hz injected at the center of the mesh.
+# We also specify to record the solution at 101 microphones near the top of the domain.
+# This transect of receivers is created with the helper function `create_transect`.
+dictionary["acquisition"] = {
+    "source_type": "ricker",
+    "source_locations": [(-0.1, 0.5)],
+    "frequency": 5.0,
+    "delay": 1.0,
+    "receiver_locations": spyro.create_transect(
+        (-0.10, 0.1), (-0.10, 0.9), 20
+    ),
+}
+
+# Simulate for 2.0 seconds.
+dictionary["time_axis"] = {
+    "initial_time": 0.0,  #  Initial time for event
+    "final_time": 2.00,  # Final time for event
+    "dt": 0.001,  # timestep size
+    "amplitude": 1,  # the Ricker has an amplitude of 1.
+    "output_frequency": 100,  # how frequently to output solution to pvds - Perguntar Daiane ''post_processing_frequnecy'
+    "gradient_sampling_frequency": 100,  # how frequently to save solution to RAM    - Perguntar Daiane 'gradient_sampling_frequency'
+}
+dictionary["visualization"] = {
+    "forward_output" : True,
+    "output_filename": "results/forward_output.pvd",
+    "fwi_velocity_model_output": False,
+    "velocity_model_filename": None,
+    "gradient_output": False,
+    "gradient_filename": None,
+    "adjoint_output": False,
+    "adjoint_filename": None,
+}
+outfile_total_gradient = File(os.getcwd() + "/results/Gradient.pvd")
 
 forward = spyro.solvers.forward
 gradient = spyro.solvers.gradient
@@ -21,7 +103,6 @@ def _make_vp_exact(V, mesh):
     vp_exact = Function(V).interpolate(
         4.0
         + 1.0 * tanh(10.0 * (0.5 - sqrt((z - 1.5) ** 2 + (x + 1.5) ** 2)))
-        # 5.0 + 0.5 * tanh(10.0 * (0.5 - sqrt((z - 1.5) ** 2 + (x + 1.5) ** 2)))
     )
     File("exact_vel.pvd").write(vp_exact)
     return vp_exact
