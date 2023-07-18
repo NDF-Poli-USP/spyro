@@ -245,7 +245,7 @@ def convert_old_dictionary(old_dictionary):
     new_dictionary["time_axis"] = {
         "initial_time": old_dictionary["timeaxis"][
             "t0"
-        ],  #  Initial time for event
+        ],  # Initial time for event
         "final_time": old_dictionary["timeaxis"]["tf"],  # Final time for event
         "dt": old_dictionary["timeaxis"]["dt"],  # timestep size
         "output_frequency": old_dictionary["timeaxis"][
@@ -267,7 +267,8 @@ class Model_parameters:
         Parameters
         ----------
         dictionary: 'dictionary' (optional)
-            Contains all input parameters already organized based on examples from github.
+            Contains all input parameters already organized based on examples
+            from github.
         comm: MPI communicator (optional)
             MPI comunicator. If None is given model_parameters creates one.
 
@@ -311,14 +312,19 @@ class Model_parameters:
 
     # default_dictionary["absorving_boundary_conditions"] = {
     #     "status": False,  # True or false
-    #     "outer_bc": "non-reflective",  #  None or non-reflective (outer boundary condition)
-    #     "damping_type": "polynomial",  # polynomial, hyperbolic, shifted_hyperbolic
+    # #  None or non-reflective (outer boundary condition)
+    #     "outer_bc": "non-reflective",
+    # # polynomial, hyperbolic, shifted_hyperbolic
+    #     "damping_type": "polynomial",
     #     "exponent": 2,  # damping layer has a exponent variation
     #     "cmax": 4.7,  # maximum acoustic wave velocity in PML - km/s
     #     "R": 1e-6,  # theoretical reflection coefficient
-    #     "lz": 0.25,  # thickness of the PML in the z-direction (km) - always positive
-    #     "lx": 0.25,  # thickness of the PML in the x-direction (km) - always positive
-    #     "ly": 0.0,  # thickness of the PML in the y-direction (km) - always positive
+    # # thickness of the PML in the z-direction (km) - always positive
+    #     "lz": 0.25,
+    # # thickness of the PML in the x-direction (km) - always positive
+    #     "lx": 0.25,
+    # # thickness of the PML in the y-direction (km) - always positive
+    #     "ly": 0.0,
     # }
     def _sanitize_absorving_boundary_condition(self):
         if "absorving_boundary_conditions" in self.input_dictionary:
@@ -393,7 +399,7 @@ class Model_parameters:
         # Estabilishing forward output file and setting a default
         if "forward_output_filename" not in dictionary:
             self.forward_output_file = "results/forward_propogation.pvd"
-        elif dictionary["forward_output_filename"] != None:
+        elif dictionary["forward_output_filename"] is None:
             self.forward_output_file = dictionary["forward_output_filename"]
         else:
             self.forward_output_file = "results/forward_propagation.pvd"
@@ -403,7 +409,7 @@ class Model_parameters:
             self.fwi_velocity_model_output_file = (
                 "results/fwi_velocity_model.pvd"
             )
-        elif dictionary["velocity_model_filename"] != None:
+        elif dictionary["velocity_model_filename"] is None:
             self.fwi_velocity_model_output_file = dictionary[
                 "velocity_model_filename"
             ]
@@ -415,7 +421,7 @@ class Model_parameters:
         # Estabilishing gradient file and setting a default
         if "gradient_filename" not in dictionary:
             self.gradient_output_file = "results/gradient.pvd"
-        elif dictionary["gradient_filename"] != None:
+        elif dictionary["gradient_filename"] is None:
             self.gradient_output_file = dictionary["gradient_filename"]
         else:
             self.gradient_output_file = "results/gradient.pvd"
@@ -423,7 +429,7 @@ class Model_parameters:
         # Estabilishing adjoint file and setting a default
         if "adjoint_filename" not in dictionary:
             self.adjoint_output_file = "results/adjoint.pvd"
-        elif dictionary["adjoint_filename"] != None:
+        elif dictionary["adjoint_filename"] is None:
             self.adjoint_output_file = dictionary["adjoint_filename"]
         else:
             self.adjoint_output_file = "results/adjoint.pvd"
@@ -473,7 +479,7 @@ class Model_parameters:
             warnings.warn("No paralellism type listed. Assuming automatic")
             self.parallelism_type = "automatic"
 
-        if comm == None:
+        if comm is None:
             self.comm = spyro.utils.mpi_init(self)
             self.comm.comm.barrier()
         else:
@@ -531,23 +537,24 @@ class Model_parameters:
         self.length_z = dictionary["mesh"]["Lz"]
         self.length_x = dictionary["mesh"]["Lx"]
         self.length_y = dictionary["mesh"]["Ly"]
-        if "user_mesh" in dictionary["mesh"] and self.mesh_file == None:
+        if "user_mesh" in dictionary["mesh"] and self.mesh_file is None:
             self.mesh_type = "user_mesh"
-        if self.user_mesh == None and self.mesh_file == None:
+        if self.user_mesh is None and self.mesh_file is None:
             warnings.warn("No mesh yet provided.")
 
-        if self.mesh_file != None:
+        if self.mesh_file is not None:
             self.mesh_type = "file"
-        # self.__check_mesh() #Olhar objeto do Firedrake - assumir retangular sempre -só warning se z nao for negativo
 
     def _sanitize_optimization_and_velocity(self):
         """
-        Checks if we are doing a FWI and sorts velocity model types, inputs, and outputs
+        Checks if we are doing a FWI and sorts velocity model types, inputs,
+        and outputs
         """
         dictionary = self.input_dictionary
         self.velocity_model_type = "file"
 
-        # Check if we are doing a FWI and sorting output locations and velocity model inputs
+        # Check if we are doing a FWI and sorting output locations and
+        # velocity model inputs
         self.running_fwi = False
         if "inversion" in dictionary:
             if dictionary["inversion"]["perform_fwi"]:
@@ -571,11 +578,13 @@ class Model_parameters:
                 dictionary["synthetic_data"] = {"real_velocity_file": None}
                 self.initial_velocity_model_file = None
 
-        if self.initial_velocity_model_file == None:
+        if self.initial_velocity_model_file is None:
             if "velocity_conditional" not in dictionary["synthetic_data"]:
                 self.velocity_model_type = None
                 warnings.warn(
-                    "No velocity model set initially. If using user defined conditional or expression, please input it in the Wave object."
+                    "No velocity model set initially. If using \
+                        user defined conditional or expression, please \
+                            input it in the Wave object."
                 )
 
         if "velocity_conditional" in dictionary["synthetic_data"]:
@@ -614,13 +623,6 @@ class Model_parameters:
         self.__check_degree()
 
     def __check_acquisition(self):
-        min_z = -self.length_z
-        max_z = 0.0
-        min_x = 0.0
-        max_x = self.length_x
-        if self.dimension == 3:
-            min_y = 0.0
-            max_y = self.length_y
         for source in self.source_locations:
             if self.dimension == 2:
                 source_z, source_x = source
@@ -629,22 +631,16 @@ class Model_parameters:
                 source_z, source_x, source_y = source
             else:
                 raise ValueError("Source input type not supported")
-            # if min_z > source_z or source_z > max_z:
-            #     raise ValueError(f'Source of ({source_z},{source_x}, {source_y}) not located inside the mesh.')
-            # if min_x > source_x or source_x > max_x:
-            #     raise ValueError(f'Source of ({source_z},{source_x}, {source_y}) not located inside the mesh.')
-            # if self.dimension == 3:
-            #     if (min_y > source_y or source_y > max_y):
-            #         raise ValueError(f'Source of ({source_z},{source_x}, {source_y}) not located inside the mesh.')
 
     def __check_time(self):
         if self.final_time < 0.0:
             raise ValueError(f"Negative time of {self.final_time} not valid.")
         if self.dt > 1.0:
             warnings.warn(f"Time step of {self.dt} too big.")
-        if self.dt == None:
+        if self.dt is None:
             warnings.warn(
-                "Timestep not given. Will calculate internally when user attemps to propagate wave."
+                "Timestep not given. Will calculate internally when user \
+                    attemps to propagate wave."
             )
 
     def __check_degree(self):
@@ -652,17 +648,20 @@ class Model_parameters:
             if self.dimension == 2:
                 if self.degree > 5:
                     raise ValueError(
-                        f"Degree of {self.degree} not supported by {self.dimension}D {self.method}."
+                        f"Degree of {self.degree} not supported by \
+                            {self.dimension}D {self.method}."
                     )
             if self.dimension == 3:
                 if self.degree > 4:
                     raise ValueError(
-                        f"Degree of {self.degree} not supported by {self.dimension}D {self.method}."
+                        f"Degree of {self.degree} not supported by \
+                            {self.dimension}D {self.method}."
                     )
             if self.dimension == 3:
                 if self.degree == 4:
                     warnings.warn(
-                        f"Degree of {self.degree} not supported by {self.dimension}D {self.method} in main firedrake."
+                        f"Degree of {self.degree} not supported by \
+                            {self.dimension}D {self.method} in main firedrake."
                     )
 
     def __convert_old_dictionary(self, old_dictionary):
@@ -675,8 +674,10 @@ class Model_parameters:
         }
         new_dictionary["parallelism"] = {
             "type": old_dictionary["parallelism"][
+                # options: automatic (same number of cores for evey processor)
+                # or spatial
                 "type"
-            ],  # options: automatic (same number of cores for evey processor) or spatial
+            ],
         }
         new_dictionary["mesh"] = {
             "Lz": old_dictionary["mesh"]["Lz"],
@@ -686,8 +687,8 @@ class Model_parameters:
         }
         fwi_running = False
         if (
-            old_dictionary["mesh"]["initmodel"] != None
-            and old_dictionary["mesh"]["truemodel"] != None
+            old_dictionary["mesh"]["initmodel"] is not None
+            and old_dictionary["mesh"]["truemodel"] is not None
         ):
             if (
                 old_dictionary["mesh"]["initmodel"] != "not_used.hdf5"
@@ -695,9 +696,10 @@ class Model_parameters:
             ):
                 warnings.warn("Assuming parameters set for fwi.")
                 fwi_running = True
-        if fwi_running == False:
+        if fwi_running is False:
             warnings.warn(
-                "Assuming parameters set for forward only propagation, will use velocity model from old_dictionary truemodel."
+                "Assuming parameters set for forward only propagation, will \
+                    use velocity model from old_dictionary truemodel."
             )
         if fwi_running:
             new_dictionary["synthetic_data"] = {
@@ -707,7 +709,7 @@ class Model_parameters:
         else:
             model_file = None
             if (
-                old_dictionary["mesh"]["initmodel"] != None
+                old_dictionary["mesh"]["initmodel"] is not None
                 and old_dictionary["mesh"]["initmodel"] != "not_used.hdf5"
             ):
                 model_file = old_dictionary["mesh"]["initmodel"]
@@ -775,7 +777,7 @@ class Model_parameters:
         new_dictionary["time_axis"] = {
             "initial_time": old_dictionary["timeaxis"][
                 "t0"
-            ],  #  Initial time for event
+            ],  # Initial time for event
             "final_time": old_dictionary["timeaxis"][
                 "tf"
             ],  # Final time for event
@@ -835,7 +837,7 @@ class Model_parameters:
             or cell_type == "hexahedra"
         ):
             unified_cell_type = "quadrilateral"
-        elif cell_type == None:
+        elif cell_type is None:
             unified_cell_type = None
         else:
             warnings.warn(f"Cell type of {cell_type} not accepted.")
@@ -889,17 +891,18 @@ class Model_parameters:
             and ("variant" in dictionary["options"])
         ):
             if (
-                dictionary["options"]["method"] != None
-                and dictionary["options"]["cell_type"] != None
+                dictionary["options"]["method"] is not None
+                and dictionary["options"]["cell_type"] is not None
             ):
                 self.cell_type = dictionary["options"]["cell_type"]
                 self.__unify_cell_type_input()
                 warnings.warn(
-                    "Both methods of specifying method and cell_type with variant used. Method specification taking priority."
+                    "Both methods of specifying method and cell_type with \
+                        variant used. Method specification taking priority."
                 )
         if (
             "method" in dictionary["options"]
-            and dictionary["options"]["method"] != None
+            and dictionary["options"]["method"] is not None
         ):
             self.method = dictionary["options"]["method"]
             self.__unify_method_input()
@@ -915,7 +918,7 @@ class Model_parameters:
         elif (
             ("cell_type" in dictionary["options"])
             and ("variant" in dictionary["options"])
-            and dictionary["options"]["cell_type"] != None
+            and dictionary["options"]["cell_type"] is not None
         ):
             self.cell_type = dictionary["options"]["cell_type"]
             self.__unify_cell_type_input()
@@ -959,14 +962,14 @@ class Model_parameters:
             Whether the domain is periodic. The default is False.
         """
 
-        if user_mesh != None:
+        if user_mesh is not None:
             self.user_mesh = user_mesh
             self.mesh_type = "user_mesh"
-        elif mesh_file != None:
+        elif mesh_file is not None:
             self.mesh_file = mesh_file
             self.mesh_type = "file"
         elif (
-            dx != None
+            dx is not None
             and self.mesh_type == "firedrake_mesh"
             and self.dimension == 2
         ):
@@ -994,7 +997,7 @@ class Model_parameters:
                     quadrilateral=quadrilateral,
                 )
         elif (
-            dx != None
+            dx is not None
             and self.mesh_type == "firedrake_mesh"
             and self.dimension == 3
         ):
@@ -1017,19 +1020,19 @@ class Model_parameters:
             )
 
         if (
-            length_z == None
-            or length_x == None
-            or (length_y == None and self.dimension == 2)
+            length_z is None
+            or length_x is None
+            or (length_y is None and self.dimension == 2)
         ) and self.mesh_type != "firedrake_mesh":
             warnings.warn(
                 "Mesh dimensions not completely reset from initial dictionary"
             )
         else:
-            if length_z != None:
+            if length_z is not None:
                 self.length_z = length_z
-            if length_x != None:
+            if length_x is not None:
                 self.length_x = length_x
-            if length_y != None:
+            if length_y is not None:
                 self.length_y = length_y
 
     def get_mesh(self):
@@ -1040,7 +1043,7 @@ class Model_parameters:
         mesh: Firedrake.Mesh object
             The distributed mesh across `ens_comm`
         """
-        if self.mesh_file != None:
+        if self.mesh_file is not None:
             return spyro.io.read_mesh(self)
         elif (
             self.mesh_type == "user_mesh" or self.mesh_type == "firedrake_mesh"
