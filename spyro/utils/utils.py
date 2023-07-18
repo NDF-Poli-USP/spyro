@@ -147,5 +147,5 @@ def analytical_solution_for_pressure_based_on_MMS(model, mesh, time):
     z, x = SpatialCoordinate(mesh)  # noqa: F405
     p = Function(V).interpolate(  # noqa: F405
         (time**2) * sin(pi * z) * sin(pi * x)  # noqa: F405
-        )
+    )
     return p
