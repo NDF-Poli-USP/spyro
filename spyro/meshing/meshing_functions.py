@@ -1,11 +1,10 @@
 import firedrake as fire
-import SeismicMesh as sm
-import numpy as np
 
 
 def RectangleMesh(nx, ny, Lx, Ly, pad=None, comm=None, quadrilateral=False):
     """Create a rectangle mesh based on the Firedrake mesh.
-    First axis is negative, second axis is positive. If there is a pad, both axis are dislocated by the pad.
+    First axis is negative, second axis is positive. If there is a pad, both
+    axis are dislocated by the pad.
 
     Parameters
     ----------
@@ -29,7 +28,7 @@ def RectangleMesh(nx, ny, Lx, Ly, pad=None, comm=None, quadrilateral=False):
     mesh : Firedrake Mesh
         Mesh
     """
-    if pad != None:
+    if pad is not None:
         Lx += pad
         Ly += 2 * pad
     else:
@@ -45,7 +44,8 @@ def PeriodicRectangleMesh(
     nx, ny, Lx, Ly, pad=None, comm=None, quadrilateral=False
 ):
     """Create a periodic rectangle mesh based on the Firedrake mesh.
-    First axis is negative, second axis is positive. If there is a pad, both axis are dislocated by the pad.
+    First axis is negative, second axis is positive. If there is a pad, both
+    axis are dislocated by the pad.
 
     Parameters
     ----------
@@ -70,7 +70,7 @@ def PeriodicRectangleMesh(
         Mesh
 
     """
-    if pad != None:
+    if pad is not None:
         Lx += pad
         Ly += 2 * pad
     else:
@@ -84,22 +84,8 @@ def PeriodicRectangleMesh(
     return mesh
 
 
-def UnitSquareMesh(nx, ny, quadrilateral=False, comm=None):
-    mesh = fire.UnitSquareMesh(
-        nx,
-        ny,
-        quadrilateral=quadrilateral,
-        reorder=reorder,
-        distribution_parameters=distribution_parameters,
-        comm=comm,
-        **kwargs
-    )
-    mesh.coordinates.dat.data[:, 0] *= -1.0
-    return mesh
-
-
 def BoxMesh(nx, ny, nz, Lx, Ly, Lz, pad=None, quadrilateral=False):
-    if pad != None:
+    if pad is not None:
         Lx += pad
         Ly += 2 * pad
         Lz += 2 * pad

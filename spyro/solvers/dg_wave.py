@@ -1,5 +1,5 @@
 import firedrake as fire
-from firedrake import dot, grad, jump, avg, dx, dX, ds, dS, Constant
+from firedrake import dot, grad, jump, avg, dx, ds, dS, Constant
 from spyro import Wave
 
 fire.set_log_level(fire.ERROR)
@@ -7,7 +7,8 @@ fire.set_log_level(fire.ERROR)
 
 class DG_Wave(Wave):
     def matrix_building(self):
-        """Builds solver operators. Doesn't create mass matrices if matrix_free option is on,
+        """Builds solver operators. Doesn't create mass matrices if
+        matrix_free option is on,
         which it is by default.
         """
         V = self.function_space
@@ -15,7 +16,7 @@ class DG_Wave(Wave):
         u = fire.TrialFunction(V)
         v = fire.TestFunction(V)
 
-        ## Previous functions for time integration
+        # # Previous functions for time integration
         u_n = fire.Function(V)
         u_nm1 = fire.Function(V)
         self.u_nm1 = u_nm1

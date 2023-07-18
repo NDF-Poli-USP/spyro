@@ -1,7 +1,7 @@
 import os
 import warnings
 import firedrake as fire
-from firedrake import sin, pi
+from firedrake import sin, cos, pi  # noqa: F401
 from SeismicMesh import write_velocity_model
 
 from ..io import Model_parameters, interpolate
@@ -34,7 +34,7 @@ class Wave(Model_parameters):
 
         self.wavelet = self.get_wavelet()
         self.mesh = self.get_mesh()
-        if self.mesh != None and self.mesh != False:
+        if self.mesh is not None and self.mesh is not False:
             self._build_function_space()
             if self.source_type == "ricker":
                 self.sources = Sources(self)
@@ -86,9 +86,9 @@ class Wave(Model_parameters):
             self.mesh_y = y
 
     def set_solver_parameters(self, parameters=None):
-        if parameters != None:
+        if parameters is not None:
             self.solver_parameters = parameters
-        elif parameters == None:
+        elif parameters is None:
             if self.method == "mass_lumped_triangle":
                 self.solver_parameters = {
                     "ksp_type": "preonly",
@@ -127,7 +127,8 @@ class Wave(Model_parameters):
         velocity_model_function:  (optional)
 
         expression:  str (optional)
-            If you use an expression, you can use the following variables: x, y, z, pi
+            If you use an expression, you can use the following variables:
+            x, y, z, pi
 
         new_file:  (optional)
         """
@@ -135,16 +136,16 @@ class Wave(Model_parameters):
         self.initial_velocity_model = None
         self.initial_velocity_model_file = None
 
-        if conditional != None:
+        if conditional is not None:
             V = self.function_space
             vp = fire.Function(V, name="velocity")
             vp.interpolate(conditional)
             self.initial_velocity_model = vp
-        elif expression != None:
-            z = self.mesh_z
-            x = self.mesh_x
+        elif expression is not None:
+            z = self.mesh_z  # noqa: F841
+            x = self.mesh_x  # noqa: F841
             if self.dimension == 3:
-                y = self.mesh_y
+                y = self.mesh_y  # noqa: F841
             expression = eval(expression)
             V = self.function_space
             vp = fire.Function(V, name="velocity")
@@ -153,11 +154,11 @@ class Wave(Model_parameters):
                 vp, name="velocity"
             )
             self.initial_velocity_model = vp
-        elif velocity_model_function != None:
+        elif velocity_model_function is not None:
             self.initial_velocity_model = velocity_model_function
-        elif new_file != None:
+        elif new_file is not None:
             self.initial_velocity_model_file = new_file
-        elif constant != None:
+        elif constant is not None:
             V = self.function_space
             vp = fire.Function(V, name="velocity")
             vp.interpolate(fire.Constant(constant))
@@ -165,7 +166,8 @@ class Wave(Model_parameters):
             self.initial_velocity_model = vp
         else:
             raise ValueError(
-                "Please specify either a conditional, expression, firedrake function or new file name (segy or hdf5)."
+                "Please specify either a conditional, expression, firedrake \
+                    function or new file name (segy or hdf5)."
             )
 
     def _get_initial_velocity_model(self):
@@ -174,10 +176,10 @@ class Wave(Model_parameters):
                 conditional=self.model_parameters.velocity_conditional
             )
 
-        if self.initial_velocity_model != None:
+        if self.initial_velocity_model is not None:
             return None
 
-        if self.initial_velocity_model_file == None:
+        if self.initial_velocity_model_file is None:
             raise ValueError("No velocity model or velocity file to load.")
 
         if self.initial_velocity_model_file.endswith(".segy"):

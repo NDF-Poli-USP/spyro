@@ -1,5 +1,5 @@
 import copy
-from firedrake import *
+from firedrake import *  # noqa: F403
 import numpy as np
 from mpi4py import MPI
 from scipy.signal import butter, filtfilt
@@ -69,11 +69,11 @@ def evaluate_misfit(model, guess, exact):
     return ds_exact[:ll] - guess
 
 
-def myrank(COMM=COMM_SELF):
+def myrank(COMM=COMM_SELF):  # noqa: F405
     return COMM.Get_rank()
 
 
-def mysize(COMM=COMM_SELF):
+def mysize(COMM=COMM_SELF):  # noqa: F405
     return COMM.Get_size()
 
 
@@ -81,7 +81,7 @@ def mpi_init(model):
     """Initialize computing environment"""
     # rank = myrank()
     # size = mysize()
-    available_cores = COMM_WORLD.size
+    available_cores = COMM_WORLD.size  # noqa: F405
     if model.parallelism_type == "automatic":
         num_cores_per_shot = available_cores / model.number_of_sources
         if available_cores % model.number_of_sources != 0:
@@ -93,15 +93,15 @@ def mpi_init(model):
     elif model.parallelism_type == "custom":
         raise ValueError("Custom parallelism not yet implemented")
 
-    comm_ens = Ensemble(COMM_WORLD, num_cores_per_shot)
+    comm_ens = Ensemble(COMM_WORLD, num_cores_per_shot)  # noqa: F405
     return comm_ens
 
 
 def mpi_init_simple(number_of_sources):
     """Initialize computing environment"""
-    rank = myrank()
-    size = mysize()
-    available_cores = COMM_WORLD.size
+    rank = myrank()  # noqa: F841
+    size = mysize()  # noqa: F841
+    available_cores = COMM_WORLD.size  # noqa: F405
 
     num_cores_per_shot = available_cores / number_of_sources
     if available_cores % number_of_sources != 0:
@@ -109,7 +109,7 @@ def mpi_init_simple(number_of_sources):
             "Available cores cannot be divided between sources equally."
         )
 
-    comm_ens = Ensemble(COMM_WORLD, num_cores_per_shot)
+    comm_ens = Ensemble(COMM_WORLD, num_cores_per_shot)  # noqa: F405
     return comm_ens
 
 
@@ -143,7 +143,9 @@ def communicate(array, my_ensemble):
 
 def analytical_solution_for_pressure_based_on_MMS(model, mesh, time):
     degree = model["opts"]["degree"]
-    V = FunctionSpace(mesh, "CG", degree)
-    z, x = SpatialCoordinate(mesh)
-    p = Function(V).interpolate((time**2) * sin(pi * z) * sin(pi * x))
+    V = FunctionSpace(mesh, "CG", degree)  # noqa: F405
+    z, x = SpatialCoordinate(mesh)  # noqa: F405
+    p = Function(V).interpolate(  # noqa: F405
+        (time**2) * sin(pi * z) * sin(pi * x)  # noqa: F405
+        )
     return p

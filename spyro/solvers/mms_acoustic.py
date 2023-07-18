@@ -1,6 +1,5 @@
 import firedrake as fire
-from firedrake import Constant, dx, dot, grad, sin
-from numpy import pi
+from firedrake import Constant, dx, dot, grad
 from .CG_acoustic import AcousticWave
 from ..io.basicio import ensemble_propagator
 from . import helpers
@@ -58,7 +57,8 @@ class AcousticWaveMMS(AcousticWave):
         self.analytical = fire.Function(self.function_space)
         x = self.mesh_z
         y = self.mesh_x
-        # analytical = fire.project(sin(pi*x)*sin(pi*y)*t**2, self.function_space)
+        # analytical = fire.project(sin(pi*x)*sin(pi*y)*t**2,
+        # self.function_space)
         # self.analytical.interpolate(sin(pi*x)*sin(pi*y)*t**2)
         if self.dimension == 2:
             self.analytical.interpolate(x * (x + 1) * y * (y - 1) * t)
@@ -97,9 +97,9 @@ class AcousticWaveMMS(AcousticWave):
         comm.comm.barrier()
 
         X = fire.Function(self.function_space)
-        if final_time == None:
+        if final_time is None:
             final_time = self.final_time
-        if dt == None:
+        if dt is None:
             dt = self.dt
         t = self.current_time
         nt = int((final_time - t) / dt) + 1  # number of timesteps
@@ -136,9 +136,9 @@ class AcousticWaveMMS(AcousticWave):
                 * dx(scheme=quad_rule)
             )
             a = dot(grad(u_n), grad(v)) * dx(scheme=quad_rule)
-            l = q * v * dx(scheme=quad_rule)
+            le = q * v * dx(scheme=quad_rule)
 
-            form = m1 + a - l
+            form = m1 + a - le
             rhs = fire.rhs(form)
 
             B = fire.assemble(rhs, tensor=B)
@@ -158,7 +158,8 @@ class AcousticWaveMMS(AcousticWave):
             if (step - 1) % self.output_frequency == 0:
                 assert (
                     fire.norm(u_n) < 1
-                ), "Numerical instability. Try reducing dt or building the mesh differently"
+                ), "Numerical instability. Try reducing dt or building the \
+                    mesh differently"
                 if self.forward_output:
                     output.write(u_n, time=t, name="Pressure")
                 if t > 0:

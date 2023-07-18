@@ -43,7 +43,8 @@ def estimate_timestep(mesh, V, c, estimate_max_eigenvalue=True):
         max_eigval = np.amax(np.abs(Lsp.diagonal()))
     else:
         print(
-            "Computing exact eigenvalues is extremely computationally demanding!",
+            "Computing exact eigenvalues is extremely computationally \
+                demanding!",
             flush=True,
         )
         max_eigval = scipy.sparse.linalg.eigs(
@@ -56,7 +57,8 @@ def estimate_timestep(mesh, V, c, estimate_max_eigenvalue=True):
     else:
         max_dt = 100000000
     # print(
-    #    f"Maximum stable timestep should be about: {np.float(2 / np.sqrt(max_eigval))} seconds",
+    #    f"Maximum stable timestep should be about: {np.float(2 / 
+    # np.sqrt(max_eigval))} seconds",
     #    flush=True,
     # )
     return max_dt

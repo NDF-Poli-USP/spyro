@@ -27,7 +27,8 @@ class AcousticWave(Wave):
         self.wave_propagator()
 
     def matrix_building(self):
-        """Builds solver operators. Doesn't create mass matrices if matrix_free option is on,
+        """Builds solver operators. Doesn't create mass matrices if
+        matrix_free option is on,
         which it is by default.
         """
         V = self.function_space
@@ -109,9 +110,9 @@ class AcousticWave(Wave):
         comm.comm.barrier()
 
         X = fire.Function(self.function_space)
-        if final_time == None:
+        if final_time is None:
             final_time = self.final_time
-        if dt == None:
+        if dt is None:
             dt = self.dt
         t = self.current_time
         nt = int((final_time - t) / dt) + 1  # number of timesteps
@@ -154,7 +155,8 @@ class AcousticWave(Wave):
             if (step - 1) % self.output_frequency == 0:
                 assert (
                     fire.norm(u_n) < 1
-                ), "Numerical instability. Try reducing dt or building the mesh differently"
+                ), "Numerical instability. Try reducing dt or building the \
+                    mesh differently"
                 if self.forward_output:
                     output.write(u_n, time=t, name="Pressure")
                 if t > 0:
@@ -182,7 +184,8 @@ class AcousticWave(Wave):
     def gradient_solve(self, guess, residual):
         if self.current_time == 0.0:
             warnings.warn(
-                "You need to run the forward solver before the adjoint solver, will do it for you now"
+                "You need to run the forward solver before the adjoint solver,\
+                     will do it for you now"
             )
             self.forward_solve()
         self.c = guess

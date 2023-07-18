@@ -1,7 +1,7 @@
 import math
 import warnings
 
-from firedrake import *
+from firedrake import *  # noqa: F403
 
 
 def functions(
