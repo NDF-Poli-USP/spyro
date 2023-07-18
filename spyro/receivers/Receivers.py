@@ -1,10 +1,10 @@
-from firedrake import *
+from firedrake import *  # noqa: F403
 from FIAT.reference_element import (
     UFCTriangle,
     UFCTetrahedron,
     UFCQuadrilateral,
 )
-from FIAT.reference_element import UFCHexahedron, UFCInterval
+from FIAT.reference_element import UFCInterval
 from FIAT import GaussLobattoLegendre as GLLelement
 from FIAT.tensor_product import TensorProductElement
 from FIAT.kong_mulder_veldhuizen import KongMulderVeldhuizen as KMV
@@ -338,9 +338,9 @@ class Receivers:
         where line n has the x and y values of the nth degree of freedom,
         and a numpy matrix of the vertex coordinates.
         """
-        z, x = SpatialCoordinate(self.mesh)
-        ux = Function(self.space).interpolate(x)
-        uz = Function(self.space).interpolate(z)
+        z, x = SpatialCoordinate(self.mesh)  # noqa: F405
+        ux = Function(self.space).interpolate(x)  # noqa: F405
+        uz = Function(self.space).interpolate(z)  # noqa: F405
         datax = ux.dat.data_ro_with_halos[:]
         dataz = uz.dat.data_ro_with_halos[:]
         node_locations = np.zeros((len(datax), 2))
@@ -413,10 +413,10 @@ class Receivers:
         and a numpy matrix of the vertex coordinates.
 
         """
-        x, y, z = SpatialCoordinate(self.mesh)
-        ux = Function(self.space).interpolate(x)
-        uy = Function(self.space).interpolate(y)
-        uz = Function(self.space).interpolate(z)
+        x, y, z = SpatialCoordinate(self.mesh)  # noqa: F405
+        ux = Function(self.space).interpolate(x)  # noqa: F405
+        uy = Function(self.space).interpolate(y)  # noqa: F405
+        uz = Function(self.space).interpolate(z)  # noqa: F405
         datax = ux.dat.data_ro_with_halos[:]
         datay = uy.dat.data_ro_with_halos[:]
         dataz = uz.dat.data_ro_with_halos[:]
@@ -433,7 +433,7 @@ class Receivers:
             return self.__func_build_cell_tabulations_3D()
         elif self.dimension == 2 and self.quadrilateral is True:
             return self.__func_build_cell_tabulations_2D_quad()
-        elif self.dimension == 3 and self.quadrilateral == True:
+        elif self.dimension == 3 and self.quadrilateral is True:
             return self.__func_build_cell_tabulations_3D_quad()
         else:
             raise ValueError
@@ -486,7 +486,8 @@ class Receivers:
         return cell_tabulations
 
     def __func_build_cell_tabulations_2D_quad(self):
-        # finatelement = FiniteElement('CG', self.mesh.ufl_cell(), degree=self.degree, variant='spectral')
+        # finatelement = FiniteElement('CG', self.mesh.ufl_cell(),
+        # degree=self.degree, variant='spectral')
         V = self.space
 
         element = V.finat_element.fiat_equivalent
@@ -512,10 +513,10 @@ class Receivers:
         return cell_tabulations
 
     def __func_build_cell_tabulations_3D_quad(self):
-        I = UFCInterval()
-        An = GLLelement(I, self.degree)
-        Bn = GLLelement(I, self.degree)
-        Cn = GLLelement(I, self.degree)
+        Inter = UFCInterval()
+        An = GLLelement(Inter, self.degree)
+        Bn = GLLelement(Inter, self.degree)
+        Cn = GLLelement(Inter, self.degree)
         Dn = TensorProductElement(An, Bn)
         element = TensorProductElement(Dn, Cn)
 
@@ -571,7 +572,7 @@ class Receivers:
             print("This dimension is not accepted.")
             quit()
 
-        point_cloud = VertexOnlyMesh(self.mesh, xs)
+        point_cloud = VertexOnlyMesh(self.mesh, xs)  # noqa: F405
 
         return point_cloud
 
@@ -596,16 +597,16 @@ def choosing_element(V, degree):
         UFL element to be used in the interpolation.
     """
     cell_geometry = V.mesh().ufl_cell()
-    if cell_geometry == quadrilateral:
+    if cell_geometry == quadrilateral:  # noqa: F405
         T = UFCQuadrilateral()
         raise ValueError(
             "Point interpolation for quads implemented somewhere else."
         )
 
-    elif cell_geometry == triangle:
+    elif cell_geometry == triangle:  # noqa: F405
         T = UFCTriangle()
 
-    elif cell_geometry == tetrahedron:
+    elif cell_geometry == tetrahedron:  # noqa: F405
         T = UFCTetrahedron()
 
     else:
@@ -1028,10 +1029,10 @@ def change_to_reference_quad(p, v0, v1, v2, v3):
     F = c * d - a * f
     G = d * h - e * g
     H = b * g - a * h
-    I = a * e - b * d
+    Ij = a * e - b * d
 
-    pnx = (A * px + B * py + C) / (G * px + H * py + I)
-    pny = (D * px + E * py + F) / (G * px + H * py + I)
+    pnx = (A * px + B * py + C) / (G * px + H * py + Ij)
+    pny = (D * px + E * py + F) / (G * px + H * py + Ij)
 
     return (pnx, pny)
 

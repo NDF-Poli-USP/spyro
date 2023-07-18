@@ -1,9 +1,5 @@
-from .meshing_functions import (
-    RectangleMesh,
-    UnitSquareMesh,
-    PeriodicRectangleMesh,
-    BoxMesh,
-)
+from .meshing_functions import RectangleMesh, UnitSquareMesh
+from .meshing_functions import PeriodicRectangleMesh, BoxMesh
 
 all = [
     "RectangleMesh",
