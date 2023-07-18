@@ -1,8 +1,6 @@
 from genericpath import exists
 import warnings
 import spyro
-import firedrake as fire
-import os.path
 
 # default_optimization_parameters = {
 #     "General": {"Secant": {"Type": "Limited-Memory BFGS", "Maximum Storage": 10}},
@@ -478,8 +476,12 @@ class Model_parameters:
         #self.__check_mesh() #Olhar objeto do Firedrake - assumir retangular sempre -só warning se z nao for negativo
 
     def _sanitize_optimization_and_velocity(self):
+        """
+        Checks if we are doing a FWI and sorts velocity model types, inputs, and outputs
+        """
         dictionary = self.input_dictionary
         self.velocity_model_type = "file"
+
         # Check if we are doing a FWI and sorting output locations and velocity model inputs
         self.running_fwi = False
         if "inversion" in dictionary:

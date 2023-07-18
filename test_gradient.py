@@ -112,14 +112,18 @@ def test_gradient(dictionary):
 
     # simulate the exact model
     Wave_obj.set_initial_velocity_model(velocity_model_function=vp_exact)
-    p_exact, p_exact_receivers = Wave_obj.forward_solve() 
+    Wave_obj.forward_solve()
+
+    p_exact = Wave_obj.forward_solution
+    p_exact_receivers = Wave_obj.forward_solution_receivers
 
     # simulate the guess model
     Wave_obj.current_time = 0.0
     Wave_obj.set_initial_velocity_model(velocity_model_function=vp_guess)
-    p_guess, p_guess_receivers = Wave_obj.forward_solve()
-
-    misfit = p_exact_receivers - p_guess_receivers
+    Wave_obj.forward_solve()
+    
+    p_guess = Wave_obj.forward_solution
+    p_guess_receivers = Wave_obj.forward_solution_receivers
 
     quad_rule = Wave_obj.quadrature_rule
 
@@ -127,7 +131,7 @@ def test_gradient(dictionary):
     print("\n Cost functional at fixed point : " + str(Jm) + " \n ")
 
     # compute the gradient of the control (to be verified)
-    dJ = Wave_obj.gradient(p_guess, misfit)
+    dJ = Wave_obj.gradient()
     dJ.dat.data[:] = dJ.dat.data[:]*mask.dat.data[:]
     File("gradient.pvd").write(dJ)
 

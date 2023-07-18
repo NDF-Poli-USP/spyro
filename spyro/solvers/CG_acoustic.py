@@ -1,5 +1,6 @@
 import firedrake as fire
 from firedrake import Constant, dx, dot, grad
+import warnings
 
 from .wave import Wave
 from ..io.basicio import ensemble_propagator
@@ -155,10 +156,22 @@ class AcousticWave(Wave):
         usol_recv = utils.utils.communicate(usol_recv, comm)
         self.receivers_output = usol_recv
 
+        self.forward_solution = usol
+        self.forward_solution_receivers = usol_recv
+
         return usol, usol_recv
     
     def gradient_solve(self, guess, residual):
+        if self.current_time == 0.0:
+            warnings.warn(
+                "You need to run the forward solver before the adjoint solver, will do it for you now"
+                )
+            self.forward_solve()
+        self.c = guess
+        self.misfit = residual
+        self.wave_backward_propagator()    
 
+    def wave_backward_propagator(self):
         V = self.function_space
         receivers = self.receivers
         dxlump = dx(scheme = self.quadrature_rule)
