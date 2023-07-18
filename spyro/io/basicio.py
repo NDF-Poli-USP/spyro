@@ -1,6 +1,5 @@
 from __future__ import with_statement
 
-import os
 import pickle
 
 import firedrake as fire
@@ -9,7 +8,6 @@ import numpy as np
 from scipy.interpolate import RegularGridInterpolator
 from scipy.interpolate import griddata
 import segyio
-from .. import domains
 
 
 def ensemble_save(func):
@@ -68,7 +66,8 @@ def ensemble_load(func):
 
 
 def ensemble_plot(func):
-    """Decorator for `plot_shots` to distribute shots for ensemble parallelism"""
+    """Decorator for `plot_shots` to distribute shots for
+    ensemble parallelism"""
 
     def wrapper(*args, **kwargs):
         acq = args[0].get("acquisition")
@@ -130,7 +129,8 @@ def ensemble_forward_ad(func):
 
 
 def ensemble_forward_elastic_waves(func):
-    """Decorator for forward elastic waves to distribute shots for ensemble parallelism"""
+    """Decorator for forward elastic waves to distribute shots for
+    ensemble parallelism"""
 
     def wrapper(*args, **kwargs):
         acq = args[0].get("acquisition")
@@ -167,7 +167,8 @@ def ensemble_gradient(func):
 
 
 def ensemble_gradient_elastic_waves(func):
-    """Decorator for gradient (elastic waves) to distribute shots for ensemble parallelism"""
+    """Decorator for gradient (elastic waves) to distribute shots
+    for ensemble parallelism"""
 
     def wrapper(*args, **kwargs):
         acq = args[0].get("acquisition")
@@ -238,7 +239,8 @@ def create_segy(velocity, filename):
     Parameters
     ----------
     velocity:
-        Firedrake function representing the values of the velocity model to save
+        Firedrake function representing the values of the velocity
+        model to save
     filename: str
         Name of the segy file to save
 
@@ -355,7 +357,8 @@ def interpolate(Model, fname, V):
     Returns
     -------
     c: Firedrake.Function
-        P-wave seismic velocity interpolated onto the nodes of the finite elements.
+        P-wave seismic velocity interpolated onto the nodes
+        of the finite elements.
 
     """
     sd = V.mesh().geometric_dimension()
@@ -467,7 +470,8 @@ def read_mesh(model_parameters):
         mesh = fire.Mesh(mshname, comm=ens_comm.comm)
     if ens_comm.comm.rank == 0 and ens_comm.ensemble_comm.rank == 0:
         print(
-            "INFO: Distributing %d shot(s) across %d core(s). Each shot is using %d cores"
+            "INFO: Distributing %d shot(s) across %d core(s). \
+                Each shot is using %d cores"
             % (
                 num_sources,
                 fire.COMM_WORLD.size,

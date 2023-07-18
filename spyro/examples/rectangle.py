@@ -24,7 +24,8 @@ rectangle_optimization_parameters = {
 
 rectangle_dictionary = {}
 rectangle_dictionary["options"] = {
-    "cell_type": "Q",  # simplexes such as triangles or tetrahedra (T) or quadrilaterals (Q)
+    # simplexes such as triangles or tetrahedra (T) or quadrilaterals (Q)
+    "cell_type": "Q",
     "variant": "lumped",  # lumped, equispaced or DG, default is lumped
     "degree": 4,  # p order
     "dimension": 2,  # dimension
@@ -34,14 +35,16 @@ rectangle_dictionary["options"] = {
 # Number of cores for the shot. For simplicity, we keep things serial.
 # spyro however supports both spatial parallelism and "shot" parallelism.
 rectangle_dictionary["parallelism"] = {
-    "type": "automatic",  # options: automatic (same number of cores for evey processor) or spatial
+    # options: automatic (same number of cores for evey processor) or spatial
+    "type": "automatic",
 }
 
 # Define the domain size without the PML. Here we'll assume a 0.75 x 1.50 km
-# domain and reserve the remaining 250 m for the Perfectly Matched Layer (PML) to absorb
+# domain and reserve the remaining 250 m for the Perfectly Matched Layer (PML)
+# to absorb
 # outgoing waves on three sides (eg., -z, +-x sides) of the domain.
 rectangle_dictionary["mesh"] = {
-    "Lz": 1.0,  # depth in km - always positive   # Como ver isso sem ler a malha?
+    "Lz": 1.0,  # depth in km - always positive
     "Lx": 1.0,  # width in km - always positive
     "Ly": 0.0,  # thickness in km - always positive
     "mesh_file": None,
@@ -49,7 +52,9 @@ rectangle_dictionary["mesh"] = {
 }
 rectangle_dictionary[
     "synthetic_data"
-] = {  # For use only if you are using a synthetic test model or a forward only simulation -adicionar discrição para modelo direto
+    # For use only if you are using a synthetic test model or a forward only
+    # simulation -adicionar discrição para modelo direto
+] = {
     "real_mesh_file": None,
     "real_velocity_file": None,
     "velocity_conditional": None,
@@ -64,20 +69,27 @@ rectangle_dictionary["inversion"] = {
 # Specify a 250-m PML on the three sides of the domain to damp outgoing waves.
 rectangle_dictionary["absorving_boundary_conditions"] = {
     "status": False,  # True or false
-    "outer_bc": "non-reflective",  #  None or non-reflective (outer boundary condition)
+    # None or non-reflective (outer boundary condition)
+    "outer_bc": "non-reflective",
     "damping_type": "polynomial",  # polynomial, hyperbolic, shifted_hyperbolic
     "exponent": 2,  # damping layer has a exponent variation
     "cmax": 4.7,  # maximum acoustic wave velocity in PML - km/s
     "R": 1e-6,  # theoretical reflection coefficient
-    "lz": 0.25,  # thickness of the PML in the z-direction (km) - always positive
-    "lx": 0.25,  # thickness of the PML in the x-direction (km) - always positive
-    "ly": 0.0,  # thickness of the PML in the y-direction (km) - always positive
+    # thickness of the PML in the z-direction (km) - always positive
+    "lz": 0.25,
+    # thickness of the PML in the x-direction (km) - always positive
+    "lx": 0.25,
+    # thickness of the PML in the y-direction (km) - always positive
+    "ly": 0.0,
 }
 
 # Create a source injection operator. Here we use a single source with a
-# Ricker wavelet that has a peak frequency of 8 Hz injected at the center of the mesh.
-# We also specify to record the solution at 101 microphones near the top of the domain.
-# This transect of receivers is created with the helper function `create_transect`.
+# Ricker wavelet that has a peak frequency of 8 Hz injected at the center
+# of the mesh.
+# We also specify to record the solution at 101 microphones near the top
+# of the domain.
+# This transect of receivers is created with the helper function
+# `create_transect`.
 rectangle_dictionary["acquisition"] = {
     "source_type": "ricker",
     "source_locations": [(-0.1, 0.3)],
@@ -88,12 +100,13 @@ rectangle_dictionary["acquisition"] = {
 
 # Simulate for 2.0 seconds.
 rectangle_dictionary["time_axis"] = {
-    "initial_time": 0.0,  #  Initial time for event
+    "initial_time": 0.0,  # Initial time for event
     "final_time": 2.00,  # Final time for event
     "dt": 0.001,  # timestep size
     "amplitude": 1,  # the Ricker has an amplitude of 1.
-    "output_frequency": 100,  # how frequently to output solution to pvds - Perguntar Daiane ''post_processing_frequnecy'
-    "gradient_sampling_frequency": 100,  # how frequently to save solution to RAM    - Perguntar Daiane 'gradient_sampling_frequency'
+    "output_frequency": 100,  # how frequently to output solution to pvds
+    # how frequently to save solution to RAM
+    "gradient_sampling_frequency": 100,
 }
 
 rectangle_dictionary["visualization"] = {
@@ -175,7 +188,8 @@ class Rectangle(AcousticWave):
         num_sources = self.number_of_sources
         if comm.comm.rank == 0 and comm.ensemble_comm.rank == 0:
             print(
-                "INFO: Distributing %d shot(s) across %d core(s). Each shot is using %d cores"
+                "INFO: Distributing %d shot(s) across %d core(s). \
+                    Each shot is using %d cores"
                 % (
                     num_sources,
                     fire.COMM_WORLD.size,
