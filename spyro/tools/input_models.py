@@ -101,7 +101,11 @@ def create_model_2D_homogeneous(grid_point_calculator_parameters, degree):
     bin1_endX = source_x + receiver_bin_width / 2.0
 
     receiver_coordinates = spyro.create_2d_grid(
-        bin1_startZ, bin1_endZ, bin1_startX, bin1_endX, int(np.sqrt(receiver_quantity))
+        bin1_startZ,
+        bin1_endZ,
+        bin1_startX,
+        bin1_endX,
+        int(np.sqrt(receiver_quantity)),
     )
 
     # Choose method and parameters
@@ -204,7 +208,9 @@ def create_model_2D_heterogeneous(grid_point_calculator_parameters, degree):
     receiver_type = grid_point_calculator_parameters["receiver_setup"]
 
     method = grid_point_calculator_parameters["FEM_method_to_evaluate"]
-    velocity_model = grid_point_calculator_parameters["velocity_model_file_name"]
+    velocity_model = grid_point_calculator_parameters[
+        "velocity_model_file_name"
+    ]
     model = {}
 
     if minimum_mesh_velocity > 500:
@@ -243,7 +249,6 @@ def create_model_2D_heterogeneous(grid_point_calculator_parameters, degree):
     padx = pad
 
     if receiver_type == "bins":
-
         # time calculations
         tmin = 1.0 / frequency
         final_time = 25 * tmin  # should be 35
@@ -256,7 +261,9 @@ def create_model_2D_heterogeneous(grid_point_calculator_parameters, degree):
 
         bin1_startZ = source_z - receiver_bin_width / 2.0
         bin1_endZ = source_z + receiver_bin_width / 2.0
-        bin1_startX = source_x + receiver_bin_center1 - receiver_bin_width / 2.0
+        bin1_startX = (
+            source_x + receiver_bin_center1 - receiver_bin_width / 2.0
+        )
         bin1_endX = source_x + receiver_bin_center1 + receiver_bin_width / 2.0
 
         receiver_coordinates = spyro.create_2d_grid(
@@ -272,7 +279,9 @@ def create_model_2D_heterogeneous(grid_point_calculator_parameters, degree):
 
         bin2_startZ = source_z - receiver_bin_width / 2.0
         bin2_endZ = source_z + receiver_bin_width / 2.0
-        bin2_startX = source_x + receiver_bin_center2 - receiver_bin_width / 2.0
+        bin2_startX = (
+            source_x + receiver_bin_center2 - receiver_bin_width / 2.0
+        )
         bin2_endX = source_x + receiver_bin_center2 + receiver_bin_width / 2.0
 
         receiver_coordinates = receiver_coordinates + spyro.create_2d_grid(
@@ -286,7 +295,6 @@ def create_model_2D_heterogeneous(grid_point_calculator_parameters, degree):
         receiver_quantity = 2 * receiver_quantity_in_bin
 
     if receiver_type == "line":
-
         # time calculations
         tmin = 1.0 / frequency
         final_time = 2 * 10 * tmin + 5.0  # should be 35
@@ -303,7 +311,9 @@ def create_model_2D_heterogeneous(grid_point_calculator_parameters, degree):
         bin1_endX = source_x + receiver_bin_center2
 
         receiver_coordinates = spyro.create_transect(
-            (bin1_startZ, bin1_startX), (bin1_endZ, bin1_endX), receiver_quantity
+            (bin1_startZ, bin1_startX),
+            (bin1_endZ, bin1_endX),
+            receiver_quantity,
         )
 
     # Choose method and parameters
@@ -421,7 +431,9 @@ def create_model_3D_homogeneous(grid_point_calculator_parameters, degree):
     bin1_endY = source_y + receiver_bin_width / 2.0
 
     receiver_coordinates = create_3d_grid(
-        (bin1_startZ, bin1_startX, bin1_startY), (bin1_endZ, bin1_endX, bin1_endY), 6
+        (bin1_startZ, bin1_startX, bin1_startY),
+        (bin1_endZ, bin1_endX, bin1_endY),
+        6,
     )
     # Choose method and parameters
     model["opts"] = {
@@ -477,7 +489,9 @@ def create_model_3D_homogeneous(grid_point_calculator_parameters, degree):
     return model
 
 
-def create_model_for_grid_point_calculation(grid_point_calculator_parameters, degree):
+def create_model_for_grid_point_calculation(
+    grid_point_calculator_parameters, degree
+):
     """Creates models  with the correct parameters for for grid point calculation experiments
     on the 2D homogeneous case with a grid of receivers near the source.
 
@@ -495,10 +509,16 @@ def create_model_for_grid_point_calculation(grid_point_calculator_parameters, de
     dimension = grid_point_calculator_parameters["dimension"]
     experiment_type = grid_point_calculator_parameters["velocity_profile_type"]
     if dimension == 2 and experiment_type == "homogeneous":
-        model = create_model_2D_homogeneous(grid_point_calculator_parameters, degree)
+        model = create_model_2D_homogeneous(
+            grid_point_calculator_parameters, degree
+        )
     elif dimension == 2 and experiment_type == "heterogeneous":
-        model = create_model_2D_heterogeneous(grid_point_calculator_parameters, degree)
+        model = create_model_2D_heterogeneous(
+            grid_point_calculator_parameters, degree
+        )
     elif dimension == 3:
-        model = create_model_3D_homogeneous(grid_point_calculator_parameters, degree)
+        model = create_model_3D_homogeneous(
+            grid_point_calculator_parameters, degree
+        )
 
     return model

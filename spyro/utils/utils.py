@@ -44,7 +44,7 @@ def compute_functional(Wave_object, residual):
     num_receivers = Wave_object.number_of_receivers
     dt = Wave_object.dt
     tf = Wave_object.final_time
-    nt = int(tf / dt) + 1 # number of timesteps
+    nt = int(tf / dt) + 1  # number of timesteps
 
     J = 0.0
     for ti in range(nt):
@@ -96,6 +96,7 @@ def mpi_init(model):
     comm_ens = Ensemble(COMM_WORLD, num_cores_per_shot)
     return comm_ens
 
+
 def mpi_init_simple(number_of_sources):
     """Initialize computing environment"""
     rank = myrank()
@@ -107,7 +108,7 @@ def mpi_init_simple(number_of_sources):
         raise ValueError(
             "Available cores cannot be divided between sources equally."
         )
-        
+
     comm_ens = Ensemble(COMM_WORLD, num_cores_per_shot)
     return comm_ens
 

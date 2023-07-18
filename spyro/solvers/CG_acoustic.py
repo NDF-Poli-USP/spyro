@@ -8,9 +8,10 @@ from . import helpers
 from .. import utils
 from ..domains.quadrature import quadrature_rules
 
+
 class AcousticWave(Wave):
     def forward_solve(self):
-        """ Solves the forward problem.
+        """Solves the forward problem.
 
         Parameters:
         -----------
@@ -24,9 +25,9 @@ class AcousticWave(Wave):
         self.c = self.initial_velocity_model
         self.matrix_building()
         self.wave_propagator()
-    
+
     def matrix_building(self):
-        """ Builds solver operators. Doesn't create mass matrices if matrix_free option is on,
+        """Builds solver operators. Doesn't create mass matrices if matrix_free option is on,
         which it is by default.
         """
         V = self.function_space
@@ -39,7 +40,7 @@ class AcousticWave(Wave):
         v = fire.TestFunction(V)
 
         u_nm1 = fire.Function(V, name="pressure t-dt")
-        u_n = fire.Function(V,  name="pressure")
+        u_n = fire.Function(V, name="pressure")
         self.u_nm1 = u_nm1
         self.u_n = u_n
 
@@ -47,8 +48,13 @@ class AcousticWave(Wave):
         dt = self.dt
 
         # -------------------------------------------------------
-        m1 = (1/(self.c * self.c)) * ((u - 2.0 * u_n + u_nm1) / Constant(dt ** 2)) * v * dx(scheme = quad_rule)
-        a = dot(grad(u_n), grad(v)) * dx(scheme = quad_rule)  # explicit
+        m1 = (
+            (1 / (self.c * self.c))
+            * ((u - 2.0 * u_n + u_nm1) / Constant(dt**2))
+            * v
+            * dx(scheme=quad_rule)
+        )
+        a = dot(grad(u_n), grad(v)) * dx(scheme=quad_rule)  # explicit
 
         B = fire.Function(V)
 
@@ -58,15 +64,17 @@ class AcousticWave(Wave):
         self.lhs = lhs
 
         A = fire.assemble(lhs, mat_type="matfree")
-        self.solver = fire.LinearSolver(A, solver_parameters=self.solver_parameters)
+        self.solver = fire.LinearSolver(
+            A, solver_parameters=self.solver_parameters
+        )
 
-        #lterar para como o thiago fez
+        # lterar para como o thiago fez
         self.rhs = rhs
         self.B = B
-    
+
     @ensemble_propagator
-    def wave_propagator(self, dt = None, final_time = None, source_num = 0):
-        """ Propagates the wave forward in time.
+    def wave_propagator(self, dt=None, final_time=None, source_num=0):
+        """Propagates the wave forward in time.
         Currently uses central differences.
 
         Parameters:
@@ -91,9 +99,11 @@ class AcousticWave(Wave):
         comm = self.comm
         temp_filename = self.forward_output_file
         filename, file_extension = temp_filename.split(".")
-        output_filename = filename+'sn'+str(source_num)+"."+file_extension
+        output_filename = (
+            filename + "sn" + str(source_num) + "." + file_extension
+        )
         if self.forward_output:
-            print(f'Saving output in: {output_filename}', flush = True)
+            print(f"Saving output in: {output_filename}", flush=True)
 
         output = fire.File(output_filename, comm=comm.comm)
         comm.comm.barrier()
@@ -104,20 +114,24 @@ class AcousticWave(Wave):
         if dt == None:
             dt = self.dt
         t = self.current_time
-        nt = int( (final_time-t) / dt) +1# number of timesteps
+        nt = int((final_time - t) / dt) + 1  # number of timesteps
 
         u_nm1 = self.u_nm1
         u_n = self.u_n
         u_np1 = fire.Function(self.function_space)
 
         rhs_forcing = fire.Function(self.function_space)
-        usol = [fire.Function(self.function_space, name="pressure") for t in range(nt) if t % self.gradient_sampling_frequency == 0]
+        usol = [
+            fire.Function(self.function_space, name="pressure")
+            for t in range(nt)
+            if t % self.gradient_sampling_frequency == 0
+        ]
         usol_recv = []
         save_step = 0
         B = self.B
         rhs = self.rhs
 
-        #assembly_callable = create_assembly_callable(rhs, tensor=B)
+        # assembly_callable = create_assembly_callable(rhs, tensor=B)
 
         for step in range(nt):
             rhs_forcing.assign(0.0)
@@ -129,13 +143,15 @@ class AcousticWave(Wave):
 
             u_np1.assign(X)
 
-            usol_recv.append(self.receivers.interpolate(u_np1.dat.data_ro_with_halos[:]))
+            usol_recv.append(
+                self.receivers.interpolate(u_np1.dat.data_ro_with_halos[:])
+            )
 
             if step % self.gradient_sampling_frequency == 0:
                 usol[save_step].assign(u_np1)
                 save_step += 1
 
-            if (step-1) % self.output_frequency == 0:
+            if (step - 1) % self.output_frequency == 0:
                 assert (
                     fire.norm(u_n) < 1
                 ), "Numerical instability. Try reducing dt or building the mesh differently"
@@ -152,7 +168,9 @@ class AcousticWave(Wave):
         self.current_time = t
         helpers.display_progress(self.comm, t)
 
-        usol_recv = helpers.fill(usol_recv, receivers.is_local, nt, receivers.num_receivers)
+        usol_recv = helpers.fill(
+            usol_recv, receivers.is_local, nt, receivers.num_receivers
+        )
         usol_recv = utils.utils.communicate(usol_recv, comm)
         self.receivers_output = usol_recv
 
@@ -160,21 +178,21 @@ class AcousticWave(Wave):
         self.forward_solution_receivers = usol_recv
 
         return usol, usol_recv
-    
+
     def gradient_solve(self, guess, residual):
         if self.current_time == 0.0:
             warnings.warn(
                 "You need to run the forward solver before the adjoint solver, will do it for you now"
-                )
+            )
             self.forward_solve()
         self.c = guess
         self.misfit = residual
-        self.wave_backward_propagator()    
+        self.wave_backward_propagator()
 
     def wave_backward_propagator(self):
         V = self.function_space
         receivers = self.receivers
-        dxlump = dx(scheme = self.quadrature_rule)
+        dxlump = dx(scheme=self.quadrature_rule)
         c = self.c
         final_time = self.final_time
         t = self.current_time
@@ -183,9 +201,9 @@ class AcousticWave(Wave):
         adjoint_output = self.adjoint_output
         adjoint_output_file = self.adjoint_output_file
         if self.adjoint_output:
-            print(f'Saving output in: {adjoint_output_file}', flush = True)
+            print(f"Saving output in: {adjoint_output_file}", flush=True)
         output = fire.File(adjoint_output_file, comm=comm.comm)
-        nt = int( (final_time-t) / dt) +1# number of timesteps
+        nt = int((final_time - t) / dt) + 1  # number of timesteps
 
         # Define gradient problem
         m_u = fire.Function(V)
@@ -217,14 +235,18 @@ class AcousticWave(Wave):
 
         rhs_forcing = fire.Function(V)  # forcing term
         if adjoint_output:
-            adjoint = [fire.Function(V, name="adjoint_pressure") for t in range(nt)]
+            adjoint = [
+                fire.Function(V, name="adjoint_pressure") for t in range(nt)
+            ]
         for step in range(nt - 1, -1, -1):
             t = step * float(dt)
             rhs_forcing.assign(0.0)
             # Solver - main equation - (I)
             B = fire.assemble(rhsG, tensor=B)
 
-            f = receivers.apply_receivers_as_source(rhs_forcing, residual, step)
+            f = receivers.apply_receivers_as_source(
+                rhs_forcing, residual, step
+            )
             # add forcing term to solve scalar pressure
             B0 = B.sub(0)
             B0 += f
@@ -252,13 +274,10 @@ class AcousticWave(Wave):
                 if adjoint_output:
                     adjoint.append(u_n)
                 helpers.display_progress(comm, t)
-        
+
         self.gradient = dJ
 
         if adjoint_output:
             return dJ, adjoint
         else:
             return dJ
-
-
-
