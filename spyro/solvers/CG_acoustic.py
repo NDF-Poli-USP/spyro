@@ -157,7 +157,7 @@ class AcousticWave(Wave):
 
         return usol, usol_recv
     
-    def gradient(self, guess, residual):
+    def gradient_solve(self, guess, residual):
 
         V = self.function_space
         receivers = self.receivers
@@ -239,6 +239,8 @@ class AcousticWave(Wave):
                 if adjoint_output:
                     adjoint.append(u_n)
                 helpers.display_progress(comm, t)
+        
+        self.gradient = dJ
 
         if adjoint_output:
             return dJ, adjoint
