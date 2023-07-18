@@ -5,24 +5,32 @@ from scipy.signal import butter, filtfilt
 import spyro
 from .Sources import Sources
 
+
 class NodalSources(Sources):
     """Methods that inject a wavelet into a
     mesh directly into a node.
     """
+
     def __init__(self, wave_object):
-        self.dof_source_locations = [0]*self.num_receivers
-        self.source_locations = [0]*self.num_receivers
+        self.dof_source_locations = [0] * self.num_receivers
+        self.source_locations = [0] * self.num_receivers
         super().__init__(wave_object)
-    
+
     def build_maps(self):
         for rid in range(self.num_receivers):
             tolerance = 1e-6
             if self.dimension == 2:
                 receiver_z, receiver_x = self.receiver_locations[rid]
-                cell_id = self.mesh.locate_cell([receiver_z, receiver_x], tolerance=tolerance )
+                cell_id = self.mesh.locate_cell(
+                    [receiver_z, receiver_x], tolerance=tolerance
+                )
             elif self.dimension == 3:
-                receiver_z, receiver_x, receiver_y = self.receiver_locations[rid]
-                cell_id = self.mesh.locate_cell([receiver_z, receiver_x, receiver_y], tolerance=tolerance )
+                receiver_z, receiver_x, receiver_y = self.receiver_locations[
+                    rid
+                ]
+                cell_id = self.mesh.locate_cell(
+                    [receiver_z, receiver_x, receiver_y], tolerance=tolerance
+                )
             self.is_local[rid] = cell_id
 
         (
@@ -35,7 +43,7 @@ class NodalSources(Sources):
         self.num_receivers = len(self.receiver_locations)
 
         self.dof_source_locations = self.source_move_and_locate()
-    
+
     def source_move_and_locate(self):
         for source_id in range(self.num_receivers):
             source_x, source_y = self.receiver_locations[source_id][0]
@@ -46,8 +54,10 @@ class NodalSources(Sources):
                 node_id = nodes[i]
                 node_x = self.node_locations[node_id, 0]
                 node_y = self.node_locations[node_id, 1]
-                d = math.sqrt((source_x - node_x)**2 + (source_y - node_y)**2)
-                
+                d = math.sqrt(
+                    (source_x - node_x) ** 2 + (source_y - node_y) ** 2
+                )
+
                 if d < distance_from_node:
                     distance_from_node = d
                     j = node_id
@@ -58,15 +68,15 @@ class NodalSources(Sources):
             else:
                 self.dof_source_locations[source_id] = j
                 self.source_locations[source_id] = (moved_x, moved_y)
-            
+
     def apply_source(self, rhs_forcing, value):
         """Applies source in a assembled right hand side."""
         for source_id in range(self.num_receivers):
-            if self.is_local[source_id] and source_id==self.current_source:
-                rhs_forcing.dat.data_with_halos[int(self.dof_source_locations[source_id])] = (
-                    value
-                )
-            else: 
+            if self.is_local[source_id] and source_id == self.current_source:
+                rhs_forcing.dat.data_with_halos[
+                    int(self.dof_source_locations[source_id])
+                ] = value
+            else:
                 for i in range(len(self.cellNodeMaps[source_id])):
                     tmp = rhs_forcing.dat.data_with_halos[0]
 

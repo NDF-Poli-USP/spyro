@@ -4,7 +4,9 @@ from spyro import AcousticWave
 import firedrake as fire
 
 rectangle_optimization_parameters = {
-    "General": {"Secant": {"Type": "Limited-Memory BFGS", "Maximum Storage": 10}},
+    "General": {
+        "Secant": {"Type": "Limited-Memory BFGS", "Maximum Storage": 10}
+    },
     "Step": {
         "Type": "Augmented Lagrangian",
         "Augmented Lagrangian": {
@@ -23,7 +25,7 @@ rectangle_optimization_parameters = {
 rectangle_dictionary = {}
 rectangle_dictionary["options"] = {
     "cell_type": "Q",  # simplexes such as triangles or tetrahedra (T) or quadrilaterals (Q)
-    "variant": 'lumped', # lumped, equispaced or DG, default is lumped
+    "variant": "lumped",  # lumped, equispaced or DG, default is lumped
     "degree": 4,  # p order
     "dimension": 2,  # dimension
     "automatic_adjoint": False,
@@ -45,13 +47,15 @@ rectangle_dictionary["mesh"] = {
     "mesh_file": None,
     "user_mesh": None,
 }
-rectangle_dictionary["synthetic_data"] = {    #For use only if you are using a synthetic test model or a forward only simulation -adicionar discrição para modelo direto
+rectangle_dictionary[
+    "synthetic_data"
+] = {  # For use only if you are using a synthetic test model or a forward only simulation -adicionar discrição para modelo direto
     "real_mesh_file": None,
     "real_velocity_file": None,
     "velocity_conditional": None,
 }
 rectangle_dictionary["inversion"] = {
-    "perform_fwi": False, # switch to true to make a FWI
+    "perform_fwi": False,  # switch to true to make a FWI
     "initial_guess_model_file": None,
     "shot_record_file": None,
     "optimization_parameters": rectangle_optimization_parameters,
@@ -79,9 +83,7 @@ rectangle_dictionary["acquisition"] = {
     "source_locations": [(-0.1, 0.3)],
     "frequency": 5.0,
     "delay": 1.0,
-    "receiver_locations": create_transect(
-        (-0.10, 0.1), (-0.10, 0.9), 20
-    ),
+    "receiver_locations": create_transect((-0.10, 0.1), (-0.10, 0.9), 20),
 }
 
 # Simulate for 2.0 seconds.
@@ -95,7 +97,7 @@ rectangle_dictionary["time_axis"] = {
 }
 
 rectangle_dictionary["visualization"] = {
-    "forward_output" : True,
+    "forward_output": True,
     "output_filename": "results/forward_output.pvd",
     "fwi_velocity_model_output": False,
     "velocity_model_filename": None,
@@ -103,17 +105,27 @@ rectangle_dictionary["visualization"] = {
     "gradient_filename": None,
 }
 
-rectangle_dictionary["example_specific_options"]={
+rectangle_dictionary["example_specific_options"] = {
     "elements_in_z": 10,
     "elements_in_x": 10,
     "fault_depth": -0.5,
-    "c_salt":4.6,
-    "c_not_salt":1.6,
+    "c_salt": 4.6,
+    "c_not_salt": 1.6,
 }
 
+
 class Rectangle_parameters(Example_model):
-    def __init__(self, dictionary=None, example_dictionary= rectangle_dictionary, comm = None):
-        super().__init__(dictionary=dictionary,default_dictionary=example_dictionary,comm=comm)
+    def __init__(
+        self,
+        dictionary=None,
+        example_dictionary=rectangle_dictionary,
+        comm=None,
+    ):
+        super().__init__(
+            dictionary=dictionary,
+            default_dictionary=example_dictionary,
+            comm=comm,
+        )
 
         specific_dictionary = self.input_dictionary["example_specific_options"]
         self.nz = specific_dictionary["elements_in_z"]
@@ -121,37 +133,44 @@ class Rectangle_parameters(Example_model):
         self.depth = specific_dictionary["fault_depth"]
         self.c_salt = specific_dictionary["c_salt"]
         self.c_not_salt = specific_dictionary["c_not_salt"]
-        
+
         self._rectangle_mesh()
         self._rectangle_velocity_model()
         self.velocity_model_type = "conditional"
-    
+
     def _rectangle_mesh(self):
         nz = self.nz
         nx = self.nx
         Lz = self.length_z
         Lx = self.length_x
-        if self.cell_type == 'quadrilateral':
+        if self.cell_type == "quadrilateral":
             quadrilateral = True
         else:
             quadrilateral = False
-        
-        user_mesh = fire.RectangleMesh(nz,nx,Lz,Lx, quadrilateral = quadrilateral, comm=self.comm.comm)
-        user_mesh.coordinates.dat.data[:,0] *= -1.0
+
+        user_mesh = fire.RectangleMesh(
+            nz, nx, Lz, Lx, quadrilateral=quadrilateral, comm=self.comm.comm
+        )
+        user_mesh.coordinates.dat.data[:, 0] *= -1.0
         self.user_mesh = user_mesh
-    
+
     def _rectangle_velocity_model(self):
         x, y = fire.SpatialCoordinate(self.user_mesh)
         c_salt = self.c_salt
         c_not_salt = self.c_not_salt
         depth = self.depth
-        cond = fire.conditional( x < depth ,  c_salt , c_not_salt)
-        self.velocity_conditional=cond
+        cond = fire.conditional(x < depth, c_salt, c_not_salt)
+        self.velocity_conditional = cond
+
 
 class Rectangle(AcousticWave):
-    def __init__(self, model_dictionary = None, comm = None):     
-        model_parameters = Rectangle_parameters(dictionary=model_dictionary, comm = comm)
-        super().__init__(model_parameters = model_parameters, comm = model_parameters.comm)
+    def __init__(self, model_dictionary=None, comm=None):
+        model_parameters = Rectangle_parameters(
+            dictionary=model_dictionary, comm=comm
+        )
+        super().__init__(
+            model_parameters=model_parameters, comm=model_parameters.comm
+        )
         comm = self.comm
         num_sources = self.number_of_sources
         if comm.comm.rank == 0 and comm.ensemble_comm.rank == 0:

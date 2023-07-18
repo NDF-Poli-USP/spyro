@@ -63,7 +63,7 @@ class Sources(spyro.receivers.Receivers.Receivers):
         """
         my_ensemble = wave_object.comm
 
-        self.mesh  = wave_object.mesh
+        self.mesh = wave_object.mesh
         self.space = wave_object.function_space.sub(0)
         self.my_ensemble = my_ensemble
         self.dimension = wave_object.dimension
@@ -79,31 +79,31 @@ class Sources(spyro.receivers.Receivers.Receivers):
         self.nodes_per_cell = None
         self.is_local = [0] * self.num_receivers
         self.current_source = None
-        if wave_object.cell_type == 'quadrilateral':
+        if wave_object.cell_type == "quadrilateral":
             self.quadrilateral = True
         else:
             self.quadrilateral = False
 
         self.build_maps()
-    
+
     def build_maps(self):
         super().build_maps()
 
     def apply_source(self, rhs_forcing, value):
         """Applies source in a assembled right hand side.
-        
+
         Parameters
         ----------
         rhs_forcing: Firedrake.Function
             The right hand side of the wave equation
         value: float
             The value of the source
-            
+
         Returns
         -------
         rhs_forcing: Firedrake.Function
             The right hand side of the wave equation with the source applied
-                """
+        """
         for source_id in range(self.num_receivers):
             if self.is_local[source_id] and source_id == self.current_source:
                 for i in range(len(self.cellNodeMaps[source_id])):
@@ -126,7 +126,9 @@ def timedependentSource(model, t, freq=None, amp=1, delay=1.5):
         raise ValueError("source not implemented")
 
 
-def ricker_wavelet(t, freq, amp=1.0, delay=1.5, delay_type="multiples_of_minimun"):
+def ricker_wavelet(
+    t, freq, amp=1.0, delay=1.5, delay_type="multiples_of_minimun"
+):
     """Creates a Ricker source function with a
     delay in term of multiples of the distance
     between the minimums.
@@ -161,13 +163,19 @@ def ricker_wavelet(t, freq, amp=1.0, delay=1.5, delay_type="multiples_of_minimun
     return (
         amp
         * (1.0 - (2.0) * (math.pi * freq) * (math.pi * freq) * t * t)
-        * math.exp(
-            (-1.0 ) * (math.pi * freq) * (math.pi * freq) * t * t
-        )
+        * math.exp((-1.0) * (math.pi * freq) * (math.pi * freq) * t * t)
     )
 
 
-def full_ricker_wavelet(dt, final_time, frequency, amplitude=1.0, cutoff=None, delay = 1.5, delay_type="multiples_of_minimun"):
+def full_ricker_wavelet(
+    dt,
+    final_time,
+    frequency,
+    amplitude=1.0,
+    cutoff=None,
+    delay=1.5,
+    delay_type="multiples_of_minimun",
+):
     """Compute the Ricker wavelet optionally applying low-pass filtering
     using cutoff frequency in Hertz.
 
@@ -196,11 +204,13 @@ def full_ricker_wavelet(dt, final_time, frequency, amplitude=1.0, cutoff=None, d
     list of float
         list of ricker values at each time step
     """
-    nt = int(final_time / dt) + 1 # number of timesteps
+    nt = int(final_time / dt) + 1  # number of timesteps
     time = 0.0
     full_wavelet = np.zeros((nt,))
     for t in range(nt):
-        full_wavelet[t] = ricker_wavelet(time, frequency, amplitude, delay=delay, delay_type=delay_type)
+        full_wavelet[t] = ricker_wavelet(
+            time, frequency, amplitude, delay=delay, delay_type=delay_type
+        )
         time += dt
     if cutoff is not None:
         fs = 1.0 / dt

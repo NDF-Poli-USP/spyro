@@ -98,18 +98,16 @@ def forward(
 
     nt = int(final_time / dt)  # number of timesteps
 
-
     element = fire.FiniteElement(method, mesh.ufl_cell(), degree=degree)
 
     V = fire.FunctionSpace(mesh, element)
-
 
     # typical CG FEM in 2d/3d
     u = fire.TrialFunction(V)
     v = fire.TestFunction(V)
 
     u_nm1 = fire.Function(V)
-    u_n = fire.Function(V, name = "pressure")
+    u_n = fire.Function(V, name="pressure")
     u_np1 = fire.Function(V)
 
     if output:
@@ -118,8 +116,11 @@ def forward(
     t = 0.0
 
     # -------------------------------------------------------
-    m1 = ((u ) / Constant(dt ** 2)) * v * dx
-    a = c * c * dot(grad(u_n), grad(v)) * dx +((- 2.0 * u_n + u_nm1) / Constant(dt ** 2)) * v * dx# explicit
+    m1 = ((u) / Constant(dt**2)) * v * dx
+    a = (
+        c * c * dot(grad(u_n), grad(v)) * dx
+        + ((-2.0 * u_n + u_nm1) / Constant(dt**2)) * v * dx
+    )  # explicit
 
     X = fire.Function(V)
     B = fire.Function(V)
@@ -130,7 +131,9 @@ def forward(
     A = fire.assemble(lhs)
     solver = fire.LinearSolver(A)
 
-    usol = [fire.Function(V, name="pressure") for t in range(nt) if t % fspool == 0]
+    usol = [
+        fire.Function(V, name="pressure") for t in range(nt) if t % fspool == 0
+    ]
     usol_recv = []
     save_step = 0
 
@@ -148,7 +151,9 @@ def forward(
 
         u_np1.assign(X)
 
-        usol_recv.append(receivers.interpolate(u_np1.dat.data_ro_with_halos[:]))
+        usol_recv.append(
+            receivers.interpolate(u_np1.dat.data_ro_with_halos[:])
+        )
 
         if step % fspool == 0:
             usol[save_step].assign(u_np1)
@@ -168,7 +173,9 @@ def forward(
 
         t = step * float(dt)
 
-    usol_recv = helpers.fill(usol_recv, receivers.is_local, nt, receivers.num_receivers)
+    usol_recv = helpers.fill(
+        usol_recv, receivers.is_local, nt, receivers.num_receivers
+    )
     usol_recv = utils.communicate(usol_recv, comm)
 
     return usol, usol_recv

@@ -3,7 +3,9 @@ from spyro.examples.example_model import Example_model
 import firedrake as fire
 
 marmousi_optimization_parameters = {
-    "General": {"Secant": {"Type": "Limited-Memory BFGS", "Maximum Storage": 10}},
+    "General": {
+        "Secant": {"Type": "Limited-Memory BFGS", "Maximum Storage": 10}
+    },
     "Step": {
         "Type": "Augmented Lagrangian",
         "Augmented Lagrangian": {
@@ -22,8 +24,8 @@ marmousi_optimization_parameters = {
 marmousi_dictionary = {}
 marmousi_dictionary["options"] = {
     "cell_type": "T",  # simplexes such as triangles or tetrahedra (T) or quadrilaterals (Q)
-    "variant": 'lumped', # lumped, equispaced or DG, default is lumped
-    "method": "MLT", # (MLT/spectral_quadrilateral/DG_triangle/DG_quadrilateral) You can either specify a cell_type+variant or a method
+    "variant": "lumped",  # lumped, equispaced or DG, default is lumped
+    "method": "MLT",  # (MLT/spectral_quadrilateral/DG_triangle/DG_quadrilateral) You can either specify a cell_type+variant or a method
     "degree": 4,  # p order
     "dimension": 2,  # dimension
     "automatic_adjoint": False,
@@ -44,12 +46,14 @@ marmousi_dictionary["mesh"] = {
     "Ly": 0.0,  # thickness in km - always positive
     "mesh_file": None,
 }
-marmousi_dictionary["synthetic_data"] = {    #For use only if you are using a synthetic test model or a forward only simulation -adicionar discrição para modelo direto
+marmousi_dictionary[
+    "synthetic_data"
+] = {  # For use only if you are using a synthetic test model or a forward only simulation -adicionar discrição para modelo direto
     "real_mesh_file": None,
     "real_velocity_file": None,
 }
 marmousi_dictionary["inversion"] = {
-    "perform_fwi": False, # switch to true to make a FWI
+    "perform_fwi": False,  # switch to true to make a FWI
     "initial_guess_model_file": None,
     "shot_record_file": None,
     "optimization_parameters": marmousi_optimization_parameters,
@@ -77,9 +81,7 @@ marmousi_dictionary["acquisition"] = {
     "source_locations": [(-0.1, 0.5)],
     "frequency": 5.0,
     "delay": 1.0,
-    "receiver_locations": create_transect(
-        (-0.10, 0.1), (-0.10, 0.9), 20
-    ),
+    "receiver_locations": create_transect((-0.10, 0.1), (-0.10, 0.9), 20),
 }
 
 # Simulate for 2.0 seconds.
@@ -94,11 +96,14 @@ marmousi_dictionary["time_axis"] = {
 
 
 class Marmousi(Example_model):
-    def __init__(self, dictionary=None, example_dictionary= marmousi_dictionary, comm = None):
-        super().__init__(dictionary=dictionary,default_dictionary=example_dictionary,comm=comm)
-
-    
-    
-
-        
-
+    def __init__(
+        self,
+        dictionary=None,
+        example_dictionary=marmousi_dictionary,
+        comm=None,
+    ):
+        super().__init__(
+            dictionary=dictionary,
+            default_dictionary=example_dictionary,
+            comm=comm,
+        )

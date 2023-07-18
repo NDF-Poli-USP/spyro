@@ -8,9 +8,10 @@ from ..io import ensemble_gradient
 from . import helpers
 
 # Note this turns off non-fatal warnings
-#set_log_level(ERROR)
+# set_log_level(ERROR)
 
 __all__ = ["gradient"]
+
 
 def gauss_lobatto_legendre_line_rule(degree):
     fiat_make_rule = FIAT.quadrature.GaussLobattoLegendreQuadratureLineRule
@@ -29,9 +30,18 @@ def gauss_lobatto_legendre_cube_rule(dimension, degree):
         result = make_tensor_rule([result, line_rule])
     return result
 
+
 @ensemble_gradient
 def gradient(
-    model, mesh, comm, c, receivers, guess, residual, output=False, save_adjoint=False
+    model,
+    mesh,
+    comm,
+    c,
+    receivers,
+    guess,
+    residual,
+    output=False,
+    save_adjoint=False,
 ):
     """Discrete adjoint with secord-order in time fully-explicit timestepping scheme
     with implementation of a Perfectly Matched Layer (PML) using
@@ -77,12 +87,16 @@ def gradient(
 
     params = {"ksp_type": "cg", "pc_type": "jacobi"}
 
-    element = fire.FiniteElement(method, mesh.ufl_cell(), degree=degree, variant="spectral")
+    element = fire.FiniteElement(
+        method, mesh.ufl_cell(), degree=degree, variant="spectral"
+    )
 
     V = fire.FunctionSpace(mesh, element)
 
     qr_x = gauss_lobatto_legendre_cube_rule(dimension=dimension, degree=degree)
-    qr_s = gauss_lobatto_legendre_cube_rule(dimension=(dimension - 1), degree=degree)
+    qr_s = gauss_lobatto_legendre_cube_rule(
+        dimension=(dimension - 1), degree=degree
+    )
 
     nt = int(tf / dt)  # number of timesteps
 
@@ -129,7 +143,7 @@ def gradient(
 
     gradi = fire.Function(V)
     grad_prob = fire.LinearVariationalProblem(lhsG, rhsG, gradi)
-    
+
     if method == "KMV":
         grad_solver = fire.LinearVariationalSolver(
             grad_prob,
@@ -151,7 +165,9 @@ def gradient(
 
     rhs_forcing = fire.Function(V)  # forcing term
     if save_adjoint:
-        adjoint = [fire.Function(V, name="adjoint_pressure") for t in range(nt)]
+        adjoint = [
+            fire.Function(V, name="adjoint_pressure") for t in range(nt)
+        ]
     for step in range(nt - 1, -1, -1):
         t = step * float(dt)
         rhs_forcing.assign(0.0)
