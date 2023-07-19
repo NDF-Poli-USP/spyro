@@ -1,4 +1,5 @@
 import numpy as np
+import os
 from firedrake import *
 import spyro
 from spyro.domains import quadrature

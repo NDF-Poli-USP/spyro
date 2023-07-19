@@ -40,7 +40,7 @@ import spyro
 # }
 
 # # Define the domain size without the PML. Here we'll assume a 0.75 x 1.50 km
-# # domain and reserve the remaining 250 m for the Perfectly Matched Layer 
+# # domain and reserve the remaining 250 m for the Perfectly Matched Layer
 # # (PML) to absorb
 # # outgoing waves on three sides (eg., -z, +-x sides) of the domain.
 # default_dictionary["mesh"] = {

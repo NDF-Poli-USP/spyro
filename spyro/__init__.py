@@ -17,7 +17,6 @@ from . import tools
 from . import examples
 from .meshing import (
     RectangleMesh,
-    UnitSquareMesh,
     PeriodicRectangleMesh,
     BoxMesh,
 )
@@ -45,7 +44,6 @@ __all__ = [
     "AcousticWave",
     "AcousticWaveMMS",
     "RectangleMesh",
-    "UnitSquareMesh",
     "PeriodicRectangleMesh",
     "BoxMesh",
 ]
