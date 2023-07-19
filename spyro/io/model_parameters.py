@@ -143,9 +143,9 @@ def convert_old_dictionary(old_dictionary):
         "dimension": old_dictionary["opts"]["dimension"],
     }
     new_dictionary["parallelism"] = {
-        # options: automatic (same number of cores for evey processor)
-        # or spatial
         "type": old_dictionary["parallelism"][
+            # options: automatic (same number of cores for evey processor)
+            # or spatial
             "type"
         ],
     }
@@ -159,17 +159,16 @@ def convert_old_dictionary(old_dictionary):
     if (
         old_dictionary["mesh"]["initmodel"] is not None
         and old_dictionary["mesh"]["truemodel"] is not None
+    ) and (
+        old_dictionary["mesh"]["initmodel"] != "not_used.hdf5"
+        and old_dictionary["mesh"]["truemodel"] != "not_used.hdf5"
     ):
-        if (
-            old_dictionary["mesh"]["initmodel"] != "not_used.hdf5"
-            and old_dictionary["mesh"]["truemodel"] != "not_used.hdf5"
-        ):
-            warnings.warn("Assuming parameters set for fwi.")
-            fwi_running = True
+        warnings.warn("Assuming parameters set for fwi.")
+        fwi_running = True
     if fwi_running is False:
         warnings.warn(
-            "Assuming parameters set for forward only propagation, \
-                will use velocity model from old_dictionary truemodel."
+            "Assuming parameters set for forward only propagation, will \
+                use velocity model from old_dictionary truemodel."
         )
     if fwi_running:
         new_dictionary["synthetic_data"] = {
@@ -179,7 +178,7 @@ def convert_old_dictionary(old_dictionary):
     else:
         model_file = None
         if (
-            old_dictionary["mesh"]["initmodel"] is None
+            old_dictionary["mesh"]["initmodel"] is not None
             and old_dictionary["mesh"]["initmodel"] != "not_used.hdf5"
         ):
             model_file = old_dictionary["mesh"]["initmodel"]
@@ -220,7 +219,9 @@ def convert_old_dictionary(old_dictionary):
             shot_record_file = old_default_shot_record_file
         new_dictionary["inversion"] = {
             "perform_fwi": True,  # switch to true to make a FWI
-            "initial_guess_model_file": old_dictionary["mesh"]["initmodel"],
+            "initial_guess_model_file": old_dictionary["mesh"][
+                "initmodel"
+            ],
             "shot_record_file": shot_record_file,
             "optimization_parameters": default_optimization_parameters,
         }
@@ -246,7 +247,9 @@ def convert_old_dictionary(old_dictionary):
         "initial_time": old_dictionary["timeaxis"][
             "t0"
         ],  # Initial time for event
-        "final_time": old_dictionary["timeaxis"]["tf"],  # Final time for event
+        "final_time": old_dictionary["timeaxis"][
+            "tf"
+        ],  # Final time for event
         "dt": old_dictionary["timeaxis"]["dt"],  # timestep size
         "output_frequency": old_dictionary["timeaxis"][
             "nspool"
@@ -257,6 +260,50 @@ def convert_old_dictionary(old_dictionary):
     }
 
     return new_dictionary
+
+def create_firedrake_2D_mesh_based_on_parameters(dx, cell_type):
+    nx = int(self.length_x / dx)
+    nz = int(self.length_z / dx)
+    if self.cell_type == "quadrilateral":
+        quadrilateral = True
+    else:
+        quadrilateral = False
+
+    if periodic:
+        return spyro.PeriodicRectangleMesh(
+            nz,
+            nx,
+            self.length_z,
+            self.length_x,
+            quadrilateral=quadrilateral,
+        )
+    else:
+        return spyro.RectangleMesh(
+            nz,
+            nx,
+            self.length_z,
+            self.length_x,
+            quadrilateral=quadrilateral,
+        )
+
+def create_firedrake_3D_mesh_based_on_parameters(dx, cell_type):
+    nx = int(self.length_x / dx)
+    nz = int(self.length_z / dx)
+    ny = int(self.length_y / dx)
+    if self.cell_type == "quadrilateral":
+        quadrilateral = True
+    else:
+        quadrilateral = False
+
+    return spyro.BoxMesh(
+        nz,
+        nx,
+        ny,
+        self.length_z,
+        self.length_x,
+        self.length_y,
+        quadrilateral=quadrilateral,
+    )
 
 
 class Model_parameters:
@@ -665,131 +712,7 @@ class Model_parameters:
                     )
 
     def __convert_old_dictionary(self, old_dictionary):
-        new_dictionary = {}
-        new_dictionary["options"] = {
-            "method": old_dictionary["opts"]["method"],
-            "variant": old_dictionary["opts"]["quadrature"],
-            "degree": old_dictionary["opts"]["degree"],
-            "dimension": old_dictionary["opts"]["dimension"],
-        }
-        new_dictionary["parallelism"] = {
-            "type": old_dictionary["parallelism"][
-                # options: automatic (same number of cores for evey processor)
-                # or spatial
-                "type"
-            ],
-        }
-        new_dictionary["mesh"] = {
-            "Lz": old_dictionary["mesh"]["Lz"],
-            "Lx": old_dictionary["mesh"]["Lx"],
-            "Ly": old_dictionary["mesh"]["Ly"],
-            "mesh_file": old_dictionary["mesh"]["meshfile"],
-        }
-        fwi_running = False
-        if (
-            old_dictionary["mesh"]["initmodel"] is not None
-            and old_dictionary["mesh"]["truemodel"] is not None
-        ):
-            if (
-                old_dictionary["mesh"]["initmodel"] != "not_used.hdf5"
-                and old_dictionary["mesh"]["truemodel"] != "not_used.hdf5"
-            ):
-                warnings.warn("Assuming parameters set for fwi.")
-                fwi_running = True
-        if fwi_running is False:
-            warnings.warn(
-                "Assuming parameters set for forward only propagation, will \
-                    use velocity model from old_dictionary truemodel."
-            )
-        if fwi_running:
-            new_dictionary["synthetic_data"] = {
-                "real_velocity_file": old_dictionary["mesh"]["truemodel"],
-                "real_mesh_file": None,
-            }
-        else:
-            model_file = None
-            if (
-                old_dictionary["mesh"]["initmodel"] is not None
-                and old_dictionary["mesh"]["initmodel"] != "not_used.hdf5"
-            ):
-                model_file = old_dictionary["mesh"]["initmodel"]
-            else:
-                model_file = old_dictionary["mesh"]["truemodel"]
-            new_dictionary["synthetic_data"] = {
-                "real_velocity_file": model_file,
-                "real_mesh_file": None,
-            }
-        if fwi_running:
-            warnings.warn("Using default optimization parameters.")
-            default_optimization_parameters = {
-                "General": {
-                    "Secant": {
-                        "Type": "Limited-Memory BFGS",
-                        "Maximum Storage": 10,
-                    }
-                },
-                "Step": {
-                    "Type": "Augmented Lagrangian",
-                    "Augmented Lagrangian": {
-                        "Subproblem Step Type": "Line Search",
-                        "Subproblem Iteration Limit": 5.0,
-                    },
-                    "Line Search": {
-                        "Descent Method": {"Type": "Quasi-Newton Step"}
-                    },
-                },
-                "Status Test": {
-                    "Gradient Tolerance": 1e-16,
-                    "Iteration Limit": None,
-                    "Step Tolerance": 1.0e-16,
-                },
-            }
-            old_default_shot_record_file = "shots/shot_record_1.dat"
-            shot_record_file = None
-            if exists(old_default_shot_record_file):
-                shot_record_file = old_default_shot_record_file
-            new_dictionary["inversion"] = {
-                "perform_fwi": True,  # switch to true to make a FWI
-                "initial_guess_model_file": old_dictionary["mesh"][
-                    "initmodel"
-                ],
-                "shot_record_file": shot_record_file,
-                "optimization_parameters": default_optimization_parameters,
-            }
-        else:
-            new_dictionary["inversion"] = {
-                "perform_fwi": False,  # switch to true to make a FWI
-                "initial_guess_model_file": None,
-                "shot_record_file": None,
-                "optimization_parameters": None,
-            }
-        new_dictionary["absorving_boundary_conditions"] = old_dictionary["BCs"]
-        new_dictionary["acquisition"] = {
-            "source_type": old_dictionary["acquisition"]["source_type"],
-            "source_locations": old_dictionary["acquisition"]["source_pos"],
-            "frequency": old_dictionary["acquisition"]["frequency"],
-            "delay": old_dictionary["acquisition"]["delay"],
-            "amplitude": old_dictionary["timeaxis"]["amplitude"],
-            "receiver_locations": old_dictionary["acquisition"][
-                "receiver_locations"
-            ],
-        }
-        new_dictionary["time_axis"] = {
-            "initial_time": old_dictionary["timeaxis"][
-                "t0"
-            ],  # Initial time for event
-            "final_time": old_dictionary["timeaxis"][
-                "tf"
-            ],  # Final time for event
-            "dt": old_dictionary["timeaxis"]["dt"],  # timestep size
-            "output_frequency": old_dictionary["timeaxis"][
-                "nspool"
-            ],  # how frequently to output solution to pvds
-            "gradient_sampling_frequency": old_dictionary["timeaxis"][
-                "fspool"
-            ],  # how frequently to save solution to RAM
-        }
-
+        new_dictionary = convert_old_dictionary(old_dictionary)
         return new_dictionary
 
     def __unify_method_input(self):
@@ -973,51 +896,13 @@ class Model_parameters:
             and self.mesh_type == "firedrake_mesh"
             and self.dimension == 2
         ):
-            nx = int(self.length_x / dx)
-            nz = int(self.length_z / dx)
-            if self.cell_type == "quadrilateral":
-                quadrilateral = True
-            else:
-                quadrilateral = False
-
-            if periodic:
-                self.user_mesh = spyro.PeriodicRectangleMesh(
-                    nz,
-                    nx,
-                    self.length_z,
-                    self.length_x,
-                    quadrilateral=quadrilateral,
-                )
-            else:
-                self.user_mesh = spyro.RectangleMesh(
-                    nz,
-                    nx,
-                    self.length_z,
-                    self.length_x,
-                    quadrilateral=quadrilateral,
-                )
+            self.user_mesh = create_firedrake_2D_mesh_based_on_parameters(dx, self.cell_type)
         elif (
             dx is not None
             and self.mesh_type == "firedrake_mesh"
             and self.dimension == 3
         ):
-            nx = int(self.length_x / dx)
-            nz = int(self.length_z / dx)
-            ny = int(self.length_y / dx)
-            if self.cell_type == "quadrilateral":
-                quadrilateral = True
-            else:
-                quadrilateral = False
-
-            self.user_mesh = spyro.BoxMesh(
-                nz,
-                nx,
-                ny,
-                self.length_z,
-                self.length_x,
-                self.length_y,
-                quadrilateral=quadrilateral,
-            )
+            self.user_mesh = create_firedrake_3D_mesh_based_on_parameters(dx, self.cell_type)
 
         if (
             length_z is None
