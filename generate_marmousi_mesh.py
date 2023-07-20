@@ -120,7 +120,7 @@ frequency = float(sys.argv[1])
 degree = int(sys.argv[2])
 pad_size = float(sys.argv[3])
 
-input_vp_model = "/media/alexandre/Extreme SSD/common_files/velocity_models/vp_marmousi-ii.segy"
+input_vp_model = "/media/olender/Extreme SSD/common_files/velocity_models/vp_marmousi-ii.segy"
 output_mesh_name = "meshes/marmousi_f"+str(frequency)+"_degree"+str(degree)+"_pad"+str(pad_size)  #Onde vamos salvar a malha
 show = True #Gera um .pvd para visualizar no paraview o modelo de velocidade
 pad = pad_size
