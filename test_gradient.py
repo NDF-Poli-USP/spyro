@@ -113,8 +113,8 @@ def test_gradient(dictionary):
     # simulate the exact model
     Wave_obj.set_initial_velocity_model(velocity_model_function=vp_exact)
     Wave_obj.forward_solve()
+    Wave_obj.set_last_solve_as_real_shot_record()
 
-    p_exact = Wave_obj.forward_solution
     p_exact_receivers = Wave_obj.forward_solution_receivers
 
     # simulate the guess model
@@ -122,16 +122,14 @@ def test_gradient(dictionary):
     Wave_obj.set_initial_velocity_model(velocity_model_function=vp_guess)
     Wave_obj.forward_solve()
     
-    p_guess = Wave_obj.forward_solution
     p_guess_receivers = Wave_obj.forward_solution_receivers
 
-    quad_rule = Wave_obj.quadrature_rule
-
+    misfit = Wave_obj.real_shot_record - p_guess_receivers
     Jm = functional(Wave_obj, misfit)
     print("\n Cost functional at fixed point : " + str(Jm) + " \n ")
 
     # compute the gradient of the control (to be verified)
-    dJ = Wave_obj.gradient()
+    dJ = Wave_obj.gradient_solve()
     dJ.dat.data[:] = dJ.dat.data[:]*mask.dat.data[:]
     File("gradient.pvd").write(dJ)
 
@@ -143,6 +141,7 @@ def test_gradient(dictionary):
     # this deepcopy is important otherwise pertubations accumulate
     vp_original = vp_guess.copy(deepcopy=True)
 
+    quad_rule = Wave_obj.quadrature_rule
     errors = []
     for step in steps:  # range(3):
         # steps.append(step)

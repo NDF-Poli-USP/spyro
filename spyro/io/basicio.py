@@ -14,12 +14,11 @@ def ensemble_save(func):
     """Decorator for read and write shots for ensemble parallelism"""
 
     def wrapper(*args, **kwargs):
-        acq = args[0].get("acquisition")
-        num = len(acq["source_pos"])
-        _comm = args[1]
+        num = args[0].number_of_sources
+        comm = args[0].comm
         custom_file_name = kwargs.get("file_name")
         for snum in range(num):
-            if is_owner(_comm, snum) and _comm.comm.rank == 0:
+            if is_owner(comm, snum) and comm.comm.rank == 0:
                 if custom_file_name is None:
                     func(
                         *args,
@@ -31,7 +30,15 @@ def ensemble_save(func):
                         )
                     )
                 else:
-                    func(*args, **dict(kwargs, file_name=custom_file_name))
+                    func(
+                        *args,
+                        **dict(
+                            kwargs,
+                            file_name="shots/"+custom_file_name
+                            + str(snum + 1)
+                            + ".dat",
+                        )
+                    )
 
     return wrapper
 
@@ -266,18 +273,16 @@ def create_segy(velocity, filename):
 
 
 @ensemble_save
-def save_shots(model, comm, array, file_name=None):
-    """Save a `numpy.ndarray` to a `pickle`.
+def save_shots(Wave_obj, source_id=0, file_name=None):
+    """Save a the shot record from last forward solve to a `pickle`.
 
     Parameters
     ----------
-    model:
-
-    comm:
-
-    array: `numpy.ndarray`
-        The data to save a pickle (e.g., a shot)
-    filename: str, optional by default shot_number_#.dat
+    Wave_obj: `spyro.Wave` object
+        A `spyro.Wave` object
+    source_id: int, optional by default 0
+        The source number
+    file_name: str, optional by default shot_number_#.dat
         The filename to save the data as a `pickle`
 
     Returns
@@ -286,7 +291,7 @@ def save_shots(model, comm, array, file_name=None):
 
     """
     with open(file_name, "wb") as f:
-        pickle.dump(array, f)
+        pickle.dump(Wave_obj.forward_solution_receivers[source_id,:], f)
     return None
 
 

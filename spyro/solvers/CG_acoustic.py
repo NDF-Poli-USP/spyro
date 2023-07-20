@@ -181,18 +181,35 @@ class AcousticWave(Wave):
 
         return usol, usol_recv
 
-    def gradient_solve(self, guess, residual):
-        if self.current_time == 0.0:
+    def gradient_solve(self, guess=None):
+        """Solves the adjoint problem to calculate de gradient.
+
+        Parameters:
+        -----------
+        guess: Firedrake 'Function' (optional)
+            Initial guess for the velocity model. If not mentioned uses the
+            one currently in the wave object.
+
+        Returns:
+        --------
+        dJ: Firedrake 'Function'
+            Gradient of the cost functional.
+        """
+        if self.real_shot_record is None:
+            warnings.warn("Please load a real shot record first")
+        if self.current_time == 0.0 and guess is not None:
+            self.c = guess
             warnings.warn(
                 "You need to run the forward solver before the adjoint solver,\
                      will do it for you now"
             )
             self.forward_solve()
-        self.c = guess
-        self.misfit = residual
+        self.misfit = self.real_shot_record - self.forward_solution_receivers
         self.wave_backward_propagator()
 
     def wave_backward_propagator(self):
+        residual = self.misfit
+        guess = self.forward_solution
         V = self.function_space
         receivers = self.receivers
         dxlump = dx(scheme=self.quadrature_rule)
