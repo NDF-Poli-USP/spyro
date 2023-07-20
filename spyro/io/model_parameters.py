@@ -261,10 +261,10 @@ def convert_old_dictionary(old_dictionary):
 
     return new_dictionary
 
-def create_firedrake_2D_mesh_based_on_parameters(dx, cell_type):
-    nx = int(self.length_x / dx)
-    nz = int(self.length_z / dx)
-    if self.cell_type == "quadrilateral":
+def create_firedrake_2D_mesh_based_on_parameters(Wave_object, dx, cell_type, periodic):
+    nx = int(Wave_object.length_x / dx)
+    nz = int(Wave_object.length_z / dx)
+    if cell_type == "quadrilateral":
         quadrilateral = True
     else:
         quadrilateral = False
@@ -273,16 +273,16 @@ def create_firedrake_2D_mesh_based_on_parameters(dx, cell_type):
         return spyro.PeriodicRectangleMesh(
             nz,
             nx,
-            self.length_z,
-            self.length_x,
+            Wave_object.length_z,
+            Wave_object.length_x,
             quadrilateral=quadrilateral,
         )
     else:
         return spyro.RectangleMesh(
             nz,
             nx,
-            self.length_z,
-            self.length_x,
+            Wave_object.length_z,
+            Wave_object.length_x,
             quadrilateral=quadrilateral,
         )
 
@@ -896,13 +896,13 @@ class Model_parameters:
             and self.mesh_type == "firedrake_mesh"
             and self.dimension == 2
         ):
-            self.user_mesh = create_firedrake_2D_mesh_based_on_parameters(dx, self.cell_type)
+            self.user_mesh = create_firedrake_2D_mesh_based_on_parameters(self, dx, self.cell_type, periodic)
         elif (
             dx is not None
             and self.mesh_type == "firedrake_mesh"
             and self.dimension == 3
         ):
-            self.user_mesh = create_firedrake_3D_mesh_based_on_parameters(dx, self.cell_type)
+            self.user_mesh = create_firedrake_3D_mesh_based_on_parameters(self, dx, self.cell_type)
 
         if (
             length_z is None
