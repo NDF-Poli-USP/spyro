@@ -15,6 +15,7 @@ from . import io
 from . import solvers
 from . import tools
 from . import examples
+from . import habc
 from .meshing import RectangleMesh, UnitSquareMesh, PeriodicRectangleMesh, BoxMesh
 
 __all__ = [
@@ -38,6 +39,7 @@ __all__ = [
     "DG_Wave",
     "examples",
     "AcousticWave",
+    "habc",
     "AcousticWaveMMS",
     "RectangleMesh",
     "UnitSquareMesh",

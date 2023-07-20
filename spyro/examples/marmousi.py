@@ -1,6 +1,9 @@
 from spyro import create_transect
 from spyro.examples.example_model import Example_model
+from spyro import AcousticWave
 import firedrake as fire
+
+from spyro.solvers.CG_acoustic import AcousticWave
 
 marmousi_optimization_parameters = {
     "General": {"Secant": {"Type": "Limited-Memory BFGS", "Maximum Storage": 10}},
@@ -39,13 +42,12 @@ marmousi_dictionary["parallelism"] = {
 # domain and reserve the remaining 250 m for the Perfectly Matched Layer (PML) to absorb
 # outgoing waves on three sides (eg., -z, +-x sides) of the domain.
 marmousi_dictionary["mesh"] = {
-    "Lz": 1.0,  # depth in km - always positive   # Como ver isso sem ler a malha?
-    "Lx": 1.0,  # width in km - always positive
+    "Lz": 3.5,  # depth in km - always positive   # Como ver isso sem ler a malha?
+    "Lx": 17.0,  # width in km - always positive
     "Ly": 0.0,  # thickness in km - always positive
     "mesh_file": None,
 }
 marmousi_dictionary["synthetic_data"] = {    #For use only if you are using a synthetic test model or a forward only simulation -adicionar discrição para modelo direto
-    "real_mesh_file": None,
     "real_velocity_file": None,
 }
 marmousi_dictionary["inversion"] = {
@@ -93,11 +95,14 @@ marmousi_dictionary["time_axis"] = {
 }
 
 
-class Marmousi(Example_model):
+class Marmousi_parameters(Example_model):
     def __init__(self, dictionary=None, example_dictionary= marmousi_dictionary, comm = None):
         super().__init__(dictionary=dictionary,default_dictionary=example_dictionary,comm=comm)
 
-    
+class Marmousi_acoustic(AcousticWave):
+    def __init__(self, model_dictionary = None, comm = None):     
+        model_parameters = Marmousi_parameters(dictionary=model_dictionary, comm = comm)
+        super().__init__(model_parameters = model_parameters, comm = comm)
     
 
         
