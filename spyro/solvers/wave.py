@@ -31,6 +31,7 @@ class Wave(Model_parameters):
         self.function_space = None
         self.current_time = 0.0
         self.set_solver_parameters()
+        self.real_shot_record = None
 
         self.wavelet = self.get_wavelet()
         self.mesh = self.get_mesh()
@@ -226,3 +227,8 @@ class Wave(Model_parameters):
         petsc_matrix = A.petscmat
         diagonal = petsc_matrix.getDiagonal()
         return diagonal.array
+
+    def set_last_solve_as_real_shot_record(self):
+        if self.current_time == 0.0:
+            raise ValueError("No previous solve to set as real shot record.")
+        self.real_shot_record = self.forward_solution_receivers
