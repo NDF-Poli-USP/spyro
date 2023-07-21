@@ -1,11 +1,12 @@
 import FIAT
 import finat
-from firedrake import *
+from firedrake import *  # noqa:F403
 
 
 def quadrature_rules(V):
-    """ Quadrature rule - Gauss-Lobatto-Legendre, Gauss-Legendre and Equi-spaced, KMV
-    
+    """Quadrature rule - Gauss-Lobatto-Legendre, Gauss-Legendre and Equi
+    spaced, KMV
+
     Parameters:
     -----------
     V: Firedrake FunctionSpace
@@ -35,9 +36,11 @@ def quadrature_rules(V):
     if ufl_method == "Mixed":
         ufl_method = V.sub(1).ufl_element().family()
 
-    if (cell_geometry == quadrilateral) and ufl_method == "Q":
+    if (cell_geometry == quadrilateral) and ufl_method == "Q":  # noqa: F405
         # In this case, for the spectral element method we use GLL quadrature
-        qr_x = gauss_lobatto_legendre_cube_rule(dimension=dimension, degree=degree)
+        qr_x = gauss_lobatto_legendre_cube_rule(
+            dimension=dimension, degree=degree
+        )
         qr_k = qr_x
         qr_s = gauss_lobatto_legendre_cube_rule(
             dimension=(dimension - 1), degree=degree
@@ -46,14 +49,16 @@ def quadrature_rules(V):
     #     # In this case, we use GL quadrature
     #     qr_x = gauss_legendre_cube_rule(dimension=dimension, degree=degree)
     #     qr_k = qr_x
-    #     qr_s = gauss_legendre_cube_rule(dimension=(dimension - 1), degree=degree)
-    elif (cell_geometry == triangle) and (
+    #     qr_s = gauss_legendre_cube_rule(
+    # dimension=(dimension - 1), degree=degree
+    # )
+    elif (cell_geometry == triangle) and (  # noqa: F405
         ufl_method == "Lagrange" or ufl_method == "Discontinuous Lagrange"
     ):
         qr_x = None
         qr_s = None
         qr_k = None
-    elif (cell_geometry == tetrahedron) and (
+    elif (cell_geometry == tetrahedron) and (  # noqa: F405
         ufl_method == "Lagrange" or ufl_method == "Discontinuous Lagrange"
     ):
         qr_x = None
@@ -65,10 +70,15 @@ def quadrature_rules(V):
         )
         qr_s = None
         qr_k = None
-    elif dimension == 3 and cell_geometry == TensorProductCell(quadrilateral, interval):
+    elif dimension == 3 and cell_geometry == TensorProductCell(  # noqa: F405
+        quadrilateral,  # noqa: F405
+        interval,  # noqa: F405
+    ):  # noqa: F405
         # In this case, for the spectral element method we use GLL quadrature
-        degree, _ = degree 
-        qr_x = gauss_lobatto_legendre_cube_rule(dimension=dimension, degree=degree)
+        degree, _ = degree
+        qr_x = gauss_lobatto_legendre_cube_rule(
+            dimension=dimension, degree=degree
+        )
         qr_k = qr_x
         qr_s = gauss_lobatto_legendre_cube_rule(
             dimension=(dimension - 1), degree=degree
@@ -88,7 +98,7 @@ def gauss_lobatto_legendre_line_rule(degree):
     ----------
     degree : int
         degree of the polynomial
-    
+
     Returns
     -------
     result : obj
@@ -111,7 +121,7 @@ def gauss_lobatto_legendre_cube_rule(dimension, degree):
         dimension of the space
     degree : int
         degree of the polynomial
-    
+
     Returns
     -------
     result : obj
@@ -133,7 +143,8 @@ def gauss_lobatto_legendre_cube_rule(dimension, degree):
 #     fiat_rule = fiat_make_rule(FIAT.ufc_simplex(1), degree + 1)
 #     finat_ps = finat.point_set.GaussLegendrePointSet
 #     finat_qr = finat.quadrature.QuadratureRule
-#     return finat_qr(finat_ps(fiat_rule.get_points()), fiat_rule.get_weights())
+#     return finat_qr(finat_ps(fiat_rule.get_points()), fiat_rule.get_weights()
+# )
 
 
 # # 3D

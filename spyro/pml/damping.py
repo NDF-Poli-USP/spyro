@@ -1,7 +1,7 @@
 import math
 import warnings
 
-from firedrake import *
+from firedrake import *  # noqa: F403
 
 
 def functions(
@@ -22,7 +22,7 @@ def functions(
     b_pml=None,
 ):
     """Damping functions for the perfect matched layer for 2D and 3D
-    
+
     Parameters
     ----------
     model : dict
@@ -64,7 +64,7 @@ def functions(
         Firedrake function with the damping function in the z direction
     sigma_y : obj
         Firedrake function with the damping function in the y direction
-    
+
     """
 
     damping_type = model["BCs"]["damping_type"]
@@ -117,7 +117,6 @@ def functions(
     # sgm_z.write(sigma_z)
 
     if dimension == 2:
-
         return (sigma_x, sigma_z)
 
     elif dimension == 3:
@@ -154,7 +153,9 @@ def matrices_2D(sigma_x, sigma_y):
 
 def matrices_3D(sigma_x, sigma_y, sigma_z):
     """Damping matrices for a three-dimensional problem"""
-    Gamma_1 = as_tensor([[sigma_x, 0.0, 0.0], [0.0, sigma_y, 0.0], [0.0, 0.0, sigma_z]])
+    Gamma_1 = as_tensor(
+        [[sigma_x, 0.0, 0.0], [0.0, sigma_y, 0.0], [0.0, 0.0, sigma_z]]
+    )
     Gamma_2 = as_tensor(
         [
             [sigma_x - sigma_y - sigma_z, 0.0, 0.0],

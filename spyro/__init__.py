@@ -15,7 +15,11 @@ from . import io
 from . import solvers
 from . import tools
 from . import examples
-from .meshing import RectangleMesh, UnitSquareMesh, PeriodicRectangleMesh, BoxMesh
+from .meshing import (
+    RectangleMesh,
+    PeriodicRectangleMesh,
+    BoxMesh,
+)
 
 __all__ = [
     "io",
@@ -40,7 +44,6 @@ __all__ = [
     "AcousticWave",
     "AcousticWaveMMS",
     "RectangleMesh",
-    "UnitSquareMesh",
     "PeriodicRectangleMesh",
     "BoxMesh",
 ]

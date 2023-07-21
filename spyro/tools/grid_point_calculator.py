@@ -45,7 +45,9 @@ def minimum_grid_point_calculator(grid_point_calculator_parameters):
     model = spyro.tools.create_model_for_grid_point_calculation(
         grid_point_calculator_parameters, desired_degree
     )
-    G = searching_for_minimum(model, p_exact, TOL, starting_G=G_initial, comm=comm)
+    G = searching_for_minimum(
+        model, p_exact, TOL, starting_G=G_initial, comm=comm
+    )
 
     return G
 
@@ -68,7 +70,9 @@ def wave_solver(model, G, comm=False):
         The pressure field at the receivers
 
     """
-    minimum_mesh_velocity = model["testing_parameters"]["minimum_mesh_velocity"]
+    minimum_mesh_velocity = model["testing_parameters"][
+        "minimum_mesh_velocity"
+    ]
     model["mesh"]["meshfile"] = "meshes/2Dhomogeneous" + str(G) + ".msh"
     try:
         mesh, V = spyro.basicio.read_mesh(model, comm)
@@ -78,7 +82,7 @@ def wave_solver(model, G, comm=False):
 
     if model["testing_parameters"]["experiment_type"] == "homogeneous":
         vp_exact = fire.Constant(minimum_mesh_velocity)
-    elif model['testing_parameters']['experiment_type'] == 'heterogeneous':
+    elif model["testing_parameters"]["experiment_type"] == "heterogeneous":
         vp_exact = spyro.basicio.interpolate(model, mesh, V, guess=False)
 
     if model["opts"]["method"] == "KMV":
@@ -180,7 +184,7 @@ def searching_for_minimum(
     -------
     G : `float`
         The minimum grid point density
-    
+
     """
     error = 100.0
     G = starting_G
@@ -242,7 +246,9 @@ def grid_point_to_mesh_point_converter_for_seismicmesh(model, G):
         #     M = 0.2*G
 
     if model["opts"]["method"] == "spectral":
-        raise ValueError("Correct M to G conversion to be inputed for spectral")
+        raise ValueError(
+            "Correct M to G conversion to be inputed for spectral"
+        )
         # if degree == 1:
         #     M = G
         # if degree == 2:
@@ -258,7 +264,7 @@ def grid_point_to_mesh_point_converter_for_seismicmesh(model, G):
 
 
 def error_calc(p_exact, p, model, comm=False):
-    """ Calculates the error between the exact and the numerical solution
+    """Calculates the error between the exact and the numerical solution
 
     Parameters
     ----------
@@ -275,7 +281,7 @@ def error_calc(p_exact, p, model, comm=False):
     -------
     error : `float`
         The error between the exact and the numerical solution
-    
+
     """
     # p0 doesn't necessarily have the same dt as p_exact
     # therefore we have to interpolate the missing points
@@ -306,7 +312,9 @@ def error_calc(p_exact, p, model, comm=False):
             numerator_time_int = 0.0
             denominator_time_int = 0.0
             for t in range(times - 1):
-                top_integration = (p_exact[t, receiver] - p[t, receiver]) ** 2 * dt
+                top_integration = (
+                    p_exact[t, receiver] - p[t, receiver]
+                ) ** 2 * dt
                 bot_integration = (p_exact[t, receiver]) ** 2 * dt
 
                 # Adding 1e-25 filter to receivers to eliminate noise
@@ -333,7 +341,9 @@ def error_calc(p_exact, p, model, comm=False):
     #     print('Warning: error too small to measure correctly.', flush = True)
     #     error = 0.0
     if denominator < 1e-15:
-        print("Warning: receivers don't appear to register a shot.", flush=True)
+        print(
+            "Warning: receivers don't appear to register a shot.", flush=True
+        )
         error = 0.0
 
     # print("ERROR IS ", flush = True)
@@ -382,7 +392,10 @@ def error_calc_line(p_exact, p, model, comm=False):
         error = np.sqrt(numerator_time_int / denominator_time_int)
 
         if denominator_time_int < 1e-15:
-            print("Warning: receivers don't appear to register a shot.", flush=True)
+            print(
+                "Warning: receivers don't appear to register a shot.",
+                flush=True,
+            )
             error = 0.0
 
     return error
@@ -457,8 +470,9 @@ def generate_mesh2D(model, G, comm):
     Real_Lx = Lx + 2 * lx
 
     if model["testing_parameters"]["experiment_type"] == "homogeneous":
-
-        minimum_mesh_velocity = model["testing_parameters"]["minimum_mesh_velocity"]
+        minimum_mesh_velocity = model["testing_parameters"][
+            "minimum_mesh_velocity"
+        ]
         frequency = model["acquisition"]["frequency"]
         lbda = minimum_mesh_velocity / frequency
 
@@ -577,7 +591,9 @@ def generate_mesh3D(model, G, comm):
     Real_Lx = Lx + 2 * lx
     Real_Ly = Ly + 2 * ly
 
-    minimum_mesh_velocity = model["testing_parameters"]["minimum_mesh_velocity"]
+    minimum_mesh_velocity = model["testing_parameters"][
+        "minimum_mesh_velocity"
+    ]
     frequency = model["acquisition"]["frequency"]
     lbda = minimum_mesh_velocity / frequency
 
