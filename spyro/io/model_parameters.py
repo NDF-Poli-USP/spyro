@@ -261,9 +261,9 @@ def convert_old_dictionary(old_dictionary):
 
     return new_dictionary
 
-def create_firedrake_2D_mesh_based_on_parameters(Wave_object, dx, cell_type, periodic):
-    nx = int(Wave_object.length_x / dx)
-    nz = int(Wave_object.length_z / dx)
+def create_firedrake_2D_mesh_based_on_parameters(length_z, length_x, dx, cell_type, periodic, comm=None):
+    nx = int(length_x / dx)
+    nz = int(length_z / dx)
     if cell_type == "quadrilateral":
         quadrilateral = True
     else:
@@ -273,17 +273,19 @@ def create_firedrake_2D_mesh_based_on_parameters(Wave_object, dx, cell_type, per
         return spyro.PeriodicRectangleMesh(
             nz,
             nx,
-            Wave_object.length_z,
-            Wave_object.length_x,
+            length_z,
+            length_x,
             quadrilateral=quadrilateral,
+            comm=comm.comm,
         )
     else:
         return spyro.RectangleMesh(
             nz,
             nx,
-            Wave_object.length_z,
-            Wave_object.length_x,
+            length_z,
+            length_x,
             quadrilateral=quadrilateral,
+            comm=comm.comm,
         )
 
 def create_firedrake_3D_mesh_based_on_parameters(dx, cell_type):
@@ -446,7 +448,7 @@ class Model_parameters:
         # Estabilishing forward output file and setting a default
         if "forward_output_filename" not in dictionary:
             self.forward_output_file = "results/forward_propogation.pvd"
-        elif dictionary["forward_output_filename"] is None:
+        elif dictionary["forward_output_filename"] is not None:
             self.forward_output_file = dictionary["forward_output_filename"]
         else:
             self.forward_output_file = "results/forward_propagation.pvd"
@@ -640,7 +642,7 @@ class Model_parameters:
                 "velocity_conditional"
             ]
 
-        self.foward_output_file = "results/forward_output.pvd"
+        self.forward_output_file = "results/forward_output.pvd"
 
     def _sanitize_time_inputs(self):
         dictionary = self.input_dictionary["time_axis"]
@@ -896,7 +898,13 @@ class Model_parameters:
             and self.mesh_type == "firedrake_mesh"
             and self.dimension == 2
         ):
-            self.user_mesh = create_firedrake_2D_mesh_based_on_parameters(self, dx, self.cell_type, periodic)
+            self.user_mesh = create_firedrake_2D_mesh_based_on_parameters(
+                self.length_z,
+                self.length_x, dx,
+                self.cell_type,
+                periodic,
+                comm=self.comm
+                )
         elif (
             dx is not None
             and self.mesh_type == "firedrake_mesh"
