@@ -10,7 +10,7 @@ from scipy.interpolate import griddata
 import segyio
 
 
-def ensemble_save(func):
+def ensemble_save_or_load(func):
     """Decorator for read and write shots for ensemble parallelism"""
 
     def wrapper(*args, **kwargs):
@@ -24,6 +24,7 @@ def ensemble_save(func):
                         *args,
                         **dict(
                             kwargs,
+                            source_id=snum,
                             file_name="shots/shot_record_"
                             + str(snum + 1)
                             + ".dat",
@@ -34,40 +35,12 @@ def ensemble_save(func):
                         *args,
                         **dict(
                             kwargs,
+                            source_id=snum,
                             file_name="shots/"+custom_file_name
                             + str(snum + 1)
                             + ".dat",
                         )
                     )
-
-    return wrapper
-
-
-def ensemble_load(func):
-    """Decorator for read and write shots for ensemble parallelism"""
-
-    def wrapper(*args, **kwargs):
-        acq = args[0].get("acquisition")
-        num = len(acq["source_pos"])
-        _comm = args[1]
-        custom_file_name = kwargs.get("file_name")
-        for snum in range(num):
-            if is_owner(_comm, snum):
-                if custom_file_name is None:
-                    values = func(
-                        *args,
-                        **dict(
-                            kwargs,
-                            file_name="shots/shot_record_"
-                            + str(snum + 1)
-                            + ".dat",
-                        )
-                    )
-                else:
-                    values = func(
-                        *args, **dict(kwargs, file_name=custom_file_name)
-                    )
-                return values
 
     return wrapper
 
@@ -272,7 +245,7 @@ def create_segy(velocity, filename):
             f.trace[tr] = velocity[:, tr]
 
 
-@ensemble_save
+@ensemble_save_or_load
 def save_shots(Wave_obj, source_id=0, file_name=None):
     """Save a the shot record from last forward solve to a `pickle`.
 
@@ -291,12 +264,12 @@ def save_shots(Wave_obj, source_id=0, file_name=None):
 
     """
     with open(file_name, "wb") as f:
-        pickle.dump(Wave_obj.forward_solution_receivers[source_id,:], f)
+        pickle.dump(Wave_obj.forward_solution_receivers[:, source_id], f)
     return None
 
 
-@ensemble_load
-def load_shots(model, comm, file_name=None):
+@ensemble_save_or_load
+def load_shots(Wave_obj, source_id=0, file_name=None):
     """Load a `pickle` to a `numpy.ndarray`.
 
     Parameters
@@ -310,10 +283,12 @@ def load_shots(model, comm, file_name=None):
         The data
 
     """
+    array = np.zeros(())
 
     with open(file_name, "rb") as f:
         array = np.asarray(pickle.load(f), dtype=float)
-    return array
+        Wave_obj.forward_solution_receivers = array
+    return None
 
 
 def is_owner(ens_comm, rank):
