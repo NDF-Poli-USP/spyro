@@ -1,8 +1,8 @@
 import spyro
-import firedrake as fire
+from spyro.io import parallel_print
 import numpy as np
 import matplotlib.pyplot as plt
-import sys
+import time
 
 
 # dt = float(sys.argv[1])
@@ -11,7 +11,7 @@ final_time = 1.0
 
 dictionary = {}
 dictionary["options"] = {
-    "cell_type": "Q",  # simplexes such as triangles or tetrahedra (T) or quadrilaterals (Q)
+    "cell_type": "T",  # simplexes such as triangles or tetrahedra (T) or quadrilaterals (Q)
     "variant": 'lumped',  # lumped, equispaced or DG, default is lumped "method":"MLT", # (MLT/spectral_quadrilateral/DG_triangle/DG_quadrilateral) You can either specify a cell_type+variant or a method
     "degree": 4,  # p order
     "dimension": 2,  # dimension
@@ -40,7 +40,7 @@ dictionary["mesh"] = {
 # This transect of receivers is created with the helper function `create_transect`.
 dictionary["acquisition"] = {
     "source_type": "ricker",
-    "source_locations": [(-1.0, 1.0)],#, (-0.605, 1.7), (-0.61, 1.7), (-0.615, 1.7)],#, (-0.1, 1.5), (-0.1, 2.0), (-0.1, 2.5), (-0.1, 3.0)],
+    "source_locations": [(-1.0, 1.0), (-1.0, 2.0)],#, (-0.605, 1.7), (-0.61, 1.7), (-0.615, 1.7)],#, (-0.1, 1.5), (-0.1, 2.0), (-0.1, 2.5), (-0.1, 3.0)],
     "frequency": 5.0,
     "delay": 1.5,
     "receiver_locations": [(-1.0, 1.5)],
@@ -58,18 +58,24 @@ dictionary["time_axis"] = {
 
 dictionary["visualization"] = {
     "forward_output" : True,
-    "output_filename": "results/forward_output.pvd",
+    "forward_output_filename": "results/two_source.pvd",
     "fwi_velocity_model_output": False,
     "velocity_model_filename": None,
     "gradient_output": False,
     "gradient_filename": None,
 }
 
+t0 = time.time()
+
 Wave_obj = spyro.AcousticWave(dictionary=dictionary)
 Wave_obj.set_mesh(dx=0.02, periodic=True)
 
 Wave_obj.set_initial_velocity_model(constant=1.5)
 Wave_obj.forward_solve()
+
+t1 = time.time()
+
+parallel_print(f"Time elapsed: {t1-t0}", Wave_obj.comm)
 
 time = np.linspace(0.0, final_time, int(final_time/dt)+1)
 

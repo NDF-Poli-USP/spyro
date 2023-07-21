@@ -3,7 +3,7 @@ from firedrake import Constant, dx, dot, grad
 import warnings
 
 from .wave import Wave
-from ..io.basicio import ensemble_propagator
+from ..io.basicio import ensemble_propagator, parallel_print
 from . import helpers
 from .. import utils
 from ..domains.quadrature import quadrature_rules
@@ -104,7 +104,7 @@ class AcousticWave(Wave):
             filename + "sn" + str(source_num) + "." + file_extension
         )
         if self.forward_output:
-            print(f"Saving output in: {output_filename}", flush=True)
+            parallel_print(f"Saving output in: {output_filename}", self.comm)
 
         output = fire.File(output_filename, comm=comm.comm)
         comm.comm.barrier()
