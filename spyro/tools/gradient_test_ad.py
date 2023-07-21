@@ -6,9 +6,11 @@ import spyro
 forward = spyro.solvers.forward_AD
 
 
-def gradient_test_acoustic(model, mesh, V, comm, vp_exact, vp_guess, mask=None):
+def gradient_test_acoustic(
+    model, mesh, V, comm, vp_exact, vp_guess, mask=None
+):
     """Gradient test for the acoustic FWI problem
-    
+
     Parameters
     ----------
     model : `dictionary`
@@ -67,7 +69,10 @@ def gradient_test_acoustic(model, mesh, V, comm, vp_exact, vp_guess, mask=None):
         true_rec=p_exact_recv,
     )
     if comm.comm.rank == 0:
-        print("\n Cost functional at fixed point : " + str(Jm) + " \n ", flush=True)
+        print(
+            "\n Cost functional at fixed point : " + str(Jm) + " \n ",
+            flush=True,
+        )
 
     # compute the gradient of the control (to be verified)
     if comm.comm.rank == 0:

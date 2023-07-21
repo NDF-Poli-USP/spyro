@@ -346,7 +346,7 @@ def test_dictionary_conversion():
         same = False
     if model_from_new.final_time != model_from_old.final_time:
         same = False
-    if model_from_new.foward_output_file != model_from_old.foward_output_file:
+    if model_from_new.forward_output_file != model_from_old.forward_output_file:
         same = False
     if model_from_new.running_fwi != model_from_old.running_fwi:
         same = False
