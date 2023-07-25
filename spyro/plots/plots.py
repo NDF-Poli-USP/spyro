@@ -8,9 +8,7 @@ __all__ = ["plot_shots"]
 
 @ensemble_plot
 def plot_shots(
-    model,
-    comm,
-    arr,
+    Wave_object,
     show=False,
     file_name="1",
     vmin=-1e-5,
@@ -49,12 +47,14 @@ def plot_shots(
     None
     """
 
-    num_recvs = len(model["acquisition"]["receiver_locations"])
+    num_recvs = Wave_object.number_of_receivers
 
-    dt = model["timeaxis"]["dt"]
-    tf = model["timeaxis"]["tf"]
+    dt = Wave_object.dt
+    tf = Wave_object.final_time
 
-    nt = int(tf / dt)  # number of timesteps
+    arr = Wave_object.receivers_output
+
+    nt = int(tf / dt)  + 1 # number of timesteps
 
     if end_index == 0:
         end_index = num_recvs
