@@ -506,24 +506,21 @@ class Model_parameters:
 
     def __check_degree(self):
         if self.method == "mass_lumped_triangle":
-            if self.dimension == 2:
-                if self.degree > 5:
-                    raise ValueError(
-                        f"Degree of {self.degree} not supported by \
-                            {self.dimension}D {self.method}."
-                    )
-            if self.dimension == 3:
-                if self.degree > 4:
-                    raise ValueError(
-                        f"Degree of {self.degree} not supported by \
-                            {self.dimension}D {self.method}."
-                    )
-            if self.dimension == 3:
-                if self.degree == 4:
-                    warnings.warn(
-                        f"Degree of {self.degree} not supported by \
-                            {self.dimension}D {self.method} in main firedrake."
-                    )
+            if self.dimension == 2 and self.degree > 5:
+                raise ValueError(
+                    f"Degree of {self.degree} not supported by \
+                        {self.dimension}D {self.method}."
+                )
+            if self.dimension == 3 and self.degree > 4:
+                raise ValueError(
+                    f"Degree of {self.degree} not supported by \
+                        {self.dimension}D {self.method}."
+                )
+            if self.dimension == 3 and self.degree == 4:
+                warnings.warn(
+                    f"Degree of {self.degree} not supported by \
+                        {self.dimension}D {self.method} in main firedrake."
+                )
 
     def __unify_method_input(self):
         unified_method = None
