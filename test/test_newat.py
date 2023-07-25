@@ -128,7 +128,7 @@ def test_correct_at_value2D_quad():
     recvs = spyro.create_transect((pz, px), (pz, px), 3)
 
     oldmodel_quad["acquisition"]["receiver_locations"] = recvs
-    new_dictionary = spyro.io.convert_old_dictionary(oldmodel_quad)
+    new_dictionary = spyro.io.Dictionary_conversion(oldmodel_quad).new_dictionary
     new_dictionary["mesh"]["mesh_file"] = None
     new_dictionary["mesh"]["mesh_type"] = "firedrake_mesh"
     new_dictionary["options"]["cell_type"] = "quadrilateral"
