@@ -121,147 +121,6 @@ import spyro
 # }
 
 
-def convert_old_dictionary(old_dictionary):
-    """
-    Convert the old dictionary to the new one
-
-    Parameters
-    ----------
-    old_dictionary : dict
-        Old dictionary
-
-    Returns
-    -------
-    new_dictionary : dict
-        New dictionary
-    """
-    new_dictionary = {}
-    new_dictionary["options"] = {
-        "method": old_dictionary["opts"]["method"],
-        "variant": old_dictionary["opts"]["quadrature"],
-        "degree": old_dictionary["opts"]["degree"],
-        "dimension": old_dictionary["opts"]["dimension"],
-    }
-    new_dictionary["parallelism"] = {
-        "type": old_dictionary["parallelism"][
-            # options: automatic (same number of cores for evey processor)
-            # or spatial
-            "type"
-        ],
-    }
-    new_dictionary["mesh"] = {
-        "Lz": old_dictionary["mesh"]["Lz"],
-        "Lx": old_dictionary["mesh"]["Lx"],
-        "Ly": old_dictionary["mesh"]["Ly"],
-        "mesh_file": old_dictionary["mesh"]["meshfile"],
-    }
-    fwi_running = False
-    if (
-        old_dictionary["mesh"]["initmodel"] is not None
-        and old_dictionary["mesh"]["truemodel"] is not None
-    ) and (
-        old_dictionary["mesh"]["initmodel"] != "not_used.hdf5"
-        and old_dictionary["mesh"]["truemodel"] != "not_used.hdf5"
-    ):
-        warnings.warn("Assuming parameters set for fwi.")
-        fwi_running = True
-    if fwi_running is False:
-        warnings.warn(
-            "Assuming parameters set for forward only propagation, will \
-                use velocity model from old_dictionary truemodel."
-        )
-    if fwi_running:
-        new_dictionary["synthetic_data"] = {
-            "real_velocity_file": old_dictionary["mesh"]["truemodel"],
-            "real_mesh_file": None,
-        }
-    else:
-        model_file = None
-        if (
-            old_dictionary["mesh"]["initmodel"] is not None
-            and old_dictionary["mesh"]["initmodel"] != "not_used.hdf5"
-        ):
-            model_file = old_dictionary["mesh"]["initmodel"]
-        else:
-            model_file = old_dictionary["mesh"]["truemodel"]
-        new_dictionary["synthetic_data"] = {
-            "real_velocity_file": model_file,
-            "real_mesh_file": None,
-        }
-    if fwi_running:
-        warnings.warn("Using default optimization parameters.")
-        default_optimization_parameters = {
-            "General": {
-                "Secant": {
-                    "Type": "Limited-Memory BFGS",
-                    "Maximum Storage": 10,
-                }
-            },
-            "Step": {
-                "Type": "Augmented Lagrangian",
-                "Augmented Lagrangian": {
-                    "Subproblem Step Type": "Line Search",
-                    "Subproblem Iteration Limit": 5.0,
-                },
-                "Line Search": {
-                    "Descent Method": {"Type": "Quasi-Newton Step"}
-                },
-            },
-            "Status Test": {
-                "Gradient Tolerance": 1e-16,
-                "Iteration Limit": None,
-                "Step Tolerance": 1.0e-16,
-            },
-        }
-        old_default_shot_record_file = "shots/shot_record_1.dat"
-        shot_record_file = None
-        if exists(old_default_shot_record_file):
-            shot_record_file = old_default_shot_record_file
-        new_dictionary["inversion"] = {
-            "perform_fwi": True,  # switch to true to make a FWI
-            "initial_guess_model_file": old_dictionary["mesh"][
-                "initmodel"
-            ],
-            "shot_record_file": shot_record_file,
-            "optimization_parameters": default_optimization_parameters,
-        }
-    else:
-        new_dictionary["inversion"] = {
-            "perform_fwi": False,  # switch to true to make a FWI
-            "initial_guess_model_file": None,
-            "shot_record_file": None,
-            "optimization_parameters": None,
-        }
-    new_dictionary["absorving_boundary_conditions"] = old_dictionary["BCs"]
-    new_dictionary["acquisition"] = {
-        "source_type": old_dictionary["acquisition"]["source_type"],
-        "source_locations": old_dictionary["acquisition"]["source_pos"],
-        "frequency": old_dictionary["acquisition"]["frequency"],
-        "delay": old_dictionary["acquisition"]["delay"],
-        "amplitude": old_dictionary["timeaxis"]["amplitude"],
-        "receiver_locations": old_dictionary["acquisition"][
-            "receiver_locations"
-        ],
-    }
-    new_dictionary["time_axis"] = {
-        "initial_time": old_dictionary["timeaxis"][
-            "t0"
-        ],  # Initial time for event
-        "final_time": old_dictionary["timeaxis"][
-            "tf"
-        ],  # Final time for event
-        "dt": old_dictionary["timeaxis"]["dt"],  # timestep size
-        "output_frequency": old_dictionary["timeaxis"][
-            "nspool"
-        ],  # how frequently to output solution to pvds
-        "gradient_sampling_frequency": old_dictionary["timeaxis"][
-            "fspool"
-        ],  # how frequently to save solution to RAM
-    }
-
-    return new_dictionary
-
-
 class Model_parameters:
     def __init__(self, dictionary=None, comm=None):
         """Initializes class that reads and sanitizes input parameters.
@@ -282,7 +141,7 @@ class Model_parameters:
         # Converts old dictionary to new one. Deprecated feature
         if "opts" in dictionary:
             warnings.warn("Old deprecated dictionary style in usage.")
-            dictionary = convert_old_dictionary(dictionary)
+            dictionary = spyro.io.Dictionary_conversion(dictionary)
         # Saves inout_dictionary internally
         self.input_dictionary = dictionary
 
@@ -807,10 +666,6 @@ class Model_parameters:
         else:
             raise ValueError("Missing options inputs.")
 
-    # def get_wavelet(self):
-    #     dictionary = self.input_dictionary
-    #     source_type = dictionary["acquisition"]
-
     def set_mesh(
         self,
         dx=None,
@@ -886,7 +741,6 @@ class Model_parameters:
             warnings.warn(
                 "Mesh dimensions not completely reset from initial dictionary"
             )
-
 
     def get_mesh(self):
         """Reads in an external mesh and scatters it between cores.
