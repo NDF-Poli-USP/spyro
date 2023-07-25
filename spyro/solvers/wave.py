@@ -118,6 +118,7 @@ class Wave(Model_parameters):
         velocity_model_function=None,
         expression=None,
         new_file=None,
+        output=False,
     ):
         """Method to define new user velocity model or file. It is optional.
 
@@ -151,9 +152,6 @@ class Wave(Model_parameters):
             V = self.function_space
             vp = fire.Function(V, name="velocity")
             vp.interpolate(expression)
-            fire.File("initial_velocity_model_3d.pvd").write(
-                vp, name="velocity"
-            )
             self.initial_velocity_model = vp
         elif velocity_model_function is not None:
             self.initial_velocity_model = velocity_model_function
@@ -163,12 +161,15 @@ class Wave(Model_parameters):
             V = self.function_space
             vp = fire.Function(V, name="velocity")
             vp.interpolate(fire.Constant(constant))
-            fire.File("initial_velocity_model.pvd").write(vp, name="velocity")
             self.initial_velocity_model = vp
         else:
             raise ValueError(
                 "Please specify either a conditional, expression, firedrake \
                     function or new file name (segy or hdf5)."
+            )
+        if output:
+            fire.File("initial_velocity_model.pvd").write(
+                self.initial_velocity_model, name="velocity"
             )
 
     def _get_initial_velocity_model(self):
