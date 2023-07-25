@@ -83,7 +83,7 @@ def test_read_and_write_segy():
 
 
 def test_saving_shot_record():
-    from model import dictionary
+    from .inputfiles.model import dictionary
     dictionary["time_axis"]["final_time"] = 0.5
     Wave_obj = spyro.AcousticWave(dictionary=dictionary)
     Wave_obj.set_mesh(dx=0.02)
@@ -93,7 +93,7 @@ def test_saving_shot_record():
 
 
 def test_loading_shot_record():
-    from model import dictionary
+    from .inputfiles.model import dictionary
     dictionary["time_axis"]["final_time"] = 0.5
     Wave_obj = spyro.AcousticWave(dictionary=dictionary)
     Wave_obj.set_mesh(dx=0.02)
