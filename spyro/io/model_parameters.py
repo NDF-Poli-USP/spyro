@@ -261,52 +261,6 @@ def convert_old_dictionary(old_dictionary):
 
     return new_dictionary
 
-def create_firedrake_2D_mesh_based_on_parameters(length_z, length_x, dx, cell_type, periodic, comm=None):
-    nx = int(length_x / dx)
-    nz = int(length_z / dx)
-    if cell_type == "quadrilateral":
-        quadrilateral = True
-    else:
-        quadrilateral = False
-
-    if periodic:
-        return spyro.PeriodicRectangleMesh(
-            nz,
-            nx,
-            length_z,
-            length_x,
-            quadrilateral=quadrilateral,
-            comm=comm.comm,
-        )
-    else:
-        return spyro.RectangleMesh(
-            nz,
-            nx,
-            length_z,
-            length_x,
-            quadrilateral=quadrilateral,
-            comm=comm.comm,
-        )
-
-def create_firedrake_3D_mesh_based_on_parameters(dx, cell_type):
-    nx = int(self.length_x / dx)
-    nz = int(self.length_z / dx)
-    ny = int(self.length_y / dx)
-    if self.cell_type == "quadrilateral":
-        quadrilateral = True
-    else:
-        quadrilateral = False
-
-    return spyro.BoxMesh(
-        nz,
-        nx,
-        ny,
-        self.length_z,
-        self.length_x,
-        self.length_y,
-        quadrilateral=quadrilateral,
-    )
-
 
 class Model_parameters:
     def __init__(self, dictionary=None, comm=None):
@@ -887,30 +841,42 @@ class Model_parameters:
             Whether the domain is periodic. The default is False.
         """
 
+        if length_z is not None:
+            self.length_z = length_z
+        if length_x is not None:
+            self.length_x = length_x
+        if length_y is not None:
+            self.length_y = length_y
+
         if user_mesh is not None:
             self.user_mesh = user_mesh
             self.mesh_type = "user_mesh"
         elif mesh_file is not None:
             self.mesh_file = mesh_file
             self.mesh_type = "file"
-        elif (
+        elif self.mesh_type == "firedrake_mesh":
+            AutoMeshing = spyro.meshing.AutomaticMesh(dimension=self.dimension, comm=self.comm)
+        
+        if periodic and self.mesh_type == "firedrake_mesh":
+            AutoMeshing.make_periodic()
+        elif periodic and self.mesh_type != "firedrake_mesh":
+            raise ValueError("Periodic meshes only supported for firedrake meshes.")
+
+        if (
             dx is not None
             and self.mesh_type == "firedrake_mesh"
-            and self.dimension == 2
         ):
-            self.user_mesh = create_firedrake_2D_mesh_based_on_parameters(
-                self.length_z,
-                self.length_x, dx,
-                self.cell_type,
-                periodic,
-                comm=self.comm
-                )
-        elif (
-            dx is not None
-            and self.mesh_type == "firedrake_mesh"
-            and self.dimension == 3
-        ):
-            self.user_mesh = create_firedrake_3D_mesh_based_on_parameters(self, dx, self.cell_type)
+            AutoMeshing.set_mesh_size(
+                length_z=self.length_z,
+                length_x=self.length_x,
+                length_y=self.length_y,
+            )
+            AutoMeshing.set_meshing_parameters(
+                dx=dx,
+                cell_type=self.cell_type,
+                mesh_type=self.mesh_type
+            )
+            self.user_mesh = AutoMeshing.create_mesh()
 
         if (
             length_z is None
@@ -920,13 +886,7 @@ class Model_parameters:
             warnings.warn(
                 "Mesh dimensions not completely reset from initial dictionary"
             )
-        else:
-            if length_z is not None:
-                self.length_z = length_z
-            if length_x is not None:
-                self.length_x = length_x
-            if length_y is not None:
-                self.length_y = length_y
+
 
     def get_mesh(self):
         """Reads in an external mesh and scatters it between cores.
