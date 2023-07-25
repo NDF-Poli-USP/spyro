@@ -14,7 +14,8 @@ from .basicio import (
     ensemble_plot,
     parallel_print,
 )
-from .model_parameters import Model_parameters, convert_old_dictionary
+from .model_parameters import Model_parameters
+from .backwards_compatibility_io import Dictionary_conversion
 
 __all__ = [
     "write_function_to_grid",
@@ -33,4 +34,5 @@ __all__ = [
     "parallel_print",
     "Model_parameters",
     "convert_old_dictionary",
+    "Dictionary_conversion"
 ]
