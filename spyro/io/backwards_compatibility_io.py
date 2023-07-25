@@ -1,3 +1,4 @@
+from genericpath import exists
 import warnings
 
 class Dictionary_conversion():
@@ -31,8 +32,6 @@ class Dictionary_conversion():
         self.convert_absorving_boundary_conditions()
         self.convert_acquisition()
         self.convert_time_axis()
-
-        return self.new_dictionary
 
     def convert_options(self):
         self.new_dictionary["options"] = {

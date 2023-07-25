@@ -1,4 +1,3 @@
-from genericpath import exists
 import warnings
 import spyro
 
@@ -141,7 +140,7 @@ class Model_parameters:
         # Converts old dictionary to new one. Deprecated feature
         if "opts" in dictionary:
             warnings.warn("Old deprecated dictionary style in usage.")
-            dictionary = spyro.io.Dictionary_conversion(dictionary)
+            dictionary = spyro.io.Dictionary_conversion(dictionary).new_dictionary
         # Saves inout_dictionary internally
         self.input_dictionary = dictionary
 
@@ -525,10 +524,6 @@ class Model_parameters:
                         f"Degree of {self.degree} not supported by \
                             {self.dimension}D {self.method} in main firedrake."
                     )
-
-    def __convert_old_dictionary(self, old_dictionary):
-        new_dictionary = convert_old_dictionary(old_dictionary)
-        return new_dictionary
 
     def __unify_method_input(self):
         unified_method = None
