@@ -50,9 +50,8 @@ def ensemble_plot(func):
     ensemble parallelism"""
 
     def wrapper(*args, **kwargs):
-        acq = args[0].get("acquisition")
-        num = len(acq["source_pos"])
-        _comm = args[1]
+        num = args[0].number_of_sources
+        _comm = args[0].comm
         for snum in range(num):
             if is_owner(_comm, snum) and _comm.comm.rank == 0:
                 func(*args, **dict(kwargs, file_name=str(snum + 1)))
