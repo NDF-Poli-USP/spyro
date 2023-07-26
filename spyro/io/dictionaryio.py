@@ -2,6 +2,7 @@ from genericpath import exists
 import warnings
 import os
 
+
 def parse_cg(dictionary):
     """
     Parse the CG method from the dictionary.
@@ -10,7 +11,7 @@ def parse_cg(dictionary):
     ----------
     dictionary : dict
         Dictionary containing the options information.
-    
+
     Returns
     -------
     method : str
@@ -32,14 +33,24 @@ def parse_cg(dictionary):
         cell_type = "triangle"
     elif dictionary["cell_type"] in quadrilateral_equivalents:
         cell_type = "quadrilateral"
+    elif dictionary["variant"] == "GLL":
+        cell_type = "quadrilateral"
+        warnings.warn("GLL variant only supported for quadrilateral meshes. Assuming quadrilateral.")
     else:
         raise ValueError(f"cell_type of {dictionary['cell_type']} is not valid.")
 
-    accepted_variants = ["lumped", "equispaced", "DG"]
+    if dictionary["variant"] is None:
+        warnings.warn("variant not specified for CG method. Assuming lumped.")
+        dictionary["variant"] = "lumped"
+
+    accepted_variants = ["lumped", "equispaced", "DG", "GLL"]
     if dictionary["variant"] not in accepted_variants:
         raise ValueError(f"variant of {dictionary['variant']} is not valid.")
-    
+
     variant = dictionary["variant"]
+
+    if variant == "GLL":
+        variant = "lumped"
 
     if cell_type == "triangle" and variant == "lumped":
         method = "mass_lumped_triangle"
@@ -55,6 +66,7 @@ def parse_cg(dictionary):
         method = "DG_quadrilateral"
     return method, cell_type, variant
 
+
 def check_if_mesh_file_exists(file_name):
     if file_name is None:
         return
@@ -63,13 +75,14 @@ def check_if_mesh_file_exists(file_name):
     else:
         raise ValueError(f"Mesh file {file_name} does not exist.")
 
+
 class read_options():
 
     def __init__(self, options_dictionary=None):
         default_dictionary = {
             # simplexes such as triangles or tetrahedra (T)
             # or quadrilaterals (Q)
-            "cell_type": "T",  
+            "cell_type": "T",
             # lumped, equispaced or DG, default is lumped
             "variant": 'lumped',
             # (MLT/spectral_quadrilateral/DG_triangle/
@@ -93,8 +106,14 @@ class read_options():
         self.variant = None
         self.degree = None
         self.dimension = None
-        self.check_mismatch_cell_type_variant_method()
-        if self.overdefined_method is True or "method" in self.options_dictionary:
+        self.overdefined_method = self.check_mismatch_cell_type_variant_method()
+
+        if "method" not in self.options_dictionary:
+            self.options_dictionary["method"] = None
+
+        if self.overdefined_method is True:
+            self.method, self.cell_type, self.variant = self.get_from_method()
+        elif self.options_dictionary["method"] is not None:
             self.method, self.cell_type, self.variant = self.get_from_method()
         else:
             self.method, self.cell_type, self.variant = self.get_from_cell_type_variant()
@@ -124,8 +143,7 @@ class read_options():
             raise ValueError("Degree must be greater than 0.")
         if self.method == "mass_lumped_triangle":
             self._check_valid_degree_for_mlt()
-        
-    
+
     def _check_valid_degree_for_mlt(self):
         degree = self.degree
         dimension = self.dimension
@@ -139,25 +157,28 @@ class read_options():
                     {self.dimension}D {self.method} in main firedrake."
             )
 
-
     def check_mismatch_cell_type_variant_method(self):
         dictionary = self.options_dictionary
-        overdefined = self.overdefined_method
+        overdefined = False
         if (
             "method" in dictionary
-            and ("cell_type" in dictionary
-            or "variant" in dictionary)
+            and ("cell_type" in dictionary or "variant" in dictionary)
         ):
             overdefined = True
         else:
             pass
 
         if overdefined:
+            if dictionary["method"] is None:
+                overdefined = False
+
+        if overdefined:
             warnings.warn(
-                    "Both methods of specifying method and cell_type with \
-                        variant used. Method specification taking priority."
-                )
-            
+                "Both methods of specifying method and cell_type with \
+                    variant used. Method specification taking priority."
+            )
+        return overdefined
+
     def get_from_method(self):
         dictionary = self.options_dictionary
         if dictionary["method"] is None:
@@ -252,6 +273,7 @@ class read_options():
         else:
             raise ValueError(f"cell_type of {cell_type} with variant of {variant} is not valid.")
         return method, cell_type, variant
+
 
 class read_mesh():
     def __init__(self, dimension=2, mesh_dictionary=None):
