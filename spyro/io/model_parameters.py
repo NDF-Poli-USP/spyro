@@ -145,7 +145,12 @@ class Model_parameters:
         self.input_dictionary = dictionary
 
         # Sanitizes method or cell_type+variant inputs
-        self._sanitize_method()
+        Options = spyro.io.dictionaryio.read_options(self.input_dictionary["options"])
+        self.cell_type = Options.cell_type
+        self.method = Options.method
+        self.variant = Options.variant
+        self.degree = Options.degree
+        self.dimension = Options.dimension
 
         # Checks time inputs
         self._sanitize_time_inputs()
