@@ -145,7 +145,12 @@ class Model_parameters:
         self.input_dictionary = dictionary
 
         # Sanitizes method or cell_type+variant inputs
-        self._sanitize_method()
+        Options = spyro.io.dictionaryio.read_options(self.input_dictionary["options"])
+        self.cell_type = Options.cell_type
+        self.method = Options.method
+        self.variant = Options.variant
+        self.degree = Options.degree
+        self.dimension = Options.dimension
 
         # Checks time inputs
         self._sanitize_time_inputs()
@@ -154,7 +159,18 @@ class Model_parameters:
         self._sanitize_optimization_and_velocity()
 
         # Checking mesh_parameters
-        self._sanitize_mesh()
+        # self._sanitize_mesh()
+        Mesh_parameters = spyro.io.dictionaryio.read_mesh(
+            mesh_dictionary=self.input_dictionary["mesh"],
+            dimension=self.dimension,
+        )
+        self.mesh_file = Mesh_parameters.mesh_file
+        self.mesh_type = Mesh_parameters.mesh_type
+        self.length_z = Mesh_parameters.length_z
+        self.length_x = Mesh_parameters.length_x
+        self.length_y = Mesh_parameters.length_y
+        self.user_mesh = Mesh_parameters.user_mesh
+        self.firedrake_mesh = Mesh_parameters.firedrake_mesh
 
         # Checking absorving boundary condition parameters
         self._sanitize_absorving_boundary_condition()
@@ -368,44 +384,6 @@ class Model_parameters:
         if self.source_type == "Ricker":
             self.source_type = "ricker"
 
-    def _sanitize_mesh(self):
-        dictionary = self.input_dictionary
-        self.mesh_file = dictionary["mesh"]["mesh_file"]
-        if "mesh_type" in dictionary["mesh"]:
-            self.mesh_type = dictionary["mesh"]["mesh_type"]
-        else:
-            self.mesh_type = None
-
-        if "user_mesh" in dictionary["mesh"]:
-            if dictionary["mesh"]["user_mesh"]:
-                self.user_mesh = dictionary["mesh"]["user_mesh"]
-            else:
-                self.user_mesh = False
-        else:
-            self.user_mesh = False
-
-        if (
-            "firedrake_mesh" in dictionary["mesh"]
-            or self.mesh_type == "firedrake_mesh"
-        ):
-            self.firedrake_mesh = True
-            self.mesh_type = "firedrake_mesh"
-        else:
-            self.firedrake_mesh = False
-
-        if self.mesh_file == "not_used.msh":
-            self.mesh_file = None
-        self.length_z = dictionary["mesh"]["Lz"]
-        self.length_x = dictionary["mesh"]["Lx"]
-        self.length_y = dictionary["mesh"]["Ly"]
-        if "user_mesh" in dictionary["mesh"] and self.mesh_file is None:
-            self.mesh_type = "user_mesh"
-        if self.user_mesh is None and self.mesh_file is None:
-            warnings.warn("No mesh yet provided.")
-
-        if self.mesh_file is not None:
-            self.mesh_type = "file"
-
     def _sanitize_optimization_and_velocity(self):
         """
         Checks if we are doing a FWI and sorts velocity model types, inputs,
@@ -471,18 +449,6 @@ class Model_parameters:
 
         self.__check_time()
 
-    def _sanitize_method(self):
-        dictionary = self.input_dictionary
-        self.cell_type = None
-        self.method = None
-        self.variant = None
-        self.__get_method()
-
-        # Checks if degree is valid
-        self.degree = dictionary["options"]["degree"]
-        self.dimension = dictionary["options"]["dimension"]
-        self.__check_degree()
-
     def __check_acquisition(self):
         for source in self.source_locations:
             if self.dimension == 2:
@@ -503,163 +469,6 @@ class Model_parameters:
                 "Timestep not given. Will calculate internally when user \
                     attemps to propagate wave."
             )
-
-    def __check_degree(self):
-        if self.method == "mass_lumped_triangle":
-            if self.dimension == 2:
-                if self.degree > 5:
-                    raise ValueError(
-                        f"Degree of {self.degree} not supported by \
-                            {self.dimension}D {self.method}."
-                    )
-            if self.dimension == 3:
-                if self.degree > 4:
-                    raise ValueError(
-                        f"Degree of {self.degree} not supported by \
-                            {self.dimension}D {self.method}."
-                    )
-            if self.dimension == 3:
-                if self.degree == 4:
-                    warnings.warn(
-                        f"Degree of {self.degree} not supported by \
-                            {self.dimension}D {self.method} in main firedrake."
-                    )
-
-    def __unify_method_input(self):
-        unified_method = None
-        method = self.method
-        if (
-            method == "KMV"
-            or method == "MLT"
-            or method == "mass_lumped_triangle"
-            or method == "mass_lumped_tetrahedra"
-        ):
-            unified_method = "mass_lumped_triangle"
-        elif (
-            method == "spectral"
-            or method == "SEM"
-            or method == "spectral_quadrilateral"
-        ):
-            unified_method = "spectral_quadrilateral"
-        elif method == "DG_triangle":
-            unified_method = method
-        elif method == "DG_quadrilateral":
-            unified_method = method
-        elif method == "CG":
-            unified_method = method
-        else:
-            warnings.warn(f"Method of {method} not accepted.")
-        self.method = unified_method
-
-    def __unify_cell_type_input(self):
-        unified_cell_type = None
-        cell_type = self.cell_type
-        if (
-            cell_type == "T"
-            or cell_type == "triangles"
-            or cell_type == "triangle"
-            or cell_type == "tetrahedron"
-            or cell_type == "tetrahedra"
-        ):
-            unified_cell_type = "triangle"
-        elif (
-            cell_type == "Q"
-            or cell_type == "quadrilateral"
-            or cell_type == "quadrilaterals"
-            or cell_type == "hexahedron"
-            or cell_type == "hexahedra"
-        ):
-            unified_cell_type = "quadrilateral"
-        elif cell_type is None:
-            unified_cell_type = None
-        else:
-            warnings.warn(f"Cell type of {cell_type} not accepted.")
-        self.cell_type = unified_cell_type
-
-    def __unify_variant_input(self):
-        unified_variant = None
-        variant = self.variant
-
-        if (
-            variant == "spectral"
-            or variant == "GLL"
-            or variant == "SEM"
-            or variant == "lumped"
-            or variant == "KMV"
-        ):
-            unified_variant = "lumped"
-        elif variant == "equispaced" or variant == "equis":
-            unified_variant = "equispaced"
-        elif variant == "DG" or variant == "discontinuous_galerkin":
-            unified_variant = "DG"
-        else:
-            warnings.warn(f"Variant of {variant} not accepted.")
-        self.method = unified_variant
-
-    def __get_method_from_cell_type(self):
-        cell_type = self.cell_type
-        variant = self.variant
-        if cell_type == "triangle":
-            if variant == "lumped":
-                method = "mass_lumped_triangle"
-            elif variant == "equispaced":
-                method = "CG_triangle"
-            elif variant == "DG":
-                method = "DG_triangle"
-        elif cell_type == "quadrilateral":
-            if variant == "lumped":
-                method = "spectral_quadrilateral"
-            elif variant == "equispaced":
-                method = "CG_quadrilateral"
-            elif variant == "DG":
-                method = "DG_quadrilateral"
-        self.method = method
-
-    def __get_method(self):
-        dictionary = self.input_dictionary
-        # Checking if method/cell_type + variant specified twice:
-        if (
-            "method" in dictionary["options"]
-            and ("cell_type" in dictionary["options"])
-            and ("variant" in dictionary["options"])
-        ):
-            if (
-                dictionary["options"]["method"] is not None
-                and dictionary["options"]["cell_type"] is not None
-            ):
-                self.cell_type = dictionary["options"]["cell_type"]
-                self.__unify_cell_type_input()
-                warnings.warn(
-                    "Both methods of specifying method and cell_type with \
-                        variant used. Method specification taking priority."
-                )
-        if (
-            "method" in dictionary["options"]
-            and dictionary["options"]["method"] is not None
-        ):
-            self.method = dictionary["options"]["method"]
-            self.__unify_method_input()
-            # For backwards compatibility
-            if "variant" in dictionary["options"]:
-                if (
-                    dictionary["options"]["variant"] == "spectral"
-                    or dictionary["options"]["variant"] == "GLL"
-                    and self.method == "CG"
-                ):
-                    self.method = "spectral_quadrilateral"
-
-        elif (
-            ("cell_type" in dictionary["options"])
-            and ("variant" in dictionary["options"])
-            and dictionary["options"]["cell_type"] is not None
-        ):
-            self.cell_type = dictionary["options"]["cell_type"]
-            self.__unify_cell_type_input()
-            self.variant = dictionary["options"]["variant"]
-            self.__unify_variant_input()
-            self.__get_method_from_cell_type()
-        else:
-            raise ValueError("Missing options inputs.")
 
     def set_mesh(
         self,

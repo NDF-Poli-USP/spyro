@@ -47,7 +47,7 @@ def test_read_and_write_segy():
         "Lz": 1.0,  # depth in km - always positive
         "Lx": 1.0,  # width in km - always positive
         "Ly": 0.0,  # thickness in km - always positive
-        "user_mesh": mesh,  
+        "user_mesh": mesh,
         "mesh_file": None,  # specify the mesh file
     }
     model["BCs"] = {
@@ -98,7 +98,6 @@ def test_loading_shot_record():
     Wave_obj = spyro.AcousticWave(dictionary=dictionary)
     Wave_obj.set_mesh(dx=0.02)
     spyro.io.load_shots(Wave_obj, file_name="test_shot_record")
-
 
 
 if __name__ == "__main__":

@@ -16,6 +16,7 @@ from .basicio import (
 )
 from .model_parameters import Model_parameters
 from .backwards_compatibility_io import Dictionary_conversion
+from . import dictionaryio
 
 __all__ = [
     "write_function_to_grid",
@@ -34,5 +35,6 @@ __all__ = [
     "parallel_print",
     "Model_parameters",
     "convert_old_dictionary",
-    "Dictionary_conversion"
+    "Dictionary_conversion",
+    "dictionaryio",
 ]
