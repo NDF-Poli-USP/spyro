@@ -74,28 +74,16 @@ class Receivers:
         -------
         Receivers: :class: 'Receiver' object
         """
-        my_ensemble = wave_object.comm
-        if wave_object.automatic_adjoint:
-            self.automatic_adjoint = True
-        else:
-            self.automatic_adjoint = False
-
-        self.mesh = wave_object.mesh
-        self.space = wave_object.function_space.sub(0)
-        self.my_ensemble = my_ensemble
-        self.dimension = wave_object.dimension
-        self.degree = wave_object.degree
-        self.receiver_locations = wave_object.receiver_locations
+        self.point_locations = wave_object.receiver_locations
 
         if self.dimension == 3 and wave_object.automatic_adjoint:
             # self.column_x = model["acquisition"]["num_rec_x_columns"]
             # self.column_y = model["acquisition"]["num_rec_y_columns"]
             # self.column_z = model["acquisition"]["num_rec_z_columns"]
-            # self.num_receivers = self.column_x*self.column_y
+            # self.number_of_points = self.column_x*self.column_y
             raise ValueError("Implement this later")
-
         else:
-            self.num_receivers = wave_object.number_of_receivers
+            self.number_of_points = wave_object.number_of_receivers
 
         self.cellIDs = None
         self.cellVertices = None
@@ -106,7 +94,7 @@ class Receivers:
             self.quadrilateral = True
         else:
             self.quadrilateral = False
-        self.is_local = [0] * self.num_receivers
+        self.is_local = [0] * self.number_of_points
         if not self.automatic_adjoint:
             self.build_maps()
 
@@ -139,15 +127,15 @@ class Receivers:
             List of tabulations for each receiver
         """
 
-        for rid in range(self.num_receivers):
+        for rid in range(self.number_of_points):
             tolerance = 1e-6
             if self.dimension == 2:
-                receiver_z, receiver_x = self.receiver_locations[rid]
+                receiver_z, receiver_x = self.point_locations[rid]
                 cell_id = self.mesh.locate_cell(
                     [receiver_z, receiver_x], tolerance=tolerance
                 )
             elif self.dimension == 3:
-                receiver_z, receiver_x, receiver_y = self.receiver_locations[
+                receiver_z, receiver_x, receiver_y = self.point_locations[
                     rid
                 ]
                 cell_id = self.mesh.locate_cell(
@@ -162,7 +150,7 @@ class Receivers:
         ) = self.__func_receiver_locator()
         self.cell_tabulations = self.__func_build_cell_tabulations()
 
-        self.num_receivers = len(self.receiver_locations)
+        self.number_of_points = len(self.point_locations)
 
     def interpolate(self, field):
         """Interpolate the solution to the receiver coordinates for
@@ -179,7 +167,7 @@ class Receivers:
             Solution interpolated to the list of receiver coordinates
             for the given timestep.
         """
-        return [self.__new_at(field, rn) for rn in range(self.num_receivers)]
+        return [self.__new_at(field, rn) for rn in range(self.number_of_points)]
 
     def apply_receivers_as_source(self, rhs_forcing, residual, IT):
         """The adjoint operation of interpolation (injection)
@@ -203,7 +191,7 @@ class Receivers:
         rhs_forcing: object
             Firedrake assembled right hand side operator with injected values
         """
-        for rid in range(self.num_receivers):
+        for rid in range(self.number_of_points):
             value = residual[IT][rid]
             if self.is_local[rid]:
                 idx = np.int_(self.cellNodeMaps[rid])
@@ -260,7 +248,7 @@ class Receivers:
         The matrix has the deegres of freedom of the nodes inside
         same element as the receiver.
         """
-        num_recv = self.num_receivers
+        num_recv = self.number_of_points
 
         fdrake_cell_node_map = self.space.cell_node_map()
         cell_node_map = fdrake_cell_node_map.values_with_halo
@@ -359,7 +347,7 @@ class Receivers:
 
         """
         print("start func_receiver_locator", flush=True)
-        num_recv = self.num_receivers
+        num_recv = self.number_of_points
 
         fdrake_cell_node_map = self.space.cell_node_map()
         cell_node_map = fdrake_cell_node_map.values_with_halo
@@ -441,13 +429,13 @@ class Receivers:
     def __func_build_cell_tabulations_2D(self):
         element = choosing_element(self.space, self.degree)
 
-        cell_tabulations = np.zeros((self.num_receivers, self.nodes_per_cell))
+        cell_tabulations = np.zeros((self.number_of_points, self.nodes_per_cell))
 
-        for receiver_id in range(self.num_receivers):
+        for receiver_id in range(self.number_of_points):
             cell_id = self.is_local[receiver_id]
             if cell_id is not None:
                 # getting coordinates to change to reference element
-                p = self.receiver_locations[receiver_id]
+                p = self.point_locations[receiver_id]
                 v0 = self.cellVertices[receiver_id][0]
                 v1 = self.cellVertices[receiver_id][1]
                 v2 = self.cellVertices[receiver_id][2]
@@ -463,13 +451,13 @@ class Receivers:
     def __func_build_cell_tabulations_3D(self):
         element = choosing_element(self.space, self.degree)
 
-        cell_tabulations = np.zeros((self.num_receivers, self.nodes_per_cell))
+        cell_tabulations = np.zeros((self.number_of_points, self.nodes_per_cell))
 
-        for receiver_id in range(self.num_receivers):
+        for receiver_id in range(self.number_of_points):
             cell_id = self.is_local[receiver_id]
             if cell_id is not None:
                 # getting coordinates to change to reference element
-                p = self.receiver_locations[receiver_id]
+                p = self.point_locations[receiver_id]
                 v0 = self.cellVertices[receiver_id][0]
                 v1 = self.cellVertices[receiver_id][1]
                 v2 = self.cellVertices[receiver_id][2]
@@ -492,13 +480,13 @@ class Receivers:
 
         element = V.finat_element.fiat_equivalent
 
-        cell_tabulations = np.zeros((self.num_receivers, self.nodes_per_cell))
+        cell_tabulations = np.zeros((self.number_of_points, self.nodes_per_cell))
 
-        for receiver_id in range(self.num_receivers):
+        for receiver_id in range(self.number_of_points):
             cell_id = self.is_local[receiver_id]
             if cell_id is not None:
                 # getting coordinates to change to reference element
-                p = self.receiver_locations[receiver_id]
+                p = self.point_locations[receiver_id]
                 v0 = self.cellVertices[receiver_id][0]
                 v1 = self.cellVertices[receiver_id][1]
                 v2 = self.cellVertices[receiver_id][2]
@@ -520,13 +508,13 @@ class Receivers:
         Dn = TensorProductElement(An, Bn)
         element = TensorProductElement(Dn, Cn)
 
-        cell_tabulations = np.zeros((self.num_receivers, self.nodes_per_cell))
+        cell_tabulations = np.zeros((self.number_of_points, self.nodes_per_cell))
 
-        for receiver_id in range(self.num_receivers):
+        for receiver_id in range(self.number_of_points):
             cell_id = self.is_local[receiver_id]
             if cell_id is not None:
                 # getting coordinates to change to reference element
-                p = self.receiver_locations[receiver_id]
+                p = self.point_locations[receiver_id]
                 v0 = self.cellVertices[receiver_id][0]
                 v1 = self.cellVertices[receiver_id][1]
                 v2 = self.cellVertices[receiver_id][2]
@@ -549,11 +537,11 @@ class Receivers:
     def set_point_cloud(self, comm):
         # Receivers always parallel to z-axis
 
-        rec_pos = self.receiver_locations
+        rec_pos = self.point_locations
 
         # 2D --
         if self.dimension == 2:
-            num_rec = self.num_receivers
+            num_rec = self.number_of_points
             δz = np.linspace(rec_pos[0, 0], rec_pos[num_rec - 1, 0], 1)
             δx = np.linspace(rec_pos[0, 1], rec_pos[num_rec - 1, 1], num_rec)
 
