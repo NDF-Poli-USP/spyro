@@ -433,6 +433,24 @@ class Delta_projector:
         return cellId_maps, cellVertices, cellNodeMaps
 
 
+def choosing_geometry(cell_geometry):
+    if cell_geometry == quadrilateral:  # noqa: F405
+        T = UFCQuadrilateral()
+        raise ValueError(
+            "Point interpolation for quads implemented somewhere else."
+        )
+
+    elif cell_geometry == triangle:  # noqa: F405
+        T = UFCTriangle()
+
+    elif cell_geometry == tetrahedron:  # noqa: F405
+        T = UFCTetrahedron()
+
+    else:
+        raise ValueError("Unrecognized cell geometry.")
+
+    return T
+
 
 def choosing_element(V, degree):
     """Chooses UFL element based on desired function space
@@ -450,21 +468,7 @@ def choosing_element(V, degree):
     element : UFL element
         UFL element to be used in the interpolation.
     """
-    cell_geometry = V.mesh().ufl_cell()
-    if cell_geometry == quadrilateral:  # noqa: F405
-        T = UFCQuadrilateral()
-        raise ValueError(
-            "Point interpolation for quads implemented somewhere else."
-        )
-
-    elif cell_geometry == triangle:  # noqa: F405
-        T = UFCTriangle()
-
-    elif cell_geometry == tetrahedron:  # noqa: F405
-        T = UFCTetrahedron()
-
-    else:
-        raise ValueError("Unrecognized cell geometry.")
+    T = choosing_geometry(V.mesh().ufl_cell())
 
     if V.ufl_element().family() == "Kong-Mulder-Veldhuizen":
         element = KMV(T, degree)
