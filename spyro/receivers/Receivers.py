@@ -144,3 +144,6 @@ class Receivers(Delta_projector):
         point_cloud = VertexOnlyMesh(self.mesh, xs)  # noqa: F405
 
         return point_cloud
+
+    def new_at(self, udat, receiver_id):
+        return super().new_at(udat, receiver_id)

@@ -7,6 +7,7 @@ import spyro
 from .inputfiles.Model1_2d_CG import model as oldmodel
 from .inputfiles.Model1_3d_CG import model as oldmodel3D
 
+
 def triangle_area(p1, p2, p3):
     """Simple function to calculate triangle area based on its 3 vertices."""
     (x1, y1) = p1
@@ -104,13 +105,13 @@ def test_correct_at_value2D():
 
     u1 = Function(V).interpolate(x + z)
     test1 = math.isclose(
-        (pz + px), receivers.__new_at(u1.dat.data[:], 0), rel_tol=1e-09
+        (pz + px), receivers.new_at(u1.dat.data[:], 0), rel_tol=1e-09
     )
 
     u1 = Function(V).interpolate(sin(x) * z * 2)
     test2 = math.isclose(
         sin(px) * pz * 2,
-        receivers.__new_at(u1.dat.data[:], 0),
+        receivers.new_at(u1.dat.data[:], 0),
         rel_tol=1e-05,
     )
 
@@ -143,13 +144,13 @@ def test_correct_at_value2D_quad():
 
     u1 = Function(V).interpolate(x + z)
     test1 = math.isclose(
-        (pz + px), receivers.__new_at(u1.dat.data[:], 0), rel_tol=1e-09
+        (pz + px), receivers.new_at(u1.dat.data[:], 0), rel_tol=1e-09
     )
 
     u1 = Function(V).interpolate(sin(x) * z * 2)
     test2 = math.isclose(
         sin(px) * pz * 2,
-        receivers.__new_at(u1.dat.data[:], 0),
+        receivers.new_at(u1.dat.data[:], 0),
         rel_tol=1e-05,
     )
 
@@ -287,13 +288,13 @@ def test_correct_at_value3D():
     u1 = Function(V).interpolate(x + z + y)
     realvalue = x_real + y_real + z_real
     test1 = math.isclose(
-        realvalue, receivers.__new_at(u1.dat.data[:], 0), rel_tol=1e-09
+        realvalue, receivers.new_at(u1.dat.data[:], 0), rel_tol=1e-09
     )
 
     u1 = Function(V).interpolate(sin(x) * (z + 1) ** 2 * cos(y))
     realvalue = sin(x_real) * (z_real + 1) ** 2 * cos(y_real)
     test2 = math.isclose(
-        realvalue, receivers.__new_at(u1.dat.data[:], 0), rel_tol=1e-05
+        realvalue, receivers.new_at(u1.dat.data[:], 0), rel_tol=1e-05
     )
 
     assert all([test1, test2])
@@ -308,3 +309,4 @@ if __name__ == "__main__":
     test_correct_receiver_to_cell_location3D()
     test_correct_at_value3D()
 
+    print("END")
