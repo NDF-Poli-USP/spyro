@@ -2,9 +2,10 @@ import math
 import numpy as np
 from scipy.signal import butter, filtfilt
 import spyro
+from spyro.receivers.dirac_delta_projector import Delta_projector
 
 
-class Sources(spyro.receivers.Receivers.Receivers):
+class Sources(Delta_projector):
     """Methods that inject a wavelet into a mesh
 
     ...
@@ -61,33 +62,14 @@ class Sources(spyro.receivers.Receivers.Receivers):
         Sources: :class: 'Source' object
 
         """
-        my_ensemble = wave_object.comm
+        super().__init__(wave_object)
 
-        self.mesh = wave_object.mesh
-        self.space = wave_object.function_space.sub(0)
-        self.my_ensemble = my_ensemble
-        self.dimension = wave_object.dimension
-        self.degree = wave_object.degree
-
-        self.receiver_locations = wave_object.source_locations
-        self.num_receivers = wave_object.number_of_sources
-
-        self.cellIDs = None
-        self.cellVertices = None
-        self.cell_tabulations = None
-        self.cellNodeMaps = None
-        self.nodes_per_cell = None
-        self.is_local = [0] * self.num_receivers
+        self.point_locations = wave_object.source_locations
+        self.number_of_points = wave_object.number_of_sources
+        self.is_local = [0] * self.number_of_points
         self.current_source = None
-        if wave_object.cell_type == "quadrilateral":
-            self.quadrilateral = True
-        else:
-            self.quadrilateral = False
 
         self.build_maps()
-
-    def build_maps(self):
-        super().build_maps()
 
     def apply_source(self, rhs_forcing, value):
         """Applies source in a assembled right hand side.
@@ -104,7 +86,7 @@ class Sources(spyro.receivers.Receivers.Receivers):
         rhs_forcing: Firedrake.Function
             The right hand side of the wave equation with the source applied
         """
-        for source_id in range(self.num_receivers):
+        for source_id in range(self.number_of_points):
             if self.is_local[source_id] and source_id == self.current_source:
                 for i in range(len(self.cellNodeMaps[source_id])):
                     rhs_forcing.dat.data_with_halos[
