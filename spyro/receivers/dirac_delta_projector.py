@@ -100,9 +100,9 @@ class Delta_projector:
             Solution interpolated to the list of receiver coordinates
             for the given timestep.
         """
-        return [self.__new_at(field, rn) for rn in range(self.number_of_points)]
+        return [self.new_at(field, rn) for rn in range(self.number_of_points)]
 
-    def __new_at(self, udat, receiver_id):
+    def new_at(self, udat, receiver_id):
         """Function that evaluates the receiver value given its id.
         For 2D simplices only.
         Parameters
