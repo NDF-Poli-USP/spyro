@@ -23,6 +23,8 @@ def parse_cg(dictionary):
     """
     if "variant" not in dictionary:
         raise ValueError("variant must be specified for CG method.")
+    if dictionary["variant"] == "KMV":
+        dictionary["cell_type"] = "T"
     if "cell_type" not in dictionary:
         raise ValueError("cell_type must be specified for CG method.")
 
@@ -43,13 +45,16 @@ def parse_cg(dictionary):
         warnings.warn("variant not specified for CG method. Assuming lumped.")
         dictionary["variant"] = "lumped"
 
-    accepted_variants = ["lumped", "equispaced", "DG", "GLL"]
+    accepted_variants = ["lumped", "equispaced", "DG", "GLL", "KMV"]
     if dictionary["variant"] not in accepted_variants:
         raise ValueError(f"variant of {dictionary['variant']} is not valid.")
 
     variant = dictionary["variant"]
 
     if variant == "GLL":
+        variant = "lumped"
+    
+    if variant == "KMV":
         variant = "lumped"
 
     if cell_type == "triangle" and variant == "lumped":
