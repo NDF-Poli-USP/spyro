@@ -10,12 +10,13 @@ from FIAT.tensor_product import TensorProductElement
 from FIAT.kong_mulder_veldhuizen import KongMulderVeldhuizen as KMV
 from FIAT.lagrange import Lagrange as CG
 from FIAT.discontinuous_lagrange import DiscontinuousLagrange as DG
+from spyro.receivers.dirac_delta_projector import Delta_projector
 
 import numpy as np
 
 
-class Receivers:
-    """Interpolate data defined on a triangular mesh to a
+class Receivers(Delta_projector):
+    """Project data defined on a triangular mesh to a
     set of 2D/3D coordinates for variable spatial order
     using Lagrange interpolation.
 
@@ -85,16 +86,6 @@ class Receivers:
         else:
             self.number_of_points = wave_object.number_of_receivers
 
-        self.cellIDs = None
-        self.cellVertices = None
-        self.cell_tabulations = None
-        self.cellNodeMaps = None
-        self.nodes_per_cell = None
-        if wave_object.cell_type == "quadrilateral":
-            self.quadrilateral = True
-        else:
-            self.quadrilateral = False
-        self.is_local = [0] * self.number_of_points
         if not self.automatic_adjoint:
             self.build_maps()
 
