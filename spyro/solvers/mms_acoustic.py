@@ -175,7 +175,7 @@ class AcousticWaveMMS(AcousticWave):
         self.analytical_solution(t)
 
         usol_recv = helpers.fill(
-            usol_recv, receivers.is_local, nt, receivers.num_receivers
+            usol_recv, receivers.is_local, nt, receivers.number_of_points
         )
         usol_recv = utils.utils.communicate(usol_recv, comm)
         self.receivers_output = usol_recv
