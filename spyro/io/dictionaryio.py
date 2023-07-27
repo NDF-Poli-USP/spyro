@@ -356,7 +356,7 @@ class read_mesh():
         ]
         dictionary = self.mesh_dictionary
         if "mesh_type" not in dictionary:
-            mesh_type = self._derive_mesh_file()
+            mesh_type = self._derive_mesh_type()
         elif dictionary["mesh_type"] in valid_mesh_types:
             mesh_type = dictionary["mesh_type"]
         else:
@@ -367,17 +367,20 @@ class read_mesh():
 
         return mesh_type
     
-    def _derive_mesh_file(self):
+    def _derive_mesh_type(self):
         dictionary = self.mesh_dictionary
+        user_mesh_in_dictionary = False
+        if "user_mesh" not in dictionary:
+            dictionary["user_mesh"] = None
+
         if self.mesh_file is not None:
             mesh_type = "file"
             return mesh_type
-        elif "user_mesh" not in dictionary:
-            mesh_type = None
+        elif dictionary["user_mesh"] is not None:
+            mesh_type = "user_mesh"
             return mesh_type
-        elif self.user_mesh is None or self.user_mesh is False:
-            mesh_type = None
-            return mesh_type
+        else:
+            return None
     
     def get_user_mesh(self):
         if self.mesh_type == "user_mesh":
