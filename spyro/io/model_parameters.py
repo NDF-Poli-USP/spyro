@@ -253,6 +253,7 @@ class Model_parameters:
                 "gradient_output": False,
                 "adjoint_output": False,
             }
+            self.input_dictionary["visualization"] = dictionary
 
         self.forward_output = dictionary["forward_output"]
 
@@ -272,8 +273,12 @@ class Model_parameters:
             self.adjoint_output = dictionary["adjoint_output"]
         else:
             self.adjoint_output = False
+        
+        # Getting output file names
+        self._sanitize_output_files()
 
-        # Estabilishing forward output file and setting a default
+    def _sanitize_output_files(self):
+        dictionary = self.input_dictionary["visualization"]
         if "forward_output_filename" not in dictionary:
             self.forward_output_file = "results/forward_propogation.pvd"
         elif dictionary["forward_output_filename"] is not None:
