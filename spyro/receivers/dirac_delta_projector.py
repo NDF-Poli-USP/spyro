@@ -29,3 +29,14 @@ class Delta_projector:
 
         self.point_locations = None
         self.number_of_points = None
+
+        self.cellIDs = None
+        self.cellVertices = None
+        self.cell_tabulations = None
+        self.cellNodeMaps = None
+        self.nodes_per_cell = None
+        if wave_object.cell_type == "quadrilateral":
+            self.quadrilateral = True
+        else:
+            self.quadrilateral = False
+        self.is_local = [0] * self.number_of_points
