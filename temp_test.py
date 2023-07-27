@@ -4,8 +4,8 @@ from copy import deepcopy
 from firedrake import *
 import spyro
 
-from .inputfiles.Model1_2d_CG import model as oldmodel
-from .inputfiles.Model1_3d_CG import model as oldmodel3D
+from model2d import model as oldmodel
+from model3d import model as oldmodel3D
 
 def triangle_area(p1, p2, p3):
     """Simple function to calculate triangle area based on its 3 vertices."""
@@ -300,11 +300,11 @@ def test_correct_at_value3D():
 
 
 if __name__ == "__main__":
-    test_correct_receiver_location_generation2D()
-    test_correct_receiver_to_cell_location2D()
+    # test_correct_receiver_location_generation2D()
+    # test_correct_receiver_to_cell_location2D()
     test_correct_at_value2D()
-    test_correct_at_value2D_quad()
-    test_correct_receiver_location_generation3D()
-    test_correct_receiver_to_cell_location3D()
-    test_correct_at_value3D()
+    # test_correct_at_value2D_quad()
+    # test_correct_receiver_location_generation3D()
+    # test_correct_receiver_to_cell_location3D()
+    # test_correct_at_value3D()
 
