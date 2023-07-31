@@ -161,8 +161,9 @@ class Delta_projector:
                 v0 = self.cellVertices[receiver_id][0]
                 v1 = self.cellVertices[receiver_id][1]
                 v2 = self.cellVertices[receiver_id][2]
+                cell_vertices = [v0, v1, v2]
 
-                p_reference = change_to_reference_triangle(p, v0, v1, v2)
+                p_reference = change_to_reference_triangle(p, cell_vertices)
                 initial_tab = element.tabulate(0, [p_reference])
                 phi_tab = initial_tab[(0, 0)]
 
@@ -184,9 +185,10 @@ class Delta_projector:
                 v1 = self.cellVertices[receiver_id][1]
                 v2 = self.cellVertices[receiver_id][2]
                 v3 = self.cellVertices[receiver_id][3]
+                cell_vertices = [v0, v1, v2, v3]
 
                 p_reference = change_to_reference_tetrahedron(
-                    p, v0, v1, v2, v3
+                    p, cell_vertices
                 )
                 initial_tab = element.tabulate(0, [p_reference])
                 phi_tab = initial_tab[(0, 0, 0)]
@@ -213,8 +215,9 @@ class Delta_projector:
                 v1 = self.cellVertices[receiver_id][1]
                 v2 = self.cellVertices[receiver_id][2]
                 v3 = self.cellVertices[receiver_id][3]
+                cell_vertices = [v0, v1, v2, v3]
 
-                p_reference = change_to_reference_quad(p, v0, v1, v2, v3)
+                p_reference = change_to_reference_quad(p, cell_vertices)
                 initial_tab = element.tabulate(0, [p_reference])
                 phi_tab = initial_tab[(0, 0)]
 
@@ -245,9 +248,10 @@ class Delta_projector:
                 v5 = self.cellVertices[receiver_id][5]
                 v6 = self.cellVertices[receiver_id][6]
                 v7 = self.cellVertices[receiver_id][7]
+                cell_vertices = [v0, v1, v2, v3, v4, v5, v6, v7]
 
                 p_reference = change_to_reference_hexa(
-                    p, v0, v1, v2, v3, v4, v5, v6, v7
+                    p, cell_vertices
                 )
                 initial_tab = element.tabulate(0, [p_reference])
                 phi_tab = initial_tab[(0, 0, 0)]

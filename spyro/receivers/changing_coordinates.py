@@ -1,11 +1,11 @@
 import numpy as np
 
 
-def change_to_reference_triangle(p, a, b, c):
+def change_to_reference_triangle(p, cell_vertices):
     """Changes variables to reference triangle"""
-    (xa, ya) = a
-    (xb, yb) = b
-    (xc, yc) = c
+    (xa, ya) = cell_vertices[0]
+    (xb, yb) = cell_vertices[1]
+    (xc, yc) = cell_vertices[2]
     (px, py) = p
 
     xna = 0.0
@@ -53,12 +53,12 @@ def change_to_reference_triangle(p, a, b, c):
     return (pnx, pny)
 
 
-def change_to_reference_tetrahedron(p, a, b, c, d, reference_coordinates=None):
+def change_to_reference_tetrahedron(p, cell_vertices, reference_coordinates=None):
     """Changes variables to reference tetrahedron"""
-    (xa, ya, za) = a
-    (xb, yb, zb) = b
-    (xc, yc, zc) = c
-    (xd, yd, zd) = d
+    (xa, ya, za) = cell_vertices[0]
+    (xb, yb, zb) = cell_vertices[1]
+    (xc, yc, zc) = cell_vertices[2]
+    (xd, yd, zd) = cell_vertices[3]
     (px, py, pz) = p
 
     if reference_coordinates is None:
@@ -352,14 +352,14 @@ def change_to_reference_tetrahedron(p, a, b, c, d, reference_coordinates=None):
     return (pnx, pny, pnz)
 
 
-def change_to_reference_quad(p, v0, v1, v2, v3):
+def change_to_reference_quad(p, cell_vertices):
     """Changes varibales to reference quadrilateral"""
     (px, py) = p
     # Irregular quad
-    (x0, y0) = v0
-    (x1, y1) = v1
-    (x2, y2) = v2
-    (x3, y3) = v3
+    (x0, y0) = cell_vertices[0]
+    (x1, y1) = cell_vertices[1]
+    (x2, y2) = cell_vertices[2]
+    (x3, y3) = cell_vertices[3]
 
     # Reference quad
     # xn0 = 0.0
@@ -415,11 +415,11 @@ def change_to_reference_quad(p, v0, v1, v2, v3):
     return (pnx, pny)
 
 
-def change_to_reference_hexa(p, v0, v1, v2, v3, v4, v5, v6, v7):
-    a = v0
-    b = v1
-    c = v2
-    d = v4
+def change_to_reference_hexa(p, cell_vertices):
+    a = cell_vertices[0]
+    b = cell_vertices[1]
+    c = cell_vertices[2]
+    d = cell_vertices[4]
 
     ra = (0.0, 0.0, 0.0)
     rb = (0.0, 0.0, 1.0)
