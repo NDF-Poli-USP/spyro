@@ -19,7 +19,7 @@ class AutomaticMesh:
         self.quadrilateral = False
         self.periodic = False
         self.comm = comm
-        self.mesh_type = 'firedrake_mesh'
+        self.mesh_type = "firedrake_mesh"
 
     def set_mesh_size(self, length_z=None, length_x=None, length_y=None):
         """
@@ -66,15 +66,17 @@ class AutomaticMesh:
             self.dx = dx
         if mesh_type is not None:
             self.mesh_type = mesh_type
-    
+
     def make_periodic(self):
         """
         Sets the mesh boundaries periodic.
         """
         self.periodic = True
-        if self.mesh_type is not 'firedrake_mesh':
-            raise ValueError('periodic mesh is only supported for firedrake_mesh')
-    
+        if self.mesh_type is not "firedrake_mesh":
+            raise ValueError(
+                "periodic mesh is only supported for firedrake_mesh"
+            )
+
     def create_mesh(self):
         """
         Creates the mesh.
@@ -84,15 +86,15 @@ class AutomaticMesh:
         mesh : Firedrake Mesh
             Mesh
         """
-        if self.dx is None and self.mesh_type == 'firedrake_mesh':
-            raise ValueError('dx is not set')
-        elif self.mesh_type == 'firedrake_mesh' and self.dimension == 2:
+        if self.dx is None and self.mesh_type == "firedrake_mesh":
+            raise ValueError("dx is not set")
+        elif self.mesh_type == "firedrake_mesh" and self.dimension == 2:
             return self.create_firedrake_2D_mesh()
-        elif self.mesh_type == 'firedrake_mesh' and self.dimension == 3:
+        elif self.mesh_type == "firedrake_mesh" and self.dimension == 3:
             return self.create_firedrake_3D_mesh()
         else:
-            raise ValueError('mesh_type is not supported')
-    
+            raise ValueError("mesh_type is not supported")
+
     def create_firedrake_2D_mesh(self):
         """
         Creates a 2D mesh based on Firedrake meshing utilities.
@@ -123,7 +125,7 @@ class AutomaticMesh:
                 quadrilateral=quadrilateral,
                 comm=comm.comm,
             )
-    
+
     def create_firedrake_3D_mesh(self):
         dx = self.dx
         nx = int(self.length_x / dx)

@@ -17,8 +17,7 @@ def change_to_reference_triangle(p, cell_vertices):
 
     div = xa * yb - xb * ya - xa * yc + xc * ya + xb * yc - xc * yb
     a11 = (
-        -(xnb * ya - xnc * ya - xna * yb + xnc * yb + xna * yc - xnb * yc)
-        / div
+        -(xnb * ya - xnc * ya - xna * yb + xnc * yb + xna * yc - xnb * yc) / div
     )
     a12 = (
         xa * xnb - xa * xnc - xb * xna + xb * xnc + xc * xna - xc * xnb
@@ -32,8 +31,7 @@ def change_to_reference_triangle(p, cell_vertices):
         - xc * xna * yb
     ) / div
     a21 = (
-        -(ya * ynb - ya * ync - yb * yna + yb * ync + yc * yna - yc * ynb)
-        / div
+        -(ya * ynb - ya * ync - yb * yna + yb * ync + yc * yna - yc * ynb) / div
     )
     a22 = (
         xa * ynb - xa * ync - xb * yna + xb * ync + xc * yna - xc * ynb
@@ -53,7 +51,9 @@ def change_to_reference_triangle(p, cell_vertices):
     return (pnx, pny)
 
 
-def change_to_reference_tetrahedron(p, cell_vertices, reference_coordinates=None):
+def change_to_reference_tetrahedron(
+    p, cell_vertices, reference_coordinates=None
+):
     """Changes variables to reference tetrahedron"""
     (xa, ya, za) = cell_vertices[0]
     (xb, yb, zb) = cell_vertices[1]
@@ -429,12 +429,7 @@ def change_to_reference_hexa(p, cell_vertices):
     reference_coordinates = [ra, rb, rc, rd]
 
     return change_to_reference_tetrahedron(
-        p,
-        a,
-        b,
-        c,
-        d,
-        reference_coordinates=reference_coordinates
+        p, a, b, c, d, reference_coordinates=reference_coordinates
     )
 
     # det = (
