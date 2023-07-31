@@ -100,9 +100,7 @@ class AcousticWave(Wave):
         comm = self.comm
         temp_filename = self.forward_output_file
         filename, file_extension = temp_filename.split(".")
-        output_filename = (
-            filename + "sn" + str(source_num) + "." + file_extension
-        )
+        output_filename = (filename + "sn" + str(source_num) + "." + file_extension)
         if self.forward_output:
             parallel_print(f"Saving output in: {output_filename}", self.comm)
 
@@ -159,8 +157,8 @@ class AcousticWave(Wave):
                     mesh differently"
                 if self.forward_output:
                     output.write(u_n, time=t, name="Pressure")
-                if t > 0:
-                    helpers.display_progress(self.comm, t)
+                
+                helpers.display_progress(self.comm, t)
 
             u_nm1.assign(u_n)
             u_n.assign(u_np1)
@@ -255,9 +253,7 @@ class AcousticWave(Wave):
 
         rhs_forcing = fire.Function(V)  # forcing term
         if adjoint_output:
-            adjoint = [
-                fire.Function(V, name="adjoint_pressure") for t in range(nt)
-            ]
+            adjoint = [fire.Function(V, name="adjoint_pressure") for t in range(nt)]
         for step in range(nt - 1, -1, -1):
             t = step * float(dt)
             rhs_forcing.assign(0.0)
@@ -291,7 +287,6 @@ class AcousticWave(Wave):
             if step % self.output_frequency == 0:
                 if adjoint_output:
                     output.write(u_n, time=t)
-                if adjoint_output:
                     adjoint.append(u_n)
                 helpers.display_progress(comm, t)
 
