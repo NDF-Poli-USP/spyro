@@ -10,8 +10,8 @@ from .inputfiles.Model1_gradient_3d_pml import model_pml
 
 # outfile_total_gradient = File(os.getcwd() + "/results/Gradient.pvd")
 
-forward = spyro.solvers.forward
-gradient = spyro.solvers.gradient
+# forward = spyro.solvers.forward
+# gradient = spyro.solvers.gradient
 functional = spyro.utils.compute_functional
 
 

@@ -400,27 +400,16 @@ class Model_parameters:
         # Check if we are doing a FWI and sorting output locations and
         # velocity model inputs
         self.running_fwi = False
-        if "inversion" in dictionary:
-            if dictionary["inversion"]["perform_fwi"]:
-                self.running_fwi = True
+        if "inversion" not in dictionary:
+            dictionary["inversion"] = {"perform_fwi": False}
+
+        if dictionary["inversion"]["perform_fwi"]:
+            self.running_fwi = True
+        
         if self.running_fwi:
-            self.initial_velocity_model_file = dictionary["inversion"][
-                "initial_guess_model_file"
-            ]
-            self.fwi_output_folder = "fwi/"
-            self.control_output_file = self.fwi_output_folder + "control"
-            self.gradient_output_file = self.fwi_output_folder + "gradient"
-            self.optimization_parameters = dictionary["inversion"][
-                "optimization_parameters"
-            ]
+            self._sanitize_optimization_and_velocity_for_fwi()
         else:
-            if "synthetic_data" in dictionary:
-                self.initial_velocity_model_file = dictionary[
-                    "synthetic_data"
-                ]["real_velocity_file"]
-            else:
-                dictionary["synthetic_data"] = {"real_velocity_file": None}
-                self.initial_velocity_model_file = None
+            self._sanitize_optimization_and_velocity_without_fwi()
 
         if self.initial_velocity_model_file is None:
             if "velocity_conditional" not in dictionary["synthetic_data"]:
@@ -438,6 +427,28 @@ class Model_parameters:
             ]
 
         self.forward_output_file = "results/forward_output.pvd"
+
+    def _sanitize_optimization_and_velocity_for_fwi(self):
+        dictionary = self.input_dictionary
+        self.initial_velocity_model_file = dictionary["inversion"][
+            "initial_guess_model_file"
+        ]
+        self.fwi_output_folder = "fwi/"
+        self.control_output_file = self.fwi_output_folder + "control"
+        self.gradient_output_file = self.fwi_output_folder + "gradient"
+        self.optimization_parameters = dictionary["inversion"][
+            "optimization_parameters"
+        ]
+
+    def _sanitize_optimization_and_velocity_without_fwi(self):
+        dictionary = self.input_dictionary
+        if "synthetic_data" in dictionary:
+            self.initial_velocity_model_file = dictionary[
+                "synthetic_data"
+            ]["real_velocity_file"]
+        else:
+            dictionary["synthetic_data"] = {"real_velocity_file": None}
+            self.initial_velocity_model_file = None
 
     def _sanitize_time_inputs(self):
         dictionary = self.input_dictionary["time_axis"]
