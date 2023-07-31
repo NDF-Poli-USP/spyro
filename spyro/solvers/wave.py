@@ -9,6 +9,7 @@ from .. import utils
 from ..receivers.Receivers import Receivers
 from ..sources.Sources import Sources
 from ..domains.space import FE_method
+from .solver_parameters import get_default_parameters_for_method
 
 fire.set_log_level(fire.ERROR)
 
@@ -90,18 +91,7 @@ class Wave(Model_parameters):
         if parameters is not None:
             self.solver_parameters = parameters
         elif parameters is None:
-            if self.method == "mass_lumped_triangle":
-                self.solver_parameters = {
-                    "ksp_type": "preonly",
-                    "pc_type": "jacobi",
-                }
-            elif self.method == "spectral_quadrilateral":
-                self.solver_parameters = {
-                    "ksp_type": "preonly",
-                    "pc_type": "jacobi",
-                }
-            else:
-                self.solver_parameters = None
+            self.solver_parameters = get_default_parameters_for_method(self.method)
 
     def get_spatial_coordinates(self):
         if self.dimension == 2:
@@ -205,9 +195,9 @@ class Wave(Model_parameters):
         self.function_space = FE_method(self.mesh, self.method, self.degree)
 
     def get_and_set_maximum_dt(self, fraction=1.0):
-        if self.method == "KMV" or (
-            self.method == "CG" and self.mesh.ufl_cell() == fire.quadrilateral
-        ):
+        if self.method == "KMV":
+            estimate_max_eigenvalue = True
+        elif self.method == "spectral_quadrilateral":
             estimate_max_eigenvalue = True
         else:
             estimate_max_eigenvalue = False
