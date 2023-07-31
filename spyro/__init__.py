@@ -5,7 +5,7 @@ from .receivers.Receivers import Receivers
 from .sources.Sources import Sources, ricker_wavelet, full_ricker_wavelet
 from .solvers.wave import Wave
 from .solvers.CG_acoustic import AcousticWave
-from .solvers.dg_wave import DG_Wave
+# from .solvers.dg_wave import DG_Wave
 from .solvers.mms_acoustic import AcousticWaveMMS
 from .utils import utils
 from .utils.geometry_creation import create_transect, create_2d_grid
@@ -39,7 +39,7 @@ __all__ = [
     "plots",
     "tools",
     "Wave",
-    "DG_Wave",
+    # "DG_Wave",
     "examples",
     "AcousticWave",
     "AcousticWaveMMS",

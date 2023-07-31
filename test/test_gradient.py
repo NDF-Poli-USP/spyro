@@ -93,8 +93,8 @@ dictionary["visualization"] = {
 }
 outfile_total_gradient = File(os.getcwd() + "/results/Gradient.pvd")
 
-forward = spyro.solvers.forward
-gradient = spyro.solvers.gradient
+# forward = spyro.solvers.forward
+# gradient = spyro.solvers.gradient
 functional = spyro.utils.compute_functional
 
 
