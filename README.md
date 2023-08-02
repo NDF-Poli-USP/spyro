@@ -4,8 +4,9 @@
 [![CodeScene Code Health](https://codescene.io/projects/42047/status-badges/code-health)](https://codescene.io/projects/42047)
 
 SPIRO: Seismic Parallel Inversion and Reconstruction Optimization framework
-Acoustic wave modeling in Firedrake
 ============================================
+
+Acoustic wave modeling in Firedrake
 
 SPIRO is a Python library for modeling acoustic waves. The main
 functionality is a set of forward and adjoint wave propagators for solving the acoustic wave equation in the time domain.
