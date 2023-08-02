@@ -13,15 +13,31 @@ import sys
 # after finite element analysis
 ##############
 
+
 def detLref(posCrit, source_position):
     '''
     Determining the reference of the size of the absorbing layer
+
+    Parameters
+    ----------
+    posCrit:
+        Coordinates of critical point given by Eikonal
+
+    source_position:
+        Positions of sources
+
+    Returns
+    -------
+    lref:
+        Reference length for the size of the absorbing layer
     '''
     # Defining Critical Source
     print('Defining Critical Source')
     # Distances between sources and the critical point
     # (with minimum eikonal at boundaries)
-    souCrit = source_position[np.argmin([np.linalg.norm(posCrit - p) for p in source_position])]
+    souCrit = source_position[
+        np.argmin([np.linalg.norm(posCrit - p) for p in source_position])
+    ]
     # Reference length for the size of the absorbing layer
     print('Defining Reference Length')
     lsrx = abs(posCrit[0] - souCrit[0])
@@ -37,13 +53,15 @@ def detLref(posCrit, source_position):
 def F(x, a, m=1, s=0.999, typ='FL'):
     '''
     Function whose zeros are solution for layer size
-    Zeros for s = 0.999, a = c/(lref*fref) = Z/fref = 0.25 = 1.5/(1.2*5) without rounding
+    Zeros for s = 0.999, a = c/(lref*fref) = Z/fref = 0.25 = 1.5/(1.2*5)
+    without rounding
     Expected: F_L1=0.1917, F_L2=0.2682, F_L3=0.2981, F_L4=0.4130, F_L5=0.4244
     Tol 1e-2: F_L1=0.1917, F_L2=0.2682, F_L3=0.2981, F_L4=0.4130, F_L5=0.4244
     Tol 1e-3: F_L1=0.1917, F_L2=0.2682, F_L3=0.2981, F_L4=0.4130, F_L5=0.4244
     Tol 1e-4: F_L1=0.1917, F_L2=0.2682, F_L3=0.2981, F_L4=0.4130, F_L5=0.4244
 
-    Zeros for s = 0.999, a = c/(lref*fref) = 0.555 = 1.5/(1.2*2.25) without rounding
+    Zeros for s = 0.999, a = c/(lref*fref) = 0.555 = 1.5/(1.2*2.25) without
+    rounding
     Expected: F_L1=0.4267, F_L2=0.5971, F_L3=0.6637, F_L4=0.9197, F_L5=0.9450
     Tol 1e-4: F_L1=0.4268, F_L2=0.5971, F_L3=0.6638, F_L4=0.9197, F_L5=0.9450
     '''
@@ -65,7 +83,21 @@ def F(x, a, m=1, s=0.999, typ='FL'):
 
 def calcZero(xini, a, nz=1):
     '''
-    Loop for calculating layer sizes
+    Loop for calculating layer sizes.
+
+    Parameters
+    ----------
+    xini: float
+        Initial value for layer size
+    a: float
+        Parameter for layer size calculation
+    nz: int
+        Number of layer sizes calculated
+
+    Returns
+    -------
+    x: float
+        Layer size
     '''
     print(f'xini = {xini}')
     print('CalcZero')
@@ -158,7 +190,7 @@ def CalcFL(TipLay, Lx, Ly, fref, lmin, lref, Z, nexp, nz=5, crtCR=0):
     FLpos = []
     crtCR = min(crtCR, nz-1)  # Position in CRpos. Default: 0
     print(f"lmin: {lmin}, lref: {lref}")
-    FLmin = 2 * lmin / lref # passar lmin da camada de agua
+    FLmin = 2 * lmin / lref  # passar lmin da camada de agua
     x = FLmin
     for i in range(1, nz + 1):
         x = calcZero(x, a, i)
@@ -233,7 +265,7 @@ def CalcFL(TipLay, Lx, Ly, fref, lmin, lref, Z, nexp, nz=5, crtCR=0):
 
     # Size of damping layer
     pml = F_L * lref
-    
+
     return F_L, pml
 
 
@@ -280,7 +312,8 @@ def habc_size(HABC):
     lmin: Minimal dimension of finite element
     Z: Inverse of minimum Eikonal
     TipLay: Layer damping type ('rectangular' or 'hyperelliptical')
-    nexp: Hyperellipse exponent for damping layer. nexp = NaN for rectangular layers
+    nexp: Hyperellipse exponent for damping layer. nexp = NaN for rectangular 
+    layers
     '''
 
     Lx = HABC.Lz
@@ -299,7 +332,7 @@ def habc_size(HABC):
     # Determining the reference frequency
     fref = detFref(HABC.get_histPcrit(), f0, it_fwi, dt)
     HABC.reference_frequency = fref
-    
+
     # Absorbing layer size
     F_L, pml = CalcFL(HABC.TipLay, Lx, Ly, fref, lmin, lref, Z, nexp)
 

@@ -7,16 +7,19 @@ import finat
 import scipy
 # Work from Ruben Andres Salas,
 # Andre Luis Ferreira da Silva,
-# Luis Fernando Nogueira de Sá, Emilio Carlos Nelli Silva, Hybrid absorbing scheme based on hyperel-
-# liptical layers with non-reflecting boundary conditions in scalar wave equations, Applied Mathematical
+# Luis Fernando Nogueira de Sá, Emilio Carlos Nelli Silva, Hybrid absorbing
+# scheme based on hyperel-
+# liptical layers with non-reflecting boundary conditions in scalar wave
+# equations, Applied Mathematical
 # Modelling (2022), doi: https://doi.org/10.1016/j.apm.2022.09.014
 # With additions by Alexandre Olender
 
 
 class HABC:
-    """ class HABC that determines absorbing layer size and parameters to be used
     """
-    def __init__(self, Wave_object, h_min=None, fwi_iteration=0, skip_eikonal=False):
+    class HABC that determines absorbing layer size and parameters to be used
+    """
+    def __init__(self, Wave_object, h_min=None, fwi_iteration=0):
         """Initializes class and gets a wave object as an input.
 
         Parameters
