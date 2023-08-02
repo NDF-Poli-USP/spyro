@@ -13,7 +13,7 @@ import sys
 # after finite element analysis
 ##############
 
-def detLref(posCrit, possou):
+def detLref(posCrit, source_position):
     '''
     Determining the reference of the size of the absorbing layer
     '''
@@ -21,7 +21,7 @@ def detLref(posCrit, possou):
     print('Defining Critical Source')
     # Distances between sources and the critical point
     # (with minimum eikonal at boundaries)
-    souCrit = possou[np.argmin([np.linalg.norm(posCrit - p) for p in possou])]
+    souCrit = source_position[np.argmin([np.linalg.norm(posCrit - p) for p in source_position])]
     # Reference length for the size of the absorbing layer
     print('Defining Reference Length')
     lsrx = abs(posCrit[0] - souCrit[0])
@@ -273,7 +273,7 @@ def habc_size(HABC):
     Determines the size of the absorbing layer
     Lx, Ly: Original domain dimensions
     posCrit: Coordinates of critical point given by Eikonal
-    possou: Positions of sources
+    source_position: Positions of sources
     histPcrit: Transient response in at critical coordinates "posCrit"
     f0: Theorical central Ricker source frequency
     it_fwi: Iteration unmber of inversion process
@@ -286,7 +286,7 @@ def habc_size(HABC):
     Lx = HABC.Lz
     Ly = HABC.Lx
     posCrit = HABC.posCrit
-    possou = HABC.possou
+    source_position = HABC.source_position
     f0 = HABC.reference_frequency
     it_fwi = HABC.fwi_iteration
     lmin = HABC.h_min
@@ -295,7 +295,7 @@ def habc_size(HABC):
     nexp = HABC.nexp
 
     # Critical position for reference
-    lref = detLref(posCrit, possou)
+    lref = detLref(posCrit, source_position)
     # Determining the reference frequency
     fref = detFref(HABC.get_histPcrit(), f0, it_fwi, dt)
     HABC.reference_frequency = fref

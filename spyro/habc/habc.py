@@ -1,12 +1,8 @@
 import numpy as np
-from . import eikCrit_spy
+from . import eikonal as eikonal_module
 from . import lenCam_spy
 import firedrake as fire
-from firedrake import dot, grad, dx
-from copy import deepcopy
-from ..receivers import Receivers
-import spyro
-import pickle
+from firedrake import dot, grad
 import finat
 import scipy
 # Work from Ruben Andres Salas,
@@ -15,6 +11,7 @@ import scipy
 # liptical layers with non-reflecting boundary conditions in scalar wave equations, Applied Mathematical
 # Modelling (2022), doi: https://doi.org/10.1016/j.apm.2022.09.014
 # With additions by Alexandre Olender
+
 
 class HABC:
     """ class HABC that determines absorbing layer size and parameters to be used
@@ -45,15 +42,15 @@ class HABC:
 
         # TODO: ajust weak implementation of boundary condition
 
-        possou = []
+        source_position = []
 
         for source in Wave_object.source_locations:
             z, x = source
-            possou.append(np.asarray([z, x]))
+            source_position.append(np.asarray([z, x]))
 
         self.Lz = Wave_object.length_z
         self.Lx = Wave_object.length_x
-        self.possou = possou
+        self.source_position = source_position
         self.Wave = Wave_object
         self.dt = Wave_object.dt
         self.TipLay = 'rectangular'
@@ -113,7 +110,6 @@ class HABC:
 
         return None
 
-
     def _store_data_without_HABC(self):
         self.mesh_without_habc = self.Wave.mesh
         self.c_without_habc = self.Wave.c
@@ -143,7 +139,8 @@ class HABC:
         pass
 
     def eikonal(self):
-        Eik_obj = eikCrit_spy.EikonalSolve(self)
+        # Eik_obj = eikCrit_spy.EikonalSolve(self)
+        Eik_obj = eikonal_module.Eikonal_Solve(self)
         self.eikonal = Eik_obj
         Z = Eik_obj.Z
         posCrit = Eik_obj.min_point
@@ -161,12 +158,12 @@ class HABC:
         print(f"L ref = {lref}")
         self.pad_length = pad_length
 
-        # fref, F_L, pad_length = habc_size(Lz, Lx, posCrit, possou, 
+        # fref, F_L, pad_length = habc_size(Lz, Lx, posCrit, source_position, 
         # initial_frequency, it_fwi, lmin, Z, histPcrit=None, TipLay='REC',
         # nexp=np.nan)
 
     def get_mesh_with_pad(self):
-        """ 
+        """
         Creates a new mesh with the calculated PML length
         """
         h_min = self.h_min
