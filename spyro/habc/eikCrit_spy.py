@@ -356,6 +356,7 @@ def mapBound(yp, mesh, Lx, Ly):
 
     boundary_points = []
     min_vertical = min_horizontal = np.inf
+    max_vertical = max_horizontal = -np.inf
     tol = 1e-2
 
     for i,_ in enumerate(x_boundary):
@@ -380,10 +381,16 @@ def mapBound(yp, mesh, Lx, Ly):
             if value < min_horizontal:
                 min_horizontal = value
                 point_h = point
+            if value > max_horizontal:
+                max_horizontal = value
+                point_h_max = point
         else:
             if value < min_vertical:
                 min_vertical = value
                 point_v = point
+            if value > max_vertical:
+                max_vertical = value
+                point_v_max = point
 
     if min_horizontal < min_vertical:
         min_value = min_horizontal
@@ -396,7 +403,14 @@ def mapBound(yp, mesh, Lx, Ly):
         sec_value = min_horizontal
         sec_point = point_h
 
-    return min_value, min_point, sec_value, sec_point
+    if max_horizontal > max_vertical:
+        max_value = max_horizontal
+        max_point = point_h_max
+    else:     
+        max_value = max_vertical
+        max_point = point_v_max
+
+    return min_value, min_point, sec_value, sec_point, max_value, max_point
 
 
 # def bcMesh(mesh, c_eik, Lx, Ly, CamComp=False):
@@ -423,6 +437,78 @@ def mapBound(yp, mesh, Lx, Ly):
 #     cbound.set_allow_extrapolation(True)
 #     return cbound, bcoord
 
+class EikonalSolve():
+    def __init__(self, HABC):
+        mesh = HABC.mesh_without_habc
+        c_eik = HABC.c_without_habc # somente o dominio 
+        # Create and define function space for current mesh
+        # BCs for eikonal
+        print('Defining Eikonal Boundaries')
+        xs =[]
+        ys = []
+        for source in HABC.Wave.source_locations:
+            x,y = source
+            xs.append(x)
+            ys.append(y)
+
+        possou = [xs, ys]
+        V = HABC.function_space_without_habc
+        # dx, bcs_eik = DefineBoundaries(possou, mesh, V, lmin)
+        # Solving Eikonal
+        yp = Function(V, name='Eikonal (Time [s])')
+
+        yp.assign(SolveEikonal(c_eik, V, mesh, HABC.Wave.sources, annotate=False))
+        eikonal_file = File('out/Eik.pvd')
+        eikonal_file.write(yp)
+
+        # Mesh coordinates
+        # xmesh,ymesh = SpatialCoordinate(mesh)
+        # ux = Function(V).interpolate(xmesh)
+        # uy = Function(V).interpolate(ymesh)
+        # ux_data = ux.dat.data[:]
+        # uy_data = uy.dat.data[:]
+        # mesh_coord = V.tabulate_dof_coordinates()
+        # Velocity profile and coordinates at boundary
+        # cbound, bcoord = bcMesh(mesh, c_eik, Wave.length_z, Wave.length_x)
+        min_value, min_point, sec_value, sec_point, max_value, max_point = mapBound(yp, mesh, HABC.Wave.length_z, HABC.Wave.length_x)
+        # eik_max, posCrit = mapBound(yp, mesh, Wave.length_z, Wave.length_x)
+
+        # Defining critical points for vertical and horizontal boundaries
+        # yp.set_allow_extrapolation(True)
+        coordCritEik = np.empty([2, 4])
+        # refx = refy = ref0 = ref1 = 0
+        # for i, coord in enumerate(bcoord):
+        #     xc = coord[0]
+        #     yc = coord[1]
+        #     if xc <= 0.0 or xc >= Wave.length_z and yc > 0.0:
+        #         ref0 = yp(xc, yc)
+        #         if refx == 0 or ref0 < refx:
+        #             refx = ref0
+        #             coordCritEik[0, :] = [xc, yc, cbound(xc, yc), refx]
+        #     else:
+        #         ref1 = yp(xc, yc)
+        #         if refy == 0 or ref1 < refy:
+        #             refy = ref1
+        #             coordCritEik[1, :] = [xc, yc, cbound(xc, yc), refy]
+        del yp
+        min_px, min_py = min_point
+        sec_px, sec_py = sec_point
+        coordCritEik[0, :] = [min_px, min_py, c_eik.at(min_point), min_value]
+        coordCritEik[1, :] = [sec_px, sec_py, c_eik.at(sec_point), sec_value]
+        np.savetxt('out/Eik.txt', coordCritEik, delimiter='\t')
+        # Minimum eikonal at boundaries
+        # eik0cr = np.argmin(coordCritEik[:, -1])
+        # posCrit = np.array([coordCritEik[eik0cr, 0], coordCritEik[eik0cr, 1]])
+        # Inverse of minimum Eikonal (For approximating c_bound/lref)
+        Z = 1 / min_value
+        cref = c_eik.at(min_point)
+
+        self.Z = Z
+        self.min_point = min_point
+        self.cref = cref
+        self.min_value = min_value
+        self.max_value = max_value
+
 
 # def Eikonal(mesh, c_eik, possou, lmin, Lx, Ly):
 def eikonal(HABC):
@@ -440,7 +526,7 @@ def eikonal(HABC):
     print('Defining Eikonal Boundaries')
     xs =[]
     ys = []
-    for source in HABC.Wave.model_parameters.source_locations:
+    for source in HABC.Wave.source_locations:
         x,y = source
         xs.append(x)
         ys.append(y)
@@ -464,7 +550,7 @@ def eikonal(HABC):
     # mesh_coord = V.tabulate_dof_coordinates()
     # Velocity profile and coordinates at boundary
     # cbound, bcoord = bcMesh(mesh, c_eik, Wave.length_z, Wave.length_x)
-    min_value, min_point, sec_value, sec_point = mapBound(yp, mesh, HABC.Wave.length_z, HABC.Wave.length_x)
+    min_value, min_point, sec_value, sec_point, max_value, max_point = mapBound(yp, mesh, HABC.Wave.length_z, HABC.Wave.length_x)
     # eik_max, posCrit = mapBound(yp, mesh, Wave.length_z, Wave.length_x)
     
 

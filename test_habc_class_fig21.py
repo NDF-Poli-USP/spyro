@@ -42,7 +42,7 @@ dictionary["synthetic_data"] = {    #For use only if you are using a synthetic t
 dictionary["acquisition"] = {
     "source_type": "ricker",
     "source_locations": [(-0.025,9.2-5.65)],# (-0.025, 2.0)],#[(-0.6, 4.8-1.68)],#, (-0.605, 1.7), (-0.61, 1.7), (-0.615, 1.7)],#, (-0.1, 1.5), (-0.1, 2.0), (-0.1, 2.5), (-0.1, 3.0)],
-    "frequency": 5.0,
+    "frequency": 6.0,
     "delay": 1.5,
     "receiver_locations": spyro.create_transect(
         (-0.10, 0.1), (-0.10, 4.0), 20

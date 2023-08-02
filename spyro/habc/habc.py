@@ -19,7 +19,7 @@ import scipy
 class HABC:
     """ class HABC that determines absorbing layer size and parameters to be used
     """
-    def __init__(self, Wave_object, h_min=None, it_fwi=0, skip_eikonal=False):
+    def __init__(self, Wave_object, h_min=None, fwi_iteration=0, skip_eikonal=False):
         """Initializes class and gets a wave object as an input.
 
         Parameters
@@ -47,7 +47,7 @@ class HABC:
 
         possou = []
 
-        for source in Wave_object.model_parameters.source_locations:
+        for source in Wave_object.source_locations:
             z, x = source
             possou.append(np.asarray([z, x]))
 
@@ -69,8 +69,9 @@ class HABC:
             h_min = self._minimum_h_calc()
         print(f"h_min = {h_min}")
         self.h_min = h_min
-        self.it_fwi = it_fwi
+        self.fwi_iteration = fwi_iteration
         self.initial_frequency = Wave_object.frequency
+        self.reference_frequency = Wave_object.frequency
         print("Assuming initial mesh without pad")
         self._store_data_without_HABC()
         # if not skip_eikonal:
@@ -142,7 +143,11 @@ class HABC:
         pass
 
     def eikonal(self):
-        Z, posCrit, cref = eikCrit_spy.eikonal(self)
+        Eik_obj = eikCrit_spy.EikonalSolve(self)
+        self.eikonal = Eik_obj
+        Z = Eik_obj.Z
+        posCrit = Eik_obj.min_point
+        cref = Eik_obj.cref
         posCrit_x, posCrit_y = posCrit
         self.posCrit = np.asarray([posCrit_x, posCrit_y])
         self.Z = Z
@@ -180,7 +185,7 @@ class HABC:
         '''
         Returns pressure value at critical point
         '''
-        if self.it_fwi == 0:
+        if self.fwi_iteration == 0:
             return None
         else:
             return self.Receivers.interpolate(self.Wave.u_n)

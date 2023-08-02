@@ -1,17 +1,14 @@
 import spyro
-from firedrake import RectangleMesh, conditional, UnitSquareMesh, Function, FunctionSpace, File
 from spyro.habc import HABC
 import firedrake as fire
-import numpy as np
+import math
 
-from spyro.io.model_parameters import Model_parameters
-from generate_velocity_model_from_paper import get_paper_velocity
 
 dictionary = {}
 dictionary["options"] = {
     "cell_type": "T",  # simplexes such as triangles or tetrahedra (T) or quadrilaterals (Q)
     "variant": 'lumped',  # lumped, equispaced or DG, default is lumped "method":"MLT", # (MLT/spectral_quadrilateral/DG_triangle/DG_quadrilateral) You can either specify a cell_type+variant or a method
-    "degree": 1,  # p order
+    "degree": 2,  # p order
     "dimension": 2,  # dimension
 }
 
@@ -30,6 +27,7 @@ dictionary["mesh"] = {
     "Ly": 0.0,  # thickness in km - always positive
     "mesh_file": None,
     "user_mesh": None,
+    "mesh_type": "firedrake_mesh",
 }
 
 # Create a source injection operator. Here we use a single source with a
@@ -65,22 +63,19 @@ dictionary["visualization"] = {
     "gradient_filename": None,
 }
 
-Model = Model_parameters(dictionary=dictionary)
+Wave_no_habc = spyro.AcousticWave(dictionary=dictionary)
 
 Lx = 1
 Lz = 1
-user_mesh = fire.RectangleMesh(60, 60, Lz, Lx, diagonal="crossed")
+user_mesh = fire.RectangleMesh(120, 120, Lz, Lx, diagonal="crossed")
 user_mesh.coordinates.dat.data[:, 0] *= -1.0
 z, x = fire.SpatialCoordinate(user_mesh)
 
-cond = fire.conditional(x < 0.5, fire.conditional(x < 0.25, 6.0, 3.0), 1.5)
+cond = fire.conditional(x < 0.5, 3.0, 1.5)
         
 
-Model.set_mesh(user_mesh=user_mesh)
+Wave_no_habc.set_mesh(user_mesh=user_mesh)
 
-Wave_no_habc = spyro.AcousticWave(model_parameters=Model)
-
-V = Wave_no_habc.function_space
 Wave_no_habc.set_initial_velocity_model(conditional=cond)
 Wave_no_habc._get_initial_velocity_model()
 
@@ -88,8 +83,36 @@ Wave_no_habc.c = Wave_no_habc.initial_velocity_model
 
 habc = HABC(Wave_no_habc, h_min=0.00833)
 
+eikonal = habc.eikonal
+
+min_value = eikonal.min_value
+max_value = eikonal.max_value
+
+paper_min = 0.085
+paper_max = 0.56
+
+test_min = math.isclose(min_value, paper_min, rel_tol=0.1)
+test_max = math.isclose(max_value, paper_max, rel_tol=0.2)
+
 # Verificar valores das distancias como lref e velocidades
 
 print("END")
 
+# Final time
+# Lf = F_Inf*F_wl*lmbda/AspRatio = cmin*T = lmbda*f0*T, lmbda = c/f0
+# tf = round(pH['F_Inf'] * pH['F_wl'] / (pH['f0'] * factGeom), 4)
 
+# R = Lx/Ly
+# Fig 8 : F_Inf = 1 + 3/R, R=2
+# Mar: F_Inf = 1 + 2.3 /R, R = 9.2/3
+
+# --ACU--
+# *INI
+# Options for F_L: [0.3196, 0.4616, 0.4972, 0.6747, 0.7102]
+# Elements for F_L: [9, 13, 14, 19, 20] 
+# *FIN
+# Options for F_L: [0.8878, 1.2429, 1.3494, 1.8821, 1.9531]
+# Elements for F_L: [25, 35, 38, 53, 55] 
+
+
+# Coisas para fazer: Tentar colocar isso no modelo

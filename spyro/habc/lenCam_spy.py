@@ -287,8 +287,8 @@ def habc_size(HABC):
     Ly = HABC.Lx
     posCrit = HABC.posCrit
     possou = HABC.possou
-    f0 = 3.37#HABC.initial_frequency
-    it_fwi = HABC.it_fwi
+    f0 = HABC.reference_frequency
+    it_fwi = HABC.fwi_iteration
     lmin = HABC.h_min
     dt = HABC.dt
     Z = HABC.Z
@@ -298,6 +298,7 @@ def habc_size(HABC):
     lref = detLref(posCrit, possou)
     # Determining the reference frequency
     fref = detFref(HABC.get_histPcrit(), f0, it_fwi, dt)
+    HABC.reference_frequency = fref
     
     # Absorbing layer size
     F_L, pml = CalcFL(HABC.TipLay, Lx, Ly, fref, lmin, lref, Z, nexp)
