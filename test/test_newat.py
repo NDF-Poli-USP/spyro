@@ -7,6 +7,7 @@ import spyro
 from .inputfiles.Model1_2d_CG import model as oldmodel
 from .inputfiles.Model1_3d_CG import model as oldmodel3D
 
+
 def triangle_area(p1, p2, p3):
     """Simple function to calculate triangle area based on its 3 vertices."""
     (x1, y1) = p1
@@ -40,8 +41,8 @@ def test_correct_receiver_to_cell_location2D():
     cell_vertex1 = receivers.cellVertices[0][0]
     cell_vertex2 = receivers.cellVertices[0][1]
     cell_vertex3 = receivers.cellVertices[0][2]
-    x = receivers.receiver_locations[0, 0]
-    y = receivers.receiver_locations[0, 1]
+    x = receivers.point_locations[0, 0]
+    y = receivers.point_locations[0, 1]
     p = (x, y)
 
     areaT = triangle_area(cell_vertex1, cell_vertex2, cell_vertex3)
@@ -55,8 +56,8 @@ def test_correct_receiver_to_cell_location2D():
     cell_vertex1 = receivers.cellVertices[1][0]
     cell_vertex2 = receivers.cellVertices[1][1]
     cell_vertex3 = receivers.cellVertices[1][2]
-    x = receivers.receiver_locations[1, 0]
-    y = receivers.receiver_locations[1, 1]
+    x = receivers.point_locations[1, 0]
+    y = receivers.point_locations[1, 1]
     p = (x, y)
 
     areaT = triangle_area(cell_vertex1, cell_vertex2, cell_vertex3)
@@ -70,8 +71,8 @@ def test_correct_receiver_to_cell_location2D():
     cell_vertex1 = receivers.cellVertices[2][0]
     cell_vertex2 = receivers.cellVertices[2][1]
     cell_vertex3 = receivers.cellVertices[2][2]
-    x = receivers.receiver_locations[2, 0]
-    y = receivers.receiver_locations[2, 1]
+    x = receivers.point_locations[2, 0]
+    y = receivers.point_locations[2, 1]
     p = (x, y)
 
     areaT = triangle_area(cell_vertex1, cell_vertex2, cell_vertex3)
@@ -104,13 +105,13 @@ def test_correct_at_value2D():
 
     u1 = Function(V).interpolate(x + z)
     test1 = math.isclose(
-        (pz + px), receivers._Receivers__new_at(u1.dat.data[:], 0), rel_tol=1e-09
+        (pz + px), receivers.new_at(u1.dat.data[:], 0), rel_tol=1e-09
     )
 
     u1 = Function(V).interpolate(sin(x) * z * 2)
     test2 = math.isclose(
         sin(px) * pz * 2,
-        receivers._Receivers__new_at(u1.dat.data[:], 0),
+        receivers.new_at(u1.dat.data[:], 0),
         rel_tol=1e-05,
     )
 
@@ -128,7 +129,7 @@ def test_correct_at_value2D_quad():
     recvs = spyro.create_transect((pz, px), (pz, px), 3)
 
     oldmodel_quad["acquisition"]["receiver_locations"] = recvs
-    new_dictionary = spyro.io.convert_old_dictionary(oldmodel_quad)
+    new_dictionary = spyro.io.Dictionary_conversion(oldmodel_quad).new_dictionary
     new_dictionary["mesh"]["mesh_file"] = None
     new_dictionary["mesh"]["mesh_type"] = "firedrake_mesh"
     new_dictionary["options"]["cell_type"] = "quadrilateral"
@@ -143,13 +144,13 @@ def test_correct_at_value2D_quad():
 
     u1 = Function(V).interpolate(x + z)
     test1 = math.isclose(
-        (pz + px), receivers._Receivers__new_at(u1.dat.data[:], 0), rel_tol=1e-09
+        (pz + px), receivers.new_at(u1.dat.data[:], 0), rel_tol=1e-09
     )
 
     u1 = Function(V).interpolate(sin(x) * z * 2)
     test2 = math.isclose(
         sin(px) * pz * 2,
-        receivers._Receivers__new_at(u1.dat.data[:], 0),
+        receivers.new_at(u1.dat.data[:], 0),
         rel_tol=1e-05,
     )
 
@@ -184,7 +185,7 @@ def test_correct_receiver_location_generation3D():
 
     answer = np.array([[-0.05, 0.3, 0.5], [-0.05, 0.6, 0.5], [-0.05, 0.9, 0.5]])
 
-    assert np.allclose(receivers.receiver_locations, answer)
+    assert np.allclose(receivers.point_locations, answer)
 
 
 def test_correct_receiver_to_cell_location3D():
@@ -203,9 +204,9 @@ def test_correct_receiver_to_cell_location3D():
     cell_vertex2 = receivers.cellVertices[0][1]
     cell_vertex3 = receivers.cellVertices[0][2]
     cell_vertex4 = receivers.cellVertices[0][3]
-    x = receivers.receiver_locations[0, 0]
-    y = receivers.receiver_locations[0, 1]
-    z = receivers.receiver_locations[0, 2]
+    x = receivers.point_locations[0, 0]
+    y = receivers.point_locations[0, 1]
+    z = receivers.point_locations[0, 2]
     p = (x, y, z)
 
     volumeT = tetrahedral_volume(cell_vertex1, cell_vertex2, cell_vertex3, cell_vertex4)
@@ -223,9 +224,9 @@ def test_correct_receiver_to_cell_location3D():
     cell_vertex2 = receivers.cellVertices[1][1]
     cell_vertex3 = receivers.cellVertices[1][2]
     cell_vertex4 = receivers.cellVertices[1][3]
-    x = receivers.receiver_locations[1, 0]
-    y = receivers.receiver_locations[1, 1]
-    z = receivers.receiver_locations[1, 2]
+    x = receivers.point_locations[1, 0]
+    y = receivers.point_locations[1, 1]
+    z = receivers.point_locations[1, 2]
     p = (x, y, z)
 
     volumeT = tetrahedral_volume(cell_vertex1, cell_vertex2, cell_vertex3, cell_vertex4)
@@ -243,9 +244,9 @@ def test_correct_receiver_to_cell_location3D():
     cell_vertex2 = receivers.cellVertices[2][1]
     cell_vertex3 = receivers.cellVertices[2][2]
     cell_vertex4 = receivers.cellVertices[2][3]
-    x = receivers.receiver_locations[2, 0]
-    y = receivers.receiver_locations[2, 1]
-    z = receivers.receiver_locations[2, 2]
+    x = receivers.point_locations[2, 0]
+    y = receivers.point_locations[2, 1]
+    z = receivers.point_locations[2, 2]
     p = (x, y, z)
 
     volumeT = tetrahedral_volume(cell_vertex1, cell_vertex2, cell_vertex3, cell_vertex4)
@@ -287,13 +288,13 @@ def test_correct_at_value3D():
     u1 = Function(V).interpolate(x + z + y)
     realvalue = x_real + y_real + z_real
     test1 = math.isclose(
-        realvalue, receivers._Receivers__new_at(u1.dat.data[:], 0), rel_tol=1e-09
+        realvalue, receivers.new_at(u1.dat.data[:], 0), rel_tol=1e-09
     )
 
     u1 = Function(V).interpolate(sin(x) * (z + 1) ** 2 * cos(y))
     realvalue = sin(x_real) * (z_real + 1) ** 2 * cos(y_real)
     test2 = math.isclose(
-        realvalue, receivers._Receivers__new_at(u1.dat.data[:], 0), rel_tol=1e-05
+        realvalue, receivers.new_at(u1.dat.data[:], 0), rel_tol=1e-05
     )
 
     assert all([test1, test2])
@@ -308,3 +309,4 @@ if __name__ == "__main__":
     test_correct_receiver_to_cell_location3D()
     test_correct_at_value3D()
 
+    print("END")

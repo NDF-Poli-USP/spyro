@@ -1,16 +1,19 @@
 [![DOI](https://zenodo.org/badge/318542339.svg)](https://zenodo.org/badge/latestdoi/318542339)
 [![Python tests](https://github.com/NDF-Poli-USP/spyro/actions/workflows/python-tests.yml/badge.svg)](https://github.com/NDF-Poli-USP/spyro/actions/workflows/python-tests.yml)
 [![codecov](https://codecov.io/gh/NDF-Poli-USP/spyro/branch/main/graph/badge.svg?token=8NM4N4N7YW)](https://codecov.io/gh/NDF-Poli-USP/spyro)
+[![CodeScene Code Health](https://codescene.io/projects/42047/status-badges/code-health)](https://codescene.io/projects/42047)
 
-spyro: Acoustic wave modeling in Firedrake
+SPIRO: Seismic Parallel Inversion and Reconstruction Optimization framework
 ============================================
 
-spyro is a Python library for modeling acoustic waves. The main
+Acoustic wave modeling in Firedrake
+
+SPIRO is a Python library for modeling acoustic waves. The main
 functionality is a set of forward and adjoint wave propagators for solving the acoustic wave equation in the time domain.
 These wave propagators can be used to form complete full waveform inversion (FWI) applications. See the [demos](https://github.com/krober10nd/spyro/tree/main/demos).
-To implement these solvers, spyro uses the finite element package [Firedrake](https://www.firedrakeproject.org/index.html).
+To implement these solvers, SPIRO uses the finite element package [Firedrake](https://www.firedrakeproject.org/index.html).
 
-To use Spyro, you'll need to have some knowledge of Python and some basic concepts in inverse modeling relevant to active-sourcce seismology.
+To use SPIRO, you'll need to have some knowledge of Python and some basic concepts in inverse modeling relevant to active-sourcce seismology.
 
 Discussions about development take place on our Slack channel. Everyone is invited to join using the link: https://join.slack.com/t/spyroworkspace/shared_invite/zt-u87ih28m-2h9JobfkdArs4ku3a1wLLQ
 
@@ -51,137 +54,119 @@ See the demos folder for an FWI example (this requires some other dependencies p
 ![Above shows the simulation at two timesteps in ParaView that results from running the code below](https://user-images.githubusercontent.com/18619644/94087976-7e81df00-fde5-11ea-96c0-474348286091.png)
 
 ```python
-from firedrake import (
-    RectangleMesh,
-    FunctionSpace,
-    Function,
-    SpatialCoordinate,
-    conditional,
-    File,
-)
-
 import spyro
 
-model = {}
+dictionary = {}
 
-# Choose method and parameters
-model["opts"] = {
-    "method": "KMV",  # either CG or KMV
-    "quadratrue": "KMV", # Equi or KMV
-    "degree": 4,  # p order
-    "dimension": 2,  # dimension
+# Choose spatial discretization method and parameters
+dictionary["options"] = {
+    # simplexes such as triangles or tetrahedra (T) or quadrilaterals (Q)
+    "cell_type": "T",  
+    # lumped, equispaced or DG, default is lumped "method":"MLT",
+    # (MLT/spectral_quadrilateral/DG_triangle/DG_quadrilateral)
+    # You can either specify a cell_type+variant or a method.
+    "variant": 'lumped',  
+    # Polynomial order of the spatial discretion's basis functions.
+    # For MLT we recomend 4th order in 2D, 3rd order in 3D, for SEM 4th or 8th.
+    "degree": 4,  
+    # Dimension (2 or 3)
+    "dimension": 2,  
 }
 
-# Number of cores for the shot. For simplicity, we keep things serial.
-# spyro however supports both spatial parallelism and "shot" parallelism.
-model["parallelism"] = {
-    "type": "automatic",  # options: automatic (same number of cores for evey processor) or spatial
+# Number of cores for the shot. For simplicity, we keep things automatic.
+# SPIRO supports both spatial parallelism and "shot" parallelism.
+dictionary["parallelism"] = {
+    # options: automatic (same number of cores for every shot) or spatial
+    "type": "automatic",
 }
 
 # Define the domain size without the PML. Here we'll assume a 0.75 x 1.50 km
-# domain and reserve the remaining 250 m for the Perfectly Matched Layer (PML) to absorb
-# outgoing waves on three sides (eg., -z, +-x sides) of the domain.
-model["mesh"] = {
-    "Lz": 0.75,  # depth in km - always positive
-    "Lx": 1.5,  # width in km - always positive
-    "Ly": 0.0,  # thickness in km - always positive
-    "meshfile": "not_used.msh",
-    "initmodel": "not_used.hdf5",
-    "truemodel": "not_used.hdf5",
-}
-
-# Specify a 250-m PML on the three sides of the domain to damp outgoing waves.
-model["BCs"] = {
-    "status": True,  # True or false
-    "outer_bc": "non-reflective",  #  None or non-reflective (outer boundary condition)
-    "damping_type": "polynomial",  # polynomial, hyperbolic, shifted_hyperbolic
-    "exponent": 2,  # damping layer has a exponent variation
-    "cmax": 4.7,  # maximum acoustic wave velocity in PML - km/s
-    "R": 1e-6,  # theoretical reflection coefficient
-    "lz": 0.25,  # thickness of the PML in the z-direction (km) - always positive
-    "lx": 0.25,  # thickness of the PML in the x-direction (km) - always positive
-    "ly": 0.0,  # thickness of the PML in the y-direction (km) - always positive
+dictionary["mesh"] = {
+    # depth in km - always positive
+    "Lz": 0.75,
+    # width in km - always positive
+    "Lx": 1.50,
+    # thickness in km - always positive
+    "Ly": 0.0,
+    # If we are loading and external .msh mesh file
+    "mesh_file": None,
+    # options: None (default), firedrake_mesh, user_mesh, or SeismicMesh
+    # use this opion if your are not loading an external file
+    # 'firedrake_mesh' will create an automatic mesh using firedrake's built-in meshing tools
+    # 'user_mesh' gives the option to load other user generated meshes from unsuported formats
+    # 'SeismicMesh' automatically creates a waveform adapted unstructured mesh to reduce total
+    # DoFs using the SeismicMesh tool.
+    "mesh_type": "firedrake_mesh",
 }
 
 # Create a source injection operator. Here we use a single source with a
 # Ricker wavelet that has a peak frequency of 8 Hz injected at the center of the mesh.
 # We also specify to record the solution at 101 microphones near the top of the domain.
 # This transect of receivers is created with the helper function `create_transect`.
-model["acquisition"] = {
-    "source_type": "Ricker",
-    "source_pos": [(-0.1, 0.75)],
+dictionary["acquisition"] = {
+    "source_type": "ricker",
+    "source_locations": [(-0.3, 0.75)],
     "frequency": 8.0,
     "delay": 1.0,
     "receiver_locations": spyro.create_transect(
-        (-0.10, 0.1), (-0.10, 1.4), 100
+        (-0.5, 0.1), (-0.5, 1.4), 100
     ),
 }
 
 # Simulate for 2.0 seconds.
-model["timeaxis"] = {
-    "t0": 0.0,  #  Initial time for event
-    "tf": 2.00,  # Final time for event
-    "dt": 0.0005,  # timestep size
-    "amplitude": 1,  # the Ricker has an amplitude of 1.
-    "nspool": 100,  # how frequently to output solution to pvds
-    "fspool": 100,  # how frequently to save solution to RAM
+dictionary["time_axis"] = {
+    # Initial time for event
+    "initial_time": 0.0,
+    # Final time for event
+    "final_time": 0.50,
+    # timestep size
+    "dt": 0.0001,
+    # the Ricker has an amplitude of 1.
+    "amplitude": 1,
+    # how frequently to output solution to pvds
+    "output_frequency": 100,
+    # how frequently to save solution to RAM
+    "gradient_sampling_frequency": 100,
+}
+
+dictionary["visualization"] = {
+    "forward_output" : True,
+    "output_filename": "results/forward_output.pvd",
+    "fwi_velocity_model_output": False,
+    "velocity_model_filename": None,
+    "gradient_output": False,
+    "gradient_filename": None,
 }
 
 
-# Create a simple mesh of a rectangle ∈ [1 x 2] km with ~100 m sized elements
-# and then create a function space for P=1 Continuous Galerkin FEM
-mesh = RectangleMesh(100, 200, 1.0, 2.0)
+# Create an AcousticWave object with the above dictionary.
+Wave_obj = spyro.AcousticWave(dictionary=dictionary)
 
-# We edit the coordinates of the mesh so that it's in the (z, x) plane
-# and has a domain padding of 250 m on three sides, which will be used later to show
-# the Perfectly Matched Layer (PML). More complex 2D/3D meshes can be automatically generated with
-# SeismicMesh https://github.com/krober10nd/SeismicMesh
-mesh.coordinates.dat.data[:, 0] -= 1.0
-mesh.coordinates.dat.data[:, 1] -= 0.25
+# Defines the element size in the automatically generated firedrake mesh.
+Wave_obj.set_mesh(dx=0.01)
 
 
-# Create the computational environment
-comm = spyro.utils.mpi_init(model)
-
-element = spyro.domains.space.FE_method(
-    mesh, model["opts"]["method"], model["opts"]["degree"]
-)
-V = FunctionSpace(mesh, element)
-
-# Manually create a simple two layer seismic velocity model `vp`.
-# Note: the user can specify their own velocity model in a HDF5 file format
-# in the above two lines using SeismicMesh.
-# If so, the HDF5 file has to contain an array with
+# Manually create a simple two layer seismic velocity model.
+# Note: the user can specify their own velocity model in a HDF5 or SEG-Y file format.
+# The HDF5 file has to contain an array with
 # the velocity data and it is linearly interpolated onto the mesh nodes at run-time.
-x, y = SpatialCoordinate(mesh)
-velocity = conditional(x > -0.35, 1.5, 3.0)
-vp = Function(V, name="velocity").interpolate(velocity)
-# These pvd files can be easily visualized in ParaView!
-File("simple_velocity_model.pvd").write(vp)
-
-
-# Now we instantiate both the receivers and source objects.
-sources = spyro.Sources(model, mesh, V, comm)
-
-receivers = spyro.Receivers(model, mesh, V, comm)
-
-# Create a wavelet to force the simulation
-wavelet = spyro.full_ricker_wavelet(dt=0.0005, tf=2.0, freq=8.0)
+z = Wave_obj.mesh_z
+import firedrake as fire
+velocity_conditional = fire.conditional(z > -0.35, 1.5, 3.0)
+Wave_obj.set_initial_velocity_model(conditional=velocity_conditional, output=True)
 
 # And now we simulate the shot using a 2nd order central time-stepping scheme
 # Note: simulation results are stored in the folder `~/results/` by default
-p_field, p_at_recv = spyro.solvers.forward(
-    model, mesh, comm, vp, sources, wavelet, receivers
-)
+Wave_obj.forward_solve()
 
 # Visualize the shot record
-spyro.plots.plot_shots(model, comm, p_at_recv)
+spyro.plots.plot_shots(Wave_obj, show=True)
 
 # Save the shot (a Numpy array) as a pickle for other use.
-spyro.io.save_shots(model, comm, p_at_recv)
+spyro.io.save_shots(Wave_obj)
 
 # can be loaded back via
-my_shot = spyro.io.load_shots(model, comm)
+my_shot = spyro.io.load_shots(Wave_obj)
 ```
 
 ### Testing

@@ -47,7 +47,7 @@ def test_read_and_write_segy():
         "Lz": 1.0,  # depth in km - always positive
         "Lx": 1.0,  # width in km - always positive
         "Ly": 0.0,  # thickness in km - always positive
-        "user_mesh": mesh,  
+        "user_mesh": mesh,
         "mesh_file": None,  # specify the mesh file
     }
     model["BCs"] = {
@@ -82,5 +82,25 @@ def test_read_and_write_segy():
     assert all([test1, test2])
 
 
+def test_saving_shot_record():
+    from .inputfiles.model import dictionary
+    dictionary["time_axis"]["final_time"] = 0.5
+    Wave_obj = spyro.AcousticWave(dictionary=dictionary)
+    Wave_obj.set_mesh(dx=0.02)
+    Wave_obj.set_initial_velocity_model(constant=1.5)
+    Wave_obj.forward_solve()
+    spyro.io.save_shots(Wave_obj, file_name="test_shot_record")
+
+
+def test_loading_shot_record():
+    from .inputfiles.model import dictionary
+    dictionary["time_axis"]["final_time"] = 0.5
+    Wave_obj = spyro.AcousticWave(dictionary=dictionary)
+    Wave_obj.set_mesh(dx=0.02)
+    spyro.io.load_shots(Wave_obj, file_name="test_shot_record")
+
+
 if __name__ == "__main__":
     test_read_and_write_segy()
+    test_saving_shot_record()
+    test_loading_shot_record()
