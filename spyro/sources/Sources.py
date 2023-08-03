@@ -1,7 +1,6 @@
 import math
 import numpy as np
 from scipy.signal import butter, filtfilt
-import spyro
 from spyro.receivers.dirac_delta_projector import Delta_projector
 
 
@@ -98,25 +97,26 @@ class Sources(Delta_projector):
 
         return rhs_forcing
 
-    def make_mask(self,campo):
-        for source_id in range(self.num_receivers):
-            if self.is_local[source_id] and source_id==self.current_source:
+    def make_mask(self, campo):
+        for source_id in range(self.number_of_points):
+            if self.is_local[source_id] and source_id == self.current_source:
                 for i in range(len(self.cellNodeMaps[source_id])):
-                    campo.dat.data_with_halos[int(self.cellNodeMaps[source_id][i])] = 1.0* self.cell_tabulations[source_id][i]
-            else: 
+                    campo.dat.data_with_halos[int(self.cellNodeMaps[source_id][i])] = 1.0 * self.cell_tabulations[source_id][i]
+            else:
                 for i in range(len(self.cellNodeMaps[source_id])):
-                    tmp = campo.dat.data_with_halos[0]
+                    tmp = campo.dat.data_with_halos[0]  # noqa: F841
         return campo
-    
-    def make_mask_element(self,campo):
-        for source_id in range(self.num_receivers):
-            if self.is_local[source_id] and source_id==self.current_source:
+
+    def make_mask_element(self, campo):
+        for source_id in range(self.number_of_points):
+            if self.is_local[source_id] and source_id == self.current_source:
                 for i in range(len(self.cellNodeMaps[source_id])):
                     campo.dat.data_with_halos[int(self.cellNodeMaps[source_id][i])] = 1.0
-            else: 
+            else:
                 for i in range(len(self.cellNodeMaps[source_id])):
-                    tmp = campo.dat.data_with_halos[0]
+                    tmp = campo.dat.data_with_halos[0]  # noqa: F841
         return campo
+
 
 def timedependentSource(model, t, freq=None, amp=1, delay=1.5):
     if model["acquisition"]["source_type"] == "Ricker":

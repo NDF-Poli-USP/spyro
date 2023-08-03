@@ -1,11 +1,10 @@
-from firedrake import set_log_level, parameters, dx
-from firedrake import DirichletBC, Constant, Measure
+from firedrake import dx
+from firedrake import Constant
 from firedrake import File, CellDiameter, sqrt, inner, grad, TestFunction
 from firedrake import TrialFunction, solve, lhs, rhs
-from firedrake import FunctionSpace, Function
+from firedrake import Function
 import firedrake as fire
 import numpy as np
-from ufl import SpatialCoordinate
 
 # Work from Ruben Andres Salas,
 # Andre Luis Ferreira da Silva,
@@ -30,16 +29,16 @@ DBG       = 10  // sundry
 To turn of logging completely, use
 set_log_active(False)
 '''
-set_log_level(13)
-parameters['std_out_all_processes'] = True
-parameters['form_compiler']['optimize'] = True
-parameters['form_compiler']['cpp_optimize'] = True
-# parameters['form_compiler']['cpp_optimize_flags'] = '-O2'
-parameters['form_compiler'][
-    'cpp_optimize_flags'] = '-O3 -ffast-math -march=native'
-parameters['form_compiler']['representation'] = 'uflacs'
-parameters['form_compiler']['quadrature_degree'] = 5
-parameters['ghost_mode'] = 'shared_facet'
+# set_log_level(13)
+# parameters['std_out_all_processes'] = True
+# parameters['form_compiler']['optimize'] = True
+# parameters['form_compiler']['cpp_optimize'] = True
+# # parameters['form_compiler']['cpp_optimize_flags'] = '-O2'
+# parameters['form_compiler'][
+#     'cpp_optimize_flags'] = '-O3 -ffast-math -march=native'
+# parameters['form_compiler']['representation'] = 'uflacs'
+# parameters['form_compiler']['quadrature_degree'] = 5
+# parameters['ghost_mode'] = 'shared_facet'
 
 
 # def DefineBoundaries(possou, mesh, V, lmin):
