@@ -9,36 +9,8 @@ def functions(Wave_obj):
 
     Parameters
     ----------
-    model : dict
-        Dictionary with the model parameters
-    V : obj
-        Firedrake function space
-    dimension : int
-        Dimension of the problem
-    x : obj
-        Firedrake spatial coordinate
-    x1 : float
-        x coordinate of the left boundary of the PML
-    x2 : float
-        x coordinate of the right boundary of the PML
-    a_pml : float
-        Width of the PML in the x direction
-    z : obj
-        Firedrake spatial coordinate
-    z1 : float
-        z coordinate of the bottom boundary of the PML
-    z2 : float
-        z coordinate of the top boundary of the PML
-    c_pml : float
-        Width of the PML in the z direction
-    y : obj, optional
-        Firedrake spatial coordinate, by default None
-    y1 : float, optional
-        y coordinate of the back boundary of the PML, by default None
-    y2 : float, optional
-        y coordinate of the front boundary of the PML, by default None
-    b_pml : float, optional
-        Width of the PML in the y direction, by default None
+    Wave_obj : obj
+        Wave object with the parameters of the problem
 
     Returns
     -------
@@ -50,20 +22,21 @@ def functions(Wave_obj):
         Firedrake function with the damping function in the y direction
 
     """
-
     
+    ps = Wave_obj.abc_exponent
+    cmax = Wave_obj.abc_cmax # maximum acoustic wave velocity
+    R = Wave_obj.abc_R # theoretical reclection coefficient
+    pad_length = Wave_obj.abc_pad_length # length of the padding
+    V = Wave_obj.function_space
+    dimension = Wave_obj.dimension
+    z = Wave_obj.mesh_z
+    x = Wave_obj.mesh_x
+    x1 = 0.0
+    x2 = Wave_obj.length_x
+    z1 = 0.0
+    z2 = -Wave_obj.length_z
 
-
-
-    damping_type = model["BCs"]["damping_type"]
-    if damping_type != "polynomial":
-        warnings.warn("Warning: only polynomial damping functions supported!")
-    
-    ps = model["BCs"]["exponent"]  # polynomial scaling
-    cmax = model["BCs"]["cmax"]  # maximum acoustic wave velocity
-    R = model["BCs"]["R"]  # theoretical reclection coefficient
-
-    bar_sigma = ((3.0 * cmax) / (2.0 * a_pml)) * math.log10(1.0 / R)
+    bar_sigma = ((3.0 * cmax) / (2.0 * pad_length)) * math.log10(1.0 / R)
     aux1 = Function(V)
     aux2 = Function(V)
 
@@ -72,15 +45,15 @@ def functions(Wave_obj):
     sigma_max_x = bar_sigma  # Max damping
     aux1.interpolate(
         conditional(
-            And((x >= x1 - a_pml), x < x1),
-            ((abs(x - x1) ** (ps)) / (a_pml ** (ps))) * sigma_max_x,
+            And((x >= x1 - pad_length), x < x1),
+            ((abs(x - x1) ** (ps)) / (pad_length ** (ps))) * sigma_max_x,
             0.0,
         )
     )
     aux2.interpolate(
         conditional(
-            And(x > x2, (x <= x2 + a_pml)),
-            ((abs(x - x2) ** (ps)) / (a_pml ** (ps))) * sigma_max_x,
+            And(x > x2, (x <= x2 + pad_length)),
+            ((abs(x - x2) ** (ps)) / (pad_length ** (ps))) * sigma_max_x,
             0.0,
         )
     )
@@ -91,8 +64,8 @@ def functions(Wave_obj):
     sigma_max_z = bar_sigma  # Max damping
     aux1.interpolate(
         conditional(
-            And(z < z2, (z >= z2 - tol_z * c_pml)),
-            ((abs(z - z2) ** (ps)) / (c_pml ** (ps))) * sigma_max_z,
+            And(z < z2, (z >= z2 - tol_z * pad_length)),
+            ((abs(z - z2) ** (ps)) / (pad_length ** (ps))) * sigma_max_z,
             0.0,
         )
     )
@@ -105,17 +78,20 @@ def functions(Wave_obj):
     elif dimension == 3:
         # Sigma Y
         sigma_max_y = bar_sigma  # Max damping
+        y = Wave_obj.mesh_y
+        y1 = 0.0
+        y2 = Wave_obj.length_y
         aux1.interpolate(
             conditional(
-                And((y >= y1 - b_pml), y < y1),
-                ((abs(y - y1) ** (ps)) / (b_pml ** (ps))) * sigma_max_y,
+                And((y >= y1 - pad_length), y < y1),
+                ((abs(y - y1) ** (ps)) / (pad_length ** (ps))) * sigma_max_y,
                 0.0,
             )
         )
         aux2.interpolate(
             conditional(
-                And(y > y2, (y <= y2 + b_pml)),
-                ((abs(y - y2) ** (ps)) / (b_pml ** (ps))) * sigma_max_y,
+                And(y > y2, (y <= y2 + pad_length)),
+                ((abs(y - y2) ** (ps)) / (pad_length ** (ps))) * sigma_max_y,
                 0.0,
             )
         )
