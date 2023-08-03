@@ -204,33 +204,16 @@ class Model_parameters:
     #     "ly": 0.0,
     # }
     def _sanitize_absorving_boundary_condition(self):
-        if "absorving_boundary_conditions" in self.input_dictionary:
-            dictionary = self.input_dictionary["absorving_boundary_conditions"]
-        else:
-            dictionary = {"status": False}
+        if "absorving_boundary_conditions" not in self.input_dictionary:
+            self.input_dictionary["absorving_boundary_conditions"] = {"status": False}
+        dictionary = self.input_dictionary["absorving_boundary_conditions"]
         self.abc_status = dictionary["status"]
 
-        if "outer_bc" in dictionary:
-            self.abc_outer_bc = dictionary["outer_bc"]
-        else:
-            self.abc_outer_bc = None
-
-        if self.abc_status:
-            self.abc_damping_type = dictionary["damping_type"]
-            self.abc_exponent = dictionary["exponent"]
-            self.abc_cmax = dictionary["cmax"]
-            self.abc_R = dictionary["R"]
-            self.abc_lz = dictionary["lz"]
-            self.abc_lx = dictionary["lx"]
-            self.abc_ly = dictionary["ly"]
-        else:
-            self.abc_damping_type = None
-            self.abc_exponent = None
-            self.abc_cmax = None
-            self.abc_R = None
-            self.abc_lz = 0.0
-            self.abc_lx = 0.0
-            self.abc_ly = 0.0
+        BL_obj = spyro.io.boundary_layer_io.read_boundary_layer(dictionary)
+        self.abc_exponent = BL_obj.abc_exponent
+        self.abc_cmax = BL_obj.abc_cmax
+        self.abc_R = BL_obj.abc_R
+        self.abc_pad_length = BL_obj.abc_pad_length
 
     def _sanitize_output(self):
         #         default_dictionary["visualization"] = {
