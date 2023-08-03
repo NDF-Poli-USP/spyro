@@ -40,7 +40,6 @@ def functions(Wave_obj):
     aux1 = Function(V)
     aux2 = Function(V)
 
-
     # Sigma X
     sigma_max_x = bar_sigma  # Max damping
     aux1.interpolate(
