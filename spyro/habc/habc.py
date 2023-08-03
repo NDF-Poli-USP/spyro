@@ -15,9 +15,65 @@ import scipy
 # With additions by Alexandre Olender
 
 
+def make_eikonal_mesh(Lz, Lx, h_min):
+    nz = int(Lz / h_min)
+    nx = int(Lx / h_min)
+    user_mesh = fire.RectangleMesh(nz, nx, Lz, Lx, diagonal="crossed")
+    user_mesh.coordinates.dat.data[:, 0] *= -1.0
+
+    return user_mesh
+
+
+def make_eikonal_function_space(user_mesh):
+    return fire.FunctionSpace(user_mesh, "CG", 1)
+
+
 class HABC:
     """
     class HABC that determines absorbing layer size and parameters to be used
+
+    Attributes
+    ----------
+    Lz: `float`
+        Length of the mesh in z direction
+    Lx: `float`
+        Length of the mesh in x direction
+    source_position: `list`
+        List of source positions
+    Wave: `class`
+        Contains simulation parameters and options without a pad.
+    dt: `float`
+        Time step size
+    TipLay: `string`
+        Type of pad layer
+    nexp: `int`
+        Exponent of the hyperelliptical pad layer
+    h_min: `float`
+        Minimum mesh size
+    fwi_iteration: `int`
+        Number of FWI iteration
+    initial_frequency: `float`
+        Initial frequency of the source wave
+    reference_frequency: `float`
+        Reference frequency of the source wave
+
+    Methods
+    -------
+    _minimum_h_calc()
+        Calculates the minimum mesh size
+    _fundamental_frequency()
+        Calculates the fundamental frequency
+    _store_data_without_HABC()
+        Stores data without HABC
+    eikonal()
+        Calculates the eikonal
+    habc_size()
+        Calculates the size of the pad layer
+    get_mesh_with_pad()
+        Creates the mesh with pad layer
+    get_histPcrit()
+        Calculates the critical pressure history
+
     """
     def __init__(self, Wave_object, h_min=None, fwi_iteration=0):
         """Initializes class and gets a wave object as an input.
@@ -27,19 +83,15 @@ class HABC:
         Wave_object: `dictionary`
             Contains simulation parameters and options without a pad.
 
-        histPcrit: numpy array
-            Pressure value history in critical point
+        h_min: `float`
+            Minimum mesh size
 
-        initial_freqquency : float
-            FWI frequency
-
-        it_fwi: int
-            Current FWI iteration
-
+        fwi_iteration: `int`
+            Number of FWI iteration
 
         Returns
         -------
-        pad_length; size of absorbing layer
+        None
 
         """
 
@@ -64,24 +116,18 @@ class HABC:
         else:
             UserWarning(f"Please use 'rectangular' or \
                 'hyperelliptical', f{self.TipLay} not supported.")
-        print(f"h_min = {h_min}")
-        if h_min is None:
-            h_min = self._minimum_h_calc()
-        print(f"h_min = {h_min}")
+        # print(f"h_min = {h_min}")
+        # if h_min is None:
+        #     h_min = self._minimum_h_calc()
+        # print(f"h_min = {h_min}")
         self.h_min = h_min
         self.fwi_iteration = fwi_iteration
         self.initial_frequency = Wave_object.frequency
         self.reference_frequency = Wave_object.frequency
         print("Assuming initial mesh without pad")
         self._store_data_without_HABC()
-        # if not skip_eikonal:
         self.eikonal()
-        # elif:
-        #     self._fundamental_frequency()
-
         self.habc_size()
-        # self.reset_mesh()
-        # self.get_mesh_with_pad()
 
     def _fundamental_frequency(self):
         V = self.Wave.function_space
@@ -93,7 +139,7 @@ class HABC:
         u, v = fire.TrialFunction(V), fire.TestFunction(V)
         A = fire.assemble(u * v * dxlump)
         ai, aj, av = A.petscmat.getValuesCSR()
-        Asp = scipy.sparse.csr_matrix((av, aj, ai))
+        # Asp = scipy.sparse.csr_matrix((av, aj, ai))
         av_inv = []
         for value in av:
             if value == 0:
@@ -114,36 +160,21 @@ class HABC:
         return None
 
     def _store_data_without_HABC(self):
-        self.mesh_without_habc = self.Wave.mesh
-        self.c_without_habc = self.Wave.c
-        self.function_space_without_habc = self.Wave.function_space
+        self.mesh_without_habc = make_eikonal_mesh(self.Lz, self.Lx, self.h_min)
+        self.function_space_without_habc = make_eikonal_function_space(self.mesh_without_habc)
+        self.c_without_habc = fire.project(self.Wave.c, self.function_space_without_habc)
+
         self.sources_without_habc = self.Wave.sources
 
-    # def reset_mesh(self, mesh=None, h_min=None):
-    #     """ Reset mesh dependent variables
-    #     """
-    #     if h_min is not None:
-    #         self.h_min = h_min
-
-    #     temp_wave_object = spyro.AcousticWave(
-    #         model_parameters=self.Wave.model_parameters
-    #         )
-    #     x, y = self.posCrit
-    #     temp_wave_object.model_parameters.receiver_locations = [(x, y)]
-    #     temp_wave_object.model_parameters.number_of_receivers = 1
-    #     self.Receivers = Receivers(temp_wave_object)
-
     def _minimum_h_calc(self):
-        # diameters = fire.CellDiameter(self.mesh)
-        # fdrake_cell_node_map = self.Wave.function_space.cell_node_map()
-        # cell_node_map = fdrake_cell_node_map.values_with_halo
-        # (num_cells, nodes_per_cell) = cell_node_map.shape
+        diameters = fire.CellDiameter(self.mesh)
+        value = fire.assemble(diameters*fire.dx)
 
-        pass
+        return value
 
     def eikonal(self):
         # Eik_obj = eikCrit_spy.EikonalSolve(self)
-        Eik_obj = eikonal_module.Eikonal_Solve(self)
+        Eik_obj = eikonal_module.Eikonal_Solve(self, show=True)
         self.eikonal = Eik_obj
         Z = Eik_obj.Z
         posCrit = Eik_obj.min_point

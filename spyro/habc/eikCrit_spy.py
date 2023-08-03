@@ -39,7 +39,8 @@ set_log_active(False)
 # parameters['form_compiler']['representation'] = 'uflacs'
 # parameters['form_compiler']['quadrature_degree'] = 5
 # parameters['ghost_mode'] = 'shared_facet'
-
+# from matplotlib import use
+# use('Agg')  # https://github.com/BVLC/caffe/issues/861
 
 # def DefineBoundaries(possou, mesh, V, lmin):
 #     '''
