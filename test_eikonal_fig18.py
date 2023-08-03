@@ -23,8 +23,8 @@ def test_eikonal_values_fig18():
     # domain and reserve the remaining 250 m for the Perfectly Matched Layer (PML) to absorb
     # outgoing waves on three sides (eg., -z, +-x sides) of the domain.
     dictionary["mesh"] = {
-        "Lz": 4.8,  # depth in km - always positive
-        "Lx": 2.4,  # width in km - always positive
+        "Lz": 2.4,  # depth in km - always positive
+        "Lx": 4.8,  # width in km - always positive
         "Ly": 0.0,  # thickness in km - always positive
         "mesh_file": None,
         "user_mesh": None,
@@ -37,7 +37,7 @@ def test_eikonal_values_fig18():
     # This transect of receivers is created with the helper function `create_transect`.
     dictionary["acquisition"] = {
         "source_type": "ricker",
-        "source_locations": [(-0.6, 4.8-1.68)],
+        "source_locations": [(-0.6, 3.2)],
         "frequency": 5.0,
         "delay": 1.5,
         "receiver_locations": spyro.create_transect(
