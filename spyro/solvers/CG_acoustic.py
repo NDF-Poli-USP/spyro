@@ -157,7 +157,7 @@ class AcousticWave(Wave):
                     mesh differently"
                 if self.forward_output:
                     output.write(u_n, time=t, name="Pressure")
-                
+
                 helpers.display_progress(self.comm, t)
 
             u_nm1.assign(u_n)
