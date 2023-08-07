@@ -1,6 +1,6 @@
 import firedrake as fire
 from firedrake import Constant, dot, dx, grad, ds, inner
-from CG_acoustic import AcousticWave
+from .CG_acoustic import AcousticWave
 from ..domains.quadrature import quadrature_rules
 from ..pml import damping
 from ..io.basicio import ensemble_propagator, parallel_print
@@ -18,7 +18,7 @@ class AcousticWavePML(AcousticWave):
         V = self.function_space
         Z = self.vector_function_space
         dxlump = dx(scheme=self.quadrature_rule)
-        dslump = ds(scheme=self.quadrature_rule)
+        dslump = ds(scheme=self.surface_quadrature_rule)
         c = self.c
 
         W = V * Z
@@ -80,7 +80,8 @@ class AcousticWavePML(AcousticWave):
 
         form = m1 + a + nf + pml
 
-        B = fire.Function(V)
+        B = fire.Function(W)
+        # B = fire.Function(V)
 
         lhs = fire.lhs(form)
         rhs = fire.rhs(form)

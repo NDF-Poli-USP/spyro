@@ -85,7 +85,7 @@ def quadrature_rules(V):
         )
     else:
         raise ValueError("Unrecognized quadrature scheme")
-    return qr_x, qr_s, qr_k
+    return qr_x, qr_k, qr_s
 
 
 # -------------------------- #
