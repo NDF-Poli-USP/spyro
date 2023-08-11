@@ -1,16 +1,19 @@
 [![DOI](https://zenodo.org/badge/318542339.svg)](https://zenodo.org/badge/latestdoi/318542339)
 [![Python tests](https://github.com/NDF-Poli-USP/spyro/actions/workflows/python-tests.yml/badge.svg)](https://github.com/NDF-Poli-USP/spyro/actions/workflows/python-tests.yml)
 [![codecov](https://codecov.io/gh/NDF-Poli-USP/spyro/branch/main/graph/badge.svg?token=8NM4N4N7YW)](https://codecov.io/gh/NDF-Poli-USP/spyro)
+[![CodeScene Code Health](https://codescene.io/projects/42047/status-badges/code-health)](https://codescene.io/projects/42047)
 
-spyro: Acoustic wave modeling in Firedrake
+SPIRO: Seismic Parallel Inversion and Reconstruction Optimization framework
 ============================================
 
-spyro is a Python library for modeling acoustic waves. The main
+Acoustic wave modeling in Firedrake
+
+SPIRO is a Python library for modeling acoustic waves. The main
 functionality is a set of forward and adjoint wave propagators for solving the acoustic wave equation in the time domain.
 These wave propagators can be used to form complete full waveform inversion (FWI) applications. See the [demos](https://github.com/krober10nd/spyro/tree/main/demos).
-To implement these solvers, spyro uses the finite element package [Firedrake](https://www.firedrakeproject.org/index.html).
+To implement these solvers, SPIRO uses the finite element package [Firedrake](https://www.firedrakeproject.org/index.html).
 
-To use Spyro, you'll need to have some knowledge of Python and some basic concepts in inverse modeling relevant to active-sourcce seismology.
+To use SPIRO, you'll need to have some knowledge of Python and some basic concepts in inverse modeling relevant to active-sourcce seismology.
 
 Discussions about development take place on our Slack channel. Everyone is invited to join using the link: https://join.slack.com/t/spyroworkspace/shared_invite/zt-u87ih28m-2h9JobfkdArs4ku3a1wLLQ
 
@@ -71,7 +74,7 @@ dictionary["options"] = {
 }
 
 # Number of cores for the shot. For simplicity, we keep things automatic.
-# spyro supports both spatial parallelism and "shot" parallelism.
+# SPIRO supports both spatial parallelism and "shot" parallelism.
 dictionary["parallelism"] = {
     # options: automatic (same number of cores for every shot) or spatial
     "type": "automatic",
