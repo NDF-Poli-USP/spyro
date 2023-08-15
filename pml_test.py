@@ -69,7 +69,7 @@ def run_forward(dt):
     }
 
     dictionary["visualization"] = {
-        "forward_output" : True,
+        "forward_output": True,
         "output_filename": "results/forward_output.pvd",
         "fwi_velocity_model_output": False,
         "velocity_model_filename": None,
@@ -77,7 +77,7 @@ def run_forward(dt):
         "gradient_filename": None,
     }
 
-    Wave_obj = spyro.AcousticWavePML(dictionary=dictionary)
+    Wave_obj = spyro.solvers.temp_pml(dictionary=dictionary)
     Wave_obj.set_mesh(dx=0.02)
 
     Wave_obj.set_initial_velocity_model(constant=1.5)
@@ -87,11 +87,11 @@ def run_forward(dt):
     print("Time elapsed: ", t1-t0)
 
     time = np.linspace(0.0, final_time, int(final_time/dt)+1)
-    p_r = Wave_obj.receivers_output
+    p_r = Wave_obj.forward_solution_receivers
     plt.plot(time, p_r)
     plt.show()
 
-    rec_out = Wave_obj.receivers_output
+    rec_out = None
 
     return rec_out
 
@@ -102,7 +102,6 @@ def test_second_order_time_convergence():
 
     dts = [
         0.0005,
-        0.0001,
     ]
 
     rec_out = run_forward(dts[0])

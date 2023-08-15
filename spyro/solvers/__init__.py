@@ -5,6 +5,7 @@ from .wave import Wave
 from .CG_acoustic import AcousticWave
 from .mms_acoustic import AcousticWaveMMS
 from .acousticPML import AcousticWavePML
+from .old_forward import temp_pml
 
 __all__ = [
     # "forward",  # forward solver adapted for discrete adjoint
@@ -15,4 +16,5 @@ __all__ = [
     # "DG_Wave",
     "AcousticWaveMMS",
     "AcousticWavePML",
+    "temp_pml",
 ]
