@@ -518,7 +518,9 @@ class Model_parameters:
             self.mesh_type = "file"
         elif self.mesh_type == "firedrake_mesh":
             AutoMeshing = spyro.meshing.AutomaticMesh(
-                dimension=self.dimension, comm=self.comm
+                dimension=self.dimension,
+                comm=self.comm,
+                abc_pad=self.abc_pad_length
             )
 
         if periodic and self.mesh_type == "firedrake_mesh":
