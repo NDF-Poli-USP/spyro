@@ -112,7 +112,25 @@ class temp_pml(AcousticWave):
 
     @ensemble_propagator
     def wave_propagator(self, dt=None, final_time=None, source_num=0):
+        """Propagates the wave forward in time.
+        Currently uses central differences.
 
+        Parameters:
+        -----------
+        dt: Python 'float' (optional)
+            Time step to be used explicitly. If not mentioned uses the default,
+            that was estabilished in the wave object.
+        final_time: Python 'float' (optional)
+            Time which simulation ends. If not mentioned uses the default,
+            that was estabilished in the wave object.
+
+        Returns:
+        --------
+        usol: Firedrake 'Function'
+            Pressure wavefield at the final time.
+        u_rec: numpy array
+            Pressure wavefield at the receivers across the timesteps.
+        """
         excitations = self.sources
         excitations.current_source = source_num
         receivers = self.receivers
@@ -125,6 +143,9 @@ class temp_pml(AcousticWave):
         if self.forward_output:
             parallel_print(f"Saving output in: {output_filename}", self.comm)
 
+        output = fire.File(output_filename, comm=comm.comm)
+        comm.comm.barrier()
+
         if final_time is None:
             final_time = self.final_time
         if dt is None:
@@ -133,38 +154,29 @@ class temp_pml(AcousticWave):
         nt = int(final_time / dt) + 1  # number of timesteps
 
         X = self.X
-        u_n = self.u_n
         X_n = self.X_n
         X_nm1 = self.X_nm1
 
-        V = self.function_space
-        wavelet = self.wavelet
-        solver = self.solver
-        rhs_ = self.rhs
-        B = self.B
-
-        nspool = self.output_frequency
-        fspool = self.gradient_sampling_frequency
-
+        rhs_forcing = fire.Function(self.function_space)
         usol = [
-            fire.Function(V, name="pressure")
+            fire.Function(self.function_space, name="pressure")
             for t in range(nt)
             if t % self.gradient_sampling_frequency == 0
         ]
         usol_recv = []
         save_step = 0
+        B = self.B
+        rhs_ = self.rhs
 
         assembly_callable = create_assembly_callable(rhs_, tensor=B)
-
-        rhs_forcing = fire.Function(V)
 
         for step in range(nt):
             rhs_forcing.assign(0.0)
             assembly_callable()
-            f = excitations.apply_source(rhs_forcing, wavelet[step])
+            f = excitations.apply_source(rhs_forcing, self.wavelet[step])
             B0 = B.sub(0)
             B0 += f
-            solver.solve(X, B)
+            self.solver.solve(X, B)
 
             X_np1 = X
 
@@ -175,21 +187,30 @@ class temp_pml(AcousticWave):
                 self.receivers.interpolate(X_np1.dat.data_ro_with_halos[0][:])
             )
 
-            if step % fspool == 0:
+            if step % self.gradient_sampling_frequency == 0:
                 usol[save_step].assign(X_np1.sub(0))
                 save_step += 1
 
-            if step % nspool == 0:
+            if (step - 1) % self.output_frequency == 0:
                 assert (
-                    fire.norm(u_n) < 1
-                ), "Numerical instability. Try reducing dt or building the mesh differently"
-                if t > 0:
-                    helpers.display_progress(comm, t)
+                    fire.norm(X_np1.sub(0)) < 1
+                ), "Numerical instability. Try reducing dt or building the \
+                    mesh differently"
+                if self.forward_output:
+                    output.write(X_np1.sub(0), time=t, name="Pressure")
+
+                helpers.display_progress(comm, t)
 
             t = step * float(dt)
 
-        usol_recv = helpers.fill(usol_recv, receivers.is_local, nt, receivers.number_of_points)
+        self.current_time = t
+        helpers.display_progress(self.comm, t)
+
+        usol_recv = helpers.fill(
+            usol_recv, receivers.is_local, nt, receivers.number_of_points
+        )
         usol_recv = utils.utils.communicate(usol_recv, comm)
+        self.receivers_output = usol_recv
 
         self.forward_solution = usol
         self.forward_solution_receivers = usol_recv
