@@ -5,6 +5,7 @@ from .receivers.Receivers import Receivers
 from .sources.Sources import Sources, ricker_wavelet, full_ricker_wavelet
 from .solvers.wave import Wave
 from .solvers.CG_acoustic import AcousticWave
+
 # from .solvers.dg_wave import DG_Wave
 from .solvers.mms_acoustic import AcousticWaveMMS
 from .solvers.acousticPML import AcousticWavePML

@@ -100,7 +100,9 @@ class AcousticWave(Wave):
         comm = self.comm
         temp_filename = self.forward_output_file
         filename, file_extension = temp_filename.split(".")
-        output_filename = (filename + "sn" + str(source_num) + "." + file_extension)
+        output_filename = (
+            filename + "sn" + str(source_num) + "." + file_extension
+        )
         if self.forward_output:
             parallel_print(f"Saving output in: {output_filename}", self.comm)
 
@@ -253,16 +255,16 @@ class AcousticWave(Wave):
 
         rhs_forcing = fire.Function(V)  # forcing term
         if adjoint_output:
-            adjoint = [fire.Function(V, name="adjoint_pressure") for t in range(nt)]
+            adjoint = [
+                fire.Function(V, name="adjoint_pressure") for t in range(nt)
+            ]
         for step in range(nt - 1, -1, -1):
             t = step * float(dt)
             rhs_forcing.assign(0.0)
             # Solver - main equation - (I)
             B = fire.assemble(rhsG, tensor=B)
 
-            f = receivers.apply_receivers_as_source(
-                rhs_forcing, residual, step
-            )
+            f = receivers.apply_receivers_as_source(rhs_forcing, residual, step)
             # add forcing term to solve scalar pressure
             B0 = B.sub(0)
             B0 += f

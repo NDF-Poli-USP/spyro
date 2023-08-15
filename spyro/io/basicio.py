@@ -36,7 +36,8 @@ def ensemble_save_or_load(func):
                         **dict(
                             kwargs,
                             source_id=snum,
-                            file_name="shots/"+custom_file_name
+                            file_name="shots/"
+                            + custom_file_name
                             + str(snum + 1)
                             + ".dat",
                         )
