@@ -22,11 +22,11 @@ def functions(Wave_obj):
         Firedrake function with the damping function in the y direction
 
     """
-    
+
     ps = Wave_obj.abc_exponent
-    cmax = Wave_obj.abc_cmax # maximum acoustic wave velocity
-    R = Wave_obj.abc_R # theoretical reclection coefficient
-    pad_length = Wave_obj.abc_pad_length # length of the padding
+    cmax = Wave_obj.abc_cmax  # maximum acoustic wave velocity
+    R = Wave_obj.abc_R  # theoretical reclection coefficient
+    pad_length = Wave_obj.abc_pad_length  # length of the padding
     V = Wave_obj.function_space
     dimension = Wave_obj.dimension
     z = Wave_obj.mesh_z
