@@ -52,7 +52,7 @@ class AcousticWavePML(AcousticWave):
 
         mm2 = inner(dot(gamma_1, pp_n), qq) * dxlump
 
-        dd = inner(grad(u_n), dot(gamma_2, qq)) * dxlump
+        dd = c * c * inner(grad(u_n), dot(gamma_2, qq)) * dxlump
 
         pml = pml_term1 + pml_term2 + pml_term3 + mm1 + mm2 + dd
 
@@ -61,18 +61,17 @@ class AcousticWavePML(AcousticWave):
         # -------------------------------------------------------
 
         m1 = (
-            (1 / (c * c))
-            * ((u - 2.0 * u_n + u_nm1) / Constant(dt**2))
+            ((u - 2.0 * u_n + u_nm1) / Constant(dt**2))
             * v
             * dxlump
         )
-        a = dot(grad(u_n), grad(v)) * dxlump  # explicit
+        a = c * c * dot(grad(u_n), grad(v)) * dxlump  # explicit
 
         # -------------------------------------------------------
         # Getting other nf boundary condition
         # -------------------------------------------------------
 
-        nf = (1 / c) * ((u_n - u_nm1) / dt) * v * dslump
+        nf = c * ((u_n - u_nm1) / dt) * v * dslump
 
         # -------------------------------------------------------
         # Building form
