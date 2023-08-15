@@ -13,7 +13,7 @@ def run_forward(dt):
 
     dictionary = {}
     dictionary["options"] = {
-        "cell_type": "Q",  # simplexes such as triangles or tetrahedra (T) or quadrilaterals (Q)
+        "cell_type": "T",  # simplexes such as triangles or tetrahedra (T) or quadrilaterals (Q)
         "variant": 'lumped',  # lumped, equispaced or DG, default is lumped "method":"MLT", # (MLT/spectral_quadrilateral/DG_triangle/DG_quadrilateral) You can either specify a cell_type+variant or a method
         "degree": 4,  # p order
         "dimension": 2,  # dimension
@@ -78,7 +78,7 @@ def run_forward(dt):
     }
 
     Wave_obj = spyro.AcousticWavePML(dictionary=dictionary)
-    Wave_obj.set_mesh(dx=0.02, periodic=True)
+    Wave_obj.set_mesh(dx=0.02)
 
     Wave_obj.set_initial_velocity_model(constant=1.5)
     Wave_obj.forward_solve()
