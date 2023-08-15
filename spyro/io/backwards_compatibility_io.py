@@ -1,7 +1,8 @@
 from genericpath import exists
 import warnings
 
-class Dictionary_conversion():
+
+class Dictionary_conversion:
     def __init__(self, old_dictionary):
         """
         Convert the old dictionary to the new one
@@ -40,7 +41,7 @@ class Dictionary_conversion():
             "degree": self.old_dictionary["opts"]["degree"],
             "dimension": self.old_dictionary["opts"]["dimension"],
         }
-    
+
     def convert_parallelism(self):
         self.new_dictionary["parallelism"] = {
             "type": self.old_dictionary["parallelism"][
@@ -49,7 +50,7 @@ class Dictionary_conversion():
                 "type"
             ],
         }
-    
+
     def convert_mesh(self):
         self.new_dictionary["mesh"] = {
             "Lz": self.old_dictionary["mesh"]["Lz"],
@@ -57,7 +58,7 @@ class Dictionary_conversion():
             "Ly": self.old_dictionary["mesh"]["Ly"],
             "mesh_file": self.old_dictionary["mesh"]["meshfile"],
         }
-    
+
     def check_if_fwi(self):
         if (
             self.old_dictionary["mesh"]["initmodel"] is not None
@@ -68,13 +69,13 @@ class Dictionary_conversion():
         ):
             warnings.warn("Assuming parameters set for fwi.")
             self.fwi_running = True
-        
+
         if self.fwi_running is False:
             warnings.warn(
                 "Assuming parameters set for forward only propagation, will \
                     use velocity model from old_dictionary truemodel."
             )
-    
+
     def convert_synthetic_data(self):
         if self.fwi_running:
             self.new_dictionary["synthetic_data"] = {
@@ -95,7 +96,7 @@ class Dictionary_conversion():
                 "real_mesh_file": None,
             }
 
-    def set_optimization_parameters(self):    
+    def set_optimization_parameters(self):
         if self.fwi_running is False:
             pass
 
@@ -135,7 +136,7 @@ class Dictionary_conversion():
             "shot_record_file": shot_record_file,
             "optimization_parameters": default_optimization_parameters,
         }
-    
+
     def set_no_inversion(self):
         self.new_dictionary["inversion"] = {
             "perform_fwi": False,  # switch to true to make a FWI
@@ -153,23 +154,16 @@ class Dictionary_conversion():
 # }
 
     def convert_absorving_boundary_conditions(self):
-        old_dict = self.old_dictionary["BCs"]
-        new_dict = {}
-        new_dict["status"] = old_dict["status"]
-        if new_dict["status"] is True:
-            new_dict["damping_type"] = "PML"
-            new_dict["exponent"] = old_dict["exponent"]
-            new_dict["cmax"] = old_dict["cmax"]
-            new_dict["R"] = old_dict["R"]
-            new_dict["pad_length"] = old_dict["lz"]
+        self.new_dictionary[
+            "absorving_boundary_conditions"
+        ] = self.old_dictionary["BCs"]
 
-
-        self.new_dictionary["absorving_boundary_conditions"] = new_dict
-    
     def convert_acquisition(self):
         self.new_dictionary["acquisition"] = {
             "source_type": self.old_dictionary["acquisition"]["source_type"],
-            "source_locations": self.old_dictionary["acquisition"]["source_pos"],
+            "source_locations": self.old_dictionary["acquisition"][
+                "source_pos"
+            ],
             "frequency": self.old_dictionary["acquisition"]["frequency"],
             "delay": self.old_dictionary["acquisition"]["delay"],
             "amplitude": self.old_dictionary["timeaxis"]["amplitude"],
@@ -177,7 +171,7 @@ class Dictionary_conversion():
                 "receiver_locations"
             ],
         }
-    
+
     def convert_time_axis(self):
         self.new_dictionary["time_axis"] = {
             "initial_time": self.old_dictionary["timeaxis"][
@@ -194,4 +188,3 @@ class Dictionary_conversion():
                 "fspool"
             ],  # how frequently to save solution to RAM
         }
-

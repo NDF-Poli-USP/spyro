@@ -1,7 +1,6 @@
 import math
 import numpy as np
 from scipy.signal import butter, filtfilt
-import spyro
 from spyro.receivers.dirac_delta_projector import Delta_projector
 
 
