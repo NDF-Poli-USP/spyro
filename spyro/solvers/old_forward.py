@@ -57,14 +57,17 @@ class temp_pml(AcousticWave):
         u, pp = fire.TrialFunctions(W)
         v, qq = fire.TestFunctions(W)
 
-        u_np1, pp_np1 = fire.Function(W).split()
-        u_n, pp_n = fire.Function(W).split()
-        u_nm1, pp_nm1 = fire.Function(W).split()
+        X = fire.Function(W)
+        X_n = fire.Function(W)
+        X_nm1 = fire.Function(W)
+
+        u_n, pp_n = X_n.split()
+        u_nm1, _ = X_nm1.split()
 
         self.u_n = u_n
-        self.pp_n = pp_n
-        self.u_nm1 = u_nm1
-        self.pp_nm1 = pp_nm1
+        self.X = X
+        self.X_n = X_n
+        self.X_nm1 = X_nm1
 
         sigma_x, sigma_z = damping.functions(self)
         Gamma_1, Gamma_2 = damping.matrices_2D(sigma_z, sigma_x)
@@ -85,7 +88,6 @@ class temp_pml(AcousticWave):
 
         FF = m1 + a + nf
 
-        X = fire.Function(W)
         B = fire.Function(W)
 
         pml2 = sigma_x * sigma_z * u_n * v * dxlump
@@ -105,7 +107,6 @@ class temp_pml(AcousticWave):
         self.solver = solver
         self.rhs = rhs_
         self.B = B
-        self.X = X
 
         return
 
@@ -124,7 +125,6 @@ class temp_pml(AcousticWave):
         if self.forward_output:
             parallel_print(f"Saving output in: {output_filename}", self.comm)
 
-        X = self.X
         if final_time is None:
             final_time = self.final_time
         if dt is None:
@@ -132,10 +132,10 @@ class temp_pml(AcousticWave):
         t = self.current_time
         nt = int(final_time / dt) + 1  # number of timesteps
 
+        X = self.X
         u_n = self.u_n
-        pp_n = self.pp_n
-        u_nm1 = self.u_nm1
-        pp_nm1 = self.pp_nm1
+        X_n = self.X_n
+        X_nm1 = self.X_nm1
 
         V = self.function_space
         wavelet = self.wavelet
@@ -166,17 +166,17 @@ class temp_pml(AcousticWave):
             B0 += f
             solver.solve(X, B)
 
-            u_np1, pp_np1 = X.split()
+            X_np1 = X
 
-            pp_nm1.assign(pp_n)
-            pp_n.assign(pp_np1)
+            X_nm1.assign(X_n)
+            X_n.assign(X_np1)
 
             usol_recv.append(
-                self.receivers.interpolate(u_np1.dat.data_ro_with_halos[:])
+                self.receivers.interpolate(X_np1.dat.data_ro_with_halos[0][:])
             )
 
             if step % fspool == 0:
-                usol[save_step].assign(u_np1)
+                usol[save_step].assign(X_np1.sub(0))
                 save_step += 1
 
             if step % nspool == 0:
@@ -185,9 +185,6 @@ class temp_pml(AcousticWave):
                 ), "Numerical instability. Try reducing dt or building the mesh differently"
                 if t > 0:
                     helpers.display_progress(comm, t)
-
-            u_nm1.assign(u_n)
-            u_n.assign(u_np1)
 
             t = step * float(dt)
 
