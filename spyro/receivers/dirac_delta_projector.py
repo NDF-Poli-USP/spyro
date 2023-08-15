@@ -19,6 +19,7 @@ from .changing_coordinates import (
 
 import numpy as np
 
+
 class Delta_projector:
     def __init__(self, wave_object):
         my_ensemble = wave_object.comm
@@ -46,7 +47,7 @@ class Delta_projector:
         else:
             self.quadrilateral = False
         self.is_local = None
-    
+
     def build_maps(self):
         """Calculates and stores tabulations for interpolation
 
@@ -74,9 +75,7 @@ class Delta_projector:
                     [receiver_z, receiver_x], tolerance=tolerance
                 )
             elif self.dimension == 3:
-                receiver_z, receiver_x, receiver_y = self.point_locations[
-                    rid
-                ]
+                receiver_z, receiver_x, receiver_y = self.point_locations[rid]
                 cell_id = self.mesh.locate_cell(
                     [receiver_z, receiver_x, receiver_y], tolerance=tolerance
                 )
@@ -151,7 +150,9 @@ class Delta_projector:
     def __func_build_cell_tabulations_2D(self):
         element = choosing_element(self.space, self.degree)
 
-        cell_tabulations = np.zeros((self.number_of_points, self.nodes_per_cell))
+        cell_tabulations = np.zeros(
+            (self.number_of_points, self.nodes_per_cell)
+        )
 
         for receiver_id in range(self.number_of_points):
             cell_id = self.is_local[receiver_id]
@@ -174,7 +175,9 @@ class Delta_projector:
     def __func_build_cell_tabulations_3D(self):
         element = choosing_element(self.space, self.degree)
 
-        cell_tabulations = np.zeros((self.number_of_points, self.nodes_per_cell))
+        cell_tabulations = np.zeros(
+            (self.number_of_points, self.nodes_per_cell)
+        )
 
         for receiver_id in range(self.number_of_points):
             cell_id = self.is_local[receiver_id]
@@ -187,9 +190,7 @@ class Delta_projector:
                 v3 = self.cellVertices[receiver_id][3]
                 cell_vertices = [v0, v1, v2, v3]
 
-                p_reference = change_to_reference_tetrahedron(
-                    p, cell_vertices
-                )
+                p_reference = change_to_reference_tetrahedron(p, cell_vertices)
                 initial_tab = element.tabulate(0, [p_reference])
                 phi_tab = initial_tab[(0, 0, 0)]
 
@@ -204,7 +205,9 @@ class Delta_projector:
 
         element = V.finat_element.fiat_equivalent
 
-        cell_tabulations = np.zeros((self.number_of_points, self.nodes_per_cell))
+        cell_tabulations = np.zeros(
+            (self.number_of_points, self.nodes_per_cell)
+        )
 
         for receiver_id in range(self.number_of_points):
             cell_id = self.is_local[receiver_id]
@@ -233,7 +236,9 @@ class Delta_projector:
         Dn = TensorProductElement(An, Bn)
         element = TensorProductElement(Dn, Cn)
 
-        cell_tabulations = np.zeros((self.number_of_points, self.nodes_per_cell))
+        cell_tabulations = np.zeros(
+            (self.number_of_points, self.nodes_per_cell)
+        )
 
         for receiver_id in range(self.number_of_points):
             cell_id = self.is_local[receiver_id]
@@ -250,9 +255,7 @@ class Delta_projector:
                 v7 = self.cellVertices[receiver_id][7]
                 cell_vertices = [v0, v1, v2, v3, v4, v5, v6, v7]
 
-                p_reference = change_to_reference_hexa(
-                    p, cell_vertices
-                )
+                p_reference = change_to_reference_hexa(p, cell_vertices)
                 initial_tab = element.tabulate(0, [p_reference])
                 phi_tab = initial_tab[(0, 0, 0)]
 
