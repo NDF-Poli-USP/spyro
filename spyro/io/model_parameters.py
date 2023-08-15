@@ -140,12 +140,16 @@ class Model_parameters:
         # Converts old dictionary to new one. Deprecated feature
         if "opts" in dictionary:
             warnings.warn("Old deprecated dictionary style in usage.")
-            dictionary = spyro.io.Dictionary_conversion(dictionary).new_dictionary
+            dictionary = spyro.io.Dictionary_conversion(
+                dictionary
+            ).new_dictionary
         # Saves inout_dictionary internally
         self.input_dictionary = dictionary
 
         # Sanitizes method or cell_type+variant inputs
-        Options = spyro.io.dictionaryio.read_options(self.input_dictionary["options"])
+        Options = spyro.io.dictionaryio.read_options(
+            self.input_dictionary["options"]
+        )
         self.cell_type = Options.cell_type
         self.method = Options.method
         self.variant = Options.variant
@@ -256,7 +260,7 @@ class Model_parameters:
             self.adjoint_output = dictionary["adjoint_output"]
         else:
             self.adjoint_output = False
-        
+
         # Getting output file names
         self._sanitize_output_files()
 
@@ -388,7 +392,7 @@ class Model_parameters:
 
         if dictionary["inversion"]["perform_fwi"]:
             self.running_fwi = True
-        
+
         if self.running_fwi:
             self._sanitize_optimization_and_velocity_for_fwi()
         else:
@@ -426,9 +430,9 @@ class Model_parameters:
     def _sanitize_optimization_and_velocity_without_fwi(self):
         dictionary = self.input_dictionary
         if "synthetic_data" in dictionary:
-            self.initial_velocity_model_file = dictionary[
-                "synthetic_data"
-            ]["real_velocity_file"]
+            self.initial_velocity_model_file = dictionary["synthetic_data"][
+                "real_velocity_file"
+            ]
         else:
             dictionary["synthetic_data"] = {"real_velocity_file": None}
             self.initial_velocity_model_file = None
@@ -522,21 +526,18 @@ class Model_parameters:
         if periodic and self.mesh_type == "firedrake_mesh":
             AutoMeshing.make_periodic()
         elif periodic and self.mesh_type != "firedrake_mesh":
-            raise ValueError("Periodic meshes only supported for firedrake meshes.")
+            raise ValueError(
+                "Periodic meshes only supported for firedrake meshes."
+            )
 
-        if (
-            dx is not None
-            and self.mesh_type == "firedrake_mesh"
-        ):
+        if dx is not None and self.mesh_type == "firedrake_mesh":
             AutoMeshing.set_mesh_size(
                 length_z=self.length_z,
                 length_x=self.length_x,
                 length_y=self.length_y,
             )
             AutoMeshing.set_meshing_parameters(
-                dx=dx,
-                cell_type=self.cell_type,
-                mesh_type=self.mesh_type
+                dx=dx, cell_type=self.cell_type, mesh_type=self.mesh_type
             )
             self.user_mesh = AutoMeshing.create_mesh()
 

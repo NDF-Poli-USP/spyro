@@ -28,13 +28,13 @@ def FE_method(mesh, method, degree):
             "CG", mesh.ufl_cell(), degree=degree, variant="spectral"
         )
     elif method == "DG_triangle" or "DG_quadrilateral" or "DG":
-        element = FiniteElement(  # noqa: F405
+        element = FiniteElement(
             "DG", mesh.ufl_cell(), degree=degree
-        )
+        )  # noqa: F405
     elif method == "CG_triangle" or "CG_quadrilateral" or "CG":
-        element = FiniteElement(  # noqa: F405
+        element = FiniteElement(
             "CG", mesh.ufl_cell(), degree=degree
-        )
+        )  # noqa: F405
 
     function_space = FunctionSpace(mesh, element)  # noqa: F405
     return function_space
