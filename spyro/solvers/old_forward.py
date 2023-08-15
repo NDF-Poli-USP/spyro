@@ -1,17 +1,14 @@
 import math
-from firedrake import *
+import firedrake as fire
+from firedrake import Constant, dx, ds, dot, grad, inner, as_tensor
 from firedrake.assemble import create_assembly_callable
 
-from .. import utils
-from ..domains import quadrature, space
-from ..io import ensemble_forward
-from ..pml import damping
+from ..io.basicio import ensemble_propagator, parallel_print
 from . import helpers
+from .. import utils
 from .CG_acoustic import AcousticWave
-from ..io.basicio import ensemble_propagator
-
-# Note this turns off non-fatal warnings
-set_log_level(ERROR)
+from ..pml import damping
+from ..domains.quadrature import quadrature_rules
 
 
 def dampingfunctions(
@@ -158,22 +155,22 @@ class temp_pml(AcousticWave):
 
         params = {"ksp_type": "preonly", "pc_type": "jacobi"}
 
-        element = FiniteElement("KMV", mesh.ufl_cell(), degree, variant="KMV")
+        element = fire.FiniteElement("KMV", mesh.ufl_cell(), degree, variant="KMV")
 
-        V = FunctionSpace(mesh, element)
+        V = fire.FunctionSpace(mesh, element)
 
-        qr_x, qr_s, _ = quadrature.quadrature_rules(V)
+        qr_x, qr_s, _ = quadrature_rules(V)
 
-        z, x = SpatialCoordinate(mesh)
+        z, x = fire.SpatialCoordinate(mesh)
 
-        Z = VectorFunctionSpace(V.ufl_domain(), V.ufl_element())
+        Z = fire.VectorFunctionSpace(V.ufl_domain(), V.ufl_element())
         W = V * Z
-        u, pp = TrialFunctions(W)
-        v, qq = TestFunctions(W)
+        u, pp = fire.TrialFunctions(W)
+        v, qq = fire.TestFunctions(W)
 
-        u_np1, pp_np1 = Function(W).split()
-        u_n, pp_n = Function(W).split()
-        u_nm1, pp_nm1 = Function(W).split()
+        u_np1, pp_np1 = fire.Function(W).split()
+        u_n, pp_n = fire.Function(W).split()
+        u_nm1, pp_nm1 = fire.Function(W).split()
 
         self.u_n = u_n
         self.pp_n = pp_n
@@ -202,8 +199,8 @@ class temp_pml(AcousticWave):
 
         FF = m1 + a + nf
 
-        X = Function(W)
-        B = Function(W)
+        X = fire.Function(W)
+        B = fire.Function(W)
 
         pml2 = sigma_x * sigma_z * u_n * v * dx(scheme=qr_x)
         pml3 = inner(pp_n, grad(v)) * dx(scheme=qr_x)
@@ -214,11 +211,11 @@ class temp_pml(AcousticWave):
         dd = c * c * inner(grad(u_n), dot(Gamma_2, qq)) * dx(scheme=qr_x)
         FF += mm1 + mm2 + dd
 
-        lhs_ = lhs(FF)
-        rhs_ = rhs(FF)
+        lhs_ = fire.lhs(FF)
+        rhs_ = fire.rhs(FF)
 
-        A = assemble(lhs_, mat_type="matfree")
-        solver = LinearSolver(A, solver_parameters=params)
+        A = fire.assemble(lhs_, mat_type="matfree")
+        solver = fire.LinearSolver(A, solver_parameters=params)
         self.solver = solver
         self.rhs = rhs_
         self.B = B
@@ -317,37 +314,51 @@ class temp_pml(AcousticWave):
         # mm2 = inner(dot(Gamma_1, pp_n), qq) * dx(scheme=qr_x)
         # dd = c * c * inner(grad(u_n), dot(Gamma_2, qq)) * dx(scheme=qr_x)
         # FF += mm1 + mm2 + dd
-        t = 0.0
+        excitations = self.sources
+        excitations.current_source = source_num
+        receivers = self.receivers
+        comm = self.comm
+        temp_filename = self.forward_output_file
+        filename, file_extension = temp_filename.split(".")
+        output_filename = (
+            filename + "sn" + str(source_num) + "." + file_extension
+        )
+        if self.forward_output:
+            parallel_print(f"Saving output in: {output_filename}", self.comm)
+
+        X = self.X
+        if final_time is None:
+            final_time = self.final_time
+        if dt is None:
+            dt = self.dt
+        t = self.current_time
+        nt = int(final_time / dt) + 1  # number of timesteps
 
         u_n = self.u_n
         pp_n = self.pp_n
         u_nm1 = self.u_nm1
         pp_nm1 = self.pp_nm1
 
-        comm = self.comm
-        dt = self.dt
-        tf = self.final_time
-        nt = int(tf / dt) + 1  # number of timesteps
         V = self.function_space
         wavelet = self.wavelet
-        receivers = self.receivers
-        excitations = self.sources
-        excitations.current_source = source_num
         solver = self.solver
         rhs_ = self.rhs
         B = self.B
-        X = self.X
 
         nspool = self.output_frequency
         fspool = self.gradient_sampling_frequency
 
-        usol = [Function(V, name="pressure") for t in range(nt) if t % fspool == 0]
+        usol = [
+            fire.Function(V, name="pressure")
+            for t in range(nt)
+            if t % self.gradient_sampling_frequency == 0
+        ]
         usol_recv = []
         save_step = 0
 
         assembly_callable = create_assembly_callable(rhs_, tensor=B)
 
-        rhs_forcing = Function(V)
+        rhs_forcing = fire.Function(V)
 
         for step in range(nt):
             rhs_forcing.assign(0.0)
@@ -362,7 +373,9 @@ class temp_pml(AcousticWave):
             pp_nm1.assign(pp_n)
             pp_n.assign(pp_np1)
 
-            usol_recv.append(receivers.interpolate(u_np1.dat.data_ro_with_halos[:]))
+            usol_recv.append(
+                self.receivers.interpolate(u_np1.dat.data_ro_with_halos[:])
+            )
 
             if step % fspool == 0:
                 usol[save_step].assign(u_np1)
@@ -370,7 +383,7 @@ class temp_pml(AcousticWave):
 
             if step % nspool == 0:
                 assert (
-                    norm(u_n) < 1
+                    fire.norm(u_n) < 1
                 ), "Numerical instability. Try reducing dt or building the mesh differently"
                 if t > 0:
                     helpers.display_progress(comm, t)
