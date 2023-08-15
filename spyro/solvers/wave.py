@@ -91,7 +91,9 @@ class Wave(Model_parameters):
         if parameters is not None:
             self.solver_parameters = parameters
         elif parameters is None:
-            self.solver_parameters = get_default_parameters_for_method(self.method)
+            self.solver_parameters = get_default_parameters_for_method(
+                self.method
+            )
 
     def get_spatial_coordinates(self):
         if self.dimension == 2:

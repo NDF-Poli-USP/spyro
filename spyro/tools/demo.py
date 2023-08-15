@@ -8,7 +8,7 @@
 #     "source_frequency": 5.0,
 #     # The minimum velocity present in the domain.
 #     "minimum_velocity_in_the_domain": 1.429,
-#     # if an homogeneous test case is used this velocity will be defined in 
+#     # if an homogeneous test case is used this velocity will be defined in
 #     # the whole domain.
 #     # Either or heterogeneous. If heterogeneous is
 #     "velocity_profile_type": "homogeneous",
