@@ -171,7 +171,7 @@ class Wave(Model_parameters):
         self.initial_velocity_model_file = None
 
         if conditional is not None:
-            V = self.function_space
+            V = fire.FunctionSpace(self.mesh, "DG", 0)
             vp = fire.Function(V, name="velocity")
             vp.interpolate(conditional)
             self.initial_velocity_model = vp
