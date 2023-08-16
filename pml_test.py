@@ -70,14 +70,14 @@ def run_forward(dt):
 
     dictionary["visualization"] = {
         "forward_output": True,
-        "output_filename": "results/forward_output.pvd",
+        "output_filename": "results/pml_propagation.pvd",
         "fwi_velocity_model_output": False,
         "velocity_model_filename": None,
         "gradient_output": False,
         "gradient_filename": None,
     }
 
-    Wave_obj = spyro.solvers.temp_pml(dictionary=dictionary)
+    Wave_obj = spyro.solvers.AcousticWavePML(dictionary=dictionary)
     Wave_obj.set_mesh(dx=0.02)
 
     Wave_obj.set_initial_velocity_model(constant=1.5)
