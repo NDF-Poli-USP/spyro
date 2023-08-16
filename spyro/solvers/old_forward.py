@@ -1,6 +1,5 @@
-import math
 import firedrake as fire
-from firedrake import Constant, dx, ds, dot, grad, inner, as_tensor
+from firedrake import Constant, dx, ds, dot, grad, inner
 from firedrake.assemble import create_assembly_callable
 
 from ..io.basicio import ensemble_propagator, parallel_print
@@ -12,22 +11,6 @@ from ..domains.quadrature import quadrature_rules
 
 
 class temp_pml(AcousticWave):
-    def forward_solve(self):
-        """Solves the forward problem.
-
-        Parameters:
-        -----------
-        None
-
-        Returns:
-        --------
-        None
-        """
-        self._get_initial_velocity_model()
-        self.c = self.initial_velocity_model
-        self.matrix_building()
-        self.wave_propagator()
-
     def matrix_building(self):
         self.current_time = 0.0
         V = self.function_space
@@ -40,7 +23,7 @@ class temp_pml(AcousticWave):
         if self.dimension == 2:
             self.matrix_building_2d()
         elif self.dimension == 3:
-            raise NotImplementedError("3D not implemented yet")
+            self.matrix_building_3d()
         else:
             raise ValueError("Only 2D and 3D supported")
 
