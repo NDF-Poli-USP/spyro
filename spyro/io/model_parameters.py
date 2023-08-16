@@ -209,7 +209,9 @@ class Model_parameters:
     # }
     def _sanitize_absorving_boundary_condition(self):
         if "absorving_boundary_conditions" not in self.input_dictionary:
-            self.input_dictionary["absorving_boundary_conditions"] = {"status": False}
+            self.input_dictionary["absorving_boundary_conditions"] = {
+                "status": False
+            }
         dictionary = self.input_dictionary["absorving_boundary_conditions"]
         self.abc_status = dictionary["status"]
 
@@ -520,7 +522,7 @@ class Model_parameters:
             AutoMeshing = spyro.meshing.AutomaticMesh(
                 dimension=self.dimension,
                 comm=self.comm,
-                abc_pad=self.abc_pad_length
+                abc_pad=self.abc_pad_length,
             )
 
         if periodic and self.mesh_type == "firedrake_mesh":

@@ -19,13 +19,13 @@ class AutomaticMesh:
         self.quadrilateral = False
         self.periodic = False
         self.comm = comm
-        self.mesh_type = 'firedrake_mesh'
+        self.mesh_type = "firedrake_mesh"
         if abc_pad is None:
             self.abc_pad = 0.0
         elif abc_pad >= 0.0:
             self.abc_pad = abc_pad
         else:
-            raise ValueError('abc_pad must be positive')
+            raise ValueError("abc_pad must be positive")
 
     def set_mesh_size(self, length_z=None, length_x=None, length_y=None):
         """
@@ -78,8 +78,10 @@ class AutomaticMesh:
         Sets the mesh boundaries periodic.
         """
         self.periodic = True
-        if self.mesh_type != 'firedrake_mesh':
-            raise ValueError('periodic mesh is only supported for firedrake_mesh')
+        if self.mesh_type != "firedrake_mesh":
+            raise ValueError(
+                "periodic mesh is only supported for firedrake_mesh"
+            )
 
     def create_mesh(self):
         """
@@ -97,7 +99,7 @@ class AutomaticMesh:
         elif self.mesh_type == "firedrake_mesh" and self.dimension == 3:
             return self.create_firedrake_3D_mesh()
         else:
-            raise ValueError('mesh_type is not supported')
+            raise ValueError("mesh_type is not supported")
 
     def create_firedrake_2D_mesh(self):
         """

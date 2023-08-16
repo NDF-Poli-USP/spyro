@@ -17,7 +17,8 @@
 #     "ly": 0.0,
 # }
 
-class read_boundary_layer():
+
+class read_boundary_layer:
     """
     Read the boundary layer dictionary
 
@@ -41,6 +42,7 @@ class read_boundary_layer():
     read_PML_dictionary()
         Read the PML dictionary for a perfectly matched layer
     """
+
     def __init__(self, abc_dictionary):
         self.dictionary = abc_dictionary
         if self.dictionary["status"] is False:
@@ -55,16 +57,12 @@ class read_boundary_layer():
             self.read_PML_dictionary()
         else:
             abc_type = self.dictionary["damping_type"]
-            raise ValueError(f"Boundary layer type of {abc_type} not recognized")
+            raise ValueError(
+                f"Boundary layer type of {abc_type} not recognized"
+            )
 
     def read_PML_dictionary(self):
         self.abc_exponent = self.dictionary["exponent"]
         self.abc_cmax = self.dictionary["cmax"]
         self.abc_R = self.dictionary["R"]
         self.abc_pad_length = self.dictionary["pad_length"]
-
-
-
-
-
-
