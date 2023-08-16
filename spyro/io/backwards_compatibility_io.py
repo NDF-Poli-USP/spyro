@@ -155,9 +155,17 @@ class Dictionary_conversion:
     # }
 
     def convert_absorving_boundary_conditions(self):
+        old_dictionary = self.old_dictionary["BCs"]
         self.new_dictionary[
             "absorving_boundary_conditions"
-        ] = self.old_dictionary["BCs"]
+        ] = {
+            "status": old_dictionary["status"],
+            "damping_type": "PML",
+            "exponent": old_dictionary["exponent"],
+            "cmax": old_dictionary["cmax"],
+            "R": old_dictionary["R"],
+            "pad_length": old_dictionary["lz"],
+        }
 
     def convert_acquisition(self):
         self.new_dictionary["acquisition"] = {
