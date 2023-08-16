@@ -54,6 +54,7 @@ class Wave(Model_parameters):
     get_mass_matrix_diagonal: returns diagonal of mass matrix
     set_last_solve_as_real_shot_record: sets last solve as real shot record
     """
+
     def __init__(self, dictionary=None, comm=None):
         """Wave object solver. Contains both the forward solver
         and gradient calculator methods.

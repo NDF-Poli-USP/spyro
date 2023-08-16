@@ -119,7 +119,9 @@ class AcousticWavePML(AcousticWave):
         self.X_nm1 = X_nm1
 
         sigma_x, sigma_y, sigma_z = damping.functions(self)
-        Gamma_1, Gamma_2, Gamma_3 = damping.matrices_3D(sigma_x, sigma_y, sigma_z)
+        Gamma_1, Gamma_2, Gamma_3 = damping.matrices_3D(
+            sigma_x, sigma_y, sigma_z
+        )
 
         pml1 = (
             (sigma_x + sigma_y + sigma_z)
