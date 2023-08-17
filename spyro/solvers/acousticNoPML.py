@@ -9,7 +9,7 @@ from .. import utils
 from ..domains.quadrature import quadrature_rules
 
 
-class AcousticWave(Wave):
+class AcousticWaveNoPML(Wave):
     def forward_solve(self):
         """Solves the forward problem.
 
