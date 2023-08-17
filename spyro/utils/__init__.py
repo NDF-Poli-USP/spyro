@@ -1,3 +1,9 @@
-from . import utils, geometry_creation, estimate_timestep
+from . import geometry_creation, estimate_timestep
+from .utils import mpi_init, compute_functional
 
-__all__ = ["utils", "geometry_creation", "estimate_timestep"]
+__all__ = [
+    "geometry_creation",
+    "estimate_timestep",
+    "mpi_init",
+    "compute_functional",
+]

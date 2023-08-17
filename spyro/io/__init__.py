@@ -17,6 +17,7 @@ from .basicio import (
 from .model_parameters import Model_parameters
 from .backwards_compatibility_io import Dictionary_conversion
 from . import dictionaryio
+from . import boundary_layer_io
 
 __all__ = [
     "write_function_to_grid",
@@ -37,4 +38,5 @@ __all__ = [
     "convert_old_dictionary",
     "Dictionary_conversion",
     "dictionaryio",
+    "boundary_layer_io",
 ]

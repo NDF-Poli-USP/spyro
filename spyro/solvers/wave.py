@@ -15,6 +15,46 @@ fire.set_log_level(fire.ERROR)
 
 
 class Wave(Model_parameters):
+    """
+    Base class for wave equation solvers.
+
+    Attributes:
+    -----------
+    comm: MPI communicator
+
+    initial_velocity_model: firedrake function
+        Initial velocity model
+    function_space: firedrake function space
+        Function space for the wave equation
+    current_time: float
+        Current time of the simulation
+    solver_parameters: Python object
+        Contains solver parameters
+    real_shot_record: firedrake function
+        Real shot record
+    wavelet: list of floats
+        Values at timesteps of wavelet used in the simulation
+    mesh: firedrake mesh
+        Mesh used in the simulation (2D or 3D)
+    mesh_z: symbolic coordinate z of the mesh object
+    mesh_x: symbolic coordinate x of the mesh object
+    mesh_y: symbolic coordinate y of the mesh object
+    sources: Sources object
+        Contains information about sources
+    receivers: Receivers object
+        Contains information about receivers
+
+    Methods:
+    --------
+    set_mesh: sets or calculates new mesh
+    set_solver_parameters: sets new or default solver parameters
+    get_spatial_coordinates: returns spatial coordinates of mesh
+    set_initial_velocity_model: sets initial velocity model
+    get_and_set_maximum_dt: calculates and/or sets maximum dt
+    get_mass_matrix_diagonal: returns diagonal of mass matrix
+    set_last_solve_as_real_shot_record: sets last solve as real shot record
+    """
+
     def __init__(self, dictionary=None, comm=None):
         """Wave object solver. Contains both the forward solver
         and gradient calculator methods.
@@ -131,7 +171,7 @@ class Wave(Model_parameters):
         self.initial_velocity_model_file = None
 
         if conditional is not None:
-            V = self.function_space
+            V = fire.FunctionSpace(self.mesh, "DG", 0)
             vp = fire.Function(V, name="velocity")
             vp.interpolate(conditional)
             self.initial_velocity_model = vp
