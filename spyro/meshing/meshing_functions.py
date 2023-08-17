@@ -2,7 +2,7 @@ import firedrake as fire
 
 
 class AutomaticMesh:
-    def __init__(self, dimension=2, comm=None):
+    def __init__(self, dimension=2, comm=None, abc_pad=None):
         """
         Parameters
         ----------
@@ -20,6 +20,12 @@ class AutomaticMesh:
         self.periodic = False
         self.comm = comm
         self.mesh_type = "firedrake_mesh"
+        if abc_pad is None:
+            self.abc_pad = 0.0
+        elif abc_pad >= 0.0:
+            self.abc_pad = abc_pad
+        else:
+            raise ValueError("abc_pad must be positive")
 
     def set_mesh_size(self, length_z=None, length_x=None, length_y=None):
         """
@@ -72,7 +78,7 @@ class AutomaticMesh:
         Sets the mesh boundaries periodic.
         """
         self.periodic = True
-        if self.mesh_type is not "firedrake_mesh":
+        if self.mesh_type != "firedrake_mesh":
             raise ValueError(
                 "periodic mesh is only supported for firedrake_mesh"
             )
@@ -115,6 +121,7 @@ class AutomaticMesh:
                 self.length_x,
                 quadrilateral=quadrilateral,
                 comm=comm.comm,
+                pad=self.abc_pad,
             )
         else:
             return RectangleMesh(
@@ -124,6 +131,7 @@ class AutomaticMesh:
                 self.length_x,
                 quadrilateral=quadrilateral,
                 comm=comm.comm,
+                pad=self.abc_pad,
             )
 
     def create_firedrake_3D_mesh(self):

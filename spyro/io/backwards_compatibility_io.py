@@ -145,10 +145,25 @@ class Dictionary_conversion:
             "optimization_parameters": None,
         }
 
+    # default_dictionary["absorving_boundary_conditions"] = {
+    # # thickness of the PML in the z-direction (km) - always positive
+    #     "lz": 0.25,
+    # # thickness of the PML in the x-direction (km) - always positive
+    #     "lx": 0.25,
+    # # thickness of the PML in the y-direction (km) - always positive
+    #     "ly": 0.0,
+    # }
+
     def convert_absorving_boundary_conditions(self):
-        self.new_dictionary[
-            "absorving_boundary_conditions"
-        ] = self.old_dictionary["BCs"]
+        old_dictionary = self.old_dictionary["BCs"]
+        self.new_dictionary["absorving_boundary_conditions"] = {
+            "status": old_dictionary["status"],
+            "damping_type": "PML",
+            "exponent": old_dictionary["exponent"],
+            "cmax": old_dictionary["cmax"],
+            "R": old_dictionary["R"],
+            "pad_length": old_dictionary["lz"],
+        }
 
     def convert_acquisition(self):
         self.new_dictionary["acquisition"] = {
