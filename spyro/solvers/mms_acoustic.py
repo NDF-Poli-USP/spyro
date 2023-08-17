@@ -1,12 +1,12 @@
 import firedrake as fire
 from firedrake import Constant, dx, dot, grad
-from .CG_acoustic import AcousticWave
+from .acousticNoPML import AcousticWaveNoPML
 from ..io.basicio import ensemble_propagator
 from . import helpers
 from .. import utils
 
 
-class AcousticWaveMMS(AcousticWave):
+class AcousticWaveMMS(AcousticWaveNoPML):
     """Class for solving the acoustic wave equation in 2D or 3D using
     the finite element method. This class inherits from the AcousticWave class
     and overwrites the matrix_building method to use source propagated along

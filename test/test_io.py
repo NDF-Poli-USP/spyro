@@ -63,7 +63,7 @@ def test_read_and_write_segy():
     }
     model["acquisition"] = {
         "source_type": "ricker",
-        "source_locations": [(-1.0, 1.0)],#, (-0.605, 1.7), (-0.61, 1.7), (-0.615, 1.7)],#, (-0.1, 1.5), (-0.1, 2.0), (-0.1, 2.5), (-0.1, 3.0)],
+        "source_locations": [(-1.0, 1.0)],
         "frequency": 5.0,
         "delay": 1.5,
         "receiver_locations": [(-0.0, 0.5)],

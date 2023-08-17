@@ -5,12 +5,12 @@ from firedrake.assemble import create_assembly_callable
 from ..io.basicio import ensemble_propagator, parallel_print
 from . import helpers
 from .. import utils
-from .CG_acoustic import AcousticWave
+from .acousticNoPML import AcousticWaveNoPML
 from ..pml import damping
 from ..domains.quadrature import quadrature_rules
 
 
-class AcousticWavePML(AcousticWave):
+class AcousticWavePML(AcousticWaveNoPML):
     def matrix_building(self):
         self.current_time = 0.0
         V = self.function_space

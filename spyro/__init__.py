@@ -9,10 +9,10 @@ from .solvers.secondordersolverchooser import AcousticWave
 # from .solvers.dg_wave import DG_Wave
 from .solvers.mms_acoustic import AcousticWaveMMS
 from .solvers.acousticPML import AcousticWavePML
-from .utils import utils
 from .utils.geometry_creation import create_transect, create_2d_grid
 from .utils.geometry_creation import insert_fixed_value, create_3d_grid
 from .utils.estimate_timestep import estimate_timestep
+from . import utils
 from . import io
 from . import solvers
 from . import tools

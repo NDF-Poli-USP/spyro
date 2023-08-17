@@ -1,5 +1,8 @@
 import warnings
-import spyro
+from .. import io
+from .. import utils
+from .. import meshing
+from ..sources import full_ricker_wavelet
 
 # default_optimization_parameters = {
 #     "General": {"Secant": {"Type": "Limited-Memory BFGS",
@@ -140,14 +143,14 @@ class Model_parameters:
         # Converts old dictionary to new one. Deprecated feature
         if "opts" in dictionary:
             warnings.warn("Old deprecated dictionary style in usage.")
-            dictionary = spyro.io.Dictionary_conversion(
+            dictionary = io.Dictionary_conversion(
                 dictionary
             ).new_dictionary
         # Saves inout_dictionary internally
         self.input_dictionary = dictionary
 
         # Sanitizes method or cell_type+variant inputs
-        Options = spyro.io.dictionaryio.read_options(
+        Options = io.dictionaryio.read_options(
             self.input_dictionary["options"]
         )
         self.cell_type = Options.cell_type
@@ -164,7 +167,7 @@ class Model_parameters:
 
         # Checking mesh_parameters
         # self._sanitize_mesh()
-        Mesh_parameters = spyro.io.dictionaryio.read_mesh(
+        Mesh_parameters = io.dictionaryio.read_mesh(
             mesh_dictionary=self.input_dictionary["mesh"],
             dimension=self.dimension,
         )
@@ -215,7 +218,7 @@ class Model_parameters:
         dictionary = self.input_dictionary["absorving_boundary_conditions"]
         self.abc_status = dictionary["status"]
 
-        BL_obj = spyro.io.boundary_layer_io.read_boundary_layer(dictionary)
+        BL_obj = io.boundary_layer_io.read_boundary_layer(dictionary)
         self.abc_exponent = BL_obj.abc_exponent
         self.abc_cmax = BL_obj.abc_cmax
         self.abc_R = BL_obj.abc_R
@@ -318,7 +321,7 @@ class Model_parameters:
                 delay_type = self.input_dictionary["acquisition"]["delay_type"]
             else:
                 delay_type = "multiples_of_minimun"
-            wavelet = spyro.full_ricker_wavelet(
+            wavelet = full_ricker_wavelet(
                 dt=self.dt,
                 final_time=self.final_time,
                 frequency=self.frequency,
@@ -351,17 +354,30 @@ class Model_parameters:
             self.parallelism_type = "automatic"
 
         if comm is None:
-            self.comm = spyro.utils.mpi_init(self)
+            self.comm = utils.mpi_init(self)
             self.comm.comm.barrier()
         else:
             self.comm = comm
 
     def _sanitize_acquisition(self):
         dictionary = self.input_dictionary["acquisition"]
-        self.number_of_sources = len(dictionary["source_locations"])
-        self.source_locations = dictionary["source_locations"]
         self.number_of_receivers = len(dictionary["receiver_locations"])
         self.receiver_locations = dictionary["receiver_locations"]
+
+        # Check ricker source:
+        self.source_type = dictionary["source_type"]
+        if self.source_type == "Ricker":
+            self.source_type = "ricker"
+        elif self.source_type == "MMS":
+            self.number_of_sources = 0
+            self.source_locations = []
+            self.frequency = None
+            self.amplitude = None
+            self.delay = None
+            return
+
+        self.number_of_sources = len(dictionary["source_locations"])
+        self.source_locations = dictionary["source_locations"]
         self.frequency = dictionary["frequency"]
         if "amplitude" in dictionary:
             self.amplitude = dictionary["amplitude"]
@@ -372,11 +388,6 @@ class Model_parameters:
         else:
             self.delay = 1.5
         self.__check_acquisition()
-
-        # Check ricker source:
-        self.source_type = dictionary["source_type"]
-        if self.source_type == "Ricker":
-            self.source_type = "ricker"
 
     def _sanitize_optimization_and_velocity(self):
         """
@@ -519,7 +530,7 @@ class Model_parameters:
             self.mesh_file = mesh_file
             self.mesh_type = "file"
         elif self.mesh_type == "firedrake_mesh":
-            AutoMeshing = spyro.meshing.AutomaticMesh(
+            AutoMeshing = meshing.AutomaticMesh(
                 dimension=self.dimension,
                 comm=self.comm,
                 abc_pad=self.abc_pad_length,
@@ -561,7 +572,7 @@ class Model_parameters:
             The distributed mesh across `ens_comm`
         """
         if self.mesh_file is not None:
-            return spyro.io.read_mesh(self)
+            return io.read_mesh(self)
         elif (
             self.mesh_type == "user_mesh" or self.mesh_type == "firedrake_mesh"
         ):
