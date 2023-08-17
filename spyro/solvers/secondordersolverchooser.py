@@ -13,7 +13,6 @@ def get_abc_type(dictionary):
 
 
 def AcousticWave(dictionary=None):
-
     if dictionary["acquisition"]["source_type"] == "MMS":
         return AcousticWaveMMS(dictionary=dictionary)
 
