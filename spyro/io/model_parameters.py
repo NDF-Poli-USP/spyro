@@ -143,16 +143,12 @@ class Model_parameters:
         # Converts old dictionary to new one. Deprecated feature
         if "opts" in dictionary:
             warnings.warn("Old deprecated dictionary style in usage.")
-            dictionary = io.Dictionary_conversion(
-                dictionary
-            ).new_dictionary
+            dictionary = io.Dictionary_conversion(dictionary).new_dictionary
         # Saves inout_dictionary internally
         self.input_dictionary = dictionary
 
         # Sanitizes method or cell_type+variant inputs
-        Options = io.dictionaryio.read_options(
-            self.input_dictionary["options"]
-        )
+        Options = io.dictionaryio.read_options(self.input_dictionary["options"])
         self.cell_type = Options.cell_type
         self.method = Options.method
         self.variant = Options.variant
