@@ -512,12 +512,11 @@ class Model_parameters:
             Whether the domain is periodic. The default is False.
         """
 
-        if length_z is not None:
-            self.length_z = length_z
-        if length_x is not None:
-            self.length_x = length_x
-        if length_y is not None:
-            self.length_y = length_y
+        self._set_mesh_length(
+            length_z=length_z,
+            length_x=length_x,
+            length_y=length_y,
+        )
 
         if user_mesh is not None:
             self.user_mesh = user_mesh
@@ -532,14 +531,10 @@ class Model_parameters:
                 abc_pad=self.abc_pad_length,
             )
 
-        if periodic and self.mesh_type == "firedrake_mesh":
+        if periodic:
             AutoMeshing.make_periodic()
-        elif periodic and self.mesh_type != "firedrake_mesh":
-            raise ValueError(
-                "Periodic meshes only supported for firedrake meshes."
-            )
 
-        if dx is not None and self.mesh_type == "firedrake_mesh":
+        if self.mesh_type == "firedrake_mesh":
             AutoMeshing.set_mesh_size(
                 length_z=self.length_z,
                 length_x=self.length_x,
@@ -558,6 +553,19 @@ class Model_parameters:
             warnings.warn(
                 "Mesh dimensions not completely reset from initial dictionary"
             )
+
+    def _set_mesh_length(
+        self,
+        length_z=None,
+        length_x=None,
+        length_y=None,
+    ):
+        if length_z is not None:
+            self.length_z = length_z
+        if length_x is not None:
+            self.length_x = length_x
+        if length_y is not None:
+            self.length_y = length_y
 
     def get_mesh(self):
         """Reads in an external mesh and scatters it between cores.

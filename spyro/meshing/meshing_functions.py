@@ -92,14 +92,22 @@ class AutomaticMesh:
         mesh : Firedrake Mesh
             Mesh
         """
-        if self.dx is None and self.mesh_type == "firedrake_mesh":
-            raise ValueError("dx is not set")
-        elif self.mesh_type == "firedrake_mesh" and self.dimension == 2:
-            return self.create_firedrake_2D_mesh()
-        elif self.mesh_type == "firedrake_mesh" and self.dimension == 3:
-            return self.create_firedrake_3D_mesh()
+        if self.mesh_type == "firedrake_mesh":
+            return self.create_firedrake_mesh()
+        elif self.mesh_type == "SeismicMesh":
+            raise NotImplementedError("Not implemented yet")
         else:
             raise ValueError("mesh_type is not supported")
+
+    def create_firedrake_mesh(self):
+        if self.dx is None:
+            raise ValueError("dx is not set")
+        elif self.dimension == 2:
+            return self.create_firedrake_2D_mesh()
+        elif self.dimension == 3:
+            return self.create_firedrake_3D_mesh()
+        else:
+            raise ValueError("dimension is not supported")
 
     def create_firedrake_2D_mesh(self):
         """
