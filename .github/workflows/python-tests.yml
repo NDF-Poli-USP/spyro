@@ -15,10 +15,10 @@ jobs:
 
     steps:
     - uses: actions/checkout@v3
-    - name: Running serial tests in parallel (only one test per core)
+    - name: Running serial tests
       run: |
           source /home/olender/Firedrakes/main/firedrake/bin/activate
-          pytest -n 8 --cov-report=xml --cov=spyro test/
+          pytest --cov-report=xml --cov=spyro test/
     # - name: Running serial tests for adjoint
     #   run: |
     #       source /home/olender/Firedrakes/main/firedrake/bin/activate
