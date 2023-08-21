@@ -5,6 +5,7 @@ from scipy.interpolate import RegularGridInterpolator
 import h5py
 import numpy as np
 
+
 def _check_units(c):
     if min(c.dat.data[:]) > 100.0:
         # data is in m/s but must be in km/s
@@ -46,7 +47,6 @@ def interpolate_to_pvd(hdf5_filename, V, pvd_filename):
     length_z = np.abs(np.min(z_data))
     length_x = np.max(x_data)
 
-
     minz = -length_z
     maxz = 0.0
     minx = 0.0
@@ -77,8 +77,12 @@ def interpolate_to_pvd(hdf5_filename, V, pvd_filename):
             x = np.linspace(minx, maxx, ncol)
 
             # make sure no out-of-bounds
-            qp_z2 = [minz if z < minz else maxz if z > maxz else z for z in qp_z]
-            qp_x2 = [minx if x < minx else maxx if x > maxx else x for x in qp_x]
+            qp_z2 = [
+                minz if z < minz else maxz if z > maxz else z for z in qp_z
+            ]
+            qp_x2 = [
+                minx if x < minx else maxx if x > maxx else x for x in qp_x
+            ]
 
             interpolant = RegularGridInterpolator((z, x), Z)
             tmp = interpolant((qp_z2, qp_x2))
@@ -89,9 +93,15 @@ def interpolate_to_pvd(hdf5_filename, V, pvd_filename):
             y = np.linspace(miny, maxy, ncol2)
 
             # make sure no out-of-bounds
-            qp_z2 = [minz if z < minz else maxz if z > maxz else z for z in qp_z]
-            qp_x2 = [minx if x < minx else maxx if x > maxx else x for x in qp_x]
-            qp_y2 = [miny if y < miny else maxy if y > maxy else y for y in qp_y]
+            qp_z2 = [
+                minz if z < minz else maxz if z > maxz else z for z in qp_z
+            ]
+            qp_x2 = [
+                minx if x < minx else maxx if x > maxx else x for x in qp_x
+            ]
+            qp_y2 = [
+                miny if y < miny else maxy if y > maxy else y for y in qp_y
+            ]
 
             interpolant = RegularGridInterpolator((z, x, y), Z)
             tmp = interpolant((qp_z2, qp_x2, qp_y2))
@@ -101,6 +111,7 @@ def interpolate_to_pvd(hdf5_filename, V, pvd_filename):
     c = _check_units(c)
     fire.File(pvd_filename).write(c)
     return c
+
 
 def project_to_pvd(hdf5_filename, V, pvd_filename):
     """Read and interpolate a seismic velocity model stored
@@ -134,7 +145,6 @@ def project_to_pvd(hdf5_filename, V, pvd_filename):
     length_z = np.abs(np.min(z_data))
     length_x = np.max(x_data)
 
-
     minz = -length_z
     maxz = 0.0
     minx = 0.0
@@ -165,8 +175,12 @@ def project_to_pvd(hdf5_filename, V, pvd_filename):
             x = np.linspace(minx, maxx, ncol)
 
             # make sure no out-of-bounds
-            qp_z2 = [minz if z < minz else maxz if z > maxz else z for z in qp_z]
-            qp_x2 = [minx if x < minx else maxx if x > maxx else x for x in qp_x]
+            qp_z2 = [
+                minz if z < minz else maxz if z > maxz else z for z in qp_z
+            ]
+            qp_x2 = [
+                minx if x < minx else maxx if x > maxx else x for x in qp_x
+            ]
 
             interpolant = RegularGridInterpolator((z, x), Z)
             tmp = interpolant((qp_z2, qp_x2))
@@ -177,9 +191,15 @@ def project_to_pvd(hdf5_filename, V, pvd_filename):
             y = np.linspace(miny, maxy, ncol2)
 
             # make sure no out-of-bounds
-            qp_z2 = [minz if z < minz else maxz if z > maxz else z for z in qp_z]
-            qp_x2 = [minx if x < minx else maxx if x > maxx else x for x in qp_x]
-            qp_y2 = [miny if y < miny else maxy if y > maxy else y for y in qp_y]
+            qp_z2 = [
+                minz if z < minz else maxz if z > maxz else z for z in qp_z
+            ]
+            qp_x2 = [
+                minx if x < minx else maxx if x > maxx else x for x in qp_x
+            ]
+            qp_y2 = [
+                miny if y < miny else maxy if y > maxy else y for y in qp_y
+            ]
 
             interpolant = RegularGridInterpolator((z, x, y), Z)
             tmp = interpolant((qp_z2, qp_x2, qp_y2))

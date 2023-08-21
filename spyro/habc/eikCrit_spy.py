@@ -16,7 +16,7 @@ import numpy as np
 # Execute this code before starting inversion process
 ##############
 
-'''
+"""
 # INFO PROGRESS DBG WARNING ERROR CRITICAL
 # set_log_level(LogLevel.INFO)
 CRITICAL  = 50, // errors that may lead to data corruption and suchlike
@@ -28,7 +28,7 @@ TRACE     = 13, // what's happening (in detail)
 DBG       = 10  // sundry
 To turn of logging completely, use
 set_log_active(False)
-'''
+"""
 # set_log_level(13)
 # parameters['std_out_all_processes'] = True
 # parameters['form_compiler']['optimize'] = True
@@ -93,7 +93,7 @@ set_log_active(False)
 #         sigma = Sigma(possou, [xl, xu], [yl, yu])
 #     sigma.mark(facet_marker, 1)
 #     '''
-#         OBS: Nodal approach may fail if there is 
+#         OBS: Nodal approach may fail if there is
 #         not at least a node in the demarcated area
 #         '''
 #     # bcs = [DirichletBC(V, Constant(0.0), CompiledSubDomain(
@@ -109,40 +109,45 @@ set_log_active(False)
 
 #     return dx, bcs
 
+
 def SolveEikonal(c, Eik, mesh, sources, annotate=False):
-    '''
+    """
     Solve for Eikonal
-    '''
+    """
     sources.current_source = 0
-    
+
     yp = Function(Eik)
     vy = TestFunction(Eik)
     u = TrialFunction(Eik)
 
     mask = Function(Eik)
     mask = sources.make_mask(mask)
-    File('mask_test.pvd').write(mask)
-    File('c_test.pvd').write(c)
+    File("mask_test.pvd").write(mask)
+    File("c_test.pvd").write(c)
 
     k = Constant(1e4)
     u0 = Constant(1e-3)
     # k2 = Constant(1e-3)
 
-    print('-------------------------------------------')
-    print('Solve Pre-Eikonal')
-    print('-------------------------------------------')
+    print("-------------------------------------------")
+    print("Solve Pre-Eikonal")
+    print("-------------------------------------------")
     f = Constant(1.0)
-    F1 = inner(grad(u), grad(vy))*dx - f/c*vy*dx  + mask * k * inner(u - u0, vy) * dx
+    F1 = (
+        inner(grad(u), grad(vy)) * dx
+        - f / c * vy * dx
+        + mask * k * inner(u - u0, vy) * dx
+    )
     # F1 = inner(grad(u), grad(vy))*dx - f/c*vy*dx + mask * k * inner(u - u0, vy) * dx
 
     # bcs = [DirichletBC(Eik, Constant(0.0), 1)]
-    A = fire.assemble(lhs(F1))#, bcs=bcs)
-    
+    A = fire.assemble(lhs(F1))  # , bcs=bcs)
+
     B = fire.Function(Eik)
     B = fire.assemble(rhs(F1), tensor=B)
 
     B_data = B.dat.data[:]
-    
+
     # solver_parameters = {
     #     'ksp_type': 'bcgs',
     #     'snes_monitor': None,
@@ -150,12 +155,12 @@ def SolveEikonal(c, Eik, mesh, sources, annotate=False):
     #     'pc_type': 'hypre',
     # }
     solver_parameters = {
-        'pc_type': 'hypre',
-        'ksp_type':'gmres',
-        'linear_ksp_monitor':None,
+        "pc_type": "hypre",
+        "ksp_type": "gmres",
+        "linear_ksp_monitor": None,
         "ksp_monitor": None,
-        'ksp_converged_reason': None,
-        'ksp_monitor_true_residual': None,
+        "ksp_converged_reason": None,
+        "ksp_monitor_true_residual": None,
         "ksp_max_it": 20,
     }
 
@@ -168,25 +173,25 @@ def SolveEikonal(c, Eik, mesh, sources, annotate=False):
     #     'ksp_converged_reason': None,
     #     'ksp_monitor_true_residual': None,
     # }
-#     solver_parameters = {
-#     "ksp_type": "cg",
-#     "pc_type": "gamg",
-#     "ksp_rtol": 1e-8,
-#     "ksp_max_it": 1000,
-#     'ksp_converged_reason': None,
-# }
+    #     solver_parameters = {
+    #     "ksp_type": "cg",
+    #     "pc_type": "gamg",
+    #     "ksp_rtol": 1e-8,
+    #     "ksp_max_it": 1000,
+    #     'ksp_converged_reason': None,
+    # }
     # solver_parameters = {"ksp_max_it": 100, "ksp_type": "cg", "pc_type": "none"}
-    # solver_parameters = {"ksp_max_it": 100, 
+    # solver_parameters = {"ksp_max_it": 100,
     #                     "pc_type": "gamg",
     #                     "mat_type": "aij",
     #                     }
     # import pickle
     # with open('A.pkl', 'wb') as f:
     #     pickle.dump(A, f)
-    solve(A, yp, B)#, bcs = bcs)#, solver_parameters=solver_parameters)
-    print('-------------------------------------------')
-    print('Solved pre-eikonal')
-    print('-------------------------------------------')
+    solve(A, yp, B)  # , bcs = bcs)#, solver_parameters=solver_parameters)
+    print("-------------------------------------------")
+    print("Solved pre-eikonal")
+    print("-------------------------------------------")
     # converged_reason = solver.snes.ksp.getConvergedReason()
     # if converged_reason < 0:
     #     reason_string = KSPConvergedReasons[converged_reason]
@@ -198,26 +203,31 @@ def SolveEikonal(c, Eik, mesh, sources, annotate=False):
     # solve(k2*lhs(F1) == k2*rhs(F1), yp, solver_parameters=solver_parameters)
     # solve(k2*F1 == 0., yp, solver_parameters=solver_parameters)
 
-    output = File('linear.pvd')
+    output = File("linear.pvd")
     output.write(yp)
 
-    '''
+    """
     Eikonal with stabilizer term
-    '''
+    """
     f = Constant(1.0)
     eps = CellDiameter(mesh)  # Stabilizer
     mask = Function(Eik)
 
     # mask = sources.make_mask_element(mask)
     mask = sources.make_mask(mask)
-    output = File('mask.pvd')
+    output = File("mask.pvd")
     output.write(mask)
 
     weak_bc = mask * k * inner(yp - u0, vy) * dx
-    F = inner(sqrt(inner(grad(yp), grad(yp))),vy) *dx + eps*inner(grad(yp), grad(vy))*dx - f / c*vy*dx + weak_bc
+    F = (
+        inner(sqrt(inner(grad(yp), grad(yp))), vy) * dx
+        + eps * inner(grad(yp), grad(vy)) * dx
+        - f / c * vy * dx
+        + weak_bc
+    )
     L = 0
 
-    print('Solve Post-Eikonal')
+    print("Solve Post-Eikonal")
     # Solver Parameters
     # https://petsc.org/release/docs/manualpages/KSP/KSPSetFromOptions.html
     # https://petsc.org/release/docs/manualpages/SNES/SNESSetFromOptions.html
@@ -247,23 +257,25 @@ def SolveEikonal(c, Eik, mesh, sources, annotate=False):
     # # redistribute svd gamg kaczmarz hypre pfmg syspfmg tfs bddc python
     # PETScOptions.set('pc_type', 'lu')
 
-    solver_parameters = {'snes_type': 'vinewtonssls',
-                        "snes_max_it": 1000,
-                        "snes_atol": 5e-6,
-                        "snes_rtol": 1e-20,
-                        'snes_linesearch_type': 'l2',  # basic bt nleqerr cp l2
-                        "snes_linesearch_damping": 1.00, # for basic,l2,cp
-                        "snes_linesearch_maxstep": 0.50,  # bt,l2,cp
-                        'snes_linesearch_order': 2,  # for newtonls com bt
-                        'ksp_type': 'gmres',
-                        'pc_type': 'lu',
-                        'nonlinear_solver': 'snes',
-                        } 
+    solver_parameters = {
+        "snes_type": "vinewtonssls",
+        "snes_max_it": 1000,
+        "snes_atol": 5e-6,
+        "snes_rtol": 1e-20,
+        "snes_linesearch_type": "l2",  # basic bt nleqerr cp l2
+        "snes_linesearch_damping": 1.00,  # for basic,l2,cp
+        "snes_linesearch_maxstep": 0.50,  # bt,l2,cp
+        "snes_linesearch_order": 2,  # for newtonls com bt
+        "ksp_type": "gmres",
+        "pc_type": "lu",
+        "nonlinear_solver": "snes",
+    }
 
-    solve(F == L, yp, solver_parameters=solver_parameters)#{"newton_solver": {"relative_tolerance": 1e-6}})
-    output = File('nonlinear.pvd')
+    solve(
+        F == L, yp, solver_parameters=solver_parameters
+    )  # {"newton_solver": {"relative_tolerance": 1e-6}})
+    output = File("nonlinear.pvd")
     output.write(yp)
-
 
     return yp
 
@@ -305,7 +317,7 @@ def SolveEikonal(c, Eik, mesh, sources, annotate=False):
 
 # def pot_arr(dim, nel, pot_usu=13):
 #     '''
-#     Return the value of the rounding power to avoid numerical errors in 
+#     Return the value of the rounding power to avoid numerical errors in
 #     bidimensional problems
 
 #     Args:
@@ -338,18 +350,19 @@ def SolveEikonal(c, Eik, mesh, sources, annotate=False):
 
 
 def mapBound(yp, mesh, Lx, Ly):
-    '''
+    """
     Mapping of positions inside of absorbing layer
-    '''
+    """
 
     Lx = -Lx
-    xcoord = mesh.coordinates.dat.data[:,0]
-    ycoord = mesh.coordinates.dat.data[:,1]
+    xcoord = mesh.coordinates.dat.data[:, 0]
+    ycoord = mesh.coordinates.dat.data[:, 1]
 
     # np.finfo(float).eps
     eps = 1e-10
-    ref_bound = ((xcoord <= 0-eps) & ((ycoord <= 0+eps) | (ycoord >= Ly-eps))) |  \
-        ((ycoord >= 0 - eps) & (xcoord <= Lx + eps) )
+    ref_bound = (
+        (xcoord <= 0 - eps) & ((ycoord <= 0 + eps) | (ycoord >= Ly - eps))
+    ) | ((ycoord >= 0 - eps) & (xcoord <= Lx + eps))
 
     x_boundary = xcoord[ref_bound]
     y_boundary = ycoord[ref_bound]
@@ -359,25 +372,25 @@ def mapBound(yp, mesh, Lx, Ly):
     max_vertical = max_horizontal = -np.inf
     tol = 1e-2
 
-    for i,_ in enumerate(x_boundary):
+    for i, _ in enumerate(x_boundary):
         # point = (np.sign(xbound[i])*(abs(xbound[i])-tol),np.sign(ybound[i])*(abs(ybound[i])-tol)
         point_x = x_boundary[i]
         point_y = y_boundary[i]
-        if abs(point_x-Lx)<=eps:
+        if abs(point_x - Lx) <= eps:
             point_x += eps
-        if abs(point_x-0) <= eps:
+        if abs(point_x - 0) <= eps:
             point_x -= eps
-        if abs(point_y-0) <= eps:
+        if abs(point_y - 0) <= eps:
             point_y += eps
-        if abs(point_y-Ly) <= eps:
+        if abs(point_y - Ly) <= eps:
             point_y -= eps
 
         point = (point_x, point_y)
         boundary_points.append(point)
 
-        value = yp.at(point) 
+        value = yp.at(point)
 
-        if y_boundary[i] >= Ly-eps or y_boundary[i] <= 0+eps :
+        if y_boundary[i] >= Ly - eps or y_boundary[i] <= 0 + eps:
             if value < min_horizontal:
                 min_horizontal = value
                 point_h = point
@@ -396,7 +409,7 @@ def mapBound(yp, mesh, Lx, Ly):
         min_value = min_horizontal
         min_point = point_h
         sec_value = min_vertical
-        sec_point = point_v 
+        sec_point = point_v
     else:
         min_value = min_vertical
         min_point = point_v
@@ -406,7 +419,7 @@ def mapBound(yp, mesh, Lx, Ly):
     if max_horizontal > max_vertical:
         max_value = max_horizontal
         max_point = point_h_max
-    else:     
+    else:
         max_value = max_vertical
         max_point = point_v_max
 
@@ -437,17 +450,18 @@ def mapBound(yp, mesh, Lx, Ly):
 #     cbound.set_allow_extrapolation(True)
 #     return cbound, bcoord
 
-class EikonalSolve():
+
+class EikonalSolve:
     def __init__(self, HABC):
         mesh = HABC.mesh_without_habc
-        c_eik = HABC.c_without_habc # somente o dominio 
+        c_eik = HABC.c_without_habc  # somente o dominio
         # Create and define function space for current mesh
         # BCs for eikonal
-        print('Defining Eikonal Boundaries')
-        xs =[]
+        print("Defining Eikonal Boundaries")
+        xs = []
         ys = []
         for source in HABC.Wave.source_locations:
-            x,y = source
+            x, y = source
             xs.append(x)
             ys.append(y)
 
@@ -455,10 +469,12 @@ class EikonalSolve():
         V = HABC.function_space_without_habc
         # dx, bcs_eik = DefineBoundaries(possou, mesh, V, lmin)
         # Solving Eikonal
-        yp = Function(V, name='Eikonal (Time [s])')
+        yp = Function(V, name="Eikonal (Time [s])")
 
-        yp.assign(SolveEikonal(c_eik, V, mesh, HABC.Wave.sources, annotate=False))
-        eikonal_file = File('out/Eik.pvd')
+        yp.assign(
+            SolveEikonal(c_eik, V, mesh, HABC.Wave.sources, annotate=False)
+        )
+        eikonal_file = File("out/Eik.pvd")
         eikonal_file.write(yp)
 
         # Mesh coordinates
@@ -470,7 +486,14 @@ class EikonalSolve():
         # mesh_coord = V.tabulate_dof_coordinates()
         # Velocity profile and coordinates at boundary
         # cbound, bcoord = bcMesh(mesh, c_eik, Wave.length_z, Wave.length_x)
-        min_value, min_point, sec_value, sec_point, max_value, max_point = mapBound(yp, mesh, HABC.Wave.length_z, HABC.Wave.length_x)
+        (
+            min_value,
+            min_point,
+            sec_value,
+            sec_point,
+            max_value,
+            max_point,
+        ) = mapBound(yp, mesh, HABC.Wave.length_z, HABC.Wave.length_x)
         # eik_max, posCrit = mapBound(yp, mesh, Wave.length_z, Wave.length_x)
 
         # Defining critical points for vertical and horizontal boundaries
@@ -495,7 +518,7 @@ class EikonalSolve():
         sec_px, sec_py = sec_point
         coordCritEik[0, :] = [min_px, min_py, c_eik.at(min_point), min_value]
         coordCritEik[1, :] = [sec_px, sec_py, c_eik.at(sec_point), sec_value]
-        np.savetxt('out/Eik.txt', coordCritEik, delimiter='\t')
+        np.savetxt("out/Eik.txt", coordCritEik, delimiter="\t")
         # Minimum eikonal at boundaries
         # eik0cr = np.argmin(coordCritEik[:, -1])
         # posCrit = np.array([coordCritEik[eik0cr, 0], coordCritEik[eik0cr, 1]])
@@ -512,22 +535,22 @@ class EikonalSolve():
 
 # def Eikonal(mesh, c_eik, possou, lmin, Lx, Ly):
 def eikonal(HABC):
-    '''
+    """
     Solving eikonal for defining critical points from original domain
     mesh: Mesh without layer
     c_eik: Velocity profile without layer
     possou: Positions of sources
     Lx, Ly: Original domain dimensions
-    '''
+    """
     mesh = HABC.mesh_without_habc
-    c_eik = HABC.c_without_habc # somente o dominio 
+    c_eik = HABC.c_without_habc  # somente o dominio
     # Create and define function space for current mesh
     # BCs for eikonal
-    print('Defining Eikonal Boundaries')
-    xs =[]
+    print("Defining Eikonal Boundaries")
+    xs = []
     ys = []
     for source in HABC.Wave.source_locations:
-        x,y = source
+        x, y = source
         xs.append(x)
         ys.append(y)
 
@@ -535,10 +558,10 @@ def eikonal(HABC):
     V = HABC.function_space_without_habc
     # dx, bcs_eik = DefineBoundaries(possou, mesh, V, lmin)
     # Solving Eikonal
-    yp = Function(V, name='Eikonal (Time [s])')
+    yp = Function(V, name="Eikonal (Time [s])")
 
     yp.assign(SolveEikonal(c_eik, V, mesh, HABC.Wave.sources, annotate=False))
-    eikonal_file = File('out/Eik.pvd')
+    eikonal_file = File("out/Eik.pvd")
     eikonal_file.write(yp)
 
     # Mesh coordinates
@@ -550,9 +573,10 @@ def eikonal(HABC):
     # mesh_coord = V.tabulate_dof_coordinates()
     # Velocity profile and coordinates at boundary
     # cbound, bcoord = bcMesh(mesh, c_eik, Wave.length_z, Wave.length_x)
-    min_value, min_point, sec_value, sec_point, max_value, max_point = mapBound(yp, mesh, HABC.Wave.length_z, HABC.Wave.length_x)
+    min_value, min_point, sec_value, sec_point, max_value, max_point = mapBound(
+        yp, mesh, HABC.Wave.length_z, HABC.Wave.length_x
+    )
     # eik_max, posCrit = mapBound(yp, mesh, Wave.length_z, Wave.length_x)
-    
 
     # Defining critical points for vertical and horizontal boundaries
     # yp.set_allow_extrapolation(True)
@@ -576,7 +600,7 @@ def eikonal(HABC):
     sec_px, sec_py = sec_point
     coordCritEik[0, :] = [min_px, min_py, c_eik.at(min_point), min_value]
     coordCritEik[1, :] = [sec_px, sec_py, c_eik.at(sec_point), sec_value]
-    np.savetxt('out/Eik.txt', coordCritEik, delimiter='\t')
+    np.savetxt("out/Eik.txt", coordCritEik, delimiter="\t")
     # Minimum eikonal at boundaries
     # eik0cr = np.argmin(coordCritEik[:, -1])
     # posCrit = np.array([coordCritEik[eik0cr, 0], coordCritEik[eik0cr, 1]])

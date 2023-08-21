@@ -101,7 +101,9 @@ class Sources(Delta_projector):
         for source_id in range(self.number_of_points):
             if self.is_local[source_id] and source_id == self.current_source:
                 for i in range(len(self.cellNodeMaps[source_id])):
-                    campo.dat.data_with_halos[int(self.cellNodeMaps[source_id][i])] = 1.0 * self.cell_tabulations[source_id][i]
+                    campo.dat.data_with_halos[
+                        int(self.cellNodeMaps[source_id][i])
+                    ] = (1.0 * self.cell_tabulations[source_id][i])
             else:
                 for i in range(len(self.cellNodeMaps[source_id])):
                     tmp = campo.dat.data_with_halos[0]  # noqa: F841
@@ -111,7 +113,9 @@ class Sources(Delta_projector):
         for source_id in range(self.number_of_points):
             if self.is_local[source_id] and source_id == self.current_source:
                 for i in range(len(self.cellNodeMaps[source_id])):
-                    campo.dat.data_with_halos[int(self.cellNodeMaps[source_id][i])] = 1.0
+                    campo.dat.data_with_halos[
+                        int(self.cellNodeMaps[source_id][i])
+                    ] = 1.0
             else:
                 for i in range(len(self.cellNodeMaps[source_id])):
                     tmp = campo.dat.data_with_halos[0]  # noqa: F841

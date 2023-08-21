@@ -6,9 +6,9 @@ import numpy as np
 
 
 def mapBound(yp, mesh, Lx, Ly):
-    '''
+    """
     Mapping of positions inside of absorbing layer
-    '''
+    """
 
     Lx = -Lx
     xcoord = mesh.coordinates.dat.data[:, 0]
@@ -16,10 +16,9 @@ def mapBound(yp, mesh, Lx, Ly):
 
     # np.finfo(float).eps
     eps = 1e-10
-    ref_bound = ((xcoord <= 0-eps)
-                 & ((ycoord <= 0+eps) |
-                 (ycoord >= Ly-eps))) | \
-        ((ycoord >= 0 - eps) & (xcoord <= Lx + eps))
+    ref_bound = (
+        (xcoord <= 0 - eps) & ((ycoord <= 0 + eps) | (ycoord >= Ly - eps))
+    ) | ((ycoord >= 0 - eps) & (xcoord <= Lx + eps))
 
     x_boundary = xcoord[ref_bound]
     y_boundary = ycoord[ref_bound]
@@ -31,13 +30,13 @@ def mapBound(yp, mesh, Lx, Ly):
     for i, _ in enumerate(x_boundary):
         point_x = x_boundary[i]
         point_y = y_boundary[i]
-        if abs(point_x-Lx) <= eps:
+        if abs(point_x - Lx) <= eps:
             point_x += eps
-        if abs(point_x-0) <= eps:
+        if abs(point_x - 0) <= eps:
             point_x -= eps
-        if abs(point_y-0) <= eps:
+        if abs(point_y - 0) <= eps:
             point_y += eps
-        if abs(point_y-Ly) <= eps:
+        if abs(point_y - Ly) <= eps:
             point_y -= eps
 
         point = (point_x, point_y)
@@ -45,7 +44,7 @@ def mapBound(yp, mesh, Lx, Ly):
 
         value = yp.at(point)
 
-        if y_boundary[i] >= Ly-eps or y_boundary[i] <= 0 + eps:
+        if y_boundary[i] >= Ly - eps or y_boundary[i] <= 0 + eps:
             if value < min_horizontal:
                 min_horizontal = value
                 point_h = point
@@ -76,7 +75,6 @@ def mapBound(yp, mesh, Lx, Ly):
 
 
 def sort_primary_secondary_points(points):
-
     min_horizontal = points[0]
     min_vertical = points[1]
     max_horizontal = points[2]
@@ -116,7 +114,7 @@ def sort_primary_secondary_points(points):
     return sorted_points
 
 
-class Eikonal_Solve():
+class Eikonal_Solve:
     """
     Solve the Eikonal Equation
 
@@ -127,6 +125,7 @@ class Eikonal_Solve():
     show : bool, optional
         Show the Eikonal solution, by default False
     """
+
     def __init__(self, HABC, show=False):
         """
         Solve the Eikonal Equation
@@ -143,7 +142,7 @@ class Eikonal_Solve():
         self.c_eik = HABC.c_without_habc
         self.V = HABC.function_space_without_habc
         self.sources = HABC.Wave.sources
-        print('Defining Eikonal Boundaries')
+        print("Defining Eikonal Boundaries")
 
         self.mask, self.weak_bc_constant, self.mask_zero = self.define_mask(
             show=show
@@ -151,14 +150,11 @@ class Eikonal_Solve():
 
         yp = self.solve_eikonal(show=show)
         if show is True:
-            eikonal_file = File('out/Eik.pvd')
+            eikonal_file = File("out/Eik.pvd")
             eikonal_file.write(yp)
 
         temp_values = mapBound(
-            yp,
-            self.mesh,
-            HABC.Wave.length_z,
-            HABC.Wave.length_x
+            yp, self.mesh, HABC.Wave.length_z, HABC.Wave.length_x
         )
 
         min_value = temp_values[0]
@@ -184,20 +180,18 @@ class Eikonal_Solve():
             min_px,
             min_py,
             c_eik.at(min_point),
-            min_value
+            min_value,
         ]
         coordinates_critical_points[1, :] = [
             sec_px,
             sec_py,
             c_eik.at(sec_point),
-            sec_value
+            sec_value,
         ]
 
         if show is True:
             np.savetxt(
-                'out/Eik.txt',
-                coordinates_critical_points,
-                delimiter='\t'
+                "out/Eik.txt", coordinates_critical_points, delimiter="\t"
             )
 
         Z = 1 / min_value
@@ -218,8 +212,8 @@ class Eikonal_Solve():
         mask = Function(Eik_FS)
         mask = sources.make_mask(mask)
         if show is True:
-            File('mask_test.pvd').write(mask)
-            File('c_test.pvd').write(c)
+            File("mask_test.pvd").write(mask)
+            File("c_test.pvd").write(c)
 
         k = Constant(1e4)
         u0 = Constant(1e-3)
@@ -227,16 +221,16 @@ class Eikonal_Solve():
         return mask, k, u0
 
     def solve_eikonal(self, show=False):
-        print('-------------------------------------------')
-        print('Solve Pre-Eikonal')
-        print('-------------------------------------------')
+        print("-------------------------------------------")
+        print("Solve Pre-Eikonal")
+        print("-------------------------------------------")
         yp = self.linear_eikonal(show=show)
-        print('-------------------------------------------')
-        print('Solved pre-eikonal')
-        print('-------------------------------------------')
-        print('-------------------------------------------')
-        print('Solve Post-Eikonal')
-        print('-------------------------------------------')
+        print("-------------------------------------------")
+        print("Solved pre-eikonal")
+        print("-------------------------------------------")
+        print("-------------------------------------------")
+        print("Solve Post-Eikonal")
+        print("-------------------------------------------")
         yp = self.nonlinear_eikonal(yp, show=show)
 
         return yp
@@ -255,12 +249,15 @@ class Eikonal_Solve():
         k = self.weak_bc_constant
         u0 = self.mask_zero
 
-        print('-------------------------------------------')
-        print('Solve Pre-Eikonal')
-        print('-------------------------------------------')
+        print("-------------------------------------------")
+        print("Solve Pre-Eikonal")
+        print("-------------------------------------------")
         f = Constant(1.0)
-        F1 = inner(grad(u), grad(vy))*dx \
-            - f/c*vy*dx + mask * k * inner(u - u0, vy) * dx
+        F1 = (
+            inner(grad(u), grad(vy)) * dx
+            - f / c * vy * dx
+            + mask * k * inner(u - u0, vy) * dx
+        )
 
         A = fire.assemble(lhs(F1))
 
@@ -268,22 +265,22 @@ class Eikonal_Solve():
         B = fire.assemble(rhs(F1), tensor=B)
 
         solver_parameters = {
-            'pc_type': 'hypre',
-            'ksp_type': 'gmres',
-            'linear_ksp_monitor': None,
+            "pc_type": "hypre",
+            "ksp_type": "gmres",
+            "linear_ksp_monitor": None,
             "ksp_monitor": None,
-            'ksp_converged_reason': None,
-            'ksp_monitor_true_residual': None,
+            "ksp_converged_reason": None,
+            "ksp_monitor_true_residual": None,
             "ksp_max_it": 20,
         }
 
         solve(A, yp, B)
-        print('-------------------------------------------')
-        print('Solved pre-eikonal')
-        print('-------------------------------------------')
+        print("-------------------------------------------")
+        print("Solved pre-eikonal")
+        print("-------------------------------------------")
 
         if show is True:
-            output = File('linear.pvd')
+            output = File("linear.pvd")
             output.write(yp)
         return yp
 
@@ -305,29 +302,33 @@ class Eikonal_Solve():
         vy = TestFunction(Eik_FS)
 
         weak_bc = mask * k * inner(yp - u0, vy) * dx
-        F = inner(sqrt(inner(grad(yp), grad(yp))), vy)*dx \
-            + eps*inner(grad(yp), grad(vy))*dx - f / c*vy*dx + weak_bc
+        F = (
+            inner(sqrt(inner(grad(yp), grad(yp))), vy) * dx
+            + eps * inner(grad(yp), grad(vy)) * dx
+            - f / c * vy * dx
+            + weak_bc
+        )
         L = 0
 
-        print('Solve Post-Eikonal')
+        print("Solve Post-Eikonal")
 
         solver_parameters = {
-            'snes_type': 'vinewtonssls',
+            "snes_type": "vinewtonssls",
             "snes_max_it": 1000,
             "snes_atol": 5e-6,
             "snes_rtol": 1e-20,
-            'snes_linesearch_type': 'l2',  # basic bt nleqerr cp l2
+            "snes_linesearch_type": "l2",  # basic bt nleqerr cp l2
             "snes_linesearch_damping": 1.00,  # for basic,l2,cp
             "snes_linesearch_maxstep": 0.50,  # bt,l2,cp
-            'snes_linesearch_order': 2,  # for newtonls com bt
-            'ksp_type': 'gmres',
-            'pc_type': 'lu',
-            'nonlinear_solver': 'snes',
+            "snes_linesearch_order": 2,  # for newtonls com bt
+            "ksp_type": "gmres",
+            "pc_type": "lu",
+            "nonlinear_solver": "snes",
         }
 
         solve(F == L, yp, solver_parameters=solver_parameters)
         if show is True:
-            output = File('nonlinear.pvd')
+            output = File("nonlinear.pvd")
             output.write(yp)
 
         return yp

@@ -122,6 +122,7 @@ class read_options:
     get_from_cell_type_variant()
         Get the method, cell type and variant from the cell type and variant.
     """
+
     def __init__(self, options_dictionary=None):
         default_dictionary = {
             # simplexes such as triangles or tetrahedra (T)
@@ -363,6 +364,7 @@ class read_mesh:
     get_user_mesh()
         Get the user mesh.
     """
+
     def __init__(self, dimension=2, mesh_dictionary=None):
         default_dictionary = {
             # depth in km - always positive

@@ -248,6 +248,7 @@ class Model_parameters:
     get_mesh()
         Reads in a mesh and scatters it between cores.
     """
+
     def __init__(self, dictionary=None, comm=None):
         """Initializes class that reads and sanitizes input parameters.
         A dictionary can be used.

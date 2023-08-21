@@ -45,6 +45,7 @@ class AutomaticMesh:
     create_firedrake_3D_mesh()
         Creates a 3D mesh based on Firedrake meshing utilities.
     """
+
     def __init__(self, dimension=2, comm=None, abc_pad=None):
         """
         Parameters

@@ -7,9 +7,10 @@ from . import helpers
 from .. import utils
 from ..domains.quadrature import quadrature_rules
 
+
 class HABC(AcousticWave):
     def matrix_building(self):
-        """ Builds solver operators. Doesn't create mass matrices if matrix_free option is on,
+        """Builds solver operators. Doesn't create mass matrices if matrix_free option is on,
         which it is by default.
         """
         V = self.function_space
@@ -28,10 +29,16 @@ class HABC(AcousticWave):
         dt = self.dt
 
         # -------------------------------------------------------
-        m1 = ((u - 2.0 * u_n + u_nm1) / Constant(dt ** 2)) * v * dx(rule = quad_rule)
-        a = self.c * self.c * dot(grad(u_n), grad(v)) * dx(rule = quad_rule)  # explicit
-        habc_form = eta*(u - u_n)/Constant(dt) *v*dx(rule=quad_rule)
-        nf = costet1* c * ((u_n - u_nm1) / dt) * v * ds(rule=s_rule)
+        m1 = (
+            ((u - 2.0 * u_n + u_nm1) / Constant(dt**2))
+            * v
+            * dx(rule=quad_rule)
+        )
+        a = (
+            self.c * self.c * dot(grad(u_n), grad(v)) * dx(rule=quad_rule)
+        )  # explicit
+        habc_form = eta * (u - u_n) / Constant(dt) * v * dx(rule=quad_rule)
+        nf = costet1 * c * ((u_n - u_nm1) / dt) * v * ds(rule=s_rule)
 
         B = fire.Function(V)
 
@@ -40,8 +47,10 @@ class HABC(AcousticWave):
         rhs = fire.rhs(form)
 
         A = fire.assemble(lhs, mat_type="matfree")
-        self.solver = fire.LinearSolver(A, solver_parameters=self.solver_parameters)
+        self.solver = fire.LinearSolver(
+            A, solver_parameters=self.solver_parameters
+        )
 
-        #lterar para como o thiago fez
+        # lterar para como o thiago fez
         self.rhs = rhs
         self.B = B

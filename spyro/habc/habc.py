@@ -5,6 +5,7 @@ import firedrake as fire
 from firedrake import dot, grad
 import finat
 import scipy
+
 # Work from Ruben Andres Salas,
 # Andre Luis Ferreira da Silva,
 # Luis Fernando Nogueira de Sá, Emilio Carlos Nelli Silva, Hybrid absorbing
@@ -75,6 +76,7 @@ class HABC:
         Calculates the critical pressure history
 
     """
+
     def __init__(self, Wave_object, h_min=None, fwi_iteration=0):
         """Initializes class and gets a wave object as an input.
 
@@ -108,14 +110,16 @@ class HABC:
         self.source_position = source_position
         self.Wave = Wave_object
         self.dt = Wave_object.dt
-        self.TipLay = 'rectangular'
-        if self.TipLay == 'rectangular':
+        self.TipLay = "rectangular"
+        if self.TipLay == "rectangular":
             self.nexp = np.nan
-        elif self.TipLay == 'hyperelliptical':
+        elif self.TipLay == "hyperelliptical":
             self.nexp = 2
         else:
-            UserWarning(f"Please use 'rectangular' or \
-                'hyperelliptical', f{self.TipLay} not supported.")
+            UserWarning(
+                f"Please use 'rectangular' or \
+                'hyperelliptical', f{self.TipLay} not supported."
+            )
         # print(f"h_min = {h_min}")
         # if h_min is None:
         #     h_min = self._minimum_h_calc()
@@ -161,14 +165,18 @@ class HABC:
 
     def _store_data_without_HABC(self):
         self.mesh_without_habc = make_eikonal_mesh(self.Lz, self.Lx, self.h_min)
-        self.function_space_without_habc = make_eikonal_function_space(self.mesh_without_habc)
-        self.c_without_habc = fire.project(self.Wave.c, self.function_space_without_habc)
+        self.function_space_without_habc = make_eikonal_function_space(
+            self.mesh_without_habc
+        )
+        self.c_without_habc = fire.project(
+            self.Wave.c, self.function_space_without_habc
+        )
 
         self.sources_without_habc = self.Wave.sources
 
     def _minimum_h_calc(self):
         diameters = fire.CellDiameter(self.mesh)
-        value = fire.assemble(diameters*fire.dx)
+        value = fire.assemble(diameters * fire.dx)
 
         return value
 
@@ -192,7 +200,7 @@ class HABC:
         print(f"L ref = {lref}")
         self.pad_length = pad_length
 
-        # fref, F_L, pad_length = habc_size(Lz, Lx, posCrit, source_position, 
+        # fref, F_L, pad_length = habc_size(Lz, Lx, posCrit, source_position,
         # initial_frequency, it_fwi, lmin, Z, histPcrit=None, TipLay='REC',
         # nexp=np.nan)
 
@@ -204,7 +212,7 @@ class HABC:
         pad_length = self.pad_length
 
         Lz = self.Lz + pad_length
-        Lx = self.Lx + 2*pad_length
+        Lx = self.Lx + 2 * pad_length
         nz = int(self.Lz / h_min) + int(pad_length / h_min)
         nx = int(self.Lx / h_min) + int(2 * pad_length / h_min)
         nx = nx + nx % 2
@@ -213,9 +221,9 @@ class HABC:
         return mesh
 
     def get_histPcrit(self):
-        '''
+        """
         Returns pressure value at critical point
-        '''
+        """
         if self.fwi_iteration == 0:
             return None
         else:
