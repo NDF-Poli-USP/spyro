@@ -89,6 +89,39 @@ def check_if_mesh_file_exists(file_name):
 
 
 class read_options:
+    """
+    Read the options section of the dictionary.
+
+    Attributes
+    ----------
+    options_dictionary : dict
+        Dictionary containing the options information.
+    cell_type : str
+        The cell type to be used.
+    method : str
+        The FEM method to be used.
+    variant : str
+        The quadrature variant to be used.
+    degree : int
+        The polynomial degree of the FEM method.
+    dimension : int
+        The spatial dimension of the problem.
+    automatic_adjoint : bool
+        Whether to automatically compute the adjoint.
+
+    Methods
+    -------
+    check_valid_degree()
+        Check that the degree is valid for the method.
+    _check_valid_degree_for_mlt()
+        Check that the degree is valid for the MLT method.
+    check_mismatch_cell_type_variant_method()
+        Check that the user has not specified both the method and the cell type.
+    get_from_method()
+        Get the method, cell type and variant from the method.
+    get_from_cell_type_variant()
+        Get the method, cell type and variant from the cell type and variant.
+    """
     def __init__(self, options_dictionary=None):
         default_dictionary = {
             # simplexes such as triangles or tetrahedra (T)
@@ -295,6 +328,41 @@ class read_options:
 
 
 class read_mesh:
+    """
+    Read the mesh section of the dictionary.
+
+    Attributes
+    ----------
+    mesh_dictionary : dict
+        Dictionary containing the mesh information.
+    dimension : int
+        The spatial dimension of the problem.
+    mesh_file : str
+        The mesh file name.
+    mesh_type : str
+        The type of mesh.
+    user_mesh : bool
+        Whether the user has provided a mesh.
+    firedrake_mesh : bool
+        Whether the user requires a firedrake mesh.
+    length_z : float
+        The length in the z direction.
+    length_x : float
+        The length in the x direction.
+    length_y : float
+        The length in the y direction.
+
+    Methods
+    -------
+    get_mesh_file_info()
+        Get the mesh file name.
+    get_mesh_type()
+        Get the mesh type.
+    _derive_mesh_type()
+        Derive the mesh type.
+    get_user_mesh()
+        Get the user mesh.
+    """
     def __init__(self, dimension=2, mesh_dictionary=None):
         default_dictionary = {
             # depth in km - always positive
