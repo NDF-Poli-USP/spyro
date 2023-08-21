@@ -49,6 +49,6 @@ jobs:
     #       cp /home/olender/Testing_files/velocity_models/* velocity_models/
     #       cp /home/olender/Testing_files/meshes/* meshes/
     #       mpiexec -n 10 pytest --cov-report=xml --cov-append --cov=spyro test_3d/test_forward_3d.py 
-    # - name: Uploading coverage to Codecov
-    #   run: export CODECOV_TOKEN="6cd21147-54f7-4b77-94ad-4b138053401d" && bash <(curl -s https://codecov.io/bash)
+    - name: Uploading coverage to Codecov
+      run: export CODECOV_TOKEN="057ec853-d7ea-4277-819b-0c5ea2f9ff57" && bash <(curl -s https://codecov.io/bash)
 
