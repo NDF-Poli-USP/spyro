@@ -13,5 +13,5 @@ def get_default_parameters_for_method(method):
         }
     else:
         solver_parameters = None
-    
+
     return solver_parameters

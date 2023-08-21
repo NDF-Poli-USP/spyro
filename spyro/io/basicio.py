@@ -36,7 +36,8 @@ def ensemble_save_or_load(func):
                         **dict(
                             kwargs,
                             source_id=snum,
-                            file_name="shots/"+custom_file_name
+                            file_name="shots/"
+                            + custom_file_name
                             + str(snum + 1)
                             + ".dat",
                         )
@@ -323,12 +324,12 @@ def interpolate(Model, fname, V):
 
     Parameters
     ----------
-    Model: Firedrake.Model
-        The model
+    Model: spyro object
+        Model options and parameters.
     fname: str
-        The filename of the function to interpolate
-    V: Firedrake.FunctionSpace
-        The function space to interpolate to
+        The name of the HDF5 file containing the seismic velocity model.
+    V: Firedrake.FunctionSpace object
+        The space of the finite elements.
 
     Returns
     -------
@@ -417,10 +418,8 @@ def read_mesh(model_parameters):
 
     Parameters
     ----------
-    model: `dictionary`
+    model_parameters: spyro object
         Model options and parameters.
-    ens_comm: Firedrake.ensemble_communicator
-        An ensemble communicator
 
     Returns
     -------
@@ -470,5 +469,8 @@ def read_mesh(model_parameters):
 
 
 def parallel_print(string, comm):
+    """
+    Just prints a string in comm 0
+    """
     if comm.ensemble_comm.rank == 0 and comm.comm.rank == 0:
         print(string, flush=True)

@@ -54,7 +54,7 @@ def plot_shots(
 
     arr = Wave_object.receivers_output
 
-    nt = int(tf / dt)  + 1 # number of timesteps
+    nt = int(tf / dt) + 1  # number of timesteps
 
     if end_index == 0:
         end_index = num_recvs

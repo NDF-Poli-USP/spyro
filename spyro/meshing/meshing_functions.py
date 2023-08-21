@@ -2,7 +2,50 @@ import firedrake as fire
 
 
 class AutomaticMesh:
-    def __init__(self, dimension=2, comm=None):
+    """
+    Class for automatic meshing.
+
+    Attributes
+    ----------
+    dimension : int
+        Spatial dimension of the mesh.
+    length_z : float
+        Length of the domain in the z direction.
+    length_x : float
+        Length of the domain in the x direction.
+    length_y : float
+        Length of the domain in the y direction.
+    dx : float
+        Mesh size.
+    quadrilateral : bool
+        If True, the mesh is quadrilateral.
+    periodic : bool
+        If True, the mesh is periodic.
+    comm : MPI communicator
+        MPI communicator.
+    mesh_type : str
+        Type of the mesh.
+    abc_pad : float
+        Padding to be added to the domain.
+
+    Methods
+    -------
+    set_mesh_size(length_z=None, length_x=None, length_y=None)
+        Sets the mesh size.
+    set_meshing_parameters(dx=None, cell_type=None, mesh_type=None)
+        Sets the meshing parameters.
+    make_periodic()
+        Sets the mesh boundaries periodic.
+    create_mesh()
+        Creates the mesh.
+    create_firedrake_mesh()
+        Creates a 2D mesh based on Firedrake meshing utilities.
+    create_firedrake_2D_mesh()
+        Creates a 2D mesh based on Firedrake meshing utilities.
+    create_firedrake_3D_mesh()
+        Creates a 3D mesh based on Firedrake meshing utilities.
+    """
+    def __init__(self, dimension=2, comm=None, abc_pad=None):
         """
         Parameters
         ----------
@@ -19,7 +62,13 @@ class AutomaticMesh:
         self.quadrilateral = False
         self.periodic = False
         self.comm = comm
-        self.mesh_type = 'firedrake_mesh'
+        self.mesh_type = "firedrake_mesh"
+        if abc_pad is None:
+            self.abc_pad = 0.0
+        elif abc_pad >= 0.0:
+            self.abc_pad = abc_pad
+        else:
+            raise ValueError("abc_pad must be positive")
 
     def set_mesh_size(self, length_z=None, length_x=None, length_y=None):
         """
@@ -66,15 +115,17 @@ class AutomaticMesh:
             self.dx = dx
         if mesh_type is not None:
             self.mesh_type = mesh_type
-    
+
     def make_periodic(self):
         """
         Sets the mesh boundaries periodic.
         """
         self.periodic = True
-        if self.mesh_type is not 'firedrake_mesh':
-            raise ValueError('periodic mesh is only supported for firedrake_mesh')
-    
+        if self.mesh_type != "firedrake_mesh":
+            raise ValueError(
+                "periodic mesh is only supported for firedrake_mesh"
+            )
+
     def create_mesh(self):
         """
         Creates the mesh.
@@ -84,15 +135,23 @@ class AutomaticMesh:
         mesh : Firedrake Mesh
             Mesh
         """
-        if self.dx is None and self.mesh_type == 'firedrake_mesh':
-            raise ValueError('dx is not set')
-        elif self.mesh_type == 'firedrake_mesh' and self.dimension == 2:
+        if self.mesh_type == "firedrake_mesh":
+            return self.create_firedrake_mesh()
+        elif self.mesh_type == "SeismicMesh":
+            raise NotImplementedError("Not implemented yet")
+        else:
+            raise ValueError("mesh_type is not supported")
+
+    def create_firedrake_mesh(self):
+        if self.dx is None:
+            raise ValueError("dx is not set")
+        elif self.dimension == 2:
             return self.create_firedrake_2D_mesh()
-        elif self.mesh_type == 'firedrake_mesh' and self.dimension == 3:
+        elif self.dimension == 3:
             return self.create_firedrake_3D_mesh()
         else:
-            raise ValueError('mesh_type is not supported')
-    
+            raise ValueError("dimension is not supported")
+
     def create_firedrake_2D_mesh(self):
         """
         Creates a 2D mesh based on Firedrake meshing utilities.
@@ -113,6 +172,7 @@ class AutomaticMesh:
                 self.length_x,
                 quadrilateral=quadrilateral,
                 comm=comm.comm,
+                pad=self.abc_pad,
             )
         else:
             return RectangleMesh(
@@ -122,8 +182,9 @@ class AutomaticMesh:
                 self.length_x,
                 quadrilateral=quadrilateral,
                 comm=comm.comm,
+                pad=self.abc_pad,
             )
-    
+
     def create_firedrake_3D_mesh(self):
         dx = self.dx
         nx = int(self.length_x / dx)

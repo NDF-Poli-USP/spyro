@@ -1,5 +1,8 @@
 import warnings
-import spyro
+from .. import io
+from .. import utils
+from .. import meshing
+from ..sources import full_ricker_wavelet
 
 # default_optimization_parameters = {
 #     "General": {"Secant": {"Type": "Limited-Memory BFGS",
@@ -121,6 +124,130 @@ import spyro
 
 
 class Model_parameters:
+    """
+    Class that reads and sanitizes input parameters.
+
+    Attributes
+    ----------
+    input_dictionary: dictionary
+        Contains all input parameters already organized based on examples
+        from github.
+    cell_type: str
+        Type of cell used in meshing. Can be "T" for triangles or "Q" for
+        quadrilaterals.
+    method: str
+        Method used in meshing. Can be "MLT" for mass lumped triangles,
+        "spectral_quadrilateral" for spectral quadrilaterals, "DG_triangle"
+        for discontinuous Galerkin triangles, or "DG_quadrilateral" for
+        discontinuous Galerkin quadrilaterals.
+    variant: str
+        Variant used in meshing. Can be "lumped" for lumped mass matrices,
+        "equispaced" for equispaced nodes, or "DG" for discontinuous Galerkin
+        nodes.
+    degree: int
+        Degree of the basis functions used in the FEM.
+    dimension: int
+        Dimension of the mesh.
+    final_time: float
+        Final time of the simulation.
+    dt: float
+        Time step of the simulation.
+    initial_time: float
+        Initial time of the simulation.
+    output_frequency: int
+        Frequency of outputting the solution to pvd files.
+    gradient_sampling_frequency: int
+        Frequency of saving the solution to RAM.
+    number_of_sources: int
+        Number of sources used in the simulation.
+    source_locations: list
+        List of source locations.
+    frequency: float
+        Frequency of the source.
+    amplitude: float
+        Amplitude of the source.
+    delay: float
+        Delay of the source.
+    number_of_receivers: int
+        Number of receivers used in the simulation.
+    receiver_locations: list
+        List of receiver locations.
+    parallelism_type: str
+        Type of parallelism used in the simulation. Can be "automatic" for
+        automatic parallelism or "spatial" for spatial parallelism.
+    mesh_file: str
+        Path to the mesh file.
+    length_z: float
+        Length of the domain in the z-direction.
+    length_x: float
+        Length of the domain in the x-direction.
+    length_y: float
+        Length of the domain in the y-direction.
+    user_mesh: spyro.Mesh
+        User defined mesh.
+    firedrake_mesh: firedrake.Mesh
+        Firedrake mesh.
+    abc_status: bool
+        Whether or not the absorbing boundary conditions are used.
+    abc_exponent: int
+        Exponent of the absorbing boundary conditions.
+    abc_cmax: float
+        Maximum acoustic wave velocity in the absorbing boundary conditions.
+    abc_R: float
+        Theoretical reflection coefficient of the absorbing boundary
+        conditions.
+    abc_pad_length: float
+        Thickness of the absorbing boundary conditions.
+    source_type: str
+        Type of source used in the simulation. Can be "ricker" for a Ricker
+        wavelet or "MMS" for a manufactured solution.
+    running_fwi: bool
+        Whether or not the simulation is a FWI.
+    initial_velocity_model_file: str
+        Path to the initial velocity model file.
+    fwi_output_folder: str
+        Path to the FWI output folder.
+    control_output_file: str
+        Path to the control output file.
+    gradient_output_file: str
+        Path to the gradient output file.
+    optimization_parameters: dict
+        Dictionary of the optimization parameters.
+    automatic_adjoint: bool
+        Whether or not the adjoint is calculated automatically.
+    forward_output: bool
+        Whether or not the forward output is saved.
+    fwi_velocity_model_output: bool
+        Whether or not the FWI velocity model output is saved.
+    gradient_output: bool
+        Whether or not the gradient output is saved.
+    adjoint_output: bool
+        Whether or not the adjoint output is saved.
+    forward_output_file: str
+        Path to the forward output file.
+    fwi_velocity_model_output_file: str
+        Path to the FWI velocity model output file.
+    gradient_output_file: str
+        Path to the gradient output file.
+    adjoint_output_file: str
+        Path to the adjoint output file.
+    comm: MPI communicator
+        MPI communicator.
+    velocity_model_type: str
+        Type of velocity model used in the simulation. Can be "file" for a
+        file, "conditional" for a conditional, or None for no velocity model.
+    velocity_conditional: str
+        Conditional used for the velocity model.
+
+    Methods
+    -------
+    get_wavelet()
+        Returns a wavelet based on the source type.
+    set_mesh()
+        Sets the mesh.
+    get_mesh()
+        Reads in a mesh and scatters it between cores.
+    """
     def __init__(self, dictionary=None, comm=None):
         """Initializes class that reads and sanitizes input parameters.
         A dictionary can be used.
@@ -140,12 +267,12 @@ class Model_parameters:
         # Converts old dictionary to new one. Deprecated feature
         if "opts" in dictionary:
             warnings.warn("Old deprecated dictionary style in usage.")
-            dictionary = spyro.io.Dictionary_conversion(dictionary).new_dictionary
+            dictionary = io.Dictionary_conversion(dictionary).new_dictionary
         # Saves inout_dictionary internally
         self.input_dictionary = dictionary
 
         # Sanitizes method or cell_type+variant inputs
-        Options = spyro.io.dictionaryio.read_options(self.input_dictionary["options"])
+        Options = io.dictionaryio.read_options(self.input_dictionary["options"])
         self.cell_type = Options.cell_type
         self.method = Options.method
         self.variant = Options.variant
@@ -160,7 +287,7 @@ class Model_parameters:
 
         # Checking mesh_parameters
         # self._sanitize_mesh()
-        Mesh_parameters = spyro.io.dictionaryio.read_mesh(
+        Mesh_parameters = io.dictionaryio.read_mesh(
             mesh_dictionary=self.input_dictionary["mesh"],
             dimension=self.dimension,
         )
@@ -204,33 +331,18 @@ class Model_parameters:
     #     "ly": 0.0,
     # }
     def _sanitize_absorving_boundary_condition(self):
-        if "absorving_boundary_conditions" in self.input_dictionary:
-            dictionary = self.input_dictionary["absorving_boundary_conditions"]
-        else:
-            dictionary = {"status": False}
+        if "absorving_boundary_conditions" not in self.input_dictionary:
+            self.input_dictionary["absorving_boundary_conditions"] = {
+                "status": False
+            }
+        dictionary = self.input_dictionary["absorving_boundary_conditions"]
         self.abc_status = dictionary["status"]
 
-        if "outer_bc" in dictionary:
-            self.abc_outer_bc = dictionary["outer_bc"]
-        else:
-            self.abc_outer_bc = None
-
-        if self.abc_status:
-            self.abc_damping_type = dictionary["damping_type"]
-            self.abc_exponent = dictionary["exponent"]
-            self.abc_cmax = dictionary["cmax"]
-            self.abc_R = dictionary["R"]
-            self.abc_lz = dictionary["lz"]
-            self.abc_lx = dictionary["lx"]
-            self.abc_ly = dictionary["ly"]
-        else:
-            self.abc_damping_type = None
-            self.abc_exponent = None
-            self.abc_cmax = None
-            self.abc_R = None
-            self.abc_lz = 0.0
-            self.abc_lx = 0.0
-            self.abc_ly = 0.0
+        BL_obj = io.boundary_layer_io.read_boundary_layer(dictionary)
+        self.abc_exponent = BL_obj.abc_exponent
+        self.abc_cmax = BL_obj.abc_cmax
+        self.abc_R = BL_obj.abc_R
+        self.abc_pad_length = BL_obj.abc_pad_length
 
     def _sanitize_output(self):
         #         default_dictionary["visualization"] = {
@@ -273,7 +385,7 @@ class Model_parameters:
             self.adjoint_output = dictionary["adjoint_output"]
         else:
             self.adjoint_output = False
-        
+
         # Getting output file names
         self._sanitize_output_files()
 
@@ -329,7 +441,7 @@ class Model_parameters:
                 delay_type = self.input_dictionary["acquisition"]["delay_type"]
             else:
                 delay_type = "multiples_of_minimun"
-            wavelet = spyro.full_ricker_wavelet(
+            wavelet = full_ricker_wavelet(
                 dt=self.dt,
                 final_time=self.final_time,
                 frequency=self.frequency,
@@ -362,17 +474,30 @@ class Model_parameters:
             self.parallelism_type = "automatic"
 
         if comm is None:
-            self.comm = spyro.utils.mpi_init(self)
+            self.comm = utils.mpi_init(self)
             self.comm.comm.barrier()
         else:
             self.comm = comm
 
     def _sanitize_acquisition(self):
         dictionary = self.input_dictionary["acquisition"]
-        self.number_of_sources = len(dictionary["source_locations"])
-        self.source_locations = dictionary["source_locations"]
         self.number_of_receivers = len(dictionary["receiver_locations"])
         self.receiver_locations = dictionary["receiver_locations"]
+
+        # Check ricker source:
+        self.source_type = dictionary["source_type"]
+        if self.source_type == "Ricker":
+            self.source_type = "ricker"
+        elif self.source_type == "MMS":
+            self.number_of_sources = 0
+            self.source_locations = []
+            self.frequency = None
+            self.amplitude = None
+            self.delay = None
+            return
+
+        self.number_of_sources = len(dictionary["source_locations"])
+        self.source_locations = dictionary["source_locations"]
         self.frequency = dictionary["frequency"]
         if "amplitude" in dictionary:
             self.amplitude = dictionary["amplitude"]
@@ -383,11 +508,6 @@ class Model_parameters:
         else:
             self.delay = 1.5
         self.__check_acquisition()
-
-        # Check ricker source:
-        self.source_type = dictionary["source_type"]
-        if self.source_type == "Ricker":
-            self.source_type = "ricker"
 
     def _sanitize_optimization_and_velocity(self):
         """
@@ -405,7 +525,7 @@ class Model_parameters:
 
         if dictionary["inversion"]["perform_fwi"]:
             self.running_fwi = True
-        
+
         if self.running_fwi:
             self._sanitize_optimization_and_velocity_for_fwi()
         else:
@@ -443,9 +563,9 @@ class Model_parameters:
     def _sanitize_optimization_and_velocity_without_fwi(self):
         dictionary = self.input_dictionary
         if "synthetic_data" in dictionary:
-            self.initial_velocity_model_file = dictionary[
-                "synthetic_data"
-            ]["real_velocity_file"]
+            self.initial_velocity_model_file = dictionary["synthetic_data"][
+                "real_velocity_file"
+            ]
         else:
             dictionary["synthetic_data"] = {"real_velocity_file": None}
             self.initial_velocity_model_file = None
@@ -516,12 +636,11 @@ class Model_parameters:
             Whether the domain is periodic. The default is False.
         """
 
-        if length_z is not None:
-            self.length_z = length_z
-        if length_x is not None:
-            self.length_x = length_x
-        if length_y is not None:
-            self.length_y = length_y
+        self._set_mesh_length(
+            length_z=length_z,
+            length_x=length_x,
+            length_y=length_y,
+        )
 
         if user_mesh is not None:
             self.user_mesh = user_mesh
@@ -530,26 +649,23 @@ class Model_parameters:
             self.mesh_file = mesh_file
             self.mesh_type = "file"
         elif self.mesh_type == "firedrake_mesh":
-            AutoMeshing = spyro.meshing.AutomaticMesh(dimension=self.dimension, comm=self.comm)
-        
-        if periodic and self.mesh_type == "firedrake_mesh":
-            AutoMeshing.make_periodic()
-        elif periodic and self.mesh_type != "firedrake_mesh":
-            raise ValueError("Periodic meshes only supported for firedrake meshes.")
+            AutoMeshing = meshing.AutomaticMesh(
+                dimension=self.dimension,
+                comm=self.comm,
+                abc_pad=self.abc_pad_length,
+            )
 
-        if (
-            dx is not None
-            and self.mesh_type == "firedrake_mesh"
-        ):
+        if periodic:
+            AutoMeshing.make_periodic()
+
+        if self.mesh_type == "firedrake_mesh":
             AutoMeshing.set_mesh_size(
                 length_z=self.length_z,
                 length_x=self.length_x,
                 length_y=self.length_y,
             )
             AutoMeshing.set_meshing_parameters(
-                dx=dx,
-                cell_type=self.cell_type,
-                mesh_type=self.mesh_type
+                dx=dx, cell_type=self.cell_type, mesh_type=self.mesh_type
             )
             self.user_mesh = AutoMeshing.create_mesh()
 
@@ -562,6 +678,19 @@ class Model_parameters:
                 "Mesh dimensions not completely reset from initial dictionary"
             )
 
+    def _set_mesh_length(
+        self,
+        length_z=None,
+        length_x=None,
+        length_y=None,
+    ):
+        if length_z is not None:
+            self.length_z = length_z
+        if length_x is not None:
+            self.length_x = length_x
+        if length_y is not None:
+            self.length_y = length_y
+
     def get_mesh(self):
         """Reads in an external mesh and scatters it between cores.
 
@@ -571,7 +700,7 @@ class Model_parameters:
             The distributed mesh across `ens_comm`
         """
         if self.mesh_file is not None:
-            return spyro.io.read_mesh(self)
+            return io.read_mesh(self)
         elif (
             self.mesh_type == "user_mesh" or self.mesh_type == "firedrake_mesh"
         ):
