@@ -1,4 +1,5 @@
 import os
+from abc import abstractmethod
 import warnings
 import firedrake as fire
 from firedrake import sin, cos, pi  # noqa: F401
@@ -78,17 +79,23 @@ class Wave(Model_parameters):
         self.mesh = self.get_mesh()
         if self.mesh is not None and self.mesh is not False:
             self._build_function_space()
-            if self.source_type == "ricker":
-                self.sources = Sources(self)
-            else:
-                self.sources = None
-            self.receivers = Receivers(self)
+            self._map_sources_and_receivers()
         elif self.mesh_type == "firedrake_mesh":
             warnings.warn(
                 "No mesh file, Firedrake mesh will be automatically generated."
             )
         else:
             warnings.warn("No mesh found. Please define a mesh.")
+
+    @abstractmethod
+    def forward_solve(self):
+        """Solves the forward problem."""
+        pass
+
+    @abstractmethod
+    def matrix_building(self):
+        """Builds the matrix for the forward problem."""
+        pass
 
     def set_mesh(
         self,
@@ -112,11 +119,7 @@ class Wave(Model_parameters):
 
         self.mesh = self.get_mesh()
         self._build_function_space()
-        if self.source_type == "ricker":
-            self.sources = Sources(self)
-        else:
-            self.sources = None
-        self.receivers = Receivers(self)
+        self._map_sources_and_receivers()
         if self.dimension == 2:
             z, x = fire.SpatialCoordinate(self.mesh)
             self.mesh_z = z
@@ -137,11 +140,9 @@ class Wave(Model_parameters):
 
     def get_spatial_coordinates(self):
         if self.dimension == 2:
-            x, y = fire.SpatialCoordinate(self.mesh)
-            return x, y
+            return self.mesh_z, self.mesh_x
         elif self.dimension == 3:
-            x, y, z = fire.SpatialCoordinate(self.mesh)
-            return x, y, z
+            return self.mesh_z, self.mesh_x, self.mesh_y
 
     def set_initial_velocity_model(
         self,
@@ -203,6 +204,13 @@ class Wave(Model_parameters):
             fire.File("initial_velocity_model.pvd").write(
                 self.initial_velocity_model, name="velocity"
             )
+
+    def _map_sources_and_receivers(self):
+        if self.source_type == "ricker":
+            self.sources = Sources(self)
+        else:
+            self.sources = None
+        self.receivers = Receivers(self)
 
     def _get_initial_velocity_model(self):
         if self.velocity_model_type == "conditional":
