@@ -2,6 +2,49 @@ import firedrake as fire
 
 
 class AutomaticMesh:
+    """
+    Class for automatic meshing.
+
+    Attributes
+    ----------
+    dimension : int
+        Spatial dimension of the mesh.
+    length_z : float
+        Length of the domain in the z direction.
+    length_x : float
+        Length of the domain in the x direction.
+    length_y : float
+        Length of the domain in the y direction.
+    dx : float
+        Mesh size.
+    quadrilateral : bool
+        If True, the mesh is quadrilateral.
+    periodic : bool
+        If True, the mesh is periodic.
+    comm : MPI communicator
+        MPI communicator.
+    mesh_type : str
+        Type of the mesh.
+    abc_pad : float
+        Padding to be added to the domain.
+
+    Methods
+    -------
+    set_mesh_size(length_z=None, length_x=None, length_y=None)
+        Sets the mesh size.
+    set_meshing_parameters(dx=None, cell_type=None, mesh_type=None)
+        Sets the meshing parameters.
+    make_periodic()
+        Sets the mesh boundaries periodic.
+    create_mesh()
+        Creates the mesh.
+    create_firedrake_mesh()
+        Creates a 2D mesh based on Firedrake meshing utilities.
+    create_firedrake_2D_mesh()
+        Creates a 2D mesh based on Firedrake meshing utilities.
+    create_firedrake_3D_mesh()
+        Creates a 3D mesh based on Firedrake meshing utilities.
+    """
     def __init__(self, dimension=2, comm=None, abc_pad=None):
         """
         Parameters

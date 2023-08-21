@@ -325,14 +325,12 @@ def interpolate(Model, fname, V):
 
     Parameters
     ----------
-    model: `dictionary`
+    Model: spyro object
         Model options and parameters.
-    mesh: Firedrake.mesh object
-        A mesh object read in by Firedrake.
+    fname: str
+        The name of the HDF5 file containing the seismic velocity model.
     V: Firedrake.FunctionSpace object
         The space of the finite elements.
-    guess: boolean, optinal
-        Is it a guess model or a `exact` model?
 
     Returns
     -------
@@ -421,10 +419,8 @@ def read_mesh(model_parameters):
 
     Parameters
     ----------
-    model: `dictionary`
+    model_parameters: spyro object
         Model options and parameters.
-    ens_comm: Firedrake.ensemble_communicator
-        An ensemble communicator
 
     Returns
     -------
@@ -474,5 +470,8 @@ def read_mesh(model_parameters):
 
 
 def parallel_print(string, comm):
+    """
+    Just prints a string in comm 0
+    """
     if comm.ensemble_comm.rank == 0 and comm.comm.rank == 0:
         print(string, flush=True)

@@ -124,6 +124,130 @@ from ..sources import full_ricker_wavelet
 
 
 class Model_parameters:
+    """
+    Class that reads and sanitizes input parameters.
+
+    Attributes
+    ----------
+    input_dictionary: dictionary
+        Contains all input parameters already organized based on examples
+        from github.
+    cell_type: str
+        Type of cell used in meshing. Can be "T" for triangles or "Q" for
+        quadrilaterals.
+    method: str
+        Method used in meshing. Can be "MLT" for mass lumped triangles,
+        "spectral_quadrilateral" for spectral quadrilaterals, "DG_triangle"
+        for discontinuous Galerkin triangles, or "DG_quadrilateral" for
+        discontinuous Galerkin quadrilaterals.
+    variant: str
+        Variant used in meshing. Can be "lumped" for lumped mass matrices,
+        "equispaced" for equispaced nodes, or "DG" for discontinuous Galerkin
+        nodes.
+    degree: int
+        Degree of the basis functions used in the FEM.
+    dimension: int
+        Dimension of the mesh.
+    final_time: float
+        Final time of the simulation.
+    dt: float
+        Time step of the simulation.
+    initial_time: float
+        Initial time of the simulation.
+    output_frequency: int
+        Frequency of outputting the solution to pvd files.
+    gradient_sampling_frequency: int
+        Frequency of saving the solution to RAM.
+    number_of_sources: int
+        Number of sources used in the simulation.
+    source_locations: list
+        List of source locations.
+    frequency: float
+        Frequency of the source.
+    amplitude: float
+        Amplitude of the source.
+    delay: float
+        Delay of the source.
+    number_of_receivers: int
+        Number of receivers used in the simulation.
+    receiver_locations: list
+        List of receiver locations.
+    parallelism_type: str
+        Type of parallelism used in the simulation. Can be "automatic" for
+        automatic parallelism or "spatial" for spatial parallelism.
+    mesh_file: str
+        Path to the mesh file.
+    length_z: float
+        Length of the domain in the z-direction.
+    length_x: float
+        Length of the domain in the x-direction.
+    length_y: float
+        Length of the domain in the y-direction.
+    user_mesh: spyro.Mesh
+        User defined mesh.
+    firedrake_mesh: firedrake.Mesh
+        Firedrake mesh.
+    abc_status: bool
+        Whether or not the absorbing boundary conditions are used.
+    abc_exponent: int
+        Exponent of the absorbing boundary conditions.
+    abc_cmax: float
+        Maximum acoustic wave velocity in the absorbing boundary conditions.
+    abc_R: float
+        Theoretical reflection coefficient of the absorbing boundary
+        conditions.
+    abc_pad_length: float
+        Thickness of the absorbing boundary conditions.
+    source_type: str
+        Type of source used in the simulation. Can be "ricker" for a Ricker
+        wavelet or "MMS" for a manufactured solution.
+    running_fwi: bool
+        Whether or not the simulation is a FWI.
+    initial_velocity_model_file: str
+        Path to the initial velocity model file.
+    fwi_output_folder: str
+        Path to the FWI output folder.
+    control_output_file: str
+        Path to the control output file.
+    gradient_output_file: str
+        Path to the gradient output file.
+    optimization_parameters: dict
+        Dictionary of the optimization parameters.
+    automatic_adjoint: bool
+        Whether or not the adjoint is calculated automatically.
+    forward_output: bool
+        Whether or not the forward output is saved.
+    fwi_velocity_model_output: bool
+        Whether or not the FWI velocity model output is saved.
+    gradient_output: bool
+        Whether or not the gradient output is saved.
+    adjoint_output: bool
+        Whether or not the adjoint output is saved.
+    forward_output_file: str
+        Path to the forward output file.
+    fwi_velocity_model_output_file: str
+        Path to the FWI velocity model output file.
+    gradient_output_file: str
+        Path to the gradient output file.
+    adjoint_output_file: str
+        Path to the adjoint output file.
+    comm: MPI communicator
+        MPI communicator.
+    velocity_model_type: str
+        Type of velocity model used in the simulation. Can be "file" for a
+        file, "conditional" for a conditional, or None for no velocity model.
+    velocity_conditional: str
+        Conditional used for the velocity model.
+
+    Methods
+    -------
+    get_wavelet()
+        Returns a wavelet based on the source type.
+    set_mesh()
+        Sets the mesh.
+    get_mesh()
+        Reads in a mesh and scatters it between cores.
+    """
     def __init__(self, dictionary=None, comm=None):
         """Initializes class that reads and sanitizes input parameters.
         A dictionary can be used.
