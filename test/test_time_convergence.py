@@ -1,17 +1,14 @@
 import spyro
-from firedrake import RectangleMesh, conditional, UnitSquareMesh, Function, FunctionSpace, File
-import firedrake as fire
 import numpy as np
 import math
-from spyro.io.model_parameters import Model_parameters
-import matplotlib.pyplot as plt
-import sys
+
 
 def error_calc(p_numerical, p_analytical, nt):
     norm = np.linalg.norm(p_numerical, 2) / np.sqrt(nt)
     error_time = np.linalg.norm(p_analytical - p_numerical, 2) / np.sqrt(nt)
     div_error_time = error_time / norm
     return div_error_time
+
 
 def run_forward(dt):
     # dt = float(sys.argv[1])
@@ -50,7 +47,7 @@ def run_forward(dt):
     # This transect of receivers is created with the helper function `create_transect`.
     dictionary["acquisition"] = {
         "source_type": "ricker",
-        "source_locations": [(-1.5-dx, 1.5+dx)],#, (-0.605, 1.7), (-0.61, 1.7), (-0.615, 1.7)],#, (-0.1, 1.5), (-0.1, 2.0), (-0.1, 2.5), (-0.1, 3.0)],
+        "source_locations": [(-1.5-dx, 1.5+dx)],
         "frequency": 5.0,
         "delay": 0.3,
         "receiver_locations": [(-1.5-dx, 2.0+dx)],
@@ -68,7 +65,7 @@ def run_forward(dt):
     }
 
     dictionary["visualization"] = {
-        "forward_output" : True,
+        "forward_output": True,
         "output_filename": "results/forward_output.pvd",
         "fwi_velocity_model_output": False,
         "velocity_model_filename": None,
@@ -85,6 +82,7 @@ def run_forward(dt):
     rec_out = Wave_obj.receivers_output
 
     return rec_out
+
 
 def test_second_order_time_convergence():
     """Test that the second order time convergence  
@@ -111,11 +109,12 @@ def test_second_order_time_convergence():
         nt = len(time)
         numerical_results.append(rec_out.flatten())
         errors.append(error_calc(rec_out.flatten(), rec_anal, nt))
-    
+
     theory = [t**2 for t in dts]
     theory = [errors[0]*th/theory[0] for th in theory]
 
-    assert math.isclose(np.log(theory[-1]),np.log(errors[-1]),rel_tol=1e-2)
+    assert math.isclose(np.log(theory[-1]), np.log(errors[-1]), rel_tol=1e-2)
+
 
 if __name__ == "__main__":
     test_second_order_time_convergence()

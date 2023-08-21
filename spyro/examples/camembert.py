@@ -50,6 +50,7 @@ camembert_dictionary["mesh"] = {
     "Lx": 1.0,  # width in km - always positive
     "Ly": 0.0,  # thickness in km - always positive
     "mesh_file": None,
+    "mesh_type": "firedrake_mesh",  # options: firedrake_mesh or user_mesh
 }
 # For use only if you are using a synthetic test model
 # or a forward only simulation
@@ -67,18 +68,6 @@ camembert_dictionary["inversion"] = {
 # Specify a 250-m PML on the three sides of the domain to damp outgoing waves.
 camembert_dictionary["absorving_boundary_conditions"] = {
     "status": False,  # True or false
-    # None or non-reflective (outer boundary condition)
-    "outer_bc": "non-reflective",
-    "damping_type": "polynomial",  # polynomial, hyperbolic, shifted_hyperbolic
-    "exponent": 2,  # damping layer has a exponent variation
-    "cmax": 4.7,  # maximum acoustic wave velocity in PML - km/s
-    "R": 1e-6,  # theoretical reflection coefficient
-    # thickness of the PML in the z-direction (km) - always positive
-    "lz": 0.25,
-    # thickness of the PML in the x-direction (km) - always positive
-    "lx": 0.25,
-    # thickness of the PML in the y-direction (km) - always positive
-    "ly": 0.0,
 }
 
 # Create a source injection operator. Here we use a single source with a
@@ -137,21 +126,11 @@ class Camembert(Example_model):
         self._camembert_velocity_model()
 
     def _camembert_mesh(self):
-        nz = 100
-        nx = 100
-        Lz = self.Lz
-        Lx = self.Lx
-        if self.cell_type == "quadrilateral":
-            quadrilateral = True
-        else:
-            quadrilateral = False
-        self.user_mesh = fire.RectangleMesh(
-            nz, nx, Lz, Lx, quadrilateral=quadrilateral
-        )
+        super().set_mesh(dx=0.01)
 
     def _camembert_velocity_model(self):
         x, y = fire.SpatialCoordinate(self.mesh)
-        xc = 0.5
+        xc = -0.5
         yc = 0.5
         rc = 0.5
         c_salt = 4.6
