@@ -32,6 +32,9 @@ from ..sources import full_ricker_wavelet
 #     "degree": 4,  # p order
 #     "dimension": 2,  # dimension
 #     "automatic_adjoint": False,
+# OPTIONAL PARAMETERS
+#     "time_integration_scheme": "central_difference",
+#     "equation_type": "second_order_in_pressure",
 # }
 
 # # Number of cores for the shot. For simplicity, we keep things serial.
@@ -238,6 +241,10 @@ class Model_parameters:
         file, "conditional" for a conditional, or None for no velocity model.
     velocity_conditional: str
         Conditional used for the velocity model.
+    equation_type: str
+        Type of equation used in the simulation. Can be "second_order_in_pressure".
+    time_integrator: str
+        Type of time integrator used in the simulation. Can be "central_difference".
 
     Methods
     -------
@@ -278,6 +285,8 @@ class Model_parameters:
         self.variant = Options.variant
         self.degree = Options.degree
         self.dimension = Options.dimension
+        self.time_integrator = self._check_time_integrator()
+        self.equation_type = self._check_equation_type()
 
         # Checks time inputs
         self._sanitize_time_inputs()
@@ -330,6 +339,34 @@ class Model_parameters:
     # # thickness of the PML in the y-direction (km) - always positive
     #     "ly": 0.0,
     # }
+    def _check_time_integrator(self):
+        if "time_integration_scheme" in self.input_dictionary:
+            time_integrator = self.input_dictionary[
+                "time_integration_scheme"
+            ]
+        else:
+            time_integrator = "central_difference"
+
+        if time_integrator != "central_difference":
+            raise ValueError(
+                "The time integrator specified is not implemented yet"
+            )
+
+        return time_integrator
+
+    def _check_equation_type(self):
+        if "equation_type" in self.input_dictionary:
+            equation_type = self.input_dictionary["equation_type"]
+        else:
+            equation_type = "second_order_in_pressure"
+
+        if equation_type != "second_order_in_pressure":
+            raise ValueError(
+                "The equation type specified is not implemented yet"
+            )
+
+        return equation_type
+
     def _sanitize_absorving_boundary_condition(self):
         if "absorving_boundary_conditions" not in self.input_dictionary:
             self.input_dictionary["absorving_boundary_conditions"] = {
@@ -343,6 +380,12 @@ class Model_parameters:
         self.abc_cmax = BL_obj.abc_cmax
         self.abc_R = BL_obj.abc_R
         self.abc_pad_length = BL_obj.abc_pad_length
+        if self.abc_status:
+            self._correct_time_integrator_for_abc()
+
+    def _correct_time_integrator_for_abc(self):
+        if self.time_integrator == "central_difference":
+            self.time_integrator = "mixed_space_central_difference"
 
     def _sanitize_output(self):
         #         default_dictionary["visualization"] = {
@@ -449,7 +492,7 @@ class Model_parameters:
                 amplitude=self.amplitude,
                 delay_type=delay_type,
             )
-        elif self.source_type == "mms_source":
+        elif self.source_type == "MMS":
             wavelet = None
         else:
             raise ValueError(
@@ -473,6 +516,9 @@ class Model_parameters:
             warnings.warn("No paralellism type listed. Assuming automatic")
             self.parallelism_type = "automatic"
 
+        if self.source_type == "MMS":
+            self.parallelism_type = "spatial"
+
         if comm is None:
             self.comm = utils.mpi_init(self)
             self.comm.comm.barrier()
@@ -489,7 +535,7 @@ class Model_parameters:
         if self.source_type == "Ricker":
             self.source_type = "ricker"
         elif self.source_type == "MMS":
-            self.number_of_sources = 0
+            self.number_of_sources = 1
             self.source_locations = []
             self.frequency = None
             self.amplitude = None
