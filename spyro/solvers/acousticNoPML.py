@@ -3,6 +3,7 @@ from firedrake import Constant, dx, dot, grad
 import warnings
 
 from .wave import Wave
+from .time_integration import time_integrator
 from ..io.basicio import ensemble_propagator, parallel_print
 from . import helpers
 from .. import utils
@@ -94,90 +95,12 @@ class AcousticWaveNoPML(Wave):
         u_rec: numpy array
             Pressure wavefield at the receivers across the timesteps.
         """
-        excitations = self.sources
-        excitations.current_source = source_num
-        receivers = self.receivers
-        comm = self.comm
-        temp_filename = self.forward_output_file
-        filename, file_extension = temp_filename.split(".")
-        output_filename = (
-            filename + "sn" + str(source_num) + "." + file_extension
-        )
-        if self.forward_output:
-            parallel_print(f"Saving output in: {output_filename}", self.comm)
+        if final_time is not None:
+            self.final_time = final_time
+        if dt is not None:
+            self.dt = dt
 
-        output = fire.File(output_filename, comm=comm.comm)
-        comm.comm.barrier()
-
-        X = fire.Function(self.function_space)
-        if final_time is None:
-            final_time = self.final_time
-        if dt is None:
-            dt = self.dt
-        t = self.current_time
-        nt = int((final_time - t) / dt) + 1  # number of timesteps
-
-        u_nm1 = self.u_nm1
-        u_n = self.u_n
-        u_np1 = fire.Function(self.function_space)
-
-        rhs_forcing = fire.Function(self.function_space)
-        usol = [
-            fire.Function(self.function_space, name="pressure")
-            for t in range(nt)
-            if t % self.gradient_sampling_frequency == 0
-        ]
-        usol_recv = []
-        save_step = 0
-        B = self.B
-        rhs = self.rhs
-
-        # assembly_callable = create_assembly_callable(rhs, tensor=B)
-
-        for step in range(nt):
-            rhs_forcing.assign(0.0)
-            B = fire.assemble(rhs, tensor=B)
-            f = excitations.apply_source(rhs_forcing, self.wavelet[step])
-            B0 = B.sub(0)
-            B0 += f
-            self.solver.solve(X, B)
-
-            u_np1.assign(X)
-
-            usol_recv.append(
-                self.receivers.interpolate(u_np1.dat.data_ro_with_halos[:])
-            )
-
-            if step % self.gradient_sampling_frequency == 0:
-                usol[save_step].assign(u_np1)
-                save_step += 1
-
-            if (step - 1) % self.output_frequency == 0:
-                assert (
-                    fire.norm(u_n) < 1
-                ), "Numerical instability. Try reducing dt or building the \
-                    mesh differently"
-                if self.forward_output:
-                    output.write(u_n, time=t, name="Pressure")
-
-                helpers.display_progress(self.comm, t)
-
-            u_nm1.assign(u_n)
-            u_n.assign(u_np1)
-
-            t = step * float(dt)
-
-        self.current_time = t
-        helpers.display_progress(self.comm, t)
-
-        usol_recv = helpers.fill(
-            usol_recv, receivers.is_local, nt, receivers.number_of_points
-        )
-        usol_recv = utils.utils.communicate(usol_recv, comm)
-        self.receivers_output = usol_recv
-
-        self.forward_solution = usol
-        self.forward_solution_receivers = usol_recv
+        usol, usol_recv = time_integrator(self, source_id=source_num)
 
         return usol, usol_recv
 
