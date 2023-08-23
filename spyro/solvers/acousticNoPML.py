@@ -32,47 +32,21 @@ class AcousticWaveNoPML(Wave):
         matrix_free option is on,
         which it is by default.
         """
-        V = self.function_space
-        quad_rule, k_rule, s_rule = quadrature_rules(V)
-        self.quadrature_rule = quad_rule
-
-        # typical CG FEM in 2d/3d
-        u = fire.TrialFunction(V)
-        self.trial_function = u
-        v = fire.TestFunction(V)
-
-        u_nm1 = fire.Function(V, name="pressure t-dt")
-        u_n = fire.Function(V, name="pressure")
-        self.u_nm1 = u_nm1
-        self.u_n = u_n
-
         self.current_time = 0.0
-        dt = self.dt
+        quad_rule, k_rule, s_rule = quadrature_rules(self.function_space)
+        self.quadrature_rule = quad_rule
+        self.stiffness_quadrature_rule = k_rule
+        self.surface_quadrature_rule = s_rule
 
-        # -------------------------------------------------------
-        m1 = (
-            (1 / (self.c * self.c))
-            * ((u - 2.0 * u_n + u_nm1) / Constant(dt**2))
-            * v
-            * dx(scheme=quad_rule)
-        )
-        a = dot(grad(u_n), grad(v)) * dx(scheme=quad_rule)  # explicit
-
-        B = fire.Function(V)
-
-        form = m1 + a
-        lhs = fire.lhs(form)
-        rhs = fire.rhs(form)
-        self.lhs = lhs
-
-        A = fire.assemble(lhs, mat_type="matfree")
-        self.solver = fire.LinearSolver(
-            A, solver_parameters=self.solver_parameters
-        )
-
-        # lterar para como o thiago fez
-        self.rhs = rhs
-        self.B = B
+        # Just to document variables that will be overwritten
+        self.trial_function = None
+        self.u_nm1 = None
+        self.u_n = None
+        self.lhs = None
+        self.solver = None
+        self.rhs = None
+        self.B = None
+        
 
     @ensemble_propagator
     def wave_propagator(self, dt=None, final_time=None, source_num=0):
