@@ -4,7 +4,7 @@ from . import pml
 from .receivers.Receivers import Receivers
 from .sources.Sources import Sources, ricker_wavelet, full_ricker_wavelet
 from .solvers.wave import Wave
-from .solvers.secondordersolverchooser import AcousticWave
+from .solvers.acoustic_wave import AcousticWave
 
 # from .solvers.dg_wave import DG_Wave
 from .solvers.mms_acoustic import AcousticWaveMMS
