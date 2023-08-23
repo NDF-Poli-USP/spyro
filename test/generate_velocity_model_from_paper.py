@@ -11,7 +11,7 @@ def apply_box(mesh, c, x1, y1, x2, y2, value):
     box = fire.conditional(
         And(And(x1 >= x, x >= x2), And(y1 >= -y, -y >= y2)), value, c
     )
-    print("a")
+
     c.interpolate(box)
     return c
 
@@ -23,7 +23,7 @@ def apply_slope(mesh, c, x1, y1, x3, y3, value):
     x1 = 4.8 - x1
     x3 = 4.8 - x3
     slope = (y3 - y1) / (x3 - x1)
-    print(slope)
+
     slope = fire.conditional(
         And((-y - y1) / (x - x1) <= slope, x < x1), value, c
     )
