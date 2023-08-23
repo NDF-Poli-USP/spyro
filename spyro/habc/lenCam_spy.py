@@ -333,8 +333,8 @@ def habc_size(HABC):
     layers
     """
 
-    Lx = HABC.Lz
-    Ly = HABC.Lx
+    Lx = HABC.length_z
+    Ly = HABC.length_x
     posCrit = HABC.posCrit
     source_position = HABC.source_position
     f0 = HABC.reference_frequency
@@ -351,7 +351,7 @@ def habc_size(HABC):
     HABC.reference_frequency = fref
 
     # Absorbing layer size
-    F_L, pml = CalcFL(HABC.TipLay, Lx, Ly, fref, lmin, lref, Z, nexp)
+    F_L, pml = CalcFL(HABC.layer_shape, Lx, Ly, fref, lmin, lref, Z, nexp)
 
     ###############
     # Remesh of the domain adding the distance "pml" according to the case

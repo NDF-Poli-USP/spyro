@@ -45,8 +45,8 @@ class HABC:
         Contains simulation parameters and options without a pad.
     dt: `float`
         Time step size
-    TipLay: `string`
-        Type of pad layer
+    layer_shape: `string`
+        Shape type of pad layer
     nexp: `int`
         Exponent of the hyperelliptical pad layer
     h_min: `float`
@@ -105,20 +105,20 @@ class HABC:
             z, x = source
             source_position.append(np.asarray([z, x]))
 
-        self.Lz = Wave_object.length_z
-        self.Lx = Wave_object.length_x
+        self.length_z = Wave_object.length_z
+        self.length_x = Wave_object.length_x
         self.source_position = source_position
         self.Wave = Wave_object
         self.dt = Wave_object.dt
-        self.TipLay = "rectangular"
-        if self.TipLay == "rectangular":
+        self.layer_shape = "rectangular"
+        if self.layer_shape == "rectangular":
             self.nexp = np.nan
-        elif self.TipLay == "hyperelliptical":
+        elif self.layer_shape == "hyperelliptical":
             self.nexp = 2
         else:
             UserWarning(
                 f"Please use 'rectangular' or \
-                'hyperelliptical', f{self.TipLay} not supported."
+                'hyperelliptical', f{self.layer_shape} not supported."
             )
         # print(f"h_min = {h_min}")
         # if h_min is None:
@@ -164,12 +164,12 @@ class HABC:
         return None
 
     def _store_data_without_HABC(self):
-        self.mesh_without_habc = make_eikonal_mesh(self.Lz, self.Lx, self.h_min)
+        self.mesh_without_habc = make_eikonal_mesh(self.length_z, self.length_x, self.h_min)
         self.function_space_without_habc = make_eikonal_function_space(
             self.mesh_without_habc
         )
         self.c_without_habc = fire.project(
-            self.Wave.c, self.function_space_without_habc
+            self.Wave.c, fire.FunctionSpace(self.mesh_without_habc, "DG", 0)
         )
 
         self.sources_without_habc = self.Wave.sources
@@ -201,7 +201,7 @@ class HABC:
         self.pad_length = pad_length
 
         # fref, F_L, pad_length = habc_size(Lz, Lx, posCrit, source_position,
-        # initial_frequency, it_fwi, lmin, Z, histPcrit=None, TipLay='REC',
+        # initial_frequency, it_fwi, lmin, Z, histPcrit=None, layer_shape='REC',
         # nexp=np.nan)
 
     def get_mesh_with_pad(self):
