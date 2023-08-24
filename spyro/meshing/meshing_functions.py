@@ -1,4 +1,6 @@
 import firedrake as fire
+from pyop2.mpi import COMM_WORLD
+import mpi4py
 
 
 class AutomaticMesh:
@@ -46,7 +48,7 @@ class AutomaticMesh:
         Creates a 3D mesh based on Firedrake meshing utilities.
     """
 
-    def __init__(self, dimension=2, comm=None, abc_pad=None):
+    def __init__(self, dimension=2, comm=COMM_WORLD, abc_pad=None):
         """
         Parameters
         ----------
@@ -64,6 +66,7 @@ class AutomaticMesh:
         self.periodic = False
         self.comm = comm
         self.mesh_type = "firedrake_mesh"
+        self.cell_type = None
         if abc_pad is None:
             self.abc_pad = 0.0
         elif abc_pad >= 0.0:
@@ -160,6 +163,11 @@ class AutomaticMesh:
         nx = int(self.length_x / self.dx)
         nz = int(self.length_z / self.dx)
         comm = self.comm
+        if isinstance(comm, fire.ensemble.Ensemble):
+            meshcomm = comm.comm
+        elif isinstance(comm, mpi4py.MPI.Intracomm):
+            meshcomm = comm
+
         if self.cell_type == "quadrilateral":
             quadrilateral = True
         else:
@@ -172,7 +180,7 @@ class AutomaticMesh:
                 self.length_z,
                 self.length_x,
                 quadrilateral=quadrilateral,
-                comm=comm.comm,
+                comm=meshcomm,
                 pad=self.abc_pad,
             )
         else:
@@ -182,7 +190,7 @@ class AutomaticMesh:
                 self.length_z,
                 self.length_x,
                 quadrilateral=quadrilateral,
-                comm=comm.comm,
+                comm=meshcomm,
                 pad=self.abc_pad,
             )
 
