@@ -1,6 +1,7 @@
 import numpy as np
 from . import eikonal as eikonal_module
 from . import lenCam_spy
+from ..meshing import AutomaticMesh
 import firedrake as fire
 from firedrake import dot, grad
 import finat
@@ -17,10 +18,28 @@ import scipy
 
 
 def make_eikonal_mesh(Lz, Lx, h_min):
-    nz = int(Lz / h_min)
-    nx = int(Lx / h_min)
-    user_mesh = fire.RectangleMesh(nz, nx, Lz, Lx, diagonal="crossed")
-    user_mesh.coordinates.dat.data[:, 0] *= -1.0
+    """
+    Creates a mesh for the eikonal solver, just a wrapper for AutomaticMesh
+
+    Parameters
+    ----------
+    Lz: `float`
+        Length of the mesh in z direction
+    Lx: `float`
+        Length of the mesh in x direction
+    h_min: `float`
+        Minimum mesh size
+
+    Returns
+    -------
+    user_mesh: `firedrake.mesh`
+        Mesh for the eikonal solver
+    """
+
+    Automatic_mesh = AutomaticMesh(dimension=2)
+    Automatic_mesh.set_mesh_size(length_z=Lz, length_x=Lx)
+    Automatic_mesh.set_meshing_parameters(dx=h_min)
+    user_mesh = Automatic_mesh.create_mesh()
 
     return user_mesh
 
@@ -169,7 +188,7 @@ class HABC:
             self.mesh_without_habc
         )
         self.c_without_habc = fire.project(
-            self.Wave.c, fire.FunctionSpace(self.mesh_without_habc, "DG", 0)
+            self.Wave.c, self.function_space_without_habc
         )
 
         self.sources_without_habc = self.Wave.sources
