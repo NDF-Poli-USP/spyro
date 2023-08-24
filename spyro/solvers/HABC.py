@@ -1,18 +1,25 @@
 import firedrake as fire
 from firedrake import Constant, dx, dot, grad, ds
 
-from .CG_acoustic import AcousticWave
-from ..io.io import ensemble_propagator
+from .acousticNoPML import AcousticWaveNoPML
 from . import helpers
 from .. import utils
 from ..domains.quadrature import quadrature_rules
 
 
-class HABC(AcousticWave):
+class HABC_wave(AcousticWaveNoPML):
+    def __init__(self, dictionary=None, comm=None, eta=None, costet=None):
+        super().__init__(dictionary=dictionary, comm=comm)
+        self.eta = eta
+        self.costet = costet
+
     def matrix_building(self):
         """Builds solver operators. Doesn't create mass matrices if matrix_free option is on,
         which it is by default.
         """
+        eta = self.eta
+        costet1 = self.costet
+        c = self.c
         V = self.function_space
         quad_rule, k_rule, s_rule = quadrature_rules(V)
 
@@ -42,7 +49,7 @@ class HABC(AcousticWave):
 
         B = fire.Function(V)
 
-        form = m1 + a
+        form = m1 + a + habc_form + nf
         lhs = fire.lhs(form)
         rhs = fire.rhs(form)
 

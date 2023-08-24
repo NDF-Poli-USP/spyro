@@ -35,11 +35,17 @@ def make_eikonal_mesh(Lz, Lx, h_min):
     user_mesh: `firedrake.mesh`
         Mesh for the eikonal solver
     """
+    nz = int(Lz / h_min)
 
-    Automatic_mesh = AutomaticMesh(dimension=2)
-    Automatic_mesh.set_mesh_size(length_z=Lz, length_x=Lx)
-    Automatic_mesh.set_meshing_parameters(dx=h_min)
-    user_mesh = Automatic_mesh.create_mesh()
+    nx = int(Lx / h_min)
+
+    user_mesh = fire.RectangleMesh(nz, nx, Lz, Lx)
+    user_mesh.coordinates.dat.data[:, 0] *= -1.0
+
+    # Automatic_mesh = AutomaticMesh(dimension=2)
+    # Automatic_mesh.set_mesh_size(length_z=Lz, length_x=Lx)
+    # Automatic_mesh.set_meshing_parameters(dx=h_min)
+    # user_mesh = Automatic_mesh.create_mesh()
 
     return user_mesh
 
@@ -183,13 +189,17 @@ class HABC:
         return None
 
     def _store_data_without_HABC(self):
+        fire.File("c_before_proj.pvd").write(self.Wave.c)
         self.mesh_without_habc = make_eikonal_mesh(self.length_z, self.length_x, self.h_min)
         self.function_space_without_habc = make_eikonal_function_space(
             self.mesh_without_habc
         )
         self.c_without_habc = fire.project(
-            self.Wave.c, self.function_space_without_habc
+            self.Wave.c, fire.FunctionSpace(self.mesh_without_habc, "CG", 2)
         )
+        # self.c_without_habc = fire.Function(self.function_space_without_habc)
+        # self.c_without_habc.interpolate(self.Wave.c)
+        fire.File("c_after_proj.pvd").write(self.c_without_habc)
 
         self.sources_without_habc = self.Wave.sources
 

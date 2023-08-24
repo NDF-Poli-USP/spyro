@@ -104,7 +104,7 @@ def calcZero(xini, a, nz=1):
     """
     print(f"xini = {xini}")
     print("CalcZero")
-    f_tol = 1e-5
+    f_tol = 1e-4
     if xini >= 1.0:
         f_tol = 1e-3
     if nz == 1:
