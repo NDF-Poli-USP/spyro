@@ -1,6 +1,6 @@
 from spyro import create_transect
 from spyro.examples.example_model import Example_model
-from spyro.solvers import AcousticWaveNoPML
+from spyro.solvers import AcousticWave
 
 cut_marmousi_optimization_parameters = {
     "General": {
@@ -119,7 +119,7 @@ class Cut_marmousi_parameters(Example_model):
         )
 
 
-class Cut_marmousi_acoustic(AcousticWaveNoPML):
+class Cut_marmousi_acoustic(AcousticWave):
     def __init__(self, model_dictionary=None, comm=None):
         model_parameters = Cut_marmousi_parameters(
             dictionary=model_dictionary, comm=comm
