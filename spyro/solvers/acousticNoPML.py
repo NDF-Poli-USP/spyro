@@ -1,13 +1,13 @@
 import firedrake as fire
-from firedrake import Constant, dx, dot, grad
+from firedrake import dx, dot, grad
 import warnings
 
 from .wave import Wave
 from .time_integration import time_integrator
-from ..io.basicio import ensemble_propagator, parallel_print
+from ..io.basicio import ensemble_propagator
 from . import helpers
-from .. import utils
 from ..domains.quadrature import quadrature_rules
+from .acoustic_solver_construction_no_pml import construct_solver_or_matrix_no_pml
 
 
 class AcousticWaveNoPML(Wave):
@@ -46,7 +46,7 @@ class AcousticWaveNoPML(Wave):
         self.solver = None
         self.rhs = None
         self.B = None
-        
+        construct_solver_or_matrix_no_pml(self)
 
     @ensemble_propagator
     def wave_propagator(self, dt=None, final_time=None, source_num=0):

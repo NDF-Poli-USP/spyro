@@ -12,7 +12,6 @@ def construct_solver_or_matrix_no_pml(Wave_object):
 
     # typical CG FEM in 2d/3d
     u = fire.TrialFunction(V)
-    Wave_object.trial_function = u
     v = fire.TestFunction(V)
 
     u_nm1 = fire.Function(V, name="pressure t-dt")
