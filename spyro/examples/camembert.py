@@ -82,7 +82,7 @@ camembert_dictionary["acquisition"] = {
     "source_locations": [(-0.1, 0.5)],
     "frequency": 5.0,
     "delay": 1.0,
-    "receiver_locations": create_transect((-0.10, 0.1), (-0.10, 0.9), 20),
+    "receiver_locations": create_transect((-0.90, 0.1), (-0.90, 0.9), 30),
 }
 
 # Simulate for 2.0 seconds.
@@ -98,7 +98,7 @@ camembert_dictionary["time_axis"] = {
 
 camembert_dictionary["visualization"] = {
     "forward_output": True,
-    "output_filename": "results/camembert_forward_output.pvd",
+    "forward_output_filename": "results/camembert_forward_output.pvd",
     "fwi_velocity_model_output": False,
     "velocity_model_filename": None,
     "gradient_output": False,
