@@ -171,6 +171,9 @@ class Wave(Model_parameters):
         self.initial_velocity_model = None
         self.initial_velocity_model_file = None
 
+        if self.debug_output:
+            output = True
+
         if conditional is not None:
             V = fire.FunctionSpace(self.mesh, "DG", 0)
             vp = fire.Function(V, name="velocity")

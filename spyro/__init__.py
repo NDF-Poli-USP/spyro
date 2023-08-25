@@ -8,7 +8,6 @@ from .solvers.acoustic_wave import AcousticWave
 
 # from .solvers.dg_wave import DG_Wave
 from .solvers.mms_acoustic import AcousticWaveMMS
-from .solvers.acousticPML import AcousticWavePML
 from .utils.geometry_creation import create_transect, create_2d_grid
 from .utils.geometry_creation import insert_fixed_value, create_3d_grid
 from .utils.estimate_timestep import estimate_timestep
@@ -44,7 +43,6 @@ __all__ = [
     "examples",
     "AcousticWave",
     "AcousticWaveMMS",
-    "AcousticWavePML",
     "RectangleMesh",
     "PeriodicRectangleMesh",
     "BoxMesh",

@@ -123,6 +123,7 @@ from ..sources import full_ricker_wavelet
 #     "gradient_filename": None,
 #     "adjoint_output": False,
 #     "adjoint_filename": None,
+#     "debug_output": False,
 # }
 
 
@@ -471,6 +472,18 @@ class Model_parameters:
             self.adjoint_output_file = dictionary["adjoint_filename"]
         else:
             self.adjoint_output_file = "results/adjoint.pvd"
+
+        # Estabilishing debug output
+        if "debug_output" not in dictionary:
+            self.debug_output = False
+        elif dictionary["debug_output"] is None:
+            self.debug_output = False
+        elif dictionary["debug_output"] is False:
+            self.debug_output = False
+        elif dictionary["debug_output"] is True:
+            self.debug_output = True
+        else:
+            raise ValueError("Debug output not understood")
 
     def get_wavelet(self):
         """Returns a wavelet based on the source type.

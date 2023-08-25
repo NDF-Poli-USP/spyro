@@ -1,6 +1,5 @@
 from spyro import create_transect
-from spyro.examples.example_model import Example_model
-from spyro.solvers import AcousticWave
+from spyro.examples.example_model import Example_model_acoustic
 import firedrake as fire
 
 rectangle_optimization_parameters = {
@@ -127,7 +126,7 @@ rectangle_dictionary["example_specific_options"] = {
 }
 
 
-class Rectangle_parameters(Example_model):
+class Rectangle_acoustic(Example_model_acoustic):
     def __init__(
         self,
         dictionary=None,
@@ -176,24 +175,24 @@ class Rectangle_parameters(Example_model):
         self.velocity_conditional = cond
 
 
-class Rectangle(AcousticWave):
-    def __init__(self, model_dictionary=None, comm=None):
-        model_parameters = Rectangle_parameters(
-            dictionary=model_dictionary, comm=comm
-        )
-        super().__init__(
-            model_parameters=model_parameters, comm=model_parameters.comm
-        )
-        comm = self.comm
-        num_sources = self.number_of_sources
-        if comm.comm.rank == 0 and comm.ensemble_comm.rank == 0:
-            print(
-                "INFO: Distributing %d shot(s) across %d core(s). \
-                    Each shot is using %d cores"
-                % (
-                    num_sources,
-                    fire.COMM_WORLD.size,
-                    fire.COMM_WORLD.size / comm.ensemble_comm.size,
-                ),
-                flush=True,
-            )
+# class Rectangle(AcousticWave):
+#     def __init__(self, model_dictionary=None, comm=None):
+#         model_parameters = Rectangle_parameters(
+#             dictionary=model_dictionary, comm=comm
+#         )
+#         super().__init__(
+#             model_parameters=model_parameters, comm=model_parameters.comm
+#         )
+#         comm = self.comm
+#         num_sources = self.number_of_sources
+#         if comm.comm.rank == 0 and comm.ensemble_comm.rank == 0:
+#             print(
+#                 "INFO: Distributing %d shot(s) across %d core(s). \
+#                     Each shot is using %d cores"
+#                 % (
+#                     num_sources,
+#                     fire.COMM_WORLD.size,
+#                     fire.COMM_WORLD.size / comm.ensemble_comm.size,
+#                 ),
+#                 flush=True,
+#             )

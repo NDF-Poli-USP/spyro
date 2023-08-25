@@ -1,5 +1,5 @@
 from spyro import create_transect
-from spyro.examples.example_model import Example_model
+from spyro.examples.example_model import Example_model_acoustic
 
 marmousi_optimization_parameters = {
     "General": {
@@ -109,7 +109,7 @@ marmousi_dictionary["time_axis"] = {
 }
 
 
-class Marmousi(Example_model):
+class Marmousi_acoustic(Example_model_acoustic):
     def __init__(
         self,
         dictionary=None,
