@@ -218,7 +218,7 @@ def central_difference_MMS(Wave_object, source_id=0):
     u_nm1.assign(Wave_object.analytical_solution(t - 2 * dt))
     u_n.assign(Wave_object.analytical_solution(t - dt))
     u_np1 = fire.Function(Wave_object.function_space, name="pressure t +dt")
-    u = Wave_object.trial_function
+    u = fire.TrialFunction(Wave_object.function_space)
     v = fire.TestFunction(Wave_object.function_space)
 
     usol = [
