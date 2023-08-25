@@ -1,8 +1,8 @@
 import firedrake as fire
-from .acousticNoPML import AcousticWaveNoPML
+from .acoustic_wave import AcousticWave
 
 
-class AcousticWaveMMS(AcousticWaveNoPML):
+class AcousticWaveMMS(AcousticWave):
     """Class for solving the acoustic wave equation in 2D or 3D using
     the finite element method. This class inherits from the AcousticWave class
     and overwrites the matrix_building method to use source propagated along
