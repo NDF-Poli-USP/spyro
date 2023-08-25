@@ -1,5 +1,5 @@
 from spyro import create_transect
-from spyro.examples.example_model import Example_model
+from spyro.examples.example_model import Example_model_acoustic
 import firedrake as fire
 
 camembert_optimization_parameters = {
@@ -88,16 +88,28 @@ camembert_dictionary["acquisition"] = {
 # Simulate for 2.0 seconds.
 camembert_dictionary["time_axis"] = {
     "initial_time": 0.0,  # Initial time for event
-    "final_time": 2.00,  # Final time for event
-    "dt": 0.001,  # timestep size
+    "final_time": 1.0,  # Final time for event
+    "dt": 0.0005,  # timestep size
     "amplitude": 1,  # the Ricker has an amplitude of 1.
     "output_frequency": 100,  # how frequently to output solution to pvds
     # how frequently to save solution to RAM
     "gradient_sampling_frequency": 100,
 }
 
+camembert_dictionary["visualization"] = {
+    "forward_output": True,
+    "output_filename": "results/camembert_forward_output.pvd",
+    "fwi_velocity_model_output": False,
+    "velocity_model_filename": None,
+    "gradient_output": False,
+    "gradient_filename": None,
+    "adjoint_output": False,
+    "adjoint_filename": None,
+    "debug_output": False,
+}
 
-class Camembert(Example_model):
+
+class Camembert_acoustic(Example_model_acoustic):
     """Camembert model.
     This class is a child of the Example_model class.
     It is used to create a dictionary with the parameters of the
@@ -126,16 +138,18 @@ class Camembert(Example_model):
         self._camembert_velocity_model()
 
     def _camembert_mesh(self):
-        super().set_mesh(dx=0.01)
+        super().set_mesh(dx=0.05)
 
     def _camembert_velocity_model(self):
-        x, y = fire.SpatialCoordinate(self.mesh)
-        xc = -0.5
-        yc = 0.5
-        rc = 0.5
+        z = self.mesh_z
+        x = self.mesh_x
+        zc = -0.5
+        xc = 0.5
+        rc = 0.2
         c_salt = 4.6
         c_not_salt = 1.6
         cond = fire.conditional(
-            (x - xc) ** 2 + (y - yc) ** 2 < rc**2, c_salt, c_not_salt
+            (z - zc) ** 2 + (x - xc) ** 2 < rc**2, c_salt, c_not_salt
         )
-        return cond
+        self.set_initial_velocity_model(conditional=cond)
+        return None
