@@ -77,6 +77,7 @@ class Wave(Model_parameters):
 
         self.wavelet = self.get_wavelet()
         self.mesh = self.get_mesh()
+        self.c = None
         if self.mesh is not None and self.mesh is not False:
             self._build_function_space()
             self._map_sources_and_receivers()
@@ -251,10 +252,15 @@ class Wave(Model_parameters):
         else:
             estimate_max_eigenvalue = False
 
+        if self.c is None:
+            c = self.initial_velocity_model
+        else:
+            c = self.c
+
         dt = utils.estimate_timestep(
             self.mesh,
             self.function_space,
-            self.c,
+            c,
             estimate_max_eigenvalue=estimate_max_eigenvalue,
         )
         dt *= fraction
