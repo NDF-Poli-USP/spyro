@@ -28,5 +28,29 @@ def test_camembert_forward():
     assert all([test1, test2, test3])
 
 
+def test_rectangle_forward():
+
+    Wave_obj = spyro.examples.Rectangle_acoustic()
+
+    # Check if velocity model is correct
+    layer_values = [1.5, 2.0, 2.5, 3.0]
+    z_switches = [-0.25, -0.5, -0.75]
+    Wave_obj.multiple_layer_velocity_model(z_switches, layer_values)
+    c_wave = Wave_obj.initial_velocity_model
+
+    c0 = layer_values[0]
+    test1 = math.isclose(c0, c_wave.at(-0.2, 0.5))
+
+    c2 = layer_values[2]
+    test2 = math.isclose(c2, c_wave.at(-0.6, 0.5))
+
+    # Check if forward solve runs
+    Wave_obj.forward_solve()
+    test3 = True
+
+    assert all([test1, test2, test3])
+
+
 if __name__ == "__main__":
     test_camembert_forward()
+    test_rectangle_forward()

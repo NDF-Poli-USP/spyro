@@ -216,10 +216,6 @@ class Wave(Model_parameters):
         self.receivers = Receivers(self)
 
     def _get_initial_velocity_model(self):
-        if self.velocity_model_type == "conditional":
-            self.set_initial_velocity_model(
-                conditional=self.model_parameters.velocity_conditional
-            )
 
         if self.initial_velocity_model is not None:
             return None
