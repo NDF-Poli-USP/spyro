@@ -86,8 +86,8 @@ rectangle_dictionary["acquisition"] = {
 # Simulate for 2.0 seconds.
 rectangle_dictionary["time_axis"] = {
     "initial_time": 0.0,  # Initial time for event
-    "final_time": 2.00,  # Final time for event
-    "dt": 0.001,  # timestep size
+    "final_time": 1.0,  # Final time for event
+    "dt": 0.0005,  # timestep size
     "amplitude": 1,  # the Ricker has an amplitude of 1.
     "output_frequency": 100,  # how frequently to output solution to pvds
     # how frequently to save solution to RAM
