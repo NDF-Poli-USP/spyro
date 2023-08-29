@@ -96,7 +96,7 @@ rectangle_dictionary["time_axis"] = {
 
 rectangle_dictionary["visualization"] = {
     "forward_output": True,
-    "output_filename": "results/forward_output.pvd",
+    "forward_output_filename": "results/rectangle_forward_output.pvd",
     "fwi_velocity_model_output": False,
     "velocity_model_filename": None,
     "gradient_output": False,
