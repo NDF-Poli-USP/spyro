@@ -46,8 +46,9 @@ rectangle_dictionary["mesh"] = {
     "Lz": 1.0,  # depth in km - always positive
     "Lx": 1.0,  # width in km - always positive
     "Ly": 0.0,  # thickness in km - always positive
+    "h": 0.05,  # mesh size in km
     "mesh_file": None,
-    "user_mesh": None,
+    "mesh_type": "firedrake_mesh",  # options: firedrake_mesh or user_mesh
 }
 rectangle_dictionary[
     "synthetic_data"
@@ -64,31 +65,16 @@ rectangle_dictionary["inversion"] = {
     "shot_record_file": None,
     "optimization_parameters": rectangle_optimization_parameters,
 }
-
 # Specify a 250-m PML on the three sides of the domain to damp outgoing waves.
 rectangle_dictionary["absorving_boundary_conditions"] = {
-    "status": False,  # True or false
-    # None or non-reflective (outer boundary condition)
-    "outer_bc": "non-reflective",
-    "damping_type": "polynomial",  # polynomial, hyperbolic, shifted_hyperbolic
-    "exponent": 2,  # damping layer has a exponent variation
-    "cmax": 4.7,  # maximum acoustic wave velocity in PML - km/s
-    "R": 1e-6,  # theoretical reflection coefficient
-    # thickness of the PML in the z-direction (km) - always positive
-    "lz": 0.25,
-    # thickness of the PML in the x-direction (km) - always positive
-    "lx": 0.25,
-    # thickness of the PML in the y-direction (km) - always positive
-    "ly": 0.0,
+    "status": True,
+    "damping_type": "PML",
+    "exponent": 2,
+    "cmax": 4.5,
+    "R": 1e-6,
+    "pad_length": 0.25,
 }
 
-# Create a source injection operator. Here we use a single source with a
-# Ricker wavelet that has a peak frequency of 8 Hz injected at the center
-# of the mesh.
-# We also specify to record the solution at 101 microphones near the top
-# of the domain.
-# This transect of receivers is created with the helper function
-# `create_transect`.
 rectangle_dictionary["acquisition"] = {
     "source_type": "ricker",
     "source_locations": [(-0.1, 0.3)],
@@ -117,14 +103,6 @@ rectangle_dictionary["visualization"] = {
     "gradient_filename": None,
 }
 
-rectangle_dictionary["example_specific_options"] = {
-    "elements_in_z": 10,
-    "elements_in_x": 10,
-    "fault_depth": -0.5,
-    "c_salt": 4.6,
-    "c_not_salt": 1.6,
-}
-
 
 class Rectangle_acoustic(Example_model_acoustic):
     def __init__(
@@ -139,40 +117,38 @@ class Rectangle_acoustic(Example_model_acoustic):
             comm=comm,
         )
 
-        specific_dictionary = self.input_dictionary["example_specific_options"]
-        self.nz = specific_dictionary["elements_in_z"]
-        self.nx = specific_dictionary["elements_in_x"]
-        self.depth = specific_dictionary["fault_depth"]
-        self.c_salt = specific_dictionary["c_salt"]
-        self.c_not_salt = specific_dictionary["c_not_salt"]
-
         self._rectangle_mesh()
-        self._rectangle_velocity_model()
-        self.velocity_model_type = "conditional"
 
     def _rectangle_mesh(self):
-        nz = self.nz
-        nx = self.nx
-        Lz = self.length_z
-        Lx = self.length_x
-        if self.cell_type == "quadrilateral":
-            quadrilateral = True
-        else:
-            quadrilateral = False
+        mesh_dict = self.input_dictionary["mesh"]
+        h = mesh_dict["h"]
+        super().set_mesh(dx=h)
 
-        user_mesh = fire.RectangleMesh(
-            nz, nx, Lz, Lx, quadrilateral=quadrilateral, comm=self.comm.comm
-        )
-        user_mesh.coordinates.dat.data[:, 0] *= -1.0
-        self.user_mesh = user_mesh
+    def multiple_layer_velocity_model(self, z_switch, layers):
+        """
+        Sets the heterogeneous velocity model to be split into horizontal layers.
+        Each layer's velocity value is defined by the corresponding value in the
+        layers list. The layers are separated by the values in the z_switch list.
 
-    def _rectangle_velocity_model(self):
-        x, y = fire.SpatialCoordinate(self.user_mesh)
-        c_salt = self.c_salt
-        c_not_salt = self.c_not_salt
-        depth = self.depth
-        cond = fire.conditional(x < depth, c_salt, c_not_salt)
-        self.velocity_conditional = cond
+        Parameters
+        ----------
+        z_switch : list of floats
+            List of z values that separate the layers.
+        layers : list of floats
+            List of velocity values for each layer.
+        """
+        if len(z_switch) != (len(layers) - 1):
+            raise ValueError("Float list of z_switch has to have length exactly one less \
+                              than list of layer values")
+        if len(z_switch) == 0:
+            raise ValueError("Float list of z_switch cannot be empty")
+        for i in range(len(z_switch)):
+            if i == 0:
+                cond = fire.conditional(self.mesh_z > z_switch[i], layers[i], layers[i + 1])
+            else:
+                cond = fire.conditional(self.mesh_z > z_switch[i], cond, layers[i + 1])
+        # cond = fire.conditional(self.mesh_z > z_switch, layer1, layer2)
+        self.set_initial_velocity_model(conditional=cond)
 
 
 # class Rectangle(AcousticWave):
