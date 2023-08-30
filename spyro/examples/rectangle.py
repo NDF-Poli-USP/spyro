@@ -46,6 +46,7 @@ rectangle_dictionary["mesh"] = {
     "Lz": 1.0,  # depth in km - always positive
     "Lx": 1.0,  # width in km - always positive
     "Ly": 0.0,  # thickness in km - always positive
+    "h": 0.05,  # mesh size in km
     "mesh_file": None,
     "mesh_type": "firedrake_mesh",  # options: firedrake_mesh or user_mesh
 }
@@ -64,9 +65,14 @@ rectangle_dictionary["inversion"] = {
     "shot_record_file": None,
     "optimization_parameters": rectangle_optimization_parameters,
 }
-
 # Specify a 250-m PML on the three sides of the domain to damp outgoing waves.
 rectangle_dictionary["absorving_boundary_conditions"] = {
+    "status": True,
+    "damping_type": "PML",
+    "exponent": 2,
+    "cmax": 4.5,
+    "R": 1e-6,
+    "pad_length": 0.25,
     "status": True,
     "damping_type": "PML",
     "exponent": 2,
@@ -86,8 +92,8 @@ rectangle_dictionary["acquisition"] = {
 # Simulate for 2.0 seconds.
 rectangle_dictionary["time_axis"] = {
     "initial_time": 0.0,  # Initial time for event
-    "final_time": 2.00,  # Final time for event
-    "dt": 0.001,  # timestep size
+    "final_time": 1.0,  # Final time for event
+    "dt": 0.0005,  # timestep size
     "amplitude": 1,  # the Ricker has an amplitude of 1.
     "output_frequency": 100,  # how frequently to output solution to pvds
     # how frequently to save solution to RAM
@@ -96,7 +102,7 @@ rectangle_dictionary["time_axis"] = {
 
 rectangle_dictionary["visualization"] = {
     "forward_output": True,
-    "output_filename": "results/forward_output.pvd",
+    "forward_output_filename": "results/rectangle_forward_output.pvd",
     "fwi_velocity_model_output": False,
     "velocity_model_filename": None,
     "gradient_output": False,
@@ -116,12 +122,39 @@ class Rectangle_acoustic(Example_model_acoustic):
             default_dictionary=example_dictionary,
             comm=comm,
         )
+
         self._rectangle_mesh()
 
     def _rectangle_mesh(self):
-        dictionary = self.input_dictionary["mesh"]
-        h = dictionary["h"]
+        mesh_dict = self.input_dictionary["mesh"]
+        h = mesh_dict["h"]
         super().set_mesh(dx=h)
+
+    def multiple_layer_velocity_model(self, z_switch, layers):
+        """
+        Sets the heterogeneous velocity model to be split into horizontal layers.
+        Each layer's velocity value is defined by the corresponding value in the
+        layers list. The layers are separated by the values in the z_switch list.
+
+        Parameters
+        ----------
+        z_switch : list of floats
+            List of z values that separate the layers.
+        layers : list of floats
+            List of velocity values for each layer.
+        """
+        if len(z_switch) != (len(layers) - 1):
+            raise ValueError("Float list of z_switch has to have length exactly one less \
+                              than list of layer values")
+        if len(z_switch) == 0:
+            raise ValueError("Float list of z_switch cannot be empty")
+        for i in range(len(z_switch)):
+            if i == 0:
+                cond = fire.conditional(self.mesh_z > z_switch[i], layers[i], layers[i + 1])
+            else:
+                cond = fire.conditional(self.mesh_z > z_switch[i], cond, layers[i + 1])
+        # cond = fire.conditional(self.mesh_z > z_switch, layer1, layer2)
+        self.set_initial_velocity_model(conditional=cond)
 
 
 # class Rectangle(AcousticWave):

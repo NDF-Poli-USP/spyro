@@ -1,5 +1,5 @@
 from spyro import create_transect
-from spyro.examples.example_model import Example_model_acoustic
+from spyro.examples.rectangle import Rectangle_acoustic
 import firedrake as fire
 
 camembert_optimization_parameters = {
@@ -49,6 +49,7 @@ camembert_dictionary["mesh"] = {
     "Lz": 1.0,  # depth in km - always positive
     "Lx": 1.0,  # width in km - always positive
     "Ly": 0.0,  # thickness in km - always positive
+    "h": 0.05,  # mesh size in km
     "mesh_file": None,
     "mesh_type": "firedrake_mesh",  # options: firedrake_mesh or user_mesh
     "h": 0.05,
@@ -110,7 +111,7 @@ camembert_dictionary["visualization"] = {
 }
 
 
-class Camembert_acoustic(Example_model_acoustic):
+class Camembert_acoustic(Rectangle_acoustic):
     """Camembert model.
     This class is a child of the Example_model class.
     It is used to create a dictionary with the parameters of the
@@ -132,16 +133,10 @@ class Camembert_acoustic(Example_model_acoustic):
     ):
         super().__init__(
             dictionary=dictionary,
-            default_dictionary=example_dictionary,
+            example_dictionary=example_dictionary,
             comm=comm,
         )
-        self._camembert_mesh()
         self._camembert_velocity_model()
-
-    def _camembert_mesh(self):
-        dictionary = self.input_dictionary["mesh"]
-        h = dictionary["h"]
-        super().set_mesh(dx=h)
 
     def _camembert_velocity_model(self):
         z = self.mesh_z
