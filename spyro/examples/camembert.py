@@ -51,6 +51,7 @@ camembert_dictionary["mesh"] = {
     "Ly": 0.0,  # thickness in km - always positive
     "mesh_file": None,
     "mesh_type": "firedrake_mesh",  # options: firedrake_mesh or user_mesh
+    "h": 0.05,
 }
 # For use only if you are using a synthetic test model
 # or a forward only simulation
@@ -138,7 +139,9 @@ class Camembert_acoustic(Example_model_acoustic):
         self._camembert_velocity_model()
 
     def _camembert_mesh(self):
-        super().set_mesh(dx=0.05)
+        dictionary = self.input_dictionary["mesh"]
+        h = dictionary["h"]
+        super().set_mesh(dx=h)
 
     def _camembert_velocity_model(self):
         z = self.mesh_z
