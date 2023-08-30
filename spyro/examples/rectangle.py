@@ -47,7 +47,7 @@ rectangle_dictionary["mesh"] = {
     "Lx": 1.0,  # width in km - always positive
     "Ly": 0.0,  # thickness in km - always positive
     "mesh_file": None,
-    "user_mesh": None,
+    "mesh_type": "firedrake_mesh",  # options: firedrake_mesh or user_mesh
 }
 rectangle_dictionary[
     "synthetic_data"
@@ -67,28 +67,14 @@ rectangle_dictionary["inversion"] = {
 
 # Specify a 250-m PML on the three sides of the domain to damp outgoing waves.
 rectangle_dictionary["absorving_boundary_conditions"] = {
-    "status": False,  # True or false
-    # None or non-reflective (outer boundary condition)
-    "outer_bc": "non-reflective",
-    "damping_type": "polynomial",  # polynomial, hyperbolic, shifted_hyperbolic
-    "exponent": 2,  # damping layer has a exponent variation
-    "cmax": 4.7,  # maximum acoustic wave velocity in PML - km/s
-    "R": 1e-6,  # theoretical reflection coefficient
-    # thickness of the PML in the z-direction (km) - always positive
-    "lz": 0.25,
-    # thickness of the PML in the x-direction (km) - always positive
-    "lx": 0.25,
-    # thickness of the PML in the y-direction (km) - always positive
-    "ly": 0.0,
+    "status": True,
+    "damping_type": "PML",
+    "exponent": 2,
+    "cmax": 4.5,
+    "R": 1e-6,
+    "pad_length": 0.25,
 }
 
-# Create a source injection operator. Here we use a single source with a
-# Ricker wavelet that has a peak frequency of 8 Hz injected at the center
-# of the mesh.
-# We also specify to record the solution at 101 microphones near the top
-# of the domain.
-# This transect of receivers is created with the helper function
-# `create_transect`.
 rectangle_dictionary["acquisition"] = {
     "source_type": "ricker",
     "source_locations": [(-0.1, 0.3)],
@@ -117,14 +103,6 @@ rectangle_dictionary["visualization"] = {
     "gradient_filename": None,
 }
 
-rectangle_dictionary["example_specific_options"] = {
-    "elements_in_z": 10,
-    "elements_in_x": 10,
-    "fault_depth": -0.5,
-    "c_salt": 4.6,
-    "c_not_salt": 1.6,
-}
-
 
 class Rectangle_acoustic(Example_model_acoustic):
     def __init__(
@@ -138,41 +116,12 @@ class Rectangle_acoustic(Example_model_acoustic):
             default_dictionary=example_dictionary,
             comm=comm,
         )
-
-        specific_dictionary = self.input_dictionary["example_specific_options"]
-        self.nz = specific_dictionary["elements_in_z"]
-        self.nx = specific_dictionary["elements_in_x"]
-        self.depth = specific_dictionary["fault_depth"]
-        self.c_salt = specific_dictionary["c_salt"]
-        self.c_not_salt = specific_dictionary["c_not_salt"]
-
         self._rectangle_mesh()
-        self._rectangle_velocity_model()
-        self.velocity_model_type = "conditional"
 
     def _rectangle_mesh(self):
-        nz = self.nz
-        nx = self.nx
-        Lz = self.length_z
-        Lx = self.length_x
-        if self.cell_type == "quadrilateral":
-            quadrilateral = True
-        else:
-            quadrilateral = False
-
-        user_mesh = fire.RectangleMesh(
-            nz, nx, Lz, Lx, quadrilateral=quadrilateral, comm=self.comm.comm
-        )
-        user_mesh.coordinates.dat.data[:, 0] *= -1.0
-        self.user_mesh = user_mesh
-
-    def _rectangle_velocity_model(self):
-        x, y = fire.SpatialCoordinate(self.user_mesh)
-        c_salt = self.c_salt
-        c_not_salt = self.c_not_salt
-        depth = self.depth
-        cond = fire.conditional(x < depth, c_salt, c_not_salt)
-        self.velocity_conditional = cond
+        dictionary = self.input_dictionary["mesh"]
+        h = dictionary["h"]
+        super().set_mesh(dx=h)
 
 
 # class Rectangle(AcousticWave):
