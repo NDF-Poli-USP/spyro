@@ -16,6 +16,7 @@ from . import io
 from . import solvers
 from . import tools
 from . import examples
+from . import sources
 from .meshing import (
     RectangleMesh,
     PeriodicRectangleMesh,
@@ -41,6 +42,7 @@ __all__ = [
     "tools",
     "Wave",
     "examples",
+    "sources",
     "AcousticWave",
     "AcousticWaveMMS",
     "RectangleMesh",
