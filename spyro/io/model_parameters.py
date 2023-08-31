@@ -473,6 +473,10 @@ class Model_parameters:
         else:
             self.adjoint_output_file = "results/adjoint.pvd"
 
+        self._check_debug_output()
+
+    def _check_debug_output(self):
+        dictionary = self.input_dictionary["visualization"]
         # Estabilishing debug output
         if "debug_output" not in dictionary:
             self.debug_output = False
