@@ -37,5 +37,28 @@ def test_butter_lowpast_filter():
     assert all([test1, test2])
 
 
+def test_geometry_creation():
+    # Checking 3D grid
+    points1_3D = spyro.create_3d_grid((0, 0, 0), (1, 1, 1), 5)
+    test0 = (len(points1_3D) == 5**3)
+    test1 = (points1_3D[0] == (0.0, 0.0, 0.0))
+    test2 = (points1_3D[3] == (0.0, 0.0, 0.75))
+    test3 = (points1_3D[6] == (0.25, 0.0, 0.25))
+    test4 = (points1_3D[12] == (0.5, 0.0, 0.5))
+    test5 = (points1_3D[18] == (0.75, 0.0, 0.75))
+    test6 = (points1_3D[124] == (1.0, 1.0, 1.0))
+
+    print("Geometry creation test 0: ", test0)
+    print("Geometry creation test 1: ", test1)
+    print("Geometry creation test 2: ", test2)
+    print("Geometry creation test 3: ", test3)
+    print("Geometry creation test 4: ", test4)
+    print("Geometry creation test 5: ", test5)
+    print("Geometry creation test 6: ", test6)
+
+    assert all([test0, test1, test2, test3, test4, test5, test6])
+
+
 if __name__ == "__main__":
     test_butter_lowpast_filter()
+    test_geometry_creation()

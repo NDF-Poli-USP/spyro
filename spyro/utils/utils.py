@@ -141,11 +141,11 @@ def communicate(array, my_ensemble):
     return array_reduced
 
 
-def analytical_solution_for_pressure_based_on_MMS(model, mesh, time):
-    degree = model["opts"]["degree"]
-    V = FunctionSpace(mesh, "CG", degree)  # noqa: F405
-    z, x = SpatialCoordinate(mesh)  # noqa: F405
-    p = Function(V).interpolate(  # noqa: F405
-        (time**2) * sin(pi * z) * sin(pi * x)  # noqa: F405
-    )
-    return p
+# def analytical_solution_for_pressure_based_on_MMS(model, mesh, time):
+#     degree = model["opts"]["degree"]
+#     V = FunctionSpace(mesh, "CG", degree)  # noqa: F405
+#     z, x = SpatialCoordinate(mesh)  # noqa: F405
+#     p = Function(V).interpolate(  # noqa: F405
+#         (time**2) * sin(pi * z) * sin(pi * x)  # noqa: F405
+#     )
+#     return p
