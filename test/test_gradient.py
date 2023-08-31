@@ -12,8 +12,8 @@ from .inputfiles.Model1_gradient_2d_pml import model_pml
 dictionary = {}
 dictionary["options"] = {
     "cell_type": "T",  # simplexes such as triangles or tetrahedra (T) or quadrilaterals (Q)
-    "variant": 'lumped', # lumped, equispaced or DG, default is lumped
-    "method": "MLT", # (MLT/spectral_quadrilateral/DG_triangle/DG_quadrilateral) You can either specify a cell_type+variant or a method
+    "variant": 'lumped',  # lumped, equispaced or DG, default is lumped
+    "method": "MLT",  # (MLT/spectral_quadrilateral/DG_triangle/DG_quadrilateral) You can either specify a cell_type+variant or a method
     "degree": 4,  # p order
     "dimension": 2,  # dimension
     "automatic_adjoint": False,
@@ -34,7 +34,7 @@ dictionary["mesh"] = {
     "Ly": 0.0,  # thickness in km - always positive
     "mesh_file": None,
 }
-dictionary["synthetic_data"] = {    #For use only if you are using a synthetic test model or a forward only simulation -adicionar discrição para modelo direto
+dictionary["synthetic_data"] = {    # For use only if you are using a synthetic test model or a forward only simulation -adicionar discrição para modelo direto
     "real_mesh_file": None,
     "real_velocity_file": None,
 }
@@ -48,7 +48,7 @@ dictionary["inversion"] = {
 # Specify a 250-m PML on the three sides of the domain to damp outgoing waves.
 dictionary["absorving_boundary_conditions"] = {
     "status": False,  # True or false
-    "outer_bc": "non-reflective",  #  None or non-reflective (outer boundary condition)
+    "outer_bc": "non-reflective",  # None or non-reflective (outer boundary condition)
     "damping_type": "polynomial",  # polynomial, hyperbolic, shifted_hyperbolic
     "exponent": 2,  # damping layer has a exponent variation
     "cmax": 4.7,  # maximum acoustic wave velocity in PML - km/s
@@ -74,7 +74,7 @@ dictionary["acquisition"] = {
 
 # Simulate for 2.0 seconds.
 dictionary["time_axis"] = {
-    "initial_time": 0.0,  #  Initial time for event
+    "initial_time": 0.0,  # Initial time for event
     "final_time": 2.00,  # Final time for event
     "dt": 0.001,  # timestep size
     "amplitude": 1,  # the Ricker has an amplitude of 1.

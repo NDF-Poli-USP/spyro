@@ -244,20 +244,20 @@ class Wave(Model_parameters):
     def _build_function_space(self):
         self.function_space = FE_method(self.mesh, self.method, self.degree)
 
-    def get_and_set_maximum_dt(self, fraction=1.0):
-        if self.method == "KMV":
-            estimate_max_eigenvalue = True
-        elif self.method == "spectral_quadrilateral":
-            estimate_max_eigenvalue = True
-        else:
-            estimate_max_eigenvalue = False
+    def get_and_set_maximum_dt(self, fraction=0.7):
+        # if self.method == "mass_lumped_triangle":
+        #     estimate_max_eigenvalue = True
+        # elif self.method == "spectral_quadrilateral":
+        #     estimate_max_eigenvalue = True
+        # else:
+        estimate_max_eigenvalue = False
 
         if self.c is None:
             c = self.initial_velocity_model
         else:
             c = self.c
 
-        dt = utils.estimate_timestep(
+        dt = utils.estimate_timestep.estimate_timestep(
             self.mesh,
             self.function_space,
             c,
