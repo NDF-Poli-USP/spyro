@@ -1,6 +1,5 @@
 from spyro import create_transect
-from spyro.examples.example_model import Example_model
-from spyro.solvers import AcousticWaveNoPML
+from spyro.examples.example_model import Example_model_acoustic
 
 cut_marmousi_optimization_parameters = {
     "General": {
@@ -105,7 +104,7 @@ cut_marmousi_dictionary["time_axis"] = {
 }
 
 
-class Cut_marmousi_parameters(Example_model):
+class Cut_marmousi_acoustic(Example_model_acoustic):
     def __init__(
         self,
         dictionary=None,
@@ -117,11 +116,3 @@ class Cut_marmousi_parameters(Example_model):
             default_dictionary=example_dictionary,
             comm=comm,
         )
-
-
-class Cut_marmousi_acoustic(AcousticWaveNoPML):
-    def __init__(self, model_dictionary=None, comm=None):
-        model_parameters = Cut_marmousi_parameters(
-            dictionary=model_dictionary, comm=comm
-        )
-        super().__init__(model_parameters=model_parameters, comm=comm)

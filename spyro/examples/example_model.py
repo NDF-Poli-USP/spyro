@@ -1,4 +1,4 @@
-from spyro.io import Model_parameters
+from ..solvers.acoustic_wave import AcousticWave
 from copy import deepcopy
 
 
@@ -19,7 +19,7 @@ def recursive_dictionary_substitution(dictionary, default):
             recursive_dictionary_substitution(dictionary[key], default[key])
 
 
-class Example_model(Model_parameters):
+class Example_model_acoustic(AcousticWave):
     """Sets up a basic model parameter class for examples and test case models.
     It has the option of reading a dictionary, and if any parameter is missing
     from
