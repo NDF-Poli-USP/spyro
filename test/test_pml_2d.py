@@ -88,7 +88,7 @@ def run_forward():
         "gradient_filename": None,
     }
 
-    Wave_obj = spyro.solvers.AcousticWavePML(dictionary=dictionary)
+    Wave_obj = spyro.solvers.AcousticWave(dictionary=dictionary)
     Wave_obj.set_mesh(dx=0.02)
 
     z = Wave_obj.mesh_z
