@@ -500,8 +500,10 @@ class Model_parameters:
         if self.source_type == "ricker":
             if "delay_type" in self.input_dictionary["acquisition"]:
                 delay_type = self.input_dictionary["acquisition"]["delay_type"]
+                self.delay_type = delay_type
             else:
                 delay_type = "multiples_of_minimun"
+                self.delay_type = delay_type
             wavelet = full_ricker_wavelet(
                 dt=self.dt,
                 final_time=self.final_time,
