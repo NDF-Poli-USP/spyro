@@ -4,10 +4,31 @@ from ..sources import full_ricker_wavelet
 
 
 def nodal_homogeneous_analytical(Wave_object, offset, c_value, n_extra=5000):
+    """
+    This function calculates the analytical solution for an homogeneous
+    medium with a single source and receiver.
+
+    Parameters
+    ----------
+    Wave_object: spyro.Wave
+        Wave object
+    offset: float
+        Offset between source and receiver.
+    c_value: float
+        Velocity of the homogeneous medium.
+    n_extra: int (optional)
+        Multiplied factor for the final time.
+
+    Returns
+    -------
+    u_analytical: numpy array
+        Analytical solution for the wave equation.
+    """
 
     # Generating extended ricker wavelet
     dt = Wave_object.dt
     final_time = Wave_object.final_time
+    num_t = int(final_time/dt + 1)
 
     extended_final_time = n_extra * final_time
 
@@ -25,7 +46,11 @@ def nodal_homogeneous_analytical(Wave_object, offset, c_value, n_extra=5000):
         delay_type=delay_type,
     )
 
-    return analytical_solution(ricker_wavelet, c_value, final_time, offset)
+    full_u_analytical = analytical_solution(ricker_wavelet, c_value, final_time, offset)
+
+    u_analytical = full_u_analytical[:num_t]
+
+    return u_analytical
 
 
 def analytical_solution(ricker_wavelet, c_value, final_time, offset):
