@@ -41,12 +41,12 @@ def nodal_homogeneous_analytical(Wave_object, offset, c_value, n_extra=5000):
         dt=dt,
         final_time=extended_final_time,
         frequency=frequency,
-        delay=delay,
+        delay=delay-dt,
         amplitude=amplitude,
         delay_type=delay_type,
     )
 
-    full_u_analytical = analytical_solution(ricker_wavelet, c_value, final_time, offset)
+    full_u_analytical = analytical_solution(ricker_wavelet, c_value, extended_final_time, offset)
 
     u_analytical = full_u_analytical[:num_t]
 
