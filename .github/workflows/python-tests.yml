@@ -22,7 +22,7 @@ jobs:
     - name: Running parallel 3D forward test
       run: |
           source /home/olender/Firedrakes/newest3/firedrake/bin/activate
-          mpiexec -n 10 pytest test_3d/test_hexahedral_convergence.py
+          mpiexec -n 6 pytest test_3d/test_hexahedral_convergence.py
     # - name: Running serial tests for adjoint
     #   run: |
     #       source /home/olender/Firedrakes/main/firedrake/bin/activate
