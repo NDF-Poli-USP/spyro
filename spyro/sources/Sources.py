@@ -141,10 +141,11 @@ def ricker_wavelet(
         time_delay = delay
     t = t - time_delay
     # t = t - delay / freq
+    tt = (math.pi * freq * t)**2
     return (
         amp
-        * (1.0 - (2.0) * (math.pi * freq) * (math.pi * freq) * t * t)
-        * math.exp((-1.0) * (math.pi * freq) * (math.pi * freq) * t * t)
+        * (1.0 - (2.0) * tt)
+        * math.exp((-1.0) * tt)
     )
 
 

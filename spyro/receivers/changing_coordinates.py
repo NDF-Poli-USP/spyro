@@ -427,9 +427,10 @@ def change_to_reference_hexa(p, cell_vertices):
     rd = (1.0, 0.0, 0.0)
 
     reference_coordinates = [ra, rb, rc, rd]
+    tet_cell_vertices = [a, b, c, d]
 
     return change_to_reference_tetrahedron(
-        p, a, b, c, d, reference_coordinates=reference_coordinates
+        p, tet_cell_vertices, reference_coordinates=reference_coordinates
     )
 
     # det = (
