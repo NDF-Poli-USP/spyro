@@ -9,7 +9,7 @@ import sys
 print("Setting model definition")
 mesh = RectangleMesh(50, 50, 1.5, 1.5)
 
-po = 4
+po = 2
 #V = VectorFunctionSpace(mesh, "Lagrange", po)
 #H = FunctionSpace(mesh, "Lagrange", po)
 V = VectorFunctionSpace(mesh, "Lagrange", po)
