@@ -1,9 +1,5 @@
-from mpi4py import MPI
 import numpy as np
 from scipy import interpolate
-import meshio
-import firedrake as fire
-import time
 import copy
 import spyro
 
@@ -80,7 +76,7 @@ def error_calc(p_exact, p, model, comm=False):
     -------
     error : `float`
         The error between the exact and the numerical solution
-    
+
     """
     # p0 doesn't necessarily have the same dt as p_exact
     # therefore we have to interpolate the missing points
