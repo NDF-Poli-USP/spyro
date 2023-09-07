@@ -1,3 +1,10 @@
+from .cells_per_wavelength_calculator import Meshing_parameter_calculator
+
+
+__all__ = [
+    "Meshing_parameter_calculator",
+]
+
 # from .grid_point_calculator import wave_solver, generate_mesh, error_calc
 # from .grid_point_calculator import minimum_grid_point_calculator
 # from .input_models import create_model_for_grid_point_calculation
