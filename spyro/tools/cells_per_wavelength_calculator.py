@@ -5,7 +5,7 @@ import spyro
 
 
 class Meshing_parameter_calculator():
-    def __int__(self, parameters_dictionary):
+    def __init__(self, parameters_dictionary):
         self.parameters_dictionary = parameters_dictionary
         self.source_frequency = parameters_dictionary["source_frequency"]
         self.minimum_velocity = parameters_dictionary["minimum_velocity_in_the_domain"]
@@ -40,12 +40,20 @@ class Meshing_parameter_calculator():
             return self.calculate_analytical_solution()
 
     def calculate_analytical_solution(self):
-        np.array()
+        # Initializing array
         Wave_obj = self.initial_guess_object
+        number_of_receivers = Wave_obj.number_of_receivers
+        dt = Wave_obj.dt
+        final_time = Wave_obj.final_time
+        num_t = int(final_time/dt + 1)
+        analytical_solution = np.zeros((num_t, number_of_receivers))
+
+        # Solving analytical solution for each receiver
         receiver_locations = Wave_obj.receiver_locations
-        source_locations = Wave_obj.receiver_locations
+        source_locations = Wave_obj.source_locations
         source_location = source_locations[0]
         sz, sx = source_location
+        i = 0
         for receiver in receiver_locations:
             rz, rx = receiver
             offset = np.sqrt((rz-sz)**2+(rx-sx)**2)
@@ -54,8 +62,12 @@ class Meshing_parameter_calculator():
                 offset,
                 self.minimum_velocity
             )
+            analytical_solution[:, i] = r_sol
+            print(i)
+            i += 1
 
-        return np.array(r_sol)
+        np.save("reference_solution.npy", analytical_solution)
+        return analytical_solution
 
 
 def error_calc(p_exact, p, model, comm=False):
