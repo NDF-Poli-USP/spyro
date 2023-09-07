@@ -96,6 +96,7 @@ def create_initial_model_for_meshing_parameter_2D_homogeneous(Meshing_calc_obj):
 
     method = Meshing_calc_obj.FEM_method_to_evaluate
     degree = Meshing_calc_obj.desired_degree
+    reduced = Meshing_calc_obj.reduced_obj_for_testing
 
     if c_value > 500:
         warnings.warn("Velocity in meters per second")
@@ -114,7 +115,10 @@ def create_initial_model_for_meshing_parameter_2D_homogeneous(Meshing_calc_obj):
 
     receiver_bin_center1 = 10 * lbda  # 20*lbda
     receiver_bin_width = 5 * lbda  # 15*lbda
-    receiver_quantity = 36  # 2500 # 50 squared
+    if reduced is True:
+        receiver_quantity = 4
+    else:
+        receiver_quantity = 36  # 2500 # 50 squared
 
     bin1_startZ = source_z + receiver_bin_center1 - receiver_bin_width / 2.0
     bin1_endZ = source_z + receiver_bin_center1 + receiver_bin_width / 2.0

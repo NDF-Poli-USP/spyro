@@ -24,6 +24,13 @@ class Meshing_parameter_calculator():
         # Initializing optimization parameters
         self.c_initial = parameters_dictionary["C_initial"]
         self.c_accuracy = parameters_dictionary["C_accuracy"]
+
+        # Debugging and testing  parameters
+        if "testing" in parameters_dictionary:
+            self.reduced_obj_for_testing = parameters_dictionary["testing"]
+        else:
+            self.reduced_obj_for_testing = False
+
         self.initial_guess_object = self.build_initial_guess_model()
         self.reference_solution = self.get_reference_solution()
 
@@ -66,7 +73,7 @@ class Meshing_parameter_calculator():
             print(i)
             i += 1
 
-        np.save("reference_solution.npy", analytical_solution)
+        # np.save("reference_solution.npy", analytical_solution)
         return analytical_solution
 
 
