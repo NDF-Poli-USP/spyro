@@ -31,6 +31,16 @@ class Meshing_parameter_calculator():
         else:
             self.reduced_obj_for_testing = False
 
+        if "save_reference" in parameters_dictionary:
+            self.save_reference = parameters_dictionary["save_reference"]
+        else:
+            self.save_reference = False
+
+        if "load_reference" in parameters_dictionary:
+            self.load_reference = parameters_dictionary["load_reference"]
+        else:
+            self.load_reference = False
+
         self.initial_guess_object = self.build_initial_guess_model()
         self.reference_solution = self.get_reference_solution()
 
@@ -40,7 +50,9 @@ class Meshing_parameter_calculator():
         return spyro.AcousticWave(dictionary)
 
     def get_reference_solution(self):
-        if self.velocity_profile_type == "heterogeneous":
+        if self.load_reference:
+            return np.load("reference_solution.npy")
+        elif self.velocity_profile_type == "heterogeneous":
             raise NotImplementedError("Not yet implemented")
             # return self.get_referecen_solution_from refined_mesh()
         elif self.velocity_profile_type == "homogeneous":
@@ -73,7 +85,9 @@ class Meshing_parameter_calculator():
             print(i)
             i += 1
 
-        # np.save("reference_solution.npy", analytical_solution)
+        if self.save_reference:
+            np.save("reference_solution.npy", analytical_solution)
+
         return analytical_solution
 
 
