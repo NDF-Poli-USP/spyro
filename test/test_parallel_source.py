@@ -17,7 +17,6 @@ functional = spyro.utils.compute_functional
 
 @pytest.mark.skip(reason="no way of currently testing this")
 def test_parallel_source():
-
     comm = spyro.utils.mpi_init(options)
 
     mesh, V = spyro.io.read_mesh(options, comm)
