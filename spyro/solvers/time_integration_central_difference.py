@@ -15,9 +15,7 @@ def central_difference(Wave_object, source_id=0):
     temp_filename = Wave_object.forward_output_file
 
     filename, file_extension = temp_filename.split(".")
-    output_filename = (
-        filename + "sn" + str(source_id) + "." + file_extension
-    )
+    output_filename = filename + "sn" + str(source_id) + "." + file_extension
     if Wave_object.forward_output:
         parallel_print(f"Saving output in: {output_filename}", Wave_object.comm)
 
@@ -103,9 +101,7 @@ def mixed_space_central_difference(Wave_object, source_id=0):
     comm = Wave_object.comm
     temp_filename = Wave_object.forward_output_file
     filename, file_extension = temp_filename.split(".")
-    output_filename = (
-        filename + "sn" + str(source_id) + "." + file_extension
-    )
+    output_filename = filename + "sn" + str(source_id) + "." + file_extension
     if Wave_object.forward_output:
         parallel_print(f"Saving output in: {output_filename}", Wave_object.comm)
 
@@ -148,7 +144,9 @@ def mixed_space_central_difference(Wave_object, source_id=0):
         X_n.assign(X_np1)
 
         usol_recv.append(
-            Wave_object.receivers.interpolate(X_np1.dat.data_ro_with_halos[0][:])
+            Wave_object.receivers.interpolate(
+                X_np1.dat.data_ro_with_halos[0][:]
+            )
         )
 
         if step % Wave_object.gradient_sampling_frequency == 0:
