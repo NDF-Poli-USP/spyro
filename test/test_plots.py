@@ -17,7 +17,9 @@ def test_plot():
     rectangle_dictionary["time_axis"] = {
         "final_time": 2.0,  # Final time for event
     }
-    Wave_obj = spyro.examples.Rectangle_acoustic(dictionary=rectangle_dictionary)
+    Wave_obj = spyro.examples.Rectangle_acoustic(
+        dictionary=rectangle_dictionary
+    )
     layer_values = [1.5, 3.0]
     z_switches = [-0.5]
     Wave_obj.multiple_layer_velocity_model(z_switches, layer_values)

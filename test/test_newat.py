@@ -86,7 +86,6 @@ def test_correct_receiver_to_cell_location2D():
 
 
 def test_correct_at_value2D():
-
     oldmodel["opts"]["degree"] = 3
     pz = -0.1
     px = 0.3
@@ -129,7 +128,9 @@ def test_correct_at_value2D_quad():
     recvs = spyro.create_transect((pz, px), (pz, px), 3)
 
     oldmodel_quad["acquisition"]["receiver_locations"] = recvs
-    new_dictionary = spyro.io.Dictionary_conversion(oldmodel_quad).new_dictionary
+    new_dictionary = spyro.io.Dictionary_conversion(
+        oldmodel_quad
+    ).new_dictionary
     new_dictionary["mesh"]["mesh_file"] = None
     new_dictionary["mesh"]["mesh_type"] = "firedrake_mesh"
     new_dictionary["options"]["cell_type"] = "quadrilateral"
@@ -209,7 +210,9 @@ def test_correct_receiver_to_cell_location3D():
     z = receivers.point_locations[0, 2]
     p = (x, y, z)
 
-    volumeT = tetrahedral_volume(cell_vertex1, cell_vertex2, cell_vertex3, cell_vertex4)
+    volumeT = tetrahedral_volume(
+        cell_vertex1, cell_vertex2, cell_vertex3, cell_vertex4
+    )
     volume1 = tetrahedral_volume(p, cell_vertex2, cell_vertex3, cell_vertex4)
     volume2 = tetrahedral_volume(cell_vertex1, p, cell_vertex3, cell_vertex4)
     volume3 = tetrahedral_volume(cell_vertex1, cell_vertex2, p, cell_vertex4)
@@ -229,7 +232,9 @@ def test_correct_receiver_to_cell_location3D():
     z = receivers.point_locations[1, 2]
     p = (x, y, z)
 
-    volumeT = tetrahedral_volume(cell_vertex1, cell_vertex2, cell_vertex3, cell_vertex4)
+    volumeT = tetrahedral_volume(
+        cell_vertex1, cell_vertex2, cell_vertex3, cell_vertex4
+    )
     volume1 = tetrahedral_volume(p, cell_vertex2, cell_vertex3, cell_vertex4)
     volume2 = tetrahedral_volume(cell_vertex1, p, cell_vertex3, cell_vertex4)
     volume3 = tetrahedral_volume(cell_vertex1, cell_vertex2, p, cell_vertex4)
@@ -249,7 +254,9 @@ def test_correct_receiver_to_cell_location3D():
     z = receivers.point_locations[2, 2]
     p = (x, y, z)
 
-    volumeT = tetrahedral_volume(cell_vertex1, cell_vertex2, cell_vertex3, cell_vertex4)
+    volumeT = tetrahedral_volume(
+        cell_vertex1, cell_vertex2, cell_vertex3, cell_vertex4
+    )
     volume1 = tetrahedral_volume(p, cell_vertex2, cell_vertex3, cell_vertex4)
     volume2 = tetrahedral_volume(cell_vertex1, p, cell_vertex3, cell_vertex4)
     volume3 = tetrahedral_volume(cell_vertex1, cell_vertex2, p, cell_vertex4)
@@ -276,9 +283,11 @@ def test_correct_at_value3D():
 
     x_real, y_real, z_real = x_start, y_start, z_start
 
-    recvs = spyro.create_transect((z_start, x_start, y_start), (z_end, x_end, y_end), 3)
+    recvs = spyro.create_transect(
+        (z_start, x_start, y_start), (z_end, x_end, y_end), 3
+    )
     oldtest_model2["acquisition"]["receiver_locations"] = recvs
-    
+
     test_model2 = spyro.Wave(dictionary=oldtest_model2)
     receivers = spyro.Receivers(test_model2)
     V = receivers.space

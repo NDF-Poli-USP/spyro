@@ -4,7 +4,6 @@ import spyro
 import pytest
 
 
-
 def tetrahedral_volume(p1, p2, p3, p4):
     (x1, y1, z1) = p1
     (x2, y2, z2) = p2
@@ -28,6 +27,7 @@ def triangle_area(p1, p2, p3):
     (x3, y3) = p3
 
     return abs(x1 * (y2 - y3) + x2 * (y3 - y1) + x3 * (y1 - y2)) / 2
+
 
 @pytest.mark.skip(reason="not yet implemented")
 def test_mesh_generation_for_grid_calc():
@@ -61,6 +61,7 @@ def test_mesh_generation_for_grid_calc():
     for G in Gs:
         model["mesh"]["meshfile"] = "meshes/2Dhomogeneous" + str(G) + ".msh"
         model = spyro.tools.generate_mesh(model, G, comm)
+
 
 @pytest.mark.skip(reason="not yet implemented")
 def test_input_models_receivers():
@@ -108,7 +109,9 @@ def test_input_models_receivers():
         area2 = triangle_area(p1, p3, r)
         area3 = triangle_area(p3, p4, r)
         area4 = triangle_area(p2, p4, r)
-        test = math.isclose((area1 + area2 + area3 + area4), areaSquare, rel_tol=1e-09)
+        test = math.isclose(
+            (area1 + area2 + area3 + area4), areaSquare, rel_tol=1e-09
+        )
         if test is False:
             test1 = False
 
@@ -172,6 +175,7 @@ def test_input_models_receivers():
 
     assert all([test1, test2])
 
+
 @pytest.mark.skip(reason="not yet implemented")
 def test_input_models_receivers_heterogeneous():
     test1 = True  # testing if 2D receivers bins are inside the domain on an heterogeneous case
@@ -219,7 +223,9 @@ def test_input_models_receivers_heterogeneous():
         area2 = triangle_area(p1, p3, r)
         area3 = triangle_area(p3, p4, r)
         area4 = triangle_area(p2, p4, r)
-        test = math.isclose((area1 + area2 + area3 + area4), areaSquare, rel_tol=1e-09)
+        test = math.isclose(
+            (area1 + area2 + area3 + area4), areaSquare, rel_tol=1e-09
+        )
         if test is False:
             test1 = False
 
@@ -268,11 +274,14 @@ def test_input_models_receivers_heterogeneous():
         area2 = triangle_area(p1, p3, r)
         area3 = triangle_area(p3, p4, r)
         area4 = triangle_area(p2, p4, r)
-        test = math.isclose((area1 + area2 + area3 + area4), areaSquare, rel_tol=1e-09)
+        test = math.isclose(
+            (area1 + area2 + area3 + area4), areaSquare, rel_tol=1e-09
+        )
         if test is False:
             test2 = False
 
     assert all([test1, test2])
+
 
 @pytest.mark.skip(reason="not yet implemented")
 def test_grid_calc2d():
@@ -297,7 +306,9 @@ def test_grid_calc2d():
         "g_accuracy": 1e-1,
     }
 
-    G = spyro.tools.minimum_grid_point_calculator(grid_point_calculator_parameters)
+    G = spyro.tools.minimum_grid_point_calculator(
+        grid_point_calculator_parameters
+    )
     inside = 6.9 < G and G < 8.0
     print(G)
     assert inside

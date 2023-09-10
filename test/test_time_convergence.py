@@ -19,7 +19,7 @@ def run_forward(dt):
     dictionary = {}
     dictionary["options"] = {
         "cell_type": "Q",  # simplexes such as triangles or tetrahedra (T) or quadrilaterals (Q)
-        "variant": 'lumped',  # lumped, equispaced or DG, default is lumped "method":"MLT", # (MLT/spectral_quadrilateral/DG_triangle/DG_quadrilateral) You can either specify a cell_type+variant or a method
+        "variant": "lumped",  # lumped, equispaced or DG, default is lumped "method":"MLT", # (MLT/spectral_quadrilateral/DG_triangle/DG_quadrilateral) You can either specify a cell_type+variant or a method
         "degree": 4,  # p order
         "dimension": 2,  # dimension
     }
@@ -47,10 +47,10 @@ def run_forward(dt):
     # This transect of receivers is created with the helper function `create_transect`.
     dictionary["acquisition"] = {
         "source_type": "ricker",
-        "source_locations": [(-1.5-dx, 1.5+dx)],
+        "source_locations": [(-1.5 - dx, 1.5 + dx)],
         "frequency": 5.0,
         "delay": 0.3,
-        "receiver_locations": [(-1.5-dx, 2.0+dx)],
+        "receiver_locations": [(-1.5 - dx, 2.0 + dx)],
         "delay_type": "time",
     }
 
@@ -85,7 +85,7 @@ def run_forward(dt):
 
 
 def test_second_order_time_convergence():
-    """Test that the second order time convergence  
+    """Test that the second order time convergence
     of the central difference method is achieved"""
 
     dts = [
@@ -105,13 +105,13 @@ def test_second_order_time_convergence():
         dt = dts[i]
         rec_out = run_forward(dt)
         rec_anal = np.load(analytical_files[i])
-        time = np.linspace(0.0, 1.0, int(1.0/dts[i])+1)
+        time = np.linspace(0.0, 1.0, int(1.0 / dts[i]) + 1)
         nt = len(time)
         numerical_results.append(rec_out.flatten())
         errors.append(error_calc(rec_out.flatten(), rec_anal, nt))
 
     theory = [t**2 for t in dts]
-    theory = [errors[0]*th/theory[0] for th in theory]
+    theory = [errors[0] * th / theory[0] for th in theory]
 
     assert math.isclose(np.log(theory[-1]), np.log(errors[-1]), rel_tol=1e-2)
 
