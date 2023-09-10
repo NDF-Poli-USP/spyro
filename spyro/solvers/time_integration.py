@@ -16,15 +16,11 @@ def time_integrator_ricker(Wave_object, source_id=0):
     elif Wave_object.time_integrator == "mixed_space_central_difference":
         return mixed_space_central_difference(Wave_object, source_id=source_id)
     else:
-        raise ValueError(
-            "The time integrator specified is not implemented yet"
-        )
+        raise ValueError("The time integrator specified is not implemented yet")
 
 
 def time_integrator_mms(Wave_object, source_id=0):
     if Wave_object.time_integrator == "central_difference":
         return central_difference_MMS(Wave_object, source_id=source_id)
     else:
-        raise ValueError(
-            "The time integrator specified is not implemented yet"
-        )
+        raise ValueError("The time integrator specified is not implemented yet")
