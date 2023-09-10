@@ -45,7 +45,10 @@ class AutomaticMesh:
     create_firedrake_3D_mesh()
         Creates a 3D mesh based on Firedrake meshing utilities.
     """
-    def __init__(self, dimension=2, comm=None, abc_pad=None):
+
+    def __init__(
+        self, dimension=2, comm=None, abc_pad=None, mesh_type="firedrake_mesh"
+    ):
         """
         Parameters
         ----------
@@ -58,17 +61,24 @@ class AutomaticMesh:
         self.length_z = None
         self.length_x = None
         self.length_y = None
-        self.dx = None
-        self.quadrilateral = False
-        self.periodic = False
         self.comm = comm
-        self.mesh_type = "firedrake_mesh"
         if abc_pad is None:
             self.abc_pad = 0.0
         elif abc_pad >= 0.0:
             self.abc_pad = abc_pad
         else:
             raise ValueError("abc_pad must be positive")
+        self.mesh_type = mesh_type
+
+        # Firedrake mesh only parameters
+        self.dx = None
+        self.quadrilateral = False
+        self.periodic = False
+
+        # SeismicMesh only parameters
+        self.cpw = None
+        self.velocity_model = None
+        self.edge_length = None
 
     def set_mesh_size(self, length_z=None, length_x=None, length_y=None):
         """
@@ -116,6 +126,9 @@ class AutomaticMesh:
         if mesh_type is not None:
             self.mesh_type = mesh_type
 
+        if self.mesh_type != "firedrake_mesh":
+            raise ValueError("mesh_type is not supported")
+
     def make_periodic(self):
         """
         Sets the mesh boundaries periodic.
@@ -138,7 +151,7 @@ class AutomaticMesh:
         if self.mesh_type == "firedrake_mesh":
             return self.create_firedrake_mesh()
         elif self.mesh_type == "SeismicMesh":
-            raise NotImplementedError("Not implemented yet")
+            return self.create_seismicmesh_mesh()
         else:
             raise ValueError("mesh_type is not supported")
 
@@ -204,6 +217,30 @@ class AutomaticMesh:
             self.length_y,
             quadrilateral=quadrilateral,
         )
+
+    def create_seismicmesh_mesh(self):
+        if self.cpw is None:
+            raise ValueError("cells per wavelength parameter is not set")
+        elif self.dimension == 2:
+            return self.create_seismicmesh_2D_mesh()
+        elif self.dimension == 3:
+            return self.create_seismicmesh_3D_mesh()
+        else:
+            raise ValueError("dimension is not supported")
+
+    def create_seismicmesh_2D_mesh(self):
+        """
+        Creates a 2D mesh based on SeismicMesh meshing utilities.
+        """
+        Lz = self.length_z
+        Lx = self.length_x
+        pad = self.abc_pad
+        cpw = self.cpw
+
+        real_lz = Lz + pad
+        real_lx = Lx + 2 * pad
+
+        # raise NotImplementedError("Not implemented yet")
 
 
 # def create_firedrake_3D_mesh_based_on_parameters(dx, cell_type):

@@ -4,17 +4,27 @@ import copy
 import spyro
 
 
-class Meshing_parameter_calculator():
+class Meshing_parameter_calculator:
     def __init__(self, parameters_dictionary):
         self.parameters_dictionary = parameters_dictionary
         self.source_frequency = parameters_dictionary["source_frequency"]
-        self.minimum_velocity = parameters_dictionary["minimum_velocity_in_the_domain"]
-        self.velocity_profile_type = parameters_dictionary["velocity_profile_type"]
-        self.velocity_model_file_name = parameters_dictionary["velocity_model_file_name"]
-        self.FEM_method_to_evaluate = parameters_dictionary["FEM_method_to_evaluate"]
+        self.minimum_velocity = parameters_dictionary[
+            "minimum_velocity_in_the_domain"
+        ]
+        self.velocity_profile_type = parameters_dictionary[
+            "velocity_profile_type"
+        ]
+        self.velocity_model_file_name = parameters_dictionary[
+            "velocity_model_file_name"
+        ]
+        self.FEM_method_to_evaluate = parameters_dictionary[
+            "FEM_method_to_evaluate"
+        ]
         self.dimension = parameters_dictionary["dimension"]
         self.receiver_setup = parameters_dictionary["receiver_setup"]
-        self.accepted_error_threshold = parameters_dictionary["accepted_error_threshold"]
+        self.accepted_error_threshold = parameters_dictionary[
+            "accepted_error_threshold"
+        ]
         self.desired_degree = parameters_dictionary["desired_degree"]
 
         # Only for use in heterogenoeus models
@@ -46,7 +56,9 @@ class Meshing_parameter_calculator():
 
     def build_initial_guess_model(self):
         from temp_input_models import create_initial_model_for_meshing_parameter
+
         dictionary = create_initial_model_for_meshing_parameter(self)
+        self.initial_dictionary = dictionary
         return spyro.AcousticWave(dictionary)
 
     def get_reference_solution(self):
@@ -64,7 +76,7 @@ class Meshing_parameter_calculator():
         number_of_receivers = Wave_obj.number_of_receivers
         dt = Wave_obj.dt
         final_time = Wave_obj.final_time
-        num_t = int(final_time/dt + 1)
+        num_t = int(final_time / dt + 1)
         analytical_solution = np.zeros((num_t, number_of_receivers))
 
         # Solving analytical solution for each receiver
@@ -75,11 +87,9 @@ class Meshing_parameter_calculator():
         i = 0
         for receiver in receiver_locations:
             rz, rx = receiver
-            offset = np.sqrt((rz-sz)**2+(rx-sx)**2)
+            offset = np.sqrt((rz - sz) ** 2 + (rx - sx) ** 2)
             r_sol = spyro.utils.nodal_homogeneous_analytical(
-                Wave_obj,
-                offset,
-                self.minimum_velocity
+                Wave_obj, offset, self.minimum_velocity
             )
             analytical_solution[:, i] = r_sol
             print(i)
@@ -90,9 +100,58 @@ class Meshing_parameter_calculator():
 
         return analytical_solution
 
+    def find_minimum(self, starting_c=None, TOL=None, accuracy=None):
+        if starting_c is None:
+            starting_c = self.c_initial
+        if TOL is None:
+            TOL = self.accepted_error_threshold
+        if accuracy is None:
+            accuracy = self.c_accuracy
+
+        error = 100.0
+        c = starting_c
+
+        print("Starting line search", flush=True)
+        while error > TOL:
+            dif = max(0.1 * c, accuracy)
+            c = c + dif
+            print("Trying c = ", c, flush=True)
+
+            # Running forward model
+            dictionary = copy.deepcopy(self.initial_dictionary)
+            dictionary["mesh"]["cells_per_wavelength"] = c
+            Wave_obj = spyro.AcousticWave(dictionary)
+            Wave_obj.forward_solve()
+            p_receivers = Wave_obj.forward_solution_receivers
+
+            error = error_calc(self.reference_solution, p_receivers, dictionary)
+            print("Error is ", error, flush=True)
+
+        if dif < accuracy:
+            return c
+
+        c -= dif
+        error = 100.0
+        while error > TOL:
+            dif = accuracy
+            c = c + dif
+            print("Trying c = ", c, flush=True)
+
+            # Running forward model
+            dictionary = copy.deepcopy(self.initial_dictionary)
+            dictionary["mesh"]["cells_per_wavelength"] = c
+            Wave_obj = spyro.AcousticWave(dictionary)
+            Wave_obj.forward_solve()
+            p_receivers = Wave_obj.forward_solution_receivers
+
+            error = error_calc(self.reference_solution, p_receivers, dictionary)
+            print("Error is ", error, flush=True)
+
+        return c
+
 
 def error_calc(p_exact, p, model, comm=False):
-    """ Calculates the error between the exact and the numerical solution
+    """Calculates the error between the exact and the numerical solution
 
     Parameters
     ----------
@@ -140,7 +199,9 @@ def error_calc(p_exact, p, model, comm=False):
             numerator_time_int = 0.0
             denominator_time_int = 0.0
             for t in range(times - 1):
-                top_integration = (p_exact[t, receiver] - p[t, receiver]) ** 2 * dt
+                top_integration = (
+                    p_exact[t, receiver] - p[t, receiver]
+                ) ** 2 * dt
                 bot_integration = (p_exact[t, receiver]) ** 2 * dt
 
                 # Adding 1e-25 filter to receivers to eliminate noise
@@ -216,7 +277,10 @@ def error_calc_line(p_exact, p, model, comm=False):
         error = np.sqrt(numerator_time_int / denominator_time_int)
 
         if denominator_time_int < 1e-15:
-            print("Warning: receivers don't appear to register a shot.", flush=True)
+            print(
+                "Warning: receivers don't appear to register a shot.",
+                flush=True,
+            )
             error = 0.0
 
     return error
