@@ -42,12 +42,7 @@ def construct_solver_or_matrix_with_pml_2d(Wave_object):
 
     sigma_x, sigma_z = damping.functions(Wave_object)
     Gamma_1, Gamma_2 = damping.matrices_2D(sigma_z, sigma_x)
-    pml1 = (
-        (sigma_x + sigma_z)
-        * ((u - u_nm1) / Constant(2.0 * dt))
-        * v
-        * dxlump
-    )
+    pml1 = (sigma_x + sigma_z) * ((u - u_nm1) / Constant(2.0 * dt)) * v * dxlump
 
     # typical CG FEM in 2d/3d
 
@@ -74,7 +69,9 @@ def construct_solver_or_matrix_with_pml_2d(Wave_object):
     rhs_ = fire.rhs(FF)
 
     A = fire.assemble(lhs_, mat_type="matfree")
-    solver = fire.LinearSolver(A, solver_parameters=Wave_object.solver_parameters)
+    solver = fire.LinearSolver(
+        A, solver_parameters=Wave_object.solver_parameters
+    )
     Wave_object.solver = solver
     Wave_object.rhs = rhs_
     Wave_object.B = B
@@ -106,9 +103,7 @@ def construct_solver_or_matrix_with_pml_3d(Wave_object):
     Wave_object.X_nm1 = X_nm1
 
     sigma_x, sigma_y, sigma_z = damping.functions(Wave_object)
-    Gamma_1, Gamma_2, Gamma_3 = damping.matrices_3D(
-        sigma_x, sigma_y, sigma_z
-    )
+    Gamma_1, Gamma_2, Gamma_3 = damping.matrices_3D(sigma_x, sigma_y, sigma_z)
 
     pml1 = (
         (sigma_x + sigma_y + sigma_z)
@@ -155,7 +150,9 @@ def construct_solver_or_matrix_with_pml_3d(Wave_object):
     rhs_ = fire.rhs(FF)
 
     A = fire.assemble(lhs_, mat_type="matfree")
-    solver = fire.LinearSolver(A, solver_parameters=Wave_object.solver_parameters)
+    solver = fire.LinearSolver(
+        A, solver_parameters=Wave_object.solver_parameters
+    )
     Wave_object.solver = solver
     Wave_object.rhs = rhs_
     Wave_object.B = B

@@ -256,6 +256,7 @@ class Model_parameters:
     get_mesh()
         Reads in a mesh and scatters it between cores.
     """
+
     def __init__(self, dictionary=None, comm=None):
         """Initializes class that reads and sanitizes input parameters.
         A dictionary can be used.
@@ -342,9 +343,7 @@ class Model_parameters:
     # }
     def _check_time_integrator(self):
         if "time_integration_scheme" in self.input_dictionary:
-            time_integrator = self.input_dictionary[
-                "time_integration_scheme"
-            ]
+            time_integrator = self.input_dictionary["time_integration_scheme"]
         else:
             time_integrator = "central_difference"
 
@@ -719,6 +718,14 @@ class Model_parameters:
                 dimension=self.dimension,
                 comm=self.comm,
                 abc_pad=self.abc_pad_length,
+                mesh_type=self.mesh_type,
+            )
+        elif self.mesh_type == "SeismicMesh":
+            AutoMeshing = meshing.AutomaticMesh(
+                dimension=self.dimension,
+                comm=self.comm,
+                abc_pad=self.abc_pad_length,
+                mesh_type=self.mesh_type,
             )
 
         if periodic:

@@ -28,7 +28,7 @@ def nodal_homogeneous_analytical(Wave_object, offset, c_value, n_extra=5000):
     # Generating extended ricker wavelet
     dt = Wave_object.dt
     final_time = Wave_object.final_time
-    num_t = int(final_time/dt + 1)
+    num_t = int(final_time / dt + 1)
 
     extended_final_time = n_extra * final_time
 
@@ -41,12 +41,14 @@ def nodal_homogeneous_analytical(Wave_object, offset, c_value, n_extra=5000):
         dt=dt,
         final_time=extended_final_time,
         frequency=frequency,
-        delay=delay-dt,
+        delay=delay - dt,
         amplitude=amplitude,
         delay_type=delay_type,
     )
 
-    full_u_analytical = analytical_solution(ricker_wavelet, c_value, extended_final_time, offset)
+    full_u_analytical = analytical_solution(
+        ricker_wavelet, c_value, extended_final_time, offset
+    )
 
     u_analytical = full_u_analytical[:num_t]
 
@@ -57,8 +59,8 @@ def analytical_solution(ricker_wavelet, c_value, final_time, offset):
     num_t = len(ricker_wavelet)
 
     # Constantes de Fourier
-    nf = int(num_t/2 + 1)
-    frequency_axis = (1.0/final_time) * np.arange(nf)
+    nf = int(num_t / 2 + 1)
+    frequency_axis = (1.0 / final_time) * np.arange(nf)
 
     # FOurier tranform of ricker wavelet
     fft_rw = np.fft.fft(ricker_wavelet)

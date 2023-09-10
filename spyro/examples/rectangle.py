@@ -146,15 +146,21 @@ class Rectangle_acoustic(Example_model_acoustic):
             List of velocity values for each layer.
         """
         if len(z_switch) != (len(layers) - 1):
-            raise ValueError("Float list of z_switch has to have length exactly one less \
-                              than list of layer values")
+            raise ValueError(
+                "Float list of z_switch has to have length exactly one less \
+                              than list of layer values"
+            )
         if len(z_switch) == 0:
             raise ValueError("Float list of z_switch cannot be empty")
         for i in range(len(z_switch)):
             if i == 0:
-                cond = fire.conditional(self.mesh_z > z_switch[i], layers[i], layers[i + 1])
+                cond = fire.conditional(
+                    self.mesh_z > z_switch[i], layers[i], layers[i + 1]
+                )
             else:
-                cond = fire.conditional(self.mesh_z > z_switch[i], cond, layers[i + 1])
+                cond = fire.conditional(
+                    self.mesh_z > z_switch[i], cond, layers[i + 1]
+                )
         # cond = fire.conditional(self.mesh_z > z_switch, layer1, layer2)
         self.set_initial_velocity_model(conditional=cond)
 
