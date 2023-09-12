@@ -24,6 +24,7 @@ def test_cpw_calc():
         # offsets.
         # Line search parameters
         "load_reference": False,
+        "save_reference": True,
         "reference_degree": None,  # Degree to use in the reference case (int)
         # grid point density to use in the reference case (float)
         "C_reference": None,
