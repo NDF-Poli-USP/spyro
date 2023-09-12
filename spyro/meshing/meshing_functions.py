@@ -1,4 +1,6 @@
 import firedrake as fire
+import SeismicMesh
+import meshio
 
 
 class AutomaticMesh:
@@ -129,6 +131,42 @@ class AutomaticMesh:
         if self.mesh_type != "firedrake_mesh":
             raise ValueError("mesh_type is not supported")
 
+    def set_seismicmesh_parameters(
+        self,
+        cpw=None,
+        velocity_model=None,
+        edge_length=None,
+        output_file_name=None,
+    ):
+        """
+        Parameters
+        ----------
+        cpw : float, optional
+            Cells per wavelength parameter. The default is None.
+        velocity_model : str, optional
+            Velocity model. The default is None.
+        edge_length : float, optional
+            Edge length. The default is None.
+
+        Returns
+        -------
+        None
+        """
+        if cpw is not None:
+            self.cpw = cpw
+        if velocity_model is not None:
+            # self.velocity_model = velocity_model
+            raise NotImplementedError("Reading from velocity file not yet implemented")
+        if edge_length is not None:
+            self.edge_length = edge_length
+        if output_file_name is not None:
+            self.output_file_name = output_file_name
+        else:
+            self.output_file_name = "automatically_generated_mesh.msh"
+
+        if self.mesh_type != "SeismicMesh":
+            raise ValueError("mesh_type is not supported")
+
     def make_periodic(self):
         """
         Sets the mesh boundaries periodic.
@@ -222,13 +260,20 @@ class AutomaticMesh:
         if self.cpw is None:
             raise ValueError("cells per wavelength parameter is not set")
         elif self.dimension == 2:
-            return self.create_seismicmesh_2D_mesh()
+            return self.create_seimicmesh_2d_mesh()
         elif self.dimension == 3:
-            return self.create_seismicmesh_3D_mesh()
+            raise NotImplementedError("Not implemented yet")
+            # return self.create_seismicmesh_3D_mesh()
         else:
             raise ValueError("dimension is not supported")
 
-    def create_seismicmesh_2D_mesh(self):
+    def create_seimicmesh_2d_mesh(self):
+        if self.cpw is not None:
+            return self.create_seismicmesh_2D_mesh_homogeneous()
+        else:
+            raise NotImplementedError("Not yet implemented")
+
+    def create_seismicmesh_2D_mesh_homogeneous(self):
         """
         Creates a 2D mesh based on SeismicMesh meshing utilities.
         """
@@ -240,9 +285,36 @@ class AutomaticMesh:
         real_lz = Lz + pad
         real_lx = Lx + 2 * pad
 
+        edge_length = self.edge_length
+        bbox = (-real_lz, 0.0, -pad, real_lx - pad)
+        rectangle = SeismicMesh.Rectangle(bbox)
+
+        points, cells = SeismicMesh.generate_mesh(
+            domain=rectangle,
+            edge_length=edge_length,
+            verbose=0,
+        )
+
+        points, cells = SeismicMesh.geometry.delete_boundary_entities(
+            points, cells, min_qual=0.6
+        )
+
+        meshio.write_points_cells(
+            self.output_file_name,
+            points,
+            [("triangle", cells)],
+            file_format="gmsh22",
+            binary=False,
+        )
+        meshio.write_points_cells(
+            self.output_file_name + ".vtk",
+            points,
+            [("triangle", cells)],
+            file_format="vtk",
+        )
+
+        return fire.Mesh(self.output_file_name)
         # raise NotImplementedError("Not implemented yet")
-
-
 # def create_firedrake_3D_mesh_based_on_parameters(dx, cell_type):
 #     nx = int(self.length_x / dx)
 #     nz = int(self.length_z / dx)
