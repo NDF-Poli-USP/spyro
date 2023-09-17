@@ -29,11 +29,11 @@ class Meshing_parameter_calculator:
 
         # Only for use in heterogenoeus models
         self.reference_degree = parameters_dictionary["reference_degree"]
-        self.c_reference = parameters_dictionary["C_reference"]
+        self.cpw_reference = parameters_dictionary["C_reference"]
 
         # Initializing optimization parameters
-        self.c_initial = parameters_dictionary["C_initial"]
-        self.c_accuracy = parameters_dictionary["C_accuracy"]
+        self.cpw_initial = parameters_dictionary["C_initial"]
+        self.cpw_accuracy = parameters_dictionary["C_accuracy"]
 
         # Debugging and testing  parameters
         if "testing" in parameters_dictionary:
@@ -100,54 +100,62 @@ class Meshing_parameter_calculator:
 
         return analytical_solution
 
-    def find_minimum(self, starting_c=None, TOL=None, accuracy=None):
-        if starting_c is None:
-            starting_c = self.c_initial
+    def find_minimum(self, starting_cpw=None, TOL=None, accuracy=None):
+        if starting_cpw is None:
+            starting_cpw = self.cpw_initial
         if TOL is None:
             TOL = self.accepted_error_threshold
         if accuracy is None:
-            accuracy = self.c_accuracy
+            accuracy = self.cpw_accuracy
 
         error = 100.0
-        c = starting_c
+        cpw = starting_cpw
 
         print("Starting line search", flush=True)
         while error > TOL:
-            dif = max(0.1 * c, accuracy)
-            c = c + dif
-            print("Trying c = ", c, flush=True)
+            dif = max(0.1 * cpw, accuracy)
+            cpw = cpw + dif
+            print("Trying cells-per-wavelength = ", cpw, flush=True)
 
             # Running forward model
-            dictionary = copy.deepcopy(self.initial_dictionary)
-            dictionary["mesh"]["cells_per_wavelength"] = c
-            Wave_obj = spyro.AcousticWave(dictionary)
+            Wave_obj = self.build_current_object(cpw)
             Wave_obj.forward_solve()
             p_receivers = Wave_obj.forward_solution_receivers
+            spyro.io.save_shots(Wave_obj, file_name="test_shot_record"+str(cpw))
 
-            error = error_calc(self.reference_solution, p_receivers, dictionary)
+            error = error_calc(self.reference_solution, p_receivers, self.initial_dictionary)
             print("Error is ", error, flush=True)
 
         if dif < accuracy:
-            return c
+            return cpw
 
-        c -= dif
+        cpw -= dif
         error = 100.0
         while error > TOL:
             dif = accuracy
-            c = c + dif
-            print("Trying c = ", c, flush=True)
+            cpw = cpw + dif
+            print("Trying cells-per-wavelength = ", cpw, flush=True)
 
             # Running forward model
-            dictionary = copy.deepcopy(self.initial_dictionary)
-            dictionary["mesh"]["cells_per_wavelength"] = c
-            Wave_obj = spyro.AcousticWave(dictionary)
+            Wave_obj = self.build_current_object(cpw)
             Wave_obj.forward_solve()
             p_receivers = Wave_obj.forward_solution_receivers
 
-            error = error_calc(self.reference_solution, p_receivers, dictionary)
+            error = error_calc(self.reference_solution, p_receivers, self.initial_dictionary)
             print("Error is ", error, flush=True)
 
-        return c
+        return cpw
+
+    def build_current_object(self, cpw):
+        dictionary = copy.deepcopy(self.initial_dictionary)
+        dictionary["mesh"]["cells_per_wavelength"] = cpw
+        Wave_obj = spyro.AcousticWave(dictionary)
+        lba = self.minimum_velocity / self.source_frequency
+
+        edge_length = lba/cpw
+        Wave_obj.set_mesh(edge_length=edge_length)
+        Wave_obj.set_initial_velocity_model(constant=self.minimum_velocity)
+        return Wave_obj
 
 
 def error_calc(p_exact, p, model, comm=False):
@@ -178,15 +186,15 @@ def error_calc(p_exact, p, model, comm=False):
     times_p, _ = p.shape
     if times_p_exact > times_p:  # then we interpolate p_exact
         times, receivers = p.shape
-        dt = model["timeaxis"]["tf"] / times
+        dt = model["time_axis"]["final_time"] / times
         p_exact = time_interpolation(p_exact, p, model)
     elif times_p_exact < times_p:  # then we interpolate p
         times, receivers = p_exact.shape
-        dt = model["timeaxis"]["tf"] / times
+        dt = model["time_axis"]["final_time"] / times
         p = time_interpolation(p, p_exact, model)
     else:  # then we dont need to interpolate
         times, receivers = p.shape
-        dt = model["timeaxis"]["tf"] / times
+        dt = model["time_axis"]["final_time"] / times
     # p = time_interpolation(p, p_exact, model)
 
     max_absolute_diff = 0.0
@@ -249,15 +257,15 @@ def error_calc_line(p_exact, p, model, comm=False):
     (times_p,) = p.shape
     if times_p_exact > times_p:  # then we interpolate p_exact
         (times,) = p.shape
-        dt = model["timeaxis"]["tf"] / times
+        dt = model["time_axis"]["final_time"] / times
         p_exact = time_interpolation_line(p_exact, p, model)
     elif times_p_exact < times_p:  # then we interpolate p
         (times,) = p_exact.shape
-        dt = model["timeaxis"]["tf"] / times
+        dt = model["time_axis"]["final_time"] / times
         p = time_interpolation_line(p, p_exact, model)
     else:  # then we dont need to interpolate
         (times,) = p.shape
-        dt = model["timeaxis"]["tf"] / times
+        dt = model["time_axis"]["final_time"] / times
 
     if comm.ensemble_comm.rank == 0:
         numerator_time_int = 0.0
@@ -288,10 +296,10 @@ def error_calc_line(p_exact, p, model, comm=False):
 
 def time_interpolation(p_old, p_exact, model):
     times, receivers = p_exact.shape
-    dt = model["timeaxis"]["tf"] / times
+    dt = model["time_axis"]["final_time"] / times
 
     times_old, rec = p_old.shape
-    dt_old = model["timeaxis"]["tf"] / times_old
+    dt_old = model["time_axis"]["final_time"] / times_old
     time_vector_old = np.zeros((1, times_old))
     for ite in range(times_old):
         time_vector_old[0, ite] = dt_old * ite
@@ -310,10 +318,10 @@ def time_interpolation(p_old, p_exact, model):
 
 def time_interpolation_line(p_old, p_exact, model):
     (times,) = p_exact.shape
-    dt = model["timeaxis"]["tf"] / times
+    dt = model["time_axis"]["final_time"] / times
 
     (times_old,) = p_old.shape
-    dt_old = model["timeaxis"]["tf"] / times_old
+    dt_old = model["time_axis"]["final_time"] / times_old
     time_vector_old = np.zeros((1, times_old))
     for ite in range(times_old):
         time_vector_old[0, ite] = dt_old * ite

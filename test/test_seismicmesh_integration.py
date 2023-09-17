@@ -29,7 +29,7 @@ def test_spyro_seimicmesh_2d_homogeneous_generation():
         mesh_type="SeismicMesh"
     )
     Mesh_obj.set_mesh_size(length_z=Lz, length_x=Lx)
-    Mesh_obj.set_seismicmesh_parameters(cpw=cpw, edge_length=lbda/cpw, output_file_name="test.msh")
+    Mesh_obj.set_seismicmesh_parameters(edge_length=lbda/cpw, output_file_name="test.msh")
 
     mesh = Mesh_obj.create_mesh()
 

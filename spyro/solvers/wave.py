@@ -71,6 +71,7 @@ class Wave(Model_parameters):
         self.initial_velocity_model = None
 
         self.function_space = None
+        self.forward_solution_receivers = None
         self.current_time = 0.0
         self.set_solver_parameters()
         self.real_shot_record = None
@@ -107,6 +108,7 @@ class Wave(Model_parameters):
         length_x=None,
         length_y=None,
         periodic=False,
+        edge_length=None,
     ):
         super().set_mesh(
             dx=dx,
@@ -116,6 +118,7 @@ class Wave(Model_parameters):
             length_x=length_x,
             length_y=length_y,
             periodic=periodic,
+            edge_length=edge_length,
         )
 
         self.mesh = self.get_mesh()
