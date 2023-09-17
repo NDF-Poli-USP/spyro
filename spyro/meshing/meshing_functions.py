@@ -257,9 +257,7 @@ class AutomaticMesh:
         )
 
     def create_seismicmesh_mesh(self):
-        if self.cpw is None:
-            raise ValueError("cells per wavelength parameter is not set")
-        elif self.dimension == 2:
+        if self.dimension == 2:
             return self.create_seimicmesh_2d_mesh()
         elif self.dimension == 3:
             raise NotImplementedError("Not implemented yet")
@@ -268,7 +266,7 @@ class AutomaticMesh:
             raise ValueError("dimension is not supported")
 
     def create_seimicmesh_2d_mesh(self):
-        if self.cpw is not None:
+        if self.edge_length is not None:
             return self.create_seismicmesh_2D_mesh_homogeneous()
         else:
             raise NotImplementedError("Not yet implemented")
@@ -280,7 +278,6 @@ class AutomaticMesh:
         Lz = self.length_z
         Lx = self.length_x
         pad = self.abc_pad
-        cpw = self.cpw
 
         real_lz = Lz + pad
         real_lx = Lx + 2 * pad

@@ -680,6 +680,7 @@ class Model_parameters:
         length_x=None,
         length_y=None,
         periodic=False,
+        edge_length=None,
     ):
         """
 
@@ -741,6 +742,14 @@ class Model_parameters:
                 dx=dx, cell_type=self.cell_type, mesh_type=self.mesh_type
             )
             self.user_mesh = AutoMeshing.create_mesh()
+        elif self.mesh_type == "SeismicMesh":
+            AutoMeshing.set_mesh_size(
+                length_z=self.length_z,
+                length_x=self.length_x,
+                length_y=self.length_y,
+            )
+            AutoMeshing.set_seismicmesh_parameters(edge_length=edge_length)
+            self.user_mesh = AutoMeshing.create_mesh()
 
         if (
             length_z is None
@@ -777,4 +786,6 @@ class Model_parameters:
         elif (
             self.mesh_type == "user_mesh" or self.mesh_type == "firedrake_mesh"
         ):
+            return self.user_mesh
+        elif self.mesh_type == "SeismicMesh":
             return self.user_mesh

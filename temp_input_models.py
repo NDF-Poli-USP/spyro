@@ -92,7 +92,7 @@ def create_initial_model_for_meshing_parameter_2D_homogeneous(Meshing_calc_obj):
     dimension = 2
     c_value = Meshing_calc_obj.minimum_velocity
     frequency = Meshing_calc_obj.source_frequency
-    cells_per_wavelength = Meshing_calc_obj.c_initial
+    cells_per_wavelength = Meshing_calc_obj.cpw_initial
 
     method = Meshing_calc_obj.FEM_method_to_evaluate
     degree = Meshing_calc_obj.desired_degree
@@ -146,7 +146,7 @@ def create_initial_model_for_meshing_parameter_2D_homogeneous(Meshing_calc_obj):
         "frequency": frequency,
         "receiver_locations": receiver_locations,
         "final_time": final_time,
-        "dt": 0.001,
+        "dt": 0.0005,
     }
 
     model_dictionary = build_on_top_of_base_dictionary(variables)
