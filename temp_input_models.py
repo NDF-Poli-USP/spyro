@@ -4,6 +4,10 @@ import warnings
 
 
 def build_on_top_of_base_dictionary(variables):
+    if variables["method"] == "mass_lumped_triangle":
+        mesh_type = "SeismicMesh"
+    elif variables["method"] == "spectral_quadrilateral":
+        mesh_type = "firedrake_mesh"
     model_dictionary = {}
     model_dictionary["options"] = {
         "method": variables["method"],
@@ -19,7 +23,7 @@ def build_on_top_of_base_dictionary(variables):
         "Lx": variables["Lx"],
         "Ly": variables["Ly"],
         "cells_per_wavelength": variables["cells_per_wavelength"],
-        "mesh_type": "SeismicMesh",
+        "mesh_type": mesh_type,
     }
     model_dictionary["absorving_boundary_conditions"] = {
         "status": True,
@@ -40,7 +44,7 @@ def build_on_top_of_base_dictionary(variables):
         "final_time": variables["final_time"],  # Final time for event
         "dt": variables["dt"],  # timestep size
         "amplitude": 1,  # the Ricker has an amplitude of 1.
-        "output_frequency": 100,  # how frequently to output solution to pvds
+        "output_frequency": 10000,  # how frequently to output solution to pvds
         "gradient_sampling_frequency": 100,  # how frequently to save solution to RAM
     }
     model_dictionary["visualization"] = {

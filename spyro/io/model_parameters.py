@@ -738,6 +738,8 @@ class Model_parameters:
                 length_x=self.length_x,
                 length_y=self.length_y,
             )
+            if dx is None:
+                dx = edge_length
             AutoMeshing.set_meshing_parameters(
                 dx=dx, cell_type=self.cell_type, mesh_type=self.mesh_type
             )

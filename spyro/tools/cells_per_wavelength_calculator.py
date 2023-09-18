@@ -94,11 +94,11 @@ class Meshing_parameter_calculator:
             analytical_solution[:, i] = r_sol
             print(i)
             i += 1
+        analytical_solution = analytical_solution/(self.minimum_velocity**2)
 
         if self.save_reference:
             np.save("reference_solution.npy", analytical_solution)
 
-        analytical_solution = analytical_solution/(self.minimum_velocity**2)
         return analytical_solution
 
     def find_minimum(self, starting_cpw=None, TOL=None, accuracy=None):

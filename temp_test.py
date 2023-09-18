@@ -23,19 +23,20 @@ def test_cpw_calc():
         # line defines a line of point receivers with pre-established near and far
         # offsets.
         # Line search parameters
-        "load_reference": False,
-        "save_reference": True,
+        "load_reference": True,
+        "save_reference": False,
         "reference_degree": None,  # Degree to use in the reference case (int)
         # grid point density to use in the reference case (float)
         "C_reference": None,
         "desired_degree": 4,  # degree we are calculating G for. (int)
-        "C_initial": 6.0,  # Initial G for line search (float)
+        "C_initial": 2.0,  # Initial G for line search (float)
         "accepted_error_threshold": 0.05,
-        "C_accuracy": 1e-1,
+        "C_accuracy": 1e-2,
     }
 
     Cpw_calc = spyro.tools.Meshing_parameter_calculator(grid_point_calculator_parameters)
-    Cpw_calc.find_minimum()
+    cpw = Cpw_calc.find_minimum()
+    print(f"C calculated = {cpw}")
 
     print("END")
     pass
