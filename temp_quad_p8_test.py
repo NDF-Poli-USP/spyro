@@ -16,7 +16,7 @@ def test_cpw_calc():
         "velocity_model_file_name": None,
         # FEM to evaluate such as `KMV` or `spectral`
         # (GLL nodes on quads and hexas)
-        "FEM_method_to_evaluate": "mass_lumped_triangle",
+        "FEM_method_to_evaluate": "spectral_quadrilateral",
         "dimension": 2,  # Domain dimension. Either 2 or 3.
         # Either near or line. Near defines a receiver grid near to the source,
         "receiver_setup": "near",
@@ -28,8 +28,8 @@ def test_cpw_calc():
         "reference_degree": None,  # Degree to use in the reference case (int)
         # grid point density to use in the reference case (float)
         "C_reference": None,
-        "desired_degree": 4,  # degree we are calculating G for. (int)
-        "C_initial": 2.0,  # Initial G for line search (float)
+        "desired_degree": 8,  # degree we are calculating G for. (int)
+        "C_initial": 1.0,  # Initial G for line search (float)
         "accepted_error_threshold": 0.05,
         "C_accuracy": 1e-2,
     }
