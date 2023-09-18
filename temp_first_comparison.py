@@ -1,4 +1,7 @@
 import spyro
+import pickle
+import numpy as np
+
 
 grid_point_calculator_parameters = {
     # Experiment parameters
@@ -21,8 +24,8 @@ grid_point_calculator_parameters = {
     # line defines a line of point receivers with pre-established near and far
     # offsets.
     # Line search parameters
-    "load_reference": False,
-    "save_reference": True,
+    "load_reference": True,
+    "save_reference": False,
     "reference_degree": None,  # Degree to use in the reference case (int)
     # grid point density to use in the reference case (float)
     "C_reference": None,
@@ -34,7 +37,10 @@ grid_point_calculator_parameters = {
 
 Cpw_calc = spyro.tools.Meshing_parameter_calculator(grid_point_calculator_parameters)
 Wave_obj = Cpw_calc.initial_guess_object
-spyro.io.load_shots(Wave_obj, file_name="test_shot_record"+str(6.6))
+with open("testing_rec.pck", "rb") as f:
+    array = np.asarray(pickle.load(f), dtype=float)
+    Wave_obj.forward_solution_receivers = array
+
 rec_num = Wave_obj.forward_solution_receivers
 rec_ana = Cpw_calc.reference_solution
 print("END")
