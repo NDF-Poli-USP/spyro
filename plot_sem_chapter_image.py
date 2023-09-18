@@ -12,7 +12,7 @@ cmap4 = matplotlib.cm.get_cmap("Greys")
 colors_regular = [cmap0(0.2), cmap1(0.3), cmap2(0.5), cmap3(0.7), cmap4(0.9)]
 colors_dark = [cmap0(0.3), cmap1(0.4), cmap2(0.6), cmap3(0.8), cmap4(1.0)]
 
-fig, ax = plt.subplots(1,1)
+fig, ax = plt.subplots(1, 1)
 leters_size = 20
 y_limits = (1, 200)
 
@@ -56,7 +56,7 @@ ax.set_yticks([3, 5, 10, 30, 100])
 ax.yaxis.set_major_formatter(matplotlib.ticker.ScalarFormatter())
 # ax.text(-0.1, 1.0, '(b)', transform=ax .transAxes, size=leters_size)
 ax.yaxis.set_major_formatter(matplotlib.ticker.ScalarFormatter())
-fig.set_size_inches(9,5)
+fig.set_size_inches(9, 5)
 plt.show()
 
 # cont = 0
