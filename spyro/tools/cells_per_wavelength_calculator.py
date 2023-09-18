@@ -98,6 +98,7 @@ class Meshing_parameter_calculator:
         if self.save_reference:
             np.save("reference_solution.npy", analytical_solution)
 
+        analytical_solution = analytical_solution/(self.minimum_velocity**2)
         return analytical_solution
 
     def find_minimum(self, starting_cpw=None, TOL=None, accuracy=None):
@@ -123,7 +124,7 @@ class Meshing_parameter_calculator:
             p_receivers = Wave_obj.forward_solution_receivers
             spyro.io.save_shots(Wave_obj, file_name="test_shot_record"+str(cpw))
 
-            error = error_calc(self.reference_solution, p_receivers, self.initial_dictionary)
+            error = new_error_calc(p_receivers, self.reference_solution, Wave_obj.dt)
             print("Error is ", error, flush=True)
 
         if dif < accuracy:
@@ -141,7 +142,8 @@ class Meshing_parameter_calculator:
             Wave_obj.forward_solve()
             p_receivers = Wave_obj.forward_solution_receivers
 
-            error = error_calc(self.reference_solution, p_receivers, self.initial_dictionary)
+            error = new_error_calc(p_receivers, self.reference_solution, Wave_obj.dt)
+            # error = error_calc(self.reference_solution, p_receivers, self.initial_dictionary)
             print("Error is ", error, flush=True)
 
         return cpw
@@ -156,6 +158,25 @@ class Meshing_parameter_calculator:
         Wave_obj.set_mesh(edge_length=edge_length)
         Wave_obj.set_initial_velocity_model(constant=self.minimum_velocity)
         return Wave_obj
+
+
+def new_error_calc(rec, ana, dt):
+    _, num_rec = np.shape(rec)
+    total_numerator = 0.0
+    total_denumenator = 0.0
+    for i in range(num_rec):
+        diff = rec[:, i] - ana[:, i]
+        diff_squared = np.power(diff, 2)
+        numerator = np.trapz(diff_squared, dx=dt)
+        ref_squared = np.power(ana[:, i], 2)
+        denominator = np.trapz(ref_squared, dx=dt)
+        total_numerator += numerator
+        total_denumenator += denominator
+
+    squared_error = total_numerator/total_denumenator
+
+    error = np.sqrt(squared_error)
+    return error
 
 
 def error_calc(p_exact, p, model, comm=False):

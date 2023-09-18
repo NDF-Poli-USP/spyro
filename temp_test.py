@@ -23,8 +23,8 @@ def test_cpw_calc():
         # line defines a line of point receivers with pre-established near and far
         # offsets.
         # Line search parameters
-        "load_reference": True,
-        "save_reference": False,
+        "load_reference": False,
+        "save_reference": True,
         "reference_degree": None,  # Degree to use in the reference case (int)
         # grid point density to use in the reference case (float)
         "C_reference": None,
