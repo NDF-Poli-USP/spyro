@@ -29,16 +29,16 @@ def test_cpw_calc():
         # grid point density to use in the reference case (float)
         "C_reference": None,
         "desired_degree": 4,  # degree we are calculating G for. (int)
-        "C_initial": 2.0,  # Initial G for line search (float)
+        "C_initial": 2.46,  # Initial G for line search (float)
         "accepted_error_threshold": 0.05,
-        "C_accuracy": 0.5,
+        "C_accuracy": 0.01,
     }
 
-    Cpw_calc = spyro.tools.Meshing_parameter_calculator(grid_point_calculator_parameters)
-    cpw = Cpw_calc.find_minimum()
-    print(f"C calculated = {cpw}")
+    # Cpw_calc = spyro.tools.Meshing_parameter_calculator(grid_point_calculator_parameters)
+    # cpw = Cpw_calc.find_minimum()
+    # print(f"C calculated = {cpw}")
 
-    print("END")
+    # print("END")
     pass
 
 

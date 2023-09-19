@@ -44,11 +44,11 @@ def build_on_top_of_base_dictionary(variables):
         "final_time": variables["final_time"],  # Final time for event
         "dt": variables["dt"],  # timestep size
         "amplitude": 1,  # the Ricker has an amplitude of 1.
-        "output_frequency": 10000,  # how frequently to output solution to pvds
+        "output_frequency": 100,  # how frequently to output solution to pvds
         "gradient_sampling_frequency": 100,  # how frequently to save solution to RAM
     }
     model_dictionary["visualization"] = {
-        "forward_output": False,
+        "forward_output": True,
         "output_filename": "results/forward_output.pvd",
         "fwi_velocity_model_output": False,
         "velocity_model_filename": None,
