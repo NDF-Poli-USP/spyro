@@ -266,7 +266,11 @@ class Wave(Model_parameters):
             estimate_max_eigenvalue=estimate_max_eigenvalue,
         )
         dt *= fraction
+        nt = int(self.final_time/dt)+1
+        dt = self.final_time/(nt-1)
+
         self.dt = dt
+        self.wavelet = self.get_wavelet()
         return dt
 
     def get_mass_matrix_diagonal(self):
