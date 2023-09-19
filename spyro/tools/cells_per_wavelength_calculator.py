@@ -114,12 +114,14 @@ class Meshing_parameter_calculator:
 
         print("Starting line search", flush=True)
         while error > TOL:
-            dif = max(0.1 * cpw, accuracy)
-            cpw = cpw + dif
+            if error != 100.0:
+                dif = max(0.1 * cpw, accuracy)
+                cpw = cpw + dif
             print("Trying cells-per-wavelength = ", cpw, flush=True)
 
             # Running forward model
             Wave_obj = self.build_current_object(cpw)
+            Wave_obj.get_and_set_maximum_dt(fraction=0.2)
             Wave_obj.forward_solve()
             p_receivers = Wave_obj.forward_solution_receivers
             spyro.io.save_shots(Wave_obj, file_name="test_shot_record"+str(cpw))
@@ -139,6 +141,7 @@ class Meshing_parameter_calculator:
 
             # Running forward model
             Wave_obj = self.build_current_object(cpw)
+            Wave_obj.get_and_set_maximum_dt(fraction=0.2)
             Wave_obj.forward_solve()
             p_receivers = Wave_obj.forward_solution_receivers
 
@@ -160,12 +163,21 @@ class Meshing_parameter_calculator:
         return Wave_obj
 
 
-def new_error_calc(rec, ana, dt):
-    _, num_rec = np.shape(rec)
+def new_error_calc(receivers, analytical, dt):
+    rec_len, num_rec = np.shape(receivers)
+
+    # Interpolate analytical solution into numerical dts
+    final_time = dt*(rec_len-1)
+    time_vector_rec = np.linspace(0.0, final_time, rec_len)
+    time_vector_ana = np.linspace(0.0, final_time, len(analytical[:, 0]))
+    ana = np.zeros(np.shape(receivers))
+    for i in range(num_rec):
+        ana[:, i] = np.interp(time_vector_rec, time_vector_ana, analytical[:, i])
+
     total_numerator = 0.0
     total_denumenator = 0.0
     for i in range(num_rec):
-        diff = rec[:, i] - ana[:, i]
+        diff = receivers[:, i] - ana[:, i]
         diff_squared = np.power(diff, 2)
         numerator = np.trapz(diff_squared, dx=dt)
         ref_squared = np.power(ana[:, i], 2)
