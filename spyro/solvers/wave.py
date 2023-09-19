@@ -270,6 +270,7 @@ class Wave(Model_parameters):
         dt = self.final_time/(nt-1)
 
         self.dt = dt
+        print(dt)
         self.wavelet = self.get_wavelet()
         return dt
 

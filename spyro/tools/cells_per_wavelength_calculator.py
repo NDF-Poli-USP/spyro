@@ -1,5 +1,6 @@
 import numpy as np
 from scipy import interpolate
+import time as timinglib
 import copy
 import spyro
 
@@ -111,23 +112,31 @@ class Meshing_parameter_calculator:
 
         error = 100.0
         cpw = starting_cpw
-
+        # f = open("p"+str(self.initial_guess_object.degree)+"cpw_results.txt", "w")
         print("Starting line search", flush=True)
         while error > TOL:
             if error != 100.0:
                 dif = max(0.1 * cpw, accuracy)
                 cpw = cpw + dif
             print("Trying cells-per-wavelength = ", cpw, flush=True)
+            # f.write("Trying cells-per-wavelength = " + str(cpw))
 
             # Running forward model
             Wave_obj = self.build_current_object(cpw)
-            Wave_obj.get_and_set_maximum_dt(fraction=0.2)
+            # Wave_obj.get_and_set_maximum_dt(fraction=0.2)
+            print(Wave_obj.dt)
+            t0 = timinglib.time()
             Wave_obj.forward_solve()
+            t1 = timinglib.time()
+            runtime = t1-t0
+            print("took = (s)", runtime, flush=True)
+            # f.write("took = (s)" + str(runtime))
             p_receivers = Wave_obj.forward_solution_receivers
             spyro.io.save_shots(Wave_obj, file_name="test_shot_record"+str(cpw))
 
             error = new_error_calc(p_receivers, self.reference_solution, Wave_obj.dt)
             print("Error is ", error, flush=True)
+            # f.write("Error is " + str(error)+"\n")
 
         if dif < accuracy:
             return cpw
@@ -138,16 +147,26 @@ class Meshing_parameter_calculator:
             dif = accuracy
             cpw = cpw + dif
             print("Trying cells-per-wavelength = ", cpw, flush=True)
+            # f.write("Trying cells-per-wavelength = " + str(cpw))
 
             # Running forward model
             Wave_obj = self.build_current_object(cpw)
-            Wave_obj.get_and_set_maximum_dt(fraction=0.2)
+            # Wave_obj.get_and_set_maximum_dt(fraction=0.2)
+            print(Wave_obj.dt)
+            t0 = timinglib.time()
             Wave_obj.forward_solve()
+            t1 = timinglib.time()
+            runtime = t1-t0
+            print("took = (s)", runtime, flush=True)
+            # f.write("took = (s)" + str(runtime))
             p_receivers = Wave_obj.forward_solution_receivers
 
             error = new_error_calc(p_receivers, self.reference_solution, Wave_obj.dt)
             # error = error_calc(self.reference_solution, p_receivers, self.initial_dictionary)
             print("Error is ", error, flush=True)
+            # f.write("Error is " + str(error)+"\n")
+
+        # f.close()
 
         return cpw
 
