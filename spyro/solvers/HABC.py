@@ -4,6 +4,7 @@ from .acousticNoPML import AcousticWaveNoPML
 from . import helpers
 from .. import utils
 from ..domains.quadrature import quadrature_rules
+from .. import io
 
 
 class HABC_wave(AcousticWaveNoPML):
@@ -16,10 +17,12 @@ class HABC_wave(AcousticWaveNoPML):
         """Builds solver operators. Doesn't create mass matrices if matrix_free option is on,
         which it is by default.
         """
-        eta = self.eta
-        costet1 = self.costet
+        # eta = self.eta
+        # costet1 = self.costet
         c = self.c
         V = self.function_space
+        costet1 = io.loading_csv_into_function(V, "cosHig.csv")
+        eta = io.loading_csv_into_function(V, "Damp.csv")
         quad_rule, k_rule, s_rule = quadrature_rules(V)
 
         # typical CG FEM in 2d/3d

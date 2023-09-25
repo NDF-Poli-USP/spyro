@@ -13,6 +13,7 @@ from .basicio import (
     ensemble_gradient_elastic_waves,
     ensemble_plot,
     parallel_print,
+    loading_csv_into_function,
 )
 from .model_parameters import Model_parameters
 from .backwards_compatibility_io import Dictionary_conversion
@@ -39,4 +40,5 @@ __all__ = [
     "Dictionary_conversion",
     "dictionaryio",
     "boundary_layer_io",
+    "loading_csv_into_function",
 ]
