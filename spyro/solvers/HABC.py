@@ -1,6 +1,5 @@
 import firedrake as fire
 from firedrake import Constant, dx, dot, grad, ds
-
 from .acousticNoPML import AcousticWaveNoPML
 from . import helpers
 from .. import utils
