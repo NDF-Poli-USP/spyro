@@ -2,6 +2,7 @@ import numpy as np
 from scipy import interpolate
 import time as timinglib
 import copy
+from .input_models import create_initial_model_for_meshing_parameter
 import spyro
 
 
@@ -56,8 +57,6 @@ class Meshing_parameter_calculator:
         self.reference_solution = self.get_reference_solution()
 
     def build_initial_guess_model(self):
-        from temp_input_models import create_initial_model_for_meshing_parameter
-
         dictionary = create_initial_model_for_meshing_parameter(self)
         self.initial_dictionary = dictionary
         return spyro.AcousticWave(dictionary)
@@ -112,61 +111,40 @@ class Meshing_parameter_calculator:
 
         error = 100.0
         cpw = starting_cpw
-        # f = open("p"+str(self.initial_guess_object.degree)+"cpw_results.txt", "w")
         print("Starting line search", flush=True)
+
+        fast_loop = True
+        cont = 0
         while error > TOL:
-            if error != 100.0:
+            if fast_loop:
                 dif = max(0.1 * cpw, accuracy)
+            else:
+                dif = accuracy
+
+            if error != 100.0:
                 cpw = cpw + dif
             print("Trying cells-per-wavelength = ", cpw, flush=True)
-            # f.write("Trying cells-per-wavelength = " + str(cpw))
 
             # Running forward model
             Wave_obj = self.build_current_object(cpw)
             # Wave_obj.get_and_set_maximum_dt(fraction=0.2)
-            print(Wave_obj.dt)
-            t0 = timinglib.time()
             Wave_obj.forward_solve()
-            t1 = timinglib.time()
-            runtime = t1-t0
-            print("took = (s)", runtime, flush=True)
-            # f.write("took = (s)" + str(runtime))
             p_receivers = Wave_obj.forward_solution_receivers
             spyro.io.save_shots(Wave_obj, file_name="test_shot_record"+str(cpw))
 
             error = new_error_calc(p_receivers, self.reference_solution, Wave_obj.dt)
             print("Error is ", error, flush=True)
-            # f.write("Error is " + str(error)+"\n")
 
-        if dif < accuracy:
-            return cpw
+            if cont == 0 and error < TOL:
+                return cpw
+            elif error < TOL and dif > accuracy:
+                cpw -= dif
+                error = 100.0
+                # Flooring CPW to the neartest decimal point inside accuracy
+                cpw = np.round((cpw+1e-6) // accuracy * accuracy, int(-np.log10(accuracy)))
+                fast_loop = False
 
-        cpw -= dif
-        error = 100.0
-        while error > TOL:
-            dif = accuracy
-            cpw = cpw + dif
-            print("Trying cells-per-wavelength = ", cpw, flush=True)
-            # f.write("Trying cells-per-wavelength = " + str(cpw))
-
-            # Running forward model
-            Wave_obj = self.build_current_object(cpw)
-            # Wave_obj.get_and_set_maximum_dt(fraction=0.2)
-            print(Wave_obj.dt)
-            t0 = timinglib.time()
-            Wave_obj.forward_solve()
-            t1 = timinglib.time()
-            runtime = t1-t0
-            print("took = (s)", runtime, flush=True)
-            # f.write("took = (s)" + str(runtime))
-            p_receivers = Wave_obj.forward_solution_receivers
-
-            error = new_error_calc(p_receivers, self.reference_solution, Wave_obj.dt)
-            # error = error_calc(self.reference_solution, p_receivers, self.initial_dictionary)
-            print("Error is ", error, flush=True)
-            # f.write("Error is " + str(error)+"\n")
-
-        # f.close()
+            cont += 1
 
         return cpw
 
