@@ -4,7 +4,6 @@ import spyro
 
 def test_cpw_analytic_calc():
     grid_point_calculator_parameters = {
-        "testing": True,
         # Experiment parameters
         # Here we define the frequency of the Ricker wavelet source
         "source_frequency": 5.0,
@@ -18,21 +17,22 @@ def test_cpw_analytic_calc():
         "velocity_model_file_name": None,
         # FEM to evaluate such as `KMV` or `spectral`
         # (GLL nodes on quads and hexas)
-        "FEM_method_to_evaluate": "mass_lumped_triangle",
+        "FEM_method_to_evaluate": "spectral_quadrilateral",
         "dimension": 2,  # Domain dimension. Either 2 or 3.
         # Either near or line. Near defines a receiver grid near to the source,
         "receiver_setup": "near",
         # line defines a line of point receivers with pre-established near and far
         # offsets.
         # Line search parameters
-        "load_reference": False,
+        "load_reference": True,
+        "save_reference": False,
         "reference_degree": None,  # Degree to use in the reference case (int)
         # grid point density to use in the reference case (float)
         "C_reference": None,
         "desired_degree": 4,  # degree we are calculating G for. (int)
-        "C_initial": 6.0,  # Initial G for line search (float)
+        "C_initial": 2.5,  # Initial G for line search (float)
         "accepted_error_threshold": 0.05,
-        "C_accuracy": 1e-1,
+        "C_accuracy": 0.1,
     }
 
     Cpw_calc = spyro.tools.Meshing_parameter_calculator(
@@ -45,19 +45,23 @@ def test_cpw_analytic_calc():
     sz, sx = source_location
     rz, rx = receiver_location
     offset = np.sqrt((sz - rz) ** 2 + (sx - rx) ** 2)
-    expected_offset_value = 3.824264635194589
+    expected_offset_value = 2.6580067720004026
     test1 = np.isclose(offset, expected_offset_value)
     print(f"Checked if offset calculation is correct: {test1}")
 
     # Check if analytical solution has the correct peak location
     analytical_solve_one_receiver = Cpw_calc.reference_solution[:, 1]
     peak_indice = np.argmax(analytical_solve_one_receiver)
-    expected_peak_indice = 2804
+    expected_peak_indice = 4052  # 2804
     test2 = expected_peak_indice == peak_indice
     print(f"Checked if reference solution seems correct: {test2}")
 
+    # Check if cpw is within error TOL, starting search at min
+    min = Cpw_calc.find_minimum()
+    test3 = np.isclose(2.5, min)
+
     print("END")
-    assert all([test1, test2])
+    assert all([test1, test2, test3])
 
 
 if __name__ == "__main__":
