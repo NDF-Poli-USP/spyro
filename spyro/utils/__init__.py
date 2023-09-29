@@ -8,5 +8,5 @@ __all__ = [
     "estimate_timestep",
     "mpi_init",
     "compute_functional",
-    "nodal_homogeneous_analytical"
+    "nodal_homogeneous_analytical",
 ]

@@ -56,7 +56,8 @@ def test_gradient_talyor_remainder_v2():
     class L2Inner(object):
         def __init__(self):
             self.A = assemble(
-                TrialFunction(V) * TestFunction(V) * dx(scheme=qr_x), mat_type="matfree"
+                TrialFunction(V) * TestFunction(V) * dx(scheme=qr_x),
+                mat_type="matfree",
             )
             self.Ap = as_backend_type(self.A).mat()
 
@@ -86,7 +87,9 @@ def test_gradient_talyor_remainder_v2():
                 receivers,
                 output=False,
             )
-            self.misfit = spyro.utils.evaluate_misfit(model, p_guess_recv, p_exact_recv)
+            self.misfit = spyro.utils.evaluate_misfit(
+                model, p_guess_recv, p_exact_recv
+            )
             J = spyro.utils.compute_functional(model, self.misfit)
             return J
 
