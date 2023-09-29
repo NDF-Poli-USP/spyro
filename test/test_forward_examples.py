@@ -29,7 +29,6 @@ def test_camembert_forward():
 
 
 def test_rectangle_forward():
-
     Wave_obj = spyro.examples.Rectangle_acoustic()
 
     # Check if velocity model is correct

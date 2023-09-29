@@ -5,6 +5,7 @@ from firedrake import *
 import spyro
 
 from .model import dictionary as model
+
 model["acquisition"]["source_type"] = "MMS"
 
 

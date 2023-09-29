@@ -71,6 +71,7 @@ class Wave(Model_parameters):
         self.initial_velocity_model = None
 
         self.function_space = None
+        self.forward_solution_receivers = None
         self.current_time = 0.0
         self.set_solver_parameters()
         self.real_shot_record = None
@@ -107,6 +108,7 @@ class Wave(Model_parameters):
         length_x=None,
         length_y=None,
         periodic=False,
+        edge_length=None,
     ):
         super().set_mesh(
             dx=dx,
@@ -116,6 +118,7 @@ class Wave(Model_parameters):
             length_x=length_x,
             length_y=length_y,
             periodic=periodic,
+            edge_length=edge_length,
         )
 
         self.mesh = self.get_mesh()
@@ -217,7 +220,6 @@ class Wave(Model_parameters):
         self.receivers = Receivers(self)
 
     def _get_initial_velocity_model(self):
-
         if self.initial_velocity_model is not None:
             return None
 
@@ -264,7 +266,12 @@ class Wave(Model_parameters):
             estimate_max_eigenvalue=estimate_max_eigenvalue,
         )
         dt *= fraction
+        nt = int(self.final_time/dt)+1
+        dt = self.final_time/(nt-1)
+
         self.dt = dt
+        print(dt)
+        self.wavelet = self.get_wavelet()
         return dt
 
     def get_mass_matrix_diagonal(self):

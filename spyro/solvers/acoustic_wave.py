@@ -4,8 +4,12 @@ from .wave import Wave
 from .time_integration import time_integrator
 from ..io.basicio import ensemble_propagator
 from ..domains.quadrature import quadrature_rules
-from .acoustic_solver_construction_no_pml import construct_solver_or_matrix_no_pml
-from .acoustic_solver_construction_with_pml import construct_solver_or_matrix_with_pml
+from .acoustic_solver_construction_no_pml import (
+    construct_solver_or_matrix_no_pml,
+)
+from .acoustic_solver_construction_with_pml import (
+    construct_solver_or_matrix_with_pml,
+)
 
 
 class AcousticWave(Wave):

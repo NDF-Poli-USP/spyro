@@ -39,7 +39,7 @@ def test_read_and_write_segy():
 
     model["options"] = {
         "cell_type": "T",  # simplexes such as triangles or tetrahedra (T) or quadrilaterals (Q)
-        "variant": 'equispaced',  # lumped, equispaced or DG, default is lumped "method":"MLT", # (MLT/spectral_quadrilateral/DG_triangle/DG_quadrilateral) You can either specify a cell_type+variant or a method
+        "variant": "equispaced",  # lumped, equispaced or DG, default is lumped "method":"MLT", # (MLT/spectral_quadrilateral/DG_triangle/DG_quadrilateral) You can either specify a cell_type+variant or a method
         "degree": 3,  # p order
         "dimension": 2,  # dimension
     }
@@ -84,6 +84,7 @@ def test_read_and_write_segy():
 
 def test_saving_shot_record():
     from .inputfiles.model import dictionary
+
     dictionary["time_axis"]["final_time"] = 0.5
     Wave_obj = spyro.AcousticWave(dictionary=dictionary)
     Wave_obj.set_mesh(dx=0.02)
@@ -94,6 +95,7 @@ def test_saving_shot_record():
 
 def test_loading_shot_record():
     from .inputfiles.model import dictionary
+
     dictionary["time_axis"]["final_time"] = 0.5
     Wave_obj = spyro.AcousticWave(dictionary=dictionary)
     Wave_obj.set_mesh(dx=0.02)

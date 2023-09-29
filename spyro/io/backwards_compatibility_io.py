@@ -32,6 +32,7 @@ class Dictionary_conversion:
     set_no_inversion()
         Set the no_inversion section of dictionary
     """
+
     def __init__(self, old_dictionary):
         """
         Convert the old dictionary to the new one
