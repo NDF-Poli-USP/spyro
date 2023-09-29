@@ -63,7 +63,11 @@ class Meshing_parameter_calculator:
 
     def get_reference_solution(self):
         if self.load_reference:
-            return np.load("reference_solution.npy")
+            if "reference_solution_file" in self.parameters_dictionary:
+                filename = self.parameters_dictionary["reference_solution_file"]
+            else:
+                filename = "reference_solution.npy"
+            return np.load(filename)
         elif self.velocity_profile_type == "heterogeneous":
             raise NotImplementedError("Not yet implemented")
             # return self.get_referecen_solution_from refined_mesh()
