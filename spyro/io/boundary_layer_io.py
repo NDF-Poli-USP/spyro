@@ -62,6 +62,9 @@ class read_boundary_layer:
             )
 
     def read_PML_dictionary(self):
+        """
+        Reads the PML dictionary for a perfectly matched layer
+        """
         self.abc_exponent = self.dictionary["exponent"]
         self.abc_cmax = self.dictionary["cmax"]
         self.abc_R = self.dictionary["R"]
