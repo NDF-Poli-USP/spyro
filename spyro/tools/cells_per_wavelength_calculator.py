@@ -134,9 +134,7 @@ class Meshing_parameter_calculator:
             error = error_calc(p_receivers, self.reference_solution, Wave_obj.dt)
             print("Error is ", error, flush=True)
 
-            if cont == 0 and error < TOL:
-                return cpw
-            elif error < TOL and dif > accuracy:
+            if error < TOL and dif > accuracy:
                 cpw -= dif
                 error = 100.0
                 # Flooring CPW to the neartest decimal point inside accuracy
@@ -148,7 +146,7 @@ class Meshing_parameter_calculator:
 
             cont += 1
 
-        return cpw
+        return cpw - dif
 
     def build_current_object(self, cpw):
         dictionary = copy.deepcopy(self.initial_dictionary)

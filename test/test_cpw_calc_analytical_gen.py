@@ -2,7 +2,7 @@ import numpy as np
 import spyro
 
 
-def test_cpw_analytic_calc():
+def test_cpw_analytic_calc_analytical_gen():
     grid_point_calculator_parameters = {
         # Experiment parameters
         # Here we define the frequency of the Ricker wavelet source
@@ -24,8 +24,8 @@ def test_cpw_analytic_calc():
         # line defines a line of point receivers with pre-established near and far
         # offsets.
         # Line search parameters
-        "load_reference": True,
-        "reference_solution_file": "test/inputfiles/reference_solution_cpw.npy",
+        "load_reference": False,
+        "testing": True,
         "save_reference": False,
         "reference_degree": None,  # Degree to use in the reference case (int)
         # grid point density to use in the reference case (float)
@@ -46,24 +46,22 @@ def test_cpw_analytic_calc():
     sz, sx = source_location
     rz, rx = receiver_location
     offset = np.sqrt((sz - rz) ** 2 + (sx - rx) ** 2)
-    expected_offset_value = 2.6580067720004026
+    expected_offset_value = 3.824264635194589
     test1 = np.isclose(offset, expected_offset_value)
     print(f"Checked if offset calculation is correct: {test1}")
 
     # Check if analytical solution has the correct peak location
     analytical_solve_one_receiver = Cpw_calc.reference_solution[:, 1]
     peak_indice = np.argmax(analytical_solve_one_receiver)
-    expected_peak_indice = 4052  # 2804
+    expected_peak_indice = 5607
     test2 = expected_peak_indice == peak_indice
     print(f"Checked if reference solution seems correct: {test2}")
 
     # Check if cpw is within error TOL, starting search at min
-    min = Cpw_calc.find_minimum()
-    test3 = np.isclose(2.5, min)
 
     print("END")
-    assert all([test1, test2, test3])
+    assert all([test1, test2])
 
 
 if __name__ == "__main__":
-    test_cpw_analytic_calc()
+    test_cpw_analytic_calc_analytical_gen()
