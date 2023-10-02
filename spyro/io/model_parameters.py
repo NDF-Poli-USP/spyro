@@ -729,9 +729,7 @@ class Model_parameters:
             self.mesh_type = "file"
         elif automatic_mesh:
             self.user_mesh = self.creating_automatic_mesh(
-                periodic=periodic,
-                edge_length=edge_length,
-                dx=dx
+                periodic=periodic, edge_length=edge_length, dx=dx
             )
 
         if (
@@ -743,7 +741,9 @@ class Model_parameters:
                 "Mesh dimensions not completely reset from initial dictionary"
             )
 
-    def creating_automatic_mesh(self, periodic=False, edge_length=None, dx=None):
+    def creating_automatic_mesh(
+        self, periodic=False, edge_length=None, dx=None
+    ):
         if self.mesh_type == "firedrake_mesh":
             AutoMeshing = meshing.AutomaticMesh(
                 dimension=self.dimension,

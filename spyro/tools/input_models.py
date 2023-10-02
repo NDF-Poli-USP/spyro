@@ -72,24 +72,30 @@ def create_initial_model_for_meshing_parameter(Meshing_calc_obj):
 def create_initial_model_for_meshing_parameter_2D(Meshing_calc_obj):
     velocity_profile_type = Meshing_calc_obj.velocity_profile_type
     if velocity_profile_type == "homogeneous":
-        return create_initial_model_for_meshing_parameter_2D_homogeneous(Meshing_calc_obj)  
+        return create_initial_model_for_meshing_parameter_2D_homogeneous(
+            Meshing_calc_obj
+        )
     elif velocity_profile_type == "heterogeneous":
         raise NotImplementedError("Not yet implemented")
         # return create_initial_model_for_meshing_parameter_2D_heterogeneous(Meshing_calc_obj)
     else:
-        raise ValueError("Velocity profile type is not homogeneous or heterogeneous")
+        raise ValueError(
+            "Velocity profile type is not homogeneous or heterogeneous"
+        )
 
 
 def create_initial_model_for_meshing_parameter_3D(Meshing_calc_obj):
     velocity_profile_type = Meshing_calc_obj.velocity_profile_type
     if velocity_profile_type == "homogeneous":
         raise NotImplementedError("Not yet implemented")
-        # return create_initial_model_for_meshing_parameter_3D_homogeneous(Meshing_calc_obj)  
+        # return create_initial_model_for_meshing_parameter_3D_homogeneous(Meshing_calc_obj)
     elif velocity_profile_type == "heterogeneous":
         raise NotImplementedError("Not yet implemented")
         # return create_initial_model_for_meshing_parameter_3D_heterogeneous(Meshing_calc_obj)
     else:
-        raise ValueError("Velocity profile type is not homogeneous or heterogeneous")
+        raise ValueError(
+            "Velocity profile type is not homogeneous or heterogeneous"
+        )
 
 
 def create_initial_model_for_meshing_parameter_2D_homogeneous(Meshing_calc_obj):
@@ -106,15 +112,15 @@ def create_initial_model_for_meshing_parameter_2D_homogeneous(Meshing_calc_obj):
         warnings.warn("Velocity in meters per second")
 
     # Domain calculations
-    lbda = c_value/frequency
-    Lz = 40*lbda
-    Lx = 30*lbda
+    lbda = c_value / frequency
+    Lz = 40 * lbda
+    Lx = 30 * lbda
     Ly = 0.0
     pad = lbda
 
     # Source and receiver calculations
-    source_z = -Lz/2.0
-    source_x = Lx/2.0
+    source_z = -Lz / 2.0
+    source_x = Lx / 2.0
     source_locations = [(source_z, source_x)]
 
     receiver_bin_center1 = 10 * lbda  # 20*lbda
@@ -130,7 +136,11 @@ def create_initial_model_for_meshing_parameter_2D_homogeneous(Meshing_calc_obj):
     bin1_endX = source_x + receiver_bin_width / 2.0
 
     receiver_locations = spyro.create_2d_grid(
-        bin1_startZ, bin1_endZ, bin1_startX, bin1_endX, int(np.sqrt(receiver_quantity))
+        bin1_startZ,
+        bin1_endZ,
+        bin1_startX,
+        bin1_endX,
+        int(np.sqrt(receiver_quantity)),
     )
 
     # Time axis calculations

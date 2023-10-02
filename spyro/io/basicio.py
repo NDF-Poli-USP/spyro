@@ -479,23 +479,23 @@ def parallel_print(string, comm):
 
 def saving_source_and_receiver_location_in_csv(model, folder_name=None):
     if folder_name is None:
-        folder_name = 'results/'
+        folder_name = "results/"
 
-    file_name = folder_name + 'sources.txt'
-    file_obj = open(file_name, 'w')
-    file_obj.write('Z,\tX \n')
-    for source in model['acquisition']['source_locations']:
+    file_name = folder_name + "sources.txt"
+    file_obj = open(file_name, "w")
+    file_obj.write("Z,\tX \n")
+    for source in model["acquisition"]["source_locations"]:
         z, x = source
-        string = str(z)+',\t'+str(x)+' \n'
+        string = str(z) + ",\t" + str(x) + " \n"
         file_obj.write(string)
     file_obj.close()
 
-    file_name = folder_name + 'receivers.txt'
-    file_obj = open(file_name, 'w')
-    file_obj.write('Z,\tX \n')
-    for receiver in model['acquisition']['receiver_locations']:
+    file_name = folder_name + "receivers.txt"
+    file_obj = open(file_name, "w")
+    file_obj.write("Z,\tX \n")
+    for receiver in model["acquisition"]["receiver_locations"]:
         z, x = receiver
-        string = str(z)+',\t'+str(x)+' \n'
+        string = str(z) + ",\t" + str(x) + " \n"
         file_obj.write(string)
     file_obj.close()
 

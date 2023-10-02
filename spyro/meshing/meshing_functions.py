@@ -156,7 +156,9 @@ class AutomaticMesh:
             self.cpw = cpw
         if velocity_model is not None:
             # self.velocity_model = velocity_model
-            raise NotImplementedError("Reading from velocity file not yet implemented")
+            raise NotImplementedError(
+                "Reading from velocity file not yet implemented"
+            )
         if edge_length is not None:
             self.edge_length = edge_length
         if output_file_name is not None:
@@ -312,6 +314,8 @@ class AutomaticMesh:
 
         return fire.Mesh(self.output_file_name)
         # raise NotImplementedError("Not implemented yet")
+
+
 # def create_firedrake_3D_mesh_based_on_parameters(dx, cell_type):
 #     nx = int(self.length_x / dx)
 #     nz = int(self.length_z / dx)
