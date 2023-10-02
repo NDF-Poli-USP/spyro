@@ -434,13 +434,8 @@ class Model_parameters:
         self._sanitize_output_files()
 
     def _sanitize_output_files(self):
+        self._sanitize_forward_output_files()
         dictionary = self.input_dictionary["visualization"]
-        if "forward_output_filename" not in dictionary:
-            self.forward_output_file = "results/forward_propogation.pvd"
-        elif dictionary["forward_output_filename"] is not None:
-            self.forward_output_file = dictionary["forward_output_filename"]
-        else:
-            self.forward_output_file = "results/forward_propagation.pvd"
 
         # Estabilishing velocity model file and setting a default
         if "velocity_model_filename" not in dictionary:
@@ -456,6 +451,19 @@ class Model_parameters:
                 "results/fwi_velocity_model.pvd"
             )
 
+        self._check_debug_output()
+
+    def _sanitize_forward_output_files(self):
+        dictionary = self.input_dictionary["visualization"]
+        if "forward_output_filename" not in dictionary:
+            self.forward_output_file = "results/forward_propogation.pvd"
+        elif dictionary["forward_output_filename"] is not None:
+            self.forward_output_file = dictionary["forward_output_filename"]
+        else:
+            self.forward_output_file = "results/forward_propagation.pvd"
+
+    def _sanitize_adjoint_and_gradient_output_files(self):
+        dictionary = self.input_dictionary["visualization"]
         # Estabilishing gradient file and setting a default
         if "gradient_filename" not in dictionary:
             self.gradient_output_file = "results/gradient.pvd"
@@ -471,8 +479,6 @@ class Model_parameters:
             self.adjoint_output_file = dictionary["adjoint_filename"]
         else:
             self.adjoint_output_file = "results/adjoint.pvd"
-
-        self._check_debug_output()
 
     def _check_debug_output(self):
         dictionary = self.input_dictionary["visualization"]
@@ -708,31 +714,43 @@ class Model_parameters:
             length_y=length_y,
         )
 
+        if self.mesh_type == "firedrake_mesh":
+            automatic_mesh = True
+        elif self.mesh_type == "SeismicMesh":
+            automatic_mesh = True
+        else:
+            automatic_mesh = False
+
         if user_mesh is not None:
             self.user_mesh = user_mesh
             self.mesh_type = "user_mesh"
         elif mesh_file is not None:
             self.mesh_file = mesh_file
             self.mesh_type = "file"
-        elif self.mesh_type == "firedrake_mesh":
-            AutoMeshing = meshing.AutomaticMesh(
-                dimension=self.dimension,
-                comm=self.comm,
-                abc_pad=self.abc_pad_length,
-                mesh_type=self.mesh_type,
-            )
-        elif self.mesh_type == "SeismicMesh":
-            AutoMeshing = meshing.AutomaticMesh(
-                dimension=self.dimension,
-                comm=self.comm,
-                abc_pad=self.abc_pad_length,
-                mesh_type=self.mesh_type,
+        elif automatic_mesh:
+            self.user_mesh = self.creating_automatic_mesh(
+                periodic=periodic,
+                edge_length=edge_length,
+                dx=dx
             )
 
-        if periodic:
-            AutoMeshing.make_periodic()
+        if (
+            length_z is None
+            or length_x is None
+            or (length_y is None and self.dimension == 2)
+        ) and self.mesh_type != "firedrake_mesh":
+            warnings.warn(
+                "Mesh dimensions not completely reset from initial dictionary"
+            )
 
+    def creating_automatic_mesh(self, periodic=False, edge_length=None, dx=None):
         if self.mesh_type == "firedrake_mesh":
+            AutoMeshing = meshing.AutomaticMesh(
+                dimension=self.dimension,
+                comm=self.comm,
+                abc_pad=self.abc_pad_length,
+                mesh_type=self.mesh_type,
+            )
             AutoMeshing.set_mesh_size(
                 length_z=self.length_z,
                 length_x=self.length_x,
@@ -743,24 +761,24 @@ class Model_parameters:
             AutoMeshing.set_meshing_parameters(
                 dx=dx, cell_type=self.cell_type, mesh_type=self.mesh_type
             )
-            self.user_mesh = AutoMeshing.create_mesh()
         elif self.mesh_type == "SeismicMesh":
+            AutoMeshing = meshing.AutomaticMesh(
+                dimension=self.dimension,
+                comm=self.comm,
+                abc_pad=self.abc_pad_length,
+                mesh_type=self.mesh_type,
+            )
             AutoMeshing.set_mesh_size(
                 length_z=self.length_z,
                 length_x=self.length_x,
                 length_y=self.length_y,
             )
             AutoMeshing.set_seismicmesh_parameters(edge_length=edge_length)
-            self.user_mesh = AutoMeshing.create_mesh()
 
-        if (
-            length_z is None
-            or length_x is None
-            or (length_y is None and self.dimension == 2)
-        ) and self.mesh_type != "firedrake_mesh":
-            warnings.warn(
-                "Mesh dimensions not completely reset from initial dictionary"
-            )
+        if periodic:
+            AutoMeshing.make_periodic()
+
+        return AutoMeshing.create_mesh()
 
     def _set_mesh_length(
         self,
