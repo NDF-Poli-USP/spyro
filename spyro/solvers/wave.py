@@ -266,8 +266,8 @@ class Wave(Model_parameters):
             estimate_max_eigenvalue=estimate_max_eigenvalue,
         )
         dt *= fraction
-        nt = int(self.final_time/dt)+1
-        dt = self.final_time/(nt-1)
+        nt = int(self.final_time / dt) + 1
+        dt = self.final_time / (nt - 1)
 
         self.dt = dt
         print(dt)
