@@ -36,16 +36,24 @@ class AutomaticMesh:
         Sets the mesh size.
     set_meshing_parameters(dx=None, cell_type=None, mesh_type=None)
         Sets the meshing parameters.
+    set_seismicmesh_parameters(cpw=None, velocity_model=None, edge_length=None)
+        Sets the SeismicMesh parameters.
     make_periodic()
-        Sets the mesh boundaries periodic.
+        Sets the mesh boundaries periodic. Only works for firedrake_mesh.
     create_mesh()
         Creates the mesh.
     create_firedrake_mesh()
-        Creates a 2D mesh based on Firedrake meshing utilities.
+        Creates a mesh based on Firedrake meshing utilities.
     create_firedrake_2D_mesh()
         Creates a 2D mesh based on Firedrake meshing utilities.
     create_firedrake_3D_mesh()
         Creates a 3D mesh based on Firedrake meshing utilities.
+    create_seismicmesh_mesh()
+        Creates a mesh based on SeismicMesh meshing utilities.
+    create_seimicmesh_2d_mesh()
+        Creates a 2D mesh based on SeismicMesh meshing utilities.
+    create_seismicmesh_2D_mesh_homogeneous()
+        Creates a 2D mesh homogeneous velocity mesh based on SeismicMesh meshing utilities.
     """
 
     def __init__(
@@ -147,6 +155,8 @@ class AutomaticMesh:
             Velocity model. The default is None.
         edge_length : float, optional
             Edge length. The default is None.
+        output_file_name : str, optional
+            Output file name. The default is None.
 
         Returns
         -------
@@ -172,6 +182,7 @@ class AutomaticMesh:
     def make_periodic(self):
         """
         Sets the mesh boundaries periodic.
+        Only works for firedrake_mesh.
         """
         self.periodic = True
         if self.mesh_type != "firedrake_mesh":
@@ -185,7 +196,7 @@ class AutomaticMesh:
 
         Returns
         -------
-        mesh : Firedrake Mesh
+        mesh : Mesh
             Mesh
         """
         if self.mesh_type == "firedrake_mesh":
@@ -196,6 +207,9 @@ class AutomaticMesh:
             raise ValueError("mesh_type is not supported")
 
     def create_firedrake_mesh(self):
+        """
+        Creates a mesh based on Firedrake meshing utilities.
+        """
         if self.dx is None:
             raise ValueError("dx is not set")
         elif self.dimension == 2:
@@ -239,6 +253,9 @@ class AutomaticMesh:
             )
 
     def create_firedrake_3D_mesh(self):
+        """
+        Creates a 3D mesh based on Firedrake meshing utilities.
+        """
         dx = self.dx
         nx = int(self.length_x / dx)
         nz = int(self.length_z / dx)
@@ -259,6 +276,14 @@ class AutomaticMesh:
         )
 
     def create_seismicmesh_mesh(self):
+        """
+        Creates a mesh based on SeismicMesh meshing utilities.
+
+        Returns
+        -------
+        mesh : Mesh
+            Mesh
+        """
         if self.dimension == 2:
             return self.create_seimicmesh_2d_mesh()
         elif self.dimension == 3:
@@ -268,6 +293,9 @@ class AutomaticMesh:
             raise ValueError("dimension is not supported")
 
     def create_seimicmesh_2d_mesh(self):
+        """
+        Creates a 2D mesh based on SeismicMesh meshing utilities.
+        """
         if self.edge_length is not None:
             return self.create_seismicmesh_2D_mesh_homogeneous()
         else:
@@ -275,7 +303,7 @@ class AutomaticMesh:
 
     def create_seismicmesh_2D_mesh_homogeneous(self):
         """
-        Creates a 2D mesh based on SeismicMesh meshing utilities.
+        Creates a 2D mesh based on SeismicMesh meshing utilities, with homogeneous velocity model.
         """
         Lz = self.length_z
         Lx = self.length_x

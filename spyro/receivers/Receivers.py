@@ -52,14 +52,8 @@ class Receivers(Delta_projector):
         input file.
         Parameters
         ----------
-        model: `dictionary`
-            Contains simulation parameters and options.
-        mesh: a Firedrake.mesh
-            2D/3D simplicial mesh read in by Firedrake.Mesh
-        V: Firedrake.FunctionSpace object
-            The space of the finite elements
-        my_ensemble: Firedrake.ensemble_communicator
-            An ensemble communicator
+        wave_object: :class: 'Wave' object
+            Waveform object that contains all simulation parameters
         Returns
         -------
         Receivers: :class: 'Receiver' object

@@ -2,7 +2,21 @@ import numpy as np
 
 
 def change_to_reference_triangle(p, cell_vertices):
-    """Changes variables to reference triangle"""
+    """
+    Changes variables to reference triangle
+
+    Parameters
+    ----------
+    p : tuple
+        Point in original triangle
+    cell_vertices : list
+        List of vertices, in tuple format, of original triangle
+
+    Returns
+    -------
+    tuple
+        Point location in reference triangle
+    """
     (xa, ya) = cell_vertices[0]
     (xb, yb) = cell_vertices[1]
     (xc, yc) = cell_vertices[2]
@@ -54,7 +68,23 @@ def change_to_reference_triangle(p, cell_vertices):
 def change_to_reference_tetrahedron(
     p, cell_vertices, reference_coordinates=None
 ):
-    """Changes variables to reference tetrahedron"""
+    """
+    Changes variables to reference tetrahedron
+
+    Parameters
+    ----------
+    p : tuple
+        Point in original tetrahedron
+    cell_vertices : list
+        List of vertices, in tuple format, of original tetrahedron
+    reference_coordinates : list, optional
+        List of reference coordinates, in tuple format, of original tetrahedron
+
+    Returns
+    -------
+    tuple
+        Point location in reference tetrahedron
+    """
     (xa, ya, za) = cell_vertices[0]
     (xb, yb, zb) = cell_vertices[1]
     (xc, yc, zc) = cell_vertices[2]
@@ -353,7 +383,21 @@ def change_to_reference_tetrahedron(
 
 
 def change_to_reference_quad(p, cell_vertices):
-    """Changes varibales to reference quadrilateral"""
+    """
+    Changes varibales to reference quadrilateral
+
+    Parameters
+    ----------
+    p : tuple
+        Point in original quadrilateral
+    cell_vertices : list
+        List of vertices, in tuple format, of original quadrilateral
+
+    Returns
+    -------
+    tuple
+        Point location in reference quadrilateral
+    """
     (px, py) = p
     # Irregular quad
     (x0, y0) = cell_vertices[0]
@@ -416,6 +460,21 @@ def change_to_reference_quad(p, cell_vertices):
 
 
 def change_to_reference_hexa(p, cell_vertices):
+    """
+    Changes variables to reference hexahedron
+
+    Parameters
+    ----------
+    p : tuple
+        Point in original hexahedron
+    cell_vertices : list
+        List of vertices, in tuple format, of original hexahedron
+
+    Returns
+    -------
+    tuple
+        Point location in reference hexahedron
+    """
     a = cell_vertices[0]
     b = cell_vertices[1]
     c = cell_vertices[2]
