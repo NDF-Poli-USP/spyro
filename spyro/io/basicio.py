@@ -60,19 +60,19 @@ def ensemble_plot(func):
     return wrapper
 
 
-def ensemble_forward(func):
-    """Decorator for forward to distribute shots for ensemble parallelism"""
+# def ensemble_forward(func):
+#     """Decorator for forward to distribute shots for ensemble parallelism"""
 
-    def wrapper(*args, **kwargs):
-        acq = args[0].get("acquisition")
-        num = len(acq["source_pos"])
-        _comm = args[2]
-        for snum in range(num):
-            if is_owner(_comm, snum):
-                u, u_r = func(*args, **dict(kwargs, source_num=snum))
-                return u, u_r
+#     def wrapper(*args, **kwargs):
+#         acq = args[0].get("acquisition")
+#         num = len(acq["source_pos"])
+#         _comm = args[2]
+#         for snum in range(num):
+#             if is_owner(_comm, snum):
+#                 u, u_r = func(*args, **dict(kwargs, source_num=snum))
+#                 return u, u_r
 
-    return wrapper
+#     return wrapper
 
 
 def ensemble_propagator(func):
@@ -89,82 +89,82 @@ def ensemble_propagator(func):
     return wrapper
 
 
-def ensemble_forward_ad(func):
-    """Decorator for forward to distribute shots for ensemble parallelism"""
+# def ensemble_forward_ad(func):
+#     """Decorator for forward to distribute shots for ensemble parallelism"""
 
-    def wrapper(*args, **kwargs):
-        acq = args[0].get("acquisition")
-        num = len(acq["source_pos"])
-        fwi = kwargs.get("fwi")
-        _comm = args[2]
-        for snum in range(num):
-            if is_owner(_comm, snum):
-                if fwi:
-                    u_r, J = func(*args, **dict(kwargs, source_num=snum))
-                    return u_r, J
-                else:
-                    u_r = func(*args, **dict(kwargs, source_num=snum))
+#     def wrapper(*args, **kwargs):
+#         acq = args[0].get("acquisition")
+#         num = len(acq["source_pos"])
+#         fwi = kwargs.get("fwi")
+#         _comm = args[2]
+#         for snum in range(num):
+#             if is_owner(_comm, snum):
+#                 if fwi:
+#                     u_r, J = func(*args, **dict(kwargs, source_num=snum))
+#                     return u_r, J
+#                 else:
+#                     u_r = func(*args, **dict(kwargs, source_num=snum))
 
-    return wrapper
-
-
-def ensemble_forward_elastic_waves(func):
-    """Decorator for forward elastic waves to distribute shots for
-    ensemble parallelism"""
-
-    def wrapper(*args, **kwargs):
-        acq = args[0].get("acquisition")
-        num = len(acq["source_pos"])
-        _comm = args[2]
-        for snum in range(num):
-            if is_owner(_comm, snum):
-                u, uz_r, ux_r, uy_r = func(
-                    *args, **dict(kwargs, source_num=snum)
-                )
-                return u, uz_r, ux_r, uy_r
-
-    return wrapper
+#     return wrapper
 
 
-def ensemble_gradient(func):
-    """Decorator for gradient to distribute shots for ensemble parallelism"""
+# def ensemble_forward_elastic_waves(func):
+#     """Decorator for forward elastic waves to distribute shots for
+#     ensemble parallelism"""
 
-    def wrapper(*args, **kwargs):
-        acq = args[0].get("acquisition")
-        save_adjoint = kwargs.get("save_adjoint")
-        num = len(acq["source_pos"])
-        _comm = args[2]
-        for snum in range(num):
-            if is_owner(_comm, snum):
-                if save_adjoint:
-                    grad, u_adj = func(*args, **kwargs)
-                    return grad, u_adj
-                else:
-                    grad = func(*args, **kwargs)
-                    return grad
+#     def wrapper(*args, **kwargs):
+#         acq = args[0].get("acquisition")
+#         num = len(acq["source_pos"])
+#         _comm = args[2]
+#         for snum in range(num):
+#             if is_owner(_comm, snum):
+#                 u, uz_r, ux_r, uy_r = func(
+#                     *args, **dict(kwargs, source_num=snum)
+#                 )
+#                 return u, uz_r, ux_r, uy_r
 
-    return wrapper
+#     return wrapper
 
 
-def ensemble_gradient_elastic_waves(func):
-    """Decorator for gradient (elastic waves) to distribute shots
-    for ensemble parallelism"""
+# def ensemble_gradient(func):
+#     """Decorator for gradient to distribute shots for ensemble parallelism"""
 
-    def wrapper(*args, **kwargs):
-        acq = args[0].get("acquisition")
-        save_adjoint = kwargs.get("save_adjoint")
-        num = len(acq["source_pos"])
-        _comm = args[2]
-        for snum in range(num):
-            if is_owner(_comm, snum):
-                if save_adjoint:
-                    grad_lambda, grad_mu, u_adj = func(*args, **kwargs)
-                    return grad_lambda, grad_mu, u_adj
-                else:
-                    grad_lambda, grad_mu = func(*args, **kwargs)
-                    return grad_lambda, grad_mu
+#     def wrapper(*args, **kwargs):
+#         acq = args[0].get("acquisition")
+#         save_adjoint = kwargs.get("save_adjoint")
+#         num = len(acq["source_pos"])
+#         _comm = args[2]
+#         for snum in range(num):
+#             if is_owner(_comm, snum):
+#                 if save_adjoint:
+#                     grad, u_adj = func(*args, **kwargs)
+#                     return grad, u_adj
+#                 else:
+#                     grad = func(*args, **kwargs)
+#                     return grad
 
-    return wrapper
+#     return wrapper
+
+
+# def ensemble_gradient_elastic_waves(func):
+#     """Decorator for gradient (elastic waves) to distribute shots
+#     for ensemble parallelism"""
+
+#     def wrapper(*args, **kwargs):
+#         acq = args[0].get("acquisition")
+#         save_adjoint = kwargs.get("save_adjoint")
+#         num = len(acq["source_pos"])
+#         _comm = args[2]
+#         for snum in range(num):
+#             if is_owner(_comm, snum):
+#                 if save_adjoint:
+#                     grad_lambda, grad_mu, u_adj = func(*args, **kwargs)
+#                     return grad_lambda, grad_mu, u_adj
+#                 else:
+#                     grad_lambda, grad_mu = func(*args, **kwargs)
+#                     return grad_lambda, grad_mu
+
+#     return wrapper
 
 
 def write_function_to_grid(function, V, grid_spacing):
