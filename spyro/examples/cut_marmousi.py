@@ -105,6 +105,15 @@ cut_marmousi_dictionary["time_axis"] = {
 
 
 class Cut_marmousi_acoustic(Example_model_acoustic):
+    """
+    Class for the cut marmousi model.
+
+    Parameters
+    ----------
+    dictionary : dict, optional
+        Dictionary with the parameters of the model that are different from
+        the default model. The default is None.
+    """
     def __init__(
         self,
         dictionary=None,

@@ -21,7 +21,49 @@ import numpy as np
 
 
 class Delta_projector:
+    """
+    Class that interpolates the solution to the receiver coordinates
+
+    Attributes
+    ----------
+    mesh: firedrake.Mesh
+        Mesh object
+    space: firedrake.FunctionSpace
+        Function space to be used
+    my_ensemble: mpi4py.MPI.Intracomm
+        MPI communicator
+    dimension: int
+        Dimension of the mesh
+    degree: int
+        Degree of FEM space
+    point_locations: list
+        List of tuples of point locations
+    number_of_points: int
+        Number of points
+    cellIDs: list
+        List of cell IDs for each point
+    cellVertices: list
+        List of vertices for each cell containing a point
+    cell_tabulations: list
+        List of tabulations for each point in a cell
+    cellNodeMaps: list
+        List of node maps for each cell
+    nodes_per_cell: int
+        Number of nodes per cell
+    quadrilateral: bool
+        True if mesh is quadrilateral
+    is_local: list
+        List of cell IDs local to the processor
+    """
     def __init__(self, wave_object):
+        """
+        Initializes the class
+
+        Parameters
+        ----------
+        wave_object: spyro.wave.Wave
+            Wave object
+        """
         my_ensemble = wave_object.comm
         if wave_object.automatic_adjoint:
             self.automatic_adjoint = True
@@ -447,6 +489,19 @@ class Delta_projector:
 
 
 def choosing_geometry(cell_geometry):
+    """
+    Chooses UFC reference element geometry based on desired function space
+
+    Parameters
+    ----------
+    cell_geometry : firedrake.Cell
+        Cell geometry of the mesh.
+
+    Returns
+    -------
+    T : FIAT reference element
+        FIAT reference element to be used in the interpolation.
+    """
     if cell_geometry == quadrilateral:  # noqa: F405
         T = UFCQuadrilateral()
         raise ValueError(

@@ -274,6 +274,10 @@ def load_shots(Wave_obj, source_id=0, file_name=None):
 
     Parameters
     ----------
+    Wave_obj: `spyro.Wave` object
+        A `spyro.Wave` object
+    source_id: int, optional by default 0
+        The source number
     filename: str, optional by default shot_number_#.dat
         The filename to save the data as a `pickle`
 
@@ -472,12 +476,29 @@ def read_mesh(model_parameters):
 def parallel_print(string, comm):
     """
     Just prints a string in comm 0
+
+    Parameters
+    ----------
+    string: str
+        The string to print
+    comm: Firedrake.ensemble_communicator
+        An ensemble communicator
     """
     if comm.ensemble_comm.rank == 0 and comm.comm.rank == 0:
         print(string, flush=True)
 
 
 def saving_source_and_receiver_location_in_csv(model, folder_name=None):
+    """
+    Saving the source and receiver locations in a csv file
+
+    Parameters
+    ----------
+    model: spyro object
+        Model options and parameters.
+    folder_name: str, optional by default None
+        The folder name to save the csv file
+    """
     if folder_name is None:
         folder_name = "results/"
 

@@ -5,6 +5,10 @@ from ..pml import damping
 
 
 def construct_solver_or_matrix_with_pml(Wave_object):
+    """
+    Builds solver operators for wave propagator with a PML. Doesn't create mass matrices if
+    matrix_free option is on, which it is by default.
+    """
     if Wave_object.dimension == 2:
         return construct_solver_or_matrix_with_pml_2d(Wave_object)
     elif Wave_object.dimension == 3:
@@ -12,9 +16,9 @@ def construct_solver_or_matrix_with_pml(Wave_object):
 
 
 def construct_solver_or_matrix_with_pml_2d(Wave_object):
-    """Builds solver operators. Doesn't create mass matrices if
-    matrix_free option is on,
-    which it is by default.
+    """
+    Builds solver operators for 2D wave propagator with a PML. Doesn't create mass matrices if
+    matrix_free option is on, which it is by default.
     """
     dt = Wave_object.dt
     c = Wave_object.c
@@ -78,6 +82,10 @@ def construct_solver_or_matrix_with_pml_2d(Wave_object):
 
 
 def construct_solver_or_matrix_with_pml_3d(Wave_object):
+    """
+    Builds solver operators for 3D wave propagator with a PML. Doesn't create mass matrices if
+    matrix_free option is on, which it is by default.
+    """
     dt = Wave_object.dt
     c = Wave_object.c
 

@@ -728,7 +728,7 @@ class Model_parameters:
             self.mesh_file = mesh_file
             self.mesh_type = "file"
         elif automatic_mesh:
-            self.user_mesh = self.creating_automatic_mesh(
+            self.user_mesh = self._creating_automatic_mesh(
                 periodic=periodic, edge_length=edge_length, dx=dx
             )
 
@@ -741,7 +741,7 @@ class Model_parameters:
                 "Mesh dimensions not completely reset from initial dictionary"
             )
 
-    def creating_automatic_mesh(
+    def _creating_automatic_mesh(
         self, periodic=False, edge_length=None, dx=None
     ):
         if self.mesh_type == "firedrake_mesh":
