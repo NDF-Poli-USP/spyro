@@ -111,6 +111,22 @@ rectangle_dictionary["visualization"] = {
 
 
 class Rectangle_acoustic(Example_model_acoustic):
+    """
+    Rectangle model.
+    This class is a child of the Example_model class.
+    It is used to create a dictionary with the parameters of the
+    Rectangle model.
+
+    Parameters
+    ----------
+    dictionary : dict, optional
+        Dictionary with the parameters of the model that are different from
+        the default model. The default is None.
+    comm : firedrake.mpi_comm.MPI.Intracomm, optional
+    periodic : bool, optional
+        If True, the mesh will be periodic in all directions. The default is
+        False.
+    """
     def __init__(
         self,
         dictionary=None,

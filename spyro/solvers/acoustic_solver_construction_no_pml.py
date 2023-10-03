@@ -3,9 +3,13 @@ from firedrake import dx, Constant, dot, grad
 
 
 def construct_solver_or_matrix_no_pml(Wave_object):
-    """Builds solver operators. Doesn't create mass matrices if
-    matrix_free option is on,
-    which it is by default.
+    """Builds solver operators for wave object without a PML. Doesn't create mass matrices if
+    matrix_free option is on, which it is by default.
+
+    Parameters
+    ----------
+    Wave_object: :class: 'Wave' object
+        Waveform object that contains all simulation parameters
     """
     V = Wave_object.function_space
     quad_rule = Wave_object.quadrature_rule

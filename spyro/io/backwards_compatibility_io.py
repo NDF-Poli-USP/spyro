@@ -31,6 +31,12 @@ class Dictionary_conversion:
         Set the optimization_parameters section of dictionary
     set_no_inversion()
         Set the no_inversion section of dictionary
+    convert_absorving_boundary_conditions()
+        Convert the absorving_boundary_conditions section of dictionary
+    convert_acquisition()
+        Convert the acquisition section of dictionary
+    convert_time_axis()
+        Convert the time_axis section of dictionary
     """
 
     def __init__(self, old_dictionary):
