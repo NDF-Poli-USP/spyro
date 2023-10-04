@@ -31,7 +31,7 @@ def cpw_calc(accuracy=None):
         # grid point density to use in the reference case (float)
         "C_reference": None,
         "desired_degree": 5,  # degree we are calculating G for. (int)
-        "C_initial": 1.7,  # Initial G for line search (float)
+        "C_initial": 1.0,  # Initial G for line search (float)
         "accepted_error_threshold": 0.05,
         "C_accuracy": accuracy,
     }
@@ -40,7 +40,7 @@ def cpw_calc(accuracy=None):
         grid_point_calculator_parameters
     )
 
-    min = Cpw_calc.find_minimum()
+    min = Cpw_calc.find_minimum(savetxt=True)
     print(f"Minimum found at c = {min}, with accuracy of {accuracy}")
 
     print("END")
