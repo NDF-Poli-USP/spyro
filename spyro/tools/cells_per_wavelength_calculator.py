@@ -1,5 +1,4 @@
 import numpy as np
-from scipy import interpolate
 import time as timinglib
 import copy
 from .input_models import create_initial_model_for_meshing_parameter
@@ -105,7 +104,7 @@ class Meshing_parameter_calculator:
 
         return analytical_solution
 
-    def find_minimum(self, starting_cpw=None, TOL=None, accuracy=None):
+    def find_minimum(self, starting_cpw=None, TOL=None, accuracy=None, savetxt=False):
         if starting_cpw is None:
             starting_cpw = self.cpw_initial
         if TOL is None:
@@ -116,8 +115,13 @@ class Meshing_parameter_calculator:
         error = 100.0
         cpw = starting_cpw
         print("Starting line search", flush=True)
+        cpws = []
+        dts = []
+        errors = []
+        runtimes = []
 
         fast_loop = True
+        # fast_loop = False
         dif = 0.0
         cont = 0
         while error > TOL:
@@ -125,8 +129,11 @@ class Meshing_parameter_calculator:
 
             # Running forward model
             Wave_obj = self.build_current_object(cpw)
-            # Wave_obj.get_and_set_maximum_dt(fraction=0.2)
+            Wave_obj.get_and_set_maximum_dt(fraction=0.2)
+            print("Maximum dt is ", Wave_obj.dt, flush=True)
+            t0 = timinglib.time()
             Wave_obj.forward_solve()
+            t1 = timinglib.time()
             p_receivers = Wave_obj.forward_solution_receivers
             spyro.io.save_shots(
                 Wave_obj, file_name="test_shot_record" + str(cpw)
@@ -136,6 +143,10 @@ class Meshing_parameter_calculator:
                 p_receivers, self.reference_solution, Wave_obj.dt
             )
             print("Error is ", error, flush=True)
+            cpws.append(cpw)
+            dts.append(Wave_obj.dt)
+            errors.append(error)
+            runtimes.append(t1 - t0)
 
             if error < TOL and dif > accuracy:
                 cpw -= dif
@@ -151,6 +162,12 @@ class Meshing_parameter_calculator:
                 cpw += dif
 
             cont += 1
+
+        if savetxt:
+            np.savetxt(
+                "p"+str(self.initial_guess_object.degree)+"_cpw_results.txt",
+                np.transpose([cpws, dts, errors, runtimes]),
+            )
 
         return cpw - dif
 
