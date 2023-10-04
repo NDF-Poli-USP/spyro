@@ -1,5 +1,5 @@
 # Open the file for reading
-with open('p3_cpw_results.txt', 'r') as file:
+with open('p5_cpw_results.txt', 'r') as file:
     # Initialize empty lists for each column
     C_values = []
     dt_values = []
