@@ -48,8 +48,8 @@ def build_on_top_of_base_dictionary(variables):
         "gradient_sampling_frequency": 100,  # how frequently to save solution to RAM
     }
     model_dictionary["visualization"] = {
-        "forward_output": False,
-        "output_filename": "results/forward_output.pvd",
+        "forward_output": True,
+        "forward_output_filename": "results/reference_forward_output.pvd",
         "fwi_velocity_model_output": False,
         "velocity_model_filename": None,
         "gradient_output": False,

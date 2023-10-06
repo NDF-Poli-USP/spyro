@@ -101,10 +101,19 @@ class Meshing_parameter_calculator:
                 filename = "reference_solution.npy"
             return np.load(filename)
         elif self.velocity_profile_type == "heterogeneous":
-            raise NotImplementedError("Not yet implemented")
-            # return self.get_referecen_solution_from refined_mesh()
+            return self.calculate_reference_solution()
         elif self.velocity_profile_type == "homogeneous":
             return self.calculate_analytical_solution()
+
+    def calculate_reference_solution(self):
+        Wave_obj = self.build_current_object(self.cpw_reference, degree=self.reference_degree)
+        Wave_obj.forward_solve()
+        p_receivers = Wave_obj.forward_solution_receivers
+
+        if self.save_reference:
+            np.save("reference_solution.npy", p_receivers)
+
+        return p_receivers
 
     def calculate_analytical_solution(self):
         # Initializing array
@@ -204,9 +213,11 @@ class Meshing_parameter_calculator:
 
         return cpw - dif
 
-    def build_current_object(self, cpw):
+    def build_current_object(self, cpw, degree=None):
         dictionary = copy.deepcopy(self.initial_dictionary)
         dictionary["mesh"]["cells_per_wavelength"] = cpw
+        if degree is not None:
+            dictionary["options"]["degree"] = degree
         Wave_obj = spyro.AcousticWave(dictionary)
         lba = self.minimum_velocity / self.source_frequency
 
