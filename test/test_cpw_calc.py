@@ -2,7 +2,7 @@ import numpy as np
 import spyro
 
 
-def test_cpw_analytic_calc():
+def test_cpw_calc():
     grid_point_calculator_parameters = {
         # Experiment parameters
         # Here we define the frequency of the Ricker wavelet source
@@ -66,4 +66,4 @@ def test_cpw_analytic_calc():
 
 
 if __name__ == "__main__":
-    test_cpw_analytic_calc()
+    test_cpw_calc()

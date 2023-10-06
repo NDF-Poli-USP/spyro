@@ -18,6 +18,7 @@ class Meshing_parameter_calculator:
         self.velocity_model_file_name = parameters_dictionary[
             "velocity_model_file_name"
         ]
+        self._check_velocity_profile_type()
         self.FEM_method_to_evaluate = parameters_dictionary[
             "FEM_method_to_evaluate"
         ]
@@ -54,6 +55,38 @@ class Meshing_parameter_calculator:
 
         self.initial_guess_object = self.build_initial_guess_model()
         self.reference_solution = self.get_reference_solution()
+
+    def _check_velocity_profile_type(self):
+        if self.velocity_profile_type == "homogeneous":
+            if self.velocity_model_file_name is not None:
+                raise ValueError(
+                    "Velocity model file name should be None for homogeneous models"
+                )
+        elif self.velocity_profile_type == "heterogeneous":
+            self._check_heterogenous_mesh_lengths()
+            if self.velocity_model_file_name is None:
+                raise ValueError(
+                    "Velocity model file name should be defined for heterogeneous models"
+                )
+        else:
+            raise ValueError(
+                "Velocity profile type is not homogeneous or heterogeneous"
+            )
+
+    def _check_heterogenous_mesh_lengths(self):
+        parameters = self.parameters_dictionary
+        if "length_z" not in parameters:
+            raise ValueError("Length in z direction not defined")
+        if "length_x" not in parameters:
+            raise ValueError("Length in x direction not defined")
+        if parameters["length_z"] is None:
+            raise ValueError("Length in z direction not defined")
+        if parameters["length_x"] is None:
+            raise ValueError("Length in x direction not defined")
+        if parameters["length_z"] < 0.0:
+            parameters["length_z"] = abs(parameters["length_z"])
+        if parameters["length_x"] < 0.0:
+            raise ValueError("Length in x direction must be positive")
 
     def build_initial_guess_model(self):
         dictionary = create_initial_model_for_meshing_parameter(self)
@@ -120,8 +153,8 @@ class Meshing_parameter_calculator:
         errors = []
         runtimes = []
 
-        fast_loop = True
-        # fast_loop = False
+        # fast_loop = True
+        fast_loop = False
         dif = 0.0
         cont = 0
         while error > TOL:
