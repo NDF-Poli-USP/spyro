@@ -76,12 +76,79 @@ def create_initial_model_for_meshing_parameter_2D(Meshing_calc_obj):
             Meshing_calc_obj
         )
     elif velocity_profile_type == "heterogeneous":
-        raise NotImplementedError("Not yet implemented")
-        # return create_initial_model_for_meshing_parameter_2D_heterogeneous(Meshing_calc_obj)
+        return create_initial_model_for_meshing_parameter_2D_heterogeneous(Meshing_calc_obj)
     else:
         raise ValueError(
             "Velocity profile type is not homogeneous or heterogeneous"
         )
+
+
+def create_initial_model_for_meshing_parameter_2D_heterogeneous(Meshing_calc_obj):
+    dimension = 2
+    c_value = Meshing_calc_obj.minimum_velocity
+    frequency = Meshing_calc_obj.source_frequency
+    cells_per_wavelength = Meshing_calc_obj.cpw_initial
+
+    method = Meshing_calc_obj.FEM_method_to_evaluate
+    degree = Meshing_calc_obj.desired_degree
+    reduced = Meshing_calc_obj.reduced_obj_for_testing
+
+    # Domain calculations
+    lbda = c_value / frequency
+    pad = lbda
+
+    parameters = Meshing_calc_obj.parameters_dictionary
+    length_z = parameters["length_z"]
+    length_x = parameters["length_x"]
+
+    # Source and receiver calculations
+    source_z = -1.0
+    source_x = (length_x + 2*pad) / 2.0
+    source_locations = [(source_z, source_x)]
+
+    # Receiver calculations
+    receiver_bin_center1 = 2000.0/1000
+    receiver_bin_center2 = 10000.0/1000
+    receiver_quantity = 500
+
+    bin1_startZ = source_z
+    bin1_endZ = source_z
+    bin1_startX = source_x + receiver_bin_center1
+    bin1_endX = source_x + receiver_bin_center2
+
+    receiver_locations = spyro.create_transect(
+        (bin1_startZ, bin1_startX),
+        (bin1_endZ, bin1_endX),
+        receiver_quantity
+    )
+
+    # Time axis calculations
+    tmin = 1.0 / frequency
+    final_time = 20 * tmin  # Should be 35
+
+    variables = {
+        "method": method,
+        "degree": degree,
+        "dimension": dimension,
+        "Lz": length_z,
+        "Lx": length_x,
+        "Ly": 0.0,
+        "cells_per_wavelength": cells_per_wavelength,
+        "pad": pad,
+        "source_locations": source_locations,
+        "frequency": frequency,
+        "receiver_locations": receiver_locations,
+        "final_time": final_time,
+        "dt": 0.0005,
+    }
+
+    model_dictionary = build_on_top_of_base_dictionary(variables)
+
+    model_dictionary["synthetic_data"] = {
+        "real_velocity_file": Meshing_calc_obj.velocity_model_file_name,
+    }
+
+    return model_dictionary
 
 
 def create_initial_model_for_meshing_parameter_3D(Meshing_calc_obj):
