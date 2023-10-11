@@ -801,11 +801,16 @@ class Model_parameters:
         mesh: Firedrake.Mesh object
             The distributed mesh across `ens_comm`
         """
+        if self.user_mesh is False:
+            non_file_mesh = None
+        else:
+            non_file_mesh = self.user_mesh
+
         if self.mesh_file is not None:
             return io.read_mesh(self)
         elif (
             self.mesh_type == "user_mesh" or self.mesh_type == "firedrake_mesh"
         ):
-            return self.user_mesh
+            return non_file_mesh
         elif self.mesh_type == "SeismicMesh":
-            return self.user_mesh
+            return non_file_mesh
