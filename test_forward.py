@@ -2,8 +2,6 @@ import spyro
 
 dt = 0.0001
 
-t0 = timer.time()
-
 final_time = 1.4
 
 dictionary = {}
@@ -24,10 +22,9 @@ dictionary["parallelism"] = {
 # domain and reserve the remaining 250 m for the Perfectly Matched Layer (PML) to absorb
 # outgoing waves on three sides (eg., -z, +-x sides) of the domain.
 dictionary["mesh"] = {
-    "Lz": 17.0,  # depth in km - always positive
-    "Lx": 3.5,  # width in km - always positive
+    "Lz": 3.5,  # depth in km - always positive
+    "Lx": 17.0,  # width in km - always positive
     "Ly": 0.0,  # thickness in km - always positive
-    "mesh_file": None,
     "mesh_type": "SeismicMesh",  # options: firedrake_mesh or user_mesh
 }
 
@@ -63,26 +60,22 @@ dictionary["absorving_boundary_conditions"] = {
     "pad_length": 0.25,
 }
 
+dictionary["synthetic_data"] = {
+    "real_velocity_file": "/media/olender/Extreme SSD/common_files/velocity_models/vp_marmousi-ii.segy"
+}
+
 dictionary["visualization"] = {
     "forward_output": True,
-    "forward_output_filename": "results/extended_pml_propagation.pvd",
+    "forward_output_filename": "results/new_extended_pml_propagation.pvd",
     "fwi_velocity_model_output": False,
     "velocity_model_filename": None,
     "gradient_output": False,
     "gradient_filename": None,
+    "debug_output": True,
 }
 
-Wave_obj = spyro.solvers.AcousticWave(dictionary=dictionary)
-Wave_obj.set_mesh(dx=0.02)
-
-z = Wave_obj.mesh_z
-cond = fire.conditional(
-    z > -0.333, 1.5, fire.conditional(z > -0.667, 3.0, 4.5)
-)
-Wave_obj.set_initial_velocity_model(conditional=cond)
+Wave_obj = spyro.AcousticWave(dictionary)
+Wave_obj.set_mesh(edge_length=0.1)
 Wave_obj.forward_solve()
 
-t1 = timer.time()
-print("Time elapsed: ", t1 - t0)
-nt = int(final_time / dt) + 1
-p_r = Wave_obj.forward_solution_receivers
+print("END")
