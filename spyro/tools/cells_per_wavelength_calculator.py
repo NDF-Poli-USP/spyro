@@ -223,7 +223,8 @@ class Meshing_parameter_calculator:
 
         edge_length = lba / cpw
         Wave_obj.set_mesh(edge_length=edge_length)
-        Wave_obj.set_initial_velocity_model(constant=self.minimum_velocity)
+        if self.velocity_profile_type == "homogeneous":
+            Wave_obj.set_initial_velocity_model(constant=self.minimum_velocity)
         return Wave_obj
 
 

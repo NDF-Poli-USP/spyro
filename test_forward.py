@@ -61,7 +61,7 @@ dictionary["absorving_boundary_conditions"] = {
 }
 
 dictionary["synthetic_data"] = {
-    "real_velocity_file": "/media/olender/Extreme SSD/common_files/velocity_models/vp_marmousi-ii.segy"
+    "real_velocity_file": "/media/alexandre/Extreme SSD/common_files/velocity_models/vp_marmousi-ii.segy"
 }
 
 dictionary["visualization"] = {
@@ -75,7 +75,7 @@ dictionary["visualization"] = {
 }
 
 Wave_obj = spyro.AcousticWave(dictionary)
-Wave_obj.set_mesh(edge_length=0.1)
+Wave_obj.set_mesh()
 Wave_obj.forward_solve()
 
 print("END")
