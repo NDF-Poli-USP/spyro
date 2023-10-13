@@ -28,7 +28,7 @@ def cpw_calc(accuracy=None):
         # Line search parameters
         "load_reference": False,
         # "reference_solution_file": "test/inputfiles/reference_solution_cpw.npy",
-        "save_reference": False,
+        "save_reference": True,
         "reference_degree": 5,  # Degree to use in the reference case (int)
         # grid point density to use in the reference case (float)
         "C_reference": 3.0,

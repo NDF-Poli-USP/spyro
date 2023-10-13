@@ -101,24 +101,12 @@ class Wave(Model_parameters):
 
     def set_mesh(
         self,
-        dx=None,
         user_mesh=None,
-        mesh_file=None,
-        length_z=None,
-        length_x=None,
-        length_y=None,
-        periodic=False,
-        edge_length=None,
+        mesh_parameters=None,
     ):
         super().set_mesh(
-            dx=dx,
             user_mesh=user_mesh,
-            mesh_file=mesh_file,
-            length_z=length_z,
-            length_x=length_x,
-            length_y=length_y,
-            periodic=periodic,
-            edge_length=edge_length,
+            mesh_parameters=mesh_parameters,
         )
 
         self.mesh = self.get_mesh()
@@ -250,7 +238,6 @@ class Wave(Model_parameters):
             fire.File("initial_velocity_model.pvd").write(
                 self.initial_velocity_model, name="velocity"
             )
-
 
     def _build_function_space(self):
         self.function_space = FE_method(self.mesh, self.method, self.degree)

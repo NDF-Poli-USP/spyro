@@ -31,7 +31,7 @@ def test_cpw_calc():
         # grid point density to use in the reference case (float)
         "C_reference": None,
         "desired_degree": 4,  # degree we are calculating G for. (int)
-        "C_initial": 2.3,  # Initial G for line search (float)
+        "C_initial": 2.2,  # Initial G for line search (float)
         "accepted_error_threshold": 0.05,
         "C_accuracy": 0.1,
     }
