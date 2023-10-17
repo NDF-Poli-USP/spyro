@@ -89,7 +89,7 @@ def run_forward():
     }
 
     Wave_obj = spyro.solvers.AcousticWave(dictionary=dictionary)
-    Wave_obj.set_mesh(dx=0.02)
+    Wave_obj.set_mesh(mesh_parameters={"dx": 0.02})
 
     z = Wave_obj.mesh_z
     cond = fire.conditional(
