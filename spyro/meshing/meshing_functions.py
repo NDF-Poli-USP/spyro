@@ -323,17 +323,19 @@ class AutomaticMesh:
             return self.create_seismicmesh_2D_mesh_with_velocity_model()
 
     def create_seismicmesh_2D_mesh_with_velocity_model(self):
+        v_min = 1.5
+        frequency = 5.0
+        C = 3.0  # cells_per_wavelength(method, degree, dimension)
+        
         Lz = self.length_z
         Lx = self.length_x
         domain_pad = self.abc_pad
-        lbda = self.lbda
+        lbda_min = v_min/frequency
 
         bbox = (-Lz, 0.0, 0.0, Lx)
         domain = SeismicMesh.Rectangle(bbox)
 
-        C = 3.0  # cells_per_wavelength(method, degree, dimension)
-        hmin = lbda/C
-        frequency = 5.0
+        hmin = lbda_min/C
 
         # if units == 'km-s':
         #     hmin *= 1000
@@ -343,7 +345,7 @@ class AutomaticMesh:
         fname = vp_filename+'.hdf5'
 
         ef = SeismicMesh.get_sizing_function_from_segy(
-            fname,
+            self.velocity_model,
             bbox,
             hmin=hmin,
             wl=C,
