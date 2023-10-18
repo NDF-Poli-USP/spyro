@@ -108,7 +108,9 @@ class AutomaticMesh:
         self.periodic = mesh_parameters["periodic"]
 
         # SeismicMesh only parameters
-        self.cpw = None
+        self.cpw = mesh_parameters["cells_per_wavelength"]
+        self.source_frequency = mesh_parameters["source_frequency"]
+        self.minimum_velocity = mesh_parameters["minimum_velocity"]
         self.lbda = None
         self.velocity_model = mesh_parameters["velocity_model_file"]
         self.edge_length = mesh_parameters["edge_length"]
@@ -323,10 +325,10 @@ class AutomaticMesh:
             return self.create_seismicmesh_2D_mesh_with_velocity_model()
 
     def create_seismicmesh_2D_mesh_with_velocity_model(self):
-        v_min = 1.5
-        frequency = 5.0
-        C = 3.0  # cells_per_wavelength(method, degree, dimension)
-        
+        v_min = self.minimum_velocity
+        frequency = self.source_frequency
+        C = self.cpw  # cells_per_wavelength(method, degree, dimension)
+
         Lz = self.length_z
         Lx = self.length_x
         domain_pad = self.abc_pad
@@ -336,13 +338,6 @@ class AutomaticMesh:
         domain = SeismicMesh.Rectangle(bbox)
 
         hmin = lbda_min/C
-
-        # if units == 'km-s':
-        #     hmin *= 1000
-        #     domain_pad *= 1000
-        vp_filename, vp_filetype = os.path.splitext(self.velocity_model)
-        SeismicMesh.write_velocity_model(self.velocity_model, ofname=vp_filename)
-        fname = vp_filename+'.hdf5'
 
         ef = SeismicMesh.get_sizing_function_from_segy(
             self.velocity_model,
@@ -368,7 +363,7 @@ class AutomaticMesh:
 
         meshio.write_points_cells(
             "test.msh",
-            points / 1000,
+            points,
             [("triangle", cells)],
             file_format="gmsh22",
             binary=False
@@ -376,7 +371,7 @@ class AutomaticMesh:
 
         meshio.write_points_cells(
             "test.vtk",
-            points / 1000,
+            points,
             [("triangle", cells)],
             file_format="vtk"
         )

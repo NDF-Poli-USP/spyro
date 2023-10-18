@@ -692,6 +692,7 @@ class Model_parameters:
 
         # Setting default mesh parameters
         mesh_parameters.setdefault("periodic", False)
+        mesh_parameters.setdefault("minimum_velocity", 1.5)
         mesh_parameters.setdefault("edge_length", None)
         mesh_parameters.setdefault("dx", None)
         mesh_parameters.setdefault("length_z", self.length_z)
@@ -706,6 +707,7 @@ class Model_parameters:
         mesh_parameters.setdefault("degree", self.degree)
         mesh_parameters.setdefault("velocity_model_file", self.initial_velocity_model_file)
         mesh_parameters.setdefault("cell_type", self.cell_type)
+        mesh_parameters.setdefault("cells_per_wavelength", None)
 
         self._set_mesh_length(
             length_z=mesh_parameters["length_z"],

@@ -107,6 +107,7 @@ class Meshing_parameter_calculator:
 
     def calculate_reference_solution(self):
         Wave_obj = self.build_current_object(self.cpw_reference, degree=self.reference_degree)
+
         Wave_obj.forward_solve()
         p_receivers = Wave_obj.forward_solution_receivers
 
@@ -162,8 +163,8 @@ class Meshing_parameter_calculator:
         errors = []
         runtimes = []
 
-        # fast_loop = True
-        fast_loop = False
+        fast_loop = True
+        # fast_loop = False
         dif = 0.0
         cont = 0
         while error > TOL:
@@ -171,7 +172,8 @@ class Meshing_parameter_calculator:
 
             # Running forward model
             Wave_obj = self.build_current_object(cpw)
-            Wave_obj.get_and_set_maximum_dt(fraction=0.2)
+            Wave_obj._get_initial_velocity_model()
+            # Wave_obj.get_and_set_maximum_dt(fraction=0.2)
             print("Maximum dt is ", Wave_obj.dt, flush=True)
             t0 = timinglib.time()
             Wave_obj.forward_solve()
@@ -219,12 +221,13 @@ class Meshing_parameter_calculator:
         if degree is not None:
             dictionary["options"]["degree"] = degree
         Wave_obj = spyro.AcousticWave(dictionary)
-        lba = self.minimum_velocity / self.source_frequency
-
-        edge_length = lba / cpw
-        Wave_obj.set_mesh(mesh_parameters={"edge_length": edge_length})
         if self.velocity_profile_type == "homogeneous":
+            lba = self.minimum_velocity / self.source_frequency
+            edge_length = lba / cpw
+            Wave_obj.set_mesh(mesh_parameters={"edge_length": edge_length})
             Wave_obj.set_initial_velocity_model(constant=self.minimum_velocity)
+        elif self.velocity_profile_type == "heterogeneous":
+            Wave_obj.set_mesh(mesh_parameters={"cells_per_wavelength": cpw})
         return Wave_obj
 
 

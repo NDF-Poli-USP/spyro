@@ -14,7 +14,7 @@ def cpw_calc(accuracy=None):
         # Either or heterogeneous. If heterogeneous is
         "velocity_profile_type": "heterogeneous",
         # chosen be careful to have the desired velocity model below.
-        "velocity_model_file_name": "/media/alexandre/Extreme SSD/common_files/velocity_models/vp_marmousi-ii.segy",
+        "velocity_model_file_name": "/media/olender/Extreme SSD/common_files/velocity_models/vp_marmousi-ii.segy",
         "length_z": 3.5,
         "length_x": 17.0,
         # FEM to evaluate such as `KMV` or `spectral`
@@ -26,14 +26,14 @@ def cpw_calc(accuracy=None):
         # line defines a line of point receivers with pre-established near and far
         # offsets.
         # Line search parameters
-        "load_reference": False,
-        # "reference_solution_file": "test/inputfiles/reference_solution_cpw.npy",
-        "save_reference": True,
-        "reference_degree": 5,  # Degree to use in the reference case (int)
+        "load_reference": True,
+        # "reference_solution_file": "reference_solutionc5.npy",
+        "save_reference": False,
+        "reference_degree": 4,  # Degree to use in the reference case (int)
         # grid point density to use in the reference case (float)
-        "C_reference": 3.0,
+        "C_reference": 5.0,
         "desired_degree": 4,  # degree we are calculating G for. (int)
-        "C_initial": 1.0,  # Initial G for line search (float)
+        "C_initial": 2.0,  # Initial G for line search (float)
         "accepted_error_threshold": 0.05,
         "C_accuracy": accuracy,
     }
