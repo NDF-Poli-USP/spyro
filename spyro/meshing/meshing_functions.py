@@ -106,6 +106,8 @@ class AutomaticMesh:
         self.dx = mesh_parameters["dx"]
         self.quadrilateral = False
         self.periodic = mesh_parameters["periodic"]
+        if self.dx is None:
+            self.dx = mesh_parameters["edge_length"]
 
         # SeismicMesh only parameters
         self.cpw = mesh_parameters["cells_per_wavelength"]
