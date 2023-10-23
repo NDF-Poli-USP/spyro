@@ -68,7 +68,6 @@ dictionary["visualization"] = {
 
 
 Wave_obj = spyro.AcousticWave(dictionary=dictionary)
-Wave_obj.set_mesh(dx=0.02, periodic=True)
 Wave_obj.set_mesh(mesh_parameters={"dx": 0.02, "periodic": True})
 
 Wave_obj.set_initial_velocity_model(constant=1.5)

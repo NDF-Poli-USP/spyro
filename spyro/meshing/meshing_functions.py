@@ -540,10 +540,16 @@ def BoxMesh(nx, ny, nz, Lx, Ly, Lz, pad=None, quadrilateral=False):
         Lz += 2 * pad
     else:
         pad = 0
-    quad_mesh = fire.RectangleMesh(nx, ny, Lx, Ly, quadrilateral=quadrilateral)
-    quad_mesh.coordinates.dat.data[:, 0] *= -1.0
-    quad_mesh.coordinates.dat.data[:, 1] -= pad
-    layer_height = Lz / nz
-    mesh = fire.ExtrudedMesh(quad_mesh, nz, layer_height=layer_height)
+    if quadrilateral:
+        quad_mesh = fire.RectangleMesh(nx, ny, Lx, Ly, quadrilateral=quadrilateral)
+        quad_mesh.coordinates.dat.data[:, 0] *= -1.0
+        quad_mesh.coordinates.dat.data[:, 1] -= pad
+        layer_height = Lz / nz
+        mesh = fire.ExtrudedMesh(quad_mesh, nz, layer_height=layer_height)
+    else:
+        mesh = fire.BoxMesh(nx, ny, nz, Lx, Ly, Lz)
+        mesh.coordinates.dat.data[:, 0] *= -1.0
 
     return mesh
+
+
