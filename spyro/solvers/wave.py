@@ -79,7 +79,7 @@ class Wave(Model_parameters):
         self.wavelet = self.get_wavelet()
         self.mesh = self.get_mesh()
         self.c = None
-        if self.mesh is not None and self.mesh is not False:
+        if self.mesh is not None:
             self._build_function_space()
             self._map_sources_and_receivers()
         elif self.mesh_type == "firedrake_mesh":
@@ -101,24 +101,12 @@ class Wave(Model_parameters):
 
     def set_mesh(
         self,
-        dx=None,
         user_mesh=None,
-        mesh_file=None,
-        length_z=None,
-        length_x=None,
-        length_y=None,
-        periodic=False,
-        edge_length=None,
+        mesh_parameters=None,
     ):
         super().set_mesh(
-            dx=dx,
             user_mesh=user_mesh,
-            mesh_file=mesh_file,
-            length_z=length_z,
-            length_x=length_x,
-            length_y=length_y,
-            periodic=periodic,
-            edge_length=edge_length,
+            mesh_parameters=mesh_parameters,
         )
 
         self.mesh = self.get_mesh()
@@ -171,6 +159,9 @@ class Wave(Model_parameters):
 
         new_file:  (optional)
         """
+        # If no mesh is set, we have to do it beforehand
+        if self.mesh is None:
+            self.set_mesh()
         # Resseting old velocity model
         self.initial_velocity_model = None
         self.initial_velocity_model_file = None
@@ -238,9 +229,14 @@ class Wave(Model_parameters):
 
         if self.initial_velocity_model_file.endswith(".hdf5"):
             self.initial_velocity_model = interpolate(
-                self.model_parameters,
+                self,
                 self.initial_velocity_model_file,
                 self.function_space.sub(0),
+            )
+
+        if self.debug_output:
+            fire.File("initial_velocity_model.pvd").write(
+                self.initial_velocity_model, name="velocity"
             )
 
     def _build_function_space(self):

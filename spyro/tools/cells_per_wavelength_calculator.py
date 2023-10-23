@@ -1,5 +1,4 @@
 import numpy as np
-from scipy import interpolate
 import time as timinglib
 import copy
 from .input_models import create_initial_model_for_meshing_parameter
@@ -19,6 +18,7 @@ class Meshing_parameter_calculator:
         self.velocity_model_file_name = parameters_dictionary[
             "velocity_model_file_name"
         ]
+        self._check_velocity_profile_type()
         self.FEM_method_to_evaluate = parameters_dictionary[
             "FEM_method_to_evaluate"
         ]
@@ -56,6 +56,38 @@ class Meshing_parameter_calculator:
         self.initial_guess_object = self.build_initial_guess_model()
         self.reference_solution = self.get_reference_solution()
 
+    def _check_velocity_profile_type(self):
+        if self.velocity_profile_type == "homogeneous":
+            if self.velocity_model_file_name is not None:
+                raise ValueError(
+                    "Velocity model file name should be None for homogeneous models"
+                )
+        elif self.velocity_profile_type == "heterogeneous":
+            self._check_heterogenous_mesh_lengths()
+            if self.velocity_model_file_name is None:
+                raise ValueError(
+                    "Velocity model file name should be defined for heterogeneous models"
+                )
+        else:
+            raise ValueError(
+                "Velocity profile type is not homogeneous or heterogeneous"
+            )
+
+    def _check_heterogenous_mesh_lengths(self):
+        parameters = self.parameters_dictionary
+        if "length_z" not in parameters:
+            raise ValueError("Length in z direction not defined")
+        if "length_x" not in parameters:
+            raise ValueError("Length in x direction not defined")
+        if parameters["length_z"] is None:
+            raise ValueError("Length in z direction not defined")
+        if parameters["length_x"] is None:
+            raise ValueError("Length in x direction not defined")
+        if parameters["length_z"] < 0.0:
+            parameters["length_z"] = abs(parameters["length_z"])
+        if parameters["length_x"] < 0.0:
+            raise ValueError("Length in x direction must be positive")
+
     def build_initial_guess_model(self):
         dictionary = create_initial_model_for_meshing_parameter(self)
         self.initial_dictionary = dictionary
@@ -69,10 +101,20 @@ class Meshing_parameter_calculator:
                 filename = "reference_solution.npy"
             return np.load(filename)
         elif self.velocity_profile_type == "heterogeneous":
-            raise NotImplementedError("Not yet implemented")
-            # return self.get_referecen_solution_from refined_mesh()
+            return self.calculate_reference_solution()
         elif self.velocity_profile_type == "homogeneous":
             return self.calculate_analytical_solution()
+
+    def calculate_reference_solution(self):
+        Wave_obj = self.build_current_object(self.cpw_reference, degree=self.reference_degree)
+
+        Wave_obj.forward_solve()
+        p_receivers = Wave_obj.forward_solution_receivers
+
+        if self.save_reference:
+            np.save("reference_solution.npy", p_receivers)
+
+        return p_receivers
 
     def calculate_analytical_solution(self):
         # Initializing array
@@ -105,7 +147,7 @@ class Meshing_parameter_calculator:
 
         return analytical_solution
 
-    def find_minimum(self, starting_cpw=None, TOL=None, accuracy=None):
+    def find_minimum(self, starting_cpw=None, TOL=None, accuracy=None, savetxt=False):
         if starting_cpw is None:
             starting_cpw = self.cpw_initial
         if TOL is None:
@@ -116,8 +158,13 @@ class Meshing_parameter_calculator:
         error = 100.0
         cpw = starting_cpw
         print("Starting line search", flush=True)
+        cpws = []
+        dts = []
+        errors = []
+        runtimes = []
 
         fast_loop = True
+        # fast_loop = False
         dif = 0.0
         cont = 0
         while error > TOL:
@@ -125,8 +172,12 @@ class Meshing_parameter_calculator:
 
             # Running forward model
             Wave_obj = self.build_current_object(cpw)
+            Wave_obj._get_initial_velocity_model()
             # Wave_obj.get_and_set_maximum_dt(fraction=0.2)
+            print("Maximum dt is ", Wave_obj.dt, flush=True)
+            t0 = timinglib.time()
             Wave_obj.forward_solve()
+            t1 = timinglib.time()
             p_receivers = Wave_obj.forward_solution_receivers
             spyro.io.save_shots(
                 Wave_obj, file_name="test_shot_record" + str(cpw)
@@ -136,6 +187,10 @@ class Meshing_parameter_calculator:
                 p_receivers, self.reference_solution, Wave_obj.dt
             )
             print("Error is ", error, flush=True)
+            cpws.append(cpw)
+            dts.append(Wave_obj.dt)
+            errors.append(error)
+            runtimes.append(t1 - t0)
 
             if error < TOL and dif > accuracy:
                 cpw -= dif
@@ -152,17 +207,27 @@ class Meshing_parameter_calculator:
 
             cont += 1
 
+        if savetxt:
+            np.savetxt(
+                "p"+str(self.initial_guess_object.degree)+"_cpw_results.txt",
+                np.transpose([cpws, dts, errors, runtimes]),
+            )
+
         return cpw - dif
 
-    def build_current_object(self, cpw):
+    def build_current_object(self, cpw, degree=None):
         dictionary = copy.deepcopy(self.initial_dictionary)
         dictionary["mesh"]["cells_per_wavelength"] = cpw
+        if degree is not None:
+            dictionary["options"]["degree"] = degree
         Wave_obj = spyro.AcousticWave(dictionary)
-        lba = self.minimum_velocity / self.source_frequency
-
-        edge_length = lba / cpw
-        Wave_obj.set_mesh(edge_length=edge_length)
-        Wave_obj.set_initial_velocity_model(constant=self.minimum_velocity)
+        if self.velocity_profile_type == "homogeneous":
+            lba = self.minimum_velocity / self.source_frequency
+            edge_length = lba / cpw
+            Wave_obj.set_mesh(mesh_parameters={"edge_length": edge_length})
+            Wave_obj.set_initial_velocity_model(constant=self.minimum_velocity)
+        elif self.velocity_profile_type == "heterogeneous":
+            Wave_obj.set_mesh(mesh_parameters={"cells_per_wavelength": cpw})
         return Wave_obj
 
 

@@ -145,8 +145,16 @@ class Rectangle_acoustic(Example_model_acoustic):
 
     def _rectangle_mesh(self):
         mesh_dict = self.input_dictionary["mesh"]
-        h = mesh_dict["h"]
-        super().set_mesh(dx=h, periodic=self.periodic)
+        mesh_parameters = {
+            "length_z": mesh_dict["Lz"],
+            "length_x": mesh_dict["Lx"],
+            "length_y": mesh_dict["Ly"],
+            "dx": mesh_dict["h"],
+            "mesh_file": mesh_dict["mesh_file"],
+            "mesh_type": mesh_dict["mesh_type"],
+            "periodic": self.periodic,
+        }
+        super().set_mesh(mesh_parameters=mesh_parameters)
 
     def multiple_layer_velocity_model(self, z_switch, layers):
         """

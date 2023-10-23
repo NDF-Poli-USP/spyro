@@ -23,13 +23,28 @@ def test_spyro_seimicmesh_2d_homogeneous_generation():
     pad = 0.3
     cpw = 3
 
+    mesh_parameters = {
+        "length_z": Lz,
+        "length_x": Lx,
+        "length_y": 0.0,
+        "cell_type": "triangle",
+        "mesh_type": "SeismicMesh",
+        "dx": None,
+        "periodic": False,
+        "velocity_model_file": None,
+        "cells_per_wavelength": cpw,
+        "source_frequency": freq,
+        "minimum_velocity": c,
+        "abc_pad_length": pad,
+        "lbda": lbda,
+        "dimension": 2,
+        "edge_length": lbda/cpw,
+    }
+
     Mesh_obj = spyro.meshing.AutomaticMesh(
-        dimension=2,
-        abc_pad=pad,
-        mesh_type="SeismicMesh"
+        mesh_parameters=mesh_parameters,
     )
-    Mesh_obj.set_mesh_size(length_z=Lz, length_x=Lx)
-    Mesh_obj.set_seismicmesh_parameters(edge_length=lbda/cpw, output_file_name="test.msh")
+    Mesh_obj.set_seismicmesh_parameters(output_file_name="test.msh")
 
     mesh = Mesh_obj.create_mesh()
 
