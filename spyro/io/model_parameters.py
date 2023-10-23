@@ -679,39 +679,40 @@ class Model_parameters:
 
     def set_mesh(
         self,
-        dx=None,
         user_mesh=None,
-        mesh_file=None,
-        length_z=None,
-        length_x=None,
-        length_y=None,
-        periodic=False,
-        edge_length=None,
+        mesh_parameters={},
     ):
         """
 
         Parameters
         ----------
-        dx : float, optional
-            The desired mesh spacing. The default is None.
         user_mesh : spyro.Mesh, optional
             The desired mesh. The default is None.
-        mesh_file : str, optional
-            The path to the desired mesh file. The default is None.
-        length_z : float, optional
-            The length of the domain in the z-direction. The default is None.
-        length_x : float, optional
-            The length of the domain in the x-direction. The default is None.
-        length_y : float, optional
-            The length of the domain in the y-direction. The default is None.
-        periodic : bool, optional
-            Whether the domain is periodic. The default is False.
         """
 
+        # Setting default mesh parameters
+        mesh_parameters.setdefault("periodic", False)
+        mesh_parameters.setdefault("minimum_velocity", 1.5)
+        mesh_parameters.setdefault("edge_length", None)
+        mesh_parameters.setdefault("dx", None)
+        mesh_parameters.setdefault("length_z", self.length_z)
+        mesh_parameters.setdefault("length_x", self.length_x)
+        mesh_parameters.setdefault("length_y", self.length_y)
+        mesh_parameters.setdefault("abc_pad_length", self.abc_pad_length)
+        mesh_parameters.setdefault("mesh_file", self.mesh_file)
+        mesh_parameters.setdefault("dimension", self.dimension)
+        mesh_parameters.setdefault("mesh_type", self.mesh_type)
+        mesh_parameters.setdefault("source_frequency", self.frequency)
+        mesh_parameters.setdefault("method", self.method)
+        mesh_parameters.setdefault("degree", self.degree)
+        mesh_parameters.setdefault("velocity_model_file", self.initial_velocity_model_file)
+        mesh_parameters.setdefault("cell_type", self.cell_type)
+        mesh_parameters.setdefault("cells_per_wavelength", None)
+
         self._set_mesh_length(
-            length_z=length_z,
-            length_x=length_x,
-            length_y=length_y,
+            length_z=mesh_parameters["length_z"],
+            length_x=mesh_parameters["length_x"],
+            length_y=mesh_parameters["length_y"],
         )
 
         if self.mesh_type == "firedrake_mesh":
@@ -724,59 +725,30 @@ class Model_parameters:
         if user_mesh is not None:
             self.user_mesh = user_mesh
             self.mesh_type = "user_mesh"
-        elif mesh_file is not None:
-            self.mesh_file = mesh_file
+        elif mesh_parameters["mesh_file"] is not None:
+            self.mesh_file = mesh_parameters["mesh_file"]
             self.mesh_type = "file"
         elif automatic_mesh:
             self.user_mesh = self._creating_automatic_mesh(
-                periodic=periodic, edge_length=edge_length, dx=dx
+                mesh_parameters=mesh_parameters
             )
 
         if (
-            length_z is None
-            or length_x is None
-            or (length_y is None and self.dimension == 2)
+            mesh_parameters["length_z"] is None
+            or mesh_parameters["length_x"] is None
+            or (mesh_parameters["length_y"] is None and self.dimension == 2)
         ) and self.mesh_type != "firedrake_mesh":
             warnings.warn(
                 "Mesh dimensions not completely reset from initial dictionary"
             )
 
     def _creating_automatic_mesh(
-        self, periodic=False, edge_length=None, dx=None
+        self, mesh_parameters={},
     ):
-        if self.mesh_type == "firedrake_mesh":
-            AutoMeshing = meshing.AutomaticMesh(
-                dimension=self.dimension,
-                comm=self.comm,
-                abc_pad=self.abc_pad_length,
-                mesh_type=self.mesh_type,
-            )
-            AutoMeshing.set_mesh_size(
-                length_z=self.length_z,
-                length_x=self.length_x,
-                length_y=self.length_y,
-            )
-            if dx is None:
-                dx = edge_length
-            AutoMeshing.set_meshing_parameters(
-                dx=dx, cell_type=self.cell_type, mesh_type=self.mesh_type
-            )
-        elif self.mesh_type == "SeismicMesh":
-            AutoMeshing = meshing.AutomaticMesh(
-                dimension=self.dimension,
-                comm=self.comm,
-                abc_pad=self.abc_pad_length,
-                mesh_type=self.mesh_type,
-            )
-            AutoMeshing.set_mesh_size(
-                length_z=self.length_z,
-                length_x=self.length_x,
-                length_y=self.length_y,
-            )
-            AutoMeshing.set_seismicmesh_parameters(edge_length=edge_length)
-
-        if periodic:
-            AutoMeshing.make_periodic()
+        AutoMeshing = meshing.AutomaticMesh(
+            comm=self.comm,
+            mesh_parameters=mesh_parameters,
+        )
 
         return AutoMeshing.create_mesh()
 
@@ -801,11 +773,16 @@ class Model_parameters:
         mesh: Firedrake.Mesh object
             The distributed mesh across `ens_comm`
         """
+        if self.user_mesh is False:
+            non_file_mesh = None
+        else:
+            non_file_mesh = self.user_mesh
+
         if self.mesh_file is not None:
             return io.read_mesh(self)
         elif (
             self.mesh_type == "user_mesh" or self.mesh_type == "firedrake_mesh"
         ):
-            return self.user_mesh
+            return non_file_mesh
         elif self.mesh_type == "SeismicMesh":
-            return self.user_mesh
+            return non_file_mesh

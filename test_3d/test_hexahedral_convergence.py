@@ -80,7 +80,11 @@ def run_forward_hexahedral(dt, final_time, offset):
     }
 
     Wave_obj = spyro.AcousticWave(dictionary=dictionary)
-    Wave_obj.set_mesh(dx=0.02, periodic=True)
+    mesh_parameters = {
+        "dx": 0.02,
+        "periodic": True,
+    }
+    Wave_obj.set_mesh(mesh_parameters=mesh_parameters)
 
     Wave_obj.set_initial_velocity_model(constant=1.5)
     Wave_obj.forward_solve()
