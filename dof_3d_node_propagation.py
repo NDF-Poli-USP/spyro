@@ -3,7 +3,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 
 
-dt = 0.0001
+dt = 0.00005
 # dt = float(sys.argv[1])
 
 final_time = 1.0
