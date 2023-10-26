@@ -3,7 +3,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 
 
-dt = 0.00005
+dt = 0.00001
 # dt = float(sys.argv[1])
 
 final_time = 1.0
@@ -59,7 +59,7 @@ dictionary["time_axis"] = {
 
 dictionary["visualization"] = {
     "forward_output": True,
-    "forward_output_filename": "results/forward_3d_output3by3by3.pvd",
+    "forward_output_filename": "results/forward_3d_output3by3by3copy.pvd",
     "fwi_velocity_model_output": False,
     "velocity_model_filename": None,
     "gradient_output": False,

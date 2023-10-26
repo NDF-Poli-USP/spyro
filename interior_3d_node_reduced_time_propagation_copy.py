@@ -6,7 +6,7 @@ import matplotlib.pyplot as plt
 dt = 0.00005
 # dt = float(sys.argv[1])
 
-final_time = 1.0
+final_time = 0.7
 dx = 0.006546536707079771
 # dx = 0.0
 
@@ -59,7 +59,7 @@ dictionary["time_axis"] = {
 
 dictionary["visualization"] = {
     "forward_output": True,
-    "forward_output_filename": "results/forward_3d_output3by3by3.pvd",
+    "forward_output_filename": "results/forward_3d_output3by3by3copy.pvd",
     "fwi_velocity_model_output": False,
     "velocity_model_filename": None,
     "gradient_output": False,
@@ -76,7 +76,7 @@ Wave_obj.forward_solve()
 time = np.linspace(0.0, final_time, int(final_time/dt)+1)
 
 rec_out = Wave_obj.receivers_output
-np.save("dofs_3D_quads_p4_dt"+str(dt)+".npy", rec_out)
+np.save("interior_3D_ML4Tet_dt"+str(dt)+".npy", rec_out)
 
 # plt.plot(time, Wave_obj.receivers_output)
 # plt.show()
