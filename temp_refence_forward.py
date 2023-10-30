@@ -34,10 +34,10 @@ def error_calc(receivers, analytical, dt):
     return error
 
 
-final_time = 6.0
-dt = 0.001
+final_time = 7.5
+dt = 0.0005
 degree = 4
-cpw = 2.0
+cpw = 2.67
 # Source and receiver calculations
 source_z = -0.1
 source_x = 3.0
@@ -75,8 +75,9 @@ dictionary["mesh"] = {
     "Lz": 3.5,
     "Lx": 17.0,
     "Ly": 0.0,
-    "cells_per_wavelength": cpw,
-    "mesh_type": "SeismicMesh",
+    # "cells_per_wavelength": cpw,
+    # "mesh_type": "SeismicMesh",
+    "mesh_file": "test2p5.msh",
 }
 dictionary["absorving_boundary_conditions"] = {
     "status": True,
@@ -102,7 +103,7 @@ dictionary["time_axis"] = {
 }
 dictionary["visualization"] = {
     "forward_output": True,
-    "forward_output_filename": "results/temp_forward_output.pvd",
+    "forward_output_filename": "results/2p5temp_forward_output.pvd",
     "fwi_velocity_model_output": False,
     "velocity_model_filename": None,
     "gradient_output": False,
@@ -112,10 +113,10 @@ dictionary["visualization"] = {
 dictionary["synthetic_data"] = {
     "real_velocity_file": "/home/olender/common_files/velocity_models/vp_marmousi-ii.segy",
 }
-
+spyro.io.saving_source_and_receiver_location_in_csv(dictionary)
 Wave_obj = spyro.AcousticWave(dictionary)
-Wave_obj.set_mesh(mesh_parameters={"cells_per_wavelength": cpw})
+# Wave_obj.set_mesh(mesh_parameters={"cells_per_wavelength": cpw})
 Wave_obj.forward_solve()
 p_receivers = Wave_obj.forward_solution_receivers
-# np.save("test1.npy", p_receivers)
+np.save("test2p67.npy", p_receivers)
 print("END")
