@@ -112,15 +112,6 @@ class Wave(Model_parameters):
         self.mesh = self.get_mesh()
         self._build_function_space()
         self._map_sources_and_receivers()
-        if self.dimension == 2:
-            z, x = fire.SpatialCoordinate(self.mesh)
-            self.mesh_z = z
-            self.mesh_x = x
-        elif self.dimension == 3:
-            z, x, y = fire.SpatialCoordinate(self.mesh)
-            self.mesh_z = z
-            self.mesh_x = x
-            self.mesh_y = y
 
     def set_solver_parameters(self, parameters=None):
         if parameters is not None:
@@ -241,6 +232,15 @@ class Wave(Model_parameters):
 
     def _build_function_space(self):
         self.function_space = FE_method(self.mesh, self.method, self.degree)
+        if self.dimension == 2:
+            z, x = fire.SpatialCoordinate(self.mesh)
+            self.mesh_z = z
+            self.mesh_x = x
+        elif self.dimension == 3:
+            z, x, y = fire.SpatialCoordinate(self.mesh)
+            self.mesh_z = z
+            self.mesh_x = x
+            self.mesh_y = y
 
     def get_and_set_maximum_dt(self, fraction=0.7):
         # if self.method == "mass_lumped_triangle":

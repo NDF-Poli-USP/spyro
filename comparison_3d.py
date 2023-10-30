@@ -24,23 +24,39 @@ def analytical_solution(dt, final_time, offset):
     return p_analytic
 
 
+dts = [
+    0.0001,
+    0.00005,
+]
+
 offset = 0.5
 final_time = 1.0
-dt = 0.0001
-rec_full = np.load("interior_3D_MLT4_dt"+str(dt)+".npy")
-rec = rec_full.flatten()
-# ana = analytical_solution(dt, final_time, offset)
-# np.save("ana_3D_MLT4_dt"+str(dt)+".npy", ana)
-ana = np.load("ana_3D_MLT4_dt"+str(dt)+".npy")
+errors = []
 
-cutoff = 0.7
-cutoff_index = int(cutoff/dt)
+for dt in dts:
+    rec_full = np.load("interior_3D_MLT4_dt"+str(dt)+".npy")
+    rec = rec_full.flatten()
+    ana = analytical_solution(dt, final_time, offset)
 
-rec_cut = rec[:cutoff_index]
-ana_cut = ana[:cutoff_index]
+    cutoff = 0.6
+    cutoff_index = int(cutoff/dt)
 
-nt = len(ana_cut)
+    rec_cut = rec[:cutoff_index]
+    ana_cut = ana[:cutoff_index]
 
-error = error_calc(rec_cut, ana_cut, nt)
+    nt = len(ana_cut)
 
-print(f"Error is: {error}")
+    errors.append(error_calc(rec_cut, ana_cut, nt))
+
+plt.loglog(dts, errors)
+
+theory = [t**2 for t in dts]
+theory = [errors[0]*th/theory[0] for th in theory]
+
+plt.loglog(dts, theory, '--')
+
+theory = [t for t in dts]
+theory = [errors[0]*th/theory[0] for th in theory]
+
+plt.loglog(dts, theory, '-.')
+plt.show()
