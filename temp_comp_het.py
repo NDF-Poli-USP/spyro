@@ -35,8 +35,8 @@ def error_calc(receivers, analytical, dt):
 
 
 dt = 0.0005
-rec_refined = np.load("test5.npy")
-rec_coarse = np.load("test2p5.npy")
+rec_refined = np.load("testc5z50.npy")
+rec_coarse = np.load("testc2p67z50.npy")
 error = error_calc(rec_coarse, rec_refined, dt)
 print(f"Error of {error}")
 # For debugging

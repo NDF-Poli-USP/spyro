@@ -38,8 +38,19 @@ final_time = 7.5
 dt = 0.0005
 degree = 4
 cpw = 5.0
+z_meters = 20
+
+# generating strings
+if np.isclose(int(cpw)/cpw, 1.0):
+    cpw_str = str(int(cpw))
+else:
+    cpw_centecimals = int((cpw-int(cpw))*100)
+    cpw_str = str(int(cpw)) + 'p' + str(cpw_centecimals)
+
+z_str = str(int(z_meters))
+
 # Source and receiver calculations
-source_z = -0.05
+source_z = -z_meters/1000
 source_x = 3.0
 source_locations = [(source_z, source_x)]
 
@@ -103,7 +114,7 @@ dictionary["time_axis"] = {
 }
 dictionary["visualization"] = {
     "forward_output": True,
-    "forward_output_filename": "results/5temp_forward_output.pvd",
+    "forward_output_filename": "results/"+str(cpw)+"z"+str(z_meters)+"mtemp_forward_output.pvd",
     "fwi_velocity_model_output": False,
     "velocity_model_filename": None,
     "gradient_output": False,
@@ -111,12 +122,12 @@ dictionary["visualization"] = {
     "debug_output": True,
 }
 dictionary["synthetic_data"] = {
-    "real_velocity_file": "/home/olender/common_files/velocity_models/vp_marmousi-ii.segy",
+    "real_velocity_file": "/home/alexandre/common_files/velocity_models/vp_marmousi-ii.segy",
 }
 spyro.io.saving_source_and_receiver_location_in_csv(dictionary)
 Wave_obj = spyro.AcousticWave(dictionary)
-# Wave_obj.set_mesh(mesh_parameters={"cells_per_wavelength": cpw})
+Wave_obj.set_mesh(mesh_parameters={"cells_per_wavelength": cpw})
 Wave_obj.forward_solve()
 p_receivers = Wave_obj.forward_solution_receivers
-np.save("test5.npy", p_receivers)
+np.save("testc5z20.npy", p_receivers)
 print("END")
