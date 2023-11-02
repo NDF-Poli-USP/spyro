@@ -1,7 +1,7 @@
 import spyro
 from spyro.habc import HABC
 import math
-from generate_velocity_model_from_paper import get_paper_velocity
+from .generate_velocity_model_from_paper import get_paper_velocity
 
 
 def test_eikonal_values_fig18():

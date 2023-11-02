@@ -1,13 +1,13 @@
 import firedrake as fire
 from firedrake import Constant, dx, dot, grad, ds
-from .acousticNoPML import AcousticWaveNoPML
+from .acoustic_wave import AcousticWave
 from . import helpers
 from .. import utils
 from ..domains.quadrature import quadrature_rules
 from .. import io
 
 
-class HABC_wave(AcousticWaveNoPML):
+class HABC_wave(AcousticWave):
     def __init__(self, dictionary=None, comm=None, eta=None, costet=None):
         super().__init__(dictionary=dictionary, comm=comm)
         self.eta = eta
