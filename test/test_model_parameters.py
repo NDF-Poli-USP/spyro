@@ -6,7 +6,7 @@ from copy import deepcopy
 dictionary = {}
 dictionary["options"] = {
     "cell_type": "T",  # simplexes such as triangles or tetrahedra (T) or quadrilaterals (Q)
-    "variant": 'lumped',  # lumped, equispaced or DG, default is lumped
+    "variant": "lumped",  # lumped, equispaced or DG, default is lumped
     # (MLT/spectral_quadrilateral/DG_triangle/DG_quadrilateral) You can either specify a cell_type+variant or a method
     "method": "MLT",
     "degree": 4,  # p order
@@ -61,9 +61,7 @@ dictionary["acquisition"] = {
     "source_locations": [(-0.1, 0.5)],
     "frequency": 5.0,
     "delay": 1.0,
-    "receiver_locations": spyro.create_transect(
-        (-0.10, 0.1), (-0.10, 0.9), 20
-    ),
+    "receiver_locations": spyro.create_transect((-0.10, 0.1), (-0.10, 0.9), 20),
 }
 
 # Simulate for 2.0 seconds.
@@ -89,54 +87,54 @@ def test_method_reader():
     }
     # Trying out different method entries and seeing if all of them work for MLT
     test1 = False
-    test_dictionary["options"]["method"] = 'MLT'
+    test_dictionary["options"]["method"] = "MLT"
     model = Model_parameters(dictionary=test_dictionary)
-    if model.method == 'mass_lumped_triangle':
+    if model.method == "mass_lumped_triangle":
         test1 = True
 
     test2 = False
-    test_dictionary["options"]["method"] = 'KMV'
+    test_dictionary["options"]["method"] = "KMV"
     model = Model_parameters(dictionary=test_dictionary)
-    if model.method == 'mass_lumped_triangle':
+    if model.method == "mass_lumped_triangle":
         test2 = True
 
     test3 = False
-    test_dictionary["options"]["method"] = 'mass_lumped_triangle'
+    test_dictionary["options"]["method"] = "mass_lumped_triangle"
     model = Model_parameters(dictionary=test_dictionary)
-    if model.method == 'mass_lumped_triangle':
+    if model.method == "mass_lumped_triangle":
         test3 = True
 
     # Trying out different method entries for spectral quads
     test4 = False
-    test_dictionary["options"]["method"] = 'spectral_quadrilateral'
+    test_dictionary["options"]["method"] = "spectral_quadrilateral"
     model = Model_parameters(dictionary=test_dictionary)
-    if model.method == 'spectral_quadrilateral':
+    if model.method == "spectral_quadrilateral":
         test4 = True
 
     test5 = False
-    test_dictionary["options"]["method"] = 'CG'
-    test_dictionary["options"]["variant"] = 'GLL'
+    test_dictionary["options"]["method"] = "CG"
+    test_dictionary["options"]["variant"] = "GLL"
     model = Model_parameters(dictionary=test_dictionary)
-    if model.method == 'spectral_quadrilateral':
+    if model.method == "spectral_quadrilateral":
         test5 = True
 
     test6 = False
-    test_dictionary["options"]["method"] = 'SEM'
+    test_dictionary["options"]["method"] = "SEM"
     model = Model_parameters(dictionary=test_dictionary)
-    if model.method == 'spectral_quadrilateral':
+    if model.method == "spectral_quadrilateral":
         test6 = True
 
     # Trying out some entries for other less used methods
     test7 = False
-    test_dictionary["options"]["method"] = 'DG_triangle'
+    test_dictionary["options"]["method"] = "DG_triangle"
     model = Model_parameters(dictionary=test_dictionary)
-    if model.method == 'DG_triangle':
+    if model.method == "DG_triangle":
         test7 = True
 
     test8 = False
-    test_dictionary["options"]["method"] = 'DG_quadrilateral'
+    test_dictionary["options"]["method"] = "DG_quadrilateral"
     model = Model_parameters(dictionary=test_dictionary)
-    if model.method == 'DG_quadrilateral':
+    if model.method == "DG_quadrilateral":
         test8 = True
 
     assert all([test1, test2, test3, test4, test5, test6, test7, test8])
@@ -152,48 +150,48 @@ def test_cell_type_reader():
         "dimension": 2,  # dimension
     }
     # Testing lumped cases
-    ct_dictionary["options"]["variant"] = 'lumped'
+    ct_dictionary["options"]["variant"] = "lumped"
 
     test1 = False
-    ct_dictionary["options"]["cell_type"] = 'triangle'
+    ct_dictionary["options"]["cell_type"] = "triangle"
     model = Model_parameters(dictionary=ct_dictionary)
-    if model.method == 'mass_lumped_triangle':
+    if model.method == "mass_lumped_triangle":
         test1 = True
 
     test2 = False
-    ct_dictionary["options"]["cell_type"] = 'quadrilateral'
+    ct_dictionary["options"]["cell_type"] = "quadrilateral"
     model = Model_parameters(dictionary=ct_dictionary)
-    if model.method == 'spectral_quadrilateral':
+    if model.method == "spectral_quadrilateral":
         test2 = True
 
     # Testing equispaced cases
-    ct_dictionary["options"]["variant"] = 'equispaced'
+    ct_dictionary["options"]["variant"] = "equispaced"
 
     test3 = False
-    ct_dictionary["options"]["cell_type"] = 'triangle'
+    ct_dictionary["options"]["cell_type"] = "triangle"
     model = Model_parameters(dictionary=ct_dictionary)
-    if model.method == 'CG_triangle':
+    if model.method == "CG_triangle":
         test3 = True
 
     test4 = False
-    ct_dictionary["options"]["cell_type"] = 'quadrilateral'
+    ct_dictionary["options"]["cell_type"] = "quadrilateral"
     model = Model_parameters(dictionary=ct_dictionary)
-    if model.method == 'CG_quadrilateral':
+    if model.method == "CG_quadrilateral":
         test4 = True
 
     # Testing DG cases
-    ct_dictionary["options"]["variant"] = 'DG'
+    ct_dictionary["options"]["variant"] = "DG"
 
     test5 = False
-    ct_dictionary["options"]["cell_type"] = 'triangle'
+    ct_dictionary["options"]["cell_type"] = "triangle"
     model = Model_parameters(dictionary=ct_dictionary)
-    if model.method == 'DG_triangle':
+    if model.method == "DG_triangle":
         test5 = True
 
     test6 = False
-    ct_dictionary["options"]["cell_type"] = 'quadrilateral'
+    ct_dictionary["options"]["cell_type"] = "quadrilateral"
     model = Model_parameters(dictionary=ct_dictionary)
-    if model.method == 'DG_quadrilateral':
+    if model.method == "DG_quadrilateral":
         test6 = True
 
     assert all([test1, test2, test3, test4, test5, test6])
@@ -264,7 +262,7 @@ def test_dictionary_conversion():
     new_dictionary = {}
     new_dictionary["options"] = {
         "cell_type": "T",  # simplexes such as triangles or tetrahedra (T) or quadrilaterals (Q)
-        "variant": 'lumped',  # lumped, equispaced or DG, default is lumped
+        "variant": "lumped",  # lumped, equispaced or DG, default is lumped
         "degree": 3,  # p order
         "dimension": 2,  # dimension
     }
@@ -377,14 +375,20 @@ def test_time_exception():
 def test_source_exception():
     ex_dictionary = deepcopy(dictionary)
     with pytest.raises(Exception):
-        ex_dictionary["acquistion"]["source_locations"] = [(-0.1, 0.5), (1.0, 0.5)]
+        ex_dictionary["acquistion"]["source_locations"] = [
+            (-0.1, 0.5),
+            (1.0, 0.5),
+        ]
         model = Model_parameters(dictionary=ex_dictionary)
 
 
 def test_receiver_exception():
     ex_dictionary = deepcopy(dictionary)
     with pytest.raises(Exception):
-        ex_dictionary["acquistion"]["receiver_locations"] = [(-0.1, 0.5), (1.0, 0.5)]
+        ex_dictionary["acquistion"]["receiver_locations"] = [
+            (-0.1, 0.5),
+            (1.0, 0.5),
+        ]
         model = Model_parameters(dictionary=ex_dictionary)
 
 
@@ -398,4 +402,4 @@ if __name__ == "__main__":
     test_source_exception()
     test_receiver_exception()
 
-    print('END')
+    print("END")

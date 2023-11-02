@@ -1,5 +1,5 @@
 from spyro import create_transect
-from spyro.examples.example_model import Example_model
+from spyro.examples.rectangle import Rectangle_acoustic
 import firedrake as fire
 
 camembert_optimization_parameters = {
@@ -49,7 +49,10 @@ camembert_dictionary["mesh"] = {
     "Lz": 1.0,  # depth in km - always positive
     "Lx": 1.0,  # width in km - always positive
     "Ly": 0.0,  # thickness in km - always positive
+    "h": 0.05,  # mesh size in km
     "mesh_file": None,
+    "mesh_type": "firedrake_mesh",  # options: firedrake_mesh or user_mesh
+    "h": 0.05,
 }
 # For use only if you are using a synthetic test model
 # or a forward only simulation
@@ -67,18 +70,6 @@ camembert_dictionary["inversion"] = {
 # Specify a 250-m PML on the three sides of the domain to damp outgoing waves.
 camembert_dictionary["absorving_boundary_conditions"] = {
     "status": False,  # True or false
-    # None or non-reflective (outer boundary condition)
-    "outer_bc": "non-reflective",
-    "damping_type": "polynomial",  # polynomial, hyperbolic, shifted_hyperbolic
-    "exponent": 2,  # damping layer has a exponent variation
-    "cmax": 4.7,  # maximum acoustic wave velocity in PML - km/s
-    "R": 1e-6,  # theoretical reflection coefficient
-    # thickness of the PML in the z-direction (km) - always positive
-    "lz": 0.25,
-    # thickness of the PML in the x-direction (km) - always positive
-    "lx": 0.25,
-    # thickness of the PML in the y-direction (km) - always positive
-    "ly": 0.0,
 }
 
 # Create a source injection operator. Here we use a single source with a
@@ -93,22 +84,34 @@ camembert_dictionary["acquisition"] = {
     "source_locations": [(-0.1, 0.5)],
     "frequency": 5.0,
     "delay": 1.0,
-    "receiver_locations": create_transect((-0.10, 0.1), (-0.10, 0.9), 20),
+    "receiver_locations": create_transect((-0.90, 0.1), (-0.90, 0.9), 30),
 }
 
 # Simulate for 2.0 seconds.
 camembert_dictionary["time_axis"] = {
     "initial_time": 0.0,  # Initial time for event
-    "final_time": 2.00,  # Final time for event
-    "dt": 0.001,  # timestep size
+    "final_time": 1.0,  # Final time for event
+    "dt": 0.0005,  # timestep size
     "amplitude": 1,  # the Ricker has an amplitude of 1.
     "output_frequency": 100,  # how frequently to output solution to pvds
     # how frequently to save solution to RAM
     "gradient_sampling_frequency": 100,
 }
 
+camembert_dictionary["visualization"] = {
+    "forward_output": True,
+    "forward_output_filename": "results/camembert_forward_output.pvd",
+    "fwi_velocity_model_output": False,
+    "velocity_model_filename": None,
+    "gradient_output": False,
+    "gradient_filename": None,
+    "adjoint_output": False,
+    "adjoint_filename": None,
+    "debug_output": False,
+}
 
-class Camembert(Example_model):
+
+class Camembert_acoustic(Rectangle_acoustic):
     """Camembert model.
     This class is a child of the Example_model class.
     It is used to create a dictionary with the parameters of the
@@ -130,33 +133,21 @@ class Camembert(Example_model):
     ):
         super().__init__(
             dictionary=dictionary,
-            default_dictionary=example_dictionary,
+            example_dictionary=example_dictionary,
             comm=comm,
         )
-        self._camembert_mesh()
         self._camembert_velocity_model()
 
-    def _camembert_mesh(self):
-        nz = 100
-        nx = 100
-        Lz = self.Lz
-        Lx = self.Lx
-        if self.cell_type == "quadrilateral":
-            quadrilateral = True
-        else:
-            quadrilateral = False
-        self.user_mesh = fire.RectangleMesh(
-            nz, nx, Lz, Lx, quadrilateral=quadrilateral
-        )
-
     def _camembert_velocity_model(self):
-        x, y = fire.SpatialCoordinate(self.mesh)
+        z = self.mesh_z
+        x = self.mesh_x
+        zc = -0.5
         xc = 0.5
-        yc = 0.5
-        rc = 0.5
+        rc = 0.2
         c_salt = 4.6
         c_not_salt = 1.6
         cond = fire.conditional(
-            (x - xc) ** 2 + (y - yc) ** 2 < rc**2, c_salt, c_not_salt
+            (z - zc) ** 2 + (x - xc) ** 2 < rc**2, c_salt, c_not_salt
         )
-        return cond
+        self.set_initial_velocity_model(conditional=cond)
+        return None

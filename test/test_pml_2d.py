@@ -23,7 +23,7 @@ def run_forward():
     dictionary = {}
     dictionary["options"] = {
         "cell_type": "T",  # simplexes such as triangles or tetrahedra (T) or quadrilaterals (Q)
-        "variant": 'lumped',  # lumped, equispaced or DG, default is lumped "method":"MLT", # (MLT/spectral_quadrilateral/DG_triangle/DG_quadrilateral) You can either specify a cell_type+variant or a method
+        "variant": "lumped",  # lumped, equispaced or DG, default is lumped "method":"MLT", # (MLT/spectral_quadrilateral/DG_triangle/DG_quadrilateral) You can either specify a cell_type+variant or a method
         "degree": 4,  # p order
         "dimension": 2,  # dimension
     }
@@ -88,22 +88,19 @@ def run_forward():
         "gradient_filename": None,
     }
 
-    Wave_obj = spyro.solvers.AcousticWavePML(dictionary=dictionary)
-    Wave_obj.set_mesh(dx=0.02)
+    Wave_obj = spyro.solvers.AcousticWave(dictionary=dictionary)
+    Wave_obj.set_mesh(mesh_parameters={"dx": 0.02})
 
     z = Wave_obj.mesh_z
-    cond = fire.conditional(z > -0.333,
-                            1.5,
-                            fire.conditional(z > -0.667,
-                                             3.0,
-                                             4.5)
-                            )
+    cond = fire.conditional(
+        z > -0.333, 1.5, fire.conditional(z > -0.667, 3.0, 4.5)
+    )
     Wave_obj.set_initial_velocity_model(conditional=cond)
     Wave_obj.forward_solve()
 
     t1 = timer.time()
-    print("Time elapsed: ", t1-t0)
-    nt = int(final_time/dt)+1
+    print("Time elapsed: ", t1 - t0)
+    nt = int(final_time / dt) + 1
     p_r = Wave_obj.forward_solution_receivers
 
     return p_r, nt

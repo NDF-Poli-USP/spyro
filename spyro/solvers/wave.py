@@ -1,4 +1,5 @@
 import os
+from abc import abstractmethod
 import warnings
 import firedrake as fire
 from firedrake import sin, cos, pi  # noqa: F401
@@ -70,19 +71,17 @@ class Wave(Model_parameters):
         self.initial_velocity_model = None
 
         self.function_space = None
+        self.forward_solution_receivers = None
         self.current_time = 0.0
         self.set_solver_parameters()
         self.real_shot_record = None
 
         self.wavelet = self.get_wavelet()
         self.mesh = self.get_mesh()
-        if self.mesh is not None and self.mesh is not False:
+        self.c = None
+        if self.mesh is not None:
             self._build_function_space()
-            if self.source_type == "ricker":
-                self.sources = Sources(self)
-            else:
-                self.sources = None
-            self.receivers = Receivers(self)
+            self._map_sources_and_receivers()
         elif self.mesh_type == "firedrake_mesh":
             warnings.warn(
                 "No mesh file, Firedrake mesh will be automatically generated."
@@ -90,33 +89,29 @@ class Wave(Model_parameters):
         else:
             warnings.warn("No mesh found. Please define a mesh.")
 
+    @abstractmethod
+    def forward_solve(self):
+        """Solves the forward problem."""
+        pass
+
+    @abstractmethod
+    def matrix_building(self):
+        """Builds the matrix for the forward problem."""
+        pass
+
     def set_mesh(
         self,
-        dx=None,
         user_mesh=None,
-        mesh_file=None,
-        length_z=None,
-        length_x=None,
-        length_y=None,
-        periodic=False,
+        mesh_parameters=None,
     ):
         super().set_mesh(
-            dx=dx,
             user_mesh=user_mesh,
-            mesh_file=mesh_file,
-            length_z=length_z,
-            length_x=length_x,
-            length_y=length_y,
-            periodic=periodic,
+            mesh_parameters=mesh_parameters,
         )
 
         self.mesh = self.get_mesh()
         self._build_function_space()
-        if self.source_type == "ricker":
-            self.sources = Sources(self)
-        else:
-            self.sources = None
-        self.receivers = Receivers(self)
+        self._map_sources_and_receivers()
         if self.dimension == 2:
             z, x = fire.SpatialCoordinate(self.mesh)
             self.mesh_z = z
@@ -137,11 +132,9 @@ class Wave(Model_parameters):
 
     def get_spatial_coordinates(self):
         if self.dimension == 2:
-            x, y = fire.SpatialCoordinate(self.mesh)
-            return x, y
+            return self.mesh_z, self.mesh_x
         elif self.dimension == 3:
-            x, y, z = fire.SpatialCoordinate(self.mesh)
-            return x, y, z
+            return self.mesh_z, self.mesh_x, self.mesh_y
 
     def set_initial_velocity_model(
         self,
@@ -166,9 +159,15 @@ class Wave(Model_parameters):
 
         new_file:  (optional)
         """
+        # If no mesh is set, we have to do it beforehand
+        if self.mesh is None:
+            self.set_mesh()
         # Resseting old velocity model
         self.initial_velocity_model = None
         self.initial_velocity_model_file = None
+
+        if self.debug_output:
+            output = True
 
         if conditional is not None:
             V = fire.FunctionSpace(self.mesh, "DG", 0)
@@ -204,12 +203,14 @@ class Wave(Model_parameters):
                 self.initial_velocity_model, name="velocity"
             )
 
-    def _get_initial_velocity_model(self):
-        if self.velocity_model_type == "conditional":
-            self.set_initial_velocity_model(
-                conditional=self.model_parameters.velocity_conditional
-            )
+    def _map_sources_and_receivers(self):
+        if self.source_type == "ricker":
+            self.sources = Sources(self)
+        else:
+            self.sources = None
+        self.receivers = Receivers(self)
 
+    def _get_initial_velocity_model(self):
         if self.initial_velocity_model is not None:
             return None
 
@@ -228,30 +229,45 @@ class Wave(Model_parameters):
 
         if self.initial_velocity_model_file.endswith(".hdf5"):
             self.initial_velocity_model = interpolate(
-                self.model_parameters,
+                self,
                 self.initial_velocity_model_file,
                 self.function_space.sub(0),
+            )
+
+        if self.debug_output:
+            fire.File("initial_velocity_model.pvd").write(
+                self.initial_velocity_model, name="velocity"
             )
 
     def _build_function_space(self):
         self.function_space = FE_method(self.mesh, self.method, self.degree)
 
-    def get_and_set_maximum_dt(self, fraction=1.0):
-        if self.method == "KMV":
-            estimate_max_eigenvalue = True
-        elif self.method == "spectral_quadrilateral":
-            estimate_max_eigenvalue = True
-        else:
-            estimate_max_eigenvalue = False
+    def get_and_set_maximum_dt(self, fraction=0.7):
+        # if self.method == "mass_lumped_triangle":
+        #     estimate_max_eigenvalue = True
+        # elif self.method == "spectral_quadrilateral":
+        #     estimate_max_eigenvalue = True
+        # else:
+        estimate_max_eigenvalue = False
 
-        dt = utils.estimate_timestep(
+        if self.c is None:
+            c = self.initial_velocity_model
+        else:
+            c = self.c
+
+        dt = utils.estimate_timestep.estimate_timestep(
             self.mesh,
             self.function_space,
-            self.c,
+            c,
             estimate_max_eigenvalue=estimate_max_eigenvalue,
         )
         dt *= fraction
+        nt = int(self.final_time / dt) + 1
+        dt = self.final_time / (nt - 1)
+
         self.dt = dt
+        print(dt)
+        self.wavelet = self.get_wavelet()
         return dt
 
     def get_mass_matrix_diagonal(self):

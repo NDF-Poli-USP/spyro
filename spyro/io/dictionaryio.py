@@ -27,6 +27,27 @@ def parse_cg(dictionary):
     if "cell_type" not in dictionary:
         raise ValueError("cell_type must be specified for CG method.")
 
+    cell_type = parse_cell_type(dictionary)
+    variant = parse_variant(dictionary)
+    method = parse_method(cell_type, variant)
+
+    return method, cell_type, variant
+
+
+def parse_cell_type(dictionary):
+    """
+    Parse the cell type from the dictionary of a CG.
+
+    Parameters
+    ----------
+    dictionary : dict
+        Dictionary containing the options information.
+
+    Returns
+    -------
+    cell_type : str
+        The cell type to be used. Returns either triangle or quadrilateral.
+    """
     cell_type = None
     triangle_equivalents = ["T", "triangle", "triangles", "tetrahedra"]
     quadrilateral_equivalents = [
@@ -47,7 +68,23 @@ def parse_cg(dictionary):
         raise ValueError(
             f"cell_type of {dictionary['cell_type']} is not valid."
         )
+    return cell_type
 
+
+def parse_variant(dictionary):
+    """
+    Parse the variant from the dictionary of a CG.
+
+    Parameters
+    ----------
+    dictionary : dict
+        Dictionary containing the options information.
+
+    Returns
+    -------
+    variant : str
+        The variant to be used. Returns either lumped, equispaced or DG.
+    """
     if dictionary["variant"] is None:
         warnings.warn("variant not specified for CG method. Assuming lumped.")
         dictionary["variant"] = "lumped"
@@ -64,6 +101,25 @@ def parse_cg(dictionary):
     if variant == "KMV":
         variant = "lumped"
 
+    return variant
+
+
+def parse_method(cell_type, variant):
+    """
+    Parse the method from the dictionary of a CG.
+
+    Parameters
+    ----------
+    cell_type : str
+        The cell type to be used.
+    variant : str
+        The variant to be used.
+
+    Returns
+    -------
+    method : str
+        The method to be used.
+    """
     if cell_type == "triangle" and variant == "lumped":
         method = "mass_lumped_triangle"
     elif cell_type == "triangle" and variant == "equispaced":
@@ -76,10 +132,26 @@ def parse_cg(dictionary):
         method = "CG_quadrilateral"
     elif cell_type == "quadrilateral" and variant == "DG":
         method = "DG_quadrilateral"
-    return method, cell_type, variant
+    else:
+        raise ValueError(f"Cell type of {cell_type} with variant of {variant} results in a not implemented method")
+
+    return method
 
 
 def check_if_mesh_file_exists(file_name):
+    """
+    Just checks if the mesh file exists.
+
+    Parameters
+    ----------
+    file_name : str
+        The mesh file name.
+
+    Raises
+    ------
+    ValueError
+        If the mesh file does not exist.
+    """
     if file_name is None:
         return
     if os.path.isfile(file_name):

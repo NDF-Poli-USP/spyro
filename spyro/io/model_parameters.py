@@ -32,6 +32,9 @@ from ..sources import full_ricker_wavelet
 #     "degree": 4,  # p order
 #     "dimension": 2,  # dimension
 #     "automatic_adjoint": False,
+# OPTIONAL PARAMETERS
+#     "time_integration_scheme": "central_difference",
+#     "equation_type": "second_order_in_pressure",
 # }
 
 # # Number of cores for the shot. For simplicity, we keep things serial.
@@ -120,6 +123,7 @@ from ..sources import full_ricker_wavelet
 #     "gradient_filename": None,
 #     "adjoint_output": False,
 #     "adjoint_filename": None,
+#     "debug_output": False,
 # }
 
 
@@ -238,6 +242,10 @@ class Model_parameters:
         file, "conditional" for a conditional, or None for no velocity model.
     velocity_conditional: str
         Conditional used for the velocity model.
+    equation_type: str
+        Type of equation used in the simulation. Can be "second_order_in_pressure".
+    time_integrator: str
+        Type of time integrator used in the simulation. Can be "central_difference".
 
     Methods
     -------
@@ -279,6 +287,8 @@ class Model_parameters:
         self.variant = Options.variant
         self.degree = Options.degree
         self.dimension = Options.dimension
+        self.time_integrator = self._check_time_integrator()
+        self.equation_type = self._check_equation_type()
 
         # Checks time inputs
         self._sanitize_time_inputs()
@@ -331,6 +341,32 @@ class Model_parameters:
     # # thickness of the PML in the y-direction (km) - always positive
     #     "ly": 0.0,
     # }
+    def _check_time_integrator(self):
+        if "time_integration_scheme" in self.input_dictionary:
+            time_integrator = self.input_dictionary["time_integration_scheme"]
+        else:
+            time_integrator = "central_difference"
+
+        if time_integrator != "central_difference":
+            raise ValueError(
+                "The time integrator specified is not implemented yet"
+            )
+
+        return time_integrator
+
+    def _check_equation_type(self):
+        if "equation_type" in self.input_dictionary:
+            equation_type = self.input_dictionary["equation_type"]
+        else:
+            equation_type = "second_order_in_pressure"
+
+        if equation_type != "second_order_in_pressure":
+            raise ValueError(
+                "The equation type specified is not implemented yet"
+            )
+
+        return equation_type
+
     def _sanitize_absorving_boundary_condition(self):
         if "absorving_boundary_conditions" not in self.input_dictionary:
             self.input_dictionary["absorving_boundary_conditions"] = {
@@ -344,6 +380,13 @@ class Model_parameters:
         self.abc_cmax = BL_obj.abc_cmax
         self.abc_R = BL_obj.abc_R
         self.abc_pad_length = BL_obj.abc_pad_length
+        self.abc_boundary_layer_type = BL_obj.abc_boundary_layer_type
+        if self.abc_status:
+            self._correct_time_integrator_for_abc()
+
+    def _correct_time_integrator_for_abc(self):
+        if self.time_integrator == "central_difference":
+            self.time_integrator = "mixed_space_central_difference"
 
     def _sanitize_output(self):
         #         default_dictionary["visualization"] = {
@@ -391,13 +434,8 @@ class Model_parameters:
         self._sanitize_output_files()
 
     def _sanitize_output_files(self):
+        self._sanitize_forward_output_files()
         dictionary = self.input_dictionary["visualization"]
-        if "forward_output_filename" not in dictionary:
-            self.forward_output_file = "results/forward_propogation.pvd"
-        elif dictionary["forward_output_filename"] is not None:
-            self.forward_output_file = dictionary["forward_output_filename"]
-        else:
-            self.forward_output_file = "results/forward_propagation.pvd"
 
         # Estabilishing velocity model file and setting a default
         if "velocity_model_filename" not in dictionary:
@@ -413,6 +451,19 @@ class Model_parameters:
                 "results/fwi_velocity_model.pvd"
             )
 
+        self._check_debug_output()
+
+    def _sanitize_forward_output_files(self):
+        dictionary = self.input_dictionary["visualization"]
+        if "forward_output_filename" not in dictionary:
+            self.forward_output_file = "results/forward_propogation.pvd"
+        elif dictionary["forward_output_filename"] is not None:
+            self.forward_output_file = dictionary["forward_output_filename"]
+        else:
+            self.forward_output_file = "results/forward_propagation.pvd"
+
+    def _sanitize_adjoint_and_gradient_output_files(self):
+        dictionary = self.input_dictionary["visualization"]
         # Estabilishing gradient file and setting a default
         if "gradient_filename" not in dictionary:
             self.gradient_output_file = "results/gradient.pvd"
@@ -429,6 +480,20 @@ class Model_parameters:
         else:
             self.adjoint_output_file = "results/adjoint.pvd"
 
+    def _check_debug_output(self):
+        dictionary = self.input_dictionary["visualization"]
+        # Estabilishing debug output
+        if "debug_output" not in dictionary:
+            self.debug_output = False
+        elif dictionary["debug_output"] is None:
+            self.debug_output = False
+        elif dictionary["debug_output"] is False:
+            self.debug_output = False
+        elif dictionary["debug_output"] is True:
+            self.debug_output = True
+        else:
+            raise ValueError("Debug output not understood")
+
     def get_wavelet(self):
         """Returns a wavelet based on the source type.
 
@@ -440,8 +505,10 @@ class Model_parameters:
         if self.source_type == "ricker":
             if "delay_type" in self.input_dictionary["acquisition"]:
                 delay_type = self.input_dictionary["acquisition"]["delay_type"]
+                self.delay_type = delay_type
             else:
                 delay_type = "multiples_of_minimun"
+                self.delay_type = delay_type
             wavelet = full_ricker_wavelet(
                 dt=self.dt,
                 final_time=self.final_time,
@@ -450,7 +517,7 @@ class Model_parameters:
                 amplitude=self.amplitude,
                 delay_type=delay_type,
             )
-        elif self.source_type == "mms_source":
+        elif self.source_type == "MMS":
             wavelet = None
         else:
             raise ValueError(
@@ -474,6 +541,9 @@ class Model_parameters:
             warnings.warn("No paralellism type listed. Assuming automatic")
             self.parallelism_type = "automatic"
 
+        if self.source_type == "MMS":
+            self.parallelism_type = "spatial"
+
         if comm is None:
             self.comm = utils.mpi_init(self)
             self.comm.comm.barrier()
@@ -490,7 +560,7 @@ class Model_parameters:
         if self.source_type == "Ricker":
             self.source_type = "ricker"
         elif self.source_type == "MMS":
-            self.number_of_sources = 0
+            self.number_of_sources = 1
             self.source_locations = []
             self.frequency = None
             self.amplitude = None
@@ -609,75 +679,78 @@ class Model_parameters:
 
     def set_mesh(
         self,
-        dx=None,
         user_mesh=None,
-        mesh_file=None,
-        length_z=None,
-        length_x=None,
-        length_y=None,
-        periodic=False,
+        mesh_parameters={},
     ):
         """
 
         Parameters
         ----------
-        dx : float, optional
-            The desired mesh spacing. The default is None.
         user_mesh : spyro.Mesh, optional
             The desired mesh. The default is None.
-        mesh_file : str, optional
-            The path to the desired mesh file. The default is None.
-        length_z : float, optional
-            The length of the domain in the z-direction. The default is None.
-        length_x : float, optional
-            The length of the domain in the x-direction. The default is None.
-        length_y : float, optional
-            The length of the domain in the y-direction. The default is None.
-        periodic : bool, optional
-            Whether the domain is periodic. The default is False.
         """
 
+        # Setting default mesh parameters
+        mesh_parameters.setdefault("periodic", False)
+        mesh_parameters.setdefault("minimum_velocity", 1.5)
+        mesh_parameters.setdefault("edge_length", None)
+        mesh_parameters.setdefault("dx", None)
+        mesh_parameters.setdefault("length_z", self.length_z)
+        mesh_parameters.setdefault("length_x", self.length_x)
+        mesh_parameters.setdefault("length_y", self.length_y)
+        mesh_parameters.setdefault("abc_pad_length", self.abc_pad_length)
+        mesh_parameters.setdefault("mesh_file", self.mesh_file)
+        mesh_parameters.setdefault("dimension", self.dimension)
+        mesh_parameters.setdefault("mesh_type", self.mesh_type)
+        mesh_parameters.setdefault("source_frequency", self.frequency)
+        mesh_parameters.setdefault("method", self.method)
+        mesh_parameters.setdefault("degree", self.degree)
+        mesh_parameters.setdefault("velocity_model_file", self.initial_velocity_model_file)
+        mesh_parameters.setdefault("cell_type", self.cell_type)
+        mesh_parameters.setdefault("cells_per_wavelength", None)
+
         self._set_mesh_length(
-            length_z=length_z,
-            length_x=length_x,
-            length_y=length_y,
+            length_z=mesh_parameters["length_z"],
+            length_x=mesh_parameters["length_x"],
+            length_y=mesh_parameters["length_y"],
         )
+
+        if self.mesh_type == "firedrake_mesh":
+            automatic_mesh = True
+        elif self.mesh_type == "SeismicMesh":
+            automatic_mesh = True
+        else:
+            automatic_mesh = False
 
         if user_mesh is not None:
             self.user_mesh = user_mesh
             self.mesh_type = "user_mesh"
-        elif mesh_file is not None:
-            self.mesh_file = mesh_file
+        elif mesh_parameters["mesh_file"] is not None:
+            self.mesh_file = mesh_parameters["mesh_file"]
             self.mesh_type = "file"
-        elif self.mesh_type == "firedrake_mesh":
-            AutoMeshing = meshing.AutomaticMesh(
-                dimension=self.dimension,
-                comm=self.comm,
-                abc_pad=self.abc_pad_length,
+        elif automatic_mesh:
+            self.user_mesh = self._creating_automatic_mesh(
+                mesh_parameters=mesh_parameters
             )
-
-        if periodic:
-            AutoMeshing.make_periodic()
-
-        if self.mesh_type == "firedrake_mesh":
-            AutoMeshing.set_mesh_size(
-                length_z=self.length_z,
-                length_x=self.length_x,
-                length_y=self.length_y,
-            )
-            AutoMeshing.set_meshing_parameters(
-                dx=dx, cell_type=self.cell_type, mesh_type=self.mesh_type
-            )
-            self.user_mesh = AutoMeshing.create_mesh()
 
         if (
-            length_z is None
-            or length_x is None
-            or (length_y is None and self.dimension == 2)
+            mesh_parameters["length_z"] is None
+            or mesh_parameters["length_x"] is None
+            or (mesh_parameters["length_y"] is None and self.dimension == 2)
         ) and self.mesh_type != "firedrake_mesh":
             warnings.warn(
                 "Mesh dimensions not completely reset from initial dictionary"
             )
+
+    def _creating_automatic_mesh(
+        self, mesh_parameters={},
+    ):
+        AutoMeshing = meshing.AutomaticMesh(
+            comm=self.comm,
+            mesh_parameters=mesh_parameters,
+        )
+
+        return AutoMeshing.create_mesh()
 
     def _set_mesh_length(
         self,
@@ -700,9 +773,16 @@ class Model_parameters:
         mesh: Firedrake.Mesh object
             The distributed mesh across `ens_comm`
         """
+        if self.user_mesh is False:
+            non_file_mesh = None
+        else:
+            non_file_mesh = self.user_mesh
+
         if self.mesh_file is not None:
             return io.read_mesh(self)
         elif (
             self.mesh_type == "user_mesh" or self.mesh_type == "firedrake_mesh"
         ):
-            return self.user_mesh
+            return non_file_mesh
+        elif self.mesh_type == "SeismicMesh":
+            return non_file_mesh
