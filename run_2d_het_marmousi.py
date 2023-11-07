@@ -14,7 +14,7 @@ def test_cpw_calc():
         # Either or heterogeneous. If heterogeneous is
         "velocity_profile_type": "heterogeneous",
         # chosen be careful to have the desired velocity model below.
-        "velocity_model_file_name": "/home/olender/common_files/velocity_models/vp_marmousi-ii.segy",
+        "velocity_model_file_name": "/media/alexandre/Extreme SSD/common_files/velocity_models/vp_marmousi-ii.segy",
         "length_z": 3.5,
         "length_x": 17.0,
         # FEM to evaluate such as `KMV` or `spectral`
@@ -26,8 +26,8 @@ def test_cpw_calc():
         # line defines a line of point receivers with pre-established near and far
         # offsets.
         # Line search parameters
-        "load_reference": False,
-        "save_reference": True,
+        "load_reference": True,
+        "save_reference": False,
         "reference_degree": 5,  # Degree to use in the reference case (int)
         # grid point density to use in the reference case (float)
         "C_reference": 5.0,
@@ -41,7 +41,7 @@ def test_cpw_calc():
         grid_point_calculator_parameters
     )
     # Check if cpw is within error TOL, starting search at min
-    min = Cpw_calc.find_minimum()
+    min = Cpw_calc.find_minimum(savetxt=True)
     print(min, flush=True)
 
 
