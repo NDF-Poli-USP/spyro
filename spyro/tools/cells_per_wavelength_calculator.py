@@ -54,6 +54,7 @@ class Meshing_parameter_calculator:
             self.load_reference = False
 
         self.initial_guess_object = self.build_initial_guess_model()
+        self.comm = self.initial_guess_object.comm
         self.reference_solution = self.get_reference_solution()
 
     def _check_velocity_profile_type(self):
