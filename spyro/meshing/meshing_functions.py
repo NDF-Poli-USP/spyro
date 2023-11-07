@@ -327,62 +327,70 @@ class AutomaticMesh:
             return self.create_seismicmesh_2D_mesh_with_velocity_model()
 
     def create_seismicmesh_2D_mesh_with_velocity_model(self):
-        v_min = self.minimum_velocity
-        frequency = self.source_frequency
-        C = self.cpw  # cells_per_wavelength(method, degree, dimension)
+        if self.comm.ensemble_comm.rank == 0:
+            v_min = self.minimum_velocity
+            frequency = self.source_frequency
+            C = self.cpw  # cells_per_wavelength(method, degree, dimension)
 
-        Lz = self.length_z
-        Lx = self.length_x
-        domain_pad = self.abc_pad
-        lbda_min = v_min/frequency
+            Lz = self.length_z
+            Lx = self.length_x
+            domain_pad = self.abc_pad
+            lbda_min = v_min/frequency
 
-        bbox = (-Lz, 0.0, 0.0, Lx)
-        domain = SeismicMesh.Rectangle(bbox)
+            bbox = (-Lz, 0.0, 0.0, Lx)
+            domain = SeismicMesh.Rectangle(bbox)
 
-        hmin = lbda_min/C
+            hmin = lbda_min/C
+            self.comm.comm.barrier()
 
-        ef = SeismicMesh.get_sizing_function_from_segy(
-            self.velocity_model,
-            bbox,
-            hmin=hmin,
-            wl=C,
-            freq=frequency,
-            grade=0.15,
-            domain_pad=domain_pad,
-            pad_style="edge",
-            units='km/s',
-        )
+            ef = SeismicMesh.get_sizing_function_from_segy(
+                self.velocity_model,
+                bbox,
+                hmin=hmin,
+                wl=C,
+                freq=frequency,
+                grade=0.15,
+                domain_pad=domain_pad,
+                pad_style="edge",
+                units='km/s',
+                comm=self.comm.comm,
+            )
+            self.comm.comm.barrier()
 
-        # Creating rectangular mesh
-        points, cells = SeismicMesh.generate_mesh(
-            domain=domain,
-            edge_length=ef,
-            verbose=0,
-            mesh_improvement=False
-        )
+            # Creating rectangular mesh
+            points, cells = SeismicMesh.generate_mesh(
+                domain=domain,
+                edge_length=ef,
+                verbose=0,
+                mesh_improvement=False,
+                comm=self.comm.comm,
+            )
+            self.comm.comm.barrier()
 
-        print('entering spatial rank 0 after mesh generation')
+            print('entering spatial rank 0 after mesh generation')
+            if self.comm.comm.rank == 0:
+                meshio.write_points_cells(
+                    "automatic_mesh.msh",
+                    points,
+                    [("triangle", cells)],
+                    file_format="gmsh22",
+                    binary=False
+                )
 
-        meshio.write_points_cells(
-            "test.msh",
-            points,
-            [("triangle", cells)],
-            file_format="gmsh22",
-            binary=False
-        )
+                meshio.write_points_cells(
+                    "automatic_mesh.vtk",
+                    points,
+                    [("triangle", cells)],
+                    file_format="vtk"
+                )
 
-        meshio.write_points_cells(
-            "test.vtk",
-            points,
-            [("triangle", cells)],
-            file_format="vtk"
-        )
-
+        self.comm.comm.barrier()
         mesh = fire.Mesh(
-            'test.msh',
+            'automatic_mesh.msh',
             distribution_parameters={
                 "overlap_type": (fire.DistributedMeshOverlapType.NONE, 0)
             },
+            comm=self.comm.comm,
         )
 
         return mesh
@@ -551,5 +559,3 @@ def BoxMesh(nx, ny, nz, Lx, Ly, Lz, pad=None, quadrilateral=False):
         mesh.coordinates.dat.data[:, 0] *= -1.0
 
     return mesh
-
-

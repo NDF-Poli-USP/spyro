@@ -102,8 +102,8 @@ def create_initial_model_for_meshing_parameter_2D_heterogeneous(Meshing_calc_obj
     length_x = parameters["length_x"]
 
     # Source and receiver calculations
-    source_z = -0.02
-    source_x = 1.0
+    source_z = -0.3
+    source_x = 3.0
     source_locations = [(source_z, source_x)]
 
     # Receiver calculations
@@ -124,7 +124,7 @@ def create_initial_model_for_meshing_parameter_2D_heterogeneous(Meshing_calc_obj
 
     # Time axis calculations
     tmin = 1.0 / frequency
-    final_time = 30 * tmin  # Should be 35
+    final_time = 7.5
 
     variables = {
         "method": method,
