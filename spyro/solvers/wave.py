@@ -102,7 +102,7 @@ class Wave(Model_parameters):
     def set_mesh(
         self,
         user_mesh=None,
-        mesh_parameters=None,
+        mesh_parameters={},
     ):
         super().set_mesh(
             user_mesh=user_mesh,
