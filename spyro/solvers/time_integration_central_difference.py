@@ -1,6 +1,7 @@
 import firedrake as fire
 from firedrake import Constant, dx, dot, grad
 from firedrake.assemble import create_assembly_callable
+import numpy as np
 
 from ..io.basicio import parallel_print
 from . import helpers
@@ -44,7 +45,25 @@ def central_difference(Wave_object, source_id=0):
     B = Wave_object.B
     rhs = Wave_object.rhs
 
+    check_boundary = True
+
     # assembly_callable = create_assembly_callable(rhs, tensor=B)
+    if check_boundary is True:
+        function_z = fire.Function(X)
+        function_z.interpolate(Wave_object.mesh_z)
+        function_x = fire.Function(X)
+        function_x.interpolate(Wave_object.mesh_x)
+        tol = 1e-6
+        left_boundary = np.where(function_x.dat.data[:] <= tol)
+        right_boundary = np.where(function_x.dat.data[:] >= Wave_object.length_x-tol)
+        bottom_boundary = np.where(function_z.dat.data[:] <= tol-Wave_object.length_z)
+        pressure_on_left = u_n.dat.data_ro_with_halos[left_boundary]
+        pressure_on_right = u_n.dat.data_ro_with_halos[right_boundary]
+        pressure_on_bottom = u_n.dat.data_ro_with_halos[bottom_boundary]
+        threshold = 1e-6
+        check_left = True
+        check_right = True
+        check_bottom = True
 
     for step in range(nt):
         rhs_forcing.assign(0.0)
@@ -71,8 +90,28 @@ def central_difference(Wave_object, source_id=0):
                 mesh differently"
             if Wave_object.forward_output:
                 output.write(u_n, time=t, name="Pressure")
-
             helpers.display_progress(Wave_object.comm, t)
+
+        pressure_on_left = u_n.dat.data_ro_with_halos[left_boundary]
+        pressure_on_right = u_n.dat.data_ro_with_halos[right_boundary]
+        pressure_on_bottom = u_n.dat.data_ro_with_halos[bottom_boundary]
+        if np.any(np.abs(pressure_on_left) > threshold) and check_left:
+            print("Pressure on left boundary is not zero")
+            print(f"Time hit left boundary = {t}")
+            t_left = t
+            check_left = False
+
+        if np.any(np.abs(pressure_on_right) > threshold) and check_right:
+            print("Pressure on right boundary is not zero")
+            print(f"Time hit right boundary = {t}")
+            t_right = t
+            check_right = False
+
+        if np.any(np.abs(pressure_on_bottom) > threshold) and check_bottom:
+            print("Pressure on bottom boundary is not zero")
+            print(f"Time hit bottom boundary = {t}")
+            t_bottom = t
+            check_bottom = False
 
         u_nm1.assign(u_n)
         u_n.assign(u_np1)
@@ -80,6 +119,8 @@ def central_difference(Wave_object, source_id=0):
         t = step * float(dt)
 
     Wave_object.current_time = t
+    Wave_object.noneikonal_minimum = np.amin([t_left, t_right, t_bottom])
+    Wave_object.noneikonal_maximum = np.amax([t_left, t_right, t_bottom])
     helpers.display_progress(Wave_object.comm, t)
 
     usol_recv = helpers.fill(
