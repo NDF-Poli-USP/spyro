@@ -167,7 +167,7 @@ def ensemble_propagator(func):
 #     return wrapper
 
 
-def write_function_to_grid(function, V, grid_spacing):
+def write_function_to_grid(function, V, grid_spacing, units='m/s'):
     """Interpolate a Firedrake function to a structured grid
 
     Parameters
@@ -200,7 +200,10 @@ def write_function_to_grid(function, V, grid_spacing):
     min_y = np.amin(y) + 0.01
     max_y = np.amax(y) - 0.01
 
-    z = function.dat.data[:] * 1000.0  # convert from km/s to m/s
+    if units == 'm/s':
+        z = function.dat.data[:] * 1000.0  # convert from km/s to m/s
+    elif units == 'km/s':
+        z = function.dat.data[:]
 
     # target grid to interpolate to
     xi = np.arange(min_x, max_x, grid_spacing)

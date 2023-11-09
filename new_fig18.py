@@ -83,19 +83,31 @@ def test_eikonal_values_fig18():
     min_value = Wave_obj.noneikonal_minimum
     paper_min = 0.58755
 
+    # Testing minimum values
     test_min = math.isclose(min_value, paper_min, rel_tol=0.1)
-
     print("min_value: ", min_value)
     print("paper_min: ", paper_min)
+    print(f"Passed the minimum value test: {test_min}")
 
-    assert all([test_min])
+    # Testing minimum location
+    z_min, x_min = Wave_obj.noneikonal_minimum_point
+    paper_z_min = -(2.4-1.925)
+    paper_x_min = 4.8
+
+    test_z_min = math.isclose(z_min, paper_z_min, rel_tol=0.1)
+    test_x_min = math.isclose(x_min, paper_x_min, rel_tol=0.1)
+
+    test_min_point = all([test_z_min, test_x_min])
+    print(f"Passed the minimum point location test: {test_min_point}")
+
+    assert all([test_min, test_min_point])
 
 
 # Verificar valores das distancias como lref e velocidades
 if __name__ == "__main__":
     test_eikonal_values_fig18()
 
-# xloc[m] #yloc[m] #c[km/s] #eik[ms] 
+# xloc[m] #yloc[m] #c[km/s] #eik[ms]
 
 # hmin = 25m
 # 0.000000000000000000e+00	1.925000000000000000e+03	3.700000000000000178e+00	5.841707164493551545e+02

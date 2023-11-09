@@ -67,9 +67,9 @@ def central_difference(Wave_object, source_id=0):
         t_left = 1e5
         t_right = 1e5
         t_bottom = 1e5
-        point_left = np.nan
-        point_right = np.nan
-        point_bottom = np.nan
+        bottom_point_dof = np.nan
+        left_point_dof = np.nan
+        right_point_dof = np.nan
 
     for step in range(nt):
         rhs_forcing.assign(0.0)
@@ -110,9 +110,9 @@ def central_difference(Wave_object, source_id=0):
             vector_indices = vector_indices[0]
             global_indices = left_boundary[0][vector_indices]
             z_values = function_z.dat.data[global_indices]
-            z_value = np.average(z_values)
-            x_value = 0.0
-            point_left = (z_value, x_value)
+            z_avg = np.average(z_values)
+            indice = global_indices[np.argmin(np.abs(z_values-z_avg))]
+            left_point_dof = indice
 
         if np.any(np.abs(pressure_on_right) > threshold) and check_right:
             print("Pressure on right boundary is not zero")
@@ -132,13 +132,13 @@ def central_difference(Wave_object, source_id=0):
             print(f"Time hit bottom boundary = {t}")
             t_bottom = t
             check_bottom = False
-            vector_indice = np.where(np.abs(pressure_on_bottom) > threshold)
-            vector_indice = vector_indice[0]
-            global_indice = bottom_boundary[0][vector_indice]
-            x_values = function_x.dat.data[global_indice]
-            x_value = np.average(x_values)
-            z_value = Wave_object.length_z
-            point_bottom = (z_value, x_value)
+            vector_indices = np.where(np.abs(pressure_on_bottom) > threshold)
+            vector_indices = vector_indices[0]
+            global_indices = bottom_boundary[0][vector_indices]
+            x_values = function_x.dat.data[global_indices]
+            x_avg = np.average(x_values)
+            indice = global_indices[np.argmin(np.abs(x_values-x_avg))]
+            bottom_point_dof = indice
 
         u_nm1.assign(u_n)
         u_n.assign(u_np1)
@@ -146,9 +146,10 @@ def central_difference(Wave_object, source_id=0):
         t = step * float(dt)
 
     Wave_object.current_time = t
+    noneikonal_dofs = [left_point_dof, right_point_dof, bottom_point_dof]
     Wave_object.noneikonal_minimum = np.min([t_left, t_right, t_bottom])
-    Wave_object.noneikonal_maximum = np.max([t_left, t_right, t_bottom])
-    eikonal_points = [point_left, point_right, point_bottom]
+    Wave_object.noneikonal_dof = noneikonal_dofs[np.argmin([t_left, t_right, t_bottom])]
+    Wave_object.noneikonal_minimum_point = (function_z.dat.data[Wave_object.noneikonal_dof], function_x.dat.data[Wave_object.noneikonal_dof])
     # Wave_object.noneikonal_minimum_point = eikonal_points[]
     helpers.display_progress(Wave_object.comm, t)
 
