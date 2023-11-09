@@ -64,6 +64,9 @@ def central_difference(Wave_object, source_id=0):
         check_left = True
         check_right = True
         check_bottom = True
+        t_left = np.nan
+        t_right = np.nan
+        t_bottom = np.nan
 
     for step in range(nt):
         rhs_forcing.assign(0.0)
@@ -119,8 +122,8 @@ def central_difference(Wave_object, source_id=0):
         t = step * float(dt)
 
     Wave_object.current_time = t
-    Wave_object.noneikonal_minimum = np.amin([t_left, t_right, t_bottom])
-    Wave_object.noneikonal_maximum = np.amax([t_left, t_right, t_bottom])
+    Wave_object.noneikonal_minimum = np.nanmin([t_left, t_right, t_bottom])
+    Wave_object.noneikonal_maximum = np.nanmax([t_left, t_right, t_bottom])
     helpers.display_progress(Wave_object.comm, t)
 
     usol_recv = helpers.fill(

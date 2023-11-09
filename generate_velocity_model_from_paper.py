@@ -44,35 +44,39 @@ def apply_vs_from_list(velmat, mesh, Lx, Ly, c):
     return c
 
 
-def get_paper_velocity(mesh, V, output=True):
+def get_paper_velocity(mesh, V, output=True, units='km/s'):
+    if units == 'km/s':
+        multiplier = 1.0
+    elif units == 'm/s':
+        multiplier = 1000.0
     velmat = []
-    velmat.append([0.00, 0.00, 0.35, 0.10, 2.9 * 1000])
-    velmat.append([0.00, 0.10, 0.25, 0.30, 2.9 * 1000])
-    velmat.append([0.00, 0.30, 0.25, 0.70, 2.0 * 1000])
-    velmat.append([0.00, 0.70, 0.10, 1.00, 3.7 * 1000])
-    velmat.append([0.10, 0.70, 0.30, 0.90, 3.7 * 1000])
-    velmat.append([0.25, 0.10, 0.75, 0.30, 2.5 * 1000])
-    velmat.append([0.25, 0.30, 0.40, 0.70, 2.5 * 1000])
-    velmat.append([0.35, 0.00, 0.70, 0.10, 2.1 * 1000])
-    velmat.append([0.70, 0.00, 0.90, 0.10, 3.4 * 1000])
-    velmat.append([0.80, 0.10, 0.90, 0.35, 3.4 * 1000])
-    velmat.append([0.90, 0.00, 1.00, 0.20, 3.4 * 1000])
-    velmat.append([0.90, 0.20, 1.00, 0.65, 2.6 * 1000])
-    velmat.append([0.75, 0.10, 0.80, 0.50, 4.0 * 1000])
-    velmat.append([0.80, 0.35, 0.90, 0.80, 4.0 * 1000])
-    velmat.append([0.85, 0.80, 0.90, 0.95, 3.6 * 1000])
-    velmat.append([0.90, 0.65, 1.00, 1.00, 3.6 * 1000])
-    velmat.append([0.00, 0.00, 0.00, 0.00, 1.5 * 1000])
+    velmat.append([0.00, 0.00, 0.35, 0.10, 2.9 * multiplier])
+    velmat.append([0.00, 0.10, 0.25, 0.30, 2.9 * multiplier])
+    velmat.append([0.00, 0.30, 0.25, 0.70, 2.0 * multiplier])
+    velmat.append([0.00, 0.70, 0.10, 1.00, 3.7 * multiplier])
+    velmat.append([0.10, 0.70, 0.30, 0.90, 3.7 * multiplier])
+    velmat.append([0.25, 0.10, 0.75, 0.30, 2.5 * multiplier])
+    velmat.append([0.25, 0.30, 0.40, 0.70, 2.5 * multiplier])
+    velmat.append([0.35, 0.00, 0.70, 0.10, 2.1 * multiplier])
+    velmat.append([0.70, 0.00, 0.90, 0.10, 3.4 * multiplier])
+    velmat.append([0.80, 0.10, 0.90, 0.35, 3.4 * multiplier])
+    velmat.append([0.90, 0.00, 1.00, 0.20, 3.4 * multiplier])
+    velmat.append([0.90, 0.20, 1.00, 0.65, 2.6 * multiplier])
+    velmat.append([0.75, 0.10, 0.80, 0.50, 4.0 * multiplier])
+    velmat.append([0.80, 0.35, 0.90, 0.80, 4.0 * multiplier])
+    velmat.append([0.85, 0.80, 0.90, 0.95, 3.6 * multiplier])
+    velmat.append([0.90, 0.65, 1.00, 1.00, 3.6 * multiplier])
+    velmat.append([0.00, 0.00, 0.00, 0.00, 1.5 * multiplier])
 
     Lx = 4.8
     Ly = 2.4
 
     c = fire.Function(V)
 
-    c.dat.data[:] = 1.5 * 1000
+    c.dat.data[:] = 1.5 * multiplier
 
     c = apply_slope(
-        mesh, c, 0.4 * Lx, 0.3 * Ly, 0.75 * Lx, 0.65 * Ly, 3.3 * 1000
+        mesh, c, 0.4 * Lx, 0.3 * Ly, 0.75 * Lx, 0.65 * Ly, 3.3 * multiplier
     )
     c = apply_vs_from_list(velmat, mesh, Lx, Ly, c)
 
