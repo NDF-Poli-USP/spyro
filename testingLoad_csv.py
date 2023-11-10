@@ -10,7 +10,7 @@ def loading_csv_into_function(V, file_name, crossed=False):
     mesh = V.ufl_domain()
 
     # TODO change columns for 3D
-    field = np.loadtxt(file_name, delimiter=",", skiprows=1, usecols=(0, 1, 2))
+    field = np.loadtxt(file_name, delimiter="\t", skiprows=1, usecols=(0, 1, 2))
     Lx = np.amax(field[:, 1])
     Lz = np.amax(field[:, 2])
 
@@ -64,4 +64,4 @@ if __name__ == "__main__":
     V = fire.FunctionSpace(mesh, "CG", 1)
     u = fire.Function(V)
     # loading_csv_into_function(V, "cosHig.csv")
-    loading_csv_into_function(V, "InfHLIN.csv")
+    # loading_csv_into_function(V, "InfHLIN.csv")

@@ -96,6 +96,8 @@ def test_eikonal_values_fig8():
     test_x_min = math.isclose(x_min, paper_x_min, rel_tol=0.1)
 
     test_min_point = all([test_z_min, test_x_min])
+    print("z_min: ", z_min)
+    print("paper_z_min: ", paper_z_min)
     print(f"Passed the minimum point location test: {test_min_point}")
 
     assert all([test_min, test_min_point])

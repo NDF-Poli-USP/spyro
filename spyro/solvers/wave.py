@@ -248,7 +248,7 @@ class Wave(Model_parameters):
         # elif self.method == "spectral_quadrilateral":
         #     estimate_max_eigenvalue = True
         # else:
-        estimate_max_eigenvalue = False
+        estimate_max_eigenvalue = True
 
         if self.c is None:
             c = self.initial_velocity_model

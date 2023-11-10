@@ -64,9 +64,9 @@ def central_difference(Wave_object, source_id=0):
         check_left = True
         check_right = True
         check_bottom = True
-        t_left = 1e5
-        t_right = 1e5
-        t_bottom = 1e5
+        t_left = np.inf
+        t_right = np.inf
+        t_bottom = np.inf
         bottom_point_dof = np.nan
         left_point_dof = np.nan
         right_point_dof = np.nan
@@ -101,6 +101,7 @@ def central_difference(Wave_object, source_id=0):
         pressure_on_left = u_n.dat.data_ro_with_halos[left_boundary]
         pressure_on_right = u_n.dat.data_ro_with_halos[right_boundary]
         pressure_on_bottom = u_n.dat.data_ro_with_halos[bottom_boundary]
+
         if np.any(np.abs(pressure_on_left) > threshold) and check_left:
             print("Pressure on left boundary is not zero")
             print(f"Time hit left boundary = {t}")
