@@ -3,7 +3,7 @@
 #SBATCH --ntasks-per-node=40
 #SBATCH --partition=intel_large
 #SBATCH --time=10:00:00
-#SBATCH --job-name=results/verification1e4
+#SBATCH --job-name=results/verification3d
 #SBATCH --output=%x.%j.out
 #SBATCH --error=%x.%j.err
 #SBATCH --exclusive
@@ -58,7 +58,7 @@ srun hostname > $HOSTFILE
 ## Information about the entry and exit of the job
 echo -e "\n## Diretorio de submissao do job:   $SLURM_SUBMIT_DIR \n"
 
-mpiexec -n 20 python interior_3d_node_reduced_time_propagation.py
+mpiexec -n 20 python interior_propagation_3d.py
 
 
 echo -e "\n## Job finished on $(date +'%d-%m-%Y as %T') ###################"
