@@ -74,6 +74,7 @@ Wave_obj.forward_solve()
 time = np.linspace(0.0, final_time, int(final_time/dt)+1)
 
 rec_out = Wave_obj.receivers_output
-np.save("interior_3D_ML3Tet_dt"+str(dt)+".npy", rec_out)
+rec_out_flat = rec_out.flatten()
+np.save("interior_3D_ML3Tet_dt"+str(dt)+".npy", rec_out_flat)
 
 print("END")
