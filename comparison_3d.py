@@ -26,15 +26,14 @@ def analytical_solution(dt, final_time, offset):
 
 dts = [
     0.0001,
-    0.00005,
 ]
 
 offset = 0.5
-final_time = 1.0
+final_time = 0.7
 errors = []
 
 for dt in dts:
-    rec_full = np.load("interior_3D_MLT4_dt"+str(dt)+".npy")
+    rec_full = np.load("interior_3D_ML3Tet_dt"+str(dt)+".npy")
     rec = rec_full.flatten()
     ana = analytical_solution(dt, final_time, offset)
 
@@ -48,15 +47,17 @@ for dt in dts:
 
     errors.append(error_calc(rec_cut, ana_cut, nt))
 
-plt.loglog(dts, errors)
+timevector = np.linspace(0.0, final_time, len(rec_full))
+# plt.loglog(dts, errors)
 
-theory = [t**2 for t in dts]
-theory = [errors[0]*th/theory[0] for th in theory]
+# theory = [t**2 for t in dts]
+# theory = [errors[0]*th/theory[0] for th in theory]
 
-plt.loglog(dts, theory, '--')
+# plt.loglog(dts, theory, '--')
 
-theory = [t for t in dts]
-theory = [errors[0]*th/theory[0] for th in theory]
+# theory = [t for t in dts]
+# theory = [errors[0]*th/theory[0] for th in theory]
 
-plt.loglog(dts, theory, '-.')
-plt.show()
+# plt.loglog(dts, theory, '-.')
+# plt.show()
+print("END")
