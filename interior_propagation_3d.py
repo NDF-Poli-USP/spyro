@@ -5,7 +5,7 @@ import numpy as np
 
 dt = 0.0001
 
-final_time = 0.7
+final_time = 1.0
 dx = 0.006546536707079771
 
 dictionary = {}
@@ -57,7 +57,7 @@ dictionary["time_axis"] = {
 
 dictionary["visualization"] = {
     "forward_output": True,
-    "forward_output_filename": "results/serial_forward_3d_output3by1by1.pvd",
+    "forward_output_filename": "results/intel_forward_3d_output3by1by1.pvd",
     "fwi_velocity_model_output": False,
     "velocity_model_filename": None,
     "gradient_output": False,
