@@ -174,7 +174,7 @@ class Meshing_parameter_calculator:
             # Running forward model
             Wave_obj = self.build_current_object(cpw)
             Wave_obj._get_initial_velocity_model()
-            # Wave_obj.get_and_set_maximum_dt(fraction=0.2)
+            Wave_obj.get_and_set_maximum_dt(fraction=0.2)
             print("Maximum dt is ", Wave_obj.dt, flush=True)
             t0 = timinglib.time()
             Wave_obj.forward_solve()
