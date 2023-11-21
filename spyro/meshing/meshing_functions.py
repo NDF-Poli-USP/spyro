@@ -116,7 +116,7 @@ class AutomaticMesh:
         self.lbda = None
         self.velocity_model = mesh_parameters["velocity_model_file"]
         self.edge_length = mesh_parameters["edge_length"]
-        self.output_file_name = None
+        self.output_file_name = "automatic_mesh.msh"
 
     def set_mesh_size(self, length_z=None, length_x=None, length_y=None):
         """

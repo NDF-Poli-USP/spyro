@@ -143,7 +143,7 @@ ax[1].text(-0.1, 1.0, '(b)', transform=ax[1].transAxes, size=leters_size)
 fig.set_size_inches(9, 5)
 
 print("Table results:")
-print("Element \tminimum G \tminimum C")
+print("Element \tminimum C \tminimum G \ttime-step (s) \t runtime (s)")
 print("------------------------------------------")
 for i in range(len(p)):
     p_i = p[i]
@@ -159,9 +159,10 @@ for i in range(len(p)):
     if np.isnan(indice):
         print("ML" + str(p_i) + "tri \t\t" + "DNF" + "\t\t" + "DNF")
     else:
-        print(f"ML{p_i}tri \t\t{g[indice]:.2f}\t\t{cpw_i[indice]:.2f}")
+        # print(f"ML{p_i}tri \t\t{cpw_i[indice]:.2f}\t\t{g[indice]:.2f}")
+        print(f"ML{p_i}tri & ${cpw_i[indice]:.2f}$ & ${g[indice]:.2f}$ & ${dts_i[indice]:.2e}$ & ${runtimes_i[indice]:.1f}$ \\\\")
 
-# plt.show()
+plt.show()
 # cont = 0
 # p = [1, 2, 3, 4, 5]
 # for degree in p:
