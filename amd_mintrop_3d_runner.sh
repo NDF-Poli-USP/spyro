@@ -1,9 +1,9 @@
 #!/bin/bash
 #SBATCH --nodes=1
 #SBATCH --ntasks-per-node=40
-#SBATCH --partition=intel_large
+#SBATCH --partition=amd_large
 #SBATCH --time=10:00:00
-#SBATCH --job-name=results/intel_verification3d
+#SBATCH --job-name=results/amd_verification3d
 #SBATCH --output=%x.%j.out
 #SBATCH --error=%x.%j.err
 #SBATCH --exclusive
