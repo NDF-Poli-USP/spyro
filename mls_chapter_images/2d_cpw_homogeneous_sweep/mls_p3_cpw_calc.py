@@ -30,8 +30,8 @@ def cpw_calc(accuracy=None):
         "reference_degree": None,  # Degree to use in the reference case (int)
         # grid point density to use in the reference case (float)
         "C_reference": None,
-        "desired_degree": 3,  # degree we are calculating G for. (int)
-        "C_initial": 1.5,  # Initial G for line search (float)
+        "desired_degree": 5,  # degree we are calculating G for. (int)
+        "C_initial": 1.0,  # Initial G for line search (float)
         "accepted_error_threshold": 0.05,
         "C_accuracy": accuracy,
     }
@@ -47,4 +47,4 @@ def cpw_calc(accuracy=None):
 
 
 if __name__ == "__main__":
-    cpw_calc(accuracy=0.01)
+    cpw_calc(accuracy=0.1)
