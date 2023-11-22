@@ -1,4 +1,5 @@
 import matplotlib.pyplot as plt
+import pickle
 import numpy as np
 import matplotlib
 import copy
@@ -43,6 +44,16 @@ def get_minumum_cpw_indice(cpws, errs):
         return np.nan
 
 
+# Load the pickle file
+with open('ml_results.pkl', 'rb') as f:
+    data = pickle.load(f)
+
+ml1t = data["ml1t"]
+ml2t = data["ml2t"]
+ml3t = data["ml3t"]
+ml4t = data["ml4t"]
+ml5t = data["ml5t"]
+
 plt.rcParams["font.family"] = "Times New Roman"
 
 cmap0 = matplotlib.cm.get_cmap("Oranges")
@@ -61,35 +72,35 @@ alphas = [0.707813887967734, 1.7326282059345566, 2.5500981353665586, 3.317227833
 
 p = [1, 2, 3, 4, 5]
 cpwl = [
-    [],
-    [],
-    [],
-    [],
-    [],
+    ml1t['c'].tolist(),
+    ml2t['c'].tolist(),
+    ml3t['c'].tolist(),
+    ml4t['c'].tolist(),
+    ml5t['c'].tolist(),
 ]
 
 err = [
-    [],
-    [],
-    [],
-    [],
-    [],
+    ml1t['error'].tolist(),
+    ml2t['error'].tolist(),
+    ml3t['error'].tolist(),
+    ml4t['error'].tolist(),
+    ml5t['error'].tolist(),
 ]
 
 dts = [
-    [],
-    [],
-    [],
-    [],
-    [],
+    ml1t['dt'].tolist(),
+    ml2t['dt'].tolist(),
+    ml3t['dt'].tolist(),
+    ml4t['dt'].tolist(),
+    ml5t['dt'].tolist(),
 ]
 
 runtimes = [
-    [],
-    [],
-    [],
-    [],
-    [],
+    ml1t['runtime'].tolist(),
+    ml2t['runtime'].tolist(),
+    ml3t['runtime'].tolist(),
+    ml4t['runtime'].tolist(),
+    ml5t['runtime'].tolist(),
 ]
 
 cont = 0
