@@ -4,7 +4,7 @@ import pickle
 
 
 # Define the directory path where the files are located
-directory = '/media/olender/T7 Shield/Development/mls_chapter_ALL_images/spyro-1'
+directory = '/media/alexandre/T7 Shield/Development/mls_chapter_ALL_images/spyro-1'
 
 # Initialize an empty dictionary to store the file data
 file_data = {}
@@ -18,6 +18,9 @@ for filename in os.listdir(directory):
         # Read the contents of the file into a DataFrame
         df = pd.read_csv(os.path.join(directory, filename), sep='\s+', names=column_names)
 
+        # Round the 'C' column to 2 decimal places
+        df['c'] = df['c'].round(2)
+
         # Form the new key
         new_key = 'ml' + filename[1] + 't'
 
@@ -29,12 +32,26 @@ for filename in os.listdir(directory):
             # If it doesn't, store the DataFrame in the dictionary using the filename as the key
             file_data[new_key] = df
 
+        # eliminating repeated Cs and using the ones with lowest runtimes
+        filtered_df = file_data[new_key]
+        # Sort the DataFrame by 'c' and 'runtime' columns
+        filtered_df = filtered_df.sort_values(['c', 'runtime'])
+
+        # Drop duplicate rows based on the 'c' column and keep the first occurrence
+        filtered_df = filtered_df.drop_duplicates(subset='c', keep='first') # Sort the DataFrame by 'c' and 'runtime' columns
+        filtered_df = filtered_df.sort_values(['c', 'runtime'])
+
+        # Drop duplicate rows based on the 'c' column and keep the first occurrence
+        filtered_df = filtered_df.drop_duplicates(subset='c', keep='first')
+
+        file_data[new_key] = filtered_df
+
 # Print the dictionary
 for key, value in file_data.items():
     print(f"{key}:\n{value}\n")
 
 # Save the dictionary to a file
-with open(new_key+'.pkl', 'wb') as f:
+with open('ml_results.pkl', 'wb') as f:
     pickle.dump(file_data, f)
 
 print("END")
