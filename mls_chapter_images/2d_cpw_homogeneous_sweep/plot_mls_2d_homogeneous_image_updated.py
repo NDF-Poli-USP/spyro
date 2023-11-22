@@ -142,6 +142,7 @@ for degree in p:
 
 ax[1].plot([3.0, 13.0], [5, 5], 'k--')
 ax[1].set_title("Error with varying G")
+ax[1].set(xlabel="Grid-points-per-wavelength (G)", ylabel="E %")
 ax[1].set_xticks([2, 4, 6, 8, 10, 12])
 ax[1].set_xlim((1.5, 12.5))
 ax[1].set_ylim(y_limits)
@@ -173,6 +174,7 @@ for i in range(len(p)):
         # print(f"ML{p_i}tri \t\t{cpw_i[indice]:.2f}\t\t{g[indice]:.2f}")
         print(f"ML{p_i}tri & ${cpw_i[indice]:.2f}$ & ${g[indice]:.2f}$ & ${dts_i[indice]:.2e}$ & ${runtimes_i[indice]:.1f}$ \\\\")
 
+fig.savefig("mls_cpw_results_homogeneous_mltriangles.png")
 plt.show()
 # cont = 0
 # p = [1, 2, 3, 4, 5]
