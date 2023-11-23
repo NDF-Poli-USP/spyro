@@ -29,7 +29,7 @@ dts = [
 ]
 
 offset = 0.5
-final_time = 0.7
+final_time = 1.0
 errors = []
 
 for dt in dts:
@@ -37,17 +37,32 @@ for dt in dts:
     rec = rec_full.flatten()
     ana = analytical_solution(dt, final_time, offset)
 
-    cutoff = 0.6
-    cutoff_index = int(cutoff/dt)
+    start = 0.35
+    cutoff = 0.76
+    start_index = int(start/dt)+1
+    cutoff_index = int(cutoff/dt)+1
 
-    rec_cut = rec[:cutoff_index]
-    ana_cut = ana[:cutoff_index]
+    rec_cut = rec[start_index:cutoff_index]
+    ana_cut = ana[start_index:cutoff_index]
 
     nt = len(ana_cut)
+    error = error_calc(rec_cut, ana_cut, nt)
+    print(error)
 
-    errors.append(error_calc(rec_cut, ana_cut, nt))
+    errors.append(error)
 
 timevector = np.linspace(0.0, final_time, len(rec_full))
+timevector_cut = np.linspace(start, cutoff, len(rec_cut))
+# plt.plot(timevector, rec)
+# plt.show()
+plt.plot(timevector_cut, rec_cut, label="Numerical")
+plt.plot(timevector_cut, ana_cut, "--", label="Analytical")
+plt.title("Pressure at r = 0.5 km")
+plt.xlabel("Time (s)")
+plt.ylabel("Pressure (Pa)")
+plt.legend()
+plt.savefig("mls_3d_ricker_propagation_comparison.png")
+plt.show()
 # plt.loglog(dts, errors)
 
 # theory = [t**2 for t in dts]
