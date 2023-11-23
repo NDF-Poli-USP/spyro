@@ -1,3 +1,4 @@
+import numpy as np
 import firedrake as fire
 
 
@@ -35,7 +36,7 @@ def create_element_points_2d(degree, element_type="equispaced"):
 
 
 def create_element_points_3d(degree, element_type="equispaced"):
-    """Creates 2D single cell element point locations with a given degree and element type.
+    """Creates 3D single cell element point locations with a given degree and element type.
 
     Parameters
     ----------
@@ -104,6 +105,16 @@ def basic_tetrahedron_tikz():
     return "\n".join(tikz_commands)
 
 
+def opacity_calculator_for_3d(point):
+    x, y, z = point
+    # Calculate plane distance from origin (not distance from point)
+    distance = x + y + z
+    min_opacity = 0.2
+    max_opacity = 1.0
+    opacity = min_opacity + (max_opacity-min_opacity)*distance
+    return opacity
+
+
 def convert_to_tikz_3d(points):
     """Converts a list of points to tikz commands.
 
@@ -120,14 +131,15 @@ def convert_to_tikz_3d(points):
     tikz_commands = []
     tikz_commands.append(basic_tetrahedron_tikz())
     for point in points:
+        opacity = opacity_calculator_for_3d(point)
         tikz_commands.append(f"\t\\draw[fill=black, opacity={opacity}] ({point[0]}, {point[1]}, {point[2]}) circle (0.02);")
     tikz_commands.append("\\end{tikzpicture} \\\\ \\small")
     return "\n".join(tikz_commands)
 
 
 if __name__ == "__main__":
-    degree = 5
-    points = create_element_points_2d(degree, element_type="equispaced")
-    tikz_commands = convert_to_tikz_2d(points)
+    degree = 3
+    points = create_element_points_3d(degree, element_type="equispaced")
+    tikz_commands = convert_to_tikz_3d(points)
     print(tikz_commands)
     print("END")
