@@ -169,5 +169,5 @@ for i in range(len(p)):
         # print(f"ML{p_i}tri \t\t{cpw_i[indice]:.2f}\t\t{g[indice]:.2f}")
         print(f"ML{p_i}tri & ${cpw_i[indice]:.2f}$ & ${g[indice]:.2f}$ & ${dts_i[indice]:.2e}$ & ${runtimes_i[indice]:.1f}$ \\\\")
 
-fig.savefig("mls_cpw_results_homogeneous_mltriangles.png")
+fig.savefig("mls_cpw_results_heterogeneous_mltriangles.png")
 plt.show()
