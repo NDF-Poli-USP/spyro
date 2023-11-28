@@ -2,6 +2,7 @@ import numpy as np
 import h5py
 import firedrake as fire
 import matplotlib.pyplot as plt
+import copy
 from scipy.interpolate import RegularGridInterpolator
 
 
@@ -24,8 +25,8 @@ maximun_z = np.amax(mesh.coordinates.dat.data[:, 0])
 minimum_x = np.amin(mesh.coordinates.dat.data[:, 1])
 maximum_x = np.amax(mesh.coordinates.dat.data[:, 1])
 
-V = fire.FunctionSpace(mesh, "KMV", 4)
-W = fire.VectorFunctionSpace(mesh, "KMV", 4)
+V = fire.FunctionSpace(mesh, "KMV", 5)
+W = fire.VectorFunctionSpace(mesh, "KMV", 5)
 dof_coordinates = fire.interpolate(mesh.coordinates, W)
 dofs_z, dofs_x = dof_coordinates.dat.data[:, 0], dof_coordinates.dat.data[:, 1]
 
@@ -54,5 +55,22 @@ if min(c.dat.data[:]) > 100.0:
     if fire.COMM_WORLD.rank == 0:
         print("INFO: converting from m/s to km/s", flush=True)
     c.assign(c / 1000.0)  # meters to kilometers
+coordinates = copy.deepcopy(mesh.coordinates.dat.data)
+mesh.coordinates.dat.data[:, 0] = coordinates[:, 1]
+mesh.coordinates.dat.data[:, 1] = coordinates[:, 0]
 
+
+fig, axes = plt.subplots()
+im = fire.tripcolor(c, axes=axes, cmap='coolwarm')
+# axes.axis("equal")
+axes.set_aspect("equal", "box")
+plt.title("Velocity field")
+
+cbar = fig.colorbar(im, orientation="vertical", fraction=0.046)
+cbar.ax.set_xlabel("velocity (km/s)")
+axes.set_xticks([0, 2.5, 5, 7.5, 10, 12.5, 15, 17.3])
+fig.set_size_inches(13, 10)
+plt.savefig("velocity_field_marmousi.png")
+
+plt.show()
 print("END")
