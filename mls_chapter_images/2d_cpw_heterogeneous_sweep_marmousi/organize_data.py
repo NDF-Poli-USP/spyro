@@ -4,7 +4,7 @@ import pickle
 
 
 # Define the directory path where the files are located
-directory = '/media/olender/T7 Shield/Development/mls_chapter_ALL_images/spyro-1'
+directory = '/media/alexandre/T7 Shield/Development/mls_chapter_ALL_images/spyro-1'
 
 # Initialize an empty dictionary to store the file data
 file_data = {}
