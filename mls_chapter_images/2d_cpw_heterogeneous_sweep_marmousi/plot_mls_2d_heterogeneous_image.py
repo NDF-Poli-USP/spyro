@@ -52,6 +52,7 @@ ml2t = data["ml2t"]
 ml3t = data["ml3t"]
 ml4t = data["ml4t"]
 ml5t = data["ml5t"]
+ml6t = data["ml6t"]
 
 plt.rcParams["font.family"] = "Times New Roman"
 
@@ -60,21 +61,23 @@ cmap1 = matplotlib.cm.get_cmap("Blues")
 cmap2 = matplotlib.cm.get_cmap("Reds")
 cmap3 = matplotlib.cm.get_cmap("Purples")
 cmap4 = matplotlib.cm.get_cmap("Greys")
+cmap5 = matplotlib.cm.get_cmap("Greens")
 
-colors_regular = [cmap0(0.2), cmap1(0.3), cmap2(0.5), cmap3(0.7), cmap4(0.9)]
-colors_dark = [cmap0(0.3), cmap1(0.4), cmap2(0.6), cmap3(0.8), cmap4(1.0)]
+colors_regular = [cmap0(0.2), cmap1(0.3), cmap2(0.5), cmap3(0.7), cmap4(0.9), cmap5(1.0)]
+colors_dark = [cmap0(0.3), cmap1(0.4), cmap2(0.6), cmap3(0.8), cmap4(1.0), cmap5(1.0)]
 
 fig, ax = plt.subplots(1, 2)
 leters_size = 20
 y_limits = (1, 200)
-alphas = [1.7326282059345566, 2.5500981353665586, 3.31722783359841, 4.637348434180895]
+alphas = [1.7326282059345566, 2.5500981353665586, 3.31722783359841, 4.637348434180895, 5.385721910756255]
 
-p = [2, 3, 4, 5]
+p = [2, 3, 4, 5, 6]
 cpwl = [
     ml2t['c'].tolist(),
     ml3t['c'].tolist(),
     ml4t['c'].tolist(),
     ml5t['c'].tolist(),
+    ml6t['c'].tolist(),
 ]
 
 err = [
@@ -82,6 +85,7 @@ err = [
     ml3t['error'].tolist(),
     ml4t['error'].tolist(),
     ml5t['error'].tolist(),
+    ml6t['error'].tolist(),
 ]
 
 dts = [
@@ -89,6 +93,7 @@ dts = [
     ml3t['dt'].tolist(),
     ml4t['dt'].tolist(),
     ml5t['dt'].tolist(),
+    ml6t['dt'].tolist(),
 ]
 
 runtimes = [
@@ -96,6 +101,7 @@ runtimes = [
     ml3t['runtime'].tolist(),
     ml4t['runtime'].tolist(),
     ml5t['runtime'].tolist(),
+    ml6t['runtime'].tolist(),
 ]
 
 cont = 0
