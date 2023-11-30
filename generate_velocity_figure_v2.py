@@ -41,7 +41,7 @@ class Velocity_figure:
 
     def get_function_space(self):
         return fire.FunctionSpace(self.mesh, "KMV", 5)
-    
+
     def get_dof_coordinates(self):
         V = self.function_space
         x_mesh, y_mesh = fire.SpatialCoordinate(self.mesh)
@@ -101,14 +101,17 @@ class Velocity_figure:
         self.mesh.coordinates.dat.data[:, 1] = coordinates[:, 0]
 
         fig, axes = plt.subplots()
+
         im = fire.tripcolor(self.velocity, axes=axes, cmap='coolwarm')
-        # axes.axis("equal")
         axes.set_aspect("equal", "box")
         plt.title("Velocity field")
 
         cbar = fig.colorbar(im, orientation="horizontal")
         cbar.ax.set_xlabel("velocity (km/s)")
+        axes.set_xticks([0, 2.5, 5, 7.5, 10, 12.5, 15, 17.3])
+
         fig.set_size_inches(13, 10)
+        plt.margins(x=0, y=0)
 
         if output_filename is not None:
             plt.savefig(output_filename)
@@ -118,7 +121,7 @@ class Velocity_figure:
 
 
 if __name__ == "__main__":
-    velocity_filename = "/media/alexandre/T7 Shield/common_files/velocity_models/vp_marmousi-ii.hdf5"
+    velocity_filename = "/media/olender/T7 Shield/common_files/velocity_models/vp_marmousi-ii.hdf5"
     mesh_filename = "automatic_mesh.msh"
     Vel_obj = Velocity_figure(velocity_filename, mesh_filename)
     Vel_obj.plot(output_filename="velocity_model_marmousi.png", show=True)
