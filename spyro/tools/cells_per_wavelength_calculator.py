@@ -52,6 +52,20 @@ class Meshing_parameter_calculator:
             self.load_reference = parameters_dictionary["load_reference"]
         else:
             self.load_reference = False
+        
+        if "time-step_calculation" in parameters_dictionary:
+            self.timestep_calculation = parameters_dictionary["time-step_calculation"]
+        else:
+            self.timestep_calculation = "exact"
+        self.fixed_timestep = None
+
+        if self.timestep_calculation == "exact":
+            self.estimate_timestep = False
+        elif self.timestep_calculation == "estimate":
+            self.estimate_timestep = True
+        else:
+            self.estimate_timestep = None
+            self.fixed_timestep = parameters_dictionary["time-step"]
 
         self.initial_guess_object = self.build_initial_guess_model()
         self.comm = self.initial_guess_object.comm
@@ -174,8 +188,17 @@ class Meshing_parameter_calculator:
             # Running forward model
             Wave_obj = self.build_current_object(cpw)
             Wave_obj._get_initial_velocity_model()
-            Wave_obj.get_and_set_maximum_dt(fraction=0.2)
+
+            # Setting up time-step
+            if self.timestep_calculation != "float":
+                Wave_obj.get_and_set_maximum_dt(
+                    fraction=0.2,
+                    estimate_max_eigenvalue=self.estimate_timestep
+                )
+            else:
+                Wave_obj.dt = self.fixed_timestep
             print("Maximum dt is ", Wave_obj.dt, flush=True)
+
             t0 = timinglib.time()
             Wave_obj.forward_solve()
             t1 = timinglib.time()
