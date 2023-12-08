@@ -7,13 +7,14 @@ import finat
 
 
 def estimate_timestep(mesh, V, c, estimate_max_eigenvalue=True):
-    """Estimate the maximum stable timestep based on the spectral radius
+    """
+    Estimate the maximum stable timestep based on the spectral radius
     using optionally the Gershgorin Circle Theorem to estimate the
     maximum generalized eigenvalue. Otherwise computes the maximum
-    generalized eigenvalue exactly
+    generalized eigenvalue exactly.
 
-    ONLY WORKS WITH KMV ELEMENTS
-
+    Parameters
+    ----------
     """
 
     u, v = fd.TrialFunction(V), fd.TestFunction(V)
