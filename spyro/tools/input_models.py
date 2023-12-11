@@ -4,10 +4,46 @@ import warnings
 
 
 def build_on_top_of_base_dictionary(variables):
-    if variables["method"] == "mass_lumped_triangle":
-        mesh_type = "SeismicMesh"
-    elif variables["method"] == "spectral_quadrilateral":
-        mesh_type = "firedrake_mesh"
+    """
+    Builds a model dictionary on top of the base dictionary.
+
+    Parameters
+    ----------
+    variables : dict
+        Dictionary containing the variables to be used in the model dictionary. It should include:
+            - method: string
+                The finite element method to be used. Either "mass_lumped_triangle" or "spectral_quadrilateral".
+            - degree: int
+                The spatial polynomial degree of the finite element method
+            - dimension: int
+                The dimension of the problem. Either 2 or 3.
+            - Lz: float
+                The length of the domain in the z direction.
+            - Lx: float
+                The length of the domain in the x direction.
+            - Ly: float
+                The length of the domain in the y direction.
+            - cells_per_wavelength: float
+                The number of cells per wavelength.
+            - pad: float
+                The padding to be used in the domain.
+            - source_locations: list
+                A list containing the source locations.
+            - frequency: float
+                The frequency of the source.
+            - receiver_locations: list
+                A list containing the receiver locations.
+            - final_time: float
+                The final time of the simulation.
+            - dt: float
+                The time step size of the simulation.
+
+    Returns
+    -------
+    model_dictionary : dict
+        Dictionary containing the model dictionary.
+    """
+    mesh_type = set_mesh_type(variables["method"])
     model_dictionary = {}
     model_dictionary["options"] = {
         "method": variables["method"],
@@ -15,9 +51,7 @@ def build_on_top_of_base_dictionary(variables):
         "dimension": variables["dimension"],
         "automatic_adjoint": False,
     }
-    model_dictionary["parallelism"] = {
-        "type": "automatic",
-    }
+    model_dictionary["parallelism"] = {"type": "automatic",}
     model_dictionary["mesh"] = {
         "Lz": variables["Lz"],
         "Lx": variables["Lx"],
@@ -55,11 +89,46 @@ def build_on_top_of_base_dictionary(variables):
         "gradient_output": False,
         "gradient_filename": None,
     }
-
     return model_dictionary
 
 
+def set_mesh_type(method):
+    """
+    Sets the mesh type based on the method.
+
+    Parameters
+    ----------
+    method : string
+        The finite element method to be used. Either "mass_lumped_triangle" or "spectral_quadrilateral".
+
+    Returns
+    -------
+    mesh_type : string
+        The mesh type to be used.
+    """
+    if method == "mass_lumped_triangle":
+        mesh_type = "SeismicMesh"
+    elif method == "spectral_quadrilateral":
+        mesh_type = "firedrake_mesh"
+    else:
+        raise ValueError("Method is not mass_lumped_triangle or spectral_quadrilateral")
+    return mesh_type
+
+
 def create_initial_model_for_meshing_parameter(Meshing_calc_obj):
+    """
+    Creates an initial model dictionary for the meshing parameter calculation.
+
+    Parameters
+    ----------
+    Meshing_calc_obj : spyro.Meshing_parameter_calculator
+        The meshing calculation object.
+
+    Returns
+    -------
+    model_dictionary : dict
+        Dictionary containing the initial model dictionary to be later incremented.
+    """
     dimension = Meshing_calc_obj.dimension
     if dimension == 2:
         return create_initial_model_for_meshing_parameter_2D(Meshing_calc_obj)
@@ -70,6 +139,19 @@ def create_initial_model_for_meshing_parameter(Meshing_calc_obj):
 
 
 def create_initial_model_for_meshing_parameter_2D(Meshing_calc_obj):
+    """
+    Creates an initial model dictionary for the meshing parameter calculation in 2D.
+
+    Parameters
+    ----------
+    Meshing_calc_obj : spyro.Meshing_parameter_calculator
+        The meshing calculation object.
+
+    Returns
+    -------
+    model_dictionary : dict
+        Dictionary containing the initial model dictionary to be later incremented.
+    """
     velocity_profile_type = Meshing_calc_obj.velocity_profile_type
     if velocity_profile_type == "homogeneous":
         return create_initial_model_for_meshing_parameter_2D_homogeneous(
@@ -84,6 +166,19 @@ def create_initial_model_for_meshing_parameter_2D(Meshing_calc_obj):
 
 
 def create_initial_model_for_meshing_parameter_2D_heterogeneous(Meshing_calc_obj):
+    """
+    Creates an initial model dictionary for the meshing parameter calculation in 2D with a heterogeneous velocity model.
+
+    Parameters
+    ----------
+    Meshing_calc_obj : spyro.Meshing_parameter_calculator
+        The meshing calculation object.
+    
+    Returns
+    -------
+    model_dictionary : dict
+        Dictionary containing the initial model dictionary.
+    """
     dimension = 2
     c_value = Meshing_calc_obj.minimum_velocity
     frequency = Meshing_calc_obj.source_frequency
@@ -102,8 +197,8 @@ def create_initial_model_for_meshing_parameter_2D_heterogeneous(Meshing_calc_obj
     length_x = parameters["length_x"]
 
     # Source and receiver calculations
-    source_z = -0.2
-    source_x = 5.0
+    source_z = -0.3
+    source_x = 3.0
     source_locations = [(source_z, source_x)]
 
     # Receiver calculations
@@ -124,7 +219,7 @@ def create_initial_model_for_meshing_parameter_2D_heterogeneous(Meshing_calc_obj
 
     # Time axis calculations
     tmin = 1.0 / frequency
-    final_time = 25 * tmin  # Should be 35
+    final_time = 7.5
 
     variables = {
         "method": method,
@@ -152,6 +247,19 @@ def create_initial_model_for_meshing_parameter_2D_heterogeneous(Meshing_calc_obj
 
 
 def create_initial_model_for_meshing_parameter_3D(Meshing_calc_obj):
+    """
+    Creates an initial model dictionary for the meshing parameter calculation in 3D.
+
+    Parameters
+    ----------
+    Meshing_calc_obj : spyro.Meshing_parameter_calculator
+        The meshing calculation object.
+
+    Returns
+    -------
+    model_dictionary : dict
+        Dictionary containing the initial model dictionary.
+    """
     velocity_profile_type = Meshing_calc_obj.velocity_profile_type
     if velocity_profile_type == "homogeneous":
         raise NotImplementedError("Not yet implemented")
@@ -166,6 +274,19 @@ def create_initial_model_for_meshing_parameter_3D(Meshing_calc_obj):
 
 
 def create_initial_model_for_meshing_parameter_2D_homogeneous(Meshing_calc_obj):
+    """
+    Creates an initial model dictionary for the meshing parameter calculation in 2D with a homogeneous velocity model.
+
+    Parameters
+    ----------
+    Meshing_calc_obj : spyro.Meshing_parameter_calculator
+        The meshing calculation object.
+
+    Returns
+    -------
+    model_dictionary : dict
+        Dictionary containing the initial model dictionary.
+    """
     dimension = 2
     c_value = Meshing_calc_obj.minimum_velocity
     frequency = Meshing_calc_obj.source_frequency
