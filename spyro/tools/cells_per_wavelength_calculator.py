@@ -131,23 +131,41 @@ class Meshing_parameter_calculator:
         self.cpw_accuracy = parameters_dictionary["C_accuracy"]
 
         # Debugging and testing  parameters
-        if "testing" in parameters_dictionary:
-            self.reduced_obj_for_testing = parameters_dictionary["testing"]
+        self._setting_up_testing_options()
+
+        # Setting up reference file read or load
+        self._setting_up_reference_file_read_or_load()
+
+        # Setting up time-step attributes
+        self._setting_up_time_step()
+
+        self.initial_guess_object = self.build_initial_guess_model()
+        self.comm = self.initial_guess_object.comm
+        self.reference_solution = self.get_reference_solution()
+
+    def _setting_up_testing_options(self):
+        """
+        Sets up the testing options.
+        """
+        if "testing" in self.parameters_dictionary:
+            self.reduced_obj_for_testing = self.parameters_dictionary["testing"]
         else:
             self.reduced_obj_for_testing = False
 
-        if "save_reference" in parameters_dictionary:
-            self.save_reference = parameters_dictionary["save_reference"]
+    def _setting_up_reference_file_read_or_load(self):
+        if "save_reference" in self.parameters_dictionary:
+            self.save_reference = self.parameters_dictionary["save_reference"]
         else:
             self.save_reference = False
 
-        if "load_reference" in parameters_dictionary:
-            self.load_reference = parameters_dictionary["load_reference"]
+        if "load_reference" in self.parameters_dictionary:
+            self.load_reference = self.parameters_dictionary["load_reference"]
         else:
             self.load_reference = False
-        
-        if "time-step_calculation" in parameters_dictionary:
-            self.timestep_calculation = parameters_dictionary["time-step_calculation"]
+
+    def _setting_up_time_step(self):
+        if "time-step_calculation" in self.parameters_dictionary:
+            self.timestep_calculation = self.parameters_dictionary["time-step_calculation"]
         else:
             self.timestep_calculation = "exact"
         self.fixed_timestep = None
@@ -158,11 +176,7 @@ class Meshing_parameter_calculator:
             self.estimate_timestep = True
         else:
             self.estimate_timestep = None
-            self.fixed_timestep = parameters_dictionary["time-step"]
-
-        self.initial_guess_object = self.build_initial_guess_model()
-        self.comm = self.initial_guess_object.comm
-        self.reference_solution = self.get_reference_solution()
+            self.fixed_timestep = self.parameters_dictionary["time-step"]
 
     def _check_velocity_profile_type(self):
         if self.velocity_profile_type == "homogeneous":
@@ -324,7 +338,7 @@ class Meshing_parameter_calculator:
         errors = []
         runtimes = []
 
-        fast_loop = True
+        self.fast_loop = True
         # fast_loop = False
         dif = 0.0
         cont = 0
@@ -362,26 +376,11 @@ class Meshing_parameter_calculator:
             errors.append(error)
             runtimes.append(t1 - t0)
 
-            if error < TOL and dif > accuracy:
-                cpw -= dif
-                error = 100.0
-                # Flooring CPW to the neartest decimal point inside accuracy
-                cpw = np.round(
-                    (cpw + 1e-6) // accuracy * accuracy,
-                    int(-np.log10(accuracy)),
-                )
-                fast_loop = False
-            else:
-                dif = calculate_dif(cpw, accuracy, fast_loop=fast_loop)
-                cpw += dif
+            cpw, error, dif = self._updating_cpw_error_and_dif(cpw, error, dif)
 
             cont += 1
 
-        if savetxt:
-            np.savetxt(
-                "p"+str(self.initial_guess_object.degree)+"_cpw_results.txt",
-                np.transpose([cpws, dts, errors, runtimes]),
-            )
+        self._saving_file(savetxt, np.transpose([cpws, dts, errors, runtimes]))
 
         return cpw - dif
 
@@ -414,6 +413,35 @@ class Meshing_parameter_calculator:
         elif self.velocity_profile_type == "heterogeneous":
             Wave_obj.set_mesh(mesh_parameters={"cells_per_wavelength": cpw})
         return Wave_obj
+
+    def _saving_file(self, savetxt, info):
+        """
+        Saves the results to a text file.
+        """
+        if savetxt:
+            np.savetxt(
+                "p"+str(self.initial_guess_object.degree)+"_cpw_results.txt",
+                info,
+            )
+
+    def _updating_cpw_error_and_dif(self, cpw, error, dif):
+        """
+        Updates the cells-per-wavelength parameter.
+        """
+        if error < self.accepted_error_threshold and dif > self.cpw_accuracy:
+            cpw -= dif
+            error = 100.0
+            # Flooring CPW to the neartest decimal point inside accuracy
+            cpw = np.round(
+                (cpw + 1e-6) // self.cpw_accuracy * self.cpw_accuracy,
+                int(-np.log10(self.cpw_accuracy)),
+            )
+            self.fast_loop = False
+        else:
+            dif = calculate_dif(cpw, self.cpw_accuracy, fast_loop=self.fast_loop)
+            cpw += dif
+
+        return cpw, error, dif
 
 
 def calculate_dif(cpw, accuracy, fast_loop=False):
