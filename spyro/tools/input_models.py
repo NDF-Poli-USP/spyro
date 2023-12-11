@@ -43,10 +43,7 @@ def build_on_top_of_base_dictionary(variables):
     model_dictionary : dict
         Dictionary containing the model dictionary.
     """
-    if variables["method"] == "mass_lumped_triangle":
-        mesh_type = "SeismicMesh"
-    elif variables["method"] == "spectral_quadrilateral":
-        mesh_type = "firedrake_mesh"
+    mesh_type = set_mesh_type(variables["method"])
     model_dictionary = {}
     model_dictionary["options"] = {
         "method": variables["method"],
@@ -54,9 +51,7 @@ def build_on_top_of_base_dictionary(variables):
         "dimension": variables["dimension"],
         "automatic_adjoint": False,
     }
-    model_dictionary["parallelism"] = {
-        "type": "automatic",
-    }
+    model_dictionary["parallelism"] = {"type": "automatic",}
     model_dictionary["mesh"] = {
         "Lz": variables["Lz"],
         "Lx": variables["Lx"],
@@ -94,8 +89,30 @@ def build_on_top_of_base_dictionary(variables):
         "gradient_output": False,
         "gradient_filename": None,
     }
-
     return model_dictionary
+
+
+def set_mesh_type(method):
+    """
+    Sets the mesh type based on the method.
+
+    Parameters
+    ----------
+    method : string
+        The finite element method to be used. Either "mass_lumped_triangle" or "spectral_quadrilateral".
+
+    Returns
+    -------
+    mesh_type : string
+        The mesh type to be used.
+    """
+    if method == "mass_lumped_triangle":
+        mesh_type = "SeismicMesh"
+    elif method == "spectral_quadrilateral":
+        mesh_type = "firedrake_mesh"
+    else:
+        raise ValueError("Method is not mass_lumped_triangle or spectral_quadrilateral")
+    return mesh_type
 
 
 def create_initial_model_for_meshing_parameter(Meshing_calc_obj):
