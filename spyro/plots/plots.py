@@ -1,6 +1,8 @@
 # from scipy.io import savemat
 import matplotlib.pyplot as plt
 import numpy as np
+import firedrake
+import copy
 from ..io import ensemble_plot
 
 __all__ = ["plot_shots"]
@@ -79,3 +81,39 @@ def plot_shots(
         plt.show()
     plt.close()
     return None
+
+
+def plot_mesh_sizes(
+    mesh_filename,
+    title_str=None,
+    output_filename=None,
+    show=False
+):
+    plt.rcParams['font.family'] = "Times New Roman"
+    plt.rcParams['font.size'] = 12
+
+    mesh = firedrake.Mesh(mesh_filename)
+
+    coordinates = copy.deepcopy(mesh.coordinates.dat.data)
+
+    mesh.coordinates.dat.data[:, 0] = coordinates[:, 1]
+    mesh.coordinates.dat.data[:, 1] = coordinates[:, 0]
+
+    DG0 = firedrake.FunctionSpace(mesh, "DG", 0)
+    f = firedrake.interpolate(firedrake.CellSize(mesh), DG0)
+
+    fig, axes = plt.subplots()
+    im = firedrake.tricontourf(f, axes=axes)
+
+    axes.set_aspect("equal", "box")
+    plt.xlabel("X (km)")
+    plt.ylabel("Z (km)")
+    plt.title(title_str)
+
+    cbar = fig.colorbar(im, orientation="horizontal")
+    cbar.ax.set_xlabel("circumcircle radius (km)")
+    fig.set_size_inches(13, 10)
+    if show:
+        plt.show()
+    if output_filename is not None:
+        plt.savefig(output_filename)

@@ -27,6 +27,7 @@ def test_cpw_calc():
         "load_reference": True,
         "reference_solution_file": "test/inputfiles/reference_solution_cpw.npy",
         "save_reference": False,
+        "time-step_calculation": "estimate",
         "reference_degree": None,  # Degree to use in the reference case (int)
         # grid point density to use in the reference case (float)
         "C_reference": None,
