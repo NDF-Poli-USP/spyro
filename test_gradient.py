@@ -9,7 +9,7 @@ dictionary["options"] = {
     "cell_type": "T",  # simplexes such as triangles or tetrahedra (T) or quadrilaterals (Q)
     "variant": "lumped",  # lumped, equispaced or DG, default is lumped
     "method": "MLT",  # (MLT/spectral_quadrilateral/DG_triangle/DG_quadrilateral) You can either specify a cell_type+variant or a method
-    "degree": 4,  # p order
+    "degree": 1,  # p order
     "dimension": 2,  # dimension
 }
 
@@ -23,11 +23,11 @@ dictionary["parallelism"] = {
 # domain and reserve the remaining 250 m for the Perfectly Matched Layer (PML) to absorb
 # outgoing waves on three sides (eg., -z, +-x sides) of the domain.
 dictionary["mesh"] = {
-    "Lz": 1.0,  # depth in km - always positive   # Como ver isso sem ler a malha?
-    "Lx": 1.0,  # width in km - always positive
+    "Lz": 3.0,  # depth in km - always positive   # Como ver isso sem ler a malha?
+    "Lx": 3.0,  # width in km - always positive
     "Ly": 0.0,  # thickness in km - always positive
     "mesh_file": None,
-    "mesh_type": "firedrake_mesh",  # options: firedrake_mesh or user_mesh
+    "mesh_type": "firedrake_mesh",
 }
 # Create a source injection operator. Here we use a single source with a
 # Ricker wavelet that has a peak frequency of 8 Hz injected at the center of the mesh.
@@ -35,20 +35,20 @@ dictionary["mesh"] = {
 # This transect of receivers is created with the helper function `create_transect`.
 dictionary["acquisition"] = {
     "source_type": "ricker",
-    "source_locations": [(-0.1, 0.5)],
+    "source_locations": [(-0.5, 1.5)],
     "frequency": 5.0,
     "delay": 1.0,
-    "receiver_locations": spyro.create_transect((-0.10, 0.1), (-0.10, 0.9), 20),
+    "receiver_locations": spyro.create_transect((-2.9, 0.1), (-2.9, 2.9), 100),
 }
 
 # Simulate for 2.0 seconds.
 dictionary["time_axis"] = {
     "initial_time": 0.0,  # Initial time for event
-    "final_time": 2.00,  # Final time for event
+    "final_time": 1.00,  # Final time for event
     "dt": 0.001,  # timestep size
     "amplitude": 1,  # the Ricker has an amplitude of 1.
     "output_frequency": 100,  # how frequently to output solution to pvds - Perguntar Daiane ''post_processing_frequnecy'
-    "gradient_sampling_frequency": 100,  # how frequently to save solution to RAM    - Perguntar Daiane 'gradient_sampling_frequency'
+    "gradient_sampling_frequency": 1,  # how frequently to save solution to RAM    - Perguntar Daiane 'gradient_sampling_frequency'
 }
 dictionary["visualization"] = {
     "forward_output": True,
@@ -59,31 +59,31 @@ dictionary["visualization"] = {
     "gradient_filename": "results/Gradient.pvd",
     "adjoint_output": False,
     "adjoint_filename": None,
+    "debug_output": True,
 }
-
-functional = spyro.utils.compute_functional
 
 
 def test_gradient():
 
     Wave_obj_exact = spyro.AcousticWave(dictionary=dictionary)
-    Wave_obj_exact.set_mesh(mesh_parameters={"dx": 0.02})
+    Wave_obj_exact.set_mesh(mesh_parameters={"dx": 0.05})
     Wave_obj_exact.set_initial_velocity_model(
-        expression="4.0 + 1.0 * tanh(10.0 * (0.5 - sqrt((z - 1.5) ** 2 + (x + 1.5) ** 2)))"
+        expression="4.0 + 1.0 * tanh(10.0 * (0.5 - sqrt((x - 1.5) ** 2 + (z + 1.5) ** 2)))",
+        output=True
     )
     Wave_obj_exact.forward_solve()
     rec_out_exact = Wave_obj_exact.receivers_output
 
     Wave_obj_guess = spyro.AcousticWave(dictionary=dictionary)
-    Wave_obj_guess.set_mesh(mesh_parameters={"dx": 0.02})
+    Wave_obj_guess.set_mesh(mesh_parameters={"dx": 0.05})
     Wave_obj_guess.set_initial_velocity_model(constant=4.0)
     Wave_obj_guess.forward_solve()
     rec_out_guess = Wave_obj_guess.receivers_output
 
     misfit = rec_out_exact - rec_out_guess
 
-    # Jm = functional(options, misfit)
-    # print("\n Cost functional at fixed point : " + str(Jm) + " \n ")
+    Jm = spyro.utils.compute_functional(Wave_obj_guess, misfit)
+    print(f"Cost functional : {Jm}")
 
     # # compute the gradient of the control (to be verified)
     # dJ = gradient(options, mesh, comm, vp_guess, receivers, p_guess, misfit)
@@ -135,6 +135,7 @@ def test_gradient():
     # # all errors less than 1 %
     # errors = np.array(errors)
     # assert (np.abs(errors) < 5.0).all()
+    print("END")
 
 
 if __name__ == "__main__":
