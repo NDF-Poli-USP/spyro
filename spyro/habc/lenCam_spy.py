@@ -197,23 +197,23 @@ def CalcFL(TipLay, Lx, Ly, fref, lmin, lref, Z, nexp, nz=5, crtCR=0):
     nz: Number of layer sizes calculated
     crtCR: Position in CRpos. Default: 0
     """
-    a = Z / fref  # print(a, Z,fref)
+    tol = 1e-3
+    a = Z / 3.37 # fref  # print(a, Z,fref) para 18 fref com fft = 4.8
     print(f"a = {a}")
     print(f"fref = {fref}")
     FLpos = []
     crtCR = min(crtCR, nz - 1)  # Position in CRpos. Default: 0
     print(f"lmin: {lmin}, lref: {lref}")
-    FLmin = 18.15 [m] / 1.68[km]  #0.1 * lmin / lref  # passar lmin da camada de agua
+    FLmin = 0.2 * lmin / lref # 18.75 [m] / 1.68[km]  #0.1 * lmin / lref  # passar lmin da camada de agua
     x = FLmin
     for i in range(1, nz + 1):
         x = calcZero(x, a, i)
-        xred = redFL(x, lmin, lref)
-        if i > 1 and xred == FLpos[i - 2]:
-            x = calcZero(xred, a, i)
-        FLpos += [redFL(x, lmin, lref)]
+        if i > 1 and x == FLpos[i - 2]:
+            x = calcZero(x*(1+tol), a, i)
+        FLpos += [x]
         print("********")
         print("Possible FL")
-        print(x, F(x, a))
+        print(x, F(x, a)) # fig 18 [0.2772544000000001, 0.3879248000000001, 0.43123300000000014, 0.5975390999999995, 0.6139344999999998]
     CRpos = np.array([round(abs(F(x, a, typ="CR")), 4) for x in FLpos])
     indCR = np.array([crtCR])
     indFL = np.where(np.array(FLpos) < 1)[0]

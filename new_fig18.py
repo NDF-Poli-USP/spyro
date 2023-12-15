@@ -39,12 +39,10 @@ def test_eikonal_values_fig18():
         "source_locations": [(-0.6, 4.8-1.68)],
         "frequency": 5.0,
         "delay": 1.5,
-        "receiver_locations": spyro.create_transect(
-            (-0.10, 0.1), (-0.10, 4.0), 20
-        ),
+        "receiver_locations": [(-0.6, 4.8-1.68)],
     }
 
-    # Simulate for 2.0 seconds.
+    # Simulate for 1.0 seconds.
     dictionary["time_axis"] = {
         "initial_time": 0.0,  # Initial time for event
         "final_time": 1.00,  # Final time for event
@@ -78,10 +76,11 @@ def test_eikonal_values_fig18():
     Wave_obj._get_initial_velocity_model()
 
     Wave_obj.c = Wave_obj.initial_velocity_model
-    Wave_obj.get_and_set_maximum_dt(fraction=0.2)
+    # Wave_obj.get_and_set_maximum_dt(fraction=0.5)
     Wave_obj.forward_solve()
 
     min_value = Wave_obj.noneikonal_minimum
+    rec_source = Wave_obj.receivers_output[:,0]
     paper_min = 0.58755
 
     # Testing minimum values
@@ -103,6 +102,9 @@ def test_eikonal_values_fig18():
     print("paper_z_min: ", paper_z_min)
     print(f"Passed the minimum point location test: {test_min_point}")
 
+    # Testing lengths of layer
+    
+
     assert all([test_min, test_min_point])
 
 
@@ -119,16 +121,14 @@ if __name__ == "__main__":
 # hmin = 18.75m (paper for FR=16)
 # 0.000000000000000000e+00	1.893750000000000000e+03	3.700000000000000178e+00	5.875518884462277356e+02
 # 1.556250000000000000e+03	0.000000000000000000e+00	2.899999999999999911e+00	7.726379453924002974e+02
+# 18.75
+# 1690.10
 
-# xloc[m] #yloc[m] #c[km/s] #eik[ms] 
-# Marmousi hmin = 12.5m
-# 9.200000000000000000e+03	1.687500000000000000e+03	3.500000000000000444e+00	1.122692634216587066e+03
-# 5.662500000000000000e+03	0.000000000000000000e+00	3.859560000000000102e+00	1.039170607108715558e+03
 
 # --ACU--
 # *INI
 # Options for F_L: [0.3196, 0.4616, 0.4972, 0.6747, 0.7102]
-# Elements for F_L: [9, 13, 14, 19, 20] 
+# Elements for F_L: [9, 13, 14, 19, 20]
 # *FIN
 # Options for F_L: [0.8878, 1.2429, 1.3494, 1.8821, 1.9531]
 # Elements for F_L: [25, 35, 38, 53, 55]

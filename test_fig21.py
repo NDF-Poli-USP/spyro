@@ -103,3 +103,11 @@ def test_marmousi_fig21():
 # Verificar valores das distancias como lref e velocidades
 if __name__ == "__main__":
     test_marmousi_fig21()
+
+# 0.2227, 0.3067, 0.3403, 0.4748 fref=3.37 lmin=12.5m
+# xloc[m] #yloc[m] #c[km/s] #eik[ms]
+# Marmousi hmin = 12.5m
+# 9.200000000000000000e+03	1.687500000000000000e+03	3.500000000000000444e+00	1.122692634216587066e+03
+# 5.662500000000000000e+03	0.000000000000000000e+00	3.859560000000000102e+00	1.039170607108715558e+03
+
+
