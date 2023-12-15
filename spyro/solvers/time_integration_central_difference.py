@@ -6,6 +6,7 @@ import numpy as np
 from ..io.basicio import parallel_print
 from . import helpers
 from .. import utils
+from ..habc import lenCam_spy
 
 
 def central_difference(Wave_object, source_id=0):
@@ -151,9 +152,14 @@ def central_difference(Wave_object, source_id=0):
     Wave_object.noneikonal_minimum = np.min([t_left, t_right, t_bottom])
     Wave_object.noneikonal_dof = noneikonal_dofs[np.argmin([t_left, t_right, t_bottom])]
     Wave_object.noneikonal_minimum_point = (function_z.dat.data[Wave_object.noneikonal_dof], function_x.dat.data[Wave_object.noneikonal_dof])
+    Wave_object.noneikonal_velocity = u_n.dat.data_ro_with_halos[Wave_object.noneikonal_dof]
     # Wave_object.noneikonal_minimum_point = eikonal_points[]
     helpers.display_progress(Wave_object.comm, t)
+    diameters = fire.CellDiameter(Wave_object.mesh)
+    Wave_object.h_min = fire.assemble(diameters * fire.dx)
 
+    fref, F_L, pad_length, lref = lenCam_spy.habc_size(Wave_object)
+    print(f"L ref = {lref}")
     usol_recv = helpers.fill(
         usol_recv, receivers.is_local, nt, receivers.number_of_points
     )
@@ -360,3 +366,5 @@ def central_difference_MMS(Wave_object, source_id=0):
     Wave_object.receivers_output = usol_recv
 
     return usol, usol_recv
+
+

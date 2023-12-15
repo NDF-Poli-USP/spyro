@@ -1,9 +1,9 @@
 import spyro
+import firedrake as fire
 import math
-from generate_velocity_model_from_paper import get_paper_velocity
 
 
-def test_eikonal_values_fig18():
+def test_eikonal_values_fig8():
     dictionary = {}
     dictionary["options"] = {
         "cell_type": "T",  # simplexes such as triangles or tetrahedra (T) or quadrilaterals (Q)
@@ -22,11 +22,9 @@ def test_eikonal_values_fig18():
     # domain and reserve the remaining 250 m for the Perfectly Matched Layer (PML) to absorb
     # outgoing waves on three sides (eg., -z, +-x sides) of the domain.
     dictionary["mesh"] = {
-        "Lz": 2.4,  # depth in km - always positive
-        "Lx": 4.8,  # width in km - always positive
+        "Lz": 1.0,  # depth in km - always positive
+        "Lx": 1.0,  # width in km - always positive
         "Ly": 0.0,  # thickness in km - always positive
-        "mesh_file": None,
-        "user_mesh": None,
         "mesh_type": "SeismicMesh",
     }
 
@@ -36,11 +34,11 @@ def test_eikonal_values_fig18():
     # This transect of receivers is created with the helper function `create_transect`.
     dictionary["acquisition"] = {
         "source_type": "ricker",
-        "source_locations": [(-0.6, 4.8-1.68)],
+        "source_locations": [(-0.5, 0.25)],
         "frequency": 5.0,
         "delay": 1.5,
         "receiver_locations": spyro.create_transect(
-            (-0.10, 0.1), (-0.10, 4.0), 20
+            (-0.10, 0.1), (-0.10, 0.9), 20
         ),
     }
 
@@ -56,33 +54,32 @@ def test_eikonal_values_fig18():
 
     dictionary["visualization"] = {
         "forward_output": True,
-        "forward_output_filename": "results/figeigteen_forward_output.pvd",
+        "forward_output_filename": "results/fd_forward_output.pvd",
         "fwi_velocity_model_output": False,
         "velocity_model_filename": None,
         "gradient_output": False,
         "gradient_filename": None,
-        "debug_output": True,
     }
 
     Wave_obj = spyro.AcousticWave(dictionary=dictionary)
 
-    cpw = 6.0
+    # Using SeismicMesh:
+    cpw = 5.0
     lba = 1.5 / 5.0
     edge_length = lba / cpw
     Wave_obj.set_mesh(mesh_parameters={"edge_length": edge_length})
-    V = Wave_obj.function_space
-    mesh = Wave_obj.mesh
-    c = get_paper_velocity(mesh, V)
+    cond = fire.conditional(Wave_obj.mesh_x < 0.5, 3.0, 1.5)
 
-    Wave_obj.set_initial_velocity_model(velocity_model_function=c)
+    # Rest of setup
+    Wave_obj.set_initial_velocity_model(conditional=cond)
     Wave_obj._get_initial_velocity_model()
 
     Wave_obj.c = Wave_obj.initial_velocity_model
-    Wave_obj.get_and_set_maximum_dt(fraction=0.2)
     Wave_obj.forward_solve()
 
     min_value = Wave_obj.noneikonal_minimum
-    paper_min = 0.58755
+
+    paper_min = 0.085
 
     # Testing minimum values
     test_min = math.isclose(min_value, paper_min, rel_tol=0.1)
@@ -92,8 +89,8 @@ def test_eikonal_values_fig18():
 
     # Testing minimum location
     z_min, x_min = Wave_obj.noneikonal_minimum_point
-    paper_z_min = -(2.4-1.925)
-    paper_x_min = 4.8
+    paper_z_min = -0.5
+    paper_x_min = 0.0
 
     test_z_min = math.isclose(z_min, paper_z_min, rel_tol=0.1)
     test_x_min = math.isclose(x_min, paper_x_min, rel_tol=0.1)
@@ -108,27 +105,4 @@ def test_eikonal_values_fig18():
 
 # Verificar valores das distancias como lref e velocidades
 if __name__ == "__main__":
-    test_eikonal_values_fig18()
-
-# xloc[m] #yloc[m] #c[km/s] #eik[ms]
-
-# hmin = 25m
-# 0.000000000000000000e+00	1.925000000000000000e+03	3.700000000000000178e+00	5.841707164493551545e+02
-# 1.550000000000000000e+03	0.000000000000000000e+00	2.899999999999999911e+00	7.776865120601910348e+02
-
-# hmin = 18.75m (paper for FR=16)
-# 0.000000000000000000e+00	1.893750000000000000e+03	3.700000000000000178e+00	5.875518884462277356e+02
-# 1.556250000000000000e+03	0.000000000000000000e+00	2.899999999999999911e+00	7.726379453924002974e+02
-
-# xloc[m] #yloc[m] #c[km/s] #eik[ms] 
-# Marmousi hmin = 12.5m
-# 9.200000000000000000e+03	1.687500000000000000e+03	3.500000000000000444e+00	1.122692634216587066e+03
-# 5.662500000000000000e+03	0.000000000000000000e+00	3.859560000000000102e+00	1.039170607108715558e+03
-
-# --ACU--
-# *INI
-# Options for F_L: [0.3196, 0.4616, 0.4972, 0.6747, 0.7102]
-# Elements for F_L: [9, 13, 14, 19, 20] 
-# *FIN
-# Options for F_L: [0.8878, 1.2429, 1.3494, 1.8821, 1.9531]
-# Elements for F_L: [25, 35, 38, 53, 55]
+    test_eikonal_values_fig8()

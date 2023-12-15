@@ -203,7 +203,7 @@ def CalcFL(TipLay, Lx, Ly, fref, lmin, lref, Z, nexp, nz=5, crtCR=0):
     FLpos = []
     crtCR = min(crtCR, nz - 1)  # Position in CRpos. Default: 0
     print(f"lmin: {lmin}, lref: {lref}")
-    FLmin = 2 * lmin / lref  # passar lmin da camada de agua
+    FLmin = 18.15 [m] / 1.68[km]  #0.1 * lmin / lref  # passar lmin da camada de agua
     x = FLmin
     for i in range(1, nz + 1):
         x = calcZero(x, a, i)
@@ -333,28 +333,34 @@ def habc_size(HABC):
     layers
     """
 
+    source_position = []
+    for source in HABC.source_locations:
+        z, x = source
+        source_position.append(np.asarray([z, x]))
+
     Lx = HABC.length_z
     Ly = HABC.length_x
-    posCrit = HABC.posCrit
-    source_position = HABC.source_position
-    f0 = HABC.reference_frequency
-    it_fwi = HABC.fwi_iteration
+    posCrit = HABC.noneikonal_minimum_point
+    f0 = HABC.frequency
+    # it_fwi = HABC.fwi_iteration
     lmin = HABC.h_min
-    dt = HABC.dt
-    Z = HABC.Z
-    nexp = HABC.nexp
+    # dt = HABC.dt
+    Z = 1/HABC.noneikonal_minimum
+    nexp = np.nan
 
     # Critical position for reference
     lref = detLref(posCrit, source_position)
     # Determining the reference frequency
-    fref = detFref(HABC.get_histPcrit(), f0, it_fwi, dt)
+    # fref = detFref(HABC.get_histPcrit(), f0, it_fwi, dt)
+    fref = f0
     HABC.reference_frequency = fref
 
     # Absorbing layer size
-    F_L, pml = CalcFL(HABC.layer_shape, Lx, Ly, fref, lmin, lref, Z, nexp)
+    F_L, pml = CalcFL("rectangular", Lx, Ly, fref, lmin, lref, Z, nexp)
 
     ###############
     # Remesh of the domain adding the distance "pml" according to the case
+
     ##############
 
     return fref, F_L, pml, lref

@@ -220,8 +220,8 @@ class HABC:
         self.posCrit = np.asarray([posCrit_x, posCrit_y])
         self.Z = Z
         self.cref = cref
-        print(f"1/Z = {1/Z}")
-        print(f"posCrit = {posCrit}")
+        print(f"1/Z = {1/Z}") #inverse of time
+        print(f"posCrit = {posCrit}") 
         print(f"cref = {cref}")
 
     def habc_size(self):
