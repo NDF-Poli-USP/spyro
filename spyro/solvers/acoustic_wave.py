@@ -27,10 +27,19 @@ class AcousticWave(Wave):
         --------
         None
         """
+        if self.function_space is None:
+            self.force_rebuild_function_space()
+    
         self._get_initial_velocity_model()
         self.c = self.initial_velocity_model
         self.matrix_building()
         self.wave_propagator()
+
+    def force_rebuild_function_space(self):
+        if self.mesh is None:
+            self.mesh = self.get_mesh()
+        self._build_function_space()
+        self._map_sources_and_receivers()
 
     def matrix_building(self):
         """Builds solver operators. Doesn't create mass matrices if
