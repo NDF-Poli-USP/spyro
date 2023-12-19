@@ -32,8 +32,8 @@ model["BCs"] = {
 }
 model["acquisition"] = {
     "source_type": "Ricker",
-    "num_sources": 40,
-    "source_pos": spyro.create_transect((-0.01, 1.0), (-0.01, 15.0), 40),
+    "num_sources": 1,
+    "source_pos": spyro.create_transect((-0.01, 1.0), (-0.01, 15.0), 1),
     "frequency": 5.0,
     "delay": 1.0,
     "num_receivers": 500,

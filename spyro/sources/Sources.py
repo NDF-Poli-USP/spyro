@@ -2,6 +2,7 @@ import math
 import numpy as np
 from scipy.signal import butter, filtfilt
 import spyro
+from firedrake import *
 
 
 class Sources(spyro.receivers.Receivers.Receivers):
@@ -108,6 +109,33 @@ class Sources(spyro.receivers.Receivers.Receivers):
                     tmp = rhs_forcing.dat.data_with_halos[0]  # noqa: F841
 
         return rhs_forcing
+
+    def apply_source_based_in_vom(self, wavelet):
+        """Applie source using VertexOnlyMesh (VOM).
+
+        Parameters
+        ----------
+        wavelet : float
+            Value of the wavelet at time t.
+
+        Returns
+        -------
+        firedrake.Function
+            The forcing function that models the wavelet source in the wave
+            equation.
+        """
+        vom = VertexOnlyMesh(self.mesh, self.receiver_locations,
+                             redundant=False)
+        f_vom = FunctionSpace(vom, "DG", 0)
+        f_vom_input_ordering = FunctionSpace(vom.input_ordering, "DG", 0)
+        f_point_data_input_ordering = Function(f_vom_input_ordering)
+        f_point_data_input_ordering.dat.data_wo[:] = wavelet
+        f_vom_wavelet = interpolate(f_point_data_input_ordering, f_vom)
+
+        I = Interpolator(TestFunction(self.space), f_vom)
+        f0 = I.interpolate(f_vom_wavelet, transpose=True)
+
+        return interpolate(f0, self.space)
 
 
 def timedependentSource(model, t, freq=None, amp=1, delay=1.5):
