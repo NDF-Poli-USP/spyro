@@ -8,7 +8,7 @@ set_log_level(ERROR)
 
 
 # @ensemble_forward
-def forward(model, mesh, comm, c, wavelet, source_num=0, fwi=False, **kwargs):
+def forward(model, mesh, comm, c, wavelet, source_number=0, fwi=False, **kwargs):
     """Secord-order in time fully-explicit scheme.
 
     Parameters
@@ -23,7 +23,7 @@ def forward(model, mesh, comm, c, wavelet, source_num=0, fwi=False, **kwargs):
         The velocity model interpolated onto the mesh.
     wavelet: array-like
         Time series data that's injected at the source location.
-    source_num: `int`, optional
+    source_number: `int`, optional
         The source number you wish to simulate
     fwi: `bool`, optional
         Whether this forward simulation is for FWI or not.
@@ -98,7 +98,7 @@ def forward(model, mesh, comm, c, wavelet, source_num=0, fwi=False, **kwargs):
         # cost function
         J = 0.0
     for step in range(nt):
-        f.assign(source.apply_source_based_in_vom(wavelet[step], source_num))
+        f.assign(source.apply_source_based_in_vom(1.0, source_number)*Constant(wavelet[step]))
         solver.solve()
         u_np1.assign(X)
         # receiver function

@@ -117,6 +117,8 @@ class Sources(spyro.receivers.Receivers.Receivers):
         ----------
         wavelet : float
             Value of the wavelet at time t.
+        source_number : int
+            The source number.
 
         Returns
         -------
