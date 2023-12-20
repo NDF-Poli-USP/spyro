@@ -110,7 +110,7 @@ class Sources(spyro.receivers.Receivers.Receivers):
 
         return rhs_forcing
 
-    def apply_source_based_in_vom(self, wavelet):
+    def apply_source_based_in_vom(self, wavelet, source_number):
         """Applie source using VertexOnlyMesh (VOM).
 
         Parameters
@@ -124,7 +124,7 @@ class Sources(spyro.receivers.Receivers.Receivers):
             The forcing function that models the wavelet source in the wave
             equation.
         """
-        vom = VertexOnlyMesh(self.mesh, self.receiver_locations,
+        vom = VertexOnlyMesh(self.mesh, [self.receiver_locations[source_number]],
                              redundant=False)
         f_vom = FunctionSpace(vom, "DG", 0)
         f_vom_input_ordering = FunctionSpace(vom.input_ordering, "DG", 0)

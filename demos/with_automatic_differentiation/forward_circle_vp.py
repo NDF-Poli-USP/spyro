@@ -1,5 +1,4 @@
 from firedrake import *
-from scipy.optimize import *
 import spyro
 import matplotlib.pyplot as plt
 import numpy as np
@@ -17,7 +16,7 @@ model["opts"] = {
 }
 
 model["parallelism"] = {
-    "type": "automatic",  # options: automatic (same number of cores for evey processor) or spatial
+    "type": "spatial",  # options: automatic (same number of cores for evey processor) or spatial
 }
 
 # Define the domain size without the ABL.
@@ -42,7 +41,7 @@ model["BCs"] = {
 
 model["acquisition"] = {
     "source_type": "Ricker",
-    "source_pos": [(0.7, 0.7)],
+    "source_pos": spyro.create_transect((0.2, 0.2), (0.2, 0.8), 1),
     "frequency": 10.0,
     "delay": 1.0,
     "receiver_locations": spyro.create_transect((0.9, 0.2), (0.9, 0.8), 10),
@@ -71,17 +70,10 @@ V = FunctionSpace(mesh, element)
 z, x = SpatialCoordinate(mesh)
 
 vp_exact = Function(V).interpolate(1.0 + 0.0 * x)
-source_position = model["acquisition"]["source_pos"] 
 wavelet = spyro.full_ricker_wavelet(
     dt=model["timeaxis"]["dt"],
     tf=model["timeaxis"]["tf"],
     freq=model["acquisition"]["frequency"],
 )
 
-source = spyro.Sources(model, mesh, V, comm)
-f = source.apply_source_based_in_vom(max(wavelet))
-outfile = File("output.pvd")
-outfile.write(f)
-
-
-# spyro.solvers.forward_AD(model, model, mesh, comm, vp_exact, excitations, wavelet, receivers, source_num=0)
+spyro.solvers.forward_AD(model, mesh, comm, vp_exact, wavelet, debug=True)
