@@ -1,78 +1,8 @@
 import numpy as np
 import matplotlib.pyplot as plt
+from firedrake import File
+import firedrake as fire
 import spyro
-
-
-def plot_shots(
-    Wave,
-    arr,
-    vmin=-1e-5,
-    vmax=1e-5,
-    file_format="pdf",
-    start_index=0,
-    end_index=0,
-):
-    """Plot a shot record and save the image to disk. Note that
-    this automatically will rename shots when ensmeble paralleism is
-    activated.
-    Parameters
-    ----------
-    model: `dictionary`
-        Contains model parameters and options.
-    comm:A Firedrake commmunicator
-        The communicator you get from calling spyro.utils.mpi_init()
-    arr: array-like
-        An array in which rows are intervals in time and columns are receivers
-    show: `boolean`, optional
-        Should the images appear on screen?
-    file_name: string, optional
-        The name of the saved image
-    vmin: float, optional
-        The minimum value to plot on the colorscale
-    vmax: float, optional
-        The maximum value to plot on the colorscale
-    file_format: string, optional
-        File format, pdf or png
-    start_index: integer, optional
-        The index of the first receiver to plot
-    end_index: integer, optional
-        The index of the last receiver to plot
-    Returns
-    -------
-    None
-    """
-
-    num_recvs = len(Wave.receiver_locations)
-
-    dt = Wave.dt
-    tf = Wave.final_time
-
-    file_name = "test"
-
-    nt = int(tf / dt) + 1  # number of timesteps
-
-    if end_index == 0:
-        end_index = num_recvs
-
-    x_rec = np.linspace(start_index, end_index, num_recvs)
-    t_rec = np.linspace(0.0, tf, nt)
-    X, Y = np.meshgrid(x_rec, t_rec)
-
-    cmap = plt.get_cmap("gray")
-    plt.contourf(X, Y, arr, cmap=cmap, vmin=vmin, vmax=vmax)
-    # savemat("test.mat", {"mydata": arr})
-    plt.xlabel("receiver number", fontsize=18)
-    plt.ylabel("time (s)", fontsize=18)
-    plt.xticks(fontsize=18)
-    plt.yticks(fontsize=18)
-    plt.xlim(start_index, end_index)
-    plt.ylim(tf, 0)
-    plt.subplots_adjust(left=0.18, right=0.95, bottom=0.14, top=0.95)
-    plt.savefig(file_name + "." + file_format, format=file_format)
-    # plt.axis("image")
-    plt.show()
-    plt.close()
-    return None
 
 
 dictionary = {}
@@ -148,65 +78,58 @@ def test_gradient():
 
     Wave_obj_guess = spyro.AcousticWave(dictionary=dictionary)
     Wave_obj_guess.set_mesh(mesh_parameters={"dx": 0.05})
-    Wave_obj_guess.set_initial_velocity_model(constant=4.0)
+    Wave_obj_guess.set_initial_velocity_model(constant=3.0)
     Wave_obj_guess.forward_solve()
+    forward_solution = Wave_obj_guess.forward_solution
     rec_out_guess = Wave_obj_guess.receivers_output
 
     misfit = rec_out_exact - rec_out_guess
+    misfit_old = np.load("misfit_old.npy")
 
-    Jm = spyro.utils.compute_functional(Wave_obj_guess, misfit)
+    Jm = spyro.utils.compute_functional(Wave_obj_guess, misfit_old)
     print(f"Cost functional : {Jm}")
 
-    # # compute the gradient of the control (to be verified)
-    # dJ = gradient(options, mesh, comm, vp_guess, receivers, p_guess, misfit)
+    # compute the gradient of the control (to be verified)
+    dJ = Wave_obj_guess.gradient_solve(misfit=misfit_old, forward_solution=forward_solution)
     # dJ.dat.data[:] = dJ.dat.data[:] * mask.dat.data[:]
-    # File("gradient.pvd").write(dJ)
+    File("gradient.pvd").write(dJ)
 
-    # steps = [1e-3, 1e-4, 1e-5]  # , 1e-6]  # step length
+    steps = [1e-3, 1e-4, 1e-5]  # step length
 
-    # delta_m = Function(V)  # model direction (random)
-    # delta_m.assign(dJ)
+    errors = []
+    for step in steps:
 
-    # # this deepcopy is important otherwise pertubations accumulate
-    # vp_original = vp_guess.copy(deepcopy=True)
+        Wave_obj_guess = spyro.AcousticWave(dictionary=dictionary)
+        Wave_obj_guess.set_mesh(mesh_parameters={"dx": 0.05})
+        Wave_obj_guess.set_initial_velocity_model(constant=3.0)
+        Wave_obj_guess.initial_velocity_model = Wave_obj_guess.initial_velocity_model + step*dJ
+        Wave_obj_guess.forward_solve()
+        forward_solution = Wave_obj_guess.forward_solution
+        rec_out_guess = Wave_obj_guess.receivers_output
 
-    # errors = []
-    # for step in steps:  # range(3):
-    #     # steps.append(step)
-    #     # perturb the model and calculate the functional (again)
-    #     # J(m + delta_m*h)
-    #     vp_guess = vp_original + step * delta_m
-    #     _, p_guess_recv = forward(
-    #         options,
-    #         mesh,
-    #         comm,
-    #         vp_guess,
-    #         sources,
-    #         wavelet,
-    #         receivers,
-    #     )
+        Jp = spyro.utils.compute_functional(Wave_obj_guess, rec_out_exact - rec_out_guess)
+        projnorm = fire.assemble(dJ * dJ * fire.dx(scheme=Wave_obj_guess.quadrature_rule))
+        fd_grad = (Jp - Jm) / step
+        print(
+            "\n Cost functional for step "
+            + str(step)
+            + " : "
+            + str(Jp)
+            + ", fd approx.: "
+            + str(fd_grad)
+            + ", grad'*dir : "
+            + str(projnorm)
+            + " \n ",
+        )
+        error = 100 * ((fd_grad - projnorm) / projnorm)
 
-    #     Jp = functional(options, p_exact_recv - p_guess_recv)
-    #     projnorm = assemble(mask * dJ * delta_m * dx(scheme=qr_x))
-    #     fd_grad = (Jp - Jm) / step
-    #     print(
-    #         "\n Cost functional for step "
-    #         + str(step)
-    #         + " : "
-    #         + str(Jp)
-    #         + ", fd approx.: "
-    #         + str(fd_grad)
-    #         + ", grad'*dir : "
-    #         + str(projnorm)
-    #         + " \n ",
-    #     )
+        errors.append(error)
+        print(f"Error : {error}")
+        # step /= 2
 
-    #     errors.append(100 * ((fd_grad - projnorm) / projnorm))
-    #     # step /= 2
-
-    # # all errors less than 1 %
-    # errors = np.array(errors)
-    # assert (np.abs(errors) < 5.0).all()
+    # all errors less than 1 %
+    errors = np.array(errors)
+    assert (np.abs(errors) < 5.0).all()
     print("END")
 
 

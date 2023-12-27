@@ -29,7 +29,7 @@ class AcousticWave(Wave):
         """
         if self.function_space is None:
             self.force_rebuild_function_space()
-    
+
         self._get_initial_velocity_model()
         self.c = self.initial_velocity_model
         self.matrix_building()
@@ -103,7 +103,7 @@ class AcousticWave(Wave):
 
         return usol, usol_recv
 
-    def gradient_solve(self, guess=None):
+    def gradient_solve(self, guess=None, misfit=None, forward_solution=None):
         """Solves the adjoint problem to calculate de gradient.
 
         Parameters:
@@ -117,6 +117,8 @@ class AcousticWave(Wave):
         dJ: Firedrake 'Function'
             Gradient of the cost functional.
         """
+        if misfit is not None:
+            self.misfit = misfit
         if self.real_shot_record is None:
             warnings.warn("Please load or calculate a real shot record first")
         if self.current_time == 0.0 and guess is not None:
@@ -126,11 +128,10 @@ class AcousticWave(Wave):
                      will do it for you now"
             )
             self.forward_solve()
-        self.misfit = self.real_shot_record - self.forward_solution_receivers
-        self.backward_wave_propagator()
+            self.misfit = self.real_shot_record - self.forward_solution_receivers
+        return self.backward_wave_propagator()
 
-    @ensemble_propagator
-    def backward_wave_propagator(self, dt=None, source_num=0):
+    def backward_wave_propagator(self, dt=None):
         """Propagates the adjoint wave backwards in time.
         Currently uses central differences.
 
@@ -153,14 +154,14 @@ class AcousticWave(Wave):
         if dt is not None:
             self.dt = dt
 
-        guess = self.guess
+        forward_solution = self.forward_solution
         receivers = self.receivers
         residual = self.misfit
         comm = self.comm
         temp_filename = self.forward_output_file
 
         filename, file_extension = temp_filename.split(".")
-        output_filename = filename + "sn" + str(source_id) + "." + file_extension
+        output_filename = "backward." + file_extension
 
         output = fire.File(output_filename, comm=comm.comm)
         comm.comm.barrier()
@@ -171,7 +172,7 @@ class AcousticWave(Wave):
         final_time = self.final_time
         dt = self.dt
         t = self.current_time
-        nt = int((final_time - t) / dt) + 1  # number of timesteps
+        nt = int((final_time - 0) / dt) + 1  # number of timesteps
 
         u_nm1 = self.u_nm1
         u_n = self.u_n
@@ -213,7 +214,7 @@ class AcousticWave(Wave):
 
         # assembly_callable = create_assembly_callable(rhs, tensor=B)
 
-        for step in range(nt - 1, -1, -1):
+        for step in range(nt-1, -1, -1):
             rhs_forcing.assign(0.0)
             B = fire.assemble(rhs, tensor=B)
             f = receivers.apply_receivers_as_source(rhs_forcing, residual, step)
@@ -229,12 +230,12 @@ class AcousticWave(Wave):
 
             if step % self.gradient_sampling_frequency == 0:
                 uuadj.assign(u_np1)
-                uufor.assign(guess.pop())
+                uufor.assign(forward_solution.pop())
 
                 grad_solver.solve()
                 dJ += gradi
 
-            if (step - 1) % self.output_frequency == 0:
+            if (step) % self.output_frequency == 0:
                 assert (
                     fire.norm(u_n) < 1
                 ), "Numerical instability. Try reducing dt or building the \
@@ -252,13 +253,4 @@ class AcousticWave(Wave):
         self.current_time = t
         helpers.display_progress(self.comm, t)
 
-        usol_recv = helpers.fill(
-            usol_recv, receivers.is_local, nt, receivers.number_of_points
-        )
-        usol_recv = utils.utils.communicate(usol_recv, comm)
-        self.receivers_output = usol_recv
-
-        self.forward_solution = usol
-        self.forward_solution_receivers = usol_recv
-
-        return gradient
+        return dJ
