@@ -5,6 +5,78 @@ import firedrake as fire
 import spyro
 
 
+def plot_shots(
+    num_recvs,
+    dt,
+    tf,
+    shots,
+    show=False,
+    file_name="1",
+    vmin=-1e-5,
+    vmax=1e-5,
+    file_format="pdf",
+    start_index=0,
+    end_index=0,
+):
+    """Plot a shot record and save the image to disk. Note that
+    this automatically will rename shots when ensmeble paralleism is
+    activated.
+    Parameters
+    ----------
+    model: `dictionary`
+        Contains model parameters and options.
+    comm:A Firedrake commmunicator
+        The communicator you get from calling spyro.utils.mpi_init()
+    arr: array-like
+        An array in which rows are intervals in time and columns are receivers
+    show: `boolean`, optional
+        Should the images appear on screen?
+    file_name: string, optional
+        The name of the saved image
+    vmin: float, optional
+        The minimum value to plot on the colorscale
+    vmax: float, optional
+        The maximum value to plot on the colorscale
+    file_format: string, optional
+        File format, pdf or png
+    start_index: integer, optional
+        The index of the first receiver to plot
+    end_index: integer, optional
+        The index of the last receiver to plot
+    Returns
+    -------
+    None
+    """
+
+    arr = shots
+
+    nt = int(tf / dt) + 1  # number of timesteps
+
+    if end_index == 0:
+        end_index = num_recvs
+
+    x_rec = np.linspace(start_index, end_index, num_recvs)
+    t_rec = np.linspace(0.0, tf, nt)
+    X, Y = np.meshgrid(x_rec, t_rec)
+
+    cmap = plt.get_cmap("gray")
+    plt.contourf(X, Y, arr, 700, cmap=cmap, vmin=vmin, vmax=vmax)
+    # savemat("test.mat", {"mydata": arr})
+    plt.xlabel("receiver number", fontsize=18)
+    plt.ylabel("time (s)", fontsize=18)
+    plt.xticks(fontsize=18)
+    plt.yticks(fontsize=18)
+    plt.xlim(start_index, end_index)
+    plt.ylim(tf, 0)
+    plt.subplots_adjust(left=0.18, right=0.95, bottom=0.14, top=0.95)
+    plt.savefig(file_name + "." + file_format, format=file_format)
+    # plt.axis("image")
+    if show:
+        plt.show()
+    plt.close()
+    return None
+
+
 dictionary = {}
 dictionary["options"] = {
     "cell_type": "T",  # simplexes such as triangles or tetrahedra (T) or quadrilaterals (Q)
@@ -40,7 +112,7 @@ dictionary["acquisition"] = {
     "frequency": 5.0,
     "delay": 1.5,
     "delay_type": "multiples_of_minimun",
-    "receiver_locations": spyro.create_transect((-2.9, 0.1), (-2.9, 2.9), 100),
+    "receiver_locations": spyro.create_transect((-2.0, 0.1), (-2.0, 2.9), 100),
 }
 
 # Simulate for 2.0 seconds.
@@ -66,6 +138,15 @@ dictionary["visualization"] = {
 
 
 def test_gradient():
+    # beginning of debugging variables
+    num_recvs = 100
+    dt = 0.001
+    tf = 1.0
+    show = True
+    vabs = 1e-2
+    timevector = np.linspace(0.0, tf, 1001)
+
+    # end of debugging variables
 
     Wave_obj_exact = spyro.AcousticWave(dictionary=dictionary)
     Wave_obj_exact.set_mesh(mesh_parameters={"dx": 0.05})
@@ -86,23 +167,28 @@ def test_gradient():
     misfit = rec_out_exact - rec_out_guess
     misfit_old = np.load("misfit_old.npy")
 
-    Jm = spyro.utils.compute_functional(Wave_obj_guess, misfit_old)
+    Jm = spyro.utils.compute_functional(Wave_obj_guess, misfit)
     print(f"Cost functional : {Jm}")
 
     # compute the gradient of the control (to be verified)
-    dJ = Wave_obj_guess.gradient_solve(misfit=misfit_old, forward_solution=forward_solution)
+    # plot_shots(num_recvs, dt, tf, misfit, show=show, vmin=-vabs, vmax=vabs, file_name="misfit_new")
+    # plot_shots(num_recvs, dt, tf, misfit_old, show=show, vmin=-vabs, vmax=vabs, file_name="misfit_old")
+    # plot_shots(num_recvs, dt, tf, misfit-misfit_old, show=show, vmin=-vabs, vmax=vabs, file_name="diff_misfit")
+    dJ = Wave_obj_guess.gradient_solve(misfit=misfit, forward_solution=forward_solution)
     # dJ.dat.data[:] = dJ.dat.data[:] * mask.dat.data[:]
     File("gradient.pvd").write(dJ)
 
-    steps = [1e-3, 1e-4, 1e-5]  # step length
+    steps = [1e-5, 1e-6, 1e-7]  # step length
 
     errors = []
+    c_guess = Wave_obj_guess.initial_velocity_model
     for step in steps:
 
-        Wave_obj_guess = spyro.AcousticWave(dictionary=dictionary)
-        Wave_obj_guess.set_mesh(mesh_parameters={"dx": 0.05})
-        Wave_obj_guess.set_initial_velocity_model(constant=3.0)
-        Wave_obj_guess.initial_velocity_model = Wave_obj_guess.initial_velocity_model + step*dJ
+        # Wave_obj_guess = spyro.AcousticWave(dictionary=dictionary)
+        # Wave_obj_guess.set_mesh(mesh_parameters={"dx": 0.05})
+        # Wave_obj_guess.set_initial_velocity_model(constant=3.0)
+        Wave_obj_guess.reset_pressure()
+        Wave_obj_guess.initial_velocity_model = c_guess + step*dJ
         Wave_obj_guess.forward_solve()
         forward_solution = Wave_obj_guess.forward_solution
         rec_out_guess = Wave_obj_guess.receivers_output

@@ -151,6 +151,7 @@ class AcousticWave(Wave):
         u_rec: numpy array
             Pressure wavefield at the receivers across the timesteps.
         """
+        self.reset_pressure()
         if dt is not None:
             self.dt = dt
 
@@ -175,9 +176,7 @@ class AcousticWave(Wave):
         nt = int((final_time - 0) / dt) + 1  # number of timesteps
 
         u_nm1 = self.u_nm1
-        u_nm1.assign(0.0)
         u_n = self.u_n
-        u_n.assign(0.0)
         u_np1 = fire.Function(self.function_space)
 
         rhs_forcing = fire.Function(self.function_space)
@@ -256,3 +255,7 @@ class AcousticWave(Wave):
         helpers.display_progress(self.comm, t)
 
         return dJ
+
+    def reset_pressure(self):
+        self.u_nm1.assign(0.0)
+        self.u_n.assign(0.0)  
