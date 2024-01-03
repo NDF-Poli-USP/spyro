@@ -1,5 +1,6 @@
 from firedrake import *
 import spyro
+from spyro.io import front_ensemble_run_forward
 import matplotlib.pyplot as plt
 import numpy as np
 
@@ -16,7 +17,10 @@ model["opts"] = {
 }
 
 model["parallelism"] = {
-    "type": "spatial",  # options: automatic (same number of cores for evey processor) or spatial
+    # options: shots_parallelism (same number of cores for every processor)
+    # or automatic (same number of cores for every processor) or
+    # or spatial.
+    "type": "none",
 }
 
 # Define the domain size without the ABL.
@@ -59,13 +63,16 @@ model["timeaxis"] = {
     "fspool": 1,  # how frequently to save solution to RAM
 }
 
-comm = spyro.utils.mpi_init(model)
-mesh = UnitSquareMesh(100, 100)  # to test FWI, mesh aligned with interface
+comm, spatial_comm = spyro.utils.mpi_init(model)
+if model["parallelism"]["type"] == "shots_parallelism":
+    # Only shots parallelism.
+    mesh = UnitSquareMesh(50, 50, comm=spatial_comm)
+else:
+    mesh = UnitSquareMesh(50, 50)
 
 element = spyro.domains.space.FE_method(
     mesh, model["opts"]["method"], model["opts"]["degree"]
 )
-
 V = FunctionSpace(mesh, element)
 
 
@@ -89,19 +96,48 @@ wavelet = spyro.full_ricker_wavelet(
     tf=model["timeaxis"]["tf"],
     freq=model["acquisition"]["frequency"],
 )
-
+# True acoustic velocity model
 vp_exact = make_vp_circle(plot_vp=True)
-if comm.comm.rank == 0:
+
+
+def run_forward(source_number):
+    """Execute a acoustic wave equation.
+
+    Parameters
+    ----------
+    source_number: `int`, optional
+        The source number defined by the user.
+
+    Notes
+    -----
+    The forward solver (`forward_AD`) is implemented in spyro using firedrake's
+    functions that can be annotated by the algorithimic differentiation (AD).
+    This is because spyro is capable of executing Full Waveform Inversion (FWI),
+    which needs the computation of the gradient of the objective function with
+    respect to the velocity model through (AD).
+    """
+    receiver_data = spyro.solvers.forward_AD(model, mesh, comm, vp_exact,
+                                             wavelet, debug=True,
+                                             source_number=source_number)
+    # --- Plot the receiver data --- #
+    data = []
+    for _, rec in enumerate(receiver_data):
+        data.append(rec.dat.data_ro[:])
+
+    spyro.plots.plot_shots(model, comm, data, vmax=1e-08, vmin=-1e-08)
+
+
+# Processor number.
+rank = comm.ensemble_comm.rank
+# Number of processors used in the simulation.
+size = comm.ensemble_comm.size
+if size == 1:
     for sn in range(len(model["acquisition"]["source_pos"])):
-        receiver_data = spyro.solvers.forward_AD(model, mesh, comm, vp_exact,
-                                                 wavelet, debug=True,
-                                                 source_number=sn)
-
-        # --- Plot the receiver data --- #
-        data = []
-        for _, rec in enumerate(receiver_data):
-            data.append(rec.dat.data_ro[:])
-
-        spyro.plots.plot_shots(model, comm, data, vmax=1e-08, vmin=-1e-08)
+        run_forward(sn)
+elif size == len(model["acquisition"]["source_pos"]):
+    # Only run the forward simulation for the source number that matches the
+    # processor number. 
+    run_forward(rank)
 else:
-    raise NotImplementedError("Only implemented for 1 processor")
+    raise NotImplementedError("`size` must be 1 or equal to `num_sources`."
+                              "Different values are not supported yet.")

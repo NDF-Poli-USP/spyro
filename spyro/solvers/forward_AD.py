@@ -7,7 +7,6 @@ from ..sources.Sources import Sources
 set_log_level(ERROR)
 
 
-# @ensemble_forward
 def forward(model, mesh, comm, c, wavelet, source_number=0, fwi=False, **kwargs):
     """Secord-order in time fully-explicit scheme.
 

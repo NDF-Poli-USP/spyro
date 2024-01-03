@@ -89,24 +89,37 @@ def mysize(COMM=COMM_SELF):
     return COMM.Get_size()
 
 
-def mpi_init(model):
+def mpi_init(model, spatial_core_parallelism=None):
     """Initialize computing environment"""
     # rank = myrank()
     # size = mysize()
-    available_cores = COMM_WORLD.size
-    if model["parallelism"]["type"] == "automatic":
-        num_cores_per_shot = available_cores / len(model["acquisition"]["source_pos"])
-        if available_cores % len(model["acquisition"]["source_pos"]) != 0:
+    if (
+        model["parallelism"]["type"] == "shots_parallelism"
+        or model["parallelism"]["type"] == "automatic"
+    ):
+        
+        num_cores_per_shot = COMM_WORLD.size / len(model["acquisition"]["source_pos"])
+        if COMM_WORLD.size % len(model["acquisition"]["source_pos"]) != 0:
             raise ValueError(
                 "Available cores cannot be divided between sources equally."
             )
     elif model["parallelism"]["type"] == "spatial":
-        num_cores_per_shot = available_cores
+        # Parallellism is only over spatial domain. No shots parallelism.
+        num_cores_per_shot = COMM_WORLD.size
     elif model["parallelism"]["type"] == "custom":
         raise ValueError("Custom parallelism not yet implemented")
+    elif model["parallelism"]["type"] == "none":
+        num_cores_per_shot = 1
 
+    if model["parallelism"]["type"] == "shots_parallelism":
+        # Parrallellism is over shots. No spatial parallelism.
+        spatial_comm = COMM_WORLD.Split(
+            COMM_WORLD.rank % len(model["acquisition"]["source_pos"])
+            )
+    else:
+        spatial_comm = None
     comm_ens = Ensemble(COMM_WORLD, num_cores_per_shot)
-    return comm_ens
+    return comm_ens, spatial_comm
 
 
 def communicate(array, my_ensemble):
@@ -136,6 +149,26 @@ def communicate(array, my_ensemble):
     # print(array_reduced,array)
     return array_reduced
 
+
+def communicate_receiver_vom(array, comm):
+    """Gather all coordinates from all ranks.
+
+    Parameters
+    ----------
+    array: numpy array
+        Array of data to gather across all ranks.
+    comm: Firedrake.comm
+        Firedrake ensemble communicator.
+
+    Returns
+    -------
+    array: numpy array
+        Array of data gathered across all ranks.
+    """
+    array = array.copy()
+    array = comm.allgather(array)
+    array = np.concatenate(array)
+    return array
 
 def analytical_solution_for_pressure_based_on_MMS(model, mesh, time):
     degree = model["opts"]["degree"]

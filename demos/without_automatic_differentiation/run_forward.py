@@ -47,7 +47,7 @@ model["timeaxis"] = {
     "nspool": 100,  # how frequently to output solution to pvds
     "fspool": 99999,  # how frequently to save solution to RAM
 }
-comm = spyro.utils.mpi_init(model)
+comm, _ = spyro.utils.mpi_init(model)
 mesh, V = spyro.io.read_mesh(model, comm)
 vp = spyro.io.interpolate(model, mesh, V, guess=False)
 sources = spyro.Sources(model, mesh, V, comm)

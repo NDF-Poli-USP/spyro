@@ -55,7 +55,7 @@ def test_mesh_generation_for_grid_calc():
     model = spyro.tools.create_model_for_grid_point_calculation(
         grid_point_calculator_parameters, degree_reference
     )
-    comm = spyro.utils.mpi_init(model)
+    comm, _ = spyro.utils.mpi_init(model)
     for G in Gs:
         model["mesh"]["meshfile"] = "meshes/2Dhomogeneous" + str(G) + ".msh"
         model = spyro.tools.generate_mesh(model, G, comm)

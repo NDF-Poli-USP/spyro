@@ -9,7 +9,6 @@ from .io import (
 from .io import (
     interpolate,
     ensemble_forward,
-    ensemble_forward_ad,
     ensemble_forward_elastic_waves,
     ensemble_gradient,
     ensemble_gradient_elastic_waves,
@@ -26,7 +25,6 @@ __all__ = [
     "read_mesh",
     "interpolate",
     "ensemble_forward",
-    "ensemble_forward_ad",
     "ensemble_forward_elastic_waves",
     "ensemble_gradient",
     "ensemble_gradient_elastic_waves",
