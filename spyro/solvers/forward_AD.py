@@ -7,7 +7,10 @@ from ..sources.Sources import Sources
 set_log_level(ERROR)
 
 
-def forward(model, mesh, comm, c, wavelet, source_number=0, fwi=False, **kwargs):
+def forward(
+            model, mesh, comm, c, wavelet, receiver_mesh, source_number=0,
+            fwi=False, **kwargs
+    ):
     """Secord-order in time fully-explicit scheme.
 
     Parameters
@@ -40,7 +43,6 @@ def forward(model, mesh, comm, c, wavelet, source_number=0, fwi=False, **kwargs)
     dt = model["timeaxis"]["dt"]
     tf = model["timeaxis"]["tf"]
     nspool = model["timeaxis"]["nspool"]
-    receiver_points = model["acquisition"]["receiver_locations"]
     nt = int(tf / dt)  # number of timesteps
     params = set_params(method, mesh)
     element = space.FE_method(mesh, method, degree)
@@ -84,20 +86,18 @@ def forward(model, mesh, comm, c, wavelet, source_number=0, fwi=False, **kwargs)
     usol_recv = []
     # Source object.
     source = Sources(model, mesh, V, comm)
-    # Receiver mesh.
-    vom = VertexOnlyMesh(mesh, receiver_points)
     # P0DG is the only function space you can make on a vertex-only mesh.
-    P0DG = FunctionSpace(vom, "DG", 0)
+    P0DG = FunctionSpace(receiver_mesh, "DG", 0)
     interpolator = Interpolator(u_np1, P0DG)
     if fwi:
         # Get the true receiver data.
         # In FWI, we need to calculate the objective function,
         # which requires the true receiver data.
-        true_receivers = kwargs.get("true_receiver")
+        true_receiver_data = kwargs.get("true_receiver_data")
         # cost function
         J = 0.0
     for step in range(nt):
-        f.assign(source.apply_source_based_in_vom(1.0, source_number)*Constant(wavelet[step]))
+        f.assign(source.apply_source_based_in_vom(wavelet[step]*100, source_number))
         solver.solve()
         u_np1.assign(X)
         # receiver function
@@ -105,7 +105,7 @@ def forward(model, mesh, comm, c, wavelet, source_number=0, fwi=False, **kwargs)
         interpolator.interpolate(output=receivers)
         usol_recv.append(receivers)
         if fwi:
-            J += compute_functional(receivers, true_receivers[step])
+            J += compute_functional(receivers, true_receiver_data[step], P0DG)
         if step % nspool == 0:
             assert (
                 norm(u_n) < 1
@@ -126,14 +126,14 @@ def forward(model, mesh, comm, c, wavelet, source_number=0, fwi=False, **kwargs)
         return usol_recv
 
 
-def compute_functional(guess_receivers, true_receivers):
+def compute_functional(guess_receivers, true_receiver_data, P0DG):
     """Compute the functional for FWI.
 
     Parameters
     ----------
     guess_receivers : firedrake.Function
         The receivers from the forward simulation.
-    true_receivers : firedrake.Function
+    true_receiver_data : firedrake.Function
         Supposed to be the receivers data from the true model.
 
     Returns
@@ -141,7 +141,8 @@ def compute_functional(guess_receivers, true_receivers):
     J : float
         The functional.
     """
-    misfit = guess_receivers - true_receivers
+    misfit = Function(P0DG)
+    misfit.assign(guess_receivers - true_receiver_data)
     J = 0.5 * assemble(inner(misfit, misfit) * dx)
     return J
 

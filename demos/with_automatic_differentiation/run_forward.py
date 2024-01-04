@@ -1,6 +1,5 @@
 from firedrake import *
 import spyro
-from spyro.io import front_ensemble_run_forward
 import matplotlib.pyplot as plt
 import numpy as np
 
@@ -17,10 +16,14 @@ model["opts"] = {
 }
 
 model["parallelism"] = {
-    # options: shots_parallelism (same number of cores for every processor)
-    # or automatic (same number of cores for every processor) or
-    # or spatial.
-    "type": "none",
+    # options:
+    # `shots_parallelism` (same number of cores for every processor. Apply only
+    # shots parallelism, i.e., the spatial domain is not parallelised.)
+    # `automatic` (same number of cores for every processor. Apply shots and
+    # spatial parallelism.)
+    # `spatial` (Only spatial parallelisation).
+    # `None` (No parallelisation).
+    "type": "shots_parallelism",
 }
 
 # Define the domain size without the ABL.
@@ -46,7 +49,7 @@ model["BCs"] = {
 model["acquisition"] = {
     "source_type": "Ricker",
     "source_pos": spyro.create_transect((0.2, 0.15), (0.8, 0.15), 3),
-    "frequency": 10.0,
+    "frequency": 7.0,
     "delay": 1.0,
     "receiver_locations": spyro.create_transect((0.2, 0.2), (0.8, 0.2), 10),
 }
@@ -70,6 +73,9 @@ if model["parallelism"]["type"] == "shots_parallelism":
 else:
     mesh = UnitSquareMesh(50, 50)
 
+# Receiver mesh.
+vom = VertexOnlyMesh(mesh, model["acquisition"]["receiver_locations"])
+
 element = spyro.domains.space.FE_method(
     mesh, model["opts"]["method"], model["opts"]["degree"]
 )
@@ -91,14 +97,6 @@ def make_vp_circle(vp_guess=False, plot_vp=False):
         outfile.write(vp)
     return vp
 
-wavelet = spyro.full_ricker_wavelet(
-    dt=model["timeaxis"]["dt"],
-    tf=model["timeaxis"]["tf"],
-    freq=model["acquisition"]["frequency"],
-)
-# True acoustic velocity model
-vp_exact = make_vp_circle(plot_vp=True)
-
 
 def run_forward(source_number):
     """Execute a acoustic wave equation.
@@ -117,15 +115,23 @@ def run_forward(source_number):
     respect to the velocity model through (AD).
     """
     receiver_data = spyro.solvers.forward_AD(model, mesh, comm, vp_exact,
-                                             wavelet, debug=True,
+                                             wavelet, vom, debug=True,
                                              source_number=source_number)
     # --- Plot the receiver data --- #
     data = []
     for _, rec in enumerate(receiver_data):
         data.append(rec.dat.data_ro[:])
-
     spyro.plots.plot_shots(model, comm, data, vmax=1e-08, vmin=-1e-08)
 
+
+# Rickers wavelet
+wavelet = spyro.full_ricker_wavelet(
+    dt=model["timeaxis"]["dt"],
+    tf=model["timeaxis"]["tf"],
+    freq=model["acquisition"]["frequency"],
+)
+# True acoustic velocity model
+vp_exact = make_vp_circle(plot_vp=True)
 
 # Processor number.
 rank = comm.ensemble_comm.rank
@@ -136,7 +142,7 @@ if size == 1:
         run_forward(sn)
 elif size == len(model["acquisition"]["source_pos"]):
     # Only run the forward simulation for the source number that matches the
-    # processor number. 
+    # processor number.
     run_forward(rank)
 else:
     raise NotImplementedError("`size` must be 1 or equal to `num_sources`."

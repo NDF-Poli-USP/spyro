@@ -108,7 +108,7 @@ def mpi_init(model, spatial_core_parallelism=None):
         num_cores_per_shot = COMM_WORLD.size
     elif model["parallelism"]["type"] == "custom":
         raise ValueError("Custom parallelism not yet implemented")
-    elif model["parallelism"]["type"] == "none":
+    else:
         num_cores_per_shot = 1
 
     if model["parallelism"]["type"] == "shots_parallelism":
