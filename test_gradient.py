@@ -1,8 +1,55 @@
 import numpy as np
 import matplotlib.pyplot as plt
+from copy import deepcopy
 from firedrake import File
 import firedrake as fire
 import spyro
+
+
+def compute_functional(Wave_object, residual):
+    """Compute the functional to be optimized.
+    Accepts the velocity optionally and uses
+    it if regularization is enabled
+    """
+    num_receivers = Wave_object.number_of_receivers
+    dt = Wave_object.dt
+    tf = Wave_object.final_time
+    # nt = int(tf / dt) + 1  # number of timesteps
+
+    # J = np.zeros((num_receivers))
+    # for ti in range(nt):
+    #     for rn in range(num_receivers):
+    #         first_integral[ti] += residual[ti][rn] ** 2
+    J = 0
+    for rn in range(num_receivers):
+        J += np.trapz(residual[:, rn] ** 2, dx=dt)
+
+    J *= 0.5
+
+    return J
+
+
+def compute_functional_partial_derivative(Wave_object, residual):
+    """Compute the functional to be optimized.
+    Accepts the velocity optionally and uses
+    it if regularization is enabled
+    """
+    num_receivers = Wave_object.number_of_receivers
+    dt = Wave_object.dt
+    tf = Wave_object.final_time
+    nt = int(tf / dt) + 1  # number of timesteps
+
+    # first_integral = np.zeros((nt))
+    # for ti in range(nt):
+    #     for rn in range(num_receivers):
+    #         first_integral[ti] += residual[ti][rn]
+
+    # J = np.trapz(first_integral, dx=dt)
+    J = 0
+    for rn in range(num_receivers):
+        J += np.trapz(residual[:, rn], dx=dt)
+
+    return J
 
 
 def plot_shots(
@@ -155,6 +202,7 @@ def test_gradient():
         output=True
     )
     Wave_obj_exact.forward_solve()
+    forward_solution_exact = Wave_obj_exact.forward_solution
     rec_out_exact = Wave_obj_exact.receivers_output
 
     Wave_obj_guess = spyro.AcousticWave(dictionary=dictionary)
@@ -162,52 +210,61 @@ def test_gradient():
     Wave_obj_guess.set_initial_velocity_model(constant=3.0)
     Wave_obj_guess.forward_solve()
     forward_solution = Wave_obj_guess.forward_solution
+    forward_solution_guess = deepcopy(forward_solution)
     rec_out_guess = Wave_obj_guess.receivers_output
 
     misfit = rec_out_exact - rec_out_guess
     misfit_old = np.load("misfit_old.npy")
 
-    Jm = spyro.utils.compute_functional(Wave_obj_guess, misfit)
+    Jm = compute_functional(Wave_obj_guess, misfit)
     print(f"Cost functional : {Jm}")
 
     # compute the gradient of the control (to be verified)
     # plot_shots(num_recvs, dt, tf, misfit, show=show, vmin=-vabs, vmax=vabs, file_name="misfit_new")
     # plot_shots(num_recvs, dt, tf, misfit_old, show=show, vmin=-vabs, vmax=vabs, file_name="misfit_old")
     # plot_shots(num_recvs, dt, tf, misfit-misfit_old, show=show, vmin=-vabs, vmax=vabs, file_name="diff_misfit")
-    dJ = Wave_obj_guess.gradient_solve(misfit=misfit, forward_solution=forward_solution)
+    dJ = Wave_obj_guess.gradient_solve(misfit=misfit, forward_solution=forward_solution_guess)
     # dJ.dat.data[:] = dJ.dat.data[:] * mask.dat.data[:]
     File("gradient.pvd").write(dJ)
+    gradient = dJ.dat.data[:]
 
-    steps = [1e-5, 1e-6, 1e-7]  # step length
+    steps = [1e-1, 1e-2, 1e-3]  # step length
 
     errors = []
-    c_guess = Wave_obj_guess.initial_velocity_model
+    # V_c = fire.FunctionSpace(Wave_obj_guess.mesh, "DG", 0)
+    V_c = Wave_obj_guess.function_space
+    c_guess = fire.Function(V_c)
+    c_guess.assign(3.0)
+    point_id = 650  # 1250
+
+    # c_guess = Wave_obj_guess.initial_velocity_model
+
     for step in steps:
 
-        # Wave_obj_guess = spyro.AcousticWave(dictionary=dictionary)
-        # Wave_obj_guess.set_mesh(mesh_parameters={"dx": 0.05})
-        # Wave_obj_guess.set_initial_velocity_model(constant=3.0)
         Wave_obj_guess.reset_pressure()
-        Wave_obj_guess.initial_velocity_model = c_guess + step*dJ
+        c_guess.dat.data[point_id] = c_guess.dat.data[point_id] + step
+        # c_guess.dat.data[point_index_1] = c_guess.dat.data[point_index_1] + step
+        # c_guess.dat.data[point_index_2] = c_guess.dat.data[point_index_2] + step
+        Wave_obj_guess.initial_velocity_model = c_guess
         Wave_obj_guess.forward_solve()
-        forward_solution = Wave_obj_guess.forward_solution
+        forward_solution_perturbed_guess = Wave_obj_guess.forward_solution
         rec_out_guess = Wave_obj_guess.receivers_output
 
-        Jp = spyro.utils.compute_functional(Wave_obj_guess, rec_out_exact - rec_out_guess)
-        projnorm = fire.assemble(dJ * dJ * fire.dx(scheme=Wave_obj_guess.quadrature_rule))
-        fd_grad = (Jp - Jm) / step
-        print(
-            "\n Cost functional for step "
-            + str(step)
-            + " : "
-            + str(Jp)
-            + ", fd approx.: "
-            + str(fd_grad)
-            + ", grad'*dir : "
-            + str(projnorm)
-            + " \n ",
-        )
-        error = 100 * ((fd_grad - projnorm) / projnorm)
+        Jp = compute_functional(Wave_obj_guess, rec_out_exact - rec_out_guess)
+        grad_point_fd = (Jp - Jm) / step
+
+        u_c = forward_solution_guess[-1].dat.data[point_id]
+        u_cnew = forward_solution_perturbed_guess[-1].dat.data[point_id]
+        dudc_point_fd = (u_cnew - u_c)/step
+        drJ = compute_functional_partial_derivative(Wave_obj_guess, rec_out_exact - rec_out_guess)
+        other_grad_point_fd = drJ*dudc_point_fd
+
+        grad_point = gradient[point_id]
+        # grad_point_1 = gradient.dat.data[point_index_1]
+        # grad_point_2 = gradient.dat.data[point_index_2]
+        # grad = (grad_point_0 + grad_point_1 + grad_point_2)/3
+
+        error = 100 * np.abs((grad_point_fd - grad_point) / grad_point)
 
         errors.append(error)
         print(f"Error : {error}")
