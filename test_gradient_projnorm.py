@@ -25,7 +25,6 @@ def compute_functional(Wave_object, residual):
         J += np.trapz(residual[:, rn] ** 2, dx=dt)
 
     J *= 0.5
-
     return J
 
 
@@ -129,7 +128,7 @@ dictionary["options"] = {
     "cell_type": "T",  # simplexes such as triangles or tetrahedra (T) or quadrilaterals (Q)
     "variant": "lumped",  # lumped, equispaced or DG, default is lumped
     "method": "MLT",  # (MLT/spectral_quadrilateral/DG_triangle/DG_quadrilateral) You can either specify a cell_type+variant or a method
-    "degree": 1,  # p order
+    "degree": 2,  # p order
     "dimension": 2,  # dimension
 }
 
@@ -159,7 +158,7 @@ dictionary["acquisition"] = {
     "frequency": 5.0,
     "delay": 1.5,
     "delay_type": "multiples_of_minimun",
-    "receiver_locations": spyro.create_transect((-2.0, 0.1), (-2.0, 2.9), 100),
+    "receiver_locations": spyro.create_transect((-2.0, 0.5), (-2.0, 2.5), 100),
 }
 
 # Simulate for 2.0 seconds.
@@ -228,43 +227,34 @@ def test_gradient():
     File("gradient.pvd").write(dJ)
     gradient = dJ.dat.data[:]
 
-    steps = [1e-1, 1e-2, 1e-3]  # step length
+    steps = [1e-3, 1e-4, 1e-5]  # step length
 
     errors = []
-    # V_c = fire.FunctionSpace(Wave_obj_guess.mesh, "DG", 0)
     V_c = Wave_obj_guess.function_space
-    c_guess = fire.Function(V_c)
-    c_guess.assign(3.0)
-    point_id = 650  # 1250
-
-    # c_guess = Wave_obj_guess.initial_velocity_model
+    dm = fire.Function(V_c)
+    dm.assign(dJ)
 
     for step in steps:
 
         Wave_obj_guess.reset_pressure()
-        c_guess.dat.data[point_id] = c_guess.dat.data[point_id] + step
-        # c_guess.dat.data[point_index_1] = c_guess.dat.data[point_index_1] + step
-        # c_guess.dat.data[point_index_2] = c_guess.dat.data[point_index_2] + step
+        c_guess = fire.Constant(3.0) + step*dm
         Wave_obj_guess.initial_velocity_model = c_guess
         Wave_obj_guess.forward_solve()
-        forward_solution_perturbed_guess = Wave_obj_guess.forward_solution
-        rec_out_guess = Wave_obj_guess.receivers_output
+        misfit_plusdm = rec_out_exact - Wave_obj_guess.receivers_output
+        J_plusdm = compute_functional(Wave_obj_guess, misfit_plusdm)
 
-        Jp = compute_functional(Wave_obj_guess, rec_out_exact - rec_out_guess)
-        grad_point_fd = (Jp - Jm) / step
+        # Wave_obj_guess.reset_pressure()
+        # c_guess = fire.Constant(3.0) - step*dm
+        # Wave_obj_guess.initial_velocity_model = c_guess
+        # Wave_obj_guess.forward_solve()
+        # misfit_minusdm = rec_out_exact - Wave_obj_guess.receivers_output
+        # J_minusdm = compute_functional(Wave_obj_guess, misfit_minusdm)
 
-        u_c = forward_solution_guess[-1].dat.data[point_id]
-        u_cnew = forward_solution_perturbed_guess[-1].dat.data[point_id]
-        dudc_point_fd = (u_cnew - u_c)/step
-        drJ = compute_functional_partial_derivative(Wave_obj_guess, rec_out_exact - rec_out_guess)
-        other_grad_point_fd = drJ*dudc_point_fd
+        # grad_fd = (J_plusdm - J_minusdm) / (2*step)
+        grad_fd = (J_plusdm - Jm) / (step)
+        projnorm = fire.assemble(dJ * dm * fire.dx(scheme=Wave_obj_guess.quadrature_rule))
 
-        grad_point = gradient[point_id]
-        # grad_point_1 = gradient.dat.data[point_index_1]
-        # grad_point_2 = gradient.dat.data[point_index_2]
-        # grad = (grad_point_0 + grad_point_1 + grad_point_2)/3
-
-        error = 100 * np.abs((grad_point_fd - grad_point) / grad_point)
+        error = 100 * ((grad_fd - projnorm) / projnorm)
 
         errors.append(error)
         print(f"Error : {error}")

@@ -197,7 +197,7 @@ class AcousticWave(Wave):
         uuadj = fire.Function(self.function_space)  # auxiliarly function for the gradient compt.
         uufor = fire.Function(self.function_space)  # auxiliarly function for the gradient compt.
 
-        ffG = 2.0 * self.c * fire.dot(fire.grad(uuadj), fire.grad(uufor)) * m_v * fire.dx(scheme=self.quadrature_rule)
+        ffG = 2.0 * (1 / self.c) * fire.dot(fire.grad(uuadj), fire.grad(uufor)) * m_v * fire.dx(scheme=self.quadrature_rule)
 
         G = mgrad - ffG
         lhsG, rhsG = fire.lhs(G), fire.rhs(G)
@@ -233,8 +233,11 @@ class AcousticWave(Wave):
                 uuadj.assign(u_np1)
                 uufor.assign(forward_solution.pop())
 
-                grad_solver.solve()
-                dJ += gradi
+                num_gradi = 2.0 * (1 / self.c) * fire.dot(fire.grad(uuadj), fire.grad(uufor))* fire.dx(scheme=self.quadrature_rule)
+                if step == nt-1 or step == 0:
+                    dJ += gradi
+                else:
+                    dJ += 2*gradi
 
             if (step) % self.output_frequency == 0:
                 assert (
@@ -254,8 +257,9 @@ class AcousticWave(Wave):
         self.current_time = t
         helpers.display_progress(self.comm, t)
 
+        dJ.dat.data_with_halos[:] *= (dt/2)
         return dJ
 
     def reset_pressure(self):
         self.u_nm1.assign(0.0)
-        self.u_n.assign(0.0)  
+        self.u_n.assign(0.0)
