@@ -8,6 +8,7 @@ import math
 import h5py
 import sys
 import time
+import matplotlib.pyplot as plt
 
 # make vp {{{
 def _make_vp(V, vp_model=1, field="velocity_model"):
@@ -68,11 +69,12 @@ Tx = 0
 Tz = 0
 model_name = ""
 lamb = 0
-adapt_mesh = 0
-run_ref = 1
+adapt_mesh = 1
+run_ref = 0
 use_Neumann_BC_as_source = False
 print_vtk = True
 use_DG0 = False 
+CHECK_MESH_QUALITY = 1 # if 1, check the mesh quality and exit before running
 
 if case==1: # Marmousi model, structured mesh {{{
     method = "CG" 
@@ -331,6 +333,7 @@ if case==13: # Marmousi model, unstructured mesh, from gmsh with non-uniform res
         mesh.clear_spatial_index()
     else:
         mesh = Mesh('./meshes/marmousi_mesh_for_moving_mesh_paper.msh')
+        #mesh = Mesh('./meshes/marmousi_mesh_for_moving_mesh_paper_nonuniform_level_4.msh') # FIXME testing it
 
     element = spyro.domains.space.FE_method(mesh, method, degree)
     V = FunctionSpace(mesh, element)
@@ -528,6 +531,48 @@ File("vp_after_amr_"+model_name+".pvd").write(_vp)
 #sys.exit("exit")
 #}}}
 
+if CHECK_MESH_QUALITY==1: # {{{
+    mesh_quality = spyro.calculate_mesh_quality(mesh)
+
+    AMR = adapt_mesh
+    if AMR==0:
+        MFUNC=0
+    else:
+        MFUNC=3
+
+    mq_path = "/home/santos/spyro/paper_moving_mesh/mesh_quality/"
+    if case==13:
+        simple_model_name = "marmousi"
+        QUAD = 0
+    elif case==5:
+        simple_model_name = "seam"
+        QUAD = 1
+
+    mq_file = mq_path + simple_model_name + "_QUAD=" + str(QUAD) + "_AMR=" + str(AMR) + "_M=" + str(MFUNC) + ".npy"
+    with open(mq_file, 'wb') as f:
+        np.save(f, mesh_quality)
+
+    with open(mq_file, 'rb') as f:
+        mesh_quality = np.load(f) 
+
+    bins = [0.1,0.2,0.3,0.4,0.5,0.6,0.7,0.8,0.9,1.0]
+    plt.hist(mesh_quality, bins, color='#0504aa',
+                                alpha=0.7, rwidth=0.85, label="x")
+
+    plt.grid(axis='y', alpha=0.75)
+    plt.xlabel('Value')
+    plt.ylabel('Frequency')
+    plt.title('My Very Own Histogram')
+    plt.text(23, 45, r'$\mu=15, b=3$')
+    plt.show()
+
+    print("min mesh quality = " + str(min(mesh_quality)))
+    print("average mesh quality = " + str(np.mean(mesh_quality)))
+
+    #print(mesh_quality)
+    sys.exit("exit")
+#}}}
+
 # code to run the forward model (acoustic waves) {{{
 
 # define the model parameters {{{
@@ -535,11 +580,11 @@ model = {}
 
 model["opts"] = {
     ## for Marmousi ##
-    #"method": "KMV",  # either CG or KMV or spectral
-    #"quadrature": "KMV", # Equi or KMV #FIXME it will be removed
+    "method": "KMV",  # either CG or KMV or spectral
+    "quadrature": "KMV", # Equi or KMV #FIXME it will be removed
     ## for SEAM ##
-    "method": "CG",
-    "quadrature": "GLL",
+    #"method": "CG",
+    #"quadrature": "GLL",
     "degree": 4,
     "dimension": 2,  # dimension
     "regularization": False,  # regularization is on?
