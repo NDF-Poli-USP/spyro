@@ -119,17 +119,24 @@ def _make_vp(V):
 
 # controls
 FIREMESH = 1    # keep it 1
-AMR = 1         # should adapt the mesh?
+AMR = 0         # should adapt the mesh?
 GUESS = 1       # if 1, run the guess model; otherwise (=0), read results
 REF = 0         # if 1, run the reference model; otherwise (=0), read results
-QUAD = 1        # if 1, run with quadrilateral elements; otherwise (=0), run with triangles
+QUAD = 0        # if 1, run with quadrilateral elements; otherwise (=0), run with triangles
 DG_VP = 1       # if 1, vp is defined on a Discontinuous space (L2 instead of an H1 space)
 CONST_VP = 0    # if 1, run with a uniform vp = 2 km/s (it is employed to check convergence rate and wheter adapted mesh introduces errors)
 PLOT_AT_REC = 1 # if 1, plot the pressure over time at one receiver
 MFUNC = 1       # if 1, M1; if 2, M2; if 3, M3 (default is M3, therefore MFUNC = 3)
+CHECK_MESH_QUALITY = 1 # if 1, check the mesh quality and exit before running
 print_vtk = False
 use_Neumann_BC_as_source = False 
 
+if CHECK_MESH_QUALITY==1:
+    # run in serial only
+    model["acquisition"]["num_sources"] = 1
+    model["acquisition"]["source_pos"] = spyro.create_transect((0.1, 0.9), (0.9, 0.9), 1)
+    REF = -1
+    
 comm = spyro.utils.mpi_init(model)
 distribution_parameters={"partition": True,
                          "overlap_type": (DistributedMeshOverlapType.VERTEX, 60)} # FIXME if "at" will be the default scheme, then we could remove overlap
@@ -138,7 +145,8 @@ distribution_parameters={"partition": True,
 file_name = "p_ref_p5_recv_freq_"+str(model["acquisition"]["frequency"]) # with P=5
 if platform.node()=='recruta':
     path = ""
-    sys.exit("path not defined")
+    if CHECK_MESH_QUALITY==0:
+        sys.exit("path not defined")
 else:
     #path = "/share/tdsantos/shots/acoustic_forward_camembert_6Hz/" 
     #path = "/share/tdsantos/shots/acoustic_forward_camembert_10Hz/" 
@@ -146,7 +154,7 @@ else:
     path = "/share/tdsantos/shots/acoustic_forward_camembert_15Hz_4_sources/" 
 
 # run reference model {{{
-if REF:
+if REF==1:
     sys.exit("exit")
     _nx = 100  # nx=100  => dx = dz = 10 m
     _ny = math.ceil( _nx*model["mesh"]["Lz"]/model["mesh"]["Lx"] ) # nx * Lz/Lx, Delta x = Delta z
@@ -442,6 +450,47 @@ if AMR==1 and GUESS==1:
     File("vp_after_amr.pvd").write(_vp)
 #}}}
 #sys.exit("exit")
+
+if CHECK_MESH_QUALITY==1: # {{{
+    mesh_quality = spyro.calculate_mesh_quality(mesh)
+ 
+    if AMR==0:
+        MFUNC=0
+
+    mq_path = "/home/santos/spyro/paper_moving_mesh/mesh_quality/"
+    mq_file = mq_path + "camembert_model" + "_QUAD=" + str(QUAD) + "_AMR=" + str(AMR) + "_M=" + str(MFUNC) + ".npy" 
+    with open(mq_file, 'wb') as f:
+        np.save(f, mesh_quality)
+
+    with open(mq_file, 'rb') as f:
+        mesh_quality = np.load(f)
+    
+
+    bins = [0.1,0.2,0.3,0.4,0.5,0.6,0.7,0.8,0.9,1.0]
+
+    plt.hist(mesh_quality, bins, color='#0504aa',
+                                alpha=0.7, rwidth=0.85, label="x") 
+    
+    plt.hist(mesh_quality, bins, color='#0504aa',
+                                alpha=0.7, rwidth=0.85, label="y") 
+    
+    plt.grid(axis='y', alpha=0.75)
+    plt.xlabel('Value')
+    plt.ylabel('Frequency')
+    plt.title('My Very Own Histogram')
+    plt.text(23, 45, r'$\mu=15, b=3$')
+    #maxfreq = n.max()
+
+    #plt.ylim(ymax=np.ceil(maxfreq / 10) * 10 if maxfreq % 10 else maxfreq + 10)
+
+    plt.show()
+
+    print("min mesh quality = " + str(min(mesh_quality)))
+    print("average mesh quality = " + str(np.mean(mesh_quality)))
+
+    #print(mesh_quality)
+    sys.exit("exit")
+#}}}
 
 # set the file name
 h = round(1000*model["mesh"]["Lx"]/nx)
