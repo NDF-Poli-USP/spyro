@@ -33,6 +33,51 @@ def error_calc_other(p_numerical, p_analytical, nt):
     return div_error_time
 
 
+def error_calc_single(receivers, analytical, dt):
+    """
+    Calculates the error between the numerical and analytical solutions.
+
+    Parameters
+    ----------
+    receivers : np.ndarray
+        the numerical solution to be evaluated
+    analytical : np.ndarray
+        the analytical or reference solution
+    dt : float
+        the time-step used in the numerical solution
+
+    Returns
+    -------
+    error : float
+        the error between the numerical and analytical solutions
+    """
+    rec_len, = np.shape(receivers)
+
+    # Interpolate analytical solution into numerical dts
+    final_time = dt * (rec_len - 1)
+    time_vector_rec = np.linspace(0.0, final_time, rec_len)
+    time_vector_ana = np.linspace(0.0, final_time, len(analytical))
+    ana = np.zeros(np.shape(receivers))
+    ana = np.interp(
+        time_vector_rec, time_vector_ana, analytical
+    )
+
+    total_numerator = 0.0
+    total_denumenator = 0.0
+    diff = receivers - ana
+    diff_squared = np.power(diff, 2)
+    numerator = np.trapz(diff_squared, dx=dt)
+    ref_squared = np.power(ana, 2)
+    denominator = np.trapz(ref_squared, dx=dt)
+    total_numerator += numerator
+    total_denumenator += denominator
+
+    squared_error = total_numerator / total_denumenator
+
+    error = np.sqrt(squared_error)
+    return error
+
+
 def error_calc(receivers, analytical, dt):
     """
     Calculates the error between the numerical and analytical solutions.
@@ -218,8 +263,8 @@ dictionary["parallelism"] = {
 # domain and reserve the remaining 250 m for the Perfectly Matched Layer (PML) to absorb
 # outgoing waves on three sides (eg., -z, +-x sides) of the domain.
 dictionary["mesh"] = {
-    "Lz": 3.0,  # depth in km - always positive   # Como ver isso sem ler a malha?
-    "Lx": 3.0,  # width in km - always positive
+    "Lz": 5.0,  # depth in km - always positive   # Como ver isso sem ler a malha?
+    "Lx": 5.0,  # width in km - always positive
     "Ly": 0.0,  # thickness in km - always positive
     "mesh_file": None,
     "mesh_type": "firedrake_mesh",
@@ -230,12 +275,14 @@ dictionary["mesh"] = {
 # This transect of receivers is created with the helper function `create_transect`.
 dictionary["acquisition"] = {
     "source_type": "ricker",
-    "source_locations": [(-0.5, 1.5)],
+    "source_locations": [(-1.5, 2.5)],
     "frequency": 5.0,
-    "delay": 0.553002223869533-0.3565,
-    "delay_type": "time",
+    # "delay": 0.553002223869533-0.3565,
+    # "delay_type": "time",
+    "delay": 1.5,
+    "delay_type": "multiples_of_minimun",
     # "receiver_locations": spyro.create_transect((-2.0, 0.5), (-2.0, 2.5), 100),
-    "receiver_locations": [(-1.0, 1.5) , (-1.3, 1.5), (-2.0, 1.5), (-2.5, 1.5), (-0.5, 1.0), (-0.5, 1.5)]
+    "receiver_locations": [(-2.0, 2.5) , (-2.3, 2.5), (-3.0, 2.5), (-3.5, 2.5), (-1.5, 2.0), (-1.5, 2.5)],
 }
 
 # Simulate for 2.0 seconds.
@@ -269,11 +316,7 @@ def test_gradient():
     vabs = 1e-2
     timevector = np.linspace(0.0, tf, 4001)
 
-    devito_r0 = np.load("devito_r0.npy")
-    devito_r1 = np.load("devito_r1.npy")
-    devito_r2 = np.load("devito_r2.npy")
-    dev_nt, = np.shape(devito_r0)
-    devito_timevector = np.linspace(0.0, tf, dev_nt)
+    old_spyro_receivers = np.load("old_spyro_shot_record.npy")
     # end of debugging variables
 
     Wave_obj_exact = spyro.AcousticWave(dictionary=dictionary)
@@ -282,7 +325,7 @@ def test_gradient():
     #     expression="4.0 + 1.0 * tanh(10.0 * (0.5 - sqrt((x - 1.5) ** 2 + (z + 1.5) ** 2)))",
     #     output=True
     # )
-    cond = fire.conditional(Wave_obj_exact.mesh_z > -1.5, 1.5, 3.5)
+    cond = fire.conditional(Wave_obj_exact.mesh_z > -2.5, 1.5, 3.5)
     Wave_obj_exact.set_initial_velocity_model(
         conditional=cond,
         output=True
@@ -290,6 +333,18 @@ def test_gradient():
     Wave_obj_exact.forward_solve()
     forward_solution_exact = Wave_obj_exact.forward_solution
     rec_out_exact = Wave_obj_exact.receivers_output
+
+    # Saving figures
+    # 0
+    for i in range(4):
+        title = "Receiver "+str(i)
+        figname = "old_spyro_test"+str(i)+".png"
+        plt.plot(timevector, rec_out_exact[:, i], label="New")
+        plt.plot(timevector, old_spyro_receivers[:, i])
+        plt.legend()
+        plt.title(title)
+        plt.savefig(figname)
+        plt.close()
 
     # old_rec_out_exact = np.load("old_real_model_receivers.npy")
     # diff = error_calc(old_rec_out_exact, rec_out_exact, dt)
