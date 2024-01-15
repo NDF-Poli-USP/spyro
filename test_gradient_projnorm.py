@@ -6,6 +6,80 @@ import firedrake as fire
 import spyro
 
 
+def calc_error_distribution(
+        p_numerical_rec, p_analytical_rec,
+        savefig=True,
+        fname="error_distribution.png"
+    ):
+    rec_len, num_rec = np.shape(p_numerical_rec)
+    errors = []
+    for i in range(num_rec):
+        error = error_calc_other(
+            p_numerical_rec[:, i],
+            p_analytical_rec[:, i],
+            rec_len
+        )
+        errors.append(error)
+    plt.close()
+    plt.plot(range(num_rec), errors)
+    if savefig is True:
+        plt.savefig(fname)
+
+
+def error_calc_other(p_numerical, p_analytical, nt):
+    norm = np.linalg.norm(p_numerical, 2) / np.sqrt(nt)
+    error_time = np.linalg.norm(p_analytical - p_numerical, 2) / np.sqrt(nt)
+    div_error_time = error_time / norm
+    return div_error_time
+
+
+def error_calc(receivers, analytical, dt):
+    """
+    Calculates the error between the numerical and analytical solutions.
+
+    Parameters
+    ----------
+    receivers : np.ndarray
+        the numerical solution to be evaluated
+    analytical : np.ndarray
+        the analytical or reference solution
+    dt : float
+        the time-step used in the numerical solution
+
+    Returns
+    -------
+    error : float
+        the error between the numerical and analytical solutions
+    """
+    rec_len, num_rec = np.shape(receivers)
+
+    # Interpolate analytical solution into numerical dts
+    final_time = dt * (rec_len - 1)
+    time_vector_rec = np.linspace(0.0, final_time, rec_len)
+    time_vector_ana = np.linspace(0.0, final_time, len(analytical[:, 0]))
+    ana = np.zeros(np.shape(receivers))
+    for i in range(num_rec):
+        ana[:, i] = np.interp(
+            time_vector_rec, time_vector_ana, analytical[:, i]
+        )
+
+    total_numerator = 0.0
+    total_denumenator = 0.0
+    for i in range(num_rec):
+        diff = receivers[:, i] - ana[:, i]
+        diff_squared = np.power(diff, 2)
+        numerator = np.trapz(diff_squared, dx=dt)
+        ref_squared = np.power(ana[:, i], 2)
+        denominator = np.trapz(ref_squared, dx=dt)
+        total_numerator += numerator
+        total_denumenator += denominator
+
+    squared_error = total_numerator / total_denumenator
+
+    error = np.sqrt(squared_error)
+    return error
+
+
 def compute_functional(Wave_object, residual):
     """Compute the functional to be optimized.
     Accepts the velocity optionally and uses
@@ -123,12 +197,14 @@ def plot_shots(
     return None
 
 
+final_time = 2.0
+
 dictionary = {}
 dictionary["options"] = {
     "cell_type": "T",  # simplexes such as triangles or tetrahedra (T) or quadrilaterals (Q)
     "variant": "lumped",  # lumped, equispaced or DG, default is lumped
     "method": "MLT",  # (MLT/spectral_quadrilateral/DG_triangle/DG_quadrilateral) You can either specify a cell_type+variant or a method
-    "degree": 2,  # p order
+    "degree": 4,  # p order
     "dimension": 2,  # dimension
 }
 
@@ -156,16 +232,17 @@ dictionary["acquisition"] = {
     "source_type": "ricker",
     "source_locations": [(-0.5, 1.5)],
     "frequency": 5.0,
-    "delay": 1.5,
-    "delay_type": "multiples_of_minimun",
-    "receiver_locations": spyro.create_transect((-2.0, 0.5), (-2.0, 2.5), 100),
+    "delay": 0.553002223869533-0.3565,
+    "delay_type": "time",
+    # "receiver_locations": spyro.create_transect((-2.0, 0.5), (-2.0, 2.5), 100),
+    "receiver_locations": [(-1.0, 1.5) , (-1.3, 1.5), (-2.0, 1.5), (-2.5, 1.5), (-0.5, 1.0), (-0.5, 1.5)]
 }
 
 # Simulate for 2.0 seconds.
 dictionary["time_axis"] = {
     "initial_time": 0.0,  # Initial time for event
-    "final_time": 1.00,  # Final time for event
-    "dt": 0.001,  # timestep size
+    "final_time": final_time,  # Final time for event
+    "dt": 0.0005,  # timestep size
     "amplitude": 1,  # the Ricker has an amplitude of 1.
     "output_frequency": 100,  # how frequently to output solution to pvds - Perguntar Daiane ''post_processing_frequnecy'
     "gradient_sampling_frequency": 1,  # how frequently to save solution to RAM    - Perguntar Daiane 'gradient_sampling_frequency'
@@ -186,23 +263,38 @@ dictionary["visualization"] = {
 def test_gradient():
     # beginning of debugging variables
     num_recvs = 100
-    dt = 0.001
-    tf = 1.0
+    dt = 0.0005
+    tf = final_time
     show = True
     vabs = 1e-2
-    timevector = np.linspace(0.0, tf, 1001)
+    timevector = np.linspace(0.0, tf, 4001)
 
+    devito_r0 = np.load("devito_r0.npy")
+    devito_r1 = np.load("devito_r1.npy")
+    devito_r2 = np.load("devito_r2.npy")
+    dev_nt, = np.shape(devito_r0)
+    devito_timevector = np.linspace(0.0, tf, dev_nt)
     # end of debugging variables
 
     Wave_obj_exact = spyro.AcousticWave(dictionary=dictionary)
     Wave_obj_exact.set_mesh(mesh_parameters={"dx": 0.05})
+    # Wave_obj_exact.set_initial_velocity_model(
+    #     expression="4.0 + 1.0 * tanh(10.0 * (0.5 - sqrt((x - 1.5) ** 2 + (z + 1.5) ** 2)))",
+    #     output=True
+    # )
+    cond = fire.conditional(Wave_obj_exact.mesh_z > -1.5, 1.5, 3.5)
     Wave_obj_exact.set_initial_velocity_model(
-        expression="4.0 + 1.0 * tanh(10.0 * (0.5 - sqrt((x - 1.5) ** 2 + (z + 1.5) ** 2)))",
+        conditional=cond,
         output=True
     )
     Wave_obj_exact.forward_solve()
     forward_solution_exact = Wave_obj_exact.forward_solution
     rec_out_exact = Wave_obj_exact.receivers_output
+
+    # old_rec_out_exact = np.load("old_real_model_receivers.npy")
+    # diff = error_calc(old_rec_out_exact, rec_out_exact, dt)
+    # print(f"Difference with old propagation Real = {diff}")
+    # calc_error_distribution(rec_out_exact, old_rec_out_exact, fname="real_error_dist.png")
 
     Wave_obj_guess = spyro.AcousticWave(dictionary=dictionary)
     Wave_obj_guess.set_mesh(mesh_parameters={"dx": 0.05})
@@ -212,8 +304,14 @@ def test_gradient():
     forward_solution_guess = deepcopy(forward_solution)
     rec_out_guess = Wave_obj_guess.receivers_output
 
+    old_rec_out_guess = np.load("old_guess_model_receivers.npy")
+    diff = error_calc(old_rec_out_guess, rec_out_guess, dt)
+    print(f"Difference with old propagation Guess= {diff}")
+    calc_error_distribution(rec_out_guess, old_rec_out_guess, fname="guess_error_dist.png")
+
+
     misfit = rec_out_exact - rec_out_guess
-    misfit_old = np.load("misfit_old.npy")
+    # misfit_old = np.load("misfit_old.npy")
 
     Jm = compute_functional(Wave_obj_guess, misfit)
     print(f"Cost functional : {Jm}")
@@ -243,14 +341,6 @@ def test_gradient():
         misfit_plusdm = rec_out_exact - Wave_obj_guess.receivers_output
         J_plusdm = compute_functional(Wave_obj_guess, misfit_plusdm)
 
-        # Wave_obj_guess.reset_pressure()
-        # c_guess = fire.Constant(3.0) - step*dm
-        # Wave_obj_guess.initial_velocity_model = c_guess
-        # Wave_obj_guess.forward_solve()
-        # misfit_minusdm = rec_out_exact - Wave_obj_guess.receivers_output
-        # J_minusdm = compute_functional(Wave_obj_guess, misfit_minusdm)
-
-        # grad_fd = (J_plusdm - J_minusdm) / (2*step)
         grad_fd = (J_plusdm - Jm) / (step)
         projnorm = fire.assemble(dJ * dm * fire.dx(scheme=Wave_obj_guess.quadrature_rule))
 
