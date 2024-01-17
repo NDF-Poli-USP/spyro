@@ -316,7 +316,7 @@ def test_gradient():
     vabs = 1e-2
     timevector = np.linspace(0.0, tf, 4001)
 
-    old_spyro_receivers = np.load("old_spyro_shot_record.npy")
+    old_spyro_receivers = np.load("old_spyro_shot_record_v4_changingc2location.npy")
     # end of debugging variables
 
     Wave_obj_exact = spyro.AcousticWave(dictionary=dictionary)
@@ -338,9 +338,9 @@ def test_gradient():
     # 0
     for i in range(4):
         title = "Receiver "+str(i)
-        figname = "old_spyro_test"+str(i)+".png"
+        figname = "post_multi_old_spyro_test"+str(i)+".png"
         plt.plot(timevector, rec_out_exact[:, i], label="New")
-        plt.plot(timevector, old_spyro_receivers[:, i])
+        plt.plot(timevector, (1.5**2)*old_spyro_receivers[:, i], label="Old")
         plt.legend()
         plt.title(title)
         plt.savefig(figname)

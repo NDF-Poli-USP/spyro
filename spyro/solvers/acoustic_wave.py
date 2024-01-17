@@ -199,8 +199,10 @@ class AcousticWave(Wave):
 
         ffG = 2.0 * (1 / self.c) * fire.dot(fire.grad(uuadj), fire.grad(uufor)) * m_v * fire.dx(scheme=self.quadrature_rule)
 
-        G = mgrad - ffG
-        lhsG, rhsG = fire.lhs(G), fire.rhs(G)
+        # G = mgrad - ffG
+        # lhsG, rhsG = fire.lhs(G), fire.rhs(G)
+        lhsG = mgrad
+        rhsG = ffG
 
         gradi = fire.Function(self.function_space)
         grad_prob = fire.LinearVariationalProblem(lhsG, rhsG, gradi)
@@ -233,7 +235,7 @@ class AcousticWave(Wave):
                 uuadj.assign(u_np1)
                 uufor.assign(forward_solution.pop())
 
-                num_gradi = 2.0 * (1 / self.c) * fire.dot(fire.grad(uuadj), fire.grad(uufor))* fire.dx(scheme=self.quadrature_rule)
+                grad_solver.solve()
                 if step == nt-1 or step == 0:
                     dJ += gradi
                 else:
