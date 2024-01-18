@@ -242,7 +242,7 @@ def plot_shots(
     return None
 
 
-final_time = 2.0
+final_time = 1.0
 
 dictionary = {}
 dictionary["options"] = {
@@ -275,14 +275,14 @@ dictionary["mesh"] = {
 # This transect of receivers is created with the helper function `create_transect`.
 dictionary["acquisition"] = {
     "source_type": "ricker",
-    "source_locations": [(-1.5, 2.5)],
-    "frequency": 5.0,
-    # "delay": 0.553002223869533-0.3565,
-    # "delay_type": "time",
-    "delay": 1.5,
-    "delay_type": "multiples_of_minimun",
+    "source_locations": [(-2.5, 2.02)],
+    "frequency": 10.0,
+    "delay": 0.1,
+    "delay_type": "time",
+    # "delay": 1.5,
+    # "delay_type": "multiples_of_minimun",
     # "receiver_locations": spyro.create_transect((-2.0, 0.5), (-2.0, 2.5), 100),
-    "receiver_locations": [(-2.0, 2.5) , (-2.3, 2.5), (-3.0, 2.5), (-3.5, 2.5), (-1.5, 2.0), (-1.5, 2.5)],
+    "receiver_locations": spyro.create_transect((-2.0, 2.98), (-3.0, 2.98), 101),
 }
 
 # Simulate for 2.0 seconds.
@@ -314,18 +314,22 @@ def test_gradient():
     tf = final_time
     show = True
     vabs = 1e-2
-    timevector = np.linspace(0.0, tf, 4001)
+    timevector = np.linspace(0.0, tf, 2001)
 
-    old_spyro_receivers = np.load("old_spyro_shot_record_v4_changingc2location.npy")
+    devito_shots = np.load("true_data_camembert.npy")
+    devito_nt, _ = np.shape(devito_shots)
+    devito_timevector = np.linspace(0.0, tf, devito_nt)
+
     # end of debugging variables
 
     Wave_obj_exact = spyro.AcousticWave(dictionary=dictionary)
     Wave_obj_exact.set_mesh(mesh_parameters={"dx": 0.05})
-    # Wave_obj_exact.set_initial_velocity_model(
-    #     expression="4.0 + 1.0 * tanh(10.0 * (0.5 - sqrt((x - 1.5) ** 2 + (z + 1.5) ** 2)))",
-    #     output=True
-    # )
-    cond = fire.conditional(Wave_obj_exact.mesh_z > -2.5, 1.5, 3.5)
+
+    center_z = -2.5
+    center_x = 2.5
+    mesh_z = Wave_obj_exact.mesh_z
+    mesh_x = Wave_obj_exact.mesh_x
+    cond = fire.conditional((mesh_z-center_z)**2 + (mesh_x-center_x)**2 < .15**2, 3.0, 2.5)
     Wave_obj_exact.set_initial_velocity_model(
         conditional=cond,
         output=True
@@ -335,48 +339,51 @@ def test_gradient():
     rec_out_exact = Wave_obj_exact.receivers_output
 
     # Saving figures
-    # 0
-    for i in range(4):
+    checked_receivers = [0, 25, 50, 75, 100]
+    for i in checked_receivers:
         title = "Receiver "+str(i)
-        figname = "post_multi_old_spyro_test"+str(i)+".png"
-        plt.plot(timevector, rec_out_exact[:, i], label="New")
-        plt.plot(timevector, (1.5**2)*old_spyro_receivers[:, i], label="Old")
+        figname = "devito_camembert_test_r"+str(i)+".png"
+        plt.plot(timevector, 100*rec_out_exact[:, i], label="spyro")
+        plt.plot(devito_timevector, devito_shots[:, i], label="devito")
         plt.legend()
         plt.title(title)
         plt.savefig(figname)
         plt.close()
 
-    # old_rec_out_exact = np.load("old_real_model_receivers.npy")
-    # diff = error_calc(old_rec_out_exact, rec_out_exact, dt)
-    # print(f"Difference with old propagation Real = {diff}")
-    # calc_error_distribution(rec_out_exact, old_rec_out_exact, fname="real_error_dist.png")
-
     Wave_obj_guess = spyro.AcousticWave(dictionary=dictionary)
     Wave_obj_guess.set_mesh(mesh_parameters={"dx": 0.05})
-    Wave_obj_guess.set_initial_velocity_model(constant=3.0)
+    Wave_obj_guess.set_initial_velocity_model(constant=2.5)
     Wave_obj_guess.forward_solve()
     forward_solution = Wave_obj_guess.forward_solution
     forward_solution_guess = deepcopy(forward_solution)
     rec_out_guess = Wave_obj_guess.receivers_output
 
-    old_rec_out_guess = np.load("old_guess_model_receivers.npy")
-    diff = error_calc(old_rec_out_guess, rec_out_guess, dt)
-    print(f"Difference with old propagation Guess= {diff}")
-    calc_error_distribution(rec_out_guess, old_rec_out_guess, fname="guess_error_dist.png")
+    misfit = rec_out_guess - rec_out_exact
+    misfit_devito = np.load("misfit_camembert.npy")
 
-
-    misfit = rec_out_exact - rec_out_guess
-    # misfit_old = np.load("misfit_old.npy")
+    # Saving figures
+    checked_receivers = [0, 25, 50, 75, 100]
+    for i in checked_receivers:
+        title = "Misfit "+str(i)
+        figname = "devito_camembert_misfit_test_r"+str(i)+".png"
+        plt.plot(timevector, 100*misfit[:, i], label="spyro")
+        plt.plot(devito_timevector, misfit_devito[:, i], label="devito")
+        plt.legend()
+        plt.title(title)
+        plt.savefig(figname)
+        plt.close()
 
     Jm = compute_functional(Wave_obj_guess, misfit)
     print(f"Cost functional : {Jm}")
+    devito_objective = 5880.085343733546
+    # Fixing devito objective
+    # obj*dt/((dx**2)**2)
+    devito_objective = devito_objective*devito_timevector[1]/(10**4)
+    objective_error = 100*np.abs(Jm-devito_objective)/np.abs(devito_objective)
+    print(f" Error with devito cost functional: {objective_error}\%")
 
-    # compute the gradient of the control (to be verified)
-    # plot_shots(num_recvs, dt, tf, misfit, show=show, vmin=-vabs, vmax=vabs, file_name="misfit_new")
-    # plot_shots(num_recvs, dt, tf, misfit_old, show=show, vmin=-vabs, vmax=vabs, file_name="misfit_old")
-    # plot_shots(num_recvs, dt, tf, misfit-misfit_old, show=show, vmin=-vabs, vmax=vabs, file_name="diff_misfit")
     dJ = Wave_obj_guess.gradient_solve(misfit=misfit, forward_solution=forward_solution_guess)
-    # dJ.dat.data[:] = dJ.dat.data[:] * mask.dat.data[:]
+
     File("gradient.pvd").write(dJ)
     gradient = dJ.dat.data[:]
 

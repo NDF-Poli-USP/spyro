@@ -175,8 +175,8 @@ class AcousticWave(Wave):
         t = self.current_time
         nt = int((final_time - 0) / dt) + 1  # number of timesteps
 
-        u_nm1 = self.u_nm1
-        u_n = self.u_n
+        u_nm1 = fire.Function(self.function_space)
+        u_n = fire.Function(self.function_space)
         u_np1 = fire.Function(self.function_space)
 
         rhs_forcing = fire.Function(self.function_space)
@@ -194,11 +194,13 @@ class AcousticWave(Wave):
         m_u = fire.TrialFunction(self.function_space)
         m_v = fire.TestFunction(self.function_space)
         mgrad = m_u * m_v * fire.dx(scheme=self.quadrature_rule)
-        uuadj = fire.Function(self.function_space)  # auxiliarly function for the gradient compt.
-        uufor = fire.Function(self.function_space)  # auxiliarly function for the gradient compt.
+        # uuadj = fire.Function(self.function_space)  # auxiliarly function for the gradient compt.
+        duadjdt2 = fire.Function(self.function_space)  # auxiliarly function for the gradient compt.
+        ufor = fire.Function(self.function_space)  # auxiliarly function for the gradient compt.
 
-        ffG = 2.0 * (1 / self.c) * fire.dot(fire.grad(uuadj), fire.grad(uufor)) * m_v * fire.dx(scheme=self.quadrature_rule)
+        # ffG = 2.0 * (1 / self.c) * fire.dot(fire.grad(uuadj), fire.grad(uufor)) * m_v * fire.dx(scheme=self.quadrature_rule)
 
+        ffG = fire.dot(ufor, duadjdt2) * m_v * fire.dx(scheme=self.quadrature_rule)
         # G = mgrad - ffG
         # lhsG, rhsG = fire.lhs(G), fire.rhs(G)
         lhsG = mgrad
@@ -227,20 +229,6 @@ class AcousticWave(Wave):
 
             u_np1.assign(X)
 
-            usol_recv.append(
-                self.receivers.interpolate(u_np1.dat.data_ro_with_halos[:])
-            )
-
-            if step % self.gradient_sampling_frequency == 0:
-                uuadj.assign(u_np1)
-                uufor.assign(forward_solution.pop())
-
-                grad_solver.solve()
-                if step == nt-1 or step == 0:
-                    dJ += gradi
-                else:
-                    dJ += 2*gradi
-
             if (step) % self.output_frequency == 0:
                 assert (
                     fire.norm(u_n) < 1
@@ -250,6 +238,16 @@ class AcousticWave(Wave):
                     output.write(u_n, time=t, name="Pressure")
 
                 helpers.display_progress(self.comm, t)
+
+            if step % self.gradient_sampling_frequency == 0:
+                duadjdt2.assign( ((u_np1 - 2.0 * u_n + u_nm1) / fire.Constant(dt**2)) )
+                ufor.assign(forward_solution.pop())
+
+                grad_solver.solve()
+                if step == nt-1 or step == 0:
+                    dJ += gradi
+                else:
+                    dJ += 2*gradi
 
             u_nm1.assign(u_n)
             u_n.assign(u_np1)
