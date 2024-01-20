@@ -49,8 +49,8 @@ dictionary["parallelism"] = {
 # domain and reserve the remaining 250 m for the Perfectly Matched Layer (PML) to absorb
 # outgoing waves on three sides (eg., -z, +-x sides) of the domain.
 dictionary["mesh"] = {
-    "Lz": 5.0,  # depth in km - always positive   # Como ver isso sem ler a malha?
-    "Lx": 5.0,  # width in km - always positive
+    "Lz": 3.0,  # depth in km - always positive   # Como ver isso sem ler a malha?
+    "Lx": 3.0,  # width in km - always positive
     "Ly": 0.0,  # thickness in km - always positive
     "mesh_file": None,
     "mesh_type": "firedrake_mesh",
@@ -61,14 +61,14 @@ dictionary["mesh"] = {
 # This transect of receivers is created with the helper function `create_transect`.
 dictionary["acquisition"] = {
     "source_type": "ricker",
-    "source_locations": [(-2.5, 2.02)],
+    "source_locations": [(-1.5, 1.02)],
     "frequency": 10.0,
     "delay": 0.1,
     "delay_type": "time",
     # "delay": 1.5,
     # "delay_type": "multiples_of_minimun",
     # "receiver_locations": spyro.create_transect((-2.0, 0.5), (-2.0, 2.5), 100),
-    "receiver_locations": spyro.create_transect((-2.0, 2.98), (-3.0, 2.98), 101),
+    "receiver_locations": spyro.create_transect((-1.0, 1.98), (-2.0, 1.98), 101),
 }
 
 # Simulate for 2.0 seconds.
@@ -111,8 +111,8 @@ def test_gradient():
     Wave_obj_exact = spyro.AcousticWave(dictionary=dictionary)
     Wave_obj_exact.set_mesh(mesh_parameters={"dx": 0.05})
 
-    center_z = -2.5
-    center_x = 2.5
+    center_z = -1.5
+    center_x = 1.5
     mesh_z = Wave_obj_exact.mesh_z
     mesh_x = Wave_obj_exact.mesh_x
     cond = fire.conditional((mesh_z-center_z)**2 + (mesh_x-center_x)**2 < .15**2, 3.0, 2.5)
@@ -122,7 +122,7 @@ def test_gradient():
     )
     spyro.plots.plot_model(
         Wave_obj_exact,
-        abc_points = [(-2, 2), (-3, 2), (-3, 3), (-2, 3)]
+        abc_points = [(-1, 1), (-2, 1), (-2, 2), (-1, 2)]
     )
     Wave_obj_exact.forward_solve()
     forward_solution_exact = Wave_obj_exact.forward_solution

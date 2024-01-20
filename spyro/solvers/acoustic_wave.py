@@ -175,8 +175,8 @@ class AcousticWave(Wave):
         t = self.current_time
         nt = int((final_time - 0) / dt) + 1  # number of timesteps
 
-        u_nm1 = fire.Function(self.function_space)
-        u_n = fire.Function(self.function_space)
+        u_nm1 = self.u_nm1
+        u_n = self.u_n
         u_np1 = fire.Function(self.function_space)
 
         rhs_forcing = fire.Function(self.function_space)
