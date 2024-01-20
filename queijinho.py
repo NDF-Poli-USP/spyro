@@ -87,8 +87,8 @@ dictionary["visualization"] = {
     "velocity_model_filename": None,
     "gradient_output": True,
     "gradient_filename": "results/Gradient.pvd",
-    "adjoint_output": False,
-    "adjoint_filename": None,
+    "adjoint_output": True,
+    "adjoint_filename": "results/adjoint.pvd",
     "debug_output": True,
 }
 
@@ -119,6 +119,10 @@ def test_gradient():
     Wave_obj_exact.set_initial_velocity_model(
         conditional=cond,
         output=True
+    )
+    spyro.plots.plot_model(
+        Wave_obj_exact,
+        abc_points = [(-2, 2), (-3, 2), (-3, 3), (-2, 3)]
     )
     Wave_obj_exact.forward_solve()
     forward_solution_exact = Wave_obj_exact.forward_solution
