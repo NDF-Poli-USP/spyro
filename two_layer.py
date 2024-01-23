@@ -63,7 +63,7 @@ final_time = 1.6
 
 dictionary = {}
 dictionary["options"] = {
-    "cell_type": "T",  # simplexes such as triangles or tetrahedra (T) or quadrilaterals (Q)
+    "cell_type": "Q",  # simplexes such as triangles or tetrahedra (T) or quadrilaterals (Q)
     "variant": "lumped",  # lumped, equispaced or DG, default is lumped
     "degree": 4,  # p order
     "dimension": 2,  # dimension
@@ -145,10 +145,10 @@ def get_forward_model(load_true=False):
 
     Wave_obj_guess = spyro.AcousticWave(dictionary=dictionary)
     Wave_obj_guess.set_mesh(mesh_parameters={"dx": 0.05})
-    Wave_obj_guess.set_initial_velocity_model(constant=3.0)
+    Wave_obj_guess.set_initial_velocity_model(constant=2.0)
     Wave_obj_guess.forward_solve()
-    forward_solution = Wave_obj_guess.forward_solution
-    forward_solution_guess = deepcopy(forward_solution)
+    # forward_solution = Wave_obj_guess.forward_solution
+    # forward_solution_guess = deepcopy(forward_solution)
     rec_out_guess = Wave_obj_guess.receivers_output
 
     return rec_out_exact, rec_out_guess, Wave_obj_guess

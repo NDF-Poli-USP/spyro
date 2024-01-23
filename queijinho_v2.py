@@ -61,14 +61,14 @@ dictionary["mesh"] = {
 # This transect of receivers is created with the helper function `create_transect`.
 dictionary["acquisition"] = {
     "source_type": "ricker",
-    "source_locations": [(-1.5, 1.02)],
+    "source_locations": [(-1.02, 1.5)],
     "frequency": 10.0,
     "delay": 0.1,
     "delay_type": "time",
     # "delay": 1.5,
     # "delay_type": "multiples_of_minimun",
     # "receiver_locations": spyro.create_transect((-2.0, 0.5), (-2.0, 2.5), 100),
-    "receiver_locations": spyro.create_transect((-1.0, 1.98), (-2.0, 1.98), 101),
+    "receiver_locations": spyro.create_transect((-1.98, 1.02), (-1.98, 1.98), 20),
 }
 
 # Simulate for 2.0 seconds.
@@ -102,10 +102,6 @@ def test_gradient():
     vabs = 1e-2
     timevector = np.linspace(0.0, tf, 2001)
 
-    # devito_shots = np.load("true_data_camembert.npy")
-    # devito_nt, _ = np.shape(devito_shots)
-    # devito_timevector = np.linspace(0.0, tf, devito_nt)
-
     # end of debugging variables
 
     Wave_obj_exact = spyro.AcousticWave(dictionary=dictionary)
@@ -128,18 +124,6 @@ def test_gradient():
     forward_solution_exact = Wave_obj_exact.forward_solution
     rec_out_exact = Wave_obj_exact.receivers_output
 
-    # # Saving figures
-    # checked_receivers = [0, 25, 50, 75, 100]
-    # for i in checked_receivers:
-    #     title = "Receiver "+str(i)
-    #     figname = "devito_camembert_test_r"+str(i)+".png"
-    #     plt.plot(timevector, 100*rec_out_exact[:, i], label="spyro")
-    #     plt.plot(devito_timevector, devito_shots[:, i], label="devito")
-    #     plt.legend()
-    #     plt.title(title)
-    #     plt.savefig(figname)
-    #     plt.close()
-
     Wave_obj_guess = spyro.AcousticWave(dictionary=dictionary)
     Wave_obj_guess.set_mesh(mesh_parameters={"dx": 0.05})
     Wave_obj_guess.set_initial_velocity_model(constant=2.5)
@@ -149,62 +133,43 @@ def test_gradient():
     rec_out_guess = Wave_obj_guess.receivers_output
 
     misfit = rec_out_guess - rec_out_exact
-    # misfit_devito = np.load("misfit_camembert.npy")
-
-    # # Saving figures
-    # checked_receivers = [0, 25, 50, 75, 100]
-    # for i in checked_receivers:
-    #     title = "Misfit "+str(i)
-    #     figname = "devito_camembert_misfit_test_r"+str(i)+".png"
-    #     plt.plot(timevector, 100*misfit[:, i], label="spyro")
-    #     plt.plot(devito_timevector, misfit_devito[:, i], label="devito")
-    #     plt.legend()
-    #     plt.title(title)
-    #     plt.savefig(figname)
-    #     plt.close()
 
     Jm = compute_functional(Wave_obj_guess, misfit)
     print(f"Cost functional : {Jm}")
-    # devito_objective = 5880.085343733546
-    # Fixing devito objective
-    # obj*dt/((dx**2)**2)
-    # devito_objective = devito_objective*devito_timevector[1]/(10**4)
-    # objective_error = 100*np.abs(Jm-devito_objective)/np.abs(devito_objective)
-    # print(f" Error with devito cost functional: {objective_error}\%")
 
     dJ = Wave_obj_guess.gradient_solve(misfit=misfit, forward_solution=forward_solution_guess)
 
     File("gradient.pvd").write(dJ)
     gradient = dJ.dat.data[:]
 
-    # steps = [1e-3, 1e-4, 1e-5]  # step length
+    steps = [1e-3, 1e-4, 1e-5]  # step length
 
-    # errors = []
-    # V_c = Wave_obj_guess.function_space
-    # dm = fire.Function(V_c)
-    # dm.assign(dJ)
+    errors = []
+    V_c = Wave_obj_guess.function_space
+    dm = fire.Function(V_c)
+    dm.assign(dJ)
 
-    # for step in steps:
+    for step in steps:
 
-    #     Wave_obj_guess.reset_pressure()
-    #     c_guess = fire.Constant(3.0) + step*dm
-    #     Wave_obj_guess.initial_velocity_model = c_guess
-    #     Wave_obj_guess.forward_solve()
-    #     misfit_plusdm = rec_out_exact - Wave_obj_guess.receivers_output
-    #     J_plusdm = compute_functional(Wave_obj_guess, misfit_plusdm)
+        Wave_obj_guess.reset_pressure()
+        c_guess = fire.Constant(3.0) + step*dm
+        Wave_obj_guess.initial_velocity_model = c_guess
+        Wave_obj_guess.forward_solve()
+        misfit_plusdm = rec_out_exact - Wave_obj_guess.receivers_output
+        J_plusdm = compute_functional(Wave_obj_guess, misfit_plusdm)
 
-    #     grad_fd = (J_plusdm - Jm) / (step)
-    #     projnorm = fire.assemble(dJ * dm * fire.dx(scheme=Wave_obj_guess.quadrature_rule))
+        grad_fd = (J_plusdm - Jm) / (step)
+        projnorm = fire.assemble(dJ * dm * fire.dx(scheme=Wave_obj_guess.quadrature_rule))
 
-    #     error = 100 * ((grad_fd - projnorm) / projnorm)
+        error = 100 * ((grad_fd - projnorm) / projnorm)
 
-    #     errors.append(error)
-    #     print(f"Error : {error}")
-    #     # step /= 2
+        errors.append(error)
+        print(f"Error : {error}")
+        # step /= 2
 
-    # # all errors less than 1 %
-    # errors = np.array(errors)
-    # assert (np.abs(errors) < 5.0).all()
+    # all errors less than 1 %
+    errors = np.array(errors)
+    assert (np.abs(errors) < 5.0).all()
     print("END")
 
 
