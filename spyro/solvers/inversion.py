@@ -2,7 +2,7 @@ import firedrake as fire
 import warnings
 
 from .acoustic_wave import AcousticWave
-
+from ..utils import compute_functional
 
 class FullWaveformInversion(AcousticWave):
     def __init__(self, dictionary=None, comm=None):
@@ -18,6 +18,7 @@ class FullWaveformInversion(AcousticWave):
         self.mesh_iteration = 0
         self.iteration_limit = 100
         self.inner_product = 'L2'
+        self.misfit = None
 
     def calculate_misfit(self):
         Wave_obj_guess = AcousticWave(dictionary=self.input_dictionary)
@@ -29,7 +30,8 @@ class FullWaveformInversion(AcousticWave):
         self.guess_shot_record = Wave_obj_guess.forward_solution_receivers
         self.guess_forward_solution = Wave_obj_guess.forward_solution
 
-        return self.real_shot_record - self.guess_shot_record
+        self.misfit = self.real_shot_record - self.guess_shot_record
+        return self.misfit
 
     def generate_real_shot_record(self):
         Wave_obj_real_velocity = SyntheticRealAcousticWave(dictionary=self.input_dictionary)
@@ -83,6 +85,7 @@ class FullWaveformInversion(AcousticWave):
             output=output,
         )
         self.guess_velocity_model = self.initial_velocity_model
+        self.misfit = None
 
     def set_real_mesh(
         self,
@@ -105,6 +108,22 @@ class FullWaveformInversion(AcousticWave):
             mesh_parameters=mesh_parameters,
         )
         self.guess_mesh = self.get_mesh()
+
+    def get_functional(self):
+        if self.misfit is not None:
+            Jm = compute_functional(self, self.misfit)
+        else:
+            self.calculate_misfit()
+            Jm = compute_functional(self, self.misfit)
+
+        self.functional = Jm
+
+        return Jm
+
+    def get_gradient(self, save=False):
+        dJ = self.gradient_solve(misfit=self.misfit, forward_solution=self.guess_forward_solution)
+        if save:
+            fire.File("gradient.pvd").write(dJ)
 
 
 class SyntheticRealAcousticWave(AcousticWave):
