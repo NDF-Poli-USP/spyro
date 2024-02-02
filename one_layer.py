@@ -1,4 +1,5 @@
 import numpy as np
+import math
 import matplotlib.pyplot as plt
 from copy import deepcopy
 from firedrake import File
@@ -6,13 +7,16 @@ import firedrake as fire
 import spyro
 
 
-def check_with_non_cell_gradient(Wave_obj_guess, dJ, rec_out_exact, Jm):
-    steps = [1e-4]#, 1e-4, 1e-5]  # step length
+def check_with_non_cell_gradient(Wave_obj_guess, dJ, rec_out_exact, Jm, plot=False):
+    steps = [1e-3, 1e-4, 1e-5]  # step length
 
     errors = []
     V_c = Wave_obj_guess.function_space
     dm = fire.Function(V_c)
-    dm.assign(dJ)
+    size, = np.shape(dm.dat.data[:])
+    dm_data = np.random.rand(size)
+    dm.dat.data[:] = dm_data
+    # dm.assign(dJ)
 
     for step in steps:
 
@@ -29,13 +33,26 @@ def check_with_non_cell_gradient(Wave_obj_guess, dJ, rec_out_exact, Jm):
         error = 100 * ((grad_fd - projnorm) / projnorm)
 
         errors.append(error)
-        print(f"Error : {error}")
+        # print(f"Error : {error}")
         # step /= 2
 
     # all errors less than 1 %
     errors = np.array(errors)
-    assert (np.abs(errors) < 5.0).all()
-    print("END")
+    # Checking if error is first order in step
+    theory = [t for t in steps]
+    theory = [errors[0] * th / theory[0] for th in theory]
+    if plot:
+        plt.close()
+        plt.plot(steps, errors, label="Error")
+        plt.plot(steps, theory, "--",label="first order")
+        plt.legend()
+        plt.title(" Adjoint gradient versus finite difference gradient")
+        plt.xlabel("Step")
+        plt.ylabel("Error \%")
+        plt.savefig("gradient_error_verification.png")
+        plt.close()
+
+    assert math.isclose(np.log(theory[-1]), np.log(errors[-1]), rel_tol=1e-1)
 
 
 def compute_functional(Wave_object, residual):
