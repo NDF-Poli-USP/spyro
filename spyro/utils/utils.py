@@ -43,15 +43,12 @@ def compute_functional(Wave_object, residual):
     """
     num_receivers = Wave_object.number_of_receivers
     dt = Wave_object.dt
-    tf = Wave_object.final_time
-    nt = int(tf / dt) + 1  # number of timesteps
 
-    J = 0.0
-    for ti in range(nt):
-        for rn in range(num_receivers):
-            J += residual[ti][rn] ** 2
+    J = 0
+    for rn in range(num_receivers):
+        J += np.trapz(residual[:, rn] ** 2, dx=dt)
+
     J *= 0.5
-
     return J
 
 
