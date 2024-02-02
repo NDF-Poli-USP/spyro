@@ -620,6 +620,7 @@ class Model_parameters:
         self.forward_output_file = "results/forward_output.pvd"
 
     def _sanitize_optimization_and_velocity_for_fwi(self):
+        self._sanitize_optimization_and_velocity_without_fwi()
         dictionary = self.input_dictionary
         self.initial_velocity_model_file = dictionary["inversion"][
             "initial_guess_model_file"
