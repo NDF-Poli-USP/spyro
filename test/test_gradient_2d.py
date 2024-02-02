@@ -33,11 +33,9 @@ def check_gradient(Wave_obj_guess, dJ, rec_out_exact, Jm, plot=False):
         error = 100 * ((grad_fd - projnorm) / projnorm)
 
         errors.append(error)
-        # print(f"Error : {error}")
-        # step /= 2
 
-    # all errors less than 1 %
     errors = np.array(errors)
+
     # Checking if error is first order in step
     theory = [t for t in steps]
     theory = [errors[0] * th / theory[0] for th in theory]
@@ -52,11 +50,17 @@ def check_gradient(Wave_obj_guess, dJ, rec_out_exact, Jm, plot=False):
         plt.savefig("gradient_error_verification.png")
         plt.close()
 
-    test = math.isclose(np.log(theory[-1]), np.log(errors[-1]), rel_tol=1e-1)
+    # Checking if every error is less than 1 percent
 
-    print(f"Gradient error behaved as expected: {test}")
+    test1 = all(abs(error) < 1 for error in errors)
+    print(f"Gradient error less than 1 percent: {test1}")
 
-    assert test
+    # Checking if error follows expected finite difference error convergence
+    test2 = math.isclose(np.log(theory[-1]), np.log(errors[-1]), rel_tol=1e-1)
+
+    print(f"Gradient error behaved as expected: {test2}")
+
+    assert all([test1, test2])
 
 
 final_time = 1.0
@@ -69,15 +73,10 @@ dictionary["options"] = {
     "dimension": 2,  # dimension
 }
 
-# Number of cores for the shot. For simplicity, we keep things serial.
-# spyro however supports both spatial parallelism and "shot" parallelism.
 dictionary["parallelism"] = {
     "type": "automatic",  # options: automatic (same number of cores for evey processor) or spatial
 }
 
-# Define the domain size without the PML. Here we'll assume a 0.75 x 1.50 km
-# domain and reserve the remaining 250 m for the Perfectly Matched Layer (PML) to absorb
-# outgoing waves on three sides (eg., -z, +-x sides) of the domain.
 dictionary["mesh"] = {
     "Lz": 3.0,  # depth in km - always positive   # Como ver isso sem ler a malha?
     "Lx": 3.0,  # width in km - always positive
@@ -85,10 +84,7 @@ dictionary["mesh"] = {
     "mesh_file": None,
     "mesh_type": "firedrake_mesh",
 }
-# Create a source injection operator. Here we use a single source with a
-# Ricker wavelet that has a peak frequency of 8 Hz injected at the center of the mesh.
-# We also specify to record the solution at 101 microphones near the top of the domain.
-# This transect of receivers is created with the helper function `create_transect`.
+
 dictionary["acquisition"] = {
     "source_type": "ricker",
     "source_locations": [(-1.1, 1.5)],
@@ -101,7 +97,6 @@ dictionary["acquisition"] = {
     # "receiver_locations": [(-2.0, 2.5) , (-2.3, 2.5), (-3.0, 2.5), (-3.5, 2.5)],
 }
 
-# Simulate for 2.0 seconds.
 dictionary["time_axis"] = {
     "initial_time": 0.0,  # Initial time for event
     "final_time": final_time,  # Final time for event
@@ -166,7 +161,7 @@ def test_gradient():
     dJ = Wave_obj_guess.gradient_solve(misfit=misfit, forward_solution=forward_solution_guess)
     File("gradient.pvd").write(dJ)
 
-    check_gradient(Wave_obj_guess, dJ, rec_out_exact, Jm)
+    check_gradient(Wave_obj_guess, dJ, rec_out_exact, Jm, plot=True)
 
 
 if __name__ == "__main__":
