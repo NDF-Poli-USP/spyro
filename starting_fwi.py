@@ -137,6 +137,7 @@ def test_fwi(load_real_shot=False):
         np.save("real_shot_record", FWI_obj.real_shot_record)
     else:
         dictionary["inversion"]["shot_record_file"] = "real_shot_record.npy"
+        FWI_obj = spyro.FullWaveformInversion(dictionary=dictionary)
 
     # Setting up initial guess problem
     FWI_obj.set_guess_mesh(mesh_parameters={"dx": 0.1})
@@ -160,4 +161,4 @@ def test_fwi(load_real_shot=False):
 
 
 if __name__ == "__main__":
-    test_fwi(load_real_shot=False)
+    test_fwi(load_real_shot=True)
