@@ -6,6 +6,38 @@ import firedrake as fire
 import spyro
 
 
+def check_with_non_cell_gradient():
+    steps = [1e-3, 1e-4, 1e-5]  # step length
+
+    errors = []
+    V_c = Wave_obj_guess.function_space
+    dm = fire.Function(V_c)
+    dm.assign(dJ)
+
+    for step in steps:
+
+        Wave_obj_guess.reset_pressure()
+        c_guess = fire.Constant(3.0) + step*dm
+        Wave_obj_guess.initial_velocity_model = c_guess
+        Wave_obj_guess.forward_solve()
+        misfit_plusdm = rec_out_exact - Wave_obj_guess.receivers_output
+        J_plusdm = compute_functional(Wave_obj_guess, misfit_plusdm)
+
+        grad_fd = (J_plusdm - Jm) / (step)
+        projnorm = fire.assemble(dJ * dm * fire.dx(scheme=Wave_obj_guess.quadrature_rule))
+
+        error = 100 * ((grad_fd - projnorm) / projnorm)
+
+        errors.append(error)
+        print(f"Error : {error}")
+        # step /= 2
+
+    # all errors less than 1 %
+    errors = np.array(errors)
+    assert (np.abs(errors) < 5.0).all()
+    print("END")
+
+
 def compute_functional(Wave_object, residual):
     """Compute the functional to be optimized.
     Accepts the velocity optionally and uses
