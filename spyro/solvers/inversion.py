@@ -19,16 +19,16 @@ class FullWaveformInversion(AcousticWave):
         self.iteration_limit = 100
         self.inner_product = 'L2'
         self.misfit = None
+        self.guess_forward_solution = None
 
     def calculate_misfit(self):
-        Wave_obj_guess = AcousticWave(dictionary=self.input_dictionary)
-        if Wave_obj_guess.mesh is None and self.guess_mesh is not None:
-            Wave_obj_guess.mesh = self.guess_mesh
-        if Wave_obj_guess.initial_velocity_model is None:
-            Wave_obj_guess.initial_velocity_model = self.guess_velocity_model
-        Wave_obj_guess.forward_solve()
-        self.guess_shot_record = Wave_obj_guess.forward_solution_receivers
-        self.guess_forward_solution = Wave_obj_guess.forward_solution
+        if self.mesh is None and self.guess_mesh is not None:
+            self.mesh = self.guess_mesh
+        if self.initial_velocity_model is None:
+            self.initial_velocity_model = self.guess_velocity_model
+        self.forward_solve()
+        self.guess_shot_record = self.forward_solution_receivers
+        self.guess_forward_solution = self.forward_solution
 
         self.misfit = self.real_shot_record - self.guess_shot_record
         return self.misfit
@@ -121,9 +121,12 @@ class FullWaveformInversion(AcousticWave):
         return Jm
 
     def get_gradient(self, save=False):
+        if self.misfit is None:
+            self.get_functional()
         dJ = self.gradient_solve(misfit=self.misfit, forward_solution=self.guess_forward_solution)
         if save:
             fire.File("gradient.pvd").write(dJ)
+        self.gradient = dJ
 
 
 class SyntheticRealAcousticWave(AcousticWave):
