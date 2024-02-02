@@ -200,7 +200,7 @@ class AcousticWave(Wave):
 
         # ffG = 2.0 * (1 / self.c) * fire.dot(fire.grad(uuadj), fire.grad(uufor)) * m_v * fire.dx(scheme=self.quadrature_rule)
 
-        ffG = fire.dot(ufor, duadjdt2) * m_v * fire.dx(scheme=self.quadrature_rule)
+        ffG = -2 * (self.c)**(-3) * fire.dot(ufor, duadjdt2) * m_v * fire.dx(scheme=self.quadrature_rule)
         # G = mgrad - ffG
         # lhsG, rhsG = fire.lhs(G), fire.rhs(G)
         lhsG = mgrad

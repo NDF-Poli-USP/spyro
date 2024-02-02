@@ -6,8 +6,8 @@ import firedrake as fire
 import spyro
 
 
-def check_with_non_cell_gradient():
-    steps = [1e-3, 1e-4, 1e-5]  # step length
+def check_with_non_cell_gradient(Wave_obj_guess, dJ, rec_out_exact, Jm):
+    steps = [1e-4]#, 1e-4, 1e-5]  # step length
 
     errors = []
     V_c = Wave_obj_guess.function_space
@@ -17,7 +17,7 @@ def check_with_non_cell_gradient():
     for step in steps:
 
         Wave_obj_guess.reset_pressure()
-        c_guess = fire.Constant(3.0) + step*dm
+        c_guess = fire.Constant(2.0) + step*dm
         Wave_obj_guess.initial_velocity_model = c_guess
         Wave_obj_guess.forward_solve()
         misfit_plusdm = rec_out_exact - Wave_obj_guess.receivers_output
@@ -66,7 +66,8 @@ def compare_with_devito(
         output_filename="test",
         devito_dx=5,
         title="Receiver",
-        ):
+):
+
     plt.close()
 
     devito_true_rec = np.load(devito_receivers_filename)
@@ -91,7 +92,7 @@ def compare_with_devito(
         plt.close()
 
 
-final_time = 1.6
+final_time = 1.0
 
 dictionary = {}
 dictionary["options"] = {
@@ -111,8 +112,8 @@ dictionary["parallelism"] = {
 # domain and reserve the remaining 250 m for the Perfectly Matched Layer (PML) to absorb
 # outgoing waves on three sides (eg., -z, +-x sides) of the domain.
 dictionary["mesh"] = {
-    "Lz": 5.0,  # depth in km - always positive   # Como ver isso sem ler a malha?
-    "Lx": 5.0,  # width in km - always positive
+    "Lz": 3.0,  # depth in km - always positive   # Como ver isso sem ler a malha?
+    "Lx": 3.0,  # width in km - always positive
     "Ly": 0.0,  # thickness in km - always positive
     "mesh_file": None,
     "mesh_type": "firedrake_mesh",
@@ -123,13 +124,13 @@ dictionary["mesh"] = {
 # This transect of receivers is created with the helper function `create_transect`.
 dictionary["acquisition"] = {
     "source_type": "ricker",
-    "source_locations": [(-1.5, 2.5)],
+    "source_locations": [(-1.1, 1.5)],
     "frequency": 5.0,
-    "delay": 1.2227264394269568,
-    "delay_type": "time",
-    # "delay": 1.5,
+    # "delay": 1.2227264394269568,
+    # "delay_type": "time",
+    "delay": 1.5,
     "delay_type": "multiples_of_minimun",
-    "receiver_locations": spyro.create_transect((-3.5, 1.0), (-3.5, 4.0), 10),
+    "receiver_locations": spyro.create_transect((-1.8, 1.2), (-1.8, 1.8), 10),
     # "receiver_locations": [(-2.0, 2.5) , (-2.3, 2.5), (-3.0, 2.5), (-3.5, 2.5)],
 }
 
@@ -158,15 +159,16 @@ dictionary["visualization"] = {
 def get_forward_model(load_true=False):
     if load_true is False:
         Wave_obj_exact = spyro.AcousticWave(dictionary=dictionary)
-        Wave_obj_exact.set_mesh(mesh_parameters={"dx": 0.05})
+        Wave_obj_exact.set_mesh(mesh_parameters={"dx": 0.1})
+        # Wave_obj_exact.set_initial_velocity_model(constant=3.0)
         cond = fire.conditional(Wave_obj_exact.mesh_z > -2.5, 1.5, 3.5)
         Wave_obj_exact.set_initial_velocity_model(
             conditional=cond,
             # output=True
         )
-        spyro.plots.plot_model(Wave_obj_exact, abc_points = [(-1, 1), (-4, 1), (-4, 4), (-1, 4)])
+        spyro.plots.plot_model(Wave_obj_exact, abc_points=[(-1, 1), (-2, 1), (-2, 4), (-1, 2)])
         Wave_obj_exact.forward_solve()
-        forward_solution_exact = Wave_obj_exact.forward_solution
+        # forward_solution_exact = Wave_obj_exact.forward_solution
         rec_out_exact = Wave_obj_exact.receivers_output
         np.save("rec_out_exact", rec_out_exact)
 
@@ -176,7 +178,7 @@ def get_forward_model(load_true=False):
     # compare_with_devito(rec_out_exact, "devito_true_rec.npy")
 
     Wave_obj_guess = spyro.AcousticWave(dictionary=dictionary)
-    Wave_obj_guess.set_mesh(mesh_parameters={"dx": 0.05})
+    Wave_obj_guess.set_mesh(mesh_parameters={"dx": 0.1})
     Wave_obj_guess.set_initial_velocity_model(constant=2.0)
     Wave_obj_guess.forward_solve()
     # forward_solution = Wave_obj_guess.forward_solution
@@ -196,7 +198,7 @@ def test_gradient():
     timevector = np.linspace(0.0, tf, 2001)
     # end of debugging variables
 
-    rec_out_exact, rec_out_guess, Wave_obj_guess = get_forward_model(load_true=True)
+    rec_out_exact, rec_out_guess, Wave_obj_guess = get_forward_model(load_true=False)
     forward_solution = Wave_obj_guess.forward_solution
     forward_solution_guess = deepcopy(forward_solution)
 
@@ -209,6 +211,8 @@ def test_gradient():
     dJ = Wave_obj_guess.gradient_solve(misfit=misfit, forward_solution=forward_solution_guess)
     File("gradient.pvd").write(dJ)
     gradient = dJ.dat.data[:]
+
+    check_with_non_cell_gradient(Wave_obj_guess, dJ, rec_out_exact, Jm)
 
     print("END")
 
