@@ -117,30 +117,47 @@ dictionary["visualization"] = {
     "adjoint_filename": None,
     "debug_output": False,
 }
+dictionary["inversion"] = {
+    "perform_fwi": True, # switch to true to make a FWI
+    "initial_guess_model_file": None,
+    "shot_record_file": None,
+}
 
 
-def test_fwi():
-    FWI_obj = spyro.FullWaveformInversion(dictionary=dictionary)
+def test_fwi(load_real_shot=False):
 
     # Setting up to run synthetic real problem
-    FWI_obj.set_real_mesh(mesh_parameters={"dx": 0.1})
-    cond = fire.conditional(FWI_obj.mesh_z > -2.5, 1.5, 3.5)
-    FWI_obj.set_real_velocity_model(conditional=cond)
-    FWI_obj.generate_real_shot_record()
+    if load_real_shot is False:
+        FWI_obj = spyro.FullWaveformInversion(dictionary=dictionary)
+
+        FWI_obj.set_real_mesh(mesh_parameters={"dx": 0.1})
+        cond = fire.conditional(FWI_obj.mesh_z > -2.5, 1.5, 3.5)
+        FWI_obj.set_real_velocity_model(conditional=cond)
+        FWI_obj.generate_real_shot_record()
+        np.save("real_shot_record", FWI_obj.real_shot_record)
+    else:
+        dictionary["inversion"]["shot_record_file"] = "real_shot_record.npy"
 
     # Setting up initial guess problem
     FWI_obj.set_guess_mesh(mesh_parameters={"dx": 0.1})
     FWI_obj.set_guess_velocity_model(constant=2.0)
 
     # Getting functional
-    Jm = FWI_obj.get_functional()
-    print(f"Functional :{Jm}")
+    # Jm = FWI_obj.get_functional()
+    # print(f"Functional :{Jm}")
 
     # Calculating gradient
     FWI_obj.get_gradient(save=True)
+    check_gradient(
+        FWI_obj,
+        FWI_obj.gradient,
+        FWI_obj.real_shot_record,
+        FWI_obj.functional,
+        plot=True,
+    )
 
     print("END")
 
 
 if __name__ == "__main__":
-    test_fwi()
+    test_fwi(load_real_shot=False)

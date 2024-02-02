@@ -122,12 +122,7 @@ class AcousticWave(Wave):
             self.misfit = misfit
         if self.real_shot_record is None:
             warnings.warn("Please load or calculate a real shot record first")
-        if self.current_time == 0.0 and guess is not None:
-            self.c = guess
-            warnings.warn(
-                "You need to run the forward solver before the adjoint solver,\
-                     will do it for you now"
-            )
+        if self.current_time == 0.0:
             self.forward_solve()
             self.misfit = self.real_shot_record - self.forward_solution_receivers
         return backward_wave_propagator(self)
