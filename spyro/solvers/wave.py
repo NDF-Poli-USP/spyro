@@ -2,7 +2,7 @@ import os
 from abc import abstractmethod
 import warnings
 import firedrake as fire
-from firedrake import sin, cos, pi  # noqa: F401
+from firedrake import sin, cos, pi, tanh, sqrt  # noqa: F401
 from SeismicMesh import write_velocity_model
 
 from ..io import Model_parameters, interpolate

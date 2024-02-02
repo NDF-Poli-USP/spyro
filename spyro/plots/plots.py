@@ -1,5 +1,7 @@
 # from scipy.io import savemat
 import matplotlib.pyplot as plt
+import matplotlib.patches as patches
+from matplotlib.ticker import MultipleLocator
 import numpy as np
 import firedrake
 import copy
@@ -117,3 +119,47 @@ def plot_mesh_sizes(
         plt.show()
     if output_filename is not None:
         plt.savefig(output_filename)
+
+
+def plot_model(Wave_object, filename="model.png", abc_points=None):
+    fig = plt.figure(figsize=(9, 9))
+    axes = fig.add_subplot(111)
+    fig.set_figwidth=9.0
+    fig.set_figheight=9.0
+    vp_object = Wave_object.initial_velocity_model
+    vp_image = firedrake.tripcolor(vp_object, axes=axes)
+    for source in Wave_object.source_locations:
+        z, x = source
+        plt.scatter(z, x, c="green")
+    for receiver in Wave_object.receiver_locations:
+        z, x = receiver
+        plt.scatter(z, x, c="red")
+
+    axes.invert_yaxis()
+    plt.setp(axes.get_xticklabels(), rotation=-90, va="top", ha="center")
+    plt.setp(axes.get_yticklabels(), rotation=-90, va="center", ha="left")
+    cbar = plt.colorbar(vp_image, orientation="horizontal")
+    cbar.ax.tick_params(rotation=-90)
+    axes.tick_params(axis='y', pad=20)
+    axes.axis('equal')
+
+    if abc_points is not None:
+        zs = []
+        xs = []
+
+        first = True
+        for point in abc_points:
+            z, x = point
+            zs.append(z)
+            xs.append(x)
+            if first:
+                z_first = z
+                x_first = x
+            first = False
+        zs.append(z_first)
+        xs.append(x_first)
+        plt.plot(zs, xs, "--")
+
+    plt.savefig(filename)
+
+
