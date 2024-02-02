@@ -11,7 +11,6 @@ class FullWaveformInversion(AcousticWave):
             warnings.warn("Dictionary FWI options set to not run FWI.")
         self.real_velocity_model = None
         self.real_velocity_model_file = None
-        self.real_shot_record = None
         self.guess_shot_record = None
         self.gradient = None
         self.current_iteration = 0

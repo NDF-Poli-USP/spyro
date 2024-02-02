@@ -1,3 +1,4 @@
+import numpy as np
 import warnings
 from .. import io
 from .. import utils
@@ -294,6 +295,7 @@ class Model_parameters:
         self._sanitize_time_inputs()
 
         # Checks inversion variables, FWI and velocity model inputs and outputs
+        self.real_shot_record = None
         self._sanitize_optimization_and_velocity()
 
         # Checking mesh_parameters
@@ -628,9 +630,32 @@ class Model_parameters:
         self.fwi_output_folder = "fwi/"
         self.control_output_file = self.fwi_output_folder + "control"
         self.gradient_output_file = self.fwi_output_folder + "gradient"
-        self.optimization_parameters = dictionary["inversion"][
-            "optimization_parameters"
-        ]
+        if "optimization_parameters" in dictionary["inversion"]:
+            self.optimization_parameters = dictionary["inversion"][
+                "optimization_parameters"
+            ]
+        else:
+            default_optimization_parameters = {
+                "General": {"Secant": {"Type": "Limited-Memory BFGS",
+                    "Maximum Storage": 10}},
+                "Step": {
+                    "Type": "Augmented Lagrangian",
+                    "Augmented Lagrangian": {
+                        "Subproblem Step Type": "Line Search",
+                        "Subproblem Iteration Limit": 5.0,
+                    },
+                    "Line Search": {"Descent Method": {"Type": "Quasi-Newton Step"}},
+                },
+                "Status Test": {
+                    "Gradient Tolerance": 1e-16,
+                    "Iteration Limit": None,
+                    "Step Tolerance": 1.0e-16,
+                },
+            }
+            self.optimization_parameters = default_optimization_parameters
+
+        if "shot_record_file" in dictionary["inversion"]:
+            self.real_shot_record = np.load(dictionary["inversion"]["shot_record_file"])
 
     def _sanitize_optimization_and_velocity_without_fwi(self):
         dictionary = self.input_dictionary

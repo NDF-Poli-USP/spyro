@@ -74,7 +74,6 @@ class Wave(Model_parameters):
         self.forward_solution_receivers = None
         self.current_time = 0.0
         self.set_solver_parameters()
-        self.real_shot_record = None
 
         self.wavelet = self.get_wavelet()
         self.mesh = self.get_mesh()
