@@ -655,7 +655,8 @@ class Model_parameters:
             self.optimization_parameters = default_optimization_parameters
 
         if "shot_record_file" in dictionary["inversion"]:
-            self.real_shot_record = np.load(dictionary["inversion"]["shot_record_file"])
+            if dictionary["inversion"]["shot_record_file"] is not None:
+                self.real_shot_record = np.load(dictionary["inversion"]["shot_record_file"])
 
     def _sanitize_optimization_and_velocity_without_fwi(self):
         dictionary = self.input_dictionary
@@ -709,11 +710,18 @@ class Model_parameters:
         mesh_parameters={},
     ):
         """
+        Set the mesh for the model.
 
         Parameters
         ----------
         user_mesh : spyro.Mesh, optional
             The desired mesh. The default is None.
+        mesh_parameters : dict, optional
+            Additional parameters for setting up the mesh. The default is an empty dictionary.
+
+        Returns
+        -------
+        None
         """
 
         # Setting default mesh parameters
@@ -768,9 +776,16 @@ class Model_parameters:
                 "Mesh dimensions not completely reset from initial dictionary"
             )
 
-    def _creating_automatic_mesh(
-        self, mesh_parameters={},
-    ):
+    def _creating_automatic_mesh(self, mesh_parameters={}):
+        """
+        Creates an automatic mesh using the specified mesh parameters.
+
+        Args:
+            mesh_parameters (dict): A dictionary containing the parameters for meshing.
+
+        Returns:
+            Mesh: The created mesh object.
+        """
         AutoMeshing = meshing.AutomaticMesh(
             comm=self.comm,
             mesh_parameters=mesh_parameters,

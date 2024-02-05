@@ -99,26 +99,42 @@ class Wave(Model_parameters):
         pass
 
     def set_mesh(
-        self,
-        user_mesh=None,
-        mesh_parameters=None,
-    ):
-        super().set_mesh(
-            user_mesh=user_mesh,
-            mesh_parameters=mesh_parameters,
-        )
+            self,
+            user_mesh=None,
+            mesh_parameters=None,
+        ):
+            """
+            Set the mesh for the solver.
 
-        self.mesh = self.get_mesh()
-        self._build_function_space()
-        self._map_sources_and_receivers()
+            Args:
+                user_mesh (optional): User-defined mesh. Defaults to None.
+                mesh_parameters (optional): Parameters for generating a mesh. Defaults to None.
+            """
+            super().set_mesh(
+                user_mesh=user_mesh,
+                mesh_parameters=mesh_parameters,
+            )
+
+            self.mesh = self.get_mesh()
+            self._build_function_space()
+            self._map_sources_and_receivers()
 
     def set_solver_parameters(self, parameters=None):
-        if parameters is not None:
-            self.solver_parameters = parameters
-        elif parameters is None:
-            self.solver_parameters = get_default_parameters_for_method(
-                self.method
-            )
+            """
+            Set the solver parameters.
+
+            Args:
+                parameters (dict): A dictionary containing the solver parameters.
+
+            Returns:
+                None
+            """
+            if parameters is not None:
+                self.solver_parameters = parameters
+            elif parameters is None:
+                self.solver_parameters = get_default_parameters_for_method(
+                    self.method
+                )
 
     def get_spatial_coordinates(self):
         if self.dimension == 2:
@@ -140,14 +156,18 @@ class Wave(Model_parameters):
         Parameters:
         -----------
         conditional:  (optional)
-
-        velocity_model_function:  (optional)
-
+            Firedrake conditional object.
+        velocity_model_function: Firedrake function (optional)
+            Firedrake function to be used as the velocity model. Has to be in the same function space as the object.
         expression:  str (optional)
             If you use an expression, you can use the following variables:
-            x, y, z, pi
-
-        new_file:  (optional)
+            x, y, z, pi, tanh, sqrt. Example: "2.0 + 0.5*tanh((x-2.0)/0.1)".
+            It will be interpoalte into either the same function space as the object or a DG0 function space
+            in the same mesh.
+        new_file:  str (optional)
+            Name of the file containing the velocity model.
+        output:  bool (optional)
+            If True, outputs the velocity model to a pvd file for visualization.
         """
         # If no mesh is set, we have to do it beforehand
         if self.mesh is None:
@@ -242,6 +262,18 @@ class Wave(Model_parameters):
             self.mesh_y = y
 
     def get_and_set_maximum_dt(self, fraction=0.7, estimate_max_eigenvalue=False):
+        """
+        Calculates and sets the maximum stable time step (dt) for the wave solver.
+
+        Args:
+            fraction (float, optional):
+                Fraction of the estimated time step to use. Defaults to 0.7.
+            estimate_max_eigenvalue (bool, optional):
+                Whether to estimate the maximum eigenvalue. Defaults to False.
+
+        Returns:
+            float: The calculated maximum time step (dt).
+        """
         # if self.method == "mass_lumped_triangle":
         #     estimate_max_eigenvalue = True
         # elif self.method == "spectral_quadrilateral":

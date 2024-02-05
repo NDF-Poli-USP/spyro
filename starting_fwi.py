@@ -8,6 +8,26 @@ import spyro
 
 
 def check_gradient(Wave_obj_guess, dJ, rec_out_exact, Jm, plot=False):
+    """
+    Function to check the accuracy of the gradient computation using finite difference method.
+
+    Parameters:
+    ------------
+    Wave_obj_guess:
+        The wave object representing the initial guess.
+    dJ:
+        The derivative of the objective functional with respect to the model parameters.
+    rec_out_exact:
+        The exact output of the receivers.
+    Jm:
+        The value of the objective functional for the initial guess.
+    plot:
+        A boolean indicating whether to plot the error.
+
+    Returns:
+    --------
+    None
+    """
     steps = [1e-3, 1e-4, 1e-5]  # step length
 
     errors = []
@@ -87,14 +107,12 @@ dictionary["mesh"] = {
 
 dictionary["acquisition"] = {
     "source_type": "ricker",
+    # "source_locations": [(-1.1, 1.3), (-1.1, 1.5), (-1.1, 1.8)],
     "source_locations": [(-1.1, 1.5)],
     "frequency": 5.0,
-    # "delay": 1.2227264394269568,
-    # "delay_type": "time",
     "delay": 1.5,
     "delay_type": "multiples_of_minimun",
     "receiver_locations": spyro.create_transect((-1.8, 1.2), (-1.8, 1.8), 10),
-    # "receiver_locations": [(-2.0, 2.5) , (-2.3, 2.5), (-3.0, 2.5), (-3.5, 2.5)],
 }
 
 dictionary["time_axis"] = {
@@ -118,13 +136,20 @@ dictionary["visualization"] = {
     "debug_output": False,
 }
 dictionary["inversion"] = {
-    "perform_fwi": True, # switch to true to make a FWI
+    "perform_fwi": True,  # switch to true to make a FWI
     "initial_guess_model_file": None,
     "shot_record_file": None,
 }
 
 
 def test_fwi(load_real_shot=False):
+    """
+    Run the Full Waveform Inversion (FWI) test.
+
+    Parameters
+    ----------
+        load_real_shot (bool, optional): Whether to load a real shot record or not. Defaults to False.
+    """
 
     # Setting up to run synthetic real problem
     if load_real_shot is False:
@@ -161,4 +186,4 @@ def test_fwi(load_real_shot=False):
 
 
 if __name__ == "__main__":
-    test_fwi(load_real_shot=True)
+    test_fwi(load_real_shot=False)
