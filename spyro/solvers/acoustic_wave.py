@@ -3,7 +3,7 @@ import warnings
 
 from .wave import Wave
 from .time_integration import time_integrator
-from ..io.basicio import ensemble_propagator
+from ..io.basicio import ensemble_propagator, ensemble_gradient
 from ..domains.quadrature import quadrature_rules
 from .acoustic_solver_construction_no_pml import (
     construct_solver_or_matrix_no_pml,
@@ -104,6 +104,7 @@ class AcousticWave(Wave):
 
         return usol, usol_recv
 
+    @ensemble_gradient
     def gradient_solve(self, guess=None, misfit=None, forward_solution=None):
         """Solves the adjoint problem to calculate de gradient.
 
