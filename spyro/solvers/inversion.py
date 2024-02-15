@@ -1,5 +1,9 @@
 import firedrake as fire
 import warnings
+# from ROL.firedrake_vector import FiredrakeVector as FiredrakeVector
+# import ROL
+from scipy.optimize import minimize as scipy_minimize
+from mpi4py import MPI
 
 from .acoustic_wave import AcousticWave
 from ..utils import compute_functional
@@ -292,12 +296,58 @@ class FullWaveformInversion(AcousticWave):
         --------
         Firedrake function
         """
+        comm = self.comm
         if self.misfit is None:
             self.get_functional()
         dJ = self.gradient_solve(misfit=self.misfit, forward_solution=self.guess_forward_solution)
         if save:
             fire.File("gradient.pvd").write(dJ)
+        dJ_total = fire.Function(self.function_space)
+        print(f"Main comm :{comm} has spatial size {comm.comm.size} and ensemble size {comm.ensemble_comm.size}")
+        dJcomm = dJ.comm
+        print(f"dJcomm: {dJcomm} has size {dJcomm.size}")
+        dJ_totalcomm = dJ_total.comm
+        print(f"dJtotalcomm : {dJ_totalcomm}, has size {dJ_totalcomm.size}")
+        comm.comm.barrier()
+        dJ_total = comm.allreduce(dJ, dJ_total)
         self.gradient = dJ
+
+    def return_functional_and_gradient(self):
+        self.get_gradient()
+        dJ = self.gradient.dat.data[:]
+        return self.functional, dJ
+
+    def run_fwi(self):
+        """
+        Run the full waveform inversion.
+        """
+        # if self.running_fwi is False:
+        #     warnings.warn("Dictionary FWI options set to not run FWI.")
+        # if self.current_iteration < self.iteration_limit:
+        #     self.get_gradient()
+        #     self.update_guess_model()
+        #     self.current_iteration += 1
+        # else:
+        #     warnings.warn("Iteration limit reached. FWI stopped.")
+        #     self.running_fwi = False
+        vp_0 = self.c.vector().gather()
+        vmin = 1.5
+        vmax = 5.0
+        bounds = [(vmin, vmax) for _ in range(len(vp_0))]
+        options={"disp": True, "eps": 1e-15,
+                "gtol": 1e-15, "maxiter": 5}
+        result = scipy_minimize(
+            self.return_functional_and_gradient,
+            vp_0,
+            method="L-BFGS-B",
+            jac=True,
+            tol=1e-15,
+            bounds=bounds,
+            options=options,
+        )
+        vp_end = fire.Function(self.function_space)
+        vp_end.dat.data[:] = result.x
+        fire.File("vp_end.pvd").write(vp_end)
 
 
 class SyntheticRealAcousticWave(AcousticWave):
