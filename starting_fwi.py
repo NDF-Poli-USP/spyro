@@ -1,7 +1,7 @@
-from mpi4py.MPI import COMM_WORLD
-import debugpy
-debugpy.listen(3000 + COMM_WORLD.rank)
-debugpy.wait_for_client()
+# from mpi4py.MPI import COMM_WORLD
+# import debugpy
+# debugpy.listen(3000 + COMM_WORLD.rank)
+# debugpy.wait_for_client()
 
 import numpy as np
 import math
@@ -109,12 +109,12 @@ dictionary["mesh"] = {
 }
 dictionary["acquisition"] = {
     "source_type": "ricker",
-    "source_locations": spyro.create_transect((-1.8, 1.2), (-1.8, 1.8), 2),
+    "source_locations": spyro.create_transect((-1.1, 1.2), (-1.1, 1.8), 8),
     # "source_locations": [(-1.1, 1.5)],
     "frequency": 5.0,
     "delay": 1.5,
     "delay_type": "multiples_of_minimun",
-    "receiver_locations": spyro.create_transect((-1.8, 1.2), (-1.8, 1.8), 10),
+    "receiver_locations": spyro.create_transect((-1.9, 1.2), (-1.9, 1.8), 20),
 }
 dictionary["time_axis"] = {
     "initial_time": 0.0,  # Initial time for event
@@ -156,7 +156,7 @@ def test_fwi(load_real_shot=False):
         FWI_obj = spyro.FullWaveformInversion(dictionary=dictionary)
 
         FWI_obj.set_real_mesh(mesh_parameters={"dx": 0.1})
-        cond = fire.conditional(FWI_obj.mesh_z > -2.5, 1.5, 3.5)
+        cond = fire.conditional(FWI_obj.mesh_z > -1.5, 1.5, 3.5)
         FWI_obj.set_real_velocity_model(conditional=cond)
         FWI_obj.generate_real_shot_record()
         np.save("real_shot_record", FWI_obj.real_shot_record)
@@ -174,12 +174,15 @@ def test_fwi(load_real_shot=False):
 
     # Calculating gradient
     comm = FWI_obj.comm
+    V = FWI_obj.function_space
     print(f"Comm: {comm}", flush=True)
     FWI_obj.get_gradient(save=True)
     dJ = FWI_obj.gradient
     dJ_total = fire.Function(FWI_obj.function_space)
     comm.comm.barrier()
     dJ_total = FWI_obj.comm.allreduce(dJ, dJ_total)
+    gradfile = fire.File("Gradient.pvd")
+    gradfile.write(dJ_total)
     # check_gradient(
     #     FWI_obj,
     #     FWI_obj.gradient,
