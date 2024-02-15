@@ -92,11 +92,9 @@ dictionary["options"] = {
     "degree": 4,  # p order
     "dimension": 2,  # dimension
 }
-
 dictionary["parallelism"] = {
     "type": "automatic",  # options: automatic (same number of cores for evey processor) or spatial
 }
-
 dictionary["mesh"] = {
     "Lz": 3.0,  # depth in km - always positive   # Como ver isso sem ler a malha?
     "Lx": 3.0,  # width in km - always positive
@@ -104,17 +102,15 @@ dictionary["mesh"] = {
     "mesh_file": None,
     "mesh_type": "firedrake_mesh",
 }
-
 dictionary["acquisition"] = {
     "source_type": "ricker",
-    # "source_locations": [(-1.1, 1.3), (-1.1, 1.5), (-1.1, 1.8)],
+    # "source_locations": spyro.create_transect((-1.8, 1.2), (-1.8, 1.8), 2),
     "source_locations": [(-1.1, 1.5)],
     "frequency": 5.0,
     "delay": 1.5,
     "delay_type": "multiples_of_minimun",
     "receiver_locations": spyro.create_transect((-1.8, 1.2), (-1.8, 1.8), 10),
 }
-
 dictionary["time_axis"] = {
     "initial_time": 0.0,  # Initial time for event
     "final_time": final_time,  # Final time for event
@@ -123,7 +119,6 @@ dictionary["time_axis"] = {
     "output_frequency": 100,  # how frequently to output solution to pvds - Perguntar Daiane ''post_processing_frequnecy'
     "gradient_sampling_frequency": 1,  # how frequently to save solution to RAM    - Perguntar Daiane 'gradient_sampling_frequency'
 }
-
 dictionary["visualization"] = {
     "forward_output": False,
     "forward_output_filename": "results/forward_output.pvd",
@@ -181,6 +176,9 @@ def test_fwi(load_real_shot=False):
         FWI_obj.functional,
         plot=True,
     )
+
+    # Running the optimization
+
 
     print("END")
 
