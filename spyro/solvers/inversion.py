@@ -114,7 +114,7 @@ class FullWaveformInversion(AcousticWave):
         """
         Generates the real synthetic shot record. Only for use in synthetic test cases.
         """
-        Wave_obj_real_velocity = SyntheticRealAcousticWave(dictionary=self.input_dictionary)
+        Wave_obj_real_velocity = SyntheticRealAcousticWave(dictionary=self.input_dictionary, comm=self.comm)
         if Wave_obj_real_velocity.mesh is None and self.real_mesh is not None:
             Wave_obj_real_velocity.mesh = self.real_mesh
         if Wave_obj_real_velocity.initial_velocity_model is None:
@@ -296,20 +296,15 @@ class FullWaveformInversion(AcousticWave):
         --------
         Firedrake function
         """
-        comm = self.comm
+        # comm = self.comm
         if self.misfit is None:
             self.get_functional()
         dJ = self.gradient_solve(misfit=self.misfit, forward_solution=self.guess_forward_solution)
         if save:
             fire.File("gradient.pvd").write(dJ)
-        dJ_total = fire.Function(self.function_space)
-        print(f"Main comm :{comm} has spatial size {comm.comm.size} and ensemble size {comm.ensemble_comm.size}")
-        dJcomm = dJ.comm
-        print(f"dJcomm: {dJcomm} has size {dJcomm.size}")
-        dJ_totalcomm = dJ_total.comm
-        print(f"dJtotalcomm : {dJ_totalcomm}, has size {dJ_totalcomm.size}")
-        comm.comm.barrier()
-        dJ_total = comm.allreduce(dJ, dJ_total)
+        # dJ_total = fire.Function(self.function_space)
+        # comm.comm.barrier()
+        # dJ_total = comm.allreduce(dJ, dJ_total)
         self.gradient = dJ
 
     def return_functional_and_gradient(self):
