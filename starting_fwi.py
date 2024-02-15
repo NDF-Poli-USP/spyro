@@ -155,9 +155,13 @@ def test_fwi(load_real_shot=False):
     if load_real_shot is False:
         FWI_obj = spyro.FullWaveformInversion(dictionary=dictionary)
 
-        FWI_obj.set_real_mesh(mesh_parameters={"dx": 0.1})
-        cond = fire.conditional(FWI_obj.mesh_z > -1.5, 1.5, 3.5)
-        FWI_obj.set_real_velocity_model(conditional=cond)
+        FWI_obj.set_real_mesh(mesh_parameters={"dx": 0.05})
+        center_z = -1.5
+        center_x = 1.5
+        mesh_z = FWI_obj.mesh_z
+        mesh_x = FWI_obj.mesh_x
+        cond = fire.conditional((mesh_z-center_z)**2 + (mesh_x-center_x)**2 < .2**2, 2.5, 1.5)
+        FWI_obj.set_real_velocity_model(conditional=cond, output=True)
         FWI_obj.generate_real_shot_record()
         np.save("real_shot_record", FWI_obj.real_shot_record)
     else:
