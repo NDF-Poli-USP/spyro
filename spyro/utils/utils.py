@@ -85,6 +85,7 @@ def mpi_init(model):
     # rank = myrank()
     # size = mysize()
     available_cores = COMM_WORLD.size  # noqa: F405
+    print(f"Parallelism type: {model.parallelism_type}", flush=True)
     if model.parallelism_type == "automatic":
         num_cores_per_shot = available_cores / model.number_of_sources
         if available_cores % model.number_of_sources != 0:

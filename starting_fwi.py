@@ -1,3 +1,8 @@
+from mpi4py.MPI import COMM_WORLD
+import debugpy
+debugpy.listen(3000 + COMM_WORLD.rank)
+debugpy.wait_for_client()
+
 import numpy as np
 import math
 import matplotlib.pyplot as plt
@@ -104,8 +109,8 @@ dictionary["mesh"] = {
 }
 dictionary["acquisition"] = {
     "source_type": "ricker",
-    # "source_locations": spyro.create_transect((-1.8, 1.2), (-1.8, 1.8), 2),
-    "source_locations": [(-1.1, 1.5)],
+    "source_locations": spyro.create_transect((-1.8, 1.2), (-1.8, 1.8), 2),
+    # "source_locations": [(-1.1, 1.5)],
     "frequency": 5.0,
     "delay": 1.5,
     "delay_type": "multiples_of_minimun",
@@ -168,19 +173,25 @@ def test_fwi(load_real_shot=False):
     # print(f"Functional :{Jm}")
 
     # Calculating gradient
+    comm = FWI_obj.comm
+    print(f"Comm: {comm}", flush=True)
     FWI_obj.get_gradient(save=True)
-    check_gradient(
-        FWI_obj,
-        FWI_obj.gradient,
-        FWI_obj.real_shot_record,
-        FWI_obj.functional,
-        plot=True,
-    )
+    dJ = FWI_obj.gradient
+    dJ_total = fire.Function(FWI_obj.function_space)
+    comm.comm.barrier()
+    dJ_total = FWI_obj.comm.allreduce(dJ, dJ_total)
+    # check_gradient(
+    #     FWI_obj,
+    #     FWI_obj.gradient,
+    #     FWI_obj.real_shot_record,
+    #     FWI_obj.functional,
+    #     plot=True,
+    # )
 
     # Running the optimization
 
 
-    print("END")
+    print("END", flush=True)
 
 
 if __name__ == "__main__":
