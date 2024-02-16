@@ -1,7 +1,7 @@
-# from mpi4py.MPI import COMM_WORLD
-# import debugpy
-# debugpy.listen(3000 + COMM_WORLD.rank)
-# debugpy.wait_for_client()
+from mpi4py.MPI import COMM_WORLD
+import debugpy
+debugpy.listen(3000 + COMM_WORLD.rank)
+debugpy.wait_for_client()
 
 import numpy as np
 import math
@@ -109,7 +109,7 @@ dictionary["mesh"] = {
 }
 dictionary["acquisition"] = {
     "source_type": "ricker",
-    "source_locations": spyro.create_transect((-1.1, 1.2), (-1.1, 1.8), 8),
+    "source_locations": spyro.create_transect((-1.1, 1.2), (-1.1, 1.8), 2),
     # "source_locations": [(-1.1, 1.5)],
     "frequency": 5.0,
     "delay": 1.5,
