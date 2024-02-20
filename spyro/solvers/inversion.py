@@ -296,16 +296,19 @@ class FullWaveformInversion(AcousticWave):
         --------
         Firedrake function
         """
-        # comm = self.comm
+        comm = self.comm
         if self.misfit is None:
             self.get_functional()
         dJ = self.gradient_solve(misfit=self.misfit, forward_solution=self.guess_forward_solution)
         if save:
             fire.File("gradient.pvd").write(dJ)
-        # dJ_total = fire.Function(self.function_space)
-        # comm.comm.barrier()
-        # dJ_total = comm.allreduce(dJ, dJ_total)
-        self.gradient = dJ
+        dJ_total = fire.Function(self.function_space)
+        comm.comm.barrier()
+        dJ_total = comm.allreduce(dJ, dJ_total)
+        dJ_total /= comm.ensemble_comm.size
+        if comm.comm.size > 1:
+            dJ_total /= comm.comm.size
+        self.gradient = dJ_total
 
     def return_functional_and_gradient(self):
         self.get_gradient()
@@ -329,8 +332,11 @@ class FullWaveformInversion(AcousticWave):
         vmin = 1.5
         vmax = 5.0
         bounds = [(vmin, vmax) for _ in range(len(vp_0))]
-        options={"disp": True, "eps": 1e-15,
-                "gtol": 1e-15, "maxiter": 5}
+        options = {
+            "disp": True,
+            "eps": 1e-15,
+            "gtol": 1e-15, "maxiter": 5,
+        }
         result = scipy_minimize(
             self.return_functional_and_gradient,
             vp_0,
@@ -365,7 +371,6 @@ class SyntheticRealAcousticWave(AcousticWave):
     """
     def __init__(self, dictionary=None, comm=None):
         super().__init__(dictionary=dictionary, comm=comm)
-        print("END")
 
     def forward_solve(self):
         super().forward_solve()
