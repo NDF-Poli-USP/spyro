@@ -32,6 +32,7 @@ def regFreq(factLen, nexp, a, b):
 
 def minSemiAx(Ly, pml, CamComp=False):
     """
+    CamComp: camada completa
     Calculating the minor semi-axis for rectangular layer
     """
     if CamComp:
@@ -114,27 +115,32 @@ def calcCritDamp(eikmin, Lx, Ly, lref, factLen):
     return etacr
 
 
-def testPosDamp(mesh_Fin, Lx, Ly, pml, ref):
+def testPosDamp(function_space, Lx, Ly, pml, ref):
     """
+    ref: ponderação da distribuição de amortecimento
     Mapping of positions inside of absorbing layer
     """
-    V = FunctionSpace(mesh_Fin, "CG", 1)
+    V = function_space
+    mesh = function_space.get_mesh()
     # Mesh coordinates
     mesh_coord = V.tabulate_dof_coordinates()
 
+    # identificar se esta na camada (posso retirar depois)
     refamx = np.abs(mesh_coord[:, 0] - (0.5 * Lx + pml))
     refamy = np.abs(mesh_coord[:, 1] - (0.5 * Ly + pml))
     condAmo = (refamx > 0.5 * Lx) | (refamy > 0.5 * Ly)
 
+    # identificar os cantos e modificar amortecimento
     testc = (refamx >= 0.5 * Lx) & (refamy >= 0.5 * Ly)
     ref[testc] = (
         (refamx[testc] - 0.5 * Lx) ** 2 + (refamy[testc] - 0.5 * Ly) ** 2
     ) ** 0.5
+
     testx = (refamx > 0.5 * Lx) & (refamy < 0.5 * Ly)
     ref[testx] = refamx[testx] - 0.5 * Lx
     testy = (refamx < 0.5 * Lx) & (refamy > 0.5 * Ly)
     ref[testy] = refamy[testy] - 0.5 * Ly
-    ref = ref / pml
+    ref = ref / pml #ref no artigo é a equação 12 xiref
 
     return condAmo
 
@@ -161,10 +167,10 @@ def CRminQua(
     Option 'MEF' is an auxiliary function to determine xCR
     """
     if typ == "QUA":  # Minimum coefficient reflection
-        return (xCR * d) ** 2 / (kCR**2 + (xCR * d) ** 2)
+        return (xCR * d) ** 2 / (kCR**2 + (xCR * d) ** 2) # Começando uma regreção e calulando o ponto inicial
     elif typ == "MEF":  # Unidimensional spourious reflection
 
-        def Zi(p, alpha, Mass="COM"):
+        def Zi(p, alpha, Mass="COM"): #Z1 e Z2 da equação 20 LUM é lumped com é consistente
             if Mass == "COM":
                 m1 = 1 / 3
                 m2 = 1 / 6
@@ -202,7 +208,7 @@ def xCRVert(x0, x1, x2, y0, y1, y2, xCRInf):
     b = m2 - a * (x2 + x0)
     c = y2 - x2 * (m2 - a * x0)
     # Vertex or minimum positive root
-    if -b / (2 * a) < xCRInf:
+    if -b / (2 * a) < xCRInf: # Da equação 28
         ind = np.where(np.roots([a, b, c]) >= xCRInf)[0][0]
         return np.roots([a, b, c])[ind], 0
     else:
@@ -212,7 +218,7 @@ def xCRVert(x0, x1, x2, y0, y1, y2, xCRInf):
 def estXCR(psi, d, kCR, pCR, CRmax, a, F_L, Ra, Fa):
     """
     Estimation of xCR
-    CRref > 0, because always have both reflections: physical ans spurious)
+    CRref > 0, because always have both reflections: physical and spurious)
     """
     # Reference values for regression
     xCRIni = psi * (d + 1) / 2
@@ -222,6 +228,7 @@ def estXCR(psi, d, kCR, pCR, CRmax, a, F_L, Ra, Fa):
     CRMef, xCRMef = CRminQua(d, kCR, typ="MEF", p=pCR, psi=psi, a=a, F_L=F_L)
     # Vertex or minimum positive root
     xCRreg, CRreg = xCRVert(xCRIni, xCRSup, xCRMef, CRIni, CRmax, CRMef, xCRInf)
+    # Ini primeiro ponto(a=b da eq quadratica), Sup máximo, Mef devido a essa reflexão espúria,Inf valor de referencia para o infinto 
     # Errors
     err1 = abs(np.sin(pCR / 2))
     err2 = abs(-1 + np.cos(pCR))
@@ -257,7 +264,7 @@ def estXCR(psi, d, kCR, pCR, CRmax, a, F_L, Ra, Fa):
 
     return xCRref, xCRInf, xCRSup, xCRmin, xCRmax
 
-
+# Reler 2.4 e ler ref 73
 def funDamp(
     mesh_Fin,
     TipLay,
@@ -276,6 +283,9 @@ def funDamp(
     m=1,
 ):
     """
+    Z: 1/eik
+    lmin: do ponto critico
+
     Calculates the damping distribution within layer
     psi: Damping ratio. psi < 1: Underdamped regime
     m : Vibration mode
@@ -284,13 +294,12 @@ def funDamp(
     condAmo = testPosDamp(mesh_Fin, Lx, Ly, pml, ref)
 
     a = Z / fref
-    d = lmin / pml
-    kCR = 4 * F_L / (a * m)
+    d = lmin / pml # Mudar para as anotações lmin do critico/pml
+    kCR = 4 * F_L / (a * m) # 
     psiaux = psi * (2 * d - d**2)
-    CRmax = abs(psiaux**2 / (psiaux**2 + kCR**2))
-    pCR = 2 * pi * fref * lmin / cref
+
     arec = Lx + 2 * pml
-    brec = 2 * minSemiAx(Ly, pml)
+    brec = 2 * minSemiAx(Ly, pml) # Para realocar o centroide da hiperelipse
     Ra = arec / brec  # Aspect ratio of domain with layer
     if not TipLay == "REC":
         FactA = 4 * gamma(1 + 1 / nexp) ** 2 / gamma(1 + 2 / nexp)
@@ -298,7 +307,12 @@ def funDamp(
         Fa = 4
 
     # Estimation of xCR
+    CRmax = abs(psiaux**2 / (psiaux**2 + kCR**2))
+    pCR = 2 * pi * fref * lmin / cref # numero de onda adimensional a partir da eq 20
+    # Ler artigo da eq 20 pois elementos variam e alpha dif de 1
+    # Olhar alpha como fração entre tamanho dos elementos
     xCR, xCRInf, xCRSup = estXCR(psi, d, kCR, pCR, CRmax, a, F_L, Ra, Fa)[0:3]
+
     # Minimum Reflection Coefficient
     CRmin = min(CRminQua(d, kCR, xCR=xCR), CRmax)
     aq, bq = coeDampFun(CRmin, kCR, d, psi)[0:2]

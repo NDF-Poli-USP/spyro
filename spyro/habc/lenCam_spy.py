@@ -198,13 +198,14 @@ def CalcFL(TipLay, Lx, Ly, fref, lmin, lref, Z, nexp, nz=5, crtCR=0):
     crtCR: Position in CRpos. Default: 0
     """
     tol = 1e-3
-    a = Z / 3.37 # fref  # print(a, Z,fref) para 18 fref com fft = 4.8
+    a = Z / fref # print(a, Z,fref) para 18 fref com fft = 4.8
     print(f"a = {a}")
     print(f"fref = {fref}")
     FLpos = []
     crtCR = min(crtCR, nz - 1)  # Position in CRpos. Default: 0
     print(f"lmin: {lmin}, lref: {lref}")
-    FLmin = 0.2 * lmin / lref # 18.75 [m] / 1.68[km]  #0.1 * lmin / lref  # passar lmin da camada de agua
+    FLmin = 0.1*lmin/lref # 0.2 * lmin / lref # 18.75 [m] / 1.68[km]  #0.1 * lmin / lref  # passar lmin da camada de agua
+    print(f"Flmin {FLmin}")
     x = FLmin
     for i in range(1, nz + 1):
         x = calcZero(x, a, i)
@@ -364,3 +365,22 @@ def habc_size(HABC):
     ##############
 
     return fref, F_L, pml, lref
+
+
+
+
+    # pmlx = Dom.dimensions[0]
+    # pmly = Dom.dimensions[1]
+    # Lx = Dom.dimensions[2]
+    # Ly = Dom.dimensions[3]
+    # scx = possou[0].item()
+    # scy = possou[1].item()
+
+    # if pH['ExtC'] == 'LIN':
+    #     oper_damp_x = 'pow(max(pmlx, x[0]) + \
+    #         min(pmlx + Lx, x[0]) - x[0] - scx, 2)'
+    #     oper_damp_y = 'pow(max(pmly, x[1]) + \
+    #         min(pmly + Ly, x[1]) - x[1] - scy, 2)'
+    #     oper_damp = 'sqrt(' + oper_damp_x + '+' + oper_damp_y + ') / lref'
+    #     exp_func = Expression(oper_damp, Lx=Lx, Ly=Ly, pmlx=pmlx, pmly=pmly,
+    #                           scx=scx, scy=scy, lref=Mes.lref, degree=2)

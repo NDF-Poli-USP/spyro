@@ -80,7 +80,7 @@ def test_eikonal_values_fig18():
     Wave_obj.forward_solve()
 
     min_value = Wave_obj.noneikonal_minimum
-    rec_source = Wave_obj.receivers_output[:,0]
+    rec_source = Wave_obj.receivers_output[:, 0]
     paper_min = 0.58755
 
     # Testing minimum values
