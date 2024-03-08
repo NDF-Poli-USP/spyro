@@ -2,6 +2,7 @@
 import matplotlib.pyplot as plt
 import matplotlib.patches as patches
 from matplotlib.ticker import MultipleLocator
+from PIL import Image
 import numpy as np
 import firedrake
 import copy
@@ -122,10 +123,23 @@ def plot_mesh_sizes(
 
 
 def plot_model(Wave_object, filename="model.png", abc_points=None):
+    """
+    Plot the model with source and receiver locations.
+
+    Parameters
+    -----------
+    Wave_object:
+        The Wave object containing the model and locations.
+    filename (optional):
+        The filename to save the plot (default: "model.png").
+    abc_points (optional):
+        List of points to plot an ABC line (default: None).
+    """
+    plt.close()
     fig = plt.figure(figsize=(9, 9))
     axes = fig.add_subplot(111)
-    fig.set_figwidth=9.0
-    fig.set_figheight=9.0
+    fig.set_figwidth = 9.0
+    fig.set_figheight = 9.0
     vp_object = Wave_object.initial_velocity_model
     vp_image = firedrake.tripcolor(vp_object, axes=axes)
     for source in Wave_object.source_locations:
@@ -136,9 +150,12 @@ def plot_model(Wave_object, filename="model.png", abc_points=None):
         plt.scatter(z, x, c="red")
 
     axes.invert_yaxis()
+    axes.set_xlabel("Z (km)")
+    axes.set_ylabel("X (km)", rotation=-90, labelpad=20)
     plt.setp(axes.get_xticklabels(), rotation=-90, va="top", ha="center")
     plt.setp(axes.get_yticklabels(), rotation=-90, va="center", ha="left")
     cbar = plt.colorbar(vp_image, orientation="horizontal")
+    cbar.set_label("Velocity (km/s)")
     cbar.ax.tick_params(rotation=-90)
     axes.tick_params(axis='y', pad=20)
     axes.axis('equal')
@@ -159,7 +176,10 @@ def plot_model(Wave_object, filename="model.png", abc_points=None):
         zs.append(z_first)
         xs.append(x_first)
         plt.plot(zs, xs, "--")
-
+    print(f"File name {filename}", flush=True)
     plt.savefig(filename)
+    img = Image.open(filename)
+    img_rotated = img.rotate(90)
 
-
+    # Save the rotated image
+    img_rotated.save(filename)
