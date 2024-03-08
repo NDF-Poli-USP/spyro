@@ -341,12 +341,12 @@ def habc_size(HABC):
 
     Lx = HABC.length_z
     Ly = HABC.length_x
-    posCrit = HABC.noneikonal_minimum_point
+    posCrit = HABC.ne_location
     f0 = HABC.frequency
     # it_fwi = HABC.fwi_iteration
     lmin = HABC.h_min
     # dt = HABC.dt
-    Z = 1/HABC.noneikonal_minimum
+    Z = 1/HABC.ne_time_value
     nexp = np.nan
 
     # Critical position for reference

@@ -91,6 +91,9 @@ class AcousticWave(Wave):
 
         return usol, usol_recv
 
+    def reset_pressure(self):
+        self.u_nm1.assign(0.0)
+        self.u_n.assign(0.0)
     # def gradient_solve(self, guess=None):
     #     """Solves the adjoint problem to calculate de gradient.
 

@@ -60,4 +60,20 @@ dictionary["visualization"] = {
     "debug_output": True,
 }
 
-Wave_obj = spyro.AcousticWave(dictionary=dictionary)
+Wave_obj = spyro.HABC(dictionary=dictionary)
+
+cpw = 6.0
+lba = 1.5 / 5.0
+edge_length = lba / cpw
+Wave_obj.set_mesh(mesh_parameters={"edge_length": edge_length})
+V = Wave_obj.function_space
+mesh = Wave_obj.mesh
+c = get_paper_velocity(mesh, V)
+
+Wave_obj.set_initial_velocity_model(velocity_model_function=c)
+Wave_obj._get_initial_velocity_model()
+
+Wave_obj.c = Wave_obj.initial_velocity_model
+# Wave_obj.get_and_set_maximum_dt(fraction=0.5)
+Wave_obj.no_boundary_forward_solve()
+Wave_obj.set_damping_field()

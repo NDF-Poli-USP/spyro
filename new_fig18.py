@@ -79,7 +79,7 @@ def test_eikonal_values_fig18():
     # Wave_obj.get_and_set_maximum_dt(fraction=0.5)
     Wave_obj.forward_solve()
 
-    min_value = Wave_obj.noneikonal_minimum
+    min_value = Wave_obj.ne_time_value
     rec_source = Wave_obj.receivers_output[:, 0]
     paper_min = 0.58755
 
@@ -90,7 +90,7 @@ def test_eikonal_values_fig18():
     print(f"Passed the minimum value test: {test_min}")
 
     # Testing minimum location
-    z_min, x_min = Wave_obj.noneikonal_minimum_point
+    z_min, x_min = Wave_obj.ne_location
     paper_z_min = -(2.4-1.925)
     paper_x_min = 4.8
 

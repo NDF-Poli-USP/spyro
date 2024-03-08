@@ -18,6 +18,90 @@ import sys
 ##############
 
 
+class Damping_field_calculator:
+    """
+    Calcules damping function across the field.
+
+    Attributes
+    ----------
+
+    Methods
+    -------
+
+    """
+    def __init__(self, Wave_obj):
+        """
+        Initializes 
+        """
+        self.mesh = Wave_obj.mesh
+        self.pad_length = Wave_obj.abc_pad_length
+        self.lref = Wave_obj.neik_reference_length
+        self.layer_type = "rectangle"
+        self.eta = Function(Wave_obj.function_space)
+        self.length_z = Wave_obj.length_z
+        self.length_x = Wave_obj.length_x
+        self.damping_function()
+    
+    def damping_function(self):
+        """
+        Determines the distribution of the damping within the absorbing
+        layer from the calcultions of the maximum damping value
+        mesh_Fin: Final mesh with absorbing layer
+        TipLay: Layer damping type (Rectangular: 'REC' or Hyperelliptical: 'HYP')
+        Lx, Ly: Original domain dimensions
+        lref: Reference length for the size of the absorbing layer
+        pml: Length of absrobing layer
+        Z: Inverse of minimum Eikonal
+        fref: Reference frequency
+        lmin: Minimal dimension of finite element
+        F_L: Parameterized length of absorbing layer
+        c_ref: Valocity at critical point wit minimum Eikonal
+        nexp: Hyperellipse exponent for damping layer. nexp = NaN for rectangular layers
+        """
+        print("Determining Damping Distribution")
+        eta = self.eta
+        eta_array = eta.dat.data[:]
+        # Factor for frequency correction
+        factLen = calcFact2D(
+            self.layer_type,
+            self.length_z,
+            self.length_x,
+            self.pad_length,
+            0,
+        ) # Change 0 to atribute nexp in future for hyper-ellipse
+        # Min Eikonal = 1 / Z. Tau = kw*eikmin
+        etacr = calcCritDamp(
+            1 / self.neik_time_value,
+            self.length_z,
+            self.length_x,
+            self.lref,
+            factLen,
+        )
+        # Damping Function
+        etalim = funDamp(
+            self.mesh,
+            self.layer_type,
+            self.length_z,
+            self.length_x,
+            self.pad_length,
+            0, # NEXP change for kargs in all places
+            eta_array,
+            etacr,
+            self.neik_time_value,
+            self.frequency,
+            self.neik_edge_length,
+            self.neik_length_factor,
+            self.neik_reference_velocity,
+        )
+
+
+        damp_file = File("/out/Damp.pvd")
+        damp_file.write(eta)
+
+        return eta, etalim
+
+
+
 def regFreq(factLen, nexp, a, b):
     """
     Frequency factor for hiperellipses and hipercircles
@@ -47,7 +131,7 @@ def calcFact2D(TipLay, Lx, Ly, pml, nexp, CamComp=False):
     Computing length factor for natural frequency
     """
     a = 0.5 * Lx + pml  # Major semi-axis
-    if TipLay == "REC":
+    if TipLay == "rectangle":
         """
         Rectangular layers
         https://www.sc.ehu.es/sbweb/fisica3/ondas/membrana_1/membrana_1.html

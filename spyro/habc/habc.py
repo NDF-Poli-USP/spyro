@@ -1,7 +1,9 @@
 import numpy as np
 from . import eikonal as eikonal_module
 from . import lenCam_spy
+from .damping_spy import Damping_field_calculator
 from ..meshing import AutomaticMesh
+from ..solvers.acoustic_wave import AcousticWave
 import firedrake as fire
 from firedrake import dot, grad
 import finat
@@ -10,8 +12,7 @@ import scipy
 # Work from Ruben Andres Salas,
 # Andre Luis Ferreira da Silva,
 # Luis Fernando Nogueira de Sá, Emilio Carlos Nelli Silva, Hybrid absorbing
-# scheme based on hyperel-
-# liptical layers with non-reflecting boundary conditions in scalar wave
+# scheme based on hyperelliptical layers with non-reflecting BCs in scalar wave
 # equations, Applied Mathematical
 # Modelling (2022), doi: https://doi.org/10.1016/j.apm.2022.09.014
 # With additions by Alexandre Olender
@@ -54,7 +55,7 @@ def make_eikonal_function_space(user_mesh):
     return fire.FunctionSpace(user_mesh, "CG", 1)
 
 
-class HABC:
+class HABC(AcousticWave):
     """
     class HABC that determines absorbing layer size and parameters to be used
 
@@ -102,39 +103,28 @@ class HABC:
 
     """
 
-    def __init__(self, Wave_object, h_min=None, fwi_iteration=0):
-        """Initializes class and gets a wave object as an input.
+    def __init__(self, dictionary=None, comm=None, h_min=None, fwi_iteration=0):
+        """
+        Initializes the HABC class.
 
         Parameters
         ----------
-        Wave_object: `dictionary`
-            Contains simulation parameters and options without a pad.
-
-        h_min: `float`
-            Minimum mesh size
-
-        fwi_iteration: `int`
-            Number of FWI iteration
+        dictionary : dict, optional
+            A dictionary containing the input parameters for the HABC class.
+        comm : object, optional
+            An object representing the communication interface.
+        h_min : float, optional
+            The minimum value of the mesh size.
+        fwi_iteration : int, optional
+            The iteration number for the Full Waveform Inversion (FWI) algorithm.
 
         Returns
         -------
         None
 
         """
+        super().__init__(dictionary=dictionary, comm=comm)
 
-        # TODO: ajust weak implementation of boundary condition
-
-        source_position = []
-
-        for source in Wave_object.source_locations:
-            z, x = source
-            source_position.append(np.asarray([z, x]))
-
-        self.length_z = Wave_object.length_z
-        self.length_x = Wave_object.length_x
-        self.source_position = source_position
-        self.Wave = Wave_object
-        self.dt = Wave_object.dt
         self.layer_shape = "rectangular"
         if self.layer_shape == "rectangular":
             self.nexp = np.nan
@@ -142,21 +132,30 @@ class HABC:
             self.nexp = 2
         else:
             UserWarning(
-                f"Please use 'rectangular' or \
-                'hyperelliptical', f{self.layer_shape} not supported."
+                f"Please use 'rectangular' or 'hyperelliptical', {self.layer_shape} not supported."
             )
-        # print(f"h_min = {h_min}")
-        # if h_min is None:
-        #     h_min = self._minimum_h_calc()
-        # print(f"h_min = {h_min}")
         self.h_min = h_min
         self.fwi_iteration = fwi_iteration
-        self.initial_frequency = Wave_object.frequency
-        self.reference_frequency = Wave_object.frequency
-        print("Assuming initial mesh without pad")
-        self._store_data_without_HABC()
-        self.eikonal()
-        self.habc_size()
+        self.initial_frequency = self.frequency
+        self.reference_frequency = self.frequency
+        # Initial noneikonal (ne) related attributes
+        self.neik_location = None
+        self.neik_time_value = None
+        self.neik_velocity_value = None
+
+    def no_boundary_forward_solve(self):
+        self.forward_solve()
+        self.reset_pressure()
+        fref, F_L, pad_length, lref = lenCam_spy.habc_size(self)
+        self.abc_pad_length = pad_length
+        self.neik_reference_length = lref
+        self.neik_length_factor = F_L
+
+        print("PAUSE in noboundaryforwardsolve")
+
+    def set_damping_field(self):
+        Damp_obj = Damping_field_calculator(self)
+        
 
     def _fundamental_frequency(self):
         V = self.Wave.function_space
@@ -187,21 +186,6 @@ class HABC:
         self.fundamental_freq = np.sqrt(min_eigval) / (2 * np.pi)
 
         return None
-
-    def _store_data_without_HABC(self):
-        fire.File("c_before_proj.pvd").write(self.Wave.c)
-        self.mesh_without_habc = make_eikonal_mesh(self.length_z, self.length_x, self.h_min)
-        self.function_space_without_habc = make_eikonal_function_space(
-            self.mesh_without_habc
-        )
-        self.c_without_habc = fire.project(
-            self.Wave.c, fire.FunctionSpace(self.mesh_without_habc, "CG", 2)
-        )
-        # self.c_without_habc = fire.Function(self.function_space_without_habc)
-        # self.c_without_habc.interpolate(self.Wave.c)
-        fire.File("c_after_proj.pvd").write(self.c_without_habc)
-
-        self.sources_without_habc = self.Wave.sources
 
     def _minimum_h_calc(self):
         diameters = fire.CellDiameter(self.mesh)
