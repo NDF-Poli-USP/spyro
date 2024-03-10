@@ -1,7 +1,7 @@
-# from mpi4py.MPI import COMM_WORLD
-# import debugpy
-# debugpy.listen(3000 + COMM_WORLD.rank)
-# debugpy.wait_for_client()
+# # from mpi4py.MPI import COMM_WORLD
+# # import debugpy
+# # debugpy.listen(3000 + COMM_WORLD.rank)
+# # debugpy.wait_for_client()
 
 import numpy as np
 import math
@@ -88,6 +88,24 @@ def check_gradient(Wave_obj_guess, dJ, rec_out_exact, Jm, plot=False):
     assert all([test1, test2])
 
 
+def mask_gradient(Wave_obj, dJ, zlim, xlim):
+    mesh_z = Wave_obj.mesh_z
+    mesh_x = Wave_obj.mesh_x
+    zlim_lower, zlim_upper = zlim
+    xlim_lower, xlim_upper = xlim
+    mask = fire.Function(Wave_obj.function_space)
+    cond = fire.conditional(mesh_z < zlim_lower, 1, mask)
+    mask.interpolate(cond)
+    cond = fire.conditional(mesh_z > zlim_upper, 1, mask)
+    mask.interpolate(cond)
+    cond = fire.conditional(mesh_x < xlim_lower, 1, mask)
+    mask.interpolate(cond)
+    cond = fire.conditional(mesh_x > xlim_upper, 1, mask)
+    mask.interpolate(cond)
+    mask_dofs = np.where(mask.dat.data[:] > 0.5)
+    return mask_dofs
+
+
 final_time = 1.0
 
 dictionary = {}
@@ -112,9 +130,9 @@ dictionary["acquisition"] = {
     "source_locations": spyro.create_transect((-1.1, 1.2), (-1.1, 1.8), 5),
     # "source_locations": [(-1.1, 1.5)],
     "frequency": 5.0,
-    "delay": 1.5,
-    "delay_type": "multiples_of_minimun",
-    "receiver_locations": spyro.create_transect((-1.9, 1.2), (-1.9, 1.8), 20),
+    "delay": 0.2,
+    "delay_type": "time",
+    "receiver_locations": spyro.create_transect((-1.9, 1.2), (-1.9, 1.8), 300),
 }
 dictionary["time_axis"] = {
     "initial_time": 0.0,  # Initial time for event
@@ -154,25 +172,61 @@ def test_fwi(load_real_shot=False):
     # Setting up to run synthetic real problem
     if load_real_shot is False:
         FWI_obj = spyro.FullWaveformInversion(dictionary=dictionary)
+        comm = FWI_obj.comm
 
         FWI_obj.set_real_mesh(mesh_parameters={"dx": 0.05})
         center_z = -1.5
         center_x = 1.5
         mesh_z = FWI_obj.mesh_z
         mesh_x = FWI_obj.mesh_x
-        cond = fire.conditional((mesh_z-center_z)**2 + (mesh_x-center_x)**2 < .2**2, 2.5, 1.5)
-        # mesh_z = FWI_obj.mesh_z
-        # cond = fire.conditional(mesh_z > -1.5, 1.5, 3.5)
+        cond = fire.conditional((mesh_z-center_z)**2 + (mesh_x-center_x)**2 < .2**2, 3.0, 2.5)
+
         FWI_obj.set_real_velocity_model(conditional=cond, output=True)
-        FWI_obj.generate_real_shot_record()
+        FWI_obj.generate_real_shot_record(
+            # plot_model=True,
+            # filename="True_experiment.png",
+            # abc_points=[(-1.0, 1.0), (-2.0, 1.0), (-2.0, 2.0), (-1.0, 2.0)]
+        )
         np.save("real_shot_record", FWI_obj.real_shot_record)
+
+        spyro_shots = FWI_obj.real_shot_record
+        nt_spy, nr_spy = np.shape(spyro_shots)
+        devito_fl = "true_data_camembert.npy"
+        devito_shots = np.load(devito_fl)
+        if comm.comm.rank == 0:
+            print(np.shape(devito_shots), flush=True)
+            print(np.shape(spyro_shots), flush=True)
+        nt_dev, nr_dev, ns_dev = np.shape(devito_shots)
+        timevector_dev = np.linspace(0.0, 1.0, nt_dev)
+        timevector_spy = np.linspace(0.0, 1.0, nt_spy)
+        desired_recs = [0, 99, 149, 299]
+        sources_desired = [0, 3, 9]
+
+        for rec_i in desired_recs:
+            for source_id in sources_desired:
+                if comm.ensemble_comm.rank == source_id:
+                    multiplier = np.max(devito_shots[:, rec_i, source_id])/np.max(spyro_shots[:, rec_i])
+                    print(f"Multiplier of {multiplier} changed to 100", flush=True)
+                    multiplier = 100
+                    plt.close()
+                    plt.plot(timevector_spy, multiplier*spyro_shots[:, rec_i], label="spyro")
+                    plt.plot(timevector_dev, devito_shots[:, rec_i, source_id], "--", label="devito")
+                    plt.title(f"Source {source_id}, Receiver {rec_i}")
+                    plt.legend()
+                    plt.savefig("test_source_"+str(source_id)+"receiver_"+str(rec_i)+".png")
+                    peak_dev = timevector_dev[np.argmax(devito_shots[:, rec_i, source_id])]
+                    peak_spy = timevector_spy[np.argmax(spyro_shots[:, rec_i])]
+                    time_delay = dictionary["acquisition"]["delay"] + peak_dev - peak_spy
+                    print(f"Time Delay to put: {time_delay}", flush=True)
+
+        print("END", flush=True)
     else:
         dictionary["inversion"]["shot_record_file"] = "real_shot_record.npy"
         FWI_obj = spyro.FullWaveformInversion(dictionary=dictionary)
 
     # Setting up initial guess problem
     FWI_obj.set_guess_mesh(mesh_parameters={"dx": 0.05})
-    FWI_obj.set_guess_velocity_model(constant=1.5)
+    FWI_obj.set_guess_velocity_model(constant=2.5)
 
     # Getting functional
     # Jm = FWI_obj.get_functional()
@@ -181,6 +235,10 @@ def test_fwi(load_real_shot=False):
     # Calculating gradient
     FWI_obj.get_gradient(save=True)
     dJ = FWI_obj.gradient
+    mask = mask_gradient(FWI_obj, dJ, (-1.9, -1.1), (1.1, 1.9))
+    if FWI_obj.comm.comm.rank == 0:
+        np.save("gradient.npy", dJ.dat.data[:])
+    dJ.dat.data[mask] = 0.0
     gradfile = fire.File("Gradient.pvd")
     gradfile.write(dJ)
     # check_gradient(
