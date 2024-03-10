@@ -95,7 +95,7 @@ class FullWaveformInversion(AcousticWave):
         self.misfit = None
         self.guess_forward_solution = None
 
-    def calculate_misfit(self):
+    def calculate_misfit(self, c=None):
         """
         Calculates the misfit, between the real shot record and the guess shot record.
         If the guess forward model has already been run it uses that value. Otherwise, it runs the forward model.
@@ -104,7 +104,10 @@ class FullWaveformInversion(AcousticWave):
             self.mesh = self.guess_mesh
         if self.initial_velocity_model is None:
             self.initial_velocity_model = self.guess_velocity_model
+        if c is not None:
+            self.initial_velocity_model.dat.data[:] = c
         self.forward_solve()
+        self.save_current_velocity_model(file_name="control"+str(self.current_iteration)+".pvd")
         self.guess_shot_record = self.forward_solution_receivers
         self.guess_forward_solution = self.forward_solution
 
@@ -268,7 +271,7 @@ class FullWaveformInversion(AcousticWave):
         )
         self.guess_mesh = self.get_mesh()
 
-    def get_functional(self):
+    def get_functional(self, c=None):
         """
         Calculate and return the functional value.
 
@@ -278,17 +281,14 @@ class FullWaveformInversion(AcousticWave):
         Returns:
             float: The functional value.
         """
-        if self.misfit is not None:
-            Jm = compute_functional(self, self.misfit)
-        else:
-            self.calculate_misfit()
-            Jm = compute_functional(self, self.misfit)
+        self.calculate_misfit(c=c)
+        Jm = compute_functional(self, self.misfit)
 
         self.functional = Jm
 
         return Jm
 
-    def get_gradient(self, save=False):
+    def get_gradient(self, c=None, save=True):
         """
         Calculates the gradient of the functional with respect to the model parameters.
 
@@ -302,22 +302,22 @@ class FullWaveformInversion(AcousticWave):
         Firedrake function
         """
         comm = self.comm
-        if self.misfit is None:
-            self.get_functional()
+        self.get_functional(c=c)
         dJ = self.gradient_solve(misfit=self.misfit, forward_solution=self.guess_forward_solution)
-        if save:
-            fire.File("gradient.pvd").write(dJ)
         dJ_total = fire.Function(self.function_space)
         comm.comm.barrier()
         dJ_total = comm.allreduce(dJ, dJ_total)
         dJ_total /= comm.ensemble_comm.size
         if comm.comm.size > 1:
             dJ_total /= comm.comm.size
+        if save and comm.comm.rank == 0:
+            fire.File("gradient"+str(self.current_iteration)+".pvd").write(dJ_total)
         self.gradient = dJ_total
 
-    def return_functional_and_gradient(self):
-        self.get_gradient()
+    def return_functional_and_gradient(self, c):
+        self.get_gradient(c=c)
         dJ = self.gradient.dat.data[:]
+        self.current_iteration += 1
         return self.functional, dJ
 
     def run_fwi(self):
@@ -333,7 +333,7 @@ class FullWaveformInversion(AcousticWave):
         # else:
         #     warnings.warn("Iteration limit reached. FWI stopped.")
         #     self.running_fwi = False
-        vp_0 = self.c.vector().gather()
+        vp_0 = self.initial_velocity_model.vector().gather()
         vmin = 1.5
         vmax = 5.0
         bounds = [(vmin, vmax) for _ in range(len(vp_0))]

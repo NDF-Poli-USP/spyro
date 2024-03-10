@@ -17,6 +17,15 @@ from .backward_time_integration import (
 
 
 class AcousticWave(Wave):
+    def save_current_velocity_model(self, file_name=None):
+        if self.c is None:
+            raise ValueError("C not loaded")
+        if file_name is None:
+            file_name = "velocity_model.pvd"
+        fire.File(file_name).write(
+            self.c, name="velocity"
+        )
+
     def forward_solve(self):
         """Solves the forward problem.
 
