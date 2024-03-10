@@ -1,12 +1,13 @@
 import firedrake as fire
 import warnings
-# from ROL.firedrake_vector import FiredrakeVector as FiredrakeVector
-# import ROL
+from ROL.firedrake_vector import FiredrakeVector as FiredrakeVector
+import ROL
 from scipy.optimize import minimize as scipy_minimize
 from mpi4py import MPI
 
 from .acoustic_wave import AcousticWave
 from ..utils import compute_functional
+from ..plots import plot_model as spyro_plot_model
 
 
 class FullWaveformInversion(AcousticWave):
@@ -110,7 +111,7 @@ class FullWaveformInversion(AcousticWave):
         self.misfit = self.real_shot_record - self.guess_shot_record
         return self.misfit
 
-    def generate_real_shot_record(self):
+    def generate_real_shot_record(self, plot_model=False, filename=None, abc_points=None):
         """
         Generates the real synthetic shot record. Only for use in synthetic test cases.
         """
@@ -119,6 +120,10 @@ class FullWaveformInversion(AcousticWave):
             Wave_obj_real_velocity.mesh = self.real_mesh
         if Wave_obj_real_velocity.initial_velocity_model is None:
             Wave_obj_real_velocity.initial_velocity_model = self.real_velocity_model
+
+        if plot_model and Wave_obj_real_velocity.comm.comm.rank == 0 and Wave_obj_real_velocity.comm.ensemble_comm.rank == 0:
+            spyro_plot_model(Wave_obj_real_velocity, filename=filename, abc_points=abc_points)
+
         Wave_obj_real_velocity.forward_solve()
         self.real_shot_record = Wave_obj_real_velocity.real_shot_record
 
