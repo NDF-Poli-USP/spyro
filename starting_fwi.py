@@ -1,7 +1,7 @@
-from mpi4py.MPI import COMM_WORLD
-import debugpy
-debugpy.listen(3000 + COMM_WORLD.rank)
-debugpy.wait_for_client()
+# from mpi4py.MPI import COMM_WORLD
+# import debugpy
+# debugpy.listen(3000 + COMM_WORLD.rank)
+# debugpy.wait_for_client()
 
 import numpy as np
 import math
@@ -109,7 +109,7 @@ dictionary["mesh"] = {
 }
 dictionary["acquisition"] = {
     "source_type": "ricker",
-    "source_locations": spyro.create_transect((-1.1, 1.2), (-1.1, 1.8), 2),
+    "source_locations": spyro.create_transect((-1.1, 1.2), (-1.1, 1.8), 5),
     # "source_locations": [(-1.1, 1.5)],
     "frequency": 5.0,
     "delay": 1.5,
@@ -161,6 +161,8 @@ def test_fwi(load_real_shot=False):
         mesh_z = FWI_obj.mesh_z
         mesh_x = FWI_obj.mesh_x
         cond = fire.conditional((mesh_z-center_z)**2 + (mesh_x-center_x)**2 < .2**2, 2.5, 1.5)
+        # mesh_z = FWI_obj.mesh_z
+        # cond = fire.conditional(mesh_z > -1.5, 1.5, 3.5)
         FWI_obj.set_real_velocity_model(conditional=cond, output=True)
         FWI_obj.generate_real_shot_record()
         np.save("real_shot_record", FWI_obj.real_shot_record)
@@ -169,24 +171,18 @@ def test_fwi(load_real_shot=False):
         FWI_obj = spyro.FullWaveformInversion(dictionary=dictionary)
 
     # Setting up initial guess problem
-    FWI_obj.set_guess_mesh(mesh_parameters={"dx": 0.1})
-    FWI_obj.set_guess_velocity_model(constant=2.0)
+    FWI_obj.set_guess_mesh(mesh_parameters={"dx": 0.05})
+    FWI_obj.set_guess_velocity_model(constant=1.5)
 
     # Getting functional
     # Jm = FWI_obj.get_functional()
     # print(f"Functional :{Jm}")
 
     # Calculating gradient
-    comm = FWI_obj.comm
-    V = FWI_obj.function_space
-    print(f"Comm: {comm}", flush=True)
     FWI_obj.get_gradient(save=True)
     dJ = FWI_obj.gradient
-    dJ_total = fire.Function(FWI_obj.function_space)
-    comm.comm.barrier()
-    dJ_total = FWI_obj.comm.allreduce(dJ, dJ_total)
     gradfile = fire.File("Gradient.pvd")
-    gradfile.write(dJ_total)
+    gradfile.write(dJ)
     # check_gradient(
     #     FWI_obj,
     #     FWI_obj.gradient,
@@ -196,7 +192,6 @@ def test_fwi(load_real_shot=False):
     # )
 
     # Running the optimization
-
 
     print("END", flush=True)
 
