@@ -61,7 +61,7 @@ model["timeaxis"] = {
     "nspool": 1000,  # how frequently to output solution to pvds
     "fspool": 10,  # how frequently to save solution to RAM
 }
-comm = spyro.utils.mpi_init(model)
+comm, _ = spyro.utils.mpi_init(model)
 # if comm.comm.rank == 0 and comm.ensemble_comm.rank == 0:
 #    fil = open("FUNCTIONAL_FWI_P5.txt", "w")
 mesh, V = spyro.io.read_mesh(model, comm)

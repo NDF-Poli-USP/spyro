@@ -32,8 +32,8 @@ model["BCs"] = {
 }
 model["acquisition"] = {
     "source_type": "Ricker",
-    "num_sources": 40,
-    "source_pos": spyro.create_transect((-0.01, 1.0), (-0.01, 15.0), 40),
+    "num_sources": 1,
+    "source_pos": spyro.create_transect((-0.01, 1.0), (-0.01, 15.0), 1),
     "frequency": 5.0,
     "delay": 1.0,
     "num_receivers": 500,
@@ -47,7 +47,7 @@ model["timeaxis"] = {
     "nspool": 100,  # how frequently to output solution to pvds
     "fspool": 99999,  # how frequently to save solution to RAM
 }
-comm = spyro.utils.mpi_init(model)
+comm, _ = spyro.utils.mpi_init(model)
 mesh, V = spyro.io.read_mesh(model, comm)
 vp = spyro.io.interpolate(model, mesh, V, guess=False)
 sources = spyro.Sources(model, mesh, V, comm)

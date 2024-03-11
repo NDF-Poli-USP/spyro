@@ -86,7 +86,7 @@ def run_solve(timestep_method, method, model, mesh, expr):
     elif method == "KMV":
         variant = "KMV"
 
-    comm = spyro.utils.mpi_init(testmodel)
+    comm, _ = spyro.utils.mpi_init(testmodel)
 
     element = FiniteElement(method, mesh.ufl_cell(), degree=1, variant=variant)
     V = FunctionSpace(mesh, element)

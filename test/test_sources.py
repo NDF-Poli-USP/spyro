@@ -52,7 +52,7 @@ def test_ricker_varies_in_time():
     # modelRicker["opts"]["method"] = "CG"
     # modelRicker["opts"]["degree"] = 2
     # modelRicker["opts"]["dimension"] = 2
-    # comm = spyro.utils.mpi_init(modelRicker)
+    # comm, _ = spyro.utils.mpi_init(modelRicker)
     # mesh = fire.UnitSquareMesh(10, 10)
     # element = fire.FiniteElement("CG", mesh.ufl_cell(), 2, variant="equispaced")
     # V = fire.FunctionSpace(mesh, element)

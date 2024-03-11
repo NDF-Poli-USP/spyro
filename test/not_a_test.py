@@ -35,7 +35,7 @@ def test_gradient_talyor_remainder_v2():
     from ROL.firedrake_vector import FiredrakeVector as FeVector
     import ROL
 
-    comm = spyro.utils.mpi_init(model)
+    comm, _ = spyro.utils.mpi_init(model)
 
     mesh, V = spyro.io.read_mesh(model, comm)
 

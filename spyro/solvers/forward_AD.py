@@ -1,62 +1,44 @@
 from firedrake import *
-
-# from .. import utils
+from firedrake.adjoint import get_working_tape
 from ..domains import quadrature, space
-
-# from ..pml import damping
-# from ..io import ensemble_forward
 from . import helpers
+from ..sources.Sources import Sources
+from firedrake.__future__ import Interpolator, interpolate
 
 # Note this turns off non-fatal warnings
 set_log_level(ERROR)
 
 
-# @ensemble_forward
 def forward(
-    model,
-    mesh,
-    comm,
-    c,
-    excitations,
-    wavelet,
-    receivers,
-    source_num=0,
-    output=False,
-    **kwargs
-):
-    """Secord-order in time fully-explicit scheme
-    with implementation of a Perfectly Matched Layer (PML) using
-    CG FEM with or without higher order mass lumping (KMV type elements).
+            model, mesh, comm, c, wavelet, receiver_mesh, source_number=0,
+            fwi=False, **kwargs
+    ):
+    """Secord-order in time fully-explicit scheme.
 
     Parameters
     ----------
-    model: Python `dictionary`
-        Contains model options and parameters
-    mesh: Firedrake.mesh object
+    model: dict
+        Contains model options and parameters.
+    mesh: firedrake.mesh
         The 2D/3D triangular mesh
-    comm: Firedrake.ensemble_communicator
+    comm: firedrake.ensemble_communicator
         The MPI communicator for parallelism
-       c: Firedrake.Function
+    c: firedrake.Function
         The velocity model interpolated onto the mesh.
-    excitations: A list Firedrake.Functions
     wavelet: array-like
         Time series data that's injected at the source location.
-    receivers: A :class:`spyro.Receivers` object.
-        Contains the receiver locations and sparse interpolation methods.
-    source_num: `int`, optional
+    source_number: `int`, optional
         The source number you wish to simulate
-    output: `boolean`, optional
-        Whether or not to write results to pvd files.
+    fwi: `bool`, optional
+        Whether this forward simulation is for FWI or not.
 
     Returns
     -------
-    usol: list of Firedrake.Functions
-        The full field solution at `fspool` timesteps
-    usol_recv: array-like
-        The solution interpolated to the receivers at all timesteps
-
+    usol_recv: list
+        The receiver data.
+    J: float
+        The functional for FWI. Only returned if `fwi=True`.
     """
-
     method = model["opts"]["method"]
     degree = model["opts"]["degree"]
     dim = model["opts"]["dimension"]
@@ -64,8 +46,7 @@ def forward(
     tf = model["timeaxis"]["tf"]
     nspool = model["timeaxis"]["nspool"]
     nt = int(tf / dt)  # number of timesteps
-    excitations.current_source = source_num
-    params = set_params(method)
+    params = set_params(method, mesh)
     element = space.FE_method(mesh, method, degree)
 
     V = FunctionSpace(mesh, element)
@@ -84,21 +65,16 @@ def forward(
     u_n = Function(V)
     u_np1 = Function(V)
 
-    if output:
-        outfile = helpers.create_output_file("forward.pvd", comm, source_num)
-
-    t = 0.0
     m = 1 / (c * c)
     m1 = m * ((u - 2.0 * u_n + u_nm1) / Constant(dt**2)) * v * dx(scheme=qr_x)
     a = dot(grad(u_n), grad(v)) * dx(scheme=qr_x)  # explicit
-    f = Function(V)
+    source_function = Function(V)
     nf = 0
 
     if model["BCs"]["outer_bc"] == "non-reflective":
         nf = c * ((u_n - u_nm1) / dt) * v * ds(scheme=qr_s)
 
-    h = CellSize(mesh)
-    FF = m1 + a + nf - (1 / (h / degree * h / degree)) * f * v * dx(scheme=qr_x)
+    FF = m1 + a + nf - source_function * v * dx(scheme=qr_x)
     X = Function(V)
 
     lhs_ = lhs(FF)
@@ -107,58 +83,91 @@ def forward(
     problem = LinearVariationalProblem(lhs_, rhs_, X)
     solver = LinearVariationalSolver(problem, solver_parameters=params)
 
+    # This part of the code is the base for receivers and sources.
+    # definition
     usol_recv = []
+    # Source object.
+    source = Sources(model, mesh, V, comm)
+    # P0DG is the only function space you can make on a vertex-only mesh.
+    P0DG = FunctionSpace(receiver_mesh, "DG", 0)
+    interpolator_receivers = Interpolator(u_np1, P0DG)
+    interpolator_sources, forcing_point = source.apply_source_based_in_vom(source_number, V)
 
-    P = FunctionSpace(receivers, "DG", 0)
-    interpolator = Interpolator(u_np1, P)
-    J0 = 0.0
+    def only_forward():
+        for step in range(nt):
+            forcing_point.dat.data[:] = wavelet[step]
+            source_function.assign(1000*assemble(interpolator_sources.interpolate(forcing_point, transpose=True)
+                                            ).riesz_representation(riesz_map="l2"))
+            solver.solve()
+            u_np1.assign(X)
+            receivers = assemble(interpolator_receivers.interpolate())
+            usol_recv.append(receivers)
+            if step % nspool == 0:
+                assert (
+                    norm(u_n) < 1
+                ), "Numerical instability. Try reducing dt or building the mesh differently"
+                if float(step*dt) > 0:
+                    helpers.display_progress(comm, float(step*dt))
+            u_nm1.assign(u_n)
+            u_n.assign(u_np1)
 
-    for step in range(nt):
-
-        excitations.apply_source(f, wavelet[step])
-
-        solver.solve()
-        u_np1.assign(X)
-
-        rec = Function(P)
-        interpolator.interpolate(output=rec)
-
-        fwi = kwargs.get("fwi")
-        p_true_rec = kwargs.get("true_rec")
-
-        usol_recv.append(rec.dat.data)
-
-        if fwi:
-            J0 += calc_objective_func(rec, p_true_rec[step], step, dt, P)
-
-        if step % nspool == 0:
-            assert (
-                norm(u_n) < 1
-            ), "Numerical instability. Try reducing dt or building the mesh differently"
-            if output:
-                outfile.write(u_n, time=t, name="Pressure")
-            if t > 0:
-                helpers.display_progress(comm, t)
-
-        u_nm1.assign(u_n)
-        u_n.assign(u_np1)
-
-        t = step * float(dt)
-
+    def for_fwi():
+        true_receiver_data = kwargs.get("true_receiver_data")
+        J = 0.0
+        for step in get_working_tape().timestepper(iter(range(nt))):
+            forcing_point.dat.data[:] = wavelet[step]
+            source_function.assign(1000*assemble(interpolator_sources.interpolate(forcing_point, transpose=True)
+                                            ).riesz_representation(riesz_map="l2"))
+            solver.solve()
+            u_np1.assign(X)
+            receivers = assemble(interpolator_receivers.interpolate())
+            usol_recv.append(receivers)
+            if fwi:
+                J += compute_functional(receivers, true_receiver_data[step], P0DG)
+            if step % nspool == 0:
+                assert (
+                    norm(u_n) < 1
+                ), "Numerical instability. Try reducing dt or building the mesh differently"
+                if float(step*dt) > 0:
+                    helpers.display_progress(comm, float(step*dt))
+            u_nm1.assign(u_n)
+            u_n.assign(u_np1)
+        return J
+    debug = kwargs.get("debug")
+    if debug:
+        # Save the solution for debugging.
+        outfile = File("output.pvd")
+        outfile.write(u_n)
     if fwi:
-        return usol_recv, J0
+        J = for_fwi()
+        return usol_recv, J
     else:
+        only_forward()
         return usol_recv
 
 
-def calc_objective_func(p_rec, p_true_rec, IT, dt, P):
-    true_rec = Function(P)
-    true_rec.dat.data[:] = p_true_rec
-    J = 0.5 * assemble(inner(true_rec - p_rec, true_rec - p_rec) * dx)
+def compute_functional(guess_receivers, true_receiver_data, P0DG):
+    """Compute the functional for FWI.
+
+    Parameters
+    ----------
+    guess_receivers : firedrake.Function
+        The receivers from the forward simulation.
+    true_receiver_data : firedrake.Function
+        Supposed to be the receivers data from the true model.
+
+    Returns
+    -------
+    J : float
+        The functional.
+    """
+    misfit = Function(P0DG)
+    misfit.assign(guess_receivers - true_receiver_data)
+    J = 0.5 * assemble(inner(misfit, misfit) * dx)
     return J
 
 
-def set_params(method):
+def set_params(method, mesh):
     if method == "KMV":
         params = {"ksp_type": "preonly", "pc_type": "jacobi"}
     elif (

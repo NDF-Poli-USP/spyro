@@ -19,7 +19,7 @@ def triangle_area(p1, p2, p3):
 
 def test_correct_receiver_location_generation2D():
     """Tests if receiver locations where generated correctly"""
-    comm = spyro.utils.mpi_init(model)
+    comm, _ = spyro.utils.mpi_init(model)
     mesh, V = spyro.io.read_mesh(model, comm)
 
     receivers = spyro.create_transect((-0.1, 0.3), (-0.1, 0.9), 3)
@@ -30,7 +30,7 @@ def test_correct_receiver_location_generation2D():
 
 def test_correct_receiver_to_cell_location2D():
     """Tests if the receivers where located in the correct cell"""
-    comm = spyro.utils.mpi_init(model)
+    comm, _ = spyro.utils.mpi_init(model)
     model["opts"]["degree"] = 3
     mesh, V = spyro.io.read_mesh(model, comm)
 
@@ -89,7 +89,7 @@ def test_correct_receiver_to_cell_location2D():
 
 
 def test_correct_at_value2D():
-    comm = spyro.utils.mpi_init(model)
+    comm, _ = spyro.utils.mpi_init(model)
     model["opts"]["degree"] = 3
     mesh, V = spyro.io.read_mesh(model, comm)
     pz = -0.1
@@ -122,7 +122,7 @@ def test_correct_at_value2D():
 
 def test_correct_at_value2D_quad():
     model_quad = deepcopy(model)
-    comm = spyro.utils.mpi_init(model_quad)
+    comm, _ = spyro.utils.mpi_init(model_quad)
     model_quad["opts"]["degree"] = 3
     model_quad["opts"]["degree"] = 3
     mesh, V = spyro.io.read_mesh(model_quad, comm)
@@ -174,7 +174,7 @@ def test_correct_receiver_location_generation3D():
     """Tests if receiver locations where generated correctly"""
 
     test_model = deepcopy(model3D)
-    comm = spyro.utils.mpi_init(test_model)
+    comm, _ = spyro.utils.mpi_init(test_model)
     mesh, V = spyro.io.read_mesh(test_model, comm)
     test_model["acquisition"]["num_receivers"] = 3
     receivers = spyro.create_transect((-0.05, 0.3, 0.5), (-0.05, 0.9, 0.5), 3)
@@ -189,7 +189,7 @@ def test_correct_receiver_to_cell_location3D():
     """Tests if the receivers where located in the correct cell"""
 
     test_model1 = deepcopy(model3D)
-    comm = spyro.utils.mpi_init(test_model1)
+    comm, _ = spyro.utils.mpi_init(test_model1)
     mesh, V = spyro.io.read_mesh(test_model1, comm)
     rec = spyro.create_transect((-0.05, 0.1, 0.5), (-0.05, 0.9, 0.5), 3)
     test_model1["acquisition"]["receiver_locations"] = rec
@@ -263,7 +263,7 @@ def test_correct_at_value3D():
     test_model2 = deepcopy(model3D)
     test_model2["acquisition"]["num_receivers"] = 3
     test_model2["opts"]["degree"] = 3
-    comm = spyro.utils.mpi_init(test_model2)
+    comm, _ = spyro.utils.mpi_init(test_model2)
     mesh, V = spyro.io.read_mesh(test_model2, comm)
     x_start = 0.09153949331982138
     x_end = 0.09153949331982138

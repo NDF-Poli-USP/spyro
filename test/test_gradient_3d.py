@@ -39,7 +39,7 @@ def test_gradient_3d():
 
 def _test_gradient(options, pml=False):
 
-    comm = spyro.utils.mpi_init(options)
+    comm, _ = spyro.utils.mpi_init(options)
 
     mesh, V = spyro.io.read_mesh(options, comm)
 

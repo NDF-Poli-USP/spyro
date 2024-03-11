@@ -2,6 +2,8 @@ import math
 import numpy as np
 from scipy.signal import butter, filtfilt
 import spyro
+from firedrake import *
+from firedrake.__future__ import Interpolator
 
 
 class Sources(spyro.receivers.Receivers.Receivers):
@@ -108,6 +110,30 @@ class Sources(spyro.receivers.Receivers.Receivers):
                     tmp = rhs_forcing.dat.data_with_halos[0]  # noqa: F841
 
         return rhs_forcing
+
+    def apply_source_based_in_vom(self, source_number, W):
+        """Applie source using VertexOnlyMesh (VOM).
+
+        Parameters
+        ----------
+        source_number : int
+            The source number.
+        W : Firedrake.FunctionSpace
+            The space of the finite elements.
+
+        Returns
+        -------
+        interp : Firedrake.Interpolator
+            An interpolator object. This object is used to interpolate the
+            forcing point into a function space W.
+        forcing_point : Function
+            A function that represents the forcing point.
+        """
+        vom_mesh = VertexOnlyMesh(self.mesh, [self.receiver_locations[source_number]])
+        vom_space = FunctionSpace(vom_mesh, "DG", 0)
+        forcing_point = assemble(Constant(1.0)*TestFunction(vom_space)*dx)
+        interp = Interpolator(TestFunction(W), vom_space)
+        return interp, forcing_point
 
 
 def timedependentSource(model, t, freq=None, amp=1, delay=1.5):
