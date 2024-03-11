@@ -3,6 +3,7 @@ import numpy as np
 from scipy.signal import butter, filtfilt
 import spyro
 from firedrake import *
+from firedrake.__future__ import Interpolator
 
 
 class Sources(spyro.receivers.Receivers.Receivers):
@@ -110,34 +111,29 @@ class Sources(spyro.receivers.Receivers.Receivers):
 
         return rhs_forcing
 
-    def apply_source_based_in_vom(self, wavelet, source_number):
+    def apply_source_based_in_vom(self, source_number, W):
         """Applie source using VertexOnlyMesh (VOM).
 
         Parameters
         ----------
-        wavelet : float
-            Value of the wavelet at time t.
         source_number : int
             The source number.
+        W : Firedrake.FunctionSpace
+            The space of the finite elements.
 
         Returns
         -------
-        firedrake.Function
-            The forcing function that models the wavelet source in the wave
-            equation.
+        interp : Firedrake.Interpolator
+            An interpolator object. This object is used to interpolate the
+            forcing point into a function space W.
+        forcing_point : Function
+            A function that represents the forcing point.
         """
-        vom = VertexOnlyMesh(self.mesh, [self.receiver_locations[source_number]],
-                             redundant=False)
-        f_vom = FunctionSpace(vom, "DG", 0)
-        f_vom_input_ordering = FunctionSpace(vom.input_ordering, "DG", 0)
-        f_point_data_input_ordering = Function(f_vom_input_ordering)
-        f_point_data_input_ordering.dat.data_wo[:] = wavelet
-        f_vom_wavelet = interpolate(f_point_data_input_ordering, f_vom)
-
-        I = Interpolator(TestFunction(self.space), f_vom)
-        f0 = I.interpolate(f_vom_wavelet, transpose=True)
-
-        return interpolate(f0, self.space)
+        vom_mesh = VertexOnlyMesh(self.mesh, [self.receiver_locations[source_number]])
+        vom_space = FunctionSpace(vom_mesh, "DG", 0)
+        forcing_point = assemble(Constant(1.0)*TestFunction(vom_space)*dx)
+        interp = Interpolator(TestFunction(W), vom_space)
+        return interp, forcing_point
 
 
 def timedependentSource(model, t, freq=None, amp=1, delay=1.5):

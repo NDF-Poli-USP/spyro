@@ -1,7 +1,9 @@
 from firedrake import *
+from firedrake.adjoint import get_working_tape
 from ..domains import quadrature, space
 from . import helpers
 from ..sources.Sources import Sources
+from firedrake.__future__ import Interpolator, interpolate
 
 # Note this turns off non-fatal warnings
 set_log_level(ERROR)
@@ -66,13 +68,13 @@ def forward(
     m = 1 / (c * c)
     m1 = m * ((u - 2.0 * u_n + u_nm1) / Constant(dt**2)) * v * dx(scheme=qr_x)
     a = dot(grad(u_n), grad(v)) * dx(scheme=qr_x)  # explicit
-    f = Function(V)
+    source_function = Function(V)
     nf = 0
 
     if model["BCs"]["outer_bc"] == "non-reflective":
         nf = c * ((u_n - u_nm1) / dt) * v * ds(scheme=qr_s)
 
-    FF = m1 + a + nf - f * v * dx(scheme=qr_x)
+    FF = m1 + a + nf - source_function * v * dx(scheme=qr_x)
     X = Function(V)
 
     lhs_ = lhs(FF)
@@ -88,41 +90,59 @@ def forward(
     source = Sources(model, mesh, V, comm)
     # P0DG is the only function space you can make on a vertex-only mesh.
     P0DG = FunctionSpace(receiver_mesh, "DG", 0)
-    interpolator = Interpolator(u_np1, P0DG)
-    if fwi:
-        # Get the true receiver data.
-        # In FWI, we need to calculate the objective function,
-        # which requires the true receiver data.
+    interpolator_receivers = Interpolator(u_np1, P0DG)
+    interpolator_sources, forcing_point = source.apply_source_based_in_vom(source_number, V)
+
+    def only_forward():
+        for step in range(nt):
+            forcing_point.dat.data[:] = wavelet[step]
+            source_function.assign(1000*assemble(interpolator_sources.interpolate(forcing_point, transpose=True)
+                                            ).riesz_representation(riesz_map="l2"))
+            solver.solve()
+            u_np1.assign(X)
+            receivers = assemble(interpolator_receivers.interpolate())
+            usol_recv.append(receivers)
+            if step % nspool == 0:
+                assert (
+                    norm(u_n) < 1
+                ), "Numerical instability. Try reducing dt or building the mesh differently"
+                if float(step*dt) > 0:
+                    helpers.display_progress(comm, float(step*dt))
+            u_nm1.assign(u_n)
+            u_n.assign(u_np1)
+
+    def for_fwi():
         true_receiver_data = kwargs.get("true_receiver_data")
-        # cost function
         J = 0.0
-    for step in range(nt):
-        f.assign(source.apply_source_based_in_vom(wavelet[step]*100, source_number))
-        solver.solve()
-        u_np1.assign(X)
-        # receiver function
-        receivers = Function(P0DG)
-        interpolator.interpolate(output=receivers)
-        usol_recv.append(receivers)
-        if fwi:
-            J += compute_functional(receivers, true_receiver_data[step], P0DG)
-        if step % nspool == 0:
-            assert (
-                norm(u_n) < 1
-            ), "Numerical instability. Try reducing dt or building the mesh differently"
-            if float(step*dt) > 0:
-                helpers.display_progress(comm, float(step*dt))
-        u_nm1.assign(u_n)
-        u_n.assign(u_np1)
+        for step in get_working_tape().timestepper(iter(range(nt))):
+            forcing_point.dat.data[:] = wavelet[step]
+            source_function.assign(1000*assemble(interpolator_sources.interpolate(forcing_point, transpose=True)
+                                            ).riesz_representation(riesz_map="l2"))
+            solver.solve()
+            u_np1.assign(X)
+            receivers = assemble(interpolator_receivers.interpolate())
+            usol_recv.append(receivers)
+            if fwi:
+                J += compute_functional(receivers, true_receiver_data[step], P0DG)
+            if step % nspool == 0:
+                assert (
+                    norm(u_n) < 1
+                ), "Numerical instability. Try reducing dt or building the mesh differently"
+                if float(step*dt) > 0:
+                    helpers.display_progress(comm, float(step*dt))
+            u_nm1.assign(u_n)
+            u_n.assign(u_np1)
+        return J
     debug = kwargs.get("debug")
     if debug:
         # Save the solution for debugging.
         outfile = File("output.pvd")
         outfile.write(u_n)
-
     if fwi:
+        J = for_fwi()
         return usol_recv, J
     else:
+        only_forward()
         return usol_recv
 
 
