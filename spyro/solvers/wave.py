@@ -150,6 +150,7 @@ class Wave(Model_parameters):
         expression=None,
         new_file=None,
         output=False,
+        dg_velocity_model=True,
     ):
         """Method to define new user velocity model or file. It is optional.
 
@@ -180,8 +181,10 @@ class Wave(Model_parameters):
             output = True
 
         if conditional is not None:
-            # V = fire.FunctionSpace(self.mesh, "DG", 0)
-            V = self.function_space
+            if dg_velocity_model:
+                V = fire.FunctionSpace(self.mesh, "DG", 0)
+            else:
+                V = self.function_space
             vp = fire.Function(V, name="velocity")
             vp.interpolate(conditional)
             self.initial_velocity_model = vp
