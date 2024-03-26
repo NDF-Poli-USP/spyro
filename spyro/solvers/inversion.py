@@ -1,7 +1,5 @@
 import firedrake as fire
 import warnings
-from ROL.firedrake_vector import FiredrakeVector as FireVector
-import ROL
 from scipy.optimize import minimize as scipy_minimize
 from mpi4py import MPI
 import numpy as np
@@ -9,6 +7,12 @@ import numpy as np
 from .acoustic_wave import AcousticWave
 from ..utils import compute_functional
 from ..plots import plot_model as spyro_plot_model
+
+try:
+    from ROL.firedrake_vector import FiredrakeVector as FireVector
+    import ROL
+except ImportError:
+    ROL = None
 
 
 class L2Inner(object):
@@ -32,6 +36,8 @@ class L2Inner(object):
 
 class Objective(ROL.Objective):
     def __init__(self, inner_product, FWI_obj):
+        if ROL is None:
+            raise ImportError("The ROL module is not available.")
         ROL.Objective.__init__(self)
         self.inner_product = inner_product
         self.p_guess = None
@@ -415,6 +421,8 @@ class FullWaveformInversion(AcousticWave):
         """
         Run the full waveform inversion using ROL.
         """
+        if ROL is None:
+            raise ImportError("The ROL module is not available.")
         paramsDict = {
             "General": {"Secant": {"Type": "Limited-Memory BFGS", "Maximum Storage": 10}},
             "Step": {
