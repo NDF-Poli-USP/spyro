@@ -127,8 +127,7 @@ dictionary["mesh"] = {
 }
 dictionary["acquisition"] = {
     "source_type": "ricker",
-    "source_locations": spyro.create_transect((-1.1, 1.2), (-1.1, 1.8), 8),
-    # "source_locations": [(-1.1, 1.5)],
+    "source_locations": spyro.create_transect((-1.1, 1.2), (-1.1, 1.8), 6),
     # "source_locations": [(-1.1, 1.5)],
     "frequency": 5.0,
     "delay": 0.2,
@@ -138,7 +137,7 @@ dictionary["acquisition"] = {
 dictionary["time_axis"] = {
     "initial_time": 0.0,  # Initial time for event
     "final_time": final_time,  # Final time for event
-    "dt": 0.0005,  # timestep size
+    "dt": 0.001,  # timestep size
     "amplitude": 1,  # the Ricker has an amplitude of 1.
     "output_frequency": 100,  # how frequently to output solution to pvds - Perguntar Daiane ''post_processing_frequnecy'
     "gradient_sampling_frequency": 1,  # how frequently to save solution to RAM    - Perguntar Daiane 'gradient_sampling_frequency'
@@ -173,9 +172,8 @@ def test_fwi(load_real_shot=False):
     # Setting up to run synthetic real problem
     if load_real_shot is False:
         FWI_obj = spyro.FullWaveformInversion(dictionary=dictionary)
-        comm = FWI_obj.comm
 
-        FWI_obj.set_real_mesh(mesh_parameters={"dx": 0.05})
+        FWI_obj.set_real_mesh(mesh_parameters={"dx": 0.1})
         center_z = -1.5
         center_x = 1.5
         mesh_z = FWI_obj.mesh_z
@@ -183,7 +181,11 @@ def test_fwi(load_real_shot=False):
         cond = fire.conditional((mesh_z-center_z)**2 + (mesh_x-center_x)**2 < .2**2, 3.0, 2.5)
 
         FWI_obj.set_real_velocity_model(conditional=cond, output=True)
-        FWI_obj.generate_real_shot_record()
+        FWI_obj.generate_real_shot_record(
+            plot_model=True,
+            filename="True_experiment.png",
+            abc_points=[(-1.0, 1.0), (-2.0, 1.0), (-2.0, 2.0), (-1.0, 2.0)]
+        )
         np.save("real_shot_record", FWI_obj.real_shot_record)
 
         spyro_shots = FWI_obj.real_shot_record
@@ -193,31 +195,21 @@ def test_fwi(load_real_shot=False):
         FWI_obj = spyro.FullWaveformInversion(dictionary=dictionary)
 
     # Setting up initial guess problem
-    FWI_obj.set_guess_mesh(mesh_parameters={"dx": 0.05})
+    FWI_obj.set_guess_mesh(mesh_parameters={"dx": 0.1})
     FWI_obj.set_guess_velocity_model(constant=2.5)
 
-    # Getting functional
-    # Jm = FWI_obj.get_functional()
-    # print(f"Functional :{Jm}")
-
-    # Calculating gradient
-    FWI_obj.get_gradient(save=True)
-    dJ = FWI_obj.gradient
-    mask = mask_gradient(FWI_obj, dJ, (-1.9, -1.1), (1.1, 1.9))
-    if FWI_obj.comm.comm.rank == 0:
-        np.save("gradient.npy", dJ.dat.data[:])
-    dJ.dat.data[mask] = 0.0
-    gradfile = fire.File("Gradient.pvd")
-    gradfile.write(dJ)
-    # check_gradient(
-    #     FWI_obj,
-    #     FWI_obj.gradient,
-    #     FWI_obj.real_shot_record,
-    #     FWI_obj.functional,
-    #     plot=True,
-    # )
+    # # Calculating gradient
+    # FWI_obj.get_gradient(save=True)
+    # dJ = FWI_obj.gradient
+    # mask = mask_gradient(FWI_obj, dJ, (-1.9, -1.1), (1.1, 1.9))
+    # if FWI_obj.comm.comm.rank == 0:
+    #     np.save("gradient.npy", dJ.dat.data[:])
+    # dJ.dat.data[mask] = 0.0
+    # gradfile = fire.File("Gradient.pvd")
+    # gradfile.write(dJ)
 
     # Running the optimization
+    FWI_obj.run_fwi()
 
     print("END", flush=True)
 
