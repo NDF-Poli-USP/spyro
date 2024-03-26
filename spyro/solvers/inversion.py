@@ -10,9 +10,13 @@ from ..plots import plot_model as spyro_plot_model
 
 try:
     from ROL.firedrake_vector import FiredrakeVector as FireVector
+    import ROL.objective as RObjective
     import ROL
 except ImportError:
     ROL = None
+    RObjective = object
+
+# ROL = None
 
 
 class L2Inner(object):
@@ -34,7 +38,7 @@ class L2Inner(object):
         return vpet.dot(A_u)
 
 
-class Objective(ROL.Objective):
+class Objective(RObjective):
     def __init__(self, inner_product, FWI_obj):
         if ROL is None:
             raise ImportError("The ROL module is not available.")
