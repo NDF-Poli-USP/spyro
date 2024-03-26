@@ -1,13 +1,68 @@
 import firedrake as fire
 import warnings
-from ROL.firedrake_vector import FiredrakeVector as FiredrakeVector
+from ROL.firedrake_vector import FiredrakeVector as FireVector
 import ROL
 from scipy.optimize import minimize as scipy_minimize
 from mpi4py import MPI
+import numpy as np
 
 from .acoustic_wave import AcousticWave
 from ..utils import compute_functional
 from ..plots import plot_model as spyro_plot_model
+
+
+class L2Inner(object):
+    def __init__(self, Wave_obj):
+        V = Wave_obj.function_space
+        # print(f"Dir {dir(Wave_obj)}", flush=True)
+        dxlump = fire.dx(scheme=Wave_obj.quadrature_rule)
+        self.A = fire.assemble(
+            fire.TrialFunction(V) * fire.TestFunction(V) * dxlump,
+            mat_type="matfree"
+        )
+        self.Ap = fire.as_backend_type(self.A).mat()
+
+    def eval(self, _u, _v):
+        upet = fire.as_backend_type(_u).vec()
+        vpet = fire.as_backend_type(_v).vec()
+        A_u = self.Ap.createVecLeft()
+        self.Ap.mult(upet, A_u)
+        return vpet.dot(A_u)
+
+
+class Objective(ROL.Objective):
+    def __init__(self, inner_product, FWI_obj):
+        ROL.Objective.__init__(self)
+        self.inner_product = inner_product
+        self.p_guess = None
+        self.misfit = 0.0
+        self.real_shot_record = FWI_obj.real_shot_record
+        self.inversion_obj = FWI_obj
+        self.comm = FWI_obj.comm
+
+    def value(self, x, tol):
+        """Compute the functional"""
+        J_total = np.zeros((1))
+        self.inversion_obj.misfit=None
+        self.inversion_obj.reset_pressure()
+        Jm = self.inversion_obj.get_functional()
+        self.misfit = self.inversion_obj.misfit
+        
+        return J_total[0]
+
+    def gradient(self, g, x, tol):
+        """Compute the gradient of the functional"""
+        dJ = self.inversion_obj.get_gradient()
+        g.scale(0)
+        g.vec += dJ
+
+    def update(self, x, flag, iteration):
+        vp = self.inversion_obj.initial_velocity_model
+        vp.assign(fire.Function(
+            self.inversion_obj.function_space,
+            x.vec,
+            name = "velocity")
+        )
 
 
 class FullWaveformInversion(AcousticWave):
@@ -126,6 +181,7 @@ class FullWaveformInversion(AcousticWave):
 
         Wave_obj_real_velocity.forward_solve()
         self.real_shot_record = Wave_obj_real_velocity.real_shot_record
+        self.quadrature_rule = Wave_obj_real_velocity.quadrature_rule
 
     def set_smooth_guess_velocity_model(self, real_velocity_model_file=None):
         """
@@ -354,6 +410,50 @@ class FullWaveformInversion(AcousticWave):
         vp_end = fire.Function(self.function_space)
         vp_end.dat.data[:] = result.x
         fire.File("vp_end.pvd").write(vp_end)
+
+    def run_fwi_rol(self):
+        """
+        Run the full waveform inversion using ROL.
+        """
+        paramsDict = {
+            "General": {"Secant": {"Type": "Limited-Memory BFGS", "Maximum Storage": 10}},
+            "Step": {
+                "Type": "Augmented Lagrangian",
+                "Augmented Lagrangian": {
+                    "Subproblem Step Type": "Line Search",
+                    "Subproblem Iteration Limit": 5.0,
+                },
+                "Line Search": {"Descent Method": {"Type": "Quasi-Newton Step"}},
+            },
+            "Status Test": {
+                "Gradient Tolerance": 1e-16,
+                "Iteration Limit": 100,
+                "Step Tolerance": 1.0e-16,
+            },
+        }
+        params = ROL.ParameterList(paramsDict, "Parameters")
+
+        inner_product = L2Inner(self)
+
+        obj = Objective(inner_product, self)
+
+        u = fire.Function(self.function_space, name="velocity").assign(self.guess_velocity_model)
+        opt = FireVector(u.vector(), inner_product)
+
+        # Add control bounds to the problem (uses more RAM)
+        xlo = fire.Function(self.function_space)
+        xlo.interpolate(fire.Constant(1.0))
+        x_lo = FireVector(xlo.vector(), inner_product)
+
+        xup = fire.Function(self.function_space)
+        xup.interpolate(fire.Constant(5.0))
+        x_up = FireVector(xup.vector(), inner_product)
+
+        bnd = ROL.Bounds(x_lo, x_up, 1.0)
+
+        algo = ROL.Algorithm("Line Search", params)
+
+        algo.run(opt, obj, bnd)
 
 
 class SyntheticRealAcousticWave(AcousticWave):

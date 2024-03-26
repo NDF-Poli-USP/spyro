@@ -129,5 +129,8 @@ class AcousticWave(Wave):
         return backward_wave_propagator(self)
 
     def reset_pressure(self):
-        self.u_nm1.assign(0.0)
-        self.u_n.assign(0.0)
+        try:
+            self.u_nm1.assign(0.0)
+            self.u_n.assign(0.0)
+        except:
+            warnings.warn("No pressure to reset")

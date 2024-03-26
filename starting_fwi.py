@@ -127,7 +127,7 @@ dictionary["mesh"] = {
 }
 dictionary["acquisition"] = {
     "source_type": "ricker",
-    "source_locations": spyro.create_transect((-1.1, 1.2), (-1.1, 1.8), 10),
+    "source_locations": spyro.create_transect((-1.1, 1.2), (-1.1, 1.8), 8),
     # "source_locations": [(-1.1, 1.5)],
     # "source_locations": [(-1.1, 1.5)],
     "frequency": 5.0,
@@ -183,44 +183,11 @@ def test_fwi(load_real_shot=False):
         cond = fire.conditional((mesh_z-center_z)**2 + (mesh_x-center_x)**2 < .2**2, 3.0, 2.5)
 
         FWI_obj.set_real_velocity_model(conditional=cond, output=True)
-        FWI_obj.generate_real_shot_record(
-            # plot_model=True,
-            # filename="True_experiment.png",
-            # abc_points=[(-1.0, 1.0), (-2.0, 1.0), (-2.0, 2.0), (-1.0, 2.0)]
-        )
+        FWI_obj.generate_real_shot_record()
         np.save("real_shot_record", FWI_obj.real_shot_record)
 
         spyro_shots = FWI_obj.real_shot_record
-        nt_spy, nr_spy = np.shape(spyro_shots)
-        devito_fl = "true_data_camembert.npy"
-        devito_shots = np.load(devito_fl)
-        if comm.comm.rank == 0:
-            print(np.shape(devito_shots), flush=True)
-            print(np.shape(spyro_shots), flush=True)
-        nt_dev, nr_dev, ns_dev = np.shape(devito_shots)
-        timevector_dev = np.linspace(0.0, 1.0, nt_dev)
-        timevector_spy = np.linspace(0.0, 1.0, nt_spy)
-        desired_recs = [0, 99, 149, 299]
-        sources_desired = [0, 3, 9]
 
-        for rec_i in desired_recs:
-            for source_id in sources_desired:
-                if comm.ensemble_comm.rank == source_id:
-                    multiplier = np.max(devito_shots[:, rec_i, source_id])/np.max(spyro_shots[:, rec_i])
-                    print(f"Multiplier of {multiplier} changed to 100", flush=True)
-                    multiplier = 100
-                    plt.close()
-                    plt.plot(timevector_spy, multiplier*spyro_shots[:, rec_i], label="spyro")
-                    plt.plot(timevector_dev, devito_shots[:, rec_i, source_id], "--", label="devito")
-                    plt.title(f"Source {source_id}, Receiver {rec_i}")
-                    plt.legend()
-                    plt.savefig("test_source_"+str(source_id)+"receiver_"+str(rec_i)+".png")
-                    peak_dev = timevector_dev[np.argmax(devito_shots[:, rec_i, source_id])]
-                    peak_spy = timevector_spy[np.argmax(spyro_shots[:, rec_i])]
-                    time_delay = dictionary["acquisition"]["delay"] + peak_dev - peak_spy
-                    print(f"Time Delay to put: {time_delay}", flush=True)
-
-        print("END", flush=True)
     else:
         dictionary["inversion"]["shot_record_file"] = "real_shot_record.npy"
         FWI_obj = spyro.FullWaveformInversion(dictionary=dictionary)
