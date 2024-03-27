@@ -109,6 +109,7 @@ class AcousticWave(Wave):
         if dt is not None:
             self.dt = dt
 
+        self.current_source = source_num
         usol, usol_recv = time_integrator(self, source_id=source_num)
 
         return usol, usol_recv
