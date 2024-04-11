@@ -18,6 +18,7 @@ def plot_shots(
     file_name="1",
     vmin=-1e-5,
     vmax=1e-5,
+    contour_lines=700,
     file_format="pdf",
     start_index=0,
     end_index=0,
@@ -69,7 +70,7 @@ def plot_shots(
     X, Y = np.meshgrid(x_rec, t_rec)
 
     cmap = plt.get_cmap("gray")
-    plt.contourf(X, Y, arr, 700, cmap=cmap, vmin=vmin, vmax=vmax)
+    plt.contourf(X, Y, arr, contour_lines, cmap=cmap, vmin=vmin, vmax=vmax)
     # savemat("test.mat", {"mydata": arr})
     plt.xlabel("receiver number", fontsize=18)
     plt.ylabel("time (s)", fontsize=18)
@@ -82,7 +83,7 @@ def plot_shots(
     # plt.axis("image")
     if show:
         plt.show()
-    plt.close()
+    # plt.close()
     return None
 
 
@@ -122,7 +123,7 @@ def plot_mesh_sizes(
         plt.savefig(output_filename)
 
 
-def plot_model(Wave_object, filename="model.png", abc_points=None):
+def plot_model(Wave_object, filename="model.png", abc_points=None, show=False, flip_axis=True):
     """
     Plot the model with source and receiver locations.
 
@@ -149,14 +150,22 @@ def plot_model(Wave_object, filename="model.png", abc_points=None):
         z, x = receiver
         plt.scatter(z, x, c="red")
 
-    axes.invert_yaxis()
+    if flip_axis:
+        axes.invert_yaxis()
+
     axes.set_xlabel("Z (km)")
-    axes.set_ylabel("X (km)", rotation=-90, labelpad=20)
-    plt.setp(axes.get_xticklabels(), rotation=-90, va="top", ha="center")
-    plt.setp(axes.get_yticklabels(), rotation=-90, va="center", ha="left")
+
+    if flip_axis:
+        axes.set_ylabel("X (km)", rotation=-90, labelpad=20)
+        plt.setp(axes.get_xticklabels(), rotation=-90, va="top", ha="center")
+        plt.setp(axes.get_yticklabels(), rotation=-90, va="center", ha="left")
+    else:
+        axes.set_ylabel("X (km)")
+
     cbar = plt.colorbar(vp_image, orientation="horizontal")
     cbar.set_label("Velocity (km/s)")
-    cbar.ax.tick_params(rotation=-90)
+    if flip_axis:
+        cbar.ax.tick_params(rotation=-90)
     axes.tick_params(axis='y', pad=20)
     axes.axis('equal')
 
@@ -178,8 +187,24 @@ def plot_model(Wave_object, filename="model.png", abc_points=None):
         plt.plot(zs, xs, "--")
     print(f"File name {filename}", flush=True)
     plt.savefig(filename)
-    img = Image.open(filename)
-    img_rotated = img.rotate(90)
 
-    # Save the rotated image
-    img_rotated.save(filename)
+    if flip_axis:
+        img = Image.open(filename)
+        img_rotated = img.rotate(90)
+
+        # Save the rotated image
+        img_rotated.save(filename)
+    if show:
+        plt.show()
+    else:
+        plt.close()
+
+
+def plot_function(function):
+    plt.close()
+    fig = plt.figure(figsize=(9, 9))
+    axes = fig.add_subplot(111)
+    fig.set_figwidth = 9.0
+    fig.set_figheight = 9.0
+    firedrake.tricontourf(function, axes=axes)
+    axes.axis('equal')
