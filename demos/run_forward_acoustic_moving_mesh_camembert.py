@@ -119,14 +119,14 @@ def _make_vp(V):
 
 # controls
 FIREMESH = 1    # keep it 1
-AMR = 0         # should adapt the mesh?
+AMR = 1         # should adapt the mesh?
 GUESS = 1       # if 1, run the guess model; otherwise (=0), read results
 REF = 0         # if 1, run the reference model; otherwise (=0), read results
-QUAD = 0        # if 1, run with quadrilateral elements; otherwise (=0), run with triangles
+QUAD = 1        # if 1, run with quadrilateral elements; otherwise (=0), run with triangles
 DG_VP = 1       # if 1, vp is defined on a Discontinuous space (L2 instead of an H1 space)
 CONST_VP = 0    # if 1, run with a uniform vp = 2 km/s (it is employed to check convergence rate and wheter adapted mesh introduces errors)
 PLOT_AT_REC = 1 # if 1, plot the pressure over time at one receiver
-MFUNC = 1       # if 1, M1; if 2, M2; if 3, M3 (default is M3, therefore MFUNC = 3)
+MFUNC = 3       # if 1, M1; if 2, M2; if 3, M3 (default is M3, therefore MFUNC = 3)
 CHECK_MESH_QUALITY = 1 # if 1, check the mesh quality and exit before running
 print_vtk = False
 use_Neumann_BC_as_source = False 
@@ -325,14 +325,16 @@ if AMR==1 and GUESS==1:
     E = E1
     #beta = 0.5 # (0, 1) # for E2 + smooth
     #beta = 0.10 # (0, 1) # for E2 w/n smooth
-    beta = 0.20 # (0, 1) # for E2 w/n smooth
+    beta = 0.20 # (0, 1) # for E2 w/n smooth ORIGINAL OF THE PAPER
+    #beta = 0.30 # (0, 1) # for E2 w/n smooth FOR REVIEW
     phi = sqrt( 1 + E*E ) - 1
     phi_hat = assemble(phi*dx(domain=mesh_grid)) / assemble(Constant(1.0)*dx(domain=mesh_grid))
     alpha = beta / ( phi_hat * ( 1 - beta ) )
     M1 = 1 + alpha * phi
    
     E = E2
-    beta = 0.5 # (0, 1) # for E2 + smooth
+    #beta = 0.4 # (0, 1) # for E2 + smooth FOR REVIEW
+    beta = 0.5 # (0, 1) # for E2 + smooth ORIGINAL OF THE PAPER
     #beta = 0.3 # (0, 1) # for E2 w/n smooth
     phi = sqrt( 1 + E*E ) - 1
     phi_hat = assemble(phi*dx(domain=mesh_grid)) / assemble(Constant(1.0)*dx(domain=mesh_grid))
@@ -433,7 +435,7 @@ if AMR==1 and GUESS==1:
 
     mesh._parallel_compatible = {weakref.ref(mesh_grid)}
     start = time.time()
-    step = spyro.monge_ampere_solver(mesh, monitor_function, p=2, mask=mask) #fix_boundary_nodes=fix_boundary_nodes) 
+    step = spyro.monge_ampere_solver(mesh, monitor_function, p=2, mask=mask, print_solution=True) #fix_boundary_nodes=fix_boundary_nodes) 
     
     # since coordinates were chanegd, clear spatial index
     mesh.clear_spatial_index()
@@ -449,7 +451,7 @@ if AMR==1 and GUESS==1:
         _vp = _make_vp(V) # V is the original space of mesh
     File("vp_after_amr.pvd").write(_vp)
 #}}}
-#sys.exit("exit")
+sys.exit("exit")
 
 if CHECK_MESH_QUALITY==1: # {{{
     mesh_quality = spyro.calculate_mesh_quality(mesh)

@@ -60,8 +60,8 @@ def _make_vp(V, vp_model=1, field="velocity_model"):
     return vp
 #}}}
 
-#case=13 # Marmousi
-case=5  # SEAM 
+case=13 # Marmousi
+#case=5  # SEAM 
 vp_model = 0
 Lx = 0
 Lz = 0
@@ -74,7 +74,7 @@ run_ref = 0
 use_Neumann_BC_as_source = False
 print_vtk = True
 use_DG0 = False 
-CHECK_MESH_QUALITY = 1 # if 1, check the mesh quality and exit before running
+CHECK_MESH_QUALITY = 0 # if 1, check the mesh quality and exit before running
 
 if case==1: # Marmousi model, structured mesh {{{
     method = "CG" 
@@ -572,6 +572,7 @@ if CHECK_MESH_QUALITY==1: # {{{
     #print(mesh_quality)
     sys.exit("exit")
 #}}}
+sys.exit("exit")
 
 # code to run the forward model (acoustic waves) {{{
 

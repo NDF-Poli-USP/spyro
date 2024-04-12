@@ -17,6 +17,7 @@ doi:10.1137/16M1109515.
 """
 
 # solver parameters - from `movement', https://github.com/pyroteus/movement {{{
+# there is additonal explanation about in https://www.firedrakeproject.org/demos/ma-demo.py.html
 _serial_qn = {
     "ksp_type": "gmres",
     "pc_type": "fieldsplit",
@@ -317,7 +318,8 @@ def monge_ampere_solver(mesh, monitor_function,
         PETSc.Sys.Print(f"{i:4d}"
                         f"   Min/Max {minmax:10.4e}"
                         f"   Residual {residual:10.4e}"
-                        f"   Equidistribution {equi:10.4e}")
+                        f"   Equidistribution {equi:10.4e}"
+                        f"   SNES rnorm {rnorm:10.4e}")
     #}}}
 
     snes = equidistributor.snes

@@ -400,8 +400,8 @@ if AMR==1 and GUESS==1:
 
     E = E1
     #beta = 0.5 # (0, 1) # for E2 + smooth
-    beta = 0.20 # (0, 1) # for E2 w/n smooth
-    #beta = 0.30 # (0, 1) # for E2 w/n smooth
+    beta = 0.20 # (0, 1) # for E2 w/n smooth ORIGINAL OF THE PAPER
+    #beta = 0.30 # (0, 1) # for E2 w/n smooth FOR REVIEW
     phi = sqrt( 1 + E*E ) - 1
     phi_hat = assemble(phi*dx(domain=mesh_grid)) / assemble(Constant(1.0)*dx(domain=mesh_grid))
     alpha = beta / ( phi_hat * ( 1 - beta ) )
@@ -409,7 +409,8 @@ if AMR==1 and GUESS==1:
    
     E = E2
     #beta = 0.5 # (0, 1) # for E2 + smooth
-    beta = 0.3 # (0, 1) # for E2 w/n smooth
+    beta = 0.3 # (0, 1) # for E2 w/n smooth ORIGINAL OF THE PAPER
+    #beta = 0.4 # (0, 1) # for E2 w/n smooth FOR REVIEW
     phi = sqrt( 1 + E*E ) - 1
     phi_hat = assemble(phi*dx(domain=mesh_grid)) / assemble(Constant(1.0)*dx(domain=mesh_grid))
     alpha = beta / ( phi_hat * ( 1 - beta ) )
@@ -525,7 +526,7 @@ if AMR==1 and GUESS==1:
         _vp = _make_vp(V) # V is the original space of mesh
     File("vp_after_amr.pvd").write(_vp)
 #}}}
-#sys.exit("exit")
+sys.exit("exit")
 
 if CHECK_MESH_QUALITY==1: # {{{
     mesh_quality = spyro.calculate_mesh_quality(mesh)
