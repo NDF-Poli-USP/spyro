@@ -88,15 +88,21 @@ def plot_shots(
 
 
 def plot_mesh_sizes(
-    mesh_filename,
+    mesh_filename=None,
+    firedrake_mesh=None,
     title_str=None,
     output_filename=None,
-    show=False
+    show=False,
 ):
     plt.rcParams['font.family'] = "Times New Roman"
     plt.rcParams['font.size'] = 12
 
-    mesh = firedrake.Mesh(mesh_filename)
+    if mesh_filename is not None:
+        mesh = firedrake.Mesh(mesh_filename)
+    elif firedrake_mesh is not None:
+        mesh = firedrake_mesh
+    else:
+        raise ValueError("Please specify mesh")
 
     coordinates = copy.deepcopy(mesh.coordinates.dat.data)
 

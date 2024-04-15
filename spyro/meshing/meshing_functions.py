@@ -332,15 +332,15 @@ class AutomaticMesh:
             frequency = self.source_frequency
             C = self.cpw  # cells_per_wavelength(method, degree, dimension)
 
-            Lz = self.length_z
-            Lx = self.length_x
-            domain_pad = self.abc_pad
+            Lz = self.length_z*1000
+            Lx = self.length_x*1000
+            domain_pad = self.abc_pad*1000
             lbda_min = v_min/frequency
 
             bbox = (-Lz, 0.0, 0.0, Lx)
             domain = SeismicMesh.Rectangle(bbox)
 
-            hmin = lbda_min/C
+            hmin = lbda_min/C*1000
             self.comm.comm.barrier()
 
             ef = SeismicMesh.get_sizing_function_from_segy(
@@ -371,7 +371,7 @@ class AutomaticMesh:
             if self.comm.comm.rank == 0:
                 meshio.write_points_cells(
                     "automatic_mesh.msh",
-                    points,
+                    points/1000.0,
                     [("triangle", cells)],
                     file_format="gmsh22",
                     binary=False
@@ -379,7 +379,7 @@ class AutomaticMesh:
 
                 meshio.write_points_cells(
                     "automatic_mesh.vtk",
-                    points,
+                    points/1000.0,
                     [("triangle", cells)],
                     file_format="vtk"
                 )
