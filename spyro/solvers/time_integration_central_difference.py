@@ -1,6 +1,5 @@
 import firedrake as fire
 from firedrake import Constant, dx, dot, grad
-from firedrake.assemble import create_assembly_callable
 
 from ..io.basicio import parallel_print
 from . import helpers
@@ -8,6 +7,21 @@ from .. import utils
 
 
 def central_difference(Wave_object, source_id=0):
+    """
+    Perform central difference time integration for wave propagation.
+
+    Parameters:
+    -----------
+    Wave_object: Spyro object
+        The Wave object containing the necessary data and parameters.
+    source_id: int (optional)
+        The ID of the source being propagated. Defaults to 0.
+
+    Returns:
+    --------
+        tuple:
+            A tuple containing the forward solution and the receiver output.
+    """
     excitations = Wave_object.sources
     excitations.current_source = source_id
     receivers = Wave_object.receivers
@@ -43,8 +57,6 @@ def central_difference(Wave_object, source_id=0):
     save_step = 0
     B = Wave_object.B
     rhs = Wave_object.rhs
-
-    # assembly_callable = create_assembly_callable(rhs, tensor=B)
 
     for step in range(nt):
         rhs_forcing.assign(0.0)
@@ -95,6 +107,24 @@ def central_difference(Wave_object, source_id=0):
 
 
 def mixed_space_central_difference(Wave_object, source_id=0):
+    """
+    Performs central difference time integration for wave propagation.
+    Solves for  a mixed space formulation, for function X. For correctly
+    outputing pressure, order the mixed function space so that the space
+    pressure lives in is first.
+
+    Parameters:
+    -----------
+    Wave_object: Spyro object
+        The Wave object containing the necessary data and parameters.
+    source_id: int (optional)
+        The ID of the source being propagated. Defaults to 0.
+
+    Returns:
+    --------
+        tuple:
+            A tuple containing the forward solution and the receiver output.
+    """
     excitations = Wave_object.sources
     excitations.current_source = source_id
     receivers = Wave_object.receivers
@@ -128,11 +158,9 @@ def mixed_space_central_difference(Wave_object, source_id=0):
     B = Wave_object.B
     rhs_ = Wave_object.rhs
 
-    assembly_callable = create_assembly_callable(rhs_, tensor=B)
-
     for step in range(nt):
         rhs_forcing.assign(0.0)
-        assembly_callable()
+        B = fire.assemble(rhs_, tensor=B)
         f = excitations.apply_source(rhs_forcing, Wave_object.wavelet[step])
         B0 = B.sub(0)
         B0 += f
@@ -230,7 +258,6 @@ def central_difference_MMS(Wave_object, source_id=0):
     rhs = Wave_object.rhs
     quad_rule = Wave_object.quadrature_rule
 
-    # assembly_callable = create_assembly_callable(rhs, tensor=B)
     q_xy = Wave_object.q_xy
 
     for step in range(nt):
