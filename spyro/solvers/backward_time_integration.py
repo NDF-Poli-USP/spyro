@@ -39,7 +39,7 @@ def backward_wave_propagator(Wave_obj, dt=None):
     comm.comm.barrier()
 
     X = fire.Function(Wave_obj.function_space)
-    dJ = fire.Function(Wave_obj.function_space, name="gradient")
+    dJ = fire.Function(Wave_obj.function_space)#, name="gradient")
 
     final_time = Wave_obj.final_time
     dt = Wave_obj.dt

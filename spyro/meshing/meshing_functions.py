@@ -78,45 +78,77 @@ class AutomaticMesh:
     """
 
     def __init__(
-        self, comm=None, mesh_parameters=None
-    ):
-        """
-        Parameters
-        ----------
-        dimension : int, optional
-            Dimension of the mesh. The default is 2.
-        comm : MPI communicator, optional
-            MPI communicator. The default is None.
-        """
-        self.dimension = mesh_parameters["dimension"]
-        self.length_z = mesh_parameters["length_z"]
-        self.length_x = mesh_parameters["length_x"]
-        self.length_y = mesh_parameters["length_y"]
-        self.cell_type = mesh_parameters["cell_type"]
-        self.comm = comm
-        if mesh_parameters["abc_pad_length"] is None:
-            self.abc_pad = 0.0
-        elif mesh_parameters["abc_pad_length"] >= 0.0:
-            self.abc_pad = mesh_parameters["abc_pad_length"]
-        else:
-            raise ValueError("abc_pad must be positive")
-        self.mesh_type = mesh_parameters["mesh_type"]
+            self, comm=None, mesh_parameters=None
+        ):
+            """
+            Initialize the MeshingFunctions class.
 
-        # Firedrake mesh only parameters
-        self.dx = mesh_parameters["dx"]
-        self.quadrilateral = False
-        self.periodic = mesh_parameters["periodic"]
-        if self.dx is None:
-            self.dx = mesh_parameters["edge_length"]
+            Parameters
+            ----------
+            comm : MPI communicator, optional
+                MPI communicator. The default is None.
+            mesh_parameters : dict, optional
+                Dictionary containing the mesh parameters. The default is None.
 
-        # SeismicMesh only parameters
-        self.cpw = mesh_parameters["cells_per_wavelength"]
-        self.source_frequency = mesh_parameters["source_frequency"]
-        self.minimum_velocity = mesh_parameters["minimum_velocity"]
-        self.lbda = None
-        self.velocity_model = mesh_parameters["velocity_model_file"]
-        self.edge_length = mesh_parameters["edge_length"]
-        self.output_file_name = "automatic_mesh.msh"
+            Raises
+            ------
+            ValueError
+                If `abc_pad_length` is negative.
+
+            Notes
+            -----
+            The `mesh_parameters` dictionary should contain the following keys:
+            - 'dimension': int, optional. Dimension of the mesh. The default is 2.
+            - 'length_z': float, optional. Length of the mesh in the z-direction.
+            - 'length_x': float, optional. Length of the mesh in the x-direction.
+            - 'length_y': float, optional. Length of the mesh in the y-direction.
+            - 'cell_type': str, optional. Type of the mesh cells.
+            - 'mesh_type': str, optional. Type of the mesh.
+
+            For mesh with absorbing layer only:
+            - 'abc_pad_length': float, optional. Length of the absorbing boundary condition padding.
+
+            For Firedrake mesh only:
+            - 'dx': float, optional. Mesh element size.
+            - 'periodic': bool, optional. Whether the mesh is periodic.
+            - 'edge_length': float, optional. Length of the mesh edges.
+
+            For SeismicMesh only:
+            - 'cells_per_wavelength': float, optional. Number of cells per wavelength.
+            - 'source_frequency': float, optional. Frequency of the source.
+            - 'minimum_velocity': float, optional. Minimum velocity.
+            - 'velocity_model_file': str, optional. File containing the velocity model.
+            - 'edge_length': float, optional. Length of the mesh edges.
+            """
+            self.dimension = mesh_parameters["dimension"]
+            self.length_z = mesh_parameters["length_z"]
+            self.length_x = mesh_parameters["length_x"]
+            self.length_y = mesh_parameters["length_y"]
+            self.cell_type = mesh_parameters["cell_type"]
+            self.comm = comm
+            if mesh_parameters["abc_pad_length"] is None:
+                self.abc_pad = 0.0
+            elif mesh_parameters["abc_pad_length"] >= 0.0:
+                self.abc_pad = mesh_parameters["abc_pad_length"]
+            else:
+                raise ValueError("abc_pad must be positive")
+            self.mesh_type = mesh_parameters["mesh_type"]
+
+            # Firedrake mesh only parameters
+            self.dx = mesh_parameters["dx"]
+            self.quadrilateral = False
+            self.periodic = mesh_parameters["periodic"]
+            if self.dx is None:
+                self.dx = mesh_parameters["edge_length"]
+
+            # SeismicMesh only parameters
+            self.cpw = mesh_parameters["cells_per_wavelength"]
+            self.source_frequency = mesh_parameters["source_frequency"]
+            self.minimum_velocity = mesh_parameters["minimum_velocity"]
+            self.lbda = None
+            self.velocity_model = mesh_parameters["velocity_model_file"]
+            self.edge_length = mesh_parameters["edge_length"]
+            self.output_file_name = "automatic_mesh.msh"
 
     def set_mesh_size(self, length_z=None, length_x=None, length_y=None):
         """
@@ -332,15 +364,15 @@ class AutomaticMesh:
             frequency = self.source_frequency
             C = self.cpw  # cells_per_wavelength(method, degree, dimension)
 
-            Lz = self.length_z
-            Lx = self.length_x
-            domain_pad = self.abc_pad
+            Lz = self.length_z*1000
+            Lx = self.length_x*1000
+            domain_pad = self.abc_pad*1000
             lbda_min = v_min/frequency
 
             bbox = (-Lz, 0.0, 0.0, Lx)
             domain = SeismicMesh.Rectangle(bbox)
 
-            hmin = lbda_min/C
+            hmin = lbda_min/C*1000
             self.comm.comm.barrier()
 
             ef = SeismicMesh.get_sizing_function_from_segy(
@@ -371,7 +403,7 @@ class AutomaticMesh:
             if self.comm.comm.rank == 0:
                 meshio.write_points_cells(
                     "automatic_mesh.msh",
-                    points,
+                    points/1000.0,
                     [("triangle", cells)],
                     file_format="gmsh22",
                     binary=False
@@ -379,7 +411,7 @@ class AutomaticMesh:
 
                 meshio.write_points_cells(
                     "automatic_mesh.vtk",
-                    points,
+                    points/1000.0,
                     [("triangle", cells)],
                     file_format="vtk"
                 )
@@ -490,7 +522,7 @@ def RectangleMesh(nx, ny, Lx, Ly, pad=None, comm=None, quadrilateral=False):
         Ly += 2 * pad
     else:
         pad = 0
-    mesh = fire.RectangleMesh(nx, ny, Lx, Ly, quadrilateral=quadrilateral)
+    mesh = fire.RectangleMesh(nx, ny, Lx, Ly, quadrilateral=quadrilateral, comm=comm)
     mesh.coordinates.dat.data[:, 0] *= -1.0
     mesh.coordinates.dat.data[:, 1] -= pad
 
