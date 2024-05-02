@@ -52,7 +52,6 @@ camembert_dictionary["mesh"] = {
     "h": 0.05,  # mesh size in km
     "mesh_file": None,
     "mesh_type": "firedrake_mesh",  # options: firedrake_mesh or user_mesh
-    "h": 0.05,
 }
 # For use only if you are using a synthetic test model
 # or a forward only simulation
@@ -109,6 +108,12 @@ camembert_dictionary["visualization"] = {
     "adjoint_filename": None,
     "debug_output": False,
 }
+camembert_dictionary["camembert_options"] = {
+    "radius": 0.2,
+    "circle_center": (-0.5, 0.5),
+    "outside_velocity": 1.6,
+    "inside_circle_velocity": 4.6,
+}
 
 
 class Camembert_acoustic(Rectangle_acoustic):
@@ -139,15 +144,15 @@ class Camembert_acoustic(Rectangle_acoustic):
         self._camembert_velocity_model()
 
     def _camembert_velocity_model(self):
+        camembert_dict = self.input_dictionary["camembert_options"]
         z = self.mesh_z
         x = self.mesh_x
-        zc = -0.5
-        xc = 0.5
-        rc = 0.2
-        c_salt = 4.6
-        c_not_salt = 1.6
+        zc, xc = camembert_dict["circle_center"]
+        rc = camembert_dict["radius"]
+        c_salt = camembert_dict["inside_circle_velocity"]
+        c_not_salt = camembert_dict["outside_velocity"]
         cond = fire.conditional(
             (z - zc) ** 2 + (x - xc) ** 2 < rc**2, c_salt, c_not_salt
         )
-        self.set_initial_velocity_model(conditional=cond)
+        self.set_initial_velocity_model(conditional=cond, dg_velocity_model=False)
         return None

@@ -126,24 +126,18 @@ def ensemble_propagator(func):
 #     return wrapper
 
 
-# def ensemble_gradient(func):
-#     """Decorator for gradient to distribute shots for ensemble parallelism"""
+def ensemble_gradient(func):
+    """Decorator for gradient to distribute shots for ensemble parallelism"""
 
-#     def wrapper(*args, **kwargs):
-#         acq = args[0].get("acquisition")
-#         save_adjoint = kwargs.get("save_adjoint")
-#         num = len(acq["source_pos"])
-#         _comm = args[2]
-#         for snum in range(num):
-#             if is_owner(_comm, snum):
-#                 if save_adjoint:
-#                     grad, u_adj = func(*args, **kwargs)
-#                     return grad, u_adj
-#                 else:
-#                     grad = func(*args, **kwargs)
-#                     return grad
+    def wrapper(*args, **kwargs):
+        num = args[0].number_of_sources
+        _comm = args[0].comm
+        for snum in range(num):
+            if is_owner(_comm, snum):
+                grad = func(*args, **kwargs)
+                return grad
 
-#     return wrapper
+    return wrapper
 
 
 # def ensemble_gradient_elastic_waves(func):

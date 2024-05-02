@@ -23,11 +23,13 @@ jobs:
       run: |
           source /home/olender/Firedrakes/newest3/firedrake/bin/activate
           mpiexec -n 6 pytest test_3d/test_hexahedral_convergence.py
+          mpiexec -n 6 pytest test_parallel/test_forward.py
     - name: Covering parallel 3D forward test
       continue-on-error: true
       run: |
           source /home/olender/Firedrakes/newest3/firedrake/bin/activate
           mpiexec -n 6 pytest --cov-report=xml --cov-append --cov=spyro test_3d/test_hexahedral_convergence.py
+          mpiexec -n 6 pytest --cov-report=xml --cov-append --cov=spyro test_parallel/test_forward.py
     # - name: Running serial tests for adjoint
     #   run: |
     #       source /home/olender/Firedrakes/main/firedrake/bin/activate
