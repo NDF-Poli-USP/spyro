@@ -3,9 +3,10 @@ from . import helpers
 
 def backward_wave_propagator(Wave_obj, dt=None):
     if Wave_obj.abc_type is None:
-        backward_wave_propagator_no_pml(Wave_obj, dt=None)
+        return backward_wave_propagator_no_pml(Wave_obj, dt=None)
     elif Wave_obj.abc_type == "PML":
-        mixed_space_backward_wave_propagator(Wave_obj, dt=None)
+        return mixed_space_backward_wave_propagator(Wave_obj, dt=None)
+
 
 def backward_wave_propagator_no_pml(Wave_obj, dt=None):
     """Propagates the adjoint wave backwards in time.
