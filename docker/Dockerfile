@@ -27,11 +27,17 @@ FROM spyro_base AS spyro_release
 
 RUN . /home/firedrake/firedrake/bin/activate; pip install git+https://github.com/Olender/spyro-1.git
 
-FROM spyro_base AS spyro_test
+FROM spyro_base AS spyro_test_base
 
 RUN . /home/firedrake/firedrake/bin/activate; pip3 install pytest
 
 WORKDIR /home/firedrake
-RUN git clone https://github.com/Olender/spyro-1.git
 
+FROM spyro_test_base AS spyro_test
+
+RUN git clone https://github.com/Olender/spyro-1.git
 WORKDIR /home/firedrake/spyro-1/test
+
+FROM spyro_test_base AS spyro_development
+
+RUN echo "/home/firedrake/shared/" >> /home/firedrake/firedrake/lib/python3.10/site-packages/shared.pth
