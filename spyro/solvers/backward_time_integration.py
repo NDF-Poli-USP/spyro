@@ -1,10 +1,11 @@
 import firedrake as fire
 from . import helpers
 
+
 def backward_wave_propagator(Wave_obj, dt=None):
-    if Wave_obj.abc_type is None:
+    if Wave_obj.abc_status is False:
         return backward_wave_propagator_no_pml(Wave_obj, dt=None)
-    elif Wave_obj.abc_type == "PML":
+    elif Wave_obj.abc_status is True:
         return mixed_space_backward_wave_propagator(Wave_obj, dt=None)
 
 
@@ -135,6 +136,7 @@ def backward_wave_propagator_no_pml(Wave_obj, dt=None):
 
     dJ.dat.data_with_halos[:] *= (dt/2)
     return dJ
+
 
 def mixed_space_backward_wave_propagator(Wave_obj, dt=None):
     """Propagates the adjoint wave backwards in time.
