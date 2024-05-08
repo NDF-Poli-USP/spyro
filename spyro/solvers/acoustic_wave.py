@@ -144,7 +144,7 @@ class AcousticWave(Wave):
             self.u_n.assign(0.0)
         except:
             warnings.warn("No pressure to reset")
-        if self.abc_type == "PML":
+        if self.abc_status is True:
             try:
                 self.X = fire.Function(self.mixed_function_space)
                 self.X_n = fire.Function(self.mixed_function_space)
