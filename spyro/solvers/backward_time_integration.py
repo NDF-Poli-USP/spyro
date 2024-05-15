@@ -70,7 +70,7 @@ def backward_wave_propagator_no_pml(Wave_obj, dt=None):
     dufordt2 = fire.Function(Wave_obj.function_space)
     uadj = fire.Function(Wave_obj.function_space)  # auxiliarly function for the gradient compt.
 
-    ffG = -2 * (Wave_obj.c)**(-3) * fire.dot(dufordt2, uadj) * m_v * fire.dx(scheme=Wave_obj.quadrature_rule)
+    ffG = +2 * (Wave_obj.c)**(-3) * fire.dot(dufordt2, uadj) * m_v * fire.dx(scheme=Wave_obj.quadrature_rule)
 
     lhsG = mgrad
     rhsG = ffG
@@ -175,7 +175,7 @@ def mixed_space_backward_wave_propagator(Wave_obj, dt=None):
     comm.comm.barrier()
 
     X = Wave_obj.X
-    dJ = fire.Function(Wave_obj.function_space)#, name="gradient")
+    dJ = fire.Function(Wave_obj.function_space)  #, name="gradient")
 
     final_time = Wave_obj.final_time
     dt = Wave_obj.dt
@@ -196,10 +196,12 @@ def mixed_space_backward_wave_propagator(Wave_obj, dt=None):
     m_v = fire.TestFunction(Wave_obj.function_space)
     mgrad = m_u * m_v * fire.dx(scheme=Wave_obj.quadrature_rule)
 
-    dufordt2 = fire.Function(Wave_obj.function_space)
+    # dufordt2 = fire.Function(Wave_obj.function_space)
+    ufor = fire.Function(Wave_obj.function_space)
     uadj = fire.Function(Wave_obj.function_space)  # auxiliarly function for the gradient compt.
 
-    ffG = -2 * (Wave_obj.c)**(-3) * fire.dot(dufordt2, uadj) * m_v * fire.dx(scheme=Wave_obj.quadrature_rule)
+    # ffG = -2 * (Wave_obj.c)**(-3) * fire.dot(dufordt2, uadj) * m_v * fire.dx(scheme=Wave_obj.quadrature_rule)
+    ffG = 2.0 * Wave_obj.c * fire.dot(fire.grad(uadj), fire.grad(ufor)) * m_v * fire.dx(scheme=Wave_obj.quadrature_rule)
 
     lhsG = mgrad
     rhsG = ffG
@@ -236,14 +238,7 @@ def mixed_space_backward_wave_propagator(Wave_obj, dt=None):
         if step % Wave_obj.gradient_sampling_frequency == 0:
             # duadjdt2.assign( ((u_np1 - 2.0 * u_n + u_nm1) / fire.Constant(dt**2)) )
             uadj.assign(X_np1.sub(0))
-            if len(forward_solution) > 2:
-                dufordt2.assign(
-                    (forward_solution.pop() - 2.0 * forward_solution[-1] + forward_solution[-2]) / fire.Constant(dt**2)
-                )
-            else:
-                dufordt2.assign(
-                    (forward_solution.pop() - 2.0 * 0.0 + 0.0) / fire.Constant(dt**2)
-                )
+            ufor.assign(forward_solution.pop())
 
             grad_solver.solve()
             if step == nt-1 or step == 0:
