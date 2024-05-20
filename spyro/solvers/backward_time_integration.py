@@ -70,7 +70,7 @@ def backward_wave_propagator_no_pml(Wave_obj, dt=None):
     dufordt2 = fire.Function(Wave_obj.function_space)
     uadj = fire.Function(Wave_obj.function_space)  # auxiliarly function for the gradient compt.
 
-    ffG = +2 * (Wave_obj.c)**(-3) * fire.dot(dufordt2, uadj) * m_v * fire.dx(scheme=Wave_obj.quadrature_rule)
+    ffG = -2 * (Wave_obj.c)**(-3) * fire.dot(dufordt2, uadj) * m_v * fire.dx(scheme=Wave_obj.quadrature_rule)
 
     lhsG = mgrad
     rhsG = ffG
@@ -201,7 +201,7 @@ def mixed_space_backward_wave_propagator(Wave_obj, dt=None):
     uadj = fire.Function(Wave_obj.function_space)  # auxiliarly function for the gradient compt.
 
     # ffG = -2 * (Wave_obj.c)**(-3) * fire.dot(dufordt2, uadj) * m_v * fire.dx(scheme=Wave_obj.quadrature_rule)
-    ffG = 2.0 * Wave_obj.c * fire.dot(fire.grad(uadj), fire.grad(ufor)) * m_v * fire.dx(scheme=Wave_obj.quadrature_rule)
+    ffG =  2.0 * Wave_obj.c * fire.dot(fire.grad(uadj), fire.grad(ufor)) * m_v * fire.dx(scheme=Wave_obj.quadrature_rule)
 
     lhsG = mgrad
     rhsG = ffG
