@@ -146,9 +146,8 @@ class AcousticWave(Wave):
             warnings.warn("No pressure to reset")
         if self.abc_status is True:
             try:
-                self.X = fire.Function(self.mixed_function_space)
-                self.X_n = fire.Function(self.mixed_function_space)
-                self.X_nm1 = fire.Function(self.mixed_function_space)
+                self.X_n.assign(0.0)
+                self.X_nm1.assign(0.0)
             except:
                 warnings.warn("No mixed space pressure to reset")
             
