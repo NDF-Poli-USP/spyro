@@ -124,7 +124,7 @@ def get_forward_model(load_true=False):
         Wave_obj_exact = spyro.AcousticWave(dictionary=dictionary)
         Wave_obj_exact.set_mesh(mesh_parameters={"dx": 0.1})
         # Wave_obj_exact.set_initial_velocity_model(constant=3.0)
-        cond = fire.conditional(Wave_obj_exact.mesh_z > -2.5, 1.5, 3.5)
+        cond = fire.conditional(Wave_obj_exact.mesh_z > -1.5, 1.5, 3.5)
         Wave_obj_exact.set_initial_velocity_model(
             conditional=cond,
             # output=True
