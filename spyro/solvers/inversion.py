@@ -6,6 +6,7 @@ import numpy as np
 
 from .acoustic_wave import AcousticWave
 from ..utils import compute_functional
+from ..utils import Gradient_mask_for_pml, Mask
 from ..plots import plot_model as spyro_plot_model
 
 try:
@@ -159,6 +160,7 @@ class FullWaveformInversion(AcousticWave):
         self.inner_product = 'L2'
         self.misfit = None
         self.guess_forward_solution = None
+        self.has_gradient_mask = False
 
     def calculate_misfit(self, c=None):
         """
@@ -218,6 +220,7 @@ class FullWaveformInversion(AcousticWave):
         expression=None,
         new_file=None,
         output=False,
+        dg_velocity_model=True,
     ):
         """"
         Sets the real velocity model. Only to be used for synthetic cases.
@@ -245,6 +248,7 @@ class FullWaveformInversion(AcousticWave):
             expression=expression,
             new_file=new_file,
             output=output,
+            dg_velocity_model=dg_velocity_model,
         )
         self.real_velocity_model = self.initial_velocity_model
 
@@ -379,6 +383,7 @@ class FullWaveformInversion(AcousticWave):
         if save and comm.comm.rank == 0:
             fire.File("gradient"+str(self.current_iteration)+".pvd").write(dJ_total)
         self.gradient = dJ_total
+        self._apply_gradient_mask()
 
     def return_functional_and_gradient(self, c):
         self.get_gradient(c=c)
@@ -406,7 +411,7 @@ class FullWaveformInversion(AcousticWave):
         options = {
             "disp": True,
             "eps": 1e-15,
-            "gtol": 1e-15, "maxiter": 5,
+            "gtol": 1e-15, "maxiter": 20,
         }
         result = scipy_minimize(
             self.return_functional_and_gradient,
@@ -466,6 +471,59 @@ class FullWaveformInversion(AcousticWave):
         algo = ROL.Algorithm("Line Search", params)
 
         algo.run(opt, obj, bnd)
+
+    def set_gradient_mask(self, boundaries=None):
+        """
+        Sets the gradient mask for zeroing gradient values outside defined boundaries.
+
+        Args:
+            boundaries (list, optional): List of boundary values for the mask. If not provided, 
+                the method expects the abc_status to be True and uses PML locations for boundary
+                values.
+
+        Raises:
+            ValueError: If no abc boundary is present in the object and boundaries is None.
+            ValueError: If mask options do not make sense.
+
+        Warnings:
+            UserWarning: If abc_status is True and boundaries is not None, the boundaries will 
+                override the PML boundaries for the mask.
+
+        """
+        self.has_gradient_mask = True
+
+        if self.abc_status is False and boundaries is None:
+            raise ValueError("If no abc boundary please define boundaries for the mask")
+        elif self.abc_status is True and boundaries is None:
+            mask_obj = Gradient_mask_for_pml(Wave_obj=self)
+        elif self.abc_status is True and boundaries is not None:
+            warnings.warn("Boundaries overuling PML boundaries for mask")
+            mask_obj = Mask(boundaries, Wave_obj=self)
+        elif self.abc_status is False and boundaries is not None:
+            mask_obj = Mask(boundaries, Wave_obj=self)
+        else:
+            raise ValueError("Mask options do not make sense")
+
+        self.mask_obj = mask_obj
+    
+    def _apply_gradient_mask(self):
+            """
+            Applies a gradient mask to the gradient if it exists.
+
+            If a gradient mask is available, this method applies the mask to the gradient
+            using the `apply_mask` method of the `mask_obj`. If no gradient mask is available,
+            this method does nothing.
+
+            Parameters:
+                None
+
+            Returns:
+                None
+            """
+            if self.has_gradient_mask:
+                self.gradient = self.mask_obj.apply_mask(self.gradient)
+            else:
+                pass
 
 
 class SyntheticRealAcousticWave(AcousticWave):
