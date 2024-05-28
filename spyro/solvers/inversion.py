@@ -161,6 +161,7 @@ class FullWaveformInversion(AcousticWave):
         self.misfit = None
         self.guess_forward_solution = None
         self.has_gradient_mask = False
+        self.functional_history = []
 
     def calculate_misfit(self, c=None):
         """
@@ -354,6 +355,7 @@ class FullWaveformInversion(AcousticWave):
         self.calculate_misfit(c=c)
         Jm = compute_functional(self, self.misfit)
 
+        self.functional_history.append(Jm)
         self.functional = Jm
 
         return Jm
@@ -391,10 +393,27 @@ class FullWaveformInversion(AcousticWave):
         self.current_iteration += 1
         return self.functional, dJ
 
-    def run_fwi(self):
+    def run_fwi(self, **kwargs):
         """
         Run the full waveform inversion.
         """
+        parameters = {
+            "vmin": 1.429,
+            "vmax": 6.0,
+            "scipy_options": {
+                "disp": True,
+                "eps": 1e-15,
+                "gtol": 1e-15, "maxiter": kwargs.pop("maxiter", 20),
+            }
+        }
+        parameters.update(kwargs)
+
+        vmin = parameters["vmin"]
+        vmax = parameters["vmax"]
+        vp_0 = self.initial_velocity_model.vector().gather()
+        bounds = [(vmin, vmax) for _ in range(len(vp_0))]
+        options = parameters["scipy_options"]
+
         # if self.running_fwi is False:
         #     warnings.warn("Dictionary FWI options set to not run FWI.")
         # if self.current_iteration < self.iteration_limit:
@@ -404,15 +423,6 @@ class FullWaveformInversion(AcousticWave):
         # else:
         #     warnings.warn("Iteration limit reached. FWI stopped.")
         #     self.running_fwi = False
-        vp_0 = self.initial_velocity_model.vector().gather()
-        vmin = 1.5
-        vmax = 5.0
-        bounds = [(vmin, vmax) for _ in range(len(vp_0))]
-        options = {
-            "disp": True,
-            "eps": 1e-15,
-            "gtol": 1e-15, "maxiter": 20,
-        }
         result = scipy_minimize(
             self.return_functional_and_gradient,
             vp_0,
