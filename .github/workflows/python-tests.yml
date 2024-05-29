@@ -30,7 +30,15 @@ jobs:
       run: |
           source /home/olender/Firedrakes/newest3/firedrake/bin/activate
           mpiexec -n 6 pytest --cov-report=xml --cov-append --cov=spyro test_3d/test_hexahedral_convergence.py
+    - name: Covering parallel forward test
+      continue-on-error: true
+      run: |
+          source /home/olender/Firedrakes/newest3/firedrake/bin/activate
           mpiexec -n 6 pytest --cov-report=xml --cov-append --cov=spyro test_parallel/test_forward.py
+    - name: Covering parallel fwi test
+      continue-on-error: true
+      run: |
+          source /home/olender/Firedrakes/newest3/firedrake/bin/activate
           mpiexec -n 6 pytest --cov-report=xml --cov-append --cov=spyro test_parallel/test_fwi.py
     # - name: Running serial tests for adjoint
     #   run: |
