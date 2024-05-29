@@ -8,7 +8,7 @@ import spyro
 
 class Gradient_mask_for_pml():
     def __init__(self, Wave_obj=None):
-        if Wave_obj.abc_status is False:
+        if Wave_obj.abc_active is False:
             pass
 
         # Gatting necessary data from wave object

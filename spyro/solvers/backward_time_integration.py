@@ -3,9 +3,9 @@ from . import helpers
 
 
 def backward_wave_propagator(Wave_obj, dt=None):
-    if Wave_obj.abc_status is False:
+    if Wave_obj.abc_active is False:
         return backward_wave_propagator_no_pml(Wave_obj, dt=None)
-    elif Wave_obj.abc_status is True:
+    elif Wave_obj.abc_active:
         return mixed_space_backward_wave_propagator(Wave_obj, dt=None)
 
 
