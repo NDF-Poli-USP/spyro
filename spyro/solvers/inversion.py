@@ -11,8 +11,8 @@ from ..plots import plot_model as spyro_plot_model
 
 try:
     from ROL.firedrake_vector import FiredrakeVector as FireVector
-    import ROL.objective as RObjective
     import ROL
+    RObjective = ROL.Objective
 except ImportError:
     ROL = None
     RObjective = object
@@ -54,16 +54,18 @@ class Objective(RObjective):
     def value(self, x, tol):
         """Compute the functional"""
         J_total = np.zeros((1))
-        self.inversion_obj.misfit=None
+        self.inversion_obj.misfit = None
         self.inversion_obj.reset_pressure()
         Jm = self.inversion_obj.get_functional()
         self.misfit = self.inversion_obj.misfit
-        
+        J_total[0] += Jm
+
         return J_total[0]
 
     def gradient(self, g, x, tol):
         """Compute the gradient of the functional"""
-        dJ = self.inversion_obj.get_gradient()
+        self.inversion_obj.get_gradient(calculate_functional=False)
+        dJ = self.inversion_obj.gradient
         g.scale(0)
         g.vec += dJ
 
@@ -72,7 +74,7 @@ class Objective(RObjective):
         vp.assign(fire.Function(
             self.inversion_obj.function_space,
             x.vec,
-            name = "velocity")
+            name="velocity")
         )
 
 
@@ -162,6 +164,8 @@ class FullWaveformInversion(AcousticWave):
         self.guess_forward_solution = None
         self.has_gradient_mask = False
         self.functional_history = []
+        self.control_out = fire.File("results/control.pvd")
+        self.gradient_out = fire.File("results/gradient.pvd")
 
     def calculate_misfit(self, c=None):
         """
@@ -175,7 +179,8 @@ class FullWaveformInversion(AcousticWave):
         if c is not None:
             self.initial_velocity_model.dat.data[:] = c
         self.forward_solve()
-        self.save_current_velocity_model(file_name="control"+str(self.current_iteration)+".pvd")
+        output = fire.File("control_" + str(self.current_iteration)+".pvd")
+        output.write(self.c)
         self.guess_shot_record = self.forward_solution_receivers
         self.guess_forward_solution = self.forward_solution
 
@@ -360,7 +365,7 @@ class FullWaveformInversion(AcousticWave):
 
         return Jm
 
-    def get_gradient(self, c=None, save=True):
+    def get_gradient(self, c=None, save=True, calculate_functional=True):
         """
         Calculates the gradient of the functional with respect to the model parameters.
 
@@ -374,7 +379,9 @@ class FullWaveformInversion(AcousticWave):
         Firedrake function
         """
         comm = self.comm
-        self.get_functional(c=c)
+        if calculate_functional:
+            self.get_functional(c=c)
+        comm.comm.barrier()
         dJ = self.gradient_solve(misfit=self.misfit, forward_solution=self.guess_forward_solution)
         dJ_total = fire.Function(self.function_space)
         comm.comm.barrier()
@@ -382,15 +389,19 @@ class FullWaveformInversion(AcousticWave):
         dJ_total /= comm.ensemble_comm.size
         if comm.comm.size > 1:
             dJ_total /= comm.comm.size
-        if save and comm.comm.rank == 0:
-            fire.File("gradient"+str(self.current_iteration)+".pvd").write(dJ_total)
         self.gradient = dJ_total
         self._apply_gradient_mask()
+        if save and comm.comm.rank == 0:
+            # self.gradient_out.write(dJ_total)
+            output = fire.File("gradient_" + str(self.current_iteration)+".pvd")
+            output.write(dJ_total)
+            print("DEBUG")
+        self.current_iteration += 1
+        comm.comm.barrier()
 
     def return_functional_and_gradient(self, c):
         self.get_gradient(c=c)
         dJ = self.gradient.dat.data[:]
-        self.current_iteration += 1
         return self.functional, dJ
 
     def run_fwi(self, **kwargs):
@@ -436,29 +447,38 @@ class FullWaveformInversion(AcousticWave):
         vp_end.dat.data[:] = result.x
         fire.File("vp_end.pvd").write(vp_end)
 
-    def run_fwi_rol(self):
+    def run_fwi_rol(self, **kwargs):
         """
         Run the full waveform inversion using ROL.
         """
         if ROL is None:
             raise ImportError("The ROL module is not available.")
-        paramsDict = {
-            "General": {"Secant": {"Type": "Limited-Memory BFGS", "Maximum Storage": 10}},
-            "Step": {
-                "Type": "Augmented Lagrangian",
-                "Augmented Lagrangian": {
-                    "Subproblem Step Type": "Line Search",
-                    "Subproblem Iteration Limit": 5.0,
+        parameters = {
+            "vmin": 1.429,
+            "vmax": 6.0,
+            "ROL_options": {
+                "General": {"Secant": {"Type": "Limited-Memory BFGS", "Maximum Storage": 10}},
+                "Step": {
+                    "Type": "Augmented Lagrangian",
+                    "Augmented Lagrangian": {
+                        "Subproblem Step Type": "Line Search",
+                        "Subproblem Iteration Limit": 5.0,
+                    },
+                    "Line Search": {"Descent Method": {"Type": "Quasi-Newton Step"}},
                 },
-                "Line Search": {"Descent Method": {"Type": "Quasi-Newton Step"}},
-            },
-            "Status Test": {
-                "Gradient Tolerance": 1e-16,
-                "Iteration Limit": 100,
-                "Step Tolerance": 1.0e-16,
-            },
+                "Status Test": {
+                    "Gradient Tolerance": 1e-16,
+                    "Iteration Limit": kwargs.pop("maxiter", 20),
+                    "Step Tolerance": 1.0e-16,
+                },
+            }
         }
-        params = ROL.ParameterList(paramsDict, "Parameters")
+        parameters.update(kwargs)
+        vmin = parameters["vmin"]
+        vmax = parameters["vmax"]
+
+        warnings.warn("This functionality is deprecated, since the pyROL library is no longer supported.")
+        params = ROL.ParameterList(parameters["ROL_options"], "Parameters")
 
         inner_product = L2Inner(self)
 
@@ -469,11 +489,11 @@ class FullWaveformInversion(AcousticWave):
 
         # Add control bounds to the problem (uses more RAM)
         xlo = fire.Function(self.function_space)
-        xlo.interpolate(fire.Constant(1.0))
+        xlo.interpolate(fire.Constant(vmin))
         x_lo = FireVector(xlo.vector(), inner_product)
 
         xup = fire.Function(self.function_space)
-        xup.interpolate(fire.Constant(5.0))
+        xup.interpolate(fire.Constant(vmax))
         x_up = FireVector(xup.vector(), inner_product)
 
         bnd = ROL.Bounds(x_lo, x_up, 1.0)
@@ -515,7 +535,7 @@ class FullWaveformInversion(AcousticWave):
             raise ValueError("Mask options do not make sense")
 
         self.mask_obj = mask_obj
-    
+
     def _apply_gradient_mask(self):
             """
             Applies a gradient mask to the gradient if it exists.
