@@ -1,8 +1,4 @@
 import numpy as np
-import math
-import matplotlib.pyplot as plt
-from copy import deepcopy
-from firedrake import File
 import firedrake as fire
 import spyro
 
@@ -33,7 +29,7 @@ dictionary["acquisition"] = {
     "frequency": 5.0,
     "delay": 0.2,
     "delay_type": "time",
-    "receiver_locations": spyro.create_transect((-1.45, 0.7), (-1.45, 1.3), 300),
+    "receiver_locations": spyro.create_transect((-1.45, 0.7), (-1.45, 1.3), 200),
 }
 dictionary["time_axis"] = {
     "initial_time": 0.0,  # Initial time for event
@@ -61,7 +57,7 @@ dictionary["inversion"] = {
 }
 
 
-def test_fwi(load_real_shot=False):
+def test_fwi(load_real_shot=False, use_rol=False):
     """
     Run the Full Waveform Inversion (FWI) test.
 
@@ -99,26 +95,43 @@ def test_fwi(load_real_shot=False):
     FWI_obj.set_guess_mesh(mesh_parameters={"dx": 0.1})
     FWI_obj.set_guess_velocity_model(constant=2.5)
     mask_boundaries = {
-        "z_min":-1.3,
-        "z_max":-0.7,
-        "x_min":0.7,
-        "x_max":1.3,
+        "z_min": -1.3,
+        "z_max": -0.7,
+        "x_min": 0.7,
+        "x_max": 1.3,
     }
     FWI_obj.set_gradient_mask(boundaries=mask_boundaries)
-    FWI_obj.run_fwi(vmin=2.5, vmax=3.0, maxiter=5)
+    if use_rol:
+        FWI_obj.run_fwi_rol(vmin=2.5, vmax=3.0, maxiter=2)
+    else:
+        FWI_obj.run_fwi(vmin=2.5, vmax=3.0, maxiter=5)
 
     # simple mask test
     grad_test = FWI_obj.gradient
-    test0 = np.isclose(grad_test.at((-0.1,0.1)), 0.0)
-    test1 = np.abs(grad_test.at((-1.0,1.0)))> 1e-5
-    
+    test0 = np.isclose(grad_test.at((-0.1, 0.1)), 0.0)
+    print(f"PML looks masked: {test0}", flush=True)
+    test1 = np.abs(grad_test.at((-1.0, 1.0))) > 1e-5
+    print(f"Center looks unmasked: {test1}", flush=True)
+
     # quick look at functional and if it reduced
     test2 = FWI_obj.functional < 1e-3
+    print(f"Last functional small: {test2}", flush=True)
     test3 = FWI_obj.functional_history[-1]/FWI_obj.functional_history[0] < 1e-2
+    print(f"Considerable functional reduction during test: {test3}", flush=True)
 
     print("END", flush=True)
     assert all([test0, test1, test2, test3])
 
 
+def test_fwi_with_rol(load_real_shot=False, use_rol=True):
+    try:
+        import ROL
+    except ImportError:
+        assert True
+
+    test_fwi(load_real_shot=load_real_shot, use_rol=use_rol)
+
+
 if __name__ == "__main__":
     test_fwi(load_real_shot=False)
+    test_fwi_with_rol()
