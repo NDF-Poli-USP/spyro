@@ -155,7 +155,6 @@ class HABC(AcousticWave):
 
     def set_damping_field(self):
         Damp_obj = Damping_field_calculator(self)
-        
 
     def _fundamental_frequency(self):
         V = self.Wave.function_space
