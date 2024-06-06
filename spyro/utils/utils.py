@@ -43,13 +43,19 @@ def compute_functional(Wave_object, residual):
     """
     num_receivers = Wave_object.number_of_receivers
     dt = Wave_object.dt
+    comm = Wave_object.comm
 
     J = 0
     for rn in range(num_receivers):
         J += np.trapz(residual[:, rn] ** 2, dx=dt)
 
     J *= 0.5
-    return J
+
+    J_total = np.zeros((1))
+    J_total[0] += J
+    J_total = COMM_WORLD.allreduce(J_total, op=MPI.SUM)
+    J_total[0] /= comm.comm.size
+    return J_total[0]
 
 
 def evaluate_misfit(model, guess, exact):
@@ -79,6 +85,7 @@ def mpi_init(model):
     # rank = myrank()
     # size = mysize()
     available_cores = COMM_WORLD.size  # noqa: F405
+    print(f"Parallelism type: {model.parallelism_type}", flush=True)
     if model.parallelism_type == "automatic":
         num_cores_per_shot = available_cores / model.number_of_sources
         if available_cores % model.number_of_sources != 0:
