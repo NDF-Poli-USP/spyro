@@ -139,7 +139,9 @@ class HABC(AcousticWave):
         self.initial_frequency = self.frequency
         self.reference_frequency = self.frequency
         # Initial noneikonal (ne) related attributes
+        self.with_neik_calculation = True
         self.neik_location = None
+        self.neik_point_values = []
         self.neik_time_value = None
         self.neik_velocity_value = None
 

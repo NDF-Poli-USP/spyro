@@ -9,6 +9,13 @@ from .. import utils
 # from ..habc import lenCam_spy
 
 
+class Noneikonal():
+    def __init__(self, Wave_obj):
+        function_space = Wave_obj.function_space
+        mesh_z = Wave_obj.mesh_z
+        mesh_x = Wave_obj.mesh_x
+
+
 def central_difference(Wave_object, source_id=0):
     excitations = Wave_object.sources
     excitations.current_source = source_id
