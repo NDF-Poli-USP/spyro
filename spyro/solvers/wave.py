@@ -242,13 +242,12 @@ class Wave(Model_parameters):
             self.mesh_x = x
             self.mesh_y = y
 
-    def get_and_set_maximum_dt(self, fraction=0.7):
+    def get_and_set_maximum_dt(self, fraction=0.7, estimate_max_eigenvalue=False):
         # if self.method == "mass_lumped_triangle":
         #     estimate_max_eigenvalue = True
         # elif self.method == "spectral_quadrilateral":
         #     estimate_max_eigenvalue = True
         # else:
-        estimate_max_eigenvalue = True
 
         if self.c is None:
             c = self.initial_velocity_model
@@ -266,7 +265,7 @@ class Wave(Model_parameters):
         dt = self.final_time / (nt - 1)
 
         self.dt = dt
-        print(dt)
+
         self.wavelet = self.get_wavelet()
         return dt
 
