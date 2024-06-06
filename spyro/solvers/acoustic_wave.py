@@ -3,7 +3,7 @@ import warnings
 
 from .wave import Wave
 from .time_integration import time_integrator
-from ..io.basicio import ensemble_propagator
+from ..io.basicio import ensemble_propagator, ensemble_gradient
 from ..domains.quadrature import quadrature_rules
 from .acoustic_solver_construction_no_pml import (
     construct_solver_or_matrix_no_pml,
@@ -17,6 +17,15 @@ from .backward_time_integration import (
 
 
 class AcousticWave(Wave):
+    def save_current_velocity_model(self, file_name=None):
+        if self.c is None:
+            raise ValueError("C not loaded")
+        if file_name is None:
+            file_name = "velocity_model.pvd"
+        fire.File(file_name).write(
+            self.c, name="velocity"
+        )
+
     def forward_solve(self):
         """Solves the forward problem.
 
@@ -100,10 +109,12 @@ class AcousticWave(Wave):
         if dt is not None:
             self.dt = dt
 
+        self.current_source = source_num
         usol, usol_recv = time_integrator(self, source_id=source_num)
 
         return usol, usol_recv
 
+    @ensemble_gradient
     def gradient_solve(self, guess=None, misfit=None, forward_solution=None):
         """Solves the adjoint problem to calculate de gradient.
 
@@ -122,16 +133,14 @@ class AcousticWave(Wave):
             self.misfit = misfit
         if self.real_shot_record is None:
             warnings.warn("Please load or calculate a real shot record first")
-        if self.current_time == 0.0 and guess is not None:
-            self.c = guess
-            warnings.warn(
-                "You need to run the forward solver before the adjoint solver,\
-                     will do it for you now"
-            )
+        if self.current_time == 0.0:
             self.forward_solve()
             self.misfit = self.real_shot_record - self.forward_solution_receivers
         return backward_wave_propagator(self)
 
     def reset_pressure(self):
-        self.u_nm1.assign(0.0)
-        self.u_n.assign(0.0)
+        try:
+            self.u_nm1.assign(0.0)
+            self.u_n.assign(0.0)
+        except:
+            warnings.warn("No pressure to reset")
