@@ -5,6 +5,7 @@ from .receivers.Receivers import Receivers
 from .sources.Sources import Sources, ricker_wavelet, full_ricker_wavelet
 from .solvers.wave import Wave
 from .solvers.acoustic_wave import AcousticWave
+from .solvers.inversion import FullWaveformInversion
 from .habc.habc import HABC
 
 # from .solvers.dg_wave import DG_Wave
@@ -45,6 +46,7 @@ __all__ = [
     "examples",
     "sources",
     "AcousticWave",
+    "FullWaveformInversion",
     "HABC",
     "AcousticWaveMMS",
     "RectangleMesh",

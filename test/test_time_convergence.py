@@ -66,7 +66,7 @@ def run_forward(dt):
 
     dictionary["visualization"] = {
         "forward_output": True,
-        "output_filename": "results/forward_output.pvd",
+        "forward_output_filename": "results/forward_output.pvd",
         "fwi_velocity_model_output": False,
         "velocity_model_filename": None,
         "gradient_output": False,

@@ -1,5 +1,8 @@
 # from scipy.io import savemat
 import matplotlib.pyplot as plt
+import matplotlib.patches as patches
+from matplotlib.ticker import MultipleLocator
+from PIL import Image
 import numpy as np
 import firedrake
 import copy
@@ -15,6 +18,7 @@ def plot_shots(
     file_name="1",
     vmin=-1e-5,
     vmax=1e-5,
+    contour_lines=700,
     file_format="pdf",
     start_index=0,
     end_index=0,
@@ -66,7 +70,7 @@ def plot_shots(
     X, Y = np.meshgrid(x_rec, t_rec)
 
     cmap = plt.get_cmap("gray")
-    plt.contourf(X, Y, arr, 700, cmap=cmap, vmin=vmin, vmax=vmax)
+    plt.contourf(X, Y, arr, contour_lines, cmap=cmap, vmin=vmin, vmax=vmax)
     # savemat("test.mat", {"mydata": arr})
     plt.xlabel("receiver number", fontsize=18)
     plt.ylabel("time (s)", fontsize=18)
@@ -79,20 +83,26 @@ def plot_shots(
     # plt.axis("image")
     if show:
         plt.show()
-    plt.close()
+    # plt.close()
     return None
 
 
 def plot_mesh_sizes(
-    mesh_filename,
+    mesh_filename=None,
+    firedrake_mesh=None,
     title_str=None,
     output_filename=None,
-    show=False
+    show=False,
 ):
     plt.rcParams['font.family'] = "Times New Roman"
     plt.rcParams['font.size'] = 12
 
-    mesh = firedrake.Mesh(mesh_filename)
+    if mesh_filename is not None:
+        mesh = firedrake.Mesh(mesh_filename)
+    elif firedrake_mesh is not None:
+        mesh = firedrake_mesh
+    else:
+        raise ValueError("Please specify mesh")
 
     coordinates = copy.deepcopy(mesh.coordinates.dat.data)
 
@@ -117,3 +127,90 @@ def plot_mesh_sizes(
         plt.show()
     if output_filename is not None:
         plt.savefig(output_filename)
+
+
+def plot_model(Wave_object, filename="model.png", abc_points=None, show=False, flip_axis=True):
+    """
+    Plot the model with source and receiver locations.
+
+    Parameters
+    -----------
+    Wave_object:
+        The Wave object containing the model and locations.
+    filename (optional):
+        The filename to save the plot (default: "model.png").
+    abc_points (optional):
+        List of points to plot an ABC line (default: None).
+    """
+    plt.close()
+    fig = plt.figure(figsize=(9, 9))
+    axes = fig.add_subplot(111)
+    fig.set_figwidth = 9.0
+    fig.set_figheight = 9.0
+    vp_object = Wave_object.initial_velocity_model
+    vp_image = firedrake.tripcolor(vp_object, axes=axes)
+    for source in Wave_object.source_locations:
+        z, x = source
+        plt.scatter(z, x, c="green")
+    for receiver in Wave_object.receiver_locations:
+        z, x = receiver
+        plt.scatter(z, x, c="red")
+
+    if flip_axis:
+        axes.invert_yaxis()
+
+    axes.set_xlabel("Z (km)")
+
+    if flip_axis:
+        axes.set_ylabel("X (km)", rotation=-90, labelpad=20)
+        plt.setp(axes.get_xticklabels(), rotation=-90, va="top", ha="center")
+        plt.setp(axes.get_yticklabels(), rotation=-90, va="center", ha="left")
+    else:
+        axes.set_ylabel("X (km)")
+
+    cbar = plt.colorbar(vp_image, orientation="horizontal")
+    cbar.set_label("Velocity (km/s)")
+    if flip_axis:
+        cbar.ax.tick_params(rotation=-90)
+    axes.tick_params(axis='y', pad=20)
+    axes.axis('equal')
+
+    if abc_points is not None:
+        zs = []
+        xs = []
+
+        first = True
+        for point in abc_points:
+            z, x = point
+            zs.append(z)
+            xs.append(x)
+            if first:
+                z_first = z
+                x_first = x
+            first = False
+        zs.append(z_first)
+        xs.append(x_first)
+        plt.plot(zs, xs, "--")
+    print(f"File name {filename}", flush=True)
+    plt.savefig(filename)
+
+    if flip_axis:
+        img = Image.open(filename)
+        img_rotated = img.rotate(90)
+
+        # Save the rotated image
+        img_rotated.save(filename)
+    if show:
+        plt.show()
+    else:
+        plt.close()
+
+
+def plot_function(function):
+    plt.close()
+    fig = plt.figure(figsize=(9, 9))
+    axes = fig.add_subplot(111)
+    fig.set_figwidth = 9.0
+    fig.set_figheight = 9.0
+    firedrake.tricontourf(function, axes=axes)
+    axes.axis('equal')

@@ -2,7 +2,7 @@ import os
 from abc import abstractmethod
 import warnings
 import firedrake as fire
-from firedrake import sin, cos, pi  # noqa: F401
+from firedrake import sin, cos, pi, tanh, sqrt  # noqa: F401
 from SeismicMesh import write_velocity_model
 
 from ..io import Model_parameters, interpolate
@@ -74,7 +74,6 @@ class Wave(Model_parameters):
         self.forward_solution_receivers = None
         self.current_time = 0.0
         self.set_solver_parameters()
-        self.real_shot_record = None
 
         self.wavelet = self.get_wavelet()
         self.mesh = self.get_mesh()
@@ -100,26 +99,42 @@ class Wave(Model_parameters):
         pass
 
     def set_mesh(
-        self,
-        user_mesh=None,
-        mesh_parameters={},
-    ):
-        super().set_mesh(
-            user_mesh=user_mesh,
-            mesh_parameters=mesh_parameters,
-        )
+            self,
+            user_mesh=None,
+            mesh_parameters=None,
+        ):
+            """
+            Set the mesh for the solver.
 
-        self.mesh = self.get_mesh()
-        self._build_function_space()
-        self._map_sources_and_receivers()
+            Args:
+                user_mesh (optional): User-defined mesh. Defaults to None.
+                mesh_parameters (optional): Parameters for generating a mesh. Defaults to None.
+            """
+            super().set_mesh(
+                user_mesh=user_mesh,
+                mesh_parameters=mesh_parameters,
+            )
+
+            self.mesh = self.get_mesh()
+            self._build_function_space()
+            self._map_sources_and_receivers()
 
     def set_solver_parameters(self, parameters=None):
-        if parameters is not None:
-            self.solver_parameters = parameters
-        elif parameters is None:
-            self.solver_parameters = get_default_parameters_for_method(
-                self.method
-            )
+            """
+            Set the solver parameters.
+
+            Args:
+                parameters (dict): A dictionary containing the solver parameters.
+
+            Returns:
+                None
+            """
+            if parameters is not None:
+                self.solver_parameters = parameters
+            elif parameters is None:
+                self.solver_parameters = get_default_parameters_for_method(
+                    self.method
+                )
 
     def get_spatial_coordinates(self):
         if self.dimension == 2:
@@ -135,20 +150,25 @@ class Wave(Model_parameters):
         expression=None,
         new_file=None,
         output=False,
+        dg_velocity_model=True,
     ):
         """Method to define new user velocity model or file. It is optional.
 
         Parameters:
         -----------
         conditional:  (optional)
-
-        velocity_model_function:  (optional)
-
+            Firedrake conditional object.
+        velocity_model_function: Firedrake function (optional)
+            Firedrake function to be used as the velocity model. Has to be in the same function space as the object.
         expression:  str (optional)
             If you use an expression, you can use the following variables:
-            x, y, z, pi
-
-        new_file:  (optional)
+            x, y, z, pi, tanh, sqrt. Example: "2.0 + 0.5*tanh((x-2.0)/0.1)".
+            It will be interpoalte into either the same function space as the object or a DG0 function space
+            in the same mesh.
+        new_file:  str (optional)
+            Name of the file containing the velocity model.
+        output:  bool (optional)
+            If True, outputs the velocity model to a pvd file for visualization.
         """
         # If no mesh is set, we have to do it beforehand
         if self.mesh is None:
@@ -161,7 +181,10 @@ class Wave(Model_parameters):
             output = True
 
         if conditional is not None:
-            V = fire.FunctionSpace(self.mesh, "DG", 0)
+            if dg_velocity_model:
+                V = fire.FunctionSpace(self.mesh, "DG", 0)
+            else:
+                V = self.function_space
             vp = fire.Function(V, name="velocity")
             vp.interpolate(conditional)
             self.initial_velocity_model = vp
@@ -243,6 +266,18 @@ class Wave(Model_parameters):
             self.mesh_y = y
 
     def get_and_set_maximum_dt(self, fraction=0.7, estimate_max_eigenvalue=False):
+        """
+        Calculates and sets the maximum stable time step (dt) for the wave solver.
+
+        Args:
+            fraction (float, optional):
+                Fraction of the estimated time step to use. Defaults to 0.7.
+            estimate_max_eigenvalue (bool, optional):
+                Whether to estimate the maximum eigenvalue. Defaults to False.
+
+        Returns:
+            float: The calculated maximum time step (dt).
+        """
         # if self.method == "mass_lumped_triangle":
         #     estimate_max_eigenvalue = True
         # elif self.method == "spectral_quadrilateral":

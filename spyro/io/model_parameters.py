@@ -1,3 +1,4 @@
+import numpy as np
 import warnings
 from .. import io
 from .. import utils
@@ -294,6 +295,7 @@ class Model_parameters:
         self._sanitize_time_inputs()
 
         # Checks inversion variables, FWI and velocity model inputs and outputs
+        self.real_shot_record = None
         self._sanitize_optimization_and_velocity()
 
         # Checking mesh_parameters
@@ -620,6 +622,7 @@ class Model_parameters:
         self.forward_output_file = "results/forward_output.pvd"
 
     def _sanitize_optimization_and_velocity_for_fwi(self):
+        self._sanitize_optimization_and_velocity_without_fwi()
         dictionary = self.input_dictionary
         self.initial_velocity_model_file = dictionary["inversion"][
             "initial_guess_model_file"
@@ -627,9 +630,33 @@ class Model_parameters:
         self.fwi_output_folder = "fwi/"
         self.control_output_file = self.fwi_output_folder + "control"
         self.gradient_output_file = self.fwi_output_folder + "gradient"
-        self.optimization_parameters = dictionary["inversion"][
-            "optimization_parameters"
-        ]
+        if "optimization_parameters" in dictionary["inversion"]:
+            self.optimization_parameters = dictionary["inversion"][
+                "optimization_parameters"
+            ]
+        else:
+            default_optimization_parameters = {
+                "General": {"Secant": {"Type": "Limited-Memory BFGS",
+                    "Maximum Storage": 10}},
+                "Step": {
+                    "Type": "Augmented Lagrangian",
+                    "Augmented Lagrangian": {
+                        "Subproblem Step Type": "Line Search",
+                        "Subproblem Iteration Limit": 5.0,
+                    },
+                    "Line Search": {"Descent Method": {"Type": "Quasi-Newton Step"}},
+                },
+                "Status Test": {
+                    "Gradient Tolerance": 1e-16,
+                    "Iteration Limit": None,
+                    "Step Tolerance": 1.0e-16,
+                },
+            }
+            self.optimization_parameters = default_optimization_parameters
+
+        if "shot_record_file" in dictionary["inversion"]:
+            if dictionary["inversion"]["shot_record_file"] is not None:
+                self.real_shot_record = np.load(dictionary["inversion"]["shot_record_file"])
 
     def _sanitize_optimization_and_velocity_without_fwi(self):
         dictionary = self.input_dictionary
@@ -683,11 +710,18 @@ class Model_parameters:
         mesh_parameters={},
     ):
         """
+        Set the mesh for the model.
 
         Parameters
         ----------
         user_mesh : spyro.Mesh, optional
             The desired mesh. The default is None.
+        mesh_parameters : dict, optional
+            Additional parameters for setting up the mesh. The default is an empty dictionary.
+
+        Returns
+        -------
+        None
         """
 
         # Setting default mesh parameters
@@ -742,9 +776,16 @@ class Model_parameters:
                 "Mesh dimensions not completely reset from initial dictionary"
             )
 
-    def _creating_automatic_mesh(
-        self, mesh_parameters={},
-    ):
+    def _creating_automatic_mesh(self, mesh_parameters={}):
+        """
+        Creates an automatic mesh using the specified mesh parameters.
+
+        Args:
+            mesh_parameters (dict): A dictionary containing the parameters for meshing.
+
+        Returns:
+            Mesh: The created mesh object.
+        """
         AutoMeshing = meshing.AutomaticMesh(
             comm=self.comm,
             mesh_parameters=mesh_parameters,
