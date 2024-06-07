@@ -37,6 +37,6 @@ docker build -t devtag:1.0 -f docker/Dockerfile --target spyro_development .
 
 Then, start a container and share your local repository:
 ````
-docker run -v $PWD/spyro:/home/firedrake/firedrake -it devtag:1.0
+docker run -v $PWD/spyro:/home/firedrake/shared/spyro -it devtag:1.0
 . firedrake/bin/activate
 ````
