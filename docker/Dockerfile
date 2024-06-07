@@ -17,7 +17,7 @@ RUN . /home/firedrake/firedrake/bin/activate; pip3 install segyio
 # spyro dependencies
 USER root
 # Is there a reason for using development versions?
-RUN apt-get update && apt-get install -y libgmp3-dev libmpfr-dev libcgal-dev
+RUN apt-get update && apt-get install -y libgmp3-dev libmpfr-dev libcgal-dev python3-tk
 USER firedrake
 RUN . /home/firedrake/firedrake/bin/activate; pip3 install --no-dependencies SeismicMesh[io]
 RUN . /home/firedrake/firedrake/bin/activate; pip3 install pyamg
