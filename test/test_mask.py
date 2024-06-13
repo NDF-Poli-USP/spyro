@@ -112,8 +112,10 @@ def test_mask():
     # Checking results close to or in the boundaries
     for result in boundary_results:
         if result not in interval(-2, 12):
+            print(f"Value of point failing in boundary: {result}")
             test1 = False
     for result in close_to_boundary_results:
+        print(f"Value of point failing close to boundary: {result}")
         if result not in interval(-2, 12):
             test1 = False
     if test1 is False:
