@@ -525,12 +525,12 @@ class FullWaveformInversion(AcousticWave):
         if self.abc_active is False and boundaries is None:
             raise ValueError("If no abc boundary please define boundaries for the mask")
         elif self.abc_active and boundaries is None:
-            mask_obj = Gradient_mask_for_pml(Wave_obj=self)
+            mask_obj = Gradient_mask_for_pml(self)
         elif self.abc_active and boundaries is not None:
             warnings.warn("Boundaries overuling PML boundaries for mask")
-            mask_obj = Mask(boundaries, Wave_obj=self)
+            mask_obj = Mask(boundaries, self)
         elif self.abc_active is False and boundaries is not None:
-            mask_obj = Mask(boundaries, Wave_obj=self)
+            mask_obj = Mask(boundaries, self)
         else:
             raise ValueError("Mask options do not make sense")
 

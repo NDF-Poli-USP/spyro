@@ -169,7 +169,7 @@ class Mask():
 
     """
 
-    def __init__(self, boundaries, Wave_obj=None, dg=False, inverse_mask=False):
+    def __init__(self, boundaries, Wave_obj, dg=False, inverse_mask=False):
         possible_boundaries = [
             "z_min",
             "z_max",
@@ -187,16 +187,16 @@ class Mask():
 
         self.active_boundaries = active_boundaries
         if inverse_mask is False:
-            self._get_mask_conditional(Wave_obj)
+            self._calculate_mask_conditional(Wave_obj)
         elif inverse_mask is True:
-            self._get_mask_conditional_inverted(Wave_obj)
+            self._calculate_mask_conditional_inverted(Wave_obj)
         self.in_dg = dg
         if dg is False:
-            self._get_mask_dofs(Wave_obj)
+            self._calculate_mask_dofs(Wave_obj)
         elif dg is True:
-            self._get_dg_mask(Wave_obj)
+            self._calculate_dg_mask(Wave_obj)
 
-    def _get_dg_mask(self, Wave_obj):
+    def _calculate_dg_mask(self, Wave_obj):
         """
         Calculates the DG mask.
 
@@ -209,7 +209,7 @@ class Mask():
         dg_mask.interpolate(self.cond)
         self.dg_mask = dg_mask
 
-    def _get_mask_conditional(self, Wave_obj):
+    def _calculate_mask_conditional(self, Wave_obj):
         """
         Calculates the mask degrees of freedom based on the active boundaries.
 
@@ -246,8 +246,8 @@ class Mask():
                     raise ValueError(f"Boundary of {boundary} not possible")
 
         self.cond = cond
-    
-    def _get_mask_conditional_inverted(self, Wave_obj):
+
+    def _calculate_mask_conditional_inverted(self, Wave_obj):
         """
         Calculates the inverted mask degrees of freedom based on the active boundaries.
 
@@ -277,15 +277,15 @@ class Mask():
             else:
                 axis = boundary[0]
                 if boundary[-3:] == "min":
-                    cond = conditional(getattr(self, axis) < getattr(self, boundary), cond, 1)
+                    cond = conditional(getattr(self, axis) < getattr(self, boundary), 0, cond)
                 elif boundary[-3:] == "max":
-                    cond = conditional(getattr(self, axis) > getattr(self, boundary), cond, 1)
+                    cond = conditional(getattr(self, axis) > getattr(self, boundary), 0, cond)
                 else:
                     raise ValueError(f"Boundary of {boundary} not possible")
 
         self.cond = cond
 
-    def _get_mask_dofs(self, Wave_obj):
+    def _calculate_mask_dofs(self, Wave_obj):
         """
         Calculates the mask degrees of freedom.
 
@@ -328,9 +328,9 @@ class Gradient_mask_for_pml(Mask):
 
     """
 
-    def __init__(self, Wave_obj=None):
+    def __init__(self, Wave_obj):
         if Wave_obj.abc_active is False:
-            pass
+            raise ValueError("No PML present in wave object")
 
         # building firedrake function for mask
         z_min = -(Wave_obj.length_z)
@@ -341,7 +341,7 @@ class Gradient_mask_for_pml(Mask):
             "x_min": x_min,
             "x_max": x_max,
         }
-        super().__init__(boundaries, Wave_obj=Wave_obj)
+        super().__init__(boundaries, Wave_obj)
 
 
 # def analytical_solution_for_pressure_based_on_MMS(model, mesh, time):
