@@ -94,8 +94,6 @@ def test_fwi(load_real_shot=False, use_rol=False):
         )
         np.save("real_shot_record", FWI_obj.real_shot_record)
 
-        spyro_shots = FWI_obj.real_shot_record
-
     else:
         dictionary["inversion"]["shot_record_file"] = "real_shot_record.npy"
         FWI_obj = spyro.FullWaveformInversion(dictionary=dictionary)
