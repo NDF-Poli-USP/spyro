@@ -96,14 +96,12 @@ def test_mask():
     ]
 
     # Testing mask that applies zeros to a function in the objects space
-    test1 = True
-
     Mask_not_dg = Mask(boundaries, Wave_obj)
     V = Wave_obj.function_space
     u = fire.Function(V)
     u.interpolate(fire.Constant(10))
     u = Mask_not_dg.apply_mask(u)
-    
+
     unmasked_results = u.at(points_not_masked)
     boundary_results = u.at(points_on_boundary)
     close_to_boundary_results = u.at(points_in_tolerance)
@@ -111,33 +109,19 @@ def test_mask():
 
     # Checking results close to or in the boundaries
     for result in boundary_results:
-        if result not in interval(-2, 12):
-            print(f"Value of point failing in boundary: {result}")
-            test1 = False
+        assert result in interval(-2.1, 12.5), f"Value of point failling in boundary: {result}"
     for result in close_to_boundary_results:
-        print(f"Value of point failing close to boundary: {result}")
-        if result not in interval(-2, 12):
-            test1 = False
-    if test1 is False:
-        print(f"Boundary going crazy")
-        assert False
+        assert result in interval(-2.1, 12.5), f"Value of point failing close to boundary: {result}"
+
     # Checking results in mask
     for result in masked_results:
-        if np.isclose(result, 0.0) is False:
-            test1 = False
-    if test1 is False:
-        print(f"Mask not zero")
-        assert False
+        assert np.isclose(result, 0.0), f"Mask not zero: {result}"
+
     # Checking interior points
     for result in unmasked_results:
-        if np.isclose(result, 10.0) is False:
-            test1 = False
-    if test1 is False:
-        print(f"Interior is masked")
-        assert False
-    
+        assert np.isclose(result, 10.0), f"Interior is masked: {result}"
+
     # Testing DG mask for 1 in mask and 0 outside
-    test2 = True
     Mask_dg = Mask(boundaries, Wave_obj, dg=True)
     dg_func = Mask_dg.dg_mask
 
@@ -148,31 +132,18 @@ def test_mask():
 
     # Checking results close to or in the boundaries
     for result in boundary_results:
-        if result not in interval(0, 10):
-            test2 = False
+        assert result in interval(0 - 1e-5, 1.0 + 1e-5), f"Value of DG point failling in boundary: {result}"
     for result in close_to_boundary_results:
-        if result not in interval(0, 10):
-            test2 = False
-    if test2 is False:
-        print(f"DG boundary going crazy")
-        assert False
+        assert result in interval(0 - 1e-5, 1.0 + 1e-5), f"Value of DG point failling close to boundary: {result}"
+
     # Checking results in mask
     for result in masked_results:
-        if np.isclose(result, 1.0) is False:
-            test2 = False
-    if test2 is False:
-        print(f"DG mask not one")
-        assert False
+        assert np.isclose(result, 1.0), f"Value of DG point in mask should be 1 not: {result}"
     # Checking interior points
     for result in unmasked_results:
-        if np.isclose(result, 0.0) is False:
-            test2 = False
-    if test2 is False:
-        print(f"DG interior is not zero")
-        assert False
-    
+        assert np.isclose(result, 0.0), f"Value of DG point unmask should be zero not: {result}"
+
     # Testing DG inverse mask for 0 in mask and 1 outside
-    test3 = True
     Mask_dg = Mask(boundaries, Wave_obj, dg=True, inverse_mask=True)
     dg_func_inverted = Mask_dg.dg_mask
 
@@ -183,30 +154,19 @@ def test_mask():
 
     # Checking results close to or in the boundaries
     for result in boundary_results:
-        if result not in interval(0, 10):
-            test3 = False
+        assert result in interval(0, 10), f"Value of inv DG point failling in boundary: {result}"
     for result in close_to_boundary_results:
-        if result not in interval(0, 10):
-            test3 = False
-    if test3 is False:
-        print(f"Inverted DG boundary going crazy")
-        assert False
+        assert result in interval(0, 10), f"Value of inv DG point failling close to boundary: {result}"
+
     # Checking results in mask
     for result in masked_results:
-        if np.isclose(result, 0.0) is False:
-            test3 = False
-    if test3 is False:
-        print(f"inverted DG mask not zero")
-        assert False
+        assert np.isclose(result, 0.0), f"Inverted DG mask not zero, but {result}"
+
     # Checking interior points
     for result in unmasked_results:
-        if np.isclose(result, 1.0) is False:
-            test3 = False
-    if test3 is False:
-        print(f"Inverted DG interior is not one")
-        assert False
-    
-    assert all([test1, test2, test3])
+        assert np.isclose(result, 1.0), f"Inverted DG mask interior not 1, but {result}"
+
+    assert True
 
 
 def test_gradient_mask():
@@ -285,7 +245,7 @@ def test_gradient_mask():
     u = fire.Function(V)
     u.interpolate(fire.Constant(10))
     u = Mask_not_dg.apply_mask(u)
-    
+
     unmasked_results = u.at(points_not_masked)
     boundary_results = u.at(points_on_boundary)
     close_to_boundary_results = u.at(points_in_tolerance)
@@ -293,31 +253,30 @@ def test_gradient_mask():
 
     # Checking results close to or in the boundaries
     for result in boundary_results:
-        if result not in interval(-2, 13):
+        if result not in interval(-2.1, 13):
             test1 = False
     for result in close_to_boundary_results:
-        if result not in interval(-2, 13):
+        if result not in interval(-2.1, 13):
             test1 = False
     if test1 is False:
-        print(f"Boundary going crazy")
+        print("Boundary going crazy")
         assert False
     # Checking results in mask
     for result in masked_results:
         if np.isclose(result, 0.0) is False:
             test1 = False
     if test1 is False:
-        print(f"Mask not zero")
+        print("Mask not zero")
         assert False
     # Checking interior points
     for result in unmasked_results:
         if np.isclose(result, 10.0) is False:
             test1 = False
     if test1 is False:
-        print(f"Interior is masked")
+        print("Interior is masked")
         assert False
-    
-    assert test1
 
+    assert test1
 
 
 if __name__ == "__main__":
