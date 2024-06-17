@@ -186,10 +186,7 @@ class Mask():
                 active_boundaries.append(possible_boundary)
 
         self.active_boundaries = active_boundaries
-        if inverse_mask is False:
-            self._calculate_mask_conditional(Wave_obj)
-        elif inverse_mask is True:
-            self._calculate_mask_conditional_inverted(Wave_obj)
+        self._calculate_mask_conditional(Wave_obj, inverse_mask)
         self.in_dg = dg
         if dg is False:
             self._calculate_mask_dofs(Wave_obj)
@@ -209,12 +206,13 @@ class Mask():
         dg_mask.interpolate(self.cond)
         self.dg_mask = dg_mask
 
-    def _calculate_mask_conditional(self, Wave_obj):
+    def _calculate_mask_conditional(self, Wave_obj, inverted=False):
         """
         Calculates the mask degrees of freedom based on the active boundaries.
 
         Parameters:
         - Wave_obj (object): The wave object containing the necessary data.
+        - inverted (bool, optional): If True gives nonzero value inside the boundaries
 
         """
         # Getting necessary data from wave object
@@ -225,65 +223,25 @@ class Mask():
             self.y = Wave_obj.mesh_y
 
         # Getting mask conditional
-        first_boundary = True
+        if inverted:
+            cond = [1]
+            true_value = [0]
+            false_value = cond
+        else:
+            cond = [0]
+            true_value = [1]
+            false_value = cond
+
         for boundary in active_boundaries:
-            if first_boundary:
-                axis = boundary[0]
-                if boundary[-3:] == "min":
-                    cond = conditional(getattr(self, axis) < getattr(self, boundary), 1, 0)
-                elif boundary[-3:] == "max":
-                    cond = conditional(getattr(self, axis) > getattr(self, boundary), 1, 0)
-                else:
-                    raise ValueError(f"Boundary of {boundary} not possible")
-                first_boundary = False
+            axis = boundary[0]
+            if boundary[-3:] == "min":
+                cond[0] = conditional(getattr(self, axis) < getattr(self, boundary), true_value[0], false_value[0])
+            elif boundary[-3:] == "max":
+                cond[0] = conditional(getattr(self, axis) > getattr(self, boundary), true_value[0], false_value[0])
             else:
-                axis = boundary[0]
-                if boundary[-3:] == "min":
-                    cond = conditional(getattr(self, axis) < getattr(self, boundary), 1, cond)
-                elif boundary[-3:] == "max":
-                    cond = conditional(getattr(self, axis) > getattr(self, boundary), 1, cond)
-                else:
-                    raise ValueError(f"Boundary of {boundary} not possible")
+                raise ValueError(f"Boundary of {boundary} not possible")
 
-        self.cond = cond
-
-    def _calculate_mask_conditional_inverted(self, Wave_obj):
-        """
-        Calculates the inverted mask degrees of freedom based on the active boundaries.
-
-        Parameters:
-        - Wave_obj (object): The wave object containing the necessary data.
-
-        """
-        # Getting necessary data from wave object
-        active_boundaries = self.active_boundaries
-        self.z = Wave_obj.mesh_z
-        self.x = Wave_obj.mesh_x
-        if ("y_min" in active_boundaries) or ("y_max" in active_boundaries):
-            self.y = Wave_obj.mesh_y
-
-        # Getting mask conditional
-        first_boundary = True
-        for boundary in active_boundaries:
-            if first_boundary:
-                axis = boundary[0]
-                if boundary[-3:] == "min":
-                    cond = conditional(getattr(self, axis) < getattr(self, boundary), 0, 1)
-                elif boundary[-3:] == "max":
-                    cond = conditional(getattr(self, axis) > getattr(self, boundary), 0, 1)
-                else:
-                    raise ValueError(f"Boundary of {boundary} not possible")
-                first_boundary = False
-            else:
-                axis = boundary[0]
-                if boundary[-3:] == "min":
-                    cond = conditional(getattr(self, axis) < getattr(self, boundary), 0, cond)
-                elif boundary[-3:] == "max":
-                    cond = conditional(getattr(self, axis) > getattr(self, boundary), 0, cond)
-                else:
-                    raise ValueError(f"Boundary of {boundary} not possible")
-
-        self.cond = cond
+        self.cond = cond[0]
 
     def _calculate_mask_dofs(self, Wave_obj):
         """
