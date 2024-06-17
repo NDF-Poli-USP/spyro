@@ -3,31 +3,44 @@ from . import helpers
 
 
 def backward_wave_propagator(Wave_obj, dt=None):
-    if Wave_obj.abc_active is False:
-        return backward_wave_propagator_no_pml(Wave_obj, dt=None)
-    elif Wave_obj.abc_active:
-        return mixed_space_backward_wave_propagator(Wave_obj, dt=None)
-
-
-def backward_wave_propagator_no_pml(Wave_obj, dt=None):
     """Propagates the adjoint wave backwards in time.
     Currently uses central differences.
 
     Parameters:
     -----------
+    Wave_obj: Spyro wave object
+        Wave object that already propagated a forward wave.
     dt: Python 'float' (optional)
         Time step to be used explicitly. If not mentioned uses the default,
         that was estabilished in the wave object for the adjoint model.
-    final_time: Python 'float' (optional)
-        Time which simulation ends. If not mentioned uses the default,
-        that was estabilished in the wave object.
 
     Returns:
     --------
-    usol: Firedrake 'Function'
-        Pressure wavefield at the final time.
-    u_rec: numpy array
-        Pressure wavefield at the receivers across the timesteps.
+    dJ: Firedrake 'Function'
+        Calculated gradient
+    """
+    if Wave_obj.abc_active is False:
+        return backward_wave_propagator_no_pml(Wave_obj, dt=dt)
+    elif Wave_obj.abc_active:
+        return mixed_space_backward_wave_propagator(Wave_obj, dt=dt)
+
+
+def backward_wave_propagator_no_pml(Wave_obj, dt=None):
+    """Propagates the adjoint wave backwards in time.
+    Currently uses central differences. Does not have any PML.
+
+    Parameters:
+    -----------
+    Wave_obj: Spyro wave object
+        Wave object that already propagated a forward wave.
+    dt: Python 'float' (optional)
+        Time step to be used explicitly. If not mentioned uses the default,
+        that was estabilished in the wave object for the adjoint model.
+
+    Returns:
+    --------
+    dJ: Firedrake 'Function'
+        Calculated gradient
     """
     Wave_obj.reset_pressure()
     if dt is not None:
@@ -46,12 +59,14 @@ def backward_wave_propagator_no_pml(Wave_obj, dt=None):
     comm.comm.barrier()
 
     X = fire.Function(Wave_obj.function_space)
-    dJ = fire.Function(Wave_obj.function_space)#, name="gradient")
+    dJ = fire.Function(Wave_obj.function_space)  # , name="gradient")
 
     final_time = Wave_obj.final_time
     dt = Wave_obj.dt
     t = Wave_obj.current_time
-    nt = int((final_time - 0) / dt) + 1  # number of timesteps
+    if t != final_time:
+        print(f"Current time of {t}, different than final_time of {final_time}. Setting final_time to current time in backwards propagation.", flush= True)
+    nt = int(t / dt) + 1  # number of timesteps
 
     u_nm1 = Wave_obj.u_nm1
     u_n = Wave_obj.u_n
@@ -140,23 +155,21 @@ def backward_wave_propagator_no_pml(Wave_obj, dt=None):
 
 def mixed_space_backward_wave_propagator(Wave_obj, dt=None):
     """Propagates the adjoint wave backwards in time.
-    Currently uses central differences.
+    Currently uses central differences. Based on the
+    mixed space implementation of PML.
 
     Parameters:
     -----------
+    Wave_obj: Spyro wave object
+        Wave object that already propagated a forward wave.
     dt: Python 'float' (optional)
         Time step to be used explicitly. If not mentioned uses the default,
         that was estabilished in the wave object for the adjoint model.
-    final_time: Python 'float' (optional)
-        Time which simulation ends. If not mentioned uses the default,
-        that was estabilished in the wave object.
 
     Returns:
     --------
-    usol: Firedrake 'Function'
-        Pressure wavefield at the final time.
-    u_rec: numpy array
-        Pressure wavefield at the receivers across the timesteps.
+    dJ: Firedrake 'Function'
+        Calculated gradient
     """
     Wave_obj.reset_pressure()
     if dt is not None:
@@ -175,12 +188,14 @@ def mixed_space_backward_wave_propagator(Wave_obj, dt=None):
     comm.comm.barrier()
 
     X = Wave_obj.X
-    dJ = fire.Function(Wave_obj.function_space)  #, name="gradient")
+    dJ = fire.Function(Wave_obj.function_space)  # , name="gradient")
 
     final_time = Wave_obj.final_time
     dt = Wave_obj.dt
     t = Wave_obj.current_time
-    nt = int((final_time - 0) / dt) + 1  # number of timesteps
+    if t != final_time:
+        print(f"Current time of {t}, different than final_time of {final_time}. Setting final_time to current time in backwards propagation.", flush= True)
+    nt = int(t / dt) + 1  # number of timesteps
 
     X_nm1 = Wave_obj.X_nm1
     X_n = Wave_obj.X_n
