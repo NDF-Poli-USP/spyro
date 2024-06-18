@@ -144,3 +144,10 @@ class AcousticWave(Wave):
             self.u_n.assign(0.0)
         except:
             warnings.warn("No pressure to reset")
+        if self.abc_active:
+            try:
+                self.X_n.assign(0.0)
+                self.X_nm1.assign(0.0)
+            except:
+                warnings.warn("No mixed space pressure to reset")
+            

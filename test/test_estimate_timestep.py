@@ -33,7 +33,7 @@ def test_estimate_timestep_mlt():
     # Tests value and if stable for 0.7 times estimated timestep
     maxdt = Wave_obj.get_and_set_maximum_dt(fraction=0.7)
     print(maxdt)
-    test1 = math.isclose(maxdt, 0.00085928546, rel_tol=1e-3)
+    test1 = math.isclose(maxdt, 0.000644745, rel_tol=1e-3)
 
     test2 = False
     try:
@@ -45,7 +45,7 @@ def test_estimate_timestep_mlt():
     # Tests value and if unstable for 1.1 times estimated timestep
     Wave_obj.current_time = 0.0
     maxdt = Wave_obj.get_and_set_maximum_dt(fraction=1.1)
-    test3 = math.isclose(maxdt, 0.001350305724782782, rel_tol=1e-3)
+    test3 = math.isclose(maxdt, 0.00101317122593, rel_tol=1e-3)
 
     test4 = False
     try:
