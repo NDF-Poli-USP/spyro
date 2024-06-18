@@ -26,6 +26,7 @@ def construct_solver_or_matrix_with_pml_2d(Wave_object):
     V = Wave_object.function_space
     Z = Wave_object.vector_function_space
     W = V * Z
+    Wave_object.mixed_function_space = W
     dxlump = dx(scheme=Wave_object.quadrature_rule)
     dslump = ds(scheme=Wave_object.surface_quadrature_rule)
 
@@ -92,6 +93,7 @@ def construct_solver_or_matrix_with_pml_3d(Wave_object):
     V = Wave_object.function_space
     Z = Wave_object.vector_function_space
     W = V * V * Z
+    Wave_object.mixed_function_space = W
     dxlump = dx(scheme=Wave_object.quadrature_rule)
     dslump = ds(scheme=Wave_object.surface_quadrature_rule)
 
