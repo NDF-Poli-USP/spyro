@@ -347,7 +347,7 @@ class Meshing_parameter_calculator:
 
             # Running forward model
             Wave_obj = self.build_current_object(cpw)
-            Wave_obj._get_initial_velocity_model()
+            Wave_obj._initialize_model_parameters() # TO REVIEW: call to protected method
 
             # Setting up time-step
             if self.timestep_calculation != "float":
