@@ -608,9 +608,9 @@ class Model_parameters:
             if "velocity_conditional" not in dictionary["synthetic_data"]:
                 self.velocity_model_type = None
                 warnings.warn(
-                    "No velocity model set initially. If using \
-                        user defined conditional or expression, please \
-                            input it in the Wave object."
+                    "No velocity model set initially. If using " \
+                        "user defined conditional or expression, please " \
+                            "input it in the Wave object."
                 )
 
         if "velocity_conditional" in dictionary["synthetic_data"]:

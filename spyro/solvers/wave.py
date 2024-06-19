@@ -209,8 +209,8 @@ class Wave(Model_parameters):
             self.initial_velocity_model = vp
         else:
             raise ValueError(
-                "Please specify either a conditional, expression, firedrake \
-                    function or new file name (segy or hdf5)."
+                "Please specify either a conditional, expression, firedrake " \
+                    "function or new file name (segy or hdf5)."
             )
         if output:
             fire.File("initial_velocity_model.pvd").write(
@@ -223,35 +223,10 @@ class Wave(Model_parameters):
         else:
             self.sources = None
         self.receivers = Receivers(self)
-
-    def _get_initial_velocity_model(self):
-        if self.initial_velocity_model is not None:
-            return None
-
-        if self.initial_velocity_model_file is None:
-            raise ValueError("No velocity model or velocity file to load.")
-
-        if self.initial_velocity_model_file.endswith(".segy"):
-            vp_filename, vp_filetype = os.path.splitext(
-                self.initial_velocity_model_file
-            )
-            warnings.warn("Converting segy file to hdf5")
-            write_velocity_model(
-                self.initial_velocity_model_file, ofname=vp_filename
-            )
-            self.initial_velocity_model_file = vp_filename + ".hdf5"
-
-        if self.initial_velocity_model_file.endswith(".hdf5"):
-            self.initial_velocity_model = interpolate(
-                self,
-                self.initial_velocity_model_file,
-                self.function_space.sub(0),
-            )
-
-        if self.debug_output:
-            fire.File("initial_velocity_model.pvd").write(
-                self.initial_velocity_model, name="velocity"
-            )
+    
+    @abstractmethod
+    def _initialize_model_parameters(self):
+        pass
 
     def _build_function_space(self):
         self.function_space = FE_method(self.mesh, self.method, self.degree)

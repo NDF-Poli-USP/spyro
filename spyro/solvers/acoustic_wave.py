@@ -40,7 +40,7 @@ class AcousticWave(Wave):
         if self.function_space is None:
             self.force_rebuild_function_space()
 
-        self._get_initial_velocity_model()
+        self._initialize_model_parameters()
         self.c = self.initial_velocity_model
         self.matrix_building()
         self.wave_propagator()
@@ -144,3 +144,33 @@ class AcousticWave(Wave):
             self.u_n.assign(0.0)
         except:
             warnings.warn("No pressure to reset")
+
+    #@override
+    def _initialize_model_parameters(self):
+        if self.initial_velocity_model is not None:
+            return None
+
+        if self.initial_velocity_model_file is None:
+            raise ValueError("No velocity model or velocity file to load.")
+
+        if self.initial_velocity_model_file.endswith(".segy"):
+            vp_filename, vp_filetype = os.path.splitext(
+                self.initial_velocity_model_file
+            )
+            warnings.warn("Converting segy file to hdf5")
+            write_velocity_model(
+                self.initial_velocity_model_file, ofname=vp_filename
+            )
+            self.initial_velocity_model_file = vp_filename + ".hdf5"
+
+        if self.initial_velocity_model_file.endswith((".hdf5", ".h5")):
+            self.initial_velocity_model = interpolate(
+                self,
+                self.initial_velocity_model_file,
+                self.function_space.sub(0),
+            )
+
+        if self.debug_output:
+            fire.File("initial_velocity_model.pvd").write(
+                self.initial_velocity_model, name="velocity"
+            )

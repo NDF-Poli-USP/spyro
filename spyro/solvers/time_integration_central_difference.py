@@ -79,8 +79,8 @@ def central_difference(Wave_object, source_id=0):
         if (step - 1) % Wave_object.output_frequency == 0:
             assert (
                 fire.norm(u_n) < 1
-            ), "Numerical instability. Try reducing dt or building the \
-                mesh differently"
+            ), "Numerical instability. Try reducing dt or building the " \
+               "mesh differently"
             if Wave_object.forward_output:
                 output.write(u_n, time=t, name="Pressure")
 
@@ -184,8 +184,8 @@ def mixed_space_central_difference(Wave_object, source_id=0):
         if (step - 1) % Wave_object.output_frequency == 0:
             assert (
                 fire.norm(X_np1.sub(0)) < 1
-            ), "Numerical instability. Try reducing dt or building the \
-                mesh differently"
+            ), "Numerical instability. Try reducing dt or building the " \
+               "mesh differently"
             if Wave_object.forward_output:
                 output.write(X_np1.sub(0), time=t, name="Pressure")
 
@@ -292,8 +292,8 @@ def central_difference_MMS(Wave_object, source_id=0):
         if (step - 1) % Wave_object.output_frequency == 0:
             assert (
                 fire.norm(u_n) < 1
-            ), "Numerical instability. Try reducing dt or building the \
-                mesh differently"
+            ), "Numerical instability. Try reducing dt or building the " \
+               "mesh differently"
             if Wave_object.forward_output:
                 output.write(u_n, time=t, name="Pressure")
             if t > 0:
