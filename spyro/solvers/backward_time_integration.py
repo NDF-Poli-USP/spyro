@@ -50,7 +50,7 @@ def backward_wave_propagator(Wave_obj, dt=None):
     u_n = Wave_obj.u_n
     u_np1 = fire.Function(Wave_obj.function_space)
 
-    rhs_forcing = fire.Function(Wave_obj.function_space)
+    rhs_forcing = fire.Cofunction(Wave_obj.function_space.dual())
 
     B = Wave_obj.B
     rhs = Wave_obj.rhs
