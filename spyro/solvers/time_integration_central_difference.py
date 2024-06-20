@@ -65,7 +65,7 @@ def central_difference(Wave_object, source_id=0):
         f = excitations.apply_source(rhs_forcing, Wave_object.wavelet[step])
         B0 = B.sub(0)
         B0 += f
-        Wave_object.solver.solve()
+        Wave_object.solver.solve(X, B)
 
         u_np1.assign(X)
 
