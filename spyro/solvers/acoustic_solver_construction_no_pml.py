@@ -20,8 +20,10 @@ def construct_solver_or_matrix_no_pml(Wave_object):
 
     u_nm1 = fire.Function(V, name="pressure t-dt")
     u_n = fire.Function(V, name="pressure")
+    u_np1 = fire.Function(V, name="pressure t+dt")
     Wave_object.u_nm1 = u_nm1
     Wave_object.u_n = u_n
+    Wave_object.u_np1 = u_np1
 
     Wave_object.current_time = 0.0
     dt = Wave_object.dt
@@ -35,7 +37,7 @@ def construct_solver_or_matrix_no_pml(Wave_object):
     )
     a = dot(grad(u_n), grad(v)) * dx(scheme=quad_rule)  # explicit
 
-    B = fire.Function(V)
+    B = fire.Cofunction(V.dual())
 
     form = m1 + a
     lhs = fire.lhs(form)
@@ -43,9 +45,12 @@ def construct_solver_or_matrix_no_pml(Wave_object):
     Wave_object.lhs = lhs
 
     A = fire.assemble(lhs, mat_type="matfree")
-    Wave_object.solver = fire.LinearSolver(
-        A, solver_parameters=Wave_object.solver_parameters
-    )
+    # Wave_object.solver = fire.LinearSolver(
+    #     A, solver_parameters=Wave_object.solver_parameters
+    # )
+    lin_var = fire.LinearVariationalProblem(lhs, rhs + B, u_np1)
+    solver_parameters = {"mat_type": "matfree", "ksp_type": "preonly", "pc_type": "jacobi"}
+    Wave_object.solver = fire.LinearVariationalSolver(lin_var,solver_parameters=solver_parameters)
 
     Wave_object.rhs = rhs
     Wave_object.B = B

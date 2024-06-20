@@ -1,5 +1,6 @@
 import firedrake as fire
 from firedrake import Constant, dx, dot, grad
+import numpy as np
 
 from ..io.basicio import parallel_print
 from . import helpers
@@ -47,7 +48,7 @@ def central_difference(Wave_object, source_id=0):
     u_n = Wave_object.u_n
     u_np1 = fire.Function(Wave_object.function_space)
 
-    rhs_forcing = fire.Function(Wave_object.function_space)
+    rhs_forcing = fire.Cofunction(Wave_object.function_space.dual())
     usol = [
         fire.Function(Wave_object.function_space, name="pressure")
         for t in range(nt)
@@ -64,7 +65,7 @@ def central_difference(Wave_object, source_id=0):
         f = excitations.apply_source(rhs_forcing, Wave_object.wavelet[step])
         B0 = B.sub(0)
         B0 += f
-        Wave_object.solver.solve(X, B)
+        Wave_object.solver.solve()
 
         u_np1.assign(X)
 
@@ -241,9 +242,12 @@ def central_difference_MMS(Wave_object, source_id=0):
 
     u_nm1 = Wave_object.u_nm1
     u_n = Wave_object.u_n
+    u_np1 = Wave_object.u_np1
     u_nm1.assign(Wave_object.analytical_solution(t - 2 * dt))
     u_n.assign(Wave_object.analytical_solution(t - dt))
-    u_np1 = fire.Function(Wave_object.function_space, name="pressure t +dt")
+    # u_np1 = fire.Function(Wave_object.function_space, name="pressure t +dt")
+    # u_nm1.dat.data[:] = np.load("old_u_nm1.npy")
+    # u_n.dat.data[:] = np.load("old_u_n.npy")
     u = fire.TrialFunction(Wave_object.function_space)
     v = fire.TestFunction(Wave_object.function_space)
 
@@ -277,9 +281,9 @@ def central_difference_MMS(Wave_object, source_id=0):
 
         B = fire.assemble(rhs, tensor=B)
 
-        Wave_object.solver.solve(X, B)
+        Wave_object.solver.solve(u_np1, B)
 
-        u_np1.assign(X)
+        # u_np1.assign(X)
 
         usol_recv.append(
             Wave_object.receivers.interpolate(u_np1.dat.data_ro_with_halos[:])
