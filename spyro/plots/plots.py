@@ -214,3 +214,13 @@ def plot_function(function):
     fig.set_figheight = 9.0
     firedrake.tricontourf(function, axes=axes)
     axes.axis('equal')
+
+
+def debug_plot(function, filename="debug.png"):
+    plot_function(function)
+    plt.savefig(filename)
+
+
+def debug_pvd(function, filename="debug.pvd"):
+    out = firedrake.File(filename)
+    out.write(function)
