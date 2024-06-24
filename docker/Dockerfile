@@ -1,4 +1,4 @@
-FROM firedrakeproject/firedrake:2024-05 AS spyro_base
+FROM firedrakeproject/firedrake:2023-09 AS spyro_base
 
 USER root
 RUN apt-get update \
@@ -16,10 +16,10 @@ RUN . /home/firedrake/firedrake/bin/activate; pip3 install segyio
 
 # spyro dependencies
 USER root
-# Is there a reason for using development versions?
 RUN apt-get update && apt-get install -y libgmp3-dev libmpfr-dev libcgal-dev python3-tk
 USER firedrake
-RUN . /home/firedrake/firedrake/bin/activate; pip3 install --no-dependencies SeismicMesh[io]
+# The PyPI SeismicMesh has bugs. It is better to install from GitHub
+RUN . /home/firedrake/firedrake/bin/activate; pip3 install --no-dependencies git+https://github.com/krober10nd/SeismicMesh.git
 RUN . /home/firedrake/firedrake/bin/activate; pip3 install pyamg
 RUN . /home/firedrake/firedrake/bin/activate; pip3 install meshio
 
@@ -27,17 +27,8 @@ FROM spyro_base AS spyro_release
 
 RUN . /home/firedrake/firedrake/bin/activate; pip install git+https://github.com/Olender/spyro-1.git
 
-FROM spyro_base AS spyro_test_base
+FROM spyro_base AS spyro_development
 
 RUN . /home/firedrake/firedrake/bin/activate; pip3 install pytest
-
 WORKDIR /home/firedrake
-
-FROM spyro_test_base AS spyro_test
-
-RUN git clone https://github.com/Olender/spyro-1.git
-WORKDIR /home/firedrake/spyro-1/test
-
-FROM spyro_test_base AS spyro_development
-
-RUN echo "/home/firedrake/shared/" >> /home/firedrake/firedrake/lib/python3.10/site-packages/shared.pth
+RUN echo "/home/firedrake/shared/spyro" >> /home/firedrake/firedrake/lib/python3.10/site-packages/shared.pth
