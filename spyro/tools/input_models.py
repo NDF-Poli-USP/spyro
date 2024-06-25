@@ -1,504 +1,356 @@
 import numpy as np
 import spyro
-import shutil
+import warnings
 
 
-def create_3d_grid(start, end, num):
-    """Create a 3d grid of `num**3` points between `start1`
-    and `end1` and `start2` and `end2`
+def build_on_top_of_base_dictionary(variables):
+    """
+    Builds a model dictionary on top of the base dictionary.
 
     Parameters
     ----------
-    start: tuple of floats
-        starting position coordinate
-    end: tuple of floats
-        ending position coordinate
-    num: integer
-        number of receivers between `start` and `end`
+    variables : dict
+        Dictionary containing the variables to be used in the model dictionary. It should include:
+            - method: string
+                The finite element method to be used. Either "mass_lumped_triangle" or "spectral_quadrilateral".
+            - degree: int
+                The spatial polynomial degree of the finite element method
+            - dimension: int
+                The dimension of the problem. Either 2 or 3.
+            - Lz: float
+                The length of the domain in the z direction.
+            - Lx: float
+                The length of the domain in the x direction.
+            - Ly: float
+                The length of the domain in the y direction.
+            - cells_per_wavelength: float
+                The number of cells per wavelength.
+            - pad: float
+                The padding to be used in the domain.
+            - source_locations: list
+                A list containing the source locations.
+            - frequency: float
+                The frequency of the source.
+            - receiver_locations: list
+                A list containing the receiver locations.
+            - final_time: float
+                The final time of the simulation.
+            - dt: float
+                The time step size of the simulation.
 
     Returns
     -------
-    receiver_locations: a list of tuples
-
+    model_dictionary : dict
+        Dictionary containing the model dictionary.
     """
-    (start1, start2, start3) = start
-    (end1, end2, end3) = end
-    x = np.linspace(start1, end1, num)
-    y = np.linspace(start2, end2, num)
-    z = np.linspace(start3, end3, num)
-    X, Y, Z = np.meshgrid(x, y, z)
-    points = np.vstack((X.flatten(), Y.flatten(), Z.flatten())).T
-    return [tuple(point) for point in points]
+    mesh_type = set_mesh_type(variables["method"])
+    model_dictionary = {}
+    model_dictionary["options"] = {
+        "method": variables["method"],
+        "degree": variables["degree"],
+        "dimension": variables["dimension"],
+        "automatic_adjoint": False,
+    }
+    model_dictionary["parallelism"] = {"type": "automatic",}
+    model_dictionary["mesh"] = {
+        "Lz": variables["Lz"],
+        "Lx": variables["Lx"],
+        "Ly": variables["Ly"],
+        "cells_per_wavelength": variables["cells_per_wavelength"],
+        "mesh_type": mesh_type,
+    }
+    model_dictionary["absorving_boundary_conditions"] = {
+        "status": True,
+        "damping_type": "PML",
+        "exponent": 2,
+        "cmax": 4.5,
+        "R": 1e-6,
+        "pad_length": variables["pad"],
+    }
+    model_dictionary["acquisition"] = {
+        "source_type": "ricker",
+        "source_locations": variables["source_locations"],
+        "frequency": variables["frequency"],
+        "receiver_locations": variables["receiver_locations"],
+    }
+    model_dictionary["time_axis"] = {
+        "initial_time": 0.0,  # Initial time for event
+        "final_time": variables["final_time"],  # Final time for event
+        "dt": variables["dt"],  # timestep size
+        "amplitude": 1,  # the Ricker has an amplitude of 1.
+        "output_frequency": 1000,  # how frequently to output solution to pvds
+        "gradient_sampling_frequency": 100,  # how frequently to save solution to RAM
+    }
+    model_dictionary["visualization"] = {
+        "forward_output": True,
+        "forward_output_filename": "results/reference_forward_output.pvd",
+        "fwi_velocity_model_output": False,
+        "velocity_model_filename": None,
+        "gradient_output": False,
+        "gradient_filename": None,
+    }
+    return model_dictionary
 
 
-def create_model_2D_homogeneous(grid_point_calculator_parameters, degree):
-    """Creates models  with the correct parameters for for grid point
-    calculation experiments
-    on the 2D homogeneous case with a grid of receivers near the source.
+def set_mesh_type(method):
+    """
+    Sets the mesh type based on the method.
 
     Parameters
     ----------
-    grid_point_calculator_parameters: Python 'dictionary'
+    method : string
+        The finite element method to be used. Either "mass_lumped_triangle" or "spectral_quadrilateral".
 
     Returns
     -------
-    model: Python `dictionary`
-        Contains model options and parameters for use in Spyro
-
-
+    mesh_type : string
+        The mesh type to be used.
     """
-    minimum_mesh_velocity = grid_point_calculator_parameters[
-        "minimum_velocity_in_the_domain"
-    ]
-    frequency = grid_point_calculator_parameters["source_frequency"]
-    dimension = grid_point_calculator_parameters["dimension"]
-    receiver_type = grid_point_calculator_parameters["receiver_setup"]
+    if method == "mass_lumped_triangle":
+        mesh_type = "SeismicMesh"
+    elif method == "spectral_quadrilateral":
+        mesh_type = "firedrake_mesh"
+    else:
+        raise ValueError("Method is not mass_lumped_triangle or spectral_quadrilateral")
+    return mesh_type
 
-    method = grid_point_calculator_parameters["FEM_method_to_evaluate"]
 
-    model = {}
+def create_initial_model_for_meshing_parameter(Meshing_calc_obj):
+    """
+    Creates an initial model dictionary for the meshing parameter calculation.
 
-    if minimum_mesh_velocity > 500:
-        print(
-            "Warning: minimum mesh velocity seems to be in m/s, input should be in km/s",
-            flush=True,
+    Parameters
+    ----------
+    Meshing_calc_obj : spyro.Meshing_parameter_calculator
+        The meshing calculation object.
+
+    Returns
+    -------
+    model_dictionary : dict
+        Dictionary containing the initial model dictionary to be later incremented.
+    """
+    dimension = Meshing_calc_obj.dimension
+    if dimension == 2:
+        return create_initial_model_for_meshing_parameter_2D(Meshing_calc_obj)
+    elif dimension == 3:
+        return create_initial_model_for_meshing_parameter_3D(Meshing_calc_obj)
+    else:
+        raise ValueError("Dimension is not 2 or 3")
+
+
+def create_initial_model_for_meshing_parameter_2D(Meshing_calc_obj):
+    """
+    Creates an initial model dictionary for the meshing parameter calculation in 2D.
+
+    Parameters
+    ----------
+    Meshing_calc_obj : spyro.Meshing_parameter_calculator
+        The meshing calculation object.
+
+    Returns
+    -------
+    model_dictionary : dict
+        Dictionary containing the initial model dictionary to be later incremented.
+    """
+    velocity_profile_type = Meshing_calc_obj.velocity_profile_type
+    if velocity_profile_type == "homogeneous":
+        return create_initial_model_for_meshing_parameter_2D_homogeneous(
+            Meshing_calc_obj
         )
-    # domain calculations
-    pady = 0.0
-    Ly = 0.0
+    elif velocity_profile_type == "heterogeneous":
+        return create_initial_model_for_meshing_parameter_2D_heterogeneous(Meshing_calc_obj)
+    else:
+        raise ValueError(
+            "Velocity profile type is not homogeneous or heterogeneous"
+        )
 
-    lbda = minimum_mesh_velocity / frequency
+
+def create_initial_model_for_meshing_parameter_2D_heterogeneous(Meshing_calc_obj):
+    """
+    Creates an initial model dictionary for the meshing parameter calculation in 2D with a heterogeneous velocity model.
+
+    Parameters
+    ----------
+    Meshing_calc_obj : spyro.Meshing_parameter_calculator
+        The meshing calculation object.
+    
+    Returns
+    -------
+    model_dictionary : dict
+        Dictionary containing the initial model dictionary.
+    """
+    dimension = 2
+    c_value = Meshing_calc_obj.minimum_velocity
+    frequency = Meshing_calc_obj.source_frequency
+    cells_per_wavelength = Meshing_calc_obj.cpw_initial
+
+    method = Meshing_calc_obj.FEM_method_to_evaluate
+    degree = Meshing_calc_obj.desired_degree
+    reduced = Meshing_calc_obj.reduced_obj_for_testing
+
+    # Domain calculations
+    lbda = c_value / frequency
     pad = lbda
-    Lz = 40 * lbda  # 100*lbda
-    Real_Lz = Lz + pad
-    # print(Real_Lz)
-    Lx = 30 * lbda  # 90*lbda
-    Real_Lx = Lx + 2 * pad
 
-    # source location
-    source_z = -Real_Lz / 2.0  # 1.0
-    # print(source_z)
-    source_x = Real_Lx / 2.0
-    # Source at the center. If this is changes receiver's bin has to also be
-    # changed.
-    source_coordinates = [(source_z, source_x)]
-    padz = pad
-    padx = pad
+    parameters = Meshing_calc_obj.parameters_dictionary
+    length_z = parameters["length_z"]
+    length_x = parameters["length_x"]
 
-    # time calculations
+    # Source and receiver calculations
+    source_z = -0.3
+    source_x = 3.0
+    source_locations = [(source_z, source_x)]
+
+    # Receiver calculations
+    receiver_bin_center1 = 2000.0/1000
+    receiver_bin_center2 = 10000.0/1000
+    receiver_quantity = 500
+
+    bin1_startZ = source_z
+    bin1_endZ = source_z
+    bin1_startX = source_x + receiver_bin_center1
+    bin1_endX = source_x + receiver_bin_center2
+
+    receiver_locations = spyro.create_transect(
+        (bin1_startZ, bin1_startX),
+        (bin1_endZ, bin1_endX),
+        receiver_quantity
+    )
+
+    # Time axis calculations
     tmin = 1.0 / frequency
-    final_time = 20 * tmin  # Should be 35
+    final_time = 7.5
 
-    # receiver calculations
+    variables = {
+        "method": method,
+        "degree": degree,
+        "dimension": dimension,
+        "Lz": length_z,
+        "Lx": length_x,
+        "Ly": 0.0,
+        "cells_per_wavelength": cells_per_wavelength,
+        "pad": pad,
+        "source_locations": source_locations,
+        "frequency": frequency,
+        "receiver_locations": receiver_locations,
+        "final_time": final_time,
+        "dt": 0.0001,
+    }
+
+    model_dictionary = build_on_top_of_base_dictionary(variables)
+
+    model_dictionary["synthetic_data"] = {
+        "real_velocity_file": Meshing_calc_obj.velocity_model_file_name,
+    }
+
+    return model_dictionary
+
+
+def create_initial_model_for_meshing_parameter_3D(Meshing_calc_obj):
+    """
+    Creates an initial model dictionary for the meshing parameter calculation in 3D.
+
+    Parameters
+    ----------
+    Meshing_calc_obj : spyro.Meshing_parameter_calculator
+        The meshing calculation object.
+
+    Returns
+    -------
+    model_dictionary : dict
+        Dictionary containing the initial model dictionary.
+    """
+    velocity_profile_type = Meshing_calc_obj.velocity_profile_type
+    if velocity_profile_type == "homogeneous":
+        raise NotImplementedError("Not yet implemented")
+        # return create_initial_model_for_meshing_parameter_3D_homogeneous(Meshing_calc_obj)
+    elif velocity_profile_type == "heterogeneous":
+        raise NotImplementedError("Not yet implemented")
+        # return create_initial_model_for_meshing_parameter_3D_heterogeneous(Meshing_calc_obj)
+    else:
+        raise ValueError(
+            "Velocity profile type is not homogeneous or heterogeneous"
+        )
+
+
+def create_initial_model_for_meshing_parameter_2D_homogeneous(Meshing_calc_obj):
+    """
+    Creates an initial model dictionary for the meshing parameter calculation in 2D with a homogeneous velocity model.
+
+    Parameters
+    ----------
+    Meshing_calc_obj : spyro.Meshing_parameter_calculator
+        The meshing calculation object.
+
+    Returns
+    -------
+    model_dictionary : dict
+        Dictionary containing the initial model dictionary.
+    """
+    dimension = 2
+    c_value = Meshing_calc_obj.minimum_velocity
+    frequency = Meshing_calc_obj.source_frequency
+    cells_per_wavelength = Meshing_calc_obj.cpw_initial
+
+    method = Meshing_calc_obj.FEM_method_to_evaluate
+    degree = Meshing_calc_obj.desired_degree
+    reduced = Meshing_calc_obj.reduced_obj_for_testing
+
+    if c_value > 500:
+        warnings.warn("Velocity in meters per second")
+
+    # Domain calculations
+    lbda = c_value / frequency
+    Lz = 40 * lbda
+    Lx = 30 * lbda
+    Ly = 0.0
+    pad = lbda
+
+    # Source and receiver calculations
+    source_z = -Lz / 2.0
+    source_x = Lx / 2.0
+    source_locations = [(source_z, source_x)]
 
     receiver_bin_center1 = 10 * lbda  # 20*lbda
     receiver_bin_width = 5 * lbda  # 15*lbda
-    receiver_quantity = 36  # 2500 # 50 squared
+    if reduced is True:
+        receiver_quantity = 4
+    else:
+        receiver_quantity = 36  # 2500 # 50 squared
 
     bin1_startZ = source_z + receiver_bin_center1 - receiver_bin_width / 2.0
     bin1_endZ = source_z + receiver_bin_center1 + receiver_bin_width / 2.0
     bin1_startX = source_x - receiver_bin_width / 2.0
     bin1_endX = source_x + receiver_bin_width / 2.0
 
-    receiver_coordinates = spyro.create_2d_grid(
-        bin1_startZ, bin1_endZ, bin1_startX, bin1_endX, int(np.sqrt(receiver_quantity))
+    receiver_locations = spyro.create_2d_grid(
+        bin1_startZ,
+        bin1_endZ,
+        bin1_startX,
+        bin1_endX,
+        int(np.sqrt(receiver_quantity)),
     )
 
-    # Choose method and parameters
-    model["opts"] = {
-        "method": method,
-        "quadrature": "KMV",
-        "variant": None,
-        "element": "tria",  # tria or tetra
-        "degree": degree,  # p order
-        "dimension": dimension,  # dimension
-    }
-
-    model["BCs"] = {
-        "status": True,  # True or false
-        "outer_bc": "non-reflective",  # neumann, non-reflective (outer boundary condition)
-        "damping_type": "polynomial",  # polynomial. hyperbolic, shifted_hyperbolic
-        "exponent": 1,
-        "cmax": 4.7,  # maximum acoustic wave velocity in PML - km/s
-        "R": 0.001,  # theoretical reflection coefficient
-        "lz": padz,  # thickness of the pml in the z-direction (km) - always positive
-        "lx": padx,  # thickness of the pml in the x-direction (km) - always positive
-        "ly": pady,  # thickness of the pml in the y-direction (km) - always positive
-    }
-
-    model["mesh"] = {
-        "Lz": Lz,  # depth in km - always positive
-        "Lx": Lx,  # width in km - always positive
-        "Ly": Ly,  # thickness in km - always positive
-        "meshfile": "demos/mm_exact.msh",
-        "initmodel": "velocity_models/bp2004.hdf5",
-        "truemodel": "velocity_models/bp2004.hdf5",
-    }
-
-    model["acquisition"] = {
-        "source_type": "Ricker",
-        "num_sources": 1,
-        "source_pos": source_coordinates,
-        "source_mesh_point": False,
-        "source_point_dof": False,
-        "frequency": frequency,
-        "delay": 1.0,
-        "num_receivers": receiver_quantity,
-        "receiver_locations": receiver_coordinates,
-    }
-
-    model["timeaxis"] = {
-        "t0": 0.0,  # Initial time for event
-        "tf": final_time,  # Final time for event
-        "dt": 0.001,  # timestep size
-        "nspool": 200,  # how frequently to output solution to pvds
-        "fspool": 100,  # how frequently to save solution to RAM
-    }
-    model["parallelism"] = {
-        "type": "spatial",  # options: automatic (same number of cores for evey processor), custom, off.
-        "custom_cores_per_shot": [],  # only if the user wants a different number of cores for every shot.
-        # input is a list of integers with the length of the number of shots.
-    }
-    model["testing_parameters"] = {
-        "minimum_mesh_velocity": minimum_mesh_velocity,
-        "pml_fraction": padz / Lz,
-        "receiver_type": receiver_type,
-        "experiment_type": "homogeneous",
-    }
-
-    return model
-
-
-def create_model_2D_heterogeneous(grid_point_calculator_parameters, degree):
-    """Creates models  with the correct parameters for for grid point calculation experiments.
-
-    Parameters
-    ----------
-    frequency: `float`
-        Source frequency to use in calculation
-    degree: `int`
-        Polynomial degree of finite element space
-    method: `string`
-        The finite element method choosen
-    minimum_mesh_velocity: `float`
-        Minimum velocity presented in the medium
-    experiment_type: `string`
-        Only options are `homogenous` or `heterogenous`
-    receiver_type: `string`
-        Options: `near`, `far` or `near_and_far`. Specifies receiver grid locations for experiment
-
-    Returns
-    -------
-    model: Python `dictionary`
-        Contains model options and parameters for use in Spyro
-
-
-    """
-    import SeismicMesh
-
-    minimum_mesh_velocity = grid_point_calculator_parameters[
-        "minimum_velocity_in_the_domain"
-    ]
-    frequency = grid_point_calculator_parameters["source_frequency"]
-    dimension = grid_point_calculator_parameters["dimension"]
-    receiver_type = grid_point_calculator_parameters["receiver_setup"]
-
-    method = grid_point_calculator_parameters["FEM_method_to_evaluate"]
-    velocity_model = grid_point_calculator_parameters["velocity_model_file_name"]
-    model = {}
-
-    if minimum_mesh_velocity > 500:
-        print(
-            "Warning: minimum mesh velocity seems to be in m/s, input should be in km/s",
-            flush=True,
-        )
-    # domain calculations
-    pady = 0.0
-    Ly = 0.0
-
-    # using the BP2004 velocity model
-
-    Lz = 12000.0 / 1000.0
-    Lx = 67000.0 / 1000.0
-    pad = 1000.0 / 1000.0
-    Real_Lx = Lx + 2 * pad
-    source_z = -1.0
-    source_x = Real_Lx / 2.0
-    source_coordinates = [(source_z, source_x)]
-    if velocity_model is not None:
-        if velocity_model[-4:] == "segy":
-            SeismicMesh.write_velocity_model(
-                velocity_model, ofname="velocity_models/gridsweepcalc"
-            )
-        elif velocity_model[-4:] == "hdf5":
-            shutil.copy(velocity_model, "velocity_models/gridsweepcalc.hdf5")
-        else:
-            raise ValueError("Velocity model filetype not recognized.")
-    else:
-        print(
-            "Warning: running without a velocity model is suitable for testing purposes only.",
-            flush=True,
-        )
-    padz = pad
-    padx = pad
-
-    if receiver_type == "bins":
-
-        # time calculations
-        tmin = 1.0 / frequency
-        final_time = 25 * tmin  # should be 35
-
-        # receiver calculations
-
-        receiver_bin_center1 = 2.5 * 750.0 / 1000
-        receiver_bin_width = 500.0 / 1000
-        receiver_quantity_in_bin = 100  # 2500 # 50 squared
-
-        bin1_startZ = source_z - receiver_bin_width / 2.0
-        bin1_endZ = source_z + receiver_bin_width / 2.0
-        bin1_startX = source_x + receiver_bin_center1 - receiver_bin_width / 2.0
-        bin1_endX = source_x + receiver_bin_center1 + receiver_bin_width / 2.0
-
-        receiver_coordinates = spyro.create_2d_grid(
-            bin1_startZ,
-            bin1_endZ,
-            bin1_startX,
-            bin1_endX,
-            int(np.sqrt(receiver_quantity_in_bin)),
-        )
-
-        receiver_bin_center2 = 6500.0 / 1000
-        receiver_bin_width = 500.0 / 1000
-
-        bin2_startZ = source_z - receiver_bin_width / 2.0
-        bin2_endZ = source_z + receiver_bin_width / 2.0
-        bin2_startX = source_x + receiver_bin_center2 - receiver_bin_width / 2.0
-        bin2_endX = source_x + receiver_bin_center2 + receiver_bin_width / 2.0
-
-        receiver_coordinates = receiver_coordinates + spyro.create_2d_grid(
-            bin2_startZ,
-            bin2_endZ,
-            bin2_startX,
-            bin2_endX,
-            int(np.sqrt(receiver_quantity_in_bin)),
-        )
-
-        receiver_quantity = 2 * receiver_quantity_in_bin
-
-    if receiver_type == "line":
-
-        # time calculations
-        tmin = 1.0 / frequency
-        final_time = 2 * 10 * tmin + 5.0  # should be 35
-
-        # receiver calculations
-
-        receiver_bin_center1 = 2000.0 / 1000
-        receiver_bin_center2 = 10000.0 / 1000
-        receiver_quantity = 500
-
-        bin1_startZ = source_z
-        bin1_endZ = source_z
-        bin1_startX = source_x + receiver_bin_center1
-        bin1_endX = source_x + receiver_bin_center2
-
-        receiver_coordinates = spyro.create_transect(
-            (bin1_startZ, bin1_startX), (bin1_endZ, bin1_endX), receiver_quantity
-        )
-
-    # Choose method and parameters
-    model["opts"] = {
-        "method": method,
-        "variant": None,
-        "element": "tria",  # tria or tetra
-        "degree": degree,  # p order
-        "dimension": dimension,  # dimension
-    }
-
-    model["BCs"] = {
-        "status": True,  # True or false
-        "outer_bc": "non-reflective",  # neumann, non-reflective (outer boundary condition)
-        "damping_type": "polynomial",  # polynomial. hyperbolic, shifted_hyperbolic
-        "exponent": 1,
-        "cmax": 4.7,  # maximum acoustic wave velocity in PML - km/s
-        "R": 0.001,  # theoretical reflection coefficient
-        "lz": padz,  # thickness of the pml in the z-direction (km) - always positive
-        "lx": padx,  # thickness of the pml in the x-direction (km) - always positive
-        "ly": pady,  # thickness of the pml in the y-direction (km) - always positive
-    }
-
-    model["mesh"] = {
-        "Lz": Lz,  # depth in km - always positive
-        "Lx": Lx,  # width in km - always positive
-        "Ly": Ly,  # thickness in km - always positive
-        "meshfile": "demos/mm_exact.msh",
-        "initmodel": "velocity_models/gridsweepcalc.hdf5",
-        "truemodel": "velocity_models/gridsweepcalc.hdf5",
-    }
-
-    model["acquisition"] = {
-        "source_type": "Ricker",
-        "num_sources": 1,
-        "source_pos": source_coordinates,
-        "source_mesh_point": False,
-        "source_point_dof": False,
-        "frequency": frequency,
-        "delay": 1.0,
-        "num_receivers": receiver_quantity,
-        "receiver_locations": receiver_coordinates,
-    }
-
-    model["timeaxis"] = {
-        "t0": 0.0,  # Initial time for event
-        "tf": final_time,  # Final time for event
-        "dt": 0.001,  # timestep size
-        "nspool": 200,  # how frequently to output solution to pvds
-        "fspool": 100,  # how frequently to save solution to RAM
-    }
-    model["parallelism"] = {
-        "type": "off",  # options: automatic (same number of cores for evey processor), custom, off.
-        "custom_cores_per_shot": [],  # only if the user wants a different number of cores for every shot.
-        # input is a list of integers with the length of the number of shots.
-    }
-    model["testing_parameters"] = {
-        "minimum_mesh_velocity": minimum_mesh_velocity,
-        "pml_fraction": padz / Lz,
-        "receiver_type": receiver_type,
-    }
-
-    # print(source_coordinates)
-    # print(receiver_coordinates)
-    return model
-
-
-def create_model_3D_homogeneous(grid_point_calculator_parameters, degree):
-    minimum_mesh_velocity = grid_point_calculator_parameters[
-        "minimum_velocity_in_the_domain"
-    ]
-    frequency = grid_point_calculator_parameters["source_frequency"]
-    dimension = grid_point_calculator_parameters["dimension"]
-
-    method = grid_point_calculator_parameters["FEM_method_to_evaluate"]
-
-    model = {}
-
-    lbda = minimum_mesh_velocity / frequency
-    pad = lbda
-    Lz = 15 * lbda  # 100*lbda
-    Real_Lz = Lz + pad
-    # print(Real_Lz)
-    Lx = 30 * lbda  # 90*lbda
-    Ly = Lx
-    Real_Ly = Ly + 2 * pad
-
-    # source location
-    source_z = -Real_Lz / 2.0  # 1.0
-    # print(source_z)
-    source_x = lbda * 1.5
-    source_y = Real_Ly / 2.0
-    source_coordinates = [
-        (source_z, source_x, source_y)
-    ]  # Source at the center. If this is changes receiver's bin has to also be changed.
-    padz = pad
-    padx = pad
-    pady = pad
-
-    # time calculations
+    # Time axis calculations
     tmin = 1.0 / frequency
-    final_time = 20 * tmin  # should be 35
+    final_time = 20 * tmin  # Should be 35
 
-    # receiver calculations
-
-    receiver_bin_center1 = 10 * lbda  # 20*lbda
-    receiver_bin_width = 5 * lbda  # 15*lbda
-    receiver_quantity = 36  # 2500 # 50 squared
-
-    bin1_startZ = source_z - receiver_bin_width / 2.0
-    bin1_endZ = source_z + receiver_bin_width / 2.0
-    bin1_startX = source_x + receiver_bin_center1 - receiver_bin_width / 2.0
-    bin1_endX = source_x + receiver_bin_center1 + receiver_bin_width / 2.0
-    bin1_startY = source_y - receiver_bin_width / 2.0
-    bin1_endY = source_y + receiver_bin_width / 2.0
-
-    receiver_coordinates = create_3d_grid(
-        (bin1_startZ, bin1_startX, bin1_startY), (bin1_endZ, bin1_endX, bin1_endY), 6
-    )
-    # Choose method and parameters
-    model["opts"] = {
+    variables = {
         "method": method,
-        "variant": None,
-        "element": "tetra",  # tria or tetra
-        "quadrature": "KMV",
-        "degree": degree,  # p order
-        "dimension": dimension,  # dimension
-    }
-
-    model["BCs"] = {
-        "status": True,  # True or false
-        "outer_bc": "non-reflective",  # neumann, non-reflective (outer boundary condition)
-        "damping_type": "polynomial",  # polynomial. hyperbolic, shifted_hyperbolic
-        "exponent": 1,
-        "cmax": 4.7,  # maximum acoustic wave velocity in PML - km/s
-        "R": 0.001,  # theoretical reflection coefficient
-        "lz": padz,  # thickness of the pml in the z-direction (km) - always positive
-        "lx": padx,  # thickness of the pml in the x-direction (km) - always positive
-        "ly": pady,  # thickness of the pml in the y-direction (km) - always positive
-    }
-
-    model["mesh"] = {
-        "Lz": Lz,  # depth in km - always positive
-        "Lx": Lx,  # width in km - always positive
-        "Ly": Ly,  # thickness in km - always positive
-    }
-
-    model["acquisition"] = {
-        "source_type": "Ricker",
-        "num_sources": 1,
-        "source_pos": source_coordinates,
+        "degree": degree,
+        "dimension": dimension,
+        "Lz": Lz,
+        "Lx": Lx,
+        "Ly": Ly,
+        "cells_per_wavelength": cells_per_wavelength,
+        "pad": pad,
+        "source_locations": source_locations,
         "frequency": frequency,
-        "delay": 1.0,
-        "num_receivers": receiver_quantity,
-        "receiver_locations": receiver_coordinates,
+        "receiver_locations": receiver_locations,
+        "final_time": final_time,
+        "dt": 0.0005,
     }
 
-    model["timeaxis"] = {
-        "t0": 0.0,  # Initial time for event
-        "tf": final_time,  # Final time for event
-        "dt": 0.0002,  # timestep size
-        "nspool": 200,  # how frequently to output solution to pvds
-        "fspool": 100,  # how frequently to save solution to RAM
-    }
-    model["parallelism"] = {
-        "type": "spatial",
-    }
+    model_dictionary = build_on_top_of_base_dictionary(variables)
 
-    # print(source_coordinates)
-    # print(receiver_coordinates)
-    return model
-
-
-def create_model_for_grid_point_calculation(grid_point_calculator_parameters, degree):
-    """Creates models  with the correct parameters for for grid point calculation experiments
-    on the 2D homogeneous case with a grid of receivers near the source.
-
-    Parameters
-    ----------
-    grid_point_calculator_parameters: Python 'dictionary'
-
-    Returns
-    -------
-    model: Python `dictionary`
-        Contains model options and parameters for use in Spyro
-
-
-    """
-    dimension = grid_point_calculator_parameters["dimension"]
-    experiment_type = grid_point_calculator_parameters["velocity_profile_type"]
-    if dimension == 2 and experiment_type == "homogeneous":
-        model = create_model_2D_homogeneous(grid_point_calculator_parameters, degree)
-    elif dimension == 2 and experiment_type == "heterogeneous":
-        model = create_model_2D_heterogeneous(grid_point_calculator_parameters, degree)
-    elif dimension == 3:
-        model = create_model_3D_homogeneous(grid_point_calculator_parameters, degree)
-
-    return model
+    return model_dictionary

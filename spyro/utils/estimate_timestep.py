@@ -7,13 +7,14 @@ import finat
 
 
 def estimate_timestep(mesh, V, c, estimate_max_eigenvalue=True):
-    """Estimate the maximum stable timestep based on the spectral radius
+    """
+    Estimate the maximum stable timestep based on the spectral radius
     using optionally the Gershgorin Circle Theorem to estimate the
     maximum generalized eigenvalue. Otherwise computes the maximum
-    generalized eigenvalue exactly
+    generalized eigenvalue exactly.
 
-    ONLY WORKS WITH KMV ELEMENTS
-
+    Parameters
+    ----------
     """
 
     u, v = fd.TrialFunction(V), fd.TestFunction(V)
@@ -43,7 +44,8 @@ def estimate_timestep(mesh, V, c, estimate_max_eigenvalue=True):
         max_eigval = np.amax(np.abs(Lsp.diagonal()))
     else:
         print(
-            "Computing exact eigenvalues is extremely computationally demanding!",
+            "Computing exact eigenvalues is extremely computationally \
+                demanding!",
             flush=True,
         )
         max_eigval = scipy.sparse.linalg.eigs(
@@ -56,7 +58,8 @@ def estimate_timestep(mesh, V, c, estimate_max_eigenvalue=True):
     else:
         max_dt = 100000000
     # print(
-    #    f"Maximum stable timestep should be about: {np.float(2 / np.sqrt(max_eigval))} seconds",
+    #    f"Maximum stable timestep should be about: {np.float(2 /
+    # np.sqrt(max_eigval))} seconds",
     #    flush=True,
     # )
     return max_dt
