@@ -192,7 +192,7 @@ class Model_parameters:
         User defined mesh.
     firedrake_mesh: firedrake.Mesh
         Firedrake mesh.
-    abc_status: bool
+    abc_active: bool
         Whether or not the absorbing boundary conditions are used.
     abc_exponent: int
         Exponent of the absorbing boundary conditions.
@@ -375,7 +375,7 @@ class Model_parameters:
                 "status": False
             }
         dictionary = self.input_dictionary["absorving_boundary_conditions"]
-        self.abc_status = dictionary["status"]
+        self.abc_active = dictionary["status"]
 
         BL_obj = io.boundary_layer_io.read_boundary_layer(dictionary)
         self.abc_exponent = BL_obj.abc_exponent
@@ -383,7 +383,7 @@ class Model_parameters:
         self.abc_R = BL_obj.abc_R
         self.abc_pad_length = BL_obj.abc_pad_length
         self.abc_boundary_layer_type = BL_obj.abc_boundary_layer_type
-        if self.abc_status:
+        if self.abc_active:
             self._correct_time_integrator_for_abc()
 
     def _correct_time_integrator_for_abc(self):
