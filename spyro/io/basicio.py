@@ -339,7 +339,7 @@ def interpolate(Model, fname, V):
     """
     sd = V.mesh().geometric_dimension()
     m = V.ufl_domain()
-    if Model.abc_status:
+    if Model.abc_active:
         minz = -Model.length_z - Model.abc_pad_length
         maxz = 0.0
         minx = 0.0 - Model.abc_pad_length
