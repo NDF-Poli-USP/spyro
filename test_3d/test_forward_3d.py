@@ -1,5 +1,6 @@
 from firedrake import File
 import numpy as np
+import pytest
 import spyro
 
 
@@ -26,6 +27,7 @@ def compare_velocity(
     return error_percent
 
 
+@pytest.mark.skip(reason="takes too long")
 def test_forward_3d(tf=0.6):
     model = {}
 

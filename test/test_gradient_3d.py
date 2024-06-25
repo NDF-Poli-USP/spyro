@@ -10,8 +10,8 @@ from .inputfiles.Model1_gradient_3d_pml import model_pml
 
 # outfile_total_gradient = File(os.getcwd() + "/results/Gradient.pvd")
 
-forward = spyro.solvers.forward
-gradient = spyro.solvers.gradient
+# forward = spyro.solvers.forward
+# gradient = spyro.solvers.gradient
 functional = spyro.utils.compute_functional
 
 
@@ -38,7 +38,6 @@ def test_gradient_3d():
 
 
 def _test_gradient(options, pml=False):
-
     comm = spyro.utils.mpi_init(options)
 
     mesh, V = spyro.io.read_mesh(options, comm)

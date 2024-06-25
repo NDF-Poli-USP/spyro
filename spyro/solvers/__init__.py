@@ -1,9 +1,11 @@
-from .forward import forward
-from .forward_AD import forward as forward_AD
-from .gradient import gradient
+from .wave import Wave
+from .acoustic_wave import AcousticWave
+from .mms_acoustic import AcousticWaveMMS
+from .inversion import FullWaveformInversion
 
 __all__ = [
-    "forward",  # forward solver adapted for discrete adjoint
-    "forward_AD",  # forward solver adapted for Automatic Differentiation
-    "gradient",
+    "Wave",
+    "AcousticWave",
+    "AcousticWaveMMS",
+    "FullWaveformInversion",
 ]

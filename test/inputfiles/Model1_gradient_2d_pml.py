@@ -46,7 +46,9 @@ acquisition = {
     "source_pos": [(-0.1, 0.5)],
     "frequency": 5.0,
     "delay": 1.0,
-    "receiver_locations": spyro.create_transect((-0.95, 0.1), (-0.95, 0.9), 100),
+    "receiver_locations": spyro.create_transect(
+        (-0.95, 0.1), (-0.95, 0.9), 100
+    ),
 }
 timeaxis = {
     "t0": 0.0,  # Initial time for event

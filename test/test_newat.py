@@ -4,8 +4,8 @@ from copy import deepcopy
 from firedrake import *
 import spyro
 
-from .inputfiles.Model1_2d_CG import model
-from .inputfiles.Model1_3d_CG import model as model3D
+from .inputfiles.Model1_2d_CG import model as oldmodel
+from .inputfiles.Model1_3d_CG import model as oldmodel3D
 
 
 def triangle_area(p1, p2, p3):
@@ -19,8 +19,6 @@ def triangle_area(p1, p2, p3):
 
 def test_correct_receiver_location_generation2D():
     """Tests if receiver locations where generated correctly"""
-    comm = spyro.utils.mpi_init(model)
-    mesh, V = spyro.io.read_mesh(model, comm)
 
     receivers = spyro.create_transect((-0.1, 0.3), (-0.1, 0.9), 3)
     answer = np.array([[-0.1, 0.3], [-0.1, 0.6], [-0.1, 0.9]])
@@ -30,22 +28,21 @@ def test_correct_receiver_location_generation2D():
 
 def test_correct_receiver_to_cell_location2D():
     """Tests if the receivers where located in the correct cell"""
-    comm = spyro.utils.mpi_init(model)
-    model["opts"]["degree"] = 3
-    mesh, V = spyro.io.read_mesh(model, comm)
 
-    model["acquisition"]["num_receivers"] = 3
+    oldmodel["opts"]["degree"] = 3
     recvs = spyro.create_transect((-0.1, 0.3), (-0.1, 0.9), 3)
-    recvs = model["acquisition"]["receiver_locations"] = recvs
+    oldmodel["acquisition"]["receiver_locations"] = recvs
 
-    receivers = spyro.Receivers(model, mesh, V, comm)
+    model = spyro.Wave(dictionary=oldmodel)
+
+    receivers = spyro.Receivers(model)
 
     # test 1
     cell_vertex1 = receivers.cellVertices[0][0]
     cell_vertex2 = receivers.cellVertices[0][1]
     cell_vertex3 = receivers.cellVertices[0][2]
-    x = receivers.receiver_locations[0, 0]
-    y = receivers.receiver_locations[0, 1]
+    x = receivers.point_locations[0, 0]
+    y = receivers.point_locations[0, 1]
     p = (x, y)
 
     areaT = triangle_area(cell_vertex1, cell_vertex2, cell_vertex3)
@@ -59,8 +56,8 @@ def test_correct_receiver_to_cell_location2D():
     cell_vertex1 = receivers.cellVertices[1][0]
     cell_vertex2 = receivers.cellVertices[1][1]
     cell_vertex3 = receivers.cellVertices[1][2]
-    x = receivers.receiver_locations[1, 0]
-    y = receivers.receiver_locations[1, 1]
+    x = receivers.point_locations[1, 0]
+    y = receivers.point_locations[1, 1]
     p = (x, y)
 
     areaT = triangle_area(cell_vertex1, cell_vertex2, cell_vertex3)
@@ -74,8 +71,8 @@ def test_correct_receiver_to_cell_location2D():
     cell_vertex1 = receivers.cellVertices[2][0]
     cell_vertex2 = receivers.cellVertices[2][1]
     cell_vertex3 = receivers.cellVertices[2][2]
-    x = receivers.receiver_locations[2, 0]
-    y = receivers.receiver_locations[2, 1]
+    x = receivers.point_locations[2, 0]
+    y = receivers.point_locations[2, 1]
     p = (x, y)
 
     areaT = triangle_area(cell_vertex1, cell_vertex2, cell_vertex3)
@@ -89,31 +86,31 @@ def test_correct_receiver_to_cell_location2D():
 
 
 def test_correct_at_value2D():
-    comm = spyro.utils.mpi_init(model)
-    model["opts"]["degree"] = 3
-    mesh, V = spyro.io.read_mesh(model, comm)
+    oldmodel["opts"]["degree"] = 3
     pz = -0.1
     px = 0.3
     recvs = spyro.create_transect((pz, px), (pz, px), 3)
     # recvs = spyro.create_transect(
     #    (-0.00935421,  3.25160664), (-0.00935421,  3.25160664), 3
     # )
-    model["acquisition"]["receiver_locations"] = recvs
-    model["acquisition"]["num_receivers"] = 3
+    oldmodel["acquisition"]["receiver_locations"] = recvs
+    oldmodel["acquisition"]["num_receivers"] = 3
 
-    receivers = spyro.Receivers(model, mesh, V, comm)
+    model = spyro.Wave(dictionary=oldmodel)
+    mesh = model.mesh
+    receivers = spyro.Receivers(model)
     V = receivers.space
     z, x = SpatialCoordinate(mesh)
 
     u1 = Function(V).interpolate(x + z)
     test1 = math.isclose(
-        (pz + px), receivers._Receivers__new_at(u1.dat.data[:], 0), rel_tol=1e-09
+        (pz + px), receivers.new_at(u1.dat.data[:], 0), rel_tol=1e-09
     )
 
     u1 = Function(V).interpolate(sin(x) * z * 2)
     test2 = math.isclose(
         sin(px) * pz * 2,
-        receivers._Receivers__new_at(u1.dat.data[:], 0),
+        receivers.new_at(u1.dat.data[:], 0),
         rel_tol=1e-05,
     )
 
@@ -121,33 +118,40 @@ def test_correct_at_value2D():
 
 
 def test_correct_at_value2D_quad():
-    model_quad = deepcopy(model)
-    comm = spyro.utils.mpi_init(model_quad)
-    model_quad["opts"]["degree"] = 3
-    model_quad["opts"]["degree"] = 3
-    mesh, V = spyro.io.read_mesh(model_quad, comm)
+    oldmodel_quad = deepcopy(oldmodel)
+    oldmodel_quad["opts"]["degree"] = 3
+    oldmodel_quad["opts"]["quadrature"] = "GLL"
+    oldmodel_quad["mesh"]["initmodel"] = None
+    oldmodel_quad["mesh"]["truemodel"] = None
     pz = -0.1
     px = 0.3
     recvs = spyro.create_transect((pz, px), (pz, px), 3)
-    # recvs = spyro.create_transect(
-    #    (-0.00935421,  3.25160664), (-0.00935421,  3.25160664), 3
-    # )
-    model_quad["acquisition"]["receiver_locations"] = recvs
-    model_quad["acquisition"]["num_receivers"] = 3
 
-    receivers = spyro.Receivers(model_quad, mesh, V, comm)
+    oldmodel_quad["acquisition"]["receiver_locations"] = recvs
+    new_dictionary = spyro.io.Dictionary_conversion(
+        oldmodel_quad
+    ).new_dictionary
+    new_dictionary["mesh"]["mesh_file"] = None
+    new_dictionary["mesh"]["mesh_type"] = "firedrake_mesh"
+    new_dictionary["options"]["cell_type"] = "quadrilateral"
+
+    model_quad = spyro.Wave(dictionary=new_dictionary)
+    model_quad.set_mesh(mesh_parameters={"dx": 0.02})
+    mesh = model_quad.mesh
+
+    receivers = spyro.Receivers(model_quad)
     V = receivers.space
     z, x = SpatialCoordinate(mesh)
 
     u1 = Function(V).interpolate(x + z)
     test1 = math.isclose(
-        (pz + px), receivers._Receivers__new_at(u1.dat.data[:], 0), rel_tol=1e-09
+        (pz + px), receivers.new_at(u1.dat.data[:], 0), rel_tol=1e-09
     )
 
     u1 = Function(V).interpolate(sin(x) * z * 2)
     test2 = math.isclose(
         sin(px) * pz * 2,
-        receivers._Receivers__new_at(u1.dat.data[:], 0),
+        receivers.new_at(u1.dat.data[:], 0),
         rel_tol=1e-05,
     )
 
@@ -173,40 +177,42 @@ def tetrahedral_volume(p1, p2, p3, p4):
 def test_correct_receiver_location_generation3D():
     """Tests if receiver locations where generated correctly"""
 
-    test_model = deepcopy(model3D)
-    comm = spyro.utils.mpi_init(test_model)
-    mesh, V = spyro.io.read_mesh(test_model, comm)
-    test_model["acquisition"]["num_receivers"] = 3
+    oldtest_model = deepcopy(oldmodel3D)
     receivers = spyro.create_transect((-0.05, 0.3, 0.5), (-0.05, 0.9, 0.5), 3)
-    test_model["acquisition"]["receiver_locations"] = receivers
-    receivers = spyro.Receivers(test_model, mesh, V, comm)
+    oldtest_model["acquisition"]["receiver_locations"] = receivers
+    test_model = spyro.Wave(dictionary=oldtest_model)
+
+    receivers = spyro.Receivers(test_model)
+
     answer = np.array([[-0.05, 0.3, 0.5], [-0.05, 0.6, 0.5], [-0.05, 0.9, 0.5]])
 
-    assert np.allclose(receivers.receiver_locations, answer)
+    assert np.allclose(receivers.point_locations, answer)
 
 
 def test_correct_receiver_to_cell_location3D():
     """Tests if the receivers where located in the correct cell"""
 
-    test_model1 = deepcopy(model3D)
-    comm = spyro.utils.mpi_init(test_model1)
-    mesh, V = spyro.io.read_mesh(test_model1, comm)
+    oldtest_model1 = deepcopy(oldmodel3D)
     rec = spyro.create_transect((-0.05, 0.1, 0.5), (-0.05, 0.9, 0.5), 3)
-    test_model1["acquisition"]["receiver_locations"] = rec
-    test_model1["acquisition"]["num_receivers"] = 3
-    receivers = spyro.Receivers(test_model1, mesh, V, comm)
+    oldtest_model1["acquisition"]["receiver_locations"] = rec
+
+    test_model1 = spyro.Wave(dictionary=oldtest_model1)
+
+    receivers = spyro.Receivers(test_model1)
 
     # test 1
     cell_vertex1 = receivers.cellVertices[0][0]
     cell_vertex2 = receivers.cellVertices[0][1]
     cell_vertex3 = receivers.cellVertices[0][2]
     cell_vertex4 = receivers.cellVertices[0][3]
-    x = receivers.receiver_locations[0, 0]
-    y = receivers.receiver_locations[0, 1]
-    z = receivers.receiver_locations[0, 2]
+    x = receivers.point_locations[0, 0]
+    y = receivers.point_locations[0, 1]
+    z = receivers.point_locations[0, 2]
     p = (x, y, z)
 
-    volumeT = tetrahedral_volume(cell_vertex1, cell_vertex2, cell_vertex3, cell_vertex4)
+    volumeT = tetrahedral_volume(
+        cell_vertex1, cell_vertex2, cell_vertex3, cell_vertex4
+    )
     volume1 = tetrahedral_volume(p, cell_vertex2, cell_vertex3, cell_vertex4)
     volume2 = tetrahedral_volume(cell_vertex1, p, cell_vertex3, cell_vertex4)
     volume3 = tetrahedral_volume(cell_vertex1, cell_vertex2, p, cell_vertex4)
@@ -221,12 +227,14 @@ def test_correct_receiver_to_cell_location3D():
     cell_vertex2 = receivers.cellVertices[1][1]
     cell_vertex3 = receivers.cellVertices[1][2]
     cell_vertex4 = receivers.cellVertices[1][3]
-    x = receivers.receiver_locations[1, 0]
-    y = receivers.receiver_locations[1, 1]
-    z = receivers.receiver_locations[1, 2]
+    x = receivers.point_locations[1, 0]
+    y = receivers.point_locations[1, 1]
+    z = receivers.point_locations[1, 2]
     p = (x, y, z)
 
-    volumeT = tetrahedral_volume(cell_vertex1, cell_vertex2, cell_vertex3, cell_vertex4)
+    volumeT = tetrahedral_volume(
+        cell_vertex1, cell_vertex2, cell_vertex3, cell_vertex4
+    )
     volume1 = tetrahedral_volume(p, cell_vertex2, cell_vertex3, cell_vertex4)
     volume2 = tetrahedral_volume(cell_vertex1, p, cell_vertex3, cell_vertex4)
     volume3 = tetrahedral_volume(cell_vertex1, cell_vertex2, p, cell_vertex4)
@@ -241,12 +249,14 @@ def test_correct_receiver_to_cell_location3D():
     cell_vertex2 = receivers.cellVertices[2][1]
     cell_vertex3 = receivers.cellVertices[2][2]
     cell_vertex4 = receivers.cellVertices[2][3]
-    x = receivers.receiver_locations[2, 0]
-    y = receivers.receiver_locations[2, 1]
-    z = receivers.receiver_locations[2, 2]
+    x = receivers.point_locations[2, 0]
+    y = receivers.point_locations[2, 1]
+    z = receivers.point_locations[2, 2]
     p = (x, y, z)
 
-    volumeT = tetrahedral_volume(cell_vertex1, cell_vertex2, cell_vertex3, cell_vertex4)
+    volumeT = tetrahedral_volume(
+        cell_vertex1, cell_vertex2, cell_vertex3, cell_vertex4
+    )
     volume1 = tetrahedral_volume(p, cell_vertex2, cell_vertex3, cell_vertex4)
     volume2 = tetrahedral_volume(cell_vertex1, p, cell_vertex3, cell_vertex4)
     volume3 = tetrahedral_volume(cell_vertex1, cell_vertex2, p, cell_vertex4)
@@ -260,11 +270,10 @@ def test_correct_receiver_to_cell_location3D():
 
 
 def test_correct_at_value3D():
-    test_model2 = deepcopy(model3D)
-    test_model2["acquisition"]["num_receivers"] = 3
-    test_model2["opts"]["degree"] = 3
-    comm = spyro.utils.mpi_init(test_model2)
-    mesh, V = spyro.io.read_mesh(test_model2, comm)
+    oldtest_model2 = deepcopy(oldmodel3D)
+
+    oldtest_model2["opts"]["degree"] = 3
+
     x_start = 0.09153949331982138
     x_end = 0.09153949331982138
     z_start = 0.0
@@ -274,22 +283,27 @@ def test_correct_at_value3D():
 
     x_real, y_real, z_real = x_start, y_start, z_start
 
-    recvs = spyro.create_transect((z_start, x_start, y_start), (z_end, x_end, y_end), 3)
-    test_model2["acquisition"]["receiver_locations"] = recvs
-    receivers = spyro.Receivers(test_model2, mesh, V, comm)
+    recvs = spyro.create_transect(
+        (z_start, x_start, y_start), (z_end, x_end, y_end), 3
+    )
+    oldtest_model2["acquisition"]["receiver_locations"] = recvs
+
+    test_model2 = spyro.Wave(dictionary=oldtest_model2)
+    receivers = spyro.Receivers(test_model2)
     V = receivers.space
+    mesh = test_model2.mesh
     z, x, y = SpatialCoordinate(mesh)
 
     u1 = Function(V).interpolate(x + z + y)
     realvalue = x_real + y_real + z_real
     test1 = math.isclose(
-        realvalue, receivers._Receivers__new_at(u1.dat.data[:], 0), rel_tol=1e-09
+        realvalue, receivers.new_at(u1.dat.data[:], 0), rel_tol=1e-09
     )
 
     u1 = Function(V).interpolate(sin(x) * (z + 1) ** 2 * cos(y))
     realvalue = sin(x_real) * (z_real + 1) ** 2 * cos(y_real)
     test2 = math.isclose(
-        realvalue, receivers._Receivers__new_at(u1.dat.data[:], 0), rel_tol=1e-05
+        realvalue, receivers.new_at(u1.dat.data[:], 0), rel_tol=1e-05
     )
 
     assert all([test1, test2])
@@ -303,3 +317,5 @@ if __name__ == "__main__":
     test_correct_receiver_location_generation3D()
     test_correct_receiver_to_cell_location3D()
     test_correct_at_value3D()
+
+    print("END")
