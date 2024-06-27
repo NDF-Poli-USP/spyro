@@ -96,7 +96,9 @@ def mpi_init(model):
     elif model.parallelism_type == "spatial":
         num_cores_per_shot = available_cores
     elif model.parallelism_type == "custom":
-        raise ValueError("Custom parallelism not yet implemented")
+        shots_per_core = model.shots_per_core
+        num_max_shots_per_core = max(len(sublist) for sublist in shots_per_core)
+        num_cores_per_shot = len(shots_per_core)
 
     comm_ens = Ensemble(COMM_WORLD, num_cores_per_shot)  # noqa: F405
     return comm_ens

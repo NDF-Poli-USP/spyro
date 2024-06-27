@@ -79,12 +79,20 @@ def ensemble_propagator(func):
     """Decorator for forward to distribute shots for ensemble parallelism"""
 
     def wrapper(*args, **kwargs):
-        num = args[0].number_of_sources
-        _comm = args[0].comm
-        for snum in range(num):
-            if is_owner(_comm, snum):
-                u, u_r = func(*args, **dict(kwargs, source_num=snum))
-                return u, u_r
+        if args[0].parallelism_type == "automatic":
+            num = args[0].number_of_sources
+            _comm = args[0].comm
+            for snum in range(num):
+                if is_owner(_comm, snum):
+                    u, u_r = func(*args, **dict(kwargs, source_nums=[snum]))
+                    return u, u_r
+        elif args[0].parallelism_type == "custom":
+            shots_per_core_list = args[0].shots_per_core
+            _comm = args[0].comm
+            for id_shots, shots_in_core in enumerate(shots_per_core_list):
+                if is_owner(_comm, id_shots):
+                    u, u_r = func(*args, **dict(kwargs, source_num=shots_in_core))
+                    return u, u_r
 
     return wrapper
 
