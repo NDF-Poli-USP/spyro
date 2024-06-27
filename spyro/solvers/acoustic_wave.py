@@ -84,7 +84,7 @@ class AcousticWave(Wave):
             construct_solver_or_matrix_with_pml(self)
 
     @ensemble_propagator
-    def wave_propagator(self, dt=None, final_time=None, source_num=0):
+    def wave_propagator(self, dt=None, final_time=None, source_nums=[0]):
         """Propagates the wave forward in time.
         Currently uses central differences.
 
@@ -109,8 +109,8 @@ class AcousticWave(Wave):
         if dt is not None:
             self.dt = dt
 
-        self.current_source = source_num
-        usol, usol_recv = time_integrator(self, source_id=source_num)
+        self.current_sources = source_nums
+        usol, usol_recv = time_integrator(self, source_ids=source_nums)
 
         return usol, usol_recv
 

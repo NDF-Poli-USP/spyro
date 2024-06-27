@@ -542,9 +542,11 @@ class Model_parameters:
         else:
             warnings.warn("No paralellism type listed. Assuming automatic")
             self.parallelism_type = "automatic"
-
-        if self.source_type == "MMS":
-            self.parallelism_type = "spatial"
+        
+        if self.parallelism_type == "custom":
+            self.shots_per_core = dictionary["parallelism"]["shots_per_core"]
+        else:
+            self.shots_per_core = 1
 
         if comm is None:
             self.comm = utils.mpi_init(self)
