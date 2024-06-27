@@ -27,8 +27,7 @@ class AcousticWaveMMS(AcousticWave):
         if self.dimension == 2:
             # xy = fire.project(sin(pi*x)*sin(pi*y), V)
             # self.q_xy.assign(xy)
-            xy = fire.project((-(x**2) - x - y**2 + y), V)
-            self.q_xy.assign(xy)
+            self.q_xy.interpolate(-(x**2) - x - y**2 + y)
         elif self.dimension == 3:
             z = self.mesh_y
             # xyz = fire.project(sin(pi*x)*sin(pi*y)*sin(pi*z), V)
