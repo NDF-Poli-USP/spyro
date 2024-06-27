@@ -4,10 +4,10 @@ from firedrake import *
 import spyro
 
 from test.model import dictionary as model
-
 model["acquisition"]["source_type"] = "MMS"
-model["cell_type"] = "Q"
-model["variant"] = "lumped"
+model["options"]["cell_type"] = "Q"
+model["options"]["variant"] = "lumped"
+
 
 
 def run_solve(model):
