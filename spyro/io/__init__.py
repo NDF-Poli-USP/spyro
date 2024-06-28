@@ -14,6 +14,7 @@ from .basicio import (
     ensemble_plot,
     parallel_print,
     saving_source_and_receiver_location_in_csv,
+    loading_csv_into_function,
 )
 from .model_parameters import Model_parameters
 from .backwards_compatibility_io import Dictionary_conversion
@@ -41,4 +42,5 @@ __all__ = [
     "dictionaryio",
     "boundary_layer_io",
     "saving_source_and_receiver_location_in_csv",
+    "loading_csv_into_function",
 ]

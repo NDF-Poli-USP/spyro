@@ -288,6 +288,11 @@ class AutomaticMesh:
             nz = int(self.length_z / self.dx)
 
         comm = self.comm
+        if isinstance(comm, fire.ensemble.Ensemble):
+            meshcomm = comm.comm
+        elif isinstance(comm, mpi4py.MPI.Intracomm):
+            meshcomm = comm
+
         if self.cell_type == "quadrilateral":
             quadrilateral = True
         else:
@@ -300,7 +305,7 @@ class AutomaticMesh:
                 self.length_z,
                 self.length_x,
                 quadrilateral=quadrilateral,
-                comm=comm.comm,
+                comm=meshcomm,
                 pad=self.abc_pad,
             )
         else:
@@ -310,7 +315,7 @@ class AutomaticMesh:
                 self.length_z,
                 self.length_x,
                 quadrilateral=quadrilateral,
-                comm=comm.comm,
+                comm=meshcomm,
                 pad=self.abc_pad,
             )
 
@@ -374,9 +379,10 @@ class AutomaticMesh:
             domain_pad = self.abc_pad*1000
             lbda_min = v_min/frequency
 
-            bbox = (-Lz, 0.0, 0.0, Lx)
+            bbox = (-Lz*1000, 0.0, 0.0, Lx*1000)
             domain = SeismicMesh.Rectangle(bbox)
 
+            hmin = lbda_min/C*1000
             hmin = lbda_min/C*1000
             self.comm.comm.barrier()
 

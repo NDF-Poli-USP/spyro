@@ -1,9 +1,18 @@
 import firedrake as fire
 from firedrake import Constant, dx, dot, grad
+import numpy as np
 
 from ..io.basicio import parallel_print
 from . import helpers
 from .. import utils
+# from ..habc import lenCam_spy
+
+
+class Noneikonal():
+    def __init__(self, Wave_obj):
+        function_space = Wave_obj.function_space
+        mesh_z = Wave_obj.mesh_z
+        mesh_x = Wave_obj.mesh_x
 
 
 def central_difference(Wave_object, source_id=0):
@@ -58,6 +67,32 @@ def central_difference(Wave_object, source_id=0):
     B = Wave_object.B
     rhs = Wave_object.rhs
 
+    check_boundary = True
+
+    # assembly_callable = create_assembly_callable(rhs, tensor=B)
+    if check_boundary is True:
+        function_z = fire.Function(X)
+        function_z.interpolate(Wave_object.mesh_z)
+        function_x = fire.Function(X)
+        function_x.interpolate(Wave_object.mesh_x)
+        tol = 1e-6
+        left_boundary = np.where(function_x.dat.data[:] <= tol)
+        right_boundary = np.where(function_x.dat.data[:] >= Wave_object.length_x-tol)
+        bottom_boundary = np.where(function_z.dat.data[:] <= tol-Wave_object.length_z)
+        pressure_on_left = u_n.dat.data_ro_with_halos[left_boundary]
+        pressure_on_right = u_n.dat.data_ro_with_halos[right_boundary]
+        pressure_on_bottom = u_n.dat.data_ro_with_halos[bottom_boundary]
+        threshold = 1e-6
+        check_left = True
+        check_right = True
+        check_bottom = True
+        t_left = np.inf
+        t_right = np.inf
+        t_bottom = np.inf
+        bottom_point_dof = np.nan
+        left_point_dof = np.nan
+        right_point_dof = np.nan
+
     for step in range(nt):
         rhs_forcing.assign(0.0)
         B = fire.assemble(rhs, tensor=B)
@@ -83,8 +118,50 @@ def central_difference(Wave_object, source_id=0):
                 mesh differently"
             if Wave_object.forward_output:
                 output.write(u_n, time=t, name="Pressure")
-
             helpers.display_progress(Wave_object.comm, t)
+
+        pressure_on_left = u_n.dat.data_ro_with_halos[left_boundary]
+        pressure_on_right = u_n.dat.data_ro_with_halos[right_boundary]
+        pressure_on_bottom = u_n.dat.data_ro_with_halos[bottom_boundary]
+
+        if np.any(np.abs(pressure_on_left) > threshold) and check_left:
+            print("Pressure on left boundary is not zero")
+            print(f"Time hit left boundary = {t}")
+            t_left = t
+            check_left = False
+            vector_indices = np.where(np.abs(pressure_on_left) > threshold)
+            vector_indices = vector_indices[0]
+            global_indices = left_boundary[0][vector_indices]
+            z_values = function_z.dat.data[global_indices]
+            z_avg = np.average(z_values)
+            indice = global_indices[np.argmin(np.abs(z_values-z_avg))]
+            left_point_dof = indice
+
+        if np.any(np.abs(pressure_on_right) > threshold) and check_right:
+            print("Pressure on right boundary is not zero")
+            print(f"Time hit right boundary = {t}")
+            t_right = t
+            check_right = False
+            vector_indices = np.where(np.abs(pressure_on_right) > threshold)
+            vector_indices = vector_indices[0]
+            global_indices = right_boundary[0][vector_indices]
+            z_values = function_z.dat.data[global_indices]
+            z_avg = np.average(z_values)
+            indice = global_indices[np.argmin(np.abs(z_values-z_avg))]
+            right_point_dof = indice
+
+        if np.any(np.abs(pressure_on_bottom) > threshold) and check_bottom:
+            print("Pressure on bottom boundary is not zero")
+            print(f"Time hit bottom boundary = {t}")
+            t_bottom = t
+            check_bottom = False
+            vector_indices = np.where(np.abs(pressure_on_bottom) > threshold)
+            vector_indices = vector_indices[0]
+            global_indices = bottom_boundary[0][vector_indices]
+            x_values = function_x.dat.data[global_indices]
+            x_avg = np.average(x_values)
+            indice = global_indices[np.argmin(np.abs(x_values-x_avg))]
+            bottom_point_dof = indice
 
         u_nm1.assign(u_n)
         u_n.assign(u_np1)
@@ -92,8 +169,18 @@ def central_difference(Wave_object, source_id=0):
         t = step * float(dt)
 
     Wave_object.current_time = t
+    noneikonal_dofs = [left_point_dof, right_point_dof, bottom_point_dof]
+    Wave_object.neik_time_value = np.min([t_left, t_right, t_bottom])
+    Wave_object.noneikonal_dof = noneikonal_dofs[np.argmin([t_left, t_right, t_bottom])]
+    Wave_object.neik_location = (function_z.dat.data[Wave_object.noneikonal_dof], function_x.dat.data[Wave_object.noneikonal_dof])
+    Wave_object.neik_velocity_value = Wave_object.c.dat.data_ro_with_halos[Wave_object.noneikonal_dof]
+    # Wave_object.noneikonal_minimum_point = eikonal_points[]
     helpers.display_progress(Wave_object.comm, t)
+    diameters = fire.CellDiameter(Wave_object.mesh)
+    Wave_object.h_min = fire.assemble(diameters * fire.dx)
 
+    # fref, F_L, pad_length, lref = lenCam_spy.habc_size(Wave_object)
+    # print(f"L ref = {lref}")
     usol_recv = helpers.fill(
         usol_recv, receivers.is_local, nt, receivers.number_of_points
     )
@@ -315,3 +402,5 @@ def central_difference_MMS(Wave_object, source_id=0):
     Wave_object.receivers_output = usol_recv
 
     return usol, usol_recv
+
+

@@ -161,7 +161,7 @@ def ensemble_gradient(func):
 #     return wrapper
 
 
-def write_function_to_grid(function, V, grid_spacing):
+def write_function_to_grid(function, V, grid_spacing, units='m/s'):
     """Interpolate a Firedrake function to a structured grid
 
     Parameters
@@ -194,7 +194,10 @@ def write_function_to_grid(function, V, grid_spacing):
     min_y = np.amin(y) + 0.01
     max_y = np.amax(y) - 0.01
 
-    z = function.dat.data[:] * 1000.0  # convert from km/s to m/s
+    if units == 'm/s':
+        z = function.dat.data[:] * 1000.0  # convert from km/s to m/s
+    elif units == 'km/s':
+        z = function.dat.data[:]
 
     # target grid to interpolate to
     xi = np.arange(min_x, max_x, grid_spacing)
@@ -318,8 +321,7 @@ def _check_units(c):
 
 
 def interpolate(Model, fname, V):
-    """Read and interpolate a seismic velocity model stored
-    in a HDF5 file onto the nodes of a finite element space.
+    """Interpolate a function from a file to a Firedrake function space
 
     Parameters
     ----------
@@ -515,3 +517,54 @@ def saving_source_and_receiver_location_in_csv(model, folder_name=None):
     file_obj.close()
 
     return None
+
+
+def loading_csv_into_function(V, file_name, crossed=False):
+    print("a")
+    dimension = V.ufl_domain()._geometric_dimension
+    mesh = V.ufl_domain()
+
+    # TODO change columns for 3D
+    field = np.loadtxt(file_name, delimiter=",", skiprows=1, usecols=(0, 1, 2))
+    Lx = np.amax(field[:, 1])
+    Lz = np.amax(field[:, 2])
+
+    # GEtting correct Lz if negative z values
+    Lzmin = np.amin(field[:, 1])
+    if np.abs(Lzmin) > np.abs(Lz):
+        Lz = Lzmin
+    if np.abs(Lz) > 500 or np.abs(Lx) > 500:
+        warnings.warn("Assuming m/s changing to km/s")
+        field[:, 1] = field[:, 1] / 1000
+        field[:, 2] = field[:, 2] / 1000
+    if Lz > 0:
+        field[:, 2] = field[:, 2]*(-1)
+
+    # if dimension == 2:
+
+    # print("END")
+    # points : 2-D ndarray of floats with shape (n, D), or length D tuple of 1-D ndarrays with shape (n,).
+    #     Data point coordinates.
+    # values : ndarray of float or complex, shape (n,)
+    #     Data values.
+    W = fire.VectorFunctionSpace(mesh, V.ufl_element())
+    coords = fire.interpolate(mesh.coordinates, W)
+    z_mesh, x_mesh = coords.dat.data[:, 0], coords.dat.data[:, 1]
+    points = np.zeros(np.shape(field[:, 1:]))
+    points[:, 0] = field[:, 2]
+    points[:, 1] = field[:, 1]
+    values = field[:, 0]
+
+    new_field = griddata(points, values, (z_mesh, x_mesh))
+    u = fire.Function(V)
+    u.dat.data[:] = new_field
+    out = fire.File("test1.pvd")
+    out.write(u)
+
+    # Revisar valores menores que raiz(2)/2 para o CosHig
+
+    # # Domain shape depending on format
+    # shape = (nx+1, ny+1)
+    # prop = prop.reshape(np.flipud(shape))
+    # # Get field with indexes in the same order as vertices from function
+    # prop = np.flipud(prop).flat
