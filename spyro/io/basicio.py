@@ -91,7 +91,7 @@ def ensemble_propagator(func):
             _comm = args[0].comm
             for id_shots, shots_in_core in enumerate(shots_per_core_list):
                 if is_owner(_comm, id_shots):
-                    u, u_r = func(*args, **dict(kwargs, source_num=shots_in_core))
+                    u, u_r = func(*args, **dict(kwargs, source_nums=shots_in_core))
                     return u, u_r
 
     return wrapper
