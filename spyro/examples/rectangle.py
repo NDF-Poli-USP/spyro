@@ -24,7 +24,7 @@ rectangle_optimization_parameters = {
 rectangle_dictionary = {}
 rectangle_dictionary["options"] = {
     # simplexes such as triangles or tetrahedra (T) or quadrilaterals (Q)
-    "cell_type": "Q",
+    "cell_type": "T",
     "variant": "lumped",  # lumped, equispaced or DG, default is lumped
     "degree": 4,  # p order
     "dimension": 2,  # dimension

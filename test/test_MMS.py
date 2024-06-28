@@ -5,27 +5,8 @@ from firedrake import *
 import spyro
 import time
 
-from .model import dictionary as model
-
+from model import dictionary as model
 model["acquisition"]["source_type"] = "MMS"
-
-
-@pytest.fixture(params=["triangle", "square"])
-def mesh_type(request):
-    if mesh_type == "triangle":
-        model["cell_type"] = "triangles"
-    elif mesh_type == "square":
-        model["cell_type"] = "quadrilaterals"
-    return request.param
-
-
-@pytest.fixture(params=["lumped", "equispaced"])
-def method_type(request):
-    if method_type == "lumped":
-        model["variant"] = "lumped"
-    elif method_type == "equispaced":
-        model["variant"] = "equispaced"
-    return request.param
 
 
 def run_solve(model):
@@ -42,12 +23,28 @@ def run_solve(model):
     return errornorm(u_num, u_an)
 
 
-def test_method(mesh_type, method_type):
+def run_method(mesh_type, method_type):
+    model["options"]["cell_type"] = mesh_type
+    model["options"]["variant"] = method_type
+    print(f"For {mesh_type} and {method_type}")
     error = run_solve(model)
-    print(error)
-    print(mesh_type)
-    print(method_type)
-    print(version.__version__)
-    time.sleep(10)
+    test = math.isclose(error, 0.0, abs_tol=1e-7)
+    print(f"Error is {error}")
+    print(f"Test: {test}")
 
-    assert math.isclose(error, 0.0, abs_tol=1e-7)
+    assert test
+
+
+def test_method_triangles_lumped():
+    run_method("triangles", "lumped")
+
+
+def test_method_quads_lumped():
+    run_method("quadrilaterals", "lumped")
+
+
+if __name__ == "__main__":
+    test_method_triangles_lumped()
+    test_method_quads_lumped()
+
+    print("END")
