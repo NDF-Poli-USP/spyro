@@ -24,7 +24,7 @@ def run_forward(dt):
     # spyro however supports both spatial parallelism and "shot" parallelism.
     dictionary["parallelism"] = {
         "type": "custom",  # options: automatic (same number of cores for evey processor) or spatial
-        "seperate_shots" : True,
+        "seperate_shots": True,
         "shots_per_core": [[0, 1]],
     }
 
