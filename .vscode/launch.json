@@ -4,20 +4,20 @@
     // For more information, visit: https://go.microsoft.com/fwlink/?linkid=830387
     "version": "0.2.0",
     "configurations": [
-        // {
-        //     "name": "Python Attach 0",
-        //     "type": "python",
-        //     "request": "attach",
-        //     "port": 3000,
-        //     "host": "localhost",
-        // },
-        // {
-        //     "name": "Python Attach 1",
-        //     "type": "python",
-        //     "request": "attach",
-        //     "port": 3001,
-        //     "host": "localhost"
-        // },
+        {
+            "name": "Python Attach 0",
+            "type": "python",
+            "request": "attach",
+            "port": 3000,
+            "host": "localhost",
+        },
+        {
+            "name": "Python Attach 1",
+            "type": "python",
+            "request": "attach",
+            "port": 3001,
+            "host": "localhost"
+        },
         {
             "name": "Python Debugger: Current File",
             "type": "debugpy",

@@ -1,7 +1,7 @@
-# from mpi4py.MPI import COMM_WORLD
-# import debugpy
-# debugpy.listen(3000 + COMM_WORLD.rank)
-# debugpy.wait_for_client()
+from mpi4py.MPI import COMM_WORLD
+import debugpy
+debugpy.listen(3000 + COMM_WORLD.rank)
+debugpy.wait_for_client()
 import spyro
 import numpy as np
 import math
@@ -24,8 +24,7 @@ def run_forward(dt):
     # spyro however supports both spatial parallelism and "shot" parallelism.
     dictionary["parallelism"] = {
         "type": "custom",  # options: automatic (same number of cores for evey processor) or spatial
-        "seperate_shots": True,
-        "shots_per_core": [[0, 1]],
+        "shot_ids_per_propagation": [[0, 1, 2]],
     }
 
     # Define the domain size without the PML. Here we'll assume a 1.00 x 1.00 km
@@ -40,7 +39,7 @@ def run_forward(dt):
     }
     dictionary["acquisition"] = {
         "source_type": "ricker",
-        "source_locations": spyro.create_transect((-0.55, 0.7), (-0.55, 1.3), 2),
+        "source_locations": spyro.create_transect((-0.55, 0.7), (-0.55, 1.3), 3),
         "frequency": 5.0,
         "delay": 0.2,
         "delay_type": "time",

@@ -87,11 +87,11 @@ def ensemble_propagator(func):
                     u, u_r = func(*args, **dict(kwargs, source_nums=[snum]))
                     return u, u_r
         elif args[0].parallelism_type == "custom":
-            shots_per_core_list = args[0].shots_per_core
+            shot_ids_per_propagation_list = args[0].shot_ids_per_propagation
             _comm = args[0].comm
-            for id_shots, shots_in_core in enumerate(shots_per_core_list):
-                if is_owner(_comm, id_shots):
-                    u, u_r = func(*args, **dict(kwargs, source_nums=shots_in_core))
+            for shot_ids_in_propagation in shot_ids_per_propagation_list:
+                if is_owner(_comm, shot_ids_in_propagation):
+                    u, u_r = func(*args, **dict(kwargs, source_nums=shot_ids_in_propagation))
                     return u, u_r
 
     return wrapper
@@ -313,7 +313,8 @@ def is_owner(ens_comm, rank):
         `True` if `rank` owns this shot
 
     """
-    return ens_comm.ensemble_comm.rank == (rank % ens_comm.ensemble_comm.size)
+    owner = ens_comm.ensemble_comm.rank == (rank % ens_comm.ensemble_comm.size)
+    return owner
 
 
 def _check_units(c):

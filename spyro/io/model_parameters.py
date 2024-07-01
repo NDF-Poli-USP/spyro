@@ -1,4 +1,5 @@
 import numpy as np
+from mpi4py import MPI
 import warnings
 from .. import io
 from .. import utils
@@ -542,11 +543,15 @@ class Model_parameters:
         else:
             warnings.warn("No paralellism type listed. Assuming automatic")
             self.parallelism_type = "automatic"
-        
+
         if self.parallelism_type == "custom":
-            self.shots_per_core = dictionary["parallelism"]["shots_per_core"]
+            self.shot_ids_per_propagation = dictionary["parallelism"]["shot_ids_per_propagation"]
         else:
-            self.shots_per_core = 1
+            shot_ids_per_propagation = []
+            available_cores = COMM_WORLD.size
+            num_cores_per_propagation = available_cores / self.number_of_sources
+            for shot in range(self.number_of_sources):
+                
 
         if comm is None:
             self.comm = utils.mpi_init(self)

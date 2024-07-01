@@ -44,6 +44,7 @@ class AcousticWave(Wave):
         self.c = self.initial_velocity_model
         self.matrix_building()
         self.wave_propagator()
+        self.comm.comm.barrier()
 
     def force_rebuild_function_space(self):
         if self.mesh is None:
