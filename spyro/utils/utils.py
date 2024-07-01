@@ -88,19 +88,19 @@ def mpi_init(model):
     available_cores = COMM_WORLD.size  # noqa: F405
     print(f"Parallelism type: {model.parallelism_type}", flush=True)
     if model.parallelism_type == "automatic":
-        num_cores_per_shot = available_cores / model.number_of_sources
+        num_cores_per_propagation = available_cores / model.number_of_sources
         if available_cores % model.number_of_sources != 0:
             raise ValueError(
                 "Available cores cannot be divided between sources equally."
             )
     elif model.parallelism_type == "spatial":
-        num_cores_per_shot = available_cores
+        num_cores_per_propagation = available_cores
     elif model.parallelism_type == "custom":
-        shots_per_core = model.shots_per_core
-        num_max_shots_per_core = max(len(sublist) for sublist in shots_per_core)
-        num_cores_per_shot = len(shots_per_core)
+        shot_ids_per_propagation = model.shot_ids_per_propagation
+        num_max_shots_per_core = max(len(sublist) for sublist in shot_ids_per_propagation)
+        num_cores_per_propagation = len(shot_ids_per_propagation)
 
-    comm_ens = Ensemble(COMM_WORLD, num_cores_per_shot)  # noqa: F405
+    comm_ens = Ensemble(COMM_WORLD, num_cores_per_propagation)  # noqa: F405
     return comm_ens
 
 
