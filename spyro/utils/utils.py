@@ -98,7 +98,8 @@ def mpi_init(model):
     elif model.parallelism_type == "custom":
         shot_ids_per_propagation = model.shot_ids_per_propagation
         num_max_shots_per_core = max(len(sublist) for sublist in shot_ids_per_propagation)
-        num_cores_per_propagation = len(shot_ids_per_propagation)
+        num_propagations = len(shot_ids_per_propagation)
+        num_cores_per_propagation = available_cores / num_propagations
 
     comm_ens = Ensemble(COMM_WORLD, num_cores_per_propagation)  # noqa: F405
     return comm_ens

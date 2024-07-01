@@ -1,7 +1,7 @@
-from mpi4py.MPI import COMM_WORLD
-import debugpy
-debugpy.listen(3000 + COMM_WORLD.rank)
-debugpy.wait_for_client()
+# from mpi4py.MPI import COMM_WORLD
+# import debugpy
+# debugpy.listen(3000 + COMM_WORLD.rank)
+# debugpy.wait_for_client()
 import spyro
 import numpy as np
 import math

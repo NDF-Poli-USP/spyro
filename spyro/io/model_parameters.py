@@ -549,9 +549,7 @@ class Model_parameters:
         else:
             shot_ids_per_propagation = []
             available_cores = COMM_WORLD.size
-            num_cores_per_propagation = available_cores / self.number_of_sources
-            for shot in range(self.number_of_sources):
-                
+            self.shot_ids_per_propagation = [[i] for i in range(0, available_cores)]
 
         if comm is None:
             self.comm = utils.mpi_init(self)
