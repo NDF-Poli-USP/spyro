@@ -1,5 +1,6 @@
 import numpy as np
 from mpi4py import MPI
+from firedrake import COMM_WORLD
 import warnings
 from .. import io
 from .. import utils

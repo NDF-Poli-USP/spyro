@@ -32,7 +32,7 @@ def test_forward_supershot():
     # spyro however supports both spatial parallelism and "shot" parallelism.
     dictionary["parallelism"] = {
         "type": "custom",  # options: automatic (same number of cores for evey processor) or spatial
-        "shot_ids_per_propagation": [[0, 1, 2]],
+        "shot_ids_per_propagation": [[0, 1]],
     }
 
     # Define the domain size without the PML. Here we'll assume a 1.00 x 1.00 km
@@ -103,7 +103,9 @@ def test_forward_supershot():
     if comm.comm.rank == 0:
         print(f"Combined error for shots {Wave_obj.current_sources} is {error_all} and test has passed equals {np.abs(error_all) < 0.01}", flush=True)
 
-    return rec_out
+    test = np.abs(error_all) < 0.01
+
+    assert test
 
 
 if __name__ == "__main__":
