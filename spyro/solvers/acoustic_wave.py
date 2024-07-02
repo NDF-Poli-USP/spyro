@@ -2,9 +2,8 @@ import firedrake as fire
 import warnings
 
 from .wave import Wave
-from .time_integration import time_integrator
-from ..io.basicio import ensemble_propagator, ensemble_gradient
-from ..domains.quadrature import quadrature_rules
+
+from ..io.basicio import ensemble_gradient
 from .acoustic_solver_construction_no_pml import (
     construct_solver_or_matrix_no_pml,
 )
@@ -81,37 +80,6 @@ class AcousticWave(Wave):
             self.X_nm1 = None
             self.X_np1 = fire.Function(V * Z)
             construct_solver_or_matrix_with_pml(self)
-
-    @ensemble_propagator
-    def wave_propagator(self, dt=None, final_time=None, source_num=0):
-        """Propagates the wave forward in time.
-        Currently uses central differences.
-
-        Parameters:
-        -----------
-        dt: Python 'float' (optional)
-            Time step to be used explicitly. If not mentioned uses the default,
-            that was estabilished in the wave object.
-        final_time: Python 'float' (optional)
-            Time which simulation ends. If not mentioned uses the default,
-            that was estabilished in the wave object.
-
-        Returns:
-        --------
-        usol: Firedrake 'Function'
-            Pressure wavefield at the final time.
-        u_rec: numpy array
-            Pressure wavefield at the receivers across the timesteps.
-        """
-        if final_time is not None:
-            self.final_time = final_time
-        if dt is not None:
-            self.dt = dt
-
-        self.current_source = source_num
-        usol, usol_recv = time_integrator(self, source_id=source_num)
-
-        return usol, usol_recv
 
     @ensemble_gradient
     def gradient_solve(self, guess=None, misfit=None, forward_solution=None):
