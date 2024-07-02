@@ -14,34 +14,22 @@ def ensemble_save_or_load(func):
     """Decorator for read and write shots for ensemble parallelism"""
 
     def wrapper(*args, **kwargs):
-        num = args[0].number_of_sources
-        comm = args[0].comm
-        custom_file_name = kwargs.get("file_name")
-        for snum in range(num):
-            if is_owner(comm, snum) and comm.comm.rank == 0:
-                if custom_file_name is None:
-                    func(
-                        *args,
-                        **dict(
-                            kwargs,
-                            source_id=snum,
-                            file_name="shots/shot_record_"
-                            + str(snum + 1)
-                            + ".dat",
-                        )
+        shot_ids_per_propagation_list = args[0].shot_ids_per_propagation
+        _comm = args[0].comm
+        file_name = kwargs.get("file_name")
+        for propagation_id, shot_ids_in_propagation in enumerate(shot_ids_per_propagation_list):
+            if is_owner(_comm, propagation_id) and _comm.comm.rank == 0:
+                func(
+                    *args,
+                    **dict(
+                        kwargs,
+                        propagation_id=propagation_id,
+                        file_name="shots/"
+                        + file_name
+                        + str(shot_ids_in_propagation)
+                        + ".dat",
                     )
-                else:
-                    func(
-                        *args,
-                        **dict(
-                            kwargs,
-                            source_id=snum,
-                            file_name="shots/"
-                            + custom_file_name
-                            + str(snum + 1)
-                            + ".dat",
-                        )
-                    )
+                )
 
     return wrapper
 
@@ -60,71 +48,30 @@ def ensemble_plot(func):
     return wrapper
 
 
-# def ensemble_forward(func):
-#     """Decorator for forward to distribute shots for ensemble parallelism"""
-
-#     def wrapper(*args, **kwargs):
-#         acq = args[0].get("acquisition")
-#         num = len(acq["source_pos"])
-#         _comm = args[2]
-#         for snum in range(num):
-#             if is_owner(_comm, snum):
-#                 u, u_r = func(*args, **dict(kwargs, source_num=snum))
-#                 return u, u_r
-
-#     return wrapper
-
-
 def ensemble_propagator(func):
     """Decorator for forward to distribute shots for ensemble parallelism"""
 
     def wrapper(*args, **kwargs):
-        # if args[0].parallelism_type == "custom":
-        shot_ids_per_propagation_list = args[0].shot_ids_per_propagation
-        _comm = args[0].comm
-        for propagation_id, shot_ids_in_propagation in enumerate(shot_ids_per_propagation_list):
-            if is_owner(_comm, propagation_id):
-                u, u_r = func(*args, **dict(kwargs, source_nums=shot_ids_in_propagation))
-                return u, u_r
+        if args[0].parallelism_type != "serial":
+            shot_ids_per_propagation_list = args[0].shot_ids_per_propagation
+            _comm = args[0].comm
+            for propagation_id, shot_ids_in_propagation in enumerate(shot_ids_per_propagation_list):
+                if is_owner(_comm, propagation_id):
+                    u, u_r = func(*args, **dict(kwargs, source_nums=shot_ids_in_propagation))
+                    return u, u_r
+        elif args[0].parallelism_type == "serial":
+            num = args[0].number_of_sources
+            starting_time = args[0].current_time
+            for snum in range(num):
+                args[0].reset_pressure()
+                args[0].current_time = starting_time
+                u, u_r = func(*args, **dict(kwargs, source_nums=[snum]))
+                arrays_list = [obj.dat.data[:] for obj in u]
+                stacked_arrays = np.stack(arrays_list, axis=0)
+                np.save(f'tmp_shot{snum}.npy', stacked_arrays)
+                np.save(f"tmp_rec{snum}.npy", u_r)
 
     return wrapper
-
-
-# def ensemble_forward_ad(func):
-#     """Decorator for forward to distribute shots for ensemble parallelism"""
-
-#     def wrapper(*args, **kwargs):
-#         acq = args[0].get("acquisition")
-#         num = len(acq["source_pos"])
-#         fwi = kwargs.get("fwi")
-#         _comm = args[2]
-#         for snum in range(num):
-#             if is_owner(_comm, snum):
-#                 if fwi:
-#                     u_r, J = func(*args, **dict(kwargs, source_num=snum))
-#                     return u_r, J
-#                 else:
-#                     u_r = func(*args, **dict(kwargs, source_num=snum))
-
-#     return wrapper
-
-
-# def ensemble_forward_elastic_waves(func):
-#     """Decorator for forward elastic waves to distribute shots for
-#     ensemble parallelism"""
-
-#     def wrapper(*args, **kwargs):
-#         acq = args[0].get("acquisition")
-#         num = len(acq["source_pos"])
-#         _comm = args[2]
-#         for snum in range(num):
-#             if is_owner(_comm, snum):
-#                 u, uz_r, ux_r, uy_r = func(
-#                     *args, **dict(kwargs, source_num=snum)
-#                 )
-#                 return u, uz_r, ux_r, uy_r
-
-#     return wrapper
 
 
 def ensemble_gradient(func):
@@ -139,27 +86,6 @@ def ensemble_gradient(func):
                 return grad
 
     return wrapper
-
-
-# def ensemble_gradient_elastic_waves(func):
-#     """Decorator for gradient (elastic waves) to distribute shots
-#     for ensemble parallelism"""
-
-#     def wrapper(*args, **kwargs):
-#         acq = args[0].get("acquisition")
-#         save_adjoint = kwargs.get("save_adjoint")
-#         num = len(acq["source_pos"])
-#         _comm = args[2]
-#         for snum in range(num):
-#             if is_owner(_comm, snum):
-#                 if save_adjoint:
-#                     grad_lambda, grad_mu, u_adj = func(*args, **kwargs)
-#                     return grad_lambda, grad_mu, u_adj
-#                 else:
-#                     grad_lambda, grad_mu = func(*args, **kwargs)
-#                     return grad_lambda, grad_mu
-
-#     return wrapper
 
 
 def write_function_to_grid(function, V, grid_spacing):
@@ -241,7 +167,7 @@ def create_segy(velocity, filename):
 
 
 @ensemble_save_or_load
-def save_shots(Wave_obj, source_id=0, file_name=None):
+def save_shots(Wave_obj, propagation_id=0, file_name="shot_record_"):
     """Save a the shot record from last forward solve to a `pickle`.
 
     Parameters
@@ -259,12 +185,12 @@ def save_shots(Wave_obj, source_id=0, file_name=None):
 
     """
     with open(file_name, "wb") as f:
-        pickle.dump(Wave_obj.forward_solution_receivers[:, source_id], f)
+        pickle.dump(Wave_obj.forward_solution_receivers[:, propagation_id], f)
     return None
 
 
 @ensemble_save_or_load
-def load_shots(Wave_obj, source_id=0, file_name=None):
+def load_shots(Wave_obj, propagation_id=0, file_name=None):
     """Load a `pickle` to a `numpy.ndarray`.
 
     Parameters
