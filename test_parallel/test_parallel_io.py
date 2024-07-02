@@ -1,6 +1,3 @@
-import firedrake as fire
-import math
-import pytest
 import spyro
 
 
