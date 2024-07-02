@@ -5,8 +5,10 @@ import firedrake as fire
 from firedrake import sin, cos, pi, tanh, sqrt  # noqa: F401
 from SeismicMesh import write_velocity_model
 
+from .time_integration_central_difference import central_difference as time_integrator
 from ..domains.quadrature import quadrature_rules
 from ..io import Model_parameters, interpolate
+from ..io.basicio import ensemble_propagator
 from .. import utils
 from ..receivers.Receivers import Receivers
 from ..sources.Sources import Sources
@@ -359,3 +361,34 @@ class Wave(Model_parameters):
         '''Update the source expression during wave propagation. This method must be 
         implemented only by subclasses that make use of the source term'''
         pass
+
+    @ensemble_propagator
+    def wave_propagator(self, dt=None, final_time=None, source_num=0):
+        """Propagates the wave forward in time.
+        Currently uses central differences.
+
+        Parameters:
+        -----------
+        dt: Python 'float' (optional)
+            Time step to be used explicitly. If not mentioned uses the default,
+            that was estabilished in the wave object.
+        final_time: Python 'float' (optional)
+            Time which simulation ends. If not mentioned uses the default,
+            that was estabilished in the wave object.
+
+        Returns:
+        --------
+        usol: Firedrake 'Function'
+            Wavefield at the final time.
+        u_rec: numpy array
+            Wavefield at the receivers across the timesteps.
+        """
+        if final_time is not None:
+            self.final_time = final_time
+        if dt is not None:
+            self.dt = dt
+
+        self.current_source = source_num
+        usol, usol_recv = time_integrator(self)
+
+        return usol, usol_recv
