@@ -230,8 +230,12 @@ class Wave(Model_parameters):
     def _initialize_model_parameters(self):
         pass
 
+    @abstractmethod
+    def _create_function_space(self):
+        pass
+
     def _build_function_space(self):
-        self.function_space = FE_method(self.mesh, self.method, self.degree)
+        self.function_space = self._create_function_space()
         if self.dimension == 2:
             z, x = fire.SpatialCoordinate(self.mesh)
             self.mesh_z = z

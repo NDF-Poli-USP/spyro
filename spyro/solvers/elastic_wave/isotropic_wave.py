@@ -1,4 +1,8 @@
+from firedrake import VectorFunctionSpace
+
 from .elastic_wave import ElasticWave
+
+from ...utils.typing import override
 
 class IsotropicWave(ElasticWave):
     '''Isotropic elastic wave propagator'''
@@ -10,7 +14,7 @@ class IsotropicWave(ElasticWave):
         self.mu = None    # Second Lame parameter
         self.c_s = None   # Secondary wave velocity
     
-    #@override
+    @override
     def initialize_model_parameters_from_object(self, synthetic_data_dict: dict):
         self.rho = synthetic_data_dict.get("density", None)
         self.lmbda = synthetic_data_dict.get("lambda", 
@@ -43,6 +47,10 @@ class IsotropicWave(ElasticWave):
                             "The valid options are \{Density, Lame first, Lame second\} "\
                             "or \{Density, P-wave velocity, S-wave velocity\}")
     
-    #@override
+    @override
     def initialize_model_parameters_from_file(self, synthetic_data_dict):
         raise NotImplementedError
+    
+    @override
+    def _create_function_space(self):
+        return VectorFunctionSpace(self.mesh, "CG", self.degree)

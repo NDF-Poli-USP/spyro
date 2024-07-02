@@ -90,7 +90,7 @@ def mpi_init(model):
         num_cores_per_shot = available_cores / model.number_of_sources
         if available_cores % model.number_of_sources != 0:
             raise ValueError(
-                "Available cores cannot be divided between sources equally."
+                f"Available cores cannot be divided between sources equally {available_cores}/{model.number_of_sources}."
             )
     elif model.parallelism_type == "spatial":
         num_cores_per_shot = available_cores
