@@ -5,11 +5,11 @@ import firedrake as fire
 from firedrake import sin, cos, pi, tanh, sqrt  # noqa: F401
 from SeismicMesh import write_velocity_model
 
+from ..domains.quadrature import quadrature_rules
 from ..io import Model_parameters, interpolate
 from .. import utils
 from ..receivers.Receivers import Receivers
 from ..sources.Sources import Sources
-from ..domains.space import FE_method
 from .solver_parameters import get_default_parameters_for_method
 
 fire.set_log_level(fire.ERROR)
@@ -236,6 +236,16 @@ class Wave(Model_parameters):
 
     def _build_function_space(self):
         self.function_space = self._create_function_space()
+
+        # TO REVIEW: I moved the quadrature rule update here because I believe
+        # it must run everytime the function space is changed
+        quad_rule, k_rule, s_rule = quadrature_rules(self.function_space)
+        self.quadrature_rule = quad_rule
+        self.stiffness_quadrature_rule = k_rule
+        self.surface_quadrature_rule = s_rule
+
+        # TO REVIEW: why are the mesh coordinates assigned here? I believe they 
+        # should be copied when the mesh is assigned
         if self.dimension == 2:
             z, x = fire.SpatialCoordinate(self.mesh)
             self.mesh_z = z
