@@ -151,4 +151,3 @@ class AcousticWave(Wave):
                 self.X_nm1.assign(0.0)
             except:
                 warnings.warn("No mixed space pressure to reset")
-            

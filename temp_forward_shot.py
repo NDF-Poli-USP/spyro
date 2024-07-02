@@ -10,7 +10,7 @@ import math
 def run_forward(dt):
     # dt = float(sys.argv[1])
 
-    final_time = 1.0
+    final_time = 0.8
 
     dictionary = {}
     dictionary["options"] = {
@@ -23,8 +23,8 @@ def run_forward(dt):
     # Number of cores for the shot. For simplicity, we keep things serial.
     # spyro however supports both spatial parallelism and "shot" parallelism.
     dictionary["parallelism"] = {
-        "type": "custom",  # options: automatic (same number of cores for evey processor) or spatial
-        "shot_ids_per_propagation": [[0, 1, 2]],
+        "type": "spatial",  # options: automatic (same number of cores for evey processor) or spatial
+        "shot_ids_per_propagation": [[0], [1]],
     }
 
     # Define the domain size without the PML. Here we'll assume a 1.00 x 1.00 km
@@ -39,7 +39,7 @@ def run_forward(dt):
     }
     dictionary["acquisition"] = {
         "source_type": "ricker",
-        "source_locations": spyro.create_transect((-0.55, 0.7), (-0.55, 1.3), 3),
+        "source_locations": spyro.create_transect((-0.55, 0.7), (-0.55, 1.3), 2),
         "frequency": 5.0,
         "delay": 0.2,
         "delay_type": "time",
