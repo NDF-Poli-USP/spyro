@@ -1,19 +1,4 @@
 from .time_integration_central_difference import central_difference
-from .time_integration_central_difference import central_difference_MMS
-
 
 def time_integrator(Wave_object, source_id=0):
-    if Wave_object.source_type == "ricker":
-        return time_integrator_ricker(Wave_object, source_id=source_id)
-    elif Wave_object.source_type == "MMS":
-        return time_integrator_mms(Wave_object, source_id=source_id)
-
-
-def time_integrator_ricker(Wave_object, source_id=0):
     return central_difference(Wave_object, source_id=source_id)
-
-def time_integrator_mms(Wave_object, source_id=0):
-    if Wave_object.time_integrator == "central_difference":
-        return central_difference_MMS(Wave_object, source_id=source_id)
-    else:
-        raise ValueError("The time integrator specified is not implemented yet")
