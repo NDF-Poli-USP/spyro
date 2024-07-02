@@ -14,7 +14,7 @@ from .acoustic_solver_construction_with_pml import (
 from .backward_time_integration import (
     backward_wave_propagator,
 )
-
+from ..utils.typing import override
 
 class AcousticWave(Wave):
     def save_current_velocity_model(self, file_name=None):
@@ -68,6 +68,7 @@ class AcousticWave(Wave):
         self.trial_function = None
         self.u_nm1 = None
         self.u_n = None
+        self.u_np1 = fire.Function(self.function_space)
         self.lhs = None
         self.solver = None
         self.rhs = None
@@ -81,6 +82,7 @@ class AcousticWave(Wave):
             self.X = None
             self.X_n = None
             self.X_nm1 = None
+            self.X_np1 = fire.Function(V * Z)
             construct_solver_or_matrix_with_pml(self)
 
     @ensemble_propagator
@@ -145,7 +147,7 @@ class AcousticWave(Wave):
         except:
             warnings.warn("No pressure to reset")
 
-    #@override
+    @override
     def _initialize_model_parameters(self):
         if self.initial_velocity_model is not None:
             return None
@@ -174,3 +176,64 @@ class AcousticWave(Wave):
             fire.File("initial_velocity_model.pvd").write(
                 self.initial_velocity_model, name="velocity"
             )
+
+    @override
+    def _set_vstate(self, vstate):
+        if self.abc_boundary_layer_type == "PML":
+            self.X_n.assign(vstate)
+        else:
+            self.u_n.assign(vstate)
+
+    @override
+    def _get_vstate(self):
+        if self.abc_boundary_layer_type == "PML":
+            return self.X_n
+        else:
+            return self.u_n
+
+    @override
+    def _set_prev_vstate(self, vstate):
+        if self.abc_boundary_layer_type == "PML":
+            self.X_nm1.assign(vstate)
+        else:
+            self.u_nm1.assign(vstate)
+
+    @override
+    def _get_prev_vstate(self):
+        if self.abc_boundary_layer_type == "PML":
+            return self.X_nm1
+        else:
+            return self.u_nm1
+
+    @override
+    def _set_next_vstate(self, vstate):
+        if self.abc_boundary_layer_type == "PML":
+            self.X_np1.assign(vstate)
+        else:
+            self.u_np1.assign(vstate)
+
+    @override
+    def _get_next_vstate(self):
+        if self.abc_boundary_layer_type == "PML":
+            return self.X_np1
+        else:
+            return self.u_np1
+    
+    @override
+    def get_receivers_output(self):
+        if self.abc_boundary_layer_type == "PML":
+            data_with_halos = self.X_n.dat.data_ro_with_halos[0][:]
+        else:
+            data_with_halos = self.u_n.dat.data_ro_with_halos[:]
+        return self.receivers.interpolate(data_with_halos)
+    
+    @override
+    def get_function(self):
+        if self.abc_boundary_layer_type == "PML":
+            return self.X_n.sub(0)
+        else:
+            return self.u_n
+    
+    @override
+    def get_function_name(self):
+        return "Pressure"

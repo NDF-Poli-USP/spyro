@@ -188,25 +188,6 @@ class Rectangle_acoustic(Example_model_acoustic):
         # cond = fire.conditional(self.mesh_z > z_switch, layer1, layer2)
         self.set_initial_velocity_model(conditional=cond)
 
-
-# class Rectangle(AcousticWave):
-#     def __init__(self, model_dictionary=None, comm=None):
-#         model_parameters = Rectangle_parameters(
-#             dictionary=model_dictionary, comm=comm
-#         )
-#         super().__init__(
-#             model_parameters=model_parameters, comm=model_parameters.comm
-#         )
-#         comm = self.comm
-#         num_sources = self.number_of_sources
-#         if comm.comm.rank == 0 and comm.ensemble_comm.rank == 0:
-#             print(
-#                 "INFO: Distributing %d shot(s) across %d core(s). \
-#                     Each shot is using %d cores"
-#                 % (
-#                     num_sources,
-#                     fire.COMM_WORLD.size,
-#                     fire.COMM_WORLD.size / comm.ensemble_comm.size,
-#                 ),
-#                 flush=True,
-#             )
+if __name__ == "__main__":
+    wave = Rectangle_acoustic()
+    wave.forward_solve()

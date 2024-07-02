@@ -290,3 +290,51 @@ class Wave(Model_parameters):
         if self.current_time == 0.0:
             raise ValueError("No previous solve to set as real shot record.")
         self.real_shot_record = self.forward_solution_receivers
+    
+    @abstractmethod
+    def _set_vstate(self, vstate):
+        pass
+
+    @abstractmethod
+    def _get_vstate(self):
+        pass
+
+    @abstractmethod
+    def _set_prev_vstate(self, vstate):
+        pass
+
+    @abstractmethod
+    def _get_prev_vstate(self):
+        pass
+
+    @abstractmethod
+    def _set_next_vstate(self, vstate):
+        pass
+
+    @abstractmethod
+    def _get_next_vstate(self):
+        pass
+
+    # Managed attributes to access state variables in current, previous and next iteration
+    vstate = property(fget=lambda self: self._get_vstate(),
+                      fset=lambda self, value: self._set_vstate(value))
+    prev_vstate = property(fget=lambda self: self._get_prev_vstate(),
+                           fset=lambda self, value: self._set_prev_vstate(value))
+    next_vstate = property(fget=lambda self: self._get_next_vstate(),
+                           fset=lambda self, value: self._set_next_vstate(value))
+    
+    @abstractmethod
+    def get_receivers_output(self):
+        pass
+
+    @abstractmethod
+    def get_function(self):
+        '''Returns the function (e.g., pressure or displacement) associated with
+        the wave object without additional variables (e.g., PML variables)'''
+        pass
+
+    @abstractmethod
+    def get_function_name(self):
+        '''Returns the string representing the function of the wave object 
+        (e.g., "pressure" or "displacement")'''
+        pass
