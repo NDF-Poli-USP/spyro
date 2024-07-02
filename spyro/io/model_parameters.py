@@ -547,10 +547,11 @@ class Model_parameters:
 
         if self.parallelism_type == "custom":
             self.shot_ids_per_propagation = dictionary["parallelism"]["shot_ids_per_propagation"]
-        else:
-            shot_ids_per_propagation = []
+        elif self.parallelism_type == "automatic":
             available_cores = COMM_WORLD.size
             self.shot_ids_per_propagation = [[i] for i in range(0, available_cores)]
+        elif self.parallelism_type == "spatial":
+            self.shot_ids_per_propagation = [[i] for i in range(0, self.number_of_sources)]
 
         if comm is None:
             self.comm = utils.mpi_init(self)
