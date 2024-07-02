@@ -14,6 +14,7 @@ from .acoustic_solver_construction_with_pml import (
 from .backward_time_integration import (
     backward_wave_propagator,
 )
+from ..domains.space import FE_method
 from ..utils.typing import override
 
 class AcousticWave(Wave):
@@ -237,3 +238,7 @@ class AcousticWave(Wave):
     @override
     def get_function_name(self):
         return "Pressure"
+    
+    @override
+    def _create_function_space(self):
+        return FE_method(self.mesh, self.method, self.degree)
