@@ -58,10 +58,6 @@ class AcousticWave(Wave):
         which it is by default.
         """
         self.current_time = 0.0
-        quad_rule, k_rule, s_rule = quadrature_rules(self.function_space)
-        self.quadrature_rule = quad_rule
-        self.stiffness_quadrature_rule = k_rule
-        self.surface_quadrature_rule = s_rule
 
         abc_type = self.abc_boundary_layer_type
 
