@@ -87,6 +87,8 @@ class Wave(Model_parameters):
             )
         else:
             warnings.warn("No mesh found. Please define a mesh.")
+        # Expression to define sources through UFL (less efficient)
+        self.source_expression = None
 
     @abstractmethod
     def forward_solve(self):
@@ -337,4 +339,9 @@ class Wave(Model_parameters):
     def get_function_name(self):
         '''Returns the string representing the function of the wave object 
         (e.g., "pressure" or "displacement")'''
+        pass
+
+    def update_source_expression(self, t):
+        '''Update the source expression during wave propagation. This method must be 
+        implemented only by subclasses that make use of the source term'''
         pass

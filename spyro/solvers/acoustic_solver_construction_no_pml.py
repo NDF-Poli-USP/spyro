@@ -35,9 +35,14 @@ def construct_solver_or_matrix_no_pml(Wave_object):
     )
     a = dot(grad(u_n), grad(v)) * dx(scheme=quad_rule)  # explicit
 
+    le = 0
+    q = Wave_object.source_expression
+    if q is not None:
+        le = q * v * dx(scheme=quad_rule)
+
     B = fire.Function(V)
 
-    form = m1 + a
+    form = m1 + a - le
     lhs = fire.lhs(form)
     rhs = fire.rhs(form)
     Wave_object.lhs = lhs

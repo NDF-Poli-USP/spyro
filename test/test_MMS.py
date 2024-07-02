@@ -35,7 +35,7 @@ def run_solve(model):
     Wave_obj.set_initial_velocity_model(expression="1 + sin(pi*-z)*sin(pi*x)")
     Wave_obj.forward_solve()
 
-    u_an = Wave_obj.analytical
+    u_an = Wave_obj.analytical_solution(Wave_obj.current_time)
     u_num = Wave_obj.u_n
 
     return errornorm(u_num, u_an)
