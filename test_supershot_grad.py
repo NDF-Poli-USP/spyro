@@ -145,7 +145,7 @@ def get_forward_model(load_true=False):
     return rec_out_exact, rec_out_guess, Wave_obj_guess
 
 
-def test_gradient():
+def test_gradient_supershot():
     rec_out_exact, rec_out_guess, Wave_obj_guess = get_forward_model(load_true=False)
     forward_solution = Wave_obj_guess.forward_solution
     forward_solution_guess = deepcopy(forward_solution)
@@ -163,4 +163,4 @@ def test_gradient():
 
 
 if __name__ == "__main__":
-    test_gradient()
+    test_gradient_supershot()
