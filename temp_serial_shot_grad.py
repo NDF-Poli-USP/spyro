@@ -52,11 +52,11 @@ def check_gradient(Wave_obj_guess, dJ, rec_out_exact, Jm, plot=False):
 
     # Checking if every error is less than 1 percent
 
-    test1 =abs(errors[-1]) < 1 
+    test1 = abs(errors[-1]) < 1
     print(f"Last gradient error less than 1 percent: {test1}")
 
     # Checking if error follows expected finite difference error convergence
-    test2 = math.isclose(np.log(theory[-1]), np.log(errors[-1]), rel_tol=1e-1)
+    test2 = math.isclose(np.log(abs(theory[-1])), np.log(abs(errors[-1])), rel_tol=1e-1)
 
     print(f"Gradient error behaved as expected: {test2}")
 
@@ -74,7 +74,8 @@ dictionary["options"] = {
 }
 
 dictionary["parallelism"] = {
-    "type": "automatic",  # options: automatic (same number of cores for evey processor) or spatial
+    "type": "custom",  # options: automatic (same number of cores for evey processor) or spatial
+    "shot_ids_per_propagation": [[0, 1]],
 }
 
 dictionary["mesh"] = {
@@ -87,7 +88,7 @@ dictionary["mesh"] = {
 
 dictionary["acquisition"] = {
     "source_type": "ricker",
-    "source_locations": [(-1.1, 1.5)],
+    "source_locations": [(-1.1, 1.3), (-1.1, 1.7)],
     "frequency": 5.0,
     "delay": 1.5,
     "delay_type": "multiples_of_minimun",
@@ -163,4 +164,3 @@ def test_gradient():
 
 if __name__ == "__main__":
     test_gradient()
-
