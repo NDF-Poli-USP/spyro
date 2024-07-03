@@ -56,7 +56,7 @@ acquisition = {
     "frequency": 2.0,
     "delay": 1.0,
     "source_pos": [(-0.05, 1.5)],
-    "receiver_locations": [()],
+    "receiver_locations": [(-0.02, 1.5)],
 }  # equi-spaced for now
 
 timeaxis = {

@@ -5,7 +5,7 @@ from . import helpers
 from .. import utils
 
 
-def central_difference(wave):
+def central_difference(wave, source_id=0):
     """
     Perform central difference time integration for wave propagation.
 
@@ -20,10 +20,8 @@ def central_difference(wave):
             A tuple containing the forward solution and the receiver output.
     """
     if wave.sources is not None:
-        source_id = wave.sources.current_source
+        wave.sources.current_source = source_id
         rhs_forcing = fire.Function(wave.function_space)
-    else:
-        source_id = 0
 
     filename, file_extension = wave.forward_output_file.split(".")
     output_filename = filename + "sn" + str(source_id) + "." + file_extension

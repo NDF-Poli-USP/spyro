@@ -13,6 +13,10 @@ class IsotropicWave(ElasticWave):
         self.lmbda = None # First Lame parameter
         self.mu = None    # Second Lame parameter
         self.c_s = None   # Secondary wave velocity
+
+        self.u_n = None   # Current displacement field
+        self.u_nm1 = None # Displacement field in previous iteration
+        self.u_npq = None # Displacement field in next iteration
     
     @override
     def initialize_model_parameters_from_object(self, synthetic_data_dict: dict):
@@ -54,3 +58,47 @@ class IsotropicWave(ElasticWave):
     @override
     def _create_function_space(self):
         return VectorFunctionSpace(self.mesh, "CG", self.degree)
+
+    @override
+    def _set_vstate(self, vstate):
+        self.u_n.assign(vstate)
+
+    @override
+    def _get_vstate(self):
+        return self.u_n
+
+    @override
+    def _set_prev_vstate(self, vstate):
+        self.u_nm1.assign(vstate)
+
+    @override
+    def _get_prev_vstate(self):
+        return self.u_nm1
+
+    @override
+    def _set_next_vstate(self, vstate):
+        self.u_np1.assign(vstate)
+
+    @override
+    def _get_next_vstate(self):
+        return self.u_np1
+    
+    @override
+    def get_receivers_output(self):
+        raise NotImplementedError
+
+    @override
+    def get_function(self):
+        return self.u_n
+
+    @override
+    def get_function_name(self):
+        return "Displacement"
+    
+    @override
+    def forward_solve(self):
+        raise NotImplementedError
+
+    @override
+    def matrix_building(self):
+        raise NotImplementedError
