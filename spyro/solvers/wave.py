@@ -1,5 +1,5 @@
 import os
-from abc import abstractmethod
+from abc import abstractmethod, ABCMeta
 import warnings
 import firedrake as fire
 from firedrake import sin, cos, pi, tanh, sqrt  # noqa: F401
@@ -17,7 +17,7 @@ from .solver_parameters import get_default_parameters_for_method
 fire.set_log_level(fire.ERROR)
 
 
-class Wave(Model_parameters):
+class Wave(Model_parameters, metaclass=ABCMeta):
     """
     Base class for wave equation solvers.
 
@@ -389,6 +389,6 @@ class Wave(Model_parameters):
             self.dt = dt
 
         self.current_source = source_num
-        usol, usol_recv = time_integrator(self)
+        usol, usol_recv = time_integrator(self, source_num)
 
         return usol, usol_recv

@@ -1,8 +1,8 @@
-from abc import abstractmethod
+from abc import abstractmethod, ABCMeta
 
 from ..wave import Wave
 
-class ElasticWave(Wave):
+class ElasticWave(Wave, metaclass=ABCMeta):
     '''Base class for elastic wave propagators'''
     def __init__(self, dictionary, comm=None):
         super().__init__(dictionary, comm=comm)

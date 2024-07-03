@@ -33,7 +33,7 @@ def test_correct_receiver_to_cell_location2D():
     recvs = spyro.create_transect((-0.1, 0.3), (-0.1, 0.9), 3)
     oldmodel["acquisition"]["receiver_locations"] = recvs
 
-    model = spyro.Wave(dictionary=oldmodel)
+    model = spyro.AcousticWave(dictionary=oldmodel)
 
     receivers = spyro.Receivers(model)
 
@@ -96,7 +96,7 @@ def test_correct_at_value2D():
     oldmodel["acquisition"]["receiver_locations"] = recvs
     oldmodel["acquisition"]["num_receivers"] = 3
 
-    model = spyro.Wave(dictionary=oldmodel)
+    model = spyro.AcousticWave(dictionary=oldmodel)
     mesh = model.mesh
     receivers = spyro.Receivers(model)
     V = receivers.space
@@ -135,7 +135,7 @@ def test_correct_at_value2D_quad():
     new_dictionary["mesh"]["mesh_type"] = "firedrake_mesh"
     new_dictionary["options"]["cell_type"] = "quadrilateral"
 
-    model_quad = spyro.Wave(dictionary=new_dictionary)
+    model_quad = spyro.AcousticWave(dictionary=new_dictionary)
     model_quad.set_mesh(mesh_parameters={"dx": 0.02})
     mesh = model_quad.mesh
 
@@ -180,7 +180,7 @@ def test_correct_receiver_location_generation3D():
     oldtest_model = deepcopy(oldmodel3D)
     receivers = spyro.create_transect((-0.05, 0.3, 0.5), (-0.05, 0.9, 0.5), 3)
     oldtest_model["acquisition"]["receiver_locations"] = receivers
-    test_model = spyro.Wave(dictionary=oldtest_model)
+    test_model = spyro.AcousticWave(dictionary=oldtest_model)
 
     receivers = spyro.Receivers(test_model)
 
@@ -196,7 +196,7 @@ def test_correct_receiver_to_cell_location3D():
     rec = spyro.create_transect((-0.05, 0.1, 0.5), (-0.05, 0.9, 0.5), 3)
     oldtest_model1["acquisition"]["receiver_locations"] = rec
 
-    test_model1 = spyro.Wave(dictionary=oldtest_model1)
+    test_model1 = spyro.AcousticWave(dictionary=oldtest_model1)
 
     receivers = spyro.Receivers(test_model1)
 
@@ -288,7 +288,7 @@ def test_correct_at_value3D():
     )
     oldtest_model2["acquisition"]["receiver_locations"] = recvs
 
-    test_model2 = spyro.Wave(dictionary=oldtest_model2)
+    test_model2 = spyro.AcousticWave(dictionary=oldtest_model2)
     receivers = spyro.Receivers(test_model2)
     V = receivers.space
     mesh = test_model2.mesh
