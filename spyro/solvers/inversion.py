@@ -382,19 +382,12 @@ class FullWaveformInversion(AcousticWave):
         if calculate_functional:
             self.get_functional(c=c)
         comm.comm.barrier()
-        dJ = self.gradient_solve(misfit=self.misfit, forward_solution=self.guess_forward_solution)
-        dJ_total = fire.Function(self.function_space)
-        comm.comm.barrier()
-        dJ_total = comm.allreduce(dJ, dJ_total)
-        dJ_total /= comm.ensemble_comm.size
-        if comm.comm.size > 1:
-            dJ_total /= comm.comm.size
-        self.gradient = dJ_total
+        self.gradient = self.gradient_solve(misfit=self.misfit, forward_solution=self.guess_forward_solution)
         self._apply_gradient_mask()
         if save and comm.comm.rank == 0:
             # self.gradient_out.write(dJ_total)
             output = fire.File("gradient_" + str(self.current_iteration)+".pvd")
-            output.write(dJ_total)
+            output.write(self.gradient)
             print("DEBUG")
         self.current_iteration += 1
         comm.comm.barrier()
