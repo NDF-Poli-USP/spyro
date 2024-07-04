@@ -66,12 +66,25 @@ def ensemble_propagator(func):
                 args[0].reset_pressure()
                 args[0].current_time = starting_time
                 u, u_r = func(*args, **dict(kwargs, source_nums=[snum]))
-                arrays_list = [obj.dat.data[:] for obj in u]
-                stacked_arrays = np.stack(arrays_list, axis=0)
-                np.save(f'tmp_shot{snum}.npy', stacked_arrays)
-                np.save(f"tmp_rec{snum}.npy", u_r)
+                save_serial_data(args[0], snum)
+                return u, u_r
 
     return wrapper
+
+
+def save_serial_data(wave, propagation_id):
+    arrays_list = [obj.dat.data[:] for obj in wave.forward_solution]
+    stacked_arrays = np.stack(arrays_list, axis=0)
+    np.save(f'tmp_shot{propagation_id}.npy', stacked_arrays)
+    np.save(f"tmp_rec{propagation_id}.npy", wave.forward_solution_receivers)
+
+
+def switch_serial_shot(wave, propagation_id):
+    stacked_shot_arrays = np.load(f'tmp_shot{propagation_id}.npy')
+    for array_i, array in enumerate(stacked_shot_arrays):
+        wave.forward_solution[array_i].dat.data[:] = array
+    wave.forward_solution_receivers = np.load(f"tmp_rec{propagation_id}.npy")
+
 
 
 def ensemble_gradient(func):
