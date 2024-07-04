@@ -92,10 +92,20 @@ class Wave(Model_parameters, metaclass=ABCMeta):
         # Expression to define sources through UFL (less efficient)
         self.source_expression = None
 
-    @abstractmethod
     def forward_solve(self):
         """Solves the forward problem."""
-        pass
+        if self.function_space is None:
+            self.force_rebuild_function_space()
+
+        self._initialize_model_parameters()
+        self.matrix_building()
+        self.wave_propagator()
+
+    def force_rebuild_function_space(self):
+        if self.mesh is None:
+            self.mesh = self.get_mesh()
+        self._build_function_space()
+        self._map_sources_and_receivers()
 
     @abstractmethod
     def matrix_building(self):
