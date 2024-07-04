@@ -3,6 +3,7 @@ from mpi4py import MPI
 import numpy as np
 import firedrake as fire
 import spyro
+import matplotlib.pyplot as plt
 
 
 def error_calc(p_numerical, p_analytical, nt):
@@ -24,7 +25,7 @@ def test_forward_3_shots():
     }
     dictionary["parallelism"] = {
         "type": "spatial",  # options: automatic (same number of cores for evey processor) or spatial
-        "shot_ids_per_propagation": [[0], [1], [2]],
+        "shot_ids_per_propagation": [[0], [1]],
     }
     dictionary["mesh"] = {
         "Lz": 2.0,  # depth in km - always positive   # Como ver isso sem ler a malha?
@@ -35,7 +36,7 @@ def test_forward_3_shots():
     }
     dictionary["acquisition"] = {
         "source_type": "ricker",
-        "source_locations": spyro.create_transect((-0.55, 0.7), (-0.55, 1.3), 2),
+        "source_locations": spyro.create_transect((-0.55, 0.7), (-0.55, 1.3), 3),
         "frequency": 5.0,
         "delay": 0.2,
         "delay_type": "time",
@@ -69,8 +70,6 @@ def test_forward_3_shots():
 
     comm = Wave_obj.comm
 
-    arr = Wave_obj.receivers_output
-
     if comm.comm.rank == 0:
         analytical_p = spyro.utils.nodal_homogeneous_analytical(
             Wave_obj, 0.2, 1.5, n_extra=100
@@ -79,22 +78,36 @@ def test_forward_3_shots():
         analytical_p = None
     analytical_p = comm.comm.bcast(analytical_p, root=0)
 
-    # Checking if error before reflection matches
-    if comm.ensemble_comm.rank == 0:
-        rec_id = 0
-    elif comm.ensemble_comm.rank == 1:
-        rec_id = 150
-    elif comm.ensemble_comm.rank == 2:
-        rec_id = 300
+    time_vector = np.linspace(0.0, 1.0, 2001)
+    cutoff = 830
+    errors = []
 
-    arr0 = arr[:, rec_id]
-    arr0 = arr0.flatten()
+    for i in range(Wave_obj.number_of_sources):
+        plt.close()
+        plt.plot(time_vector[:cutoff], analytical_p[:cutoff], "--",label="analyt")
+        spyro.io.switch_serial_shot(Wave_obj, i)
+        rec_out = Wave_obj.forward_solution_receivers
+        if i == 0:
+            rec0 =  rec_out[:, 0].flatten()
+        elif i == 1:
+            rec0 =  rec_out[:, 99].flatten()
+        elif i == 2:
+            rec0 =  rec_out[:, 199].flatten()
+        plt.plot(time_vector[:cutoff], rec0[:cutoff], label="numerical")
+        plt.title(f"Source {i}")
+        plt.legend()
+        plt.savefig(f"test{i}.png")
+        error_core = error_calc(rec0[:cutoff], analytical_p[:cutoff], cutoff)
+        error = COMM_WORLD.allreduce(error_core, op=MPI.SUM)
+        error /= comm.comm.size
+        errors.append(error)
+        print(f"Shot {i} produced error of {error}", flush=True)
+    
+    error_all = (errors[0] + errors[1] + errors[2]) / 3
+    comm.comm.barrier()
 
-    error = error_calc(arr0[:430], analytical_p[:430], 430)
     if comm.comm.rank == 0:
-        print(f"Error for shot {Wave_obj.current_sources} is {error} and test has passed equals {np.abs(error) < 0.01}", flush=True)
-    error_all = COMM_WORLD.allreduce(error, op=MPI.SUM)
-    error_all /= 3
+        print(f"Combined error for all shots is {error_all} and test has passed equals {np.abs(error_all) < 0.01}", flush=True)
 
     test = np.abs(error_all) < 0.01
 
