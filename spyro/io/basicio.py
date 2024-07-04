@@ -14,36 +14,18 @@ def ensemble_save_or_load(func):
     """Decorator for read and write shots for ensemble parallelism"""
 
     def wrapper(*args, **kwargs):
-        shot_ids_per_propagation_list = args[0].shot_ids_per_propagation
         _comm = args[0].comm
-        file_name = kwargs.get("file_name")
-        for propagation_id, shot_ids_in_propagation in enumerate(shot_ids_per_propagation_list):
-            if is_owner(_comm, propagation_id) and _comm.comm.rank == 0:
-                func(
-                    *args,
-                    **dict(
-                        kwargs,
-                        propagation_id=propagation_id,
-                        file_name="shots/"
-                        + file_name
-                        + str(shot_ids_in_propagation)
-                        + ".dat",
-                    )
-                )
 
-    return wrapper
-
-
-def ensemble_plot(func):
-    """Decorator for `plot_shots` to distribute shots for
-    ensemble parallelism"""
-
-    def wrapper(*args, **kwargs):
-        num = args[0].number_of_sources
-        _comm = args[0].comm
-        for snum in range(num):
-            if is_owner(_comm, snum) and _comm.comm.rank == 0:
-                func(*args, **dict(kwargs, file_name=str(snum + 1)))
+        if args[0].parallelism_type != "spatial" or args[0].number_of_sources == 1:
+            shot_ids_per_propagation_list = args[0].shot_ids_per_propagation
+            for propagation_id, shot_ids_in_propagation in enumerate(shot_ids_per_propagation_list):
+                if is_owner(_comm, propagation_id) and _comm.comm.rank == 0:
+                    func(*args, **dict(kwargs, shot_ids=shot_ids_in_propagation))
+        elif args[0].parallelism_type == "spatial" and args[0].number_of_sources > 1:
+            for snum in range(args[0].number_of_sources):
+                switch_serial_shot(args[0], snum)
+                if _comm.comm.rank == 0:
+                    func(*args, **dict(kwargs, shot_ids=[snum]))
 
     return wrapper
 
@@ -67,13 +49,23 @@ def ensemble_propagator(func):
                 args[0].current_time = starting_time
                 u, u_r = func(*args, **dict(kwargs, source_nums=[snum]))
                 save_serial_data(args[0], snum)
-                
+
             return u, u_r
 
     return wrapper
 
 
 def save_serial_data(wave, propagation_id):
+    """
+    Save serial data to numpy files.
+
+    Args:
+        wave (Wave): The wave object containing the forward solution.
+        propagation_id (int): The propagation ID.
+
+    Returns:
+        None
+    """
     arrays_list = [obj.dat.data[:] for obj in wave.forward_solution]
     stacked_arrays = np.stack(arrays_list, axis=0)
     spatialcomm = wave.comm.comm.rank
@@ -82,12 +74,21 @@ def save_serial_data(wave, propagation_id):
 
 
 def switch_serial_shot(wave, propagation_id):
+    """
+    Switches the current serial shot for a given wave to shot identified with propagation ID.
+
+    Args:
+        wave (Wave): The wave object.
+        propagation_id (int): The propagation ID.
+
+    Returns:
+        None
+    """
     spatialcomm = wave.comm.comm.rank
     stacked_shot_arrays = np.load(f'tmp_shot{propagation_id}_comm{spatialcomm}.npy')
     for array_i, array in enumerate(stacked_shot_arrays):
         wave.forward_solution[array_i].dat.data[:] = array
     wave.forward_solution_receivers = np.load(f"tmp_rec{propagation_id}_comm{spatialcomm}.npy")
-
 
 
 def ensemble_gradient(func):
@@ -195,7 +196,7 @@ def create_segy(velocity, filename):
 
 
 @ensemble_save_or_load
-def save_shots(Wave_obj, propagation_id=0, file_name="shot_record_"):
+def save_shots(Wave_obj, file_name="shots/shot_record_", shot_ids=0):
     """Save a the shot record from last forward solve to a `pickle`.
 
     Parameters
@@ -212,13 +213,14 @@ def save_shots(Wave_obj, propagation_id=0, file_name="shot_record_"):
     None
 
     """
+    file_name = file_name + str(shot_ids) + ".dat"
     with open(file_name, "wb") as f:
-        pickle.dump(Wave_obj.forward_solution_receivers[:, propagation_id], f)
+        pickle.dump(Wave_obj.forward_solution_receivers, f)
     return None
 
 
 @ensemble_save_or_load
-def load_shots(Wave_obj, propagation_id=0, file_name=None):
+def load_shots(Wave_obj, file_name=None):
     """Load a `pickle` to a `numpy.ndarray`.
 
     Parameters

@@ -88,11 +88,11 @@ def test_forward_3_shots():
         spyro.io.switch_serial_shot(Wave_obj, i)
         rec_out = Wave_obj.forward_solution_receivers
         if i == 0:
-            rec0 =  rec_out[:, 0].flatten()
+            rec0 = rec_out[:, 0].flatten()
         elif i == 1:
-            rec0 =  rec_out[:, 99].flatten()
+            rec0 = rec_out[:, 99].flatten()
         elif i == 2:
-            rec0 =  rec_out[:, 199].flatten()
+            rec0 = rec_out[:, 199].flatten()
         plt.plot(time_vector[:cutoff], rec0[:cutoff], label="numerical")
         plt.title(f"Source {i}")
         plt.legend()
@@ -102,7 +102,7 @@ def test_forward_3_shots():
         error /= comm.comm.size
         errors.append(error)
         print(f"Shot {i} produced error of {error}", flush=True)
-    
+
     error_all = (errors[0] + errors[1] + errors[2]) / 3
     comm.comm.barrier()
 
