@@ -7,6 +7,7 @@ rm *.pvtu
 rm *.pvd
 rm *.npy
 rm *.pdf
+rm *.dat
 rm results/*.vtu
 rm results/*.pvd
 rm results/*.pvtu

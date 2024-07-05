@@ -388,7 +388,7 @@ class FullWaveformInversion(AcousticWave):
             # self.gradient_out.write(dJ_total)
             output = fire.File("gradient_" + str(self.current_iteration)+".pvd")
             output.write(self.gradient)
-            print("DEBUG")
+
         self.current_iteration += 1
         comm.comm.barrier()
 

@@ -101,15 +101,16 @@ def ensemble_gradient(func):
             for propagation_id, shot_ids_in_propagation in enumerate(shot_ids_per_propagation_list):
                 if is_owner(comm, propagation_id):
                     grad = func(*args, **kwargs)
-                    grad_total = fire.Function(args[0].function_space)
+            grad_total = fire.Function(args[0].function_space)
 
-                comm.comm.barrier()
-                grad_total = comm.allreduce(grad, grad_total)
-                grad_total /= comm.ensemble_comm.size
-                if comm.comm.size > 1:
-                    grad_total /= comm.comm.size
+            comm.comm.barrier()
+            grad_total = comm.allreduce(grad, grad_total)
+            grad_total /= comm.ensemble_comm.size
 
-                return grad_total
+            if comm.comm.size > 1:
+                grad_total /= comm.comm.size
+
+            return grad_total
         elif args[0].parallelism_type == "spatial" and args[0].number_of_sources > 1:
             num = args[0].number_of_sources
             starting_time = args[0].current_time
