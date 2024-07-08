@@ -107,9 +107,6 @@ def ensemble_gradient(func):
             grad_total = comm.allreduce(grad, grad_total)
             grad_total /= comm.ensemble_comm.size
 
-            if comm.comm.size > 1:
-                grad_total /= comm.comm.size
-
             return grad_total
         elif args[0].parallelism_type == "spatial" and args[0].number_of_sources > 1:
             num = args[0].number_of_sources
@@ -123,8 +120,6 @@ def ensemble_gradient(func):
                 grad_total += grad
 
             grad_total /= num
-            if comm.comm.size > 1:
-                grad_total /= comm.comm.size
 
             return grad_total
 
@@ -253,6 +248,7 @@ def load_shots(Wave_obj, file_name=None, shot_ids=0):
 
     """
     array = np.zeros(())
+    file_name = file_name + str(shot_ids) + ".dat"
 
     with open(file_name, "rb") as f:
         array = np.asarray(pickle.load(f), dtype=float)
