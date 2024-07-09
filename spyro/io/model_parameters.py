@@ -1,4 +1,5 @@
 import numpy as np
+import uuid
 from mpi4py import MPI
 from firedrake import COMM_WORLD
 import warnings
@@ -328,6 +329,7 @@ class Model_parameters:
 
         # Sanitize output files
         self._sanitize_output()
+        self.random_id_string = str(uuid.uuid4())[:10]
 
     # default_dictionary["absorving_boundary_conditions"] = {
     #     "status": False,  # True or false
