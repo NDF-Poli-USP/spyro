@@ -69,8 +69,9 @@ def save_serial_data(wave, propagation_id):
     arrays_list = [obj.dat.data[:] for obj in wave.forward_solution]
     stacked_arrays = np.stack(arrays_list, axis=0)
     spatialcomm = wave.comm.comm.rank
-    np.save(f'tmp_shot{propagation_id}_comm{spatialcomm}.npy', stacked_arrays)
-    np.save(f"tmp_rec{propagation_id}_comm{spatialcomm}.npy", wave.forward_solution_receivers)
+    id_str = wave.random_id_string
+    np.save(f'tmp_shot{propagation_id}_comm{spatialcomm}'+id_str+'.npy', stacked_arrays)
+    np.save(f"tmp_rec{propagation_id}_comm{spatialcomm}"+id_str+".npy", wave.forward_solution_receivers)
 
 
 def switch_serial_shot(wave, propagation_id):
@@ -85,19 +86,23 @@ def switch_serial_shot(wave, propagation_id):
         None
     """
     spatialcomm = wave.comm.comm.rank
-    stacked_shot_arrays = np.load(f'tmp_shot{propagation_id}_comm{spatialcomm}.npy')
+    id_str = wave.random_id_string
+    stacked_shot_arrays = np.load(f'tmp_shot{propagation_id}_comm{spatialcomm}'+id_str+'.npy')
+    if len(wave.forward_solution) == 0:
+        n_dts, n_dofs = np.shape(stacked_shot_arrays)
+        rebuild_empty_forward_solution(wave, n_dts)
     for array_i, array in enumerate(stacked_shot_arrays):
         wave.forward_solution[array_i].dat.data[:] = array
-    wave.forward_solution_receivers = np.load(f"tmp_rec{propagation_id}_comm{spatialcomm}.npy")
+    wave.forward_solution_receivers = np.load(f"tmp_rec{propagation_id}_comm{spatialcomm}"+id_str+".npy")
 
 
 def ensemble_gradient(func):
     """Decorator for gradient to distribute shots for ensemble parallelism"""
 
     def wrapper(*args, **kwargs):
+        comm = args[0].comm
         if args[0].parallelism_type != "spatial" or args[0].number_of_sources == 1:
             shot_ids_per_propagation_list = args[0].shot_ids_per_propagation
-            comm = args[0].comm
             for propagation_id, shot_ids_in_propagation in enumerate(shot_ids_per_propagation_list):
                 if is_owner(comm, propagation_id):
                     grad = func(*args, **kwargs)
@@ -120,6 +125,7 @@ def ensemble_gradient(func):
                 grad_total += grad
 
             grad_total /= num
+            comm.comm.barrier()
 
             return grad_total
 
@@ -226,6 +232,13 @@ def save_shots(Wave_obj, file_name="shots/shot_record_", shot_ids=0):
     with open(file_name, "wb") as f:
         pickle.dump(Wave_obj.forward_solution_receivers, f)
     return None
+
+
+def rebuild_empty_forward_solution(wave, time_steps):
+    wave.forward_solution = []
+    for i in range(time_steps):
+        wave.forward_solution.append(fire.Function(wave.function_space))
+
 
 
 @ensemble_save_or_load
