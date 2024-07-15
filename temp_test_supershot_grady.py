@@ -1,7 +1,7 @@
-from mpi4py.MPI import COMM_WORLD
-import debugpy
-debugpy.listen(3000 + COMM_WORLD.rank)
-debugpy.wait_for_client()
+# from mpi4py.MPI import COMM_WORLD
+# import debugpy
+# debugpy.listen(3000 + COMM_WORLD.rank)
+# debugpy.wait_for_client()
 import numpy as np
 import math
 import matplotlib.pyplot as plt
@@ -17,10 +17,10 @@ def check_gradient(Wave_obj_guess, dJ, rec_out_exact, Jm, plot=False):
     errors = []
     V_c = Wave_obj_guess.function_space
     dm = fire.Function(V_c)
-    # size, = np.shape(dm.dat.data[:])
-    # dm_data = np.random.rand(size)
+    size, = np.shape(dm.dat.data[:])
+    dm_data = np.random.rand(size)
     # np.save(f"dmdata{COMM_WORLD.rank}", dm_data)
-    dm_data = np.load(f"dmdata{COMM_WORLD.rank}.npy")
+    # dm_data = np.load(f"dmdata{COMM_WORLD.rank}.npy")
     dm.dat.data[:] = dm_data
     # dm.assign(dJ)
 

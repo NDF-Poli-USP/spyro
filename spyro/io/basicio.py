@@ -94,7 +94,7 @@ def switch_serial_shot(wave, propagation_id):
     for array_i, array in enumerate(stacked_shot_arrays):
         wave.forward_solution[array_i].dat.data[:] = array
     wave.forward_solution_receivers = np.load(f"tmp_rec{propagation_id}_comm{spatialcomm}"+id_str+".npy")
-
+    wave.receivers_output = wave.forward_solution_receivers
 
 def ensemble_gradient(func):
     """Decorator for gradient to distribute shots for ensemble parallelism"""
