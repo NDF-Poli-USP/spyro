@@ -29,6 +29,7 @@ jobs:
           mpiexec -n 2 pytest test_parallel/test_parallel_io.py
           mpiexec -n 3 pytest test_parallel/test_supershot_grad.py
           mpiexec -n 2 pytest test_parallel/test_forward_multiple_serial_shots.py
+          mpiexec -n 2 pytest test_parallel/test_gradient_serialshots.py
     - name: Covering parallel 3D forward test
       continue-on-error: true
       run: |
@@ -64,6 +65,11 @@ jobs:
       run: |
           source /home/olender/Firedrakes/newest3/firedrake/bin/activate
           mpiexec -n 2 pytest --cov-report=xml --cov-append --cov=spyro test_parallel/test_forward_multiple_serial_shots.py
+    - name: Covering spatially parallelized shots in serial
+      continue-on-error: true
+      run: |
+          source /home/olender/Firedrakes/newest3/firedrake/bin/activate
+          mpiexec -n 2 pytest --cov-report=xml --cov-append --cov=spyro test_parallel/test_test_gradient_serialshots.py
     # - name: Running serial tests for adjoint
     #   run: |
     #       source /home/olender/Firedrakes/main/firedrake/bin/activate
