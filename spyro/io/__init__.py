@@ -14,6 +14,7 @@ from .basicio import (
     saving_source_and_receiver_location_in_csv,
     switch_serial_shot,
     ensemble_save_or_load,
+    delete_tmp_files,
 )
 from .model_parameters import Model_parameters
 from .backwards_compatibility_io import Dictionary_conversion
@@ -42,4 +43,5 @@ __all__ = [
     "saving_source_and_receiver_location_in_csv",
     "switch_serial_shot",
     "ensemble_save_or_load",
+    "delete_tmp_files",
 ]

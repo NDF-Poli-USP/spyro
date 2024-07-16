@@ -8,6 +8,15 @@ import numpy as np
 from scipy.interpolate import RegularGridInterpolator
 from scipy.interpolate import griddata
 import segyio
+import glob
+import os
+
+
+def delete_tmp_files(wave):
+    str_id = "*" + wave.random_id_string + ".npy"
+    temp_files = glob.glob(str_id)
+    for file in temp_files:
+        os.remove(file)
 
 
 def ensemble_save_or_load(func):
@@ -96,6 +105,7 @@ def switch_serial_shot(wave, propagation_id):
     wave.forward_solution_receivers = np.load(f"tmp_rec{propagation_id}_comm{spatialcomm}"+id_str+".npy")
     wave.receivers_output = wave.forward_solution_receivers
 
+
 def ensemble_gradient(func):
     """Decorator for gradient to distribute shots for ensemble parallelism"""
 
@@ -117,11 +127,19 @@ def ensemble_gradient(func):
             num = args[0].number_of_sources
             starting_time = args[0].current_time
             grad_total = fire.Function(args[0].function_space)
+            misfit_list = kwargs.get("misfit")
+
             for snum in range(num):
                 switch_serial_shot(args[0], snum)
+                current_misfit = misfit_list[snum]
                 args[0].reset_pressure()
                 args[0].current_time = starting_time
-                grad = func(*args, **kwargs)
+                grad = func(*args,
+                            **dict(
+                                kwargs,
+                                misfit=current_misfit,
+                            )
+                        )
                 grad_total += grad
 
             grad_total /= num
