@@ -15,6 +15,8 @@ from .basicio import (
     switch_serial_shot,
     ensemble_save_or_load,
     delete_tmp_files,
+    ensemble_shot_record,
+    ensemble_functional
 )
 from .model_parameters import Model_parameters
 from .backwards_compatibility_io import Dictionary_conversion
@@ -44,4 +46,6 @@ __all__ = [
     "switch_serial_shot",
     "ensemble_save_or_load",
     "delete_tmp_files",
+    "ensemble_shot_record",
+    "ensemble_functional",
 ]

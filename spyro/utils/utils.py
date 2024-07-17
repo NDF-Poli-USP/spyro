@@ -4,6 +4,7 @@ import numpy as np
 from mpi4py import MPI
 from scipy.signal import butter, filtfilt
 import warnings
+from ..io import ensemble_functional
 
 
 def butter_lowpass_filter(shot, cutoff, fs, order=2):
@@ -37,6 +38,7 @@ def butter_lowpass_filter(shot, cutoff, fs, order=2):
     return filtered_shot
 
 
+@ensemble_functional
 def compute_functional(Wave_object, residual):
     """Compute the functional to be optimized.
     Accepts the velocity optionally and uses
@@ -52,11 +54,7 @@ def compute_functional(Wave_object, residual):
 
     J *= 0.5
 
-    J_total = np.zeros((1))
-    J_total[0] += J
-    J_total = COMM_WORLD.allreduce(J_total, op=MPI.SUM)
-    J_total[0] /= comm.comm.size
-    return J_total[0]
+    return J
 
 
 def evaluate_misfit(model, guess, exact):
