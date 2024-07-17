@@ -1,7 +1,7 @@
 from __future__ import with_statement
 
 import pickle
-
+from mpi4py import MPI
 import firedrake as fire
 import h5py
 import numpy as np
@@ -17,6 +17,21 @@ def delete_tmp_files(wave):
     temp_files = glob.glob(str_id)
     for file in temp_files:
         os.remove(file)
+
+
+def ensemble_shot_record(func):
+    """Decorator for read and write shots for ensemble parallelism"""
+
+    def wrapper(*args, **kwargs):
+        if args[0].parallelism_type == "spatial" and args[0].number_of_sources > 1:
+            output_list = []
+            for snum in range(args[0].number_of_sources):
+                switch_serial_shot(args[0], snum)
+                output_list.append(func(*args, **kwargs))
+            
+            return output_list
+
+    return wrapper
 
 
 def ensemble_save_or_load(func):
@@ -104,6 +119,37 @@ def switch_serial_shot(wave, propagation_id):
         wave.forward_solution[array_i].dat.data[:] = array
     wave.forward_solution_receivers = np.load(f"tmp_rec{propagation_id}_comm{spatialcomm}"+id_str+".npy")
     wave.receivers_output = wave.forward_solution_receivers
+
+
+def ensemble_functional(func):
+    """Decorator for gradient to distribute shots for ensemble parallelism"""
+
+    def wrapper(*args, **kwargs):
+        comm = args[0].comm
+        if args[0].parallelism_type != "spatial" or args[0].number_of_sources == 1:
+            J = func(*args, **kwargs)
+            J_total = np.zeros((1))
+            J_total[0] += J
+            J_total = fire.COMM_WORLD.allreduce(J_total, op=MPI.SUM)
+            J_total[0] /= comm.comm.size
+
+        elif args[0].parallelism_type == "spatial" and args[0].number_of_sources > 1:
+            num = args[0].number_of_sources
+            residual_list = args[1]
+            J_total = np.zeros((1))
+
+            for snum in range(args[0].number_of_sources):
+                switch_serial_shot(args[0], snum)
+                current_residual = residual_list[snum]
+                J = func(args[0], current_residual)
+                J_total += J
+            J_total[0] /= comm.comm.size
+
+            comm.comm.barrier()
+
+        return J_total[0]
+
+    return wrapper
 
 
 def ensemble_gradient(func):
