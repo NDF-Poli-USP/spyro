@@ -383,12 +383,6 @@ class Model_parameters:
         self.abc_R = BL_obj.abc_R
         self.abc_pad_length = BL_obj.abc_pad_length
         self.abc_boundary_layer_type = BL_obj.abc_boundary_layer_type
-        if self.abc_active:
-            self._correct_time_integrator_for_abc()
-
-    def _correct_time_integrator_for_abc(self):
-        if self.time_integrator == "central_difference":
-            self.time_integrator = "mixed_space_central_difference"
 
     def _sanitize_output(self):
         #         default_dictionary["visualization"] = {
@@ -608,9 +602,9 @@ class Model_parameters:
             if "velocity_conditional" not in dictionary["synthetic_data"]:
                 self.velocity_model_type = None
                 warnings.warn(
-                    "No velocity model set initially. If using \
-                        user defined conditional or expression, please \
-                            input it in the Wave object."
+                    "No velocity model set initially. If using " \
+                        "user defined conditional or expression, please " \
+                            "input it in the Wave object."
                 )
 
         if "velocity_conditional" in dictionary["synthetic_data"]:
