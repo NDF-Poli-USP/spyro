@@ -25,6 +25,8 @@ def test_plot():
     Wave_obj.multiple_layer_velocity_model(z_switches, layer_values)
     Wave_obj.forward_solve()
     spyro.plots.plot_shots(Wave_obj)
+    spyro.plots.debug_plot(Wave_obj.u_n, filename="test_debug_plot.png")
+    spyro.plots.debug_pvd(Wave_obj.u_n, filename="test_debug_plot.pvd")
 
 
 if __name__ == "__main__":

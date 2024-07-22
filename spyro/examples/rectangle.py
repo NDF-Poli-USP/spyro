@@ -73,12 +73,6 @@ rectangle_dictionary["absorving_boundary_conditions"] = {
     "cmax": 4.5,
     "R": 1e-6,
     "pad_length": 0.25,
-    "status": True,
-    "damping_type": "PML",
-    "exponent": 2,
-    "cmax": 4.5,
-    "R": 1e-6,
-    "pad_length": 0.25,
 }
 
 rectangle_dictionary["acquisition"] = {
