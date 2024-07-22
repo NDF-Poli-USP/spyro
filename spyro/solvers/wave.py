@@ -87,6 +87,8 @@ class Wave(Model_parameters):
             )
         else:
             warnings.warn("No mesh found. Please define a mesh.")
+        # Expression to define sources through UFL (less efficient)
+        self.source_expression = None
 
     @abstractmethod
     def forward_solve(self):
@@ -209,8 +211,8 @@ class Wave(Model_parameters):
             self.initial_velocity_model = vp
         else:
             raise ValueError(
-                "Please specify either a conditional, expression, firedrake \
-                    function or new file name (segy or hdf5)."
+                "Please specify either a conditional, expression, firedrake " \
+                    "function or new file name (segy or hdf5)."
             )
         if output:
             fire.File("initial_velocity_model.pvd").write(
@@ -223,35 +225,10 @@ class Wave(Model_parameters):
         else:
             self.sources = None
         self.receivers = Receivers(self)
-
-    def _get_initial_velocity_model(self):
-        if self.initial_velocity_model is not None:
-            return None
-
-        if self.initial_velocity_model_file is None:
-            raise ValueError("No velocity model or velocity file to load.")
-
-        if self.initial_velocity_model_file.endswith(".segy"):
-            vp_filename, vp_filetype = os.path.splitext(
-                self.initial_velocity_model_file
-            )
-            warnings.warn("Converting segy file to hdf5")
-            write_velocity_model(
-                self.initial_velocity_model_file, ofname=vp_filename
-            )
-            self.initial_velocity_model_file = vp_filename + ".hdf5"
-
-        if self.initial_velocity_model_file.endswith(".hdf5"):
-            self.initial_velocity_model = interpolate(
-                self,
-                self.initial_velocity_model_file,
-                self.function_space.sub(0),
-            )
-
-        if self.debug_output:
-            fire.File("initial_velocity_model.pvd").write(
-                self.initial_velocity_model, name="velocity"
-            )
+    
+    @abstractmethod
+    def _initialize_model_parameters(self):
+        pass
 
     def _build_function_space(self):
         self.function_space = FE_method(self.mesh, self.method, self.degree)
@@ -315,3 +292,56 @@ class Wave(Model_parameters):
         if self.current_time == 0.0:
             raise ValueError("No previous solve to set as real shot record.")
         self.real_shot_record = self.forward_solution_receivers
+    
+    @abstractmethod
+    def _set_vstate(self, vstate):
+        pass
+
+    @abstractmethod
+    def _get_vstate(self):
+        pass
+
+    @abstractmethod
+    def _set_prev_vstate(self, vstate):
+        pass
+
+    @abstractmethod
+    def _get_prev_vstate(self):
+        pass
+
+    @abstractmethod
+    def _set_next_vstate(self, vstate):
+        pass
+
+    @abstractmethod
+    def _get_next_vstate(self):
+        pass
+
+    # Managed attributes to access state variables in current, previous and next iteration
+    vstate = property(fget=lambda self: self._get_vstate(),
+                      fset=lambda self, value: self._set_vstate(value))
+    prev_vstate = property(fget=lambda self: self._get_prev_vstate(),
+                           fset=lambda self, value: self._set_prev_vstate(value))
+    next_vstate = property(fget=lambda self: self._get_next_vstate(),
+                           fset=lambda self, value: self._set_next_vstate(value))
+    
+    @abstractmethod
+    def get_receivers_output(self):
+        pass
+
+    @abstractmethod
+    def get_function(self):
+        '''Returns the function (e.g., pressure or displacement) associated with
+        the wave object without additional variables (e.g., PML variables)'''
+        pass
+
+    @abstractmethod
+    def get_function_name(self):
+        '''Returns the string representing the function of the wave object 
+        (e.g., "pressure" or "displacement")'''
+        pass
+
+    def update_source_expression(self, t):
+        '''Update the source expression during wave propagation. This method must be 
+        implemented only by subclasses that make use of the source term'''
+        pass
