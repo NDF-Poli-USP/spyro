@@ -2,17 +2,17 @@
 [![Python tests](https://github.com/NDF-Poli-USP/spyro/actions/workflows/python-tests.yml/badge.svg)](https://github.com/NDF-Poli-USP/spyro/actions/workflows/python-tests.yml)
 [![codecov](https://codecov.io/gh/Olender/spyro-1/graph/badge.svg?token=69M30UMRFD)](https://codecov.io/gh/Olender/spyro-1)
 
-SPIRO: Seismic Parallel Inversion and Reconstruction Optimization framework
+spyro: seismic parallel inversion and reconstruction optimization framework
 ============================================
 
-Acoustic wave modeling in Firedrake
+Wave modeling in Firedrake
 
-SPIRO is a Python library for modeling acoustic waves. The main
+spyro is a Python library for modeling acoustic waves. The main
 functionality is a set of forward and adjoint wave propagators for solving the acoustic wave equation in the time domain.
-These wave propagators can be used to form complete full waveform inversion (FWI) applications. See the [demos](https://github.com/krober10nd/spyro/tree/main/demos).
-To implement these solvers, SPIRO uses the finite element package [Firedrake](https://www.firedrakeproject.org/index.html).
+These wave propagators can be used to form complete full waveform inversion (FWI) applications. See the [notebooks](https://github.com/Olender/spyro-1/tree/main/notebook_tutorials).
+To implement these solvers, spyro uses the finite element package [Firedrake](https://www.firedrakeproject.org/index.html).
 
-To use SPIRO, you'll need to have some knowledge of Python and some basic concepts in inverse modeling relevant to active-sourcce seismology.
+To use spyro, you'll need to have some knowledge of Python and some basic concepts in inverse modeling relevant to active-source seismology.
 
 Discussions about development take place on our Slack channel. Everyone is invited to join using the link: https://join.slack.com/t/spyroworkspace/shared_invite/zt-u87ih28m-2h9JobfkdArs4ku3a1wLLQ
 

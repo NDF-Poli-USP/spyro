@@ -280,8 +280,13 @@ class AutomaticMesh:
         """
         Creates a 2D mesh based on Firedrake meshing utilities.
         """
-        nx = int(self.length_x / self.dx)
-        nz = int(self.length_z / self.dx)
+        if self.abc_pad:
+            nx = int( (self.length_x + 2*self.abc_pad) / self.dx)
+            nz = int( (self.length_z + self.abc_pad)/ self.dx)
+        else:
+            nx = int(self.length_x / self.dx)
+            nz = int(self.length_z / self.dx)
+
         comm = self.comm
         if self.cell_type == "quadrilateral":
             quadrilateral = True
