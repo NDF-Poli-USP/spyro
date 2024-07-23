@@ -35,8 +35,6 @@ class Wave(Model_parameters, metaclass=ABCMeta):
         Contains solver parameters
     real_shot_record: firedrake function
         Real shot record
-    wavelet: list of floats
-        Values at timesteps of wavelet used in the simulation
     mesh: firedrake mesh
         Mesh used in the simulation (2D or 3D)
     mesh_z: symbolic coordinate z of the mesh object
@@ -77,7 +75,6 @@ class Wave(Model_parameters, metaclass=ABCMeta):
         self.current_time = 0.0
         self.set_solver_parameters()
 
-        self.wavelet = self.get_wavelet()
         self.mesh = self.get_mesh()
         self.c = None
         if self.mesh is not None:
@@ -91,6 +88,8 @@ class Wave(Model_parameters, metaclass=ABCMeta):
             warnings.warn("No mesh found. Please define a mesh.")
         # Expression to define sources through UFL (less efficient)
         self.source_expression = None
+        # Object for efficient application of sources
+        self.sources = None
 
     def forward_solve(self):
         """Solves the forward problem."""
@@ -234,8 +233,6 @@ class Wave(Model_parameters, metaclass=ABCMeta):
     def _map_sources_and_receivers(self):
         if self.source_type == "ricker":
             self.sources = Sources(self)
-        else:
-            self.sources = None
         self.receivers = Receivers(self)
     
     @abstractmethod
@@ -304,7 +301,6 @@ class Wave(Model_parameters, metaclass=ABCMeta):
 
         self.dt = dt
 
-        self.wavelet = self.get_wavelet()
         return dt
 
     def get_mass_matrix_diagonal(self):
@@ -402,3 +398,13 @@ class Wave(Model_parameters, metaclass=ABCMeta):
         usol, usol_recv = time_integrator(self, source_num)
 
         return usol, usol_recv
+    
+    def get_dt(self):
+        return self._dt
+    
+    def set_dt(self, dt):
+        self._dt = dt
+        if self.sources is not None:
+            self.sources.update_wavelet(self)
+
+    dt = property(fget=get_dt, fset=set_dt)
