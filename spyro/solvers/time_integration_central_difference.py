@@ -49,7 +49,7 @@ def central_difference(wave, source_id=0):
         # More efficient way of applying sources
         if wave.sources is not None:
             rhs_forcing.assign(0.0)
-            f = wave.sources.apply_source(rhs_forcing, wave.wavelet[step])
+            f = wave.sources.apply_source(rhs_forcing, step)
             B0 = wave.B.sub(0)
             B0 += f
         

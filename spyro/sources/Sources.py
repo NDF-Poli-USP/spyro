@@ -30,6 +30,8 @@ class Sources(Delta_projector):
     is_local: list of booleans
         List that checks if sources are present in cores
         spatial paralelism
+    wavelet: list of floats
+        Values at timesteps of wavelet used in the simulation
 
     Methods
     -------
@@ -67,18 +69,28 @@ class Sources(Delta_projector):
         self.number_of_points = wave_object.number_of_sources
         self.is_local = [0] * self.number_of_points
         self.current_source = None
-
+        self.update_wavelet(wave_object)
         self.build_maps()
 
-    def apply_source(self, rhs_forcing, value):
+    def update_wavelet(self, wave_object):
+        self.wavelet = full_ricker_wavelet(
+            dt=wave_object.dt,
+            final_time=wave_object.final_time,
+            frequency=wave_object.frequency,
+            delay=wave_object.delay,
+            amplitude=wave_object.amplitude,
+            delay_type=wave_object.delay_type,
+        )
+
+    def apply_source(self, rhs_forcing, step):
         """Applies source in a assembled right hand side.
 
         Parameters
         ----------
         rhs_forcing: Firedrake.Function
             The right hand side of the wave equation
-        value: float
-            The value of the source
+        step: int
+            Time step (index of the wavelet array)
 
         Returns
         -------
@@ -90,7 +102,7 @@ class Sources(Delta_projector):
                 for i in range(len(self.cellNodeMaps[source_id])):
                     rhs_forcing.dat.data_with_halos[
                         int(self.cellNodeMaps[source_id][i])
-                    ] = (value * self.cell_tabulations[source_id][i])
+                    ] = (self.wavelet[step] * self.cell_tabulations[source_id][i])
             else:
                 for i in range(len(self.cellNodeMaps[source_id])):
                     tmp = rhs_forcing.dat.data_with_halos[0]  # noqa: F841

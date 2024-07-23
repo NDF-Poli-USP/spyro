@@ -64,15 +64,10 @@ class Delta_projector:
         wave_object: spyro.wave.Wave
             Wave object
         """
-        my_ensemble = wave_object.comm
-        if wave_object.automatic_adjoint:
-            self.automatic_adjoint = True
-        else:
-            self.automatic_adjoint = False
-
+        self.automatic_adjoint = wave_object.automatic_adjoint
         self.mesh = wave_object.mesh
         self.space = wave_object.function_space.sub(0)
-        self.my_ensemble = my_ensemble
+        self.my_ensemble = wave_object.comm
         self.dimension = wave_object.dimension
         self.degree = wave_object.degree
 
@@ -110,17 +105,8 @@ class Delta_projector:
         """
 
         for rid in range(self.number_of_points):
-            tolerance = 1e-6
-            if self.dimension == 2:
-                receiver_z, receiver_x = self.point_locations[rid]
-                cell_id = self.mesh.locate_cell(
-                    [receiver_z, receiver_x], tolerance=tolerance
-                )
-            elif self.dimension == 3:
-                receiver_z, receiver_x, receiver_y = self.point_locations[rid]
-                cell_id = self.mesh.locate_cell(
-                    [receiver_z, receiver_x, receiver_y], tolerance=tolerance
-                )
+            cell_id = self.mesh.locate_cell(self.point_locations[rid],
+                                            tolerance=1e-6)
             self.is_local[rid] = cell_id
 
         (
