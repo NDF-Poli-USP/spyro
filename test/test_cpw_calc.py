@@ -17,7 +17,7 @@ def test_cpw_calc():
         "velocity_model_file_name": None,
         # FEM to evaluate such as `KMV` or `spectral`
         # (GLL nodes on quads and hexas)
-        "FEM_method_to_evaluate": "spectral_quadrilateral",
+        "FEM_method_to_evaluate": "mass_lumped_triangle",
         "dimension": 2,  # Domain dimension. Either 2 or 3.
         # Either near or line. Near defines a receiver grid near to the source,
         "receiver_setup": "near",
@@ -32,7 +32,7 @@ def test_cpw_calc():
         # grid point density to use in the reference case (float)
         "C_reference": None,
         "desired_degree": 4,  # degree we are calculating G for. (int)
-        "C_initial": 2.4,  # Initial G for line search (float)
+        "C_initial": 2.2,  # Initial G for line search (float)
         "accepted_error_threshold": 0.05,
         "C_accuracy": 0.1,
     }
@@ -60,7 +60,8 @@ def test_cpw_calc():
 
     # Check if cpw is within error TOL, starting search at min
     min = Cpw_calc.find_minimum()
-    test3 = np.isclose(2.5, min)
+    print(f"Minimum of {min}")
+    test3 = np.isclose(2.3, min)
 
     print("END")
     assert all([test1, test2, test3])
