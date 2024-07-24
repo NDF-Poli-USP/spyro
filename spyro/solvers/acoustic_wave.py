@@ -182,3 +182,10 @@ class AcousticWave(Wave):
     @override
     def _create_function_space(self):
         return FE_method(self.mesh, self.method, self.degree)
+
+    @override
+    def rhs_no_pml(self):
+        if self.abc_boundary_layer_type == "PML":
+            return self.B.sub(0)
+        else:
+            return self.B
