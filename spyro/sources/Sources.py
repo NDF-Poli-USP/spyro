@@ -196,7 +196,11 @@ def full_ricker_wavelet(
     """
     nt = int(final_time / dt) + 1  # number of timesteps
     time = 0.0
-    full_wavelet = np.zeros((nt,))
+    if np.isscalar(amplitude):
+        full_wavelet = np.zeros((nt,))
+    else:
+        ndim = len(amplitude)
+        full_wavelet = np.zeros((nt, ndim))
     for t in range(nt):
         full_wavelet[t] = ricker_wavelet(
             time, frequency, amplitude, delay=delay, delay_type=delay_type
@@ -209,5 +213,9 @@ def full_ricker_wavelet(
         normal_cutoff = cutoff / nyq
         # Get the filter coefficients
         b, a = butter(order, normal_cutoff, btype="low", analog=False)
-        full_wavelet = filtfilt(b, a, full_wavelet)
+        if np.isscalar(amplitude):
+            full_wavelet = filtfilt(b, a, full_wavelet)
+        else:
+            for i in range(ndim):
+                full_wavelet[:, i] = filtfilt(b, a, full_wavelet[:, i])
     return full_wavelet

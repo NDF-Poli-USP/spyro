@@ -408,3 +408,11 @@ class Wave(Model_parameters, metaclass=ABCMeta):
             self.sources.update_wavelet(self)
 
     dt = property(fget=get_dt, fset=set_dt)
+
+    @abstractmethod
+    def rhs_no_pml(self):
+        '''
+        Returns the right-hand side Cofunction without PML DOFs (i.e., only
+        the DOFs associated with the subspace of the original problem).
+        '''
+        pass
