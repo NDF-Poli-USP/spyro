@@ -34,7 +34,7 @@ def ensemble_shot_record(func):
     return wrapper
 
 
-def ensemble_save_or_load(func):
+def ensemble_save_or_load_propagation_dependent(func):
     """Decorator for read and write shots for ensemble parallelism"""
 
     def wrapper(*args, **kwargs):
@@ -274,7 +274,7 @@ def create_segy(velocity, filename):
             f.trace[tr] = velocity[:, tr]
 
 
-@ensemble_save_or_load
+@ensemble_save_or_load_propagation_dependent
 def save_shots(Wave_obj, file_name="shots/shot_record_", shot_ids=0):
     """Save a the shot record from last forward solve to a `pickle`.
 
@@ -305,7 +305,7 @@ def rebuild_empty_forward_solution(wave, time_steps):
 
 
 
-@ensemble_save_or_load
+@ensemble_save_or_load_propagation_dependent
 def load_shots(Wave_obj, file_name=None, shot_ids=0):
     """Load a `pickle` to a `numpy.ndarray`.
 

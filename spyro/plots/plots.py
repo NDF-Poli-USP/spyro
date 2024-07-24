@@ -6,12 +6,12 @@ from PIL import Image
 import numpy as np
 import firedrake
 import copy
-from ..io import ensemble_save_or_load
+from ..io import ensemble_save_or_load_propagation_dependent
 
 __all__ = ["plot_shots"]
 
 
-@ensemble_save_or_load
+@ensemble_save_or_load_propagation_dependent
 def plot_shots(
     Wave_object,
     show=False,
@@ -144,6 +144,7 @@ def plot_model(Wave_object, filename="model.png", abc_points=None, show=False, f
         List of points to plot an ABC line (default: None).
     """
     plt.close()
+    comm = firedrake.COMM_WORLD
     fig = plt.figure(figsize=(9, 9))
     axes = fig.add_subplot(111)
     fig.set_figwidth = 9.0
@@ -176,7 +177,14 @@ def plot_model(Wave_object, filename="model.png", abc_points=None, show=False, f
     axes.tick_params(axis='y', pad=20)
     axes.axis('equal')
 
-    if abc_points is not None:
+    if abc_points is not None or Wave_object.abc_pad_length > 0.0:
+        if abc_points is None:
+            abc_points = [
+                (-0.0, 0.0),
+                (-Wave_object.length_z, 0.0),
+                (-Wave_object.length_z, Wave_object.length_x),
+                (-0.0, Wave_object.length_x),
+            ]
         zs = []
         xs = []
 
@@ -193,19 +201,20 @@ def plot_model(Wave_object, filename="model.png", abc_points=None, show=False, f
         xs.append(x_first)
         plt.plot(zs, xs, "--")
     print(f"File name {filename}", flush=True)
-    plt.savefig(filename)
+    if comm.rank == 0:
+        plt.savefig(filename)
 
-    if flip_axis:
-        img = Image.open(filename)
-        img_rotated = img.rotate(90)
+        if flip_axis:
+            img = Image.open(filename)
+            img_rotated = img.rotate(90)
 
-        # Save the rotated image
-        img_rotated.save(filename)
-    if show:
-        plt.show()
-    else:
-        plt.close()
-
+            # Save the rotated image
+            img_rotated.save(filename)
+        if show:
+            plt.show()
+        else:
+            plt.close()
+    plt.close()
 
 def plot_function(function):
     plt.close()

@@ -13,7 +13,7 @@ from .basicio import (
     parallel_print,
     saving_source_and_receiver_location_in_csv,
     switch_serial_shot,
-    ensemble_save_or_load,
+    ensemble_save_or_load_propagation_dependent,
     delete_tmp_files,
     ensemble_shot_record,
     ensemble_functional
@@ -44,7 +44,7 @@ __all__ = [
     "boundary_layer_io",
     "saving_source_and_receiver_location_in_csv",
     "switch_serial_shot",
-    "ensemble_save_or_load",
+    "ensemble_save_or_load_propagation_dependent",
     "delete_tmp_files",
     "ensemble_shot_record",
     "ensemble_functional",
