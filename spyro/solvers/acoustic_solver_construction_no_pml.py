@@ -48,9 +48,6 @@ def construct_solver_or_matrix_no_pml(Wave_object):
     Wave_object.solver = fire.LinearSolver(
         A, solver_parameters=Wave_object.solver_parameters
     )
-    # lin_var = fire.LinearVariationalProblem(lhs, rhs + B, u_np1)
-    # solver_parameters = {"mat_type": "matfree", "ksp_type": "preonly", "pc_type": "jacobi"}
-    # Wave_object.solver = fire.LinearVariationalSolver(lin_var,solver_parameters=solver_parameters)
 
     Wave_object.rhs = rhs
     Wave_object.B = B
