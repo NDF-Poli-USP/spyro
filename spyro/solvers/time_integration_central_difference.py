@@ -245,9 +245,6 @@ def central_difference_MMS(Wave_object, source_id=0):
     u_np1 = Wave_object.u_np1
     u_nm1.assign(Wave_object.analytical_solution(t - 2 * dt))
     u_n.assign(Wave_object.analytical_solution(t - dt))
-    # u_np1 = fire.Function(Wave_object.function_space, name="pressure t +dt")
-    # u_nm1.dat.data[:] = np.load("old_u_nm1.npy")
-    # u_n.dat.data[:] = np.load("old_u_n.npy")
     u = fire.TrialFunction(Wave_object.function_space)
     v = fire.TestFunction(Wave_object.function_space)
 
@@ -282,8 +279,6 @@ def central_difference_MMS(Wave_object, source_id=0):
         B = fire.assemble(rhs, tensor=B)
 
         Wave_object.solver.solve(u_np1, B)
-
-        # u_np1.assign(X)
 
         usol_recv.append(
             Wave_object.receivers.interpolate(u_np1.dat.data_ro_with_halos[:])
