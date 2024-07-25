@@ -1,7 +1,9 @@
-from firedrake import VectorFunctionSpace
+from firedrake import Function
 
 from .elastic_wave import ElasticWave
-
+from .forms import (isotropic_elastic_without_pml,
+                    isotropic_elastic_with_pml)
+from ...domains.space import FE_method
 from ...utils.typing import override
 
 class IsotropicWave(ElasticWave):
@@ -16,7 +18,7 @@ class IsotropicWave(ElasticWave):
 
         self.u_n = None   # Current displacement field
         self.u_nm1 = None # Displacement field in previous iteration
-        self.u_npq = None # Displacement field in next iteration
+        self.u_np1 = None # Displacement field in next iteration
     
     @override
     def initialize_model_parameters_from_object(self, synthetic_data_dict: dict):
@@ -57,7 +59,8 @@ class IsotropicWave(ElasticWave):
     
     @override
     def _create_function_space(self):
-        return VectorFunctionSpace(self.mesh, "CG", self.degree)
+        return FE_method(self.mesh, self.method, self.degree,
+                         dim=self.mesh.ufl_cell().geometric_dimension())
 
     @override
     def _set_vstate(self, vstate):
@@ -85,7 +88,11 @@ class IsotropicWave(ElasticWave):
     
     @override
     def get_receivers_output(self):
-        raise NotImplementedError
+        if self.abc_boundary_layer_type == "PML":
+            raise NotImplementedError
+        else:
+            data_with_halos = self.u_n.dat.data_ro_with_halos[:]
+        return self.receivers.interpolate(data_with_halos)
 
     @override
     def get_function(self):
@@ -94,11 +101,26 @@ class IsotropicWave(ElasticWave):
     @override
     def get_function_name(self):
         return "Displacement"
-    
-    @override
-    def forward_solve(self):
-        raise NotImplementedError
 
     @override
     def matrix_building(self):
-        raise NotImplementedError
+        self.current_time = 0.0
+
+        self.u_n = Function(self.function_space,
+                            name=self.get_function_name())
+        self.u_nm1 = Function(self.function_space,
+                              name=self.get_function_name())
+        self.u_np1 = Function(self.function_space,
+                              name=self.get_function_name())
+
+        if self.abc_boundary_layer_type is None:
+            isotropic_elastic_without_pml(self)
+        elif self.abc_boundary_layer_type == "PML":
+            isotropic_elastic_with_pml(self)
+    
+    @override
+    def rhs_no_pml(self):
+        if self.abc_boundary_layer_type == "PML":
+            raise NotImplementedError
+        else:
+            return self.B
