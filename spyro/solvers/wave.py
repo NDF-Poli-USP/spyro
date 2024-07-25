@@ -202,6 +202,7 @@ class Wave(Model_parameters):
             self.initial_velocity_model = velocity_model_function
         elif new_file is not None:
             self.initial_velocity_model_file = new_file
+            self._get_initial_velocity_model()
         elif constant is not None:
             V = self.function_space
             vp = fire.Function(V, name="velocity")

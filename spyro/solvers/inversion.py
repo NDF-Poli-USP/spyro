@@ -187,7 +187,7 @@ class FullWaveformInversion(AcousticWave):
         self.misfit = self.real_shot_record - self.guess_shot_record
         return self.misfit
 
-    def generate_real_shot_record(self, plot_model=False, filename=None, abc_points=None):
+    def generate_real_shot_record(self, plot_model=False, filename="model.png", abc_points=None):
         """
         Generates the real synthetic shot record. Only for use in synthetic test cases.
         """
