@@ -25,6 +25,11 @@ jobs:
           mpiexec -n 6 pytest test_3d/test_hexahedral_convergence.py
           mpiexec -n 6 pytest test_parallel/test_forward.py
           mpiexec -n 6 pytest test_parallel/test_fwi.py
+          mpiexec -n 6 pytest test_parallel/test_forward_supershot.py
+          mpiexec -n 2 pytest test_parallel/test_parallel_io.py
+          mpiexec -n 3 pytest test_parallel/test_supershot_grad.py
+          mpiexec -n 2 pytest test_parallel/test_forward_multiple_serial_shots.py
+          mpiexec -n 2 pytest test_parallel/test_gradient_serialshots.py
     - name: Covering parallel 3D forward test
       continue-on-error: true
       run: |
@@ -40,6 +45,31 @@ jobs:
       run: |
           source /home/olender/firedrakes/2024_07_19/firedrake/bin/activate
           mpiexec -n 6 pytest --cov-report=xml --cov-append --cov=spyro test_parallel/test_fwi.py
+    - name: Covering parallel supershot test
+      continue-on-error: true
+      run: |
+          source /home/olender/firedrakes/2024_07_19/firedrake/bin/activate
+          mpiexec -n 6 pytest --cov-report=xml --cov-append --cov=spyro test_parallel/test_forward_supershot.py
+    - name: Covering parallel io test
+      continue-on-error: true
+      run: |
+          source /home/olender/firedrakes/2024_07_19/firedrake/bin/activate
+          mpiexec -n 2 pytest --cov-report=xml --cov-append --cov=spyro test_parallel/test_parallel_io.py
+    - name: Covering parallel supershot grad test
+      continue-on-error: true
+      run: |
+          source /home/olender/firedrakes/2024_07_19/firedrake/bin/activate
+          mpiexec -n 3 pytest --cov-report=xml --cov-append --cov=spyro test_parallel/test_supershot_grad.py
+    - name: Covering spatially parallelized shots in serial
+      continue-on-error: true
+      run: |
+          source /home/olender/firedrakes/2024_07_19/firedrake/bin/activate
+          mpiexec -n 2 pytest --cov-report=xml --cov-append --cov=spyro test_parallel/test_forward_multiple_serial_shots.py
+    - name: Covering spatially parallelized shots in serial
+      continue-on-error: true
+      run: |
+          source /home/olender/firedrakes/2024_07_19/firedrake/bin/activate
+          mpiexec -n 2 pytest --cov-report=xml --cov-append --cov=spyro test_parallel/test_test_gradient_serialshots.py
     - name: Uploading coverage to Codecov
       run: export CODECOV_TOKEN="057ec853-d7ea-4277-819b-0c5ea2f9ff57" && bash <(curl -s https://codecov.io/bash)
 

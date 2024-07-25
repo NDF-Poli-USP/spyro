@@ -1,4 +1,7 @@
 import numpy as np
+import uuid
+from mpi4py import MPI
+from firedrake import COMM_WORLD
 import warnings
 from .. import io
 from .. import utils
@@ -326,6 +329,7 @@ class Model_parameters:
 
         # Sanitize output files
         self._sanitize_output()
+        self.random_id_string = str(uuid.uuid4())[:10]
 
     # default_dictionary["absorving_boundary_conditions"] = {
     #     "status": False,  # True or false
@@ -543,8 +547,13 @@ class Model_parameters:
             warnings.warn("No paralellism type listed. Assuming automatic")
             self.parallelism_type = "automatic"
 
-        if self.source_type == "MMS":
-            self.parallelism_type = "spatial"
+        if self.parallelism_type == "custom":
+            self.shot_ids_per_propagation = dictionary["parallelism"]["shot_ids_per_propagation"]
+        elif self.parallelism_type == "automatic":
+            available_cores = COMM_WORLD.size
+            self.shot_ids_per_propagation = [[i] for i in range(0, available_cores)]
+        elif self.parallelism_type == "spatial":
+            self.shot_ids_per_propagation = [[i] for i in range(0, self.number_of_sources)]
 
         if comm is None:
             self.comm = utils.mpi_init(self)

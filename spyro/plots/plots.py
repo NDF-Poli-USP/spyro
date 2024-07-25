@@ -6,16 +6,17 @@ from PIL import Image
 import numpy as np
 import firedrake
 import copy
-from ..io import ensemble_plot
+from ..io import ensemble_save_or_load
 
 __all__ = ["plot_shots"]
 
 
-@ensemble_plot
+@ensemble_save_or_load
 def plot_shots(
     Wave_object,
     show=False,
-    file_name="1",
+    file_name="plot_of_shot",
+    shot_ids=[0],
     vmin=-1e-5,
     vmax=1e-5,
     contour_lines=700,
@@ -52,7 +53,7 @@ def plot_shots(
     -------
     None
     """
-
+    file_name = file_name + str(shot_ids) + "." + file_format
     num_recvs = Wave_object.number_of_receivers
 
     dt = Wave_object.dt
@@ -79,7 +80,7 @@ def plot_shots(
     plt.xlim(start_index, end_index)
     plt.ylim(tf, 0)
     plt.subplots_adjust(left=0.18, right=0.95, bottom=0.14, top=0.95)
-    plt.savefig(file_name + "." + file_format, format=file_format)
+    plt.savefig(file_name, format=file_format)
     # plt.axis("image")
     if show:
         plt.show()

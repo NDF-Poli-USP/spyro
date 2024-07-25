@@ -8,6 +8,9 @@ from .acoustic_wave import AcousticWave
 from ..utils import compute_functional
 from ..utils import Gradient_mask_for_pml, Mask
 from ..plots import plot_model as spyro_plot_model
+from ..io.basicio import ensemble_shot_record
+from ..io.basicio import switch_serial_shot
+
 
 try:
     from ROL.firedrake_vector import FiredrakeVector as FireVector
@@ -181,10 +184,19 @@ class FullWaveformInversion(AcousticWave):
         self.forward_solve()
         output = fire.File("control_" + str(self.current_iteration)+".pvd")
         output.write(self.c)
-        self.guess_shot_record = self.forward_solution_receivers
-        self.guess_forward_solution = self.forward_solution
-
-        self.misfit = self.real_shot_record - self.guess_shot_record
+        if self.parallelism_type == "spatial" and self.number_of_sources > 1:
+            misfit_list = []
+            guess_shot_record_list = []
+            for snum in range (self.number_of_sources):
+                switch_serial_shot(self, snum)
+                guess_shot_record_list.append(self.forward_solution_receivers)
+                misfit_list.append(self.real_shot_record[snum] - self.forward_solution_receivers)
+            self.guess_shot_record = guess_shot_record_list
+            self.misfit = misfit_list
+        else:
+            self.guess_shot_record = self.forward_solution_receivers
+            self.guess_forward_solution = self.forward_solution
+            self.misfit = self.real_shot_record - self.guess_shot_record
         return self.misfit
 
     def generate_real_shot_record(self, plot_model=False, filename="model.png", abc_points=None):
@@ -382,20 +394,13 @@ class FullWaveformInversion(AcousticWave):
         if calculate_functional:
             self.get_functional(c=c)
         comm.comm.barrier()
-        dJ = self.gradient_solve(misfit=self.misfit, forward_solution=self.guess_forward_solution)
-        dJ_total = fire.Function(self.function_space)
-        comm.comm.barrier()
-        dJ_total = comm.allreduce(dJ, dJ_total)
-        dJ_total /= comm.ensemble_comm.size
-        if comm.comm.size > 1:
-            dJ_total /= comm.comm.size
-        self.gradient = dJ_total
+        self.gradient = self.gradient_solve(misfit=self.misfit, forward_solution=self.guess_forward_solution)
         self._apply_gradient_mask()
         if save and comm.comm.rank == 0:
             # self.gradient_out.write(dJ_total)
             output = fire.File("gradient_" + str(self.current_iteration)+".pvd")
-            output.write(dJ_total)
-            print("DEBUG")
+            output.write(self.gradient)
+
         self.current_iteration += 1
         comm.comm.barrier()
 
@@ -579,4 +584,11 @@ class SyntheticRealAcousticWave(AcousticWave):
 
     def forward_solve(self):
         super().forward_solve()
-        self.real_shot_record = self.receivers_output
+        if self.parallelism_type == "spatial" and self.number_of_sources > 1:
+            real_shot_record_list = []
+            for snum in range (self.number_of_sources):
+                switch_serial_shot(self, snum)
+                real_shot_record_list.append(self.receivers_output)
+            self.real_shot_record = real_shot_record_list
+        else:
+            self.real_shot_record = self.receivers_output
