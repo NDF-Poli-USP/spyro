@@ -1,5 +1,6 @@
 from spyro import create_transect
 from spyro.examples.example_model import Example_model_acoustic
+from spyro.examples.example_model import Example_model_acoustic_FWI
 import firedrake as fire
 
 rectangle_optimization_parameters = {
@@ -183,24 +184,80 @@ class Rectangle_acoustic(Example_model_acoustic):
         self.set_initial_velocity_model(conditional=cond)
 
 
-# class Rectangle(AcousticWave):
-#     def __init__(self, model_dictionary=None, comm=None):
-#         model_parameters = Rectangle_parameters(
-#             dictionary=model_dictionary, comm=comm
-#         )
-#         super().__init__(
-#             model_parameters=model_parameters, comm=model_parameters.comm
-#         )
-#         comm = self.comm
-#         num_sources = self.number_of_sources
-#         if comm.comm.rank == 0 and comm.ensemble_comm.rank == 0:
-#             print(
-#                 "INFO: Distributing %d shot(s) across %d core(s). \
-#                     Each shot is using %d cores"
-#                 % (
-#                     num_sources,
-#                     fire.COMM_WORLD.size,
-#                     fire.COMM_WORLD.size / comm.ensemble_comm.size,
-#                 ),
-#                 flush=True,
-#             )
+class Rectangle_acoustic_FWI(Example_model_acoustic_FWI):
+    """
+    Rectangle model.
+    This class is a child of the Example_model class.
+    It is used to create a dictionary with the parameters of the
+    Rectangle model.
+
+    Parameters
+    ----------
+    dictionary : dict, optional
+        Dictionary with the parameters of the model that are different from
+        the default model. The default is None.
+    comm : firedrake.mpi_comm.MPI.Intracomm, optional
+    periodic : bool, optional
+        If True, the mesh will be periodic in all directions. The default is
+        False.
+    """
+    def __init__(
+        self,
+        dictionary=None,
+        example_dictionary=rectangle_dictionary,
+        comm=None,
+        periodic=False,
+    ):
+        super().__init__(
+            dictionary=dictionary,
+            default_dictionary=example_dictionary,
+            comm=comm,
+        )
+        self.periodic = periodic
+
+        self._rectangle_mesh()
+
+    def _rectangle_mesh(self):
+        mesh_dict = self.input_dictionary["mesh"]
+        mesh_parameters = {
+            "length_z": mesh_dict["Lz"],
+            "length_x": mesh_dict["Lx"],
+            "length_y": mesh_dict["Ly"],
+            "dx": mesh_dict["h"],
+            "mesh_file": mesh_dict["mesh_file"],
+            "mesh_type": mesh_dict["mesh_type"],
+            "periodic": self.periodic,
+        }
+        super().set_mesh(mesh_parameters=mesh_parameters)
+
+    def multiple_layer_velocity_model(self, z_switch, layers):
+        """
+        Sets the heterogeneous velocity model to be split into horizontal layers.
+        Each layer's velocity value is defined by the corresponding value in the
+        layers list. The layers are separated by the values in the z_switch list.
+
+        Parameters
+        ----------
+        z_switch : list of floats
+            List of z values that separate the layers.
+        layers : list of floats
+            List of velocity values for each layer.
+        """
+        if len(z_switch) != (len(layers) - 1):
+            raise ValueError(
+                "Float list of z_switch has to have length exactly one less \
+                              than list of layer values"
+            )
+        if len(z_switch) == 0:
+            raise ValueError("Float list of z_switch cannot be empty")
+        for i in range(len(z_switch)):
+            if i == 0:
+                cond = fire.conditional(
+                    self.mesh_z > z_switch[i], layers[i], layers[i + 1]
+                )
+            else:
+                cond = fire.conditional(
+                    self.mesh_z > z_switch[i], cond, layers[i + 1]
+                )
+        # cond = fire.conditional(self.mesh_z > z_switch, layer1, layer2)
+        self.set_initial_velocity_model(conditional=cond)

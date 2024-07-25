@@ -171,7 +171,7 @@ def write_function_to_grid(function, V, grid_spacing):
     V : firedrake.FunctionSpace
         Function space of function
     grid_spacing : float
-        Spacing of grid points in metres
+        Spacing of grid points
 
     Returns
     -------
@@ -194,7 +194,7 @@ def write_function_to_grid(function, V, grid_spacing):
     min_y = np.amin(y) + 0.01
     max_y = np.amax(y) - 0.01
 
-    z = function.dat.data[:] * 1000.0  # convert from km/s to m/s
+    z = function.dat.data[:]
 
     # target grid to interpolate to
     xi = np.arange(min_x, max_x, grid_spacing)
@@ -204,10 +204,10 @@ def write_function_to_grid(function, V, grid_spacing):
     # interpolate
     zi = griddata((x, y), z, (xi, yi), method="linear")
 
-    return xi, yi, zi
+    return zi
 
 
-def create_segy(velocity, filename):
+def create_segy(function, V, grid_spacing, filename):
     """Write the velocity data into a segy file named filename
 
     Parameters
@@ -222,6 +222,7 @@ def create_segy(velocity, filename):
     -------
     None
     """
+    velocity = write_function_to_grid(function, V, grid_spacing)
     spec = segyio.spec()
 
     velocity = np.flipud(velocity.T)
@@ -263,7 +264,7 @@ def save_shots(Wave_obj, source_id=0, file_name=None):
 
 
 @ensemble_save_or_load
-def load_shots(Wave_obj, source_id=0, file_name=None):
+def load_shots(Wave_obj, source_id=0, file_name="shots/shot_record_"):
     """Load a `pickle` to a `numpy.ndarray`.
 
     Parameters
