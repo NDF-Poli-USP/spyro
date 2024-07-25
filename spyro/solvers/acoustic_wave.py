@@ -44,6 +44,7 @@ class AcousticWave(Wave):
         self.c = self.initial_velocity_model
         self.matrix_building()
         self.wave_propagator()
+        self.comm.comm.barrier()
 
     def force_rebuild_function_space(self):
         if self.mesh is None:
@@ -84,7 +85,7 @@ class AcousticWave(Wave):
             construct_solver_or_matrix_with_pml(self)
 
     @ensemble_propagator
-    def wave_propagator(self, dt=None, final_time=None, source_num=0):
+    def wave_propagator(self, dt=None, final_time=None, source_nums=[0]):
         """Propagates the wave forward in time.
         Currently uses central differences.
 
@@ -109,8 +110,8 @@ class AcousticWave(Wave):
         if dt is not None:
             self.dt = dt
 
-        self.current_source = source_num
-        usol, usol_recv = time_integrator(self, source_id=source_num)
+        self.current_sources = source_nums
+        usol, usol_recv = time_integrator(self, source_ids=source_nums)
 
         return usol, usol_recv
 
@@ -150,4 +151,3 @@ class AcousticWave(Wave):
                 self.X_nm1.assign(0.0)
             except:
                 warnings.warn("No mixed space pressure to reset")
-            

@@ -7,7 +7,7 @@ from . import helpers
 from .. import utils
 
 
-def central_difference(Wave_object, source_id=0):
+def central_difference(Wave_object, source_ids=[0]):
     """
     Perform central difference time integration for wave propagation.
 
@@ -15,8 +15,8 @@ def central_difference(Wave_object, source_id=0):
     -----------
     Wave_object: Spyro object
         The Wave object containing the necessary data and parameters.
-    source_id: int (optional)
-        The ID of the source being propagated. Defaults to 0.
+    source_ids: list of ints (optional)
+        The ID of the sources being propagated. Defaults to [0].
 
     Returns:
     --------
@@ -24,13 +24,13 @@ def central_difference(Wave_object, source_id=0):
             A tuple containing the forward solution and the receiver output.
     """
     excitations = Wave_object.sources
-    excitations.current_source = source_id
+    excitations.current_sources = source_ids
     receivers = Wave_object.receivers
     comm = Wave_object.comm
     temp_filename = Wave_object.forward_output_file
 
     filename, file_extension = temp_filename.split(".")
-    output_filename = filename + "sn" + str(source_id) + "." + file_extension
+    output_filename = filename + "sn" + str(source_ids) + "." + file_extension
     if Wave_object.forward_output:
         parallel_print(f"Saving output in: {output_filename}", Wave_object.comm)
 
@@ -107,7 +107,7 @@ def central_difference(Wave_object, source_id=0):
     return usol, usol_recv
 
 
-def mixed_space_central_difference(Wave_object, source_id=0):
+def mixed_space_central_difference(Wave_object, source_ids=[0]):
     """
     Performs central difference time integration for wave propagation.
     Solves for  a mixed space formulation, for function X. For correctly
@@ -118,8 +118,8 @@ def mixed_space_central_difference(Wave_object, source_id=0):
     -----------
     Wave_object: Spyro object
         The Wave object containing the necessary data and parameters.
-    source_id: int (optional)
-        The ID of the source being propagated. Defaults to 0.
+    source_ids: list of int (optional)
+        The ID of the source being propagated. Defaults to [0].
 
     Returns:
     --------
@@ -127,12 +127,12 @@ def mixed_space_central_difference(Wave_object, source_id=0):
             A tuple containing the forward solution and the receiver output.
     """
     excitations = Wave_object.sources
-    excitations.current_source = source_id
+    excitations.current_sources = source_ids
     receivers = Wave_object.receivers
     comm = Wave_object.comm
     temp_filename = Wave_object.forward_output_file
     filename, file_extension = temp_filename.split(".")
-    output_filename = filename + "sn" + str(source_id) + "." + file_extension
+    output_filename = filename + "sn" + str(source_ids) + "." + file_extension
     if Wave_object.forward_output:
         parallel_print(f"Saving output in: {output_filename}", Wave_object.comm)
 
@@ -209,7 +209,7 @@ def mixed_space_central_difference(Wave_object, source_id=0):
     return usol, usol_recv
 
 
-def central_difference_MMS(Wave_object, source_id=0):
+def central_difference_MMS(Wave_object, source_ids=[0]):
     """Propagates the wave forward in time.
     Currently uses central differences.
 
