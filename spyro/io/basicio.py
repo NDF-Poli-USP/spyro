@@ -307,7 +307,7 @@ def rebuild_empty_forward_solution(wave, time_steps):
 
 
 @ensemble_save_or_load
-def load_shots(Wave_obj, file_name=None, shot_ids=0):
+def load_shots(Wave_obj, file_name="shots/shot_record_", shot_ids=0):
     """Load a `pickle` to a `numpy.ndarray`.
 
     Parameters
