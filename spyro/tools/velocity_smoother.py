@@ -3,9 +3,10 @@ from scipy.ndimage import gaussian_filter
 import segyio
 import numpy as np
 import matplotlib.pyplot as plt
+from SeismicMesh import write_velocity_model
 
 
-def smooth_velocity_field_file(input_filename, output_filename, sigma, show=False):
+def smooth_velocity_field_file(input_filename, output_filename, sigma, show=False, write_hdf5=True):
     """Smooths a velocity field using a Gaussian filter.
 
     Parameters
@@ -40,7 +41,7 @@ def smooth_velocity_field_file(input_filename, output_filename, sigma, show=Fals
 
     for i in range(ni):
         for j in range(nj):
-            if vp[i, j] < 1.51 and i < 400:
+            if vp[i, j] < 1.51:
                 vp_smooth[i, j] = vp[i, j]
 
     spec = segyio.spec()
@@ -71,5 +72,8 @@ def smooth_velocity_field_file(input_filename, output_filename, sigma, show=Fals
         plt.ylabel("z-direction (m)")
         ax.axis("equal")
         plt.show()
+
+    if write_hdf5:
+        write_velocity_model(output_filename, ofname=output_filename[:-5])
 
     return None
