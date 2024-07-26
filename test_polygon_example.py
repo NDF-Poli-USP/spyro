@@ -52,7 +52,7 @@ def test_polygon_vp():
     assert test
 
 
-def test_real_shot_record_generation_for_polygon():
+def test_real_shot_record_generation_for_polygon_and_save_and_load():
     dictionary = {}
     dictionary["absorving_boundary_conditions"] = {
         "pad_length": 2.0,  # True or false
@@ -77,20 +77,30 @@ def test_real_shot_record_generation_for_polygon():
     }
     dictionary["time_axis"] = {
         "final_time": 1.0,  # Final time for event
-        "dt": 0.0001,  # timestep size
+        "dt": 0.0005,  # timestep size
         "amplitude": 1,  # the Ricker has an amplitude of 1.
         "output_frequency": 500,  # how frequently to output solution to pvds
         # how frequently to save solution to RAM
         "gradient_sampling_frequency": 1,
     }
     fwi = spyro.examples.Polygon_acoustic_FWI(dictionary=dictionary, periodic=True)
-    fwi.generate_real_shot_record(plot_model=True)
-    spyro.io.save_shots(fwi)
+    fwi.generate_real_shot_record(plot_model=True, save_shot_record=True)
 
-    print("END")
+    dictionary["inversion"] = {
+        "real_shot_record_files": "shots/shot_record_",
+    }
+    fwi2 = spyro.examples.Polygon_acoustic_FWI(dictionary=dictionary, periodic=True)
 
+    test1 = np.isclose(np.max(fwi2.real_shot_record[:, 0]), 0.18, atol=1e-2)
+    test2 = np.isclose(np.max(fwi2.real_shot_record[:, -1]), 0.0243, atol=1e-3)
+
+    test = all([test1, test2])
+
+    print(f"Correctly loaded shots: {test}")
+
+    assert test
 
 
 if __name__ == "__main__":
-    # test_polygon_vp()
-    test_real_shot_record_generation_for_polygon()
+    test_polygon_vp()
+    test_real_shot_record_generation_for_polygon_and_save_and_load()
