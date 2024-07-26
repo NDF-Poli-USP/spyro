@@ -4,6 +4,7 @@
 # debugpy.wait_for_client()
 import spyro
 import numpy as np
+import matplotlib.pyplot as plt
 
 
 def test_real_shot_record_generation_parallel():
@@ -56,5 +57,36 @@ def test_real_shot_record_generation_parallel():
     assert test
 
 
+def test_velocity_smoother_in_fwi():
+    dictionary = {}
+    dictionary["absorving_boundary_conditions"] = {
+        "pad_length": 2.0,  # True or false
+    }
+    dictionary["mesh"] = {
+        "h": 0.01,  # mesh size in km
+    }
+    dictionary["polygon_options"] = {
+        "water_layer_is_present": True,
+        "upper_layer": 2.0,
+        "middle_layer": 2.5,
+        "lower_layer": 3.0,
+        "polygon_layer_perturbation": 0.3,
+    }
+    dictionary["acquisition"] = {
+        "source_locations": spyro.create_transect((-0.1, 0.1), (-0.1, 0.9), 1),
+    }
+    fwi = spyro.examples.Polygon_acoustic_FWI(dictionary=dictionary, periodic=True)
+    spyro.io.create_segy(
+        fwi.initial_velocity_model,
+        fwi.function_space,
+        10.0/1000.0,
+        "velocity_models/true_case1.segy",
+    )
+    spyro.tools.velocity_smoother.smooth_velocity_field_file("velocity_models/true_case1.segy", "velocity_models/case1_sigma10.segy", 10, show=True, write_hdf5=True)
+    plt.savefig("velocity_models/case1_sigma10.png")
+    plt.close()
+
+
 if __name__ == "__main__":
-    test_real_shot_record_generation_parallel()
+    # test_real_shot_record_generation_parallel()
+    test_velocity_smoother_in_fwi()

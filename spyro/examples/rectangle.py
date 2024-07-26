@@ -2,6 +2,7 @@ from spyro import create_transect
 from spyro.examples.example_model import Example_model_acoustic
 from spyro.examples.example_model import Example_model_acoustic_FWI
 import firedrake as fire
+import copy
 
 rectangle_optimization_parameters = {
     "General": {
@@ -104,6 +105,11 @@ rectangle_dictionary["visualization"] = {
     "gradient_filename": None,
 }
 
+rectangle_dictionary_fwi = copy.deepcopy(rectangle_dictionary)
+rectangle_dictionary_fwi["inversion"] = {
+    "perform_fwi": True,  # switch to true to make a FWI
+}
+
 
 class Rectangle_acoustic(Example_model_acoustic):
     """
@@ -204,7 +210,7 @@ class Rectangle_acoustic_FWI(Example_model_acoustic_FWI):
     def __init__(
         self,
         dictionary=None,
-        example_dictionary=rectangle_dictionary,
+        example_dictionary=rectangle_dictionary_fwi,
         comm=None,
         periodic=False,
     ):

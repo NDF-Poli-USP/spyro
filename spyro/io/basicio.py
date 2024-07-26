@@ -28,7 +28,7 @@ def ensemble_shot_record(func):
             for snum in range(args[0].number_of_sources):
                 switch_serial_shot(args[0], snum)
                 output_list.append(func(*args, **kwargs))
-            
+
             return output_list
 
     return wrapper
@@ -303,7 +303,6 @@ def rebuild_empty_forward_solution(wave, time_steps):
     wave.forward_solution = []
     for i in range(time_steps):
         wave.forward_solution.append(fire.Function(wave.function_space))
-
 
 
 @ensemble_save_or_load
