@@ -224,10 +224,10 @@ def write_function_to_grid(function, V, grid_spacing):
     x, y = coords.dat.data[:, 0], coords.dat.data[:, 1]
 
     # add buffer to avoid NaN when calling griddata
-    min_x = np.amin(x) + 0.01
-    max_x = np.amax(x) - 0.01
-    min_y = np.amin(y) + 0.01
-    max_y = np.amax(y) - 0.01
+    min_x = np.amin(x) + 0.005
+    max_x = np.amax(x) - 0.005
+    min_y = np.amin(y) + 0.005
+    max_y = np.amax(y) - 0.005
 
     z = function.dat.data[:]
 
@@ -384,7 +384,7 @@ def interpolate(Model, fname, V):
     """
     sd = V.mesh().geometric_dimension()
     m = V.ufl_domain()
-    if Model.abc_active:
+    if Model.abc_active or Model.abc_pad_length > 0.1:
         minz = -Model.length_z - Model.abc_pad_length
         maxz = 0.0
         minx = 0.0 - Model.abc_pad_length
