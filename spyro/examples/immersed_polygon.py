@@ -144,7 +144,7 @@ class Polygon_acoustic(Rectangle_acoustic):
         cond = fire.conditional(z <= -0.5 - 0.2*x, vl, cond)
 
         cond = fire.conditional(300*((x-0.5)*(-z-0.5))**2 + ((x-0.5)+(-z-0.5))**2 <= 0.300**2, v2+dv, cond)
-        
+
         if self.abc_pad_length > 0.0:
             middle_of_pad = -self.length_z - self.abc_pad_length*0.5
             cond = fire.conditional(z <= middle_of_pad, v0, cond)
