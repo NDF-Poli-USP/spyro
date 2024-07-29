@@ -380,6 +380,7 @@ class FullWaveformInversion(AcousticWave):
 
         self.functional_history.append(Jm)
         self.functional = Jm
+        print(f"Functional: {Jm} at iteration: {self.current_iteration}", flush=True)
 
         return Jm
 

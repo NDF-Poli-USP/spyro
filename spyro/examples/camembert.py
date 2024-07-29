@@ -1,5 +1,5 @@
 from spyro import create_transect
-from spyro.examples.rectangle import Rectangle_acoustic
+from spyro.examples.rectangle import Rectangle_acoustic, Rectangle_acoustic_FWI
 import firedrake as fire
 
 camembert_optimization_parameters = {
@@ -135,11 +135,13 @@ class Camembert_acoustic(Rectangle_acoustic):
         dictionary=None,
         example_dictionary=camembert_dictionary,
         comm=None,
+        periodic=False,
     ):
         super().__init__(
             dictionary=dictionary,
             example_dictionary=example_dictionary,
             comm=comm,
+            periodic=False,
         )
         self._camembert_velocity_model()
 
@@ -156,3 +158,57 @@ class Camembert_acoustic(Rectangle_acoustic):
         )
         self.set_initial_velocity_model(conditional=cond, dg_velocity_model=False)
         return None
+
+
+camembert_dictionary["inversion"] = {
+    "perform_fwi": True,  # switch to true to make a FWI
+    "initial_guess_model_file": None,
+    "shot_record_file": None,
+}
+
+
+class Camembert_acoustic_FWI(Rectangle_acoustic_FWI):
+    """Camembert model.
+    This class is a child of the Example_model class.
+    It is used to create a dictionary with the parameters of the
+    Camembert model.
+
+    Parameters
+    ----------
+    dictionary : dict, optional
+        Dictionary with the parameters of the model that are different from
+        the default Camembert model. The default is None.
+
+    """
+
+    def __init__(
+        self,
+        dictionary=None,
+        example_dictionary=camembert_dictionary,
+        comm=None,
+        periodic=False,
+    ):
+        super().__init__(
+            dictionary=dictionary,
+            example_dictionary=example_dictionary,
+            comm=comm,
+            periodic=False,
+        )
+        self._camembert_velocity_model()
+        self.real_velocity_model = self.initial_velocity_model
+        self.real_mesh = self.mesh
+
+    def _camembert_velocity_model(self):
+        camembert_dict = self.input_dictionary["camembert_options"]
+        z = self.mesh_z
+        x = self.mesh_x
+        zc, xc = camembert_dict["circle_center"]
+        rc = camembert_dict["radius"]
+        c_salt = camembert_dict["inside_circle_velocity"]
+        c_not_salt = camembert_dict["outside_velocity"]
+        cond = fire.conditional(
+            (z - zc) ** 2 + (x - xc) ** 2 < rc**2, c_salt, c_not_salt
+        )
+        self.set_initial_velocity_model(conditional=cond, dg_velocity_model=False)
+        return None
+
