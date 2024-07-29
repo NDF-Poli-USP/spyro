@@ -5,6 +5,9 @@
 import spyro
 import numpy as np
 import matplotlib.pyplot as plt
+import warnings
+warnings.filterwarnings("ignore")
+
 
 
 def test_real_shot_record_generation_parallel():
@@ -130,9 +133,9 @@ def test_realistic_fwi():
     fwi.set_guess_velocity_model(new_file="velocity_models/case1_sigma10.hdf5")
     mask_boundaries = {
         "z_min": -2.0,
-        "z_max": -0.25,
-        "x_min": 1.0,
-        "x_max": 2.0,
+        "z_max": -0.,
+        "x_min": 0.0,
+        "x_max": 3.0,
     }
     fwi.set_gradient_mask(boundaries=mask_boundaries)
     fwi.run_fwi(vmin=1.5, vmax=3.25, maxiter=5)

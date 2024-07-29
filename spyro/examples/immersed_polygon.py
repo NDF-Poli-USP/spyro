@@ -40,8 +40,8 @@ polygon_dictionary["parallelism"] = {
     # every processor) or spatial
 }
 polygon_dictionary["mesh"] = {
-    "Lz": 2.0,  # depth in km - always positive
-    "Lx": 3.0,  # width in km - always positive
+    "Lz": 1.0,  # depth in km - always positive
+    "Lx": 1.0,  # width in km - always positive
     "Ly": 0.0,  # thickness in km - always positive
     "h": 0.05,  # mesh size in km
     "mesh_file": None,
@@ -149,7 +149,7 @@ class Polygon_acoustic(Rectangle_acoustic):
             cond = fire.conditional(z <= d1, v2, v1)
         cond = fire.conditional(z <= d2 - 0.2*x, vl, cond)
 
-        cond = fire.conditional(300*((x-1.5)*(-z-0.7))**2 + ((x-1.5)+(-z-0.7))**2 <= 0.300**2, v2+dv, cond)
+        cond = fire.conditional(300*((x-0.5)*(-z-0.5))**2 + ((x-0.5)+(-z-0.5))**2 <= 0.300**2, v2+dv, cond)
 
         if self.abc_pad_length > 0.0:
             middle_of_pad = -self.length_z - self.abc_pad_length*0.5
