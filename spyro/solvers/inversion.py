@@ -380,7 +380,11 @@ class FullWaveformInversion(AcousticWave):
 
         self.functional_history.append(Jm)
         self.functional = Jm
-        print(f"Functional: {Jm} at iteration: {self.current_iteration}", flush=True)
+        # Save the functional value to a text file
+        if self.comm.ensemble_comm.rank == 0 and self.comm.comm.rank == 0:
+            print(f"Functional: {Jm} at iteration: {self.current_iteration}", flush=True)
+            with open("functional_values.txt", "a") as file:
+                file.write(f"Iteration: {self.current_iteration}, Functional: {Jm}\n")
 
         return Jm
 
