@@ -30,10 +30,15 @@ def isotropic_elastic_without_pml(wave):
     F_k = lmbda*div(u_n)*div(v)*dx(scheme=quad_rule) \
           + 2*mu*inner(eps(u_n), eps(v))*dx(scheme=quad_rule)
 
-    F = F_m + F_k
+    F_s = 0
+    b = wave.body_forces
+    if b is not None:
+        F_s += dot(b, v)*dx(scheme=quad_rule)
+
+    F = F_m + F_k - F_s
 
     wave.lhs = lhs(F)
-    A = assemble(wave.lhs, mat_type="matfree")
+    A = assemble(wave.lhs, bcs=wave.bcs, mat_type="matfree")
     wave.solver = LinearSolver(A, solver_parameters=wave.solver_parameters)
 
     wave.rhs = rhs(F)
