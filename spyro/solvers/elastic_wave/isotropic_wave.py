@@ -1,4 +1,4 @@
-from firedrake import Function
+from firedrake import (DirichletBC, Function)
 
 from .elastic_wave import ElasticWave
 from .forms import (isotropic_elastic_without_pml,
@@ -19,6 +19,12 @@ class IsotropicWave(ElasticWave):
         self.u_n = None   # Current displacement field
         self.u_nm1 = None # Displacement field in previous iteration
         self.u_np1 = None # Displacement field in next iteration
+
+        # Volumetric sourcers (defined through UFL)
+        self.body_forces = None
+
+        # Boundary conditions
+        self.bcs = []
     
     @override
     def initialize_model_parameters_from_object(self, synthetic_data_dict: dict):
@@ -112,7 +118,11 @@ class IsotropicWave(ElasticWave):
                               name=self.get_function_name())
         self.u_np1 = Function(self.function_space,
                               name=self.get_function_name())
-
+        
+        self.parse_initial_conditions()
+        self.parse_boundary_conditions()
+        self.parse_volumetric_forces()
+        
         if self.abc_boundary_layer_type is None:
             isotropic_elastic_without_pml(self)
         elif self.abc_boundary_layer_type == "PML":
@@ -124,3 +134,33 @@ class IsotropicWave(ElasticWave):
             raise NotImplementedError
         else:
             return self.B
+    
+    def parse_initial_conditions(self):
+        time_dict = self.input_dictionary["time_axis"]
+        initial_condition = time_dict.get("initial_condition", None)
+        if initial_condition is not None:
+            x_vec = self.get_spatial_coordinates()
+            self.u_n.interpolate(initial_condition(x_vec, 0 - self.dt))
+            self.u_nm1.interpolate(initial_condition(x_vec, 0 - 2*self.dt))
+    
+    def parse_boundary_conditions(self):
+        bc_list = self.input_dictionary.get("boundary_conditions", [])
+        for tag, id, value in bc_list:
+            if tag == "u":
+                subspace = self.function_space
+            elif tag == "uz":
+                subspace = self.function_space.sub(0)
+            elif tag == "ux":
+                subspace = self.function_space.sub(1)
+            elif tag == "uy":
+                subspace = self.function_space.sub(2)
+            else:
+                raise Exception(f"Unsupported boundary condition with tag: {tag}")
+            self.bcs.append(DirichletBC(subspace, value, id))
+    
+    def parse_volumetric_forces(self):
+        acquisition_dict = self.input_dictionary["acquisition"]
+        body_forces_data = acquisition_dict.get("body_forces", None)
+        if body_forces_data is not None:
+            x_vec = self.get_spatial_coordinates()
+            self.body_forces = body_forces_data(x_vec, self.time)
