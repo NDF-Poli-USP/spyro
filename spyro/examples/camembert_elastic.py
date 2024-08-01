@@ -6,8 +6,8 @@ import firedrake as fire
 import numpy as np
 import spyro
 
-Lz = 0.500 # [km]
-Lx = 0.500 # [km]
+Lz = 500 # [m]
+Lx = 500 # [m]
 
 rho = 7850          # [kg/m3]
 lambda_in = 6.86e9  # [Pa]
@@ -16,8 +16,8 @@ mu_in = 3.86e9      # [Pa]
 mu_out = 5.86e9     # [Pa]
 
 freq = 2 # Central frequency of Ricker wavelet [Hz]
-hf = 0.090 # [km]
-hs = 0.100 # [km]
+hf =  90 # [m]
+hs = 100 # [m]
 source_locations = spyro.create_transect((-hf, 0.2*Lx), (-hf, 0.8*Lx), 3)
 receiver_locations = spyro.create_transect((-hs, 0), (-hs, Lx), 40)
 source_locations = [[-hf, 0.5*Lx]]
@@ -31,9 +31,9 @@ nx = 80
 mesh = fire.RectangleMesh(nz, nx, 0, Lx, originX=-Lz, diagonal='crossed')
 z, x = fire.SpatialCoordinate(mesh)
 
-zc = 0.250 # [km]
-xc = 0.250 # [km]
-ri = 0.050 # [km]
+zc = 250 # [m]
+xc = 250 # [m]
+ri =  50 # [m]
 camembert = lambda v_inside, v_outside: fire.conditional(
     (z - zc) ** 2 + (x - xc) ** 2 < ri**2, v_inside, v_outside)
 
@@ -51,11 +51,7 @@ d["parallelism"] = {
 }
 
 d["mesh"] = {
-    "Lz": Lz,
-    "Lx": Lx,
-    "Ly": 0,
-    "mesh_file": None,
-    "mesh_type": "firedrake_mesh",
+    "user_mesh": mesh,
 }
 
 d["acquisition"] = {
@@ -64,7 +60,7 @@ d["acquisition"] = {
     "frequency": freq,
     "delay": 0,
     "delay_type": "time",
-    "amplitude": np.array([0, 1e-9]),
+    "amplitude": np.array([0, 1]),
     "receiver_locations": receiver_locations,
 }
 
