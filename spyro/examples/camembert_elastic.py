@@ -22,9 +22,9 @@ source_locations = spyro.create_transect((-hf, 0.2*Lx), (-hf, 0.8*Lx), 3)
 receiver_locations = spyro.create_transect((-hs, 0), (-hs, Lx), 40)
 source_locations = [[-hf, 0.5*Lx]]
 
-time_step = 5e-4 # [s]
-final_time = 5   # [s]
-out_freq = 100
+time_step = 2e-4 # [s]
+final_time = 1.5 # [s]
+out_freq = int(0.01/time_step)
 
 nz = 80
 nx = 80
