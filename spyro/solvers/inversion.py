@@ -407,7 +407,7 @@ class FullWaveformInversion(AcousticWave):
         comm.comm.barrier()
         self.gradient = self.gradient_solve(misfit=self.misfit, forward_solution=self.guess_forward_solution)
         self._apply_gradient_mask()
-        if save and comm.comm.rank == 0:
+        if save:
             # self.gradient_out.write(dJ_total)
             output = fire.File("gradient_" + str(self.current_iteration)+".pvd")
             output.write(self.gradient)
@@ -461,7 +461,16 @@ class FullWaveformInversion(AcousticWave):
         )
         vp_end = fire.Function(self.function_space)
         vp_end.dat.data[:] = result.x
+        np.save("result", result.x)
         fire.File("vp_end.pvd").write(vp_end)
+        super().set_mesh(
+            mesh_parameters={"dx": 0.02},
+        )
+        mesh = self.get_mesh()
+        V = fire.FunctionSpace(mesh, "KMV", 1)
+        v_inter = fire.project(vp_end, V)
+        fire.File("vp_end_projected.pvd").write(v_inter)
+        
 
     def run_fwi_rol(self, **kwargs):
         """
