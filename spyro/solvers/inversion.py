@@ -437,7 +437,7 @@ class FullWaveformInversion(AcousticWave):
 
         vmin = parameters["vmin"]
         vmax = parameters["vmax"]
-        vp_0 = self.initial_velocity_model.vector().gather()
+        vp_0 = self.initial_velocity_model.vector()
         bounds = [(vmin, vmax) for _ in range(len(vp_0))]
         options = parameters["scipy_options"]
 
