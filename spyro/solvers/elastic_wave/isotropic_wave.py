@@ -81,7 +81,7 @@ class IsotropicWave(ElasticWave):
     @override
     def _create_function_space(self):
         return FE_method(self.mesh, self.method, self.degree,
-                         dim=self.mesh.ufl_cell().geometric_dimension())
+                         dim=self.dimension)
 
     @override
     def _set_vstate(self, vstate):
