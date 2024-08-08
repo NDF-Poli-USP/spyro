@@ -424,7 +424,6 @@ class Delta_projector:
         same element as the receiver.
 
         """
-        print("start func_receiver_locator", flush=True)
         num_recv = self.number_of_points
 
         fdrake_cell_node_map = self.space.cell_node_map()
@@ -470,7 +469,6 @@ class Delta_projector:
                     y = node_locations[cell_node_map[cell_id, vertex_id], 2]
                     cellVertices[receiver_id][vertex_number] = (z, x, y)
 
-        print("end func_receiver_locator", flush=True)
         return cellId_maps, cellVertices, cellNodeMaps
 
 
