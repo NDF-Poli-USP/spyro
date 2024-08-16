@@ -41,8 +41,10 @@ def smooth_velocity_field_file(input_filename, output_filename, sigma, show=Fals
 
     for i in range(ni):
         for j in range(nj):
-            if vp[i, j] < 1.51:
+            if i < 25:
                 vp_smooth[i, j] = vp[i, j]
+            if i < 20:
+                vp_smooth[i, j] = 1.5
 
     spec = segyio.spec()
     spec.sorting = 2  # not sure what this means

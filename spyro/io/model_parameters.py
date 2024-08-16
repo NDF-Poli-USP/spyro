@@ -551,7 +551,7 @@ class Model_parameters:
             self.shot_ids_per_propagation = dictionary["parallelism"]["shot_ids_per_propagation"]
         elif self.parallelism_type == "automatic":
             available_cores = COMM_WORLD.size
-            self.shot_ids_per_propagation = [[i] for i in range(0, available_cores)]
+            self.shot_ids_per_propagation = [[i] for i in range(0, self.number_of_sources)]
         elif self.parallelism_type == "spatial":
             self.shot_ids_per_propagation = [[i] for i in range(0, self.number_of_sources)]
 
@@ -633,9 +633,12 @@ class Model_parameters:
     def _sanitize_optimization_and_velocity_for_fwi(self):
         self._sanitize_optimization_and_velocity_without_fwi()
         dictionary = self.input_dictionary
-        self.initial_velocity_model_file = dictionary["inversion"][
-            "initial_guess_model_file"
-        ]
+        try:
+            self.initial_velocity_model_file = dictionary["inversion"][
+                "initial_guess_model_file"
+            ]
+        except:
+            self.initial_velocity_model_file = None
         self.fwi_output_folder = "fwi/"
         self.control_output_file = self.fwi_output_folder + "control"
         self.gradient_output_file = self.fwi_output_folder + "gradient"
@@ -666,7 +669,6 @@ class Model_parameters:
         if "shot_record_file" in dictionary["inversion"]:
             if dictionary["inversion"]["shot_record_file"] is not None:
                 self.real_shot_record = np.load(dictionary["inversion"]["shot_record_file"])
-
     def _sanitize_optimization_and_velocity_without_fwi(self):
         dictionary = self.input_dictionary
         if "synthetic_data" in dictionary:

@@ -380,6 +380,11 @@ class FullWaveformInversion(AcousticWave):
 
         self.functional_history.append(Jm)
         self.functional = Jm
+        # Save the functional value to a text file
+        if self.comm.ensemble_comm.rank == 0 and self.comm.comm.rank == 0:
+            print(f"Functional: {Jm} at iteration: {self.current_iteration}", flush=True)
+            with open("functional_values.txt", "a") as file:
+                file.write(f"Iteration: {self.current_iteration}, Functional: {Jm}\n")
 
         return Jm
 
@@ -402,7 +407,7 @@ class FullWaveformInversion(AcousticWave):
         comm.comm.barrier()
         self.gradient = self.gradient_solve(misfit=self.misfit, forward_solution=self.guess_forward_solution)
         self._apply_gradient_mask()
-        if save and comm.comm.rank == 0:
+        if save:
             # self.gradient_out.write(dJ_total)
             output = fire.File("gradient_" + str(self.current_iteration)+".pvd")
             output.write(self.gradient)
@@ -432,7 +437,7 @@ class FullWaveformInversion(AcousticWave):
 
         vmin = parameters["vmin"]
         vmax = parameters["vmax"]
-        vp_0 = self.initial_velocity_model.vector().gather()
+        vp_0 = self.initial_velocity_model.vector()
         bounds = [(vmin, vmax) for _ in range(len(vp_0))]
         options = parameters["scipy_options"]
 
@@ -456,7 +461,16 @@ class FullWaveformInversion(AcousticWave):
         )
         vp_end = fire.Function(self.function_space)
         vp_end.dat.data[:] = result.x
+        np.save("result", result.x)
         fire.File("vp_end.pvd").write(vp_end)
+        super().set_mesh(
+            mesh_parameters={"dx": 0.02},
+        )
+        mesh = self.get_mesh()
+        V = fire.FunctionSpace(mesh, "KMV", 1)
+        v_inter = fire.project(vp_end, V)
+        fire.File("vp_end_projected.pvd").write(v_inter)
+        
 
     def run_fwi_rol(self, **kwargs):
         """

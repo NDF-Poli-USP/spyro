@@ -89,6 +89,7 @@ polygon_dictionary["visualization"] = {
 }
 polygon_dictionary["polygon_options"] = {
     "water_layer_is_present": True,
+    "water_layer_depth": 0.2,
     "upper_layer": 2.0,
     "middle_layer": 2.5,
     "lower_layer": 3.0,
@@ -131,17 +132,22 @@ class Polygon_acoustic(Rectangle_acoustic):
         x = self.mesh_x
 
         v0 = 1.5  # water layer
+        water_layer_depth = polygon_dict.get("water_layer_depth", 0.0)
+        water_layer_present = polygon_dict.get("water_layer_is_present", False)
         v1 = polygon_dict["upper_layer"]
         v2 = polygon_dict["middle_layer"]  # background vp (km/s)
         vl = polygon_dict["lower_layer"]  # lower layer (km/s)
         dv = polygon_dict["polygon_layer_perturbation"]*v2  # 30% of perturbation
+        d0 = -water_layer_depth
+        d1 = d0 - 0.14
+        d2 = d1 - 0.2
 
-        if polygon_dict["water_layer_is_present"]:
-            cond = fire.conditional(z >= -0.16, v0, v1)
-            cond = fire.conditional(z <= -0.3, v2, cond)
+        if water_layer_present:
+            cond = fire.conditional(z >= d0, v0, v1)
+            cond = fire.conditional(z <= d1, v2, cond)
         else:
-            cond = fire.conditional(z <= -0.3, v2, v1)
-        cond = fire.conditional(z <= -0.5 - 0.2*x, vl, cond)
+            cond = fire.conditional(z <= d1, v2, v1)
+        cond = fire.conditional(z <= d2 - 0.2*x, vl, cond)
 
         cond = fire.conditional(300*((x-0.5)*(-z-0.5))**2 + ((x-0.5)+(-z-0.5))**2 <= 0.300**2, v2+dv, cond)
 
@@ -196,19 +202,25 @@ class Polygon_acoustic_FWI(Rectangle_acoustic_FWI):
         x = self.mesh_x
 
         v0 = 1.5  # water layer
+        water_layer_depth = polygon_dict.get("water_layer_depth", 0.0)
+        water_layer_present = polygon_dict.get("water_layer_is_present", False)
         v1 = polygon_dict["upper_layer"]
         v2 = polygon_dict["middle_layer"]  # background vp (km/s)
         vl = polygon_dict["lower_layer"]  # lower layer (km/s)
         dv = polygon_dict["polygon_layer_perturbation"]*v2  # 30% of perturbation
+        d0 = -water_layer_depth
+        d1 = d0 - 0.14
+        d2 = d1 - 0.2
 
-        if polygon_dict["water_layer_is_present"]:
-            cond = fire.conditional(z >= -0.16, v0, v1)
-            cond = fire.conditional(z <= -0.3, v2, cond)
+        if water_layer_present:
+            cond = fire.conditional(z >= d0, v0, v1)
+            cond = fire.conditional(z <= d1, v2, cond)
         else:
-            cond = fire.conditional(z <= -0.3, v2, v1)
-        cond = fire.conditional(z <= -0.5 - 0.2*x, vl, cond)
+            cond = fire.conditional(z <= d1, v2, v1)
+        cond = fire.conditional(z <= d2 - 0.2*x, vl, cond)
 
-        cond = fire.conditional(300*((x-0.5)*(-z-0.5))**2 + ((x-0.5)+(-z-0.5))**2 <= 0.300**2, v2+dv, cond)
+        cond = fire.conditional(300*((x-1.5)*(-z-0.7))**2 + ((x-1.5)+(-z-0.7))**2 <= 0.300**2, v2+dv, cond)
+
         if self.abc_pad_length > 0.0:
             middle_of_pad = -self.length_z - self.abc_pad_length*0.5
             cond = fire.conditional(z <= middle_of_pad, v0, cond)
