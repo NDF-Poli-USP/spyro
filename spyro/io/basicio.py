@@ -34,7 +34,7 @@ def ensemble_shot_record(func):
     return wrapper
 
 
-def ensemble_save_or_load(func):
+def ensemble_save(func):
     """Decorator for read and write shots for ensemble parallelism"""
 
     def wrapper(*args, **kwargs):
@@ -44,6 +44,26 @@ def ensemble_save_or_load(func):
             shot_ids_per_propagation_list = args[0].shot_ids_per_propagation
             for propagation_id, shot_ids_in_propagation in enumerate(shot_ids_per_propagation_list):
                 if is_owner(_comm, propagation_id) and _comm.comm.rank == 0:
+                    func(*args, **dict(kwargs, shot_ids=shot_ids_in_propagation))
+        elif args[0].parallelism_type == "spatial" and args[0].number_of_sources > 1:
+            for snum in range(args[0].number_of_sources):
+                switch_serial_shot(args[0], snum)
+                if _comm.comm.rank == 0:
+                    func(*args, **dict(kwargs, shot_ids=[snum]))
+
+    return wrapper
+
+
+def ensemble_load(func):
+    """Decorator for read and write shots for ensemble parallelism"""
+
+    def wrapper(*args, **kwargs):
+        _comm = args[0].comm
+
+        if args[0].parallelism_type != "spatial" or args[0].number_of_sources == 1:
+            shot_ids_per_propagation_list = args[0].shot_ids_per_propagation
+            for propagation_id, shot_ids_in_propagation in enumerate(shot_ids_per_propagation_list):
+                if is_owner(_comm, propagation_id):
                     func(*args, **dict(kwargs, shot_ids=shot_ids_in_propagation))
         elif args[0].parallelism_type == "spatial" and args[0].number_of_sources > 1:
             for snum in range(args[0].number_of_sources):
@@ -224,10 +244,10 @@ def write_function_to_grid(function, V, grid_spacing):
     x, y = coords.dat.data[:, 0], coords.dat.data[:, 1]
 
     # add buffer to avoid NaN when calling griddata
-    min_x = np.amin(x) + 0.01
-    max_x = np.amax(x) - 0.01
-    min_y = np.amin(y) + 0.01
-    max_y = np.amax(y) - 0.01
+    min_x = np.amin(x) + 0.005
+    max_x = np.amax(x) - 0.005
+    min_y = np.amin(y) + 0.005
+    max_y = np.amax(y) - 0.005
 
     z = function.dat.data[:]
 
@@ -275,7 +295,7 @@ def create_segy(function, V, grid_spacing, filename):
             f.trace[tr] = velocity[:, tr]
 
 
-@ensemble_save_or_load
+@ensemble_save
 def save_shots(Wave_obj, file_name="shots/shot_record_", shot_ids=0):
     """Save a the shot record from last forward solve to a `pickle`.
 
@@ -305,7 +325,7 @@ def rebuild_empty_forward_solution(wave, time_steps):
         wave.forward_solution.append(fire.Function(wave.function_space))
 
 
-@ensemble_save_or_load
+@ensemble_load
 def load_shots(Wave_obj, file_name="shots/shot_record_", shot_ids=0):
     """Load a `pickle` to a `numpy.ndarray`.
 
@@ -384,7 +404,7 @@ def interpolate(Model, fname, V):
     """
     sd = V.mesh().geometric_dimension()
     m = V.ufl_domain()
-    if Model.abc_active:
+    if Model.abc_active or Model.abc_pad_length > 0.1:
         minz = -Model.length_z - Model.abc_pad_length
         maxz = 0.0
         minx = 0.0 - Model.abc_pad_length

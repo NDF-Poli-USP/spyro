@@ -6,12 +6,12 @@ from PIL import Image
 import numpy as np
 import firedrake
 import copy
-from ..io import ensemble_save_or_load
+from ..io import ensemble_save
 
 __all__ = ["plot_shots"]
 
 
-@ensemble_save_or_load
+@ensemble_save
 def plot_shots(
     Wave_object,
     show=False,
