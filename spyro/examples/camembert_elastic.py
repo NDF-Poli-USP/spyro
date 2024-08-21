@@ -89,6 +89,11 @@ d["visualization"] = {
     "debug_output": False,
 }
 
+d["absorving_boundary_conditions"] = {
+    "status": True,
+    "damping_type": "local",
+}
+
 wave = spyro.IsotropicWave(d)
 wave.set_mesh(user_mesh=mesh, mesh_parameters={})
 #wave.set_initial_velocity_model(constant=[1.5, 1.5])

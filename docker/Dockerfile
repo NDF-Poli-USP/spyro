@@ -29,6 +29,10 @@ RUN . /home/firedrake/firedrake/bin/activate; pip install git+https://github.com
 
 FROM spyro_base AS spyro_development
 
+# For notebook development
+RUN . /home/firedrake/firedrake/bin/activate; pip3 install notebook
+EXPOSE 8888
+
 RUN . /home/firedrake/firedrake/bin/activate; pip3 install pytest
 WORKDIR /home/firedrake
 RUN echo "/home/firedrake/shared/spyro" >> /home/firedrake/firedrake/lib/python3.10/site-packages/shared.pth

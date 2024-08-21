@@ -81,6 +81,11 @@ d["visualization"] = {
     "debug_output": False,
 }
 
+d["absorving_boundary_conditions"] = {
+    "status": True,
+    "damping_type": "local",
+}
+
 wave = spyro.IsotropicWave(d)
 wave.set_mesh(mesh_parameters={'dx': h})
 wave.forward_solve()
