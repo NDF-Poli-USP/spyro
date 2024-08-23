@@ -7,6 +7,26 @@ from .. import io
 from .. import utils
 from .. import meshing
 from ..sources import full_ricker_wavelet
+from copy import deepcopy
+from scipy.signal  import sosfilt, iirfilter, zpk2sos
+
+
+def butter_lowpass_filter_source(wavelet, cutoff, fs, order=2):
+    """Low-pass filter the shot record with sampling-rate fs Hz
+    and cutoff freq. Hz
+    """
+    filtered_shot = deepcopy(wavelet)
+
+    fe = 0.5 * fs  # Nyquist Frequency
+    f = cutoff/fe
+
+    z, p, k, = iirfilter(order, f, btype='lowpass', ftype='butter', output='zpk')
+    sos = zpk2sos(z, p, k)
+
+    firstpass = sosfilt(sos,wavelet )
+    filtered_shot = sosfilt(sos, firstpass[::-1])[::-1]
+        
+    return filtered_shot
 
 # default_optimization_parameters = {
 #     "General": {"Secant": {"Type": "Limited-Memory BFGS",
@@ -529,6 +549,9 @@ class Model_parameters:
             raise ValueError(
                 f"Source type of {self.source_type} not yet implemented."
             )
+        
+        if "frequency_filter" in "delay_type" in self.input_dictionary:
+            wavelet = butter_lowpass_filter_source(wavelet, self.frequency, 1/self.dt, order=2)
 
         return wavelet
 

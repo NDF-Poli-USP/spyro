@@ -3,6 +3,7 @@ import warnings
 from scipy.optimize import minimize as scipy_minimize
 from mpi4py import MPI
 import numpy as np
+import resource
 
 from .acoustic_wave import AcousticWave
 from ..utils import compute_functional
@@ -22,6 +23,12 @@ except ImportError:
     RObjective = object
 
 # ROL = None
+
+
+def get_peak_memory():
+    peak_memory_kb = resource.getrusage(resource.RUSAGE_SELF).ru_maxrss
+    peak_memory_mb = peak_memory_kb / 1024
+    return peak_memory_mb
 
 
 class L2Inner(object):
@@ -186,8 +193,9 @@ class FullWaveformInversion(AcousticWave):
         if c is not None:
             self.initial_velocity_model.dat.data[:] = c
         self.forward_solve()
-        output = fire.File("control_" + str(self.current_iteration)+".pvd")
+        output = fire.File("control_" + str(self.current_iteration)+".pvd", project_output=True)
         output.write(self.c)
+        np.save(f"control{self.comm.ensemble_comm.rank}_{self.comm.comm.rank}", self.c.dat.data[:])
         if self.parallelism_type == "spatial" and self.number_of_sources > 1:
             misfit_list = []
             guess_shot_record_list = []
@@ -380,11 +388,15 @@ class FullWaveformInversion(AcousticWave):
 
         self.functional_history.append(Jm)
         self.functional = Jm
+        peak_memory_mb = get_peak_memory()
         # Save the functional value to a text file
         if self.comm.ensemble_comm.rank == 0 and self.comm.comm.rank == 0:
             print(f"Functional: {Jm} at iteration: {self.current_iteration}", flush=True)
             with open("functional_values.txt", "a") as file:
                 file.write(f"Iteration: {self.current_iteration}, Functional: {Jm}\n")
+            
+            with open("peak_memory.txt", "a") as file:
+                file.write(f"Peak memory usage: {peak_memory_mb:.2f} MB \n")
 
         return Jm
 
@@ -407,7 +419,7 @@ class FullWaveformInversion(AcousticWave):
         comm.comm.barrier()
         self.gradient = self.gradient_solve(misfit=self.misfit, forward_solution=self.guess_forward_solution)
         self._apply_gradient_mask()
-        if save and comm.comm.rank == 0:
+        if save:
             # self.gradient_out.write(dJ_total)
             output = fire.File("gradient_" + str(self.current_iteration)+".pvd")
             output.write(self.gradient)
@@ -430,7 +442,7 @@ class FullWaveformInversion(AcousticWave):
             "scipy_options": {
                 "disp": True,
                 "eps": 1e-15,
-                "gtol": 1e-15, "maxiter": kwargs.pop("maxiter", 20),
+                "ftol": 1e-7, "maxiter": kwargs.pop("maxiter", 20),
             }
         }
         parameters.update(kwargs)
@@ -462,6 +474,7 @@ class FullWaveformInversion(AcousticWave):
         vp_end = fire.Function(self.function_space)
         vp_end.dat.data[:] = result.x
         fire.File("vp_end.pvd").write(vp_end)
+        np.save("end_result", vp_end.dat.data[:])
 
     def run_fwi_rol(self, **kwargs):
         """
