@@ -14,9 +14,9 @@ def cells_per_wavelength(method, degree, dimension):
         'mlt3tet': 3.72,
     }
 
-    if dimension == 2 and (method == 'KMV' or method == 'CG'):
+    if dimension == 2 and (method == 'MLT' or method == 'CG'):
         cell_type = 'tri'
-    if dimension == 3 and (method == 'KMV' or method == 'CG'):
+    if dimension == 3 and (method == 'MLT' or method == 'CG'):
         cell_type = 'tet'
 
     key = method.lower()+str(degree)+cell_type
@@ -358,6 +358,7 @@ class AutomaticMesh:
         """
         Creates a 2D mesh based on SeismicMesh meshing utilities.
         """
+        print(f"velocity_model{self.velocity_model}", flush=True)
         if self.velocity_model is None:
             return self.create_seismicmesh_2D_mesh_homogeneous()
         else:
@@ -367,17 +368,19 @@ class AutomaticMesh:
         if self.comm.ensemble_comm.rank == 0:
             v_min = self.minimum_velocity
             frequency = self.source_frequency
+            if self.cpw is None:
+                self.cpw = cells_per_wavelength('MLT', 4, 2)
             C = self.cpw  # cells_per_wavelength(method, degree, dimension)
 
-            Lz = self.length_z*1000
-            Lx = self.length_x*1000
-            domain_pad = self.abc_pad*1000
+            Lz = self.length_z
+            Lx = self.length_x
+            domain_pad = self.abc_pad
             lbda_min = v_min/frequency
 
             bbox = (-Lz, 0.0, 0.0, Lx)
             domain = SeismicMesh.Rectangle(bbox)
 
-            hmin = lbda_min/C*1000
+            hmin = lbda_min/C
             self.comm.comm.barrier()
 
             ef = SeismicMesh.get_sizing_function_from_segy(
@@ -408,7 +411,7 @@ class AutomaticMesh:
             if self.comm.comm.rank == 0:
                 meshio.write_points_cells(
                     "automatic_mesh.msh",
-                    points/1000.0,
+                    points,
                     [("triangle", cells)],
                     file_format="gmsh22",
                     binary=False
@@ -416,7 +419,7 @@ class AutomaticMesh:
 
                 meshio.write_points_cells(
                     "automatic_mesh.vtk",
-                    points/1000.0,
+                    points,
                     [("triangle", cells)],
                     file_format="vtk"
                 )

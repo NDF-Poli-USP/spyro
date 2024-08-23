@@ -101,7 +101,7 @@ class Wave(Model_parameters):
     def set_mesh(
             self,
             user_mesh=None,
-            mesh_parameters=None,
+            mesh_parameters={},
         ):
             """
             Set the mesh for the solver.
@@ -170,6 +170,8 @@ class Wave(Model_parameters):
         output:  bool (optional)
             If True, outputs the velocity model to a pvd file for visualization.
         """
+        if new_file is not None:
+            self.initial_velocity_model_file = new_file
         # If no mesh is set, we have to do it beforehand
         if self.mesh is None:
             self.set_mesh()
