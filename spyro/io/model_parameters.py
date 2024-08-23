@@ -11,6 +11,29 @@ from copy import deepcopy
 from scipy.signal  import sosfilt, iirfilter, zpk2sos
 
 
+def cells_per_wavelength(method, degree, dimension):
+    if method == "mass_lumped_triangle":
+        method = "MLT"
+    cell_per_wavelength_dictionary = {
+        'mlt2tri': 7.02,
+        'mlt3tri': 3.70,
+        'mlt4tri': 2.67,
+        'mlt5tri': 2.03,
+        'mlt2tet': 6.12,
+        'mlt3tet': 3.72,
+    }
+    print(f"method: {method}", flush=True)
+
+    if dimension == 2 and (method == 'MLT' or method == 'CG'):
+        cell_type = 'tri'
+    if dimension == 3 and (method == 'MLT' or method == 'CG'):
+        cell_type = 'tet'
+
+    key = method.lower()+str(degree)+cell_type
+
+    return cell_per_wavelength_dictionary.get(key)
+
+
 def butter_lowpass_filter_source(wavelet, cutoff, fs, order=2):
     """Low-pass filter the shot record with sampling-rate fs Hz
     and cutoff freq. Hz
@@ -775,7 +798,7 @@ class Model_parameters:
         mesh_parameters.setdefault("degree", self.degree)
         mesh_parameters.setdefault("velocity_model_file", self.initial_velocity_model_file)
         mesh_parameters.setdefault("cell_type", self.cell_type)
-        mesh_parameters.setdefault("cells_per_wavelength", None)
+        mesh_parameters.setdefault("cells_per_wavelength", cells_per_wavelength(self.method, self.degree, self.dimension))
 
         self._set_mesh_length(
             length_z=mesh_parameters["length_z"],

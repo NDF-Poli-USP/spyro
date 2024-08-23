@@ -219,6 +219,7 @@ class FullWaveformInversion(AcousticWave):
         if Wave_obj_real_velocity.mesh is None and self.real_mesh is not None:
             Wave_obj_real_velocity.mesh = self.real_mesh
         if Wave_obj_real_velocity.initial_velocity_model is None:
+            print("C", flush=True)
             Wave_obj_real_velocity.initial_velocity_model = self.real_velocity_model
 
         if plot_model and Wave_obj_real_velocity.comm.comm.rank == 0 and Wave_obj_real_velocity.comm.ensemble_comm.rank == 0:
