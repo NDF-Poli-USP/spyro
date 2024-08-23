@@ -444,6 +444,9 @@ class AutomaticMesh:
         real_lx = Lx + 2 * pad
 
         edge_length = self.edge_length
+        if edge_length is None:
+            edge_length = self.minimum_velocity/(self.source_frequency*self.cpw)
+
         bbox = (-real_lz, 0.0, -pad, real_lx - pad)
         rectangle = SeismicMesh.Rectangle(bbox)
 

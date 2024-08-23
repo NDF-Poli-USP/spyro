@@ -473,6 +473,7 @@ class FullWaveformInversion(AcousticWave):
         )
         vp_end = fire.Function(self.function_space)
         vp_end.dat.data[:] = result.x
+        np.save("result", result.x)
         fire.File("vp_end.pvd").write(vp_end)
         np.save("end_result", vp_end.dat.data[:])
 
