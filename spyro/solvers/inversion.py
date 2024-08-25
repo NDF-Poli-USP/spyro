@@ -3,6 +3,7 @@ import warnings
 from scipy.optimize import minimize as scipy_minimize
 from mpi4py import MPI
 import numpy as np
+from copy import deepcopy
 import resource
 
 from .acoustic_wave import AcousticWave

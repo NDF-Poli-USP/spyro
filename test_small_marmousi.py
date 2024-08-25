@@ -2,9 +2,13 @@ import spyro
 import sys
 
 
-degree = int(sys.argv[1])
-frequency = float(sys.argv[2])
-final_time = float(sys.argv[3])
+# degree = int(sys.argv[1])
+# frequency = float(sys.argv[2])
+# final_time = float(sys.argv[3])
+
+degree = 4
+frequency = 5.0
+final_time = 4.0
 
 
 dictionary = {}
@@ -21,12 +25,12 @@ dictionary["mesh"] = {
     "Lz": 3.5,  # depth in km - always positive   # Como ver isso sem ler a malha?
     "Lx": 17.0,  # width in km - always positive
     "Ly": 0.0,  # thickness in km - always positive
-    "mesh_file": None,
+    "mesh_file": "real5hz.msh",
 }
 dictionary["acquisition"] = {
     "source_type": "ricker",
-    "source_locations": spyro.create_transect((-0.01, 4.0), (-0.01, 12.0), 20),
-    # "source_locations": [(-0.01, 4.0)],
+    # "source_locations": spyro.create_transect((-0.01, 4.0), (-0.01, 12.0), 20),
+    "source_locations": [(-0.01, 4.0)],
     "frequency": frequency,
     # "frequency_filter": frequency_filter,
     "delay": 0.2,
@@ -57,6 +61,7 @@ dictionary["inversion"] = {
     "initial_guess_model_file": None,
     "shot_record_file": None,
 }
+
 
 def test_real_shot_record_generation_parallel():
     dictionary["mesh"]["mesh_file"] = "meshes/real5hz.msh"

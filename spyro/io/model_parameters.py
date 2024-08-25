@@ -12,8 +12,10 @@ from scipy.signal  import sosfilt, iirfilter, zpk2sos
 
 
 def cells_per_wavelength(method, degree, dimension):
-    if method == "mass_lumped_triangle":
+    if method == "mass_lumped_triangle" or method == "MLT":
         method = "MLT"
+    else:
+        return None
     cell_per_wavelength_dictionary = {
         'mlt2tri': 7.02,
         'mlt3tri': 3.70,
