@@ -1,4 +1,5 @@
 import spyro
+from copy import deepcopy
 import sys
 
 
@@ -25,7 +26,6 @@ dictionary["mesh"] = {
     "Lz": 3.5,  # depth in km - always positive   # Como ver isso sem ler a malha?
     "Lx": 17.0,  # width in km - always positive
     "Ly": 0.0,  # thickness in km - always positive
-    "mesh_file": "real5hz.msh",
 }
 dictionary["acquisition"] = {
     "source_type": "ricker",
@@ -64,11 +64,13 @@ dictionary["inversion"] = {
 
 
 def test_real_shot_record_generation_parallel():
-    dictionary["mesh"]["mesh_file"] = "meshes/real5hz.msh"
+    real_dictionary = deepcopy(dictionary)
+    real_dictionary["mesh"]["mesh_file"] = "meshes/real5hz.msh"
     
-    fwi = spyro.FullWaveformInversion(dictionary=dictionary)
-    fwi.set_real_velocity_model(new_file="velocity_models/vp_marmousi-ii.hdf5")
-    fwi.generate_real_shot_record(plot_model=True, save_shot_record=True)
+    real_wave = spyro.AcousticWave(dictionary=real_dictionary)
+    real_wave.set_initial_velocity_model(new_file="velocity_models/vp_marmousi-ii.hdf5")
+    real_wave.forward_solve()
+    spyro.io.save_shots(real_wave)
 
 
 def test_realistic_fwi():
