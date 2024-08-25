@@ -6,7 +6,7 @@ import matplotlib.pyplot as plt
 from SeismicMesh import write_velocity_model
 
 
-def smooth_velocity_field_file(input_filename, output_filename, sigma, show=False, write_hdf5=True):
+def smooth_velocity_field_file(input_filename, output_filename, sigma, show=False, write_hdf5=True, i_limit=None, vp_limit=None, tol=1e-5):
     """Smooths a velocity field using a Gaussian filter.
 
     Parameters
@@ -35,16 +35,24 @@ def smooth_velocity_field_file(input_filename, output_filename, sigma, show=Fals
                 vp[:, index] = trace
     else:
         raise ValueError("Not yet implemented!")
+    
+    vp_min = np.min(vp)
+    vp_max = np.max(vp)
+    print(f"Velocity model has minimum vp of {vp_min}, and max of {vp_max}")
 
     vp_smooth = gaussian_filter(vp, sigma)
     ni, nj = np.shape(vp)
+    if i_limit is None:
+        i_limit = 0
+    if vp_limit is None:
+        vp_limit = vp_min
 
     for i in range(ni):
         for j in range(nj):
-            if i < 25:
+            if i < i_limit:
                 vp_smooth[i, j] = vp[i, j]
-            if i < 20:
-                vp_smooth[i, j] = 1.5
+            if vp[i, j] <= vp_limit + tol:
+                vp_smooth[i, j] = vp_min
 
     spec = segyio.spec()
     spec.sorting = 2  # not sure what this means
@@ -73,6 +81,7 @@ def smooth_velocity_field_file(input_filename, output_filename, sigma, show=Fals
         plt.xlabel("x-direction (m)")
         plt.ylabel("z-direction (m)")
         ax.axis("equal")
+        plt.savefig("debug.png")
         plt.show()
 
     if write_hdf5:

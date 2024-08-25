@@ -74,23 +74,35 @@ def test_real_shot_record_generation_parallel():
 
 
 def test_realistic_fwi():
-    dictionary["inversion"] = {
+    fwi_dictionary = deepcopy(dictionary)
+    fwi_dictionary["inversion"] = {
         "perform_fwi": True,
         "real_shot_record_files": f"shots/shot_record_",
-        "initial_guess_model_file": "velocity_models/initial_guess_15Hz.hdf5",
+        "initial_guess_model_file": "velocity_models/initial_guess_5Hz.hdf5",
     }
+    fwi_dictionary["mesh"]["mesh_type"] = "SeismicMesh"
     fwi = spyro.FullWaveformInversion(dictionary=dictionary)
-    fwi.set_guess_velocity_model(new_file="velocity_models/initial_guess_15Hz.hdf5")
+    # fwi.set_guess_velocity_model(new_file="velocity_models/initial_guess_5Hz.hdf5")
+    fwi.set_guess_mesh()
     mask_boundaries = {
-        "z_min": -1.3,
-        "z_max": -0.7,
-        "x_min": 0.7,
-        "x_max": 1.3,
+        "z_min": -3.5,
+        "z_max": -0.5,
+        "x_min": 3.0,
+        "x_max": 13.0,
     }
     fwi.set_gradient_mask(boundaries=mask_boundaries)
     fwi.run_fwi(vmin=2.5, vmax=3.5, maxiter=60)
 
 
+def test_smoothing_real_model():
+    real_vp_file = "velocity_models/vp_marmousi-ii.segy"
+    sigma = 100
+    output_filename = f"velocity_models/vp_marmousi-ii_sigma{sigma}.segy"
+
+    spyro.tools.velocity_smoother.smooth_velocity_field_file(real_vp_file, output_filename, sigma, show=True, vp_limit=1.5)
+
+
 if __name__ == "__main__":
-    test_real_shot_record_generation_parallel()
+    # test_real_shot_record_generation_parallel()
     # test_realistic_fwi()
+    test_smoothing_real_model()

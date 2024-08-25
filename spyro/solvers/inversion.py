@@ -353,7 +353,7 @@ class FullWaveformInversion(AcousticWave):
     def set_guess_mesh(
         self,
         user_mesh=None,
-        mesh_parameters=None,
+        mesh_parameters={},
     ):
         """
         Set the mesh for the guess model.
