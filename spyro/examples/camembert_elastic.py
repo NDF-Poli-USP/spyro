@@ -15,6 +15,7 @@ lambda_out = 9.88e9 # [Pa]
 mu_in = 3.86e9      # [Pa]
 mu_out = 5.86e9     # [Pa]
 
+smag = 1e6
 freq = 2 # Central frequency of Ricker wavelet [Hz]
 hf =  90 # [m]
 hs = 100 # [m]
@@ -26,8 +27,8 @@ time_step = 2e-4 # [s]
 final_time = 1.5 # [s]
 out_freq = int(0.01/time_step)
 
-nz = 80
-nx = 80
+nz = 20
+nx = 20
 mesh = fire.RectangleMesh(nz, nx, 0, Lx, originX=-Lz, diagonal='crossed')
 z, x = fire.SpatialCoordinate(mesh)
 
@@ -42,7 +43,7 @@ d = {}
 d["options"] = {
     "cell_type": "T",
     "variant": "lumped",
-    "degree": 2,
+    "degree": 4,
     "dimension": 2,
 }
 
@@ -60,7 +61,7 @@ d["acquisition"] = {
     "frequency": freq,
     "delay": 0,
     "delay_type": "time",
-    "amplitude": np.array([0, 1]),
+    "amplitude": np.array([0, smag]),
     "receiver_locations": receiver_locations,
 }
 
@@ -96,6 +97,7 @@ d["absorving_boundary_conditions"] = {
 
 wave = spyro.IsotropicWave(d)
 wave.set_mesh(user_mesh=mesh, mesh_parameters={})
-#wave.set_initial_velocity_model(constant=[1.5, 1.5])
-#spyro.plots.plot_model(wave, filename="model.png", flip_axis=False, show=True)
+
+print(f'Number of degrees of freedom: {wave.function_space.dim()}')
+
 wave.forward_solve()
