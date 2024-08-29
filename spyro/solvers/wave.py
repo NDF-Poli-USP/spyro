@@ -246,8 +246,6 @@ class Wave(Model_parameters, metaclass=ABCMeta):
     def _build_function_space(self):
         self.function_space = self._create_function_space()
 
-        # TO REVIEW: I moved the quadrature rule update here because I believe
-        # it must run everytime the function space is changed
         quad_rule, k_rule, s_rule = quadrature_rules(self.function_space)
         self.quadrature_rule = quad_rule
         self.stiffness_quadrature_rule = k_rule

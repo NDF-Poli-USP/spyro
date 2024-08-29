@@ -6,14 +6,14 @@ import numpy as np
 import spyro
 
 L = 2000   # Size of the edges of the cube [m]
-N = 20     # Number of elements in each direction
+N = 5      # Number of elements in each direction
 h = L/N    # Element size [m]
 
 c_p = 5000 # P-wave velocity [m/s]
 c_s = 2500 # S-wave velocity [m/s]
 rho = 1000 # Density [kg/m3]
 
-smag = 1e0 # Source magnitude
+smag = 1e9 # Source magnitude
 freq = 1   # Source frequency [Hz]
 
 final_time = 2
@@ -29,7 +29,7 @@ d = {}
 d["options"] = {
     "cell_type": "T",
     "variant": "lumped",
-    "degree": 2,
+    "degree": 3,
     "dimension": 3,
 }
 
@@ -88,4 +88,7 @@ d["absorving_boundary_conditions"] = {
 
 wave = spyro.IsotropicWave(d)
 wave.set_mesh(mesh_parameters={'dx': h})
+
+print(f'Number of degrees of freedom: {wave.function_space.dim()}')
+
 wave.forward_solve()
