@@ -1,180 +1,156 @@
-# from firedrake import *
-
-# # from .. import utils
-# from ..domains import quadrature, space
-
-# # from ..pml import damping
-# # from ..io import ensemble_forward
-# from . import helpers
-
-# # Note this turns off non-fatal warnings
-# set_log_level(ERROR)
+from firedrake import *
+from firedrake.adjoint import *
+from ..domains import quadrature, space
+from firedrake.__future__ import interpolate
+import finat
+# Note this turns off non-fatal warnings
+set_log_level(ERROR)
 
 
-# # @ensemble_forward
-# def forward(
-#     model,
-#     mesh,
-#     comm,
-#     c,
-#     excitations,
-#     wavelet,
-#     receivers,
-#     source_num=0,
-#     output=False,
-#     **kwargs
-# ):
-#     """Secord-order in time fully-explicit scheme
-#     with implementation of a Perfectly Matched Layer (PML) using
-#     CG FEM with or without higher order mass lumping (KMV type elements).
+class ForwardSolver:
+    """Forward solver for the acoustic wave equation.
 
-#     Parameters
-#     ----------
-#     model: Python `dictionary`
-#         Contains model options and parameters
-#     mesh: Firedrake.mesh object
-#         The 2D/3D triangular mesh
-#     comm: Firedrake.ensemble_communicator
-#         The MPI communicator for parallelism
-#        c: Firedrake.Function
-#         The velocity model interpolated onto the mesh.
-#     excitations: A list Firedrake.Functions
-#     wavelet: array-like
-#         Time series data that's injected at the source location.
-#     receivers: A :class:`spyro.Receivers` object.
-#         Contains the receiver locations and sparse interpolation methods.
-#     source_num: `int`, optional
-#         The source number you wish to simulate
-#     output: `boolean`, optional
-#         Whether or not to write results to pvd files.
+    This forward solver is prepared to work with the automatic
+    differentiation.
 
-#     Returns
-#     -------
-#     usol: list of Firedrake.Functions
-#         The full field solution at `fspool` timesteps
-#     usol_recv: array-like
-#         The solution interpolated to the receivers at all timesteps
+    Parameters
+    ----------
+    model : dict
+        Dictionary containing the model parameters.
+    mesh : Mesh
+        Firedrake mesh object.
+    """
 
-#     """
+    def __init__(self, model, mesh):
+        self.model = model
+        self.mesh = mesh
+        self.element = space.FE_method(
+            self.mesh, self.model["opts"]["method"],
+            self.model["opts"]["degree"]
+        )
+        self.V = FunctionSpace(self.mesh, self.element)
+        self.receiver_mesh = VertexOnlyMesh(
+            self.mesh, self.model["acquisition"]["receiver_locations"])
 
-#     method = model["opts"]["method"]
-#     degree = model["opts"]["degree"]
-#     dim = model["opts"]["dimension"]
-#     dt = model["timeaxis"]["dt"]
-#     tf = model["timeaxis"]["tf"]
-#     nspool = model["timeaxis"]["nspool"]
-#     nt = int(tf / dt)  # number of timesteps
-#     excitations.current_source = source_num
-#     params = set_params(method)
-#     element = space.FE_method(mesh, method, degree)
+    def execute_acoustic(
+            self, c, source_number, wavelet, compute_functional=False,
+            true_data_receivers=None, annotate=False
+            ):
+        """Time-stepping acoustic forward solver.
 
-#     V = FunctionSpace(mesh, element)
+        Parameters
+        ----------
+        c : firedrake.Function
+            Velocity field.
+        source_number : int
+            Number of the source. This is used to select the source
+            location.
+        wavelet : list
+            Time-dependent wavelet.
+        compute_functional : bool, optional
+            Whether to compute the functional. If True, the true receiver
+            data must be provided.
+        true_data_receivers : list, optional
+            True receiver data. This is used to compute the functional.
+        annotate : bool, optional
+            Whether to annotate the forward solver. Annotated solvers are
+            used for automated adjoint computations from automatic
+            differentiation.
 
-#     qr_x, qr_s, _ = quadrature.quadrature_rules(V)
+        Returns
+        -------
+        (receiver_data : list, J_val : float)
+            Receiver data and functional value.
 
-#     if dim == 2:
-#         z, x = SpatialCoordinate(mesh)
-#     elif dim == 3:
-#         z, x, y = SpatialCoordinate(mesh)
+        Raises
+        ------
+        ValueError
+            If true_data_receivers is not provided when computing the
+            functional.
+        """
+        if annotate:
+            continue_annotation()
+        # RHS
+        source_function = Cofunction(self.V.dual())
+        solver, u_np1, u_n, u_nm1 = self._acoustic_lvs(
+            c, source_function)
+        # Sources.
+        source_mesh = VertexOnlyMesh(
+            self.mesh,
+            [self.model["acquisition"]["source_locations"][source_number]]
+            )
+        # Source function space.
+        V_s = FunctionSpace(source_mesh, "DG", 0)
+        d_s = Function(V_s)
+        d_s.assign(1.0)
+        source_cofunction = assemble(d_s * TestFunction(V_s) * dx)
+        # Interpolate from the source function space to the velocity function space.
+        q_s = Cofunction(self.V.dual()).interpolate(source_cofunction)
 
-#     u = TrialFunction(V)
-#     v = TestFunction(V)
+        # Receivers
+        V_r = FunctionSpace(self.receiver_mesh, "DG", 0)
+        # Interpolate object.
+        interpolate_receivers = interpolate(u_np1, V_r)
 
-#     u_nm1 = Function(V)
-#     u_n = Function(V)
-#     u_np1 = Function(V)
+        # Time execution.
+        J_val = 0.0
+        receiver_data = []
+        for step in range(self.model["timeaxis"]["nt"]):
+            source_cofunction.assign(wavelet(step) * q_s)
+            solver.solve()
+            u_nm1.assign(u_n)
+            u_n.assign(u_np1)
+            receiver_data.append(assemble(interpolate_receivers))
+            if compute_functional:
+                if not true_data_receivers:
+                    raise ValueError("True receiver data is required for"
+                                     "computing the functional.")
+                misfit = receiver_data - true_data_receivers[step]
+                J_val += assemble(0.5 * inner(misfit, misfit) * dx)
 
-#     if output:
-#         outfile = helpers.create_output_file("forward.pvd", comm, source_num)
+        return receiver_data, J_val
 
-#     t = 0.0
-#     m = 1 / (c * c)
-#     m1 = (
-#         m * ((u - 2.0 * u_n + u_nm1) / Constant(dt**2)) * v * dx(scheme=qr_x)
-#     )
-#     a = dot(grad(u_n), grad(v)) * dx(scheme=qr_x)  # explicit
-#     f = Function(V)
-#     nf = 0
+    def _acoustic_lvs(self, c, source_function):
+        # Acoustic linear variational solver.
+        V = self.V
+        dt = self.model["timeaxis"]["dt"]
+        u = TrialFunction(V)
+        v = TestFunction(V)
+        u_np1 = Function(V)  # timestep n+1
+        u_n = Function(V)  # timestep n
+        u_nm1 = Function(V)  # timestep n-1
 
-#     if model["BCs"]["outer_bc"] == "non-reflective":
-#         nf = c * ((u_n - u_nm1) / dt) * v * ds(scheme=qr_s)
+        qr_x, qr_s, _ = quadrature.quadrature_rules(V)
+        time_term = (1 / (c * c)) * (u - 2.0 * u_n + u_nm1) / \
+              Constant(dt**2) * v * dx(scheme=quad_rule)
 
-#     h = CellSize(mesh)
-#     FF = (
-#         m1 + a + nf - (1 / (h / degree * h / degree)) * f * v * dx(scheme=qr_x)
-#     )
-#     X = Function(V)
+        nf = 0
+        if self.model["BCs"]["outer_bc"] == "non-reflective":
+            nf = (1/c) * ((u_n - u_nm1) / dt) * v * ds(scheme=qr_s)
 
-#     lhs_ = lhs(FF)
-#     rhs_ = rhs(FF)
+        a = dot(grad(u_n), grad(v)) * dx(scheme=qr_x)
+        F = time_term + a + nf
+        lin_var = LinearVariationalProblem(
+            lhs(F), rhs(F) + source_function, u_np1)
+        solver = LinearVariationalSolver(
+            lin_var,solver_parameters=self._solver_parameters())
+        return solver, u_np1, u_n, u_nm1
 
-#     problem = LinearVariationalProblem(lhs_, rhs_, X)
-#     solver = LinearVariationalSolver(problem, solver_parameters=params)
+    def _solver_parameters(self):
+        if self.model["opts"]["method"] == "KMV":
+            params = {"ksp_type": "preonly", "pc_type": "jacobi"}
+        elif (
+            self.model["opts"]["method"] == "CG"
+            and self.mesh.ufl_cell() != quadrilateral
+            and self.mesh.ufl_cell() != hexahedron
+        ):
+            params = {"ksp_type": "cg", "pc_type": "jacobi"}
+        elif self.model["opts"]["method"] == "CG" and (
+            self.mesh.ufl_cell() == quadrilateral 
+            or self.mesh.ufl_cell() == hexahedron
+        ):
+            params = {"ksp_type": "preonly", "pc_type": "jacobi"}
+        else:
+            raise ValueError("method is not yet supported")
 
-#     usol_recv = []
-
-#     P = FunctionSpace(receivers, "DG", 0)
-#     interpolator = Interpolator(u_np1, P)
-#     J0 = 0.0
-
-#     for step in range(nt):
-#         excitations.apply_source(f, wavelet[step])
-
-#         solver.solve()
-#         u_np1.assign(X)
-
-#         rec = Function(P)
-#         interpolator.interpolate(output=rec)
-
-#         fwi = kwargs.get("fwi")
-#         p_true_rec = kwargs.get("true_rec")
-
-#         usol_recv.append(rec.dat.data)
-
-#         if fwi:
-#             J0 += calc_objective_func(rec, p_true_rec[step], step, dt, P)
-
-#         if step % nspool == 0:
-#             assert (
-#                 norm(u_n) < 1
-#             ), "Numerical instability. Try reducing dt or building the mesh differently"
-#             if output:
-#                 outfile.write(u_n, time=t, name="Pressure")
-#             if t > 0:
-#                 helpers.display_progress(comm, t)
-
-#         u_nm1.assign(u_n)
-#         u_n.assign(u_np1)
-
-#         t = step * float(dt)
-
-#     if fwi:
-#         return usol_recv, J0
-#     else:
-#         return usol_recv
-
-
-# def calc_objective_func(p_rec, p_true_rec, IT, dt, P):
-#     true_rec = Function(P)
-#     true_rec.dat.data[:] = p_true_rec
-#     J = 0.5 * assemble(inner(true_rec - p_rec, true_rec - p_rec) * dx)
-#     return J
-
-
-# def set_params(method):
-#     if method == "KMV":
-#         params = {"ksp_type": "preonly", "pc_type": "jacobi"}
-#     elif (
-#         method == "CG"
-#         and mesh.ufl_cell() != quadrilateral
-#         and mesh.ufl_cell() != hexahedron
-#     ):
-#         params = {"ksp_type": "cg", "pc_type": "jacobi"}
-#     elif method == "CG" and (
-#         mesh.ufl_cell() == quadrilateral or mesh.ufl_cell() == hexahedron
-#     ):
-#         params = {"ksp_type": "preonly", "pc_type": "jacobi"}
-#     else:
-#         raise ValueError("method is not yet supported")
-
-#     return params
+        return params
