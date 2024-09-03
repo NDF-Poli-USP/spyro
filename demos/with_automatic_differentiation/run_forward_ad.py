@@ -1,4 +1,4 @@
-from firedrake import *
+import firedrake as fire
 import spyro
 import matplotlib.pyplot as plt
 import numpy as np
@@ -9,8 +9,8 @@ import spyro.solvers
 model = {}
 
 model["opts"] = {
-    "method": "KMV",  # either CG or KMV
-    "quadrature": "KMV",  # Equi or KMV
+    "method": "KMV",  # either CG or mass_lumped_triangle
+    "quadrature": "KMV",  # Equi or mass_lumped_triangle
     "degree": 1,  # p order
     "dimension": 2,  # dimension
     "regularization": False,  # regularization is on?
@@ -58,7 +58,7 @@ model["aut_dif"] = {
 
 model["timeaxis"] = {
     "t0": 0.0,  # Initial time for event
-    "tf": 0.8,  # Final time for event (for test 7)
+    "tf": 0.2,  # Final time for event (for test 7)
     "dt": 0.001,  # timestep size (divided by 2 in the test 4. dt for test 3 is 0.00050)
     "amplitude": 1,  # the Ricker has an amplitude of 1.
     "nspool": 20,  # (20 for dt=0.00050) how frequently to output solution to pvds
@@ -68,51 +68,52 @@ model["timeaxis"] = {
 
 # Use emsemble parallelism.
 M = model["parallelism"]["num_spacial_cores"]
-my_ensemble = Ensemble(COMM_WORLD, M)
-mesh = UnitSquareMesh(50, 50, comm=my_ensemble.comm)
-element = spyro.domains.space.FE_method(
-    mesh, model["opts"]["method"], model["opts"]["degree"]
-)
-V = FunctionSpace(mesh, element)
+my_ensemble = fire.Ensemble(fire.COMM_WORLD, M)
+mesh = fire.UnitSquareMesh(50, 50, comm=my_ensemble.comm)
+element = fire.FiniteElement(
+    model["opts"]["method"], mesh.ufl_cell(), degree=model["opts"]["degree"],
+    variant=model["opts"]["quadrature"]
+    )
+V = fire.FunctionSpace(mesh, element)
 
 
 def make_vp_circle(vp_guess=False, plot_vp=False):
     """Acoustic velocity model"""
-    x, z = SpatialCoordinate(mesh)
+    x, z = fire.SpatialCoordinate(mesh)
     if vp_guess:
-        vp = Function(V).interpolate(1.5 + 0.0 * x)
+        vp = fire.Function(V).interpolate(1.5 + 0.0 * x)
     else:
-        vp = Function(V).interpolate(
+        vp = fire.Function(V).interpolate(
             2.5
-            + 1 * tanh(100 * (0.125 - sqrt((x - 0.5) ** 2 + (z - 0.5) ** 2)))
+            + 1 * fire.tanh(100 * (0.125 - fire.sqrt((x - 0.5) ** 2 + (z - 0.5) ** 2)))
         )
     if plot_vp:
-        outfile = File("acoustic_cp.pvd")
+        outfile = fire.File("acoustic_cp.pvd")
         outfile.write(vp)
     return vp
 
 
-forward_solver = spyro.solvers.forward_ad.ForwardSolver(
-    model, mesh
-)
+forward_solver = spyro.solvers.forward_ad.ForwardSolver(model, mesh, V)
 
 c_true = make_vp_circle()
 # Ricker wavelet
 wavelet = spyro.full_ricker_wavelet(
-    dt=model["timeaxis"]["dt"],
-    tf=model["timeaxis"]["tf"],
-    freq=model["acquisition"]["frequency"],
+    model["timeaxis"]["dt"], model["timeaxis"]["tf"],
+    model["acquisition"]["frequency"],
 )
 
 if model["parallelism"]["type"] is None:
+    outfile = fire.VTKFile("solution.pvd")
     for sn in range(len(model["acquisition"]["source_pos"])):
         rec_data, _ = forward_solver.execute(c_true, sn, wavelet)
-        spyro.plots.plot_shots(
-            model, my_ensemble.comm, rec_data, vmax=1e-08, vmin=-1e-08)
+        sol = forward_solver.solution
+        outfile.write(sol)
 else:
     # source_number based on the ensemble.ensemble_comm.rank
     source_number = my_ensemble.ensemble_comm.rank
     rec_data, _ = forward_solver.execute_acoustic(
         c_true, source_number, wavelet)
-    spyro.plots.plot_shots(
-        model, my_ensemble.comm, rec_data, vmax=1e-08, vmin=-1e-08)
+    sol = forward_solver.solution
+    fire.VTKFile(
+        "solution_" + str(source_number) + ".pvd", comm=my_ensemble.comm
+        ).write(sol)
