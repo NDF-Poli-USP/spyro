@@ -56,7 +56,7 @@ model["BCs"] = {
 
 model["acquisition"] = {
     "source_type": "Ricker",
-    "source_pos": spyro.create_transect((0.3, 0.15), (0.7, 0.15), 5),
+    "source_pos": spyro.create_transect((0.3, 0.15), (0.7, 0.15), 1),
     "frequency": 7.0,
     "delay": 1.0,
     "receiver_locations": spyro.create_transect((0.2, 0.8), (0.8, 0.8), 10),
@@ -67,8 +67,8 @@ model["aut_dif"] = {
 
 model["timeaxis"] = {
     "t0": 0.0,  # Initial time for event
-    "tf": 1.0,  # Final time for event (for test 7)
-    "dt": 0.001,  # timestep size (divided by 2 in the test 4. dt for test 3 is 0.00050)
+    "tf": 0.8,  # Final time for event (for test 7)
+    "dt": 0.002,  # timestep size (divided by 2 in the test 4. dt for test 3 is 0.00050)
     "amplitude": 1,  # the Ricker has an amplitude of 1.
     "nspool": 20,  # (20 for dt=0.00050) how frequently to output solution to pvds
     "fspool": 1,  # how frequently to save solution to RAM
@@ -89,6 +89,8 @@ def make_vp_circle(vp_guess=False, plot_vp=False):
         outfile = File("acoustic_cp.pvd")
         outfile.write(vp)
     return vp
+
+
 true_receiver_data = []
 iterations = 0
 nt = int(model["timeaxis"]["tf"] / model["timeaxis"]["dt"])  # number of timesteps
@@ -123,9 +125,11 @@ def run_fwi(vp_guess_data):
             continue_annotation()
             tape = get_working_tape()
             tape.progress_bar = ProgressBar
-            get_working_tape().enable_checkpointing(Revolve(nt, nt//4))
-            J_total += J(mesh, comm, vp_exact, wavelet, vom, sn, vp_guess)
-            dJ_total += compute_gradient(J_total, Control(vp_guess))
+            get_working_tape().enable_checkpointing(SingleMemoryStorageSchedule())
+            Js = J(mesh, comm, vp_exact, wavelet, vom, sn, vp_guess)
+            print(Js)
+            dJ_total += compute_gradient(Js, Control(vp_guess))
+            J_total += Js
             get_working_tape().clear_tape()
     elif size == len(model["acquisition"]["source_pos"]):
         J_local = J(mesh, comm, vp_exact, wavelet, vom, rank, vp_guess)
@@ -142,9 +146,9 @@ def run_fwi(vp_guess_data):
 comm, spatial_comm = spyro.utils.mpi_init(model)
 if model["parallelism"]["type"] == "shots_parallelism":
     # Only shots parallelism.
-    mesh = UnitSquareMesh(100, 100, comm=spatial_comm)
+    mesh = UnitSquareMesh(60, 60, comm=spatial_comm)
 else:
-    mesh = UnitSquareMesh(100, 100)
+    mesh = UnitSquareMesh(60, 60)
 
 element = spyro.domains.space.FE_method(
     mesh, model["opts"]["method"], model["opts"]["degree"]

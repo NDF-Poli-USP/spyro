@@ -3,6 +3,8 @@ import spyro
 import matplotlib.pyplot as plt
 import numpy as np
 
+import spyro.solvers
+
 # --- Basid setup to run a forward simulation with AD --- #
 model = {}
 
@@ -17,13 +19,10 @@ model["opts"] = {
 
 model["parallelism"] = {
     # options:
-    # `shots_parallelism` (same number of cores for every processor. Apply only
-    # shots parallelism, i.e., the spatial domain is not parallelised.)
-    # `automatic` (same number of cores for every processor. Apply shots and
-    # spatial parallelism.)
-    # `spatial` (Only spatial parallelisation).
-    # `None` (No parallelisation).
+    # `shots_parallelism`. Shots parallelism.
+    # None - no shots parallelism.
     "type": "shots_parallelism",
+    "num_spacial_cores": 1,  # Number of cores to use in the spatial parallelism.
 }
 
 # Define the domain size without the ABL.
@@ -66,16 +65,11 @@ model["timeaxis"] = {
     "fspool": 1,  # how frequently to save solution to RAM
 }
 
-comm, spatial_comm = spyro.utils.mpi_init(model)
-if model["parallelism"]["type"] == "shots_parallelism":
-    # Only shots parallelism.
-    mesh = UnitSquareMesh(50, 50, comm=spatial_comm)
-else:
-    mesh = UnitSquareMesh(50, 50)
 
-# Receiver mesh.
-vom = VertexOnlyMesh(mesh, model["acquisition"]["receiver_locations"])
-
+# Use emsemble parallelism.
+M = model["parallelism"]["num_spacial_cores"]
+my_ensemble = Ensemble(COMM_WORLD, M)
+mesh = UnitSquareMesh(50, 50, comm=my_ensemble.comm)
 element = spyro.domains.space.FE_method(
     mesh, model["opts"]["method"], model["opts"]["degree"]
 )
@@ -98,52 +92,27 @@ def make_vp_circle(vp_guess=False, plot_vp=False):
     return vp
 
 
-def run_forward(source_number):
-    """Execute a acoustic wave equation.
+forward_solver = spyro.solvers.forward_ad.ForwardSolver(
+    model, mesh
+)
 
-    Parameters
-    ----------
-    source_number: `int`, optional
-        The source number defined by the user.
-
-    Notes
-    -----
-    The forward solver (`forward_AD`) is implemented in spyro using firedrake's
-    functions that can be annotated by the algorithimic differentiation (AD).
-    This is because spyro is capable of executing Full Waveform Inversion (FWI),
-    which needs the computation of the gradient of the objective function with
-    respect to the velocity model through (AD).
-    """
-    receiver_data = spyro.solvers.forward_AD(model, mesh, comm, vp_exact,
-                                             wavelet, vom, debug=True,
-                                             source_number=source_number)
-    # --- Plot the receiver data --- #
-    data = []
-    for _, rec in enumerate(receiver_data):
-        data.append(rec.dat.data_ro[:])
-    spyro.plots.plot_shots(model, comm, data, vmax=1e-08, vmin=-1e-08)
-
-
-# Rickers wavelet
+c_true = make_vp_circle()
+# Ricker wavelet
 wavelet = spyro.full_ricker_wavelet(
     dt=model["timeaxis"]["dt"],
     tf=model["timeaxis"]["tf"],
     freq=model["acquisition"]["frequency"],
 )
-# True acoustic velocity model
-vp_exact = make_vp_circle(plot_vp=True)
 
-# Processor number.
-rank = comm.ensemble_comm.rank
-# Number of processors used in the simulation.
-size = comm.ensemble_comm.size
-if size == 1:
+if model["parallelism"]["type"] is None:
     for sn in range(len(model["acquisition"]["source_pos"])):
-        run_forward(sn)
-elif size == len(model["acquisition"]["source_pos"]):
-    # Only run the forward simulation for the source number that matches the
-    # processor number.
-    run_forward(rank)
+        rec_data, _ = forward_solver.execute(c_true, sn, wavelet)
+        spyro.plots.plot_shots(
+            model, my_ensemble.comm, rec_data, vmax=1e-08, vmin=-1e-08)
 else:
-    raise NotImplementedError("`size` must be 1 or equal to `num_sources`."
-                              "Different values are not supported yet.")
+    # source_number based on the ensemble.ensemble_comm.rank
+    source_number = my_ensemble.ensemble_comm.rank
+    rec_data, _ = forward_solver.execute(
+        c_true, source_number, wavelet)
+    spyro.plots.plot_shots(
+        model, my_ensemble.comm, rec_data, vmax=1e-08, vmin=-1e-08)

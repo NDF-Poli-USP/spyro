@@ -1,186 +1,153 @@
 from firedrake import *
-from firedrake.adjoint import get_working_tape
+from firedrake.adjoint import *
 from ..domains import quadrature, space
-from . import helpers
-from ..sources.Sources import Sources
-from firedrake.__future__ import Interpolator, interpolate
-
+from firedrake.__future__ import interpolate
+import finat
 # Note this turns off non-fatal warnings
 set_log_level(ERROR)
 
 
-def forward(
-            model, mesh, comm, c, wavelet, receiver_mesh, source_number=0,
-            fwi=False, **kwargs
-    ):
-    """Secord-order in time fully-explicit scheme.
+class ForwardSolver:
+    """Forward solver for the acoustic wave equation.
+
+    This forward solver is prepared to work with the automatic
+    differentiation.
 
     Parameters
     ----------
-    model: dict
-        Contains model options and parameters.
-    mesh: firedrake.mesh
-        The 2D/3D triangular mesh
-    comm: firedrake.ensemble_communicator
-        The MPI communicator for parallelism
-    c: firedrake.Function
-        The velocity model interpolated onto the mesh.
-    wavelet: array-like
-        Time series data that's injected at the source location.
-    source_number: `int`, optional
-        The source number you wish to simulate
-    fwi: `bool`, optional
-        Whether this forward simulation is for FWI or not.
-
-    Returns
-    -------
-    usol_recv: list
-        The receiver data.
-    J: float
-        The functional for FWI. Only returned if `fwi=True`.
+    model : dict
+        Dictionary containing the model parameters.
+    mesh : Mesh
+        Firedrake mesh object.
     """
-    method = model["opts"]["method"]
-    degree = model["opts"]["degree"]
-    dim = model["opts"]["dimension"]
-    dt = model["timeaxis"]["dt"]
-    tf = model["timeaxis"]["tf"]
-    nspool = model["timeaxis"]["nspool"]
-    nt = int(tf / dt)  # number of timesteps
-    params = set_params(method, mesh)
-    element = space.FE_method(mesh, method, degree)
 
-    V = FunctionSpace(mesh, element)
+    def __init__(self, model, mesh):
+        self.model = model
+        self.mesh = mesh
+        self.element = space.FE_method(
+            self.mesh, self.model["opts"]["method"],
+            self.model["opts"]["degree"]
+        )
+        self.V = FunctionSpace(self.mesh, self.element)
+        self.receiver_mesh = VertexOnlyMesh(
+            self.mesh, self.model["acquisition"]["receiver_locations"])
 
-    qr_x, qr_s, _ = quadrature.quadrature_rules(V)
+    def execute(
+            self, c, source_number, wavelet, compute_functional=False,
+            true_data_receivers=None, annotate=False
+            ):
+        """Time-stepping forward solver.
 
-    if dim == 2:
-        z, x = SpatialCoordinate(mesh)
-    elif dim == 3:
-        z, x, y = SpatialCoordinate(mesh)
+        Parameters
+        ----------
+        c : firedrake.Function
+            Velocity field.
+        source_number : int
+            Number of the source. This is used to select the source
+            location.
+        wavelet : list
+            Time-dependent wavelet.
+        compute_functional : bool, optional
+            Whether to compute the functional. If True, the true receiver
+            data must be provided.
+        true_data_receivers : list, optional
+            True receiver data. This is used to compute the functional.
+        annotate : bool, optional
+            Whether to annotate the forward solver. Annotated solvers are
+            used for automated adjoint computations from automatic
+            differentiation.
 
-    u = TrialFunction(V)
-    v = TestFunction(V)
+        Returns
+        -------
+        (receiver_data : list, J_val : float)
+            Receiver data and functional value.
 
-    u_nm1 = Function(V)
-    u_n = Function(V)
-    u_np1 = Function(V)
+        Raises
+        ------
+        ValueError
+            If true_data_receivers is not provided when computing the
+            functional.
+        """
+        if annotate:
+            continue_annotation()
+        # RHS
+        source_function = Cofunction(self.V.dual())
+        solver, u_np1, u_n, u_nm1 = self._linear_variational_solver(
+            c, source_function)
+        # Sources.
+        source_mesh = VertexOnlyMesh(
+            self.mesh,
+            [self.model["acquisition"]["source_locations"][source_number]]
+            )
+        # Source function space.
+        V_s = FunctionSpace(source_mesh, "DG", 0)
+        d_s = Function(V_s)
+        d_s.assign(1.0)
+        source_cofunction = assemble(d_s * TestFunction(V_s) * dx)
+        # Interpolate from the source function space to the velocity function space.
+        q_s = Cofunction(self.V.dual()).interpolate(source_cofunction)
 
-    m = 1 / (c * c)
-    m1 = m * ((u - 2.0 * u_n + u_nm1) / Constant(dt**2)) * v * dx(scheme=qr_x)
-    a = dot(grad(u_n), grad(v)) * dx(scheme=qr_x)  # explicit
-    source_function = Function(V)
-    nf = 0
+        # Receivers
+        V_r = FunctionSpace(self.receiver_mesh, "DG", 0)
+        # Interpolate object.
+        interpolate_receivers = interpolate(u_np1, V_r)
 
-    if model["BCs"]["outer_bc"] == "non-reflective":
-        nf = c * ((u_n - u_nm1) / dt) * v * ds(scheme=qr_s)
-
-    FF = m1 + a + nf - source_function * v * dx(scheme=qr_x)
-    X = Function(V)
-
-    lhs_ = lhs(FF)
-    rhs_ = rhs(FF)
-
-    problem = LinearVariationalProblem(lhs_, rhs_, X)
-    solver = LinearVariationalSolver(problem, solver_parameters=params)
-
-    # This part of the code is the base for receivers and sources.
-    # definition
-    usol_recv = []
-    # Source object.
-    source = Sources(model, mesh, V, comm)
-    # P0DG is the only function space you can make on a vertex-only mesh.
-    P0DG = FunctionSpace(receiver_mesh, "DG", 0)
-    interpolator_receivers = Interpolator(u_np1, P0DG)
-    interpolator_sources, forcing_point = source.apply_source_based_in_vom(source_number, V)
-
-    def only_forward():
-        for step in range(nt):
-            forcing_point.dat.data[:] = wavelet[step]
-            source_function.assign(1000*assemble(interpolator_sources.interpolate(forcing_point, transpose=True)
-                                            ).riesz_representation(riesz_map="l2"))
+        # Time execution.
+        J_val = 0.0
+        receiver_data = []
+        for step in range(self.model["timeaxis"]["nt"]):
+            source_cofunction.assign(wavelet(step) * q_s)
             solver.solve()
-            u_np1.assign(X)
-            receivers = assemble(interpolator_receivers.interpolate())
-            usol_recv.append(receivers)
-            if step % nspool == 0:
-                assert (
-                    norm(u_n) < 1
-                ), "Numerical instability. Try reducing dt or building the mesh differently"
-                if float(step*dt) > 0:
-                    helpers.display_progress(comm, float(step*dt))
             u_nm1.assign(u_n)
             u_n.assign(u_np1)
+            receiver_data.append(assemble(interpolate_receivers))
+            if compute_functional:
+                if not true_data_receivers:
+                    raise ValueError("True receiver data is required for"
+                                        "computing the functional.")
+                misfit = receiver_data - true_data_receivers[step]
+                J_val += assemble(0.5 * inner(misfit, misfit) * dx)
 
-    def for_fwi():
-        true_receiver_data = kwargs.get("true_receiver_data")
-        J = 0.0
-        for step in get_working_tape().timestepper(iter(range(nt))):
-            forcing_point.dat.data[:] = wavelet[step]
-            source_function.assign(1000*assemble(interpolator_sources.interpolate(forcing_point, transpose=True)
-                                            ).riesz_representation(riesz_map="l2"))
-            solver.solve()
-            u_np1.assign(X)
-            receivers = assemble(interpolator_receivers.interpolate())
-            usol_recv.append(receivers)
-            if fwi:
-                J += compute_functional(receivers, true_receiver_data[step], P0DG)
-            if step % nspool == 0:
-                assert (
-                    norm(u_n) < 1
-                ), "Numerical instability. Try reducing dt or building the mesh differently"
-                if float(step*dt) > 0:
-                    helpers.display_progress(comm, float(step*dt))
-            u_nm1.assign(u_n)
-            u_n.assign(u_np1)
-        return J
-    debug = kwargs.get("debug")
-    if debug:
-        # Save the solution for debugging.
-        outfile = File("output.pvd")
-        outfile.write(u_n)
-    if fwi:
-        J = for_fwi()
-        return usol_recv, J
-    else:
-        only_forward()
-        return usol_recv
+        return receiver_data, J_val
 
+    def _linear_variational_solver(self, c, source_function):
+        V = self.V
+        dt = self.model["timeaxis"]["dt"]
+        u = TrialFunction(V)
+        v = TestFunction(V)
+        u_np1 = Function(V)  # timestep n+1
+        u_n = Function(V)  # timestep n
+        u_nm1 = Function(V)  # timestep n-1
 
-def compute_functional(guess_receivers, true_receiver_data, P0DG):
-    """Compute the functional for FWI.
+        qr_x, qr_s, _ = quadrature.quadrature_rules(V)
+        time_term = (1 / (c * c)) * (u - 2.0 * u_n + u_nm1) / Constant(dt**2) * v * dx(scheme=quad_rule)
 
-    Parameters
-    ----------
-    guess_receivers : firedrake.Function
-        The receivers from the forward simulation.
-    true_receiver_data : firedrake.Function
-        Supposed to be the receivers data from the true model.
+        nf = 0
+        if self.model["BCs"]["outer_bc"] == "non-reflective":
+            nf = (1/c) * ((u_n - u_nm1) / dt) * v * ds(scheme=qr_s)
 
-    Returns
-    -------
-    J : float
-        The functional.
-    """
-    misfit = Function(P0DG)
-    misfit.assign(guess_receivers - true_receiver_data)
-    J = 0.5 * assemble(inner(misfit, misfit) * dx)
-    return J
+        a = dot(grad(u_n), grad(v)) * dx(scheme=qr_x)
+        F = time_term + a + nf
+        lin_var = LinearVariationalProblem(lhs(F), rhs(F) + source_function, u_np1)
+        solver = LinearVariationalSolver(
+            lin_var,solver_parameters=self._solver_parameters())
+        return solver, u_np1, u_n, u_nm1
 
+    def _solver_parameters(self):
+        if self.model["opts"]["method"] == "KMV":
+            params = {"ksp_type": "preonly", "pc_type": "jacobi"}
+        elif (
+            self.model["opts"]["method"] == "CG"
+            and self.mesh.ufl_cell() != quadrilateral
+            and self.mesh.ufl_cell() != hexahedron
+        ):
+            params = {"ksp_type": "cg", "pc_type": "jacobi"}
+        elif self.model["opts"]["method"] == "CG" and (
+            self.mesh.ufl_cell() == quadrilateral 
+            or self.mesh.ufl_cell() == hexahedron
+        ):
+            params = {"ksp_type": "preonly", "pc_type": "jacobi"}
+        else:
+            raise ValueError("method is not yet supported")
 
-def set_params(method, mesh):
-    if method == "KMV":
-        params = {"ksp_type": "preonly", "pc_type": "jacobi"}
-    elif (
-        method == "CG"
-        and mesh.ufl_cell() != quadrilateral
-        and mesh.ufl_cell() != hexahedron
-    ):
-        params = {"ksp_type": "cg", "pc_type": "jacobi"}
-    elif method == "CG" and (
-        mesh.ufl_cell() == quadrilateral or mesh.ufl_cell() == hexahedron
-    ):
-        params = {"ksp_type": "preonly", "pc_type": "jacobi"}
-    else:
-        raise ValueError("method is not yet supported")
-
-    return params
+        return params

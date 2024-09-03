@@ -111,31 +111,6 @@ class Sources(spyro.receivers.Receivers.Receivers):
 
         return rhs_forcing
 
-    def apply_source_based_in_vom(self, source_number, W):
-        """Applie source using VertexOnlyMesh (VOM).
-
-        Parameters
-        ----------
-        source_number : int
-            The source number.
-        W : Firedrake.FunctionSpace
-            The space of the finite elements.
-
-        Returns
-        -------
-        interp : Firedrake.Interpolator
-            An interpolator object. This object is used to interpolate the
-            forcing point into a function space W.
-        forcing_point : Function
-            A function that represents the forcing point.
-        """
-        vom_mesh = VertexOnlyMesh(self.mesh, [self.receiver_locations[source_number]])
-        vom_space = FunctionSpace(vom_mesh, "DG", 0)
-        forcing_point = assemble(Constant(1.0)*TestFunction(vom_space)*dx)
-        interp = Interpolator(TestFunction(W), vom_space)
-        return interp, forcing_point
-
-
 def timedependentSource(model, t, freq=None, amp=1, delay=1.5):
     if model["acquisition"]["source_type"] == "Ricker":
         return ricker_wavelet(t, freq, amp, delay=delay)
