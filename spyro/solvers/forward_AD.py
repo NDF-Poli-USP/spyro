@@ -91,7 +91,16 @@ class ForwardSolver:
         J_val = 0.0
         receiver_data = []
         total_steps = int(self.model["timeaxis"]["tf"] / self.model["timeaxis"]["dt"])
-        for step in range(total_steps):
+        if (
+            fire_ad.get_working_tape()._checkpoint_manager
+            and self.model["aut_dif"]["checkpointing"]
+        ):
+            time_range = fire_ad.get_working_tape().timestepper(
+                iter(range(total_steps)))
+        else:
+            time_range = range(total_steps)
+
+        for step in time_range:
             source_function.assign(wavelet[step] * q_s)
             solver.solve()
             u_nm1.assign(u_n)
