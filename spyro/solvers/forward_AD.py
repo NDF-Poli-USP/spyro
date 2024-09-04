@@ -32,7 +32,7 @@ class ForwardSolver:
 
     def execute_acoustic(
             self, c, source_number, wavelet, compute_functional=False,
-            true_data_receivers=None, annotate=False
+            true_data_receivers=None
             ):
         """Time-stepping acoustic forward solver.
 
@@ -52,10 +52,6 @@ class ForwardSolver:
             data must be provided.
         true_data_receivers : list, optional
             True receiver data. This is used to compute the functional.
-        annotate : bool, optional
-            Whether to annotate the forward solver. Annotated solvers are
-            used for automated adjoint computations from automatic
-            differentiation.
 
         Returns
         -------
@@ -69,8 +65,6 @@ class ForwardSolver:
             functional.
         """
         self.solution = None
-        if annotate:
-            fire_ad.continue_annotation()
         # RHS
         source_function = fire.Cofunction(self.V.dual())
         solver, u_np1, u_n, u_nm1 = central_difference_acoustic(
@@ -102,13 +96,14 @@ class ForwardSolver:
             solver.solve()
             u_nm1.assign(u_n)
             u_n.assign(u_np1)
-            receiver_data.append(fire.assemble(interpolate_receivers))
+            rec_data = fire.assemble(interpolate_receivers)
+            receiver_data.append(rec_data)
             if compute_functional:
                 if not true_data_receivers:
                     raise ValueError("True receiver data is required for"
                                      "computing the functional.")
-                misfit = receiver_data - true_data_receivers[step]
-                J_val += fire.assemble(0.5 * fire.inner(misfit, misfit) * dx)
+                misfit = rec_data - true_data_receivers[step]
+                J_val += fire.assemble(0.5 * fire.inner(misfit, misfit) * fire.dx)
         self.solution = u_np1
         return receiver_data, J_val
 

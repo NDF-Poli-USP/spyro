@@ -66,17 +66,6 @@ model["timeaxis"] = {
 }
 
 
-# Use emsemble parallelism.
-M = model["parallelism"]["num_spacial_cores"]
-my_ensemble = fire.Ensemble(fire.COMM_WORLD, M)
-mesh = fire.UnitSquareMesh(50, 50, comm=my_ensemble.comm)
-element = fire.FiniteElement(
-    model["opts"]["method"], mesh.ufl_cell(), degree=model["opts"]["degree"],
-    variant=model["opts"]["quadrature"]
-    )
-V = fire.FunctionSpace(mesh, element)
-
-
 def make_vp_circle(vp_guess=False, plot_vp=False):
     """Acoustic velocity model"""
     x, z = fire.SpatialCoordinate(mesh)
@@ -88,9 +77,20 @@ def make_vp_circle(vp_guess=False, plot_vp=False):
             + 1 * fire.tanh(100 * (0.125 - fire.sqrt((x - 0.5) ** 2 + (z - 0.5) ** 2)))
         )
     if plot_vp:
-        outfile = fire.File("acoustic_cp.pvd")
+        outfile = fire.VTKFile("acoustic_cp.pvd")
         outfile.write(vp)
     return vp
+
+
+# Use emsemble parallelism.
+M = model["parallelism"]["num_spacial_cores"]
+my_ensemble = fire.Ensemble(fire.COMM_WORLD, M)
+mesh = fire.UnitSquareMesh(50, 50, comm=my_ensemble.comm)
+element = fire.FiniteElement(
+    model["opts"]["method"], mesh.ufl_cell(), degree=model["opts"]["degree"],
+    variant=model["opts"]["quadrature"]
+    )
+V = fire.FunctionSpace(mesh, element)
 
 
 forward_solver = spyro.solvers.forward_ad.ForwardSolver(model, mesh, V)
