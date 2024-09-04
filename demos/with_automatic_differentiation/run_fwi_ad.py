@@ -53,6 +53,7 @@ model["acquisition"] = {
 }
 model["aut_dif"] = {
     "status": True,
+    "checkpointing": False,
 }
 
 model["timeaxis"] = {
