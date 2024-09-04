@@ -3,7 +3,10 @@ import firedrake.adjoint as fire_ad
 from checkpoint_schedules import Revolve
 import spyro
 from demos.with_automatic_differentiation import utils
+import os
+os.environ["OMP_NUM_THREADS"] = "1"
 
+# --- Basid setup to run a FWI --- #
 model = utils.model_settings()
 
 
@@ -79,6 +82,7 @@ V = fire.FunctionSpace(mesh, element)
 
 
 forward_solver = spyro.solvers.forward_ad.ForwardSolver(model, mesh, V)
+# Camembert model.
 c_true = utils.make_c_camembert(mesh, V)
 # Ricker wavelet
 wavelet = spyro.full_ricker_wavelet(
