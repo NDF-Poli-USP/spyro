@@ -1,6 +1,7 @@
 import firedrake as fire
 import firedrake.adjoint as fire_ad
 import spyro
+from numpy.random import rand
 
 
 # --- Basid setup to run a forward simulation with AD --- #
@@ -127,5 +128,6 @@ def test_taylor():
     # parallel the functional and its gradient associated.
     J_hat = fire_ad.EnsembleReducedFunctional(
         J, fire_ad.Control(c_guess), my_ensemble)
-
-    assert fire_ad.taylor_test(J_hat, c_guess, fire.Function(V).assign(1.0)) > 1.9
+    h = fire.Function(V)
+    h.dat.data[:] = rand(V.dim())
+    assert fire_ad.taylor_test(J_hat, c_guess, h) > 1.9
