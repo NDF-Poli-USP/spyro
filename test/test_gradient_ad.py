@@ -63,20 +63,20 @@ model["timeaxis"] = {
 }
 
 
-def make_vp_circle(V, mesh, vp_guess=False, plot_vp=False):
+def make_c_camembert(V, mesh, c_guess=False, plot_c=False):
     """Acoustic velocity model"""
     x, z = fire.SpatialCoordinate(mesh)
-    if vp_guess:
-        vp = fire.Function(V).interpolate(1.5 + 0.0 * x)
+    if c_guess:
+        c = fire.Function(V).interpolate(1.5 + 0.0 * x)
     else:
-        vp = fire.Function(V).interpolate(
+        c = fire.Function(V).interpolate(
             2.5
             + 1 * fire.tanh(100 * (0.125 - fire.sqrt((x - 0.5) ** 2 + (z - 0.5) ** 2)))
         )
-    if plot_vp:
+    if plot_c:
         outfile = fire.VTKFile("acoustic_cp.pvd")
-        outfile.write(vp)
-    return vp
+        outfile.write(c)
+    return c
 
 
 def forward(
@@ -112,11 +112,11 @@ def test_taylor():
         model["timeaxis"]["dt"], model["timeaxis"]["tf"],
         model["acquisition"]["frequency"],
     )
-    c_true = make_vp_circle(V, mesh)
+    c_true = make_c_camembert(V, mesh)
     true_rec, _ = forward(c_true, fwd_solver, wavelet, my_ensemble)
 
     # --- Gradient with AD --- #
-    c_guess = make_vp_circle(V, mesh, vp_guess=True)
+    c_guess = make_c_camembert(V, mesh, c_guess=True)
     _, J = forward(
         c_guess, fwd_solver, wavelet, my_ensemble,
         compute_functional=True,

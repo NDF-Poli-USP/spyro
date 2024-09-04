@@ -66,20 +66,20 @@ model["timeaxis"] = {
 }
 
 
-def make_vp_circle(vp_guess=False, plot_vp=False):
+def make_c_camembert(c_guess=False, plot_c=False):
     """Acoustic velocity model"""
     x, z = fire.SpatialCoordinate(mesh)
-    if vp_guess:
-        vp = fire.Function(V).interpolate(1.5 + 0.0 * x)
+    if c_guess:
+        c = fire.Function(V).interpolate(1.5 + 0.0 * x)
     else:
-        vp = fire.Function(V).interpolate(
+        c = fire.Function(V).interpolate(
             2.5
             + 1 * fire.tanh(100 * (0.125 - fire.sqrt((x - 0.5) ** 2 + (z - 0.5) ** 2)))
         )
-    if plot_vp:
+    if plot_c:
         outfile = fire.VTKFile("acoustic_cp.pvd")
-        outfile.write(vp)
-    return vp
+        outfile.write(c)
+    return c
 
 
 # Use emsemble parallelism.
@@ -95,7 +95,7 @@ V = fire.FunctionSpace(mesh, element)
 
 forward_solver = spyro.solvers.forward_ad.ForwardSolver(model, mesh, V)
 
-c_true = make_vp_circle()
+c_true = make_c_camembert()
 # Ricker wavelet
 wavelet = spyro.full_ricker_wavelet(
     model["timeaxis"]["dt"], model["timeaxis"]["tf"],
