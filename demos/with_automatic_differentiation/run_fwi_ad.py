@@ -91,7 +91,7 @@ def forward(
         receiver_data = []
         J = 0.0
         for sn in range(len(model["acquisition"]["source_pos"])):
-            rec_data, J_val = forward_solver.execute(c, sn, wavelet)
+            rec_data, J_val = forward_solver.execute_acoustic(c, sn, wavelet)
             receiver_data.append(rec_data)
             J += J_val
             sol = forward_solver.solution
