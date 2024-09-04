@@ -1,5 +1,6 @@
 import firedrake as fire
 import firedrake.adjoint as fire_ad
+from checkpoint_schedules import Revolve
 import spyro
 
 
@@ -53,12 +54,12 @@ model["acquisition"] = {
 }
 model["aut_dif"] = {
     "status": True,
-    "checkpointing": False,
+    "checkpointing": True,
 }
 
 model["timeaxis"] = {
     "t0": 0.0,  # Initial time for event
-    "tf": 0.6,  # Final time for event (for test 7)
+    "tf": 0.8,  # Final time for event (for test 7)
     "dt": 0.001,  # timestep size (divided by 2 in the test 4. dt for test 3 is 0.00050)
     "amplitude": 1,  # the Ricker has an amplitude of 1.
     "nspool": 20,  # (20 for dt=0.00050) how frequently to output solution to pvds
@@ -87,6 +88,12 @@ def forward(
 ):
     if annotate:
         fire_ad.continue_annotation()
+        if model["aut_dif"]["checkpointing"]:
+            total_steps = int(model["timeaxis"]["tf"] / model["timeaxis"]["dt"])
+            steps_store = int(total_steps / 10)  # Store 10% of the steps.
+            tape = fire_ad.get_working_tape()
+            tape.progress_bar = fire.ProgressBar
+            tape.enable_checkpointing(Revolve(total_steps, steps_store))
     if model["parallelism"]["type"] is None:
         outfile = fire.VTKFile("solution.pvd")
         receiver_data = []
@@ -147,8 +154,9 @@ guess_rec, J = forward(
 # (3 in this case).
 J_hat = fire_ad.EnsembleReducedFunctional(
     J, fire_ad.Control(c_guess), my_ensemble)
-fire_ad.taylor_test(J_hat, c_guess, fire.Function(V).assign(1.0))
 c_optimised = fire_ad.minimize(J_hat, method="L-BFGS-B",
                                options={"disp": True, "maxiter": 10},
                                bounds=(1.5, 3.5),
                                derivative_options={"riesz_representation": 'l2'})
+
+fire.VTKFile("c_optimised.pvd").write(c_optimised)
