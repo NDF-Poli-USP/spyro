@@ -85,7 +85,7 @@ class Delta_projector:
             self.quadrilateral = False
         self.is_local = None
 
-    def build_maps(self):
+    def build_maps(self, order=0):
         """Calculates and stores tabulations for interpolation
 
         Is always automatticaly called when initializing the class,
@@ -114,7 +114,7 @@ class Delta_projector:
             self.cellVertices,
             self.cellNodeMaps,
         ) = self.__point_locator()
-        self.cell_tabulations = self.__func_build_cell_tabulations()
+        self.cell_tabulations = self.__func_build_cell_tabulations(order)
 
         self.number_of_points = len(self.point_locations)
 
@@ -163,20 +163,40 @@ class Delta_projector:
 
         return at
 
-    def __func_build_cell_tabulations(self):
+    def __func_build_cell_tabulations(self, order):
+        if order != 0 and order != 1:
+            raise NotImplementedError
+        
         element = self.choose_element()
 
-        cell_tabulations = np.zeros(
-            (self.number_of_points, self.nodes_per_cell)
-        )
+        if order == 0:
+            tab_shape = (self.number_of_points, self.nodes_per_cell)
+        elif order == 1:
+            tab_shape = (self.number_of_points, self.nodes_per_cell, self.dimension)
+        cell_tabulations = np.zeros(tab_shape)
 
         for receiver_id in range(self.number_of_points):
             cell_id = self.is_local[receiver_id]
             if cell_id is not None:
                 p_reference = self.__reference_element(receiver_id)
-                initial_tab = element.tabulate(0, [p_reference])
-                tab = initial_tab[(0,) * self.dimension]
-                cell_tabulations[receiver_id, :] = tab.transpose()
+                initial_tab = element.tabulate(order, [p_reference])
+
+                if order == 0:
+                    tab = initial_tab[(0,) * self.dimension].transpose()
+                elif order == 1:
+                    if self.dimension == 2:
+                        tab_x1 = initial_tab[(1, 0)]
+                        tab_x2 = initial_tab[(0, 1)]
+                        tab = np.hstack([tab_x1, tab_x2])
+                    elif self.dimension == 3:
+                        tab_x1 = initial_tab[(1, 0, 0)]
+                        tab_x2 = initial_tab[(0, 1, 0)]
+                        tab_x3 = initial_tab[(0, 0, 1)]
+                        tab = np.hstack([tab_x1, tab_x2, tab_x3])
+                    else:
+                        raise NotImplementedError
+
+                cell_tabulations[receiver_id, :] = tab
 
         return cell_tabulations
     
