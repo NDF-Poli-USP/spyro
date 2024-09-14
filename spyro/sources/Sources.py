@@ -67,10 +67,14 @@ class Sources(Delta_projector):
 
         self.point_locations = wave_object.source_locations
         self.number_of_points = wave_object.number_of_sources
+        self.amplitude = wave_object.amplitude
         self.is_local = [0] * self.number_of_points
         self.current_source = None
         self.update_wavelet(wave_object)
-        self.build_maps()
+        if np.isscalar(self.amplitude) or (self.amplitude.size <= 3):
+            self.build_maps(order=0)
+        else:
+            self.build_maps(order=1)
 
     def update_wavelet(self, wave_object):
         self.wavelet = full_ricker_wavelet(
@@ -78,7 +82,6 @@ class Sources(Delta_projector):
             final_time=wave_object.final_time,
             frequency=wave_object.frequency,
             delay=wave_object.delay,
-            amplitude=wave_object.amplitude,
             delay_type=wave_object.delay_type,
         )
 
@@ -102,7 +105,7 @@ class Sources(Delta_projector):
                 for i in range(len(self.cellNodeMaps[source_id])):
                     rhs_forcing.dat.data_with_halos[
                         int(self.cellNodeMaps[source_id][i])
-                    ] = (self.wavelet[step] * self.cell_tabulations[source_id][i])
+                    ] = (self.wavelet[step] * np.dot(self.amplitude, self.cell_tabulations[source_id][i]))
             else:
                 for i in range(len(self.cellNodeMaps[source_id])):
                     tmp = rhs_forcing.dat.data_with_halos[0]  # noqa: F841
@@ -161,7 +164,6 @@ def full_ricker_wavelet(
     dt,
     final_time,
     frequency,
-    amplitude=1.0,
     cutoff=None,
     delay=1.5,
     delay_type="multiples_of_minimun",
@@ -177,8 +179,6 @@ def full_ricker_wavelet(
         Final time
     frequency: float
         Frequency of the wavelet
-    amplitude: float
-        Amplitude of the wavelet
     cutoff: float
         Cutoff frequency in Hertz
     delay: float
@@ -196,14 +196,10 @@ def full_ricker_wavelet(
     """
     nt = int(final_time / dt) + 1  # number of timesteps
     time = 0.0
-    if np.isscalar(amplitude):
-        full_wavelet = np.zeros((nt,))
-    else:
-        ndim = len(amplitude)
-        full_wavelet = np.zeros((nt, ndim))
+    full_wavelet = np.zeros((nt,))
     for t in range(nt):
         full_wavelet[t] = ricker_wavelet(
-            time, frequency, amplitude, delay=delay, delay_type=delay_type
+            time, frequency, 1, delay=delay, delay_type=delay_type
         )
         time += dt
     if cutoff is not None:
@@ -213,9 +209,5 @@ def full_ricker_wavelet(
         normal_cutoff = cutoff / nyq
         # Get the filter coefficients
         b, a = butter(order, normal_cutoff, btype="low", analog=False)
-        if np.isscalar(amplitude):
-            full_wavelet = filtfilt(b, a, full_wavelet)
-        else:
-            for i in range(ndim):
-                full_wavelet[:, i] = filtfilt(b, a, full_wavelet[:, i])
+        full_wavelet = filtfilt(b, a, full_wavelet)
     return full_wavelet

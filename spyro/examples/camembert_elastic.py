@@ -6,8 +6,7 @@ import firedrake as fire
 import numpy as np
 import spyro
 
-Lz = 500 # [m]
-Lx = 500 # [m]
+L = 500 # [m]
 
 rho = 7850          # [kg/m3]
 lambda_in = 6.86e9  # [Pa]
@@ -19,17 +18,16 @@ smag = 1e6
 freq = 2 # Central frequency of Ricker wavelet [Hz]
 hf =  90 # [m]
 hs = 100 # [m]
-source_locations = spyro.create_transect((-hf, 0.2*Lx), (-hf, 0.8*Lx), 3)
-receiver_locations = spyro.create_transect((-hs, 0), (-hs, Lx), 40)
-source_locations = [[-hf, 0.5*Lx]]
+source_locations = spyro.create_transect((-hf, 0.2*L), (-hf, 0.8*L), 3)
+receiver_locations = spyro.create_transect((-hs, 0), (-hs, L), 40)
+source_locations = [[-hf, 0.5*L]]
 
 time_step = 2e-4 # [s]
 final_time = 1.5 # [s]
 out_freq = int(0.01/time_step)
 
-nz = 20
-nx = 20
-mesh = fire.RectangleMesh(nz, nx, 0, Lx, originX=-Lz, diagonal='crossed')
+n = 20
+mesh = fire.RectangleMesh(n, n, 0, L, originX=-L, diagonal='crossed')
 z, x = fire.SpatialCoordinate(mesh)
 
 zc = 250 # [m]
@@ -62,6 +60,8 @@ d["acquisition"] = {
     "delay": 0,
     "delay_type": "time",
     "amplitude": np.array([0, smag]),
+    #"amplitude": smag * np.eye(2),
+    #"amplitude": smag * np.array([[0, 1], [-1, 0]]),
     "receiver_locations": receiver_locations,
 }
 
