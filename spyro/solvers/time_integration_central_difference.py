@@ -21,7 +21,7 @@ def central_difference(wave, source_id=0):
     """
     if wave.sources is not None:
         wave.sources.current_source = source_id
-        rhs_forcing = fire.Function(wave.function_space)
+        rhs_forcing = fire.Cofunction(wave.function_space.dual())
 
     filename, file_extension = wave.forward_output_file.split(".")
     output_filename = filename + "sn" + str(source_id) + "." + file_extension
