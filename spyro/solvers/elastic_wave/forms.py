@@ -1,6 +1,6 @@
 import numpy as np
 
-from firedrake import (assemble, Constant, div, dot, dx, Function, grad,
+from firedrake import (assemble, Cofunction, Constant, div, dot, dx, grad,
                        inner, lhs, LinearSolver, rhs, TestFunction, TrialFunction)
 
 from .local_abc import clayton_engquist_A1
@@ -48,7 +48,7 @@ def isotropic_elastic_without_pml(wave):
     wave.solver = LinearSolver(A, solver_parameters=wave.solver_parameters)
 
     wave.rhs = rhs(F)
-    wave.B = Function(V)
+    wave.B = Cofunction(V.dual())
 
 def isotropic_elastic_with_pml():
     raise NotImplementedError

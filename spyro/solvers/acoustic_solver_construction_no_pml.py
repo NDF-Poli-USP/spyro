@@ -40,7 +40,7 @@ def construct_solver_or_matrix_no_pml(Wave_object):
     if q is not None:
         le = q * v * dx(scheme=quad_rule)
 
-    B = fire.Function(V)
+    B = fire.Cofunction(V.dual())
 
     form = m1 + a - le
     lhs = fire.lhs(form)
