@@ -37,4 +37,6 @@ For running the automated tests:
 ````
 cd shared/spyro/
 python3 -m pytest --maxfail=1 test/
+python3 -m pytest --maxfail=1 test_3d/
+mpiexec -n 6 python3 -m pytest --maxfail=1 test_parallel/
 ````

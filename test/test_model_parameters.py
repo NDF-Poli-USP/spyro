@@ -337,7 +337,7 @@ def test_dictionary_conversion():
         same = False
     if model_from_new.dimension != model_from_old.dimension:
         same = False
-    if model_from_new.dt != model_from_old.dt:
+    if model_from_new._dt != model_from_old._dt:
         same = False
     if model_from_new.final_time != model_from_old.final_time:
         same = False

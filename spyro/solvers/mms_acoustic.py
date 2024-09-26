@@ -9,6 +9,7 @@ class AcousticWaveMMS(AcousticWave):
     the whole domain, which generates a known solution for comparison.
     """
 
+    @override
     def matrix_building(self):
         self.mms_source_in_space()
         self.q_t = fire.Constant(0)

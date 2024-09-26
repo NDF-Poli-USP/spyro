@@ -13,8 +13,6 @@ def central_difference(wave, source_id=0):
     -----------
     wave: Spyro object
         The Wave object containing the necessary data and parameters.
-    source_id: int (optional)
-        The ID of the source being propagated. Defaults to 0.
 
     Returns:
     --------
@@ -23,7 +21,7 @@ def central_difference(wave, source_id=0):
     """
     if wave.sources is not None:
         wave.sources.current_source = source_id
-        rhs_forcing = fire.Function(wave.function_space)
+        rhs_forcing = fire.Cofunction(wave.function_space.dual())
 
     filename, file_extension = wave.forward_output_file.split(".")
     output_filename = filename + "sn" + str(source_id) + "." + file_extension
@@ -50,9 +48,8 @@ def central_difference(wave, source_id=0):
 
         # More efficient way of applying sources
         if wave.sources is not None:
-            rhs_forcing.assign(0.0)
-            f = wave.sources.apply_source(rhs_forcing, wave.wavelet[step])
-            B0 = wave.B.sub(0)
+            f = wave.sources.apply_source(rhs_forcing, step)
+            B0 = wave.rhs_no_pml()
             B0 += f
         
         wave.solver.solve(wave.next_vstate, wave.B)
