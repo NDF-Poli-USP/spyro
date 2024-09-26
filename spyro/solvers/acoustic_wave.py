@@ -2,9 +2,8 @@ import firedrake as fire
 import warnings
 
 from .wave import Wave
-from .time_integration import time_integrator
-from ..io.basicio import ensemble_propagator, ensemble_gradient
-from ..domains.quadrature import quadrature_rules
+
+from ..io.basicio import ensemble_gradient
 from .acoustic_solver_construction_no_pml import (
     construct_solver_or_matrix_no_pml,
 )
@@ -14,6 +13,7 @@ from .acoustic_solver_construction_with_pml import (
 from .backward_time_integration import (
     backward_wave_propagator,
 )
+from ..domains.space import FE_method
 from ..utils.typing import override
 
 class AcousticWave(Wave):
@@ -26,41 +26,13 @@ class AcousticWave(Wave):
             self.c, name="velocity"
         )
 
-    def forward_solve(self):
-        """Solves the forward problem.
-
-        Parameters:
-        -----------
-        None
-
-        Returns:
-        --------
-        None
-        """
-        if self.function_space is None:
-            self.force_rebuild_function_space()
-
-        self._initialize_model_parameters()
-        self.c = self.initial_velocity_model
-        self.matrix_building()
-        self.wave_propagator()
-
-    def force_rebuild_function_space(self):
-        if self.mesh is None:
-            self.mesh = self.get_mesh()
-        self._build_function_space()
-        self._map_sources_and_receivers()
-
+    @override
     def matrix_building(self):
         """Builds solver operators. Doesn't create mass matrices if
         matrix_free option is on,
         which it is by default.
         """
         self.current_time = 0.0
-        quad_rule, k_rule, s_rule = quadrature_rules(self.function_space)
-        self.quadrature_rule = quad_rule
-        self.stiffness_quadrature_rule = k_rule
-        self.surface_quadrature_rule = s_rule
 
         abc_type = self.abc_boundary_layer_type
 
@@ -84,37 +56,6 @@ class AcousticWave(Wave):
             self.X_nm1 = None
             self.X_np1 = fire.Function(V * Z)
             construct_solver_or_matrix_with_pml(self)
-
-    @ensemble_propagator
-    def wave_propagator(self, dt=None, final_time=None, source_num=0):
-        """Propagates the wave forward in time.
-        Currently uses central differences.
-
-        Parameters:
-        -----------
-        dt: Python 'float' (optional)
-            Time step to be used explicitly. If not mentioned uses the default,
-            that was estabilished in the wave object.
-        final_time: Python 'float' (optional)
-            Time which simulation ends. If not mentioned uses the default,
-            that was estabilished in the wave object.
-
-        Returns:
-        --------
-        usol: Firedrake 'Function'
-            Pressure wavefield at the final time.
-        u_rec: numpy array
-            Pressure wavefield at the receivers across the timesteps.
-        """
-        if final_time is not None:
-            self.final_time = final_time
-        if dt is not None:
-            self.dt = dt
-
-        self.current_source = source_num
-        usol, usol_recv = time_integrator(self, source_id=source_num)
-
-        return usol, usol_recv
 
     @ensemble_gradient
     def gradient_solve(self, guess=None, misfit=None, forward_solution=None):
@@ -149,33 +90,33 @@ class AcousticWave(Wave):
 
     @override
     def _initialize_model_parameters(self):
-        if self.initial_velocity_model is not None:
-            return None
+        if self.initial_velocity_model is None:
+            if self.initial_velocity_model_file is None:
+                raise ValueError("No velocity model or velocity file to load.")
 
-        if self.initial_velocity_model_file is None:
-            raise ValueError("No velocity model or velocity file to load.")
+            if self.initial_velocity_model_file.endswith(".segy"):
+                vp_filename, vp_filetype = os.path.splitext(
+                    self.initial_velocity_model_file
+                )
+                warnings.warn("Converting segy file to hdf5")
+                write_velocity_model(
+                    self.initial_velocity_model_file, ofname=vp_filename
+                )
+                self.initial_velocity_model_file = vp_filename + ".hdf5"
 
-        if self.initial_velocity_model_file.endswith(".segy"):
-            vp_filename, vp_filetype = os.path.splitext(
-                self.initial_velocity_model_file
-            )
-            warnings.warn("Converting segy file to hdf5")
-            write_velocity_model(
-                self.initial_velocity_model_file, ofname=vp_filename
-            )
-            self.initial_velocity_model_file = vp_filename + ".hdf5"
+            if self.initial_velocity_model_file.endswith((".hdf5", ".h5")):
+                self.initial_velocity_model = interpolate(
+                    self,
+                    self.initial_velocity_model_file,
+                    self.function_space.sub(0),
+                )
 
-        if self.initial_velocity_model_file.endswith((".hdf5", ".h5")):
-            self.initial_velocity_model = interpolate(
-                self,
-                self.initial_velocity_model_file,
-                self.function_space.sub(0),
-            )
-
-        if self.debug_output:
-            fire.File("initial_velocity_model.pvd").write(
-                self.initial_velocity_model, name="velocity"
-            )
+            if self.debug_output:
+                fire.File("initial_velocity_model.pvd").write(
+                    self.initial_velocity_model, name="velocity"
+                )
+        
+        self.c = self.initial_velocity_model
 
     @override
     def _set_vstate(self, vstate):
@@ -237,3 +178,14 @@ class AcousticWave(Wave):
     @override
     def get_function_name(self):
         return "Pressure"
+    
+    @override
+    def _create_function_space(self):
+        return FE_method(self.mesh, self.method, self.degree)
+
+    @override
+    def rhs_no_pml(self):
+        if self.abc_boundary_layer_type == "PML":
+            return self.B.sub(0)
+        else:
+            return self.B
