@@ -67,7 +67,7 @@ final_time = 1.0
 
 dictionary = {}
 dictionary["options"] = {
-    "cell_type": "Q",  # simplexes such as triangles or tetrahedra (T) or quadrilaterals (Q)
+    "cell_type": "T",  # simplexes such as triangles or tetrahedra (T) or quadrilaterals (Q)
     "variant": "lumped",  # lumped, equispaced or DG, default is lumped
     "degree": 4,  # p order
     "dimension": 2,  # dimension
