@@ -1,6 +1,6 @@
 [![DOI](https://zenodo.org/badge/318542339.svg)](https://zenodo.org/badge/latestdoi/318542339)
 [![Python tests](https://github.com/NDF-Poli-USP/spyro/actions/workflows/python-tests.yml/badge.svg)](https://github.com/NDF-Poli-USP/spyro/actions/workflows/python-tests.yml)
-[![codecov](https://codecov.io/gh/Olender/spyro-1/graph/badge.svg?token=69M30UMRFD)](https://codecov.io/gh/Olender/spyro-1)
+[![codecov](https://codecov.io/gh/NDF-Poli-USP/spyro/graph/badge.svg?token=8NM4N4N7YW)](https://codecov.io/gh/NDF-Poli-USP/spyro)
 
 spyro: seismic parallel inversion and reconstruction optimization framework
 ============================================
