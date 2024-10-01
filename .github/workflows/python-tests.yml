@@ -17,53 +17,29 @@ jobs:
     - uses: actions/checkout@v3
     - name: Running serial tests
       run: |
-          source /home/olender/Firedrakes/newest3/firedrake/bin/activate
+          source /home/olender/firedrakes/2024_09_11/firedrake/bin/activate
           pytest --cov-report=xml --cov=spyro test/
     - name: Running parallel 3D forward test
       run: |
-          source /home/olender/Firedrakes/newest3/firedrake/bin/activate
+          source /home/olender/firedrakes/2024_09_11/firedrake/bin/activate
           mpiexec -n 6 pytest test_3d/test_hexahedral_convergence.py
           mpiexec -n 6 pytest test_parallel/test_forward.py
           mpiexec -n 6 pytest test_parallel/test_fwi.py
     - name: Covering parallel 3D forward test
       continue-on-error: true
       run: |
-          source /home/olender/Firedrakes/newest3/firedrake/bin/activate
+          source /home/olender/firedrakes/2024_09_11/firedrake/bin/activate
           mpiexec -n 6 pytest --cov-report=xml --cov-append --cov=spyro test_3d/test_hexahedral_convergence.py
     - name: Covering parallel forward test
       continue-on-error: true
       run: |
-          source /home/olender/Firedrakes/newest3/firedrake/bin/activate
+          source /home/olender/firedrakes/2024_09_11/firedrake/bin/activate
           mpiexec -n 6 pytest --cov-report=xml --cov-append --cov=spyro test_parallel/test_forward.py
     - name: Covering parallel fwi test
       continue-on-error: true
       run: |
-          source /home/olender/Firedrakes/newest3/firedrake/bin/activate
+          source /home/olender/firedrakes/2024_09_11/firedrake/bin/activate
           mpiexec -n 6 pytest --cov-report=xml --cov-append --cov=spyro test_parallel/test_fwi.py
-    # - name: Running serial tests for adjoint
-    #   run: |
-    #       source /home/olender/Firedrakes/main/firedrake/bin/activate
-    #       pytest -n 10 --cov-report=xml --cov-append --cov=spyro test_ad/
-    # - name: Running parallel tests
-    #   run: |
-    #       source /home/olender/Firedrakes/main/firedrake/bin/activate
-    #       cp /home/olender/Testing_files/velocity_models/* velocity_models/
-    #       cp /home/olender/Testing_files/meshes/* meshes/
-    #       mpiexec -n 10 pytest test_parallel/test_forward.py
-    # - name: Covering parallel tests
-    #   continue-on-error: true
-    #   run: |
-    #       source /home/olender/Firedrakes/main/firedrake/bin/activate
-    #       cp /home/olender/Testing_files/velocity_models/* velocity_models/
-    #       cp /home/olender/Testing_files/meshes/* meshes/
-    #       mpiexec -n 10 pytest --cov-report=xml --cov-append --cov=spyro test_parallel/test_forward.py
-    # - name: Covering parallel 3D forward test
-    #   continue-on-error: true
-    #   run: |
-    #       source /home/olender/Firedrakes/main/firedrake/bin/activate
-    #       cp /home/olender/Testing_files/velocity_models/* velocity_models/
-    #       cp /home/olender/Testing_files/meshes/* meshes/
-    #       mpiexec -n 10 pytest --cov-report=xml --cov-append --cov=spyro test_3d/test_forward_3d.py 
     - name: Uploading coverage to Codecov
-      run: export CODECOV_TOKEN="057ec853-d7ea-4277-819b-0c5ea2f9ff57" && bash <(curl -s https://codecov.io/bash)
+      run: export CODECOV_TOKEN="6cd21147-54f7-4b77-94ad-4b138053401d" && bash <(curl -s https://codecov.io/bash)
 

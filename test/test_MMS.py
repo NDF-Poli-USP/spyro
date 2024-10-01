@@ -5,26 +5,7 @@ from firedrake import *
 import spyro
 
 from .model import dictionary as model
-
 model["acquisition"]["source_type"] = "MMS"
-
-
-@pytest.fixture(params=["triangle", "square"])
-def mesh_type(request):
-    if mesh_type == "triangle":
-        model["cell_type"] = "triangles"
-    elif mesh_type == "square":
-        model["cell_type"] = "quadrilaterals"
-    return request.param
-
-
-@pytest.fixture(params=["lumped", "equispaced"])
-def method_type(request):
-    if method_type == "lumped":
-        model["variant"] = "lumped"
-    elif method_type == "equispaced":
-        model["variant"] = "equispaced"
-    return request.param
 
 
 def run_solve(model):
@@ -41,12 +22,27 @@ def run_solve(model):
     return errornorm(u_num, u_an)
 
 
-def test_method(mesh_type, method_type):
+def run_method(mesh_type, method_type):
+    model["options"]["cell_type"] = mesh_type
+    model["options"]["variant"] = method_type
+    print(f"For {mesh_type} and {method_type}")
     error = run_solve(model)
+    test = math.isclose(error, 0.0, abs_tol=1e-7)
+    print(f"Error is {error}")
+    print(f"Test: {test}")
 
-    assert math.isclose(error, 0.0, abs_tol=1e-7)
+    assert test
 
-def test_isotropic_wave_2D(mesh_type, method_type):
+
+def test_method_triangles_lumped():
+    run_method("triangles", "lumped")
+
+
+def test_method_quads_lumped():
+    run_method("quadrilaterals", "lumped")
+
+
+def test_isotropic_wave_2D():
     u1 = lambda x, t: (x[0]**2 + x[0])*(x[1]**2 - x[1])*t
     u2 = lambda x, t: (2*x[0]**2 + 2*x[0])*(-x[1]**2 + x[1])*t
     u = lambda x, t: as_vector([u1(x, t), u2(x, t)])
@@ -89,3 +85,9 @@ def test_isotropic_wave_2D(mesh_type, method_type):
 
     assert math.isclose(e1, 0.0, abs_tol=1e-7)
     assert math.isclose(e2, 0.0, abs_tol=1e-7)
+
+if __name__ == "__main__":
+    test_method_triangles_lumped()
+    test_method_quads_lumped()
+
+    print("END")

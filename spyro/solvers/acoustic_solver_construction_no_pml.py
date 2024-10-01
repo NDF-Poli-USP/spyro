@@ -20,8 +20,10 @@ def construct_solver_or_matrix_no_pml(Wave_object):
 
     u_nm1 = fire.Function(V, name="pressure t-dt")
     u_n = fire.Function(V, name="pressure")
+    u_np1 = fire.Function(V, name="pressure t+dt")
     Wave_object.u_nm1 = u_nm1
     Wave_object.u_n = u_n
+    Wave_object.u_np1 = u_np1
 
     Wave_object.current_time = 0.0
     dt = Wave_object.dt
