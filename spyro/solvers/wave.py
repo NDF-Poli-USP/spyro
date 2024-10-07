@@ -9,6 +9,7 @@ from .time_integration_central_difference import central_difference as time_inte
 from ..domains.quadrature import quadrature_rules
 from ..io import Model_parameters, interpolate
 from ..io.basicio import ensemble_propagator
+from ..io.field_logger import FieldLogger
 from .. import utils
 from ..receivers.Receivers import Receivers
 from ..sources.Sources import Sources
@@ -90,6 +91,10 @@ class Wave(Model_parameters, metaclass=ABCMeta):
         self.source_expression = None
         # Object for efficient application of sources
         self.sources = None
+
+        self.field_logger = FieldLogger(self.comm, self.input_dictionary["visualization"])
+        self.field_logger.add_field("forward", self.get_function_name(),
+                                    lambda: self.get_function())
 
     def forward_solve(self):
         """Solves the forward problem."""

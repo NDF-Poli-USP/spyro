@@ -1,6 +1,5 @@
 import firedrake as fire
 
-from ..io.basicio import parallel_print
 from . import helpers
 from .. import utils
 
@@ -23,12 +22,8 @@ def central_difference(wave, source_id=0):
         wave.sources.current_source = source_id
         rhs_forcing = fire.Cofunction(wave.function_space.dual())
 
-    filename, file_extension = wave.forward_output_file.split(".")
-    output_filename = filename + "sn" + str(source_id) + "." + file_extension
-    if wave.forward_output:
-        parallel_print(f"Saving output in: {output_filename}", wave.comm)
+    wave.field_logger.start_logging(source_id)
     
-    output = fire.File(output_filename, comm=wave.comm.comm)
     wave.comm.comm.barrier()
 
     t = wave.current_time
@@ -68,10 +63,7 @@ def central_difference(wave, source_id=0):
                 fire.norm(wave.get_function()) < 1
             ), "Numerical instability. Try reducing dt or building the " \
                "mesh differently"
-            if wave.forward_output:
-                output.write(wave.get_function(), time=t,
-                             name=wave.get_function_name())
-
+            wave.field_logger.log(t)
             helpers.display_progress(wave.comm, t)
 
         t = step * float(wave.dt)
@@ -87,5 +79,7 @@ def central_difference(wave, source_id=0):
 
     wave.forward_solution = usol
     wave.forward_solution_receivers = usol_recv
+
+    wave.field_logger.stop_logging()
 
     return usol, usol_recv
