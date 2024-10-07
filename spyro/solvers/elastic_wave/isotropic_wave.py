@@ -1,12 +1,13 @@
 import numpy as np
 
-from firedrake import (Constant, DirichletBC, Function)
+from firedrake import (Constant, curl, DirichletBC, div, Function,
+                       FunctionSpace, project, VectorFunctionSpace)
+from typing import override
 
 from .elastic_wave import ElasticWave
 from .forms import (isotropic_elastic_without_pml,
                     isotropic_elastic_with_pml)
 from ...domains.space import FE_method
-from ...utils.typing import override
 
 class IsotropicWave(ElasticWave):
     '''Isotropic elastic wave propagator'''
@@ -27,6 +28,18 @@ class IsotropicWave(ElasticWave):
 
         # Boundary conditions
         self.bcs = []
+
+        # Variables for logging the P-wave
+        self.p_wave = None
+        self.D_h = None
+        self.field_logger.add_field("p-wave", "P-wave",
+                                    lambda: self.update_p_wave())
+
+        # Variables for logging the S-wave
+        self.s_wave = None
+        self.C_h = None
+        self.field_logger.add_field("s-wave", "S-wave",
+                                    lambda: self.update_s_wave())
     
     @override
     def initialize_model_parameters_from_object(self, synthetic_data_dict: dict):
@@ -179,3 +192,24 @@ class IsotropicWave(ElasticWave):
         if body_forces_data is not None:
             x_vec = self.get_spatial_coordinates()
             self.body_forces = body_forces_data(x_vec, self.time)
+    
+    def update_p_wave(self):
+        if self.p_wave == None:
+            self.D_h = FunctionSpace(self.mesh, "DG", 0)
+            self.p_wave = Function(self.D_h)
+        
+        self.p_wave.assign(project(div(self.get_function()), self.D_h))
+        
+        return self.p_wave
+
+    def update_s_wave(self):
+        if self.s_wave == None:
+            if self.dimension == 2:
+                self.C_h = FunctionSpace(self.mesh, "DG", 0)
+            else:
+                self.C_h = VectorFunctionSpace(self.mesh, "DG", 0)
+            self.s_wave = Function(self.C_h)
+        
+        self.s_wave.assign(project(curl(self.get_function()), self.C_h))
+        
+        return self.s_wave
