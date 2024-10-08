@@ -181,7 +181,3 @@ class Rectangle_acoustic(Example_model_acoustic):
                 )
         # cond = fire.conditional(self.mesh_z > z_switch, layer1, layer2)
         self.set_initial_velocity_model(conditional=cond)
-
-if __name__ == "__main__":
-    wave = Rectangle_acoustic()
-    wave.forward_solve()
