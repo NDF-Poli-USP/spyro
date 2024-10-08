@@ -2,12 +2,12 @@ import numpy as np
 
 from firedrake import (Constant, curl, DirichletBC, div, Function,
                        FunctionSpace, project, VectorFunctionSpace)
-from typing import override
 
 from .elastic_wave import ElasticWave
 from .forms import (isotropic_elastic_without_pml,
                     isotropic_elastic_with_pml)
 from ...domains.space import FE_method
+from ...utils.typing import override
 
 class IsotropicWave(ElasticWave):
     '''Isotropic elastic wave propagator'''
@@ -84,8 +84,8 @@ class IsotropicWave(ElasticWave):
                             f"    Lame second    : {bool(self.mu)}\n"\
                             f"    P-wave velocity: {bool(self.c)}\n"\
                             f"    S-wave velocity: {bool(self.c_s)}\n"\
-                            "The valid options are \{Density, Lame first, Lame second\} "\
-                            "or (exclusive) \{Density, P-wave velocity, S-wave velocity\}")
+                            "The valid options are {Density, Lame first, Lame second} "\
+                            "or (exclusive) {Density, P-wave velocity, S-wave velocity}")
     
     @override
     def initialize_model_parameters_from_file(self, synthetic_data_dict):
