@@ -156,7 +156,3 @@ class Camembert_acoustic(Rectangle_acoustic):
         )
         self.set_initial_velocity_model(conditional=cond, dg_velocity_model=False)
         return None
-
-if __name__ == "__main__":
-    wave = Camembert_acoustic()
-    wave.forward_solve()

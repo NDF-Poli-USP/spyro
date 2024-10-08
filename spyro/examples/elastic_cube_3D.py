@@ -88,7 +88,3 @@ d["absorving_boundary_conditions"] = {
 
 wave = spyro.IsotropicWave(d)
 wave.set_mesh(mesh_parameters={'dx': h})
-
-print(f'Number of degrees of freedom: {wave.function_space.dim()}')
-
-wave.forward_solve()
