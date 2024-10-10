@@ -59,7 +59,7 @@ def construct_solver_or_matrix_with_pml_2d(Wave_object):
 
     FF = m1 + a + nf
 
-    B = fire.Function(W)
+    B = fire.Cofunction(W.dual())
 
     pml2 = sigma_x * sigma_z * u_n * v * dxlump
     pml3 = inner(pp_n, grad(v)) * dxlump
@@ -142,7 +142,7 @@ def construct_solver_or_matrix_with_pml_3d(Wave_object):
 
     FF = m1 + a + nf
 
-    B = fire.Function(W)
+    B = fire.Cofunction(W.dual())
 
     FF += pml1 + pml2 + pml3 + pml4
     # -------------------------------------------------------

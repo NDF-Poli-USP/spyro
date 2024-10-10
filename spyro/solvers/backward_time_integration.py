@@ -201,7 +201,7 @@ def mixed_space_backward_wave_propagator(Wave_obj, dt=None):
     X_n = Wave_obj.X_n
     X_np1 = fire.Function(Wave_obj.mixed_function_space)
 
-    rhs_forcing = fire.Function(Wave_obj.function_space)
+    rhs_forcing = fire.Cofunction(Wave_obj.function_space.dual())
 
     B = Wave_obj.B
     rhs = Wave_obj.rhs
