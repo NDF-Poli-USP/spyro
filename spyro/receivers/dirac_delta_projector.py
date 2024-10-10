@@ -64,15 +64,10 @@ class Delta_projector:
         wave_object: spyro.wave.Wave
             Wave object
         """
-        my_ensemble = wave_object.comm
-        if wave_object.automatic_adjoint:
-            self.automatic_adjoint = True
-        else:
-            self.automatic_adjoint = False
-
+        self.automatic_adjoint = wave_object.automatic_adjoint
         self.mesh = wave_object.mesh
         self.space = wave_object.function_space.sub(0)
-        self.my_ensemble = my_ensemble
+        self.my_ensemble = wave_object.comm
         self.dimension = wave_object.dimension
         self.degree = wave_object.degree
 
@@ -90,7 +85,7 @@ class Delta_projector:
             self.quadrilateral = False
         self.is_local = None
 
-    def build_maps(self):
+    def build_maps(self, order=0):
         """Calculates and stores tabulations for interpolation
 
         Is always automatticaly called when initializing the class,
@@ -110,17 +105,8 @@ class Delta_projector:
         """
 
         for rid in range(self.number_of_points):
-            tolerance = 1e-6
-            if self.dimension == 2:
-                receiver_z, receiver_x = self.point_locations[rid]
-                cell_id = self.mesh.locate_cell(
-                    [receiver_z, receiver_x], tolerance=tolerance
-                )
-            elif self.dimension == 3:
-                receiver_z, receiver_x, receiver_y = self.point_locations[rid]
-                cell_id = self.mesh.locate_cell(
-                    [receiver_z, receiver_x, receiver_y], tolerance=tolerance
-                )
+            cell_id = self.mesh.locate_cell(self.point_locations[rid],
+                                            tolerance=1e-6)
             self.is_local[rid] = cell_id
 
         (
@@ -128,7 +114,7 @@ class Delta_projector:
             self.cellVertices,
             self.cellNodeMaps,
         ) = self.__point_locator()
-        self.cell_tabulations = self.__func_build_cell_tabulations()
+        self.cell_tabulations = self.__func_build_cell_tabulations(order)
 
         self.number_of_points = len(self.point_locations)
 
@@ -177,133 +163,62 @@ class Delta_projector:
 
         return at
 
-    def __func_build_cell_tabulations(self):
+    def __func_build_cell_tabulations(self, order):
+        if order != 0 and order != 1:
+            raise NotImplementedError
+        
+        element = self.choose_element()
+
+        if order == 0:
+            tab_shape = (self.number_of_points, self.nodes_per_cell)
+        elif order == 1:
+            tab_shape = (self.number_of_points, self.nodes_per_cell, self.dimension)
+        cell_tabulations = np.zeros(tab_shape)
+
+        for receiver_id in range(self.number_of_points):
+            cell_id = self.is_local[receiver_id]
+            if cell_id is not None:
+                p_reference = self.__reference_element(receiver_id)
+                initial_tab = element.tabulate(order, [p_reference])
+
+                if order == 0:
+                    tab = initial_tab[(0,) * self.dimension].transpose()
+                elif order == 1:
+                    if self.dimension == 2:
+                        tab_x1 = initial_tab[(1, 0)]
+                        tab_x2 = initial_tab[(0, 1)]
+                        tab = np.hstack([tab_x1, tab_x2])
+                    elif self.dimension == 3:
+                        tab_x1 = initial_tab[(1, 0, 0)]
+                        tab_x2 = initial_tab[(0, 1, 0)]
+                        tab_x3 = initial_tab[(0, 0, 1)]
+                        tab = np.hstack([tab_x1, tab_x2, tab_x3])
+                    else:
+                        raise NotImplementedError
+
+                cell_tabulations[receiver_id, :] = tab
+
+        return cell_tabulations
+    
+    def __reference_element(self, id):
         if self.dimension == 2 and self.quadrilateral is False:
-            return self.__func_build_cell_tabulations_2D()
+            n_v = 3
+            change_to_reference = change_to_reference_triangle
         elif self.dimension == 3 and self.quadrilateral is False:
-            return self.__func_build_cell_tabulations_3D()
+            n_v = 4
+            change_to_reference = change_to_reference_tetrahedron
         elif self.dimension == 2 and self.quadrilateral is True:
-            return self.__func_build_cell_tabulations_2D_quad()
+            n_v = 4
+            change_to_reference = change_to_reference_quad
         elif self.dimension == 3 and self.quadrilateral is True:
-            return self.__func_build_cell_tabulations_3D_quad()
+            n_v = 8
+            change_to_reference = change_to_reference_hexa
         else:
             raise ValueError
 
-    def __func_build_cell_tabulations_2D(self):
-        element = choosing_element(self.space, self.degree)
-
-        cell_tabulations = np.zeros(
-            (self.number_of_points, self.nodes_per_cell)
-        )
-
-        for receiver_id in range(self.number_of_points):
-            cell_id = self.is_local[receiver_id]
-            if cell_id is not None:
-                # getting coordinates to change to reference element
-                p = self.point_locations[receiver_id]
-                v0 = self.cellVertices[receiver_id][0]
-                v1 = self.cellVertices[receiver_id][1]
-                v2 = self.cellVertices[receiver_id][2]
-                cell_vertices = [v0, v1, v2]
-
-                p_reference = change_to_reference_triangle(p, cell_vertices)
-                initial_tab = element.tabulate(0, [p_reference])
-                phi_tab = initial_tab[(0, 0)]
-
-                cell_tabulations[receiver_id, :] = phi_tab.transpose()
-
-        return cell_tabulations
-
-    def __func_build_cell_tabulations_3D(self):
-        element = choosing_element(self.space, self.degree)
-
-        cell_tabulations = np.zeros(
-            (self.number_of_points, self.nodes_per_cell)
-        )
-
-        for receiver_id in range(self.number_of_points):
-            cell_id = self.is_local[receiver_id]
-            if cell_id is not None:
-                # getting coordinates to change to reference element
-                p = self.point_locations[receiver_id]
-                v0 = self.cellVertices[receiver_id][0]
-                v1 = self.cellVertices[receiver_id][1]
-                v2 = self.cellVertices[receiver_id][2]
-                v3 = self.cellVertices[receiver_id][3]
-                cell_vertices = [v0, v1, v2, v3]
-
-                p_reference = change_to_reference_tetrahedron(p, cell_vertices)
-                initial_tab = element.tabulate(0, [p_reference])
-                phi_tab = initial_tab[(0, 0, 0)]
-
-                cell_tabulations[receiver_id, :] = phi_tab.transpose()
-
-        return cell_tabulations
-
-    def __func_build_cell_tabulations_2D_quad(self):
-        # finatelement = FiniteElement('CG', self.mesh.ufl_cell(),
-        # degree=self.degree, variant='spectral')
-        V = self.space
-
-        element = V.finat_element.fiat_equivalent
-
-        cell_tabulations = np.zeros(
-            (self.number_of_points, self.nodes_per_cell)
-        )
-
-        for receiver_id in range(self.number_of_points):
-            cell_id = self.is_local[receiver_id]
-            if cell_id is not None:
-                # getting coordinates to change to reference element
-                p = self.point_locations[receiver_id]
-                v0 = self.cellVertices[receiver_id][0]
-                v1 = self.cellVertices[receiver_id][1]
-                v2 = self.cellVertices[receiver_id][2]
-                v3 = self.cellVertices[receiver_id][3]
-                cell_vertices = [v0, v1, v2, v3]
-
-                p_reference = change_to_reference_quad(p, cell_vertices)
-                initial_tab = element.tabulate(0, [p_reference])
-                phi_tab = initial_tab[(0, 0)]
-
-                cell_tabulations[receiver_id, :] = phi_tab.transpose()
-
-        return cell_tabulations
-
-    def __func_build_cell_tabulations_3D_quad(self):
-        Inter = UFCInterval()
-        An = GLLelement(Inter, self.degree)
-        Bn = GLLelement(Inter, self.degree)
-        Cn = GLLelement(Inter, self.degree)
-        Dn = TensorProductElement(An, Bn)
-        element = TensorProductElement(Dn, Cn)
-
-        cell_tabulations = np.zeros(
-            (self.number_of_points, self.nodes_per_cell)
-        )
-
-        for receiver_id in range(self.number_of_points):
-            cell_id = self.is_local[receiver_id]
-            if cell_id is not None:
-                # getting coordinates to change to reference element
-                p = self.point_locations[receiver_id]
-                v0 = self.cellVertices[receiver_id][0]
-                v1 = self.cellVertices[receiver_id][1]
-                v2 = self.cellVertices[receiver_id][2]
-                v3 = self.cellVertices[receiver_id][3]
-                v4 = self.cellVertices[receiver_id][4]
-                v5 = self.cellVertices[receiver_id][5]
-                v6 = self.cellVertices[receiver_id][6]
-                v7 = self.cellVertices[receiver_id][7]
-                cell_vertices = [v0, v1, v2, v3, v4, v5, v6, v7]
-
-                p_reference = change_to_reference_hexa(p, cell_vertices)
-                initial_tab = element.tabulate(0, [p_reference])
-                phi_tab = initial_tab[(0, 0, 0)]
-
-                cell_tabulations[receiver_id, :] = phi_tab.transpose()
-
-        return cell_tabulations
+        p = self.point_locations[id]
+        cell_vertices = self.cellVertices[id][0:n_v]
+        return change_to_reference(p, cell_vertices)
 
     def __build_local_nodes(self):
         """Builds local element nodes, locations and I,J,K numbering"""
@@ -438,7 +353,6 @@ class Delta_projector:
         same element as the receiver.
 
         """
-        print("start func_receiver_locator", flush=True)
         num_recv = self.number_of_points
 
         fdrake_cell_node_map = self.space.cell_node_map()
@@ -484,9 +398,24 @@ class Delta_projector:
                     y = node_locations[cell_node_map[cell_id, vertex_id], 2]
                     cellVertices[receiver_id][vertex_number] = (z, x, y)
 
-        print("end func_receiver_locator", flush=True)
         return cellId_maps, cellVertices, cellNodeMaps
-
+    
+    def choose_element(self):
+        if not self.quadrilateral:
+            element = choosing_element(self.space, self.degree)
+        else:
+            if self.dimension == 2:
+                element = self.space.finat_element.fiat_equivalent
+            elif self.dimension == 3:
+                Inter = UFCInterval()
+                An = GLLelement(Inter, self.degree)
+                Bn = GLLelement(Inter, self.degree)
+                Cn = GLLelement(Inter, self.degree)
+                Dn = TensorProductElement(An, Bn)
+                element = TensorProductElement(Dn, Cn)
+            else:
+                raise NotImplementedError
+        return element
 
 def choosing_geometry(cell_geometry):
     """

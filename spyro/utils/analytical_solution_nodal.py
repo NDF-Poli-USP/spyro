@@ -34,7 +34,6 @@ def nodal_homogeneous_analytical(Wave_object, offset, c_value, n_extra=5000):
 
     frequency = Wave_object.frequency
     delay = Wave_object.delay
-    amplitude = Wave_object.amplitude
     delay_type = Wave_object.delay_type
 
     ricker_wavelet = full_ricker_wavelet(
@@ -42,7 +41,6 @@ def nodal_homogeneous_analytical(Wave_object, offset, c_value, n_extra=5000):
         final_time=extended_final_time,
         frequency=frequency,
         delay=delay - dt,
-        amplitude=amplitude,
         delay_type=delay_type,
     )
 

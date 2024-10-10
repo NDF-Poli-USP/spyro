@@ -49,6 +49,13 @@ def test_rectangle_forward():
 
     assert all([test1, test2, test3])
 
+def test_camembert_elastic():
+    from spyro.examples.camembert_elastic import wave
+    wave.forward_solve()
+
+def test_elastic_cube_3D():
+    from spyro.examples.elastic_cube_3D import wave
+    wave.forward_solve()
 
 if __name__ == "__main__":
     test_camembert_forward()

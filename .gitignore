@@ -7,3 +7,5 @@
 *.hdf5
 *.msh
 *.segy
+*.png
+*.vtk

@@ -3,7 +3,6 @@ import warnings
 from .. import io
 from .. import utils
 from .. import meshing
-from ..sources import full_ricker_wavelet
 
 # default_optimization_parameters = {
 #     "General": {"Secant": {"Type": "Limited-Memory BFGS",
@@ -383,12 +382,6 @@ class Model_parameters:
         self.abc_R = BL_obj.abc_R
         self.abc_pad_length = BL_obj.abc_pad_length
         self.abc_boundary_layer_type = BL_obj.abc_boundary_layer_type
-        if self.abc_active:
-            self._correct_time_integrator_for_abc()
-
-    def _correct_time_integrator_for_abc(self):
-        if self.time_integrator == "central_difference":
-            self.time_integrator = "mixed_space_central_difference"
 
     def _sanitize_output(self):
         #         default_dictionary["visualization"] = {
@@ -496,38 +489,6 @@ class Model_parameters:
         else:
             raise ValueError("Debug output not understood")
 
-    def get_wavelet(self):
-        """Returns a wavelet based on the source type.
-
-        Returns
-        -------
-        wavelet : numpy.ndarray
-            Wavelet values in each time step to be used in the simulation.
-        """
-        if self.source_type == "ricker":
-            if "delay_type" in self.input_dictionary["acquisition"]:
-                delay_type = self.input_dictionary["acquisition"]["delay_type"]
-                self.delay_type = delay_type
-            else:
-                delay_type = "multiples_of_minimun"
-                self.delay_type = delay_type
-            wavelet = full_ricker_wavelet(
-                dt=self.dt,
-                final_time=self.final_time,
-                frequency=self.frequency,
-                delay=self.delay,
-                amplitude=self.amplitude,
-                delay_type=delay_type,
-            )
-        elif self.source_type == "MMS":
-            wavelet = None
-        else:
-            raise ValueError(
-                f"Source type of {self.source_type} not yet implemented."
-            )
-
-        return wavelet
-
     def _sanitize_automatic_adjoint(self):
         dictionary = self.input_dictionary
         if "automatic_adjoint" in dictionary:
@@ -580,6 +541,7 @@ class Model_parameters:
             self.delay = dictionary["delay"]
         else:
             self.delay = 1.5
+        self.delay_type = dictionary.get("delay_type", "multiples_of_minimun")
         self.__check_acquisition()
 
     def _sanitize_optimization_and_velocity(self):
@@ -608,9 +570,9 @@ class Model_parameters:
             if "velocity_conditional" not in dictionary["synthetic_data"]:
                 self.velocity_model_type = None
                 warnings.warn(
-                    "No velocity model set initially. If using \
-                        user defined conditional or expression, please \
-                            input it in the Wave object."
+                    "No velocity model set initially. If using " \
+                        "user defined conditional or expression, please " \
+                            "input it in the Wave object."
                 )
 
         if "velocity_conditional" in dictionary["synthetic_data"]:
@@ -671,7 +633,7 @@ class Model_parameters:
     def _sanitize_time_inputs(self):
         dictionary = self.input_dictionary["time_axis"]
         self.final_time = dictionary["final_time"]
-        self.dt = dictionary["dt"]
+        self._dt = dictionary["dt"]
         if "initial_time" in dictionary:
             self.initial_time = dictionary["initial_time"]
         else:
@@ -696,9 +658,9 @@ class Model_parameters:
     def __check_time(self):
         if self.final_time < 0.0:
             raise ValueError(f"Negative time of {self.final_time} not valid.")
-        if self.dt > 1.0:
+        if self._dt > 1.0:
             warnings.warn(f"Time step of {self.dt} too big.")
-        if self.dt is None:
+        if self._dt is None:
             warnings.warn(
                 "Timestep not given. Will calculate internally when user \
                     attemps to propagate wave."
