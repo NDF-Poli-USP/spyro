@@ -55,6 +55,7 @@ class Delta_projector:
     is_local: list
         List of cell IDs local to the processor
     """
+
     def __init__(self, wave_object):
         """
         Initializes the class
@@ -166,7 +167,7 @@ class Delta_projector:
     def __func_build_cell_tabulations(self, order):
         if order != 0 and order != 1:
             raise NotImplementedError
-        
+
         element = self.choose_element()
 
         if order == 0:
@@ -199,7 +200,7 @@ class Delta_projector:
                 cell_tabulations[receiver_id, :] = tab
 
         return cell_tabulations
-    
+
     def __reference_element(self, id):
         if self.dimension == 2 and self.quadrilateral is False:
             n_v = 3
@@ -399,7 +400,7 @@ class Delta_projector:
                     cellVertices[receiver_id][vertex_number] = (z, x, y)
 
         return cellId_maps, cellVertices, cellNodeMaps
-    
+
     def choose_element(self):
         if not self.quadrilateral:
             element = choosing_element(self.space, self.degree)
@@ -416,6 +417,7 @@ class Delta_projector:
             else:
                 raise NotImplementedError
         return element
+
 
 def choosing_geometry(cell_geometry):
     """

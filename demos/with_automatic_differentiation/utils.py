@@ -2,6 +2,7 @@
 import firedrake as fire
 import spyro
 
+
 def model_settings():
     """Model settings for forward and Full Waveform Inversion (FWI)
     simulations.
@@ -29,7 +30,7 @@ def model_settings():
         # None - no shots parallelism.
         "type": "shots_parallelism",
         "num_spacial_cores": 1,  # Number of cores to use in the spatial
-                                # parallelism.
+        # parallelism.
     }
 
     # Define the domain size without the ABL.
