@@ -1,13 +1,11 @@
-import os
 from abc import abstractmethod, ABCMeta
 import warnings
 import firedrake as fire
 from firedrake import sin, cos, pi, tanh, sqrt  # noqa: F401
-from SeismicMesh import write_velocity_model
 
 from .time_integration_central_difference import central_difference as time_integrator
 from ..domains.quadrature import quadrature_rules
-from ..io import Model_parameters, interpolate
+from ..io import Model_parameters
 from ..io.basicio import ensemble_propagator
 from ..io.field_logger import FieldLogger
 from .. import utils
@@ -117,42 +115,42 @@ class Wave(Model_parameters, metaclass=ABCMeta):
         pass
 
     def set_mesh(
-            self,
-            user_mesh=None,
-            mesh_parameters=None,
-        ):
-            """
-            Set the mesh for the solver.
+        self,
+        user_mesh=None,
+        mesh_parameters=None,
+    ):
+        """
+        Set the mesh for the solver.
 
-            Args:
-                user_mesh (optional): User-defined mesh. Defaults to None.
-                mesh_parameters (optional): Parameters for generating a mesh. Defaults to None.
-            """
-            super().set_mesh(
-                user_mesh=user_mesh,
-                mesh_parameters=mesh_parameters,
-            )
+        Args:
+            user_mesh (optional): User-defined mesh. Defaults to None.
+            mesh_parameters (optional): Parameters for generating a mesh. Defaults to None.
+        """
+        super().set_mesh(
+            user_mesh=user_mesh,
+            mesh_parameters=mesh_parameters,
+        )
 
-            self.mesh = self.get_mesh()
-            self._build_function_space()
-            self._map_sources_and_receivers()
+        self.mesh = self.get_mesh()
+        self._build_function_space()
+        self._map_sources_and_receivers()
 
     def set_solver_parameters(self, parameters=None):
-            """
-            Set the solver parameters.
+        """
+        Set the solver parameters.
 
-            Args:
-                parameters (dict): A dictionary containing the solver parameters.
+        Args:
+            parameters (dict): A dictionary containing the solver parameters.
 
-            Returns:
-                None
-            """
-            if parameters is not None:
-                self.solver_parameters = parameters
-            elif parameters is None:
-                self.solver_parameters = get_default_parameters_for_method(
-                    self.method
-                )
+        Returns:
+            None
+        """
+        if parameters is not None:
+            self.solver_parameters = parameters
+        elif parameters is None:
+            self.solver_parameters = get_default_parameters_for_method(
+                self.method
+            )
 
     def get_spatial_coordinates(self):
         if self.dimension == 2:
@@ -227,8 +225,8 @@ class Wave(Model_parameters, metaclass=ABCMeta):
             self.initial_velocity_model = vp
         else:
             raise ValueError(
-                "Please specify either a conditional, expression, firedrake " \
-                    "function or new file name (segy or hdf5)."
+                "Please specify either a conditional, expression, firedrake "
+                "function or new file name (segy or hdf5)."
             )
         if output:
             fire.File("initial_velocity_model.pvd").write(
@@ -239,7 +237,7 @@ class Wave(Model_parameters, metaclass=ABCMeta):
         if self.source_type == "ricker":
             self.sources = Sources(self)
         self.receivers = Receivers(self)
-    
+
     @abstractmethod
     def _initialize_model_parameters(self):
         pass
@@ -256,7 +254,7 @@ class Wave(Model_parameters, metaclass=ABCMeta):
         self.stiffness_quadrature_rule = k_rule
         self.surface_quadrature_rule = s_rule
 
-        # TO REVIEW: why are the mesh coordinates assigned here? I believe they 
+        # TO REVIEW: why are the mesh coordinates assigned here? I believe they
         # should be copied when the mesh is assigned
         if self.dimension == 2:
             z, x = fire.SpatialCoordinate(self.mesh)
@@ -317,7 +315,7 @@ class Wave(Model_parameters, metaclass=ABCMeta):
         if self.current_time == 0.0:
             raise ValueError("No previous solve to set as real shot record.")
         self.real_shot_record = self.forward_solution_receivers
-    
+
     @abstractmethod
     def _set_vstate(self, vstate):
         pass
@@ -349,7 +347,7 @@ class Wave(Model_parameters, metaclass=ABCMeta):
                            fset=lambda self, value: self._set_prev_vstate(value))
     next_vstate = property(fget=lambda self: self._get_next_vstate(),
                            fset=lambda self, value: self._set_next_vstate(value))
-    
+
     @abstractmethod
     def get_receivers_output(self):
         pass
@@ -362,12 +360,12 @@ class Wave(Model_parameters, metaclass=ABCMeta):
 
     @abstractmethod
     def get_function_name(self):
-        '''Returns the string representing the function of the wave object 
+        '''Returns the string representing the function of the wave object
         (e.g., "pressure" or "displacement")'''
         pass
 
     def update_source_expression(self, t):
-        '''Update the source expression during wave propagation. This method must be 
+        '''Update the source expression during wave propagation. This method must be
         implemented only by subclasses that make use of the source term'''
         pass
 
@@ -401,10 +399,10 @@ class Wave(Model_parameters, metaclass=ABCMeta):
         usol, usol_recv = time_integrator(self, source_num)
 
         return usol, usol_recv
-    
+
     def get_dt(self):
         return self._dt
-    
+
     def set_dt(self, dt):
         self._dt = dt
         if self.sources is not None:

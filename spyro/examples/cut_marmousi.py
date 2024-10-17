@@ -114,6 +114,7 @@ class Cut_marmousi_acoustic(Example_model_acoustic):
         Dictionary with the parameters of the model that are different from
         the default model. The default is None.
     """
+
     def __init__(
         self,
         dictionary=None,

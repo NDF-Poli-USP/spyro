@@ -23,12 +23,12 @@ def central_difference(wave, source_id=0):
         rhs_forcing = fire.Cofunction(wave.function_space.dual())
 
     wave.field_logger.start_logging(source_id)
-    
+
     wave.comm.comm.barrier()
 
     t = wave.current_time
     nt = int(wave.final_time / wave.dt) + 1  # number of timesteps
-    
+
     usol = [
         fire.Function(wave.function_space, name=wave.get_function_name())
         for t in range(nt)
@@ -46,7 +46,7 @@ def central_difference(wave, source_id=0):
             f = wave.sources.apply_source(rhs_forcing, step)
             B0 = wave.rhs_no_pml()
             B0 += f
-        
+
         wave.solver.solve(wave.next_vstate, wave.B)
 
         wave.prev_vstate = wave.vstate
@@ -67,7 +67,7 @@ def central_difference(wave, source_id=0):
             helpers.display_progress(wave.comm, t)
 
         t = step * float(wave.dt)
-    
+
     wave.current_time = t
     helpers.display_progress(wave.comm, t)
 

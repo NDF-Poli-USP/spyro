@@ -9,11 +9,11 @@ L = 2000   # Size of the edges of the cube [m]
 N = 5      # Number of elements in each direction
 h = L/N    # Element size [m]
 
-c_p = 5000 # P-wave velocity [m/s]
-c_s = 2500 # S-wave velocity [m/s]
-rho = 1000 # Density [kg/m3]
+c_p = 5000  # P-wave velocity [m/s]
+c_s = 2500  # S-wave velocity [m/s]
+rho = 1000  # Density [kg/m3]
 
-smag = 1e9 # Source magnitude
+smag = 1e9  # Source magnitude
 freq = 1   # Source frequency [Hz]
 
 final_time = 2

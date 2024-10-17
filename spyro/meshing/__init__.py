@@ -1,6 +1,6 @@
-from .meshing_functions import RectangleMesh
-from .meshing_functions import PeriodicRectangleMesh, BoxMesh
-from .meshing_functions import AutomaticMesh
+from .meshing_functions import RectangleMesh  # noqa: F401
+from .meshing_functions import PeriodicRectangleMesh, BoxMesh  # noqa: F401
+from .meshing_functions import AutomaticMesh  # noqa: F401
 
 all = [
     "RectangleMesh",
