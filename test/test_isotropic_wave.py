@@ -26,13 +26,15 @@ dummy_dict = {
     },
 }
 
+
 def test_initialize_model_parameters_from_object_missing_parameters():
     synthetic_dict = {
         "type": "object",
     }
     wave = IsotropicWave(dummy_dict)
-    with pytest.raises(Exception) as e:
+    with pytest.raises(Exception) as e:  # noqa: F841
         wave.initialize_model_parameters_from_object(synthetic_dict)
+
 
 def test_initialize_model_parameters_from_object_first_option():
     synthetic_dict = {
@@ -44,6 +46,7 @@ def test_initialize_model_parameters_from_object_first_option():
     wave = IsotropicWave(dummy_dict)
     wave.initialize_model_parameters_from_object(synthetic_dict)
 
+
 def test_initialize_model_parameters_from_object_second_option():
     synthetic_dict = {
         "type": "object",
@@ -53,6 +56,7 @@ def test_initialize_model_parameters_from_object_second_option():
     }
     wave = IsotropicWave(dummy_dict)
     wave.initialize_model_parameters_from_object(synthetic_dict)
+
 
 def test_initialize_model_parameters_from_object_redundant():
     synthetic_dict = {
@@ -64,8 +68,9 @@ def test_initialize_model_parameters_from_object_redundant():
         "s_wave_velocity": 3,
     }
     wave = IsotropicWave(dummy_dict)
-    with pytest.raises(Exception) as e:
+    with pytest.raises(Exception) as e:  # noqa: F841
         wave.initialize_model_parameters_from_object(synthetic_dict)
+
 
 def test_parse_boundary_conditions():
     d = dummy_dict.copy()
@@ -77,7 +82,7 @@ def test_parse_boundary_conditions():
         "mesh_type": "firedrake_mesh",
     }
     d["boundary_conditions"] = [
-        ("u",  1, fire.Constant((1, 1, 1))), # x == 0:  1 (z in spyro)
+        ("u", 1, fire.Constant((1, 1, 1))),  # x == 0:  1 (z in spyro)
         ("uz", 2, fire.Constant(2)),         # x == Lx: 2 (z in spyro)
         ("ux", 3, fire.Constant(3)),         # y == 0:  3 (x in spyro)
         ("uy", 4, fire.Constant(4)),         # y == Ly: 4 (x in spyro)
@@ -88,11 +93,12 @@ def test_parse_boundary_conditions():
     u = fire.Function(wave.function_space)
     for bc in wave.bcs:
         bc.apply(u)
-    
-    assert np.allclose([1, 1, 1], u.at( 0.0,  0.5,  0.5))
-    assert np.allclose([2, 0, 0], u.at(-1.0,  0.5,  0.5))
-    assert np.allclose([0, 3, 0], u.at(-0.5,  0.0,  0.5))
-    assert np.allclose([0, 0, 4], u.at(-0.5,  1.0,  0.5))
+
+    assert np.allclose([1, 1, 1], u.at(0.0, 0.5, 0.5))
+    assert np.allclose([2, 0, 0], u.at(-1.0, 0.5, 0.5))
+    assert np.allclose([0, 3, 0], u.at(-0.5, 0.0, 0.5))
+    assert np.allclose([0, 0, 4], u.at(-0.5, 1.0, 0.5))
+
 
 def test_parse_boundary_conditions_exception():
     d = dummy_dict.copy()
@@ -108,13 +114,14 @@ def test_parse_boundary_conditions_exception():
     ]
     wave = IsotropicWave(d)
     wave.set_mesh(mesh_parameters={"dx": 0.2, "periodic": True})
-    with pytest.raises(Exception) as e:
+    with pytest.raises(Exception) as e:  # noqa: F841
         wave.parse_boundary_conditions()
+
 
 def test_initialize_model_parameters_from_file_notimplemented():
     synthetic_dict = {
         "type": "file",
     }
     wave = IsotropicWave(dummy_dict)
-    with pytest.raises(NotImplementedError) as e:
+    with pytest.raises(NotImplementedError) as e:  # noqa: F841
         wave.initialize_model_parameters_from_file(synthetic_dict)

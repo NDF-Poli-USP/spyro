@@ -82,6 +82,7 @@ class Meshing_parameter_calculator:
     build_current_object(cpw, degree=None):
         Builds the current acoustic wave solver object.
     """
+
     def __init__(self, parameters_dictionary):
         """
         Initializes the Meshing_parameter_calculator class with a dictionary of parameters.
@@ -347,7 +348,7 @@ class Meshing_parameter_calculator:
 
             # Running forward model
             Wave_obj = self.build_current_object(cpw)
-            Wave_obj._initialize_model_parameters() # TO REVIEW: call to protected method
+            Wave_obj._initialize_model_parameters()  # TO REVIEW: call to protected method
 
             # Setting up time-step
             if self.timestep_calculation != "float":

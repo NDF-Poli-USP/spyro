@@ -1,4 +1,3 @@
-import spyro
 from spyro.utils import Mask
 from spyro.utils import Gradient_mask_for_pml
 from spyro.examples.rectangle import Rectangle_acoustic
@@ -36,10 +35,10 @@ def test_mask():
     }
     Wave_obj = Rectangle_acoustic(dictionary=dictionary)
     boundaries = {
-        "z_min":-0.9,
-        "z_max":-0.1,
-        "x_min":0.2,
-        "x_max":0.8,
+        "z_min": -0.9,
+        "z_max": -0.1,
+        "x_min": 0.2,
+        "x_max": 0.8,
     }
 
     # Points we are going to check

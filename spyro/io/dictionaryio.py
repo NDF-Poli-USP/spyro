@@ -526,7 +526,6 @@ class read_mesh:
 
     def _derive_mesh_type(self):
         dictionary = self.mesh_dictionary
-        user_mesh_in_dictionary = False
         if "user_mesh" not in dictionary:
             dictionary["user_mesh"] = None
 

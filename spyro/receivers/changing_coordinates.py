@@ -763,4 +763,4 @@ def change_to_reference_hexa(p, cell_vertices):
     # pny = px * a21 + py * a22 + pz * a23 + a24
     # pnz = px * a31 + py * a32 + pz * a33 + a34
 
-    return (pnx, pny, pnz)
+    # return (pnx, pny, pnz)

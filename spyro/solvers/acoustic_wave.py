@@ -1,9 +1,12 @@
 import firedrake as fire
 import warnings
+import os
+from SeismicMesh import write_velocity_model
 
 from .wave import Wave
 
 from ..io.basicio import ensemble_gradient
+from ..io import interpolate
 from .acoustic_solver_construction_no_pml import (
     construct_solver_or_matrix_no_pml,
 )
@@ -15,6 +18,7 @@ from .backward_time_integration import (
 )
 from ..domains.space import FE_method
 from ..utils.typing import override
+
 
 class AcousticWave(Wave):
     def save_current_velocity_model(self, file_name=None):
@@ -85,7 +89,7 @@ class AcousticWave(Wave):
         try:
             self.u_nm1.assign(0.0)
             self.u_n.assign(0.0)
-        except:
+        except Exception:
             warnings.warn("No pressure to reset")
 
     @override
@@ -115,7 +119,7 @@ class AcousticWave(Wave):
                 fire.File("initial_velocity_model.pvd").write(
                     self.initial_velocity_model, name="velocity"
                 )
-        
+
         self.c = self.initial_velocity_model
 
     @override
@@ -159,7 +163,7 @@ class AcousticWave(Wave):
             return self.X_np1
         else:
             return self.u_np1
-    
+
     @override
     def get_receivers_output(self):
         if self.abc_boundary_layer_type == "PML":
@@ -167,18 +171,18 @@ class AcousticWave(Wave):
         else:
             data_with_halos = self.u_n.dat.data_ro_with_halos[:]
         return self.receivers.interpolate(data_with_halos)
-    
+
     @override
     def get_function(self):
         if self.abc_boundary_layer_type == "PML":
             return self.X_n.sub(0)
         else:
             return self.u_n
-    
+
     @override
     def get_function_name(self):
         return "Pressure"
-    
+
     @override
     def _create_function_space(self):
         return FE_method(self.mesh, self.method, self.degree)

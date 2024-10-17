@@ -1,6 +1,5 @@
 import math
 from copy import deepcopy
-import pytest
 from firedrake import *
 import spyro
 
@@ -50,7 +49,7 @@ def test_isotropic_wave_2D():
     b1 = lambda x, t: -(2*x[0]**2 + 6*x[1]**2 - 16*x[0]*x[1] + 10*x[0] - 14*x[1] + 4)*t
     b2 = lambda x, t: -(-12*x[0]**2 - 4*x[1]**2 + 8*x[0]*x[1] - 16*x[0] + 8*x[1] - 2)*t
     b = lambda x, t: as_vector([b1(x, t), b2(x, t)])
-    
+
     dt = 1e-3
     fo = int(0.1/dt)
 
@@ -85,6 +84,7 @@ def test_isotropic_wave_2D():
 
     assert math.isclose(e1, 0.0, abs_tol=1e-7)
     assert math.isclose(e2, 0.0, abs_tol=1e-7)
+
 
 if __name__ == "__main__":
     test_method_triangles_lumped()

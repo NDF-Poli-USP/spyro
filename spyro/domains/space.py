@@ -40,6 +40,6 @@ def FE_method(mesh, method, degree, dim=1):
 
     if dim > 1:
         element = VectorElement(element, dim=dim)
-    
+
     function_space = FunctionSpace(mesh, element)
     return function_space
