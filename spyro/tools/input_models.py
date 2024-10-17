@@ -51,7 +51,7 @@ def build_on_top_of_base_dictionary(variables):
         "dimension": variables["dimension"],
         "automatic_adjoint": False,
     }
-    model_dictionary["parallelism"] = {"type": "automatic",}
+    model_dictionary["parallelism"] = {"type": "automatic", }
     model_dictionary["mesh"] = {
         "Lz": variables["Lz"],
         "Lx": variables["Lx"],
@@ -186,7 +186,7 @@ def create_initial_model_for_meshing_parameter_2D_heterogeneous(Meshing_calc_obj
     ----------
     Meshing_calc_obj : spyro.Meshing_parameter_calculator
         The meshing calculation object.
-    
+
     Returns
     -------
     model_dictionary : dict
@@ -199,7 +199,7 @@ def create_initial_model_for_meshing_parameter_2D_heterogeneous(Meshing_calc_obj
 
     method = Meshing_calc_obj.FEM_method_to_evaluate
     degree = Meshing_calc_obj.desired_degree
-    reduced = Meshing_calc_obj.reduced_obj_for_testing
+    reduced = Meshing_calc_obj.reduced_obj_for_testing  # noqa: F841
 
     # Domain calculations
     lbda = c_value / frequency
@@ -231,7 +231,7 @@ def create_initial_model_for_meshing_parameter_2D_heterogeneous(Meshing_calc_obj
     )
 
     # Time axis calculations
-    tmin = 1.0 / frequency
+    tmin = 1.0 / frequency  # noqa: F841
     final_time = 7.5
 
     variables = {

@@ -1,7 +1,7 @@
 import firedrake as fire
 import spyro
 from demos.with_automatic_differentiation.utils import \
-      model_settings, make_c_camembert
+    model_settings, make_c_camembert
 import os
 os.environ["OMP_NUM_THREADS"] = "1"
 
@@ -16,7 +16,7 @@ mesh = fire.UnitSquareMesh(50, 50, comm=my_ensemble.comm)
 element = fire.FiniteElement(
     model["opts"]["method"], mesh.ufl_cell(), degree=model["opts"]["degree"],
     variant=model["opts"]["quadrature"]
-    )
+)
 V = fire.FunctionSpace(mesh, element)
 
 
@@ -43,4 +43,4 @@ else:
     sol = forward_solver.solution
     fire.VTKFile(
         "solution_" + str(source_number) + ".pvd", comm=my_ensemble.comm
-        ).write(sol)
+    ).write(sol)

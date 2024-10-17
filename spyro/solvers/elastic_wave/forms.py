@@ -1,9 +1,8 @@
-import numpy as np
-
 from firedrake import (assemble, Cofunction, Constant, div, dot, dx, grad,
                        inner, lhs, LinearSolver, rhs, TestFunction, TrialFunction)
 
 from .local_abc import clayton_engquist_A1
+
 
 def isotropic_elastic_without_pml(wave):
     V = wave.function_space
@@ -14,7 +13,7 @@ def isotropic_elastic_without_pml(wave):
 
     u_nm1 = wave.u_nm1
     u_n = wave.u_n
-    
+
     dt = Constant(wave.dt)
     rho = wave.rho
     lmbda = wave.lmbda
@@ -24,7 +23,7 @@ def isotropic_elastic_without_pml(wave):
 
     eps = lambda v: 0.5*(grad(v) + grad(v).T)
     F_k = lmbda*div(u_n)*div(v)*dx(scheme=quad_rule) \
-          + 2*mu*inner(eps(u_n), eps(v))*dx(scheme=quad_rule)
+        + 2*mu*inner(eps(u_n), eps(v))*dx(scheme=quad_rule)
 
     F_s = 0
     b = wave.body_forces
@@ -49,6 +48,7 @@ def isotropic_elastic_without_pml(wave):
 
     wave.rhs = rhs(F)
     wave.B = Cofunction(V.dual())
+
 
 def isotropic_elastic_with_pml():
     raise NotImplementedError

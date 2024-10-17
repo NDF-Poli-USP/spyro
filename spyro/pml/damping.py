@@ -1,5 +1,4 @@
 import math
-import warnings
 
 from firedrake import *  # noqa: F403
 
@@ -33,7 +32,6 @@ def functions(Wave_obj):
     x = Wave_obj.mesh_x
     x1 = 0.0
     x2 = Wave_obj.length_x
-    z1 = 0.0
     z2 = -Wave_obj.length_z
 
     bar_sigma = ((3.0 * cmax) / (2.0 * pad_length)) * math.log10(1.0 / R)

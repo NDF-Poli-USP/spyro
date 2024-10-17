@@ -1,11 +1,12 @@
 from firedrake import (Constant, ds, TestFunction)
 
+
 def clayton_engquist_A1(wave):
     '''
-    Returns the linear form associated with the traction loads 
+    Returns the linear form associated with the traction loads
     when combined with the Clayton-Engquist A1 relations.
     '''
-    F_t = 0 # linear form
+    F_t = 0  # linear form
 
     V = wave.function_space
     v = TestFunction(V)
@@ -20,7 +21,9 @@ def clayton_engquist_A1(wave):
     qr_s = wave.surface_quadrature_rule
 
     # Index of each coordinate
-    iz = 0; ix = 1; iy = 2
+    iz = 0
+    ix = 1
+    iy = 2
 
     # Partial derivatives
     uz_dt = (u_n[iz] - u_nm1[iz])/dt
@@ -46,7 +49,7 @@ def clayton_engquist_A1(wave):
     if wave.dimension == 3:
         sig_yz = rho*c_s*uy_dt + rho*(c_s**2)*uz_dy
         F_t += -sig_yz*v[iy]*ds(1, scheme=qr_s)
-    
+
     # Plane z = 0
     sig_zz = -rho*c_p*uz_dt + rho*(c_p**2 - 2*c_s**2)*ux_dx
     if wave.dimension == 3:

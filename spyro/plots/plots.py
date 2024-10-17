@@ -1,7 +1,5 @@
 # from scipy.io import savemat
 import matplotlib.pyplot as plt
-import matplotlib.patches as patches
-from matplotlib.ticker import MultipleLocator
 from PIL import Image
 import numpy as np
 import firedrake
@@ -59,7 +57,7 @@ def plot_shots(
     dt = Wave_object.dt
     tf = Wave_object.final_time
 
-    if out_index == None:
+    if out_index is None:
         arr = Wave_object.receivers_output
     else:
         arr = Wave_object.receivers_output[:, :, out_index]

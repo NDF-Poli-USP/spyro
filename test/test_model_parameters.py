@@ -349,47 +349,47 @@ def test_dictionary_conversion():
     assert same
 
 
-def test_degree_exception_2d():
+def test_degree_exception_2d():  # TODO: improve
     ex_dictionary = deepcopy(dictionary)
     with pytest.raises(Exception):
         ex_dictionary["options"]["dimension"] = 2
         ex_dictionary["options"]["degree"] = 6
-        model = Model_parameters(dictionary=ex_dictionary)
+        model = Model_parameters(dictionary=ex_dictionary)  # noqa: F841
 
 
-def test_degree_exception_3d():
+def test_degree_exception_3d():  # TODO: improve
     ex_dictionary = deepcopy(dictionary)
     with pytest.raises(Exception):
         ex_dictionary["options"]["dimension"] = 3
         ex_dictionary["options"]["degree"] = 5
-        model = Model_parameters(dictionary=ex_dictionary)
+        model = Model_parameters(dictionary=ex_dictionary)  # noqa: F841
 
 
-def test_time_exception():
+def test_time_exception():  # TODO: improve
     ex_dictionary = deepcopy(dictionary)
     with pytest.raises(Exception):
         ex_dictionary["time_axis"]["final_time"] = -0.5
-        model = Model_parameters(dictionary=ex_dictionary)
+        model = Model_parameters(dictionary=ex_dictionary)  # noqa: F841
 
 
-def test_source_exception():
+def test_source_exception():  # TODO: improve
     ex_dictionary = deepcopy(dictionary)
     with pytest.raises(Exception):
         ex_dictionary["acquistion"]["source_locations"] = [
             (-0.1, 0.5),
             (1.0, 0.5),
         ]
-        model = Model_parameters(dictionary=ex_dictionary)
+        model = Model_parameters(dictionary=ex_dictionary)  # noqa: F841
 
 
-def test_receiver_exception():
+def test_receiver_exception():  # TODO: improve
     ex_dictionary = deepcopy(dictionary)
     with pytest.raises(Exception):
         ex_dictionary["acquistion"]["receiver_locations"] = [
             (-0.1, 0.5),
             (1.0, 0.5),
         ]
-        model = Model_parameters(dictionary=ex_dictionary)
+        model = Model_parameters(dictionary=ex_dictionary)  # noqa: F841
 
 
 if __name__ == "__main__":
