@@ -52,7 +52,7 @@ def check_gradient(Wave_obj_guess, dJ, rec_out_exact, Jm, plot=False):
 
     # Checking if every error is less than 1 percent
 
-    test1 =abs(errors[-1]) < 1 
+    test1 = abs(errors[-1]) < 1
     print(f"Last gradient error less than 1 percent: {test1}")
 
     # Checking if error follows expected finite difference error convergence

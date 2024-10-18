@@ -65,7 +65,7 @@ def forward(
         sol = forward_solver.solution
         fire.VTKFile(
             "solution_" + str(source_number) + ".pvd", comm=my_ensemble.comm
-            ).write(sol)
+        ).write(sol)
 
     return receiver_data, J
 
@@ -77,7 +77,7 @@ mesh = fire.UnitSquareMesh(50, 50, comm=my_ensemble.comm)
 element = fire.FiniteElement(
     model["opts"]["method"], mesh.ufl_cell(), degree=model["opts"]["degree"],
     variant=model["opts"]["quadrature"]
-    )
+)
 V = fire.FunctionSpace(mesh, element)
 
 
@@ -97,7 +97,7 @@ c_guess = utils.make_c_camembert(mesh, V, c_guess=True)
 guess_rec, J = forward(
     c_guess, compute_functional=True, true_data_receivers=true_rec,
     annotate=True
-    )
+)
 
 # :class:`~.EnsembleReducedFunctional` is employed to recompute in
 # parallel the functional and its gradient associated with the multiple sources

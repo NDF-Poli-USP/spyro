@@ -13,7 +13,7 @@ def test_ricker_varies_in_time():
     and if the applied ricker function behaves correctly
     """
 
-    ### initial ricker tests
+    # initial ricker tests
     modelRicker = deepcopy(oldmodel)
     frequency = 2
     amplitude = 3

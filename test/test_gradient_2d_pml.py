@@ -12,7 +12,7 @@ class Gradient_mask_for_pml():
             pass
 
         # Gatting necessary data from wave object
-        pad = Wave_obj.abc_pad_length
+        pad = Wave_obj.abc_pad_length  # noqa: F841
         z = Wave_obj.mesh_z
         x = Wave_obj.mesh_x
         V = Wave_obj.function_space
@@ -78,7 +78,7 @@ def check_gradient(Wave_obj_guess, dJ, rec_out_exact, Jm, plot=False):
 
     # Checking if every error is less than 5 percent
 
-    test1 = (abs(errors[-1]) < 5 )
+    test1 = (abs(errors[-1]) < 5)
     print(f"Gradient error less than 5 percent: {test1}")
     print(f"Error of {errors}")
 
@@ -165,7 +165,7 @@ def get_forward_model(dictionary=None):
         conditional=cond,
         dg_velocity_model=False,
     )
-    spyro.plots.plot_model(Wave_obj_exact, filename="pml_grad_test_model.png",abc_points=[(-0, 0), (-1, 0), (-1, 1), (-0, 1)])
+    spyro.plots.plot_model(Wave_obj_exact, filename="pml_grad_test_model.png", abc_points=[(-0, 0), (-1, 0), (-1, 1), (-0, 1)])
     Wave_obj_exact.forward_solve()
     rec_out_exact = Wave_obj_exact.receivers_output
 
