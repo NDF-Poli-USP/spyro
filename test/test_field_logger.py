@@ -8,6 +8,7 @@ from spyro.io.field_logger import FieldLogger
 
 comm = fire.Ensemble(MPI.COMM_WORLD, 1)
 
+
 @pytest.fixture
 def logger():
     mesh = fire.UnitIntervalMesh(2)
@@ -25,6 +26,7 @@ def logger():
     logger.add_field("c", "3rd", lambda: u)
     return logger
 
+
 def test_writing(logger):
     logger.start_logging(0)
     logger.log(0)
@@ -33,10 +35,12 @@ def test_writing(logger):
     assert os.path.isfile("bsn0.pvd")
     assert not os.path.isfile("csn0.pvd")
 
+
 def test_warning(logger):
     logger.start_logging(0)
     with pytest.warns(UserWarning):
         logger.start_logging(1)
+
 
 def test_no_warning(logger):
     logger.start_logging(0)

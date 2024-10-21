@@ -2,6 +2,7 @@ import firedrake as fire
 from .acoustic_wave import AcousticWave
 from ..utils.typing import override
 
+
 class AcousticWaveMMS(AcousticWave):
     """Class for solving the acoustic wave equation in 2D or 3D using
     the finite element method. This class inherits from the AcousticWave class
@@ -69,7 +70,7 @@ class AcousticWaveMMS(AcousticWave):
         # self.analytical.assign(analytical)
 
         return self.analytical
-    
+
     @override
     def update_source_expression(self, t):
         self.q_t.assign(2*t)
