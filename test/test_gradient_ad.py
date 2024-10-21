@@ -112,7 +112,7 @@ def test_taylor():
     element = fire.FiniteElement(
         model["opts"]["method"], mesh.ufl_cell(), degree=model["opts"]["degree"],
         variant=model["opts"]["quadrature"]
-        )
+    )
     V = fire.FunctionSpace(mesh, element)
 
     fwd_solver = spyro.solvers.forward_ad.ForwardSolver(model, mesh, V)

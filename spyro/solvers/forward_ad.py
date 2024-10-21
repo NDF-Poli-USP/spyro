@@ -1,9 +1,7 @@
 import firedrake as fire
 import firedrake.adjoint as fire_ad
-from ..domains import quadrature
 from .time_integration_ad import central_difference_acoustic
 from firedrake.__future__ import interpolate
-import finat
 # Note this turns off non-fatal warnings
 fire.set_log_level(fire.ERROR)
 
@@ -33,7 +31,7 @@ class ForwardSolver:
     def execute_acoustic(
             self, c, source_number, wavelet, compute_functional=False,
             true_data_receivers=None
-            ):
+    ):
         """Time-stepping acoustic forward solver.
 
         The time integration is done using a central difference scheme.
@@ -73,7 +71,7 @@ class ForwardSolver:
         source_mesh = fire.VertexOnlyMesh(
             self.mesh,
             [self.model["acquisition"]["source_pos"][source_number]]
-            )
+        )
         # Source function space.
         V_s = fire.FunctionSpace(source_mesh, "DG", 0)
         d_s = fire.Function(V_s)
@@ -125,13 +123,13 @@ class ForwardSolver:
             params = {"ksp_type": "preonly", "pc_type": "jacobi"}
         elif (
             self.model["opts"]["method"] == "CG"
-            and self.mesh.ufl_cell() != quadrilateral
-            and self.mesh.ufl_cell() != hexahedron
+            and self.mesh.ufl_cell() != quadrilateral  # noqa: F821
+            and self.mesh.ufl_cell() != hexahedron  # noqa: F821
         ):
             params = {"ksp_type": "cg", "pc_type": "jacobi"}
         elif self.model["opts"]["method"] == "CG" and (
-            self.mesh.ufl_cell() == quadrilateral 
-            or self.mesh.ufl_cell() == hexahedron
+            self.mesh.ufl_cell() == quadrilateral  # noqa: F821
+            or self.mesh.ufl_cell() == hexahedron  # noqa: F821
         ):
             params = {"ksp_type": "preonly", "pc_type": "jacobi"}
         else:
