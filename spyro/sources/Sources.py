@@ -70,11 +70,13 @@ class Sources(Delta_projector):
         self.amplitude = wave_object.amplitude
         self.is_local = [0] * self.number_of_points
         self.current_source = None
-        self.update_wavelet(wave_object)
         if np.isscalar(self.amplitude) or (self.amplitude.size <= 3):
+            self.integral = False
             self.build_maps(order=0)
         else:
+            self.integral = True
             self.build_maps(order=1)
+        self.update_wavelet(wave_object)
 
     def update_wavelet(self, wave_object):
         self.wavelet = full_ricker_wavelet(
@@ -83,6 +85,7 @@ class Sources(Delta_projector):
             frequency=wave_object.frequency,
             delay=wave_object.delay,
             delay_type=wave_object.delay_type,
+            integral=self.integral
         )
 
     def apply_source(self, rhs_forcing, step):
@@ -123,7 +126,8 @@ def timedependentSource(model, t, freq=None, amp=1, delay=1.5):
 
 
 def ricker_wavelet(
-    t, freq, amp=1.0, delay=1.5, delay_type="multiples_of_minimun"
+    t, freq, amp=1.0, delay=1.5, delay_type="multiples_of_minimun",
+    integral=False
 ):
     """Creates a Ricker source function with a
     delay in term of multiples of the distance
@@ -157,7 +161,10 @@ def ricker_wavelet(
     t = t - time_delay
     # t = t - delay / freq
     tt = (math.pi * freq * t) ** 2
-    return amp * (1.0 - (2.0) * tt) * math.exp((-1.0) * tt)
+    if integral:
+        return t*math.exp((-1.0) * tt)
+    else:
+        return amp * (1.0 - (2.0) * tt) * math.exp((-1.0) * tt)
 
 
 def full_ricker_wavelet(
@@ -167,6 +174,7 @@ def full_ricker_wavelet(
     cutoff=None,
     delay=1.5,
     delay_type="multiples_of_minimun",
+    integral=False
 ):
     """Compute the Ricker wavelet optionally applying low-pass filtering
     using cutoff frequency in Hertz.
@@ -199,7 +207,7 @@ def full_ricker_wavelet(
     full_wavelet = np.zeros((nt,))
     for t in range(nt):
         full_wavelet[t] = ricker_wavelet(
-            time, frequency, 1, delay=delay, delay_type=delay_type
+            time, frequency, 1, delay=delay, delay_type=delay_type, integral=integral
         )
         time += dt
     if cutoff is not None:
