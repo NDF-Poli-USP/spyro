@@ -3,7 +3,7 @@ import numpy as np
 
 import spyro
 
-L = 500  # [m]
+L = 10000  # [m]
 
 rho = 7850          # [kg/m3]
 lambda_in = 6.86e9  # [Pa]
@@ -12,15 +12,32 @@ mu_in = 3.86e9      # [Pa]
 mu_out = 5.86e9     # [Pa]
 
 smag = 1e6
-freq = 2  # Central frequency of Ricker wavelet [Hz]
+freq = 5  # Central frequency of Ricker wavelet [Hz]
 hf = 90  # [m]
 hs = 100  # [m]
-source_locations = spyro.create_transect((-hf, 0.2*L), (-hf, 0.8*L), 3)
-receiver_locations = spyro.create_transect((-hs, 0), (-hs, L), 40)
-source_locations = [[-hf, 0.5*L]]
+
+source_z = -L*0.5
+source_x = L*0.5
+source_locations = [(source_z, source_x)]
+receiver_bin_center_offset = 3000
+receiver_bin_width = 1500
+receiver_quantity = 500
+
+bin1_startZ = source_z + receiver_bin_center_offset - receiver_bin_width / 2.0
+bin1_endZ = source_z + receiver_bin_center_offset + receiver_bin_width / 2.0
+bin1_startX = source_x - receiver_bin_width / 2.0
+bin1_endX = source_x + receiver_bin_width / 2.0
+
+receiver_locations = spyro.create_2d_grid(
+    bin1_startZ,
+    bin1_endZ,
+    bin1_startX,
+    bin1_endX,
+    int(np.sqrt(receiver_quantity)),
+)
 
 time_step = 2e-4  # [s]
-final_time = 1.5  # [s]
+final_time = 1.0  # [s]
 out_freq = int(0.01/time_step)
 
 n = 20
@@ -57,8 +74,8 @@ d["acquisition"] = {
     "delay": 0,
     "delay_type": "time",
     "amplitude": np.array([0, smag]),
-    #"amplitude": smag * np.eye(2),
-    #"amplitude": smag * np.array([[0, 1], [-1, 0]]),
+    # "amplitude": smag * np.eye(2),
+    # "amplitude": smag * np.array([[0, 1], [-1, 0]]),
     "receiver_locations": receiver_locations,
 }
 

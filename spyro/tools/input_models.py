@@ -136,7 +136,7 @@ def create_initial_model_for_meshing_parameter(Meshing_calc_obj):
         model_dictionary = create_initial_model_for_meshing_parameter_3D(Meshing_calc_obj)
     else:
         raise ValueError("Dimension is not 2 or 3")
-    
+
     if Meshing_calc_obj.equation_type == "isotropic_elastic" and dimension == 2:
         model_dictionary = add_elastic_to_dictionary(model_dictionary)
 
