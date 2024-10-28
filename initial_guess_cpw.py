@@ -39,9 +39,13 @@ receiver_locations = spyro.create_2d_grid(
 time_step = 2e-4  # [s]
 final_time = 1.0  # [s]
 out_freq = int(0.01/time_step)
+cpw = 5
 
-n = 50
-mesh = fire.RectangleMesh(n, n, 0, L, originX=-L, diagonal='crossed')
+c = ((lambda_out + 2*mu_out)/7850)**0.5
+
+edge_length = c/(freq*cpw)
+n = int(L/edge_length)+1
+mesh = fire.RectangleMesh(n, n, 0, L, originX=-L)
 z, x = fire.SpatialCoordinate(mesh)
 
 d = {}
