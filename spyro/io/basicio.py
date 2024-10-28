@@ -53,9 +53,10 @@ def ensemble_plot(func):
     def wrapper(*args, **kwargs):
         num = args[0].number_of_sources
         _comm = args[0].comm
+        basename = kwargs.get("file_name", "")
         for snum in range(num):
             if is_owner(_comm, snum) and _comm.comm.rank == 0:
-                func(*args, **dict(kwargs, file_name=str(snum + 1)))
+                func(*args, **dict(kwargs, file_name=basename + str(snum + 1)))
 
     return wrapper
 

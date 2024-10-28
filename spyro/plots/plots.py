@@ -13,7 +13,7 @@ __all__ = ["plot_shots"]
 def plot_shots(
     Wave_object,
     show=False,
-    file_name="1",
+    file_name="",
     vmin=-1e-5,
     vmax=1e-5,
     contour_lines=700,
