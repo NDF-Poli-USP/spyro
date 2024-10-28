@@ -40,15 +40,9 @@ time_step = 2e-4  # [s]
 final_time = 1.0  # [s]
 out_freq = int(0.01/time_step)
 
-n = 20
+n = 50
 mesh = fire.RectangleMesh(n, n, 0, L, originX=-L, diagonal='crossed')
 z, x = fire.SpatialCoordinate(mesh)
-
-zc = 250  # [m]
-xc = 250  # [m]
-ri = 50  # [m]
-camembert = lambda v_inside, v_outside: fire.conditional(
-    (z - zc) ** 2 + (x - xc) ** 2 < ri**2, v_inside, v_outside)
 
 d = {}
 
@@ -71,8 +65,7 @@ d["acquisition"] = {
     "source_type": "ricker",
     "source_locations": source_locations,
     "frequency": freq,
-    "delay": 0,
-    "delay_type": "time",
+    "delay": 1.5,
     "amplitude": np.array([0, smag]),
     # "amplitude": smag * np.eye(2),
     # "amplitude": smag * np.array([[0, 1], [-1, 0]]),
@@ -82,8 +75,8 @@ d["acquisition"] = {
 d["synthetic_data"] = {
     "type": "object",
     "density": fire.Constant(rho),
-    "lambda": camembert(lambda_in, lambda_out),
-    "mu": camembert(mu_in, mu_out),
+    "lambda": fire.Constant(lambda_out),
+    "mu": fire.Constant(mu_out),
     "real_velocity_file": None,
 }
 
