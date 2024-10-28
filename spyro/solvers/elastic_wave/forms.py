@@ -1,7 +1,7 @@
 from firedrake import (assemble, Cofunction, Constant, div, dot, dx, grad,
                        inner, lhs, LinearSolver, rhs, TestFunction, TrialFunction)
 
-from .local_abc import clayton_engquist_A1
+from .local_abc import local_abc_form
 
 
 def isotropic_elastic_without_pml(wave):
@@ -30,15 +30,7 @@ def isotropic_elastic_without_pml(wave):
     if b is not None:
         F_s += dot(b, v)*dx(scheme=quad_rule)
 
-    abc_dict = wave.input_dictionary.get("absorving_boundary_conditions", None)
-    if abc_dict is None:
-        F_t = 0
-    else:
-        abc_active = abc_dict.get("status", False)
-        if abc_active:
-            F_t = clayton_engquist_A1(wave)
-        else:
-            F_t = 0
+    F_t = local_abc_form(wave)
 
     F = F_m + F_k - F_s - F_t
 
