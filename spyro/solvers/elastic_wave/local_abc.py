@@ -1,4 +1,4 @@
-from firedrake import (Constant, ds, TestFunction)
+from firedrake import (Constant, ds, TestFunction, TrialFunction)
 
 
 def local_abc_form(wave):
@@ -13,6 +13,7 @@ def local_abc_form(wave):
         abc_active = abc_dict.get("status", False)
         if abc_active:
             abc_type = abc_dict.get("local", {}).get("type", "Stacey")
+            dt_scheme = abc_dict.get("local", {}).get("dt_scheme", "backward")
         else:
             return 0
 
@@ -34,14 +35,24 @@ def local_abc_form(wave):
     iy = 2
 
     # Partial derivatives
-    uz_dt = (u_n[iz] - u_nm1[iz])/dt
-    ux_dt = (u_n[ix] - u_nm1[ix])/dt
+    if dt_scheme == "backward":
+        uz_dt = (u_n[iz] - u_nm1[iz])/dt
+        ux_dt = (u_n[ix] - u_nm1[ix])/dt
+    elif dt_scheme == "central":
+        u = TrialFunction(V)
+        uz_dt = (u[iz] - u_nm1[iz])/(2*dt)
+        ux_dt = (u[ix] - u_nm1[ix])/(2*dt)
+    else:
+        raise NotImplementedError(f"Unsupported time discretization: {dt_scheme}")
     uz_dz = u_n[iz].dx(iz)
     uz_dx = u_n[iz].dx(ix)
     ux_dz = u_n[ix].dx(iz)
     ux_dx = u_n[ix].dx(ix)
     if wave.dimension == 3:
-        uy_dt = (u_n[iy] - u_nm1[iy])/dt
+        if dt_scheme == "backward":
+            uy_dt = (u_n[iy] - u_nm1[iy])/dt
+        elif dt_scheme == "central":
+            uy_dt = (u[iy] - u_nm1[iy])/(2*dt)
         uz_dy = u_n[iz].dx(iy)
         ux_dy = u_n[ix].dx(iy)
         uy_dz = u_n[iy].dx(iz)
@@ -146,10 +157,10 @@ def stacey_terms(ndim, rho, c_p, c_s,
     sig_zz = rho*c_p*uz_dt + rho*c_s*(c_p - 2*c_s)*ux_dx
     if ndim == 3:
         sig_zz += rho*c_s*(c_p - 2*c_s)*uy_dy
-    sig_xz = rho*c_s*ux_dt + rho*c_s*(2*c_s - c_p)*uz_dx
+    sig_xz = rho*c_s*ux_dt - rho*c_s*(c_p - 2*c_s)*uz_dx
     F_t += -(sig_zz*v[iz] + sig_xz*v[ix])*ds(1, scheme=qr_s)
     if ndim == 3:
-        sig_yz = rho*c_s*uy_dt + rho*c_s*(2*c_s - c_p)*uz_dy
+        sig_yz = rho*c_s*uy_dt - rho*c_s*(c_p - 2*c_s)*uz_dy
         F_t += -sig_yz*v[iy]*ds(1, scheme=qr_s)
 
     # Plane z = 0
@@ -177,10 +188,10 @@ def stacey_terms(ndim, rho, c_p, c_s,
     sig_xx = -rho*c_p*ux_dt + rho*c_s*(c_p - 2*c_s)*uz_dz
     if ndim == 3:
         sig_xx += rho*c_s*(c_p - 2*c_s)*uy_dy
-    F_t += -(sig_zx*v[iz] + sig_xx*v[ix])*ds(3, scheme=qr_s)
+    F_t += (sig_zx*v[iz] + sig_xx*v[ix])*ds(3, scheme=qr_s)
     if ndim == 3:
         sig_yx = -rho*c_s*uy_dt - rho*c_s*(c_p - 2*c_s)*ux_dy
-        F_t += -sig_yx*v[iy]*ds(3, scheme=qr_s)
+        F_t += sig_yx*v[iy]*ds(3, scheme=qr_s)
 
     if ndim == 3:
         # Plane y = 0
