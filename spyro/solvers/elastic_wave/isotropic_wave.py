@@ -24,6 +24,7 @@ class IsotropicWave(ElasticWave):
 
         self.u_n = None   # Current displacement field
         self.u_nm1 = None  # Displacement field in previous iteration
+        self.u_nm2 = None  # Displacement field at iteration n-2
         self.u_np1 = None  # Displacement field in next iteration
 
         # Volumetric sourcers (defined through UFL)
@@ -113,6 +114,8 @@ class IsotropicWave(ElasticWave):
 
     @override
     def _set_prev_vstate(self, vstate):
+        if self.u_nm2 is not None:
+            self.u_nm2.assign(self.u_nm1)
         self.u_nm1.assign(vstate)
 
     @override
@@ -153,6 +156,16 @@ class IsotropicWave(ElasticWave):
                               name=self.get_function_name())
         self.u_np1 = Function(self.function_space,
                               name=self.get_function_name())
+
+        abc_dict = self.input_dictionary.get("absorving_boundary_conditions", None)
+        if abc_dict is not None:
+            abc_active = abc_dict.get("status", False)
+            if abc_active:
+                dt_scheme = abc_dict.get("local", {}).get("dt_scheme", None)
+                if dt_scheme == "backward_2nd":
+                    self.u_nm2 = Function(self.function_space,
+                                          name=self.get_function_name())
+
         self.mechanical_energy = mechanical_energy_form(self)
 
         self.parse_initial_conditions()
