@@ -38,6 +38,10 @@ def local_abc_form(wave):
     if dt_scheme == "backward":
         uz_dt = (u_n[iz] - u_nm1[iz])/dt
         ux_dt = (u_n[ix] - u_nm1[ix])/dt
+    elif dt_scheme == "backward_2nd":
+        u_nm2 = wave.u_nm2
+        uz_dt = (3*u_n[iz] - 4*u_nm1[iz] + u_nm2[iz])/(2*dt)
+        ux_dt = (3*u_n[ix] - 4*u_nm1[ix] + u_nm2[ix])/(2*dt)
     elif dt_scheme == "central":
         u = TrialFunction(V)
         uz_dt = (u[iz] - u_nm1[iz])/(2*dt)
@@ -51,6 +55,8 @@ def local_abc_form(wave):
     if wave.dimension == 3:
         if dt_scheme == "backward":
             uy_dt = (u_n[iy] - u_nm1[iy])/dt
+        elif dt_scheme == "backward_2nd":
+            uy_dt = (3*u_n[iy] - 4*u_nm1[iy] + u_nm2[iy])/(2*dt)
         elif dt_scheme == "central":
             uy_dt = (u[iy] - u_nm1[iy])/(2*dt)
         uz_dy = u_n[iz].dx(iy)
