@@ -188,10 +188,10 @@ def stacey_terms(ndim, rho, c_p, c_s,
     sig_xx = -rho*c_p*ux_dt + rho*c_s*(c_p - 2*c_s)*uz_dz
     if ndim == 3:
         sig_xx += rho*c_s*(c_p - 2*c_s)*uy_dy
-    F_t += (sig_zx*v[iz] + sig_xx*v[ix])*ds(3, scheme=qr_s)
+    F_t += (sig_zx*v[iz] + sig_xx*v[ix])*ds(4, scheme=qr_s)
     if ndim == 3:
         sig_yx = -rho*c_s*uy_dt - rho*c_s*(c_p - 2*c_s)*ux_dy
-        F_t += sig_yx*v[iy]*ds(3, scheme=qr_s)
+        F_t += sig_yx*v[iy]*ds(4, scheme=qr_s)
 
     if ndim == 3:
         # Plane y = 0
