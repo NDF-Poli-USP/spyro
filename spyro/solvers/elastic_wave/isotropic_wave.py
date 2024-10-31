@@ -1,11 +1,12 @@
 import numpy as np
 
-from firedrake import (Constant, curl, DirichletBC, div, Function,
+from firedrake import (assemble, Constant, curl, DirichletBC, div, Function,
                        FunctionSpace, project, VectorFunctionSpace)
 
 from .elastic_wave import ElasticWave
 from .forms import (isotropic_elastic_without_pml,
                     isotropic_elastic_with_pml)
+from .functionals import mechanical_energy_form
 from ...domains.space import FE_method
 from ...utils.typing import override
 
@@ -42,6 +43,10 @@ class IsotropicWave(ElasticWave):
         self.C_h = None
         self.field_logger.add_field("s-wave", "S-wave",
                                     lambda: self.update_s_wave())
+
+        self.mechanical_energy = None
+        self.field_logger.add_functional("mechanical_energy",
+                                         lambda: assemble(self.mechanical_energy))
 
     @override
     def initialize_model_parameters_from_object(self, synthetic_data_dict: dict):
@@ -148,6 +153,7 @@ class IsotropicWave(ElasticWave):
                               name=self.get_function_name())
         self.u_np1 = Function(self.function_space,
                               name=self.get_function_name())
+        self.mechanical_energy = mechanical_energy_form(self)
 
         self.parse_initial_conditions()
         self.parse_boundary_conditions()
