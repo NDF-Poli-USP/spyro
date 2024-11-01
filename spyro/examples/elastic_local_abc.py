@@ -1,4 +1,3 @@
-import firedrake as fire
 import numpy as np
 import spyro
 
@@ -20,6 +19,7 @@ source_locations = [[-L/2, L/2]]
 time_step = 2e-4  # [s]
 final_time = 2.0  # [s]
 out_freq = int(0.01/time_step)
+
 
 def build_solver(local_abc, dt_scheme):
     d = {}
