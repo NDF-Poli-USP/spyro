@@ -22,7 +22,7 @@ def test_clayton_engquist_abc():
 
 def test_with_central():
     wave = build_solver("Stacey", "central")
-    with pytest.raises(AssertionError) as e:
+    with pytest.raises(AssertionError):
         wave.forward_solve()
 
 

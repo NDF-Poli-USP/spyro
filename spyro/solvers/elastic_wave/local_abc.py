@@ -86,6 +86,7 @@ def local_abc_form(wave):
                     uz_dx, ux_dx, uy_dx,
                     uz_dy, ux_dy, uy_dy)
 
+
 def clayton_engquist_A1_terms(ndim, rho, c_p, c_s,
                               v, iz, ix, iy, qr_s,
                               uz_dt, ux_dt, uy_dt,
@@ -149,6 +150,7 @@ def clayton_engquist_A1_terms(ndim, rho, c_p, c_s,
         F_t += (sig_zy*v[iz] + sig_xy*v[ix] + sig_yy*v[iy])*ds(6, scheme=qr_s)
 
     return F_t
+
 
 def stacey_terms(ndim, rho, c_p, c_s,
                  v, iz, ix, iy, qr_s,
