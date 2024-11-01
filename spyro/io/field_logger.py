@@ -40,8 +40,8 @@ class FieldLogger:
 
         self.__rank = comm.comm.Get_rank()
         if self.__rank == 0:
-            self.__func_data = []
-            self.__enabled_functionals = []
+            self.__func_data = {}
+            self.__enabled_functionals = {}
 
             self.__time_enabled = self.vis_dict.get("time", False)
             if self.__time_enabled:
@@ -54,7 +54,7 @@ class FieldLogger:
 
     def add_functional(self, key, callback):
         if self.__rank == 0:
-            self.__func_data.append((key, callback))
+            self.__func_data[key] = callback
 
     def start_logging(self, source_id):
         if self.__source_id is not None:
@@ -78,13 +78,12 @@ class FieldLogger:
             if self.__time_enabled:
                 self.__time = []
 
-            self.__enabled_functionals = []
-            for key, callback in self.__func_data:
+            for key, callback in self.__func_data.items():
                 enabled = self.vis_dict.get(key, False)
                 if enabled:
                     filename = self.vis_dict.get(key + "_filename", key + ".npy")
                     print(f"Saving {key} in: {filename}")
-                    self.__enabled_functionals.append(Functional(filename, callback))
+                    self.__enabled_functionals[key] = Functional(filename, callback)
 
     def stop_logging(self):
         self.__source_id = None
@@ -93,7 +92,7 @@ class FieldLogger:
             if self.__time_enabled:
                 np.save(self.__time_filename, self.__time)
 
-            for functional in self.__enabled_functionals:
+            for functional in self.__enabled_functionals.values():
                 functional.save()
 
     def log(self, t):
@@ -104,5 +103,8 @@ class FieldLogger:
             if self.__time_enabled:
                 self.__time.append(t)
 
-            for functional in self.__enabled_functionals:
+            for functional in self.__enabled_functionals.values():
                 functional.sample()
+
+    def get(self, key):
+        return self.__enabled_functionals[key].list[-1]
