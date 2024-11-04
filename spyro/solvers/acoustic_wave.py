@@ -18,9 +18,17 @@ from .backward_time_integration import (
 )
 from ..domains.space import FE_method
 from ..utils.typing import override
+from .functionals import acoustic_energy
 
 
 class AcousticWave(Wave):
+    def __init__(self, dictionary, comm=None):
+        super().__init__(dictionary, comm=comm)
+
+        self.acoustic_energy = None
+        self.field_logger.add_functional("acoustic_energy",
+                                         lambda: fire.assemble(self.acoustic_energy))
+
     def save_current_velocity_model(self, file_name=None):
         if self.c is None:
             raise ValueError("C not loaded")
@@ -60,6 +68,8 @@ class AcousticWave(Wave):
             self.X_nm1 = None
             self.X_np1 = fire.Function(V * Z)
             construct_solver_or_matrix_with_pml(self)
+
+        self.acoustic_energy = acoustic_energy(self)
 
     @ensemble_gradient
     def gradient_solve(self, guess=None, misfit=None, forward_solution=None):
