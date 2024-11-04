@@ -383,6 +383,13 @@ class Model_parameters:
         self.abc_pad_length = BL_obj.abc_pad_length
         self.abc_boundary_layer_type = BL_obj.abc_boundary_layer_type
 
+        self.absorb_top = dictionary.get("absorb_top", False)
+        self.absorb_bottom = dictionary.get("absorb_bottom", True)
+        self.absorb_right = dictionary.get("absorb_right", True)
+        self.absorb_left = dictionary.get("absorb_left", True)
+        self.absorb_front = dictionary.get("absorb_front", True)
+        self.absorb_back = dictionary.get("absorb_back", True)
+
     def _sanitize_output(self):
         #         default_dictionary["visualization"] = {
         #     "forward_output" : True,
