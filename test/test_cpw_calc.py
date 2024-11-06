@@ -2,7 +2,19 @@ import numpy as np
 import spyro
 
 
+def is_seismicmesh_installed():
+    try:
+        import SeismicMesh
+        return True
+    except ImportError:
+        return False
+
+
 def test_cpw_calc():
+    if is_seismicmesh_installed():
+        FEM_method_to_evaluate = "mass_lumped_triangle"
+    else:
+        FEM_method_to_evaluate = "spectral_quadrilateral"
     grid_point_calculator_parameters = {
         # Experiment parameters
         # Here we define the frequency of the Ricker wavelet source
@@ -17,7 +29,7 @@ def test_cpw_calc():
         "velocity_model_file_name": None,
         # FEM to evaluate such as `KMV` or `spectral`
         # (GLL nodes on quads and hexas)
-        "FEM_method_to_evaluate": "mass_lumped_triangle",
+        "FEM_method_to_evaluate": FEM_method_to_evaluate,
         "dimension": 2,  # Domain dimension. Either 2 or 3.
         # Either near or line. Near defines a receiver grid near to the source,
         "receiver_setup": "near",
