@@ -13,8 +13,10 @@ def is_seismicmesh_installed():
 def test_cpw_calc():
     if is_seismicmesh_installed():
         FEM_method_to_evaluate = "mass_lumped_triangle"
+        correct_cpw = 2.3
     else:
         FEM_method_to_evaluate = "spectral_quadrilateral"
+        correct_cpw = 2.5
     grid_point_calculator_parameters = {
         # Experiment parameters
         # Here we define the frequency of the Ricker wavelet source
@@ -73,7 +75,7 @@ def test_cpw_calc():
     # Check if cpw is within error TOL, starting search at min
     min = Cpw_calc.find_minimum()
     print(f"Minimum of {min}")
-    test3 = np.isclose(2.3, min)
+    test3 = np.isclose(correct_cpw, min)
 
     print("END")
     assert all([test1, test2, test3])
