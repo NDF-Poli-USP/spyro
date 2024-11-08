@@ -197,6 +197,6 @@ class AcousticWave(Wave):
     @override
     def check_stability(self):
         assert (
-            fire.norm(wave.get_function()) < 1
+            fire.norm(self.get_function()) < 1
         ), "Numerical instability. Try reducing dt or building the " \
            "mesh differently"
