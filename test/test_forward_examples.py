@@ -50,6 +50,27 @@ def test_rectangle_forward():
     assert all([test1, test2, test3])
 
 
+def test_acoustic_local_abc():
+    dictionary = {}
+    dictionary["absorving_boundary_conditions"] = {
+        "status": True,
+        "damping_type": "local",
+        "absorb_top": True,
+        "absorb_bottom": True,
+        "absorb_right": True,
+        "absorb_left": True,
+    }
+    dictionary["visualization"] = {
+        "forward_output": False,
+        "acoustic_energy": True,
+        "acoustic_energy_filename": "results/acoustic_potential_energy.npy",
+    }
+    wave = spyro.examples.Camembert_acoustic(dictionary=dictionary)
+    wave.forward_solve()
+    last_acoustic_energy = wave.field_logger.get("acoustic_energy")
+    assert last_acoustic_energy < 7e-7  # The expected value was found empirically
+
+
 def test_camembert_elastic():
     from spyro.examples.camembert_elastic import wave
     wave.forward_solve()
