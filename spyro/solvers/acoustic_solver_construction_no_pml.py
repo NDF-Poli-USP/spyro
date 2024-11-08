@@ -1,5 +1,5 @@
 import firedrake as fire
-from firedrake import dx, Constant, dot, grad
+from firedrake import ds, dx, Constant, dot, grad
 
 
 def construct_solver_or_matrix_no_pml(Wave_object):
@@ -40,9 +40,26 @@ def construct_solver_or_matrix_no_pml(Wave_object):
     le = 0
     q = Wave_object.source_expression
     if q is not None:
-        le = q * v * dx(scheme=quad_rule)
+        le += q * v * dx(scheme=quad_rule)
 
     B = fire.Cofunction(V.dual())
+
+    if Wave_object.abc_active:
+        f_abc = - (1/Wave_object.c) * dot((u_n - u_nm1) / Constant(dt), v)
+        qr_s = Wave_object.surface_quadrature_rule
+        if Wave_object.absorb_top:
+            le += f_abc*ds(1, scheme=qr_s)
+        if Wave_object.absorb_bottom:
+            le += f_abc*ds(2, scheme=qr_s)
+        if Wave_object.absorb_right:
+            le += f_abc*ds(3, scheme=qr_s)
+        if Wave_object.absorb_left:
+            le += f_abc*ds(4, scheme=qr_s)
+        if Wave_object.dimension == 3:
+            if Wave_object.absorb_front:
+                le += f_abc*ds(5, scheme=qr_s)
+            if Wave_object.absorb_back:
+                le += f_abc*ds(6, scheme=qr_s)
 
     form = m1 + a - le
     lhs = fire.lhs(form)
