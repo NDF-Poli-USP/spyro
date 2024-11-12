@@ -2,31 +2,66 @@
 The analytical solutions are provided by the book:
 Quantitative Seismology (2nd edition) from Aki and Richards
 '''
+import argparse
 import numpy as np
 import spyro
+import sys
 
 from math import pi as PI
 from scipy.integrate import quad
 
-L = 450   # Length (m)
-N = 30    # Number of elements in each direction
-h = L/N   # Element size (m)
+parser = argparse.ArgumentParser()
+parser.add_argument("-L", default=450, type=float, metavar='<value>',
+                    help="size of the edge of the computational domain (cube)")
+parser.add_argument("-N", default=30, type=int, metavar='<value>',
+                    help="number of divisions in each direction")
+parser.add_argument("-alpha", default=1500, type=float, metavar='<value>',
+                    help="P wave velocity")
+parser.add_argument("-beta", default=1000, type=float, metavar='<value>',
+                    help="S wave velocity")
+parser.add_argument("-rho", default=2000, type=float, metavar='<value>',
+                    help="density")
+parser.add_argument("-amplitude", default=1e3, type=float, metavar='<value>',
+                    help="amplitude of the wavelet")
+parser.add_argument("-frequency", default=20, type=float, metavar='<value>',
+                    help="frequency of the wavelet")
+parser.add_argument("-total_time", default=0.3, type=float, metavar='<value>',
+                    help="total simulation time")
+parser.add_argument("-time_steps", default=750, type=int, metavar='<value>',
+                    help="number of time steps")
+parser.add_argument("-receiver_x", default=100, type=float, metavar='<value>',
+                    help="receiver position in x direction")
+parser.add_argument("-receiver_y", default=0, type=float, metavar='<value>',
+                    help="receiver position in y direction")
+parser.add_argument("-receiver_z", default=100, type=float, metavar='<value>',
+                    help="receiver position in z direction")
 
-alpha = 1500   # P-wave velocity
-beta = 1000    # S-wave velocity
-rho = 2000     # Density (kg/m3)
+if "pytest" in sys.argv[0]:
+    args = parser.parse_args([])
+else:
+    args = parser.parse_args()
 
-smag = 1e3
-f0 = 20     # Frequency (Hz)
-t0 = 1/f0   # Time delay
+L = args.L  # Length (m)
+N = args.N  # Number of elements in each direction
+h = L/N     # Element size (m)
 
-tn = 0.3  # Simulation time (s)
-nt = 750
+alpha = args.alpha  # P-wave velocity
+beta = args.beta    # S-wave velocity
+rho = args.rho      # Density (kg/m3)
+
+smag = args.amplitude  # Source amplitude
+f0 = args.frequency    # Frequency (Hz)
+t0 = 1/f0              # Time delay
+
+tn = args.total_time  # Simulation time (s)
+nt = args.time_steps
 time_step = (tn/nt)
 out_freq = int(0.01/time_step)
 
-x_s = np.r_[-L/2, L/2, L/2]  # Source location (m)
-x_r = np.r_[100, 0, 100]     # Receiver location (m)
+x_s = np.r_[-L/2, L/2, L/2]   # Source location (m)
+x_r = np.r_[args.receiver_x,  # Receiver relative location (m)
+            args.receiver_y,
+            args.receiver_z]
 
 
 def analytical_solution(i, j):
