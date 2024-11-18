@@ -4,7 +4,7 @@ import spyro
 
 def is_seismicmesh_installed():
     try:
-        import SeismicMesh
+        import SeismicMesh  # noqa: F401
         return True
     except ImportError:
         return False
