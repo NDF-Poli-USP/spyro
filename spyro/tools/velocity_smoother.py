@@ -71,5 +71,6 @@ def smooth_velocity_field_file(input_filename, output_filename, sigma, show=Fals
         plt.ylabel("z-direction (m)")
         ax.axis("equal")
         plt.show()
+        plt.savefig(output_filename+".png")
 
     return None
