@@ -1,4 +1,5 @@
 import numpy as np
+import pytest
 import spyro
 
 
@@ -10,13 +11,7 @@ def is_seismicmesh_installed():
         return False
 
 
-def test_cpw_calc():
-    if is_seismicmesh_installed():
-        FEM_method_to_evaluate = "mass_lumped_triangle"
-        correct_cpw = 2.3
-    else:
-        FEM_method_to_evaluate = "spectral_quadrilateral"
-        correct_cpw = 2.5
+def run_test_cpw_calc(FEM_method_to_evaluate, correct_cpw):
     grid_point_calculator_parameters = {
         # Experiment parameters
         # Here we define the frequency of the Ricker wavelet source
@@ -81,5 +76,19 @@ def test_cpw_calc():
     assert all([test1, test2, test3])
 
 
+@pytest.mark.skipif(not is_seismicmesh_installed(), reason="SeismicMesh is not installed")
+def test_cpw_calc_triangles():
+    method = "mass_lumped_triangle"
+    correct_cpw = 2.3
+    return run_test_cpw_calc(method, correct_cpw)
+
+
+def test_cpw_calc_quads():
+    method = "spectral_quadrilateral"
+    correct_cpw = 2.5
+    return run_test_cpw_calc(method, correct_cpw)
+
+
 if __name__ == "__main__":
-    test_cpw_calc()
+    test_cpw_calc_triangles()
+    test_cpw_calc_quads()

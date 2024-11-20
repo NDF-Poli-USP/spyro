@@ -56,8 +56,8 @@ def test_write_segy_and_smooth(show=False):
         plt.xlabel("x-direction (m)")
         plt.ylabel("z-direction (m)")
         ax.axis("equal")
-        plt.show()
         plt.savefig("nonsmoothedtest.png")
+        plt.show()
 
     spyro.tools.smooth_velocity_field_file(segy_file, smoothed_file, 5, show=show)
 
