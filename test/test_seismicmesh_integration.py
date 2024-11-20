@@ -1,6 +1,15 @@
 import spyro
 import firedrake as fire
 import numpy as np
+import pytest
+
+
+def is_seismicmesh_installed():
+    try:
+        import SeismicMesh  # noqa: F401
+        return True
+    except ImportError:
+        return False
 
 
 def mean_edge_length(triangle):
@@ -14,6 +23,7 @@ def mean_edge_length(triangle):
     return (l0+l1+l2)/3.0
 
 
+@pytest.mark.skipif(not is_seismicmesh_installed(), reason="SeismicMesh is not installed")
 def test_spyro_seimicmesh_2d_homogeneous_generation():
     Lz = 1.0
     Lx = 2.0

@@ -1,7 +1,6 @@
 import firedrake as fire
 import warnings
 import os
-from SeismicMesh import write_velocity_model
 
 from .wave import Wave
 
@@ -19,6 +18,12 @@ from .backward_time_integration import (
 from ..domains.space import FE_method
 from ..utils.typing import override
 from .functionals import acoustic_energy
+
+try:
+    from SeismicMesh import write_velocity_model
+    SEISMIC_MESH_AVAILABLE = True
+except ImportError:
+    SEISMIC_MESH_AVAILABLE = False
 
 
 class AcousticWave(Wave):
@@ -109,6 +114,8 @@ class AcousticWave(Wave):
                 raise ValueError("No velocity model or velocity file to load.")
 
             if self.initial_velocity_model_file.endswith(".segy"):
+                if not SEISMIC_MESH_AVAILABLE:
+                    raise ImportError("SeismicMesh is required to convert segy files.")
                 vp_filename, vp_filetype = os.path.splitext(
                     self.initial_velocity_model_file
                 )
