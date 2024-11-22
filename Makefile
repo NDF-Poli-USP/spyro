@@ -25,13 +25,7 @@ clean:
 	@rm -rf dist/
 
 format:
-	isort -rc spyro/ test/*.py
-	black spyro/ test/*.py
-
-black:
-	black .
+	autopep8 --in-place --global-config setup.cfg --recursive .
 
 lint:
-	isort --check . spyro/ setup.py test/*.py
-	black --check spyro/ setup.py test/*.py
 	flake8 setup.py spyro/ test/*.py

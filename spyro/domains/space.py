@@ -1,7 +1,7 @@
-from firedrake import *  # noqa:F403
+from firedrake import (FiniteElement, FunctionSpace, VectorElement)
 
 
-def FE_method(mesh, method, degree):
+def FE_method(mesh, method, degree, dim=1):
     """Define the finite element space:
 
     Parameters:
@@ -12,6 +12,8 @@ def FE_method(mesh, method, degree):
         Method to be used for the finite element space.
     degree: int
         Degree of the finite element space.
+    dim: int
+        Number of degrees of freedom per node.
 
     Returns:
     --------
@@ -20,21 +22,24 @@ def FE_method(mesh, method, degree):
     """
 
     if method == "mass_lumped_triangle":
-        element = FiniteElement(  # noqa: F405
+        element = FiniteElement(
             "KMV", mesh.ufl_cell(), degree=degree, variant="KMV"
         )
     elif method == "spectral_quadrilateral":
-        element = FiniteElement(  # noqa: F405
+        element = FiniteElement(
             "CG", mesh.ufl_cell(), degree=degree, variant="spectral"
         )
     elif method == "DG_triangle" or "DG_quadrilateral" or "DG":
         element = FiniteElement(
             "DG", mesh.ufl_cell(), degree=degree
-        )  # noqa: F405
+        )
     elif method == "CG_triangle" or "CG_quadrilateral" or "CG":
         element = FiniteElement(
             "CG", mesh.ufl_cell(), degree=degree
-        )  # noqa: F405
+        )
 
-    function_space = FunctionSpace(mesh, element)  # noqa: F405
+    if dim > 1:
+        element = VectorElement(element, dim=dim)
+
+    function_space = FunctionSpace(mesh, element)
     return function_space

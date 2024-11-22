@@ -1,8 +1,17 @@
 import numpy as np
+import pytest
 import spyro
 
 
-def test_cpw_calc():
+def is_seismicmesh_installed():
+    try:
+        import SeismicMesh  # noqa: F401
+        return True
+    except ImportError:
+        return False
+
+
+def run_test_cpw_calc(FEM_method_to_evaluate, correct_cpw):
     grid_point_calculator_parameters = {
         # Experiment parameters
         # Here we define the frequency of the Ricker wavelet source
@@ -17,7 +26,7 @@ def test_cpw_calc():
         "velocity_model_file_name": None,
         # FEM to evaluate such as `KMV` or `spectral`
         # (GLL nodes on quads and hexas)
-        "FEM_method_to_evaluate": "mass_lumped_triangle",
+        "FEM_method_to_evaluate": FEM_method_to_evaluate,
         "dimension": 2,  # Domain dimension. Either 2 or 3.
         # Either near or line. Near defines a receiver grid near to the source,
         "receiver_setup": "near",
@@ -61,11 +70,25 @@ def test_cpw_calc():
     # Check if cpw is within error TOL, starting search at min
     min = Cpw_calc.find_minimum()
     print(f"Minimum of {min}")
-    test3 = np.isclose(2.3, min)
+    test3 = np.isclose(correct_cpw, min)
 
     print("END")
     assert all([test1, test2, test3])
 
 
+@pytest.mark.skipif(not is_seismicmesh_installed(), reason="SeismicMesh is not installed")
+def test_cpw_calc_triangles():
+    method = "mass_lumped_triangle"
+    correct_cpw = 2.3
+    return run_test_cpw_calc(method, correct_cpw)
+
+
+def test_cpw_calc_quads():
+    method = "spectral_quadrilateral"
+    correct_cpw = 2.5
+    return run_test_cpw_calc(method, correct_cpw)
+
+
 if __name__ == "__main__":
-    test_cpw_calc()
+    test_cpw_calc_triangles()
+    test_cpw_calc_quads()

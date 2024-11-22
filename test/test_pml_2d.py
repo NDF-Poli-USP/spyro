@@ -1,5 +1,4 @@
 import spyro
-import matplotlib.pyplot as plt
 import numpy as np
 import time as timer
 import firedrake as fire

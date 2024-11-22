@@ -45,7 +45,7 @@ class read_boundary_layer:
 
     def __init__(self, abc_dictionary):
         self.dictionary = abc_dictionary
-        if self.dictionary["status"] is False:
+        if self.dictionary["status"] is False or self.dictionary["damping_type"] == "local":
             self.abc_exponent = None
             self.abc_cmax = None
             self.abc_R = None

@@ -1,7 +1,10 @@
-import os
 import firedrake as fire
-import SeismicMesh
 import meshio
+
+try:
+    import SeismicMesh
+except ImportError:
+    SeismicMesh = None
 
 
 def cells_per_wavelength(method, degree, dimension):
@@ -78,77 +81,77 @@ class AutomaticMesh:
     """
 
     def __init__(
-            self, comm=None, mesh_parameters=None
-        ):
-            """
-            Initialize the MeshingFunctions class.
+        self, comm=None, mesh_parameters=None
+    ):
+        """
+        Initialize the MeshingFunctions class.
 
-            Parameters
-            ----------
-            comm : MPI communicator, optional
-                MPI communicator. The default is None.
-            mesh_parameters : dict, optional
-                Dictionary containing the mesh parameters. The default is None.
+        Parameters
+        ----------
+        comm : MPI communicator, optional
+            MPI communicator. The default is None.
+        mesh_parameters : dict, optional
+            Dictionary containing the mesh parameters. The default is None.
 
-            Raises
-            ------
-            ValueError
-                If `abc_pad_length` is negative.
+        Raises
+        ------
+        ValueError
+            If `abc_pad_length` is negative.
 
-            Notes
-            -----
-            The `mesh_parameters` dictionary should contain the following keys:
-            - 'dimension': int, optional. Dimension of the mesh. The default is 2.
-            - 'length_z': float, optional. Length of the mesh in the z-direction.
-            - 'length_x': float, optional. Length of the mesh in the x-direction.
-            - 'length_y': float, optional. Length of the mesh in the y-direction.
-            - 'cell_type': str, optional. Type of the mesh cells.
-            - 'mesh_type': str, optional. Type of the mesh.
+        Notes
+        -----
+        The `mesh_parameters` dictionary should contain the following keys:
+        - 'dimension': int, optional. Dimension of the mesh. The default is 2.
+        - 'length_z': float, optional. Length of the mesh in the z-direction.
+        - 'length_x': float, optional. Length of the mesh in the x-direction.
+        - 'length_y': float, optional. Length of the mesh in the y-direction.
+        - 'cell_type': str, optional. Type of the mesh cells.
+        - 'mesh_type': str, optional. Type of the mesh.
 
-            For mesh with absorbing layer only:
-            - 'abc_pad_length': float, optional. Length of the absorbing boundary condition padding.
+        For mesh with absorbing layer only:
+        - 'abc_pad_length': float, optional. Length of the absorbing boundary condition padding.
 
-            For Firedrake mesh only:
-            - 'dx': float, optional. Mesh element size.
-            - 'periodic': bool, optional. Whether the mesh is periodic.
-            - 'edge_length': float, optional. Length of the mesh edges.
+        For Firedrake mesh only:
+        - 'dx': float, optional. Mesh element size.
+        - 'periodic': bool, optional. Whether the mesh is periodic.
+        - 'edge_length': float, optional. Length of the mesh edges.
 
-            For SeismicMesh only:
-            - 'cells_per_wavelength': float, optional. Number of cells per wavelength.
-            - 'source_frequency': float, optional. Frequency of the source.
-            - 'minimum_velocity': float, optional. Minimum velocity.
-            - 'velocity_model_file': str, optional. File containing the velocity model.
-            - 'edge_length': float, optional. Length of the mesh edges.
-            """
-            self.dimension = mesh_parameters["dimension"]
-            self.length_z = mesh_parameters["length_z"]
-            self.length_x = mesh_parameters["length_x"]
-            self.length_y = mesh_parameters["length_y"]
-            self.cell_type = mesh_parameters["cell_type"]
-            self.comm = comm
-            if mesh_parameters["abc_pad_length"] is None:
-                self.abc_pad = 0.0
-            elif mesh_parameters["abc_pad_length"] >= 0.0:
-                self.abc_pad = mesh_parameters["abc_pad_length"]
-            else:
-                raise ValueError("abc_pad must be positive")
-            self.mesh_type = mesh_parameters["mesh_type"]
+        For SeismicMesh only:
+        - 'cells_per_wavelength': float, optional. Number of cells per wavelength.
+        - 'source_frequency': float, optional. Frequency of the source.
+        - 'minimum_velocity': float, optional. Minimum velocity.
+        - 'velocity_model_file': str, optional. File containing the velocity model.
+        - 'edge_length': float, optional. Length of the mesh edges.
+        """
+        self.dimension = mesh_parameters["dimension"]
+        self.length_z = mesh_parameters["length_z"]
+        self.length_x = mesh_parameters["length_x"]
+        self.length_y = mesh_parameters["length_y"]
+        self.cell_type = mesh_parameters["cell_type"]
+        self.comm = comm
+        if mesh_parameters["abc_pad_length"] is None:
+            self.abc_pad = 0.0
+        elif mesh_parameters["abc_pad_length"] >= 0.0:
+            self.abc_pad = mesh_parameters["abc_pad_length"]
+        else:
+            raise ValueError("abc_pad must be positive")
+        self.mesh_type = mesh_parameters["mesh_type"]
 
-            # Firedrake mesh only parameters
-            self.dx = mesh_parameters["dx"]
-            self.quadrilateral = False
-            self.periodic = mesh_parameters["periodic"]
-            if self.dx is None:
-                self.dx = mesh_parameters["edge_length"]
+        # Firedrake mesh only parameters
+        self.dx = mesh_parameters["dx"]
+        self.quadrilateral = False
+        self.periodic = mesh_parameters["periodic"]
+        if self.dx is None:
+            self.dx = mesh_parameters["edge_length"]
 
-            # SeismicMesh only parameters
-            self.cpw = mesh_parameters["cells_per_wavelength"]
-            self.source_frequency = mesh_parameters["source_frequency"]
-            self.minimum_velocity = mesh_parameters["minimum_velocity"]
-            self.lbda = None
-            self.velocity_model = mesh_parameters["velocity_model_file"]
-            self.edge_length = mesh_parameters["edge_length"]
-            self.output_file_name = "automatic_mesh.msh"
+        # SeismicMesh only parameters
+        self.cpw = mesh_parameters["cells_per_wavelength"]
+        self.source_frequency = mesh_parameters["source_frequency"]
+        self.minimum_velocity = mesh_parameters["minimum_velocity"]
+        self.lbda = None
+        self.velocity_model = mesh_parameters["velocity_model_file"]
+        self.edge_length = mesh_parameters["edge_length"]
+        self.output_file_name = "automatic_mesh.msh"
 
     def set_mesh_size(self, length_z=None, length_x=None, length_y=None):
         """
@@ -222,6 +225,8 @@ class AutomaticMesh:
         -------
         None
         """
+        if SeismicMesh is None:
+            raise ImportError("SeismicMesh is not available. Please install it to use this function.")
         if cpw is not None:
             self.cpw = cpw
         if velocity_model is not None:
@@ -259,6 +264,8 @@ class AutomaticMesh:
         if self.mesh_type == "firedrake_mesh":
             return self.create_firedrake_mesh()
         elif self.mesh_type == "SeismicMesh":
+            if SeismicMesh is None:
+                raise ImportError("SeismicMesh is not available. Please install it to use this function.")
             return self.create_seismicmesh_mesh()
         else:
             raise ValueError("mesh_type is not supported")
@@ -281,8 +288,8 @@ class AutomaticMesh:
         Creates a 2D mesh based on Firedrake meshing utilities.
         """
         if self.abc_pad:
-            nx = int( (self.length_x + 2*self.abc_pad) / self.dx)
-            nz = int( (self.length_z + self.abc_pad)/ self.dx)
+            nx = int((self.length_x + 2*self.abc_pad) / self.dx)
+            nz = int((self.length_z + self.abc_pad) / self.dx)
         else:
             nx = int(self.length_x / self.dx)
             nz = int(self.length_z / self.dx)

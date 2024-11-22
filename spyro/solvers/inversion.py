@@ -1,7 +1,7 @@
 import firedrake as fire
 import warnings
 from scipy.optimize import minimize as scipy_minimize
-from mpi4py import MPI
+from mpi4py import MPI  # noqa: F401
 import numpy as np
 from copy import deepcopy
 import resource
@@ -539,7 +539,7 @@ class FullWaveformInversion(AcousticWave):
         Sets the gradient mask for zeroing gradient values outside defined boundaries.
 
         Args:
-            boundaries (list, optional): List of boundary values for the mask. If not provided, 
+            boundaries (list, optional): List of boundary values for the mask. If not provided,
                 the method expects the abc_active to be True and uses PML locations for boundary
                 values.
 
@@ -548,7 +548,7 @@ class FullWaveformInversion(AcousticWave):
             ValueError: If mask options do not make sense.
 
         Warnings:
-            UserWarning: If abc_active is True and boundaries is not None, the boundaries will 
+            UserWarning: If abc_active is True and boundaries is not None, the boundaries will
                 override the PML boundaries for the mask.
 
         """
@@ -569,23 +569,23 @@ class FullWaveformInversion(AcousticWave):
         self.mask_obj = mask_obj
 
     def _apply_gradient_mask(self):
-            """
-            Applies a gradient mask to the gradient if it exists.
+        """
+        Applies a gradient mask to the gradient if it exists.
 
-            If a gradient mask is available, this method applies the mask to the gradient
-            using the `apply_mask` method of the `mask_obj`. If no gradient mask is available,
-            this method does nothing.
+        If a gradient mask is available, this method applies the mask to the gradient
+        using the `apply_mask` method of the `mask_obj`. If no gradient mask is available,
+        this method does nothing.
 
-            Parameters:
-                None
+        Parameters:
+            None
 
-            Returns:
-                None
-            """
-            if self.has_gradient_mask:
-                self.gradient = self.mask_obj.apply_mask(self.gradient)
-            else:
-                pass
+        Returns:
+            None
+        """
+        if self.has_gradient_mask:
+            self.gradient = self.mask_obj.apply_mask(self.gradient)
+        else:
+            pass
 
     def load_real_shot_record(self, filename="shots/shot_record_"):
         load_shots(self, file_name=filename)
@@ -611,6 +611,7 @@ class SyntheticRealAcousticWave(AcousticWave):
     forward_solve():
         Solves the forward problem.
     """
+
     def __init__(self, dictionary=None, comm=None):
         super().__init__(dictionary=dictionary, comm=comm)
 

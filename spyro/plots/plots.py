@@ -1,7 +1,5 @@
 # from scipy.io import savemat
 import matplotlib.pyplot as plt
-import matplotlib.patches as patches
-from matplotlib.ticker import MultipleLocator
 from PIL import Image
 import numpy as np
 import firedrake
@@ -23,6 +21,7 @@ def plot_shots(
     file_format="pdf",
     start_index=0,
     end_index=0,
+    out_index=None,
 ):
     """Plot a shot record and save the image to disk. Note that
     this automatically will rename shots when ensmeble paralleism is
@@ -59,7 +58,10 @@ def plot_shots(
     dt = Wave_object.dt
     tf = Wave_object.final_time
 
-    arr = Wave_object.receivers_output
+    if out_index is None:
+        arr = Wave_object.receivers_output
+    else:
+        arr = Wave_object.receivers_output[:, :, out_index]
 
     nt = int(tf / dt) + 1  # number of timesteps
 
