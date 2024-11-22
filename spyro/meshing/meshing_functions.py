@@ -348,8 +348,7 @@ class AutomaticMesh:
         if self.dimension == 2:
             return self.create_seimicmesh_2d_mesh()
         elif self.dimension == 3:
-            raise NotImplementedError("Not implemented yet")
-            # return self.create_seismicmesh_3D_mesh()
+            return self.create_seismicmesh_3d_mesh()
         else:
             raise ValueError("dimension is not supported")
 
@@ -471,27 +470,67 @@ class AutomaticMesh:
         )
 
         return fire.Mesh(self.output_file_name)
-        # raise NotImplementedError("Not implemented yet")
 
+    def create_seismicmesh_3d_mesh(self):
+        """
+        Creates a 3D mesh based on SeismicMesh meshing utilities.
+        """
+        if self.velocity_model is None:
+            return self.create_seismicmesh_3D_mesh_homogeneous()
+        else:
+            raise NotImplementedError("Not implemented yet")
 
-# def create_firedrake_3D_mesh_based_on_parameters(dx, cell_type):
-#     nx = int(self.length_x / dx)
-#     nz = int(self.length_z / dx)
-#     ny = int(self.length_y / dx)
-#     if self.cell_type == "quadrilateral":
-#         quadrilateral = True
-#     else:
-#         quadrilateral = False
+    def create_seismicmesh_3D_mesh_homogeneous(self):
+        """
+        Creates a 3D mesh based on SeismicMesh meshing utilities, with homogeneous velocity model.
+        """
+        Lz = self.length_z
+        Lx = self.length_x
+        Ly = self.length_y
+        pad = self.abc_pad
 
-#     return spyro.BoxMesh(
-#         nz,
-#         nx,
-#         ny,
-#         self.length_z,
-#         self.length_x,
-#         self.length_y,
-#         quadrilateral=quadrilateral,
-#     )
+        real_lz = Lz + pad
+        real_lx = Lx + 2 * pad
+        real_ly = Ly + 2 * pad
+
+        bbox = (-real_lz, 0.0,
+                -pad, real_lx - pad,
+                -pad, real_ly - pad)
+        cube = SeismicMesh.Cube(bbox)
+
+        points, cells = SeismicMesh.generate_mesh(
+            domain=cube,
+            edge_length=self.edge_length,
+            verbose=0,
+            max_iter=75,
+        )
+
+        points, cells = SeismicMesh.sliver_removal(
+            points=points,
+            domain=cube,
+            edge_length=self.edge_length,
+            preserve=True,
+        )
+
+        meshio.write_points_cells(
+            self.output_file_name,
+            points,
+            [("tetra", cells)],
+            file_format="gmsh22",
+            binary=False,
+        )
+
+        meshio.write_points_cells(
+            self.output_file_name + ".vtk",
+            points,
+            [("tetra", cells)],
+            file_format="vtk",
+        )
+
+        return fire.Mesh(self.output_file_name,
+                         distribution_parameters={
+                            "overlap_type": (fire.DistributedMeshOverlapType.NONE, 0)
+                        })
 
 
 def RectangleMesh(nx, ny, Lx, Ly, pad=None, comm=None, quadrilateral=False):
