@@ -1,10 +1,11 @@
 import firedrake as fire
 import warnings
+import os
 
 from .wave import Wave
-from .time_integration import time_integrator
-from ..io.basicio import ensemble_propagator, ensemble_gradient
-from ..domains.quadrature import quadrature_rules
+
+from ..io.basicio import ensemble_gradient
+from ..io import interpolate
 from .acoustic_solver_construction_no_pml import (
     construct_solver_or_matrix_no_pml,
 )
@@ -14,9 +15,25 @@ from .acoustic_solver_construction_with_pml import (
 from .backward_time_integration import (
     backward_wave_propagator,
 )
+from ..domains.space import FE_method
+from ..utils.typing import override
+from .functionals import acoustic_energy
+
+try:
+    from SeismicMesh import write_velocity_model
+    SEISMIC_MESH_AVAILABLE = True
+except ImportError:
+    SEISMIC_MESH_AVAILABLE = False
 
 
 class AcousticWave(Wave):
+    def __init__(self, dictionary, comm=None):
+        super().__init__(dictionary, comm=comm)
+
+        self.acoustic_energy = None
+        self.field_logger.add_functional("acoustic_energy",
+                                         lambda: fire.assemble(self.acoustic_energy))
+
     def save_current_velocity_model(self, file_name=None):
         if self.c is None:
             raise ValueError("C not loaded")
@@ -26,42 +43,13 @@ class AcousticWave(Wave):
             self.c, name="velocity"
         )
 
-    def forward_solve(self):
-        """Solves the forward problem.
-
-        Parameters:
-        -----------
-        None
-
-        Returns:
-        --------
-        None
-        """
-        if self.function_space is None:
-            self.force_rebuild_function_space()
-
-        self._get_initial_velocity_model()
-        self.c = self.initial_velocity_model
-        self.matrix_building()
-        self.wave_propagator()
-        self.comm.comm.barrier()
-
-    def force_rebuild_function_space(self):
-        if self.mesh is None:
-            self.mesh = self.get_mesh()
-        self._build_function_space()
-        self._map_sources_and_receivers()
-
+    @override
     def matrix_building(self):
         """Builds solver operators. Doesn't create mass matrices if
         matrix_free option is on,
         which it is by default.
         """
         self.current_time = 0.0
-        quad_rule, k_rule, s_rule = quadrature_rules(self.function_space)
-        self.quadrature_rule = quad_rule
-        self.stiffness_quadrature_rule = k_rule
-        self.surface_quadrature_rule = s_rule
 
         abc_type = self.abc_boundary_layer_type
 
@@ -69,6 +57,7 @@ class AcousticWave(Wave):
         self.trial_function = None
         self.u_nm1 = None
         self.u_n = None
+        self.u_np1 = fire.Function(self.function_space)
         self.lhs = None
         self.solver = None
         self.rhs = None
@@ -82,38 +71,10 @@ class AcousticWave(Wave):
             self.X = None
             self.X_n = None
             self.X_nm1 = None
+            self.X_np1 = fire.Function(V * Z)
             construct_solver_or_matrix_with_pml(self)
 
-    @ensemble_propagator
-    def wave_propagator(self, dt=None, final_time=None, source_nums=[0]):
-        """Propagates the wave forward in time.
-        Currently uses central differences.
-
-        Parameters:
-        -----------
-        dt: Python 'float' (optional)
-            Time step to be used explicitly. If not mentioned uses the default,
-            that was estabilished in the wave object.
-        final_time: Python 'float' (optional)
-            Time which simulation ends. If not mentioned uses the default,
-            that was estabilished in the wave object.
-
-        Returns:
-        --------
-        usol: Firedrake 'Function'
-            Pressure wavefield at the final time.
-        u_rec: numpy array
-            Pressure wavefield at the receivers across the timesteps.
-        """
-        if final_time is not None:
-            self.final_time = final_time
-        if dt is not None:
-            self.dt = dt
-
-        self.current_sources = source_nums
-        usol, usol_recv = time_integrator(self, source_ids=source_nums)
-
-        return usol, usol_recv
+        self.acoustic_energy = acoustic_energy(self)
 
     @ensemble_gradient
     def gradient_solve(self, guess=None, misfit=None, forward_solution=None):
@@ -143,11 +104,109 @@ class AcousticWave(Wave):
         try:
             self.u_nm1.assign(0.0)
             self.u_n.assign(0.0)
-        except:
+        except Exception:
             warnings.warn("No pressure to reset")
-        if self.abc_active:
-            try:
-                self.X_n.assign(0.0)
-                self.X_nm1.assign(0.0)
-            except:
-                warnings.warn("No mixed space pressure to reset")
+
+    @override
+    def _initialize_model_parameters(self):
+        if self.initial_velocity_model is None:
+            if self.initial_velocity_model_file is None:
+                raise ValueError("No velocity model or velocity file to load.")
+
+            if self.initial_velocity_model_file.endswith(".segy"):
+                if not SEISMIC_MESH_AVAILABLE:
+                    raise ImportError("SeismicMesh is required to convert segy files.")
+                vp_filename, vp_filetype = os.path.splitext(
+                    self.initial_velocity_model_file
+                )
+                warnings.warn("Converting segy file to hdf5")
+                write_velocity_model(
+                    self.initial_velocity_model_file, ofname=vp_filename
+                )
+                self.initial_velocity_model_file = vp_filename + ".hdf5"
+
+            if self.initial_velocity_model_file.endswith((".hdf5", ".h5")):
+                self.initial_velocity_model = interpolate(
+                    self,
+                    self.initial_velocity_model_file,
+                    self.function_space.sub(0),
+                )
+
+            if self.debug_output:
+                fire.File("initial_velocity_model.pvd").write(
+                    self.initial_velocity_model, name="velocity"
+                )
+
+        self.c = self.initial_velocity_model
+
+    @override
+    def _set_vstate(self, vstate):
+        if self.abc_boundary_layer_type == "PML":
+            self.X_n.assign(vstate)
+        else:
+            self.u_n.assign(vstate)
+
+    @override
+    def _get_vstate(self):
+        if self.abc_boundary_layer_type == "PML":
+            return self.X_n
+        else:
+            return self.u_n
+
+    @override
+    def _set_prev_vstate(self, vstate):
+        if self.abc_boundary_layer_type == "PML":
+            self.X_nm1.assign(vstate)
+        else:
+            self.u_nm1.assign(vstate)
+
+    @override
+    def _get_prev_vstate(self):
+        if self.abc_boundary_layer_type == "PML":
+            return self.X_nm1
+        else:
+            return self.u_nm1
+
+    @override
+    def _set_next_vstate(self, vstate):
+        if self.abc_boundary_layer_type == "PML":
+            self.X_np1.assign(vstate)
+        else:
+            self.u_np1.assign(vstate)
+
+    @override
+    def _get_next_vstate(self):
+        if self.abc_boundary_layer_type == "PML":
+            return self.X_np1
+        else:
+            return self.u_np1
+
+    @override
+    def get_receivers_output(self):
+        if self.abc_boundary_layer_type == "PML":
+            data_with_halos = self.X_n.dat.data_ro_with_halos[0][:]
+        else:
+            data_with_halos = self.u_n.dat.data_ro_with_halos[:]
+        return self.receivers.interpolate(data_with_halos)
+
+    @override
+    def get_function(self):
+        if self.abc_boundary_layer_type == "PML":
+            return self.X_n.sub(0)
+        else:
+            return self.u_n
+
+    @override
+    def get_function_name(self):
+        return "Pressure"
+
+    @override
+    def _create_function_space(self):
+        return FE_method(self.mesh, self.method, self.degree)
+
+    @override
+    def rhs_no_pml(self):
+        if self.abc_boundary_layer_type == "PML":
+            return self.B.sub(0)
+        else:
+            return self.B

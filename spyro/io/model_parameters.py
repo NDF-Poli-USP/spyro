@@ -6,52 +6,6 @@ import warnings
 from .. import io
 from .. import utils
 from .. import meshing
-from ..sources import full_ricker_wavelet
-from copy import deepcopy
-from scipy.signal  import sosfilt, iirfilter, zpk2sos
-
-
-def cells_per_wavelength(method, degree, dimension):
-    if method == "mass_lumped_triangle" or method == "MLT":
-        method = "MLT"
-    else:
-        return None
-    cell_per_wavelength_dictionary = {
-        'mlt2tri': 7.02,
-        'mlt3tri': 3.70,
-        'mlt4tri': 2.67,
-        'mlt5tri': 2.03,
-        'mlt2tet': 6.12,
-        'mlt3tet': 3.72,
-    }
-    print(f"method: {method}", flush=True)
-
-    if dimension == 2 and (method == 'MLT' or method == 'CG'):
-        cell_type = 'tri'
-    if dimension == 3 and (method == 'MLT' or method == 'CG'):
-        cell_type = 'tet'
-
-    key = method.lower()+str(degree)+cell_type
-
-    return cell_per_wavelength_dictionary.get(key)
-
-
-def butter_lowpass_filter_source(wavelet, cutoff, fs, order=2):
-    """Low-pass filter the shot record with sampling-rate fs Hz
-    and cutoff freq. Hz
-    """
-    filtered_shot = deepcopy(wavelet)
-
-    fe = 0.5 * fs  # Nyquist Frequency
-    f = cutoff/fe
-
-    z, p, k, = iirfilter(order, f, btype='lowpass', ftype='butter', output='zpk')
-    sos = zpk2sos(z, p, k)
-
-    firstpass = sosfilt(sos,wavelet )
-    filtered_shot = sosfilt(sos, firstpass[::-1])[::-1]
-        
-    return filtered_shot
 
 # default_optimization_parameters = {
 #     "General": {"Secant": {"Type": "Limited-Memory BFGS",
@@ -432,12 +386,13 @@ class Model_parameters:
         self.abc_R = BL_obj.abc_R
         self.abc_pad_length = BL_obj.abc_pad_length
         self.abc_boundary_layer_type = BL_obj.abc_boundary_layer_type
-        if self.abc_active:
-            self._correct_time_integrator_for_abc()
 
-    def _correct_time_integrator_for_abc(self):
-        if self.time_integrator == "central_difference":
-            self.time_integrator = "mixed_space_central_difference"
+        self.absorb_top = dictionary.get("absorb_top", False)
+        self.absorb_bottom = dictionary.get("absorb_bottom", True)
+        self.absorb_right = dictionary.get("absorb_right", True)
+        self.absorb_left = dictionary.get("absorb_left", True)
+        self.absorb_front = dictionary.get("absorb_front", True)
+        self.absorb_back = dictionary.get("absorb_back", True)
 
     def _sanitize_output(self):
         #         default_dictionary["visualization"] = {
@@ -545,41 +500,6 @@ class Model_parameters:
         else:
             raise ValueError("Debug output not understood")
 
-    def get_wavelet(self):
-        """Returns a wavelet based on the source type.
-
-        Returns
-        -------
-        wavelet : numpy.ndarray
-            Wavelet values in each time step to be used in the simulation.
-        """
-        if self.source_type == "ricker":
-            if "delay_type" in self.input_dictionary["acquisition"]:
-                delay_type = self.input_dictionary["acquisition"]["delay_type"]
-                self.delay_type = delay_type
-            else:
-                delay_type = "multiples_of_minimun"
-                self.delay_type = delay_type
-            wavelet = full_ricker_wavelet(
-                dt=self.dt,
-                final_time=self.final_time,
-                frequency=self.frequency,
-                delay=self.delay,
-                amplitude=self.amplitude,
-                delay_type=delay_type,
-            )
-        elif self.source_type == "MMS":
-            wavelet = None
-        else:
-            raise ValueError(
-                f"Source type of {self.source_type} not yet implemented."
-            )
-        
-        if "frequency_filter" in "delay_type" in self.input_dictionary:
-            wavelet = butter_lowpass_filter_source(wavelet, self.frequency, 1/self.dt, order=2)
-
-        return wavelet
-
     def _sanitize_automatic_adjoint(self):
         dictionary = self.input_dictionary
         if "automatic_adjoint" in dictionary:
@@ -637,6 +557,7 @@ class Model_parameters:
             self.delay = dictionary["delay"]
         else:
             self.delay = 1.5
+        self.delay_type = dictionary.get("delay_type", "multiples_of_minimun")
         self.__check_acquisition()
 
     def _sanitize_optimization_and_velocity(self):
@@ -665,9 +586,9 @@ class Model_parameters:
             if "velocity_conditional" not in dictionary["synthetic_data"]:
                 self.velocity_model_type = None
                 warnings.warn(
-                    "No velocity model set initially. If using \
-                        user defined conditional or expression, please \
-                            input it in the Wave object."
+                    "No velocity model set initially. If using "
+                    "user defined conditional or expression, please "
+                    "input it in the Wave object."
                 )
 
         if "velocity_conditional" in dictionary["synthetic_data"]:
@@ -697,7 +618,7 @@ class Model_parameters:
         else:
             default_optimization_parameters = {
                 "General": {"Secant": {"Type": "Limited-Memory BFGS",
-                    "Maximum Storage": 10}},
+                                       "Maximum Storage": 10}},
                 "Step": {
                     "Type": "Augmented Lagrangian",
                     "Augmented Lagrangian": {
@@ -730,7 +651,7 @@ class Model_parameters:
     def _sanitize_time_inputs(self):
         dictionary = self.input_dictionary["time_axis"]
         self.final_time = dictionary["final_time"]
-        self.dt = dictionary["dt"]
+        self._dt = dictionary["dt"]
         if "initial_time" in dictionary:
             self.initial_time = dictionary["initial_time"]
         else:
@@ -755,9 +676,9 @@ class Model_parameters:
     def __check_time(self):
         if self.final_time < 0.0:
             raise ValueError(f"Negative time of {self.final_time} not valid.")
-        if self.dt > 1.0:
+        if self._dt > 1.0:
             warnings.warn(f"Time step of {self.dt} too big.")
-        if self.dt is None:
+        if self._dt is None:
             warnings.warn(
                 "Timestep not given. Will calculate internally when user \
                     attemps to propagate wave."

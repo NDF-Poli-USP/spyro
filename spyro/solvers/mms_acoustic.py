@@ -1,5 +1,6 @@
 import firedrake as fire
 from .acoustic_wave import AcousticWave
+from ..utils.typing import override
 
 
 class AcousticWaveMMS(AcousticWave):
@@ -9,15 +10,23 @@ class AcousticWaveMMS(AcousticWave):
     the whole domain, which generates a known solution for comparison.
     """
 
+    @override
     def matrix_building(self):
+        self.mms_source_in_space()
+        self.q_t = fire.Constant(0)
+        self.source_expression = self.q_t * self.q_xy
+
         super().matrix_building()
         lhs = self.lhs
         bcs = fire.DirichletBC(self.function_space, 0.0, "on_boundary")
         A = fire.assemble(lhs, bcs=bcs, mat_type="matfree")
-        self.mms_source_in_space()
         self.solver = fire.LinearSolver(
             A, solver_parameters=self.solver_parameters
         )
+        dt = self.dt
+        t = self.current_time
+        self.u_nm1.assign(self.analytical_solution(t - 2 * dt))
+        self.u_n.assign(self.analytical_solution(t - dt))
 
     def mms_source_in_space(self):
         V = self.function_space
@@ -44,10 +53,6 @@ class AcousticWaveMMS(AcousticWave):
 
         # self.q_xy.interpolate(sin(pi*x)*sin(pi*y))
 
-    def mms_source_in_time(self, t):
-        # return fire.Constant(2*pi**2*t**2 + 2.0)
-        return fire.Constant(2 * t)
-
     def analytical_solution(self, t):
         self.analytical = fire.Function(self.function_space)
         x = self.mesh_z
@@ -65,3 +70,7 @@ class AcousticWaveMMS(AcousticWave):
         # self.analytical.assign(analytical)
 
         return self.analytical
+
+    @override
+    def update_source_expression(self, t):
+        self.q_t.assign(2*t)

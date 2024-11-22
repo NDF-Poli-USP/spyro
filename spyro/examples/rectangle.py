@@ -128,6 +128,7 @@ class Rectangle_acoustic(Example_model_acoustic):
         If True, the mesh will be periodic in all directions. The default is
         False.
     """
+
     def __init__(
         self,
         dictionary=None,

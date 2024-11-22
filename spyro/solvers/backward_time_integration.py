@@ -65,7 +65,7 @@ def backward_wave_propagator_no_pml(Wave_obj, dt=None):
     dt = Wave_obj.dt
     t = Wave_obj.current_time
     if t != final_time:
-        print(f"Current time of {t}, different than final_time of {final_time}. Setting final_time to current time in backwards propagation.", flush= True)
+        print(f"Current time of {t}, different than final_time of {final_time}. Setting final_time to current time in backwards propagation.", flush=True)
     nt = int(t / dt) + 1  # number of timesteps
 
     u_nm1 = Wave_obj.u_nm1
@@ -194,14 +194,14 @@ def mixed_space_backward_wave_propagator(Wave_obj, dt=None):
     dt = Wave_obj.dt
     t = Wave_obj.current_time
     if t != final_time:
-        print(f"Current time of {t}, different than final_time of {final_time}. Setting final_time to current time in backwards propagation.", flush= True)
+        print(f"Current time of {t}, different than final_time of {final_time}. Setting final_time to current time in backwards propagation.", flush=True)
     nt = int(t / dt) + 1  # number of timesteps
 
     X_nm1 = Wave_obj.X_nm1
     X_n = Wave_obj.X_n
     X_np1 = fire.Function(Wave_obj.mixed_function_space)
 
-    rhs_forcing = fire.Function(Wave_obj.function_space)
+    rhs_forcing = fire.Cofunction(Wave_obj.function_space.dual())
 
     B = Wave_obj.B
     rhs = Wave_obj.rhs
@@ -216,7 +216,7 @@ def mixed_space_backward_wave_propagator(Wave_obj, dt=None):
     uadj = fire.Function(Wave_obj.function_space)  # auxiliarly function for the gradient compt.
 
     # ffG = -2 * (Wave_obj.c)**(-3) * fire.dot(dufordt2, uadj) * m_v * fire.dx(scheme=Wave_obj.quadrature_rule)
-    ffG =  2.0 * Wave_obj.c * fire.dot(fire.grad(uadj), fire.grad(ufor)) * m_v * fire.dx(scheme=Wave_obj.quadrature_rule)
+    ffG = 2.0 * Wave_obj.c * fire.dot(fire.grad(uadj), fire.grad(ufor)) * m_v * fire.dx(scheme=Wave_obj.quadrature_rule)
 
     lhsG = mgrad
     rhsG = ffG

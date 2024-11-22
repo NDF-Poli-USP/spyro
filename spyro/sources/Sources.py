@@ -30,6 +30,8 @@ class Sources(Delta_projector):
     is_local: list of booleans
         List that checks if sources are present in cores
         spatial paralelism
+    wavelet: list of floats
+        Values at timesteps of wavelet used in the simulation
 
     Methods
     -------
@@ -65,20 +67,33 @@ class Sources(Delta_projector):
 
         self.point_locations = wave_object.source_locations
         self.number_of_points = wave_object.number_of_sources
+        self.amplitude = wave_object.amplitude
         self.is_local = [0] * self.number_of_points
         self.current_sources = None
+        self.update_wavelet(wave_object)
+        if np.isscalar(self.amplitude) or (self.amplitude.size <= 3):
+            self.build_maps(order=0)
+        else:
+            self.build_maps(order=1)
 
-        self.build_maps()
+    def update_wavelet(self, wave_object):
+        self.wavelet = full_ricker_wavelet(
+            dt=wave_object.dt,
+            final_time=wave_object.final_time,
+            frequency=wave_object.frequency,
+            delay=wave_object.delay,
+            delay_type=wave_object.delay_type,
+        )
 
-    def apply_source(self, rhs_forcing, value):
+    def apply_source(self, rhs_forcing, step):
         """Applies source in a assembled right hand side.
 
         Parameters
         ----------
         rhs_forcing: Firedrake.Function
             The right hand side of the wave equation
-        value: float
-            The value of the source
+        step: int
+            Time step (index of the wavelet array)
 
         Returns
         -------
@@ -90,7 +105,7 @@ class Sources(Delta_projector):
                 for i in range(len(self.cellNodeMaps[source_id])):
                     rhs_forcing.dat.data_with_halos[
                         int(self.cellNodeMaps[source_id][i])
-                    ] = (value * self.cell_tabulations[source_id][i])
+                    ] = (self.wavelet[step] * np.dot(self.amplitude, self.cell_tabulations[source_id][i]))
             else:
                 for i in range(len(self.cellNodeMaps[source_id])):
                     tmp = rhs_forcing.dat.data_with_halos[0]  # noqa: F841
@@ -149,7 +164,6 @@ def full_ricker_wavelet(
     dt,
     final_time,
     frequency,
-    amplitude=1.0,
     cutoff=None,
     delay=1.5,
     delay_type="multiples_of_minimun",
@@ -165,8 +179,6 @@ def full_ricker_wavelet(
         Final time
     frequency: float
         Frequency of the wavelet
-    amplitude: float
-        Amplitude of the wavelet
     cutoff: float
         Cutoff frequency in Hertz
     delay: float
@@ -187,7 +199,7 @@ def full_ricker_wavelet(
     full_wavelet = np.zeros((nt,))
     for t in range(nt):
         full_wavelet[t] = ricker_wavelet(
-            time, frequency, amplitude, delay=delay, delay_type=delay_type
+            time, frequency, 1, delay=delay, delay_type=delay_type
         )
         time += dt
     if cutoff is not None:
