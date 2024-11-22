@@ -46,7 +46,6 @@ def compute_functional(Wave_object, residual):
     """
     num_receivers = Wave_object.number_of_receivers
     dt = Wave_object.dt
-    comm = Wave_object.comm
 
     J = 0
     for rn in range(num_receivers):
@@ -95,7 +94,6 @@ def mpi_init(model):
         num_cores_per_propagation = available_cores
     elif model.parallelism_type == "custom":
         shot_ids_per_propagation = model.shot_ids_per_propagation
-        num_max_shots_per_core = max(len(sublist) for sublist in shot_ids_per_propagation)
         num_propagations = len(shot_ids_per_propagation)
         num_cores_per_propagation = available_cores / num_propagations
 

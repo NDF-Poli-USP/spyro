@@ -35,7 +35,7 @@ def smooth_velocity_field_file(input_filename, output_filename, sigma, show=Fals
                 vp[:, index] = trace
     else:
         raise ValueError("Not yet implemented!")
-    
+
     vp_min = np.min(vp)
     vp_max = np.max(vp)
     print(f"Velocity model has minimum vp of {vp_min}, and max of {vp_max}")

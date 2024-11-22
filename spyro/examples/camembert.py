@@ -211,4 +211,3 @@ class Camembert_acoustic_FWI(Rectangle_acoustic_FWI):
         )
         self.set_initial_velocity_model(conditional=cond, dg_velocity_model=False)
         return None
-

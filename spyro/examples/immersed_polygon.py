@@ -165,6 +165,7 @@ polygon_dictionary["inversion"] = {
     "shot_record_file": None,
 }
 
+
 class Polygon_acoustic_FWI(Rectangle_acoustic_FWI):
     """polygon model.
     This class is a child of the Example_model class.

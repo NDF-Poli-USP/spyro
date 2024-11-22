@@ -154,7 +154,6 @@ def ensemble_functional(func):
             J_total[0] /= comm.comm.size
 
         elif args[0].parallelism_type == "spatial" and args[0].number_of_sources > 1:
-            num = args[0].number_of_sources
             residual_list = args[1]
             J_total = np.zeros((1))
 
@@ -205,7 +204,7 @@ def ensemble_gradient(func):
                                 kwargs,
                                 misfit=current_misfit,
                             )
-                        )
+                            )
                 grad_total += grad
 
             grad_total /= num

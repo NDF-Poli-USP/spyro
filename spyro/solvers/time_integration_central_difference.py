@@ -24,7 +24,7 @@ def central_difference(wave, source_ids=[0]):
         wave.sources.current_sources = source_ids
         rhs_forcing = fire.Cofunction(wave.function_space.dual())
 
-    wave.field_logger.start_logging(source_id)
+    wave.field_logger.start_logging(source_ids)
 
     wave.comm.comm.barrier()
 

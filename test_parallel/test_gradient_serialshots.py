@@ -91,7 +91,7 @@ def get_gradient(parallelism_type, points):
             spyro.io.switch_serial_shot(Wave_obj_exact, source_id)
             spyro.io.switch_serial_shot(Wave_obj_guess, source_id)
             misfit_list.append(Wave_obj_exact.forward_solution_receivers - Wave_obj_guess.forward_solution_receivers)
-        misfit= misfit_list
+        misfit = misfit_list
 
     gradient = Wave_obj_guess.gradient_solve(misfit=misfit)
     Wave_obj_guess.comm.comm.barrier()

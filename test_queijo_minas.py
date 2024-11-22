@@ -10,6 +10,7 @@ warnings.filterwarnings("ignore")
 degree = int(sys.argv[2])
 frequency = float(sys.argv[1])
 
+
 def cells_per_wavelength(degree):
     cell_per_wavelength_dictionary = {
         'kmv2tri': 7.20,
@@ -24,8 +25,9 @@ def cells_per_wavelength(degree):
     cell_type = 'tri'
 
     key = 'kmv'+str(degree)+cell_type
-    
+
     return cell_per_wavelength_dictionary.get(key)
+
 
 cpw = cells_per_wavelength(degree)
 final_time = 0.9
@@ -84,8 +86,9 @@ dictionary["inversion"] = {
     "shot_record_file": None,
 }
 
+
 def test_real_shot_record_generation_parallel():
-    
+
     fwi = spyro.FullWaveformInversion(dictionary=dictionary)
 
     fwi.set_real_mesh(mesh_parameters={"dx": dx})
@@ -93,12 +96,12 @@ def test_real_shot_record_generation_parallel():
     center_x = 1.0
     mesh_z = fwi.mesh_z
     mesh_x = fwi.mesh_x
-    square_top_z   = -0.9
-    square_bot_z   = -1.1
-    square_left_x  = 0.9
+    square_top_z = -0.9
+    square_bot_z = -1.1
+    square_left_x = 0.9
     square_right_x = 1.1
     cond = fire.conditional((mesh_z-center_z)**2 + (mesh_x-center_x)**2 < .2**2, 3.0, 2.5)
-    cond =  fire.conditional(
+    cond = fire.conditional(
         fire.And(
             fire.And(mesh_z < square_top_z, mesh_z > square_bot_z),
             fire.And(mesh_x > square_left_x, mesh_x < square_right_x)

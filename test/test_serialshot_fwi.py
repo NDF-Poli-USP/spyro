@@ -10,7 +10,7 @@ warnings.filterwarnings("ignore")
 
 def is_rol_installed():
     try:
-        import ROL
+        import ROL  # noqa:F401
         return True
     except ImportError:
         return False

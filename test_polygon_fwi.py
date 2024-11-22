@@ -9,7 +9,6 @@ import warnings
 warnings.filterwarnings("ignore")
 
 
-
 def test_real_shot_record_generation_parallel():
     dictionary = {}
     dictionary["absorving_boundary_conditions"] = {

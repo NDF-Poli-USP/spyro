@@ -10,6 +10,7 @@ warnings.filterwarnings("ignore")
 frequency = float(sys.argv[1])
 degree = int(sys.argv[2])
 
+
 def cells_per_wavelength(degree):
     cell_per_wavelength_dictionary = {
         'kmv2tri': 7.20,
@@ -24,8 +25,9 @@ def cells_per_wavelength(degree):
     cell_type = 'tri'
 
     key = 'kmv'+str(degree)+cell_type
-    
+
     return cell_per_wavelength_dictionary.get(key)
+
 
 cpw = cells_per_wavelength(degree)
 final_time = 0.9
@@ -83,8 +85,9 @@ dictionary["inversion"] = {
     "shot_record_file": None,
 }
 
+
 def test_real_shot_record_generation_parallel():
-    
+
     fwi = spyro.FullWaveformInversion(dictionary=dictionary)
 
     fwi.set_real_mesh(mesh_parameters={"dx": dx})

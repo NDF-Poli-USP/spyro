@@ -66,7 +66,7 @@ dictionary["inversion"] = {
 def test_real_shot_record_generation_parallel():
     real_dictionary = deepcopy(dictionary)
     real_dictionary["mesh"]["mesh_file"] = "meshes/real5hz.msh"
-    
+
     real_wave = spyro.AcousticWave(dictionary=real_dictionary)
     real_wave.set_initial_velocity_model(new_file="velocity_models/vp_marmousi-ii.hdf5")
     real_wave.forward_solve()

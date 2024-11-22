@@ -3,14 +3,12 @@ import warnings
 from scipy.optimize import minimize as scipy_minimize
 from mpi4py import MPI  # noqa: F401
 import numpy as np
-from copy import deepcopy
 import resource
 
 from .acoustic_wave import AcousticWave
 from ..utils import compute_functional
 from ..utils import Gradient_mask_for_pml, Mask
 from ..plots import plot_model as spyro_plot_model
-from ..io.basicio import ensemble_shot_record
 from ..io.basicio import switch_serial_shot
 from ..io.basicio import load_shots, save_shots
 
@@ -200,7 +198,7 @@ class FullWaveformInversion(AcousticWave):
         if self.parallelism_type == "spatial" and self.number_of_sources > 1:
             misfit_list = []
             guess_shot_record_list = []
-            for snum in range (self.number_of_sources):
+            for snum in range(self.number_of_sources):
                 switch_serial_shot(self, snum)
                 guess_shot_record_list.append(self.forward_solution_receivers)
                 misfit_list.append(self.real_shot_record[snum] - self.forward_solution_receivers)
@@ -396,7 +394,7 @@ class FullWaveformInversion(AcousticWave):
             print(f"Functional: {Jm} at iteration: {self.current_iteration}", flush=True)
             with open("functional_values.txt", "a") as file:
                 file.write(f"Iteration: {self.current_iteration}, Functional: {Jm}\n")
-            
+
             with open("peak_memory.txt", "a") as file:
                 file.write(f"Peak memory usage: {peak_memory_mb:.2f} MB \n")
 
@@ -619,7 +617,7 @@ class SyntheticRealAcousticWave(AcousticWave):
         super().forward_solve()
         if self.parallelism_type == "spatial" and self.number_of_sources > 1:
             real_shot_record_list = []
-            for snum in range (self.number_of_sources):
+            for snum in range(self.number_of_sources):
                 switch_serial_shot(self, snum)
                 real_shot_record_list.append(self.receivers_output)
             self.real_shot_record = real_shot_record_list

@@ -208,6 +208,7 @@ class Rectangle_acoustic_FWI(Example_model_acoustic_FWI):
         If True, the mesh will be periodic in all directions. The default is
         False.
     """
+
     def __init__(
         self,
         dictionary=None,
