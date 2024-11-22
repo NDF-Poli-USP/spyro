@@ -2,15 +2,11 @@ import numpy as np
 import firedrake as fire
 import spyro
 import pytest
-import warnings
-
-
-warnings.filterwarnings("ignore")
 
 
 def is_rol_installed():
     try:
-        import ROL  # noqa:F401
+        import ROL
         return True
     except ImportError:
         return False
@@ -26,7 +22,7 @@ dictionary["options"] = {
     "dimension": 2,  # dimension
 }
 dictionary["parallelism"] = {
-    "type": "spatial",  # options: automatic (same number of cores for evey processor) or spatial
+    "type": "automatic",  # options: automatic (same number of cores for evey processor) or spatial
 }
 dictionary["mesh"] = {
     "Lz": 2.0,  # depth in km - always positive   # Como ver isso sem ler a malha?
@@ -37,7 +33,8 @@ dictionary["mesh"] = {
 }
 dictionary["acquisition"] = {
     "source_type": "ricker",
-    "source_locations": spyro.create_transect((-0.55, 0.7), (-0.55, 1.3), 6),
+    "source_locations": spyro.create_transect((-0.55, 0.7), (-0.55, 1.3), 1),
+    # "source_locations": [(-1.1, 1.5)],
     "frequency": 5.0,
     "delay": 0.2,
     "delay_type": "time",

@@ -118,9 +118,9 @@ class Wave(Model_parameters, metaclass=ABCMeta):
             self,
             user_mesh=None,
             mesh_parameters={},
-        ):
-            """
-            Set the mesh for the solver.
+    ):
+        """
+        Set the mesh for the solver.
 
         Args:
             user_mesh (optional): User-defined mesh. Defaults to None.
@@ -373,7 +373,7 @@ class Wave(Model_parameters, metaclass=ABCMeta):
         pass
 
     @ensemble_propagator
-    def wave_propagator(self, dt=None, final_time=None, source_num=0):
+    def wave_propagator(self, dt=None, final_time=None, source_nums=[0]):
         """Propagates the wave forward in time.
         Currently uses central differences.
 
@@ -398,8 +398,8 @@ class Wave(Model_parameters, metaclass=ABCMeta):
         if dt is not None:
             self.dt = dt
 
-        self.current_source = source_num
-        usol, usol_recv = time_integrator(self, source_num)
+        self.current_sources = source_nums
+        usol, usol_recv = time_integrator(self, source_nums)
 
         return usol, usol_recv
 

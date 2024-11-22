@@ -21,10 +21,10 @@ def test_polygon_vp():
         (-0.1, 0.5),  # Water layer p1
         (-0.05, 0.7),  # Water layer p2
         (-0.22, 0.1),  # Upper layer p1
-        (-0.25, 0.6), # Upper layer p2
-        (-0.50, 0.1), # Middle layer p1
-        (-0.55, 0.1), # Bottom layer p1
-        (-0.57, 0.2), # Bottom layer p2
+        (-0.25, 0.6),  # Upper layer p2
+        (-0.50, 0.1),  # Middle layer p1
+        (-0.55, 0.1),  # Bottom layer p1
+        (-0.57, 0.2),  # Bottom layer p2
         (-0.3, 0.5),  # polygon p1
         (-0.4, 0.6),  # polygon p2
         (-1.3, 0.5),  # pad before change

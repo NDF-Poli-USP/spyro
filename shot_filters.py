@@ -1,6 +1,6 @@
 import spyro
 import numpy as np
-from scipy.signal  import butter, filtfilt, sosfilt
+from scipy.signal import butter, filtfilt, sosfilt
 from scipy.signal import sosfilt
 import sys
 
@@ -8,29 +8,30 @@ filter_type = 'butter'
 
 filter_frequency = 7.0
 
-def filter_shot(shot, cutoff, fs, filter_type = 'butter'):
+
+def filter_shot(shot, cutoff, fs, filter_type='butter'):
     if filter_type == 'butter':
-        return butter_filter(shot,cutoff, fs)
+        return butter_filter(shot, cutoff, fs)
 
 
 def butter_filter(shot, cutoff, fs, order=1):
-
     """ Low-pass filter the shot record with sampling-rate fs Hz
         and cutoff freq. Hz
     """
-    
-    nyq = 0.5*fs # Nyquist Frequency
+
+    nyq = 0.5*fs  # Nyquist Frequency
     normal_cutoff = (cutoff) / nyq
-  
-    # Get the filter coefficients  
+
+    # Get the filter coefficients
     b, a = butter(order, normal_cutoff, btype="low", analog=False)
-    
+
     nc, nr = np.shape(shot)
 
     for rec in range(nr):
-        shot[:,rec] = filtfilt(b, a, shot[:,rec])
-    
+        shot[:, rec] = filtfilt(b, a, shot[:, rec])
+
     return shot
+
 
 frequency = 7.0
 dt = 0.0001
@@ -91,7 +92,7 @@ fwi = spyro.FullWaveformInversion(dictionary=dictionary)
 spyro.io.load_shots(fwi, file_name="shots/shot_record_")
 shots = fwi.forward_solution_receivers
 shots *= 5.455538535049624
-print(f'Applying {filter_type} filter for {filter_frequency}Hz', flush = True)
-p_filtered = filter_shot(shots, filter_frequency, fs, filter_type = filter_type)
+print(f'Applying {filter_type} filter for {filter_frequency}Hz', flush=True)
+p_filtered = filter_shot(shots, filter_frequency, fs, filter_type=filter_type)
 shot_filename = f"shots/shot_record_{filter_frequency}_"
 spyro.io.save_shots(fwi, file_name=shot_filename)

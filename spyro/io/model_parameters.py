@@ -1,11 +1,12 @@
 import numpy as np
 import uuid
-from mpi4py import MPI
-from firedrake import COMM_WORLD
+from mpi4py import MPI  # noqa:F401
+from firedrake import COMM_WORLD  # noqa:
 import warnings
 from .. import io
 from .. import utils
 from .. import meshing
+from ..meshing.meshing_functions import cells_per_wavelength
 
 # default_optimization_parameters = {
 #     "General": {"Secant": {"Type": "Limited-Memory BFGS",
@@ -518,7 +519,6 @@ class Model_parameters:
         if self.parallelism_type == "custom":
             self.shot_ids_per_propagation = dictionary["parallelism"]["shot_ids_per_propagation"]
         elif self.parallelism_type == "automatic":
-            available_cores = COMM_WORLD.size
             self.shot_ids_per_propagation = [[i] for i in range(0, self.number_of_sources)]
         elif self.parallelism_type == "spatial":
             self.shot_ids_per_propagation = [[i] for i in range(0, self.number_of_sources)]
@@ -606,7 +606,7 @@ class Model_parameters:
             self.initial_velocity_model_file = dictionary["inversion"][
                 "initial_guess_model_file"
             ]
-        except:
+        except KeyError:
             self.initial_velocity_model_file = None
         self.fwi_output_folder = "fwi/"
         self.control_output_file = self.fwi_output_folder + "control"
@@ -638,6 +638,7 @@ class Model_parameters:
         if "shot_record_file" in dictionary["inversion"]:
             if dictionary["inversion"]["shot_record_file"] is not None:
                 self.real_shot_record = np.load(dictionary["inversion"]["shot_record_file"])
+
     def _sanitize_optimization_and_velocity_without_fwi(self):
         dictionary = self.input_dictionary
         if "synthetic_data" in dictionary:
@@ -721,6 +722,7 @@ class Model_parameters:
         mesh_parameters.setdefault("degree", self.degree)
         mesh_parameters.setdefault("velocity_model_file", self.initial_velocity_model_file)
         mesh_parameters.setdefault("cell_type", self.cell_type)
+        print(f"Method: {self.method}, Degree: {self.degree}, Dimension: {self.dimension}")
         mesh_parameters.setdefault("cells_per_wavelength", cells_per_wavelength(self.method, self.degree, self.dimension))
 
         self._set_mesh_length(

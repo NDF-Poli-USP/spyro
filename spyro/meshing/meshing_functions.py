@@ -17,9 +17,9 @@ def cells_per_wavelength(method, degree, dimension):
         'mlt3tet': 3.72,
     }
 
-    if dimension == 2 and (method == 'MLT' or method == 'CG'):
+    if dimension == 2 and (method == 'mass_lumped_triangle'):
         cell_type = 'tri'
-    if dimension == 3 and (method == 'MLT' or method == 'CG'):
+    if dimension == 3 and (method == 'mass_lumped_triangle'):
         cell_type = 'tet'
 
     key = method.lower()+str(degree)+cell_type
