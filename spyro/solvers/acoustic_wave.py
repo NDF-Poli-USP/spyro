@@ -1,7 +1,6 @@
 import firedrake as fire
 import warnings
 import os
-from SeismicMesh import write_velocity_model
 
 from .wave import Wave
 
@@ -18,9 +17,23 @@ from .backward_time_integration import (
 )
 from ..domains.space import FE_method
 from ..utils.typing import override
+from .functionals import acoustic_energy
+
+try:
+    from SeismicMesh import write_velocity_model
+    SEISMIC_MESH_AVAILABLE = True
+except ImportError:
+    SEISMIC_MESH_AVAILABLE = False
 
 
 class AcousticWave(Wave):
+    def __init__(self, dictionary, comm=None):
+        super().__init__(dictionary, comm=comm)
+
+        self.acoustic_energy = None
+        self.field_logger.add_functional("acoustic_energy",
+                                         lambda: fire.assemble(self.acoustic_energy))
+
     def save_current_velocity_model(self, file_name=None):
         if self.c is None:
             raise ValueError("C not loaded")
@@ -61,6 +74,8 @@ class AcousticWave(Wave):
             self.X_np1 = fire.Function(V * Z)
             construct_solver_or_matrix_with_pml(self)
 
+        self.acoustic_energy = acoustic_energy(self)
+
     @ensemble_gradient
     def gradient_solve(self, guess=None, misfit=None, forward_solution=None):
         """Solves the adjoint problem to calculate de gradient.
@@ -99,6 +114,8 @@ class AcousticWave(Wave):
                 raise ValueError("No velocity model or velocity file to load.")
 
             if self.initial_velocity_model_file.endswith(".segy"):
+                if not SEISMIC_MESH_AVAILABLE:
+                    raise ImportError("SeismicMesh is required to convert segy files.")
                 vp_filename, vp_filetype = os.path.splitext(
                     self.initial_velocity_model_file
                 )
