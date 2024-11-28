@@ -2,66 +2,38 @@
 The analytical solutions are provided by the book:
 Quantitative Seismology (2nd edition) from Aki and Richards
 '''
-import argparse
 import numpy as np
 import spyro
-import sys
 
+from firedrake.petsc import PETSc
 from math import pi as PI
 from scipy.integrate import quad
 
-parser = argparse.ArgumentParser()
-parser.add_argument("-L", default=450, type=float, metavar='<value>',
-                    help="size of the edge of the computational domain (cube)")
-parser.add_argument("-N", default=30, type=int, metavar='<value>',
-                    help="number of divisions in each direction")
-parser.add_argument("-alpha", default=1500, type=float, metavar='<value>',
-                    help="P wave velocity")
-parser.add_argument("-beta", default=1000, type=float, metavar='<value>',
-                    help="S wave velocity")
-parser.add_argument("-rho", default=2000, type=float, metavar='<value>',
-                    help="density")
-parser.add_argument("-amplitude", default=1e3, type=float, metavar='<value>',
-                    help="amplitude of the wavelet")
-parser.add_argument("-frequency", default=20, type=float, metavar='<value>',
-                    help="frequency of the wavelet")
-parser.add_argument("-total_time", default=0.3, type=float, metavar='<value>',
-                    help="total simulation time")
-parser.add_argument("-time_steps", default=750, type=int, metavar='<value>',
-                    help="number of time steps")
-parser.add_argument("-receiver_x", default=100, type=float, metavar='<value>',
-                    help="receiver position in x direction")
-parser.add_argument("-receiver_y", default=0, type=float, metavar='<value>',
-                    help="receiver position in y direction")
-parser.add_argument("-receiver_z", default=100, type=float, metavar='<value>',
-                    help="receiver position in z direction")
+opts = PETSc.Options()
 
-if "pytest" in sys.argv[0]:
-    args = parser.parse_args([])
-else:
-    args = parser.parse_args()
+moment_tensor = opts.getBool("moment_tensor", False)
 
-L = args.L  # Length (m)
-N = args.N  # Number of elements in each direction
-h = L/N     # Element size (m)
+L = opts.getReal("L", default=450)  # Length (m)
+N = opts.getInt("N", default=30)    # Number of elements in each direction
+h = L/N                             # Element size (m)
 
-alpha = args.alpha  # P-wave velocity
-beta = args.beta    # S-wave velocity
-rho = args.rho      # Density (kg/m3)
+alpha = opts.getReal("alpha", default=1500)  # P-wave velocity
+beta = opts.getReal("beta", default=1000)    # S-wave velocity
+rho = opts.getReal("rho", default=2000)      # Density (kg/m3)
 
-smag = args.amplitude  # Source amplitude
-f0 = args.frequency    # Frequency (Hz)
-t0 = 1/f0              # Time delay
+smag = opts.getReal("amplitude", default=1e3)  # Source amplitude
+f0 = opts.getReal("frequency", default=20)     # Frequency (Hz)
+t0 = 1/f0                                      # Time delay
 
-tn = args.total_time  # Simulation time (s)
-nt = args.time_steps
+tn = opts.getReal("total_time", default=0.3)  # Simulation time (s)
+nt = opts.getInt("time_steps", default=750)   # Number of time steps
 time_step = (tn/nt)
 out_freq = int(0.01/time_step)
 
 x_s = np.r_[-L/2, L/2, L/2]   # Source location (m)
-x_r = np.r_[args.receiver_x,  # Receiver relative location (m)
-            args.receiver_y,
-            args.receiver_z]
+x_r = np.r_[opts.getReal("receiver_x", default=100),  # Receiver relative location (m)
+            opts.getReal("receiver_y", default=0),
+            opts.getReal("receiver_z", default=100)]
 
 
 def analytical_solution(i, j):
@@ -89,9 +61,36 @@ def analytical_solution(i, j):
     return u_near + P_far - S_far
 
 
+def explosive_source_analytical(i):
+    t = np.linspace(0, tn, nt)
+
+    P_mid = np.zeros(nt)  # P wave intermediate field
+    P_far = np.zeros(nt)  # P wave far field
+
+    r = np.linalg.norm(x_r)
+    gamma_i = x_r[i]/r
+
+    def w(t):
+        a = PI*f0*(t - t0)
+        return (t - t0)*np.exp(-a**2)
+
+    def w_dot(t):
+        a = PI*f0*(t - t0)
+        return (1 - 2*a**2)*np.exp(-a**2)
+
+    for k in range(nt):
+        P_mid[k] = smag*(gamma_i/(4*PI*rho*alpha**2))*(1./r**2)*w(t[k] - r/alpha)
+        P_far[k] = smag*(gamma_i/(4*PI*rho*alpha**3))*(1./r)*w_dot(t[k] - r/alpha)
+
+    return P_mid + P_far
+
+
 def numerical_solution(j):
-    A0 = np.zeros(3)
-    A0[j] = smag
+    if moment_tensor:
+        A0 = smag*np.eye(3)
+    else:
+        A0 = np.zeros(3)
+        A0[j] = smag
 
     d = {}
 
@@ -110,7 +109,6 @@ def numerical_solution(j):
         "Lz": L,
         "Lx": L,
         "Ly": L,
-        "h": h,
         "mesh_file": None,
         "mesh_type": "firedrake_mesh",
     }
@@ -156,7 +154,7 @@ def numerical_solution(j):
     }
 
     wave = spyro.IsotropicWave(d)
-    wave.set_mesh(mesh_parameters={'dx': h})
+    wave.set_mesh(mesh_parameters={'edge_length': h})
     wave.forward_solve()
 
     return wave.receivers_output.reshape(nt + 1, 3)[0:-1, :]

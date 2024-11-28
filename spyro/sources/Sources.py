@@ -116,17 +116,15 @@ class Sources(Delta_projector):
         return rhs_forcing
 
 
-def timedependentSource(model, t, freq=None, amp=1, delay=1.5):
+def timedependentSource(model, t, freq=None, delay=1.5):
     if model["acquisition"]["source_type"] == "Ricker":
-        return ricker_wavelet(t, freq, amp, delay=delay)
-    # elif model["acquisition"]["source_type"] == "MMS":
-    #     return MMS_time(t)
+        return ricker_wavelet(t, freq, delay=delay)
     else:
         raise ValueError("source not implemented")
 
 
 def ricker_wavelet(
-    t, freq, amp=1.0, delay=1.5, delay_type="multiples_of_minimun",
+    t, freq, delay=1.5, delay_type="multiples_of_minimun",
     integral=False
 ):
     """Creates a Ricker source function with a
@@ -139,8 +137,6 @@ def ricker_wavelet(
         Time
     freq: float
         Frequency of the wavelet
-    amp: float
-        Amplitude of the wavelet
     delay: float
         Delay in term of multiples of the distance
         between the minimums.
@@ -164,7 +160,7 @@ def ricker_wavelet(
     if integral:
         return t*math.exp((-1.0) * tt)
     else:
-        return amp * (1.0 - (2.0) * tt) * math.exp((-1.0) * tt)
+        return (1.0 - (2.0) * tt) * math.exp((-1.0) * tt)
 
 
 def full_ricker_wavelet(
@@ -207,7 +203,7 @@ def full_ricker_wavelet(
     full_wavelet = np.zeros((nt,))
     for t in range(nt):
         full_wavelet[t] = ricker_wavelet(
-            time, frequency, 1, delay=delay, delay_type=delay_type, integral=integral
+            time, frequency, delay=delay, delay_type=delay_type, integral=integral
         )
         time += dt
     if cutoff is not None:
