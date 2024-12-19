@@ -1,4 +1,4 @@
-FROM firedrakeproject/firedrake:2024-12 AS spyro_base
+FROM firedrakeproject/firedrake:2024-09 AS spyro_base
 
 USER root
 RUN apt-get update \
