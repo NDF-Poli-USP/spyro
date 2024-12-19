@@ -25,13 +25,17 @@ apptainer build devimg.sif docker-archive://devimg.tar
 
 ### Running Apptainer images
 
+Before running the Apptainer image, it is necessary to create an [overlay filesystem](https://docs.sylabs.io/guides/3.6/user-guide/persistent_overlays.html) because the SIF container is read only and spyro requires writing to the filesystem.
+````
+apptainer overlay create --size 1024 /tmp/ext3_overlay.img
+````
+
 To execute the image in interactive mode:
 ````
-apptainer shell --bind /tmp/cache-${USER}:/home/firedrake/firedrake/.cache -e devimg.sif
+apptainer shell --overlay overlay.img -e devimg.sif
 ````
 
 To execute the image in batch mode:
 ````
-mkdir /tmp/cache-${USER}
-apptainer run --bind /tmp/cache-${USER}:/home/firedrake/firedrake/.cache -e devimg.sif ./workshop_script.sh
+apptainer run  --overlay overlay.img -e devimg.sif <script>
 ````
