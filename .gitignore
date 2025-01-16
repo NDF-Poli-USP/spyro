@@ -1,5 +1,6 @@
 *.pyc
-*.vtu
+#*.pvd
+#*.vtu
 *.pdf
 *.pvtu
 *.dat
