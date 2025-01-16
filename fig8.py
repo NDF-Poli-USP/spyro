@@ -1,7 +1,7 @@
 import spyro
 import firedrake as fire
 import math
-import ipdb
+# import ipdb
 
 
 def test_eikonal_values_fig8():
@@ -9,10 +9,9 @@ def test_eikonal_values_fig8():
     dictionary["options"] = {
         # Simplexes: triangles or tetrahedra (T) or quadrilaterals (Q)
         "cell_type": "T",
-        # Options: lumped, equispaced or DG. Default is lumped "method":"MLT"
+        "variant": "lumped",  # Options: lumped, equispaced or DG. Default is lumped "method":"MLT"
         # (MLT/spectral_quadrilateral/DG_triangle/DG_quadrilateral)
         # You can either specify a cell_type+variant or a method
-        "variant": "equispaced",
         # accepted_variants = ["lumped", "equispaced", "DG"]
         "degree": 4,  # p order
         "dimension": 2,  # dimension
