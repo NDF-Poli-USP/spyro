@@ -1,7 +1,18 @@
 import spyro
 import firedrake as fire
 import math
+import numpy as np
+from firedrake.cython import dmcommon
 # import ipdb
+
+class MyBC(DirichletBC):
+    def __init__(self, V, value, nodes):
+        # Call superclass init
+        # We provide a dummy subdomain id.
+        super(MyBC, self).__init__(V, value, 0)
+        # Override the "nodes" property which says where the boundary
+        # condition is to be applied.
+        self.nodes = nodes
 
 
 def test_eikonal_values_fig8():
@@ -31,7 +42,7 @@ def test_eikonal_values_fig8():
         "Lz": 1.0,  # depth in km - always positive
         "Lx": 1.0,  # width in km - always positive
         "Ly": 0.0,  # thickness in km - always positive
-        "mesh_type": "SeismicMesh",
+        "mesh_type": "firedrake_mesh",
     }
 
     # Create a source injection operator. Here we use a single source with a
