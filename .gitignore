@@ -172,7 +172,8 @@ cython_debug/
 
 # Other files specific to this project
 *.pyc
-*.vtu
+#*.pvd
+#*.vtu
 *.pdf
 *.pvtu
 *.dat
