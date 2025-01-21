@@ -1,18 +1,13 @@
+import os
+os.environ["OMP_NUM_THREADS"] = "1"
+from firedrake import parameters
+parameters["loopy"] = {"silenced_warnings": ["v1_scheduler_fallback"]}
 import spyro
 import firedrake as fire
 import math
 import numpy as np
-from firedrake.cython import dmcommon
-# import ipdb
-
-class MyBC(DirichletBC):
-    def __init__(self, V, value, nodes):
-        # Call superclass init
-        # We provide a dummy subdomain id.
-        super(MyBC, self).__init__(V, value, 0)
-        # Override the "nodes" property which says where the boundary
-        # condition is to be applied.
-        self.nodes = nodes
+from sys import float_info
+import ipdb
 
 
 def test_eikonal_values_fig8():
@@ -32,7 +27,7 @@ def test_eikonal_values_fig8():
     # spyro however supports both spatial parallelism and "shot" parallelism.
     # Options: automatic (same number of cores for evey processor) or spatial
     dictionary["parallelism"] = {
-        "type": "automatic",
+        "type": "spatial",
     }
 
     # Define the domain size without the PML or AL. Here we'll assume a
@@ -52,6 +47,7 @@ def test_eikonal_values_fig8():
     # the helper function `create_transect`.
     dictionary["acquisition"] = {
         "source_type": "ricker",
+        # "source_locations": [(-0.5, 0.2), (-0.5, 0.25), (-0.5, 0.3)],
         "source_locations": [(-0.5, 0.25)],
         "frequency": 5.0,
         "delay": 1.5,
@@ -85,147 +81,153 @@ def test_eikonal_values_fig8():
     # cpw = 5.0
     # lba = 1.5 / 5.0
     # edge_length = lba / cpw
-    edge_length = 0.05
+    edge_length = 0.01
+
     Wave_obj.set_mesh(mesh_parameters={"edge_length": edge_length})
     cond = fire.conditional(Wave_obj.mesh_x < 0.5, 3.0, 1.5)
 
     # Rest of setup
     Wave_obj.set_initial_velocity_model(conditional=cond)
-    # Wave_obj._get_initial_velocity_model()
-
     Wave_obj.c = Wave_obj.initial_velocity_model
-    # Wave_obj.forward_solve()
 
-    outfile = fire.VTKFile("output.pvd")
+    outfile = fire.VTKFile("/mnt/d/spyro/output/output.pvd")
     outfile.write(Wave_obj.c)
 
-    eikonal(Wave_obj)
+    # ipdb.set_trace()
+    yp = eikonal(Wave_obj)
 
-    ipdb.set_trace()
+
+class dir_point_bc(fire.DirichletBC):
+    '''
+    Class for Eikonal boundary conditions at a point.
+    '''
+
+    def __init__(self, V, value, nodes):
+        # Call superclass init
+        # We provide a dummy subdomain id.
+        super(dir_point_bc, self).__init__(V, value, 0)
+        # Override the "nodes" property which says where the boundary
+        # condition is to be applied.
+        self.nodes = nodes
 
 
 def define_bcs(Wave):
-    pass
+    '''
+    BCs for eikonal
+    '''
+
+    print('Defining Eikonal BCs')
+
+    # Extract node positions
+    z_f = fire.Function(Wave.function_space).interpolate(Wave.mesh_z)
+    x_f = fire.Function(Wave.function_space).interpolate(Wave.mesh_x)
+    z_data = z_f.dat.data_with_halos[:]
+    x_data = x_f.dat.data_with_halos[:]
+
+    # Identify source locations
+    possou = Wave.sources.point_locations
+    sou_ids = [np.where(np.isclose(z_data, z_s) & np.isclose(
+        x_data, x_s))[0] for z_s, x_s in possou]
+
+    # Define BCs for eikonal
+    bcs_eik = [dir_point_bc(Wave.function_space,
+                            fire.Constant(0.0), ids) for ids in sou_ids]
+
+    # Mark source locations
+    sou_marker = fire.Function(Wave.function_space, name="source_marker")
+    sou_marker.assign(0)
+    sou_marker.dat.data_with_halos[sou_ids] = 1
+
+    # Save source marker
+    outfile = fire.VTKFile("/mnt/d/spyro/output/souEik.pvd")
+    outfile.write(sou_marker)
+
     return bcs_eik
 
 
-def assemble_eik(Wave, yp, vy, dx):
+def linear_eik(Wave, u, vy, dx):
+    '''
+    Linear Eikonal
+    '''
     f = fire.Constant(1.0)
-    eps = fire.CellDiameter(Wave.mesh)  # Stabilizer
-    F = (fire.sqrt(fire.inner(fire.grad(yp), fire.grad(yp))) * vy * dx
-         - f / Wave.c * vy * dx + eps * fire.inner(
-        fire.grad(yp), fire.grad(vy)) * dx)
+    FL = fire.inner(fire.grad(u), fire.grad(vy)) * dx - f / Wave.c * vy * dx
+    return FL
+
+
+def assemble_eik(Wave, u, vy, dx, eps):
+    '''
+    Eikonal with stabilizer term
+    '''
+    f = fire.Constant(1.0)
+    eps = fire.Constant(eps)
+    # eps = fire.CellDiameter(Wave.mesh) # Stabilizer
+    grad_u_norm = fire.sqrt(fire.inner(fire.grad(u), fire.grad(u))) \
+        + float_info.epsilon
+    F = (grad_u_norm * vy * dx - f / Wave.c * vy * dx + eps * fire.inner(
+        fire.grad(u), fire.grad(vy)) * dx)
     return F
 
 
-def solve_eik(Wave, bcs_eik, yp):
-
-    # Initialize mesh function for boundary domains
-    elreg_marker = fire.Function(Wave.function_space, name="elreg_marker")
-    elreg_marker.assign(0)
-    dx = fire.Measure('dx', domain=Wave.mesh, subdomain_data=elreg_marker)
+def solve_eik(Wave, bcs_eik):
+    '''
+    Solve nonlinear eikonal
+    '''
 
     # Functions
-
+    yp = fire.Function(Wave.function_space, name='Eikonal (Time [s])')
     vy = fire.TestFunction(Wave.function_space)
     u = fire.TrialFunction(Wave.function_space)
 
+    # Linear Eikonal
     print('Solve Pre-Eikonal')
-    f = fire.Constant(1.0)
-    F1 = fire.inner(fire.grad(u), fire.grad(vy)) * dx - f / Wave.c * vy * dx
-    fire.solve(fire.lhs(F1) == fire.rhs(F1), yp, bcs=bcs_eik)
+    FeikL = linear_eik(Wave, u, vy, fire.dx)
+    fire.solve(fire.lhs(FeikL) == fire.rhs(FeikL), yp, bcs=bcs_eik)
 
+    # Determining the stabilizer
+    cell_diameter_function = fire.Function(Wave.function_space)
+    cell_diameter_function.interpolate(fire.CellDiameter(Wave.mesh))
+    eps = 0.06 * max(cell_diameter_function.dat.data[:]) # Stabilizer
+
+    # Nonlinear Eikonal
     print('Solve Post-Eikonal')
-    Feik = assemble_eik(Wave, yp, vy, dx)
+    Feik = assemble_eik(Wave, yp, vy, fire.dx, eps)
+    J = fire.derivative(Feik, yp)
+    user_tol = 1e-7
     fire.solve(Feik == 0, yp, bcs=bcs_eik, solver_parameters={
         'snes_type': 'vinewtonssls',
         'snes_max_it': 1000,
-        'snes_atol': 5e-6,
+        'snes_atol': user_tol, # Increase the tolerance
         'snes_rtol': 1e-20,
         'snes_linesearch_type': 'l2',
         'snes_linesearch_damping': 1.00,
         'snes_linesearch_maxstep': 0.50,
         'snes_linesearch_order': 2,
+        'pc_type': 'lu',
         'ksp_type': 'gmres',
-        'pc_type': 'lu'
-    })
+        'ksp_max_it': 1000,
+        'ksp_atol': user_tol, # Increase the tolerance
+    }, J=J)
 
     return yp
 
 
-def eikonal(Wave):  # (Mes, Dom, pH):
+def eikonal(Wave):
+    '''
+    Eikonal solver
+    '''
 
-    print('Defining Eikonal BCs')
+    # Boundary conditions
     bcs_eik = define_bcs(Wave)
 
     # Solving Eikonal
-    yp = fire.Function(Wave.function_space, name='Eikonal (Time [ms])')
-    yp.assign(solve_eik(Wave, bcs_eik, yp))
+    yp = solve_eik(Wave, bcs_eik)
 
-    # if pH['saveFile']:
-    #     eikonal_file = fire.File(pH['FolderCase'] + '/out/Eik.pvd')
-    #     eikonal_file.write(yp)
+    eikonal_file = fire.VTKFile('/mnt/d/spyro/output/Eik.pvd')
+    eikonal_file.write(yp)
 
-    # return yp
+    return yp
 
 
 # Verify distant values as lref and velocities
 if __name__ == "__main__":
     test_eikonal_values_fig8()
-
-
-# def define_boundaries(Wave, edge_length):
-#     class Sigma:
-#         def __init__(self, possou, tolz, tolx):
-#             self.possou = possou
-#             self.tolz = tolz
-#             self.tolx = tolx
-
-#         def inside(self, x):
-#             cond = False
-#             for p in self.possou:
-#                 cond = cond or (p[0] - self.tolz[0] <= x[0] <= p[0]
-#                                 + self.tolz[1] and p[1] - self.tolx[0]
-#                                 <= x[1] <= p[1] + self.tolx[1])
-#             return cond
-
-#     # Initialize mesh function for boundary domains
-#     elreg_marker = fire.Function(Wave.function_space, name="elreg_marker")
-#     elreg_marker.assign(0)
-
-#     element = Wave.function_space.ufl_element()
-#     function_space_fs = fire.FunctionSpace(
-#         Wave.mesh, element.reconstruct(degree=element.degree() - 1))
-#     facet_marker = fire.Function(function_space_fs, name="facet_marker")
-#     facet_marker.assign(0)
-
-#     # Initialize sub-domain instances
-#     possou = Wave.sources.point_locations
-
-#     if Wave.sources.number_of_points > 1:
-#         zl = 0.25 * edge_length
-#         zu = 0.25 * edge_length
-#         xl = 0.25 * edge_length
-#         xu = 1.25 * edge_length
-#     else:
-#         zl = 0.6 * edge_length
-#         zu = 0.6 * edge_length
-#         xl = 0.6 * edge_length
-#         xu = 0.6 * edge_length
-
-#     sigma = Sigma(possou, [zl, zu], [xl, xu])
-#     for i in range(len(Wave.mesh.coordinates.dat.data_with_halos)):
-#         if sigma.inside(Wave.mesh.coordinates.dat.data_with_halos[i]):
-#             facet_marker.dat.data_with_halos[i] = 1
-
-#     bcs = [fire.DirichletBC(Wave.function_space,
-#                             fire.Constant(0.0), facet_marker)]
-
-#     dx = fire.Measure('dx', domain=Wave.mesh, subdomain_data=elreg_marker)
-
-#     souEik_file = fire.VTKFile('SouEik.pvd')
-#     souEik_file.write(facet_marker)
-
-#     ipdb.set_trace()
-
-#     return dx, bcs
