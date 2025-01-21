@@ -1,0 +1,6 @@
+<?xml version="1.0" ?>
+<VTKFile type="Collection" version="0.1" byte_order="LittleEndian">
+<Collection>
+<DataSet timestep="0" file="test_debug_plot/test_debug_plot_0.vtu" />
+</Collection>
+</VTKFile>
