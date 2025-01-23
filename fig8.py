@@ -1,13 +1,12 @@
 import os
-os.environ["OMP_NUM_THREADS"] = "1"
-from firedrake import parameters
-parameters["loopy"] = {"silenced_warnings": ["v1_scheduler_fallback"]}
 import spyro
+from sys import float_info
 import firedrake as fire
 import math
 import numpy as np
-from sys import float_info
 import ipdb
+os.environ["OMP_NUM_THREADS"] = "1"
+fire.parameters["loopy"] = {"silenced_warnings": ["v1_scheduler_fallback"]}
 
 
 def test_eikonal_values_fig8():
@@ -15,7 +14,8 @@ def test_eikonal_values_fig8():
     dictionary["options"] = {
         # Simplexes: triangles or tetrahedra (T) or quadrilaterals (Q)
         "cell_type": "T",
-        "variant": "lumped",  # Options: lumped, equispaced or DG. Default is lumped "method":"MLT"
+        "variant": "lumped",  # Options: lumped, equispaced or DG.
+        # Default is lumped "method":"MLT"
         # (MLT/spectral_quadrilateral/DG_triangle/DG_quadrilateral)
         # You can either specify a cell_type+variant or a method
         # accepted_variants = ["lumped", "equispaced", "DG"]
@@ -154,15 +154,16 @@ def linear_eik(Wave, u, vy, dx):
     return FL
 
 
-def assemble_eik(Wave, u, vy, dx, eps):
+def assemble_eik(Wave, u, vy, dx):
     '''
     Eikonal with stabilizer term
     '''
+    eps = fire.Constant(1.) * fire.CellDiameter(Wave.mesh)  # Stabilizer
+
+    # delta = fire.Constant(float_info.min)
+    delta = fire.Constant(float_info.epsilon)
     f = fire.Constant(1.0)
-    eps = fire.Constant(eps)
-    # eps = fire.CellDiameter(Wave.mesh) # Stabilizer
-    grad_u_norm = fire.sqrt(fire.inner(fire.grad(u), fire.grad(u))) \
-        + float_info.epsilon
+    grad_u_norm = fire.sqrt(fire.inner(fire.grad(u), fire.grad(u))) + delta
     F = (grad_u_norm * vy * dx - f / Wave.c * vy * dx + eps * fire.inner(
         fire.grad(u), fire.grad(vy)) * dx)
     return F
@@ -179,24 +180,19 @@ def solve_eik(Wave, bcs_eik):
     u = fire.TrialFunction(Wave.function_space)
 
     # Linear Eikonal
-    print('Solve Pre-Eikonal')
+    print('Solving Pre-Eikonal')
     FeikL = linear_eik(Wave, u, vy, fire.dx)
     fire.solve(fire.lhs(FeikL) == fire.rhs(FeikL), yp, bcs=bcs_eik)
 
-    # Determining the stabilizer
-    cell_diameter_function = fire.Function(Wave.function_space)
-    cell_diameter_function.interpolate(fire.CellDiameter(Wave.mesh))
-    eps = 0.06 * max(cell_diameter_function.dat.data[:]) # Stabilizer
-
     # Nonlinear Eikonal
-    print('Solve Post-Eikonal')
-    Feik = assemble_eik(Wave, yp, vy, fire.dx, eps)
+    print('Solving Post-Eikonal')
+    Feik = assemble_eik(Wave, yp, vy, fire.dx)
     J = fire.derivative(Feik, yp)
-    user_tol = 1e-7
+    user_tol = 1e-16
     fire.solve(Feik == 0, yp, bcs=bcs_eik, solver_parameters={
         'snes_type': 'vinewtonssls',
         'snes_max_it': 1000,
-        'snes_atol': user_tol, # Increase the tolerance
+        'snes_atol': user_tol,  # Increase the tolerance
         'snes_rtol': 1e-20,
         'snes_linesearch_type': 'l2',
         'snes_linesearch_damping': 1.00,
@@ -205,7 +201,7 @@ def solve_eik(Wave, bcs_eik):
         'pc_type': 'lu',
         'ksp_type': 'gmres',
         'ksp_max_it': 1000,
-        'ksp_atol': user_tol, # Increase the tolerance
+        'ksp_atol': user_tol,  # Increase the tolerance
     }, J=J)
 
     return yp
@@ -224,6 +220,22 @@ def eikonal(Wave):
 
     eikonal_file = fire.VTKFile('/mnt/d/spyro/output/Eik.pvd')
     eikonal_file.write(yp)
+
+    # Extract node positions
+    z_f = fire.Function(Wave.function_space).interpolate(Wave.mesh_z)
+    x_f = fire.Function(Wave.function_space).interpolate(Wave.mesh_x)
+    z_data = z_f.dat.data_with_halos[:]
+    x_data = x_f.dat.data_with_halos[:]
+    poseik = [(-0.5, 0)]
+    eik_ids = [np.where(np.isclose(z_data, z_s) & np.isclose(
+        x_data, x_s))[0] for z_s, x_s in poseik]
+
+    for pos in eik_ids:
+        print('Eikonal min:', round(1e3 * yp.dat.data_with_halos[
+            pos].item(), 3), 'ms')
+
+    print('min:', round(1e3*yp.dat.data_with_halos[:].min(), 3), 'ms')
+    print('max:', round(yp.dat.data_with_halos[:].max(), 5), 's')
 
     return yp
 
