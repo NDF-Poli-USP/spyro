@@ -21,8 +21,8 @@ docker run -it runtag:1.0
 
 The Dockerfile may also be used to create a development environment. First, clone the git repository and then build the development image:
 ````
-git clone https://github.com/Olender/spyro-1.git
-cd spyro-1
+git clone git@github.com:NDF-Poli-USP/spyro.git
+cd spyro
 git checkout <your_branch>
 docker build -t devtag:1.0 -f docker/Dockerfile --target spyro_development docker
 ````

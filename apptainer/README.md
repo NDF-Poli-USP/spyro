@@ -39,3 +39,14 @@ To execute the image in batch mode:
 ````
 apptainer run  --overlay /tmp/ext3_overlay.img -e devimg.sif <script>
 ````
+
+### Running on Mintrop
+
+In order to run code with Apptainer on Mintrop, you may add the following lines to your Slurm script:
+````
+module load apptainer
+apptainer overlay create --size 1024 /tmp/ext3_overlay.img
+apptainer run  --overlay /tmp/ext3_overlay.img -e devimg.sif ./example.sh
+````
+
+where the script [example.sh](./example.sh) is provided in this directory to show how spyro code could be called.
