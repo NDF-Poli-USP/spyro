@@ -19,7 +19,7 @@ USER firedrake
 # The PyPI SeismicMesh has bugs. It is better to install from GitHub
 RUN . /home/firedrake/firedrake/bin/activate; pip3 install --no-dependencies git+https://github.com/NDF-Poli-USP/SeismicMesh.git
 RUN . /home/firedrake/firedrake/bin/activate; pip3 install pyamg
-RUN . /home/firedrake/firedrake/bin/activate; pip3 install "meshio==5.3.5"
+RUN . /home/firedrake/firedrake/bin/activate; pip3 install meshio
 RUN . /home/firedrake/firedrake/bin/activate; pip3 install siphash24
 
 FROM spyro_base AS spyro_release
