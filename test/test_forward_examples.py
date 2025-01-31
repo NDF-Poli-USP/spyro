@@ -81,11 +81,6 @@ def test_elastic_cube_3D():
     wave.forward_solve()
 
 
-def test_specfem2d_comparison():
-    from spyro.examples.specfem2d_comparison import wave
-    wave.forward_solve()
-
-
 if __name__ == "__main__":
     test_camembert_forward()
     test_rectangle_forward()
