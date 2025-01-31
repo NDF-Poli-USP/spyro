@@ -3,11 +3,17 @@ The analytical solutions are provided by the book:
 Quantitative Seismology (2nd edition) from Aki and Richards
 '''
 import numpy as np
+import os
 import spyro
+import time
 
 from firedrake.petsc import PETSc
 from math import pi as PI
+from mpi4py import MPI
+from numpy.linalg import norm
 from scipy.integrate import quad
+
+from spyro.utils.file_utils import mkdir_timestamp
 
 opts = PETSc.Options()
 
@@ -158,3 +164,43 @@ def numerical_solution(j):
     wave.forward_solve()
 
     return wave.receivers_output.reshape(nt + 1, 3)[0:-1, :]
+
+
+def err(u_a, u_n):
+    return norm(u_a - u_n)/norm(u_a)
+
+
+if __name__ == "__main__":
+    rank = MPI.COMM_WORLD.Get_rank()
+    if rank == 0:
+        start = time.time()
+
+    j = 0
+    U_x = analytical_solution(0, j)
+    U_y = analytical_solution(1, j)
+    U_z = analytical_solution(2, j)
+
+    u_n = numerical_solution(j)
+    u_x = u_n[:, 0]
+    u_y = u_n[:, 1]
+    u_z = u_n[:, 2]
+
+    if rank == 0:
+        end = time.time()
+        print(f"Elapsed time: {end - start:.2f} s")
+        print(f"err_x = {err(U_x, u_x)}")
+        print(f"err_y = {err(U_y, u_y)}")
+        print(f"err_z = {err(U_z, u_z)}")
+
+
+        if moment_tensor:
+            basename = "ExplosiveSource"
+        else:
+            basename = "ForceSource"
+        output_dir = mkdir_timestamp(basename)
+        np.save(os.path.join(output_dir, "x_analytical.npy"), U_x)
+        np.save(os.path.join(output_dir, "y_analytical.npy"), U_y)
+        np.save(os.path.join(output_dir, "z_analytical.npy"), U_z)
+        np.save(os.path.join(output_dir, "numerical.npy"), u_n)
+
+        print(f"Data saved to: {output_dir}")
