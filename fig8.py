@@ -5,9 +5,11 @@ import firedrake as fire
 import math
 import numpy as np
 import ipdb
+import warnings
+import time             # For runtime
+import tracemalloc      # For memory usage
 os.environ["OMP_NUM_THREADS"] = "1"
 fire.parameters["loopy"] = {"silenced_warnings": ["v1_scheduler_fallback"]}
-import warnings
 warnings.filterwarnings("ignore", category=RuntimeWarning)
 
 
@@ -21,7 +23,7 @@ def test_eikonal_values_fig8():
         # (MLT/spectral_quadrilateral/DG_triangle/DG_quadrilateral)
         # You can either specify a cell_type+variant or a method
         # accepted_variants = ["lumped", "equispaced", "DG"]
-        "degree": 2,  # p order p=4 ok
+        "degree": 1,  # p order p=4 ok
         "dimension": 2,  # dimension
     }
 
@@ -64,7 +66,7 @@ def test_eikonal_values_fig8():
         "dt": 0.0005,  # timestep size
         "amplitude": 1,  # the Ricker has an amplitude of 1.
         "output_frequency": 100,  # how frequently to output solution to pvds
-        "gradient_sampling_frequency": 100,  # how frequently to save solution to RAM
+        "gradient_sampling_frequency": 100,  # how frequently to save to RAM
     }
 
     dictionary["visualization"] = {
@@ -83,7 +85,7 @@ def test_eikonal_values_fig8():
     # cpw = 5.0
     # lba = 1.5 / 5.0
     # edge_length = lba / cpw
-    edge_length = 0.01
+    edge_length = 0.05
 
     Wave_obj.set_mesh(mesh_parameters={"edge_length": edge_length})
     cond = fire.conditional(Wave_obj.mesh_x < 0.5, 3.0, 1.5)
@@ -156,11 +158,11 @@ def linear_eik(Wave, u, vy, dx):
     return FL
 
 
-def assemble_eik(Wave, u, vy, dx):
+def assemble_eik(Wave, u, vy, dx, f_est=1.0):
     '''
     Eikonal with stabilizer term
     '''
-    eps = fire.Constant(1.0) * fire.CellDiameter(Wave.mesh)  # Stabilizer
+    eps = fire.Constant(f_est) * fire.CellDiameter(Wave.mesh)  # Stabilizer
     delta = fire.Constant(float_info.min)
     # delta = fire.Constant(float_info.epsilon)
     grad_u_norm = fire.sqrt(fire.inner(fire.grad(u), fire.grad(u))) + delta
@@ -171,17 +173,23 @@ def assemble_eik(Wave, u, vy, dx):
 
 
 def solve_prop(nl_solver='newtonls', l_solver='preonly',
-               user_rtol=1e-16, user_iter=50, monitor=False):
+               user_atol=1e-16, user_iter=50, monitor=False):
     '''
     Solver Parameters
     https://petsc.org/release/manualpages/SNES/SNESType/
     https://petsc.org/release/manualpages/KSP/KSPType/
     https://petsc.org/release/manualpages/PC/PCType/
+
+    atol: F(x) ≤ atol
+    rtol: F(x) ≤ rtol∗F(x0)
+    stol: || delta x || < stol*|| x ||
+    haptol: lhs - rhs < haptol
+    haptol < atol < rtol < stol
     '''
 
     # Tolerances and iterations
-    user_atol = user_rtol**2
-    user_stol = user_rtol**2.5
+    user_rtol = user_atol * 1e2
+    user_stol = user_atol * 1e3
     ksp_max_it = user_iter
 
     param_solver = {'snes_type': nl_solver, 'ksp_type': l_solver}
@@ -202,18 +210,14 @@ def solve_prop(nl_solver='newtonls', l_solver='preonly',
 
     if nl_solver == 'ngs':
         param_solver.update({'snes_ngs_sweeps': 2,
-                             'snes_ngs_atol': user_rtol,
-                             'snes_ngs_rtol': user_atol,
+                             'snes_ngs_atol': user_atol,
+                             'snes_ngs_rtol': user_rtol,
                              'snes_ngs_stol': user_stol,
                              'snes_ngs_max_it': user_iter})
 
     if nl_solver == 'ncg':
         # fr, prp, dy, hs, cd
         param_solver.update({'snes_ncg_type': 'cd'})
-
-    if nl_solver == 'anderson':
-        param_solver.update({'snes_anderson_m': 3,
-                             'snes_anderson_beta': 0.3})
 
     if l_solver == 'preonly':
         ig_nz = False
@@ -222,19 +226,19 @@ def solve_prop(nl_solver='newtonls', l_solver='preonly',
         param_solver.update({'pc_factor_mat_solver_type': 'umfpack'})  # mumps
     else:
         ig_nz = True
-        pc_type = 'icc'  # ilu, icc
+        pc_type = 'ilu'  # ilu, icc, lu, cholesky
 
     if l_solver == 'gmres':
         param_solver.update({'ksp_gmres_restart': 3,
-                             'ksp_gmres_haptol': user_stol})
+                             'ksp_gmres_haptol': user_atol * 1e-4})
 
     param_solver.update({
         'snes_linesearch_type': 'l2',  # l2, cp, basic
-        'snes_linesearch_damping': 0.25,
+        'snes_linesearch_damping': 1.0,  # 0.1-41 0.3-30 0.5-21 0.9-13 1.0-7
         'snes_linesearch_maxstep': 1.0,
         'snes_max_funcs': 1000,
-        'snes_linesearch_order': 3,
-        'snes_linesearch_alpha': 0.5,
+        'snes_linesearch_order': 2,
+        'snes_linesearch_alpha': 1e-4,
         'snes_max_it': user_iter,
         'snes_linesearch_rtol': user_rtol,
         'snes_linesearch_atol': user_atol,
@@ -271,7 +275,7 @@ def clean_inst_num(data_arr):
     return data_arr
 
 
-def solve_eik(Wave, bcs_eik, tol=1e-16):
+def solve_eik(Wave, bcs_eik, tol=1e-16, f_est=0.21):
     '''
     Solve nonlinear eikonal
     '''
@@ -293,52 +297,60 @@ def solve_eik(Wave, bcs_eik, tol=1e-16):
               / Wave.c.dat.data_with_halos.min())
 
     # Linear Eikonal
-    user_rtol = tol**0.5
-    # newtontr, nrichardson, qn, ngs, ncg, ngmres, anderson
+    user_atol = tol**0.75
+    # newtontr, qn, ngs, ncg, ngmres
     nl_solver = 'newtontr'
-    l_solver = 'gmres'  # gmres, bcgs, preonly
+    l_solver = 'gmres'  # gmres, preonly, bcgs
     while True:
         try:
             pL = solve_prop(nl_solver=nl_solver, l_solver=l_solver,
-                            user_rtol=user_rtol, user_iter=50)
+                            user_atol=user_atol, user_iter=50)
             fire.solve(fire.lhs(FeikL) == fire.rhs(FeikL), yp,
                        bcs=bcs_eik, solver_parameters=pL, J=J)
-            print(f"\nSolver Executed Successfully. Tol: {user_rtol:.1e}")
+            print(f"\nSolver Executed Successfully. AbsTol: {user_atol:.1e}")
             break
         except Exception as e:
             print(f"Error Solving: {e}")
-            user_rtol = user_rtol * 10 if user_rtol < 1e-3 \
-                else round(user_rtol + 1e-3, 3)
-            if user_rtol > 1e-2:
+            user_atol = user_atol * 10 if user_atol < 1e-5 \
+                else round(user_atol + 1e-5, 5)
+            if user_atol > 1e-4:
                 print("\nTolerance too high. Exiting.")
                 break
 
     # Clean data: Set NaNs and negative values to zero
-    yp.dat.data_with_halos[:] = clean_inst_num(yp.dat.data_with_halos)
+    data_eikL = clean_inst_num(yp.dat.data_with_halos[:])
 
     # Nonlinear Eikonal
     print('Solving Post-Eikonal')
-    Feik = assemble_eik(Wave, yp, vy, fire.dx)
-    J = fire.derivative(Feik, yp)
-    user_rtol = tol
-    # newtonls, newtontr, nrichardson, qn, ngs, ncg, ngmres, anderson
-    nl_solver = 'newtonls'
-    l_solver = 'preonly'  # gmres, bcgs, preonly
+    user_atol = tol
+    # vinewtonrsls, vinewtonssls, newtonls, newtontr, qn, ngs, ncg, ngmres
+    nl_solver = 'vinewtonrsls'
+    l_solver = 'preonly'  # gmres, preonly, bcgs
+    user_est = f_est
     while True:
         try:
+            print(f"Iteration for Festab: {user_est:.2f}")
+            yp = fire.Function(Wave.function_space, name='Eikonal (Time [s])')
+            yp.dat.data_with_halos[:] = data_eikL
+            Feik = assemble_eik(Wave, yp, vy, fire.dx, f_est=user_est)
+            J = fire.derivative(Feik, yp)
             pNL = solve_prop(nl_solver=nl_solver, l_solver=l_solver,
-                             user_rtol=user_rtol, user_iter=50)
+                             user_atol=user_atol, user_iter=50)
             fire.solve(Feik == 0, yp, bcs=bcs_eik, solver_parameters=pNL, J=J)
-            print(f"\nSolver Executed Successfully. Tol: {user_rtol:.1e}")
+            print(f"\nSolver Executed Successfully. AbsTol: {user_atol:.1e}")
+            print(f"Solver Executed Successfully. Festab: {user_est:.2f}")
             break
         except Exception as e:
             print(f"Error Solving: {e}")
-            user_rtol = user_rtol * 10 if user_rtol < 1e-3 \
-                else round(user_rtol + 1e-3, 3)
-            if user_rtol > 1e-2:
-                print('\nHigh Tolerance. Exiting!')
-                break
-            # yp.dat.data_with_halos[:] = clean_inst_num(yp.dat.data_with_halos)
+            user_est += 0.01
+            if user_est > 1.0:
+                user_est = f_est
+                print('\nHigh Stabilizing Factor. Increasing Tolerance!')
+                user_atol = user_atol * 10 if user_atol < 1e-5 \
+                    else round(user_atol + 1e-5, 5)
+                if user_atol > 1e-4:
+                    print('\nHigh Tolerance. Exiting!')
+                    break
 
     return yp
 
@@ -348,12 +360,16 @@ def eikonal(Wave):
     Eikonal solver
     '''
 
+    tracemalloc.start()
+    tRef = time.perf_counter()  # Reference time. Don't move
+
     # Boundary conditions
     bcs_eik = define_bcs(Wave)
 
     # Solving Eikonal
     yp = solve_eik(Wave, bcs_eik)
 
+    # Eikonal results
     eikonal_file = fire.VTKFile('/mnt/d/spyro/output/Eik.pvd')
     eikonal_file.write(yp)
 
@@ -372,6 +388,26 @@ def eikonal(Wave):
 
     print('min:', round(1e3*yp.dat.data_with_halos[:].min(), 3), 'ms')
     print('max:', round(yp.dat.data_with_halos[:].max(), 5), 's')
+
+    # Total time
+    print(67*'*')
+    print('Estimating Runtime and Used Memory')
+    # tTotal = time.clock() - tRef
+    tTotal = time.perf_counter() - tRef
+    print('tTotal(s):{:3.3f}, tTotal(m):{:3.3f}, tTotal(h):{:3.3f}'.format(
+        tTotal, tTotal/60, tTotal/3600))
+
+    # Memory usage
+    curr, peak = tracemalloc.get_traced_memory()
+    print('UdMem(MB):{:3.3f}, PkMem(MB):{:3.3f}'.format(
+        curr/1024**2, peak/1024**2))
+    tracemalloc.stop()
+    print(67*'*')
+
+    # Save file for resource usage
+    np.savetxt('/mnt/d/spyro/output/Eik_time.txt',
+               (tTotal, tTotal/60, tTotal/3600, curr/1024**2,
+                peak/1024**2), delimiter='\t')
 
     return yp
 
