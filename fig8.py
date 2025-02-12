@@ -81,10 +81,7 @@ def test_eikonal_values_fig8():
     # Create the acoustic wave object
     Wave_obj = spyro.AcousticWave(dictionary=dictionary)
 
-    # Using SeismicMesh:
-    # cpw = 5.0
-    # lba = 1.5 / 5.0
-    # edge_length = lba / cpw
+    # Mesh
     edge_length = 0.05
 
     Wave_obj.set_mesh(mesh_parameters={"edge_length": edge_length})
