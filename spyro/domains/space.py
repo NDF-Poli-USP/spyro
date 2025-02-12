@@ -23,7 +23,7 @@ def FE_method(mesh, method, degree, dim=1):
 
     if method == "mass_lumped_triangle":
         element = FiniteElement(
-            "KMV", mesh.ufl_cell(), degree=degree, variant="KMV"
+            "KMV", mesh.ufl_cell(), degree=degree
         )
     elif method == "spectral_quadrilateral":
         element = FiniteElement(
