@@ -1,0 +1,346 @@
+import firedrake as fire
+import numpy as np
+from sys import float_info
+from os import getcwd
+# import ipdb
+
+
+class dir_point_bc(fire.DirichletBC):
+    '''
+    Class for Eikonal boundary conditions at a point.
+    '''
+
+    def __init__(self, V, value, nodes):
+        # Call superclass init
+        # We provide a dummy subdomain id.
+        super(dir_point_bc, self).__init__(V, value, 0)
+        # Override the "nodes" property which says where the boundary
+        # condition is to be applied.
+        self.nodes = nodes
+
+
+class eikonal():
+    '''
+    Class for Nonlinear Eikonal
+
+    '''
+
+    def __init__(self, Wave):
+
+        # Path to save data
+        self.path_save = getcwd() + "/output/"
+
+        # Extract node positions
+        z_f = fire.Function(Wave.function_space).interpolate(Wave.mesh_z)
+        x_f = fire.Function(Wave.function_space).interpolate(Wave.mesh_x)
+        self.z_data = z_f.dat.data_with_halos[:]
+        self.x_data = x_f.dat.data_with_halos[:]
+
+        # Boundary conditions
+        self.define_bcs(Wave)
+
+    def define_bcs(self, Wave):
+        '''
+        BCs for eikonal
+        '''
+
+        print('Defining Eikonal BCs')
+
+        # Identify source locations
+        possou = Wave.sources.point_locations
+        sou_ids = [np.where(np.isclose(self.z_data, z_s) & np.isclose(
+            self.x_data, x_s))[0] for z_s, x_s in possou]
+
+        # Define BCs for eikonal
+        self.bcs_eik = [dir_point_bc(
+            Wave.function_space, fire.Constant(0.0), ids) for ids in sou_ids]
+
+        # Mark source locations
+        sou_marker = fire.Function(Wave.function_space, name="source_marker")
+        sou_marker.assign(0)
+        sou_marker.dat.data_with_halos[sou_ids] = 1
+
+        # Save source marker
+        outfile = fire.VTKFile(self.path_save + "souEik.pvd")
+        outfile.write(sou_marker)
+
+    @staticmethod
+    def clean_inst_num(data_arr):
+        ''''
+        Clean data: Set NaNs and negative values to zero
+        '''
+        data_arr[np.where(np.isnan(data_arr) | np.isinf(
+            data_arr) | (data_arr < 0.0))] = 0.0
+        return data_arr
+
+    @staticmethod
+    def linear_eik(Wave, u, vy, dx):
+        '''
+        Linear Eikonal
+        '''
+        f = fire.Constant(1.0)
+        lhs = fire.inner(fire.grad(u), fire.grad(vy)) * dx
+        rhs = f / Wave.c * vy * dx
+        FL = lhs - rhs
+        return FL
+
+    @staticmethod
+    def assemble_eik(Wave, u, vy, dx, f_est=1.0):
+        '''
+        Eikonal with stabilizing term
+        '''
+
+        # Stabilizer
+        eps = fire.Constant(f_est) * fire.CellDiameter(Wave.mesh)
+        delta = fire.Constant(float_info.epsilon)  # float_info.min
+        gr_norm = fire.sqrt(fire.inner(fire.grad(u), fire.grad(u))) + delta
+        f = fire.Constant(1.0)
+        F = gr_norm * vy * dx - f / Wave.c * vy * dx + \
+            eps * fire.inner(fire.grad(u), fire.grad(vy)) * dx
+        return F
+
+    @staticmethod
+    def solve_prop(nl_solver='newtonls', l_solver='preonly',
+                   user_atol=1e-16, user_iter=50, monitor=False):
+        '''
+        Solver Parameters
+        https://petsc.org/release/manualpages/SNES/SNESType/
+        https://petsc.org/release/manualpages/KSP/KSPType/
+        https://petsc.org/release/manualpages/PC/PCType/
+
+        atol: F(x) ≤ atol
+        rtol: F(x) ≤ rtol∗F(x0)
+        stol: || delta x || < stol*|| x ||
+        haptol: lhs - rhs < haptol
+        haptol < atol < rtol < stol
+        '''
+
+        # Tolerances and iterations
+        user_rtol = user_atol * 1e2
+        user_stol = user_atol * 1e3
+        ksp_max_it = user_iter
+
+        param_solver = {'snes_type': nl_solver, 'ksp_type': l_solver}
+
+        if nl_solver == 'newtontr':  # newton, cauchy, dogleg
+            param_solver.update({'snes_tr_fallback_type': 'newton'})
+
+        if nl_solver == 'ngmres':  # difference, none, linesearch
+            param_solver.update({'snes_ngmres_select_type': 'linesearch'})
+
+        if nl_solver == 'qn':
+            param_solver.update({'snes_qn_m_type': 5,
+                                 'snes_qn_powell_descent': True,
+                                 # lbfgs, broyden, badbroyden
+                                 'snes_qn_type': 'badbroyden',
+                                 # diagonal, none, scalar, jacobian
+                                 'snes_qn_scale_type': 'jacobian'})
+
+        if nl_solver == 'ngs':
+            param_solver.update({'snes_ngs_sweeps': 2,
+                                 'snes_ngs_atol': user_atol,
+                                 'snes_ngs_rtol': user_rtol,
+                                 'snes_ngs_stol': user_stol,
+                                 'snes_ngs_max_it': user_iter})
+
+        if nl_solver == 'ncg':
+            # fr, prp, dy, hs, cd
+            param_solver.update({'snes_ncg_type': 'cd'})
+
+        if l_solver == 'preonly':
+            ig_nz = False
+            pc_type = 'lu'  # lu, cholesky
+
+            # mumps
+            param_solver.update({'pc_factor_mat_solver_type': 'umfpack'})
+        else:
+            ig_nz = True
+            pc_type = 'ilu'  # ilu, icc, lu, cholesky
+
+        if l_solver == 'gmres':
+            param_solver.update({'ksp_gmres_restart': 3,
+                                 'ksp_gmres_haptol': user_atol * 1e-4})
+
+        param_solver.update({
+            'snes_linesearch_type': 'l2',  # l2, cp, basic
+            'snes_linesearch_damping': 1.0,
+            'snes_linesearch_maxstep': 1.0,
+            'snes_max_funcs': 1000,
+            'snes_linesearch_order': 2,
+            'snes_linesearch_alpha': 1e-4,
+            'snes_max_it': user_iter,
+            'snes_linesearch_rtol': user_rtol,
+            'snes_linesearch_atol': user_atol,
+            'snes_rtol': user_atol,
+            'snes_atol': user_rtol,
+            'snes_stol': user_stol,
+            'ksp_max_it': ksp_max_it,
+            'ksp_rtol': user_rtol,
+            'ksp_atol': user_atol,
+            'ksp_initial_guess_nonzero': ig_nz,
+            'pc_type': pc_type,
+            'pc_factor_reuse_ordering': True,
+            'snes_monitor': None,
+        })
+
+        if monitor:  # For debugging
+            param_solver.update({
+                'snes_view': None,
+                'snes_converged_reason': None,
+                'snes_linesearch_monitor': None,
+                'ksp_monitor_true_residual': None,
+                'ksp_converged_reason': None,
+                'report': True,
+                'error_on_nonconvergence': True})
+        return param_solver
+
+    def solve_eik(self, Wave, tol=1e-16, f_est=0.06):
+        '''
+        Solve nonlinear eikonal
+        '''
+
+        # Functions
+        yp = fire.Function(Wave.function_space, name='Eikonal (Time [s])')
+        vy = fire.TestFunction(Wave.function_space)
+        u = fire.TrialFunction(Wave.function_space)
+
+        # Linear Eikonal
+        print('Solving Pre-Eikonal')
+        FeikL = self.linear_eik(Wave, u, vy, fire.dx)
+        J = fire.derivative(FeikL, yp)
+
+        # Initial guess
+        cell_diameter_function = fire.Function(Wave.function_space)
+        cell_diameter_function.interpolate(fire.CellDiameter(Wave.mesh))
+        yp.assign(cell_diameter_function.dat.data_with_halos.max()
+                  / Wave.c.dat.data_with_halos.min())
+
+        # Linear Eikonal
+        user_atol = tol**0.75
+        # vinewtonssls, vinewtonrsls, newtonls, newtontr, qn, ncg, ngs, ngmres
+        nl_solver = 'vinewtonssls'
+        l_solver = 'preonly'  # preonly, bcgs, gmres
+        while True:
+            try:
+                # Solver parameters
+                pL = self.solve_prop(nl_solver=nl_solver, l_solver=l_solver,
+                                     user_atol=user_atol, user_iter=50)
+
+                # Solving LIN Eikonal
+                fire.solve(fire.lhs(FeikL) == fire.rhs(FeikL), yp,
+                           bcs=self.bcs_eik, solver_parameters=pL, J=J)
+                print(
+                    f"\nSolver Executed Successfully. AbsTol: {user_atol:.1e}")
+                break
+
+            except Exception as e:
+                print(f"Error Solving: {e}")
+
+                # Adjusting tolerance
+                user_atol = user_atol * 10 if user_atol < 1e-5 \
+                    else round(user_atol + 1e-5, 5)
+                if user_atol > 1e-4:
+                    print("\nTolerance too high. Exiting.")
+                    break
+
+        # Clean data: Set NaNs and negative values to zero
+        data_eikL = self.clean_inst_num(yp.dat.data_with_halos[:])
+
+        # Nonlinear Eikonal
+        print('Solving Post-Eikonal')
+        user_atol = tol
+        # vinewtonrsls, vinewtonssls, newtonls, qn, ncg, newtontr, ngs, ngmres
+        nl_solver = 'vinewtonssls'
+        l_solver = 'preonly'  # preonly, bcgs, gmres
+        user_est = f_est
+        while True:
+            try:
+                print(f"Iteration for Festab: {user_est:.2f}")
+
+                # Preserving intial guess
+                yp = fire.Function(
+                    Wave.function_space, name='Eikonal (Time [s])')
+                yp.dat.data_with_halos[:] = data_eikL
+
+                # Solver parameters
+                pNL = self.solve_prop(nl_solver=nl_solver, l_solver=l_solver,
+                                      user_atol=user_atol, user_iter=50)
+                # Solving NL Eikonal
+                Feik = self.assemble_eik(Wave, yp, vy, fire.dx, f_est=user_est)
+                J = fire.derivative(Feik, yp)
+                fire.solve(Feik == 0, yp, bcs=self.bcs_eik,
+                           solver_parameters=pNL, J=J)
+
+                # Final parameters
+                print(
+                    f"\nSolver Executed Successfully. AbsTol: {user_atol:.1e}")
+                print(f"Solver Executed Successfully. Festab: {user_est:.2f}")
+                self.yp = yp
+                break
+
+            except Exception as e:
+                print(f"Error Solving: {e}")
+
+                # Adjusting stabilizing factor
+                user_est += 0.01
+                if user_est > 1.0:
+                    user_est = f_est
+                    print('\nHigh Stabilizing Factor. Increasing Tolerance!')
+                    user_atol = user_atol * 10 if user_atol < 1e-5 \
+                        else round(user_atol + 1e-5, 5)
+                    if user_atol > 1e-4:
+                        print('\nHigh Tolerance. Exiting!')
+                        break
+
+        # Save Eikonal results
+        eikonal_file = fire.VTKFile(self.path_save + "Eik.pvd")
+        eikonal_file.write(self.yp)
+
+    def ident_eik_on_bnd(self, boundary):
+        '''
+        Identify Eikonal minimum values on boundary
+        '''
+
+        boundary_eik = self.yp.dat.data_with_halos[boundary]
+        eikmin = boundary_eik.min()
+        idxbnd = np.where(boundary_eik == eikmin)[0][0]
+        idxmin = boundary[0][idxbnd]  # Original index
+
+        return eikmin, idxmin
+
+    def ident_crit_eik(self, Wave):
+
+        # Tolerance for boundary
+        diam = fire.Function(
+            Wave.function_space).interpolate(fire.CellDiameter(Wave.mesh))
+        tol = 10**(min(int(np.log10(diam.dat.data_with_halos.min() / 10)), -6))
+
+        # Boundaries
+        left_boundary = np.where(self.x_data <= tol)
+        right_boundary = np.where(self.x_data >= Wave.length_x-tol)
+        bottom_boundary = np.where(self.z_data <= tol-Wave.length_z)
+        bnds = [left_boundary, right_boundary, bottom_boundary]
+
+        # Source locations
+        possou = Wave.sources.point_locations
+
+        # Loop over boundaries
+        eik_bnd = []
+        for bnd in bnds:
+
+            # Identify Eikonal minimum
+            eikmin, idxmin = self.ident_eik_on_bnd(bnd)
+            pt_cr = (self.z_data[idxmin], self.x_data[idxmin])
+            c_bnd = np.float64(Wave.c.at(pt_cr).item())
+
+            # Identify closest source
+            lref_allsou = [np.linalg.norm(
+                np.asarray(pt_cr) - np.asarray(p_sou)) for p_sou in possou]
+            idxsou = np.argmin(lref_allsou)
+            lref = lref_allsou[idxsou]
+            sou_cr = possou[idxsou]
+
+            eik_bnd.append([pt_cr, c_bnd, eikmin, lref, sou_cr])
+
+        # Sort the list by the minimum Eikonal values
+        self.eikmin = sorted(eik_bnd, key=lambda x: x[2])

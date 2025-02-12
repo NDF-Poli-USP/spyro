@@ -8,6 +8,7 @@ import ipdb
 import warnings
 import time             # For runtime
 import tracemalloc      # For memory usage
+import spyro.habc.eik as eik
 os.environ["OMP_NUM_THREADS"] = "1"
 fire.parameters["loopy"] = {"silenced_warnings": ["v1_scheduler_fallback"]}
 warnings.filterwarnings("ignore", category=RuntimeWarning)
@@ -23,7 +24,7 @@ def test_eikonal_values_fig8():
         # (MLT/spectral_quadrilateral/DG_triangle/DG_quadrilateral)
         # You can either specify a cell_type+variant or a method
         # accepted_variants = ["lumped", "equispaced", "DG"]
-        "degree": 5,  # p order p=4 ok
+        "degree": 1,  # p order p=4 ok
         "dimension": 2,  # dimension
     }
 
@@ -81,12 +82,8 @@ def test_eikonal_values_fig8():
     # Create the acoustic wave object
     Wave_obj = spyro.AcousticWave(dictionary=dictionary)
 
-    # Using SeismicMesh:
-    # cpw = 5.0
-    # lba = 1.5 / 5.0
-    # edge_length = lba / cpw
+    # Mesh
     edge_length = 0.05
-
     Wave_obj.set_mesh(mesh_parameters={"edge_length": edge_length})
     cond = fire.conditional(Wave_obj.mesh_x < 0.5, 3.0, 1.5)
 
@@ -94,8 +91,8 @@ def test_eikonal_values_fig8():
     p = dictionary["options"]["degree"]
     Wave_obj.function_space = fire.FunctionSpace(Wave_obj.mesh, 'CG', p)
     Wave_obj.set_initial_velocity_model(conditional=cond)
-    Wave_obj.c = Wave_obj.initial_velocity_model
 
+    Wave_obj.c = Wave_obj.initial_velocity_model
     outfile = fire.VTKFile("/mnt/d/spyro/output/output.pvd")
     outfile.write(Wave_obj.c)
 
@@ -165,12 +162,12 @@ def assemble_eik(Wave, u, vy, dx, f_est=1.0):
     Eikonal with stabilizer term
     '''
     eps = fire.Constant(f_est) * fire.CellDiameter(Wave.mesh)  # Stabilizer
-    delta = fire.Constant(float_info.min)
-    # delta = fire.Constant(float_info.epsilon)
+    # delta = fire.Constant(float_info.min)
+    delta = fire.Constant(float_info.epsilon)
     grad_u_norm = fire.sqrt(fire.inner(fire.grad(u), fire.grad(u))) + delta
     f = fire.Constant(1.0)
-    F = (grad_u_norm * vy * dx - f / Wave.c * vy * dx + eps * fire.inner(
-        fire.grad(u), fire.grad(vy)) * dx)
+    F = grad_u_norm * vy * dx - f / Wave.c * vy * dx + eps * fire.inner(
+        fire.grad(u), fire.grad(vy)) * dx
     return F
 
 
