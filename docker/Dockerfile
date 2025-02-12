@@ -28,10 +28,9 @@ RUN . /home/firedrake/firedrake/bin/activate; pip install git+https://github.com
 
 FROM spyro_base AS spyro_development
 
-# For notebook development
-RUN . /home/firedrake/firedrake/bin/activate; pip3 install notebook
-EXPOSE 8888
+# Profiling tools
+RUN . /home/firedrake/firedrake/bin/activate; pip3 install -U memory_profiler
 
-RUN . /home/firedrake/firedrake/bin/activate; pip3 install pytest
+RUN . /home/firedrake/firedrake/bin/activate; pip3 install pytest pytest-cov
 WORKDIR /home/firedrake
 RUN echo "/home/firedrake/shared/spyro" >> /home/firedrake/firedrake/lib/python3.12/site-packages/shared.pth
