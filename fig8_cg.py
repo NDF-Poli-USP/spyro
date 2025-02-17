@@ -32,7 +32,7 @@ def test_eikonal_values_fig8():
     # spyro however supports both spatial parallelism and "shot" parallelism.
     # Options: automatic (same number of cores for evey processor) or spatial
     dictionary["parallelism"] = {
-        "type": "spatial",
+        "type": "automatic",
     }
 
     # Define the domain size without the PML or AL. Here we'll assume a
