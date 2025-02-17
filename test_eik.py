@@ -2,6 +2,7 @@ import spyro
 import firedrake as fire
 import ipdb
 import spyro.habc.eik as eik
+import spyro.habc.len_layer as len_layer
 fire.parameters["loopy"] = {"silenced_warnings": ["v1_scheduler_fallback"]}
 
 
@@ -43,9 +44,9 @@ def test_eikonal_values_fig8():
     # the helper function `create_transect`.
     dictionary["acquisition"] = {
         "source_type": "ricker",
-        # "source_locations": [(-0.5, 0.25), (-0.5, 0.35), (-0.5, 0.5)],
         "source_locations": [(-0.5, 0.25)],
-        "frequency": 5.0,
+        # "source_locations": [(-0.5, 0.25), (-0.5, 0.35), (-0.5, 0.5)],
+        "frequency": 5.0, # in Hz
         "delay": 1.5,
         "receiver_locations": spyro.create_transect(
             (-0.10, 0.1), (-0.10, 0.9), 20),
@@ -88,11 +89,14 @@ def test_eikonal_values_fig8():
     outfile.write(Wave_obj.c)
 
     # Solving Eikonal
-    Eik_obj = eik.eikonal(Wave_obj)
+    Eik_obj = eik.Eikonal(Wave_obj)
     Eik_obj.solve_eik(Wave_obj)
 
     # Identifying critical points
     Eik_obj.ident_crit_eik(Wave_obj)
+
+    # Computing layer sizes
+    len_layer.calc_size_lay(Wave_obj, Eik_obj)
 
 
 # Cheking Eikonal values

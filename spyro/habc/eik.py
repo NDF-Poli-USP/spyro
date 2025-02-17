@@ -4,28 +4,85 @@ from sys import float_info
 from os import getcwd
 # import ipdb
 
+# Work from Ruben Andres Salas, Andre Luis Ferreira da Silva,
+# Luis Fernando Nogueira de Sá, Emilio Carlos Nelli Silva.
+# Hybrid absorbing scheme based on hyperelliptical layers with
+# non-reflecting boundary conditions in scalar wave equations.
+# Applied Mathematical Modelling (2022)
+# doi: https://doi.org/10.1016/j.apm.2022.09.014
 
-class dir_point_bc(fire.DirichletBC):
+
+class Dir_point_bc(fire.DirichletBC):
     '''
     Class for Eikonal boundary conditions at a point.
+
+    Attributes
+    ----------
+    nodes: `array`
+        Points where the boundary condition is to be applied
     '''
 
     def __init__(self, V, value, nodes):
         # Call superclass init
         # We provide a dummy subdomain id.
-        super(dir_point_bc, self).__init__(V, value, 0)
+        super(Dir_point_bc, self).__init__(V, value, 0)
         # Override the "nodes" property which says where the boundary
         # condition is to be applied.
         self.nodes = nodes
 
 
-class eikonal():
+class Eikonal():
     '''
-    Class for Nonlinear Eikonal
+    Class for the Nonlinear Eikonal.
 
+    Attributes
+    ----------
+    path_save: `str`
+        Path to save Eikonal results
+    z_data: `array`
+        z-coordinates of the domain
+    x_data: `array`
+        x-coordinates of the domain
+    bcs_eik: `list`
+        Dirichlet BCs for eikonal
+    yp: `firedrake function`
+        Eikonal field
+    eik_bnd: `list`
+        Properties on boundaries according to minimum values
+
+    Methods
+    -------
+    define_bcs()
+        Impose Dirichlet BCs for Eikonal equation
+    clean_inst_num():
+        Set NaNs and negative values to zero in an array
+    linear_eik()
+        Assemble the linear Eikonal
+    assemble_eik)
+        Assemble the Nonlinear Eikonal with stabilizing term
+    solve_prop()
+        Set the solver parameters
+   solve_eik()
+        Solve the nonlinear Eikonal
+    ident_eik_on_bnd()
+        Identify Eikonal minimum values on boundary
+    ident_crit_eik()
+        Identify the critical points at boundaries subject to reflections
     '''
 
     def __init__(self, Wave):
+        '''
+        Initializes the Eikonal class.
+
+        Parameters
+        ----------
+        Wave : `wave`
+            Wave class
+
+        Returns
+        -------
+        None
+        '''
 
         # Path to save data
         self.path_save = getcwd() + "/output/"
@@ -41,7 +98,16 @@ class eikonal():
 
     def define_bcs(self, Wave):
         '''
-        BCs for eikonal
+        Impose Dirichlet BCs for eikonal equation
+
+        Parameters
+        ----------
+        Wave : `wave`
+            Wave class
+
+        Returns
+        -------
+        None
         '''
 
         print('Defining Eikonal BCs')
@@ -52,7 +118,7 @@ class eikonal():
             self.x_data, x_s))[0] for z_s, x_s in possou]
 
         # Define BCs for eikonal
-        self.bcs_eik = [dir_point_bc(
+        self.bcs_eik = [Dir_point_bc(
             Wave.function_space, fire.Constant(0.0), ids) for ids in sou_ids]
 
         # Mark source locations
@@ -67,7 +133,17 @@ class eikonal():
     @staticmethod
     def clean_inst_num(data_arr):
         ''''
-        Clean data: Set NaNs and negative values to zero
+        Set NaNs and negative values to zero in an array
+
+        Parameters
+        ----------
+        data_arr : `array`
+            An array with possible with possible NaN or negartive components
+
+        Returns
+        -------
+        data_arr : `array`
+            An array with null or positive components
         '''
         data_arr[np.where(np.isnan(data_arr) | np.isinf(
             data_arr) | (data_arr < 0.0))] = 0.0
@@ -76,7 +152,23 @@ class eikonal():
     @staticmethod
     def linear_eik(Wave, u, vy, dx):
         '''
-        Linear Eikonal
+        Assemble the linear Eikonal
+
+        Parameters
+        ----------
+        Wave : `wave`
+            Wave class
+        u : `firedrake trial function`
+            Trial function
+        vy : `firedrake test function`
+            Test function
+        dx : `firedrake measure`
+            Integration domain
+
+        Returns
+        -------
+        FL : `firedrake form`
+            Linear Eikonal equation
         '''
         f = fire.Constant(1.0)
         lhs = fire.inner(fire.grad(u), fire.grad(vy)) * dx
@@ -87,7 +179,25 @@ class eikonal():
     @staticmethod
     def assemble_eik(Wave, u, vy, dx, f_est=1.0):
         '''
-        Eikonal with stabilizing term
+        Assemble the Nonlinear Eikonal with stabilizing term
+
+        Parameters
+        ----------
+        Wave : `wave`
+            Wave class
+        u : `firedrake trial function`
+            Trial function
+        vy : `firedrake test function`
+            Test function
+        dx : `firedrake measure`
+            Integration domain
+        f_est: `float`, optional
+            Factor for the stabilizing term in Eikonal equation
+
+        Returns
+        -------
+        F: `firedrake form`
+            Nonlinear Eikonal equation
         '''
 
         # Stabilizer
@@ -103,11 +213,34 @@ class eikonal():
     def solve_prop(nl_solver='newtonls', l_solver='preonly',
                    user_atol=1e-16, user_iter=50, monitor=False):
         '''
-        Solver Parameters
+        Set the solver parameters
+
+        Parameters
+        ----------
+        nl_solver : `str`, optional
+            Nonlinear solver type (See PETSC documentation)
+        l_solver : `str`, optional
+            Linear solver type
+        user_atol : `float`, optional
+            Absolute user tolerance
+        user_iter : `float`, optional
+            Maximum user iterations
+        monitor : 'bool', optional
+            Prints the solver progress
+
+        Returns
+        -------
+        param_solver: `dict`
+            Solver parameters
+
+        PETSC Documentation
+        -------------------
         https://petsc.org/release/manualpages/SNES/SNESType/
         https://petsc.org/release/manualpages/KSP/KSPType/
         https://petsc.org/release/manualpages/PC/PCType/
 
+        Tolerance Types
+        ---------------
         atol: F(x) ≤ atol
         rtol: F(x) ≤ rtol∗F(x0)
         stol: || delta x || < stol*|| x ||
@@ -196,13 +329,26 @@ class eikonal():
 
     def solve_eik(self, Wave, tol=1e-16, f_est=0.06):
         '''
-        Solve nonlinear eikonal
+        Solve the nonlinear Eikonal
+
+        Parameters
+        ----------
+        Wave : `wave`
+            Wave class
+        tol : `float`, optional
+            User solver tolerance
+        f_est: `float`, optional
+            Factor for the stabilizing term in Eikonal equation
+
+        Returns
+        -------
+        None
         '''
 
         # Functions
         yp = fire.Function(Wave.function_space, name='Eikonal (Time [s])')
-        vy = fire.TestFunction(Wave.function_space)
         u = fire.TrialFunction(Wave.function_space)
+        vy = fire.TestFunction(Wave.function_space)
 
         # Linear Eikonal
         print('Solving Pre-Eikonal')
@@ -243,7 +389,7 @@ class eikonal():
                     print("\nTolerance too high. Exiting.")
                     break
 
-        # Clean data: Set NaNs and negative values to zero
+        # Clean numerical instabilities
         data_eikL = self.clean_inst_num(yp.dat.data_with_halos[:])
 
         # Nonlinear Eikonal
@@ -298,7 +444,19 @@ class eikonal():
 
     def ident_eik_on_bnd(self, boundary):
         '''
-        Identify Eikonal minimum values on boundary
+        Identify Eikonal minimum values on a boundary
+
+        Parameters
+        ----------
+        boundary : `array`
+            Domain boundary subject to reflections
+
+        Returns
+        -------
+        eikmin : `float`
+            Minimum eikonal value
+        idxmin : 'int'
+            Array index corresponding to the minimum eikonal value
         '''
 
         boundary_eik = self.yp.dat.data_with_halos[boundary]
@@ -309,29 +467,44 @@ class eikonal():
         return eikmin, idxmin
 
     def ident_crit_eik(self, Wave):
+        '''
+        Identify the critical points at boundaries subject to reflections
+
+        Parameters
+        ----------
+        Wave : `wave`
+            Wave class
+
+        Returns
+        -------
+        None
+        '''
 
         # Tolerance for boundary
         diam = fire.Function(
             Wave.function_space).interpolate(fire.CellDiameter(Wave.mesh))
-        tol = 10**(min(int(np.log10(diam.dat.data_with_halos.min() / 10)), -6))
+        self.lmin = round(diam.dat.data_with_halos.min() / 2**0.5, 6)
+        tol = 10**(min(int(np.log10(self.lmin / 10)), -6))
 
         # Boundaries
         left_boundary = np.where(self.x_data <= tol)
         right_boundary = np.where(self.x_data >= Wave.length_x-tol)
         bottom_boundary = np.where(self.z_data <= tol-Wave.length_z)
         bnds = [left_boundary, right_boundary, bottom_boundary]
+        bnds_str = ['Left Boundary', 'Right Boundary', 'Bottom Boundary']
 
         # Source locations
         possou = Wave.sources.point_locations
 
         # Loop over boundaries
         eik_bnd = []
-        for bnd in bnds:
+        for bnd, bnd_str in zip(bnds, bnds_str):
 
             # Identify Eikonal minimum
             eikmin, idxmin = self.ident_eik_on_bnd(bnd)
             pt_cr = (self.z_data[idxmin], self.x_data[idxmin])
             c_bnd = np.float64(Wave.c.at(pt_cr).item())
+            print('Min Eikonal on', bnd_str, ':', round(1e3 * eikmin, 3), 'ms')
 
             # Identify closest source
             lref_allsou = [np.linalg.norm(
@@ -339,8 +512,16 @@ class eikonal():
             idxsou = np.argmin(lref_allsou)
             lref = lref_allsou[idxsou]
             sou_cr = possou[idxsou]
+            z_par = 1/eikmin
 
-            eik_bnd.append([pt_cr, c_bnd, eikmin, lref, sou_cr])
+            # Grouping properties
+            # pt_cr: Critical point coordinates
+            # c_bnd: Propagation speed at critical point
+            # eikmin: Eikonal value in seconds
+            # z_par: Inverse of minimum Eikonal (Equivalent to c_bound / lref)
+            # lref: Distance to the closest source from critical point
+            # sou_cr: Critical source coordinates
+            eik_bnd.append([pt_cr, c_bnd, eikmin, z_par, lref, sou_cr])
 
         # Sort the list by the minimum Eikonal values
-        self.eikmin = sorted(eik_bnd, key=lambda x: x[2])
+        self.eik_bnd = sorted(eik_bnd, key=lambda x: x[2])
