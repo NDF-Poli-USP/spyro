@@ -2,7 +2,7 @@ import spyro
 import firedrake as fire
 import ipdb
 import spyro.habc.eik as eik
-import spyro.habc.len_layer as len_layer
+import spyro.habc.lay_len as lay_len
 fire.parameters["loopy"] = {"silenced_warnings": ["v1_scheduler_fallback"]}
 
 
@@ -16,7 +16,7 @@ def test_eikonal_values_fig8():
         # (MLT/spectral_quadrilateral/DG_triangle/DG_quadrilateral)
         # You can either specify a cell_type+variant or a method
         # accepted_variants = ["lumped", "equispaced", "DG"]
-        "degree": 1,  # p order p=4 ok
+        "degree": 4,  # p order p=4 ok
         "dimension": 2,  # dimension
     }
 
@@ -46,7 +46,7 @@ def test_eikonal_values_fig8():
         "source_type": "ricker",
         "source_locations": [(-0.5, 0.25)],
         # "source_locations": [(-0.5, 0.25), (-0.5, 0.35), (-0.5, 0.5)],
-        "frequency": 5.0, # in Hz
+        "frequency": 5.0,  # in Hz
         "delay": 1.5,
         "receiver_locations": spyro.create_transect(
             (-0.10, 0.1), (-0.10, 0.9), 20),
@@ -75,13 +75,16 @@ def test_eikonal_values_fig8():
     Wave_obj = spyro.AcousticWave(dictionary=dictionary)
 
     # Mesh
+    # cpw: cells per wavelength
+    # lba = minimum_velocity /source_frequency
+    # edge_length = lba / cpw
     edge_length = 0.05
     Wave_obj.set_mesh(mesh_parameters={"edge_length": edge_length})
     cond = fire.conditional(Wave_obj.mesh_x < 0.5, 3.0, 1.5)
 
     # Rest of setup
     p = dictionary["options"]["degree"]
-    Wave_obj.function_space = fire.FunctionSpace(Wave_obj.mesh, 'CG', p)
+    eik.properties_eik_mesh(Wave_obj, p)
     Wave_obj.set_initial_velocity_model(conditional=cond)
 
     Wave_obj.c = Wave_obj.initial_velocity_model
@@ -96,7 +99,7 @@ def test_eikonal_values_fig8():
     Eik_obj.ident_crit_eik(Wave_obj)
 
     # Computing layer sizes
-    len_layer.calc_size_lay(Wave_obj, Eik_obj)
+    lay_len.calc_size_lay(Wave_obj, Eik_obj)
 
 
 # Cheking Eikonal values
