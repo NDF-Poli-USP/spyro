@@ -10,6 +10,29 @@ from os import getcwd
 # non-reflecting boundary conditions in scalar wave equations.
 # Applied Mathematical Modelling (2022)
 # doi: https://doi.org/10.1016/j.apm.2022.09.014
+# With additions by Alexandre Olender
+
+
+def properties_eik_mesh(Wave, p):
+    '''
+    Properties for the mesh used to solve the Eikonal equation
+
+    Parameters
+    ----------
+    Wave : `wave`
+        Wave object
+    p : `int`
+        Finite element order
+
+    Returns
+    -------
+    None
+    '''
+
+    Wave.funct_space_eik = fire.FunctionSpace(Wave.mesh, 'CG', p)
+    diam = fire.Function(Wave.funct_space_eik
+                         ).interpolate(fire.CellDiameter(Wave.mesh))
+    Wave.lmin = round(diam.dat.data_with_halos.min() / 2**0.5, 6)
 
 
 class Dir_point_bc(fire.DirichletBC):
@@ -77,7 +100,7 @@ class Eikonal():
         Parameters
         ----------
         Wave : `wave`
-            Wave class
+            Wave object
 
         Returns
         -------
@@ -88,8 +111,8 @@ class Eikonal():
         self.path_save = getcwd() + "/output/"
 
         # Extract node positions
-        z_f = fire.Function(Wave.function_space).interpolate(Wave.mesh_z)
-        x_f = fire.Function(Wave.function_space).interpolate(Wave.mesh_x)
+        z_f = fire.Function(Wave.funct_space_eik).interpolate(Wave.mesh_z)
+        x_f = fire.Function(Wave.funct_space_eik).interpolate(Wave.mesh_x)
         self.z_data = z_f.dat.data_with_halos[:]
         self.x_data = x_f.dat.data_with_halos[:]
 
@@ -103,7 +126,7 @@ class Eikonal():
         Parameters
         ----------
         Wave : `wave`
-            Wave class
+            Wave object
 
         Returns
         -------
@@ -119,10 +142,10 @@ class Eikonal():
 
         # Define BCs for eikonal
         self.bcs_eik = [Dir_point_bc(
-            Wave.function_space, fire.Constant(0.0), ids) for ids in sou_ids]
+            Wave.funct_space_eik, fire.Constant(0.0), ids) for ids in sou_ids]
 
         # Mark source locations
-        sou_marker = fire.Function(Wave.function_space, name="source_marker")
+        sou_marker = fire.Function(Wave.funct_space_eik, name="source_marker")
         sou_marker.assign(0)
         sou_marker.dat.data_with_halos[sou_ids] = 1
 
@@ -157,7 +180,7 @@ class Eikonal():
         Parameters
         ----------
         Wave : `wave`
-            Wave class
+            Wave object
         u : `firedrake trial function`
             Trial function
         vy : `firedrake test function`
@@ -184,7 +207,7 @@ class Eikonal():
         Parameters
         ----------
         Wave : `wave`
-            Wave class
+            Wave object
         u : `firedrake trial function`
             Trial function
         vy : `firedrake test function`
@@ -334,7 +357,7 @@ class Eikonal():
         Parameters
         ----------
         Wave : `wave`
-            Wave class
+            Wave object
         tol : `float`, optional
             User solver tolerance
         f_est: `float`, optional
@@ -346,9 +369,9 @@ class Eikonal():
         '''
 
         # Functions
-        yp = fire.Function(Wave.function_space, name='Eikonal (Time [s])')
-        u = fire.TrialFunction(Wave.function_space)
-        vy = fire.TestFunction(Wave.function_space)
+        yp = fire.Function(Wave.funct_space_eik, name='Eikonal (Time [s])')
+        u = fire.TrialFunction(Wave.funct_space_eik)
+        vy = fire.TestFunction(Wave.funct_space_eik)
 
         # Linear Eikonal
         print('Solving Pre-Eikonal')
@@ -356,7 +379,7 @@ class Eikonal():
         J = fire.derivative(FeikL, yp)
 
         # Initial guess
-        cell_diameter_function = fire.Function(Wave.function_space)
+        cell_diameter_function = fire.Function(Wave.funct_space_eik)
         cell_diameter_function.interpolate(fire.CellDiameter(Wave.mesh))
         yp.assign(cell_diameter_function.dat.data_with_halos.max()
                   / Wave.c.dat.data_with_halos.min())
@@ -405,7 +428,7 @@ class Eikonal():
 
                 # Preserving intial guess
                 yp = fire.Function(
-                    Wave.function_space, name='Eikonal (Time [s])')
+                    Wave.funct_space_eik, name='Eikonal (Time [s])')
                 yp.dat.data_with_halos[:] = data_eikL
 
                 # Solver parameters
@@ -473,7 +496,7 @@ class Eikonal():
         Parameters
         ----------
         Wave : `wave`
-            Wave class
+            Wave object
 
         Returns
         -------
@@ -481,10 +504,7 @@ class Eikonal():
         '''
 
         # Tolerance for boundary
-        diam = fire.Function(
-            Wave.function_space).interpolate(fire.CellDiameter(Wave.mesh))
-        self.lmin = round(diam.dat.data_with_halos.min() / 2**0.5, 6)
-        tol = 10**(min(int(np.log10(self.lmin / 10)), -6))
+        tol = 10**(min(int(np.log10(Wave.lmin / 10)), -6))
 
         # Boundaries
         left_boundary = np.where(self.x_data <= tol)
