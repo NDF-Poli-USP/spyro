@@ -13,28 +13,6 @@ from os import getcwd
 # With additions by Alexandre Olender
 
 
-def properties_eik_mesh(Wave, p):
-    '''
-    Properties for the mesh used to solve the Eikonal equation
-
-    Parameters
-    ----------
-    Wave : `wave`
-        Wave object
-    p : `int`
-        Finite element order
-
-    Returns
-    -------
-    None
-    '''
-
-    Wave.funct_space_eik = fire.FunctionSpace(Wave.mesh, 'CG', p)
-    diam = fire.Function(Wave.funct_space_eik
-                         ).interpolate(fire.CellDiameter(Wave.mesh))
-    Wave.lmin = round(diam.dat.data_with_halos.min() / 2**0.5, 6)
-
-
 class Dir_point_bc(fire.DirichletBC):
     '''
     Class for Eikonal boundary conditions at a point.
@@ -70,8 +48,6 @@ class Eikonal():
         Dirichlet BCs for eikonal
     yp: `firedrake function`
         Eikonal field
-    eik_bnd: `list`
-        Properties on boundaries according to minimum values
 
     Methods
     -------
@@ -500,7 +476,15 @@ class Eikonal():
 
         Returns
         -------
-        None
+        eik_bnd : `list`
+            Properties on boundaries according to minimum values of Eikonal
+            Structure sublist: [pt_cr, c_bnd, eikmin, z_par, lref, sou_cr]
+            - pt_cr: Critical point coordinates
+            - c_bnd: Propagation speed at critical point
+            - eikmin: Eikonal value in seconds
+            - z_par: Inverse of minimum Eikonal (Equivalent to c_bound/lref)
+            - lref: Distance to the closest source from critical point
+            - sou_cr: Critical source coordinates
         '''
 
         # Tolerance for boundary
@@ -535,13 +519,7 @@ class Eikonal():
             z_par = 1/eikmin
 
             # Grouping properties
-            # pt_cr: Critical point coordinates
-            # c_bnd: Propagation speed at critical point
-            # eikmin: Eikonal value in seconds
-            # z_par: Inverse of minimum Eikonal (Equivalent to c_bound / lref)
-            # lref: Distance to the closest source from critical point
-            # sou_cr: Critical source coordinates
             eik_bnd.append([pt_cr, c_bnd, eikmin, z_par, lref, sou_cr])
 
         # Sort the list by the minimum Eikonal values
-        self.eik_bnd = sorted(eik_bnd, key=lambda x: x[2])
+        return sorted(eik_bnd, key=lambda x: x[2])

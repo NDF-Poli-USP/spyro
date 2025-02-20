@@ -90,7 +90,8 @@ class Wave(Model_parameters, metaclass=ABCMeta):
         # Object for efficient application of sources
         self.sources = None
 
-        self.field_logger = FieldLogger(self.comm, self.input_dictionary["visualization"])
+        self.field_logger = FieldLogger(self.comm,
+                                        self.input_dictionary["visualization"])
         self.field_logger.add_field("forward", self.get_function_name(),
                                     lambda: self.get_function())
 
