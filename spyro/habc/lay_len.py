@@ -1,5 +1,5 @@
 import numpy as np
-import ipdb
+# import ipdb
 
 # Work from Ruben Andres Salas, Andre Luis Ferreira da Silva,
 # Luis Fernando Nogueira de Sá, Emilio Carlos Nelli Silva.
@@ -17,7 +17,7 @@ def f_layer(x, a, m=1, s=0.999, typ='FL'):
     Parameters
     ----------
     x : `float`
-        Size  parameter of the absorbing layer (FL)
+        Size  parameter of the absorbing layer (F_L)
     a : `float`
         Adimensional parameter for the absorbing layer (a = z/f, z = c/l)
     m : `float`, optional
@@ -78,7 +78,7 @@ def calcZero(xini, a, tol, nz=1):
     Parameters
     ----------
     xini : `float`
-        Initial guess for size parameter of the absorbing layer (FL)
+        Initial guess for size parameter of the absorbing layer (F_L)
     a : `float`
         Adimensional parameter for the absorbing layer (a = z/f, z = c/l)
     tol : `float`
@@ -89,7 +89,7 @@ def calcZero(xini, a, tol, nz=1):
     Returns
     -------
     x : `float`
-        Size  parameter of the absorbing layer (FL)
+        Size  parameter of the absorbing layer (F_L)
     '''
 
     if nz == 1:
@@ -119,7 +119,7 @@ def calcZero(xini, a, tol, nz=1):
     return x
 
 
-def calc_size_lay(Wave, Eikonal, nz=5, crtCR=1, tol_rel=1e-3, monitor=False):
+def calc_size_lay(Wave, nz=5, crtCR=1, tol_rel=1e-3, monitor=False):
     '''
     Calculate the lenght of the absorbing layer
 
@@ -127,8 +127,6 @@ def calc_size_lay(Wave, Eikonal, nz=5, crtCR=1, tol_rel=1e-3, monitor=False):
     ----------
     Wave : `wave`
             Wave object
-    Eikonal : `eikonal`
-            Eikonal object
     nz : `int`, optional
         Number of layer sizes calculated. Default is 5
     crtCR : `int`, optional
@@ -146,21 +144,29 @@ def calc_size_lay(Wave, Eikonal, nz=5, crtCR=1, tol_rel=1e-3, monitor=False):
         Size of damping layer
     '''
 
+    # Visualizing parameters for computing layer size
+    print('\nComputing Size for Absorbing Layer')
+    # z_par: Inverse of minimum Eikonal (Equivalent to c_bound / lref)
+    z_par = Wave.eik_bnd[0][3]
+    aux0 = f"Parameter z (1/s): {round(z_par, 4)},"
     # fref: Reference frequency
     fref = Wave.frequency
-    # z_par: Inverse of minimum Eikonal (Equivalent to c_bound / lref)
-    z_par = Eikonal.eik_bnd[0][3]
-    print(f"Parameter z={round(z_par, 4)}, Reference Frequency: {round(fref, 4)}")
+    aux1 = f"Reference Frequency (Hz): {round(fref, 4)}"
+    print(aux0, aux1)
 
     # lmin: Minimal dimension of finite element in mesh
     lmin = Wave.lmin
+    aux2 = f"Minimuim Mesh Length (km): {lmin},"
     # lref: Reference length for the size of the absorbing layer
-    lref = Eikonal.eik_bnd[0][4]
-    print(f"Minimum Mesh Length: {lmin}, Reference Length: {round(lref, 4)}")
+    lref = Wave.eik_bnd[0][4]
+    aux3 = f"Reference Length (km): {round(lref, 4)}"
+    print(aux2, aux3)
 
     a = z_par / fref  # Adimensional parameter
+    aux4 = f"Parameter a: {round(a, 4)},"
     FLmin = 0.5 * lmin / lref  # Initial guess
-    print(f"Parameter a: {round(a, 4)}, Initial Guess: {round(FLmin, 4)}")
+    aux5 = f"Initial Guess: {round(FLmin, 4)}"
+    print(aux4, aux5)
 
     x = FLmin
     FLpos = []  # Size factor
@@ -189,14 +195,15 @@ def calc_size_lay(Wave, Eikonal, nz=5, crtCR=1, tol_rel=1e-3, monitor=False):
     # Selecting a size
     F_L = FLpos[crtCR]
 
-    # Size of damping layer
+    # Size of the absorving layer
     pad_len = F_L * lref
 
     # Visualizing options for layer size
-    print('Selected F_L:', round(F_L, 4))
+    print('Selected Parameter Size F_L:', round(F_L, 4))
     print('Options for F_L:', [round(float(x), 4) for x in FLpos])
-    print('Elements for F_L:', [int(x * lref / lmin) for x in FLpos])
+    print('Aproximated Number of Elements (' + str(Wave.lmin),
+          'km) in Layer:', [int(x * lref / lmin) for x in FLpos])
     print('Options for CR:', CRpos)
-    print('Layer Size:', round(pad_len, 4), '(km)')
+    print('Selected Layer Size (km):', round(pad_len, 4))
 
     return F_L, pad_len

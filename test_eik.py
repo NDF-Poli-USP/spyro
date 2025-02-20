@@ -1,12 +1,13 @@
 import spyro
 import firedrake as fire
-import ipdb
+import spyro.habc.habc as habc
 import spyro.habc.eik as eik
 import spyro.habc.lay_len as lay_len
+import ipdb
 fire.parameters["loopy"] = {"silenced_warnings": ["v1_scheduler_fallback"]}
 
 
-def test_eikonal_values_fig8():
+def test_habc_fig8():
     dictionary = {}
     dictionary["options"] = {
         # Simplexes: triangles or tetrahedra (T) or quadrilaterals (Q)
@@ -71,8 +72,8 @@ def test_eikonal_values_fig8():
         "gradient_filename": None,
     }
 
-    # Create the acoustic wave object
-    Wave_obj = spyro.AcousticWave(dictionary=dictionary)
+    # Create the acoustic wave object with HABCs
+    Wave_obj = habc.HABC_Wave(dictionary=dictionary)
 
     # Mesh
     # cpw: cells per wavelength
@@ -80,28 +81,24 @@ def test_eikonal_values_fig8():
     # edge_length = lba / cpw
     edge_length = 0.05
     Wave_obj.set_mesh(mesh_parameters={"edge_length": edge_length})
+
+    # Initial velocity model
     cond = fire.conditional(Wave_obj.mesh_x < 0.5, 3.0, 1.5)
-
-    # Rest of setup
-    p = dictionary["options"]["degree"]
-    eik.properties_eik_mesh(Wave_obj, p)
     Wave_obj.set_initial_velocity_model(conditional=cond)
-
     Wave_obj.c = Wave_obj.initial_velocity_model
     outfile = fire.VTKFile("/mnt/d/spyro/output/output.pvd")
     outfile.write(Wave_obj.c)
 
-    # Solving Eikonal
-    Eik_obj = eik.Eikonal(Wave_obj)
-    Eik_obj.solve_eik(Wave_obj)
+    # Mesh properties for Eikonal
+    Wave_obj.properties_eik_mesh()
 
-    # Identifying critical points
-    Eik_obj.ident_crit_eik(Wave_obj)
+    # Determining layer size
+    Wave_obj.size_habc_criterion(layer_based_on_mesh=True)
 
-    # Computing layer sizes
-    lay_len.calc_size_lay(Wave_obj, Eik_obj)
+    # Creating mesh with absorbing layer
+    Wave_obj.create_mesh_habc()
 
 
 # Cheking Eikonal values
 if __name__ == "__main__":
-    test_eikonal_values_fig8()
+    test_habc_fig8()
