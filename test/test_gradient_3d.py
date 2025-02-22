@@ -8,7 +8,7 @@ from spyro.domains import quadrature
 
 from .inputfiles.Model1_gradient_3d_pml import model_pml
 
-# outfile_total_gradient = File(os.getcwd() + "/results/Gradient.pvd")
+# outfile_total_gradient = VTKFile(os.getcwd() + "/results/Gradient.pvd")
 
 # forward = spyro.solvers.forward
 # gradient = spyro.solvers.gradient
@@ -20,7 +20,7 @@ def _make_vp_exact_pml(V, mesh):
     z, x, y = SpatialCoordinate(mesh)
     velocity = conditional(z > -0.5, 1.5, 4.0)
     vp_exact = Function(V, name="vp").interpolate(velocity)
-    File("exact_vel.pvd").write(vp_exact)
+    VTKFile("exact_vel.pvd").write(vp_exact)
     return vp_exact
 
 
@@ -28,7 +28,7 @@ def _make_vp_guess(V, mesh):
     """The guess is a uniform velocity of 4.0 km/s"""
     z, x, y = SpatialCoordinate(mesh)
     vp_guess = Function(V).interpolate(4.0 + 0.0 * x)
-    File("guess_vel.pvd").write(vp_guess)
+    VTKFile("guess_vel.pvd").write(vp_guess)
     return vp_guess
 
 
@@ -62,7 +62,7 @@ def _test_gradient(options, pml=False):
 
     boxz1 = Function(V).interpolate(conditional(z > z2, 1.0, 0.0))
     box1 = Function(V).interpolate(boxx1 * boxx2 * boxz1 * boxy1 * boxy2)
-    File("inner-product-energy.pvd").write(box1)
+    VTKFile("inner-product-energy.pvd").write(box1)
 
     vp_guess = _make_vp_guess(V, mesh)
 
@@ -107,7 +107,7 @@ def _test_gradient(options, pml=False):
 
     # compute the gradient of the control (to be verified)
     dJ = gradient(options, mesh, comm, vp_guess, receivers, p_guess, misfit)
-    File("gradient.pvd").write(dJ)
+    VTKFile("gradient.pvd").write(dJ)
 
     steps = [1e-3, 1e-4, 1e-5]  # , 1e-6]  # step length
 

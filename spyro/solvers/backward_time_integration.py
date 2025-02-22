@@ -55,7 +55,7 @@ def backward_wave_propagator_no_pml(Wave_obj, dt=None):
     filename, file_extension = temp_filename.split(".")
     output_filename = "backward." + file_extension
 
-    output = fire.File(output_filename, comm=comm.comm)
+    output = fire.VTKFile(output_filename, comm=comm.comm)
     comm.comm.barrier()
 
     X = fire.Function(Wave_obj.function_space)
@@ -184,7 +184,7 @@ def mixed_space_backward_wave_propagator(Wave_obj, dt=None):
     filename, file_extension = temp_filename.split(".")
     output_filename = "backward." + file_extension
 
-    output = fire.File(output_filename, comm=comm.comm)
+    output = fire.VTKFile(output_filename, comm=comm.comm)
     comm.comm.barrier()
 
     X = Wave_obj.X
