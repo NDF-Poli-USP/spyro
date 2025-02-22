@@ -3,6 +3,7 @@ import firedrake as fire
 import spyro.habc.habc as habc
 import spyro.habc.eik as eik
 import spyro.habc.lay_len as lay_len
+from os import getcwd
 import ipdb
 fire.parameters["loopy"] = {"silenced_warnings": ["v1_scheduler_fallback"]}
 
@@ -82,21 +83,34 @@ def test_habc_fig8():
     edge_length = 0.05
     Wave_obj.set_mesh(mesh_parameters={"edge_length": edge_length})
 
-    # Initial velocity model
-    cond = fire.conditional(Wave_obj.mesh_x < 0.5, 3.0, 1.5)
-    Wave_obj.set_initial_velocity_model(conditional=cond)
-    Wave_obj.c = Wave_obj.initial_velocity_model
-    outfile = fire.VTKFile("/mnt/d/spyro/output/output.pvd")
-    outfile.write(Wave_obj.c)
+    if Wave_obj.fwi_iteration == 0:
+        # Initial velocity model
+        cond = fire.conditional(Wave_obj.mesh_x < 0.5, 3.0, 1.5)
+        Wave_obj.set_initial_velocity_model(conditional=cond)
+        Wave_obj.c = Wave_obj.initial_velocity_model
+
+        # Save initial velocity model
+        path_save = getcwd() + "/output/"
+        vel_c = fire.VTKFile(path_save + "c_vel.pvd")
+        vel_c.write(Wave_obj.c)
 
     # Mesh properties for Eikonal
     Wave_obj.properties_eik_mesh()
 
+    # Initializing Eikonal object
+    if Wave_obj.fwi_iteration == 0:
+        Eik_obj = eik.Eikonal(Wave_obj)
+
     # Determining layer size
-    Wave_obj.size_habc_criterion(layer_based_on_mesh=True)
+    Wave_obj.size_habc_criterion(Eik_obj, layer_based_on_mesh=True)
 
     # Creating mesh with absorbing layer
     Wave_obj.create_mesh_habc()
+
+    # Updating velocity model
+    Wave_obj.velocity_habc()
+
+    # ipdb.set_trace()
 
 
 # Cheking Eikonal values

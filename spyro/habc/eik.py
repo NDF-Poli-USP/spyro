@@ -38,35 +38,37 @@ class Eikonal():
 
     Attributes
     ----------
-    path_save: `str`
-        Path to save Eikonal results
-    z_data: `array`
-        z-coordinates of the domain
-    x_data: `array`
-        x-coordinates of the domain
+    bnds : `list` of 'arrays'
+        Mesh point coordinates on boundaries of the domain
     bcs_eik: `list`
         Dirichlet BCs for eikonal
+    path_save: `str`
+        Path to save Eikonal results
     yp: `firedrake function`
         Eikonal field
+    x_data: `array`
+        x-coordinates of the domain
+    z_data: `array`
+        z-coordinates of the domain
 
     Methods
     -------
+    assemble_eik()
+        Assemble the Nonlinear Eikonal with stabilizing term
     define_bcs()
         Impose Dirichlet BCs for Eikonal equation
-    clean_inst_num():
+    clean_inst_num()
         Set NaNs and negative values to zero in an array
-    linear_eik()
-        Assemble the linear Eikonal
-    assemble_eik)
-        Assemble the Nonlinear Eikonal with stabilizing term
-    solve_prop()
-        Set the solver parameters
-   solve_eik()
-        Solve the nonlinear Eikonal
-    ident_eik_on_bnd()
-        Identify Eikonal minimum values on boundary
     ident_crit_eik()
         Identify the critical points at boundaries subject to reflections
+    ident_eik_on_bnd()
+        Identify Eikonal minimum values on boundary
+    linear_eik()
+        Assemble the linear Eikonal
+    solve_eik()
+        Solve the nonlinear Eikonal
+    solve_prop()
+        Set the solver parameters
     '''
 
     def __init__(self, Wave):
@@ -83,17 +85,23 @@ class Eikonal():
         None
         '''
 
-        # Path to save data
-        self.path_save = getcwd() + "/output/"
-
         # Extract node positions
         z_f = fire.Function(Wave.funct_space_eik).interpolate(Wave.mesh_z)
         x_f = fire.Function(Wave.funct_space_eik).interpolate(Wave.mesh_x)
         self.z_data = z_f.dat.data_with_halos[:]
         self.x_data = x_f.dat.data_with_halos[:]
 
-        # Boundary conditions
-        self.define_bcs(Wave)
+        # Tolerance for boundary
+        tol = 10**(min(int(np.log10(Wave.lmin / 10)), -6))
+
+        # Boundaries
+        left_boundary = np.where(self.x_data <= tol)
+        right_boundary = np.where(self.x_data >= Wave.length_x-tol)
+        bottom_boundary = np.where(self.z_data <= tol-Wave.length_z)
+        self.bnds = [left_boundary, right_boundary, bottom_boundary]
+
+        # Path to save data
+        self.path_save = getcwd() + "/output/"
 
     def define_bcs(self, Wave):
         '''
@@ -200,7 +208,7 @@ class Eikonal():
         '''
 
         # Stabilizer
-        eps = fire.Constant(f_est) * fire.CellDiameter(Wave.mesh)
+        eps = fire.Constant(f_est) * Wave.diam_mesh
         delta = fire.Constant(float_info.epsilon)  # float_info.min
         gr_norm = fire.sqrt(fire.inner(fire.grad(u), fire.grad(u))) + delta
         f = fire.Constant(1.0)
@@ -356,7 +364,7 @@ class Eikonal():
 
         # Initial guess
         cell_diameter_function = fire.Function(Wave.funct_space_eik)
-        cell_diameter_function.interpolate(fire.CellDiameter(Wave.mesh))
+        cell_diameter_function.interpolate(Wave.diam_mesh)
         yp.assign(cell_diameter_function.dat.data_with_halos.max()
                   / Wave.c.dat.data_with_halos.min())
 
@@ -487,14 +495,6 @@ class Eikonal():
             - sou_cr: Critical source coordinates
         '''
 
-        # Tolerance for boundary
-        tol = 10**(min(int(np.log10(Wave.lmin / 10)), -6))
-
-        # Boundaries
-        left_boundary = np.where(self.x_data <= tol)
-        right_boundary = np.where(self.x_data >= Wave.length_x-tol)
-        bottom_boundary = np.where(self.z_data <= tol-Wave.length_z)
-        bnds = [left_boundary, right_boundary, bottom_boundary]
         bnds_str = ['Left Boundary', 'Right Boundary', 'Bottom Boundary']
 
         # Source locations
@@ -502,7 +502,7 @@ class Eikonal():
 
         # Loop over boundaries
         eik_bnd = []
-        for bnd, bnd_str in zip(bnds, bnds_str):
+        for bnd, bnd_str in zip(self.bnds, bnds_str):
 
             # Identify Eikonal minimum
             eikmin, idxmin = self.ident_eik_on_bnd(bnd)
