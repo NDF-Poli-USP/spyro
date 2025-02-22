@@ -11,7 +11,7 @@ def _make_vp_exact(V, mesh):
     vp_exact = Function(V).interpolate(
         4.0 + 1.0 * tanh(10.0 * (0.5 - sqrt((z - 1.5) ** 2 + (x + 1.5) ** 2)))
     )
-    File("exact_vel.pvd").write(vp_exact)
+    VTKFile("exact_vel.pvd").write(vp_exact)
     return vp_exact
 
 
@@ -19,7 +19,7 @@ def _make_vp_guess(V, mesh):
     """The guess is a uniform velocity of 4.0 km/s"""
     z, x = SpatialCoordinate(mesh)
     vp_guess = Function(V).interpolate(4.0 + 0.0 * x)
-    File("guess_vel.pvd").write(vp_guess)
+    VTKFile("guess_vel.pvd").write(vp_guess)
     return vp_guess
 
 
