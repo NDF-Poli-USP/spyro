@@ -2,7 +2,7 @@ import numpy as np
 import math
 import matplotlib.pyplot as plt
 from copy import deepcopy
-from firedrake import File
+from firedrake import VTKFile
 import firedrake as fire
 import spyro
 
