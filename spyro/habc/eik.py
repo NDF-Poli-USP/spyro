@@ -508,7 +508,9 @@ class Eikonal():
             eikmin, idxmin = self.ident_eik_on_bnd(bnd)
             pt_cr = (self.z_data[idxmin], self.x_data[idxmin])
             c_bnd = np.float64(Wave.c.at(pt_cr).item())
-            print('Min Eikonal on', bnd_str, ':', round(1e3 * eikmin, 3), 'ms')
+            print('Min Eikonal on', bnd_str, '(ms):', round(1e3 * eikmin, 3),
+                  'at (in km): (' + str(round(pt_cr[0], 3)) + ','
+                  + str(round(pt_cr[1], 3)) + ')')
 
             # Identify closest source
             lref_allsou = [np.linalg.norm(
