@@ -156,7 +156,7 @@ def calc_size_lay(Wave, nz=5, crtCR=1, tol_rel=1e-3, monitor=False):
 
     # lmin: Minimal dimension of finite element in mesh
     lmin = Wave.lmin
-    aux2 = f"Minimuim Mesh Length (km): {lmin},"
+    aux2 = f"Minimum Mesh Length (km): {lmin},"
     # lref: Reference length for the size of the absorbing layer
     lref = Wave.eik_bnd[0][4]
     aux3 = f"Reference Length (km): {round(lref, 4)}"
