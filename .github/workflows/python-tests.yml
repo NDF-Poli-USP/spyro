@@ -13,32 +13,35 @@ jobs:
 
     runs-on: self-hosted
 
+    env:
+      VENV_PATH: /home/olender/firedrakes/2024_09_11/firedrake/bin/activate
+
     steps:
     - uses: actions/checkout@v3
     - name: Running serial tests
       run: |
-          source /home/olender/firedrakes/2024_09_11/firedrake/bin/activate
+          source $VENV_PATH
           pytest --cov-report=xml --cov=spyro test/
     - name: Running parallel 3D forward test
       run: |
-          source /home/olender/firedrakes/2024_09_11/firedrake/bin/activate
+          source $VENV_PATH
           mpiexec -n 6 pytest test_3d/test_hexahedral_convergence.py
           mpiexec -n 6 pytest test_parallel/test_forward.py
           mpiexec -n 6 pytest test_parallel/test_fwi.py
     - name: Covering parallel 3D forward test
       continue-on-error: true
       run: |
-          source /home/olender/firedrakes/2024_09_11/firedrake/bin/activate
+          source $VENV_PATH
           mpiexec -n 6 pytest --cov-report=xml --cov-append --cov=spyro test_3d/test_hexahedral_convergence.py
     - name: Covering parallel forward test
       continue-on-error: true
       run: |
-          source /home/olender/firedrakes/2024_09_11/firedrake/bin/activate
+          source $VENV_PATH
           mpiexec -n 6 pytest --cov-report=xml --cov-append --cov=spyro test_parallel/test_forward.py
     - name: Covering parallel fwi test
       continue-on-error: true
       run: |
-          source /home/olender/firedrakes/2024_09_11/firedrake/bin/activate
+          source $VENV_PATH
           mpiexec -n 6 pytest --cov-report=xml --cov-append --cov=spyro test_parallel/test_fwi.py
     - name: Uploading coverage to Codecov
       run: export CODECOV_TOKEN="6cd21147-54f7-4b77-94ad-4b138053401d" && bash <(curl -s https://codecov.io/bash)
