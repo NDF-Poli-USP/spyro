@@ -39,7 +39,7 @@ class AcousticWave(Wave):
             raise ValueError("C not loaded")
         if file_name is None:
             file_name = "velocity_model.pvd"
-        fire.File(file_name).write(
+        fire.VTKFile(file_name).write(
             self.c, name="velocity"
         )
 
@@ -133,7 +133,7 @@ class AcousticWave(Wave):
                 )
 
             if self.debug_output:
-                fire.File("initial_velocity_model.pvd").write(
+                fire.VTKFile("initial_velocity_model.pvd").write(
                     self.initial_velocity_model, name="velocity"
                 )
 

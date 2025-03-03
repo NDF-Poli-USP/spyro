@@ -24,7 +24,7 @@ RUN . /home/firedrake/firedrake/bin/activate; pip3 install siphash24
 
 FROM spyro_base AS spyro_release
 
-RUN . /home/firedrake/firedrake/bin/activate; pip install git+https://github.com/Olender/spyro-1.git
+RUN . /home/firedrake/firedrake/bin/activate; pip install git+https://github.com/NDF-Poli-USP/spyro.git
 
 FROM spyro_base AS spyro_development
 

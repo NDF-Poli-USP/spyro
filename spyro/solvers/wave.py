@@ -229,7 +229,7 @@ class Wave(Model_parameters, metaclass=ABCMeta):
                 "function or new file name (segy or hdf5)."
             )
         if output:
-            fire.File("initial_velocity_model.pvd").write(
+            fire.VTKFile("initial_velocity_model.pvd").write(
                 self.initial_velocity_model, name="velocity"
             )
 
