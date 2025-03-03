@@ -1,7 +1,7 @@
 import numpy as np
 import matplotlib.pyplot as plt
 from copy import deepcopy
-from firedrake import File
+from firedrake import VTKFile
 import firedrake as fire
 import spyro
 
@@ -192,10 +192,10 @@ def test_gradient(PML=False):
 
     # compute the gradient of the control (to be verified)
     dJ = Wave_obj_guess.gradient_solve(misfit=misfit, forward_solution=forward_solution_guess)
-    File("gradient_premask.pvd").write(dJ)
+    VTKFile("gradient_premask.pvd").write(dJ)
     Mask_data = Gradient_mask_for_pml(Wave_obj=Wave_obj_guess)
     dJ = Mask_data.apply_mask(dJ)
-    File("gradient.pvd").write(dJ)
+    VTKFile("gradient.pvd").write(dJ)
 
     check_gradient(Wave_obj_guess, dJ, rec_out_exact, Jm, plot=True)
 

@@ -1,7 +1,7 @@
 import os
 
 import numpy as np
-from firedrake import File
+from firedrake import VTKFile
 
 from .. import io
 
@@ -61,7 +61,7 @@ def create_output_file(name, comm, source_num):
         Firedrake.File object
     """
     if io.is_owner(comm, source_num):
-        outfile = File(
+        outfile = VTKFile(
             os.getcwd()
             + "/results/shots_"
             + str(source_num)

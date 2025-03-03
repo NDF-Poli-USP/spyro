@@ -164,8 +164,8 @@ class FullWaveformInversion(AcousticWave):
         self.guess_forward_solution = None
         self.has_gradient_mask = False
         self.functional_history = []
-        self.control_out = fire.File("results/control.pvd")
-        self.gradient_out = fire.File("results/gradient.pvd")
+        self.control_out = fire.VTKFile("results/control.pvd")
+        self.gradient_out = fire.VTKFile("results/gradient.pvd")
 
     def calculate_misfit(self, c=None):
         """
@@ -179,7 +179,7 @@ class FullWaveformInversion(AcousticWave):
         if c is not None:
             self.initial_velocity_model.dat.data[:] = c
         self.forward_solve()
-        output = fire.File("control_" + str(self.current_iteration)+".pvd")
+        output = fire.VTKFile("control_" + str(self.current_iteration)+".pvd")
         output.write(self.c)
         self.guess_shot_record = self.forward_solution_receivers
         self.guess_forward_solution = self.forward_solution
@@ -393,7 +393,7 @@ class FullWaveformInversion(AcousticWave):
         self._apply_gradient_mask()
         if save and comm.comm.rank == 0:
             # self.gradient_out.write(dJ_total)
-            output = fire.File("gradient_" + str(self.current_iteration)+".pvd")
+            output = fire.VTKFile("gradient_" + str(self.current_iteration)+".pvd")
             output.write(dJ_total)
             print("DEBUG")
         self.current_iteration += 1
@@ -445,7 +445,7 @@ class FullWaveformInversion(AcousticWave):
         )
         vp_end = fire.Function(self.function_space)
         vp_end.dat.data[:] = result.x
-        fire.File("vp_end.pvd").write(vp_end)
+        fire.VTKFile("vp_end.pvd").write(vp_end)
 
     def run_fwi_rol(self, **kwargs):
         """
