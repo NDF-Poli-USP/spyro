@@ -152,10 +152,10 @@ class HABC_Wave(AcousticWave):
         self.pad_len = self.F_L * lref
 
         print('\nModifying Layer Size Based on the Element Size')
-        print('Modified Parameter Size F_L:', round(self.F_L, 4))
-        print('Modified Layer Size (km):', round(self.pad_len, 4))
-        print('Elements (' + str(self.lmin), 'km) in Layer:',
-              int(self.pad_len / self.lmin))
+        print("Modified Parameter Size F_L: {:.4f}".format(self.F_L))
+        print("Modified Layer Size (km): {:.4f}".format(self.pad_len))
+        print('Elements ({:.3f} km) in Layer: {}'.format(
+            self.lmin, int(self.pad_len / self.lmin)))
 
     def size_habc_criterion(self, Eikonal, layer_based_on_mesh=False):
         '''
@@ -313,21 +313,17 @@ class HABC_Wave(AcousticWave):
         a_ptr, a_ind, a_val = A.petscmat.getValuesCSR()
         Asp = ss.csr_matrix((a_val, a_ind, a_ptr), A.petscmat.size)
 
-        # Lsp0 = ss.linalg.eigs(Asp, k=2, M=Msp, which='SM', ncv=12,
-        #                      return_eigenvectors=False, Minv=None)
-
-        # Lsp1 = ss.linalg.eigs(Asp, k=2, M=Msp, which='SM', ncv=12,
-        #                      return_eigenvectors=False, Minv=Msp_inv)
-
-        ipdb.set_trace()
         # Operator
-        Lsp = Asp.diagonal() * Msp_inv.diagonal()
+        print('\nSolving Eigenvalue Problem')
+        Lsp = ss.linalg.eigs(Asp, k=2, M=Msp, sigma=0.0,
+                             return_eigenvectors=False)
 
-        for eigval in np.unique(Lsp):
-            print(eigval, np.sqrt(abs(eigval)) / (2 * np.pi))
+        # for eigval in np.unique(Lsp):
+        #     print(np.sqrt(abs(eigval)) / (2 * np.pi))
 
-        min_eigval = np.amin(np.unique(Lsp[Lsp > 0.]))
-        self.fundamental_freq = np.sqrt(min_eigval) / (2 * np.pi)
+        min_eigval = np.unique(Lsp[(Lsp > 0.) & (np.imag(Lsp) == 0.)])[1]
+        self.fundam_freq = np.real(np.sqrt(min_eigval) / (2 * np.pi))
+        print("Fundamental Frequency (Hz): {0:.5f}".format(self.fundam_freq))
 
     def damping_layer(self):
         '''
@@ -343,9 +339,9 @@ class HABC_Wave(AcousticWave):
         '''
 
         self.fundamental_frequency()
-        print(self.fundamental_freq)
-        # 55.95494944065594 dx = 0.05
-        # 281.0691908560122 dx = 0.01
+        # print(self.fundamental_freq)
+        # 0.45592718619481450 dx = 0.05
+        # 0.47524802941560956 dx = 0.01
 
         # Homogeneous domain
         # Dirichlet     m   n   f           Neumann       Sommerfeld
@@ -365,50 +361,3 @@ class HABC_Wave(AcousticWave):
         # 1.5940        0.93186         0.93195
         # 1.6356        0.95159         0.95177
         # 1.7080        1.04420         1.04460
-
-
-# from firedrake import *
-# from slepc4py import SLEPc
-
-# # Create mesh and function space
-# mesh = UnitSquareMesh(32, 32)
-# V = FunctionSpace(mesh, "CG", 1)
-
-# # Define the bilinear and linear forms for the scalar wave equation
-# u = TrialFunction(V)
-# v = TestFunction(V)
-# c = Constant(1.0)  # Wave speed
-# a = c**2 * inner(grad(u), grad(v)) * dx
-# m = u * v * dx
-
-# # Assemble the matrices
-# A = assemble(a)
-# M = assemble(m)
-
-# # Set up the SLEPc eigensolver
-# eigensolver = SLEPc.EPS().create()
-# A_petsc = A.M.handle
-# M_petsc = M.M.handle
-# eigensolver.setOperators(A_petsc, M_petsc)
-# eigensolver.setProblemType(SLEPc.EPS.ProblemType.GHEP)
-# eigensolver.setWhichEigenpairs(SLEPc.EPS.Which.SMALLEST_REAL)
-# eigensolver.setFromOptions()
-
-# # Solve the eigenvalue problem
-# eigensolver.solve()
-
-# # Extract the eigenvalues
-# nconv = eigensolver.getConverged()
-# eigenvalues = []
-# for i in range(nconv):
-#     eigenvalue = eigensolver.getEigenvalue(i)
-#     eigenvalues.append(eigenvalue)
-
-# print("Eigenvalues:", eigenvalues)
-
-
-
-# https://github.com/firedrakeproject/slepc
-# https://github.com/firedrakeproject/firedrake/blob/master/docs/source/install.rst
-# https://slepc.upv.es/documentation/instal.htm
-# https://pypi.org/project/slepc4py/

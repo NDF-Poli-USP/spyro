@@ -148,24 +148,24 @@ def calc_size_lay(Wave, nz=5, crtCR=1, tol_rel=1e-3, monitor=False):
     print('\nComputing Size for Absorbing Layer')
     # z_par: Inverse of minimum Eikonal (Equivalent to c_bound / lref)
     z_par = Wave.eik_bnd[0][3]
-    aux0 = f"Parameter z (1/s): {round(z_par, 4)},"
+    aux0 = "Parameter z (1/s): {:.4f},".format(z_par)
     # fref: Reference frequency
     fref = Wave.frequency
-    aux1 = f"Reference Frequency (Hz): {round(fref, 4)}"
+    aux1 = "Reference Frequency (Hz): {:.4f}".format(fref)
     print(aux0, aux1)
 
     # lmin: Minimal dimension of finite element in mesh
     lmin = Wave.lmin
-    aux2 = f"Minimum Mesh Length (km): {lmin},"
+    aux2 = "Minimum Mesh Length (km): {:.4f},".format(lmin)
     # lref: Reference length for the size of the absorbing layer
     lref = Wave.eik_bnd[0][4]
-    aux3 = f"Reference Length (km): {round(lref, 4)}"
+    aux3 = "Reference Length (km): {:.4f}".format(lref)
     print(aux2, aux3)
 
     a = z_par / fref  # Adimensional parameter
-    aux4 = f"Parameter a: {round(a, 4)},"
+    aux4 = "Parameter a: {:.4f},".format(a)
     FLmin = 0.5 * lmin / lref  # Initial guess
-    aux5 = f"Initial Guess: {round(FLmin, 4)}"
+    aux5 = "Initial Guess: {:.4f}".format(FLmin)
     print(aux4, aux5)
 
     x = FLmin
@@ -199,11 +199,14 @@ def calc_size_lay(Wave, nz=5, crtCR=1, tol_rel=1e-3, monitor=False):
     pad_len = F_L * lref
 
     # Visualizing options for layer size
-    print('Selected Parameter Size F_L:', round(F_L, 4))
-    print('Options for F_L:', [round(float(x), 4) for x in FLpos])
-    print('Aproximated Number of Elements (' + str(Wave.lmin),
-          'km) in Layer:', [int(x * lref / lmin) for x in FLpos])
-    print('Options for CR:', CRpos)
-    print('Selected Layer Size (km):', round(pad_len, 4))
+    print("Selected Parameter Size F_L: {:.4f}".format(F_L))
+    format_FL = ', '.join(['{:.4f}'.format(float(x)) for x in FLpos])
+    print("Options for F_L: [{}]".format(format_FL))
+    format_CR = ', '.join(['{:.4f}'.format(x) for x in CRpos])
+    print("Options for CR: [{}]".format(format_CR))
+    format_ele = [int(x * lref / lmin) for x in FLpos]
+    print("Aprox. Number of Elements ({:.3f} km) in Layer: {}".format(
+        lmin, format_ele))
+    print("Selected Layer Size (km): {:.4f}".format(pad_len))
 
     return F_L, pad_len

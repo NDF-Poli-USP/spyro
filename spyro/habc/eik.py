@@ -117,7 +117,7 @@ class Eikonal():
         None
         '''
 
-        print('Defining Eikonal BCs')
+        print('\nDefining Eikonal BCs')
 
         # Identify source locations
         possou = Wave.sources.point_locations
@@ -354,7 +354,7 @@ class Eikonal():
         vy = fire.TestFunction(Wave.funct_space_eik)
 
         # Linear Eikonal
-        print('Solving Pre-Eikonal')
+        print('\nSolving Pre-Eikonal')
         FeikL = self.linear_eik(Wave, u, vy)
         J = fire.derivative(FeikL, yp)
 
@@ -378,8 +378,12 @@ class Eikonal():
                 # Solving LIN Eikonal
                 fire.solve(fire.lhs(FeikL) == fire.rhs(FeikL), yp,
                            bcs=self.bcs_eik, solver_parameters=pL, J=J)
-                print(
-                    f"\nSolver Executed Successfully. AbsTol: {user_atol:.1e}")
+
+                solv_ok = "Solver Executed Successfully. "
+                print((solv_ok + 'AbsTol: {:.1e}').format(user_atol))
+
+                # print(
+                #     f"\nSolver Executed Successfully. AbsTol: {user_atol:.1e}")
                 break
 
             except Exception as e:
@@ -389,14 +393,14 @@ class Eikonal():
                 user_atol = user_atol * 10 if user_atol < 1e-5 \
                     else round(user_atol + 1e-5, 5)
                 if user_atol > 1e-4:
-                    print("\nTolerance too high. Exiting.")
+                    print("Tolerance too high. Exiting.")
                     break
 
         # Clean numerical instabilities
         data_eikL = self.clean_inst_num(yp.dat.data_with_halos[:])
 
         # Nonlinear Eikonal
-        print('Solving Post-Eikonal')
+        print('\nSolving Post-Eikonal')
         user_atol = tol
         # vinewtonrsls, vinewtonssls, newtonls, qn, ncg, newtontr, ngs, ngmres
         nl_solver = 'vinewtonssls'
@@ -421,9 +425,10 @@ class Eikonal():
                            solver_parameters=pNL, J=J)
 
                 # Final parameters
-                print(
-                    f"\nSolver Executed Successfully. AbsTol: {user_atol:.1e}")
-                print(f"Solver Executed Successfully. Festab: {user_est:.2f}")
+                solv_ok = "Solver Executed Successfully. "
+                print((solv_ok + 'AbsTol: {:.1e}').format(user_atol))
+                print((solv_ok + 'Festab: {:.2f}').format(user_est))
+
                 self.yp = yp
                 break
 
@@ -438,7 +443,7 @@ class Eikonal():
                     user_atol = user_atol * 10 if user_atol < 1e-5 \
                         else round(user_atol + 1e-5, 5)
                     if user_atol > 1e-4:
-                        print('\nHigh Tolerance. Exiting!')
+                        print('High Tolerance. Exiting!')
                         break
 
         # Save Eikonal results
@@ -498,15 +503,16 @@ class Eikonal():
 
         # Loop over boundaries
         eik_bnd = []
+        print('\nIdentifying Critical Points on Boundaries')
         for bnd, bnd_str in zip(self.bnds, bnds_str):
 
             # Identify Eikonal minimum
             eikmin, idxmin = self.ident_eik_on_bnd(bnd)
             pt_cr = (self.z_data[idxmin], self.x_data[idxmin])
             c_bnd = np.float64(Wave.c.at(pt_cr).item())
-            print('Min Eikonal on', bnd_str, '(ms):', round(1e3 * eikmin, 3),
-                  'at (in km): (' + str(round(pt_cr[0], 3)) + ','
-                  + str(round(pt_cr[1], 3)) + ')')
+            eik_str = "Min Eikonal on {0:>16} (ms): {1:>7.3f} "
+            print((eik_str + 'at (in km): ({2:3.3f}, {3:3.3f})').format(
+                bnd_str, 1e3 * eikmin, pt_cr[0], pt_cr[1]))
 
             # Identify closest source
             lref_allsou = [np.linalg.norm(
