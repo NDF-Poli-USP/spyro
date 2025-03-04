@@ -1,10 +1,12 @@
 import firedrake as fire
+import numpy as np
+import scipy.sparse as ss
 import spyro.habc.eik as eik
 import spyro.habc.lay_len as lay_len
 from spyro.solvers.acoustic_wave import AcousticWave
-import numpy as np
 from os import getcwd
 import ipdb
+fire.parameters["loopy"] = {"silenced_warnings": ["v1_scheduler_fallback"]}
 
 # Work from Ruben Andres Salas, Andre Luis Ferreira da Silva,
 # Luis Fernando Nogueira de Sá, Emilio Carlos Nelli Silva.
@@ -21,7 +23,9 @@ class HABC_Wave(AcousticWave):
 
     Attributes
     ----------
-    eik_bnd : `list`
+    c_habc': 'firedrake function'
+        Velocity model with absorbing layer
+    eik_bnd: `list`
         Properties on boundaries according to minimum values of Eikonal
         Structure sublist: [pt_cr, c_bnd, eikmin, z_par, lref, sou_cr]
         - pt_cr: Critical point coordinates
@@ -219,7 +223,7 @@ class HABC_Wave(AcousticWave):
 
     def velocity_habc(self):
         '''
-        Set the velocity model fir the model with absorbing layer.
+        Set the velocity model for the model with absorbing layer.
 
         Parameters
         ----------
@@ -230,11 +234,8 @@ class HABC_Wave(AcousticWave):
         None
         '''
 
-        # cond = fire.conditional(self.mesh_x < 0.5, 3.0, 1.5)
-        # self.set_initial_velocity_model(conditional=cond)
-        # self.c_habc = self.initial_velocity_model
-
         # Initialize field
+        print('\nUpdating Velocity Profile')
         self.c_habc = fire.Function(self.function_space, name='c [km/s])')
 
         # Extract node positions
@@ -243,7 +244,7 @@ class HABC_Wave(AcousticWave):
         z_data = z_f.dat.data_with_halos[:]
         x_data = x_f.dat.data_with_halos[:]
 
-        # Points to update
+        # Points to update velocity model
         orig_pts = np.where((z_data >= -self.length_z) & (x_data >= 0.)
                             & (x_data <= self.length_x))
         zpt_to_update = z_data[orig_pts]
@@ -256,6 +257,158 @@ class HABC_Wave(AcousticWave):
 
         self.c_habc.dat.data_with_halos[orig_pts] = vel_to_update
 
+        # Extending velocity model in absorbing layer
+        print('Extending Profile Inside Layer')
+
+        # Points to extend velocity model
+        pad_pts = np.setdiff1d(np.arange(
+            self.c_habc.dat.data_with_halos.size), orig_pts)
+        zpt_to_extend = z_data[pad_pts]
+        xpt_to_extend = x_data[pad_pts]
+
+        # Tolerance for original boundary
+        tol = 10**(min(int(np.log10(self.lmin / 10)), -6))
+
+        vel_to_extend = self.c_habc.dat.data_with_halos[pad_pts]
+        for idp, (zpt, xpt) in enumerate(zip(zpt_to_extend, xpt_to_extend)):
+
+            # Find nearest point on the boundary of the original domain
+            z_bnd = zpt
+            if zpt < -self.length_z:
+                z_bnd += self.pad_len + tol
+
+            x_bnd = xpt
+            if xpt < 0. or xpt > self.length_x:
+                x_bnd -= np.sign(xpt) * (self.pad_len + tol)
+
+            # Ensure that point is within the domain bounds
+            z_bnd = np.clip(z_bnd, -self.length_z, 0.)
+            x_bnd = np.clip(x_bnd, 0., self.length_x)
+
+            vel_to_extend[idp] = self.c.at(z_bnd, x_bnd)
+
+        self.c_habc.dat.data_with_halos[pad_pts] = vel_to_extend
+
         # Save new velocity model
         outfile = fire.VTKFile(self.path_save + "c_habc.pvd")
         outfile.write(self.c_habc)
+
+    def fundamental_frequency(self):
+
+        V = self.function_space
+        c = self.c_habc
+        u, v = fire.TrialFunction(V), fire.TestFunction(V)
+
+        # Bilinear forms
+        m = fire.inner(u, v) * fire.dx
+        M = fire.assemble(m)
+        m_ptr, m_ind, m_val = M.petscmat.getValuesCSR()
+        mv_inv = []
+        mv_inv = [0.0 if value == 0 else 1 / value for value in m_val]
+        Msp_inv = ss.csr_matrix((mv_inv, m_ind, m_ptr), M.petscmat.size)
+        Msp = ss.csr_matrix((m_val, m_ind, m_ptr), M.petscmat.size)
+
+        a = c * c * fire.inner(fire.grad(u), fire.grad(v)) * fire.dx
+        A = fire.assemble(a)
+        a_ptr, a_ind, a_val = A.petscmat.getValuesCSR()
+        Asp = ss.csr_matrix((a_val, a_ind, a_ptr), A.petscmat.size)
+
+        # Lsp0 = ss.linalg.eigs(Asp, k=2, M=Msp, which='SM', ncv=12,
+        #                      return_eigenvectors=False, Minv=None)
+
+        # Lsp1 = ss.linalg.eigs(Asp, k=2, M=Msp, which='SM', ncv=12,
+        #                      return_eigenvectors=False, Minv=Msp_inv)
+
+        ipdb.set_trace()
+        # Operator
+        Lsp = Asp.diagonal() * Msp_inv.diagonal()
+
+        for eigval in np.unique(Lsp):
+            print(eigval, np.sqrt(abs(eigval)) / (2 * np.pi))
+
+        min_eigval = np.amin(np.unique(Lsp[Lsp > 0.]))
+        self.fundamental_freq = np.sqrt(min_eigval) / (2 * np.pi)
+
+    def damping_layer(self):
+        '''
+        Set the damping profile within the absorbing layer.
+
+        Parameters
+        ----------
+        None
+
+        Returns
+        -------
+        None
+        '''
+
+        self.fundamental_frequency()
+        print(self.fundamental_freq)
+        # 55.95494944065594 dx = 0.05
+        # 281.0691908560122 dx = 0.01
+
+        # Homogeneous domain
+        # Dirichlet     m   n   f           Neumann       Sommerfeld
+        # 0.62531       1   1   0.62500     4.0023E-8i    1.9418E-5i
+        # 0.90226       2   1   0.90139     0.37507       0.37508
+        # 1.06960       1   2   1.06800     0.50016       0.50021
+        # 1.23330       3   1   1.23111     0.62530       0.62533
+        # 1.25240       2   2   1.25000     0.75052       0.75065
+        # 1.50940       3   2   1.50520     0.90227       0.90234
+
+        # Bimaterial domain
+
+        # Dirichlet     Neumann         Sommerfeld
+        # 0.72606       3.2247E-5i      2.4562E-5i
+        # 1.1675        0.54933         0.54937
+        # 1.2368        0.55590         0.55594
+        # 1.5940        0.93186         0.93195
+        # 1.6356        0.95159         0.95177
+        # 1.7080        1.04420         1.04460
+
+
+# from firedrake import *
+# from slepc4py import SLEPc
+
+# # Create mesh and function space
+# mesh = UnitSquareMesh(32, 32)
+# V = FunctionSpace(mesh, "CG", 1)
+
+# # Define the bilinear and linear forms for the scalar wave equation
+# u = TrialFunction(V)
+# v = TestFunction(V)
+# c = Constant(1.0)  # Wave speed
+# a = c**2 * inner(grad(u), grad(v)) * dx
+# m = u * v * dx
+
+# # Assemble the matrices
+# A = assemble(a)
+# M = assemble(m)
+
+# # Set up the SLEPc eigensolver
+# eigensolver = SLEPc.EPS().create()
+# A_petsc = A.M.handle
+# M_petsc = M.M.handle
+# eigensolver.setOperators(A_petsc, M_petsc)
+# eigensolver.setProblemType(SLEPc.EPS.ProblemType.GHEP)
+# eigensolver.setWhichEigenpairs(SLEPc.EPS.Which.SMALLEST_REAL)
+# eigensolver.setFromOptions()
+
+# # Solve the eigenvalue problem
+# eigensolver.solve()
+
+# # Extract the eigenvalues
+# nconv = eigensolver.getConverged()
+# eigenvalues = []
+# for i in range(nconv):
+#     eigenvalue = eigensolver.getEigenvalue(i)
+#     eigenvalues.append(eigenvalue)
+
+# print("Eigenvalues:", eigenvalues)
+
+
+
+# https://github.com/firedrakeproject/slepc
+# https://github.com/firedrakeproject/firedrake/blob/master/docs/source/install.rst
+# https://slepc.upv.es/documentation/instal.htm
+# https://pypi.org/project/slepc4py/

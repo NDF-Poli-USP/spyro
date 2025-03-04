@@ -95,7 +95,7 @@ def test_habc_fig8():
         vel_c.write(Wave_obj.c)
 
     # Mesh properties for Eikonal
-    Wave_obj.properties_eik_mesh(p_usu=2)
+    Wave_obj.properties_eik_mesh(p_usu=1)
 
     # Initializing Eikonal object
     if Wave_obj.fwi_iteration == 0:
@@ -109,6 +109,9 @@ def test_habc_fig8():
 
     # Updating velocity model
     Wave_obj.velocity_habc()
+
+    # Setting the damping profile within absorbing layer
+    Wave_obj.damping_layer()
 
     # ipdb.set_trace()
 

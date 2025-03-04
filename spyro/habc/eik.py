@@ -157,7 +157,7 @@ class Eikonal():
         return data_arr
 
     @staticmethod
-    def linear_eik(Wave, u, vy, dx):
+    def linear_eik(Wave, u, vy):
         '''
         Assemble the linear Eikonal
 
@@ -169,8 +169,6 @@ class Eikonal():
             Trial function
         vy : `firedrake test function`
             Test function
-        dx : `firedrake measure`
-            Integration domain
 
         Returns
         -------
@@ -178,13 +176,13 @@ class Eikonal():
             Linear Eikonal equation
         '''
         f = fire.Constant(1.0)
-        lhs = fire.inner(fire.grad(u), fire.grad(vy)) * dx
-        rhs = f / Wave.c * vy * dx
+        lhs = fire.inner(fire.grad(u), fire.grad(vy)) * fire.dx
+        rhs = f / Wave.c * vy * fire.dx
         FL = lhs - rhs
         return FL
 
     @staticmethod
-    def assemble_eik(Wave, u, vy, dx, f_est=1.0):
+    def assemble_eik(Wave, u, vy, f_est=1.0):
         '''
         Assemble the Nonlinear Eikonal with stabilizing term
 
@@ -196,8 +194,6 @@ class Eikonal():
             Trial function
         vy : `firedrake test function`
             Test function
-        dx : `firedrake measure`
-            Integration domain
         f_est: `float`, optional
             Factor for the stabilizing term in Eikonal equation
 
@@ -212,8 +208,8 @@ class Eikonal():
         delta = fire.Constant(float_info.epsilon)  # float_info.min
         gr_norm = fire.sqrt(fire.inner(fire.grad(u), fire.grad(u))) + delta
         f = fire.Constant(1.0)
-        F = gr_norm * vy * dx - f / Wave.c * vy * dx + \
-            eps * fire.inner(fire.grad(u), fire.grad(vy)) * dx
+        F = gr_norm * vy * fire.dx - f / Wave.c * vy * fire.dx + \
+            eps * fire.inner(fire.grad(u), fire.grad(vy)) * fire.dx
         return F
 
     @staticmethod
@@ -359,7 +355,7 @@ class Eikonal():
 
         # Linear Eikonal
         print('Solving Pre-Eikonal')
-        FeikL = self.linear_eik(Wave, u, vy, fire.dx)
+        FeikL = self.linear_eik(Wave, u, vy)
         J = fire.derivative(FeikL, yp)
 
         # Initial guess
@@ -419,7 +415,7 @@ class Eikonal():
                 pNL = self.solve_prop(nl_solver=nl_solver, l_solver=l_solver,
                                       user_atol=user_atol, user_iter=50)
                 # Solving NL Eikonal
-                Feik = self.assemble_eik(Wave, yp, vy, fire.dx, f_est=user_est)
+                Feik = self.assemble_eik(Wave, yp, vy, f_est=user_est)
                 J = fire.derivative(Feik, yp)
                 fire.solve(Feik == 0, yp, bcs=self.bcs_eik,
                            solver_parameters=pNL, J=J)
@@ -484,7 +480,7 @@ class Eikonal():
 
         Returns
         -------
-        eik_bnd : `list`
+        eik_bnd: `list`
             Properties on boundaries according to minimum values of Eikonal
             Structure sublist: [pt_cr, c_bnd, eikmin, z_par, lref, sou_cr]
             - pt_cr: Critical point coordinates
