@@ -481,6 +481,7 @@ class AutomaticMesh:
         return fire.Mesh(self.output_file_name)
         # raise NotImplementedError("Not implemented yet")
 
+
 def calculate_edge_length(cpw, minimum_velocity, frequency):
     v_min = minimum_velocity
 
