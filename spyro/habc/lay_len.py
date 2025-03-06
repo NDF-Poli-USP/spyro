@@ -19,7 +19,8 @@ def f_layer(x, a, m=1, s=0.999, typ='FL'):
     x : `float`
         Size  parameter of the absorbing layer (F_L)
     a : `float`
-        Adimensional parameter for the absorbing layer (a = z/f, z = c/l)
+        Adimensional propagation speed parameter (a = z/f, z = c/l).
+        Also, "z" parameter is the inverse of the minimum Eikonal (1/phi_min)
     m : `float`, optional
         Vibration mode. Default is 1 (Fundamental mode)
     s : `float`, optional
@@ -80,7 +81,8 @@ def calcZero(xini, a, tol, nz=1):
     xini : `float`
         Initial guess for size parameter of the absorbing layer (F_L)
     a : `float`
-        Adimensional parameter for the absorbing layer (a = z/f, z = c/l)
+        Adimensional propagation speed parameter (a = z/f, z = c/l).
+        Also, "z" parameter is the inverse of the minimum Eikonal (1/phi_min)
     tol : `float`
         Tolerance for the n-th root fo the function f_layer(x, a)
     nz : `int`, optional
@@ -142,16 +144,21 @@ def calc_size_lay(Wave, nz=5, crtCR=1, tol_rel=1e-3, monitor=False):
         Size  parameter of the absorbing layer
     pad_len : `float`
         Size of damping layer
+    a : `float`
+        Adimensional propagation speed parameter (a = z/f, z = c/l).
+        Also, "z" parameter is the inverse of the minimum Eikonal (1/phi_min)
     '''
 
     # Visualizing parameters for computing layer size
     print('\nComputing Size for Absorbing Layer')
+
+    # fref: Reference frequency
+    fref = Wave.freq_ref
     # z_par: Inverse of minimum Eikonal (Equivalent to c_bound / lref)
     z_par = Wave.eik_bnd[0][3]
     aux0 = "Parameter z (1/s): {:.4f},".format(z_par)
-    # fref: Reference frequency
-    fref = Wave.frequency
-    aux1 = "Reference Frequency (Hz): {:.4f}".format(fref)
+    a = z_par / fref  # Adimensional parameter
+    aux1 = "Parameter a (adim): {:.4f},".format(a)
     print(aux0, aux1)
 
     # lmin: Minimal dimension of finite element in mesh
@@ -162,11 +169,8 @@ def calc_size_lay(Wave, nz=5, crtCR=1, tol_rel=1e-3, monitor=False):
     aux3 = "Reference Length (km): {:.4f}".format(lref)
     print(aux2, aux3)
 
-    a = z_par / fref  # Adimensional parameter
-    aux4 = "Parameter a: {:.4f},".format(a)
     FLmin = 0.5 * lmin / lref  # Initial guess
-    aux5 = "Initial Guess: {:.4f}".format(FLmin)
-    print(aux4, aux5)
+    print("Initial Guess for Size Parameter: {:.4f}".format(FLmin))
 
     x = FLmin
     FLpos = []  # Size factor
@@ -199,7 +203,6 @@ def calc_size_lay(Wave, nz=5, crtCR=1, tol_rel=1e-3, monitor=False):
     pad_len = F_L * lref
 
     # Visualizing options for layer size
-    print("Selected Parameter Size F_L: {:.4f}".format(F_L))
     format_FL = ', '.join(['{:.4f}'.format(float(x)) for x in FLpos])
     print("Options for F_L: [{}]".format(format_FL))
     format_CR = ', '.join(['{:.4f}'.format(x) for x in CRpos])
@@ -207,6 +210,7 @@ def calc_size_lay(Wave, nz=5, crtCR=1, tol_rel=1e-3, monitor=False):
     format_ele = [int(x * lref / lmin) for x in FLpos]
     print("Aprox. Number of Elements ({:.3f} km) in Layer: {}".format(
         lmin, format_ele))
+    print("Selected Parameter Size F_L: {:.4f}".format(F_L))
     print("Selected Layer Size (km): {:.4f}".format(pad_len))
 
-    return F_L, pad_len
+    return F_L, pad_len, a
