@@ -83,7 +83,7 @@ def test_habc_fig8():
     edge_length = 0.05
     Wave_obj.set_mesh(mesh_parameters={"edge_length": edge_length})
 
-    if Wave_obj.fwi_iteration == 0:
+    if Wave_obj.fwi_iter == 0:
         # Initial velocity model
         cond = fire.conditional(Wave_obj.mesh_x < 0.5, 3.0, 1.5)
         Wave_obj.set_initial_velocity_model(conditional=cond)
@@ -95,14 +95,15 @@ def test_habc_fig8():
         vel_c.write(Wave_obj.c)
 
     # Mesh properties for Eikonal
-    Wave_obj.properties_eik_mesh(p_usu=1)
+    Wave_obj.properties_eik_mesh(p_usu=2)
 
     # Initializing Eikonal object
-    if Wave_obj.fwi_iteration == 0:
+    if Wave_obj.fwi_iter == 0:
         Eik_obj = eik.Eikonal(Wave_obj)
+        histPcrit = None
 
     # Determining layer size
-    Wave_obj.size_habc_criterion(Eik_obj, layer_based_on_mesh=True)
+    Wave_obj.size_habc_criterion(Eik_obj, histPcrit, layer_based_on_mesh=True)
 
     # Creating mesh with absorbing layer
     Wave_obj.create_mesh_habc()
