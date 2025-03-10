@@ -20,7 +20,7 @@ class DifferentiableWaveEquation:
     model : dict
         Dictionary containing the model parameters.
     mesh : Mesh
-        Firedrake mesh object used for the simulation. 
+        Firedrake mesh object used for the simulation.
     """
 
     def __init__(self, model, mesh):
@@ -82,7 +82,7 @@ class DifferentiableWaveEquation:
 
         q_s = self._source(source_number)
         interpolate_receivers = self._interpolate_receivers(u_np1)
-        
+
         # Time execution.
         if compute_functional:
             self._functional_value = 0.0
@@ -166,7 +166,7 @@ class DifferentiableWaveEquation:
         return fire.FunctionSpace(
             self.mesh, self.model["opts"]["method"],
             self.model["opts"]["degree"]
-            )
+        )
 
     def _solver_parameters(self):
         if self.model["opts"]["method"] == "KMV":

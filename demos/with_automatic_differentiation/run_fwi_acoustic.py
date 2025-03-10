@@ -1,7 +1,5 @@
 import firedrake as fire
 import firedrake.adjoint as fire_ad
-from pyadjoint import set_working_tape, Tape
-from checkpoint_schedules import Revolve
 from spyro.solvers import DifferentiableWaveEquation, AutomatedGradientOptimisation
 from demos.with_automatic_differentiation.utils import \
     model_settings, make_c_camembert

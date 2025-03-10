@@ -96,7 +96,7 @@ class AutomatedGradientOptimisation:
         if parameters is None:
             parameters = {"tao_type": "blmvm", "tao_max_it": maxiter}
         solver = TAOSolver(
-            problem, parameters, comm=my_ensemble.comm,
+            problem, parameters, comm=comm,
             convert_options={"riesz_representation": "L2"})
         solver.tao.setConvergenceTest(self._tao_convergence_tracker)
         return solver.solve()

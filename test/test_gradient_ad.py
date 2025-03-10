@@ -1,8 +1,6 @@
 import firedrake as fire
 import firedrake.adjoint as fire_ad
-from pyadjoint import set_working_tape, Tape
-from checkpoint_schedules import Revolve
-from spyro.solvers import DifferentiableWaveEquation, AutomatedGradientOptimisation
+from spyro.solvers import DifferentiableWaveEquation
 import spyro
 from numpy.random import rand
 
