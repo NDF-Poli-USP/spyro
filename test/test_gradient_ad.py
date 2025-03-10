@@ -1,8 +1,10 @@
 import firedrake as fire
 import firedrake.adjoint as fire_ad
+from pyadjoint import set_working_tape, Tape
+from checkpoint_schedules import Revolve
+from spyro.solvers import DifferentiableWaveEquation, AutomatedGradientOptimisation
 import spyro
 from numpy.random import rand
-from checkpoint_schedules import Revolve
 
 
 # --- Basid setup to run a forward simulation with AD --- #
@@ -47,7 +49,7 @@ model["BCs"] = {
 model["acquisition"] = {
     "source_type": "Ricker",
     "source_pos": spyro.create_transect((0.2, 0.15), (0.8, 0.15), 1),
-    "frequency": 7.0,
+    "frequency_peak": 7.0,
     "delay": 1.0,
     "receiver_locations": spyro.create_transect((0.2, 0.2), (0.8, 0.2), 10),
 }
@@ -65,6 +67,11 @@ model["timeaxis"] = {
     "fspool": 1,  # how frequently to save solution to RAM
 }
 
+M = model["parallelism"]["num_spacial_cores"]
+my_ensemble = fire.Ensemble(fire.COMM_WORLD, M)
+mesh = fire.UnitSquareMesh(20, 20, comm=my_ensemble.comm)
+wave_equation = DifferentiableWaveEquation(model, mesh)
+
 
 def make_c_camembert(V, mesh, c_guess=False, plot_c=False):
     """Acoustic velocity model"""
@@ -76,72 +83,40 @@ def make_c_camembert(V, mesh, c_guess=False, plot_c=False):
             2.5
             + 1 * fire.tanh(100 * (0.125 - fire.sqrt((x - 0.5) ** 2 + (z - 0.5) ** 2)))
         )
-    if plot_c:
-        outfile = fire.VTKFile("acoustic_cp.pvd")
-        outfile.write(c)
     return c
 
 
-def forward(
-        c, fwd_solver, wavelet, ensemble,
-        compute_functional=False, true_data_receivers=None, annotate=False
-):
+def run_forward(
+        c, to_generate_true_data=False, compute_functional=False,
+        true_data_receivers=None, annotate=False):
     if annotate:
         fire_ad.continue_annotation()
-        if model["aut_dif"]["checkpointing"]:
-            total_steps = int(model["timeaxis"]["tf"] / model["timeaxis"]["dt"])
-            steps_store = int(total_steps / 10)  # Store 10% of the steps.
-            tape = fire_ad.get_working_tape()
-            tape.progress_bar = fire.ProgressBar
-            tape.enable_checkpointing(Revolve(total_steps, steps_store))
     # source_number based on the ensemble.ensemble_comm.rank
-    source_number = ensemble.ensemble_comm.rank
-    receiver_data, J = fwd_solver.execute_acoustic(
-        c, source_number, wavelet,
-        compute_functional=compute_functional,
-        true_data_receivers=true_data_receivers
-    )
-    return receiver_data, J
+    source_number = my_ensemble.ensemble_comm.rank
+    wave_equation.acoustic_solver(
+        c, source_number, compute_functional=compute_functional,
+        true_data_receivers=true_data_receivers)
+    if to_generate_true_data:
+        return wave_equation.receiver_data
+    if compute_functional and annotate:
+        return fire_ad.EnsembleReducedFunctional(
+            wave_equation.functional_value, fire_ad.Control(c),
+            my_ensemble)
 
 
 def test_taylor():
     # Test only serial for now.
-    M = model["parallelism"]["num_spacial_cores"]
-    my_ensemble = fire.Ensemble(fire.COMM_WORLD, M)
-    mesh = fire.UnitSquareMesh(20, 20, comm=my_ensemble.comm)
-    element = fire.FiniteElement(
-        model["opts"]["method"], mesh.ufl_cell(), degree=model["opts"]["degree"]
-    )
-    V = fire.FunctionSpace(mesh, element)
-
-    fwd_solver = spyro.solvers.forward_ad.ForwardSolver(model, mesh, V)
-    # Ricker wavelet
-    wavelet = spyro.full_ricker_wavelet(
-        model["timeaxis"]["dt"], model["timeaxis"]["tf"],
-        model["acquisition"]["frequency"],
-    )
-    c_true = make_c_camembert(V, mesh)
-    true_rec, _ = forward(c_true, fwd_solver, wavelet, my_ensemble)
+    c_true = make_c_camembert(wave_equation.function_space, mesh)
+    true_data_rec = run_forward(c_true, to_generate_true_data=True)
 
     # --- Gradient with AD --- #
-    c_guess = make_c_camembert(V, mesh, c_guess=True)
-    _, J = forward(
-        c_guess, fwd_solver, wavelet, my_ensemble,
-        compute_functional=True,
-        true_data_receivers=true_rec, annotate=True
+    c_guess = make_c_camembert(wave_equation.function_space, mesh, c_guess=True)
+    J_hat = run_forward(
+        c_guess, compute_functional=True, true_data_receivers=true_data_rec,
+        annotate=True
     )
-
-    # :class:`~.EnsembleReducedFunctional` is employed to recompute in
-    # parallel the functional and its gradient associated.
-    J_hat = fire_ad.EnsembleReducedFunctional(
-        J, fire_ad.Control(c_guess), my_ensemble)
-    h = fire.Function(V)
-    h.dat.data[:] = rand(V.dim())
+    h = fire.Function(wave_equation.function_space)
+    h.dat.data[:] = rand(wave_equation.function_space.dim())
     assert fire_ad.taylor_test(J_hat, c_guess, h) > 1.9
     fire_ad.get_working_tape().clear_tape()
     fire_ad.pause_annotation()
-
-
-def test_taylor_checkpointing():
-    model["aut_dif"]["checkpointing"] = True
-    test_taylor()

@@ -1,12 +1,15 @@
+import logging
+
 import firedrake as fire
 import firedrake.adjoint as fire_ad
 from .time_integration_ad import central_difference_acoustic
 from firedrake.__future__ import interpolate
+from ..sources import full_ricker_wavelet
 # Note this turns off non-fatal warnings
 fire.set_log_level(fire.ERROR)
 
 
-class ForwardSolver:
+class DifferentiableWaveEquation:
     """Wave equation forward solver.
 
     This forward solver is prepared to work with the automatic
@@ -17,20 +20,22 @@ class ForwardSolver:
     model : dict
         Dictionary containing the model parameters.
     mesh : Mesh
-        Firedrake mesh object.
+        Firedrake mesh object used for the simulation. 
     """
 
-    def __init__(self, model, mesh, function_space):
+    def __init__(self, model, mesh):
         self.model = model
         self.mesh = mesh
-        self.V = function_space
-        self.receiver_mesh = fire.VertexOnlyMesh(
-            self.mesh, self.model["acquisition"]["receiver_locations"])
-        self.solution = None
+        self._function_space = self._build_function_space()
+        self._solution = None
+        self._receiver_data = None
+        self._functional_value = None
+        # Receiver mesh.
+        self._rec_mesh = self._set_receiver_mesh(self.mesh, self.model)
 
-    def execute_acoustic(
-            self, c, source_number, wavelet, compute_functional=False,
-            true_data_receivers=None
+    def acoustic_solver(
+            self, c, source_number, wavelet=None,
+            compute_functional=False, true_data_receivers=None
     ):
         """Time-stepping acoustic forward solver.
 
@@ -62,32 +67,25 @@ class ForwardSolver:
             If true_data_receivers is not provided when computing the
             functional.
         """
-        self.solution = None
+        if wavelet is None:
+            # Log information.
+            logging.info("Wavelet not provided. Using Ricker wavelet.")
+            wavelet = full_ricker_wavelet(
+                self.model["timeaxis"]["dt"],
+                self.model["timeaxis"]["tf"],
+                self.model["acquisition"]["frequency_peak"]
+            )
         # RHS
-        source_function = fire.Cofunction(self.V.dual())
+        source_function = fire.Cofunction(self._function_space.dual())
         solver, u_np1, u_n, u_nm1 = central_difference_acoustic(
             self, c, source_function)
-        # Sources.
-        source_mesh = fire.VertexOnlyMesh(
-            self.mesh,
-            [self.model["acquisition"]["source_pos"][source_number]]
-        )
-        # Source function space.
-        V_s = fire.FunctionSpace(source_mesh, "DG", 0)
-        d_s = fire.Function(V_s)
-        d_s.assign(1.0)
-        source_d_s = fire.assemble(d_s * fire.TestFunction(V_s) * fire.dx)
-        # Interpolate from the source function space to the velocity function space.
-        q_s = fire.Cofunction(self.V.dual()).interpolate(source_d_s)
 
-        # Receivers
-        V_r = fire.FunctionSpace(self.receiver_mesh, "DG", 0)
-        # Interpolate object.
-        interpolate_receivers = interpolate(u_np1, V_r)
-
+        q_s = self._source(source_number)
+        interpolate_receivers = self._interpolate_receivers(u_np1)
+        
         # Time execution.
-        J_val = 0.0
-        receiver_data = []
+        if compute_functional:
+            self._functional_value = 0.0
         total_steps = int(self.model["timeaxis"]["tf"] / self.model["timeaxis"]["dt"])
         if (
             fire_ad.get_working_tape()._checkpoint_manager
@@ -98,25 +96,86 @@ class ForwardSolver:
         else:
             time_range = range(total_steps)
 
+        self._receiver_data = []
         for step in time_range:
             source_function.assign(wavelet[step] * q_s)
             solver.solve()
             u_nm1.assign(u_n)
             u_n.assign(u_np1)
             rec_data = fire.assemble(interpolate_receivers)
-            receiver_data.append(rec_data)
+            self._receiver_data.append(rec_data)
             if compute_functional:
                 if not true_data_receivers:
                     raise ValueError("True receiver data is required for"
                                      "computing the functional.")
                 misfit = rec_data - true_data_receivers[step]
-                J_val += fire.assemble(0.5 * fire.inner(misfit, misfit) * fire.dx)
-        self.solution = u_np1
-        return receiver_data, J_val
+                self._functional_value += fire.assemble(
+                    0.5 * fire.inner(misfit, misfit) * fire.dx)
 
-    def execute_elastic(self):
+        self._solution = u_np1
+
+    def elastic_solver(self):
         raise NotImplementedError("Elastic wave equation is not yet implemented"
                                   "for the automatic differentiation based FWI.")
+
+    @property
+    def receiver_data(self):
+        return self._receiver_data
+
+    @property
+    def solution(self):
+        return self._solution
+
+    @property
+    def function_space(self):
+        return self._function_space
+
+    @property
+    def functional_value(self):
+        return self._functional_value
+
+    def set_mesh(self, mesh):
+        self.mesh = mesh
+        self._function_space = fire.FunctionSpace(
+            self.mesh, self.model["opts"]["method"],
+            degree=self.model["opts"]["degree"],
+            variant=self.model["opts"]["quadrature"]
+        )
+
+    def _source(self, source_number):
+        # Sources.
+        source_mesh = self._set_source_mesh(source_number)
+
+        # Source function space.
+        V_s = fire.FunctionSpace(source_mesh, "DG", 0)
+        d_s = fire.Function(V_s)
+        d_s.assign(1.0)
+        source_d_s = fire.assemble(d_s * fire.TestFunction(V_s) * fire.dx)
+        # Interpolate from the source function space to the velocity function space.
+        return fire.Cofunction(
+            self._function_space.dual()).interpolate(source_d_s)
+
+    def _interpolate_receivers(self, u_field):
+        return interpolate(u_field,
+                           fire.FunctionSpace(self._rec_mesh, "DG", 0))
+
+    def _set_receiver_mesh(self, mesh, model):
+        return fire.VertexOnlyMesh(
+            mesh, model["acquisition"]["receiver_locations"]
+        )
+
+    def _set_source_mesh(self, source_number):
+        return fire.VertexOnlyMesh(
+            self.mesh,
+            [self.model["acquisition"]["source_pos"][source_number]]
+        )
+
+    def _build_function_space(self):
+        return fire.FunctionSpace(
+            self.mesh, self.model["opts"]["method"],
+            self.model["opts"]["degree"]
+            )
+
 
     def _solver_parameters(self):
         if self.model["opts"]["method"] == "KMV":
