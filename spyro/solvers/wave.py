@@ -76,6 +76,7 @@ class Wave(Model_parameters, metaclass=ABCMeta):
 
         self.mesh = self.get_mesh()
         self.c = None
+        self.sources = None
         if self.mesh is not None:
             self._build_function_space()
             self._map_sources_and_receivers()
@@ -88,7 +89,6 @@ class Wave(Model_parameters, metaclass=ABCMeta):
         # Expression to define sources through UFL (less efficient)
         self.source_expression = None
         # Object for efficient application of sources
-        self.sources = None
 
         self.field_logger = FieldLogger(self.comm, self.input_dictionary["visualization"])
         self.field_logger.add_field("forward", self.get_function_name(),
