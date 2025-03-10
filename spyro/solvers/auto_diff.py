@@ -33,10 +33,6 @@ class AutomatedGradientOptimisation:
         riesz_representation : str
             Riesz representation.
         """
-        # c_optimised = minimize(
-#     J_hat, method="L-BFGS-B", options={"disp": True, "maxiter": 10},
-#     bounds=(lb, up), derivative_options={"riesz_representation": 'L2'}
-# )
         return minimize(
             self.reduced_functional, method=method,
             options={"disp": disp, "maxiter": max_iter},
@@ -81,9 +77,6 @@ class AutomatedGradientOptimisation:
             self._minimization_problem(bounds), parameters, inner_product="L2")
         return solver.solve()
 
-    def _minimization_problem(self, bounds):
-        return MinimizationProblem(self.reduced_functional, bounds=bounds)
-
     def minimise_tao(
             self, maxiter=10, bounds=None, parameters=None, comm=None):
         """Minimise the reduced functional using tao optimisation methods.
@@ -116,3 +109,5 @@ class AutomatedGradientOptimisation:
         else:
             tao.setConvergedReason(PETSc.TAO.ConvergedReason.CONTINUE_ITERATING)
 
+    def _minimization_problem(self, bounds):
+        return MinimizationProblem(self.reduced_functional, bounds=bounds)

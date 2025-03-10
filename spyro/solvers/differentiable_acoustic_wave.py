@@ -134,14 +134,6 @@ class DifferentiableWaveEquation:
     def functional_value(self):
         return self._functional_value
 
-    def set_mesh(self, mesh):
-        self.mesh = mesh
-        self._function_space = fire.FunctionSpace(
-            self.mesh, self.model["opts"]["method"],
-            degree=self.model["opts"]["degree"],
-            variant=self.model["opts"]["quadrature"]
-        )
-
     def _source(self, source_number):
         # Sources.
         source_mesh = self._set_source_mesh(source_number)
@@ -175,7 +167,6 @@ class DifferentiableWaveEquation:
             self.mesh, self.model["opts"]["method"],
             self.model["opts"]["degree"]
             )
-
 
     def _solver_parameters(self):
         if self.model["opts"]["method"] == "KMV":
