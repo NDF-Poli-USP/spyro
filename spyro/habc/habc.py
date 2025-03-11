@@ -69,7 +69,7 @@ class HABC_Wave(AcousticWave):
         Create a mesh with absorbing layer based on the determined size
     coeff_damp_fun()
         Compute the coefficients for quadratic damping function
-    damping_layer
+    damping_layer()
         Set the damping profile within the absorbing layer
     det_reference_freq()
         Determine the reference frequency for a new layer size.
@@ -171,12 +171,12 @@ class HABC_Wave(AcousticWave):
         self.pad_len = self.F_L * lref
 
         print('\nModifying Layer Size Based on the Element Size')
-        print("Modified Parameter Size F_L: {:.4f}".format(self.F_L))
+        print("Modified Parameter Size FL: {:.4f}".format(self.F_L))
         print("Modified Layer Size (km): {:.4f}".format(self.pad_len))
         print('Elements ({:.3f} km) in Layer: {}'.format(
             self.lmin, int(self.pad_len / self.lmin)))
 
-    def det_reference_freq(self, histPcrit, padding=4):
+    def det_reference_freq(self, histPcrit, fpad=4):
         '''
         Determine the reference frequency for a new layer size.
 
@@ -184,7 +184,7 @@ class HABC_Wave(AcousticWave):
         ----------
         histPcrit: `array`
             Transient response at the minimum Eikonal point
-        padding: `int`, optional
+        fpad: `int`, optional
             Padding factor for FFT. Default is 4
 
         Returns
@@ -197,7 +197,7 @@ class HABC_Wave(AcousticWave):
         if self.fwi_iter > 0:  # FWI iteration
 
             # Zero Padding for increasing smoothing in FFT
-            yt = np.concatenate([np.zeros(padding * len(histPcrit)), histPcrit])
+            yt = np.concatenate([np.zeros(fpad * len(histPcrit)), histPcrit])
 
             # Number of sample points
             N_samples = len(yt)
@@ -257,6 +257,10 @@ class HABC_Wave(AcousticWave):
         if layer_based_on_mesh:
             self.roundFL()
 
+        # Normalized element size
+        self.d = self.lmin / self.pad_len
+        print("Normalized Element Size (adim): {0:.5f}".format(self.d))
+
     def create_mesh_habc(self):
         '''
         Create a mesh with absorbing layer based on the determined size.
@@ -273,7 +277,6 @@ class HABC_Wave(AcousticWave):
         # New geometry with layer
         Lz = self.length_z + self.pad_len
         Lx = self.length_x + 2 * self.pad_len
-        print(self.length_z, self.length_x, self.pad_len)
 
         # Number of elements
         nz = int(self.length_z / self.lmin) + int(self.pad_len / self.lmin)
@@ -469,7 +472,7 @@ class HABC_Wave(AcousticWave):
         #     print(np.sqrt(abs(eigval)) / (2 * np.pi))
 
         # Fundamental frequency
-        min_eigval = np.unique(Lsp[(Lsp > 0.) & (np.imag(Lsp) == 0.)])[1]
+        min_eigval = max(np.unique(Lsp[(Lsp > 0.) & (np.imag(Lsp) == 0.)]))
         self.fundam_freq = np.real(np.sqrt(min_eigval) / (2 * np.pi))
         print("Fundamental Frequency (Hz): {0:.5f}".format(self.fundam_freq))
 
@@ -524,10 +527,10 @@ class HABC_Wave(AcousticWave):
         xCR_ini = psi * (self.d + 1.) / 2.
 
         # Computed values and its range
-        print('Minimum Damping Ratio: {:.4f}'.format(psi_min))
+        print('Minimum Damping Ratio: {:.5f}'.format(psi_min))
         psi_str = 'Range for Minimum Damping Ratio. Min:{:.5f} - Max:{:.5f}'
         print(psi_str.format(psimin_inf, psimin_sup))
-        print('Heuristic Factor xCR: {:.2f}'.format(xCR))
+        print('Heuristic Factor xCR: {:.3f}'.format(xCR))
         xcr_str = 'Range Values for xCR Factor. Min:{:.3f} - Max:{:.3f}'
         print(xcr_str.format(xCR_inf, xCR_sup))
 
@@ -569,17 +572,14 @@ class HABC_Wave(AcousticWave):
         -------
         None
         '''
-        print('\nCreating Damping Profile')
 
         # Estimating fundamental frequency
         self.fundamental_frequency()
 
-        # Normalized element size
-        self.d = self.lmin / self.pad_len
-
         # Initialize damping field
+        print('\nCreating Damping Profile')
         self.eta_habc = fire.Function(self.function_space, name='eta [1/s])')
-  
+
         # Dimensions and node coordinates
         Lz = self.length_z
         Lx = self.length_x
@@ -599,7 +599,8 @@ class HABC_Wave(AcousticWave):
         aq, bq = self.coeff_damp_fun(psi_min)
 
         # Apply damping profile
-        expr_damp = eta_crt * (aq * ref**2 + bq * ref)
+        expr_damp = fire.Constant(eta_crt) * (fire.Constant(aq) * ref**2
+                                              + fire.Constant(bq) * ref)
         self.eta_habc.interpolate(expr_damp)
 
         # Save damping profile
