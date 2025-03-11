@@ -38,7 +38,7 @@ for i in range(nconv):
 print("Eigenvalues:", eigenvalues)
 
 
-https://github.com/firedrakeproject/slepc
-https://github.com/firedrakeproject/firedrake/blob/master/docs/source/install.rst
-https://slepc.upv.es/documentation/instal.htm
-https://pypi.org/project/slepc4py/
+# https://github.com/firedrakeproject/slepc
+# https://github.com/firedrakeproject/firedrake/blob/master/docs/source/install.rst
+# https://slepc.upv.es/documentation/instal.htm
+# https://pypi.org/project/slepc4py/

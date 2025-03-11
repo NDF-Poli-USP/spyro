@@ -204,13 +204,13 @@ def calc_size_lay(Wave, nz=5, crtCR=1, tol_rel=1e-3, monitor=False):
 
     # Visualizing options for layer size
     format_FL = ', '.join(['{:.4f}'.format(float(x)) for x in FLpos])
-    print("Options for F_L: [{}]".format(format_FL))
+    print("Options for FL: [{}]".format(format_FL))
     format_CR = ', '.join(['{:.4f}'.format(x) for x in CRpos])
     print("Options for CR: [{}]".format(format_CR))
     format_ele = [int(x * lref / lmin) for x in FLpos]
     print("Aprox. Number of Elements ({:.3f} km) in Layer: {}".format(
         lmin, format_ele))
-    print("Selected Parameter Size F_L: {:.4f}".format(F_L))
+    print("Selected Parameter Size FL: {:.4f}".format(F_L))
     print("Selected Layer Size (km): {:.4f}".format(pad_len))
 
     return F_L, pad_len, a
