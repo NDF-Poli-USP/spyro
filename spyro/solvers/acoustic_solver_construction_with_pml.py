@@ -37,8 +37,8 @@ def construct_solver_or_matrix_with_pml_2d(Wave_object):
     X_n = fire.Function(W)
     X_nm1 = fire.Function(W)
 
-    u_n, pp_n = X_n.split()
-    u_nm1, _ = X_nm1.split()
+    u_n, pp_n = X_n.subfunctions
+    u_nm1, _ = X_nm1.subfunctions
 
     Wave_object.u_n = u_n
     Wave_object.X = X
@@ -104,8 +104,8 @@ def construct_solver_or_matrix_with_pml_3d(Wave_object):
     X_n = fire.Function(W)
     X_nm1 = fire.Function(W)
 
-    u_n, psi_n, pp_n = X_n.split()
-    u_nm1, psi_nm1, _ = X_nm1.split()
+    u_n, psi_n, pp_n = X_n.subfunctions
+    u_nm1, psi_nm1, _ = X_nm1.subfunctions
 
     Wave_object.u_n = u_n
     Wave_object.X = X
