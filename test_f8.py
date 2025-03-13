@@ -103,7 +103,8 @@ def test_habc_fig8():
         histPcrit = None
 
     # Determining layer size
-    Wave_obj.size_habc_criterion(Eik_obj, histPcrit, layer_based_on_mesh=True)
+    Wave_obj.size_habc_criterion(Eik_obj, histPcrit,
+                                 layer_based_on_mesh=True)
 
     # Creating mesh with absorbing layer
     Wave_obj.create_mesh_habc()
@@ -114,9 +115,7 @@ def test_habc_fig8():
     # Setting the damping profile within absorbing layer
     Wave_obj.damping_layer()
 
-    # ipdb.set_trace()
 
-
-# Cheking Eikonal values
+# Applying HABCs to the model in Fig. 8 of Salas et al. (2022)
 if __name__ == "__main__":
     test_habc_fig8()
