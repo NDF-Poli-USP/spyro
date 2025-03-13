@@ -2,7 +2,7 @@ import firedrake as fire
 import numpy as np
 from sys import float_info
 from os import getcwd
-# import ipdb
+import ipdb
 
 # Work from Ruben Andres Salas, Andre Luis Ferreira da Silva,
 # Luis Fernando Nogueira de Sá, Emilio Carlos Nelli Silva.
@@ -91,6 +91,10 @@ class Eikonal():
         self.z_data = z_f.dat.data_with_halos[:]
         self.x_data = x_f.dat.data_with_halos[:]
 
+        if Wave.dimension == 3:  # 3D
+            y_f = fire.Function(Wave.funct_space_eik).interpolate(Wave.mesh_y)
+            self.y_data = y_f.dat.data_with_halos[:]
+
         # Tolerance for boundary
         tol = 10**(min(int(np.log10(Wave.lmin / 10)), -6))
 
@@ -98,7 +102,13 @@ class Eikonal():
         left_boundary = np.where(self.x_data <= tol)
         right_boundary = np.where(self.x_data >= Wave.length_x-tol)
         bottom_boundary = np.where(self.z_data <= tol-Wave.length_z)
+
         self.bnds = [left_boundary, right_boundary, bottom_boundary]
+
+        if Wave.dimension == 3:  # 3D
+            left_bnd_y = np.where(self.y_data <= tol)
+            right_bnd_y = np.where(self.y_data >= Wave.length_y-tol)
+            self.bnds += [left_bnd_y, right_bnd_y]
 
         # Path to save data
         self.path_save = getcwd() + "/output/"
@@ -121,8 +131,15 @@ class Eikonal():
 
         # Identify source locations
         possou = Wave.sources.point_locations
-        sou_ids = [np.where(np.isclose(self.z_data, z_s) & np.isclose(
-            self.x_data, x_s))[0] for z_s, x_s in possou]
+
+        if Wave.dimension == 2:  # 2D
+            sou_ids = [np.where(np.isclose(self.z_data, z_s) & np.isclose(
+                self.x_data, x_s))[0] for z_s, x_s in possou]
+
+        if Wave.dimension == 3:  # 3D
+            sou_ids = [np.where(np.isclose(self.z_data, z_s) & np.isclose(
+                self.x_data, x_s) & np.isclose(self.y_data, y_s))[0]
+                for z_s, x_s, y_s in possou]
 
         # Define BCs for eikonal
         self.bcs_eik = [Dir_point_bc(
@@ -381,9 +398,6 @@ class Eikonal():
 
                 solv_ok = "Solver Executed Successfully. "
                 print((solv_ok + 'AbsTol: {:.1e}').format(user_atol))
-
-                # print(
-                #     f"\nSolver Executed Successfully. AbsTol: {user_atol:.1e}")
                 break
 
             except Exception as e:
@@ -496,7 +510,11 @@ class Eikonal():
             - sou_cr: Critical source coordinates
         '''
 
-        bnds_str = ['Left Boundary', 'Right Boundary', 'Bottom Boundary']
+        if Wave.dimension == 2:  # 2D
+            bnds_str = ['Left Boundary', 'Right Boundary', 'Bottom Boundary']
+        if Wave.dimension == 3:  # 3D
+            bnds_str = ['Xmin Boundary', 'Xmax Boundary', 'Bottom Boundary',
+                        'Ymin Boundary', 'Ymax Boundary', ]
 
         # Source locations
         possou = Wave.sources.point_locations
@@ -504,15 +522,28 @@ class Eikonal():
         # Loop over boundaries
         eik_bnd = []
         print('\nIdentifying Critical Points on Boundaries')
+        eik_str = "Min Eikonal on {0:>16} (ms): {1:>7.3f} "
         for bnd, bnd_str in zip(self.bnds, bnds_str):
 
             # Identify Eikonal minimum
             eikmin, idxmin = self.ident_eik_on_bnd(bnd)
-            pt_cr = (self.z_data[idxmin], self.x_data[idxmin])
+
+            if Wave.dimension == 2:  # 2D
+                pt_cr = (self.z_data[idxmin], self.x_data[idxmin])
+            if Wave.dimension == 3:  # 3D
+                pt_cr = (self.z_data[idxmin], self.x_data[idxmin],
+                         self.y_data[idxmin])
+
+            # Identifying propagation speed at critical point
             c_bnd = np.float64(Wave.c.at(pt_cr).item())
-            eik_str = "Min Eikonal on {0:>16} (ms): {1:>7.3f} "
-            print((eik_str + 'at (in km): ({2:3.3f}, {3:3.3f})').format(
-                bnd_str, 1e3 * eikmin, pt_cr[0], pt_cr[1]))
+
+            # Print critical point coordinates
+            if Wave.dimension == 2:  # 2D
+                pnt_str = 'at (in km): ({2:3.3f}, {3:3.3f})'
+            if Wave.dimension == 3:  # 3D
+                pnt_str = 'at (in km): ({2:3.3f}, {3:3.3f}, {4:3.3f})'
+
+            print((eik_str + pnt_str).format(bnd_str, 1e3 * eikmin, *pt_cr))
 
             # Identify closest source
             lref_allsou = [np.linalg.norm(
@@ -525,5 +556,5 @@ class Eikonal():
             # Grouping properties
             eik_bnd.append([pt_cr, c_bnd, eikmin, z_par, lref, sou_cr])
 
-        # Sort the list by the minimum Eikonal values
-        return sorted(eik_bnd, key=lambda x: x[2])
+        # Sort the list by the minimum Eikonal and then by the maximum velocity
+        return sorted(eik_bnd, key=lambda x: (x[2], -x[1]))

@@ -1,5 +1,6 @@
 import firedrake as fire
 import numpy as np
+import scipy.linalg as sl
 import scipy.sparse as ss
 import spyro.habc.eik as eik
 import spyro.habc.lay_len as lay_len
@@ -144,10 +145,15 @@ class HABC_Wave(AcousticWave):
         self.diam_mesh = fire.CellDiameter(self.mesh)
 
         if self.fwi_iter == 0:
+
+            if self.dimension == 2:  # 2D
+                fdim = 2**0.5
+            if self.dimension == 3:  # 3D
+                fdim = 3**0.5
             # Minimum mesh size
             diam = fire.Function(
                 self.funct_space_eik).interpolate(self.diam_mesh)
-            self.lmin = round(diam.dat.data_with_halos.min() / 2**0.5, 6)
+            self.lmin = round(diam.dat.data_with_halos.min() / fdim, 6)
 
     def roundFL(self):
         '''
@@ -279,12 +285,23 @@ class HABC_Wave(AcousticWave):
         Lx = self.length_x + 2 * self.pad_len
 
         # Number of elements
-        nz = int(self.length_z / self.lmin) + int(self.pad_len / self.lmin)
-        nx = int(self.length_x / self.lmin) + int(2 * self.pad_len / self.lmin)
+        n_pad = self.pad_len / self.lmin  # Elements in the layer
+        nz = int(self.length_z / self.lmin) + int(n_pad)
+        nx = int(self.length_x / self.lmin) + int(2 * n_pad)
         nx = nx + nx % 2
 
         # New mesh with layer
-        mesh_habc = fire.RectangleMesh(nz, nx, Lz, Lx)
+        if self.dimension == 2:  # 2D
+            mesh_habc = fire.RectangleMesh(nz, nx, Lz, Lx)
+
+        if self.dimension == 3:  # 3D
+            Ly = self.length_y + 2 * self.pad_len
+            ny = int(self.length_y / self.lmin) + int(2 * n_pad)
+            ny = ny + ny % 2
+            mesh_habc = fire.BoxMesh(nz, nx, ny, Lz, Lx, Ly)
+            mesh_habc.coordinates.dat.data_with_halos[:, 2] -= self.pad_len
+
+        # Adjusting coordinates
         mesh_habc.coordinates.dat.data_with_halos[:, 0] *= -1.0
         mesh_habc.coordinates.dat.data_with_halos[:, 1] -= self.pad_len
 
@@ -319,15 +336,35 @@ class HABC_Wave(AcousticWave):
         x_data = x_f.dat.data_with_halos[:]
 
         # Points to update velocity model
-        orig_pts = np.where((z_data >= -self.length_z) & (x_data >= 0.)
-                            & (x_data <= self.length_x))
+        if self.dimension == 2:  # 2D
+            orig_pts = np.where((z_data >= -self.length_z) & (x_data >= 0.)
+                                & (x_data <= self.length_x))
+        if self.dimension == 3:  # 3D
+            y_f = fire.Function(self.function_space).interpolate(self.mesh_y)
+            y_data = y_f.dat.data_with_halos[:]
+
+            # Points to update velocity model
+            orig_pts = np.where((z_data >= -self.length_z) & (x_data >= 0.)
+                                & (x_data <= self.length_x) & (y_data >= 0.)
+                                & (y_data <= self.length_y))
+            ypt_to_update = y_data[orig_pts]
+
         zpt_to_update = z_data[orig_pts]
         xpt_to_update = x_data[orig_pts]
 
         # Updating velocity model
         vel_to_update = self.c_habc.dat.data_with_halos[orig_pts]
-        for idp, (zpt, xpt) in enumerate(zip(zpt_to_update, xpt_to_update)):
-            vel_to_update[idp] = self.c.at(zpt, xpt)
+        for idp, zc in enumerate(zpt_to_update):
+            xc = xpt_to_update[idp]
+
+            if self.dimension == 2:  # 2D
+                pnt_c = (zc, xc)
+
+            if self.dimension == 3:  # 3D
+                yc = ypt_to_update[idp]
+                pnt_c = (zc, xc, yc)
+
+            vel_to_update[idp] = self.c.at(pnt_c)
 
         self.c_habc.dat.data_with_halos[orig_pts] = vel_to_update
 
@@ -340,26 +377,41 @@ class HABC_Wave(AcousticWave):
         zpt_to_extend = z_data[pad_pts]
         xpt_to_extend = x_data[pad_pts]
 
+        if self.dimension == 3:  # 3D
+            ypt_to_extend = y_data[pad_pts]
+
         # Tolerance for original boundary
         tol = 10**(min(int(np.log10(self.lmin / 10)), -6))
 
         vel_to_extend = self.c_habc.dat.data_with_halos[pad_pts]
-        for idp, (zpt, xpt) in enumerate(zip(zpt_to_extend, xpt_to_extend)):
+        for idp, z_bnd in enumerate(zpt_to_extend):
 
             # Find nearest point on the boundary of the original domain
-            z_bnd = zpt
-            if zpt < -self.length_z:
+            if z_bnd < -self.length_z:
                 z_bnd += self.pad_len + tol
 
-            x_bnd = xpt
-            if xpt < 0. or xpt > self.length_x:
-                x_bnd -= np.sign(xpt) * (self.pad_len + tol)
+            x_bnd = xpt_to_extend[idp]
+            if x_bnd < 0. or x_bnd > self.length_x:
+                x_bnd -= np.sign(x_bnd) * (self.pad_len + tol)
 
             # Ensure that point is within the domain bounds
             z_bnd = np.clip(z_bnd, -self.length_z, 0.)
             x_bnd = np.clip(x_bnd, 0., self.length_x)
 
-            vel_to_extend[idp] = self.c.at(z_bnd, x_bnd)
+            # Set the velocity at points in layer boundary
+            if self.dimension == 2:  # 2D
+                pnt_c = (z_bnd, x_bnd)
+
+            if self.dimension == 3:  # 3D
+                y_bnd = ypt_to_extend[idp]
+
+                if y_bnd < 0. or y_bnd > self.length_y:
+                    y_bnd -= np.sign(y_bnd) * (self.pad_len + tol)
+                y_bnd = np.clip(y_bnd, 0., self.length_y)
+
+                pnt_c = (z_bnd, x_bnd, y_bnd)
+
+            vel_to_extend[idp] = self.c.at(pnt_c)
 
         self.c_habc.dat.data_with_halos[pad_pts] = vel_to_extend
 
@@ -465,13 +517,27 @@ class HABC_Wave(AcousticWave):
 
         # Operator
         print('\nSolving Eigenvalue Problem')
-        Lsp = ss.linalg.eigs(Asp, k=2, M=Msp, sigma=0.0,
-                             return_eigenvectors=False)
+        if self.dimension == 2:  # 2D
+            Lsp = ss.linalg.eigs(Asp, k=2, M=Msp, sigma=0.0,
+                                 return_eigenvectors=False)
+        if self.dimension == 3:  # 3D
+            # M_ilu = ss.linalg.spilu(Msp)
+            # Lsp = ss.linalg.eigs(Asp, k=2, M=Msp, sigma=0.0,
+            #                      return_eigenvectors=False,
+            #                      OPinv=M_ilu.solve)
+
+            # Convert to proper CSR format if needed
+            # Msp = Msp.tocsr()
+            # Asp = Asp.tocsr()
+
+            # Initialize random vectors for LOBPCG
+            X = sl.orth(np.random.rand(Msp.shape[0], 2))  # Assuming k=2
+            Lsp = ss.linalg.lobpcg(Asp, X, M=Msp, largest=False)[0]
 
         # for eigval in np.unique(Lsp):
         #     print(np.sqrt(abs(eigval)) / (2 * np.pi))
 
-        # Fundamental frequency
+        # Fundamental frequency (eig = 0 is a rigid body motion)
         min_eigval = max(np.unique(Lsp[(Lsp > 0.) & (np.imag(Lsp) == 0.)]))
         self.fundam_freq = np.real(np.sqrt(min_eigval) / (2 * np.pi))
         print("Fundamental Frequency (Hz): {0:.5f}".format(self.fundam_freq))
@@ -590,7 +656,17 @@ class HABC_Wave(AcousticWave):
         z_pad_sqr = fire.conditional(z_f + Lz < 0, (z_f + Lz)**2, 0.)
         x_pad_sqr = fire.conditional(x_f < 0, x_f**2, 0.) + \
             fire.conditional(x_f - Lx > 0, (x_f - Lx)**2, 0.)
-        ref = fire.sqrt(z_pad_sqr + x_pad_sqr) / fire.Constant(self.pad_len)
+
+        # Reference distance to the original boundary
+        if self.dimension == 2:  # 2D
+            ref = fire.sqrt(z_pad_sqr + x_pad_sqr) / fire.Constant(self.pad_len)
+        if self.dimension == 3:  # 3D
+            Ly = self.length_y
+            y_f = fire.Function(self.function_space).interpolate(self.mesh_y)
+            y_pad_sqr = fire.conditional(y_f < 0, y_f**2, 0.) + \
+                fire.conditional(y_f - Ly > 0, (y_f - Ly)**2, 0.)
+            ref = fire.sqrt(z_pad_sqr + x_pad_sqr
+                            + y_pad_sqr) / fire.Constant(self.pad_len)
 
         # Compute the minimum damping ratio and its heuristic factor
         eta_crt, psi_min, xCR = self.calc_damping_prop()
