@@ -13,5 +13,6 @@ setup(
         "scipy",
         "matplotlib",
         "segyio",
-        "meshio"],
+        "meshio",
+        "mpi-pytest"],
 )

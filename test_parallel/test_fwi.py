@@ -66,6 +66,7 @@ dictionary["inversion"] = {
 }
 
 
+@pytest.mark.parallel(6)
 def test_fwi(load_real_shot=False, use_rol=False):
     """
     Run the Full Waveform Inversion (FWI) test.
@@ -131,6 +132,7 @@ def test_fwi(load_real_shot=False, use_rol=False):
 
 
 @pytest.mark.skipif(not is_rol_installed(), reason="ROL is not installed")
+@pytest.mark.parallel(6)
 def test_fwi_with_rol(load_real_shot=False, use_rol=True):
     test_fwi(load_real_shot=load_real_shot, use_rol=use_rol)
 
