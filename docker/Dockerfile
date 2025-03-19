@@ -21,6 +21,7 @@ RUN . /home/firedrake/firedrake/bin/activate; pip3 install --no-dependencies git
 RUN . /home/firedrake/firedrake/bin/activate; pip3 install pyamg
 RUN . /home/firedrake/firedrake/bin/activate; pip3 install meshio
 RUN . /home/firedrake/firedrake/bin/activate; pip3 install siphash24
+RUN . /home/firedrake/firedrake/bin/activate; pip3 install mpi-pytest
 
 FROM spyro_base AS spyro_release
 

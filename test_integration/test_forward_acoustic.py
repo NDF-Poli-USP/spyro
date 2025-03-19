@@ -3,6 +3,7 @@ from mpi4py import MPI
 import numpy as np
 import firedrake as fire
 import spyro
+import pytest
 
 
 def error_calc(p_numerical, p_analytical, nt):
@@ -12,6 +13,7 @@ def error_calc(p_numerical, p_analytical, nt):
     return div_error_time
 
 
+@pytest.mark.parallel(6)
 def test_forward_3_shots():
     final_time = 1.0
 
