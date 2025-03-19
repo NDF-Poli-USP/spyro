@@ -94,7 +94,7 @@ def test_habc_3d():
         vel_c.write(Wave_obj.c)
 
     # Mesh properties for Eikonal
-    Wave_obj.properties_eik_mesh(p_usu=2)
+    Wave_obj.properties_eik_mesh(p_usu=1)
 
     # Initializing Eikonal object
     if Wave_obj.fwi_iter == 0:
