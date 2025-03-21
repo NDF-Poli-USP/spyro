@@ -74,7 +74,8 @@ def test_habc_fig8():
     }
 
     # Create the acoustic wave object with HABCs
-    Wave_obj = habc.HABC_Wave(dictionary=dictionary)
+    # Wave_obj = habc.HABC_Wave(dictionary=dictionary)
+    Wave_obj = habc.HABC_Wave(dictionary=dictionary, layer_shape='hypershape')
 
     # Mesh
     # cpw: cells per wavelength
