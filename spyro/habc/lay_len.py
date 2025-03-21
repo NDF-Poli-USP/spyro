@@ -21,7 +21,7 @@ def f_layer(x, a, m=1, s=0.999, typ='FL'):
     a : `float`
         Adimensional propagation speed parameter (a = z/f, z = c/l).
         Also, "z" parameter is the inverse of the minimum Eikonal (1/phi_min)
-    m : `float`, optional
+    m : `int`, optional
         Vibration mode. Default is 1 (Fundamental mode)
     s : `float`, optional
         Damping ratio. Default is 0.999
