@@ -96,7 +96,7 @@ def plot_mesh_sizes(
     output_filename=None,
     show=False,
 ):
-    plt.rcParams['font.family'] = "Times New Roman"
+    # plt.rcParams['font.family'] = "Times New Roman"
     plt.rcParams['font.size'] = 12
 
     if mesh_filename is not None:
