@@ -158,7 +158,7 @@ def calc_size_lay(Wave, nz=5, crtCR=1, tol_rel=1e-3, monitor=False):
     z_par = Wave.eik_bnd[0][3]
     aux0 = "Parameter z (1/s): {:.4f},".format(z_par)
     a = z_par / fref  # Adimensional parameter
-    aux1 = "Parameter a (adim): {:.4f},".format(a)
+    aux1 = "Parameter a (adim): {:.4f}".format(a)
     print(aux0, aux1)
 
     # lmin: Minimal dimension of finite element in mesh

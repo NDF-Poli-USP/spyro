@@ -18,7 +18,7 @@ def test_habc_3d():
         # (MLT/spectral_quadrilateral/DG_triangle/DG_quadrilateral)
         # You can either specify a cell_type+variant or a method
         # accepted_variants = ["lumped", "equispaced", "DG"]
-        "degree": 3,  # p order p < 4
+        "degree": 3,  # p order p <= 3 for 3D
         "dimension": 3,  # dimension
     }
 
@@ -73,7 +73,10 @@ def test_habc_3d():
     }
 
     # Create the acoustic wave object with HABCs
-    Wave_obj = habc.HABC_Wave(dictionary=dictionary)
+    p_usu = 1
+    f_est = 0.07 if p_usu == 2 else 0.06
+
+    Wave_obj = habc.HABC_Wave(dictionary=dictionary, f_est=f_est)
 
     # Mesh
     # cpw: cells per wavelength
@@ -94,7 +97,7 @@ def test_habc_3d():
         vel_c.write(Wave_obj.c)
 
     # Mesh properties for Eikonal
-    Wave_obj.properties_eik_mesh(p_usu=1)
+    Wave_obj.properties_eik_mesh(p_usu=p_usu)
 
     # Initializing Eikonal object
     if Wave_obj.fwi_iter == 0:
@@ -113,6 +116,7 @@ def test_habc_3d():
 
     # Setting the damping profile within absorbing layer
     Wave_obj.damping_layer()
+
 
 # Applying HABCs to the model 3D
 if __name__ == "__main__":
