@@ -45,6 +45,8 @@ class HABC_Wave(AcousticWave, HyperLayer):
         Damping profile within the absorbing layer
     F_L : `float`
         Size  parameter of the absorbing layer
+    f_est: `float`
+        Factor for the stabilizing term in Eikonal equation
     freq_ref: `float`
         Reference frequency of the wave at the minimum Eikonal point
     fundam_freq; `float`
@@ -109,8 +111,8 @@ class HABC_Wave(AcousticWave, HyperLayer):
         Determine the initial search range for the heuristic factor xCR
     '''
 
-    def __init__(self, dictionary=None, comm=None,
-                 layer_shape='rectangular', fwi_iter=0):
+    def __init__(self, dictionary=None, layer_shape='rectangular',
+                 f_est=0.06, fwi_iter=0, comm=None):
         '''
         Initializes the HABC class.
 
@@ -118,13 +120,17 @@ class HABC_Wave(AcousticWave, HyperLayer):
         ----------
         dictionary : dict, optional
             A dictionary containing the input parameters for the HABC class
-        comm : object, optional
-            An object representing the communication interface
         layer_shape : str, optional
             Shape type of pad layer. Options: 'rectangular' or 'hypershape'
             Default is 'rectangular'
+        f_est: `float`, optional
+            Factor for the stabilizing term in Eikonal equation
+            Default is 0.06
         fwi_iter: int, optional
             The iteration number for the FWI algorithm
+            Default is 0
+        comm : object, optional
+            An object representing the communication interface
 
         Returns
         -------
@@ -137,8 +143,6 @@ class HABC_Wave(AcousticWave, HyperLayer):
 
         # Layer shape
         self.layer_shape = layer_shape
-
-        # Hyperellipse degree
         if self.layer_shape == 'rectangular':
             self.n_hyp = None
             print("\nAbsorbing Layer Shape: Rectangular")
@@ -149,6 +153,9 @@ class HABC_Wave(AcousticWave, HyperLayer):
         else:
             aux0 = "Please use 'rectangular' or 'hypershape', "
             UserWarning(aux0 + f"{self.layer_shape} not supported.")
+
+        # Factor for the stabilizing term in Eikonal equation
+        self.f_est = f_est
 
         # Current iteration
         self.fwi_iter = fwi_iter
@@ -284,7 +291,7 @@ class HABC_Wave(AcousticWave, HyperLayer):
         Eikonal.define_bcs(self)
 
         # Solving Eikonal
-        Eikonal.solve_eik(self)
+        Eikonal.solve_eik(self, f_est=self.f_est)
 
         # Identifying critical points
         self.eik_bnd = Eikonal.ident_crit_eik(self)
@@ -324,7 +331,7 @@ class HABC_Wave(AcousticWave, HyperLayer):
             # Defining the hypershape semi-axes
             self.define_hyperaxes(domain_dim)
 
-            # Degree of the hyperelliptical layer
+            # Degree of the hypershape layer
             self.define_hyperlayer(self.pad_len, self.lmin)
 
     def create_mesh_habc(self):
@@ -1076,3 +1083,119 @@ class HABC_Wave(AcousticWave, HyperLayer):
         # Save damping profile
         outfile = fire.VTKFile(self.path_save + "eta_habc.pvd")
         outfile.write(self.eta_habc)
+
+
+# from firedrake import *
+
+# # Create a circular mesh
+# circle = CircleMesh(radius=1.0, refinement_level=3)
+
+# # Transform it into an ellipse by scaling along the x-axis
+# for x, y in circle.coordinates.dat.data:
+#     x *= 2  # Scale x-coordinates to make it elliptical
+
+# # Define the mesh with transformed coordinates
+# elliptical_mesh = Mesh(circle.coordinates)
+
+# # Use the mesh in your simulation
+# print(elliptical_mesh)
+
+# from firedrake import *
+# import numpy as np
+
+# # Parameters for the hyperellipse
+# a, b = 2.0, 1.0  # Semi-axes
+# n = 4            # Degree of the hyperellipse
+# resolution = 50  # Number of points along each axis
+
+# # Create an initial mesh (e.g., a square)
+# square = UnitSquareMesh(resolution, resolution)
+
+# # Transform the square mesh into a hyperellipse
+# coordinates = square.coordinates.dat.data
+# for i, (x, y) in enumerate(coordinates):
+#     # Map points to the boundary of the hyperellipse
+#     r = (abs(x / a)**n + abs(y / b)**n)**(1.0 / n)
+#     coordinates[i] = [x / r, y / r]
+
+# # Define the mesh with transformed coordinates
+# hyperellipse_mesh = Mesh(square.coordinates)
+
+# # Use the mesh in your simulation
+# print(hyperellipse_mesh)
+
+# from firedrake import *
+# import numpy as np
+# import meshio
+
+# # Parameters for the hyperellipse
+# a, b = 2.0, 1.0  # Semi-axes
+# n = 4            # Degree of the hyperellipse
+# num_points = 500  # Number of random points for the mesh
+
+# # Generate random points in the bounding box of the hyperellipse
+# points = []
+# while len(points) < num_points:
+#     x = np.random.uniform(-a, a)
+#     y = np.random.uniform(-b, b)
+#     if (abs(x / a)**n + abs(y / b)**n) <= 1.0:
+#         points.append((x, y))
+
+# # Write points to a file (for gmsh)
+# with open("hyperellipse.geo", "w") as f:
+#     f.write("Point(1) = {0, 0, 0, 1.0};\n")
+#     for i, (x, y) in enumerate(points, start=1):
+#         f.write(f"Point({i}) = {{{x}, {y}, 0, 0.1}};\n")
+#     # Add code for gmsh to generate a mesh here, e.g., Delaunay triangulation
+
+# # Use gmsh to generate the unstructured mesh
+# # Command: gmsh -2 hyperellipse.geo -format msh -o hyperellipse.msh
+
+# # Convert the mesh to Firedrake format
+# mesh = Mesh("hyperellipse.msh")
+
+# # Use the mesh in your Firedrake simulation
+# print(mesh)
+
+# import numpy as np
+# import pygmsh
+# from firedrake import Mesh
+# import meshio
+
+# # Parameters for the hyperellipse
+# a = 2.0        # Semi-major axis
+# b = 1.0        # Semi-minor axis
+# n = 4          # Degree of the hyperellipse
+# lmin = 0.1     # Minimum edge length
+# lmax = 0.5     # Maximum edge length
+
+# # Function to define the hyperellipse boundary points
+# def parametric_hyperellipse(a, b, n, num_points):
+#     t = np.linspace(0, 2 * np.pi, num_points)
+#     x = a * np.sign(np.cos(t)) * np.abs(np.cos(t))**(2/n)
+#     y = b * np.sign(np.sin(t)) * np.abs(np.sin(t))**(2/n)
+#     return np.column_stack((x, y))
+
+# # Generate the hyperellipse boundary points
+# num_boundary_points = 100
+# boundary_points = parametric_hyperellipse(a, b, n, num_boundary_points)
+
+# # Use pygmsh to generate the unstructured mesh
+# with pygmsh.geo.Geometry() as geom:
+#     # Add hyperellipse boundary
+#     boundary = geom.add_polygon(
+#         boundary_points,
+#         mesh_size=lmax
+#     )
+
+#     # Generate mesh
+#     mesh = geom.generate_mesh()
+
+# # Export the mesh to a file that Firedrake can read
+# meshio.write("hyperellipse.msh", mesh)
+
+# # Load the mesh into Firedrake
+# firedrake_mesh = Mesh("hyperellipse.msh")
+
+# # Use the mesh in your Firedrake simulation
+# print(firedrake_mesh)

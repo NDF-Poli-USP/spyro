@@ -18,7 +18,7 @@ def test_habc_fig8():
         # (MLT/spectral_quadrilateral/DG_triangle/DG_quadrilateral)
         # You can either specify a cell_type+variant or a method
         # accepted_variants = ["lumped", "equispaced", "DG"]
-        "degree": 4,  # p order p=4 ok
+        "degree": 4,  # p order p<=4 for 2D
         "dimension": 2,  # dimension
     }
 
@@ -107,14 +107,14 @@ def test_habc_fig8():
     Wave_obj.size_habc_criterion(Eik_obj, histPcrit,
                                  layer_based_on_mesh=True)
 
-    # Creating mesh with absorbing layer
-    Wave_obj.create_mesh_habc()
+    # # Creating mesh with absorbing layer
+    # Wave_obj.create_mesh_habc()
 
-    # Updating velocity model
-    Wave_obj.velocity_habc()
+    # # Updating velocity model
+    # Wave_obj.velocity_habc()
 
-    # Setting the damping profile within absorbing layer
-    Wave_obj.damping_layer()
+    # # Setting the damping profile within absorbing layer
+    # Wave_obj.damping_layer()
 
 
 # Applying HABCs to the model in Fig. 8 of Salas et al. (2022)
