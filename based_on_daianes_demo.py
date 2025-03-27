@@ -1,6 +1,6 @@
 from firedrake import *
 from firedrake.adjoint import *
-# from irksome import Dt, MeshConstant, StageDerivativeNystromTimeStepper
+from irksome import Dt, MeshConstant, StageDerivativeNystromTimeStepper
 import os
 import numpy as np
 import finat
@@ -97,7 +97,7 @@ for step in range(total_steps):
 J_hat = ReducedFunctional(J_val, Control(c_guess))
 
 c_optimised = minimize(
-    J_hat, method="L-BFGS-B", options={"disp": True, "maxiter": 1},
+    J_hat, method="L-BFGS-B", options={"disp": True, "maxiter": 20},
     bounds=(1.5, 2.0), derivative_options={"riesz_representation": 'l2'}
 )
 
