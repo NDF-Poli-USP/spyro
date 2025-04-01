@@ -26,25 +26,35 @@ class HABC_Wave(AcousticWave, HyperLayer):
     Attributes
     ----------
     a_par: `float`
-        Adimensional propagation speed parameter (a = z/f).
-        "z" parameter is the inverse of the minimum Eikonal (1/phi_min)
+        Adimensional propagation speed parameter (a = z / f).
+        "z" parameter is the inverse of the minimum Eikonal (1 / phi_min)
+    a_rat : `float`
+        Area ratio to the area of the original domain. a_rat = area / a_orig
+    area : `float`
+        Area of the domain with absorbing layer
     c_habc': 'firedrake function'
         Velocity model with absorbing layer
     d_par: `float`
-        Normalized element size (lmin/pad_len)
+        Normalized element size (lmin / pad_len)
     eik_bnd: `list`
         Properties on boundaries according to minimum values of Eikonal
         Structure sublist: [pt_cr, c_bnd, eikmin, z_par, lref, sou_cr]
         - pt_cr: Critical point coordinates
         - c_bnd: Propagation speed at critical point
         - eikmin: Eikonal value in seconds
-        - z_par: Inverse of minimum Eikonal (Equivalent to c_bound/lref)
+        - z_par: Inverse of minimum Eikonal (Equivalent to c_bound / lref)
         - lref: Distance to the closest source from critical point
         - sou_cr: Critical source coordinates
     eta_habc: `firedrake function`
         Damping profile within the absorbing layer
     F_L : `float`
         Size  parameter of the absorbing layer
+    f_Ah : `float`
+        Hyperelliptical area factor. f_Ah = area / (a_hyp * b_hyp).
+        f_Ah is 4 for rectangular layers
+    f_Vh : `float`
+        Hyperellipsoidal volume factor. f_Vh = vol / (a_hyp * b_hyp * c_hyp).
+        f_Vh is 8 for rectangular layers
     f_est: `float`
         Factor for the stabilizing term in Eikonal equation
     freq_ref: `float`
@@ -60,29 +70,40 @@ class HABC_Wave(AcousticWave, HyperLayer):
     Ly_habc: `float`
         Length of the domain in the y-direction with absorbing (3D models)
     layer_shape: `string`
-        Shape type of pad layer
+        Shape type of pad layer. Options: 'rectangular' or 'hypershape'
     lmin: `float`
         Minimum mesh size
     lmax: `float`
         Maxmum mesh size
-    nexp: `int`
-        Exponent of the hyperelliptical pad layer
+    n_bounds: `tuple`
+        Bounds for the hypershape layer degree. (n_min, n_max)
+        - n_min ensures to add lmin in the domain diagonal direction
+        - n_max ensures to add pad_len in the domain diagonal direction
+    n_hyp: `int`
+        Degree of the hyperelliptical pad layer (n >= 2). Default is 2.
+        For rectangular layers, n_hyp is set to infinity
     pad_len : `float`
-        Size of damping layer
+        Size of the absorbing layer
     path_save: `string`
         Path to save data
+    v_rat : `float`
+        Volume ratio to the volume of the original domain. v_rat = vol / v_orig
+    vol : `float`
+        Volume of the domain with absorbing layer
     xCR: `float`
         Heuristic factor for the minimum damping ratio (psi_min = xCR * d)
     xCR_bounds: `list`
         Bounds for the heuristic factor. [xCR_lim, xCR_search]
         Structure: [[xCR_inf, xCR_sup], [xCR_min, xCR_max]]
         - xCR_lim: Limits for the heuristic factor.
-        - xCR_search: Initial search range for the heuristic factor.
+        - xCR_search: Initial search range for the heuristic factor
 
     Methods
     -------
     calc_damping_prop()
         Compute the damping properties for the absorbing layer
+    calc_rec_geom_prop()
+        Calculate the geometric properties for the rectangular layer
     coeff_damp_fun()
         Compute the coefficients for quadratic damping function
     create_mesh_habc()
@@ -92,7 +113,7 @@ class HABC_Wave(AcousticWave, HyperLayer):
     det_reference_freq()
         Determine the reference frequency for a new layer size
     est_min_damping()
-        Estimate the minimum damping ratio and the associated heuristic factor.
+        Estimate the minimum damping ratio and the associated heuristic factor
     fundamental_frequency()
         Compute the fundamental frequency in Hz via modal analysis
     min_reflection()
@@ -114,7 +135,7 @@ class HABC_Wave(AcousticWave, HyperLayer):
     def __init__(self, dictionary=None, layer_shape='rectangular',
                  f_est=0.06, fwi_iter=0, comm=None):
         '''
-        Initializes the HABC class.
+        Initialize the HABC class.
 
         Parameters
         ----------
@@ -144,7 +165,6 @@ class HABC_Wave(AcousticWave, HyperLayer):
         # Layer shape
         self.layer_shape = layer_shape
         if self.layer_shape == 'rectangular':
-            self.n_hyp = None
             print("\nAbsorbing Layer Shape: Rectangular")
 
         elif self.layer_shape == 'hypershape':
@@ -188,6 +208,7 @@ class HABC_Wave(AcousticWave, HyperLayer):
 
             if self.dimension == 2:  # 2D
                 fdim = 2**0.5
+
             if self.dimension == 3:  # 3D
                 fdim = 3**0.5
 
@@ -267,6 +288,25 @@ class HABC_Wave(AcousticWave, HyperLayer):
 
         print("Reference Frequency (Hz): {:.4f}".format(self.freq_ref))
 
+    def calc_rec_geom_prop(self):
+        '''
+        Calculate the geometric properties for the rectangular layer.
+        '''
+
+        self.n_hyp = np.inf
+        self.n_bounds = None
+
+        # Geometric properties of the rectangular layer
+        if self.dimension == 2:  # 2D
+            self.area = self.Lx_habc * self.Lz_habc
+            self.a_rat = self.area / (self.length_x * self.length_z)
+            self.f_Ah = 4
+
+        if self.dimension == 3:  # 3D
+            self.vol = self.Lx_habc * self.Lz_habc * self.Ly_habc
+            self.v_rat = self.vol / (self.length_x * self.length_z * self.length_y)
+            self.f_Vh = 8
+
     def size_habc_criterion(self, Eikonal, histPcrit,
                             layer_based_on_mesh=False):
         '''
@@ -310,14 +350,11 @@ class HABC_Wave(AcousticWave, HyperLayer):
         print("Normalized Element Size (adim): {0:.5f}".format(self.d))
 
         # New geometry with layer
-        Lz = self.length_z + self.pad_len
-        Lx = self.length_x + 2 * self.pad_len
-        self.Lz_habc = Lz
-        self.Lx_habc = Lx
+        self.Lx_habc = self.length_x + 2 * self.pad_len
+        self.Lz_habc = self.length_z + self.pad_len
 
         if self.dimension == 3:  # 3D
-            Ly = self.length_y + 2 * self.pad_len
-            self.Ly_habc = Ly
+            self.Ly_habc = self.length_y + 2 * self.pad_len
 
         if self.layer_shape == 'hypershape':
 
@@ -325,14 +362,26 @@ class HABC_Wave(AcousticWave, HyperLayer):
 
             # Original domain dimensions
             domain_dim = [self.length_x, self.length_z]
+            domain_hyp = [self.Lx_habc, self.length_z + 2 * self.pad_len]
             if self.dimension == 3:  # 3D
                 domain_dim.append(self.length_y)
+                domain_hyp.append(self.Ly_habc)
 
             # Defining the hypershape semi-axes
-            self.define_hyperaxes(domain_dim)
+            self.define_hyperaxes(domain_dim, domain_hyp)
 
             # Degree of the hypershape layer
             self.define_hyperlayer(self.pad_len, self.lmin)
+
+            # Geometric properties of the hypershape layer
+            self.calc_hyp_geom_prop()
+
+        else:
+
+            print("\nDetermining Rectangular Layer Parameters")
+
+            # Geometric properties of the rectangular layer
+            self.calc_rec_geom_prop()
 
     def create_mesh_habc(self):
         '''
@@ -643,7 +692,7 @@ class HABC_Wave(AcousticWave, HyperLayer):
         if typ == 'CR_FEM' or typ == 'CR_ERR':
             def psi_from_CR(CR, kCR):
                 '''
-                Compute the damping ratio from the reflection coefficient
+                Compute the damping ratio from the reflection coefficient.
 
                 Parameters
                 ----------
@@ -675,7 +724,7 @@ class HABC_Wave(AcousticWave, HyperLayer):
 
             def Zi(p, alpha, ele_type):
                 '''
-                Compute the Z parameter for the spurious reflection coefficient
+                Compute the Z parameter in the spurious reflection coefficient.
 
                 Parameters
                 ----------
@@ -838,20 +887,16 @@ class HABC_Wave(AcousticWave, HyperLayer):
 
         if self.dimension == 2:  # 2D
 
-            # Area factor  0 < F_area <= 4
-            if self.layer_shape == 'rectangular':
-                F_area = 4
-            elif self.layer_shape == 'hyperelliptical':
-                # F_area = FactA
-                pass
+            # Area factor 0 < f_Ah <= 4
+            f_Ah = self.f_Ah
 
             # Factors and their inverses from sqrt(1/a^2 + 1/b^2)
             fa = (1 + Rab**2)**0.5  # Factoring 1/a^2
             fainv = 1 / fa
             fb = (1 + Rab**2)**0.5 / Rab  # Factoring 1/b^2
             fbinv = 1 / fb
-            fmin = F_area / 4 * min(fainv, fbinv)
-            fmax = 4 / F_area * max(fa, fb)
+            fmin = f_Ah / 4 * min(fainv, fbinv)
+            fmax = 4 / f_Ah * max(fa, fb)
 
         if self.dimension == 3:  # 3D
 
@@ -862,6 +907,9 @@ class HABC_Wave(AcousticWave, HyperLayer):
             Rac = a_rect / c_rect
             Rbc = b_rect / c_rect
 
+            # Volume factor 0 < f_Vh <= 8
+            f_Vh = self.f_Vh = 8
+
             # Factors and their inverses from sqrt(1/a^2 + 1/b^2 + 1/c^2)
             fa = (1 + Rab**2 + Rac**2)**0.5  # Factoring 1/a^2
             fainv = 1 / fa
@@ -869,15 +917,8 @@ class HABC_Wave(AcousticWave, HyperLayer):
             fbinv = 1 / fb
             fc = (Rac**2 + (Rac * Rbc)**2 + Rbc**2)**0.5 / (Rac * Rbc)  # 1/c^2
             fcinv = 1 / fc
-
-            if self.layer_shape == 'rectangular':
-                F_vol = 8
-            elif self.layer_shape == 'hyperelliptical':
-                # F_vol = FactV
-                pass
-
-            fmin = F_vol / 8 * min(fainv, fbinv, min(fc, 1 / fc))
-            fmax = 8 / F_vol * max(fa, fb, max(fc, 1 / fc))
+            fmin = f_Vh / 8 * min(fainv, fbinv, min(fc, 1 / fc))
+            fmax = 8 / f_Vh * max(fa, fb, max(fc, 1 / fc))
 
         # Correction by geometry
         xCR_min = np.clip(xCR_min * fmin, xCR_inf, xCR_sup)
@@ -1001,7 +1042,7 @@ class HABC_Wave(AcousticWave, HyperLayer):
 
     def coeff_damp_fun(self, psi_min, psi=0.999):
         '''
-        Compute the coefficients for quadratic damping function
+        Compute the coefficients for quadratic damping function.
 
         Parameters
         ----------
@@ -1057,6 +1098,7 @@ class HABC_Wave(AcousticWave, HyperLayer):
         # Reference distance to the original boundary
         if self.dimension == 2:  # 2D
             ref = fire.sqrt(z_pd_sqr + x_pd_sqr) / fire.Constant(self.pad_len)
+
         if self.dimension == 3:  # 3D
             Ly = self.length_y
             y_f = fire.Function(self.function_space).interpolate(self.mesh_y)

@@ -73,7 +73,7 @@ class Eikonal():
 
     def __init__(self, Wave):
         '''
-        Initializes the Eikonal class.
+        Initialize the Eikonal class.
 
         Parameters
         ----------

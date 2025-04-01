@@ -12,22 +12,22 @@ import numpy as np
 
 def f_layer(x, a, m=1, s=0.999, typ='FL'):
     '''
-    Function whose zeros are solution for the parameter size of the layer
+    Function whose zeros are solution for the parameter size of the layer.
 
     Parameters
     ----------
     x : `float`
         Size  parameter of the absorbing layer (F_L)
     a : `float`
-        Adimensional propagation speed parameter (a = z/f, z = c/l).
-        Also, "z" parameter is the inverse of the minimum Eikonal (1/phi_min)
+        Adimensional propagation speed parameter (a = z / f, z = c / l)
+        Also, "z" parameter is the inverse of the minimum Eikonal (1 / phi_min)
     m : `int`, optional
         Vibration mode. Default is 1 (Fundamental mode)
     s : `float`, optional
         Damping ratio. Default is 0.999
     typ : `str`, optional
         Type of function to be computed. Default is 'FL'
-        Options: 'FL' (size layer criterion) or 'CR' (reflection coeficient).
+        Options: 'FL' (size layer criterion) or 'CR' (reflection coeficient)
 
     Returns
     -------
@@ -74,15 +74,15 @@ def f_layer(x, a, m=1, s=0.999, typ='FL'):
 
 def calcZero(xini, a, tol, nz=1):
     '''
-    Compute several parameter sizes for the absorbing layer
+    Compute several parameter sizes for the absorbing layer.
 
     Parameters
     ----------
     xini : `float`
         Initial guess for size parameter of the absorbing layer (F_L)
     a : `float`
-        Adimensional propagation speed parameter (a = z/f, z = c/l).
-        Also, "z" parameter is the inverse of the minimum Eikonal (1/phi_min)
+        Adimensional propagation speed parameter (a = z / f, z = c / l)
+        Also, "z" parameter is the inverse of the minimum Eikonal (1 / phi_min)
     tol : `float`
         Tolerance for the n-th root fo the function f_layer(x, a)
     nz : `int`, optional
@@ -123,7 +123,7 @@ def calcZero(xini, a, tol, nz=1):
 
 def calc_size_lay(Wave, nz=5, crtCR=1, tol_rel=1e-3, monitor=False):
     '''
-    Calculate the lenght of the absorbing layer
+    Calculate the lenght of the absorbing layer.
 
     Parameters
     ----------
@@ -143,10 +143,10 @@ def calc_size_lay(Wave, nz=5, crtCR=1, tol_rel=1e-3, monitor=False):
     F_L : `float`
         Size  parameter of the absorbing layer
     pad_len : `float`
-        Size of damping layer
+        Size of the absorbing layer
     a : `float`
-        Adimensional propagation speed parameter (a = z/f, z = c/l).
-        Also, "z" parameter is the inverse of the minimum Eikonal (1/phi_min)
+        Adimensional propagation speed parameter (a = z / f, z = c / l)
+        Also, "z" parameter is the inverse of the minimum Eikonal (1 / phi_min)
     '''
 
     # Visualizing parameters for computing layer size
@@ -174,7 +174,7 @@ def calc_size_lay(Wave, nz=5, crtCR=1, tol_rel=1e-3, monitor=False):
 
     x = FLmin
     FLpos = []  # Size factor
-    crtCR = min(crtCR - 1, nz - 1)  # Size selected. Default: 0
+    crtCR = min(crtCR - 1, nz - 1)  # Size selected
     dig_x = 13
 
     tol = 10**int(np.log10(tol_rel * FLmin))

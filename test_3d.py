@@ -75,8 +75,10 @@ def test_habc_3d():
     # Create the acoustic wave object with HABCs
     p_usu = 1
     f_est = 0.07 if p_usu == 2 else 0.06
-
-    Wave_obj = habc.HABC_Wave(dictionary=dictionary, f_est=f_est)
+    # layer_shape = 'rectangular'
+    layer_shape = 'hypershape'
+    Wave_obj = habc.HABC_Wave(dictionary=dictionary,
+                              layer_shape=layer_shape, f_est=f_est)
 
     # Mesh
     # cpw: cells per wavelength
@@ -108,14 +110,14 @@ def test_habc_3d():
     Wave_obj.size_habc_criterion(Eik_obj, histPcrit,
                                  layer_based_on_mesh=True)
 
-    # Creating mesh with absorbing layer
-    Wave_obj.create_mesh_habc()
+    # # Creating mesh with absorbing layer
+    # Wave_obj.create_mesh_habc()
 
-    # Updating velocity model
-    Wave_obj.velocity_habc()
+    # # Updating velocity model
+    # Wave_obj.velocity_habc()
 
-    # Setting the damping profile within absorbing layer
-    Wave_obj.damping_layer()
+    # # Setting the damping profile within absorbing layer
+    # Wave_obj.damping_layer()
 
 
 # Applying HABCs to the model 3D
