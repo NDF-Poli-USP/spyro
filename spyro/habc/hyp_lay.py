@@ -59,8 +59,12 @@ class HyperLayer():
         Define the hyperlayer degree and its limits
     half_hyp_area()
         Compute half the area of the hyperellipse
-    truncated_half_hyp_area()
-        Compute the truncated area of superellipse between 0 <= z0 / b <= 1
+    half_hyp_volume()
+        Compute half the volume of the hyperellipsoid
+    trunc_half_hyp_area()
+        Compute the truncated area of superellipse for 0 <= z0 / b <= 1
+    trunc_half_hyp_volume()
+        Compute the truncated volume of hyperellipsoid for 0 <= z0 / b <= 1
     '''
 
     def __init__(self, n_hyp=2, dimension=2):
@@ -341,10 +345,10 @@ class HyperLayer():
         self.n_bounds = (n_min, n_max)
 
     @staticmethod
-    def truncated_half_hyp_area(a, b, n, z0):
+    def trunc_half_hyp_area(a, b, n, z0):
         '''
-        Compute the truncated area of superellipse between 0 <= z0 / b <= 1.
-        Verify area with self.truncated_half_hyp_area(1, 1, 2, 1) = pi / 2
+        Compute the truncated area of hyperellipse for 0 <= z0 / b <= 1.
+        Verify with self.trunc_half_hyp_area(1, 1, 2, 1) = pi / 2.
 
         Parameters
         ----------
@@ -363,7 +367,7 @@ class HyperLayer():
             Truncated area of the hyperellipse
         '''
 
-        if z0 <= 0 or z0 >= b:
+        if z0 < 0 or z0 > b:
             UserWarning("Truncation plane must be 0 <= h <= {:5.3f}".format(b))
 
         w = (z0 / b) ** n  # w <= 1
@@ -378,7 +382,7 @@ class HyperLayer():
     def half_hyp_area(a, b, n):
         '''
         Compute half the area of the hyperellipse.
-        Verify area with self.half_hyp_area(1, 1, 2) = pi / 2
+        Verify with self.half_hyp_area(1, 1, 2) = pi / 2.
 
         Parameters
         ----------
@@ -399,9 +403,81 @@ class HyperLayer():
 
         return A_hf
 
+    @staticmethod
+    def trunc_half_hyp_volume(a, b, c, n, z0):
+        '''
+        Compute the truncated volume of hyperellipsoid for 0 <= z0 / b <= 1.
+        Verify with self.trunc_half_hyp_volume(1, 1, 1, 2, 1) = 2 * pi / 3.
+
+        Parameters
+        ----------
+        a : `float`
+            Hyperellipsoid semi-axis in direction 1
+        b : `float`
+            Hyperellipsoid semi-axis in truncated direction 2
+        c : `float`
+            Hyperellipsoid semi-axis in direction 3
+        n : `int`
+            Degree of the hyperellipsoid
+        z0 : `float`
+            Truncation plane
+
+        Returns
+        -------
+        A_tr : `float`
+            Truncated volume of the hyperellipsoid
+        '''
+
+        if z0 < 0 or z0 > b:
+            UserWarning("Truncation plane must be 0 <= h <= {:5.3f}".format(b))
+
+        w = (z0 / b) ** n  # w <= 1
+        p = 1 / n
+        q = 1 + 2 / n
+        A_f = gamma(1 + p)**2 / gamma(q)
+        B_w = beta(p, q) * betainc(p, q, w)  # Non-regularized B_z(p, q)
+        V_tr = (4 * a * b * c / n) * A_f * B_w
+
+        return V_tr
+
+    @staticmethod
+    def half_hyp_volume(a, b, c, n):
+        '''
+        Compute half the volume of the hyperellipsoid.
+        Verify with self.half_hyp_volume(1, 1, 1, 2) = 2 * pi / 3.
+
+        Parameters
+        ----------
+        a : `float`
+            Hyperellipsoid semi-axis in direction 1
+        b : `float`
+            Hyperellipsoid semi-axis in direction 2
+        c : `float`
+            Hyperellipsoid semi-axis in direction 3
+        n : `int`
+            Degree of the hyperellipsoid
+
+        Returns
+        -------
+        V_hf : `float`
+            Half the volume of the hyperellipsoid
+        '''
+
+        V_hf = 4 * a * b * c * gamma(1 + 1 / n)**3 / gamma(1 + 3 / n)
+
+        return V_hf
+
     def calc_hyp_geom_prop(self):
         '''
         Calculate the geometric properties for the hypershape layer.
+
+        Parameters
+        ----------
+        None
+
+        Returns
+        -------
+        None
         '''
 
         # Hypershape semi-axes and domain dimensions
@@ -413,16 +489,17 @@ class HyperLayer():
         # Hyperellipse degree
         n_hyp = self.n_hyp
 
+        # Geometric properties realted to Area (2D) or Volume (3D)
         if self.dimension == 2:  # 2D
             self.area = self.half_hyp_area(a_hyp, b_hyp, n_hyp) + \
-                self.truncated_half_hyp_area(a_hyp, b_hyp, n_hyp, Lz / 2)
+                self.trunc_half_hyp_area(a_hyp, b_hyp, n_hyp, Lz / 2)
             self.a_rat = self.area / (Lx * Lz)
             self.f_Ah = self.area / (a_hyp * b_hyp)
 
         if self.dimension == 3:  # 3D
             c_hyp = self.hyper_axes[2]
             Ly = self.domain_dim[2]
-
-            ipdb.set_trace()
-            self.v_rat = self.vol / (Lx * Lz * Lz)
+            self.vol = self.half_hyp_volume(a_hyp, b_hyp, c_hyp, n_hyp) + \
+                self.trunc_half_hyp_volume(a_hyp, b_hyp, c_hyp, n_hyp, Lz / 2)
+            self.v_rat = self.vol / (Lx * Lz * Ly)
             self.f_Vh = self.vol / (a_hyp * b_hyp * c_hyp)
