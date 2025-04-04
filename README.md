@@ -14,8 +14,6 @@ To implement these solvers, spyro uses the finite element package [Firedrake](ht
 
 To use spyro, you'll need to have some knowledge of Python and some basic concepts in inverse modeling relevant to active-source seismology.
 
-Discussions about development take place on our Slack channel. Everyone is invited to join using the link: https://join.slack.com/t/spyroworkspace/shared_invite/zt-u87ih28m-2h9JobfkdArs4ku3a1wLLQ
-
 If you want to know more or cite our code please see our open access publication: https://gmd.copernicus.org/articles/15/8639/2022/gmd-15-8639-2022.html
 
 Functionality
