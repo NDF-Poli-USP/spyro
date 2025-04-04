@@ -76,7 +76,7 @@ class Wave(Model_parameters, metaclass=ABCMeta):
 
         self.mesh = self.get_mesh()
         self.c = None
-        self.sources = None
+        self.sources_spyro_only = None
         if self.mesh is not None:
             self._build_function_space()
             self._map_sources_and_receivers()
@@ -235,7 +235,7 @@ class Wave(Model_parameters, metaclass=ABCMeta):
 
     def _map_sources_and_receivers(self):
         if self.source_type == "ricker":
-            self.sources = Sources(self)
+            self.sources_spyro_only = Sources(self)
         self.receivers = Receivers(self)
 
     @abstractmethod

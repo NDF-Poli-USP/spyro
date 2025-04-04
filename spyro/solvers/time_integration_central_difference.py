@@ -18,8 +18,8 @@ def central_difference(wave, source_id=0):
         tuple:
             A tuple containing the forward solution and the receiver output.
     """
-    if wave.sources is not None:
-        wave.sources.current_source = source_id
+    if wave.sources_spyro_only is not None:
+        wave.sources_spyro_only.current_source = source_id
         rhs_forcing = fire.Cofunction(wave.function_space.dual())
 
     wave.field_logger.start_logging(source_id)
@@ -42,8 +42,8 @@ def central_difference(wave, source_id=0):
         fire.assemble(wave.rhs, tensor=wave.B)
 
         # More efficient way of applying sources
-        if wave.sources is not None:
-            f = wave.sources.apply_source(rhs_forcing, step)
+        if wave.sources_spyro_only is not None:
+            f = wave.sources_spyro_only.apply_source(rhs_forcing, step)
             B0 = wave.rhs_no_pml()
             B0 += f
 

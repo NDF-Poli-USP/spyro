@@ -226,3 +226,8 @@ def debug_plot(function, filename="debug.png"):
 def debug_pvd(function, filename="debug.pvd"):
     out = firedrake.VTKFile(filename)
     out.write(function)
+
+def plot_receiver_in_time(wave, receiver_id=0, show=True):
+    nt = int(wave.final_time / wave.dt) + 1
+    timevector = np.linspace(0.0, wave.final_time, nt)
+    plt.plot(timevector, wave.receivers_output)
