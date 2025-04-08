@@ -24,8 +24,8 @@ def parametric_hyperellipse(a, b, n, num_pts):
 # Parameters for the hyperellipse
 a = 2.0          # Semi-major axis
 b = 1.0          # Semi-minor axis
-n = 192            # Degree of the hyperellipse
-lmax = 0.05       # Maximum edge length
+n = 192          # Degree of the hyperellipse
+lmax = 0.05      # Maximum edge length
 lmin = lmax / 2  # Minimum edge length
 
 # Generate the hyperellipse boundary points
@@ -51,7 +51,7 @@ for idp in range(0, num_bnd_pts - 1, 2):
 # Generate the mesh
 ngmsh = geo.GenerateMesh(maxh=lmax, quad_dominated=False)
 msh = Mesh(ngmsh)
-VTKFile("mesh_hyp00.pvd").write(msh)
+VTKFile("output/hyp_test.pvd").write(msh)
 
 # f"O valor  vale {r}"
 # f"The price is {price:.2f} dollars"
