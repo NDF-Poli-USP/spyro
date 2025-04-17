@@ -19,7 +19,7 @@ class Dir_point_bc(fire.DirichletBC):
 
     Attributes
     ----------
-    nodes: `array`
+    nodes : `array`
         Points where the boundary condition is to be applied
     '''
 
@@ -38,18 +38,23 @@ class Eikonal():
 
     Attributes
     ----------
-    bnds : `list` of 'arrays'
-        Mesh point coordinates on boundaries of the domain
-    bcs_eik: `list`
+    bnds : `list` of `arrays`
+        Mesh point indices on boundaries of the domain. Structure:
+        - [left_boundary, right_boundary, bottom_boundary] for 2D
+        - [left_boundary, right_boundary, bottom_boundary,
+            left_bnd_y, right_bnd_y] for 3D
+    bcs_eik : `list`
         Dirichlet BCs for eikonal
-    path_save: `str`
+    path_save : `str`
         Path to save Eikonal results
-    yp: `firedrake function`
+    yp : `firedrake function`
         Eikonal field
-    x_data: `array`
+    x_data : `array`
         x-coordinates of the domain
-    z_data: `array`
+    z_data : `array`
         z-coordinates of the domain
+    y_data : `array`
+        y-coordinates of the domain (3D)
 
     Methods
     -------
@@ -85,30 +90,11 @@ class Eikonal():
         None
         '''
 
-        # Extract node positions
-        z_f = fire.Function(Wave.funct_space_eik).interpolate(Wave.mesh_z)
-        x_f = fire.Function(Wave.funct_space_eik).interpolate(Wave.mesh_x)
-        self.z_data = z_f.dat.data_with_halos[:]
-        self.x_data = x_f.dat.data_with_halos[:]
-
+        # Extract node positions and boundary data
+        self.bnds, node_positions = Wave.boundary_data(typ_bnd='eikonal')
+        self.z_data, self.x_data = node_positions[:2]
         if Wave.dimension == 3:  # 3D
-            y_f = fire.Function(Wave.funct_space_eik).interpolate(Wave.mesh_y)
-            self.y_data = y_f.dat.data_with_halos[:]
-
-        # Tolerance for boundary
-        tol = 10**(min(int(np.log10(Wave.lmin / 10)), -6))
-
-        # Boundaries
-        left_boundary = np.where(self.x_data <= tol)
-        right_boundary = np.where(self.x_data >= Wave.length_x-tol)
-        bottom_boundary = np.where(self.z_data <= tol-Wave.length_z)
-
-        self.bnds = [left_boundary, right_boundary, bottom_boundary]
-
-        if Wave.dimension == 3:  # 3D
-            left_bnd_y = np.where(self.y_data <= tol)
-            right_bnd_y = np.where(self.y_data >= Wave.length_y-tol)
-            self.bnds += [left_bnd_y, right_bnd_y]
+            self.y_data = node_positions[-1]
 
         # Path to save data
         self.path_save = getcwd() + "/output/"
@@ -127,7 +113,7 @@ class Eikonal():
         None
         '''
 
-        print('\nDefining Eikonal BCs')
+        print("\nDefining Eikonal BCs")
 
         # Identify source locations
         possou = Wave.sources.point_locations
@@ -162,7 +148,7 @@ class Eikonal():
         Parameters
         ----------
         data_arr : `array`
-            An array with possible with possible NaN or negartive components
+            An array with possible with possible NaN or negative components
 
         Returns
         -------
@@ -211,7 +197,7 @@ class Eikonal():
             Trial function
         vy : `firedrake test function`
             Test function
-        f_est: `float`, optional
+        f_est : `float`, optional
             Factor for the stabilizing term in Eikonal equation
 
         Returns
@@ -371,7 +357,7 @@ class Eikonal():
         vy = fire.TestFunction(Wave.funct_space_eik)
 
         # Linear Eikonal
-        print('\nSolving Pre-Eikonal')
+        print("\nSolving Pre-Eikonal")
         FeikL = self.linear_eik(Wave, u, vy)
         J = fire.derivative(FeikL, yp)
 
@@ -414,7 +400,7 @@ class Eikonal():
         data_eikL = self.clean_inst_num(yp.dat.data_with_halos[:])
 
         # Nonlinear Eikonal
-        print('\nSolving Post-Eikonal')
+        print("\nSolving Post-Eikonal")
         user_atol = tol
         # vinewtonrsls, vinewtonssls, newtonls, qn, ncg, newtontr, ngs, ngmres
         nl_solver = 'vinewtonssls'
@@ -453,11 +439,11 @@ class Eikonal():
                 user_est += 0.01
                 if user_est > 1.0:
                     user_est = f_est
-                    print('\nHigh Stabilizing Factor. Increasing Tolerance!')
+                    print("\nHigh Stabilizing Factor. Increasing Tolerance!")
                     user_atol = user_atol * 10 if user_atol < 1e-5 \
                         else round(user_atol + 1e-5, 5)
                     if user_atol > 1e-4:
-                        print('High Tolerance. Exiting!')
+                        print("High Tolerance. Exiting!")
                         break
 
         # Save Eikonal results
@@ -502,12 +488,12 @@ class Eikonal():
         eik_bnd: `list`
             Properties on boundaries according to minimum values of Eikonal
             Structure sublist: [pt_cr, c_bnd, eikmin, z_par, lref, sou_cr]
-            - pt_cr: Critical point coordinates
-            - c_bnd: Propagation speed at critical point
-            - eikmin: Eikonal value in seconds
-            - z_par: Inverse of minimum Eikonal (Equivalent to c_bound/lref)
-            - lref: Distance to the closest source from critical point
-            - sou_cr: Critical source coordinates
+            - pt_cr : Critical point coordinates
+            - c_bnd : Propagation speed at critical point
+            - eikmin : Eikonal value in seconds
+            - z_par : Inverse of minimum Eikonal (Equivalent to c_bound/lref)
+            - lref : Distance to the closest source from critical point
+            - sou_cr : Critical source coordinates
         '''
 
         if Wave.dimension == 2:  # 2D
@@ -521,7 +507,7 @@ class Eikonal():
 
         # Loop over boundaries
         eik_bnd = []
-        print('\nIdentifying Critical Points on Boundaries')
+        print("\nIdentifying Critical Points on Boundaries")
         eik_str = "Min Eikonal on {0:>16} (ms): {1:>7.3f} "
         for bnd, bnd_str in zip(self.bnds, bnds_str):
 
@@ -539,9 +525,9 @@ class Eikonal():
 
             # Print critical point coordinates
             if Wave.dimension == 2:  # 2D
-                pnt_str = 'at (in km): ({2:3.3f}, {3:3.3f})'
+                pnt_str = "at (in km): ({2:3.3f}, {3:3.3f})"
             if Wave.dimension == 3:  # 3D
-                pnt_str = 'at (in km): ({2:3.3f}, {3:3.3f}, {4:3.3f})'
+                pnt_str = "at (in km): ({2:3.3f}, {3:3.3f}, {4:3.3f})"
 
             print((eik_str + pnt_str).format(bnd_str, 1e3 * eikmin, *pt_cr))
 

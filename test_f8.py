@@ -76,7 +76,10 @@ def test_habc_fig8():
     # Create the acoustic wave object with HABCs
     # layer_shape = 'rectangular'
     layer_shape = 'hypershape'
-    Wave_obj = habc.HABC_Wave(dictionary=dictionary, layer_shape=layer_shape)
+    n_usu = 5
+    Wave_obj = habc.HABC_Wave(dictionary=dictionary,
+                              layer_shape=layer_shape,
+                              n_usu=n_usu)
 
     # Mesh
     # cpw: cells per wavelength
@@ -89,18 +92,11 @@ def test_habc_fig8():
         # Initial velocity model
         cond = fire.conditional(Wave_obj.mesh_x < 0.5, 3.0, 1.5)
         Wave_obj.set_initial_velocity_model(conditional=cond)
-        Wave_obj.c = Wave_obj.initial_velocity_model
 
-        # Save initial velocity model
-        path_save = getcwd() + "/output/"
-        vel_c = fire.VTKFile(path_save + "c_vel.pvd")
-        vel_c.write(Wave_obj.c)
+        # Preamble mesh operations
+        Wave_obj.preamble_mesh_operations(p_usu=2)
 
-    # Mesh properties for Eikonal
-    Wave_obj.properties_eik_mesh(p_usu=2)
-
-    # Initializing Eikonal object
-    if Wave_obj.fwi_iter == 0:
+        # Initializing Eikonal object
         Eik_obj = eik.Eikonal(Wave_obj)
         histPcrit = None
 
@@ -108,14 +104,14 @@ def test_habc_fig8():
     Wave_obj.size_habc_criterion(Eik_obj, histPcrit,
                                  layer_based_on_mesh=True)
 
-    # # Creating mesh with absorbing layer
-    # Wave_obj.create_mesh_habc()
+    # Creating mesh with absorbing layer
+    Wave_obj.create_mesh_habc()
 
-    # # Updating velocity model
-    # Wave_obj.velocity_habc()
+    # Updating velocity model
+    Wave_obj.velocity_habc()
 
-    # # Setting the damping profile within absorbing layer
-    # Wave_obj.damping_layer()
+    # Setting the damping profile within absorbing layer
+    Wave_obj.damping_layer()
 
 
 # Applying HABCs to the model in Fig. 8 of Salas et al. (2022)

@@ -91,18 +91,14 @@ def test_habc_3d():
         # Initial velocity model
         cond = fire.conditional(Wave_obj.mesh_x < 0.5, 3.0, 1.5)
         Wave_obj.set_initial_velocity_model(conditional=cond)
-        Wave_obj.c = Wave_obj.initial_velocity_model
 
-        # Save initial velocity model
-        path_save = getcwd() + "/output/"
-        vel_c = fire.VTKFile(path_save + "c_vel.pvd")
-        vel_c.write(Wave_obj.c)
+        # Preamble mesh operations
+        Wave_obj.preamble_mesh_operations(p_usu=2)
 
-    # Mesh properties for Eikonal
-    Wave_obj.properties_eik_mesh(p_usu=p_usu)
+        # Mesh properties for Eikonal
+        Wave_obj.properties_eik_mesh(p_usu=p_usu)
 
-    # Initializing Eikonal object
-    if Wave_obj.fwi_iter == 0:
+        # Initializing Eikonal object
         Eik_obj = eik.Eikonal(Wave_obj)
         histPcrit = None
 

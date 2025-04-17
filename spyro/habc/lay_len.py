@@ -31,7 +31,7 @@ def f_layer(x, a, m=1, s=0.999, typ='FL'):
 
     Returns
     -------
-    CritFL = CR - RF: `float`
+    CritFL = CR - RF : `float`
         Value of the function for the size criterion
     CR: `float`
         Value for the reflection coefficient4
@@ -150,7 +150,7 @@ def calc_size_lay(Wave, nz=5, crtCR=1, tol_rel=1e-3, monitor=False):
     '''
 
     # Visualizing parameters for computing layer size
-    print('\nComputing Size for Absorbing Layer')
+    print("\nComputing Size for Absorbing Layer")
 
     # fref: Reference frequency
     fref = Wave.freq_ref

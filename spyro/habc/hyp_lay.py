@@ -1,5 +1,9 @@
 import firedrake as fire
+from netgen.geom2d import SplineGeometry
+from netgen.meshing import Mesh, Element2D, MeshPoint, FaceDescriptor
 import numpy as np
+from scipy.integrate import quad
+from scipy.spatial import KDTree
 from scipy.special import gamma, beta, betainc
 import ipdb
 fire.parameters["loopy"] = {"silenced_warnings": ["v1_scheduler_fallback"]}
@@ -47,12 +51,18 @@ class HyperLayer():
 
     Methods
     -------
+    bnd_pnts_hyp2D()
+        Generate points on the boundary of a hyperellipse
     calc_degree_hyp2D()
         Define the limits for the hyperellipse degree. See Salas et al (2022)
     calc_degree_hyp3D()
         Define the limits for the hyperellipsoid degree
     calc_hyp_geom_prop(self):
         Calculate the geometric properties for the hypershape layer
+    create_bnd_mesh2D()
+        Generate the boundary segment curves for the hyperellipse boundary mesh
+    create_hyp_trunc_mesh2D()
+        Generate the mesh for the hyperelliptical absorbing layer
     define_hyperaxes()
         Define the hyperlayer semi-axes
     define_hyperlayer()
@@ -61,10 +71,14 @@ class HyperLayer():
         Compute half the area of the hyperellipse
     half_hyp_volume()
         Compute half the volume of the hyperellipsoid
+    merge_mesh_2D()
+        Merge the rectangular and the hyperelliptical meshes
     trunc_half_hyp_area()
         Compute the truncated area of superellipse for 0 <= z0 / b <= 1
     trunc_half_hyp_volume()
         Compute the truncated volume of hyperellipsoid for 0 <= z0 / b <= 1
+    trunc_hyp_bnd_points()
+        Generate the boundary points for a truncated hyperellipse
     '''
 
     def __init__(self, n_hyp=2, dimension=2):
@@ -87,7 +101,7 @@ class HyperLayer():
         self.dimension = dimension
 
         # Hypershape degree
-        self.n_hyp = n_hyp
+        self.n_hyp = n_hyp if n_hyp is not None else 2
 
     def define_hyperaxes(self, domain_dim, domain_hyp):
         '''
@@ -99,8 +113,8 @@ class HyperLayer():
             Domain dimensions [Lx, Lz] (2D) or [Lx, Lz, Ly] (3D)
         domain_hyp : list
             Maximum hypershape dimensions without truncations.
-            - 2D: [Lx + 2 * pad_len, Lz + 2 * pad_len]
-            - 3D: [Lx + 2 * pad_len, Lz + 2 * pad_len, Ly + 2 * pad_len]
+            - 2D : [Lx + 2 * pad_len, Lz + 2 * pad_len]
+            - 3D : [Lx + 2 * pad_len, Lz + 2 * pad_len, Ly + 2 * pad_len]
 
         Returns
         -------
@@ -176,7 +190,7 @@ class HyperLayer():
             n += 1
             r = abs(xs / a)**n + abs(ys / b)**n
             if monitor:
-                print('ParHypEll - r: {:>5.3f} - n: {:>}'.format(r, n))
+                print("ParHypEll - r: {:>5.3f} - n: {:>}".format(r, n))
 
         if lim == 'MIN':
             n = np.clip(max(n, h, g, z), n_min, n_max)
@@ -246,7 +260,7 @@ class HyperLayer():
             n += 1
             r = abs(xs / a)**n + abs(ys / b)**n + abs(zs / c)**n
             if monitor:
-                print('ParHypEll - r: {:>5.3f} - n: {:>}'.format(r, n))
+                print("ParHypEll - r: {:>5.3f} - n: {:>}".format(r, n))
 
         if lim == 'MIN':
             n = np.clip(max(n, h, g, z), n_min, n_max)
@@ -275,7 +289,7 @@ class HyperLayer():
         ----------
         pad_len : `float`
             Size of the absorbing layer
-        lmin: `float`
+        lmin : `float`
             Minimum mesh size
 
         Returns
@@ -312,7 +326,7 @@ class HyperLayer():
         if self.dimension == 3:  # 3D
             x_min.append(0.5 * Ly + lmin)
             n_min = self.calc_degree_hyp3D(x_min, 'MIN')
-        print('Minimum Degree for Hypershape n_min: {}'.format(n_min))
+        print("Minimum Degree for Hypershape n_min: {}".format(n_min))
 
         # Maximum allowed exponent
         # n_max ensures to add pad_len in the domain diagonal direction
@@ -330,16 +344,16 @@ class HyperLayer():
                      0.5 * Lz + pad_len * np.sin(theta) * np.sin(phi),
                      0.5 * Ly + pad_len * np.cos(phi)]
             n_max = self.calc_degree_hyp3D(x_max, 'MAX', n_min=n_min)
-        print('Maximum Degree for Hypershape n_max: {}'.format(n_max))
+        print("Maximum Degree for Hypershape n_max: {}".format(n_max))
 
         if n_min <= n_hyp <= n_max:
             print("Current Hypershape Degree n_hyp: {}".format(n_hyp))
         else:
-            hyp_str = 'Degree for Hypershape Layer. Setting to'
+            hyp_str = "Degree for Hypershape Layer. Setting to"
             if n_hyp < n_min:
-                print('Low', hyp_str, 'n_min: {}'.format(n_min))
+                print("Low", hyp_str, "n_min: {}".format(n_min))
             elif n_hyp > n_max:
-                print('High', hyp_str, 'n_max: {}'.format(n_max))
+                print("High", hyp_str, "n_max: {}".format(n_max))
 
         self.n_hyp = np.clip(n_hyp, n_min, n_max)
         self.n_bounds = (n_min, n_max)
@@ -467,6 +481,51 @@ class HyperLayer():
 
         return V_hf
 
+    @staticmethod
+    def hyp_full_perimeter(a, b, n):
+        '''
+        Compute perimeter of a hyperellipse.
+
+        Parameters
+        ----------
+        a : `float`
+            Hyperellipse semi-axis in direction 1
+        b : `float`
+            Hyperellipse semi-axis in direction 2
+        n : `int`
+            Degree of the hyperellipse
+
+        Returns
+        -------
+        perim_hyp : `float`
+            Perimeter of the hyperellipse
+        '''
+
+        def integrand(theta):
+            '''
+            Differential arc length element to compute the perimeter
+
+            Parameters
+            ----------
+            theta : `float`
+                Angle in radians
+
+            Returns
+            -------
+            ds : `float`
+                Differential arc length element
+            '''
+            dx = -(2 * a / n) * np.cos(theta)**(2 / n - 1) * np.sin(theta)
+            dy = (2 * b / n) * np.sin(theta)**(2 / n - 1) * np.cos(theta)
+            ds = np.sqrt(dx**2 + dy**2)
+
+            return ds
+
+        # Integrate from 0 to pi/2 and multiply by 4
+        perim_hyp = 4 * quad(integrand, 0, np.pi/2)[0]
+
+        return perim_hyp
+
     def calc_hyp_geom_prop(self):
         '''
         Calculate the geometric properties for the hypershape layer.
@@ -491,15 +550,380 @@ class HyperLayer():
 
         # Geometric properties realted to Area (2D) or Volume (3D)
         if self.dimension == 2:  # 2D
+
+            # Area
             self.area = self.half_hyp_area(a_hyp, b_hyp, n_hyp) + \
                 self.trunc_half_hyp_area(a_hyp, b_hyp, n_hyp, Lz / 2)
+
+            # Area ratio
             self.a_rat = self.area / (Lx * Lz)
+            print("Area Ratio: {:5.3f}".format(self.a_rat))
+
+            # Area factor
             self.f_Ah = self.area / (a_hyp * b_hyp)
+
+            # Full perimeter to estimate the mesh size
+            self.perim_hyp = self.hyp_full_perimeter(a_hyp, b_hyp, n_hyp)
 
         if self.dimension == 3:  # 3D
             c_hyp = self.hyper_axes[2]
             Ly = self.domain_dim[2]
+
+            # Volume
             self.vol = self.half_hyp_volume(a_hyp, b_hyp, c_hyp, n_hyp) + \
                 self.trunc_half_hyp_volume(a_hyp, b_hyp, c_hyp, n_hyp, Lz / 2)
+
+            # Volume ratio
             self.v_rat = self.vol / (Lx * Lz * Ly)
+            print("Volume Ratio: {:5.3f}".format(self.v_rat))
+
+            # Volume factor
             self.f_Vh = self.vol / (a_hyp * b_hyp * c_hyp)
+
+            # Full surface area to estimate the mesh size
+            self.surf_hyp = None
+
+    @staticmethod
+    def bnd_pnts_hyp2D(a, b, n, num_pts):
+        '''
+        Generate points on the boundary of a hyperellipse.
+
+        'Parameters
+        ----------
+        a : `float`
+            Hyperellipse semi-axis in direction 1
+        b : `float`
+            Hyperellipse semi-axis in direction 2
+        n : `int`
+            Degree of the hyperellipse
+        num_pts : `int`
+            Number of points to generate on the hyperellipse boundary
+
+        Returns
+        -------
+        bnd_pnts : `array`
+            Array of shape (num_pts, 2) containing the coordinates
+            of the hyperellipse boundary points
+        '''
+
+        # Generate angle values for the parametric equations
+        theta = np.linspace(0, 2 * np.pi, num_pts)
+
+        # Especial angle values
+        rc_zero = [np.pi / 2., 3 * np.pi / 2.]
+        rs_zero = [0., np.pi, 2 * np.pi]
+
+        # Trigonometric function evaluation
+        cr = np.cos(theta)
+        sr = np.sin(theta)
+        cr = np.where(np.isin(theta, rc_zero), 0, cr)
+        sr = np.where(np.isin(theta, rs_zero), 0, sr)
+
+        # Parametric equations for the hyperellipse
+        x = a * np.sign(cr) * np.abs(cr)**(2 / n)
+        y = b * np.sign(sr) * np.abs(sr)**(2 / n)
+
+        bnd_pnts = np.column_stack((x, y))
+
+        return bnd_pnts
+
+    def trunc_hyp_bnd_points(self, xdom, z0):
+        '''
+        Generate the boundary points for a truncated hyperellipse
+
+        Parameters
+        ----------
+        xdom : `float`
+            Maximum coordinate in normal to the truncation plane
+        z0 : `float`
+            Truncation plane
+
+        Returns
+        -------
+        filt_bnd_pts : `array`
+            Array of shape (num_bnd_pts, 2) containing the coordinates
+            of the truncated hyperellipse boundary points
+        trunc_feat : `list`
+            List containing the truncation features:
+            - ini_trunc : Index of the first point after the truncation plane
+            - end_trunc : Index of the last point before the truncation plane
+            - num_filt_bnd_pts : Number of filtered boundary points
+            - ltrunc : Mesh size for arc length due to the truncation operation
+        '''
+
+        # Hypershape parameters
+        a_hyp = self.hyper_axes[0]
+        b_hyp = self.hyper_axes[1]
+        n_hyp = self.n_hyp
+        perimeter = self.perim_hyp
+
+        # Boundary points: Use 16 or 24 as a minimum
+        lmin = self.lmin
+        num_bnd_pts = int(max(np.ceil(perimeter / lmin), 16)) - 1
+
+        # Generate the hyperellipse boundary points
+        pnt_bef_trunc = 0
+        pnt_aft_trunc = 0
+        pnt_str = "Number of Boundary Points for"
+        while pnt_bef_trunc % 2 == 0 or pnt_aft_trunc % 2 == 0 \
+                or pnt_bef_trunc < 3 or pnt_aft_trunc < 3:
+
+            num_bnd_pts += 1
+            print(pnt_str, f"Complete Hyperellipse: {num_bnd_pts}")
+            bnd_pts = self.bnd_pnts_hyp2D(a_hyp, b_hyp, n_hyp, num_bnd_pts)
+
+            # Filter hyperellipse points based on the truncation plane z0
+            filt_bnd_pts = np.array([point for point in bnd_pts
+                                     if point[1] <= z0])
+            print(pnt_str, f"Truncated Hyperellipse: {len(filt_bnd_pts)}")
+
+            # Identify truncation index
+            ini_trunc = max(np.where(bnd_pts[:, 1] > z0)[0][0] - 1, 0)
+
+            # Modify points to match with the truncation plane
+            r0 = np.asin((z0 / b_hyp)**(n_hyp / 2))
+            x0 = a_hyp * np.cos(r0)**(2 / n_hyp)
+            filt_bnd_pts[ini_trunc] = np.array([x0, z0])
+            filt_bnd_pts[ini_trunc + 1] = np.array([-x0, z0])
+
+            # Insert new points to create a rectangular trunc
+            new_pnts = np.array([[xdom, z0], [xdom, -z0],
+                                 [-xdom, -z0], [-xdom, z0]])
+            filt_bnd_pts = np.insert(filt_bnd_pts, ini_trunc + 1,
+                                     new_pnts, axis=0)
+            end_trunc = ini_trunc + 5
+
+            # Points before and after truncation
+            pnt_bef_trunc = len(filt_bnd_pts[:ini_trunc + 1])
+            pnt_aft_trunc = len(filt_bnd_pts[end_trunc:])
+
+        # Total number of the boundary points including the trunc
+        num_filt_bnd_pts = len(filt_bnd_pts)
+
+        # Mesh size for arc length due to the truncation operation
+        ltrunc = perimeter / num_bnd_pts
+
+        # Truncation features
+        trunc_feat = [ini_trunc, end_trunc, num_filt_bnd_pts, ltrunc]
+
+        return filt_bnd_pts, trunc_feat
+
+    def create_bnd_mesh2D(self, geo, bnd_pts, trunc_feat, spln):
+        '''
+        Generate the boundary segment curves for the hyperellipse boundary mesh.
+
+        Parameters
+        ----------
+        geo : `SplineGeometry`
+            Geometry object with the data to generate the mesh
+        bnd_pts : `array`
+            Array of shape (num_bnd_pts, 2) containing the coordinates
+            of the hyperellipse boundary points
+        trunc_feat : `list`
+            List containing the truncation features:
+            - ini_trunc : Index of the first point after the truncation plane
+            - end_trunc : Index of the last point before the truncation plane
+            - num_bnd_pts : Number of filtered boundary points
+            - ltrunc : Mesh size for arc length due to the truncation operation
+        spln : `bool`
+            Flag to indicate whether to use splines (True) or lines (False)
+
+        Returns
+        -------
+        curves : `list`
+            List of curves to be added to the geometry object. Each curve is
+            represented as a list containing the curve type and its points.
+        '''
+
+        ini_trunc, end_trunc, num_bnd_pts, ltrunc = trunc_feat
+
+        curves = []
+        if spln:
+            # Mesh with spline segments
+            for idp in range(0, ini_trunc, 2):
+                p1 = geo.PointData()[2][idp]
+                p2 = geo.PointData()[2][idp + 1]
+                p3 = geo.PointData()[2][idp + 2]
+                curves.append(["spline3", p1, p2, p3, ltrunc])
+                # print(p1, p2, p3)
+
+            for idp in range(ini_trunc, end_trunc):
+                p1 = geo.PointData()[2][idp]
+                p2 = geo.PointData()[2][idp + 1]
+                # print(p1, p2)
+
+                if idp == ini_trunc or idp == end_trunc - 1:
+                    curves.append(["line", p1, p2, ltrunc])
+                else:
+                    curves.append(["line", p1, p2, self.lmin])
+
+            for idp in range(end_trunc, num_bnd_pts - 1, 2):
+                p1 = geo.PointData()[2][idp]
+                p2 = geo.PointData()[2][idp + 1]
+                p3 = geo.PointData()[2][idp + 2]
+                curves.append(["spline3", p1, p2, p3, ltrunc])
+                # print(p1, p2, p3)
+
+        else:
+            # Mesh with line segments
+            for idp in range(0, num_bnd_pts - 1, 2):
+                p1 = geo.PointData()[2][idp]
+                p2 = geo.PointData()[2][idp + 1]
+                if ini_trunc + 1 <= idp <= end_trunc - 2:
+                    curves.append(["line", p1, p2, self.lmin])
+                else:
+                    curves.append(["line", p1, p2, ltrunc])
+                # print(p1, p2)
+
+        return curves
+
+    def create_hyp_trunc_mesh2D(self):
+        '''
+        Generate the mesh for the hyperelliptical absorbing layer.
+
+        Parameters
+        ----------
+        None
+
+        Returns
+        -------
+        hyp_mesh : `netgen mesh`
+            Generated mesh for the hyperelliptical layer
+        '''
+
+        # Domain dimensions
+        Lx = self.domain_dim[0]
+        Lz = self.domain_dim[1]
+
+        # Generate the hyperellipse boundary points
+        bnd_pts, trunc_feat = self.trunc_hyp_bnd_points(Lx / 2, Lz / 2)
+
+        # Initialize geometry
+        geo = SplineGeometry()
+
+        # Append points to the geometry
+        [geo.AppendPoint(*pnt) for pnt in bnd_pts]
+
+        spln = True
+        while True:
+            try:
+                # Generate the boundary segment curves
+                curves = self.create_bnd_mesh2D(geo, bnd_pts, trunc_feat, spln)
+                [geo.Append(c[:-1], bc="outer", maxh=c[-1], leftdomain=1,
+                            rightdomain=0) for c in curves]
+
+                # Generate the mesh using netgen library
+                hyp_mesh = geo.GenerateMesh(maxh=self.lmin,
+                                            quad_dominated=False)
+                print("Hyperelliptical Mesh Generated Successfully")
+                break
+
+            except Exception as e:
+                if spln:
+                    print(f"Error Meshing with Splines: {e}")
+                    print("Now meshing with Lines")
+                    spln = False
+                else:
+                    UserWarning(f"Error Meshing with Lines: {e}. Exiting.")
+                    break
+
+        # Mesh is transformed into a firedrake mesh
+        return fire.Mesh(hyp_mesh)
+
+    def merge_mesh_2D(self, rec_mesh, hyp_mesh):
+        '''
+        Merge the rectangular and the hyperelliptical meshes.
+
+        Parameters
+        ----------
+        rec_mesh : `firedrake mesh`
+            Rectangular mesh representing the original domain
+        hyp_mesh : `firedrake mesh`
+            Hyperelliptical annular mesh representing the absorbing layer
+
+        Returns
+        -------
+        final_mesh : `firedrake mesh`
+            Merged final mesh
+        '''
+
+        # Create the final mesh that will contain both
+        final_mesh = Mesh()
+        final_mesh.dim = self.dimension
+
+        # Get coordinates of the rectangular mesh
+        coord_rec = rec_mesh.coordinates.dat.data_with_halos
+
+        # Find min/max coordinates to detect boundary points
+        z_min, z_max = coord_rec[:, 0].min(), coord_rec[:, 0].max()
+        x_min, x_max = coord_rec[:, 1].min(), coord_rec[:, 1].max()
+
+        # Create KDTree for efficient nearest neighbor search
+        boundary_tree = KDTree([(z, x) for z, x in
+                                zip(self.bnd_nodes[0], self.bnd_nodes[1])])
+
+        # Add all vertices from rectangular mesh and create mapping
+        rec_map = {}
+        boundary_coords = []
+        boundary_points = []
+        for i, coord in enumerate(coord_rec):
+            z, x = coord
+            rec_map[i] = final_mesh.Add(MeshPoint((z, x, 0.)))  # y = 0 for 2D
+
+            # Check if the point is on the original boundary
+            if boundary_tree.query(coord)[0] <= self.tol:
+                boundary_coords.append(coord)
+                boundary_points.append(rec_map[i])
+
+        # Create KDTree for efficient nearest neighbor search
+        boundary_tree = KDTree([coord for coord in boundary_coords])
+
+        # Face descriptor for the rectangular mesh
+        fd_rec = final_mesh.Add(FaceDescriptor(bc=1, domin=1, domout=2))
+
+        # Get mesh cells from rectangular mesh
+        rec_cells = rec_mesh.coordinates.cell_node_map().values_with_halo
+
+        # Add all elements from rectangular mesh to the netgen mesh
+        final_mesh.SetMaterial(1, "rec")
+        for cell in rec_cells:
+            netgen_points = [rec_map[cell[i]] for i in range(len(cell))]
+            final_mesh.Add(Element2D(fd_rec, netgen_points))
+
+        # Add all vertices from hyperelliptical mesh and create mapping
+        hyp_map = {}
+        coord_hyp = hyp_mesh.coordinates.dat.data_with_halos
+        for i, coord in enumerate(coord_hyp):
+            z, x = coord
+
+            # Check if the point is on the original boundary
+            dist, idx = boundary_tree.query(coord)
+
+            if dist <= self.tol:
+                # Reuse the existing point
+                hyp_map[i] = boundary_points[idx]
+            else:
+                # Creating a new point (y = 0 for 2D)
+                hyp_map[i] = final_mesh.Add(MeshPoint((z, x, 0.)))
+
+        # Face descriptor for the hyperelliptical mesh
+        fd_hyp = final_mesh.Add(FaceDescriptor(bc=2, domin=2, domout=0))
+
+        # Get mesh cells from hyperelliptical mesh
+        hyp_cells = hyp_mesh.coordinates.cell_node_map().values_with_halo
+
+        # Add all elements from hyperelliptical mesh to the netgen mesh
+        final_mesh.SetMaterial(2, "hyp")
+        for cell in hyp_cells:
+            netgen_points = [hyp_map[cell[i]] for i in range(len(cell))]
+            final_mesh.Add(Element2D(fd_hyp, netgen_points))
+
+        try:
+            # Mesh is transformed into a firedrake mesh
+            final_mesh = fire.Mesh(final_mesh)
+            print("Merged Mesh Generated Successfully")
+
+        except Exception as e:
+            UserWarning(f"Error Generating Merged Mesh: {e}. Exiting.")
+
+        return final_mesh

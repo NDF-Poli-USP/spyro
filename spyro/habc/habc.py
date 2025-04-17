@@ -4,9 +4,12 @@ import scipy.linalg as sl
 import scipy.sparse as ss
 import spyro.habc.eik as eik
 import spyro.habc.lay_len as lay_len
+from os import getcwd
+from scipy.spatial import KDTree
 from spyro.solvers.acoustic_wave import AcousticWave
 from spyro.habc.hyp_lay import HyperLayer
-from os import getcwd
+from time import perf_counter  # For runtime
+from tracemalloc import get_traced_memory, start, stop  # For memory usage
 import ipdb
 fire.parameters["loopy"] = {"silenced_warnings": ["v1_scheduler_fallback"]}
 
@@ -19,33 +22,99 @@ fire.parameters["loopy"] = {"silenced_warnings": ["v1_scheduler_fallback"]}
 # With additions by Alexandre Olender
 
 
+def comp_cost(flag, tRef=None):
+    '''
+    Estimate runtime and used memory and save them to a *.txt file.
+
+    Parameters
+    ----------
+    flag : str
+        Flag to indicate the action to be performed
+        - 'tini' to start the timer
+        - 'tfin' to finish the timer and print the results
+    tRef : float, optional
+        Reference time in seconds. Default is None
+
+    Returns
+    -------
+    tRef : float
+        Reference time in seconds. Only returned if flag is 'tini'
+    '''
+
+    if flag == 'tini':
+        # Start memory usage
+        start()
+
+        # Reference time. Don't move this line!
+        tRef = perf_counter()
+
+        return tRef
+
+    elif flag == 'tfin':
+
+        # Separation format
+        hifem_draw = 62
+
+        # Total time
+        print('\n' + hifem_draw * '-')
+        print("Estimating Runtime and Used Memory")
+        tTotal = perf_counter() - tRef
+        val_time = [tTotal, tTotal/60, tTotal/3600]
+        cad_time = 'Runtime: (s):{:3.3f}, (m):{:3.3f}, (h):{:3.3f}'
+        print(cad_time.format(*val_time))
+
+        # Memory usage
+        curr, peak = get_traced_memory()
+        val_memo = [curr/1024**2, peak/1024**2]
+        cad_memo = "Used Memory: Current (MB):{:3.3f}, Peak (MB):{:3.3f}"
+        print(cad_memo.format(*val_memo))
+        print(hifem_draw * '-' + '\n')
+        stop()
+
+        # Save file for resource usage
+        file_name = 'cost.txt'
+        path_cost = getcwd() + "/output/" + file_name
+        np.savetxt(path_cost, (*val_time, *val_memo), delimiter='\t')
+
+
 class HABC_Wave(AcousticWave, HyperLayer):
     '''
     class HABC that determines absorbing layer size and parameters to be used.
 
     Attributes
     ----------
-    a_par: `float`
+    a_par : `float`
         Adimensional propagation speed parameter (a = z / f).
         "z" parameter is the inverse of the minimum Eikonal (1 / phi_min)
-    a_rat : `float`
+    a_rat: `float`
         Area ratio to the area of the original domain. a_rat = area / a_orig
     area : `float`
         Area of the domain with absorbing layer
-    c_habc': 'firedrake function'
+    bnds : `list` of `arrays`
+        Mesh point indices on boundaries of the domain. Structure:
+        - [left_boundary, right_boundary, bottom_boundary] for 2D
+        - [left_boundary, right_boundary, bottom_boundary,
+            left_bnd_y, right_bnd_y] for 3D
+    bnd_nodes : `list` of `arrays`
+        Mesh point coordinates on boundaries of the domain. Structure:
+        - [z_data[bnds], x_data[bnds]] for 2D
+        - [z_data[bnds], x_data[bnds], y_data[bnds]] for 3D
+    c : `firedrake function`
+        Velocity model without absorbing layer
+    c_habc : `firedrake function`
         Velocity model with absorbing layer
-    d_par: `float`
+    d_par : `float`
         Normalized element size (lmin / pad_len)
-    eik_bnd: `list`
+    eik_bnd : `list`
         Properties on boundaries according to minimum values of Eikonal
         Structure sublist: [pt_cr, c_bnd, eikmin, z_par, lref, sou_cr]
-        - pt_cr: Critical point coordinates
-        - c_bnd: Propagation speed at critical point
-        - eikmin: Eikonal value in seconds
-        - z_par: Inverse of minimum Eikonal (Equivalent to c_bound / lref)
-        - lref: Distance to the closest source from critical point
-        - sou_cr: Critical source coordinates
-    eta_habc: `firedrake function`
+        - pt_cr : Critical point coordinates
+        - c_bnd : Propagation speed at critical point
+        - eikmin : Eikonal value in seconds
+        - z_par : Inverse of minimum Eikonal (Equivalent to c_bound / lref)
+        - lref : Distance to the closest source from critical point
+        - sou_cr : Critical source coordinates
+    eta_habc : `firedrake function`
         Damping profile within the absorbing layer
     F_L : `float`
         Size  parameter of the absorbing layer
@@ -55,51 +124,57 @@ class HABC_Wave(AcousticWave, HyperLayer):
     f_Vh : `float`
         Hyperellipsoidal volume factor. f_Vh = vol / (a_hyp * b_hyp * c_hyp).
         f_Vh is 8 for rectangular layers
-    f_est: `float`
+    f_est : `float`
         Factor for the stabilizing term in Eikonal equation
-    freq_ref: `float`
+    freq_ref : `float`
         Reference frequency of the wave at the minimum Eikonal point
-    fundam_freq; `float`
+    fundam_freq : `float`
         Fundamental frequency of the numerical model
-    fwi_iter: `int`
+    fwi_iter : `int`
         The iteration number for the Full Waveform Inversion (FWI) algorithm
-    Lz_habc: `float`
+    Lz_habc : `float`
         Length of the domain in the z-direction with absorbing layer
-    Lx_habc: `float`
+    Lx_habc : `float`
         Length of the domain in the x-direction with absorbing layer
-    Ly_habc: `float`
+    Ly_habc : `float`
         Length of the domain in the y-direction with absorbing (3D models)
-    layer_shape: `string`
+    layer_shape : `string`
         Shape type of pad layer. Options: 'rectangular' or 'hypershape'
-    lmin: `float`
+    lmin : `float`
         Minimum mesh size
-    lmax: `float`
+    lmax : `float`
         Maxmum mesh size
-    n_bounds: `tuple`
+    mesh_original : `firedrake mesh`
+        Original mesh without absorbing layer
+    n_bounds : `tuple`
         Bounds for the hypershape layer degree. (n_min, n_max)
         - n_min ensures to add lmin in the domain diagonal direction
         - n_max ensures to add pad_len in the domain diagonal direction
-    n_hyp: `int`
+    n_hyp : `int`
         Degree of the hyperelliptical pad layer (n >= 2). Default is 2.
         For rectangular layers, n_hyp is set to infinity
     pad_len : `float`
         Size of the absorbing layer
-    path_save: `string`
+    path_save : `string`
         Path to save data
+    tol : `float`
+        Tolerance for searching nodes on the boundary
     v_rat : `float`
         Volume ratio to the volume of the original domain. v_rat = vol / v_orig
     vol : `float`
         Volume of the domain with absorbing layer
-    xCR: `float`
+    xCR : `float`
         Heuristic factor for the minimum damping ratio (psi_min = xCR * d)
     xCR_bounds: `list`
         Bounds for the heuristic factor. [xCR_lim, xCR_search]
         Structure: [[xCR_inf, xCR_sup], [xCR_min, xCR_max]]
-        - xCR_lim: Limits for the heuristic factor.
-        - xCR_search: Initial search range for the heuristic factor
+        - xCR_lim : Limits for the heuristic factor.
+        - xCR_search : Initial search range for the heuristic factor
 
     Methods
     -------
+    boundary_data()
+        Generate the boundary data from the original domain mesh
     calc_damping_prop()
         Compute the damping properties for the absorbing layer
     calc_rec_geom_prop()
@@ -118,6 +193,8 @@ class HABC_Wave(AcousticWave, HyperLayer):
         Compute the fundamental frequency in Hz via modal analysis
     min_reflection()
         Compute a minimum reflection coefficiente for the quadratic damping
+    preamble_mesh_operations()
+        Perform mesh operations previous to size an absorbing layer
     properties_eik_mesh()
         Set the properties for the mesh used to solve the Eikonal equation
     regression_CRmin()
@@ -133,7 +210,7 @@ class HABC_Wave(AcousticWave, HyperLayer):
     '''
 
     def __init__(self, dictionary=None, layer_shape='rectangular',
-                 f_est=0.06, fwi_iter=0, comm=None):
+                 f_est=0.06, fwi_iter=0, n_usu=None, comm=None):
         '''
         Initialize the HABC class.
 
@@ -144,23 +221,21 @@ class HABC_Wave(AcousticWave, HyperLayer):
         layer_shape : str, optional
             Shape type of pad layer. Options: 'rectangular' or 'hypershape'
             Default is 'rectangular'
-        f_est: `float`, optional
-            Factor for the stabilizing term in Eikonal equation
-            Default is 0.06
-        fwi_iter: int, optional
-            The iteration number for the FWI algorithm
-            Default is 0
+        f_est : `float`, optional
+            Factor for the stabilizing term in Eikonal equation. Default is 0.06
+        fwi_iter : int, optional
+            The iteration number for the FWI algorithm. Default is 0
+        n_usu : int, optional
+            User's hypershape degree. Default is None
         comm : object, optional
             An object representing the communication interface
 
         Returns
         -------
         None
-
         '''
 
         AcousticWave.__init__(self, dictionary=dictionary, comm=comm)
-        HyperLayer.__init__(self, dimension=self.dimension)
 
         # Layer shape
         self.layer_shape = layer_shape
@@ -168,6 +243,7 @@ class HABC_Wave(AcousticWave, HyperLayer):
             print("\nAbsorbing Layer Shape: Rectangular")
 
         elif self.layer_shape == 'hypershape':
+            HyperLayer.__init__(self, n_hyp=n_usu, dimension=self.dimension)
             print("\nAbsorbing Layer Shape: Hypershape")
 
         else:
@@ -183,6 +259,36 @@ class HABC_Wave(AcousticWave, HyperLayer):
         # Path to save data
         self.path_save = getcwd() + "/output/"
 
+    def preamble_mesh_operations(self, p_usu=None):
+        '''
+        Perform mesh operations previous to size an absorbing layer.
+
+        Parameters
+        ----------
+        p_usu : `int`, optional
+            Finite element order. Default is None
+
+        Returns
+        -------
+        None
+        '''
+
+        # Save a copy of the original mesh
+        self.mesh_original = fire.Mesh(self.mesh.topology_dm.clone())
+
+        # Velocity profile model
+        self.c = self.initial_velocity_model
+
+        # Save initial velocity model
+        vel_c = fire.VTKFile(self.path_save + "c_vel.pvd")
+        vel_c.write(self.c)
+
+        # Mesh properties for Eikonal
+        self.properties_eik_mesh(p_usu=p_usu)
+
+        # Generating boundary data from the original domain mesh
+        self.boundary_data()
+
     def properties_eik_mesh(self, p_usu=None):
         '''
         Set the properties for the mesh used to solve the Eikonal equation.
@@ -190,7 +296,7 @@ class HABC_Wave(AcousticWave, HyperLayer):
         Parameters
         ----------
         p_usu : `int`, optional
-            Finite element order
+            Finite element order. Default is None
 
         Returns
         -------
@@ -218,6 +324,75 @@ class HABC_Wave(AcousticWave, HyperLayer):
             self.lmin = round(diam.dat.data_with_halos.min() / fdim, 6)
             self.lmax = round(diam.dat.data_with_halos.max() / fdim, 6)
 
+    def boundary_data(self, typ_bnd='original'):
+        '''
+        Generate the boundary data from the original domain mesh.
+
+        Parameters
+        ----------
+        typ_bnd : str, optional
+            Type of boundary data to extract. Options: 'original' for original
+            domain or 'eikonal' for Eikonal analysis. Default is 'original'
+
+        Returns
+        -------
+        bnds : `list` of 'arrays'
+            Mesh point indices on boundaries of the domain. Structure:
+            - [left_boundary, right_boundary, bottom_boundary] for 2D
+            - [left_boundary, right_boundary, bottom_boundary,
+                left_bnd_y, right_bnd_y] for 3D
+        node_positions : `list`, optional
+            List of node positions for Eikonal analysis. Structure:
+            - [z_data, x_data] for 2D
+            - [z_data, x_data, y_data] for 3D
+        '''
+
+        if typ_bnd == 'original':
+            func_space = self.function_space
+        elif typ_bnd == 'eikonal':
+            func_space = self.funct_space_eik
+        else:
+            aux0 = "Please use 'original' or 'eikonal', "
+            UserWarning(aux0 + f"{self.layer_shape} not supported.")
+
+        # Extract node positions
+        z_f = fire.Function(func_space).interpolate(self.mesh_z)
+        x_f = fire.Function(func_space).interpolate(self.mesh_x)
+        z_data = z_f.dat.data_with_halos[:]
+        x_data = x_f.dat.data_with_halos[:]
+
+        if self.dimension == 3:  # 3D
+            y_f = fire.Function(func_space).interpolate(self.mesh_y)
+            y_data = y_f.dat.data_with_halos[:]
+
+        # Tolerance for boundary
+        self.tol = 10**(min(int(np.log10(self.lmin / 10)), -6))
+
+        # Boundaries
+        left_boundary = np.where(x_data <= self.tol)
+        right_boundary = np.where(x_data >= self.length_x - self.tol)
+        bottom_boundary = np.where(z_data <= self.tol - self.length_z)
+
+        bnds = [left_boundary, right_boundary, bottom_boundary]
+
+        if self.dimension == 3:  # 3D
+            left_bnd_y = np.where(y_data <= self.tol)
+            right_bnd_y = np.where(y_data >= self.length_y - self.tol)
+            bnds += [left_bnd_y, right_bnd_y]
+
+        if typ_bnd == 'original':
+            self.bnds = np.unique(np.concatenate(
+                [idxs for idx_list in bnds for idxs in idx_list]))
+            self.bnd_nodes = [z_data[self.bnds], x_data[self.bnds]]
+            if self.dimension == 3:  # 3D
+                self.bnd_nodes.append(y_data[self.bnds])
+
+        elif typ_bnd == 'eikonal':
+            node_positions = [z_data, x_data]
+            if self.dimension == 3:  # 3D
+                node_positions.append(y_data)
+            return bnds, node_positions
+
     def roundFL(self):
         '''
         Adjust the layer parameter based on the element size to get
@@ -239,10 +414,10 @@ class HABC_Wave(AcousticWave, HyperLayer):
         # New size of the absorving layer
         self.pad_len = self.F_L * lref
 
-        print('\nModifying Layer Size Based on the Element Size')
+        print("\nModifying Layer Size Based on the Element Size")
         print("Modified Parameter Size FL: {:.4f}".format(self.F_L))
         print("Modified Layer Size (km): {:.4f}".format(self.pad_len))
-        print('Elements ({:.3f} km) in Layer: {}'.format(
+        print("Elements ({:.3f} km) in Layer: {}".format(
             self.lmin, int(self.pad_len / self.lmin)))
 
     def det_reference_freq(self, histPcrit, fpad=4):
@@ -251,9 +426,9 @@ class HABC_Wave(AcousticWave, HyperLayer):
 
         Parameters
         ----------
-        histPcrit: `array`
+        histPcrit : `array`
             Transient response at the minimum Eikonal point
-        fpad: `int`, optional
+        fpad : `int`, optional
             Padding factor for FFT. Default is 4
 
         Returns
@@ -261,7 +436,7 @@ class HABC_Wave(AcousticWave, HyperLayer):
         None
         '''
 
-        print('\nDetermining Reference Frequency')
+        print("\nDetermining Reference Frequency")
 
         if self.fwi_iter > 0:  # FWI iteration
 
@@ -291,6 +466,14 @@ class HABC_Wave(AcousticWave, HyperLayer):
     def calc_rec_geom_prop(self):
         '''
         Calculate the geometric properties for the rectangular layer.
+
+        Parameters
+        ----------
+        None
+
+        Returns
+        -------
+        None
         '''
 
         self.n_hyp = np.inf
@@ -304,7 +487,8 @@ class HABC_Wave(AcousticWave, HyperLayer):
 
         if self.dimension == 3:  # 3D
             self.vol = self.Lx_habc * self.Lz_habc * self.Ly_habc
-            self.v_rat = self.vol / (self.length_x * self.length_z * self.length_y)
+            self.v_rat = self.vol / (self.length_x * self.length_z
+                                     * self.length_y)
             self.f_Vh = 8
 
     def size_habc_criterion(self, Eikonal, histPcrit,
@@ -317,7 +501,7 @@ class HABC_Wave(AcousticWave, HyperLayer):
         ----------
         Eikonal : `eikonal`
             An object representing the Eikonal solver
-        histPcrit: `array`
+        histPcrit : `array`
             Transient response at the minimum Eikonal point
         layer_based_on_mesh : `bool`, optional
             Adjust the layer size based on the element size. Default is False
@@ -396,33 +580,59 @@ class HABC_Wave(AcousticWave, HyperLayer):
         None
         '''
 
-        # New geometry with layer
-        Lz = self.Lz_habc
-        Lx = self.Lx_habc
-
-        # Number of elements
-        n_pad = self.pad_len / self.lmin  # Elements in the layer
-        nz = int(self.length_z / self.lmin) + int(n_pad)
-        nx = int(self.length_x / self.lmin) + int(2 * n_pad)
-        nx = nx + nx % 2
+        print("\nGenerating Mesh with Absorbing Layer")
 
         # New mesh with layer
-        if self.dimension == 2:  # 2D
-            mesh_habc = fire.RectangleMesh(nz, nx, Lz, Lx)
+        if self.layer_shape == 'rectangular':
 
-        if self.dimension == 3:  # 3D
-            Ly = self.Ly_habc
-            ny = int(self.length_y / self.lmin) + int(2 * n_pad)
-            ny = ny + ny % 2
-            mesh_habc = fire.BoxMesh(nz, nx, ny, Lz, Lx, Ly)
-            mesh_habc.coordinates.dat.data_with_halos[:, 2] -= self.pad_len
+            # New geometry with layer
+            Lz = self.Lz_habc
+            Lx = self.Lx_habc
 
-        # Adjusting coordinates
-        mesh_habc.coordinates.dat.data_with_halos[:, 0] *= -1.0
-        mesh_habc.coordinates.dat.data_with_halos[:, 1] -= self.pad_len
+            # Number of elements
+            n_pad = self.pad_len / self.lmin  # Elements in the layer
+            nz = int(self.length_z / self.lmin) + int(n_pad)
+            nx = int(self.length_x / self.lmin) + int(2 * n_pad)
+            nx = nx + nx % 2
+
+            if self.dimension == 2:  # 2D
+                mesh_habc = fire.RectangleMesh(nz, nx, Lz, Lx)
+
+            if self.dimension == 3:  # 3D
+                Ly = self.Ly_habc
+                ny = int(self.length_y / self.lmin) + int(2 * n_pad)
+                ny = ny + ny % 2
+                mesh_habc = fire.BoxMesh(nz, nx, ny, Lz, Lx, Ly)
+                mesh_habc.coordinates.dat.data_with_halos[:, 2] -= self.pad_len
+
+            # Adjusting coordinates
+            mesh_habc.coordinates.dat.data_with_halos[:, 0] *= -1.0
+            mesh_habc.coordinates.dat.data_with_halos[:, 1] -= self.pad_len
+
+            print("Extended Rectangular Mesh Generated Successfully")
+
+        elif self.layer_shape == 'hypershape':
+
+            # Creating the hyperellipse layer mesh
+            hyp_mesh = self.create_hyp_trunc_mesh2D()
+
+            # Adjusting coordinates
+            coords = hyp_mesh.coordinates.dat.data_with_halos
+            coords[:, 0], coords[:, 1] = coords[:, 1], -coords[:, 0]
+            Lz_half = self.length_z / 2
+            Lx_half = self.length_x / 2
+            hyp_mesh.coordinates.dat.data_with_halos[:, 0] -= Lz_half
+            hyp_mesh.coordinates.dat.data_with_halos[:, 1] += Lx_half
+            # fire.VTKFile("output/trunc_hyp_test.pvd").write(hyp_mesh)
+
+            # Merging the original mesh with the hyperellipse layer mesh
+            mesh_habc = self.merge_mesh_2D(self.mesh, hyp_mesh)
+            # fire.VTKFile("output/trunc_merged_test.pvd").write(mesh_habc)
 
         # Updating the mesh with the absorbing layer
         self.set_mesh(user_mesh=mesh_habc, mesh_parameters={})
+
+        print("Mesh Generated Successfully")
 
         # Save new mesh
         outfile = fire.VTKFile(self.path_save + "mesh_habc.pvd")
@@ -439,11 +649,28 @@ class HABC_Wave(AcousticWave, HyperLayer):
         Returns
         -------
         None
+
+        Improvements
+        ------------
+        dx = 0.05 km
+        New approach: 1.602 1.495 1.588 mean = 1.562
+        Old approach: 1.982 2.124 1.961 mean = 2.022
+
+        dx = 0.02 km
+        New approach: 5.276 5.214 6.275 mean = 5.588
+        Old approach: 12.232 12.372 12.078 = 12.227
         '''
 
+        print("\nUpdating Velocity Profile")
+
         # Initialize velocity field
-        print('\nUpdating Velocity Profile')
         self.c_habc = fire.Function(self.function_space, name='c [km/s])')
+
+        # Assigning the original velocity model to the new mesh
+        self.c_habc.interpolate(self.c, allow_missing_dofs=True)
+
+        # Extending velocity model within the absorbing layer
+        print("Extending Profile Inside Layer")
 
         # Extract node positions
         z_f = fire.Function(self.function_space).interpolate(self.mesh_z)
@@ -451,70 +678,40 @@ class HABC_Wave(AcousticWave, HyperLayer):
         z_data = z_f.dat.data_with_halos[:]
         x_data = x_f.dat.data_with_halos[:]
 
-        # Points to update velocity model
+        # Points to extend the velocity model
         if self.dimension == 2:  # 2D
-            orig_pts = np.where((z_data >= -self.length_z) & (x_data >= 0.)
-                                & (x_data <= self.length_x))
+            pad_pts = np.where((z_data < -self.length_z) | (x_data < 0.)
+                               | (x_data > self.length_x))
+
         if self.dimension == 3:  # 3D
             y_f = fire.Function(self.function_space).interpolate(self.mesh_y)
             y_data = y_f.dat.data_with_halos[:]
+            pad_pts = np.where((z_data < -self.length_z) | (x_data < 0.)
+                               | (x_data > self.length_x) | (y_data < 0.)
+                               | (y_data > self.length_y))
+            ypt_to_extend = y_data[pad_pts]
 
-            # Points to update velocity model
-            orig_pts = np.where((z_data >= -self.length_z) & (x_data >= 0.)
-                                & (x_data <= self.length_x) & (y_data >= 0.)
-                                & (y_data <= self.length_y))
-            ypt_to_update = y_data[orig_pts]
-
-        zpt_to_update = z_data[orig_pts]
-        xpt_to_update = x_data[orig_pts]
-
-        # Updating velocity model
-        vel_to_update = self.c_habc.dat.data_with_halos[orig_pts]
-        for idp, zc in enumerate(zpt_to_update):
-            xc = xpt_to_update[idp]
-
-            if self.dimension == 2:  # 2D
-                pnt_c = (zc, xc)
-
-            if self.dimension == 3:  # 3D
-                yc = ypt_to_update[idp]
-                pnt_c = (zc, xc, yc)
-
-            vel_to_update[idp] = self.c.at(pnt_c)
-
-        self.c_habc.dat.data_with_halos[orig_pts] = vel_to_update
-
-        # Extending velocity model in absorbing layer
-        print('Extending Profile Inside Layer')
-
-        # Points to extend velocity model
-        pad_pts = np.setdiff1d(np.arange(
-            self.c_habc.dat.data_with_halos.size), orig_pts)
         zpt_to_extend = z_data[pad_pts]
         xpt_to_extend = x_data[pad_pts]
 
-        if self.dimension == 3:  # 3D
-            ypt_to_extend = y_data[pad_pts]
-
-        # Tolerance for original boundary
-        tol = 10**(min(int(np.log10(self.lmin / 10)), -6))
-
+        # Velocity profile inside the layer
         vel_to_extend = self.c_habc.dat.data_with_halos[pad_pts]
+
         for idp, z_bnd in enumerate(zpt_to_extend):
 
             # Find nearest point on the boundary of the original domain
             if z_bnd < -self.length_z:
-                z_bnd += self.pad_len + tol
+                z_bnd += self.pad_len + self.tol
 
             x_bnd = xpt_to_extend[idp]
             if x_bnd < 0. or x_bnd > self.length_x:
-                x_bnd -= np.sign(x_bnd) * (self.pad_len + tol)
+                x_bnd -= np.sign(x_bnd) * (self.pad_len + self.tol)
 
             # Ensure that point is within the domain bounds
             z_bnd = np.clip(z_bnd, -self.length_z, 0.)
             x_bnd = np.clip(x_bnd, 0., self.length_x)
 
-            # Set the velocity at points in layer boundary
+            # Set the velocity of the nearest point on the original boundary
             if self.dimension == 2:  # 2D
                 pnt_c = (z_bnd, x_bnd)
 
@@ -522,13 +719,14 @@ class HABC_Wave(AcousticWave, HyperLayer):
                 y_bnd = ypt_to_extend[idp]
 
                 if y_bnd < 0. or y_bnd > self.length_y:
-                    y_bnd -= np.sign(y_bnd) * (self.pad_len + tol)
+                    y_bnd -= np.sign(y_bnd) * (self.pad_len + self.tol)
                 y_bnd = np.clip(y_bnd, 0., self.length_y)
 
                 pnt_c = (z_bnd, x_bnd, y_bnd)
 
             vel_to_extend[idp] = self.c.at(pnt_c)
 
+        # Assign the extended velocity model to the absorbing layer
         self.c_habc.dat.data_with_halos[pad_pts] = vel_to_extend
 
         # Save new velocity model
@@ -541,7 +739,7 @@ class HABC_Wave(AcousticWave, HyperLayer):
 
         Parameters
         ----------
-        monitor: `bool`, optional
+        monitor : `bool`, optional
             Print on screen the computed natural frequencies. Default is False
 
         Returns
@@ -633,7 +831,7 @@ class HABC_Wave(AcousticWave, HyperLayer):
         Asp = ss.csr_matrix((a_val, a_ind, a_ptr), A.petscmat.size)
 
         # Operator
-        print('\nSolving Eigenvalue Problem')
+        print("\nSolving Eigenvalue Problem")
         if self.dimension == 2:  # 2D
             Lsp = ss.linalg.eigs(Asp, k=2, M=Msp, sigma=0.0,
                                  return_eigenvectors=False)
@@ -663,29 +861,29 @@ class HABC_Wave(AcousticWave, HyperLayer):
 
         Parameters
         ----------
-        kCR: `float`
+        kCR : `float`
             Adimensional parameter in reflection coefficient
-        psi: `float`, optional
+        psi : `float`, optional
             Damping ratio in option 'CR_PSI'. Default is None
-        p: `list`, optional
+        p : `list`, optional
             Dimensionless wavenumbers for fundamental mode.
             p = [p1, p2, ele_type]. Default is None
-            - p1: Dimensionless wavenumber at the original domain boundary
-            - p2: Dimensionless wavenumber at the begining of absorbing layer
-            - ele_type: Element type. 'consistent' or 'lumped'
-        CR_err: `float`, optional
+            - p1 : Dimensionless wavenumber at the original domain boundary
+            - p2 : Dimensionless wavenumber at the begining of absorbing layer
+            - ele_type : Element type. 'consistent' or 'lumped'
+        CR_err : `float`, optional
             Reflection coefficient in option 'CR_err'. Default is None
-        typ: `string`, optional
+        typ : `string`, optional
             Type of reflection coefficient. Default is 'CR_PSI'.
-            - 'CR_PSI': Minimum coefficient reflection from a damping ratio
-            - 'CR_FEM': Spourious reflection coeeficient in FEM
-            - 'CR_ERR': Correction for the minimum damping ratio
+            - 'CR_PSI' : Minimum coefficient reflection from a damping ratio
+            - 'CR_FEM' : Spourious reflection coeeficient in FEM
+            - 'CR_ERR' : Correction for the minimum damping ratio
 
         Returns
         -------
-        CRmin: `float`
+        CRmin : `float`
             Minimum reflection coefficient at the minimum damping
-        xCRmin: `float`
+        xCRmin : `float`
             Heuristic factor for the minimum damping ratio
         '''
 
@@ -696,14 +894,14 @@ class HABC_Wave(AcousticWave, HyperLayer):
 
                 Parameters
                 ----------
-                CR: `float`
+                CR : `float`
                     Reflection coefficient
-                kCR: `float`
+                kCR : `float`
                     Adimensional parameter in reflection coefficient
 
                 Returns
                 -------
-                psi: `float`
+                psi : `float`
                     Damping ratio
                 '''
                 if CR == 0:
@@ -728,16 +926,16 @@ class HABC_Wave(AcousticWave, HyperLayer):
 
                 Parameters
                 ----------
-                p: `float`
+                p : `float`
                     Dimensionless wavenumber
-                alpha: `float`
+                alpha : `float`
                     Ratio between the representative mesh dimensions
-                ele_type: `string`
+                ele_type : `string`
                     Element type. 'consistent' or 'lumped'
 
                 Returns
                 -------
-                Z_fem: `float`
+                Z_fem : `float`
                     Parameter for the spurious reflection coefficient
                 '''
                 if ele_type == 'lumped':
@@ -793,22 +991,22 @@ class HABC_Wave(AcousticWave, HyperLayer):
 
         Parameters
         ----------
-        data_reg: `list`
+        data_reg : `list`
             Data for regression. Structure: [x_reg, y_reg]
-            - x_reg: Values for the heuristic factor
-            - y_reg: Values for the minimum damping ratio
-        xCR_lim: `list`
+            - x_reg : Values for the heuristic factor
+            - y_reg : Values for the minimum damping ratio
+        xCR_lim : `list`
             Limits for the heuristic factor. [xCR_inf, xCR_sup, xCR_ini]
-        kCR: `float`
+        kCR : `float`
             Adimensional parameter in reflection coefficient
 
         Returns
         -------
-        psi_min: `float`
+        psi_min : `float`
             Minimum damping ratio
-        xCR_min: `float`
+        xCR_min : `float`
             Heuristic factor for the minimum damping ratio
-        CRmin: `float`
+        CRmin : `float`
             Minimum reflection coefficient at the minimum damping ratio
         '''
 
@@ -843,21 +1041,21 @@ class HABC_Wave(AcousticWave, HyperLayer):
 
         Parameters
         ----------
-        CRmin: `float`
+        CRmin : `float`
             Minimum reflection coefficient at the minimum damping
-        kCR: `float`
+        kCR : `float`
             Adimensional parameter in reflection coefficient
-        p: `list`
+        p : `list`
             Dimensionless wavenumbers for fundamental mode
-        xCR_lim: `list`
+        xCR_lim : `list`
             Limits for the heuristic factor. [xCR_inf, xCR_sup]
 
         Returns
         -------
-        xCR_search: `list`
+        xCR_search : `list`
             Initial search range for the heuristic factor. [xCR_min, xCR_max]
-            - xCR_min: Lower bound on the search range
-            - xCR_max: Upper bound on the search range
+            - xCR_min : Lower bound on the search range
+            - xCR_max : Upper bound on the search range
         '''
 
         # Dimensionless wavenumbers
@@ -934,20 +1132,20 @@ class HABC_Wave(AcousticWave, HyperLayer):
 
         Parameters
         ----------
-        psi: `float`, optional
+        psi : `float`, optional
             Damping ratio. Default is 0.999
-        m: `int`, optional
+        m : `int`, optional
             Vibration mode. Default is 1 (Fundamental mode)
 
         Returns
         -------
-        psi_min: `float`
+        psi_min : `float`
             Minimum damping ratio of the absorbing layer
-        xCR: `float`
+        xCR : `float`
             Heuristic factor for the minimum damping ratio (psi_min = xCR * d)
-        xCR_lim: `list`
+        xCR_lim : `list`
             Limits for the heuristic factor. [xCR_inf, xCR_sup]
-        xCR_search: `list`
+        xCR_search : `list`
             Initial search range for the heuristic factor. [xCR_min, xCR_max]
         '''
 
@@ -994,24 +1192,24 @@ class HABC_Wave(AcousticWave, HyperLayer):
 
         Parameters
         ----------
-        psi: `float`, optional
+        psi : `float`, optional
             Damping ratio. Default is 0.999
-        m: `int`, optional
+        m : `int`, optional
             Vibration mode. Default is 1 (Fundamental mode)
 
         Returns
         -------
-        eta_crt: `float`
+        eta_crt : `float`
             Critical damping coefficient (1/s)
-        psi_min: `float`
+        psi_min : `float`
             Minimum damping ratio of the absorbing layer
-        xCR: `float`
+        xCR : `float`
             Heuristic factor for the minimum damping ratio (psi_min = xCR * d)
-        psimin_lim: `list`
+        psimin_lim : `list`
             Limits for the minimum damping ratio. [psimin_inf, psimin_sup]
-        xCR_lim: `list`
+        xCR_lim : `list`
             Limits for the heuristic factor. [xCR_inf, xCR_sup]
-        xCR_search: `list`
+        xCR_search : `list`
             Initial search range for the heuristic factor. [xCR_min, xCR_max]
         '''
 
@@ -1029,13 +1227,13 @@ class HABC_Wave(AcousticWave, HyperLayer):
         # Range for Minimum Damping Ratio. Min:0.01233 - Max:0.20967
 
         # Computed values and its range
-        print('Minimum Damping Ratio: {:.5f}'.format(psi_min))
-        psi_str = 'Range for Minimum Damping Ratio. Min:{:.5f} - Max:{:.5f}'
+        print("Minimum Damping Ratio: {:.5f}".format(psi_min))
+        psi_str = "Range for Minimum Damping Ratio. Min:{:.5f} - Max:{:.5f}"
         print(psi_str.format(xCR_inf * self.d, xCR_sup * self.d))
-        print('Heuristic Factor xCR: {:.3f}'.format(xCR))
-        xcr_str = 'Range Values for xCR Factor. Min:{:.3f} - Max:{:.3f}'
+        print("Heuristic Factor xCR: {:.3f}".format(xCR))
+        xcr_str = "Range Values for xCR Factor. Min:{:.3f} - Max:{:.3f}"
         print(xcr_str.format(xCR_inf, xCR_sup))
-        lim_str = 'Initial Range for xCR Factor. Min:{:.3f} - Max:{:.3f}'
+        lim_str = "Initial Range for xCR Factor. Min:{:.3f} - Max:{:.3f}"
         print(lim_str.format(xCR_min, xCR_max))
 
         return eta_crt, psi_min, xCR, xCR_lim, xCR_search
@@ -1046,16 +1244,16 @@ class HABC_Wave(AcousticWave, HyperLayer):
 
         Parameters
         ----------
-        psi_min': `float`
+        psi_min' : `float`
             Minimum damping ratio
-        psi: `float`, optional
+        psi : `float`, optional
             Damping ratio. Default is 0.999
 
         Returns
         -------
-        aq: `float`
+        aq : `float`
             Coefficient for quadratic term in the damping function
-        bq: `float`
+        bq : `float`
             Coefficient bq for linear term in the damping function
         '''
 
@@ -1081,7 +1279,7 @@ class HABC_Wave(AcousticWave, HyperLayer):
         self.fundamental_frequency()
 
         # Initialize damping field
-        print('\nCreating Damping Profile')
+        print("\nCreating Damping Profile")
         self.eta_habc = fire.Function(self.function_space, name='eta [1/s])')
 
         # Dimensions and node coordinates
@@ -1125,3 +1323,11 @@ class HABC_Wave(AcousticWave, HyperLayer):
         # Save damping profile
         outfile = fire.VTKFile(self.path_save + "eta_habc.pvd")
         outfile.write(self.eta_habc)
+
+
+# # Old approach: 3.994, 3.907, 4.021 mean = 3.974
+# # New approach: 4.908, 4.705, 4.699 mean = 4.772
+# # Reference to resource usage
+# tRef = comp_cost('tini')
+# # Estimating computational resource usage
+# comp_cost('tfin', tRef=tRef)

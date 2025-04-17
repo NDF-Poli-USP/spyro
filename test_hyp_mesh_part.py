@@ -323,7 +323,7 @@ def truncated_bnd_points(xdom, y0, a, b, n, perimeter, lmax):
         # print(filt_bnd_pts[ini_cut], filt_bnd_pts[end_cut])
         # print(pnt_bef_cut, pnt_aft_cut, len(filt_bnd_pts))
 
-        # Mesh arc lengthg
+        # Mesh arc length
         lcut = round(perimeter / num_bnd_pts, 6)
 
     return filt_bnd_pts, ini_cut, end_cut, len(filt_bnd_pts), lcut
@@ -336,14 +336,13 @@ def create_composite_mesh(Lx, Ly, pad, n, lmin, lmax):
     b = 0.5 * Ly + pad  # Semi-minor axis
     perimeter = superellipse_perimeter_integral(a, b, n)
 
-    # Initialize geometry
-    geo = SplineGeometry()
-
     # Generate the hyperellipse boundary points
     bnd_pts, ini_cut, end_cut, num_bnd_pts, lcut = truncated_bnd_points(
         Lx / 2, Ly / 2, a, b, n, perimeter, lmax)
 
+    # Initialize geometry
     geo = SplineGeometry()
+
     # Append points to the geometry
     [geo.AppendPoint(*pnt) for pnt in bnd_pts]
 
@@ -374,18 +373,18 @@ def create_composite_mesh(Lx, Ly, pad, n, lmin, lmax):
         curves.append(["spline3", p1, p2, p3, lcut])
         # print(p1, p2, p3)
 
-    [geo.Append(c[:-1], bc="outer", maxh=2*c[-1], leftdomain=1,
+    [geo.Append(c[:-1], bc="outer", maxh=c[-1], leftdomain=1,
                 rightdomain=0) for c in curves]
 
     return geo.GenerateMesh(maxh=lmax, quad_dominated=False)
 
 
 # Parameters for the hyperellipse
-Lx = 1.0           # Length of the rectangle
-Ly = 1.0           # Width of the rectangle
-pad = 0.45         # Pad length
-n = 5              # Degree of the hyperellipse
-lmax = 0.05        # Maximum edge length
+Lx = 4.8           # Length of the rectangle
+Ly = 2.4           # Width of the rectangle
+lmax = 0.01875        # Maximum edge length
+n = 3              # Degree of the hyperellipse
+pad = 33 * lmax         # Pad length
 lmin = lmax        # Minimum edge length
 
 # Create rectangular mesh
@@ -396,8 +395,25 @@ mesh_rec.coordinates.dat.data_with_halos[:, 1] -= Ly / 2
 
 # Create hyperelliptical mesh
 mesh_hyp = create_composite_mesh(Lx, Ly, pad, n, lmin, lmax)
-fire.VTKFile("output/trunc_hyp_test.pvd").write(fire.Mesh(mesh_hyp))
+# fire.VTKFile("output/trunc_hyp_test.pvd").write(fire.Mesh(mesh_hyp))
 
 # # Merge meshes
 msh = merge_meshes(mesh_rec, mesh_hyp)
 fire.VTKFile("output/trunc_merged_test.pvd").write(fire.Mesh(msh))
+
+# # See connectivity
+# Get coordinates of the rectangular mesh
+# coord = mesh.coordinates.dat.data_with_halos
+# Get connectivity of the rectangular mesh
+# connect = mesh.coordinates.cell_node_map().values_with_halo
+# for cell_num in range(mesh.num_cells()):
+
+#     # Get vertex indices for the cell
+#     vrtx_idxs = connect[cell_num]
+
+#     # Get coordinates of each vertex in the cell
+#     coord_cell = [coord[vrtx_idx] for vrtx_idx in vrtx_idxs]
+
+#     print(f"Cell {cell_num}:")
+#     for (vrtx_idx, vrtx_coord) in zip(vrtx_idxs, coord_cell):
+#         print(f"(Global {vrtx_idx}): Coord {vrtx_coord}")
