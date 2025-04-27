@@ -14,7 +14,7 @@ jobs:
     runs-on: self-hosted
 
     env:
-      VENV_PATH: /home/olender/firedrakes/2024_09_11/firedrake/bin/activate
+      VENV_PATH: /home/olender/firedrakes/2025_03_11/venv_firedrake/bin/activate
 
     steps:
     - uses: actions/checkout@v3
