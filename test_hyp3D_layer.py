@@ -25,7 +25,7 @@ def hyperellipsoid_surface_area(a, b, c, n):
         # Parametric equations (first octant, no abs/sgn needed)
         x = a * (np.cos(r) * np.sin(t))**(2/n)
         y = b * (np.sin(r) * np.sin(t))**(2/n)
-        z = c * (np.cos(t))**(2/n)
+        z = c * np.cos(t)**(2/n)
 
         # Partial derivatives (simplified)
         dx_dr = a * (2/n) * (np.cos(r)*np.sin(t))**(2/n - 1) * (-np.sin(r)*np.sin(t))
@@ -83,36 +83,34 @@ def parametric_hyperellipsoid(a, b, c, n, num_pts):
     Returns:
         tuple: (x, y, z) coordinates
     """
-    # Create angular grids
+
+    # Create wdge popints
     c_zero = [np.pi / 2., 3 * np.pi / 2.]
     s_zero = [0., np.pi, 2 * np.pi]
-    # theta = np.linspace(0, 2 * np.pi, num_pts)  # Azimuthal angle (0 to 2π)
-    # phi = np.linspace(0, np.pi, num_pts // 2)  # Polar angle (0 to π)
-    theta = np.linspace(0, 2 * np.pi, 5)  # Azimuthal angle (0 to 2π)
-    phi = np.linspace(0, np.pi, 3)  # Polar angle (0 to π)
+    theta = np.linspace(0, 2 * np.pi, num_pts)  # Azimuthal angle (0 to 2π)
+    n_pts_phi = num_pts // 2 + 1 if num_pts // 2 % 2 == 0 else num_pts // 2 + 2
+    phi = np.linspace(0, np.pi, n_pts_phi)  # Polar angle (0 to π)
 
-    # Broadcast to grid
-    theta_grid, phi_grid = np.meshgrid(theta, phi)
+    cr = np.cos(theta)
+    sr = np.sin(theta)
+    cr = np.where(np.isin(theta, c_zero), 0, cr)
+    sr = np.where(np.isin(theta, s_zero), 0, sr)
 
-    cr = np.cos(theta_grid)
-    sr = np.sin(theta_grid)
-    cr = np.where(np.isin(theta_grid, c_zero), 0, cr)
-    sr = np.where(np.isin(theta_grid, s_zero), 0, sr)
+    ct = np.cos(phi)
+    st = np.sin(phi)
+    ct = np.where(np.isin(phi, c_zero), 0, ct)
+    st = np.where(np.isin(phi, s_zero), 0, st)
 
-    ct = np.cos(phi_grid)
-    st = np.sin(phi_grid)
-    ct = np.where(np.isin(phi_grid, c_zero), 0, ct)
-    st = np.where(np.isin(phi_grid, s_zero), 0, st)
+    aux0 = np.outer(cr, st)
+    aux1 = np.outer(sr, st)
+    aux2 = np.outer(np.ones(num_pts), ct)
+    x = a * np.abs(aux0)**(2 / n) * np.sign(aux0)
+    y = b * np.abs(aux1)**(2 / n) * np.sign(aux1)
+    z = c * np.abs(aux2)**(2 / n) * np.sign(aux2)
+    # https://github.com/oszn/rengongzhineng_zuoye/blob/459fea5bd0dcb34457d750f4b22abb750bb0e493/k/xixi/drx.py
 
-    # Parametric equations (vectorized)
-    x = a * np.abs(cr * st)**(2 / n) * np.sign(cr * st)
-    y = b * np.abs(sr * st)**(2 / n) * np.sign(sr * st)
-    z = c * np.abs(ct)**(2 / n) * np.sign(ct)
-
-    ipdb.set_trace()
-
-    # Stack into (N, 3) array
-    return np.vstack([x.ravel(), y.ravel(), z.ravel()]).T
+    # Return as a list of arrays
+    return [x, y, z]
 
 
 def merge_meshes_without_match_bnds(mesh_rec, mesh_hyp):
@@ -291,49 +289,47 @@ def create_composite_mesh(Lx, Ly, Lz, pad, n, lmin, lmax):
     num_bnd_pts = int(max(np.ceil(np.sqrt((surface / lmax**2))) + 1, 16))
     print(f"Number of boundary points: {num_bnd_pts}")
 
-    bnd_pts = parametric_hyperellipsoid(a, b, c, n, 8)
-
-    # # 1. Create outer hyperellipsoidal boundary
-    # # Generate the hyperellipse boundary points
-    # num_bnd_pts += 1 if num_bnd_pts % 2 == 0 else 2  # to close the curve
-    # bnd_pts = parametric_hyperellipsoid(a, b, c, n, num_bnd_pts)
-    # # print(bnd_pts)
-
-    ipdb.set_trace()
+    # 1. Create outer hyperellipsoidal boundary
+    # Generate the hyperellipse boundary points
+    num_bnd_pts += 1 if num_bnd_pts % 2 == 0 else 2  # to close the curve
+    bnd_pts = parametric_hyperellipsoid(a, b, c, n, num_bnd_pts)
+    # print(bnd_pts)
 
     # Initialize geometry
     geo = SplineGeometry()
+
     # Append points to the geometry
     [geo.AppendPoint(*pnt) for pnt in bnd_pts]
 
-    # Generate the boundary curves
-    curves = []
-    for idp in range(0, num_bnd_pts - 1, 2):
-        p1 = geo.PointData()[2][idp]
-        p2 = geo.PointData()[2][idp + 1]
-        p3 = geo.PointData()[2][idp + 2]
-        curves.append(["spline3", p1, p2, p3])
-        # print(p1, p2, p3)
-    [geo.Append(c, bc="outer", maxh=lmin, leftdomain=1,
-                rightdomain=0) for c in curves]
+    # # Generate the boundary curves
+    # curves = []
+    # for idp in range(0, num_bnd_pts - 1, 2):
+    #     ipdb.set_trace()
+    #     p1 = geo.PointData()[2][idp]
+    #     p2 = geo.PointData()[2][idp + 1]
+    #     p3 = geo.PointData()[2][idp + 2]
+    #     curves.append(["spline3", p1, p2, p3])
+    #     # print(p1, p2, p3)
+    # [geo.Append(c, bc="outer", maxh=lmin, leftdomain=1,
+    #             rightdomain=0) for c in curves]
 
-    # 2. Create inner rectangular hole (counter-clockwise)
-    rect_vtx = [(-Lx/2, -Ly/2), (Lx/2, -Ly/2), (Lx/2, Ly/2), (-Lx/2, Ly/2)]
-    [geo.AppendPoint(*pnt) for pnt in rect_vtx]
+    # # 2. Create inner rectangular hole (counter-clockwise)
+    # rect_vtx = [(-Lx/2, -Ly/2), (Lx/2, -Ly/2), (Lx/2, Ly/2), (-Lx/2, Ly/2)]
+    # [geo.AppendPoint(*pnt) for pnt in rect_vtx]
 
-    # # Add rectangle edges
-    geo.Append(["line", geo.PointData()[2][-4], geo.PointData()[2][-3]],
-               bc="inner", maxh=lmax, leftdomain=0, rightdomain=1)
-    geo.Append(["line", geo.PointData()[2][-3], geo.PointData()[2][-2]],
-               bc="inner", maxh=lmax, leftdomain=0, rightdomain=1)
-    geo.Append(["line", geo.PointData()[2][-2], geo.PointData()[2][-1]],
-               bc="inner", maxh=lmax, leftdomain=0, rightdomain=1)
-    geo.Append(["line", geo.PointData()[2][-1], geo.PointData()[2][-4]],
-               bc="inner", maxh=lmax, leftdomain=0, rightdomain=1)
+    # # # Add rectangle edges
+    # geo.Append(["line", geo.PointData()[2][-4], geo.PointData()[2][-3]],
+    #            bc="inner", maxh=lmax, leftdomain=0, rightdomain=1)
+    # geo.Append(["line", geo.PointData()[2][-3], geo.PointData()[2][-2]],
+    #            bc="inner", maxh=lmax, leftdomain=0, rightdomain=1)
+    # geo.Append(["line", geo.PointData()[2][-2], geo.PointData()[2][-1]],
+    #            bc="inner", maxh=lmax, leftdomain=0, rightdomain=1)
+    # geo.Append(["line", geo.PointData()[2][-1], geo.PointData()[2][-4]],
+    #            bc="inner", maxh=lmax, leftdomain=0, rightdomain=1)
 
-    # Set domains
-    geo.SetMaterial(1, "outer")
-    geo.SetMaterial(2, "inner")
+    # # Set domains
+    # geo.SetMaterial(1, "outer")
+    # geo.SetMaterial(2, "inner")
 
     return geo.GenerateMesh(maxh=lmax, quad_dominated=False)
 

@@ -812,6 +812,8 @@ class HyperLayer():
                 [geo.Append(c[:-1], bc="outer", maxh=c[-1], leftdomain=1,
                             rightdomain=0) for c in curves]
 
+                # geo.Compress() # Test
+
                 # Generate the mesh using netgen library
                 hyp_mesh = geo.GenerateMesh(maxh=self.lmin,
                                             quad_dominated=False)
@@ -920,6 +922,7 @@ class HyperLayer():
 
         try:
             # Mesh is transformed into a firedrake mesh
+            # final_mesh.Compress() # Test
             final_mesh = fire.Mesh(final_mesh)
             print("Merged Mesh Generated Successfully")
 
