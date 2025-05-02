@@ -113,6 +113,10 @@ def test_habc_fig8():
     # Setting the damping profile within absorbing layer
     Wave_obj.damping_layer()
 
+    # Applying NRBCs on outer boundary layer
+    Wave_obj.cos_ang_HigdonBC()
+    ipdb.set_trace()
+
 
 # Applying HABCs to the model in Fig. 8 of Salas et al. (2022)
 if __name__ == "__main__":

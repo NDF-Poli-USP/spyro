@@ -8,6 +8,7 @@ from os import getcwd
 from scipy.spatial import KDTree
 from spyro.solvers.acoustic_wave import AcousticWave
 from spyro.habc.hyp_lay import HyperLayer
+from spyro.habc.nrbc import NRBCHabc
 from time import perf_counter  # For runtime
 from tracemalloc import get_traced_memory, start, stop  # For memory usage
 import ipdb
@@ -77,7 +78,7 @@ def comp_cost(flag, tRef=None):
         np.savetxt(path_cost, (*val_time, *val_memo), delimiter='\t')
 
 
-class HABC_Wave(AcousticWave, HyperLayer):
+class HABC_Wave(AcousticWave, HyperLayer, NRBCHabc):
     '''
     class HABC that determines absorbing layer size and parameters to be used.
 
@@ -236,6 +237,7 @@ class HABC_Wave(AcousticWave, HyperLayer):
         '''
 
         AcousticWave.__init__(self, dictionary=dictionary, comm=comm)
+        NRBCHabc.__init__(self)
 
         # Layer shape
         self.layer_shape = layer_shape
