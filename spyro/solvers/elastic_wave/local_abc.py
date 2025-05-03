@@ -6,7 +6,7 @@ def local_abc_form(wave):
     Returns the linear form associated with the traction loads
     when combined with local absorbing boundary conditions.
     '''
-    abc_dict = wave.input_dictionary.get("absorving_boundary_conditions", None)
+    abc_dict = wave.input_dictionary.get(v, None)
     if abc_dict is None:
         return 0
     else:

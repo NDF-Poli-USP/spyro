@@ -239,6 +239,8 @@ class HABC_Wave(AcousticWave, HyperLayer, NRBCHabc):
         AcousticWave.__init__(self, dictionary=dictionary, comm=comm)
         NRBCHabc.__init__(self)
 
+        self.habc_active = True
+
         # Layer shape
         self.layer_shape = layer_shape
         if self.layer_shape == 'rectangular':
