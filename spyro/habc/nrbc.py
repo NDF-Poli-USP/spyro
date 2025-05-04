@@ -57,6 +57,31 @@ class NRBCHabc():
     def hyperellipse_normal_vector(x, y, a, b, n):
         '''
         Compute the normal vector to a hyperellipse |x/a|^n + |y/b|^n = 1.
+
+        Observations:
+        Let f(x, y) = 1 - |x/a|^n - |y/b|^n = 0 a level curve (level set for
+        two variables) for f(x, y, z) at z = 0. The gradient of the function
+        f given by ∇f(x,y) = [∂f/∂x, ∂f/∂y] is a normal vector to the curve.
+
+        Parameters
+        ----------
+        x : `float`
+            x-coordinate of the point
+        y : `float`
+            y-coordinate of the point
+        a : `float`
+            semi-axis in the x-direction
+        b : `float`
+            semi-axis in the y-direction
+        n : `int`
+            degree of the hyperellipse
+
+        Returns
+        -------
+        nx : `float`
+            x-component of the normal vector
+        ny : `float`
+            y-component of the normal vector
         '''
 
         # Compute partial derivatives
@@ -129,7 +154,7 @@ class NRBCHabc():
                 # Hyperellipse degree
                 n_hyp = self.n_hyp
 
-                # Normal vector pointing to the boundary point
+                # Unitary vector pointing to the boundary point
                 nz_r = ref_z / norm_ref
                 nx_r = ref_x / norm_ref
 

@@ -35,7 +35,12 @@ class read_boundary_layer:
     abc_pad_length : float
         Thickness of the PML in the z-direction (km) - always positive
     abc_boundary_layer_type : str
-        Type of the boundary layer
+        Type of the boundary layer. Option 'hybrid' is based on paper
+        of Salas et al. (2022). doi: https://doi.org/10.1016/j.apm.2022.09.014
+    abc_boundary_layer_shape : str
+        Shape type of pad layer. Options: 'rectangular' or 'hypershape'
+    abc_deg_layer : int
+        Hypershape degree
 
     Methods
     -------
@@ -55,6 +60,11 @@ class read_boundary_layer:
         elif self.dictionary["damping_type"] == "PML":
             self.abc_boundary_layer_type = self.dictionary["damping_type"]
             self.read_PML_dictionary()
+        elif self.dictionary["damping_type"] == "hybrid":
+            self.abc_boundary_layer_type = self.dictionary["damping_type"]
+            self.abc_boundary_layer_shape = self.dictionary["layer_shape"]
+            self.abc_deg_layer = self.dictionary["degree_layer"]
+            self.abc_pad_length = 0.0
         else:
             abc_type = self.dictionary["damping_type"]
             raise ValueError(

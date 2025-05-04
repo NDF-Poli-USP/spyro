@@ -375,20 +375,25 @@ class Model_parameters:
             }
         dictionary = self.input_dictionary["absorving_boundary_conditions"]
         self.abc_active = dictionary["status"]
-
         BL_obj = io.boundary_layer_io.read_boundary_layer(dictionary)
-        self.abc_exponent = BL_obj.abc_exponent
-        self.abc_cmax = BL_obj.abc_cmax
-        self.abc_R = BL_obj.abc_R
-        self.abc_pad_length = BL_obj.abc_pad_length
-        self.abc_boundary_layer_type = BL_obj.abc_boundary_layer_type
 
-        self.absorb_top = dictionary.get("absorb_top", False)
-        self.absorb_bottom = dictionary.get("absorb_bottom", True)
-        self.absorb_right = dictionary.get("absorb_right", True)
-        self.absorb_left = dictionary.get("absorb_left", True)
-        self.absorb_front = dictionary.get("absorb_front", True)
-        self.absorb_back = dictionary.get("absorb_back", True)
+        if BL_obj.abc_boundary_layer_type == "hybrid":
+            self.abc_boundary_layer_type = BL_obj.abc_boundary_layer_type
+            self.abc_boundary_layer_shape = BL_obj.abc_boundary_layer_shape
+            self.abc_deg_layer = BL_obj.abc_deg_layer
+            self.abc_pad_length = BL_obj.abc_pad_length
+        else:
+            self.abc_exponent = BL_obj.abc_exponent
+            self.abc_cmax = BL_obj.abc_cmax
+            self.abc_R = BL_obj.abc_R
+            self.abc_pad_length = BL_obj.abc_pad_length
+
+            self.absorb_top = dictionary.get("absorb_top", False)
+            self.absorb_bottom = dictionary.get("absorb_bottom", True)
+            self.absorb_right = dictionary.get("absorb_right", True)
+            self.absorb_left = dictionary.get("absorb_left", True)
+            self.absorb_front = dictionary.get("absorb_front", True)
+            self.absorb_back = dictionary.get("absorb_back", True)
 
     def _sanitize_output(self):
         #         default_dictionary["visualization"] = {

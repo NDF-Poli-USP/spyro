@@ -64,6 +64,16 @@ def test_habc_fig8():
         "gradient_sampling_frequency": 100,  # how frequently to save to RAM
     }
 
+    # Define Parameters for absorbing boundary conditions
+    dictionary["absorving_boundary_conditions"] = {
+        "status": True,
+        "damping_type": "hybrid",
+        "layer_shape": "rectangular",
+        # "layer_shape": "hypershape",
+        "degree_layer": 5,
+    }
+
+    # Define parameters for visualization
     dictionary["visualization"] = {
         "forward_output": True,
         "forward_output_filename": "results/fd_forward_output.pvd",
@@ -74,12 +84,7 @@ def test_habc_fig8():
     }
 
     # Create the acoustic wave object with HABCs
-    # layer_shape = 'rectangular'
-    layer_shape = 'hypershape'
-    n_usu = 5
-    Wave_obj = habc.HABC_Wave(dictionary=dictionary,
-                              layer_shape=layer_shape,
-                              n_usu=n_usu)
+    Wave_obj = habc.HABC_Wave(dictionary=dictionary)
 
     # Mesh
     # cpw: cells per wavelength
@@ -115,6 +120,9 @@ def test_habc_fig8():
 
     # Applying NRBCs on outer boundary layer
     Wave_obj.cos_ang_HigdonBC()
+
+    # Solving the forward problem
+    Wave_obj.forward_solve()
     ipdb.set_trace()
 
 

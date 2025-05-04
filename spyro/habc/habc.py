@@ -210,8 +210,7 @@ class HABC_Wave(AcousticWave, HyperLayer, NRBCHabc):
         Determine the initial search range for the heuristic factor xCR
     '''
 
-    def __init__(self, dictionary=None, layer_shape='rectangular',
-                 f_est=0.06, fwi_iter=0, n_usu=None, comm=None):
+    def __init__(self, dictionary=None, f_est=0.06, fwi_iter=0, comm=None):
         '''
         Initialize the HABC class.
 
@@ -219,15 +218,10 @@ class HABC_Wave(AcousticWave, HyperLayer, NRBCHabc):
         ----------
         dictionary : dict, optional
             A dictionary containing the input parameters for the HABC class
-        layer_shape : str, optional
-            Shape type of pad layer. Options: 'rectangular' or 'hypershape'
-            Default is 'rectangular'
         f_est : `float`, optional
             Factor for the stabilizing term in Eikonal equation. Default is 0.06
         fwi_iter : int, optional
             The iteration number for the FWI algorithm. Default is 0
-        n_usu : int, optional
-            User's hypershape degree. Default is None
         comm : object, optional
             An object representing the communication interface
 
@@ -239,15 +233,14 @@ class HABC_Wave(AcousticWave, HyperLayer, NRBCHabc):
         AcousticWave.__init__(self, dictionary=dictionary, comm=comm)
         NRBCHabc.__init__(self)
 
-        self.habc_active = True
-
         # Layer shape
-        self.layer_shape = layer_shape
+        self.layer_shape = self.abc_boundary_layer_shape
         if self.layer_shape == 'rectangular':
             print("\nAbsorbing Layer Shape: Rectangular")
 
         elif self.layer_shape == 'hypershape':
-            HyperLayer.__init__(self, n_hyp=n_usu, dimension=self.dimension)
+            HyperLayer.__init__(self, n_hyp=self.abc_deg_layer,
+                                dimension=self.dimension)
             print("\nAbsorbing Layer Shape: Hypershape")
 
         else:
@@ -630,11 +623,14 @@ class HABC_Wave(AcousticWave, HyperLayer, NRBCHabc):
             # fire.VTKFile("output/trunc_hyp_test.pvd").write(hyp_mesh)
 
             # Merging the original mesh with the hyperellipse layer mesh
-            mesh_habc = self.merge_mesh_2D(self.mesh, hyp_mesh)
+            mesh_habc = self.merge_mesh_2D(self.mesh_original, hyp_mesh)
             # fire.VTKFile("output/trunc_merged_test.pvd").write(mesh_habc)
 
         # Updating the mesh with the absorbing layer
         self.set_mesh(user_mesh=mesh_habc, mesh_parameters={})
+
+
+        ipdb.set_trace()
 
         print("Mesh Generated Successfully")
 
@@ -668,10 +664,11 @@ class HABC_Wave(AcousticWave, HyperLayer, NRBCHabc):
         print("\nUpdating Velocity Profile")
 
         # Initialize velocity field
-        self.c_habc = fire.Function(self.function_space, name='c [km/s])')
+        self.c = fire.Function(self.function_space, name='c [km/s])')
 
         # Assigning the original velocity model to the new mesh
-        self.c_habc.interpolate(self.c, allow_missing_dofs=True)
+        self.c.interpolate(self.initial_velocity_model,
+                                allow_missing_dofs=True)
 
         # Extending velocity model within the absorbing layer
         print("Extending Profile Inside Layer")
@@ -699,7 +696,7 @@ class HABC_Wave(AcousticWave, HyperLayer, NRBCHabc):
         xpt_to_extend = x_data[pad_pts]
 
         # Velocity profile inside the layer
-        vel_to_extend = self.c_habc.dat.data_with_halos[pad_pts]
+        vel_to_extend = self.c.dat.data_with_halos[pad_pts]
 
         for idp, z_bnd in enumerate(zpt_to_extend):
 
@@ -731,11 +728,11 @@ class HABC_Wave(AcousticWave, HyperLayer, NRBCHabc):
             vel_to_extend[idp] = self.c.at(pnt_c)
 
         # Assign the extended velocity model to the absorbing layer
-        self.c_habc.dat.data_with_halos[pad_pts] = vel_to_extend
+        self.c.dat.data_with_halos[pad_pts] = vel_to_extend
 
         # Save new velocity model
         outfile = fire.VTKFile(self.path_save + "c_habc.pvd")
-        outfile.write(self.c_habc)
+        outfile.write(self.c)
 
     def fundamental_frequency(self, monitor=False):
         '''
@@ -820,7 +817,7 @@ class HABC_Wave(AcousticWave, HyperLayer, NRBCHabc):
         '''
 
         V = self.function_space
-        c = self.c_habc
+        c = self.c
         u, v = fire.TrialFunction(V), fire.TestFunction(V)
 
         # Bilinear forms
