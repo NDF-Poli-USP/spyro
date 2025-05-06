@@ -122,7 +122,7 @@ def test_habc_fig8():
     Wave_obj.cos_ang_HigdonBC()
 
     # Solving the forward problem
-    Wave_obj.forward_solve()
+    # Wave_obj.forward_solve()
     ipdb.set_trace()
 
 

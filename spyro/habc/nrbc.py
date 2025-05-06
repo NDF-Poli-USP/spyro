@@ -59,7 +59,7 @@ class NRBCHabc():
         Compute the normal vector to a hyperellipse |x/a|^n + |y/b|^n = 1.
 
         Observations:
-        Let f(x, y) = 1 - |x/a|^n - |y/b|^n = 0 a level curve (level set for
+        Let f(x, y) = |x/a|^n - |y/b|^n -1 = 0 a level curve (level set for
         two variables) for f(x, y, z) at z = 0. The gradient of the function
         f given by ∇f(x,y) = [∂f/∂x, ∂f/∂y] is a normal vector to the curve.
 

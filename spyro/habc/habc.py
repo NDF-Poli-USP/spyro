@@ -271,7 +271,9 @@ class HABC_Wave(AcousticWave, HyperLayer, NRBCHabc):
         '''
 
         # Save a copy of the original mesh
-        self.mesh_original = fire.Mesh(self.mesh.topology_dm.clone())
+        self.mesh_original = self.mesh
+        mesh_orig = fire.VTKFile(self.path_save + "mesh_orig.pvd")
+        mesh_orig.write(self.mesh_original)
 
         # Velocity profile model
         self.c = self.initial_velocity_model
@@ -628,10 +630,6 @@ class HABC_Wave(AcousticWave, HyperLayer, NRBCHabc):
 
         # Updating the mesh with the absorbing layer
         self.set_mesh(user_mesh=mesh_habc, mesh_parameters={})
-
-
-        ipdb.set_trace()
-
         print("Mesh Generated Successfully")
 
         # Save new mesh
@@ -667,8 +665,7 @@ class HABC_Wave(AcousticWave, HyperLayer, NRBCHabc):
         self.c = fire.Function(self.function_space, name='c [km/s])')
 
         # Assigning the original velocity model to the new mesh
-        self.c.interpolate(self.initial_velocity_model,
-                                allow_missing_dofs=True)
+        self.c.interpolate(self.initial_velocity_model, allow_missing_dofs=True)
 
         # Extending velocity model within the absorbing layer
         print("Extending Profile Inside Layer")
@@ -725,7 +722,7 @@ class HABC_Wave(AcousticWave, HyperLayer, NRBCHabc):
 
                 pnt_c = (z_bnd, x_bnd, y_bnd)
 
-            vel_to_extend[idp] = self.c.at(pnt_c)
+            vel_to_extend[idp] = self.initial_velocity_model.at(pnt_c)
 
         # Assign the extended velocity model to the absorbing layer
         self.c.dat.data_with_halos[pad_pts] = vel_to_extend
