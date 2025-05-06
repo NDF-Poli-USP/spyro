@@ -115,7 +115,7 @@ class NRBCHabc():
         # Boundary nodes
         bnd_nod = fire.DirichletBC(self.function_space, 0, "on_boundary").nodes
 
-        # Node coordinates
+        # Node coordinates - To do: refactor
         z_f = fire.Function(self.function_space).interpolate(self.mesh_z)
         x_f = fire.Function(self.function_space).interpolate(self.mesh_x)
         bnd_z = z_f.dat.data_with_halos[bnd_nod]

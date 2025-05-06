@@ -117,6 +117,8 @@ class HABC_Wave(AcousticWave, HyperLayer, NRBCHabc):
         - sou_cr : Critical source coordinates
     eta_habc : `firedrake function`
         Damping profile within the absorbing layer
+    eta_mask : `firedrake function`
+        Mask function to identify the absorbing layer domain
     F_L : `float`
         Size  parameter of the absorbing layer
     f_Ah : `float`
@@ -182,6 +184,10 @@ class HABC_Wave(AcousticWave, HyperLayer, NRBCHabc):
         Calculate the geometric properties for the rectangular layer
     coeff_damp_fun()
         Compute the coefficients for quadratic damping function
+    cond_marker_for_eta()
+        Define the conditional expressions to identify the domain of
+        the absorbing layer or the reference to the original boundary
+        to compute the damping profile inside the absorbing layer
     create_mesh_habc()
         Create a mesh with absorbing layer based on the determined size
     damping_layer()
@@ -670,7 +676,7 @@ class HABC_Wave(AcousticWave, HyperLayer, NRBCHabc):
         # Extending velocity model within the absorbing layer
         print("Extending Profile Inside Layer")
 
-        # Extract node positions
+        # Extract node positions - To do: Refactor
         z_f = fire.Function(self.function_space).interpolate(self.mesh_z)
         x_f = fire.Function(self.function_space).interpolate(self.mesh_x)
         z_data = z_f.dat.data_with_halos[:]
@@ -828,7 +834,7 @@ class HABC_Wave(AcousticWave, HyperLayer, NRBCHabc):
         a_ptr, a_ind, a_val = A.petscmat.getValuesCSR()
         Asp = ss.csr_matrix((a_val, a_ind, a_ptr), A.petscmat.size)
 
-        # Operator
+        # Operator - To do: Slepc
         print("\nSolving Eigenvalue Problem")
         if self.dimension == 2:  # 2D
             Lsp = ss.linalg.eigs(Asp, k=2, M=Msp, sigma=0.0,
@@ -1260,6 +1266,81 @@ class HABC_Wave(AcousticWave, HyperLayer, NRBCHabc):
 
         return aq, bq
 
+    def cond_marker_for_eta(self, nodes_coord, typ_marker='damping'):
+        '''
+        Define the conditional expressions to identify the domain of
+        the absorbing layer or the reference to the original boundary
+        to compute the damping profile inside the absorbing layer.
+
+        Parameters
+        ----------
+        nodes_coord : `list`
+            Node coordinates. [z_f, x_f, y_f]
+        typ_marker : `string`, optional
+            Type of marker. Default is 'damping'.
+            - 'damping' : Get the reference distance to the original boundary
+            - 'mask' : Define a mask to filter the layer boundary domain
+
+        Returns
+        -------
+        ref :
+            - 'damping' : `ufl.conditional.Conditional`
+                Reference distance to the original boundary
+            - 'mask' : `ufl.algebra.Division`
+                Conditional expression to identify the layer domain
+        '''
+
+        # Node coordinates
+        z_f, x_f = nodes_coord[:2]
+
+        # Dimensions
+        Lz = self.length_z
+        Lx = self.length_x
+
+        # Conditional value
+        val_condz = (z_f + Lz)**2 if typ_marker == 'damping' else 1.0
+        val_condx1 = x_f**2 if typ_marker == 'damping' else 1.0
+        val_condx2 = (x_f - Lx)**2 if typ_marker == 'damping' else 1.0
+
+        # Define the conditional expressions for damping
+        z_pd_sqr = fire.conditional(z_f + Lz < 0, val_condz, 0.)
+        x_pd_sqr = fire.conditional(x_f < 0, val_condx1, 0.) + \
+            fire.conditional(x_f - Lx > 0, val_condx2, 0.)
+
+        if self.dimension == 3:  # 3D
+
+            # 3D dimension
+            Ly = self.length_y
+            y_f = nodes_coord[-1]
+
+            # Conditional value
+            val_condy1 = y_f**2 if typ_marker == 'damping' else 1.0
+            val_condy2 = (y_f - Ly)**2 if typ_marker == 'damping' else 1.0
+
+            # Conditional expressions
+            y_pd_sqr = fire.conditional(y_f < 0, val_condy1, 0.) + \
+                fire.conditional(y_f - Ly > 0, val_condy2, 0.)
+
+        if typ_marker == 'damping':
+
+            # Reference distance to the original boundary
+            norm_sqr = z_pd_sqr + x_pd_sqr
+            if self.dimension == 3:  # 3D
+                norm_sqr += y_pd_sqr
+
+            ref = fire.sqrt(norm_sqr) / fire.Constant(self.pad_len)
+
+        elif typ_marker == 'mask':
+
+            # Mask filter for layer boundary domain
+            ref = z_pd_sqr + x_pd_sqr
+            if self.dimension == 3:  # 3D
+                ref += y_pd_sqr
+
+            ref = fire.conditional(ref > 0, 1.0, 0.0)
+
+        return ref
+
     def damping_layer(self):
         '''
         Set the damping profile within the absorbing layer.
@@ -1280,28 +1361,29 @@ class HABC_Wave(AcousticWave, HyperLayer, NRBCHabc):
         print("\nCreating Damping Profile")
         self.eta_habc = fire.Function(self.function_space, name='eta [1/s])')
 
-        # Dimensions and node coordinates
-        Lz = self.length_z
-        Lx = self.length_x
+        # Dimensions and node coordinates - To do: Refactor
         z_f = fire.Function(self.function_space).interpolate(self.mesh_z)
         x_f = fire.Function(self.function_space).interpolate(self.mesh_x)
+        nodes_coord = [z_f, x_f]
+        if self.dimension == 3:  # 3D
+            y_f = fire.Function(self.function_space).interpolate(self.mesh_y)
+            nodes_coord.append(y_f)
 
-        # Define the damping expressions
-        z_pd_sqr = fire.conditional(z_f + Lz < 0, (z_f + Lz)**2, 0.)
-        x_pd_sqr = fire.conditional(x_f < 0, x_f**2, 0.) + \
-            fire.conditional(x_f - Lx > 0, (x_f - Lx)**2, 0.)
+        # Damping mask
+        mask = self.cond_marker_for_eta(nodes_coord, 'mask')
+
+        print(type(mask))
+        fnc_spc_eta_mask = fire.FunctionSpace(self.mesh, 'DG', 0)
+        self.eta_mask = fire.Function(fnc_spc_eta_mask, name='eta_mask')
+        self.eta_mask.interpolate(mask)
+
+        # Save damping mask
+        outfile = fire.VTKFile(self.path_save + "eta_mask.pvd")
+        outfile.write(self.eta_mask)
 
         # Reference distance to the original boundary
-        if self.dimension == 2:  # 2D
-            ref = fire.sqrt(z_pd_sqr + x_pd_sqr) / fire.Constant(self.pad_len)
-
-        if self.dimension == 3:  # 3D
-            Ly = self.length_y
-            y_f = fire.Function(self.function_space).interpolate(self.mesh_y)
-            y_pd_sqr = fire.conditional(y_f < 0, y_f**2, 0.) + \
-                fire.conditional(y_f - Ly > 0, (y_f - Ly)**2, 0.)
-            ref = fire.sqrt(z_pd_sqr + x_pd_sqr
-                            + y_pd_sqr) / fire.Constant(self.pad_len)
+        ref = self.cond_marker_for_eta(nodes_coord, 'damping')
+        print(type(ref))
 
         # Compute the minimum damping ratio and the associated heuristic factor
         eta_crt, psi_min, xCR, xCR_lim, xCR_search = self.calc_damping_prop()

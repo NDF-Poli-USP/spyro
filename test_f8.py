@@ -51,7 +51,7 @@ def test_habc_fig8():
         "frequency": 5.0,  # in Hz
         "delay": 1.5,
         "receiver_locations": spyro.create_transect(
-            (-0.10, 0.1), (-0.10, 0.9), 20),
+            (-0.10, 0.1), (-0.10, 0.9), 20), # Tuple list
     }
 
     # Simulate for 1.0 seconds.
@@ -122,7 +122,7 @@ def test_habc_fig8():
     Wave_obj.cos_ang_HigdonBC()
 
     # Solving the forward problem
-    # Wave_obj.forward_solve()
+    Wave_obj.forward_solve()
     ipdb.set_trace()
 
 

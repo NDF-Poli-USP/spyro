@@ -46,14 +46,20 @@ def construct_solver_or_matrix_no_pml(Wave_object):
     B = fire.Cofunction(V.dual())
 
     if Wave_object.abc_active:
-        f_abc = - (1/Wave_object.c) * dot((u_n - u_nm1) / Constant(dt), v)
+        weak_expr_abc = dot((u_n - u_nm1) / Constant(dt), v)
+
+        f_abc = (1 / Wave_object.c) * weak_expr_abc
         qr_s = Wave_object.surface_quadrature_rule
 
-        if Wave_obj.abc_boundary_layer_type == "hybrid":
+        if Wave_object.abc_boundary_layer_type == "hybrid":
 
-            le += Wave_obj.cosHig * f_abc * ds(scheme=qr_s)
+            # NRBC
+            le += Wave_object.cosHig * f_abc * ds(scheme=qr_s)
 
-            ipdb.set_trace()
+            # Damping
+            le += Wave_object.eta_mask * weak_expr_abc * \
+                (1 / (Wave_object.c * Wave_object.c)) * \
+                Wave_object.eta_habc * dx(scheme=quad_rule)
 
         else:
             if Wave_object.absorb_top:
@@ -70,7 +76,10 @@ def construct_solver_or_matrix_no_pml(Wave_object):
                 if Wave_object.absorb_back:
                     le += f_abc*ds(6, scheme=qr_s)
 
-    form = m1 + a - le
+    # form = m1 + a - le
+    # Signal for le is + in derivation, see Salas et al (2022)
+    # doi: https://doi.org/10.1016/j.apm.2022.09.014
+    form = m1 + a + le
     lhs = fire.lhs(form)
     rhs = fire.rhs(form)
     Wave_object.lhs = lhs
