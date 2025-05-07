@@ -282,7 +282,8 @@ class HABC_Wave(AcousticWave, HyperLayer, NRBCHabc):
         mesh_orig.write(self.mesh_original)
 
         # Velocity profile model
-        self.c = self.initial_velocity_model
+        self.c = fire.Function(self.function_space, name='c_orig [km/s])')
+        self.c.interpolate(self.initial_velocity_model)
 
         # Save initial velocity model
         vel_c = fire.VTKFile(self.path_save + "c_vel.pvd")

@@ -146,7 +146,8 @@ def create_ellipsoid_solid(a, b, c, max_edge_length):
     # Option 1: Simple CSG approach (recommended)
     print("Using CSG approach for robust mesh generation")
     geo = CSGeometry()
-    ellipsoid = Ellipsoid(Pnt(0, 0, 0), Vec(a, 0, 0), Vec(0, b, 0), Vec(0, 0, c))
+    ellipsoid = Ellipsoid(Pnt(0, 0, 0), Vec(a, 0, 0),
+                          Vec(0, b, 0), Vec(0, 0, c))
     geo.Add(ellipsoid)
     mesh = geo.GenerateMesh(maxh=max_edge_length)
     return mesh
@@ -169,36 +170,7 @@ def parametric_hyperellipse(a, b, n, num_pts):
     return np.column_stack((x, y))
 
 
-def create_ellipsoidal_cap_boundary(a, b, c, n, num_pts_r, num_pts_t):
-    """
-    Create boundary points of an ellipsoidal cap with given height.
-
-    Parameters:
-    a, b, c - semi-axes of the ellipsoid (a and b equatorial, c polar)
-    h - height - height of the cap (distance from pole along c-axis)
-
-    Returns:
-    Array of (x,y) points representing the boundary of the cap
-    """
-
-    # Calculate the parameter t (angle from pole) where the cap ends
-    # At height h from the pole (z = c - h)
-    t = 10 * pi / (num_pts_t - 1)
-
-    # The boundary is an ellipse with semi-axes at height z0
-    a_boundary = a * np.sin(t)**(2/n)
-    b_boundary = b * np.sin(t)**(2/n)
-    z0 = c * np.cos(t)**(2 / n)
-
-    print(z0)
-
-    # Generate points on the cap boundary
-    bnd_cap = parametric_hyperellipse(a_boundary, b_boundary, n, num_pts_r)
-
-    return bnd_cap
-
-
-def create_ellipsoidal_cap_mesh(a, b, c, n, max_edge_length):
+def create_hyp_cap_mesh(a, b, c, n, max_edge_length):
     """
     Creates a 2D mesh of an ellipsoidal cap boundary using Netgen.
 
@@ -239,7 +211,7 @@ def create_ellipsoidal_cap_mesh(a, b, c, n, max_edge_length):
     mesh = geo.GenerateMesh(maxh=max_edge_length, quad_dominated=False)
     mesh.Compress()
 
-    return mesh, nt
+    return mesh
 
 
 def substitute_ellipsoid_caps(ellipsoid_mesh, cap_mesh_2d, a, b, c, n, num_pts_t):
@@ -360,7 +332,6 @@ def create_hyperellipsoid_scaled(a, b, c, n, max_edge_length):
     mesh = geo.GenerateMesh(maxh=max_edge_length / fact, perfstepsend=MeshingStep.MESHSURFACE)
     # mesh.Refine()
 
-
     # Transform the sphere points to create the hyperellipsoid
     for i, p in enumerate(mesh.Coordinates()):
         x, y, z = p
@@ -383,18 +354,73 @@ def create_hyperellipsoid_scaled(a, b, c, n, max_edge_length):
     return mesh
 
 
+def create_ellipsoidal_cap_boundary(a, b, c, n, num_pts_r, num_pts_t):
+    """
+    Create boundary points of an ellipsoidal cap with given height.
+
+    Parameters:
+    a, b, c - semi-axes of the ellipsoid (a and b equatorial, c polar)
+    h - height - height of the cap (distance from pole along c-axis)
+
+    Returns:
+    Array of (x,y) points representing the boundary of the cap
+    """
+
+    # Calculate the parameter t (angle from pole) where the cap ends
+    # At height h from the pole (z = c - h)
+    t = pi / 2  # 10 * pi / (num_pts_t - 1)
+
+    # The boundary is an ellipse with semi-axes at height z0
+    a_boundary = a * np.sin(t)**(2 / n)
+    b_boundary = b * np.sin(t)**(2 / n)
+    z0 = c * np.cos(t)**(2 / n)
+    print(z0)
+
+    # Generate points on the cap boundary
+    bnd_cap = parametric_hyperellipse(a_boundary, b_boundary, n, num_pts_r)
+
+    return bnd_cap
+
+
+def projection_hyp2D_mesh(hyp2D_mesh):
+
+    merged_mesh = ngm.Mesh()
+    merged_mesh.dim = 3
+
+    # Identify non-cap points
+    hyp2D_points = list(hyp2D_mesh.Points())
+    hyp2D_elements = list(hyp2D_mesh.Elements2D())
+
+    point_map = {}
+    cap_points = set()
+
+    for i, p in enumerate(hyp2D_points, 1):
+        x2d, y2d = p[0], p[1]
+        z3d = (1 - abs(x2d / a)**n - abs(y2d / b)**n)**(1/n)
+        cap_points.add(i)
+
+    fd_hyp = merged_mesh.Add(ngm.FaceDescriptor(bc=1, domin=1, domout=0))
+
+    for el in hyp2D_elements:
+        p1, p2, p3 = el.vertices[0].nr - 1, el.vertices[1].nr - 1
+        p3 = el.vertices[2].nr - 1
+        merged_mesh.Add(ngm.Element2D(
+            fd_hyp, [cap_points[p1], cap_points[p2], cap_points[p3]]))
+
+
 a, b, c, n = 2.0, 1.5, 1.0, 4
-lmax = 0.05
+lmax = 0.1
 
 # Generate and export mesh
-ellip_cad2D, nt = create_ellipsoidal_cap_mesh(a, b, c, n, lmax)
-# fire.VTKFile("output/ellip_cad2D.pvd").write(fire.Mesh(ellip_cad2D))
-ellip3D_pol = create_ellipsoid(a, b, c, n, lmax)
-fire.VTKFile("output/ellip3D_pol.pvd").write(fire.Mesh(ellip3D_pol))
-ellip3D_merge = substitute_ellipsoid_caps(ellip3D_pol, ellip_cad2D, a, b, c, n, nt)
-fire.VTKFile("output/ellipsoid_test.pvd").write(fire.Mesh(ellip3D_merge))
+hyp2D_mesh = create_hyp_cap_mesh(a, b, c, n, lmax)
+fire.VTKFile("output/hyp2D_mesh.pvd").write(fire.Mesh(hyp2D_mesh))
+projection_hyp2D_mesh(hyp2D_mesh)
+# ellip3D_pol = create_ellipsoid(a, b, c, n, lmax)
+# fire.VTKFile("output/ellip3D_pol.pvd").write(fire.Mesh(ellip3D_pol))
+# ellip3D_merge = substitute_ellipsoid_caps(ellip3D_pol, ellip_cad2D, a, b, c, n, nt)
+# fire.VTKFile("output/ellipsoid_test.pvd").write(fire.Mesh(ellip3D_merge))
 
-ellipsoid_solid = create_hyperellipsoid_scaled(a, b, c, n, lmax)
-# ellipsoid_solid = create_ellipsoid_solid(a, b, c, lmax)
-# Export results
-fire.VTKFile("output/ellipsoid_solid.pvd").write(fire.Mesh(ellipsoid_solid))
+# ellipsoid_solid = create_hyperellipsoid_scaled(a, b, c, n, lmax)
+# # ellipsoid_solid = create_ellipsoid_solid(a, b, c, lmax)
+# # Export results
+# fire.VTKFile("output/ellipsoid_solid.pvd").write(fire.Mesh(ellipsoid_solid))

@@ -26,7 +26,7 @@ def test_habc_fig8():
     # spyro however supports both spatial parallelism and "shot" parallelism.
     # Options: automatic (same number of cores for evey processor) or spatial
     dictionary["parallelism"] = {
-        "type": "spatial",
+        "type": "automatic",
     }
 
     # Define the domain size without the PML or AL. Here we'll assume a
@@ -51,13 +51,13 @@ def test_habc_fig8():
         "frequency": 5.0,  # in Hz
         "delay": 1.5,
         "receiver_locations": spyro.create_transect(
-            (-0.10, 0.1), (-0.10, 0.9), 20), # Tuple list
+            (-0.10, 0.1), (-0.10, 0.9), 20),  # Tuple list
     }
 
     # Simulate for 1.0 seconds.
     dictionary["time_axis"] = {
         "initial_time": 0.0,  # Initial time for event
-        "final_time": 1.00,  # Final time for event
+        "final_time": 5.00,  # Final time for event
         "dt": 0.0005,  # timestep size
         "amplitude": 1,  # the Ricker has an amplitude of 1.
         "output_frequency": 100,  # how frequently to output solution to pvds
@@ -68,8 +68,8 @@ def test_habc_fig8():
     dictionary["absorving_boundary_conditions"] = {
         "status": True,
         "damping_type": "hybrid",
-        "layer_shape": "rectangular",
-        # "layer_shape": "hypershape",
+        # "layer_shape": "rectangular",
+        "layer_shape": "hypershape",
         "degree_layer": 5,
     }
 
@@ -81,6 +81,8 @@ def test_habc_fig8():
         "velocity_model_filename": None,
         "gradient_output": False,
         "gradient_filename": None,
+        "acoustic_energy": True,
+        "acoustic_energy_filename": "results/acoustic_potential_energy.txt",
     }
 
     # Create the acoustic wave object with HABCs
@@ -123,7 +125,6 @@ def test_habc_fig8():
 
     # Solving the forward problem
     Wave_obj.forward_solve()
-    ipdb.set_trace()
 
 
 # Applying HABCs to the model in Fig. 8 of Salas et al. (2022)

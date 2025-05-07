@@ -31,8 +31,8 @@ class AcousticWave(Wave):
         super().__init__(dictionary, comm=comm)
 
         self.acoustic_energy = None
-        self.field_logger.add_functional("acoustic_energy",
-                                         lambda: fire.assemble(self.acoustic_energy))
+        self.field_logger.add_functional(
+            "acoustic_energy", lambda: fire.assemble(self.acoustic_energy))
 
     def save_current_velocity_model(self, file_name=None):
         if self.c is None:

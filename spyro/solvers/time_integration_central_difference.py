@@ -4,6 +4,7 @@ from . import helpers
 from .. import utils
 import ipdb
 
+
 def central_difference(wave, source_id=0):
     """
     Perform central difference time integration for wave propagation.
@@ -39,8 +40,6 @@ def central_difference(wave, source_id=0):
     for step in range(nt):
         # Basic way of applying sources
         wave.update_source_expression(t)
-
-        ipdb.set_trace()
         fire.assemble(wave.rhs, tensor=wave.B)
 
         # More efficient way of applying sources
