@@ -1,10 +1,11 @@
 import firedrake as fire
-import numpy as np
 import scipy.linalg as sl
 import scipy.sparse as ss
 import spyro.habc.eik as eik
 import spyro.habc.lay_len as lay_len
+import numpy as np
 from os import getcwd
+from scipy.signal import find_peaks
 from scipy.spatial import KDTree
 from spyro.solvers.acoustic_wave import AcousticWave
 from spyro.habc.hyp_lay import HyperLayer
@@ -115,6 +116,12 @@ class HABC_Wave(AcousticWave, HyperLayer, NRBCHabc):
         - z_par : Inverse of minimum Eikonal (Equivalent to c_bound / lref)
         - lref : Distance to the closest source from critical point
         - sou_cr : Critical source coordinates
+    err_habc : `list`
+        Error measures at the receivers for the HABC scheme.
+        Structure sublist: [errIt, errPk, pkMax]
+        - errIt : Integral error
+        - errPk : Peak error
+        - pkMax : Maximum reference peak
     eta_habc : `firedrake function`
         Damping profile within the absorbing layer
     eta_mask : `firedrake function`
@@ -194,6 +201,8 @@ class HABC_Wave(AcousticWave, HyperLayer, NRBCHabc):
         Set the damping profile within the absorbing layer
     det_reference_freq()
         Determine the reference frequency for a new layer size
+    error_measures_habc()
+        Compute the error measures at the receivers for the HABC scheme.
     est_min_damping()
         Estimate the minimum damping ratio and the associated heuristic factor
     fundamental_frequency()
@@ -525,6 +534,11 @@ class HABC_Wave(AcousticWave, HyperLayer, NRBCHabc):
 
         # Identifying critical points
         self.eik_bnd = Eikonal.ident_crit_eik(self)
+
+        # Critical point coordinates as receivers
+        pcrit = [bnd[0] for bnd in self.eik_bnd]
+        self.receiver_locations = pcrit + self.receiver_locations
+        self.number_of_receivers = len(self.receiver_locations)
 
         # Determining the reference frequency
         self.det_reference_freq(histPcrit)
@@ -1404,6 +1418,64 @@ class HABC_Wave(AcousticWave, HyperLayer, NRBCHabc):
         # Save damping profile
         outfile = fire.VTKFile(self.path_save + "eta_habc.pvd")
         outfile.write(self.eta_habc)
+
+    def error_measures_habc(self):
+        '''
+        Compute the error measures at the receivers for the HABC scheme.
+        Error measures as in Salas et al. (2022) Sec. 2.5.
+        Obs: If you get an error during running in find_peaks means that
+        the transient time of the simulation must be increased.
+
+        Parameters
+        ----------
+        None
+
+        Returns
+        -------
+        None
+        '''
+
+        pkMax = []
+        errPk = []
+        errIt = []
+        dt = self.dt
+
+        for i in range(self.number_of_receivers):
+
+            # Transient response in receiver
+            u_abc = self.receivers_output[:, i]
+            u_ref = self.receivers_output[:, i]  # Reference signal (To Do)
+
+            # Finding peaks in transient response
+            u_pks = find_peaks(u_abc)
+
+            if len(u_pks[0]) == 0:
+                wrn_str0 = "No peak observed in the transient response. "
+                wrn_str1 = "Increase the transient time of the simulation."
+                UserWarning(wrn_str0 + wrn_str1)
+
+            # M aximum peak
+            p_abc = max(u_abc[u_pks[0]])
+            p_ref = max(u_ref)
+            pkMax.append(p_abc)
+
+            if len(u_ref) < len(u_abc):
+                u_ref = np.concatenate([u_ref, np.zeros(len(u_abc) - len(u_ref))])
+
+            elif len(u_ref) > len(u_abc):
+                u_abc = np.concatenate([u_abc, np.zeros(len(u_ref) - len(u_abc))])
+
+            # Integral error
+            errIt.append(np.trapz((u_abc - u_ref)**2, dx=dt)
+                         / np.trapz(u_ref**2, dx=dt))
+
+            # Peak error
+            errPk.append(abs(p_abc / p_ref - 1))
+
+        self.err_habc = [errIt, errPk, pkMax]
+
+        np.savetxt(self.path_save + '_errs.txt',
+                   (errIt, errPk, pkMax), delimiter='\t')
 
 
 # # Old approach: 3.994, 3.907, 4.021 mean = 3.974

@@ -3,6 +3,7 @@ import firedrake as fire
 import spyro.habc.habc as habc
 import spyro.habc.eik as eik
 import spyro.habc.lay_len as lay_len
+import spyro.plots.plots as plt_spyro
 from os import getcwd
 import ipdb
 fire.parameters["loopy"] = {"silenced_warnings": ["v1_scheduler_fallback"]}
@@ -41,23 +42,21 @@ def test_habc_fig8():
 
     # Create a source injection operator. Here we use a single source with a
     # Ricker wavelet that has a peak frequency of 5 Hz injected at a specified
-    # point of the mesh. We also specify to record the solution at a microphone
-    # near the top of the domain. This transect of receivers is created with
-    # the helper function `create_transect`.
+    # point of the mesh. We also specify to record the solution at the corners
+    # of the domain to verify the efficiency of the absorbing layer.
     dictionary["acquisition"] = {
         "source_type": "ricker",
         "source_locations": [(-0.5, 0.25)],
         # "source_locations": [(-0.5, 0.25), (-0.5, 0.35), (-0.5, 0.5)],
         "frequency": 5.0,  # in Hz
         "delay": 1.5,
-        "receiver_locations": spyro.create_transect(
-            (-0.10, 0.1), (-0.10, 0.9), 20),  # Tuple list
+        "receiver_locations": [(-1., 0.), (-1., 1.), (0., 1.), (0., 0.)]
     }
 
     # Simulate for 1.0 seconds.
     dictionary["time_axis"] = {
         "initial_time": 0.0,  # Initial time for event
-        "final_time": 5.00,  # Final time for event
+        "final_time": 4.00, #5.00,  # Final time for event
         "dt": 0.0005,  # timestep size
         "amplitude": 1,  # the Ricker has an amplitude of 1.
         "output_frequency": 100,  # how frequently to output solution to pvds
@@ -82,7 +81,7 @@ def test_habc_fig8():
         "gradient_output": False,
         "gradient_filename": None,
         "acoustic_energy": True,
-        "acoustic_energy_filename": "results/acoustic_potential_energy.txt",
+        "acoustic_energy_filename": "results/acoustic_potential_energy",
     }
 
     # Create the acoustic wave object with HABCs
@@ -125,6 +124,13 @@ def test_habc_fig8():
 
     # Solving the forward problem
     Wave_obj.forward_solve()
+
+    # Computing the error measures
+    Wave_obj.error_measures_habc()
+
+    # Plotting the solution at receivers
+    plt_spyro.plot_hist_receivers(Wave_obj)
+    ipdb.set_trace()
 
 
 # Applying HABCs to the model in Fig. 8 of Salas et al. (2022)

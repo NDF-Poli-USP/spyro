@@ -6,6 +6,11 @@ import firedrake
 import copy
 from ..io import ensemble_plot
 
+# Matplotlib lattex configuration
+# plt.rcParams['text.latex.preamble'] = r'\usepackage{bm} \usepackage{amsmath}'
+# plt.rcParams.update({"text.usetex": True, "font.family": "serif"})
+
+
 __all__ = ["plot_shots"]
 
 
@@ -22,9 +27,11 @@ def plot_shots(
     end_index=0,
     out_index=None,
 ):
-    """Plot a shot record and save the image to disk. Note that
+    """
+    Plot a shot record and save the image to disk. Note that
     this automatically will rename shots when ensmeble paralleism is
     activated.
+
     Parameters
     ----------
     model: `dictionary`
@@ -47,6 +54,7 @@ def plot_shots(
         The index of the first receiver to plot
     end_index: integer, optional
         The index of the last receiver to plot
+
     Returns
     -------
     None
@@ -131,7 +139,8 @@ def plot_mesh_sizes(
         plt.savefig(output_filename)
 
 
-def plot_model(Wave_object, filename="model.png", abc_points=None, show=False, flip_axis=True):
+def plot_model(Wave_object, filename="model.png",
+               abc_points=None, show=False, flip_axis=True):
     """
     Plot the model with source and receiver locations.
 
@@ -226,3 +235,71 @@ def debug_plot(function, filename="debug.png"):
 def debug_pvd(function, filename="debug.pvd"):
     out = firedrake.VTKFile(filename)
     out.write(function)
+
+
+def plot_hist_receivers(Wave_object, show=False):
+    '''
+    Plot the solution results at the receivers.
+
+    Parameters
+    ----------
+    Wave_object: `wave`
+        The Wave object containing the simulation results.
+    show: bool, optional
+        Whether to show the plot. Default is False.
+
+    Returns
+    -------
+    None
+
+    '''
+
+    # Time data
+    dt = Wave_object.dt
+    tf = Wave_object.final_time
+    nt = int(tf / dt) + 1  # number of timesteps
+    t_rec = np.linspace(0.0, tf, nt)
+
+    # Setting fonts
+    plt.rcParams['font.family'] = "serif"
+    plt.rcParams['font.size'] = 7
+
+    # Setting subplots
+    num_recvs = Wave_object.number_of_receivers
+    plt.rcParams['axes.grid'] = True
+    fig, axes = plt.subplots(nrows=num_recvs, ncols=1)
+    fig.subplots_adjust(hspace=0.6)
+
+    # Setting colormap
+    cl_rc = (1., 0., 0., 1.)  # RGB-alpha
+    cl_rf = (0., 1., 0., 1.)  # RGB-alpha
+
+    for rec in range(num_recvs):
+
+        # Plot the receiver data
+        rc_dat = Wave_object.receivers_output[:, rec]
+        rf_dat = Wave_object.receivers_output[:, rec]  # Reference (To Do)
+        spl = -(rec + 1)
+        axes[spl].plot(t_rec, rc_dat, color=cl_rc, linestyle='-', linewidth=2)
+        axes[spl].plot(t_rec, rf_dat, color=cl_rf, linestyle='--', linewidth=2)
+
+        # Centered title
+        if rec == num_recvs // 2:
+            axes[rec].set_ylabel(r'$sol \; recs$')
+
+        # Hide all the xticks for receiver different of the last one
+        hide_xticks = False if rec < num_recvs - 1 else True
+        plt.setp(axes[rec].get_xticklabels(), visible=hide_xticks)
+
+        # Axis format
+        axes[rec].set_xlim(0, tf)
+        axes[rec].ticklabel_format(
+            axis='y', style='scientific', scilimits=(-2, 2))
+        if rec == num_recvs - 1:
+            axes[rec].set_xlabel(r'$t \; (s)$')
+
+    # Saving the plot
+    plt.savefig(Wave_object.path_save + 'time.png')
+    plt.savefig(Wave_object.path_save + 'time.pdf')
+    plt.show() if show else None
+    plt.close()
