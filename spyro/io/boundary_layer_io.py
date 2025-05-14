@@ -64,6 +64,7 @@ class read_boundary_layer:
             self.abc_boundary_layer_type = self.dictionary["damping_type"]
             self.abc_boundary_layer_shape = self.dictionary["layer_shape"]
             self.abc_deg_layer = self.dictionary["degree_layer"]
+            self.reference_habc_freq = self.dictionary["reference_habc_freq"]
             self.abc_pad_length = 0.0
         else:
             abc_type = self.dictionary["damping_type"]

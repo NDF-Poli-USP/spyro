@@ -165,7 +165,7 @@ def calc_size_lay(Wave, nz=5, crtCR=1, tol_rel=1e-3, monitor=False):
     lmin = Wave.lmin
     aux2 = "Minimum Mesh Length (km): {:.4f},".format(lmin)
     # lref: Reference length for the size of the absorbing layer
-    lref = Wave.eik_bnd[0][4]
+    lref = Wave.lref
     aux3 = "Reference Length (km): {:.4f}".format(lref)
     print(aux2, aux3)
 
@@ -174,9 +174,8 @@ def calc_size_lay(Wave, nz=5, crtCR=1, tol_rel=1e-3, monitor=False):
 
     x = FLmin
     FLpos = []  # Size factor
-    crtCR = min(crtCR - 1, nz - 1)  # Size selected
+    nz = crtCR if crtCR > nz else nz  # Number of sizes to be computed
     dig_x = 13
-
     tol = 10**int(np.log10(tol_rel * FLmin))
     for i in range(1, nz + 1):
         x = calcZero(x, a, tol, i)
@@ -197,7 +196,7 @@ def calc_size_lay(Wave, nz=5, crtCR=1, tol_rel=1e-3, monitor=False):
     CRpos = np.array([round(abs(f_layer(x, a, typ="CR")), 4) for x in FLpos])
 
     # Selecting a size
-    F_L = FLpos[crtCR]
+    F_L = FLpos[crtCR - 1]
 
     # Size of the absorving layer
     pad_len = F_L * lref

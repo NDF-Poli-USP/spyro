@@ -5,13 +5,9 @@ import numpy as np
 import firedrake
 import copy
 from ..io import ensemble_plot
-
-# Matplotlib lattex configuration
-# plt.rcParams['text.latex.preamble'] = r'\usepackage{bm} \usepackage{amsmath}'
-# plt.rcParams.update({"text.usetex": True, "font.family": "serif"})
-
-
-__all__ = ["plot_shots"]
+plt.rcParams.update({"font.family": "serif"})
+plt.rcParams['text.latex.preamble'] = r'\usepackage{bm} \usepackage{amsmath}'
+__all__ = ["plot_shots", "plot_hist_receivers"]
 
 
 @ensemble_plot
@@ -237,7 +233,7 @@ def debug_pvd(function, filename="debug.pvd"):
     out.write(function)
 
 
-def plot_hist_receivers(Wave_object, show=False):
+def plot_hist_receivers(Wave_object, show=False, file_name=None):
     '''
     Plot the solution results at the receivers.
 
@@ -245,14 +241,17 @@ def plot_hist_receivers(Wave_object, show=False):
     ----------
     Wave_object: `wave`
         The Wave object containing the simulation results.
-    show: bool, optional
+    show: `bool`, optional
         Whether to show the plot. Default is False.
+    file_name: `str`, optional
+        The name of the file to save the plot. Default is None.
 
     Returns
     -------
     None
-
     '''
+
+    print("\nPlotting Comparison")
 
     # Time data
     dt = Wave_object.dt
@@ -261,7 +260,6 @@ def plot_hist_receivers(Wave_object, show=False):
     t_rec = np.linspace(0.0, tf, nt)
 
     # Setting fonts
-    plt.rcParams['font.family'] = "serif"
     plt.rcParams['font.size'] = 7
 
     # Setting subplots
@@ -271,14 +269,14 @@ def plot_hist_receivers(Wave_object, show=False):
     fig.subplots_adjust(hspace=0.6)
 
     # Setting colormap
-    cl_rc = (1., 0., 0., 1.)  # RGB-alpha
-    cl_rf = (0., 1., 0., 1.)  # RGB-alpha
+    cl_rc = (0., 1., 0., 1.)  # RGB-alpha
+    cl_rf = (1., 0., 0., 1.)  # RGB-alpha
 
     for rec in range(num_recvs):
 
         # Plot the receiver data
         rc_dat = Wave_object.receivers_output[:, rec]
-        rf_dat = Wave_object.receivers_output[:, rec]  # Reference (To Do)
+        rf_dat = Wave_object.receivers_reference[:, rec]
         spl = -(rec + 1)
         axes[spl].plot(t_rec, rc_dat, color=cl_rc, linestyle='-', linewidth=2)
         axes[spl].plot(t_rec, rf_dat, color=cl_rf, linestyle='--', linewidth=2)
@@ -299,7 +297,10 @@ def plot_hist_receivers(Wave_object, show=False):
             axes[rec].set_xlabel(r'$t \; (s)$')
 
     # Saving the plot
-    plt.savefig(Wave_object.path_save + 'time.png')
-    plt.savefig(Wave_object.path_save + 'time.pdf')
+    if file_name is None:
+        file_name = "time"
+
+    plt.savefig(Wave_object.path_save + file_name + '.png')
+    plt.savefig(Wave_object.path_save + file_name + '.pdf')
     plt.show() if show else None
     plt.close()

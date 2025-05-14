@@ -97,6 +97,9 @@ class Wave(Model_parameters, metaclass=ABCMeta):
 
     def forward_solve(self):
         """Solves the forward problem."""
+
+        print("\nSolving Forward Problem")
+
         if self.function_space is None:
             self.force_rebuild_function_space()
 

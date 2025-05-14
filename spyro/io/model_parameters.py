@@ -381,6 +381,7 @@ class Model_parameters:
             self.abc_boundary_layer_type = BL_obj.abc_boundary_layer_type
             self.abc_boundary_layer_shape = BL_obj.abc_boundary_layer_shape
             self.abc_deg_layer = BL_obj.abc_deg_layer
+            self.reference_habc_freq = BL_obj.reference_habc_freq
             self.abc_pad_length = BL_obj.abc_pad_length
         else:
             self.abc_exponent = BL_obj.abc_exponent

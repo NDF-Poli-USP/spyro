@@ -45,6 +45,10 @@ class Eikonal():
             left_bnd_y, right_bnd_y] for 3D
     bcs_eik : `list`
         Dirichlet BCs for eikonal
+    c : `firedrake function`
+        Velocity model without absorbing layer
+    mesh: `firedrake mesh`
+        Original mesh without absorbing layer
     path_save : `str`
         Path to save Eikonal results
     yp : `firedrake function`
@@ -89,6 +93,12 @@ class Eikonal():
         -------
         None
         '''
+
+        # Setting the mesh
+        self.mesh = Wave.mesh_original
+
+        # Velocity profile model
+        self.c = Wave.c
 
         # Extract node positions and boundary data
         self.bnds, node_positions = Wave.boundary_data(typ_bnd='eikonal')
@@ -159,15 +169,12 @@ class Eikonal():
             data_arr) | (data_arr < 0.0))] = 0.0
         return data_arr
 
-    @staticmethod
-    def linear_eik(Wave, u, vy):
+    def linear_eik(self, u, vy):
         '''
         Assemble the linear Eikonal
 
         Parameters
         ----------
-        Wave : `wave`
-            Wave object
         u : `firedrake trial function`
             Trial function
         vy : `firedrake test function`
@@ -180,12 +187,11 @@ class Eikonal():
         '''
         f = fire.Constant(1.0)
         lhs = fire.inner(fire.grad(u), fire.grad(vy)) * fire.dx
-        rhs = f / Wave.c * vy * fire.dx
+        rhs = f / self.c * vy * fire.dx
         FL = lhs - rhs
         return FL
 
-    @staticmethod
-    def assemble_eik(Wave, u, vy, f_est=1.0):
+    def assemble_eik(self, Wave, u, vy, f_est=1.0):
         '''
         Assemble the Nonlinear Eikonal with stabilizing term
 
@@ -211,7 +217,7 @@ class Eikonal():
         delta = fire.Constant(float_info.epsilon)  # float_info.min
         gr_norm = fire.sqrt(fire.inner(fire.grad(u), fire.grad(u))) + delta
         f = fire.Constant(1.0)
-        F = gr_norm * vy * fire.dx - f / Wave.c * vy * fire.dx + \
+        F = gr_norm * vy * fire.dx - f / self.c * vy * fire.dx + \
             eps * fire.inner(fire.grad(u), fire.grad(vy)) * fire.dx
         return F
 
@@ -358,14 +364,14 @@ class Eikonal():
 
         # Linear Eikonal
         print("\nSolving Pre-Eikonal")
-        FeikL = self.linear_eik(Wave, u, vy)
+        FeikL = self.linear_eik(u, vy)
         J = fire.derivative(FeikL, yp)
 
         # Initial guess
         cell_diameter_function = fire.Function(Wave.funct_space_eik)
         cell_diameter_function.interpolate(Wave.diam_mesh)
         yp.assign(cell_diameter_function.dat.data_with_halos.max()
-                  / Wave.c.dat.data_with_halos.min())
+                  / self.c.dat.data_with_halos.min())
 
         # Linear Eikonal
         user_atol = tol**0.75
@@ -521,7 +527,7 @@ class Eikonal():
                          self.y_data[idxmin])
 
             # Identifying propagation speed at critical point
-            c_bnd = np.float64(Wave.c.at(pt_cr).item())
+            c_bnd = np.float64(self.c.at(pt_cr).item())
 
             # Print critical point coordinates
             if Wave.dimension == 2:  # 2D

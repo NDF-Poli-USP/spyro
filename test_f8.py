@@ -56,7 +56,7 @@ def test_habc_fig8():
     # Simulate for 1.0 seconds.
     dictionary["time_axis"] = {
         "initial_time": 0.0,  # Initial time for event
-        "final_time": 4.00, #5.00,  # Final time for event
+        "final_time": 3.,    # Final time for event
         "dt": 0.0005,  # timestep size
         "amplitude": 1,  # the Ricker has an amplitude of 1.
         "output_frequency": 100,  # how frequently to output solution to pvds
@@ -67,9 +67,11 @@ def test_habc_fig8():
     dictionary["absorving_boundary_conditions"] = {
         "status": True,
         "damping_type": "hybrid",
-        # "layer_shape": "rectangular",
-        "layer_shape": "hypershape",
-        "degree_layer": 5,
+        "layer_shape": "rectangular",
+        # "layer_shape": "hypershape",  # Options: rectangular or hypershape
+        "degree_layer": 5,  # Integer greater than or equal to 2
+        "reference_habc_freq": "boundary" 
+        # "reference_habc_freq": "source"  # Options: source or boundary
     }
 
     # Define parameters for visualization
@@ -91,24 +93,27 @@ def test_habc_fig8():
     # cpw: cells per wavelength
     # lba = minimum_velocity /source_frequency
     # edge_length = lba / cpw
-    edge_length = 0.05
+    edge_length = 0.1
     Wave_obj.set_mesh(mesh_parameters={"edge_length": edge_length})
 
-    if Wave_obj.fwi_iter == 0:
-        # Initial velocity model
-        cond = fire.conditional(Wave_obj.mesh_x < 0.5, 3.0, 1.5)
-        Wave_obj.set_initial_velocity_model(conditional=cond)
+    # Initial velocity model
+    cond = fire.conditional(Wave_obj.mesh_x < 0.5, 3.0, 1.5)
+    Wave_obj.set_initial_velocity_model(conditional=cond)
 
-        # Preamble mesh operations
-        Wave_obj.preamble_mesh_operations(p_usu=2)
+    # Preamble mesh operations
+    Wave_obj.preamble_mesh_operations(p_usu=2)
 
-        # Initializing Eikonal object
-        Eik_obj = eik.Eikonal(Wave_obj)
-        histPcrit = None
+    # Initializing Eikonal object
+    Eik_obj = eik.Eikonal(Wave_obj)
+
+    # Finding critical points
+    Wave_obj.critical_boundary_points(Eik_obj)
+
+    # Computing reference signal
+    Wave_obj.infinite_model()
 
     # Determining layer size
-    Wave_obj.size_habc_criterion(Eik_obj, histPcrit,
-                                 layer_based_on_mesh=True)
+    Wave_obj.size_habc_criterion(crtCR=1, layer_based_on_mesh=True)
 
     # Creating mesh with absorbing layer
     Wave_obj.create_mesh_habc()
@@ -130,7 +135,6 @@ def test_habc_fig8():
 
     # Plotting the solution at receivers
     plt_spyro.plot_hist_receivers(Wave_obj)
-    ipdb.set_trace()
 
 
 # Applying HABCs to the model in Fig. 8 of Salas et al. (2022)
