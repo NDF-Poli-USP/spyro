@@ -49,7 +49,7 @@ def compute_functional(Wave_object, residual):
 
     J = 0
     for rn in range(num_receivers):
-        J += np.trapz(residual[:, rn] ** 2, dx=dt)
+        J += np.trapezoid(residual[:, rn] ** 2, dx=dt)
 
     J *= 0.5
 

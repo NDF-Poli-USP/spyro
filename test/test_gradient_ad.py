@@ -98,7 +98,7 @@ def test_taylor():
     my_ensemble = fire.Ensemble(fire.COMM_WORLD, M)
     mesh = fire.UnitSquareMesh(20, 20, comm=my_ensemble.comm)
     element = fire.FiniteElement(
-        model["opts"]["method"], mesh.ufl_cell(), degree=model["opts"]["degree"]
+        model["options"]["method"], mesh.ufl_cell(), degree=model["options"]["degree"]
     )
     V = fire.FunctionSpace(mesh, element)
 
