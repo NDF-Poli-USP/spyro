@@ -27,6 +27,8 @@ def cells_per_wavelength(method, degree, dimension):
         cell_type = 'tet'
     if dimension == 2 and method == 'spectral_quadrilateral':
         cell_type = 'quad'
+    if dimension == 3 and method == 'spectral_quadrilateral':
+        cell_type = 'quad'
 
     key = method.lower()+str(degree)+cell_type
 
