@@ -97,8 +97,14 @@ def test_taylor():
     M = 1
     my_ensemble = fire.Ensemble(fire.COMM_WORLD, M)
     mesh = fire.UnitSquareMesh(20, 20, comm=my_ensemble.comm)
+    ufl_cell_obj = mesh.ufl_cell()
+    if ufl_cell_obj._cellname == "triangle":
+        method = "KMV"
+    else:
+        method = "CG"
+    print(f"Using {method} method")
     element = fire.FiniteElement(
-        model["options"]["method"], mesh.ufl_cell(), degree=model["options"]["degree"]
+        method, mesh.ufl_cell(), degree=model["options"]["degree"]
     )
     V = fire.FunctionSpace(mesh, element)
 
@@ -125,7 +131,8 @@ def test_taylor():
         J, fire_ad.Control(c_guess), my_ensemble)
     h = fire.Function(V)
     h.dat.data[:] = rand(V.dim())
-    assert fire_ad.taylor_test(J_hat, c_guess, h) > 1.9
+    tt_conv = fire_ad.taylor_test(J_hat, c_guess, h)
+    assert tt_conv > 1.9
     fire_ad.get_working_tape().clear_tape()
     fire_ad.pause_annotation()
 
@@ -133,3 +140,7 @@ def test_taylor():
 def test_taylor_checkpointing():
     model["aut_dif"]["checkpointing"] = True
     test_taylor()
+
+
+if __name__ == "__main__":
+    test_taylor_checkpointing()
