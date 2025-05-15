@@ -93,7 +93,7 @@ def functions(Wave_obj):
             )
         )
         sigma_y = Function(V, name="sigma_y").interpolate(aux1 + aux2)
-        # sgm_y = File("pmlField/sigma_y.pvd")
+        # sgm_y = VTKFile("pmlField/sigma_y.pvd")
         # sgm_y.write(sigma_y)
 
         return (sigma_x, sigma_y, sigma_z)

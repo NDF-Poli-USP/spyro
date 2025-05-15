@@ -280,9 +280,7 @@ class AutomaticMesh:
         """
         Creates a mesh based on Firedrake meshing utilities.
         """
-        if self.dx is None:
-            raise ValueError("dx is not set")
-        elif self.dimension == 2:
+        if self.dimension == 2:
             return self.create_firedrake_2D_mesh()
         elif self.dimension == 3:
             return self.create_firedrake_3D_mesh()
@@ -293,6 +291,8 @@ class AutomaticMesh:
         """
         Creates a 2D mesh based on Firedrake meshing utilities.
         """
+        if self.dx is None and self.cpw is not None:
+            self.dx = calculate_edge_length(self.cpw, self.minimum_velocity, self.source_frequency)
         if self.abc_pad:
             nx = int((self.length_x + 2*self.abc_pad) / self.dx)
             nz = int((self.length_z + self.abc_pad) / self.dx)
@@ -493,6 +493,14 @@ class AutomaticMesh:
         return fire.Mesh(self.output_file_name)
         # raise NotImplementedError("Not implemented yet")
 
+
+def calculate_edge_length(cpw, minimum_velocity, frequency):
+    v_min = minimum_velocity
+
+    lbda_min = v_min/frequency
+
+    edge_length = lbda_min/cpw
+    return edge_length
 
 # def create_firedrake_3D_mesh_based_on_parameters(dx, cell_type):
 #     nx = int(self.length_x / dx)

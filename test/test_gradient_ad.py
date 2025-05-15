@@ -16,7 +16,7 @@ model["options"] = {
 }
 
 model["parallelism"] = {
-        "type": "automatic",  # options: automatic (same number of cores for evey processor) or spatial
+    "type": "automatic",  # options: automatic (same number of cores for evey processor) or spatial
 }
 
 # Define the domain size without the ABL.
@@ -98,8 +98,7 @@ def test_taylor():
     my_ensemble = fire.Ensemble(fire.COMM_WORLD, M)
     mesh = fire.UnitSquareMesh(20, 20, comm=my_ensemble.comm)
     element = fire.FiniteElement(
-        "KMV", mesh.ufl_cell(), degree=model["options"]["degree"],
-        variant="KMV"
+        model["opts"]["method"], mesh.ufl_cell(), degree=model["opts"]["degree"]
     )
     V = fire.FunctionSpace(mesh, element)
 
