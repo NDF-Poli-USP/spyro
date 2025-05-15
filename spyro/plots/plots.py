@@ -225,5 +225,5 @@ def debug_plot(function, filename="debug.png"):
 
 
 def debug_pvd(function, filename="debug.pvd"):
-    out = firedrake.File(filename)
+    out = firedrake.VTKFile(filename)
     out.write(function)

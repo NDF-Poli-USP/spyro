@@ -90,7 +90,7 @@ def test_fwi(load_real_shot=False, use_rol=False):
         FWI_obj.set_real_velocity_model(conditional=cond, output=True, dg_velocity_model=False)
         FWI_obj.generate_real_shot_record(
             plot_model=True,
-            model_filename="True_experiment.png",
+            filename="True_experiment.png",
             abc_points=[(-0.5, 0.5), (-1.5, 0.5), (-1.5, 1.5), (-0.5, 1.5)]
         )
         np.save("real_shot_record", FWI_obj.real_shot_record)
@@ -131,8 +131,8 @@ def test_fwi(load_real_shot=False, use_rol=False):
     assert all([test0, test1, test2, test3])
 
 
-@pytest.mark.skipif(not is_rol_installed(), reason="ROL is not installed")
 @pytest.mark.parallel(6)
+@pytest.mark.skipif(not is_rol_installed(), reason="ROL is not installed")
 def test_fwi_with_rol(load_real_shot=False, use_rol=True):
     test_fwi(load_real_shot=load_real_shot, use_rol=use_rol)
 
