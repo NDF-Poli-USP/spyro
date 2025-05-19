@@ -10,6 +10,7 @@ from scipy.interpolate import griddata
 import segyio
 import glob
 import os
+import warnings
 
 
 def delete_tmp_files(wave):
@@ -248,7 +249,11 @@ def write_function_to_grid(function, V, grid_spacing):
     min_y = np.amin(y) + 0.005
     max_y = np.amax(y) - 0.005
 
-    z = function.dat.data[:]
+    try:
+        z = function.dat.data[:]
+    except:
+        warnings.warn("Using numpy array instead of a firedrake function to interpolate.")
+        z = function
 
     # target grid to interpolate to
     xi = np.arange(min_x, max_x, grid_spacing)
