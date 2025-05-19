@@ -21,10 +21,12 @@ Installation
 First please install the Firedrake library first by following the instructions here: https://www.firedrakeproject.org/install
 
 To install spyro without optional dependencies, inside the Firedrake virtual environment, use:
+
     git clone https://github.com/NDF-Poli-USP/spyro.git
     python -m pip install -e spyro/
 
 If you want to also use the optional API to the mesh generation library please install:
+
     sudo apt-get update 
     sudo apt-get install libgmp3-dev libmpfr-dev libcgal-dev python3-tk
     pip3 install pyamg
