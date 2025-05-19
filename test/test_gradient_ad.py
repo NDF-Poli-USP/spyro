@@ -29,8 +29,8 @@ model["mesh"] = {
 }
 
 model["absorving_boundary_conditions"] = {
-        "status": False,
-        "pad_length": 0.,
+    "status": False,
+    "pad_length": 0.,
 }
 
 model["acquisition"] = {

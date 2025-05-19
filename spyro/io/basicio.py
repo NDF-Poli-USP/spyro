@@ -251,7 +251,7 @@ def write_function_to_grid(function, V, grid_spacing):
 
     try:
         z = function.dat.data[:]
-    except:
+    except AttributeError:
         warnings.warn("Using numpy array instead of a firedrake function to interpolate.")
         z = function
 

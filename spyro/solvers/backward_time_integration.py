@@ -53,9 +53,9 @@ def backward_wave_propagator_no_pml(Wave_obj, dt=None):
     temp_filename = Wave_obj.forward_output_file
 
     filename, file_extension = temp_filename.split(".")
-    output_filename = "backward." + file_extension
+    # output_filename = "backward." + file_extension
 
-    output = fire.VTKFile(output_filename)
+    # output = fire.VTKFile(output_filename)
     # output = fire.File(output_filename, comm=comm.comm)
     comm.comm.barrier()
 
