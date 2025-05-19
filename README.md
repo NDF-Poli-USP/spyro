@@ -14,9 +14,21 @@ To implement these solvers, spyro uses the finite element package [Firedrake](ht
 
 To use spyro, you'll need to have some knowledge of Python and some basic concepts in inverse modeling relevant to active-source seismology.
 
-Discussions about development take place on our Slack channel. Everyone is invited to join using the link: https://join.slack.com/t/spyroworkspace/shared_invite/zt-u87ih28m-2h9JobfkdArs4ku3a1wLLQ
-
 If you want to know more or cite our code please see our open access publication: https://gmd.copernicus.org/articles/15/8639/2022/gmd-15-8639-2022.html
+
+Installation
+=============
+First please install the Firedrake library first by following the instructions here: https://www.firedrakeproject.org/install
+
+To install spyro without optional dependencies, inside the Firedrake virtual environment, use:
+    git clone https://github.com/NDF-Poli-USP/spyro.git
+    python -m pip install -e spyro/
+
+If you want to also use the optional API to the mesh generation library please install:
+    sudo apt-get update 
+    sudo apt-get install libgmp3-dev libmpfr-dev libcgal-dev python3-tk
+    pip3 install pyamg
+    pip3 install --no-dependencies git+https://github.com/NDF-Poli-USP/SeismicMesh.git
 
 Functionality
 =============
