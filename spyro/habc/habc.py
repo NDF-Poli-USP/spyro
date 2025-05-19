@@ -7,7 +7,6 @@ import numpy as np
 from os import getcwd
 from scipy.fft import fft
 from scipy.signal import find_peaks
-from scipy.spatial import KDTree
 from spyro.solvers.acoustic_wave import AcousticWave
 from spyro.habc.hyp_lay import HyperLayer
 from spyro.habc.nrbc import NRBCHabc
@@ -505,14 +504,14 @@ class HABC_Wave(AcousticWave, HyperLayer, NRBCHabc):
 
         print("\nDetermining Reference Frequency")
 
-        reference_habc_freq = self.reference_habc_freq \
+        abc_reference_freq = self.abc_reference_freq \
             if hasattr(self, 'receivers_reference') else 'source'
 
-        if self.reference_habc_freq == 'source':  # Initial guess
+        if self.abc_reference_freq == 'source':  # Initial guess
             # Theorical central Ricker source frequency
             self.freq_ref = self.frequency
 
-        elif reference_habc_freq == 'boundary':
+        elif abc_reference_freq == 'boundary':
 
             # Transient response at the minimum Eikonal point
             histPcrit = self.receivers_reference[:, 0]
@@ -534,7 +533,7 @@ class HABC_Wave(AcousticWave, HyperLayer, NRBCHabc):
 
             del yt, xf, yf
 
-        print("Reference Frequency (Hz): {:.4f}".format(self.freq_ref))
+        print("Reference Frequency (Hz): {:.5f}".format(self.freq_ref))
 
     def calc_rec_geom_prop(self):
         '''
@@ -557,12 +556,14 @@ class HABC_Wave(AcousticWave, HyperLayer, NRBCHabc):
             self.area = self.Lx_habc * self.Lz_habc
             self.a_rat = self.area / (self.length_x * self.length_z)
             self.f_Ah = 4
+            print("Area Ratio: {:5.3f}".format(self.a_rat))
 
         if self.dimension == 3:  # 3D
             self.vol = self.Lx_habc * self.Lz_habc * self.Ly_habc
             self.v_rat = self.vol / (self.length_x * self.length_z
                                      * self.length_y)
             self.f_Vh = 8
+            print("Volume Ratio: {:5.3f}".format(self.v_rat))
 
     def size_habc_criterion(self, crtCR=1, layer_based_on_mesh=False):
         '''
@@ -775,17 +776,9 @@ class HABC_Wave(AcousticWave, HyperLayer, NRBCHabc):
         for idp, z_bnd in enumerate(zpt_to_extend):
 
             # Find nearest point on the boundary of the original domain
-            if z_bnd < -self.length_z:
-                z_bnd = -self.length_z
-            elif z_bnd > 0.:
-                z_bnd = 0.
-
-            # Ensure that point is within the domain bounds
+            z_bnd = np.clip(z_bnd, -self.length_z, 0.)
             x_bnd = xpt_to_extend[idp]
-            if x_bnd < 0.:
-                x_bnd = 0.
-            elif x_bnd > self.length_x:
-                x_bnd = self.length_x
+            x_bnd = np.clip(x_bnd, 0., self.length_x)
 
             # Set the velocity of the nearest point on the original boundary
             if self.dimension == 2:  # 2D
@@ -793,11 +786,7 @@ class HABC_Wave(AcousticWave, HyperLayer, NRBCHabc):
 
             if self.dimension == 3:  # 3D
                 y_bnd = ypt_to_extend[idp]
-
-                if y_bnd < 0. or y_bnd > self.length_y:
-                    y_bnd -= np.sign(y_bnd) * (self.pad_len + self.tol)
                 y_bnd = np.clip(y_bnd, 0., self.length_y)
-
                 pnt_c = (z_bnd, x_bnd, y_bnd)
 
             vel_to_extend[idp] = self.initial_velocity_model.at(pnt_c)
@@ -1299,7 +1288,7 @@ class HABC_Wave(AcousticWave, HyperLayer, NRBCHabc):
         eta_crt = 2 * np.pi * self.fundam_freq
         eta_max = psi * eta_crt
         print("Critical Damping Coefficient (1/s): {0:.5f}".format(eta_crt))
-        print("Maximum Damping Coefficient (1/s): {0:.5f}".format(eta_max))
+        print("Maximum Damping Ratio: {0:.3%}".format(psi))
 
         # Minimum damping ratio and the associated heuristic factor
         psi_min, xCR, xCR_lim, xCR_search = self.est_min_damping()
@@ -1309,7 +1298,7 @@ class HABC_Wave(AcousticWave, HyperLayer, NRBCHabc):
         # Range for Minimum Damping Ratio. Min:0.01233 - Max:0.20967
 
         # Computed values and its range
-        print("Minimum Damping Ratio: {:.5f}".format(psi_min))
+        print("Minimum Damping Ratio: {:.3%}".format(psi_min))
         psi_str = "Range for Minimum Damping Ratio. Min:{:.5f} - Max:{:.5f}"
         print(psi_str.format(xCR_inf * self.d, xCR_sup * self.d))
         print("Heuristic Factor xCR: {:.3f}".format(xCR))
@@ -1493,49 +1482,77 @@ class HABC_Wave(AcousticWave, HyperLayer, NRBCHabc):
         None
         '''
 
-        print("\nBuilding Infinite Domain Model")
+        if self.abc_get_ref_model:
 
-        # Size of the domain extension
-        max_c = self.initial_velocity_model.dat.data_with_halos.max()
-        add_dom = max_c * self.final_time / 2.
-        if hasattr(self, 'lref'):  # To Do: Dist bound-sources
-            add_dom -= self.lref
+            print("\nBuilding Infinite Domain Model")
 
-        pad_len = self.lmin * np.ceil(add_dom / self.lmin)
-        self.pad_len = pad_len
-        print("Infinite Domain Extension (km): {:.4f}".format(self.pad_len))
+            # Size of the domain extension
+            max_c = self.initial_velocity_model.dat.data_with_halos.max()
+            add_dom = max_c * self.final_time / 2.
 
-        # New dimensions
-        self.Lx_habc = self.length_x + 2 * self.pad_len
-        self.Lz_habc = self.length_z + self.pad_len
+            # Distance already travelled by the wave
+            if hasattr(self, 'lref'):
+                # If Eikonal analysis was performed
+                add_dom -= self.lref
+            else:
+                # If Eikonal analysis was not performed
+                dist_to_bnd = np.inf
+                for nsou in range(self.number_of_sources):
+                    psou_z = self.source_locations[nsou][0]
+                    psou_x = self.source_locations[nsou][1]
+                    delta_z = abs(psou_z - self.length_z)
+                    delta_x = min(abs(psou_x), abs(psou_x - self.length_x))
 
-        if self.dimension == 3:  # 3D
-            self.Ly_habc = self.length_y + 2 * self.pad_len
+                    if self.dimension == 2:  # 2D
+                        dist_to_bnd = min(dist_to_bnd, delta_z, delta_x)
 
-        # Creating mesh for infinite domain
-        self.create_mesh_habc(inf_model=True)
+                    if self.dimension == 3:  # 3D
+                        psou_y = self.source_locations[nsou][2]
+                        delta_y = min(abs(psou_y), abs(psou_y - self.length_y))
+                        dist_to_bnd = min(dist_to_bnd, delta_z, delta_x, delta_y)
 
-        # Updating velocity model
-        self.velocity_habc(inf_model=True)
+                add_dom -= dist_to_bnd
 
-        # Setting no damping
-        self.cosHig = fire.Constant(0.)
-        self.eta_mask = fire.Constant(0.)
-        self.eta_habc = fire.Constant(0.)
+            pad_len = self.lmin * np.ceil(add_dom / self.lmin)
+            self.pad_len = pad_len
+            print("Infinite Domain Extension (km): {:.4f}".format(self.pad_len))
 
-        # Solving the forward problem
-        print("\nSolving Infinite Model")
-        self.forward_solve()
+            # New dimensions
+            self.Lx_habc = self.length_x + 2 * self.pad_len
+            self.Lz_habc = self.length_z + self.pad_len
 
-        # Saving reference signal
-        print("Saving Reference Output")
-        self.receivers_reference = self.receivers_output.copy()
+            if self.dimension == 3:  # 3D
+                self.Ly_habc = self.length_y + 2 * self.pad_len
 
-        # Deleting variables to be computed for HABC scheme
-        del self.pad_len, self.Lx_habc, self.Lz_habc
-        del self.cosHig, self.eta_mask, self.eta_habc
-        if self.dimension == 3:
-            del self.Ly_habc
+            # Creating mesh for infinite domain
+            self.create_mesh_habc(inf_model=True)
+
+            # Updating velocity model
+            self.velocity_habc(inf_model=True)
+
+            # Setting no damping
+            self.cosHig = fire.Constant(0.)
+            self.eta_mask = fire.Constant(0.)
+            self.eta_habc = fire.Constant(0.)
+
+            # Solving the forward problem
+            print("\nSolving Infinite Model")
+            self.forward_solve()
+
+            # Saving reference signal
+            print("Saving Reference Output")
+            self.receivers_reference = self.receivers_output.copy()
+            np.save(self.path_save + 'habc_ref.npy', self.receivers_reference)
+
+            # Deleting variables to be computed for HABC scheme
+            del self.pad_len, self.Lx_habc, self.Lz_habc
+            del self.cosHig, self.eta_mask, self.eta_habc
+            if self.dimension == 3:
+                del self.Ly_habc
+
+        else:
+            print("\nLoading Reference Signal from Infinite Model")
+            self.receivers_reference = np.load(self.path_save + 'habc_ref.npy')
 
     def error_measures_habc(self):
         '''
@@ -1568,22 +1585,22 @@ class HABC_Wave(AcousticWave, HyperLayer, NRBCHabc):
 
             # Finding peaks in transient response
             u_pks = find_peaks(u_abc)
-
             if len(u_pks[0]) == 0:
                 wrn_str0 = "No peak observed in the transient response. "
                 wrn_str1 = "Increase the transient time of the simulation."
                 UserWarning(wrn_str0 + wrn_str1)
 
-            # M aximum peak
+            # Maximum peak
             p_abc = max(u_abc[u_pks[0]])
             p_ref = max(u_ref)
             pkMax.append(p_abc)
 
+            # Completing with zeros if the length of arrays is different
+            delta_len = abs(len(u_abc) - len(u_ref))
             if len(u_ref) < len(u_abc):
-                u_ref = np.concatenate([u_ref, np.zeros(len(u_abc) - len(u_ref))])
-
+                u_ref = np.concatenate([u_ref, np.zeros(delta_len)])
             elif len(u_ref) > len(u_abc):
-                u_abc = np.concatenate([u_abc, np.zeros(len(u_ref) - len(u_abc))])
+                u_abc = np.concatenate([u_abc, np.zeros(delta_len)])
 
             # Integral error
             errIt.append(np.trapz((u_abc - u_ref)**2, dx=dt)
@@ -1592,17 +1609,15 @@ class HABC_Wave(AcousticWave, HyperLayer, NRBCHabc):
             # Peak error
             errPk.append(abs(p_abc / p_ref - 1))
 
-        self.err_habc = [errIt, errPk, pkMax]
+        final_energy = fire.assemble(self.acoustic_energy)
+        self.err_habc = [errIt, errPk, pkMax, final_energy]
         print("Maximum Integral Error: {:.2%}".format(max(errIt)))
         print("Maximum Peak Error: {:.2%}".format(max(errPk)))
+        print("Acoustic Energy: {:.2e}".format(final_energy))
 
+        # Save error measures
         np.savetxt(self.path_save + '_errs.txt',
                    (errIt, errPk, pkMax), delimiter='\t')
-
-
-# # Old approach: 3.994, 3.907, 4.021 mean = 3.974
-# # New approach: 4.908, 4.705, 4.699 mean = 4.772
-# # Reference to resource usage
-# tRef = comp_cost('tini')
-# # Estimating computational resource usage
-# comp_cost('tfin', tRef=tRef)
+        # Append the energy value at the end
+        with open(self.path_save + 'habc_errs.txt', 'a') as f:
+            np.savetxt(f, np.array([final_energy]), delimiter='\t')

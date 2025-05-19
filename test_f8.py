@@ -4,7 +4,7 @@ import spyro.habc.habc as habc
 import spyro.habc.eik as eik
 import spyro.habc.lay_len as lay_len
 import spyro.plots.plots as plt_spyro
-from os import getcwd
+from habc import comp_cost
 import ipdb
 fire.parameters["loopy"] = {"silenced_warnings": ["v1_scheduler_fallback"]}
 
@@ -67,11 +67,12 @@ def test_habc_fig8():
     dictionary["absorving_boundary_conditions"] = {
         "status": True,
         "damping_type": "hybrid",
-        "layer_shape": "rectangular",
-        # "layer_shape": "hypershape",  # Options: rectangular or hypershape
-        "degree_layer": 5,  # Integer greater than or equal to 2
-        "reference_habc_freq": "boundary" 
-        # "reference_habc_freq": "source"  # Options: source or boundary
+        # "layer_shape": "rectangular",
+        "layer_shape": "hypershape",  # Options: rectangular or hypershape
+        "degree_layer": 2,  # Integer >= 2. Only for "hypershape"
+        "habc_reference_freq": "boundary",
+        # "habc_reference_freq": "source" , # Options: source or boundary
+        "get_ref_model": False,  # If True, the infinite model is created
     }
 
     # Define parameters for visualization
@@ -93,7 +94,7 @@ def test_habc_fig8():
     # cpw: cells per wavelength
     # lba = minimum_velocity /source_frequency
     # edge_length = lba / cpw
-    edge_length = 0.1
+    edge_length = 0.05
     Wave_obj.set_mesh(mesh_parameters={"edge_length": edge_length})
 
     # Initial velocity model
@@ -139,4 +140,12 @@ def test_habc_fig8():
 
 # Applying HABCs to the model in Fig. 8 of Salas et al. (2022)
 if __name__ == "__main__":
+
+    # Reference to resource usage
+    tRef = comp_cost('tini')
+
+    # Run the test for Fig. 8
     test_habc_fig8()
+
+    # Estimating computational resource usage
+    comp_cost('tfin', tRef=tRef)

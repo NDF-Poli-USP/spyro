@@ -124,10 +124,8 @@ class NRBCHabc():
         bnd_z = z_f.dat.data_with_halos[bnd_nod]
         bnd_x = x_f.dat.data_with_halos[bnd_nod]
 
-        # Include nodes at a distance greater than the minimum mesh size
-        no_free_surf = ~((abs(bnd_z) <= self.tol)
-                         & (bnd_x >= self.tol - self.lmin)
-                         & (bnd_x <= self.length_x - self.tol + self.lmin))
+        # Include nodes at a distance from the domain >= the minimum mesh size
+        no_free_surf = ~(abs(bnd_z) <= self.tol)
 
         if sommerfeld:  # Sommerfeld BC
             cos_Hig = 1.
@@ -153,7 +151,7 @@ class NRBCHabc():
                 if self.layer_shape == 'rectangular':
                     # Normal vector to the boundary is a orthonormal vector, then
                     # cosine on incidence angle can be estimated from a projection
-                    # of the reference vector to boundary onto the vector [1.,0.]
+                    # of the reference vector to boundary onto the vector [1, 0]
                     cos_Hig = abs(ref_z / norm_ref)
                     cos_Hig[cos_Hig < self.cos_max] = (1. - cos_Hig[
                         cos_Hig < self.cos_max]**2)**0.5
@@ -182,7 +180,6 @@ class NRBCHabc():
                 y_f = fire.Function(
                     self.function_space).interpolate(bnd_coord[:, 2])
                 bnd_y = y_f.dat.data_with_halos[bnd_nod]
-
                 # To Do: Complete
 
             cos_Hig[cos_Hig < self.cos_max] = (1. - cos_Hig[
@@ -193,3 +190,33 @@ class NRBCHabc():
         # Save boundary profile of cosine of incidence angle
         outfile = fire.VTKFile(self.path_save + "cosHig.pvd")
         outfile.write(self.cosHig)
+
+# dx = 0.1 km REC
+# W/O = 107.72% - 0.80%
+# bnd_dom = 6.40% - 24.61%
+# l/4 = 7439003.04% - 38808.77%
+# l/3 = 7439003.04% - 38808.77%
+# l/2 = 7439003.04% - 38808.77%
+# 3*l/4 =  3.44% - 6.15%
+# l = 2.72% - 3.40%
+# 2l =  1.75% - 3.45%
+# 3l = 1.28% - 0.80%
+# 4l = 1.14% - 0.80%
+# 5l = 1.03% - 0.80%
+# 6l = 0.53% - 0.80%
+# 10l = 0.53% - 0.80%
+# free_surf = 0.43% - 0.80%
+
+
+# dx = 0.1 km HYP n = 2
+# W/O = 323.65% - 18.53%
+# bnd_dom = 7.80% - 26.49%
+# l/4 = No results (Numerical Inst)
+# l/3 = No results (Numerical Inst)
+# l/2 = 4.32 - 7.12%
+# 3*l/4 =  4.32% - 7.12%
+# l = 3.18% - 5.35%
+# 2l =  2.73% - 3.86%
+# 3l = 2.08% - 0.76%
+# 5l = 1.02% - 0.76%
+# free_surf = 1.02% - 0.76%

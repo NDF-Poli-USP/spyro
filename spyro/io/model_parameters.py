@@ -202,6 +202,18 @@ class Model_parameters:
         conditions.
     abc_pad_length: float
         Thickness of the absorbing boundary conditions.
+    abc_boundary_layer_type : `str`
+        Type of the boundary layer. Option 'hybrid' is based on paper
+        of Salas et al. (2022). doi: https://doi.org/10.1016/j.apm.2022.09.014
+    abc_boundary_layer_shape : str
+        Shape type of pad layer. Options: 'rectangular' or 'hypershape'
+    abc_deg_layer : `int`
+        Hypershape degree
+    abc_reference_freq : `str`
+        Reference frequency for the hybrid absorbing layer.
+        Options: 'source' or 'boundary'
+    abc_get_ref_model : `bool`
+        If True, the infinite model is created
     source_type: str
         Type of source used in the simulation. Can be "ricker" for a Ricker
         wavelet or "MMS" for a manufactured solution.
@@ -381,7 +393,8 @@ class Model_parameters:
             self.abc_boundary_layer_type = BL_obj.abc_boundary_layer_type
             self.abc_boundary_layer_shape = BL_obj.abc_boundary_layer_shape
             self.abc_deg_layer = BL_obj.abc_deg_layer
-            self.reference_habc_freq = BL_obj.reference_habc_freq
+            self.abc_reference_freq = BL_obj.abc_reference_freq
+            self.abc_get_ref_model = BL_obj.abc_get_ref_model
             self.abc_pad_length = BL_obj.abc_pad_length
         else:
             self.abc_exponent = BL_obj.abc_exponent
