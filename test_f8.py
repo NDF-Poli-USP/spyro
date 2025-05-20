@@ -56,7 +56,7 @@ def test_habc_fig8():
     # Simulate for 1.0 seconds.
     dictionary["time_axis"] = {
         "initial_time": 0.0,  # Initial time for event
-        "final_time": 3.,    # Final time for event
+        "final_time": 2.,    # Final time for event
         "dt": 0.0005,  # timestep size
         "amplitude": 1,  # the Ricker has an amplitude of 1.
         "output_frequency": 100,  # how frequently to output solution to pvds
@@ -67,9 +67,9 @@ def test_habc_fig8():
     dictionary["absorving_boundary_conditions"] = {
         "status": True,
         "damping_type": "hybrid",
-        # "layer_shape": "rectangular",
-        "layer_shape": "hypershape",  # Options: rectangular or hypershape
-        "degree_layer": 2,  # Integer >= 2. Only for "hypershape"
+        "layer_shape": "rectangular",
+        # "layer_shape": "hypershape",  # Options: rectangular or hypershape
+        # "degree_layer": 2,  # Integer >= 2. Only for "hypershape"
         "habc_reference_freq": "boundary",
         # "habc_reference_freq": "source" , # Options: source or boundary
         "get_ref_model": False,  # If True, the infinite model is created

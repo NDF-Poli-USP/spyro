@@ -1491,9 +1491,10 @@ class HABC_Wave(AcousticWave, HyperLayer, NRBCHabc):
             add_dom = max_c * self.final_time / 2.
 
             # Distance already travelled by the wave
-            if hasattr(self, 'lref'):
+            if hasattr(self, 'eik_bnd'):
                 # If Eikonal analysis was performed
-                add_dom -= self.lref
+                eikmin = self.eik_bnd[0][2]
+                add_dom -= max_c * eikmin / 2.
             else:
                 # If Eikonal analysis was not performed
                 dist_to_bnd = np.inf
@@ -1616,7 +1617,7 @@ class HABC_Wave(AcousticWave, HyperLayer, NRBCHabc):
         print("Acoustic Energy: {:.2e}".format(final_energy))
 
         # Save error measures
-        np.savetxt(self.path_save + '_errs.txt',
+        np.savetxt(self.path_save + 'habc_errs.txt',
                    (errIt, errPk, pkMax), delimiter='\t')
         # Append the energy value at the end
         with open(self.path_save + 'habc_errs.txt', 'a') as f:
