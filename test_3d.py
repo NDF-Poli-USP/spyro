@@ -3,7 +3,8 @@ import firedrake as fire
 import spyro.habc.habc as habc
 import spyro.habc.eik as eik
 import spyro.habc.lay_len as lay_len
-from os import getcwd
+import spyro.plots.plots as plt_spyro
+from habc import comp_cost
 import ipdb
 fire.parameters["loopy"] = {"silenced_warnings": ["v1_scheduler_fallback"]}
 
@@ -18,7 +19,7 @@ def test_habc_3d():
         # (MLT/spectral_quadrilateral/DG_triangle/DG_quadrilateral)
         # You can either specify a cell_type+variant or a method
         # accepted_variants = ["lumped", "equispaced", "DG"]
-        "degree": 3,  # p order p <= 3 for 3D
+        "degree": 3,  # p order p<=3 for 3D
         "dimension": 3,  # dimension
     }
 
@@ -26,7 +27,7 @@ def test_habc_3d():
     # spyro however supports both spatial parallelism and "shot" parallelism.
     # Options: automatic (same number of cores for evey processor) or spatial
     dictionary["parallelism"] = {
-        "type": "spatial",
+        "type": "automatic",
     }
 
     # Define the domain size without the PML or AL. Here we'll assume a
@@ -41,70 +42,84 @@ def test_habc_3d():
 
     # Create a source injection operator. Here we use a single source with a
     # Ricker wavelet that has a peak frequency of 5 Hz injected at a specified
-    # point of the mesh. We also specify to record the solution at a microphone
-    # near the top of the domain. This transect of receivers is created with
-    # the helper function `create_transect`.
+    # point of the mesh. We also specify to record the solution at the corners
+    # of the domain to verify the efficiency of the absorbing layer.
     dictionary["acquisition"] = {
         "source_type": "ricker",
         "source_locations": [(-0.5, 0.25, 0.5)],
         "frequency": 5.0,  # in Hz
         "delay": 1.5,
-        "receiver_locations": spyro.create_transect(
-            (-0.10, 0.1, 0.5), (-0.10, 0.9, 0.5), 20),
+        "delay_type": "time",  # "multiple_of_minimun" or "time"
+        "receiver_locations": [(-1., 0., 0.), (-1., 1., 0.),
+                               (0., 1., 0.), (0., 0., 0),
+                               (-1., 0., 1.), (-1., 1., 1.),
+                               (0., 1., 1.), (0., 0., 1.)]
     }
 
-    # Simulate for 1.0 seconds.
+    # Simulate for 1.25 seconds.
     dictionary["time_axis"] = {
         "initial_time": 0.0,  # Initial time for event
-        "final_time": 1.00,  # Final time for event
+        "final_time": 1.25,  # Final time for event
         "dt": 0.0005,  # timestep size
         "amplitude": 1,  # the Ricker has an amplitude of 1.
         "output_frequency": 100,  # how frequently to output solution to pvds
         "gradient_sampling_frequency": 100,  # how frequently to save to RAM
     }
 
+    # Define Parameters for absorbing boundary conditions
+    dictionary["absorving_boundary_conditions"] = {
+        "status": True,  # Activate ABCs
+        "damping_type": "hybrid",  # Activate HABC
+        "layer_shape": "rectangular",  # Options: rectangular or hypershape
+        "habc_reference_freq": "source",  # Options: source or boundary
+        # "layer_shape": "hypershape",  # Options: rectangular or hypershape
+        # "degree_layer": 2,  # Integer >= 2. Only for "hypershape"
+        # "habc_reference_freq": "boundary",  # Options: source or boundary
+        "get_ref_model": True,  # If True, the infinite model is created
+    }
+
+    # Define parameters for visualization
     dictionary["visualization"] = {
         "forward_output": True,
-        "forward_output_filename": "results/fd_forward_output.pvd",
+        "forward_output_filename": "results/fd_forward_output_3d.pvd",
         "fwi_velocity_model_output": False,
         "velocity_model_filename": None,
         "gradient_output": False,
         "gradient_filename": None,
+        "acoustic_energy": True,  # Activate energy calculation
+        "acoustic_energy_filename": "results/acoustic_potential_energy3D",
     }
 
     # Create the acoustic wave object with HABCs
     p_usu = 1
     f_est = 0.07 if p_usu == 2 else 0.06
-    # layer_shape = 'rectangular'
-    layer_shape = 'hypershape'
-    Wave_obj = habc.HABC_Wave(dictionary=dictionary,
-                              layer_shape=layer_shape, f_est=f_est)
+    Wave_obj = habc.HABC_Wave(dictionary=dictionary, f_est=f_est)
 
     # Mesh
     # cpw: cells per wavelength
     # lba = minimum_velocity /source_frequency
     # edge_length = lba / cpw
-    edge_length = 0.05
+    edge_length = 0.1
     Wave_obj.set_mesh(mesh_parameters={"edge_length": edge_length})
 
-    if Wave_obj.fwi_iter == 0:
-        # Initial velocity model
-        cond = fire.conditional(Wave_obj.mesh_x < 0.5, 3.0, 1.5)
-        Wave_obj.set_initial_velocity_model(conditional=cond)
+    # Initial velocity model
+    cond = fire.conditional(Wave_obj.mesh_x < 0.5, 3.0, 1.5)
+    Wave_obj.set_initial_velocity_model(conditional=cond)
 
-        # Preamble mesh operations
-        Wave_obj.preamble_mesh_operations(p_usu=2)
+    # Preamble mesh operations
+    Wave_obj.preamble_mesh_operations(p_usu=p_usu)
 
-        # Mesh properties for Eikonal
-        Wave_obj.properties_eik_mesh(p_usu=p_usu)
+    # Initializing Eikonal object
+    Eik_obj = eik.Eikonal(Wave_obj)
 
-        # Initializing Eikonal object
-        Eik_obj = eik.Eikonal(Wave_obj)
-        histPcrit = None
+    # Finding critical points
+    Wave_obj.critical_boundary_points(Eik_obj)
 
-    # Determining layer size
-    Wave_obj.size_habc_criterion(Eik_obj, histPcrit,
-                                 layer_based_on_mesh=True)
+    # Computing reference signal
+    Wave_obj.infinite_model()
+
+    # # Determining layer size
+    # Wave_obj.size_habc_criterion(layer_based_on_mesh=True)
 
     # # Creating mesh with absorbing layer
     # Wave_obj.create_mesh_habc()
@@ -115,7 +130,27 @@ def test_habc_3d():
     # # Setting the damping profile within absorbing layer
     # Wave_obj.damping_layer()
 
+    # # Applying NRBCs on outer boundary layer
+    # Wave_obj.cos_ang_HigdonBC()
+
+    # # Solving the forward problem
+    # Wave_obj.forward_solve()
+
+    # # Computing the error measures
+    # Wave_obj.error_measures_habc()
+
+    # # Plotting the solution at receivers
+    # plt_spyro.plot_hist_receivers(Wave_obj)
+
 
 # Applying HABCs to the model 3D
 if __name__ == "__main__":
+
+    # Reference to resource usage
+    tRef = comp_cost('tini')
+
+    # Run the test for 3D model
     test_habc_3d()
+
+    # Estimating computational resource usage
+    comp_cost('tfin', tRef=tRef)

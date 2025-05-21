@@ -53,7 +53,7 @@ def test_habc_fig8():
         "receiver_locations": [(-1., 0.), (-1., 1.), (0., 1.), (0., 0.)]
     }
 
-    # Simulate for 1.0 seconds.
+    # Simulate for 2.0 seconds.
     dictionary["time_axis"] = {
         "initial_time": 0.0,  # Initial time for event
         "final_time": 2.,    # Final time for event
@@ -65,8 +65,8 @@ def test_habc_fig8():
 
     # Define Parameters for absorbing boundary conditions
     dictionary["absorving_boundary_conditions"] = {
-        "status": True,
-        "damping_type": "hybrid",
+        "status": True,  # Activate ABCs
+        "damping_type": "hybrid",  # Activate HABC
         "layer_shape": "rectangular",
         # "layer_shape": "hypershape",  # Options: rectangular or hypershape
         # "degree_layer": 2,  # Integer >= 2. Only for "hypershape"
@@ -83,7 +83,7 @@ def test_habc_fig8():
         "velocity_model_filename": None,
         "gradient_output": False,
         "gradient_filename": None,
-        "acoustic_energy": True,
+        "acoustic_energy": True,  # Activate energy calculation
         "acoustic_energy_filename": "results/acoustic_potential_energy",
     }
 
@@ -114,7 +114,7 @@ def test_habc_fig8():
     Wave_obj.infinite_model()
 
     # Determining layer size
-    Wave_obj.size_habc_criterion(crtCR=1, layer_based_on_mesh=True)
+    Wave_obj.size_habc_criterion(layer_based_on_mesh=True)
 
     # Creating mesh with absorbing layer
     Wave_obj.create_mesh_habc()
