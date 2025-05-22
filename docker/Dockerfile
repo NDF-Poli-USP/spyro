@@ -6,14 +6,11 @@ RUN apt-get update \
     && apt-get -y install gmsh patchelf \
     && rm -rf /var/lib/apt/lists/*
 
-USER firedrake
 RUN pip3 install segyio
 
 # spyro dependencies
 USER root
 RUN apt-get update && apt-get install -y libgmp3-dev libmpfr-dev libcgal-dev python3-tk
-USER firedrake
-# The PyPI SeismicMesh has bugs. It is better to install from GitHub
 RUN pip3 install --no-dependencies git+https://github.com/NDF-Poli-USP/SeismicMesh.git
 RUN pip3 install pyamg
 RUN pip3 install meshio
