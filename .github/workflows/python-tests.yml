@@ -18,31 +18,36 @@ jobs:
 
     steps:
     - uses: actions/checkout@v3
+
+    - name: Build Docker image
+      run: |
+        docker build -t devtag:1.0 -f docker/Dockerfile --target spyro_development docker
+
+    - name: Define reusable Docker run command
+      id: docker-run
+      run: echo "::set-output name=cmd::docker run --rm -v ${{ github.workspace }}:/home/shared/spyro -it devtag:1.0 bash -c 'cd /home/shared/spyro && '"
+  
     - name: Running serial tests
       run: |
-          source $VENV_PATH
-          pytest --cov-report=xml --cov=spyro test/
+        ${{ steps.docker-run.outputs.cmd }} python3 -m pytest --cov-report=xml --cov=spyro test/
     - name: Running parallel 3D forward test
       run: |
-          source $VENV_PATH
-          mpiexec -n 6 pytest test_3d/test_hexahedral_convergence.py
-          mpiexec -n 6 pytest test_parallel/test_forward.py
-          mpiexec -n 6 pytest test_parallel/test_fwi.py
+        ${{ steps.docker-run.outputs.cmd }} mpiexec -n 6 python3 -m pytest test_3d/test_hexahedral_convergence.py
+        ${{ steps.docker-run.outputs.cmd }} mpiexec -n 6 python3 -m pytest test_parallel/test_forward.py
+        ${{ steps.docker-run.outputs.cmd }} mpiexec -n 6 python3 -m pytest test_parallel/test_fwi.py
     - name: Covering parallel 3D forward test
       continue-on-error: true
       run: |
-          source $VENV_PATH
-          mpiexec -n 6 pytest --cov-report=xml --cov-append --cov=spyro test_3d/test_hexahedral_convergence.py
+        ${{ steps.docker-run.outputs.cmd }} mpiexec -n 6 python3 -m pytest --cov-report=xml --cov-append --cov=spyro test_3d/test_hexahedral_convergence.py
     - name: Covering parallel forward test
       continue-on-error: true
       run: |
-          source $VENV_PATH
-          mpiexec -n 6 pytest --cov-report=xml --cov-append --cov=spyro test_parallel/test_forward.py
+        ${{ steps.docker-run.outputs.cmd }} mpiexec -n 6 python3 -m pytest --cov-report=xml --cov-append --cov=spyro test_parallel/test_forward.py
     - name: Covering parallel fwi test
       continue-on-error: true
       run: |
-          source $VENV_PATH
-          mpiexec -n 6 pytest --cov-report=xml --cov-append --cov=spyro test_parallel/test_fwi.py
+        ${{ steps.docker-run.outputs.cmd }} mpiexec -n 6 python3 -m pytest --cov-report=xml --cov-append --cov=spyro test_parallel/test_fwi.py
     - name: Uploading coverage to Codecov
-      run: export CODECOV_TOKEN="6cd21147-54f7-4b77-94ad-4b138053401d" && bash <(curl -s https://codecov.io/bash)
+      run: |
+        ${{ steps.docker-run.outputs.cmd }} export CODECOV_TOKEN="6cd21147-54f7-4b77-94ad-4b138053401d" && bash <(curl -s https://codecov.io/bash)
 
