@@ -1,0 +1,13 @@
+{
+    "name": "spyro_dev",
+    "build": {
+      "dockerfile": "../docker/Dockerfile",
+      "target": "spyro_development" // Specify the target stage
+    },
+    "settings": {
+      "terminal.integrated.shell.linux": "/bin/bash"
+    },
+    "postCreateCommand": "apt-get update",
+    "remoteUser": "root"
+  }
+  
