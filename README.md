@@ -18,7 +18,7 @@ If you want to know more or cite our code please see our open access publication
 
 Installation
 =============
-First please install the Firedrake library first by following the instructions here: https://www.firedrakeproject.org/install
+First please install the Firedrake library with SLEPc first by following the instructions here: https://www.firedrakeproject.org/install.html#slepc
 
 To install spyro without optional dependencies, inside the Firedrake virtual environment, use:
 
