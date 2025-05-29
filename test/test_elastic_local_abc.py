@@ -38,8 +38,9 @@ def test_clayton_engquist_abc():
 @pytest.mark.skipif(not has_sufficient_memory(), reason="Insufficient memory")
 def test_with_central():
     wave = build_solver("Stacey", "central")
-    with pytest.raises(AssertionError):
-        wave.forward_solve()
+    wave.forward_solve()
+    last_mechanical_energy = wave.field_logger.get("mechanical_energy")
+    assert last_mechanical_energy < expected_mechanical_energy
 
 
 @pytest.mark.skipif(not has_sufficient_memory(), reason="Insufficient memory")
