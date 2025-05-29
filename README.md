@@ -83,16 +83,18 @@ pip install --no-binary h5py 'firedrake[check,slepc,netgen,vtk]'
 
 
 8. To install spyro without optional dependencies, inside the Firedrake virtual environment, use:
-
-    git clone https://github.com/NDF-Poli-USP/spyro.git
-    python -m pip install -e spyro/
+```
+git clone https://github.com/NDF-Poli-USP/spyro.git
+python -m pip install -e spyro/
+```
 
 9. If you want to also use the optional API to the mesh generation library please install:
-
-    sudo apt-get update 
-    sudo apt-get install libgmp3-dev libmpfr-dev libcgal-dev python3-tk
-    pip3 install pyamg
-    pip3 install --no-dependencies git+https://github.com/NDF-Poli-USP/SeismicMesh.git
+```
+sudo apt-get update 
+sudo apt-get install libgmp3-dev libmpfr-dev libcgal-dev python3-tk
+pip3 install pyamg
+pip3 install --no-dependencies git+https://github.com/NDF-Poli-USP/SeismicMesh.git
+```
 
 Functionality
 =============
