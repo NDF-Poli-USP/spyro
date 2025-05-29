@@ -55,5 +55,5 @@ jobs:
         mpiexec -n 6 python3 -m pytest --cov-report=xml --cov-append --cov=spyro test_parallel/test_fwi.py
     - name: Uploading coverage to Codecov
       run: |
-        export CODECOV_TOKEN="6cd21147-54f7-4b77-94ad-4b138053401d" && bash <(curl -s https://codecov.io/bash)
+        export CODECOV_TOKEN="6cd21147-54f7-4b77-94ad-4b138053401d" && curl -s https://codecov.io/bash | bash
 
