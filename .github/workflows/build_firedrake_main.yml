@@ -80,9 +80,9 @@ jobs:
           : # install of PETSc.
           pip cache remove petsc4py
           pip cache remove slepc4py
-          pip install "$PETSC_DIR"/src/binding/petsc4py
-          pip install -r ./firedrake-repo/requirements-build.txt
-          pip install --no-build-isolation --no-deps \
+          pip install --verbose "$PETSC_DIR"/src/binding/petsc4py
+          pip install --verbose -r ./firedrake-repo/requirements-build.txt
+          pip install --verbose --no-build-isolation --no-deps \
               "$PETSC_DIR"/"$PETSC_ARCH"/externalpackages/git.slepc/src/binding/slepc4py
             pip install --no-deps ngsPETSc netgen-mesher netgen-occt
           pip install --verbose --no-build-isolation --no-binary h5py --editable './firedrake-repo[check,slepc,vtk]'
