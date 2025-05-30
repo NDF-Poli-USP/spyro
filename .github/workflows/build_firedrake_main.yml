@@ -15,7 +15,15 @@ jobs:
 
     container:
       image: ubuntu:latest
-    
+    env:
+      OMPI_ALLOW_RUN_AS_ROOT: 1
+      OMPI_ALLOW_RUN_AS_ROOT_CONFIRM: 1
+      OMP_NUM_THREADS: 1
+      OPENBLAS_NUM_THREADS: 1
+      FIREDRAKE_CI: 1
+      PYOP2_CI_TESTS: 1
+      PYOP2_SPMD_STRICT: 1
+
     steps:
       - name: Fix HOME
         # For unknown reasons GitHub actions overwrite HOME to /github/home
@@ -47,10 +55,10 @@ jobs:
           git clone --depth 1 https://gitlab.com/petsc/petsc.git
           cd petsc
           python3 ../firedrake-repo/scripts/firedrake-configure \
-            --arch ${{ matrix.arch }} --show-petsc-configure-options | \
+            --show-petsc-configure-options | \
             xargs -L1 ./configure --with-make-np=8 --download-slepc
-          make
-          make check
+          make PETSC_DIR=/__w/spyro/spyro/petsc PETSC_ARCH=arch-linux-c-debug all
+          make PETSC_DIR=/__w/spyro/spyro/petsc PETSC_ARCH=arch-linux-c-debug check
 
       - name: Install Firedrake
         id: install
