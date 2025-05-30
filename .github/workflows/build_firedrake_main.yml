@@ -59,6 +59,11 @@ jobs:
             xargs -L1 ./configure --with-make-np=8 --download-slepc
           make PETSC_DIR=/__w/spyro/spyro/petsc PETSC_ARCH=arch-firedrake-default all
           make PETSC_DIR=/__w/spyro/spyro/petsc PETSC_ARCH=arch-firedrake-default check
+          {
+            echo "PETSC_DIR=/__w/spyro/spyro/petsc"
+            echo "PETSC_ARCH=arch-firedrake-default"
+            echo "SLEPC_DIR=/__w/spyro/spyro/petsc/arch-firedrake-default"
+          } >> "$GITHUB_ENV"
 
       - name: Install Firedrake
         id: install
