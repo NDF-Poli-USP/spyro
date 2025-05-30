@@ -14,7 +14,6 @@ docker build -t runtag:1.0 --target spyro_release docker
 Then, the following commands gives access to a virtual environment with spyro:
 ````
 docker run -it runtag:1.0
-. firedrake/bin/activate
 ````
 
 ### Development/Testing
@@ -29,8 +28,7 @@ docker build -t devtag:1.0 -f docker/Dockerfile --target spyro_development docke
 
 Then, start a container and share your local repository:
 ````
-docker run -v $PWD:/home/firedrake/shared/spyro -it devtag:1.0
-. firedrake/bin/activate
+docker run -v $PWD:/home/shared/spyro -it devtag:1.0
 ````
 
 For running the automated tests:
