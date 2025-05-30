@@ -57,8 +57,8 @@ jobs:
           python3 ../firedrake-repo/scripts/firedrake-configure \
             --show-petsc-configure-options | \
             xargs -L1 ./configure --with-make-np=8 --download-slepc
-          make PETSC_DIR=/__w/spyro/spyro/petsc PETSC_ARCH=arch-linux-c-debug all
-          make PETSC_DIR=/__w/spyro/spyro/petsc PETSC_ARCH=arch-linux-c-debug check
+          make PETSC_DIR=/__w/spyro/spyro/petsc PETSC_ARCH=arch-firedrake-default all
+          make PETSC_DIR=/__w/spyro/spyro/petsc PETSC_ARCH=arch-firedrake-default check
 
       - name: Install Firedrake
         id: install
