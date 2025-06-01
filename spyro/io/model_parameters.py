@@ -210,8 +210,10 @@ class Model_parameters:
     abc_deg_layer : `int`
         Hypershape degree
     abc_reference_freq : `str`
-        Reference frequency for the hybrid absorbing layer.
+        Reference frequency for sizing the hybrid absorbing layer.
         Options: 'source' or 'boundary'
+    abc_deg_eikonal : `int`
+        Finite element order for the Eikonal analysis
     abc_get_ref_model : `bool`
         If True, the infinite model is created
     source_type: str
@@ -395,6 +397,7 @@ class Model_parameters:
             self.abc_deg_layer = BL_obj.abc_deg_layer
             self.abc_reference_freq = BL_obj.abc_reference_freq
             self.abc_get_ref_model = BL_obj.abc_get_ref_model
+            self.abc_deg_eikonal = BL_obj.abc_deg_eikonal
             self.abc_pad_length = BL_obj.abc_pad_length
         else:
             self.abc_exponent = BL_obj.abc_exponent

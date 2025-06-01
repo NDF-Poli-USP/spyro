@@ -4,7 +4,7 @@ import spyro.habc.habc as habc
 import spyro.habc.eik as eik
 import spyro.habc.lay_len as lay_len
 import spyro.plots.plots as plt_spyro
-from habc import comp_cost
+from spyro.habc.cost import comp_cost
 import ipdb
 fire.parameters["loopy"] = {"silenced_warnings": ["v1_scheduler_fallback"]}
 
@@ -48,7 +48,7 @@ def test_habc_3d():
         "source_type": "ricker",
         "source_locations": [(-0.5, 0.25, 0.5)],
         "frequency": 5.0,  # in Hz
-        "delay": 1.5,
+        "delay": 0.75,
         "delay_type": "time",  # "multiple_of_minimun" or "time"
         "receiver_locations": [(-1., 0., 0.), (-1., 1., 0.),
                                (0., 1., 0.), (0., 0., 0),
@@ -56,10 +56,10 @@ def test_habc_3d():
                                (0., 1., 1.), (0., 0., 1.)]
     }
 
-    # Simulate for 1.25 seconds.
+    # Simulate for 1.0 seconds.
     dictionary["time_axis"] = {
         "initial_time": 0.0,  # Initial time for event
-        "final_time": 1.25,  # Final time for event
+        "final_time": 1.0,  # Final time for event
         "dt": 0.0005,  # timestep size
         "amplitude": 1,  # the Ricker has an amplitude of 1.
         "output_frequency": 100,  # how frequently to output solution to pvds
@@ -99,7 +99,7 @@ def test_habc_3d():
     # cpw: cells per wavelength
     # lba = minimum_velocity /source_frequency
     # edge_length = lba / cpw
-    edge_length = 0.1
+    edge_length = 0.05
     Wave_obj.set_mesh(mesh_parameters={"edge_length": edge_length})
 
     # Initial velocity model
@@ -153,4 +153,4 @@ if __name__ == "__main__":
     test_habc_3d()
 
     # Estimating computational resource usage
-    comp_cost('tfin', tRef=tRef)
+    comp_cost('tfin', tRef=tRef, user_name="test_")

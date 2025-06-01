@@ -1,15 +1,32 @@
-import spyro
 import firedrake as fire
 import spyro.habc.habc as habc
 import spyro.habc.eik as eik
-import spyro.habc.lay_len as lay_len
-import spyro.plots.plots as plt_spyro
-from habc import comp_cost
+from spyro.habc.cost import comp_cost
 import ipdb
-fire.parameters["loopy"] = {"silenced_warnings": ["v1_scheduler_fallback"]}
 
 
-def test_habc_fig8():
+def wave_dict(layer_shape, degree_layer, habc_reference_freq, get_ref_model):
+    '''
+    Create a dictionary with parameters for the model.
+
+    Parameters
+    ----------
+    layer_shape : `str`
+        Shape of the absorbing layer, either 'rectangular' or 'hypershape'
+    degree_layer : `int` or `None`
+        Degree of the hypershape layer, if applicable. If None, it is not used
+    habc_reference_freq : str
+        Reference frequency for the layer size. Options: 'source' or 'boundary
+    get_ref_model : `bool`
+        If True, the infinite model is created. If False, the absorbing layer
+        is created based on the model parameters.
+
+    Returns
+    -------
+    dictionary : `dict`
+        Dictionary containing the parameters for the model.
+    '''
+
     dictionary = {}
     dictionary["options"] = {
         # Simplexes: triangles or tetrahedra (T) or quadrilaterals (Q)
@@ -47,10 +64,10 @@ def test_habc_fig8():
     dictionary["acquisition"] = {
         "source_type": "ricker",
         "source_locations": [(-0.5, 0.25)],
-        # "source_locations": [(-0.5, 0.25), (-0.5, 0.35), (-0.5, 0.5)],
         "frequency": 5.0,  # in Hz
         "delay": 1.5,
         "receiver_locations": [(-1., 0.), (-1., 1.), (0., 1.), (0., 0.)]
+        # "source_locations": [(-0.5, 0.25), (-0.5, 0.35), (-0.5, 0.5)],
     }
 
     # Simulate for 2.0 seconds.
@@ -67,34 +84,53 @@ def test_habc_fig8():
     dictionary["absorving_boundary_conditions"] = {
         "status": True,  # Activate ABCs
         "damping_type": "hybrid",  # Activate HABC
-        "layer_shape": "rectangular",
-        # "layer_shape": "hypershape",  # Options: rectangular or hypershape
-        # "degree_layer": 2,  # Integer >= 2. Only for "hypershape"
-        "habc_reference_freq": "boundary",
-        # "habc_reference_freq": "source" , # Options: source or boundary
-        "get_ref_model": False,  # If True, the infinite model is created
+        "layer_shape": layer_shape,  # Options: rectangular or hypershape
+        "degree_layer": degree_layer,  # Integer >= 2. Only for hypershape
+        "habc_reference_freq": habc_reference_freq,  # Options: source or boundary
+        "degree_eikonal": 2,  # Finite element order for the Eikonal analysis
+        "get_ref_model": get_ref_model,  # If True, the infinite model is created
     }
 
     # Define parameters for visualization
     dictionary["visualization"] = {
         "forward_output": True,
-        "forward_output_filename": "results/fd_forward_output.pvd",
+        "forward_output_filename": "output/forward/fw_output.pvd",
         "fwi_velocity_model_output": False,
         "velocity_model_filename": None,
         "gradient_output": False,
         "gradient_filename": None,
         "acoustic_energy": True,  # Activate energy calculation
-        "acoustic_energy_filename": "results/acoustic_potential_energy",
+        "acoustic_energy_filename": "output/preamble/acoustic_potential_energy",
     }
+
+    return dictionary
+
+
+def preamble_habc(dictionary, edge_length):
+    '''
+    Run the infinite model and the Rikonal analysis
+
+    Parameters
+    ----------
+    dictionary : `dict`
+        Dictionary containing the parameters for the model
+    edge_length : `float`
+        Mesh size in km
+
+    Returns
+    -------
+    Wave_obj : `habc.HABC_Wave`
+        An instance of the HABC_Wave class
+    '''
+
+    # ============ MESH FEATURES ============
+    # Reference to resource usage
+    tRef = comp_cost('tini')
 
     # Create the acoustic wave object with HABCs
     Wave_obj = habc.HABC_Wave(dictionary=dictionary)
 
     # Mesh
-    # cpw: cells per wavelength
-    # lba = minimum_velocity /source_frequency
-    # edge_length = lba / cpw
-    edge_length = 0.05
     Wave_obj.set_mesh(mesh_parameters={"edge_length": edge_length})
 
     # Initial velocity model
@@ -102,7 +138,15 @@ def test_habc_fig8():
     Wave_obj.set_initial_velocity_model(conditional=cond)
 
     # Preamble mesh operations
-    Wave_obj.preamble_mesh_operations(p_usu=2)
+    Wave_obj.preamble_mesh_operations()
+
+    # Estimating computational resource usage
+    comp_cost('tfin', tRef=tRef,
+              user_name=Wave_obj.path_save + "preamble/MSH_")
+
+    # ============ EIKONAL ANALYSIS ============
+    # Reference to resource usage
+    tRef = comp_cost('tini')
 
     # Initializing Eikonal object
     Eik_obj = eik.Eikonal(Wave_obj)
@@ -110,11 +154,38 @@ def test_habc_fig8():
     # Finding critical points
     Wave_obj.critical_boundary_points(Eik_obj)
 
-    # Computing reference signal
-    Wave_obj.infinite_model()
+    # Estimating computational resource usage
+    comp_cost('tfin', tRef=tRef,
+              user_name=Wave_obj.path_save + "preamble/EIK_")
+
+    return Wave_obj
+
+
+def test_habc_fig8(Wave_obj, xCR_usu=None):
+    '''
+    Apply the HABC to the model in Fig. 8 of Salas et al. (2022).
+
+    Parameters
+    ----------
+    Wave_obj : `habc.HABC_Wave`
+        An instance of the HABC_Wave class
+    xCR_usu : `float`, optional
+        User-defined heuristic factor for the minimum damping ratio.
+        Default is None, which defines an estimated value
+
+    Returns
+    -------
+    None
+    '''
+
+    # Identifier for the current case study
+    Wave_obj.identify_habc_case()
+
+    # Acquiring reference signal
+    Wave_obj.get_reference_signal()
 
     # Determining layer size
-    Wave_obj.size_habc_criterion(layer_based_on_mesh=True)
+    Wave_obj.size_habc_criterion(n_root=1, layer_based_on_mesh=True)
 
     # Creating mesh with absorbing layer
     Wave_obj.create_mesh_habc()
@@ -123,7 +194,7 @@ def test_habc_fig8():
     Wave_obj.velocity_habc()
 
     # Setting the damping profile within absorbing layer
-    Wave_obj.damping_layer()
+    Wave_obj.damping_layer(xCR_usu=xCR_usu)
 
     # Applying NRBCs on outer boundary layer
     Wave_obj.cos_ang_HigdonBC()
@@ -135,17 +206,82 @@ def test_habc_fig8():
     Wave_obj.error_measures_habc()
 
     # Plotting the solution at receivers
-    plt_spyro.plot_hist_receivers(Wave_obj)
+    Wave_obj.comparison_plots()
 
 
 # Applying HABCs to the model in Fig. 8 of Salas et al. (2022)
 if __name__ == "__main__":
 
-    # Reference to resource usage
-    tRef = comp_cost('tini')
+    # Mesh size
+    # cpw: cells per wavelength
+    # lba = minimum_velocity /source_frequency
+    # edge_length = lba / cpw
+    edge_length_lst = [0.05]  # [0.05, 0.02, 0.01]
 
-    # Run the test for Fig. 8
-    test_habc_fig8()
+    degree_layer_lst = [None]  # [None, 2, 3, 4, 5]
 
-    # Estimating computational resource usage
-    comp_cost('tfin', tRef=tRef)
+    habc_reference_freq_lst = ["source"]  # ["source", "boundary"]
+
+    get_ref_model = False
+
+    loop_modeling = not get_ref_model
+
+    for edge_length in edge_length_lst:
+
+        # ============ MESH AND EIKONAL ============
+        # Create dictionary with parameters for the model
+        dictionary = wave_dict("rectangular", None, "source", get_ref_model)
+
+        # Creating mesh and performing eikonal analysis
+        Wave_obj = preamble_habc(dictionary, edge_length)
+
+        # ============ REFERENCE MODEL ============
+        if get_ref_model:
+            # Reference to resource usage
+            tRef = comp_cost('tini')
+
+            # Computing reference signal
+            Wave_obj.infinite_model()
+
+            # Set model parameters for the HABC scheme
+            Wave_obj.abc_get_ref_model = False
+
+            # Estimating computational resource usage
+            comp_cost('tfin', tRef=tRef,
+                      user_name=Wave_obj.path_save + "preamble/INF_")
+
+        # ============ HABC SCHEME ============
+        if loop_modeling:
+
+            # Loop for different layer shapes and degrees
+            for habc_reference_freq in habc_reference_freq_lst:
+
+                # Reference frequency for sizing the hybrid absorbing layer
+                Wave_obj.abc_reference_freq = habc_reference_freq
+
+                for degree_layer in degree_layer_lst:
+
+                    # Update the layer shape and its degree
+                    Wave_obj.abc_boundary_layer_shape = "hypershape" \
+                        if degree_layer is not None else "rectangular"
+                    Wave_obj.abc_deg_layer = degree_layer
+
+                    # Reference to resource usage
+                    tRef = comp_cost('tini')
+
+                    # Run the HABC scheme
+                    test_habc_fig8(Wave_obj, xCR_usu=1.495)
+
+                    # Estimating computational resource usage
+                    user_name = Wave_obj.path_save + Wave_obj.case_habc + "/"
+                    comp_cost('tfin', tRef=tRef, user_name=user_name)
+
+
+# 0.111 1.78 0.60 5.60e-08
+# 0.158 1.75 0.65 5.47e-08
+# 0.319 1.64 0.79 5.03e-08
+# 0.637 1.47 1.07 4.33e-08
+# 0.955 1.33 1.33 3.77e-08
+# 1.103 1.28 1.45 3.55e-08
+# 1.495 1.17 1.73 3.09e-08
+# 1.887 1.10 2.01 2.75e-08

@@ -2,7 +2,7 @@ import firedrake as fire
 import numpy as np
 from sys import float_info
 from os import getcwd
-import ipdb
+# import ipdb
 
 # Work from Ruben Andres Salas, Andre Luis Ferreira da Silva,
 # Luis Fernando Nogueira de Sá, Emilio Carlos Nelli Silva.
@@ -24,11 +24,27 @@ class Dir_point_bc(fire.DirichletBC):
     '''
 
     def __init__(self, V, value, nodes):
-        # Call superclass init
-        # We provide a dummy subdomain id.
+        '''
+        Initialize the Dir_point_bc class.
+
+        Parameters
+        ----------
+        V : `firedrake function space`
+            Function space where the boundary condition is applied
+        value : `firedrake constant`
+            Value of the boundary condition
+        nodes : `array`
+            Points where the boundary condition is to be applied
+
+        Returns
+        -------
+        None
+        '''
+
+        # Calling superclass init and providing a dummy subdomain id
         super(Dir_point_bc, self).__init__(V, value, 0)
-        # Override the "nodes" property which says where the boundary
-        # condition is to be applied.
+
+        # Overriding the "nodes" property
         self.nodes = nodes
 
 
@@ -94,6 +110,9 @@ class Eikonal():
         None
         '''
 
+        # Communicator MPI4py
+        self.comm = Wave.comm
+
         # Setting the mesh
         self.mesh = Wave.mesh_original
 
@@ -107,7 +126,7 @@ class Eikonal():
             self.y_data = node_positions[-1]
 
         # Path to save data
-        self.path_save = getcwd() + "/output/"
+        self.path_save = getcwd() + "/output/preamble/"
 
     def define_bcs(self, Wave):
         '''

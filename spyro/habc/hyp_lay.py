@@ -1,12 +1,12 @@
 import firedrake as fire
 from netgen.geom2d import SplineGeometry
-from netgen.meshing import Mesh, Element2D, MeshPoint, FaceDescriptor
+from netgen.meshing import Element2D, FaceDescriptor, Mesh, MeshPoint
 import numpy as np
 from scipy.integrate import quad
 from scipy.spatial import KDTree
-from scipy.special import gamma, beta, betainc
-import ipdb
-fire.parameters["loopy"] = {"silenced_warnings": ["v1_scheduler_fallback"]}
+from scipy.special import beta, betainc, gamma
+# import ipdb
+# fire.parameters["loopy"] = {"silenced_warnings": ["v1_scheduler_fallback"]}
 
 # Work from Ruben Andres Salas, Andre Luis Ferreira da Silva,
 # Luis Fernando Nogueira de Sá, Emilio Carlos Nelli Silva.

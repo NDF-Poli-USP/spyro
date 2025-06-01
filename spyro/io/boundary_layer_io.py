@@ -42,8 +42,10 @@ class read_boundary_layer:
     abc_deg_layer : `int`
         Hypershape degree
     abc_reference_freq : `str`
-        Reference frequency for the hybrid absorbing layer.
+        Reference frequency for sizing the hybrid absorbing layer
         Options: 'source' or 'boundary'
+    abc_deg_eikonal : `int`
+        Finite element order for the Eikonal analysis
     abc_get_ref_model : `bool`
         If True, the infinite model is created
 
@@ -69,11 +71,11 @@ class read_boundary_layer:
         elif self.dictionary["damping_type"] == "hybrid":
             self.abc_boundary_layer_type = self.dictionary["damping_type"]
             self.abc_boundary_layer_shape = self.dictionary["layer_shape"]
-            if self.dictionary["layer_shape"] == "rectangular":
-                self.abc_deg_layer = None
-            else:
-                self.abc_deg_layer = self.dictionary.get("degree_layer", 2)
+            self.abc_deg_layer = None \
+                if self.dictionary["layer_shape"] == "rectangular" \
+                else self.dictionary.get("degree_layer", 2)
             self.abc_reference_freq = self.dictionary["habc_reference_freq"]
+            self.abc_deg_eikonal = self.dictionary.get("degree_eikonal", None)
             self.abc_get_ref_model = self.dictionary["get_ref_model"]
             self.abc_pad_length = 0.0
         else:

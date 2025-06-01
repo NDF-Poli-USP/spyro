@@ -233,9 +233,11 @@ def debug_pvd(function, filename="debug.pvd"):
     out.write(function)
 
 
-def plot_hist_receivers(Wave_object, show=False, file_name=None):
+def plot_hist_receivers(Wave_object, show=False):
     '''
-    Plot the solution results at the receivers.
+    Plot the comparison of the time-domain response at the
+    receivers between the reference model and the HABC scheme.
+    The plots are saved in PDF and PNG formats.
 
     Parameters
     ----------
@@ -243,15 +245,13 @@ def plot_hist_receivers(Wave_object, show=False, file_name=None):
         The Wave object containing the simulation results.
     show: `bool`, optional
         Whether to show the plot. Default is False.
-    file_name: `str`, optional
-        The name of the file to save the plot. Default is None.
 
     Returns
     -------
     None
     '''
 
-    print("\nPlotting Comparison")
+    print("\nPlotting Time Comparison")
 
     # Time data
     dt = Wave_object.dt
@@ -269,17 +269,22 @@ def plot_hist_receivers(Wave_object, show=False, file_name=None):
     fig.subplots_adjust(hspace=0.6)
 
     # Setting colormap
-    cl_rc = (0., 1., 0., 1.)  # RGB-alpha
-    cl_rf = (1., 0., 0., 1.)  # RGB-alpha
+    cl_rc = (0., 1., 0., 1.)  # RGB-alpha (Green)
+    cl_rf = (1., 0., 0., 1.)  # RGB-alpha (Red)
 
     for rec in range(num_recvs):
 
         # Plot the receiver data
         rc_dat = Wave_object.receivers_output[:, rec]
         rf_dat = Wave_object.receivers_reference[:, rec]
-        spl = -(rec + 1)
-        axes[spl].plot(t_rec, rc_dat, color=cl_rc, linestyle='-', linewidth=2)
-        axes[spl].plot(t_rec, rf_dat, color=cl_rf, linestyle='--', linewidth=2)
+        axes[rec].plot(t_rec, rc_dat, color=cl_rc, linestyle='-', linewidth=2)
+        axes[rec].plot(t_rec, rf_dat, color=cl_rf, linestyle='--', linewidth=2)
+
+        # Adding the receiver number label
+        axes[rec].text(0.995, 0.9, "R" + str(rec + 1), fontsize=8.5,
+                       transform=axes[rec].transAxes, fontweight='bold',
+                       verticalalignment='top', horizontalalignment='right',
+                       bbox=dict(facecolor='none', edgecolor='none'))
 
         # Centered title
         if rec == num_recvs // 2:
@@ -297,10 +302,112 @@ def plot_hist_receivers(Wave_object, show=False, file_name=None):
             axes[rec].set_xlabel(r'$t \; (s)$')
 
     # Saving the plot
-    if file_name is None:
-        file_name = "time"
+    time_str = Wave_object.path_save + Wave_object.case_habc + "/time"
+    plt.savefig(time_str + '.png')
+    plt.savefig(time_str + '.pdf')
+    plt.show() if show else None
+    plt.close()
 
-    plt.savefig(Wave_object.path_save + file_name + '.png')
-    plt.savefig(Wave_object.path_save + file_name + '.pdf')
+
+def plot_rfft_receivers(Wave_object, fxlim=4., show=False):
+    '''
+    Plot the comparison of the frequency-domain response at the
+    receivers between the reference model and the HABC scheme.
+    The plots are saved in PDF and PNG formats.
+
+    Parameters
+    ----------
+    Wave_object: `wave`
+        Wave object containing the simulation results.
+    fxlim: `float`, optional
+        Factor to set the x-axis limits in the plots realtive to
+        the source frequency. Default is 4 and the minimum is 2.
+    show: `bool`, optional
+        Whether to show the plot. Default is False.
+
+    Returns
+    -------
+    None
+    '''
+
+    print("\nPlotting Frequency Comparison")
+
+    # Frequency data
+    f_Nyq = Wave_object.f_Nyq
+    f_sou = Wave_object.frequency
+    pfft = Wave_object.receivers_out_fft.shape[0] - 1
+    df = f_Nyq / pfft
+    limf = round(min(max(fxlim, 2.) * f_sou, f_Nyq), 1)
+    idx_lim = int(limf / df) + 1
+    f_rec = np.linspace(0, df * idx_lim, idx_lim)
+
+    # Setting fonts
+    plt.rcParams['font.size'] = 7
+
+    # Setting subplots
+    num_recvs = Wave_object.number_of_receivers
+    plt.rcParams['axes.grid'] = True
+    fig, axes = plt.subplots(nrows=num_recvs, ncols=1)
+    fig.subplots_adjust(hspace=0.6)
+
+    # Setting colormap
+    cl_rc = (0., 1., 0., 1.)  # RGB-alpha (Green)
+    cl_rf = (1., 0., 0., 1.)  # RGB-alpha (Red)
+
+    for rec in range(num_recvs):
+
+        # Plot the receiver data
+        rc_dat = Wave_object.receivers_out_fft[:idx_lim, rec]
+        rf_dat = Wave_object.receivers_ref_fft[:idx_lim, rec]
+        axes[rec].plot(f_rec, rc_dat, color=cl_rc, linestyle='-', linewidth=2)
+        axes[rec].plot(f_rec, rf_dat, color=cl_rf, linestyle='--', linewidth=2)
+
+        # Add a vertical line at f_ref and f_sou
+        if f_sou == Wave_object.freq_ref:
+            f_ref = f_sou
+            f_str = r'$f_{ref} = f_{sou}$'
+        else:
+            f_ref = Wave_object.freq_ref
+            f_str = r'$f_{ref}$'
+            axes[rec].axvline(
+                x=f_sou, color='black', linestyle='-', linewidth=1.25)
+
+        axes[rec].axvline(
+            x=f_ref, color='black', linestyle='-', linewidth=1.25)
+
+        # Adding the receiver number label
+        axes[rec].text(0.995, 0.9, "R" + str(rec + 1), fontsize=8.5,
+                       transform=axes[rec].transAxes, fontweight='bold',
+                       verticalalignment='top', horizontalalignment='right',
+                       bbox=dict(facecolor='none', edgecolor='none'))
+
+        # Centered title
+        if rec == num_recvs // 2:
+            axes[rec].set_ylabel(r'$FFT \; recs_{norm}$')
+
+        # Hide all the xticks for receiver different of the last one
+        hide_xticks = False if rec < num_recvs - 1 else True
+        plt.setp(axes[rec].get_xticklabels(), visible=hide_xticks)
+
+        # Axis format
+        axes[rec].set_xlim(0, limf)
+        axes[rec].ticklabel_format(
+            axis='y', style='scientific', scilimits=(-2, 2))
+        if rec == num_recvs - 1:
+            axes[rec].set_xlabel(r'$f \; (Hz)$')
+
+            # Adding the frequency labels
+            axes[rec].text(f_ref - limf / 500., axes[rec].get_ylim()[0] * 1.05,
+                           f_str, color='black', fontsize=8, fontweight='bold',
+                           ha='right', va='bottom')
+            axes[rec].text(f_sou + limf / 500., axes[rec].get_ylim()[0] * 1.05,
+                           r'$f_{sou}$', color='black', fontsize=8,
+                           fontweight='bold', ha='left', va='bottom') \
+                if f_sou != Wave_object.freq_ref else None
+
+    # Saving the plot
+    time_str = Wave_object.path_save + Wave_object.case_habc + "/freq"
+    plt.savefig(time_str + '.png')
+    plt.savefig(time_str + '.pdf')
     plt.show() if show else None
     plt.close()

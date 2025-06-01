@@ -121,7 +121,7 @@ def calcZero(xini, a, tol, nz=1):
     return x
 
 
-def calc_size_lay(Wave, nz=5, crtCR=1, tol_rel=1e-3, monitor=False):
+def calc_size_lay(Wave, nz=5, n_root=1, tol_rel=1e-3, monitor=False):
     '''
     Calculate the lenght of the absorbing layer.
 
@@ -131,7 +131,7 @@ def calc_size_lay(Wave, nz=5, crtCR=1, tol_rel=1e-3, monitor=False):
             Wave object
     nz : `int`, optional
         Number of layer sizes calculated. Default is 5
-    crtCR : `int`, optional
+    n_root : `int`, optional
         n-th Root selected for the size of the absorbing layer. Default is 1
     tol_rel : `float`, optional
         Relative convergence tolerance w.r.t the initial guess. Default is 1e-3
@@ -174,7 +174,7 @@ def calc_size_lay(Wave, nz=5, crtCR=1, tol_rel=1e-3, monitor=False):
 
     x = FLmin
     FLpos = []  # Size factor
-    nz = crtCR if crtCR > nz else nz  # Number of sizes to be computed
+    nz = n_root if n_root > nz else nz  # Number of sizes to be computed
     dig_x = 13
     tol = 10**int(np.log10(tol_rel * FLmin))
     for i in range(1, nz + 1):
@@ -196,7 +196,7 @@ def calc_size_lay(Wave, nz=5, crtCR=1, tol_rel=1e-3, monitor=False):
     CRpos = np.array([round(abs(f_layer(x, a, typ="CR")), 4) for x in FLpos])
 
     # Selecting a size
-    F_L = FLpos[crtCR - 1]
+    F_L = FLpos[n_root - 1]
 
     # Size of the absorving layer
     pad_len = F_L * lref

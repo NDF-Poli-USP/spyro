@@ -1,6 +1,0 @@
-<?xml version="1.0" ?>
-<VTKFile type="Collection" version="0.1" byte_order="LittleEndian">
-<Collection>
-<DataSet timestep="0" file="hyp2D_mesh/hyp2D_mesh_0.vtu" />
-</Collection>
-</VTKFile>

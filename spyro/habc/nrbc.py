@@ -1,7 +1,6 @@
 import firedrake as fire
 import numpy as np
-from os import getcwd
-import ipdb
+# import ipdb
 
 # Work from Ruben Andres Salas, Andre Luis Ferreira da Silva,
 # Luis Fernando Nogueira de Sá, Emilio Carlos Nelli Silva.
@@ -188,7 +187,7 @@ class NRBCHabc():
         self.cosHig.dat.data_with_halos[bnd_nod[no_free_surf]] = cos_Hig
 
         # Save boundary profile of cosine of incidence angle
-        outfile = fire.VTKFile(self.path_save + "cosHig.pvd")
+        outfile = fire.VTKFile(self.path_save + self.case_habc + "/cosHig.pvd")
         outfile.write(self.cosHig)
 
 # dx = 0.1 km REC
