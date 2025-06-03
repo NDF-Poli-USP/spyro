@@ -20,66 +20,72 @@ jobs:
 
     runs-on: self-hosted
 
-    env:
-      VENV_PATH: /home/olender/firedrakes/2024_09_11/firedrake/bin/activate
+    container:
+      image: firedrakeproject/firedrake
+      options: --user root  # Ensures it can install packages if needed
 
     steps:
-    - uses: actions/checkout@v3
+    - uses: actions/checkout@v4
 
-    - name: Build Docker image
+    - name: Install dependencies
       run: |
-        docker build -t devtag:1.0 -f docker/Dockerfile --target spyro_development docker
+        apt-get update \
+        && apt-get -y install git python3 \
+        && apt-get -y install gmsh patchelf \
+        && pip3 install segyio \
+        && apt-get update && apt-get install -y libgmp3-dev libmpfr-dev libcgal-dev python3-tk \
+        && pip3 install --no-dependencies git+https://github.com/NDF-Poli-USP/SeismicMesh.git \
+        && pip3 install pyamg \
+        && pip3 install meshio \
+        && pip3 install -U memory_profiler \
+        && pip3 install pytest pytest-cov
 
-    - name: Define reusable Docker run command
-      id: docker-run
-      run: echo "::set-output name=cmd::docker run --rm -v ${{ github.workspace }}:/home/shared/spyro -it devtag:1.0 bash -c 'cd /home/shared/spyro && '"
-  
     - name: Running serial tests
       run: |
-        ${{ steps.docker-run.outputs.cmd }} python3 -m pytest --cov-report=xml --cov=spyro test/
+        python3 -m pytest --cov-report=xml --cov=spyro test/
     - name: Running parallel 3D forward test
       run: |
-        ${{ steps.docker-run.outputs.cmd }} mpiexec -n 6 python3 -m pytest test_3d/test_hexahedral_convergence.py
-        ${{ steps.docker-run.outputs.cmd }} mpiexec -n 6 python3 -m pytest test_parallel/test_forward.py
-        ${{ steps.docker-run.outputs.cmd }} mpiexec -n 6 python3 -m pytest test_parallel/test_fwi.py
-        ${{ steps.docker-run.outputs.cmd }} mpiexec -n 6 pytest test_parallel/test_forward_supershot.py
-        ${{ steps.docker-run.outputs.cmd }} mpiexec -n 2 pytest test_parallel/test_parallel_io.py
-        ${{ steps.docker-run.outputs.cmd }} mpiexec -n 3 pytest test_parallel/test_supershot_grad.py
-        ${{ steps.docker-run.outputs.cmd }} mpiexec -n 2 pytest test_parallel/test_forward_multiple_serial_shots.py
-        ${{ steps.docker-run.outputs.cmd }} mpiexec -n 2 pytest test_parallel/test_gradient_serialshots.py
+          mpiexec -n 6 pytest test_3d/test_hexahedral_convergence.py
+          mpiexec -n 6 pytest test_parallel/test_forward.py
+          mpiexec -n 6 pytest test_parallel/test_fwi.py
+          mpiexec -n 6 pytest test_parallel/test_forward_supershot.py
+          mpiexec -n 2 pytest test_parallel/test_parallel_io.py
+          mpiexec -n 3 pytest test_parallel/test_supershot_grad.py
+          mpiexec -n 2 pytest test_parallel/test_forward_multiple_serial_shots.py
+          mpiexec -n 2 pytest test_parallel/test_gradient_serialshots.py
     - name: Covering parallel 3D forward test
       continue-on-error: true
       run: |
-        ${{ steps.docker-run.outputs.cmd }} mpiexec -n 6 python3 -m pytest --cov-report=xml --cov-append --cov=spyro test_3d/test_hexahedral_convergence.py
+        mpiexec -n 6 python3 -m pytest --cov-report=xml --cov-append --cov=spyro test_3d/test_hexahedral_convergence.py
     - name: Covering parallel forward test
       continue-on-error: true
       run: |
-        ${{ steps.docker-run.outputs.cmd }} mpiexec -n 6 python3 -m pytest --cov-report=xml --cov-append --cov=spyro test_parallel/test_forward.py
+        mpiexec -n 6 python3 -m pytest --cov-report=xml --cov-append --cov=spyro test_parallel/test_forward.py
     - name: Covering parallel fwi test
       continue-on-error: true
       run: |
-        ${{ steps.docker-run.outputs.cmd }} mpiexec -n 6 pytest --cov-report=xml --cov-append --cov=spyro test_parallel/test_fwi.py
+          mpiexec -n 6 pytest --cov-report=xml --cov-append --cov=spyro test_parallel/test_fwi.py
     - name: Covering parallel supershot test
       continue-on-error: true
       run: |
-        ${{ steps.docker-run.outputs.cmd }} mpiexec -n 6 pytest --cov-report=xml --cov-append --cov=spyro test_parallel/test_forward_supershot.py
+          mpiexec -n 6 pytest --cov-report=xml --cov-append --cov=spyro test_parallel/test_forward_supershot.py
     - name: Covering parallel io test
       continue-on-error: true
       run: |
-        ${{ steps.docker-run.outputs.cmd }} mpiexec -n 2 pytest --cov-report=xml --cov-append --cov=spyro test_parallel/test_parallel_io.py
+          mpiexec -n 2 pytest --cov-report=xml --cov-append --cov=spyro test_parallel/test_parallel_io.py
     - name: Covering parallel supershot grad test
       continue-on-error: true
       run: |
-        ${{ steps.docker-run.outputs.cmd }} mpiexec -n 3 pytest --cov-report=xml --cov-append --cov=spyro test_parallel/test_supershot_grad.py
+          mpiexec -n 3 pytest --cov-report=xml --cov-append --cov=spyro test_parallel/test_supershot_grad.py
     - name: Covering spatially parallelized shots in serial
       continue-on-error: true
       run: |
-        ${{ steps.docker-run.outputs.cmd }} mpiexec -n 2 pytest --cov-report=xml --cov-append --cov=spyro test_parallel/test_forward_multiple_serial_shots.py
+          mpiexec -n 2 pytest --cov-report=xml --cov-append --cov=spyro test_parallel/test_forward_multiple_serial_shots.py
     - name: Covering spatially parallelized shots in serial
       continue-on-error: true
       run: |
-        ${{ steps.docker-run.outputs.cmd }} mpiexec -n 2 pytest --cov-report=xml --cov-append --cov=spyro test_parallel/test_test_gradient_serialshots.py
+          mpiexec -n 2 pytest --cov-report=xml --cov-append --cov=spyro test_parallel/test_test_gradient_serialshots.py
     - name: Uploading coverage to Codecov
       run: |
-        ${{ steps.docker-run.outputs.cmd }} export CODECOV_TOKEN="6cd21147-54f7-4b77-94ad-4b138053401d" && bash <(curl -s https://codecov.io/bash)
+        export CODECOV_TOKEN="6cd21147-54f7-4b77-94ad-4b138053401d" && curl -s https://codecov.io/bash | bash
 
