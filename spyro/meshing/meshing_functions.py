@@ -269,6 +269,8 @@ class AutomaticMesh:
         mesh : Mesh
             Mesh
         """
+        # if self.comm.rank == 0:
+        print(f"Creating {self.mesh_type} type mesh.", flush=True)
         if self.mesh_type == "firedrake_mesh":
             return self.create_firedrake_mesh()
         elif self.mesh_type == "SeismicMesh":

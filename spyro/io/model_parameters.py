@@ -730,6 +730,7 @@ class Model_parameters:
             length_x=mesh_parameters["length_x"],
             length_y=mesh_parameters["length_y"],
         )
+        self.set_mesh_type(new_mesh_type=mesh_parameters["mesh_type"])
 
         if self.mesh_type == "firedrake_mesh":
             automatic_mesh = True
@@ -757,6 +758,10 @@ class Model_parameters:
             warnings.warn(
                 "Mesh dimensions not completely reset from initial dictionary"
             )
+
+    def set_mesh_type(self, new_mesh_type=None):
+        if new_mesh_type is not None:
+            self.mesh_type = new_mesh_type
 
     def _creating_automatic_mesh(self, mesh_parameters={}):
         """
