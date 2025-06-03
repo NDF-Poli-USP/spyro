@@ -125,7 +125,7 @@ def preamble_habc(dictionary, edge_length):
 
     # ============ MESH FEATURES ============
     # Reference to resource usage
-    tRef = comp_cost('tini')
+    tRef = comp_cost("tini")
 
     # Create the acoustic wave object with HABCs
     Wave_obj = habc.HABC_Wave(dictionary=dictionary)
@@ -141,12 +141,12 @@ def preamble_habc(dictionary, edge_length):
     Wave_obj.preamble_mesh_operations()
 
     # Estimating computational resource usage
-    comp_cost('tfin', tRef=tRef,
+    comp_cost("tfin", tRef=tRef,
               user_name=Wave_obj.path_save + "preamble/MSH_")
 
     # ============ EIKONAL ANALYSIS ============
     # Reference to resource usage
-    tRef = comp_cost('tini')
+    tRef = comp_cost("tini")
 
     # Initializing Eikonal object
     Eik_obj = eik.Eikonal(Wave_obj)
@@ -155,13 +155,67 @@ def preamble_habc(dictionary, edge_length):
     Wave_obj.critical_boundary_points(Eik_obj)
 
     # Estimating computational resource usage
-    comp_cost('tfin', tRef=tRef,
+    comp_cost("tfin", tRef=tRef,
               user_name=Wave_obj.path_save + "preamble/EIK_")
 
     return Wave_obj
 
 
-def test_habc_fig8(Wave_obj, xCR_usu=None):
+def get_xCR_usu(Wave_obj, dat_reg_xCR, itr_xCR, n_pts):
+    '''
+    Get the user-defined heuristic factor for the minimum damping ratio.
+
+    Parameters
+    ----------
+    Wave_obj : `habc.HABC_Wave`
+        An instance of the HABC_Wave class
+    data_regr_xCR: `list`
+        Data for the regression of the parameter xCR.
+        Structure: [xCR, max_errIt, max_errPK, crit_opt]
+        - xCR: Values of xCR used in the regression.
+          The last value IS the optimal xCR
+        - max_errIt: Values of the maximum integral error.
+          The last value corresponds to the optimal xCR
+        - max_errPK: Values of the maximum peak error.
+          The last value corresponds to the optimal xCR
+    itr_xCR : `int`
+        Iteration number for the heuristic factor
+
+    Returns
+    -------
+    xCR_cand : `list`
+        List of xCR candidates based on the current xCR and its bounds.
+        Current xCR is not included
+    xCR_opt : `float`
+        Optimal xCR based on a quadratic regression and a criterion
+    '''
+
+    # Heuristic factor for the minimum damping ratio
+    if itr_xCR == 0:
+
+        # Determining the xCR candidates for iterations
+        if n_pts == 3:
+            xCR_min, xCR_max = Wave_obj.xCR_bounds[1]
+            xCR_cand = [xCR_min, xCR_max]
+        else:
+            xCR = Wave_obj.xCR
+            xCR_inf, xCR_sup = Wave_obj.xCR_bounds[0]
+            step = 0.25 * min(abs(xCR - xCR_inf), abs(xCR_sup - xCR))
+            xCR_cand = [np.clip(xCR - i * step, xCR_inf, xCR_sup)
+                        for i in range(n_pts // 2, 0, -1)] + \
+                [np.clip(xCR + i * step, xCR_inf, xCR_sup)
+                 for i in range(1, n_pts // 2 + 1)]
+        return xCR_cand
+
+    elif itr_xCR == n_pts:
+
+        # Getting an optimal xCR
+        crit_opt = dat_reg_xCR[-1]  # Criterion for optimal xCR
+        xCR_opt = Wave_obj.get_xCR_optimal(dat_reg_xCR, crit_opt=crit_opt)
+        return xCR_opt
+
+
+def test_habc_fig8(Wave_obj, dat_reg_xCR, xCR_usu=None, plot_comparison=True):
     '''
     Apply the HABC to the model in Fig. 8 of Salas et al. (2022).
 
@@ -169,9 +223,23 @@ def test_habc_fig8(Wave_obj, xCR_usu=None):
     ----------
     Wave_obj : `habc.HABC_Wave`
         An instance of the HABC_Wave class
+    data_regr_xCR: `list`
+        Data for the regression of the parameter xCR.
+        Structure: [xCR, max_errIt, max_errPK, crit_opt]
+        - xCR: Values of xCR used in the regression.
+          The last value IS the optimal xCR
+        - max_errIt: Values of the maximum integral error.
+          The last value corresponds to the optimal xCR
+        - max_errPK: Values of the maximum peak error.
+          The last value corresponds to the optimal xCR
+    itr_xCR : `int`
+        Iteration number for the heuristic factor
     xCR_usu : `float`, optional
         User-defined heuristic factor for the minimum damping ratio.
         Default is None, which defines an estimated value
+    plot_comparison : `bool`, optional
+        If True, the solution (time and frequency) at receivers
+        and the error measures are plotted. Default is True.
 
     Returns
     -------
@@ -205,8 +273,15 @@ def test_habc_fig8(Wave_obj, xCR_usu=None):
     # Computing the error measures
     Wave_obj.error_measures_habc()
 
-    # Plotting the solution at receivers
-    Wave_obj.comparison_plots()
+    # Collecting data for regression
+    dat_reg_xCR[0].append(Wave_obj.xCR)
+    dat_reg_xCR[1].append(Wave_obj.max_errIt)
+    dat_reg_xCR[2].append(Wave_obj.max_errPK)
+
+    if plot_comparison:
+
+        # Plotting the solution at receivers and the error measures
+        Wave_obj.comparison_plots(loop_xCR=True, data_regr_xCR=data_regr_xCR)
 
 
 # Applying HABCs to the model in Fig. 8 of Salas et al. (2022)
@@ -222,9 +297,13 @@ if __name__ == "__main__":
 
     habc_reference_freq_lst = ["source"]  # ["source", "boundary"]
 
-    get_ref_model = False
+    get_ref_model = True
 
     loop_modeling = not get_ref_model
+
+    crit_opt = "error_difference"  # or "error_integral"
+
+    n_pts = 3  # Number of points for regression (odd number)
 
     for edge_length in edge_length_lst:
 
@@ -238,7 +317,7 @@ if __name__ == "__main__":
         # ============ REFERENCE MODEL ============
         if get_ref_model:
             # Reference to resource usage
-            tRef = comp_cost('tini')
+            tRef = comp_cost("tini")
 
             # Computing reference signal
             Wave_obj.infinite_model()
@@ -247,11 +326,14 @@ if __name__ == "__main__":
             Wave_obj.abc_get_ref_model = False
 
             # Estimating computational resource usage
-            comp_cost('tfin', tRef=tRef,
+            comp_cost("tfin", tRef=tRef,
                       user_name=Wave_obj.path_save + "preamble/INF_")
 
         # ============ HABC SCHEME ============
         if loop_modeling:
+
+            # Setting odd number of points for regression
+            n_pts = max(3, n_pts + 1 if n_pts % 2 == 0 else n_pts)
 
             # Loop for different layer shapes and degrees
             for habc_reference_freq in habc_reference_freq_lst:
@@ -266,16 +348,52 @@ if __name__ == "__main__":
                         if degree_layer is not None else "rectangular"
                     Wave_obj.abc_deg_layer = degree_layer
 
-                    # Reference to resource usage
-                    tRef = comp_cost('tini')
+                    # Data for regression of xCR parameter
+                    dat_reg_xCR = [[] for _ in range(3)]
+                    data_regr_xCR.append(crit_opt)
 
-                    # Run the HABC scheme
-                    test_habc_fig8(Wave_obj, xCR_usu=1.495)
+                    for itr_xCR in range(n_pts + 1):
 
-                    # Estimating computational resource usage
-                    user_name = Wave_obj.path_save + Wave_obj.case_habc + "/"
-                    comp_cost('tfin', tRef=tRef, user_name=user_name)
+                        # User-defined heuristic factor x_CR
+                        if itr_xCR == 0:
+                            xCR_usu = None
+                        if itr_xCR == n_pts:
+                            xCR_usu = xCR_opt
+                        else:
+                            xCR_cand[itr_xCR - 1]
 
+                        # Reference to resource usage
+                        tRef = comp_cost("tini")
+
+                        # Run the HABC scheme
+                        plot_comparison = True if itr_xCR == n_pts else False
+                        test_habc_fig8(Wave_obj, dat_reg_xCR, xCR_usu=xCR_usu,
+                                       plot_comparison=plot_comparison)
+
+                        # Estimating computational resource usage
+                        u_name = Wave_obj.path_save + Wave_obj.case_habc + "/"
+                        comp_cost("tfin", tRef=tRef, user_name=u_name)
+
+                        # User-defined heuristic factor x_CR
+                        if itr_xCR == 0:
+                            xCR_cand = get_xCR_usu(
+                                Wave_obj, dat_reg_xCR, itr_xCR, n_pts)
+                        if itr_xCR == n_pts:
+                            xCR_opt = get_xCR_usu(
+                                Wave_obj, dat_reg_xCR, itr_xCR, n_pts)
+
+    # from spyro.plots.plots import plot_xCR_opt
+
+    # data_regr_xCR = [[0.111, 0.158, 0.319, 0.637, 1.103, 1.495, 1.887, 0.955],
+    #                  [0.0178, 0.0175, 0.0164, 0.0147, 0.0128, 0.0117, 0.0110, 0.0133],
+    #                  [0.0060, 0.0065, 0.0079, 0.0107, 0.0145, 0.0173, 0.0201, 0.0133],
+    #                  'error_difference']
+
+    # # data_regr_xCR = [[0.111, 0.158, 0.319, 0.637, 1.103, 1.495, 1.887, 1.887],
+    # #                  [0.0178, 0.0175, 0.0164, 0.0147, 0.0128, 0.0117, 0.0110, 0.011],
+    # #                  [0.0060, 0.0065, 0.0079, 0.0107, 0.0145, 0.0173, 0.0201, 0.0201],
+    # #                  'error_integral']
+    # plot_xCR_opt(None, data_regr_xCR)
 
 # 0.111 1.78 0.60 5.60e-08
 # 0.158 1.75 0.65 5.47e-08

@@ -9,7 +9,8 @@ from scipy.signal import find_peaks
 from spyro.solvers.acoustic_wave import AcousticWave
 from spyro.habc.hyp_lay import HyperLayer
 from spyro.habc.nrbc import NRBCHabc
-from spyro.plots.plots import plot_hist_receivers, plot_rfft_receivers
+from spyro.plots.plots import plot_hist_receivers, \
+    plot_rfft_receivers, plot_xCR_opt
 # fire.parameters["loopy"] = {"silenced_warnings": ["v1_scheduler_fallback"]}
 import ipdb
 
@@ -55,7 +56,7 @@ class HABC_Wave(AcousticWave, HyperLayer, NRBCHabc):
         ('SOU' or 'BND'). Example: 'REC_SOU' or 'HN2_BND'
     c_habc : `firedrake function`
         Velocity model with absorbing layer
-    d_par : `float`
+    d : `float`
         Normalized element size (lmin / pad_len)
     diam_mesh : `ufl.geometry.CellDiameter`
         Mesh cell diameters
@@ -90,6 +91,8 @@ class HABC_Wave(AcousticWave, HyperLayer, NRBCHabc):
         Nyquist frequency according to the time step. f_Nyq = 1 / (2 * dt)
     f_est : `float`
         Factor for the stabilizing term in Eikonal equation
+    final_energy : `float`
+        Final value of the dissipated energy in the HABC scheme
     freq_ref : `float`
         Reference frequency of the wave at the minimum Eikonal point
     fundam_freq : `float`
@@ -112,6 +115,10 @@ class HABC_Wave(AcousticWave, HyperLayer, NRBCHabc):
         Maxmum mesh size
     lref : `float`
         Reference length for the size of the absorbing layer
+    max_errIt : `float`
+        Maximum integral error at the receivers for the HABC scheme
+    max_errPK : `float`
+        Maximum peak error at the receivers for the HABC scheme
     mesh: `firedrake mesh`
         Mesh used in the simulation (HABC or Infinite Model)
     mesh_original : `firedrake mesh`
@@ -130,7 +137,7 @@ class HABC_Wave(AcousticWave, HyperLayer, NRBCHabc):
     path_save : `string`
         Path to save data
     psi_min : `float`
-        Minimum damping ratio of the absorbing layer
+        Minimum damping ratio of the absorbing layer (psi_min = xCR * d)
     receiver_locations: `list`
         List of receiver locations
     receivers_output : `array`
@@ -148,7 +155,7 @@ class HABC_Wave(AcousticWave, HyperLayer, NRBCHabc):
     vol : `float`
         Volume of the domain with absorbing layer
     xCR : `float`
-        Heuristic factor for the minimum damping ratio (psi_min = xCR * d)
+        Heuristic factor for the minimum damping ratio
     xCR_bounds: `list`
         Bounds for the heuristic factor. [xCR_lim, xCR_search]
         Structure: [[xCR_inf, xCR_sup], [xCR_min, xCR_max]]
@@ -190,6 +197,8 @@ class HABC_Wave(AcousticWave, HyperLayer, NRBCHabc):
         Compute the fundamental frequency in Hz via modal analysis
     get_reference_signal()
         Acquire the reference signal to compare with the HABC scheme
+    get_xCR_optimal()
+        Get the optimal heuristic factor for the quadratic damping.
     identify_habc_case()
         Generate an identifier for the current case study of the HABC scheme
     infinite_model()
@@ -616,7 +625,7 @@ class HABC_Wave(AcousticWave, HyperLayer, NRBCHabc):
         fpad : `int`, optional
             Padding factor for FFT. Default is 4
         n_root : `int`, optional
-            n-th Root selected for the size of the absorbing layer. Default is 1
+            n-th Root selected as the size of the absorbing layer. Default is 1
         layer_based_on_mesh : `bool`, optional
             Adjust the layer size based on the element size. Default is False
 
@@ -793,51 +802,114 @@ class HABC_Wave(AcousticWave, HyperLayer, NRBCHabc):
         # Extending velocity model within the absorbing layer
         print("Extending Profile Inside Layer")
 
-        # Extract node positions - To do: Refactor
-        z_f = fire.Function(self.function_space).interpolate(self.mesh_z)
-        x_f = fire.Function(self.function_space).interpolate(self.mesh_x)
-        z_data = z_f.dat.data_with_halos[:]
-        x_data = x_f.dat.data_with_halos[:]
+        # Vectorial space
+        W = fire.VectorFunctionSpace(
+            self.mesh, self.function_space.ufl_element().family(), 1)
 
-        # Points to extend the velocity model
         if self.dimension == 2:  # 2D
-            pad_pts = np.where((z_data < -self.length_z) | (x_data < 0.)
-                               | (x_data > self.length_x))
+            z, x = fire.SpatialCoordinate(self.mesh)
+            coords = fire.as_vector([z, x])
 
         if self.dimension == 3:  # 3D
-            y_f = fire.Function(self.function_space).interpolate(self.mesh_y)
-            y_data = y_f.dat.data_with_halos[:]
-            pad_pts = np.where((z_data < -self.length_z) | (x_data < 0.)
-                               | (x_data > self.length_x) | (y_data < 0.)
-                               | (y_data > self.length_y))
-            ypt_to_extend = y_data[pad_pts]
+            z, x, y = fire.SpatialCoordinate(self.mesh)
+            coords = fire.as_vector([z, x, y])
 
-        zpt_to_extend = z_data[pad_pts]
-        xpt_to_extend = x_data[pad_pts]
+        w = fire.Function(W).interpolate(coords)
+        w_arr = w.dat.data_with_halos[:]
+        w_arr[:, 0] = np.clip(w_arr[:, 0], -self.length_z, 0.)
+        w_arr[:, 1] = np.clip(w_arr[:, 1], 0., self.length_x)
 
-        # Velocity profile inside the layer
-        vel_to_extend = self.c.dat.data_with_halos[pad_pts]
+        if self.dimension == 3:  # 3D
+            w_arr[:, 2] = np.clip(w_arr[:, 2], 0., self.length_y)
 
-        for idp, z_bnd in enumerate(zpt_to_extend):
+        # Dimensions
+        Lz = self.length_z
+        Lx = self.length_x
 
-            # Find nearest point on the boundary of the original domain
-            z_bnd = np.clip(z_bnd, -self.length_z, 0.)
-            x_bnd = xpt_to_extend[idp]
-            x_bnd = np.clip(x_bnd, 0., self.length_x)
+        # Define the conditional expressions for mask
+        z_pd = fire.conditional(z + Lz < 0., 1., 0.)
+        x_pd = fire.conditional(x < 0., 1., 0.) + \
+            fire.conditional(x - Lx > 0., 1., 0.)
 
-            # Set the velocity of the nearest point on the original boundary
-            if self.dimension == 2:  # 2D
-                pnt_c = (z_bnd, x_bnd)
+        # Mask filter for layer boundary domain
+        mask = z_pd + x_pd
 
-            if self.dimension == 3:  # 3D
-                y_bnd = ypt_to_extend[idp]
-                y_bnd = np.clip(y_bnd, 0., self.length_y)
-                pnt_c = (z_bnd, x_bnd, y_bnd)
+        if self.dimension == 3:  # 3D
 
-            vel_to_extend[idp] = self.initial_velocity_model.at(pnt_c)
+            # 3D dimension
+            Ly = self.length_y
 
-        # Assign the extended velocity model to the absorbing layer
-        self.c.dat.data_with_halos[pad_pts] = vel_to_extend
+            # Conditional expressions
+            y_pd = fire.conditional(y < 0., 1., 0.) + \
+                fire.conditional(y - Ly > 0., 1., 0.)
+            mask += y_pd
+
+        # Final value for the mask
+        mask = fire.conditional(mask > 0., 1., 0.)
+
+        # Layer mask
+        fnc_spc_layer_mask = fire.FunctionSpace(self.mesh, 'DG', 0)
+        layer_mask = fire.Function(fnc_spc_layer_mask, name='layer_mask')
+        layer_mask.interpolate(mask)
+
+        # Points to extend the velocity model
+        pad_field = fire.Function(W).interpolate(w * layer_mask)
+        # fire.VTKFile("output/pad_field.pvd").write(pad_field)
+
+        pad_pts = pad_field.dat.data_with_halos[:]
+        pts_to_extend = pad_pts[np.where(~((abs(pad_pts[:, 0]) == 0.)
+                                           & (abs(pad_pts[:, 1]) == 0.)))]
+
+        vel_to_extend = self.initial_velocity_model.at(pts_to_extend,
+                                                       dont_raise=True)
+
+        ipdb.set_trace()
+
+        # # Extract node positions - To do: Refactor
+        # z_f = fire.Function(self.function_space).interpolate(self.mesh_z)
+        # x_f = fire.Function(self.function_space).interpolate(self.mesh_x)
+        # z_data = z_f.dat.data_with_halos[:]
+        # x_data = x_f.dat.data_with_halos[:]
+
+        # # Points to extend the velocity model
+        # if self.dimension == 2:  # 2D
+        #     pad_pts = np.where((z_data < -self.length_z) | (x_data < 0.)
+        #                        | (x_data > self.length_x))
+
+        # if self.dimension == 3:  # 3D
+        #     y_f = fire.Function(self.function_space).interpolate(self.mesh_y)
+        #     y_data = y_f.dat.data_with_halos[:]
+        #     pad_pts = np.where((z_data < -self.length_z) | (x_data < 0.)
+        #                        | (x_data > self.length_x) | (y_data < 0.)
+        #                        | (y_data > self.length_y))
+        #     ypt_to_extend = y_data[pad_pts]
+
+        # zpt_to_extend = z_data[pad_pts]
+        # xpt_to_extend = x_data[pad_pts]
+
+        # # Velocity profile inside the layer
+        # vel_to_extend = self.c.dat.data_with_halos[pad_pts]
+
+        # for idp, z_bnd in enumerate(zpt_to_extend):
+
+        #     # Find nearest point on the boundary of the original domain
+        #     z_bnd = np.clip(z_bnd, -self.length_z, 0.)
+        #     x_bnd = xpt_to_extend[idp]
+        #     x_bnd = np.clip(x_bnd, 0., self.length_x)
+
+        #     # Set the velocity of the nearest point on the original boundary
+        #     if self.dimension == 2:  # 2D
+        #         pnt_c = (z_bnd, x_bnd)
+
+        #     if self.dimension == 3:  # 3D
+        #         y_bnd = ypt_to_extend[idp]
+        #         y_bnd = np.clip(y_bnd, 0., self.length_y)
+        #         pnt_c = (z_bnd, x_bnd, y_bnd)
+
+        #     vel_to_extend[idp] = self.initial_velocity_model.at(pnt_c)
+
+        # # Assign the extended velocity model to the absorbing layer
+        # self.c.dat.data_with_halos[pad_pts] = vel_to_extend
 
         # Save new velocity model
         if inf_model:
@@ -848,6 +920,8 @@ class HABC_Wave(AcousticWave, HyperLayer, NRBCHabc):
         # Save new mesh
         outfile = fire.VTKFile(self.path_save + file_name)
         outfile.write(self.c)
+
+        ipdb.set_trace()
 
     def solve_eigenproblem(self, Asp, Msp, method, k=2, inv_operator=False):
         '''
@@ -1168,9 +1242,9 @@ class HABC_Wave(AcousticWave, HyperLayer, NRBCHabc):
         Returns
         -------
         psi_min : `float`
-            Minimum damping ratio
-        xCR_min : `float`
-            Heuristic factor for the minimum damping ratio
+            Minimum damping ratio of the absorbing layer (psi_min = xCR * d)
+        xCR_est : `float`
+            Estimated heuristic factor for the minimum damping ratio
         CRmin : `float`
             Minimum reflection coefficient at the minimum damping ratio
         '''
@@ -1190,15 +1264,15 @@ class HABC_Wave(AcousticWave, HyperLayer, NRBCHabc):
         # Vertex or minimum positive root
         xCR_vtx = -z[1] / (2 * z[0])
         max_root = max(roots)
-        xCR_min = xCR_vtx if xCR_vtx > xCR_inf else (
+        xCR_est = xCR_vtx if xCR_vtx > xCR_inf else (
             max_root if max_root > xCR_inf else xCR_ini)
-        xCR_min = np.clip(xCR_min, xCR_inf, xCR_sup)
+        xCR_est = np.clip(xCR_est, xCR_inf, xCR_sup)
 
         # Minimum damping ratio
-        psi_min = xCR_min * self.d
+        psi_min = xCR_est * self.d
         CRmin = self.min_reflection(kCR, psi=psi_min)[0]
 
-        return psi_min, xCR_min, CRmin
+        return psi_min, xCR_est, CRmin
 
     def xCR_search_range(self, CRmin, kCR, p, xCR_lim):
         '''
@@ -1305,9 +1379,9 @@ class HABC_Wave(AcousticWave, HyperLayer, NRBCHabc):
         Returns
         -------
         psi_min : `float`
-            Minimum damping ratio of the absorbing layer
-        xCR : `float`
-            Heuristic factor for the minimum damping ratio (psi_min = xCR * d)
+            Minimum damping ratio of the absorbing layer (psi_min = xCR * d)
+        xCR_est : `float`
+            Estimated heuristic factor for the minimum damping ratio
         xCR_lim : `list`
             Limits for the heuristic factor. [xCR_inf, xCR_sup]
         xCR_search : `list`
@@ -1345,11 +1419,11 @@ class HABC_Wave(AcousticWave, HyperLayer, NRBCHabc):
         y_reg = [CRmin_inf, CRmin_sup, CRmin_ini, CRmin_fem]
         data_reg = [x_reg, y_reg]
         xCR_lim = [xCR_inf, xCR_sup, xCR_ini]
-        psi_min, xCR, CRmin = self.regression_CRmin(data_reg, xCR_lim, kCRp)
+        psi_min, xCR_est, CRmin = self.regression_CRmin(data_reg, xCR_lim, kCRp)
 
         xCR_search = self.xCR_search_range(CRmin, kCRp, p[:2], xCR_lim[:2])
 
-        return psi_min, xCR, xCR_lim[:2], xCR_search
+        return psi_min, xCR_est, xCR_lim[:2], xCR_search
 
     def calc_damping_prop(self, psi=0.999, m=1):
         '''
@@ -1367,9 +1441,9 @@ class HABC_Wave(AcousticWave, HyperLayer, NRBCHabc):
         eta_crt : `float`
             Critical damping coefficient (1/s)
         psi_min : `float`
-            Minimum damping ratio of the absorbing layer
-        xCR : `float`
-            Heuristic factor for the minimum damping ratio (psi_min = xCR * d)
+            Minimum damping ratio of the absorbing layer (psi_min = xCR * d)
+        xCR_est : `float`
+            Estimated heuristic factor for the minimum damping ratio
         psimin_lim : `list`
             Limits for the minimum damping ratio. [psimin_inf, psimin_sup]
         xCR_lim : `list`
@@ -1385,7 +1459,7 @@ class HABC_Wave(AcousticWave, HyperLayer, NRBCHabc):
         print("Maximum Damping Ratio: {0:.3%}".format(psi))
 
         # Minimum damping ratio and the associated heuristic factor
-        psi_min, xCR, xCR_lim, xCR_search = self.est_min_damping()
+        psi_min, xCR_est, xCR_lim, xCR_search = self.est_min_damping()
         xCR_inf, xCR_sup = xCR_lim
         xCR_min, xCR_max = xCR_search
 
@@ -1393,13 +1467,13 @@ class HABC_Wave(AcousticWave, HyperLayer, NRBCHabc):
         print("Minimum Damping Ratio: {:.3%}".format(psi_min))
         psi_str = "Range for Minimum Damping Ratio. Min:{:.5f} - Max:{:.5f}"
         print(psi_str.format(xCR_inf * self.d, xCR_sup * self.d))
-        print("Heuristic Factor xCR: {:.3f}".format(xCR))
+        print("Estimated Heuristic Factor xCR: {:.3f}".format(xCR_est))
         xcr_str = "Range Values for xCR Factor. Min:{:.3f} - Max:{:.3f}"
         print(xcr_str.format(xCR_inf, xCR_sup))
         lim_str = "Initial Range for xCR Factor. Min:{:.3f} - Max:{:.3f}"
         print(lim_str.format(xCR_min, xCR_max))
 
-        return eta_crt, psi_min, xCR, xCR_lim, xCR_search
+        return eta_crt, psi_min, xCR_est, xCR_lim, xCR_search
 
     def coeff_damp_fun(self, psi_min, psi=0.999):
         '''
@@ -1502,7 +1576,10 @@ class HABC_Wave(AcousticWave, HyperLayer, NRBCHabc):
 
     def damping_layer(self, xCR_usu=None):
         '''
-        Set the damping profile within the absorbing layer.
+        Set the damping profile within the absorbing layer. Minimum damping
+        ratio is computed as psi_min = xCR * d where xCR is the heuristic
+        factor for the minimum damping ratio and d is the normalized element
+        size (lmin / pad_len).
 
         Parameters
         ----------
@@ -1537,14 +1614,16 @@ class HABC_Wave(AcousticWave, HyperLayer, NRBCHabc):
         self.eta_mask.interpolate(mask)
 
         # Save damping mask
-        outfile = fire.VTKFile(self.path_save + self.case_habc + "/eta_mask.pvd")
+        path_damp = self.path_save + self.case_habc
+        outfile = fire.VTKFile(path_damp + "/eta_mask.pvd")
         outfile.write(self.eta_mask)
 
         # Reference distance to the original boundary
         ref = self.cond_marker_for_eta(nodes_coord, 'damping')
 
         # Compute the minimum damping ratio and the associated heuristic factor
-        eta_crt, psi_min, xCR, xCR_lim, xCR_search = self.calc_damping_prop()
+        eta_crt, psi_min, \
+            xCR_est, xCR_lim, xCR_search = self.calc_damping_prop()
 
         # Heuristic factor for the minimum damping ratio
         self.xCR_bounds = [xCR_lim, xCR_search]  # Bounds
@@ -1552,9 +1631,10 @@ class HABC_Wave(AcousticWave, HyperLayer, NRBCHabc):
         if xCR_usu is not None:
             self.xCR = np.clip(xCR_usu, xCR_lim[0], xCR_lim[1])
             self.psi_min = self.xCR * self.d
-            print("Using User-defined xCR: {:.3f}".format(self.xCR))
+            xcr_str = "Using User-Defined Heuristic Factor xCR: {:.3f}"
+            print(xcr_str.format(self.xCR))
         else:
-            self.xCR = xCR
+            self.xCR = xCR_est
             self.psi_min = psi_min
 
         # Compute the coefficients for quadratic damping function
@@ -1566,7 +1646,7 @@ class HABC_Wave(AcousticWave, HyperLayer, NRBCHabc):
         self.eta_habc.interpolate(expr_damp)
 
         # Save damping profile
-        outfile = fire.VTKFile(self.path_save + self.case_habc + "/eta_habc.pvd")
+        outfile = fire.VTKFile(path_damp + "/eta_habc.pvd")
         outfile.write(self.eta_habc)
 
     def infinite_model(self):
@@ -1736,11 +1816,13 @@ class HABC_Wave(AcousticWave, HyperLayer, NRBCHabc):
             # Peak error
             errPk.append(abs(p_abc / p_ref - 1))
 
-        final_energy = fire.assemble(self.acoustic_energy)
+        self.final_energy = fire.assemble(self.acoustic_energy)
         self.err_habc = [errIt, errPk, pkMax, final_energy]
-        print("Maximum Integral Error: {:.2%}".format(max(errIt)))
-        print("Maximum Peak Error: {:.2%}".format(max(errPk)))
-        print("Acoustic Energy: {:.2e}".format(final_energy))
+        self.max_errIt = max(errIt)
+        self.max_errPK = max(errPk)
+        print("Maximum Integral Error: {:.2%}".format(self.max_errIt))
+        print("Maximum Peak Error: {:.2%}".format(self.max_errPK))
+        print("Acoustic Energy: {:.2e}".format(self.final_energy))
 
         # Save error measures
         err_str = self.path_save + self.case_habc + "/habc_errs.txt"
@@ -1750,13 +1832,27 @@ class HABC_Wave(AcousticWave, HyperLayer, NRBCHabc):
         with open(err_str, 'a') as f:
             np.savetxt(f, np.array([final_energy]), delimiter='\t')
 
-    def comparison_plots(self):
+    def comparison_plots(self, regression_xCR=False, data_regr_xCR=None):
         '''
         Plot the comparison between the HABC scheme and the reference model.
 
         Parameters
         ----------
-        None
+        regression_xCR : `bool`, optional
+            If True, Plot the regression for the error measure vs xCR
+            Default is False.
+        data_regr_xCR: `list`
+            Data for the regression of the parameter xCR.
+            Structure: [xCR, max_errIt, max_errPK, crit_opt]
+            - xCR: Values of xCR used in the regression.
+              The last value IS the optimal xCR
+            - max_errIt: Values of the maximum integral error.
+              The last value corresponds to the optimal xCR
+            - max_errPK: Values of the maximum peak error.
+              The last value corresponds to the optimal xCR
+             -crit_opt : Criterion for the optimal heuristic factor.
+              * 'error_difference' : Difference between integral and peak errors
+              * 'error_integral' : Minimum integral error
 
         Returns
         -------
@@ -1776,3 +1872,61 @@ class HABC_Wave(AcousticWave, HyperLayer, NRBCHabc):
 
         # Frequency domain comparison
         plot_rfft_receivers(self)
+
+        # Plot the error measures
+        if regression_xCR:
+            plot_xCR_opt(self, data_regr_xCR)
+
+    def get_xCR_optimal(self, dat_reg_xCR, crit_opt='error_difference'):
+        '''
+        Get the optimal heuristic factor for the quadratic damping.
+
+        Parameters
+        ----------
+        dat_reg_xCR : `list`
+            Data for the regression of the parameter xCR.
+            Structure: [xCR, max_errIt, max_errPK]
+        crit_opt : `string`, optional
+            Criterion for the optimal heuristic factor
+            Default is 'error_difference'.
+            - 'error_difference' : Difference between integral and peak errors
+            - 'error_integral' : Minimum integral error
+
+        Returns
+        -------
+        xCR_opt : `float`, optional
+            Optimal heuristic factor for the quadratic damping
+        '''
+
+        # Data for regression
+        xCR = dat_reg_xCR[0]
+        max_errIt = dat_reg_xCR[1]
+        max_errPK = dat_reg_xCR[2]
+
+        if crit_opt == 'error_difference':
+            y_err = [eI - eP for eI, eP in zip(max_errIt, max_errPK)]
+
+        elif crit_opt == 'error_integral':
+            y_err = max_errIt
+
+        # Limits for the heuristic factor
+        xCR_inf, xCR_sup = self.xCR_bounds[0]
+
+        # Coefficients for the quadratic equation
+        eq_xCR = np.polyfit(xCR, y_err, 2)
+
+        if crit_opt == 'error_difference':
+            # Roots of the quadratic equation
+            roots = np.roots(eq_xCR)
+            valid_roots = [np.clip(rth, xCR_inf, xCR_sup)
+                           for rth in roots if isinstance(rth, float)]
+            min_err = [np.polyval(eq_xCR, rth) for rth in valid_roots]
+            xCR_opt = valid_roots[np.argmin(min_err)]
+
+        elif crit_opt == 'error_integral':
+
+            # Vertex of the quadratic equation
+            vtx = - eq_xCR[1] / (2 * eq_xCR[0])
+            xCR_opt = np.clip(vtx, xCR_inf, xCR_sup)
+
+        return xCR_opt

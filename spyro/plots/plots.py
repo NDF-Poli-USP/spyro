@@ -5,6 +5,7 @@ import numpy as np
 import firedrake
 import copy
 from ..io import ensemble_plot
+from spyro.utils.stats_tools import coeff_of_determination
 plt.rcParams.update({"font.family": "serif"})
 plt.rcParams['text.latex.preamble'] = r'\usepackage{bm} \usepackage{amsmath}'
 __all__ = ["plot_shots", "plot_hist_receivers"]
@@ -303,8 +304,8 @@ def plot_hist_receivers(Wave_object, show=False):
 
     # Saving the plot
     time_str = Wave_object.path_save + Wave_object.case_habc + "/time"
-    plt.savefig(time_str + '.png')
-    plt.savefig(time_str + '.pdf')
+    plt.savefig(time_str + ".png")
+    plt.savefig(time_str + ".pdf")
     plt.show() if show else None
     plt.close()
 
@@ -407,7 +408,110 @@ def plot_rfft_receivers(Wave_object, fxlim=4., show=False):
 
     # Saving the plot
     time_str = Wave_object.path_save + Wave_object.case_habc + "/freq"
-    plt.savefig(time_str + '.png')
-    plt.savefig(time_str + '.pdf')
+    plt.savefig(time_str + ".png")
+    plt.savefig(time_str + ".pdf")
+    plt.show() if show else None
+    plt.close()
+
+
+def plot_xCR_opt(Wave_object, data_regr_xCR, show=False):
+    '''
+    Plot the regression curve for the optimal xCR value.
+
+    Parameters
+    ----------
+    Wave_object: `wave`
+        The Wave object containing the simulation results
+    data_regr_xCR: `list`
+        Data for the regression of the parameter xCR.
+        Structure: [xCR, max_errIt, max_errPK, crit_opt]
+        - xCR: Values of xCR used in the regression.
+          The last value IS the optimal xCR
+        - max_errIt: Values of the maximum integral error.
+          The last value corresponds to the optimal xCR
+        - max_errPK: Values of the maximum peak error.
+          The last value corresponds to the optimal xCR
+         -crit_opt : Criterion for the optimal heuristic factor.
+          * 'error_difference' : Difference between integral and peak errors
+          * 'error_integral' : Minimum integral error
+    show: `bool`, optional
+        Whether to show the plot. Default is False.
+
+    Returns
+    -------
+    None
+    '''
+
+    import ipdb
+    from os import getcwd
+    pth = getcwd() + "/output/"
+
+    # Data for regression
+    xCR, max_errIt, max_errPk, crit_opt = data_regr_xCR
+    xCR_opt = xCR[-1]
+    err_opt = max_errIt[-1]
+    eq_eI = np.polyfit(xCR[:-1], max_errIt[:-1], 2)
+    eq_eP = np.polyfit(xCR[:-1], max_errPk[:-1], 2)
+
+    # Compute R^2 values
+    y_eI_true = max_errIt[:-1]
+    y_eI_pred = np.polyval(eq_eI, xCR[:-1])
+    y_eP_true = max_errPk[:-1]
+    y_eP_pred = np.polyval(eq_eP, xCR[:-1])
+    p = 2  # Quadratic model (Predictors: x and x^2)
+    r2_eI = coeff_of_determination(y_eI_true, y_eI_pred, p)
+    r2_eP = coeff_of_determination(y_eP_true, y_eP_pred, p)
+
+    # Format equations
+    qua_reg = r'${:.3e} x^{{2}} + {:.3e} x + {:.3e}, R^{{2}} = {:.3f}$'
+    eq_str_eI = (r'$e_I = $' + qua_reg).format(*eq_eI, r2_eI)
+    eq_str_eP = (r'$e_P = $' + qua_reg).format(*eq_eP, r2_eP)
+
+    # Regression points
+    plt.plot(xCR[:-1], 100 * np.asarray(max_errIt[:-1]), 'ro',
+             label=r'Integral Error: ' + eq_str_eI)
+    plt.plot(xCR[:-1], 100 * np.asarray(max_errPk[:-1]), 'bo',
+             label=r'Peak Error: ' + eq_str_eP)
+
+    # xCR limits
+    xCR_inf, xCR_sup = Wave_obj.xCR_bounds[0]
+
+    # Regression curves
+    xgraf = np.linspace(xCR_inf, xCR_sup, int((xCR_sup - xCR_inf) / 0.1))
+    y_eI = np.polyval(eq_eI, xgraf)
+    y_eP = np.polyval(eq_eP, xgraf)
+    plt.plot(xgraf, 100 * y_eI, color='r', linestyle='--')
+    plt.plot(xgraf, 100 * y_eP, color='b', linestyle='--')
+
+    # Locating the optimal value
+    plt.plot([xCR_opt, xCR_opt], [0., 100 * err_opt], 'k-')
+    xopt_str = r'Optimized Heuristic Factor: $X_{{C_{{R}}}} = {:.3f}$'
+    if crit_opt == 'error_difference':
+        xopt_str += r' | $e_{{I}} = e_{{P}} = {:.2f}\%$'
+        label = xopt_str.format(xCR_opt, 100 * err_opt)
+    elif crit_opt == 'error_integral':
+        xopt_str += r' | $e_{{I}} = {:.2f}\%$ | $e_{{P}} = {:.2f}\%$'
+        label = xopt_str.format(xCR_opt, 100 * err_opt, 100 * max_errPk[-1])
+    plt.plot(xCR_opt, 100 * err_opt, marker=r'$\ast$', color='k',
+             markersize=10, label=label)
+    plt.legend(loc="best", fontsize=8.5)
+
+    # Formatting the plot
+    max_err = max(max(max_errIt[:-1]), max(max_errPk[:-1]))
+    plt.xlim(0, round(xCR_sup, 1) + 0.1)
+    plt.ylim(0, round(100 * max_err, 1) + 0.1)
+    if crit_opt == 'error_difference':
+        str_crt = r' (Criterion: Min $(e_I - e_P)$)'
+    elif crit_opt == 'error_integral':
+        str_crt = r' (Criterion: Min $e_I$)'
+
+    plt.xlabel(r'$X_{C_{R}}$' + str_crt)
+    plt.tight_layout(pad=2)
+    plt.ylabel(r'$e_I \; | \; e_P \; (\%)$')
+
+    # Saving the plot
+    xcr_str = Wave_object.path_save + Wave_object.case_habc + "/xCR"
+    plt.savefig(xcr_str + '.png')
+    plt.savefig(xcr_str + '.pdf')
     plt.show() if show else None
     plt.close()
