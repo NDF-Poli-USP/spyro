@@ -342,6 +342,7 @@ class FullWaveformInversion(AcousticWave):
         -------
         None
         """
+        mesh_parameters.setdefault("mesh_type", "firedrake_mesh")
         super().set_mesh(
             user_mesh=user_mesh,
             mesh_parameters=mesh_parameters,
