@@ -4,14 +4,6 @@ import spyro
 import pytest
 
 
-def is_rol_installed():
-    try:
-        import ROL
-        return True
-    except ImportError:
-        return False
-
-
 final_time = 0.9
 
 dictionary = {}
@@ -132,11 +124,10 @@ def test_fwi(load_real_shot=False, use_rol=False):
 
 
 @pytest.mark.parallel(6)
-@pytest.mark.skip(reason="ROL is not installed")
+@pytest.mark.skip(reason="ROL is not working in spyro anymore")
 def test_fwi_with_rol(load_real_shot=False, use_rol=True):
     test_fwi(load_real_shot=load_real_shot, use_rol=use_rol)
 
 
 if __name__ == "__main__":
     test_fwi(load_real_shot=False)
-    test_fwi_with_rol()
