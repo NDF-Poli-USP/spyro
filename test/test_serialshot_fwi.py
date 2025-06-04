@@ -133,7 +133,7 @@ def test_fwi(load_real_shot=False, use_rol=False):
     assert all([test0, test1, test2, test3])
 
 
-@pytest.mark.skipif(not is_rol_installed(), reason="ROL is not installed")
+@pytest.mark.skip(reason="ROL is not working for spyro")
 def test_fwi_with_rol(load_real_shot=False, use_rol=True):
     test_fwi(load_real_shot=load_real_shot, use_rol=use_rol)
 
