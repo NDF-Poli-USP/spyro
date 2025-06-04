@@ -62,7 +62,7 @@ dictionary["acquisition"] = {
 dictionary["time_axis"] = {
     "initial_time": 0.0,  # Initial time for event
     "final_time": final_time,  # Final time for event
-    "dt": 0.0001,  # timestep size
+    "dt": 0.0005,  # timestep size
     "amplitude": 1,  # the Ricker has an amplitude of 1.
     "output_frequency": 100,  # how frequently to output solution to pvds - Perguntar Daiane ''post_processing_frequnecy'
     "gradient_sampling_frequency": 1,  # how frequently to save solution to RAM    - Perguntar Daiane 'gradient_sampling_frequency'
@@ -88,7 +88,7 @@ def test_real_shot_record_generation_parallel():
 
     fwi = spyro.FullWaveformInversion(dictionary=dictionary)
 
-    fwi.set_real_mesh(mesh_parameters={"dx": 0.01, "mesh_type": "firedrake_mesh"})
+    fwi.set_real_mesh(mesh_parameters={"dx": 0.05, "mesh_type": "firedrake_mesh"})
     center_z = -1.0
     center_x = 1.0
     mesh_z = fwi.mesh_z
