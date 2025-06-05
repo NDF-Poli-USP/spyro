@@ -20,7 +20,18 @@ def recursive_dictionary_substitution(dictionary, default):
             recursive_dictionary_substitution(dictionary[key], default[key])
 
 
-class Example_model_acoustic(AcousticWave):
+class ExampleModelBase:
+    """Base class for example models with dictionary handling."""
+    def __init__(self, dictionary=None, default_dictionary=None, comm=None):
+        self.optional_dictionary = deepcopy(dictionary)
+        self.default_dictionary = default_dictionary
+        if dictionary is None:
+            dictionary = {}
+        recursive_dictionary_substitution(dictionary, default_dictionary)
+        self.input_dictionary = dictionary
+
+
+class Example_model_acoustic(ExampleModelBase, AcousticWave):
     """Sets up a basic model parameter class for examples and test case models.
     It has the option of reading a dictionary, and if any parameter is missing
     from
@@ -41,16 +52,11 @@ class Example_model_acoustic(AcousticWave):
     """
 
     def __init__(self, dictionary=None, default_dictionary=None, comm=None):
-        self.optional_dictionary = deepcopy(dictionary)
-        self.default_dictionary = default_dictionary
-        if dictionary is None:
-            dictionary = {}
-        recursive_dictionary_substitution(dictionary, default_dictionary)
-        self.input_dictionary = dictionary
-        super().__init__(dictionary=dictionary, comm=comm)
+        super().__init__(dictionary=dictionary, default_dictionary=default_dictionary, comm=comm)
+        AcousticWave.__init__(self, dictionary=self.input_dictionary, comm=comm)
 
 
-class Example_model_acoustic_FWI(FullWaveformInversion):
+class Example_model_acoustic_FWI(ExampleModelBase, FullWaveformInversion):
     """Sets up a basic model parameter class for examples and test case models.
     It has the option of reading a dictionary, and if any parameter is missing
     from
@@ -71,10 +77,5 @@ class Example_model_acoustic_FWI(FullWaveformInversion):
     """
 
     def __init__(self, dictionary=None, default_dictionary=None, comm=None):
-        self.optional_dictionary = deepcopy(dictionary)
-        self.default_dictionary = default_dictionary
-        if dictionary is None:
-            dictionary = {}
-        recursive_dictionary_substitution(dictionary, default_dictionary)
-        self.input_dictionary = dictionary
-        super().__init__(dictionary=dictionary, comm=comm)
+        super().__init__(dictionary=dictionary, default_dictionary=default_dictionary, comm=comm)
+        FullWaveformInversion.__init__(self, dictionary=self.input_dictionary, comm=comm)

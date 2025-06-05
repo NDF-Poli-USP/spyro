@@ -1,6 +1,7 @@
 from spyro import create_transect
 from spyro.examples.rectangle import Rectangle_acoustic, Rectangle_acoustic_FWI
 import firedrake as fire
+import copy
 # Adapted from Velocity model-based adapted meshes using optimal transport
 # TODO: add correct citation as soon as Thiago's paper is published
 
@@ -95,37 +96,11 @@ polygon_dictionary["polygon_options"] = {
     "lower_layer": 3.0,
     "polygon_layer_perturbation": 0.3,
 }
+polygon_dictionary_fwi = copy.deepcopy(polygon_dictionary)
+polygon_dictionary_fwi["inversion"]["perform_fwi"] = True
 
 
-class Polygon_acoustic(Rectangle_acoustic):
-    """polygon model.
-    This class is a child of the Example_model class.
-    It is used to create a dictionary with the parameters of the
-    polygon model.
-
-    Parameters
-    ----------
-    dictionary : dict, optional
-        Dictionary with the parameters of the model that are different from
-        the default polygon model. The default is None.
-
-    """
-
-    def __init__(
-        self,
-        dictionary=None,
-        example_dictionary=polygon_dictionary,
-        comm=None,
-        periodic=False,
-    ):
-        super().__init__(
-            dictionary=dictionary,
-            example_dictionary=example_dictionary,
-            comm=comm,
-            periodic=periodic,
-        )
-        self._polygon_velocity_model()
-
+class Polygon_velocity:
     def _polygon_velocity_model(self):
         polygon_dict = self.input_dictionary["polygon_options"]
         z = self.mesh_z
@@ -159,14 +134,37 @@ class Polygon_acoustic(Rectangle_acoustic):
         return None
 
 
-polygon_dictionary["inversion"] = {
-    "perform_fwi": True,  # switch to true to make a FWI
-    "initial_guess_model_file": None,
-    "shot_record_file": None,
-}
+class Polygon_acoustic(Polygon_velocity, Rectangle_acoustic):
+    """polygon model.
+    This class is a child of the Example_model class.
+    It is used to create a dictionary with the parameters of the
+    polygon model.
+
+    Parameters
+    ----------
+    dictionary : dict, optional
+        Dictionary with the parameters of the model that are different from
+        the default polygon model. The default is None.
+
+    """
+
+    def __init__(
+        self,
+        dictionary=None,
+        example_dictionary=polygon_dictionary,
+        comm=None,
+        periodic=False,
+    ):
+        super().__init__(
+            dictionary=dictionary,
+            example_dictionary=example_dictionary,
+            comm=comm,
+            periodic=periodic,
+        )
+        self._polygon_velocity_model()
 
 
-class Polygon_acoustic_FWI(Rectangle_acoustic_FWI):
+class Polygon_acoustic_FWI(Polygon_velocity, Rectangle_acoustic_FWI):
     """polygon model.
     This class is a child of the Example_model class.
     It is used to create a dictionary with the parameters of the
@@ -196,35 +194,3 @@ class Polygon_acoustic_FWI(Rectangle_acoustic_FWI):
         self._polygon_velocity_model()
         self.real_velocity_model = self.initial_velocity_model
         self.real_mesh = self.mesh
-
-    def _polygon_velocity_model(self):
-        polygon_dict = self.input_dictionary["polygon_options"]
-        z = self.mesh_z
-        x = self.mesh_x
-
-        v0 = 1.5  # water layer
-        water_layer_depth = polygon_dict.get("water_layer_depth", 0.0)
-        water_layer_present = polygon_dict.get("water_layer_is_present", False)
-        v1 = polygon_dict["upper_layer"]
-        v2 = polygon_dict["middle_layer"]  # background vp (km/s)
-        vl = polygon_dict["lower_layer"]  # lower layer (km/s)
-        dv = polygon_dict["polygon_layer_perturbation"]*v2  # 30% of perturbation
-        d0 = -water_layer_depth
-        d1 = d0 - 0.14
-        d2 = d1 - 0.2
-
-        if water_layer_present:
-            cond = fire.conditional(z >= d0, v0, v1)
-            cond = fire.conditional(z <= d1, v2, cond)
-        else:
-            cond = fire.conditional(z <= d1, v2, v1)
-        cond = fire.conditional(z <= d2 - 0.2*x, vl, cond)
-
-        cond = fire.conditional(300*((x-1.5)*(-z-0.7))**2 + ((x-1.5)+(-z-0.7))**2 <= 0.300**2, v2+dv, cond)
-
-        if self.abc_pad_length > 0.0:
-            middle_of_pad = -self.length_z - self.abc_pad_length*0.5
-            cond = fire.conditional(z <= middle_of_pad, v0, cond)
-
-        self.set_initial_velocity_model(conditional=cond, dg_velocity_model=False)
-        return None
