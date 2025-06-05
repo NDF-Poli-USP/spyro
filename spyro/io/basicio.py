@@ -14,64 +14,59 @@ import warnings
 
 
 def delete_tmp_files(wave):
-    str_id = "*" + wave.random_id_string + ".npy"
-    temp_files = glob.glob(str_id)
-    for file in temp_files:
+    """Delete temporary numpy files associated with a wave object."""
+    str_id = f"*{wave.random_id_string}.npy"
+    for file in glob.glob(str_id):
         os.remove(file)
+
+
+def _run_for_each_shot(obj, func, *args, **kwargs):
+    """Helper to run a function for each shot in spatial parallelism."""
+    results = []
+    for snum in range(obj.number_of_sources):
+        switch_serial_shot(obj, snum)
+        results.append(func(*args, **kwargs))
+    return results
 
 
 def ensemble_shot_record(func):
     """Decorator for read and write shots for ensemble parallelism"""
-
     def wrapper(*args, **kwargs):
-        if args[0].parallelism_type == "spatial" and args[0].number_of_sources > 1:
-            output_list = []
-            for snum in range(args[0].number_of_sources):
-                switch_serial_shot(args[0], snum)
-                output_list.append(func(*args, **kwargs))
-
-            return output_list
-
+        obj = args[0]
+        if obj.parallelism_type == "spatial" and obj.number_of_sources > 1:
+            return _run_for_each_shot(obj, func, *args, **kwargs)
     return wrapper
+
+
+def _ensemble_save_load_loop(obj, func, kwargs, require_rank0=False):
+    """
+    Helper to loop over shots for ensemble parallelism in save or load operations.
+    """
+    _comm = obj.comm
+    if obj.parallelism_type != "spatial" or obj.number_of_sources == 1:
+        for propagation_id, shot_ids_in_propagation in enumerate(obj.shot_ids_per_propagation):
+            if is_owner(_comm, propagation_id) and (not require_rank0 or _comm.comm.rank == 0):
+                func(obj, **dict(kwargs, shot_ids=shot_ids_in_propagation))
+    else:
+        for snum in range(obj.number_of_sources):
+            switch_serial_shot(obj, snum)
+            if not require_rank0 or _comm.comm.rank == 0:
+                func(obj, **dict(kwargs, shot_ids=[snum]))
 
 
 def ensemble_save(func):
     """Decorator for read and write shots for ensemble parallelism"""
-
     def wrapper(*args, **kwargs):
-        _comm = args[0].comm
-
-        if args[0].parallelism_type != "spatial" or args[0].number_of_sources == 1:
-            shot_ids_per_propagation_list = args[0].shot_ids_per_propagation
-            for propagation_id, shot_ids_in_propagation in enumerate(shot_ids_per_propagation_list):
-                if is_owner(_comm, propagation_id) and _comm.comm.rank == 0:
-                    func(*args, **dict(kwargs, shot_ids=shot_ids_in_propagation))
-        elif args[0].parallelism_type == "spatial" and args[0].number_of_sources > 1:
-            for snum in range(args[0].number_of_sources):
-                switch_serial_shot(args[0], snum)
-                if _comm.comm.rank == 0:
-                    func(*args, **dict(kwargs, shot_ids=[snum]))
-
+        obj = args[0]
+        _ensemble_save_load_loop(obj, func, kwargs, require_rank0=True)
     return wrapper
 
 
 def ensemble_load(func):
     """Decorator for read and write shots for ensemble parallelism"""
-
     def wrapper(*args, **kwargs):
-        _comm = args[0].comm
-
-        if args[0].parallelism_type != "spatial" or args[0].number_of_sources == 1:
-            shot_ids_per_propagation_list = args[0].shot_ids_per_propagation
-            for propagation_id, shot_ids_in_propagation in enumerate(shot_ids_per_propagation_list):
-                if is_owner(_comm, propagation_id):
-                    func(*args, **dict(kwargs, shot_ids=shot_ids_in_propagation))
-        elif args[0].parallelism_type == "spatial" and args[0].number_of_sources > 1:
-            for snum in range(args[0].number_of_sources):
-                switch_serial_shot(args[0], snum)
-                if _comm.comm.rank == 0:
-                    func(*args, **dict(kwargs, shot_ids=[snum]))
-
+        obj = args[0]
+        _ensemble_save_load_loop(obj, func, kwargs, require_rank0=False)
     return wrapper
 
 
@@ -100,6 +95,13 @@ def ensemble_propagator(func):
     return wrapper
 
 
+def _shot_filename(prefix, propagation_id, wave):
+    """Helper to construct filenames for shot/receiver data."""
+    spatialcomm = wave.comm.comm.rank
+    id_str = wave.random_id_string
+    return f"{prefix}{propagation_id}_comm{spatialcomm}{id_str}.npy"
+
+
 def save_serial_data(wave, propagation_id):
     """
     Save serial data to numpy files.
@@ -113,10 +115,8 @@ def save_serial_data(wave, propagation_id):
     """
     arrays_list = [obj.dat.data[:] for obj in wave.forward_solution]
     stacked_arrays = np.stack(arrays_list, axis=0)
-    spatialcomm = wave.comm.comm.rank
-    id_str = wave.random_id_string
-    np.save(f'tmp_shot{propagation_id}_comm{spatialcomm}'+id_str+'.npy', stacked_arrays)
-    np.save(f"tmp_rec{propagation_id}_comm{spatialcomm}"+id_str+".npy", wave.forward_solution_receivers)
+    np.save(_shot_filename('tmp_shot', propagation_id, wave), stacked_arrays)
+    np.save(_shot_filename('tmp_rec', propagation_id, wave), wave.forward_solution_receivers)
 
 
 def switch_serial_shot(wave, propagation_id):
@@ -130,15 +130,13 @@ def switch_serial_shot(wave, propagation_id):
     Returns:
         None
     """
-    spatialcomm = wave.comm.comm.rank
-    id_str = wave.random_id_string
-    stacked_shot_arrays = np.load(f'tmp_shot{propagation_id}_comm{spatialcomm}'+id_str+'.npy')
+    stacked_shot_arrays = np.load(_shot_filename('tmp_shot', propagation_id, wave))
     if len(wave.forward_solution) == 0:
         n_dts, n_dofs = np.shape(stacked_shot_arrays)
         rebuild_empty_forward_solution(wave, n_dts)
     for array_i, array in enumerate(stacked_shot_arrays):
         wave.forward_solution[array_i].dat.data[:] = array
-    wave.forward_solution_receivers = np.load(f"tmp_rec{propagation_id}_comm{spatialcomm}"+id_str+".npy")
+    wave.forward_solution_receivers = np.load(_shot_filename('tmp_rec', propagation_id, wave))
     wave.receivers_output = wave.forward_solution_receivers
 
 
