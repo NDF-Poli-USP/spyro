@@ -1,6 +1,7 @@
 from spyro import create_transect
 from spyro.examples.rectangle import Rectangle_acoustic, Rectangle_acoustic_FWI
 import firedrake as fire
+import copy
 
 camembert_optimization_parameters = {
     "General": {
@@ -114,9 +115,27 @@ camembert_dictionary["camembert_options"] = {
     "outside_velocity": 1.6,
     "inside_circle_velocity": 4.6,
 }
+camembert_dictionary_fwi = copy.deepcopy(camembert_dictionary)
+camembert_dictionary_fwi["inversion"]["perform_fwi"] = True
 
 
-class Camembert_acoustic(Rectangle_acoustic):
+class CamembertVelocity:
+    def _camembert_velocity_model(self):
+        camembert_dict = self.input_dictionary["camembert_options"]
+        z = self.mesh_z
+        x = self.mesh_x
+        zc, xc = camembert_dict["circle_center"]
+        rc = camembert_dict["radius"]
+        c_salt = camembert_dict["inside_circle_velocity"]
+        c_not_salt = camembert_dict["outside_velocity"]
+        cond = fire.conditional(
+            (z - zc) ** 2 + (x - xc) ** 2 < rc**2, c_salt, c_not_salt
+        )
+        self.set_initial_velocity_model(conditional=cond, dg_velocity_model=False)
+        return None
+
+
+class Camembert_acoustic(CamembertVelocity, Rectangle_acoustic):
     """Camembert model.
     This class is a child of the Example_model class.
     It is used to create a dictionary with the parameters of the
@@ -145,29 +164,8 @@ class Camembert_acoustic(Rectangle_acoustic):
         )
         self._camembert_velocity_model()
 
-    def _camembert_velocity_model(self):
-        camembert_dict = self.input_dictionary["camembert_options"]
-        z = self.mesh_z
-        x = self.mesh_x
-        zc, xc = camembert_dict["circle_center"]
-        rc = camembert_dict["radius"]
-        c_salt = camembert_dict["inside_circle_velocity"]
-        c_not_salt = camembert_dict["outside_velocity"]
-        cond = fire.conditional(
-            (z - zc) ** 2 + (x - xc) ** 2 < rc**2, c_salt, c_not_salt
-        )
-        self.set_initial_velocity_model(conditional=cond, dg_velocity_model=False)
-        return None
 
-
-camembert_dictionary["inversion"] = {
-    "perform_fwi": True,  # switch to true to make a FWI
-    "initial_guess_model_file": None,
-    "shot_record_file": None,
-}
-
-
-class Camembert_acoustic_FWI(Rectangle_acoustic_FWI):
+class Camembert_acoustic_FWI(CamembertVelocity, Rectangle_acoustic_FWI):
     """Camembert model.
     This class is a child of the Example_model class.
     It is used to create a dictionary with the parameters of the
@@ -184,7 +182,7 @@ class Camembert_acoustic_FWI(Rectangle_acoustic_FWI):
     def __init__(
         self,
         dictionary=None,
-        example_dictionary=camembert_dictionary,
+        example_dictionary=camembert_dictionary_fwi,
         comm=None,
         periodic=False,
     ):
@@ -197,17 +195,3 @@ class Camembert_acoustic_FWI(Rectangle_acoustic_FWI):
         self._camembert_velocity_model()
         self.real_velocity_model = self.initial_velocity_model
         self.real_mesh = self.mesh
-
-    def _camembert_velocity_model(self):
-        camembert_dict = self.input_dictionary["camembert_options"]
-        z = self.mesh_z
-        x = self.mesh_x
-        zc, xc = camembert_dict["circle_center"]
-        rc = camembert_dict["radius"]
-        c_salt = camembert_dict["inside_circle_velocity"]
-        c_not_salt = camembert_dict["outside_velocity"]
-        cond = fire.conditional(
-            (z - zc) ** 2 + (x - xc) ** 2 < rc**2, c_salt, c_not_salt
-        )
-        self.set_initial_velocity_model(conditional=cond, dg_velocity_model=False)
-        return None

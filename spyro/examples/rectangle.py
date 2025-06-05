@@ -111,7 +111,54 @@ rectangle_dictionary_fwi["inversion"] = {
 }
 
 
-class Rectangle_acoustic(Example_model_acoustic):
+class Rectangle_mesh_and_velocity:
+    def _rectangle_mesh(self):
+        mesh_dict = self.input_dictionary["mesh"]
+        mesh_parameters = {
+            "length_z": mesh_dict["Lz"],
+            "length_x": mesh_dict["Lx"],
+            "length_y": mesh_dict["Ly"],
+            "dx": mesh_dict["h"],
+            "mesh_file": mesh_dict["mesh_file"],
+            "mesh_type": mesh_dict["mesh_type"],
+            "periodic": self.periodic,
+        }
+        super().set_mesh(mesh_parameters=mesh_parameters)
+
+    def multiple_layer_velocity_model(self, z_switch, layers):
+        """
+        Sets the heterogeneous velocity model to be split into horizontal layers.
+        Each layer's velocity value is defined by the corresponding value in the
+        layers list. The layers are separated by the values in the z_switch list.
+
+        Parameters
+        ----------
+        z_switch : list of floats
+            List of z values that separate the layers.
+        layers : list of floats
+            List of velocity values for each layer.
+        """
+        if len(z_switch) != (len(layers) - 1):
+            raise ValueError(
+                "Float list of z_switch has to have length exactly one less \
+                              than list of layer values"
+            )
+        if len(z_switch) == 0:
+            raise ValueError("Float list of z_switch cannot be empty")
+        for i in range(len(z_switch)):
+            if i == 0:
+                cond = fire.conditional(
+                    self.mesh_z > z_switch[i], layers[i], layers[i + 1]
+                )
+            else:
+                cond = fire.conditional(
+                    self.mesh_z > z_switch[i], cond, layers[i + 1]
+                )
+        # cond = fire.conditional(self.mesh_z > z_switch, layer1, layer2)
+        self.set_initial_velocity_model(conditional=cond)
+
+
+class Rectangle_acoustic(Rectangle_mesh_and_velocity, Example_model_acoustic):
     """
     Rectangle model.
     This class is a child of the Example_model class.
@@ -145,53 +192,8 @@ class Rectangle_acoustic(Example_model_acoustic):
 
         self._rectangle_mesh()
 
-    def _rectangle_mesh(self):
-        mesh_dict = self.input_dictionary["mesh"]
-        mesh_parameters = {
-            "length_z": mesh_dict["Lz"],
-            "length_x": mesh_dict["Lx"],
-            "length_y": mesh_dict["Ly"],
-            "dx": mesh_dict["h"],
-            "mesh_file": mesh_dict["mesh_file"],
-            "mesh_type": mesh_dict["mesh_type"],
-            "periodic": self.periodic,
-        }
-        super().set_mesh(mesh_parameters=mesh_parameters)
 
-    def multiple_layer_velocity_model(self, z_switch, layers):
-        """
-        Sets the heterogeneous velocity model to be split into horizontal layers.
-        Each layer's velocity value is defined by the corresponding value in the
-        layers list. The layers are separated by the values in the z_switch list.
-
-        Parameters
-        ----------
-        z_switch : list of floats
-            List of z values that separate the layers.
-        layers : list of floats
-            List of velocity values for each layer.
-        """
-        if len(z_switch) != (len(layers) - 1):
-            raise ValueError(
-                "Float list of z_switch has to have length exactly one less \
-                              than list of layer values"
-            )
-        if len(z_switch) == 0:
-            raise ValueError("Float list of z_switch cannot be empty")
-        for i in range(len(z_switch)):
-            if i == 0:
-                cond = fire.conditional(
-                    self.mesh_z > z_switch[i], layers[i], layers[i + 1]
-                )
-            else:
-                cond = fire.conditional(
-                    self.mesh_z > z_switch[i], cond, layers[i + 1]
-                )
-        # cond = fire.conditional(self.mesh_z > z_switch, layer1, layer2)
-        self.set_initial_velocity_model(conditional=cond)
-
-
-class Rectangle_acoustic_FWI(Example_model_acoustic_FWI):
+class Rectangle_acoustic_FWI(Rectangle_mesh_and_velocity, Example_model_acoustic_FWI):
     """
     Rectangle model.
     This class is a child of the Example_model class.
@@ -224,48 +226,3 @@ class Rectangle_acoustic_FWI(Example_model_acoustic_FWI):
         self.periodic = periodic
 
         self._rectangle_mesh()
-
-    def _rectangle_mesh(self):
-        mesh_dict = self.input_dictionary["mesh"]
-        mesh_parameters = {
-            "length_z": mesh_dict["Lz"],
-            "length_x": mesh_dict["Lx"],
-            "length_y": mesh_dict["Ly"],
-            "dx": mesh_dict["h"],
-            "mesh_file": mesh_dict["mesh_file"],
-            "mesh_type": mesh_dict["mesh_type"],
-            "periodic": self.periodic,
-        }
-        super().set_mesh(mesh_parameters=mesh_parameters)
-
-    def multiple_layer_velocity_model(self, z_switch, layers):
-        """
-        Sets the heterogeneous velocity model to be split into horizontal layers.
-        Each layer's velocity value is defined by the corresponding value in the
-        layers list. The layers are separated by the values in the z_switch list.
-
-        Parameters
-        ----------
-        z_switch : list of floats
-            List of z values that separate the layers.
-        layers : list of floats
-            List of velocity values for each layer.
-        """
-        if len(z_switch) != (len(layers) - 1):
-            raise ValueError(
-                "Float list of z_switch has to have length exactly one less \
-                              than list of layer values"
-            )
-        if len(z_switch) == 0:
-            raise ValueError("Float list of z_switch cannot be empty")
-        for i in range(len(z_switch)):
-            if i == 0:
-                cond = fire.conditional(
-                    self.mesh_z > z_switch[i], layers[i], layers[i + 1]
-                )
-            else:
-                cond = fire.conditional(
-                    self.mesh_z > z_switch[i], cond, layers[i + 1]
-                )
-        # cond = fire.conditional(self.mesh_z > z_switch, layer1, layer2)
-        self.set_initial_velocity_model(conditional=cond)
