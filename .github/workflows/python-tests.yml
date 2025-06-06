@@ -50,7 +50,7 @@ jobs:
     
     - name: Reinstall islpy from source
       run: |
-        pip3 install --no-binary=:all: --force-reinstall --no-cache-dir islpy
+        pip3 install --force-reinstall --no-cache-dir islpy
 
     - name: Running serial tests
       run: |
