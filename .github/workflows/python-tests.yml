@@ -21,19 +21,11 @@ jobs:
     runs-on: self-hosted
 
     container:
-      image: firedrakeproject/firedrake:2025.4.1
+      image: firedrakeproject/firedrake:2025.4.0.post0
       options: --user root  # Ensures it can install packages if needed
 
     steps:
     - uses: actions/checkout@v4
-
-    - name: Clean up Python and system caches
-      run: |
-        find /usr/local/lib/python3.12/ -name '*.pyc' -delete || true
-        rm -rf /root/.cache/pip || true
-        pip3 uninstall -y islpy || true
-        apt-get remove -y python3-islpy libisl23 || true
-        apt-get install -y libisl23
 
     - name: Install dependencies
       run: |
@@ -47,10 +39,6 @@ jobs:
         && pip3 install meshio \
         && pip3 install -U memory_profiler \
         && pip3 install pytest pytest-cov
-    
-    - name: Reinstall islpy from source
-      run: |
-        pip3 install --force-reinstall --no-cache-dir islpy
 
     - name: Running serial tests
       run: |
