@@ -19,16 +19,23 @@ def cells_per_wavelength(method, degree, dimension):
         'sem4quad': None,
         'sem6quad': None,
         'sem8quad': None,
+        'cg_triangle1tri': None,
     }
 
     if dimension == 2 and (method == 'mass_lumped_triangle' or method == "MLT"):
         cell_type = 'tri'
+        method = 'mlt'
     if dimension == 3 and (method == 'mass_lumped_triangle' or method == "MLT"):
         cell_type = 'tet'
+        method = 'mlt'
     if dimension == 2 and method == 'spectral_quadrilateral':
         cell_type = 'quad'
+        method = 'sem'
     if dimension == 3 and method == 'spectral_quadrilateral':
         cell_type = 'quad'
+        method = 'sem'
+    if method == 'CG_triangle':
+        cell_type = 'tri'
 
     key = method.lower()+str(degree)+cell_type
 
