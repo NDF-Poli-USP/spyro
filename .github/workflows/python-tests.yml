@@ -47,6 +47,10 @@ jobs:
         && pip3 install meshio \
         && pip3 install -U memory_profiler \
         && pip3 install pytest pytest-cov
+    
+    - name: Reinstall islpy from source
+      run: |
+        pip3 install --no-binary=:all: --force-reinstall --no-cache-dir islpy
 
     - name: Running serial tests
       run: |
