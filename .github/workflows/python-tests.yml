@@ -31,6 +31,7 @@ jobs:
       run: |
         apt-get update \
         && apt-get -y install git python3 \
+        && pip3 install --force-reinstall --no-cache-dir --upgrade islpy
         && apt-get -y install gmsh patchelf \
         && pip3 install segyio \
         && apt-get update && apt-get install -y libgmp3-dev libmpfr-dev libcgal-dev python3-tk \
