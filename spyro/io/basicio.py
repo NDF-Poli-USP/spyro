@@ -536,7 +536,7 @@ def read_mesh(model_parameters):
 
 def parallel_print(string, comm):
     """
-    Just prints a string once. Without any comm it just prints, 
+    Just prints a string once. Without any comm it just prints,
     without ensemble_comm it prints in comm 0,
     with ensemble_comm it prints in ensemble 0 and comm 0.
 
@@ -556,6 +556,7 @@ def parallel_print(string, comm):
         elif getattr(comm, "rank", None) is not None:
             if comm.rank == 0:
                 print(string, flush=True)
+
 
 def saving_source_and_receiver_location_in_csv(model, folder_name=None):
     """
