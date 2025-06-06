@@ -536,7 +536,9 @@ def read_mesh(model_parameters):
 
 def parallel_print(string, comm):
     """
-    Just prints a string in comm 0
+    Just prints a string once. Without any comm it just prints, 
+    without ensemble_comm it prints in comm 0,
+    with ensemble_comm it prints in ensemble 0 and comm 0.
 
     Parameters
     ----------
@@ -545,9 +547,15 @@ def parallel_print(string, comm):
     comm: Firedrake.ensemble_communicator
         An ensemble communicator
     """
-    if comm.ensemble_comm.rank == 0 and comm.comm.rank == 0:
+    if comm is None:
         print(string, flush=True)
-
+    else:
+        if getattr(comm, "ensemble_comm", None) is not None:
+            if comm.ensemble_comm.rank == 0 and comm.comm.rank == 0:
+                print(string, flush=True)
+        elif getattr(comm, "rank", None) is not None:
+            if comm.rank == 0:
+                print(string, flush=True)
 
 def saving_source_and_receiver_location_in_csv(model, folder_name=None):
     """
