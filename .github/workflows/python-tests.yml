@@ -27,6 +27,14 @@ jobs:
     steps:
     - uses: actions/checkout@v4
 
+    - name: Clean up Python and system caches
+      run: |
+        find /usr/local/lib/python3.12/ -name '*.pyc' -delete || true
+        rm -rf /root/.cache/pip || true
+        pip3 uninstall -y islpy || true
+        apt-get remove -y python3-islpy libisl23 || true
+        apt-get install -y libisl23
+
     - name: Install dependencies
       run: |
         apt-get update \
@@ -39,12 +47,6 @@ jobs:
         && pip3 install meshio \
         && pip3 install -U memory_profiler \
         && pip3 install pytest pytest-cov
-    
-    - name: Debug islpy and libisl versions
-      run: |
-        python3 -c "import islpy; print('islpy:', islpy.__version__)"
-        dpkg -l | grep isl
-        ldd $(python3 -c 'import islpy; print(islpy.__file__)')
 
     - name: Running serial tests
       run: |
