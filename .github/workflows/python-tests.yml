@@ -31,7 +31,6 @@ jobs:
       run: |
         apt-get update \
         && apt-get -y install git python3 \
-        && pip3 install --force-reinstall --no-cache-dir --upgrade islpy \
         && apt-get -y install gmsh patchelf \
         && pip3 install segyio \
         && apt-get update && apt-get install -y libgmp3-dev libmpfr-dev libcgal-dev python3-tk \
@@ -40,6 +39,12 @@ jobs:
         && pip3 install meshio \
         && pip3 install -U memory_profiler \
         && pip3 install pytest pytest-cov
+    
+    - name: Debug islpy and libisl versions
+      run: |
+        python3 -c "import islpy; print('islpy:', islpy.__version__)"
+        dpkg -l | grep isl
+        ldd $(python3 -c 'import islpy; print(islpy.__file__)')
 
     - name: Running serial tests
       run: |
