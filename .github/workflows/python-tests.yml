@@ -21,7 +21,7 @@ jobs:
     runs-on: self-hosted
 
     container:
-      image: firedrakeproject/firedrake
+      image: firedrakeproject/firedrake:2025.4.1
       options: --user root  # Ensures it can install packages if needed
 
     steps:
