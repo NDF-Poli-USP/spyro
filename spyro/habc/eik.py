@@ -562,7 +562,7 @@ class Eikonal():
             idxsou = np.argmin(lref_allsou)
             lref = lref_allsou[idxsou]
             sou_cr = possou[idxsou]
-            z_par = 1/eikmin
+            z_par = 1 / eikmin
 
             # Grouping properties
             eik_bnd.append([pt_cr, c_bnd, eikmin, z_par, lref, sou_cr])

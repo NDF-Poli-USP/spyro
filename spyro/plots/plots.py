@@ -431,7 +431,7 @@ def plot_xCR_opt(Wave_object, data_regr_xCR, show=False):
           The last value corresponds to the optimal xCR
         - max_errPK: Values of the maximum peak error.
           The last value corresponds to the optimal xCR
-         -crit_opt : Criterion for the optimal heuristic factor.
+        - crit_opt : Criterion for the optimal heuristic factor.
           * 'error_difference' : Difference between integral and peak errors
           * 'error_integral' : Minimum integral error
     show: `bool`, optional
@@ -474,7 +474,7 @@ def plot_xCR_opt(Wave_object, data_regr_xCR, show=False):
              label=r'Peak Error: ' + eq_str_eP)
 
     # xCR limits
-    xCR_inf, xCR_sup = Wave_obj.xCR_bounds[0]
+    xCR_inf, xCR_sup = Wave_object.xCR_bounds[0]
 
     # Regression curves
     xgraf = np.linspace(xCR_inf, xCR_sup, int((xCR_sup - xCR_inf) / 0.1))
