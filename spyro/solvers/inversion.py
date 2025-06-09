@@ -292,6 +292,7 @@ class FullWaveformInversion(AcousticWave):
         expression=None,
         new_file=None,
         output=False,
+        dg_velocity_model=True,
     ):
         """"
         Sets the initial guess.
@@ -319,6 +320,7 @@ class FullWaveformInversion(AcousticWave):
             expression=expression,
             new_file=new_file,
             output=output,
+            dg_velocity_model=dg_velocity_model,
         )
         self.guess_velocity_model = self.initial_velocity_model
         self.misfit = None

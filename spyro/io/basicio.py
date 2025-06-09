@@ -49,7 +49,7 @@ def _ensemble_save_load_loop(obj, func, kwargs, require_rank0=False):
                 func(obj, **dict(kwargs, shot_ids=shot_ids_in_propagation))
     else:
         for snum in range(obj.number_of_sources):
-            switch_serial_shot(obj, snum)
+            switch_serial_shot(obj, snum, filename=kwargs.get("filename"))
             if not require_rank0 or _comm.comm.rank == 0:
                 func(obj, **dict(kwargs, shot_ids=[snum]))
 
@@ -95,10 +95,13 @@ def ensemble_propagator(func):
     return wrapper
 
 
-def _shot_filename(prefix, propagation_id, wave):
+def _shot_filename(propagation_id, wave, prefix='tmp', random_str_in_use=True):
     """Helper to construct filenames for shot/receiver data."""
     spatialcomm = wave.comm.comm.rank
-    id_str = wave.random_id_string
+    if random_str_in_use:
+        id_str = wave.random_id_string
+    else:
+        id_str = ""
     return f"{prefix}{propagation_id}_comm{spatialcomm}{id_str}.npy"
 
 
@@ -115,11 +118,11 @@ def save_serial_data(wave, propagation_id):
     """
     arrays_list = [obj.dat.data[:] for obj in wave.forward_solution]
     stacked_arrays = np.stack(arrays_list, axis=0)
-    np.save(_shot_filename('tmp_shot', propagation_id, wave), stacked_arrays)
-    np.save(_shot_filename('tmp_rec', propagation_id, wave), wave.forward_solution_receivers)
+    np.save(_shot_filename(propagation_id, wave, prefix='tmp_shot'), stacked_arrays)
+    np.save(_shot_filename(propagation_id, wave, prefix='tmp_rec'), wave.forward_solution_receivers)
 
 
-def switch_serial_shot(wave, propagation_id):
+def switch_serial_shot(wave, propagation_id, filename=None):
     """
     Switches the current serial shot for a given wave to shot identified with propagation ID.
 
@@ -130,13 +133,14 @@ def switch_serial_shot(wave, propagation_id):
     Returns:
         None
     """
-    stacked_shot_arrays = np.load(_shot_filename('tmp_shot', propagation_id, wave))
+    if filename is None:
+        stacked_shot_arrays = np.load(_shot_filename(propagation_id, wave, prefix='tmp_shot'))
     if len(wave.forward_solution) == 0:
         n_dts, n_dofs = np.shape(stacked_shot_arrays)
         rebuild_empty_forward_solution(wave, n_dts)
     for array_i, array in enumerate(stacked_shot_arrays):
         wave.forward_solution[array_i].dat.data[:] = array
-    wave.forward_solution_receivers = np.load(_shot_filename('tmp_rec', propagation_id, wave))
+    wave.forward_solution_receivers = np.load(_shot_filename(propagation_id, wave, prefix='tmp_rec'))
     wave.receivers_output = wave.forward_solution_receivers
 
 
