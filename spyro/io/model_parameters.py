@@ -635,9 +635,9 @@ class Model_parameters:
             }
             self.optimization_parameters = default_optimization_parameters
 
-        if "shot_record_file" in dictionary["inversion"]:
-            if dictionary["inversion"]["shot_record_file"] is not None:
-                self.real_shot_record = np.load(dictionary["inversion"]["shot_record_file"])
+        # if "shot_record_file" in dictionary["inversion"]:
+        #     if dictionary["inversion"]["shot_record_file"] is not None:
+        #         self.real_shot_record = np.load(dictionary["inversion"]["shot_record_file"])
 
     def _sanitize_optimization_and_velocity_without_fwi(self):
         dictionary = self.input_dictionary
