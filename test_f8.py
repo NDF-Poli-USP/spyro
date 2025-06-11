@@ -5,12 +5,15 @@ from spyro.habc.cost import comp_cost
 import ipdb
 
 
-def wave_dict(layer_shape, degree_layer, habc_reference_freq, get_ref_model):
+def wave_dict(dt_usu, layer_shape, degree_layer,
+              habc_reference_freq, get_ref_model):
     '''
     Create a dictionary with parameters for the model.
 
     Parameters
     ----------
+    dt_usu: `float`
+        Time step of the simulation
     layer_shape : `str`
         Shape of the absorbing layer, either 'rectangular' or 'hypershape'
     degree_layer : `int` or `None`
@@ -71,13 +74,14 @@ def wave_dict(layer_shape, degree_layer, habc_reference_freq, get_ref_model):
     }
 
     # Simulate for 2.0 seconds.
+    fr_files = max(int(100 * 0.0005 / dt_usu), 1)
     dictionary["time_axis"] = {
         "initial_time": 0.0,  # Initial time for event
         "final_time": 2.,    # Final time for event
-        "dt": 0.0005,  # timestep size
+        "dt": dt_usu,  # timestep size in seconds
         "amplitude": 1,  # the Ricker has an amplitude of 1.
-        "output_frequency": 100,  # how frequently to output solution to pvds
-        "gradient_sampling_frequency": 100,  # how frequently to save to RAM
+        "output_frequency": fr_files,  # how frequently to output solution to pvds
+        "gradient_sampling_frequency": fr_files,  # how frequently to save to RAM
     }
 
     # Define Parameters for absorbing boundary conditions
@@ -221,9 +225,9 @@ def get_xCR_usu(Wave_obj, dat_regr_xCR, typ_xCR, n_pts):
         else:
             step = 0.25 * min(abs(xCR - xCR_inf), abs(xCR_sup - xCR))
             xCR_cand = [np.clip(xCR - i * step, xCR_inf, xCR_sup)
-                        for i in range(n_pts // 2, 0, -1)] + \
-                [np.clip(xCR + i * step, xCR_inf, xCR_sup)
-                 for i in range(1, n_pts // 2 + 1)]
+                        for i in range(n_pts // 2, 0, -1)]
+            + [np.clip(xCR + i * step, xCR_inf, xCR_sup)
+               for i in range(1, n_pts // 2 + 1)]
         return xCR_cand
 
     elif typ_xCR == "optimal":
@@ -274,7 +278,7 @@ def test_habc_fig8(Wave_obj, dat_regr_xCR, xCR_usu=None, plot_comparison=True):
                                  layer_based_on_mesh=True)
 
     # Creating mesh with absorbing layer
-    Wave_obj.create_mesh_habc()
+    Wave_obj.create_mesh_habc(fmesh=1.)  # 1.1: 0.15s
 
     # Updating velocity model
     Wave_obj.velocity_habc()
@@ -310,9 +314,12 @@ if __name__ == "__main__":
     # cpw: cells per wavelength
     # lba = minimum_velocity /source_frequency
     # edge_length = lba / cpw
-    edge_length_lst = [0.05]  # [0.05, 0.02, 0.01]
+    edge_length_lst = [0.05, 0.02, 0.01]
 
-    degree_layer_lst = [2, 3, 4, 5]  # [None, 2, 3, 4, 5]
+    # dt size
+    dt_usu_lst = [0.0005, 0.0002, 0.000125]
+
+    degree_layer_lst = [None, 2, 3, 4, 5]
 
     habc_reference_freq_lst = ["source", "boundary"]
 
@@ -324,11 +331,17 @@ if __name__ == "__main__":
 
     n_pts = 3  # Number of points for regression (odd number)
 
-    for edge_length in edge_length_lst:
+    for case, edge_length in enumerate(edge_length_lst):
+
+        # Get simulation parameters
+        dt_usu = dt_usu_lst[case]
+        print("\nMesh Size: {:.3f} km".format(edge_length))
+        print("Timestep Size: {:.3f} ms\n".format(1e3 * dt_usu))
 
         # ============ MESH AND EIKONAL ============
         # Create dictionary with parameters for the model
-        dictionary = wave_dict("rectangular", None, "source", get_ref_model)
+        dictionary = wave_dict(dt_usu, "rectangular",
+                               None, "source", get_ref_model)
 
         # Creating mesh and performing eikonal analysis
         Wave_obj = preamble_habc(dictionary, edge_length)
@@ -338,7 +351,7 @@ if __name__ == "__main__":
             # Reference to resource usage
             tRef = comp_cost("tini")
 
-            # Computing reference signal
+            # Computing reference get_reference_signal
             Wave_obj.infinite_model()
 
             # Set model parameters for the HABC scheme
@@ -359,6 +372,8 @@ if __name__ == "__main__":
 
                 # Reference frequency for sizing the hybrid absorbing layer
                 Wave_obj.abc_reference_freq = habc_reference_freq
+                print("\nHABC Reference Frequency: {}\n".format(
+                    habc_reference_freq.capitalize()))
 
                 for degree_layer in degree_layer_lst:
 
@@ -402,25 +417,3 @@ if __name__ == "__main__":
                         elif itr_xCR == n_pts - 1:
                             xCR_opt = get_xCR_usu(
                                 Wave_obj, dat_regr_xCR, "optimal", n_pts)
-
-    # from spyro.plots.plots import plot_xCR_opt
-
-    # data_regr_xCR = [[0.111, 0.158, 0.319, 0.637, 1.103, 1.495, 1.887, 0.955],
-    #                  [0.0178, 0.0175, 0.0164, 0.0147, 0.0128, 0.0117, 0.0110, 0.0133],
-    #                  [0.0060, 0.0065, 0.0079, 0.0107, 0.0145, 0.0173, 0.0201, 0.0133],
-    #                  'error_difference']
-
-    # # data_regr_xCR = [[0.111, 0.158, 0.319, 0.637, 1.103, 1.495, 1.887, 1.887],
-    # #                  [0.0178, 0.0175, 0.0164, 0.0147, 0.0128, 0.0117, 0.0110, 0.011],
-    # #                  [0.0060, 0.0065, 0.0079, 0.0107, 0.0145, 0.0173, 0.0201, 0.0201],
-    # #                  'error_integral']
-    # plot_xCR_opt(None, data_regr_xCR)
-
-# 0.111 1.78 0.60 5.60e-08
-# 0.158 1.75 0.65 5.47e-08
-# 0.319 1.64 0.79 5.03e-08
-# 0.637 1.47 1.07 4.33e-08
-# 0.955 1.33 1.33 3.77e-08
-# 1.103 1.28 1.45 3.55e-08
-# 1.495 1.17 1.73 3.09e-08
-# 1.887 1.10 2.01 2.75e-08

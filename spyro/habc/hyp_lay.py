@@ -769,15 +769,16 @@ class HyperLayer():
             for idp in range(0, num_bnd_pts - 1, 2):
                 p1 = geo.PointData()[2][idp]
                 p2 = geo.PointData()[2][idp + 1]
+                # print(p1, p2)
+
                 if ini_trunc + 1 <= idp <= end_trunc - 2:
                     curves.append(["line", p1, p2, self.lmin])
                 else:
                     curves.append(["line", p1, p2, ltrunc])
-                # print(p1, p2)
 
         return curves
 
-    def create_hyp_trunc_mesh2D(self):
+    def create_hyp_trunc_mesh2D(self, spln=True, fmesh=1.):
         '''
         Generate the mesh for the hyperelliptical absorbing layer.
 
@@ -789,6 +790,11 @@ class HyperLayer():
         -------
         hyp_mesh : `netgen mesh`
             Generated mesh for the hyperelliptical layer
+        spln : `bool`
+            Flag to indicate whether to use splines (True) or lines (False)
+        fmesh : `float`
+            Mesh size factor for the hyperelliptical layer with respect to mesh
+            size of the original domain. Default is 1.0.
         '''
 
         # Domain dimensions
@@ -804,7 +810,16 @@ class HyperLayer():
         # Append points to the geometry
         [geo.AppendPoint(*pnt) for pnt in bnd_pts]
 
-        spln = True
+        #  Mesh size for arc length due to the truncation operation
+        ltrunc = trunc_feat[-1]
+        fmin = ltrunc / self.lmin
+
+        # Mesh size factor for the hyperelliptical layer
+        if fmesh != 1.:
+            fmesh = max(fmesh, fmin)
+        fm_str = "Mesh Factor Size Inside Layer (Min): {:.2f} ({:.2f})"
+        print(fm_str.format(fmesh, fmin))
+
         while True:
             try:
                 # Generate the boundary segment curves
@@ -813,7 +828,7 @@ class HyperLayer():
                             rightdomain=0) for c in curves]
 
                 # Generate the mesh using netgen library
-                hyp_mesh = geo.GenerateMesh(maxh=self.lmin,
+                hyp_mesh = geo.GenerateMesh(maxh=fmesh*self.lmin,
                                             quad_dominated=False)
                 print("Hyperelliptical Mesh Generated Successfully")
                 break

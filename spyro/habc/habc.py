@@ -680,7 +680,7 @@ class HABC_Wave(AcousticWave, HyperLayer, NRBCHabc):
             # Geometric properties of the rectangular layer
             self.calc_rec_geom_prop()
 
-    def create_mesh_habc(self, inf_model=False):
+    def create_mesh_habc(self, inf_model=False, spln=True, fmesh=1.):
         '''
         Create a mesh with absorbing layer based on the determined size.
 
@@ -689,6 +689,12 @@ class HABC_Wave(AcousticWave, HyperLayer, NRBCHabc):
         inf_model : `bool`, optional
             If True, build a rectangular layer for the infinite or reference
             model (Model with "infinite" dimensions). Default is False
+        spln : `bool`
+            Flag to indicate whether to use splines (True) or lines (False)
+            in hypershape layer generation. Default is True
+        fmesh : `float`
+            Mesh size factor for the hyperelliptical layer with respect to mesh
+            size of the original domain. Default is 1.0.
 
         Returns
         -------
@@ -737,7 +743,7 @@ class HABC_Wave(AcousticWave, HyperLayer, NRBCHabc):
         elif layer_shape == 'hypershape':
 
             # Creating the hyperellipse layer mesh
-            hyp_mesh = self.create_hyp_trunc_mesh2D()
+            hyp_mesh = self.create_hyp_trunc_mesh2D(spln=spln, fmesh=fmesh)
 
             # Adjusting coordinates
             coords = hyp_mesh.coordinates.dat.data_with_halos
@@ -853,6 +859,7 @@ class HABC_Wave(AcousticWave, HyperLayer, NRBCHabc):
 
         # Points to extend the velocity model
         pad_field = fire.Function(W).interpolate(w_aux * layer_mask)
+        del w_aux
         # fire.VTKFile("output/pad_field.pvd").write(pad_field)
         pad_pts = pad_field.dat.data_with_halos[:]
         if self.dimension == 2:  # 2D
@@ -868,12 +875,14 @@ class HABC_Wave(AcousticWave, HyperLayer, NRBCHabc):
         # Set the velocity of the nearest point on the original boundary
         vel_to_extend = self.initial_velocity_model.at(pts_to_extend,
                                                        dont_raise=True)
+        del pts_to_extend
 
         # Velocity profile inside the layer
         pad_field.dat.data_with_halos[ind_pts, 0] = vel_to_extend
-        self.c.interpolate(
-            pad_field.sub(0) * layer_mask + (1 - layer_mask) * self.c,
-            allow_missing_dofs=True)
+        del vel_to_extend, ind_pts
+        self.c.interpolate(pad_field.sub(0) * layer_mask + (
+            1 - layer_mask) * self.c, allow_missing_dofs=True)
+        del layer_mask, pad_field
         # fire.VTKFile("output/c_extend.pvd").write(pad_field.sub(0))
 
         # Save new velocity model
@@ -1884,8 +1893,15 @@ class HABC_Wave(AcousticWave, HyperLayer, NRBCHabc):
             roots = np.roots(eq_xCR)
             valid_roots = [np.clip(rth, xCR_inf, xCR_sup)
                            for rth in roots if isinstance(rth, float)]
-            min_err = [abs(np.polyval(eq_xCR, rth)) for rth in valid_roots]
-            xCR_opt = valid_roots[np.argmin(min_err)]
+
+            if valid_roots:
+                # Real root that provides the absolute minimum error
+                min_err = [abs(np.polyval(eq_xCR, rth)) for rth in valid_roots]
+                xCR_opt = valid_roots[np.argmin(min_err)]
+            else:
+                # Vertex when there are no real roots
+                vtx = - eq_xCR[1] / (2 * eq_xCR[0])
+                xCR_opt = np.clip(vtx, xCR_inf, xCR_sup)
 
         elif crit_opt == 'error_integral':
 

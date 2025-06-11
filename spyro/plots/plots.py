@@ -464,8 +464,10 @@ def plot_xCR_opt(Wave_object, data_regr_xCR, show=False):
 
     # Format equations
     qua_reg = r'${:.3e} x^{{2}} + {:.3e} x + {:.3e}, R^{{2}} = {:.3f}$'
-    eq_str_eI = (r'$e_I = $' + qua_reg).format(*eq_eI, r2_eI)
-    eq_str_eP = (r'$e_P = $' + qua_reg).format(*eq_eP, r2_eP)
+    eq_str_eI = (
+        r'$e_I = $' + qua_reg).format(*eq_eI, r2_eI).replace("+ -", "- ")
+    eq_str_eP = (
+        r'$e_P = $' + qua_reg).format(*eq_eP, r2_eP).replace("+ -", "- ")
 
     # Regression points
     plt.plot(xCR[:-1], 100 * np.asarray(max_errIt[:-1]), 'ro',
@@ -486,10 +488,11 @@ def plot_xCR_opt(Wave_object, data_regr_xCR, show=False):
     # Locating the optimal value
     plt.plot([xCR_opt, xCR_opt], [0., 100 * err_opt], 'k-')
     xopt_str = r'Optimized Heuristic Factor: $X_{{C_{{R}}}} = {:.3f}$'
-    if crit_opt == 'error_difference':
+    if round(100 * np.polyval(eq_eI, xCR_opt), 2) == round(
+            100 * np.polyval(eq_eP, xCR_opt), 2):
         xopt_str += r' | $e_{{I}} = e_{{P}} = {:.2f}\%$'
         label = xopt_str.format(xCR_opt, 100 * err_opt)
-    elif crit_opt == 'error_integral':
+    else:
         xopt_str += r' | $e_{{I}} = {:.2f}\%$ | $e_{{P}} = {:.2f}\%$'
         label = xopt_str.format(xCR_opt, 100 * err_opt, 100 * max_errPk[-1])
     plt.plot(xCR_opt, 100 * err_opt, marker=r'$\ast$', color='k',
