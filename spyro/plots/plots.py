@@ -487,7 +487,7 @@ def plot_xCR_opt(Wave_object, data_regr_xCR, show=False):
 
     # Locating the optimal value
     plt.plot([xCR_opt, xCR_opt], [0., 100 * err_opt], 'k-')
-    xopt_str = r'Optimized Heuristic Factor: $X_{{C_{{R}}}} = {:.3f}$'
+    xopt_str = r'Optimized Heuristic Factor: $X^{{*}}_{{C_{{R}}}} = {:.3f}$'
     if round(100 * np.polyval(eq_eI, xCR_opt), 2) == round(
             100 * np.polyval(eq_eP, xCR_opt), 2):
         xopt_str += r' | $e_{{I}} = e_{{P}} = {:.2f}\%$'
@@ -514,7 +514,7 @@ def plot_xCR_opt(Wave_object, data_regr_xCR, show=False):
 
     # Saving the plot
     xcr_str = Wave_object.path_save + Wave_object.case_habc + "/xCR"
-    plt.savefig(xcr_str + '.png')
-    plt.savefig(xcr_str + '.pdf')
+    plt.savefig(xcr_str + '.png', bbox_inches='tight')
+    plt.savefig(xcr_str + '.pdf', bbox_inches='tight')
     plt.show() if show else None
     plt.close()

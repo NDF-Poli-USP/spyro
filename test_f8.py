@@ -207,20 +207,26 @@ def get_xCR_usu(Wave_obj, dat_regr_xCR, typ_xCR, n_pts):
         # Determining the xCR candidates for iterations
         if n_pts == 3:
 
+            xCR_cand = [xCR_inf, xCR_sup]
+
+            if xCR in xCR_cand:
+                xCR_unq = xCR_cand[1 - xCR_cand.index(xCR)]
+                xCR_cand = sorted([xCR_unq, (xCR_unq + xCR) / 2])
+
             # Initial search range
-            xCR_min, xCR_max = Wave_obj.xCR_bounds[1]
+            # xCR_min, xCR_max = Wave_obj.xCR_bounds[1]
 
-            xCR_rang = [xCR_inf, xCR_min, xCR_max, xCR_sup]
-            unique_xCR = list(dict.fromkeys(xCR_rang))
-            if xCR in unique_xCR:
-                unique_xCR.remove(xCR)
+            # xCR_rang = [xCR_inf, xCR_min, xCR_max, xCR_sup]
+            # unique_xCR = list(dict.fromkeys(xCR_rang))
+            # if xCR in unique_xCR:
+            #     unique_xCR.remove(xCR)
 
-            if len(unique_xCR) == 1:
-                xCR_int = (unique_xCR[0] + xCR) / 2
-                xCR_cand = [unique_xCR[0], xCR_int]
-            else:
-                xCR_cand = sorted(
-                    unique_xCR, key=lambda u_xCR: abs(u_xCR - xCR))[:2]
+            # if len(unique_xCR) == 1:
+            #     xCR_int = (unique_xCR[0] + xCR) / 2
+            #     xCR_cand = [unique_xCR[0], xCR_int]
+            # else:
+            #     xCR_cand = sorted(
+            #         unique_xCR, key=lambda u_xCR: abs(u_xCR - xCR))[:2]
 
         else:
             step = 0.25 * min(abs(xCR - xCR_inf), abs(xCR_sup - xCR))
@@ -278,7 +284,7 @@ def test_habc_fig8(Wave_obj, dat_regr_xCR, xCR_usu=None, plot_comparison=True):
                                  layer_based_on_mesh=True)
 
     # Creating mesh with absorbing layer
-    Wave_obj.create_mesh_habc(fmesh=1.)  # 1.1: 0.15s
+    Wave_obj.create_mesh_habc()
 
     # Updating velocity model
     Wave_obj.velocity_habc()
@@ -314,21 +320,20 @@ if __name__ == "__main__":
     # cpw: cells per wavelength
     # lba = minimum_velocity /source_frequency
     # edge_length = lba / cpw
-    edge_length_lst = [0.05, 0.02, 0.01]
+    edge_length_lst = [0.05]  # [0.05, 0.02, 0.01]
 
-    # dt size
+    # Timestep size
     dt_usu_lst = [0.0005, 0.0002, 0.000125]
 
+    # Hyperellipse degrees
     degree_layer_lst = [None, 2, 3, 4, 5]
 
+    # Reference frequency
     habc_reference_freq_lst = ["source", "boundary"]
 
-    get_ref_model = False
-
-    loop_modeling = not get_ref_model
-
-    crit_opt = "error_difference"  # "error_integral"
-
+    get_ref_model = True  # Infinite model
+    loop_modeling = not get_ref_model  # Loop for HABC cases
+    crit_opt = "error_difference"  # Error criterion for regression
     n_pts = 3  # Number of points for regression (odd number)
 
     for case, edge_length in enumerate(edge_length_lst):

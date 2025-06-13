@@ -798,15 +798,12 @@ class HABC_Wave(AcousticWave, HyperLayer, NRBCHabc):
 
         print("\nUpdating Velocity Profile")
 
-        # Initialize velocity field
+        # Initialize velocity field and assigning the original velocity model
         element_c = self.initial_velocity_model.ufl_element().family()
         p = self.initial_velocity_model.function_space().ufl_element().degree()
         V = fire.FunctionSpace(self.mesh, element_c, p)
-        self.c = fire.Function(V, name='c [km/s])')
-
-        # Assigning the original velocity model to the new mesh
-        self.c.interpolate(self.initial_velocity_model,
-                           allow_missing_dofs=True)
+        self.c = fire.Function(V).interpolate(self.initial_velocity_model,
+                                              allow_missing_dofs=True)
 
         # Extending velocity model within the absorbing layer
         print("Extending Profile Inside Layer")
@@ -829,7 +826,6 @@ class HABC_Wave(AcousticWave, HyperLayer, NRBCHabc):
         w_arr[:, 1] = np.clip(w_arr[:, 1], 0., self.length_x)
         if self.dimension == 3:  # 3D
             w_arr[:, 2] = np.clip(w_arr[:, 2], 0., self.length_y)
-        # fire.VTKFile("output/coord_field.pvd").write(w_aux)
 
         # Dimensions
         Lz = self.length_z
@@ -855,12 +851,11 @@ class HABC_Wave(AcousticWave, HyperLayer, NRBCHabc):
         mask = fire.conditional(mask > 0., 1., 0.)
         layer_mask = fire.Function(V, name='layer_mask')
         layer_mask.interpolate(mask)
-        # fire.VTKFile("output/layer_mask.pvd").write(layer_mask)
 
         # Points to extend the velocity model
         pad_field = fire.Function(W).interpolate(w_aux * layer_mask)
         del w_aux
-        # fire.VTKFile("output/pad_field.pvd").write(pad_field)
+
         pad_pts = pad_field.dat.data_with_halos[:]
         if self.dimension == 2:  # 2D
             ind_pts = np.where(~((abs(pad_pts[:, 0]) == 0.)
@@ -877,13 +872,31 @@ class HABC_Wave(AcousticWave, HyperLayer, NRBCHabc):
                                                        dont_raise=True)
         del pts_to_extend
 
+        '''
+        Possible new apprach
+        # Set the velocity of the nearest point on the original boundary
+        # pts_mesh = fire.VertexOnlyMesh(self.mesh_original, pts_to_extend,
+        #                                missing_points_behaviour='warn')
+        # del pts_to_extend
+        # V0 = fire.FunctionSpace(pts_mesh, "DG", 0)
+        # c_int = fire.Interpolator(self.initial_velocity_model, V0,
+        #                           allow_missing_dofs=True)
+        # vel_to_extend = fire.assemble(c_int.interpolate())
+        # # Velocity profile inside the layer
+        # pad_field.dat.data_with_halos[
+        #     ind_pts, 0] = vel_to_extend.dat.data_with_halos[:]
+        '''
+
         # Velocity profile inside the layer
         pad_field.dat.data_with_halos[ind_pts, 0] = vel_to_extend
         del vel_to_extend, ind_pts
         self.c.interpolate(pad_field.sub(0) * layer_mask + (
             1 - layer_mask) * self.c, allow_missing_dofs=True)
         del layer_mask, pad_field
-        # fire.VTKFile("output/c_extend.pvd").write(pad_field.sub(0))
+
+        # Interpolating in the space function of the problem
+        self.c = fire.Function(
+            self.function_space, name='c [km/s])').interpolate(self.c)
 
         # Save new velocity model
         if inf_model:
@@ -891,7 +904,6 @@ class HABC_Wave(AcousticWave, HyperLayer, NRBCHabc):
         else:
             file_name = self.case_habc + "/c_habc.pvd"
 
-        # Save new mesh
         outfile = fire.VTKFile(self.path_save + file_name)
         outfile.write(self.c)
 
@@ -1176,7 +1188,7 @@ class HABC_Wave(AcousticWave, HyperLayer, NRBCHabc):
             # Ratio between the representative mesh dimensions
             alpha = self.lmax / self.lmin
 
-            # Z's parameters for the spurious reflection coefficient
+            # Zi parameters for the spurious reflection coefficient
             Z1 = Zi(p1, alpha, ele_type)
             Z2 = Zi(p2, alpha, ele_type)
 
@@ -1781,7 +1793,7 @@ class HABC_Wave(AcousticWave, HyperLayer, NRBCHabc):
             elif len(u_ref) > len(u_abc):
                 u_abc = np.concatenate([u_abc, np.zeros(delta_len)])
 
-            # Integral error
+            # Integral error: To Do - Substitute np.trapz by np.trapezoid
             errIt.append(np.trapz((u_abc - u_ref)**2, dx=self.dt)
                          / np.trapz(u_ref**2, dx=self.dt))
 

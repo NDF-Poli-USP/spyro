@@ -185,3 +185,4 @@ cython_debug/
 __pycache__/
 **/__pycache__/
 *.sublime-*
+fw_outputs*.*
