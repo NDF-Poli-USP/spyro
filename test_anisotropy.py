@@ -176,22 +176,24 @@ def gen_tensor_pvd(mesh, iso_par, thomsen_par, anysotropy, name, tilt_par=None):
                                    gamma, delta, anysotropy)
     C2_vti, comp_C2 = c_vti_tensor(1.5 * vP, vP / 4., 2.5 * rho,
                                    0.3, 0.4, 0.2, anysotropy)
+    print(name)
 
     if tilt_par is not None:
         theta, phi = tilt_par
         C1_tti, comp_C1 = c_tti_tensor(C1_vti, theta, phi)
         C2_tti, comp_C2 = c_tti_tensor(C2_vti, theta, phi)
+        print("Tilt angle: {:.1f}°".format(theta))
+        print("Azimuth angle: {:.1f}°".format(phi))
 
     # Show tensor components
-    print("C1 components:", comp_C1)
-    print("C2 components:", comp_C2)
+    print("C1 components (MPa):", comp_C1)
+    print("C2 components (MPa):", comp_C2)
 
     # Determine the number of components
     c1_arr = np.array(list(comp_C1.values()))
     c2_arr = np.array(list(comp_C2.values()))
     if tilt_par is None:
         shape = (3, 2)
-        name = 'C_vti'
     else:
         n_comp = len(comp_C1.keys())
         if not (n_comp % 3 == 0):
@@ -199,7 +201,6 @@ def gen_tensor_pvd(mesh, iso_par, thomsen_par, anysotropy, name, tilt_par=None):
             c2_arr = np.append(c2_arr, np.zeros(3 - n_comp % 3))
             n_comp += 3 - n_comp % 3
         shape = (3, n_comp // 3)
-        name = 'C_tti'
 
     # Reshape the arrays to match the shape
     c1_arr = c1_arr.reshape(shape)
@@ -250,11 +251,11 @@ theta = 30.  # Tilt angle in degrees
 phi = 0.  # azimuth angle in degrees (phi = 0: 2D case)
 
 gen_tensor_pvd(mesh, [vP, vS, rho], [epsilon, gamma, delta],
-               'exact', 'c_vti_exact')
+               'exact', 'C_VTI_exact')
 gen_tensor_pvd(mesh, [vP, vS, rho], [epsilon, gamma, delta],
-               'weak', 'c_vti_weak')
+               'weak', 'C_VTI_weak')
 
-# gen_tensor_pvd(mesh, [vP, vS, rho], [epsilon, gamma, delta],
-#                'exact', 'c_tti_exact', tilt_par=[theta, phi])
-# gen_tensor_pvd(mesh, [vP, vS, rho], [epsilon, gamma, delta],
-#                'weak', 'c_tti_weak', tilt_par=[theta, phi])
+gen_tensor_pvd(mesh, [vP, vS, rho], [epsilon, gamma, delta],
+               'exact', 'C_TTI_exact', tilt_par=[theta, phi])
+gen_tensor_pvd(mesh, [vP, vS, rho], [epsilon, gamma, delta],
+               'weak', 'C_TTI_weak', tilt_par=[theta, phi])

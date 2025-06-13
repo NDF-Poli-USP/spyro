@@ -195,8 +195,10 @@ class HABC_Wave(AcousticWave, HyperLayer, NRBCHabc):
         Compute the fundamental frequency in Hz via modal analysis
     get_reference_signal()
         Acquire the reference signal to compare with the HABC scheme
+    get_xCR_candidates()
+        Get the heuristic factor candidates for the quadratic regression
     get_xCR_optimal()
-        Get the optimal heuristic factor for the quadratic damping.
+        Get the optimal heuristic factor for the quadratic damping
     identify_habc_case()
         Generate an identifier for the current case study of the HABC scheme
     infinite_model()
@@ -1861,6 +1863,45 @@ class HABC_Wave(AcousticWave, HyperLayer, NRBCHabc):
         # Plot the error measures
         if regression_xCR:
             plot_xCR_opt(self, data_regr_xCR)
+
+    def get_xCR_candidates(self, n_pts=3):
+        '''
+        Get the heuristic factor candidates for the quadratic regression.
+
+        Parameters
+        ----------
+        n_pts : `int`, optional
+            Number of candidates for the heuristic factor xCR.
+            Default is 3. Must be an odd number
+
+        Returns
+        -------
+        xCR_cand : `list`
+            Candidates for the heuristic factor xCR based on the
+            current xCR and its bounds. The candidates are sorted
+            in ascending order and current xCR is not included
+        '''
+
+        # Setting odd number of points for regression
+        n_pts = max(3, n_pts + 1 if n_pts % 2 == 0 else n_pts)
+
+        # Limits for the heuristic factor
+        xCR_inf, xCR_sup = self.xCR_bounds[0]
+
+        # Estimated intial value
+        xCR = self.xCR
+
+        # Determining the xCR candidates for regression
+        if xCR in self.xCR_bounds[0]:
+            xCR_cand = list(np.linspace(xCR_inf, xCR_sup, n_pts))
+            xCR_cand.remove(xCR)
+        else:
+            xCR_cand = list(np.linspace(xCR_inf, xCR_sup, n_pts-1))
+
+        format_xCR = ', '.join(['{:.3f}'.format(x) for x in xCR_cand])
+        print("Candidates for Heuristic Factor xCR: [{}]".format(format_xCR))
+
+        return xCR_cand
 
     def get_xCR_optimal(self, dat_reg_xCR, crit_opt='error_difference'):
         '''

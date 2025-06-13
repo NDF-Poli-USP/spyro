@@ -304,8 +304,8 @@ def plot_hist_receivers(Wave_object, show=False):
 
     # Saving the plot
     time_str = Wave_object.path_save + Wave_object.case_habc + "/time"
-    plt.savefig(time_str + ".png")
-    plt.savefig(time_str + ".pdf")
+    plt.savefig(time_str + ".png", bbox_inches='tight')
+    plt.savefig(time_str + ".pdf", bbox_inches='tight')
     plt.show() if show else None
     plt.close()
 
@@ -408,8 +408,8 @@ def plot_rfft_receivers(Wave_object, fxlim=4., show=False):
 
     # Saving the plot
     time_str = Wave_object.path_save + Wave_object.case_habc + "/freq"
-    plt.savefig(time_str + ".png")
-    plt.savefig(time_str + ".pdf")
+    plt.savefig(time_str + ".png", bbox_inches='tight')
+    plt.savefig(time_str + ".pdf", bbox_inches='tight')
     plt.show() if show else None
     plt.close()
 
