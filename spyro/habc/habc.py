@@ -877,13 +877,17 @@ class HABC_Wave(AcousticWave, HyperLayer, NRBCHabc):
         '''
         Possible new apprach
         # Set the velocity of the nearest point on the original boundary
-        # pts_mesh = fire.VertexOnlyMesh(self.mesh_original, pts_to_extend,
-        #                                missing_points_behaviour='warn')
+        # pts_mesh = fire.VertexOnlyMesh(
+        #     self.mesh_original, pts_to_extend,
+        #     missing_points_behaviour='warn', redundant=True)
         # del pts_to_extend
         # V0 = fire.FunctionSpace(pts_mesh, "DG", 0)
         # c_int = fire.Interpolator(self.initial_velocity_model, V0,
         #                           allow_missing_dofs=True)
-        # vel_to_extend = fire.assemble(c_int.interpolate())
+        # V1 = fire.FunctionSpace(pts_mesh.input_ordering, "DG", 0)
+        # c_pts = fire.assemble(c_int.interpolate())
+        # vel_to_extend = Function(V1)
+        # vel_to_extend.interpolate(c_pts)
         # # Velocity profile inside the layer
         # pad_field.dat.data_with_halos[
         #     ind_pts, 0] = vel_to_extend.dat.data_with_halos[:]

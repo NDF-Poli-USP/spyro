@@ -308,10 +308,10 @@ if __name__ == "__main__":
     # ============ HABC PARAMETERS ============
 
     # Hyperellipse degrees
-    degree_layer_lst = [None]  # [None, 2, 3, 4, 5]
+    degree_layer_lst = [None, 2, 3, 4, 5]
 
     # Reference frequency
-    habc_reference_freq_lst = ["source"]  # ["source", "boundary"]
+    habc_reference_freq_lst = ["source", "boundary"]
 
     # Infinite model
     get_ref_model = False
@@ -320,7 +320,7 @@ if __name__ == "__main__":
     loop_modeling = not get_ref_model
 
     # Error criterion for heuristic factor xCR
-    crit_opt = 'error_integral'  # "error_difference"
+    crit_opt = "error_difference"  # "error_integral"
 
     # Number of points for regression (odd number)
     n_pts = 3
