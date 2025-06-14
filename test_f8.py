@@ -204,6 +204,7 @@ def get_xCR_usu(Wave_obj, dat_regr_xCR, typ_xCR, n_pts):
 
         # Determining the xCR candidates for iterations
         xCR_cand = Wave_obj.get_xCR_candidates(n_pts=n_pts)
+        return xCR_cand
 
     elif typ_xCR == "optimal":
 
@@ -319,10 +320,10 @@ if __name__ == "__main__":
     loop_modeling = not get_ref_model
 
     # Error criterion for heuristic factor xCR
-    crit_opt = "error_difference"  # 'error_integral'
+    crit_opt = 'error_integral'  # "error_difference"
 
     # Number of points for regression (odd number)
-    n_pts = 5  # 3
+    n_pts = 3
 
     # ============ MESH AND EIKONAL ============
     # Create dictionary with parameters for the model
