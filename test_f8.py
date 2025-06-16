@@ -286,7 +286,7 @@ def test_habc_fig8(Wave_obj, dat_regr_xCR, xCR_usu=None, plot_comparison=True):
 # Applying HABCs to the model in Fig. 8 of Salas et al. (2022)
 if __name__ == "__main__":
 
-    case = 2  # Integer from 0 to 3
+    case = 3  # Integer from 0 to 3
 
     # ============ SIMULATION PARAMETERS ============
 
@@ -308,10 +308,10 @@ if __name__ == "__main__":
     # ============ HABC PARAMETERS ============
 
     # Hyperellipse degrees
-    degree_layer_lst = [None]  # [None, 2, 3, 4, 5]
+    degree_layer_lst = [None, 2, 3, 4, 5]
 
     # Reference frequency
-    habc_reference_freq_lst = ["boundary"]  # ["source", "boundary"]
+    habc_reference_freq_lst = ["source", "boundary"]
 
     # Infinite model
     get_ref_model = False
