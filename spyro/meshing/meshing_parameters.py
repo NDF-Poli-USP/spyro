@@ -5,28 +5,23 @@ import os
 
 def cells_per_wavelength(method, degree, dimension):
     cell_per_wavelength_dictionary = {
-        'mlt2tri': 7.02,
-        'mlt3tri': 3.70,
-        'mlt4tri': 2.67,
-        'mlt5tri': 2.03,
-        'mlt2tet': 6.12,
-        'mlt3tet': 3.72,
-        'sem2quad': None,
-        'sem4quad': None,
-        'sem6quad': None,
-        'sem8quad': None,
+        'mass_lumped_triangle2dim2': 7.02,
+        'mass_lumped_triangle3dim2': 3.70,
+        'mass_lumped_triangle4dim2': 2.67,
+        'mass_lumped_triangle5dim2': 2.03,
+        'mass_lumped_triangle2dim3': 6.12,
+        'mass_lumped_triangle3dim3': 3.72,
+        'spectral_quadrilateral2dim2': None,
+        'spectral_quadrilateral4dim2': None,
+        'spectral_quadrilateral6dim2': None,
+        'spectral_quadrilateral8dim2': None,
+        'spectral_quadrilateral2dim3': None,
+        'spectral_quadrilateral4dim3': None,
+        'spectral_quadrilateral6dim3': None,
+        'spectral_quadrilateral8dim3': None,
     }
 
-    if dimension == 2 and (method == 'mass_lumped_triangle' or method == "MLT"):
-        cell_type = 'tri'
-    if dimension == 3 and (method == 'mass_lumped_triangle' or method == "MLT"):
-        cell_type = 'tet'
-    if dimension == 2 and method == 'spectral_quadrilateral':
-        cell_type = 'quad'
-    if dimension == 3 and method == 'spectral_quadrilateral':
-        cell_type = 'quad'
-
-    key = method.lower()+str(degree)+cell_type
+    key = f"{method}{degree}dim{dimension}"
 
     return cell_per_wavelength_dictionary.get(key)
 
@@ -36,7 +31,7 @@ class MeshingParameters():
     Class that handles mesh parameter logic and mesh type/length/file handling.
     """
 
-    def __init__(self, input_mesh_dictionary=None, dimension=None, source_frequency=None, comm=None):
+    def __init__(self, input_mesh_dictionary=None, dimension=None, source_frequency=None, comm=None, quadrilateral=False, method=None, degree=None, velocity_model=None):
         """
         Initializes the MeshingParamaters class.
 
@@ -60,9 +55,14 @@ class MeshingParameters():
         self.length_x = self.input_mesh_dictionary.get("Lx", None)
         self.length_y = self.input_mesh_dictionary.get("Ly", None)
         self.user_mesh = self.input_mesh_dictionary.get("user_mesh", None)
-        self.firedrake_mesh = self.input_mesh_dictionary.get("firedrake_mesh", None)
         self.source_frequency = source_frequency
         self.abc_pad_length = None
+        self.quadrilateral = False
+        self.method = method
+        self.degree = degree
+        self.minimum_velocity = None
+        self.velocity_model = velocity_model
+        self.automatic_mesh = self.mesh_type in {"firedrake_mesh", "SeismicMesh"}
     
     def _set_length_with_unit_check(self, attr_name, value):
         """
@@ -80,6 +80,41 @@ class MeshingParameters():
             if value < 0.0:
                 raise ValueError(f"Please do not use negative value for {attr_name}")
         setattr(self, attr_name, value)
+
+    @property
+    def edge_length(self):
+        return self._edge_length
+
+    @edge_length.setter
+    def edge_length(self, value):
+        if self.cells_per_wavelength is not None:
+            warnings.warn("Setting edge_length removes cells per wavelength parameter")
+            self.cells_per_wavelength = None
+        self._edge_length = value
+
+    @property
+    def cells_per_wavelength(self):
+        return self._cells_per_wavelength
+
+    @cells_per_wavelength.setter
+    def cells_per_wavelength(self, value):
+        if self.edge_length is not None:
+            warnings.warn("Setting cells_per_wavelength removes edge_length parameter")
+            self.edge_length = None
+        self._cells_per_wavelength = value
+
+    @property
+    def method(self):
+        return self._method
+
+    @method.setter
+    def method(self, value):
+        allowed_types = {"mass_lumped_triangle", "spectral_quadrilateral"}
+        if value is not None and value not in allowed_types:
+            raise ValueError(
+                f"method must be one of {allowed_types}, got '{value}'"
+            )
+        self._method = value
 
     @property
     def mesh_file(self):
@@ -105,6 +140,8 @@ class MeshingParameters():
             raise ValueError(
                 f"mesh_type must be one of {allowed_types}, got '{value}'"
             )
+        if value == "SeismicMesh" and self.quadrilateral:
+            raise ValueError(f"SeismicMesh does not work with quads.")
         self._mesh_type = value
 
     @property
@@ -183,78 +220,32 @@ class MeshingParameters():
 
         # Setting default mesh parameters
         mesh_parameters.setdefault("periodic", False)
-        mesh_parameters.setdefault("minimum_velocity", 1.5)
-        mesh_parameters.setdefault("edge_length", None)
-        mesh_parameters.setdefault("dx", None)
-        mesh_parameters.setdefault("length_z", self._length_z)
-        mesh_parameters.setdefault("length_x", self._length_x)
-        mesh_parameters.setdefault("length_y", self._length_y)
-        mesh_parameters.setdefault("abc_pad_length", self._abc_pad_length)
+        mesh_parameters.setdefault("minimum_velocity", self.minimum_velocity)
+        mesh_parameters.setdefault("length_z", self.length_z)
+        mesh_parameters.setdefault("length_x", self.length_x)
+        mesh_parameters.setdefault("length_y", self.length_y)
+        mesh_parameters.setdefault("abc_pad_length", self.abc_pad_length)
         mesh_parameters.setdefault("mesh_file", self.mesh_file)
         mesh_parameters.setdefault("dimension", self.dimension)
         mesh_parameters.setdefault("mesh_type", self.mesh_type)
         mesh_parameters.setdefault("source_frequency", self.source_frequency)
-        mesh_parameters.setdefault("method", None)
-        mesh_parameters.setdefault("degree", None)
-        mesh_parameters.setdefault("velocity_model_file", None)
-        mesh_parameters.setdefault("cell_type", None)
+        mesh_parameters.setdefault("method", self.method)
+        mesh_parameters.setdefault("degree", self.degree)
+        mesh_parameters.setdefault("quadrilateral", self.quadrilateral)
+        mesh_parameters.setdefault("velocity_model", self.velocity_model)
+
+        # Mesh length based parameters
         mesh_parameters.setdefault("cells_per_wavelength", None)
+        mesh_parameters.setdefault("edge_length", None)
+
+        # Set all parameters that are not None
+        for key, value in mesh_parameters.items():
+            if value is not None and hasattr(self, key):
+                setattr(self, key, value)
 
         # Ensure all AutomaticMesh-required parameters are present
         required_keys = [
-            "cell_type",
-            "mesh_type",
-            "abc_pad_length",
-            "dx",
-            "periodic",
-            "edge_length",
-            "cells_per_wavelength",
-            "source_frequency",
             "velocity_model_file",
         ]
-        for key in required_keys:
-            if key not in mesh_parameters:
-                mesh_parameters[key] = None
 
-        self.length_z = mesh_parameters["length_z"]
-        self.length_x = mesh_parameters["length_x"]
-        self.length_y = mesh_parameters["length_y"]
-
-        self.set_mesh_type(new_mesh_type=mesh_parameters.get("mesh_type"))
-
-        automatic_mesh = self.mesh_type in {"firedrake_mesh", "SeismicMesh"}
-
-        if user_mesh is not None:
-            self.user_mesh = user_mesh
-            self.mesh_type = "user_mesh"
-        elif mesh_parameters["mesh_file"] is not None:
-            self.mesh_file = mesh_parameters["mesh_file"]
-            self.mesh_type = "file"
-        elif automatic_mesh:
-            self.user_mesh = self._creating_automatic_mesh(
-                mesh_parameters=mesh_parameters
-            )
-
-        if (
-            mesh_parameters["length_z"] is None
-            or mesh_parameters["length_x"] is None
-            or (mesh_parameters["length_y"] is None and self.dimension == 2)
-        ) and self.mesh_type != "firedrake_mesh":
-            raise ValueError("Mesh lengths must be specified for non-firedrake meshes.")
-
-    def set_mesh_type(self, new_mesh_type=None):
-        if new_mesh_type is not None:
-            self.mesh_type = new_mesh_type
-
-    def _set_mesh_length(
-        self,
-        length_z=None,
-        length_x=None,
-        length_y=None,
-    ):
-        if length_z is not None:
-            self.length_z = length_z
-        if length_x is not None:
-            self.length_x = length_x
-        if length_y is not None:
-            self.length_y = length_y
+        self.automatic_mesh = self.mesh_type in {"firedrake_mesh", "SeismicMesh"}
