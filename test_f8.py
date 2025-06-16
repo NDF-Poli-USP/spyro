@@ -308,7 +308,7 @@ if __name__ == "__main__":
     # ============ HABC PARAMETERS ============
 
     # Hyperellipse degrees
-    degree_layer_lst = [4, 5]  # [None, 2, 3, 4, 5]
+    degree_layer_lst = [None]  # [None, 2, 3, 4, 5]
 
     # Reference frequency
     habc_reference_freq_lst = ["boundary"]  # ["source", "boundary"]
@@ -379,7 +379,6 @@ if __name__ == "__main__":
                 for itr_xCR in range(n_pts + 1):
                     try:
 
-                        xxx
                         # User-defined heuristic factor x_CR
                         if itr_xCR == 0:
                             xCR_usu = None
@@ -412,4 +411,4 @@ if __name__ == "__main__":
 
                     except Exception as e:
                         print(f"Error Solving: {e}")
-                        continue
+                        break
