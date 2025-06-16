@@ -3,29 +3,6 @@ import spyro.habc.habc as habc
 import spyro.habc.eik as eik
 from spyro.habc.cost import comp_cost
 import ipdb
-import logging
-from datetime import datetime
-
-
-def setup_logging(log_file='ouput.log'):
-    '''
-    Set up logging configuration.
-
-    Parameters
-    ----------
-    log_file : `str`
-        Name of the log file. Default is 'application.log'.
-
-    Returns
-    -------
-    None
-    '''
-
-    logging.basicConfig(
-        level=logging.INFO,
-        format='%(asctime)s - %(levelname)s - %(message)s',
-        handlers=[logging.FileHandler(log_file),
-                  logging.StreamHandler()])
 
 
 def wave_dict(dt_usu, layer_shape, degree_layer,
@@ -285,23 +262,21 @@ def test_habc_fig8(Wave_obj, dat_regr_xCR, xCR_usu=None, plot_comparison=True):
     # Setting the damping profile within absorbing layer
     Wave_obj.damping_layer(xCR_usu=xCR_usu)
 
+    # Applying NRBCs on outer boundary layer
+    Wave_obj.cos_ang_HigdonBC()
+
+    # Solving the forward problem
+    Wave_obj.forward_solve()
+
+    # Computing the error measures
+    Wave_obj.error_measures_habc()
+
+    # Collecting data for regression
+    dat_regr_xCR[0].append(Wave_obj.xCR)
+    dat_regr_xCR[1].append(Wave_obj.max_errIt)
+    dat_regr_xCR[2].append(Wave_obj.max_errPK)
+
     if plot_comparison:
-
-        # Applying NRBCs on outer boundary layer
-        Wave_obj.cos_ang_HigdonBC()
-
-        # Solving the forward problem
-        Wave_obj.forward_solve()
-
-        # Computing the error measures
-        Wave_obj.error_measures_habc()
-
-        # Collecting data for regression
-        dat_regr_xCR[0].append(Wave_obj.xCR)
-        dat_regr_xCR[1].append(Wave_obj.max_errIt)
-        dat_regr_xCR[2].append(Wave_obj.max_errPK)
-
-        # if plot_comparison:
 
         # Plotting the solution at receivers and the error measures
         Wave_obj.comparison_plots(regression_xCR=True,
@@ -311,10 +286,7 @@ def test_habc_fig8(Wave_obj, dat_regr_xCR, xCR_usu=None, plot_comparison=True):
 # Applying HABCs to the model in Fig. 8 of Salas et al. (2022)
 if __name__ == "__main__":
 
-    case = 1  # Integer from 0 to 3
-
-    # =========== LOGGING ============
-    setup_logging("case" + str(case) + ".log")
+    case = 2  # Integer from 0 to 3
 
     # ============ SIMULATION PARAMETERS ============
 
@@ -336,10 +308,10 @@ if __name__ == "__main__":
     # ============ HABC PARAMETERS ============
 
     # Hyperellipse degrees
-    degree_layer_lst = [None, 2, 3, 4, 5]
+    degree_layer_lst = [4, 5]  # [None, 2, 3, 4, 5]
 
     # Reference frequency
-    habc_reference_freq_lst = ["source", "boundary"]
+    habc_reference_freq_lst = ["boundary"]  # ["source", "boundary"]
 
     # Infinite model
     get_ref_model = False
@@ -351,7 +323,7 @@ if __name__ == "__main__":
     crit_opt = "error_difference"  # "error_integral"
 
     # Number of points for regression (odd number)
-    n_pts = 0  # 3
+    n_pts = 3
 
     # ============ MESH AND EIKONAL ============
     # Create dictionary with parameters for the model
@@ -405,34 +377,39 @@ if __name__ == "__main__":
                 dat_regr_xCR.append(crit_opt)
 
                 for itr_xCR in range(n_pts + 1):
+                    try:
 
-                    # User-defined heuristic factor x_CR
-                    if itr_xCR == 0:
-                        xCR_usu = None
-                    elif itr_xCR == n_pts:
-                        xCR_usu = xCR_opt
-                    else:
-                        xCR_usu = xCR_cand[itr_xCR - 1]
+                        xxx
+                        # User-defined heuristic factor x_CR
+                        if itr_xCR == 0:
+                            xCR_usu = None
+                        elif itr_xCR == n_pts:
+                            xCR_usu = xCR_opt
+                        else:
+                            xCR_usu = xCR_cand[itr_xCR - 1]
 
-                    print("Iteration {} of {}".format(itr_xCR, n_pts))
+                        print("Iteration {} of {}".format(itr_xCR, n_pts))
 
-                    # Reference to resource usage
-                    tRef = comp_cost("tini")
+                        # Reference to resource usage
+                        tRef = comp_cost("tini")
 
-                    # Run the HABC scheme
-                    # plot_comparison = True if itr_xCR == n_pts else False
-                    plot_comparison = False
-                    test_habc_fig8(Wave_obj, dat_regr_xCR, xCR_usu=xCR_usu,
-                                   plot_comparison=plot_comparison)
+                        # Run the HABC scheme
+                        plot_comparison = True if itr_xCR == n_pts else False
+                        test_habc_fig8(Wave_obj, dat_regr_xCR, xCR_usu=xCR_usu,
+                                       plot_comparison=plot_comparison)
 
-                    # Estimating computational resource usage
-                    u_name = Wave_obj.path_save + Wave_obj.case_habc + "/"
-                    comp_cost("tfin", tRef=tRef, user_name=u_name)
+                        # Estimating computational resource usage
+                        u_name = Wave_obj.path_save + Wave_obj.case_habc + "/"
+                        comp_cost("tfin", tRef=tRef, user_name=u_name)
 
-                    # User-defined heuristic factor x_CR
-                    if itr_xCR == 0:
-                        xCR_cand = get_xCR_usu(
-                            Wave_obj, dat_regr_xCR, "candidates", n_pts)
-                    elif itr_xCR == n_pts - 1:
-                        xCR_opt = get_xCR_usu(
-                            Wave_obj, dat_regr_xCR, "optimal", n_pts)
+                        # User-defined heuristic factor x_CR
+                        if itr_xCR == 0:
+                            xCR_cand = get_xCR_usu(
+                                Wave_obj, dat_regr_xCR, "candidates", n_pts)
+                        elif itr_xCR == n_pts - 1:
+                            xCR_opt = get_xCR_usu(
+                                Wave_obj, dat_regr_xCR, "optimal", n_pts)
+
+                    except Exception as e:
+                        print(f"Error Solving: {e}")
+                        continue
