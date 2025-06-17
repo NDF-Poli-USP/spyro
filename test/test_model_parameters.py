@@ -219,9 +219,9 @@ def test_dictionary_conversion():
         "Lz": 0.75,  # depth in km - always positive
         "Lx": 1.5,  # width in km - always positive
         "Ly": 0.0,  # thickness in km - always positive
-        "meshfile": "not_used.msh",
-        "initmodel": "not_used.hdf5",
-        "truemodel": "not_used.hdf5",
+        "meshfile": None,
+        "initmodel": None,
+        "truemodel": None,
     }
     # Specify a 250-m PML on the three sides of the domain to damp outgoing waves.
     old_dictionary["BCs"] = {

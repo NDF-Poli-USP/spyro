@@ -58,7 +58,7 @@ class MeshingParameters():
         self.user_mesh = self.input_mesh_dictionary.get("user_mesh", None)
         self.source_frequency = source_frequency
         self.abc_pad_length = None
-        self.quadrilateral = False
+        self.quadrilateral = quadrilateral
         self.method = method
         self.degree = degree
         self.minimum_velocity = None
@@ -116,7 +116,14 @@ class MeshingParameters():
 
     @method.setter
     def method(self, value):
-        allowed_types = {"mass_lumped_triangle", "spectral_quadrilateral"}
+        allowed_types = {
+            "mass_lumped_triangle",
+            "CG_triangle",
+            "DG_triangle",
+            "spectral_quadrilateral",
+            "CG_quadrilateral",
+            "DG_quadrilateral",
+        }
         if value is not None and value not in allowed_types:
             raise ValueError(
                 f"method must be one of {allowed_types}, got '{value}'"
