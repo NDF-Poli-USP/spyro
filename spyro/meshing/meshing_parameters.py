@@ -49,8 +49,9 @@ class MeshingParameters():
         self.comm = comm
 
         # Set mesh parameters from dictionary or defaults
-        self.mesh_file = self.input_mesh_dictionary.get("mesh_file", None)
         self.mesh_type = self.input_mesh_dictionary.get("mesh_type", None)
+        self.periodic = False
+        self.mesh_file = self.input_mesh_dictionary.get("mesh_file", None)
         self.length_z = self.input_mesh_dictionary.get("Lz", None)
         self.length_x = self.input_mesh_dictionary.get("Lx", None)
         self.length_y = self.input_mesh_dictionary.get("Ly", None)
@@ -197,6 +198,16 @@ class MeshingParameters():
         if value is not None:
             self.mesh_type = "user_mesh"
         self._user_mesh = value
+    
+    @property
+    def periodic(self):
+        return self._periodic
+
+    @periodic.setter
+    def periodic(self, value):
+        if self.mesh_type != "firedrake_mesh" and value is True:
+            return ValueError("Periodic meshes are only supported with Firedrake meshes for now.")
+        self._periodic = value
 
     def set_mesh(
         self,
@@ -219,7 +230,7 @@ class MeshingParameters():
         """
 
         # Setting default mesh parameters
-        mesh_parameters.setdefault("periodic", False)
+        mesh_parameters.setdefault("periodic", self.periodic)
         mesh_parameters.setdefault("minimum_velocity", self.minimum_velocity)
         mesh_parameters.setdefault("length_z", self.length_z)
         mesh_parameters.setdefault("length_x", self.length_x)
@@ -233,6 +244,7 @@ class MeshingParameters():
         mesh_parameters.setdefault("degree", self.degree)
         mesh_parameters.setdefault("quadrilateral", self.quadrilateral)
         mesh_parameters.setdefault("velocity_model", self.velocity_model)
+        # mesh_parameters.setdefault("cells_per_wavelength", cells_per_wavelength(self.method, self.degree, self.dimension))
 
         # Mesh length based parameters
         mesh_parameters.setdefault("cells_per_wavelength", None)
@@ -242,10 +254,5 @@ class MeshingParameters():
         for key, value in mesh_parameters.items():
             if value is not None and hasattr(self, key):
                 setattr(self, key, value)
-
-        # Ensure all AutomaticMesh-required parameters are present
-        required_keys = [
-            "velocity_model_file",
-        ]
 
         self.automatic_mesh = self.mesh_type in {"firedrake_mesh", "SeismicMesh"}
