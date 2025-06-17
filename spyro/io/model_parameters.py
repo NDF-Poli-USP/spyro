@@ -293,6 +293,11 @@ class Model_parameters:
         self.time_integrator = self._check_time_integrator()
         self.equation_type = self._check_equation_type()
 
+        if self.cell_type == "quadrilateral":
+            quadrilateral = True
+        else:
+            quadrilateral = False
+
         # Checks time inputs
         self._sanitize_time_inputs()
 
@@ -301,18 +306,23 @@ class Model_parameters:
         self._sanitize_optimization_and_velocity()
 
         # Checking mesh_parameters
-        # self._sanitize_mesh()
-        Mesh_parameters = io.dictionaryio.read_mesh(
-            mesh_dictionary=self.input_dictionary["mesh"],
+        mesh_parameters = meshing.MeshingParameters(
+            input_mesh_dictionary=self.input_dictionary["mesh"],
             dimension=self.dimension,
+            source_frequency=self.input_dictionary["acquisition"]["frequency"],
+            comm=comm,
+            quadrilateral=quadrilateral,
+            method=self.method,
+            degree=self.degree,
         )
-        self.mesh_file = Mesh_parameters.mesh_file
-        self.mesh_type = Mesh_parameters.mesh_type
-        self.length_z = Mesh_parameters.length_z
-        self.length_x = Mesh_parameters.length_x
-        self.length_y = Mesh_parameters.length_y
-        self.user_mesh = Mesh_parameters.user_mesh
-        self.firedrake_mesh = Mesh_parameters.firedrake_mesh
+
+        self.mesh_file = mesh_parameters.mesh_file
+        self.mesh_type = mesh_parameters.mesh_type
+        self.length_z = mesh_parameters.length_z
+        self.length_x = mesh_parameters.length_x
+        self.length_y = mesh_parameters.length_y
+        self.user_mesh = mesh_parameters.user_mesh
+        # self.firedrake_mesh = mesh_parameters.firedrake_mesh
 
         # Checking absorving boundary condition parameters
         self._sanitize_absorving_boundary_condition()
