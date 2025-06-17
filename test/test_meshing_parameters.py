@@ -1,5 +1,9 @@
 import pytest
 import spyro
+from spyro.meshing.meshing_parameters import cells_per_wavelength
+import warnings
+from pathlib import Path
+import os
 
 
 def test_initialize_mesh_pam():
@@ -173,6 +177,101 @@ def test_invalid_method_raises():
             degree=4,
         )
 
+
+def test_cells_per_wavelength_known_key():
+    assert cells_per_wavelength('mass_lumped_triangle', 2, 2) == 7.02
+    assert cells_per_wavelength('mass_lumped_triangle', 3, 2) == 3.70
+    assert cells_per_wavelength('spectral_quadrilateral', 2, 2) is None
+
+
+def test_cells_per_wavelength_unknown_key():
+    assert cells_per_wavelength('unknown', 1, 1) is None
+
+
+def test_meshing_parameters_init_defaults():
+    mp = spyro.meshing.MeshingParameters()
+    assert mp.input_mesh_dictionary == {}
+    assert mp.dimension is None
+    assert mp.mesh_type is None
+    assert mp.periodic is False
+    assert mp.mesh_file is None
+    assert mp.length_z is None
+    assert mp.length_x is None
+    assert mp.length_y is None
+    assert mp.user_mesh is None
+    assert mp.source_frequency is None
+    assert mp.abc_pad_length is None
+    assert mp.quadrilateral is False
+    assert mp.method is None
+    assert mp.degree is None
+    assert mp.minimum_velocity is None
+    assert mp.velocity_model is None
+    assert mp.automatic_mesh is False
+
+
+def test_mesh_file_validation():
+    mp = spyro.meshing.MeshingParameters()
+    # Non-string or wrong extension
+    with pytest.raises(ValueError):
+        mp.mesh_file = 123
+    with pytest.raises(ValueError):
+        mp.mesh_file = "mesh.txt"
+    # File does not exist
+    with pytest.raises(FileNotFoundError):
+        mp.mesh_file = "not_exist.msh"
+    # File exists
+    mesh_path = Path.cwd() / "mesh.msh"
+    mesh_path.write_text("dummy")
+    mp.mesh_file = str(mesh_path)
+    if mesh_path.exists():
+        os.remove(mesh_path)
+    assert mp.mesh_file == str(mesh_path)
+
+
+def test_length_unit_check_warns():
+    mp = spyro.meshing.MeshingParameters()
+    with warnings.catch_warnings(record=True) as w:
+        warnings.simplefilter("always")
+        mp.length_z = 200  # meters
+        mp.length_x = 0.1  # km, triggers warning
+        assert any("appears to be in km" in str(warn.message) for warn in w)
+
+
+def test_source_frequency_warnings():
+    mp = spyro.meshing.MeshingParameters()
+    with warnings.catch_warnings(record=True) as w:
+        warnings.simplefilter("always")
+        mp.source_frequency = 1.0
+        mp.source_frequency = 100.0
+        assert any("too low" in str(warn.message) for warn in w)
+        assert any("too high" in str(warn.message) for warn in w)
+
+
+def test_cells_per_wavelength_and_edge_length_mutual_exclusion():
+    mp = spyro.meshing.MeshingParameters()
+    mp._edge_length = None
+    mp._cells_per_wavelength = None
+    mp.cells_per_wavelength = 10
+    assert mp.cells_per_wavelength == 10
+    assert mp.edge_length is None
+    with warnings.catch_warnings(record=True) as w:
+        warnings.simplefilter("always")
+        mp.edge_length = 5
+        assert mp.edge_length == 5
+        assert mp.cells_per_wavelength is None
+        assert any("removes cells per wavelength" in str(warn.message) for warn in w)
+
+
+def test_periodic_only_for_firedrake_mesh():
+    mp = spyro.meshing.MeshingParameters()
+    mp.mesh_type = "firedrake_mesh"
+    mp.periodic = True
+    assert mp.periodic is True
+    mp.mesh_type = "user_mesh"
+    with pytest.raises(ValueError):
+        mp.periodic = True
+
+
 if __name__ == "__main__":
     test_initialize_mesh_pam()
     test_negative_length_z_raises()
@@ -180,3 +279,11 @@ if __name__ == "__main__":
     test_negative_length_y_raises()
     test_invalid_mesh_type_raises()
     test_invalid_method_raises()
+    test_cells_per_wavelength_known_key()
+    test_cells_per_wavelength_unknown_key()
+    test_meshing_parameters_init_defaults()
+    test_mesh_file_validation()
+    test_length_unit_check_warns()
+    test_source_frequency_warnings()
+    test_cells_per_wavelength_and_edge_length_mutual_exclusion()
+    test_periodic_only_for_firedrake_mesh()

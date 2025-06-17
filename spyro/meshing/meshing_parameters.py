@@ -69,7 +69,13 @@ class MeshingParameters():
         """
         Checks if all dimensions are in the same unit (meters or km)
         """
-        new_unit = "meters" if value is not None and value > 100 else "km"
+        if value is not None:
+            if value > 100:
+                new_unit = "meters"
+            else:
+                new_unit = "km"
+        else:
+            new_unit = None
         if not hasattr(self, "_unit") or self._unit is None:
             self._unit = new_unit
         elif new_unit != self._unit and value is not None:
@@ -151,11 +157,16 @@ class MeshingParameters():
 
     @source_frequency.setter
     def source_frequency(self, value):
-        if value < 1.5:
-            warnings.warn(f"Source frequency of {value} too low for realistic FWI case")
-        elif value > 50:
-            warnings.warn(f"Source frequency of {value} too high for realistic FWI case, please low-pass filter")
-        self._source_frequency = value
+        if value is None:
+            self._source_frequency = value
+        elif not isinstance(value, (int, float)):
+            raise TypeError(f"Source frequency must be a number, got {type(value).__name__}")
+        else:
+            if value < 1.5:
+                warnings.warn(f"Source frequency of {value} too low for realistic FWI case")
+            elif value > 50:
+                warnings.warn(f"Source frequency of {value} too high for realistic FWI case, please low-pass filter")
+            self._source_frequency = value
 
     @property
     def abc_pad_length(self):
@@ -206,7 +217,7 @@ class MeshingParameters():
     @periodic.setter
     def periodic(self, value):
         if self.mesh_type != "firedrake_mesh" and value is True:
-            return ValueError("Periodic meshes are only supported with Firedrake meshes for now.")
+            raise ValueError("Periodic meshes are only supported with Firedrake meshes for now.")
         self._periodic = value
 
     def set_mesh(
