@@ -186,3 +186,5 @@ __pycache__/
 **/__pycache__/
 *.sublime-*
 fw_outputs*.*
+output/
+forgotten_files/
