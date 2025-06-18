@@ -80,7 +80,7 @@ def test_fwi(load_real_shot=False, use_rol=False):
     if load_real_shot is False:
         FWI_obj = spyro.FullWaveformInversion(dictionary=dictionary)
 
-        FWI_obj.set_real_mesh(mesh_parameters={"dx": 0.1})
+        FWI_obj.set_real_mesh(input_mesh_parameters={"edge_length": 0.1})
         center_z = -1.0
         center_x = 1.0
         mesh_z = FWI_obj.mesh_z
@@ -100,7 +100,7 @@ def test_fwi(load_real_shot=False, use_rol=False):
         FWI_obj = spyro.FullWaveformInversion(dictionary=dictionary)
 
     # Setting up initial guess problem
-    FWI_obj.set_guess_mesh(mesh_parameters={"dx": 0.1})
+    FWI_obj.set_guess_mesh(input_mesh_parameters={"edge_length": 0.1})
     FWI_obj.set_guess_velocity_model(constant=2.5)
     mask_boundaries = {
         "z_min": -1.3,

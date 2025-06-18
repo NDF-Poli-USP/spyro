@@ -136,7 +136,7 @@ def test_correct_at_value2D_quad():
     new_dictionary["options"]["cell_type"] = "quadrilateral"
 
     model_quad = spyro.AcousticWave(dictionary=new_dictionary)
-    model_quad.set_mesh(mesh_parameters={"dx": 0.02})
+    model_quad.set_mesh(input_mesh_parameters={"edge_length": 0.02})
     mesh = model_quad.mesh
 
     receivers = spyro.Receivers(model_quad)
