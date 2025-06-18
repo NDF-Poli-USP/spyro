@@ -407,19 +407,19 @@ def interpolate(Model, fname, V):
     sd = V.mesh().geometric_dimension()
     m = V.ufl_domain()
     if Model.abc_active or Model.abc_pad_length > 0.1:
-        minz = -Model.length_z - Model.abc_pad_length
+        minz = -Model.mesh_parameters.length_z - Model.mesh_parameters.abc_pad_length
         maxz = 0.0
-        minx = 0.0 - Model.abc_pad_length
-        maxx = Model.length_x + Model.abc_pad_length
-        miny = 0.0 - Model.abc_pad_length
-        maxy = Model.length_y + Model.abc_pad_length
+        minx = 0.0 - Model.mesh_parameters.abc_pad_length
+        maxx = Model.mesh_parameters.length_x + Model.mesh_parameters.abc_pad_length
+        miny = 0.0 - Model.mesh_parameters.abc_pad_length
+        maxy = Model.mesh_parameters.length_y + Model.mesh_parameters.abc_pad_length
     else:
-        minz = -Model.length_z
+        minz = -Model.mesh_parameters.length_z
         maxz = 0.0
         minx = 0.0
-        maxx = Model.length_x
+        maxx = Model.mesh_parameters.length_x
         miny = 0.0
-        maxy = Model.length_y
+        maxy = Model.mesh_parameters.length_y
 
     W = fire.VectorFunctionSpace(m, V.ufl_element())
     coords = fire.interpolate(m.coordinates, W)
@@ -479,7 +479,7 @@ def interpolate(Model, fname, V):
     return c
 
 
-def read_mesh(model_parameters):
+def read_mesh(mesh_parameters):
     """Reads in an external mesh and scatters it between cores.
 
     Parameters
@@ -493,11 +493,11 @@ def read_mesh(model_parameters):
         The distributed mesh across `ens_comm`.
     """
 
-    method = model_parameters.method
-    ens_comm = model_parameters.comm
+    method = mesh_parameters.method
+    ens_comm = mesh_parameters.comm
+    num_propagations = ens_comm.ensemble_comm.size
 
-    num_sources = model_parameters.number_of_sources
-    mshname = model_parameters.mesh_file
+    mshname = mesh_parameters.mesh_file
 
     if method == "CG_triangle" or method == "mass_lumped_triangle":
         mesh = fire.Mesh(
@@ -511,10 +511,10 @@ def read_mesh(model_parameters):
         mesh = fire.Mesh(mshname, comm=ens_comm.comm)
     if ens_comm.comm.rank == 0 and ens_comm.ensemble_comm.rank == 0:
         print(
-            "INFO: Distributing %d shot(s) across %d core(s). \
+            "INFO: Distributing %d propagation(s) across %d core(s). \
                 Each shot is using %d cores"
             % (
-                num_sources,
+                num_propagations,
                 fire.COMM_WORLD.size,
                 fire.COMM_WORLD.size / ens_comm.ensemble_comm.size,
             ),

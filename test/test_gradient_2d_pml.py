@@ -12,15 +12,15 @@ class Gradient_mask_for_pml():
             pass
 
         # Gatting necessary data from wave object
-        pad = Wave_obj.abc_pad_length  # noqa: F841
+        pad = Wave_obj.mesh_parameters.abc_pad_length  # noqa: F841
         z = Wave_obj.mesh_z
         x = Wave_obj.mesh_x
         V = Wave_obj.function_space
 
         # building firedrake function for mask
-        z_min = -(Wave_obj.length_z)
+        z_min = -(Wave_obj.mesh_parameters.length_z)
         x_min = 0.0
-        x_max = Wave_obj.length_x
+        x_max = Wave_obj.mesh_parameters.length_x
         mask = fire.Function(V)
         cond = fire.conditional(z < z_min, 1, 0)
         cond = fire.conditional(x < x_min, 1, cond)
