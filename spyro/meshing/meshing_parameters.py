@@ -64,6 +64,10 @@ class MeshingParameters():
         self.minimum_velocity = None
         self.velocity_model = velocity_model
         self.automatic_mesh = self.mesh_type in {"firedrake_mesh", "SeismicMesh"}
+        self._edge_length = None
+        self._cells_per_wavelength = None
+        self.edge_length = None
+        self.cells_per_wavelength = None
     
     def _set_length_with_unit_check(self, attr_name, value):
         """
@@ -230,7 +234,7 @@ class MeshingParameters():
     def set_mesh(
         self,
         user_mesh=None,
-        mesh_parameters={},
+        input_mesh_parameters={},
     ):
         """
         Set the mesh for the model.
@@ -239,7 +243,7 @@ class MeshingParameters():
         ----------
         user_mesh : spyro.Mesh, optional
             The desired mesh. The default is None.
-        mesh_parameters : dict, optional
+        input_mesh_parameters : dict, optional
             Additional parameters for setting up the mesh. The default is an empty dictionary.
 
         Returns
@@ -248,28 +252,28 @@ class MeshingParameters():
         """
 
         # Setting default mesh parameters
-        mesh_parameters.setdefault("periodic", self.periodic)
-        mesh_parameters.setdefault("minimum_velocity", self.minimum_velocity)
-        mesh_parameters.setdefault("length_z", self.length_z)
-        mesh_parameters.setdefault("length_x", self.length_x)
-        mesh_parameters.setdefault("length_y", self.length_y)
-        mesh_parameters.setdefault("abc_pad_length", self.abc_pad_length)
-        mesh_parameters.setdefault("mesh_file", self.mesh_file)
-        mesh_parameters.setdefault("dimension", self.dimension)
-        mesh_parameters.setdefault("mesh_type", self.mesh_type)
-        mesh_parameters.setdefault("source_frequency", self.source_frequency)
-        mesh_parameters.setdefault("method", self.method)
-        mesh_parameters.setdefault("degree", self.degree)
-        mesh_parameters.setdefault("quadrilateral", self.quadrilateral)
-        mesh_parameters.setdefault("velocity_model", self.velocity_model)
-        # mesh_parameters.setdefault("cells_per_wavelength", cells_per_wavelength(self.method, self.degree, self.dimension))
+        input_mesh_parameters.setdefault("periodic", self.periodic)
+        input_mesh_parameters.setdefault("minimum_velocity", self.minimum_velocity)
+        input_mesh_parameters.setdefault("length_z", self.length_z)
+        input_mesh_parameters.setdefault("length_x", self.length_x)
+        input_mesh_parameters.setdefault("length_y", self.length_y)
+        input_mesh_parameters.setdefault("abc_pad_length", self.abc_pad_length)
+        input_mesh_parameters.setdefault("mesh_file", self.mesh_file)
+        input_mesh_parameters.setdefault("dimension", self.dimension)
+        input_mesh_parameters.setdefault("mesh_type", self.mesh_type)
+        input_mesh_parameters.setdefault("source_frequency", self.source_frequency)
+        input_mesh_parameters.setdefault("method", self.method)
+        input_mesh_parameters.setdefault("degree", self.degree)
+        input_mesh_parameters.setdefault("quadrilateral", self.quadrilateral)
+        input_mesh_parameters.setdefault("velocity_model", self.velocity_model)
+        # input_mesh_parameters.setdefault("cells_per_wavelength", cells_per_wavelength(self.method, self.degree, self.dimension))
 
         # Mesh length based parameters
-        mesh_parameters.setdefault("cells_per_wavelength", None)
-        mesh_parameters.setdefault("edge_length", None)
+        input_mesh_parameters.setdefault("cells_per_wavelength", None)
+        input_mesh_parameters.setdefault("edge_length", None)
 
         # Set all parameters that are not None
-        for key, value in mesh_parameters.items():
+        for key, value in input_mesh_parameters.items():
             if value is not None and hasattr(self, key):
                 setattr(self, key, value)
 
