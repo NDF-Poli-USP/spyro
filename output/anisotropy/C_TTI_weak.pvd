@@ -1,6 +1,0 @@
-<?xml version="1.0" ?>
-<VTKFile type="Collection" version="0.1" byte_order="LittleEndian">
-<Collection>
-<DataSet timestep="0" file="C_TTI_weak/C_TTI_weak_0.vtu" />
-</Collection>
-</VTKFile>
