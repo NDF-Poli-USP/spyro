@@ -116,7 +116,7 @@ def test_realistic_fwi():
         "real_shot_record_files": f"shots/shot_record_{frequency}_",
     }
     fwi = spyro.FullWaveformInversion(dictionary=dictionary)
-    # fwi.set_guess_mesh(input_mesh_parameters={"dx": dx})
+    # fwi.set_guess_mesh(input_mesh_parameters={"edge_length": dx})
     fwi.set_guess_velocity_model(constant=2.5)
     mask_boundaries = {
         "z_min": -1.3,
