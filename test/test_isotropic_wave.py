@@ -88,7 +88,7 @@ def test_parse_boundary_conditions():
         ("uy", 4, fire.Constant(4)),         # y == Ly: 4 (x in spyro)
     ]
     wave = IsotropicWave(d)
-    wave.set_mesh(mesh_parameters={"dx": 0.2, "periodic": True})
+    wave.set_mesh(input_mesh_parameters={"edge_length": 0.2, "periodic": True})
     wave.parse_boundary_conditions()
     u = fire.Function(wave.function_space)
     for bc in wave.bcs:
@@ -113,7 +113,7 @@ def test_parse_boundary_conditions_exception():
         ("?", 2, fire.Constant(2)),
     ]
     wave = IsotropicWave(d)
-    wave.set_mesh(mesh_parameters={"dx": 0.2, "periodic": True})
+    wave.set_mesh(input_mesh_parameters={"edge_length": 0.2, "periodic": True})
     with pytest.raises(Exception) as e:  # noqa: F841
         wave.parse_boundary_conditions()
 

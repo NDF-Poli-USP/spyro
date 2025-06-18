@@ -68,7 +68,7 @@ def get_gradient(parallelism_type, points):
     dictionary["parallelism"]["type"] = parallelism_type
     print(f"Calculating exact", flush=True)
     Wave_obj_exact = spyro.AcousticWave(dictionary=dictionary)
-    Wave_obj_exact.set_mesh(mesh_parameters={"dx": 0.1})
+    Wave_obj_exact.set_mesh(input_mesh_parameters={"edge_length": 0.1})
 
     cond = fire.conditional(Wave_obj_exact.mesh_z > -1.5, 1.5, 3.5)
     Wave_obj_exact.set_initial_velocity_model(
@@ -79,7 +79,7 @@ def get_gradient(parallelism_type, points):
 
     print(f"Calculating guess", flush=True)
     Wave_obj_guess = spyro.AcousticWave(dictionary=dictionary)
-    Wave_obj_guess.set_mesh(mesh_parameters={"dx": 0.1})
+    Wave_obj_guess.set_mesh(input_mesh_parameters={"edge_length": 0.1})
     Wave_obj_guess.set_initial_velocity_model(constant=2.0)
     Wave_obj_guess.forward_solve()
 

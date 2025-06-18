@@ -60,7 +60,7 @@ def test_forward_3_shots():
     }
 
     Wave_obj = spyro.AcousticWave(dictionary=dictionary)
-    Wave_obj.set_mesh(mesh_parameters={"dx": 0.1})
+    Wave_obj.set_mesh(input_mesh_parameters={"edge_length": 0.1})
 
     mesh_z = Wave_obj.mesh_z
     cond = fire.conditional(mesh_z < -1.5, 3.5, 1.5)

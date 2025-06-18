@@ -74,7 +74,7 @@ def test_forward_supershot():
     }
 
     Wave_obj = spyro.AcousticWave(dictionary=dictionary)
-    Wave_obj.set_mesh(mesh_parameters={"dx": 0.02, "periodic": True})
+    Wave_obj.set_mesh(input_mesh_parameters={"edge_length": 0.02, "periodic": True})
 
     Wave_obj.set_initial_velocity_model(constant=1.5)
     Wave_obj.forward_solve()

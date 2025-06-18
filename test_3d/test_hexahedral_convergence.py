@@ -84,7 +84,7 @@ def run_forward_hexahedral(dt, final_time, offset):
         "dx": 0.02,
         "periodic": True,
     }
-    Wave_obj.set_mesh(mesh_parameters=mesh_parameters)
+    Wave_obj.set_mesh(input_mesh_parameters=mesh_parameters)
 
     Wave_obj.set_initial_velocity_model(constant=1.5)
     Wave_obj.forward_solve()

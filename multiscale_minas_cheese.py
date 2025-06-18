@@ -88,7 +88,7 @@ def test_real_shot_record_generation_parallel():
 
     fwi = spyro.FullWaveformInversion(dictionary=dictionary)
 
-    fwi.set_real_mesh(mesh_parameters={"dx": 0.05, "mesh_type": "firedrake_mesh"})
+    fwi.set_real_mesh(input_mesh_parameters={"edge_length": 0.05, "mesh_type": "firedrake_mesh"})
     center_z = -1.0
     center_x = 1.0
     mesh_z = fwi.mesh_z
@@ -116,7 +116,7 @@ def test_realistic_fwi():
         "real_shot_record_files": f"shots/shot_record_{frequency}_",
     }
     fwi = spyro.FullWaveformInversion(dictionary=dictionary)
-    # fwi.set_guess_mesh(mesh_parameters={"dx": dx})
+    # fwi.set_guess_mesh(input_mesh_parameters={"dx": dx})
     fwi.set_guess_velocity_model(constant=2.5)
     mask_boundaries = {
         "z_min": -1.3,

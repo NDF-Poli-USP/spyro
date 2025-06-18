@@ -89,19 +89,19 @@ def test_misfit_2d():
 
     # Using FWI Object
     FWI_obj = spyro.FullWaveformInversion(dictionary=dictionary)
-    FWI_obj.set_real_mesh(mesh_parameters={"dx": 0.05})
+    FWI_obj.set_real_mesh(input_mesh_parameters={"edge_length": 0.05})
     FWI_obj.set_real_velocity_model(
         expression="4.0 + 1.0 * tanh(10.0 * (0.5 - sqrt((x - 1.5) ** 2 + (z + 1.5) ** 2)))",
     )
     FWI_obj.generate_real_shot_record()
 
-    FWI_obj.set_guess_mesh(mesh_parameters={"dx": 0.05})
+    FWI_obj.set_guess_mesh(input_mesh_parameters={"edge_length": 0.05})
     FWI_obj.set_guess_velocity_model(constant=4.0)
     misfit = FWI_obj.calculate_misfit()
 
     # Using only wave objects
     Wave_obj_exact = spyro.AcousticWave(dictionary=dictionary)
-    Wave_obj_exact.set_mesh(mesh_parameters={"dx": 0.05})
+    Wave_obj_exact.set_mesh(input_mesh_parameters={"edge_length": 0.05})
     Wave_obj_exact.set_initial_velocity_model(
         expression="4.0 + 1.0 * tanh(10.0 * (0.5 - sqrt((x - 1.5) ** 2 + (z + 1.5) ** 2)))",
         output=True
@@ -110,7 +110,7 @@ def test_misfit_2d():
     rec_out_exact = Wave_obj_exact.receivers_output
 
     Wave_obj_guess = spyro.AcousticWave(dictionary=dictionary)
-    Wave_obj_guess.set_mesh(mesh_parameters={"dx": 0.05})
+    Wave_obj_guess.set_mesh(input_mesh_parameters={"edge_length": 0.05})
     Wave_obj_guess.set_initial_velocity_model(constant=4.0)
     Wave_obj_guess.forward_solve()
     rec_out_guess = Wave_obj_guess.receivers_output

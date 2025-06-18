@@ -159,7 +159,7 @@ def get_forward_model(dictionary=None):
 
     # Exact model
     Wave_obj_exact = spyro.AcousticWave(dictionary=dictionary)
-    Wave_obj_exact.set_mesh(mesh_parameters={"dx": 0.03})
+    Wave_obj_exact.set_mesh(input_mesh_parameters={"edge_length": 0.03})
     cond = fire.conditional(Wave_obj_exact.mesh_z > -0.5, 1.5, 3.5)
     Wave_obj_exact.set_initial_velocity_model(
         conditional=cond,
@@ -171,7 +171,7 @@ def get_forward_model(dictionary=None):
 
     # Guess model
     Wave_obj_guess = spyro.AcousticWave(dictionary=dictionary)
-    Wave_obj_guess.set_mesh(mesh_parameters={"dx": 0.03})
+    Wave_obj_guess.set_mesh(input_mesh_parameters={"edge_length": 0.03})
     Wave_obj_guess.set_initial_velocity_model(constant=2.0)
     Wave_obj_guess.forward_solve()
     rec_out_guess = Wave_obj_guess.receivers_output

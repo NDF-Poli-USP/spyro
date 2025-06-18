@@ -122,7 +122,7 @@ dictionary["visualization"] = {
 def get_forward_model(load_true=False):
     if load_true is False:
         Wave_obj_exact = spyro.AcousticWave(dictionary=dictionary)
-        Wave_obj_exact.set_mesh(mesh_parameters={"dx": 0.1})
+        Wave_obj_exact.set_mesh(input_mesh_parameters={"edge_length": 0.1})
         # Wave_obj_exact.set_initial_velocity_model(constant=3.0)
         cond = fire.conditional(Wave_obj_exact.mesh_z > -1.5, 1.5, 3.5)
         Wave_obj_exact.set_initial_velocity_model(
@@ -139,7 +139,7 @@ def get_forward_model(load_true=False):
         rec_out_exact = np.load("rec_out_exact.npy")
 
     Wave_obj_guess = spyro.AcousticWave(dictionary=dictionary)
-    Wave_obj_guess.set_mesh(mesh_parameters={"dx": 0.1})
+    Wave_obj_guess.set_mesh(input_mesh_parameters={"dx": 0.1})
     Wave_obj_guess.set_initial_velocity_model(constant=2.0)
     Wave_obj_guess.forward_solve()
     rec_out_guess = Wave_obj_guess.receivers_output
