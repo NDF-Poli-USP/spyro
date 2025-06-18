@@ -118,7 +118,7 @@ class Rectangle_mesh_and_velocity:
             "length_z": mesh_dict["Lz"],
             "length_x": mesh_dict["Lx"],
             "length_y": mesh_dict["Ly"],
-            "dx": mesh_dict["h"],
+            "edge_length": mesh_dict["h"],
             "mesh_file": mesh_dict["mesh_file"],
             "mesh_type": mesh_dict["mesh_type"],
             "periodic": self.periodic,

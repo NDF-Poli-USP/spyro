@@ -139,7 +139,7 @@ def get_forward_model(load_true=False):
         rec_out_exact = np.load("rec_out_exact.npy")
 
     Wave_obj_guess = spyro.AcousticWave(dictionary=dictionary)
-    Wave_obj_guess.set_mesh(input_mesh_parameters={"dx": 0.1})
+    Wave_obj_guess.set_mesh(input_mesh_parameters={"edge_length": 0.1})
     Wave_obj_guess.set_initial_velocity_model(constant=2.0)
     Wave_obj_guess.forward_solve()
     rec_out_guess = Wave_obj_guess.receivers_output
