@@ -123,7 +123,7 @@ class AutomaticMesh:
         self.minimum_velocity = mesh_parameters.minimum_velocity
         self.lbda = None
         self.velocity_model = mesh_parameters.velocity_model
-        self.output_file_name = "automatic_mesh.msh"
+        self.output_file_name = mesh_parameters.output_filename
 
     def create_mesh(self):
         """
