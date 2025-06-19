@@ -7,128 +7,6 @@ from .. import io
 from .. import utils
 from .. import meshing
 
-# default_optimization_parameters = {
-#     "General": {"Secant": {"Type": "Limited-Memory BFGS",
-# "Maximum Storage": 10}},
-#     "Step": {
-#         "Type": "Augmented Lagrangian",
-#         "Augmented Lagrangian": {
-#             "Subproblem Step Type": "Line Search",
-#             "Subproblem Iteration Limit": 5.0,
-#         },
-#         "Line Search": {"Descent Method": {"Type": "Quasi-Newton Step"}},
-#     },
-#     "Status Test": {
-#         "Gradient Tolerance": 1e-16,
-#         "Iteration Limit": None,
-#         "Step Tolerance": 1.0e-16,
-#     },
-# }
-
-# default_dictionary = {}
-# default_dictionary["options"] = {
-#     "cell_type": "T",  # simplexes such as triangles or tetrahedra (T)
-# or quadrilaterals (Q)
-#     "variant": 'lumped', # lumped, equispaced or DG, default is lumped
-#     "method": "MLT", # (MLT/spectral_quadrilateral/DG_triangle/
-# DG_quadrilateral) You can either specify a cell_type+variant or a method
-#     "degree": 4,  # p order
-#     "dimension": 2,  # dimension
-#     "automatic_adjoint": False,
-# OPTIONAL PARAMETERS
-#     "time_integration_scheme": "central_difference",
-#     "equation_type": "second_order_in_pressure",
-# }
-
-# # Number of cores for the shot. For simplicity, we keep things serial.
-# # spyro however supports both spatial parallelism and "shot" parallelism.
-# default_dictionary["parallelism"] = {
-# # options: automatic (same number of cores for evey processor) or spatial
-#     "type": "automatic",
-# }
-
-# # Define the domain size without the PML. Here we'll assume a 0.75 x 1.50 km
-# # domain and reserve the remaining 250 m for the Perfectly Matched Layer
-# # (PML) to absorb
-# # outgoing waves on three sides (eg., -z, +-x sides) of the domain.
-# default_dictionary["mesh"] = {
-#     "Lz": 1.0,  # depth in km - always positive
-#     "Lx": 1.0,  # width in km - always positive
-#     "Ly": 0.0,  # thickness in km - always positive
-#     "mesh_file": None,
-# }
-# #For use only if you are using a synthetic test model
-# #or a forward only simulation -adicionar discrição para modelo direto
-# default_dictionary["synthetic_data"] = {
-#     "real_mesh_file": None,
-#     "real_velocity_file": None,
-# }
-# default_dictionary["inversion"] = {
-#     "perform_fwi": False, # switch to true to make a FWI
-#     "initial_guess_model_file": None,
-#     "shot_record_file": None,
-#     "optimization_parameters": default_optimization_parameters,
-# }
-
-# # Specify a 250-m PML on the three sides of the
-# # domain to damp outgoing waves.
-# default_dictionary["absorving_boundary_conditions"] = {
-#     "status": False,  # True or false
-# #  None or non-reflective (outer boundary condition)
-#     "outer_bc": "non-reflective",
-# # polynomial, hyperbolic, shifted_hyperbolic
-#     "damping_type": "polynomial",
-#     "exponent": 2,  # damping layer has a exponent variation
-#     "cmax": 4.7,  # maximum acoustic wave velocity in PML - km/s
-#     "R": 1e-6,  # theoretical reflection coefficient
-# # thickness of the PML in the z-direction (km) - always positive
-#     "lz": 0.25,
-# # thickness of the PML in the x-direction (km) - always positive
-#     "lx": 0.25,
-# # thickness of the PML in the y-direction (km) - always positive
-#     "ly": 0.0,
-# }
-
-# # Create a source injection operator. Here we use a single source with a
-# # Ricker wavelet that has a peak frequency of 8 Hz injected at the
-# # center of the mesh.
-# # We also specify to record the solution at 101 microphones near the
-# # top of the domain.
-# # This transect of receivers is created with the helper function
-# # `create_transect`.
-# default_dictionary["acquisition"] = {
-#     "source_type": "ricker",
-#     "source_locations": [(-0.1, 0.5)],
-#     "frequency": 5.0,
-#     "delay": 1.0,
-#     "receiver_locations": spyro.create_transect(
-#         (-0.10, 0.1), (-0.10, 0.9), 20
-#     ),
-# }
-
-# # Simulate for 2.0 seconds.
-# default_dictionary["time_axis"] = {
-#     "initial_time": 0.0,  #  Initial time for event
-#     "final_time": 2.00,  # Final time for event
-#     "dt": 0.001,  # timestep size
-#     "amplitude": 1,  # the Ricker has an amplitude of 1.
-# # how frequently to output solution to pvds
-#     "output_frequency": 100,
-# # how frequently to save solution to RAM
-#     "gradient_sampling_frequency": 100,
-# }
-# default_dictionary["visualization"] = {
-#     "forward_output" : True,
-#     "output_filename": "results/forward_output.pvd",
-#     "fwi_velocity_model_output": False,
-#     "velocity_model_filename": None,
-#     "gradient_output": False,
-#     "gradient_filename": None,
-#     "adjoint_output": False,
-#     "adjoint_filename": None,
-#     "debug_output": False,
-# }
-
 
 class Model_parameters:
     """
@@ -283,15 +161,19 @@ class Model_parameters:
         # Saves inout_dictionary internally
         self.input_dictionary = dictionary
 
+        # some default parameters we might use in the future
+        self.input_dictionary["time_axis"].setdefault("time_integration_scheme", "central_difference")
+        self.input_dictionary.setdefault("equation_type", "second_order_in_pressure")
+
         # Sanitizes method or cell_type+variant inputs
         Options = io.dictionaryio.read_options(self.input_dictionary["options"])
         self.cell_type = Options.cell_type
         self.method = Options.method
         self.variant = Options.variant
-        self.degree = Options.degree
-        self.dimension = Options.dimension
-        self.time_integrator = self._check_time_integrator()
-        self.equation_type = self._check_equation_type()
+        self.degree = self.input_dictionary["options"]["degree"]
+        self.dimension = self.input_dictionary["options"]["dimension"]
+        self.time_integrator = self.input_dictionary["time_axis"]["time_integration_scheme"]
+        self.equation_type = self.input_dictionary["equation_type"]
 
         if self.cell_type == "quadrilateral":
             quadrilateral = True
@@ -334,47 +216,47 @@ class Model_parameters:
         self._sanitize_output()
         self.random_id_string = str(uuid.uuid4())[:10]
 
-    # default_dictionary["absorving_boundary_conditions"] = {
-    #     "status": False,  # True or false
-    # #  None or non-reflective (outer boundary condition)
-    #     "outer_bc": "non-reflective",
-    # # polynomial, hyperbolic, shifted_hyperbolic
-    #     "damping_type": "polynomial",
-    #     "exponent": 2,  # damping layer has a exponent variation
-    #     "cmax": 4.7,  # maximum acoustic wave velocity in PML - km/s
-    #     "R": 1e-6,  # theoretical reflection coefficient
-    # # thickness of the PML in the z-direction (km) - always positive
-    #     "lz": 0.25,
-    # # thickness of the PML in the x-direction (km) - always positive
-    #     "lx": 0.25,
-    # # thickness of the PML in the y-direction (km) - always positive
-    #     "ly": 0.0,
-    # }
-    def _check_time_integrator(self):
-        if "time_integration_scheme" in self.input_dictionary:
-            time_integrator = self.input_dictionary["time_integration_scheme"]
-        else:
-            time_integrator = "central_difference"
+    @property
+    def degree(self):
+        return self._degree
+    
+    @degree.setter
+    def degree(self, value):
+        if not isinstance(variable, int):
+            raise ValueError("Degree has to be integer")
+        self._degree = value
+    
+    @property
+    def dimension(self):
+        return self._dimension
+    
+    @dimension.setter
+    def dimension(self, value):
+        if value not in {2, 3}:
+            raise ValueError(f"Dimension of {value} not 2 or 3.")
+        self._dimension = value
 
-        if time_integrator != "central_difference":
-            raise ValueError(
-                "The time integrator specified is not implemented yet"
-            )
-
-        return time_integrator
-
-    def _check_equation_type(self):
-        if "equation_type" in self.input_dictionary:
-            equation_type = self.input_dictionary["equation_type"]
-        else:
-            equation_type = "second_order_in_pressure"
-
-        if equation_type != "second_order_in_pressure":
+    @property
+    def time_integrator(self):
+        return self._time_integrator
+    
+    @time_integrator.setter
+    def time_integrator(self, value):
+        if value != "central_difference":
+            raise ValueError(f"The time integrator of {value} is not implemented yet")
+        self._time_integrator = value
+    
+    @property
+    def equation_type(self):
+        return self._equation_type
+    
+    @equation_type.setter
+    def equation_type(self, value):
+        if value != "second_order_in_pressure":
             raise ValueError(
                 "The equation type specified is not implemented yet"
             )
-
-        return equation_type
+        self._equation_type = value
 
     def _sanitize_absorving_boundary_condition(self):
         if "absorving_boundary_conditions" not in self.input_dictionary:
