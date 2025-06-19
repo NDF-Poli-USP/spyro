@@ -58,6 +58,7 @@ class MeshingParameters():
         self.length_x = self.input_mesh_dictionary.get("Lx", None)
         self.length_y = self.input_mesh_dictionary.get("Ly", None)
         self.user_mesh = self.input_mesh_dictionary.get("user_mesh", None)
+        self.output_filename = self.input_mesh_dictionary.get("output_filename", "automatic_mesh.msh")
         self.source_frequency = source_frequency
         self.abc_pad_length = abc_pad_length
         self.degree = degree
@@ -91,6 +92,17 @@ class MeshingParameters():
             if value < 0.0:
                 raise ValueError(f"Please do not use negative value for {attr_name}")
         setattr(self, attr_name, value)
+
+    @property
+    def output_filename(self):
+        return self._output_filename
+
+    @output_filename.setter
+    def output_filename(self, value):
+        if value is not None:
+            if not (isinstance(value, str) and value.endswith('.msh')):
+                raise ValueError(f"mesh_file '{value}' must be a .msh file")
+        self._output_filename = value
 
     @property
     def edge_length(self):
