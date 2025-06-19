@@ -319,8 +319,13 @@ class AutomaticMesh:
         Lx = self.length_x
         pad = self.abc_pad
 
-        real_lz = Lz + pad
-        real_lx = Lx + 2 * pad
+        if pad is not None:
+            real_lz = Lz + pad
+            real_lx = Lx + 2 * pad
+        else:
+            real_lz = Lz
+            real_lx = Lx
+            pad = 0.0
 
         edge_length = self.edge_length
         if edge_length is None:

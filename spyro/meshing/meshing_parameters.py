@@ -31,7 +31,7 @@ class MeshingParameters():
     Class that handles mesh parameter logic and mesh type/length/file handling.
     """
 
-    def __init__(self, input_mesh_dictionary=None, dimension=None, source_frequency=None, comm=None, quadrilateral=False, method=None, degree=None, velocity_model=None):
+    def __init__(self, input_mesh_dictionary=None, dimension=None, source_frequency=None, comm=None, quadrilateral=False, method=None, degree=None, velocity_model=None, abc_pad_length=None):
         """
         Initializes the MeshingParamaters class.
 
@@ -49,7 +49,9 @@ class MeshingParameters():
         self.comm = comm
 
         # Set mesh parameters from dictionary or defaults
+        self.quadrilateral = quadrilateral
         self.mesh_type = self.input_mesh_dictionary.get("mesh_type", None)
+        self.method = method
         self.periodic = False
         self.mesh_file = self.input_mesh_dictionary.get("mesh_file", None)
         self.length_z = self.input_mesh_dictionary.get("Lz", None)
@@ -57,9 +59,7 @@ class MeshingParameters():
         self.length_y = self.input_mesh_dictionary.get("Ly", None)
         self.user_mesh = self.input_mesh_dictionary.get("user_mesh", None)
         self.source_frequency = source_frequency
-        self.abc_pad_length = None
-        self.quadrilateral = quadrilateral
-        self.method = method
+        self.abc_pad_length = abc_pad_length
         self.degree = degree
         self.minimum_velocity = None
         self.velocity_model = velocity_model
@@ -235,6 +235,7 @@ class MeshingParameters():
         self,
         user_mesh=None,
         input_mesh_parameters={},
+        abc_pad_length=None,
     ):
         """
         Set the mesh for the model.
@@ -250,6 +251,8 @@ class MeshingParameters():
         -------
         None
         """
+        if abc_pad_length is not None:
+            self.abc_pad_length = abc_pad_length
 
         # Setting default mesh parameters
         input_mesh_parameters.setdefault("periodic", self.periodic)
