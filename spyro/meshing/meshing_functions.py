@@ -195,7 +195,7 @@ class AutomaticMesh:
         """
         Creates a 3D mesh based on Firedrake meshing utilities.
         """
-        dx = self.dx
+        dx = self.edge_length
         nx = int(self.length_x / dx)
         nz = int(self.length_z / dx)
         ny = int(self.length_y / dx)

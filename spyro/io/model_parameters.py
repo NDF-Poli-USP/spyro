@@ -707,6 +707,9 @@ class Model_parameters:
         -------
         None
         """
+        if user_mesh is not None:
+            self.user_mesh = user_mesh
+
         pad_length = None
         if self.abc_active:
             pad_length = self.abc_pad_length
