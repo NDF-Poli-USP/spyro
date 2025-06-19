@@ -313,6 +313,8 @@ class Model_parameters:
 
         # Checking mesh_parameters
         self.input_dictionary["mesh"].setdefault("user_mesh", None)
+        self.input_dictionary.setdefault("absorving_boundary_conditions", {})
+        self.input_dictionary["absorving_boundary_conditions"].setdefault("pad_length", None)
         self.user_mesh = self.input_dictionary["mesh"]["user_mesh"]
         mesh_parameters = meshing.MeshingParameters(
             input_mesh_dictionary=self.input_dictionary["mesh"],
@@ -322,6 +324,7 @@ class Model_parameters:
             quadrilateral=quadrilateral,
             method=self.method,
             degree=self.degree,
+            abc_pad_length=self.input_dictionary["absorving_boundary_conditions"]["pad_length"],
         )
         self.mesh_parameters = mesh_parameters
 
