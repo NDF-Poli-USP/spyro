@@ -194,7 +194,11 @@ class Model_parameters:
         self._sanitize_comm(comm)
 
         # Checking mesh_parameters
-        self.user_mesh = None
+        self.input_dictionary["mesh"].setdefault("user_mesh", None)
+        self.input_dictionary.setdefault("absorving_boundary_conditions", {})
+        self.input_dictionary["absorving_boundary_conditions"].setdefault("pad_length", None)
+        self.input_dictionary["absorving_boundary_conditions"].setdefault("status", False)
+        self.user_mesh = self.input_dictionary["mesh"]["user_mesh"]
         mesh_parameters = meshing.MeshingParameters(
             input_mesh_dictionary=self.input_dictionary["mesh"],
             dimension=self.dimension,
@@ -203,6 +207,7 @@ class Model_parameters:
             quadrilateral=quadrilateral,
             method=self.method,
             degree=self.degree,
+            abc_pad_length=self.input_dictionary["absorving_boundary_conditions"]["pad_length"],
         )
         self.mesh_parameters = mesh_parameters
 
@@ -589,7 +594,13 @@ class Model_parameters:
         -------
         None
         """
-        self.mesh_parameters.set_mesh(user_mesh=user_mesh,input_mesh_parameters=input_mesh_parameters)
+        if user_mesh is not None:
+            self.user_mesh = user_mesh
+
+        pad_length = None
+        if self.abc_active:
+            pad_length = self.abc_pad_length
+        self.mesh_parameters.set_mesh(user_mesh=user_mesh,input_mesh_parameters=input_mesh_parameters, abc_pad_length=pad_length)
 
         if self.mesh_parameters.automatic_mesh:
             autoMeshing = meshing.AutomaticMesh(
@@ -619,7 +630,10 @@ class Model_parameters:
         mesh: Firedrake.Mesh object
             The distributed mesh across `ens_comm`
         """
-        if self.mesh_parameters.mesh_file is not None:
+        if self.mesh_parameters.user_mesh is not None:
+            self.user_mesh = self.mesh_parameters.user_mesh
+            return self.user_mesh
+        elif self.mesh_parameters.mesh_file is not None:
             return io.read_mesh(self.mesh_parameters)
         else:
             return self.user_mesh

@@ -122,7 +122,7 @@ def test_misfit_2d():
 
     print(f"Misfit calculated with FWI object is close to the individually calculated: {test}")
 
-    return test
+    assert test
 
 
 if __name__ == "__main__":

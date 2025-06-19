@@ -125,3 +125,13 @@ def test_initialize_model_parameters_from_file_notimplemented():
     wave = IsotropicWave(dummy_dict)
     with pytest.raises(NotImplementedError) as e:  # noqa: F841
         wave.initialize_model_parameters_from_file(synthetic_dict)
+
+
+if __name__ == "__main__":
+    test_initialize_model_parameters_from_object_missing_parameters()
+    test_initialize_model_parameters_from_object_first_option()
+    test_initialize_model_parameters_from_object_second_option()
+    test_initialize_model_parameters_from_object_redundant()
+    test_parse_boundary_conditions()
+    test_parse_boundary_conditions_exception()
+    test_initialize_model_parameters_from_file_notimplemented()
