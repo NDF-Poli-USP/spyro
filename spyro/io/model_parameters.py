@@ -312,7 +312,8 @@ class Model_parameters:
         self._sanitize_comm(comm)
 
         # Checking mesh_parameters
-        self.user_mesh = None
+        self.input_dictionary["mesh"].setdefault("user_mesh", None)
+        self.user_mesh = self.input_dictionary["mesh"]["user_mesh"]
         mesh_parameters = meshing.MeshingParameters(
             input_mesh_dictionary=self.input_dictionary["mesh"],
             dimension=self.dimension,
@@ -743,7 +744,10 @@ class Model_parameters:
         mesh: Firedrake.Mesh object
             The distributed mesh across `ens_comm`
         """
-        if self.mesh_parameters.mesh_file is not None:
+        if self.mesh_parameters.user_mesh is not None:
+            self.user_mesh = self.mesh_parameters.user_mesh
+            return self.user_mesh
+        elif self.mesh_parameters.mesh_file is not None:
             return io.read_mesh(self.mesh_parameters)
         else:
             return self.user_mesh
