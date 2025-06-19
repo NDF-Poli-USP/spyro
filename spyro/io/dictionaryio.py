@@ -246,31 +246,6 @@ class read_options:
         else:
             self.automatic_adjoint = default_dictionary["automatic_adjoint"]
 
-        self.check_valid_degree()
-
-    def check_valid_degree(self):
-        if self.degree < 1:
-            raise ValueError("Degree must be greater than 0.")
-        if self.method == "mass_lumped_triangle":
-            self._check_valid_degree_for_mlt()
-
-    def _check_valid_degree_for_mlt(self):
-        degree = self.degree
-        dimension = self.dimension
-        if dimension == 2 and degree > 5:
-            raise ValueError(
-                "Degree must be less than or equal to 5 for MLT in 2D."
-            )
-        elif dimension == 3 and degree > 4:
-            raise ValueError(
-                "Degree must be less than or equal to 4 for MLT in 3D."
-            )
-        elif dimension == 3 and degree == 4:
-            warnings.warn(
-                f"Degree of {self.degree} not supported by \
-                    {self.dimension}D {self.method} in main firedrake."
-            )
-
     def check_mismatch_cell_type_variant_method(self):
         dictionary = self.options_dictionary
         overdefined = False

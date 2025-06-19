@@ -227,7 +227,7 @@ class Model_parameters:
     
     @degree.setter
     def degree(self, value):
-        if not isinstance(variable, int):
+        if not isinstance(value, int):
             raise ValueError("Degree has to be integer")
         self._degree = value
     
