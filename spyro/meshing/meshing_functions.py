@@ -123,7 +123,7 @@ class AutomaticMesh:
         self.minimum_velocity = mesh_parameters.minimum_velocity
         self.lbda = None
         self.velocity_model = mesh_parameters.velocity_model
-        self.output_file_name = "automatic_mesh.msh"
+        self.output_file_name = mesh_parameters.output_filename
 
     def create_mesh(self):
         """
@@ -195,14 +195,10 @@ class AutomaticMesh:
         """
         Creates a 3D mesh based on Firedrake meshing utilities.
         """
-        dx = self.dx
+        dx = self.edge_length
         nx = int(self.length_x / dx)
         nz = int(self.length_z / dx)
         ny = int(self.length_y / dx)
-        if self.cell_type == "quadrilateral":
-            quadrilateral = True
-        else:
-            quadrilateral = False
 
         return BoxMesh(
             nz,
@@ -211,7 +207,7 @@ class AutomaticMesh:
             self.length_z,
             self.length_x,
             self.length_y,
-            quadrilateral=quadrilateral,
+            quadrilateral=self.quadrilateral,
         )
 
     def create_seismicmesh_mesh(self):
@@ -319,8 +315,13 @@ class AutomaticMesh:
         Lx = self.length_x
         pad = self.abc_pad
 
-        real_lz = Lz + pad
-        real_lx = Lx + 2 * pad
+        if pad is not None:
+            real_lz = Lz + pad
+            real_lx = Lx + 2 * pad
+        else:
+            real_lz = Lz
+            real_lx = Lx
+            pad = 0.0
 
         edge_length = self.edge_length
         if edge_length is None:
