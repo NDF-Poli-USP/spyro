@@ -239,18 +239,6 @@ class read_options:
                 self.variant,
             ) = self.get_from_cell_type_variant()
 
-        if "degree" in self.options_dictionary:
-            self.degree = self.options_dictionary["degree"]
-        else:
-            self.degree = default_dictionary["degree"]
-            warnings.warn("Degree not specified, using default of 4.")
-
-        if "dimension" in self.options_dictionary:
-            self.dimension = self.options_dictionary["dimension"]
-        else:
-            self.dimension = default_dictionary["dimension"]
-            warnings.warn("Dimension not specified, using default of 2.")
-
         if "automatic_adjoint" in self.options_dictionary:
             self.automatic_adjoint = self.options_dictionary[
                 "automatic_adjoint"
