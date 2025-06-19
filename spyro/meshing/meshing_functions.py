@@ -199,10 +199,6 @@ class AutomaticMesh:
         nx = int(self.length_x / dx)
         nz = int(self.length_z / dx)
         ny = int(self.length_y / dx)
-        if self.cell_type == "quadrilateral":
-            quadrilateral = True
-        else:
-            quadrilateral = False
 
         return BoxMesh(
             nz,
@@ -211,7 +207,7 @@ class AutomaticMesh:
             self.length_z,
             self.length_x,
             self.length_y,
-            quadrilateral=quadrilateral,
+            quadrilateral=self.quadrilateral,
         )
 
     def create_seismicmesh_mesh(self):
