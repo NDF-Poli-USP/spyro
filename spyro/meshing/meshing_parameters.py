@@ -134,11 +134,10 @@ class MeshingParameters():
     def method(self, value):
         allowed_types = {
             "mass_lumped_triangle",
-            "CG_triangle",
             "DG_triangle",
             "spectral_quadrilateral",
-            "CG_quadrilateral",
             "DG_quadrilateral",
+            "CG",
         }
         if value is not None and value not in allowed_types:
             raise ValueError(
