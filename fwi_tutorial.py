@@ -70,7 +70,7 @@ input_dictionary["inversion"] = {
 # spyro.plots.plot_mesh_sizes(firedrake_mesh=fwiobj.real_mesh, output_filename="true_mesh.png", show_size_contour=False)
 
 # fwiobj.generate_real_shot_record(save_shot_record=True)
-input_dictionary["inversion"]["real_shot_record_files"] = "shots/shot_record"
+input_dictionary["inversion"]["real_shot_record_files"] = "shots/shot_record_"
 fwiobj = spyro.examples.Camembert_acoustic_FWI(dictionary=input_dictionary)
 
 fwiobj.set_guess_mesh()

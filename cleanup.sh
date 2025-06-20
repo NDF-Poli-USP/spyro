@@ -11,7 +11,7 @@ rm *.dat
 rm results/*.vtu
 rm results/*.pvd
 rm results/*.pvtu
-# rm shots/*.dat
+rm shots/*.dat
 rm -rf results/shot*
 rm -rf results/gradient
 rm -rf results/*

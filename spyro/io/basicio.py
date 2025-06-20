@@ -97,12 +97,15 @@ def ensemble_propagator(func):
 
 def _shot_filename(propagation_id, wave, prefix='tmp', random_str_in_use=True):
     """Helper to construct filenames for shot/receiver data."""
-    spatialcomm = wave.comm.comm.rank
+    shot_ids = wave.shot_ids_per_propagation[propagation_id]
     if random_str_in_use:
         id_str = wave.random_id_string
+        spatialcomm = wave.comm.comm.rank
+        comm__str = f"_comm{spatialcomm}"
     else:
         id_str = ""
-    return f"{prefix}{propagation_id}_comm{spatialcomm}{id_str}.npy"
+        comm__str = ""
+    return f"{prefix}{shot_ids}{comm__str}{id_str}.npy"
 
 
 def save_serial_data(wave, propagation_id):
@@ -122,7 +125,7 @@ def save_serial_data(wave, propagation_id):
     np.save(_shot_filename(propagation_id, wave, prefix='tmp_rec'), wave.forward_solution_receivers)
 
 
-def switch_serial_shot(wave, propagation_id, filename=None):
+def switch_serial_shot(wave, propagation_id, filename=None, just_for_dat_management=False):
     """
     Switches the current serial shot for a given wave to shot identified with propagation ID.
 
@@ -135,12 +138,15 @@ def switch_serial_shot(wave, propagation_id, filename=None):
     """
     if filename is None:
         stacked_shot_arrays = np.load(_shot_filename(propagation_id, wave, prefix='tmp_shot'))
-    if len(wave.forward_solution) == 0:
-        n_dts, n_dofs = np.shape(stacked_shot_arrays)
-        rebuild_empty_forward_solution(wave, n_dts)
-    for array_i, array in enumerate(stacked_shot_arrays):
-        wave.forward_solution[array_i].dat.data[:] = array
-    wave.forward_solution_receivers = np.load(_shot_filename(propagation_id, wave, prefix='tmp_rec'))
+        if len(wave.forward_solution) == 0:
+            n_dts, n_dofs = np.shape(stacked_shot_arrays)
+            rebuild_empty_forward_solution(wave, n_dts)
+        for array_i, array in enumerate(stacked_shot_arrays):
+            wave.forward_solution[array_i].dat.data[:] = array
+        receiver_solution_filename = _shot_filename(propagation_id, wave, prefix='tmp_rec')
+    else:
+        receiver_solution_filename = _shot_filename(propagation_id, wave, prefix=filename, random_str_in_use=False)
+    wave.forward_solution_receivers = np.load(receiver_solution_filename)
     wave.receivers_output = wave.forward_solution_receivers
 
 
@@ -302,7 +308,7 @@ def create_segy(function, V, grid_spacing, filename):
 
 
 @ensemble_save
-def save_shots(Wave_obj, file_name="shots/shot_record_", shot_ids=0):
+def save_shots(Wave_obj, filename="shots/shot_record_", shot_ids=0):
     """Save a the shot record from last forward solve to a `pickle`.
 
     Parameters
@@ -319,8 +325,8 @@ def save_shots(Wave_obj, file_name="shots/shot_record_", shot_ids=0):
     None
 
     """
-    file_name = file_name + str(shot_ids) + ".dat"
-    with open(file_name, "wb") as f:
+    filename = filename + str(shot_ids) + ".dat"
+    with open(filename, "wb") as f:
         pickle.dump(Wave_obj.forward_solution_receivers, f)
     return None
 
@@ -332,7 +338,7 @@ def rebuild_empty_forward_solution(wave, time_steps):
 
 
 @ensemble_load
-def load_shots(Wave_obj, file_name="shots/shot_record_", shot_ids=0):
+def load_shots(Wave_obj, filename="shots/shot_record_", shot_ids=0):
     """Load a `pickle` to a `numpy.ndarray`.
 
     Parameters
@@ -351,9 +357,9 @@ def load_shots(Wave_obj, file_name="shots/shot_record_", shot_ids=0):
 
     """
     array = np.zeros(())
-    file_name = file_name + str(shot_ids) + ".dat"
+    filename = filename + str(shot_ids) + ".dat"
 
-    with open(file_name, "rb") as f:
+    with open(filename, "rb") as f:
         array = np.asarray(pickle.load(f), dtype=float)
         Wave_obj.forward_solution_receivers = array
     return None

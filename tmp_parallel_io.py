@@ -1,8 +1,8 @@
 import spyro
-import debugpy
-from mpi4py.MPI import COMM_WORLD
-debugpy.listen(3000 + COMM_WORLD.rank)
-debugpy.wait_for_client()
+# import debugpy
+# from mpi4py.MPI import COMM_WORLD
+# debugpy.listen(3000 + COMM_WORLD.rank)
+# debugpy.wait_for_client()
 
 
 def test_saving_and_loading_supershot_record():
@@ -26,13 +26,16 @@ def test_saving_and_loading_supershot_record():
     spyro.io.load_shots(wave2, filename="test_shot_record")
     shots2 = wave.forward_solution_receivers
 
-    assert (shots1 == shots2).all()
+    test_pass = (shots1 == shots2).all()
+    print(f"Passes supershot io test:{test_pass}", flush=True)
+
+    assert test_pass
 
 
 def test_saving_and_loading_shot_records_in_ensemble_serial_with_spatial_parallelism():
     from test.inputfiles.model import dictionary
 
-    dictionary["parallelism"]["parallelism"]["type"] = ["spatial"]
+    dictionary["parallelism"]["type"] = "spatial"
     dictionary["time_axis"]["final_time"] = 0.5
     dictionary["acquisition"]["source_locations"] = [(-0.5, 0.4), (-0.5, 0.6)]
     dictionary["acquisition"]["receiver_locations"] = spyro.create_transect((-0.55, 0.1), (-0.55, 0.9), 200)
@@ -49,9 +52,12 @@ def test_saving_and_loading_shot_records_in_ensemble_serial_with_spatial_paralle
     spyro.io.load_shots(wave2, filename="test_shot_record")
     shots2 = wave.forward_solution_receivers
 
-    assert (shots1 == shots2).all()
+    test_pass = (shots1 == shots2).all()
+    print(f"Passes shot in ensemble serial io test:{test_pass}", flush=True)
+
+    assert test_pass
 
 
 if __name__ == "__main__":
-    test_saving_and_loading_supershot_record()
+    # test_saving_and_loading_supershot_record()
     test_saving_and_loading_shot_records_in_ensemble_serial_with_spatial_parallelism()
