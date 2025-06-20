@@ -174,6 +174,7 @@ class Model_parameters:
         self.variant = options.variant
         self.degree = options.degree
         self.dimension = options.dimension
+        self.sources = None
 
         if self.cell_type == "quadrilateral":
             quadrilateral = True
@@ -184,7 +185,7 @@ class Model_parameters:
         self.input_dictionary["time_axis"].setdefault("initial_time", 0.0)
         self.initial_time = self.input_dictionary["time_axis"]["initial_time"]
         self.final_time = self.input_dictionary["time_axis"]["final_time"]
-        self.dt = self.initial_time = self.input_dictionary["time_axis"]["dt"]
+        self.dt = self.input_dictionary["time_axis"]["dt"]
 
         # Checks inversion variables, FWI and velocity model inputs and outputs
         self.real_shot_record = None
@@ -216,12 +217,56 @@ class Model_parameters:
         # Checking absorving boundary condition parameters
         self._sanitize_absorving_boundary_condition()
 
+        # Checking source and receiver inputs
+        self._sanitize_acquisition()
+
         # Check automatic adjoint
+        self.input_dictionary["time_axis"].setdefault("gradient_sampling_frequency", 99999)
+        self.input_dictionary["time_axis"].setdefault("output_frequency", 99999)
+        self.gradient_sampling_frequency = self.input_dictionary["time_axis"]["output_frequency"]
+        self.output_frequency = self.input_dictionary["time_axis"]["output_frequency"]
         self._sanitize_automatic_adjoint()
 
         # Sanitize output files
         self._sanitize_output()
         self.random_id_string = str(uuid.uuid4())[:10]
+
+    @property
+    def source_locations(self):
+        return self._source_locations
+    
+    @source_locations.setter
+    def source_locations(self, value):
+        if value is not None:
+            self.number_of_sources = len(value)
+        else:
+            self.number_of_sources = 1
+        self._source_locations = value
+
+    @property
+    def frequency(self):
+        return self._frequency
+    
+    @frequency.setter
+    def frequency(self, value):
+        if value is not None:
+            if value < 1.0:
+                warnings.warn("Frequency of {value} too low for realistic FWI.")
+            elif value > 50:
+                warnings.warn("Frequency of {value} too high for eficient FWI.")
+        self._frequency = value
+
+    @property
+    def receiver_locations(self):
+        return self._receiver_locations
+    
+    @receiver_locations.setter
+    def receiver_locations(self, value):
+        if value is not None:
+            self.number_of_receivers = len(value)
+        else:
+            self.number_of_receivers = 1
+        self._receiver_locations = value
 
     @property
     def initial_time(self):
@@ -432,14 +477,14 @@ class Model_parameters:
         if self.source_type == "Ricker":
             self.source_type = "ricker"
         elif self.source_type == "MMS":
-            self.number_of_sources = 1
             self.source_locations = []
+            self.number_of_sources = 1
             self.frequency = None
             self.amplitude = None
             self.delay = None
             return
 
-        self.number_of_sources = len(dictionary["source_locations"])
+        # self.number_of_sources = len(dictionary["source_locations"])
         self.source_locations = dictionary["source_locations"]
         self.frequency = dictionary["frequency"]
         if "amplitude" in dictionary:
