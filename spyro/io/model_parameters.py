@@ -181,7 +181,10 @@ class Model_parameters:
             quadrilateral = False
 
         # Checks time inputs
-        self._sanitize_time_inputs()
+        self.input_dictionary["time_axis"].setdefault("initial_time", 0.0)
+        self.initial_time = self.input_dictionary["time_axis"]["initial_time"]
+        self.final_time = self.input_dictionary["time_axis"]["final_time"]
+        self.dt = self.initial_time = self.input_dictionary["time_axis"]["dt"]
 
         # Checks inversion variables, FWI and velocity model inputs and outputs
         self.real_shot_record = None
@@ -199,7 +202,7 @@ class Model_parameters:
         self.input_dictionary["absorving_boundary_conditions"].setdefault("pad_length", None)
         self.input_dictionary["absorving_boundary_conditions"].setdefault("status", False)
         self.user_mesh = self.input_dictionary["mesh"]["user_mesh"]
-        mesh_parameters = meshing.MeshingParameters(
+        self.mesh_parameters = meshing.MeshingParameters(
             input_mesh_dictionary=self.input_dictionary["mesh"],
             dimension=self.dimension,
             source_frequency=self.input_dictionary["acquisition"]["frequency"],
@@ -209,7 +212,6 @@ class Model_parameters:
             degree=self.degree,
             abc_pad_length=self.input_dictionary["absorving_boundary_conditions"]["pad_length"],
         )
-        self.mesh_parameters = mesh_parameters
 
         # Checking absorving boundary condition parameters
         self._sanitize_absorving_boundary_condition()
@@ -220,6 +222,27 @@ class Model_parameters:
         # Sanitize output files
         self._sanitize_output()
         self.random_id_string = str(uuid.uuid4())[:10]
+
+    @property
+    def initial_time(self):
+        return self._initial_time
+    
+    @initial_time.setter
+    def initial_time(self, value):
+        if value is None:
+            value = 0.0
+        self._initial_time = value
+    
+    @property
+    def final_time(self):
+        return self._final_time
+    
+    @final_time.setter
+    def final_time(self, value):
+        if value < self.initial_time:
+            raise ValueError(f"Final time of {value} lower than initial time of {self.initial_time} not allowed.")
+        
+        self._final_time = value
 
     @property
     def time_integrator(self):
@@ -520,18 +543,6 @@ class Model_parameters:
             self.initial_velocity_model_file = None
 
     def _sanitize_time_inputs(self):
-        dictionary = self.input_dictionary["time_axis"]
-        self.final_time = dictionary["final_time"]
-        self._dt = dictionary["dt"]
-        if "initial_time" in dictionary:
-            self.initial_time = dictionary["initial_time"]
-        else:
-            self.initial_time = 0.0
-        self.output_frequency = dictionary["output_frequency"]
-        self.gradient_sampling_frequency = dictionary[
-            "gradient_sampling_frequency"
-        ]
-
         self.__check_time()
 
     def __check_acquisition(self):
