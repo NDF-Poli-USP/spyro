@@ -164,16 +164,16 @@ class Model_parameters:
         # some default parameters we might use in the future
         self.input_dictionary["time_axis"].setdefault("time_integration_scheme", "central_difference")
         self.input_dictionary.setdefault("equation_type", "second_order_in_pressure")
-
-        # Sanitizes method or cell_type+variant inputs
-        Options = io.dictionaryio.read_options(self.input_dictionary["options"])
-        self.cell_type = Options.cell_type
-        self.method = Options.method
-        self.variant = Options.variant
-        self.degree = self.input_dictionary["options"]["degree"]
-        self.dimension = self.input_dictionary["options"]["dimension"]
         self.time_integrator = self.input_dictionary["time_axis"]["time_integration_scheme"]
         self.equation_type = self.input_dictionary["equation_type"]
+
+        # Sanitizes method or cell_type+variant inputs
+        options = io.dictionaryio.Read_options(self.input_dictionary["options"])
+        self.cell_type = options.cell_type
+        self.method = options.method
+        self.variant = options.variant
+        self.degree = options.degree
+        self.dimension = options.dimension
 
         if self.cell_type == "quadrilateral":
             quadrilateral = True
@@ -220,26 +220,6 @@ class Model_parameters:
         # Sanitize output files
         self._sanitize_output()
         self.random_id_string = str(uuid.uuid4())[:10]
-
-    @property
-    def degree(self):
-        return self._degree
-    
-    @degree.setter
-    def degree(self, value):
-        if not isinstance(value, int):
-            raise ValueError("Degree has to be integer")
-        self._degree = value
-    
-    @property
-    def dimension(self):
-        return self._dimension
-    
-    @dimension.setter
-    def dimension(self, value):
-        if value not in {2, 3}:
-            raise ValueError(f"Dimension of {value} not 2 or 3.")
-        self._dimension = value
 
     @property
     def time_integrator(self):

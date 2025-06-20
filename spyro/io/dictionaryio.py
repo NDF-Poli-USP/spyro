@@ -160,7 +160,7 @@ def check_if_mesh_file_exists(file_name):
         raise ValueError(f"Mesh file {file_name} does not exist.")
 
 
-class read_options:
+class Read_options:
     """
     Read the options section of the dictionary.
 
@@ -195,83 +195,38 @@ class read_options:
         Get the method, cell type and variant from the cell type and variant.
     """
 
-    def __init__(self, options_dictionary=None):
-        default_dictionary = {
-            # simplexes such as triangles or tetrahedra (T)
-            # or quadrilaterals (Q)
-            "cell_type": "T",
-            # lumped, equispaced or DG, default is lumped
-            "variant": "lumped",
-            # (MLT/spectral_quadrilateral/DG_triangle/
-            # DG_quadrilateral) You can either specify a cell_type+variant or a method
-            "method": "MLT",
-            # p order
-            "degree": 4,
-            # dimension
-            "dimension": 2,
-            "automatic_adjoint": False,
-        }
+    def __init__(self, options_dictionary={}):
+        options_dictionary.setdefault("method", None)
+        options_dictionary.setdefault("cell_type", "T")
+        options_dictionary.setdefault("variant", "lumped")
+        options_dictionary.setdefault("degree", 4)
+        options_dictionary.setdefault("dimension", 2)
+        options_dictionary.setdefault("automatic_adjoint", False)
+        self.options_dictionary = options_dictionary
 
-        if options_dictionary is None:
-            self.options_dictionary = default_dictionary
-        else:
-            self.options_dictionary = options_dictionary
+        self.method = options_dictionary["method"]
+        self.variant = options_dictionary["variant"]
+        self.cell_type = options_dictionary["cell_type"]
+        self.degree = options_dictionary["degree"]
+        self.dimension = options_dictionary["dimension"]
 
-        self.cell_type = None
-        self.method = None
-        self.overdefined_method = False
-        self.variant = None
-        self.degree = None
-        self.dimension = None
-        self.overdefined_method = self.check_mismatch_cell_type_variant_method()
-
-        if "method" not in self.options_dictionary:
-            self.options_dictionary["method"] = None
-
-        if self.overdefined_method is True:
-            self.method, self.cell_type, self.variant = self.get_from_method()
-        elif self.options_dictionary["method"] is not None:
-            self.method, self.cell_type, self.variant = self.get_from_method()
-        else:
-            (
-                self.method,
-                self.cell_type,
-                self.variant,
-            ) = self.get_from_cell_type_variant()
-
-        if "automatic_adjoint" in self.options_dictionary:
-            self.automatic_adjoint = self.options_dictionary[
-                "automatic_adjoint"
-            ]
-        else:
-            self.automatic_adjoint = default_dictionary["automatic_adjoint"]
-
-    def check_mismatch_cell_type_variant_method(self):
-        dictionary = self.options_dictionary
-        overdefined = False
-        if "method" in dictionary and (
-            "cell_type" in dictionary or "variant" in dictionary
-        ):
-            overdefined = True
-        else:
-            pass
-
-        if overdefined:
-            if dictionary["method"] is None:
-                overdefined = False
-
-        if overdefined:
-            warnings.warn(
-                "Both methods of specifying method and cell_type with \
-                    variant used. Method specification taking priority."
-            )
-        return overdefined
-
-    def get_from_method(self):
-        dictionary = self.options_dictionary
-        if dictionary["method"] is None:
-            raise ValueError("Method input of None is invalid.")
-
+    @property
+    def variant(self):
+        return self._variant
+    
+    @variant.setter
+    def variant(self, value):
+        accepted_variants = ["lumped", "equispaced", "DG", None]
+        if value not in accepted_variants:
+            raise ValueError(f"Variant of {value} is not valid.")
+        self._variant = value
+        
+    @property
+    def method(self):
+        return self._method
+    
+    @method.setter
+    def method(self, value):
         mlt_equivalents = [
             "KMV",
             "MLT",
@@ -289,75 +244,102 @@ class read_options:
             "DGQ",
             "discontinuous_galerkin_quadrilateral",
         ]
-        if dictionary["method"] in mlt_equivalents:
-            method = "mass_lumped_triangle"
-            cell_type = "triangle"
-            variant = "lumped"
-        elif dictionary["method"] in sem_equivalents:
-            method = "spectral_quadrilateral"
-            cell_type = "quadrilateral"
-            variant = "lumped"
-        elif dictionary["method"] in dg_t_equivalents:
-            method = "DG_triangle"
-            cell_type = "triangle"
-            variant = "DG"
-        elif dictionary["method"] in dg_q_equivalents:
-            method = "DG_quadrilateral"
-            cell_type = "quadrilateral"
-            variant = "DG"
-        elif dictionary["method"] == "DG":
+        if value in mlt_equivalents:
+            self._method = "mass_lumped_triangle"
+        elif value in sem_equivalents:
+            self._method = "spectral_quadrilateral"
+        elif value in dg_t_equivalents:
+            self._method = "DG_triangle"
+        elif value in dg_q_equivalents:
+            self._method = "DG_quadrilateral"
+        elif value == "DG":
             raise ValueError(
                 "DG is not a valid method. Please specify \
                 either DG_triangle or DG_quadrilateral."
             )
-        elif dictionary["method"] == "CG":
-            method, cell_type, variant = parse_cg(dictionary)
+        elif value == "CG":
+            if "variant" in self.options_dictionary and "cell_type" in self.options_dictionary:
+                self.cell_type = self.options_dictionary["cell_type"]
+                self.variant = self.options_dictionary["variant"]
+            else:
+                raise ValueError("Cant use CG without specifying cell type and variant.")
+        elif value is None:
+            self._method = None
         else:
-            raise ValueError(f"Method of {dictionary['method']} is not valid.")
-        return method, cell_type, variant
+            raise ValueError(f"Method of {value} is not valid.")
 
-    def get_from_cell_type_variant(self):
+    @property
+    def cell_type(self):
+        return self._cell_type
+    
+    @cell_type.setter
+    def cell_type(self, value):
         triangle_equivalents = [
-            "T",
-            "triangle",
-            "triangles",
-            "tetrahedra",
-            "tetrahedron",
+            "T", "triangle", "triangles", "tetrahedra", "tetrahedron"
+        ]
+        triangle_methods = [
+            "mass_lumped_triangle", "DG_triangle", "CG"
         ]
         quadrilateral_equivalents = [
-            "Q",
-            "quadrilateral",
-            "quadrilaterals",
-            "hexahedra",
-            "hexahedron",
+            "Q", "quadrilateral", "quadrilaterals", "hexahedra", "hexahedron"
         ]
-        cell_type = self.options_dictionary["cell_type"]
-        if cell_type in triangle_equivalents:
-            cell_type = "triangle"
-        elif cell_type in quadrilateral_equivalents:
-            cell_type = "quadrilateral"
-        else:
-            raise ValueError(f"cell_type of {cell_type} is not valid.")
+        quadrilateral_methods = [
+            "spectral_quadrilateral", "DG_quadrilateral", "CG"
+        ]
 
-        variant = self.options_dictionary["variant"]
-        accepted_variants = ["lumped", "equispaced", "DG"]
-        if variant not in accepted_variants:
-            raise ValueError(f"variant of {variant} is not valid.")
+        if value is None:
+            self._cell_type = None
+            return
 
-        if cell_type == "triangle" and variant == "lumped":
-            method = "mass_lumped_triangle"
-        elif cell_type == "triangle" and variant == "equispaced":
-            method = "CG_triangle"
-        elif cell_type == "triangle" and variant == "DG":
-            method = "DG_triangle"
-        elif cell_type == "quadrilateral" and variant == "lumped":
-            method = "spectral_quadrilateral"
-        elif cell_type == "quadrilateral" and variant == "equispaced":
-            method = "CG_quadrilateral"
-        elif cell_type == "quadrilateral" and variant == "DG":
-            method = "DG_quadrilateral"
+        if value in triangle_equivalents:
+            canonical = "triangle"
+            if self.method is not None and self.method not in triangle_methods:
+                raise ValueError(
+                    f"Cell type '{canonical}' is not compatible with method '{self.method}'."
+                )
+            self._cell_type = canonical
+        elif value in quadrilateral_equivalents:
+            canonical = "quadrilateral"
+            if self.method is not None and self.method not in quadrilateral_methods:
+                raise ValueError(
+                    f"Cell type '{canonical}' is not compatible with method '{self.method}'."
+                )
+            self._cell_type = canonical
         else:
-            raise ValueError(
-                f"cell_type of {cell_type} with variant of {variant} is not valid."
-            )
-        return method, cell_type, variant
+            raise ValueError(f"Cell type '{value}' is not supported.")
+        
+        if self.variant is not None and self.method is None:
+            if self.variant == "lumped" and canonical == "triangle":
+                self.method = "mass_lumped_triangle"
+            elif self.variant == "DG" and canonical == "triangle":
+                self.method = "DG_triangle"
+            elif self.variant == "equispaced" and canonical == "triangle":
+                self.method = "CG"
+            elif self.variant == "lumped" and canonical == "quadrilateral":
+                self.method = "spectral_quadrilateral"
+            elif self.variant == "DG" and canonical == "quadrilateral":
+                self.method = "DG_quadrilateral"
+            elif self.variant == "equispaced" and canonical == "quadrilateral":
+                self.method = "CG"
+            else:
+                raise ValueError(f"Cell type of {canonical} not compatible with variant {self.variant}")
+
+    @property
+    def degree(self):
+        return self._degree
+    
+    @degree.setter
+    def degree(self, value):
+        if not isinstance(value, int):
+            raise ValueError("Degree has to be integer")
+        self._degree = value
+    
+    @property
+    def dimension(self):
+        return self._dimension
+    
+    @dimension.setter
+    def dimension(self, value):
+        if value not in {2, 3}:
+            raise ValueError(f"Dimension of {value} not 2 or 3.")
+        self._dimension = value
