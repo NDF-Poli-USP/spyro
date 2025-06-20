@@ -80,6 +80,9 @@ class Dictionary_conversion:
             "degree": self.old_dictionary["opts"]["degree"],
             "dimension": self.old_dictionary["opts"]["dimension"],
         }
+        variant = self.new_dictionary["options"]["variant"]
+        if variant == "GLL" or variant == "KMV":
+            self.new_dictionary["options"]["variant"] = "lumped"
 
     def convert_parallelism(self):
         """

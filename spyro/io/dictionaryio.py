@@ -101,7 +101,7 @@ class Read_options:
             )
         elif value == "CG":
             if "variant" in self.options_dictionary and "cell_type" in self.options_dictionary:
-                self._method = None
+                self._method = "CG"
             else:
                 raise ValueError("Cant use CG without specifying cell type and variant.")
         elif value is None:
