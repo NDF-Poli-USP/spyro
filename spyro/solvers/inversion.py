@@ -226,7 +226,7 @@ class FullWaveformInversion(AcousticWave):
 
         Wave_obj_real_velocity.forward_solve()
         if save_shot_record:
-            save_shots(Wave_obj_real_velocity, file_name=shot_filename)
+            save_shots(Wave_obj_real_velocity, filename=shot_filename)
         self.real_shot_record = Wave_obj_real_velocity.real_shot_record
         self.quadrature_rule = Wave_obj_real_velocity.quadrature_rule
 
@@ -587,7 +587,7 @@ class FullWaveformInversion(AcousticWave):
             pass
 
     def load_real_shot_record(self, filename="shots/shot_record_"):
-        load_shots(self, file_name=filename)
+        load_shots(self, filename=filename)
         self.real_shot_record = self.forward_solution_receivers
         self.forward_solution_receivers = None
 
