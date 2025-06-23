@@ -1,6 +1,5 @@
 import firedrake as fire
 from firedrake import ds, dx, Constant, dot, grad
-import ipdb
 
 
 def construct_solver_or_matrix_no_pml(Wave_object):

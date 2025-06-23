@@ -5,7 +5,6 @@ from netgen.meshing import Mesh, Element2D, MeshPoint, FaceDescriptor
 from scipy.special import gamma, factorial
 from scipy.integrate import quad
 from scipy.spatial import KDTree
-import ipdb
 # https://docu.ngsolve.org/latest/netgen_tutorials/working_with_meshes.html
 
 

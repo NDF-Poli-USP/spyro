@@ -4,7 +4,6 @@ from sys import float_info
 import firedrake as fire
 import math
 import numpy as np
-import ipdb
 import warnings
 import time             # For runtime
 import tracemalloc      # For memory usage
@@ -96,7 +95,6 @@ def test_eikonal_values_fig8():
     outfile = fire.VTKFile("/mnt/d/spyro/output/output.pvd")
     outfile.write(Wave_obj.c)
 
-    # ipdb.set_trace()
     yp = eikonal(Wave_obj)
 
 
@@ -364,7 +362,6 @@ def eikonal(Wave):
 
     # Boundary conditions
     bcs_eik = define_bcs(Wave)
-    # ipdb.set_trace()
 
     # Solving Eikonal
     yp = solve_eik(Wave, bcs_eik)

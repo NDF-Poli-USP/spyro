@@ -5,7 +5,6 @@ import numpy as np
 from scipy.integrate import quad
 from scipy.spatial import KDTree
 from scipy.special import beta, betainc, gamma
-# import ipdb
 # fire.parameters["loopy"] = {"silenced_warnings": ["v1_scheduler_fallback"]}
 
 # Work from Ruben Andres Salas, Andre Luis Ferreira da Silva,

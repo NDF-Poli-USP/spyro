@@ -442,7 +442,6 @@ def plot_xCR_opt(Wave_object, data_regr_xCR, show=False):
     None
     '''
 
-    import ipdb
     from os import getcwd
     pth = getcwd() + "/output/"
 

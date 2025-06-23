@@ -1,6 +1,5 @@
 import firedrake as fire
 import numpy as np
-import ipdb
 
 
 def c_vti_tensor(vP, vS, rho, epsilon, gamma, delta, anysotropy):

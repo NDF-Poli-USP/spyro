@@ -1,5 +1,4 @@
 import numpy as np
-# import ipdb
 
 # Work from Ruben Andres Salas, Andre Luis Ferreira da Silva,
 # Luis Fernando Nogueira de Sá, Emilio Carlos Nelli Silva.

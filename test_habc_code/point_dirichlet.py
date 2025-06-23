@@ -1,7 +1,6 @@
 import firedrake as fire
 from firedrake import dx
 import numpy as np
-import ipdb
 
 
 class MyBC(fire.DirichletBC):

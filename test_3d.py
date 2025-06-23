@@ -5,7 +5,6 @@ import spyro.habc.eik as eik
 import spyro.habc.lay_len as lay_len
 import spyro.plots.plots as plt_spyro
 from spyro.habc.cost import comp_cost
-import ipdb
 fire.parameters["loopy"] = {"silenced_warnings": ["v1_scheduler_fallback"]}
 
 

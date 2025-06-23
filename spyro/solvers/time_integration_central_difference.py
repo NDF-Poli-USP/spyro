@@ -2,7 +2,6 @@ import firedrake as fire
 
 from . import helpers
 from .. import utils
-import ipdb
 
 
 def central_difference(wave, source_id=0):

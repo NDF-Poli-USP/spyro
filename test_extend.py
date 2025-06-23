@@ -1,6 +1,5 @@
 from firedrake import *
 import numpy as np
-import ipdb
 
 
 class Dir_point_bc(DirichletBC):

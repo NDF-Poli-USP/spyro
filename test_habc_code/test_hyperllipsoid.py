@@ -5,7 +5,6 @@ from netgen.csg import CSGeometry, OrthoBrick, Pnt
 from netgen.meshing import Mesh, Element2D, Element3D, FaceDescriptor, MeshPoint
 from scipy.spatial import KDTree, Delaunay, ConvexHull
 from sys import float_info
-import ipdb
 
 
 def create_edge_surface_mesh(edge_points, final_mesh,
@@ -127,7 +126,6 @@ def create_edge_surface_mesh(edge_points, final_mesh,
         # Add the edge element to the final mesh
         final_mesh.Add(Element2D(fd_edg, nodes))
 
-    # ipdb.set_trace()
     return final_mesh, existing_points
 
 
@@ -293,7 +291,6 @@ def complete_hyp3D_mesh(a, b, c, n, edge_length):
     final_mesh.Compress()
     # final_mesh.Refine(adaptive=True)
     # final_mesh.GenerateVolumeMesh()
-    # ipdb.set_trace()
 
     return final_mesh, box_mesh
 

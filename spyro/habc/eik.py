@@ -2,7 +2,6 @@ import firedrake as fire
 import numpy as np
 from sys import float_info
 from os import getcwd
-# import ipdb
 
 # Work from Ruben Andres Salas, Andre Luis Ferreira da Silva,
 # Luis Fernando Nogueira de Sá, Emilio Carlos Nelli Silva.

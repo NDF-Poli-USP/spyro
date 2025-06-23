@@ -1,7 +1,6 @@
 from firedrake import *
 from netgen.geom2d import SplineGeometry
 import numpy as np
-import ipdb
 
 
 # Function to define the hyperellipse boundary points

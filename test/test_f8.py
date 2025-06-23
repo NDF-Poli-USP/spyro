@@ -2,7 +2,6 @@ import firedrake as fire
 import spyro.habc.habc as habc
 import spyro.habc.eik as eik
 from spyro.habc.cost import comp_cost
-import ipdb
 
 
 def wave_dict(dt_usu, layer_shape, degree_layer,
