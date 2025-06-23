@@ -4,10 +4,7 @@ from PIL import Image
 import numpy as np
 import firedrake
 import copy
-import os
-import meshio
 from ..io import ensemble_save
-import warnings
 
 __all__ = ["plot_shots"]
 
