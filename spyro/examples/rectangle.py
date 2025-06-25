@@ -165,6 +165,16 @@ class Rectangle_acoustic(Rectangle_mesh_and_velocity, Example_model_acoustic):
     It is used to create a dictionary with the parameters of the
     Rectangle model.
 
+    Example Setup
+
+    These examples are intended as reusable velocity model configurations to assist in the development and testing of new methods, such as optimization algorithms, time-marching schemes, or inversion techniques.
+
+    Unlike targeted test cases, these examples do not have a specific objective or expected result. Instead, they provide standardized setups, such as Camembert, rectangular, and Marmousi velocity models, that can be quickly reused when prototyping, testing, or validating new functionality.
+
+    By isolating the setup of common velocity models, we aim to reduce boilerplate and encourage consistency across experiments.
+
+    Feel free to adapt these templates to your needs.
+
     Parameters
     ----------
     dictionary : dict, optional
@@ -199,6 +209,16 @@ class Rectangle_acoustic_FWI(Rectangle_mesh_and_velocity, Example_model_acoustic
     This class is a child of the Example_model class.
     It is used to create a dictionary with the parameters of the
     Rectangle model.
+
+    Example Setup
+
+    These examples are intended as reusable velocity model configurations to assist in the development and testing of new methods, such as optimization algorithms, time-marching schemes, or inversion techniques.
+
+    Unlike targeted test cases, these examples do not have a specific objective or expected result. Instead, they provide standardized setups, such as Camembert, rectangular, and Marmousi velocity models, that can be quickly reused when prototyping, testing, or validating new functionality.
+
+    By isolating the setup of common velocity models, we aim to reduce boilerplate and encourage consistency across experiments.
+
+    Feel free to adapt these templates to your needs.
 
     Parameters
     ----------
