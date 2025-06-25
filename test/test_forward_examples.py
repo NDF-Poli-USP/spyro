@@ -1,5 +1,6 @@
 import spyro
 import math
+import pytest
 
 
 def test_camembert_forward():
@@ -76,6 +77,7 @@ def test_camembert_elastic():
     wave.forward_solve()
 
 
+@pytest.mark.slow
 def test_elastic_cube_3D():
     from spyro.examples.elastic_cube_3D import wave
     wave.forward_solve()
