@@ -39,10 +39,10 @@ class Read_options:
 
     def __init__(self, options_dictionary={}):
         options_dictionary.setdefault("method", None)
-        options_dictionary.setdefault("cell_type", "T")
-        options_dictionary.setdefault("variant", "lumped")
-        options_dictionary.setdefault("degree", 4)
-        options_dictionary.setdefault("dimension", 2)
+        options_dictionary.setdefault("cell_type", None)
+        options_dictionary.setdefault("variant", None)
+        options_dictionary.setdefault("degree", None)
+        options_dictionary.setdefault("dimension", None)
         options_dictionary.setdefault("automatic_adjoint", False)
         self.options_dictionary = options_dictionary
 
