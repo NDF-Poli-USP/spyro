@@ -33,7 +33,7 @@ def test_spyro_seimicmesh_2d_homogeneous_generation():
     pad = 0.3
     cpw = 3
 
-    mesh_parameters = {
+    input_mesh_parameters = {
         "length_z": Lz,
         "length_x": Lx,
         "length_y": 0.0,
@@ -49,12 +49,14 @@ def test_spyro_seimicmesh_2d_homogeneous_generation():
         "lbda": lbda,
         "dimension": 2,
         "edge_length": lbda/cpw,
+        "output_file_name": "test.msh",
     }
+    mesh_parameters = spyro.meshing.MeshingParameters()
+    mesh_parameters.set_mesh(input_mesh_parameters=input_mesh_parameters)
 
     Mesh_obj = spyro.meshing.AutomaticMesh(
         mesh_parameters=mesh_parameters,
     )
-    Mesh_obj.set_seismicmesh_parameters(output_file_name="test.msh")
 
     mesh = Mesh_obj.create_mesh()
 
