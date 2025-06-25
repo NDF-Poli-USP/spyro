@@ -187,9 +187,8 @@ class Model_parameters:
         self.final_time = self.input_dictionary["time_axis"]["final_time"]
         self.dt = self.input_dictionary["time_axis"]["dt"]
 
-        # Checks inversion variables, FWI and velocity model inputs and outputs
-        self.real_shot_record = None
-        self._sanitize_optimization_and_velocity()
+        # Checks velocity model inputs and outputs
+        self.forward_output_file = "results/forward_output.pvd"
 
         # Checking source and receiver inputs
         self._sanitize_acquisition()
@@ -497,95 +496,6 @@ class Model_parameters:
             self.delay = 1.5
         self.delay_type = dictionary.get("delay_type", "multiples_of_minimun")
         self.__check_acquisition()
-
-    def _sanitize_optimization_and_velocity(self):
-        """
-        Checks if we are doing a FWI and sorts velocity model types, inputs,
-        and outputs
-        """
-        dictionary = self.input_dictionary
-        self.velocity_model_type = "file"
-
-        # Check if we are doing a FWI and sorting output locations and
-        # velocity model inputs
-        self.running_fwi = False
-        if "inversion" not in dictionary:
-            dictionary["inversion"] = {"perform_fwi": False}
-
-        if dictionary["inversion"]["perform_fwi"]:
-            self.running_fwi = True
-
-        if self.running_fwi:
-            self._sanitize_optimization_and_velocity_for_fwi()
-        else:
-            self._sanitize_optimization_and_velocity_without_fwi()
-
-        if self.initial_velocity_model_file is None:
-            if "velocity_conditional" not in dictionary["synthetic_data"]:
-                self.velocity_model_type = None
-                warnings.warn(
-                    "No velocity model set initially. If using "
-                    "user defined conditional or expression, please "
-                    "input it in the Wave object."
-                )
-
-        if "velocity_conditional" in dictionary["synthetic_data"]:
-            self.velocity_model_type = "conditional"
-            self.velocity_conditional = dictionary["synthetic_data"][
-                "velocity_conditional"
-            ]
-
-        self.forward_output_file = "results/forward_output.pvd"
-
-    def _sanitize_optimization_and_velocity_for_fwi(self):
-        self._sanitize_optimization_and_velocity_without_fwi()
-        dictionary = self.input_dictionary
-        try:
-            self.initial_velocity_model_file = dictionary["inversion"][
-                "initial_guess_model_file"
-            ]
-        except KeyError:
-            self.initial_velocity_model_file = None
-        self.fwi_output_folder = "fwi/"
-        self.control_output_file = self.fwi_output_folder + "control"
-        self.gradient_output_file = self.fwi_output_folder + "gradient"
-        if "optimization_parameters" in dictionary["inversion"]:
-            self.optimization_parameters = dictionary["inversion"][
-                "optimization_parameters"
-            ]
-        else:
-            default_optimization_parameters = {
-                "General": {"Secant": {"Type": "Limited-Memory BFGS",
-                                       "Maximum Storage": 10}},
-                "Step": {
-                    "Type": "Augmented Lagrangian",
-                    "Augmented Lagrangian": {
-                        "Subproblem Step Type": "Line Search",
-                        "Subproblem Iteration Limit": 5.0,
-                    },
-                    "Line Search": {"Descent Method": {"Type": "Quasi-Newton Step"}},
-                },
-                "Status Test": {
-                    "Gradient Tolerance": 1e-16,
-                    "Iteration Limit": None,
-                    "Step Tolerance": 1.0e-16,
-                },
-            }
-            self.optimization_parameters = default_optimization_parameters
-
-        if "shot_record_file" in dictionary["inversion"]:
-            if dictionary["inversion"]["shot_record_file"] is not None:
-                self.real_shot_record = np.load(dictionary["inversion"]["shot_record_file"])
-
-    def _sanitize_optimization_and_velocity_without_fwi(self):
-        dictionary = self.input_dictionary
-        if "synthetic_data" in dictionary:
-            self.initial_velocity_model_file = dictionary["synthetic_data"][
-                "real_velocity_file"
-            ]
-        else:
-            dictionary["synthetic_data"] = {"real_velocity_file": None}
-            self.initial_velocity_model_file = None
 
     def _sanitize_time_inputs(self):
         self.__check_time()
