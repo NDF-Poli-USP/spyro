@@ -18,7 +18,7 @@
 # }
 
 
-class read_boundary_layer:
+class Read_boundary_layer:
     """
     Read the boundary layer dictionary
 
@@ -43,29 +43,30 @@ class read_boundary_layer:
         Read the PML dictionary for a perfectly matched layer
     """
 
-    def __init__(self, abc_dictionary):
-        self.dictionary = abc_dictionary
-        if self.dictionary["status"] is False or self.dictionary["damping_type"] == "local":
-            self.abc_exponent = None
-            self.abc_cmax = None
-            self.abc_R = None
-            self.abc_pad_length = self.dictionary.get("pad_length", 0.0)
-            self.abc_boundary_layer_type = None
-            pass
-        elif self.dictionary["damping_type"] == "PML":
-            self.abc_boundary_layer_type = self.dictionary["damping_type"]
-            self.read_PML_dictionary()
-        else:
-            abc_type = self.dictionary["damping_type"]
-            raise ValueError(
-                f"Boundary layer type of {abc_type} not recognized"
-            )
-
-    def read_PML_dictionary(self):
-        """
-        Reads the PML dictionary for a perfectly matched layer
-        """
-        self.abc_exponent = self.dictionary["exponent"]
-        self.abc_cmax = self.dictionary["cmax"]
-        self.abc_R = self.dictionary["R"]
-        self.abc_pad_length = self.dictionary["pad_length"]
+    @property
+    def damping_type(self):
+        return self._damping_type
+    
+    @damping_type.setter
+    def damping_type(self, value):
+        abc_dictionary = self.input_dictionary
+        accepted_damping_types = [
+            "PML",
+            "local",
+            None,
+        ]
+        if value not in accepted_damping_types:
+            return ValueError(f"Damping type of {value} not recognized.")
+        if value == "PML":
+            self.abc_exponent = abc_dictionary["exponent"]
+            self.abc_R = abc_dictionary["R"]
+            self.abc_cmax = abc_dictionary["cmax"]
+        self._damping_type = value
+    
+    @property
+    def abc_pad_length(self):
+        return self._abc_pad_length
+    
+    @abc_pad_length.setter
+    def abc_pad_length(self, value):
+        self._abc_pad_length = value
