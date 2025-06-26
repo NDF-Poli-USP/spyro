@@ -101,7 +101,7 @@ class Read_options:
                 either DG_triangle or DG_quadrilateral."
             )
         elif value == "CG":
-            if "variant" in self.options_dictionary and "cell_type" in self.options_dictionary:
+            if "variant" in self.input_dictionary["options"] and "cell_type" in self.input_dictionary["options"]:
                 self._method = "CG"
             else:
                 raise ValueError("Cant use CG without specifying cell type and variant.")

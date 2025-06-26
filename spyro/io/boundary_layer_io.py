@@ -58,6 +58,9 @@ class Read_boundary_layer:
         if value not in accepted_damping_types:
             return ValueError(f"Damping type of {value} not recognized.")
         if value == "PML":
+            abc_dictionary.setdefault("exponent", 2)
+            abc_dictionary.setdefault("R", 1e-6)
+            abc_dictionary.setdefault("cmax", 4.7)
             self.abc_exponent = abc_dictionary["exponent"]
             self.abc_R = abc_dictionary["R"]
             self.abc_cmax = abc_dictionary["cmax"]
