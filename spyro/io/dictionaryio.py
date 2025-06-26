@@ -37,7 +37,8 @@ class Read_options:
         Get the method, cell type and variant from the cell type and variant.
     """
 
-    def __init__(self, options_dictionary={}):
+    def __init__(self, dictionary={}):
+        options_dictionary = dictionary["options"]
         options_dictionary.setdefault("method", None)
         options_dictionary.setdefault("cell_type", None)
         options_dictionary.setdefault("variant", None)
