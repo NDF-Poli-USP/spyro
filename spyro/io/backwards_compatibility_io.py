@@ -232,8 +232,11 @@ class Dictionary_conversion:
         """
         Convert the acquisition section of dictionary
         """
+        source_type = self.old_dictionary["acquisition"]["source_type"]
+        if source_type == "Ricker":
+            source_type = "ricker"
         self.new_dictionary["acquisition"] = {
-            "source_type": self.old_dictionary["acquisition"]["source_type"],
+            "source_type": source_type,
             "source_locations": self.old_dictionary["acquisition"][
                 "source_pos"
             ],

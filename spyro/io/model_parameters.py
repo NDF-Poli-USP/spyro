@@ -219,6 +219,9 @@ class Model_parameters(Read_options, Read_boundary_layer):
         # Checking source and receiver inputs
         self.input_dictionary["acquisition"].setdefault("source_type", "ricker")
         self.source_type = self.input_dictionary["acquisition"]["source_type"]
+
+        if self.source_type == "ricker":
+            self.frequency = self.input_dictionary["acquisition"]["frequency"]
     
         self.input_dictionary["acquisition"].setdefault("amplitude", 1.0)
         self.amplitude = self.input_dictionary["acquisition"]["amplitude"]
