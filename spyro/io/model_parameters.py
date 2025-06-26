@@ -218,7 +218,7 @@ class Model_parameters(Read_options, Read_boundary_layer):
 
         # Checking source and receiver inputs
         self.input_dictionary["acquisition"].setdefault("source_type", "ricker")
-        self.source_type = self.input_dictionary["acquisition"]["ricker"]
+        self.source_type = self.input_dictionary["acquisition"]["source_type"]
     
         self.input_dictionary["acquisition"].setdefault("amplitude", 1.0)
         self.amplitude = self.input_dictionary["acquisition"]["amplitude"]
@@ -239,7 +239,6 @@ class Model_parameters(Read_options, Read_boundary_layer):
         self.input_dictionary.setdefault("parallelism", {})
         self.input_dictionary["parallelism"].setdefault("type", "automatic")
         self.parallelism_type = self.input_dictionary["parallelism"]["type"]
-        self._sanitize_comm(comm)
 
         # Checking mesh_parameters
         self.input_dictionary["mesh"].setdefault("user_mesh", None)
@@ -280,8 +279,7 @@ class Model_parameters(Read_options, Read_boundary_layer):
         self.output_frequency = self.input_dictionary["time_axis"]["output_frequency"]
         self._sanitize_automatic_adjoint()
 
-        # Sanitize output files
-        self._sanitize_output()
+        # add random string for temp files
         self.random_id_string = str(uuid.uuid4())[:10]
 
     @property
@@ -438,11 +436,9 @@ class Model_parameters(Read_options, Read_boundary_layer):
         elif value == "spatial":
             self.shot_ids_per_propagation = [[i] for i in range(0, self.number_of_sources)]
 
-        if self.comm is None:
-            self.comm = utils.mpi_init(self)
-            self.comm.comm.barrier()
-
         self._parallelism_type = value
+        self.comm = utils.mpi_init(self)
+        self.comm.comm.barrier()
 
     def _sanitize_automatic_adjoint(self):
         dictionary = self.input_dictionary
