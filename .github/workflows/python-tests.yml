@@ -25,6 +25,10 @@ jobs:
       options: --user root  # Ensures it can install packages if needed
 
     steps:
+    - name: Pre-run cleanup
+        # Make sure the current directory is empty
+      run: find . -delete
+
     - uses: actions/checkout@v4
 
     - name: Install dependencies
@@ -39,6 +43,15 @@ jobs:
         && pip3 install meshio \
         && pip3 install -U memory_profiler \
         && pip3 install pytest pytest-cov
+
+    - name: Clear all firedrake-related caches
+      run: |
+        rm -rf ~/.cache/loopy \
+               ~/.loopy_kernel_cache \
+               ~/.cache/pyop2 \
+               ~/.cache/tsfc \
+               .pytest_cache
+        find . -name '*.pkl' -delete || true
 
     - name: Running serial tests
       run: |

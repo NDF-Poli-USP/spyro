@@ -65,17 +65,15 @@ input_dictionary["inversion"] = {
 
 fwiobj = spyro.examples.Camembert_acoustic_FWI(dictionary=input_dictionary)
 
-spyro.plots.plot_model(fwiobj, filename="true_experiment.png")
-spyro.plots.plot_model_in_p1(fwiobj, dx=0.005, filename="true_experiment_in_p1.png")
-spyro.plots.plot_mesh_sizes(firedrake_mesh=fwiobj.real_mesh, output_filename="true_mesh.png", show_size_contour=False)
+# spyro.plots.plot_model(fwiobj, filename="true_experiment.png")
+# spyro.plots.plot_model_in_p1(fwiobj, dx=0.005, filename="true_experiment_in_p1.png")
+# spyro.plots.plot_mesh_sizes(firedrake_mesh=fwiobj.real_mesh, output_filename="true_mesh.png", show_size_contour=False)
 
-fwiobj.generate_real_shot_record(save_shot_record=True)
-# input_dictionary["inversion"]["real_shot_record_files"] = "shots/shot_record_"
-# fwiobj = spyro.examples.Camembert_acoustic_FWI(dictionary=input_dictionary)
+# fwiobj.generate_real_shot_record(save_shot_record=True)
 
-# fwiobj.set_guess_mesh()
-# fwiobj.set_guess_velocity_model(constant=1.6)
-# spyro.plots.plot_mesh_sizes(firedrake_mesh=fwiobj.guess_mesh, output_filename="guess_mesh.png", show_size_contour=False)
-# fwiobj.run_fwi(vmin=v_min, vmax=v_max, maxiter=5)
+fwiobj.set_guess_velocity_model(constant=1.6)
+fwiobj.set_guess_mesh()
+spyro.plots.plot_mesh_sizes(firedrake_mesh=fwiobj.guess_mesh, output_filename="guess_mesh.png", show_size_contour=False)
+fwiobj.run_fwi(vmin=v_min, vmax=v_max, maxiter=5)
 
 print("END")
