@@ -96,8 +96,9 @@ def plot_mesh_sizes(
     title_str=None,
     output_filename=None,
     show=False,
+    show_size_contour=True,
 ):
-    plt.rcParams['font.family'] = "Times New Roman"
+    # plt.rcParams['font.family'] = "Times New Roman"
     plt.rcParams['font.size'] = 12
 
     if mesh_filename is not None:
@@ -116,20 +117,30 @@ def plot_mesh_sizes(
     f = firedrake.interpolate(firedrake.CellSize(mesh), DG0)
 
     fig, axes = plt.subplots()
-    im = firedrake.tricontourf(f, axes=axes)
+    if show_size_contour:
+        im = firedrake.tricontourf(f, axes=axes)
+    else:
+        im = firedrake.triplot(mesh, axes=axes)
 
     axes.set_aspect("equal", "box")
     plt.xlabel("X (km)")
     plt.ylabel("Z (km)")
     plt.title(title_str)
 
-    cbar = fig.colorbar(im, orientation="horizontal")
-    cbar.ax.set_xlabel("circumcircle radius (km)")
+    if show_size_contour:
+        cbar = fig.colorbar(im, orientation="horizontal")
+        cbar.ax.set_xlabel("circumcircle radius (km)")
     fig.set_size_inches(13, 10)
     if show:
         plt.show()
     if output_filename is not None:
         plt.savefig(output_filename)
+
+    # Flip back mesh coordinates so it does not change outside of method
+    coordinates = copy.deepcopy(mesh.coordinates.dat.data)
+
+    mesh.coordinates.dat.data[:, 0] = coordinates[:, 1]
+    mesh.coordinates.dat.data[:, 1] = coordinates[:, 0]
 
 
 def plot_model(Wave_object, filename="model.png", abc_points=None, show=False, flip_axis=True):
@@ -227,3 +238,44 @@ def debug_plot(function, filename="debug.png"):
 def debug_pvd(function, filename="debug.pvd"):
     out = firedrake.VTKFile(filename)
     out.write(function)
+
+
+def plot_model_in_p1(Wave_object, dx=0.01, filename="model.png", abc_points=None, show=False, flip_axis=True):
+    """
+    Plots the velocity model of a given wave_object projected into a P1 (linear) finite element discretization.
+    This function creates a deep copy of the input Wave_object's configuration, modifies it to use
+    a P1 (degree 1) continuous Galerkin, and then generates a plot of the resulting velocity model.
+    The plot can be saved to a file and optionally displayed.
+
+    Parameters
+    -----------
+    Wave_object:
+        An instance of a wave simulation object containing the velocity model and configuration.
+    dx (float, optional):
+        The mesh spacing to use for the new model. Defaults to 0.01.
+    filename (str, optional):
+        The filename to save the plot image. Defaults to "model.png".
+    abc_points (list or None, optional):
+        Points for absorbing boundary conditions to be marked on the plot. Defaults to None.
+    show (bool, optional):
+        Whether to display the plot interactively. Defaults to False.
+    flip_axis (bool, optional):
+        Whether to flip the plot axes for visualization. Defaults to True.
+
+    Returns
+    -------
+    The result of the plot_model function.
+    """
+
+    # Local import to avoid circular import
+    from ..solvers import AcousticWave
+    p1_obj_dict = copy.deepcopy(Wave_object.input_dictionary)
+    p1_obj_dict["options"]["method"] = "CG"
+    p1_obj_dict["options"]["variant"] = "equispaced"
+    p1_obj_dict["options"]["degree"] = 1
+
+    new_wave_obj = AcousticWave(dictionary=p1_obj_dict)
+    new_wave_obj.set_mesh(mesh_parameters={"dx": dx})
+    new_wave_obj.set_initial_velocity_model(conditional=Wave_object.initial_velocity_model)
+
+    return plot_model(new_wave_obj, filename=filename, abc_points=abc_points, show=show, flip_axis=flip_axis)

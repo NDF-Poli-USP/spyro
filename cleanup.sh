@@ -1,7 +1,7 @@
 #!/bin/bash
 rm *.msh
 rm *.vtk
-# rm *.png
+rm *.png
 rm *.vtu
 rm *.pvtu
 rm *.pvd
