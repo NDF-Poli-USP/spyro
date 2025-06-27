@@ -169,7 +169,6 @@ class Model_parameters(Read_options, Read_boundary_layer):
         self.time_integrator = self.input_dictionary["time_axis"]["time_integration_scheme"]
         self.equation_type = self.input_dictionary["equation_type"]
 
-
         # Get options
         options_dictionary = self.input_dictionary["options"]
         options_dictionary.setdefault("method", None)
