@@ -62,7 +62,7 @@ class AcousticWave(Wave):
         self.solver = None
         self.rhs = None
         self.B = None
-        if abc_type is None:
+        if abc_type is None or abc_type == "local":
             construct_solver_or_matrix_no_pml(self)
         elif abc_type == "PML":
             V = self.function_space

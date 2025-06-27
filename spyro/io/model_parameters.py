@@ -268,12 +268,12 @@ class Model_parameters(Read_options, Read_boundary_layer):
         self.damping_type = self.input_dictionary["absorving_boundary_conditions"]["damping_type"]
         self.abc_pad_length = self.input_dictionary["absorving_boundary_conditions"]["pad_length"]
 
-        self.absorb_top = dictionary.get("absorb_top", False)
-        self.absorb_bottom = dictionary.get("absorb_bottom", True)
-        self.absorb_right = dictionary.get("absorb_right", True)
-        self.absorb_left = dictionary.get("absorb_left", True)
-        self.absorb_front = dictionary.get("absorb_front", True)
-        self.absorb_back = dictionary.get("absorb_back", True)
+        self.absorb_top = dictionary["absorving_boundary_conditions"].get("absorb_top", False)
+        self.absorb_bottom = dictionary["absorving_boundary_conditions"].get("absorb_bottom", True)
+        self.absorb_right = dictionary["absorving_boundary_conditions"].get("absorb_right", True)
+        self.absorb_left = dictionary["absorving_boundary_conditions"].get("absorb_left", True)
+        self.absorb_front = dictionary["absorving_boundary_conditions"].get("absorb_front", True)
+        self.absorb_back = dictionary["absorving_boundary_conditions"].get("absorb_back", True)
 
         # Check automatic adjoint
         self.input_dictionary["time_axis"].setdefault("gradient_sampling_frequency", 99999)
