@@ -72,4 +72,6 @@ class Read_boundary_layer:
     
     @abc_pad_length.setter
     def abc_pad_length(self, value):
+        if (value is None or value == 0) and self.damping_type == "PML":
+            raise ValueError(f"No pad not compatible with PML")
         self._abc_pad_length = value
