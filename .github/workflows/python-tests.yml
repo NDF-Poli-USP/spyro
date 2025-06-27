@@ -44,9 +44,13 @@ jobs:
         && pip3 install -U memory_profiler \
         && pip3 install pytest pytest-cov
 
-    - name: Clear all pyop2 and loopy caches
+    - name: Clear all firedrake-related caches
       run: |
-        rm -rf ~/.cache/loopy ~/.loopy_kernel_cache ~/.cache/pyop2 .pytest_cache
+        rm -rf ~/.cache/loopy \
+               ~/.loopy_kernel_cache \
+               ~/.cache/pyop2 \
+               ~/.cache/tsfc \
+               .pytest_cache
         find . -name '*.pkl' -delete || true
 
     - name: Running serial tests
