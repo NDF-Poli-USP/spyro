@@ -44,6 +44,11 @@ jobs:
         && pip3 install -U memory_profiler \
         && pip3 install pytest pytest-cov
 
+    - name: Clear all pyop2 and loopy caches
+      run: |
+        rm -rf ~/.cache/loopy ~/.loopy_kernel_cache ~/.cache/pyop2 .pytest_cache
+        find . -name '*.pkl' -delete || true
+
     - name: Running serial tests
       run: |
         python3 -m pytest --cov-report=xml --cov=spyro test/
