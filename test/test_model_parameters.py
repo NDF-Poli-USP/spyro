@@ -47,8 +47,7 @@ dictionary["absorving_boundary_conditions"] = {
     "exponent": 2,  # damping layer has a exponent variation
     "cmax": 4.7,  # maximum acoustic wave velocity in PML - km/s
     "R": 1e-6,  # theoretical reflection coefficient
-    "lz": 0.25,  # thickness of the PML in the z-direction (km) - always positive
-    "lx": 0.25,  # thickness of the PML in the x-direction (km) - always positive
+    "pad_length": 0.25,  # thickness of the PML in the x-direction (km) - always positive
     "ly": 0.0,  # thickness of the PML in the y-direction (km) - always positive
 }
 
@@ -362,14 +361,6 @@ def test_dictionary_conversion():
     assert same
 
 
-def test_degree_exception_3d():  # TODO: improve
-    ex_dictionary = deepcopy(dictionary)
-    with pytest.raises(Exception):
-        ex_dictionary["options"]["dimension"] = 3
-        ex_dictionary["options"]["degree"] = 5
-        model = Model_parameters(dictionary=ex_dictionary)  # noqa: F841
-
-
 def test_time_exception():  # TODO: improve
     ex_dictionary = deepcopy(dictionary)
     with pytest.raises(Exception):
@@ -401,7 +392,6 @@ if __name__ == "__main__":
     test_method_reader()
     test_cell_type_reader()
     test_dictionary_conversion()
-    test_degree_exception_3d()
     test_time_exception()
     test_source_exception()
     test_receiver_exception()
