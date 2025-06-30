@@ -297,8 +297,6 @@ class HyperLayer():
         '''
 
         # Hypershape semi-axes and domain dimensions
-        a_hyp = self.hyper_axes[0]
-        b_hyp = self.hyper_axes[1]
         Lx = self.domain_dim[0]
         Lz = self.domain_dim[1]
         axis_str = "Semi-axes (km): a_hyp:{:5.3f} - b_hyp:{:5.3f}"
@@ -309,7 +307,6 @@ class HyperLayer():
         # Verification of hypershape degree
         print("Checking Current Hypershape Degree n_hyp: {}".format(n_hyp))
         if self.dimension == 3:  # 3D
-            c_hyp = self.hyper_axes[2]
             Ly = self.domain_dim[2]
             axis_str += " - c_hyp:{:5.3f}"
         print(axis_str.format(*self.hyper_axes))
@@ -709,7 +706,7 @@ class HyperLayer():
 
     def create_bnd_mesh2D(self, geo, bnd_pts, trunc_feat, spln):
         '''
-        Generate the boundary segment curves for the hyperellipse boundary mesh.
+        Generate the boundary segments for the hyperellipse boundary mesh.
 
         Parameters
         ----------
@@ -867,10 +864,6 @@ class HyperLayer():
 
         # Get coordinates of the rectangular mesh
         coord_rec = rec_mesh.coordinates.dat.data_with_halos
-
-        # Find min/max coordinates to detect boundary points
-        z_min, z_max = coord_rec[:, 0].min(), coord_rec[:, 0].max()
-        x_min, x_max = coord_rec[:, 1].min(), coord_rec[:, 1].max()
 
         # Create KDTree for efficient nearest neighbor search
         boundary_tree = KDTree([(z, x) for z, x in

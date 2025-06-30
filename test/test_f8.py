@@ -213,7 +213,7 @@ def get_xCR_usu(Wave_obj, dat_regr_xCR, typ_xCR, n_pts):
         return xCR_opt
 
 
-def test_habc_fig8(Wave_obj, dat_regr_xCR, xCR_usu=None, plot_comparison=True):
+def habc_fig8(Wave_obj, dat_regr_xCR, xCR_usu=None, plot_comparison=True):
     '''
     Apply the HABC to the model in Fig. 8 of Salas et al. (2022).
 
@@ -282,8 +282,10 @@ def test_habc_fig8(Wave_obj, dat_regr_xCR, xCR_usu=None, plot_comparison=True):
                                   data_regr_xCR=dat_regr_xCR)
 
 
-# Applying HABCs to the model in Fig. 8 of Salas et al. (2022)
-if __name__ == "__main__":
+def test_loop_habc():
+    '''
+    Loop for applying the HABC to the model in Fig. 8 of Salas et al. (2022).
+    '''
 
     case = 0  # Integer from 0 to 3
 
@@ -377,7 +379,6 @@ if __name__ == "__main__":
 
                 for itr_xCR in range(n_pts + 1):
                     try:
-
                         # User-defined heuristic factor x_CR
                         if itr_xCR == 0:
                             xCR_usu = None
@@ -393,8 +394,8 @@ if __name__ == "__main__":
 
                         # Run the HABC scheme
                         plot_comparison = True if itr_xCR == n_pts else False
-                        test_habc_fig8(Wave_obj, dat_regr_xCR, xCR_usu=xCR_usu,
-                                       plot_comparison=plot_comparison)
+                        habc_fig8(Wave_obj, dat_regr_xCR, xCR_usu=xCR_usu,
+                                  plot_comparison=plot_comparison)
 
                         # Estimating computational resource usage
                         u_name = Wave_obj.path_save + Wave_obj.case_habc + "/"
@@ -411,3 +412,8 @@ if __name__ == "__main__":
                     except Exception as e:
                         print(f"Error Solving: {e}")
                         break
+
+
+# Applying HABCs to the model in Fig. 8 of Salas et al. (2022)
+if __name__ == "__main__":
+    test_loop_habc()

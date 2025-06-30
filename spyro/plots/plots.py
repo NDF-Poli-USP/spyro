@@ -442,9 +442,6 @@ def plot_xCR_opt(Wave_object, data_regr_xCR, show=False):
     None
     '''
 
-    from os import getcwd
-    pth = getcwd() + "/output/"
-
     # Data for regression
     xCR, max_errIt, max_errPk, crit_opt = data_regr_xCR
     xCR_opt = xCR[-1]

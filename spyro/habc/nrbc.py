@@ -169,15 +169,15 @@ class NRBCHabc():
 
                     # Normal vector to the boundary
                     nz_h, nx_h = self.hyperellipse_normal_vector(
-                        ref_z, ref_x, a_hyp, a_hyp, n_hyp)
+                        ref_z, ref_x, a_hyp, b_hyp, n_hyp)
 
                     # Cosine of the incidence angle
                     cos_Hig = abs(nz_r * nz_h + nx_r * nx_h)
 
             if self.dimension == 3:  # 3D
-                y_f = fire.Function(
-                    self.function_space).interpolate(bnd_coord[:, 2])
-                bnd_y = y_f.dat.data_with_halos[bnd_nod]
+                pass
+                # y_f = fire.Function(self.function_space).interpolate(self.mesh_y)
+                # bnd_y = y_f.dat.data_with_halos[bnd_nod]
                 # To Do: Complete
 
             cos_Hig[cos_Hig < self.cos_max] = (1. - cos_Hig[

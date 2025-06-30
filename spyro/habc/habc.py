@@ -1343,7 +1343,7 @@ class HABC_Wave(AcousticWave, HyperLayer, NRBCHabc):
             fbinv = 1 / fb
             fc = (Rac**2 + (Rac * Rbc)**2 + Rbc**2)**0.5 / (Rac * Rbc)  # 1/c^2
             fcinv = 1 / fc
-            fmin = f_Vh / 8 * min(fainv, fbinv, min(fc, 1 / fc))
+            fmin = f_Vh / 8 * min(fainv, fbinv, min(fc, fcinv))
             fmax = 8 / f_Vh * max(fa, fb, max(fc, 1 / fc))
 
         # Correction by geometry
@@ -1446,6 +1446,7 @@ class HABC_Wave(AcousticWave, HyperLayer, NRBCHabc):
         eta_max = psi * eta_crt
         print("Critical Damping Coefficient (1/s): {0:.5f}".format(eta_crt))
         print("Maximum Damping Ratio: {0:.3%}".format(psi))
+        print("Maximum Damping Coefficient (1/s): {0:.5f}".format(eta_max))
 
         # Minimum damping ratio and the associated heuristic factor
         psi_min, xCR_est, xCR_lim, xCR_search = self.est_min_damping()
