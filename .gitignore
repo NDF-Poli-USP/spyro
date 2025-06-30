@@ -172,8 +172,8 @@ cython_debug/
 
 # Other files specific to this project
 *.pyc
-*.vtu
 *.pvd
+*.vtu
 *.pdf
 *.pvtu
 *.dat
@@ -182,3 +182,9 @@ cython_debug/
 *.segy
 *.png
 *.vtk
+__pycache__/
+**/__pycache__/
+*.sublime-*
+fw_outputs*.*
+output/
+forgotten_files/

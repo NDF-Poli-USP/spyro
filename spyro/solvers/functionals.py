@@ -9,4 +9,5 @@ def acoustic_energy(wave):
     '''
     u = wave.get_function()
     c = wave.c
-    return (0.5*(u/c)**2)*dx
+
+    return (0.5 * (u / c)**2) * dx
