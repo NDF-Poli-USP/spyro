@@ -356,9 +356,7 @@ def test_dictionary_conversion():
         same = False
     if model_from_new.final_time != model_from_old.final_time:
         same = False
-    if model_from_new.forward_output_file != model_from_old.forward_output_file:
-        same = False
-    if model_from_new.running_fwi != model_from_old.running_fwi:
+    if model_from_new.forward_output_filename != model_from_old.forward_output_filename:
         same = False
 
     assert same
@@ -403,7 +401,6 @@ if __name__ == "__main__":
     test_method_reader()
     test_cell_type_reader()
     test_dictionary_conversion()
-    test_degree_exception_2d()
     test_degree_exception_3d()
     test_time_exception()
     test_source_exception()
