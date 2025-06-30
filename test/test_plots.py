@@ -93,7 +93,7 @@ def test_plot_mesh_sizes():
         mesh_parameters=mesh_parameters,
     )
     Mesh_obj.set_seismicmesh_parameters(output_file_name=mesh_filename)
-    mesh = Mesh_obj.create_mesh()
+    mesh = Mesh_obj.create_mesh()  # noqa: F841
 
     output_filename = "mesh_size.png"
     spyro.plots.plot_mesh_sizes(mesh_filename=mesh_filename, output_filename=str(output_filename), show=False)
