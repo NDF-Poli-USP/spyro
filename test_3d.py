@@ -4,7 +4,7 @@ import spyro.habc.habc as habc
 import spyro.habc.eik as eik
 import spyro.habc.lay_len as lay_len
 import spyro.plots.plots as plt_spyro
-from spyro.habc.cost import comp_cost
+from spyro.utils.cost import comp_cost
 fire.parameters["loopy"] = {"silenced_warnings": ["v1_scheduler_fallback"]}
 
 

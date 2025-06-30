@@ -1,7 +1,7 @@
 import firedrake as fire
 import spyro.habc.habc as habc
 import spyro.habc.eik as eik
-from spyro.habc.cost import comp_cost
+from spyro.utils.cost import comp_cost
 
 
 def wave_dict(dt_usu, layer_shape, degree_layer,
@@ -285,7 +285,7 @@ def test_habc_fig8(Wave_obj, dat_regr_xCR, xCR_usu=None, plot_comparison=True):
 # Applying HABCs to the model in Fig. 8 of Salas et al. (2022)
 if __name__ == "__main__":
 
-    case = 3  # Integer from 0 to 3
+    case = 0  # Integer from 0 to 3
 
     # ============ SIMULATION PARAMETERS ============
 
@@ -293,10 +293,10 @@ if __name__ == "__main__":
     # cpw: cells per wavelength
     # lba = minimum_velocity /source_frequency
     # edge_length = lba / cpw
-    edge_length_lst = [0.05, 0.02, 0.016, 0.01]
+    edge_length_lst = [0.05]  # [0.05, 0.02, 0.016, 0.01]
 
     # Timestep size
-    dt_usu_lst = [0.0005, 0.0002, 0.0002, 0.000125]
+    dt_usu_lst = [0.0005]  # [0.0005, 0.0002, 0.0002, 0.000125]
 
     # Get simulation parameters
     edge_length = edge_length_lst[case]
@@ -307,16 +307,16 @@ if __name__ == "__main__":
     # ============ HABC PARAMETERS ============
 
     # Hyperellipse degrees
-    degree_layer_lst = [None, 2, 3, 4, 5]
+    degree_layer_lst = [None, 2]  # [None, 2, 3, 4, 5]
 
     # Reference frequency
     habc_reference_freq_lst = ["source", "boundary"]
 
     # Infinite model
-    get_ref_model = False
+    get_ref_model = True
 
     # Loop for HABC cases
-    loop_modeling = not get_ref_model
+    loop_modeling = True  # not get_ref_model
 
     # Error criterion for heuristic factor xCR
     crit_opt = "error_difference"  # "error_integral"

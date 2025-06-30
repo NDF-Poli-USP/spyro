@@ -1,9 +1,8 @@
 import numpy as np
 import matplotlib.pyplot as plt
 # Use latex fonts
-plt.rcParams.update({
-    "text.usetex": True,
-    "font.family": "serif"})
+plt.rcParams.update({"font.family": "serif"})
+plt.rcParams['text.latex.preamble'] = r'\usepackage{bm} \usepackage{amsmath}'
 
 #
 FL = np.linspace(0.001, 1, int(1e3))
