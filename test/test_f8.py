@@ -376,6 +376,8 @@ def test_loop_habc():
                 # Data for regression of xCR parameter
                 dat_regr_xCR = [[] for _ in range(3)]
                 dat_regr_xCR.append(crit_opt)
+                xCR_opt = None
+                xCR_cand = None
 
                 for itr_xCR in range(n_pts + 1):
                     try:
