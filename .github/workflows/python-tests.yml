@@ -8,6 +8,13 @@ on: [push, pull_request]
 permissions:
   contents: read
 
+concurrency:
+  # Cancel running jobs if new commits are pushed
+  group: >
+    ${{ github.workflow }}-
+    ${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
 jobs:
   build:
 
@@ -18,6 +25,10 @@ jobs:
       options: --user root  # Ensures it can install packages if needed
 
     steps:
+    - name: Pre-run cleanup
+        # Make sure the current directory is empty
+      run: find . -delete
+
     - uses: actions/checkout@v4
 
     - name: Install dependencies
@@ -33,14 +44,28 @@ jobs:
         && pip3 install -U memory_profiler \
         && pip3 install pytest pytest-cov
 
+    - name: Clear all firedrake-related caches
+      run: |
+        rm -rf ~/.cache/loopy \
+               ~/.loopy_kernel_cache \
+               ~/.cache/pyop2 \
+               ~/.cache/tsfc \
+               .pytest_cache
+        find . -name '*.pkl' -delete || true
+
     - name: Running serial tests
       run: |
         python3 -m pytest --cov-report=xml --cov=spyro test/
     - name: Running parallel 3D forward test
       run: |
-        mpiexec -n 6 python3 -m pytest test_3d/test_hexahedral_convergence.py
-        mpiexec -n 6 python3 -m pytest test_parallel/test_forward.py
-        mpiexec -n 6 python3 -m pytest test_parallel/test_fwi.py
+          mpiexec -n 6 pytest test_3d/test_hexahedral_convergence.py
+          mpiexec -n 6 pytest test_parallel/test_forward.py
+          mpiexec -n 6 pytest test_parallel/test_fwi.py
+          mpiexec -n 6 pytest test_parallel/test_forward_supershot.py
+          mpiexec -n 2 pytest test_parallel/test_parallel_io.py
+          mpiexec -n 3 pytest test_parallel/test_supershot_grad.py
+          mpiexec -n 2 pytest test_parallel/test_forward_multiple_serial_shots.py
+          mpiexec -n 2 pytest test_parallel/test_gradient_serialshots.py
     - name: Covering parallel 3D forward test
       continue-on-error: true
       run: |
@@ -52,7 +77,27 @@ jobs:
     - name: Covering parallel fwi test
       continue-on-error: true
       run: |
-        mpiexec -n 6 python3 -m pytest --cov-report=xml --cov-append --cov=spyro test_parallel/test_fwi.py
+          mpiexec -n 6 pytest --cov-report=xml --cov-append --cov=spyro test_parallel/test_fwi.py
+    - name: Covering parallel supershot test
+      continue-on-error: true
+      run: |
+          mpiexec -n 6 pytest --cov-report=xml --cov-append --cov=spyro test_parallel/test_forward_supershot.py
+    - name: Covering parallel io test
+      continue-on-error: true
+      run: |
+          mpiexec -n 2 pytest --cov-report=xml --cov-append --cov=spyro test_parallel/test_parallel_io.py
+    - name: Covering parallel supershot grad test
+      continue-on-error: true
+      run: |
+          mpiexec -n 3 pytest --cov-report=xml --cov-append --cov=spyro test_parallel/test_supershot_grad.py
+    - name: Covering spatially parallelized shots in serial
+      continue-on-error: true
+      run: |
+          mpiexec -n 2 pytest --cov-report=xml --cov-append --cov=spyro test_parallel/test_forward_multiple_serial_shots.py
+    - name: Covering spatially parallelized shots in serial
+      continue-on-error: true
+      run: |
+          mpiexec -n 2 pytest --cov-report=xml --cov-append --cov=spyro test_parallel/test_test_gradient_serialshots.py
     - name: Uploading coverage to Codecov
       run: |
         export CODECOV_TOKEN="6cd21147-54f7-4b77-94ad-4b138053401d" && curl -s https://codecov.io/bash | bash

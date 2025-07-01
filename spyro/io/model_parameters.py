@@ -1,8 +1,12 @@
 import numpy as np
+import uuid
+from mpi4py import MPI  # noqa:F401
+from firedrake import COMM_WORLD  # noqa:
 import warnings
 from .. import io
 from .. import utils
 from .. import meshing
+from ..meshing.meshing_functions import cells_per_wavelength
 
 # default_optimization_parameters = {
 #     "General": {"Secant": {"Type": "Limited-Memory BFGS",
@@ -325,6 +329,7 @@ class Model_parameters:
 
         # Sanitize output files
         self._sanitize_output()
+        self.random_id_string = str(uuid.uuid4())[:10]
 
     # default_dictionary["absorving_boundary_conditions"] = {
     #     "status": False,  # True or false
@@ -511,8 +516,12 @@ class Model_parameters:
             warnings.warn("No paralellism type listed. Assuming automatic")
             self.parallelism_type = "automatic"
 
-        if self.source_type == "MMS":
-            self.parallelism_type = "spatial"
+        if self.parallelism_type == "custom":
+            self.shot_ids_per_propagation = dictionary["parallelism"]["shot_ids_per_propagation"]
+        elif self.parallelism_type == "automatic":
+            self.shot_ids_per_propagation = [[i] for i in range(0, self.number_of_sources)]
+        elif self.parallelism_type == "spatial":
+            self.shot_ids_per_propagation = [[i] for i in range(0, self.number_of_sources)]
 
         if comm is None:
             self.comm = utils.mpi_init(self)
@@ -593,9 +602,12 @@ class Model_parameters:
     def _sanitize_optimization_and_velocity_for_fwi(self):
         self._sanitize_optimization_and_velocity_without_fwi()
         dictionary = self.input_dictionary
-        self.initial_velocity_model_file = dictionary["inversion"][
-            "initial_guess_model_file"
-        ]
+        try:
+            self.initial_velocity_model_file = dictionary["inversion"][
+                "initial_guess_model_file"
+            ]
+        except KeyError:
+            self.initial_velocity_model_file = None
         self.fwi_output_folder = "fwi/"
         self.control_output_file = self.fwi_output_folder + "control"
         self.gradient_output_file = self.fwi_output_folder + "gradient"
@@ -710,13 +722,15 @@ class Model_parameters:
         mesh_parameters.setdefault("degree", self.degree)
         mesh_parameters.setdefault("velocity_model_file", self.initial_velocity_model_file)
         mesh_parameters.setdefault("cell_type", self.cell_type)
-        mesh_parameters.setdefault("cells_per_wavelength", None)
+        print(f"Method: {self.method}, Degree: {self.degree}, Dimension: {self.dimension}")
+        mesh_parameters.setdefault("cells_per_wavelength", cells_per_wavelength(self.method, self.degree, self.dimension))
 
         self._set_mesh_length(
             length_z=mesh_parameters["length_z"],
             length_x=mesh_parameters["length_x"],
             length_y=mesh_parameters["length_y"],
         )
+        self.set_mesh_type(new_mesh_type=mesh_parameters["mesh_type"])
 
         if self.mesh_type == "firedrake_mesh":
             automatic_mesh = True
@@ -744,6 +758,10 @@ class Model_parameters:
             warnings.warn(
                 "Mesh dimensions not completely reset from initial dictionary"
             )
+
+    def set_mesh_type(self, new_mesh_type=None):
+        if new_mesh_type is not None:
+            self.mesh_type = new_mesh_type
 
     def _creating_automatic_mesh(self, mesh_parameters={}):
         """
