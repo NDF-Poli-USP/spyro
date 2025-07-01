@@ -8,6 +8,7 @@ from ..io.boundary_layer_io import Read_boundary_layer
 from .. import io
 from .. import utils
 from .. import meshing
+from ..meshing.meshing_functions import cells_per_wavelength
 
 
 class Model_parameters(Read_options, Read_boundary_layer):
