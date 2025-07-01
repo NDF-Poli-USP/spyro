@@ -83,6 +83,10 @@ class Dictionary_conversion:
         variant = self.new_dictionary["options"]["variant"]
         if variant == "GLL" or variant == "KMV":
             self.new_dictionary["options"]["variant"] = "lumped"
+        if variant == "KMV":
+            self.new_dictionary["options"]["method"] = "mass_lumped_triangle"
+        if variant == "GLL":
+            self.new_dictionary["options"]["method"] = "spectral_quadrilateral"
 
     def convert_parallelism(self):
         """
@@ -219,9 +223,13 @@ class Dictionary_conversion:
         convert the absorving_boundary_conditions section of dictionary
         """
         old_dictionary = self.old_dictionary["BCs"]
+        if old_dictionary["status"]:
+            damping_type = "PML"
+        else:
+            damping_type = None
         self.new_dictionary["absorving_boundary_conditions"] = {
             "status": old_dictionary["status"],
-            "damping_type": "PML",
+            "damping_type": damping_type,
             "exponent": old_dictionary["exponent"],
             "cmax": old_dictionary["cmax"],
             "R": old_dictionary["R"],
