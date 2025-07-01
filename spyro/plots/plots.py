@@ -275,7 +275,7 @@ def plot_model_in_p1(Wave_object, dx=0.01, filename="model.png", abc_points=None
     p1_obj_dict["options"]["degree"] = 1
 
     new_wave_obj = AcousticWave(dictionary=p1_obj_dict)
-    new_wave_obj.set_mesh(mesh_parameters={"dx": dx})
+    new_wave_obj.set_mesh(input_mesh_parameters={"edge_length": dx})
     new_wave_obj.set_initial_velocity_model(conditional=Wave_object.initial_velocity_model)
 
     return plot_model(new_wave_obj, filename=filename, abc_points=abc_points, show=show, flip_axis=flip_axis)

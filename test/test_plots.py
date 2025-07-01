@@ -71,7 +71,7 @@ def test_plot_mesh_sizes():
     pad = 0.3
     cpw = 3
 
-    mesh_parameters = {
+    input_mesh_parameters = {
         "length_z": Lz,
         "length_x": Lx,
         "length_y": 0.0,
@@ -87,17 +87,21 @@ def test_plot_mesh_sizes():
         "lbda": lbda,
         "dimension": 2,
         "edge_length": lbda/cpw,
+        "output_filename": mesh_filename,
     }
+
+    mesh_parameters = spyro.meshing.MeshingParameters()
+    mesh_parameters.set_mesh(input_mesh_parameters=input_mesh_parameters)
 
     Mesh_obj = spyro.meshing.AutomaticMesh(
         mesh_parameters=mesh_parameters,
     )
-    Mesh_obj.set_seismicmesh_parameters(output_file_name=mesh_filename)
+
     mesh = Mesh_obj.create_mesh()  # noqa: F841
 
-    output_filename = "mesh_size.png"
-    spyro.plots.plot_mesh_sizes(mesh_filename=mesh_filename, output_filename=str(output_filename), show=False)
-    assert os.path.exists(str(output_filename))
+    image_output_filename = "mesh_size.png"
+    spyro.plots.plot_mesh_sizes(mesh_filename=mesh_filename, output_filename=image_output_filename, show=False)
+    assert os.path.exists(str(image_output_filename))
 
 
 def test_plot_model_in_p1():
