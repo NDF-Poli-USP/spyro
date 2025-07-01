@@ -115,9 +115,9 @@ class Wave(Model_parameters, metaclass=ABCMeta):
         pass
 
     def set_mesh(
-        self,
-        user_mesh=None,
-        mesh_parameters=None,
+            self,
+            user_mesh=None,
+            mesh_parameters={},
     ):
         """
         Set the mesh for the solver.
@@ -186,6 +186,8 @@ class Wave(Model_parameters, metaclass=ABCMeta):
         output:  bool (optional)
             If True, outputs the velocity model to a pvd file for visualization.
         """
+        if new_file is not None:
+            self.initial_velocity_model_file = new_file
         # If no mesh is set, we have to do it beforehand
         if self.mesh is None:
             self.set_mesh()
@@ -218,6 +220,7 @@ class Wave(Model_parameters, metaclass=ABCMeta):
             self.initial_velocity_model = velocity_model_function
         elif new_file is not None:
             self.initial_velocity_model_file = new_file
+            self._get_initial_velocity_model()
         elif constant is not None:
             V = self.function_space
             vp = fire.Function(V, name="velocity")
@@ -370,7 +373,7 @@ class Wave(Model_parameters, metaclass=ABCMeta):
         pass
 
     @ensemble_propagator
-    def wave_propagator(self, dt=None, final_time=None, source_num=0):
+    def wave_propagator(self, dt=None, final_time=None, source_nums=[0]):
         """Propagates the wave forward in time.
         Currently uses central differences.
 
@@ -395,8 +398,8 @@ class Wave(Model_parameters, metaclass=ABCMeta):
         if dt is not None:
             self.dt = dt
 
-        self.current_source = source_num
-        usol, usol_recv = time_integrator(self, source_num)
+        self.current_sources = source_nums
+        usol, usol_recv = time_integrator(self, source_nums)
 
         return usol, usol_recv
 
