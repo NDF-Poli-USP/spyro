@@ -6,7 +6,6 @@ import warnings
 from .. import io
 from .. import utils
 from .. import meshing
-from ..meshing.meshing_functions import cells_per_wavelength
 
 # default_optimization_parameters = {
 #     "General": {"Secant": {"Type": "Limited-Memory BFGS",
