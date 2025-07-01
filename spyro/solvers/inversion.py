@@ -225,6 +225,11 @@ class FullWaveformInversion(AcousticWave):
                 raise FileNotFoundError(f"Shot record file '{value}' does not exist")
         self._real_shot_record_files = value
         self.load_real_shot_record(filename=self.real_shot_record_files)
+        self.control_out = fire.VTKFile("results/control.pvd")
+        self.gradient_out = fire.VTKFile("results/gradient.pvd")
+        self.real_shot_record_files = dictionary["inversion"].get("real_shot_record_files", None)
+        if self.real_shot_record_files is not None:
+            self.load_real_shot_record(filename=self.real_shot_record_files)
 
     def calculate_misfit(self, c=None):
         """
