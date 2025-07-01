@@ -3,7 +3,11 @@ from scipy.ndimage import gaussian_filter
 import segyio
 import numpy as np
 import matplotlib.pyplot as plt
-from SeismicMesh import write_velocity_model
+try:
+    from SeismicMesh import write_velocity_model
+    HAS_SEISMICMESH = True
+except ImportError:
+    HAS_SEISMICMESH = False
 
 
 def smooth_velocity_field_file(input_filename, output_filename, sigma, show=False, write_hdf5=True, i_limit=None, vp_limit=None, tol=1e-5):
@@ -85,6 +89,9 @@ def smooth_velocity_field_file(input_filename, output_filename, sigma, show=Fals
         plt.show()
 
     if write_hdf5:
-        write_velocity_model(output_filename, ofname=output_filename[:-5])
+        if HAS_SEISMICMESH:
+            write_velocity_model(output_filename, ofname=output_filename[:-5])
+        else:
+            print("Warning: SeismicMesh not available, skipping HDF5 writing.")
 
     return None
