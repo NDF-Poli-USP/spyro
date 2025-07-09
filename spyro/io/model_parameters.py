@@ -404,7 +404,6 @@ class Model_parameters:
             self.abc_cmax = BL_obj.abc_cmax
             self.abc_R = BL_obj.abc_R
             self.abc_pad_length = BL_obj.abc_pad_length
-
             self.absorb_top = dictionary.get("absorb_top", False)
             self.absorb_bottom = dictionary.get("absorb_bottom", True)
             self.absorb_right = dictionary.get("absorb_right", True)
