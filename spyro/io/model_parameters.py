@@ -390,9 +390,9 @@ class Model_parameters:
         dictionary = self.input_dictionary["absorving_boundary_conditions"]
         self.abc_active = dictionary["status"]
         BL_obj = io.boundary_layer_io.read_boundary_layer(dictionary)
+        self.abc_boundary_layer_type = BL_obj.abc_boundary_layer_type
 
         if BL_obj.abc_boundary_layer_type == "hybrid":
-            self.abc_boundary_layer_type = BL_obj.abc_boundary_layer_type
             self.abc_boundary_layer_shape = BL_obj.abc_boundary_layer_shape
             self.abc_deg_layer = BL_obj.abc_deg_layer
             self.abc_reference_freq = BL_obj.abc_reference_freq
