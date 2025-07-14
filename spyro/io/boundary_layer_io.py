@@ -62,7 +62,7 @@ class read_boundary_layer:
             self.abc_exponent = None
             self.abc_cmax = None
             self.abc_R = None
-            self.abc_pad_length = 0.0
+            self.abc_pad_length = self.dictionary.get("pad_length", 0.0)
             self.abc_boundary_layer_type = None
             pass
         elif self.dictionary["damping_type"] == "PML":
