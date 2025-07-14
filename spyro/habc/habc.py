@@ -1076,7 +1076,7 @@ class HABC_Wave(AcousticWave, HyperLayer, NRBCHabc):
         if monitor:
             for n_eig, eigval in enumerate(np.unique(Lsp)):
                 f_eig = np.sqrt(abs(eigval)) / (2 * np.pi)
-                print("Frequency {} (Hz): {0:.5f}".format(n_eig, f_eig))
+                print(f"Frequency {n_eig} (Hz): {f_eig:.5f}")
 
         # Fundamental frequency (eig = 0 is a rigid body motion)
         min_eigval = max(np.unique(Lsp[(Lsp > 0.) & (np.imag(Lsp) == 0.)]))

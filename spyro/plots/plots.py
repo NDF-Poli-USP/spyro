@@ -4,7 +4,7 @@ from PIL import Image
 import numpy as np
 import firedrake
 import copy
-from ..io import ensemble_plot
+from ..io import ensemble_save
 from spyro.utils.stats_tools import coeff_of_determination
 plt.rcParams.update({"font.family": "serif"})
 plt.rcParams['text.latex.preamble'] = r'\usepackage{bm} \usepackage{amsmath}'
