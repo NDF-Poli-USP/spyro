@@ -46,13 +46,20 @@ class Wave(Model_parameters, metaclass=ABCMeta):
 
     Methods:
     --------
-    set_mesh: sets or calculates new mesh
-    set_solver_parameters: sets new or default solver parameters
-    get_spatial_coordinates: returns spatial coordinates of mesh
-    set_initial_velocity_model: sets initial velocity model
-    get_and_set_maximum_dt: calculates and/or sets maximum dt
-    get_mass_matrix_diagonal: returns diagonal of mass matrix
-    set_last_solve_as_real_shot_record: sets last solve as real shot record
+    set_mesh()
+        Sets or calculates new mesh
+    set_solver_parameters()
+        Sets new or default solver parameters
+    get_spatial_coordinates()
+        Returns spatial coordinates of mesh
+    set_initial_velocity_model()
+        Ssets initial velocity model
+    get_and_set_maximum_dt()
+        Calculates and/or sets maximum dt
+    get_mass_matrix_diagonal()
+        Returns diagonal of mass matrix
+    set_last_solve_as_real_shot_record()
+        Sets last solve as real shot record
     """
 
     def __init__(self, dictionary=None, comm=None):
@@ -90,16 +97,21 @@ class Wave(Model_parameters, metaclass=ABCMeta):
         self.source_expression = None
         # Object for efficient application of sources
 
-        self.field_logger = FieldLogger(self.comm, self.input_dictionary["visualization"])
+        self.field_logger = FieldLogger(self.comm,
+                                        self.input_dictionary["visualization"])
         self.field_logger.add_field("forward", self.get_function_name(),
                                     lambda: self.get_function())
 
     def forward_solve(self):
         """Solves the forward problem."""
+
+        print("\nSolving Forward Problem")
+
         if self.function_space is None:
             self.force_rebuild_function_space()
 
-        self._initialize_model_parameters()
+        if self.abc_boundary_layer_type != "hybrid":
+            self._initialize_model_parameters()
         self.matrix_building()
         self.wave_propagator()
 
