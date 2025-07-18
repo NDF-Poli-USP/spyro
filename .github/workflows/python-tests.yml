@@ -54,9 +54,13 @@ jobs:
                .pytest_cache
         find . -name '*.pkl' -delete || true
 
-    - name: Running serial tests
+    - name: Running serial fast tests
       run: |
-        python3 -m pytest --cov-report=xml --cov=spyro test/
+        python3 -m pytest --cov-report=xml --cov=spyro test/ --skip-slow
+    - name: Running serial slow tests
+      run: |
+        python3 -m pytest --cov-report=xml --cov-append --cov=spyro test/ --only-slow
+
     - name: Running parallel 3D forward test
       run: |
           mpiexec -n 6 pytest test_3d/test_hexahedral_convergence.py
