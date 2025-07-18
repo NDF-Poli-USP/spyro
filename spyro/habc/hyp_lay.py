@@ -26,7 +26,7 @@ class HyperLayer():
         Area of the domain with hyperelliptical layer
     a_rat : `float`
         Area ratio to the area of the original domain. a_rat = area / a_orig
-    dimension : int
+    dimension : `int`
         Model dimension (2D or 3D). Default is 2D
     domain_dim : list
         Domain dimensions [Lx, Lz] (2D) or [Lx, Lz, Ly] (3D)
@@ -34,7 +34,7 @@ class HyperLayer():
         Hyperelliptical area factor. f_Ah = area / (a_hyp * b_hyp)
     f_Vh : `float`
         Hyperellipsoidal volume factor. f_Vh = vol / (a_hyp * b_hyp * c_hyp)
-    hyper_axes : list
+    hyper_axes : `list`
         Semi-axes of the hypershape layer [a, b] (2D) or [a, b, c] (3D)
     n_hyp: `int`
         Degree of the hyperelliptical pad layer (n >= 2). Default is 2.
@@ -86,9 +86,9 @@ class HyperLayer():
 
         Parameters
         ----------
-        n_hyp : int, optional
+        n_hyp : `int`, optional
             Hypershape degree. Default is 2
-        dimension : int, optional
+        dimension : `int`, optional
             Model dimension (2D or 3D). Default is 2D
 
         Returns
@@ -108,9 +108,9 @@ class HyperLayer():
 
         Parameters
         ----------
-        domain_dim : list
+        domain_dim : `list`
             Domain dimensions [Lx, Lz] (2D) or [Lx, Lz, Ly] (3D)
-        domain_hyp : list
+        domain_hyp : `list`
             Maximum hypershape dimensions without truncations.
             - 2D : [Lx + 2 * pad_len, Lz + 2 * pad_len]
             - 3D : [Lx + 2 * pad_len, Lz + 2 * pad_len, Ly + 2 * pad_len]
@@ -148,20 +148,20 @@ class HyperLayer():
 
         Parameters
         ----------
-        x_rel : list
+        x_rel : `list`
             Relative superness coordinates to the hyperellipse centroid
         lim : str
             Limit for the hyperellipse degree ('MIN' or 'MAX')
-        n_min : int, optional
+        n_min : `int`, optional
             Minimum allowed degree. Default is 2.
-        n_max : int, optional
+        n_max : `int`, optional
             Maximum allowed degree. Default is 20.
-        monitor : bool, optional
+        monitor : `bool`, optional
             Print the process on the screen. Default is False.
 
         Returns
         -------
-        n : int
+        n : `int`
             Hyperellipse degree
         '''
 
@@ -216,20 +216,20 @@ class HyperLayer():
 
         Parameters
         ----------
-        x_rel : list
+        x_rel : `list`
             Relative superness coordinates to the hyperellipsoid centroid
         lim : str
             Limit for the hyperellipsoid degree ('MIN' or 'MAX')
-        n_min : int, optional
+        n_min : `int`, optional
             Minimum allowed degree. Default is 2.
-        n_max : int, optional
+        n_max : `int`, optional
             Maximum allowed degree. Default is 20.
-        monitor : bool, optional
+        monitor : `bool`, optional
             Print the process on the screen. Default is False.
 
         Returns
         -------
-        n : int
+        n : `int`
             Hyperellipsoid degree
         '''
 
@@ -786,9 +786,9 @@ class HyperLayer():
         -------
         hyp_mesh : `netgen mesh`
             Generated mesh for the hyperelliptical layer
-        spln : `bool`
+        spln : `bool`, optional
             Flag to indicate whether to use splines (True) or lines (False)
-        fmesh : `float`
+        fmesh : `float`, optional
             Mesh size factor for the hyperelliptical layer with respect to mesh
             size of the original domain. Default is 1.0.
         '''

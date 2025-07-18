@@ -125,7 +125,7 @@ class Eikonal():
             self.y_data = node_positions[-1]
 
         # Path to save data
-        self.path_save = getcwd() + "/output/preamble/"
+        self.path_save = Wave.path_save + "preamble/"
 
     def define_bcs(self, Wave):
         '''

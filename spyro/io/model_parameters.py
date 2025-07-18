@@ -741,10 +741,13 @@ class Model_parameters:
         mesh_parameters.setdefault("source_frequency", self.frequency)
         mesh_parameters.setdefault("method", self.method)
         mesh_parameters.setdefault("degree", self.degree)
-        mesh_parameters.setdefault("velocity_model_file", self.initial_velocity_model_file)
+        mesh_parameters.setdefault("velocity_model_file",
+                                   self.initial_velocity_model_file)
         mesh_parameters.setdefault("cell_type", self.cell_type)
         print(f"Method: {self.method}, Degree: {self.degree}, Dimension: {self.dimension}")
-        mesh_parameters.setdefault("cells_per_wavelength", cells_per_wavelength(self.method, self.degree, self.dimension))
+        mesh_parameters.setdefault(
+            "cells_per_wavelength", cells_per_wavelength(
+                self.method, self.degree, self.dimension))
 
         self._set_mesh_length(
             length_z=mesh_parameters["length_z"],

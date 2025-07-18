@@ -11,7 +11,6 @@ from spyro.habc.hyp_lay import HyperLayer
 from spyro.habc.nrbc import NRBCHabc
 from spyro.plots.plots import plot_hist_receivers, \
     plot_rfft_receivers, plot_xCR_opt
-# fire.parameters["loopy"] = {"silenced_warnings": ["v1_scheduler_fallback"]}
 
 # Work from Ruben Andres Salas, Andre Luis Ferreira da Silva,
 # Luis Fernando Nogueira de Sá, Emilio Carlos Nelli Silva.
@@ -258,7 +257,13 @@ class HABC_Wave(AcousticWave, HyperLayer, NRBCHabc):
         self.fwi_iter = fwi_iter
 
         # Path to save data
-        self.path_save = getcwd() + "/output/"
+        if self.dimension == 2:  # 2D
+            folder_out = "/output/"
+
+        if self.dimension == 3:  # 3D
+            folder_out = "/output_3d/"
+
+        self.path_save = getcwd() + folder_out
 
     def identify_habc_case(self):
         '''
@@ -786,15 +791,21 @@ class HABC_Wave(AcousticWave, HyperLayer, NRBCHabc):
 
         Improvements
         ------------
-        dx = 0.05 km
-        Lst approach: 1.009 0.789 0.647 mean = 0.815
+        dx = 0.05 km (2D)
+        Pts approach: 0.699 0.599 0.717 mean = 0.672
+        Lst approach: 0.914 0.769 0.830 mean = 0.847
         New approach: 1.602 1.495 1.588 mean = 1.562
         Old approach: 1.982 2.124 1.961 mean = 2.022
 
         dx = 0.02 km
-        Lst approach: 2.011 2.078 1.898 mean = 1.996
+        Pts approach: 2.290 2.844 2.133 mean = 2.422
+        Lst approach: 2.784 2.726 3.085 mean = 2.865
         New approach: 5.276 5.214 6.275 mean = 5.588
         Old approach: 12.232 12.372 12.078 = 12.227
+
+        dx = 0.05 km (3D)
+        Pts approach: 33.234 31.697 31.598 = 32.176
+        Lst approach: 60.101 60.919 50.918 = 57.313
         '''
 
         print("\nUpdating Velocity Profile")
@@ -868,33 +879,37 @@ class HABC_Wave(AcousticWave, HyperLayer, NRBCHabc):
                                  & (abs(pad_pts[:, 2]) == 0.)))
         pts_to_extend = pad_pts[ind_pts]
 
-        # Set the velocity of the nearest point on the original boundary
-        vel_to_extend = self.initial_velocity_model.at(pts_to_extend,
-                                                       dont_raise=True)
-        del pts_to_extend
-
-        '''
-        Possible new apprach
-        # Set the velocity of the nearest point on the original boundary
-        # pts_mesh = fire.VertexOnlyMesh(
-        #     self.mesh_original, pts_to_extend,
-        #     missing_points_behaviour='warn', redundant=True)
+        # # Set the velocity of the nearest point on the original boundary
+        # vel_to_extend = self.initial_velocity_model.at(pts_to_extend,
+        #                                                dont_raise=True)
         # del pts_to_extend
-        # V0 = fire.FunctionSpace(pts_mesh, "DG", 0)
-        # c_int = fire.Interpolator(self.initial_velocity_model, V0,
-        #                           allow_missing_dofs=True)
-        # V1 = fire.FunctionSpace(pts_mesh.input_ordering, "DG", 0)
-        # c_pts = fire.assemble(c_int.interpolate())
-        # vel_to_extend = Function(V1)
-        # vel_to_extend.interpolate(c_pts)
-        # # Velocity profile inside the layer
-        # pad_field.dat.data_with_halos[
-        #     ind_pts, 0] = vel_to_extend.dat.data_with_halos[:]
-        '''
 
+        # # Velocity profile inside the layer
+        # pad_field.dat.data_with_halos[ind_pts, 0] = vel_to_extend
+        # del vel_to_extend, ind_pts
+
+        # Possible new apprach
+        # Set the velocity of the nearest point on the original boundary
+        pts_mesh = fire.VertexOnlyMesh(
+            self.mesh_original, pts_to_extend,
+            missing_points_behaviour='warn', redundant=True)
+        del pts_to_extend
+        V0 = fire.FunctionSpace(pts_mesh, "DG", 0)
+        c_int = fire.Interpolator(self.initial_velocity_model, V0,
+                                  allow_missing_dofs=True)
+        c_pts = fire.assemble(c_int.interpolate())
+        del c_int
+        V1 = fire.FunctionSpace(pts_mesh.input_ordering, "DG", 0)
+        del pts_mesh
+        vel_to_extend = fire.Function(V1)
+        vel_to_extend.interpolate(c_pts)
+        del c_pts
         # Velocity profile inside the layer
-        pad_field.dat.data_with_halos[ind_pts, 0] = vel_to_extend
+        pad_field.dat.data_with_halos[
+            ind_pts, 0] = vel_to_extend.dat.data_with_halos[:]
         del vel_to_extend, ind_pts
+
+        # Interpolating the velocity model in the layer
         self.c.interpolate(pad_field.sub(0) * layer_mask + (
             1 - layer_mask) * self.c, allow_missing_dofs=True)
         del layer_mask, pad_field
@@ -1529,6 +1544,7 @@ class HABC_Wave(AcousticWave, HyperLayer, NRBCHabc):
         z_pd_sqr = fire.conditional(z_f + Lz < 0, val_condz, 0.)
         x_pd_sqr = fire.conditional(x_f < 0, val_condx1, 0.) + \
             fire.conditional(x_f - Lx > 0, val_condx2, 0.)
+        ref = z_pd_sqr + x_pd_sqr
 
         if self.dimension == 3:  # 3D
 
@@ -1543,23 +1559,14 @@ class HABC_Wave(AcousticWave, HyperLayer, NRBCHabc):
             # Conditional expressions
             y_pd_sqr = fire.conditional(y_f < 0, val_condy1, 0.) + \
                 fire.conditional(y_f - Ly > 0, val_condy2, 0.)
+            ref += y_pd_sqr
 
         if typ_marker == 'damping':
-
             # Reference distance to the original boundary
-            norm_sqr = z_pd_sqr + x_pd_sqr
-            if self.dimension == 3:  # 3D
-                norm_sqr += y_pd_sqr
-
-            ref = fire.sqrt(norm_sqr) / fire.Constant(self.pad_len)
+            ref = fire.sqrt(ref) / fire.Constant(self.pad_len)
 
         elif typ_marker == 'mask':
-
             # Mask filter for layer boundary domain
-            ref = z_pd_sqr + x_pd_sqr
-            if self.dimension == 3:  # 3D
-                ref += y_pd_sqr
-
             ref = fire.conditional(ref > 0, 1.0, 0.0)
 
         return ref
@@ -1782,15 +1789,15 @@ class HABC_Wave(AcousticWave, HyperLayer, NRBCHabc):
 
             # Finding peaks in transient response
             u_pks = find_peaks(u_abc)
-            if len(u_pks[0]) == 0:
+            if u_pks[0].size == 0:
                 wrn_str0 = "No peak observed in the transient response. "
                 wrn_str1 = "Increase the transient time of the simulation."
                 UserWarning(wrn_str0 + wrn_str1)
 
-            # Maximum peak
-            p_abc = max(u_abc[u_pks[0]])
-            p_ref = max(u_ref)
-            pkMax.append(p_abc)
+            # Maximum peak value
+            p_abc = max(abs(u_abc))
+            p_ref = max(abs(u_ref))
+            pkMax.append(p_ref)
 
             # Completing with zeros if the length of arrays is different
             delta_len = abs(len(u_abc) - len(u_ref))
@@ -1799,9 +1806,9 @@ class HABC_Wave(AcousticWave, HyperLayer, NRBCHabc):
             elif len(u_ref) > len(u_abc):
                 u_abc = np.concatenate([u_abc, np.zeros(delta_len)])
 
-            # Integral error: To Do - Substitute np.trapz by np.trapezoid
-            errIt.append(np.trapz((u_abc - u_ref)**2, dx=self.dt)
-                         / np.trapz(u_ref**2, dx=self.dt))
+            # Integral error
+            errIt.append(np.trapezoid((u_abc - u_ref)**2, dx=self.dt)
+                         / np.trapezoid(u_ref**2, dx=self.dt))
 
             # Peak error
             errPk.append(abs(p_abc / p_ref - 1))

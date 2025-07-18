@@ -5,8 +5,7 @@ from spyro.utils.cost import comp_cost
 
 
 def wave_dict(dt_usu, layer_shape, degree_layer,
-              habc_reference_freq, get_ref_model,
-              degree_eikonal):
+              habc_reference_freq, get_ref_model):
     '''
     Create a dictionary with parameters for the model.
 
@@ -23,8 +22,6 @@ def wave_dict(dt_usu, layer_shape, degree_layer,
     get_ref_model : `bool`
         If True, the infinite model is created. If False, the absorbing layer
         is created based on the model parameters.
-    degree_eikonal : `int`
-        Finite element order for the Eikonal equation. Should be 1 or 2.
 
     Returns
     -------
@@ -41,8 +38,8 @@ def wave_dict(dt_usu, layer_shape, degree_layer,
         # (MLT/spectral_quadrilateral/DG_triangle/DG_quadrilateral)
         # You can either specify a cell_type+variant or a method
         # accepted_variants = ["lumped", "equispaced", "DG"]
-        "degree": 3,  # p order p<=3 for 3D
-        "dimension": 3,  # dimension
+        "degree": 4,  # p order p<=4 for 2D
+        "dimension": 2,  # dimension
     }
 
     # Number of cores for the shot. For simplicity, we keep things serial.
@@ -58,7 +55,7 @@ def wave_dict(dt_usu, layer_shape, degree_layer,
     dictionary["mesh"] = {
         "Lz": 1.0,  # depth in km - always positive
         "Lx": 1.0,  # width in km - always positive
-        "Ly": 1.0,  # thickness in km - always positive
+        "Ly": 0.0,  # thickness in km - always positive
         "mesh_type": "firedrake_mesh",
     }
 
@@ -68,21 +65,18 @@ def wave_dict(dt_usu, layer_shape, degree_layer,
     # of the domain to verify the efficiency of the absorbing layer.
     dictionary["acquisition"] = {
         "source_type": "ricker",
-        "source_locations": [(-0.5, 0.25, 0.5)],
+        "source_locations": [(-0.5, 0.25)],
         "frequency": 5.0,  # in Hz
-        "delay": 1. / 3.,
-        "delay_type": "time",  # "multiples_of_minimun" or "time"
-        "receiver_locations": [(-1., 0., 0.), (-1., 1., 0.),
-                               (0., 1., 0.), (0., 0., 0),
-                               (-1., 0., 1.), (-1., 1., 1.),
-                               (0., 1., 1.), (0., 0., 1.)]
+        "delay": 1.5,
+        "receiver_locations": [(-1., 0.), (-1., 1.), (0., 1.), (0., 0.)]
+        # "source_locations": [(-0.5, 0.25), (-0.5, 0.35), (-0.5, 0.5)],
     }
 
-    # Simulate for 1.0 seconds.
+    # Simulate for 2.0 seconds.
     fr_files = max(int(100 * 0.0005 / dt_usu), 1)
     dictionary["time_axis"] = {
         "initial_time": 0.0,  # Initial time for event
-        "final_time": 1.,    # Final time for event
+        "final_time": 2.,    # Final time for event
         "dt": dt_usu,  # timestep size in seconds
         "amplitude": 1,  # the Ricker has an amplitude of 1.
         "output_frequency": fr_files,  # how frequently to output solution to pvds
@@ -96,26 +90,26 @@ def wave_dict(dt_usu, layer_shape, degree_layer,
         "layer_shape": layer_shape,  # Options: rectangular or hypershape
         "degree_layer": degree_layer,  # Integer >= 2. Only for hypershape
         "habc_reference_freq": habc_reference_freq,  # Options: source or boundary
-        "degree_eikonal": degree_eikonal,  # Finite element order for the Eikonal analysis
+        "degree_eikonal": 2,  # Finite element order for the Eikonal analysis
         "get_ref_model": get_ref_model,  # If True, the infinite model is created
     }
 
     # Define parameters for visualization
     dictionary["visualization"] = {
         "forward_output": True,
-        "forward_output_filename": "output_3d/forward/fw_output_3d.pvd",
+        "forward_output_filename": "output/forward/fw_output.pvd",
         "fwi_velocity_model_output": False,
         "velocity_model_filename": None,
         "gradient_output": False,
         "gradient_filename": None,
         "acoustic_energy": True,  # Activate energy calculation
-        "acoustic_energy_filename": "output_3d/preamble/acoustic_potential_energy",
+        "acoustic_energy_filename": "output/preamble/acoustic_potential_energy",
     }
 
     return dictionary
 
 
-def preamble_habc(dictionary, edge_length, f_est):
+def preamble_habc(dictionary, edge_length):
     '''
     Run the infinite model and the Rikonal analysis
 
@@ -125,8 +119,6 @@ def preamble_habc(dictionary, edge_length, f_est):
         Dictionary containing the parameters for the model
     edge_length : `float`
         Mesh size in km
-    f_est : `float`, optional
-        Factor for the stabilizing term in Eikonal Eq. Default is 0.06
 
     Returns
     -------
@@ -139,7 +131,7 @@ def preamble_habc(dictionary, edge_length, f_est):
     tRef = comp_cost("tini")
 
     # Create the acoustic wave object with HABCs
-    Wave_obj = habc.HABC_Wave(dictionary=dictionary, f_est=f_est)
+    Wave_obj = habc.HABC_Wave(dictionary=dictionary)
 
     # Mesh
     Wave_obj.set_mesh(mesh_parameters={"edge_length": edge_length})
@@ -290,12 +282,12 @@ def habc_fig8(Wave_obj, dat_regr_xCR, xCR_usu=None, plot_comparison=True):
                                   data_regr_xCR=dat_regr_xCR)
 
 
-def test_loop_habc_3d():
+def test_loop_habc():
     '''
-    Loop for applying the HABC to the 3D-Fig.8 model in Salas et al. (2022).
+    Loop for applying the HABC to the model in Fig. 8 of Salas et al. (2022).
     '''
 
-    case = 0  # Only one case is defined
+    case = 0  # Integer from 0 to 3
 
     # ============ SIMULATION PARAMETERS ============
 
@@ -303,21 +295,16 @@ def test_loop_habc_3d():
     # cpw: cells per wavelength
     # lba = minimum_velocity /source_frequency
     # edge_length = lba / cpw
-    edge_length_lst = [0.05]
+    edge_length_lst = [0.05]  # [0.05, 0.02, 0.016, 0.01]
 
     # Timestep size
-    dt_usu_lst = [0.0005]
-
-    # Eikonal degree
-    degree_eikonal_lst = [1]  # [1 2]
+    dt_usu_lst = [0.0005]  # [0.0005, 0.0002, 0.0002, 0.000125]
 
     # Get simulation parameters
     edge_length = edge_length_lst[case]
     dt_usu = dt_usu_lst[case]
-    p_eik = degree_eikonal_lst[case]
     print("\nMesh Size: {:.3f} km".format(edge_length))
-    print("Timestep Size: {:.3f} ms".format(1e3 * dt_usu))
-    print("Eikonal Degree: {}\n".format(p_eik))
+    print("Timestep Size: {:.3f} ms\n".format(1e3 * dt_usu))
 
     # ============ HABC PARAMETERS ============
 
@@ -325,7 +312,7 @@ def test_loop_habc_3d():
     degree_layer_lst = [None]  # [None, 2, 3, 4, 5]
 
     # Reference frequency
-    habc_reference_freq_lst = ["boundary"]  # ["source", "boundary"]
+    habc_reference_freq_lst = ["source"]  # ["source", "boundary"]
 
     # Infinite model
     get_ref_model = False
@@ -337,16 +324,15 @@ def test_loop_habc_3d():
     crit_opt = "error_difference"  # "error_integral"
 
     # Number of points for regression (odd number)
-    n_pts = 1
+    n_pts = 3
 
     # ============ MESH AND EIKONAL ============
     # Create dictionary with parameters for the model
-    dictionary = wave_dict(dt_usu, "rectangular", None,
-                           "source", get_ref_model, p_eik)
+    dictionary = wave_dict(dt_usu, "rectangular",
+                           None, "source", get_ref_model)
 
     # Creating mesh and performing eikonal analysis
-    f_est = 0.07 if p_eik == 2 else 0.06
-    Wave_obj = preamble_habc(dictionary, edge_length, f_est)
+    Wave_obj = preamble_habc(dictionary, edge_length)
 
     # ============ REFERENCE MODEL ============
     if get_ref_model:
@@ -425,14 +411,11 @@ def test_loop_habc_3d():
                             xCR_opt = get_xCR_usu(
                                 Wave_obj, dat_regr_xCR, "optimal", n_pts)
 
-                        if n_pts == 1:
-                            break
-
                     except Exception as e:
                         print(f"Error Solving: {e}")
                         break
 
 
-# Applying HABCs to the model in Fig. 8 of Salas et al. (2022) in 3D
+# Applying HABCs to the model in Fig. 8 of Salas et al. (2022)
 if __name__ == "__main__":
-    test_loop_habc_3d()
+    test_loop_habc()
