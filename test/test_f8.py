@@ -2,6 +2,7 @@ import firedrake as fire
 import spyro.habc.habc as habc
 import spyro.habc.eik as eik
 from spyro.utils.cost import comp_cost
+import pytest
 
 
 def wave_dict(dt_usu, layer_shape, degree_layer,
@@ -282,6 +283,7 @@ def habc_fig8(Wave_obj, dat_regr_xCR, xCR_usu=None, plot_comparison=True):
                                   data_regr_xCR=dat_regr_xCR)
 
 
+@pytest.mark.slow
 def test_loop_habc():
     '''
     Loop for applying the HABC to the model in Fig. 8 of Salas et al. (2022).
@@ -315,7 +317,7 @@ def test_loop_habc():
     habc_reference_freq_lst = ["source", "boundary"]
 
     # Infinite model
-    get_ref_model = True
+    get_ref_model = False
 
     # Loop for HABC cases
     loop_modeling = True  # not get_ref_model
@@ -343,11 +345,13 @@ def test_loop_habc():
         Wave_obj.infinite_model()
 
         # Set model parameters for the HABC scheme
-        Wave_obj.abc_get_ref_model = False
+        Wave_obj.abc_get_ref_model = True
 
         # Estimating computational resource usage
         comp_cost("tfin", tRef=tRef,
                   user_name=Wave_obj.path_save + "preamble/INF_")
+    else:
+        Wave_obj.load_infinite_model_reference("/workspaces/fix_tests/output/preamble/habc_ref.npy")
 
     # ============ HABC SCHEME ============
     if loop_modeling:

@@ -1728,6 +1728,9 @@ class HABC_Wave(AcousticWave, HyperLayer, NRBCHabc):
         if self.dimension == 3:
             del self.Ly_habc
 
+    def load_infinite_model_reference(self, filename):
+        self.receivers_reference = np.load(filename)
+
     def get_reference_signal(self):
         '''
         Acquire the reference signal to compare with the HABC scheme.
