@@ -85,6 +85,7 @@ def test_cpw_calc_triangles():
     return run_test_cpw_calc(method, correct_cpw)
 
 
+@pytest.mark.slow
 def test_cpw_calc_quads():
     method = "spectral_quadrilateral"
     correct_cpw = 2.5
