@@ -56,7 +56,7 @@ jobs:
 
     - name: Running serial fast tests
       run: |
-        python3 -m pytest --cov-report=xml --cov=spyro test/ --skip-slow
+        python3 -m pytest -n 10 --cov-report=xml --cov=spyro test/ --skip-slow
     - name: Running serial slow tests
       run: |
         python3 -m pytest --cov-report=xml --cov-append --cov=spyro test/ --only-slow
