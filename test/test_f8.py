@@ -284,7 +284,26 @@ def habc_fig8(Wave_obj, dat_regr_xCR, xCR_usu=None, plot_comparison=True):
 
 
 @pytest.mark.slow
-def test_loop_habc():
+def test_loop_habc_rectangular_source():
+    return run_loop_habc(degree_layer_lst = [None], habc_reference_freq_lst = ["source"])
+
+
+@pytest.mark.slow
+def test_loop_habc_rectangular_boundary():
+    return run_loop_habc(degree_layer_lst = [None], habc_reference_freq_lst = ["boundary"])
+
+
+@pytest.mark.slow
+def test_loop_habc_hyperellipse_source():
+    return run_loop_habc(degree_layer_lst = [2], habc_reference_freq_lst = ["source"])
+
+
+@pytest.mark.slow
+def test_loop_habc_hyperellipse_boundary():
+    return run_loop_habc(degree_layer_lst = [2], habc_reference_freq_lst = ["boundary"])
+
+
+def run_loop_habc(degree_layer_lst, habc_reference_freq_lst):
     '''
     Loop for applying the HABC to the model in Fig. 8 of Salas et al. (2022).
     '''
@@ -311,10 +330,10 @@ def test_loop_habc():
     # ============ HABC PARAMETERS ============
 
     # Hyperellipse degrees
-    degree_layer_lst = [None, 2]  # [None, 2, 3, 4, 5]
+    # degree_layer_lst = [None, 2]  # [None, 2, 3, 4, 5]
 
     # Reference frequency
-    habc_reference_freq_lst = ["source", "boundary"]
+    # habc_reference_freq_lst = ["source", "boundary"]
 
     # Infinite model
     get_ref_model = False
@@ -351,7 +370,7 @@ def test_loop_habc():
         comp_cost("tfin", tRef=tRef,
                   user_name=Wave_obj.path_save + "preamble/INF_")
     else:
-        Wave_obj.load_infinite_model_reference("/workspaces/fix_tests/output/preamble/habc_ref.npy")
+        Wave_obj.load_infinite_model_reference("test/inputfiles/habc_ref.npy")
 
     # ============ HABC SCHEME ============
     if loop_modeling:
@@ -422,4 +441,5 @@ def test_loop_habc():
 
 # Applying HABCs to the model in Fig. 8 of Salas et al. (2022)
 if __name__ == "__main__":
-    test_loop_habc()
+    test_loop_habc_rectangular()
+    test_loop_habc_hyperellipse()
