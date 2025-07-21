@@ -285,22 +285,22 @@ def habc_fig8(Wave_obj, dat_regr_xCR, xCR_usu=None, plot_comparison=True):
 
 @pytest.mark.slow
 def test_loop_habc_rectangular_source():
-    return run_loop_habc(degree_layer_lst = [None], habc_reference_freq_lst = ["source"])
+    return run_loop_habc(degree_layer_lst=[None], habc_reference_freq_lst=["source"])
 
 
 @pytest.mark.slow
 def test_loop_habc_rectangular_boundary():
-    return run_loop_habc(degree_layer_lst = [None], habc_reference_freq_lst = ["boundary"])
+    return run_loop_habc(degree_layer_lst=[None], habc_reference_freq_lst=["boundary"])
 
 
 @pytest.mark.slow
 def test_loop_habc_hyperellipse_source():
-    return run_loop_habc(degree_layer_lst = [2], habc_reference_freq_lst = ["source"])
+    return run_loop_habc(degree_layer_lst=[2], habc_reference_freq_lst=["source"])
 
 
 @pytest.mark.slow
 def test_loop_habc_hyperellipse_boundary():
-    return run_loop_habc(degree_layer_lst = [2], habc_reference_freq_lst = ["boundary"])
+    return run_loop_habc(degree_layer_lst=[2], habc_reference_freq_lst=["boundary"])
 
 
 def run_loop_habc(degree_layer_lst, habc_reference_freq_lst):
@@ -441,5 +441,7 @@ def run_loop_habc(degree_layer_lst, habc_reference_freq_lst):
 
 # Applying HABCs to the model in Fig. 8 of Salas et al. (2022)
 if __name__ == "__main__":
-    test_loop_habc_rectangular()
-    test_loop_habc_hyperellipse()
+    test_loop_habc_rectangular_source()
+    test_loop_habc_rectangular_boundary()
+    test_loop_habc_hyperellipse_source()
+    test_loop_habc_hyperellipse_boundary()
