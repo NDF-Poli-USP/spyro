@@ -303,7 +303,12 @@ def test_loop_habc_hyperellipse_boundary():
     return run_loop_habc(degree_layer_lst=[2], habc_reference_freq_lst=["boundary"])
 
 
-def run_loop_habc(degree_layer_lst, habc_reference_freq_lst):
+@pytest.mark.slow
+def test_loop_habc_infinite():
+    return run_loop_habc(degree_layer_lst=[None], habc_reference_freq_lst=["source"], get_ref_model=True, loop_modeling=False)
+
+
+def run_loop_habc(degree_layer_lst, habc_reference_freq_lst, get_ref_model=False, loop_modeling=True):
     '''
     Loop for applying the HABC to the model in Fig. 8 of Salas et al. (2022).
     '''
@@ -336,10 +341,10 @@ def run_loop_habc(degree_layer_lst, habc_reference_freq_lst):
     # habc_reference_freq_lst = ["source", "boundary"]
 
     # Infinite model
-    get_ref_model = False
+    # get_ref_model = False
 
     # Loop for HABC cases
-    loop_modeling = True  # not get_ref_model
+    # loop_modeling = True  # not get_ref_model
 
     # Error criterion for heuristic factor xCR
     crit_opt = "error_difference"  # "error_integral"

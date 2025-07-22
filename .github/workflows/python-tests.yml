@@ -60,7 +60,7 @@ jobs:
         python3 -m pytest -n 10 --cov-report=xml --cov=spyro test/ --skip-slow
     - name: Running serial slow tests
       run: |
-        python3 -m pytest -n 5 --cov-report=xml --cov-append --cov=spyro test/ --only-slow
+        python3 -m pytest -n 8 --cov-report=xml --cov-append --cov=spyro test/ --only-slow
 
     - name: Running parallel 3D forward test
       run: |
