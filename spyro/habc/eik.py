@@ -1,6 +1,6 @@
 import firedrake as fire
 import numpy as np
-from sys import float_info
+from sys import float_info, exit
 from os import getcwd
 
 # Work from Ruben Andres Salas, Andre Luis Ferreira da Silva,
@@ -468,7 +468,7 @@ class Eikonal():
                         else round(user_atol + 1e-5, 5)
                     if user_atol > 1e-4:
                         print("High Tolerance. Exiting!")
-                        break
+                        exit("No Results for Eikonal Equation")
 
         # Save Eikonal results
         eikonal_file = fire.VTKFile(self.path_save + "Eik.pvd")

@@ -521,7 +521,8 @@ class HABC_Wave(AcousticWave, HyperLayer, NRBCHabc):
 
         # Check if the signal is empty
         if signal.size == 0:
-            raise ValueError("Input signal is empty. Cannot compute frequency response.")
+            err = "Input signal is empty. Cannot compute frequency response."
+            raise ValueError(err)
 
         # Zero padding for increasing smoothing in FFT
         yt = np.concatenate([np.zeros(fpad * len(signal)), signal])
@@ -977,8 +978,22 @@ class HABC_Wave(AcousticWave, HyperLayer, NRBCHabc):
             # Initialize random vectors for LOBPCG
             X = sl.orth(np.random.rand(Msp.shape[0], k))
 
+            prec = ss.linalg.spilu(ss.csc_matrix(Asp - 1e-8 * Msp))
+
             # Solve the eigenproblem using LOBPCG
-            Lsp = ss.linalg.lobpcg(Asp, X, M=Msp, largest=False)[0]
+            Lsp = ss.linalg.lobpcg(Asp, X, B=Msp, M=prec.solve, tol=None,
+                                   maxiter=100, largest=False,
+                                   retResidualNormsHistory=True)[0]
+
+            for n_eig, eigval in enumerate(np.unique(Lsp)):
+                f_eig = np.sqrt(abs(eigval)) / (2 * np.pi)
+                print(f"Frequency {n_eig} (Hz): {f_eig:.5f}")
+
+            import ipdb
+            ipdb.set_trace()
+
+
+        Lsp = ss.linalg.lobpcg(Asp, X, B=Msp, M=prec.solve, maxiter=100, largest=False, retResidualNormsHistory=True)[0]
 
         return Lsp
 
@@ -1086,7 +1101,10 @@ class HABC_Wave(AcousticWave, HyperLayer, NRBCHabc):
             Lsp = self.solve_eigenproblem(Asp, Msp, method='ARNOLDI')
 
         if self.dimension == 3:  # 3D
-            Lsp = self.solve_eigenproblem(Asp, Msp, method='LOBPCG')
+            shift = 1e-8
+            A_sh = Asp + shift * Msp
+            Lsp = self.solve_eigenproblem(A_sh, Msp, method='LOBPCG')
+            Lsp -= shift
 
         if monitor:
             for n_eig, eigval in enumerate(np.unique(Lsp)):
@@ -1097,6 +1115,9 @@ class HABC_Wave(AcousticWave, HyperLayer, NRBCHabc):
         min_eigval = max(np.unique(Lsp[(Lsp > 0.) & (np.imag(Lsp) == 0.)]))
         self.fundam_freq = np.real(np.sqrt(min_eigval) / (2 * np.pi))
         print("Fundamental Frequency (Hz): {0:.5f}".format(self.fundam_freq))
+
+        import ipdb
+        ipdb.set_trace()
 
     def min_reflection(self, kCR, psi=None, p=None, CR_err=None, typ='CR_PSI'):
         '''
@@ -1590,7 +1611,7 @@ class HABC_Wave(AcousticWave, HyperLayer, NRBCHabc):
         '''
 
         # Estimating fundamental frequency
-        self.fundamental_frequency()
+        self.fundamental_frequency(monitor=True)
 
         # Initialize damping field
         print("\nCreating Damping Profile")

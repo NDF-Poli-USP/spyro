@@ -295,7 +295,7 @@ def test_loop_habc_3d():
     Loop for applying the HABC to the 3D-Fig.8 model in Salas et al. (2022).
     '''
 
-    case = 0  # Only one case is defined
+    case = 3  # Integer from 0 to 3
 
     # ============ SIMULATION PARAMETERS ============
 
@@ -303,21 +303,27 @@ def test_loop_habc_3d():
     # cpw: cells per wavelength
     # lba = minimum_velocity /source_frequency
     # edge_length = lba / cpw
-    edge_length_lst = [0.05]
+    edge_length_lst = [0.15, 0.125, 0.10, 0.08]
 
     # Timestep size
-    dt_usu_lst = [0.0005]
+    dt_usu_lst = [0.0025, 0.0025, 0.002, 0.0016]
+    # dt_max = [0.0026, 0.0000034, 0.0000022, 0.0000014]
 
     # Eikonal degree
-    degree_eikonal_lst = [1]  # [1 2]
+    degree_eikonal_lst = [2, 1, 2, 1]
+
+    # Factor for the stabilizing term in Eikonal equation
+    f_est_lst = [0.04, 0.05, 0.03, 0.05]
 
     # Get simulation parameters
     edge_length = edge_length_lst[case]
     dt_usu = dt_usu_lst[case]
     p_eik = degree_eikonal_lst[case]
+    f_est = f_est_lst[case]
     print("\nMesh Size: {:.3f} km".format(edge_length))
     print("Timestep Size: {:.3f} ms".format(1e3 * dt_usu))
-    print("Eikonal Degree: {}\n".format(p_eik))
+    print("Eikonal Degree: {}".format(p_eik))
+    print("Eikonal Stabilizing Factor: {:.2f}\n".format(f_est))
 
     # ============ HABC PARAMETERS ============
 
@@ -325,7 +331,7 @@ def test_loop_habc_3d():
     degree_layer_lst = [None]  # [None, 2, 3, 4, 5]
 
     # Reference frequency
-    habc_reference_freq_lst = ["boundary"]  # ["source", "boundary"]
+    habc_reference_freq_lst = ["source"]  # ["source", "boundary"]
 
     # Infinite model
     get_ref_model = False
@@ -345,7 +351,6 @@ def test_loop_habc_3d():
                            "source", get_ref_model, p_eik)
 
     # Creating mesh and performing eikonal analysis
-    f_est = 0.07 if p_eik == 2 else 0.06
     Wave_obj = preamble_habc(dictionary, edge_length, f_est)
 
     # ============ REFERENCE MODEL ============
@@ -436,3 +441,11 @@ def test_loop_habc_3d():
 # Applying HABCs to the model in Fig. 8 of Salas et al. (2022) in 3D
 if __name__ == "__main__":
     test_loop_habc_3d()
+
+# eik_min = 83.333 ms
+# f_est Case_0  Case_1  Case_2  Case_3
+#  0.02  --/--   --/--  79.817  58.368
+#  0.03 78.201  75.378  84.365* 71.123
+#  0.04 84.857* 78.301  89.437  78.665
+#  0.05 91.477  82.274* 93.810  83.901*
+#  0.06 97.574  86.409  97.935  88.048
