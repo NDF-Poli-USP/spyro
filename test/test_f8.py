@@ -369,7 +369,7 @@ def run_loop_habc(degree_layer_lst, habc_reference_freq_lst, get_ref_model=False
         Wave_obj.infinite_model()
 
         # Set model parameters for the HABC scheme
-        Wave_obj.abc_get_ref_model = True
+        Wave_obj.abc_get_ref_model = False
 
         # Estimating computational resource usage
         comp_cost("tfin", tRef=tRef,
