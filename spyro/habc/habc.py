@@ -978,22 +978,9 @@ class HABC_Wave(AcousticWave, HyperLayer, NRBCHabc):
             # Initialize random vectors for LOBPCG
             X = sl.orth(np.random.rand(Msp.shape[0], k))
 
-            prec = ss.linalg.spilu(ss.csc_matrix(Asp - 1e-8 * Msp))
-
             # Solve the eigenproblem using LOBPCG
-            Lsp = ss.linalg.lobpcg(Asp, X, B=Msp, M=prec.solve, tol=None,
-                                   maxiter=100, largest=False,
-                                   retResidualNormsHistory=True)[0]
-
-            for n_eig, eigval in enumerate(np.unique(Lsp)):
-                f_eig = np.sqrt(abs(eigval)) / (2 * np.pi)
-                print(f"Frequency {n_eig} (Hz): {f_eig:.5f}")
-
-            import ipdb
-            ipdb.set_trace()
-
-
-        Lsp = ss.linalg.lobpcg(Asp, X, B=Msp, M=prec.solve, maxiter=100, largest=False, retResidualNormsHistory=True)[0]
+            Lsp = ss.linalg.lobpcg(Asp, X, B=Msp, maxiter=2000,
+                                   largest=False)[0]
 
         return Lsp
 
@@ -1079,23 +1066,72 @@ class HABC_Wave(AcousticWave, HyperLayer, NRBCHabc):
            0.47525      13.47       13.47
         '''
 
+        # Function space for the problem
         V = self.function_space
-        c = self.c
         u, v = fire.TrialFunction(V), fire.TestFunction(V)
 
         # Bilinear forms
+        c = self.c
         m = fire.inner(u, v) * fire.dx
-        M = fire.assemble(m)
-        m_ptr, m_ind, m_val = M.petscmat.getValuesCSR()
-        Msp = ss.csr_matrix((m_val, m_ind, m_ptr), M.petscmat.size)
-
         a = c * c * fire.inner(fire.grad(u), fire.grad(v)) * fire.dx
-        A = fire.assemble(a)
-        a_ptr, a_ind, a_val = A.petscmat.getValuesCSR()
-        Asp = ss.csr_matrix((a_val, a_ind, a_ptr), A.petscmat.size)
 
         # Operator - To do: Slepc, get computational cost
         print("\nSolving Eigenvalue Problem")
+
+        opts_k = {
+            "eps_type": "krylovschur",        # Robust, widely used eigensolver
+            "eps_tol": 1e-6,                  # Tight tolerance for accuracy
+            "eps_max_it": 200,                # Reasonable iteration cap
+            "st_type": "sinvert",             # Useful for interior eigenvalues
+            "st_shift": 1e-6,                 # Stabilizes Neumann BC null space
+            "eps_smallest_magnitude": None,   # Return smallest eigenvalues in magnitude
+            "eps_monitor": "ascii",           # Print convergence info
+            "ksp_type": "cg",                 # "cg" or "gmres" for large problems
+            "pc_type": "hypre"                # "hypre" or "gamg" for large problems
+        }
+
+        opts_l = {
+            "eps_type": "lobpcg",            # Optimized for SPD problems
+            "eps_tol": 1e-6,                 # Tight tolerance for accuracy
+            "eps_max_it": 100,               # Reasonable iteration cap
+            "eps_smallest_magnitude": None,  # Return smallest eigenvalues in magnitude
+            "eps_monitor": "ascii",          # Print convergence info
+            "ksp_type": "cg",                # "cg" or "gmres" for large problems
+            "pc_type": "hypre",               # "hypre" or "gamg" for large problems
+            # "eps_lobpcg_blocksize": 10,      # Increase for faster convergence
+            # "eps_lobpcg_restart": 30,        # Prevent stagnation
+        }
+
+        # eigensolver = fire.LinearEigensolver(eigenproblem, n_evals=2,
+        #                                      solver_parameters=opts_k)
+        M = fire.assemble(m)
+        A = fire.assemble(a)
+        eigenproblem = fire.LinearEigenproblem(A=A, M=M)
+        eigensolver = fire.LinearEigensolver(eigenproblem, n_evals=2, solver_parameters=opts_k)
+        nconv = eigensolver.solve()
+        lam = eigensolver.eigenvalue(1)
+        # eigensolver.eigenvalue(0)
+        # 5.748232931490868e-11 8.265052388483433 9.191616479570639 14.060275845331864
+
+        import ipdb
+        ipdb.set_trace()
+
+        eigenproblem = fire.LinearEigenproblem(A, restrict=True)
+        eigensolver = fire.LinearEigensolver(eigenproblem, n_evals=2, solver_parameters=opts_k)
+        nconv = eigensolver.solve()
+        lam = eigensolver.eigenvalue(1)
+        # 5.748232931490868e-11 8.265052388483433 9.191616479570639 14.060275845331864
+        #############
+
+
+
+        # Assembling the matrices for Scipy solvers
+        M = fire.assemble(m)
+        m_ptr, m_ind, m_val = M.petscmat.getValuesCSR()
+        Msp = ss.csr_matrix((m_val, m_ind, m_ptr), M.petscmat.size)
+        A = fire.assemble(a)
+        a_ptr, a_ind, a_val = A.petscmat.getValuesCSR()
+        Asp = ss.csr_matrix((a_val, a_ind, a_ptr), A.petscmat.size)
 
         if self.dimension == 2:  # 2D
             Lsp = self.solve_eigenproblem(Asp, Msp, method='ARNOLDI')
@@ -1115,9 +1151,6 @@ class HABC_Wave(AcousticWave, HyperLayer, NRBCHabc):
         min_eigval = max(np.unique(Lsp[(Lsp > 0.) & (np.imag(Lsp) == 0.)]))
         self.fundam_freq = np.real(np.sqrt(min_eigval) / (2 * np.pi))
         print("Fundamental Frequency (Hz): {0:.5f}".format(self.fundam_freq))
-
-        import ipdb
-        ipdb.set_trace()
 
     def min_reflection(self, kCR, psi=None, p=None, CR_err=None, typ='CR_PSI'):
         '''

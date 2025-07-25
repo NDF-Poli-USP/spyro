@@ -306,8 +306,8 @@ def test_loop_habc_3d():
     edge_length_lst = [0.15, 0.125, 0.10, 0.08]
 
     # Timestep size
-    dt_usu_lst = [0.0025, 0.0025, 0.002, 0.0016]
-    # dt_max = [0.0026, 0.0000034, 0.0000022, 0.0000014]
+    dt_usu_lst = [0.0032, 0.0025, 0.0020, 0.0016]
+    # dt_max = [0.0026, 0.0019, 0.0015, 0.0013] * 4/3
 
     # Eikonal degree
     degree_eikonal_lst = [2, 1, 2, 1]
@@ -331,7 +331,7 @@ def test_loop_habc_3d():
     degree_layer_lst = [None]  # [None, 2, 3, 4, 5]
 
     # Reference frequency
-    habc_reference_freq_lst = ["source"]  # ["source", "boundary"]
+    habc_reference_freq_lst = ["source", "boundary"]
 
     # Infinite model
     get_ref_model = False
