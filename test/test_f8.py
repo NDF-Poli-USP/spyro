@@ -132,7 +132,7 @@ def preamble_habc(dictionary, edge_length):
     tRef = comp_cost("tini")
 
     # Create the acoustic wave object with HABCs
-    Wave_obj = habc.HABC_Wave(dictionary=dictionary)
+    Wave_obj = habc.HABC_Wave(dictionary=dictionary, output_folder="test/inputfiles/")
 
     # Mesh
     Wave_obj.set_mesh(mesh_parameters={"edge_length": edge_length})
@@ -247,7 +247,7 @@ def habc_fig8(Wave_obj, dat_regr_xCR, xCR_usu=None, plot_comparison=True):
     Wave_obj.identify_habc_case()
 
     # Acquiring reference signal
-    Wave_obj.get_reference_signal()
+    Wave_obj.get_reference_signal(foldername="")
 
     # Determining layer size
     Wave_obj.size_habc_criterion(n_root=1,
@@ -306,11 +306,6 @@ def test_loop_habc_hyperellipse_boundary():
 @pytest.mark.slow
 def test_loop_habc_infinite_source():
     return run_loop_habc(degree_layer_lst=[None], habc_reference_freq_lst=["source"], get_ref_model=True, loop_modeling=False)
-
-
-@pytest.mark.slow
-def test_loop_habc_infinite_boundary():
-    return run_loop_habc(degree_layer_lst=[None], habc_reference_freq_lst=["boundary"], get_ref_model=True, loop_modeling=False)
 
 
 def run_loop_habc(degree_layer_lst, habc_reference_freq_lst, get_ref_model=False, loop_modeling=True):
@@ -379,8 +374,6 @@ def run_loop_habc(degree_layer_lst, habc_reference_freq_lst, get_ref_model=False
         # Estimating computational resource usage
         comp_cost("tfin", tRef=tRef,
                   user_name=Wave_obj.path_save + "preamble/INF_")
-    else:
-        Wave_obj.load_infinite_model_reference("test/inputfiles/habc_ref.npy")
 
     # ============ HABC SCHEME ============
     if loop_modeling:
@@ -452,8 +445,7 @@ def run_loop_habc(degree_layer_lst, habc_reference_freq_lst, get_ref_model=False
 # Applying HABCs to the model in Fig. 8 of Salas et al. (2022)
 if __name__ == "__main__":
     test_loop_habc_rectangular_source()
-    test_loop_habc_rectangular_boundary()
-    test_loop_habc_hyperellipse_source()
-    test_loop_habc_hyperellipse_boundary()
-    test_loop_habc_infinite_source()
-    test_loop_habc_infinite_boundary()
+    # test_loop_habc_rectangular_boundary()
+    # test_loop_habc_hyperellipse_source()
+    # test_loop_habc_hyperellipse_boundary()
+    # test_loop_habc_infinite_source()

@@ -110,4 +110,6 @@ jobs:
     - name: Uploading coverage to Codecov
       run: |
         export CODECOV_TOKEN="6cd21147-54f7-4b77-94ad-4b138053401d" && curl -s https://codecov.io/bash | bash
-
+    - name: Post-run cleanup
+      if: always()
+      run: find . -delete
