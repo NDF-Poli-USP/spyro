@@ -57,13 +57,16 @@ jobs:
 
     - name: Running serial fast tests
       run: |
+        ./cleanup.sh
         python3 -m pytest -n 10 --cov-report=xml --cov=spyro test/ --skip-slow
     - name: Running serial slow tests
       run: |
+        ./cleanup.sh
         python3 -m pytest -n 8 --cov-report=xml --cov-append --cov=spyro test/ --only-slow
 
     - name: Running parallel 3D forward test
       run: |
+          ./cleanup.sh
           mpiexec -n 6 pytest test_3d/test_hexahedral_convergence.py
           mpiexec -n 6 pytest test_parallel/test_forward.py
           mpiexec -n 6 pytest test_parallel/test_fwi.py
