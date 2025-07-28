@@ -304,8 +304,13 @@ def test_loop_habc_hyperellipse_boundary():
 
 
 @pytest.mark.slow
-def test_loop_habc_infinite():
+def test_loop_habc_infinite_source():
     return run_loop_habc(degree_layer_lst=[None], habc_reference_freq_lst=["source"], get_ref_model=True, loop_modeling=False)
+
+
+@pytest.mark.slow
+def test_loop_habc_infinite_boundary():
+    return run_loop_habc(degree_layer_lst=[None], habc_reference_freq_lst=["boundary"], get_ref_model=True, loop_modeling=False)
 
 
 def run_loop_habc(degree_layer_lst, habc_reference_freq_lst, get_ref_model=False, loop_modeling=True):
@@ -450,3 +455,5 @@ if __name__ == "__main__":
     test_loop_habc_rectangular_boundary()
     test_loop_habc_hyperellipse_source()
     test_loop_habc_hyperellipse_boundary()
+    test_loop_habc_infinite_source()
+    test_loop_habc_infinite_boundary()
