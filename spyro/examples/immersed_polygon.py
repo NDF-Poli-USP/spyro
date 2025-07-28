@@ -126,7 +126,7 @@ class Polygon_velocity:
 
         cond = fire.conditional(300*((x-0.5)*(-z-0.5))**2 + ((x-0.5)+(-z-0.5))**2 <= 0.300**2, v2+dv, cond)
 
-        if self.abc_pad_length > 0.0:
+        if self.abc_pad_length is not None and self.abc_pad_length > 0.0:
             middle_of_pad = -self.mesh_parameters.length_z - self.mesh_parameters.abc_pad_length*0.5
             cond = fire.conditional(z <= middle_of_pad, v0, cond)
 
