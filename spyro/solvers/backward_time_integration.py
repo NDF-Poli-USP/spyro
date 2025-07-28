@@ -50,7 +50,7 @@ def backward_wave_propagator_no_pml(Wave_obj, dt=None):
     receivers = Wave_obj.receivers
     residual = Wave_obj.misfit
     comm = Wave_obj.comm
-    temp_filename = Wave_obj.forward_output_file
+    temp_filename = Wave_obj.forward_output_filename
 
     filename, file_extension = temp_filename.split(".")
     # output_filename = "backward." + file_extension

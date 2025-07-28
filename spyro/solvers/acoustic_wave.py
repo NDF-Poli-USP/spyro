@@ -51,7 +51,7 @@ class AcousticWave(Wave):
         """
         self.current_time = 0.0
 
-        abc_type = self.abc_boundary_layer_type
+        abc_type = self.damping_type
 
         # Just to document variables that will be overwritten
         self.trial_function = None
@@ -62,7 +62,7 @@ class AcousticWave(Wave):
         self.solver = None
         self.rhs = None
         self.B = None
-        if abc_type is None:
+        if abc_type is None or abc_type == "local":
             construct_solver_or_matrix_no_pml(self)
         elif abc_type == "PML":
             V = self.function_space
@@ -93,11 +93,11 @@ class AcousticWave(Wave):
         """
         if misfit is not None:
             self.misfit = misfit
-        if self.real_shot_record is None:
-            warnings.warn("Please load or calculate a real shot record first")
-        if self.current_time == 0.0:
+        elif self.current_time == 0.0:
             self.forward_solve()
             self.misfit = self.real_shot_record - self.forward_solution_receivers
+        else:
+            raise ValueError("Please load or calculate a real shot record first")
         return backward_wave_propagator(self)
 
     def reset_pressure(self):
@@ -141,49 +141,49 @@ class AcousticWave(Wave):
 
     @override
     def _set_vstate(self, vstate):
-        if self.abc_boundary_layer_type == "PML":
+        if self.damping_type == "PML":
             self.X_n.assign(vstate)
         else:
             self.u_n.assign(vstate)
 
     @override
     def _get_vstate(self):
-        if self.abc_boundary_layer_type == "PML":
+        if self.damping_type == "PML":
             return self.X_n
         else:
             return self.u_n
 
     @override
     def _set_prev_vstate(self, vstate):
-        if self.abc_boundary_layer_type == "PML":
+        if self.damping_type == "PML":
             self.X_nm1.assign(vstate)
         else:
             self.u_nm1.assign(vstate)
 
     @override
     def _get_prev_vstate(self):
-        if self.abc_boundary_layer_type == "PML":
+        if self.damping_type == "PML":
             return self.X_nm1
         else:
             return self.u_nm1
 
     @override
     def _set_next_vstate(self, vstate):
-        if self.abc_boundary_layer_type == "PML":
+        if self.damping_type == "PML":
             self.X_np1.assign(vstate)
         else:
             self.u_np1.assign(vstate)
 
     @override
     def _get_next_vstate(self):
-        if self.abc_boundary_layer_type == "PML":
+        if self.damping_type == "PML":
             return self.X_np1
         else:
             return self.u_np1
 
     @override
     def get_receivers_output(self):
-        if self.abc_boundary_layer_type == "PML":
+        if self.damping_type == "PML":
             data_with_halos = self.X_n.dat.data_ro_with_halos[0][:]
         else:
             data_with_halos = self.u_n.dat.data_ro_with_halos[:]
@@ -191,7 +191,7 @@ class AcousticWave(Wave):
 
     @override
     def get_function(self):
-        if self.abc_boundary_layer_type == "PML":
+        if self.damping_type == "PML":
             return self.X_n.sub(0)
         else:
             return self.u_n
@@ -206,7 +206,7 @@ class AcousticWave(Wave):
 
     @override
     def rhs_no_pml(self):
-        if self.abc_boundary_layer_type == "PML":
+        if self.damping_type == "PML":
             return self.B.sub(0)
         else:
             return self.B

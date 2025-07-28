@@ -132,7 +132,7 @@ class IsotropicWave(ElasticWave):
 
     @override
     def get_receivers_output(self):
-        if self.abc_boundary_layer_type == "PML":
+        if self.damping_type == "PML":
             raise NotImplementedError
         else:
             data_with_halos = self.u_n.dat.data_ro_with_halos[:]
@@ -172,14 +172,14 @@ class IsotropicWave(ElasticWave):
         self.parse_boundary_conditions()
         self.parse_volumetric_forces()
 
-        if self.abc_boundary_layer_type is None:
+        if self.damping_type is None or self.damping_type == "local":
             isotropic_elastic_without_pml(self)
-        elif self.abc_boundary_layer_type == "PML":
+        elif self.damping_type == "PML":
             isotropic_elastic_with_pml(self)
 
     @override
     def rhs_no_pml(self):
-        if self.abc_boundary_layer_type == "PML":
+        if self.damping_type == "PML":
             raise NotImplementedError
         else:
             return self.B
