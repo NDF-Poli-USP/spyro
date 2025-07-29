@@ -739,7 +739,7 @@ class Model_parameters:
         pad_length = None
         if self.abc_active:
             pad_length = self.abc_pad_length
-        self.mesh_parameters.set_mesh(user_mesh=user_mesh,input_mesh_parameters=input_mesh_parameters, abc_pad_length=pad_length)
+        self.mesh_parameters.set_mesh(user_mesh=user_mesh, input_mesh_parameters=input_mesh_parameters, abc_pad_length=pad_length)
 
         if self.mesh_parameters.automatic_mesh:
             autoMeshing = meshing.AutomaticMesh(
