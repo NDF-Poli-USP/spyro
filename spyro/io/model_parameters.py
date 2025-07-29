@@ -205,6 +205,20 @@ class Model_parameters:
         conditions.
     abc_pad_length: float
         Thickness of the absorbing boundary conditions.
+    abc_boundary_layer_type : `str`
+        Type of the boundary layer. Option 'hybrid' is based on paper
+        of Salas et al. (2022). doi: https://doi.org/10.1016/j.apm.2022.09.014
+    abc_boundary_layer_shape : str
+        Shape type of pad layer. Options: 'rectangular' or 'hypershape'
+    abc_deg_layer : `int`
+        Hypershape degree
+    abc_reference_freq : `str`
+        Reference frequency for sizing the hybrid absorbing layer.
+        Options: 'source' or 'boundary'
+    abc_deg_eikonal : `int`
+        Finite element order for the Eikonal analysis
+    abc_get_ref_model : `bool`
+        If True, the infinite model is created
     source_type: str
         Type of source used in the simulation. Can be "ricker" for a Ricker
         wavelet or "MMS" for a manufactured solution.
@@ -388,20 +402,27 @@ class Model_parameters:
             }
         dictionary = self.input_dictionary["absorving_boundary_conditions"]
         self.abc_active = dictionary["status"]
-
         BL_obj = io.boundary_layer_io.read_boundary_layer(dictionary)
-        self.abc_exponent = BL_obj.abc_exponent
-        self.abc_cmax = BL_obj.abc_cmax
-        self.abc_R = BL_obj.abc_R
-        self.abc_pad_length = BL_obj.abc_pad_length
         self.abc_boundary_layer_type = BL_obj.abc_boundary_layer_type
 
-        self.absorb_top = dictionary.get("absorb_top", False)
-        self.absorb_bottom = dictionary.get("absorb_bottom", True)
-        self.absorb_right = dictionary.get("absorb_right", True)
-        self.absorb_left = dictionary.get("absorb_left", True)
-        self.absorb_front = dictionary.get("absorb_front", True)
-        self.absorb_back = dictionary.get("absorb_back", True)
+        if BL_obj.abc_boundary_layer_type == "hybrid":
+            self.abc_boundary_layer_shape = BL_obj.abc_boundary_layer_shape
+            self.abc_deg_layer = BL_obj.abc_deg_layer
+            self.abc_reference_freq = BL_obj.abc_reference_freq
+            self.abc_get_ref_model = BL_obj.abc_get_ref_model
+            self.abc_deg_eikonal = BL_obj.abc_deg_eikonal
+            self.abc_pad_length = BL_obj.abc_pad_length
+        else:
+            self.abc_exponent = BL_obj.abc_exponent
+            self.abc_cmax = BL_obj.abc_cmax
+            self.abc_R = BL_obj.abc_R
+            self.abc_pad_length = BL_obj.abc_pad_length
+            self.absorb_top = dictionary.get("absorb_top", False)
+            self.absorb_bottom = dictionary.get("absorb_bottom", True)
+            self.absorb_right = dictionary.get("absorb_right", True)
+            self.absorb_left = dictionary.get("absorb_left", True)
+            self.absorb_front = dictionary.get("absorb_front", True)
+            self.absorb_back = dictionary.get("absorb_back", True)
 
     def _sanitize_output(self):
         #         default_dictionary["visualization"] = {
