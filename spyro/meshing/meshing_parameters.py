@@ -1,4 +1,3 @@
-import firedrake as fire
 import warnings
 import os
 
@@ -69,7 +68,7 @@ class MeshingParameters():
         self._cells_per_wavelength = None
         self.edge_length = None
         self.cells_per_wavelength = None
-    
+
     def _set_length_with_unit_check(self, attr_name, value):
         """
         Checks if all dimensions are in the same unit (meters or km)
@@ -171,7 +170,7 @@ class MeshingParameters():
                 f"mesh_type must be one of {allowed_types}, got '{value}'"
             )
         if value == "SeismicMesh" and self.quadrilateral:
-            raise ValueError(f"SeismicMesh does not work with quads.")
+            raise ValueError("SeismicMesh does not work with quads.")
         self._mesh_type = value
 
     @property
@@ -232,7 +231,7 @@ class MeshingParameters():
         if value is not None:
             self.mesh_type = "user_mesh"
         self._user_mesh = value
-    
+
     @property
     def periodic(self):
         return self._periodic
