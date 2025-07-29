@@ -1,7 +1,9 @@
 import numpy as np
 import spyro
+import pytest
 
 
+@pytest.mark.slow
 def test_cpw_analytic_calc_analytical_gen():
     grid_point_calculator_parameters = {
         # Experiment parameters

@@ -11,6 +11,7 @@ def is_seismicmesh_installed():
         return False
 
 
+@pytest.mark.slow
 def run_test_cpw_calc(FEM_method_to_evaluate, correct_cpw):
     grid_point_calculator_parameters = {
         # Experiment parameters
@@ -76,6 +77,7 @@ def run_test_cpw_calc(FEM_method_to_evaluate, correct_cpw):
     assert all([test1, test2, test3])
 
 
+@pytest.mark.slow
 @pytest.mark.skipif(not is_seismicmesh_installed(), reason="SeismicMesh is not installed")
 def test_cpw_calc_triangles():
     method = "mass_lumped_triangle"
@@ -83,6 +85,7 @@ def test_cpw_calc_triangles():
     return run_test_cpw_calc(method, correct_cpw)
 
 
+@pytest.mark.slow
 def test_cpw_calc_quads():
     method = "spectral_quadrilateral"
     correct_cpw = 2.5
