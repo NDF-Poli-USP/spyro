@@ -135,7 +135,7 @@ def preamble_habc(dictionary, edge_length):
     Wave_obj = habc.HABC_Wave(dictionary=dictionary, output_folder="test/inputfiles/")
 
     # Mesh
-    Wave_obj.set_mesh(mesh_parameters={"edge_length": edge_length})
+    Wave_obj.set_mesh(input_mesh_parameters={"edge_length": edge_length})
 
     # Initial velocity model
     cond = fire.conditional(Wave_obj.mesh_x < 0.5, 3.0, 1.5)
