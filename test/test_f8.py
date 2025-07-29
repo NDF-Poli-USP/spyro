@@ -2,6 +2,7 @@ import firedrake as fire
 import spyro.habc.habc as habc
 import spyro.habc.eik as eik
 from spyro.utils.cost import comp_cost
+import pytest
 
 
 def wave_dict(dt_usu, layer_shape, degree_layer,
@@ -131,7 +132,7 @@ def preamble_habc(dictionary, edge_length):
     tRef = comp_cost("tini")
 
     # Create the acoustic wave object with HABCs
-    Wave_obj = habc.HABC_Wave(dictionary=dictionary)
+    Wave_obj = habc.HABC_Wave(dictionary=dictionary, output_folder="test/inputfiles/")
 
     # Mesh
     Wave_obj.set_mesh(mesh_parameters={"edge_length": edge_length})
@@ -246,7 +247,7 @@ def habc_fig8(Wave_obj, dat_regr_xCR, xCR_usu=None, plot_comparison=True):
     Wave_obj.identify_habc_case()
 
     # Acquiring reference signal
-    Wave_obj.get_reference_signal()
+    Wave_obj.get_reference_signal(foldername="")
 
     # Determining layer size
     Wave_obj.size_habc_criterion(n_root=1,
@@ -282,7 +283,32 @@ def habc_fig8(Wave_obj, dat_regr_xCR, xCR_usu=None, plot_comparison=True):
                                   data_regr_xCR=dat_regr_xCR)
 
 
-def test_loop_habc():
+@pytest.mark.slow
+def test_loop_habc_rectangular_source():
+    return run_loop_habc(degree_layer_lst=[None], habc_reference_freq_lst=["source"])
+
+
+@pytest.mark.slow
+def test_loop_habc_rectangular_boundary():
+    return run_loop_habc(degree_layer_lst=[None], habc_reference_freq_lst=["boundary"])
+
+
+@pytest.mark.slow
+def test_loop_habc_hyperellipse_source():
+    return run_loop_habc(degree_layer_lst=[2], habc_reference_freq_lst=["source"])
+
+
+@pytest.mark.slow
+def test_loop_habc_hyperellipse_boundary():
+    return run_loop_habc(degree_layer_lst=[2], habc_reference_freq_lst=["boundary"])
+
+
+@pytest.mark.slow
+def test_loop_habc_infinite_source():
+    return run_loop_habc(degree_layer_lst=[None], habc_reference_freq_lst=["source"], get_ref_model=True, loop_modeling=False)
+
+
+def run_loop_habc(degree_layer_lst, habc_reference_freq_lst, get_ref_model=False, loop_modeling=True):
     '''
     Loop for applying the HABC to the model in Fig. 8 of Salas et al. (2022).
     '''
@@ -309,16 +335,16 @@ def test_loop_habc():
     # ============ HABC PARAMETERS ============
 
     # Hyperellipse degrees
-    degree_layer_lst = [None, 2]  # [None, 2, 3, 4, 5]
+    # degree_layer_lst = [None, 2]  # [None, 2, 3, 4, 5]
 
     # Reference frequency
-    habc_reference_freq_lst = ["source", "boundary"]
+    # habc_reference_freq_lst = ["source", "boundary"]
 
     # Infinite model
-    get_ref_model = True
+    # get_ref_model = False
 
     # Loop for HABC cases
-    loop_modeling = True  # not get_ref_model
+    # loop_modeling = True  # not get_ref_model
 
     # Error criterion for heuristic factor xCR
     crit_opt = "error_difference"  # "error_integral"
@@ -418,4 +444,8 @@ def test_loop_habc():
 
 # Applying HABCs to the model in Fig. 8 of Salas et al. (2022)
 if __name__ == "__main__":
-    test_loop_habc()
+    test_loop_habc_rectangular_source()
+    # test_loop_habc_rectangular_boundary()
+    # test_loop_habc_hyperellipse_source()
+    # test_loop_habc_hyperellipse_boundary()
+    # test_loop_habc_infinite_source()

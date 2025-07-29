@@ -222,7 +222,7 @@ class HABC_Wave(AcousticWave, HyperLayer, NRBCHabc):
         Determine the initial search range for the heuristic factor xCR
     '''
 
-    def __init__(self, dictionary=None, f_est=0.06, fwi_iter=0, comm=None):
+    def __init__(self, dictionary=None, f_est=0.06, fwi_iter=0, comm=None, output_folder="results/"):
         '''
         Initialize the HABC class.
 
@@ -258,7 +258,7 @@ class HABC_Wave(AcousticWave, HyperLayer, NRBCHabc):
         self.fwi_iter = fwi_iter
 
         # Path to save data
-        self.path_save = getcwd() + "/output/"
+        self.path_save = getcwd() + "/" + output_folder
 
     def identify_habc_case(self):
         '''
@@ -1728,7 +1728,7 @@ class HABC_Wave(AcousticWave, HyperLayer, NRBCHabc):
         if self.dimension == 3:
             del self.Ly_habc
 
-    def get_reference_signal(self):
+    def get_reference_signal(self, foldername="preamble/"):
         '''
         Acquire the reference signal to compare with the HABC scheme.
 
@@ -1744,7 +1744,7 @@ class HABC_Wave(AcousticWave, HyperLayer, NRBCHabc):
         print("\nLoading Reference Signal from Infinite Model")
 
         # Path to the reference data folder
-        pth_str = self.path_save + "preamble/"
+        pth_str = self.path_save + foldername
 
         # Time domain signal
         self.receivers_reference = np.load(pth_str + "habc_ref.npy")
