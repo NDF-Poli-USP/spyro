@@ -506,9 +506,9 @@ def error_calc(receivers, analytical, dt):
     for i in range(num_rec):
         diff = receivers[:, i] - ana[:, i]
         diff_squared = np.power(diff, 2)
-        numerator = np.trapz(diff_squared, dx=dt)
+        numerator = np.trapezoid(diff_squared, dx=dt)
         ref_squared = np.power(ana[:, i], 2)
-        denominator = np.trapz(ref_squared, dx=dt)
+        denominator = np.trapezoid(ref_squared, dx=dt)
         total_numerator += numerator
         total_denumenator += denominator
 
