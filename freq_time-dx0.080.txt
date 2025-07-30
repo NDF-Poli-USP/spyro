@@ -1,0 +1,8 @@
+
+Mesh Size: 0.080 km
+
+Parallelism type: automatic
+
+Absorbing Layer Shape: Rectangular
+Method: mass_lumped_triangle, Degree: 3, Dimension: 3
+Creating firedrake_mesh type mesh.

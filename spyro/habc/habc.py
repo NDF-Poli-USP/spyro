@@ -928,7 +928,8 @@ class HABC_Wave(AcousticWave, HyperLayer, NRBCHabc):
         outfile = fire.VTKFile(self.path_save + file_name)
         outfile.write(self.c)
 
-    def solve_eigenproblem(self, Asp, Msp, method, k=2, inv_operator=False):
+    def solve_eigenproblem(self, Asp, Msp, method, k=2,
+                           shift=0., inv_operator=False):
         '''
         Solve the eigenvalue problem to determine the fundamental frequency.
 
@@ -940,9 +941,12 @@ class HABC_Wave(AcousticWave, HyperLayer, NRBCHabc):
             Sparse matrix representing the mass matrix
         method : `str`
             Method to use for solving the eigenvalue problem.
-            Options: 'ARNOLDI', 'LANCZOS' or 'LOBPCG'.
+            Options: 'ARNOLDI', 'LANCZOS', 'LOBPCG' 'KRYLOVSCH_CH',
+            'KRYLOVSCH_CG', 'KRYLOVSCH_GH' or 'KRYLOVSCH_GG'
         k : `int`, optional
             Number of eigenvalues to compute. Default is 2
+        shift: `float`, optional
+            Value to stabilize the Neumann BC null space. Default is 0
         inv_operator : `bool`, optional
             Option to use an inverse operator for improving convergence.
             Default is False
@@ -953,9 +957,16 @@ class HABC_Wave(AcousticWave, HyperLayer, NRBCHabc):
             Array containing the computed eigenvalues
         '''
 
-        if method not in ['ARNOLDI', 'LANCZOS', 'LOBPCG']:
-            aux0 = "Please use 'ARNOLDI', 'LANCZOS', or 'LOBPCG', "
-            UserWarning(aux0 + f"{method} not supported.")
+        if shift > 0.:
+            Asp += shift * Msp
+
+        valid_methods = ['ARNOLDI', 'LANCZOS', 'LOBPCG', 'KRYLOVSCH_CH',
+                         'KRYLOVSCH_CG', 'KRYLOVSCH_GH', 'KRYLOVSCH_GG']
+        if method not in valid_methods:
+            met_str = ", ".join(valid_methods)
+            met_str = met_str.rsplit(', ', 1)
+            met_str = f"Please use {met_str[0]} or {met_str[1]}. "
+            UserWarning(met_str + f"{method} not supported.")
 
         if method == 'ARNOLDI' or method == 'LANCZOS':
             # Inverse operator for improving convergence
@@ -982,14 +993,52 @@ class HABC_Wave(AcousticWave, HyperLayer, NRBCHabc):
             Lsp = ss.linalg.lobpcg(Asp, X, B=Msp, maxiter=2000,
                                    largest=False)[0]
 
+        if method[:-3] == 'KRYLOVSCH':
+
+            if method[-2] == "C":
+                ksp_type = "cg"
+            elif method[-2] == "G":
+                ksp_type = "gmres"
+
+            if method[-1] == "H":
+                pc_type = "hypre"
+            elif method[-1] == "G":
+                pc_type = "gamg"
+
+            opts = {
+                "eps_type": "krylovschur",        # Robust, widely used eigensolver
+                "eps_tol": 1e-6,                  # Tight tolerance for accuracy
+                "eps_max_it": 200,                # Reasonable iteration cap
+                "st_type": "sinvert",             # Useful for interior eigenvalues
+                "st_shift": 1e-6,                 # Stabilizes Neumann BC null space
+                "eps_smallest_magnitude": None,   # Smallest eigenvalues in magnitude
+                "eps_monitor": "ascii",           # Print convergence info
+                "ksp_type": ksp_type,             # Options for large problems
+                "pc_type": pc_type                # Options for large problems
+            }
+
+            eigenproblem = fire.LinearEigenproblem(Asp, M=Msp)
+            eigensolver = fire.LinearEigensolver(eigenproblem, n_evals=k,
+                                                 solver_parameters=opts)
+            nconv = eigensolver.solve()
+            lam = eigensolver.eigenvalue(1)
+            Lsp = np.asarray([eigensolver.eigenvalue(mod) for mod in range(k)])
+
+        if shift > 0.:
+            Lsp -= shift
+
         return Lsp
 
-    def fundamental_frequency(self, monitor=False):
+    def fundamental_frequency(self, method=None, monitor=False):
         '''
         Compute the fundamental frequency in Hz via modal analysis.
 
         Parameters
         ----------
+        method : `str`, optional
+            Method to use for solving the eigenvalue problem.
+            Options: 'ARNOLDI', 'LANCZOS', 'LOBPCG' 'KRYLOVSCH_CH',
+            'KRYLOVSCH_CG', 'KRYLOVSCH_GH' or 'KRYLOVSCH_GG'
         monitor : `bool`, optional
             Print on screen the computed natural frequencies. Default is False
 
@@ -1066,81 +1115,40 @@ class HABC_Wave(AcousticWave, HyperLayer, NRBCHabc):
            0.47525      13.47       13.47
         '''
 
+        if method is None:
+
+            if self.dimension == 2:  # 2D
+                method = 'ARNOLDI'
+
+            if self.dimension == 3:  # 3D
+                method = 'LOBPCG'
+
         # Function space for the problem
         V = self.function_space
         u, v = fire.TrialFunction(V), fire.TestFunction(V)
 
         # Bilinear forms
         c = self.c
-        m = fire.inner(u, v) * fire.dx
         a = c * c * fire.inner(fire.grad(u), fire.grad(v)) * fire.dx
+        A = fire.assemble(a)
+        m = fire.inner(u, v) * fire.dx
+        M = fire.assemble(m)
 
-        # Operator - To do: Slepc, get computational cost
         print("\nSolving Eigenvalue Problem")
 
-        opts_k = {
-            "eps_type": "krylovschur",        # Robust, widely used eigensolver
-            "eps_tol": 1e-6,                  # Tight tolerance for accuracy
-            "eps_max_it": 200,                # Reasonable iteration cap
-            "st_type": "sinvert",             # Useful for interior eigenvalues
-            "st_shift": 1e-6,                 # Stabilizes Neumann BC null space
-            "eps_smallest_magnitude": None,   # Return smallest eigenvalues in magnitude
-            "eps_monitor": "ascii",           # Print convergence info
-            "ksp_type": "cg",                 # "cg" or "gmres" for large problems
-            "pc_type": "hypre"                # "hypre" or "gamg" for large problems
-        }
+        if method[:-3] == 'KRYLOVSCH':
+            # Modal solver
+            Lsp = self.solve_eigenproblem(A, M, method, shift=1e-8)
 
-        opts_l = {
-            "eps_type": "lobpcg",            # Optimized for SPD problems
-            "eps_tol": 1e-6,                 # Tight tolerance for accuracy
-            "eps_max_it": 100,               # Reasonable iteration cap
-            "eps_smallest_magnitude": None,  # Return smallest eigenvalues in magnitude
-            "eps_monitor": "ascii",          # Print convergence info
-            "ksp_type": "cg",                # "cg" or "gmres" for large problems
-            "pc_type": "hypre",               # "hypre" or "gamg" for large problems
-            # "eps_lobpcg_blocksize": 10,      # Increase for faster convergence
-            # "eps_lobpcg_restart": 30,        # Prevent stagnation
-        }
+        else:
+            # Assembling the matrices for Scipy solvers
+            m_ptr, m_ind, m_val = M.petscmat.getValuesCSR()
+            Msp = ss.csr_matrix((m_val, m_ind, m_ptr), M.petscmat.size)
+            a_ptr, a_ind, a_val = A.petscmat.getValuesCSR()
+            Asp = ss.csr_matrix((a_val, a_ind, a_ptr), A.petscmat.size)
 
-        # eigensolver = fire.LinearEigensolver(eigenproblem, n_evals=2,
-        #                                      solver_parameters=opts_k)
-        M = fire.assemble(m)
-        A = fire.assemble(a)
-        eigenproblem = fire.LinearEigenproblem(A=A, M=M)
-        eigensolver = fire.LinearEigensolver(eigenproblem, n_evals=2, solver_parameters=opts_k)
-        nconv = eigensolver.solve()
-        lam = eigensolver.eigenvalue(1)
-        # eigensolver.eigenvalue(0)
-        # 5.748232931490868e-11 8.265052388483433 9.191616479570639 14.060275845331864
-
-        import ipdb
-        ipdb.set_trace()
-
-        eigenproblem = fire.LinearEigenproblem(A, restrict=True)
-        eigensolver = fire.LinearEigensolver(eigenproblem, n_evals=2, solver_parameters=opts_k)
-        nconv = eigensolver.solve()
-        lam = eigensolver.eigenvalue(1)
-        # 5.748232931490868e-11 8.265052388483433 9.191616479570639 14.060275845331864
-        #############
-
-
-
-        # Assembling the matrices for Scipy solvers
-        M = fire.assemble(m)
-        m_ptr, m_ind, m_val = M.petscmat.getValuesCSR()
-        Msp = ss.csr_matrix((m_val, m_ind, m_ptr), M.petscmat.size)
-        A = fire.assemble(a)
-        a_ptr, a_ind, a_val = A.petscmat.getValuesCSR()
-        Asp = ss.csr_matrix((a_val, a_ind, a_ptr), A.petscmat.size)
-
-        if self.dimension == 2:  # 2D
-            Lsp = self.solve_eigenproblem(Asp, Msp, method='ARNOLDI')
-
-        if self.dimension == 3:  # 3D
-            shift = 1e-8
-            A_sh = Asp + shift * Msp
-            Lsp = self.solve_eigenproblem(A_sh, Msp, method='LOBPCG')
-            Lsp -= shift
+            # Modal solver
+            Lsp = self.solve_eigenproblem(Asp, Msp, method, shift=1e-8)
 
         if monitor:
             for n_eig, eigval in enumerate(np.unique(Lsp)):

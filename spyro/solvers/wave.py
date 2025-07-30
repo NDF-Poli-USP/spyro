@@ -184,19 +184,23 @@ class Wave(Model_parameters, metaclass=ABCMeta):
 
         Parameters:
         -----------
-        conditional:  (optional)
+        constant: float, optional
+            Constant velocity in the domain
+        conditional: optional
             Firedrake conditional object.
-        velocity_model_function: Firedrake function (optional)
+        velocity_model_function: Firedrake function, optional
             Firedrake function to be used as the velocity model. Has to be in the same function space as the object.
-        expression:  str (optional)
+        expression: str, optional
             If you use an expression, you can use the following variables:
             x, y, z, pi, tanh, sqrt. Example: "2.0 + 0.5*tanh((x-2.0)/0.1)".
             It will be interpoalte into either the same function space as the object or a DG0 function space
             in the same mesh.
-        new_file:  str (optional)
+        new_file: str, optional
             Name of the file containing the velocity model.
-        output:  bool (optional)
+        output: bool (optional)
             If True, outputs the velocity model to a pvd file for visualization.
+        dg_velocity_model: bool (optional)
+            If True, the space function is set to "DG" and degree "0"
         """
         if new_file is not None:
             self.initial_velocity_model_file = new_file

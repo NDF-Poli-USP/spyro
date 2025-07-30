@@ -299,13 +299,13 @@ def test_loop_habc_3d():
 
     # ============ SIMULATION PARAMETERS ============
 
-    # Mesh size
+    # Mesh size in km
     # cpw: cells per wavelength
     # lba = minimum_velocity /source_frequency
     # edge_length = lba / cpw
     edge_length_lst = [0.15, 0.125, 0.10, 0.08]
 
-    # Timestep size
+    # Timestep size in seconds
     dt_usu_lst = [0.0032, 0.0025, 0.0020, 0.0016]
     # dt_max = [0.0026, 0.0019, 0.0015, 0.0013] * 4/3
 
