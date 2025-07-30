@@ -1006,7 +1006,8 @@ class HABC_Wave(AcousticWave, HyperLayer, NRBCHabc):
                 pc_type = "gamg"
 
             opts = {
-                "eps_type": "krylovschur",        # Robust, widely used eigensolver
+                # "eps_type": "krylovschur",      # Robust, widely used eigensolver
+                "eps_type": "lobpcg",             # Iterative
                 "eps_tol": 1e-6,                  # Tight tolerance for accuracy
                 "eps_max_it": 200,                # Reasonable iteration cap
                 "st_type": "sinvert",             # Useful for interior eigenvalues
@@ -1128,10 +1129,11 @@ class HABC_Wave(AcousticWave, HyperLayer, NRBCHabc):
         u, v = fire.TrialFunction(V), fire.TestFunction(V)
 
         # Bilinear forms
+        quad_rule = self.quadrature_rule
         c = self.c
-        a = c * c * fire.inner(fire.grad(u), fire.grad(v)) * fire.dx
+        a = c * c * fire.inner(fire.grad(u), fire.grad(v)) * fire.dx(scheme=quad_rule)
         A = fire.assemble(a)
-        m = fire.inner(u, v) * fire.dx
+        m = fire.inner(u, v) * fire.dx(scheme=quad_rule)
         M = fire.assemble(m)
 
         print("\nSolving Eigenvalue Problem")

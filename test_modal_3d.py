@@ -186,7 +186,7 @@ def test_loop_modal_3d():
     # ============ SIMULATION PARAMETERS ============
 
     # Edge of the cubic domain in km
-    edge_dom = 2.0
+    edge_dom = 4.0
 
     # Mesh size in km
     # cpw: cells per wavelength
@@ -194,15 +194,14 @@ def test_loop_modal_3d():
     # edge_length = lba / cpw
     # edge_length_lst = [0.150, 0.125, 0.100, 0.080]
     # edge_length_lst = [0.125, 0.100, 0.080]
-    edge_length_lst = [0.080]
+    edge_length_lst = [0.150]
 
     # Modal solvers
     # modal_solver_lst = ['ARNOLDI', 'LANCZOS', 'LOBPCG', 'KRYLOVSCH_CH',
     #                     'KRYLOVSCH_CG', 'KRYLOVSCH_GH', 'KRYLOVSCH_GG']
     # modal_solver_lst = ['LOBPCG', 'KRYLOVSCH_CH', 'KRYLOVSCH_CG',
     #                     'KRYLOVSCH_GH', 'KRYLOVSCH_GG']
-    modal_solver_lst = ['KRYLOVSCH_CH', 'KRYLOVSCH_CG',
-                        'KRYLOVSCH_GH', 'KRYLOVSCH_GG']
+    modal_solver_lst = ['KRYLOVSCH_GH']
 
     # Data to print on screen
     mod_str = "\nModal Solver: {}"
@@ -229,18 +228,18 @@ def test_loop_modal_3d():
             # Modal solver
             print(mod_str.format(modal_solver))
 
-            try:
-                # Reference to resource usage
-                tRef = comp_cost("tini")
+            # try:
+            # Reference to resource usage
+            tRef = comp_cost("tini")
 
-                # Computing the fundamental frequency
-                modal_fig8(Wave_obj, modal_solver)
+            # Computing the fundamental frequency
+            modal_fig8(Wave_obj, modal_solver)
 
-                # Estimating computational resource usage
-                comp_cost("tfin", tRef=tRef,
-                          user_name=Wave_obj.path_save + "modal/MOD_")
-            except Exception as e:
-                print(f"Error Solving: {e}")
+            # Estimating computational resource usage
+            comp_cost("tfin", tRef=tRef,
+                      user_name=Wave_obj.path_save + "modal/MOD_")
+            # except Exception as e:
+            #     print(f"Error Solving: {e}")
 
 
 # Testing several modal solvers for 3D models

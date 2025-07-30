@@ -1,0 +1,24 @@
+
+Mesh Size: 0.150 km
+
+Parallelism type: automatic
+
+Absorbing Layer Shape: Rectangular
+Method: mass_lumped_triangle, Degree: 3, Dimension: 3
+Creating firedrake_mesh type mesh.
+
+Creating Mesh and Initial Velocity Model
+
+Modal Solver: LOBPCG
+
+Solving Eigenvalue Problem
+Frequency 0 (Hz): 0.01046
+Frequency 1 (Hz): 0.19245
+Fundamental Frequency (Hz): 0.19245
+
+--------------------------------------------------------------
+Estimating Runtime and Used Memory
+Runtime: (s):164.076, (m):2.735, (h):0.046
+Used Memory: Current (MB):16.393, Peak (MB):4617.758
+--------------------------------------------------------------
+
