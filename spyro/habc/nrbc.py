@@ -248,7 +248,6 @@ class NRBCHabc():
 
                     # Cosine of the incidence angle
                     cos_Hig = abs(nz_r * nz_h + nx_r * nx_h + ny_r * ny_h)
-
             cos_Hig[cos_Hig < self.cos_max] = (1. - cos_Hig[
                 cos_Hig < self.cos_max]**2)**0.5
 

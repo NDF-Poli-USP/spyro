@@ -43,7 +43,8 @@ jobs:
         && pip3 install pyamg \
         && pip3 install meshio \
         && pip3 install -U memory_profiler \
-        && pip3 install pytest pytest-cov
+        && pip3 install pytest pytest-cov \
+        && pip3 install pytest-sugar
 
     - name: Clear all firedrake-related caches
       run: |
@@ -54,11 +55,18 @@ jobs:
                .pytest_cache
         find . -name '*.pkl' -delete || true
 
-    - name: Running serial tests
+    - name: Running serial fast tests
       run: |
-        python3 -m pytest --cov-report=xml --cov=spyro test/
+        ./cleanup.sh
+        python3 -m pytest -n 10 --cov-report=xml --cov=spyro test/ --skip-slow
+    - name: Running serial slow tests
+      run: |
+        ./cleanup.sh
+        python3 -m pytest -n 8 --cov-report=xml --cov-append --cov=spyro test/ --only-slow
+
     - name: Running parallel 3D forward test
       run: |
+          ./cleanup.sh
           mpiexec -n 6 pytest test_3d/test_hexahedral_convergence.py
           mpiexec -n 6 pytest test_parallel/test_forward.py
           mpiexec -n 6 pytest test_parallel/test_fwi.py
@@ -102,4 +110,6 @@ jobs:
     - name: Uploading coverage to Codecov
       run: |
         export CODECOV_TOKEN="6cd21147-54f7-4b77-94ad-4b138053401d" && curl -s https://codecov.io/bash | bash
-
+    - name: Post-run cleanup
+      if: always()
+      run: find . -delete
