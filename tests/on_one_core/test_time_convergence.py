@@ -94,8 +94,8 @@ def test_second_order_time_convergence():
     ]
 
     analytical_files = [
-        "test/inputfiles/analytical_solution_dt_0.0005.npy",
-        "test/inputfiles/analytical_solution_dt_0.0001.npy",
+        "tests/on_one_core/inputfiles/analytical_solution_dt_0.0005.npy",
+        "tests/on_one_core/inputfiles/analytical_solution_dt_0.0001.npy",
     ]
 
     numerical_results = []

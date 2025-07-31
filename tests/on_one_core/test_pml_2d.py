@@ -110,7 +110,7 @@ def test_pml():
     of the central difference method is achieved"""
 
     p_r, nt = run_forward()
-    with open("test/inputfiles/extended_pml_receveirs.pck", "rb") as f:
+    with open("tests/on_one_core/inputfiles/extended_pml_receveirs.pck", "rb") as f:
         array = np.asarray(pickle.load(f), dtype=float)
         extended_p_r = array
 
