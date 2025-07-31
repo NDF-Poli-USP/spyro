@@ -55,37 +55,63 @@ jobs:
                .pytest_cache
         find . -name '*.pkl' -delete || true
 
-    - name: Running parallel tests for forward problem only
-      run: |
-          ./cleanup.sh
-          mpiexec -n 6 python3 -m pytest --cov=spyro --cov-report=term --cov-report=xml:coverage.forward.xml --cov-context=test tests/parallel/test_forward.py
-          mpiexec -n 6 python3 -m pytest --cov=spyro --cov-report=term --cov-report=xml:coverage.3d.xml --cov-context=test tests/three_dimension/test_hexahedral_convergence.py
-          mpiexec -n 6 python3 -m pytest --cov=spyro --cov-report=term --cov-report=xml:coverage.supershot.xml --cov-context=test tests/parallel/test_forward_supershot.py
-          mpiexec -n 2 python3 -m pytest --cov=spyro --cov-report=term --cov-report=xml:coverage.io.xml --cov-context=test tests/parallel/test_parallel_io.py
-          mpiexec -n 2 python3 -m pytest --cov=spyro --cov-report=term --cov-report=xml:coverage.serial_shots.xml --cov-context=test tests/parallel/test_forward_multiple_serial_shots.py
     - name: Running serial fast tests
       run: |
         ./cleanup.sh
-        python3 -m pytest -n 8 --cov=spyro --cov-report=term --cov-report=xml:coverage.fast.xml tests/on_one_core/ --skip-slow
+        python3 -m pytest -n 8 --cov-report=xml --cov=spyro tests/on_one_core/ --skip-slow
     - name: Running serial slow tests
       run: |
         ./cleanup.sh
-        python3 -m pytest -n 8 --cov=spyro --cov-report=term --cov-report=xml:coverage.slow.xml tests/on_one_core/  --only-slow
+        python3 -m pytest -n 8 --cov-report=xml --cov-append tests/on_one_core/  --only-slow
 
+    - name: Running parallel tests for forward problem only
+      run: |
+          ./cleanup.sh
+          mpiexec -n 6 pytest tests/three_dimension/test_hexahedral_convergence.py
+          mpiexec -n 6 pytest tests/parallel/test_forward.py
+          mpiexec -n 6 pytest tests/parallel/test_forward_supershot.py
+          mpiexec -n 2 pytest tests/parallel/test_parallel_io.py
+          mpiexec -n 2 pytest tests/parallel/test_forward_multiple_serial_shots.py
     
     - name: Running parallel tests for inversion
       run: |
           ./cleanup.sh
-          mpiexec -n 6 python3 -m pytest --cov=spyro --cov-report=term --cov-report=xml:coverage.fwi.xml --cov-context=test tests/parallel/test_fwi.py
-          mpiexec -n 3 python3 -m pytest --cov=spyro --cov-report=term --cov-report=xml:coverage.supershot_grad.xml --cov-context=test tests/parallel/test_supershot_grad.py
-          mpiexec -n 2 python3 -m pytest --cov=spyro --cov-report=term --cov-report=xml:coverage.gradient_serial.xml --cov-context=test tests/parallel/test_gradient_serialshots.py
+          mpiexec -n 6 pytest tests/parallel/test_fwi.py
+          mpiexec -n 3 pytest tests/parallel/test_supershot_grad.py
+          mpiexec -n 2 pytest tests/parallel/test_gradient_serialshots.py
 
-    - name: Combine all coverage reports
+    - name: Covering parallel 3D forward test
+      continue-on-error: true
       run: |
-        pip3 install coverage
-        coverage combine
-        coverage xml
-
+        mpiexec -n 6 python3 -m pytest --cov-report=xml --cov-append --cov=spyro tests/three_dimension/test_hexahedral_convergence.py
+    - name: Covering parallel forward test
+      continue-on-error: true
+      run: |
+        mpiexec -n 6 python3 -m pytest --cov-report=xml --cov-append --cov=spyro tests/parallel/test_forward.py
+    - name: Covering parallel fwi test
+      continue-on-error: true
+      run: |
+          mpiexec -n 6 pytest --cov-report=xml --cov-append --cov=spyro tests/parallel/test_fwi.py
+    - name: Covering parallel supershot test
+      continue-on-error: true
+      run: |
+          mpiexec -n 6 pytest --cov-report=xml --cov-append --cov=spyro tests/parallel/test_forward_supershot.py
+    - name: Covering parallel io test
+      continue-on-error: true
+      run: |
+          mpiexec -n 2 pytest --cov-report=xml --cov-append --cov=spyro tests/parallel/test_parallel_io.py
+    - name: Covering parallel supershot grad test
+      continue-on-error: true
+      run: |
+          mpiexec -n 3 pytest --cov-report=xml --cov-append --cov=spyro tests/parallel/test_supershot_grad.py
+    - name: Covering spatially parallelized shots in serial
+      continue-on-error: true
+      run: |
+          mpiexec -n 2 pytest --cov-report=xml --cov-append --cov=spyro tests/parallel/test_forward_multiple_serial_shots.py
+    - name: Covering spatially parallelized shots in serial
+      continue-on-error: true
+      run: |
+          mpiexec -n 2 pytest --cov-report=xml --cov-append --cov=spyro tests/parallel/test_test_gradient_serialshots.py
     - name: Uploading coverage to Codecov
       run: |
         export CODECOV_TOKEN="6cd21147-54f7-4b77-94ad-4b138053401d" && curl -s https://codecov.io/bash | bash
