@@ -81,27 +81,21 @@ def test_read_and_write_segy():
     assert all([test1, test2])
 
 
-def test_saving_shot_record():
+def test_saving_and_loading_shot_record():
     from .inputfiles.model import dictionary
 
-    dictionary["time_axis"]["final_time"] = 0.5
-    Wave_obj = spyro.AcousticWave(dictionary=dictionary)
-    Wave_obj.set_mesh(input_mesh_parameters={"edge_length": 0.02})
-    Wave_obj.set_initial_velocity_model(constant=1.5)
-    Wave_obj.forward_solve()
-    spyro.io.save_shots(Wave_obj, file_name="test_shot_record")
+    save_dict["time_axis"]["final_time"] = 0.5
+    wave_obj_saving = spyro.AcousticWave(dictionary=dictionary)
+    wave_obj_saving.set_mesh(input_mesh_parameters={"edge_length": 0.02})
+    wave_obj_saving.set_initial_velocity_model(constant=1.5)
+    wave_obj_saving.forward_solve()
+    spyro.io.save_shots(wave_obj_saving, file_name="test_shot_record")
 
-
-def test_loading_shot_record():
-    from .inputfiles.model import dictionary
-
-    dictionary["time_axis"]["final_time"] = 0.5
-    Wave_obj = spyro.AcousticWave(dictionary=dictionary)
-    Wave_obj.set_mesh(input_mesh_parameters={"edge_length": 0.02})
-    spyro.io.load_shots(Wave_obj, file_name="test_shot_record")
+    wave_obj_loading = spyro.AcousticWave(dictionary=dictionary)
+    wave_obj_loading.set_mesh(input_mesh_parameters={"edge_length": 0.02})
+    spyro.io.load_shots(wave_obj_loading, file_name="test_shot_record")
 
 
 if __name__ == "__main__":
     test_read_and_write_segy()
-    test_saving_shot_record()
-    test_loading_shot_record()
+    test_saving_and_loading_shot_record()
