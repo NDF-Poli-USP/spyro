@@ -106,7 +106,7 @@ jobs:
     - name: Covering spatially parallelized shots in serial
       continue-on-error: true
       run: |
-          mpiexec -n 2 pytest --cov-report=xml --cov-append --cov=spyro test_parallel/test_test_gradient_serialshots.py
+          mpiexec -n 2 pytest --cov-report=xml --cov-append --cov=spyro test_parallel/test_gradient_serialshots.py
     - name: Uploading coverage to Codecov
       run: |
         export CODECOV_TOKEN="6cd21147-54f7-4b77-94ad-4b138053401d" && curl -s https://codecov.io/bash | bash
