@@ -58,7 +58,7 @@ jobs:
     - name: Running serial fast tests
       run: |
         ./cleanup.sh
-        python3 -m pytest -n 10 --cov=spyro --cov-report=term --cov-report=xml:coverage.fast.xml test/ --skip-slow
+        python3 -m pytest -n 8 --cov=spyro --cov-report=term --cov-report=xml:coverage.fast.xml test/ --skip-slow
     - name: Running serial slow tests
       run: |
         ./cleanup.sh
