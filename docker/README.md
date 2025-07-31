@@ -34,7 +34,6 @@ docker run -v $PWD:/home/shared/spyro -it devtag:1.0
 For running the automated tests:
 ````
 cd shared/spyro/
-python3 -m pytest test/
-python3 -m pytest test_3d/
-mpiexec -n 6 python3 -m pytest test_parallel/
+python3 -m pytest tests/on_one_core/
+mpiexec -n 6 python3 -m pytest tests/parallel/
 ````

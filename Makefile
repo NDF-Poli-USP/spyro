@@ -28,4 +28,4 @@ format:
 	autopep8 --in-place --global-config setup.cfg --recursive .
 
 lint:
-	flake8 setup.py spyro/ test/*.py
+	flake8 setup.py spyro/ tests/integration/*.py tests/on_one_core/*.py
