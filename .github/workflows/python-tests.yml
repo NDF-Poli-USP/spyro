@@ -58,11 +58,11 @@ jobs:
     - name: Running parallel tests for forward problem only
       run: |
           ./cleanup.sh
-          mpiexec -n 6 pytest --cov=spyro --cov-report=term --cov-report=xml:coverage.3d.xml --cov-context=test tests/three_dimension/test_hexahedral_convergence.py
-          mpiexec -n 6 pytest --cov=spyro --cov-report=term --cov-report=xml:coverage.forward.xml --cov-context=test tests/parallel/test_forward.py
-          mpiexec -n 6 pytest --cov=spyro --cov-report=term --cov-report=xml:coverage.supershot.xml --cov-context=test tests/parallel/test_forward_supershot.py
-          mpiexec -n 2 pytest --cov=spyro --cov-report=term --cov-report=xml:coverage.io.xml --cov-context=test tests/parallel/test_parallel_io.py
-          mpiexec -n 2 pytest --cov=spyro --cov-report=term --cov-report=xml:coverage.serial_shots.xml --cov-context=test tests/parallel/test_forward_multiple_serial_shots.py
+          mpiexec -n 6 python -m pytest --cov=spyro --cov-report=term --cov-report=xml:coverage.3d.xml --cov-context=test tests/three_dimension/test_hexahedral_convergence.py
+          mpiexec -n 6 python -m pytest --cov=spyro --cov-report=term --cov-report=xml:coverage.forward.xml --cov-context=test tests/parallel/test_forward.py
+          mpiexec -n 6 python -m pytest --cov=spyro --cov-report=term --cov-report=xml:coverage.supershot.xml --cov-context=test tests/parallel/test_forward_supershot.py
+          mpiexec -n 2 python -m pytest --cov=spyro --cov-report=term --cov-report=xml:coverage.io.xml --cov-context=test tests/parallel/test_parallel_io.py
+          mpiexec -n 2 python -m pytest --cov=spyro --cov-report=term --cov-report=xml:coverage.serial_shots.xml --cov-context=test tests/parallel/test_forward_multiple_serial_shots.py
     - name: Running serial fast tests
       run: |
         ./cleanup.sh
