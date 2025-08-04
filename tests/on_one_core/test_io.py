@@ -84,7 +84,7 @@ def test_read_and_write_segy():
 def test_saving_and_loading_shot_record():
     from .inputfiles.model import dictionary
 
-    save_dict["time_axis"]["final_time"] = 0.5
+    dictionary["time_axis"]["final_time"] = 0.5
     wave_obj_saving = spyro.AcousticWave(dictionary=dictionary)
     wave_obj_saving.set_mesh(input_mesh_parameters={"edge_length": 0.02})
     wave_obj_saving.set_initial_velocity_model(constant=1.5)
