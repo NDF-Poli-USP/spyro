@@ -1,7 +1,7 @@
 import os
 
-fname = os.path.join(os.path.dirname(__file__), "../meshes/Model1")
-vname = os.path.join(os.path.dirname(__file__), "../velocity_models/Model1")
+fname = os.path.join(os.path.dirname(__file__), "meshes/Model1")
+vname = os.path.join(os.path.dirname(__file__), "velocity_models/Model1")
 
 # Define mesh file to be used:
 meshfile = fname
