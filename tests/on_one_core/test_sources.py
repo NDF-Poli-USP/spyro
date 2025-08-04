@@ -3,7 +3,7 @@ from copy import deepcopy
 import spyro
 
 """Read in an external mesh and interpolate velocity to it"""
-from .inputfiles.Model1_2d_CG import model as oldmodel
+from ..inputfiles.Model1_2d_CG import model as oldmodel
 
 
 def test_ricker_varies_in_time():

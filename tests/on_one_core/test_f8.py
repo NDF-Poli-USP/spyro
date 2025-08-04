@@ -132,7 +132,7 @@ def preamble_habc(dictionary, edge_length):
     tRef = comp_cost("tini")
 
     # Create the acoustic wave object with HABCs
-    Wave_obj = habc.HABC_Wave(dictionary=dictionary, output_folder="tests/on_one_core/inputfiles/")
+    Wave_obj = habc.HABC_Wave(dictionary=dictionary, output_folder="tests/inputfiles/")
 
     # Mesh
     Wave_obj.set_mesh(input_mesh_parameters={"edge_length": edge_length})
