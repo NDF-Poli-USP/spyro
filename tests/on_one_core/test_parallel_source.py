@@ -7,7 +7,7 @@ from firedrake import *
 
 import spyro
 
-from .inputfiles.Model1_parallel_2d import model as options
+from ..inputfiles.Model1_parallel_2d import model as options
 
 
 # forward = spyro.solvers.forward
