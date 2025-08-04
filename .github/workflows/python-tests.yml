@@ -59,6 +59,7 @@ jobs:
       run: |
         ./cleanup.sh
         python3 -m pytest -n 8 --cov-report=xml --cov=spyro tests/on_one_core/ --skip-slow
+
     - name: Running serial slow tests
       run: |
         ./cleanup.sh
