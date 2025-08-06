@@ -11,7 +11,7 @@ from spyro.habc.hyp_lay import HyperLayer
 from spyro.habc.nrbc import NRBCHabc
 from spyro.plots.plots import plot_hist_receivers, \
     plot_rfft_receivers, plot_xCR_opt
-import ipdb
+# import ipdb
 
 
 # Work from Ruben Andres Salas, Andre Luis Ferreira da Silva,
