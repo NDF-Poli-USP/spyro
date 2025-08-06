@@ -1,8 +1,10 @@
 import firedrake as fire
+import glob
 import spyro.habc.habc as habc
 import spyro.habc.eik as eik
 from spyro.utils.cost import comp_cost
 import pytest
+import os
 
 
 def wave_dict(dt_usu, layer_shape, degree_layer,
@@ -443,6 +445,16 @@ def run_loop_habc(degree_layer_lst, habc_reference_freq_lst, get_ref_model=False
 
 
 # Applying HABCs to the model in Fig. 8 of Salas et al. (2022)
+
+@pytest.fixture(autouse=True)
+def cleanup_preamble_mesh_fixture():
+    mesh_files = glob.glob("tests/inputfiles/preamble/*")
+    for f in mesh_files:
+        try:
+            os.remove(f)
+        except Exception:
+            pass
+
 if __name__ == "__main__":
     test_loop_habc_rectangular_source()
     # test_loop_habc_rectangular_boundary()
