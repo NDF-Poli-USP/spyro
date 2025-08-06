@@ -103,13 +103,13 @@ def wave_dict(dt_usu, layer_shape, degree_layer,
     # Define parameters for visualization
     dictionary["visualization"] = {
         "forward_output": True,
-        "forward_output_filename": "output_3d/forward/fw_output_3d.pvd",
+        "forward_output_filename": "output/forward/fw_output_3d.pvd",
         "fwi_velocity_model_output": False,
         "velocity_model_filename": None,
         "gradient_output": False,
         "gradient_filename": None,
         "acoustic_energy": True,  # Activate energy calculation
-        "acoustic_energy_filename": "output_3d/preamble/acoustic_potential_energy",
+        "acoustic_energy_filename": "output/preamble/acoustic_potential_energy_3d",
     }
 
     return dictionary
@@ -303,10 +303,10 @@ def test_loop_habc_3d():
     # cpw: cells per wavelength
     # lba = minimum_velocity /source_frequency
     # edge_length = lba / cpw
-    edge_length_lst = [0.15, 0.125, 0.10, 0.08]
+    edge_length_lst = [0.150, 0.125, 0.100, 0.080]
 
     # Timestep size in seconds
-    dt_usu_lst = [0.0032, 0.0025, 0.0020, 0.0016]
+    dt_usu_lst = [0.0032, 0.0024, 0.0018, 0.0016]
     # dt_max = [0.0026, 0.0019, 0.0015, 0.0013] * 4/3
 
     # Eikonal degree
@@ -327,23 +327,23 @@ def test_loop_habc_3d():
 
     # ============ HABC PARAMETERS ============
 
+    # Infinite model (True: Infinite model, False: HABC scheme)
+    get_ref_model = False
+
+    # Loop for HABC cases
+    loop_modeling = not get_ref_model
+
     # Hyperellipse degrees
     degree_layer_lst = [None]  # [None, 2, 3, 4, 5]
 
     # Reference frequency
     habc_reference_freq_lst = ["source", "boundary"]
 
-    # Infinite model
-    get_ref_model = False
-
-    # Loop for HABC cases
-    loop_modeling = not get_ref_model
-
     # Error criterion for heuristic factor xCR
     crit_opt = "error_difference"  # "error_integral"
 
     # Number of points for regression (odd number)
-    n_pts = 1
+    n_pts = 3
 
     # ============ MESH AND EIKONAL ============
     # Create dictionary with parameters for the model
@@ -443,7 +443,7 @@ if __name__ == "__main__":
     test_loop_habc_3d()
 
 # eik_min = 83.333 ms
-# f_est Case_0  Case_1  Case_2  Case_3
+# f_est   150m    125m    100m     80m
 #  0.02  --/--   --/--  79.817  58.368
 #  0.03 78.201  75.378  84.365* 71.123
 #  0.04 84.857* 78.301  89.437  78.665

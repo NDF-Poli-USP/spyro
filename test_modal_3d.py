@@ -98,13 +98,13 @@ def wave_dict(edge_dom, layer_shape, degree_layer, habc_reference_freq):
     # Define parameters for visualization
     dictionary["visualization"] = {
         "forward_output": True,
-        "forward_output_filename": "output_3d/forward/fw_output_3d.pvd",
+        "forward_output_filename": "output/forward/fw_output_3d.pvd",
         "fwi_velocity_model_output": False,
         "velocity_model_filename": None,
         "gradient_output": False,
         "gradient_filename": None,
         "acoustic_energy": True,  # Activate energy calculation
-        "acoustic_energy_filename": "output_3d/preamble/acoustic_potential_energy",
+        "acoustic_energy_filename": "output/preamble/acoustic_potential_energy",
     }
 
     return dictionary
@@ -201,7 +201,7 @@ def test_loop_modal_3d():
     #                     'KRYLOVSCH_CG', 'KRYLOVSCH_GH', 'KRYLOVSCH_GG']
     # modal_solver_lst = ['LOBPCG', 'KRYLOVSCH_CH', 'KRYLOVSCH_CG',
     #                     'KRYLOVSCH_GH', 'KRYLOVSCH_GG']
-    modal_solver_lst = ['KRYLOVSCH_GH']
+    modal_solver_lst = ['LOBPCG']
 
     # Data to print on screen
     mod_str = "\nModal Solver: {}"

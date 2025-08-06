@@ -11,6 +11,8 @@ from spyro.habc.hyp_lay import HyperLayer
 from spyro.habc.nrbc import NRBCHabc
 from spyro.plots.plots import plot_hist_receivers, \
     plot_rfft_receivers, plot_xCR_opt
+import ipdb
+
 
 # Work from Ruben Andres Salas, Andre Luis Ferreira da Silva,
 # Luis Fernando Nogueira de Sá, Emilio Carlos Nelli Silva.
@@ -222,7 +224,7 @@ class HABC_Wave(AcousticWave, HyperLayer, NRBCHabc):
     '''
 
     def __init__(self, dictionary=None, f_est=0.06, fwi_iter=0,
-        comm=None, output_folder="output/"):
+                 comm=None, output_folder="output/"):
         '''
         Initialize the HABC class.
 
@@ -986,8 +988,18 @@ class HABC_Wave(AcousticWave, HyperLayer, NRBCHabc):
             X = sl.orth(np.random.rand(Msp.shape[0], k))
 
             # Solve the eigenproblem using LOBPCG
-            Lsp = ss.linalg.lobpcg(Asp, X, B=Msp, maxiter=2000,
-                                   largest=False)[0]
+            it_mod = 2500
+            it_ext = 2
+            for it in range(it_ext):
+                Lsp, X, resid = ss.linalg.lobpcg(Asp, X, B=Msp, tol=5e-4,
+                                                 maxiter=it_mod, largest=False,
+                                                 retResidualNormsHistory=True)
+
+                it_mod //= 2
+                rmin = np.array(resid)[:, 1].min()
+                if rmin < 5e-4 or it_mod < 20:
+                    del X, resid
+                    break
 
         if method[:-3] == 'KRYLOVSCH':
 
@@ -1002,16 +1014,16 @@ class HABC_Wave(AcousticWave, HyperLayer, NRBCHabc):
                 pc_type = "gamg"
 
             opts = {
-                # "eps_type": "krylovschur",      # Robust, widely used eigensolver
-                "eps_type": "lobpcg",             # Iterative
-                "eps_tol": 1e-6,                  # Tight tolerance for accuracy
-                "eps_max_it": 200,                # Reasonable iteration cap
-                "st_type": "sinvert",             # Useful for interior eigenvalues
-                "st_shift": 1e-6,                 # Stabilizes Neumann BC null space
-                "eps_smallest_magnitude": None,   # Smallest eigenvalues in magnitude
-                "eps_monitor": "ascii",           # Print convergence info
-                "ksp_type": ksp_type,             # Options for large problems
-                "pc_type": pc_type                # Options for large problems
+                "eps_type": "krylovschur",       # Robust, widely used eigensolver
+                # "eps_type": "lobpcg",          # Iterative
+                "eps_tol": 1e-6,                 # Tight tolerance for accuracy
+                "eps_max_it": 200,               # Reasonable iteration cap
+                "st_type": "sinvert",            # Useful for interior eigenvalues
+                "st_shift": 1e-6,                # Stabilizes Neumann BC null space
+                "eps_smallest_magnitude": None,  # Smallest eigenvalues in magnitude
+                "eps_monitor": "ascii",          # Print convergence info
+                "ksp_type": ksp_type,            # Options for large problems
+                "pc_type": pc_type               # Options for large problems
             }
 
             eigenproblem = fire.LinearEigenproblem(Asp, M=Msp)
@@ -1028,7 +1040,8 @@ class HABC_Wave(AcousticWave, HyperLayer, NRBCHabc):
 
     def fundamental_frequency(self, method=None, monitor=False):
         '''
-        Compute the fundamental frequency in Hz via modal analysis.
+        Compute the fundamental frequency in Hz via modal analysis
+        considering the numerical model with Neumann BCs.
 
         Parameters
         ----------
@@ -1123,13 +1136,14 @@ class HABC_Wave(AcousticWave, HyperLayer, NRBCHabc):
         # Function space for the problem
         V = self.function_space
         u, v = fire.TrialFunction(V), fire.TestFunction(V)
+        quad_rule = self.quadrature_rule
+        dx = fire.dx(scheme=quad_rule)
 
         # Bilinear forms
-        quad_rule = self.quadrature_rule
         c = self.c
-        a = c * c * fire.inner(fire.grad(u), fire.grad(v)) * fire.dx(scheme=quad_rule)
+        a = c * c * fire.inner(fire.grad(u), fire.grad(v)) * dx
         A = fire.assemble(a)
-        m = fire.inner(u, v) * fire.dx(scheme=quad_rule)
+        m = fire.inner(u, v) * dx
         M = fire.assemble(m)
 
         print("\nSolving Eigenvalue Problem")
@@ -1209,6 +1223,8 @@ class HABC_Wave(AcousticWave, HyperLayer, NRBCHabc):
                 '''
                 if CR == 0:
                     psi = 0
+                elif CR >= 1:
+                    psi = 0.999
                 else:
                     psi = kCR / (1 / CR - 1)**0.5
 
