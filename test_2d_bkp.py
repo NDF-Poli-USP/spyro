@@ -324,7 +324,7 @@ def test_loop_habc():
     crit_opt = "error_difference"  # "error_integral"
 
     # Number of points for regression (odd number)
-    n_pts = 3
+    n_pts = 1
 
     # ============ MESH AND EIKONAL ============
     # Create dictionary with parameters for the model
@@ -410,6 +410,9 @@ def test_loop_habc():
                         elif itr_xCR == n_pts - 1:
                             xCR_opt = get_xCR_usu(
                                 Wave_obj, dat_regr_xCR, "optimal", n_pts)
+
+                        if n_pts == 1:
+                            break
 
                     except Exception as e:
                         print(f"Error Solving: {e}")

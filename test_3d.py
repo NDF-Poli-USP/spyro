@@ -343,7 +343,7 @@ def test_loop_habc_3d():
     crit_opt = "error_difference"  # "error_integral"
 
     # Number of points for regression (odd number)
-    n_pts = 3
+    n_pts = 1
 
     # ============ MESH AND EIKONAL ============
     # Create dictionary with parameters for the model

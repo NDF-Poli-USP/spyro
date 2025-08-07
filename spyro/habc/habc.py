@@ -7,11 +7,12 @@ import spyro.habc.lay_len as lay_len
 from scipy.fft import fft
 from scipy.signal import find_peaks
 from spyro.solvers.acoustic_wave import AcousticWave
+from spyro.meshing.meshing_habc import HABC_Mesh
 from spyro.habc.hyp_lay import HyperLayer
 from spyro.habc.nrbc import NRBCHabc
 from spyro.plots.plots import plot_hist_receivers, \
     plot_rfft_receivers, plot_xCR_opt
-import ipdb
+# import ipdb
 
 
 # Work from Ruben Andres Salas, Andre Luis Ferreira da Silva,
@@ -23,7 +24,7 @@ import ipdb
 # With additions by Alexandre Olender
 
 
-class HABC_Wave(AcousticWave, HyperLayer, NRBCHabc):
+class HABC_Wave(AcousticWave, HABC_Mesh, HyperLayer, NRBCHabc):
     '''
     class HABC that determines absorbing layer size and parameters to be used.
 
@@ -39,17 +40,6 @@ class HABC_Wave(AcousticWave, HyperLayer, NRBCHabc):
         Area ratio to the area of the original domain. a_rat = area / a_orig
     area : `float`
         Area of the domain with absorbing layer
-    bnds : `list` of `arrays`
-        Mesh point indices on boundaries of the domain. Structure:
-        - [left_boundary, right_boundary, bottom_boundary] for 2D
-        - [left_boundary, right_boundary, bottom_boundary,
-            left_bnd_y, right_bnd_y] for 3D
-    bnd_nodes : `list` of `arrays`
-        Mesh point coordinates on boundaries of the domain. Structure:
-        - [z_data[bnds], x_data[bnds]] for 2D
-        - [z_data[bnds], x_data[bnds], y_data[bnds]] for 3D
-    c : `firedrake function`
-        Velocity model without absorbing layer
     case_habc : `str`
         Label for the output files that includes the layer shape
         ('REC' or 'HNI', I for the degree) and the reference frequency
@@ -58,8 +48,6 @@ class HABC_Wave(AcousticWave, HyperLayer, NRBCHabc):
         Velocity model with absorbing layer
     d : `float`
         Normalized element size (lmin / pad_len)
-    diam_mesh : `ufl.geometry.CellDiameter`
-        Mesh cell diameters
     eik_bnd : `list`
         Properties on boundaries according to minimum values of Eikonal
         Structure sublist: [pt_cr, c_bnd, eikmin, z_par, lref, sou_cr]
@@ -95,8 +83,6 @@ class HABC_Wave(AcousticWave, HyperLayer, NRBCHabc):
         Reference frequency of the wave at the minimum Eikonal point
     fundam_freq : `float`
         Fundamental frequency of the numerical model
-    funct_space_eik: `firedrake function space`
-        Function space for the Eikonal modeling
     fwi_iter : `int`
         The iteration number for the Full Waveform Inversion (FWI) algorithm
     Lz_habc : `float`
@@ -107,10 +93,6 @@ class HABC_Wave(AcousticWave, HyperLayer, NRBCHabc):
         Length of the domain in the y-direction with absorbing (3D models)
     layer_shape : `string`
         Shape type of pad layer. Options: 'rectangular' or 'hypershape'
-    lmin : `float`
-        Minimum mesh size
-    lmax : `float`
-        Maxmum mesh size
     lref : `float`
         Reference length for the size of the absorbing layer
     max_errIt : `float`
@@ -119,8 +101,6 @@ class HABC_Wave(AcousticWave, HyperLayer, NRBCHabc):
         Maximum peak error at the receivers for the HABC scheme
     mesh: `firedrake mesh`
         Mesh used in the simulation (HABC or Infinite Model)
-    mesh_original : `firedrake mesh`
-        Original mesh without absorbing layer
     n_bounds : `tuple`
         Bounds for the hypershape layer degree. (n_min, n_max)
         - n_min ensures to add lmin in the domain diagonal direction
@@ -146,8 +126,6 @@ class HABC_Wave(AcousticWave, HyperLayer, NRBCHabc):
         Receiver waveform data in the reference model
     receivers_ref_fft : `array`
         Frequency response at the receivers in the reference model.
-    tol : `float`
-        Tolerance for searching nodes on the boundary
     v_rat : `float`
         Volume ratio to the volume of the original domain. v_rat = vol / v_orig
     vol : `float`
@@ -162,8 +140,6 @@ class HABC_Wave(AcousticWave, HyperLayer, NRBCHabc):
 
     Methods
     -------
-    boundary_data()
-        Generate the boundary data from the original domain mesh
     calc_damping_prop()
         Compute the damping properties for the absorbing layer
     calc_rec_geom_prop()
@@ -205,10 +181,6 @@ class HABC_Wave(AcousticWave, HyperLayer, NRBCHabc):
         Create a reference model for the HABC scheme for comparative purposes
     min_reflection()
         Compute a minimum reflection coefficiente for the quadratic damping
-    preamble_mesh_operations()
-        Perform mesh operations previous to size an absorbing layer
-    properties_eik_mesh()
-        Set the properties for the mesh used to solve the Eikonal equation
     regression_CRmin()
         Define the minimum damping ratio and the associated heuristic factor
     roundFL()
@@ -245,13 +217,11 @@ class HABC_Wave(AcousticWave, HyperLayer, NRBCHabc):
         '''
 
         AcousticWave.__init__(self, dictionary=dictionary, comm=comm)
+        HABC_Mesh.__init__(self, f_est)
         NRBCHabc.__init__(self)
 
         # Identifier for the current case study
         self.identify_habc_case()
-
-        # Factor for the stabilizing term in Eikonal equation
-        self.f_est = f_est
 
         # Nyquist frequency
         self.f_Nyq = 1.0 / (2.0 * self.dt)
@@ -294,144 +264,6 @@ class HABC_Wave(AcousticWave, HyperLayer, NRBCHabc):
 
         self.case_habc += "_BND" \
             if self.abc_reference_freq == 'boundary' else "_SOU"
-
-    def preamble_mesh_operations(self):
-        '''
-        Perform mesh operations previous to size an absorbing layer.
-
-        Parameters
-        ----------
-        None
-
-        Returns
-        -------
-        None
-        '''
-
-        print("\nCreating Mesh and Initial Velocity Model")
-
-        # Save a copy of the original mesh
-        self.mesh_original = self.mesh
-        mesh_orig = fire.VTKFile(self.path_save + "preamble/mesh_orig.pvd")
-        mesh_orig.write(self.mesh_original)
-
-        # Velocity profile model
-        self.c = fire.Function(self.function_space, name='c_orig [km/s])')
-        self.c.interpolate(self.initial_velocity_model)
-
-        # Save initial velocity model
-        vel_c = fire.VTKFile(self.path_save + "preamble/c_vel.pvd")
-        vel_c.write(self.c)
-
-        # Mesh properties for Eikonal
-        self.properties_eik_mesh(p_usu=self.abc_deg_eikonal)
-
-        # Generating boundary data from the original domain mesh
-        self.boundary_data()
-
-    def properties_eik_mesh(self, p_usu=None):
-        '''
-        Set the properties for the mesh used to solve the Eikonal equation.
-
-        Parameters
-        ----------
-        p_usu : `int`, optional
-            Finite element order for the Eikonal equation. Default is None
-
-        Returns
-        -------
-        None
-        '''
-
-        # Setting the properties of the mesh used to solve the Eikonal equation
-        p = self.degree if p_usu is None else p_usu
-        self.funct_space_eik = fire.FunctionSpace(self.mesh, 'CG', p)
-
-        # Mesh cell diameters
-        self.diam_mesh = fire.CellDiameter(self.mesh)
-
-        if self.fwi_iter == 0:
-
-            if self.dimension == 2:  # 2D
-                fdim = 2**0.5
-
-            if self.dimension == 3:  # 3D
-                fdim = 3**0.5
-
-            # Minimum and maximum mesh size
-            diam = fire.Function(
-                self.funct_space_eik).interpolate(self.diam_mesh)
-            self.lmin = round(diam.dat.data_with_halos.min() / fdim, 6)
-            self.lmax = round(diam.dat.data_with_halos.max() / fdim, 6)
-
-    def boundary_data(self, typ_bnd='original'):
-        '''
-        Generate the boundary data from the original domain mesh.
-
-        Parameters
-        ----------
-        typ_bnd : str, optional
-            Type of boundary data to extract. Options: 'original' for original
-            domain or 'eikonal' for Eikonal analysis. Default is 'original'
-
-        Returns
-        -------
-        bnds : `list` of 'arrays'
-            Mesh point indices on boundaries of the domain. Structure:
-            - [left_boundary, right_boundary, bottom_boundary] for 2D
-            - [left_boundary, right_boundary, bottom_boundary,
-                left_bnd_y, right_bnd_y] for 3D
-        node_positions : `list`, optional
-            List of node positions for Eikonal analysis. Structure:
-            - [z_data, x_data] for 2D
-            - [z_data, x_data, y_data] for 3D
-        '''
-
-        if typ_bnd == 'original':
-            func_space = self.function_space
-        elif typ_bnd == 'eikonal':
-            func_space = self.funct_space_eik
-        else:
-            aux0 = "Please use 'original' or 'eikonal', "
-            UserWarning(aux0 + f"{self.layer_shape} not supported.")
-
-        # Extract node positions
-        z_f = fire.Function(func_space).interpolate(self.mesh_z)
-        x_f = fire.Function(func_space).interpolate(self.mesh_x)
-        z_data = z_f.dat.data_with_halos[:]
-        x_data = x_f.dat.data_with_halos[:]
-
-        if self.dimension == 3:  # 3D
-            y_f = fire.Function(func_space).interpolate(self.mesh_y)
-            y_data = y_f.dat.data_with_halos[:]
-
-        # Tolerance for boundary
-        self.tol = 10**(min(int(np.log10(self.lmin / 10)), -6))
-
-        # Boundaries
-        left_boundary = np.where(x_data <= self.tol)
-        right_boundary = np.where(x_data >= self.length_x - self.tol)
-        bottom_boundary = np.where(z_data <= self.tol - self.length_z)
-
-        bnds = [left_boundary, right_boundary, bottom_boundary]
-
-        if self.dimension == 3:  # 3D
-            left_bnd_y = np.where(y_data <= self.tol)
-            right_bnd_y = np.where(y_data >= self.length_y - self.tol)
-            bnds += [left_bnd_y, right_bnd_y]
-
-        if typ_bnd == 'original':
-            self.bnds = np.unique(np.concatenate(
-                [idxs for idx_list in bnds for idxs in idx_list]))
-            self.bnd_nodes = [z_data[self.bnds], x_data[self.bnds]]
-            if self.dimension == 3:  # 3D
-                self.bnd_nodes.append(y_data[self.bnds])
-
-        elif typ_bnd == 'eikonal':
-            node_positions = [z_data, x_data]
-            if self.dimension == 3:  # 3D
-                node_positions.append(y_data)
-            return bnds, node_positions
 
     def roundFL(self):
         '''
@@ -518,7 +350,6 @@ class HABC_Wave(AcousticWave, HyperLayer, NRBCHabc):
 
         # Check if the signal is empty
         if signal.size == 0:
-
             err = "Input signal is empty. Cannot compute frequency response."
             raise ValueError(err)
 
@@ -1015,7 +846,6 @@ class HABC_Wave(AcousticWave, HyperLayer, NRBCHabc):
 
             opts = {
                 "eps_type": "krylovschur",       # Robust, widely used eigensolver
-                # "eps_type": "lobpcg",          # Iterative
                 "eps_tol": 1e-6,                 # Tight tolerance for accuracy
                 "eps_max_it": 200,               # Reasonable iteration cap
                 "st_type": "sinvert",            # Useful for interior eigenvalues
