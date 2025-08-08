@@ -12,6 +12,7 @@ from spyro.habc.hyp_lay import HyperLayer
 from spyro.habc.nrbc import NRBCHabc
 from spyro.plots.plots import plot_hist_receivers, \
     plot_rfft_receivers, plot_xCR_opt
+from spyro.utils.error_management import value_parameter_error
 # import ipdb
 
 
@@ -223,9 +224,6 @@ class HABC_Wave(AcousticWave, HABC_Mesh, HyperLayer, NRBCHabc):
         # Identifier for the current case study
         self.identify_habc_case()
 
-        # Nyquist frequency
-        self.f_Nyq = 1.0 / (2.0 * self.dt)
-
         # Current iteration
         self.fwi_iter = fwi_iter
 
@@ -246,11 +244,11 @@ class HABC_Wave(AcousticWave, HABC_Mesh, HyperLayer, NRBCHabc):
         '''
 
         self.layer_shape = self.abc_boundary_layer_shape
-        if self.layer_shape == 'rectangular':
+        if self.layer_shape == 'rectangular':  # Rectangular layer
             print("\nAbsorbing Layer Shape: Rectangular")
             self.case_habc = 'REC'
 
-        elif self.layer_shape == 'hypershape':
+        elif self.layer_shape == 'hypershape':  # Hypershape layer
             lay_str = "\nAbsorbing Layer Shape: Hypershape"
             deg_str = " - Degree: " + str(self.abc_deg_layer)
             print(lay_str + deg_str)
@@ -259,8 +257,8 @@ class HABC_Wave(AcousticWave, HABC_Mesh, HyperLayer, NRBCHabc):
                                 dimension=self.dimension)
 
         else:
-            aux0 = "Please use 'rectangular' or 'hypershape', "
-            UserWarning(aux0 + f"{self.layer_shape} not supported.")
+            value_parameter_error('layer_shape', self.layer_shape,
+                                  ['rectangular', 'hypershape'])
 
         self.case_habc += "_BND" \
             if self.abc_reference_freq == 'boundary' else "_SOU"
@@ -309,11 +307,8 @@ class HABC_Wave(AcousticWave, HABC_Mesh, HyperLayer, NRBCHabc):
         None
         '''
 
-        # Eikonal boundary conditions
-        Eikonal.define_bcs(self)
-
         # Solving Eikonal
-        Eikonal.solve_eik(self, f_est=self.f_est)
+        Eikonal.solve_eik(self, f_est=Eikonal.f_est)
 
         # Identifying critical points
         self.eik_bnd = Eikonal.ident_crit_eik(self)
@@ -352,6 +347,9 @@ class HABC_Wave(AcousticWave, HABC_Mesh, HyperLayer, NRBCHabc):
         if signal.size == 0:
             err = "Input signal is empty. Cannot compute frequency response."
             raise ValueError(err)
+
+        # Nyquist frequency
+        self.f_Nyq = 1.0 / (2.0 * self.dt)
 
         # Zero padding for increasing smoothing in FFT
         yt = np.concatenate([np.zeros(fpad * len(signal)), signal])

@@ -151,7 +151,7 @@ class NRBCHabc():
         self.cosHig = fire.Function(self.function_space, name='cosHig')
 
         # Boundary nodes
-        bnd_nod = fire.DirichletBC(self.function_space, 0, "on_boundary").nodes
+        bnd_nod = fire.DirichletBC(self.function_space, 0., "on_boundary").nodes
 
         # Node coordinates - To do: refactor
         z_f = fire.Function(self.function_space).interpolate(self.mesh_z)

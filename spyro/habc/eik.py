@@ -2,6 +2,7 @@ import firedrake as fire
 import numpy as np
 from sys import float_info, exit
 from os import getcwd
+from spyro.solvers.eikonal.eikonal_eq import Dir_point_bc
 
 # Work from Ruben Andres Salas, Andre Luis Ferreira da Silva,
 # Luis Fernando Nogueira de Sá, Emilio Carlos Nelli Silva.
@@ -12,56 +13,23 @@ from os import getcwd
 # With additions by Alexandre Olender
 
 
-class Dir_point_bc(fire.DirichletBC):
-    '''
-    Class for Eikonal boundary conditions at a point.
-
-    Attributes
-    ----------
-    nodes : `array`
-        Points where the boundary condition is to be applied
-    '''
-
-    def __init__(self, V, value, nodes):
-        '''
-        Initialize the Dir_point_bc class.
-
-        Parameters
-        ----------
-        V : `firedrake function space`
-            Function space where the boundary condition is applied
-        value : `firedrake constant`
-            Value of the boundary condition
-        nodes : `array`
-            Points where the boundary condition is to be applied
-
-        Returns
-        -------
-        None
-        '''
-
-        # Calling superclass init and providing a dummy subdomain id
-        super(Dir_point_bc, self).__init__(V, value, 0)
-
-        # Overriding the "nodes" property
-        self.nodes = nodes
-
-
 class Eikonal():
     '''
     Class for the Nonlinear Eikonal.
 
     Attributes
     ----------
-    bnds : `list` of `arrays`
-        Mesh point indices on boundaries of the domain. Structure:
-        - [left_boundary, right_boundary, bottom_boundary] for 2D
-        - [left_boundary, right_boundary, bottom_boundary,
-            left_bnd_y, right_bnd_y] for 3D
+    bnds : `tuple` of 'arrays'
+        Mesh node indices on boundaries of the domain. Structure:
+        - (left_boundary, right_boundary, bottom_boundary) for 2D
+        - (left_boundary, right_boundary, bottom_boundary,
+            left_bnd_y, right_bnd_y) for 3D
     bcs_eik : `list`
         Dirichlet BCs for eikonal
     c : `firedrake function`
         Velocity model without absorbing layer
+    f_est: `float`, optional
+        Factor for the stabilizing term in Eikonal equation
     mesh: `firedrake mesh`
         Original mesh without absorbing layer
     path_save : `str`
@@ -118,14 +86,24 @@ class Eikonal():
         # Velocity profile model
         self.c = Wave.c
 
-        # Extract node positions and boundary data
-        self.bnds, node_positions = Wave.boundary_data(typ_bnd='eikonal')
+        # Extract node positions
+        node_positions = Wave.extract_node_positions(Wave.funct_space_eik)
         self.z_data, self.x_data = node_positions[:2]
         if Wave.dimension == 3:  # 3D
-            self.y_data = node_positions[-1]
+            self.y_data = node_positions[2]
+
+        # Extract boundary node coordinates
+        self.bnds = Wave.extract_bnd_node_positions(node_positions,
+                                                    Wave.funct_space_eik)
+
+        # Factor for the stabilizing term in Eikonal equation
+        self.f_est = Wave.f_est
 
         # Path to save data
         self.path_save = Wave.path_save + "preamble/"
+
+        # Eikonal boundary conditions
+        self.define_bcs(Wave)
 
     def define_bcs(self, Wave):
         '''

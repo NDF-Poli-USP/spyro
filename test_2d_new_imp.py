@@ -147,19 +147,19 @@ def preamble_habc(dictionary, edge_length):
     comp_cost("tfin", tRef=tRef,
               user_name=Wave_obj.path_save + "preamble/MSH_")
 
-    # # ============ EIKONAL ANALYSIS ============
-    # # Reference to resource usage
-    # tRef = comp_cost("tini")
+    # ============ EIKONAL ANALYSIS ============
+    # Reference to resource usage
+    tRef = comp_cost("tini")
 
-    # # Initializing Eikonal object
-    # Eik_obj = eik.Eikonal(Wave_obj)
+    # Initializing Eikonal object
+    Eik_obj = eik.Eikonal(Wave_obj)
 
-    # # Finding critical points
-    # Wave_obj.critical_boundary_points(Eik_obj)
+    # Finding critical points
+    Wave_obj.critical_boundary_points(Eik_obj)
 
-    # # Estimating computational resource usage
-    # comp_cost("tfin", tRef=tRef,
-    #           user_name=Wave_obj.path_save + "preamble/EIK_")
+    # Estimating computational resource usage
+    comp_cost("tfin", tRef=tRef,
+              user_name=Wave_obj.path_save + "preamble/EIK_")
 
     return Wave_obj
 
@@ -177,7 +177,7 @@ def test_loop_habc():
     # cpw: cells per wavelength
     # lba = minimum_velocity /source_frequency
     # edge_length = lba / cpw
-    edge_length_lst = [0.05]  # [0.050, 0.040, 0.032, 0.025, 0.020]
+    edge_length_lst = [0.050]  # [0.050, 0.040, 0.032, 0.025, 0.020]
 
     # Timestep size
     dt_usu_lst = [0.00100]  # [0.00100, 0.00080, 0.00064, 0.00040]
@@ -220,3 +220,7 @@ def test_loop_habc():
 # Applying HABCs to the model in Fig. 8 of Salas et al. (2022)
 if __name__ == "__main__":
     test_loop_habc()
+
+# from time import perf_counter  # For runtime
+# tRef = perf_counter()
+# print(f"Time: {perf_counter() - tRef:.4f} seconds")

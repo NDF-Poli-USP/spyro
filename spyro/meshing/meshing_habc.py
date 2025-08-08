@@ -1,5 +1,6 @@
 import firedrake as fire
 import numpy as np
+from spyro.utils.error_management import value_parameter_error
 
 # Work from Ruben Andres Salas, Andre Luis Ferreira da Silva,
 # Luis Fernando Nogueira de Sá, Emilio Carlos Nelli Silva.
@@ -51,6 +52,7 @@ class HABC_Mesh():
     properties_eik_mesh()
         Set the properties for the mesh used to solve the Eikonal equation
     representative_mesh_dimensions()
+        Get the representative mesh dimensions from original mesh.
     '''
 
     def __init__(self, f_est=0.06):
@@ -121,6 +123,74 @@ class HABC_Mesh():
         self.funct_space_eik = fire.FunctionSpace(self.mesh, ele_type,
                                                   self.p_eik)
 
+    def extract_node_positions(self, func_space):
+        '''
+        Extract node positions from the mesh.
+
+        Parameters
+        ----------
+        func_space : `firedrake function space`
+            Function space to extract node positions
+
+        Returns
+        -------
+        node_positions : `tuple`
+            Tuple containing the node positions in the mesh.
+            - (z_data, x_data) for 2D
+            - (z_data, x_data, y_data) for 3D
+        '''
+
+        # Extract node positions
+        z_f = fire.Function(func_space).interpolate(self.mesh_z)
+        x_f = fire.Function(func_space).interpolate(self.mesh_x)
+        z_data = z_f.dat.data_with_halos[:]
+        x_data = x_f.dat.data_with_halos[:]
+        node_positions = (z_data, x_data)
+
+        if self.dimension == 3:  # 3D
+            y_f = fire.Function(func_space).interpolate(self.mesh_y)
+            y_data = y_f.dat.data_with_halos[:]
+            node_positions += (y_data,)
+
+        return node_positions
+
+    def extract_bnd_node_positions(self, node_positions, func_space):
+        '''
+        Extract boundary node coordinates from node positions.
+
+        Parameters
+        ----------
+        node_positions : `tuple`
+            Tuple containing the node positions in the mesh.
+            - (z_data, x_data) for 2D
+            - (z_data, x_data, y_data) for 3D
+
+        Returns
+        -------
+        bnds : `tuple` of 'arrays'
+            Mesh node indices on boundaries of the domain. Structure:
+            - (left_boundary, right_boundary, bottom_boundary) for 2D
+            - (left_boundary, right_boundary, bottom_boundary,
+                left_bnd_y, right_bnd_y) for 3D
+        '''
+
+        # Extract node positions
+        z_data, x_data = node_positions[0:2]
+
+        # Boundary array
+        left_boundary = np.where(x_data <= self.tol)
+        right_boundary = np.where(x_data >= self.length_x - self.tol)
+        bottom_boundary = np.where(z_data <= self.tol - self.length_z)
+        bnds = (left_boundary, right_boundary, bottom_boundary)
+
+        if self.dimension == 3:  # 3D
+            y_data = node_positions[2]
+            left_bnd_y = np.where(y_data <= self.tol)
+            right_bnd_y = np.where(y_data >= self.length_y - self.tol)
+            bnds += (left_bnd_y, right_bnd_y,)
+
+        return bnds
+
     def boundary_data(self, typ_bnd='original'):
         '''
         Generate the boundary data from the original domain mesh.
@@ -149,32 +219,19 @@ class HABC_Mesh():
         elif typ_bnd == 'eikonal':
             func_space = self.funct_space_eik
         else:
-            aux0 = "Please use 'original' or 'eikonal'."
-            raise ValueError(f"Invalid typ_bnd: '{typ_bnd}'. " + aux0)
+            value_parameter_error('typ_bnd', typ_bnd, ['original', 'eikonal'])
 
         # Extract node positions
-        z_f = fire.Function(func_space).interpolate(self.mesh_z)
-        x_f = fire.Function(func_space).interpolate(self.mesh_x)
-        z_data = z_f.dat.data_with_halos[:]
-        x_data = x_f.dat.data_with_halos[:]
+        node_positions = self.extract_node_positions(func_space)
 
+        # Extract boundary node coordinates
+        bnds = self.extract_bnd_node_positions(node_positions, func_space)
+
+        z_data, x_data = node_positions[0:2]
         if self.dimension == 3:  # 3D
-            y_f = fire.Function(func_space).interpolate(self.mesh_y)
-            y_data = y_f.dat.data_with_halos[:]
-
-        # Boundaries
-        left_boundary = np.where(x_data <= self.tol)
-        right_boundary = np.where(x_data >= self.length_x - self.tol)
-        bottom_boundary = np.where(z_data <= self.tol - self.length_z)
-
-        bnds = [left_boundary, right_boundary, bottom_boundary]
-
-        if self.dimension == 3:  # 3D
-            left_bnd_y = np.where(y_data <= self.tol)
-            right_bnd_y = np.where(y_data >= self.length_y - self.tol)
-            bnds += [left_bnd_y, right_bnd_y]
-
+            y_data = node_positions[2]
         if typ_bnd == 'original':
+            # ToDo: Check usage of these atributes
             self.bnds = np.unique(np.concatenate([idxs for idx_list in bnds
                                                   for idxs in idx_list]))
             self.bnd_nodes = [z_data[self.bnds], x_data[self.bnds]]
@@ -222,4 +279,4 @@ class HABC_Mesh():
         self.properties_eik_mesh(p_usu=self.abc_deg_eikonal)
 
         # Generating boundary data from the original domain mesh
-        self.boundary_data()
+        # self.boundary_data()
