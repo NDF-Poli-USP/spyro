@@ -63,7 +63,7 @@ jobs:
     - name: Running serial slow tests
       run: |
         ./cleanup.sh
-        python3 -m pytest -n 8 --cov-report=xml --cov-append tests/on_one_core/  --only-slow
+        python3 -m pytest -n 8 --cov-report=xml --cov-append --cov=spyro tests/on_one_core/  --only-slow
 
     - name: Running parallel tests for forward problem only
       run: |
