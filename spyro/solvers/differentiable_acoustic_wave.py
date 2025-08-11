@@ -71,8 +71,8 @@ class DifferentiableWaveEquation:
             # Log information.
             logging.info("Wavelet not provided. Using Ricker wavelet.")
             wavelet = full_ricker_wavelet(
-                self.model["timeaxis"]["dt"],
-                self.model["timeaxis"]["tf"],
+                self.model["time_axis"]["dt"],
+                self.model["time_axis"]["final_time"],
                 self.model["acquisition"]["frequency_peak"]
             )
         # RHS
@@ -86,7 +86,7 @@ class DifferentiableWaveEquation:
         # Time execution.
         if compute_functional:
             self._functional_value = 0.0
-        total_steps = int(self.model["timeaxis"]["tf"] / self.model["timeaxis"]["dt"])
+        total_steps = int(self.model["time_axis"]["final_time"] / self.model["time_axis"]["dt"]) + 1
         if (
             fire_ad.get_working_tape()._checkpoint_manager
             and self.model["aut_dif"]["checkpointing"]
@@ -169,19 +169,10 @@ class DifferentiableWaveEquation:
         )
 
     def _solver_parameters(self):
-        if self.model["opts"]["method"] == "KMV":
+        if self.model["options"]["variant"] == "lumped":
             params = {"ksp_type": "preonly", "pc_type": "jacobi"}
-        elif (
-            self.model["opts"]["method"] == "CG"
-            and self.mesh.ufl_cell() != quadrilateral  # noqa: F821
-            and self.mesh.ufl_cell() != hexahedron  # noqa: F821
-        ):
+        elif self.model["options"]["variant"] == "equispaced":
             params = {"ksp_type": "cg", "pc_type": "jacobi"}
-        elif self.model["opts"]["method"] == "CG" and (
-            self.mesh.ufl_cell() == quadrilateral  # noqa: F821
-            or self.mesh.ufl_cell() == hexahedron  # noqa: F821
-        ):
-            params = {"ksp_type": "preonly", "pc_type": "jacobi"}
         else:
             raise ValueError("method is not yet supported")
 

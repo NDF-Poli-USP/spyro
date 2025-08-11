@@ -30,8 +30,8 @@ def central_difference_acoustic(forwardsolver, c, source_function):
         fire.Constant(dt**2) * v * fire.dx(scheme=qr_x)
 
     nf = 0
-    if forwardsolver.model["BCs"]["outer_bc"] == "non-reflective":
-        nf = ((u_n - u_nm1) / dt) * v * fire.ds(scheme=qr_s)
+    if forwardsolver.model["absorving_boundary_conditions"]["status"] is True:
+        nf = (1/c) * ((u_n - u_nm1) / dt) * v * fire.ds(scheme=qr_s)
 
     a = c * c * fire.dot(fire.grad(u_n), fire.grad(v)) * fire.dx(scheme=qr_x)
     F = time_term + a + nf

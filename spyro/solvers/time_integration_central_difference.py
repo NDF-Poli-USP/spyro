@@ -4,7 +4,7 @@ from . import helpers
 from .. import utils
 
 
-def central_difference(wave, source_id=0):
+def central_difference(wave, source_ids=[0]):
     """
     Perform central difference time integration for wave propagation.
 
@@ -12,6 +12,8 @@ def central_difference(wave, source_id=0):
     -----------
     wave: Spyro object
         The Wave object containing the necessary data and parameters.
+    source_ids: list of ints (optional)
+        The ID of the sources being propagated. Defaults to [0].
 
     Returns:
     --------
@@ -19,10 +21,10 @@ def central_difference(wave, source_id=0):
             A tuple containing the forward solution and the receiver output.
     """
     if wave.sources is not None:
-        wave.sources.current_source = source_id
+        wave.sources.current_sources = source_ids
         rhs_forcing = fire.Cofunction(wave.function_space.dual())
 
-    wave.field_logger.start_logging(source_id)
+    wave.field_logger.start_logging(source_ids)
 
     wave.comm.comm.barrier()
 

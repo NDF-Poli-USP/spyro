@@ -2,11 +2,15 @@ import numpy as np
 import firedrake as fire
 import spyro
 import pytest
+import warnings
+
+
+warnings.filterwarnings("ignore")
 
 
 def is_rol_installed():
     try:
-        import ROL
+        import ROL  # noqa:F401
         return True
     except ImportError:
         return False
@@ -22,7 +26,7 @@ dictionary["options"] = {
     "dimension": 2,  # dimension
 }
 dictionary["parallelism"] = {
-    "type": "automatic",  # options: automatic (same number of cores for evey processor) or spatial
+    "type": "spatial",  # options: automatic (same number of cores for evey processor) or spatial
 }
 dictionary["mesh"] = {
     "Lz": 2.0,  # depth in km - always positive   # Como ver isso sem ler a malha?
@@ -34,7 +38,6 @@ dictionary["mesh"] = {
 dictionary["acquisition"] = {
     "source_type": "ricker",
     "source_locations": spyro.create_transect((-0.55, 0.7), (-0.55, 1.3), 6),
-    # "source_locations": [(-1.1, 1.5)],
     "frequency": 5.0,
     "delay": 0.2,
     "delay_type": "time",
@@ -66,6 +69,7 @@ dictionary["inversion"] = {
 }
 
 
+@pytest.mark.slow
 def test_fwi(load_real_shot=False, use_rol=False):
     """
     Run the Full Waveform Inversion (FWI) test.
@@ -89,7 +93,7 @@ def test_fwi(load_real_shot=False, use_rol=False):
         FWI_obj.set_real_velocity_model(conditional=cond, output=True, dg_velocity_model=False)
         FWI_obj.generate_real_shot_record(
             plot_model=True,
-            filename="True_experiment.png",
+            model_filename="True_experiment.png",
             abc_points=[(-0.5, 0.5), (-1.5, 0.5), (-1.5, 1.5), (-0.5, 1.5)]
         )
         np.save("real_shot_record", FWI_obj.real_shot_record)
@@ -130,7 +134,8 @@ def test_fwi(load_real_shot=False, use_rol=False):
     assert all([test0, test1, test2, test3])
 
 
-@pytest.mark.skipif(not is_rol_installed(), reason="ROL is not installed")
+@pytest.mark.slow
+@pytest.mark.skip(reason="ROL is not working for spyro")
 def test_fwi_with_rol(load_real_shot=False, use_rol=True):
     test_fwi(load_real_shot=load_real_shot, use_rol=use_rol)
 

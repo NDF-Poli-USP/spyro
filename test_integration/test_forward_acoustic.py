@@ -3,6 +3,7 @@ from mpi4py import MPI
 import numpy as np
 import firedrake as fire
 import spyro
+import pytest
 
 
 def error_calc(p_numerical, p_analytical, nt):
@@ -12,6 +13,7 @@ def error_calc(p_numerical, p_analytical, nt):
     return div_error_time
 
 
+@pytest.mark.parallel(6)
 def test_forward_3_shots():
     final_time = 1.0
 
@@ -91,7 +93,7 @@ def test_forward_3_shots():
 
     error = error_calc(arr0[:430], analytical_p[:430], 430)
     if comm.comm.rank == 0:
-        print(f"Error for shot {Wave_obj.current_source} is {error} and test has passed equals {np.abs(error) < 0.01}", flush=True)
+        print(f"Error for shot {Wave_obj.current_sources} is {error} and test has passed equals {np.abs(error) < 0.01}", flush=True)
     error_all = COMM_WORLD.allreduce(error, op=MPI.SUM)
     error_all /= 3
 

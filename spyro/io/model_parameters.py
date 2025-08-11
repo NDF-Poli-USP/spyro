@@ -1,8 +1,12 @@
 import numpy as np
+import uuid
+from mpi4py import MPI  # noqa:F401
+from firedrake import COMM_WORLD  # noqa:
 import warnings
 from .. import io
 from .. import utils
 from .. import meshing
+from ..meshing.meshing_functions import cells_per_wavelength
 
 # default_optimization_parameters = {
 #     "General": {"Secant": {"Type": "Limited-Memory BFGS",
@@ -202,6 +206,20 @@ class Model_parameters:
         conditions.
     abc_pad_length: float
         Thickness of the absorbing boundary conditions.
+    abc_boundary_layer_type : `str`
+        Type of the boundary layer. Option 'hybrid' is based on paper
+        of Salas et al. (2022). doi: https://doi.org/10.1016/j.apm.2022.09.014
+    abc_boundary_layer_shape : str
+        Shape type of pad layer. Options: 'rectangular' or 'hypershape'
+    abc_deg_layer : `int`
+        Hypershape degree
+    abc_reference_freq : `str`
+        Reference frequency for sizing the hybrid absorbing layer.
+        Options: 'source' or 'boundary'
+    abc_deg_eikonal : `int`
+        Finite element order for the Eikonal analysis
+    abc_get_ref_model : `bool`
+        If True, the infinite model is created
     source_type: str
         Type of source used in the simulation. Can be "ricker" for a Ricker
         wavelet or "MMS" for a manufactured solution.
@@ -325,6 +343,7 @@ class Model_parameters:
 
         # Sanitize output files
         self._sanitize_output()
+        self.random_id_string = str(uuid.uuid4())[:10]
 
     # default_dictionary["absorving_boundary_conditions"] = {
     #     "status": False,  # True or false
@@ -375,20 +394,27 @@ class Model_parameters:
             }
         dictionary = self.input_dictionary["absorving_boundary_conditions"]
         self.abc_active = dictionary["status"]
-
         BL_obj = io.boundary_layer_io.read_boundary_layer(dictionary)
-        self.abc_exponent = BL_obj.abc_exponent
-        self.abc_cmax = BL_obj.abc_cmax
-        self.abc_R = BL_obj.abc_R
-        self.abc_pad_length = BL_obj.abc_pad_length
         self.abc_boundary_layer_type = BL_obj.abc_boundary_layer_type
 
-        self.absorb_top = dictionary.get("absorb_top", False)
-        self.absorb_bottom = dictionary.get("absorb_bottom", True)
-        self.absorb_right = dictionary.get("absorb_right", True)
-        self.absorb_left = dictionary.get("absorb_left", True)
-        self.absorb_front = dictionary.get("absorb_front", True)
-        self.absorb_back = dictionary.get("absorb_back", True)
+        if BL_obj.abc_boundary_layer_type == "hybrid":
+            self.abc_boundary_layer_shape = BL_obj.abc_boundary_layer_shape
+            self.abc_deg_layer = BL_obj.abc_deg_layer
+            self.abc_reference_freq = BL_obj.abc_reference_freq
+            self.abc_get_ref_model = BL_obj.abc_get_ref_model
+            self.abc_deg_eikonal = BL_obj.abc_deg_eikonal
+            self.abc_pad_length = BL_obj.abc_pad_length
+        else:
+            self.abc_exponent = BL_obj.abc_exponent
+            self.abc_cmax = BL_obj.abc_cmax
+            self.abc_R = BL_obj.abc_R
+            self.abc_pad_length = BL_obj.abc_pad_length
+            self.absorb_top = dictionary.get("absorb_top", False)
+            self.absorb_bottom = dictionary.get("absorb_bottom", True)
+            self.absorb_right = dictionary.get("absorb_right", True)
+            self.absorb_left = dictionary.get("absorb_left", True)
+            self.absorb_front = dictionary.get("absorb_front", True)
+            self.absorb_back = dictionary.get("absorb_back", True)
 
     def _sanitize_output(self):
         #         default_dictionary["visualization"] = {
@@ -511,8 +537,12 @@ class Model_parameters:
             warnings.warn("No paralellism type listed. Assuming automatic")
             self.parallelism_type = "automatic"
 
-        if self.source_type == "MMS":
-            self.parallelism_type = "spatial"
+        if self.parallelism_type == "custom":
+            self.shot_ids_per_propagation = dictionary["parallelism"]["shot_ids_per_propagation"]
+        elif self.parallelism_type == "automatic":
+            self.shot_ids_per_propagation = [[i] for i in range(0, self.number_of_sources)]
+        elif self.parallelism_type == "spatial":
+            self.shot_ids_per_propagation = [[i] for i in range(0, self.number_of_sources)]
 
         if comm is None:
             self.comm = utils.mpi_init(self)
@@ -593,9 +623,12 @@ class Model_parameters:
     def _sanitize_optimization_and_velocity_for_fwi(self):
         self._sanitize_optimization_and_velocity_without_fwi()
         dictionary = self.input_dictionary
-        self.initial_velocity_model_file = dictionary["inversion"][
-            "initial_guess_model_file"
-        ]
+        try:
+            self.initial_velocity_model_file = dictionary["inversion"][
+                "initial_guess_model_file"
+            ]
+        except KeyError:
+            self.initial_velocity_model_file = None
         self.fwi_output_folder = "fwi/"
         self.control_output_file = self.fwi_output_folder + "control"
         self.gradient_output_file = self.fwi_output_folder + "gradient"
@@ -710,13 +743,15 @@ class Model_parameters:
         mesh_parameters.setdefault("degree", self.degree)
         mesh_parameters.setdefault("velocity_model_file", self.initial_velocity_model_file)
         mesh_parameters.setdefault("cell_type", self.cell_type)
-        mesh_parameters.setdefault("cells_per_wavelength", None)
+        print(f"Method: {self.method}, Degree: {self.degree}, Dimension: {self.dimension}")
+        mesh_parameters.setdefault("cells_per_wavelength", cells_per_wavelength(self.method, self.degree, self.dimension))
 
         self._set_mesh_length(
             length_z=mesh_parameters["length_z"],
             length_x=mesh_parameters["length_x"],
             length_y=mesh_parameters["length_y"],
         )
+        self.set_mesh_type(new_mesh_type=mesh_parameters["mesh_type"])
 
         if self.mesh_type == "firedrake_mesh":
             automatic_mesh = True
@@ -744,6 +779,10 @@ class Model_parameters:
             warnings.warn(
                 "Mesh dimensions not completely reset from initial dictionary"
             )
+
+    def set_mesh_type(self, new_mesh_type=None):
+        if new_mesh_type is not None:
+            self.mesh_type = new_mesh_type
 
     def _creating_automatic_mesh(self, mesh_parameters={}):
         """
