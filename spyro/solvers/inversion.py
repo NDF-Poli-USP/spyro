@@ -192,7 +192,7 @@ class FullWaveformInversion(AcousticWave):
         if c is not None:
             self.initial_velocity_model.dat.data[:] = c
         self.forward_solve()
-        output = fire.File("control_" + str(self.current_iteration)+".pvd")
+        output = fire.VTKFile("control_" + str(self.current_iteration)+".pvd")
         output.write(self.c)
         np.save(f"control{self.comm.ensemble_comm.rank}_{self.comm.comm.rank}", self.c.dat.data[:])
         if self.parallelism_type == "spatial" and self.number_of_sources > 1:
@@ -422,9 +422,9 @@ class FullWaveformInversion(AcousticWave):
         self._apply_gradient_mask()
         if save:
             # self.gradient_out.write(dJ_total)
-            output = fire.File("gradient_" + str(self.current_iteration)+".pvd")
+            output = fire.VTKFile("gradient_" + str(self.current_iteration)+".pvd")
             output.write(self.gradient)
-            print("DEBUG")
+
         self.current_iteration += 1
         comm.comm.barrier()
 
@@ -474,7 +474,7 @@ class FullWaveformInversion(AcousticWave):
         )
         vp_end = fire.Function(self.function_space)
         vp_end.dat.data[:] = result.x
-        fire.File("vp_end.pvd").write(vp_end)
+        fire.VTKFile("vp_end.pvd").write(vp_end)
 
     def run_fwi_rol(self, **kwargs):
         """
