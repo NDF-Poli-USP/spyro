@@ -19,7 +19,7 @@ def backward_wave_propagator(Wave_obj, dt=None):
     dJ: Firedrake 'Function'
         Calculated gradient
     """
-    if Wave_obj.abc_active is False:
+    if Wave_obj.abc_active is False or Wave_obj.abc_pad_length is None:
         return backward_wave_propagator_no_pml(Wave_obj, dt=dt)
     elif Wave_obj.abc_active:
         return mixed_space_backward_wave_propagator(Wave_obj, dt=dt)
