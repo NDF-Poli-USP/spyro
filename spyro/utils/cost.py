@@ -6,7 +6,7 @@ from tracemalloc import get_traced_memory, start, stop  # For memory usage
 
 def comp_cost(flag, tRef=None, user_name=None):
     '''
-    Estimate runtime and used memory and save them to a *.txt file.
+    Estimate runtime and used memory and save them to a *.txt file
 
     Parameters
     ----------

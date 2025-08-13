@@ -13,7 +13,7 @@ from spyro.utils.error_management import value_parameter_error
 
 class HABC_Mesh():
     '''
-    Class for HABC mesh generation.
+    Class for HABC mesh generation
 
     Attributes
     ----------
@@ -28,8 +28,14 @@ class HABC_Mesh():
         - [z_data[bnds], x_data[bnds], y_data[bnds]] for 3D
     c : `firedrake function`
         Velocity model without absorbing layer
+    c_min : `float`
+        Minimum velocity value in the model without absorbing layer
+    c_max : `float`
+        Maximum velocity value in the model without absorbing layer
     diam_mesh : `ufl.geometry.CellDiameter`
         Mesh cell diameters
+    ele_type_eik : `string`
+        Finite element type for the Eikonal modeling. 'CG' or 'KMV'
     f_est : `float`
         Factor for the stabilizing term in Eikonal Eq. Default is 0.06
     funct_space_eik: `firedrake function space`
@@ -40,6 +46,8 @@ class HABC_Mesh():
         Maxmum mesh size
     mesh_original : `firedrake mesh`
         Original mesh without absorbing layer
+    p_eik : `int`
+        Finite element order for the Eikonal modeling
     tol : `float`
         Tolerance for searching nodes in the mesh
 
@@ -57,7 +65,7 @@ class HABC_Mesh():
 
     def __init__(self, f_est=0.06):
         '''
-        Initialize the HABC_Mesh class.
+        Initialize the HABC_Mesh class
 
         Parameters
         ----------
@@ -74,7 +82,7 @@ class HABC_Mesh():
 
     def representative_mesh_dimensions(self):
         '''
-        Get the representative mesh dimensions from original mesh.
+        Get the representative mesh dimensions from original mesh
 
         Parameters
         ----------
@@ -104,14 +112,14 @@ class HABC_Mesh():
 
     def properties_eik_mesh(self, p_usu=None, ele_type='CG'):
         '''
-        Set the properties for the mesh used to solve the Eikonal equation.
+        Set the properties for the mesh used to solve the Eikonal equation
 
         Parameters
         ----------
         p_usu : `int`, optional
             Finite element order for the Eikonal equation. Default is None
         ele_type : `string`, optional
-            Element type. 'CG' or 'KMV'. Default is 'CG'
+            Finite element type. 'CG' or 'KMV'. Default is 'CG'
 
         Returns
         -------
@@ -119,13 +127,15 @@ class HABC_Mesh():
         '''
 
         # Setting the properties of the mesh used to solve the Eikonal equation
+        self.ele_type_eik = ele_type
         self.p_eik = self.degree if p_usu is None else p_usu
-        self.funct_space_eik = fire.FunctionSpace(self.mesh, ele_type,
+        self.funct_space_eik = fire.FunctionSpace(self.mesh,
+                                                  self.ele_type_eik,
                                                   self.p_eik)
 
     def extract_node_positions(self, func_space):
         '''
-        Extract node positions from the mesh.
+        Extract node positions from the mesh
 
         Parameters
         ----------
@@ -156,7 +166,7 @@ class HABC_Mesh():
 
     def extract_bnd_node_positions(self, node_positions, func_space):
         '''
-        Extract boundary node coordinates from node positions.
+        Extract boundary node coordinates from node positions
 
         Parameters
         ----------
@@ -238,12 +248,6 @@ class HABC_Mesh():
             if self.dimension == 3:  # 3D
                 self.bnd_nodes.append(y_data[self.bnds])
 
-        elif typ_bnd == 'eikonal':
-            node_positions = [z_data, x_data]
-            if self.dimension == 3:  # 3D
-                node_positions.append(y_data)
-            return bnds, node_positions
-
     def preamble_mesh_operations(self):
         '''
         Perform mesh operations previous to size an absorbing layer.
@@ -270,6 +274,10 @@ class HABC_Mesh():
         # Velocity profile model
         self.c = fire.Function(self.function_space, name='c_orig [km/s])')
         self.c.interpolate(self.initial_velocity_model)
+
+        # Get extreme values of the velocity model
+        self.c_min = self.c.dat.data_with_halos.min()
+        self.c_max = self.c.dat.data_with_halos.max()
 
         # Save initial velocity model
         vel_c = fire.VTKFile(self.path_save + "preamble/c_vel.pvd")

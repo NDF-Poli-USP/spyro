@@ -1,11 +1,13 @@
 import firedrake as fire
 import numpy as np
-from os import getcwd
 import scipy.linalg as sl
 import scipy.sparse as ss
+import spyro.habc.eik as eik
 import spyro.habc.lay_len as lay_len
+from os import getcwd
 from scipy.fft import fft
 from scipy.signal import find_peaks
+from sympy import divisors
 from spyro.solvers.acoustic_wave import AcousticWave
 from spyro.meshing.meshing_habc import HABC_Mesh
 from spyro.habc.hyp_lay import HyperLayer
@@ -13,6 +15,7 @@ from spyro.habc.nrbc import NRBCHabc
 from spyro.plots.plots import plot_hist_receivers, \
     plot_rfft_receivers, plot_xCR_opt
 from spyro.utils.error_management import value_parameter_error
+
 # import ipdb
 
 
@@ -31,7 +34,7 @@ class HABC_Wave(AcousticWave, HABC_Mesh, HyperLayer, NRBCHabc):
 
     Attributes
     ----------
-    abc_reference_freq : `str`
+    * abc_reference_freq : `str`
         Reference frequency for sizing the hybrid absorbing layer.
         Options: 'source' or 'boundary'
     a_par : `float`
@@ -41,7 +44,7 @@ class HABC_Wave(AcousticWave, HABC_Mesh, HyperLayer, NRBCHabc):
         Area ratio to the area of the original domain. a_rat = area / a_orig
     area : `float`
         Area of the domain with absorbing layer
-    case_habc : `str`
+    * case_habc : `str`
         Label for the output files that includes the layer shape
         ('REC' or 'HNI', I for the degree) and the reference frequency
         ('SOU' or 'BND'). Example: 'REC_SOU' or 'HN2_BND'
@@ -49,7 +52,7 @@ class HABC_Wave(AcousticWave, HABC_Mesh, HyperLayer, NRBCHabc):
         Velocity model with absorbing layer
     d : `float`
         Normalized element size (lmin / pad_len)
-    eik_bnd : `list`
+    * eik_bnd : `list`
         Properties on boundaries according to minimum values of Eikonal
         Structure sublist: [pt_cr, c_bnd, eikmin, z_par, lref, sou_cr]
         - pt_cr : Critical point coordinates
@@ -84,7 +87,7 @@ class HABC_Wave(AcousticWave, HABC_Mesh, HyperLayer, NRBCHabc):
         Reference frequency of the wave at the minimum Eikonal point
     fundam_freq : `float`
         Fundamental frequency of the numerical model
-    fwi_iter : `int`
+    * fwi_iter : `int`
         The iteration number for the Full Waveform Inversion (FWI) algorithm
     Lz_habc : `float`
         Length of the domain in the z-direction with absorbing layer
@@ -92,9 +95,9 @@ class HABC_Wave(AcousticWave, HABC_Mesh, HyperLayer, NRBCHabc):
         Length of the domain in the x-direction with absorbing layer
     Ly_habc : `float`
         Length of the domain in the y-direction with absorbing (3D models)
-    layer_shape : `string`
+    * layer_shape : `string`
         Shape type of pad layer. Options: 'rectangular' or 'hypershape'
-    lref : `float`
+    * lref : `float`
         Reference length for the size of the absorbing layer
     max_errIt : `float`
         Maximum integral error at the receivers for the HABC scheme
@@ -109,15 +112,15 @@ class HABC_Wave(AcousticWave, HABC_Mesh, HyperLayer, NRBCHabc):
     n_hyp : `int`
         Degree of the hyperelliptical pad layer (n >= 2). Default is 2.
         For rectangular layers, n_hyp is set to infinity
-    number_of_receivers: `int`
+    * number_of_receivers: `int`
         Number of receivers used in the simulation
     pad_len : `float`
         Size of the absorbing layer
-    path_save : `string`
+    * path_save : `string`
         Path to save data
     psi_min : `float`
         Minimum damping ratio of the absorbing layer (psi_min = xCR * d)
-    receiver_locations: `list`
+    * receiver_locations: `list`
         List of receiver locations
     receivers_output : `array`
         Receiver waveform data in the HABC scheme
@@ -155,7 +158,7 @@ class HABC_Wave(AcousticWave, HABC_Mesh, HyperLayer, NRBCHabc):
         to compute the damping profile inside the absorbing layer
     create_mesh_habc()
         Create a mesh with absorbing layer based on the determined size
-    critical_boundary_points()
+    * critical_boundary_points()
         Determine the critical points on domain boundaries of the original
         model to size an absorbing layer using the Eikonal criterion for HABCs
     damping_layer()
@@ -176,7 +179,7 @@ class HABC_Wave(AcousticWave, HABC_Mesh, HyperLayer, NRBCHabc):
         Get the heuristic factor candidates for the quadratic regression
     get_xCR_optimal()
         Get the optimal heuristic factor for the quadratic damping
-    identify_habc_case()
+    * identify_habc_case()
         Generate an identifier for the current case study of the HABC scheme
     infinite_model()
         Create a reference model for the HABC scheme for comparative purposes
@@ -196,7 +199,7 @@ class HABC_Wave(AcousticWave, HABC_Mesh, HyperLayer, NRBCHabc):
         Determine the initial search range for the heuristic factor xCR
     '''
 
-    def __init__(self, dictionary=None, f_est=0.06, fwi_iter=0,
+    def __init__(self, dictionary=None, fwi_iter=0,
                  comm=None, output_folder="output/"):
         '''
         Initialize the HABC class.
@@ -205,8 +208,6 @@ class HABC_Wave(AcousticWave, HABC_Mesh, HyperLayer, NRBCHabc):
         ----------
         dictionary : dict, optional
             A dictionary containing the input parameters for the HABC class
-        f_est : `float`, optional
-            Factor for the stabilizing term in Eikonal Eq. Default is 0.06
         fwi_iter : int, optional
             The iteration number for the FWI algorithm. Default is 0
         comm : object, optional
@@ -218,7 +219,7 @@ class HABC_Wave(AcousticWave, HABC_Mesh, HyperLayer, NRBCHabc):
         '''
 
         AcousticWave.__init__(self, dictionary=dictionary, comm=comm)
-        HABC_Mesh.__init__(self, f_est)
+        HABC_Mesh.__init__(self)
         NRBCHabc.__init__(self)
 
         # Identifier for the current case study
@@ -263,6 +264,39 @@ class HABC_Wave(AcousticWave, HABC_Mesh, HyperLayer, NRBCHabc):
         self.case_habc += "_BND" \
             if self.abc_reference_freq == 'boundary' else "_SOU"
 
+    def critical_boundary_points(self, f_est=0.06):
+        '''
+        Determine the critical points on domain boundaries of the original
+        model to size an absorbing layer using the Eikonal criterion for HABCs.
+        See Salas et al (2022) for details.
+
+        Parameters
+        ----------
+        f_est : `float`, optional
+            Factor for the stabilizing term in Eikonal Eq. Default is 0.06
+
+        Returns
+        -------
+        None
+        '''
+
+        # Initializing Eikonal object
+        Eikonal = eik.HABC_Eikonal(self, f_est=f_est)
+
+        # Solving Eikonal
+        Eikonal.solve_eik()
+
+        # Identifying critical points
+        self.eik_bnd = Eikonal.ident_crit_eik()
+
+        # Reference length for the size of the absorbing layer
+        self.lref = self.eik_bnd[0][4]
+
+        # Critical point coordinates as receivers
+        pcrit = [bnd[0] for bnd in self.eik_bnd]
+        self.receiver_locations = pcrit + self.receiver_locations
+        self.number_of_receivers = len(self.receiver_locations)
+
     def roundFL(self):
         '''
         Adjust the layer parameter based on the element size to get
@@ -290,36 +324,6 @@ class HABC_Wave(AcousticWave, HABC_Mesh, HyperLayer, NRBCHabc):
         print("Modified Layer Size (km): {:.4f}".format(self.pad_len))
         print("Elements ({:.3f} km) in Layer: {}".format(
             self.lmin, int(self.pad_len / self.lmin)))
-
-    def critical_boundary_points(self, Eikonal):
-        '''
-        Determine the critical points on domain boundaries of the original
-        model to size an absorbing layer using the Eikonal criterion for HABCs.
-        See Salas et al (2022) for details.
-
-        Parameters
-        ----------
-        Eikonal : `eikonal`
-            An object representing the Eikonal solver
-
-        Returns
-        -------
-        None
-        '''
-
-        # Solving Eikonal
-        Eikonal.solve_eik(self, f_est=Eikonal.f_est)
-
-        # Identifying critical points
-        self.eik_bnd = Eikonal.ident_crit_eik(self)
-
-        # Reference length for the size of the absorbing layer
-        self.lref = self.eik_bnd[0][4]
-
-        # Critical point coordinates as receivers
-        pcrit = [bnd[0] for bnd in self.eik_bnd]
-        self.receiver_locations = pcrit + self.receiver_locations
-        self.number_of_receivers = len(self.receiver_locations)
 
     def freq_response(self, signal, fpad=4, get_max_freq=False):
         '''
@@ -1550,7 +1554,56 @@ class HABC_Wave(AcousticWave, HABC_Mesh, HyperLayer, NRBCHabc):
         outfile = fire.VTKFile(path_damp + "/eta_habc.pvd")
         outfile.write(self.eta_habc)
 
-    def infinite_model(self):
+    def check_timestep(self, max_divisor_tf=1, set_max_dt=True):
+        '''
+        Check if the timestep size is appropriate for the transient response.
+
+        Parameters
+        ----------
+        max_divisor_tf : `int`, optional
+            Index to select the maximum divisor of the final time, converted
+            to an integer according to the order of magnitude of the timestep
+            size. The timestep size is set to the divisor, given by the index
+            in descending order, less than or equal to the user's timestep
+            size. If the value is 1, the timestep size is set as the maximum
+            divisor. Default is 1.
+        set_max_dt : `bool`, optional
+            If True, set the timestep size to the selected divisor.
+            Default is True.
+
+        Returns
+        -------
+        None
+        '''
+
+        print("\nChecking Timestep Size")
+
+        # User timestep
+        usr_dt = self.get_dt()
+
+        # Maximum timestep size
+        self.get_and_set_maximum_dt(fraction=1.0,
+                                    estimate_max_eigenvalue=False)
+
+        print("Maximum Timestep Size: {:.3f} ms".format(1e3 * self.dt))
+
+        # Rounding power
+        pot = abs(np.ceil(np.log10(self.get_dt()))) + 3
+
+        # Maximum timestep size according to divisors of the final time
+        val_int_tf = int(10**pot * self.final_time)
+        val_int_dt = int(10**pot * self.get_dt())
+        max_div = [d for d in divisors(val_int_tf) if d <= val_int_dt]
+        index_div = min(max_divisor_tf, len(max_div))
+        max_dt = 10**(-pot) * max_div[-index_div]
+
+        # Set the timestep size
+        dt = max_dt if set_max_dt else np.min(usr_dt, max_dt)
+        self.set_dt(dt)
+
+        print("Selected Timestep Size: {:.3f} ms\n".format(1e3 * self.dt))
+
+    def infinite_model(self, check_dt=False):
         '''
         Create a reference model for the HABC scheme for comparative purposes.
 
@@ -1562,6 +1615,11 @@ class HABC_Wave(AcousticWave, HABC_Mesh, HyperLayer, NRBCHabc):
         -------
         None
         '''
+
+        # Check the timestep size
+        if check_dt:
+            self.check_timestep()
+
         print("\nBuilding Infinite Domain Model")
 
         # Size of the domain extension

@@ -1,6 +1,5 @@
 import firedrake as fire
 import spyro.habc.habc as habc
-import spyro.habc.eik as eik
 from spyro.utils.cost import comp_cost
 
 
@@ -66,19 +65,19 @@ def wave_dict(dt_usu, layer_shape, degree_layer,
     dictionary["acquisition"] = {
         "source_type": "ricker",
         "source_locations": [(-0.5, 0.25)],
+        # "source_locations": [(-0.5, 0.25), (-0.5, 0.35), (-0.5, 0.5)], # ToDo
         "frequency": 5.0,  # in Hz
         "delay": 1.5,
         "receiver_locations": [(-1., 0.), (-1., 1.), (0., 1.), (0., 0.)]
-        # "source_locations": [(-0.5, 0.25), (-0.5, 0.35), (-0.5, 0.5)],
     }
 
     # Simulate for 2.0 seconds.
-    fr_files = max(int(100 * 0.00040 / dt_usu), 1)
+    fr_files = max(int(100 * 0.00032 / dt_usu), 1)
     dictionary["time_axis"] = {
-        "initial_time": 0.0,  # Initial time for event
+        "initial_time": 0.,  # Initial time for event
         "final_time": 2.,    # Final time for event
         "dt": dt_usu,  # timestep size in seconds
-        "amplitude": 1,  # the Ricker has an amplitude of 1.
+        "amplitude": 1.,  # the Ricker has an amplitude of 1.
         "output_frequency": fr_files,  # how frequently to output solution to pvds
         "gradient_sampling_frequency": fr_files,  # how frequently to save to RAM
     }
@@ -151,11 +150,8 @@ def preamble_habc(dictionary, edge_length):
     # Reference to resource usage
     tRef = comp_cost("tini")
 
-    # Initializing Eikonal object
-    Eik_obj = eik.Eikonal(Wave_obj)
-
     # Finding critical points
-    Wave_obj.critical_boundary_points(Eik_obj)
+    Wave_obj.critical_boundary_points()
 
     # Estimating computational resource usage
     comp_cost("tfin", tRef=tRef,
@@ -169,18 +165,18 @@ def test_loop_habc():
     Loop for applying the HABC to the model in Fig. 8 of Salas et al. (2022).
     '''
 
-    case = 0  # Integer from 0 to 3
+    case = 0  # Integer from 0 to 4
 
     # ============ SIMULATION PARAMETERS ============
 
-    # Mesh size
+    # Mesh size (in km)
     # cpw: cells per wavelength
     # lba = minimum_velocity /source_frequency
     # edge_length = lba / cpw
-    edge_length_lst = [0.050]  # [0.050, 0.040, 0.032, 0.025, 0.020]
+    edge_length_lst = [0.0200]  # [0.1000, 0.0625, 0.0500, 0.0250, 0.0200]
 
-    # Timestep size
-    dt_usu_lst = [0.00100]  # [0.00100, 0.00080, 0.00064, 0.00040]
+    # Timestep size (in seconds)
+    dt_usu_lst = [0.00032]  # [0.00160, 0.00100, 0.00080, 0.00040, 0.00032]
 
     # Get simulation parameters
     edge_length = edge_length_lst[case]
@@ -215,6 +211,21 @@ def test_loop_habc():
 
     # Creating mesh and performing eikonal analysis
     Wave_obj = preamble_habc(dictionary, edge_length)
+
+    # ============ REFERENCE MODEL ============
+    if get_ref_model:
+        # Reference to resource usage
+        tRef = comp_cost("tini")
+
+        # Computing reference get_reference_signal
+        Wave_obj.infinite_model(check_dt=True)
+
+        # Set model parameters for the HABC scheme
+        Wave_obj.abc_get_ref_model = False
+
+        # Estimating computational resource usage
+        comp_cost("tfin", tRef=tRef,
+                  user_name=Wave_obj.path_save + "preamble/INF_")
 
 
 # Applying HABCs to the model in Fig. 8 of Salas et al. (2022)
