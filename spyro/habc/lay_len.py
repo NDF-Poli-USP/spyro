@@ -11,7 +11,7 @@ import numpy as np
 
 def f_layer(x, a, m=1, s=0.999, typ='FL'):
     '''
-    Function whose zeros are solution for the parameter size of the layer.
+    Function whose zeros are solution for the parameter size of the layer
 
     Parameters
     ----------
@@ -73,7 +73,7 @@ def f_layer(x, a, m=1, s=0.999, typ='FL'):
 
 def calcZero(xini, a, tol, nz=1):
     '''
-    Compute several parameter sizes for the absorbing layer.
+    Compute several parameter sizes for the absorbing layer
 
     Parameters
     ----------
@@ -120,14 +120,21 @@ def calcZero(xini, a, tol, nz=1):
     return x
 
 
-def calc_size_lay(Wave, nz=5, n_root=1, tol_rel=1e-3, monitor=False):
+def calc_size_lay(fref, z_par, lmin, lref, nz=5, n_root=1,
+                  tol_rel=1e-3, monitor=False):
     '''
-    Calculate the lenght of the absorbing layer.
+    Calculate the lenght of the absorbing layer
 
     Parameters
     ----------
-    Wave : `wave`
-            Wave object
+    freq_ref : `float`
+        Reference frequency of the wave
+    z_par : `float`
+        Inverse of minimum Eikonal (Equivalent to c_bound/lref)
+    lmin : `float`
+        Minimal dimension of finite element in mesh
+    lref : `float`
+        Reference length for the size of the absorbing layer
     nz : `int`, optional
         Number of layer sizes calculated. Default is 5
     n_root : `int`, optional
@@ -143,6 +150,8 @@ def calc_size_lay(Wave, nz=5, n_root=1, tol_rel=1e-3, monitor=False):
         Size  parameter of the absorbing layer
     pad_len : `float`
         Size of the absorbing layer
+    ele_pad : `int`
+        Approximated number of elements in the layer of edge length 'lmin'
     a : `float`
         Adimensional propagation speed parameter (a = z / f, z = c / l)
         Also, "z" parameter is the inverse of the minimum Eikonal (1 / phi_min)
@@ -151,41 +160,40 @@ def calc_size_lay(Wave, nz=5, n_root=1, tol_rel=1e-3, monitor=False):
     # Visualizing parameters for computing layer size
     print("\nComputing Size for Absorbing Layer")
 
-    # fref: Reference frequency
-    fref = Wave.freq_ref
-    # z_par: Inverse of minimum Eikonal (Equivalent to c_bound / lref)
-    z_par = Wave.eik_bnd[0][3]
+    # Parameters for the absorbing layer
     aux0 = "Parameter z (1/s): {:.4f},".format(z_par)
     a = z_par / fref  # Adimensional parameter
     aux1 = "Parameter a (adim): {:.4f}".format(a)
     print(aux0, aux1)
 
-    # lmin: Minimal dimension of finite element in mesh
-    lmin = Wave.lmin
+    # Minimum and reference length of the layer
     aux2 = "Minimum Mesh Length (km): {:.4f},".format(lmin)
-    # lref: Reference length for the size of the absorbing layer
-    lref = Wave.lref
     aux3 = "Reference Length (km): {:.4f}".format(lref)
     print(aux2, aux3)
 
-    FLmin = 0.5 * lmin / lref  # Initial guess
+    # Initial guess
+    FLmin = 0.5 * lmin / lref
     print("Initial Guess for Size Parameter: {:.4f}".format(FLmin))
 
     x = FLmin
-    FLpos = []  # Size factor
+    FLpos = []  # Size parameter
     nz = n_root if n_root > nz else nz  # Number of sizes to be computed
     dig_x = 13
     tol = 10**int(np.log10(tol_rel * FLmin))
     for i in range(1, nz + 1):
+
+        # Calculating the size parameter
         x = calcZero(x, a, tol, i)
 
         # Checking for duplicate values
-        if i > 1 and x == FLpos[i - 2]:
+        if i > 1 and round(x, 4) == round(FLpos[i - 2], 4):
             x = calcZero(x, a, tol, i)
 
+        # Rounding the size parameter
         x_rnd = round(x, dig_x)
         FLpos.append(x_rnd)
 
+        # Monitoring the size parameter
         if monitor:
             print("********")
             print("Possible FL")
@@ -211,4 +219,48 @@ def calc_size_lay(Wave, nz=5, n_root=1, tol_rel=1e-3, monitor=False):
     print("Selected Parameter Size FL: {:.4f}".format(F_L))
     print("Selected Layer Size (km): {:.4f}".format(pad_len))
 
-    return F_L, pad_len, a
+    # Approximated number of elements in the layer of edge length 'lmin'
+    ele_pad = format_ele[n_root - 1]
+
+    return F_L, pad_len, ele_pad, a
+
+
+def roundFL(lmin, lref, F_L):
+    '''
+    Adjust the layer parameter based on the element size to get
+    an integer number of elements within the layer
+
+    Parameters
+    ----------
+    F_L : `float`
+        Size parameter of the absorbing layer
+    lmin : `float`
+        Minimum mesh size
+    lref : `float`
+        Reference length for the size of the absorbing layer
+
+    Returns
+    -------
+    F_L : `float`
+        Modified size parameter of the absorbing layer according to mesh size
+    pad_len : `float`
+        Modified size of the absorbing layer
+    ele_pad : `int`
+        Number of elements in the layer of edge length 'lmin'
+    '''
+
+    # Adjusting the parameter size of the layer
+    F_L = (lmin / lref) * np.ceil(lref * F_L / lmin)
+
+    # New size of the absorving layer
+    pad_len = F_L * lref
+
+    # Number of elements in the layer
+    ele_pad = int(pad_len / lmin)
+
+    print("\nModifying Layer Size Based on the Element Size")
+    print("Modified Parameter Size FL: {:.4f}".format(F_L))
+    print("Modified Layer Size (km): {:.4f}".format(pad_len))
+    print("Elements ({:.3f} km) in Layer: {}".format(lmin, ele_pad))
+
+    return F_L, pad_len, ele_pad

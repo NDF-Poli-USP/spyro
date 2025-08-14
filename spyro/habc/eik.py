@@ -30,6 +30,7 @@ class HABC_Eikonal(Eikonal_Modeling):
         Minimum velocity value in the model without absorbing layer
     comm : object
         An object representing the communication interface
+        for parallel processing. Default is None
     diam_mesh : `ufl.geometry.CellDiameter`
         Mesh cell diameters
     funct_space_eik: `firedrake function space`

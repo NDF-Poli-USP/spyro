@@ -57,9 +57,10 @@ class Eikonal_Modeling():
     dimension : `int`
         The spatial dimension of the problem
     ele_type : `string`
-        Finite element type. 'CG' or 'KMV'
+        Finite element type. 'CG' or 'KMV'. Default is 'CG'
     f_est: `float`
-        Factor for the stabilizing term in nonlinear Eikonal equation
+        Factor for the stabilizing term in nonlinear Eikonal equation.
+        Default is 0.06
     p_eik : `int`
         Finite element order
     source_locations: `list`of `tuples`
