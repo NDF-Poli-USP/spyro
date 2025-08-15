@@ -1,68 +1,144 @@
+# This file contains methods for plotting results from the HABC scheme
 import matplotlib.pyplot as plt
 import numpy as np
-import spyro.habc.lay_len as lay_len
+import os
+from spyro.habc.lay_len import f_layer, loop_roots
 from spyro.utils.stats_tools import coeff_of_determination
 plt.rcParams.update({"font.family": "serif"})
 plt.rcParams['text.latex.preamble'] = r'\usepackage{bm} \usepackage{amsmath}'
 
 
-def plot_function_layer_size(a, fref, fsou, z, lmin, lref, FLpos, show=False):
+def create_folder(folder):
+    '''
+    Verify if a folder exists, if not, it creates the folder
 
+    Parameters
+    ----------
+    folder: `str`
+        Path to the folder to be created
+
+    Returns
+    -------
+    None
+    '''
+    if not os.path.isdir(folder):
+        os.makedirs(folder)
+
+
+def plot_function_layer_size(lay_par, freq_par, geom_par, FLpos,
+                             output_folder="output/", show=False):
+    '''
+    Plot the function of the layer size criterion for the HABC scheme
+
+    Parameters
+    ----------
+    lay_par: `list`
+        Parameters of the layer:
+        - a : `float`
+            Adimensional propagation speed parameter (a = z / f, z = c / l)
+        - z_par : `float`
+            Inverse of min. Eikonal (1 / phi_min, equivalent to c_bound/lref)
+    freq_par: `list`
+        Parameters of the frequency:
+        - fref : `float`
+            Reference frequency of the wave
+        - fsou: `float`
+            Source frequency
+    geom_par: `list`
+        Parameters of the domain geometry:
+        - lmin : `float`
+            Minimal dimension of finite element in mesh
+        - lref : `float`
+            Reference length for the size of the absorbing layer
+    FLpos: `list`
+        List of size parameters for the reference frequency
+    output_folder: `str`, optional
+        Folder to save the output plots. Default is "output/".
+    show: `bool`, optional
+        Whether to show the plot. Default is False.
+
+    Returns
+    -------
+    None
+    '''
+
+    # Create the output folder if it does not exist
+    create_folder(output_folder)
+
+    # Unpack the parameters
+    a, z = lay_par
+    fref, fsou = freq_par
+    lmin, lref = geom_par
+
+    # Prepare the data for the plot
     a_lst = [a]
     F_lst = [FLpos]
     l_lst = ["{:.2f}".format(fref)]
     c_lst = ['C0']
 
     if fsou == fref:
+
+        # Layer size based on source frequency
         FLsou = []
         w_lst = ['f_{{sou}}']
 
     else:
 
         # Calculate the size parameter for the source frequency
-        a_sou = a * fref / fsou
+        a_sou = z / fsou  # Adimensional parameter
+        FLsou = loop_roots(a_sou, lmin, lref, len(FLpos))
         a_lst.append(a_sou)
-        FLsou = lay_len.calc_size_lay(
-            fsou, z, lmin, lref, nz=len(FLpos))[-1]
         F_lst.append(FLsou)
         l_lst.append("{:.2f}".format(fsou))
         c_lst.append('C1')
         w_lst = ['f_{{bnd}}', 'f_{{sou}}']
 
+    # Calculate the maximum layer size for the plot
     FL_max = max(FLpos + FLsou) + 0.4
     FL_lim = np.ceil(FL_max * 10) / 10
     F_L = np.linspace(0.001, FL_lim, int(FL_lim * 1e3))
-    delta_x = FL_lim / 40
 
     # Plot the size criterion
-    plt.figure(figsize=(12, 6))
+    plt.figure(figsize=(12, 6))  # Set figure size
+    ax = plt.gca()
     lim_crit = np.inf
     for a_pr, FL_rt, lab, col, w_str in zip(a_lst, F_lst, l_lst, c_lst, w_lst):
-        crit = lay_len.f_layer(F_L, a_pr)
+        crit = f_layer(F_L, a_pr)
         lim_crit = min(lim_crit, crit.min())
         plt.plot(F_L, crit, color=col, zorder=2,
                  label=r'$\Psi_{{F_L}}({}={}\text{{Hz}})$'.format(w_str, lab))
         plt.scatter(FL_rt, np.zeros(5), color=col, zorder=3)
 
+    # Identify the roots of the criterion function
+    delta_x = FL_lim / 40
     delta_y = abs(lim_crit) / 2
     for lay, (FL_rt, col) in enumerate(zip(F_lst, c_lst)):
-        y_FL = -0.9 * delta_y if lay == 0 else 0.5 * delta_y
+        y_FL = -1.3 * delta_y if lay == 0 else 0.8 * delta_y
+
         for rt, FL_par in enumerate(FL_rt):
             xFL = FL_par + delta_x if rt % 2 == 0 else FL_par - delta_x
-            plt.text(x=xFL, y=y_FL, s="{:.4f}".format(FL_par),
-                     horizontalalignment='center', verticalalignment='bottom',
-                     bbox=dict(facecolor=col, alpha=0.9), zorder=4)
+            ax.annotate(
+                f"{FL_par:.4f}",  # Text
+                xy=(FL_par, 0),  # Point to connect to
+                xytext=(xFL, y_FL),  # Text position
+                ha='center', va='bottom', zorder=4,
+                bbox=dict(facecolor=col, alpha=0.9),
+                arrowprops=dict(arrowstyle='-', color='black', linewidth=0.8,
+                                alpha=0.9, connectionstyle="arc3,rad=0."))
 
-    plt.xlabel(r'$F_L$')
+    # Formatting the plot
+    FL_str = r'$F_L \; (L_{{\xi}} \; = \; L_{{ref}} \, F_L \;$'
+    lref_str = r'$\therefore \; L_{{ref}} \; = \; {:.4f}\text{{km}})$'
+    plt.xlabel((FL_str + lref_str).format(lref))
     plt.ylabel(r'$\Psi_{{F_L}} \; = \; |C_{Rmin}| \; - \; R$')
-
     plt.xticks(np.arange(0, FL_lim + 0.01, 0.5 if FL_lim > 1 else 0.2))
-
     plt.xlim((0, FL_lim))
     plt.ylim((lim_crit - 0.01, 1.01))
     plt.grid(zorder=1)
     plt.legend()
-    layer_str = "layer_opts"
+
+    # Saving the plot
+    layer_str = output_folder + "layer_opts"
     plt.savefig(layer_str + ".png", bbox_inches='tight')
     plt.savefig(layer_str + ".pdf", bbox_inches='tight')
     plt.show() if show else None
@@ -138,7 +214,7 @@ def plot_hist_receivers(Wave_object, show=False):
             axes[rec].set_xlabel(r'$t \; (s)$')
 
     # Saving the plot
-    time_str = Wave_object.path_save + Wave_object.case_habc + "/time"
+    time_str = Wave_object.path_case_habc + "time"
     plt.savefig(time_str + ".png", bbox_inches='tight')
     plt.savefig(time_str + ".pdf", bbox_inches='tight')
     plt.show() if show else None
@@ -242,7 +318,7 @@ def plot_rfft_receivers(Wave_object, fxlim=4., show=False):
                 if f_sou != Wave_object.freq_ref else None
 
     # Saving the plot
-    time_str = Wave_object.path_save + Wave_object.case_habc + "/freq"
+    time_str = Wave_object.path_case_habc + "freq"
     plt.savefig(time_str + ".png", bbox_inches='tight')
     plt.savefig(time_str + ".pdf", bbox_inches='tight')
     plt.show() if show else None
@@ -344,7 +420,7 @@ def plot_xCR_opt(Wave_object, data_regr_xCR, show=False):
     plt.ylabel(r'$e_I \; | \; e_P \; (\%)$')
 
     # Saving the plot
-    xcr_str = Wave_object.path_save + Wave_object.case_habc + "/xCR"
+    xcr_str = Wave_object.path_case_habc + "xCR"
     plt.savefig(xcr_str + '.png', bbox_inches='tight')
     plt.savefig(xcr_str + '.pdf', bbox_inches='tight')
     plt.show() if show else None

@@ -5,7 +5,6 @@ import scipy.sparse as ss
 import spyro.habc.eik as eik
 import spyro.habc.lay_len as lay_len
 from os import getcwd
-from scipy.fft import fft
 from scipy.signal import find_peaks
 from sympy import divisors
 from spyro.solvers.acoustic_wave import AcousticWave
@@ -16,6 +15,7 @@ from spyro.habc.nrbc import NRBCHabc
 from spyro.plots.plots_habc import plot_function_layer_size, \
     plot_hist_receivers, plot_rfft_receivers, plot_xCR_opt
 from spyro.utils.error_management import value_parameter_error
+from spyro.utils.freq_tools import freq_response
 
 # Work from Ruben Andres Salas, Andre Luis Ferreira da Silva,
 # Luis Fernando Nogueira de Sá, Emilio Carlos Nelli Silva.
@@ -85,7 +85,7 @@ class HABC_Wave(AcousticWave, HABC_Mesh, HyperLayer, NRBCHabc, HABC_Error):
         Nyquist frequency according to the time step. f_Nyq = 1 / (2 * dt)
     f_est : `float`
         Factor for the stabilizing term in Eikonal equation
-    freq_ref : `float`
+    * freq_ref : `float`
         Reference frequency of the wave at the minimum Eikonal point
     fundam_freq : `float`
         Fundamental frequency of the numerical model
@@ -118,6 +118,8 @@ class HABC_Wave(AcousticWave, HABC_Mesh, HyperLayer, NRBCHabc, HABC_Error):
         Number of receivers used in the simulation
     * pad_len : `float`
         Size of the absorbing layer
+    * path_case_habc : `string`
+        Path to save data for the current case study
     * path_save : `string`
         Path to save data
     psi_min : `float`
@@ -169,8 +171,6 @@ class HABC_Wave(AcousticWave, HABC_Mesh, HyperLayer, NRBCHabc, HABC_Error):
         Compute the error measures at the receivers for the HABC scheme
     est_min_damping()
         Estimate the minimum damping ratio and the associated heuristic factor
-    freq_response()
-        Calculate the response in frequency domain of a time signal via FFT
     fundamental_frequency()
         Compute the fundamental frequency in Hz via modal analysis
     * geometry_infinite_model()
@@ -282,6 +282,7 @@ class HABC_Wave(AcousticWave, HABC_Mesh, HyperLayer, NRBCHabc, HABC_Error):
 
         # Path to save data
         self.path_save = getcwd() + "/" + output_folder
+        self.path_case_habc = self.path_save + self.case_habc + "/"
 
         # Initializing the error measure class
         HABC_Error.__init__(self, path_save=self.path_save)
@@ -319,67 +320,6 @@ class HABC_Wave(AcousticWave, HABC_Mesh, HyperLayer, NRBCHabc, HABC_Error):
         self.receiver_locations = pcrit + self.receiver_locations
         self.number_of_receivers = len(self.receiver_locations)
 
-    def freq_response(self, signal, fpad=4, get_max_freq=False):
-        '''
-        Calculate the response in frequency domain of a time signal via FFT.
-
-        Parameters
-        ----------
-        signal : `array`
-            Signal data
-        fpad : `int`, optional
-            Padding factor for FFT. Default is 4
-        get_max_freq : `bool`, optional
-            If True, return only the maximum frequency of the spectrum.
-            Default is False
-
-        Returns
-        -------
-        yf : `array`
-            Normalized frequency spectrum with respect to the maximum magnitude
-        max_freq : `float`, optional
-            Maximum frequency of the spectrum
-        '''
-
-        # Check if the signal is empty
-        if signal.size == 0:
-            err = "Input signal is empty. Cannot compute frequency response."
-            raise ValueError(err)
-
-        # Nyquist frequency
-        self.f_Nyq = 1.0 / (2.0 * self.dt)
-
-        # Zero padding for increasing smoothing in FFT
-        yt = np.concatenate([np.zeros(fpad * len(signal)), signal])
-
-        # Number of sample points
-        N_samples = len(yt)
-
-        # Determine the number of samples of the spectrum
-        pfft = N_samples // 2 + N_samples % 2
-
-        # Calculate the response in frequency domain of the signal (FFT)
-        yf = np.abs(fft(yt)[0:pfft])
-        del yt
-
-        # Frequency vector
-        xf = np.linspace(0.0, self.f_Nyq, pfft)
-
-        # Get the maximum frequency of the spectrum
-        max_freq = xf[yf.argmax()]
-
-        if get_max_freq:
-
-            # Return the maximum frequency only
-            return max_freq
-        else:
-
-            # Normalized frequency spectrum
-            yf *= (1 / yf.max())
-
-            # Return the normalized spectrum
-            return yf
-
     def det_reference_freq(self, fpad=4):
         '''
         Determine the reference frequency for a new layer size
@@ -401,6 +341,9 @@ class HABC_Wave(AcousticWave, HABC_Mesh, HyperLayer, NRBCHabc, HABC_Error):
         abc_reference_freq = self.abc_reference_freq \
             if hasattr(self, 'receivers_reference') else 'source'
 
+        # Nyquist frequency
+        self.f_Nyq = 1.0 / (2.0 * self.dt)
+
         if self.abc_reference_freq == 'source':  # Initial guess
 
             # Theorical central Ricker source frequency
@@ -412,8 +355,8 @@ class HABC_Wave(AcousticWave, HABC_Mesh, HyperLayer, NRBCHabc, HABC_Error):
             histPcrit = self.receivers_reference[:, 0]
 
             # Get the minimum frequency excited at the critical point
-            self.freq_ref = self.freq_response(histPcrit, fpad=fpad,
-                                               get_max_freq=True)
+            self.freq_ref = freq_response(
+                histPcrit, self.f_Nyq, fpad=fpad, get_max_freq=True)
 
         print("Reference Frequency (Hz): {:.5f}".format(self.freq_ref))
 
@@ -475,8 +418,10 @@ class HABC_Wave(AcousticWave, HABC_Mesh, HyperLayer, NRBCHabc, HABC_Error):
             lay_len.calc_size_lay(self.freq_ref, z_par, self.lmin,
                                   self.lref, n_root=n_root)
 
-        plot_function_layer_size(self.a_par, self.freq_ref, self.frequency,
-                                 z_par, self.lmin, self.lref, self.FLpos)
+        plot_function_layer_size([self.a_par, z_par],
+                                 [self.freq_ref, self.frequency],
+                                 [self.lmin, self.lref], self.FLpos,
+                                 output_folder=self.path_case_habc)
 
         if layer_based_on_mesh:
             self.F_L, self.pad_len, self.ele_pad = \
@@ -1833,7 +1778,7 @@ class HABC_Wave(AcousticWave, HABC_Mesh, HyperLayer, NRBCHabc, HABC_Error):
         self.receivers_out_fft = []
         for rec in range(self.number_of_receivers):
             signal = self.receivers_output[:, rec]
-            yf = self.freq_response(signal)
+            yf = freq_response(signal, self.f_Nyq)
             self.receivers_out_fft.append(yf)
         self.receivers_out_fft = np.asarray(self.receivers_out_fft).T
 

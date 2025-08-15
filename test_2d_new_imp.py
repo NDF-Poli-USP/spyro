@@ -248,8 +248,8 @@ def habc_fig8(Wave_obj, dat_regr_xCR, xCR_usu=None, plot_comparison=True):
     # Determining layer size
     Wave_obj.size_habc_criterion(n_root=1)
 
-    import ipdb
-    ipdb.set_trace()  # For debugging purposes
+    # import ipdb
+    # ipdb.set_trace()  # For debugging purposes
 
     # Creating mesh with absorbing layer
     Wave_obj.create_mesh_habc()
@@ -311,7 +311,7 @@ def test_loop_habc():
     degree_layer_lst = [None]  # [None, 2, 3, 4, 5]
 
     # Reference frequency
-    habc_reference_freq_lst = ["boundary"]  # ["source", "boundary"]
+    habc_reference_freq_lst = ["source"]  # ["source", "boundary"]
 
     # Infinite model
     get_ref_model = False
@@ -323,7 +323,7 @@ def test_loop_habc():
     crit_opt = "error_difference"  # "error_integral"
 
     # Number of points for regression (odd number)
-    n_pts = 3
+    n_pts = 1
 
     # ============ MESH AND EIKONAL ============
     # Create dictionary with parameters for the model
