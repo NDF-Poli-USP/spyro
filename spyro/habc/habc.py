@@ -13,12 +13,9 @@ from spyro.meshing.meshing_habc import HABC_Mesh
 from spyro.habc.hyp_lay import HyperLayer
 from spyro.habc.error_measure import HABC_Error
 from spyro.habc.nrbc import NRBCHabc
-from spyro.plots.plots import plot_hist_receivers, \
-    plot_rfft_receivers, plot_xCR_opt
+from spyro.plots.plots_habc import plot_function_layer_size, \
+    plot_hist_receivers, plot_rfft_receivers, plot_xCR_opt
 from spyro.utils.error_management import value_parameter_error
-
-# import ipdb
-
 
 # Work from Ruben Andres Salas, Andre Luis Ferreira da Silva,
 # Luis Fernando Nogueira de Sá, Emilio Carlos Nelli Silva.
@@ -76,6 +73,8 @@ class HABC_Wave(AcousticWave, HABC_Mesh, HyperLayer, NRBCHabc, HABC_Error):
         Mask function to identify the absorbing layer domain
     * F_L : `float`
         Size parameter of the absorbing layer
+    * FLpos : `list`
+        Possible size parameters for the absorbing layer without rounding
     f_Ah : `float`
         Hyperelliptical area factor. f_Ah = area / (a_hyp * b_hyp).
         f_Ah is 4 for rectangular layers
@@ -147,6 +146,8 @@ class HABC_Wave(AcousticWave, HABC_Mesh, HyperLayer, NRBCHabc, HABC_Error):
         Compute the damping properties for the absorbing layer
     calc_rec_geom_prop()
         Calculate the geometric properties for the rectangular layer
+    * check_timestep()
+        Check if the timestep size is appropriate for the transient response
     coeff_damp_fun()
         Compute the coefficients for quadratic damping function
     comparison_plots()
@@ -172,13 +173,15 @@ class HABC_Wave(AcousticWave, HABC_Mesh, HyperLayer, NRBCHabc, HABC_Error):
         Calculate the response in frequency domain of a time signal via FFT
     fundamental_frequency()
         Compute the fundamental frequency in Hz via modal analysis
+    * geometry_infinite_model()
+        Determine the geometry for the infinite domain model.
     get_xCR_candidates()
         Get the heuristic factor candidates for the quadratic regression
     get_xCR_optimal()
         Get the optimal heuristic factor for the quadratic damping
     * identify_habc_case()
         Generate an identifier for the current case study of the HABC scheme
-    infinite_model()
+    * infinite_model()
         Create a reference model for the HABC scheme for comparative purposes
     min_reflection()
         Compute a minimum reflection coefficiente for the quadratic damping
@@ -468,9 +471,12 @@ class HABC_Wave(AcousticWave, HABC_Mesh, HyperLayer, NRBCHabc, HABC_Error):
 
         # Computing layer sizes
         z_par = self.eik_bnd[0][3]
-        F_L, pad_len, ele_pad, self.a_par = \
+        F_L, pad_len, ele_pad, self.a_par, self.FLpos = \
             lay_len.calc_size_lay(self.freq_ref, z_par, self.lmin,
                                   self.lref, n_root=n_root)
+
+        plot_function_layer_size(self.a_par, self.freq_ref, self.frequency,
+                                 z_par, self.lmin, self.lref, self.FLpos)
 
         if layer_based_on_mesh:
             self.F_L, self.pad_len, self.ele_pad = \
@@ -1604,9 +1610,70 @@ class HABC_Wave(AcousticWave, HABC_Mesh, HyperLayer, NRBCHabc, HABC_Error):
 
         print("Selected Timestep Size: {:.3f} ms\n".format(1e3 * self.dt))
 
+    def geometry_infinite_model(self):
+        '''
+        Determine the geometry for the infinite domain model.
+
+        Parameters
+        ----------
+        None
+
+        Returns
+        -------
+        None
+        '''
+
+        # Size of the domain extension - ToDo: Maximum boundary velocity
+        add_dom = self.c_max * self.final_time / 2.
+
+        # Distance already travelled by the wave
+        if hasattr(self, 'eik_bnd'):
+
+            # If Eikonal analysis was performed
+            eikmin = self.eik_bnd[0][2]
+
+            # Minimum distance to the nearest boundary
+            dist_to_bnd = self.c_max * eikmin / 2.
+        else:
+
+            # If Eikonal analysis was not performed
+            dist_to_bnd = np.inf
+            for nsou in range(self.number_of_sources):
+                psou_z = self.source_locations[nsou][0]
+                psou_x = self.source_locations[nsou][1]
+                delta_z = abs(psou_z - self.length_z)
+                delta_x = min(abs(psou_x), abs(psou_x - self.length_x))
+
+                # Candidate to minimum distance to the boundaries
+                cand_dist = (dist_to_bnd, delta_z, delta_x)
+                if self.dimension == 3:  # 3D
+                    psou_y = self.source_locations[nsou][2]
+                    delta_y = min(abs(psou_y), abs(psou_y - self.length_y))
+                    cand_dist += (delta_y,)
+
+                # Minimum distance to the nearest boundary
+                dist_to_bnd = min(cand_dist)
+
+        # Subtracting the distance already travelled by the wave
+        add_dom -= dist_to_bnd
+
+        # Pad length for the infinite domain extension
+        pad_len = self.lmin * np.ceil(add_dom / self.lmin)
+        self.pad_len = pad_len
+
+        inf_str = "Infinite Domain Extension (km): {:.4f}"
+        print(inf_str.format(self.pad_len))
+
+        # Dimensions for the infinite domain
+        self.Lx_habc = self.length_x + 2 * self.pad_len
+        self.Lz_habc = self.length_z + self.pad_len
+
+        if self.dimension == 3:  # 3D
+            self.Ly_habc = self.length_y + 2 * self.pad_len
+
     def infinite_model(self, check_dt=False, max_divisor_tf=1):
         '''
-        Create a reference model for the HABC scheme for comparative purposes.
+        Create a reference model for the HABC scheme for comparative purposes
 
         Parameters
         ----------
@@ -1632,45 +1699,8 @@ class HABC_Wave(AcousticWave, HABC_Mesh, HyperLayer, NRBCHabc, HABC_Error):
 
         print("\nBuilding Infinite Domain Model")
 
-        # Size of the domain extension
-        max_c = self.initial_velocity_model.dat.data_with_halos.max()
-        add_dom = max_c * self.final_time / 2.
-
-        # Distance already travelled by the wave
-        if hasattr(self, 'eik_bnd'):
-            # If Eikonal analysis was performed
-            eikmin = self.eik_bnd[0][2]
-            add_dom -= max_c * eikmin / 2.
-        else:
-            # If Eikonal analysis was not performed
-            dist_to_bnd = np.inf
-            for nsou in range(self.number_of_sources):
-                psou_z = self.source_locations[nsou][0]
-                psou_x = self.source_locations[nsou][1]
-                delta_z = abs(psou_z - self.length_z)
-                delta_x = min(abs(psou_x), abs(psou_x - self.length_x))
-
-                if self.dimension == 2:  # 2D
-                    dist_to_bnd = min(dist_to_bnd, delta_z, delta_x)
-
-                if self.dimension == 3:  # 3D
-                    psou_y = self.source_locations[nsou][2]
-                    delta_y = min(abs(psou_y), abs(psou_y - self.length_y))
-                    dist_to_bnd = min(dist_to_bnd, delta_z, delta_x, delta_y)
-
-            add_dom -= dist_to_bnd
-
-        pad_len = self.lmin * np.ceil(add_dom / self.lmin)
-        self.pad_len = pad_len
-        inf_str = "Infinite Domain Extension (km): {:.4f}"
-        print(inf_str.format(self.pad_len))
-
-        # New dimensions
-        self.Lx_habc = self.length_x + 2 * self.pad_len
-        self.Lz_habc = self.length_z + self.pad_len
-
-        if self.dimension == 3:  # 3D
-            self.Ly_habc = self.length_y + 2 * self.pad_len
+        # Defining geometry for infinite domain
+        self.geometry_infinite_model()
 
         # Creating mesh for infinite domain
         self.create_mesh_habc(inf_model=True)
@@ -1683,23 +1713,14 @@ class HABC_Wave(AcousticWave, HABC_Mesh, HyperLayer, NRBCHabc, HABC_Error):
         self.eta_mask = fire.Constant(0.)
         self.eta_habc = fire.Constant(0.)
 
-        # Solving the forward problem
         print("\nSolving Infinite Model")
+
+        # Solving the forward problem
         self.forward_solve()
 
         # Saving reference signal
-        print("Saving Reference Output")
-        pth_str = self.path_save + "preamble/"
-        self.receivers_reference = self.receivers_output.copy()
-        np.save(pth_str + "habc_ref.npy", self.receivers_reference)
-
-        # Computing and saving FFT of the reference signal at receivers
-        self.receivers_ref_fft = []
-        for rec in range(self.number_of_receivers):
-            signal = self.receivers_reference[:, rec]
-            yf = self.freq_response(signal)
-            self.receivers_ref_fft.append(yf)
-        np.save(pth_str + "habc_fft.npy", self.receivers_ref_fft)
+        self.save_reference_signal(self.receivers_output,
+                                   self.number_of_receivers)
 
         # Deleting variables to be computed for the HABC scheme
         del self.pad_len, self.Lx_habc, self.Lz_habc

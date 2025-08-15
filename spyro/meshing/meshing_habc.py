@@ -276,8 +276,8 @@ class HABC_Mesh():
         self.c.interpolate(self.initial_velocity_model)
 
         # Get extreme values of the velocity model
-        self.c_min = self.c.dat.data_with_halos.min()
-        self.c_max = self.c.dat.data_with_halos.max()
+        self.c_min = self.initial_velocity_model.dat.data_with_halos.min()
+        self.c_max = self.initial_velocity_model.dat.data_with_halos.max()
 
         # Save initial velocity model
         vel_c = fire.VTKFile(self.path_save + "preamble/c_vel.pvd")

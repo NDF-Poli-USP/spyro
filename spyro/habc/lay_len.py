@@ -56,19 +56,21 @@ def f_layer(x, a, m=1, s=0.999, typ='FL'):
 
     # Reflection coefficient
     CR = abs(s**2 / (s**2 + (4 * x / (m * a))**2))
-    ax0 = m * np.pi * (1 + (1 / 8) * (s * m * a / x)**2)
+
+    if typ == 'CR':
+        return CR
+
+    # Attenuation amplitude factor
+    AS = 1 + (1 / 8) * (s * m * a / x)**2
+    ax0 = m * np.pi * AS
     ax1 = (1 - s**2)**0.5
     ax2 = s / ax1
-    ax3 = (2 * np.pi * x / a) * (1 + (1 / 8) * (s * m * a / x)**2)
-
-    # Attenuation coefficient
+    ax3 = (2 * np.pi * x / a) * AS
     RF = abs(np.exp(-s * ax0) * (np.cos(ax1 * ax0)
                                  + ax2 * np.sin(ax1 * ax0)) * np.cos(ax3))
 
     if typ == 'FL':
         return CR - RF
-    elif typ == 'CR':
-        return CR
 
 
 def calcZero(xini, a, tol, nz=1):
@@ -98,6 +100,7 @@ def calcZero(xini, a, tol, nz=1):
     else:
         x = xini
 
+    # Initial tolerances
     f_tol = tol
     tol_ref = tol / 100
 
@@ -155,6 +158,8 @@ def calc_size_lay(fref, z_par, lmin, lref, nz=5, n_root=1,
     a : `float`
         Adimensional propagation speed parameter (a = z / f, z = c / l)
         Also, "z" parameter is the inverse of the minimum Eikonal (1 / phi_min)
+    FLpos : `list`
+        Possible size parameters for the absorbing layer without rounding
     '''
 
     # Visualizing parameters for computing layer size
@@ -175,19 +180,23 @@ def calc_size_lay(fref, z_par, lmin, lref, nz=5, n_root=1,
     FLmin = 0.5 * lmin / lref
     print("Initial Guess for Size Parameter: {:.4f}".format(FLmin))
 
+    # Number of digits to round the size parameter
+    dig_x = 13
+
+    # Root Tolerance
+    tol = 10**int(np.log10(tol_rel * FLmin))
+
     x = FLmin
     FLpos = []  # Size parameter
-    nz = n_root if n_root > nz else nz  # Number of sizes to be computed
-    dig_x = 13
-    tol = 10**int(np.log10(tol_rel * FLmin))
-    for i in range(1, nz + 1):
+    max_roots = max(1, n_root + 1, nz)
+    for i in range(max_roots):
 
         # Calculating the size parameter
-        x = calcZero(x, a, tol, i)
+        x = calcZero(x, a, tol, i + 1)
 
         # Checking for duplicate values
-        if i > 1 and round(x, 4) == round(FLpos[i - 2], 4):
-            x = calcZero(x, a, tol, i)
+        if round(x, 4) in np.round(FLpos, 4):
+            x = calcZero(x + tol, a, tol, i + 1)
 
         # Rounding the size parameter
         x_rnd = round(x, dig_x)
@@ -195,12 +204,11 @@ def calc_size_lay(fref, z_par, lmin, lref, nz=5, n_root=1,
 
         # Monitoring the size parameter
         if monitor:
-            print("********")
-            print("Possible FL")
-            print(x_rnd, f_layer(x_rnd, a))
+            print("**************** Possible FL ****************")
+            print(f"Root {i + 1}: {x_rnd:>} - Res: {f_layer(x_rnd, a):>}")
 
     # Reflection coefficients
-    CRpos = np.array([round(abs(f_layer(x, a, typ="CR")), 4) for x in FLpos])
+    CRpos = np.round(np.array([f_layer(x, a, typ="CR") for x in FLpos]), 4)
 
     # Selecting a size
     F_L = FLpos[n_root - 1]
@@ -222,7 +230,7 @@ def calc_size_lay(fref, z_par, lmin, lref, nz=5, n_root=1,
     # Approximated number of elements in the layer of edge length 'lmin'
     ele_pad = format_ele[n_root - 1]
 
-    return F_L, pad_len, ele_pad, a
+    return F_L, pad_len, ele_pad, a, FLpos
 
 
 def roundFL(lmin, lref, F_L):

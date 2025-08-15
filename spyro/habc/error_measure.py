@@ -1,5 +1,5 @@
-import firedrake as fire
 import numpy as np
+from os import getcwd
 
 # Work from Ruben Andres Salas, Andre Luis Ferreira da Silva,
 # Luis Fernando Nogueira de Sá, Emilio Carlos Nelli Silva.
@@ -27,9 +27,11 @@ class HABC_Error():
     -------
     get_reference_signal()
         Acquire the reference signal to compare with the HABC scheme
+    save_reference_signal()
+        Save the reference signal for the HABC scheme
     '''
 
-    def __init__(self, path_save):
+    def __init__(self, path_save=None):
         '''
         Initialize the HABC_Error class.
 
@@ -43,7 +45,42 @@ class HABC_Error():
         None
         '''
 
-        self.path_save = path_save
+        # Path to save data
+        if path_save is None:
+            self.path_save = getcwd() + "/output/"
+        else:
+            self.path_save = path_save
+
+    def save_reference_signal(self, receivers_output, number_of_receivers):
+        '''
+        Save the reference signal for the HABC scheme
+
+        Parameters
+        ----------
+        receivers_output : `array`
+            Receiver waveform data in the HABC scheme
+        number_of_receivers: `int`
+            Number of receivers used in the simulation
+
+        Returns
+        -------
+        None
+        '''
+
+        print("\nSaving Reference Output")
+
+        # Saving reference signal
+        pth_str = self.path_save + "preamble/"
+        self.receivers_reference = receivers_output.copy()
+        np.save(pth_str + "habc_ref.npy", self.receivers_reference)
+
+        # Computing and saving FFT of the reference signal at receivers
+        self.receivers_ref_fft = []
+        for rec in range(number_of_receivers):
+            signal = self.receivers_reference[:, rec]
+            yf = self.freq_response(signal)
+            self.receivers_ref_fft.append(yf)
+        np.save(pth_str + "habc_fft.npy", self.receivers_ref_fft)
 
     def get_reference_signal(self, foldername="preamble/"):
         '''
