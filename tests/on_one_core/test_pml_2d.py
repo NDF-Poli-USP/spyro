@@ -75,7 +75,7 @@ def run_forward():
         "exponent": 2,
         "cmax": 4.5,
         "R": 1e-6,
-        "pad_length": 0.25,
+        "pad_length": 0.25,  # If 3 different use tuple
     }
 
     dictionary["visualization"] = {
