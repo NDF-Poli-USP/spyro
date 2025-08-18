@@ -68,6 +68,12 @@ class MeshingParameters():
         self._cells_per_wavelength = None
         self.edge_length = None
         self.cells_per_wavelength = None
+        self._padding_type = None
+        self._ellipse_n = None
+        self._extrapolate = None
+        self._hpad = None
+        self._transition_width = None
+        self._grade = None
 
     def _set_length_with_unit_check(self, attr_name, value):
         """
@@ -172,6 +178,59 @@ class MeshingParameters():
         if value == "SeismicMesh" and self.quadrilateral:
             raise ValueError("SeismicMesh does not work with quads.")
         self._mesh_type = value
+
+    @property
+    def padding_type(self):
+        return self._padding_type
+
+    @padding_type.setter
+    def padding_type(self, value):
+        allowed_types = {"rectangular", "elliptical"}
+        if value is not None and value not in allowed_types:
+            raise ValueError(
+                f"padding type must be one of {allowed_types}, got '{value}'"
+            )
+        self._padding_type = value
+
+    @property
+    def ellipse_n(self):
+        return self._ellipse_n
+
+    @ellipse_n.setter
+    def ellipse_n(self, value):
+        self._ellipse_n = value
+
+    @property
+    def extrapolate(self):
+        return self._extrapolate
+
+    @extrapolate.setter
+    def extrapolate(self, value):
+        self._extrapolate = value
+
+    @property
+    def hpad(self):
+        return self._hpad
+
+    @hpad.setter
+    def hpad(self, value):
+        self._hpad = value
+
+    @property
+    def transition_width(self):
+        return self._transition_width
+
+    @transition_width.setter
+    def transition_width(self, value):
+        self._transition_width = value
+
+    @property
+    def grade(self):
+        return self._grade
+
+    @grade.setter
+    def grade(self, value):
+        self._grade = value
 
     @property
     def source_frequency(self):
