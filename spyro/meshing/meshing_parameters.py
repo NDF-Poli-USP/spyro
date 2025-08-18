@@ -280,7 +280,6 @@ class MeshingParameters():
         input_mesh_parameters.setdefault("degree", self.degree)
         input_mesh_parameters.setdefault("quadrilateral", self.quadrilateral)
         input_mesh_parameters.setdefault("velocity_model", self.velocity_model)
-        # input_mesh_parameters.setdefault("cells_per_wavelength", cells_per_wavelength(self.method, self.degree, self.dimension))
 
         # Mesh length based parameters
         input_mesh_parameters.setdefault("cells_per_wavelength", None)
