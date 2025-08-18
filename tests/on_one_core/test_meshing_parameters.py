@@ -259,7 +259,7 @@ def test_cells_per_wavelength_and_edge_length_mutual_exclusion():
         mp.edge_length = 5
         assert mp.edge_length == 5
         assert mp.cells_per_wavelength is None
-        assert any("removes cells per wavelength" in str(warn.message) for warn in w)
+        assert any("Mutual exclusion" in str(warn.message) for warn in w)
 
 
 def test_periodic_only_for_firedrake_mesh():
