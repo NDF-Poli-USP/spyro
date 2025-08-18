@@ -439,7 +439,7 @@ def run_loop_habc(degree_layer_lst, habc_reference_freq_lst, get_ref_model=False
                             xCR_opt = get_xCR_usu(
                                 Wave_obj, dat_regr_xCR, "optimal", n_pts)
 
-                    except Exception as e:
+                    except fire.ConvergenceError as e:
                         print(f"Error Solving: {e}")
                         break
 
