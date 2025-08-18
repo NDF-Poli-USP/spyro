@@ -23,6 +23,8 @@ from .meshing import (
     RectangleMesh,
     PeriodicRectangleMesh,
     BoxMesh,
+    AutomaticMesh,
+    MeshingParameters,
 )
 
 __all__ = [
@@ -51,5 +53,7 @@ __all__ = [
     "RectangleMesh",
     "PeriodicRectangleMesh",
     "BoxMesh",
+    "AutomaticMesh",
+    "MeshingParameters",
     "IsotropicWave",
 ]
