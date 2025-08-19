@@ -11,6 +11,7 @@ def is_seismicmesh_installed():
         return False
 
 
+@pytest.mark.slow
 def run_test_cpw_calc(FEM_method_to_evaluate, correct_cpw):
     grid_point_calculator_parameters = {
         # Experiment parameters
@@ -34,7 +35,7 @@ def run_test_cpw_calc(FEM_method_to_evaluate, correct_cpw):
         # offsets.
         # Line search parameters
         "load_reference": True,
-        "reference_solution_file": "test/inputfiles/reference_solution_cpw.npy",
+        "reference_solution_file": "tests/inputfiles/reference_solution_cpw.npy",
         "save_reference": False,
         "time-step_calculation": "estimate",
         "reference_degree": None,  # Degree to use in the reference case (int)

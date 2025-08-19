@@ -2,7 +2,7 @@ import pytest
 from firedrake import *
 import spyro
 
-from .inputfiles.Model1_gradient_2d import model
+from ..inputfiles.Model1_gradient_2d import model
 
 
 def _make_vp_exact(V, mesh):

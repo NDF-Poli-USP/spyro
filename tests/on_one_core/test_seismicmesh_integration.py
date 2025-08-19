@@ -39,7 +39,6 @@ def test_spyro_seimicmesh_2d_homogeneous_generation():
         "length_y": 0.0,
         "cell_type": "triangle",
         "mesh_type": "SeismicMesh",
-        "edge_length": None,
         "periodic": False,
         "velocity_model_file": None,
         "cells_per_wavelength": cpw,

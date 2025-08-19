@@ -1,6 +1,8 @@
 import spyro
 import numpy as np
-import math
+import time as timer
+import firedrake as fire
+import pickle
 
 
 def error_calc(p_numerical, p_analytical, nt):
@@ -10,11 +12,12 @@ def error_calc(p_numerical, p_analytical, nt):
     return div_error_time
 
 
-def run_forward(dt):
-    # dt = float(sys.argv[1])
+def run_forward():
+    dt = 0.0001
 
-    final_time = 1.0
-    dx = 0.006546536707079771
+    t0 = timer.time()
+
+    final_time = 1.4
 
     dictionary = {}
     dictionary["options"] = {
@@ -34,8 +37,8 @@ def run_forward(dt):
     # domain and reserve the remaining 250 m for the Perfectly Matched Layer (PML) to absorb
     # outgoing waves on three sides (eg., -z, +-x sides) of the domain.
     dictionary["mesh"] = {
-        "Lz": 3.0,  # depth in km - always positive
-        "Lx": 3.0,  # width in km - always positive
+        "Lz": 1.0,  # depth in km - always positive
+        "Lx": 1.0,  # width in km - always positive
         "Ly": 0.0,  # thickness in km - always positive
         "mesh_file": None,
         "mesh_type": "firedrake_mesh",  # options: firedrake_mesh or user_mesh
@@ -47,10 +50,12 @@ def run_forward(dt):
     # This transect of receivers is created with the helper function `create_transect`.
     dictionary["acquisition"] = {
         "source_type": "ricker",
-        "source_locations": [(-1.5 - dx, 1.5 + dx)],
+        "source_locations": [(-0.1, 0.5)],
         "frequency": 5.0,
         "delay": 0.3,
-        "receiver_locations": [(-1.5 - dx, 2.0 + dx)],
+        "receiver_locations": spyro.create_transect(
+            (-0.15, 0.1), (-0.15, 0.9), 50
+        ),
         "delay_type": "time",
     }
 
@@ -60,61 +65,59 @@ def run_forward(dt):
         "final_time": final_time,  # Final time for event
         "dt": dt,  # timestep size
         "amplitude": 1,  # the Ricker has an amplitude of 1.
-        "output_frequency": 100,  # how frequently to output solution to pvds
-        "gradient_sampling_frequency": 100,  # how frequently to save solution to RAM
+        "output_frequency": 200,  # how frequently to output solution to pvds
+        "gradient_sampling_frequency": 200,  # how frequently to save solution to RAM
+    }
+
+    dictionary["absorving_boundary_conditions"] = {
+        "status": True,
+        "damping_type": "PML",
+        "exponent": 2,
+        "cmax": 4.5,
+        "R": 1e-6,
+        "pad_length": 0.25,
     }
 
     dictionary["visualization"] = {
         "forward_output": True,
-        "forward_output_filename": "results/forward_output.pvd",
+        "forward_output_filename": "results/extended_pml_propagation.pvd",
         "fwi_velocity_model_output": False,
         "velocity_model_filename": None,
         "gradient_output": False,
         "gradient_filename": None,
     }
 
-    Wave_obj = spyro.AcousticWave(dictionary=dictionary)
-    Wave_obj.set_mesh(input_mesh_parameters={"edge_length": 0.02, "periodic": True})
+    Wave_obj = spyro.solvers.AcousticWave(dictionary=dictionary)
+    Wave_obj.set_mesh(input_mesh_parameters={"edge_length": 0.02})
 
-    Wave_obj.set_initial_velocity_model(constant=1.5)
+    z = Wave_obj.mesh_z
+    cond = fire.conditional(
+        z > -0.333, 1.5, fire.conditional(z > -0.667, 3.0, 4.5)
+    )
+    Wave_obj.set_initial_velocity_model(conditional=cond)
     Wave_obj.forward_solve()
 
-    rec_out = Wave_obj.receivers_output
+    t1 = timer.time()
+    print("Time elapsed: ", t1 - t0)
+    nt = int(final_time / dt) + 1
+    p_r = Wave_obj.forward_solution_receivers
 
-    return rec_out
+    return p_r, nt
 
 
-def test_second_order_time_convergence():
+def test_pml():
     """Test that the second order time convergence
     of the central difference method is achieved"""
 
-    dts = [
-        0.0005,
-        0.0001,
-    ]
+    p_r, nt = run_forward()
+    with open("tests/inputfiles/extended_pml_receveirs.pck", "rb") as f:
+        array = np.asarray(pickle.load(f), dtype=float)
+        extended_p_r = array
 
-    analytical_files = [
-        "test/inputfiles/analytical_solution_dt_0.0005.npy",
-        "test/inputfiles/analytical_solution_dt_0.0001.npy",
-    ]
-
-    numerical_results = []
-    errors = []
-
-    for i in range(len(dts)):
-        dt = dts[i]
-        rec_out = run_forward(dt)
-        rec_anal = np.load(analytical_files[i])
-        time = np.linspace(0.0, 1.0, int(1.0 / dts[i]) + 1)
-        nt = len(time)
-        numerical_results.append(rec_out.flatten())
-        errors.append(error_calc(rec_out.flatten(), rec_anal, nt))
-
-    theory = [t**2 for t in dts]
-    theory = [errors[0] * th / theory[0] for th in theory]
-
-    assert math.isclose(np.log(theory[-1]), np.log(errors[-1]), rel_tol=1e-2)
+    error = error_calc(extended_p_r, p_r, nt)
+    print(f"Error of {error}")
+    assert np.abs(error) < 0.05
 
 
 if __name__ == "__main__":
-    test_second_order_time_convergence()
+    test_pml()

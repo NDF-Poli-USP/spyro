@@ -36,6 +36,20 @@ class Read_boundary_layer:
         Thickness of the PML in the z-direction (km) - always positive
     damping_type : str
         Type of the boundary layer
+    abc_boundary_layer_type : `str`
+        Type of the boundary layer. Option 'hybrid' is based on paper
+        of Salas et al. (2022). doi: https://doi.org/10.1016/j.apm.2022.09.014
+    abc_boundary_layer_shape : str
+        Shape type of pad layer. Options: 'rectangular' or 'hypershape'
+    abc_deg_layer : `int`
+        Hypershape degree
+    abc_reference_freq : `str`
+        Reference frequency for sizing the hybrid absorbing layer
+        Options: 'source' or 'boundary'
+    abc_deg_eikonal : `int`
+        Finite element order for the Eikonal analysis
+    abc_get_ref_model : `bool`
+        If True, the infinite model is created
 
     Methods
     -------

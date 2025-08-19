@@ -7,7 +7,7 @@ from firedrake import *
 
 import spyro
 
-from .inputfiles.Model1_parallel_2d import model as options
+from ..inputfiles.Model1_parallel_2d import model as options
 
 
 # forward = spyro.solvers.forward
@@ -45,7 +45,7 @@ def test_parallel_source():
 
     # print(np.amax(np.abs(r)))
     # spyro.io.save_shots('serial_shot.dat', r)
-    r_s = spyro.io.load_shots(os.getcwd() + "/test/serial_shot.dat")
+    r_s = spyro.io.load_shots(os.getcwd() + "/tests/on_one_core/serial_shot.dat")
     assert np.amax(np.abs(r - r_s)) < 1e-16
 
 

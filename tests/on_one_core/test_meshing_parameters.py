@@ -49,13 +49,13 @@ def test_initialize_mesh_pam():
         "gradient_filename": None,
     }
     meshing_pam = spyro.meshing.MeshingParameters(
-        input_mesh_dictionary = dictionary["mesh"],
-        dimension = dictionary["options"]["dimension"],
-        source_frequency = dictionary["acquisition"]["frequency"],
-        method = "mass_lumped_triangle",
-        degree = dictionary["options"]["degree"],
-        )
-    
+        input_mesh_dictionary=dictionary["mesh"],
+        dimension=dictionary["options"]["dimension"],
+        source_frequency=dictionary["acquisition"]["frequency"],
+        method="mass_lumped_triangle",
+        degree=dictionary["options"]["degree"],
+    )
+
     # Testing correct values:
     test_unit = (meshing_pam._unit == "km")
     test_length_z = (meshing_pam.length_z == dictionary["mesh"]["Lz"])
@@ -259,7 +259,7 @@ def test_cells_per_wavelength_and_edge_length_mutual_exclusion():
         mp.edge_length = 5
         assert mp.edge_length == 5
         assert mp.cells_per_wavelength is None
-        assert any("removes cells per wavelength" in str(warn.message) for warn in w)
+        assert any("Mutual exclusion" in str(warn.message) for warn in w)
 
 
 def test_periodic_only_for_firedrake_mesh():
