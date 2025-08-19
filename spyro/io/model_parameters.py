@@ -279,7 +279,7 @@ class Model_parameters(Read_options, Read_boundary_layer):
 
         # Checking absorving boundary condition parameters
         self.abc_active = self.input_dictionary["absorving_boundary_conditions"]["status"]
-        self.damping_type = self.input_dictionary["absorving_boundary_conditions"]["damping_type"]
+        self.abc_boundary_layer_type = self.input_dictionary["absorving_boundary_conditions"]["damping_type"]
         self.abc_pad_length = self.input_dictionary["absorving_boundary_conditions"]["pad_length"]
 
         self.absorb_top = dictionary["absorving_boundary_conditions"].get("absorb_top", False)
