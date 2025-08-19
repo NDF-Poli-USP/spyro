@@ -6,7 +6,7 @@ from firedrake import *
 import spyro
 from spyro.domains import quadrature
 
-from .inputfiles.Model1_gradient_3d_pml import model_pml
+from ..inputfiles.Model1_gradient_3d_pml import model_pml
 
 # outfile_total_gradient = VTKFile(os.getcwd() + "/results/Gradient.pvd")
 

@@ -2,7 +2,7 @@ import spyro
 
 
 def test_saving_and_loading_shot_record():
-    from test.inputfiles.model import dictionary
+    from ..inputfiles.model import dictionary
 
     dictionary["parallelism"]["type"] = "custom"
     dictionary["parallelism"]["shot_ids_per_propagation"] = [[0, 1]]
