@@ -67,10 +67,11 @@ class Read_boundary_layer:
         accepted_damping_types = [
             "PML",
             "local",
+            "hybrid",
             None,
         ]
         if value not in accepted_damping_types:
-            return ValueError(f"Damping type of {value} not recognized.")
+            raise ValueError(f"Damping type of {value} not recognized.")
         if value == "PML":
             abc_dictionary.setdefault("exponent", 2)
             abc_dictionary.setdefault("R", 1e-6)
@@ -78,6 +79,17 @@ class Read_boundary_layer:
             self.abc_exponent = abc_dictionary["exponent"]
             self.abc_R = abc_dictionary["R"]
             self.abc_cmax = abc_dictionary["cmax"]
+        if value == "hybrid":
+            abc_dictionary.setdefault("layer_shape", "rectangular")
+            abc_dictionary.setdefault("degree_eikonal", None)
+            self.abc_boundary_layer_shape = abc_dictionary["layer_shape"]
+            self.abc_deg_layer = None \
+                if abc_dictionary["layer_shape"] == "rectangular" \
+                else abc_dictionary.get("degree_layer", 2)
+            self.abc_reference_freq = abc_dictionary["habc_reference_freq"]
+            self.abc_deg_eikonal = abc_dictionary.get("degree_eikonal", None)
+            self.abc_get_ref_model = abc_dictionary["get_ref_model"]
+
         self._abc_boundary_layer_type = value
     
     @property
