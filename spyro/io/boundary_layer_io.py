@@ -39,8 +39,10 @@ class read_boundary_layer:
         of Salas et al. (2022). doi: https://doi.org/10.1016/j.apm.2022.09.014
     abc_boundary_layer_shape : str
         Shape type of pad layer. Options: 'rectangular' or 'hypershape'
-    abc_deg_layer : `int`
+    abc_deg_layer : `float`
         Hypershape degree
+    abc_degree_type : `str`
+        Type of the hypereshape degree. Options: 'real' or 'integer'
     abc_reference_freq : `str`
         Reference frequency for sizing the hybrid absorbing layer
         Options: 'source' or 'boundary'
@@ -73,7 +75,8 @@ class read_boundary_layer:
             self.abc_boundary_layer_shape = self.dictionary["layer_shape"]
             self.abc_deg_layer = None \
                 if self.dictionary["layer_shape"] == "rectangular" \
-                else self.dictionary.get("degree_layer", 2)
+                else self.dictionary.get("degree_layer", 2.)
+            self.abc_degree_type = self.dictionary.get("degree_type", "real")
             self.abc_reference_freq = self.dictionary["habc_reference_freq"]
             self.abc_deg_eikonal = self.dictionary.get("degree_eikonal", None)
             self.abc_get_ref_model = self.dictionary["get_ref_model"]

@@ -3,15 +3,16 @@ import numpy as np
 import scipy.linalg as sl
 import scipy.sparse as ss
 import spyro.habc.eik as eik
-import spyro.habc.lay_len as lay_len
 from os import getcwd
 from scipy.signal import find_peaks
 from sympy import divisors
 from spyro.solvers.acoustic_wave import AcousticWave
 from spyro.meshing.meshing_habc import HABC_Mesh
 from spyro.habc.hyp_lay import HyperLayer
+from spyro.habc.rec_lay import RectangLayer
 from spyro.habc.error_measure import HABC_Error
 from spyro.habc.nrbc import NRBCHabc
+from spyro.habc.lay_len import calc_size_lay
 from spyro.plots.plots_habc import plot_function_layer_size, \
     plot_hist_receivers, plot_rfft_receivers, plot_xCR_opt
 from spyro.utils.error_management import value_parameter_error
@@ -26,7 +27,8 @@ from spyro.utils.freq_tools import freq_response
 # With additions by Alexandre Olender
 
 
-class HABC_Wave(AcousticWave, HABC_Mesh, HyperLayer, NRBCHabc, HABC_Error):
+class HABC_Wave(AcousticWave, HABC_Mesh, RectangLayer,
+                HyperLayer, NRBCHabc, HABC_Error):
     '''
     class HABC that determines absorbing layer size and parameters to be used.
 
@@ -35,13 +37,9 @@ class HABC_Wave(AcousticWave, HABC_Mesh, HyperLayer, NRBCHabc, HABC_Error):
     * abc_reference_freq : `str`
         Reference frequency for sizing the hybrid absorbing layer.
         Options: 'source' or 'boundary'
-    *a_par : `float`
+    * a_par : `float`
         Adimensional propagation speed parameter (a = z / f).
         "z" parameter is the inverse of the minimum Eikonal (1 / phi_min)
-    a_rat: `float`
-        Area ratio to the area of the original domain. a_rat = area / a_orig
-    area : `float`
-        Area of the domain with absorbing layer
     * case_habc : `str`
         Label for the output files that includes the layer shape
         ('REC' or 'HNI', I for the degree) and the reference frequency
@@ -75,27 +73,19 @@ class HABC_Wave(AcousticWave, HABC_Mesh, HyperLayer, NRBCHabc, HABC_Error):
         Size parameter of the absorbing layer
     * FLpos : `list`
         Possible size parameters for the absorbing layer without rounding
-    f_Ah : `float`
-        Hyperelliptical area factor. f_Ah = area / (a_hyp * b_hyp).
-        f_Ah is 4 for rectangular layers
-    f_Vh : `float`
-        Hyperellipsoidal volume factor. f_Vh = vol / (a_hyp * b_hyp * c_hyp).
-        f_Vh is 8 for rectangular layers
-    f_Nyq : `float`
+    * f_Nyq : `float`
         Nyquist frequency according to the time step. f_Nyq = 1 / (2 * dt)
-    f_est : `float`
-        Factor for the stabilizing term in Eikonal equation
     * freq_ref : `float`
         Reference frequency of the wave at the minimum Eikonal point
     fundam_freq : `float`
         Fundamental frequency of the numerical model
     * fwi_iter : `int`
         The iteration number for the Full Waveform Inversion (FWI) algorithm
-    Lz_habc : `float`
+    * Lz_habc : `float`
         Length of the domain in the z-direction with absorbing layer
-    Lx_habc : `float`
+    * Lx_habc : `float`
         Length of the domain in the x-direction with absorbing layer
-    Ly_habc : `float`
+    * Ly_habc : `float`
         Length of the domain in the y-direction with absorbing (3D models)
     * layer_shape : `string`
         Shape type of pad layer. Options: 'rectangular' or 'hypershape'
@@ -107,13 +97,6 @@ class HABC_Wave(AcousticWave, HABC_Mesh, HyperLayer, NRBCHabc, HABC_Error):
         Maximum peak error at the receivers for the HABC scheme
     mesh: `firedrake mesh`
         Mesh used in the simulation (HABC or Infinite Model)
-    n_bounds : `tuple`
-        Bounds for the hypershape layer degree. (n_min, n_max)
-        - n_min ensures to add lmin in the domain diagonal direction
-        - n_max ensures to add pad_len in the domain diagonal direction
-    n_hyp : `int`
-        Degree of the hyperelliptical pad layer (n >= 2). Default is 2.
-        For rectangular layers, n_hyp is set to infinity
     * number_of_receivers: `int`
         Number of receivers used in the simulation
     * pad_len : `float`
@@ -130,8 +113,6 @@ class HABC_Wave(AcousticWave, HABC_Mesh, HyperLayer, NRBCHabc, HABC_Error):
         Receiver waveform data in the HABC scheme
     receivers_out_fft : `array`
         Frequency response at the receivers in the HABC scheme
-    v_rat : `float`
-        Volume ratio to the volume of the original domain. v_rat = vol / v_orig
     vol : `float`
         Volume of the domain with absorbing layer
     xCR : `float`
@@ -146,8 +127,6 @@ class HABC_Wave(AcousticWave, HABC_Mesh, HyperLayer, NRBCHabc, HABC_Error):
     -------
     calc_damping_prop()
         Compute the damping properties for the absorbing layer
-    calc_rec_geom_prop()
-        Calculate the geometric properties for the rectangular layer
     * check_timestep()
         Check if the timestep size is appropriate for the transient response
     coeff_damp_fun()
@@ -165,7 +144,7 @@ class HABC_Wave(AcousticWave, HABC_Mesh, HyperLayer, NRBCHabc, HABC_Error):
         model to size an absorbing layer using the Eikonal criterion for HABCs
     damping_layer()
         Set the damping profile within the absorbing layer
-    det_reference_freq()
+    * det_reference_freq()
         Determine the reference frequency for a new layer size
     error_measures_habc()
         Compute the error measures at the receivers for the HABC scheme
@@ -179,6 +158,8 @@ class HABC_Wave(AcousticWave, HABC_Mesh, HyperLayer, NRBCHabc, HABC_Error):
         Get the heuristic factor candidates for the quadratic regression
     get_xCR_optimal()
         Get the optimal heuristic factor for the quadratic damping
+    habc_domain_dimensions()
+        Determine the new dimensions of the domain with absorbing layer
     * identify_habc_case()
         Generate an identifier for the current case study of the HABC scheme
     * infinite_model()
@@ -222,6 +203,7 @@ class HABC_Wave(AcousticWave, HABC_Mesh, HyperLayer, NRBCHabc, HABC_Error):
         # Initializing the parent classes
         AcousticWave.__init__(self, dictionary=dictionary, comm=comm)
         HABC_Mesh.__init__(self)
+        RectangLayer.__init__(self)
         NRBCHabc.__init__(self)
 
         # Identifier for the current case study
@@ -250,15 +232,16 @@ class HABC_Wave(AcousticWave, HABC_Mesh, HyperLayer, NRBCHabc, HABC_Error):
 
         # Labeling for the layer shape
         if self.layer_shape == 'rectangular':  # Rectangular layer
-            self.case_habc = 'REC'
+            self.case_habc = 'REC'  # Label
 
         elif self.layer_shape == 'hypershape':  # Hypershape layer
 
             # Initializing the hyperelliptical layer
             HyperLayer.__init__(self, n_hyp=self.abc_deg_layer,
+                                n_type=self.abc_degree_type,
                                 dimension=self.dimension)
 
-            self.case_habc = 'HN' + str(self.abc_deg_layer)
+            self.case_habc = 'HN' + str(self.abc_deg_layer)  # Label
             deg_str = f" - Degree: {self.abc_deg_layer}"
             lay_str += deg_str
 
@@ -287,7 +270,7 @@ class HABC_Wave(AcousticWave, HABC_Mesh, HyperLayer, NRBCHabc, HABC_Error):
         # Initializing the error measure class
         HABC_Error.__init__(self, path_save=self.path_save)
 
-    def critical_boundary_points(self, f_est=0.06):
+    def critical_boundary_points(self):
         '''
         Determine the critical points on domain boundaries of the original
         model to size an absorbing layer using the Eikonal criterion for HABCs.
@@ -295,8 +278,7 @@ class HABC_Wave(AcousticWave, HABC_Mesh, HyperLayer, NRBCHabc, HABC_Error):
 
         Parameters
         ----------
-        f_est : `float`, optional
-            Factor for the stabilizing term in Eikonal Eq. Default is 0.06
+        None
 
         Returns
         -------
@@ -304,7 +286,7 @@ class HABC_Wave(AcousticWave, HABC_Mesh, HyperLayer, NRBCHabc, HABC_Error):
         '''
 
         # Initializing Eikonal object
-        Eikonal = eik.HABC_Eikonal(self, f_est=f_est)
+        Eikonal = eik.HABC_Eikonal(self)
 
         # Solving Eikonal
         Eikonal.solve_eik()
@@ -360,9 +342,9 @@ class HABC_Wave(AcousticWave, HABC_Mesh, HyperLayer, NRBCHabc, HABC_Error):
 
         print("Reference Frequency (Hz): {:.5f}".format(self.freq_ref))
 
-    def calc_rec_geom_prop(self):
+    def habc_domain_dimensions(self):
         '''
-        Calculate the geometric properties for the rectangular layer.
+        Determine the new dimensions of the domain with absorbing layer
 
         Parameters
         ----------
@@ -370,25 +352,40 @@ class HABC_Wave(AcousticWave, HABC_Mesh, HyperLayer, NRBCHabc, HABC_Error):
 
         Returns
         -------
-        None
+        domain_dim : `tuple`
+            Original domain dimensions: (Lx, Lz) for 2D or (Lx, Lz, Ly) for 3D
+        domain_lay : `tuple`
+            Domain dimensions with layer. For rectangular layers, truncation
+            due to the free surface is included (n = 1) while for hypershape
+            layers, truncation by free surface is not included (n = 2)
+            - 2D : (Lx + 2 * pad_len, Lz + n * pad_len)
+            - 3D : (Lx + 2 * pad_len, Lz + n * pad_len, Ly + 2 * pad_len)
         '''
 
-        self.n_hyp = np.inf
-        self.n_bounds = None
-
-        # Geometric properties of the rectangular layer
-        if self.dimension == 2:  # 2D
-            self.area = self.Lx_habc * self.Lz_habc
-            self.a_rat = self.area / (self.length_x * self.length_z)
-            self.f_Ah = 4
-            print("Area Ratio: {:5.3f}".format(self.a_rat))
+        # New geometry with layer
+        self.Lx_habc = self.length_x + 2 * self.pad_len
+        self.Lz_habc = self.length_z + self.pad_len
 
         if self.dimension == 3:  # 3D
-            self.vol = self.Lx_habc * self.Lz_habc * self.Ly_habc
-            self.v_rat = self.vol / (self.length_x * self.length_z
-                                     * self.length_y)
-            self.f_Vh = 8
-            print("Volume Ratio: {:5.3f}".format(self.v_rat))
+            self.Ly_habc = self.length_y + 2 * self.pad_len
+
+        # Original domain dimensions
+        domain_dim = (self.length_x, self.length_z)
+
+        # Domain dimension with layer without truncations
+
+        # Labeling for the layer shape
+        if self.layer_shape == 'rectangular':  # Rectangular layer
+            domain_lay = (self.Lx_habc, self.Lz_habc)
+
+        elif self.layer_shape == 'hypershape':  # Hypershape layer
+            domain_lay = (self.Lx_habc, self.length_z + 2 * self.pad_len)
+
+        if self.dimension == 3:  # 3D
+            domain_dim += (self.length_y,)
+            domain_lay += (self.Ly_habc,)
+
+        return domain_dim, domain_lay
 
     def size_habc_criterion(self, fpad=4, n_root=1, layer_based_on_mesh=True):
         '''
@@ -414,61 +411,34 @@ class HABC_Wave(AcousticWave, HABC_Mesh, HyperLayer, NRBCHabc, HABC_Error):
 
         # Computing layer sizes
         z_par = self.eik_bnd[0][3]
-        F_L, pad_len, ele_pad, self.a_par, self.FLpos = \
-            lay_len.calc_size_lay(self.freq_ref, z_par, self.lmin,
-                                  self.lref, n_root=n_root)
+
+        self.F_L, self.pad_len, self.ele_pad, self.d, \
+            self.a_par, self.FLpos = calc_size_lay(
+                self.freq_ref, z_par, self.lmin, self.lref,
+                n_root=n_root, layer_based_on_mesh=layer_based_on_mesh)
 
         plot_function_layer_size([self.a_par, z_par],
                                  [self.freq_ref, self.frequency],
                                  [self.lmin, self.lref], self.FLpos,
                                  output_folder=self.path_case_habc)
 
-        if layer_based_on_mesh:
-            self.F_L, self.pad_len, self.ele_pad = \
-                lay_len.roundFL(self.lmin, self.lref, F_L)
-
-        else:
-            self.F_L = F_L
-            self.pad_len = pad_len
-            self.ele_pad = ele_pad
-
-        # Normalized element size
-        self.d = self.lmin / self.pad_len
-        print("Normalized Element Size (adim): {0:.5f}".format(self.d))
-
         # New geometry with layer
-        self.Lx_habc = self.length_x + 2 * self.pad_len
-        self.Lz_habc = self.length_z + self.pad_len
+        domain_dim, domain_lay = self.habc_domain_dimensions()
 
-        if self.dimension == 3:  # 3D
-            self.Ly_habc = self.length_y + 2 * self.pad_len
-
-        if self.layer_shape == 'hypershape':
-
-            print("\nDetermining Hypershape Layer Parameters")
-
-            # Original domain dimensions
-            domain_dim = [self.length_x, self.length_z]
-            domain_hyp = [self.Lx_habc, self.length_z + 2 * self.pad_len]
-            if self.dimension == 3:  # 3D
-                domain_dim.append(self.length_y)
-                domain_hyp.append(self.Ly_habc)
-
-            # Defining the hypershape semi-axes
-            self.define_hyperaxes(domain_dim, domain_hyp)
-
-            # Degree of the hypershape layer
-            self.define_hyperlayer(self.pad_len, self.lmin)
-
-            # Geometric properties of the hypershape layer
-            self.calc_hyp_geom_prop()
-
-        else:
+        if self.layer_shape == 'rectangular':
 
             print("\nDetermining Rectangular Layer Parameters")
 
             # Geometric properties of the rectangular layer
-            self.calc_rec_geom_prop()
+            self.calc_rec_geom_prop(domain_dim, domain_lay)
+
+        elif self.layer_shape == 'hypershape':
+
+            print("\nDetermining Hypershape Layer Parameters")
+
+            # Geometric properties of the hypershape layer
+            self.calc_hyp_geom_prop(domain_dim, domain_lay,
+                                    self.pad_len, self.lmin)
 
     def create_mesh_habc(self, inf_model=False, spln=True, fmesh=1.):
         '''
@@ -533,7 +503,9 @@ class HABC_Wave(AcousticWave, HABC_Mesh, HyperLayer, NRBCHabc, HABC_Error):
         elif layer_shape == 'hypershape':
 
             # Creating the hyperellipse layer mesh
-            hyp_mesh = self.create_hyp_trunc_mesh2D(spln=spln, fmesh=fmesh)
+            domain_dim = self.habc_domain_dimensions()[0]
+            hyp_mesh = self.create_hyp_trunc_mesh2D(
+                domain_dim, spln=spln, fmesh=fmesh)
 
             # Adjusting coordinates
             coords = hyp_mesh.coordinates.dat.data_with_halos

@@ -133,7 +133,8 @@ def parse_method(cell_type, variant):
     elif cell_type == "quadrilateral" and variant == "DG":
         method = "DG_quadrilateral"
     else:
-        raise ValueError(f"Cell type of {cell_type} with variant of {variant} results in a not implemented method")
+        raise ValueError(f"Cell type of {cell_type} with variant of {variant}"
+                         f" results in a not implemented method")
 
     return method
 

@@ -58,7 +58,7 @@ class HABC_Eikonal(Eikonal_Modeling):
         Solve the nonlinear Eikonal
     '''
 
-    def __init__(self, Wave, f_est=0.06):
+    def __init__(self, Wave):
         '''
         Initialize the Eikonal class.
 
@@ -66,9 +66,6 @@ class HABC_Eikonal(Eikonal_Modeling):
         ----------
         Wave : `wave`
             Wave object
-        f_est : `float`, optional
-            Factor for the stabilizing term in nonlinear Eikonal Eq.
-            Default is 0.06
 
         Returns
         -------
@@ -78,7 +75,7 @@ class HABC_Eikonal(Eikonal_Modeling):
         Eikonal_Modeling.__init__(self, Wave.dimension,
                                   Wave.sources.point_locations,
                                   ele_type=Wave.ele_type_eik,
-                                  p_eik=Wave.p_eik, f_est=f_est)
+                                  p_eik=Wave.p_eik, f_est=Wave.f_est)
 
         # Communicator MPI4py
         self.comm = Wave.comm

@@ -58,9 +58,8 @@ class Eikonal_Modeling():
         The spatial dimension of the problem
     ele_type : `string`
         Finite element type. 'CG' or 'KMV'. Default is 'CG'
-    f_est: `float`
-        Factor for the stabilizing term in nonlinear Eikonal equation.
-        Default is 0.06
+    f_est : `float`
+            Factor for the stabilizing term in Eikonal Eq. Default is 0.06
     p_eik : `int`
         Finite element order
     source_locations: `list`of `tuples`
@@ -106,8 +105,7 @@ class Eikonal_Modeling():
         p_eik : `int`, optional
             Finite element order for the Eikonal analysis. Default is None
         f_est : `float`, optional
-            Factor for the stabilizing term in nonlinear Eikonal Eq.
-            Default is 0.06
+            Factor for the stabilizing term in Eikonal Eq. Default is 0.06
         tol : `float`, optional
             User solver tolerance. Default is 1e-16
 
@@ -431,8 +429,10 @@ class Eikonal_Modeling():
         if typ_igs == 'constant':
             cell_diam_max = cell_diameter_function.dat.data_with_halos.max()
             init_guess = cell_diam_max / c_min
+
         elif typ_igs == 'variable':
             init_guess = cell_diameter_function / fire.Constant(c_min)
+
         else:
             value_parameter_error('typ_igs', typ_igs, ['constant', 'variable'])
 

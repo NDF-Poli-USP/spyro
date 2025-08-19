@@ -211,8 +211,10 @@ class Model_parameters:
         of Salas et al. (2022). doi: https://doi.org/10.1016/j.apm.2022.09.014
     abc_boundary_layer_shape : str
         Shape type of pad layer. Options: 'rectangular' or 'hypershape'
-    abc_deg_layer : `int`
+    abc_deg_layer : `float`
         Hypershape degree
+    abc_degree_type : `str`
+        Type of the hypereshape degree. Options: 'real' or 'integer'
     abc_reference_freq : `str`
         Reference frequency for sizing the hybrid absorbing layer.
         Options: 'source' or 'boundary'
@@ -400,6 +402,7 @@ class Model_parameters:
         if BL_obj.abc_boundary_layer_type == "hybrid":
             self.abc_boundary_layer_shape = BL_obj.abc_boundary_layer_shape
             self.abc_deg_layer = BL_obj.abc_deg_layer
+            self.abc_degree_type = BL_obj.abc_degree_type
             self.abc_reference_freq = BL_obj.abc_reference_freq
             self.abc_get_ref_model = BL_obj.abc_get_ref_model
             self.abc_deg_eikonal = BL_obj.abc_deg_eikonal

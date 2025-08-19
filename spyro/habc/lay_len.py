@@ -182,8 +182,8 @@ def loop_roots(a, lmin, lref, max_roots, tol_rel=1e-3, monitor=False):
     return FLpos
 
 
-def calc_size_lay(fref, z_par, lmin, lref, nz=5, n_root=1,
-                  tol_rel=1e-3, monitor=False):
+def calc_size_lay(fref, z_par, lmin, lref, nz=5, n_root=1, tol_rel=1e-3,
+                  layer_based_on_mesh=True, monitor=False):
     '''
     Calculate the lenght of the absorbing layer
 
@@ -214,6 +214,8 @@ def calc_size_lay(fref, z_par, lmin, lref, nz=5, n_root=1,
         Size of the absorbing layer
     ele_pad : `int`
         Approximated number of elements in the layer of edge length 'lmin'
+    d : `float`
+        Normalized element size (lmin / pad_len)
     a : `float`
         Adimensional propagation speed parameter (a = z / f, z = c / l)
         Also, "z" parameter is the inverse of the minimum Eikonal (1 / phi_min)
@@ -266,7 +268,14 @@ def calc_size_lay(fref, z_par, lmin, lref, nz=5, n_root=1,
     # Approximated number of elements in the layer of edge length 'lmin'
     ele_pad = format_ele[n_root - 1]
 
-    return F_L, pad_len, ele_pad, a, FLpos
+    if layer_based_on_mesh:
+        F_L, pad_len, ele_pad = roundFL(lmin, lref, F_L)
+
+    # Normalized element size
+    d = lmin / pad_len
+    print("Normalized Element Size (adim): {0:.5f}".format(d))
+
+    return F_L, pad_len, ele_pad, d, a, FLpos
 
 
 def roundFL(lmin, lref, F_L):

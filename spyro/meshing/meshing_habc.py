@@ -63,22 +63,19 @@ class HABC_Mesh():
         Get the representative mesh dimensions from original mesh.
     '''
 
-    def __init__(self, f_est=0.06):
+    def __init__(self):
         '''
         Initialize the HABC_Mesh class
 
         Parameters
         ----------
-        f_est : `float`, optional
-            Factor for the stabilizing term in Eikonal Eq. Default is 0.06
+        None
 
         Returns
         -------
         None
         '''
-
-        # Factor for the stabilizing term in Eikonal equation
-        self.f_est = f_est
+        pass
 
     def representative_mesh_dimensions(self):
         '''
@@ -110,7 +107,7 @@ class HABC_Mesh():
         # Tolerance for searching nodes in the mesh
         self.tol = 10**(min(int(np.log10(self.lmin / 10)), -6))
 
-    def properties_eik_mesh(self, p_usu=None, ele_type='CG'):
+    def properties_eik_mesh(self, p_usu=None, ele_type='CG', f_est=0.06):
         '''
         Set the properties for the mesh used to solve the Eikonal equation
 
@@ -120,6 +117,8 @@ class HABC_Mesh():
             Finite element order for the Eikonal equation. Default is None
         ele_type : `string`, optional
             Finite element type. 'CG' or 'KMV'. Default is 'CG'
+        f_est : `float`, optional
+            Factor for the stabilizing term in Eikonal Eq. Default is 0.06
 
         Returns
         -------
@@ -132,6 +131,9 @@ class HABC_Mesh():
         self.funct_space_eik = fire.FunctionSpace(self.mesh,
                                                   self.ele_type_eik,
                                                   self.p_eik)
+
+        # Factor for the stabilizing term in Eikonal equation
+        self.f_est = f_est
 
     def extract_node_positions(self, func_space):
         '''
@@ -248,13 +250,14 @@ class HABC_Mesh():
             if self.dimension == 3:  # 3D
                 self.bnd_nodes.append(y_data[self.bnds])
 
-    def preamble_mesh_operations(self):
+    def preamble_mesh_operations(self, f_est=0.06):
         '''
         Perform mesh operations previous to size an absorbing layer.
 
         Parameters
         ----------
-        None
+        f_est : `float`, optional
+            Factor for the stabilizing term in Eikonal Eq. Default is 0.06
 
         Returns
         -------
@@ -284,7 +287,8 @@ class HABC_Mesh():
         vel_c.write(self.c)
 
         # Mesh properties for Eikonal
-        self.properties_eik_mesh(p_usu=self.abc_deg_eikonal)
+        print("Setting Mesh Properties for Eikonal Analysis")
+        self.properties_eik_mesh(p_usu=self.abc_deg_eikonal, f_est=f_est)
 
         # Generating boundary data from the original domain mesh
         # self.boundary_data()

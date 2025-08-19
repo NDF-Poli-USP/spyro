@@ -4,7 +4,7 @@ from spyro.utils.cost import comp_cost
 
 
 def wave_dict(dt_usu, fr_files, layer_shape, degree_layer,
-              habc_reference_freq, get_ref_model):
+              degree_type, habc_reference_freq, get_ref_model):
     '''
     Create a dictionary with parameters for the model
 
@@ -16,10 +16,12 @@ def wave_dict(dt_usu, fr_files, layer_shape, degree_layer,
         Frequency of the output files to be saved in the simulation
     layer_shape : `str`
         Shape of the absorbing layer, either 'rectangular' or 'hypershape'
-    degree_layer : `int` or `None`
+    degree_layer : `float` or `None`
         Degree of the hypershape layer, if applicable. If None, it is not used
+    degree_type : `str`
+        Type of the hypereshape degree. Options: 'real' or 'integer'
     habc_reference_freq : str
-        Reference frequency for the layer size. Options: 'source' or 'boundary
+        Reference frequency for the layer size. Options: 'source' or 'boundary'
     get_ref_model : `bool`
         If True, the infinite model is created. If False, the absorbing layer
         is created based on the model parameters.
@@ -88,7 +90,8 @@ def wave_dict(dt_usu, fr_files, layer_shape, degree_layer,
         "status": True,  # Activate ABCs
         "damping_type": "hybrid",  # Activate HABC
         "layer_shape": layer_shape,  # Options: rectangular or hypershape
-        "degree_layer": degree_layer,  # Integer >= 2. Only for hypershape
+        "degree_layer": degree_layer,  # Float >= 2. Only for hypershape
+        "degree_type": degree_type,  # Options: real or integer
         "habc_reference_freq": habc_reference_freq,  # Options: source or boundary
         "degree_eikonal": 2,  # Finite element order for the Eikonal analysis
         "get_ref_model": get_ref_model,  # If True, the infinite model is created
@@ -248,8 +251,8 @@ def habc_fig8(Wave_obj, dat_regr_xCR, xCR_usu=None, plot_comparison=True):
     # Determining layer size
     Wave_obj.size_habc_criterion(n_root=1)
 
-    # import ipdb
-    # ipdb.set_trace()  # For debugging purposes
+    import ipdb
+    ipdb.set_trace()  # For debugging purposes
 
     # Creating mesh with absorbing layer
     Wave_obj.create_mesh_habc()
@@ -308,10 +311,13 @@ def test_loop_habc():
     # ============ HABC PARAMETERS ============
 
     # Hyperellipse degrees
-    degree_layer_lst = [None]  # [None, 2, 3, 4, 5]
+    degree_layer_lst = [4.4]  # [None, 2, 3, 4, 5]
 
     # Reference frequency
     habc_reference_freq_lst = ["source"]  # ["source", "boundary"]
+
+    # Type of the hypereshape degree
+    degree_type = "real"  # "integer"
 
     # Infinite model
     get_ref_model = False
@@ -328,8 +334,8 @@ def test_loop_habc():
     # ============ MESH AND EIKONAL ============
     # Create dictionary with parameters for the model
     fr_files = max(int(100 * max(dt_usu_lst) / dt_usu), 1)
-    dictionary = wave_dict(dt_usu, fr_files, "rectangular",
-                           None, "source", get_ref_model)
+    dictionary = wave_dict(dt_usu, fr_files, "rectangular", None,
+                           degree_type, "source", get_ref_model)
 
     # Creating mesh and performing eikonal analysis
     Wave_obj = preamble_habc(dictionary, edge_length)
