@@ -58,11 +58,11 @@ class Read_boundary_layer:
     """
 
     @property
-    def damping_type(self):
-        return self._damping_type
+    def abc_boundary_layer_type(self):
+        return self._abc_boundary_layer_type
     
-    @damping_type.setter
-    def damping_type(self, value):
+    @abc_boundary_layer_type.setter
+    def abc_boundary_layer_type(self, value):
         abc_dictionary = self.input_dictionary
         accepted_damping_types = [
             "PML",
@@ -78,7 +78,7 @@ class Read_boundary_layer:
             self.abc_exponent = abc_dictionary["exponent"]
             self.abc_R = abc_dictionary["R"]
             self.abc_cmax = abc_dictionary["cmax"]
-        self._damping_type = value
+        self._abc_boundary_layer_type = value
     
     @property
     def abc_pad_length(self):
