@@ -292,7 +292,7 @@ class Model_parameters(Read_options, Read_boundary_layer):
         # Check automatic adjoint
         self.input_dictionary["time_axis"].setdefault("gradient_sampling_frequency", 99999)
         self.input_dictionary["time_axis"].setdefault("output_frequency", 99999)
-        self.gradient_sampling_frequency = self.input_dictionary["time_axis"]["output_frequency"]
+        self.gradient_sampling_frequency = self.input_dictionary["time_axis"]["gradient_sampling_frequency"]
         self.output_frequency = self.input_dictionary["time_axis"]["output_frequency"]
         self._sanitize_automatic_adjoint()
 
