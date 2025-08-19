@@ -63,7 +63,7 @@ class Read_boundary_layer:
     
     @abc_boundary_layer_type.setter
     def abc_boundary_layer_type(self, value):
-        abc_dictionary = self.input_dictionary
+        abc_dictionary = self.input_dictionary['absorving_boundary_conditions']
         accepted_damping_types = [
             "PML",
             "local",
