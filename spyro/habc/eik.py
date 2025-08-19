@@ -98,9 +98,9 @@ class HABC_Eikonal(Eikonal_Modeling):
         # Extract node positions
         self.node_positions = Wave.extract_node_positions(self.funct_space_eik)
 
-        # Extract boundary node coordinates
-        self.bnds = Wave.extract_bnd_node_positions(self.node_positions,
-                                                    self.funct_space_eik)
+        # Extract boundary node indices
+        self.bnds = Wave.extract_bnd_node_indices(self.node_positions,
+                                                  self.funct_space_eik)
 
         # Path to save data
         self.path_save = Wave.path_save + "preamble/"

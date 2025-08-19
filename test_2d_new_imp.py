@@ -251,9 +251,6 @@ def habc_fig8(Wave_obj, dat_regr_xCR, xCR_usu=None, plot_comparison=True):
     # Determining layer size
     Wave_obj.size_habc_criterion(n_root=1)
 
-    import ipdb
-    ipdb.set_trace()  # For debugging purposes
-
     # Creating mesh with absorbing layer
     Wave_obj.create_mesh_habc()
 

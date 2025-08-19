@@ -52,5 +52,3 @@ ngmsh = geo.GenerateMesh(maxh=lmax, quad_dominated=False)
 msh = Mesh(ngmsh)
 VTKFile("output/hyp_test.pvd").write(msh)
 
-# f"O valor  vale {r}"
-# f"The price is {price:.2f} dollars"

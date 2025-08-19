@@ -137,7 +137,7 @@ class HABC_Wave(AcousticWave, HABC_Mesh, RectangLayer,
         Define the conditional expressions to identify the domain of
         the absorbing layer or the reference to the original boundary
         to compute the damping profile inside the absorbing layer
-    create_mesh_habc()
+    * create_mesh_habc()
         Create a mesh with absorbing layer based on the determined size
     * critical_boundary_points()
         Determine the critical points on domain boundaries of the original
@@ -449,10 +449,10 @@ class HABC_Wave(AcousticWave, HABC_Mesh, RectangLayer,
         inf_model : `bool`, optional
             If True, build a rectangular layer for the infinite or reference
             model (Model with "infinite" dimensions). Default is False
-        spln : `bool`
+        spln : `bool`, optional
             Flag to indicate whether to use splines (True) or lines (False)
             in hypershape layer generation. Default is True
-        fmesh : `float`
+        fmesh : `float`, optional
             Mesh size factor for the hyperelliptical layer with respect to mesh
             size of the original domain. Default is 1.0.
 
@@ -461,6 +461,7 @@ class HABC_Wave(AcousticWave, HABC_Mesh, RectangLayer,
         None
         '''
 
+        # Checking if the mesh for infinite model is requested
         if inf_model:
             print("\nGenerating Mesh for Infinite Model")
             layer_shape = 'rectangular'
@@ -472,53 +473,15 @@ class HABC_Wave(AcousticWave, HABC_Mesh, RectangLayer,
         # New mesh with layer
         if layer_shape == 'rectangular':
 
-            # New geometry with layer
-            Lz = self.Lz_habc
-            Lx = self.Lx_habc
-
-            # Number of elements
-            n_pad = self.pad_len / self.lmin  # Elements in the layer
-            nz = int(self.length_z / self.lmin) + int(n_pad)
-            nx = int(self.length_x / self.lmin) + int(2 * n_pad)
-            nx = nx + nx % 2
-
-            if self.dimension == 2:  # 2D
-                mesh_habc = fire.RectangleMesh(nz, nx, Lz, Lx,
-                                               comm=self.comm.comm)
-
-            if self.dimension == 3:  # 3D
-                Ly = self.Ly_habc
-                ny = int(self.length_y / self.lmin) + int(2 * n_pad)
-                ny = ny + ny % 2
-                mesh_habc = fire.BoxMesh(nz, nx, ny, Lz, Lx, Ly,
-                                         comm=self.comm.comm)
-                mesh_habc.coordinates.dat.data_with_halos[:, 2] -= self.pad_len
-
-            # Adjusting coordinates
-            mesh_habc.coordinates.dat.data_with_halos[:, 0] *= -1.0
-            mesh_habc.coordinates.dat.data_with_halos[:, 1] -= self.pad_len
-
-            print("Extended Rectangular Mesh Generated Successfully")
+            mesh_habc = self.rectangular_mesh_habc()
 
         elif layer_shape == 'hypershape':
 
-            # Creating the hyperellipse layer mesh
             domain_dim = self.habc_domain_dimensions()[0]
-            hyp_mesh = self.create_hyp_trunc_mesh2D(
-                domain_dim, spln=spln, fmesh=fmesh)
-
-            # Adjusting coordinates
-            coords = hyp_mesh.coordinates.dat.data_with_halos
-            coords[:, 0], coords[:, 1] = coords[:, 1], -coords[:, 0]
-            Lz_half = self.length_z / 2
-            Lx_half = self.length_x / 2
-            hyp_mesh.coordinates.dat.data_with_halos[:, 0] -= Lz_half
-            hyp_mesh.coordinates.dat.data_with_halos[:, 1] += Lx_half
-            # fire.VTKFile("output/trunc_hyp_test.pvd").write(hyp_mesh)
-
-            # Merging the original mesh with the hyperellipse layer mesh
-            mesh_habc = self.merge_mesh_2D(self.mesh_original, hyp_mesh)
-            # fire.VTKFile("output/trunc_merged_test.pvd").write(mesh_habc)
+            a_hyp, b_hyp = self.hyper_axes[:2]
+            hyp_par = (a_hyp, b_hyp, self.n_hyp, self.perim_hyp)
+            mesh_habc = self.hypershape_mesh_habc(domain_dim, hyp_par,
+                                                  spln=spln, fmesh=fmesh)
 
         # Updating the mesh with the absorbing layer
         self.set_mesh(user_mesh=mesh_habc, mesh_parameters={})
