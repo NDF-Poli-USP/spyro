@@ -177,8 +177,8 @@ cython_debug/
 *.pdf
 *.pvtu
 *.dat
-*.hdf5
-*.msh
+# *.hdf5
+# *.msh
 *.segy
 *.png
 *.vtk

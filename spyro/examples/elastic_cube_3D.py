@@ -87,4 +87,4 @@ d["absorving_boundary_conditions"] = {
 }
 
 wave = spyro.IsotropicWave(d)
-wave.set_mesh(mesh_parameters={'dx': h})
+wave.set_mesh(input_mesh_parameters={'edge_length': h})

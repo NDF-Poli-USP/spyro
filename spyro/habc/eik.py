@@ -410,7 +410,7 @@ class Eikonal():
                 print((solv_ok + 'AbsTol: {:.1e}').format(user_atol))
                 break
 
-            except Exception as e:
+            except fire.ConvergenceError as e:
                 print(f"Error Solving: {e}")
 
                 # Adjusting tolerance
@@ -456,7 +456,7 @@ class Eikonal():
                 self.yp = yp
                 break
 
-            except Exception as e:
+            except fire.ConvergenceError as e:
                 print(f"Error Solving: {e}")
 
                 # Adjusting stabilizing factor

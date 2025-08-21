@@ -408,14 +408,14 @@ class HABC_Wave(AcousticWave, HyperLayer, NRBCHabc):
 
         # Boundaries
         left_boundary = np.where(x_data <= self.tol)
-        right_boundary = np.where(x_data >= self.length_x - self.tol)
-        bottom_boundary = np.where(z_data <= self.tol - self.length_z)
+        right_boundary = np.where(x_data >= self.mesh_parameters.length_x - self.tol)
+        bottom_boundary = np.where(z_data <= self.tol - self.mesh_parameters.length_z)
 
         bnds = [left_boundary, right_boundary, bottom_boundary]
 
         if self.dimension == 3:  # 3D
             left_bnd_y = np.where(y_data <= self.tol)
-            right_bnd_y = np.where(y_data >= self.length_y - self.tol)
+            right_bnd_y = np.where(y_data >= self.mesh_parameters.length_y - self.tol)
             bnds += [left_bnd_y, right_bnd_y]
 
         if typ_bnd == 'original':
@@ -603,14 +603,14 @@ class HABC_Wave(AcousticWave, HyperLayer, NRBCHabc):
         # Geometric properties of the rectangular layer
         if self.dimension == 2:  # 2D
             self.area = self.Lx_habc * self.Lz_habc
-            self.a_rat = self.area / (self.length_x * self.length_z)
+            self.a_rat = self.area / (self.mesh_parameters.length_x * self.mesh_parameters.length_z)
             self.f_Ah = 4
             print("Area Ratio: {:5.3f}".format(self.a_rat))
 
         if self.dimension == 3:  # 3D
             self.vol = self.Lx_habc * self.Lz_habc * self.Ly_habc
-            self.v_rat = self.vol / (self.length_x * self.length_z
-                                     * self.length_y)
+            self.v_rat = self.vol / (self.mesh_parameters.length_x * self.mesh_parameters.length_z
+                                     * self.mesh_parameters.length_y)
             self.f_Vh = 8
             print("Volume Ratio: {:5.3f}".format(self.v_rat))
 
@@ -648,21 +648,21 @@ class HABC_Wave(AcousticWave, HyperLayer, NRBCHabc):
         print("Normalized Element Size (adim): {0:.5f}".format(self.d))
 
         # New geometry with layer
-        self.Lx_habc = self.length_x + 2 * self.pad_len
-        self.Lz_habc = self.length_z + self.pad_len
+        self.Lx_habc = self.mesh_parameters.length_x + 2 * self.pad_len
+        self.Lz_habc = self.mesh_parameters.length_z + self.pad_len
 
         if self.dimension == 3:  # 3D
-            self.Ly_habc = self.length_y + 2 * self.pad_len
+            self.Ly_habc = self.mesh_parameters.length_y + 2 * self.pad_len
 
         if self.layer_shape == 'hypershape':
 
             print("\nDetermining Hypershape Layer Parameters")
 
             # Original domain dimensions
-            domain_dim = [self.length_x, self.length_z]
-            domain_hyp = [self.Lx_habc, self.length_z + 2 * self.pad_len]
+            domain_dim = [self.mesh_parameters.length_x, self.mesh_parameters.length_z]
+            domain_hyp = [self.Lx_habc, self.mesh_parameters.length_z + 2 * self.pad_len]
             if self.dimension == 3:  # 3D
-                domain_dim.append(self.length_y)
+                domain_dim.append(self.mesh_parameters.length_y)
                 domain_hyp.append(self.Ly_habc)
 
             # Defining the hypershape semi-axes
@@ -719,8 +719,8 @@ class HABC_Wave(AcousticWave, HyperLayer, NRBCHabc):
 
             # Number of elements
             n_pad = self.pad_len / self.lmin  # Elements in the layer
-            nz = int(self.length_z / self.lmin) + int(n_pad)
-            nx = int(self.length_x / self.lmin) + int(2 * n_pad)
+            nz = int(self.mesh_parameters.length_z / self.lmin) + int(n_pad)
+            nx = int(self.mesh_parameters.length_x / self.lmin) + int(2 * n_pad)
             nx = nx + nx % 2
 
             if self.dimension == 2:  # 2D
@@ -729,7 +729,7 @@ class HABC_Wave(AcousticWave, HyperLayer, NRBCHabc):
 
             if self.dimension == 3:  # 3D
                 Ly = self.Ly_habc
-                ny = int(self.length_y / self.lmin) + int(2 * n_pad)
+                ny = int(self.mesh_parameters.length_y / self.lmin) + int(2 * n_pad)
                 ny = ny + ny % 2
                 mesh_habc = fire.BoxMesh(nz, nx, ny, Lz, Lx, Ly,
                                          comm=self.comm.comm)
@@ -749,8 +749,8 @@ class HABC_Wave(AcousticWave, HyperLayer, NRBCHabc):
             # Adjusting coordinates
             coords = hyp_mesh.coordinates.dat.data_with_halos
             coords[:, 0], coords[:, 1] = coords[:, 1], -coords[:, 0]
-            Lz_half = self.length_z / 2
-            Lx_half = self.length_x / 2
+            Lz_half = self.mesh_parameters.length_z / 2
+            Lx_half = self.mesh_parameters.length_x / 2
             hyp_mesh.coordinates.dat.data_with_halos[:, 0] -= Lz_half
             hyp_mesh.coordinates.dat.data_with_halos[:, 1] += Lx_half
             # fire.VTKFile("output/trunc_hyp_test.pvd").write(hyp_mesh)
@@ -760,7 +760,7 @@ class HABC_Wave(AcousticWave, HyperLayer, NRBCHabc):
             # fire.VTKFile("output/trunc_merged_test.pvd").write(mesh_habc)
 
         # Updating the mesh with the absorbing layer
-        self.set_mesh(user_mesh=mesh_habc, mesh_parameters={})
+        self.set_mesh(user_mesh=mesh_habc, input_mesh_parameters={})
         print("Mesh Generated Successfully")
 
         if inf_model:
@@ -823,14 +823,14 @@ class HABC_Wave(AcousticWave, HyperLayer, NRBCHabc):
         # Clipping coordinates
         w_aux = fire.Function(W).interpolate(coords)
         w_arr = w_aux.dat.data_with_halos[:]
-        w_arr[:, 0] = np.clip(w_arr[:, 0], -self.length_z, 0.)
-        w_arr[:, 1] = np.clip(w_arr[:, 1], 0., self.length_x)
+        w_arr[:, 0] = np.clip(w_arr[:, 0], -self.mesh_parameters.length_z, 0.)
+        w_arr[:, 1] = np.clip(w_arr[:, 1], 0., self.mesh_parameters.length_x)
         if self.dimension == 3:  # 3D
-            w_arr[:, 2] = np.clip(w_arr[:, 2], 0., self.length_y)
+            w_arr[:, 2] = np.clip(w_arr[:, 2], 0., self.mesh_parameters.length_y)
 
         # Dimensions
-        Lz = self.length_z
-        Lx = self.length_x
+        Lz = self.mesh_parameters.length_z
+        Lx = self.mesh_parameters.length_x
 
         # Mask for the layer domain
         z_pd = fire.conditional(z + Lz < 0., 1., 0.)
@@ -841,7 +841,7 @@ class HABC_Wave(AcousticWave, HyperLayer, NRBCHabc):
         if self.dimension == 3:  # 3D
 
             # 3D dimension
-            Ly = self.length_y
+            Ly = self.mesh_parameters.length_y
 
             # Conditional expressions for the mask
             y_pd = fire.conditional(y < 0., 1., 0.) + \
@@ -1517,8 +1517,8 @@ class HABC_Wave(AcousticWave, HyperLayer, NRBCHabc):
         z_f, x_f = nodes_coord[:2]
 
         # Dimensions
-        Lz = self.length_z
-        Lx = self.length_x
+        Lz = self.mesh_parameters.length_z
+        Lx = self.mesh_parameters.length_x
 
         # Conditional value
         val_condz = (z_f + Lz)**2 if typ_marker == 'damping' else 1.0
@@ -1533,7 +1533,7 @@ class HABC_Wave(AcousticWave, HyperLayer, NRBCHabc):
         if self.dimension == 3:  # 3D
 
             # 3D dimension
-            Ly = self.length_y
+            Ly = self.mesh_parameters.length_y
             y_f = nodes_coord[-1]
 
             # Conditional value
@@ -1668,15 +1668,15 @@ class HABC_Wave(AcousticWave, HyperLayer, NRBCHabc):
             for nsou in range(self.number_of_sources):
                 psou_z = self.source_locations[nsou][0]
                 psou_x = self.source_locations[nsou][1]
-                delta_z = abs(psou_z - self.length_z)
-                delta_x = min(abs(psou_x), abs(psou_x - self.length_x))
+                delta_z = abs(psou_z - self.mesh_parameters.length_z)
+                delta_x = min(abs(psou_x), abs(psou_x - self.mesh_parameters.length_x))
 
                 if self.dimension == 2:  # 2D
                     dist_to_bnd = min(dist_to_bnd, delta_z, delta_x)
 
                 if self.dimension == 3:  # 3D
                     psou_y = self.source_locations[nsou][2]
-                    delta_y = min(abs(psou_y), abs(psou_y - self.length_y))
+                    delta_y = min(abs(psou_y), abs(psou_y - self.mesh_parameters.length_y))
                     dist_to_bnd = min(dist_to_bnd, delta_z, delta_x, delta_y)
 
             add_dom -= dist_to_bnd
@@ -1687,11 +1687,11 @@ class HABC_Wave(AcousticWave, HyperLayer, NRBCHabc):
         print(inf_str.format(self.pad_len))
 
         # New dimensions
-        self.Lx_habc = self.length_x + 2 * self.pad_len
-        self.Lz_habc = self.length_z + self.pad_len
+        self.Lx_habc = self.mesh_parameters.length_x + 2 * self.pad_len
+        self.Lz_habc = self.mesh_parameters.length_z + self.pad_len
 
         if self.dimension == 3:  # 3D
-            self.Ly_habc = self.length_y + 2 * self.pad_len
+            self.Ly_habc = self.mesh_parameters.length_y + 2 * self.pad_len
 
         # Creating mesh for infinite domain
         self.create_mesh_habc(inf_model=True)
