@@ -257,6 +257,9 @@ def habc_fig8(Wave_obj, dat_regr_xCR, xCR_usu=None, plot_comparison=True):
     # Updating velocity model
     Wave_obj.velocity_habc()
 
+    # import ipdb
+    # ipdb.set_trace()  # For debugging purposes
+
     # Setting the damping profile within absorbing layer
     Wave_obj.damping_layer(xCR_usu=xCR_usu)
 

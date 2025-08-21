@@ -3,7 +3,6 @@ import numpy as np
 from netgen.geom2d import SplineGeometry
 from netgen.meshing import Element2D, FaceDescriptor, Mesh, MeshPoint
 from scipy.spatial import KDTree
-from spyro.utils.error_management import value_parameter_error
 
 # Work from Ruben Andres Salas, Andre Luis Ferreira da Silva,
 # Luis Fernando Nogueira de Sá, Emilio Carlos Nelli Silva.
@@ -20,64 +19,64 @@ class HABC_Mesh():
 
     Attributes
     ----------
-    * bnds : 'array'
+    bnds : 'array'
         Mesh node indices on boundaries of the original domain
-    * bnd_nodes : `tuple`
+    bnd_nodes : `tuple`
         Mesh node coordinates on boundaries of the origianl domain.
         Structure:
         - (z_data[bnds], x_data[bnds]) for 2D
         - (z_data[bnds], x_data[bnds], y_data[bnds]) for 3D
-    * c : `firedrake function`
+    c : `firedrake function`
         Velocity model without absorbing layer
-    * c_min : `float`
+    c_min : `float`
         Minimum velocity value in the model without absorbing layer
-    * c_max : `float`
+    c_max : `float`
         Maximum velocity value in the model without absorbing layer
-    * diam_mesh : `ufl.geometry.CellDiameter`
+    diam_mesh : `ufl.geometry.CellDiameter`
         Mesh cell diameters
-    * ele_type_eik : `string`
+    ele_type_eik : `string`
         Finite element type for the Eikonal modeling. 'CG' or 'KMV'
-    * f_est : `float`
+    f_est : `float`
         Factor for the stabilizing term in Eikonal Eq. Default is 0.06
-    * funct_space_eik: `firedrake function space`
+    funct_space_eik: `firedrake function space`
         Function space for the Eikonal modeling
-    * lmin : `float`
+    lmin : `float`
         Minimum mesh size
-    * lmax : `float`
+    lmax : `float`
         Maxmum mesh size
-    * mesh_original : `firedrake mesh`
+    mesh_original : `firedrake mesh`
         Original mesh without absorbing layer
-    * p_eik : `int`
+    p_eik : `int`
         Finite element order for the Eikonal modeling
-    * tol : `float`
+    tol : `float`
         Tolerance for searching nodes in the mesh
 
     Methods
     -------
-    * bnd_pnts_hyp_2D()
+    bnd_pnts_hyp_2D()
         Generate points on the boundary of a hyperellipse
-    * boundary_data()
+    boundary_data()
         Generate the boundary data from the original domain mesh
-    * create_bnd_mesh_2D()
+    create_bnd_mesh_2D()
         Generate the boundary segment curves for the hyperellipse boundary mesh
-    * create_hyp_trunc_mesh_2D()
+    create_hyp_trunc_mesh_2D()
         Generate the mesh for the hyperelliptical absorbing layer
-    * extract_bnd_node_indices()
+    extract_bnd_node_indices()
         Extract boundary node indices on boundaries of the domain
         excluding the free surface at the top boundary
-    * hypershape_mesh_habc()
+    hypershape_mesh_habc()
         Generate a mesh with a hypershape absorbing layer
-    * merge_mesh_2D()
+    merge_mesh_2D()
         Merge the rectangular and the hyperelliptical meshes
-    * preamble_mesh_operations()
+    preamble_mesh_operations()
         Perform mesh operations previous to size an absorbing layer
-    * properties_eik_mesh()
+    properties_eik_mesh()
         Set the properties for the mesh used to solve the Eikonal equation
-    * rectangular_mesh_habc()
+    rectangular_mesh_habc()
         Generate a rectangular mesh with an absorbing layer
-    * representative_mesh_dimensions()
+    representative_mesh_dimensions()
         Get the representative mesh dimensions from original mesh
-    * trunc_hyp_bndpts_2D()
+    trunc_hyp_bndpts_2D()
         Generate the boundary points for a truncated hyperellipse
     '''
 
@@ -395,15 +394,15 @@ class HABC_Mesh():
         ----------
         hyp_par : `tuple`
             Hyperellipse parameters.
-            Structure: (a_hyp, b_hyp, n_hyp, perimeter)
-            - a_hyp : `float`
-                Hyperellipse semi-axis in direction x
-            - b_hyp : `float`
-                Hyperellipse semi-axis in direction z
+            Structure: (n_hyp, perimeter, a_hyp, b_hyp)
             - n_hyp : `float`
                 Degree of the hyperellipse
             - perimeter : `float`
                 Perimeter of the hyperellipse
+            - a_hyp : `float`
+                Hyperellipse semi-axis in direction x
+            - b_hyp : `float`
+                Hyperellipse semi-axis in direction z
         xdom : `float`
             Maximum coordinate in normal to the truncation plane
         z0 : `float`
@@ -428,7 +427,7 @@ class HABC_Mesh():
         '''
 
         # Hyperellipse parameters
-        a_hyp, b_hyp, n_hyp, perimeter = hyp_par
+        n_hyp, perimeter, a_hyp, b_hyp = hyp_par
 
         # Boundary points: Use 16 or 24 as a minimum
         lmin = self.lmin
@@ -555,25 +554,25 @@ class HABC_Mesh():
 
         return curves
 
-    def create_hyp_trunc_mesh_2D(self, domain_dim, hyp_par, spln=True, fmesh=1.):
+    def create_hyp_trunc_mesh_2D(self, dom_dim, hyp_par, spln=True, fmesh=1.):
         '''
         Generate the mesh for the hyperelliptical absorbing layer.
 
         Parameters
         ----------
-        domain_dim : `tuple`
+        dom_dim : `tuple`
             Original domain dimensions: (Lx, Lz) for 2D or (Lx, Lz, Ly) for 3D
         hyp_par : `tuple`
             Hyperellipse parameters.
-            Structure: (a_hyp, b_hyp, n_hyp, perimeter)
-            - a_hyp : `float`
-                Hyperellipse semi-axis in direction x
-            - b_hyp : `float`
-                Hyperellipse semi-axis in direction z
+            Structure: (n_hyp, perimeter, a_hyp, b_hyp)
             - n_hyp : `float`
                 Degree of the hyperellipse
             - perimeter : `float`
                 Perimeter of the hyperellipse
+            - a_hyp : `float`
+                Hyperellipse semi-axis in direction x
+            - b_hyp : `float`
+                Hyperellipse semi-axis in direction z
         spln : `bool`, optional
             Flag to indicate whether to use splines (True) or lines (False)
         fmesh : `float`, optional
@@ -587,7 +586,7 @@ class HABC_Mesh():
         '''
 
         # Domain dimensions
-        Lx, Lz = domain_dim[:2]
+        Lx, Lz = dom_dim[:2]
 
         # Generate the hyperellipse boundary points
         bnd_pts, trunc_feat = self.trunc_hyp_bndpts_2D(hyp_par, Lx / 2, Lz / 2)
@@ -611,7 +610,8 @@ class HABC_Mesh():
         while True:
             try:
                 # Generate the boundary segment curves
-                curves = self.create_bnd_mesh_2D(geo, bnd_pts, trunc_feat, spln)
+                curves = self.create_bnd_mesh_2D(geo, bnd_pts,
+                                                 trunc_feat, spln)
                 [geo.Append(c[:-1], bc="outer", maxh=c[-1], leftdomain=1,
                             rightdomain=0) for c in curves]
 
@@ -658,8 +658,8 @@ class HABC_Mesh():
         coord_rec = rec_mesh.coordinates.dat.data_with_halos
 
         # Create KDTree for efficient nearest neighbor search
-        boundary_tree = KDTree([(z, x) for z, x in
-                                zip(self.bnd_nodes[0], self.bnd_nodes[1])])
+        boundary_tree = KDTree([(z, x) for z, x in zip(self.bnd_nodes[0],
+                                                       self.bnd_nodes[1])])
 
         # Add all vertices from rectangular mesh and create mapping
         rec_map = {}
@@ -728,25 +728,27 @@ class HABC_Mesh():
 
         return final_mesh
 
-    def hypershape_mesh_habc(self, domain_dim, hyp_par, spln=True, fmesh=1.):
+    def hypershape_mesh_habc(self, dom_dim, hyp_par, spln=True, fmesh=1.):
         '''
         Generate a mesh with a hypershape absorbing layer
 
         Parameters
         ----------
-        domain_dim : `tuple`
+        dom_dim : `tuple`
             Original domain dimensions: (Lx, Lz) for 2D or (Lx, Lz, Ly) for 3D
         hyp_par : `tuple`
             Hyperellipse parameters.
-            Structure: (a_hyp, b_hyp, n_hyp, perimeter)
-            - a_hyp : `float`
-                Hyperellipse semi-axis in direction x
-            - b_hyp : `float`
-                Hyperellipse semi-axis in direction z
+            Structure: (n_hyp, perimeter, a_hyp, b_hyp, c_hyp)
             - n_hyp : `float`
                 Degree of the hyperellipse
             - perimeter : `float`
                 Perimeter of the hyperellipse
+            - a_hyp : `float`
+                Hyperellipse semi-axis in direction x
+            - b_hyp : `float`
+                Hyperellipse semi-axis in direction z
+            - c_hyp : `float`
+                Hyperellipse semi-axis in direction y (3D only)
         spln : `bool`, optional
             Flag to indicate whether to use splines (True) or lines (False)
             in hypershape layer generation. Default is True
@@ -760,14 +762,14 @@ class HABC_Mesh():
             Mesh with a hypershape absorbing layer
         '''
 
+        # Domain dimensions
+        Lx, Lz = dom_dim[:2]
+
         if self.dimension == 2:  # 2D
 
             # Creating the hyperellipse layer mesh
-            hyp_mesh = self.create_hyp_trunc_mesh_2D(domain_dim, hyp_par,
+            hyp_mesh = self.create_hyp_trunc_mesh_2D(dom_dim[:4], hyp_par,
                                                      spln=spln, fmesh=fmesh)
-
-            # Domain dimensions
-            Lx, Lz = domain_dim[:2]
 
             # Adjusting coordinates
             coords = hyp_mesh.coordinates.dat.data_with_halos
@@ -781,6 +783,7 @@ class HABC_Mesh():
             # fire.VTKFile("output/trunc_merged_test.pvd").write(mesh_habc)
 
         if self.dimension == 3:  # 3D
+            Ly = dom_dim[2]
             mesh_habc = None
 
         return mesh_habc

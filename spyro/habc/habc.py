@@ -44,8 +44,6 @@ class HABC_Wave(AcousticWave, HABC_Mesh, RectangLayer,
         Label for the output files that includes the layer shape
         ('REC' or 'HNI', I for the degree) and the reference frequency
         ('SOU' or 'BND'). Example: 'REC_SOU' or 'HN2_BND'
-    c_habc : `firedrake function`
-        Velocity model with absorbing layer
     * d : `float`
         Normalized element size (lmin / pad_len)
     * eik_bnd : `list`
@@ -95,7 +93,7 @@ class HABC_Wave(AcousticWave, HABC_Mesh, RectangLayer,
         Maximum integral error at the receivers for the HABC scheme
     max_errPK : `float`
         Maximum peak error at the receivers for the HABC scheme
-    mesh: `firedrake mesh`
+    * mesh: `firedrake mesh`
         Mesh used in the simulation (HABC or Infinite Model)
     * number_of_receivers: `int`
         Number of receivers used in the simulation
@@ -113,8 +111,6 @@ class HABC_Wave(AcousticWave, HABC_Mesh, RectangLayer,
         Receiver waveform data in the HABC scheme
     receivers_out_fft : `array`
         Frequency response at the receivers in the HABC scheme
-    vol : `float`
-        Volume of the domain with absorbing layer
     xCR : `float`
         Heuristic factor for the minimum damping ratio
     xCR_bounds: `list`
@@ -352,9 +348,9 @@ class HABC_Wave(AcousticWave, HABC_Mesh, RectangLayer,
 
         Returns
         -------
-        domain_dim : `tuple`
+        dom_dim : `tuple`
             Original domain dimensions: (Lx, Lz) for 2D or (Lx, Lz, Ly) for 3D
-        domain_lay : `tuple`
+        dom_lay : `tuple`
             Domain dimensions with layer. For rectangular layers, truncation
             due to the free surface is included (n = 1) while for hypershape
             layers, truncation by free surface is not included (n = 2)
@@ -370,22 +366,22 @@ class HABC_Wave(AcousticWave, HABC_Mesh, RectangLayer,
             self.Ly_habc = self.length_y + 2 * self.pad_len
 
         # Original domain dimensions
-        domain_dim = (self.length_x, self.length_z)
+        dom_dim = (self.length_x, self.length_z)
 
         # Domain dimension with layer without truncations
 
         # Labeling for the layer shape
         if self.layer_shape == 'rectangular':  # Rectangular layer
-            domain_lay = (self.Lx_habc, self.Lz_habc)
+            dom_lay = (self.Lx_habc, self.Lz_habc)
 
         elif self.layer_shape == 'hypershape':  # Hypershape layer
-            domain_lay = (self.Lx_habc, self.length_z + 2 * self.pad_len)
+            dom_lay = (self.Lx_habc, self.length_z + 2 * self.pad_len)
 
         if self.dimension == 3:  # 3D
-            domain_dim += (self.length_y,)
-            domain_lay += (self.Ly_habc,)
+            dom_dim += (self.length_y,)
+            dom_lay += (self.Ly_habc,)
 
-        return domain_dim, domain_lay
+        return dom_dim, dom_lay
 
     def size_habc_criterion(self, fpad=4, n_root=1, layer_based_on_mesh=True):
         '''
@@ -423,22 +419,21 @@ class HABC_Wave(AcousticWave, HABC_Mesh, RectangLayer,
                                  output_folder=self.path_case_habc)
 
         # New geometry with layer
-        domain_dim, domain_lay = self.habc_domain_dimensions()
+        dom_dim, dom_lay = self.habc_domain_dimensions()
 
         if self.layer_shape == 'rectangular':
 
             print("\nDetermining Rectangular Layer Parameters")
 
             # Geometric properties of the rectangular layer
-            self.calc_rec_geom_prop(domain_dim, domain_lay)
+            self.calc_rec_geom_prop(dom_dim, dom_lay)
 
         elif self.layer_shape == 'hypershape':
 
             print("\nDetermining Hypershape Layer Parameters")
 
             # Geometric properties of the hypershape layer
-            self.calc_hyp_geom_prop(domain_dim, domain_lay,
-                                    self.pad_len, self.lmin)
+            self.calc_hyp_geom_prop(dom_dim, dom_lay, self.pad_len, self.lmin)
 
     def create_mesh_habc(self, inf_model=False, spln=True, fmesh=1.):
         '''
@@ -476,11 +471,9 @@ class HABC_Wave(AcousticWave, HABC_Mesh, RectangLayer,
             mesh_habc = self.rectangular_mesh_habc()
 
         elif layer_shape == 'hypershape':
-
-            domain_dim = self.habc_domain_dimensions()[0]
-            a_hyp, b_hyp = self.hyper_axes[:2]
-            hyp_par = (a_hyp, b_hyp, self.n_hyp, self.perim_hyp)
-            mesh_habc = self.hypershape_mesh_habc(domain_dim, hyp_par,
+            dom_dim = self.habc_domain_dimensions()[0]
+            hyp_par = (self.n_hyp, self.perim_hyp, *self.hyper_axes)
+            mesh_habc = self.hypershape_mesh_habc(dom_dim, hyp_par,
                                                   spln=spln, fmesh=fmesh)
 
         # Updating the mesh with the absorbing layer
