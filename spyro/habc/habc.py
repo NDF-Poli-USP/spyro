@@ -154,7 +154,7 @@ class HABC_Wave(AcousticWave, HABC_Mesh, RectangLayer,
         Get the heuristic factor candidates for the quadratic regression
     get_xCR_optimal()
         Get the optimal heuristic factor for the quadratic damping
-    habc_domain_dimensions()
+    * habc_domain_dimensions()
         Determine the new dimensions of the domain with absorbing layer
     * identify_habc_case()
         Generate an identifier for the current case study of the HABC scheme
@@ -168,7 +168,7 @@ class HABC_Wave(AcousticWave, HABC_Mesh, RectangLayer,
         Determine the size of the absorbing layer using the Eikonal criterion
     solve_eigenproblem()
         Solve the eigenvalue problem to determine the fundamental frequency
-    velocity_habc()
+    * velocity_habc()
         Set the velocity model for the model with absorbing layer
     xCR_search_range()
         Determine the initial search range for the heuristic factor xCR
@@ -489,13 +489,18 @@ class HABC_Wave(AcousticWave, HABC_Mesh, RectangLayer,
         outfile = fire.VTKFile(self.path_save + file_name)
         outfile.write(self.mesh)
 
-    def velocity_habc(self, inf_model=False):
+    def velocity_habc(self, inf_model=False, method='point_cloud'):
         '''
-        Set the velocity model for the model with absorbing layer.
+        Set the velocity model for the model with absorbing layer
 
         Parameters
         ----------
-        None
+        inf_model : `bool`, optional
+            If True, build a rectangular layer for the infinite or reference
+            model (Model with "infinite" dimensions). Default is False
+        method : `str`, optional
+            Method to extend the velocity profile. Options:
+            'point_cloud' or 'nearest_point'. Default is 'point_cloud'
 
         Returns
         -------
@@ -518,117 +523,42 @@ class HABC_Wave(AcousticWave, HABC_Mesh, RectangLayer,
         dx = 0.05 km (3D)
         Pts approach: 33.234 31.697 31.598 = 32.176
         Lst approach: 60.101 60.919 50.918 = 57.313
+
+        'point_cloud' - dx = 0.05 km (2D)
+        Estimating Runtime and Used Memory
+        Runtime: (s):18.437, (m):0.307, (h):0.005
+        Used Memory: Current (MB):18.813, Peak (MB):25.102
+
+        'nearest_point' - dx = 0.05 km (2D)
+        Estimating Runtime and Used Memory
+        Runtime: (s):20.494, (m):0.342, (h):0.006
+        Used Memory: Current (MB):18.715, Peak (MB):25.298
         '''
 
         print("\nUpdating Velocity Profile")
 
         # Initialize velocity field and assigning the original velocity model
-        element_c = self.initial_velocity_model.ufl_element().family()
-        p = self.initial_velocity_model.function_space().ufl_element().degree()
-        V = fire.FunctionSpace(self.mesh, element_c, p)
+        V = fire.FunctionSpace(self.mesh, self.ele_type_c0, self.p_c0)
         self.c = fire.Function(V).interpolate(self.initial_velocity_model,
                                               allow_missing_dofs=True)
 
+        # Domain dimensions
+        dom_dim = self.habc_domain_dimensions()[0]
+
+        # Clipping coordinates to the layer domain
+        lay_field, layer_mask = self.clipping_coordinates_lay_field(dom_dim, V)
+
         # Extending velocity model within the absorbing layer
-        print("Extending Profile Inside Layer")
-
-        # Vectorial space for auxiliar field of clipped coordinates
-        W = fire.VectorFunctionSpace(self.mesh, element_c, p)
-
-        if self.dimension == 2:  # 2D
-            z, x = fire.SpatialCoordinate(self.mesh)
-            coords = fire.as_vector([z, x])
-
-        if self.dimension == 3:  # 3D
-            z, x, y = fire.SpatialCoordinate(self.mesh)
-            coords = fire.as_vector([z, x, y])
-
-        # Clipping coordinates
-        w_aux = fire.Function(W).interpolate(coords)
-        w_arr = w_aux.dat.data_with_halos[:]
-        w_arr[:, 0] = np.clip(w_arr[:, 0], -self.length_z, 0.)
-        w_arr[:, 1] = np.clip(w_arr[:, 1], 0., self.length_x)
-        if self.dimension == 3:  # 3D
-            w_arr[:, 2] = np.clip(w_arr[:, 2], 0., self.length_y)
-
-        # Dimensions
-        Lz = self.length_z
-        Lx = self.length_x
-
-        # Mask for the layer domain
-        z_pd = fire.conditional(z + Lz < 0., 1., 0.)
-        x_pd = fire.conditional(x < 0., 1., 0.) + \
-            fire.conditional(x - Lx > 0., 1., 0.)
-        mask = z_pd + x_pd
-
-        if self.dimension == 3:  # 3D
-
-            # 3D dimension
-            Ly = self.length_y
-
-            # Conditional expressions for the mask
-            y_pd = fire.conditional(y < 0., 1., 0.) + \
-                fire.conditional(y - Ly > 0., 1., 0.)
-            mask += y_pd
-
-        # Final value for the mask
-        mask = fire.conditional(mask > 0., 1., 0.)
-        layer_mask = fire.Function(V, name='layer_mask')
-        layer_mask.interpolate(mask)
-
-        # Points to extend the velocity model
-        pad_field = fire.Function(W).interpolate(w_aux * layer_mask)
-        del w_aux
-
-        pad_pts = pad_field.dat.data_with_halos[:]
-        if self.dimension == 2:  # 2D
-            ind_pts = np.where(~((abs(pad_pts[:, 0]) == 0.)
-                                 & (abs(pad_pts[:, 1]) == 0.)))
-
-        if self.dimension == 3:  # 3D
-            ind_pts = np.where(~((abs(pad_pts[:, 0]) == 0.)
-                                 & (abs(pad_pts[:, 1]) == 0.)
-                                 & (abs(pad_pts[:, 2]) == 0.)))
-        pts_to_extend = pad_pts[ind_pts]
-
-        # # Set the velocity of the nearest point on the original boundary
-        # vel_to_extend = self.initial_velocity_model.at(pts_to_extend,
-        #                                                dont_raise=True)
-        # del pts_to_extend
-
-        # # Velocity profile inside the layer
-        # pad_field.dat.data_with_halos[ind_pts, 0] = vel_to_extend
-        # del vel_to_extend, ind_pts
-
-        # Possible new apprach
-        # Set the velocity of the nearest point on the original boundary
-        pts_mesh = fire.VertexOnlyMesh(
-            self.mesh_original, pts_to_extend,
-            missing_points_behaviour='warn', redundant=True)
-        del pts_to_extend
-        V0 = fire.FunctionSpace(pts_mesh, "DG", 0)
-        c_int = fire.Interpolator(self.initial_velocity_model, V0,
-                                  allow_missing_dofs=True)
-        c_pts = fire.assemble(c_int.interpolate())
-        del c_int
-        V1 = fire.FunctionSpace(pts_mesh.input_ordering, "DG", 0)
-        del pts_mesh
-        vel_to_extend = fire.Function(V1)
-        vel_to_extend.interpolate(c_pts)
-        del c_pts
-        # Velocity profile inside the layer
-        pad_field.dat.data_with_halos[
-            ind_pts, 0] = vel_to_extend.dat.data_with_halos[:]
-        del vel_to_extend, ind_pts
+        self.extend_velocity_profile(lay_field, method=method)
 
         # Interpolating the velocity model in the layer
-        self.c.interpolate(pad_field.sub(0) * layer_mask + (
-            1 - layer_mask) * self.c, allow_missing_dofs=True)
-        del layer_mask, pad_field
+        self.c.interpolate(lay_field.sub(0) * layer_mask + (1 - layer_mask)
+                           * self.c, allow_missing_dofs=True)
+        del layer_mask, lay_field
 
         # Interpolating in the space function of the problem
-        self.c = fire.Function(
-            self.function_space, name='c [km/s])').interpolate(self.c)
+        self.c = fire.Function(self.function_space,
+                               name='c [km/s])').interpolate(self.c)
 
         # Save new velocity model
         if inf_model:

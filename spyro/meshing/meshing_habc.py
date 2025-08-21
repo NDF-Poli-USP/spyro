@@ -3,6 +3,7 @@ import numpy as np
 from netgen.geom2d import SplineGeometry
 from netgen.meshing import Element2D, FaceDescriptor, Mesh, MeshPoint
 from scipy.spatial import KDTree
+from spyro.utils.error_management import value_parameter_error
 
 # Work from Ruben Andres Salas, Andre Luis Ferreira da Silva,
 # Luis Fernando Nogueira de Sá, Emilio Carlos Nelli Silva.
@@ -34,6 +35,8 @@ class HABC_Mesh():
         Maximum velocity value in the model without absorbing layer
     diam_mesh : `ufl.geometry.CellDiameter`
         Mesh cell diameters
+    ele_type_c0 : `string`
+        Finite element type for the velocity model without absorbing layer
     ele_type_eik : `string`
         Finite element type for the Eikonal modeling. 'CG' or 'KMV'
     f_est : `float`
@@ -46,6 +49,8 @@ class HABC_Mesh():
         Maxmum mesh size
     mesh_original : `firedrake mesh`
         Original mesh without absorbing layer
+    p_c0 : `int`
+        Finite element order for the velocity model without absorbing layer
     p_eik : `int`
         Finite element order for the Eikonal modeling
     tol : `float`
@@ -57,17 +62,25 @@ class HABC_Mesh():
         Generate points on the boundary of a hyperellipse
     boundary_data()
         Generate the boundary data from the original domain mesh
+    clipping_coordinates_lay_field()
+        Generate a field with clipping coordinates to the original boundary
     create_bnd_mesh_2D()
         Generate the boundary segment curves for the hyperellipse boundary mesh
     create_hyp_trunc_mesh_2D()
         Generate the mesh for the hyperelliptical absorbing layer
+    extend_velocity_profile()
+        Extend the velocity profile inside the absorbing layer
     extract_bnd_node_indices()
         Extract boundary node indices on boundaries of the domain
         excluding the free surface at the top boundary
     hypershape_mesh_habc()
         Generate a mesh with a hypershape absorbing layer
+    layer_mask_field()
+        Generate a mask for the absorbing layer
     merge_mesh_2D()
         Merge the rectangular and the hyperelliptical meshes
+    point_cloud_field()
+        Create a field on a point cloud from a parent mesh and field
     preamble_mesh_operations()
         Perform mesh operations previous to size an absorbing layer
     properties_eik_mesh()
@@ -282,6 +295,11 @@ class HABC_Mesh():
         # Velocity profile model
         self.c = fire.Function(self.function_space, name='c_orig [km/s])')
         self.c.interpolate(self.initial_velocity_model)
+
+        # Get finite element data from the velocity model
+        self.ele_type_c0 = self.initial_velocity_model.ufl_element().family()
+        self.p_c0 = \
+            self.initial_velocity_model.function_space().ufl_element().degree()
 
         # Get extreme values of the velocity model
         self.c_min = self.initial_velocity_model.dat.data_with_halos.min()
@@ -787,3 +805,205 @@ class HABC_Mesh():
             mesh_habc = None
 
         return mesh_habc
+
+    def layer_mask_field(self, dom_dim, coords, V):
+        '''
+        Generate a mask for the absorbing layer
+
+        Parameters
+        ----------
+        dom_dim : `tuple`
+            Original domain dimensions: (Lx, Lz) for 2D or (Lx, Lz, Ly) for 3D
+        coords : 'ufl.geometry.SpatialCoordinate'
+            Domain Coordinates including the absorbing layer
+        V : `firedrake function space`
+            Function space for the mask field
+
+        Returns
+        -------
+        layer_mask : `firedrake function`
+            Mask for the absorbing layer
+        '''
+
+        # Domain dimensions
+        Lx, Lz = dom_dim[:2]
+
+        # Domain coordinates
+        z, x = coords
+
+        # Mask for the layer domain
+        z_pd = fire.conditional(z + Lz < 0., 1., 0.)
+        x_pd = fire.conditional(x < 0., 1., 0.) + \
+            fire.conditional(x - Lx > 0., 1., 0.)
+        mask = z_pd + x_pd
+
+        if self.dimension == 3:  # 3D
+
+            # 3D dimension
+            Ly = dom_dim[2]
+            y = coords[2]
+
+            # Conditional expressions for the mask
+            y_pd = fire.conditional(y < 0., 1., 0.) + \
+                fire.conditional(y - Ly > 0., 1., 0.)
+            mask += y_pd
+
+        # Final value for the mask
+        mask = fire.conditional(mask > 0., 1., 0.)
+        layer_mask = fire.Function(V, name='layer_mask')
+        layer_mask.interpolate(mask)
+
+        return layer_mask
+
+    def clipping_coordinates_lay_field(self, dom_dim, V):
+        '''
+        Generate a field with clipping coordinates to the original boundary
+
+        Parameters
+        ----------
+        dom_dim : `tuple`
+            Original domain dimensions: (Lx, Lz) for 2D or (Lx, Lz, Ly) for 3D
+        coords : 'ufl.geometry.SpatialCoordinate'
+            Domain Coordinates including the absorbing layer
+        V : `firedrake function space`
+            Function space for the mask field
+
+        Returns
+        -------
+        lay_field : `firedrake function`
+            Field with clipped coordinates only in the absorbing layer
+        layer_mask : `firedrake function`
+            Mask for the absorbing layer
+        '''
+
+        print("Clipping Coordinates Inside Layer")
+
+        # Domain dimensions
+        Lx, Lz = dom_dim[:2]
+
+        # Vectorial space for auxiliar field of clipped coordinates
+        W_sp = fire.VectorFunctionSpace(self.mesh, self.ele_type_c0, self.p_c0)
+
+        # Mesh coordinates
+        coords = fire.SpatialCoordinate(self.mesh)
+
+        # Clipping coordinates
+        lay_field = fire.Function(W_sp).interpolate(coords)
+        lay_arr = lay_field.dat.data_with_halos[:]
+        lay_arr[:, 0] = np.clip(lay_arr[:, 0], -Lz, 0.)
+        lay_arr[:, 1] = np.clip(lay_arr[:, 1], 0., Lx)
+
+        if self.dimension == 3:  # 3D
+
+            # 3D dimension
+            Ly = dom_dim[2]
+
+            # Clipping coordinates
+            lay_arr[:, 2] = np.clip(lay_arr[:, 2], 0., Ly)
+
+        # Mask function to identify the absorbing layer domain
+        layer_mask = self.layer_mask_field(dom_dim, coords, V)
+
+        # Field with clipped coordinates only in the absorbing layer
+        lay_field = fire.Function(W_sp).interpolate(lay_field * layer_mask)
+
+        return lay_field, layer_mask
+
+    def point_cloud_field(self, parent_mesh, pts_cloud, parent_field):
+        '''
+        Create a field on a point cloud from a parent mesh and field
+
+        Parameters
+        ----------
+        parent_mesh : `firedrake mesh`
+            Parent mesh containing the original field
+        pts_cloud : `array`
+            Array of shape (num_pts, dim) containing the coordinates
+            of the point cloud
+        parent_field : `firedrake function`
+            Parent field defined on the parent mesh
+
+        Returns
+        -------
+        cloud_field : `firedrake function`
+            Field defined on the point cloud
+        '''
+
+        # Creating a point cloud field from the parent mesh
+        pts_mesh = fire.VertexOnlyMesh(parent_mesh, pts_cloud, redundant=True,
+                                       missing_points_behaviour='warn')
+        del pts_cloud
+
+        # Cloud field
+        V0 = fire.FunctionSpace(pts_mesh, "DG", 0)
+        f_int = fire.Interpolator(parent_field, V0, allow_missing_dofs=True)
+        f_pts = fire.assemble(f_int.interpolate())
+        del f_int
+
+        # Ensuring correct assemble
+        V1 = fire.FunctionSpace(pts_mesh.input_ordering, "DG", 0)
+        del pts_mesh
+        cloud_field = fire.Function(V1).interpolate(f_pts)
+        del f_pts
+
+        return cloud_field
+
+    def extend_velocity_profile(self, lay_field, method='point_cloud'):
+        '''
+        Extend the velocity profile inside the absorbing layer
+
+        Parameters
+        ----------
+        lay_field : `firedrake function`
+            Field with clipped coordinates only in the absorbing layer
+        method : `str`, optional
+            Method to extend the velocity profile. Options:
+            'point_cloud' or 'nearest_point'. Default is 'point_cloud'
+
+        Returns
+        -------
+        None
+        '''
+
+        print("Extending Profile Inside Layer")
+
+        # Extracting the nodes from the layer field
+        lay_nodes = lay_field.dat.data_with_halos[:]
+
+        # Nodes to extend the velocity model
+        if self.dimension == 2:  # 2D
+            ind_nodes = np.where(~((abs(lay_nodes[:, 0]) == 0.)
+                                   & (abs(lay_nodes[:, 1]) == 0.)))
+
+        if self.dimension == 3:  # 3D
+            ind_nodes = np.where(~((abs(lay_nodes[:, 0]) == 0.)
+                                   & (abs(lay_nodes[:, 1]) == 0.)
+                                   & (abs(lay_nodes[:, 2]) == 0.)))
+
+        pts_to_extend = lay_nodes[ind_nodes]
+
+        if method == 'point_cloud':
+
+            print("Using Cloud Points Method to Extend Velocity Profile")
+
+            # Set the velocity of the nearest point on the original boundary
+            vel_to_extend = self.point_cloud_field(
+                self.mesh_original, pts_to_extend,
+                self.initial_velocity_model).dat.data_with_halos[:]
+
+        elif method == 'nearest_point':
+
+            print("Using Nearest Point Method to Extend Velocity Profile")
+
+            # Set the velocity of the nearest point on the original boundary
+            vel_to_extend = self.initial_velocity_model.at(pts_to_extend,
+                                                           dont_raise=True)
+            del pts_to_extend
+
+        else:
+            value_parameter_error('method', method,
+                                  ['point_cloud', 'nearest_point'])
+
+        # Velocity profile inside the layer
+        lay_field.dat.data_with_halos[ind_nodes, 0] = vel_to_extend
+        del vel_to_extend, ind_nodes
