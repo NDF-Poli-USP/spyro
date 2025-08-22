@@ -23,7 +23,7 @@ def value_parameter_error(par_name, par_value, valid_values):
     '''
 
     # Error message about the invalid parameter
-    err_str = f"Invalid {par_name}: '{par_value}'. Please use"
+    err_str = f"Invalid {par_name}: '{par_value}'. Please use: "
     opt_str = ", ".join([f"'{val}'" for val in valid_values])
     last_comma = opt_str.rfind(',')
     opt_str = opt_str[:last_comma] + ' or' + opt_str[last_comma + 1:] \

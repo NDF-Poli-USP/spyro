@@ -1,7 +1,5 @@
 import firedrake as fire
 import numpy as np
-import scipy.linalg as sl
-import scipy.sparse as ss
 import spyro.habc.eik as eik
 from os import getcwd
 from scipy.signal import find_peaks
@@ -13,6 +11,7 @@ from spyro.habc.rec_lay import RectangLayer
 from spyro.habc.error_measure import HABC_Error
 from spyro.habc.nrbc import NRBCHabc
 from spyro.habc.lay_len import calc_size_lay
+from spyro.solvers.modal.modal_sol import Modal_Solver
 from spyro.plots.plots_habc import plot_function_layer_size, \
     plot_hist_receivers, plot_rfft_receivers, plot_xCR_opt
 from spyro.utils.error_management import value_parameter_error
@@ -146,7 +145,7 @@ class HABC_Wave(AcousticWave, HABC_Mesh, RectangLayer,
         Compute the error measures at the receivers for the HABC scheme
     est_min_damping()
         Estimate the minimum damping ratio and the associated heuristic factor
-    fundamental_frequency()
+    * fundamental_frequency()
         Compute the fundamental frequency in Hz via modal analysis
     * geometry_infinite_model()
         Determine the geometry for the infinite domain model.
@@ -166,8 +165,6 @@ class HABC_Wave(AcousticWave, HABC_Mesh, RectangLayer,
         Define the minimum damping ratio and the associated heuristic factor
     * size_habc_criterion()
         Determine the size of the absorbing layer using the Eikonal criterion
-    solve_eigenproblem()
-        Solve the eigenvalue problem to determine the fundamental frequency
     * velocity_habc()
         Set the velocity model for the model with absorbing layer
     xCR_search_range()
@@ -569,117 +566,6 @@ class HABC_Wave(AcousticWave, HABC_Mesh, RectangLayer,
         outfile = fire.VTKFile(self.path_save + file_name)
         outfile.write(self.c)
 
-    def solve_eigenproblem(self, Asp, Msp, method, k=2,
-                           shift=0., inv_operator=False):
-        '''
-        Solve the eigenvalue problem to determine the fundamental frequency.
-
-        Parameters
-        ----------
-        Asp : `scipy sparse matrix`
-            Sparse matrix representing the stiffness matrix
-        Msp : `scipy sparse matrix`
-            Sparse matrix representing the mass matrix
-        method : `str`
-            Method to use for solving the eigenvalue problem.
-            Options: 'ARNOLDI', 'LANCZOS', 'LOBPCG' 'KRYLOVSCH_CH',
-            'KRYLOVSCH_CG', 'KRYLOVSCH_GH' or 'KRYLOVSCH_GG'
-        k : `int`, optional
-            Number of eigenvalues to compute. Default is 2
-        shift: `float`, optional
-            Value to stabilize the Neumann BC null space. Default is 0
-        inv_operator : `bool`, optional
-            Option to use an inverse operator for improving convergence.
-            Default is False
-
-        Returns
-        -------
-        Lsp : `array`
-            Array containing the computed eigenvalues
-        '''
-
-        if shift > 0.:
-            Asp += shift * Msp
-
-        valid_methods = ['ARNOLDI', 'LANCZOS', 'LOBPCG', 'KRYLOVSCH_CH',
-                         'KRYLOVSCH_CG', 'KRYLOVSCH_GH', 'KRYLOVSCH_GG']
-        if method not in valid_methods:
-            met_str = ", ".join(valid_methods)
-            met_str = met_str.rsplit(', ', 1)
-            met_str = f"Please use {met_str[0]} or {met_str[1]}. "
-            UserWarning(met_str + f"{method} not supported.")
-
-        if method == 'ARNOLDI' or method == 'LANCZOS':
-            # Inverse operator for improving convergence
-            M_ilu = ss.linalg.spilu(Msp) if inv_operator else None
-            Minv = M_ilu.solve if inv_operator else None
-            A_ilu = ss.linalg.spilu(Asp) if inv_operator else None
-            OPinv = A_ilu.solve if inv_operator else None
-
-        if method == 'ARNOLDI':
-            # Solve the eigenproblem using ARNOLDI (ARPACK)
-            Lsp = ss.linalg.eigs(Asp, k=k, M=Msp, sigma=0.0, Minv=Minv,
-                                 OPinv=OPinv, return_eigenvectors=False)
-
-        if method == 'LANCZOS':
-            # Solve the eigenproblem using LANCZOS (ARPACK)
-            Lsp = ss.linalg.eigsh(Asp, k=k, M=Msp, sigma=0.0, Minv=Minv,
-                                  OPinv=OPinv, return_eigenvectors=False)
-
-        if method == 'LOBPCG':
-            # Initialize random vectors for LOBPCG
-            X = sl.orth(np.random.rand(Msp.shape[0], k))
-
-            # Solve the eigenproblem using LOBPCG
-            it_mod = 2500
-            it_ext = 2
-            for it in range(it_ext):
-                Lsp, X, resid = ss.linalg.lobpcg(Asp, X, B=Msp, tol=5e-4,
-                                                 maxiter=it_mod, largest=False,
-                                                 retResidualNormsHistory=True)
-
-                it_mod //= 2
-                rmin = np.array(resid)[:, 1].min()
-                if rmin < 5e-4 or it_mod < 20:
-                    del X, resid
-                    break
-
-        if method[:-3] == 'KRYLOVSCH':
-
-            if method[-2] == "C":
-                ksp_type = "cg"
-            elif method[-2] == "G":
-                ksp_type = "gmres"
-
-            if method[-1] == "H":
-                pc_type = "hypre"
-            elif method[-1] == "G":
-                pc_type = "gamg"
-
-            opts = {
-                "eps_type": "krylovschur",       # Robust, widely used eigensolver
-                "eps_tol": 1e-6,                 # Tight tolerance for accuracy
-                "eps_max_it": 200,               # Reasonable iteration cap
-                "st_type": "sinvert",            # Useful for interior eigenvalues
-                "st_shift": 1e-6,                # Stabilizes Neumann BC null space
-                "eps_smallest_magnitude": None,  # Smallest eigenvalues in magnitude
-                "eps_monitor": "ascii",          # Print convergence info
-                "ksp_type": ksp_type,            # Options for large problems
-                "pc_type": pc_type               # Options for large problems
-            }
-
-            eigenproblem = fire.LinearEigenproblem(Asp, M=Msp)
-            eigensolver = fire.LinearEigensolver(eigenproblem, n_evals=k,
-                                                 solver_parameters=opts)
-            nconv = eigensolver.solve()
-            lam = eigensolver.eigenvalue(1)
-            Lsp = np.asarray([eigensolver.eigenvalue(mod) for mod in range(k)])
-
-        if shift > 0.:
-            Lsp -= shift
-
-        return Lsp
-
     def fundamental_frequency(self, method=None, monitor=False):
         '''
         Compute the fundamental frequency in Hz via modal analysis
@@ -767,42 +653,12 @@ class HABC_Wave(AcousticWave, HABC_Mesh, RectangLayer,
            0.47525      13.47       13.47
         '''
 
-        if method is None:
-
-            if self.dimension == 2:  # 2D
-                method = 'ARNOLDI'
-
-            if self.dimension == 3:  # 3D
-                method = 'LOBPCG'
-
-        # Function space for the problem
-        V = self.function_space
-        u, v = fire.TrialFunction(V), fire.TestFunction(V)
-        quad_rule = self.quadrature_rule
-        dx = fire.dx(scheme=quad_rule)
-
-        # Bilinear forms
-        c = self.c
-        a = c * c * fire.inner(fire.grad(u), fire.grad(v)) * dx
-        A = fire.assemble(a)
-        m = fire.inner(u, v) * dx
-        M = fire.assemble(m)
-
         print("\nSolving Eigenvalue Problem")
+        mod_sol = Modal_Solver(self.dimension, method=method)
 
-        if method[:-3] == 'KRYLOVSCH':
-            # Modal solver
-            Lsp = self.solve_eigenproblem(A, M, method, shift=1e-8)
-
-        else:
-            # Assembling the matrices for Scipy solvers
-            m_ptr, m_ind, m_val = M.petscmat.getValuesCSR()
-            Msp = ss.csr_matrix((m_val, m_ind, m_ptr), M.petscmat.size)
-            a_ptr, a_ind, a_val = A.petscmat.getValuesCSR()
-            Asp = ss.csr_matrix((a_val, a_ind, a_ptr), A.petscmat.size)
-
-            # Modal solver
-            Lsp = self.solve_eigenproblem(Asp, Msp, method, shift=1e-8)
+        Lsp = mod_sol.solve_eigenproblem(
+            self.c, self.function_space, shift=1e-8,
+            quad_rule=self.quadrature_rule)
 
         if monitor:
             for n_eig, eigval in enumerate(np.unique(Lsp)):
@@ -1289,18 +1145,24 @@ class HABC_Wave(AcousticWave, HABC_Mesh, RectangLayer,
 
         return ref
 
-    def damping_layer(self, xCR_usu=None):
+    def damping_layer(self, xCR_usu=None, method=None):
         '''
-        Set the damping profile within the absorbing layer. Minimum damping
-        ratio is computed as psi_min = xCR * d where xCR is the heuristic
-        factor for the minimum damping ratio and d is the normalized element
-        size (lmin / pad_len).
+        Set the damping profile within the absorbing layer.
+        Minimum damping ratio is computed as psi_min = xCR * d
+        where xCR is the heuristic factor for the minimum damping
+        ratio and d is thenormalized element size (lmin / pad_len).
+        Maximum damping ratio is psi_max =  2 * pi * f_fund * psi
+        where f_fund is the fundamental frequency and psi = 0.999.
 
         Parameters
         ----------
         xCR_usu : `float`, optional
             User-defined heuristic factor for the minimum damping ratio.
             Default is None, which defines an estimated value
+        method : `str`, optional
+            Method to use for solving the eigenvalue problem.
+            Options: 'ARNOLDI', 'LANCZOS', 'LOBPCG' 'KRYLOVSCH_CH',
+            'KRYLOVSCH_CG', 'KRYLOVSCH_GH' or 'KRYLOVSCH_GG'
 
         Returns
         -------
@@ -1308,7 +1170,7 @@ class HABC_Wave(AcousticWave, HABC_Mesh, RectangLayer,
         '''
 
         # Estimating fundamental frequency
-        self.fundamental_frequency(monitor=True)
+        self.fundamental_frequency(method=method, monitor=True)
 
         # Initialize damping field
         print("\nCreating Damping Profile")
