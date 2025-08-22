@@ -260,8 +260,8 @@ def habc_fig8(Wave_obj, dat_regr_xCR, xCR_usu=None, plot_comparison=True):
     # Setting the damping profile within absorbing layer
     Wave_obj.damping_layer(xCR_usu=xCR_usu)
 
-    import ipdb
-    ipdb.set_trace()  # For debugging purposes
+    # import ipdb
+    # ipdb.set_trace()  # For debugging purposes
 
     # Applying NRBCs on outer boundary layer
     Wave_obj.cos_ang_HigdonBC()
@@ -432,3 +432,9 @@ if __name__ == "__main__":
 # from time import perf_counter  # For runtime
 # tRef = perf_counter()
 # print(f"Time: {perf_counter() - tRef:.4f} seconds")
+
+
+# Computing Error Measures
+# Maximum Integral Error: 1.87%
+# Maximum Peak Error: 2.55%
+# Acoustic Energy: 6.06e-08

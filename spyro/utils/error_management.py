@@ -34,8 +34,9 @@ def value_parameter_error(par_name, par_value, valid_values):
 
 def value_dimension_error(par_names, par_values, expected_dim):
     '''
-    Raise a ValueError if the dimensions of the parameters do not match
-    the expected dimension.
+    Raise a ValueError if the dimensions of the parameters
+    do not match the expected dimension.
+
     Parameters
     ----------
     par_names : `tuple`

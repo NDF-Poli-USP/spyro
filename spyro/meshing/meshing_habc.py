@@ -806,9 +806,13 @@ class HABC_Mesh():
 
         return mesh_habc
 
-    def layer_mask_field(self, dom_dim, coords, V):
+    def layer_mask_field(self, dom_dim, coords, V, damp_par=None,
+                         type_marker='damping', name_mask=None):
         '''
-        Generate a mask for the absorbing layer
+        Generate a mask for the absorbing layer. The mask is defined
+        for conditional expressions to identify the domain of the layer
+        (option: 'mask') or the reference to the original boundary
+        (option: 'damping') used to compute the damping profile.
 
         Parameters
         ----------
@@ -818,11 +822,32 @@ class HABC_Mesh():
             Domain Coordinates including the absorbing layer
         V : `firedrake function space`
             Function space for the mask field
+        damp_par : `tuple`, optional
+            Damping parameters for the absorbing layer.
+            Structure: (pad_len, eta_crt, aq, bq)
+            - pad_len : `float`
+                Size of the absorbing layer
+            - eta_crt : `float`
+                Critical damping coefficient (1/s)
+            - aq : `float`
+                Coefficient for quadratic term in the damping function
+            - bq : `float`
+                Coefficient bq for linear term in the damping function
+        type_marker : `string`, optional
+            Type of marker. Default is 'mask'.
+            - 'damping' : Get the reference distance to the original boundary
+            - 'mask' : Define a mask to filter the layer boundary domain
+        name_mask : `string`, optional
+            Name for the mask field. Default is None
 
         Returns
         -------
         layer_mask : `firedrake function`
             Mask for the absorbing layer
+            - 'damping' : `ufl.conditional.Conditional`
+                Reference distance to the original boundary
+            - 'mask' : `ufl.algebra.Division`
+                Conditional expression to identify the layer domain
         '''
 
         # Domain dimensions
@@ -831,11 +856,16 @@ class HABC_Mesh():
         # Domain coordinates
         z, x = coords
 
-        # Mask for the layer domain
-        z_pd = fire.conditional(z + Lz < 0., 1., 0.)
-        x_pd = fire.conditional(x < 0., 1., 0.) + \
-            fire.conditional(x - Lx > 0., 1., 0.)
-        mask = z_pd + x_pd
+        # Conditional value
+        val_condz = (z + Lz)**2 if type_marker == 'damping' else 1.0
+        val_condx1 = x**2 if type_marker == 'damping' else 1.0
+        val_condx2 = (x - Lx)**2 if type_marker == 'damping' else 1.0
+
+        # Conditional expressions for the mask
+        z_pd = fire.conditional(z + Lz < 0., val_condz, 0.)
+        x_pd = fire.conditional(x < 0., val_condx1, 0.) + \
+            fire.conditional(x - Lx > 0., val_condx2, 0.)
+        ref = z_pd + x_pd
 
         if self.dimension == 3:  # 3D
 
@@ -843,15 +873,49 @@ class HABC_Mesh():
             Ly = dom_dim[2]
             y = coords[2]
 
+            # Conditional value
+            val_condy1 = y**2 if type_marker == 'damping' else 1.0
+            val_condy2 = (y - Ly)**2 if type_marker == 'damping' else 1.0
+
             # Conditional expressions for the mask
-            y_pd = fire.conditional(y < 0., 1., 0.) + \
-                fire.conditional(y - Ly > 0., 1., 0.)
-            mask += y_pd
+            y_pd = fire.conditional(y < 0., val_condy1, 0.) + \
+                fire.conditional(y - Ly > 0., val_condy2, 0.)
+            ref += y_pd
 
         # Final value for the mask
-        mask = fire.conditional(mask > 0., 1., 0.)
-        layer_mask = fire.Function(V, name='layer_mask')
-        layer_mask.interpolate(mask)
+        if type_marker == 'damping':
+
+            if damp_par is None:
+                raise ValueError("Damping parameters must be provided "
+                                 "when 'type_marker' is 'damping'.")
+
+            # Damping parameters
+            pad_len, eta_crt, aq, bq = damp_par
+
+            if pad_len <= 0:
+                raise ValueError(f"Invalid value for 'pad_len': {pad_len}. "
+                                 "'pad_len' must be greater than zero "
+                                 "when 'type_marker' is 'damping'.")
+            if eta_crt <= 0:
+                raise ValueError(f"Invalid value for 'eta_crt': {eta_crt}. "
+                                 "'eta_crt' must be greater than zero "
+                                 "when 'type_marker' is 'damping'.")
+
+            # Reference distance to the original boundary
+            ref = fire.sqrt(ref) / fire.Constant(pad_len)
+            ref = fire.Constant(eta_crt) * (fire.Constant(aq) * ref**2
+                                            + fire.Constant(bq) * ref)
+
+        elif type_marker == 'mask':
+            # Mask filter for layer boundary domain
+            ref = fire.conditional(ref > 0, 1., 0.)
+
+        else:
+            value_parameter_error('type_marker', type_marker,
+                                  ['damping', 'mask'])
+
+        layer_mask = fire.Function(V, name=name_mask)
+        layer_mask.interpolate(ref)
 
         return layer_mask
 
@@ -902,7 +966,8 @@ class HABC_Mesh():
             lay_arr[:, 2] = np.clip(lay_arr[:, 2], 0., Ly)
 
         # Mask function to identify the absorbing layer domain
-        layer_mask = self.layer_mask_field(dom_dim, coords, V)
+        layer_mask = self.layer_mask_field(dom_dim, coords, V,
+                                           type_marker='mask')
 
         # Field with clipped coordinates only in the absorbing layer
         lay_field = fire.Function(W_sp).interpolate(lay_field * layer_mask)

@@ -10,7 +10,7 @@ import numpy as np
 # With additions by Alexandre Olender
 
 
-class NRBCHabc():
+class NRBC():
     '''
     class for NRBCs applied to outer boundary absorbing layer in HABC scheme.
 
@@ -36,11 +36,12 @@ class NRBCHabc():
 
     def __init__(self, angle_max=np.pi/4.):
         '''
-        Initialize the NRBCHabc class.
+        Initialize the NRBC class.
 
         Parameters
         ----------
-        None
+        angle_max : `float`, optional
+            Maximum incidence angle considered. Default is pi/4 (45°).
 
         Returns
         -------
@@ -73,7 +74,7 @@ class NRBCHabc():
             Structure: [x, y] for 2D and [x, y, z] for 3D
         hyper_axes : `list`
             Semi-axes of the hyperellipse [a, b] or hyperellipsoid [a, b, c].
-        n : `int`
+        n : `float`
             degree of the hyperellipse
         dimension : `int`, optional
             Model dimension (2D or 3D). Default is 2D
@@ -89,12 +90,10 @@ class NRBCHabc():
         '''
 
         # Point coordinates
-        x = coord_point[0]
-        y = coord_point[1]
+        x, y = coord_point[:2]
 
         # Hypershape semi-axes
-        a = hyper_axes[0]
-        b = hyper_axes[1]
+        a, b = hyper_axes[:2]
 
         # Compute partial derivatives
         df_dx = (n / (a**n)) * np.sign(x) * abs(x)**(n - 1)

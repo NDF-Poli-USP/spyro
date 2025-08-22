@@ -1,3 +1,5 @@
+# This file contains methods for sizing an absorbing layer
+
 import numpy as np
 
 # Work from Ruben Andres Salas, Andre Luis Ferreira da Silva,

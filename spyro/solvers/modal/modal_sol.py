@@ -22,11 +22,18 @@ class Modal_Solver():
     dimension : `int`
         The spatial dimension of the problem
     method : `str`
-        Method to use for solving the eigenvalue problem
+        Method to use for solving the eigenvalue problem.
+        Default is None, which uses as the 'ARNOLDI' method in 2D  models
+        and the 'KRYLOVSCH_CH' method in 3D models.
     valid_methods: `list`
         List of valid methods for solving the eigenproblem
         Options: 'ARNOLDI', 'LANCZOS', 'LOBPCG' 'KRYLOVSCH_CH',
-        'KRYLOVSCH_CG', 'KRYLOVSCH_GH' or 'KRYLOVSCH_GG'
+        'KRYLOVSCH_CG', 'KRYLOVSCH_GH' or 'KRYLOVSCH_GG'.
+        In 'KRYLOVSCH_(K)(P)' methods, (K) indicates the Krylov solver to
+        use: 'C' for Conjugate Gradient (cg) or 'G' for Generalized Minimal
+        Residual (gmres). (P) indicates the preconditioner to use: 'H' for
+        Hypre (hypre) or 'G' for Geometric Algebraic Multigrid (gamg). For
+        example, 'KRYLOVSCH_CH' uses cg solver with hypre preconditioner.
 
     Methods
     -------
@@ -52,8 +59,15 @@ class Modal_Solver():
             The spatial dimension of the problem
         method : `str`, optional
             Method to use for solving the eigenvalue problem.
+            Default is None, which uses as the 'ARNOLDI' method in 2D  models
+            and the 'KRYLOVSCH_CH' method in 3D models.
             Options: 'ARNOLDI', 'LANCZOS', 'LOBPCG' 'KRYLOVSCH_CH',
-            'KRYLOVSCH_CG', 'KRYLOVSCH_GH' or 'KRYLOVSCH_GG'
+            'KRYLOVSCH_CG', 'KRYLOVSCH_GH' or 'KRYLOVSCH_GG'.
+            In 'KRYLOVSCH_(K)(P)' methods, (K) indicates the Krylov solver to
+            use: 'C' for Conjugate Gradient (cg) or 'G' for Generalized Minimal
+            Residual (gmres). (P) indicates the preconditioner to use: 'H' for
+            Hypre (hypre) or 'G' for Geometric Algebraic Multigrid (gamg). For
+            example, 'KRYLOVSCH_CH' uses cg solver with hypre preconditioner.
 
         Returns
         -------

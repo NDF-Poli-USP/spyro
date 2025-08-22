@@ -1,17 +1,18 @@
-import firedrake as fire
-import numpy as np
-import spyro.habc.eik as eik
-from os import getcwd
+import firedrake as fire  # *
+import numpy as np  # *
+import spyro.habc.eik as eik  # *
+import spyro.solvers.modal.modal_sol as eigsol
+from os import getcwd  # *
 from scipy.signal import find_peaks
-from sympy import divisors
+from sympy import divisors  # *
 from spyro.solvers.acoustic_wave import AcousticWave
 from spyro.meshing.meshing_habc import HABC_Mesh
 from spyro.habc.hyp_lay import HyperLayer
 from spyro.habc.rec_lay import RectangLayer
+from spyro.habc.damp_profile import HABC_Damping
+from spyro.habc.nrbc import NRBC
 from spyro.habc.error_measure import HABC_Error
-from spyro.habc.nrbc import NRBCHabc
 from spyro.habc.lay_len import calc_size_lay
-from spyro.solvers.modal.modal_sol import Modal_Solver
 from spyro.plots.plots_habc import plot_function_layer_size, \
     plot_hist_receivers, plot_rfft_receivers, plot_xCR_opt
 from spyro.utils.error_management import value_parameter_error
@@ -27,7 +28,7 @@ from spyro.utils.freq_tools import freq_response
 
 
 class HABC_Wave(AcousticWave, HABC_Mesh, RectangLayer,
-                HyperLayer, NRBCHabc, HABC_Error):
+                HyperLayer, HABC_Damping, NRBC, HABC_Error):
     '''
     class HABC that determines absorbing layer size and parameters to be used.
 
@@ -62,9 +63,9 @@ class HABC_Wave(AcousticWave, HABC_Mesh, RectangLayer,
         - errIt : Integral error
         - errPk : Peak error
         - pkMax : Maximum reference peak
-    eta_habc : `firedrake function`
+    * eta_habc : `firedrake function`
         Damping profile within the absorbing layer
-    eta_mask : `firedrake function`
+    * eta_mask : `firedrake function`
         Mask function to identify the absorbing layer domain
     * F_L : `float`
         Size parameter of the absorbing layer
@@ -74,7 +75,7 @@ class HABC_Wave(AcousticWave, HABC_Mesh, RectangLayer,
         Nyquist frequency according to the time step. f_Nyq = 1 / (2 * dt)
     * freq_ref : `float`
         Reference frequency of the wave at the minimum Eikonal point
-    fundam_freq : `float`
+    * fundam_freq : `float`
         Fundamental frequency of the numerical model
     * fwi_iter : `int`
         The iteration number for the Full Waveform Inversion (FWI) algorithm
@@ -112,39 +113,26 @@ class HABC_Wave(AcousticWave, HABC_Mesh, RectangLayer,
         Frequency response at the receivers in the HABC scheme
     xCR : `float`
         Heuristic factor for the minimum damping ratio
-    xCR_bounds: `list`
-        Bounds for the heuristic factor. [xCR_lim, xCR_search]
-        Structure: [[xCR_inf, xCR_sup], [xCR_min, xCR_max]]
-        - xCR_lim : Limits for the heuristic factor.
-        - xCR_search : Initial search range for the heuristic factor
+    xCR_lim: `list`
+        Limits for the heuristic factor.
 
     Methods
     -------
-    calc_damping_prop()
-        Compute the damping properties for the absorbing layer
     * check_timestep()
         Check if the timestep size is appropriate for the transient response
-    coeff_damp_fun()
-        Compute the coefficients for quadratic damping function
     comparison_plots()
         Plot the comparison between the HABC scheme and the reference model
-    cond_marker_for_eta()
-        Define the conditional expressions to identify the domain of
-        the absorbing layer or the reference to the original boundary
-        to compute the damping profile inside the absorbing layer
     * create_mesh_habc()
         Create a mesh with absorbing layer based on the determined size
     * critical_boundary_points()
         Determine the critical points on domain boundaries of the original
         model to size an absorbing layer using the Eikonal criterion for HABCs
-    damping_layer()
+    * damping_layer()
         Set the damping profile within the absorbing layer
     * det_reference_freq()
         Determine the reference frequency for a new layer size
     error_measures_habc()
         Compute the error measures at the receivers for the HABC scheme
-    est_min_damping()
-        Estimate the minimum damping ratio and the associated heuristic factor
     * fundamental_frequency()
         Compute the fundamental frequency in Hz via modal analysis
     * geometry_infinite_model()
@@ -159,16 +147,10 @@ class HABC_Wave(AcousticWave, HABC_Mesh, RectangLayer,
         Generate an identifier for the current case study of the HABC scheme
     * infinite_model()
         Create a reference model for the HABC scheme for comparative purposes
-    min_reflection()
-        Compute a minimum reflection coefficiente for the quadratic damping
-    regression_CRmin()
-        Define the minimum damping ratio and the associated heuristic factor
     * size_habc_criterion()
         Determine the size of the absorbing layer using the Eikonal criterion
     * velocity_habc()
         Set the velocity model for the model with absorbing layer
-    xCR_search_range()
-        Determine the initial search range for the heuristic factor xCR
     '''
 
     def __init__(self, dictionary=None, fwi_iter=0,
@@ -197,7 +179,8 @@ class HABC_Wave(AcousticWave, HABC_Mesh, RectangLayer,
         AcousticWave.__init__(self, dictionary=dictionary, comm=comm)
         HABC_Mesh.__init__(self)
         RectangLayer.__init__(self)
-        NRBCHabc.__init__(self)
+        HABC_Damping.__init__(self)
+        NRBC.__init__(self)
 
         # Identifier for the current case study
         self.identify_habc_case(output_folder=output_folder)
@@ -575,8 +558,16 @@ class HABC_Wave(AcousticWave, HABC_Mesh, RectangLayer,
         ----------
         method : `str`, optional
             Method to use for solving the eigenvalue problem.
+            Default is None, which uses as the 'ARNOLDI' method in 2D models
+            and the 'KRYLOVSCH_CH' method in 3D models.
             Options: 'ARNOLDI', 'LANCZOS', 'LOBPCG' 'KRYLOVSCH_CH',
-            'KRYLOVSCH_CG', 'KRYLOVSCH_GH' or 'KRYLOVSCH_GG'
+            'KRYLOVSCH_CG', 'KRYLOVSCH_GH' or 'KRYLOVSCH_GG'.
+            In 'KRYLOVSCH_(K)(P)' methods, (K) indicates the Krylov solver to
+            use: 'C' for Conjugate Gradient (cg) or 'G' for Generalized Minimal
+            Residual (gmres). (P) indicates the preconditioner to use: 'H' for
+            Hypre (hypre) or 'G' for Geometric Algebraic Multigrid (gamg). For
+            example, 'KRYLOVSCH_CH' uses cg solver with hypre preconditioner.
+
         monitor : `bool`, optional
             Print on screen the computed natural frequencies. Default is False
 
@@ -586,7 +577,6 @@ class HABC_Wave(AcousticWave, HABC_Mesh, RectangLayer,
 
         Verification
         ------------
-
         f in Hz, dx in km
 
         * Homogeneous domain (Comsol)
@@ -654,7 +644,7 @@ class HABC_Wave(AcousticWave, HABC_Mesh, RectangLayer,
         '''
 
         print("\nSolving Eigenvalue Problem")
-        mod_sol = Modal_Solver(self.dimension, method=method)
+        mod_sol = eigsol.Modal_Solver(self.dimension, method=method)
 
         Lsp = mod_sol.solve_eigenproblem(
             self.c, self.function_space, shift=1e-8,
@@ -669,481 +659,6 @@ class HABC_Wave(AcousticWave, HABC_Mesh, RectangLayer,
         min_eigval = max(np.unique(Lsp[(Lsp > 0.) & (np.imag(Lsp) == 0.)]))
         self.fundam_freq = np.real(np.sqrt(min_eigval) / (2 * np.pi))
         print("Fundamental Frequency (Hz): {0:.5f}".format(self.fundam_freq))
-
-    def min_reflection(self, kCR, psi=None, p=None, CR_err=None, typ='CR_PSI'):
-        '''
-        Compute a minimum reflection coefficient for the quadratic damping.
-
-        Parameters
-        ----------
-        kCR : `float`
-            Adimensional parameter in reflection coefficient
-        psi : `float`, optional
-            Damping ratio in option 'CR_PSI'. Default is None
-        p : `list`, optional
-            Dimensionless wavenumbers for fundamental mode.
-            p = [p1, p2, ele_type]. Default is None
-            - p1 : Dimensionless wavenumber at the original domain boundary
-            - p2 : Dimensionless wavenumber at the begining of absorbing layer
-            - ele_type : Element type. 'consistent' or 'lumped'
-        CR_err : `float`, optional
-            Reflection coefficient in option 'CR_err'. Default is None
-        typ : `string`, optional
-            Type of reflection coefficient. Default is 'CR_PSI'.
-            - 'CR_PSI' : Minimum coefficient reflection from a damping ratio
-            - 'CR_FEM' : Spourious reflection coeeficient in FEM
-            - 'CR_ERR' : Correction for the minimum damping ratio
-
-        Returns
-        -------
-        CRmin : `float`
-            Minimum reflection coefficient at the minimum damping
-        xCRmin : `float`
-            Heuristic factor for the minimum damping ratio
-        '''
-
-        if typ == 'CR_FEM' or typ == 'CR_ERR':
-            def psi_from_CR(CR, kCR):
-                '''
-                Compute the damping ratio from the reflection coefficient.
-
-                Parameters
-                ----------
-                CR : `float`
-                    Reflection coefficient
-                kCR : `float`
-                    Adimensional parameter in reflection coefficient
-
-                Returns
-                -------
-                psi : `float`
-                    Damping ratio
-                '''
-                if CR == 0:
-                    psi = 0
-                elif CR >= 1:
-                    psi = 0.999
-                else:
-                    psi = kCR / (1 / CR - 1)**0.5
-
-                return psi
-
-        if typ == 'CR_PSI':
-            # Minimum coefficient reflection
-            psimin = psi
-            CRmin = psimin**2 / (kCR**2 + psimin**2)
-
-        elif typ == 'CR_FEM':
-            # Unidimensional spourious reflection in FEM (Laier, 2020)
-            p1, p2, ele_type = p  # Dimensionless wavenumbers
-
-            def Zi(p, alpha, ele_type):
-                '''
-                Compute the Z parameter in the spurious reflection coefficient.
-
-                Parameters
-                ----------
-                p : `float`
-                    Dimensionless wavenumber
-                alpha : `float`
-                    Ratio between the representative mesh dimensions
-                ele_type : `string`
-                    Element type. 'consistent' or 'lumped'
-
-                Returns
-                -------
-                Z_fem : `float`
-                    Parameter for the spurious reflection coefficient
-                '''
-                if ele_type == 'lumped':
-                    m1 = 1 / 2
-                    m2 = 0.
-                elif ele_type == 'consistent':
-                    m1 = 1 / 3
-                    m2 = 1 / 6
-                else:
-                    aux0 = "Please use 'lumped' or 'consistent', "
-                    UserWarning(aux0 + f"{ele_type} not supported.")
-
-                Z_fem = m2 * (np.cos(alpha * p) - 1) / (
-                    m1 * (np.cos(alpha * p) + 1))
-
-                return Z_fem
-
-            # Spurious reflection coefficient in FDM (Kar and Turco, 1995)
-            CRfdm = np.tan(p1 / 4)**2
-
-            # Minimum damping ratio for the spurious reflection
-            psimin = psi_from_CR(CRfdm, kCR)
-
-            # Correction for the dimensionless wavenumbers due to the damping
-            p2 *= (1 + 1 / 8 * (psimin * self.a_par / self.F_L)**2)
-
-            # Ratio between the representative mesh dimensions
-            alpha = self.lmax / self.lmin
-
-            # Zi parameters for the spurious reflection coefficient
-            Z1 = Zi(p1, alpha, ele_type)
-            Z2 = Zi(p2, alpha, ele_type)
-
-            # Spurious reflection coefficient in FEM (Laier, 2020)
-            aux0 = (1 - Z1) * np.sin(p1)
-            aux1 = (alpha * Z2 - 1) * np.sin(alpha * p2) / alpha
-            CRmin = abs((aux0 + aux1) / (aux0 - aux1))
-
-        elif typ == 'CR_ERR':
-            # Minimum damping ratio for correction in reflection parameters
-            psimin = psi_from_CR(CR_err, kCR)
-
-        xCRmin = psimin / self.d
-
-        if typ == 'CR_PSI' or typ == 'CR_FEM':
-            return CRmin, xCRmin
-        else:
-            return xCRmin
-
-    def regression_CRmin(self, data_reg, xCR_lim, kCR):
-        '''
-        Define the minimum damping ratio and the associated heuristic factor.
-
-        Parameters
-        ----------
-        data_reg : `list`
-            Data for regression. Structure: [x_reg, y_reg]
-            - x_reg : Values for the heuristic factor
-            - y_reg : Values for the minimum damping ratio
-        xCR_lim : `list`
-            Limits for the heuristic factor. [xCR_inf, xCR_sup, xCR_ini]
-        kCR : `float`
-            Adimensional parameter in reflection coefficient
-
-        Returns
-        -------
-        psi_min : `float`
-            Minimum damping ratio of the absorbing layer (psi_min = xCR * d)
-        xCR_est : `float`
-            Estimated heuristic factor for the minimum damping ratio
-        CRmin : `float`
-            Minimum reflection coefficient at the minimum damping ratio
-        '''
-
-        # Data for regression
-        x, y = data_reg
-
-        # Limits for the heuristic factor
-        xCR_inf, xCR_sup, xCR_ini = xCR_lim
-
-        # Coefficients for the quadratic equation
-        z = np.polyfit(x, y, 2)
-
-        # Roots of the quadratic equation
-        roots = np.roots(z)
-
-        # Vertex or minimum positive root
-        xCR_vtx = -z[1] / (2 * z[0])
-        max_root = max(roots)
-        xCR_est = xCR_vtx if xCR_vtx > xCR_inf else (
-            max_root if max_root > xCR_inf else xCR_ini)
-        xCR_est = np.clip(xCR_est, xCR_inf, xCR_sup)
-
-        # Minimum damping ratio
-        psi_min = xCR_est * self.d
-        CRmin = self.min_reflection(kCR, psi=psi_min)[0]
-
-        return psi_min, xCR_est, CRmin
-
-    def xCR_search_range(self, CRmin, kCR, p, xCR_lim):
-        '''
-        Determine the initial search range for the heuristic factor xCR.
-
-        Parameters
-        ----------
-        CRmin : `float`
-            Minimum reflection coefficient at the minimum damping
-        kCR : `float`
-            Adimensional parameter in reflection coefficient
-        p : `list`
-            Dimensionless wavenumbers for fundamental mode
-        xCR_lim : `list`
-            Limits for the heuristic factor. [xCR_inf, xCR_sup]
-
-        Returns
-        -------
-        xCR_search : `list`
-            Initial search range for the heuristic factor. [xCR_min, xCR_max]
-            - xCR_min : Lower bound on the search range
-            - xCR_max : Upper bound on the search range
-        '''
-
-        # Dimensionless wavenumbers
-        p1, p2 = p
-
-        # Limits for the heuristic factor
-        xCR_inf, xCR_sup = xCR_lim
-
-        # Errors: Spurious reflection rates (Matsuno, 1966)
-        err1 = abs(np.sin(np.asarray([p1, p2]) / 2)).max()
-        err2 = abs(-1 + np.cos([p1, p2])).max()
-
-        # Correction by spurious reflection
-        CR_err_min = CRmin * (1 - min(err1, err2))
-        xCR_lb = self.min_reflection(kCR, CR_err=CR_err_min, typ='CR_ERR')
-        CR_err_max = CRmin * (1 + max(err1, err2))
-        xCR_ub = self.min_reflection(kCR, CR_err=CR_err_max, typ='CR_ERR')
-        xCR_min = np.clip(max(xCR_lb, xCR_inf), xCR_inf, xCR_sup)
-        xCR_max = np.clip(min(xCR_ub, xCR_sup), xCR_inf, xCR_sup)
-
-        # Model dimensions
-        a_rect = self.Lx_habc
-        b_rect = self.Lz_habc
-
-        # Axpect ratio for 2D: a/b
-        Rab = a_rect / b_rect
-
-        if self.dimension == 2:  # 2D
-
-            # Area factor 0 < f_Ah <= 4
-            f_Ah = self.f_Ah
-
-            # Factors and their inverses from sqrt(1/a^2 + 1/b^2)
-            fa = (1 + Rab**2)**0.5  # Factoring 1/a^2
-            fainv = 1 / fa
-            fb = (1 + Rab**2)**0.5 / Rab  # Factoring 1/b^2
-            fbinv = 1 / fb
-            fmin = f_Ah / 4 * min(fainv, fbinv)
-            fmax = 4 / f_Ah * max(fa, fb)
-
-        if self.dimension == 3:  # 3D
-
-            # Adding a dimension for 3D
-            c_rect = self.Ly_habc
-
-            # Aspect ratios for 3D: a/b, b/c and a/c
-            Rac = a_rect / c_rect
-            Rbc = b_rect / c_rect
-
-            # Volume factor 0 < f_Vh <= 8
-            f_Vh = self.f_Vh
-
-            # Factors and their inverses from sqrt(1/a^2 + 1/b^2 + 1/c^2)
-            fa = (1 + Rab**2 + Rac**2)**0.5  # Factoring 1/a^2
-            fainv = 1 / fa
-            fb = (1 + Rab**2*(1 + Rbc**2))**0.5 / Rab  # Factoring 1/b^2
-            fbinv = 1 / fb
-            fc = (Rac**2 + (Rac * Rbc)**2 + Rbc**2)**0.5 / (Rac * Rbc)  # 1/c^2
-            fcinv = 1 / fc
-            fmin = f_Vh / 8 * min(fainv, fbinv, min(fc, fcinv))
-            fmax = 8 / f_Vh * max(fa, fb, max(fc, 1 / fc))
-
-        # Correction by geometry
-        xCR_min = np.clip(xCR_min * fmin, xCR_inf, xCR_sup)
-        xCR_max = np.clip(xCR_max * fmax, xCR_inf, xCR_sup)
-
-        return [xCR_min, xCR_max]
-
-    def est_min_damping(self, psi=0.999, m=1):
-        '''
-        Estimate the minimum damping ratio and the associated heuristic factor.
-        Obs: The reflection coefficient is not zero because there are always
-        both reflections: physical and spurious
-
-        Parameters
-        ----------
-        psi : `float`, optional
-            Damping ratio. Default is 0.999
-        m : `int`, optional
-            Vibration mode. Default is 1 (Fundamental mode)
-
-        Returns
-        -------
-        psi_min : `float`
-            Minimum damping ratio of the absorbing layer (psi_min = xCR * d)
-        xCR_est : `float`
-            Estimated heuristic factor for the minimum damping ratio
-        xCR_lim : `list`
-            Limits for the heuristic factor. [xCR_inf, xCR_sup]
-        xCR_search : `list`
-            Initial search range for the heuristic factor. [xCR_min, xCR_max]
-        '''
-
-        # Dimensionless wave numbers
-        c_ref = min([bnd[1] for bnd in self.eik_bnd])
-        pmin = 2 * np.pi * self.freq_ref * self.lmin / c_ref
-        pmax = 2 * np.pi * self.freq_ref * self.lmax / c_ref
-
-        # Adimensional parameter in reflection coefficient
-        kCR = 4 * self.F_L / (self.a_par * m)
-        c_bnd = self.eik_bnd[0][1]
-        kCRp = kCR * c_bnd / c_ref
-
-        # Lower Limit for the minimum damping ratio
-        psimin_inf = psi * self.d**2
-        CRmin_inf, xCR_inf = self.min_reflection(kCRp, psi=psimin_inf)
-
-        # Upper Limit for the minimum damping ratio
-        psimin_sup = psi * (2. * self.d - self.d**2)
-        CRmin_sup, xCR_sup = self.min_reflection(kCRp, psi=psimin_sup)
-
-        # Initial guess
-        psimin_ini = psi * (self.d**2 + self.d) / 2.
-        CRmin_ini, xCR_ini = self.min_reflection(kCRp, psi=psimin_ini)
-
-        # Spurious reflection
-        p = [pmin, pmax, self.variant]
-        CRmin_fem, xCR_fem = self.min_reflection(kCRp, p=p, typ='CR_FEM')
-
-        # Minimum damping ratio
-        x_reg = [xCR_inf, xCR_sup, xCR_ini, xCR_fem]
-        y_reg = [CRmin_inf, CRmin_sup, CRmin_ini, CRmin_fem]
-        data_reg = [x_reg, y_reg]
-        xCR_lim = [xCR_inf, xCR_sup, xCR_ini]
-        psi_min, xCR_est, CRmin = self.regression_CRmin(data_reg, xCR_lim, kCRp)
-
-        xCR_search = self.xCR_search_range(CRmin, kCRp, p[:2], xCR_lim[:2])
-
-        return psi_min, xCR_est, xCR_lim[:2], xCR_search
-
-    def calc_damping_prop(self, psi=0.999, m=1):
-        '''
-        Compute the damping properties for the absorbing layer.
-
-        Parameters
-        ----------
-        psi : `float`, optional
-            Damping ratio. Default is 0.999
-        m : `int`, optional
-            Vibration mode. Default is 1 (Fundamental mode)
-
-        Returns
-        -------
-        eta_crt : `float`
-            Critical damping coefficient (1/s)
-        psi_min : `float`
-            Minimum damping ratio of the absorbing layer (psi_min = xCR * d)
-        xCR_est : `float`
-            Estimated heuristic factor for the minimum damping ratio
-        psimin_lim : `list`
-            Limits for the minimum damping ratio. [psimin_inf, psimin_sup]
-        xCR_lim : `list`
-            Limits for the heuristic factor. [xCR_inf, xCR_sup]
-        xCR_search : `list`
-            Initial search range for the heuristic factor. [xCR_min, xCR_max]
-        '''
-
-        # Critical damping coefficient
-        eta_crt = 2 * np.pi * self.fundam_freq
-        eta_max = psi * eta_crt
-        print("Critical Damping Coefficient (1/s): {0:.5f}".format(eta_crt))
-        print("Maximum Damping Ratio: {0:.3%}".format(psi))
-        print("Maximum Damping Coefficient (1/s): {0:.5f}".format(eta_max))
-
-        # Minimum damping ratio and the associated heuristic factor
-        psi_min, xCR_est, xCR_lim, xCR_search = self.est_min_damping()
-        xCR_inf, xCR_sup = xCR_lim
-        xCR_min, xCR_max = xCR_search
-
-        # Computed values and its range
-        print("Minimum Damping Ratio: {:.3%}".format(psi_min))
-        psi_str = "Range for Minimum Damping Ratio. Min:{:.5f} - Max:{:.5f}"
-        print(psi_str.format(xCR_inf * self.d, xCR_sup * self.d))
-        print("Estimated Heuristic Factor xCR: {:.3f}".format(xCR_est))
-        xcr_str = "Range Values for xCR Factor. Min:{:.3f} - Max:{:.3f}"
-        print(xcr_str.format(xCR_inf, xCR_sup))
-        lim_str = "Initial Range for xCR Factor. Min:{:.3f} - Max:{:.3f}"
-        print(lim_str.format(xCR_min, xCR_max))
-
-        return eta_crt, psi_min, xCR_est, xCR_lim, xCR_search
-
-    def coeff_damp_fun(self, psi_min, psi=0.999):
-        '''
-        Compute the coefficients for quadratic damping function.
-
-        Parameters
-        ----------
-        psi_min' : `float`
-            Minimum damping ratio
-        psi : `float`, optional
-            Damping ratio. Default is 0.999
-
-        Returns
-        -------
-        aq : `float`
-            Coefficient for quadratic term in the damping function
-        bq : `float`
-            Coefficient bq for linear term in the damping function
-        '''
-
-        aq = (psi_min - self.d * psi) / (self.d**2 - self.d)
-        bq = psi - aq
-
-        return aq, bq
-
-    def cond_marker_for_eta(self, nodes_coord, typ_marker='damping'):
-        '''
-        Define the conditional expressions to identify the domain of
-        the absorbing layer or the reference to the original boundary
-        to compute the damping profile inside the absorbing layer.
-
-        Parameters
-        ----------
-        nodes_coord : `list`
-            Node coordinates. [z_f, x_f, y_f]
-        typ_marker : `string`, optional
-            Type of marker. Default is 'damping'.
-            - 'damping' : Get the reference distance to the original boundary
-            - 'mask' : Define a mask to filter the layer boundary domain
-
-        Returns
-        -------
-        ref :
-            - 'damping' : `ufl.conditional.Conditional`
-                Reference distance to the original boundary
-            - 'mask' : `ufl.algebra.Division`
-                Conditional expression to identify the layer domain
-        '''
-
-        # Node coordinates
-        z_f, x_f = nodes_coord[:2]
-
-        # Dimensions
-        Lz = self.length_z
-        Lx = self.length_x
-
-        # Conditional value
-        val_condz = (z_f + Lz)**2 if typ_marker == 'damping' else 1.0
-        val_condx1 = x_f**2 if typ_marker == 'damping' else 1.0
-        val_condx2 = (x_f - Lx)**2 if typ_marker == 'damping' else 1.0
-
-        # Define the conditional expressions for damping
-        z_pd_sqr = fire.conditional(z_f + Lz < 0, val_condz, 0.)
-        x_pd_sqr = fire.conditional(x_f < 0, val_condx1, 0.) + \
-            fire.conditional(x_f - Lx > 0, val_condx2, 0.)
-        ref = z_pd_sqr + x_pd_sqr
-
-        if self.dimension == 3:  # 3D
-
-            # 3D dimension
-            Ly = self.length_y
-            y_f = nodes_coord[-1]
-
-            # Conditional value
-            val_condy1 = y_f**2 if typ_marker == 'damping' else 1.0
-            val_condy2 = (y_f - Ly)**2 if typ_marker == 'damping' else 1.0
-
-            # Conditional expressions
-            y_pd_sqr = fire.conditional(y_f < 0, val_condy1, 0.) + \
-                fire.conditional(y_f - Ly > 0, val_condy2, 0.)
-            ref += y_pd_sqr
-
-        if typ_marker == 'damping':
-            # Reference distance to the original boundary
-            ref = fire.sqrt(ref) / fire.Constant(self.pad_len)
-
-        elif typ_marker == 'mask':
-            # Mask filter for layer boundary domain
-            ref = fire.conditional(ref > 0, 1.0, 0.0)
-
-        return ref
 
     def damping_layer(self, xCR_usu=None, method=None):
         '''
@@ -1160,9 +675,16 @@ class HABC_Wave(AcousticWave, HABC_Mesh, RectangLayer,
             User-defined heuristic factor for the minimum damping ratio.
             Default is None, which defines an estimated value
         method : `str`, optional
-            Method to use for solving the eigenvalue problem.
+            Method to use to estimate the fundamental frequency.
+            Default is None, which uses as the 'ARNOLDI' method in 2D  models
+            and the 'KRYLOVSCH_CH' method in 3D models.
             Options: 'ARNOLDI', 'LANCZOS', 'LOBPCG' 'KRYLOVSCH_CH',
-            'KRYLOVSCH_CG', 'KRYLOVSCH_GH' or 'KRYLOVSCH_GG'
+            'KRYLOVSCH_CG', 'KRYLOVSCH_GH' or 'KRYLOVSCH_GG'.
+            In 'KRYLOVSCH_(K)(P)' methods, (K) indicates the Krylov solver to
+            use: 'C' for Conjugate Gradient (cg) or 'G' for Generalized Minimal
+            Residual (gmres). (P) indicates the preconditioner to use: 'H' for
+            Hypre (hypre) or 'G' for Geometric Algebraic Multigrid (gamg). For
+            example, 'KRYLOVSCH_CH' uses cg solver with hypre preconditioner.
 
         Returns
         -------
@@ -1172,39 +694,12 @@ class HABC_Wave(AcousticWave, HABC_Mesh, RectangLayer,
         # Estimating fundamental frequency
         self.fundamental_frequency(method=method, monitor=True)
 
-        # Initialize damping field
         print("\nCreating Damping Profile")
-        self.eta_habc = fire.Function(self.function_space, name='eta [1/s])')
-
-        # Dimensions and node coordinates - To do: Refactor
-        z_f = fire.Function(self.function_space).interpolate(self.mesh_z)
-        x_f = fire.Function(self.function_space).interpolate(self.mesh_x)
-        nodes_coord = [z_f, x_f]
-        if self.dimension == 3:  # 3D
-            y_f = fire.Function(self.function_space).interpolate(self.mesh_y)
-            nodes_coord.append(y_f)
-
-        # Damping mask
-        mask = self.cond_marker_for_eta(nodes_coord, 'mask')
-        fnc_spc_eta_mask = fire.FunctionSpace(self.mesh, 'DG', 0)
-        self.eta_mask = fire.Function(fnc_spc_eta_mask, name='eta_mask')
-        self.eta_mask.interpolate(mask)
-
-        # Save damping mask
-        path_damp = self.path_save + self.case_habc
-        outfile = fire.VTKFile(path_damp + "/eta_mask.pvd")
-        outfile.write(self.eta_mask)
-
-        # Reference distance to the original boundary
-        ref = self.cond_marker_for_eta(nodes_coord, 'damping')
 
         # Compute the minimum damping ratio and the associated heuristic factor
-        eta_crt, psi_min, \
-            xCR_est, xCR_lim, xCR_search = self.calc_damping_prop()
+        eta_crt, psi_min, xCR_est, xCR_lim = self.calc_damping_prop()
 
         # Heuristic factor for the minimum damping ratio
-        self.xCR_bounds = [xCR_lim, xCR_search]  # Bounds
-
         if xCR_usu is not None:
             self.xCR = np.clip(xCR_usu, xCR_lim[0], xCR_lim[1])
             self.psi_min = self.xCR * self.d
@@ -1214,13 +709,35 @@ class HABC_Wave(AcousticWave, HABC_Mesh, RectangLayer,
             self.xCR = xCR_est
             self.psi_min = psi_min
 
+        # Limits for the heuristic factor
+        self.xCR_lim = xCR_lim
+
+        # Domain dimensions
+        dom_dim = self.habc_domain_dimensions()[0]
+
+        # Mesh coordinates
+        coords = fire.SpatialCoordinate(self.mesh)
+
+        # Damping mask
+        V_mask = fire.FunctionSpace(self.mesh, 'DG', 0)
+        self.eta_mask = self.layer_mask_field(
+            dom_dim, coords, V_mask, type_marker='mask', name_mask='eta_mask')
+
+        # Save damping mask
+        path_damp = self.path_save + self.case_habc
+        outfile = fire.VTKFile(path_damp + "/eta_mask.pvd")
+        outfile.write(self.eta_mask)
+
         # Compute the coefficients for quadratic damping function
         aq, bq = self.coeff_damp_fun(self.psi_min)
 
-        # Apply damping profile
-        expr_damp = fire.Constant(eta_crt) * (fire.Constant(aq) * ref**2
-                                              + fire.Constant(bq) * ref)
-        self.eta_habc.interpolate(expr_damp)
+        # Damping field
+        damp_par = (self.pad_len, eta_crt, aq, bq)
+        self.eta_habc = self.layer_mask_field(dom_dim, coords,
+                                              self.function_space,
+                                              damp_par=damp_par,
+                                              type_marker='damping',
+                                              name_mask='eta [1/s])')
 
         # Save damping profile
         outfile = fire.VTKFile(path_damp + "/eta_habc.pvd")
@@ -1531,13 +1048,13 @@ class HABC_Wave(AcousticWave, HABC_Mesh, RectangLayer,
         n_pts = max(3, n_pts + 1 if n_pts % 2 == 0 else n_pts)
 
         # Limits for the heuristic factor
-        xCR_inf, xCR_sup = self.xCR_bounds[0]
+        xCR_inf, xCR_sup = self.xCR_lim
 
         # Estimated intial value
         xCR = self.xCR
 
         # Determining the xCR candidates for regression
-        if xCR in self.xCR_bounds[0]:
+        if xCR in self.xCR_lim:
             xCR_cand = list(np.linspace(xCR_inf, xCR_sup, n_pts))
             xCR_cand.remove(xCR)
         else:
@@ -1581,7 +1098,7 @@ class HABC_Wave(AcousticWave, HABC_Mesh, RectangLayer,
             y_err = max_errIt
 
         # Limits for the heuristic factor
-        xCR_inf, xCR_sup = self.xCR_bounds[0]
+        xCR_inf, xCR_sup = self.xCR_lim
 
         # Coefficients for the quadratic equation
         eq_xCR = np.polyfit(xCR, y_err, 2)
