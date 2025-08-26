@@ -736,7 +736,7 @@ class HyperLayer():
         self.define_hyperaxes(dom_hyp)
 
         # Degree of the hypershape layer
-        self.define_hyperlayer(dom_dim, pad_len, lmin)
+        self.define_hyperlayer(dom_dim, pad_len, lmin, monitor=True)
 
         # Hypershape semi-axes and domain dimensions
         a_hyp, b_hyp = self.hyper_axes[:2]

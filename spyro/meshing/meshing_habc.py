@@ -20,6 +20,8 @@ class HABC_Mesh():
 
     Attributes
     ----------
+    alpha : `float`
+        Ratio between the representative mesh dimensions
     bnds : 'array'
         Mesh node indices on boundaries of the original domain
     bnd_nodes : `tuple`
@@ -133,6 +135,9 @@ class HABC_Mesh():
         diam = fire.Function(self.function_space).interpolate(self.diam_mesh)
         self.lmin = round(diam.dat.data_with_halos.min() / fdim, 6)
         self.lmax = round(diam.dat.data_with_halos.max() / fdim, 6)
+
+        # Ratio between the representative mesh dimensions
+        self.alpha = self.lmax / self.lmin
 
         # Tolerance for searching nodes in the mesh
         self.tol = 10**(min(int(np.log10(self.lmin / 10)), -6))

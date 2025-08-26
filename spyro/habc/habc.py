@@ -44,6 +44,8 @@ class HABC_Wave(AcousticWave, HABC_Mesh, RectangLayer,
         Label for the output files that includes the layer shape
         ('REC' or 'HNI', I for the degree) and the reference frequency
         ('SOU' or 'BND'). Example: 'REC_SOU' or 'HN2_BND'
+    * CRmin : `float`
+        Minimum reflection coefficient at the minimum damping ratio
     * d : `float`
         Normalized element size (lmin / pad_len)
     * eik_bnd : `list`
@@ -79,12 +81,12 @@ class HABC_Wave(AcousticWave, HABC_Mesh, RectangLayer,
         Fundamental frequency of the numerical model
     * fwi_iter : `int`
         The iteration number for the Full Waveform Inversion (FWI) algorithm
-    * Lz_habc : `float`
-        Length of the domain in the z-direction with absorbing layer
     * Lx_habc : `float`
         Length of the domain in the x-direction with absorbing layer
     * Ly_habc : `float`
-        Length of the domain in the y-direction with absorbing (3D models)
+        Length of the domain in the y-direction with absorbing layer (3D)
+    * Lz_habc : `float`
+        Length of the domain in the z-direction with absorbing layer
     * layer_shape : `string`
         Shape type of pad layer. Options: 'rectangular' or 'hypershape'
     * lref : `float`
@@ -143,6 +145,8 @@ class HABC_Wave(AcousticWave, HABC_Mesh, RectangLayer,
         Get the optimal heuristic factor for the quadratic damping
     * habc_domain_dimensions()
         Determine the new dimensions of the domain with absorbing layer
+    * habc_new_geometry
+        Determine the new domain geometry with the absorbing layer
     * identify_habc_case()
         Generate an identifier for the current case study of the HABC scheme
     * infinite_model()
@@ -179,7 +183,6 @@ class HABC_Wave(AcousticWave, HABC_Mesh, RectangLayer,
         AcousticWave.__init__(self, dictionary=dictionary, comm=comm)
         HABC_Mesh.__init__(self)
         RectangLayer.__init__(self)
-        HABC_Damping.__init__(self)
         NRBC.__init__(self)
 
         # Identifier for the current case study
@@ -318,9 +321,9 @@ class HABC_Wave(AcousticWave, HABC_Mesh, RectangLayer,
 
         print("Reference Frequency (Hz): {:.5f}".format(self.freq_ref))
 
-    def habc_domain_dimensions(self):
+    def habc_new_geometry(self):
         '''
-        Determine the new dimensions of the domain with absorbing layer
+        Determine the new domain geometry with the absorbing layer
 
         Parameters
         ----------
@@ -328,34 +331,50 @@ class HABC_Wave(AcousticWave, HABC_Mesh, RectangLayer,
 
         Returns
         -------
-        dom_dim : `tuple`
-            Original domain dimensions: (Lx, Lz) for 2D or (Lx, Lz, Ly) for 3D
-        dom_lay : `tuple`
-            Domain dimensions with layer. For rectangular layers, truncation
-            due to the free surface is included (n = 1) while for hypershape
-            layers, truncation by free surface is not included (n = 2)
-            - 2D : (Lx + 2 * pad_len, Lz + n * pad_len)
-            - 3D : (Lx + 2 * pad_len, Lz + n * pad_len, Ly + 2 * pad_len)
+        None
         '''
 
         # New geometry with layer
         self.Lx_habc = self.length_x + 2 * self.pad_len
         self.Lz_habc = self.length_z + self.pad_len
-
         if self.dimension == 3:  # 3D
             self.Ly_habc = self.length_y + 2 * self.pad_len
+
+    def habc_domain_dimensions(self, complete=True):
+        '''
+        Determine the new dimensions of the domain with absorbing layer
+
+        Parameters
+        ----------
+        complete : `bool`, optional
+            Option to get the domain dimensions in hypershape layers.
+            If True, the domain dimensions with layer do not include truncation
+            due to the free surface. If False, the domain dimensions with layer
+            include truncation by free surface. Default is True.
+
+        Returns
+        -------
+        dom_dim : `tuple`
+            Original domain dimensions: (Lx, Lz) for 2D or (Lx, Lz, Ly) for 3D
+        dom_lay : `tuple`
+            Domain dimensions with layer. For rectangular layers, truncation
+            due to the free surface is included (n = 1). For hypershape layers,
+            truncation by free surface is not included (n = 2) if complete is
+            True; otherwise, it is included (n = 1). Dimensions are defined as:
+            - 2D : (Lx + 2 * pad_len, Lz + n * pad_len)
+            - 3D : (Lx + 2 * pad_len, Lz + n * pad_len, Ly + 2 * pad_len)
+        '''
 
         # Original domain dimensions
         dom_dim = (self.length_x, self.length_z)
 
-        # Domain dimension with layer without truncations
-
-        # Labeling for the layer shape
+        # Domain dimension with layer w/ or w/o truncations
         if self.layer_shape == 'rectangular':  # Rectangular layer
             dom_lay = (self.Lx_habc, self.Lz_habc)
 
         elif self.layer_shape == 'hypershape':  # Hypershape layer
-            dom_lay = (self.Lx_habc, self.length_z + 2 * self.pad_len)
+            dom_lay = (self.Lx_habc, self.length_z + 2 * self.pad_len) \
+                if complete else (self.Lx_habc, self.Lz_habc)
 
         if self.dimension == 3:  # 3D
             dom_dim += (self.length_y,)
@@ -398,19 +417,22 @@ class HABC_Wave(AcousticWave, HABC_Mesh, RectangLayer,
                                  [self.lmin, self.lref], self.FLpos,
                                  output_folder=self.path_case_habc)
 
+        print("\nDetermining New Geometry with Absorbing Layer")
+
         # New geometry with layer
+        self.habc_new_geometry()
         dom_dim, dom_lay = self.habc_domain_dimensions()
 
         if self.layer_shape == 'rectangular':
 
-            print("\nDetermining Rectangular Layer Parameters")
+            print("Determining Rectangular Layer Parameters")
 
             # Geometric properties of the rectangular layer
             self.calc_rec_geom_prop(dom_dim, dom_lay)
 
         elif self.layer_shape == 'hypershape':
 
-            print("\nDetermining Hypershape Layer Parameters")
+            print("Determining Hypershape Layer Parameters")
 
             # Geometric properties of the hypershape layer
             self.calc_hyp_geom_prop(dom_dim, dom_lay, self.pad_len, self.lmin)
@@ -696,24 +718,27 @@ class HABC_Wave(AcousticWave, HABC_Mesh, RectangLayer,
 
         print("\nCreating Damping Profile")
 
-        # Compute the minimum damping ratio and the associated heuristic factor
-        eta_crt, psi_min, xCR_est, xCR_lim = self.calc_damping_prop()
-
-        # Heuristic factor for the minimum damping ratio
-        if xCR_usu is not None:
-            self.xCR = np.clip(xCR_usu, xCR_lim[0], xCR_lim[1])
-            self.psi_min = self.xCR * self.d
-            xcr_str = "Using User-Defined Heuristic Factor xCR: {:.3f}"
-            print(xcr_str.format(self.xCR))
-        else:
-            self.xCR = xCR_est
-            self.psi_min = psi_min
-
-        # Limits for the heuristic factor
-        self.xCR_lim = xCR_lim
-
         # Domain dimensions
-        dom_dim = self.habc_domain_dimensions()[0]
+        dom_dim, dom_lay = self.habc_domain_dimensions(complete=False)
+
+        # Layer parameters
+        layer_par = (self.F_L, self.a_par, self.d)
+
+        # mesh parameters
+        mesh_par = (self.lmin, self.lmax, self.alpha, self.variant)
+
+        # wave parameters
+        c_ref = min([bnd[1] for bnd in self.eik_bnd])
+        c_bnd = self.eik_bnd[0][1]
+        wave_par = (self.freq_ref, c_ref, c_bnd)
+
+        # Initializing the parent class for damping
+        HABC_Damping.__init__(self, dom_lay, layer_par, mesh_par,
+                              wave_par, dimension=self.dimension)
+
+        # Compute the minimum damping ratio and the associated heuristic factor
+        eta_crt, self.psi_min, self.xCR, self.xCR_lim, self.CRmin \
+            = self.calc_damping_prop(self.fundam_freq, xCR_usu=xCR_usu)
 
         # Mesh coordinates
         coords = fire.SpatialCoordinate(self.mesh)
