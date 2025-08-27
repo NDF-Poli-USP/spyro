@@ -3,20 +3,18 @@ import numpy as np  # *
 import spyro.habc.eik as eik  # *
 import spyro.solvers.modal.modal_sol as eigsol
 from os import getcwd  # *
-from scipy.signal import find_peaks
 from sympy import divisors  # *
-from spyro.solvers.acoustic_wave import AcousticWave
-from spyro.meshing.meshing_habc import HABC_Mesh
-from spyro.habc.hyp_lay import HyperLayer
-from spyro.habc.rec_lay import RectangLayer
-from spyro.habc.damp_profile import HABC_Damping
-from spyro.habc.nrbc import NRBC
+from spyro.solvers.acoustic_wave import AcousticWave  # *
+from spyro.meshing.meshing_habc import HABC_Mesh  # *
+from spyro.habc.hyp_lay import HyperLayer  # *
+from spyro.habc.rec_lay import RectangLayer  # *
+from spyro.habc.damp_profile import HABC_Damping  # *
+from spyro.habc.nrbc import NRBC  # *
 from spyro.habc.error_measure import HABC_Error
-from spyro.habc.lay_len import calc_size_lay
-from spyro.plots.plots_habc import plot_function_layer_size, \
-    plot_hist_receivers, plot_rfft_receivers, plot_xCR_opt
-from spyro.utils.error_management import value_parameter_error
-from spyro.utils.freq_tools import freq_response
+from spyro.habc.lay_len import calc_size_lay  # *
+from spyro.plots.plots_habc import plot_function_layer_size  # *
+from spyro.utils.error_management import value_parameter_error  # *
+from spyro.utils.freq_tools import freq_response  # *
 
 # Work from Ruben Andres Salas, Andre Luis Ferreira da Silva,
 # Luis Fernando Nogueira de Sá, Emilio Carlos Nelli Silva.
@@ -61,12 +59,6 @@ class HABC_Wave(AcousticWave, HABC_Mesh, RectangLayer,
         - sou_cr : Critical source coordinates
     * ele_pad : `int`
         Number of elements in the layer of edge length 'lmin'
-    err_habc : `list`
-        Error measures at the receivers for the HABC scheme.
-        Structure sublist: [errIt, errPk, pkMax]
-        - errIt : Integral error
-        - errPk : Peak error
-        - pkMax : Maximum reference peak
     * eta_habc : `firedrake function`
         Damping profile within the absorbing layer
     * eta_mask : `firedrake function`
@@ -93,10 +85,6 @@ class HABC_Wave(AcousticWave, HABC_Mesh, RectangLayer,
         Shape type of pad layer. Options: 'rectangular' or 'hypershape'
     * lref : `float`
         Reference length for the size of the absorbing layer
-    max_errIt : `float`
-        Maximum integral error at the receivers for the HABC scheme
-    max_errPK : `float`
-        Maximum peak error at the receivers for the HABC scheme
     * mesh: `firedrake mesh`
         Mesh used in the simulation (HABC or Infinite Model)
     * number_of_receivers: `int`
@@ -107,25 +95,21 @@ class HABC_Wave(AcousticWave, HABC_Mesh, RectangLayer,
         Path to save data for the current case study
     * path_save : `string`
         Path to save data
-    psi_min : `float`
+    * psi_min : `float`
         Minimum damping ratio of the absorbing layer (psi_min = xCR * d)
     * receiver_locations: `list`
         List of receiver locations
     receivers_output : `array`
         Receiver waveform data in the HABC scheme
-    receivers_out_fft : `array`
-        Frequency response at the receivers in the HABC scheme
-    xCR : `float`
+    * xCR : `float`
         Heuristic factor for the minimum damping ratio
-    xCR_lim: `list`
+    * xCR_lim: `list`
         Limits for the heuristic factor.
 
     Methods
     -------
     * check_timestep()
         Check if the timestep size is appropriate for the transient response
-    comparison_plots()
-        Plot the comparison between the HABC scheme and the reference model
     * create_mesh_habc()
         Create a mesh with absorbing layer based on the determined size
     * critical_boundary_points()
@@ -135,16 +119,10 @@ class HABC_Wave(AcousticWave, HABC_Mesh, RectangLayer,
         Set the damping profile within the absorbing layer
     * det_reference_freq()
         Determine the reference frequency for a new layer size
-    error_measures_habc()
-        Compute the error measures at the receivers for the HABC scheme
     * fundamental_frequency()
         Compute the fundamental frequency in Hz via modal analysis
     * geometry_infinite_model()
         Determine the geometry for the infinite domain model.
-    get_xCR_candidates()
-        Get the heuristic factor candidates for the quadratic regression
-    get_xCR_optimal()
-        Get the optimal heuristic factor for the quadratic damping
     * habc_domain_dimensions()
         Determine the new dimensions of the domain with absorbing layer
     * habc_new_geometry
@@ -153,6 +131,8 @@ class HABC_Wave(AcousticWave, HABC_Mesh, RectangLayer,
         Generate an identifier for the current case study of the HABC scheme
     * infinite_model()
         Create a reference model for the HABC scheme for comparative purposes
+    * nrbc_on_boundary_layer()
+        Apply the Higdon ABCs on the outer boundary of the absorbing layer
     * size_habc_criterion()
         Determine the size of the absorbing layer using the Eikonal criterion
     * velocity_habc()
@@ -181,10 +161,14 @@ class HABC_Wave(AcousticWave, HABC_Mesh, RectangLayer,
         None
         '''
 
-        # Initializing the parent classes
+        # Initializing the Wave class
         AcousticWave.__init__(self, dictionary=dictionary, comm=comm)
-        HABC_Mesh.__init__(self, dimension=self.dimension)
-        RectangLayer.__init__(self)
+
+        # Original domain dimensions
+        dom_dim = self.habc_domain_dimensions(only_orig_dom=True)
+
+        # Initializing the Mesh class
+        HABC_Mesh.__init__(self, dom_dim, dimension=self.dimension)
 
         # Identifier for the current case study
         self.identify_habc_case(output_folder=output_folder)
@@ -206,18 +190,24 @@ class HABC_Wave(AcousticWave, HABC_Mesh, RectangLayer,
         None
         '''
 
+        # Original domain dimensions
+        dom_dim = self.habc_domain_dimensions(only_orig_dom=True)
+
         # Layer shape
         self.layer_shape = self.abc_boundary_layer_shape
         lay_str = f"\nAbsorbing Layer Shape: {self.layer_shape.capitalize()}"
 
         # Labeling for the layer shape
         if self.layer_shape == 'rectangular':  # Rectangular layer
+
+            # Initialing the rectangular layer
+            RectangLayer.__init__(self, dom_dim)
             self.case_habc = 'REC'  # Label
 
         elif self.layer_shape == 'hypershape':  # Hypershape layer
 
             # Initializing the hyperelliptical layer
-            HyperLayer.__init__(self, n_hyp=self.abc_deg_layer,
+            HyperLayer.__init__(self, dom_dim, n_hyp=self.abc_deg_layer,
                                 n_type=self.abc_degree_type,
                                 dimension=self.dimension)
 
@@ -252,10 +242,8 @@ class HABC_Wave(AcousticWave, HABC_Mesh, RectangLayer,
         self.path_case_habc = self.path_save + self.case_habc + "/"
 
         # Initializing the error measure class
-        HABC_Error.__init__(self, output_folder=self.path_save)
-
-        # Original domain dimensions
-        dom_dim = self.habc_domain_dimensions(only_orig_domain=True)
+        HABC_Error.__init__(self, output_folder=self.path_save,
+                            output_case=self.path_case_habc)
 
         # Initializing the NRBC class
         NRBC.__init__(self, dom_dim, self.layer_shape,
@@ -356,19 +344,22 @@ class HABC_Wave(AcousticWave, HABC_Mesh, RectangLayer,
         if self.dimension == 3:  # 3D
             self.Ly_habc = self.length_y + 2 * self.pad_len
 
-    def habc_domain_dimensions(self, complete=True, only_orig_domain=False):
+    def habc_domain_dimensions(self, only_orig_dom=False,
+                               only_habc_dom=False, full_hyp=True):
         '''
         Determine the new dimensions of the domain with absorbing layer
 
         Parameters
         ----------
-        complete : `bool`, optional
+        only_orig_dom : `bool`, optional
+            Return only the original domain dimensions. Default is False
+        only_habc_dom : `bool`, optional
+            Return only the domain dimensions with layer. Default is False
+        full_hyp : `bool`, optional
             Option to get the domain dimensions in hypershape layers.
             If True, the domain dimensions with layer do not include truncation
             due to the free surface. If False, the domain dimensions with layer
             include truncation by free surface. Default is True.
-        only_orig_domain : `bool`, optional
-            If True, return only the original domain dimensions.
 
         Returns
         -------
@@ -377,7 +368,7 @@ class HABC_Wave(AcousticWave, HABC_Mesh, RectangLayer,
         dom_lay : `tuple`
             Domain dimensions with layer. For rectangular layers, truncation
             due to the free surface is included (n = 1). For hypershape layers,
-            truncation by free surface is not included (n = 2) if complete is
+            truncation by free surface is not included (n = 2) if 'full_hyp' is
             True; otherwise, it is included (n = 1). Dimensions are defined as:
             - 2D : (Lx + 2 * pad_len, Lz + n * pad_len)
             - 3D : (Lx + 2 * pad_len, Lz + n * pad_len, Ly + 2 * pad_len)
@@ -388,7 +379,7 @@ class HABC_Wave(AcousticWave, HABC_Mesh, RectangLayer,
         if self.dimension == 3:  # 3D
             dom_dim += (self.length_y,)
 
-        if only_orig_domain:
+        if only_orig_dom:
             return dom_dim
 
         # Domain dimension with layer w/ or w/o truncations
@@ -397,10 +388,13 @@ class HABC_Wave(AcousticWave, HABC_Mesh, RectangLayer,
 
         elif self.layer_shape == 'hypershape':  # Hypershape layer
             dom_lay = (self.Lx_habc, self.length_z + 2 * self.pad_len) \
-                if complete else (self.Lx_habc, self.Lz_habc)
+                if full_hyp else (self.Lx_habc, self.Lz_habc)
 
         if self.dimension == 3:  # 3D
             dom_lay += (self.Ly_habc,)
+
+        if only_habc_dom:
+            return dom_lay
 
         return dom_dim, dom_lay
 
@@ -443,21 +437,23 @@ class HABC_Wave(AcousticWave, HABC_Mesh, RectangLayer,
 
         # New geometry with layer
         self.habc_new_geometry()
-        dom_dim, dom_lay = self.habc_domain_dimensions()
+
+        # Domain dimensions without free surface free surface truncation
+        dom_lay = self.habc_domain_dimensions(only_habc_dom=True)
 
         if self.layer_shape == 'rectangular':
 
             print("Determining Rectangular Layer Parameters")
 
             # Geometric properties of the rectangular layer
-            self.calc_rec_geom_prop(dom_dim, dom_lay)
+            self.calc_rec_geom_prop(dom_lay)
 
         elif self.layer_shape == 'hypershape':
 
             print("Determining Hypershape Layer Parameters")
 
             # Geometric properties of the hypershape layer
-            self.calc_hyp_geom_prop(dom_dim, dom_lay, self.pad_len, self.lmin)
+            self.calc_hyp_geom_prop(dom_lay, self.pad_len, self.lmin)
 
     def create_mesh_habc(self, inf_model=False, spln=True, fmesh=1.):
         '''
@@ -491,14 +487,13 @@ class HABC_Wave(AcousticWave, HABC_Mesh, RectangLayer,
 
         # New mesh with layer
         if layer_shape == 'rectangular':
-
             mesh_habc = self.rectangular_mesh_habc()
 
         elif layer_shape == 'hypershape':
-            dom_dim = self.habc_domain_dimensions(only_orig_domain=True)
             hyp_par = (self.n_hyp, self.perim_hyp, *self.hyper_axes)
-            mesh_habc = self.hypershape_mesh_habc(dom_dim, hyp_par,
-                                                  spln=spln, fmesh=fmesh)
+            mesh_habc = self.hypershape_mesh_habc(hyp_par,
+                                                  spln=spln,
+                                                  fmesh=fmesh)
 
         # Updating the mesh with the absorbing layer
         self.set_mesh(user_mesh=mesh_habc, mesh_parameters={})
@@ -566,11 +561,8 @@ class HABC_Wave(AcousticWave, HABC_Mesh, RectangLayer,
         self.c = fire.Function(V).interpolate(self.initial_velocity_model,
                                               allow_missing_dofs=True)
 
-        # Domain dimensions
-        dom_dim = self.habc_domain_dimensions(only_orig_domain=True)
-
         # Clipping coordinates to the layer domain
-        lay_field, layer_mask = self.clipping_coordinates_lay_field(dom_dim, V)
+        lay_field, layer_mask = self.clipping_coordinates_lay_field(V)
 
         # Extending velocity model within the absorbing layer
         self.extend_velocity_profile(lay_field, method=method)
@@ -740,8 +732,9 @@ class HABC_Wave(AcousticWave, HABC_Mesh, RectangLayer,
 
         print("\nCreating Damping Profile")
 
-        # Domain dimensions
-        dom_dim, dom_lay = self.habc_domain_dimensions(complete=False)
+        # Domain dimensions with free surface truncation
+        dom_lay = self.habc_domain_dimensions(only_habc_dom=True,
+                                              full_hyp=False)
 
         # Layer parameters
         layer_par = (self.F_L, self.a_par, self.d)
@@ -767,8 +760,9 @@ class HABC_Wave(AcousticWave, HABC_Mesh, RectangLayer,
 
         # Damping mask
         V_mask = fire.FunctionSpace(self.mesh, 'DG', 0)
-        self.eta_mask = self.layer_mask_field(
-            dom_dim, coords, V_mask, type_marker='mask', name_mask='eta_mask')
+        self.eta_mask = self.layer_mask_field(coords, V_mask,
+                                              type_marker='mask',
+                                              name_mask='eta_mask')
 
         # Save damping mask
         path_damp = self.path_save + self.case_habc
@@ -780,21 +774,41 @@ class HABC_Wave(AcousticWave, HABC_Mesh, RectangLayer,
 
         # Damping field
         damp_par = (self.pad_len, eta_crt, aq, bq)
-        self.eta_habc = self.layer_mask_field(dom_dim, coords,
-                                              self.function_space,
-                                              damp_par=damp_par,
-                                              type_marker='damping',
-                                              name_mask='eta [1/s])')
+        self.eta_habc = self.layer_mask_field(
+            coords, self.function_space, damp_par=damp_par,
+            type_marker='damping', name_mask='eta [1/s])')
 
         # Save damping profile
         outfile = fire.VTKFile(path_damp + "/eta_habc.pvd")
         outfile.write(self.eta_habc)
 
-    def NRBC_on_boundary_layer(self):
+    def nrbc_on_boundary_layer(self):
+        '''
+        Apply the Higdon ABCs on the outer boundary of the absorbing layer
 
+        Parameters
+        ----------
+        None
+
+        Returns
+        -------
+        None
+        '''
+
+        print("\nApplying Non-Reflecting Boundary Conditions")
+
+        # Getting boundary data from the layer boundaries
         bnd_nfs, bnd_nodes_nfs = self.layer_boundary_data(self.function_space)
-        self.cos_ang_HigdonBC(
-            self.function_space, self.crit_source, bnd_nfs, bnd_nodes_nfs)
+
+        # Hypershape parameters
+        if self.layer_shape == 'hypershape':
+            hyp_par = (self.n_hyp, *self.hyper_axes)
+        else:
+            hyp_par = None
+
+        # Applying Higdon ABCs
+        self.cos_ang_HigdonBC(self.function_space, self.crit_source,
+                              bnd_nfs, bnd_nodes_nfs, hyp_par=hyp_par)
 
     def check_timestep(self, max_divisor_tf=1, set_max_dt=True):
         '''
@@ -962,221 +976,3 @@ class HABC_Wave(AcousticWave, HABC_Mesh, RectangLayer,
         del self.cosHig, self.eta_mask, self.eta_habc
         if self.dimension == 3:
             del self.Ly_habc
-
-    def error_measures_habc(self):
-        '''
-        Compute the error measures at the receivers for the HABC scheme.
-        Error measures as in Salas et al. (2022) Sec. 2.5.
-        Obs: If you get an error during running in find_peaks means that
-        the transient time of the simulation must be increased.
-
-        Parameters
-        ----------
-        None
-
-        Returns
-        -------
-        None
-        '''
-
-        print("\nComputing Error Measures")
-
-        pkMax = []
-        errPk = []
-        errIt = []
-
-        for i in range(self.number_of_receivers):
-
-            # Transient response in receiver
-            u_abc = self.receivers_output[:, i]
-            u_ref = self.receivers_reference[:, i]
-
-            # Finding peaks in transient response
-            u_pks = find_peaks(u_abc)
-            if u_pks[0].size == 0:
-                wrn_str0 = "No peak observed in the transient response. "
-                wrn_str1 = "Increase the transient time of the simulation."
-                UserWarning(wrn_str0 + wrn_str1)
-
-            # Maximum peak value
-            p_abc = max(abs(u_abc))
-            p_ref = max(abs(u_ref))
-            pkMax.append(p_ref)
-
-            # Completing with zeros if the length of arrays is different
-            delta_len = abs(len(u_abc) - len(u_ref))
-            if len(u_ref) < len(u_abc):
-                u_ref = np.concatenate([u_ref, np.zeros(delta_len)])
-            elif len(u_ref) > len(u_abc):
-                u_abc = np.concatenate([u_abc, np.zeros(delta_len)])
-
-            # Integral error
-            errIt.append(np.trapezoid((u_abc - u_ref)**2, dx=self.dt)
-                         / np.trapezoid(u_ref**2, dx=self.dt))
-
-            # Peak error
-            errPk.append(abs(p_abc / p_ref - 1))
-
-        # Final value of the dissipated energy in the HABC scheme
-        final_energy = fire.assemble(self.acoustic_energy)
-        self.err_habc = [errIt, errPk, pkMax, final_energy]
-        self.max_errIt = max(errIt)
-        self.max_errPK = max(errPk)
-        print("Maximum Integral Error: {:.2%}".format(self.max_errIt))
-        print("Maximum Peak Error: {:.2%}".format(self.max_errPK))
-        print("Acoustic Energy: {:.2e}".format(final_energy))
-
-        # Save error measures
-        err_str = self.path_save + self.case_habc + "/habc_errs.txt"
-        np.savetxt(err_str, (errIt, errPk, pkMax), delimiter='\t')
-
-        # Append the energy value at the end
-        with open(err_str, 'a') as f:
-            np.savetxt(f, np.array([final_energy]), delimiter='\t')
-
-    def comparison_plots(self, regression_xCR=False, data_regr_xCR=None):
-        '''
-        Plot the comparison between the HABC scheme and the reference model.
-
-        Parameters
-        ----------
-        regression_xCR : `bool`, optional
-            If True, Plot the regression for the error measure vs xCR
-            Default is False.
-        data_regr_xCR: `list`
-            Data for the regression of the parameter xCR.
-            Structure: [xCR, max_errIt, max_errPK, crit_opt]
-            - xCR: Values of xCR used in the regression.
-              The last value IS the optimal xCR
-            - max_errIt: Values of the maximum integral error.
-              The last value corresponds to the optimal xCR
-            - max_errPK: Values of the maximum peak error.
-              The last value corresponds to the optimal xCR
-            - crit_opt : Criterion for the optimal heuristic factor.
-              * 'error_difference' : Difference between integral and peak errors
-              * 'error_integral' : Minimum integral error
-
-        Returns
-        -------
-        None
-        '''
-
-        # Time domain comparison
-        plot_hist_receivers(self)
-
-        # Compute FFT for output signal at receivers
-        self.receivers_out_fft = []
-        for rec in range(self.number_of_receivers):
-            signal = self.receivers_output[:, rec]
-            yf = freq_response(signal, self.f_Nyq)
-            self.receivers_out_fft.append(yf)
-        self.receivers_out_fft = np.asarray(self.receivers_out_fft).T
-
-        # Frequency domain comparison
-        plot_rfft_receivers(self)
-
-        # Plot the error measures
-        if regression_xCR:
-            plot_xCR_opt(self, data_regr_xCR)
-
-    def get_xCR_candidates(self, n_pts=3):
-        '''
-        Get the heuristic factor candidates for the quadratic regression.
-
-        Parameters
-        ----------
-        n_pts : `int`, optional
-            Number of candidates for the heuristic factor xCR.
-            Default is 3. Must be an odd number
-
-        Returns
-        -------
-        xCR_cand : `list`
-            Candidates for the heuristic factor xCR based on the
-            current xCR and its bounds. The candidates are sorted
-            in ascending order and current xCR is not included
-        '''
-
-        # Setting odd number of points for regression
-        n_pts = max(3, n_pts + 1 if n_pts % 2 == 0 else n_pts)
-
-        # Limits for the heuristic factor
-        xCR_inf, xCR_sup = self.xCR_lim
-
-        # Estimated intial value
-        xCR = self.xCR
-
-        # Determining the xCR candidates for regression
-        if xCR in self.xCR_lim:
-            xCR_cand = list(np.linspace(xCR_inf, xCR_sup, n_pts))
-            xCR_cand.remove(xCR)
-        else:
-            xCR_cand = list(np.linspace(xCR_inf, xCR_sup, n_pts-1))
-
-        format_xCR = ', '.join(['{:.3f}'.format(x) for x in xCR_cand])
-        print("Candidates for Heuristic Factor xCR: [{}]".format(format_xCR))
-
-        return xCR_cand
-
-    def get_xCR_optimal(self, dat_reg_xCR, crit_opt='error_difference'):
-        '''
-        Get the optimal heuristic factor for the quadratic damping.
-
-        Parameters
-        ----------
-        dat_reg_xCR : `list`
-            Data for the regression of the parameter xCR.
-            Structure: [xCR, max_errIt, max_errPK]
-        crit_opt : `string`, optional
-            Criterion for the optimal heuristic factor
-            Default is 'error_difference'.
-            - 'error_difference' : Difference between integral and peak errors
-            - 'error_integral' : Minimum integral error
-
-        Returns
-        -------
-        xCR_opt : `float`, optional
-            Optimal heuristic factor for the quadratic damping
-        '''
-
-        # Data for regression
-        xCR = dat_reg_xCR[0]
-        max_errIt = dat_reg_xCR[1]
-        max_errPK = dat_reg_xCR[2]
-
-        if crit_opt == 'error_difference':
-            y_err = [eI - eP for eI, eP in zip(max_errIt, max_errPK)]
-
-        elif crit_opt == 'error_integral':
-            y_err = max_errIt
-
-        # Limits for the heuristic factor
-        xCR_inf, xCR_sup = self.xCR_lim
-
-        # Coefficients for the quadratic equation
-        eq_xCR = np.polyfit(xCR, y_err, 2)
-
-        if crit_opt == 'error_difference':
-            # Roots of the quadratic equation
-            roots = np.roots(eq_xCR)
-            valid_roots = [np.clip(rth, xCR_inf, xCR_sup)
-                           for rth in roots if isinstance(rth, float)]
-
-            if valid_roots:
-                # Real root that provides the absolute minimum error
-                min_err = [abs(np.polyval(eq_xCR, rth)) for rth in valid_roots]
-                xCR_opt = valid_roots[np.argmin(min_err)]
-            else:
-                # Vertex when there are no real roots
-                vtx = - eq_xCR[1] / (2 * eq_xCR[0])
-                xCR_opt = np.clip(vtx, xCR_inf, xCR_sup)
-
-        elif crit_opt == 'error_integral':
-
-            # Vertex of the quadratic equation
-            vtx = - eq_xCR[1] / (2 * eq_xCR[0])
-            xCR_opt = np.clip(vtx, xCR_inf, xCR_sup)
-
-        print("Optimal Heuristic Factor xCR: {:.3f}".format(xCR_opt))
-
-        return xCR_opt

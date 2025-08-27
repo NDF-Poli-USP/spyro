@@ -38,6 +38,8 @@ class HABC_Mesh():
         Mesh cell diameters
     dimension : `int`
         Model dimension (2D or 3D). Default is 2D
+    dom_dim : `tuple`
+        Original domain dimensions: (Lx, Lz) for 2D or (Lx, Lz, Ly) for 3D
     ele_type_c0 : `string`
         Finite element type for the velocity model without absorbing layer
     ele_type_eik : `string`
@@ -98,12 +100,14 @@ class HABC_Mesh():
         Generate the boundary points for a truncated hyperellipse
     '''
 
-    def __init__(self, dimension=2):
+    def __init__(self, dom_dim, dimension=2):
         '''
         Initialize the HABC_Mesh class
 
         Parameters
         ----------
+        dom_dim : `tuple`
+            Original domain dimensions: (Lx, Lz) for 2D or (Lx, Lz, Ly) for 3D
         dimension : `int`, optional
             Model dimension (2D or 3D). Default is 2D
 
@@ -111,6 +115,8 @@ class HABC_Mesh():
         -------
         None
         '''
+        # Original domain dimensions
+        self.dom_dim = dom_dim
 
         # Model dimension
         self.dimension = dimension
@@ -580,14 +586,12 @@ class HABC_Mesh():
 
         return curves
 
-    def create_hyp_trunc_mesh_2D(self, dom_dim, hyp_par, spln=True, fmesh=1.):
+    def create_hyp_trunc_mesh_2D(self, hyp_par, spln=True, fmesh=1.):
         '''
         Generate the mesh for the hyperelliptical absorbing layer.
 
         Parameters
         ----------
-        dom_dim : `tuple`
-            Original domain dimensions: (Lx, Lz) for 2D or (Lx, Lz, Ly) for 3D
         hyp_par : `tuple`
             Hyperellipse parameters.
             Structure: (n_hyp, perimeter, a_hyp, b_hyp)
@@ -612,7 +616,7 @@ class HABC_Mesh():
         '''
 
         # Domain dimensions
-        Lx, Lz = dom_dim[:2]
+        Lx, Lz = self.dom_dim[:2]
 
         # Generate the hyperellipse boundary points
         bnd_pts, trunc_feat = self.trunc_hyp_bndpts_2D(hyp_par, Lx / 2, Lz / 2)
@@ -754,14 +758,12 @@ class HABC_Mesh():
 
         return final_mesh
 
-    def hypershape_mesh_habc(self, dom_dim, hyp_par, spln=True, fmesh=1.):
+    def hypershape_mesh_habc(self, hyp_par, spln=True, fmesh=1.):
         '''
         Generate a mesh with a hypershape absorbing layer
 
         Parameters
         ----------
-        dom_dim : `tuple`
-            Original domain dimensions: (Lx, Lz) for 2D or (Lx, Lz, Ly) for 3D
         hyp_par : `tuple`
             Hyperellipse parameters.
             Structure: (n_hyp, perimeter, a_hyp, b_hyp, c_hyp)
@@ -789,13 +791,14 @@ class HABC_Mesh():
         '''
 
         # Domain dimensions
-        Lx, Lz = dom_dim[:2]
+        Lx, Lz = self.dom_dim[:2]
 
         if self.dimension == 2:  # 2D
 
             # Creating the hyperellipse layer mesh
-            hyp_mesh = self.create_hyp_trunc_mesh_2D(dom_dim[:4], hyp_par,
-                                                     spln=spln, fmesh=fmesh)
+            hyp_mesh = self.create_hyp_trunc_mesh_2D(hyp_par[:4],
+                                                     spln=spln,
+                                                     fmesh=fmesh)
 
             # Adjusting coordinates
             coords = hyp_mesh.coordinates.dat.data_with_halos
@@ -809,12 +812,12 @@ class HABC_Mesh():
             # fire.VTKFile("output/trunc_merged_test.pvd").write(mesh_habc)
 
         if self.dimension == 3:  # 3D
-            Ly = dom_dim[2]
+            Ly = self.dom_dim[2]
             mesh_habc = None
 
         return mesh_habc
 
-    def layer_mask_field(self, dom_dim, coords, V, damp_par=None,
+    def layer_mask_field(self, coords, V, damp_par=None,
                          type_marker='damping', name_mask=None):
         '''
         Generate a mask for the absorbing layer. The mask is defined
@@ -824,8 +827,6 @@ class HABC_Mesh():
 
         Parameters
         ----------
-        dom_dim : `tuple`
-            Original domain dimensions: (Lx, Lz) for 2D or (Lx, Lz, Ly) for 3D
         coords : 'ufl.geometry.SpatialCoordinate'
             Domain Coordinates including the absorbing layer
         V : `firedrake function space`
@@ -859,7 +860,7 @@ class HABC_Mesh():
         '''
 
         # Domain dimensions
-        Lx, Lz = dom_dim[:2]
+        Lx, Lz = self.dom_dim[:2]
 
         # Domain coordinates
         z, x = coords
@@ -878,7 +879,7 @@ class HABC_Mesh():
         if self.dimension == 3:  # 3D
 
             # 3D dimension
-            Ly = dom_dim[2]
+            Ly = self.dom_dim[2]
             y = coords[2]
 
             # Conditional value
@@ -927,16 +928,12 @@ class HABC_Mesh():
 
         return layer_mask
 
-    def clipping_coordinates_lay_field(self, dom_dim, V):
+    def clipping_coordinates_lay_field(self, V):
         '''
         Generate a field with clipping coordinates to the original boundary
 
         Parameters
         ----------
-        dom_dim : `tuple`
-            Original domain dimensions: (Lx, Lz) for 2D or (Lx, Lz, Ly) for 3D
-        coords : 'ufl.geometry.SpatialCoordinate'
-            Domain Coordinates including the absorbing layer
         V : `firedrake function space`
             Function space for the mask field
 
@@ -951,7 +948,7 @@ class HABC_Mesh():
         print("Clipping Coordinates Inside Layer")
 
         # Domain dimensions
-        Lx, Lz = dom_dim[:2]
+        Lx, Lz = self.dom_dim[:2]
 
         # Vectorial space for auxiliar field of clipped coordinates
         W_sp = fire.VectorFunctionSpace(self.mesh, self.ele_type_c0, self.p_c0)
@@ -968,14 +965,13 @@ class HABC_Mesh():
         if self.dimension == 3:  # 3D
 
             # 3D dimension
-            Ly = dom_dim[2]
+            Ly = self.dom_dim[2]
 
             # Clipping coordinates
             lay_arr[:, 2] = np.clip(lay_arr[:, 2], 0., Ly)
 
         # Mask function to identify the absorbing layer domain
-        layer_mask = self.layer_mask_field(dom_dim, coords, V,
-                                           type_marker='mask')
+        layer_mask = self.layer_mask_field(coords, V, type_marker='mask')
 
         # Field with clipped coordinates only in the absorbing layer
         lay_field = fire.Function(W_sp).interpolate(lay_field * layer_mask)

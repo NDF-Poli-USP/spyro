@@ -22,6 +22,8 @@ class RectangLayer():
         Area ratio to the area of the original domain. a_rat = area / a_orig
     dimension : `int`
         Model dimension (2D or 3D). Default is 2D
+    dom_dim : `tuple`
+        Original domain dimensions: (Lx, Lz) for 2D or (Lx, Lz, Ly) for 3D
     f_Ah : `float`
         Hyperelliptical area factor. f_Ah = 4 (n_hyp is considered infinite)
     f_Vh : `float`
@@ -40,12 +42,14 @@ class RectangLayer():
         Calculate the geometric properties for the rectangular layer
     '''
 
-    def __init__(self, dimension=2):
+    def __init__(self, dom_dim, dimension=2):
         '''
         Initialize the HyperLayer class.
 
         Parameters
         ----------
+        dom_dim : `tuple`
+            Original domain dimensions: (Lx, Lz) for 2D or (Lx, Lz, Ly) for 3D
         dimension : `int`, optional
             Model dimension (2D or 3D). Default is 2D
 
@@ -54,20 +58,24 @@ class RectangLayer():
         None
         '''
 
+        # Original domain dimensions
+        self.dom_dim = dom_dim
+
+        # Original domain dimensions
+        self.dom_dim = dom_dim
+
         # Model dimension
         self.dimension = dimension
 
         # Hypershape degree (Not applicable in rectangular layers)
         self.n_hyp = None
 
-    def calc_rec_geom_prop(self, dom_dim, dom_lay):
+    def calc_rec_geom_prop(self, dom_lay):
         '''
         Calculate the geometric properties for the rectangular layer.
 
         Parameters
         ----------
-        dom_dim : `tuple`
-            Original domain dimensions: (Lx, Lz) for 2D or (Lx, Lz, Ly) for 3D
         dom_lay : `tuple`
             Domain dimensions with layer including truncation by free surface.
             - 2D : (Lx + 2 * pad_len, Lz + pad_len)
@@ -79,14 +87,14 @@ class RectangLayer():
         '''
 
         # Domain dimensions w/o layer
-        chk_domd = len(dom_dim)
+        chk_domd = len(self.dom_dim)
         chk_habc = len(dom_lay)
         if self.dimension != chk_domd or self.dimension != chk_habc:
             value_dimension_error(('dom_dim', 'dom_lay'),
                                   (chk_domd, chk_habc),
                                   self.dimension)
 
-        Lx, Lz = dom_dim[:2]
+        Lx, Lz = self.dom_dim[:2]
         Lx_habc, Lz_habc = dom_lay[:2]
 
         # Geometric properties of the rectangular layer
@@ -97,7 +105,7 @@ class RectangLayer():
             print("Area Ratio: {:5.3f}".format(self.a_rat))
 
         if self.dimension == 3:  # 3D
-            Ly = dom_dim[2]
+            Ly = self.dom_dim[2]
             self.vol = Lx_habc * Lz_habc * Ly_habc
             self.v_rat = self.vol / (Lx * Lz * Ly)
             self.f_Vh = 8

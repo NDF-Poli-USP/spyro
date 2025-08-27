@@ -261,16 +261,16 @@ def habc_fig8(Wave_obj, dat_regr_xCR, xCR_usu=None, plot_comparison=True):
     Wave_obj.damping_layer(xCR_usu=xCR_usu)
 
     # Applying NRBCs on outer boundary layer
-    Wave_obj.NRBC_on_boundary_layer()
-
-    # import ipdb
-    # ipdb.set_trace()  # For debugging purposes
+    Wave_obj.nrbc_on_boundary_layer()
 
     # Solving the forward problem
     Wave_obj.forward_solve()
 
     # Computing the error measures
     Wave_obj.error_measures_habc()
+
+    # import ipdb
+    # ipdb.set_trace()  # For debugging purposes
 
     # Collecting data for regression
     dat_regr_xCR[0].append(Wave_obj.xCR)
