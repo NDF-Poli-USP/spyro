@@ -85,7 +85,7 @@ class HABC_Damping():
             - freq_ref : Reference frequency at the minimum Eikonal point
             - c_ref : Minimum propagation speed among all critical points
             - c_bnd : Propagation speed at critical point with minimum Eikonal
-        dimension : `int`
+        dimension : `int`, optional
             Model dimension (2D or 3D). Default is 2D
 
         Returns
@@ -544,4 +544,5 @@ class HABC_Damping():
         lim_str = "Initial Range for xCR Factor. Min:{:.3f} - Max:{:.3f}"
         print(lim_str.format(xCR_min, xCR_max))
 
+        # ToDo: Use for update xCR in FWI iterations
         return (xCR_min, xCR_max)

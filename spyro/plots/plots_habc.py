@@ -21,6 +21,8 @@ def create_folder(folder):
     -------
     None
     '''
+
+    # Create the folder if it does not exist
     if not os.path.isdir(folder):
         os.makedirs(folder)
 

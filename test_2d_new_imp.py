@@ -260,11 +260,11 @@ def habc_fig8(Wave_obj, dat_regr_xCR, xCR_usu=None, plot_comparison=True):
     # Setting the damping profile within absorbing layer
     Wave_obj.damping_layer(xCR_usu=xCR_usu)
 
+    # Applying NRBCs on outer boundary layer
+    Wave_obj.NRBC_on_boundary_layer()
+
     # import ipdb
     # ipdb.set_trace()  # For debugging purposes
-
-    # Applying NRBCs on outer boundary layer
-    Wave_obj.cos_ang_HigdonBC()
 
     # Solving the forward problem
     Wave_obj.forward_solve()

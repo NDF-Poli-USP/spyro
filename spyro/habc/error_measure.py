@@ -16,7 +16,7 @@ class HABC_Error():
 
     Attributes
     ----------
-    path_save : `string`
+    path_save_error : `string`
         Path to save data
     receivers_reference : `array`
         Receiver waveform data in the reference model
@@ -31,14 +31,14 @@ class HABC_Error():
         Save the reference signal for the HABC scheme
     '''
 
-    def __init__(self, path_save=None):
+    def __init__(self, output_folder=None):
         '''
         Initialize the HABC_Error class.
 
         Parameters
         ----------
-        path_save : `string`
-            Path to save data
+        output_folder : str, optional
+            The folder where output data will be saved. Default is None
 
         Returns
         -------
@@ -46,10 +46,10 @@ class HABC_Error():
         '''
 
         # Path to save data
-        if path_save is None:
-            self.path_save = getcwd() + "/output/"
+        if output_folder is None:
+            self.path_save_error = getcwd() + "/output/"
         else:
-            self.path_save = path_save
+            self.path_save_error = output_folder
 
     def save_reference_signal(self, receivers_output, number_of_receivers):
         '''
@@ -69,8 +69,10 @@ class HABC_Error():
 
         print("\nSaving Reference Output")
 
+        # Path to save the reference signal
+        pth_str = self.path_save_error + "preamble/"
+
         # Saving reference signal
-        pth_str = self.path_save + "preamble/"
         self.receivers_reference = receivers_output.copy()
         np.save(pth_str + "habc_ref.npy", self.receivers_reference)
 
@@ -100,7 +102,7 @@ class HABC_Error():
         print("\nLoading Reference Signal from Infinite Model")
 
         # Path to the reference data folder
-        pth_str = self.path_save + foldername
+        pth_str = self.path_save_error + foldername
 
         # Time domain signal
         self.receivers_reference = np.load(pth_str + "habc_ref.npy")

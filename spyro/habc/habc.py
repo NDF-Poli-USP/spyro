@@ -44,6 +44,8 @@ class HABC_Wave(AcousticWave, HABC_Mesh, RectangLayer,
         Label for the output files that includes the layer shape
         ('REC' or 'HNI', I for the degree) and the reference frequency
         ('SOU' or 'BND'). Example: 'REC_SOU' or 'HN2_BND'
+    * crit_source : `tuple`
+       Critical source coordinates
     * CRmin : `float`
         Minimum reflection coefficient at the minimum damping ratio
     * d : `float`
@@ -158,7 +160,7 @@ class HABC_Wave(AcousticWave, HABC_Mesh, RectangLayer,
     '''
 
     def __init__(self, dictionary=None, fwi_iter=0,
-                 comm=None, output_folder="output/"):
+                 comm=None, output_folder=None):
         '''
         Initialize the HABC class.
 
@@ -172,7 +174,7 @@ class HABC_Wave(AcousticWave, HABC_Mesh, RectangLayer,
             An object representing the communication interface
             for parallel processing. Default is None
         output_folder : str, optional
-            The folder where output data will be saved. Default is "output/"
+            The folder where output data will be saved. Default is None
 
         Returns
         -------
@@ -181,9 +183,8 @@ class HABC_Wave(AcousticWave, HABC_Mesh, RectangLayer,
 
         # Initializing the parent classes
         AcousticWave.__init__(self, dictionary=dictionary, comm=comm)
-        HABC_Mesh.__init__(self)
+        HABC_Mesh.__init__(self, dimension=self.dimension)
         RectangLayer.__init__(self)
-        NRBC.__init__(self)
 
         # Identifier for the current case study
         self.identify_habc_case(output_folder=output_folder)
@@ -191,14 +192,14 @@ class HABC_Wave(AcousticWave, HABC_Mesh, RectangLayer,
         # Current iteration
         self.fwi_iter = fwi_iter
 
-    def identify_habc_case(self, output_folder="output/"):
+    def identify_habc_case(self, output_folder=None):
         '''
         Generate an identifier for the current case study of the HABC scheme
 
         Parameters
         ----------
         output_folder : str, optional
-            The folder where output data will be saved. Default is "output/"
+            The folder where output data will be saved. Default is None
 
         Returns
         -------
@@ -243,11 +244,23 @@ class HABC_Wave(AcousticWave, HABC_Mesh, RectangLayer,
                                   ['boundary', 'source'])
 
         # Path to save data
-        self.path_save = getcwd() + "/" + output_folder
+        if output_folder is None:
+            self.path_save = getcwd() + "/output/"
+        else:
+            self.path_save = getcwd() + "/" + output_folder + "/"
+
         self.path_case_habc = self.path_save + self.case_habc + "/"
 
         # Initializing the error measure class
-        HABC_Error.__init__(self, path_save=self.path_save)
+        HABC_Error.__init__(self, output_folder=self.path_save)
+
+        # Original domain dimensions
+        dom_dim = self.habc_domain_dimensions(only_orig_domain=True)
+
+        # Initializing the NRBC class
+        NRBC.__init__(self, dom_dim, self.layer_shape,
+                      dimension=self.dimension,
+                      output_folder=self.path_case_habc)
 
     def critical_boundary_points(self):
         '''
@@ -275,6 +288,9 @@ class HABC_Wave(AcousticWave, HABC_Mesh, RectangLayer,
 
         # Reference length for the size of the absorbing layer
         self.lref = self.eik_bnd[0][4]
+
+        # Critical source position
+        self.crit_source = self.eik_bnd[0][-1]
 
         # Critical point coordinates as receivers
         pcrit = [bnd[0] for bnd in self.eik_bnd]
@@ -340,7 +356,7 @@ class HABC_Wave(AcousticWave, HABC_Mesh, RectangLayer,
         if self.dimension == 3:  # 3D
             self.Ly_habc = self.length_y + 2 * self.pad_len
 
-    def habc_domain_dimensions(self, complete=True):
+    def habc_domain_dimensions(self, complete=True, only_orig_domain=False):
         '''
         Determine the new dimensions of the domain with absorbing layer
 
@@ -351,6 +367,8 @@ class HABC_Wave(AcousticWave, HABC_Mesh, RectangLayer,
             If True, the domain dimensions with layer do not include truncation
             due to the free surface. If False, the domain dimensions with layer
             include truncation by free surface. Default is True.
+        only_orig_domain : `bool`, optional
+            If True, return only the original domain dimensions.
 
         Returns
         -------
@@ -367,6 +385,11 @@ class HABC_Wave(AcousticWave, HABC_Mesh, RectangLayer,
 
         # Original domain dimensions
         dom_dim = (self.length_x, self.length_z)
+        if self.dimension == 3:  # 3D
+            dom_dim += (self.length_y,)
+
+        if only_orig_domain:
+            return dom_dim
 
         # Domain dimension with layer w/ or w/o truncations
         if self.layer_shape == 'rectangular':  # Rectangular layer
@@ -377,7 +400,6 @@ class HABC_Wave(AcousticWave, HABC_Mesh, RectangLayer,
                 if complete else (self.Lx_habc, self.Lz_habc)
 
         if self.dimension == 3:  # 3D
-            dom_dim += (self.length_y,)
             dom_lay += (self.Ly_habc,)
 
         return dom_dim, dom_lay
@@ -473,7 +495,7 @@ class HABC_Wave(AcousticWave, HABC_Mesh, RectangLayer,
             mesh_habc = self.rectangular_mesh_habc()
 
         elif layer_shape == 'hypershape':
-            dom_dim = self.habc_domain_dimensions()[0]
+            dom_dim = self.habc_domain_dimensions(only_orig_domain=True)
             hyp_par = (self.n_hyp, self.perim_hyp, *self.hyper_axes)
             mesh_habc = self.hypershape_mesh_habc(dom_dim, hyp_par,
                                                   spln=spln, fmesh=fmesh)
@@ -545,7 +567,7 @@ class HABC_Wave(AcousticWave, HABC_Mesh, RectangLayer,
                                               allow_missing_dofs=True)
 
         # Domain dimensions
-        dom_dim = self.habc_domain_dimensions()[0]
+        dom_dim = self.habc_domain_dimensions(only_orig_domain=True)
 
         # Clipping coordinates to the layer domain
         lay_field, layer_mask = self.clipping_coordinates_lay_field(dom_dim, V)
@@ -767,6 +789,12 @@ class HABC_Wave(AcousticWave, HABC_Mesh, RectangLayer,
         # Save damping profile
         outfile = fire.VTKFile(path_damp + "/eta_habc.pvd")
         outfile.write(self.eta_habc)
+
+    def NRBC_on_boundary_layer(self):
+
+        bnd_nfs, bnd_nodes_nfs = self.layer_boundary_data(self.function_space)
+        self.cos_ang_HigdonBC(
+            self.function_space, self.crit_source, bnd_nfs, bnd_nodes_nfs)
 
     def check_timestep(self, max_divisor_tf=1, set_max_dt=True):
         '''

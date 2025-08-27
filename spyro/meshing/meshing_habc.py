@@ -26,7 +26,6 @@ class HABC_Mesh():
         Mesh node indices on boundaries of the original domain
     bnd_nodes : `tuple`
         Mesh node coordinates on boundaries of the origianl domain.
-        Structure:
         - (z_data[bnds], x_data[bnds]) for 2D
         - (z_data[bnds], x_data[bnds], y_data[bnds]) for 3D
     c : `firedrake function`
@@ -37,6 +36,8 @@ class HABC_Mesh():
         Maximum velocity value in the model without absorbing layer
     diam_mesh : `ufl.geometry.CellDiameter`
         Mesh cell diameters
+    dimension : `int`
+        Model dimension (2D or 3D). Default is 2D
     ele_type_c0 : `string`
         Finite element type for the velocity model without absorbing layer
     ele_type_eik : `string`
@@ -62,8 +63,6 @@ class HABC_Mesh():
     -------
     bnd_pnts_hyp_2D()
         Generate points on the boundary of a hyperellipse
-    boundary_data()
-        Generate the boundary data from the original domain mesh
     clipping_coordinates_lay_field()
         Generate a field with clipping coordinates to the original boundary
     create_bnd_mesh_2D()
@@ -77,10 +76,14 @@ class HABC_Mesh():
         excluding the free surface at the top boundary
     hypershape_mesh_habc()
         Generate a mesh with a hypershape absorbing layer
+    layer_boundary_data()
+        Generate the boundary data from the domain with the absorbing layer
     layer_mask_field()
         Generate a mask for the absorbing layer
     merge_mesh_2D()
         Merge the rectangular and the hyperelliptical meshes
+    original_boundary_data()
+        Generate the boundary data from the original domain mesh
     point_cloud_field()
         Create a field on a point cloud from a parent mesh and field
     preamble_mesh_operations()
@@ -95,19 +98,22 @@ class HABC_Mesh():
         Generate the boundary points for a truncated hyperellipse
     '''
 
-    def __init__(self):
+    def __init__(self, dimension=2):
         '''
         Initialize the HABC_Mesh class
 
         Parameters
         ----------
-        None
+        dimension : `int`, optional
+            Model dimension (2D or 3D). Default is 2D
 
         Returns
         -------
         None
         '''
-        pass
+
+        # Model dimension
+        self.dimension = dimension
 
     def representative_mesh_dimensions(self):
         '''
@@ -184,11 +190,13 @@ class HABC_Mesh():
             Tuple containing the node positions in the mesh.
             - (z_data, x_data) for 2D
             - (z_data, x_data, y_data) for 3D
+        func_space : `firedrake function space`
+            Function space to extract node positions
 
         Returns
         -------
         bnds : `tuple` of 'arrays'
-            Mesh node indices on boundaries of the domain. Structure:
+            Mesh node indices on boundaries of the domain.
             - (left_boundary, right_boundary, bottom_boundary) for 2D
             - (left_boundary, right_boundary, bottom_boundary,
                 left_bnd_y, right_bnd_y) for 3D
@@ -211,7 +219,7 @@ class HABC_Mesh():
 
         return bnds
 
-    def boundary_data(self):
+    def original_boundary_data(self):
         '''
         Generate the boundary data from the original domain mesh
 
@@ -221,13 +229,7 @@ class HABC_Mesh():
 
         Returns
         -------
-        bnds : 'array'
-            Mesh node indices on boundaries of the original domain
-        bnd_nodes : `tuple`
-            Mesh node coordinates on boundaries of the origianl domain.
-            Structure:
-            - (z_data[bnds], x_data[bnds]) for 2D
-            - (z_data[bnds], x_data[bnds], y_data[bnds]) for 3D
+        None
         '''
 
         # Extract node positions
@@ -238,6 +240,7 @@ class HABC_Mesh():
                                              self.function_space)
         self.bnds = np.unique(np.concatenate([idxs for idx_list in bnds
                                               for idxs in idx_list]))
+
         # Extract boundary node positions
         z_data, x_data = node_positions[0:2]
         self.bnd_nodes = (z_data[self.bnds], x_data[self.bnds])
@@ -316,7 +319,7 @@ class HABC_Mesh():
 
         # Generating boundary data from the original domain mesh
         print("Getting Boundary Mesh Data from Original Domain")
-        self.boundary_data()
+        self.original_boundary_data()
 
         # Mesh properties for Eikonal
         print("Setting Mesh Properties for Eikonal Analysis")
@@ -1077,3 +1080,47 @@ class HABC_Mesh():
         # Velocity profile inside the layer
         lay_field.dat.data_with_halos[ind_nodes, 0] = vel_to_extend
         del vel_to_extend, ind_nodes
+
+    def layer_boundary_data(self, V):
+        '''
+        Generate the boundary data from the domain with the absorbing layer
+
+        Parameters
+        ----------
+        V : `firedrake function space`
+            Function space for the boundary of the domain with absorbing layer
+
+        Returns
+        -------
+        bnd_nfs : 'array'
+            Mesh node indices on non-free surfaces
+        bnd_nodes_nfs : `tuple`
+            Mesh node coordinates on non-free surfaces.
+            - (z_data[nfs_idx], x_data[nfs_idx]) for 2D
+            - (z_data[nfs_idx], x_data[nfs_idx], y_data[nfs_idx]) for 3D
+        '''
+
+        # Boundary nodes indices
+        bnd_nod = fire.DirichletBC(V, 0., "on_boundary").nodes
+
+        # Extract node positions
+        node_positions = self.extract_node_positions(V)
+
+        # Boundary node coordinates
+        z_f, x_f = node_positions[:2]
+        bnd_z = z_f[bnd_nod]
+        bnd_x = x_f[bnd_nod]
+
+        # Identify non-free surfaces (remain unchanged)
+        no_free_surf = ~(abs(bnd_z) <= self.tol)
+
+        bnd_nodes_nfs = (bnd_z[no_free_surf], bnd_x[no_free_surf])
+        if self.dimension == 3:  # 3D
+            y_f = node_positions[2]
+            bnd_y = y_f[bnd_nod]
+            bnd_nodes_nfs += (bnd_y[no_free_surf],)
+
+        # Boundary node indices on non-free surfaces
+        bnd_nfs = bnd_nod[no_free_surf]
+
+        return bnd_nfs, bnd_nodes_nfs

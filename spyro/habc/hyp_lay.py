@@ -104,11 +104,11 @@ class HyperLayer():
         # Model dimension
         self.dimension = dimension
 
-        if n_type not in ['real', 'integer']:
-            value_parameter_error('n_type', n_type, ['real', 'integer'])
-
         # Type of the hypereshape degree
         self.n_type = n_type
+
+        if n_type not in ['real', 'integer']:
+            value_parameter_error('n_type', n_type, ['real', 'integer'])
 
     def define_hyperaxes(self, dom_hyp):
         '''
