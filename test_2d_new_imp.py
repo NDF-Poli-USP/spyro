@@ -181,6 +181,10 @@ def get_xCR_usu(Wave_obj, dat_regr_xCR, typ_xCR, n_pts):
           The last value corresponds to the optimal xCR
         - max_errPK: Values of the maximum peak error.
           The last value corresponds to the optimal xCR
+        - crit_opt : Criterion for the optimal heuristic factor.
+          * 'err_difference' : Difference between integral and peak errors
+          * 'err_integral' : Minimum integral error
+          * 'err_sum' : Sum of integral and peak errors
     typ_xCR : `str`
         Type of computation for the parameter xCR.
         Options: "candidates" and "optimal"
@@ -230,6 +234,10 @@ def habc_fig8(Wave_obj, dat_regr_xCR, xCR_usu=None, plot_comparison=True):
           The last value corresponds to the optimal xCR
         - max_errPK: Values of the maximum peak error.
           The last value corresponds to the optimal xCR
+        - crit_opt : Criterion for the optimal heuristic factor.
+          * 'err_difference' : Difference between integral and peak errors
+          * 'err_integral' : Minimum integral error
+          * 'err_sum' : Sum of integral and peak errors
     xCR_usu : `float`, optional
         User-defined heuristic factor for the minimum damping ratio.
         Default is None, which defines an estimated value
@@ -268,9 +276,6 @@ def habc_fig8(Wave_obj, dat_regr_xCR, xCR_usu=None, plot_comparison=True):
 
     # Computing the error measures
     Wave_obj.error_measures_habc()
-
-    # import ipdb
-    # ipdb.set_trace()  # For debugging purposes
 
     # Collecting data for regression
     dat_regr_xCR[0].append(Wave_obj.xCR)
@@ -320,16 +325,16 @@ def test_loop_habc():
     degree_type = "real"  # "integer"
 
     # Infinite model
-    get_ref_model = False
+    get_ref_model = True
 
     # Loop for HABC cases
     loop_modeling = not get_ref_model
 
     # Error criterion for heuristic factor xCR
-    crit_opt = "error_difference"  # "error_integral"
+    crit_opt = "err_sum"  # err_integral, err_peak
 
     # Number of points for regression (odd number)
-    n_pts = 1
+    n_pts = 3
 
     # ============ MESH AND EIKONAL ============
     # Create dictionary with parameters for the model

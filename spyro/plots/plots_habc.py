@@ -345,8 +345,9 @@ def plot_xCR_opt(Wave_object, data_regr_xCR, show=False):
         - max_errPK: Values of the maximum peak error.
           The last value corresponds to the optimal xCR
         - crit_opt : Criterion for the optimal heuristic factor.
-          * 'error_difference' : Difference between integral and peak errors
-          * 'error_integral' : Minimum integral error
+          * 'err_difference' : Difference between integral and peak errors
+          * 'err_integral' : Minimum integral error
+          * 'err_sum' : Sum of integral and peak errors
     show: `bool`, optional
         Whether to show the plot. Default is False.
 
@@ -385,7 +386,7 @@ def plot_xCR_opt(Wave_object, data_regr_xCR, show=False):
              label=r'Peak Error: ' + eq_str_eP)
 
     # xCR limits
-    xCR_inf, xCR_sup = Wave_object.xCR_bounds[0]
+    xCR_inf, xCR_sup = Wave_object.xCR_lim
 
     # Regression curves
     xgraf = np.linspace(xCR_inf, xCR_sup, int((xCR_sup - xCR_inf) / 0.1))
@@ -412,10 +413,12 @@ def plot_xCR_opt(Wave_object, data_regr_xCR, show=False):
     max_err = max(max(max_errIt[:-1]), max(max_errPk[:-1]))
     plt.xlim(0, round(xCR_sup, 1) + 0.1)
     plt.ylim(0, round(100 * max_err, 1) + 0.1)
-    if crit_opt == 'error_difference':
+    if crit_opt == 'err_difference':
         str_crt = r' (Criterion: Min $(e_I - e_P)$)'
-    elif crit_opt == 'error_integral':
+    elif crit_opt == 'err_integral':
         str_crt = r' (Criterion: Min $e_I$)'
+    elif crit_opt == 'err_sum':
+        str_crt = r' (Criterion: Min $(e_I + e_P)$)'
 
     plt.xlabel(r'$X_{C_{R}}$' + str_crt)
     plt.tight_layout(pad=2)

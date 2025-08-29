@@ -166,6 +166,9 @@ class HABC_Wave(AcousticWave, HABC_Mesh, RectangLayer,
         # Initializing the Wave class
         AcousticWave.__init__(self, dictionary=dictionary, comm=comm)
 
+        # Nyquist frequency
+        self.f_Nyq = 1.0 / (2.0 * self.dt)
+
         # Original domain dimensions
         dom_dim = self.habc_domain_dimensions(only_orig_dom=True)
 
@@ -244,7 +247,8 @@ class HABC_Wave(AcousticWave, HABC_Mesh, RectangLayer,
         self.path_case_habc = self.path_save + self.case_habc + "/"
 
         # Initializing the error measure class
-        HABC_Error.__init__(self, self.receiver_locations,
+        HABC_Error.__init__(self, self.dt, self.f_Nyq,
+                            self.receiver_locations,
                             output_folder=self.path_save,
                             output_case=self.path_case_habc)
 
@@ -308,9 +312,6 @@ class HABC_Wave(AcousticWave, HABC_Mesh, RectangLayer,
 
         abc_reference_freq = self.abc_reference_freq \
             if hasattr(self, 'receivers_reference') else 'source'
-
-        # Nyquist frequency
-        self.f_Nyq = 1.0 / (2.0 * self.dt)
 
         if self.abc_reference_freq == 'source':  # Initial guess
 
@@ -875,7 +876,6 @@ class HABC_Wave(AcousticWave, HABC_Mesh, RectangLayer,
             Size of the domain extension for the infinite domain model
         '''
 
-        self.c_bnd_min = vel_on_boundary.min()
         # Size of the domain extension
         add_dom = self.c_bnd_max * self.final_time / 2.
 
