@@ -207,7 +207,7 @@ class HABC_Wave(AcousticWave, HABC_Mesh, RectangLayer,
         if self.layer_shape == 'rectangular':  # Rectangular layer
 
             # Initialing the rectangular layer
-            RectangLayer.__init__(self, dom_dim)
+            RectangLayer.__init__(self, dom_dim, dimension=self.dimension)
             self.case_habc = 'REC'  # Label
 
         elif self.layer_shape == 'hypershape':  # Hypershape layer

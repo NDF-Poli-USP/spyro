@@ -906,7 +906,7 @@ class HABC_Mesh():
         Lx, Lz = self.dom_dim[:2]
 
         # Domain coordinates
-        z, x = coords
+        z, x = coords[:2]
 
         # Conditional value
         val_condz = (z + Lz)**2 if type_marker == 'damping' else 1.0

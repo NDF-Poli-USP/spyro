@@ -183,6 +183,7 @@ class AutomaticMesh:
         -------
         None
         """
+
         if length_z is not None:
             self.length_z = length_z
         if length_x is not None:

@@ -106,13 +106,13 @@ def wave_dict(dt_usu, fr_files, layer_shape, degree_layer,
         "gradient_output": False,
         "gradient_filename": None,
         "acoustic_energy": True,  # Activate energy calculation
-        "acoustic_energy_filename": "output/preamble/acoustic_potential_energy",
+        "acoustic_energy_filename": "output/preamble/acoustic_pot_energy",
     }
 
     return dictionary
 
 
-def preamble_habc(dictionary, edge_length):
+def preamble_habc(dictionary, edge_length, f_est):
     '''
     Run the infinite model and the Rikonal analysis
 
@@ -122,6 +122,8 @@ def preamble_habc(dictionary, edge_length):
         Dictionary containing the parameters for the model
     edge_length : `float`
         Mesh size in km
+    f_est : `float`, optional
+        Factor for the stabilizing term in Eikonal Eq.
 
     Returns
     -------
@@ -144,7 +146,7 @@ def preamble_habc(dictionary, edge_length):
     Wave_obj.set_initial_velocity_model(conditional=cond)
 
     # Preamble mesh operations
-    Wave_obj.preamble_mesh_operations()
+    Wave_obj.preamble_mesh_operations(f_est=f_est)
 
     # Estimating computational resource usage
     comp_cost("tfin", tRef=tRef,
@@ -289,7 +291,7 @@ def habc_fig8(Wave_obj, dat_regr_xCR, xCR_usu=None, plot_comparison=True):
                                   data_regr_xCR=dat_regr_xCR)
 
 
-def test_loop_habc():
+def test_loop_habc_2d():
     '''
     Loop for applying the HABC to the model in Fig. 8 of Salas et al. (2022).
     '''
@@ -304,16 +306,27 @@ def test_loop_habc():
     # edge_length = lba / cpw
     edge_length_lst = [0.1000, 0.0625, 0.0500, 0.0250, 0.0200]
 
-    # Timestep size (in seconds)
+    # Timestep size (in seconds). Initial guess: edge_length / 50
     dt_usu_lst = [0.00125, 0.00100, 0.00080, 0.00040, 0.00032]
+
+    # Factor for the stabilizing term in Eikonal equation
+    f_est_lst = [0.06, 0.06, 0.06, 0.06, 0.06]
 
     # Get simulation parameters
     edge_length = edge_length_lst[case]
-    dt_usu = dt_usu_lst[case]  # edge_length / 50.
+    dt_usu = dt_usu_lst[case]
+    f_est = f_est_lst[case]
     print("\nMesh Size: {:.3f} km".format(edge_length))
     print("Timestep Size: {:.3f} ms\n".format(1e3 * dt_usu))
+    print("Eikonal Stabilizing Factor: {:.2f}\n".format(f_est))
 
     # ============ HABC PARAMETERS ============
+
+    # Infinite model (True: Infinite model, False: HABC scheme)
+    get_ref_model = True
+
+    # Loop for HABC cases
+    loop_modeling = not get_ref_model
 
     # Hyperellipse degrees
     degree_layer_lst = [None]  # [None, 2, 3, 4, 5]
@@ -323,12 +336,6 @@ def test_loop_habc():
 
     # Type of the hypereshape degree
     degree_type = "real"  # "integer"
-
-    # Infinite model
-    get_ref_model = True
-
-    # Loop for HABC cases
-    loop_modeling = not get_ref_model
 
     # Error criterion for heuristic factor xCR
     crit_opt = "err_sum"  # err_integral, err_peak
@@ -343,7 +350,7 @@ def test_loop_habc():
                            degree_type, "source", get_ref_model)
 
     # Creating mesh and performing eikonal analysis
-    Wave_obj = preamble_habc(dictionary, edge_length)
+    Wave_obj = preamble_habc(dictionary, edge_length, f_est)
 
     # ============ REFERENCE MODEL ============
     if get_ref_model:
@@ -391,7 +398,6 @@ def test_loop_habc():
 
                 for itr_xCR in range(n_pts + 1):
                     try:
-
                         # User-defined heuristic factor x_CR
                         if itr_xCR == 0:
                             xCR_usu = None
@@ -411,8 +417,8 @@ def test_loop_habc():
                                   plot_comparison=plot_comparison)
 
                         # Estimating computational resource usage
-                        u_name = Wave_obj.path_save + Wave_obj.case_habc + "/"
-                        comp_cost("tfin", tRef=tRef, user_name=u_name)
+                        comp_cost("tfin", tRef=tRef,
+                                  user_name=Wave_obj.path_case_habc)
 
                         # User-defined heuristic factor x_CR
                         if itr_xCR == 0:
@@ -432,7 +438,7 @@ def test_loop_habc():
 
 # Applying HABCs to the model in Fig. 8 of Salas et al. (2022)
 if __name__ == "__main__":
-    test_loop_habc()
+    test_loop_habc_2d()
 
 # from time import perf_counter  # For runtime
 # tRef = perf_counter()

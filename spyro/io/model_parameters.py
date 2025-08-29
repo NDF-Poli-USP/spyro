@@ -800,6 +800,7 @@ class Model_parameters:
         Returns:
             Mesh: The created mesh object.
         """
+
         AutoMeshing = meshing.AutomaticMesh(
             comm=self.comm,
             mesh_parameters=mesh_parameters,

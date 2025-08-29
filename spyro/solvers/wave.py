@@ -93,6 +93,7 @@ class Wave(Model_parameters, metaclass=ABCMeta):
             )
         else:
             warnings.warn("No mesh found. Please define a mesh.")
+
         # Expression to define sources through UFL (less efficient)
         self.source_expression = None
         # Object for efficient application of sources
@@ -126,11 +127,7 @@ class Wave(Model_parameters, metaclass=ABCMeta):
         """Builds the matrix for the forward problem."""
         pass
 
-    def set_mesh(
-            self,
-            user_mesh=None,
-            mesh_parameters={},
-    ):
+    def set_mesh(self, user_mesh=None, mesh_parameters={},):
         """
         Set the mesh for the solver.
 
@@ -138,10 +135,8 @@ class Wave(Model_parameters, metaclass=ABCMeta):
             user_mesh (optional): User-defined mesh. Defaults to None.
             mesh_parameters (optional): Parameters for generating a mesh. Defaults to None.
         """
-        super().set_mesh(
-            user_mesh=user_mesh,
-            mesh_parameters=mesh_parameters,
-        )
+
+        super().set_mesh(user_mesh=user_mesh, mesh_parameters=mesh_parameters,)
 
         self.mesh = self.get_mesh()
         self._build_function_space()
