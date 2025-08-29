@@ -34,6 +34,9 @@ class HABC_Mesh():
         Minimum velocity value in the model without absorbing layer
     c_max : `float`
         Maximum velocity value in the model without absorbing layer
+    comm : object
+        An object representing the communication interface
+        for parallel processing. Default is None
     diam_mesh : `ufl.geometry.CellDiameter`
         Mesh cell diameters
     dimension : `int`
@@ -100,7 +103,7 @@ class HABC_Mesh():
         Generate the boundary points for a truncated hyperellipse
     '''
 
-    def __init__(self, dom_dim, dimension=2):
+    def __init__(self, dom_dim, dimension=2, comm=None):
         '''
         Initialize the HABC_Mesh class
 
@@ -110,16 +113,23 @@ class HABC_Mesh():
             Original domain dimensions: (Lx, Lz) for 2D or (Lx, Lz, Ly) for 3D
         dimension : `int`, optional
             Model dimension (2D or 3D). Default is 2D
+        comm : `object`, optional
+            An object representing the communication interface
+            for parallel processing. Default is None
 
         Returns
         -------
         None
         '''
+
         # Original domain dimensions
         self.dom_dim = dom_dim
 
         # Model dimension
         self.dimension = dimension
+
+        # Communicator MPI
+        self.comm = comm
 
     def representative_mesh_dimensions(self):
         '''
@@ -254,6 +264,17 @@ class HABC_Mesh():
             y_data = node_positions[2]
             self.bnd_nodes += (y_data[self.bnds],)
 
+        # Get extreme values of the velocity model on the boundarty
+        vel_on_boundary = self.point_cloud_field(
+            self.mesh_original, np.asarray(self.bnd_nodes).T,
+            self.initial_velocity_model).dat.data_with_halos[:]
+        self.c_bnd_min = vel_on_boundary.min()
+        self.c_bnd_max = vel_on_boundary.max()
+
+        # Print on screen
+        cbnd_str = "Boundary Velocity Range (km/s): {:.3f} - {:.3f}"
+        print(cbnd_str.format(self.c_bnd_min, self.c_bnd_max))
+
     def properties_eik_mesh(self, p_usu=None, ele_type='CG', f_est=0.06):
         '''
         Set the properties for the mesh used to solve the Eikonal equation
@@ -284,7 +305,7 @@ class HABC_Mesh():
 
     def preamble_mesh_operations(self, f_est=0.06):
         '''
-        Perform mesh operations previous to size an absorbing layer.
+        Perform mesh operations previous to size an absorbing layer
 
         Parameters
         ----------
@@ -319,6 +340,10 @@ class HABC_Mesh():
         self.c_min = self.initial_velocity_model.dat.data_with_halos.min()
         self.c_max = self.initial_velocity_model.dat.data_with_halos.max()
 
+        # Print on screen
+        cdom_str = "Domain Velocity Range (km/s): {:.3f} - {:.3f}"
+        print(cdom_str.format(self.c_min, self.c_max))
+
         # Save initial velocity model
         vel_c = fire.VTKFile(self.path_save + "preamble/c_vel.pvd")
         vel_c.write(self.c)
@@ -331,13 +356,18 @@ class HABC_Mesh():
         print("Setting Mesh Properties for Eikonal Analysis")
         self.properties_eik_mesh(p_usu=self.abc_deg_eikonal, f_est=f_est)
 
-    def rectangular_mesh_habc(self):
+    def rectangular_mesh_habc(self, dom_lay, pad_len):
         '''
         Generate a rectangular mesh with an absorbing layer
 
         Parameters
         ----------
-        None
+        dom_lay : `tuple`
+            Domain dimensions with layer including truncation by free surface.
+            - 2D : (Lx + 2 * pad_len, Lz + pad_len)
+            - 3D : (Lx + 2 * pad_len, Lz + pad_len, Ly + 2 * pad_len)
+        pad_len : `float`
+            Size of the absorbing layer
 
         Returns
         -------
@@ -345,30 +375,43 @@ class HABC_Mesh():
             Rectangular mesh with an absorbing layer.
         '''
 
-        # New geometry with layer
-        Lz = self.Lz_habc
-        Lx = self.Lx_habc
+        # Domain dimensions
+        Lx, Lz = self.dom_dim[:2]
 
         # Number of elements
-        n_pad = self.pad_len / self.lmin  # Elements in the layer
-        nz = int(self.length_z / self.lmin) + int(n_pad)
-        nx = int(self.length_x / self.lmin) + int(2 * n_pad)
-        nx = nx + nx % 2
+        n_pad = pad_len / self.lmin  # Elements in the layer
+        nz = int(Lz / self.lmin) + int(n_pad)
+        nx = int(Lx / self.lmin) + int(2 * n_pad)
+        nx += nx % 2
 
+        # New geometry with layer
+        Lx_habc, Lz_habc = dom_lay[:2]
+
+        # Creating the rectangular mesh with layer
         if self.dimension == 2:  # 2D
-            mesh_habc = fire.RectangleMesh(nz, nx, Lz, Lx, comm=self.comm.comm)
+            mesh_habc = fire.RectangleMesh(
+                nz, nx, Lz_habc, Lx_habc, comm=self.comm.comm)
 
         if self.dimension == 3:  # 3D
-            Ly = self.Ly_habc
-            ny = int(self.length_y / self.lmin) + int(2 * n_pad)
-            ny = ny + ny % 2
+
+            # Number of elements
+            Ly = self.dom_dim[2]
+            ny = int(Ly / self.lmin) + int(2 * n_pad)
+            ny += ny % 2
+
+            # New geometry with layer
+            Ly_habc = dom_lay[2]
+
+            # Mesh
             mesh_habc = fire.BoxMesh(
-                nz, nx, ny, Lz, Lx, Ly, comm=self.comm.comm)
-            mesh_habc.coordinates.dat.data_with_halos[:, 2] -= self.pad_len
+                nz, nx, ny, Lz_habc, Lx_habc, Ly_habc, comm=self.comm.comm)
+
+            # Adjusting coordinates
+            mesh_habc.coordinates.dat.data_with_halos[:, 2] -= pad_len
 
         # Adjusting coordinates
         mesh_habc.coordinates.dat.data_with_halos[:, 0] *= -1.0
-        mesh_habc.coordinates.dat.data_with_halos[:, 1] -= self.pad_len
+        mesh_habc.coordinates.dat.data_with_halos[:, 1] -= pad_len
 
         print("Extended Rectangular Mesh Generated Successfully")
 
@@ -661,7 +704,7 @@ class HABC_Mesh():
                     break
 
         # Mesh is transformed into a firedrake mesh
-        return fire.Mesh(hyp_mesh)
+        return fire.Mesh(hyp_mesh, comm=self.comm.comm)
 
     def merge_mesh_2D(self, rec_mesh, hyp_mesh):
         '''
@@ -750,7 +793,7 @@ class HABC_Mesh():
         try:
             # Mesh is transformed into a firedrake mesh
             final_mesh.Compress()
-            final_mesh = fire.Mesh(final_mesh)
+            final_mesh = fire.Mesh(final_mesh, comm=self.comm.comm)
             print("Merged Mesh Generated Successfully")
 
         except Exception as e:

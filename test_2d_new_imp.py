@@ -311,7 +311,7 @@ def test_loop_habc():
     # ============ HABC PARAMETERS ============
 
     # Hyperellipse degrees
-    degree_layer_lst = [4.4]  # [None, 2, 3, 4, 5]
+    degree_layer_lst = [None]  # [None, 2, 3, 4, 5]
 
     # Reference frequency
     habc_reference_freq_lst = ["source"]  # ["source", "boundary"]
@@ -433,8 +433,12 @@ if __name__ == "__main__":
 # tRef = perf_counter()
 # print(f"Time: {perf_counter() - tRef:.4f} seconds")
 
-
-# Computing Error Measures
+# Computing Error Measures: HYP
 # Maximum Integral Error: 1.87%
 # Maximum Peak Error: 2.55%
 # Acoustic Energy: 6.06e-08
+
+# Computing Error Measures: REC
+# Maximum Integral Error: 0.64%
+# Maximum Peak Error: 1.48%
+# Acoustic Energy: 4.60e-08

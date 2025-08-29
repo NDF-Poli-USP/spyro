@@ -30,16 +30,22 @@ class HABC_Error():
         Maximum integral error at the receivers for the HABC scheme
     max_errPK : `float`
         Maximum peak error at the receivers for the HABC scheme
+    number_of_receivers: `int`
+        Number of receivers used in the simulation
     path_save_error : `string`
         Path to save data
     path_save_err_case : `string`
         Path to save data for the current case study
+    receiver_locations: `list`
+        List of receiver locations
+    receivers_output : `array`
+        Receiver waveform data in the HABC scheme
     receivers_out_fft : `array`
         Frequency response at the receivers in the HABC scheme
     receivers_reference : `array`
         Receiver waveform data in the reference model
     receivers_ref_fft : `array`
-        Frequency response at the receivers in the reference model.
+        Frequency response at the receivers in the reference model
 
     Methods
     -------
@@ -57,12 +63,17 @@ class HABC_Error():
         Save the reference signal for the HABC scheme
     '''
 
-    def __init__(self, output_folder=None, output_case=None):
+    def __init__(self, receiver_locations, receivers_output=None,
+                 output_folder=None, output_case=None):
         '''
         Initialize the HABC_Error class.
 
         Parameters
         ----------
+        receiver_locations: `list`
+            List of receiver locations
+        receivers_output : `array`, optional
+            Receiver waveform data in the HABC scheme. Default is None
         output_folder : str, optional
             The folder where output data will be saved. Default is None
         output_case : str, optional
@@ -85,16 +96,18 @@ class HABC_Error():
         else:
             self.path_save_err_case = output_case
 
-    def save_reference_signal(self, receivers_output, number_of_receivers):
+        # Receivers data and initialization
+        self.receiver_locations = receiver_locations
+        self.number_of_receivers = len(self.receiver_locations)
+        self.receivers_output = receivers_output
+
+    def save_reference_signal(self):
         '''
         Save the reference signal for the HABC scheme
 
         Parameters
         ----------
-        receivers_output : `array`
-            Receiver waveform data in the HABC scheme
-        number_of_receivers: `int`
-            Number of receivers used in the simulation
+        None
 
         Returns
         -------
@@ -107,12 +120,12 @@ class HABC_Error():
         pth_str = self.path_save_error + "preamble/"
 
         # Saving reference signal
-        self.receivers_reference = receivers_output.copy()
+        self.receivers_reference = self.receivers_output.copy()
         np.save(pth_str + "habc_ref.npy", self.receivers_reference)
 
         # Computing and saving FFT of the reference signal at receivers
         self.receivers_ref_fft = []
-        for rec in range(number_of_receivers):
+        for rec in range(self.number_of_receivers):
             signal = self.receivers_reference[:, rec]
             yf = self.freq_response(signal)
             self.receivers_ref_fft.append(yf)

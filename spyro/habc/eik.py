@@ -77,7 +77,7 @@ class HABC_Eikonal(Eikonal_Modeling):
                                   ele_type=Wave.ele_type_eik,
                                   p_eik=Wave.p_eik, f_est=Wave.f_est)
 
-        # Communicator MPI4py
+        # Communicator MPI
         self.comm = Wave.comm
 
         # Setting the mesh
