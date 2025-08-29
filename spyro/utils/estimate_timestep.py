@@ -4,6 +4,7 @@ import numpy as np
 import firedrake as fd
 from firedrake import dot, grad
 import finat
+# import spyro.solvers.modal.modal_sol as eigsol
 
 
 def estimate_timestep(mesh, V, c, estimate_max_eigenvalue=True):
@@ -19,9 +20,9 @@ def estimate_timestep(mesh, V, c, estimate_max_eigenvalue=True):
 
     u, v = fd.TrialFunction(V), fd.TestFunction(V)
     quad_rule = finat.quadrature.make_quadrature(
-        V.finat_element.cell, V.ufl_element().degree(), "KMV"
-    )
+        V.finat_element.cell, V.ufl_element().degree(), "KMV")
     dxlump = fd.dx(scheme=quad_rule)
+
     A = fd.assemble(u * v * dxlump)
     ai, aj, av = A.petscmat.getValuesCSR()
     av_inv = []
@@ -43,14 +44,10 @@ def estimate_timestep(mesh, V, c, estimate_max_eigenvalue=True):
         # absolute maximum of diagonals
         max_eigval = np.amax(np.abs(Lsp.diagonal()))
     else:
-        print(
-            "Computing exact eigenvalues is extremely computationally \
-                demanding!",
-            flush=True,
-        )
+        print(f"Computing exact eigenvalues is extremely"
+              f"computationally demanding!", flush=True)
         max_eigval = scipy.sparse.linalg.eigs(
-            Ksp, M=Asp, k=1, which="LM", return_eigenvectors=False
-        )[0]
+            Ksp, M=Asp, k=1, which="LM", return_eigenvectors=False)[0]
 
     # print(max_eigval)
     if np.sqrt(max_eigval) > 0.0:

@@ -106,6 +106,7 @@ class RectangLayer():
 
         if self.dimension == 3:  # 3D
             Ly = self.dom_dim[2]
+            Ly_habc = dom_lay[2]
             self.vol = Lx_habc * Lz_habc * Ly_habc
             self.v_rat = self.vol / (Lx * Lz * Ly)
             self.f_Vh = 8

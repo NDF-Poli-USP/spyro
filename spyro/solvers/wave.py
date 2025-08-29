@@ -8,7 +8,7 @@ from ..domains.quadrature import quadrature_rules
 from ..io import Model_parameters
 from ..io.basicio import ensemble_propagator
 from ..io.field_logger import FieldLogger
-from .. import utils
+from ..utils.estimate_timestep import estimate_timestep
 from ..receivers.Receivers import Receivers
 from ..sources.Sources import Sources
 from .solver_parameters import get_default_parameters_for_method
@@ -304,12 +304,8 @@ class Wave(Model_parameters, metaclass=ABCMeta):
         else:
             c = self.c
 
-        dt = utils.estimate_timestep.estimate_timestep(
-            self.mesh,
-            self.function_space,
-            c,
-            estimate_max_eigenvalue=estimate_max_eigenvalue,
-        )
+        dt = estimate_timestep(self.mesh, self.function_space, c,
+                               estimate_max_eigenvalue=estimate_max_eigenvalue)
         dt *= fraction
         nt = int(self.final_time / dt) + 1
         dt = self.final_time / (nt - 1)

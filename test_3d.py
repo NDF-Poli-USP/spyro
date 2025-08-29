@@ -334,7 +334,7 @@ def test_loop_habc_3d():
     # ============ HABC PARAMETERS ============
 
     # Infinite model (True: Infinite model, False: HABC scheme)
-    get_ref_model = True
+    get_ref_model = False
 
     # Loop for HABC cases
     loop_modeling = not get_ref_model
@@ -343,7 +343,7 @@ def test_loop_habc_3d():
     degree_layer_lst = [None]  # [None, 2, 3, 4, 5]
 
     # Reference frequency
-    habc_reference_freq_lst = ["source", "boundary"]
+    habc_reference_freq_lst = ["source"]  # ["source", "boundary"]
 
     # Type of the hypereshape degree
     degree_type = "real"  # "integer"
@@ -352,7 +352,7 @@ def test_loop_habc_3d():
     crit_opt = "err_sum"  # err_integral, err_peak
 
     # Number of points for regression (odd number)
-    n_pts = 1
+    n_pts = 3
 
     # ============ MESH AND EIKONAL ============
     # Create dictionary with parameters for the model
@@ -458,3 +458,7 @@ if __name__ == "__main__":
 #  0.04 84.857* 78.301  89.437  78.665
 #  0.05 91.477  82.274* 93.810  83.901*
 #  0.06 97.574  86.409  97.935  88.048
+
+# Computing exact eigenvalues is extremely computationally demanding!
+# Maximum Timestep Size: 1.859 ms
+# Selected Timestep Size: 1.600 ms
