@@ -414,10 +414,10 @@ def interpolate(Model, fname, V):
     if add_pad:
         minz = -Model.mesh_parameters.length_z - Model.mesh_parameters.abc_pad_length
         maxz = 0.0
-        minx = 0.0 - pad_length
-        maxx = Model.mesh_parameters.length_x + pad_length
-        miny = 0.0 - pad_length
-        maxy = Model.mesh_parameters.length_y + pad_length
+        minx = 0.0 - Model.mesh_parameters.abc_pad_length
+        maxx = Model.mesh_parameters.length_x + Model.mesh_parameters.abc_pad_length
+        miny = 0.0 - Model.mesh_parameters.abc_pad_length
+        maxy = Model.mesh_parameters.length_y + Model.mesh_parameters.abc_pad_length
     else:
         minz = -Model.mesh_parameters.length_z
         maxz = 0.0
