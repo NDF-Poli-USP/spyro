@@ -833,6 +833,9 @@ class HABC_Wave(AcousticWave, HABC_Mesh, RectangLayer,
         Returns
         -------
         None
+
+        # Estimation: 2.770 (Old), 2.768 (New) (Scipy-sparse)
+        # Exact: 1.842 (Old), 1.842 (New) (Scipy)
         '''
 
         print("\nChecking Timestep Size")
@@ -841,17 +844,22 @@ class HABC_Wave(AcousticWave, HABC_Mesh, RectangLayer,
         usr_dt = self.get_dt()
 
         # Maximum timestep size
-        self.get_and_set_maximum_dt(fraction=1.0,
-                                    estimate_max_eigenvalue=False)
+        dt_sol = eigsol.Modal_Solver(self.dimension, calc_max_dt=True)
+        max_dt = dt_sol.estimate_timestep(self.c, self.function_space,
+                                          self.final_time, shift=1e-8,
+                                          quad_rule=self.quadrature_rule,
+                                          estimate_maxeig=False, fraction=1.)
 
-        print("Maximum Timestep Size: {:.3f} ms".format(1e3 * self.dt))
+        # self.get_and_set_maximum_dt(fraction=1.,
+        #   estimate_max_eigenvalue=False)
+        # print("Maximum Timestep Size: {:.3f} ms".format(1e3 * self.dt))
 
         # Rounding power
-        pot = abs(np.ceil(np.log10(self.get_dt()))) + 3
+        pot = abs(np.ceil(np.log10(max_dt))) + 3
 
         # Maximum timestep size according to divisors of the final time
         val_int_tf = int(10**pot * self.final_time)
-        val_int_dt = int(10**pot * self.get_dt())
+        val_int_dt = int(10**pot * max_dt)
         max_div = [d for d in divisors(val_int_tf) if d <= val_int_dt]
         index_div = min(max_divisor_tf, len(max_div))
         max_dt = 10**(-pot) * max_div[-index_div]
