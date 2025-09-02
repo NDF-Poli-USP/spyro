@@ -184,22 +184,11 @@ class Model_parameters(Read_options, Read_boundary_layer):
         self.equation_type = self.input_dictionary["equation_type"]
 
         # Get options
-        options_dictionary = self.input_dictionary["options"]
-        options_dictionary.setdefault("method", None)
-        options_dictionary.setdefault("cell_type", None)
-        options_dictionary.setdefault("variant", None)
-        options_dictionary.setdefault("degree", None)
-        options_dictionary.setdefault("dimension", None)
-        options_dictionary.setdefault("automatic_adjoint", False)
-        self.method = options_dictionary["method"]
-        self.variant = options_dictionary["variant"]
-        self.cell_type = options_dictionary["cell_type"]
-        self.degree = options_dictionary["degree"]
-        self.dimension = options_dictionary["dimension"]
+        Read_options.__init__(self, dictionary=self.input_dictionary)
 
         self.sources = None
 
-        if self.cell_type == "quadrilateral":
+        if self.cell_type == "quadrilateral" or self.method == "spectral_quadrilateral":
             quadrilateral = True
         else:
             quadrilateral = False
