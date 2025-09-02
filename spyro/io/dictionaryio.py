@@ -47,9 +47,10 @@ class Read_options:
         options_dictionary.setdefault("automatic_adjoint", False)
         self.options_dictionary = options_dictionary
 
-        self.method = options_dictionary["method"]
         self.variant = options_dictionary["variant"]
-        self.cell_type = options_dictionary["cell_type"]
+        self.method = options_dictionary["method"]
+        if options_dictionary["cell_type"] is not None:
+            self.cell_type = options_dictionary["cell_type"]
         self.degree = options_dictionary["degree"]
         self.dimension = options_dictionary["dimension"]
 
@@ -89,12 +90,16 @@ class Read_options:
         ]
         if value in mlt_equivalents:
             self._method = "mass_lumped_triangle"
+            self.cell_type = "triangle"
         elif value in sem_equivalents:
             self._method = "spectral_quadrilateral"
+            self.cell_type = "quadrilateral"
         elif value in dg_t_equivalents:
             self._method = "DG_triangle"
+            self.cell_type = "triangle"
         elif value in dg_q_equivalents:
             self._method = "DG_quadrilateral"
+            self.cell_type = "quadrilateral"
         elif value == "DG":
             raise ValueError(
                 "DG is not a valid method. Please specify \
