@@ -190,3 +190,25 @@ class Read_options:
         if value not in {2, 3}:
             raise ValueError(f"Dimension of {value} not 2 or 3.")
         self._dimension = value
+
+
+class Read_outputs:
+    def __init__(self):
+        self.input_dictionary.setdefault("visualization", {})
+        self.input_dictionary["visualization"].setdefault("forward_output", False)
+        self.forward_output = self.input_dictionary["visualization"]["forward_output"]
+        self.input_dictionary["visualization"].setdefault("forward_output_filename", "results/forward.pvd")
+        self.forward_output_filename = self.input_dictionary["visualization"]["forward_output_filename"]
+
+        self.input_dictionary["visualization"].setdefault("gradient_output", False)
+        self.gradient_output = self.input_dictionary["visualization"]["gradient_output"]
+        self.input_dictionary["visualization"].setdefault("gradient_filename", "results/gradient.pvd")
+        self.gradient_filename = self.input_dictionary["visualization"]["gradient_filename"]
+
+        self.input_dictionary["visualization"].setdefault("adjoint_output", False)
+        self.adjoint_output = self.input_dictionary["visualization"]["adjoint_output"]
+        self.input_dictionary["visualization"].setdefault("adjoint_filename", "results/adjoint.pvd")
+        self.adjoint_filename = self.input_dictionary["visualization"]["adjoint_filename"]
+
+        self.input_dictionary["visualization"].setdefault("debug_output", False)
+        self.debug_output = self.input_dictionary["visualization"]["debug_output"]

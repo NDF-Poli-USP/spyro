@@ -56,6 +56,21 @@ class Read_boundary_layer:
     read_PML_dictionary()
         Read the PML dictionary for a perfectly matched layer
     """
+    def __init__(self, dictionary=None, comm=None):
+        self.input_dictionary.setdefault("absorving_boundary_conditions", {})
+        self.input_dictionary["absorving_boundary_conditions"].setdefault("status", False)
+        self.abc_active = self.input_dictionary["absorving_boundary_conditions"]["status"]
+        self.input_dictionary["absorving_boundary_conditions"].setdefault("damping_type", None)
+        self.input_dictionary["absorving_boundary_conditions"].setdefault("pad_length", None)
+        self.abc_boundary_layer_type = self.input_dictionary["absorving_boundary_conditions"]["damping_type"]
+        self.abc_pad_length = self.input_dictionary["absorving_boundary_conditions"]["pad_length"]
+
+        self.absorb_top = dictionary["absorving_boundary_conditions"].get("absorb_top", False)
+        self.absorb_bottom = dictionary["absorving_boundary_conditions"].get("absorb_bottom", True)
+        self.absorb_right = dictionary["absorving_boundary_conditions"].get("absorb_right", True)
+        self.absorb_left = dictionary["absorving_boundary_conditions"].get("absorb_left", True)
+        self.absorb_front = dictionary["absorving_boundary_conditions"].get("absorb_front", True)
+        self.absorb_back = dictionary["absorving_boundary_conditions"].get("absorb_back", True)
 
     @property
     def abc_boundary_layer_type(self):
