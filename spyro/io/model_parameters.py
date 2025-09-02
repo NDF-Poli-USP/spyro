@@ -3,14 +3,15 @@ import uuid
 from mpi4py import MPI  # noqa:F401
 from firedrake import COMM_WORLD  # noqa:
 import warnings
-from ..io.dictionaryio import Read_options
+from ..io.dictionaryio import Read_options, Read_outputs
 from ..io.boundary_layer_io import Read_boundary_layer
+from ..io.time_io import Read_time_axis
 from .. import io
 from .. import utils
 from .. import meshing
 
 
-class Model_parameters(Read_options, Read_boundary_layer):
+class Model_parameters(Read_options, Read_boundary_layer, Read_time_axis, Read_outputs):
     """
     Class that reads and sanitizes input parameters.
 
@@ -178,9 +179,7 @@ class Model_parameters(Read_options, Read_boundary_layer):
         self.input_dictionary = dictionary
 
         # some default parameters we might use in the future
-        self.input_dictionary["time_axis"].setdefault("time_integration_scheme", "central_difference")
         self.input_dictionary.setdefault("equation_type", "second_order_in_pressure")
-        self.time_integrator = self.input_dictionary["time_axis"]["time_integration_scheme"]
         self.equation_type = self.input_dictionary["equation_type"]
 
         # Get options
@@ -188,36 +187,11 @@ class Model_parameters(Read_options, Read_boundary_layer):
 
         self.sources = None
 
-        if self.cell_type == "quadrilateral" or self.method == "spectral_quadrilateral":
-            quadrilateral = True
-        else:
-            quadrilateral = False
-
         # Checks time inputs
-        self.input_dictionary["time_axis"].setdefault("initial_time", 0.0)
-        self.initial_time = self.input_dictionary["time_axis"]["initial_time"]
-        self.final_time = self.input_dictionary["time_axis"]["final_time"]
-        self.dt = self.input_dictionary["time_axis"]["dt"]
+        Read_time_axis.__init__(self)
 
         # Checks outputs
-        self.input_dictionary.setdefault("visualization", {})
-        self.input_dictionary["visualization"].setdefault("forward_output", False)
-        self.forward_output = self.input_dictionary["visualization"]["forward_output"]
-        self.input_dictionary["visualization"].setdefault("forward_output_filename", "results/forward.pvd")
-        self.forward_output_filename = self.input_dictionary["visualization"]["forward_output_filename"]
-
-        self.input_dictionary["visualization"].setdefault("gradient_output", False)
-        self.gradient_output = dictionary["visualization"]["gradient_output"]
-        self.input_dictionary["visualization"].setdefault("gradient_filename", "results/gradient.pvd")
-        self.gradient_filename = dictionary["visualization"]["gradient_filename"]
-
-        self.input_dictionary["visualization"].setdefault("adjoint_output", False)
-        self.adjoint_output = dictionary["visualization"]["adjoint_output"]
-        self.input_dictionary["visualization"].setdefault("adjoint_filename", "results/adjoint.pvd")
-        self.adjoint_filename = dictionary["visualization"]["adjoint_filename"]
-
-        self.input_dictionary["visualization"].setdefault("debug_output", False)
-        self.debug_output = self.input_dictionary["visualization"]["debug_output"]
+        Read_outputs.__init__(self)
 
         # Checking source and receiver inputs
         self.input_dictionary["acquisition"].setdefault("source_type", "ricker")
@@ -246,13 +220,16 @@ class Model_parameters(Read_options, Read_boundary_layer):
         self.input_dictionary["parallelism"].setdefault("type", "automatic")
         self.parallelism_type = self.input_dictionary["parallelism"]["type"]
 
+        # Checking absorving boundary condition parameters
+        Read_boundary_layer.__init__(self, dictionary=self.input_dictionary)
+
         # Checking mesh_parameters
+        if self.cell_type == "quadrilateral" or self.method == "spectral_quadrilateral":
+            quadrilateral = True
+        else:
+            quadrilateral = False
         self.input_dictionary["mesh"].setdefault("user_mesh", None)
         self.input_dictionary["mesh"].setdefault("negative_z", True)
-        self.input_dictionary.setdefault("absorving_boundary_conditions", {})
-        self.input_dictionary["absorving_boundary_conditions"].setdefault("pad_length", None)
-        self.input_dictionary["absorving_boundary_conditions"].setdefault("status", False)
-        self.input_dictionary["absorving_boundary_conditions"].setdefault("damping_type", None)
         self.user_mesh = self.input_dictionary["mesh"]["user_mesh"]
         self.mesh_parameters = meshing.MeshingParameters(
             input_mesh_dictionary=self.input_dictionary["mesh"],
@@ -266,20 +243,7 @@ class Model_parameters(Read_options, Read_boundary_layer):
             negative_z=self.input_dictionary["mesh"]["negative_z"]
         )
 
-        # Checking absorving boundary condition parameters
-        self.abc_active = self.input_dictionary["absorving_boundary_conditions"]["status"]
-        self.abc_boundary_layer_type = self.input_dictionary["absorving_boundary_conditions"]["damping_type"]
-        self.abc_pad_length = self.input_dictionary["absorving_boundary_conditions"]["pad_length"]
-
-        self.absorb_top = dictionary["absorving_boundary_conditions"].get("absorb_top", False)
-        self.absorb_bottom = dictionary["absorving_boundary_conditions"].get("absorb_bottom", True)
-        self.absorb_right = dictionary["absorving_boundary_conditions"].get("absorb_right", True)
-        self.absorb_left = dictionary["absorving_boundary_conditions"].get("absorb_left", True)
-        self.absorb_front = dictionary["absorving_boundary_conditions"].get("absorb_front", True)
-        self.absorb_back = dictionary["absorving_boundary_conditions"].get("absorb_back", True)
-
         # Check automatic adjoint
-        self.input_dictionary["time_axis"].setdefault("gradient_sampling_frequency", 99999)
         self.input_dictionary["time_axis"].setdefault("output_frequency", 99999)
         self.gradient_sampling_frequency = self.input_dictionary["time_axis"]["gradient_sampling_frequency"]
         self.output_frequency = self.input_dictionary["time_axis"]["output_frequency"]
@@ -382,37 +346,6 @@ class Model_parameters(Read_options, Read_boundary_layer):
         else:
             self.number_of_receivers = 1
         self._receiver_locations = value
-
-    @property
-    def initial_time(self):
-        return self._initial_time
-    
-    @initial_time.setter
-    def initial_time(self, value):
-        if value is None:
-            value = 0.0
-        self._initial_time = value
-    
-    @property
-    def final_time(self):
-        return self._final_time
-    
-    @final_time.setter
-    def final_time(self, value):
-        if value < self.initial_time:
-            raise ValueError(f"Final time of {value} lower than initial time of {self.initial_time} not allowed.")
-        
-        self._final_time = value
-
-    @property
-    def time_integrator(self):
-        return self._time_integrator
-    
-    @time_integrator.setter
-    def time_integrator(self, value):
-        if value != "central_difference":
-            raise ValueError(f"The time integrator of {value} is not implemented yet")
-        self._time_integrator = value
     
     @property
     def equation_type(self):
