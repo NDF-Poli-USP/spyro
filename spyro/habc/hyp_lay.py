@@ -199,7 +199,7 @@ class HyperLayer():
         '''
 
         # Hyperellipse semi-axes
-        a, b = self.hyper_axes
+        a, b = self.hyper_axes[:2]
 
         # Superness s = 2^(-1/n): Extreme points of the hyperellipse
         xs, ys = spness[:2]
@@ -227,6 +227,7 @@ class HyperLayer():
             f_ari = 1 / 2
 
         if self.dimension == 3:  # 3D
+            c = self.hyper_axes[2]
             zs = spness[2]
 
             # Harmonic mean parameters
@@ -634,6 +635,7 @@ class HyperLayer():
 
         return perim_hyp
 
+    @staticmethod
     def hyp_full_surf_area(a, b, c, n):
         '''
         Compute the surface area of a hyperellipsoid.

@@ -347,6 +347,7 @@ class AutomaticMesh:
         nx = int(self.length_x / dx)
         nz = int(self.length_z / dx)
         ny = int(self.length_y / dx)
+
         if self.cell_type == "quadrilateral":
             quadrilateral = True
         else:

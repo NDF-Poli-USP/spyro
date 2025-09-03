@@ -5,13 +5,17 @@ from netgen.meshing import Element2D, FaceDescriptor, Mesh, MeshPoint
 from scipy.spatial import KDTree
 from spyro.utils.error_management import value_parameter_error
 
+import meshio
+from SeismicMesh import generation, geometry
+from scipy.spatial import Delaunay
+
 # Work from Ruben Andres Salas, Andre Luis Ferreira da Silva,
 # Luis Fernando Nogueira de Sá, Emilio Carlos Nelli Silva.
 # Hybrid absorbing scheme based on hyperelliptical layers with
 # non-reflecting boundary conditions in scalar wave equations.
 # Applied Mathematical Modelling (2022)
 # doi: https://doi.org/10.1016/j.apm.2022.09.014
-# With additions by Alexandre Olender
+# With additions by Alexandre Olender and Romildo Soares Jr
 
 
 class HABC_Mesh():
@@ -845,7 +849,8 @@ class HABC_Mesh():
 
             # Adjusting coordinates
             coords = hyp_mesh.coordinates.dat.data_with_halos
-            coords[:, 0], coords[:, 1] = coords[:, 1], -coords[:, 0]
+            coords[:, [0, 1]] = coords[:, [1, 0]]  # Swap (x,z) -> (z,x)
+            coords[:, 0] = -coords[:, 0]           # Negate z (z,x)
             hyp_mesh.coordinates.dat.data_with_halos[:, 0] -= Lz / 2
             hyp_mesh.coordinates.dat.data_with_halos[:, 1] += Lx / 2
             # fire.VTKFile("output/trunc_hyp_test.pvd").write(hyp_mesh)
@@ -856,7 +861,243 @@ class HABC_Mesh():
 
         if self.dimension == 3:  # 3D
             Ly = self.dom_dim[2]
-            mesh_habc = None
+
+            # Hyperellipse parameters
+            n_hyp, surface, a_hyp, b_hyp, c_hyp = hyp_par
+
+            # Original domain dimensions
+            box_xmin = 0.
+            box_xmax = Lx
+            box_zmin = -Lz
+            box_zmax = 0.
+            box_ymin = 0.
+            box_ymax = Ly
+
+            box = (box_xmin, box_xmax, box_zmin, box_zmax, box_ymin, box_ymax)
+            box_dom = geometry.Cube(box)
+
+            # Hyperellipsoid centroid
+            xc = Lx / 2.
+            zc = -Lz / 2.
+            yc = Ly / 2.
+            z_cut = 0.  # z-coordinate for surface cut
+
+            # Seismic mesh needs a box that envelopes all the domain
+            hyp_xmin = xc - a_hyp
+            hyp_xmax = xc + a_hyp
+            hyp_zmin = zc - b_hyp
+            hyp_zmax = zc + b_hyp
+            hyp_ymin = yc - c_hyp
+            hyp_ymax = yc + c_hyp
+            hyp = (hyp_xmin, hyp_xmax, hyp_zmin, hyp_zmax, hyp_ymin, hyp_ymax)
+
+            # Extract node positions and swap (z,x) -> (x,z)
+            fixed = self.mesh_original.coordinates.dat.data_with_halos[:].copy()
+            fixed[:, [0, 1]] = fixed[:, [1, 0]]
+
+            # Clip fixed points to ensure they are within the bounding box
+            fixed[:, 0] = np.clip(fixed[:, 0], hyp_xmin, hyp_xmax)
+            fixed[:, 1] = np.clip(fixed[:, 1], hyp_zmin, hyp_zmax)
+            fixed[:, 2] = np.clip(fixed[:, 2], hyp_ymin, hyp_ymax)
+
+            def superellipsoide_sdf(p, a=a_hyp, b=b_hyp, c=c_hyp,
+                                    n=n_hyp, xc=xc, yc=yc, zc=zc):
+
+                # Shift coordinates to center at (xc, yc, zc)
+                x = (p[:, 0] - xc) / a
+                z = (p[:, 1] - zc) / b
+                y = (p[:, 2] - yc) / c
+
+                # Avoid zero to the power of small/large n by adding epsilon
+                eps = 1e-8
+                # x_n = np.power(np.abs(x) + eps, n)
+                # y_n = np.power(np.abs(y) + eps, n)
+                # z_n = np.power(np.abs(z) + eps, n)
+                x_n = abs(x)**n
+                y_n = abs(y)**n
+                z_n = abs(z)**n
+
+                # Compute radius in hyperellipsoid space
+                # r = np.power(x_n + y_n + z_n, 1.0 / n)
+                r = (x_n + y_n + z_n)**(1.0 / n)
+
+                # Signed distance
+                sdf = r - 1.0
+
+                # Rescale back to original space
+                scale = min(a, b, c)
+
+                return sdf * scale
+
+            def top_cut_sdf(p, z_cut=0.):
+                # Rectangle for cutting the ellipse
+                return (p[:, 1] - z_cut)
+
+            def u_shape_sdf3D(p):
+                return np.maximum(superellipsoide_sdf(p), top_cut_sdf(p))
+
+            def calculate_distance_to_cube(point, box):
+                '''
+                Calculate the minimum distance from a point to a cube.
+
+                Returns 0 if point is inside the cube.
+                '''
+
+                xmin, xmax, ymin, ymax, zmin, zmax = box
+
+                x, y, z = point
+
+                # Calculate distance components for each axis
+                dx = max(0, xmin - x, x - xmax)
+                dy = max(0, ymin - y, y - ymax)
+                dz = max(0, zmin - z, z - zmax)
+
+                # Euclidean distance
+                return np.sqrt(dx*dx + dy*dy + dz*dz)
+
+            def remove_interior_points(all_points, dom_points, box=None, tolerance=1e-10):
+                """
+                Remove points that are inside the cube but keep dom_points themselves.
+                Function to remove points that arent from the structured mesh
+
+                Parameters:
+                - all_points: numpy array of shape (n, 3) containing all points
+                - dom_points: numpy array of shape (m, 3) containing cube surface points to keep
+                - xmin, xmax, ymin, ymax, zmin, zmax: cube bounds (calculated from dom_points if None)
+                - tolerance: floating point tolerance for comparisons
+
+                Returns:
+                - numpy array with interior points removed (keeps exterior + cube surface points)
+                """
+
+                if len(all_points) == 0:
+                    return all_points.copy()
+
+                # Convert to numpy arrays
+                all_points = np.asarray(all_points)
+                dom_points = np.asarray(dom_points)
+
+                # Determine cube bounds if not provided
+                if box is None:
+                    if len(dom_points) == 0:
+                        return all_points.copy()
+
+                    xmin = np.min(dom_points[:, 0])
+                    xmax = np.max(dom_points[:, 0])
+                    ymin = np.min(dom_points[:, 1])
+                    ymax = np.max(dom_points[:, 1])
+                    zmin = np.min(dom_points[:, 2])
+                    zmax = np.max(dom_points[:, 2])
+                else:
+                    xmin, xmax, ymin, ymax, zmin, zmax = box
+
+                result_points = []
+
+                for point in all_points:
+                    x, y, z = point
+
+                    # Check if point is clearly outside cube -> keep it
+                    outside = (x < xmin - tolerance or x > xmax + tolerance
+                               or y < ymin - tolerance or y > ymax + tolerance
+                               or z < zmin - tolerance or z > zmax + tolerance)
+
+                    if outside:
+                        result_points.append(point)
+                    else:
+                        # Point is inside or on boundary - check if it's a cube_point
+                        is_cube_point = False
+                        for cube_point in dom_points:
+                            if np.linalg.norm(point - cube_point) < tolerance:
+                                is_cube_point = True
+                                break
+
+                        if is_cube_point:
+                            result_points.append(point)
+                        # If inside/boundary and not cube_point, don't add (remove it)
+
+                return np.array(result_points) if result_points else np.array([]).reshape(0, 3)
+
+            def remove_points_near_orig_dom(all_points, box, distance_threshold, tolerance=1e-10):
+                '''
+                Remove points that are outside the cube but within a specified distance from it.
+
+                Parameters:
+                - all_points: numpy array of shape (n, 3) containing all points
+                - xmin, xmax, ymin, ymax, zmin, zmax: cube bounds
+                - distance_threshold: distance from cube surface within which points are removed
+                - tolerance: floating point tolerance for inside/outside determination
+
+                Returns:
+                - numpy array with points in buffer zone removed
+                '''
+
+                xmin, xmax, ymin, ymax, zmin, zmax = box
+
+                if len(all_points) == 0:
+                    return all_points.copy()
+
+                all_points = np.asarray(all_points)
+                result_points = []
+
+                for point in all_points:
+                    x, y, z = point
+
+                    # Check if point is inside cube
+                    inside = (xmin - tolerance <= x <= xmax + tolerance
+                              and ymin - tolerance <= y <= ymax + tolerance
+                              and zmin - tolerance <= z <= zmax + tolerance)
+
+                    if inside:
+                        # Point is inside cube → keep it
+                        result_points.append(point)
+                    else:
+                        # Point is outside cube → calculate distance to cube
+                        distance = calculate_distance_to_cube(point, box)
+
+                        if distance > distance_threshold:
+                            # Point is far enough from cube → keep it
+                            result_points.append(point)
+                        # If distance <= threshold, remove it (don't add to result)
+
+                return np.array(result_points) if result_points else np.array([]).reshape(0, 3)
+
+            def _remove_triangles_outside(p, t, fd, geps):
+                '''Remove vertices outside the domain'''
+                # Post processing function used by SeismicMesh
+                dim = p.shape[1]
+                pmid = p[t].sum(1) / (dim + 1)  # Compute centroids
+                return t[fd(pmid) < -geps]  # Keep interior triangles
+
+            # Generate 3D mesh
+            print("Generating Initial Mesh")
+            points, cells = generation.generate_mesh(
+                domain=u_shape_sdf3D,
+                edge_length=self.lmin,
+                bbox=hyp,
+                max_iter=50,
+                pfix=fixed,
+                subdomains=[box_dom])
+
+            # Remove points that are not from the structured mesh
+            points = remove_interior_points(points, fixed, box)
+
+            # Remove points too close from cube
+            points = remove_points_near_orig_dom(points, box, self.lmin/2., tolerance=1e-10)
+
+            # Create new Delaunay with structured mesh part
+            fixed_triangulation = Delaunay(points)
+            cells = fixed_triangulation.simplices
+            # SeismicMesh filter for boundary triangles
+            cells = _remove_triangles_outside(points, cells, u_shape_sdf3D, self.lmin / 15.)
+            print(f"Mesh generated with {len(points)} points and {len(cells)} tetrahedra")
+            # Save mesh
+            meshio.write_points_cells("mesh_hyp3D.vtk", points, [("tetra", cells)], file_format="vtk")
+
+            mesh_habc = meshio.Mesh(points=points, cells=[("tetra", cells)])
+
+            # # final_mesh = fire.Mesh(mesh_habc, comm=self.comm.comm)
+            # import ipdb
+            # ipdb.set_trace()  # Debugging
 
         return mesh_habc
 

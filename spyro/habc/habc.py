@@ -514,8 +514,16 @@ class HABC_Wave(AcousticWave, HABC_Mesh, RectangLayer,
             mesh_habc = self.rectangular_mesh_habc(dom_lay, self.pad_len)
 
         elif layer_shape == 'hypershape':
-            hyp_par = (self.n_hyp, self.perim_hyp, *self.hyper_axes)
-            mesh_habc = self.hypershape_mesh_habc(hyp_par, spln=spln,
+
+            # Parameters for hypershape mesh
+            if self.dimension == 2:  # 2D
+                par_geom = self.perim_hyp
+            if self.dimension == 3:  # 3D
+                par_geom = self.surf_hyp
+
+            hyp_par = (self.n_hyp, par_geom, *self.hyper_axes)
+            mesh_habc = self.hypershape_mesh_habc(hyp_par,
+                                                  spln=spln,
                                                   fmesh=fmesh)
 
         # Updating the mesh with the absorbing layer

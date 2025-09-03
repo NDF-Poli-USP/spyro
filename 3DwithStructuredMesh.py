@@ -31,7 +31,7 @@ box_ymax = domainY
 box_zmin = -domainZ
 box_zmax = 0.0
 cube = (box_xmin, box_xmax, box_ymin, box_ymax, box_zmin, box_zmax)
-cube1 = SeismicMesh.geometry.Cube(cube)
+cube1 = SeismicMesh.geometry.Rectangle(cube)
 # Calculating parameters for hyperellipsoid with center at center of cube
 ellipse_a = domainX/2 + ellipseLx  # x semi-axis
 ellipse_b = domainY/2 + ellipseLy  # y semi-axis
@@ -152,8 +152,6 @@ def calculate_distance_to_cube(point, xmin, xmax, ymin, ymax, zmin, zmax):
     return np.sqrt(dx*dx + dy*dy + dz*dz)
 
 # Function to create cube structured mesh points
-
-
 def create_cube_filled_points(xmin, xmax, ymin, ymax, zmin, zmax,
                               x_spacing, y_spacing, z_spacing):
     """

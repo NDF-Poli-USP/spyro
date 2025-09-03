@@ -302,7 +302,7 @@ def test_loop_habc_3d():
     Loop for applying the HABC to the 3D-Fig.8 model in Salas et al. (2022).
     '''
 
-    case = 3  # Integer from 0 to 3
+    case = 0  # Integer from 0 to 3
 
     # ============ SIMULATION PARAMETERS ============
 
@@ -340,7 +340,7 @@ def test_loop_habc_3d():
     loop_modeling = not get_ref_model
 
     # Hyperellipse degrees
-    degree_layer_lst = [None]  # [None, 2, 3, 4, 5]
+    degree_layer_lst = [2]  # [None, 2, 3, 4, 5]
 
     # Reference frequency
     habc_reference_freq_lst = ["source"]  # ["source", "boundary"]
@@ -352,7 +352,7 @@ def test_loop_habc_3d():
     crit_opt = "err_sum"  # err_integral, err_peak
 
     # Number of points for regression (odd number)
-    n_pts = 3
+    n_pts = 1
 
     # ============ MESH AND EIKONAL ============
     # Create dictionary with parameters for the model
@@ -408,43 +408,43 @@ def test_loop_habc_3d():
                 dat_regr_xCR.append(crit_opt)
 
                 for itr_xCR in range(n_pts + 1):
-                    try:
-                        # User-defined heuristic factor x_CR
-                        if itr_xCR == 0:
-                            xCR_usu = None
-                        elif itr_xCR == n_pts:
-                            xCR_usu = xCR_opt
-                        else:
-                            xCR_usu = xCR_cand[itr_xCR - 1]
+                    # try:
+                    # User-defined heuristic factor x_CR
+                    if itr_xCR == 0:
+                        xCR_usu = None
+                    elif itr_xCR == n_pts:
+                        xCR_usu = xCR_opt
+                    else:
+                        xCR_usu = xCR_cand[itr_xCR - 1]
 
-                        print("Iteration {} of {}".format(itr_xCR, n_pts))
+                    print("Iteration {} of {}".format(itr_xCR, n_pts))
 
-                        # Reference to resource usage
-                        tRef = comp_cost("tini")
+                    # Reference to resource usage
+                    tRef = comp_cost("tini")
 
-                        # Run the HABC scheme
-                        plot_comparison = True if itr_xCR == n_pts else False
-                        habc_fig8(Wave_obj, dat_regr_xCR, xCR_usu=xCR_usu,
-                                  plot_comparison=plot_comparison)
+                    # Run the HABC scheme
+                    plot_comparison = True if itr_xCR == n_pts else False
+                    habc_fig8(Wave_obj, dat_regr_xCR, xCR_usu=xCR_usu,
+                              plot_comparison=plot_comparison)
 
-                        # Estimating computational resource usage
-                        comp_cost("tfin", tRef=tRef,
-                                  user_name=Wave_obj.path_case_habc)
+                    # Estimating computational resource usage
+                    comp_cost("tfin", tRef=tRef,
+                              user_name=Wave_obj.path_case_habc)
 
-                        # User-defined heuristic factor x_CR
-                        if itr_xCR == 0:
-                            xCR_cand = get_xCR_usu(
-                                Wave_obj, dat_regr_xCR, "candidates", n_pts)
-                        elif itr_xCR == n_pts - 1:
-                            xCR_opt = get_xCR_usu(
-                                Wave_obj, dat_regr_xCR, "optimal", n_pts)
+                    # User-defined heuristic factor x_CR
+                    if itr_xCR == 0:
+                        xCR_cand = get_xCR_usu(
+                            Wave_obj, dat_regr_xCR, "candidates", n_pts)
+                    elif itr_xCR == n_pts - 1:
+                        xCR_opt = get_xCR_usu(
+                            Wave_obj, dat_regr_xCR, "optimal", n_pts)
 
-                        if n_pts == 1:
-                            break
-
-                    except Exception as e:
-                        print(f"Error Solving: {e}")
+                    if n_pts == 1:
                         break
+
+                    # except Exception as e:
+                    #     print(f"Error Solving: {e}")
+                    #     break
 
 
 # Applying HABCs to the model in Fig. 8 of Salas et al. (2022) in 3D
@@ -458,6 +458,10 @@ if __name__ == "__main__":
 #  0.04 84.857* 78.301  89.437  78.665
 #  0.05 91.477  82.274* 93.810  83.901*
 #  0.06 97.574  86.409  97.935  88.048
+
+# n_hyp 150m    125m    100m     80m
+# nmin   2.8
+# nmax   4.7
 
 # Computing exact eigenvalues is extremely computationally demanding!
 # Maximum Timestep Size: 1.859 ms
