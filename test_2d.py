@@ -296,7 +296,7 @@ def test_loop_habc_2d():
     Loop for applying the HABC to the model in Fig. 8 of Salas et al. (2022).
     '''
 
-    case = 0  # Integer from 0 to 4
+    case = 4  # Integer from 0 to 4
 
     # ============ SIMULATION PARAMETERS ============
 
@@ -307,26 +307,31 @@ def test_loop_habc_2d():
     edge_length_lst = [0.1000, 0.0625, 0.0500, 0.0250, 0.0200]
 
     # Timestep size (in seconds). Initial guess: edge_length / 50
-    dt_usu_lst = [0.00125, 0.00100, 0.00080, 0.00040, 0.00032]
+    dt_usu_lst = [0.00100, 0.00064, 0.000500, 0.00032, 0.00020]
 
     # Factor for the stabilizing term in Eikonal equation
     f_est_lst = [0.06, 0.06, 0.06, 0.06, 0.06]
+
+    # Maximum divisor of the final time
+    max_div_tf_lst = [3, 3, 4, 2, 3]
 
     # Get simulation parameters
     edge_length = edge_length_lst[case]
     dt_usu = dt_usu_lst[case]
     f_est = f_est_lst[case]
+    max_divisor_tf = max_div_tf_lst[case]
     print("\nMesh Size: {:.3f} km".format(edge_length))
-    print("Timestep Size: {:.3f} ms\n".format(1e3 * dt_usu))
-    print("Eikonal Stabilizing Factor: {:.2f}\n".format(f_est))
+    print("Timestep Size: {:.3f} ms".format(1e3 * dt_usu))
+    print("Eikonal Stabilizing Factor: {:.2f}".format(f_est))
+    print("Maximum Divisor of Final Time: {}\n".format(max_divisor_tf))
 
     # ============ HABC PARAMETERS ============
 
     # Infinite model (True: Infinite model, False: HABC scheme)
-    get_ref_model = False
+    get_ref_model = True
 
     # Loop for HABC cases
-    loop_modeling = not get_ref_model
+    loop_modeling = True  # not get_ref_model
 
     # Hyperellipse degrees
     degree_layer_lst = [5]  # [None, 2, 3, 4, 5]
@@ -358,7 +363,6 @@ def test_loop_habc_2d():
         tRef = comp_cost("tini")
 
         # Computing reference get_reference_signal
-        max_divisor_tf = 2 if case == 0 else 1
         Wave_obj.infinite_model(check_dt=True, max_divisor_tf=max_divisor_tf)
 
         # Set model parameters for the HABC scheme
@@ -446,6 +450,10 @@ if __name__ == "__main__":
 # from time import perf_counter  # For runtime
 # tRef = perf_counter()
 # print(f"Time: {perf_counter() - tRef:.4f} seconds")
+
+# n_hyp  100m  62.5m  50m  25m  20m
+# n_min   2.0    2.0  2.0  2.0  2.0
+# n_max   4.4    4.8  4.7  4.7  4.6
 
 # Computing Error Measures: HYP
 # Maximum Integral Error: 1.87%

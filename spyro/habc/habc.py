@@ -1046,10 +1046,9 @@ class HABC_Wave(AcousticWave, HABC_Mesh, RectangLayer,
                     rmtree(new)
                 else:
                     # Create target directory if it does not exist
-                    makedirs(folder)
+                    makedirs(new)
 
                 move(old, new)  # Move the directory
-                rmtree(old)  # Remove the old directory
                 print(f"Folder '{old}' Successfully Renamed to '{new}'.")
 
             except OSError as e:

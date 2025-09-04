@@ -211,20 +211,24 @@ class Modal_Solver():
             Minv = M_ilu.solve if inv_oper else None
             A_ilu = ss.linalg.spilu(Asp) if inv_oper else None
             OPinv = A_ilu.solve if inv_oper else None
-            sigma = None if self.calc_max_dt else 0.
-            mag = 'LM' if self.calc_max_dt else 'SM'
 
         if self.method == 'ARNOLDI':
             # Solve the eigenproblem using ARNOLDI (ARPACK)
-            Lsp = ss.linalg.eigs(
-                Asp, k=k, M=Msp, sigma=sigma, which=mag,
-                Minv=Minv, OPinv=OPinv, return_eigenvectors=False)
+            if self.calc_max_dt:
+                Lsp = ss.linalg.eigs(Asp, k=k, M=Msp, which='LM', Minv=Minv,
+                                     OPinv=OPinv, return_eigenvectors=False)
+            else:
+                Lsp = ss.linalg.eigs(Asp, k=k, M=Msp, sigma=0.0, Minv=Minv,
+                                     OPinv=OPinv, return_eigenvectors=False)
 
         if self.method == 'LANCZOS':
             # Solve the eigenproblem using LANCZOS (ARPACK)
-            Lsp = ss.linalg.eigsh(
-                Asp, k=k, M=Msp, sigma=sigma, which=mag,
-                Minv=Minv, OPinv=OPinv, return_eigenvectors=False)
+            if self.calc_max_dt:
+                Lsp = ss.linalg.eigsh(Asp, k=k, M=Msp, which='LM', Minv=Minv,
+                                      OPinv=OPinv, return_eigenvectors=False)
+            else:
+                Lsp = ss.linalg.eigsh(Asp, k=k, M=Msp, sigma=0.0, Minv=Minv,
+                                      OPinv=OPinv, return_eigenvectors=False)
 
         if self.method == 'LOBPCG':
             # Initialize random vectors for LOBPCG
