@@ -49,7 +49,7 @@ class HyperLayer():
     perim_hyp : `float`
         Perimeter of the full hyperellipse (only 2D)
     surf_hyp : `float`
-        Surface area of the full hyperellipsoidf (only 3D)
+        Surface area of the full hyperellipsoid (only 3D)
     vol : `float`
         Volume of the domain with hyperellipsoidal layer
     v_rat : `float`
@@ -266,7 +266,7 @@ class HyperLayer():
             print("'Geom' Superness. r: {:>5.3f} - n: {:>.1f}".format(rg, g))
             print("'Arit' Superness. r: {:>5.3f} - n: {:>.1f}".format(rz, z))
 
-        return h, g, z
+        return round(h, 1), round(g, 1), round(z, 1)
 
     def loop_criteria(self, spness, n_min=2, n_max=20, monitor=False):
         '''
@@ -323,7 +323,7 @@ class HyperLayer():
                 if monitor:
                     print("ParHypEll - r: {:>5.3f} - n: {:>.1f}".format(r, n))
 
-        return float(n), n_min, n_max
+        return round(float(n), 1), n_min, n_max
 
     def calc_degree_hypershape(self, spness, lim, n_min=2,
                                n_max=20, monitor=False):

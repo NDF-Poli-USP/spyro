@@ -217,7 +217,7 @@ class HABC_Wave(AcousticWave, HABC_Mesh, RectangLayer,
                                 n_type=self.abc_degree_type,
                                 dimension=self.dimension)
 
-            self.case_habc = 'HN' + str(self.abc_deg_layer)  # Label
+            self.case_habc = 'HN' + f"{self.abc_deg_layer:.1f}"  # Label
             deg_str = f" - Degree: {self.abc_deg_layer}"
             lay_str += deg_str
 

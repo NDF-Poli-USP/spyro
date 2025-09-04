@@ -275,3 +275,5 @@ meshio.write_points_cells(
     file_format="vtk"
 )
 print("Mesh saved to u_shape.vtk")
+
+mesh_habc = meshio.Mesh(points=points, cells=[("tetra", cells)])

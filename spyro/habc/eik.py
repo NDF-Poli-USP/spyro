@@ -170,8 +170,8 @@ class HABC_Eikonal(Eikonal_Modeling):
         '''
 
         boundary_eik = self.yp.dat.data_with_halos[boundary]
-        eikmin = boundary_eik.min()
-        idxbnd = np.where(boundary_eik == eikmin)[0][0]
+        idxbnd = boundary_eik.argmin()
+        eikmin = boundary_eik[idxbnd]  # Minimum Eikonal
         idxmin = boundary[0][idxbnd]  # Original index
 
         return eikmin, idxmin

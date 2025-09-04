@@ -302,7 +302,7 @@ def test_loop_habc_3d():
     Loop for applying the HABC to the 3D-Fig.8 model in Salas et al. (2022).
     '''
 
-    case = 0  # Integer from 0 to 3
+    case = 1  # Integer from 0 to 3
 
     # ============ SIMULATION PARAMETERS ============
 
@@ -459,9 +459,9 @@ if __name__ == "__main__":
 #  0.05 91.477  82.274* 93.810  83.901*
 #  0.06 97.574  86.409  97.935  88.048
 
-# n_hyp 150m    125m    100m     80m
-# nmin   2.8
-# nmax   4.7
+# n_hyp 150m 125m 100m  80m
+# nmin   2.8  2.4  2.2  2.1
+# nmax   4.7  4.7  4.7  4.7
 
 # Computing exact eigenvalues is extremely computationally demanding!
 # Maximum Timestep Size: 1.859 ms
