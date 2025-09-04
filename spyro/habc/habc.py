@@ -531,7 +531,7 @@ class HABC_Wave(AcousticWave, HABC_Mesh, RectangLayer,
                                                   fmesh=fmesh)
 
         # Updating the mesh with the absorbing layer
-        self.set_mesh(user_mesh=mesh_habc, mesh_parameters={})
+        self.set_mesh(user_mesh=mesh_habc, input_mesh_parameters={})
         print("Mesh Generated Successfully")
 
         if inf_model:
@@ -862,10 +862,6 @@ class HABC_Wave(AcousticWave, HABC_Mesh, RectangLayer,
                                           quad_rule=self.quadrature_rule,
                                           estimate_maxeig=False, fraction=1.)
 
-        # self.get_and_set_maximum_dt(fraction=1.,
-        #   estimate_max_eigenvalue=False)
-        # print("Maximum Timestep Size: {:.3f} ms".format(1e3 * self.dt))
-
         # Rounding power
         pot = abs(np.ceil(np.log10(max_dt))) + 3
 
@@ -958,7 +954,7 @@ class HABC_Wave(AcousticWave, HABC_Mesh, RectangLayer,
         self.Lz_habc = self.length_z + self.pad_len
 
         if self.dimension == 3:  # 3D
-            self.Ly_habc = self.length_y + 2 * self.pad_len
+            self.Ly_habc = self.mesh_parameters.length_y + 2 * self.pad_len
 
     def infinite_model(self, check_dt=False, max_divisor_tf=1):
         '''
