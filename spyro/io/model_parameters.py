@@ -736,44 +736,6 @@ class Model_parameters:
         -------
         None
         """
-
-        # Setting default mesh parameters
-        mesh_parameters.setdefault("periodic", False)
-        mesh_parameters.setdefault("minimum_velocity", 1.5)
-        mesh_parameters.setdefault("edge_length", None)
-        mesh_parameters.setdefault("dx", None)
-        mesh_parameters.setdefault("length_z", self.length_z)
-        mesh_parameters.setdefault("length_x", self.length_x)
-        mesh_parameters.setdefault("length_y", self.length_y)
-        mesh_parameters.setdefault("abc_pad_length", self.abc_pad_length)
-        mesh_parameters.setdefault("mesh_file", self.mesh_file)
-        mesh_parameters.setdefault("dimension", self.dimension)
-        mesh_parameters.setdefault("mesh_type", self.mesh_type)
-        mesh_parameters.setdefault("source_frequency", self.frequency)
-        mesh_parameters.setdefault("method", self.method)
-        mesh_parameters.setdefault("degree", self.degree)
-        mesh_parameters.setdefault("velocity_model_file",
-                                   self.initial_velocity_model_file)
-        mesh_parameters.setdefault("cell_type", self.cell_type)
-        print(f"Method: {self.method}, Degree: {self.degree}, Dimension: {self.dimension}")
-        mesh_parameters.setdefault(
-            "cells_per_wavelength", cells_per_wavelength(
-                self.method, self.degree, self.dimension))
-
-        self._set_mesh_length(
-            length_z=mesh_parameters["length_z"],
-            length_x=mesh_parameters["length_x"],
-            length_y=mesh_parameters["length_y"],
-        )
-        self.set_mesh_type(new_mesh_type=mesh_parameters["mesh_type"])
-
-        if self.mesh_type == "firedrake_mesh":
-            automatic_mesh = True
-        elif self.mesh_type == "SeismicMesh":
-            automatic_mesh = True
-        else:
-            automatic_mesh = False
-
         if user_mesh is not None:
             self.user_mesh = user_mesh
 
@@ -787,36 +749,7 @@ class Model_parameters:
                 mesh_parameters=self.mesh_parameters,
             )
 
-        if (
-            mesh_parameters["length_z"] is None
-            or mesh_parameters["length_x"] is None
-            or (mesh_parameters["length_y"] is None and self.dimension == 2)
-        ) and self.mesh_type != "firedrake_mesh":
-            warnings.warn(
-                "Mesh dimensions not completely reset from initial dictionary"
-            )
-
-    def set_mesh_type(self, new_mesh_type=None):
-        if new_mesh_type is not None:
-            self.mesh_type = new_mesh_type
-
-    def _creating_automatic_mesh(self, mesh_parameters={}):
-        """
-        Creates an automatic mesh using the specified mesh parameters.
-
-        Args:
-            mesh_parameters (dict): A dictionary containing the parameters for meshing.
-
-        Returns:
-            Mesh: The created mesh object.
-        """
-
-        AutoMeshing = meshing.AutomaticMesh(
-            comm=self.comm,
-            mesh_parameters=mesh_parameters,
-        )
-
-        return AutoMeshing.create_mesh()
+            self.user_mesh = autoMeshing.create_mesh()
 
     def _set_mesh_length(
         self,
