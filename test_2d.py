@@ -323,13 +323,13 @@ def test_loop_habc_2d():
     # ============ HABC PARAMETERS ============
 
     # Infinite model (True: Infinite model, False: HABC scheme)
-    get_ref_model = True
+    get_ref_model = False
 
     # Loop for HABC cases
     loop_modeling = not get_ref_model
 
     # Hyperellipse degrees
-    degree_layer_lst = [None]  # [None, 2, 3, 4, 5]
+    degree_layer_lst = [5]  # [None, 2, 3, 4, 5]
 
     # Reference frequency
     habc_reference_freq_lst = ["source"]  # ["source", "boundary"]
@@ -434,6 +434,9 @@ def test_loop_habc_2d():
                     except Exception as e:
                         print(f"Error Solving: {e}")
                         break
+
+                # Renaming the folder if degree_layer is modified
+                Wave_obj.rename_folder_habc()
 
 
 # Applying HABCs to the model in Fig. 8 of Salas et al. (2022)

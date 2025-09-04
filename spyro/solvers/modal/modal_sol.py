@@ -277,6 +277,7 @@ class Modal_Solver():
             pc_type = "gamg"
 
         opts = {
+            "eps_gen_hermitian": None,       # Problem is Hermitian
             "eps_type": "krylovschur",       # Robust, widely used eigensolver
             "eps_tol": 1e-6,                 # Tight tolerance for accuracy
             "eps_max_it": 200,               # Reasonable iteration cap

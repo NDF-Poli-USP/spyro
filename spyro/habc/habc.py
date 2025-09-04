@@ -2,7 +2,8 @@ import firedrake as fire
 import numpy as np
 import spyro.habc.eik as eik
 import spyro.solvers.modal.modal_sol as eigsol
-from os import getcwd
+from os import getcwd, makedirs, path
+from shutil import move, rmtree
 from sympy import divisors
 from spyro.solvers.acoustic_wave import AcousticWave
 from spyro.meshing.meshing_habc import HABC_Mesh
@@ -101,10 +102,13 @@ class HABC_Wave(AcousticWave, HABC_Mesh, RectangLayer,
         List of receiver locations
     receivers_output : `array`
         Receiver waveform data in the HABC scheme
+    rename_folder_habc()
+        Rename the folder of results if the degree for the hypershape
+        layer is out of the criterion limits
     xCR : `float`
         Heuristic factor for the minimum damping ratio
     xCR_lim: `list`
-        Limits for the heuristic factor.
+        Limits for the heuristic factor
 
     Methods
     -------
@@ -1011,3 +1015,42 @@ class HABC_Wave(AcousticWave, HABC_Mesh, RectangLayer,
         del self.cosHig, self.eta_mask, self.eta_habc
         if self.dimension == 3:
             del self.Ly_habc
+
+    def rename_folder_habc(self):
+        '''
+        Rename the folder of results if the degree for the
+        hypershape layer is out of the criterion limits
+
+        Parameters
+        ----------
+        None
+
+        Returns
+        -------
+        None
+        '''
+
+        if self.n_hyp != self.abc_deg_layer and \
+                self.layer_shape == 'hypershape':
+
+            print("Output Folder for Results Will Be Renamed.")
+
+            # Define the current and new folder names
+            old = self.path_case_habc
+            new = self.path_case_habc[:-8] + f"{self.n_hyp:.1f}" + \
+                self.path_case_habc[-5:]
+
+            try:
+                if path.isdir(new):
+                    # Remove target directory if it exists
+                    rmtree(new)
+                else:
+                    # Create target directory if it does not exist
+                    makedirs(folder)
+
+                move(old, new)  # Move the directory
+                rmtree(old)  # Remove the old directory
+                print(f"Folder '{old}' Successfully Renamed to '{new}'.")
+
+            except OSError as e:
+                print(f"Error Renaming Folder: {e}")

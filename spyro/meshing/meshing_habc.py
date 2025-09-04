@@ -1024,8 +1024,8 @@ class HABC_Mesh():
         hyp_ymax = yc + c_hyp
         hyp_box = (hyp_zmin, hyp_zmax, hyp_xmin, hyp_xmax, hyp_ymin, hyp_ymax)
 
-        # Extract node positions. ToDo: Verify if copy is needed
-        fixed_pnts = self.mesh_original.coordinates.dat.data_with_halos[:]
+        # Extract node positions
+        fixed_pnts = self.mesh_original.coordinates.dat.data_with_halos
 
         # Clip fixed_pnts points to ensure they are within the bounding box
         fixed_pnts[:, 0] = np.clip(fixed_pnts[:, 0], hyp_zmin, hyp_zmax)
@@ -1294,13 +1294,12 @@ class HABC_Mesh():
                                                      spln=spln,
                                                      fmesh=fmesh)
 
-            # Adjusting coordinates
-            coords = hyp_mesh.coordinates.dat.data_with_halos
-            coords[:, [0, 1]] = coords[:, [1, 0]]  # Swap (x,z) -> (z,x)
-            coords[:, 0] = -coords[:, 0]           # Negate z (z,x)
+            # Adjusting coordinates: Swap (x,z) -> (z,x) and apply offsets
+            hyp_mesh.coordinates.dat.data_with_halos[:, [0, 1]] = \
+                hyp_mesh.coordinates.dat.data_with_halos[:, [1, 0]]
             hyp_mesh.coordinates.dat.data_with_halos[:, 0] -= Lz / 2
             hyp_mesh.coordinates.dat.data_with_halos[:, 1] += Lx / 2
-            # fire.VTKFile("output/trunc_hyp_test.pvd").write(hyp_mesh)
+            fire.VTKFile("output/trunc_hyp_test.pvd").write(hyp_mesh)
 
             # Merging the original mesh with the hyperellipse layer mesh
             mesh_habc = self.merge_mesh_2D(self.mesh_original, hyp_mesh)

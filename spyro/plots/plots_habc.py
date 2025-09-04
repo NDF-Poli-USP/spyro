@@ -1,7 +1,7 @@
 # This file contains methods for plotting results from the HABC scheme
 import matplotlib.pyplot as plt
 import numpy as np
-import os
+from os import makedirs, path
 from spyro.habc.lay_len import f_layer, loop_roots
 from spyro.utils.stats_tools import coeff_of_determination
 plt.rcParams.update({"font.family": "serif"})
@@ -23,8 +23,8 @@ def create_folder(folder):
     '''
 
     # Create the folder if it does not exist
-    if not os.path.isdir(folder):
-        os.makedirs(folder)
+    if not path.isdir(folder):
+        makedirs(folder)
 
 
 def plot_function_layer_size(lay_par, freq_par, geom_par, FLpos,

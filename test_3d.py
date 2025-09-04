@@ -302,7 +302,7 @@ def test_loop_habc_3d():
     Loop for applying the HABC to the 3D-Fig.8 model in Salas et al. (2022).
     '''
 
-    case = 1  # Integer from 0 to 3
+    case = 0  # Integer from 0 to 3
 
     # ============ SIMULATION PARAMETERS ============
 
@@ -408,43 +408,46 @@ def test_loop_habc_3d():
                 dat_regr_xCR.append(crit_opt)
 
                 for itr_xCR in range(n_pts + 1):
-                    # try:
-                    # User-defined heuristic factor x_CR
-                    if itr_xCR == 0:
-                        xCR_usu = None
-                    elif itr_xCR == n_pts:
-                        xCR_usu = xCR_opt
-                    else:
-                        xCR_usu = xCR_cand[itr_xCR - 1]
+                    try:
+                        # User-defined heuristic factor x_CR
+                        if itr_xCR == 0:
+                            xCR_usu = None
+                        elif itr_xCR == n_pts:
+                            xCR_usu = xCR_opt
+                        else:
+                            xCR_usu = xCR_cand[itr_xCR - 1]
 
-                    print("Iteration {} of {}".format(itr_xCR, n_pts))
+                        print("Iteration {} of {}".format(itr_xCR, n_pts))
 
-                    # Reference to resource usage
-                    tRef = comp_cost("tini")
+                        # Reference to resource usage
+                        tRef = comp_cost("tini")
 
-                    # Run the HABC scheme
-                    plot_comparison = True if itr_xCR == n_pts else False
-                    habc_fig8(Wave_obj, dat_regr_xCR, xCR_usu=xCR_usu,
-                              plot_comparison=plot_comparison)
+                        # Run the HABC scheme
+                        plot_comparison = True if itr_xCR == n_pts else False
+                        habc_fig8(Wave_obj, dat_regr_xCR, xCR_usu=xCR_usu,
+                                  plot_comparison=plot_comparison)
 
-                    # Estimating computational resource usage
-                    comp_cost("tfin", tRef=tRef,
-                              user_name=Wave_obj.path_case_habc)
+                        # Estimating computational resource usage
+                        comp_cost("tfin", tRef=tRef,
+                                  user_name=Wave_obj.path_case_habc)
 
-                    # User-defined heuristic factor x_CR
-                    if itr_xCR == 0:
-                        xCR_cand = get_xCR_usu(
-                            Wave_obj, dat_regr_xCR, "candidates", n_pts)
-                    elif itr_xCR == n_pts - 1:
-                        xCR_opt = get_xCR_usu(
-                            Wave_obj, dat_regr_xCR, "optimal", n_pts)
+                        # User-defined heuristic factor x_CR
+                        if itr_xCR == 0:
+                            xCR_cand = get_xCR_usu(
+                                Wave_obj, dat_regr_xCR, "candidates", n_pts)
+                        elif itr_xCR == n_pts - 1:
+                            xCR_opt = get_xCR_usu(
+                                Wave_obj, dat_regr_xCR, "optimal", n_pts)
 
-                    if n_pts == 1:
+                        if n_pts == 1:
+                            break
+
+                    except Exception as e:
+                        print(f"Error Solving: {e}")
                         break
 
-                    # except Exception as e:
-                    #     print(f"Error Solving: {e}")
-                    #     break
+                # Renaming the folder if degree_layer is modified
+                Wave_obj.rename_folder_habc()
 
 
 # Applying HABCs to the model in Fig. 8 of Salas et al. (2022) in 3D
