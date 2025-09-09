@@ -1,4 +1,3 @@
-import numpy as np
 import uuid
 from mpi4py import MPI  # noqa:F401
 from firedrake import COMM_WORLD  # noqa:
@@ -199,7 +198,7 @@ class Model_parameters(Read_options, Read_boundary_layer, Read_time_axis, Read_o
 
         if self.source_type == "ricker":
             self.frequency = self.input_dictionary["acquisition"]["frequency"]
-    
+
         self.input_dictionary["acquisition"].setdefault("amplitude", 1.0)
         self.amplitude = self.input_dictionary["acquisition"]["amplitude"]
     
