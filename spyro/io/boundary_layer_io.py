@@ -75,7 +75,7 @@ class Read_boundary_layer:
     @property
     def abc_boundary_layer_type(self):
         return self._abc_boundary_layer_type
-    
+
     @abc_boundary_layer_type.setter
     def abc_boundary_layer_type(self, value):
         abc_dictionary = self.input_dictionary['absorving_boundary_conditions']
@@ -106,13 +106,13 @@ class Read_boundary_layer:
             self.abc_get_ref_model = abc_dictionary["get_ref_model"]
 
         self._abc_boundary_layer_type = value
-    
+
     @property
     def abc_pad_length(self):
         return self._abc_pad_length
-    
+
     @abc_pad_length.setter
     def abc_pad_length(self, value):
         if (value is None or value == 0) and self.abc_boundary_layer_type == "PML":
-            raise ValueError(f"No pad not compatible with PML")
+            raise ValueError("No pad not compatible with PML")
         self._abc_pad_length = value
