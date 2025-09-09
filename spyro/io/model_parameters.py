@@ -311,18 +311,6 @@ class Model_parameters(Read_options, Read_boundary_layer, Read_time_axis, Read_o
         self._source_type = value
 
     @property
-    def source_locations(self):
-        return self._source_locations
-    
-    @source_locations.setter
-    def source_locations(self, value):
-        if value is not None:
-            self.number_of_sources = len(value)
-        else:
-            self.number_of_sources = 1
-        self._source_locations = value
-
-    @property
     def frequency(self):
         return self._frequency
     
@@ -330,22 +318,10 @@ class Model_parameters(Read_options, Read_boundary_layer, Read_time_axis, Read_o
     def frequency(self, value):
         if value is not None:
             if value < 1.0:
-                warnings.warn("Frequency of {value} too low for realistic FWI.")
+                warnings.warn(f"Frequency of {value} too low for realistic FWI.")
             elif value > 50:
-                warnings.warn("Frequency of {value} too high for eficient FWI.")
+                warnings.warn(f"Frequency of {value} too high for eficient FWI.")
         self._frequency = value
-
-    @property
-    def receiver_locations(self):
-        return self._receiver_locations
-    
-    @receiver_locations.setter
-    def receiver_locations(self, value):
-        if value is not None:
-            self.number_of_receivers = len(value)
-        else:
-            self.number_of_receivers = 1
-        self._receiver_locations = value
     
     @property
     def equation_type(self):
