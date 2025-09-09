@@ -1,5 +1,3 @@
-import warnings
-import os
 
 
 class Read_options:
@@ -57,18 +55,18 @@ class Read_options:
     @property
     def variant(self):
         return self._variant
-    
+
     @variant.setter
     def variant(self, value):
         accepted_variants = ["lumped", "equispaced", "DG", None]
         if value not in accepted_variants:
             raise ValueError(f"Variant of {value} is not valid.")
         self._variant = value
-        
+
     @property
     def method(self):
         return self._method
-    
+
     @method.setter
     def method(self, value):
         mlt_equivalents = [
@@ -118,7 +116,7 @@ class Read_options:
     @property
     def cell_type(self):
         return self._cell_type
-    
+
     @cell_type.setter
     def cell_type(self, value):
         triangle_equivalents = [
@@ -154,7 +152,7 @@ class Read_options:
             self._cell_type = canonical
         else:
             raise ValueError(f"Cell type '{value}' is not supported.")
-        
+
         if self.variant is not None and self.method is None:
             if self.variant == "lumped" and canonical == "triangle":
                 self.method = "mass_lumped_triangle"
@@ -174,17 +172,17 @@ class Read_options:
     @property
     def degree(self):
         return self._degree
-    
+
     @degree.setter
     def degree(self, value):
         if not isinstance(value, int):
             raise ValueError("Degree has to be integer")
         self._degree = value
-    
+
     @property
     def dimension(self):
         return self._dimension
-    
+
     @dimension.setter
     def dimension(self, value):
         if value not in {2, 3}:
