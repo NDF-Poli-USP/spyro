@@ -13,28 +13,28 @@ class Read_time_axis:
     @property
     def initial_time(self):
         return self._initial_time
-    
+
     @initial_time.setter
     def initial_time(self, value):
         if value is None:
             value = 0.0
         self._initial_time = value
-    
+
     @property
     def final_time(self):
         return self._final_time
-    
+
     @final_time.setter
     def final_time(self, value):
         if value < self.initial_time:
             raise ValueError(f"Final time of {value} lower than initial time of {self.initial_time} not allowed.")
-        
+
         self._final_time = value
 
     @property
     def time_integrator(self):
         return self._time_integrator
-    
+
     @time_integrator.setter
     def time_integrator(self, value):
         if value != "central_difference":

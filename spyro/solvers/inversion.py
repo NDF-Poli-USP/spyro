@@ -162,22 +162,24 @@ class FullWaveformInversion(AcousticWave):
         """
         super().__init__(dictionary=dictionary, comm=comm)
         default_optimization_parameters = {
-                "General": {"Secant": {"Type": "Limited-Memory BFGS",
-                                       "Maximum Storage": 10}},
-                "Step": {
-                    "Type": "Augmented Lagrangian",
-                    "Augmented Lagrangian": {
-                        "Subproblem Step Type": "Line Search",
-                        "Subproblem Iteration Limit": 5.0,
-                    },
-                    "Line Search": {"Descent Method": {"Type": "Quasi-Newton Step"}},
+            "General": {"Secant": {
+                "Type": "Limited-Memory BFGS",
+                "Maximum Storage": 10
+            }},
+            "Step": {
+                "Type": "Augmented Lagrangian",
+                "Augmented Lagrangian": {
+                    "Subproblem Step Type": "Line Search",
+                    "Subproblem Iteration Limit": 5.0,
                 },
-                "Status Test": {
-                    "Gradient Tolerance": 1e-16,
-                    "Iteration Limit": None,
-                    "Step Tolerance": 1.0e-16,
-                },
-            }
+                "Line Search": {"Descent Method": {"Type": "Quasi-Newton Step"}},
+            },
+            "Status Test": {
+                "Gradient Tolerance": 1e-16,
+                "Iteration Limit": None,
+                "Step Tolerance": 1.0e-16,
+            },
+        }
         self.input_dictionary.setdefault("inversion", {})
         self.input_dictionary["inversion"].setdefault("initial_guess_model_file", None)
         self.input_dictionary["inversion"].setdefault("optimization_parameters", default_optimization_parameters)
@@ -202,22 +204,22 @@ class FullWaveformInversion(AcousticWave):
         self.guess_forward_solution = None
         self.has_gradient_mask = False
         self.functional_history = []
-    
+
     @property
     def real_velocity_model_file(self):
         return self._real_velocity_model_file
-    
+
     @real_velocity_model_file.setter
     def real_velocity_model_file(self, value):
         if value is not None:
             if not os.path.exists(value):
                 raise FileNotFoundError(f"Velocity model file '{value}' does not exist")
         self._real_velocity_model_file = value
-    
+
     @property
     def real_shot_record_files(self):
         return self._real_shot_record_files
-    
+
     @real_shot_record_files.setter
     def real_shot_record_files(self, value):
         if value is not None:

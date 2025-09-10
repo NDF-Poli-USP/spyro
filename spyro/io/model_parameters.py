@@ -201,7 +201,7 @@ class Model_parameters(Read_options, Read_boundary_layer, Read_time_axis, Read_o
 
         self.input_dictionary["acquisition"].setdefault("amplitude", 1.0)
         self.amplitude = self.input_dictionary["acquisition"]["amplitude"]
-    
+
         self.input_dictionary["acquisition"].setdefault("delay", 1.5)
         self.delay = self.input_dictionary["acquisition"]["delay"]
 
@@ -254,7 +254,7 @@ class Model_parameters(Read_options, Read_boundary_layer, Read_time_axis, Read_o
     @property
     def source_locations(self):
         return self._source_locations
-    
+
     @source_locations.setter
     def source_locations(self, value):
         if self.dimension == 2:
@@ -270,11 +270,11 @@ class Model_parameters(Read_options, Read_boundary_layer, Read_time_axis, Read_o
             self.number_of_sources = 1
 
         self._source_locations = value
-    
+
     @property
     def receiver_locations(self):
         return self._receiver_locations
-    
+
     @receiver_locations.setter
     def receiver_locations(self, value):
         if self.dimension == 2:
@@ -292,7 +292,7 @@ class Model_parameters(Read_options, Read_boundary_layer, Read_time_axis, Read_o
     @property
     def delay_type(self):
         return self._delay_type
-    
+
     @delay_type.setter
     def delay_type(self, value):
         accepted_values = ["multiples_of_minimun", "time"]
@@ -302,7 +302,7 @@ class Model_parameters(Read_options, Read_boundary_layer, Read_time_axis, Read_o
     @property
     def source_type(self):
         return self._source_type
-    
+
     @source_type.setter
     def source_type(self, value):
         accepted_values = ["ricker", "MMS"]
@@ -312,7 +312,7 @@ class Model_parameters(Read_options, Read_boundary_layer, Read_time_axis, Read_o
     @property
     def frequency(self):
         return self._frequency
-    
+
     @frequency.setter
     def frequency(self, value):
         if value is not None:
@@ -321,11 +321,11 @@ class Model_parameters(Read_options, Read_boundary_layer, Read_time_axis, Read_o
             elif value > 50:
                 warnings.warn(f"Frequency of {value} too high for eficient FWI.")
         self._frequency = value
-    
+
     @property
     def equation_type(self):
         return self._equation_type
-    
+
     @equation_type.setter
     def equation_type(self, value):
         if value != "second_order_in_pressure":
@@ -337,7 +337,7 @@ class Model_parameters(Read_options, Read_boundary_layer, Read_time_axis, Read_o
     @property
     def parallelism_type(self):
         return self._parallelism_type
-    
+
     @parallelism_type.setter
     def parallelism_type(self, value):
         accepted_values = ["custom", "automatic", "spatial", ]
@@ -465,7 +465,7 @@ def _check_point_in_domain(point_coordinates, mesh_lengths, negative_z):
     """
     if negative_z:
         mesh_lengths[0] = -mesh_lengths[0]
-    
+
     for i, (coord, length) in enumerate(zip(point_coordinates, mesh_lengths)):
         if negative_z and i == 0:
             # For negative_z, domain is [length, 0] (length is negative)

@@ -69,7 +69,7 @@ class MeshingParameters():
         self.edge_length = None
         self.cells_per_wavelength = None
         self.negative_z = negative_z
-    
+
     def _set_length_with_unit_check(self, attr_name, value):
         """
         Checks if all dimensions are in the same unit (meters or km)
