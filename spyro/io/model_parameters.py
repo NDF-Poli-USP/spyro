@@ -208,6 +208,9 @@ class Model_parameters(Read_options, Read_boundary_layer, Read_time_axis, Read_o
         self.input_dictionary["acquisition"].setdefault("delay_type", "multiples_of_minimun")
         self.delay_type = self.input_dictionary["acquisition"]["delay_type"]
 
+        self.input_dictionary["acquisition"].setdefault("source_locations", None)
+        self.source_locations = self.input_dictionary["acquisition"]["source_locations"]
+
         # Setting up MPI communicator and checking parallelism:
         self.input_dictionary.setdefault("parallelism", {})
         self.input_dictionary["parallelism"].setdefault("type", "automatic")
@@ -235,8 +238,6 @@ class Model_parameters(Read_options, Read_boundary_layer, Read_time_axis, Read_o
             abc_pad_length=self.input_dictionary["absorving_boundary_conditions"]["pad_length"],
             negative_z=self.input_dictionary["mesh"]["negative_z"]
         )
-        self.input_dictionary["acquisition"].setdefault("source_locations", None)
-        self.source_locations = self.input_dictionary["acquisition"]["source_locations"]
 
         self.input_dictionary["acquisition"].setdefault("receiver_locations", None)
         self.receiver_locations = self.input_dictionary["acquisition"]["receiver_locations"]
@@ -256,14 +257,18 @@ class Model_parameters(Read_options, Read_boundary_layer, Read_time_axis, Read_o
 
     @source_locations.setter
     def source_locations(self, value):
+        # Sources has to be estabilshied before mesh parameters object
+        length_z = self.input_dictionary["mesh"]["Lz"]
+        length_x = self.input_dictionary["mesh"]["Lx"]
         if self.dimension == 2:
-            mesh_lengths = [self.mesh_parameters.length_z, self.mesh_parameters.length_x]
+            mesh_lengths = [length_z, length_x]
         elif self.dimension == 3:
-            mesh_lengths = [self.mesh_parameters.length_z, self.mesh_parameters.length_x, self.mesh_parameters.length_y]
+            length_y = self.input_dictionary["mesh"]["Ly"]
+            mesh_lengths = [length_z, length_x, length_y]
         if value is not None:
             for source in value:
                 source_points = list(source)
-                _check_point_in_domain(source_points, mesh_lengths, self.mesh_parameters.negative_z)
+                _check_point_in_domain(source_points, mesh_lengths, True)
             self.number_of_sources = len(value)
         else:
             self.number_of_sources = 1
