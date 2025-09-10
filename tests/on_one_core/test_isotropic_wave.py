@@ -17,7 +17,13 @@ dummy_dict = {
         "output_frequency": 100,
         "gradient_sampling_frequency": 1,
     },
-    "mesh": {},
+    "mesh" : {
+        "Lz": 1.0,
+        "Lx": 1.0,
+        "Ly": 1.0,
+        "mesh_file": None,
+        "mesh_type": "firedrake_mesh",
+    },
     "acquisition": {
         "receiver_locations": [],
         "source_type": "ricker",
