@@ -296,7 +296,7 @@ def test_loop_habc_2d():
     Loop for applying the HABC to the model in Fig. 8 of Salas et al. (2022).
     '''
 
-    case = 4  # Integer from 0 to 4
+    case = 0  # Integer from 0 to 4
 
     # ============ SIMULATION PARAMETERS ============
 
@@ -310,7 +310,7 @@ def test_loop_habc_2d():
     dt_usu_lst = [0.00100, 0.00064, 0.000500, 0.00032, 0.00020]
 
     # Factor for the stabilizing term in Eikonal equation
-    f_est_lst = [0.06, 0.06, 0.06, 0.06, 0.06]
+    f_est_lst = [0.06, 0.02, 0.02, 0.02, 0.04]
 
     # Maximum divisor of the final time
     max_div_tf_lst = [3, 3, 4, 2, 3]
@@ -328,13 +328,13 @@ def test_loop_habc_2d():
     # ============ HABC PARAMETERS ============
 
     # Infinite model (True: Infinite model, False: HABC scheme)
-    get_ref_model = True
+    get_ref_model = False
 
     # Loop for HABC cases
-    loop_modeling = True  # not get_ref_model
+    loop_modeling = not get_ref_model
 
     # Hyperellipse degrees
-    degree_layer_lst = [5]  # [None, 2, 3, 4, 5]
+    degree_layer_lst = [2]  # [None, 2, 3, 4, 5]
 
     # Reference frequency
     habc_reference_freq_lst = ["source"]  # ["source", "boundary"]
@@ -447,20 +447,36 @@ def test_loop_habc_2d():
 if __name__ == "__main__":
     test_loop_habc_2d()
 
-# from time import perf_counter  # For runtime
-# tRef = perf_counter()
-# print(f"Time: {perf_counter() - tRef:.4f} seconds")
+# eik_min = 83.333 ms
+# f_est   100m   62.5m     50m     25m     20m
+#  0.01 66.836   --/--   --/--   --/--   --/--
+#  0.02 73.308  83.907* 83.944* 83.812* 82.193
+#  0.03 77.178  85.322  85.068  84.398   --/--
+#  0.04 79.680  86.352  85.933  84.901  83.434*
+#  0.05 81.498  87.263  86.718  85.375  83.863
+#  0.06 82.942* 88.130  87.470  85.837  84.250
+#  0.07 84.160  88.977  88.207  86.292  84.613
+#  0.08 85.233  89.815  88.934  86.745  84.961
 
 # n_hyp  100m  62.5m  50m  25m  20m
 # n_min   2.0    2.0  2.0  2.0  2.0
 # n_max   4.4    4.8  4.7  4.7  4.6
 
-# Computing Error Measures: HYP
-# Maximum Integral Error: 1.87%
-# Maximum Peak Error: 2.55%
-# Acoustic Energy: 6.06e-08
+# freq    N2.0    N3.0    N4.0    N4.4     REC
+# num  0.50443 0.48266 0.47423 0.47270 0.45539
+# ana  0.66479 0.46268 0.37281 0.35048 0.22232
 
-# Computing Error Measures: REC
-# Maximum Integral Error: 0.64%
-# Maximum Peak Error: 1.48%
-# Acoustic Energy: 4.60e-08
+# freq    N2.0    N3.0    N4.0    N4.4     REC
+# num  0.50443 0.48266 0.47423 0.47270 0.45539
+# ana  1.12663 0.78412 0.63181 0.59396 0.37677
+# rat  2.23347 1.62458 1.33229 1.25653 0.82736
+
+# from time import perf_counter  # For runtime
+# tRef = perf_counter()
+# print(f"Time: {perf_counter() - tRef:.4f} seconds")
+
+
+# Neumann 0 0.9729550745276565 0.1 -0.31337829009150164
+# Neumann 0 0.9729550745276565 0.5 -1.077482899918643
+# Neumann 0 0.9729550745276565 1.0 -1.279299599733833
+# Neumann 0 0.9729550745276565 1.5 -1.0058794778716127

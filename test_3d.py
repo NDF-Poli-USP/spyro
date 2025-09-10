@@ -465,7 +465,3 @@ if __name__ == "__main__":
 # n_hyp  150m 125m 100m  80m
 # n_min   2.8  2.4  2.2  2.1
 # n_max   4.7  4.7  4.7  4.7
-
-# Computing exact eigenvalues is extremely computationally demanding!
-# Maximum Timestep Size: 1.859 ms
-# Selected Timestep Size: 1.600 ms

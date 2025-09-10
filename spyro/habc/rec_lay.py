@@ -61,9 +61,6 @@ class RectangLayer():
         # Original domain dimensions
         self.dom_dim = dom_dim
 
-        # Original domain dimensions
-        self.dom_dim = dom_dim
-
         # Model dimension
         self.dimension = dimension
 

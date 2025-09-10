@@ -59,7 +59,7 @@ class Eikonal_Modeling():
     ele_type : `string`
         Finite element type. 'CG' or 'KMV'. Default is 'CG'
     f_est : `float`
-            Factor for the stabilizing term in Eikonal Eq. Default is 0.06
+            Factor for the stabilizing term in Eikonal Eq. Default is 0.03
     p_eik : `int`
         Finite element order
     source_locations: `list`of `tuples`
@@ -90,7 +90,7 @@ class Eikonal_Modeling():
     '''
 
     def __init__(self, dimension, source_locations,
-                 ele_type='CG', p_eik=None, f_est=0.06, tol=1e-16):
+                 ele_type='CG', p_eik=None, f_est=0.03, tol=1e-16):
         '''
         Initialize the Eikonal_Modeling class
 
@@ -105,7 +105,7 @@ class Eikonal_Modeling():
         p_eik : `int`, optional
             Finite element order for the Eikonal analysis. Default is None
         f_est : `float`, optional
-            Factor for the stabilizing term in Eikonal Eq. Default is 0.06
+            Factor for the stabilizing term in Eikonal Eq. Default is 0.03
         tol : `float`, optional
             User solver tolerance. Default is 1e-16
 

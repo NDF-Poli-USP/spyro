@@ -174,6 +174,10 @@ class HABC_Mesh():
         - (z_data[bnds], x_data[bnds], y_data[bnds]) for 3D
     c : `firedrake function`
         Velocity model without absorbing layer
+    c_bnd_min : `float` 
+        Minimum velocity value on the boundary of the original domain
+    c_bnd_max : `float`
+        Maximum velocity value on the boundary of the original domain
     c_min : `float`
         Minimum velocity value in the model without absorbing layer
     c_max : `float`
@@ -192,7 +196,7 @@ class HABC_Mesh():
     ele_type_eik : `string`
         Finite element type for the Eikonal modeling. 'CG' or 'KMV'
     f_est : `float`
-        Factor for the stabilizing term in Eikonal Eq. Default is 0.06
+        Factor for the stabilizing term in Eikonal Eq. Default is 0.03
     funct_space_eik: `firedrake function space`
         Function space for the Eikonal modeling
     lmin : `float`
@@ -427,7 +431,7 @@ class HABC_Mesh():
         cbnd_str = "Boundary Velocity Range (km/s): {:.3f} - {:.3f}"
         print(cbnd_str.format(self.c_bnd_min, self.c_bnd_max))
 
-    def properties_eik_mesh(self, p_usu=None, ele_type='CG', f_est=0.06):
+    def properties_eik_mesh(self, p_usu=None, ele_type='CG', f_est=0.03):
         '''
         Set the properties for the mesh used to solve the Eikonal equation
 
@@ -438,7 +442,7 @@ class HABC_Mesh():
         ele_type : `string`, optional
             Finite element type. 'CG' or 'KMV'. Default is 'CG'
         f_est : `float`, optional
-            Factor for the stabilizing term in Eikonal Eq. Default is 0.06
+            Factor for the stabilizing term in Eikonal Eq. Default is 0.03
 
         Returns
         -------
@@ -455,14 +459,14 @@ class HABC_Mesh():
         # Factor for the stabilizing term in Eikonal equation
         self.f_est = f_est
 
-    def preamble_mesh_operations(self, f_est=0.06):
+    def preamble_mesh_operations(self, f_est=0.03):
         '''
         Perform mesh operations previous to size an absorbing layer
 
         Parameters
         ----------
         f_est : `float`, optional
-            Factor for the stabilizing term in Eikonal Eq. Default is 0.06
+            Factor for the stabilizing term in Eikonal Eq. Default is 0.03
 
         Returns
         -------
@@ -1257,7 +1261,7 @@ class HABC_Mesh():
         ----------
         hyp_par : `tuple`
             Hyperellipshape parameters.
-            Structure 2D: (n_hyp, perimeter, a_hyp, b_hyp, c_hyp)
+            Structure 2D: (n_hyp, perimeter, a_hyp, b_hyp)
             Structure 3D: (n_hyp, surface, a_hyp, b_hyp, c_hyp)
             - n_hyp : `float`
                 Degree of the hypershape

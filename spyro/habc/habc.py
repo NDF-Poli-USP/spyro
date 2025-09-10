@@ -631,8 +631,8 @@ class HABC_Wave(AcousticWave, HABC_Mesh, RectangLayer,
             Method to use for solving the eigenvalue problem.
             Default is None, which uses as the 'ARNOLDI' method in 2D models
             and the 'KRYLOVSCH_CH' method in 3D models.
-            Options: 'ARNOLDI', 'LANCZOS', 'LOBPCG' 'KRYLOVSCH_CH',
-            'KRYLOVSCH_CG', 'KRYLOVSCH_GH' or 'KRYLOVSCH_GG'.
+            Options: 'ANALYTICAL', 'ARNOLDI', 'LANCZOS', 'LOBPCG',
+            'KRYLOVSCH_CH', 'KRYLOVSCH_CG', 'KRYLOVSCH_GH' or 'KRYLOVSCH_GG'.
             In 'KRYLOVSCH_(K)(P)' methods, (K) indicates the Krylov solver to
             use: 'C' for Conjugate Gradient (cg) or 'G' for Generalized Minimal
             Residual (gmres). (P) indicates the preconditioner to use: 'H' for
@@ -718,7 +718,7 @@ class HABC_Wave(AcousticWave, HABC_Mesh, RectangLayer,
         mod_sol = eigsol.Modal_Solver(self.dimension, method=method)
 
         Lsp = mod_sol.solve_eigenproblem(
-            self.c, self.function_space, shift=1e-8,
+            self.c, V=self.function_space, shift=1e-8,
             quad_rule=self.quadrature_rule)
 
         if monitor:
@@ -730,6 +730,38 @@ class HABC_Wave(AcousticWave, HABC_Mesh, RectangLayer,
         min_eigval = max(np.unique(Lsp[(Lsp > 0.) & (np.imag(Lsp) == 0.)]))
         self.fundam_freq = np.real(np.sqrt(min_eigval) / (2 * np.pi))
         print("Fundamental Frequency (Hz): {0:.5f}".format(self.fundam_freq))
+
+        mod_sol.method = 'ANALYTICAL'
+
+        # Original domain dimensions and truncated domain dimensions
+        dom_dim, dom_lay_trunc = self.habc_domain_dimensions(full_hyp=False)
+
+        # Hypershape parameters
+        hyper_axes_trunc = [dim_trunc / 2. for dim_trunc in dom_lay_trunc]
+        hyp_par = (self.n_hyp, *hyper_axes_trunc)
+
+        # Cut plane percentage
+        Lz = dom_dim[1]
+        z_cut = Lz / 2.  # Cut plane at free surface
+        b = Lz / 2. + self.pad_len  # Semi-axis of the hypershape
+        cut_plane_percent = z_cut / b
+
+        # Equivalent isotropic velocity
+        idx = -1
+        c_bnd = self.eik_bnd[idx][1]
+        eik = self.eik_bnd[idx][2]
+        lref = self.eik_bnd[idx][4]
+
+        # c_eq = (lref / eik) * self.c_bnd_min / self.c_bnd_max
+        c_eq = (lref + self.pad_len) / (eik + self.pad_len / self.c_bnd_min)
+        Lsp = mod_sol.solve_eigenproblem(
+            c_eq, hyp_par=hyp_par, cut_plane_percent=cut_plane_percent)
+
+        f_ana = np.sqrt(Lsp) / (2 * np.pi)
+        print("Analytical Fundamental Frequency (Hz): {0:.5f}".format(f_ana))
+
+        # import ipdb
+        # ipdb.set_trace()
 
     def damping_layer(self, xCR_usu=None, method=None):
         '''

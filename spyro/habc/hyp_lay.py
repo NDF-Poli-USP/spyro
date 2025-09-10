@@ -1,6 +1,7 @@
 import numpy as np
 from scipy.integrate import dblquad, quad
 from scipy.special import beta, betainc, gamma
+from sys import float_info
 from spyro.utils.error_management import value_dimension_error
 
 # Work from Ruben Andres Salas, Andre Luis Ferreira da Silva,
@@ -492,7 +493,7 @@ class HyperLayer():
             err = f"Truncation plane must be 0 <= z0 <= {b:.3f}, got {z0:.3f}"
             raise ValueError(err)
 
-        w = (z0 / b) ** n  # w <= 1
+        w = max((z0 / b) ** n, float_info.min)  # w <= 1
         p = 1 / n
         q = 1 + 1 / n
         B_w = beta(p, q) * betainc(p, q, w)  # Non-regularized B_z(p, q)
@@ -554,7 +555,7 @@ class HyperLayer():
             err = f"Truncation plane must be 0 <= z0 <= {b:.3f}, got {z0:.3f}"
             raise ValueError(err)
 
-        w = (z0 / b) ** n  # w <= 1
+        w = max((z0 / b) ** n, float_info.min)   # w <= 1
         p = 1 / n
         q = 1 + 2 / n
         A_f = gamma(1 + p)**2 / gamma(q)

@@ -152,7 +152,7 @@ class NRBC():
             Boundary hypershape points where the normal vector is computed.
             Structure: [x, y] for 2D and [x, y, z] for 3D
         hyper_axes : `list`
-            Semi-axes of the hyperellipse [a, b] or hyperellipsoid [a, b, c].
+            Semi-axes of the hyperellipse [a, b] or hyperellipsoid [a, b, c]
         n : `float`
             Degree of the hyperellipse
 
