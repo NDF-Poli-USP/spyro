@@ -2,6 +2,7 @@ import uuid
 from mpi4py import MPI  # noqa:F401
 from firedrake import COMM_WORLD  # noqa:
 import warnings
+from copy import deepcopy
 from ..io.dictionaryio import Read_options, Read_outputs
 from ..io.boundary_layer_io import Read_boundary_layer
 from ..io.time_io import Read_time_axis
@@ -449,7 +450,7 @@ def _validate_enum(value, accepted_values, name):
     return value
 
 
-def _check_point_in_domain(point_coordinates, mesh_lengths, negative_z):
+def _check_point_in_domain(point_coordinates, input_mesh_lengths, negative_z):
     """
     Checks if a point is within the mesh domain.
 
@@ -467,7 +468,10 @@ def _check_point_in_domain(point_coordinates, mesh_lengths, negative_z):
     ValueError
         If the point is outside the mesh domain.
     """
+    # avoid changing mesh lengths outside of this
+    mesh_lengths = deepcopy(input_mesh_lengths)
     if negative_z:
+        print("DEBUG")
         mesh_lengths[0] = -mesh_lengths[0]
 
     for i, (coord, length) in enumerate(zip(point_coordinates, mesh_lengths)):
