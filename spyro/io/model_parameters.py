@@ -208,12 +208,6 @@ class Model_parameters(Read_options, Read_boundary_layer, Read_time_axis, Read_o
         self.input_dictionary["acquisition"].setdefault("delay_type", "multiples_of_minimun")
         self.delay_type = self.input_dictionary["acquisition"]["delay_type"]
 
-        self.input_dictionary["acquisition"].setdefault("source_locations", None)
-        self.source_locations = self.input_dictionary["acquisition"]["source_locations"]
-
-        self.input_dictionary["acquisition"].setdefault("receiver_locations", None)
-        self.receiver_locations = self.input_dictionary["acquisition"]["receiver_locations"]
-
         # Setting up MPI communicator and checking parallelism:
         self.input_dictionary.setdefault("parallelism", {})
         self.input_dictionary["parallelism"].setdefault("type", "automatic")
@@ -241,6 +235,11 @@ class Model_parameters(Read_options, Read_boundary_layer, Read_time_axis, Read_o
             abc_pad_length=self.input_dictionary["absorving_boundary_conditions"]["pad_length"],
             negative_z=self.input_dictionary["mesh"]["negative_z"]
         )
+        self.input_dictionary["acquisition"].setdefault("source_locations", None)
+        self.source_locations = self.input_dictionary["acquisition"]["source_locations"]
+
+        self.input_dictionary["acquisition"].setdefault("receiver_locations", None)
+        self.receiver_locations = self.input_dictionary["acquisition"]["receiver_locations"]
 
         # Check automatic adjoint
         self.input_dictionary["time_axis"].setdefault("output_frequency", 99999)
