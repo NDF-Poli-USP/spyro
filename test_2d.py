@@ -334,7 +334,7 @@ def test_loop_habc_2d():
     loop_modeling = not get_ref_model
 
     # Hyperellipse degrees
-    degree_layer_lst = [2]  # [None, 2, 3, 4, 5]
+    degree_layer_lst = [None]  # [None, 2, 3, 4, 5]
 
     # Reference frequency
     habc_reference_freq_lst = ["source"]  # ["source", "boundary"]
@@ -424,6 +424,9 @@ def test_loop_habc_2d():
                         comp_cost("tfin", tRef=tRef,
                                   user_name=Wave_obj.path_case_habc)
 
+                        if n_pts == 1:
+                            break
+
                         # User-defined heuristic factor x_CR
                         if itr_xCR == 0:
                             xCR_cand = get_xCR_usu(
@@ -431,9 +434,6 @@ def test_loop_habc_2d():
                         elif itr_xCR == n_pts - 1:
                             xCR_opt = get_xCR_usu(
                                 Wave_obj, dat_regr_xCR, "optimal", n_pts)
-
-                        if n_pts == 1:
-                            break
 
                     except Exception as e:
                         print(f"Error Solving: {e}")
@@ -464,19 +464,9 @@ if __name__ == "__main__":
 
 # freq    N2.0    N3.0    N4.0    N4.4     REC
 # num  0.50443 0.48266 0.47423 0.47270 0.45539
-# ana  0.66479 0.46268 0.37281 0.35048 0.22232
-
-# freq    N2.0    N3.0    N4.0    N4.4     REC
-# num  0.50443 0.48266 0.47423 0.47270 0.45539
-# ana  1.12663 0.78412 0.63181 0.59396 0.37677
-# rat  2.23347 1.62458 1.33229 1.25653 0.82736
+# ana  1.34820 0.98311 0.83133 0.79469 0.59302
+# rat
 
 # from time import perf_counter  # For runtime
 # tRef = perf_counter()
 # print(f"Time: {perf_counter() - tRef:.4f} seconds")
-
-
-# Neumann 0 0.9729550745276565 0.1 -0.31337829009150164
-# Neumann 0 0.9729550745276565 0.5 -1.077482899918643
-# Neumann 0 0.9729550745276565 1.0 -1.279299599733833
-# Neumann 0 0.9729550745276565 1.5 -1.0058794778716127

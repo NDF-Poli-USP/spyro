@@ -2,8 +2,8 @@ import firedrake as fire
 import numpy as np
 import spyro.habc.eik as eik
 import spyro.solvers.modal.modal_sol as eigsol
-from os import getcwd, makedirs, path
-from shutil import move, rmtree
+from os import getcwd, path, rename
+from shutil import rmtree
 from sympy import divisors
 from spyro.solvers.acoustic_wave import AcousticWave
 from spyro.meshing.meshing_habc import HABC_Mesh
@@ -731,37 +731,39 @@ class HABC_Wave(AcousticWave, HABC_Mesh, RectangLayer,
         self.fundam_freq = np.real(np.sqrt(min_eigval) / (2 * np.pi))
         print("Fundamental Frequency (Hz): {0:.5f}".format(self.fundam_freq))
 
-        mod_sol.method = 'ANALYTICAL'
+        # mod_sol.method = 'ANALYTICAL'
 
-        # Original domain dimensions and truncated domain dimensions
-        dom_dim, dom_lay_trunc = self.habc_domain_dimensions(full_hyp=False)
+        # # Original domain dimensions and truncated domain dimensions
+        # dom_dim, dom_lay = self.habc_domain_dimensions(full_hyp=True)
 
-        # Hypershape parameters
-        hyper_axes_trunc = [dim_trunc / 2. for dim_trunc in dom_lay_trunc]
-        hyp_par = (self.n_hyp, *hyper_axes_trunc)
+        # # Hypershape parameters
+        # hyper_axes = [dim_lay / 2. for dim_lay in dom_lay]
+        # hyp_par = (self.n_hyp, *hyper_axes)
 
-        # Cut plane percentage
-        Lz = dom_dim[1]
-        z_cut = Lz / 2.  # Cut plane at free surface
-        b = Lz / 2. + self.pad_len  # Semi-axis of the hypershape
-        cut_plane_percent = z_cut / b
+        # # Cut plane percentage
+        # Lx, Lz = dom_dim[:2]
+        # z_cut = Lz / 2.  # Cut plane at free surface
+        # b = Lz / 2. + self.pad_len  # Semi-axis of the hypershape
+        # cut_plane_percent = z_cut / b
 
-        # Equivalent isotropic velocity
-        idx = -1
-        c_bnd = self.eik_bnd[idx][1]
-        eik = self.eik_bnd[idx][2]
-        lref = self.eik_bnd[idx][4]
+        # # Equivalent isotropic velocity
+        # uu = fire.Function(self.function_space)
+        # x, z = fire.SpatialCoordinate(self.mesh)
+        # # uu.interpolate(fire.cos(fire.pi * x / self.Lx_habc) * fire.cos(fire.pi * z / self.Lz_habc))
+        # # uu.interpolate(fire.cos(fire.pi * x / self.Lx_habc))
+        # uu.interpolate(fire.cos(fire.pi * z / self.Lz_habc))
+        # num = fire.assemble(self.c * fire.inner(fire.grad(uu), fire.grad(uu)) * fire.dx(domain=self.mesh))
+        # den = fire.assemble(fire.inner(fire.grad(uu), fire.grad(uu)) * fire.dx(domain=self.mesh))
+        # c_eq = num / den
 
-        # c_eq = (lref / eik) * self.c_bnd_min / self.c_bnd_max
-        c_eq = (lref + self.pad_len) / (eik + self.pad_len / self.c_bnd_min)
-        Lsp = mod_sol.solve_eigenproblem(
-            c_eq, hyp_par=hyp_par, cut_plane_percent=cut_plane_percent)
-
-        f_ana = np.sqrt(Lsp) / (2 * np.pi)
-        print("Analytical Fundamental Frequency (Hz): {0:.5f}".format(f_ana))
-
+        # print(c_eq)
         # import ipdb
         # ipdb.set_trace()
+
+        # Lsp = mod_sol.solve_eigenproblem(
+        #     c_eq, hyp_par=hyp_par, cut_plane_percent=cut_plane_percent)
+        # f_ana = np.sqrt(Lsp) / (2 * np.pi)
+        # print("Analytical Fundamental Frequency (Hz): {0:.5f}".format(f_ana))
 
     def damping_layer(self, xCR_usu=None, method=None):
         '''
@@ -1076,11 +1078,8 @@ class HABC_Wave(AcousticWave, HABC_Mesh, RectangLayer,
                 if path.isdir(new):
                     # Remove target directory if it exists
                     rmtree(new)
-                else:
-                    # Create target directory if it does not exist
-                    makedirs(new)
 
-                move(old, new)  # Move the directory
+                rename(old, new)  # Rename the directory
                 print(f"Folder '{old}' Successfully Renamed to '{new}'.")
 
             except OSError as e:

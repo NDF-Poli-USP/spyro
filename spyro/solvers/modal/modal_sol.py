@@ -110,7 +110,7 @@ class Modal_Solver():
                 self.method = 'ARNOLDI'
 
             if self.dimension == 3:  # 3D
-                self.method = 'LOBPCG' if self.calc_max_dt else 'KRYLOVSCH_CH'
+                self.method = 'LOBPCG'
         else:
             self.method = method
 
@@ -250,7 +250,8 @@ class Modal_Solver():
 
         if self.method == 'LOBPCG':
             # Initialize random vectors for LOBPCG
-            X = sl.orth(np.random.rand(Msp.shape[0], k))
+            # X = sl.orth(np.random.rand(Msp.shape[0], k))
+            X = np.eye(Msp.shape[0], k)
 
             # Solve the eigenproblem using LOBPCG (iterative method)
             it_mod = 2500
@@ -415,7 +416,7 @@ class Modal_Solver():
             # Eccentricity parameter: psi0 = arccosh(a/f), f = sqrt(a^2 - b^2)
             psi0 = np.arccosh(a0 / f0)
             idx = int(bc == 'Neumann')
-            print(bc, m, psi0, q, mathieu_modcem1(m, q, psi0)[idx])
+            # print(bc, m, psi0, q, mathieu_modcem1(m, q, psi0)[idx])
             return mathieu_modcem1(m, q, psi0)[idx]
 
         def ZBF(m=0, n=1):
@@ -484,19 +485,23 @@ class Modal_Solver():
 
         # Elliptical or ellipsoidal case
         if self.dimension == 2:  # 2D elliptical
+
+            # Order semi-axes
+            a, b = sorted(hyper_axes, reverse=True)
+
             # Ellipse eccentricity
             f0 = (a**2 - b**2)**0.5
             a0 = a
             M01 = float(broyden1(MMF, igss, f_tol=1e-14))
 
-            return (2 / f0) * (M01)**0.5
+            return (2 / f0) * M01**0.5
 
         if self.dimension == 3:  # 3D ellipsoidal
 
             f_ell_arr = []
 
             # Order semi-axes
-            a, b, c = sorted(hyper_axes)
+            a, b, c = sorted(hyper_axes, reverse=True)
 
             # Eccentricities for each pair of semi-axes
             ecc_arr = [(a, b, (a**2 - b**2)**0.5 if a > b else 0.),
@@ -539,6 +544,12 @@ class Modal_Solver():
             Fitted parameter pn
         qn_fit : `float`
             Fitted parameter qn
+        fr_ell : `float`
+            Ratio between the area or volume of the
+            truncated and full ellipse or ellipsoidal
+        fr_rec : `float`
+            Ratio between the area or volume of the
+            truncated and full rectangle or prism
         '''
 
         # Verify cutting plane measurement is between 0 and 1
@@ -600,10 +611,17 @@ class Modal_Solver():
         if self.dimension == 2:  # 2D
             f_max = 2. * fax_trunc
             fn2 = area_function(2., cut_plane_percent)
+            fr_ell = fn2 / area_function(2., 1.)
+            fr_rec = area_function(100., cut_plane_percent
+                                   ) / area_function(100., 1.)
             f_data = area_function(n_data, cut_plane_percent)
+
         if self.dimension == 3:  # 3D
             f_max = 4. * fax_trunc
             fn2 = volume_function(2., cut_plane_percent)
+            fr_ell = fn2 / volume_function(2., 1.)
+            fr_rec = volume_function(100., cut_plane_percent
+                                     ) / area_function(100., 1.)
             f_data = volume_function(n_data, cut_plane_percent)
 
         # Initial guess
@@ -638,7 +656,8 @@ class Modal_Solver():
             print(f"Fitted parameters: pn = {pn_fit:.6f} ± {delta_pn:.6f}, "
                   f"qn = {qn_fit:.6f} ± {delta_qn:.6f}")
             print(f"R-Squared: {r_squared:.6f} - RMSE: {rmse:.6f}")
-            return pn_fit, qn_fit
+
+            return pn_fit, qn_fit, fr_ell, fr_rec
 
         except Exception as e:
             print(f"Nonlinear Curve Fit Failed: {e}")
@@ -669,10 +688,21 @@ class Modal_Solver():
             Approximate frequency factor for the hypershape layer
         '''
 
-        pn, qn = self.reg_geometry_hyp(
+        if n_hyp is None:
+            n_hyp = 200.
+
+        pn, qn, fr_ell, fr_rec = self.reg_geometry_hyp(
             n_hyp, cut_plane_percent=cut_plane_percent)
-        cn2 = f_rec - f_ell
-        f_hyp = f_rec - cn2 * (1 / (qn * n_hyp + 1 - 2 * qn)) ** pn
+
+        if bc == 'Dirichlet':
+            f_max = f_rec / fr_rec
+            cn2 = f_max - f_ell / fr_ell
+
+        if bc == 'Neumann':
+            f_max = f_ell
+            cn2 = f_max - f_rec
+
+        f_hyp = f_max - cn2 * (1 / (qn * n_hyp + 1 - 2 * qn)) ** pn
 
         return f_hyp
 
@@ -721,16 +751,14 @@ class Modal_Solver():
             c = hyp_axes[2]
             all_axes_equal = (a == b == c)
 
+        # Frequency factors
         f_rec = self.freq_factor_rec(hyp_axes, bc=bc)
-        if n_hyp is None:
-            return (c * f_rec)**2
-
         f_ell = self.freq_factor_ell(hyp_axes, bc=bc,
                                      all_axes_equal=all_axes_equal)
-
         f_hyp = self.freq_factor_hyp(n_hyp, f_rec, f_ell,
                                      cut_plane_percent=cut_plane_percent)
 
+        # Eigenvalue
         Lsp = (c * f_hyp)**2
 
         return Lsp
@@ -785,7 +813,8 @@ class Modal_Solver():
                 raise TypeError("For 'ANALYTICAL' method, the isotropic "
                                 "velocity 'c' must be a float number.")
 
-            Lsp = self.solver_analytical(c, hyp_par, cut_plane_percent=1.)
+            Lsp = self.solver_analytical(
+                c, hyp_par, cut_plane_percent=cut_plane_percent)
 
             return Lsp
 

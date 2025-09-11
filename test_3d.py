@@ -302,7 +302,7 @@ def test_loop_habc_3d():
     Loop for applying the HABC to the 3D-Fig.8 model in Salas et al. (2022).
     '''
 
-    case = 0  # Integer from 0 to 3
+    case = 1  # Integer from 0 to 3
 
     # ============ SIMULATION PARAMETERS ============
 
@@ -431,6 +431,9 @@ def test_loop_habc_3d():
                         comp_cost("tfin", tRef=tRef,
                                   user_name=Wave_obj.path_case_habc)
 
+                        if n_pts == 1:
+                            break
+
                         # User-defined heuristic factor x_CR
                         if itr_xCR == 0:
                             xCR_cand = get_xCR_usu(
@@ -438,9 +441,6 @@ def test_loop_habc_3d():
                         elif itr_xCR == n_pts - 1:
                             xCR_opt = get_xCR_usu(
                                 Wave_obj, dat_regr_xCR, "optimal", n_pts)
-
-                        if n_pts == 1:
-                            break
 
                     except Exception as e:
                         print(f"Error Solving: {e}")
