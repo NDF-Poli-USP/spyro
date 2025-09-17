@@ -21,7 +21,7 @@ rm -rf results/*
 rm -rf control_*/
 rm -rf gradient*
 rm -rf initial_velocity_model/
-rm -rf output*
+rm -rf output/*
 rm -rf asn*
 rm -rf bsn*
 rm -rf vp_end*
