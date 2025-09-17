@@ -87,7 +87,7 @@ class Wave(Model_parameters, metaclass=ABCMeta):
         if self.mesh is not None:
             self._build_function_space()
             self._map_sources_and_receivers()
-        elif self.mesh_type == "firedrake_mesh":
+        elif self.mesh_parameters.mesh_type == "firedrake_mesh":
             warnings.warn(
                 "No mesh file, Firedrake mesh will be automatically generated."
             )
@@ -127,7 +127,11 @@ class Wave(Model_parameters, metaclass=ABCMeta):
         """Builds the matrix for the forward problem."""
         pass
 
-    def set_mesh(self, user_mesh=None, mesh_parameters={},):
+    def set_mesh(
+            self,
+            user_mesh=None,
+            input_mesh_parameters={},
+    ):
         """
         Set the mesh for the solver.
 
@@ -135,8 +139,10 @@ class Wave(Model_parameters, metaclass=ABCMeta):
             user_mesh (optional): User-defined mesh. Defaults to None.
             mesh_parameters (optional): Parameters for generating a mesh. Defaults to None.
         """
-
-        super().set_mesh(user_mesh=user_mesh, mesh_parameters=mesh_parameters,)
+        super().set_mesh(
+            user_mesh=user_mesh,
+            input_mesh_parameters=input_mesh_parameters,
+        )
 
         self.mesh = self.get_mesh()
         self._build_function_space()

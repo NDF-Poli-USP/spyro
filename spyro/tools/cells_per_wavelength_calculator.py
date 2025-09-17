@@ -409,10 +409,10 @@ class Meshing_parameter_calculator:
         if self.velocity_profile_type == "homogeneous":
             lba = self.minimum_velocity / self.source_frequency
             edge_length = lba / cpw
-            Wave_obj.set_mesh(mesh_parameters={"edge_length": edge_length})
+            Wave_obj.set_mesh(input_mesh_parameters={"edge_length": edge_length})
             Wave_obj.set_initial_velocity_model(constant=self.minimum_velocity)
         elif self.velocity_profile_type == "heterogeneous":
-            Wave_obj.set_mesh(mesh_parameters={"cells_per_wavelength": cpw})
+            Wave_obj.set_mesh(input_mesh_parameters={"cells_per_wavelength": cpw})
         return Wave_obj
 
     def _saving_file(self, savetxt, info):
