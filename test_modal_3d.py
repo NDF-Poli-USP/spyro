@@ -89,7 +89,7 @@ def wave_dict(edge_dom, layer_shape, degree_layer, habc_reference_freq):
         "status": True,  # Activate ABCs
         "damping_type": "hybrid",  # Activate HABC
         "layer_shape": layer_shape,  # Options: rectangular or hypershape
-        "degree_layer": degree_layer,  # Integer >= 2. Only for hypershape
+        "degree_layer": degree_layer,  # Float >= 2 (hyp) or None (rec)
         "habc_reference_freq": habc_reference_freq,  # Options: source or boundary
         "degree_eikonal": 1,  # Finite element order for the Eikonal analysis
         "get_ref_model": False,  # If True, the infinite model is created

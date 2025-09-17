@@ -631,14 +631,15 @@ class HABC_Wave(AcousticWave, HABC_Mesh, RectangLayer,
             Method to use for solving the eigenvalue problem.
             Default is None, which uses as the 'ARNOLDI' method in 2D models
             and the 'KRYLOVSCH_CH' method in 3D models.
-            Options: 'ANALYTICAL', 'ARNOLDI', 'LANCZOS', 'LOBPCG',
-            'KRYLOVSCH_CH', 'KRYLOVSCH_CG', 'KRYLOVSCH_GH' or 'KRYLOVSCH_GG'.
+            Opts: 'ANALYTICAL', 'ARNOLDI', 'LANCZOS', 'LOBPCG', 'KRYLOVSCH_CH',
+            'KRYLOVSCH_CG', 'KRYLOVSCH_GH', 'KRYLOVSCH_GG' or 'RAYLEIGH'.
+            'ANALYTICAL' method is only available for isotropic hypershapes.
+            'RAYLEIGH' method is an approximation by Rayleigh quotient.
             In 'KRYLOVSCH_(K)(P)' methods, (K) indicates the Krylov solver to
             use: 'C' for Conjugate Gradient (cg) or 'G' for Generalized Minimal
             Residual (gmres). (P) indicates the preconditioner to use: 'H' for
             Hypre (hypre) or 'G' for Geometric Algebraic Multigrid (gamg). For
             example, 'KRYLOVSCH_CH' uses cg solver with hypre preconditioner.
-
         monitor : `bool`, optional
             Print on screen the computed natural frequencies. Default is False
 
@@ -717,9 +718,49 @@ class HABC_Wave(AcousticWave, HABC_Mesh, RectangLayer,
         print("\nSolving Eigenvalue Problem")
         mod_sol = eigsol.Modal_Solver(self.dimension, method=method)
 
-        Lsp = mod_sol.solve_eigenproblem(
-            self.c, V=self.function_space, shift=1e-8,
-            quad_rule=self.quadrature_rule)
+        if method == 'ANALYTICAL':
+
+            # Hypershape parameters
+            hyp_par = (self.n_hyp, *self.hyper_axes)
+
+            # Cut plane at free surface
+            Lz = self.dom_dim[1]
+            z_cut = Lz / 2.
+
+            # Cut plane percentage
+            cut_plane_percent = z_cut / self.hyper_axes[1]
+
+            Lsp = mod_sol.solve_eigenproblem(
+                self.c, V=self.function_space, quad_rule=self.quadrature_rule,
+                hyp_par=hyp_par, cut_plane_percent=cut_plane_percent)
+
+        elif method == 'RAYLEIGH':
+            # Original domain dimensions
+            Lx, Lz = self.dom_dim[:2]
+            a, b = self.hyper_axes[:2]
+
+            if self.dimension == 2:  # 2D
+                x, z = fire.SpatialCoordinate(self.mesh)
+
+            x_e = (x - fire.Constant(Lx / 2.)) / fire.Constant(2. * a)
+            z_e = (z + fire.Constant(Lz / 2.)) / fire.Constant(2. * b)
+            coord_norm = (x_e, z_e)
+
+            if self.dimension == 3:  # 3D
+                Ly = self.dom_dim[2]
+                c = self.hyper_axes[2]
+                x, z, y = fire.SpatialCoordinate(self.mesh)
+                y_e = (y - fire.Constant(Ly / 2.)) / fire.Constant(2. * c)
+                coord_norm += (y_e,)
+
+            Lsp = mod_sol.solve_eigenproblem(self.c, V=self.function_space,
+                                             quad_rule=self.quadrature_rule,
+                                             coord_norm=coord_norm)
+
+        else:
+            Lsp = mod_sol.solve_eigenproblem(self.c,
+                                             V=self.function_space, shift=1e-8,
+                                             quad_rule=self.quadrature_rule)
 
         if monitor:
             for n_eig, eigval in enumerate(np.unique(Lsp)):
@@ -730,40 +771,6 @@ class HABC_Wave(AcousticWave, HABC_Mesh, RectangLayer,
         min_eigval = max(np.unique(Lsp[(Lsp > 0.) & (np.imag(Lsp) == 0.)]))
         self.fundam_freq = np.real(np.sqrt(min_eigval) / (2 * np.pi))
         print("Fundamental Frequency (Hz): {0:.5f}".format(self.fundam_freq))
-
-        # mod_sol.method = 'ANALYTICAL'
-
-        # # Original domain dimensions and truncated domain dimensions
-        # dom_dim, dom_lay = self.habc_domain_dimensions(full_hyp=True)
-
-        # # Hypershape parameters
-        # hyper_axes = [dim_lay / 2. for dim_lay in dom_lay]
-        # hyp_par = (self.n_hyp, *hyper_axes)
-
-        # # Cut plane percentage
-        # Lx, Lz = dom_dim[:2]
-        # z_cut = Lz / 2.  # Cut plane at free surface
-        # b = Lz / 2. + self.pad_len  # Semi-axis of the hypershape
-        # cut_plane_percent = z_cut / b
-
-        # # Equivalent isotropic velocity
-        # uu = fire.Function(self.function_space)
-        # x, z = fire.SpatialCoordinate(self.mesh)
-        # # uu.interpolate(fire.cos(fire.pi * x / self.Lx_habc) * fire.cos(fire.pi * z / self.Lz_habc))
-        # # uu.interpolate(fire.cos(fire.pi * x / self.Lx_habc))
-        # uu.interpolate(fire.cos(fire.pi * z / self.Lz_habc))
-        # num = fire.assemble(self.c * fire.inner(fire.grad(uu), fire.grad(uu)) * fire.dx(domain=self.mesh))
-        # den = fire.assemble(fire.inner(fire.grad(uu), fire.grad(uu)) * fire.dx(domain=self.mesh))
-        # c_eq = num / den
-
-        # print(c_eq)
-        # import ipdb
-        # ipdb.set_trace()
-
-        # Lsp = mod_sol.solve_eigenproblem(
-        #     c_eq, hyp_par=hyp_par, cut_plane_percent=cut_plane_percent)
-        # f_ana = np.sqrt(Lsp) / (2 * np.pi)
-        # print("Analytical Fundamental Frequency (Hz): {0:.5f}".format(f_ana))
 
     def damping_layer(self, xCR_usu=None, method=None):
         '''
@@ -780,11 +787,13 @@ class HABC_Wave(AcousticWave, HABC_Mesh, RectangLayer,
             User-defined heuristic factor for the minimum damping ratio.
             Default is None, which defines an estimated value
         method : `str`, optional
-            Method to use to estimate the fundamental frequency.
-            Default is None, which uses as the 'ARNOLDI' method in 2D  models
+            Method to use for solving the eigenvalue problem.
+            Default is None, which uses as the 'ARNOLDI' method in 2D models
             and the 'KRYLOVSCH_CH' method in 3D models.
-            Options: 'ARNOLDI', 'LANCZOS', 'LOBPCG' 'KRYLOVSCH_CH',
-            'KRYLOVSCH_CG', 'KRYLOVSCH_GH' or 'KRYLOVSCH_GG'.
+            Opts: 'ANALYTICAL', 'ARNOLDI', 'LANCZOS', 'LOBPCG', 'KRYLOVSCH_CH',
+            'KRYLOVSCH_CG', 'KRYLOVSCH_GH', 'KRYLOVSCH_GG' or 'RAYLEIGH'.
+            'ANALYTICAL' method is only available for isotropic hypershapes.
+            'RAYLEIGH' method is an approximation by Rayleigh quotient.
             In 'KRYLOVSCH_(K)(P)' methods, (K) indicates the Krylov solver to
             use: 'C' for Conjugate Gradient (cg) or 'G' for Generalized Minimal
             Residual (gmres). (P) indicates the preconditioner to use: 'H' for
@@ -802,7 +811,7 @@ class HABC_Wave(AcousticWave, HABC_Mesh, RectangLayer,
         print("\nCreating Damping Profile")
 
         # Compute the minimum damping ratio and the associated heuristic factor
-        eta_crt, self.psi_min, self.xCR, self.xCR_lim, self.CRmin \
+        eta_crt, self.psi_min, self.xCR, self.xCR_lim, self.CRmin\
             = self.calc_damping_prop(self.fundam_freq, xCR_usu=xCR_usu)
 
         # Mesh coordinates
@@ -895,10 +904,6 @@ class HABC_Wave(AcousticWave, HABC_Mesh, RectangLayer,
                                           self.final_time, shift=1e-8,
                                           quad_rule=self.quadrature_rule,
                                           estimate_maxeig=False, fraction=1.)
-
-        # self.get_and_set_maximum_dt(fraction=1.,
-        #   estimate_max_eigenvalue=False)
-        # print("Maximum Timestep Size: {:.3f} ms".format(1e3 * self.dt))
 
         # Rounding power
         pot = abs(np.ceil(np.log10(max_dt))) + 3

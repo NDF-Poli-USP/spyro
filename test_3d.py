@@ -96,7 +96,7 @@ def wave_dict(dt_usu, fr_files, layer_shape, degree_layer, degree_type,
         "status": True,  # Activate ABCs
         "damping_type": "hybrid",  # Activate HABC
         "layer_shape": layer_shape,  # Options: rectangular or hypershape
-        "degree_layer": degree_layer,  # Float >= 2. Only for hypershape
+        "degree_layer": degree_layer,  # Float >= 2 (hyp) or None (rec)
         "degree_type": degree_type,  # Options: real or integer
         "habc_reference_freq": habc_reference_freq,  # Options: source or boundary
         "degree_eikonal": degree_eikonal,  # Finite element order for the Eikonal analysis
@@ -276,25 +276,25 @@ def habc_fig8(Wave_obj, dat_regr_xCR, xCR_usu=None, plot_comparison=True):
     # Setting the damping profile within absorbing layer
     Wave_obj.damping_layer(xCR_usu=xCR_usu)
 
-    # Applying NRBCs on outer boundary layer
-    Wave_obj.nrbc_on_boundary_layer()
+    # # Applying NRBCs on outer boundary layer
+    # Wave_obj.nrbc_on_boundary_layer()
 
-    # Solving the forward problem
-    Wave_obj.forward_solve()
+    # # Solving the forward problem
+    # Wave_obj.forward_solve()
 
-    # Computing the error measures
-    Wave_obj.error_measures_habc()
+    # # Computing the error measures
+    # Wave_obj.error_measures_habc()
 
-    # Collecting data for regression
-    dat_regr_xCR[0].append(Wave_obj.xCR)
-    dat_regr_xCR[1].append(Wave_obj.max_errIt)
-    dat_regr_xCR[2].append(Wave_obj.max_errPK)
+    # # Collecting data for regression
+    # dat_regr_xCR[0].append(Wave_obj.xCR)
+    # dat_regr_xCR[1].append(Wave_obj.max_errIt)
+    # dat_regr_xCR[2].append(Wave_obj.max_errPK)
 
-    if plot_comparison:
+    # if plot_comparison:
 
-        # Plotting the solution at receivers and the error measures
-        Wave_obj.comparison_plots(regression_xCR=True,
-                                  data_regr_xCR=dat_regr_xCR)
+    #     # Plotting the solution at receivers and the error measures
+    #     Wave_obj.comparison_plots(regression_xCR=True,
+    #                               data_regr_xCR=dat_regr_xCR)
 
 
 def test_loop_habc_3d():
@@ -302,7 +302,7 @@ def test_loop_habc_3d():
     Loop for applying the HABC to the 3D-Fig.8 model in Salas et al. (2022).
     '''
 
-    case = 1  # Integer from 0 to 3
+    case = 2  # Integer from 0 to 3
 
     # ============ SIMULATION PARAMETERS ============
 
@@ -340,7 +340,7 @@ def test_loop_habc_3d():
     loop_modeling = not get_ref_model
 
     # Hyperellipse degrees
-    degree_layer_lst = [2]  # [None, 2, 3, 4, 5]
+    degree_layer_lst = [None]  # [None, 2, 3, 4, 5]
 
     # Reference frequency
     habc_reference_freq_lst = ["source"]  # ["source", "boundary"]

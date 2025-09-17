@@ -36,8 +36,10 @@ class Modal_Solver():
         and the 'KRYLOVSCH_CH' method in 3D models
     valid_methods: `list`
         List of valid methods for solving the eigenproblem
-        Options: 'ANALYTICAL', 'ARNOLDI', 'LANCZOS', 'LOBPCG',
-        'KRYLOVSCH_CH', 'KRYLOVSCH_CG', 'KRYLOVSCH_GH' or 'KRYLOVSCH_GG'.
+        Options: 'ANALYTICAL', 'ARNOLDI', 'LANCZOS', 'LOBPCG', 'KRYLOVSCH_CH',
+        'KRYLOVSCH_CG', 'KRYLOVSCH_GH', 'KRYLOVSCH_GG' or 'RAYLEIGH'.
+        'ANALYTICAL' method is only available for isotropic hypershapes.
+        'RAYLEIGH' method is an approximation by Rayleigh quotient.
         In 'KRYLOVSCH_(K)(P)' methods, (K) indicates the Krylov solver to
         use: 'C' for Conjugate Gradient (cg) or 'G' for Generalized Minimal
         Residual (gmres). (P) indicates the preconditioner to use: 'H' for
@@ -48,15 +50,23 @@ class Modal_Solver():
     -------
     assemble_sparse_matrices()
         Assemble the sparse matrices for SciPy solvers
-    bilinear_forms()
-        Generate the bilinear forms for the problem
-    freq_factor_rec()
-        Compute the frequency factor for rectangular or prismatic geometries
+    c_equivalent()
+        Compute an equivalent homogeneous velocity for an inhomogeneneous
+        velocity model using an energy-equivalent homogenization
+    estimate_timestep()
+        Estimate the maximum stable timestep based on the spectral
+        radius using optionally the Gershgorin Circle Theorem to
+        estimate the maximum generalized eigenvalue. Otherwise
+        computes the maximum generalized eigenvalue exactly
     freq_factor_ell()
         Compute the frequency factor for elliptical or ellipsoidal geometries
     freq_factor_hyp()
         Compute an approximate frequency factor for the hypershape with
-        truncation plane at z = 0.5 * Lz / b, b = Lz + pad
+            truncation plane at z = cut_plane_percent * b, b = Lz + pad_len
+    freq_factor_rec()
+        Compute the frequency factor for rectangular or prismatic geometries
+    generate_eigenfunctions()
+            Generate eigenfunctions for the Rayleigh Quotient method
     reg_geometry_hyp()
         Perform the nonlinear regression for the hypershape geometry factor
     solve_eigenproblem()
@@ -64,10 +74,15 @@ class Modal_Solver():
     solver_analytical()
         Compute the analytical solution for the eigenvalue problem with
         Neumann or Dirichlet boundary conditions for isotropic hypershapes
+    solver_rayleigh_quotient()
+            Solve the eigenvalue problem using the Rayleigh Quotient method
     solver_with_sparse_matrix()
         Solve the eigenvalue problem with sparse matrices using SciPy
     solver_with_ufl()
         Solve the eigenvalue problem using UFL forms with SLEPc
+    weak_forms()
+        Generate the bilinear forms for the modal problem.
+        Also, it can generate a source term in weak form
     '''
 
     def __init__(self, dimension, method=None, calc_max_dt=False):
@@ -80,16 +95,18 @@ class Modal_Solver():
             The spatial dimension of the problem
         method : `str`, optional
             Method to use for solving the eigenvalue problem.
-            Default is None, which uses as the 'ARNOLDI' method in 2D  models
+            Default is None, which uses as the 'ARNOLDI' method in 2D models
             and the 'KRYLOVSCH_CH' method in 3D models.
-            Options: 'ANALYTICAL', 'ARNOLDI', 'LANCZOS', 'LOBPCG',
-            'KRYLOVSCH_CH', 'KRYLOVSCH_CG', 'KRYLOVSCH_GH' or 'KRYLOVSCH_GG'.
+            Opts: 'ANALYTICAL', 'ARNOLDI', 'LANCZOS', 'LOBPCG', 'KRYLOVSCH_CH',
+            'KRYLOVSCH_CG', 'KRYLOVSCH_GH', 'KRYLOVSCH_GG' or 'RAYLEIGH'.
+            'ANALYTICAL' method is only available for isotropic hypershapes.
+            'RAYLEIGH' method is an approximation by Rayleigh quotient.
             In 'KRYLOVSCH_(K)(P)' methods, (K) indicates the Krylov solver to
             use: 'C' for Conjugate Gradient (cg) or 'G' for Generalized Minimal
             Residual (gmres). (P) indicates the preconditioner to use: 'H' for
             Hypre (hypre) or 'G' for Geometric Algebraic Multigrid (gamg). For
-            example, 'KRYLOVSCH_CH' uses cg solver with hypre preconditioner.
-        calc_max_dt : `bool`, optional
+            example, 'KRYLOVSCH_CH' uses cg solver with hypre preconditioner
+        calc_max_dt : `bool`
             Option to estimate the maximum stable timestep for the computation
             of the transient response. Default is False
 
@@ -115,8 +132,9 @@ class Modal_Solver():
             self.method = method
 
         # Valid methods for solving the eigenproblem
-        self.valid_methods = ['ARNOLDI', 'LANCZOS', 'LOBPCG', 'KRYLOVSCH_CH',
-                              'KRYLOVSCH_CG', 'KRYLOVSCH_GH', 'KRYLOVSCH_GG']
+        self.valid_methods = ['ANALYTICAL', 'ARNOLDI', 'LANCZOS',
+                              'LOBPCG', 'KRYLOVSCH_CH', 'KRYLOVSCH_CG',
+                              'KRYLOVSCH_GH', 'KRYLOVSCH_GG', 'RAYLEIGH']
 
         if self.method not in self.valid_methods:
             value_parameter_error('method', method, self.valid_methods)
@@ -124,9 +142,10 @@ class Modal_Solver():
         print(f'Solver Method: {self.method}')
 
     @staticmethod
-    def bilinear_forms(c, V, quad_rule=None):
+    def weak_forms(c, V, quad_rule=None, source=False):
         '''
-        Generate the bilinear forms for the problem
+        Generate the bilinear forms for the modal problem.
+        Also, it can generate a source term in weak form
 
         Parameters
         ----------
@@ -136,7 +155,9 @@ class Modal_Solver():
             Function space for the modal problem
         quad_rule : `str`, optional
             Quadrature rule to use for the integration.
-            Default is None, which uses the default quadrature rule.
+            Default is None, which uses the default quadrature rule
+        source : `bool`, optional
+            Option to get a source term in weak form. Default is False
 
         Returns
         -------
@@ -144,6 +165,9 @@ class Modal_Solver():
             Weak form representing the stiffness matrix
         m : `firedrake form`
             Weak form  representing the mass matrix
+        L : `firedrake form`, optional
+            Weak form representing a source term.
+            Returned only if 'source'=True
         '''
 
         # Functions for the problem
@@ -152,6 +176,11 @@ class Modal_Solver():
 
         # Bilinear forms
         a = c * c * fire.inner(fire.grad(u), fire.grad(v)) * dx
+
+        if source:
+            L = fire.Constant(1.0) * v * dx  # Source term
+            return a, L
+
         m = fire.inner(u, v) * dx
 
         return a, m
@@ -176,8 +205,9 @@ class Modal_Solver():
             Sparse matrix representing the stiffness matrix
         Msp : `csr matrix`
             Sparse matrix representing the mass matrix
-        Msp_inv : `csr matrix`
-            Sparse matrix representing the inverse mass matrix
+        Msp_inv : `csr matrix`, optional
+            Sparse matrix representing the inverse mass matrix.
+            Returned only if 'return_M_inv'=True
         '''
 
         # Assemble the stiffness matrix
@@ -199,16 +229,19 @@ class Modal_Solver():
 
         return Asp, Msp
 
-    def solver_with_sparse_matrix(self, a, m, k=2, inv_oper=False):
+    def solver_with_sparse_matrix(self, Asp, Msp, method, k=2, inv_oper=False):
         '''
         Solve the eigenvalue problem with sparse matrices using Scipy
 
         Parameters
         ----------
-        a : `firedrake form`
-            Weak form representing the stiffness matrix
-        m : `firedrake form`
-            Weak form  representing the mass matrix
+        Asp : `csr matrix`
+            Sparse matrix representing the stiffness matrix
+        Msp : `csr matrix`
+            Sparse matrix representing the mass matrix
+        method : `str`
+            Method to use for solving the eigenvalue problem.
+            Opts: 'ARNOLDI', 'LANCZOS' or 'LOBPCG'
         k : `int`, optional
             Number of eigenvalues to compute. Default is 2
         inv_oper : `bool`, optional
@@ -221,16 +254,14 @@ class Modal_Solver():
             Array containing the computed eigenvalues
         '''
 
-        Asp, Msp = self.assemble_sparse_matrices(a, m)
-
-        if self.method == 'ARNOLDI' or self.method == 'LANCZOS':
+        if method == 'ARNOLDI' or method == 'LANCZOS':
             # Inverse operator for improving convergence
             M_ilu = ss.linalg.spilu(Msp) if inv_oper else None
             Minv = M_ilu.solve if inv_oper else None
             A_ilu = ss.linalg.spilu(Asp) if inv_oper else None
             OPinv = A_ilu.solve if inv_oper else None
 
-        if self.method == 'ARNOLDI':
+        if method == 'ARNOLDI':
             # Solve the eigenproblem using ARNOLDI (ARPACK)
             if self.calc_max_dt:
                 Lsp = ss.linalg.eigs(Asp, k=k, M=Msp, which='LM', Minv=Minv,
@@ -239,7 +270,7 @@ class Modal_Solver():
                 Lsp = ss.linalg.eigs(Asp, k=k, M=Msp, sigma=0.0, Minv=Minv,
                                      OPinv=OPinv, return_eigenvectors=False)
 
-        if self.method == 'LANCZOS':
+        if method == 'LANCZOS':
             # Solve the eigenproblem using LANCZOS (ARPACK)
             if self.calc_max_dt:
                 Lsp = ss.linalg.eigsh(Asp, k=k, M=Msp, which='LM', Minv=Minv,
@@ -248,7 +279,7 @@ class Modal_Solver():
                 Lsp = ss.linalg.eigsh(Asp, k=k, M=Msp, sigma=0.0, Minv=Minv,
                                       OPinv=OPinv, return_eigenvectors=False)
 
-        if self.method == 'LOBPCG':
+        if method == 'LOBPCG':
             # Initialize random vectors for LOBPCG
             # X = sl.orth(np.random.rand(Msp.shape[0], k))
             X = np.eye(Msp.shape[0], k)
@@ -325,6 +356,43 @@ class Modal_Solver():
         Lsp = np.asarray([eigensolver.eigenvalue(mod) for mod in range(k)])
 
         return Lsp
+
+    def c_equivalent(self, c, V, quad_rule=None):
+        '''
+        Compute an equivalent homogeneous velocity for an inhomogeneneous
+        velocity model using an energy-equivalent homogenization
+
+        Parameters
+        ----------
+        c : `firedrake function`
+            Velocity model
+        V : `firedrake function space`
+            Function space for the modal problem
+        quad_rule : `str`, optional
+            Quadrature rule to use for the integration.
+            Default is None, which uses the default quadrature rule
+
+        Returns
+        -------
+        c_eq : `float`
+            Equivalent homogeneous velocity
+        '''
+
+        # Weak forms
+        a, L = self.weak_forms(c, V, quad_rule=None, source=True)
+
+        # Compute the energy
+        u = fire.Function(V)
+        fire.solve(a == L, u)
+        dx = fire.dx(scheme=quad_rule) if quad_rule else fire.dx
+        energy = fire.assemble(fire.Constant(0.5) * c * c
+                               * fire.inner(fire.grad(u), fire.grad(u)) * dx)
+
+        # Compute equivalent velocity
+        c_eq = np.sqrt(energy / fire.assemble(
+            fire.Constant(0.5) * fire.inner(fire.grad(u), fire.grad(u)) * dx))
+
+        return c_eq
 
     @staticmethod
     def freq_factor_rec(hyper_axes, bc='Neumann'):
@@ -666,7 +734,7 @@ class Modal_Solver():
                         bc='Neumann', cut_plane_percent=1.):
         '''
         Compute an approximate frequency factor for the hypershape with
-        truncation plane at z = 0.5 * Lz / b, b = Lz + pad
+        truncation plane at z = cut_plane_percent * b, b = Lz + pad_len
 
         Parameters
         ----------
@@ -715,7 +783,7 @@ class Modal_Solver():
         Parameters
         ----------
         c : `float`
-            Isotropic velocity in the hypershape
+            Equivalente isotropic velocity in the hypershape
         hyp_par : `tuple`
             Hyperellipshape parameters.
             Structure 2D: (n_hyp, a_hyp, b_hyp)
@@ -740,6 +808,11 @@ class Modal_Solver():
             First eigenvalue of the hypershape with Neumann or Dirichlet BCs
         '''
 
+        # Check if the velocity model is a float
+        if not isinstance(c, float):
+            raise TypeError("For 'ANALYTICAL' method, the isotropic "
+                            "velocity 'c' must be a float number.")
+
         # Hyperellipse parameters
         n_hyp, hyp_axes = hyp_par[0], hyp_par[1:]
         a, b = hyp_axes[:2]
@@ -763,15 +836,141 @@ class Modal_Solver():
 
         return Lsp
 
+    def generate_eigenfunctions(self, coord_norm, V, k=2, bc='Neumann'):
+        '''
+        Generate eigenfunctions for the Rayleigh Quotient method
+
+        Parameters
+        ----------
+        coord_norm : `tuple`
+            Normalized coordinates in the mesh [-1, 1]
+        V : `firedrake function space`
+            Function space for the modal problem
+        k : `int`, optional
+            Number of eigenvalues to compute. Default is 2
+        bc : `str`, optional
+            Boundary condition type: 'Dirichlet' or 'Neumann'.
+            Default is 'Neumann'
+
+        Returns
+        -------
+        eig_funcs : `list`
+            Eigenfunctions computed as Firedrake functions
+        grad_eig : `list`
+            Eigenfunction gradients computed as Firedrake functions
+        '''
+
+        # Number of eigenfunctions to use
+        n_eigfunc = 2 * k
+
+        # Mesh normalized coordinates to [-1, 1] w.r.t. the hypershape centroid
+        xn, zn = coord_norm[:2]
+
+        # Precompute cosine values for efficiency
+        if bc == 'Neumann':
+            fi_lst = [fire.cos(i * fire.pi * xn) for i in range(n_eigfunc)]
+            fj_lst = [fire.cos(j * fire.pi * zn) for j in range(n_eigfunc)]
+
+        if bc == 'Dirichlet':
+            fi_lst = [fire.sin(i * fire.pi * xn) for i in range(n_eigfunc)]
+            fj_lst = [fire.sin(j * fire.pi * zn) for j in range(n_eigfunc)]
+
+        if self.dimension == 3:  # 3D
+            yn = coord_norm[2]
+
+            if bc == 'Neumann':
+                fk_lst = [fire.cos(k * fire.pi * yn) for k in range(n_eigfunc)]
+            if bc == 'Dirichlet':
+                fk_lst = [fire.sin(k * fire.pi * yn) for k in range(n_eigfunc)]
+
+        # Create eigenfunctions
+        eig_funcs = []
+        grad_eig = []
+        for i in range(n_eigfunc):
+            fi = fi_lst[i]
+            for j in range(n_eigfunc):
+                fj = fj_lst[j]
+
+                if self.dimension == 2:  # 2D
+                    # Eigenfunction: cos/sin(iπx/Lx) * cos/sin(jπz/Lz)
+                    u_eig = fire.Function(V).interpolate(fi * fj)
+                    eig_funcs.append(u_eig)
+                    grad_eig.append(fire.grad(u_eig))
+
+                if self.dimension == 3:  # 3D
+                    for k in range(n_eigfunc):
+                        fk = fk_lst[k]
+                        u_eig = fire.Function(V).interpolate(fi * fj * fj)
+                        eig_funcs.append(u_eig)
+                        grad_eig.append(fire.grad(u_eig))
+
+        return eig_funcs, grad_eig
+
+    def solver_rayleigh_quotient(self, c, eig_funcs, grad_eig,
+                                 k=2, quad_rule=None):
+        '''
+        Solve the eigenvalue problem using the Rayleigh Quotient method
+
+        Parameters
+        ----------
+        c : `firedrake function` or `float`
+            Velocity model
+        eig_funcs : `list`
+            Eigenfunctions computed as Firedrake functions
+        grad_eig : `list`
+            Eigenfunction gradients computed as Firedrake functions
+        k : `int`, optional
+            Number of eigenvalues to compute. Default is 2
+        quad_rule : `str`, optional
+            Quadrature rule to use for the integration.
+            Default is None, which uses the default quadrature rule.
+
+        Returns
+        -------
+        Lsp : `array`
+            Array containing the computed eigenvalues
+        '''
+
+        # Initialize matrices for generalized eigenvalue problem
+        n_funcs = len(eig_funcs)
+        Asp = ss.lil_matrix((n_funcs, n_funcs))  # Stiffness matrix
+        Msp = ss.lil_matrix((n_funcs, n_funcs))  # Mass matrix
+
+        # Assemble stiffness and mass matrices
+        dx = fire.dx(scheme=quad_rule) if quad_rule else fire.dx
+        for i in range(n_funcs):
+            for j in range(i, n_funcs):  # Only upper triangle
+                # Stiffness and mass matrix term
+                A_term = fire.assemble(c * c * fire.inner(grad_eig[i],
+                                                          grad_eig[j]) * dx)
+                M_term = fire.assemble(fire.inner(eig_funcs[i],
+                                                  eig_funcs[j]) * dx)
+
+                # Set symmetric entries
+                Asp[i, j] = A_term
+                Asp[j, i] = A_term
+                Msp[i, j] = M_term
+                Msp[j, i] = M_term
+
+        # Convert to CSR format for eigenvalue solver
+        Asp = Asp.tocsr()
+        Msp = Msp.tocsr()
+
+        # Solve the generalized eigenvalue problem
+        Lsp = self.solver_with_sparse_matrix(Asp, Msp, 'ARNOLDI', k=k)
+
+        return Lsp
+
     def solve_eigenproblem(self, c, V=None, k=2, shift=0., quad_rule=None,
-                           inv_oper=False, hyp_par=None, cut_plane_percent=1.):
+                           inv_oper=False, coord_norm=None, hyp_par=None,
+                           cut_plane_percent=1.):
         '''
         Solve the eigenvalue problem with Neumann boundary conditions
 
         Parameters
         ----------
         c : `firedrake function` or `float`
-            Velocity model or isotropic velocity in the geometry
+            Velocity model
         V : `firedrake function space`, optional
             Function space for the modal problem. Default is None
         k : `int`, optional
@@ -807,27 +1006,32 @@ class Modal_Solver():
         '''
 
         if self.method == 'ANALYTICAL':
-
-            # Check if the velocity model is a float
-            if not isinstance(c, float):
-                raise TypeError("For 'ANALYTICAL' method, the isotropic "
-                                "velocity 'c' must be a float number.")
-
+            c_eq = self.c_equivalent(c, V, quad_rule=quad_rule)
             Lsp = self.solver_analytical(
-                c, hyp_par, cut_plane_percent=cut_plane_percent)
+                c_eq, hyp_par, cut_plane_percent=cut_plane_percent)
 
             return Lsp
 
-        a, m = self.bilinear_forms(c, V, quad_rule=quad_rule)
+        # Get bilinear forms
+        a, m = self.weak_forms(c, V, quad_rule=quad_rule)
+
+        # Add shift to stabilize Neumann BC null space
 
         if shift > 0:
-            a += shift * m
+            a += fire.Constant(shift) * m
 
-        if self.method[:-3] == 'KRYLOVSCH':
+        if self.method == 'RAYLEIGH':
+            eig_funcs, grad_eig = \
+                self.generate_eigenfunctions(coord_norm, V, k=k)
+            Lsp = self.solver_rayleigh_quotient(c, eig_funcs, grad_eig,
+                                                k=k, quad_rule=quad_rule)
+        elif self.method[:-3] == 'KRYLOVSCH':
             Lsp = self.solver_with_ufl(a, m, k=k)
 
         else:
-            Lsp = self.solver_with_sparse_matrix(a, m, k=k, inv_oper=inv_oper)
+            Asp, Msp = self.assemble_sparse_matrices(a, m)
+            Lsp = self.solver_with_sparse_matrix(Asp, Msp, self.method,
+                                                 k=k, inv_oper=inv_oper)
 
         Lsp -= shift if shift > 0. else 0.
 
@@ -871,10 +1075,10 @@ class Modal_Solver():
 
         # Maximum eigenvalue
         if estimate_maxeig:
-            a, m = self.bilinear_forms(c, V, quad_rule=quad_rule)
+            a, m = self.weak_forms(c, V, quad_rule=quad_rule)
 
             if shift > 0:
-                a += shift * m
+                a += fire.Constant(shift) * m
 
             Asp, Msp_inv = \
                 self.assemble_sparse_matrices(a, m, return_M_inv=True)

@@ -1089,53 +1089,81 @@ class HABC_Mesh():
         else:
             xmin, xmax, ymin, ymax, zmin, zmax = box
 
-        # Vectorized check
-        x, y, z = all_pnts[:, 0], all_pnts[:, 1], all_pnts[:, 2]
-        cond_out = ((x < xmin - self.tol) | (x > xmax + self.tol)
-                    | (y < ymin - self.tol) | (y > ymax + self.tol)
-                    | (z < zmin - self.tol) | (z > zmax + self.tol))
+        # # Vectorized check if point is clearly outside cube -> keep it
+        # x, y, z = all_pnts[:, 0], all_pnts[:, 1], all_pnts[:, 2]
+        # cond_out = ((x < xmin - self.tol) | (x > xmax + self.tol)
+        #             | (y < ymin - self.tol) | (y > ymax + self.tol)
+        #             | (z < zmin - self.tol) | (z > zmax + self.tol))
 
-        # Get inside points only
-        in_pnts = all_pnts[~cond_out]
+        # # Get inside points only
+        # in_pnts = all_pnts[~cond_out]
 
-        if len(in_pnts):
-            # Build k-d tree for fast nearest neighbor queries
-            dom_tree = cKDTree(dom_pnts)
+        # if len(in_pnts):
+        #     # Build k-d tree for fast nearest neighbor queries
+        #     dom_tree = cKDTree(dom_pnts)
 
-            # Batch query all inside points at once
-            distances = dom_tree.query(
-                in_pnts, distance_upper_bound=self.tol, workers=-1)[0]
+        #     # Batch query all inside points at once
+        #     distances = dom_tree.query(
+        #         in_pnts, distance_upper_bound=self.tol, workers=-1)[0]
 
-            # Get the points are close to domain points
-            clean_in_pnts = in_pnts[distances <= self.tol]
-        else:
-            clean_in_pnts = np.array([])
+        #     # Get the points are close to domain points
+        #     clean_in_pnts = in_pnts[distances <= self.tol]
+        # else:
+        #     clean_in_pnts = np.array([]).reshape(0, 3)
 
-        # Get outside points only
-        out_pnts = all_pnts[cond_out]
+        # # Get outside points only
+        # out_pnts = all_pnts[cond_out]
 
-        if len(out_pnts):
+        # if len(out_pnts):
 
-            # Vectorized minimum distance to box calculation
-            x, y, z = out_pnts[:, 0], out_pnts[:, 1], out_pnts[:, 2]
+        #     # Vectorized minimum distance to box calculation
+        #     x, y, z = out_pnts[:, 0], out_pnts[:, 1], out_pnts[:, 2]
 
-            # Calculate distance components
-            dx = np.maximum(0, np.maximum(xmin - x, x - xmax))
-            dy = np.maximum(0, np.maximum(ymin - y, y - ymax))
-            dz = np.maximum(0, np.maximum(zmin - z, z - zmax))
+        #     # Calculate distance components
+        #     dx = np.maximum(0, np.maximum(xmin - x, x - xmax))
+        #     dy = np.maximum(0, np.maximum(ymin - y, y - ymax))
+        #     dz = np.maximum(0, np.maximum(zmin - z, z - zmax))
 
-            # Euclidean distance
-            distances = np.sqrt(dx**2 + dy**2 + dz**2)
+        #     # Euclidean distance
+        #     distances = np.sqrt(dx**2 + dy**2 + dz**2)
 
-            # Keep points that are far enough from structured box mesh
-            clean_out_pnts = out_pnts[distances > self.lmin / 1.5]
-        else:
-            clean_out_pnts = np.array([])
+        #     # Keep points that are far enough from structured box mesh
+        #     clean_out_pnts = out_pnts[distances > self.lmin / 1.25]
+        # else:
+        #     clean_out_pnts = np.array([]).reshape(0, 3)
 
-        # Combine outside points and inside clean points
-        clean_pnts = np.vstack([clean_out_pnts, clean_in_pnts])
+        # # Combine outside points and inside clean points
+        # clean_pnts = np.vstack([clean_out_pnts, clean_in_pnts])
 
-        return clean_pnts if len(clean_pnts) else np.array([]).reshape(0, 3)
+        # import ipdb; ipdb.set_trace()
+
+        # return clean_pnts if len(clean_pnts) else np.array([]).reshape(0, 3)
+
+        clean_pnts = []
+
+        for point in all_pnts:
+            x, y, z = point
+
+            # Check if point is clearly outside cube -> keep it
+            cond_out = (x < xmin - self.tol or x > xmax + self.tol
+                        or y < ymin - self.tol or y > ymax + self.tol
+                        or z < zmin - self.tol or z > zmax + self.tol)
+
+            if cond_out:
+                clean_pnts.append(point)
+            else:
+                # Point is inside or on boundary - check if it's a dom_pnt
+                is_dom_pnt = False
+                for dom_pnt in dom_pnts:
+                    if np.linalg.norm(point - dom_pnt) < self.tol:
+                        is_dom_pnt = True
+                        break
+
+                if is_dom_pnt:
+                    clean_pnts.append(point)
+                # If inside/boundary and not dom_pnt, don't add (remove it)
+
+        return np.array(clean_pnts) if clean_pnts else np.array([]).reshape(0, 3)
 
     @staticmethod
     def remove_elements_outside_hyp3D(pts, connect, geps, hyp3D_sdf):
@@ -1193,63 +1221,77 @@ class HABC_Mesh():
             Merged final mesh
         '''
 
-        # Hyperellipse parameters
-        n_hyp, surface, a_hyp, b_hyp, c_hyp = hyp_par
+        # # Hyperellipse parameters
+        # n_hyp, surface, a_hyp, b_hyp, c_hyp = hyp_par
 
-        rec_box, hyp_box, pfix, centr, s_axs, \
-            surf_ele_expt = self.mesh_data_3D(hyp_par)
+        # rec_box, hyp_box, pfix, centr, s_axs, \
+        #     surf_ele_expt = self.mesh_data_3D(hyp_par)
 
-        sdfunct = Sign_Distance_Hyp3D(s_axs, centr, n_hyp)
+        # sdfunct = Sign_Distance_Hyp3D(s_axs, centr, n_hyp)
 
-        # Generate a initial 3D mesh
-        print("Generating Initial Mesh with Fixed Points in Original Box")
-        orig_dom = geometry.Cube(rec_box)
-        points, cells = generation.generate_mesh(
-            domain=sdfunct.sign_dist_hyptrunc, edge_length=self.lmin,
-            bbox=hyp_box, max_iter=50, pfix=pfix, subdomains=[orig_dom])
+        # # Generate a initial 3D mesh
+        # print("Generating Initial Mesh with Fixed Points in Original Box")
+        # orig_dom = geometry.Cube(rec_box)
+        # points, cells = generation.generate_mesh(
+        #     domain=sdfunct.sign_dist_hyptrunc, edge_length=self.lmin,
+        #     bbox=hyp_box, max_iter=400, pfix=pfix, subdomains=[orig_dom])
 
-        # Get clean points to generate final mesh
-        print("Getting Clean Points to Generate Final Mesh")
-        points = self.get_clean_mesh_pnts3D(points, pfix, rec_box)
+        # # Get clean points to generate final mesh
+        # print("Getting Clean Points to Generate Final Mesh")
+        # points = self.get_clean_mesh_pnts3D(points, pfix, rec_box)
 
-        # Create new Delaunay with structured mesh part
-        fixed_triangulation = Delaunay(points)
-        cells = fixed_triangulation.simplices
+        # # Create new Delaunay with structured mesh part
+        # fixed_triangulation = Delaunay(points)
+        # cells = fixed_triangulation.simplices
 
-        # SeismicMesh filter for boundary elements
-        print("Removing Elements Outside the Hypershape")
-        geps = (surface / (1e3 * surf_ele_expt))**0.5
-        cells = self.remove_elements_outside_hyp3D(points, cells, geps,
-                                                   sdfunct.sign_dist_hyptrunc)
+        # # SeismicMesh filter for boundary elements
+        # print("Removing Elements Outside the Hypershape")
+        # geps = (surface / (2e3 * surf_ele_expt))**0.5
+        # cells = self.remove_elements_outside_hyp3D(points, cells, geps,
+        #                                            sdfunct.sign_dist_hyptrunc)
 
-        # Create the final mesh
-        final_mesh = Mesh()
-        final_mesh.dim = self.dimension
-        final_mesh.SetMaterial(1, "habc")
+        import meshio
+        # meshio.write_points_cells(
+        #     "hyp3d.msh",
+        #     points,
+        #     [("tetra", cells)],
+        #     file_format="gmsh22",
+        #     binary=False)
 
-        # Add points
-        point_map = {}
-        for i, coord in enumerate(points):
-            z, x, y = coord
-            point_map[i] = final_mesh.Add(MeshPoint((z, x, y)))
+        final_mesh = fire.Mesh(
+            "fragmented_geometry.msh",
+            distribution_parameters={"overlap_type": (
+                fire.DistributedMeshOverlapType.NONE, 0)},
+            comm=self.comm.comm)
 
-        # Add elements
-        for cell in cells:
-            netgen_points = [point_map[cell[i]] for i in range(len(cell))]
-            final_mesh.Add(Element3D(1, netgen_points))  # 1: Volume marker
+        # # Create the final mesh
+        # final_mesh = Mesh()
+        # final_mesh.dim = self.dimension
+        # final_mesh.SetMaterial(1, "habc")
 
-        try:
-            # Mesh data
-            final_mesh.Compress()
-            print(f"Mesh created with {len(final_mesh.Points())} points "
-                  f"and {len(final_mesh.Elements3D())} elements")
+        # # Add points
+        # point_map = {}
+        # for i, coord in enumerate(points):
+        #     z, x, y = coord
+        #     point_map[i] = final_mesh.Add(MeshPoint((z, x, y)))
 
-            # Mesh is transformed into a firedrake mesh
-            final_mesh = fire.Mesh(final_mesh, comm=self.comm.comm)
-            print("Merged Mesh Generated Successfully")
+        # # Add elements
+        # for cell in cells:
+        #     netgen_points = [point_map[cell[i]] for i in range(len(cell))]
+        #     final_mesh.Add(Element3D(1, netgen_points))  # 1: Volume marker
 
-        except Exception as e:
-            UserWarning(f"Error Generating Merged Mesh: {e}. Exiting.")
+        # try:
+        #     # Mesh data
+        #     # final_mesh.Compress()
+        #     print(f"Mesh created with {len(final_mesh.Points())} points "
+        #           f"and {len(final_mesh.Elements3D())} elements")
+
+        #     # Mesh is transformed into a firedrake mesh
+        #     final_mesh = fire.Mesh(final_mesh, comm=self.comm.comm)
+        #     print("Merged Mesh Generated Successfully")
+
+        # except Exception as e:
+        #     UserWarning(f"Error Generating Merged Mesh: {e}. Exiting.")
 
         return final_mesh
 
