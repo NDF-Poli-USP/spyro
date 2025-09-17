@@ -1,6 +1,5 @@
 import firedrake as fire
 import spyro.habc.habc as habc
-import spyro.habc.eik as eik
 from spyro.utils.cost import comp_cost
 import pytest
 
@@ -152,11 +151,8 @@ def preamble_habc(dictionary, edge_length):
     # Reference to resource usage
     tRef = comp_cost("tini")
 
-    # Initializing Eikonal object
-    Eik_obj = eik.Eikonal(Wave_obj)
-
     # Finding critical points
-    Wave_obj.critical_boundary_points(Eik_obj)
+    Wave_obj.critical_boundary_points()
 
     # Estimating computational resource usage
     comp_cost("tfin", tRef=tRef,
