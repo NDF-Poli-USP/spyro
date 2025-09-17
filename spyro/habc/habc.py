@@ -243,9 +243,7 @@ class HABC_Wave(AcousticWave, HABC_Mesh, RectangLayer,
                                   ['boundary', 'source'])
 
         # Path to save data
-        if output_folder is None:
-            self.path_save = getcwd() + "/output/"
-        else:
+        if output_folder is not None:
             self.path_save = getcwd() + "/" + output_folder + "/"
 
         self.path_case_habc = self.path_save + self.case_habc + "/"
@@ -347,10 +345,10 @@ class HABC_Wave(AcousticWave, HABC_Mesh, RectangLayer,
         '''
 
         # New geometry with layer
-        self.Lx_habc = self.length_x + 2 * self.pad_len
-        self.Lz_habc = self.length_z + self.pad_len
+        self.Lx_habc = self.mesh_parameters.length_x + 2 * self.pad_len
+        self.Lz_habc = self.mesh_parameters.length_z + self.pad_len
         if self.dimension == 3:  # 3D
-            self.Ly_habc = self.length_y + 2 * self.pad_len
+            self.Ly_habc = self.mesh_parameters.length_y + 2 * self.pad_len
 
     def habc_domain_dimensions(self, only_orig_dom=False,
                                only_habc_dom=False, full_hyp=True):
@@ -383,9 +381,9 @@ class HABC_Wave(AcousticWave, HABC_Mesh, RectangLayer,
         '''
 
         # Original domain dimensions
-        dom_dim = (self.length_x, self.length_z)
+        dom_dim = (self.mesh_parameters.length_x, self.mesh_parameters.length_z)
         if self.dimension == 3:  # 3D
-            dom_dim += (self.length_y,)
+            dom_dim += (self.mesh_parameters.length_y,)
 
         if only_orig_dom:
             return dom_dim
@@ -395,7 +393,7 @@ class HABC_Wave(AcousticWave, HABC_Mesh, RectangLayer,
             dom_lay = (self.Lx_habc, self.Lz_habc)
 
         elif self.layer_shape == 'hypershape':  # Hypershape layer
-            dom_lay = (self.Lx_habc, self.length_z + 2 * self.pad_len) \
+            dom_lay = (self.Lx_habc, self.mesh_parameters.length_z + 2 * self.pad_len) \
                 if full_hyp else (self.Lx_habc, self.Lz_habc)
 
         if self.dimension == 3:  # 3D
@@ -531,7 +529,7 @@ class HABC_Wave(AcousticWave, HABC_Mesh, RectangLayer,
                                                   fmesh=fmesh)
 
         # Updating the mesh with the absorbing layer
-        self.set_mesh(user_mesh=mesh_habc, mesh_parameters={})
+        self.set_mesh(user_mesh=mesh_habc, input_mesh_parameters={})
         print("Mesh Generated Successfully")
 
         if inf_model:
@@ -993,11 +991,11 @@ class HABC_Wave(AcousticWave, HABC_Mesh, RectangLayer,
         print(inf_str.format(self.pad_len))
 
         # Dimensions for the infinite domain
-        self.Lx_habc = self.length_x + 2 * self.pad_len
-        self.Lz_habc = self.length_z + self.pad_len
+        self.Lx_habc = self.mesh_parameters.length_x + 2 * self.pad_len
+        self.Lz_habc = self.mesh_parameters.length_z + self.pad_len
 
         if self.dimension == 3:  # 3D
-            self.Ly_habc = self.length_y + 2 * self.pad_len
+            self.Ly_habc = self.mesh_parameters.length_y + 2 * self.pad_len
 
     def infinite_model(self, check_dt=False, max_divisor_tf=1):
         '''
