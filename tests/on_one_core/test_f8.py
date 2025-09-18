@@ -261,7 +261,7 @@ def habc_fig8(Wave_obj, dat_regr_xCR, xCR_usu=None, plot_comparison=True):
     Wave_obj.damping_layer(xCR_usu=xCR_usu)
 
     # Applying NRBCs on outer boundary layer
-    Wave_obj.cos_ang_HigdonBC()
+    Wave_obj.nrbc_on_boundary_layer()
 
     # Solving the forward problem
     Wave_obj.forward_solve()
