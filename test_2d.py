@@ -136,10 +136,10 @@ def preamble_habc(dictionary, edge_length, f_est):
     tRef = comp_cost("tini")
 
     # Create the acoustic wave object with HABCs
-    Wave_obj = habc.HABC_Wave(dictionary=dictionary)
+    Wave_obj = habc.HABC_Wave(dictionary=dictionary, output_folder="tests/inputfiles/")
 
     # Mesh
-    Wave_obj.set_mesh(mesh_parameters={"edge_length": edge_length})
+    Wave_obj.set_mesh(input_mesh_parameters={"edge_length": edge_length})
 
     # Initial velocity model
     cond = fire.conditional(Wave_obj.mesh_x < 0.5, 3.0, 1.5)
@@ -184,9 +184,9 @@ def get_xCR_usu(Wave_obj, dat_regr_xCR, typ_xCR, n_pts):
         - max_errPK: Values of the maximum peak error.
           The last value corresponds to the optimal xCR
         - crit_opt : Criterion for the optimal heuristic factor.
-          * 'err_difference' : Difference between integral and peak errors
-          * 'err_integral' : Minimum integral error
-          * 'err_sum' : Sum of integral and peak errors
+          * 'error_difference' : Difference between integral and peak errors
+          * 'error_integral' : Minimum integral error
+          * 'error_sum' : Sum of integral and peak errors
     typ_xCR : `str`
         Type of computation for the parameter xCR.
         Options: "candidates" and "optimal"
@@ -237,9 +237,9 @@ def habc_fig8(Wave_obj, dat_regr_xCR, xCR_usu=None, plot_comparison=True):
         - max_errPK: Values of the maximum peak error.
           The last value corresponds to the optimal xCR
         - crit_opt : Criterion for the optimal heuristic factor.
-          * 'err_difference' : Difference between integral and peak errors
-          * 'err_integral' : Minimum integral error
-          * 'err_sum' : Sum of integral and peak errors
+          * 'error_difference' : Difference between integral and peak errors
+          * 'error_integral' : Minimum integral error
+          * 'error_sum' : Sum of integral and peak errors
     xCR_usu : `float`, optional
         User-defined heuristic factor for the minimum damping ratio.
         Default is None, which defines an estimated value
@@ -256,7 +256,7 @@ def habc_fig8(Wave_obj, dat_regr_xCR, xCR_usu=None, plot_comparison=True):
     Wave_obj.identify_habc_case()
 
     # Acquiring reference signal
-    Wave_obj.get_reference_signal()
+    Wave_obj.get_reference_signal(foldername="")
 
     # Determining layer size
     Wave_obj.size_habc_criterion(n_root=1)
@@ -343,7 +343,7 @@ def test_loop_habc_2d():
     degree_type = "real"  # "integer"
 
     # Error criterion for heuristic factor xCR
-    crit_opt = "err_sum"  # err_integral, err_peak
+    crit_opt = "error_sum"  # error_integral, error_peak
 
     # Number of points for regression (odd number)
     n_pts = 1

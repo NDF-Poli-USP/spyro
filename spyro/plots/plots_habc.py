@@ -345,9 +345,9 @@ def plot_xCR_opt(Wave_object, data_regr_xCR, show=False):
         - max_errPK: Values of the maximum peak error.
           The last value corresponds to the optimal xCR
         - crit_opt : Criterion for the optimal heuristic factor.
-          * 'err_difference' : Difference between integral and peak errors
-          * 'err_integral' : Minimum integral error
-          * 'err_sum' : Sum of integral and peak errors
+          * 'error_difference' : Difference between integral and peak errors
+          * 'error_integral' : Minimum integral error
+          * 'error_sum' : Sum of integral and peak errors
     show: `bool`, optional
         Whether to show the plot. Default is False.
 
@@ -359,7 +359,7 @@ def plot_xCR_opt(Wave_object, data_regr_xCR, show=False):
     # Data for regression
     xCR, max_errIt, max_errPk, crit_opt = data_regr_xCR
     xCR_opt = xCR[-1]
-    err_opt = max_errIt[-1]
+    error_opt = max_errIt[-1]
     eq_eI = np.polyfit(xCR[:-1], max_errIt[:-1], 2)
     eq_eP = np.polyfit(xCR[:-1], max_errPk[:-1], 2)
 
@@ -396,16 +396,16 @@ def plot_xCR_opt(Wave_object, data_regr_xCR, show=False):
     plt.plot(xgraf, 100 * y_eP, color='b', linestyle='--')
 
     # Locating the optimal value
-    plt.plot([xCR_opt, xCR_opt], [0., 100 * err_opt], 'k-')
+    plt.plot([xCR_opt, xCR_opt], [0., 100 * error_opt], 'k-')
     xopt_str = r'Optimized Heuristic Factor: $X^{{*}}_{{C_{{R}}}} = {:.3f}$'
     if round(100 * np.polyval(eq_eI, xCR_opt), 2) == round(
             100 * np.polyval(eq_eP, xCR_opt), 2):
         xopt_str += r' | $e_{{I}} = e_{{P}} = {:.2f}\%$'
-        label = xopt_str.format(xCR_opt, 100 * err_opt)
+        label = xopt_str.format(xCR_opt, 100 * error_opt)
     else:
         xopt_str += r' | $e_{{I}} = {:.2f}\%$ | $e_{{P}} = {:.2f}\%$'
-        label = xopt_str.format(xCR_opt, 100 * err_opt, 100 * max_errPk[-1])
-    plt.plot(xCR_opt, 100 * err_opt, marker=r'$\ast$', color='k',
+        label = xopt_str.format(xCR_opt, 100 * error_opt, 100 * max_errPk[-1])
+    plt.plot(xCR_opt, 100 * error_opt, marker=r'$\ast$', color='k',
              markersize=10, label=label)
     plt.legend(loc="best", fontsize=8.5)
 
@@ -413,11 +413,11 @@ def plot_xCR_opt(Wave_object, data_regr_xCR, show=False):
     max_err = max(max(max_errIt[:-1]), max(max_errPk[:-1]))
     plt.xlim(0, round(xCR_sup, 1) + 0.1)
     plt.ylim(0, round(100 * max_err, 1) + 0.1)
-    if crit_opt == 'err_difference':
+    if crit_opt == 'error_difference':
         str_crt = r' (Criterion: Min $(e_I - e_P)$)'
-    elif crit_opt == 'err_integral':
+    elif crit_opt == 'error_integral':
         str_crt = r' (Criterion: Min $e_I$)'
-    elif crit_opt == 'err_sum':
+    elif crit_opt == 'error_sum':
         str_crt = r' (Criterion: Min $(e_I + e_P)$)'
 
     plt.xlabel(r'$X_{C_{R}}$' + str_crt)

@@ -488,10 +488,10 @@ class HABC_Damping():
         err2 = abs(-1 + np.cos([self.p1, self.p2])).max()
 
         # Correction by spurious reflection
-        CR_err_min = CRmin * (1 - min(err1, err2))
-        xCR_lb = self.min_reflection(CR_err=CR_err_min, typ='CR_ERR')[1]
-        CR_err_max = CRmin * (1 + max(err1, err2))
-        xCR_ub = self.min_reflection(CR_err=CR_err_max, typ='CR_ERR')[1]
+        CR_error_min = CRmin * (1 - min(err1, err2))
+        xCR_lb = self.min_reflection(CR_err=CR_error_min, typ='CR_ERR')[1]
+        CR_error_max = CRmin * (1 + max(err1, err2))
+        xCR_ub = self.min_reflection(CR_err=CR_error_max, typ='CR_ERR')[1]
         xCR_min = np.clip(max(xCR_lb, xCR_inf), xCR_inf, xCR_sup)
         xCR_max = np.clip(min(xCR_ub, xCR_sup), xCR_inf, xCR_sup)
 

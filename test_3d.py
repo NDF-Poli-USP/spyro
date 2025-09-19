@@ -190,9 +190,9 @@ def get_xCR_usu(Wave_obj, dat_regr_xCR, typ_xCR, n_pts):
         - max_errPK: Values of the maximum peak error.
           The last value corresponds to the optimal xCR
         - crit_opt : Criterion for the optimal heuristic factor.
-          * 'err_difference' : Difference between integral and peak errors
-          * 'err_integral' : Minimum integral error
-          * 'err_sum' : Sum of integral and peak errors
+          * 'error_difference' : Difference between integral and peak errors
+          * 'error_integral' : Minimum integral error
+          * 'error_sum' : Sum of integral and peak errors
     typ_xCR : `str`
         Type of computation for the parameter xCR.
         Options: "candidates" and "optimal"
@@ -243,9 +243,9 @@ def habc_fig8(Wave_obj, dat_regr_xCR, xCR_usu=None, plot_comparison=True):
         - max_errPK: Values of the maximum peak error.
           The last value corresponds to the optimal xCR
         - crit_opt : Criterion for the optimal heuristic factor.
-          * 'err_difference' : Difference between integral and peak errors
-          * 'err_integral' : Minimum integral error
-          * 'err_sum' : Sum of integral and peak errors
+          * 'error_difference' : Difference between integral and peak errors
+          * 'error_integral' : Minimum integral error
+          * 'error_sum' : Sum of integral and peak errors
     xCR_usu : `float`, optional
         User-defined heuristic factor for the minimum damping ratio.
         Default is None, which defines an estimated value
@@ -349,7 +349,7 @@ def test_loop_habc_3d():
     degree_type = "real"  # "integer"
 
     # Error criterion for heuristic factor xCR
-    crit_opt = "err_sum"  # err_integral, err_peak
+    crit_opt = "error_sum"  # error_integral, error_peak
 
     # Number of points for regression (odd number)
     n_pts = 1

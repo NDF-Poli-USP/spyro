@@ -23,13 +23,13 @@ def value_parameter_error(par_name, par_value, valid_values):
     '''
 
     # Error message about the invalid parameter
-    err_str = f"Invalid {par_name}: '{par_value}'. Please use: "
+    error_str = f"Invalid {par_name}: '{par_value}'. Please use: "
     opt_str = ", ".join([f"'{val}'" for val in valid_values])
     last_comma = opt_str.rfind(',')
     opt_str = opt_str[:last_comma] + ' or' + opt_str[last_comma + 1:] \
         if len(valid_values) > 1 else opt_str
 
-    raise ValueError(err_str + opt_str)
+    raise ValueError(error_str + opt_str)
 
 
 def value_dimension_error(par_names, par_values, expected_dim):

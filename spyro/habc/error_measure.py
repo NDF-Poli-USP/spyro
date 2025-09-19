@@ -24,7 +24,7 @@ class HABC_Error():
     ----------
     dt : `float`
         Time step used in the simulation
-    err_habc : `list`
+    error_habc : `list`
         Error measures at the receivers for the HABC scheme.
         Structure: [errIt, errPk, pkMax, final_energy]
         - errIt : Integral error
@@ -41,7 +41,7 @@ class HABC_Error():
         Number of receivers used in the simulation
     path_save_error : `string`
         Path to save data
-    path_save_err_case : `string`
+    path_save_error_case : `string`
         Path to save data for the current case study
     receiver_locations: `list`
         List of receiver locations
@@ -114,9 +114,9 @@ class HABC_Error():
 
         # Path to save data
         if output_case is None:
-            self.path_save_err_case = self.path_save_error
+            self.path_save_error_case = self.path_save_error
         else:
-            self.path_save_err_case = output_case
+            self.path_save_error_case = output_case
 
     def save_reference_signal(self):
         '''
@@ -231,7 +231,7 @@ class HABC_Error():
 
         # Final value of the dissipated energy in the HABC scheme
         final_energy = assemble(self.acoustic_energy)
-        self.err_habc = [errIt, errPk, pkMax, final_energy]
+        self.error_habc = [errIt, errPk, pkMax, final_energy]
         self.max_errIt = max(errIt)
         self.max_errPK = max(errPk)
         print("Maximum Integral Error: {:.2%}".format(self.max_errIt))
@@ -239,11 +239,11 @@ class HABC_Error():
         print("Acoustic Energy: {:.2e}".format(final_energy))
 
         # Save error measures
-        err_str = self.path_save_err_case + "habc_errs.txt"
-        np.savetxt(err_str, (errIt, errPk, pkMax), delimiter='\t')
+        error_str = self.path_save_error_case + "habc_errs.txt"
+        np.savetxt(error_str, (errIt, errPk, pkMax), delimiter='\t')
 
         # Append the energy value at the end
-        with open(err_str, 'a') as f:
+        with open(error_str, 'a') as f:
             np.savetxt(f, np.array([final_energy]), delimiter='\t')
 
     def comparison_plots(self, regression_xCR=False, data_regr_xCR=None):
@@ -265,8 +265,8 @@ class HABC_Error():
             - max_errPK: Values of the maximum peak error.
               The last value corresponds to the optimal xCR
             - crit_opt : Criterion for the optimal heuristic factor.
-              * 'err_difference' : Difference between integral and peak errors
-              * 'err_integral' : Minimum integral error
+              * 'error_difference' : Difference between integral and peak errors
+              * 'error_integral' : Minimum integral error
 
         Returns
         -------
@@ -330,7 +330,7 @@ class HABC_Error():
 
         return xCR_cand
 
-    def get_xCR_optimal(self, dat_reg_xCR, crit_opt='err_sum'):
+    def get_xCR_optimal(self, dat_reg_xCR, crit_opt='error_sum'):
         '''
         Get the optimal heuristic factor for the quadratic damping.
 
@@ -341,10 +341,10 @@ class HABC_Error():
             Structure: [xCR, max_errIt, max_errPK]
         crit_opt : `string`, optional
             Criterion for the optimal heuristic factor
-            Default is 'err_difference'.
-            - 'err_difference' : Difference between integral and peak errors
-            - 'err_integral' : Minimum integral error
-            - 'err_sum' : Sum of integral and peak errors
+            Default is 'error_difference'.
+            - 'error_difference' : Difference between integral and peak errors
+            - 'error_integral' : Minimum integral error
+            - 'error_sum' : Sum of integral and peak errors
 
         Returns
         -------
@@ -357,18 +357,18 @@ class HABC_Error():
         max_errIt = dat_reg_xCR[1]
         max_errPK = dat_reg_xCR[2]
 
-        if crit_opt == 'err_difference':
+        if crit_opt == 'error_difference':
             y_err = [eI - eP for eI, eP in zip(max_errIt, max_errPK)]
 
-        elif crit_opt == 'err_integral':
+        elif crit_opt == 'error_integral':
             y_err = max_errIt
 
-        elif crit_opt == 'err_sum':
+        elif crit_opt == 'error_sum':
             y_err = [eI + eP for eI, eP in zip(max_errIt, max_errPK)]
 
         else:
             value_parameter_error('crit_opt', crit_opt,
-                                  ['err_difference', 'err_integral', 'err_sum'])
+                                  ['error_difference', 'error_integral', 'error_sum'])
 
         # Limits for the heuristic factor
         xCR_inf, xCR_sup = self.xCR_lim
@@ -376,7 +376,7 @@ class HABC_Error():
         # Coefficients for the quadratic equation
         eq_xCR = np.polyfit(xCR, y_err, 2)
 
-        if crit_opt == 'err_difference':
+        if crit_opt == 'error_difference':
             # Roots of the quadratic equation
             roots = np.roots(eq_xCR)
             valid_roots = [np.clip(rth, xCR_inf, xCR_sup)
@@ -391,7 +391,7 @@ class HABC_Error():
                 vtx = - eq_xCR[1] / (2 * eq_xCR[0])
                 xCR_opt = np.clip(vtx, xCR_inf, xCR_sup)
 
-        elif crit_opt == 'err_integral' or crit_opt == 'err_sum':
+        elif crit_opt == 'error_integral' or crit_opt == 'error_sum':
 
             # Vertex of the quadratic equation
             vtx = - eq_xCR[1] / (2 * eq_xCR[0])
