@@ -6,21 +6,25 @@ import pytest
 import os
 
 
-def wave_dict(dt_usu, layer_shape, degree_layer,
-              habc_reference_freq, get_ref_model):
+def wave_dict(dt_usu, fr_files, layer_shape, degree_layer,
+              degree_type, habc_reference_freq, get_ref_model):
     '''
-    Create a dictionary with parameters for the model.
+    Create a dictionary with parameters for the model
 
     Parameters
     ----------
     dt_usu: `float`
         Time step of the simulation
+    fr_files : `int`
+        Frequency of the output files to be saved in the simulation
     layer_shape : `str`
         Shape of the absorbing layer, either 'rectangular' or 'hypershape'
-    degree_layer : `int` or `None`
+    degree_layer : `float` or `None`
         Degree of the hypershape layer, if applicable. If None, it is not used
+    degree_type : `str`
+        Type of the hypereshape degree. Options: 'real' or 'integer'
     habc_reference_freq : str
-        Reference frequency for the layer size. Options: 'source' or 'boundary
+        Reference frequency for the layer size. Options: 'source' or 'boundary'
     get_ref_model : `bool`
         If True, the infinite model is created. If False, the absorbing layer
         is created based on the model parameters.
@@ -68,19 +72,18 @@ def wave_dict(dt_usu, layer_shape, degree_layer,
     dictionary["acquisition"] = {
         "source_type": "ricker",
         "source_locations": [(-0.5, 0.25)],
+        # "source_locations": [(-0.5, 0.25), (-0.5, 0.35), (-0.5, 0.5)], # ToDo
         "frequency": 5.0,  # in Hz
         "delay": 1.5,
         "receiver_locations": [(-1., 0.), (-1., 1.), (0., 1.), (0., 0.)]
-        # "source_locations": [(-0.5, 0.25), (-0.5, 0.35), (-0.5, 0.5)],
     }
 
     # Simulate for 2.0 seconds.
-    fr_files = max(int(100 * 0.0005 / dt_usu), 1)
     dictionary["time_axis"] = {
-        "initial_time": 0.0,  # Initial time for event
+        "initial_time": 0.,  # Initial time for event
         "final_time": 2.,    # Final time for event
         "dt": dt_usu,  # timestep size in seconds
-        "amplitude": 1,  # the Ricker has an amplitude of 1.
+        "amplitude": 1.,  # the Ricker has an amplitude of 1.
         "output_frequency": fr_files,  # how frequently to output solution to pvds
         "gradient_sampling_frequency": fr_files,  # how frequently to save to RAM
     }
@@ -90,7 +93,8 @@ def wave_dict(dt_usu, layer_shape, degree_layer,
         "status": True,  # Activate ABCs
         "damping_type": "hybrid",  # Activate HABC
         "layer_shape": layer_shape,  # Options: rectangular or hypershape
-        "degree_layer": degree_layer,  # Integer >= 2. Only for hypershape
+        "degree_layer": degree_layer,  # Float >= 2 (hyp) or None (rec)
+        "degree_type": degree_type,  # Options: real or integer
         "habc_reference_freq": habc_reference_freq,  # Options: source or boundary
         "degree_eikonal": 2,  # Finite element order for the Eikonal analysis
         "get_ref_model": get_ref_model,  # If True, the infinite model is created
@@ -111,7 +115,7 @@ def wave_dict(dt_usu, layer_shape, degree_layer,
     return dictionary
 
 
-def preamble_habc(dictionary, edge_length):
+def preamble_habc(dictionary, edge_length, f_est):
     '''
     Run the infinite model and the Rikonal analysis
 
@@ -121,6 +125,8 @@ def preamble_habc(dictionary, edge_length):
         Dictionary containing the parameters for the model
     edge_length : `float`
         Mesh size in km
+    f_est : `float`, optional
+        Factor for the stabilizing term in Eikonal Eq.
 
     Returns
     -------
@@ -143,7 +149,7 @@ def preamble_habc(dictionary, edge_length):
     Wave_obj.set_initial_velocity_model(conditional=cond)
 
     # Preamble mesh operations
-    Wave_obj.preamble_mesh_operations()
+    Wave_obj.preamble_mesh_operations(f_est=f_est)
 
     # Estimating computational resource usage
     comp_cost("tfin", tRef=tRef,
@@ -324,6 +330,9 @@ def run_loop_habc(degree_layer_lst, habc_reference_freq_lst, get_ref_model=False
     # Timestep size
     dt_usu_lst = [0.0005]  # [0.0005, 0.0002, 0.0002, 0.000125]
 
+    # Factor for the stabilizing term in Eikonal equation
+    f_est = 0.02
+
     # Get simulation parameters
     edge_length = edge_length_lst[case]
     dt_usu = dt_usu_lst[case]
@@ -344,6 +353,9 @@ def run_loop_habc(degree_layer_lst, habc_reference_freq_lst, get_ref_model=False
     # Loop for HABC cases
     # loop_modeling = True  # not get_ref_model
 
+    # Type of the hypereshape degree
+    degree_type = "real"  # "integer"
+
     # Error criterion for heuristic factor xCR
     crit_opt = "error_difference"  # "error_integral"
 
@@ -352,11 +364,11 @@ def run_loop_habc(degree_layer_lst, habc_reference_freq_lst, get_ref_model=False
 
     # ============ MESH AND EIKONAL ============
     # Create dictionary with parameters for the model
-    dictionary = wave_dict(dt_usu, "rectangular",
-                           None, "source", get_ref_model)
+    fr_files = max(int(100 * max(dt_usu_lst) / dt_usu), 1)
+    dictionary = wave_dict(dt_usu,fr_files,  "rectangular", None, degree_type, "source", get_ref_model)
 
     # Creating mesh and performing eikonal analysis
-    Wave_obj = preamble_habc(dictionary, edge_length)
+    Wave_obj = preamble_habc(dictionary, edge_length, f_est)
 
     # ============ REFERENCE MODEL ============
     if get_ref_model:
