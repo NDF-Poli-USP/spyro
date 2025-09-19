@@ -204,7 +204,7 @@ def test_loop_modal_2d():
     Loop for applying the HABC to the model in Fig. 8 of Salas et al. (2022).
     '''
 
-    case = 0  # Integer from 0 to 4
+    case = 4  # Integer from 0 to 4
 
     # ============ SIMULATION PARAMETERS ============
 
@@ -220,13 +220,13 @@ def test_loop_modal_2d():
     # Get simulation parameters
     edge_length = edge_length_lst[case]
     f_est = f_est_lst[case]
-    print("\nMesh Size: {:.3f} km".format(edge_length))
+    print("\nMesh Size: {:.4f} km".format(edge_length))
     print("Eikonal Stabilizing Factor: {:.2f}".format(f_est))
 
     # ============ HABC PARAMETERS ============
 
     # Hyperellipse degrees
-    degree_layer_lst = [3]  # [None, 2, 3, 4, 5]
+    degree_layer_lst = [2, 3, 4, 4.4, None]
 
     # Type of the hypereshape degree
     degree_type = "real"  # "integer"
@@ -244,9 +244,10 @@ def test_loop_modal_2d():
     # ============ MODAL ANALYSIS ============
 
     # Modal solvers
-    modal_solver_lst = ['ANALYTICAL', 'ARNOLDI', 'LANCZOS',
-                        'LOBPCG', 'KRYLOVSCH_CH', 'KRYLOVSCH_CG',
-                        'KRYLOVSCH_GH', 'KRYLOVSCH_GG', 'RAYLEIGH']
+    modal_solver_lst = ['ANALYTICAL']
+    # modal_solver_lst = ['ANALYTICAL', 'ARNOLDI', 'LANCZOS',
+    #                     'LOBPCG', 'KRYLOVSCH_CH', 'KRYLOVSCH_CG',
+    #                     'KRYLOVSCH_GH', 'KRYLOVSCH_GG', 'RAYLEIGH']
 
     for degree_layer in degree_layer_lst:
 
@@ -286,16 +287,64 @@ if __name__ == "__main__":
 # n_min   2.0    2.0  2.0  2.0  2.0
 # n_max   4.4    4.8  4.7  4.7  4.6
 
-# Frequency[Hz]    N2.0      (texe/pmem)    N3.0      (texe/pmem)     N4.0    N4.4     REC
-# ANALYTICAL    0.43583 (0.154s/1.323MB) 0.75309 (0.153s/1.363MB)
-# ARNOLDI       0.50443 (0.127s/6.653MB) 0.48266 (0.118s/7.004MB)
-# LANCZOS       0.50443 (0.080s/5.967MB) 0.48266 (0.104s/6.264MB)
-# LOBPCG        0.50443 (3.633s/5.983MB) 0.48266 (3.635s/6.263MB)
-# KRYLOVSCH_CH  0.50443 (0.070s/0.085MB) 0.48266 (0.050s/0.086MB)
-# KRYLOVSCH_CG  0.50443 (0.036s/0.075MB) 0.48266 (0.034s/0.074MB)
-# KRYLOVSCH_GH  0.50443 (0.038s/0.099MB) 0.48266 (0.033s/0.087MB)
-# KRYLOVSCH_GG  0.50443 (0.032s/0.088MB) 0.48266 (0.036s/0.100MB)
-# RAYLEIGH      0.52785 (1.461s/3.528MB) 0.50497 (1.290s/3.640MB)
+# Frequency[Hz]    N2.0      (texe/pmem)    N3.0      (texe/pmem)
+# ANALYTICAL    0.51085 (0.160s/1.324MB) 0.48363 (0.194s/1.365MB)
+# ARNOLDI       0.50443 (0.098s/6.650MB) 0.48266 (0.119s/7.005MB)
+# LANCZOS       0.50443 (0.058s/5.967MB) 0.48266 (0.066s/6.264MB)
+# LOBPCG        0.50443 (3.756s/5.984MB) 0.48266 (3.770s/6.265MB)
+# KRYLOVSCH_CH  0.50443 (0.052s/0.085MB) 0.48266 (0.044s/0.086MB)
+# KRYLOVSCH_CG  0.50443 (0.033s/0.076MB) 0.48266 (0.040s/0.074MB)
+# KRYLOVSCH_GH  0.50443 (0.063s/0.099MB) 0.48266 (0.040s/0.087MB)
+# KRYLOVSCH_GG  0.50443 (0.035s/0.093MB) 0.48266 (0.033s/0.100MB)
+# RAYLEIGH      0.52785 (1.361s/3.478MB) 0.50497 (1.329s/3.639MB)
+
+# Frequency[Hz]    N4.0      (texe/pmem)    N4.4      (texe/pmem)
+# ANALYTICAL    0.44152 (0.155s/1.333MB) 0.47040 (0.166s/1.339MB)
+# ARNOLDI       0.47423 (0.094s/7.120MB) 0.47270 (0.122s/7.432MB)
+# LANCZOS       0.47423 (0.074s/6.399MB) 0.47270 (0.068s/6.692MB)
+# LOBPCG        0.47423 (3.832s/6.381MB) 0.47270 (3.920s/6.535MB)
+# KRYLOVSCH_CH  0.47423 (0.049s/0.085MB) 0.47270 (0.046s/0.085MB)
+# KRYLOVSCH_CG  0.47423 (0.040s/0.076MB) 0.47270 (0.034s/0.075MB)
+# KRYLOVSCH_GH  0.47423 (0.050s/0.099MB) 0.47270 (0.039s/0.098MB)
+# KRYLOVSCH_GG  0.47423 (0.033s/0.087MB) 0.47270 (0.038s/0.088MB)
+# RAYLEIGH      0.49647 (1.551s/3.537MB) 0.49470 (1.432s/3.573MB)
+
+# Frequency[Hz]    REC       (texe/pmem)
+# ANALYTICAL    0.42679 (0.152s/1.342MB)
+# ARNOLDI       0.45539 (0.100s/7.112MB)
+# LANCZOS       0.45539 (0.060s/6.352MB)
+# LOBPCG        0.45539 (3.351s/6.217MB)
+# KRYLOVSCH_CH  0.45539 (0.039s/0.085MB)
+# KRYLOVSCH_CG  0.45539 (0.035s/0.075MB)
+# KRYLOVSCH_GH  0.45539 (0.033s/0.086MB)
+# KRYLOVSCH_GG  0.45539 (0.032s/0.093MB)
+# RAYLEIGH      0.47634 (1.474s/3.516MB)
+
+# RAYLEIGH
+# n_eigfunc       2       4       6        8
+# freq(Hz)  0.66237 0.52785 0.51705  0.51355
+# texe(s)     0.192   1.390  18.209   35.027
+# mem(MB)     1.360   3.637  11.469   16.161
+
+# dx=0.1    REC    N4.4    N4.0    N3.0    N2.0
+# fnum  0.45539 0.47270 0.47423 0.48266 0.50443
+# clip  0.42826 0.45480 0.45843 0.47347 0.50723
+
+# dx=0.0625 REC    N4.4    N4.0    N3.0    N2.0
+# fnum  0.45567 0.47253 0.47463 0.48342 0.50330
+# clip  0.48863 0.47612 0.45643 0.53385 0.50395 *
+
+# dx=0.05   REC    N4.4    N4.0    N3.0    N2.0
+# fnum  0.45576 0.47185 0.47390 0.48232 0.50292
+# clip  0.44012 0.40888 0.39590 0.39276 0.38542 *
+
+# dx=0.025  REC    N4.4    N4.0    N3.0    N2.0
+# fnum  0.46763 0.48306 0.48550 0.49408 0.51332
+# clip  0.40181 0.40944 0.41270 0.42624 0.45891
+
+# dx=0.02   REC    N4.4    N4.0    N3.0    N2.0
+# fnum  0.47498 0.49076 0.49301 0.50200 0.52376
+# clip  0.42695 0.43504 0.43850 0.45288 0.48766
 
 
 # from time import perf_counter  # For runtime

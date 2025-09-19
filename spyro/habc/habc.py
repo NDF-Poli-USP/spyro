@@ -454,7 +454,7 @@ class HABC_Wave(AcousticWave, HABC_Mesh, RectangLayer,
             print("Determining Rectangular Layer Parameters")
 
             # Geometric properties of the rectangular layer
-            self.calc_rec_geom_prop(dom_lay_full)
+            self.calc_rec_geom_prop(dom_lay_full, self.pad_len)
 
         elif self.layer_shape == 'hypershape':
 
@@ -728,11 +728,16 @@ class HABC_Wave(AcousticWave, HABC_Mesh, RectangLayer,
             z_cut = Lz / 2.
 
             # Cut plane percentage
-            cut_plane_percent = z_cut / self.hyper_axes[1]
+            cut_plane_perc = z_cut / self.hyper_axes[1]
 
-            Lsp = mod_sol.solve_eigenproblem(
-                self.c, V=self.function_space, quad_rule=self.quadrature_rule,
-                hyp_par=hyp_par, cut_plane_percent=cut_plane_percent)
+            # Equivalent velocity for the original model
+            c_eqref = mod_sol.c_equivalent(self.initial_velocity_model,
+                                           V=self.funct_space_eik)
+
+            Lsp = mod_sol.solve_eigenproblem(self.c, V=self.function_space,
+                                             quad_rule=self.quadrature_rule,
+                                             hyp_par=hyp_par, c_eqref=c_eqref,
+                                             cut_plane_percent=cut_plane_perc)
 
         elif method == 'RAYLEIGH':
             # Original domain dimensions
@@ -742,10 +747,10 @@ class HABC_Wave(AcousticWave, HABC_Mesh, RectangLayer,
             if self.dimension == 2:  # 2D
                 x, z = fire.SpatialCoordinate(self.mesh)
 
+            # Normalized coordinates to [-1, 1] w.r.t. the hypershape centroid
             x_e = (x - fire.Constant(Lx / 2.)) / fire.Constant(2. * a)
             z_e = (z + fire.Constant(Lz / 2.)) / fire.Constant(2. * b)
             coord_norm = (x_e, z_e)
-
             if self.dimension == 3:  # 3D
                 Ly = self.dom_dim[2]
                 c = self.hyper_axes[2]

@@ -15,8 +15,8 @@ Setting Mesh Properties for Eikonal Analysis
 
 --------------------------------------------------------------
 Estimating Runtime and Used Memory
-Runtime: (s):1.002, (m):0.017, (h):0.000
-Used Memory: Current (MB):5.496, Peak (MB):5.627
+Runtime: (s):0.856, (m):0.014, (h):0.000
+Used Memory: Current (MB):5.498, Peak (MB):5.628
 --------------------------------------------------------------
 
 
@@ -47,8 +47,8 @@ Min Eikonal on  Bottom Boundary (ms): 170.373 at (in km): (-1.000, 0.250)
 
 --------------------------------------------------------------
 Estimating Runtime and Used Memory
-Runtime: (s):2.448, (m):0.041, (h):0.001
-Used Memory: Current (MB):6.403, Peak (MB):6.824
+Runtime: (s):2.439, (m):0.041, (h):0.001
+Used Memory: Current (MB):6.406, Peak (MB):6.824
 --------------------------------------------------------------
 
 
@@ -136,13 +136,13 @@ Solver Method: ANALYTICAL
 Nonlinear Curve Fit Successful!
 Fitted parameters: pn = 1.951274 ± 0.000727, qn = 0.402715 ± 0.000226
 R-Squared: 0.999999 - RMSE: 0.000053
-Frequency 0 (Hz): 0.75309
-Fundamental Frequency (Hz): 0.75309
+Frequency 0 (Hz): 0.48363
+Fundamental Frequency (Hz): 0.48363
 
 --------------------------------------------------------------
 Estimating Runtime and Used Memory
-Runtime: (s):0.153, (m):0.003, (h):0.000
-Used Memory: Current (MB):1.219, Peak (MB):1.363
+Runtime: (s):0.194, (m):0.003, (h):0.000
+Used Memory: Current (MB):1.221, Peak (MB):1.365
 --------------------------------------------------------------
 
 
@@ -156,8 +156,8 @@ Fundamental Frequency (Hz): 0.48266
 
 --------------------------------------------------------------
 Estimating Runtime and Used Memory
-Runtime: (s):0.118, (m):0.002, (h):0.000
-Used Memory: Current (MB):5.595, Peak (MB):7.004
+Runtime: (s):0.119, (m):0.002, (h):0.000
+Used Memory: Current (MB):5.596, Peak (MB):7.005
 --------------------------------------------------------------
 
 
@@ -171,7 +171,7 @@ Fundamental Frequency (Hz): 0.48266
 
 --------------------------------------------------------------
 Estimating Runtime and Used Memory
-Runtime: (s):0.104, (m):0.002, (h):0.000
+Runtime: (s):0.066, (m):0.001, (h):0.000
 Used Memory: Current (MB):0.080, Peak (MB):6.264
 --------------------------------------------------------------
 
@@ -186,8 +186,8 @@ Fundamental Frequency (Hz): 0.48266
 
 --------------------------------------------------------------
 Estimating Runtime and Used Memory
-Runtime: (s):3.635, (m):0.061, (h):0.001
-Used Memory: Current (MB):0.201, Peak (MB):6.263
+Runtime: (s):3.770, (m):0.063, (h):0.001
+Used Memory: Current (MB):0.204, Peak (MB):6.265
 --------------------------------------------------------------
 
 
@@ -203,8 +203,8 @@ Fundamental Frequency (Hz): 0.48266
 
 --------------------------------------------------------------
 Estimating Runtime and Used Memory
-Runtime: (s):0.050, (m):0.001, (h):0.000
-Used Memory: Current (MB):0.064, Peak (MB):0.086
+Runtime: (s):0.044, (m):0.001, (h):0.000
+Used Memory: Current (MB):0.063, Peak (MB):0.086
 --------------------------------------------------------------
 
 
@@ -220,8 +220,8 @@ Fundamental Frequency (Hz): 0.48266
 
 --------------------------------------------------------------
 Estimating Runtime and Used Memory
-Runtime: (s):0.034, (m):0.001, (h):0.000
-Used Memory: Current (MB):0.062, Peak (MB):0.074
+Runtime: (s):0.040, (m):0.001, (h):0.000
+Used Memory: Current (MB):0.061, Peak (MB):0.074
 --------------------------------------------------------------
 
 
@@ -237,7 +237,7 @@ Fundamental Frequency (Hz): 0.48266
 
 --------------------------------------------------------------
 Estimating Runtime and Used Memory
-Runtime: (s):0.033, (m):0.001, (h):0.000
+Runtime: (s):0.040, (m):0.001, (h):0.000
 Used Memory: Current (MB):0.074, Peak (MB):0.087
 --------------------------------------------------------------
 
@@ -254,8 +254,8 @@ Fundamental Frequency (Hz): 0.48266
 
 --------------------------------------------------------------
 Estimating Runtime and Used Memory
-Runtime: (s):0.036, (m):0.001, (h):0.000
-Used Memory: Current (MB):0.060, Peak (MB):0.100
+Runtime: (s):0.033, (m):0.001, (h):0.000
+Used Memory: Current (MB):0.061, Peak (MB):0.100
 --------------------------------------------------------------
 
 
@@ -269,7 +269,7 @@ Fundamental Frequency (Hz): 0.50497
 
 --------------------------------------------------------------
 Estimating Runtime and Used Memory
-Runtime: (s):1.290, (m):0.022, (h):0.000
-Used Memory: Current (MB):3.452, Peak (MB):3.640
+Runtime: (s):1.329, (m):0.022, (h):0.000
+Used Memory: Current (MB):3.450, Peak (MB):3.639
 --------------------------------------------------------------
 

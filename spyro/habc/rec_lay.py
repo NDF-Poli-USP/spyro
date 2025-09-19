@@ -28,6 +28,8 @@ class RectangLayer():
         Hyperelliptical area factor. f_Ah = 4 (n_hyp is considered infinite)
     f_Vh : `float`
         Hyperellipsoidal volume factor. f_Vh = 8 (n_hyp is considered infinite)
+    hyper_axes : `tuple`
+        Semi-axes of the rectangular layer (a, b) (2D) or (a, b, c) (3D)
     n_hyp: `float`
         Degree of the hyperelliptical pad layer. n_hyp is set to None because
         this attribute is not applicable to rectangular layers
@@ -67,7 +69,7 @@ class RectangLayer():
         # Hypershape degree (Not applicable in rectangular layers)
         self.n_hyp = None
 
-    def calc_rec_geom_prop(self, dom_lay):
+    def calc_rec_geom_prop(self, dom_lay, pad_len):
         '''
         Calculate the geometric properties for the rectangular layer.
 
@@ -77,6 +79,8 @@ class RectangLayer():
             Domain dimensions with layer including truncation by free surface.
             - 2D : (Lx + 2 * pad_len, Lz + pad_len)
             - 3D : (Lx + 2 * pad_len, Lz + pad_len, Ly + 2 * pad_len)
+        pad_len : `float`
+            Size of the absorbing layer
 
         Returns
         -------
@@ -94,6 +98,11 @@ class RectangLayer():
         Lx, Lz = self.dom_dim[:2]
         Lx_habc, Lz_habc = dom_lay[:2]
 
+        # Rectangular semi-axes
+        a_hyp = 0.5 * Lx + pad_len
+        b_hyp = 0.5 * Lz + pad_len
+        self.hyper_axes = (a_hyp, b_hyp)
+
         # Geometric properties of the rectangular layer
         if self.dimension == 2:  # 2D
             self.area = Lx_habc * Lz_habc
@@ -104,6 +113,8 @@ class RectangLayer():
         if self.dimension == 3:  # 3D
             Ly = self.dom_dim[2]
             Ly_habc = dom_lay[2]
+            c_hyp = 0.5 * Ly + pad_len
+            self.hyper_axes += (c_hyp,)
             self.vol = Lx_habc * Lz_habc * Ly_habc
             self.v_rat = self.vol / (Lx * Lz * Ly)
             self.f_Vh = 8

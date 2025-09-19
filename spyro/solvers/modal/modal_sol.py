@@ -357,7 +357,7 @@ class Modal_Solver():
 
         return Lsp
 
-    def c_equivalent(self, c, V, quad_rule=None):
+    def c_equivalent(self, c, V, quad_rule=None, typ_homog='energy'):
         '''
         Compute an equivalent homogeneous velocity for an inhomogeneneous
         velocity model using an energy-equivalent homogenization
@@ -371,6 +371,8 @@ class Modal_Solver():
         quad_rule : `str`, optional
             Quadrature rule to use for the integration.
             Default is None, which uses the default quadrature rule
+        typ_homog : `str`, optional
+            Type of homogenization: 'energy' or 'volume'. Default is 'energy'
 
         Returns
         -------
@@ -378,19 +380,35 @@ class Modal_Solver():
             Equivalent homogeneous velocity
         '''
 
-        # Weak forms
-        a, L = self.weak_forms(c, V, quad_rule=None, source=True)
-
-        # Compute the energy
-        u = fire.Function(V)
-        fire.solve(a == L, u)
+        # Integration measure
         dx = fire.dx(scheme=quad_rule) if quad_rule else fire.dx
-        energy = fire.assemble(fire.Constant(0.5) * c * c
-                               * fire.inner(fire.grad(u), fire.grad(u)) * dx)
 
-        # Compute equivalent velocity
-        c_eq = np.sqrt(energy / fire.assemble(
-            fire.Constant(0.5) * fire.inner(fire.grad(u), fire.grad(u)) * dx))
+        if typ_homog == 'energy':
+            # Equivalent velocity by energy-equivalent homogenization
+
+            # Weak forms
+            a, L = self.weak_forms(c, V, quad_rule=quad_rule, source=True)
+
+            # Compute the energy
+            u = fire.Function(V)
+            fire.solve(a == L, u)
+            energy = fire.assemble(
+                fire.Constant(0.5) * c * c * fire.inner(fire.grad(u),
+                                                        fire.grad(u)) * dx)
+
+            # Compute the equivalent velocity
+            c_eq = np.sqrt(energy / fire.assemble(
+                fire.Constant(0.5) * fire.inner(fire.grad(u),
+                                                fire.grad(u)) * dx))
+
+        elif typ_homog == 'volume':
+            # Equivalent velocity by volume-average homogenization
+
+            # Compute the volume
+            volume = fire.assemble(fire.Constant(1.) * (c / c) * dx)
+
+            # Compute the equivalent velocity
+            c_eq = fire.assemble(c * dx) / volume
 
         return c_eq
 
@@ -454,7 +472,7 @@ class Modal_Solver():
         if bc not in ['Dirichlet', 'Neumann']:
             value_parameter_error('bc', bc, ['Dirichlet', 'Neumann'])
 
-        def MMF(q, m=0):
+        def MMF(q):
             '''
             Compute the Modified Mathieiu's Function (MMF) or its derivative
 
@@ -463,8 +481,6 @@ class Modal_Solver():
             q : `float`
                 Argument of the MMF.
                 q = M01 is the 1st root for the 0th-order function
-            m : `int`, optional
-                Order of the MMF. Default is 0
 
             Returns
             -------
@@ -484,7 +500,8 @@ class Modal_Solver():
             # Eccentricity parameter: psi0 = arccosh(a/f), f = sqrt(a^2 - b^2)
             psi0 = np.arccosh(a0 / f0)
             idx = int(bc == 'Neumann')
-            # print(bc, m, psi0, q, mathieu_modcem1(m, q, psi0)[idx])
+            m = 1 if bc == 'Neumann' else 0  # Order of the MMF
+            print(bc, m, psi0, q, mathieu_modcem1(m, q, psi0)[idx])
             return mathieu_modcem1(m, q, psi0)[idx]
 
         def ZBF(m=0, n=1):
@@ -517,8 +534,6 @@ class Modal_Solver():
             q : `float`
                 Argument of the SBF.
                 q = J01 is the 1st root for the 0th-order function
-            m : `int`, optional
-                Order of the MMF. Default is 0
 
             Returns
             -------
@@ -528,6 +543,7 @@ class Modal_Solver():
                 spherical_jn(m, q, derivative=True) for its derivative
             '''
             deriv = (bc == 'Neumann')
+            m = 1 if bc == 'Neumann' else 0  # Order of the SBF
             # print(bc, m, q, spherical_jn(m, q, derivative=deriv))
             return spherical_jn(m, q, derivative=deriv)
 
@@ -542,9 +558,10 @@ class Modal_Solver():
 
         # Circular or spherical case
         if all_axes_equal:
-            # 1st root for the 0th-order Bessel's function
+            # 1st root for the mth-order Bessel's function
             if self.dimension == 2:  # 2D circular
-                J01 = ZBF(m=0, n=1)[0]
+                m = 1 if bc == 'Neumann' else 0
+                J01 = ZBF(m=m, n=1)[0]
 
             if self.dimension == 3:  # 3D spherical
                 J01 = float(broyden1(SBF, igss, f_tol=1e-14))
@@ -559,6 +576,8 @@ class Modal_Solver():
 
             # Ellipse eccentricity
             f0 = (a**2 - b**2)**0.5
+
+            # 1st root or the mth-order Modified Mathieu's Function
             a0 = a
             M01 = float(broyden1(MMF, igss, f_tol=1e-14))
 
@@ -584,11 +603,12 @@ class Modal_Solver():
             for a0, b0, f0 in ecc_arr:
 
                 if f0 == 0:  # Circular cross-section
-                    # 1st root for the 0th-order Bessel's function
+                    # 1st root for the mth-order Bessel's function
                     J01 = ZBF(m=0, n=1)[0]
                     f_ell_arr.append((J01 / a0)**2)
 
                 else:  # Elliptical cross-section
+                    # 1st root or the mth-order Modified Mathieu's Function
                     M01 = float(broyden1(MMF, igss, f_tol=1e-14))
                     f_ell_arr.append(4 * M01 / f0**2)
 
@@ -721,17 +741,17 @@ class Modal_Solver():
             delta_qn = qn_fit - sn.interval(0.95, loc=qn_fit, scale=perr[1])[0]
 
             print(f"Nonlinear Curve Fit Successful!")
-            print(f"Fitted parameters: pn = {pn_fit:.6f} ± {delta_pn:.6f}, "
+            print(f"Fitted Parameters: pn = {pn_fit:.6f} ± {delta_pn:.6f}, "
                   f"qn = {qn_fit:.6f} ± {delta_qn:.6f}")
             print(f"R-Squared: {r_squared:.6f} - RMSE: {rmse:.6f}")
 
             return pn_fit, qn_fit, fr_ell, fr_rec
 
-        except Exception as e:
+        except fire.ConvergenceError as e:
             print(f"Nonlinear Curve Fit Failed: {e}")
 
-    def freq_factor_hyp(self, n_hyp, f_rec, f_ell,
-                        bc='Neumann', cut_plane_percent=1.):
+    def freq_factor_hyp(self, n_hyp, f_rec, f_ell, bc='Neumann',
+                        c_eqref=None, cut_plane_percent=1.):
         '''
         Compute an approximate frequency factor for the hypershape with
         truncation plane at z = cut_plane_percent * b, b = Lz + pad_len
@@ -753,36 +773,49 @@ class Modal_Solver():
         Returns
         -------
         f_hyp : `float`
-            Approximate frequency factor for the hypershape layer
+            Approximate frequency factor for the hypershape
+        c_reg : `float` or `None`
+            Approximate equivalent velocity for the hypershape
         '''
 
         if n_hyp is None:
-            n_hyp = 200.
+            n_hyp = 6
 
+        # Regression for hypershape geometry factor
         pn, qn, fr_ell, fr_rec = self.reg_geometry_hyp(
             n_hyp, cut_plane_percent=cut_plane_percent)
 
         if bc == 'Dirichlet':
-            f_max = f_rec / fr_rec
-            cn2 = f_max - f_ell / fr_ell
+            f_min = f_rec / fr_rec
+            cn2 = f_min - f_ell / fr_ell
 
         if bc == 'Neumann':
-            f_max = f_ell
-            cn2 = f_max - f_rec
+            f_min = f_rec
+            cn2 = f_min - f_ell
 
-        f_hyp = f_max - cn2 * (1 / (qn * n_hyp + 1 - 2 * qn)) ** pn
+        # Hypershape frequency factor
+        pot_term = (1. / (qn * n_hyp + 1 - 2 * qn)) ** pn
+        f_hyp = f_min - cn2 * pot_term
 
-        return f_hyp
+        # Equivalent velocity lower bound for the hypershape
+        if c_eqref is not None:
+            c_min = c_eqref
+            cc2 = c_min - c_eqref
 
-    def solver_analytical(self, c, hyp_par, bc='Neumann',
-                          cut_plane_percent=1.):
+        c_reg = None if c_eqref is None \
+            else c_min - cc2 * pot_term
+
+        return f_hyp, c_reg
+
+    def solver_analytical(self, c_eq, hyp_par, bc='Neumann',
+                          c_eqref=None, cut_plane_percent=1.):
         '''
         Compute the analytical solution for the eigenvalue problem with
         Neumann or Dirichlet boundary conditions for isotropic hypershapes
 
         Parameters
         ----------
-        c : `float`
+        c_eq : `float`
             Equivalente isotropic velocity in the hypershape
         hyp_par : `tuple`
             Hyperellipshape parameters.
@@ -799,6 +832,9 @@ class Modal_Solver():
         bc : `str`, optional
             Boundary condition type: 'Dirichlet' or 'Neumann'.
             Default is 'Neumann'
+        c_eqref : `float`, optional
+            Reference value for the equivalent velocity based on the original
+            velocity model without an absorbing layer. Default is None
         cut_plane_percent : `float`, optional
             Percentage of the cut plane (0 to 1). Default is 1 (no cut)
 
@@ -809,14 +845,13 @@ class Modal_Solver():
         '''
 
         # Check if the velocity model is a float
-        if not isinstance(c, float):
+        if not isinstance(c_eq, float):
             raise TypeError("For 'ANALYTICAL' method, the isotropic "
-                            "velocity 'c' must be a float number.")
+                            "velocity 'c_eq' must be a float number.")
 
         # Hyperellipse parameters
         n_hyp, hyp_axes = hyp_par[0], hyp_par[1:]
         a, b = hyp_axes[:2]
-
         if self.dimension == 2:  # 2D
             all_axes_equal = (a == b)
 
@@ -826,13 +861,22 @@ class Modal_Solver():
 
         # Frequency factors
         f_rec = self.freq_factor_rec(hyp_axes, bc=bc)
-        f_ell = self.freq_factor_ell(hyp_axes, bc=bc,
-                                     all_axes_equal=all_axes_equal)
-        f_hyp = self.freq_factor_hyp(n_hyp, f_rec, f_ell,
-                                     cut_plane_percent=cut_plane_percent)
+        f_ell = self.freq_factor_ell(
+            hyp_axes, bc=bc, all_axes_equal=all_axes_equal)
+        c_ref = min(c_eq, c_eqref * f_rec / f_ell)
+        f_hyp, c_reg = \
+            self.freq_factor_hyp(n_hyp, f_rec, f_ell, bc=bc, c_eqref=c_ref,
+                                 cut_plane_percent=cut_plane_percent)
+
+        # Constraint equivalent velocity to a range
+        if c_eqref is not None:
+            c_eq = c_reg
+
+        print(f"Hypershape Equivalent Velocity c_eq (km/s) = {c_eq:.3f}")
+        print(f"Hypershape Frequency factor f_hyp (1/km): {f_hyp:.3f}")
 
         # Eigenvalue
-        Lsp = (c * f_hyp)**2
+        Lsp = (c_eq * f_hyp)**2
 
         return Lsp
 
@@ -843,7 +887,8 @@ class Modal_Solver():
         Parameters
         ----------
         coord_norm : `tuple`
-            Normalized coordinates in the mesh [-1, 1]
+            Normalized coordinates to [-1, 1] w.r.t. the hypershape centroid.
+            Structure: (xn, zn) for 2D and (xn, zn, yn) for 3D
         V : `firedrake function space`
             Function space for the modal problem
         k : `int`, optional
@@ -906,8 +951,7 @@ class Modal_Solver():
 
         return eig_funcs, grad_eig
 
-    def solver_rayleigh_quotient(self, c, eig_funcs, grad_eig,
-                                 k=2, quad_rule=None):
+    def solver_rayleigh_quotient(self, c, coord_norm, V, k=2, quad_rule=None):
         '''
         Solve the eigenvalue problem using the Rayleigh Quotient method
 
@@ -915,10 +959,11 @@ class Modal_Solver():
         ----------
         c : `firedrake function` or `float`
             Velocity model
-        eig_funcs : `list`
-            Eigenfunctions computed as Firedrake functions
-        grad_eig : `list`
-            Eigenfunction gradients computed as Firedrake functions
+        coord_norm : `tuple`
+            Normalized coordinates to [-1, 1] w.r.t. the hypershape centroid.
+            Structure: (xn, zn) for 2D and (xn, zn, yn) for 3D
+        V : `firedrake function space`
+            Function space for the modal problem
         k : `int`, optional
             Number of eigenvalues to compute. Default is 2
         quad_rule : `str`, optional
@@ -930,6 +975,9 @@ class Modal_Solver():
         Lsp : `array`
             Array containing the computed eigenvalues
         '''
+
+        # Create eigenfunctions
+        eig_funcs, grad_eig = self.generate_eigenfunctions(coord_norm, V, k=k)
 
         # Initialize matrices for generalized eigenvalue problem
         n_funcs = len(eig_funcs)
@@ -963,7 +1011,7 @@ class Modal_Solver():
 
     def solve_eigenproblem(self, c, V=None, k=2, shift=0., quad_rule=None,
                            inv_oper=False, coord_norm=None, hyp_par=None,
-                           cut_plane_percent=1.):
+                           cut_plane_percent=1., c_eqref=None):
         '''
         Solve the eigenvalue problem with Neumann boundary conditions
 
@@ -983,6 +1031,9 @@ class Modal_Solver():
         inv_oper : `bool`, optional
             Option to use an inverse operator for improving convergence.
             Default is False
+        coord_norm : `tuple`
+            Normalized coordinates to [-1, 1] w.r.t. the hypershape centroid.
+            Structure: (xn, zn) for 2D and (xn, zn, yn) for 3D
         hyp_par : `tuple`, optional
             Hyperellipshape parameters. Default is None
             Structure 2D: (n_hyp, a_hyp, b_hyp)
@@ -997,6 +1048,9 @@ class Modal_Solver():
                 Hypershape semi-axis in direction y (3D only)
         cut_plane_percent : `float`, optional
             Percentage of the cut plane (0 to 1). Default is 1 (no cut)
+        c_eqref : `float`, optional
+            Reference value for the equivalent velocity based on the original
+            velocity model without an absorbing layer. Default is None
 
         Returns
         -------
@@ -1007,28 +1061,24 @@ class Modal_Solver():
 
         if self.method == 'ANALYTICAL':
             c_eq = self.c_equivalent(c, V, quad_rule=quad_rule)
-            Lsp = self.solver_analytical(
-                c_eq, hyp_par, cut_plane_percent=cut_plane_percent)
+            Lsp = self.solver_analytical(c_eq, hyp_par, c_eqref=c_eqref,
+                                         cut_plane_percent=cut_plane_percent)
 
-            return Lsp
+        elif self.method == 'RAYLEIGH':
+            Lsp = self.solver_rayleigh_quotient(c, coord_norm, V, k=k,
+                                                quad_rule=quad_rule)
+        else:
+            # Get bilinear forms
+            a, m = self.weak_forms(c, V, quad_rule=quad_rule)
 
-        # Get bilinear forms
-        a, m = self.weak_forms(c, V, quad_rule=quad_rule)
+            # Add shift to stabilize Neumann BC null space
+            if shift > 0:
+                a += fire.Constant(shift) * m
 
-        # Add shift to stabilize Neumann BC null space
-
-        if shift > 0:
-            a += fire.Constant(shift) * m
-
-        if self.method == 'RAYLEIGH':
-            eig_funcs, grad_eig = \
-                self.generate_eigenfunctions(coord_norm, V, k=k)
-            Lsp = self.solver_rayleigh_quotient(c, eig_funcs, grad_eig,
-                                                k=k, quad_rule=quad_rule)
-        elif self.method[:-3] == 'KRYLOVSCH':
+        if self.method[:-3] == 'KRYLOVSCH':
             Lsp = self.solver_with_ufl(a, m, k=k)
 
-        else:
+        elif not (self.method == 'ANALYTICAL' or self.method == 'RAYLEIGH'):
             Asp, Msp = self.assemble_sparse_matrices(a, m)
             Lsp = self.solver_with_sparse_matrix(Asp, Msp, self.method,
                                                  k=k, inv_oper=inv_oper)

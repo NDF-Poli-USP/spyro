@@ -15,8 +15,8 @@ Setting Mesh Properties for Eikonal Analysis
 
 --------------------------------------------------------------
 Estimating Runtime and Used Memory
-Runtime: (s):0.876, (m):0.015, (h):0.000
-Used Memory: Current (MB):5.478, Peak (MB):5.608
+Runtime: (s):0.855, (m):0.014, (h):0.000
+Used Memory: Current (MB):5.496, Peak (MB):5.626
 --------------------------------------------------------------
 
 
@@ -47,12 +47,12 @@ Min Eikonal on  Bottom Boundary (ms): 170.373 at (in km): (-1.000, 0.250)
 
 --------------------------------------------------------------
 Estimating Runtime and Used Memory
-Runtime: (s):2.335, (m):0.039, (h):0.001
-Used Memory: Current (MB):5.777, Peak (MB):6.815
+Runtime: (s):2.467, (m):0.041, (h):0.001
+Used Memory: Current (MB):5.780, Peak (MB):6.826
 --------------------------------------------------------------
 
 
-Absorbing Layer Shape: Hypershape - Degree: 2
+Absorbing Layer Shape: Rectangular
 
 Determining Reference Frequency
 Reference Frequency (Hz): 5.00000
@@ -75,62 +75,11 @@ Elements (0.100 km) in Layer: 5
 Normalized Element Size (adim): 0.20000
 
 Determining New Geometry with Absorbing Layer
-Determining Hypershape Layer Parameters
-Checking Current Hypershape Degree n_hyp: 2.0
-Semi-axes (km): a_hyp:1.000 - b_hyp:1.000
-Determining the Minimum Degree for Hypershape Layer
-ParHypEll - r: 0.720 - n: 2.0
-'Harm' Superness. r: 0.720 - n: 2.0
-'Geom' Superness. r: 0.720 - n: 2.0
-'Arit' Superness. r: 0.720 - n: 2.0
-Hyperellipse Parameters. r_min: 0.720 - n_min: 2.0
-Superness Coordinates (km): (0.600, 0.600)
-Minimum Degree for Hypershape n_min: 2.0
-Determining the Maximum Degree for Hypershape Layer
-ParHypEll - r: 1.457 - n: 2.0
-ParHypEll - r: 1.244 - n: 3.0
-ParHypEll - r: 1.062 - n: 4.0
-ParHypEll - r: 0.906 - n: 5.0
-ParHypEll - r: 1.045 - n: 4.1
-ParHypEll - r: 1.028 - n: 4.2
-ParHypEll - r: 1.012 - n: 4.3
-ParHypEll - r: 0.996 - n: 4.4
-'Harm' Superness. r: 0.996 - n: 4.4
-'Geom' Superness. r: 0.996 - n: 4.4
-'Arit' Superness. r: 0.996 - n: 4.4
-Hyperellipse Parameters. r_max: 0.996 - n_max: 4.4
-Superness Coordinates (km): (0.854, 0.854)
-Maximum Degree for Hypershape n_max: 4.4
-Current Hypershape Degree n_hyp: 2.0
-Area Ratio: 2.527
+Determining Rectangular Layer Parameters
+Area Ratio: 3.000
 
 Generating Mesh with Absorbing Layer
-Number of Boundary Points for Complete Hyperellipse: 63
-Number of Boundary Points for Truncated Hyperellipse: 43
-Number of Boundary Points for Complete Hyperellipse: 64
-Number of Boundary Points for Truncated Hyperellipse: 43
-Number of Boundary Points for Complete Hyperellipse: 65
-Number of Boundary Points for Truncated Hyperellipse: 44
-Number of Boundary Points for Complete Hyperellipse: 66
-Number of Boundary Points for Truncated Hyperellipse: 44
-Number of Boundary Points for Complete Hyperellipse: 67
-Number of Boundary Points for Truncated Hyperellipse: 45
-Number of Boundary Points for Complete Hyperellipse: 68
-Number of Boundary Points for Truncated Hyperellipse: 46
-Number of Boundary Points for Complete Hyperellipse: 69
-Number of Boundary Points for Truncated Hyperellipse: 46
-Number of Boundary Points for Complete Hyperellipse: 70
-Number of Boundary Points for Truncated Hyperellipse: 47
-Number of Boundary Points for Complete Hyperellipse: 71
-Number of Boundary Points for Truncated Hyperellipse: 47
-Number of Boundary Points for Complete Hyperellipse: 72
-Number of Boundary Points for Truncated Hyperellipse: 48
-Number of Boundary Points for Complete Hyperellipse: 73
-Number of Boundary Points for Truncated Hyperellipse: 50
-Mesh Factor Size Inside Layer (Min): 1.00 (0.86)
-Hyperelliptical Mesh Generated Successfully
-Mesh created with 315 points and 562 elements
-Merged Mesh Generated Successfully
+Extended Rectangular Mesh Generated Successfully
 Method: mass_lumped_triangle, Degree: 4, Dimension: 2
 Mesh Generated Successfully
 
@@ -146,13 +95,13 @@ Solver Method: ANALYTICAL
 Nonlinear Curve Fit Successful!
 Fitted parameters: pn = 1.951274 ± 0.000727, qn = 0.402715 ± 0.000226
 R-Squared: 0.999999 - RMSE: 0.000053
-Frequency 0 (Hz): 0.51085
-Fundamental Frequency (Hz): 0.51085
+Frequency 0 (Hz): 0.42679
+Fundamental Frequency (Hz): 0.42679
 
 --------------------------------------------------------------
 Estimating Runtime and Used Memory
-Runtime: (s):0.160, (m):0.003, (h):0.000
-Used Memory: Current (MB):1.180, Peak (MB):1.324
+Runtime: (s):0.152, (m):0.003, (h):0.000
+Used Memory: Current (MB):1.195, Peak (MB):1.342
 --------------------------------------------------------------
 
 
@@ -161,13 +110,13 @@ Modal Solver: ARNOLDI
 Solving Eigenvalue Problem
 Solver Method: ARNOLDI
 Frequency 0 (Hz): 0.00000
-Frequency 1 (Hz): 0.50443
-Fundamental Frequency (Hz): 0.50443
+Frequency 1 (Hz): 0.45539
+Fundamental Frequency (Hz): 0.45539
 
 --------------------------------------------------------------
 Estimating Runtime and Used Memory
-Runtime: (s):0.098, (m):0.002, (h):0.000
-Used Memory: Current (MB):5.312, Peak (MB):6.650
+Runtime: (s):0.100, (m):0.002, (h):0.000
+Used Memory: Current (MB):5.681, Peak (MB):7.112
 --------------------------------------------------------------
 
 
@@ -176,13 +125,13 @@ Modal Solver: LANCZOS
 Solving Eigenvalue Problem
 Solver Method: LANCZOS
 Frequency 0 (Hz): 0.00000
-Frequency 1 (Hz): 0.50443
-Fundamental Frequency (Hz): 0.50443
+Frequency 1 (Hz): 0.45539
+Fundamental Frequency (Hz): 0.45539
 
 --------------------------------------------------------------
 Estimating Runtime and Used Memory
-Runtime: (s):0.058, (m):0.001, (h):0.000
-Used Memory: Current (MB):0.080, Peak (MB):5.967
+Runtime: (s):0.060, (m):0.001, (h):0.000
+Used Memory: Current (MB):0.069, Peak (MB):6.352
 --------------------------------------------------------------
 
 
@@ -190,14 +139,14 @@ Modal Solver: LOBPCG
 
 Solving Eigenvalue Problem
 Solver Method: LOBPCG
-Frequency 0 (Hz): 0.00005
-Frequency 1 (Hz): 0.50443
-Fundamental Frequency (Hz): 0.50443
+Frequency 0 (Hz): 0.00002
+Frequency 1 (Hz): 0.45539
+Fundamental Frequency (Hz): 0.45539
 
 --------------------------------------------------------------
 Estimating Runtime and Used Memory
-Runtime: (s):3.756, (m):0.063, (h):0.001
-Used Memory: Current (MB):0.195, Peak (MB):5.984
+Runtime: (s):3.351, (m):0.056, (h):0.001
+Used Memory: Current (MB):0.101, Peak (MB):6.217
 --------------------------------------------------------------
 
 
@@ -206,15 +155,15 @@ Modal Solver: KRYLOVSCH_CH
 Solving Eigenvalue Problem
 Solver Method: KRYLOVSCH_CH
   Eigenvalue approximations and residual norms for firedrake_3_ solve.
-  1 EPS nconv=5 first unconverged value (error) 62.759 (1.19621043e-05)
+  1 EPS nconv=4 first unconverged value (error) 42.8793 (1.11732431e-05)
 Frequency 0 (Hz): 0.00000
-Frequency 1 (Hz): 0.50443
-Fundamental Frequency (Hz): 0.50443
+Frequency 1 (Hz): 0.45539
+Fundamental Frequency (Hz): 0.45539
 
 --------------------------------------------------------------
 Estimating Runtime and Used Memory
-Runtime: (s):0.052, (m):0.001, (h):0.000
-Used Memory: Current (MB):0.063, Peak (MB):0.085
+Runtime: (s):0.039, (m):0.001, (h):0.000
+Used Memory: Current (MB):0.062, Peak (MB):0.085
 --------------------------------------------------------------
 
 
@@ -223,15 +172,15 @@ Modal Solver: KRYLOVSCH_CG
 Solving Eigenvalue Problem
 Solver Method: KRYLOVSCH_CG
   Eigenvalue approximations and residual norms for firedrake_4_ solve.
-  1 EPS nconv=5 first unconverged value (error) 62.759 (1.19621043e-05)
+  1 EPS nconv=4 first unconverged value (error) 42.8793 (1.11732431e-05)
 Frequency 0 (Hz): 0.00000
-Frequency 1 (Hz): 0.50443
-Fundamental Frequency (Hz): 0.50443
+Frequency 1 (Hz): 0.45539
+Fundamental Frequency (Hz): 0.45539
 
 --------------------------------------------------------------
 Estimating Runtime and Used Memory
-Runtime: (s):0.033, (m):0.001, (h):0.000
-Used Memory: Current (MB):0.063, Peak (MB):0.076
+Runtime: (s):0.035, (m):0.001, (h):0.000
+Used Memory: Current (MB):0.062, Peak (MB):0.075
 --------------------------------------------------------------
 
 
@@ -240,15 +189,15 @@ Modal Solver: KRYLOVSCH_GH
 Solving Eigenvalue Problem
 Solver Method: KRYLOVSCH_GH
   Eigenvalue approximations and residual norms for firedrake_5_ solve.
-  1 EPS nconv=5 first unconverged value (error) 62.759 (1.19621043e-05)
+  1 EPS nconv=4 first unconverged value (error) 42.8793 (1.11732431e-05)
 Frequency 0 (Hz): 0.00000
-Frequency 1 (Hz): 0.50443
-Fundamental Frequency (Hz): 0.50443
+Frequency 1 (Hz): 0.45539
+Fundamental Frequency (Hz): 0.45539
 
 --------------------------------------------------------------
 Estimating Runtime and Used Memory
-Runtime: (s):0.063, (m):0.001, (h):0.000
-Used Memory: Current (MB):0.092, Peak (MB):0.099
+Runtime: (s):0.033, (m):0.001, (h):0.000
+Used Memory: Current (MB):0.074, Peak (MB):0.086
 --------------------------------------------------------------
 
 
@@ -257,15 +206,15 @@ Modal Solver: KRYLOVSCH_GG
 Solving Eigenvalue Problem
 Solver Method: KRYLOVSCH_GG
   Eigenvalue approximations and residual norms for firedrake_6_ solve.
-  1 EPS nconv=5 first unconverged value (error) 62.759 (1.19621043e-05)
+  1 EPS nconv=4 first unconverged value (error) 42.8793 (1.11732431e-05)
 Frequency 0 (Hz): 0.00000
-Frequency 1 (Hz): 0.50443
-Fundamental Frequency (Hz): 0.50443
+Frequency 1 (Hz): 0.45539
+Fundamental Frequency (Hz): 0.45539
 
 --------------------------------------------------------------
 Estimating Runtime and Used Memory
-Runtime: (s):0.035, (m):0.001, (h):0.000
-Used Memory: Current (MB):0.073, Peak (MB):0.093
+Runtime: (s):0.032, (m):0.001, (h):0.000
+Used Memory: Current (MB):0.036, Peak (MB):0.093
 --------------------------------------------------------------
 
 
@@ -274,12 +223,12 @@ Modal Solver: RAYLEIGH
 Solving Eigenvalue Problem
 Solver Method: RAYLEIGH
 Frequency 0 (Hz): 0.00000
-Frequency 1 (Hz): 0.52785
-Fundamental Frequency (Hz): 0.52785
+Frequency 1 (Hz): 0.47634
+Fundamental Frequency (Hz): 0.47634
 
 --------------------------------------------------------------
 Estimating Runtime and Used Memory
-Runtime: (s):1.361, (m):0.023, (h):0.000
-Used Memory: Current (MB):2.959, Peak (MB):3.478
+Runtime: (s):1.474, (m):0.025, (h):0.000
+Used Memory: Current (MB):3.035, Peak (MB):3.516
 --------------------------------------------------------------
 

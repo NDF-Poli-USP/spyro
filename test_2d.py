@@ -270,25 +270,25 @@ def habc_fig8(Wave_obj, dat_regr_xCR, xCR_usu=None, plot_comparison=True):
     # Setting the damping profile within absorbing layer
     Wave_obj.damping_layer(xCR_usu=xCR_usu, method="RAYLEIGH")
 
-    # # Applying NRBCs on outer boundary layer
-    # Wave_obj.nrbc_on_boundary_layer()
+    # Applying NRBCs on outer boundary layer
+    Wave_obj.nrbc_on_boundary_layer()
 
-    # # Solving the forward problem
-    # Wave_obj.forward_solve()
+    # Solving the forward problem
+    Wave_obj.forward_solve()
 
-    # # Computing the error measures
-    # Wave_obj.error_measures_habc()
+    # Computing the error measures
+    Wave_obj.error_measures_habc()
 
-    # # Collecting data for regression
-    # dat_regr_xCR[0].append(Wave_obj.xCR)
-    # dat_regr_xCR[1].append(Wave_obj.max_errIt)
-    # dat_regr_xCR[2].append(Wave_obj.max_errPK)
+    # Collecting data for regression
+    dat_regr_xCR[0].append(Wave_obj.xCR)
+    dat_regr_xCR[1].append(Wave_obj.max_errIt)
+    dat_regr_xCR[2].append(Wave_obj.max_errPK)
 
-    # if plot_comparison:
+    if plot_comparison:
 
-    #     # Plotting the solution at receivers and the error measures
-    #     Wave_obj.comparison_plots(regression_xCR=True,
-    #                               data_regr_xCR=dat_regr_xCR)
+        # Plotting the solution at receivers and the error measures
+        Wave_obj.comparison_plots(regression_xCR=True,
+                                  data_regr_xCR=dat_regr_xCR)
 
 
 def test_loop_habc_2d():
@@ -334,7 +334,7 @@ def test_loop_habc_2d():
     loop_modeling = not get_ref_model
 
     # Hyperellipse degrees
-    degree_layer_lst = [2]  # [None, 2, 3, 4, 5]
+    degree_layer_lst = [None, 2, 3, 4, 5]
 
     # Reference frequency
     habc_reference_freq_lst = ["source"]  # ["source", "boundary"]
@@ -466,7 +466,6 @@ if __name__ == "__main__":
 # num  0.50443 0.48266 0.47423 0.47270 0.45539
 # anr  0.53970 0.52214 0.51563 0.51410 0.50036
 # anh  0.52300 0.48952 0.49112 0.48952 0.47102
-# rat
 
 # from time import perf_counter  # For runtime
 # tRef = perf_counter()
