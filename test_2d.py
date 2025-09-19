@@ -256,7 +256,7 @@ def habc_fig8(Wave_obj, dat_regr_xCR, xCR_usu=None, plot_comparison=True):
     Wave_obj.identify_habc_case()
 
     # Acquiring reference signal
-    Wave_obj.get_reference_signal(foldername="")
+    Wave_obj.get_reference_signal(foldername="preamble/")
 
     # Determining layer size
     Wave_obj.size_habc_criterion(n_root=1)
@@ -270,14 +270,14 @@ def habc_fig8(Wave_obj, dat_regr_xCR, xCR_usu=None, plot_comparison=True):
     # Setting the damping profile within absorbing layer
     Wave_obj.damping_layer(xCR_usu=xCR_usu, method="RAYLEIGH")
 
-    # # Applying NRBCs on outer boundary layer
-    # Wave_obj.nrbc_on_boundary_layer()
+    # Applying NRBCs on outer boundary layer
+    Wave_obj.nrbc_on_boundary_layer()
 
-    # # Solving the forward problem
-    # Wave_obj.forward_solve()
+    # Solving the forward problem
+    Wave_obj.forward_solve()
 
-    # # Computing the error measures
-    # Wave_obj.error_measures_habc()
+    # Computing the error measures
+    Wave_obj.error_measures_habc()
 
     # # Collecting data for regression
     # dat_regr_xCR[0].append(Wave_obj.xCR)
@@ -328,10 +328,10 @@ def test_loop_habc_2d():
     # ============ HABC PARAMETERS ============
 
     # Infinite model (True: Infinite model, False: HABC scheme)
-    get_ref_model = False
+    get_ref_model = True
 
     # Loop for HABC cases
-    loop_modeling = not get_ref_model
+    loop_modeling = True
 
     # Hyperellipse degrees
     degree_layer_lst = [2]  # [None, 2, 3, 4, 5]
