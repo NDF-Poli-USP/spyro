@@ -799,8 +799,10 @@ class Modal_Solver():
 
         # Equivalent velocity lower bound for the hypershape
         if c_eqref is not None:
-            c_min = c_eqref
-            cc2 = c_min - c_eqref
+            f1 = (fr_ell / fr_rec)**(0.3 * pn)
+            f2 = (f_ell / f_rec)**(0.3 * pn)
+            c_min = c_eqref * min(f1, f2)
+            cc2 = c_min - c_eqref * max(f1, f2)
 
         c_reg = None if c_eqref is None \
             else c_min - cc2 * pot_term
@@ -863,7 +865,7 @@ class Modal_Solver():
         f_rec = self.freq_factor_rec(hyp_axes, bc=bc)
         f_ell = self.freq_factor_ell(
             hyp_axes, bc=bc, all_axes_equal=all_axes_equal)
-        c_ref = min(c_eq, c_eqref * f_rec / f_ell)
+        c_ref = max(c_eq * (f_rec / f_ell)**3, c_eqref * (f_rec / f_ell)**2)
         f_hyp, c_reg = \
             self.freq_factor_hyp(n_hyp, f_rec, f_ell, bc=bc, c_eqref=c_ref,
                                  cut_plane_percent=cut_plane_percent)
