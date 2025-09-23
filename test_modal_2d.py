@@ -151,7 +151,7 @@ def preamble_habc(dictionary, edge_length, f_est):
     return Wave_obj
 
 
-def modal_fig8(Wave_obj, modal_solver_lst):
+def modal_fig8(Wave_obj, modal_solver_lst, fitting_c):
     '''
     Apply the HABC to the model in Fig. 8 of Salas et al. (2022).
 
@@ -164,6 +164,9 @@ def modal_fig8(Wave_obj, modal_solver_lst):
         Options: 'ANALYTICAL', 'ARNOLDI', 'LANCZOS',
         'LOBPCG', 'KRYLOVSCH_CH', 'KRYLOVSCH_CG',
         'KRYLOVSCH_GH', 'KRYLOVSCH_GG' or 'RAYLEIGH'
+    fitting_c : `tuple
+        Parameters for fitting equivalent velocity regression.
+        Structure: (fc1, fc2, fp1, fp2).
 
     Returns
     -------
@@ -192,7 +195,8 @@ def modal_fig8(Wave_obj, modal_solver_lst):
         tRef = comp_cost("tini")
 
         # Computing fundamental frequency
-        Wave_obj.fundamental_frequency(method=modal_solver, monitor=True)
+        Wave_obj.fundamental_frequency(
+            method=modal_solver, monitor=True, fitting_c=fitting_c)
 
         # Estimating computational resource usage
         name_cost = Wave_obj.path_case_habc + modal_solver + "_"
@@ -204,7 +208,7 @@ def test_loop_modal_2d():
     Loop for applying the HABC to the model in Fig. 8 of Salas et al. (2022).
     '''
 
-    case = 4  # Integer from 0 to 4
+    case = 0  # Integer from 0 to 4
 
     # ============ SIMULATION PARAMETERS ============
 
@@ -217,16 +221,24 @@ def test_loop_modal_2d():
     # Factor for the stabilizing term in Eikonal equation
     f_est_lst = [0.06, 0.02, 0.02, 0.02, 0.04]
 
+    # Parameters for fitting equivalent velocity regression
+    fitting_c_lst = [(2.0, 1.8, 1.1, 0.4),
+                     (2.0, 2.0, 0.4, 0.1),
+                     (1.0, 0.7, 0.9, 0.3),
+                     (1.0, 1.0, 1.1, 0.4),
+                     (1.0, 1.0, 0.9, 0.2)]
+
     # Get simulation parameters
     edge_length = edge_length_lst[case]
     f_est = f_est_lst[case]
+    fitting_c = fitting_c_lst[case]
     print("\nMesh Size: {:.4f} km".format(edge_length))
     print("Eikonal Stabilizing Factor: {:.2f}".format(f_est))
 
     # ============ HABC PARAMETERS ============
 
     # Hyperellipse degrees
-    degree_layer_lst = [2, 3, 4, 4.4, None]
+    degree_layer_lst = [2.0, 3.0, 4.0, 4.4, None]
 
     # Type of the hypereshape degree
     degree_type = "real"  # "integer"
@@ -258,7 +270,7 @@ def test_loop_modal_2d():
 
         try:
             # Computing the fundamental frequency
-            modal_fig8(Wave_obj, modal_solver_lst)
+            modal_fig8(Wave_obj, modal_solver_lst, fitting_c)
 
         except Exception as e:
             print(f"Error Solving: {e}")
@@ -287,8 +299,37 @@ if __name__ == "__main__":
 # n_min   2.0    2.0  2.0  2.0  2.0
 # n_max   4.4    4.8  4.7  4.7  4.6
 
+# ANALYTICAL
+# Case0     REC    N4.4    N4.0    N3.0    N2.0
+# fnum  0.45539 0.47270 0.47423 0.48266 0.50443
+# fana  0.45503 0.46622 0.46541 0.47813 0.50807
+
+# Case1     REC    N4.4    N4.0    N3.0    N2.0
+# fnum  0.45567 0.47253 0.47463 0.48342 0.50330
+# fana  0.45183 0.45920 0.46234 0.47524 0.50658
+
+# Case2     REC    N4.4    N4.0    N3.0    N2.0
+# fnum  0.45576 0.47185 0.47390 0.48232 0.50292
+# fana  0.45510 0.46558 0.47201 0.47757 0.51415
+
+# Case3     REC    N4.4    N4.0    N3.0    N2.0
+# fnum  0.46763 0.48306 0.48550 0.49408 0.51332
+# fana  0.46534 0.47554 0.48700 0.48886 0.51947
+
+# Case4     REC    N4.4    N4.0    N3.0    N2.0
+# fnum  0.47498 0.49076 0.49301 0.50200 0.52376
+# fana  0.47872 0.48446 0.48689 0.49671 0.51885
+
+# RAYLEIGH
+# n_eigfunc       2      *4       6        8
+# freq(Hz)  0.66237 0.52785 0.51705  0.51355
+# texe(s)     0.192   1.390  18.209   35.027
+# mem(MB)     1.360   3.637  11.469   16.161
+
+
+# dx = 100m
 # Frequency[Hz]    N2.0      (texe/pmem)    N3.0      (texe/pmem)
-# ANALYTICAL    0.51085 (0.160s/1.324MB) 0.48363 (0.194s/1.365MB)
+# ANALYTICAL    0.50807 (0.276s/2.020MB) 0.47813 (0.196s/0.569MB)
 # ARNOLDI       0.50443 (0.098s/6.650MB) 0.48266 (0.119s/7.005MB)
 # LANCZOS       0.50443 (0.058s/5.967MB) 0.48266 (0.066s/6.264MB)
 # LOBPCG        0.50443 (3.756s/5.984MB) 0.48266 (3.770s/6.265MB)
@@ -299,7 +340,7 @@ if __name__ == "__main__":
 # RAYLEIGH      0.52785 (1.361s/3.478MB) 0.50497 (1.329s/3.639MB)
 
 # Frequency[Hz]    N4.0      (texe/pmem)    N4.4      (texe/pmem)
-# ANALYTICAL    0.44152 (0.155s/1.333MB) 0.47040 (0.166s/1.339MB)
+# ANALYTICAL    0.46541 (0.094s/0.594MB) 0.46622 (0.114s/0.595MB)
 # ARNOLDI       0.47423 (0.094s/7.120MB) 0.47270 (0.122s/7.432MB)
 # LANCZOS       0.47423 (0.074s/6.399MB) 0.47270 (0.068s/6.692MB)
 # LOBPCG        0.47423 (3.832s/6.381MB) 0.47270 (3.920s/6.535MB)
@@ -310,7 +351,7 @@ if __name__ == "__main__":
 # RAYLEIGH      0.49647 (1.551s/3.537MB) 0.49470 (1.432s/3.573MB)
 
 # Frequency[Hz]    REC       (texe/pmem)
-# ANALYTICAL    0.42679 (0.152s/1.342MB)
+# ANALYTICAL    0.45503 (0.103s/0.545MB)
 # ARNOLDI       0.45539 (0.100s/7.112MB)
 # LANCZOS       0.45539 (0.060s/6.352MB)
 # LOBPCG        0.45539 (3.351s/6.217MB)
@@ -320,32 +361,40 @@ if __name__ == "__main__":
 # KRYLOVSCH_GG  0.45539 (0.032s/0.093MB)
 # RAYLEIGH      0.47634 (1.474s/3.516MB)
 
-# RAYLEIGH
-# n_eigfunc       2       4       6        8
-# freq(Hz)  0.66237 0.52785 0.51705  0.51355
-# texe(s)     0.192   1.390  18.209   35.027
-# mem(MB)     1.360   3.637  11.469   16.161
 
-# Case0     REC    N4.4    N4.0    N3.0    N2.0
-# fnum  0.45539 0.47270 0.47423 0.48266 0.50443
-# fana  0.39996 0.41002 0.41435 0.43245 0.47716
+# dx = 20m
+# Frequency[Hz]    N2.0          (texe/pmem)    N3.0          (texe/pmem)
+# ANALYTICAL    0.51885 (  1.239s/  5.744MB) 0.49671 (  1.353s/  5.870MB)
+# ARNOLDI       0.52736 (  3.433s/143.553MB) 0.50200 (  3.673s/154.990MB)
+# LANCZOS       0.52736 (  3.124s/133.459MB) 0.50200 (  3.279s/144.100MB)
+# LOBPCG        0.52402 (116.373s/127.448MB) 0.65813 (125.569s/137.582MB)
+# KRYLOVSCH_CH  0.52736 (  1.031s/  0.086MB) 0.50200 (  1.265s/  0.088MB)
+# KRYLOVSCH_CG  0.52736 (  1.086s/  0.088MB) 0.50200 (  1.269s/  0.088MB)
+# KRYLOVSCH_GH  0.52736 (  1.115s/  0.092MB) 0.50200 (  1.242s/  0.086MB)
+# KRYLOVSCH_GG  0.52736 (  1.053s/  0.077MB) 0.50200 (  1.170s/  0.086MB)
+# RAYLEIGH      0.54570 (  2.211s/ 20.421MB) 0.52277 (  2.073s/ 21.655MB)
 
-# Case1     REC    N4.4    N4.0    N3.0    N2.0
-# fnum  0.45567 0.47253 0.47463 0.48342 0.50330
-# fana  0.45097 0.46232 0.46719 0.48760 0.53802
+# Frequency[Hz]    N4.0          (texe/pmem)    N4.4          (texe/pmem)
+# ANALYTICAL    0.48689 (  1.453s/  6.110MB) 0.48446 (  1.469s/  6.286MB)
+# ARNOLDI       0.49301 (  3.728s/158.246MB) 0.49076 (  3.962s/165.138MB)
+# LANCZOS       0.49301 (  3.860s/147.120MB) 0.49076 (  3.650s/153.562MB)
+# LOBPCG        0.49604 (126.570s/140.415MB) 0.55850 (133.468s/146.563MB)
+# KRYLOVSCH_CH  0.49301 (  1.208s/  0.097MB) 0.49076 (  1.333s/  0.092MB)
+# KRYLOVSCH_CG  0.49301 (  1.174s/  0.077MB) 0.49076 (  1.165s/  0.076MB)
+# KRYLOVSCH_GH  0.49301 (  1.190s/  0.086MB) 0.49076 (  1.241s/  0.085MB)
+# KRYLOVSCH_GG  0.49301 (  1.231s/  0.087MB) 0.49076 (  1.210s/  0.087MB)
+# RAYLEIGH      0.51362 (  1.938s/ 22.003MB) 0.51134 (  2.045s/ 22.884MB)
 
-# Case2     REC    N4.4    N4.0    N3.0    N2.0
-# fnum  0.45576 0.47185 0.47390 0.48232 0.50292
-# fana  0.34450 0.35409 0.35783 0.37346 0.41207
-
-# Case3     REC    N4.4    N4.0    N3.0    N2.0
-# fnum  0.46763 0.48306 0.48550 0.49408 0.51332
-# fana  0.36011 0.36913 0.37302 0.38930 0.42966
-
-# Case4     REC    N4.4    N4.0    N3.0    N2.0
-# fnum  0.47498 0.49076 0.49301 0.50200 0.52376
-# fana  0.38264 0.39221 0.39633 0.41362 0.45658
-
+# Frequency[Hz]    REC       (texe/pmem)
+# ANALYTICAL    0.47872 (  1.264s/  6.090MB)
+# ARNOLDI       0.47498 (  3.464s/156.369MB)
+# LANCZOS       0.47498 (  3.351s/145.416MB)
+# LOBPCG        0.48982 (125.923s/138.745MB)
+# KRYLOVSCH_CH  0.47498 (  1.127s/  0.088MB)
+# KRYLOVSCH_CG  0.47498 (  1.093s/  0.077MB)
+# KRYLOVSCH_GH  0.47498 (  1.130s/  0.086MB)
+# KRYLOVSCH_GG  0.47498 (  1.096s/  0.086MB)
+# RAYLEIGH      0.49448 (  2.101s/ 21.516MB)
 
 # from time import perf_counter  # For runtime
 # tRef = perf_counter()

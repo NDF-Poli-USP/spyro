@@ -620,7 +620,8 @@ class HABC_Wave(AcousticWave, HABC_Mesh, RectangLayer,
         outfile = fire.VTKFile(self.path_save + file_name)
         outfile.write(self.c)
 
-    def fundamental_frequency(self, method=None, monitor=False):
+    def fundamental_frequency(self, method=None, monitor=False,
+                              fitting_c=(1., 1., 0.5, 0.5)):
         '''
         Compute the fundamental frequency in Hz via modal analysis
         considering the numerical model with Neumann BCs.
@@ -642,6 +643,17 @@ class HABC_Wave(AcousticWave, HABC_Mesh, RectangLayer,
             example, 'KRYLOVSCH_CH' uses cg solver with hypre preconditioner.
         monitor : `bool`, optional
             Print on screen the computed natural frequencies. Default is False
+        fitting_c : `tuple`, optional
+            Parameters for fitting equivalent velocity regression.
+            Structure: (fc1, fc2, fp1, fp2). Default is (1., 1., 0.5, 0.5)
+            - fc1 : `float`
+                Exponent factor for the minimum reference velocity
+            - fc2 : `float`
+                Exponent factor for the maximum reference velocity
+            - fp1 : `float`
+                Exponent fsctor for the minimum equivalent velocity
+            - fp2 : `float`
+                Exponent factor for the maximum equivalent velocity
 
         Returns
         ----
@@ -737,6 +749,7 @@ class HABC_Wave(AcousticWave, HABC_Mesh, RectangLayer,
             Lsp = mod_sol.solve_eigenproblem(self.c, V=self.function_space,
                                              quad_rule=self.quadrature_rule,
                                              hyp_par=hyp_par, c_eqref=c_eqref,
+                                             fitting_c=fitting_c,
                                              cut_plane_percent=cut_plane_perc)
 
         elif method == 'RAYLEIGH':

@@ -750,8 +750,9 @@ class Modal_Solver():
         except fire.ConvergenceError as e:
             print(f"Nonlinear Curve Fit Failed: {e}")
 
-    def freq_factor_hyp(self, n_hyp, f_rec, f_ell, bc='Neumann',
-                        c_eqref=None, cut_plane_percent=1.):
+    def freq_factor_hyp(self, n_hyp, f_rec, f_ell, c_eq, bc='Neumann',
+                        c_eqref=None, fitting_c=(1., 1., 0.5, 0.5),
+                        cut_plane_percent=1.):
         '''
         Compute an approximate frequency factor for the hypershape with
         truncation plane at z = cut_plane_percent * b, b = Lz + pad_len
@@ -764,9 +765,25 @@ class Modal_Solver():
             Fundamental frequency factor for rectangular or prismatic geometry
         f_ell : `float`
             Fundamental frequency factor for elliptical or ellipsoidal geometry
+        c_eq : `float`
+            Equivalente isotropic velocity in the hypershape
         bc : `str`, optional
             Boundary condition type: 'Dirichlet' or 'Neumann'.
             Default is 'Neumann'
+        c_eqref : `float`, optional
+            Reference value for the equivalent velocity based on the original
+            velocity model without an absorbing layer. Default is None
+        fitting_c : `list`, optional
+            Parameters for fitting equivalent velocity regression.
+            Structure: (fc1, fc2, fp1, fp2). Default is (1., 1., 0.5, 0.5)
+            - fc1 : `float`
+                Exponent factor for the minimum reference velocity
+            - fc2 : `float`
+                Exponent factor for the maximum reference velocity
+            - fp1 : `float`
+                Exponent fsctor for the minimum equivalent velocity
+            - fp2 : `float`
+                Exponent factor for the maximum equivalent velocity
         cut_plane_percent : `float`, optional
             Percentage of the cut plane (0 to 1). Default is 1 (no cut)
 
@@ -778,8 +795,8 @@ class Modal_Solver():
             Approximate equivalent velocity for the hypershape
         '''
 
-        if n_hyp is None:
-            n_hyp = 6
+        n_hyp = 6 if n_hyp is None else n_hyp
+        c_eqref = c_eq if c_eqref is None else c_eqref
 
         # Regression for hypershape geometry factor
         pn, qn, fr_ell, fr_rec = self.reg_geometry_hyp(
@@ -797,20 +814,22 @@ class Modal_Solver():
         pot_term = (1. / (qn * n_hyp + 1 - 2 * qn)) ** pn
         f_hyp = f_min - cn2 * pot_term
 
-        # Equivalent velocity lower bound for the hypershape
-        if c_eqref is not None:
-            f1 = (fr_ell / fr_rec)**(0.3 * pn)
-            f2 = (f_ell / f_rec)**(0.3 * pn)
-            c_min = c_eqref * min(f1, f2)
-            cc2 = c_min - c_eqref * max(f1, f2)
+        # Adjusting equivalent velocity for the hypershape
+        fc1, fc2, fp1, fp2 = fitting_c
+        f1 = fr_ell / fr_rec
+        f2 = f_ell / f_rec
+        f3 = 1. / f2
+        c_ref = max(c_eq * f3 ** fc1, c_eqref * f3 ** fc2)
+        c_min = c_ref * min(f1, f2) ** (fp1 * pn)
+        cc2 = c_min - c_ref * max(f1, f2) ** (fp2 * pn)
 
-        c_reg = None if c_eqref is None \
-            else c_min - cc2 * pot_term
+        # Equivalent velocity for the hypershape
+        c_reg = c_min - cc2 * pot_term
 
         return f_hyp, c_reg
 
-    def solver_analytical(self, c_eq, hyp_par, bc='Neumann',
-                          c_eqref=None, cut_plane_percent=1.):
+    def solver_analytical(self, c_eq, hyp_par, bc='Neumann', c_eqref=None,
+                          fitting_c=(1., 1., 0.5, 0.5), cut_plane_percent=1.):
         '''
         Compute the analytical solution for the eigenvalue problem with
         Neumann or Dirichlet boundary conditions for isotropic hypershapes
@@ -837,6 +856,17 @@ class Modal_Solver():
         c_eqref : `float`, optional
             Reference value for the equivalent velocity based on the original
             velocity model without an absorbing layer. Default is None
+        fitting_c : `tuple`, optional
+            Parameters for fitting equivalent velocity regression.
+            Structure: (fc1, fc2, fp1, fp2). Default is (1., 1., 0.5, 0.5)
+            - fc1 : `float`
+                Exponent factor for the minimum reference velocity
+            - fc2 : `float`
+                Exponent factor for the maximum reference velocity
+            - fp1 : `float`
+                Exponent fsctor for the minimum equivalent velocity
+            - fp2 : `float`
+                Exponent factor for the maximum equivalent velocity
         cut_plane_percent : `float`, optional
             Percentage of the cut plane (0 to 1). Default is 1 (no cut)
 
@@ -865,20 +895,15 @@ class Modal_Solver():
         f_rec = self.freq_factor_rec(hyp_axes, bc=bc)
         f_ell = self.freq_factor_ell(
             hyp_axes, bc=bc, all_axes_equal=all_axes_equal)
-        c_ref = max(c_eq * (f_rec / f_ell)**3, c_eqref * (f_rec / f_ell)**2)
-        f_hyp, c_reg = \
-            self.freq_factor_hyp(n_hyp, f_rec, f_ell, bc=bc, c_eqref=c_ref,
-                                 cut_plane_percent=cut_plane_percent)
-
-        # Constraint equivalent velocity to a range
-        if c_eqref is not None:
-            c_eq = c_reg
+        f_hyp, c_reg = self.freq_factor_hyp(
+            n_hyp, f_rec, f_ell, c_eq, bc=bc, c_eqref=c_eqref,
+            fitting_c=fitting_c, cut_plane_percent=cut_plane_percent)
 
         print(f"Hypershape Equivalent Velocity c_eq (km/s) = {c_eq:.3f}")
         print(f"Hypershape Frequency factor f_hyp (1/km): {f_hyp:.3f}")
 
         # Eigenvalue
-        Lsp = (c_eq * f_hyp)**2
+        Lsp = (c_reg * f_hyp)**2
 
         return Lsp
 
@@ -1011,9 +1036,11 @@ class Modal_Solver():
 
         return Lsp
 
-    def solve_eigenproblem(self, c, V=None, k=2, shift=0., quad_rule=None,
-                           inv_oper=False, coord_norm=None, hyp_par=None,
-                           cut_plane_percent=1., c_eqref=None):
+    def solve_eigenproblem(self, c, V=None, k=2, shift=0.,
+                           quad_rule=None, inv_oper=False,
+                           coord_norm=None, hyp_par=None,
+                           cut_plane_percent=1., c_eqref=None,
+                           fitting_c=(1., 1., 0.5, 0.5)):
         '''
         Solve the eigenvalue problem with Neumann boundary conditions
 
@@ -1053,6 +1080,17 @@ class Modal_Solver():
         c_eqref : `float`, optional
             Reference value for the equivalent velocity based on the original
             velocity model without an absorbing layer. Default is None
+        fitting_c : `tuple`, optional
+            Parameters for fitting equivalent velocity regression.
+            Structure: (fc1, fc2, fp1, fp2). Default is (1., 1., 0.5, 0.5)
+            - fc1 : `float`
+                Exponent factor for the minimum reference velocity
+            - fc2 : `float`
+                Exponent factor for the maximum reference velocity
+            - fp1 : `float`
+                Exponent fsctor for the minimum equivalent velocity
+            - fp2 : `float`
+                Exponent factor for the maximum equivalent velocity
 
         Returns
         -------
@@ -1063,7 +1101,8 @@ class Modal_Solver():
 
         if self.method == 'ANALYTICAL':
             c_eq = self.c_equivalent(c, V, quad_rule=quad_rule)
-            Lsp = self.solver_analytical(c_eq, hyp_par, c_eqref=c_eqref,
+            Lsp = self.solver_analytical(c_eq, hyp_par,
+                                         c_eqref=c_eqref, fitting_c=fitting_c,
                                          cut_plane_percent=cut_plane_percent)
 
         elif self.method == 'RAYLEIGH':
@@ -1132,8 +1171,7 @@ class Modal_Solver():
             if shift > 0:
                 a += fire.Constant(shift) * m
 
-            Asp, Msp_inv = \
-                self.assemble_sparse_matrices(a, m, return_M_inv=True)
+            Asp, Msp_inv = self.assemble_sparse_matrices(a, m, return_M_inv=True)
             Lsp = Msp_inv.multiply(Asp).toarray().squeeze()
             Lsp -= shift if shift > 0. else 0.
 

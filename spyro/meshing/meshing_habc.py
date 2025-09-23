@@ -174,7 +174,7 @@ class HABC_Mesh():
         - (z_data[bnds], x_data[bnds], y_data[bnds]) for 3D
     c : `firedrake function`
         Velocity model without absorbing layer
-    c_bnd_min : `float` 
+    c_bnd_min : `float`
         Minimum velocity value on the boundary of the original domain
     c_bnd_max : `float`
         Maximum velocity value on the boundary of the original domain
