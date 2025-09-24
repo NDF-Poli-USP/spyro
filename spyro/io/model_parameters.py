@@ -324,7 +324,7 @@ class Model_parameters(Read_options, Read_boundary_layer, Read_time_axis, Read_o
             if value < 1.0:
                 warnings.warn(f"Frequency of {value} too low for realistic FWI.")
             elif value > 50:
-                warnings.warn(f"Frequency of {value} too high for eficient FWI.")
+                warnings.warn(f"Frequency of {value} too high for efficient FWI.")
         self._frequency = value
 
     @property
