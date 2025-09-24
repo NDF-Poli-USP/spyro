@@ -218,7 +218,7 @@ class Model_parameters(Read_options, Read_boundary_layer, Read_time_axis, Read_o
         self.parallelism_type = self.input_dictionary["parallelism"]["type"]
 
         # Checking absorving boundary condition parameters
-        Read_boundary_layer.__init__(self, dictionary=self.input_dictionary)
+        Read_boundary_layer.__init__(self)
 
         # Checking mesh_parameters
         if self.cell_type == "quadrilateral" or self.method == "spectral_quadrilateral":
