@@ -31,8 +31,8 @@ class AcousticWave(Wave):
         super().__init__(dictionary, comm=comm)
 
         self.acoustic_energy = None
-        self.field_logger.add_functional("acoustic_energy",
-                                         lambda: fire.assemble(self.acoustic_energy))
+        self.field_logger.add_functional(
+            "acoustic_energy", lambda: fire.assemble(self.acoustic_energy))
 
     def save_current_velocity_model(self, file_name=None):
         if self.c is None:
@@ -62,7 +62,7 @@ class AcousticWave(Wave):
         self.solver = None
         self.rhs = None
         self.B = None
-        if abc_type is None:
+        if abc_type is None or abc_type == "local" or abc_type == "hybrid":
             construct_solver_or_matrix_no_pml(self)
         elif abc_type == "PML":
             V = self.function_space
@@ -93,11 +93,11 @@ class AcousticWave(Wave):
         """
         if misfit is not None:
             self.misfit = misfit
-        if self.real_shot_record is None:
-            warnings.warn("Please load or calculate a real shot record first")
-        if self.current_time == 0.0:
+        elif self.current_time == 0.0:
             self.forward_solve()
             self.misfit = self.real_shot_record - self.forward_solution_receivers
+        else:
+            raise ValueError("Please load or calculate a real shot record first")
         return backward_wave_propagator(self)
 
     def reset_pressure(self):

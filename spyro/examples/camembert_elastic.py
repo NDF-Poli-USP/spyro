@@ -51,6 +51,8 @@ d["parallelism"] = {
 
 d["mesh"] = {
     "user_mesh": mesh,
+    "Lz": L,
+    "Lx": L,
 }
 
 d["acquisition"] = {
@@ -96,4 +98,4 @@ d["absorving_boundary_conditions"] = {
 }
 
 wave = spyro.IsotropicWave(d)
-wave.set_mesh(user_mesh=mesh, mesh_parameters={})
+wave.set_mesh(user_mesh=mesh, input_mesh_parameters={})
