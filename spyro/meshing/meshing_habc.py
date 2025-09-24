@@ -407,9 +407,11 @@ class HABC_Mesh():
         Lx_habc, Lz_habc = dom_lay[:2]
 
         # Creating the rectangular mesh with layer
+        q = {"overlap_type": (fire.DistributedMeshOverlapType.NONE, 0)}
         if self.dimension == 2:  # 2D
-            mesh_habc = fire.RectangleMesh(
-                nz, nx, Lz_habc, Lx_habc, comm=self.comm.comm)
+            mesh_habc = fire.RectangleMesh(nz, nx, Lz_habc, Lx_habc,
+                                           distribution_parameters=q,
+                                           comm=self.comm.comm)
 
         if self.dimension == 3:  # 3D
 
@@ -422,8 +424,9 @@ class HABC_Mesh():
             Ly_habc = dom_lay[2]
 
             # Mesh
-            mesh_habc = fire.BoxMesh(
-                nz, nx, ny, Lz_habc, Lx_habc, Ly_habc, comm=self.comm.comm)
+            mesh_habc = fire.BoxMesh(nz, nx, ny, Lz_habc, Lx_habc, Ly_habc,
+                                     distribution_parameters=q,
+                                     comm=self.comm.comm)
 
             # Adjusting coordinates
             mesh_habc.coordinates.dat.data_with_halos[:, 2] -= pad_len
@@ -714,16 +717,29 @@ class HABC_Mesh():
                 break
 
             except Exception as e:
+
+                # Retry with lines if splines fail
                 if spln:
                     print(f"Error Meshing with Splines: {e}")
                     print("Now meshing with Lines")
                     spln = False
+
                 else:
                     UserWarning(f"Error Meshing with Lines: {e}. Exiting.")
                     break
 
         # Mesh is transformed into a firedrake mesh
-        return fire.Mesh(hyp_mesh, comm=self.comm.comm)
+        q = {"overlap_type": (fire.DistributedMeshOverlapType.NONE, 0)}
+        hyp_mesh = fire.Mesh(
+            hyp_mesh, distribution_parameters=q, comm=self.comm.comm)
+
+        # Adjusting coordinates: Swap (x,z) -> (z,x) and apply offsets
+        hyp_mesh.coordinates.dat.data_with_halos[:, [0, 1]] = \
+            hyp_mesh.coordinates.dat.data_with_halos[:, [1, 0]]
+        hyp_mesh.coordinates.dat.data_with_halos[:, 0] -= Lz / 2
+        hyp_mesh.coordinates.dat.data_with_halos[:, 1] += Lx / 2
+
+        return hyp_mesh
 
     def merge_mesh_2D(self, rec_mesh, hyp_mesh):
         '''
@@ -820,7 +836,9 @@ class HABC_Mesh():
                   f"and {len(final_mesh.Elements2D())} elements")
 
             # Mesh is transformed into a firedrake mesh
-            final_mesh = fire.Mesh(final_mesh, comm=self.comm.comm)
+            q = {"overlap_type": (fire.DistributedMeshOverlapType.NONE, 0)}
+            final_mesh = fire.Mesh(
+                final_mesh, distribution_parameters=q, comm=self.comm.comm)
             print("Merged Mesh Generated Successfully")
 
         except Exception as e:
@@ -862,8 +880,8 @@ class HABC_Mesh():
         semi_axes : `tuple`
             Hyperellipsoid semi-axes according to reference system (z, x, y)
             Structure: (a_hyp, c_hyp, b_hyp)
-        surf_ele_expt : `int`
-            Expected elements in a full hyperellipsoid surface
+        resol : `int`
+            Resolution for the generation of the hyperellipsoid surface
         '''
 
         # Domain dimensions
@@ -896,9 +914,10 @@ class HABC_Mesh():
         semi_axes = (a_hyp, c_hyp, b_hyp)
 
         # Expected elements in a full hyperellipsoid surface
-        surf_ele_expt = np.ceil(surface / self.lmin**2) + 1
+        r_asp = max(semi_axes) / min(semi_axes)
+        resol = int(np.ceil(surface * r_asp / self.lmin**2) + 1)
 
-        return rec_box, hyp_box, centroid, semi_axes, surf_ele_expt
+        return rec_box, hyp_box, centroid, semi_axes, resol
 
     @staticmethod
     def create_hyp_pnt_3D(u, v, semi_axes, centroid, n):
@@ -930,14 +949,15 @@ class HABC_Mesh():
         # Hyperellipsoid centroid
         xc, yc, zc = centroid
 
-        # Sign function that preserves the sign
-        def sign_power(x, p):
-            return 0. if abs(x) < 1e-10 else np.sign(x) * (np.abs(x) ** p)
-
-        cos_v = np.cos(v)
-        sin_v = np.sin(v)
+        #  Trigonometric function evaluation with special cases
         cos_u = np.cos(u)
         sin_u = np.sin(u)
+        cos_v = np.cos(v)
+        sin_v = np.sin(v)
+
+        # Power and sign function
+        def sign_power(x, p):
+            return 0. if abs(x) < 1e-10 else np.sign(x) * (abs(x) ** p)
 
         # Calculate point relative to origin
         x = a * sign_power(cos_v, 2. / n) * sign_power(cos_u, 2. / n)
@@ -976,12 +996,8 @@ class HABC_Mesh():
 
         Returns:
         -------
-        point_tags : `list`
-            List of OpenCASCADE point tags
-        u_res : `int`
-            Resolution in the u direction (longitude)
-        v_res : `int`
-            Resolution in the v direction (latitude)
+        hyp_srf_tag : int
+            OpenCASCADE surface tag for the hyperellipsoid
         '''
 
         # gmsh.initialize()
@@ -990,9 +1006,8 @@ class HABC_Mesh():
         # Create a new model using OpenCASCADE kernel
         gmsh.model.add("hyper_ellipsoid_occ")
 
-        print("Generating Hyperellipsoid Surface Points")
-
         # Generate point grid
+        print("Generating Hyperellipsoid Boundary Points")
         point_tags = []
         for j in range(v_res):
             for i in range(u_res + 1):  # +1 to include closure point at u=2π
@@ -1013,13 +1028,22 @@ class HABC_Mesh():
                     # Handle v direction including exact poles
                     v = np.pi * (j / (v_res - 1) - 0.5)  # From -π/2 to π/2
 
+                # Create point on the hyperellipsoid surface
                 x, y, z = self.create_hyp_pnt_3D(u, v, semi_axes, centroid, n)
                 point_tag = gmsh.model.occ.addPoint(x, y, z)
                 point_tags.append(point_tag)
 
-        return point_tags, u_res, v_res
+        # Create B-spline surface
+        print("Generating Hyperellipsoid Surface")
+        hyp_srf_tag = gmsh.model.occ.addBSplineSurface(
+            pointTags=point_tags,
+            numPointsU=u_res + 1,  # Include closure point
+            tag=-1, degreeU=min(3, u_res), degreeV=min(3, v_res-1))
+        gmsh.model.occ.synchronize()
 
-    def create_hyp_vol_3D(self, semi_axes, centroid, n):
+        return hyp_srf_tag
+
+    def create_hyp_vol_3D(self, semi_axes, centroid, n, resol):
         '''
         Create a 3D hyperellipsoid volume using OpenCASCADE B-spline surfaces
 
@@ -1029,40 +1053,40 @@ class HABC_Mesh():
             Semi-axes of the hyperellipsoid (a, b, c)
         centroid : `tuple`
             Centroid of the hyperellipsoid (xc, yc, zc)
-         n : `float`
+        n : `float`
             Degree of the hyperellipsoid
+        resol : `int`
+            Resolution for the generation of the hyperellipsoid surface
 
         Returns:
         --------
-        volume_tag : int
+        hyp_vol_tag : int
             OpenCASCADE volume tag for the hyperellipsoid
         '''
 
-        volume_tag = None
+        print("Creating Hyperellipsoid")
+
+        hyp_vol_tag = None
 
         try:
 
-            # Hyperellipsoid centroid
-            xc, yc, zc = centroid
-
-            # Surface points
-            point_tags, u_res, v_res = self.create_hyp_srf_3D(semi_axes,
-                                                              centroid, n)
-
-            # Create B-spline surface
-            surface_tag = gmsh.model.occ.addBSplineSurface(
-                pointTags=point_tags,
-                numPointsU=u_res + 1,  # Include closure point
-                tag=-1, degreeU=min(3, u_res), degreeV=min(3, v_res-1))
-            gmsh.model.occ.synchronize()
+            # Create surface
+            u_res = resol
+            v_res = int(np.ceil(min(semi_axes) / max(semi_axes) * resol) + 1)
+            hyp_srf_tag = self.create_hyp_srf_3D(semi_axes, centroid, n,
+                                                 u_res=u_res, v_res=v_res)
 
             # Create volume
-            surface_loop = gmsh.model.occ.addSurfaceLoop([surface_tag])
-            volume_tag = gmsh.model.occ.addVolume([surface_loop])
+            print("Generating Hyperellipsoid Volume")
+            surface_loop = gmsh.model.occ.addSurfaceLoop([hyp_srf_tag])
+            hyp_vol_tag = gmsh.model.occ.addVolume([surface_loop])
             gmsh.model.occ.synchronize()
 
-            if volume_tag is None:
+            if hyp_vol_tag is None:
                 return None
+
+            # Hyperellipsoid centroid
+            xc, yc, zc = centroid
 
             # Apply z-cut to remove upper part above free surface
             z_cut = 0.
@@ -1076,20 +1100,20 @@ class HABC_Mesh():
 
             # Remove everything above z_cut
             result = gmsh.model.occ.cut(
-                [(3, volume_tag)], [(3, cutting_box)],
+                [(3, hyp_vol_tag)], [(3, cutting_box)],
                 removeObject=True, removeTool=True)
 
             # Verify if the resulting volume is valid
             if result[0]:
                 print("Cut Applied Successfully")
-                volume_tag = result[0][0][1]
+                hyp_vol_tag = result[0][0][1]
             else:
                 UserWarning("Cut Removed Entire Volume")
-                volume_tag = None
+                hyp_vol_tag = None
 
             print("Successfully Created Volume Using Closed B-Spline Surface")
 
-            return volume_tag
+            return hyp_vol_tag
 
         except Exception as e:
             UserWarning(f"B-spline Surface Creation Failed: {e}")
@@ -1112,6 +1136,8 @@ class HABC_Mesh():
             OpenCASCADE volume tag for the box
         '''
 
+        print("Creating Original Box Domain")
+
         # Create ox volume
         xmin, xmax, ymin, ymax, zmin, zmax = rec_box
         box_vol_tag = gmsh.model.occ.addBox(xmin, ymin, zmin,  # corner
@@ -1125,7 +1151,6 @@ class HABC_Mesh():
         nx = max(1, int(round((xmax - xmin) / self.lmin)))
         ny = max(1, int(round((ymax - ymin) / self.lmin)))
         nz = max(1, int(round((zmax - zmin) / self.lmin)))
-        print(f"Box Discretization: nx: {nx} - ny: {ny} - nz: {nz}")
 
         # Get cube surfaces
         box_surfaces = gmsh.model.getBoundary(
@@ -1189,8 +1214,8 @@ class HABC_Mesh():
         # Hyperellipsoid degree
         n_hyp = hyp_par[0]
 
-        rec_box, hyp_box, centroid, semi_axes, \
-            surf_ele_expt = self.mesh_data_3D(hyp_par)
+        # Get mesh data
+        rec_box, hyp_box, centr, semi_axes, resol = self.mesh_data_3D(hyp_par)
 
         # Initialize Gmsh
         try:
@@ -1200,19 +1225,19 @@ class HABC_Mesh():
             print(f"Finalization failed: {e}")
 
         gmsh.initialize()
-        gmsh.model.add("hyp_merged_mesh_3D")
+        gmsh.model.add("hyp_mesh_3D")
 
         # Create hyperellipsoid volume
-        print("Creating Hyperellipsoid")
-        hyp_vol_tag = self.create_hyp_vol_3D(semi_axes, centroid, n_hyp)
+        hyp_vol_tag = self.create_hyp_vol_3D(semi_axes, centr, n_hyp, resol)
 
         # Create box volume
-        print("Creating Original Box")
         box_vol_tag = self.create_box_vol_3D(rec_box)
 
         # Fragment the geometries
-        if hyp_vol_tag and box_vol_tag:
+        if not (hyp_vol_tag and box_vol_tag):
+            UserWarning("Error Generating Merged Mesh")
 
+        try:
             print("Fragmenting Box and Hyperellipsoid")
 
             # Fragment operation - create proper subdomain
@@ -1259,19 +1284,18 @@ class HABC_Mesh():
 
                 # Load mesh directly from temporary file
                 q = {"overlap_type": (fire.DistributedMeshOverlapType.NONE, 0)}
-                final_mesh = fire.Mesh(tmp.name, distribution_parameters=q,
-                                       comm=self.comm.comm)
-
+                final_mesh = fire.Mesh(
+                    tmp.name, distribution_parameters=q, comm=self.comm.comm)
             print("Merged Mesh Generated Successfully")
 
-        else:
-            UserWarning("Error Generating Merged Mesh")
+            gmsh.finalize()
 
-        gmsh.finalize()
+        except Exception as e:
+            UserWarning(f"Error Generating Merged Mesh: {e}. Exiting.")
 
-        # Adjusting coordinates: Swap (x, y, z) -> (z, x ,y) and apply offsets
-        final_mesh.coordinates.dat.data_with_halos[:, [0, 2]] = \
-            final_mesh.coordinates.dat.data_with_halos[:, [2, 0]]
+        # Adjusting coordinates: Swap (x, y, z) -> (z, x ,y)
+        final_mesh.coordinates.dat.data_with_halos[:, [0, 1, 2]] = \
+            final_mesh.coordinates.dat.data_with_halos[:, [2, 0, 1]]
 
         return final_mesh
 
@@ -1312,19 +1336,10 @@ class HABC_Mesh():
 
         if self.dimension == 2:  # 2D
 
-            # Domain dimensions
-            Lx, Lz = self.dom_dim[:2]
-
             # Creating the hyperellipse layer mesh
             hyp_mesh = self.create_hyp_trunc_mesh_2D(hyp_par[:4],
                                                      spln=spln,
                                                      fmesh=fmesh)
-
-            # Adjusting coordinates: Swap (x,z) -> (z,x) and apply offsets
-            hyp_mesh.coordinates.dat.data_with_halos[:, [0, 1]] = \
-                hyp_mesh.coordinates.dat.data_with_halos[:, [1, 0]]
-            hyp_mesh.coordinates.dat.data_with_halos[:, 0] -= Lz / 2
-            hyp_mesh.coordinates.dat.data_with_halos[:, 1] += Lx / 2
             # fire.VTKFile("output/trunc_hyp_test.pvd").write(hyp_mesh)
 
             # Merging the original mesh with the hyperellipse layer mesh
@@ -1521,7 +1536,7 @@ class HABC_Mesh():
         '''
 
         # Creating a point cloud field from the parent mesh
-        pts_mesh = fire.VertexOnlyMesh(parent_mesh, pts_cloud, redundant=True,
+        pts_mesh = fire.VertexOnlyMesh(parent_mesh, pts_cloud, redundant=False,
                                        missing_points_behaviour='warn')
         del pts_cloud
 

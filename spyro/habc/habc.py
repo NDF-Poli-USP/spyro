@@ -522,6 +522,7 @@ class HABC_Wave(AcousticWave, HABC_Mesh, RectangLayer,
             # Parameters for hypershape mesh
             if self.dimension == 2:  # 2D
                 par_geom = self.perim_hyp
+
             if self.dimension == 3:  # 3D
                 par_geom = self.surf_hyp
 

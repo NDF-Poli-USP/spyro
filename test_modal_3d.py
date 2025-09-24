@@ -215,7 +215,7 @@ def test_loop_modal_3d():
 
     # ============ SIMULATION PARAMETERS ============
 
-    case = 0  # Integer from 0 to 3
+    case = 1  # Integer from 0 to 3
 
     # Mesh size (in km)
     # cpw: cells per wavelength
@@ -230,7 +230,7 @@ def test_loop_modal_3d():
     f_est_lst = [0.04, 0.05, 0.03, 0.05]
 
     # Parameters for fitting equivalent velocity regression
-    fitting_c_lst = [(1.0, 1.0, 0.2, 0.5),
+    fitting_c_lst = [(1.0, 1.0, 0.1, 0.1),
                      (1.0, 1.0, 0.5, 0.5),
                      (1.0, 1.0, 0.5, 0.5),
                      (1.0, 1.0, 0.5, 0.5)]
@@ -249,7 +249,7 @@ def test_loop_modal_3d():
     # ============ HABC PARAMETERS ============
 
     # Hyperellipse degrees
-    degree_layer_lst = [2.8]  # [None, 2.8, 3, 4, 4.7]
+    degree_layer_lst = [2.8, 3.0, 4.0, 4.7, None]
 
     # Type of the hypereshape degree
     degree_type = "real"  # "integer"
@@ -268,7 +268,7 @@ def test_loop_modal_3d():
     # ============ MODAL ANALYSIS ============
 
     # Modal solvers
-    modal_solver_lst = ['ANALYTICAL']
+    modal_solver_lst = ['ANALYTICAL', 'ARNOLDI']
     # modal_solver_lst = ['ANALYTICAL', 'ARNOLDI', 'LANCZOS',
     #                     'LOBPCG', 'KRYLOVSCH_CH', 'KRYLOVSCH_CG',
     #                     'KRYLOVSCH_GH', 'KRYLOVSCH_GG', 'RAYLEIGH']
@@ -308,8 +308,56 @@ if __name__ == "__main__":
 # n_min   2.8  2.4  2.2  2.1
 # n_max   4.7  4.7  4.7  4.7
 
+# ANALYTICAL
+# Case0     REC    N4.7    N4.0    N3.0    N2.8
+# fnum  0.45901 0.49643 0.50582 0.52873 0.53411
+# fana  0.45706 0.47593 0.49208 0.53034 0.54167
+
+
+# Case1     REC    N4.7    N4.0    N3.0    N2.8
+# fnum  0.45830 0.49402 0.50359 0.52609 0.53270
+
+# fana  0.39592 0.43402 0.46732 0.54851 0.57315
+
+# Case2     REC    N4.7    N4.0    N3.0    N2.8
+# fnum  0.45576 0.47185 0.47390 0.48232 0.50292
+# fana  0.45510 0.46558 0.47201 0.47757 0.51415
+
+# Case3     REC    N4.7    N4.0    N3.0    N2.8
+# fnum  0.46763 0.48306 0.48550 0.49408 0.51332
+# fana  0.46534 0.47554 0.48700 0.48886 0.51947
+
+# RAYLEIGH dx = 150m
+# n_eigfunc       2      *4       6
+# freq(Hz)  0.59662 0.47976 0.47087
+# texe(s)     0.842  77.643 529.358
+# mem(MB)     7.719  60.394 189.725
+
+# dx = 150m
+# Frequency[Hz]    N2.8         (texe/pmem)    N3.0         (texe/pmem)
+# ANALYTICAL    0.54167 ( 1.826s/  4.835MB) 0.53034 ( 1.750s/  4.781MB)
+# ARNOLDI       0.53411 (34.117s/131.174MB) 0.52873 (28.090s/132.650MB)
+# LANCZOS       0.53411 (32.566s/ 98.198MB) 0.52873 (28.650s/ 99.315MB)
+# LOBPCG        0.53411 (48.971s/ 95.511MB) 0.54237 (75.606s/ 97.094MB)
+# KRYLOVSCH_CH  0.53411 (11.946s/  0.104MB) 0.52873 (12.985s/  0.097MB)
+# KRYLOVSCH_CG  0.53411 (12.102s/  0.102MB) 0.52873 (13.216s/  0.099MB)
+# KRYLOVSCH_GH  0.53411 (12.127s/  0.097MB) 0.52873 (12.956s/  0.103MB)
+# KRYLOVSCH_GG  0.53411 (11.771s/  0.102MB) 0.52873 (13.322s/  0.101MB)
+# RAYLEIGH      0.55737 (30.263s/ 40.165MB) 0.55140 (33.087s/ 40.049MB)
+
+# Frequency[Hz]    N4.0         (texe/pmem)    N4.7         (texe/pmem)
+# ANALYTICAL    0.49208 ( 1.859s/  4.956MB) 0.47593 ( 1.834s/  5.019MB)
+# ARNOLDI       0.50582 (40.161s/146.603MB) 0.49643 (38.310s/145.873MB)
+# LANCZOS       0.50582 (40.994s/109.982MB) 0.49643 (39.121s/109.326MB)
+# LOBPCG        0.50688 (84.216s/107.368MB) 0.49643 (56.979s/106.325MB)
+# KRYLOVSCH_CH  0.50582 (16.147s/  0.096MB) 0.49643 (14.817s/  0.105MB)
+# KRYLOVSCH_CG  0.50582 (16.409s/  0.100MB) 0.49643 (14.728s/  0.102MB)
+# KRYLOVSCH_GH  0.50582 (16.301s/  0.104MB) 0.49643 (14.838s/  0.097MB)
+# KRYLOVSCH_GG  0.50582 (16.354s/  0.102MB) 0.49643 (15.109s/  0.103MB)
+# RAYLEIGH      0.52784 (32.724s/ 43.277MB) 0.51851 (31.391s/ 43.542MB)
+
 # Frequency[Hz]     REC          (texe/pmem)
-# ANALYTICAL    0.45565 ( 3.434s/  5.663MB)
+# ANALYTICAL    0.45706 ( 3.434s/  5.663MB)
 # ARNOLDI       0.45901 (69.961s/205.148MB)
 # LANCZOS       0.45901 (68.482s/152.205MB)
 # LOBPCG        0.48982 (45.466s/148.411MB)
@@ -318,9 +366,3 @@ if __name__ == "__main__":
 # KRYLOVSCH_GH  0.45901 (14.057s/  0.100MB)
 # KRYLOVSCH_GG  0.45901 (13.809s/  0.097MB)
 # RAYLEIGH      0.47976 (77.643s/ 60.394MB)
-
-# RAYLEIGH dx = 150m
-# n_eigfunc       2      *4       6
-# freq(Hz)  0.59662 0.47976 0.47087
-# texe(s)     0.842  77.643 529.358
-# mem(MB)     7.719  60.394 189.725
