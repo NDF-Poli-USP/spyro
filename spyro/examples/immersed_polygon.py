@@ -126,8 +126,8 @@ class Polygon_velocity:
 
         cond = fire.conditional(300*((x-0.5)*(-z-0.5))**2 + ((x-0.5)+(-z-0.5))**2 <= 0.300**2, v2+dv, cond)
 
-        if self.abc_pad_length > 0.0:
-            middle_of_pad = -self.length_z - self.abc_pad_length*0.5
+        if self.abc_pad_length is not None and self.abc_pad_length > 0.0:
+            middle_of_pad = -self.mesh_parameters.length_z - self.mesh_parameters.abc_pad_length*0.5
             cond = fire.conditional(z <= middle_of_pad, v0, cond)
 
         self.set_initial_velocity_model(conditional=cond, dg_velocity_model=False)
@@ -139,6 +139,16 @@ class Polygon_acoustic(Polygon_velocity, Rectangle_acoustic):
     This class is a child of the Example_model class.
     It is used to create a dictionary with the parameters of the
     polygon model.
+
+    Example Setup
+
+    These examples are intended as reusable velocity model configurations to assist in the development and testing of new methods, such as optimization algorithms, time-marching schemes, or inversion techniques.
+
+    Unlike targeted test cases, these examples do not have a specific objective or expected result. Instead, they provide standardized setups, such as Camembert, rectangular, and Marmousi velocity models, that can be quickly reused when prototyping, testing, or validating new functionality.
+
+    By isolating the setup of common velocity models, we aim to reduce boilerplate and encourage consistency across experiments.
+
+    Feel free to adapt these templates to your needs.
 
     Parameters
     ----------
@@ -169,6 +179,16 @@ class Polygon_acoustic_FWI(Polygon_velocity, Rectangle_acoustic_FWI):
     This class is a child of the Example_model class.
     It is used to create a dictionary with the parameters of the
     polygon model.
+
+    Example Setup
+
+    These examples are intended as reusable velocity model configurations to assist in the development and testing of new methods, such as optimization algorithms, time-marching schemes, or inversion techniques.
+
+    Unlike targeted test cases, these examples do not have a specific objective or expected result. Instead, they provide standardized setups, such as Camembert, rectangular, and Marmousi velocity models, that can be quickly reused when prototyping, testing, or validating new functionality.
+
+    By isolating the setup of common velocity models, we aim to reduce boilerplate and encourage consistency across experiments.
+
+    Feel free to adapt these templates to your needs.
 
     Parameters
     ----------

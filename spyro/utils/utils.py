@@ -290,9 +290,9 @@ class Gradient_mask_for_pml(Mask):
             raise ValueError("No PML present in wave object")
 
         # building firedrake function for mask
-        z_min = -(Wave_obj.length_z)
+        z_min = -(Wave_obj.mesh_parameters.length_z)
         x_min = 0.0
-        x_max = Wave_obj.length_x
+        x_max = Wave_obj.mesh_parameters.length_x
         boundaries = {
             "z_min": z_min,
             "x_min": x_min,
