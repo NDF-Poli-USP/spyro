@@ -356,7 +356,8 @@ class Model_parameters(Read_options, Read_boundary_layer, Read_time_axis, Read_o
             self.shot_ids_per_propagation = [[i] for i in range(0, self.number_of_sources)]
 
         self._parallelism_type = value
-        self.comm = utils.mpi_init(self)
+        if self.comm is None:
+            self.comm = utils.mpi_init(self)
         self.comm.comm.barrier()
 
     def _sanitize_automatic_adjoint(self):
