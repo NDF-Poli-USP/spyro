@@ -14,7 +14,7 @@ def wave_dict():
     Returns
     -------
     dictionary : `dict`
-        Dictionary containing the parameters for the model.
+        Dictionary containing the parameters for the model
     '''
 
     dictionary = {}
@@ -41,9 +41,9 @@ def wave_dict():
     # 1.00 x 1.00 km domain and compute the size for the Absorbing Layer (AL)
     # to absorb outgoing waves on boundries (-z, +-x sides) of the domain.
     dictionary["mesh"] = {
-        "Lz": 1.0,  # depth in km - always positive
-        "Lx": 1.0,  # width in km - always positive
-        "Ly": 0.0,  # thickness in km - always positive
+        "Lz": 1.,  # depth in km - always positive
+        "Lx": 1.,  # width in km - always positive
+        "Ly": 0.,  # thickness in km - always positive
         "mesh_type": "firedrake_mesh",
     }
 
@@ -97,9 +97,9 @@ def wave_dict():
     return dictionary
 
 
-def preamble_habc(dictionary, edge_length, f_est):
+def preamble_modal(dictionary, edge_length, f_est):
     '''
-    Run the infinite model and the Rikonal analysis
+    Run the infinite model and the Eikonal analysis
 
     Parameters
     ----------
@@ -117,6 +117,7 @@ def preamble_habc(dictionary, edge_length, f_est):
     '''
 
     # ============ MESH FEATURES ============
+
     # Reference to resource usage
     tRef = comp_cost("tini")
 
@@ -205,12 +206,12 @@ def modal_fig8(Wave_obj, modal_solver_lst, fitting_c):
 
 def test_loop_modal_2d():
     '''
-    Loop for applying the HABC to the model in Fig. 8 of Salas et al. (2022).
+    Loop for testing modals solvers in 2D
     '''
 
-    case = 0  # Integer from 0 to 4
-
     # ============ SIMULATION PARAMETERS ============
+
+    case = 0  # Integer from 0 to 4
 
     # Mesh size (in km)
     # cpw: cells per wavelength
@@ -234,6 +235,8 @@ def test_loop_modal_2d():
     fitting_c = fitting_c_lst[case]
     print("\nMesh Size: {:.4f} km".format(edge_length))
     print("Eikonal Stabilizing Factor: {:.2f}".format(f_est))
+    fit_str = "Fitting Parameters for Analytical Solver: "
+    print((fit_str + "{:.1f}, {:.1f}, {:.1f}, {:.1f}").format(*fitting_c))
 
     # ============ HABC PARAMETERS ============
 
@@ -247,19 +250,19 @@ def test_loop_modal_2d():
     fref_str = "HABC Reference Frequency: Source\n"
 
     # ============ MESH AND EIKONAL ============
+
     # Create dictionary with parameters for the model
     dictionary = wave_dict()
 
     # Creating mesh and performing eikonal analysis
-    Wave_obj = preamble_habc(dictionary, edge_length, f_est)
+    Wave_obj = preamble_modal(dictionary, edge_length, f_est)
 
     # ============ MODAL ANALYSIS ============
 
     # Modal solvers
-    modal_solver_lst = ['ANALYTICAL']
-    # modal_solver_lst = ['ANALYTICAL', 'ARNOLDI', 'LANCZOS',
-    #                     'LOBPCG', 'KRYLOVSCH_CH', 'KRYLOVSCH_CG',
-    #                     'KRYLOVSCH_GH', 'KRYLOVSCH_GG', 'RAYLEIGH']
+    modal_solver_lst = ['ANALYTICAL', 'ARNOLDI', 'LANCZOS',
+                        'LOBPCG', 'KRYLOVSCH_CH', 'KRYLOVSCH_CG',
+                        'KRYLOVSCH_GH', 'KRYLOVSCH_GG', 'RAYLEIGH']
 
     for degree_layer in degree_layer_lst:
 
@@ -320,11 +323,11 @@ if __name__ == "__main__":
 # fnum  0.47498 0.49076 0.49301 0.50200 0.52376
 # fana  0.47872 0.48446 0.48689 0.49671 0.51885
 
-# RAYLEIGH
-# n_eigfunc       2      *4       6        8
-# freq(Hz)  0.66237 0.52785 0.51705  0.51355
-# texe(s)     0.192   1.390  18.209   35.027
-# mem(MB)     1.360   3.637  11.469   16.161
+# RAYLEIGH dx = 100m
+# n_eigfunc       2      *4       6       8
+# freq(Hz)  0.66237 0.52785 0.51705 0.51355
+# texe(s)     0.192   1.390  18.209  35.027
+# mem(MB)     1.360   3.637  11.469  16.161
 
 
 # dx = 100m
@@ -385,7 +388,7 @@ if __name__ == "__main__":
 # KRYLOVSCH_GG  0.49301 (  1.231s/  0.087MB) 0.49076 (  1.210s/  0.087MB)
 # RAYLEIGH      0.51362 (  1.938s/ 22.003MB) 0.51134 (  2.045s/ 22.884MB)
 
-# Frequency[Hz]    REC       (texe/pmem)
+# Frequency[Hz]     REC          (texe/pmem)
 # ANALYTICAL    0.47872 (  1.264s/  6.090MB)
 # ARNOLDI       0.47498 (  3.464s/156.369MB)
 # LANCZOS       0.47498 (  3.351s/145.416MB)
@@ -395,7 +398,3 @@ if __name__ == "__main__":
 # KRYLOVSCH_GH  0.47498 (  1.130s/  0.086MB)
 # KRYLOVSCH_GG  0.47498 (  1.096s/  0.086MB)
 # RAYLEIGH      0.49448 (  2.101s/ 21.516MB)
-
-# from time import perf_counter  # For runtime
-# tRef = perf_counter()
-# print(f"Time: {perf_counter() - tRef:.4f} seconds")

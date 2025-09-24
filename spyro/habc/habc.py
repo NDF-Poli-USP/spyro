@@ -753,23 +753,11 @@ class HABC_Wave(AcousticWave, HABC_Mesh, RectangLayer,
                                              cut_plane_percent=cut_plane_perc)
 
         elif method == 'RAYLEIGH':
-            # Original domain dimensions
-            Lx, Lz = self.dom_dim[:2]
-            a, b = self.hyper_axes[:2]
 
-            if self.dimension == 2:  # 2D
-                x, z = fire.SpatialCoordinate(self.mesh)
-
-            # Normalized coordinates to [-1, 1] w.r.t. the hypershape centroid
-            x_e = (x - fire.Constant(Lx / 2.)) / fire.Constant(2. * a)
-            z_e = (z + fire.Constant(Lz / 2.)) / fire.Constant(2. * b)
-            coord_norm = (x_e, z_e)
-            if self.dimension == 3:  # 3D
-                Ly = self.dom_dim[2]
-                c = self.hyper_axes[2]
-                x, z, y = fire.SpatialCoordinate(self.mesh)
-                y_e = (y - fire.Constant(Ly / 2.)) / fire.Constant(2. * c)
-                coord_norm += (y_e,)
+            # Normalized coordinates
+            coord_norm = mod_sol.generate_norm_coords(self.mesh,
+                                                      self.dom_dim,
+                                                      self.hyper_axes)
 
             Lsp = mod_sol.solve_eigenproblem(self.c, V=self.function_space,
                                              quad_rule=self.quadrature_rule,

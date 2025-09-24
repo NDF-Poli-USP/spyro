@@ -1,10 +1,11 @@
 import firedrake as fire
 import numpy as np
+import gmsh
 from netgen.geom2d import SplineGeometry
 from netgen.meshing import Element2D, \
     Element3D, FaceDescriptor, Mesh, MeshPoint
-from scipy.spatial import Delaunay, cKDTree
-from SeismicMesh import generation, geometry
+from scipy.spatial import cKDTree
+from tempfile import NamedTemporaryFile
 from spyro.utils.error_management import value_parameter_error
 
 # Work from Ruben Andres Salas, Andre Luis Ferreira da Silva,
@@ -14,148 +15,6 @@ from spyro.utils.error_management import value_parameter_error
 # Applied Mathematical Modelling (2022)
 # doi: https://doi.org/10.1016/j.apm.2022.09.014
 # With additions by Alexandre Olender and Romildo Soares Jr
-
-
-class Sign_Distance_Hyp3D():
-    '''
-    Class for the signed distance function of a truncated
-    hyperellipsoid with a truncation plane at x = x_cut
-
-    Attributes
-    ----------
-    semi_axes : `tuple`
-        Semi-axes of the hyperellipsoid (a, b, c)
-    centroid : `tuple`
-        Centroid of the hyperellipsoid (xc, yc, zc)
-     n : `float`
-        Degree of the hyperellipsoid
-    x_cut : `float`, optional
-        x-coordinate of the truncation plane. Default is 0
-
-    Methods
-    -------
-    hyperellipsoid_sdf()
-        Compute the signed distance function for the hyperellipsoid
-    sign_dist_hyptrunc
-            Compute the combined signed distance function to
-            create the boundary of a truncated hypererellipsoid
-    top_cut_sdf()
-        Compute the signed distance function for the top cut
-    '''
-
-    def __init__(self, semi_axes, centroid, n, x_cut=0.):
-        '''
-        Initialize the Sign_Distance_Hyp3D class.
-        Create a signed distance function for a truncated
-        hyperellipsoid with a truncation plane at x = x_cut
-
-        Parameters
-        ----------
-        semi_axes : `tuple`
-            Semi-axes of the hyperellipsoid (a, b, c)
-        centroid : `tuple`
-            Centroid of the hyperellipsoid (xc, yc, zc)
-        n : `float`
-            Degree of the hyperellipsoid
-        x_cut : `float`, optional
-            x-coordinate of the truncation plane. Default is 0
-
-        Returns
-        -------
-        None
-        '''
-
-        # Validate input parameters
-        if len(semi_axes) != 3 or any(sa <= 0 for sa in semi_axes):
-            raise ValueError("semi_axes must be a tuple of "
-                             "three positive values (a, b, c).")
-
-        if len(centroid) != 3:
-            raise ValueError("centroid must be a tuple of "
-                             "three values (xc, yc, zc).")
-
-        if n <= 0:
-            raise ValueError("n must be a positive value.")
-
-        if not isinstance(x_cut, (int, float)):
-            raise ValueError("x_cut must be a numeric value.")
-
-        # Assign attributes
-        self.semi_axes = semi_axes
-        self.centroid = centroid
-        self.n = n
-        self.x_cut = x_cut
-
-    def hyperellipsoid_sdf(self, pts):
-        '''
-        Compute the signed distance function for the hyperellipsoid
-
-        Parameters
-        ----------
-        pts : `array`
-            Array containing the coordinates of the points
-            where the signed distance function is evaluated
-
-        Returns
-        -------
-        sdf : `array`
-            Array containing the signed distance function values
-        '''
-
-        # Semi-axes and centroid
-        a, b, c = self.semi_axes
-        xc, yc, zc = self.centroid
-
-        # Relative coordinates to center at (xc, yc, zc)
-        x_h = abs((pts[:, 0] - xc) / a)**self.n
-        y_h = abs((pts[:, 1] - yc) / b)**self.n
-        z_h = abs((pts[:, 2] - zc) / c)**self.n
-
-        # Compute radius in hyperellipsoid space
-        r = (x_h + y_h + z_h)**(1. / self.n)
-
-        # Signed distance
-        sign_dist = r - 1.
-
-        # Rescale back to original space
-        scale = min(a, b, c)
-
-        return sign_dist * scale
-
-    def top_cut_sdf(self, pts):
-        '''
-        Compute the signed distance function for the top cut
-
-        Parameters
-        ----------
-        pts : `array`
-            Array containing the coordinates of the points
-            where the signed distance function is evaluated
-
-        Returns
-        -------
-        sdf : `array`
-            Array containing the signed distance function values
-        '''
-        return (pts[:, 0] - self.x_cut)
-
-    def sign_dist_hyptrunc(self, pts):
-        '''
-        Compute the combined signed distance function to
-        create the boundary of a truncated hypererellipsoid
-
-        Parameters
-        ----------
-        pts : `array`
-            Array containing the coordinates of the points
-            where the signed distance function is evaluated
-
-        Returns
-        -------
-        sdf : `array`
-            Array containing the signed distance function values
-        '''
-        return np.maximum(self.hyperellipsoid_sdf(pts), self.top_cut_sdf(pts))
 
 
 class HABC_Mesh():
@@ -220,15 +79,21 @@ class HABC_Mesh():
         Generate a field with clipping coordinates to the original boundary
     create_bnd_mesh_2D()
         Generate the boundary segment curves for the hyperellipse boundary mesh
+    create_box_vol_3D()
+        Create a structured mesh for a box volume using OpenCASCADE
+    create_hyp_pnt_3D()
+        Create a point on the hyperellipsoid surface
+    create_hyp_srf_3D()
+        Create a closed B-spline surface for the hypershape using OpenCASCADE
     create_hyp_trunc_mesh_2D()
         Generate the mesh for the hyperelliptical absorbing layer
+    create_hyp_vol_3D()
+        Create a 3D hyperellipsoid volume using OpenCASCADE B-spline surfaces
     extend_velocity_profile()
         Extend the velocity profile inside the absorbing layer
     extract_bnd_node_indices()
         Extract boundary node indices on boundaries of the domain
         excluding the free surface at the top boundary
-    get_clean_mesh_pnts3D()
-        Remove points outside the original mesh and too close to the box
     hypershape_mesh_habc()
         Generate a mesh with a hypershape absorbing layer
     layer_boundary_data()
@@ -240,7 +105,7 @@ class HABC_Mesh():
     merge_mesh_3D()
         Build a merged mesh from a box mesh and a hyperellipsoidal mesh
     mesh_data_3D()
-        Generate mesh data for the hyperellipsoidal absorbing layer
+        Generate mesh data for the hyperellipsoidal domain
     original_boundary_data()
         Generate the boundary data from the original domain mesh
     point_cloud_field()
@@ -251,8 +116,6 @@ class HABC_Mesh():
         Set the properties for the mesh used to solve the Eikonal equation
     rectangular_mesh_habc()
         Generate a rectangular mesh with an absorbing layer
-    remove_elements_outside_hyp3D()
-        Remove elements outside the hyperellipsoid.
     representative_mesh_dimensions()
         Get the representative mesh dimensions from original mesh
     trunc_hyp_bndpts_2D()
@@ -967,7 +830,7 @@ class HABC_Mesh():
 
     def mesh_data_3D(self, hyp_par):
         '''
-        Generate mesh data for the hyperellipsoidal absorbing layer
+        Generate mesh data for the hyperellipsoidal domain
 
         Parameters
         ----------
@@ -989,18 +852,16 @@ class HABC_Mesh():
         -------
         rec_box : `tuple`
             Box defined by original domain dimensions
-            Structure: (zmin, zmax, xmin, xmax, ymin, ymax)
+            Structure: (xmin, xmax, ymin, ymax, zmin, zmax)
         hyp_box : `tuple`
             Box that envelopes the hyperellipsoid
-            Structure: (zmin, zmax, xmin, xmax, ymin, ymax)
-        fixed_pnts : `array`
-            Array containing the coordinates of the original mesh points
+            Structure: (xmin, xmax, ymin, ymax, zmin, zmax)
         centroid : `tuple`
             Hyperellipsoid centroid according to reference system (z, x, y)
-            Structure: (zc, xc, yc)
+            Structure: (xc, yc, zc)
         semi_axes : `tuple`
             Hyperellipsoid semi-axes according to reference system (z, x, y)
-            Structure: (b_hyp, a_hyp, c_hyp)
+            Structure: (a_hyp, c_hyp, b_hyp)
         surf_ele_expt : `int`
             Expected elements in a full hyperellipsoid surface
         '''
@@ -1012,188 +873,292 @@ class HABC_Mesh():
         n_hyp, surface, a_hyp, b_hyp, c_hyp = hyp_par
 
         # Box defined by original domain dimensions
-        rec_box = (-Lz, 0., 0., Lx, 0., Ly)
+        rec_box = (0., Lx, 0., Ly, -Lz, 0.)
 
         # Hyperellipsoid centroid
-        zc = -Lz / 2.
         xc = Lx / 2.
         yc = Ly / 2.
+        zc = -Lz / 2.
 
         # Box that envelopes the hyperellipsoid
-        hyp_zmin = zc - b_hyp
-        hyp_zmax = zc + b_hyp
         hyp_xmin = xc - a_hyp
         hyp_xmax = xc + a_hyp
         hyp_ymin = yc - c_hyp
         hyp_ymax = yc + c_hyp
-        hyp_box = (hyp_zmin, hyp_zmax, hyp_xmin, hyp_xmax, hyp_ymin, hyp_ymax)
+        hyp_zmin = zc - b_hyp
+        hyp_zmax = zc + b_hyp
+        hyp_box = (hyp_xmin, hyp_xmax, hyp_ymin, hyp_ymax, hyp_zmin, hyp_zmax)
 
-        # Extract node positions
-        fixed_pnts = self.mesh_original.coordinates.dat.data_with_halos
+        # Hyperellipsoid centroid according to reference system (x, y, z)
+        centroid = (xc, yc, zc)
 
-        # Clip fixed_pnts points to ensure they are within the bounding box
-        fixed_pnts[:, 0] = np.clip(fixed_pnts[:, 0], hyp_zmin, hyp_zmax)
-        fixed_pnts[:, 1] = np.clip(fixed_pnts[:, 1], hyp_xmin, hyp_xmax)
-        fixed_pnts[:, 2] = np.clip(fixed_pnts[:, 2], hyp_ymin, hyp_ymax)
-
-        # Hyperellipsoid centroid according to reference system (z, x, y)
-        centroid = (zc, xc, yc)
-
-        # Hyperellipsoid semi-axes according to reference system (z, x, y)
-        semi_axes = (b_hyp, a_hyp, c_hyp)
+        # Hyperellipsoid semi-axes according to reference system (x, y, z)
+        semi_axes = (a_hyp, c_hyp, b_hyp)
 
         # Expected elements in a full hyperellipsoid surface
         surf_ele_expt = np.ceil(surface / self.lmin**2) + 1
 
-        return rec_box, hyp_box, fixed_pnts, centroid, semi_axes, surf_ele_expt
-
-    def get_clean_mesh_pnts3D(self, all_pnts, dom_pnts, box=None):
-        '''
-        Remove points outside the original mesh and too close to the box
-
-        Parameters
-        ----------
-        all_pnts : `array`
-            Array containing the coordinates of all the mesh points
-        dom_pnts : `array`
-            Array containing the coordinates of the original mesh points
-        box : `tuple`, optional
-            Original box bounds. Default is None
-            Structure: (xmin, xmax, ymin, ymax, zmin, zmax).
-
-        Returns
-        -------
-        clean_pnts : `array`
-            Array containing the coordinates of the filtered mesh points
-        '''
-
-        if len(all_pnts) == 0:
-            return all_pnts.copy()
-
-        # Convert to numpy arrays
-        all_pnts = np.asarray(all_pnts)
-        dom_pnts = np.asarray(dom_pnts)
-
-        # Determine box bounds
-        if box is None:
-            if len(dom_pnts) == 0:
-                return all_pnts.copy()
-
-            # If not provided
-            xmin = np.min(dom_pnts[:, 0])
-            xmax = np.max(dom_pnts[:, 0])
-            ymin = np.min(dom_pnts[:, 1])
-            ymax = np.max(dom_pnts[:, 1])
-            zmin = np.min(dom_pnts[:, 2])
-            zmax = np.max(dom_pnts[:, 2])
-        else:
-            xmin, xmax, ymin, ymax, zmin, zmax = box
-
-        # # Vectorized check if point is clearly outside cube -> keep it
-        # x, y, z = all_pnts[:, 0], all_pnts[:, 1], all_pnts[:, 2]
-        # cond_out = ((x < xmin - self.tol) | (x > xmax + self.tol)
-        #             | (y < ymin - self.tol) | (y > ymax + self.tol)
-        #             | (z < zmin - self.tol) | (z > zmax + self.tol))
-
-        # # Get inside points only
-        # in_pnts = all_pnts[~cond_out]
-
-        # if len(in_pnts):
-        #     # Build k-d tree for fast nearest neighbor queries
-        #     dom_tree = cKDTree(dom_pnts)
-
-        #     # Batch query all inside points at once
-        #     distances = dom_tree.query(
-        #         in_pnts, distance_upper_bound=self.tol, workers=-1)[0]
-
-        #     # Get the points are close to domain points
-        #     clean_in_pnts = in_pnts[distances <= self.tol]
-        # else:
-        #     clean_in_pnts = np.array([]).reshape(0, 3)
-
-        # # Get outside points only
-        # out_pnts = all_pnts[cond_out]
-
-        # if len(out_pnts):
-
-        #     # Vectorized minimum distance to box calculation
-        #     x, y, z = out_pnts[:, 0], out_pnts[:, 1], out_pnts[:, 2]
-
-        #     # Calculate distance components
-        #     dx = np.maximum(0, np.maximum(xmin - x, x - xmax))
-        #     dy = np.maximum(0, np.maximum(ymin - y, y - ymax))
-        #     dz = np.maximum(0, np.maximum(zmin - z, z - zmax))
-
-        #     # Euclidean distance
-        #     distances = np.sqrt(dx**2 + dy**2 + dz**2)
-
-        #     # Keep points that are far enough from structured box mesh
-        #     clean_out_pnts = out_pnts[distances > self.lmin / 1.25]
-        # else:
-        #     clean_out_pnts = np.array([]).reshape(0, 3)
-
-        # # Combine outside points and inside clean points
-        # clean_pnts = np.vstack([clean_out_pnts, clean_in_pnts])
-
-        # import ipdb; ipdb.set_trace()
-
-        # return clean_pnts if len(clean_pnts) else np.array([]).reshape(0, 3)
-
-        clean_pnts = []
-
-        for point in all_pnts:
-            x, y, z = point
-
-            # Check if point is clearly outside cube -> keep it
-            cond_out = (x < xmin - self.tol or x > xmax + self.tol
-                        or y < ymin - self.tol or y > ymax + self.tol
-                        or z < zmin - self.tol or z > zmax + self.tol)
-
-            if cond_out:
-                clean_pnts.append(point)
-            else:
-                # Point is inside or on boundary - check if it's a dom_pnt
-                is_dom_pnt = False
-                for dom_pnt in dom_pnts:
-                    if np.linalg.norm(point - dom_pnt) < self.tol:
-                        is_dom_pnt = True
-                        break
-
-                if is_dom_pnt:
-                    clean_pnts.append(point)
-                # If inside/boundary and not dom_pnt, don't add (remove it)
-
-        return np.array(clean_pnts) if clean_pnts else np.array([]).reshape(0, 3)
+        return rec_box, hyp_box, centroid, semi_axes, surf_ele_expt
 
     @staticmethod
-    def remove_elements_outside_hyp3D(pts, connect, geps, hyp3D_sdf):
+    def create_hyp_pnt_3D(u, v, semi_axes, centroid, n):
         '''
-        Remove elements outside the hyperellipsoid.
-        Based on a post-processing function used by SeismicMesh.
+        Create a point on the hyperellipsoid surface
 
         Parameters
         ----------
-        pts : `array`
-            Array containing the coordinates of the mesh points
-        connect : `array`
-            Array containing the connectivity of the mesh points
-        geps : `float`
-            Geometric tolerance for the hyperellipsoid surface
-        hyp3D_sdf : `function`
-            Function to evaluate the signed distance to the hyperellipsoid
+        u : `float`
+            Longitude parameter [0, 2π]
+        v : `float`
+            Latitude parameter [-π/2, π/2]
+        semi_axes : `tuple`
+            Semi-axes of the hyperellipsoid (a, b, c)
+        centroid : `tuple`
+            Centroid of the hyperellipsoid (xc, yc, zc)
+        n : `float`
+            Degree of the hyperellipsoid
 
         Returns
         -------
-        connect : `array`
-            Filtered array of shape (num_tets_filtered, 4) containing the
-            indices of the mesh points that form each tetrahedral element
-            3D array
+        x, y, z : `float`
+            Coordinates of the point on the hyperellipsoid surface
         '''
 
-        dim = pts.shape[1]
-        pmid = pts[connect].sum(1) / (dim + 1)  # Compute centroids
+        # Hyperellipsoid semi-axes
+        a, b, c = semi_axes
 
-        return connect[hyp3D_sdf(pmid) < -geps]  # Keep interior elements
+        # Hyperellipsoid centroid
+        xc, yc, zc = centroid
+
+        # Sign function that preserves the sign
+        def sign_power(x, p):
+            return 0. if abs(x) < 1e-10 else np.sign(x) * (np.abs(x) ** p)
+
+        cos_v = np.cos(v)
+        sin_v = np.sin(v)
+        cos_u = np.cos(u)
+        sin_u = np.sin(u)
+
+        # Calculate point relative to origin
+        x = a * sign_power(cos_v, 2. / n) * sign_power(cos_u, 2. / n)
+        y = b * sign_power(cos_v, 2. / n) * sign_power(sin_u, 2. / n)
+        z = c * sign_power(sin_v, 2. / n)
+
+        # Translate to center coordinates
+        x += xc
+        y += yc
+        z += zc
+
+        return x, y, z
+
+    def create_hyp_srf_3D(self, semi_axes, centroid, n, u_res=800, v_res=800):
+        '''
+        Create a closed B-spline surface for the hypershape using OpenCASCADE
+
+        Parameters
+        ----------
+        u : `float`
+            Longitude parameter [0, 2π]
+        v : `float`
+            Latitude parameter [-π/2, π/2]
+        semi_axes : `tuple`
+            Semi-axes of the hyperellipsoid (a, b, c)
+        centroid : `tuple`
+            Centroid of the hyperellipsoid (xc, yc, zc)
+        n : `float`
+            Degree of the hyperellipsoid
+        point_func : `function`
+            Function to compute points on the hypershape surface
+        u_res : `int`, optional
+            Resolution in the u direction (longitude). Default is 800
+        v_res : `int`, optional
+            Resolution in the v direction (latitude). Default is 800
+
+        Returns:
+        -------
+        point_tags : `list`
+            List of OpenCASCADE point tags
+        u_res : `int`
+            Resolution in the u direction (longitude)
+        v_res : `int`
+            Resolution in the v direction (latitude)
+        '''
+
+        # gmsh.initialize()
+        gmsh.clear()
+
+        # Create a new model using OpenCASCADE kernel
+        gmsh.model.add("hyper_ellipsoid_occ")
+
+        print("Generating Hyperellipsoid Surface Points")
+
+        # Generate point grid
+        point_tags = []
+        for j in range(v_res):
+            for i in range(u_res + 1):  # +1 to include closure point at u=2π
+
+                # At poles, all u values should give the same point
+                if j == 0:  # South pole
+                    u = 0.
+                    v = -np.pi/2
+
+                elif j == v_res - 1:  # North pole
+                    u = 0.
+                    v = np.pi/2
+
+                else:
+                    # Handle u-direction closure: last point same as first
+                    u = 0. if i == u_res else 2 * np.pi * i / u_res
+
+                    # Handle v direction including exact poles
+                    v = np.pi * (j / (v_res - 1) - 0.5)  # From -π/2 to π/2
+
+                x, y, z = self.create_hyp_pnt_3D(u, v, semi_axes, centroid, n)
+                point_tag = gmsh.model.occ.addPoint(x, y, z)
+                point_tags.append(point_tag)
+
+        return point_tags, u_res, v_res
+
+    def create_hyp_vol_3D(self, semi_axes, centroid, n):
+        '''
+        Create a 3D hyperellipsoid volume using OpenCASCADE B-spline surfaces
+
+        Parameters
+        ----------
+        semi_axes : `tuple`
+            Semi-axes of the hyperellipsoid (a, b, c)
+        centroid : `tuple`
+            Centroid of the hyperellipsoid (xc, yc, zc)
+         n : `float`
+            Degree of the hyperellipsoid
+
+        Returns:
+        --------
+        volume_tag : int
+            OpenCASCADE volume tag for the hyperellipsoid
+        '''
+
+        volume_tag = None
+
+        try:
+
+            # Hyperellipsoid centroid
+            xc, yc, zc = centroid
+
+            # Surface points
+            point_tags, u_res, v_res = self.create_hyp_srf_3D(semi_axes,
+                                                              centroid, n)
+
+            # Create B-spline surface
+            surface_tag = gmsh.model.occ.addBSplineSurface(
+                pointTags=point_tags,
+                numPointsU=u_res + 1,  # Include closure point
+                tag=-1, degreeU=min(3, u_res), degreeV=min(3, v_res-1))
+            gmsh.model.occ.synchronize()
+
+            # Create volume
+            surface_loop = gmsh.model.occ.addSurfaceLoop([surface_tag])
+            volume_tag = gmsh.model.occ.addVolume([surface_loop])
+            gmsh.model.occ.synchronize()
+
+            if volume_tag is None:
+                return None
+
+            # Apply z-cut to remove upper part above free surface
+            z_cut = 0.
+            d_cut = 2 * max(semi_axes)
+
+            # Create cutting box above z_cut
+            print("Applying Cut at Free Surface")
+            cutting_box = gmsh.model.occ.addBox(xc - d_cut, yc - d_cut, z_cut,
+                                                2 * d_cut, 2 * d_cut, d_cut)
+            gmsh.model.occ.synchronize()
+
+            # Remove everything above z_cut
+            result = gmsh.model.occ.cut(
+                [(3, volume_tag)], [(3, cutting_box)],
+                removeObject=True, removeTool=True)
+
+            # Verify if the resulting volume is valid
+            if result[0]:
+                print("Cut Applied Successfully")
+                volume_tag = result[0][0][1]
+            else:
+                UserWarning("Cut Removed Entire Volume")
+                volume_tag = None
+
+            print("Successfully Created Volume Using Closed B-Spline Surface")
+
+            return volume_tag
+
+        except Exception as e:
+            UserWarning(f"B-spline Surface Creation Failed: {e}")
+
+            return None
+
+    def create_box_vol_3D(self, rec_box):
+        '''
+        Create a structured mesh for a box volume using OpenCASCADE
+
+        Parameters
+        ----------
+        rec_box : `tuple`
+            Box defined by original domain dimensions
+            Structure: (xmin, xmax, ymin, ymax, zmin, zmax)
+
+        Returns
+        -------
+        box_vol_tag : `int`
+            OpenCASCADE volume tag for the box
+        '''
+
+        # Create ox volume
+        xmin, xmax, ymin, ymax, zmin, zmax = rec_box
+        box_vol_tag = gmsh.model.occ.addBox(xmin, ymin, zmin,  # corner
+                                            xmax - xmin,       # width in x
+                                            ymax - ymin,       # width in y
+                                            zmax - zmin)       # width in z
+        gmsh.model.occ.synchronize()
+
+        # Structured mesh for cube only
+        # Compute number of divisions along each axis based on edge size and h
+        nx = max(1, int(round((xmax - xmin) / self.lmin)))
+        ny = max(1, int(round((ymax - ymin) / self.lmin)))
+        nz = max(1, int(round((zmax - zmin) / self.lmin)))
+        print(f"Box Discretization: nx: {nx} - ny: {ny} - nz: {nz}")
+
+        # Get cube surfaces
+        box_surfaces = gmsh.model.getBoundary(
+            [(3, box_vol_tag)], oriented=False, recursive=False)
+        box_surfaces = [s[1] for s in box_surfaces if s[0] == 2]
+
+        # Apply transfinite meshing to cube edges and surfaces
+        for s in box_surfaces:
+            edges = gmsh.model.getBoundary([(2, s)],
+                                           oriented=False,
+                                           recursive=False)
+            for e in edges:
+                if e[0] == 1:  # line entity
+                    # Get curve bounding box to detect direction
+                    xmin, ymin, zmin, xmax, \
+                        ymax, zmax = gmsh.model.getBoundingBox(1, e[1])
+                    dx = abs(xmax - xmin)
+                    dy = abs(ymax - ymin)
+                    dz = abs(zmax - zmin)
+
+                    if dx > dy and dx > dz:
+                        gmsh.model.mesh.setTransfiniteCurve(e[1], nx + 1)
+                    elif dy > dx and dy > dz:
+                        gmsh.model.mesh.setTransfiniteCurve(e[1], ny + 1)
+                    else:
+                        gmsh.model.mesh.setTransfiniteCurve(e[1], nz + 1)
+            gmsh.model.mesh.setTransfiniteSurface(s)
+
+        # Apply transfinite volume
+        gmsh.model.mesh.setTransfiniteVolume(box_vol_tag)
+        gmsh.model.occ.synchronize()
+
+        return box_vol_tag
 
     def merge_mesh_3D(self, hyp_par):
         '''
@@ -1221,77 +1186,92 @@ class HABC_Mesh():
             Merged final mesh
         '''
 
-        # # Hyperellipse parameters
-        # n_hyp, surface, a_hyp, b_hyp, c_hyp = hyp_par
+        # Hyperellipsoid degree
+        n_hyp = hyp_par[0]
 
-        # rec_box, hyp_box, pfix, centr, s_axs, \
-        #     surf_ele_expt = self.mesh_data_3D(hyp_par)
+        rec_box, hyp_box, centroid, semi_axes, \
+            surf_ele_expt = self.mesh_data_3D(hyp_par)
 
-        # sdfunct = Sign_Distance_Hyp3D(s_axs, centr, n_hyp)
+        # Initialize Gmsh
+        try:
+            gmsh.finalize()
 
-        # # Generate a initial 3D mesh
-        # print("Generating Initial Mesh with Fixed Points in Original Box")
-        # orig_dom = geometry.Cube(rec_box)
-        # points, cells = generation.generate_mesh(
-        #     domain=sdfunct.sign_dist_hyptrunc, edge_length=self.lmin,
-        #     bbox=hyp_box, max_iter=400, pfix=pfix, subdomains=[orig_dom])
+        except Exception as e:
+            print(f"Finalization failed: {e}")
 
-        # # Get clean points to generate final mesh
-        # print("Getting Clean Points to Generate Final Mesh")
-        # points = self.get_clean_mesh_pnts3D(points, pfix, rec_box)
+        gmsh.initialize()
+        gmsh.model.add("hyp_merged_mesh_3D")
 
-        # # Create new Delaunay with structured mesh part
-        # fixed_triangulation = Delaunay(points)
-        # cells = fixed_triangulation.simplices
+        # Create hyperellipsoid volume
+        print("Creating Hyperellipsoid")
+        hyp_vol_tag = self.create_hyp_vol_3D(semi_axes, centroid, n_hyp)
 
-        # # SeismicMesh filter for boundary elements
-        # print("Removing Elements Outside the Hypershape")
-        # geps = (surface / (2e3 * surf_ele_expt))**0.5
-        # cells = self.remove_elements_outside_hyp3D(points, cells, geps,
-        #                                            sdfunct.sign_dist_hyptrunc)
+        # Create box volume
+        print("Creating Original Box")
+        box_vol_tag = self.create_box_vol_3D(rec_box)
 
-        import meshio
-        # meshio.write_points_cells(
-        #     "hyp3d.msh",
-        #     points,
-        #     [("tetra", cells)],
-        #     file_format="gmsh22",
-        #     binary=False)
+        # Fragment the geometries
+        if hyp_vol_tag and box_vol_tag:
 
-        final_mesh = fire.Mesh(
-            "fragmented_geometry.msh",
-            distribution_parameters={"overlap_type": (
-                fire.DistributedMeshOverlapType.NONE, 0)},
-            comm=self.comm.comm)
+            print("Fragmenting Box and Hyperellipsoid")
 
-        # # Create the final mesh
-        # final_mesh = Mesh()
-        # final_mesh.dim = self.dimension
-        # final_mesh.SetMaterial(1, "habc")
+            # Fragment operation - create proper subdomain
+            fragment_result = gmsh.model.occ.fragment(
+                [(3, hyp_vol_tag), (3, box_vol_tag)],  # Object volumes
+                [],  # (empty for self-fragmentation)
+                removeObject=True, removeTool=False)
+            gmsh.model.occ.synchronize()
 
-        # # Add points
-        # point_map = {}
-        # for i, coord in enumerate(points):
-        #     z, x, y = coord
-        #     point_map[i] = final_mesh.Add(MeshPoint((z, x, y)))
+            # Get all 3D entities and volume tags from the model
+            volumes = gmsh.model.getEntities(3)
+            vol_tags = [tag for dim, tag in volumes if dim == 3]
 
-        # # Add elements
-        # for cell in cells:
-        #     netgen_points = [point_map[cell[i]] for i in range(len(cell))]
-        #     final_mesh.Add(Element3D(1, netgen_points))  # 1: Volume marker
+            # Create physical groups for the volumes
+            box = gmsh.model.addPhysicalGroup(3, [vol_tags[0]], name="Box")
+            hyp = gmsh.model.addPhysicalGroup(3, [vol_tags[1]], name="Hyp")
 
-        # try:
-        #     # Mesh data
-        #     # final_mesh.Compress()
-        #     print(f"Mesh created with {len(final_mesh.Points())} points "
-        #           f"and {len(final_mesh.Elements3D())} elements")
+            # Set mesh size in the hypershape
+            gmsh.model.mesh.setSize(gmsh.model.getBoundary([
+                (3, vol_tags[1])], oriented=False, recursive=True), self.lmin)
 
-        #     # Mesh is transformed into a firedrake mesh
-        #     final_mesh = fire.Mesh(final_mesh, comm=self.comm.comm)
-        #     print("Merged Mesh Generated Successfully")
+            # Remove unused points
+            gmsh.option.setNumber("Mesh.SaveWithoutOrphans", 1)
 
-        # except Exception as e:
-        #     UserWarning(f"Error Generating Merged Mesh: {e}. Exiting.")
+            # Generate 3D mesh
+            gmsh.model.mesh.generate(3)
+
+            # Get mesh info
+            node_tags, node_coords, _ = gmsh.model.mesh.getNodes()
+            element_types, element_tags, \
+                element_node_tags = gmsh.model.mesh.getElements(3)
+            total_nodes = len(node_tags)
+            total_elements = sum(len(tags) for tags in element_tags)
+
+            # Mesh data
+            print(f"Mesh Created with {total_nodes} Nodes "
+                  f"and {total_elements} Volume Elements")
+
+            with NamedTemporaryFile(suffix='.msh') as tmp:
+
+                # Save to temporary file
+                gmsh.write(tmp.name)
+                gmsh.clear()
+
+                # Load mesh directly from temporary file
+                q = {"overlap_type": (fire.DistributedMeshOverlapType.NONE, 0)}
+                final_mesh = fire.Mesh(tmp.name, distribution_parameters=q,
+                                       comm=self.comm.comm)
+
+            print("Merged Mesh Generated Successfully")
+
+        else:
+            UserWarning("Error Generating Merged Mesh")
+
+        gmsh.finalize()
+
+        # Adjusting coordinates: Swap (x, y, z) -> (z, x ,y) and apply offsets
+        final_mesh.coordinates.dat.data_with_halos[:, [0, 2]] = \
+            final_mesh.coordinates.dat.data_with_halos[:, [2, 0]]
 
         return final_mesh
 
@@ -1345,7 +1325,7 @@ class HABC_Mesh():
                 hyp_mesh.coordinates.dat.data_with_halos[:, [1, 0]]
             hyp_mesh.coordinates.dat.data_with_halos[:, 0] -= Lz / 2
             hyp_mesh.coordinates.dat.data_with_halos[:, 1] += Lx / 2
-            fire.VTKFile("output/trunc_hyp_test.pvd").write(hyp_mesh)
+            # fire.VTKFile("output/trunc_hyp_test.pvd").write(hyp_mesh)
 
             # Merging the original mesh with the hyperellipse layer mesh
             mesh_habc = self.merge_mesh_2D(self.mesh_original, hyp_mesh)

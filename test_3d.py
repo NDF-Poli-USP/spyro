@@ -302,7 +302,7 @@ def test_loop_habc_3d():
     Loop for applying the HABC to the 3D-Fig.8 model in Salas et al. (2022).
     '''
 
-    case = 2  # Integer from 0 to 3
+    case = 0  # Integer from 0 to 3
 
     # ============ SIMULATION PARAMETERS ============
 
@@ -330,6 +330,8 @@ def test_loop_habc_3d():
     print("Timestep Size: {:.3f} ms".format(1e3 * dt_usu))
     print("Eikonal Degree: {}".format(p_eik))
     print("Eikonal Stabilizing Factor: {:.2f}\n".format(f_est))
+    fit_str = "Fitting Parameters for Analytical Solver: "
+    print((fit_str + "{:.1f}, {:.1f}, {:.1f}, {:.1f}").format(*fitting_c))
 
     # ============ HABC PARAMETERS ============
 
@@ -340,7 +342,7 @@ def test_loop_habc_3d():
     loop_modeling = not get_ref_model
 
     # Hyperellipse degrees
-    degree_layer_lst = [None]  # [None, 2, 3, 4, 5]
+    degree_layer_lst = [None]  # [None, 2.8, 3, 4, 4.7]
 
     # Reference frequency
     habc_reference_freq_lst = ["source"]  # ["source", "boundary"]
@@ -355,6 +357,7 @@ def test_loop_habc_3d():
     n_pts = 1
 
     # ============ MESH AND EIKONAL ============
+
     # Create dictionary with parameters for the model
     fr_files = max(int(100 * max(dt_usu_lst) / dt_usu), 1)
     dictionary = wave_dict(dt_usu, fr_files, "rectangular", None,
@@ -364,6 +367,7 @@ def test_loop_habc_3d():
     Wave_obj = preamble_habc(dictionary, edge_length, f_est)
 
     # ============ REFERENCE MODEL ============
+
     if get_ref_model:
         # Reference to resource usage
         tRef = comp_cost("tini")
@@ -380,6 +384,7 @@ def test_loop_habc_3d():
                   user_name=Wave_obj.path_save + "preamble/INF_")
 
     # ============ HABC SCHEME ============
+
     if loop_modeling:
 
         # Data to print on screen

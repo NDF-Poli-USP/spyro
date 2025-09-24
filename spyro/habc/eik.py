@@ -1,5 +1,6 @@
 import firedrake as fire
 import numpy as np
+import gmsh
 from spyro.solvers.eikonal.eikonal_eq import Eikonal_Modeling
 
 # Work from Ruben Andres Salas, Andre Luis Ferreira da Silva,
@@ -235,7 +236,7 @@ class HABC_Eikonal(Eikonal_Modeling):
             idxsou = np.argmin(lref_allsou)
             lref = lref_allsou[idxsou]
             sou_cr = self.source_locations[idxsou]
-            z_par = 1 / eikmin
+            z_par = 1. / eikmin
 
             # Grouping properties
             eik_bnd.append([pt_cr, c_bnd, eikmin, z_par, lref, sou_cr])

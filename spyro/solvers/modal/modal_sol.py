@@ -67,6 +67,8 @@ class Modal_Solver():
         Compute the frequency factor for rectangular or prismatic geometries
     generate_eigenfunctions()
             Generate eigenfunctions for the Rayleigh Quotient method
+    generate_norm_coords()
+        Generate the normalized mesh coordinates w.r.t. the hypershape centroid
     reg_geometry_hyp()
         Perform the nonlinear regression for the hypershape geometry factor
     solve_eigenproblem()
@@ -907,6 +909,47 @@ class Modal_Solver():
 
         return Lsp
 
+    def generate_norm_coords(self, mesh, dom_dim, hyp_axes):
+        '''
+        Generate the normalized mesh coordinates w.r.t. the hypershape centroid
+
+        Parameters
+        ----------
+        mesh : `firedrake mesh`
+            Mesh for the modal problem
+        dom_dim : `tuple`
+            Original domain dimensions (Lx, Lz) for 2D or (Lx, Lz, Ly) for 3D
+        hyp_axes : `tuple`
+            Semi-axes of the hyperellipse [a, b] or hyperellipsoid [a, b, c]
+
+        Returns
+        -------
+        coord_norm : `tuple`
+            Normalized coordinates w.r.t. the hypershape centroid.
+            Structure: (xn, zn) for 2D and (xn, zn, yn) for 3D
+        '''
+
+        # Original domain dimensions
+        Lx, Lz = dom_dim[:2]
+
+        # Hypershape semi-axes
+        a, b = hyp_axes[:2]
+
+        # Mesh coordinates
+        coord = fire.SpatialCoordinate(mesh)
+        x, z = coord[0], coord[1]
+
+        # Normalized coordinates w.r.t. the hypershape centroid
+        x_e = (x - fire.Constant(Lx / 2.)) / fire.Constant(2. * a)
+        z_e = (z + fire.Constant(Lz / 2.)) / fire.Constant(2. * b)
+        coord_norm = (x_e, z_e)
+        if self.dimension == 3:  # 3D
+            Ly, c, y = dom_dim[2], hyp_axes[2], coord[2]
+            y_e = (y - fire.Constant(Ly / 2.)) / fire.Constant(2. * c)
+            coord_norm += (y_e,)
+
+        return coord_norm
+
     def generate_eigenfunctions(self, coord_norm, V, k=2, bc='Neumann'):
         '''
         Generate eigenfunctions for the Rayleigh Quotient method
@@ -914,7 +957,7 @@ class Modal_Solver():
         Parameters
         ----------
         coord_norm : `tuple`
-            Normalized coordinates to [-1, 1] w.r.t. the hypershape centroid.
+            Normalized coordinates w.r.t. the hypershape centroid.
             Structure: (xn, zn) for 2D and (xn, zn, yn) for 3D
         V : `firedrake function space`
             Function space for the modal problem
@@ -933,9 +976,9 @@ class Modal_Solver():
         '''
 
         # Number of eigenfunctions to use
-        n_eigfunc = 2 * k
+        n_eigfunc = max(2 * k, 2)
 
-        # Mesh normalized coordinates to [-1, 1] w.r.t. the hypershape centroid
+        # Mesh normalized coordinates w.r.t. the hypershape centroid
         xn, zn = coord_norm[:2]
 
         # Precompute cosine values for efficiency
@@ -949,7 +992,6 @@ class Modal_Solver():
 
         if self.dimension == 3:  # 3D
             yn = coord_norm[2]
-
             if bc == 'Neumann':
                 fk_lst = [fire.cos(k * fire.pi * yn) for k in range(n_eigfunc)]
             if bc == 'Dirichlet':
@@ -972,7 +1014,7 @@ class Modal_Solver():
                 if self.dimension == 3:  # 3D
                     for k in range(n_eigfunc):
                         fk = fk_lst[k]
-                        u_eig = fire.Function(V).interpolate(fi * fj * fj)
+                        u_eig = fire.Function(V).interpolate(fi * fj * fk)
                         eig_funcs.append(u_eig)
                         grad_eig.append(fire.grad(u_eig))
 
@@ -987,7 +1029,7 @@ class Modal_Solver():
         c : `firedrake function` or `float`
             Velocity model
         coord_norm : `tuple`
-            Normalized coordinates to [-1, 1] w.r.t. the hypershape centroid.
+            Normalized coordinates w.r.t. the hypershape centroid.
             Structure: (xn, zn) for 2D and (xn, zn, yn) for 3D
         V : `firedrake function space`
             Function space for the modal problem
@@ -1061,7 +1103,7 @@ class Modal_Solver():
             Option to use an inverse operator for improving convergence.
             Default is False
         coord_norm : `tuple`
-            Normalized coordinates to [-1, 1] w.r.t. the hypershape centroid.
+            Normalized coordinates w.r.t. the hypershape centroid.
             Structure: (xn, zn) for 2D and (xn, zn, yn) for 3D
         hyp_par : `tuple`, optional
             Hyperellipshape parameters. Default is None
@@ -1171,7 +1213,8 @@ class Modal_Solver():
             if shift > 0:
                 a += fire.Constant(shift) * m
 
-            Asp, Msp_inv = self.assemble_sparse_matrices(a, m, return_M_inv=True)
+            Asp, Msp_inv = \
+                self.assemble_sparse_matrices(a, m, return_M_inv=True)
             Lsp = Msp_inv.multiply(Asp).toarray().squeeze()
             Lsp -= shift if shift > 0. else 0.
 
