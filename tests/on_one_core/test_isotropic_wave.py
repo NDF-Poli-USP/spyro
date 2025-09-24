@@ -17,7 +17,7 @@ dummy_dict = {
         "output_frequency": 100,
         "gradient_sampling_frequency": 1,
     },
-    "mesh" : {
+    "mesh": {
         "Lz": 1.0,
         "Lx": 1.0,
         "Ly": 1.0,
