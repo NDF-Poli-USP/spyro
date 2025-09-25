@@ -308,7 +308,7 @@ def create_segy(function, V, grid_spacing, filename):
 
 
 @ensemble_save
-def save_shots(Wave_obj, file__name="shots/shot_record_", shot_ids=0):
+def save_shots(Wave_obj, file_name="shots/shot_record_", shot_ids=0):
     """Save a the shot record from last forward solve to a `pickle`.
 
     Parameters
