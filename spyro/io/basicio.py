@@ -308,7 +308,7 @@ def create_segy(function, V, grid_spacing, filename):
 
 
 @ensemble_save
-def save_shots(Wave_obj, filename="shots/shot_record_", shot_ids=0):
+def save_shots(Wave_obj, file__name="shots/shot_record_", shot_ids=0):
     """Save a the shot record from last forward solve to a `pickle`.
 
     Parameters
@@ -325,8 +325,8 @@ def save_shots(Wave_obj, filename="shots/shot_record_", shot_ids=0):
     None
 
     """
-    filename = filename + str(shot_ids) + ".dat"
-    with open(filename, "wb") as f:
+    file_name = file_name + str(shot_ids) + ".dat"
+    with open(file_name, "wb") as f:
         pickle.dump(Wave_obj.forward_solution_receivers, f)
     return None
 
