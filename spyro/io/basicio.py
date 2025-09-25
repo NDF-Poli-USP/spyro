@@ -338,7 +338,7 @@ def rebuild_empty_forward_solution(wave, time_steps):
 
 
 @ensemble_load
-def load_shots(Wave_obj, filename="shots/shot_record_", shot_ids=0):
+def load_shots(Wave_obj, file_name="shots/shot_record_", shot_ids=0):
     """Load a `pickle` to a `numpy.ndarray`.
 
     Parameters
@@ -357,9 +357,9 @@ def load_shots(Wave_obj, filename="shots/shot_record_", shot_ids=0):
 
     """
     array = np.zeros(())
-    filename = filename + str(shot_ids) + ".dat"
+    file_name = file_name + str(shot_ids) + ".dat"
 
-    with open(filename, "rb") as f:
+    with open(file_name, "rb") as f:
         array = np.asarray(pickle.load(f), dtype=float)
         Wave_obj.forward_solution_receivers = array
     return None
