@@ -5,6 +5,10 @@ import matplotlib.pyplot as plt
 import time
 import warnings
 import sys
+# import debugpy
+# from mpi4py.MPI import COMM_WORLD
+# debugpy.listen(3000 + COMM_WORLD.rank)
+# debugpy.wait_for_client()
 warnings.filterwarnings("ignore")
 
 
@@ -51,7 +55,7 @@ dictionary["mesh"] = {
 }
 dictionary["acquisition"] = {
     "source_type": "ricker",
-    "source_locations": spyro.create_transect((-0.55, 0.7), (-0.55, 1.3), 1),
+    "source_locations": spyro.create_transect((-0.55, 0.7), (-0.55, 1.3), 2),
     # "source_locations": [(-1.1, 1.5)],
     "frequency": frequency,
     # "frequency_filter": frequency_filter,
@@ -59,16 +63,20 @@ dictionary["acquisition"] = {
     "delay_type": "time",
     "receiver_locations": spyro.create_transect((-1.45, 0.7), (-1.45, 1.3), 200),
 }
+dictionary["absorving_boundary_conditions"] = {
+    "status": True,
+    "damping_type": "local",
+}
 dictionary["time_axis"] = {
     "initial_time": 0.0,  # Initial time for event
     "final_time": final_time,  # Final time for event
     "dt": 0.0005,  # timestep size
     "amplitude": 1,  # the Ricker has an amplitude of 1.
-    "output_frequency": 100,  # how frequently to output solution to pvds - Perguntar Daiane ''post_processing_frequnecy'
+    "output_frequency": 100,  # how frequently to output solution to pvds - Perguntar Daiane ''post_processing_frequency'
     "gradient_sampling_frequency": 1,  # how frequently to save solution to RAM    - Perguntar Daiane 'gradient_sampling_frequency'
 }
 dictionary["visualization"] = {
-    "forward_output": False,
+    "forward_output": True,
     "forward_output_filename": "results/forward_output.pvd",
     "fwi_velocity_model_output": False,
     "velocity_model_filename": None,
@@ -88,7 +96,7 @@ def test_real_shot_record_generation_parallel():
 
     fwi = spyro.FullWaveformInversion(dictionary=dictionary)
 
-    fwi.set_real_mesh(mesh_parameters={"dx": 0.05, "mesh_type": "firedrake_mesh"})
+    fwi.set_real_mesh(input_mesh_parameters={"edge_length": 0.05, "mesh_type": "firedrake_mesh"})
     center_z = -1.0
     center_x = 1.0
     mesh_z = fwi.mesh_z

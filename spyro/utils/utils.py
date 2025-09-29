@@ -5,6 +5,7 @@ from mpi4py import MPI
 from scipy.signal import butter, filtfilt
 import warnings
 from ..io import ensemble_functional
+from ..io import parallel_print
 
 
 def butter_lowpass_filter(shot, cutoff, fs, order=2):
@@ -83,7 +84,6 @@ def mpi_init(model):
     # rank = myrank()
     # size = mysize()
     available_cores = COMM_WORLD.size  # noqa: F405
-    print(f"Parallelism type: {model.parallelism_type}", flush=True)
     if model.parallelism_type == "automatic":
         num_cores_per_propagation = available_cores / model.number_of_sources
         if available_cores % model.number_of_sources != 0:
@@ -98,6 +98,7 @@ def mpi_init(model):
         num_cores_per_propagation = available_cores / num_propagations
 
     comm_ens = Ensemble(COMM_WORLD, num_cores_per_propagation)  # noqa: F405
+    parallel_print(f"Parallelism type: {model.parallelism_type}", comm=comm_ens)
     return comm_ens
 
 

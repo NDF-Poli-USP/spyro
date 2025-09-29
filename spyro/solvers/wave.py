@@ -7,6 +7,7 @@ from .time_integration_central_difference import central_difference as time_inte
 from ..domains.quadrature import quadrature_rules
 from ..io import Model_parameters
 from ..io.basicio import ensemble_propagator
+from ..io import parallel_print
 from ..io.field_logger import FieldLogger
 from .. import utils
 from ..receivers.Receivers import Receivers
@@ -105,7 +106,7 @@ class Wave(Model_parameters, metaclass=ABCMeta):
     def forward_solve(self):
         """Solves the forward problem."""
 
-        print("\nSolving Forward Problem")
+        parallel_print("\nSolving Forward Problem", comm=self.comm)
 
         if self.function_space is None:
             self.force_rebuild_function_space()

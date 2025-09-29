@@ -30,7 +30,6 @@ class Gradient_mask_for_pml():
 
         # saving mask dofs
         self.mask_dofs = np.where(mask.dat.data[:] > 0.95)
-        print("DEBUG")
 
     def apply_mask(self, dJ):
         dJ.dat.data[self.mask_dofs] = 0.0
