@@ -23,9 +23,9 @@ dictionary["parallelism"] = {
 # domain and reserve the remaining 250 m for the Perfectly Matched Layer (PML) to absorb
 # outgoing waves on three sides (eg., -z, +-x sides) of the domain.
 dictionary["mesh"] = {
-    "Lz": 1.0,  # depth in km - always positive
-    "Lx": 1.0,  # width in km - always positive
-    "Ly": 0.0,  # thickness in km - always positive
+    "length_z": 1.0,  # depth in km - always positive
+    "length_x": 1.0,  # width in km - always positive
+    "length_y": 0.0,  # thickness in km - always positive
     "mesh_file": None,
 }
 # For use only if you are using a synthetic test model
@@ -289,9 +289,9 @@ def test_dictionary_conversion():
     # domain and reserve the remaining 250 m for the Perfectly Matched Layer (PML) to absorb
     # outgoing waves on three sides (eg., -z, +-x sides) of the domain.
     new_dictionary["mesh"] = {
-        "Lz": 0.75,  # depth in km - always positive
-        "Lx": 1.50,  # width in km - always positive
-        "Ly": 0.0,  # thickness in km - always positive
+        "length_z": 0.75,  # depth in km - always positive
+        "length_x": 1.50,  # width in km - always positive
+        "length_y": 0.0,  # thickness in km - always positive
         "mesh_file": None,
     }
     # For use only if you are using a synthetic test model

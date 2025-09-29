@@ -48,9 +48,9 @@ dictionary["parallelism"] = {
     "type": "automatic",  # options: automatic (same number of cores for evey processor) or spatial
 }
 dictionary["mesh"] = {
-    "Lz": 2.0,  # depth in km - always positive   # Como ver isso sem ler a malha?
-    "Lx": 2.0,  # width in km - always positive
-    "Ly": 0.0,  # thickness in km - always positive
+    "length_z": 2.0,  # depth in km - always positive   # Como ver isso sem ler a malha?
+    "length_x": 2.0,  # width in km - always positive
+    "length_y": 0.0,  # thickness in km - always positive
     # "mesh_file": "meshes/guess7Hz.msh"
 }
 dictionary["acquisition"] = {

@@ -107,9 +107,9 @@ def set_dictionary(PML=False):
     }
 
     dictionary["mesh"] = {
-        "Lz": 1.0,  # depth in km - always positive   # Como ver isso sem ler a malha?
-        "Lx": 1.0,  # width in km - always positive
-        "Ly": 0.0,  # thickness in km - always positive
+        "length_z": 1.0,  # depth in km - always positive   # Como ver isso sem ler a malha?
+        "length_x": 1.0,  # width in km - always positive
+        "length_y": 0.0,  # thickness in km - always positive
         "mesh_file": None,
         "mesh_type": "firedrake_mesh",
     }

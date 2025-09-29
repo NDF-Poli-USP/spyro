@@ -53,9 +53,9 @@ def build_on_top_of_base_dictionary(variables):
     }
     model_dictionary["parallelism"] = {"type": "automatic", }
     model_dictionary["mesh"] = {
-        "Lz": variables["Lz"],
-        "Lx": variables["Lx"],
-        "Ly": variables["Ly"],
+        "length_z": variables["Length_z"],
+        "length_x": variables["length_x"],
+        "length_y": variables["length_y"],
         "cells_per_wavelength": variables["cells_per_wavelength"],
         "mesh_type": mesh_type,
     }
@@ -225,9 +225,9 @@ def create_initial_model_for_meshing_parameter_2D_heterogeneous(Meshing_calc_obj
         "method": method,
         "degree": degree,
         "dimension": dimension,
-        "Lz": length_z,
-        "Lx": length_x,
-        "Ly": 0.0,
+        "length_z": length_z,
+        "length_x": length_x,
+        "length_y": 0.0,
         "cells_per_wavelength": cells_per_wavelength,
         "pad": pad,
         "source_locations": source_locations,
@@ -339,9 +339,9 @@ def create_initial_model_for_meshing_parameter_2D_homogeneous(Meshing_calc_obj):
         "method": method,
         "degree": degree,
         "dimension": dimension,
-        "Lz": Lz,
-        "Lx": Lx,
-        "Ly": Ly,
+        "length_z": Lz,
+        "length_x": Lx,
+        "length_y": Ly,
         "cells_per_wavelength": cells_per_wavelength,
         "pad": pad,
         "source_locations": source_locations,

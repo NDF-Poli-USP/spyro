@@ -39,9 +39,9 @@ def test_forward_3d(tf=0.6):
     }
     model["parallelism"] = {"type": "automatic"}  # automatic",
     model["mesh"] = {
-        "Lz": 5.175,  # depth in km - always positive
-        "Lx": 7.50,  # width in km - always positive
-        "Ly": 7.50,  # thickness in km - always positive
+        "length_z": 5.175,  # depth in km - always positive
+        "length_x": 7.50,  # width in km - always positive
+        "length_y": 7.50,  # thickness in km - always positive
         "meshfile": "meshes/overthrust_3D_true_model.msh",
         "initmodel": "velocity_models/overthrust_3D_guess_model.hdf5",
         "truemodel": "velocity_models/overthrust_3D_true_model.hdf5",

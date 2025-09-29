@@ -39,9 +39,9 @@ def test_forward_supershot():
     # domain and reserve the remaining 250 m for the Perfectly Matched Layer (PML) to absorb
     # outgoing waves on three sides (eg., -z, +-x sides) of the domain.
     dictionary["mesh"] = {
-        "Lz": 2.0,  # depth in km - always positive   # Como ver isso sem ler a malha?
-        "Lx": 2.0,  # width in km - always positive
-        "Ly": 0.0,  # thickness in km - always positive
+        "length_z": 2.0,  # depth in km - always positive   # Como ver isso sem ler a malha?
+        "length_x": 2.0,  # width in km - always positive
+        "length_y": 0.0,  # thickness in km - always positive
         "mesh_file": None,
         "mesh_type": "firedrake_mesh",
     }

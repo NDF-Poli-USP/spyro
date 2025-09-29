@@ -35,9 +35,9 @@ def run_forward(dt):
     # domain and reserve the remaining 250 m for the Perfectly Matched Layer (PML) to absorb
     # outgoing waves on three sides (eg., -z, +-x sides) of the domain.
     dictionary["mesh"] = {
-        "Lz": 3.0,  # depth in km - always positive
-        "Lx": 3.0,  # width in km - always positive
-        "Ly": 0.0,  # thickness in km - always positive
+        "length_z": 3.0,  # depth in km - always positive
+        "length_x": 3.0,  # width in km - always positive
+        "length_y": 0.0,  # thickness in km - always positive
         "mesh_file": None,
         "mesh_type": "firedrake_mesh",  # options: firedrake_mesh or user_mesh
     }
