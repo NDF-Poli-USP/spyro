@@ -5,8 +5,8 @@ v_min = 1.5
 v_max = 2.5
 input_dictionary = {}
 input_dictionary["mesh"] = {
-    "Lz": 1.0,  # depth in km - always positive
-    "Lx": 1.0,  # width in km - always positive
+    "length_z": 1.0,  # depth in km - always positive
+    "length_x": 1.0,  # width in km - always positive
     "h": 0.05,  # mesh size in km
     "mesh_file": None,
     "mesh_type": "firedrake_mesh",  # options: firedrake_mesh or user_mesh

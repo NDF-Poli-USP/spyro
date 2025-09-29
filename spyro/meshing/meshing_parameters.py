@@ -53,9 +53,9 @@ class MeshingParameters():
         self.method = method
         self.periodic = False
         self.mesh_file = self.input_mesh_dictionary.get("mesh_file", None)
-        self.length_z = self.input_mesh_dictionary.get("Lz", None)
-        self.length_x = self.input_mesh_dictionary.get("Lx", None)
-        self.length_y = self.input_mesh_dictionary.get("Ly", None)
+        self.length_z = self.input_mesh_dictionary.get("length_z", None)
+        self.length_x = self.input_mesh_dictionary.get("length_x", None)
+        self.length_y = self.input_mesh_dictionary.get("length_y", None)
         self.user_mesh = self.input_mesh_dictionary.get("user_mesh", None)
         self.output_filename = self.input_mesh_dictionary.get("output_filename", "automatic_mesh.msh")
         self.source_frequency = source_frequency

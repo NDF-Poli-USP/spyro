@@ -259,12 +259,12 @@ class Model_parameters(Read_options, Read_boundary_layer, Read_time_axis, Read_o
     @source_locations.setter
     def source_locations(self, value):
         # Sources has to be estabilshied before mesh parameters object
-        length_z = self.input_dictionary["mesh"]["Lz"]
-        length_x = self.input_dictionary["mesh"]["Lx"]
+        length_z = self.input_dictionary["mesh"]["length_z"]
+        length_x = self.input_dictionary["mesh"]["length_x"]
         if self.dimension == 2:
             mesh_lengths = [length_z, length_x]
         elif self.dimension == 3:
-            length_y = self.input_dictionary["mesh"]["Ly"]
+            length_y = self.input_dictionary["mesh"]["length_y"]
             mesh_lengths = [length_z, length_x, length_y]
         if value is not None:
             for source in value:

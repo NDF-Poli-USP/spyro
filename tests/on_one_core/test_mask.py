@@ -30,8 +30,8 @@ def test_mask():
         "damping_type": None,
     }
     dictionary["mesh"] = {
-        "Lz": 1.0,
-        "Lx": 1.0,
+        "length_z": 1.0,
+        "length_x": 1.0,
         "h": 0.03
     }
     Wave_obj = Rectangle_acoustic(dictionary=dictionary)
@@ -179,8 +179,8 @@ def test_gradient_mask():
         "pad_length": 0.2,
     }
     dictionary["mesh"] = {
-        "Lz": 1.0,
-        "Lx": 1.0,
+        "length_z": 1.0,
+        "length_x": 1.0,
         "h": 0.03
     }
     Wave_obj = Rectangle_acoustic(dictionary=dictionary)
