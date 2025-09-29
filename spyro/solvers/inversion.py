@@ -269,7 +269,6 @@ class FullWaveformInversion(AcousticWave):
         if Wave_obj_real_velocity.mesh is None and self.real_mesh is not None:
             Wave_obj_real_velocity.mesh = self.real_mesh
         if Wave_obj_real_velocity.initial_velocity_model is None:
-            print("C", flush=True)
             Wave_obj_real_velocity.initial_velocity_model = self.real_velocity_model
 
         if plot_model and Wave_obj_real_velocity.comm.comm.rank == 0 and Wave_obj_real_velocity.comm.ensemble_comm.rank == 0:
@@ -277,7 +276,7 @@ class FullWaveformInversion(AcousticWave):
 
         Wave_obj_real_velocity.forward_solve()
         if save_shot_record:
-            save_shots(Wave_obj_real_velocity, filename=shot_filename)
+            save_shots(Wave_obj_real_velocity, file_name=shot_filename)
         self.real_shot_record = Wave_obj_real_velocity.real_shot_record
         self.quadrature_rule = Wave_obj_real_velocity.quadrature_rule
 
@@ -477,7 +476,6 @@ class FullWaveformInversion(AcousticWave):
             # self.gradient_out.write(dJ_total)
             output = fire.File("gradient_" + str(self.current_iteration)+".pvd")
             output.write(self.gradient)
-            print("DEBUG")
         self.current_iteration += 1
         comm.comm.barrier()
 
@@ -637,8 +635,8 @@ class FullWaveformInversion(AcousticWave):
         else:
             pass
 
-    def load_real_shot_record(self, filename="shots/shot_record_"):
-        load_shots(self, filename=filename)
+    def load_real_shot_record(self, file_name="shots/shot_record_"):
+        load_shots(self, file_name=file_name)
         self.real_shot_record = self.forward_solution_receivers
         self.forward_solution_receivers = None
 

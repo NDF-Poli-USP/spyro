@@ -1,5 +1,7 @@
 import firedrake as fire
 import meshio
+import gmsh
+from ..io import parallel_print
 
 try:
     import SeismicMesh
@@ -134,7 +136,7 @@ class AutomaticMesh:
         mesh : Mesh
             Mesh
         """
-        print(f"Creating {self.mesh_type} type mesh.", flush=True)
+        parallel_print(f"Creating {self.mesh_type} type mesh.", comm=self.comm)
         if self.mesh_type == "firedrake_mesh":
             return self.create_firedrake_mesh()
         elif self.mesh_type == "SeismicMesh":
@@ -365,25 +367,6 @@ def calculate_edge_length(cpw, minimum_velocity, frequency):
     edge_length = lbda_min/cpw
     return edge_length
 
-# def create_firedrake_3D_mesh_based_on_parameters(dx, cell_type):
-#     nx = int(self.length_x / dx)
-#     nz = int(self.length_z / dx)
-#     ny = int(self.length_y / dx)
-#     if self.cell_type == "quadrilateral":
-#         quadrilateral = True
-#     else:
-#         quadrilateral = False
-
-#     return spyro.BoxMesh(
-#         nz,
-#         nx,
-#         ny,
-#         self.length_z,
-#         self.length_x,
-#         self.length_y,
-#         quadrilateral=quadrilateral,
-#     )
-
 
 def RectangleMesh(nx, ny, Lx, Ly, pad=None, comm=None, quadrilateral=False):
     """Create a rectangle mesh based on the Firedrake mesh.
@@ -486,3 +469,110 @@ def BoxMesh(nx, ny, nz, Lx, Ly, Lz, pad=None, quadrilateral=False):
         mesh.coordinates.dat.data[:, 0] *= -1.0
 
     return mesh
+
+
+def build_big_rect_with_inner_element_group(Lx, Ly, Sx, Sy,
+                                            center=(0.0, 0.0),
+                                            outfile="two_rects_nogeom.msh",
+                                            h_min=0.05, h_max=0.5):
+
+    cx, cy = center
+
+    gmsh.initialize()
+    gmsh.model.add("BigRect_InnerElements")
+
+    gmsh.option.setNumber("Mesh.CharacteristicLengthMin", float(h_min))
+    gmsh.option.setNumber("Mesh.CharacteristicLengthMax", float(h_max))
+
+    # --- Geometry: only the big rectangle ---
+    surf_tag = gmsh.model.occ.addRectangle(cx - Lx/2, cy - Ly/2, 0.0, Lx, Ly)
+    gmsh.model.occ.synchronize()
+
+    def mesh_size_callback(dim, tag, x, y, z, lc):
+        # In case of interpolated function
+        #coords = np.array([[z, x, y]])
+        #element_size = interpolated_function(coords)[0] 
+        #return float(element_size)
+        h = x + y
+        return float(h)
+
+    gmsh.model.mesh.setSizeCallback(mesh_size_callback)
+
+    # --- Mesh the single surface ---
+    gmsh.model.mesh.generate(2)
+
+    # --- Collect elements & classify by centroid into inner/outer ---
+    # Get elements of the (only) geometric surface
+    types, elemTags, nodeTags = gmsh.model.mesh.getElements(2, surf_tag)
+    # Build a node coordinate map
+    node_ids, node_xyz, _ = gmsh.model.mesh.getNodes()
+    # node_ids may be unsorted; build dict id->(x,y,z)
+    coords = np.array(node_xyz).reshape(-1, 3)
+    id2idx = {int(nid): i for i, nid in enumerate(node_ids)}
+
+    # Small rectangle bounds
+    x_min = cx - Sx/2
+    x_max = cx + Sx/2
+    y_min = cy - Sy/2
+    y_max = cy + Sy/2
+
+    # Prepare per-type lists for inner/outer
+    inner_elem_by_type = []
+    inner_conn_by_type = []
+    outer_elem_by_type = []
+    outer_conn_by_type = []
+
+    for t, tags, conn in zip(types, elemTags, nodeTags):
+        tags = np.array(tags, dtype=np.int64)
+        # number of nodes per element type t:
+        nPer = gmsh.model.mesh.getElementProperties(t)[3]  # returns (name, dim, order, numNodes, ...)[3]
+        conn = np.array(conn, dtype=np.int64).reshape(-1, nPer)
+
+        # Compute centroids
+        # (x_c, y_c) = average of node coords
+        xyz = coords[[id2idx[int(n)] for n in conn.flatten()]].reshape(-1, nPer, 3)
+        centroids = xyz.mean(axis=1)  # (nelem, 3)
+        cx_e = centroids[:, 0]
+        cy_e = centroids[:, 1]
+
+        inside = (cx_e >= x_min) & (cx_e <= x_max) & (cy_e >= y_min) & (cy_e <= y_max)
+
+        inner_elem_by_type.append(tags[inside])
+        inner_conn_by_type.append(conn[inside])
+
+        outer_elem_by_type.append(tags[~inside])
+        outer_conn_by_type.append(conn[~inside])
+
+    # --- Move inner elements to a DISCRETE surface entity ---
+    # 1) Remove ALL elements from the original geometric surface
+    gmsh.model.mesh.removeElements(2, surf_tag)
+
+    # 2) Re-add the outer elements back to the geometric surface
+    for t, tags, conn in zip(types, outer_elem_by_type, outer_conn_by_type):
+        if tags.size == 0:
+            continue
+        gmsh.model.mesh.addElements(2, surf_tag, [t], [tags.tolist()], [conn.flatten().tolist()])
+
+    # 3) Create a discrete surface and add the inner elements
+    inner_surf_tag = gmsh.model.addDiscreteEntity(2)
+    # Pure element set container.
+    for t, tags, conn in zip(types, inner_elem_by_type, inner_conn_by_type):
+        if tags.size == 0:
+            continue
+        gmsh.model.mesh.addElements(2, inner_surf_tag, [t], [tags.tolist()], [conn.flatten().tolist()])
+
+    # --- Define Physical groups on entities ---
+    pg_outer = gmsh.model.addPhysicalGroup(2, [surf_tag]);        gmsh.model.setPhysicalName(2, pg_outer, "Outer")
+    pg_inner = gmsh.model.addPhysicalGroup(2, [inner_surf_tag]);   gmsh.model.setPhysicalName(2, pg_inner, "Inner")
+
+    # Save
+    gmsh.write(outfile)
+
+    print(f"Written mesh to: {outfile}")
+    print(f"Geometric surface tag      (Outer): {surf_tag}")
+    print(f"Discrete surface tag       (Inner): {inner_surf_tag}")
+    print(f"Physical group Outer tag: {pg_outer}")
+    print(f"Physical group Inner tag: {pg_inner}")
+
+    #gmsh.fltk.run()
+    gmsh.finalize()

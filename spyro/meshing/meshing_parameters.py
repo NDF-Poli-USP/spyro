@@ -169,7 +169,7 @@ class MeshingParameters():
 
     @mesh_type.setter
     def mesh_type(self, value):
-        allowed_types = {"firedrake_mesh", "user_mesh", "SeismicMesh", "file"}
+        allowed_types = {"firedrake_mesh", "user_mesh", "SeismicMesh", "file", "spyro_mesh"}
         if value is not None and value not in allowed_types:
             raise ValueError(
                 f"mesh_type must be one of {allowed_types}, got '{value}'"
