@@ -631,8 +631,7 @@ class HABC_Wave(AcousticWave, HABC_Mesh, RectangLayer,
         ----------
         method : `str`, optional
             Method to use for solving the eigenvalue problem.
-            Default is None, which uses as the 'ARNOLDI' method in 2D models
-            and the 'KRYLOVSCH_CH' method in 3D models.
+            Default is None, which uses the 'KRYLOVSCH_CH' method.
             Opts: 'ANALYTICAL', 'ARNOLDI', 'LANCZOS', 'LOBPCG', 'KRYLOVSCH_CH',
             'KRYLOVSCH_CG', 'KRYLOVSCH_GH', 'KRYLOVSCH_GG' or 'RAYLEIGH'.
             'ANALYTICAL' method is only available for isotropic hypershapes.
@@ -795,8 +794,7 @@ class HABC_Wave(AcousticWave, HABC_Mesh, RectangLayer,
             Default is None, which defines an estimated value
         method : `str`, optional
             Method to use for solving the eigenvalue problem.
-            Default is None, which uses as the 'ARNOLDI' method in 2D models
-            and the 'KRYLOVSCH_CH' method in 3D models.
+            Default is None, which uses the 'KRYLOVSCH_CH' method.
             Opts: 'ANALYTICAL', 'ARNOLDI', 'LANCZOS', 'LOBPCG', 'KRYLOVSCH_CH',
             'KRYLOVSCH_CG', 'KRYLOVSCH_GH', 'KRYLOVSCH_GG' or 'RAYLEIGH'.
             'ANALYTICAL' method is only available for isotropic hypershapes.

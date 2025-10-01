@@ -32,8 +32,7 @@ class Modal_Solver():
         The spatial dimension of the problem
     method : `str`
         Method to use for solving the eigenvalue problem.
-        Default is None, which uses as the 'ARNOLDI' method in 2D  models
-        and the 'KRYLOVSCH_CH' method in 3D models
+        Default is None, which uses the 'KRYLOVSCH_CH' method
     valid_methods: `list`
         List of valid methods for solving the eigenproblem
         Options: 'ANALYTICAL', 'ARNOLDI', 'LANCZOS', 'LOBPCG', 'KRYLOVSCH_CH',
@@ -97,8 +96,7 @@ class Modal_Solver():
             The spatial dimension of the problem
         method : `str`, optional
             Method to use for solving the eigenvalue problem.
-            Default is None, which uses as the 'ARNOLDI' method in 2D models
-            and the 'KRYLOVSCH_CH' method in 3D models.
+            Default is None, which uses the 'KRYLOVSCH_CH' method.
             Opts: 'ANALYTICAL', 'ARNOLDI', 'LANCZOS', 'LOBPCG', 'KRYLOVSCH_CH',
             'KRYLOVSCH_CG', 'KRYLOVSCH_GH', 'KRYLOVSCH_GG' or 'RAYLEIGH'.
             'ANALYTICAL' method is only available for isotropic hypershapes.
@@ -123,13 +121,9 @@ class Modal_Solver():
         # Option to estimate the maximum stable timestep
         self.calc_max_dt = calc_max_dt
 
-        # Default methods for each dimension
+        # Default methods
         if method is None:
-            if self.dimension == 2:  # 2D
-                self.method = 'ARNOLDI'
-
-            if self.dimension == 3:  # 3D
-                self.method = 'LOBPCG'
+            self.method = 'KRYLOVSCH_CH'
         else:
             self.method = method
 

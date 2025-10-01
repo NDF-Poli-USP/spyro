@@ -1,0 +1,185 @@
+HABC Class
+
+Key Relationships
+graph TD
+    A[HABC_Mesh] --> B[firedrake.Mesh]
+    A --> C[ufl.geometry]
+    A --> D[scipy.spatial.cKDTree]
+    A --> E[gmsh]
+    A --> F[netgen.geom2d.SplineGeometry]
+    
+    B --> G[FunctionSpace]
+    B --> H[Function]
+    B --> I[VTKFile]
+    
+    A --> J[2D Operations]
+    A --> K[3D Operations]
+    A --> L[Field Operations]
+    
+    J --> M[Rectangular Mesh]
+    J --> N[Hyperelliptical Mesh]
+    J --> O[Mesh Merging]
+    
+    K --> P[Hyperellipsoid Generation]
+    K --> Q[Box Generation]
+    K --> R[3D Merging]
+    
+    L --> S[Velocity Extension]
+    L --> T[Mask Creation]
+    L --> U[Boundary Processing]
+
+Class Diagram: HABC_Mesh
+classDiagram
+    class HABC_Mesh {
+        - alpha: float
+        - bnds: array
+        - bnd_nodes: tuple
+        - c: firedrake.Function
+        - c_bnd_min: float
+        - c_bnd_max: float
+        - c_min: float
+        - c_max: float
+        - comm: object
+        - diam_mesh: ufl.geometry.CellDiameter
+        - dimension: int
+        - dom_dim: tuple
+        - ele_type_c0: string
+        - ele_type_eik: string
+        - f_est: float
+        - funct_space_eik: firedrake.FunctionSpace
+        - lmin: float
+        - lmax: float
+        - mesh_original: firedrake.Mesh
+        - p_c0: int
+        - p_eik: int
+        - tol: float
+        
+        + __init__(dom_dim: tuple, dimension: int = 2, comm: object = None)
+        + representative_mesh_dimensions()
+        + extract_node_positions(func_space: firedrake.FunctionSpace) tuple
+        + extract_bnd_node_indices(node_positions: tuple, func_space: firedrake.FunctionSpace) tuple
+        + original_boundary_data()
+        + properties_eik_mesh(p_usu: int = None, ele_type: str = 'CG', f_est: float = 0.03)
+        + preamble_mesh_operations(f_est: float = 0.03)
+        + rectangular_mesh_habc(dom_lay: tuple, pad_len: float) firedrake.Mesh
+        + bnd_pnts_hyp_2D(a: float, b: float, n: int, num_pts: int) array
+        + trunc_hyp_bndpts_2D(hyp_par: tuple, xdom: float, z0: float) tuple
+        + create_bnd_mesh_2D(geo: SplineGeometry, bnd_pts: array, trunc_feat: tuple, spln: bool) list
+        + create_hyp_trunc_mesh_2D(hyp_par: tuple, spln: bool = True, fmesh: float = 1.0) firedrake.Mesh
+        + merge_mesh_2D(rec_mesh: firedrake.Mesh, hyp_mesh: firedrake.Mesh) firedrake.Mesh
+        + mesh_data_3D(hyp_par: tuple) tuple
+        + create_hyp_pnt_3D(u: float, v: float, semi_axes: tuple, centroid: tuple, n: float) tuple
+        + create_hyp_srf_3D(semi_axes: tuple, centroid: tuple, n: float, u_res: int = 800, v_res: int = 800) int
+        + create_hyp_vol_3D(semi_axes: tuple, centroid: tuple, n: float, resol: int) int
+        + create_box_vol_3D(rec_box: tuple) int
+        + merge_mesh_3D(hyp_par: tuple) firedrake.Mesh
+        + hypershape_mesh_habc(hyp_par: tuple, spln: bool = True, fmesh: float = 1.0) firedrake.Mesh
+        + layer_mask_field(coords: ufl.geometry.SpatialCoordinate, V: firedrake.FunctionSpace, damp_par: tuple = None, type_marker: str = 'damping', name_mask: str = None) firedrake.Function
+        + clipping_coordinates_lay_field(V: firedrake.FunctionSpace) tuple
+        + point_cloud_field(parent_mesh: firedrake.Mesh, pts_cloud: array, parent_field: firedrake.Function) firedrake.Function
+        + extend_velocity_profile(lay_field: firedrake.Function, method: str = 'point_cloud')
+        + layer_boundary_data(V: firedrake.FunctionSpace) tuple
+    }
+
+
+Detailed Attribute Descriptions
+Public Attributes
+dimension: int - Model dimension (2D or 3D)
+
+dom_dim: tuple - Original domain dimensions
+
+comm: object - MPI communication interface
+
+Private Attributes (Internal State)
+alpha: float - Ratio between representative mesh dimensions
+
+bnds: array - Mesh node indices on boundaries
+
+bnd_nodes: tuple - Mesh node coordinates on boundaries
+
+c: firedrake.Function - Velocity model without absorbing layer
+
+c_bnd_min/max: float - Min/max velocity on boundary
+
+c_min/max: float - Min/max velocity in domain
+
+diam_mesh: ufl.geometry.CellDiameter - Mesh cell diameters
+
+ele_type_c0/eik: string - Finite element types
+
+f_est: float - Stabilizing factor for Eikonal equation
+
+funct_space_eik: firedrake.FunctionSpace - Function space for Eikonal
+
+lmin/lmax: float - Min/max mesh sizes
+
+mesh_original: firedrake.Mesh - Original mesh without layer
+
+p_c0/p_eik: int - Finite element orders
+
+tol: float - Tolerance for node searching
+
+Method Categories
+1. Initialization & Setup Methods
+__init__() - Constructor
+
+preamble_mesh_operations() - Pre-processing setup
+
+properties_eik_mesh() - Configure Eikonal solver properties
+
+2. Mesh Analysis Methods
+representative_mesh_dimensions() - Calculate mesh metrics
+
+extract_node_positions() - Get nodal coordinates
+
+extract_bnd_node_indices() - Identify boundary nodes
+
+original_boundary_data() - Extract boundary information
+
+layer_boundary_data() - Get boundary data with absorbing layer
+
+3. 2D Mesh Generation Methods
+rectangular_mesh_habc() - Create rectangular mesh with layer
+
+bnd_pnts_hyp_2D() - Generate hyperellipse boundary points
+
+trunc_hyp_bndpts_2D() - Create truncated hyperellipse points
+
+create_bnd_mesh_2D() - Generate boundary segments
+
+create_hyp_trunc_mesh_2D() - Create hyperelliptical layer mesh
+
+merge_mesh_2D() - Combine rectangular and hyperelliptical meshes
+
+4. 3D Mesh Generation Methods
+mesh_data_3D() - Prepare 3D mesh parameters
+
+create_hyp_pnt_3D() - Generate 3D hyperellipsoid points
+
+create_hyp_srf_3D() - Create B-spline surface
+
+create_hyp_vol_3D() - Generate hyperellipsoid volume
+
+create_box_vol_3D() - Create box volume
+
+merge_mesh_3D() - Merge 3D meshes
+
+5. Field Operations & Utilities
+layer_mask_field() - Create damping/mask fields
+
+clipping_coordinates_lay_field() - Clip coordinates to boundary
+
+point_cloud_field() - Interpolate fields to point clouds
+
+extend_velocity_profile() - Extend velocity into absorbing layer
+
+Design Pattern Notes
+Builder Pattern: The class follows a builder pattern where methods can be chained to progressively construct complex meshes
+
+Strategy Pattern: Different implementations for 2D vs 3D operations
+
+Facade Pattern: Provides a simplified interface to complex mesh generation libraries (Gmsh, Netgen, Firedrake)
+
+Template Method: Common mesh operations with dimension-specific implementations
+
+The class demonstrates strong encapsulation with clear separation between public interface methods and internal implementation details.

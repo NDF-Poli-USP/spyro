@@ -287,8 +287,8 @@ class HABC_Mesh():
         vel_on_boundary = self.point_cloud_field(
             self.mesh_original, np.asarray(self.bnd_nodes).T,
             self.initial_velocity_model).dat.data_with_halos[:]
-        self.c_bnd_min = vel_on_boundary.min()
-        self.c_bnd_max = vel_on_boundary.max()
+        self.c_bnd_min = vel_on_boundary[vel_on_boundary > 0.].min()
+        self.c_bnd_max = vel_on_boundary[vel_on_boundary > 0.].max()
 
         # Print on screen
         cbnd_str = "Boundary Velocity Range (km/s): {:.3f} - {:.3f}"
@@ -915,7 +915,7 @@ class HABC_Mesh():
 
         # Expected elements in a full hyperellipsoid surface
         r_asp = max(semi_axes) / min(semi_axes)
-        resol = int(np.ceil(surface * r_asp / self.lmin**2) + 1)
+        resol = int(np.ceil(surface * r_asp / ((2.5 * self.lmin)**2)) + 1)
 
         return rec_box, hyp_box, centroid, semi_axes, resol
 
@@ -1185,6 +1185,49 @@ class HABC_Mesh():
 
         return box_vol_tag
 
+    @staticmethod
+    def report_quality(dim=3, quality_type=2):
+        '''
+        Report mesh quality statistics for elements in a gmsh mesh
+
+        Parameters
+        ----------
+        dim : `int`, optional
+            Dimension of elements to evaluate (2 for surface, 3 for volume).
+            Default is 3 (volume elements).
+        quality_type : `int`, optional
+            Quality metric type to use (0=gamma, 1=eta, 2=rho).
+            gamma: vol/sum_face/max_edge, eta : vol^(2/3)/sum_edge^2,
+            rho: min_edge/max_edge. Default is 2 (rho).
+
+        Returns
+        -------
+        None
+        '''
+
+        gmsh.option.setNumber("Mesh.QualityType", quality_type)
+
+        # Grab all elements of this dimension (returns per-type lists)
+        ele_types, ele_tags, node_tags = gmsh.model.mesh.getElements(dim)
+
+        # Flatten to a single list of element tags
+        all_tags = []
+        for tags in ele_tags:
+            all_tags.extend(tags.tolist() if hasattr(
+                tags, "tolist") else list(tags))
+
+        if not all_tags:
+            print(f"[Quality] No elements found for dim={dim}")
+            return
+
+        # Compute qualities for elements
+        q = gmsh.model.mesh.getElementQualities(all_tags)
+        q = np.asarray(q, dtype=float)
+        print(f"[Quality] Count={q.size} Min={q.min():.6g} "
+              f"p1={np.percentile(q, 1):.6g} - p5={np.percentile(q, 5):.6g}\n"
+              f"Median={np.median(q):.6g} p95={np.percentile(q, 95):.6g} - "
+              f"Max={q.max():.6g} - Mean={q.mean():.6g}")
+
     def merge_mesh_3D(self, hyp_par):
         '''
         Build a merged mesh from a box mesh and a hyperellipsoidal mesh
@@ -1259,11 +1302,17 @@ class HABC_Mesh():
             gmsh.model.mesh.setSize(gmsh.model.getBoundary([
                 (3, vol_tags[1])], oriented=False, recursive=True), self.lmin)
 
-            # Remove unused points
+            # Settings for the mesh generation
+            gmsh.option.setNumber("Mesh.Algorithm", 1)
+            gmsh.option.setNumber("Mesh.OptimizeThreshold", 0.5)
+            gmsh.option.setNumber("Mesh.Smoothing", 100)
             gmsh.option.setNumber("Mesh.SaveWithoutOrphans", 1)
+            gmsh.option.setNumber("Mesh.Optimize", 1)
+            gmsh.option.setNumber("Mesh.OptimizeNetgen", 1)
 
             # Generate 3D mesh
             gmsh.model.mesh.generate(3)
+            self.report_quality(dim=3, quality_type=2)
 
             # Get mesh info
             node_tags, node_coords, _ = gmsh.model.mesh.getNodes()

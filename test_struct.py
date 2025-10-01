@@ -344,8 +344,8 @@ def problema_direto(V):
     # # L = inner(F1, v) * ds(2)
     a = fire.inner(sigma, epsilon_v) * dx
     L = fire.inner(F1, v) * fire.ds(2)
-
-    fire.solve(a == L, u, bcs=bc)
+    form = a - L
+    fire.solve(fire.lhs(form) == fire.rhs(form), u, bcs=bc)
     # fire.solve(a == L, u)
 
     fire.VTKFile("displacement.pvd").write(u)
