@@ -61,7 +61,11 @@ output_file = fire.VTKFile("debug.pvd")
 output_file.write(u)
 
 z = spyro.io.write_function_to_grid(u, V, grid_spacing, buffer=True)
-grid_data = [z, grid_spacing, grid_spacing]
+grid_velocity_data = {
+    "vp_values": z,
+    "grid_spacing": grid_spacing,
+}
+mesh_parameters.grid_velocity_data = grid_velocity_data
 
 mask_boundaries = {
         "z_min": -1.3,
@@ -69,6 +73,11 @@ mask_boundaries = {
         "x_min": 0.7,
         "x_max": 1.3,
     }
-build_big_rect_with_inner_element_group(mesh_parameters, mask_boundaries, grid_data = grid_data, cpw=2.7, frequency=5.0)
+mesh_parameters.gradient_mask = mask_boundaries
+mesh_parameters.cells_per_wavelength = 2.7
+mesh_parameters.source_frequency = 5.0
+mesh_parameters.mesh_type = "spyro_mesh"
+meshing_obj = spyro.meshing.AutomaticMesh(mesh_parameters)
+mesh = meshing_obj.create_mesh()
 
 print("END")
