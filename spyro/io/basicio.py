@@ -224,7 +224,7 @@ def ensemble_gradient(func):
     return wrapper
 
 
-def write_function_to_grid(function, V, grid_spacing):
+def write_function_to_grid(function, V, grid_spacing, buffer=True):
     """Interpolate a Firedrake function to a structured grid
 
     Parameters
@@ -252,10 +252,16 @@ def write_function_to_grid(function, V, grid_spacing):
     x, y = coords.dat.data[:, 0], coords.dat.data[:, 1]
 
     # add buffer to avoid NaN when calling griddata
-    min_x = np.amin(x) + 0.005
-    max_x = np.amax(x) - 0.005
-    min_y = np.amin(y) + 0.005
-    max_y = np.amax(y) - 0.005
+    if buffer:
+        min_x = np.amin(x) + 0.005
+        max_x = np.amax(x) - 0.005
+        min_y = np.amin(y) + 0.005
+        max_y = np.amax(y) - 0.005
+    else:
+        min_x = np.amin(x)
+        max_x = np.amax(x)
+        min_y = np.amin(y)
+        max_y = np.amax(y)
 
     try:
         z = function.dat.data[:]
