@@ -69,6 +69,7 @@ class MeshingParameters():
         self.edge_length = None
         self.cells_per_wavelength = None
         self.grid_velocity_data = None
+        self.gradient_mask = None
         self.negative_z = negative_z
         if use_defaults:
             self.set_mesh(input_mesh_parameters=input_mesh_dictionary)
@@ -103,7 +104,7 @@ class MeshingParameters():
     @grid_velocity_data.setter
     def grid_velocity_data(self, value):
         if value is not None:
-            necessary_keys = ["vp_values, grid_spacing"]
+            necessary_keys = ["vp_values", "grid_spacing"]
             for necessary_key in necessary_keys:
                 if necessary_key not in value:
                     raise ValueError(f"Grid velocity data needs {necessary_key} key.")

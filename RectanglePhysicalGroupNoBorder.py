@@ -38,7 +38,7 @@ def plot_interpolator_data(grid_data, length_z, length_x, cpw, frequency, save_p
     interpolator : RegularGridInterpolator
         The created interpolator object
     """
-    vp = grid_data[0]
+    vp = grid_data["vp_values"]
     nz, nx = vp.shape
     z_grid = np.linspace(-length_z, 0.0, nz, dtype=np.float32)
     x_grid = np.linspace(0.0, length_x, nx, dtype=np.float32)
@@ -122,20 +122,16 @@ def plot_interpolator_data(grid_data, length_z, length_x, cpw, frequency, save_p
     return interpolator
 
 
-def build_big_rect_with_inner_element_group(mesh_parameters, mask_boundaries, grid_data=None, cpw=2.7, frequency=5.0, plot_interpolator=True):
+def build_big_rect_with_inner_element_group(mesh_parameters, plot_interpolator=True):
 
     length_z = mesh_parameters.length_z
     length_x = mesh_parameters.length_x
-    h_min = mesh_parameters.edge_length
     outfile = mesh_parameters.output_filename
-
-    cz, cx = (-length_z/2.0, length_x/2.0)
 
     gmsh.initialize()
     gmsh.model.add("BigRect_InnerElements")
 
     # gmsh.option.setNumber("Mesh.CharacteristicLengthMin", float(h_min))
-    gmsh.option.setNumber("Mesh.CharacteristicLengthMax", float(h_min*1000))
     gmsh.option.setNumber("Mesh.MeshSizeFromPoints", 0)
     gmsh.option.setNumber("Mesh.MeshSizeFromCurvature", 0)
     gmsh.option.setNumber("Mesh.MeshSizeExtendFromBoundary", 0)
@@ -144,7 +140,9 @@ def build_big_rect_with_inner_element_group(mesh_parameters, mask_boundaries, gr
     surf_tag = gmsh.model.occ.addRectangle(-length_z, 0.0, 0.0, length_z, length_x)
     gmsh.model.occ.synchronize()
 
-    if grid_data is None:
+    if mesh_parameters.grid_velocity_data is None:
+        h_min = mesh_parameters.edge_length
+        gmsh.option.setNumber("Mesh.CharacteristicLengthMin", float(h_min))
         def mesh_size_callback(dim, tag, x, y, z, lc):
             # In case of interpolated function
             #coords = np.array([[z, x, y]])
@@ -153,7 +151,9 @@ def build_big_rect_with_inner_element_group(mesh_parameters, mask_boundaries, gr
             h = x + y
             return float(h)
     else:
-        vp = grid_data[0]
+        frequency = mesh_parameters.source_frequency
+        cpw = mesh_parameters.cells_per_wavelength
+        vp = mesh_parameters.grid_velocity_data["vp_values"]
         nz, nx = vp.shape
         z_grid = np.linspace(-length_z, 0.0, nz, dtype=np.float32)
         x_grid = np.linspace(0.0, length_x, nx, dtype=np.float32)
@@ -165,7 +165,7 @@ def build_big_rect_with_inner_element_group(mesh_parameters, mask_boundaries, gr
 
         # Plot interpolator if requested
         if plot_interpolator:
-            plot_interpolator_data(grid_data, length_z, length_x, cpw, frequency)
+            plot_interpolator_data(mesh_parameters.grid_velocity_data, length_z, length_x, cpw, frequency)
 
         def mesh_size_callback(dim, tag, x, y, z, lc):
             size = float(interpolator([[x, y]])[0])
@@ -190,10 +190,10 @@ def build_big_rect_with_inner_element_group(mesh_parameters, mask_boundaries, gr
     id2idx = {int(nid): i for i, nid in enumerate(node_ids)}
 
     # Small rectangle bounds
-    z_min = mask_boundaries["z_min"]
-    z_max = mask_boundaries["z_max"]
-    x_min = mask_boundaries["x_min"]
-    x_max = mask_boundaries["x_max"]
+    z_min = mesh_parameters.gradient_mask["z_min"]
+    z_max = mesh_parameters.gradient_mask["z_max"]
+    x_min = mesh_parameters.gradient_mask["x_min"]
+    x_max = mesh_parameters.gradient_mask["x_max"]
 
     # Prepare per-type lists for inner/outer
     inner_elem_by_type = []
