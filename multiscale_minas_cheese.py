@@ -35,7 +35,7 @@ def cells_per_wavelength(degree):
     return cell_per_wavelength_dictionary.get(key)
 
 cpw = cells_per_wavelength(degree)
-final_time = 0.9
+final_time = 1.8
 
 dictionary = {}
 dictionary["options"] = {
@@ -55,13 +55,13 @@ dictionary["mesh"] = {
 }
 dictionary["acquisition"] = {
     "source_type": "ricker",
-    "source_locations": spyro.create_transect((-0.55, 0.7), (-0.55, 1.3), 2),
+    "source_locations": spyro.create_transect((-0.25, 0.2), (-0.25, 1.8), 10),
     # "source_locations": [(-1.1, 1.5)],
     "frequency": frequency,
     # "frequency_filter": frequency_filter,
     "delay": 1.0/frequency,
     "delay_type": "time",
-    "receiver_locations": spyro.create_transect((-1.45, 0.7), (-1.45, 1.3), 200),
+    "receiver_locations": spyro.create_transect((-1.75, 0.2), (-1.75, 1.8), 200),
 }
 dictionary["absorving_boundary_conditions"] = {
     "status": True,
@@ -99,19 +99,20 @@ def test_real_shot_record_generation_parallel():
     fwi.set_real_mesh(input_mesh_parameters={"edge_length": 0.05, "mesh_type": "firedrake_mesh"})
     center_z = -1.0
     center_x = 1.0
+    radius = 0.5
     mesh_z = fwi.mesh_z
     mesh_x = fwi.mesh_x
-    square_top_z   = -0.9
-    square_bot_z   = -1.1
-    square_left_x  = 0.9
-    square_right_x = 1.1
-    cond = fire.conditional((mesh_z-center_z)**2 + (mesh_x-center_x)**2 < .2**2, 3.0, 2.5)
+    square_top_z   = -0.75
+    square_bot_z   = -1.25
+    square_left_x  = 0.75
+    square_right_x = 1.25
+    cond = fire.conditional((mesh_z-center_z)**2 + (mesh_x-center_x)**2 < radius**2, 2.0, 1.5)
     cond =  fire.conditional(
         fire.And(
             fire.And(mesh_z < square_top_z, mesh_z > square_bot_z),
             fire.And(mesh_x > square_left_x, mesh_x < square_right_x)
         ),
-        3.5,
+        3.0,
         cond,
     )
 
