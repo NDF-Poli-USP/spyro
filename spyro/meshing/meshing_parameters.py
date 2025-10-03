@@ -30,7 +30,7 @@ class MeshingParameters():
     Class that handles mesh parameter logic and mesh type/length/file handling.
     """
 
-    def __init__(self, input_mesh_dictionary=None, dimension=None, source_frequency=None, comm=None, quadrilateral=False, method=None, degree=None, velocity_model=None, abc_pad_length=None, negative_z=True):
+    def __init__(self, input_mesh_dictionary=None, dimension=None, source_frequency=None, comm=None, quadrilateral=False, method=None, degree=None, velocity_model=None, abc_pad_length=None, negative_z=True, use_defaults=True):
         """
         Initializes the MeshingParamaters class.
 
@@ -63,12 +63,15 @@ class MeshingParameters():
         self.degree = degree
         self.minimum_velocity = None
         self.velocity_model = velocity_model
-        self.automatic_mesh = self.mesh_type in {"firedrake_mesh", "SeismicMesh"}
+        self.automatic_mesh = self.mesh_type in {"firedrake_mesh", "SeismicMesh", "spyro_mesh"}
         self._edge_length = None
         self._cells_per_wavelength = None
         self.edge_length = None
         self.cells_per_wavelength = None
+        self.grid_velocity_data = None
         self.negative_z = negative_z
+        if use_defaults:
+            self.set_mesh(input_mesh_parameters=input_mesh_dictionary)
 
     def _set_length_with_unit_check(self, attr_name, value):
         """
@@ -94,13 +97,28 @@ class MeshingParameters():
         setattr(self, attr_name, value)
 
     @property
+    def grid_velocity_data(self):
+        return self._grid_velocity_data
+    
+    @grid_velocity_data.setter
+    def grid_velocity_data(self, value):
+        if value is not None:
+            necessary_keys = ["vp_values, grid_spacing"]
+            for necessary_key in necessary_keys:
+                if necessary_key not in value:
+                    raise ValueError(f"Grid velocity data needs {necessary_key} key.")
+        self._grid_velocity_data = value
+
+    @property
     def output_filename(self):
         return self._output_filename
 
     @output_filename.setter
     def output_filename(self, value):
         if value is not None:
-            if not (isinstance(value, str) and value.endswith('.msh')):
+            if isinstance(value, str) and value.endswith('.vtk'):
+                warnings.warn("VTK meshes for visualization only, will not run a simulation.")
+            elif not (isinstance(value, str) and value.endswith('.msh')):
                 raise ValueError(f"mesh_file '{value}' must be a .msh file")
         self._output_filename = value
 

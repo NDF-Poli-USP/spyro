@@ -1,6 +1,8 @@
 import firedrake as fire
 import meshio
 import gmsh
+import numpy as np
+from scipy.interpolate import RegularGridInterpolator
 from ..io import parallel_print
 
 try:
@@ -143,6 +145,8 @@ class AutomaticMesh:
             if SeismicMesh is None:
                 raise ImportError("SeismicMesh is not available. Please install it to use this function.")
             return self.create_seismicmesh_mesh()
+        elif self.mesh_type == "spyro_mesh":
+            return self.create_spyro_mesh()
         else:
             raise ValueError("mesh_type is not supported")
 
@@ -170,7 +174,10 @@ class AutomaticMesh:
             nx = int(self.length_x / self.edge_length)
             nz = int(self.length_z / self.edge_length)
 
-        comm = self.comm
+        if self.comm is not None:
+            comm = self.comm.comm
+        else:
+            comm = None
 
         if self.periodic:
             return PeriodicRectangleMesh(
@@ -179,7 +186,7 @@ class AutomaticMesh:
                 self.length_z,
                 self.length_x,
                 quadrilateral=self.quadrilateral,
-                comm=comm.comm,
+                comm=comm,
                 pad=self.abc_pad,
             )
         else:
@@ -189,7 +196,7 @@ class AutomaticMesh:
                 self.length_z,
                 self.length_x,
                 quadrilateral=self.quadrilateral,
-                comm=comm.comm,
+                comm=comm,
                 pad=self.abc_pad,
             )
 
@@ -358,6 +365,9 @@ class AutomaticMesh:
 
         return fire.Mesh(self.output_file_name)
 
+    def create_spyro_mesh(self):
+        pass
+
 
 def calculate_edge_length(cpw, minimum_velocity, frequency):
     v_min = minimum_velocity
@@ -400,7 +410,11 @@ def RectangleMesh(nx, ny, Lx, Ly, pad=None, comm=None, quadrilateral=False):
         Ly += 2 * pad
     else:
         pad = 0
-    mesh = fire.RectangleMesh(nx, ny, Lx, Ly, quadrilateral=quadrilateral, comm=comm)
+    
+    if comm is None:
+        mesh = fire.RectangleMesh(nx, ny, Lx, Ly, quadrilateral=quadrilateral)#, comm=comm)
+    else:
+        mesh = fire.RectangleMesh(nx, ny, Lx, Ly, quadrilateral=quadrilateral, comm=comm)
     mesh.coordinates.dat.data[:, 0] *= -1.0
     mesh.coordinates.dat.data[:, 1] -= pad
 
@@ -471,38 +485,70 @@ def BoxMesh(nx, ny, nz, Lx, Ly, Lz, pad=None, quadrilateral=False):
     return mesh
 
 
-def build_big_rect_with_inner_element_group(Lx, Ly, Sx, Sy,
-                                            center=(0.0, 0.0),
-                                            outfile="two_rects_nogeom.msh",
-                                            h_min=0.05, h_max=0.5):
+def vp_to_sizing(vp, cpw, frequency):
+    if cpw < 0.0 or cpw == 0.0:
+        raise ValueError(f"Cells-per-wavelength value of {cpw} not supported.")
+    if frequency < 0.0 or frequency == 0.0:
+        raise ValueError(f"Frequency must be positive and non zero")
 
-    cx, cy = center
+    return vp / (frequency * cpw)
+
+
+def build_big_rect_with_inner_element_group(mesh_parameters, mask_boundaries, grid_data=None):
+
+    length_z = mesh_parameters.length_z
+    length_x = mesh_parameters.length_x
+    outfile = mesh_parameters.output_filename
 
     gmsh.initialize()
     gmsh.model.add("BigRect_InnerElements")
 
-    gmsh.option.setNumber("Mesh.CharacteristicLengthMin", float(h_min))
-    gmsh.option.setNumber("Mesh.CharacteristicLengthMax", float(h_max))
+    gmsh.option.setNumber("Mesh.MeshSizeFromPoints", 0)
+    gmsh.option.setNumber("Mesh.MeshSizeFromCurvature", 0)
+    gmsh.option.setNumber("Mesh.MeshSizeExtendFromBoundary", 0)
 
-    # --- Geometry: only the big rectangle ---
-    surf_tag = gmsh.model.occ.addRectangle(cx - Lx/2, cy - Ly/2, 0.0, Lx, Ly)
+    # --- Geometry: onlength_x the big rectangle ---
+    surf_tag = gmsh.model.occ.addRectangle(-length_z, 0.0, 0.0, length_z, length_x)
     gmsh.model.occ.synchronize()
 
-    def mesh_size_callback(dim, tag, x, y, z, lc):
-        # In case of interpolated function
-        #coords = np.array([[z, x, y]])
-        #element_size = interpolated_function(coords)[0] 
-        #return float(element_size)
-        h = x + y
-        return float(h)
+    if grid_data is None:
+        h_min = mesh_parameters.edge_length
+        gmsh.option.setNumber("Mesh.CharacteristicLengthMin", float(h_min))
+        def mesh_size_callback(dim, tag, x, y, z, lc):
+            # In case of interpolated function
+            #coords = np.array([[z, x, y]])
+            #element_size = interpolated_function(coords)[0] 
+            #return float(element_size)
+            h = x + y
+            return float(h)
+    else:
+        frequency = mesh_parameters.source_frequency
+        cpw = mesh_parameters.cpw
+        vp = grid_data[0]
+        nz, nx = vp.shape
+        z_grid = np.linspace(-length_z, 0.0, nz, dtype=np.float32)
+        x_grid = np.linspace(0.0, length_x, nx, dtype=np.float32)
+        cell_sizes = vp_to_sizing(vp, cpw, frequency)
+        interpolator = RegularGridInterpolator(
+            (z_grid, x_grid), cell_sizes, bounds_error=False
+        )
+        gmsh.model.occ.synchronize()
 
+        def mesh_size_callback(dim, tag, x, y, z, lc):
+            size = float(interpolator([[x, y]])[0])
+            # if size < h_min: size = h_min
+            if size > 0.15:
+                print(f"for point ({x}, {y}) we have size of {size}")
+                print("DBUG")
+            return size
     gmsh.model.mesh.setSizeCallback(mesh_size_callback)
 
     # --- Mesh the single surface ---
     gmsh.model.mesh.generate(2)
+    gmsh.fltk.run()
 
     # --- Collect elements & classify by centroid into inner/outer ---
-    # Get elements of the (only) geometric surface
+    # Get elements of the (onlength_x) geometric surface
     types, elemTags, nodeTags = gmsh.model.mesh.getElements(2, surf_tag)
     # Build a node coordinate map
     node_ids, node_xyz, _ = gmsh.model.mesh.getNodes()
@@ -511,10 +557,10 @@ def build_big_rect_with_inner_element_group(Lx, Ly, Sx, Sy,
     id2idx = {int(nid): i for i, nid in enumerate(node_ids)}
 
     # Small rectangle bounds
-    x_min = cx - Sx/2
-    x_max = cx + Sx/2
-    y_min = cy - Sy/2
-    y_max = cy + Sy/2
+    z_min = mask_boundaries["z_min"]
+    z_max = mask_boundaries["z_max"]
+    x_min = mask_boundaries["x_min"]
+    x_max = mask_boundaries["x_max"]
 
     # Prepare per-type lists for inner/outer
     inner_elem_by_type = []
@@ -532,10 +578,10 @@ def build_big_rect_with_inner_element_group(Lx, Ly, Sx, Sy,
         # (x_c, y_c) = average of node coords
         xyz = coords[[id2idx[int(n)] for n in conn.flatten()]].reshape(-1, nPer, 3)
         centroids = xyz.mean(axis=1)  # (nelem, 3)
-        cx_e = centroids[:, 0]
-        cy_e = centroids[:, 1]
+        cz_e = centroids[:, 0]
+        cx_e = centroids[:, 1]
 
-        inside = (cx_e >= x_min) & (cx_e <= x_max) & (cy_e >= y_min) & (cy_e <= y_max)
+        inside = (cz_e >= z_min) & (cz_e <= z_max) & (cx_e >= x_min) & (cx_e <= x_max)
 
         inner_elem_by_type.append(tags[inside])
         inner_conn_by_type.append(conn[inside])
