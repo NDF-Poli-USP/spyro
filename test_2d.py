@@ -56,9 +56,9 @@ def wave_dict(dt_usu, fr_files, layer_shape, degree_layer,
     # 1.00 x 1.00 km domain and compute the size for the Absorbing Layer (AL)
     # to absorb outgoing waves on boundries (-z, +-x sides) of the domain.
     dictionary["mesh"] = {
-        "Lz": 1.0,  # depth in km - always positive
-        "Lx": 1.0,  # width in km - always positive
-        "Ly": 0.0,  # thickness in km - always positive
+        "Lz": 1.,  # depth in km - always positive
+        "Lx": 1.,  # width in km - always positive
+        "Ly": 0.,  # thickness in km - always positive
         "mesh_type": "firedrake_mesh",
     }
 
@@ -219,14 +219,23 @@ def get_xCR_usu(Wave_obj, dat_regr_xCR, typ_xCR, n_pts):
         return xCR_opt
 
 
-def habc_fig8(Wave_obj, dat_regr_xCR, xCR_usu=None, plot_comparison=True):
+def habc_fig8(Wave_obj, modal_solver, fitting_c, dat_regr_xCR,
+              xCR_usu=None, plot_comparison=True):
     '''
-    Apply the HABC to the model in Fig. 8 of Salas et al. (2022).
+    Apply the HABC to the model in Fig. 8 of Salas et al. (2022)
 
     Parameters
     ----------
     Wave_obj : `habc.HABC_Wave`
         An instance of the HABC_Wave class
+   modal_solver : `str`
+        Method to use for solving the eigenvalue problem.
+        Options: 'ANALYTICAL', 'ARNOLDI', 'LANCZOS',
+        'LOBPCG', 'KRYLOVSCH_CH', 'KRYLOVSCH_CG',
+        'KRYLOVSCH_GH', 'KRYLOVSCH_GG' or 'RAYLEIGH'
+    fitting_c : `tuple
+        Parameters for fitting equivalent velocity regression.
+        Structure: (fc1, fc2, fp1, fp2)
     data_regr_xCR: `list`
         Data for the regression of the parameter xCR.
         Structure: [xCR, max_errIt, max_errPK, crit_opt]
@@ -268,7 +277,7 @@ def habc_fig8(Wave_obj, dat_regr_xCR, xCR_usu=None, plot_comparison=True):
     Wave_obj.velocity_habc()
 
     # Setting the damping profile within absorbing layer
-    Wave_obj.damping_layer(xCR_usu=xCR_usu, method="RAYLEIGH")
+    Wave_obj.damping_layer(xCR_usu=xCR_usu, method=modal_solver)
 
     # Applying NRBCs on outer boundary layer
     Wave_obj.nrbc_on_boundary_layer()
@@ -293,7 +302,7 @@ def habc_fig8(Wave_obj, dat_regr_xCR, xCR_usu=None, plot_comparison=True):
 
 def test_loop_habc_2d():
     '''
-    Loop for applying the HABC to the model in Fig. 8 of Salas et al. (2022).
+    Loop for applying the HABC to the model in Fig. 8 of Salas et al. (2022)
     '''
 
     case = 0  # Integer from 0 to 4
@@ -312,6 +321,13 @@ def test_loop_habc_2d():
     # Factor for the stabilizing term in Eikonal equation
     f_est_lst = [0.06, 0.02, 0.02, 0.02, 0.04]
 
+    # Parameters for fitting equivalent velocity regression
+    fitting_c_lst = [(2.0, 1.8, 1.1, 0.4),
+                     (2.0, 2.0, 0.4, 0.1),
+                     (1.0, 0.7, 0.9, 0.3),
+                     (1.0, 1.0, 1.1, 0.4),
+                     (1.0, 1.0, 0.9, 0.2)]
+
     # Maximum divisor of the final time
     max_div_tf_lst = [3, 3, 4, 2, 3]
 
@@ -320,10 +336,13 @@ def test_loop_habc_2d():
     dt_usu = dt_usu_lst[case]
     f_est = f_est_lst[case]
     max_divisor_tf = max_div_tf_lst[case]
+    fitting_c = fitting_c_lst[case]
     print("\nMesh Size: {:.3f} km".format(edge_length))
     print("Timestep Size: {:.3f} ms".format(1e3 * dt_usu))
     print("Eikonal Stabilizing Factor: {:.2f}".format(f_est))
-    print("Maximum Divisor of Final Time: {}\n".format(max_divisor_tf))
+    print("Maximum Divisor of Final Time: {}".format(max_divisor_tf))
+    fit_str = "Fitting Parameters for Analytical Solver: "
+    print((fit_str + "{:.1f}, {:.1f}, {:.1f}, {:.1f}\n").format(*fitting_c))
 
     # ============ HABC PARAMETERS ============
 
@@ -333,20 +352,23 @@ def test_loop_habc_2d():
     # Loop for HABC cases
     loop_modeling = not get_ref_model
 
-    # Hyperellipse degrees
-    degree_layer_lst = [None, 2, 3, 4, 5]
-
     # Reference frequency
     habc_reference_freq_lst = ["source"]  # ["source", "boundary"]
 
     # Type of the hypereshape degree
     degree_type = "real"  # "integer"
 
+    # Hyperellipse degrees
+    degree_layer_lst = [2.0, 3.0, 4.0, 4.4, None]
+
+    # Modal solver for fundamental frequency
+    modal_solver = 'KRYLOVSCH_CH'  # 'ANALYTICAL', 'RAYLEIGH'
+
     # Error criterion for heuristic factor xCR
     crit_opt = "err_sum"  # err_integral, err_peak
 
     # Number of points for regression (odd number)
-    n_pts = 1
+    n_pts = 3
 
     # ============ MESH AND EIKONAL ============
     # Create dictionary with parameters for the model
@@ -377,17 +399,25 @@ def test_loop_habc_2d():
 
         # Data to print on screen
         crit_str = "\nCriterion for Heuristic Factor ({:.0f} Points): {}"
-        fref_str = "HABC Reference Frequency: {}\n"
+        fref_str = "HABC Reference Frequency: {}"
+        degr_str = "Type of the Hypereshape Degree: {}"
+        mods_str = "Modal Solver for Fundamental Frequency: {}\n"
 
         # Loop for different layer shapes and degrees
         for habc_reference_freq in habc_reference_freq_lst:
 
-            # Reference frequency for sizing the hybrid absorbing layer
+            # Criterion for optimal heuristic factor xCR
             print(crit_str.format(n_pts, crit_opt.replace("_", " ").title()))
 
-            # Criterion for optinal heuristic factor xCR
+            # Reference frequency for sizing the hybrid absorbing layer
             Wave_obj.abc_reference_freq = habc_reference_freq
             print(fref_str.format(habc_reference_freq.capitalize()))
+
+            # Type of the hypereshape degree
+            print(degr_str.format(degree_type))
+
+            # Modal solver for fundamental frequency
+            print(mods_str.format(modal_solver))
 
             for degree_layer in degree_layer_lst:
 
@@ -417,7 +447,8 @@ def test_loop_habc_2d():
 
                         # Run the HABC scheme
                         plot_comparison = True if itr_xCR == n_pts else False
-                        habc_fig8(Wave_obj, dat_regr_xCR, xCR_usu=xCR_usu,
+                        habc_fig8(Wave_obj, modal_solver, fitting_c,
+                                  dat_regr_xCR, xCR_usu=xCR_usu,
                                   plot_comparison=plot_comparison)
 
                         # Estimating computational resource usage

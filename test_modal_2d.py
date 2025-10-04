@@ -364,7 +364,6 @@ if __name__ == "__main__":
 # KRYLOVSCH_GG  0.45539 (0.032s/0.093MB)
 # RAYLEIGH      0.47634 (1.474s/3.516MB)
 
-
 # dx = 20m
 # Frequency[Hz]    N2.0          (texe/pmem)    N3.0          (texe/pmem)
 # ANALYTICAL    0.51885 (  1.239s/  5.744MB) 0.49671 (  1.353s/  5.870MB)

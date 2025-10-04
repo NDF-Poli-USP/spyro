@@ -59,9 +59,9 @@ def wave_dict(dt_usu, fr_files, layer_shape, degree_layer, degree_type,
     # 1.00 x 1.00 km domain and compute the size for the Absorbing Layer (AL)
     # to absorb outgoing waves on boundries (-z, +-x sides) of the domain.
     dictionary["mesh"] = {
-        "Lz": 1.0,  # depth in km - always positive
-        "Lx": 1.0,  # width in km - always positive
-        "Ly": 1.0,  # thickness in km - always positive
+        "Lz": 1.,  # depth in km - always positive
+        "Lx": 1.,  # width in km - always positive
+        "Ly": 1.,  # thickness in km - always positive
         "mesh_type": "firedrake_mesh",
     }
 
@@ -81,12 +81,12 @@ def wave_dict(dt_usu, fr_files, layer_shape, degree_layer, degree_type,
                                (0., 1., 1.), (0., 0., 1.)]
     }
 
-    # Simulate for 1.0 seconds.
+    # Simulate for 1.5 seconds.
     dictionary["time_axis"] = {
-        "initial_time": 0.0,  # Initial time for event
-        "final_time": 1.,    # Final time for event
+        "initial_time": 0.,  # Initial time for event
+        "final_time": 1.5,    # Final time for event
         "dt": dt_usu,  # timestep size in seconds
-        "amplitude": 1,  # the Ricker has an amplitude of 1.
+        "amplitude": 1.,  # the Ricker has an amplitude of 1.
         "output_frequency": fr_files,  # how frequently to output solution to pvds
         "gradient_sampling_frequency": fr_files,  # how frequently to save to RAM
     }
@@ -225,14 +225,23 @@ def get_xCR_usu(Wave_obj, dat_regr_xCR, typ_xCR, n_pts):
         return xCR_opt
 
 
-def habc_fig8(Wave_obj, dat_regr_xCR, xCR_usu=None, plot_comparison=True):
+def habc_fig8(Wave_obj, modal_solver, fitting_c, dat_regr_xCR,
+              xCR_usu=None, plot_comparison=True):
     '''
-    Apply the HABC to the model in Fig. 8 of Salas et al. (2022).
+    Apply the HABC to the model 3D based on Fig. 8 of Salas et al. (2022)
 
     Parameters
     ----------
     Wave_obj : `habc.HABC_Wave`
         An instance of the HABC_Wave class
+   modal_solver : `str`
+        Method to use for solving the eigenvalue problem.
+        Options: 'ANALYTICAL', 'ARNOLDI', 'LANCZOS',
+        'LOBPCG', 'KRYLOVSCH_CH', 'KRYLOVSCH_CG',
+        'KRYLOVSCH_GH', 'KRYLOVSCH_GG' or 'RAYLEIGH'
+    fitting_c : `tuple
+        Parameters for fitting equivalent velocity regression.
+        Structure: (fc1, fc2, fp1, fp2)
     data_regr_xCR: `list`
         Data for the regression of the parameter xCR.
         Structure: [xCR, max_errIt, max_errPK, crit_opt]
@@ -274,35 +283,35 @@ def habc_fig8(Wave_obj, dat_regr_xCR, xCR_usu=None, plot_comparison=True):
     Wave_obj.velocity_habc()
 
     # Setting the damping profile within absorbing layer
-    Wave_obj.damping_layer(xCR_usu=xCR_usu)
+    Wave_obj.damping_layer(xCR_usu=xCR_usu, method=modal_solver)
 
-    # # Applying NRBCs on outer boundary layer
-    # Wave_obj.nrbc_on_boundary_layer()
+    # Applying NRBCs on outer boundary layer
+    Wave_obj.nrbc_on_boundary_layer()
 
-    # # Solving the forward problem
-    # Wave_obj.forward_solve()
+    # Solving the forward problem
+    Wave_obj.forward_solve()
 
-    # # Computing the error measures
-    # Wave_obj.error_measures_habc()
+    # Computing the error measures
+    Wave_obj.error_measures_habc()
 
-    # # Collecting data for regression
-    # dat_regr_xCR[0].append(Wave_obj.xCR)
-    # dat_regr_xCR[1].append(Wave_obj.max_errIt)
-    # dat_regr_xCR[2].append(Wave_obj.max_errPK)
+    # Collecting data for regression
+    dat_regr_xCR[0].append(Wave_obj.xCR)
+    dat_regr_xCR[1].append(Wave_obj.max_errIt)
+    dat_regr_xCR[2].append(Wave_obj.max_errPK)
 
-    # if plot_comparison:
+    if plot_comparison:
 
-    #     # Plotting the solution at receivers and the error measures
-    #     Wave_obj.comparison_plots(regression_xCR=True,
-    #                               data_regr_xCR=dat_regr_xCR)
+        # Plotting the solution at receivers and the error measures
+        Wave_obj.comparison_plots(regression_xCR=True,
+                                  data_regr_xCR=dat_regr_xCR)
 
 
 def test_loop_habc_3d():
     '''
-    Loop for applying the HABC to the 3D-Fig.8 model in Salas et al. (2022).
+    Loop for applying the HABC to the model 3D based on Fig. 8 of Salas et al. (2022)
     '''
 
-    case = 0  # Integer from 0 to 3
+    case = 1  # Integer from 0 to 1
 
     # ============ SIMULATION PARAMETERS ============
 
@@ -310,28 +319,38 @@ def test_loop_habc_3d():
     # cpw: cells per wavelength
     # lba = minimum_velocity /source_frequency
     # edge_length = lba / cpw
-    edge_length_lst = [0.150, 0.125, 0.100, 0.080]
+    edge_length_lst = [0.150, 0.125]
 
     # Timestep size (in seconds). Initial guess: edge_length / 50
-    dt_usu_lst = [0.0032, 0.0024, 0.0018, 0.0016]
+    dt_usu_lst = [0.0015, 0.0010]
 
     # Eikonal degree
-    degree_eikonal_lst = [2, 1, 2, 1]
+    degree_eikonal_lst = [2, 1]
 
     # Factor for the stabilizing term in Eikonal equation
-    f_est_lst = [0.04, 0.05, 0.03, 0.05]
+    f_est_lst = [0.04, 0.05]
+
+    # Parameters for fitting equivalent velocity regression
+    fitting_c_lst = [(1.0, 1.0, 0.1, 0.1),
+                     (1.0, 1.0, 0.1, 0.0)]
+
+    # Maximum divisor of the final time
+    max_div_tf_lst = [5, 7]
 
     # Get simulation parameters
     edge_length = edge_length_lst[case]
     dt_usu = dt_usu_lst[case]
     p_eik = degree_eikonal_lst[case]
     f_est = f_est_lst[case]
+    max_divisor_tf = max_div_tf_lst[case]
+    fitting_c = fitting_c_lst[case]
     print("\nMesh Size: {:.3f} km".format(edge_length))
     print("Timestep Size: {:.3f} ms".format(1e3 * dt_usu))
     print("Eikonal Degree: {}".format(p_eik))
-    print("Eikonal Stabilizing Factor: {:.2f}\n".format(f_est))
+    print("Eikonal Stabilizing Factor: {:.2f}".format(f_est))
+    print("Maximum Divisor of Final Time: {}".format(max_divisor_tf))
     fit_str = "Fitting Parameters for Analytical Solver: "
-    print((fit_str + "{:.1f}, {:.1f}, {:.1f}, {:.1f}").format(*fitting_c))
+    print((fit_str + "{:.1f}, {:.1f}, {:.1f}, {:.1f}\n").format(*fitting_c))
 
     # ============ HABC PARAMETERS ============
 
@@ -341,20 +360,25 @@ def test_loop_habc_3d():
     # Loop for HABC cases
     loop_modeling = not get_ref_model
 
-    # Hyperellipse degrees
-    degree_layer_lst = [None]  # [None, 2.8, 3, 4, 4.7]
-
     # Reference frequency
-    habc_reference_freq_lst = ["source"]  # ["source", "boundary"]
+    habc_reference_freq_lst = ["boundary"]  # ["source", "boundary"]
 
     # Type of the hypereshape degree
     degree_type = "real"  # "integer"
+
+    # Hyperellipse degrees
+    n_min_lst = [2.8, 2.4]
+    n_min = n_min_lst[case]
+    degree_layer_lst = [n_min, 3.0, 4.0, 4.7, None]
+
+    # Modal solver for fundamental frequency
+    modal_solver = 'KRYLOVSCH_CH'  # 'ANALYTICAL', 'RAYLEIGH'
 
     # Error criterion for heuristic factor xCR
     crit_opt = "err_sum"  # err_integral, err_peak
 
     # Number of points for regression (odd number)
-    n_pts = 1
+    n_pts = 3
 
     # ============ MESH AND EIKONAL ============
 
@@ -373,7 +397,6 @@ def test_loop_habc_3d():
         tRef = comp_cost("tini")
 
         # Computing reference get_reference_signal
-        max_divisor_tf = 1  # 2 if case == 0 else 1
         Wave_obj.infinite_model(check_dt=True, max_divisor_tf=max_divisor_tf)
 
         # Set model parameters for the HABC scheme
@@ -390,16 +413,24 @@ def test_loop_habc_3d():
         # Data to print on screen
         crit_str = "\nCriterion for Heuristic Factor ({:.0f} Points): {}"
         fref_str = "HABC Reference Frequency: {}\n"
+        degr_str = "Type of the Hypereshape Degree: {}"
+        mods_str = "Modal Solver for Fundamental Frequency: {}\n"
 
         # Loop for different layer shapes and degrees
         for habc_reference_freq in habc_reference_freq_lst:
 
             # Reference frequency for sizing the hybrid absorbing layer
-            Wave_obj.abc_reference_freq = habc_reference_freq
             print(crit_str.format(n_pts, crit_opt.replace("_", " ").title()))
 
             # Criterion for optinal heuristic factor xCR
+            Wave_obj.abc_reference_freq = habc_reference_freq
             print(fref_str.format(habc_reference_freq.capitalize()))
+
+            # Type of the hypereshape degree
+            print(degr_str.format(degree_type))
+
+            # Modal solver for fundamental frequency
+            print(mods_str.format(modal_solver))
 
             for degree_layer in degree_layer_lst:
 
@@ -413,43 +444,44 @@ def test_loop_habc_3d():
                 dat_regr_xCR.append(crit_opt)
 
                 for itr_xCR in range(n_pts + 1):
-                    try:
-                        # User-defined heuristic factor x_CR
-                        if itr_xCR == 0:
-                            xCR_usu = None
-                        elif itr_xCR == n_pts:
-                            xCR_usu = xCR_opt
-                        else:
-                            xCR_usu = xCR_cand[itr_xCR - 1]
+                    # try:
+                    # User-defined heuristic factor x_CR
+                    if itr_xCR == 0:
+                        xCR_usu = None
+                    elif itr_xCR == n_pts:
+                        xCR_usu = xCR_opt
+                    else:
+                        xCR_usu = xCR_cand[itr_xCR - 1]
 
-                        print("Iteration {} of {}".format(itr_xCR, n_pts))
+                    print("Iteration {} of {}".format(itr_xCR, n_pts))
 
-                        # Reference to resource usage
-                        tRef = comp_cost("tini")
+                    # Reference to resource usage
+                    tRef = comp_cost("tini")
 
-                        # Run the HABC scheme
-                        plot_comparison = True if itr_xCR == n_pts else False
-                        habc_fig8(Wave_obj, dat_regr_xCR, xCR_usu=xCR_usu,
-                                  plot_comparison=plot_comparison)
+                    # Run the HABC scheme
+                    plot_comparison = True if itr_xCR == n_pts else False
+                    habc_fig8(Wave_obj, modal_solver, fitting_c,
+                              dat_regr_xCR, xCR_usu=xCR_usu,
+                              plot_comparison=plot_comparison)
 
-                        # Estimating computational resource usage
-                        comp_cost("tfin", tRef=tRef,
-                                  user_name=Wave_obj.path_case_habc)
+                    # Estimating computational resource usage
+                    comp_cost("tfin", tRef=tRef,
+                              user_name=Wave_obj.path_case_habc)
 
-                        if n_pts == 1:
-                            break
-
-                        # User-defined heuristic factor x_CR
-                        if itr_xCR == 0:
-                            xCR_cand = get_xCR_usu(
-                                Wave_obj, dat_regr_xCR, "candidates", n_pts)
-                        elif itr_xCR == n_pts - 1:
-                            xCR_opt = get_xCR_usu(
-                                Wave_obj, dat_regr_xCR, "optimal", n_pts)
-
-                    except Exception as e:
-                        print(f"Error Solving: {e}")
+                    if n_pts == 1:
                         break
+
+                    # User-defined heuristic factor x_CR
+                    if itr_xCR == 0:
+                        xCR_cand = get_xCR_usu(
+                            Wave_obj, dat_regr_xCR, "candidates", n_pts)
+                    elif itr_xCR == n_pts - 1:
+                        xCR_opt = get_xCR_usu(
+                            Wave_obj, dat_regr_xCR, "optimal", n_pts)
+
+                    # except Exception as e:
+                    # print(f"Error Solving: {e}")
+                    # break
 
                 # Renaming the folder if degree_layer is modified
                 Wave_obj.rename_folder_habc()
@@ -470,3 +502,9 @@ if __name__ == "__main__":
 # n_hyp  150m 125m 100m  80m
 # n_min   2.8  2.4  2.2  2.1
 # n_max   4.7  4.7  4.7  4.7
+
+# Optional models
+# edge_length_lst = [0.100, 0.080]
+# dt_usu_lst = [0.0018, 0.0016]
+# degree_eikonal_lst = [2, 1]
+# f_est_lst = [0.03, 0.05]

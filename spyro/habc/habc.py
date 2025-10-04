@@ -778,7 +778,8 @@ class HABC_Wave(AcousticWave, HABC_Mesh, RectangLayer,
         self.fundam_freq = np.real(np.sqrt(min_eigval) / (2 * np.pi))
         print("Fundamental Frequency (Hz): {0:.5f}".format(self.fundam_freq))
 
-    def damping_layer(self, xCR_usu=None, method=None):
+    def damping_layer(self, xCR_usu=None, method=None,
+                      fitting_c=(1., 1., 0.5, 0.5)):
         '''
         Set the damping profile within the absorbing layer.
         Minimum damping ratio is computed as psi_min = xCR * d
@@ -804,6 +805,17 @@ class HABC_Wave(AcousticWave, HABC_Mesh, RectangLayer,
             Residual (gmres). (P) indicates the preconditioner to use: 'H' for
             Hypre (hypre) or 'G' for Geometric Algebraic Multigrid (gamg). For
             example, 'KRYLOVSCH_CH' uses cg solver with hypre preconditioner.
+        fitting_c : `tuple`, optional
+            Parameters for fitting equivalent velocity regression.
+            Structure: (fc1, fc2, fp1, fp2). Default is (1., 1., 0.5, 0.5)
+            - fc1 : `float`
+                Exponent factor for the minimum reference velocity
+            - fc2 : `float`
+                Exponent factor for the maximum reference velocity
+            - fp1 : `float`
+                Exponent fsctor for the minimum equivalent velocity
+            - fp2 : `float`
+                Exponent factor for the maximum equivalent velocity
 
         Returns
         -------
@@ -811,7 +823,8 @@ class HABC_Wave(AcousticWave, HABC_Mesh, RectangLayer,
         '''
 
         # Estimating fundamental frequency
-        self.fundamental_frequency(method=method, monitor=True)
+        self.fundamental_frequency(method=method, monitor=True,
+                                   fitting_c=fitting_c)
 
         print("\nCreating Damping Profile")
 
@@ -873,7 +886,8 @@ class HABC_Wave(AcousticWave, HABC_Mesh, RectangLayer,
         self.cos_ang_HigdonBC(self.function_space, self.crit_source,
                               bnd_nfs, bnd_nodes_nfs, hyp_par=hyp_par)
 
-    def check_timestep_habc(self, max_divisor_tf=1, set_max_dt=True):
+    def check_timestep_habc(self, max_divisor_tf=1,
+                            set_max_dt=True, method='LANCZOS'):
         '''
         Check if the timestep size is appropriate for the transient response
 
@@ -889,6 +903,9 @@ class HABC_Wave(AcousticWave, HABC_Mesh, RectangLayer,
         set_max_dt : `bool`, optional
             If True, set the timestep size to the selected divisor.
             Default is True
+        method : `str`, optional
+            Method to use for solving the eigenvalue problem.
+            Default is 'LANCZOS' method. Opts: 'ARNOLDI', 'LANCZOS' or 'LOBPCG'
 
         Returns
         -------
@@ -904,7 +921,8 @@ class HABC_Wave(AcousticWave, HABC_Mesh, RectangLayer,
         usr_dt = self.get_dt()
 
         # Maximum timestep size
-        dt_sol = eigsol.Modal_Solver(self.dimension, calc_max_dt=True)
+        dt_sol = eigsol.Modal_Solver(
+            self.dimension, method=method, calc_max_dt=True)
         max_dt = dt_sol.estimate_timestep(self.c, self.function_space,
                                           self.final_time, shift=1e-8,
                                           quad_rule=self.quadrature_rule,

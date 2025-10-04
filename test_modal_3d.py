@@ -215,7 +215,7 @@ def test_loop_modal_3d():
 
     # ============ SIMULATION PARAMETERS ============
 
-    case = 0  # Integer from 0 to 1
+    case = 1  # Integer from 0 to 1
 
     # Mesh size (in km)
     # cpw: cells per wavelength
@@ -231,7 +231,7 @@ def test_loop_modal_3d():
 
     # Parameters for fitting equivalent velocity regression
     fitting_c_lst = [(1.0, 1.0, 0.1, 0.1),
-                     (1.0, 0.9, 0.1, 0.0)]
+                     (1.0, 1.0, 0.1, 0.0)]
 
     # Get simulation parameters
     edge_length = edge_length_lst[case]
@@ -247,7 +247,7 @@ def test_loop_modal_3d():
     # ============ HABC PARAMETERS ============
 
     # Hyperellipse degrees
-    degree_layer_lst = [None]  # [2.8, 3.0, 4.0, 4.7, None]
+    degree_layer_lst = [2.8, 3.0, 4.0, 4.7, None]
 
     # Type of the hypereshape degree
     degree_type = "real"  # "integer"
@@ -301,6 +301,9 @@ if __name__ == "__main__":
 #  0.05 91.477  82.274* 93.810  83.901*
 #  0.06 97.574  86.409  97.935  88.048
 
+# Case  150m 125m 100m  80m
+# p_eik    2    1    2    1
+
 # n_hyp  150m 125m 100m  80m
 # n_min   2.8  2.4  2.2  2.1
 # n_max   4.7  4.7  4.7  4.7
@@ -310,9 +313,9 @@ if __name__ == "__main__":
 # fnum  0.45901 0.49643 0.50407 0.52873 0.53411
 # fana  0.45706 0.47593 0.49208 0.53034 0.54167
 
-# Case1     REC    N4.7    N4.0    N3.0    N2.8
-# fnum  0.45830 0.49442 0.50325 0.52600 0.52931
-# fana  0.46864 0.48591 0.50062 0.53525 0.54545
+# Case1     REC    N4.7    N4.0    N3.0    N2.8    N2.4
+# fnum  0.45830 0.49442 0.50325 0.52600 0.52931 0.54989
+# fana  0.45563 0.47242 0.48672 0.52039 0.53031 0.55546
 
 # (fc1, fc2, fp1, fp2)
 # fc1: Magnitude order
@@ -361,38 +364,38 @@ if __name__ == "__main__":
 # RAYLEIGH      0.47976 (39.700s/ 55.415MB)
 
 # dx = 125m
-# Frequency[Hz]    N2.8         (texe/pmem)     N3.0          (texe/pmem)
-# ANALYTICAL    0.54545 (  6.088s/  6.467MB) 0.53525 (  6.799s/  6.648MB)
-# ARNOLDI       0.52931 (205.701s/294.170MB) 0.52600 (241.925s/303.969MB)
-# LANCZOS       0.52931 (202.011s/220.315MB) 0.52600 (238.545s/227.666MB)
-# LOBPCG        0.52931 ( 91.082s/214.372MB) 0.52600 (122.774s/221.447MB)
-# KRYLOVSCH_CH  0.52931 ( 63.021s/  0.104MB) 0.52600 ( 76.163s/  0.131MB)
-# KRYLOVSCH_CG  0.52931 ( 63.662s/  0.106MB) 0.52600 ( 74.151s/  0.125MB)
-# KRYLOVSCH_GH  0.52931 ( 63.383s/  0.102MB) 0.52600 ( 72.709s/  0.105MB)
-# KRYLOVSCH_GG  0.52931 ( 63.186s/  0.108MB) 0.52600 ( 73.708s/  0.102MB)
-# RAYLEIGH      0.55254 ( 46.284s/ 75.530MB) 0.55021 ( 46.358s/ 77.413MB)
+# Frequency[Hz]    N2.4          (texe/pmem)    N2.8          (texe/pmem)
+# ANALYTICAL    0.57132 (  5.515s/  6.248MB) 0.54545 (  6.088s/  6.467MB)
+# ARNOLDI       0.54989 (152.597s/270.626MB) 0.52931 (205.701s/294.170MB)
+# LANCZOS       0.54989 (153.432s/202.672MB) 0.52931 (202.011s/220.315MB)
+# LOBPCG        0.54989 ( 90.521s/197.140MB) 0.52931 ( 91.082s/214.372MB)
+# KRYLOVSCH_CH  0.54989 ( 49.876s/  0.129MB) 0.52931 ( 63.021s/  0.104MB)
+# KRYLOVSCH_CG  0.54989 ( 49.354s/  0.125MB) 0.52931 ( 63.662s/  0.106MB)
+# KRYLOVSCH_GH  0.54989 ( 50.225s/  0.106MB) 0.52931 ( 63.383s/  0.102MB)
+# KRYLOVSCH_GG  0.54989 ( 50.658s/  0.102MB) 0.52931 ( 63.186s/  0.108MB)
+# RAYLEIGH      0.57355 ( 41.119s/ 70.123MB) 0.55254 ( 46.284s/ 75.530MB)
 
-# Frequency[Hz]    N4.0          (texe/pmem)    N4.7          (texe/pmem)
-# ANALYTICAL    0.50062 (  6.538s/  7.020MB) 0.48591 (  7.334s/  7.099MB)
-# ARNOLDI       0.50325 (272.538s/340.046MB) 0.49442 (345.013s/346.784MB)
-# LANCZOS       0.50325 (263.691s/254.721MB) 0.49442 (331.531s/259.771MB)
-# LOBPCG        0.50325 (140.752s/247.833MB) 0.49442 (150.927s/252.747MB)
-# KRYLOVSCH_CH  0.50325 ( 81.184s/  0.103MB) 0.49442 ( 89.600s/  0.103MB)
-# KRYLOVSCH_CG  0.50325 ( 81.050s/  0.106MB) 0.49442 ( 89.805s/  0.106MB)
-# KRYLOVSCH_GH  0.50325 ( 81.589s/  0.102MB) 0.49442 ( 92.358s/  0.102MB)
-# KRYLOVSCH_GG  0.50325 ( 81.358s/  0.108MB) 0.49442 ( 87.125s/  0.108MB)
-# RAYLEIGH      0.52619 ( 50.652s/ 85.582MB) 0.51701 ( 86.167s/ 87.055MB)
+# Frequency[Hz]    N3.0          (texe/pmem)    N4.0          (texe/pmem)
+# ANALYTICAL    0.53525 (  6.799s/  6.648MB) 0.50062 (  6.538s/  7.020MB)
+# ARNOLDI       0.52600 (241.925s/303.969MB) 0.50325 (272.538s/340.046MB)
+# LANCZOS       0.52600 (238.545s/227.666MB) 0.50325 (263.691s/254.721MB)
+# LOBPCG        0.52600 (122.774s/221.447MB) 0.50325 (140.752s/247.833MB)
+# KRYLOVSCH_CH  0.52600 ( 76.163s/  0.131MB) 0.50325 ( 81.184s/  0.103MB)
+# KRYLOVSCH_CG  0.52600 ( 74.151s/  0.125MB) 0.50325 ( 81.050s/  0.106MB)
+# KRYLOVSCH_GH  0.52600 ( 72.709s/  0.105MB) 0.50325 ( 81.589s/  0.102MB)
+# KRYLOVSCH_GG  0.52600 ( 73.708s/  0.102MB) 0.50325 ( 81.358s/  0.108MB)
+# RAYLEIGH      0.55021 ( 46.358s/ 77.413MB) 0.52619 ( 50.652s/ 85.582MB)
 
-# Frequency[Hz]     REC         (texe/pmem)
-# ANALYTICAL    0.46864 ( 14.197s/  9.361MB)
-# ARNOLDI       0.45830 (802.349s/540.732MB)
-# LANCZOS       0.45830 (741.509s/403.947MB)
-# LOBPCG        0.45833 (283.836s/393.509MB)
-# KRYLOVSCH_CH  0.45830 ( 96.811s/  0.107MB)
-# KRYLOVSCH_CG  0.45830 ( 98.534s/  0.102MB)
-# KRYLOVSCH_GH  0.45830 ( 95.955s/  0.121MB)
-# KRYLOVSCH_GG  0.45830 ( 96.408s/  0.102MB)
-# RAYLEIGH      0.47918 ( 65.507s/127.942MB)
+# Frequency[Hz]    N4.7          (texe/pmem)    REC           (texe/pmem)
+# ANALYTICAL    0.48591 (  7.334s/  7.099MB) 0.46864 ( 14.197s/  9.361MB)
+# ARNOLDI       0.49442 (345.013s/346.784MB) 0.45830 (802.349s/540.732MB)
+# LANCZOS       0.49442 (331.531s/259.771MB) 0.45830 (741.509s/403.947MB)
+# LOBPCG        0.49442 (150.927s/252.747MB) 0.45833 (283.836s/393.509MB)
+# KRYLOVSCH_CH  0.49442 ( 89.600s/  0.103MB) 0.45830 ( 96.811s/  0.107MB)
+# KRYLOVSCH_CG  0.49442 ( 89.805s/  0.106MB) 0.45830 ( 98.534s/  0.102MB)
+# KRYLOVSCH_GH  0.49442 ( 92.358s/  0.102MB) 0.45830 ( 95.955s/  0.121MB)
+# KRYLOVSCH_GG  0.49442 ( 87.125s/  0.108MB) 0.45830 ( 96.408s/  0.102MB)
+# RAYLEIGH      0.51701 ( 86.167s/ 87.055MB) 0.47918 ( 65.507s/127.942MB)
 
 # dx = 100m  fitting_c = (1.0, 1.0, 0.5, 0.3)
 # Frequency[Hz]    N2.8           (texe/pmem)

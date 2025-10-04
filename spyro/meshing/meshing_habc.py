@@ -283,9 +283,12 @@ class HABC_Mesh():
             y_data = node_positions[2]
             self.bnd_nodes += (y_data[self.bnds],)
 
-        # Get extreme values of the velocity model on the boundarty
+        # Get extreme values of the velocity model on the boundary
+        mask_boundary = np.isin(
+            np.asarray(self.bnd_nodes).T,
+            self.mesh_original.coordinates.dat.data_with_halos).all(axis=1)
         vel_on_boundary = self.point_cloud_field(
-            self.mesh_original, np.asarray(self.bnd_nodes).T,
+            self.mesh_original, np.asarray(self.bnd_nodes).T[mask_boundary],
             self.initial_velocity_model).dat.data_with_halos[:]
         self.c_bnd_min = vel_on_boundary[vel_on_boundary > 0.].min()
         self.c_bnd_max = vel_on_boundary[vel_on_boundary > 0.].max()
@@ -1585,8 +1588,9 @@ class HABC_Mesh():
         '''
 
         # Creating a point cloud field from the parent mesh
-        pts_mesh = fire.VertexOnlyMesh(parent_mesh, pts_cloud, redundant=False,
-                                       missing_points_behaviour='warn')
+        pts_mesh = fire.VertexOnlyMesh(
+            parent_mesh, pts_cloud, tolerance=self.tol,
+            missing_points_behaviour='warn', redundant=False)
         del pts_cloud
 
         # Cloud field

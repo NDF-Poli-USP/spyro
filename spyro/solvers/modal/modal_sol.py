@@ -132,6 +132,10 @@ class Modal_Solver():
                               'LOBPCG', 'KRYLOVSCH_CH', 'KRYLOVSCH_CG',
                               'KRYLOVSCH_GH', 'KRYLOVSCH_GG', 'RAYLEIGH']
 
+        if self.method == 'ANALYTICAL' and self.calc_max_dt:
+            raise ValueError("Method 'ANALYTICAL' is not available "
+                             "to estimate the maximum stable timestep")
+
         if self.method not in self.valid_methods:
             value_parameter_error('method', method, self.valid_methods)
 
@@ -331,9 +335,8 @@ class Modal_Solver():
             "eps_type": "krylovschur",       # Robust, widely used eigensolver
             "eps_tol": 1e-6,                 # Tight tolerance for accuracy
             "eps_max_it": 200,               # Reasonable iteration cap
-            "st_type": "sinvert",            # Useful for interior eigenvalues
             "st_shift": 1e-6,                # Stabilizes Neumann BC null space
-            "eps_smallest_magnitude": None,  # Smallest eigenvalues magnitude
+            "st_type": "sinvert",            # Useful for interior eigenvalues
             "eps_monitor": "ascii",          # Print convergence info
             "ksp_type": ksp_type,            # Options for large problems
             "pc_type": pc_type               # Options for large problems
@@ -341,9 +344,11 @@ class Modal_Solver():
 
         if self.calc_max_dt:
             # Largest eigenvalues magnitude
-            opts.pop("eps_smallest_magnitude")
             opts.update({"eps_largest_magnitude": None})
             # subspace, arnoldi, krylovschur, lapack
+        else:
+            # Smallest eigenvalues magnitude
+            opts.update({"eps_smallest_magnitude": None})
 
         eigenproblem = fire.LinearEigenproblem(a, M=m)
         eigensolver = fire.LinearEigensolver(eigenproblem, n_evals=k,
