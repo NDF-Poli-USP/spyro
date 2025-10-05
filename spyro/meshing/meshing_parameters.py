@@ -314,4 +314,4 @@ class MeshingParameters():
             if value is not None and hasattr(self, key):
                 setattr(self, key, value)
 
-        self.automatic_mesh = self.mesh_type in {"firedrake_mesh", "SeismicMesh"}
+        self.automatic_mesh = self.mesh_type in {"firedrake_mesh", "SeismicMesh", "spyro_mesh"}

@@ -55,7 +55,7 @@ dictionary["mesh"] = {
 }
 dictionary["acquisition"] = {
     "source_type": "ricker",
-    "source_locations": spyro.create_transect((-0.25, 0.2), (-0.25, 1.8), 10),
+    "source_locations": spyro.create_transect((-0.25, 0.2), (-0.25, 1.8), 1),
     # "source_locations": [(-1.1, 1.5)],
     "frequency": frequency,
     # "frequency_filter": frequency_filter,
@@ -117,29 +117,24 @@ def test_real_shot_record_generation_parallel():
     )
 
     fwi.set_real_velocity_model(conditional=cond, output=True, dg_velocity_model=False)
-    fwi.generate_real_shot_record(plot_model=True, save_shot_record=True)
+    fwi.generate_real_shot_record(plot_model=True, save_shot_record=True, shot_filename=f"shots/shot_record_f{frequency}_")
+
 
 def test_realistic_fwi():
     dictionary["inversion"] = {
         "perform_fwi": True,
-        "real_shot_record_files": f"shots/shot_record_{frequency}_",
+        "real_shot_record_files": f"shots/shot_record_f{frequency}_",
     }
     fwi = spyro.FullWaveformInversion(dictionary=dictionary)
-    # fwi.set_guess_mesh(mesh_parameters={"dx": dx})
-    fwi.set_guess_velocity_model(constant=2.5)
-    mask_boundaries = {
-        "z_min": -1.3,
-        "z_max": -0.7,
-        "x_min": 0.7,
-        "x_max": 1.3,
-    }
-    fwi.set_gradient_mask(boundaries=mask_boundaries)
-    fwi.run_fwi(vmin=2.5, vmax=3.5, maxiter=30)
+    fwi.set_guess_mesh(input_mesh_parameters={"mesh_type": "firedrake_mesh", "edge_length": 0.05})
+    fwi.set_guess_velocity_model(constant=1.5)
+
+    fwi.run_fwi(vmin=1.5, vmax=3.0, maxiter=30)
 
 
 if __name__ == "__main__":
     t0 = time.time()
-    test_real_shot_record_generation_parallel()
-    # test_realistic_fwi()
+    # test_real_shot_record_generation_parallel()
+    test_realistic_fwi()
     t1 = time.time()
     print(f"Total runtime{t1-t0}", flush=True)
