@@ -100,7 +100,7 @@ class MeshingParameters():
     @property
     def grid_velocity_data(self):
         return self._grid_velocity_data
-    
+
     @grid_velocity_data.setter
     def grid_velocity_data(self, value):
         if value is not None:

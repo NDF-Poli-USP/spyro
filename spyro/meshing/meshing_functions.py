@@ -417,9 +417,9 @@ def RectangleMesh(nx, ny, Lx, Ly, pad=None, comm=None, quadrilateral=False):
         Ly += 2 * pad
     else:
         pad = 0
-    
+
     if comm is None:
-        mesh = fire.RectangleMesh(nx, ny, Lx, Ly, quadrilateral=quadrilateral)#, comm=comm)
+        mesh = fire.RectangleMesh(nx, ny, Lx, Ly, quadrilateral=quadrilateral)
     else:
         mesh = fire.RectangleMesh(nx, ny, Lx, Ly, quadrilateral=quadrilateral, comm=comm)
     mesh.coordinates.dat.data[:, 0] *= -1.0
@@ -496,7 +496,7 @@ def vp_to_sizing(vp, cpw, frequency):
     if cpw < 0.0 or cpw == 0.0:
         raise ValueError(f"Cells-per-wavelength value of {cpw} not supported.")
     if frequency < 0.0 or frequency == 0.0:
-        raise ValueError(f"Frequency must be positive and non zero")
+        raise ValueError(f"Frequency must be positive and non zero, not {frequency}")
 
     return vp / (frequency * cpw)
 
@@ -521,11 +521,8 @@ def build_big_rect_with_inner_element_group(mesh_parameters):
     if mesh_parameters.grid_velocity_data is None:
         h_min = mesh_parameters.edge_length
         gmsh.option.setNumber("Mesh.CharacteristicLengthMin", float(h_min))
+
         def mesh_size_callback(dim, tag, x, y, z, lc):
-            # In case of interpolated function
-            #coords = np.array([[z, x, y]])
-            #element_size = interpolated_function(coords)[0] 
-            #return float(element_size)
             h = x + y
             return float(h)
     else:
@@ -612,8 +609,10 @@ def build_big_rect_with_inner_element_group(mesh_parameters):
             gmsh.model.mesh.addElements(2, inner_surf_tag, [t], [tags.tolist()], [conn.flatten().tolist()])
 
         # --- Define Physical groups on entities ---
-        pg_outer = gmsh.model.addPhysicalGroup(2, [surf_tag]);        gmsh.model.setPhysicalName(2, pg_outer, "Outer")
-        pg_inner = gmsh.model.addPhysicalGroup(2, [inner_surf_tag]);   gmsh.model.setPhysicalName(2, pg_inner, "Inner")
+        pg_outer = gmsh.model.addPhysicalGroup(2, [surf_tag])
+        gmsh.model.setPhysicalName(2, pg_outer, "Outer")
+        pg_inner = gmsh.model.addPhysicalGroup(2, [inner_surf_tag])
+        gmsh.model.setPhysicalName(2, pg_inner, "Inner")
 
     # Save
     gmsh.write(outfile)
@@ -624,5 +623,4 @@ def build_big_rect_with_inner_element_group(mesh_parameters):
     print(f"Physical group Outer tag: {pg_outer}")
     print(f"Physical group Inner tag: {pg_inner}")
 
-    #gmsh.fltk.run()
     gmsh.finalize()
