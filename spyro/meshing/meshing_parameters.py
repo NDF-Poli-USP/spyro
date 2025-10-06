@@ -30,7 +30,7 @@ class MeshingParameters():
     Class that handles mesh parameter logic and mesh type/length/file handling.
     """
 
-    def __init__(self, input_mesh_dictionary=None, dimension=None, source_frequency=None, comm=None, quadrilateral=False, method=None, degree=None, velocity_model=None, abc_pad_length=None, negative_z=True, use_defaults=True):
+    def __init__(self, input_mesh_dictionary={}, dimension=None, source_frequency=None, comm=None, quadrilateral=False, method=None, degree=None, velocity_model=None, abc_pad_length=None, negative_z=True, use_defaults=True):
         """
         Initializes the MeshingParamaters class.
 
