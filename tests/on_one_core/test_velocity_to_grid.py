@@ -2,7 +2,6 @@ import numpy as np
 from scipy.interpolate import RegularGridInterpolator
 import spyro
 import firedrake as fire
-import pytest
 
 
 def test_velocity_to_grid():
@@ -74,8 +73,8 @@ def test_velocity_to_grid():
     xc = 1.5
     rc = 0.7
     cond = fire.conditional(
-                (z - zc) ** 2 + (x - xc) ** 2 < rc**2, 2.0, 1.5
-            )
+        (z - zc) ** 2 + (x - xc) ** 2 < rc**2, 2.0, 1.5
+    )
     wave_obj.set_initial_velocity_model(conditional=cond)
     grid_velocity_data = spyro.utils.velocity_to_grid(wave_obj, 0.02)
 
@@ -95,7 +94,7 @@ def test_velocity_to_grid():
         # Generate random point within a square around the circle
         z_rand = np.random.uniform(zc - rc, zc + rc)
         x_rand = np.random.uniform(xc - rc, xc + rc)
-        
+
         # Check if point is inside circle (excluding boundary)
         distance_squared = (z_rand - zc)**2 + (x_rand - xc)**2
         if distance_squared + tol < rc**2:  # Strictly inside (no boundary)
@@ -110,7 +109,7 @@ def test_velocity_to_grid():
         # Generate random point within the domain
         z_rand = np.random.uniform(domain_z_min, domain_z_max)
         x_rand = np.random.uniform(domain_x_min, domain_x_max)
-        
+
         # Check if point is outside circle (excluding boundary)
         distance_squared = (z_rand - zc)**2 + (x_rand - xc)**2
         if distance_squared > rc**2 + tol:  # Strictly outside (no boundary)

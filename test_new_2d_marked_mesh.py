@@ -1,9 +1,6 @@
 import spyro
 import numpy as np
 import firedrake as fire
-import PacMeshIgnore.PacMesh as pm
-from RectanglePhysicalGroupNoBorder import build_big_rect_with_inner_element_group
-import gmsh
 
 
 def test_2d_gradient_marked_mesh():
