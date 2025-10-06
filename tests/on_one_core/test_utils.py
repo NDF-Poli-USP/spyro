@@ -11,7 +11,7 @@ def test_butter_lowpast_filter():
     Wave_obj.multiple_layer_velocity_model(z_switches, layer_values)
     Wave_obj.forward_solve()
 
-    spyro.io.save_shots(Wave_obj, filename="test_butter_prefilter")
+    spyro.io.save_shots(Wave_obj, file_name="test_butter_prefilter")
     shot_record = Wave_obj.forward_solution_receivers
     rec10 = shot_record[:, 10]
 
