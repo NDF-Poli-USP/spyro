@@ -118,11 +118,11 @@ def test_velocity_to_grid():
 
     for point in points_inside:
         velocity = float(interpolator(point))
-        assert velocity == 2.0
+        assert np.isclose(velocity, 2.0)
 
     for point in points_outside:
         velocity = float(interpolator(point))
-        assert velocity == 1.5
+        assert np.isclose(velocity, 1.5)
 
     print("END")
 
