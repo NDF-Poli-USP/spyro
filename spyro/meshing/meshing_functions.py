@@ -147,7 +147,8 @@ class AutomaticMesh:
                 raise ImportError("SeismicMesh is not available. Please install it to use this function.")
             return self.create_seismicmesh_mesh()
         elif self.mesh_type == "spyro_mesh":
-            return self.create_spyro_mesh()
+            self.create_spyro_mesh()
+            return fire.Mesh(self.output_file_name)
         else:
             raise ValueError("mesh_type is not supported")
 
