@@ -53,7 +53,7 @@ def build_on_top_of_base_dictionary(variables):
     }
     model_dictionary["parallelism"] = {"type": "automatic", }
     model_dictionary["mesh"] = {
-        "length_z": variables["Length_z"],
+        "length_z": variables["length_z"],
         "length_x": variables["length_x"],
         "length_y": variables["length_y"],
         "cells_per_wavelength": variables["cells_per_wavelength"],
