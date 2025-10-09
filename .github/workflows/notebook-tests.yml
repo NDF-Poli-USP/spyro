@@ -1,0 +1,133 @@
+name: Notebook Tutorial Tests
+
+# on:
+#   # Run on Sundays at 2 AM UTC
+#   schedule:
+#     - cron: '0 2 * * 0'
+  
+#   # Allow manual trigger
+#   workflow_dispatch:
+#     inputs:
+#       notebook:
+#         description: 'Which notebook to test'
+#         required: false
+#         default: 'all'
+#         type: choice
+#         options:
+#           - all
+#           - simple_forward
+#           - simple_forward_exercises
+      
+#   # Also run on pushes to main that affect tutorial files
+#   push:
+#     branches:
+#       - main
+#     paths:
+#       - 'notebook_tutorials/**'
+#       - 'tests/tutorials/**'
+#       - '.github/workflows/notebook-tests.yml'
+
+on: [push, pull_request]
+
+permissions:
+  contents: read
+
+concurrency:
+  # Cancel running jobs if new commits are pushed
+  group: >
+    ${{ github.workflow }}-
+    ${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  test-notebooks:
+    name: Test Tutorial Notebooks
+    runs-on: self-hosted
+
+    container:
+      image: firedrakeproject/firedrake:2025.4.1
+      options: --user root
+
+    env:
+      OMPI_ALLOW_RUN_AS_ROOT: 1
+      OMPI_ALLOW_RUN_AS_ROOT_CONFIRM: 1
+      OMP_NUM_THREADS: 1
+      OPENBLAS_NUM_THREADS: 1
+      FIREDRAKE_CI: 1
+      PYOP2_CI_TESTS: 1
+      PYOP2_SPMD_STRICT: 1
+      # Prevent matplotlib from trying to use GUI backends
+      MPLBACKEND: Agg
+
+    steps:
+      - name: Fix HOME
+        run: echo "HOME=/root" >> "$GITHUB_ENV"
+
+      - name: Pre-run cleanup
+        run: find . -delete
+
+      - uses: actions/checkout@v4
+
+      - name: Install system dependencies
+        run: |
+          apt-get update && apt-get -y install \
+            git python3 python3-pip \
+            gmsh patchelf \
+            libgmp3-dev libmpfr-dev libcgal-dev python3-tk
+
+      - name: Install Python dependencies for notebooks
+        run: |
+          pip3 install segyio \
+          && pip3 install --no-dependencies git+https://github.com/NDF-Poli-USP/SeismicMesh.git \
+          && pip3 install pyamg \
+          && pip3 install meshio \
+          && pip3 install -U memory_profiler \
+          && pip3 install pytest pytest-cov nbval \
+          && pip3 install pytest-sugar matplotlib
+
+      - name: Install spyro in development mode
+        run: |
+          pip3 install -e .
+
+      - name: Clear all firedrake-related caches
+        run: |
+          rm -rf ~/.cache/loopy \
+                 ~/.loopy_kernel_cache \
+                 ~/.cache/pyop2 \
+                 ~/.cache/tsfc \
+                 .pytest_cache
+          find . -name '*.pkl' -delete || true
+
+      - name: Create results directory
+        run: mkdir -p results velocity_models
+
+      - name: Run fast notebook tests (imports and basic functionality)
+        run: |
+          cd tests/tutorials
+          python3 run_tests.py --fast --verbose --notebook ${{ github.event.inputs.notebook || 'all' }}
+
+      - name: Run notebook execution tests
+        run: |
+          cd tests/tutorials
+          timeout 3600 python3 run_tests.py --verbose --notebook ${{ github.event.inputs.notebook || 'all' }}
+        timeout-minutes: 90
+
+      - name: Archive test outputs
+        if: always()
+        uses: actions/upload-artifact@v3
+        with:
+          name: notebook-test-outputs
+          path: |
+            results/
+            velocity_models/
+            *.png
+            *.pvd
+            *.vtu
+            *.msh
+            *.vtk
+            *.segy
+          retention-days: 7
+
+      - name: Post-run cleanup
+        if: always()
+        run: find . -delete

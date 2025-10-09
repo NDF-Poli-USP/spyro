@@ -15,4 +15,8 @@ setup(
         "segyio",
         "meshio",
         "mpi-pytest"],
+    extras_require={
+        "testing": ["pytest", "pytest-cov", "nbval", "pytest-sugar"],
+        "notebooks": ["jupyter", "ipykernel"],
+    },
 )
