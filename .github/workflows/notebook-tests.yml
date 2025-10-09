@@ -103,13 +103,11 @@ jobs:
 
       - name: Run fast notebook tests (imports and basic functionality)
         run: |
-          cd tests/tutorials
-          python3 run_tests.py --fast --verbose --notebook ${{ github.event.inputs.notebook || 'all' }}
+          python3 tests/tutorials/run_tests.py --fast --verbose --notebook ${{ github.event.inputs.notebook || 'all' }}
 
       - name: Run notebook execution tests
         run: |
-          cd tests/tutorials
-          timeout 3600 python3 run_tests.py --verbose --notebook ${{ github.event.inputs.notebook || 'all' }}
+          timeout 3600 python3 tests/tutorials/run_tests.py --verbose --notebook ${{ github.event.inputs.notebook || 'all' }}
         timeout-minutes: 90
 
       - name: Archive test outputs

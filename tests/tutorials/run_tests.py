@@ -25,9 +25,12 @@ def main():
     
     args = parser.parse_args()
     
-    # Change to the tests directory
+    # Get paths relative to repository root
     test_dir = Path(__file__).parent
-    os.chdir(test_dir)
+    repo_root = test_dir.parent.parent
+    
+    # Change to the repository root for consistent path resolution
+    os.chdir(repo_root)
     
     # Build pytest command
     cmd = ["python3", "-m", "pytest"]
@@ -40,19 +43,19 @@ def main():
     
     # Add notebook-specific tests
     if args.notebook == "simple_forward":
-        cmd.append("test_simple_forward.py")
+        cmd.append("tests/tutorials/test_simple_forward.py")
         if not args.fast:
-            cmd.append("../../notebook_tutorials/simple_forward.ipynb")
+            cmd.append("notebook_tutorials/simple_forward.ipynb")
     elif args.notebook == "simple_forward_exercises":
-        cmd.append("test_simple_forward_exercises.py")
+        cmd.append("tests/tutorials/test_simple_forward_exercises.py")
         if not args.fast:
-            cmd.append("../../notebook_tutorials/simple_forward_exercises_answers.ipynb")
+            cmd.append("notebook_tutorials/simple_forward_exercises_answers.ipynb")
     else:  # all
-        cmd.append(".")
+        cmd.append("tests/tutorials/")
         if not args.fast:
             cmd.extend([
-                "../../notebook_tutorials/simple_forward.ipynb",
-                "../../notebook_tutorials/simple_forward_exercises_answers.ipynb"
+                "notebook_tutorials/simple_forward.ipynb",
+                "notebook_tutorials/simple_forward_exercises_answers.ipynb"
             ])
     
     print(f"Running command: {' '.join(cmd)}")

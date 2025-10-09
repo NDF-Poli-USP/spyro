@@ -1,6 +1,18 @@
 # Tutorial Notebook Testing
 
-This directory contains tests for the Spyro tutorial notebooks using pytest-nbval.
+```bash
+# Run all notebook tests (from repository root)
+python3 tests/tutorials/run_tests.py
+
+# Run only fast tests (skip notebook execution)
+python3 tests/tutorials/run_tests.py --fast
+
+# Test specific notebook
+python3 tests/tutorials/run_tests.py --notebook simple_forward
+
+# Verbose output
+python3 tests/tutorials/run_tests.py --verbose
+``` contains tests for the Spyro tutorial notebooks using pytest-nbval.
 
 ## Overview
 
@@ -46,16 +58,16 @@ python3 run_tests.py --verbose
 
 ```bash
 # Test basic functionality only (uses existing conftest.py)
-pytest --skip-slow
+pytest --skip-slow tests/tutorials/
 
 # Test only slow tests
-pytest --only-slow
+pytest --only-slow tests/tutorials/
 
 # Test notebook execution with nbval
-pytest --nbval ../../notebook_tutorials/simple_forward.ipynb
+pytest --nbval notebook_tutorials/simple_forward.ipynb
 
 # Test both basic functionality and notebook execution
-pytest . ../../notebook_tutorials/simple_forward.ipynb ../../notebook_tutorials/simple_forward_exercises_answers.ipynb
+pytest tests/tutorials/ notebook_tutorials/simple_forward.ipynb notebook_tutorials/simple_forward_exercises_answers.ipynb
 ```
 
 ## CI Integration
