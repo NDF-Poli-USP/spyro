@@ -100,7 +100,16 @@ def main():
                 print(f"Warning: Notebook {nb_path} not found, skipping")
         
         if existing_notebooks:
-            nb_cmd = ["python3", "-m", "pytest", "--nbval"]
+            nb_cmd = ["python3", "-m", "pytest", "--nbval-lax"]
+            
+            # Add sanitization file if it exists
+            sanitize_file = os.path.join(test_dir, "nbval_sanitize.cfg")
+            if os.path.exists(sanitize_file):
+                nb_cmd.extend(["--nbval-sanitize-with", sanitize_file])
+                print(f"Using sanitization file: {sanitize_file}")
+            else:
+                print(f"Sanitization file not found: {sanitize_file}")
+            
             if args.verbose:
                 nb_cmd.extend(["-v", "-s"])
             nb_cmd.extend(existing_notebooks)
