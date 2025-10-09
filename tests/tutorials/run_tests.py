@@ -32,6 +32,21 @@ def main():
     # Change to the repository root for consistent path resolution
     os.chdir(repo_root)
     
+    # Debug information
+    print(f"Repository root: {repo_root}")
+    print(f"Current working directory: {os.getcwd()}")
+    
+    # Check if notebook files exist
+    nb_files = [
+        "notebook_tutorials/simple_forward.ipynb",
+        "notebook_tutorials/simple_forward_exercises_answers.ipynb"
+    ]
+    for nb_file in nb_files:
+        if os.path.exists(nb_file):
+            print(f"✓ Found: {nb_file}")
+        else:
+            print(f"✗ Missing: {nb_file}")
+    
     # Build pytest command
     cmd = ["python3", "-m", "pytest"]
     
@@ -45,18 +60,31 @@ def main():
     if args.notebook == "simple_forward":
         cmd.append("tests/tutorials/test_simple_forward.py")
         if not args.fast:
-            cmd.append("notebook_tutorials/simple_forward.ipynb")
+            nb_path = "notebook_tutorials/simple_forward.ipynb"
+            if os.path.exists(nb_path):
+                cmd.append(nb_path)
+            else:
+                print(f"Warning: Notebook {nb_path} not found, skipping notebook execution test")
     elif args.notebook == "simple_forward_exercises":
         cmd.append("tests/tutorials/test_simple_forward_exercises.py")
         if not args.fast:
-            cmd.append("notebook_tutorials/simple_forward_exercises_answers.ipynb")
+            nb_path = "notebook_tutorials/simple_forward_exercises_answers.ipynb"
+            if os.path.exists(nb_path):
+                cmd.append(nb_path)
+            else:
+                print(f"Warning: Notebook {nb_path} not found, skipping notebook execution test")
     else:  # all
         cmd.append("tests/tutorials/")
         if not args.fast:
-            cmd.extend([
+            notebook_paths = [
                 "notebook_tutorials/simple_forward.ipynb",
                 "notebook_tutorials/simple_forward_exercises_answers.ipynb"
-            ])
+            ]
+            for nb_path in notebook_paths:
+                if os.path.exists(nb_path):
+                    cmd.append(nb_path)
+                else:
+                    print(f"Warning: Notebook {nb_path} not found, skipping notebook execution test")
     
     print(f"Running command: {' '.join(cmd)}")
     

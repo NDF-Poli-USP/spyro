@@ -101,6 +101,13 @@ jobs:
       - name: Create results directory
         run: mkdir -p results velocity_models
 
+      - name: List notebook files for debugging
+        run: |
+          echo "Current directory: $(pwd)"
+          echo "Repository structure:"
+          find . -name "*.ipynb" -type f | head -10
+          ls -la notebook_tutorials/ || echo "notebook_tutorials directory not found"
+
       - name: Run fast notebook tests (imports and basic functionality)
         run: |
           python3 tests/tutorials/run_tests.py --fast --verbose --notebook ${{ github.event.inputs.notebook || 'all' }}
