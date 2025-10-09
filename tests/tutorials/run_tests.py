@@ -56,46 +56,67 @@ def main():
     if args.fast:
         cmd.append("--skip-slow")
     
-    # Add notebook-specific tests
+    # Determine which test files to run
+    test_files = []
+    notebook_files = []
+    
     if args.notebook == "simple_forward":
-        cmd.append("tests/tutorials/test_simple_forward.py")
+        test_files.append("tests/tutorials/test_simple_forward.py")
         if not args.fast:
-            nb_path = "notebook_tutorials/simple_forward.ipynb"
-            if os.path.exists(nb_path):
-                cmd.append(nb_path)
-            else:
-                print(f"Warning: Notebook {nb_path} not found, skipping notebook execution test")
+            notebook_files.append("notebook_tutorials/simple_forward.ipynb")
     elif args.notebook == "simple_forward_exercises":
-        cmd.append("tests/tutorials/test_simple_forward_exercises.py")
+        test_files.append("tests/tutorials/test_simple_forward_exercises.py")
         if not args.fast:
-            nb_path = "notebook_tutorials/simple_forward_exercises_answers.ipynb"
-            if os.path.exists(nb_path):
-                cmd.append(nb_path)
-            else:
-                print(f"Warning: Notebook {nb_path} not found, skipping notebook execution test")
+            notebook_files.append("notebook_tutorials/simple_forward_exercises_answers.ipynb")
     else:  # all
-        cmd.append("tests/tutorials/")
+        test_files.append("tests/tutorials/")
         if not args.fast:
-            notebook_paths = [
+            notebook_files.extend([
                 "notebook_tutorials/simple_forward.ipynb",
                 "notebook_tutorials/simple_forward_exercises_answers.ipynb"
-            ]
-            for nb_path in notebook_paths:
-                if os.path.exists(nb_path):
-                    cmd.append(nb_path)
-                else:
-                    print(f"Warning: Notebook {nb_path} not found, skipping notebook execution test")
+            ])
     
-    print(f"Running command: {' '.join(cmd)}")
+    # Run regular tests first
+    cmd.extend(test_files)
+    print(f"Running regular tests: {' '.join(cmd)}")
     
-    # Run the tests
     try:
         result = subprocess.run(cmd, check=True)
-        print("All tests passed!")
-        return 0
+        print("✓ Regular tests passed!")
     except subprocess.CalledProcessError as e:
-        print(f"Tests failed with return code: {e.returncode}")
+        print(f"✗ Regular tests failed with return code: {e.returncode}")
         return e.returncode
+    
+    # Run notebook tests separately if not fast mode
+    if notebook_files and not args.fast:
+        print(f"\nRunning notebook execution tests...")
+        
+        # Filter existing notebooks
+        existing_notebooks = []
+        for nb_path in notebook_files:
+            if os.path.exists(nb_path):
+                existing_notebooks.append(nb_path)
+            else:
+                print(f"Warning: Notebook {nb_path} not found, skipping")
+        
+        if existing_notebooks:
+            nb_cmd = ["python3", "-m", "pytest", "--nbval"]
+            if args.verbose:
+                nb_cmd.extend(["-v", "-s"])
+            nb_cmd.extend(existing_notebooks)
+            
+            print(f"Running notebook tests: {' '.join(nb_cmd)}")
+            try:
+                result = subprocess.run(nb_cmd, check=True)
+                print("✓ Notebook tests passed!")
+            except subprocess.CalledProcessError as e:
+                print(f"✗ Notebook tests failed with return code: {e.returncode}")
+                return e.returncode
+        else:
+            print("Warning: No notebook files found for testing")
+    
+    print("🎉 All tests passed!")
+    return 0
 
 
 if __name__ == "__main__":
