@@ -367,9 +367,9 @@ class Model_parameters(Read_options, Read_boundary_layer, Read_time_axis, Read_o
             self.automatic_adjoint = False
 
     def _sanitize_time_inputs(self):
-        self.__check_time()
+        self._check_time()
 
-    def __check_time(self):
+    def _check_time(self):
         if self.final_time < 0.0:
             raise ValueError(f"Negative time of {self.final_time} not valid.")
         if self.dt > 1.0:

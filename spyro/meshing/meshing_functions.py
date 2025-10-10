@@ -518,6 +518,31 @@ def build_big_rect_with_inner_element_group(mesh_parameters):
     # --- Geometry: onlength_x the big rectangle ---
     surf_tag = gmsh.model.occ.addRectangle(-length_z, 0.0, 0.0, length_z, length_x)
     gmsh.model.occ.synchronize()
+    
+    # Get boundary edges for tagging
+    boundary_entities = gmsh.model.getBoundary([(2, surf_tag)], oriented=False)
+    edge_tags = [abs(entity[1]) for entity in boundary_entities if entity[0] == 1]
+    
+    # Identify boundary edges by their geometric center
+    boundary_tag_map = {}
+    for edge_tag in edge_tags:
+        # Get center of mass of the edge
+        com = gmsh.model.occ.getCenterOfMass(1, edge_tag)
+        x_center, y_center = com[0], com[1]
+        
+        # Classify edges based on position
+        # Top edge: z ≈ 0
+        if abs(x_center - 0.0) < 1e-10:
+            boundary_tag_map[edge_tag] = 1  # Top boundary
+        # Bottom edge: z ≈ -length_z  
+        elif abs(x_center - (-length_z)) < 1e-10:
+            boundary_tag_map[edge_tag] = 2  # Bottom boundary
+        # Right edge: y ≈ length_x
+        elif abs(y_center - length_x) < 1e-10:
+            boundary_tag_map[edge_tag] = 3  # Right boundary
+        # Left edge: y ≈ 0
+        elif abs(y_center - 0.0) < 1e-10:
+            boundary_tag_map[edge_tag] = 4  # Left boundary
 
     if mesh_parameters.grid_velocity_data is None:
         h_min = mesh_parameters.edge_length
@@ -615,13 +640,27 @@ def build_big_rect_with_inner_element_group(mesh_parameters):
         pg_inner = gmsh.model.addPhysicalGroup(2, [inner_surf_tag])
         gmsh.model.setPhysicalName(2, pg_inner, "Inner")
 
+    # Create physical groups for boundary edges (for absorbing boundary conditions)
+    for edge_tag, boundary_id in boundary_tag_map.items():
+        # Set physical group ID explicitly to match ds() tags (1=top, 2=bottom, 3=right, 4=left)
+        pg_boundary = gmsh.model.addPhysicalGroup(1, [edge_tag], boundary_id)
+        boundary_names = {1: "Top", 2: "Bottom", 3: "Right", 4: "Left"}
+        gmsh.model.setPhysicalName(1, boundary_id, f"Boundary_{boundary_names.get(boundary_id, boundary_id)}")
+        # This ensures ds(1), ds(2), ds(3), ds(4) work correctly
+
     # Save
     gmsh.write(outfile)
 
     print(f"Written mesh to: {outfile}")
-    print(f"Geometric surface tag      (Outer): {surf_tag}")
-    print(f"Discrete surface tag       (Inner): {inner_surf_tag}")
-    print(f"Physical group Outer tag: {pg_outer}")
-    print(f"Physical group Inner tag: {pg_inner}")
+    print(f"Boundary tags created: {len(boundary_tag_map)} edges")
+    for edge_tag, boundary_id in boundary_tag_map.items():
+        boundary_names = {1: "Top", 2: "Bottom", 3: "Right", 4: "Left"}
+        print(f"  Edge {edge_tag} -> Boundary {boundary_id} ({boundary_names.get(boundary_id, 'Unknown')})")
+    
+    if mesh_parameters.gradient_mask is not None:
+        print(f"Geometric surface tag      (Outer): {surf_tag}")
+        print(f"Discrete surface tag       (Inner): {inner_surf_tag}")
+        print(f"Physical group Outer tag: {pg_outer}")
+        print(f"Physical group Inner tag: {pg_inner}")
 
     gmsh.finalize()
