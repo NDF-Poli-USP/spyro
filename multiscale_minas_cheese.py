@@ -123,10 +123,28 @@ def test_real_shot_record_generation_parallel():
 def test_realistic_fwi():
     dictionary["inversion"] = {
         "perform_fwi": True,
-        "real_shot_record_files": f"shots/shot_record_f{frequency}_",
+        "real_shot_record_file": f"shots/shot_record_f{frequency}_",
     }
     fwi = spyro.FullWaveformInversion(dictionary=dictionary)
+
+    # Since I'm using a constant velocity model isntead of loadgin one. I'm going to first create 
+    # a simple Firedrake mesh to project it into a velocity grid
     fwi.set_guess_mesh(input_mesh_parameters={"mesh_type": "firedrake_mesh", "edge_length": 0.05})
+    fwi.set_guess_velocity_model(constant=1.5)
+    grid_data = spyro.utils.velocity_to_grid(fwi, 0.01,output=True)
+    mask_boundaries = {
+        "z_min": -1.7,
+        "z_max": -0.3,
+        "x_min": 0.3,
+        "x_max": 1.7,
+    }
+
+    fwi.set_guess_mesh(input_mesh_parameters={
+        "mesh_type": "spyro_mesh",
+        "cells_per_wavelength": 2.7,
+        "grid_velocity_data": grid_data,
+        "gradient_mask": mask_boundaries
+    })
     fwi.set_guess_velocity_model(constant=1.5)
 
     fwi.run_fwi(vmin=1.5, vmax=3.0, maxiter=30)

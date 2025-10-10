@@ -21,8 +21,11 @@ def backward_wave_propagator(Wave_obj, dt=None):
     """
     if Wave_obj.abc_active is False:
         return backward_wave_propagator_no_pml(Wave_obj, dt=dt)
-    elif Wave_obj.abc_active:
+    elif Wave_obj.abc_active and Wave_obj.abc_boundary_layer_type == "PML":
         return mixed_space_backward_wave_propagator(Wave_obj, dt=dt)
+    else:
+        # For local ABC or other non-PML types
+        return backward_wave_propagator_no_pml(Wave_obj, dt=dt)
 
 
 def backward_wave_propagator_no_pml(Wave_obj, dt=None):
