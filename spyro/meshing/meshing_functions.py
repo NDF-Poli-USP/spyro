@@ -518,23 +518,23 @@ def build_big_rect_with_inner_element_group(mesh_parameters):
     # --- Geometry: onlength_x the big rectangle ---
     surf_tag = gmsh.model.occ.addRectangle(-length_z, 0.0, 0.0, length_z, length_x)
     gmsh.model.occ.synchronize()
-    
+
     # Get boundary edges for tagging
     boundary_entities = gmsh.model.getBoundary([(2, surf_tag)], oriented=False)
     edge_tags = [abs(entity[1]) for entity in boundary_entities if entity[0] == 1]
-    
+
     # Identify boundary edges by their geometric center
     boundary_tag_map = {}
     for edge_tag in edge_tags:
         # Get center of mass of the edge
         com = gmsh.model.occ.getCenterOfMass(1, edge_tag)
         x_center, y_center = com[0], com[1]
-        
+
         # Classify edges based on position
         # Top edge: z ≈ 0
         if abs(x_center - 0.0) < 1e-10:
             boundary_tag_map[edge_tag] = 1  # Top boundary
-        # Bottom edge: z ≈ -length_z  
+        # Bottom edge: z ≈ -length_z
         elif abs(x_center - (-length_z)) < 1e-10:
             boundary_tag_map[edge_tag] = 2  # Bottom boundary
         # Right edge: y ≈ length_x

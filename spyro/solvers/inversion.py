@@ -4,6 +4,7 @@ from scipy.optimize import minimize as scipy_minimize
 from mpi4py import MPI  # noqa: F401
 import numpy as np
 import resource
+import glob
 import os
 
 from .acoustic_wave import AcousticWave
@@ -223,13 +224,14 @@ class FullWaveformInversion(AcousticWave):
     @real_shot_record_files.setter
     def real_shot_record_files(self, value):
         if value is not None:
-            if not os.path.exists(value):
+            # Check if it's a file prefix pattern by looking for matching files
+            if not os.path.exists(value) and not glob.glob(value + "*"):
                 raise FileNotFoundError(f"Shot record file '{value}' does not exist")
         self._real_shot_record_files = value
         self.control_out = fire.VTKFile("results/control.pvd")
         self.gradient_out = fire.VTKFile("results/gradient.pvd")
         if self.real_shot_record_files is not None:
-            self.load_real_shot_record(filename=self.real_shot_record_files)
+            self.load_real_shot_record(file_name=self.real_shot_record_files)
 
     def calculate_misfit(self, c=None):
         """
