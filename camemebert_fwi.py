@@ -95,7 +95,7 @@ def test_real_shot_record_generation_parallel():
 
     fwi = spyro.FullWaveformInversion(dictionary=dictionary)
 
-    fwi.set_real_mesh(input_mesh_parameters={"edge_length": 0.01, "mesh_type": "firedrake_mesh"})
+    fwi.set_real_mesh(input_mesh_parameters={"edge_length": 0.05, "mesh_type": "firedrake_mesh"})
     center_z = -1.0
     center_x = 1.0
     radius = 0.2
@@ -120,10 +120,10 @@ def test_realistic_fwi():
     fwi.set_guess_velocity_model(constant=1.5)
     grid_data = spyro.utils.velocity_to_grid(fwi, 0.01, output=True)
     mask_boundaries = {
-        "z_min": -1.6,
-        "z_max": -0.4,
-        "x_min": 0.4,
-        "x_max": 1.6,
+        "z_min": -1.3,
+        "z_max": -0.65,
+        "x_min": 0.7,
+        "x_max": 1.3,
     }
 
     fwi.set_guess_mesh(input_mesh_parameters={
@@ -135,12 +135,12 @@ def test_realistic_fwi():
     })
     fwi.set_guess_velocity_model(constant=1.5)
 
-    fwi.run_fwi(vmin=1.5, vmax=3.0, maxiter=5)
+    fwi.run_fwi(vmin=2.5, vmax=3.0, maxiter=30)
 
 
 if __name__ == "__main__":
     t0 = time.time()
-    test_real_shot_record_generation_parallel()
-    # test_realistic_fwi()
+    # test_real_shot_record_generation_parallel()
+    test_realistic_fwi()
     t1 = time.time()
     print(f"Total runtime{t1-t0}", flush=True)
