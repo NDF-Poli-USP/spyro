@@ -46,6 +46,7 @@ def backward_wave_propagator_no_pml(Wave_obj, dt=None):
         Calculated gradient
     """
     Wave_obj.reset_pressure()
+    mask_available = Wave_obj.mask_available
     if dt is not None:
         Wave_obj.dt = dt
 
@@ -84,12 +85,25 @@ def backward_wave_propagator_no_pml(Wave_obj, dt=None):
     # Define a gradient problem
     m_u = fire.TrialFunction(Wave_obj.function_space)
     m_v = fire.TestFunction(Wave_obj.function_space)
-    mgrad = m_u * m_v * fire.dx(scheme=Wave_obj.quadrature_rule)
+    
+    if mask_available:
+        # Use masked integration over inner region only
+        mgrad = m_u * m_v * fire.dx(2, scheme=Wave_obj.quadrature_rule)
+    else:
+        # Fall back to full domain
+        mgrad = m_u * m_v * fire.dx(scheme=Wave_obj.quadrature_rule)
 
     dufordt2 = fire.Function(Wave_obj.function_space)
     uadj = fire.Function(Wave_obj.function_space)  # auxiliarly function for the gradient compt.
 
-    ffG = -2 * (Wave_obj.c)**(-3) * fire.dot(dufordt2, uadj) * m_v * fire.dx(scheme=Wave_obj.quadrature_rule)
+    if mask_available:
+        ffG = -2 * (Wave_obj.c)**(-3) * fire.dot(dufordt2, uadj) * m_v * fire.dx(2, scheme=Wave_obj.quadrature_rule)
+        if comm.comm.rank == 0:
+            print("Applying gradient mask: gradients will be computed only in inside region", flush=True)
+    else:
+        ffG = -2 * (Wave_obj.c)**(-3) * fire.dot(dufordt2, uadj) * m_v * fire.dx(scheme=Wave_obj.quadrature_rule)
+        if comm.comm.rank == 0:
+            print("No gradient mask found: computing gradients over full domain", flush=True)
 
     lhsG = mgrad
     rhsG = ffG
@@ -176,6 +190,7 @@ def mixed_space_backward_wave_propagator(Wave_obj, dt=None):
         Calculated gradient
     """
     Wave_obj.reset_pressure()
+    mask_available = Wave_obj.mask_available
     if dt is not None:
         Wave_obj.dt = dt
 
@@ -213,14 +228,29 @@ def mixed_space_backward_wave_propagator(Wave_obj, dt=None):
     # Define a gradient problem
     m_u = fire.TrialFunction(Wave_obj.function_space)
     m_v = fire.TestFunction(Wave_obj.function_space)
-    mgrad = m_u * m_v * fire.dx(scheme=Wave_obj.quadrature_rule)
+    
+    if mask_available:
+        # Use masked integration over inner region only
+        mgrad = m_u * m_v * fire.dx(2, scheme=Wave_obj.quadrature_rule)
+        mask_available = True
+    else:
+        # Fall back to full domain
+        mgrad = m_u * m_v * fire.dx(scheme=Wave_obj.quadrature_rule)
+        mask_available = False
 
     # dufordt2 = fire.Function(Wave_obj.function_space)
     ufor = fire.Function(Wave_obj.function_space)
     uadj = fire.Function(Wave_obj.function_space)  # auxiliarly function for the gradient compt.
 
     # ffG = -2 * (Wave_obj.c)**(-3) * fire.dot(dufordt2, uadj) * m_v * fire.dx(scheme=Wave_obj.quadrature_rule)
-    ffG = 2.0 * Wave_obj.c * fire.dot(fire.grad(uadj), fire.grad(ufor)) * m_v * fire.dx(scheme=Wave_obj.quadrature_rule)
+    if mask_available:
+        ffG = 2.0 * Wave_obj.c * fire.dot(fire.grad(uadj), fire.grad(ufor)) * m_v * fire.dx("Inner", scheme=Wave_obj.quadrature_rule)
+        if comm.comm.rank == 0:
+            print("Applying gradient mask: gradients will be computed only in 'Inner' region (mixed space)", flush=True)
+    else:
+        ffG = 2.0 * Wave_obj.c * fire.dot(fire.grad(uadj), fire.grad(ufor)) * m_v * fire.dx(scheme=Wave_obj.quadrature_rule)
+        if comm.comm.rank == 0:
+            print("No gradient mask found: computing gradients over full domain (mixed space)", flush=True)
 
     lhsG = mgrad
     rhsG = ffG

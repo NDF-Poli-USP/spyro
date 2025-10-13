@@ -302,6 +302,23 @@ class Gradient_mask_for_pml(Mask):
         super().__init__(boundaries, Wave_obj)
 
 
+def run_in_one_core(func):
+    """Decorator to run something in serial if first argument has a comm object as an attribute"""
+
+    def wrapper(*args, **kwargs):
+        comm = args[0].comm
+        if comm is None:
+            return func(*args, **kwargs)
+        else:
+            if getattr(comm, "ensemble_comm", None) is not None:
+                if comm.ensemble_comm.rank == 0 and comm.comm.rank == 0:
+                    return func(*args, **kwargs)
+            elif getattr(comm, "rank", None) is not None:
+                if comm.rank == 0:
+                    return func(*args, **kwargs)
+
+    return wrapper
+
 # def analytical_solution_for_pressure_based_on_MMS(model, mesh, time):
 #     degree = model["opts"]["degree"]
 #     V = FunctionSpace(mesh, "CG", degree)  # noqa: F405

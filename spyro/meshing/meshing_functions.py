@@ -4,6 +4,7 @@ import gmsh
 import numpy as np
 from scipy.interpolate import RegularGridInterpolator
 from ..io import parallel_print
+from ..utils import run_in_one_core
 
 try:
     import SeismicMesh
@@ -148,7 +149,12 @@ class AutomaticMesh:
             return self.create_seismicmesh_mesh()
         elif self.mesh_type == "spyro_mesh":
             self.create_spyro_mesh()
-            return fire.Mesh(self.output_file_name)
+            if self.comm is not None:
+                parallel_print("Loading mesh.", comm=self.comm)
+                self.comm.comm.barrier()
+                return fire.Mesh(self.output_file_name, comm=self.comm.comm)
+            else:
+                return fire.Mesh(self.output_file_name)
         else:
             raise ValueError("mesh_type is not supported")
 
@@ -502,6 +508,7 @@ def vp_to_sizing(vp, cpw, frequency):
     return vp / (frequency * cpw)
 
 
+@run_in_one_core
 def build_big_rect_with_inner_element_group(mesh_parameters):
 
     length_z = mesh_parameters.length_z

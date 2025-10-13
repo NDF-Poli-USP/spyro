@@ -55,7 +55,7 @@ dictionary["mesh"] = {
 }
 dictionary["acquisition"] = {
     "source_type": "ricker",
-    "source_locations": spyro.create_transect((-0.25, 0.2), (-0.25, 1.8), 1),
+    "source_locations": spyro.create_transect((-0.25, 0.2), (-0.25, 1.8), 10),
     # "source_locations": [(-1.1, 1.5)],
     "frequency": frequency,
     # "frequency_filter": frequency_filter,
@@ -131,23 +131,24 @@ def test_realistic_fwi():
     # a simple Firedrake mesh to project it into a velocity grid
     fwi.set_guess_mesh(input_mesh_parameters={"mesh_type": "firedrake_mesh", "edge_length": 0.05})
     fwi.set_guess_velocity_model(constant=1.5)
-    grid_data = spyro.utils.velocity_to_grid(fwi, 0.01,output=True)
+    grid_data = spyro.utils.velocity_to_grid(fwi, 0.01, output=True)
     mask_boundaries = {
-        "z_min": -1.7,
-        "z_max": -0.3,
-        "x_min": 0.3,
-        "x_max": 1.7,
+        "z_min": -1.6,
+        "z_max": -0.4,
+        "x_min": 0.4,
+        "x_max": 1.6,
     }
 
     fwi.set_guess_mesh(input_mesh_parameters={
         "mesh_type": "spyro_mesh",
         "cells_per_wavelength": 2.7,
         "grid_velocity_data": grid_data,
-        "gradient_mask": mask_boundaries
+        "gradient_mask": mask_boundaries,
+        # "output_filename": "test.vtk"
     })
     fwi.set_guess_velocity_model(constant=1.5)
 
-    fwi.run_fwi(vmin=1.5, vmax=3.0, maxiter=30)
+    fwi.run_fwi(vmin=1.5, vmax=3.0, maxiter=5)
 
 
 if __name__ == "__main__":
