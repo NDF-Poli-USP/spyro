@@ -150,8 +150,12 @@ class AutomaticMesh:
         elif self.mesh_type == "spyro_mesh":
             self.create_spyro_mesh()
             if self.comm is not None:
-                parallel_print("Loading mesh.", comm=self.comm)
+                # Ensure all processes wait for mesh creation to complete
+                # Need to sync both ensemble and spatial communicators
+                if hasattr(self.comm, 'ensemble_comm'):
+                    self.comm.ensemble_comm.barrier()
                 self.comm.comm.barrier()
+                parallel_print("Loading mesh.", comm=self.comm)
                 return fire.Mesh(self.output_file_name, comm=self.comm.comm)
             else:
                 return fire.Mesh(self.output_file_name)

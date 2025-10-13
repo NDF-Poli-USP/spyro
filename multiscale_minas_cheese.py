@@ -55,7 +55,7 @@ dictionary["mesh"] = {
 }
 dictionary["acquisition"] = {
     "source_type": "ricker",
-    "source_locations": spyro.create_transect((-0.25, 0.2), (-0.25, 1.8), 10),
+    "source_locations": spyro.create_transect((-0.25, 0.2), (-0.25, 1.8), 1),
     # "source_locations": [(-1.1, 1.5)],
     "frequency": frequency,
     # "frequency_filter": frequency_filter,
@@ -96,16 +96,21 @@ def test_real_shot_record_generation_parallel():
 
     fwi = spyro.FullWaveformInversion(dictionary=dictionary)
 
-    fwi.set_real_mesh(input_mesh_parameters={"edge_length": 0.05, "mesh_type": "firedrake_mesh"})
+    fwi.set_real_mesh(
+        input_mesh_parameters={
+            "edge_length": 0.05,
+            "mesh_type": "firedrake_mesh",
+        }
+    )
     center_z = -1.0
     center_x = 1.0
-    radius = 0.5
+    radius = 0.2
     mesh_z = fwi.mesh_z
     mesh_x = fwi.mesh_x
-    square_top_z   = -0.75
-    square_bot_z   = -1.25
-    square_left_x  = 0.75
-    square_right_x = 1.25
+    square_top_z   = -0.9
+    square_bot_z   = -1.1
+    square_left_x  = 0.9
+    square_right_x = 1.1
     cond = fire.conditional((mesh_z-center_z)**2 + (mesh_x-center_x)**2 < radius**2, 2.0, 1.5)
     cond =  fire.conditional(
         fire.And(
@@ -122,8 +127,8 @@ def test_real_shot_record_generation_parallel():
 
 def test_realistic_fwi():
     dictionary["inversion"] = {
-        "perform_fwi": True,
-        "real_shot_record_file": f"shots/shot_record_f{frequency}_",
+        "perform_fwi": False,
+        # "real_shot_record_file": f"shots/shot_record_f{frequency}_",
     }
     fwi = spyro.FullWaveformInversion(dictionary=dictionary)
 
@@ -144,7 +149,7 @@ def test_realistic_fwi():
         "cells_per_wavelength": 2.7,
         "grid_velocity_data": grid_data,
         "gradient_mask": mask_boundaries,
-        # "output_filename": "test.vtk"
+        "output_filename": "test.vtk"
     })
     fwi.set_guess_velocity_model(constant=1.5)
 
