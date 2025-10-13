@@ -35,7 +35,7 @@ def cells_per_wavelength(degree):
     return cell_per_wavelength_dictionary.get(key)
 
 cpw = cells_per_wavelength(degree)
-final_time = 1.8
+final_time = 0.9
 
 dictionary = {}
 dictionary["options"] = {
@@ -55,13 +55,12 @@ dictionary["mesh"] = {
 }
 dictionary["acquisition"] = {
     "source_type": "ricker",
-    "source_locations": spyro.create_transect((-0.25, 0.2), (-0.25, 1.8), 10),
-    # "source_locations": [(-1.1, 1.5)],
+    "source_locations": spyro.create_transect((-0.55, 0.7), (-0.55, 1.3), 6),
     "frequency": frequency,
     # "frequency_filter": frequency_filter,
     "delay": 1.0/frequency,
     "delay_type": "time",
-    "receiver_locations": spyro.create_transect((-1.75, 0.2), (-1.75, 1.8), 200),
+    "receiver_locations": spyro.create_transect((-1.45, 0.7), (-1.45, 1.3), 200),
 }
 dictionary["absorving_boundary_conditions"] = {
     "status": True,
@@ -70,7 +69,7 @@ dictionary["absorving_boundary_conditions"] = {
 dictionary["time_axis"] = {
     "initial_time": 0.0,  # Initial time for event
     "final_time": final_time,  # Final time for event
-    "dt": 0.0005,  # timestep size
+    "dt": 0.0001,  # timestep size
     "amplitude": 1,  # the Ricker has an amplitude of 1.
     "output_frequency": 100,  # how frequently to output solution to pvds - Perguntar Daiane ''post_processing_frequency'
     "gradient_sampling_frequency": 1,  # how frequently to save solution to RAM    - Perguntar Daiane 'gradient_sampling_frequency'
@@ -96,25 +95,13 @@ def test_real_shot_record_generation_parallel():
 
     fwi = spyro.FullWaveformInversion(dictionary=dictionary)
 
-    fwi.set_real_mesh(input_mesh_parameters={"edge_length": 0.05, "mesh_type": "firedrake_mesh"})
+    fwi.set_real_mesh(input_mesh_parameters={"edge_length": 0.01, "mesh_type": "firedrake_mesh"})
     center_z = -1.0
     center_x = 1.0
-    radius = 0.5
+    radius = 0.2
     mesh_z = fwi.mesh_z
     mesh_x = fwi.mesh_x
-    square_top_z   = -0.75
-    square_bot_z   = -1.25
-    square_left_x  = 0.75
-    square_right_x = 1.25
-    cond = fire.conditional((mesh_z-center_z)**2 + (mesh_x-center_x)**2 < radius**2, 2.0, 1.5)
-    cond =  fire.conditional(
-        fire.And(
-            fire.And(mesh_z < square_top_z, mesh_z > square_bot_z),
-            fire.And(mesh_x > square_left_x, mesh_x < square_right_x)
-        ),
-        3.0,
-        cond,
-    )
+    cond = fire.conditional((mesh_z-center_z)**2 + (mesh_x-center_x)**2 < radius**2, 3.0, 2.5)
 
     fwi.set_real_velocity_model(conditional=cond, output=True, dg_velocity_model=False)
     fwi.generate_real_shot_record(plot_model=True, save_shot_record=True, shot_filename=f"shots/shot_record_f{frequency}_")
@@ -153,7 +140,7 @@ def test_realistic_fwi():
 
 if __name__ == "__main__":
     t0 = time.time()
-    # test_real_shot_record_generation_parallel()
-    test_realistic_fwi()
+    test_real_shot_record_generation_parallel()
+    # test_realistic_fwi()
     t1 = time.time()
     print(f"Total runtime{t1-t0}", flush=True)

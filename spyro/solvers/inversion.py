@@ -204,6 +204,7 @@ class FullWaveformInversion(AcousticWave):
         self.misfit = None
         self.guess_forward_solution = None
         self.has_gradient_mask = False
+        self.mask_available = False
         self.functional_history = []
 
     @property
@@ -422,6 +423,8 @@ class FullWaveformInversion(AcousticWave):
         -------
         None
         """
+        if input_mesh_parameters.get("gradient_mask") is not None:
+            self.mask_available = True
         super().set_mesh(
             user_mesh=user_mesh,
             input_mesh_parameters=input_mesh_parameters,
