@@ -96,25 +96,26 @@ def test_real_shot_record_generation_parallel():
     fwi = spyro.FullWaveformInversion(dictionary=dictionary)
 
     fwi.set_real_mesh(input_mesh_parameters={"edge_length": 0.05, "mesh_type": "firedrake_mesh"})
-    center_z = -1.0
-    center_x = 1.0
-    radius = 0.4
     mesh_z = fwi.mesh_z
     mesh_x = fwi.mesh_x
-    square_top_z   = -0.8
-    square_bot_z   = -1.2
-    square_left_x  = 0.8
-    square_right_x = 1.2
-    cond = fire.conditional((mesh_z-center_z)**2 + (mesh_x-center_x)**2 < radius**2, 3.0, 2.5)
-    cond =  fire.conditional(
-        fire.And(
-            fire.And(mesh_z < square_top_z, mesh_z > square_bot_z),
-            fire.And(mesh_x > square_left_x, mesh_x < square_right_x)
-        ),
-        3.5,
-        cond,
-    )
 
+    # Create 3 irregular cheese bread-like shapes
+    # First cheese bread (main one, slightly elliptical)
+    cheese_bread0 = ((mesh_z - (-1.0))/0.18)**2 + ((mesh_x - 1.0)/0.12)**2 < 1.0
+
+    # Second cheese bread (tilted ellipse)
+    rotated_z = (mesh_z - (-0.7)) * 0.8 + (mesh_x - 0.6) * 0.6
+    rotated_x = -(mesh_z - (-0.7)) * 0.6 + (mesh_x - 0.6) * 0.8
+    cheese_bread1 = (rotated_z/0.1)**2 + (rotated_x/0.08)**2 < 1.0
+
+    # Third cheese bread (horizontal ellipse)
+    cheese_bread2 = ((mesh_z - (-1.3))/0.08)**2 + ((mesh_x - 1.4)/0.14)**2 < 1.0
+
+    # Combine all 3 cheese bread areas
+    cheese_bread_areas = fire.Or(cheese_bread0, fire.Or(cheese_bread1, cheese_bread2))
+
+    # Set conditional
+    cond = fire.conditional(cheese_bread_areas, 3.0, 2.5)
 
     fwi.set_real_velocity_model(conditional=cond, output=True, dg_velocity_model=False)
     fwi.generate_real_shot_record(plot_model=True, save_shot_record=True, shot_filename=f"shots/shot_record_f{frequency}_")
