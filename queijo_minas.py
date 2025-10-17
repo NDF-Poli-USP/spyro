@@ -101,7 +101,20 @@ def test_real_shot_record_generation_parallel():
     radius = 0.4
     mesh_z = fwi.mesh_z
     mesh_x = fwi.mesh_x
+    square_top_z   = -0.8
+    square_bot_z   = -1.2
+    square_left_x  = 0.8
+    square_right_x = 1.2
     cond = fire.conditional((mesh_z-center_z)**2 + (mesh_x-center_x)**2 < radius**2, 3.0, 2.5)
+    cond =  fire.conditional(
+        fire.And(
+            fire.And(mesh_z < square_top_z, mesh_z > square_bot_z),
+            fire.And(mesh_x > square_left_x, mesh_x < square_right_x)
+        ),
+        3.5,
+        cond,
+    )
+
 
     fwi.set_real_velocity_model(conditional=cond, output=True, dg_velocity_model=False)
     fwi.generate_real_shot_record(plot_model=True, save_shot_record=True, shot_filename=f"shots/shot_record_f{frequency}_")
