@@ -98,7 +98,7 @@ def test_real_shot_record_generation_parallel():
     fwi.set_real_mesh(input_mesh_parameters={"edge_length": 0.05, "mesh_type": "firedrake_mesh"})
     center_z = -1.0
     center_x = 1.0
-    radius = 0.5
+    radius = 0.4
     mesh_z = fwi.mesh_z
     mesh_x = fwi.mesh_x
     cond = fire.conditional((mesh_z-center_z)**2 + (mesh_x-center_x)**2 < radius**2, 3.0, 2.5)
@@ -140,7 +140,7 @@ def test_realistic_fwi():
 
 if __name__ == "__main__":
     t0 = time.time()
-    test_real_shot_record_generation_parallel()
-    # test_realistic_fwi()
+    # test_real_shot_record_generation_parallel()
+    test_realistic_fwi()
     t1 = time.time()
     print(f"Total runtime{t1-t0}", flush=True)
