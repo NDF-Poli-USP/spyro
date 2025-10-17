@@ -146,9 +146,9 @@ def test_realistic_fwi():
         "gradient_mask": mask_boundaries,
         # "output_filename": "test.vtk"
     })
-    fwi.set_guess_velocity_model(constant=1.5)
+    fwi.set_guess_velocity_model(constant=2.5)
 
-    fwi.run_fwi(vmin=2.5, vmax=3.0, maxiter=30)
+    fwi.run_fwi(vmin=2.5, vmax=3.5, maxiter=30)
 
 
 if __name__ == "__main__":
