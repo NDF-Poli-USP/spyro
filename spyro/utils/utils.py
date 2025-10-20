@@ -319,6 +319,10 @@ def run_in_one_core(func):
 
     return wrapper
 
+
+def interpolate_shot_record(file_name, output_file_name, original_dt, new_dt):
+    pass
+
 # def analytical_solution_for_pressure_based_on_MMS(model, mesh, time):
 #     degree = model["opts"]["degree"]
 #     V = FunctionSpace(mesh, "CG", degree)  # noqa: F405
