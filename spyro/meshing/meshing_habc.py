@@ -295,7 +295,7 @@ class HABC_Mesh():
 
         # Print on screen
         cbnd_str = "Boundary Velocity Range (km/s): {:.3f} - {:.3f}"
-        print(cbnd_str.format(self.c_bnd_min, self.c_bnd_max))
+        print(cbnd_str.format(self.c_bnd_min, self.c_bnd_max), flush=True)
 
     def properties_eik_mesh(self, p_usu=None, ele_type='CG', f_est=0.03):
         '''
@@ -339,7 +339,11 @@ class HABC_Mesh():
         None
         '''
 
-        print("\nCreating Mesh and Initial Velocity Model")
+        print("\nCreating Mesh and Initial Velocity Model", flush=True)
+
+        # Mesh data
+        print(f"Original Mesh with {self.mesh.num_vertices()} Nodes "
+              f"and {self.mesh.num_cells()} Volume Elements", flush=True)
 
         # Get mesh parameters from original mesh
         self.representative_mesh_dimensions()
@@ -364,18 +368,18 @@ class HABC_Mesh():
 
         # Print on screen
         cdom_str = "Domain Velocity Range (km/s): {:.3f} - {:.3f}"
-        print(cdom_str.format(self.c_min, self.c_max))
+        print(cdom_str.format(self.c_min, self.c_max), flush=True)
 
         # Save initial velocity model
         vel_c = fire.VTKFile(self.path_save + "preamble/c_vel.pvd")
         vel_c.write(self.c)
 
         # Generating boundary data from the original domain mesh
-        print("Getting Boundary Mesh Data from Original Domain")
+        print("Getting Boundary Mesh Data from Original Domain", flush=True)
         self.original_boundary_data()
 
         # Mesh properties for Eikonal
-        print("Setting Mesh Properties for Eikonal Analysis")
+        print("Setting Mesh Properties for Eikonal Analysis", flush=True)
         self.properties_eik_mesh(p_usu=self.abc_deg_eikonal, f_est=f_est)
 
     def rectangular_mesh_habc(self, dom_lay, pad_len):
@@ -438,7 +442,11 @@ class HABC_Mesh():
         mesh_habc.coordinates.dat.data_with_halos[:, 0] *= -1.0
         mesh_habc.coordinates.dat.data_with_halos[:, 1] -= pad_len
 
-        print("Extended Rectangular Mesh Generated Successfully")
+        # Mesh data
+        print(f"Mesh Created with {mesh_habc.num_vertices()} Nodes "
+              f"and {mesh_habc.num_cells()} Volume Elements", flush=True)
+
+        print("Extended Rectangular Mesh Generated Successfully", flush=True)
 
         return mesh_habc
 
@@ -541,13 +549,14 @@ class HABC_Mesh():
                 or pnt_bef_trunc < 3 or pnt_aft_trunc < 3:
 
             num_bnd_pts += 1
-            print(pnt_str, f"Complete Hyperellipse: {num_bnd_pts}")
+            print(pnt_str, f"Complete Hyperellipse: {num_bnd_pts}", flush=True)
             bnd_pts = self.bnd_pnts_hyp_2D(a_hyp, b_hyp, n_hyp, num_bnd_pts)
 
             # Filter hyperellipse points based on the truncation plane z0
             filt_bnd_pts = np.array([point for point in bnd_pts
                                      if point[1] <= z0])
-            print(pnt_str, f"Truncated Hyperellipse: {len(filt_bnd_pts)}")
+            print(pnt_str, f"Truncated Hyperellipse: {len(filt_bnd_pts)}",
+                  flush=True)
 
             # Identify truncation index
             ini_trunc = max(np.where(bnd_pts[:, 1] > z0)[0][0] - 1, 0)
@@ -703,7 +712,7 @@ class HABC_Mesh():
         if fmesh != 1.:
             fmesh = max(fmesh, fmin)
         fm_str = "Mesh Factor Size Inside Layer (Min): {:.2f} ({:.2f})"
-        print(fm_str.format(fmesh, fmin))
+        print(fm_str.format(fmesh, fmin), flush=True)
 
         while True:
             try:
@@ -716,19 +725,21 @@ class HABC_Mesh():
                 # Generate the mesh using netgen library
                 hyp_mesh = geo.GenerateMesh(maxh=fmesh*self.lmin,
                                             quad_dominated=False)
-                print("Hyperelliptical Mesh Generated Successfully")
+                print("Hyperelliptical Mesh Generated Successfully",
+                      flush=True)
                 break
 
             except Exception as e:
 
                 # Retry with lines if splines fail
                 if spln:
-                    print(f"Error Meshing with Splines: {e}")
-                    print("Now meshing with Lines")
+                    print(f"Error Meshing with Splines: {e}", flush=True)
+                    print("Now meshing with Lines", flush=True)
                     spln = False
 
                 else:
-                    UserWarning(f"Error Meshing with Lines: {e}. Exiting.")
+                    print(f"Error Meshing with Lines: {e}. Exiting.",
+                          flush=True)
                     break
 
         # Mesh is transformed into a firedrake mesh
@@ -836,16 +847,16 @@ class HABC_Mesh():
             # Mesh data
             final_mesh.Compress()
             print(f"Mesh created with {len(final_mesh.Points())} points "
-                  f"and {len(final_mesh.Elements2D())} elements")
+                  f"and {len(final_mesh.Elements2D())} elements", flush=True)
 
             # Mesh is transformed into a firedrake mesh
             q = {"overlap_type": (fire.DistributedMeshOverlapType.NONE, 0)}
             final_mesh = fire.Mesh(
                 final_mesh, distribution_parameters=q, comm=self.comm.comm)
-            print("Merged Mesh Generated Successfully")
+            print("Merged Mesh Generated Successfully", flush=True)
 
         except Exception as e:
-            UserWarning(f"Error Generating Merged Mesh: {e}. Exiting.")
+            print(f"Error Generating Merged Mesh: {e}. Exiting.", flush=True)
 
         return final_mesh
 
@@ -1010,7 +1021,7 @@ class HABC_Mesh():
         gmsh.model.add("hyper_ellipsoid_occ")
 
         # Generate point grid
-        print("Generating Hyperellipsoid Boundary Points")
+        print("Generating Hyperellipsoid Boundary Points", flush=True)
         point_tags = []
         for j in range(v_res):
             for i in range(u_res + 1):  # +1 to include closure point at u=2π
@@ -1018,18 +1029,18 @@ class HABC_Mesh():
                 # At poles, all u values should give the same point
                 if j == 0:  # South pole
                     u = 0.
-                    v = -np.pi/2
+                    v = -np.pi / 2.
 
                 elif j == v_res - 1:  # North pole
                     u = 0.
-                    v = np.pi/2
+                    v = np.pi / 2.
 
                 else:
                     # Handle u-direction closure: last point same as first
-                    u = 0. if i == u_res else 2 * np.pi * i / u_res
+                    u = 0. if i == u_res else 2. * np.pi * i / u_res
 
                     # Handle v direction including exact poles
-                    v = np.pi * (j / (v_res - 1) - 0.5)  # From -π/2 to π/2
+                    v = np.pi * (j / (v_res - 1.) - 0.5)  # From -π/2 to π/2
 
                 # Create point on the hyperellipsoid surface
                 x, y, z = self.create_hyp_pnt_3D(u, v, semi_axes, centroid, n)
@@ -1037,7 +1048,7 @@ class HABC_Mesh():
                 point_tags.append(point_tag)
 
         # Create B-spline surface
-        print("Generating Hyperellipsoid Surface")
+        print("Generating Hyperellipsoid Surface", flush=True)
         hyp_srf_tag = gmsh.model.occ.addBSplineSurface(
             pointTags=point_tags,
             numPointsU=u_res + 1,  # Include closure point
@@ -1067,7 +1078,7 @@ class HABC_Mesh():
             OpenCASCADE volume tag for the hyperellipsoid
         '''
 
-        print("Creating Hyperellipsoid")
+        print("Creating Hyperellipsoid", flush=True)
 
         hyp_vol_tag = None
 
@@ -1080,7 +1091,7 @@ class HABC_Mesh():
                                                  u_res=u_res, v_res=v_res)
 
             # Create volume
-            print("Generating Hyperellipsoid Volume")
+            print("Generating Hyperellipsoid Volume", flush=True)
             surface_loop = gmsh.model.occ.addSurfaceLoop([hyp_srf_tag])
             hyp_vol_tag = gmsh.model.occ.addVolume([surface_loop])
             gmsh.model.occ.synchronize()
@@ -1096,7 +1107,7 @@ class HABC_Mesh():
             d_cut = 2 * max(semi_axes)
 
             # Create cutting box above z_cut
-            print("Applying Cut at Free Surface")
+            print("Applying Cut at Free Surface", flush=True)
             cutting_box = gmsh.model.occ.addBox(xc - d_cut, yc - d_cut, z_cut,
                                                 2 * d_cut, 2 * d_cut, d_cut)
             gmsh.model.occ.synchronize()
@@ -1108,18 +1119,19 @@ class HABC_Mesh():
 
             # Verify if the resulting volume is valid
             if result[0]:
-                print("Cut Applied Successfully")
+                print("Cut Applied Successfully", flush=True)
                 hyp_vol_tag = result[0][0][1]
             else:
-                UserWarning("Cut Removed Entire Volume")
+                print("Cut Removed Entire Volume", flush=True)
                 hyp_vol_tag = None
 
-            print("Successfully Created Volume Using Closed B-Spline Surface")
+            print("Successfully Created Volume Using Closed B-Spline Surface",
+                  flush=True)
 
             return hyp_vol_tag
 
         except Exception as e:
-            UserWarning(f"B-spline Surface Creation Failed: {e}")
+            print(f"B-spline Surface Creation Failed: {e}", flush=True)
 
             return None
 
@@ -1139,7 +1151,7 @@ class HABC_Mesh():
             OpenCASCADE volume tag for the box
         '''
 
-        print("Creating Original Box Domain")
+        print("Creating Original Box Domain", flush=True)
 
         # Create ox volume
         xmin, xmax, ymin, ymax, zmin, zmax = rec_box
@@ -1220,7 +1232,7 @@ class HABC_Mesh():
                 tags, "tolist") else list(tags))
 
         if not all_tags:
-            print(f"[Quality] No elements found for dim={dim}")
+            print(f"[Quality] No elements found for dim={dim}", flush=True)
             return
 
         # Compute qualities for elements
@@ -1229,7 +1241,7 @@ class HABC_Mesh():
         print(f"[Quality] Count={q.size} Min={q.min():.6g} "
               f"p1={np.percentile(q, 1):.6g} - p5={np.percentile(q, 5):.6g}\n"
               f"Median={np.median(q):.6g} p95={np.percentile(q, 95):.6g} - "
-              f"Max={q.max():.6g} - Mean={q.mean():.6g}")
+              f"Max={q.max():.6g} - Mean={q.mean():.6g}", flush=True)
 
     def merge_mesh_3D(self, hyp_par):
         '''
@@ -1268,9 +1280,14 @@ class HABC_Mesh():
             gmsh.finalize()
 
         except Exception as e:
-            print(f"Finalization failed: {e}")
+            print(f"Finalization failed: {e}", flush=True)
 
         gmsh.initialize()
+        # -  0: disables all output messages
+        # -  1: minimal output
+        # -  2: default verbosity
+        # - 99: maximum verbosity
+        gmsh.option.setNumber("General.Verbosity", 1)
         gmsh.model.add("hyp_mesh_3D")
 
         # Create hyperellipsoid volume
@@ -1281,10 +1298,10 @@ class HABC_Mesh():
 
         # Fragment the geometries
         if not (hyp_vol_tag and box_vol_tag):
-            UserWarning("Error Generating Merged Mesh")
+            print("Error Generating Merged Mesh", flush=True)
 
         try:
-            print("Fragmenting Box and Hyperellipsoid")
+            print("Fragmenting Box and Hyperellipsoid", flush=True)
 
             # Fragment operation - create proper subdomain
             fragment_result = gmsh.model.occ.fragment(
@@ -1296,14 +1313,27 @@ class HABC_Mesh():
             # Get all 3D entities and volume tags from the model
             volumes = gmsh.model.getEntities(3)
             vol_tags = [tag for dim, tag in volumes if dim == 3]
+            box_vol = [vol_tags[0]] if len(vol_tags) > 0 else []
+            hyp_vol = [vol_tags[1]] if len(vol_tags) > 1 else []
 
             # Create physical groups for the volumes
             box = gmsh.model.addPhysicalGroup(3, [vol_tags[0]], name="Box")
             hyp = gmsh.model.addPhysicalGroup(3, [vol_tags[1]], name="Hyp")
 
             # Set mesh size in the hypershape
-            gmsh.model.mesh.setSize(gmsh.model.getBoundary([
-                (3, vol_tags[1])], oriented=False, recursive=True), self.lmin)
+            if hyp_vol:
+                hyp_f = gmsh.model.mesh.field.add("Constant")
+                gmsh.model.mesh.field.setNumber(hyp_f, "VIn", 0.9 * self.lmin)
+                gmsh.model.mesh.field.setNumbers(hyp_f, "VolumesList", hyp_vol)
+                hyp_r = gmsh.model.mesh.field.add("Restrict")
+                gmsh.model.mesh.field.setNumber(hyp_r, "InField", hyp_f)
+                gmsh.model.mesh.field.setNumbers(hyp_r, "VolumesList", hyp_vol)
+                field_list = [hyp_r]
+                gmsh.model.mesh.field.setAsBackgroundMesh(field_list[0])
+
+            # Free mesh in the volume mesh
+            # gmsh.model.mesh.setSize(gmsh.model.getBoundary([
+            #     (3, vol_tags[1])], oriented=False, recursive=True), self.lmin)
 
             # Settings for the mesh generation
             gmsh.option.setNumber("Mesh.Algorithm", 1)
@@ -1326,7 +1356,7 @@ class HABC_Mesh():
 
             # Mesh data
             print(f"Mesh Created with {total_nodes} Nodes "
-                  f"and {total_elements} Volume Elements")
+                  f"and {total_elements} Volume Elements", flush=True)
 
             with NamedTemporaryFile(suffix='.msh') as tmp:
 
@@ -1338,12 +1368,12 @@ class HABC_Mesh():
                 q = {"overlap_type": (fire.DistributedMeshOverlapType.NONE, 0)}
                 final_mesh = fire.Mesh(
                     tmp.name, distribution_parameters=q, comm=self.comm.comm)
-            print("Merged Mesh Generated Successfully")
+            print("Merged Mesh Generated Successfully", flush=True)
 
             gmsh.finalize()
 
         except Exception as e:
-            UserWarning(f"Error Generating Merged Mesh: {e}. Exiting.")
+            print(f"Error Generating Merged Mesh: {e}. Exiting.", flush=True)
 
         # Adjusting coordinates: Swap (x, y, z) -> (z, x ,y)
         final_mesh.coordinates.dat.data_with_halos[:, [0, 1, 2]] = \
@@ -1534,7 +1564,7 @@ class HABC_Mesh():
             Mask for the absorbing layer
         '''
 
-        print("Clipping Coordinates Inside Layer")
+        print("Clipping Coordinates Inside Layer", flush=True)
 
         # Domain dimensions
         Lx, Lz = self.dom_dim[:2]
@@ -1624,7 +1654,7 @@ class HABC_Mesh():
         None
         '''
 
-        print("Extending Profile Inside Layer")
+        print("Extending Profile Inside Layer", flush=True)
 
         # Extracting the nodes from the layer field
         lay_nodes = lay_field.dat.data_with_halos[:]
@@ -1643,7 +1673,8 @@ class HABC_Mesh():
 
         if method == 'point_cloud':
 
-            print("Using Cloud Points Method to Extend Velocity Profile")
+            print("Using Cloud Points Method to Extend Velocity Profile",
+                  flush=True)
 
             # Set the velocity of the nearest point on the original boundary
             vel_to_extend = self.point_cloud_field(
@@ -1652,7 +1683,8 @@ class HABC_Mesh():
 
         elif method == 'nearest_point':
 
-            print("Using Nearest Point Method to Extend Velocity Profile")
+            print("Using Nearest Point Method to Extend Velocity Profile",
+                  flush=True)
 
             # Set the velocity of the nearest point on the original boundary
             vel_to_extend = self.initial_velocity_model.at(pts_to_extend,

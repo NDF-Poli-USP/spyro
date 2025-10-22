@@ -131,7 +131,7 @@ class HABC_Error():
         None
         '''
 
-        print("\nSaving Reference Output")
+        print("\nSaving Reference Output", flush=True)
 
         # Path to save the reference signal
         pth_str = self.path_save_error + "preamble/"
@@ -163,7 +163,7 @@ class HABC_Error():
         None
         '''
 
-        print("\nLoading Reference Signal from Infinite Model")
+        print("\nLoading Reference Signal from Infinite Model", flush=True)
 
         # Path to the reference data folder
         pth_str = self.path_save_error + foldername
@@ -190,7 +190,7 @@ class HABC_Error():
         None
         '''
 
-        print("\nComputing Error Measures")
+        print("\nComputing Error Measures", flush=True)
 
         # Initializing error measures
         pkMax = []
@@ -234,9 +234,10 @@ class HABC_Error():
         self.err_habc = [errIt, errPk, pkMax, final_energy]
         self.max_errIt = max(errIt)
         self.max_errPK = max(errPk)
-        print("Maximum Integral Error: {:.2%}".format(self.max_errIt))
-        print("Maximum Peak Error: {:.2%}".format(self.max_errPK))
-        print("Acoustic Energy: {:.2e}".format(final_energy))
+        print("Maximum Integral Error: {:.2%}".format(
+            self.max_errIt), flush=True)
+        print("Maximum Peak Error: {:.2%}".format(self.max_errPK), flush=True)
+        print("Acoustic Energy: {:.2e}".format(final_energy), flush=True)
 
         # Save error measures
         err_str = self.path_save_err_case + "habc_errs.txt"
@@ -326,7 +327,8 @@ class HABC_Error():
             xCR_cand = list(np.linspace(xCR_inf, xCR_sup, n_pts-1))
 
         format_xCR = ', '.join(['{:.3f}'.format(x) for x in xCR_cand])
-        print("Candidates for Heuristic Factor xCR: [{}]".format(format_xCR))
+        print("Candidates for Heuristic Factor xCR: [{}]".format(
+            format_xCR), flush=True)
 
         return xCR_cand
 
@@ -397,6 +399,7 @@ class HABC_Error():
             vtx = - eq_xCR[1] / (2 * eq_xCR[0])
             xCR_opt = np.clip(vtx, xCR_inf, xCR_sup)
 
-        print("Optimal Heuristic Factor xCR: {:.3f}".format(xCR_opt))
+        print("Optimal Heuristic Factor xCR: {:.3f}".format(
+            xCR_opt), flush=True)
 
         return xCR_opt

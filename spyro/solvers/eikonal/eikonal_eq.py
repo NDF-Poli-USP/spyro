@@ -509,18 +509,19 @@ class Eikonal_Modeling():
 
                 # Final parameters
                 solv_ok = "Solver Executed Successfully. "
-                print((solv_ok + 'AbsTol: {:.1e}').format(user_atol))
+                print((solv_ok + 'AbsTol: {:.1e}').format(
+                    user_atol), flush=True)
 
                 return yp
 
-            except Exception as e:
-                print(f"Error Solving: {e}")
+            except fire.ConvergenceError as e:
+                print(f"Error Solving: {e}", flush=True)
 
                 # Adjusting tolerance
                 user_atol = user_atol * 10 if user_atol < 1e-5 \
                     else round(user_atol + 1e-5, 5)
                 if user_atol > 1e-4:
-                    print("Tolerance too high. Exiting.")
+                    print("Tolerance too high. Exiting.", flush=True)
                     break
 
     def nonlinear_solution(self, wf_parameters, nl_solver='vinewtonssls',
@@ -583,7 +584,7 @@ class Eikonal_Modeling():
         user_est = self.f_est
         while True:
             try:
-                print(f"Iteration for Festab: {user_est:.2f}")
+                print(f"Iteration for Festab: {user_est:.2f}", flush=True)
 
                 # Preserving intial guess
                 yp = fire.Function(V, name='Eikonal (Time [s])')
@@ -605,24 +606,27 @@ class Eikonal_Modeling():
 
                 # Final parameters
                 solv_ok = "Solver Executed Successfully. "
-                print((solv_ok + 'AbsTol: {:.1e}').format(user_atol))
-                print((solv_ok + 'Festab: {:.2f}').format(user_est))
+                print((solv_ok + 'AbsTol: {:.1e}').format(
+                    user_atol), flush=True)
+                print((solv_ok + 'Festab: {:.2f}').format(
+                    user_est), flush=True)
 
                 return yp
 
-            except Exception as e:
-                print(f"Error Solving: {e}")
+            except fire.ConvergenceError as e:
+                print(f"Error Solving: {e}", flush=True)
 
                 # Adjusting stabilizing factor
                 user_est += 0.01
                 if user_est > 1.0:
                     user_est = self.f_est
-                    print("\nHigh Stabilizing Factor. Increasing Tolerance!")
+                    print("\nHigh Stabilizing Factor. Increasing Tolerance!",
+                          flush=True)
                     user_atol = user_atol * 10 if user_atol < 1e-5 \
                         else round(user_atol + 1e-5, 5)
                     if user_atol > 1e-4:
-                        print("High Tolerance. Exiting!")
-                        exit("No Results for Eikonal Equation")
+                        print("High Tolerance. Exiting!", flush=True)
+                        exit("No Results for Eikonal Equation", flush=True)
 
     def eikonal_solver(self, c, c_min, V, diam_mesh):
         '''
@@ -653,11 +657,11 @@ class Eikonal_Modeling():
         wf_parameters = [u, vy, c, c_min, V, diam_mesh]
 
         # Linear Eikonal
-        print("\nSolving Pre-Eikonal")
+        print("\nSolving Pre-Eikonal", flush=True)
         yp = self.linear_solution(wf_parameters)
 
         # Nonlinear Eikonal
-        print("\nSolving Post-Eikonal")
+        print("\nSolving Post-Eikonal", flush=True)
         yp = self.nonlinear_solution(wf_parameters[1:], lin_sol=yp)
 
         return yp

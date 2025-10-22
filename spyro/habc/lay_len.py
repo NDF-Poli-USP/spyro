@@ -125,7 +125,7 @@ def calc_zero(xini, a, tol, nz=1):
     return x
 
 
-def loop_roots(a, lmin, lref, max_roots, tol_rel=1e-3, monitor=False):
+def loop_roots(a, lmin, lref, max_roots, tol_rel=1e-3, show_ig=True, monitor=False):
     '''
     Loop to calculate the size parameter for the absorbing layer
 
@@ -142,6 +142,8 @@ def loop_roots(a, lmin, lref, max_roots, tol_rel=1e-3, monitor=False):
         Number of layer sizes to be calculated. Default is 5
     tol_rel : `float`, optional
         Relative convergence tolerance w.r.t the initial guess. Default is 1e-3
+    show_ig : `bool`, optional
+        Print the initial guess for the size parameter. Default is True
     monitor : `bool`, optional
         Print the parameter sizes of the absorbing layer. Default is False
 
@@ -153,7 +155,9 @@ def loop_roots(a, lmin, lref, max_roots, tol_rel=1e-3, monitor=False):
 
     # Initial guess
     FLmin = 0.5 * lmin / lref
-    print("Initial Guess for Size Parameter: {:.4f}".format(FLmin))
+    if show_ig:
+        print("Initial Guess for Size Parameter: {:.4f}".format(
+            FLmin), flush=True)
 
     # Number of digits to round the size parameter
     dig_x = 13
@@ -178,8 +182,9 @@ def loop_roots(a, lmin, lref, max_roots, tol_rel=1e-3, monitor=False):
 
         # Monitoring the size parameter
         if monitor:
-            print("**************** Possible FL ****************")
-            print(f"Root {i + 1}: {x_rnd:>} - Res: {f_layer(x_rnd, a):>}")
+            print("**************** Possible FL ****************", flush=True)
+            print(f"Root {i + 1}: {x_rnd: >} - Res: {f_layer(x_rnd, a): >}",
+                  flush=True)
 
     return FLpos
 
@@ -194,7 +199,7 @@ def calc_size_lay(fref, z_par, lmin, lref, nz=5, n_root=1, tol_rel=1e-3,
     freq_ref : `float`
         Reference frequency of the wave
     z_par : `float`
-        Inverse of minimum Eikonal (Equivalent to c_bound/lref)
+        Inverse of the minimum Eikonal (Equivalent to c_bound/lref)
     lmin : `float`
         Minimal dimension of finite element in mesh
     lref : `float`
@@ -226,18 +231,18 @@ def calc_size_lay(fref, z_par, lmin, lref, nz=5, n_root=1, tol_rel=1e-3,
     '''
 
     # Visualizing parameters for computing layer size
-    print("\nComputing Size for Absorbing Layer")
+    print("\nComputing Size for Absorbing Layer", flush=True)
 
     # Parameters for the absorbing layer
     aux0 = "Parameter z (1/s): {:.4f},".format(z_par)
     a = z_par / fref  # Adimensional parameter
     aux1 = "Parameter a (adim): {:.4f}".format(a)
-    print(aux0, aux1)
+    print(aux0, aux1, flush=True)
 
     # Minimum and reference length of the layer
     aux2 = "Minimum Mesh Length (km): {:.4f},".format(lmin)
     aux3 = "Reference Length (km): {:.4f}".format(lref)
-    print(aux2, aux3)
+    print(aux2, aux3, flush=True)
 
     # Maximum number of sizes to be computed
     nz = max(1, n_root + 1, nz)
@@ -248,24 +253,25 @@ def calc_size_lay(fref, z_par, lmin, lref, nz=5, n_root=1, tol_rel=1e-3,
     # Reflection coefficients
     CRpos = np.round(np.array([f_layer(x, a, typ="CR") for x in FLpos]), 4)
 
+    # Visualizing options for layer size
+    format_FL = ', '.join(['{:.4f}'.format(x) for x in FLpos])
+    print("Options for FL: [{}]".format(format_FL), flush=True)
+    format_CR = ', '.join(['{:.4f}'.format(x) for x in CRpos])
+    print("Options for CR: [{}]".format(format_CR), flush=True)
+    format_lay = ', '.join(['{:.4f}'.format(x * lref) for x in FLpos])
+    print("Options for Layer Size (km): [{}]".format(format_lay), flush=True)
+    format_ele = [int(x * lref / lmin) for x in FLpos]
+    print("Aprox. Number of Elements ({:.3f} km) in Layer: {}".format(
+        lmin, format_ele), flush=True)
+
     # Selecting a size
     F_L = FLpos[n_root - 1]
 
     # Size of the absorving layer
     pad_len = F_L * lref
 
-    # Visualizing options for layer size
-    format_FL = ', '.join(['{:.4f}'.format(x) for x in FLpos])
-    print("Options for FL: [{}]".format(format_FL))
-    format_CR = ', '.join(['{:.4f}'.format(x) for x in CRpos])
-    print("Options for CR: [{}]".format(format_CR))
-    format_lay = ', '.join(['{:.4f}'.format(x * lref) for x in FLpos])
-    print("Options for Layer Size (km): [{}]".format(format_lay))
-    format_ele = [int(x * lref / lmin) for x in FLpos]
-    print("Aprox. Number of Elements ({:.3f} km) in Layer: {}".format(
-        lmin, format_ele))
-    print("Selected Parameter Size FL: {:.4f}".format(F_L))
-    print("Selected Layer Size (km): {:.4f}".format(pad_len))
+    print("Selected Parameter Size FL: {:.4f}".format(F_L), flush=True)
+    print("Selected Layer Size (km): {:.4f}".format(pad_len), flush=True)
 
     # Approximated number of elements in the layer of edge length 'lmin'
     ele_pad = format_ele[n_root - 1]
@@ -275,7 +281,7 @@ def calc_size_lay(fref, z_par, lmin, lref, nz=5, n_root=1, tol_rel=1e-3,
 
     # Normalized element size
     d = lmin / pad_len
-    print("Normalized Element Size (adim): {0:.5f}".format(d))
+    print("Normalized Element Size (adim): {0:.5f}".format(d), flush=True)
 
     return F_L, pad_len, ele_pad, d, a, FLpos
 
@@ -313,9 +319,10 @@ def roundFL(lmin, lref, F_L):
     # Number of elements in the layer
     ele_pad = int(pad_len / lmin)
 
-    print("\nModifying Layer Size Based on the Element Size")
-    print("Modified Parameter Size FL: {:.4f}".format(F_L))
-    print("Modified Layer Size (km): {:.4f}".format(pad_len))
-    print("Elements ({:.3f} km) in Layer: {}".format(lmin, ele_pad))
+    print("\nModifying Layer Size Based on the Element Size", flush=True)
+    print("Modified Parameter Size FL: {:.4f}".format(F_L), flush=True)
+    print("Modified Layer Size (km): {:.4f}".format(pad_len), flush=True)
+    print("Elements ({:.3f} km) in Layer: {}".format(
+        lmin, ele_pad), flush=True)
 
     return F_L, pad_len, ele_pad

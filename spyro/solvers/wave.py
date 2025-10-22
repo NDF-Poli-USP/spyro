@@ -113,6 +113,7 @@ class Wave(Model_parameters, metaclass=ABCMeta):
 
         if self.abc_boundary_layer_type != "hybrid":
             self._initialize_model_parameters()
+
         self.matrix_building()
         self.wave_propagator()
 
@@ -400,6 +401,7 @@ class Wave(Model_parameters, metaclass=ABCMeta):
         u_rec: numpy array
             Wavefield at the receivers across the timesteps.
         """
+
         if final_time is not None:
             self.final_time = final_time
         if dt is not None:

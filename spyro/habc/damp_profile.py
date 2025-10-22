@@ -407,9 +407,13 @@ class HABC_Damping():
         # Critical damping coefficient
         eta_crt = 2 * np.pi * fundam_freq
         eta_max = psi * eta_crt
-        print("Critical Damping Coefficient (1/s): {0:.5f}".format(eta_crt))
-        print("Maximum Damping Ratio: {0:.3%}".format(psi))
-        print("Maximum Damping Coefficient (1/s): {0:.5f}".format(eta_max))
+        print("Critical Damping Coefficient (1/s): {0:.5f}".format(eta_crt),
+              flush=True)
+
+        # Maximum damping ratio and coefficient
+        print("Maximum Damping Ratio: {0:.3%}".format(psi), flush=True)
+        print("Maximum Damping Coefficient (1/s): {0:.5f}".format(eta_max),
+              flush=True)
 
         # Minimum damping ratio and the associated heuristic factor
         psi_min, xCR_est, xCR_lim, CRmin = self.est_min_damping()
@@ -424,14 +428,18 @@ class HABC_Damping():
             psi_min = xCR * self.d
             xcr_str = "Using User-Defined Heuristic Factor xCR: {:.3f}"
 
-        print("Minimum Damping Ratio: {:.3%}".format(psi_min))
-        print(xcr_str.format(xCR))
-
-        # Computed values and its range
+        # Minimum damping ratio and coefficient
+        eta_min = psi_min * eta_crt
+        print("Minimum Damping Ratio: {:.3%}".format(psi_min), flush=True)
         psi_str = "Range for Minimum Damping Ratio. Min:{:.5f} - Max:{:.5f}"
-        print(psi_str.format(xCR_inf * self.d, xCR_sup * self.d))
-        xcr_str = "Range Values for xCR Factor. Min:{:.3f} - Max:{:.3f}"
-        print(xcr_str.format(xCR_inf, xCR_sup))
+        print(psi_str.format(xCR_inf * self.d, xCR_sup * self.d), flush=True)
+        print("Minimum Damping Coefficient (1/s): {0:.5f}".format(eta_min),
+              flush=True)
+
+        # Heuristic factor and its range
+        print(xcr_str.format(xCR), flush=True)
+        xrg_str = "Range Values for xCR Factor. Min:{:.3f} - Max:{:.3f}"
+        print(xrg_str.format(xCR_inf, xCR_sup), flush=True)
 
         return eta_crt, psi_min, xCR, xCR_lim, CRmin
 
@@ -542,7 +550,7 @@ class HABC_Damping():
         xCR_max = np.clip(xCR_max * fmax, xCR_inf, xCR_sup)
 
         lim_str = "Initial Range for xCR Factor. Min:{:.3f} - Max:{:.3f}"
-        print(lim_str.format(xCR_min, xCR_max))
+        print(lim_str.format(xCR_min, xCR_max), flush=True)
 
         # ToDo: Use for update xCR in FWI iterations
         return (xCR_min, xCR_max)

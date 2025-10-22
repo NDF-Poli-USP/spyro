@@ -190,7 +190,7 @@ def modal_fig8(Wave_obj, modal_solver_lst, fitting_c):
     for modal_solver in modal_solver_lst:
 
         # Modal solver
-        print("\nModal Solver: {}".format(modal_solver))
+        print("\nModal Solver: {}".format(modal_solver), flush=True)
 
         # Reference to resource usage
         tRef = comp_cost("tini")
@@ -215,7 +215,7 @@ def test_loop_modal_2d():
 
     # Mesh size (in km)
     # cpw: cells per wavelength
-    # lba = minimum_velocity /source_frequency
+    # lba = minimum_velocity / source_frequency
     # edge_length = lba / cpw
     edge_length_lst = [0.1000, 0.0625, 0.0500, 0.0250, 0.0200]
 
@@ -233,10 +233,10 @@ def test_loop_modal_2d():
     edge_length = edge_length_lst[case]
     f_est = f_est_lst[case]
     fitting_c = fitting_c_lst[case]
-    print("\nMesh Size: {:.4f} km".format(edge_length))
-    print("Eikonal Stabilizing Factor: {:.2f}".format(f_est))
-    fit_str = "Fitting Parameters for Analytical Solver: "
-    print((fit_str + "{:.1f}, {:.1f}, {:.1f}, {:.1f}").format(*fitting_c))
+    print("\nMesh Size: {:.4f} m".format(1e3 * edge_length), flush=True)
+    print("Eikonal Stabilizing Factor: {:.2f}".format(f_est), flush=True)
+    fit_str = "Fitting Parameters for Analytical Solver: " + 3 * "{:.1f}, "
+    print((fit_str + "{:.1f}\n").format(*fitting_c), flush=True)
 
     # ============ HABC PARAMETERS ============
 
@@ -275,8 +275,8 @@ def test_loop_modal_2d():
             # Computing the fundamental frequency
             modal_fig8(Wave_obj, modal_solver_lst, fitting_c)
 
-        except Exception as e:
-            print(f"Error Solving: {e}")
+        except fire.ConvergenceError as e:
+            print(f"Error Solving: {e}", flush=True)
             break
 
         # Renaming the folder if degree_layer is modified

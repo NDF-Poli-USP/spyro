@@ -88,7 +88,7 @@ def plot_function_layer_size(lay_par, freq_par, geom_par, FLpos,
 
         # Calculate the size parameter for the source frequency
         a_sou = z / fsou  # Adimensional parameter
-        FLsou = loop_roots(a_sou, lmin, lref, len(FLpos))
+        FLsou = loop_roots(a_sou, lmin, lref, len(FLpos), show_ig=False)
         a_lst.append(a_sou)
         F_lst.append(FLsou)
         l_lst.append("{:.2f}".format(fsou))
@@ -109,10 +109,10 @@ def plot_function_layer_size(lay_par, freq_par, geom_par, FLpos,
         lim_crit = min(lim_crit, crit.min())
         plt.plot(F_L, crit, color=col, zorder=2,
                  label=r'$\Psi_{{F_L}}({}={}\text{{Hz}})$'.format(w_str, lab))
-        plt.scatter(FL_rt, np.zeros(5), color=col, zorder=3)
+        plt.scatter(FL_rt, np.zeros(len(FL_rt)), color=col, zorder=3)
 
     # Identify the roots of the criterion function
-    delta_x = FL_lim / 40
+    delta_x = FL_lim / 35
     delta_y = abs(lim_crit) / 2
     for lay, (FL_rt, col) in enumerate(zip(F_lst, c_lst)):
         y_FL = -1.3 * delta_y if lay == 0 else 0.8 * delta_y
@@ -165,7 +165,7 @@ def plot_hist_receivers(Wave_object, show=False):
     None
     '''
 
-    print("\nPlotting Time Comparison")
+    print("\nPlotting Time Comparison", flush=True)
 
     # Time data
     dt = Wave_object.dt
@@ -244,7 +244,7 @@ def plot_rfft_receivers(Wave_object, fxlim=4., show=False):
     None
     '''
 
-    print("\nPlotting Frequency Comparison")
+    print("\nPlotting Frequency Comparison", flush=True)
 
     # Frequency data
     f_Nyq = Wave_object.f_Nyq

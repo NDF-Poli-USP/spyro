@@ -21,8 +21,8 @@ class NRBC():
     cos_Hig : `firedrake function`
         Profile of the cosine of incidence angle for 1^st-order Higdon BC.
         Free surfaces and interior nodes are set to 0
-    cos_max : `float`
-        Maximum value of the cosine of the incidence angle
+    cos_min : `float`
+        Minimum value of the cosine of the incidence angle
     dimension : `int`
         Model dimension (2D or 3D). Default is 2D
     dom_dim : `tuple`
@@ -79,7 +79,7 @@ class NRBC():
         self.angle_max = angle_max
 
         # Maximum value of the cosine of the incidence angle
-        self.cos_max = np.cos(angle_max)
+        self.cos_min = np.cos(angle_max)
 
         # Model dimension
         self.dimension = dimension
@@ -229,7 +229,7 @@ class NRBC():
         '''
 
         nrbc_str = "Sommerfeld" if sommerfeld_bc else "Higdon"
-        print("\nCreating Field for NRBC:", nrbc_str)
+        print("Creating Field for NRBC:", nrbc_str, flush=True)
 
         # Initialize field for the cosine of the incidence angle
         self.cosHig = fire.Function(V, name='cosHig')
@@ -278,8 +278,9 @@ class NRBC():
                 # Cosine of the incidence angle
                 cos_Hig = np.sum(unit_ref_vct * unit_nrm_vct, axis=0)
 
-            cos_Hig[cos_Hig < self.cos_max] = (
-                1. - cos_Hig[cos_Hig < self.cos_max]**2)**0.5
+            # Adjust values to minimum cosine of incidence angle
+            cos_Hig[cos_Hig < self.cos_min] = (
+                1. - cos_Hig[cos_Hig < self.cos_min]**2)**0.5
 
         self.cosHig.dat.data_with_halos[bnd_nfs] = cos_Hig
 

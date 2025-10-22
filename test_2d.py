@@ -311,7 +311,7 @@ def test_loop_habc_2d():
 
     # Mesh size (in km)
     # cpw: cells per wavelength
-    # lba = minimum_velocity /source_frequency
+    # lba = minimum_velocity / source_frequency
     # edge_length = lba / cpw
     edge_length_lst = [0.1000, 0.0625, 0.0500, 0.0250, 0.0200]
 
@@ -335,14 +335,14 @@ def test_loop_habc_2d():
     edge_length = edge_length_lst[case]
     dt_usu = dt_usu_lst[case]
     f_est = f_est_lst[case]
-    max_divisor_tf = max_div_tf_lst[case]
+    max_div_tf = max_div_tf_lst[case]
     fitting_c = fitting_c_lst[case]
-    print("\nMesh Size: {:.3f} km".format(edge_length))
-    print("Timestep Size: {:.3f} ms".format(1e3 * dt_usu))
-    print("Eikonal Stabilizing Factor: {:.2f}".format(f_est))
-    print("Maximum Divisor of Final Time: {}".format(max_divisor_tf))
-    fit_str = "Fitting Parameters for Analytical Solver: "
-    print((fit_str + "{:.1f}, {:.1f}, {:.1f}, {:.1f}\n").format(*fitting_c))
+    print("\nMesh Size: {:.3f} m".format(1e3 * edge_length), flush=True)
+    print("Timestep Size: {:.3f} ms".format(1e3 * dt_usu), flush=True)
+    print("Eikonal Stabilizing Factor: {:.2f}".format(f_est), flush=True)
+    print("Maximum Divisor of Final Time: {}".format(max_div_tf), flush=True)
+    fit_str = "Fitting Parameters for Analytical Solver: " + 3 * "{:.1f}, "
+    print((fit_str + "{:.1f}\n").format(*fitting_c), flush=True)
 
     # ============ HABC PARAMETERS ============
 
@@ -350,7 +350,7 @@ def test_loop_habc_2d():
     get_ref_model = False
 
     # Loop for HABC cases
-    loop_modeling = not get_ref_model
+    loop_modeling = not get_ref_model, flush = True
 
     # Reference frequency
     habc_reference_freq_lst = ["source"]  # ["source", "boundary"]
@@ -385,7 +385,7 @@ def test_loop_habc_2d():
         tRef = comp_cost("tini")
 
         # Computing reference get_reference_signal
-        Wave_obj.infinite_model(check_dt=True, max_divisor_tf=max_divisor_tf)
+        Wave_obj.infinite_model(check_dt=True, max_divisor_tf=max_div_tf)
 
         # Set model parameters for the HABC scheme
         Wave_obj.abc_get_ref_model = False
@@ -404,20 +404,21 @@ def test_loop_habc_2d():
         mods_str = "Modal Solver for Fundamental Frequency: {}\n"
 
         # Loop for different layer shapes and degrees
-        for habc_reference_freq in habc_reference_freq_lst:
+        for habc_ref_freq in habc_reference_freq_lst:
 
             # Criterion for optimal heuristic factor xCR
-            print(crit_str.format(n_pts, crit_opt.replace("_", " ").title()))
+            print(crit_str.format(
+                n_pts, crit_opt.replace("_", " ").title()), flush=True)
 
             # Reference frequency for sizing the hybrid absorbing layer
-            Wave_obj.abc_reference_freq = habc_reference_freq
-            print(fref_str.format(habc_reference_freq.capitalize()))
+            Wave_obj.abc_reference_freq = habc_ref_freq
+            print(fref_str.format(habc_ref_freq.capitalize()), flush=True)
 
             # Type of the hypereshape degree
-            print(degr_str.format(degree_type))
+            print(degr_str.format(degree_type), flush=True)
 
             # Modal solver for fundamental frequency
-            print(mods_str.format(modal_solver))
+            print(mods_str.format(modal_solver), flush=True)
 
             for degree_layer in degree_layer_lst:
 
@@ -440,7 +441,8 @@ def test_loop_habc_2d():
                         else:
                             xCR_usu = xCR_cand[itr_xCR - 1]
 
-                        print("Iteration {} of {}".format(itr_xCR, n_pts))
+                        print("Iteration {} of {}".format(
+                            itr_xCR, n_pts), flush=True)
 
                         # Reference to resource usage
                         tRef = comp_cost("tini")
@@ -466,8 +468,8 @@ def test_loop_habc_2d():
                             xCR_opt = get_xCR_usu(
                                 Wave_obj, dat_regr_xCR, "optimal", n_pts)
 
-                    except Exception as e:
-                        print(f"Error Solving: {e}")
+                    except fire.ConvergenceError as e:
+                        print(f"Error Solving: {e}", flush=True)
                         break
 
                 # Renaming the folder if degree_layer is modified

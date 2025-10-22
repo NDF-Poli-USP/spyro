@@ -108,7 +108,7 @@ class RectangLayer():
             self.area = Lx_habc * Lz_habc
             self.a_rat = self.area / (Lx * Lz)
             self.f_Ah = 4
-            print("Area Ratio: {:5.3f}".format(self.a_rat))
+            print("Area Ratio: {:5.3f}".format(self.a_rat), flush=True)
 
         if self.dimension == 3:  # 3D
             Ly = self.dom_dim[2]
@@ -118,4 +118,4 @@ class RectangLayer():
             self.vol = Lx_habc * Lz_habc * Ly_habc
             self.v_rat = self.vol / (Lx * Lz * Ly)
             self.f_Vh = 8
-            print("Volume Ratio: {:5.3f}".format(self.v_rat))
+            print("Volume Ratio: {:5.3f}".format(self.v_rat), flush=True)

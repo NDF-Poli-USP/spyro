@@ -20,12 +20,12 @@ def central_difference(wave, source_ids=[0]):
         tuple:
             A tuple containing the forward solution and the receiver output.
     """
+
     if wave.sources is not None:
         wave.sources.current_sources = source_ids
         rhs_forcing = fire.Cofunction(wave.function_space.dual())
 
     wave.field_logger.start_logging(source_ids)
-
     wave.comm.comm.barrier()
 
     t = wave.current_time
@@ -38,8 +38,10 @@ def central_difference(wave, source_ids=[0]):
     ]
     usol_recv = []
     save_step = 0
+
     for step in range(nt):
         # Basic way of applying sources
+
         wave.update_source_expression(t)
         fire.assemble(wave.rhs, tensor=wave.B)
 

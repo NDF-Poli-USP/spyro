@@ -263,9 +263,12 @@ class HyperLayer():
 
         if monitor:
             # Central tendency criteria
-            print("'Harm' Superness. r: {:>5.3f} - n: {:>.1f}".format(rh, h))
-            print("'Geom' Superness. r: {:>5.3f} - n: {:>.1f}".format(rg, g))
-            print("'Arit' Superness. r: {:>5.3f} - n: {:>.1f}".format(rz, z))
+            print("'Harm' Superness. r: {:>5.3f} - n: {:>.1f}".format(
+                rh, h), flush=True)
+            print("'Geom' Superness. r: {:>5.3f} - n: {:>.1f}".format(
+                rg, g), flush=True)
+            print("'Arit' Superness. r: {:>5.3f} - n: {:>.1f}".format(
+                rz, z), flush=True)
 
         return round(h, 1), round(g, 1), round(z, 1)
 
@@ -303,18 +306,19 @@ class HyperLayer():
         # Integer loop
         r = np.inf
         n = n_minint - 1
-        while r > 1 and n < n_maxint:
+        while r > 1 and n < n_maxint - 1:
             n += 1
             r = self.radial_parameter(spness, n)
             if monitor:
-                print("ParHypEll - r: {:>5.3f} - n: {:>.1f}".format(r, n))
+                print("ParHypEll - r: {:>5.3f} - n: {:>.1f}".format(
+                    r, n), flush=True)
 
         # Real limits (difference of at least 1)
         n_min = max(round(float(n_min), 1), 2.)
         n_max = max(round(float(n_max), 1), n_min + 1., 20.)
 
         # Real loop
-        if self.n_type == 'real' and n > 2:
+        if self.n_type == 'real' and 2 < n < 20:
             r = np.inf
             n_maxreal = n
             n -= 1
@@ -322,7 +326,8 @@ class HyperLayer():
                 n += 0.1
                 r = self.radial_parameter(spness, round(n, 1))
                 if monitor:
-                    print("ParHypEll - r: {:>5.3f} - n: {:>.1f}".format(r, n))
+                    print("ParHypEll - r: {:>5.3f} - n: {:>.1f}".format(r, n),
+                          flush=True)
 
         return round(float(n), 1), n_min, n_max
 
@@ -380,14 +385,14 @@ class HyperLayer():
             lim_str = "min" if lim == 'MIN' else "max"
             pr0_str = shp_str + " Parameters. r_" + lim_str
             pr1_str = ": {:>5.3f} - n_" + lim_str + ": {:>.1f}"
-            print(pr0_str + pr1_str.format(r, n))
+            print(pr0_str + pr1_str.format(r, n), flush=True)
 
         # Superness s = 2^(-1/n): Extreme points of the hyperellipse
         snss_str = "Superness Coordinates (km): ({:5.3f}, {:5.3f})"
         if self.dimension == 3:  # 3D
             # Superness s = 3^(-1/n): Extreme points of the hyperellipsoid
             snss_str = snss_str[:-1] + ", {:5.3f})"
-        print(snss_str.format(*spness))
+        print(snss_str.format(*spness), flush=True)
 
         return n
 
@@ -417,27 +422,30 @@ class HyperLayer():
 
         # Verification of hypershape degree
         ndeg_str = "Checking Current Hypershape Degree n_hyp: {:>.1f}"
-        print(ndeg_str.format(n_hyp))
+        print(ndeg_str.format(n_hyp), flush=True)
         axes_str = "Semi-axes (km): a_hyp:{:5.3f} - b_hyp:{:5.3f}"
         if self.dimension == 3:  # 3D
             Ly = self.dom_dim[2]
             axes_str += " - c_hyp:{:5.3f}"
-        print(axes_str.format(*self.hyper_axes))
+        print(axes_str.format(*self.hyper_axes), flush=True)
 
         # Minimum allowed exponent
         # n_min ensures to add lmin in the domain diagonal direction
-        print("Determining the Minimum Degree for Hypershape Layer")
+        print("Determining the Minimum Degree for Hypershape Layer",
+              flush=True)
         x_min = (0.5 * Lx + lmin, 0.5 * Lz + lmin)
 
         if self.dimension == 3:  # 3D
             x_min += (0.5 * Ly + lmin,)
 
         n_min = self.calc_degree_hypershape(x_min, 'MIN', monitor=monitor)
-        print("Minimum Degree for Hypershape n_min: {:>.1f}".format(n_min))
+        print("Minimum Degree for Hypershape n_min: {:>.1f}".format(
+            n_min), flush=True)
 
         # Maximum allowed exponent
         # n_max ensures to add pad_len in the domain diagonal direction
-        print("Determining the Maximum Degree for Hypershape Layer")
+        print("Determining the Maximum Degree for Hypershape Layer",
+              flush=True)
         theta = np.arctan2(Lz, Lx)
 
         if self.dimension == 2:  # 2D
@@ -452,16 +460,20 @@ class HyperLayer():
 
         n_max = self.calc_degree_hypershape(
             x_max, 'MAX', n_min=n_min, monitor=monitor)
-        print("Maximum Degree for Hypershape n_max: {:>.1f}".format(n_max))
+        print("Maximum Degree for Hypershape n_max: {:>.1f}".format(
+            n_max), flush=True)
 
         if n_min <= n_hyp <= n_max:
-            print("Current Hypershape Degree n_hyp: {:>.1f}".format(n_hyp))
+            print("Current Hypershape Degree n_hyp: {:>.1f}".format(
+                n_hyp), flush=True)
         else:
             hyp_str = "Degree for Hypershape Layer. Setting to"
             if n_hyp < n_min:
-                print("Low", hyp_str, "n_min: {:>.1f}".format(n_min))
+                print("Low", hyp_str, "n_min: {:>.1f}".format(
+                    n_min), flush=True)
             elif n_hyp > n_max:
-                print("High", hyp_str, "n_max: {:>.1f}".format(n_max))
+                print("High", hyp_str, "n_max: {:>.1f}".format(
+                    n_max), flush=True)
 
         self.n_hyp = np.clip(n_hyp, n_min, n_max)
         self.n_bounds = (n_min, n_max)
@@ -760,7 +772,7 @@ class HyperLayer():
 
             # Area ratio
             self.a_rat = self.area / (Lx * Lz)
-            print("Area Ratio: {:5.3f}".format(self.a_rat))
+            print("Area Ratio: {:5.3f}".format(self.a_rat), flush=True)
 
             # Area factor
             self.f_Ah = self.area / (a_hyp * b_hyp)
@@ -778,7 +790,7 @@ class HyperLayer():
 
             # Volume ratio
             self.v_rat = self.vol / (Lx * Lz * Ly)
-            print("Volume Ratio: {:5.3f}".format(self.v_rat))
+            print("Volume Ratio: {:5.3f}".format(self.v_rat), flush=True)
 
             # Volume factor
             self.f_Vh = self.vol / (a_hyp * b_hyp * c_hyp)

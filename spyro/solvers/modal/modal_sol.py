@@ -128,18 +128,16 @@ class Modal_Solver():
             self.method = method
 
         # Valid methods for solving the eigenproblem
-        self.valid_methods = ['ANALYTICAL', 'ARNOLDI', 'LANCZOS',
-                              'LOBPCG', 'KRYLOVSCH_CH', 'KRYLOVSCH_CG',
-                              'KRYLOVSCH_GH', 'KRYLOVSCH_GG', 'RAYLEIGH']
-
-        if self.method == 'ANALYTICAL' and self.calc_max_dt:
-            raise ValueError("Method 'ANALYTICAL' is not available "
-                             "to estimate the maximum stable timestep")
+        self.valid_methods = ['ANALYTICAL', 'ARNOLDI', 'LANCZOS', 'LOBPCG']
+        if not self.calc_max_dt:
+            self.valid_methods.extend(['KRYLOVSCH_CH', 'KRYLOVSCH_CG',
+                                       'KRYLOVSCH_GH', 'KRYLOVSCH_GG',
+                                       'RAYLEIGH'])
 
         if self.method not in self.valid_methods:
             value_parameter_error('method', method, self.valid_methods)
 
-        print(f'Solver Method: {self.method}')
+        print(f"Solver Method: {self.method}", flush=True)
 
     @staticmethod
     def weak_forms(c, V, quad_rule=None, source=False):
@@ -185,7 +183,7 @@ class Modal_Solver():
 
         return a, m
 
-    @staticmethod
+    @ staticmethod
     def assemble_sparse_matrices(a, m, return_M_inv=False):
         '''
         Assemble the sparse matrices for SciPy solvers
@@ -502,7 +500,7 @@ class Modal_Solver():
             psi0 = np.arccosh(a0 / f0)
             idx = int(bc == 'Neumann')
             m = 1 if bc == 'Neumann' else 0  # Order of the MMF
-            print(bc, m, psi0, q, mathieu_modcem1(m, q, psi0)[idx])
+            print(bc, m, psi0, q, mathieu_modcem1(m, q, psi0)[idx], flush=True)
             return mathieu_modcem1(m, q, psi0)[idx]
 
         def ZBF(m=0, n=1):
@@ -741,15 +739,15 @@ class Modal_Solver():
             delta_pn = pn_fit - sn.interval(0.95, loc=pn_fit, scale=perr[0])[0]
             delta_qn = qn_fit - sn.interval(0.95, loc=qn_fit, scale=perr[1])[0]
 
-            print(f"Nonlinear Curve Fit Successful!")
+            print(f"Nonlinear Curve Fit Successful!", flush=True)
             print(f"Fitted Parameters: pn = {pn_fit:.6f} ± {delta_pn:.6f}, "
-                  f"qn = {qn_fit:.6f} ± {delta_qn:.6f}")
-            print(f"R-Squared: {r_squared:.6f} - RMSE: {rmse:.6f}")
+                  f"qn = {qn_fit:.6f} ± {delta_qn:.6f}", flush=True)
+            print(f"R-Squared: {r_squared:.6f} - RMSE: {rmse:.6f}", flush=True)
 
             return pn_fit, qn_fit, fr_ell, fr_rec
 
         except fire.ConvergenceError as e:
-            print(f"Nonlinear Curve Fit Failed: {e}")
+            print(f"Nonlinear Curve Fit Failed: {e}", flush=True)
 
     def freq_factor_hyp(self, n_hyp, f_rec, f_ell, c_eq, bc='Neumann',
                         c_eqref=None, fitting_c=(1., 1., 0.5, 0.5),
@@ -900,8 +898,10 @@ class Modal_Solver():
             n_hyp, f_rec, f_ell, c_eq, bc=bc, c_eqref=c_eqref,
             fitting_c=fitting_c, cut_plane_percent=cut_plane_percent)
 
-        print(f"Hypershape Equivalent Velocity c_eq (km/s) = {c_eq:.3f}")
-        print(f"Hypershape Frequency factor f_hyp (1/km): {f_hyp:.3f}")
+        print(f"Hypershape Equivalent Velocity c_eq (km/s) = {c_eq:.3f}",
+              flush=True)
+        print(f"Hypershape Frequency factor f_hyp (1/km): {f_hyp:.3f}",
+              flush=True)
 
         # Eigenvalue
         Lsp = (c_reg * f_hyp)**2
@@ -1170,12 +1170,12 @@ class Modal_Solver():
         return Lsp
 
     def estimate_timestep(self, c, V, final_time, shift=0., quad_rule=None,
-                          inv_oper=False, estimate_maxeig=False, fraction=0.7):
+                          inv_oper=False, fraction=0.7):
         '''
-        Estimate the maximum stable timestep based on the spectral
-        radius using optionally the Gershgorin Circle Theorem to
-        estimate the maximum generalized eigenvalue. Otherwise
-        computes the maximum generalized eigenvalue exactly
+        Estimate the maximum stable timestep based on the spectral radius
+        using optionally the Gershgorin Circle Theorem to estimate
+        the maximum generalized eigenvalue ('ANALYTICAL' method).
+        Otherwise computes the maximum generalized eigenvalue exactly
 
         Parameters
         ----------
@@ -1193,9 +1193,6 @@ class Modal_Solver():
         inv_oper : `bool`, optional
             Option to use an inverse operator for improving convergence.
             Default is False
-        estimate_maxeig : `bool`, optional
-            Option to estimate the maximum eigenvalue using the
-            Gershgorin Circle Theorem. Default is False
         fraction : `float`, optional
             Fraction of the estimated timestep to use. Defaults to 0.7.
 
@@ -1206,7 +1203,9 @@ class Modal_Solver():
         '''
 
         # Maximum eigenvalue
-        if estimate_maxeig:
+        if self.method == 'ANALYTICAL':
+            print(f"Estimating Maximum Eigenvalue", flush=True)
+
             a, m = self.weak_forms(c, V, quad_rule=quad_rule)
 
             if shift > 0:
@@ -1216,9 +1215,7 @@ class Modal_Solver():
                 self.assemble_sparse_matrices(a, m, return_M_inv=True)
             Lsp = Msp_inv.multiply(Asp).toarray().squeeze()
             Lsp -= shift if shift > 0. else 0.
-
-            print(f"Estimating Maximum Eigenvalue", flush=True)
-            max_eigval = np.amax(np.abs(Lsp.diagonal()))[0]
+            max_eigval = np.amax(np.abs(Lsp.diagonal()))
 
         else:
             print(f"Computing Exact Maximum Eigenvalue", flush=True)

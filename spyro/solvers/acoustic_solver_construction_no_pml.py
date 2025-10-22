@@ -59,7 +59,6 @@ def construct_solver_or_matrix_no_pml(Wave_object):
             le += Wave_object.eta_mask * weak_expr_abc * \
                 (1 / (Wave_object.c * Wave_object.c)) * \
                 Wave_object.eta_habc * dx(scheme=quad_rule)
-
         else:
             if Wave_object.absorb_top:
                 le += f_abc*ds(1, scheme=qr_s)
