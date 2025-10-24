@@ -12,7 +12,8 @@ from ..utils import compute_functional
 from ..utils import Gradient_mask_for_pml, Mask
 from ..plots import plot_model as spyro_plot_model
 from ..io.basicio import switch_serial_shot
-from ..io.basicio import load_shots, save_shots
+from ..io.basicio import load_shots, save_shots, create_segy
+from ..utils import run_in_one_core
 
 
 try:
@@ -528,9 +529,12 @@ class FullWaveformInversion(AcousticWave):
             bounds=bounds,
             options=options,
         )
+        
         vp_end = fire.Function(self.function_space)
         vp_end.dat.data[:] = result.x
+        self.vp_result = vp_end
         fire.File("vp_end.pvd").write(vp_end)
+        np.save("result", result.x)
 
     def run_fwi_rol(self, **kwargs):
         """
@@ -644,6 +648,10 @@ class FullWaveformInversion(AcousticWave):
         load_shots(self, file_name=file_name)
         self.real_shot_record = self.forward_solution_receivers
         self.forward_solution_receivers = None
+
+    @run_in_one_core
+    def save_result_as_segy(self, file_name="final_vp.segy"):
+        create_segy(self.vp_result, self.function_space, 10.0/1000.0, file_name)
 
 
 class SyntheticRealAcousticWave(AcousticWave):
