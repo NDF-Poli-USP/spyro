@@ -499,7 +499,7 @@ class FullWaveformInversion(AcousticWave):
             "scipy_options": {
                 "disp": True,
                 "eps": 1e-15,
-                "ftol": 1e-7, "maxiter": kwargs.pop("maxiter", 20),
+                "ftol": 1e-11, "maxiter": kwargs.pop("maxiter", 20),
             }
         }
         parameters.update(kwargs)
