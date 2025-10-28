@@ -1,14 +1,5 @@
 import firedrake as fire
 import numpy as np
-
-
-# -*- coding: utf-8 -*-
-
-# # Importar fenics e dolfin adjoint
-# from fenics import*
-# from fenics_adjoint import*
-
-# # Importar ipdb para debugar
 import ipdb
 
 # Altura do domínio
@@ -26,26 +17,8 @@ E = 10
 # Coefieciente de Poisson
 nu = .3
 
-# # Volume do domínio
-# delta = b / h
-
-# # Volume máximo (fração volumétrica para restrição)
-# v_frac = Constant(0.6) * delta
-
 # Força de superfície
 F1 = fire.Constant((0., -0.01, 0.))
-
-# Matriz constitutiva (matriz de elasticidade) isotrópica
-# C_iso = E / (1 * nu**2) * fire.as_tensor(((1, nu, 0),
-#                                           (nu, 1, 0),
-#                                           (0, 0, (1 - nu) / 2)))
-
-
-# # Penalizador do SIMP
-# p = 3
-
-# # Raio do filtro
-# r = 6
 
 # Tamanho do elemento
 elsize = 2
@@ -60,11 +33,17 @@ nely = int(h / elsize)
 nelz = int(t / elsize)
 
 # Definir malha do MEF
-# mesh = fire.RectangleMesh(nelx, nely, b, h)
 mesh = fire.BoxMesh(nelx, nely, nelz, b, h, t)
 
 # Espaço para a variável de estado (deslocamento)
 V = fire.VectorFunctionSpace(mesh, "CG", 1)
+
+# Criando a condição de contorno de Dirichlet
+bc = fire.DirichletBC(V, ((0., 0., 0.)), 1)
+
+# Criando dx
+q_degree = 3
+dx = fire.dx(metadata={'quadrature_degree': q_degree})
 
 
 def c_vti_tensor(vP, vS, rho, epsilon, gamma, delta, anysotropy):
@@ -119,7 +98,7 @@ def c_vti_tensor(vP, vS, rho, epsilon, gamma, delta, anysotropy):
     return C_vti
 
 
-def c_tti_tensor(C_vti, theta, phi=0.):
+def c_tti_tensor(C_vti, theta, phi=0., heterogeneous_field=True):
     '''
     Constructs the elastic tensor for a material with TTI anisotropy.
     References: Yang et al (2020). Survey in Geophysics 41, 805-833
@@ -128,10 +107,11 @@ def c_tti_tensor(C_vti, theta, phi=0.):
     ----------
     C_vti: `ufl.tensors.ListTensor`
         Elastic tensor for VTI anisotropy
-    theta: `float`
+    theta: `float` or `firedrake.Function`
         Tilt angle in degrees
-    phi: `float`, optional
+    phi: `float` or `firedrake.Function`, optional
         Azimuth angle in degrees (default is 0: 2D case)
+
     Returns
     -------
     C_tti: `ufl.tensors.ListTensor`
@@ -146,13 +126,23 @@ def c_tti_tensor(C_vti, theta, phi=0.):
 
     # Tilt angle
     t = theta * np.pi / 180.
-    ct = 0. if t in c_zero else np.cos(theta)
-    st = 0. if t in s_zero else np.sin(theta)
+
+    if isinstance(theta, float):
+        ct = 0. if t in c_zero else np.cos(theta)
+        st = 0. if t in s_zero else np.sin(theta)
+    else:
+        ct = fire.cos(t)
+        st = fire.sin(t)
 
     # Azimuth angle
     p = phi * np.pi / 180.
-    cp = 0. if p in c_zero else np.cos(phi)
-    sp = 0. if p in s_zero else np.sin(phi)
+
+    if isinstance(phi, float):
+        cp = 0. if p in c_zero else np.cos(phi)
+        sp = 0. if p in s_zero else np.sin(phi)
+    else:
+        cp = fire.cos(p)
+        sp = fire.sin(p)
 
     # Rotation matrix components
     R11 = ct * cp
@@ -163,105 +153,51 @@ def c_tti_tensor(C_vti, theta, phi=0.):
     R21 = ct * sp
     R23 = st * sp
     R31 = -st
-    R32 = 0
+    R32 = 0.
 
-    # Convert to array
-    C_vti_arr = np.zeros(C_vti.ufl_shape)
-    for i in range(C_vti.ufl_shape[0]):
-        for j in range(C_vti.ufl_shape[1]):
-            C_vti_arr[i, j] = C_vti[i, j]
+    if heterogeneous_field:
 
-    # Transformation matrix
-    T_arr = np.array((
-        (R11**2, R12**2, R13**2, 2 * R12 * R13, 2 * R13 * R11, 2 * R11 * R12),
-        (R21**2, R22**2, R23**2, 2 * R22 * R23, 2 * R23 * R21, 2 * R21 * R22),
-        (R31**2, R32**2, R33**2, 2 * R32 * R33, 2 * R33 * R31, 2 * R31 * R32),
-        (R21*R31, R22*R32, R23*R33,
-            R22*R33 + R23*R32, R21*R33 + R23*R31, R22*R31 + R21*R32),
-        (R31*R11, R32*R12, R33*R13,
-            R12*R33 + R13*R32, R13*R31 + R11*R33, R11*R32 + R12*R31),
-        (R11*R21, R12*R22, R13*R23,
-            R12*R23 + R13*R22, R13*R21 + R11*R23, R11*R22 + R12*R21)))
+        # Transformation matrix for Voigt notation using UFL
+        T = fire.as_tensor([
+            [R11**2, R12**2, R13**2, 2 * R12 * R13, 2 * R13 * R11, 2 * R11 * R12],
+            [R21**2, R22**2, R23**2, 2 * R22 * R23, 2 * R23 * R21, 2 * R21 * R22],
+            [R31**2, R32**2, R33**2, 2 * R32 * R33, 2 * R33 * R31, 2 * R31 * R32],
+            [R21*R31, R22*R32, R23*R33, R22*R33 + R23*R32, R21*R33 + R23*R31,
+             R22*R31 + R21*R32],
+            [R31*R11, R32*R12, R33*R13, R12*R33 + R13*R32, R13*R31 + R11*R33,
+             R11*R32 + R12*R31],
+            [R11*R21, R12*R22, R13*R23, R12*R23 + R13*R22, R13*R21 + R11*R23,
+             R11*R22 + R12*R21]
+        ])
 
-    # Apply transformation to the VTI tensor
-    C_tti_arr = T_arr * C_vti_arr * T_arr.T
-    C_tti = fire.as_tensor(C_tti_arr)
+        # Apply transformation: C_tti = T * C_vti * T^T
+        C_tti = fire.dot(fire.dot(T, C_vti), fire.transpose(T))
+
+    else:
+
+        # Convert to array
+        C_vti_arr = np.zeros(C_vti.ufl_shape)
+        for i in range(C_vti.ufl_shape[0]):
+            for j in range(C_vti.ufl_shape[1]):
+                C_vti_arr[i, j] = C_vti[i, j]
+
+        # Transformation matrix
+        T_arr = np.array((
+            (R11**2, R12**2, R13**2, 2 * R12 * R13, 2 * R13 * R11, 2 * R11 * R12),
+            (R21**2, R22**2, R23**2, 2 * R22 * R23, 2 * R23 * R21, 2 * R21 * R22),
+            (R31**2, R32**2, R33**2, 2 * R32 * R33, 2 * R33 * R31, 2 * R31 * R32),
+            (R21*R31, R22*R32, R23*R33,
+                R22*R33 + R23*R32, R21*R33 + R23*R31, R22*R31 + R21*R32),
+            (R31*R11, R32*R12, R33*R13,
+                R12*R33 + R13*R32, R13*R31 + R11*R33, R11*R32 + R12*R31),
+            (R11*R21, R12*R22, R13*R23,
+                R12*R23 + R13*R22, R13*R21 + R11*R23, R11*R22 + R12*R21)))
+
+        # Apply transformation to the VTI tensor
+        C_tti_arr = T_arr * C_vti_arr * T_arr.T
+        C_tti = fire.as_tensor(C_tti_arr)
 
     return C_tti
-
-# # Espaço para a variável de projeto (pseudo-densidade)
-# P = fire.FunctionSpace(mesh, "CG", 1)
-
-
-# class Clamped(SubDomain):
-#     '''
-#     Definir parte fixa do contorno (posição da condição de contorno
-#     de Dirichlet)
-#     '''
-
-#     def inside(self, x, on_boundary):
-#         '''
-#         uᵢ = (0,0) ∀ x = 0
-#         '''
-#         return near(x[0], 0) and on_boundary
-
-
-# class Load(SubDomain):
-#     '''
-#     Definir onde a força de superfície é aplicada (posição da
-#     condição de contorno de Neumann)
-#     '''
-
-#     def inside(self, x, on_boundary):
-#         return near(x[0], l) and x[1] >= 45. and x[1] <= 55. and on_boundary
-
-
-# # Criando uma MeshFunction
-# boundaries = MeshFunction("size_t", mesh, 1)
-
-# # "Pintando" toda a mesh function com a cor "0"
-# boundaries.set_all(0)
-
-# # Pintando a parte fixa com a cor "1"
-# Clamped().mark(boundaries, 1)
-
-# # Pintando a posição da aplicação da força com a cor "2"
-# Load().mark(boundaries, 2)
-
-# Criando a condição de contorno de Dirichlet
-bc = fire.DirichletBC(V, ((0., 0., 0.)), 1)
-
-# # Criando ds (onde a força de superfície será integrada porteriormente)
-# ds = Measure('ds', domain=mesh, subdomain_data=boundaries)
-
-# Criando dx
-q_degree = 3
-dx = fire.dx(metadata={'quadrature_degree': q_degree})
-
-
-def SIMP(rho, p, rho_min=1e-3):
-    '''
-    Função de interpolação do modelo de material SIMP
-    '''
-    return rho_min + (1 - rho_min) * rho**p
-
-
-def helmholtz_filter(a):
-    '''
-    Função para aplicar o filtro de Helmholtz
-    '''
-    a_f = TrialFunction(P)
-    vH = TestFunction(P)
-    F = (
-        inner(r * r * grad(a_f), grad(vH)) * dx
-        + inner(a_f, vH) * dx
-        - inner(a, vH) * dx
-    )
-    aH = lhs(F)
-    LH = rhs(F)
-    a_f = Function(P, name="Filtered Control")
-    solve(aH == LH, a_f)
-    return a_f
 
 
 def deformacoes(u):
@@ -281,9 +217,6 @@ def deformacoes(u):
     epsilon = fire.as_vector((eps_x, eps_y, eps_z,
                               gamma_yz, gamma_xz, gamma_xy))
 
-    # Tensor de deformações em notação de Voigth
-    # epsilon = fire.as_vector((eps_x, eps_y, gamma_xy))
-
     return epsilon
 
 
@@ -302,7 +235,7 @@ def problema_direto(V):
     v = fire.TestFunction(V)
 
     # Criar uma função para representar a variável de estado
-    u = fire.Function(V)
+    u = fire.Function(V, name='displacement')
 
     # Derivada de du em relação a dx (deformações)
     epsilon = deformacoes(du)
@@ -355,4 +288,197 @@ def problema_direto(V):
     # A, b = assemble_system(a, L, bc)
 
 
-problema_direto(V)
+def problema_VTI(V):
+    '''
+    VTI problem
+    '''
+
+    # Criar um trial function (u = N du)
+    du = fire.TrialFunction(V)
+
+    # Criar uma função de teste
+    v = fire.TestFunction(V)
+
+    # Criar uma função para representar a variável de estado
+    u = fire.Function(V, name='u_VTI')
+
+    # Derivada de du em relação a dx (deformações)
+    epsilon = deformacoes(du)
+
+    # Derivada de v em relação a dx
+    epsilon_v = deformacoes(v)
+
+    C_vti = c_vti_tensor(vP, vS, rho, eps1,
+                         gamma, delta, 'weak')
+
+    # Tensor de tensões de Cauchy
+    sigma = C_vti * epsilon
+
+    # # Problema bilinear (Princípio dos trabalhos virtuais)
+    a = fire.inner(sigma, epsilon_v) * dx
+    L = fire.inner(F1, v) * fire.ds(2)
+    form = a - L
+    fire.solve(fire.lhs(form) == fire.rhs(form), u, bcs=bc)
+    fire.VTKFile("disp_VTI.pvd").write(u)
+
+
+def problema_TTI(V):
+    '''
+    TTI problem
+    '''
+
+    # Criar um trial function (u = N du)
+    du = fire.TrialFunction(V)
+
+    # Criar uma função de teste
+    v = fire.TestFunction(V)
+
+    # Criar uma função para representar a variável de estado
+    u = fire.Function(V, name='u_TTI')
+
+    # Derivada de du em relação a dx (deformações)
+    epsilon = deformacoes(du)
+
+    # Derivada de v em relação a dx
+    epsilon_v = deformacoes(v)
+
+    C_vti = c_vti_tensor(vP, vS, rho, eps1,
+                         gamma, delta, 'weak')
+
+    C_tti = c_tti_tensor(C_vti, theta, phi)
+
+    # Tensor de tensões de Cauchy
+    sigma = C_tti * epsilon
+
+    # # Problema bilinear (Princípio dos trabalhos virtuais)
+    a = fire.inner(sigma, epsilon_v) * dx
+    L = fire.inner(F1, v) * fire.ds(2)
+    form = a - L
+    fire.solve(fire.lhs(form) == fire.rhs(form), u, bcs=bc)
+    fire.VTKFile("disp_TTI.pvd").write(u)
+
+
+# Data
+vP_o = 1.5  # P-wave velocity [km/s]
+vS_o = 0.75  # S-wave velocity [km/s]
+rho_o = 1e3  # Density [kg/m³]
+eps1_o = 0.2  # Thomsen parameter epsilon
+gamma_o = 0.3  # Thomsen parameter gamma
+delta_o = 0.1  # Thomsen parameter delta
+theta_o = 30.  # Tilt angle in degrees
+phi_o = 0.  # azimuth angle in degrees (phi = 0: 2D case)
+
+# Create fields
+W = fire.FunctionSpace(mesh, "CG", 1)
+vP = fire.Function(W)
+vP.dat.data[:] = np.random.uniform(1.5, 2, vP.dat.data.shape)
+# vP.assign(vP_o)
+vS = fire.Function(W)
+vS.dat.data[:] = np.random.uniform(0.75, 1, vS.dat.data.shape)
+# vS.assign(vS_o)
+rho = fire.Function(W)
+rho.dat.data[:] = np.random.uniform(1e3, 1.2e3, rho.dat.data.shape)
+# rho.assign(rho_o)
+eps1 = fire.Function(W)
+eps1.dat.data[:] = np.random.uniform(0.1, 0.3, eps1.dat.data.shape)
+# eps1.assign(eps1_o)
+gamma = fire.Function(W)
+gamma.dat.data[:] = np.random.uniform(0.2, 0.4, gamma.dat.data.shape)
+# gamma.assign(gamma_o)
+delta = fire.Function(W)
+delta.dat.data[:] = np.random.uniform(-0.1, 0.2, delta.dat.data.shape)
+# delta.assign(delta_o)
+theta = fire.Function(W)
+theta.dat.data[:] = np.random.uniform(-10, 10., theta.dat.data.shape)
+# theta.assign(theta_o)
+phi = fire.Function(W)
+# phi.dat.data[:] = np.random.uniform(-180, 180, phi.dat.data.shape)
+phi.assign(phi_o)
+
+print("VTI Problem")
+problema_VTI(V)
+print("TTI Problem")
+problema_TTI(V)
+
+# def SIMP(rho, p, rho_min=1e-3):
+#     '''
+#     Função de interpolação do modelo de material SIMP
+#     '''
+#     return rho_min + (1 - rho_min) * rho**p
+
+
+# def helmholtz_filter(a):
+#     '''
+#     Função para aplicar o filtro de Helmholtz
+#     '''
+#     a_f = TrialFunction(P)
+#     vH = TestFunction(P)
+#     F = (
+#         inner(r * r * grad(a_f), grad(vH)) * dx
+#         + inner(a_f, vH) * dx
+#         - inner(a, vH) * dx
+#     )
+#     aH = lhs(F)
+#     LH = rhs(F)
+#     a_f = Function(P, name="Filtered Control")
+#     solve(aH == LH, a_f)
+#     return a_f
+
+# mesh = fire.RectangleMesh(nelx, nely, b, h)
+
+# # Criando ds (onde a força de superfície será integrada porteriormente)
+# ds = Measure('ds', domain=mesh, subdomain_data=boundaries)
+
+# # Volume do domínio
+# delta = b / h
+
+# # Volume máximo (fração volumétrica para restrição)
+# v_frac = Constant(0.6) * delta
+
+# Matriz constitutiva (matriz de elasticidade) isotrópica
+# C_iso = E / (1 * nu**2) * fire.as_tensor(((1, nu, 0),
+#                                           (nu, 1, 0),
+#                                           (0, 0, (1 - nu) / 2)))
+
+# # Penalizador do SIMP
+# p = 3
+
+# # Raio do filtro
+# r = 6
+# # Espaço para a variável de projeto (pseudo-densidade)
+# P = fire.FunctionSpace(mesh, "CG", 1)
+
+# class Clamped(SubDomain):
+#     '''
+#     Definir parte fixa do contorno (posição da condição de contorno
+#     de Dirichlet)
+#     '''
+
+#     def inside(self, x, on_boundary):
+#         '''
+#         uᵢ = (0,0) ∀ x = 0
+#         '''
+#         return near(x[0], 0) and on_boundary
+
+
+# class Load(SubDomain):
+#     '''
+#     Definir onde a força de superfície é aplicada (posição da
+#     condição de contorno de Neumann)
+#     '''
+
+#     def inside(self, x, on_boundary):
+#         return near(x[0], l) and x[1] >= 45. and x[1] <= 55. and on_boundary
+
+
+# # Criando uma MeshFunction
+# boundaries = MeshFunction("size_t", mesh, 1)
+
+# # "Pintando" toda a mesh function com a cor "0"
+# boundaries.set_all(0)
+
+# # Pintando a parte fixa com a cor "1"
+# Clamped().mark(boundaries, 1)
+
+# # Pintando a posição da aplicação da força com a cor "2"
+# Load().mark(boundaries, 2)

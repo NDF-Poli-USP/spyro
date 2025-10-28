@@ -183,7 +183,7 @@ class Modal_Solver():
 
         return a, m
 
-    @ staticmethod
+    @staticmethod
     def assemble_sparse_matrices(a, m, return_M_inv=False):
         '''
         Assemble the sparse matrices for SciPy solvers

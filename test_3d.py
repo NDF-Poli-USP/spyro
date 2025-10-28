@@ -314,7 +314,7 @@ def test_loop_habc_3d():
     Loop for HABC in model 3D based on Fig. 8 of Salas et al. (2022)
     '''
 
-    case = 1  # Integer from 0 to 1
+    case = 0  # Integer from 0 to 1
 
     # ============ SIMULATION PARAMETERS ============
 
@@ -412,6 +412,9 @@ def test_loop_habc_3d():
                   user_name=Wave_obj.path_save + "preamble/INF_")
 
     # ============ HABC SCHEME ============
+
+    # Name of the file containing the mesh
+    Wave_obj.filename_mesh = "transfinite_cube_extended_1_7.msh"
 
     if loop_modeling:
 
@@ -545,14 +548,3 @@ if __name__ == "__main__":
 # eI       66.74   67.19
 # eP       28.22   28.22
 # Ea     7.03e-6 7.18e-6
-
-
-# Computing Error Measures
-# Maximum Integral Error: 94.46%
-# Maximum Peak Error: 66.84%
-# Acoustic Energy: 1.28e-05
-
-# NAN
-
-
-# 156
