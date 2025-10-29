@@ -54,7 +54,7 @@ def quadrature_rules(V):
         qr_x = {"scheme": "KMV", "degree": degree}
         qr_s = {}
         qr_k = {}
-    elif dimension == 3 and cell_geometry == TensorProductCell(  # noqa: F405
+    elif cell_geometry == TensorProductCell(  # noqa: F405
         quadrilateral,  # noqa: F405
         interval,  # noqa: F405
     ):  # noqa: F405
