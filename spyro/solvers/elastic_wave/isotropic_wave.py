@@ -234,3 +234,7 @@ class IsotropicWave(ElasticWave):
         self.s_wave.assign(project(curl(self.get_function()), self.C_h))
 
         return self.s_wave
+
+    @override
+    def check_stability(self):
+        pass

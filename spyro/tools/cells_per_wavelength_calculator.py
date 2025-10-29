@@ -5,6 +5,13 @@ from .input_models import create_initial_model_for_meshing_parameter
 import spyro
 
 
+def wave_propagator(dictionary, equation_type):
+    if equation_type == "acoustic":
+        return spyro.AcousticWave(dictionary)
+    elif equation_type == "isotropic_elastic":
+        return spyro.IsotropicWave(dictionary)
+
+
 class Meshing_parameter_calculator:
     """
     A class used to calculate meshing parameter C (cells-per-wavelength).
@@ -101,6 +108,22 @@ class Meshing_parameter_calculator:
             - "accepted_error_threshold": float, the accepted error threshold for the calculation
             - "desired_degree": int, the desired degree for the calculation
         """
+        parameters_dictionary.setdefault("source_frequency", 5.0)
+        parameters_dictionary.setdefault("minimum_velocity_in_the_domain", 1.5)
+        parameters_dictionary.setdefault("velocity_profile_type", "homogeneous")
+        parameters_dictionary.setdefault("velocity_model_file_name", None)
+        parameters_dictionary.setdefault("FEM_method_to_evaluate", "mass_lumped_triangle")
+        parameters_dictionary.setdefault("dimension", 2)
+        parameters_dictionary.setdefault("receiver_setup", "near")
+        parameters_dictionary.setdefault("load_reference", False)
+        parameters_dictionary.setdefault("save_reference", True)
+        parameters_dictionary.setdefault("time-step_calculation", "estimate")
+        parameters_dictionary.setdefault("C_accuracy", 0.1)
+        parameters_dictionary.setdefault("equation_type", "acoustic")
+        parameters_dictionary.setdefault("accepted_error_threshold", 0.05)
+        parameters_dictionary.setdefault("testing", False)
+
+        self.equation_type = parameters_dictionary["equation_type"]
         self.parameters_dictionary = parameters_dictionary
         self.source_frequency = parameters_dictionary["source_frequency"]
         self.minimum_velocity = parameters_dictionary[
@@ -132,10 +155,11 @@ class Meshing_parameter_calculator:
         self.cpw_accuracy = parameters_dictionary["C_accuracy"]
 
         # Debugging and testing  parameters
-        self._setting_up_testing_options()
+        self.reduced_obj_for_testing = self.parameters_dictionary["testing"]
 
         # Setting up reference file read or load
-        self._setting_up_reference_file_read_or_load()
+        self.save_reference = self.parameters_dictionary["save_reference"]
+        self.load_reference = self.parameters_dictionary["load_reference"]
 
         # Setting up time-step attributes
         self._setting_up_time_step()
@@ -143,26 +167,6 @@ class Meshing_parameter_calculator:
         self.initial_guess_object = self.build_initial_guess_model()
         self.comm = self.initial_guess_object.comm
         self.reference_solution = self.get_reference_solution()
-
-    def _setting_up_testing_options(self):
-        """
-        Sets up the testing options.
-        """
-        if "testing" in self.parameters_dictionary:
-            self.reduced_obj_for_testing = self.parameters_dictionary["testing"]
-        else:
-            self.reduced_obj_for_testing = False
-
-    def _setting_up_reference_file_read_or_load(self):
-        if "save_reference" in self.parameters_dictionary:
-            self.save_reference = self.parameters_dictionary["save_reference"]
-        else:
-            self.save_reference = False
-
-        if "load_reference" in self.parameters_dictionary:
-            self.load_reference = self.parameters_dictionary["load_reference"]
-        else:
-            self.load_reference = False
 
     def _setting_up_time_step(self):
         if "time-step_calculation" in self.parameters_dictionary:
@@ -222,7 +226,7 @@ class Meshing_parameter_calculator:
         """
         dictionary = create_initial_model_for_meshing_parameter(self)
         self.initial_dictionary = dictionary
-        return spyro.AcousticWave(dictionary)
+        return wave_propagator(dictionary, self.equation_type)
 
     def get_reference_solution(self):
         """
@@ -239,9 +243,9 @@ class Meshing_parameter_calculator:
             else:
                 filename = "reference_solution.npy"
             return np.load(filename)
-        elif self.velocity_profile_type == "heterogeneous":
+        elif self.velocity_profile_type == "heterogeneous" or self.equation_type == "isotropic_elastic":
             return self.calculate_reference_solution()
-        elif self.velocity_profile_type == "homogeneous":
+        elif self.velocity_profile_type == "homogeneous" and self.equation_type == "acoustic":
             return self.calculate_analytical_solution()
 
     def calculate_reference_solution(self):
@@ -405,7 +409,7 @@ class Meshing_parameter_calculator:
         dictionary["mesh"]["cells_per_wavelength"] = cpw
         if degree is not None:
             dictionary["options"]["degree"] = degree
-        Wave_obj = spyro.AcousticWave(dictionary)
+        Wave_obj = wave_propagator(dictionary, self.equation_type)
         if self.velocity_profile_type == "homogeneous":
             lba = self.minimum_velocity / self.source_frequency
             edge_length = lba / cpw
