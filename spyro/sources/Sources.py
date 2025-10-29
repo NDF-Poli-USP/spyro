@@ -70,7 +70,6 @@ class Sources(Delta_projector):
         self.amplitude = wave_object.amplitude
         self.is_local = [0] * self.number_of_points
         self.current_sources = None
-        self.update_wavelet(wave_object)
         if np.isscalar(self.amplitude) or (self.amplitude.size <= 3):
             self.integral = False
             self.build_maps(order=0)
