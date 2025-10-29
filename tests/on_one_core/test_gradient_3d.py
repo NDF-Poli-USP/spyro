@@ -135,7 +135,7 @@ def _test_gradient(options, pml=False):
         )
 
         Jp = functional(options, p_exact_recv - p_guess_recv)
-        projnorm = assemble(box1 * dJ * delta_m * dx(scheme=qr_x))
+        projnorm = assemble(box1 * dJ * delta_m * dx(**qr_x))
         fd_grad = (Jp - Jm) / step
         print(
             "\n Cost functional for step "
