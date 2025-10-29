@@ -110,7 +110,12 @@ class MeshingParameters():
     @edge_length.setter
     def edge_length(self, value):
         if self.cells_per_wavelength is not None:
-            warnings.warn("Setting edge_length removes cells per wavelength parameter")
+            warnings.warn(
+                "Mutual exclusion: Both 'edge_length' and 'cells_per_wavelength' control mesh size, "
+                "but only one can be set at a time. Setting 'edge_length' will override and remove the "
+                "previously set 'cells_per_wavelength'. If you wish to use 'cells_per_wavelength' instead, "
+                "set it after setting 'edge_length'."
+            )
             self.cells_per_wavelength = None
         self._edge_length = value
 
@@ -280,7 +285,6 @@ class MeshingParameters():
         input_mesh_parameters.setdefault("degree", self.degree)
         input_mesh_parameters.setdefault("quadrilateral", self.quadrilateral)
         input_mesh_parameters.setdefault("velocity_model", self.velocity_model)
-        # input_mesh_parameters.setdefault("cells_per_wavelength", cells_per_wavelength(self.method, self.degree, self.dimension))
 
         # Mesh length based parameters
         input_mesh_parameters.setdefault("cells_per_wavelength", None)
