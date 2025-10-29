@@ -45,7 +45,7 @@ def quadrature_rules(V):
     #     qr_s = qr_x
     # )
     elif (cell_geometry in {triangle, tetrahedron}) and (  # noqa: F405
-        ufl_method == "Lagrange" or ufl_method == "Discontinuous Lagrange"
+        ufl_method in {"Lagrange", "Discontinuous Lagrange"}
     ):
         qr_x = {}
         qr_s = {}
