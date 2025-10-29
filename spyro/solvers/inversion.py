@@ -265,7 +265,7 @@ class FullWaveformInversion(AcousticWave):
             self.misfit = self.real_shot_record - self.guess_shot_record
         return self.misfit
 
-    def generate_real_shot_record(self, plot_model=False, model_filename="model.png", abc_points=None, save_shot_record=True, shot_filename="shots/shot_record_"):
+    def generate_real_shot_record(self, plot_model=False, model_filename="model.png", abc_points=None, save_shot_record=True, shot_filename="shots/shot_record_", high_resolution_model=False):
         """
         Generates the real synthetic shot record. Only for use in synthetic test cases.
         """
@@ -276,7 +276,7 @@ class FullWaveformInversion(AcousticWave):
             Wave_obj_real_velocity.initial_velocity_model = self.real_velocity_model
 
         if plot_model and Wave_obj_real_velocity.comm.comm.rank == 0 and Wave_obj_real_velocity.comm.ensemble_comm.rank == 0:
-            spyro_plot_model(Wave_obj_real_velocity, filename=model_filename, abc_points=abc_points)
+            spyro_plot_model(Wave_obj_real_velocity, filename=model_filename, abc_points=abc_points, high_resolution=high_resolution_model)
 
         Wave_obj_real_velocity.forward_solve()
         if save_shot_record:
