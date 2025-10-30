@@ -19,7 +19,6 @@ def quadrature_rules(V):
     qr_k: FIAT quadrature rule
         Quadrature rule for the spatial domain stiffness matrix.
     """
-    degree = V.ufl_element().degree()
     cell_geometry = V.mesh().ufl_cell()
 
     # Getting method, this returns the names used in Firedrake and UFL
@@ -27,39 +26,26 @@ def quadrature_rules(V):
     # 'Kong-Mulder-Veldhuizen' ('KMV'), 'Discontinuous Lagrange' ('DG'),
     # 'DQ' ('DG' with quads).
 
-    ufl_method = V.ufl_element().family()
-
     # Dealing with mixed function spaces
-    if ufl_method == "Mixed":
-        ufl_method = V.sub(1).ufl_element().family()
+    family = set(V_.ufl_element().family() for V_ in V)
+    degree = max(V_.ufl_element().degree() for V_ in V)
+    try:
+        degree = max(degree)
+    except TypeError:
+        pass
 
-    if (cell_geometry == quadrilateral) and ufl_method == "Q":  # noqa: F405
-        # In this case, for the spectral element method we use GLL quadrature
-        qr_x = {"scheme": "KMV", "degree": degree}
-        qr_k = qr_x
-        qr_s = qr_x
-    # elif (cell_geometry == quadrilateral) and ufl_method == "DQ":
-    #     # In this case, we use GL quadrature
-    #     qr_x = {"scheme": "KMV", "degree": degree}
-    #     qr_k = qr_x
-    #     qr_s = qr_x
-    # )
-    elif (cell_geometry in {triangle, tetrahedron}) and (  # noqa: F405
-        ufl_method in {"Lagrange", "Discontinuous Lagrange"}
-    ):
+    if (cell_geometry in {triangle, tetrahedron}
+            and family <= {"Lagrange", "Discontinuous Lagrange"}):
         qr_x = {}
         qr_s = {}
         qr_k = {}
-    elif ufl_method == "Kong-Mulder-Veldhuizen":
+    elif family == {"Kong-Mulder-Veldhuizen"}:
         qr_x = {"scheme": "KMV", "degree": degree}
         qr_s = {}
         qr_k = {}
-    elif cell_geometry == TensorProductCell(  # noqa: F405
-        quadrilateral,  # noqa: F405
-        interval,  # noqa: F405
-    ):  # noqa: F405
+    elif (cell_geometry in {quadrilateral, hexahedron, TensorProductCell(quadrilateral, interval)}
+            and family <= {"Q", "DQ"}):
         # In this case, for the spectral element method we use GLL quadrature
-        degree, _ = degree
         qr_x = {"scheme": "KMV", "degree": degree}
         qr_k = qr_x
         qr_s = qr_x
