@@ -235,16 +235,16 @@ def test_loop_habc_3d():
     # cpw: cells per wavelength
     # lba = minimum_velocity / source_frequency
     # edge_length = lba / cpw
-    edge_length_lst = [0.125]
+    edge_length_lst = [0.150]
 
     # Timestep size (in seconds). Initial guess: edge_length / 50
-    dt_usu_lst = [0.00040]
+    dt_usu_lst = [0.00125]
 
     # Eikonal degree
-    degree_eikonal_lst = [1]
+    degree_eikonal_lst = [2]
 
     # Factor for the stabilizing term in Eikonal equation
-    f_est_lst = [0.05]
+    f_est_lst = [0.04]
 
     # Get simulation parameters
     edge_length = edge_length_lst[case]
@@ -281,7 +281,7 @@ def test_loop_habc_3d():
     Wave_obj = preamble_habc(dictionary, edge_length, f_est)
 
     # Name of the file containing the mesh
-    Wave_obj.filename_mesh = "transfinite_cube_extended_pad3.msh"
+    Wave_obj.filename_mesh = "box_gmsh.msh"
 
     # ============ HABC SCHEME ============
 

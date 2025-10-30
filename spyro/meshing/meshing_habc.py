@@ -1332,8 +1332,9 @@ class HABC_Mesh():
                 gmsh.model.mesh.field.setAsBackgroundMesh(field_list[0])
 
             # Free mesh in the volume mesh
-            # gmsh.model.mesh.setSize(gmsh.model.getBoundary([
-            #     (3, vol_tags[1])], oriented=False, recursive=True), self.lmin)
+            # gmsh.model.mesh.setSize(gmsh.model.getBoundary(
+            #     [(3, vol_tags[1])], oriented=False,
+            #     recursive=True), self.lmin)
 
             # Settings for the mesh generation
             gmsh.option.setNumber("Mesh.Algorithm", 1)
@@ -1485,9 +1486,9 @@ class HABC_Mesh():
         z, x = coords[0], coords[1]
 
         # Conditional value
-        val_condz = (z + Lz)**2 if type_marker == 'damping' else 1.0
-        val_condx1 = x**2 if type_marker == 'damping' else 1.0
-        val_condx2 = (x - Lx)**2 if type_marker == 'damping' else 1.0
+        val_condz = (z + Lz)**2 if type_marker == 'damping' else 1.
+        val_condx1 = x**2 if type_marker == 'damping' else 1.
+        val_condx2 = (x - Lx)**2 if type_marker == 'damping' else 1.
 
         # Conditional expressions for the mask
         z_pd = fire.conditional(z + Lz < 0., val_condz, 0.)
@@ -1502,8 +1503,8 @@ class HABC_Mesh():
             y = coords[2]
 
             # Conditional value
-            val_condy1 = y**2 if type_marker == 'damping' else 1.0
-            val_condy2 = (y - Ly)**2 if type_marker == 'damping' else 1.0
+            val_condy1 = y**2 if type_marker == 'damping' else 1.
+            val_condy2 = (y - Ly)**2 if type_marker == 'damping' else 1.
 
             # Conditional expressions for the mask
             y_pd = fire.conditional(y < 0., val_condy1, 0.) + \

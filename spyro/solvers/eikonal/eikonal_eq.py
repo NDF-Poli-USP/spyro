@@ -626,7 +626,7 @@ class Eikonal_Modeling():
                         else round(user_atol + 1e-5, 5)
                     if user_atol > 1e-4:
                         print("High Tolerance. Exiting!", flush=True)
-                        exit("No Results for Eikonal Equation", flush=True)
+                        exit("No Results for Eikonal Equation")
 
     def eikonal_solver(self, c, c_min, V, diam_mesh):
         '''

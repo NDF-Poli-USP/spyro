@@ -330,7 +330,6 @@ def test_loop_habc_3d():
 
     # Eikonal degree
     degree_eikonal_lst = [2, 1]
-
     # Factor for the stabilizing term in Eikonal equation
     f_est_lst = [0.04, 0.05]
 
@@ -383,7 +382,7 @@ def test_loop_habc_3d():
     crit_opt = "err_sum"  # err_integral, err_peak
 
     # Number of points for regression (odd number)
-    n_pts = 3
+    n_pts = 1
 
     # ============ MESH AND EIKONAL ============
 
@@ -414,7 +413,7 @@ def test_loop_habc_3d():
     # ============ HABC SCHEME ============
 
     # Name of the file containing the mesh
-    Wave_obj.filename_mesh = "transfinite_cube_extended_1_7.msh"
+    Wave_obj.filename_mesh = "transfinite_cube_extended_all_4_sides.msh"
 
     if loop_modeling:
 
@@ -548,3 +547,8 @@ if __name__ == "__main__":
 # eI       66.74   67.19
 # eP       28.22   28.22
 # Ea     7.03e-6 7.18e-6
+
+# Err(%)   2.0    2.8    3.0    3.5    4.0    4.7    6.0    8.0   10.0   20.0   50.0  100.0  200.0    REC
+# eI     30.33  18.66  20.62  21.74  19.47  19.27  19.27  18.28  18.21  17.08  17.07  17.84  17.84  17.49
+# eP     35.57  10.34  11.38  11.40  11.69  12.16  12.31  12.42  12.39  12.42  12.43  12.46  12.47  12.88
+# ele     3030   3720   3848   3924   4110   4188   4200   5844   5910   6562   6582   6900   6912   6912
