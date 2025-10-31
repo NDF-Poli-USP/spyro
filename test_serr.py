@@ -23,11 +23,11 @@ c = edge / 2. + pad
 n = 2.8
 
 # Mesh
-# rec_mesh = fire.BoxMesh(12, 12, 8, Lx, Ly, Lz)
-# rec_mesh.coordinates.dat.data_with_halos[:, 0] -= pad
-# rec_mesh.coordinates.dat.data_with_halos[:, 1] -= pad
-# rec_mesh.coordinates.dat.data_with_halos[:, 2] *= -1.
-rec_mesh = fire.Mesh("ellipsoid_mesh.msh")
+rec_mesh = fire.BoxMesh(12, 12, 8, Lx, Ly, Lz)
+rec_mesh.coordinates.dat.data_with_halos[:, 0] -= pad
+rec_mesh.coordinates.dat.data_with_halos[:, 1] -= pad
+rec_mesh.coordinates.dat.data_with_halos[:, 2] *= -1.
+# rec_mesh = fire.Mesh("ellipsoid_mesh.msh")
 
 # Create the final mesh that will contain both
 final_mesh = Mesh()
