@@ -46,7 +46,7 @@ def quadrature_rules(V):
         qr_s = {}
         qr_k = {}
     elif (cell_geometry in {quadrilateral, hexahedron, TensorProductCell(quadrilateral, interval)}
-            and family <= {"Q", "DQ"}):
+            and family <= {"Q", "DQ", "TensorProductElement"}):
         dimension = cell_geometry._tdim
         # In this case, for the spectral element method we use GLL quadrature
         qr_x_rule = gauss_lobatto_legendre_cube_rule(
@@ -60,6 +60,8 @@ def quadrature_rules(V):
         qr_k = {"scheme": qr_x_rule}
         qr_s = {"scheme": qr_s_rule}
     else:
+        print(f"Cell geometry: {cell_geometry}", flush=True)
+        print(f"Family: {family}", flush=True)
         raise ValueError("Unrecognized quadrature scheme")
     return qr_x, qr_k, qr_s
 
