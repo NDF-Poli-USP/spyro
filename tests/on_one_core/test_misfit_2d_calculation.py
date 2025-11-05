@@ -41,7 +41,7 @@ def test_misfit_2d():
     # domain and reserve the remaining 250 m for the Perfectly Matched Layer (PML) to absorb
     # outgoing waves on three sides (eg., -z, +-x sides) of the domain.
     dictionary["mesh"] = {
-        "Lz": 3.0,  # depth in km - always positive   # Como ver isso sem ler a malha?
+        "Lz": 3.0,  # depth in km - always positive
         "Lx": 3.0,  # width in km - always positive
         "Ly": 0.0,  # thickness in km - always positive
         "mesh_file": None,
@@ -66,8 +66,8 @@ def test_misfit_2d():
         "final_time": 1.00,  # Final time for event
         "dt": 0.001,  # timestep size
         "amplitude": 1,  # the Ricker has an amplitude of 1.
-        "output_frequency": 100,  # how frequently to output solution to pvds - Perguntar Daiane ''post_processing_frequnecy'
-        "gradient_sampling_frequency": 1,  # how frequently to save solution to RAM    - Perguntar Daiane 'gradient_sampling_frequency'
+        "output_frequency": 100,  # how frequently to output solution to pvds
+        "gradient_sampling_frequency": 1,  # how frequently to save solution to RAM
     }
     dictionary["visualization"] = {
         "forward_output": True,
