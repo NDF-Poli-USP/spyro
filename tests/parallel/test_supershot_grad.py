@@ -91,7 +91,7 @@ dictionary["acquisition"] = {
     "source_locations": [(-1.1, 1.3), (-1.1, 1.7)],
     "frequency": 5.0,
     "delay": 1.5,
-    "delay_type": "multiples_of_minimun",
+    "delay_type": "multiples_of_minimum",
     "receiver_locations": spyro.create_transect((-1.8, 1.2), (-1.8, 1.8), 10),
 }
 
