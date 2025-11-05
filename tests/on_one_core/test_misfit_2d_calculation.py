@@ -56,7 +56,7 @@ def test_misfit_2d():
         "source_locations": [(-0.5, 1.5)],
         "frequency": 5.0,
         "delay": 1.5,
-        "delay_type": "multiples_of_minimun",
+        "delay_type": "multiples_of_minimum",
         "receiver_locations": spyro.create_transect((-2.9, 0.1), (-2.9, 2.9), 100),
     }
 

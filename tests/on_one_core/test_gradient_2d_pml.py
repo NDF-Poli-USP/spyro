@@ -120,7 +120,7 @@ def set_dictionary(PML=False):
         "source_locations": [(-0.1, 0.5)],
         "frequency": 5.0,
         "delay": 1.5,
-        "delay_type": "multiples_of_minimun",
+        "delay_type": "multiples_of_minimum",
         "receiver_locations": spyro.create_transect((-0.8, 0.1), (-0.8, 0.9), 10),
     }
 

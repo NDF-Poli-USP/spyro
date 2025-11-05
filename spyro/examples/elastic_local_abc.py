@@ -49,7 +49,7 @@ def build_solver(local_abc, dt_scheme):
         "source_locations": source_locations,
         "frequency": freq,
         "delay": 1.5,
-        "delay_type": "multiples_of_minimun",
+        "delay_type": "multiples_of_minimum",
         "amplitude": smag * np.array([0, 1]),
         "receiver_locations": [],
     }
