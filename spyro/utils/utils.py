@@ -2,10 +2,16 @@ import copy
 from firedrake import *  # noqa: F403
 import numpy as np
 from mpi4py import MPI
+import os
 from scipy.signal import butter, filtfilt
 import warnings
 from ..io import ensemble_functional
 from ..io import parallel_print
+try:
+    from SeismicMesh import write_velocity_model
+    SEISMIC_MESH_AVAILABLE = True
+except ImportError:
+    SEISMIC_MESH_AVAILABLE = False
 
 
 def butter_lowpass_filter(shot, cutoff, fs, order=2):
@@ -320,8 +326,51 @@ def run_in_one_core(func):
     return wrapper
 
 
+def run_in_one_core_and_broadcast(func):
+    """Decorator to run something in serial on rank 0 and broadcast result to all cores"""
+
+    def wrapper(*args, **kwargs):
+        comm = args[0].comm
+        if comm is None:
+            return func(*args, **kwargs)
+        else:
+            result = None
+            if getattr(comm, "ensemble_comm", None) is not None:
+                # Handle ensemble communicator
+                if comm.ensemble_comm.rank == 0 and comm.comm.rank == 0:
+                    result = func(*args, **kwargs)
+                # Broadcast within ensemble
+                result = comm.ensemble_comm.bcast(result, root=0)
+                # Broadcast within spatial communicator
+                result = comm.comm.bcast(result, root=0)
+            elif getattr(comm, "rank", None) is not None:
+                # Handle regular communicator
+                if comm.rank == 0:
+                    result = func(*args, **kwargs)
+                result = comm.bcast(result, root=0)
+            return result
+
+    return wrapper
+
+
 def interpolate_shot_record(file_name, output_file_name, original_dt, new_dt):
     pass
+
+
+@run_in_one_core_and_broadcast
+def write_hdf5_velocity_model(obj_with_comm, segy_filename):
+    if SEISMIC_MESH_AVAILABLE is False:
+        raise ValueError("Segy to HDF5 not yet implemented natively. Please install SeismicMesh")
+    vp_filename, vp_filetype = os.path.splitext(
+        segy_filename
+    )
+    warnings.warn("Converting segy file to hdf5")
+    write_velocity_model(
+        segy_filename, ofname=vp_filename
+    )
+    output_filename = vp_filename + ".hdf5"
+    return output_filename
+
 
 # def analytical_solution_for_pressure_based_on_MMS(model, mesh, time):
 #     degree = model["opts"]["degree"]
