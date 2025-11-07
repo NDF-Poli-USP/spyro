@@ -34,7 +34,7 @@ class L2Inner(object):
     def __init__(self, Wave_obj):
         V = Wave_obj.function_space
         # print(f"Dir {dir(Wave_obj)}", flush=True)
-        dxlump = fire.dx(scheme=Wave_obj.quadrature_rule)
+        dxlump = fire.dx(**Wave_obj.quadrature_rule)
         self.A = fire.assemble(
             fire.TrialFunction(V) * fire.TestFunction(V) * dxlump,
             mat_type="matfree"
