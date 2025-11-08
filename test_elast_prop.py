@@ -3,19 +3,16 @@ import firedrake as fire
 import numpy as np
 import ipdb
 
-# Altura do domínio
-h = 100
+# Altura do domínio [m]
+h = 50
 
-# Largura do domínio
-b = 300
+# Largura do domínio [m]
+b = 150
 
-# Espessura do domínio
-t = 40  # 10
+# Espessura do domínio [m]
+t = 40
 
-# Força de superfície
-F1 = fire.Constant((0., -0.01, 0.))
-
-# Tamanho do elemento
+# Tamanho do elemento [m]
 elsize = 10
 
 # Número de elementos em x
@@ -44,7 +41,8 @@ quad_rule = finat.quadrature.make_quadrature(
     V.finat_element.cell, V.ufl_element().degree(), "KMV")
 dx = fire.dx(scheme=quad_rule)
 
-# ipdb.set_trace()
+# Força de superfície
+F1 = fire.Constant((0., -0.01, 0.))
 
 
 def c_vti_tensor(vP, vS, rho, epsilon, gamma, delta, anysotropy):
@@ -226,9 +224,6 @@ def problema_direto(V):
     Resolve o problema direto e retorna u
     '''
 
-    # # Filtrar ρ
-    # rho_f = helmholtz_filter(rho)
-
     # Criar um trial function (u = N du)
     du = fire.TrialFunction(V)
 
@@ -273,24 +268,23 @@ def problema_direto(V):
     # Tensor de tensões de Cauchy
     sigma = C * epsilon
 
-    # # Problema bilinear (Princípio dos trabalhos virtuais)
-    # # a = t * inner(SIMP(rho_f, p) * sigma, epsilon_v) * dx
-    # # L = inner(F1, v) * ds(2)
+    # Problema bilinear (Princípio dos trabalhos virtuais)
     a = fire.inner(sigma, epsilon_v) * dx
     L = fire.inner(F1, v) * fire.ds(2)
     form = a - L
     fire.solve(fire.lhs(form) == fire.rhs(form), u, bcs=bc)
-    # A = fire.assemble(fire.lhs(form), bcs=bc)
-    # b = fire.assemble(fire.rhs(form))
-    # fire.solve(A, u, b)
+    # fire.solve(a == L, u)
 
     fire.VTKFile("displacement.pvd").write(u)
     # ipdb.set_trace()
 
+    # # Fazer o "assemble" do sistema linear
+    # A, b = assemble_system(a, L, bc)
 
-def problema_VTI(V):
+
+def static_VTI(V):
     '''
-    VTI problem
+    VTI static problem
     '''
 
     # Criar um trial function (u = N du)
@@ -308,6 +302,7 @@ def problema_VTI(V):
     # Derivada de v em relação a dx
     epsilon_v = deformacoes(v)
 
+    # Tensor elástico
     C_vti = c_vti_tensor(vP, vS, rho, eps1,
                          gamma, delta, 'weak')
 
@@ -319,15 +314,12 @@ def problema_VTI(V):
     L = fire.inner(F1, v) * fire.ds(2)
     form = a - L
     fire.solve(fire.lhs(form) == fire.rhs(form), u, bcs=bc)
-    # A = fire.assemble(fire.lhs(form), bcs=bc)
-    # b = fire.assemble(fire.rhs(form))
-    # fire.solve(A, u, b)
     fire.VTKFile("disp_VTI.pvd").write(u)
 
 
-def problema_TTI(V):
+def static_TTI(V):
     '''
-    TTI problem
+    static TTI problem
     '''
 
     # Criar um trial function (u = N du)
@@ -345,6 +337,7 @@ def problema_TTI(V):
     # Derivada de v em relação a dx
     epsilon_v = deformacoes(v)
 
+    # Tensor elástico
     C_vti = c_vti_tensor(vP, vS, rho, eps1,
                          gamma, delta, 'weak')
 
@@ -362,8 +355,8 @@ def problema_TTI(V):
 
 
 # Data
-vP_o = 1.5  # P-wave velocity [km/s]
-vS_o = 0.75  # S-wave velocity [km/s]
+vP_o = 1500  # P-wave velocity [m/s]
+vS_o = 750  # S-wave velocity [m/s]
 rho_o = 1e3  # Density [kg/m³]
 eps1_o = 0.2  # Thomsen parameter epsilon
 gamma_o = 0.3  # Thomsen parameter gamma
@@ -375,10 +368,10 @@ phi_o = 0.  # azimuth angle in degrees (phi = 0: 2D case)
 # W = fire.FunctionSpace(mesh, "CG", 1)
 W = fire.FunctionSpace(mesh, "KMV", 3)
 vP = fire.Function(W)
-vP.dat.data[:] = np.random.uniform(1.5, 2, vP.dat.data.shape)
+vP.dat.data[:] = np.random.uniform(1.5e3, 2e3, vP.dat.data.shape)
 # vP.assign(vP_o)
 vS = fire.Function(W)
-vS.dat.data[:] = np.random.uniform(0.75, 1, vS.dat.data.shape)
+vS.dat.data[:] = np.random.uniform(750, 1e3, vS.dat.data.shape)
 # vS.assign(vS_o)
 rho = fire.Function(W)
 rho.dat.data[:] = np.random.uniform(1e3, 2e3, rho.dat.data.shape)
@@ -399,90 +392,194 @@ phi = fire.Function(W)
 # phi.dat.data[:] = np.random.uniform(-180, 180, phi.dat.data.shape)
 phi.assign(phi_o)
 
-print("VTI Problem")
-problema_VTI(V)
-print("TTI Problem")
-problema_TTI(V)
-
-# def SIMP(rho, p, rho_min=1e-3):
-#     '''
-#     Função de interpolação do modelo de material SIMP
-#     '''
-#     return rho_min + (1 - rho_min) * rho**p
+# print("VTI Static Problem")
+# static_VTI(V)
+# print("TTI Static Problem")
+# static_TTI(V)
 
 
-# def helmholtz_filter(a):
-#     '''
-#     Função para aplicar o filtro de Helmholtz
-#     '''
-#     a_f = TrialFunction(P)
-#     vH = TestFunction(P)
-#     F = (
-#         inner(r * r * grad(a_f), grad(vH)) * dx
-#         + inner(a_f, vH) * dx
-#         - inner(a, vH) * dx
-#     )
-#     aH = lhs(F)
-#     LH = rhs(F)
-#     a_f = Function(P, name="Filtered Control")
-#     solve(aH == LH, a_f)
-#     return a_f
+def apply_source(t, f0, v, F_sou=1.):
+    '''
+    Ricker source for time t
+    F_sou: Maximum source amplitude
+    '''
 
-# mesh = fire.RectangleMesh(nelx, nely, b, h)
+    # Amplitude excitation
+    r = (np.pi * f0 * (t - 1./f0))**2
+    amp = (1. - 2. * r) * np.exp(-r) * F_sou
 
-# # Criando ds (onde a força de superfície será integrada porteriormente)
-# ds = Measure('ds', domain=mesh, subdomain_data=boundaries)
+    # print('Amp: {:3.2e}'.format(amp))
 
-# # Volume do domínio
-# delta = b / h
+    # Força de superfície
+    F1 = fire.Constant((0., amp, 0.))
+    L = fire.inner(F1, v) * fire.ds(2)
 
-# # Volume máximo (fração volumétrica para restrição)
-# v_frac = Constant(0.6) * delta
-
-# Matriz constitutiva (matriz de elasticidade) isotrópica
-# C_iso = E / (1 * nu**2) * fire.as_tensor(((1, nu, 0),
-#                                           (nu, 1, 0),
-#                                           (0, 0, (1 - nu) / 2)))
-
-# # Penalizador do SIMP
-# p = 3
-
-# # Raio do filtro
-# r = 6
-# # Espaço para a variável de projeto (pseudo-densidade)
-# P = fire.FunctionSpace(mesh, "CG", 1)
-
-# class Clamped(SubDomain):
-#     '''
-#     Definir parte fixa do contorno (posição da condição de contorno
-#     de Dirichlet)
-#     '''
-
-#     def inside(self, x, on_boundary):
-#         '''
-#         uᵢ = (0,0) ∀ x = 0
-#         '''
-#         return near(x[0], 0) and on_boundary
+    return L
 
 
-# class Load(SubDomain):
-#     '''
-#     Definir onde a força de superfície é aplicada (posição da
-#     condição de contorno de Neumann)
-#     '''
+def propagation_VTI(V):
+    '''
+    Algorithm to solve the forward problem
+    '''
+    # Final Time
+    T = 2.  # s
 
-#     def inside(self, x, on_boundary):
-#         return near(x[0], l) and x[1] >= 45. and x[1] <= 55. and on_boundary
+    # Number of timesteps
+    steps = 200
+
+    # Timestep size
+    dt = round(T / steps, 6)
+
+    # Criar um trial function
+    du = fire.TrialFunction(V)
+
+    # Criar uma função de teste
+    v = fire.TestFunction(V)
+
+    # Criar uma função para representar a variável de estado
+    u = fire.Function(V, name='u')
+    u_ant1 = fire.Function(V, name='u_ant1')
+    u_ant2 = fire.Function(V, name='u_ant2')
+
+    # Current time we are solving for
+    t = 0.
+
+    # Number of timesteps solved
+    ntimestep = 0
+
+    # Save results
+    outfile = fire.VTKFile("zz1/disp_VTI.pvd")
+    # Time integration loop
+    print('Solving Forward Problem')
+    print(67*'*')
+    while True:
+        # Update the time it is solving for
+        print('Step: {:1d} of {:1d} - Time: {:1.4f} ms'.format(
+            ntimestep, steps, t))
+
+        # Ricker source for time t
+        L = apply_source(t, 5., v, F_sou=1e6)
+
+        # Variational problem
+        m = fire.Constant(1. / dt**2) * rho * fire.inner(
+            du - 2 * u_ant1 + u_ant2, v) * dx
+
+        # Derivada de du em relação a dx (deformações)
+        epsilon = deformacoes(du)
+
+        # Derivada de v em relação a dx
+        epsilon_v = deformacoes(v)
+
+        # Tensor elástico
+        C_vti = c_vti_tensor(vP, vS, rho, eps1,
+                             gamma, delta, 'weak')
+
+        # Tensor de tensões de Cauchy
+        sigma = C_vti * epsilon
+
+        a = fire.inner(sigma, epsilon_v) * dx
+        form = m + a - L
+        fire.solve(fire.lhs(form) == fire.rhs(form), u, bcs=bc)
+
+        outfile.write(u, time=t)
+
+        t = round(t + dt, 6)
+        ntimestep += 1
+
+        # Cycling the variables
+        print(u.dat.data.max())
+        u_ant2.assign(u_ant1)
+        u_ant1.assign(u)
+
+        if t > T:
+            break
+
+    print(67*'*')
 
 
-# # Criando uma MeshFunction
-# boundaries = MeshFunction("size_t", mesh, 1)
+def propagation_TTI(V):
+    '''
+    Algorithm to solve the forward problem
+    '''
+    # Final Time
+    T = 2.  # s
 
-# # "Pintando" toda a mesh function com a cor "0"
-# boundaries.set_all(0)
+    # Number of timesteps
+    steps = 200
 
-# # Pintando a parte fixa com a cor "1"
-# Clamped().mark(boundaries, 1)
+    # Timestep size
+    dt = round(T / steps, 6)
 
-# # Pintando a posição da aplicação da força com a cor "2"
-# Load().mark(boundaries, 2)
+    # Criar um trial function
+    du = fire.TrialFunction(V)
+
+    # Criar uma função de teste
+    v = fire.TestFunction(V)
+
+    # Criar uma função para representar a variável de estado
+    u = fire.Function(V, name='u')
+    u_ant1 = fire.Function(V, name='u_ant1')
+    u_ant2 = fire.Function(V, name='u_ant2')
+
+    # Current time we are solving for
+    t = 0.
+
+    # Number of timesteps solved
+    ntimestep = 0
+
+    # Save results
+    outfile = fire.VTKFile("zz2/disp_TTI.pvd")
+    # Time integration loop
+    print('Solving Forward Problem')
+    print(67*'*')
+    while True:
+        # Update the time it is solving for
+        print('Step: {:1d} of {:1d} - Time: {:1.4f} ms'.format(
+            ntimestep, steps, t))
+
+        # Ricker source for time t
+        L = apply_source(t, 5., v, F_sou=1e6)
+
+        # Variational problem
+        m = fire.Constant(1. / dt**2) * rho * fire.inner(
+            du - 2 * u_ant1 + u_ant2, v) * dx
+
+        # Derivada de du em relação a dx (deformações)
+        epsilon = deformacoes(du)
+
+        # Derivada de v em relação a dx
+        epsilon_v = deformacoes(v)
+
+        # Tensor elástico
+        C_vti = c_vti_tensor(vP, vS, rho, eps1,
+                             gamma, delta, 'weak')
+
+        C_tti = c_tti_tensor(C_vti, theta, phi)
+
+        # Tensor de tensões de Cauchy
+        sigma = C_tti * epsilon
+
+        a = fire.inner(sigma, epsilon_v) * dx
+        form = m + a - L
+        fire.solve(fire.lhs(form) == fire.rhs(form), u, bcs=bc)
+
+        outfile.write(u, time=t)
+
+        t = round(t + dt, 6)
+        ntimestep += 1
+
+        # Cycling the variables
+        print(u.dat.data.max())
+        u_ant2.assign(u_ant1)
+        u_ant1.assign(u)
+
+        if t > T:
+            break
+
+    print(67*'*')
+
+
+# print("VTI Propagation Problem")
+# propagation_VTI(V)
+print("TTI Propagation Problem")
+propagation_TTI(V)

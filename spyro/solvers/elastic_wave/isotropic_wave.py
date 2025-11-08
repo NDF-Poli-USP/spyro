@@ -12,7 +12,9 @@ from ...utils.typing import override
 
 
 class IsotropicWave(ElasticWave):
-    '''Isotropic elastic wave propagator'''
+    '''
+    Isotropic elastic wave propagator
+    '''
 
     def __init__(self, dictionary, comm=None):
         super().__init__(dictionary, comm=comm)
@@ -194,7 +196,7 @@ class IsotropicWave(ElasticWave):
 
     def parse_boundary_conditions(self):
         bc_list = self.input_dictionary.get("boundary_conditions", [])
-        for tag, id, value in bc_list:
+        for tag, ident, value in bc_list:
             if tag == "u":
                 subspace = self.function_space
             elif tag == "uz":
@@ -204,8 +206,9 @@ class IsotropicWave(ElasticWave):
             elif tag == "uy":
                 subspace = self.function_space.sub(2)
             else:
-                raise Exception(f"Unsupported boundary condition with tag: {tag}")
-            self.bcs.append(DirichletBC(subspace, value, id))
+                raise Exception(f"Unsupported boundary "
+                                f"condition with tag: {tag}")
+            self.bcs.append(DirichletBC(subspace, value, ident))
 
     def parse_volumetric_forces(self):
         acquisition_dict = self.input_dictionary["acquisition"]

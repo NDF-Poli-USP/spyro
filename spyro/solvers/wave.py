@@ -63,7 +63,8 @@ class Wave(Model_parameters, metaclass=ABCMeta):
     """
 
     def __init__(self, dictionary=None, comm=None):
-        """Wave object solver. Contains both the forward solver
+        '''
+        Wave object solver. Contains both the forward solver
         and gradient calculator methods.
 
         Parameters:
@@ -72,7 +73,7 @@ class Wave(Model_parameters, metaclass=ABCMeta):
 
         model_parameters: Python object
             Contains model parameters
-        """
+        '''
         super().__init__(dictionary=dictionary, comm=comm)
         self.initial_velocity_model = None
 
@@ -176,7 +177,8 @@ class Wave(Model_parameters, metaclass=ABCMeta):
         output=False,
         dg_velocity_model=True,
     ):
-        """Method to define new user velocity model or file. It is optional.
+        '''
+        Method to define new user velocity model or file. It is optional.
 
         Parameters:
         -----------
@@ -185,19 +187,20 @@ class Wave(Model_parameters, metaclass=ABCMeta):
         conditional: optional
             Firedrake conditional object.
         velocity_model_function: Firedrake function, optional
-            Firedrake function to be used as the velocity model. Has to be in the same function space as the object.
+            Firedrake function to be used as the velocity model.
+            Has to be in the same function space as the object.
         expression: str, optional
             If you use an expression, you can use the following variables:
             x, y, z, pi, tanh, sqrt. Example: "2.0 + 0.5*tanh((x-2.0)/0.1)".
-            It will be interpoalte into either the same function space as the object or a DG0 function space
-            in the same mesh.
+            It will be interpoalte into either the same function space as
+            the object or a DG0 function space'in the same mesh.
         new_file: str, optional
             Name of the file containing the velocity model.
         output: bool (optional)
             If True, outputs the velocity model to a pvd file for visualization.
         dg_velocity_model: bool (optional)
             If True, the space function is set to "DG" and degree "0"
-        """
+        '''
         if new_file is not None:
             self.initial_velocity_model_file = new_file
         # If no mesh is set, we have to do it beforehand
@@ -282,7 +285,7 @@ class Wave(Model_parameters, metaclass=ABCMeta):
             self.mesh_y = y
 
     def get_and_set_maximum_dt(self, fraction=0.7, estimate_max_eigenvalue=False):
-        """
+        '''
         Calculates and sets the maximum stable time step (dt) for the wave solver.
 
         Args:
@@ -293,12 +296,14 @@ class Wave(Model_parameters, metaclass=ABCMeta):
 
         Returns:
             float: The calculated maximum time step (dt).
-        """
+        '''
         # if self.method == "mass_lumped_triangle":
         #     estimate_max_eigenvalue = True
         # elif self.method == "spectral_quadrilateral":
         #     estimate_max_eigenvalue = True
         # else:
+
+        # TO REVIEW: It is already implemented in the modal solver
 
         if self.c is None:
             c = self.initial_velocity_model
@@ -365,24 +370,32 @@ class Wave(Model_parameters, metaclass=ABCMeta):
 
     @abstractmethod
     def get_function(self):
-        '''Returns the function (e.g., pressure or displacement) associated with
-        the wave object without additional variables (e.g., PML variables)'''
+        '''
+        Returns the function (e.g., pressure or displacement) associated with
+        the wave object without additional variables (e.g., PML variables)
+        '''
         pass
 
     @abstractmethod
     def get_function_name(self):
-        '''Returns the string representing the function of the wave object
-        (e.g., "pressure" or "displacement")'''
+        '''
+        Returns the string representing the function of the wave object
+        (e.g., "pressure" or "displacement")
+        '''
         pass
 
     def update_source_expression(self, t):
-        '''Update the source expression during wave propagation. This method must be
-        implemented only by subclasses that make use of the source term'''
+        '''
+        Update the source expression during wave propagation.
+        This method must be implemented only by subclasses
+        that make use of the source term.
+        '''
         pass
 
     @ensemble_propagator
     def wave_propagator(self, dt=None, final_time=None, source_nums=[0]):
-        """Propagates the wave forward in time.
+        '''
+        Propagates the wave forward in time.
         Currently uses central differences.
 
         Parameters:
@@ -400,7 +413,7 @@ class Wave(Model_parameters, metaclass=ABCMeta):
             Wavefield at the final time.
         u_rec: numpy array
             Wavefield at the receivers across the timesteps.
-        """
+        '''
 
         if final_time is not None:
             self.final_time = final_time

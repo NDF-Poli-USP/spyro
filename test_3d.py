@@ -228,8 +228,8 @@ def get_xCR_usu(Wave_obj, dat_regr_xCR, typ_xCR, n_pts):
         return xCR_opt
 
 
-def habc_fig8(Wave_obj, modal_solver, fitting_c, dat_regr_xCR,
-              xCR_usu=None, plot_comparison=True):
+def habc_fig8(Wave_obj, modal_solver, fitting_c, dat_regr_xCR, xCR_usu=None,
+              plot_comparison=True, check_dt=False, max_divisor_tf=1):
     '''
     Apply the HABC to the model 3D based on Fig. 8 of Salas et al. (2022)
 
@@ -264,6 +264,16 @@ def habc_fig8(Wave_obj, modal_solver, fitting_c, dat_regr_xCR,
     plot_comparison : `bool`, optional
         If True, the solution (time and frequency) at receivers
         and the error measures are plotted. Default is True.
+    check_dt : `bool`, optional
+        If True, check if the timestep size is appropriate for the
+        transient response. Default is False
+    max_divisor_tf : `int`, optional
+        Index to select the maximum divisor of the final time, converted
+        to an integer according to the order of magnitude of the timestep
+        size. The timestep size is set to the divisor, given by the index
+        in descending order, less than or equal to the user's timestep
+        size. If the value is 1, the timestep size is set as the maximum
+        divisor. Default is 1
 
     Returns
     -------
@@ -284,6 +294,12 @@ def habc_fig8(Wave_obj, modal_solver, fitting_c, dat_regr_xCR,
 
     # Updating velocity model
     Wave_obj.velocity_habc()
+
+    # Check the timestep size
+    if check_dt:
+        Wave_obj.check_timestep_habc(max_divisor_tf=3,
+                                     method='LANCZOS',
+                                     set_max_dt=False)
 
     # Setting the damping profile within absorbing layer
     Wave_obj.damping_layer(xCR_usu=xCR_usu, method=modal_solver)
@@ -325,7 +341,7 @@ def test_loop_habc_3d():
     edge_length_lst = [0.150, 0.125]
 
     # Timestep size (in seconds). Initial guess: edge_length / 50
-    # dt_usu_lst = [0.0015, 0.0010]  # Exact eigenvalue
+    # dt_usu_lst = [0.0015, 0.0010]  # Exact eigenvalue # 1.845
     dt_usu_lst = [0.00125, 0.00080]  # Approximate eigenvalue
 
     # Eikonal degree
@@ -413,7 +429,7 @@ def test_loop_habc_3d():
     # ============ HABC SCHEME ============
 
     # Name of the file containing the mesh
-    Wave_obj.filename_mesh = "transfinite_cube_extended_all_4_sides.msh"
+    Wave_obj.filename_mesh = "transfinite_cube_extended.msh"
 
     if loop_modeling:
 
@@ -471,7 +487,8 @@ def test_loop_habc_3d():
                         plot_comparison = True if itr_xCR == n_pts else False
                         habc_fig8(Wave_obj, modal_solver, fitting_c,
                                   dat_regr_xCR, xCR_usu=xCR_usu,
-                                  plot_comparison=plot_comparison)
+                                  plot_comparison=plot_comparison,
+                                  check_dt=True, max_divisor_tf=max_div_tf)
 
                         # Estimating computational resource usage
                         comp_cost("tfin", tRef=tRef,

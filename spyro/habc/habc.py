@@ -963,7 +963,7 @@ class HABC_Wave(AcousticWave, HABC_Mesh, RectangLayer,
         max_dt = 10**(-pot) * max_div[-index_div]
 
         # Set the timestep size
-        dt = max_dt if set_max_dt else np.min(usr_dt, max_dt)
+        dt = max_dt if set_max_dt else min(usr_dt, max_dt)
         self.set_dt(dt)
 
         print("Selected Timestep Size: {:.3f} ms\n".format(1e3 * self.dt),
