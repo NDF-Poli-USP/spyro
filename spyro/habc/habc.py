@@ -958,7 +958,7 @@ class HABC_Wave(AcousticWave, HABC_Mesh, RectangLayer,
         # Maximum timestep size according to divisors of the final time
         val_int_tf = int(10**pot * self.final_time)
         val_int_dt = int(10**pot * max_dt)
-        max_div = [d for d in divisors(val_int_tf) if d <= val_int_dt]
+        max_div = [d for d in divisors(val_int_tf) if d < val_int_dt]
         index_div = min(max_divisor_tf, len(max_div))
         max_dt = 10**(-pot) * max_div[-index_div]
 

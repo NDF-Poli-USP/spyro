@@ -297,8 +297,7 @@ def habc_fig8(Wave_obj, modal_solver, fitting_c, dat_regr_xCR, xCR_usu=None,
 
     # Check the timestep size
     if check_dt:
-        Wave_obj.check_timestep_habc(max_divisor_tf=3,
-                                     method='LANCZOS',
+        Wave_obj.check_timestep_habc(method='LANCZOS',
                                      set_max_dt=False)
 
     # Setting the damping profile within absorbing layer
@@ -429,7 +428,7 @@ def test_loop_habc_3d():
     # ============ HABC SCHEME ============
 
     # Name of the file containing the mesh
-    Wave_obj.filename_mesh = "transfinite_cube_extended.msh"
+    Wave_obj.filename_mesh = "ellipsoid_mesh.msh"
 
     if loop_modeling:
 
