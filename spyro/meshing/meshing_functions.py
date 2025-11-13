@@ -626,7 +626,8 @@ def BoxMesh(nx, ny, nz, Lx, Ly, Lz, pad=None, quadrilateral=False):
     else:
         pad = 0
     if quadrilateral:
-        quad_mesh = fire.RectangleMesh(nx, ny, Lx, Ly, quadrilateral=quadrilateral)
+        quad_mesh = fire.RectangleMesh(nx, ny, Lx, Ly,
+                                       quadrilateral=quadrilateral)
         quad_mesh.coordinates.dat.data[:, 0] *= -1.0
         quad_mesh.coordinates.dat.data[:, 1] -= pad
         layer_height = Lz / nz

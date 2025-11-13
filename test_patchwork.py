@@ -1,16 +1,14 @@
 import firedrake as fire
-import warnings
+import numpy as np
 import spyro.habc.habc as habc
-import spyro.habc.eik as eik
 from spyro.utils.cost import comp_cost
-fire.parameters["loopy"] = {"silenced_warnings": ["v1_scheduler_fallback"]}
-warnings.filterwarnings("ignore", category=RuntimeWarning)
+from velocity_models.patchwork import get_velocity_model
 
 
-def wave_dict(dt_usu, fr_files, layer_shape, degree_layer, degree_type,
-              habc_reference_freq, get_ref_model, degree_eikonal):
+def wave_dict(dt_usu, fr_files, layer_shape, degree_layer,
+              degree_type, habc_reference_freq, get_ref_model):
     '''
-    Create a dictionary with parameters for the model.
+    Create a dictionary with parameters for the model
 
     Parameters
     ----------
@@ -20,17 +18,15 @@ def wave_dict(dt_usu, fr_files, layer_shape, degree_layer, degree_type,
         Frequency of the output files to be saved in the simulation
     layer_shape : `str`
         Shape of the absorbing layer, either 'rectangular' or 'hypershape'
-    degree_layer : `int` or `None`
+    degree_layer : `float` or `None`
         Degree of the hypershape layer, if applicable. If None, it is not used
     degree_type : `str`
         Type of the hypereshape degree. Options: 'real' or 'integer'
     habc_reference_freq : str
-        Reference frequency for the layer size. Options: 'source' or 'boundary
+        Reference frequency for the layer size. Options: 'source' or 'boundary'
     get_ref_model : `bool`
         If True, the infinite model is created. If False, the absorbing layer
         is created based on the model parameters.
-    degree_eikonal : `int`
-        Finite element order for the Eikonal equation. Should be 1 or 2.
 
     Returns
     -------
@@ -47,8 +43,8 @@ def wave_dict(dt_usu, fr_files, layer_shape, degree_layer, degree_type,
         # (MLT/spectral_quadrilateral/DG_triangle/DG_quadrilateral)
         # You can either specify a cell_type+variant or a method
         # accepted_variants = ["lumped", "equispaced", "DG"]
-        "degree": 3,  # p order p<=3 for 3D
-        "dimension": 3,  # dimension
+        "degree": 4,  # p order p<=4 for 2D
+        "dimension": 2,  # dimension
     }
 
     # Number of cores for the shot. For simplicity, we keep things serial.
@@ -62,9 +58,9 @@ def wave_dict(dt_usu, fr_files, layer_shape, degree_layer, degree_type,
     # 1.00 x 1.00 km domain and compute the size for the Absorbing Layer (AL)
     # to absorb outgoing waves on boundries (-z, +-x sides) of the domain.
     dictionary["mesh"] = {
-        "Lz": 1.,  # depth in km - always positive
-        "Lx": 1.,  # width in km - always positive
-        "Ly": 1.,  # thickness in km - always positive
+        "Lz": 2.4,  # depth in km - always positive
+        "Lx": 4.8,  # width in km - always positive
+        "Ly": 0.,  # thickness in km - always positive
         "mesh_type": "firedrake_mesh",
     }
 
@@ -74,20 +70,16 @@ def wave_dict(dt_usu, fr_files, layer_shape, degree_layer, degree_type,
     # of the domain to verify the efficiency of the absorbing layer.
     dictionary["acquisition"] = {
         "source_type": "ricker",
-        "source_locations": [(-0.5, 0.25, 0.5)],
+        "source_locations": [(-0.6, 1.68)],  # (0.25 * Lz, 0.75 * Lx)
         "frequency": 5.0,  # in Hz
-        "delay": 1. / 3.,
-        "delay_type": "time",  # "multiples_of_minimum" or "time"
-        "receiver_locations": [(-1., 0., 0.), (-1., 1., 0.),
-                               (0., 1., 0.), (0., 0., 0),
-                               (-1., 0., 1.), (-1., 1., 1.),
-                               (0., 1., 1.), (0., 0., 1.)]
+        "delay": np.pi / 6**5,  # delay to compare with paper
+        "receiver_locations": [(-1., 0.), (-1., 1.), (0., 1.), (0., 0.)]
     }
 
-    # Simulate for 1.5 seconds.
+    # Simulate for 2.0 seconds.
     dictionary["time_axis"] = {
         "initial_time": 0.,  # Initial time for event
-        "final_time": 1.5,    # Final time for event
+        "final_time": 4.,    # Final time for event
         "dt": dt_usu,  # timestep size in seconds
         "amplitude": 1.,  # the Ricker has an amplitude of 1.
         "output_frequency": fr_files,  # how frequently to output solution to pvds
@@ -102,20 +94,20 @@ def wave_dict(dt_usu, fr_files, layer_shape, degree_layer, degree_type,
         "degree_layer": degree_layer,  # Float >= 2 (hyp) or None (rec)
         "degree_type": degree_type,  # Options: real or integer
         "habc_reference_freq": habc_reference_freq,  # Options: source or boundary
-        "degree_eikonal": degree_eikonal,  # Finite element order for the Eikonal analysis
+        "degree_eikonal": 2,  # Finite element order for the Eikonal analysis
         "get_ref_model": get_ref_model,  # If True, the infinite model is created
     }
 
     # Define parameters for visualization
     dictionary["visualization"] = {
         "forward_output": True,
-        "forward_output_filename": "output/forward/fw_output_3d.pvd",
+        "forward_output_filename": "output/forward/fw_output.pvd",
         "fwi_velocity_model_output": False,
         "velocity_model_filename": None,
         "gradient_output": False,
         "gradient_filename": None,
         "acoustic_energy": True,  # Activate energy calculation
-        "acoustic_energy_filename": "output/preamble/acoustic_pot_energy_3d",
+        "acoustic_energy_filename": "output/preamble/acoustic_pot_energy",
     }
 
     return dictionary
@@ -151,8 +143,9 @@ def preamble_habc(dictionary, edge_length, f_est):
     Wave_obj.set_mesh(mesh_parameters={"edge_length": edge_length})
 
     # Initial velocity model
-    cond = fire.conditional(Wave_obj.mesh_x < 0.5, 3.0, 1.5)
-    Wave_obj.set_initial_velocity_model(conditional=cond)
+    c_patchwork = get_velocity_model(
+        Wave_obj.mesh, Wave_obj.function_space, output=False)
+    Wave_obj.set_initial_velocity_model(velocity_model_function=c_patchwork)
 
     # Preamble mesh operations
     Wave_obj.preamble_mesh_operations(f_est=f_est)
@@ -177,7 +170,7 @@ def preamble_habc(dictionary, edge_length, f_est):
 
 def get_xCR_usu(Wave_obj, dat_regr_xCR, typ_xCR, n_pts):
     '''
-    Get the user-defined heuristic factor for the minimum damping ratio.
+    Get the user-defined heuristic factor for the minimum damping ratio
 
     Parameters
     ----------
@@ -228,10 +221,10 @@ def get_xCR_usu(Wave_obj, dat_regr_xCR, typ_xCR, n_pts):
         return xCR_opt
 
 
-def habc_fig8(Wave_obj, modal_solver, fitting_c, dat_regr_xCR, xCR_usu=None,
-              plot_comparison=True, check_dt=False, max_divisor_tf=1):
+def habc_fig8(Wave_obj, modal_solver, fitting_c, dat_regr_xCR,
+              xCR_usu=None, plot_comparison=True):
     '''
-    Apply the HABC to the model 3D based on Fig. 8 of Salas et al. (2022)
+    Apply the HABC to the model in Fig. 8 of Salas et al. (2022)
 
     Parameters
     ----------
@@ -264,16 +257,6 @@ def habc_fig8(Wave_obj, modal_solver, fitting_c, dat_regr_xCR, xCR_usu=None,
     plot_comparison : `bool`, optional
         If True, the solution (time and frequency) at receivers
         and the error measures are plotted. Default is True.
-    check_dt : `bool`, optional
-        If True, check if the timestep size is appropriate for the
-        transient response. Default is False
-    max_divisor_tf : `int`, optional
-        Index to select the maximum divisor of the final time, converted
-        to an integer according to the order of magnitude of the timestep
-        size. The timestep size is set to the divisor, given by the index
-        in descending order, less than or equal to the user's timestep
-        size. If the value is 1, the timestep size is set as the maximum
-        divisor. Default is 1
 
     Returns
     -------
@@ -294,11 +277,6 @@ def habc_fig8(Wave_obj, modal_solver, fitting_c, dat_regr_xCR, xCR_usu=None,
 
     # Updating velocity model
     Wave_obj.velocity_habc()
-
-    # Check the timestep size
-    if check_dt:
-        Wave_obj.check_timestep_habc(method='LANCZOS',
-                                     set_max_dt=False)
 
     # Setting the damping profile within absorbing layer
     Wave_obj.damping_layer(xCR_usu=xCR_usu, method=modal_solver)
@@ -324,48 +302,41 @@ def habc_fig8(Wave_obj, modal_solver, fitting_c, dat_regr_xCR, xCR_usu=None,
                                   data_regr_xCR=dat_regr_xCR)
 
 
-def test_loop_habc_3d():
+def test_loop_patchwork_2d():
     '''
-    Loop for HABC in model 3D based on Fig. 8 of Salas et al. (2022)
+    Loop for applying the HABC to the model in Fig. 8 of Salas et al. (2022)
     '''
 
-    case = 0  # Integer from 0 to 1
+    case = 0  # Integer from 0 to 4
 
     # ============ SIMULATION PARAMETERS ============
 
-    # Mesh size in km
+    # Mesh size (in km)
     # cpw: cells per wavelength
     # lba = minimum_velocity / source_frequency
     # edge_length = lba / cpw
-    edge_length_lst = [0.150, 0.125]
+    edge_length_lst = [0.19]
 
     # Timestep size (in seconds). Initial guess: edge_length / 50
-    # dt_usu_lst = [0.0015, 0.0010]  # Exact eigenvalue # 1.845
-    dt_usu_lst = [0.00125, 0.00080]  # Approximate eigenvalue
+    dt_usu_lst = [0.004]
 
-    # Eikonal degree
-    degree_eikonal_lst = [2, 1]
     # Factor for the stabilizing term in Eikonal equation
-    f_est_lst = [0.04, 0.05]
+    f_est_lst = [0.05]
 
     # Parameters for fitting equivalent velocity regression
-    fitting_c_lst = [(1.0, 1.0, 0.1, 0.1),
-                     (1.0, 1.0, 0.1, 0.0)]
+    fitting_c_lst = [(1.0, 1.0, 1.0, 1.0)]
 
     # Maximum divisor of the final time
-    # max_div_tf_lst = [5, 7]  # Exact eigenvalue
-    max_div_tf_lst = [9, 10]  # Approximate eigenvalue
+    max_div_tf_lst = [2]
 
     # Get simulation parameters
     edge_length = edge_length_lst[case]
     dt_usu = dt_usu_lst[case]
-    p_eik = degree_eikonal_lst[case]
     f_est = f_est_lst[case]
     max_div_tf = max_div_tf_lst[case]
     fitting_c = fitting_c_lst[case]
     print("\nMesh Size: {:.3f} m".format(1e3 * edge_length), flush=True)
     print("Timestep Size: {:.3f} ms".format(1e3 * dt_usu), flush=True)
-    print("Eikonal Degree: {}".format(p_eik), flush=True)
     print("Eikonal Stabilizing Factor: {:.2f}".format(f_est), flush=True)
     print("Maximum Divisor of Final Time: {}".format(max_div_tf), flush=True)
     fit_str = "Fitting Parameters for Analytical Solver: " + 3 * "{:.1f}, "
@@ -374,7 +345,7 @@ def test_loop_habc_3d():
     # ============ HABC PARAMETERS ============
 
     # Infinite model (True: Infinite model, False: HABC scheme)
-    get_ref_model = False
+    get_ref_model = True
 
     # Loop for HABC cases
     loop_modeling = not get_ref_model
@@ -386,9 +357,7 @@ def test_loop_habc_3d():
     degree_type = "real"  # "integer"
 
     # Hyperellipse degrees
-    degree_layer_study = [[2.8, 3.0, 3.5, 4.0, None],
-                          [2.4, 3.0, 4.0, 4.2, None]]
-    degree_layer_lst = [2.8]  # degree_layer_study[case]
+    degree_layer_lst = [None]
 
     # Modal solver for fundamental frequency
     modal_solver = 'KRYLOVSCH_CH'  # 'ANALYTICAL', 'RAYLEIGH'
@@ -400,17 +369,15 @@ def test_loop_habc_3d():
     n_pts = 1
 
     # ============ MESH AND EIKONAL ============
-
     # Create dictionary with parameters for the model
     fr_files = max(int(100 * max(dt_usu_lst) / dt_usu), 1)
     dictionary = wave_dict(dt_usu, fr_files, "rectangular", None,
-                           degree_type, "source", get_ref_model, p_eik)
+                           degree_type, "source", get_ref_model)
 
     # Creating mesh and performing eikonal analysis
     Wave_obj = preamble_habc(dictionary, edge_length, f_est)
 
     # ============ REFERENCE MODEL ============
-
     if get_ref_model:
         # Reference to resource usage
         tRef = comp_cost("tini")
@@ -426,26 +393,22 @@ def test_loop_habc_3d():
                   user_name=Wave_obj.path_save + "preamble/INF_")
 
     # ============ HABC SCHEME ============
-
-    # Name of the file containing the mesh
-    Wave_obj.filename_mesh = "snapped_output.msh"
-
     if loop_modeling:
 
         # Data to print on screen
         crit_str = "\nCriterion for Heuristic Factor ({:.0f} Points): {}"
-        fref_str = "HABC Reference Frequency: {}\n"
+        fref_str = "HABC Reference Frequency: {}"
         degr_str = "Type of the Hypereshape Degree: {}"
         mods_str = "Modal Solver for Fundamental Frequency: {}\n"
 
         # Loop for different layer shapes and degrees
         for habc_ref_freq in habc_reference_freq_lst:
 
-            # Reference frequency for sizing the hybrid absorbing layer
+            # Criterion for optimal heuristic factor xCR
             print(crit_str.format(
                 n_pts, crit_opt.replace("_", " ").title()), flush=True)
 
-            # Criterion for optinal heuristic factor xCR
+            # Reference frequency for sizing the hybrid absorbing layer
             Wave_obj.abc_reference_freq = habc_ref_freq
             print(fref_str.format(habc_ref_freq.capitalize()), flush=True)
 
@@ -486,8 +449,7 @@ def test_loop_habc_3d():
                         plot_comparison = True if itr_xCR == n_pts else False
                         habc_fig8(Wave_obj, modal_solver, fitting_c,
                                   dat_regr_xCR, xCR_usu=xCR_usu,
-                                  plot_comparison=plot_comparison,
-                                  check_dt=True, max_divisor_tf=max_div_tf)
+                                  plot_comparison=plot_comparison)
 
                         # Estimating computational resource usage
                         comp_cost("tfin", tRef=tRef,
@@ -512,59 +474,27 @@ def test_loop_habc_3d():
                 Wave_obj.rename_folder_habc()
 
 
-# Applying HABCs to the model in Fig. 8 of Salas et al. (2022) in 3D
+# Applying HABCs to the model in Fig. 8 of Salas et al. (2022)
 if __name__ == "__main__":
-    test_loop_habc_3d()
+    test_loop_patchwork_2d()
 
-# eik_min = 83.333 ms
-# f_est   150m    125m    100m     80m
-#  0.02  --/--   --/--  79.817  58.368
-#  0.03 78.201  75.378  84.365* 71.123
-#  0.04 84.857* 78.301  89.437  78.665
-#  0.05 91.477  82.274* 93.810  83.901*
-#  0.06 97.574  86.409  97.935  88.048
 
-# SOU-1st 150m 125m 100m  80m
-# n_min    2.8  2.4  2.2  2.1
-# n_max    4.7  4.7  4.7  4.7
+# edge_length f_est eik[ms]         loc[km]
+# 85.0m        0.06 547.076 (-0.643, 0.000)
+# 80.0m        0.05 554.254 (-0.600, 0.000)
+# 75.0m        0.08 565.192 (-0.562, 0.000)
+# 37.5m        0.07 566.083 (-0.581, 0.000)
 
-# BND-1st 150m 125m
-# n_min    2.0  2.0
-# n_max    4.0  4.2
 
-# SOU-2nd 150m 125m
-# n_min    2.0
-# n_max    4.0
+# n_hyp  100m  62.5m  50m  25m  20m
+# n_min   2.0    2.0  2.0  2.0  2.0
+# n_max   4.4    4.8  4.7  4.7  4.6
 
-# BND-2nd 150m 125m
-# n_min    2.0
-# n_max    3.6
+# freq    N2.0    N3.0    N4.0    N4.4     REC
+# num  0.50443 0.48266 0.47423 0.47270 0.45539
+# anr  0.53970 0.52214 0.51563 0.51410 0.50036
+# anh  0.52300 0.48952 0.49112 0.48952 0.47102
 
-# Optional models
-# edge_length_lst = [0.100, 0.080]
-# dt_usu_lst = [0.0018, 0.0016]
-# degree_eikonal_lst = [2, 1]
-# f_est_lst = [0.03, 0.05]
-
-# H2.8
-# Err(%)     1        2        3        4        5
-# eI     50.19   128.36   127.04    33.81    33.81
-# eP     18.60    50.81    42.68    21.69    21.69
-# Ea  1.19e-05 2.16e-05 5.22e-04 1.77e-04 1.77e-04
-
-# REC
-# Err(%)     1        2        3        4        5
-# eI     11.32     8.59     6.20     2.79     2.79
-# eP     14.06    13.10    11.33     7.47     7.47
-# Ea  1.93e-05 4.60e-05 1.03e-04 1.87e-04 1.87e-04
-
-# H2.8
-# cosHig     Hig     Som
-# eI       66.74   67.19
-# eP       28.22   28.22
-# Ea     7.03e-6 7.18e-6
-
-# Err(%)   2.0    2.8    3.0    3.5    4.0    4.7    6.0    8.0   10.0   20.0   50.0  100.0  200.0    REC
-# eI     30.33  18.66  20.62  21.74  19.47  19.27  19.27  18.28  18.21  17.08  17.07  17.84  17.84  17.49
-# eP     35.57  10.34  11.38  11.40  11.69  12.16  12.31  12.42  12.39  12.42  12.43  12.46  12.47  12.88
-# ele     3030   3720   3848   3924   4110   4188   4200   5844   5910   6562   6582   6900   6912   6912
+# from time import perf_counter  # For runtime
+# tRef = perf_counter()
+# print(f"Time: {perf_counter() - tRef:.4f} seconds")

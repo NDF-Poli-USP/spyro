@@ -89,8 +89,8 @@ class Eikonal_Modeling():
         Set the eikonal solver parameters
     '''
 
-    def __init__(self, dimension, source_locations,
-                 ele_type='CG', p_eik=None, f_est=0.03, tol=1e-16):
+    def __init__(self, dimension, source_locations, ele_type='CG',
+                 p_eik=None, f_est=0.03, tol=1e-16):
         '''
         Initialize the Eikonal_Modeling class
 
@@ -133,7 +133,7 @@ class Eikonal_Modeling():
         # User solver tolerance
         self.tol = tol
 
-    def eikonal_bcs(self, node_positions, V):
+    def eikonal_bcs(self, node_positions, V, lmin):
         '''
         Impose Dirichlet BCs for eikonal equation
 
@@ -145,6 +145,8 @@ class Eikonal_Modeling():
             - (z_data, x_data, y_data) for 3D
         V : `firedrake function space`
             Function space where the boundary condition is applied
+        lmin : `float`
+            Minimum mesh size
 
         Returns
         -------
@@ -154,21 +156,36 @@ class Eikonal_Modeling():
             Function marking the source locations in the mesh
         '''
 
+        import ipdb
         # Extract node positions
         z_data, x_data = node_positions[:2]
 
         # Identify source indices in the mesh
-        if self.dimension == 2:  # 2D
-            sou_ids = [np.where(np.isclose(z_data, z_s)
-                                & np.isclose(x_data, x_s))[0]
-                       for z_s, x_s in self.source_locations]
+        it = int(-1)
+        div_min = int(self.p_eik + 1)
+        div_max = int(10 * div_min)
+        while True:
+            it += 1
+            div = max(div_max - it, div_min)
+            tol_node = lmin / div
 
-        if self.dimension == 3:  # 3D
-            y_data = node_positions[2]
-            sou_ids = [np.where(np.isclose(z_data, z_s)
-                                & np.isclose(x_data, x_s)
-                                & np.isclose(y_data, y_s))[0]
-                       for z_s, x_s, y_s in self.source_locations]
+            if self.dimension == 2:  # 2D
+                sou_ids = [np.where(np.isclose(z_data, z_s, atol=tol_node)
+                                    & np.isclose(x_data, x_s, atol=tol_node))[0]
+                           for z_s, x_s in self.source_locations]
+
+            if self.dimension == 3:  # 3D
+                y_data = node_positions[2]
+                sou_ids = [np.where(np.isclose(z_data, z_s, atol=tol_node)
+                                    & np.isclose(x_data, x_s, atol=tol_node)
+                                    & np.isclose(y_data, y_s, atol=tol_node))[0]
+                           for z_s, x_s, y_s in self.source_locations]
+
+            if sou_ids[0].size:
+                break
+            elif div == div_min and not sou_ids[0].size:
+                ipdb.set_trace()
+                exit("Error: Source Points Not Found!")
 
         # Define BCs for eikonal
         bcs_eik = [Dir_Point_BC(V, fire.Constant(0.0), ids) for ids in sou_ids]

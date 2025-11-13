@@ -953,14 +953,14 @@ class HABC_Wave(AcousticWave, HABC_Mesh, RectangLayer,
             quad_rule=self.quadrature_rule, fraction=1.)
 
         # Rounding power
-        pot = abs(np.ceil(np.log10(max_dt))) + 3
+        pot = int(abs(np.ceil(np.log10(max_dt))) + 3)
 
         # Maximum timestep size according to divisors of the final time
         val_int_tf = int(10**pot * self.final_time)
         val_int_dt = int(10**pot * max_dt)
         max_div = [d for d in divisors(val_int_tf) if d < val_int_dt]
         index_div = min(max_divisor_tf, len(max_div))
-        max_dt = 10**(-pot) * max_div[-index_div]
+        max_dt = round(10**(-pot) * max_div[-index_div], pot)
 
         # Set the timestep size
         dt = max_dt if set_max_dt else min(usr_dt, max_dt)

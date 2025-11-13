@@ -36,6 +36,8 @@ class HABC_Eikonal(Eikonal_Modeling):
         Mesh cell diameters
     funct_space_eik: `firedrake function space`
         Function space for the Eikonal modeling
+    lmin : `float`
+        Minimum mesh size
     mesh: `firedrake mesh`
         Original mesh without absorbing layer
     node_positions : `tuple`
@@ -73,10 +75,9 @@ class HABC_Eikonal(Eikonal_Modeling):
         None
         '''
 
-        Eikonal_Modeling.__init__(self, Wave.dimension,
-                                  Wave.sources.point_locations,
-                                  ele_type=Wave.ele_type_eik,
-                                  p_eik=Wave.p_eik, f_est=Wave.f_est)
+        Eikonal_Modeling.__init__(
+            self, Wave.dimension, Wave.sources.point_locations,
+            ele_type=Wave.ele_type_eik, p_eik=Wave.p_eik, f_est=Wave.f_est)
 
         # Communicator MPI
         self.comm = Wave.comm
@@ -89,6 +90,9 @@ class HABC_Eikonal(Eikonal_Modeling):
 
         # Mesh cell diameters
         self.diam_mesh = Wave.diam_mesh
+
+        # Minimum mesh size
+        self.lmin = Wave.lmin
 
         # Velocity profile model
         self.c = Wave.c
@@ -124,8 +128,8 @@ class HABC_Eikonal(Eikonal_Modeling):
 
         print("\nDefining Eikonal BCs")
 
-        self.bcs_eik, sou_marker = self.eikonal_bcs(self.node_positions,
-                                                    self.funct_space_eik)
+        self.bcs_eik, sou_marker = self.eikonal_bcs(
+            self.node_positions, self.funct_space_eik, self.lmin)
 
         # Save source marker
         outfile = fire.VTKFile(self.path_save + "souEik.pvd")

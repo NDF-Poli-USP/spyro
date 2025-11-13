@@ -581,7 +581,7 @@ class Model_parameters:
             self.delay = dictionary["delay"]
         else:
             self.delay = 1.5
-        self.delay_type = dictionary.get("delay_type", "multiples_of_minimun")
+        self.delay_type = dictionary.get("delay_type", "multiples_of_minimum")
         self.__check_acquisition()
 
     def _sanitize_optimization_and_velocity(self):

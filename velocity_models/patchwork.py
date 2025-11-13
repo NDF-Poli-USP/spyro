@@ -1,50 +1,48 @@
 import firedrake as fire
 from firedrake import And, VTKFile
+import ipdb
 
 
-def apply_box(mesh, c, x1, y1, x2, y2, value):
-    y1 = 2.4 - y1
-    y2 = 2.4 - y2
-    x1 = 4.8 - x1
-    x2 = 4.8 - x2
+def apply_box(mesh, c, x1, y1, x2, y2, value, tol=1e-3):
+    x1r = round(x1, 2) - tol
+    x2r = round(x2, 2) + tol
+    y1r = -(round(2.4 - y1, 2) + tol)
+    y2r = -(round(2.4 - y2, 2) - tol)
     y, x = fire.SpatialCoordinate(mesh)
     box = fire.conditional(
-        And(And(x1 >= x, x >= x2), And(y1 >= -y, -y >= y2)), value, c
-    )
+        And(And(x >= x1r, x <= x2r),
+            And(y >= y1r, y <= y2r)), value, c)
+    c.interpolate(box, allow_missing_dofs=True)
 
-    c.interpolate(box)
     return c
 
 
 def apply_slope(mesh, c, x1, y1, x3, y3, value):
     y, x = fire.SpatialCoordinate(mesh)
-    y1 = 2.4 - y1
-    y3 = 2.4 - y3
-    x1 = 4.8 - x1
-    x3 = 4.8 - x3
+    y1 = round(2.4 - y1, 2)
+    y3 = round(2.4 - y3, 2)
     slope = (y3 - y1) / (x3 - x1)
-
     slope = fire.conditional(
-        And((-y - y1) / (x - x1) <= slope, x < x1), value, c
-    )
-    c.interpolate(slope)
+        And((-y - y1) / (x - x1) >= slope, x > x1), value, c)
+    c.interpolate(slope, allow_missing_dofs=True)
+
     return c
 
 
 def apply_vs_from_list(velmat, mesh, Lx, Ly, c):
     # (x1, y1, x2, y2, cm)
     for box in velmat:
-        x1 = box[0] * Lx
-        y1 = box[1] * Ly
-        x2 = box[2] * Lx
-        y2 = box[3] * Ly
+        x1 = round(box[0] * Lx, 2)
+        y1 = round(box[1] * Ly, 2)
+        x2 = round(box[2] * Lx, 2)
+        y2 = round(box[3] * Ly, 2)
         cm = box[4]
         c = apply_box(mesh, c, x1, y1, x2, y2, cm)
 
     return c
 
 
-def get_paper_velocity(mesh, V, output=True, units='km/s'):
+def get_velocity_model(mesh, V, output=True, units='km/s'):
     if units == 'km/s':
         multiplier = 1.0
     elif units == 'm/s':
@@ -66,18 +64,14 @@ def get_paper_velocity(mesh, V, output=True, units='km/s'):
     velmat.append([0.80, 0.35, 0.90, 0.80, 4.0 * multiplier])
     velmat.append([0.85, 0.80, 0.90, 0.95, 3.6 * multiplier])
     velmat.append([0.90, 0.65, 1.00, 1.00, 3.6 * multiplier])
-    velmat.append([0.00, 0.00, 0.00, 0.00, 1.5 * multiplier])
 
     Lx = 4.8
     Ly = 2.4
 
     c = fire.Function(V)
-
     c.dat.data[:] = 1.5 * multiplier
-
-    c = apply_slope(
-        mesh, c, 0.4 * Lx, 0.3 * Ly, 0.75 * Lx, 0.65 * Ly, 3.3 * multiplier
-    )
+    c = apply_slope(mesh, c, 0.4 * Lx, 0.3 * Ly, 0.75 * Lx, 0.65 * Ly,
+                    3.3 * multiplier)
     c = apply_vs_from_list(velmat, mesh, Lx, Ly, c)
 
     if output is True:

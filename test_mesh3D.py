@@ -77,7 +77,7 @@ def wave_dict(dt_usu, fr_files, layer_shape, degree_layer, degree_type,
         "source_locations": [(-0.5, 0.25, 0.5)],
         "frequency": 5.0,  # in Hz
         "delay": 1. / 3.,
-        "delay_type": "time",  # "multiples_of_minimun" or "time"
+        "delay_type": "time",  # "multiples_of_minimum" or "time"
         "receiver_locations": [(-1., 0., 0.), (-1., 1., 0.),
                                (0., 1., 0.), (0., 0., 0),
                                (-1., 0., 1.), (-1., 1., 1.),

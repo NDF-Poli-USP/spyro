@@ -350,7 +350,7 @@ def test_loop_habc_2d():
     get_ref_model = False
 
     # Loop for HABC cases
-    loop_modeling = not get_ref_model, flush = True
+    loop_modeling = not get_ref_model
 
     # Reference frequency
     habc_reference_freq_lst = ["source"]  # ["source", "boundary"]
