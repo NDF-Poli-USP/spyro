@@ -623,11 +623,11 @@ class HABC_Wave(AcousticWave, HABC_Mesh, RectangLayer,
         lay_field, layer_mask = self.clipping_coordinates_lay_field(V)
 
         # Extending velocity model within the absorbing layer
-        self.extend_velocity_profile(lay_field, method=method)
+        self.extend_velocity_profile(lay_field, layer_mask, method=method)
 
         # Interpolating the velocity model in the layer
-        self.c.interpolate(lay_field.sub(0) * layer_mask + (1 - layer_mask)
-                           * self.c, allow_missing_dofs=True)
+        self.c.interpolate(lay_field.sub(0) * layer_mask + (
+            1. - layer_mask) * self.c, allow_missing_dofs=True)
         del layer_mask, lay_field
 
         # Interpolating in the space function of the problem
@@ -910,7 +910,7 @@ class HABC_Wave(AcousticWave, HABC_Mesh, RectangLayer,
                               bnd_nfs, bnd_nodes_nfs, hyp_par=hyp_par)
 
     def check_timestep_habc(self, max_divisor_tf=1, set_max_dt=True,
-                            method='ANALYTICAL'):
+                            method='ANALYTICAL', mag_add=3):
         '''
         Check if the timestep size is appropriate for the transient response
 
@@ -931,6 +931,8 @@ class HABC_Wave(AcousticWave, HABC_Mesh, RectangLayer,
             is 'ANALYTICAL' method that estimates the maximum eigenvalue
             using the Gershgorin Circle Theorem.
             Opts: 'ANALYTICAL', 'ARNOLDI', 'LANCZOS' or 'LOBPCG'
+        mag_add : `int`, optional
+            Additional magnitude order to adjust the rounding of the timestep
 
         Returns
         -------
@@ -953,21 +955,27 @@ class HABC_Wave(AcousticWave, HABC_Mesh, RectangLayer,
             quad_rule=self.quadrature_rule, fraction=1.)
 
         # Rounding power
-        pot = int(abs(np.ceil(np.log10(max_dt))) + 3)
+        pot = int(abs(np.ceil(np.log10(max_dt))) + mag_add)
 
         # Maximum timestep size according to divisors of the final time
         val_int_tf = int(10**pot * self.final_time)
         val_int_dt = int(10**pot * max_dt)
         max_div = [d for d in divisors(val_int_tf) if d < val_int_dt]
-        index_div = min(max_divisor_tf, len(max_div))
+        n_div = len(max_div)
+        index_div = min(max_divisor_tf, n_div)
         max_dt = round(10**(-pot) * max_div[-index_div], pot)
 
         # Set the timestep size
         dt = max_dt if set_max_dt else min(usr_dt, max_dt)
         self.set_dt(dt)
+        if set_max_dt:
+            str_dt = "Selected Timestep Size ({} of {}): {:.{p}f} ms\n".format(
+                min(max_divisor_tf, n_div), n_div, 1e3 * self.dt, p=mag_add)
+        else:
+            str_dt = "Selected Timestep Size: {:.{p}f} ms\n".format(
+                n_div, 1e3 * self.dt, p=mag_add)
 
-        print("Selected Timestep Size: {:.3f} ms\n".format(1e3 * self.dt),
-              flush=True)
+        print(str_dt, flush=True)
 
     def layer_infinite_model(self):
         '''
@@ -1047,7 +1055,7 @@ class HABC_Wave(AcousticWave, HABC_Mesh, RectangLayer,
         if self.dimension == 3:  # 3D
             self.Ly_habc = self.length_y + 2 * self.pad_len
 
-    def infinite_model(self, check_dt=False, max_divisor_tf=1):
+    def infinite_model(self, check_dt=False, max_divisor_tf=1, mag_add=3):
         '''
         Create a reference model for the HABC scheme for comparative purposes
 
@@ -1063,6 +1071,9 @@ class HABC_Wave(AcousticWave, HABC_Mesh, RectangLayer,
             in descending order, less than or equal to the user's timestep
             size. If the value is 1, the timestep size is set as the maximum
             divisor. Default is 1
+        mag_add : `int`, optional
+            Additional magnitude order to adjust the rounding of the timestep
+
 
         Returns
         -------
@@ -1071,7 +1082,8 @@ class HABC_Wave(AcousticWave, HABC_Mesh, RectangLayer,
 
         # Check the timestep size
         if check_dt:
-            self.check_timestep_habc(max_divisor_tf=max_divisor_tf)
+            self.check_timestep_habc(
+                max_divisor_tf=max_divisor_tf, mag_add=mag_add)
 
         print("\nBuilding Infinite Domain Model", flush=True)
 

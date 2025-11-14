@@ -72,16 +72,16 @@ def wave_dict(dt_usu, fr_files, layer_shape, degree_layer,
         "source_type": "ricker",
         "source_locations": [(-0.6, 1.68)],  # (0.25 * Lz, 0.75 * Lx)
         "frequency": 5.0,  # in Hz
-        "delay": np.pi / 6**5,  # delay to compare with paper
+        "delay": np.pi / np.sqrt(6),  # delay to compare with paper
         "receiver_locations": [(-1., 0.), (-1., 1.), (0., 1.), (0., 0.)]
     }
 
     # Simulate for 2.0 seconds.
     dictionary["time_axis"] = {
         "initial_time": 0.,  # Initial time for event
-        "final_time": 4.,    # Final time for event
+        "final_time": 1.,    # Final time for event
         "dt": dt_usu,  # timestep size in seconds
-        "amplitude": 1.,  # the Ricker has an amplitude of 1.
+        "amplitude": 0.4,  # the Ricker has an amplitude of 1.
         "output_frequency": fr_files,  # how frequently to output solution to pvds
         "gradient_sampling_frequency": fr_files,  # how frequently to save to RAM
     }
@@ -315,19 +315,19 @@ def test_loop_patchwork_2d():
     # cpw: cells per wavelength
     # lba = minimum_velocity / source_frequency
     # edge_length = lba / cpw
-    edge_length_lst = [0.19]
+    edge_length_lst = [0.6]
 
     # Timestep size (in seconds). Initial guess: edge_length / 50
-    dt_usu_lst = [0.004]
+    dt_usu_lst = [0.003]
 
     # Factor for the stabilizing term in Eikonal equation
-    f_est_lst = [0.05]
+    f_est_lst = [0.09]
 
     # Parameters for fitting equivalent velocity regression
     fitting_c_lst = [(1.0, 1.0, 1.0, 1.0)]
 
     # Maximum divisor of the final time
-    max_div_tf_lst = [2]
+    max_div_tf_lst = [40]
 
     # Get simulation parameters
     edge_length = edge_length_lst[case]
@@ -383,7 +383,8 @@ def test_loop_patchwork_2d():
         tRef = comp_cost("tini")
 
         # Computing reference get_reference_signal
-        Wave_obj.infinite_model(check_dt=True, max_divisor_tf=max_div_tf)
+        Wave_obj.infinite_model(
+            check_dt=True, max_divisor_tf=max_div_tf, mag_add=3)
 
         # Set model parameters for the HABC scheme
         Wave_obj.abc_get_ref_model = False
@@ -479,11 +480,13 @@ if __name__ == "__main__":
     test_loop_patchwork_2d()
 
 
-# edge_length f_est eik[ms]         loc[km]
-# 85.0m        0.06 547.076 (-0.643, 0.000)
-# 80.0m        0.05 554.254 (-0.600, 0.000)
-# 75.0m        0.08 565.192 (-0.562, 0.000)
-# 37.5m        0.07 566.083 (-0.581, 0.000)
+# lmin    f_est  eik[ms]         loc[km]
+# 400.0m   0.06  384.779 (-0.400, 0.000)
+# 200.0m   0.05  560.352 (-0.600, 0.000)
+#  85.0m   0.06  547.076 (-0.643, 0.000)
+#  80.0m   0.05  554.254 (-0.600, 0.000)
+#  75.0m   0.08  565.192 (-0.562, 0.000)
+#  37.5m   0.07  566.083 (-0.581, 0.000)
 
 
 # n_hyp  100m  62.5m  50m  25m  20m

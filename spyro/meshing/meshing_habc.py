@@ -437,10 +437,16 @@ class HABC_Mesh():
 
             # Adjusting coordinates
             mesh_habc.coordinates.dat.data_with_halos[:, 2] -= pad_len
+            err_y = abs(mesh_habc.coordinates.dat.data_with_halos[:, 2]).min()
+            if err_y > 0:
+                mesh_habc.coordinates.dat.data_with_halos[:, 1] -= err_y
 
         # Adjusting coordinates
         mesh_habc.coordinates.dat.data_with_halos[:, 0] *= -1.0
         mesh_habc.coordinates.dat.data_with_halos[:, 1] -= pad_len
+        err_x = abs(mesh_habc.coordinates.dat.data_with_halos[:, 1]).min()
+        if err_x > 0:
+            mesh_habc.coordinates.dat.data_with_halos[:, 1] -= err_x
 
         # Mesh data
         print(f"Mesh Created with {mesh_habc.num_vertices()} Nodes "
@@ -1491,9 +1497,9 @@ class HABC_Mesh():
         val_condx2 = (x - Lx)**2 if type_marker == 'damping' else 1.
 
         # Conditional expressions for the mask
-        z_pd = fire.conditional(z + Lz < 0., val_condz, 0.)
+        z_pd = fire.conditional(z < -Lz, val_condz, 0.)
         x_pd = fire.conditional(x < 0., val_condx1, 0.) + \
-            fire.conditional(x - Lx > 0., val_condx2, 0.)
+            fire.conditional(x > Lx, val_condx2, 0.)
         ref = z_pd + x_pd
 
         if self.dimension == 3:  # 3D
@@ -1508,7 +1514,7 @@ class HABC_Mesh():
 
             # Conditional expressions for the mask
             y_pd = fire.conditional(y < 0., val_condy1, 0.) + \
-                fire.conditional(y - Ly > 0., val_condy2, 0.)
+                fire.conditional(y > Ly, val_condy2, 0.)
             ref += y_pd
 
         # Final value for the mask
@@ -1620,8 +1626,8 @@ class HABC_Mesh():
 
         # Creating a point cloud field from the parent mesh
         pts_mesh = fire.VertexOnlyMesh(
-            parent_mesh, pts_cloud, tolerance=self.tol,
-            missing_points_behaviour='warn', redundant=False)
+            parent_mesh, pts_cloud, reorder=True, tolerance=self.tol,
+            missing_points_behaviour='error', redundant=False)
         del pts_cloud
 
         # Cloud field
@@ -1638,7 +1644,7 @@ class HABC_Mesh():
 
         return cloud_field
 
-    def extend_velocity_profile(self, lay_field, method='point_cloud'):
+    def extend_velocity_profile(self, lay_field, layer_mask, method='point_cloud'):
         '''
         Extend the velocity profile inside the absorbing layer
 
@@ -1661,15 +1667,7 @@ class HABC_Mesh():
         lay_nodes = lay_field.dat.data_with_halos[:]
 
         # Nodes to extend the velocity model
-        if self.dimension == 2:  # 2D
-            ind_nodes = np.where(~((abs(lay_nodes[:, 0]) == 0.)
-                                   & (abs(lay_nodes[:, 1]) == 0.)))
-
-        if self.dimension == 3:  # 3D
-            ind_nodes = np.where(~((abs(lay_nodes[:, 0]) == 0.)
-                                   & (abs(lay_nodes[:, 1]) == 0.)
-                                   & (abs(lay_nodes[:, 2]) == 0.)))
-
+        ind_nodes = np.where(layer_mask.dat.data_with_halos)[0]
         pts_to_extend = lay_nodes[ind_nodes]
 
         if method == 'point_cloud':
