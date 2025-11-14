@@ -5,10 +5,10 @@ import matplotlib.pyplot as plt
 import time
 import warnings
 import sys
-# import debugpy
-# from mpi4py.MPI import COMM_WORLD
-# debugpy.listen(3000 + COMM_WORLD.rank)
-# debugpy.wait_for_client()
+import debugpy
+from mpi4py.MPI import COMM_WORLD
+debugpy.listen(3000 + COMM_WORLD.rank)
+debugpy.wait_for_client()
 warnings.filterwarnings("ignore")
 
 
@@ -35,7 +35,7 @@ def cells_per_wavelength(degree):
     return cell_per_wavelength_dictionary.get(key)
 
 cpw = cells_per_wavelength(degree)
-final_time = 0.9
+final_time = 0.85
 
 dictionary = {}
 dictionary["options"] = {
@@ -55,7 +55,7 @@ dictionary["mesh"] = {
 }
 dictionary["acquisition"] = {
     "source_type": "ricker",
-    "source_locations": spyro.create_transect((-0.55, 0.7), (-0.55, 1.3), 6),
+    "source_locations": spyro.create_transect((-0.55, 0.7), (-0.55, 1.3), 2),
     "frequency": frequency,
     # "frequency_filter": frequency_filter,
     "delay": 1.0/frequency,
@@ -117,7 +117,7 @@ def test_realistic_fwi():
     # Since I'm using a constant velocity model isntead of loadgin one. I'm going to first create 
     # a simple Firedrake mesh to project it into a velocity grid
     fwi.set_guess_mesh(input_mesh_parameters={"mesh_type": "firedrake_mesh", "edge_length": 0.05})
-    fwi.set_guess_velocity_model(constant=1.5)
+    fwi.set_guess_velocity_model(new_file="final_vp.segy")
     grid_data = spyro.utils.velocity_to_grid(fwi, 0.01, output=True)
     mask_boundaries = {
         "z_min": -1.3,
@@ -133,9 +133,10 @@ def test_realistic_fwi():
         "gradient_mask": mask_boundaries,
         # "output_filename": "test.vtk"
     })
-    fwi.set_guess_velocity_model(constant=1.5)
+    fwi.set_guess_velocity_model(new_file="final_vp.segy")
 
-    fwi.run_fwi(vmin=2.5, vmax=3.0, maxiter=30)
+    fwi.run_fwi(vmin=2.5, vmax=3.0, maxiter=1)
+    fwi.save_result_as_segy()
 
 
 if __name__ == "__main__":
