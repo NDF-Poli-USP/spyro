@@ -17,13 +17,8 @@ from .backward_time_integration import (
 )
 from ..domains.space import FE_method
 from ..utils.typing import override
+from ..utils import write_hdf5_velocity_model
 from .functionals import acoustic_energy
-
-try:
-    from SeismicMesh import write_velocity_model
-    SEISMIC_MESH_AVAILABLE = True
-except ImportError:
-    SEISMIC_MESH_AVAILABLE = False
 
 
 class AcousticWave(Wave):
@@ -114,16 +109,7 @@ class AcousticWave(Wave):
                 raise ValueError("No velocity model or velocity file to load.")
 
             if self.initial_velocity_model_file.endswith(".segy"):
-                if not SEISMIC_MESH_AVAILABLE:
-                    raise ImportError("SeismicMesh is required to convert segy files.")
-                vp_filename, vp_filetype = os.path.splitext(
-                    self.initial_velocity_model_file
-                )
-                warnings.warn("Converting segy file to hdf5")
-                write_velocity_model(
-                    self.initial_velocity_model_file, ofname=vp_filename
-                )
-                self.initial_velocity_model_file = vp_filename + ".hdf5"
+                self.initial_velocity_model_file = write_hdf5_velocity_model(self, self.initial_velocity_model_file)
 
             if self.initial_velocity_model_file.endswith((".hdf5", ".h5")):
                 self.initial_velocity_model = interpolate(

@@ -200,14 +200,14 @@ class Wave(Model_parameters, metaclass=ABCMeta):
         output:  bool (optional)
             If True, outputs the velocity model to a pvd file for visualization.
         """
+        # Resseting old velocity model
+        self.initial_velocity_model = None
+        self.initial_velocity_model_file = None
         if new_file is not None:
             self.initial_velocity_model_file = new_file
         # If no mesh is set, we have to do it beforehand
         if self.mesh is None:
             self.set_mesh()
-        # Resseting old velocity model
-        self.initial_velocity_model = None
-        self.initial_velocity_model_file = None
 
         if self.debug_output:
             output = True
@@ -234,7 +234,7 @@ class Wave(Model_parameters, metaclass=ABCMeta):
             self.initial_velocity_model = velocity_model_function
         elif new_file is not None:
             self.initial_velocity_model_file = new_file
-            self._get_initial_velocity_model()
+            self._initialize_model_parameters()
         elif constant is not None:
             V = self.function_space
             vp = fire.Function(V, name="velocity")
