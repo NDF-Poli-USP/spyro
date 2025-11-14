@@ -2,9 +2,16 @@ import numpy as np
 import matplotlib.pyplot as plt
 import sys
 
-tot_it = int(sys.argv[1])
-filename = f"functional_values{tot_it}.txt"
-M = 3   # window size for running average
+# tot_it = int(sys.argv[1])
+# filename = f"functional_values{tot_it}.txt"
+# output_filename = f"analyze_functional_output{tot_it}.txt"
+# fig_name = f"analyse_functional{tot_it}.png"
+
+filename = "functional_values50_queijao.txt"
+output_filename = "analyze_functional_values50_queijao_5hz_m5.txt"
+fig_name = "analyse_functional_values_50_queijao_5hz_m5.png"
+
+M = 5   # window size for running average
 
 iters, J = [], []
 with open(filename, "r") as f:
@@ -36,7 +43,7 @@ def running_mean(x, M):
 dJ_rel_smooth = running_mean(dJ_rel, M)
 
 # Save output to text file
-output_filename = f"analyze_functional_output{tot_it}.txt"
+
 with open(output_filename, "w") as f:
     f.write(f"{'Iter':>5} | {'J':>14} | {'ΔJ_rel':>12} | {f'AvgΔJ_rel(M={M})':>16}\n")
     f.write("-"*55 + "\n")
@@ -66,5 +73,5 @@ ax2.legend(loc="upper right")
 
 plt.title("Functional decay and relative misfit reduction")
 plt.tight_layout()
-plt.savefig(f"analyse_functional{tot_it}.png")
+plt.savefig(fig_name)
 
