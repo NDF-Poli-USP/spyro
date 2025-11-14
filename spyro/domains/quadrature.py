@@ -1,5 +1,3 @@
-import FIAT
-import finat
 from firedrake import *  # noqa:F403
 
 
@@ -46,68 +44,11 @@ def quadrature_rules(V):
         qr_s = {}
         qr_k = {}
     elif (cell_geometry in {quadrilateral, hexahedron, TensorProductCell(quadrilateral, interval)}
-            and family <= {"Q", "DQ", "TensorProductElement"}):
-        dimension = cell_geometry._tdim
+            and family <= {"Q", "DQ"}):
         # In this case, for the spectral element method we use GLL quadrature
-        qr_x_rule = gauss_lobatto_legendre_cube_rule(
-            dimension=dimension, degree=degree
-        )
-        qr_s_rule = gauss_lobatto_legendre_cube_rule(
-            dimension=(dimension - 1), degree=degree
-        )
-        # Convert to dictionary format for consistent interface
-        qr_x = {"scheme": qr_x_rule}
-        qr_k = {"scheme": qr_x_rule}
-        qr_s = {"scheme": qr_s_rule}
+        qr_x = {"scheme": "lump", "degree": degree}
+        qr_k = qr_x
+        qr_s = qr_x
     else:
-        print(f"Cell geometry: {cell_geometry}", flush=True)
-        print(f"Family: {family}", flush=True)
         raise ValueError("Unrecognized quadrature scheme")
     return qr_x, qr_k, qr_s
-
-
-# -------------------------- #
-# Spectral method - Gauss-Lobatto-Legendre rule
-# 1D
-def gauss_lobatto_legendre_line_rule(degree):
-    """Returns GLL quad rule for a given degree in a line
-
-    Parameters
-    ----------
-    degree : int
-        degree of the polynomial
-
-    Returns
-    -------
-    result : obj
-        quadrature rule
-    """
-    fiat_make_rule = FIAT.quadrature.GaussLobattoLegendreQuadratureLineRule
-    fiat_rule = fiat_make_rule(FIAT.ufc_simplex(1), degree + 1)
-    finat_ps = finat.point_set.GaussLobattoLegendrePointSet
-    finat_qr = finat.quadrature.QuadratureRule
-    return finat_qr(finat_ps(fiat_rule.get_points()), fiat_rule.get_weights())
-
-
-# 3D
-def gauss_lobatto_legendre_cube_rule(dimension, degree):
-    """Returns GLL quad rule for a given degree in a multidimensional space
-
-    Parameters
-    ----------
-    dimension : int
-        dimension of the space
-    degree : int
-        degree of the polynomial
-
-    Returns
-    -------
-    result : obj
-        quadrature rule
-    """
-    make_tensor_rule = finat.quadrature.TensorProductQuadratureRule
-    result = gauss_lobatto_legendre_line_rule(degree)
-    for _ in range(1, dimension):
-        line_rule = gauss_lobatto_legendre_line_rule(degree)
-        result = make_tensor_rule([result, line_rule])
-    return result
