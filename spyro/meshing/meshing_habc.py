@@ -438,14 +438,14 @@ class HABC_Mesh():
             # Adjusting coordinates
             mesh_habc.coordinates.dat.data_with_halos[:, 2] -= pad_len
             err_y = abs(mesh_habc.coordinates.dat.data_with_halos[:, 2]).min()
-            if err_y > 0:
+            if err_y > 0.:
                 mesh_habc.coordinates.dat.data_with_halos[:, 1] -= err_y
 
         # Adjusting coordinates
         mesh_habc.coordinates.dat.data_with_halos[:, 0] *= -1.0
         mesh_habc.coordinates.dat.data_with_halos[:, 1] -= pad_len
         err_x = abs(mesh_habc.coordinates.dat.data_with_halos[:, 1]).min()
-        if err_x > 0:
+        if err_x > 0.:
             mesh_habc.coordinates.dat.data_with_halos[:, 1] -= err_x
 
         # Mesh data
@@ -758,6 +758,14 @@ class HABC_Mesh():
             hyp_mesh.coordinates.dat.data_with_halos[:, [1, 0]]
         hyp_mesh.coordinates.dat.data_with_halos[:, 0] -= Lz / 2
         hyp_mesh.coordinates.dat.data_with_halos[:, 1] += Lx / 2
+        err_m = np.sqrt(hyp_mesh.coordinates.dat.data_with_halos[:, 0]**2
+                        + hyp_mesh.coordinates.dat.data_with_halos[:, 1]**2)
+        if err_m.min() > 0.:
+            id_min = err_m.argmin()
+            err_z = -hyp_mesh.coordinates.dat.data_with_halos[:, 0][id_min]
+            err_x = -hyp_mesh.coordinates.dat.data_with_halos[:, 1][id_min]
+            hyp_mesh.coordinates.dat.data_with_halos[:, 0] += err_z
+            hyp_mesh.coordinates.dat.data_with_halos[:, 1] += err_x
 
         return hyp_mesh
 
@@ -1644,7 +1652,8 @@ class HABC_Mesh():
 
         return cloud_field
 
-    def extend_velocity_profile(self, lay_field, layer_mask, method='point_cloud'):
+    def extend_velocity_profile(self, lay_field, layer_mask,
+                                method='point_cloud'):
         '''
         Extend the velocity profile inside the absorbing layer
 
@@ -1652,6 +1661,8 @@ class HABC_Mesh():
         ----------
         lay_field : `firedrake function`
             Field with clipped coordinates only in the absorbing layer
+        layer_mask : `firedrake function`
+            Mask for the absorbing layer
         method : `str`, optional
             Method to extend the velocity profile. Options:
             'point_cloud' or 'nearest_point'. Default is 'point_cloud'

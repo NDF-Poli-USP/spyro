@@ -1,0 +1,1572 @@
+
+Mesh Size: 120.000 m
+Timestep Size: 1.000 ms
+Eikonal Stabilizing Factor: 0.05
+Maximum Divisor of Final Time: 6
+Fitting Parameters for Analytical Solver: 1.0, 1.0, 1.0, 1.0
+
+Parallelism type: automatic
+
+Absorbing Layer Shape: Rectangular
+Method: mass_lumped_triangle, Degree: 4, Dimension: 2
+Creating firedrake_mesh type mesh.
+
+Creating Mesh and Initial Velocity Model
+Original Mesh with 861 Nodes and 1600 Volume Elements
+Domain Velocity Range (km/s): 1.500 - 4.000
+Getting Boundary Mesh Data from Original Domain
+Boundary Velocity Range (km/s): 2.000 - 3.700
+Setting Mesh Properties for Eikonal Analysis
+
+--------------------------------------------------------------
+Estimating Runtime and Used Memory
+Runtime: (s):1.656, (m):0.028, (h):0.000
+Used Memory: Current (MB):7.712, Peak (MB):8.736
+--------------------------------------------------------------
+
+
+Defining Eikonal BCs
+
+Solving Pre-Eikonal
+  0 SNES Function norm 3.233986151188e-01
+  1 SNES Function norm 2.420794560858e-13
+Solver Executed Successfully. AbsTol: 1.0e-12
+
+Solving Post-Eikonal
+Iteration for Festab: 0.05
+  0 SNES Function norm 2.472718274572e-01
+  1 SNES Function norm 8.249835776783e-02
+  2 SNES Function norm 3.870834735870e-02
+  3 SNES Function norm 2.880134343034e-02
+  4 SNES Function norm 2.296269802071e-02
+  5 SNES Function norm 1.850985659513e-02
+  6 SNES Function norm 1.520590265301e-02
+  7 SNES Function norm 1.189003516206e-02
+  8 SNES Function norm 9.662320579429e-03
+  9 SNES Function norm 7.459801774555e-03
+ 10 SNES Function norm 5.838756782212e-03
+ 11 SNES Function norm 4.229139120313e-03
+ 12 SNES Function norm 2.645351451333e-03
+ 13 SNES Function norm 1.171050045159e-03
+ 14 SNES Function norm 1.956649842675e-04
+ 15 SNES Function norm 1.872224019473e-06
+ 16 SNES Function norm 1.158464660798e-08
+ 17 SNES Function norm 1.942093528558e-10
+ 18 SNES Function norm 1.590708191079e-12
+ 19 SNES Function norm 6.186426926077e-14
+ 20 SNES Function norm 8.853412562392e-16
+Solver Executed Successfully. AbsTol: 1.0e-16
+Solver Executed Successfully. Festab: 0.05
+
+Identifying Critical Points on Boundaries
+Min Eikonal on    Left Boundary (ms): 564.478 at (in km): (-0.540, 0.000)
+Min Eikonal on   Right Boundary (ms): 1379.540 at (in km): (-1.380, 4.800)
+Min Eikonal on  Bottom Boundary (ms): 758.163 at (in km): (-2.400, 1.620)
+
+--------------------------------------------------------------
+Estimating Runtime and Used Memory
+Runtime: (s):2.770, (m):0.046, (h):0.001
+Used Memory: Current (MB):6.522, Peak (MB):7.315
+--------------------------------------------------------------
+
+
+Checking Timestep Size
+Solver Method: ANALYTICAL
+Estimating Maximum Eigenvalue
+Maximum Stable Timestep Should Be Approximately (ms): 2.491
+Selected Timestep Size (6 of 19): 0.800 ms
+
+
+Building Infinite Domain Model
+Infinite Domain Extension (km): 6.3600
+
+Generating Mesh for Infinite Model
+Mesh Created with 10878 Nodes and 21316 Volume Elements
+Extended Rectangular Mesh Generated Successfully
+Method: mass_lumped_triangle, Degree: 4, Dimension: 2
+Mesh Generated Successfully
+
+Updating Velocity Profile
+Clipping Coordinates Inside Layer
+Extending Profile Inside Layer
+Using Cloud Points Method to Extend Velocity Profile
+
+Solving Infinite Model
+
+Solving Forward Problem
+Saving Pressure in: output/forward/fw_outputsn[0].pvd
+Saving acoustic_energy in: output/preamble/acoustic_pot_energy
+Simulation time is:        0.0 seconds
+Simulation time is:       0.08 seconds
+Simulation time is:       0.16 seconds
+Simulation time is:       0.24 seconds
+Simulation time is:       0.32 seconds
+Simulation time is:        0.4 seconds
+Simulation time is:       0.48 seconds
+Simulation time is:       0.56 seconds
+Simulation time is:       0.64 seconds
+Simulation time is:       0.72 seconds
+Simulation time is:        0.8 seconds
+Simulation time is:       0.88 seconds
+Simulation time is:       0.96 seconds
+Simulation time is:       1.04 seconds
+Simulation time is:       1.12 seconds
+Simulation time is:        1.2 seconds
+Simulation time is:       1.28 seconds
+Simulation time is:       1.36 seconds
+Simulation time is:       1.44 seconds
+Simulation time is:       1.52 seconds
+Simulation time is:        1.6 seconds
+Simulation time is:       1.68 seconds
+Simulation time is:       1.76 seconds
+Simulation time is:       1.84 seconds
+Simulation time is:       1.92 seconds
+Simulation time is:        2.0 seconds
+Simulation time is:       2.08 seconds
+Simulation time is:       2.16 seconds
+Simulation time is:       2.24 seconds
+Simulation time is:       2.32 seconds
+Simulation time is:        2.4 seconds
+Simulation time is:       2.48 seconds
+Simulation time is:       2.56 seconds
+Simulation time is:       2.64 seconds
+Simulation time is:       2.72 seconds
+Simulation time is:        2.8 seconds
+Simulation time is:       2.88 seconds
+Simulation time is:       2.96 seconds
+Simulation time is:       3.04 seconds
+Simulation time is:       3.12 seconds
+Simulation time is:        3.2 seconds
+Simulation time is:       3.28 seconds
+Simulation time is:       3.36 seconds
+Simulation time is:       3.44 seconds
+Simulation time is:       3.52 seconds
+Simulation time is:        3.6 seconds
+Simulation time is:       3.68 seconds
+Simulation time is:       3.76 seconds
+Simulation time is:       3.84 seconds
+Simulation time is:       3.92 seconds
+Simulation time is:        4.0 seconds
+
+Saving Reference Output
+
+--------------------------------------------------------------
+Estimating Runtime and Used Memory
+Runtime: (s):154.014, (m):2.567, (h):0.043
+Used Memory: Current (GB):0.124, Peak (GB):2.383
+--------------------------------------------------------------
+
+
+Criterion for Heuristic Factor (1 Points): Err Sum
+HABC Reference Frequency: Source
+Type of the Hypereshape Degree: real
+Modal Solver for Fundamental Frequency: KRYLOVSCH_CH
+
+Iteration 0 of 1
+
+Absorbing Layer Shape: Hypershape - Degree: 2.6
+
+Loading Reference Signal from Infinite Model
+
+Determining Reference Frequency
+Reference Frequency (Hz): 5.00000
+
+Computing Size for Absorbing Layer
+Parameter z (1/s): 1.7715, Parameter a (adim): 0.3543
+Minimum Mesh Length (km): 0.1200, Reference Length (km): 1.6811
+Initial Guess for Size Parameter: 0.0357
+Options for FL: [0.2716, 0.3800, 0.4225, 0.5854, 0.6015]
+Options for CR: [0.0960, 0.0514, 0.0420, 0.0223, 0.0212]
+Options for Layer Size (km): [0.4566, 0.6389, 0.7102, 0.9841, 1.0111]
+Aprox. Number of Elements (0.120 km) in Layer: [3, 5, 5, 8, 8]
+Selected Parameter Size FL: 0.2716
+Selected Layer Size (km): 0.4566
+
+Modifying Layer Size Based on the Element Size
+Modified Parameter Size FL: 0.2855
+Modified Layer Size (km): 0.4800
+Elements (0.120 km) in Layer: 4
+Normalized Element Size (adim): 0.25000
+
+Determining New Geometry with Absorbing Layer
+Determining Hypershape Layer Parameters
+Checking Current Hypershape Degree n_hyp: 2.6
+Semi-axes (km): a_hyp:2.880 - b_hyp:1.680
+Determining the Minimum Degree for Hypershape Layer
+ParHypEll - r: 1.383 - n: 2.0
+ParHypEll - r: 1.155 - n: 3.0
+ParHypEll - r: 0.967 - n: 4.0
+ParHypEll - r: 1.135 - n: 3.1
+ParHypEll - r: 1.114 - n: 3.2
+ParHypEll - r: 1.095 - n: 3.3
+ParHypEll - r: 1.076 - n: 3.4
+ParHypEll - r: 1.057 - n: 3.5
+ParHypEll - r: 1.038 - n: 3.6
+ParHypEll - r: 1.020 - n: 3.7
+ParHypEll - r: 1.002 - n: 3.8
+ParHypEll - r: 0.984 - n: 3.9
+'Harm' Superness. r: 1.057 - n: 3.5
+'Geom' Superness. r: 1.020 - n: 3.7
+'Arit' Superness. r: 0.950 - n: 4.1
+Hyperellipse Parameters. r_min: 0.950 - n_min: 4.1
+Superness Coordinates (km): (2.520, 1.320)
+Minimum Degree for Hypershape n_min: 4.1
+Determining the Maximum Degree for Hypershape Layer
+ParHypEll - r: 1.434 - n: 4.0
+ParHypEll - r: 1.338 - n: 5.0
+ParHypEll - r: 1.255 - n: 6.0
+ParHypEll - r: 1.183 - n: 7.0
+ParHypEll - r: 1.120 - n: 8.0
+ParHypEll - r: 1.065 - n: 9.0
+ParHypEll - r: 1.017 - n: 10.0
+ParHypEll - r: 0.974 - n: 11.0
+ParHypEll - r: 1.012 - n: 10.1
+ParHypEll - r: 1.008 - n: 10.2
+ParHypEll - r: 1.003 - n: 10.3
+ParHypEll - r: 0.999 - n: 10.4
+'Harm' Superness. r: 1.263 - n: 5.9
+'Geom' Superness. r: 1.157 - n: 7.4
+'Arit' Superness. r: 1.031 - n: 9.7
+Hyperellipse Parameters. r_max: 0.999 - n_max: 10.4
+Superness Coordinates (km): (2.829, 1.415)
+Maximum Degree for Hypershape n_max: 10.4
+Low Degree for Hypershape Layer. Setting to n_min: 4.1
+Area Ratio: 1.374
+
+Generating Mesh with Absorbing Layer
+Number of Boundary Points for Complete Hyperellipse: 135
+Number of Boundary Points for Truncated Hyperellipse: 91
+Number of Boundary Points for Complete Hyperellipse: 136
+Number of Boundary Points for Truncated Hyperellipse: 91
+Number of Boundary Points for Complete Hyperellipse: 137
+Number of Boundary Points for Truncated Hyperellipse: 92
+Number of Boundary Points for Complete Hyperellipse: 138
+Number of Boundary Points for Truncated Hyperellipse: 92
+Number of Boundary Points for Complete Hyperellipse: 139
+Number of Boundary Points for Truncated Hyperellipse: 93
+Number of Boundary Points for Complete Hyperellipse: 140
+Number of Boundary Points for Truncated Hyperellipse: 94
+Number of Boundary Points for Complete Hyperellipse: 141
+Number of Boundary Points for Truncated Hyperellipse: 94
+Number of Boundary Points for Complete Hyperellipse: 142
+Number of Boundary Points for Truncated Hyperellipse: 95
+Number of Boundary Points for Complete Hyperellipse: 143
+Number of Boundary Points for Truncated Hyperellipse: 95
+Number of Boundary Points for Complete Hyperellipse: 144
+Number of Boundary Points for Truncated Hyperellipse: 96
+Number of Boundary Points for Complete Hyperellipse: 145
+Number of Boundary Points for Truncated Hyperellipse: 98
+Mesh Factor Size Inside Layer (Min): 1.00 (0.93)
+Hyperelliptical Mesh Generated Successfully
+Mesh created with 1183 points and 2232 elements
+Merged Mesh Generated Successfully
+Mesh Created with 1183 Nodes and 2232 Volume Elements
+Method: mass_lumped_triangle, Degree: 4, Dimension: 2
+Mesh Generated Successfully
+
+Updating Velocity Profile
+Clipping Coordinates Inside Layer
+Extending Profile Inside Layer
+Using Cloud Points Method to Extend Velocity Profile
+
+Solving Eigenvalue Problem
+Solver Method: KRYLOVSCH_CH
+  Eigenvalue approximations and residual norms for firedrake_3_ solve.
+  1 EPS nconv=5 first unconverged value (error) 15.9504 (1.67739146e-04)
+Frequency 0 (Hz): 0.00000
+Frequency 1 (Hz): 0.20438
+Fundamental Frequency (Hz): 0.20438
+
+Creating Damping Profile
+Critical Damping Coefficient (1/s): 1.28417
+Maximum Damping Ratio: 99.900%
+Maximum Damping Coefficient (1/s): 1.28289
+Minimum Damping Ratio: 6.796%
+Range for Minimum Damping Ratio. Min:0.06244 - Max:0.43706
+Minimum Damping Coefficient (1/s): 0.08727
+Estimated Heuristic Factor xCR: 0.272
+Range Values for xCR Factor. Min:0.250 - Max:1.748
+
+Applying Non-Reflecting Boundary Conditions
+Creating Field for NRBC: Higdon
+
+Solving Forward Problem
+Saving Pressure in: output/forward/fw_outputsn[0].pvd
+Saving acoustic_energy in: output/preamble/acoustic_pot_energy
+Simulation time is:        0.0 seconds
+Simulation time is:       0.08 seconds
+Simulation time is:       0.16 seconds
+Simulation time is:       0.24 seconds
+Simulation time is:       0.32 seconds
+Simulation time is:        0.4 seconds
+Simulation time is:       0.48 seconds
+Simulation time is:       0.56 seconds
+Simulation time is:       0.64 seconds
+Simulation time is:       0.72 seconds
+Simulation time is:        0.8 seconds
+Simulation time is:       0.88 seconds
+Simulation time is:       0.96 seconds
+Simulation time is:       1.04 seconds
+Simulation time is:       1.12 seconds
+Simulation time is:        1.2 seconds
+Simulation time is:       1.28 seconds
+Simulation time is:       1.36 seconds
+Simulation time is:       1.44 seconds
+Simulation time is:       1.52 seconds
+Simulation time is:        1.6 seconds
+Simulation time is:       1.68 seconds
+Simulation time is:       1.76 seconds
+Simulation time is:       1.84 seconds
+Simulation time is:       1.92 seconds
+Simulation time is:        2.0 seconds
+Simulation time is:       2.08 seconds
+Simulation time is:       2.16 seconds
+Simulation time is:       2.24 seconds
+Simulation time is:       2.32 seconds
+Simulation time is:        2.4 seconds
+Simulation time is:       2.48 seconds
+Simulation time is:       2.56 seconds
+Simulation time is:       2.64 seconds
+Simulation time is:       2.72 seconds
+Simulation time is:        2.8 seconds
+Simulation time is:       2.88 seconds
+Simulation time is:       2.96 seconds
+Simulation time is:       3.04 seconds
+Simulation time is:       3.12 seconds
+Simulation time is:        3.2 seconds
+Simulation time is:       3.28 seconds
+Simulation time is:       3.36 seconds
+Simulation time is:       3.44 seconds
+Simulation time is:       3.52 seconds
+Simulation time is:        3.6 seconds
+Simulation time is:       3.68 seconds
+Simulation time is:       3.76 seconds
+Simulation time is:       3.84 seconds
+Simulation time is:       3.92 seconds
+Simulation time is:        4.0 seconds
+
+Computing Error Measures
+Maximum Integral Error: 3.10%
+Maximum Peak Error: 1.76%
+Acoustic Energy: 7.83e-05
+
+--------------------------------------------------------------
+Estimating Runtime and Used Memory
+Runtime: (s):70.877, (m):1.181, (h):0.020
+Used Memory: Current (MB):25.882, Peak (MB):33.200
+--------------------------------------------------------------
+
+Output Folder for Results Will Be Renamed.
+Folder '/mnt/d/spyro/output/HN2.6_SOU/' Successfully Renamed to '/mnt/d/spyro/output/HN4.1_SOU/'.
+Iteration 0 of 1
+
+Absorbing Layer Shape: Hypershape - Degree: 5.5
+
+Loading Reference Signal from Infinite Model
+
+Determining Reference Frequency
+Reference Frequency (Hz): 5.00000
+
+Computing Size for Absorbing Layer
+Parameter z (1/s): 1.7715, Parameter a (adim): 0.3543
+Minimum Mesh Length (km): 0.1200, Reference Length (km): 1.6811
+Initial Guess for Size Parameter: 0.0357
+Options for FL: [0.2716, 0.3800, 0.4225, 0.5854, 0.6015]
+Options for CR: [0.0960, 0.0514, 0.0420, 0.0223, 0.0212]
+Options for Layer Size (km): [0.4566, 0.6389, 0.7102, 0.9841, 1.0111]
+Aprox. Number of Elements (0.120 km) in Layer: [3, 5, 5, 8, 8]
+Selected Parameter Size FL: 0.2716
+Selected Layer Size (km): 0.4566
+
+Modifying Layer Size Based on the Element Size
+Modified Parameter Size FL: 0.2855
+Modified Layer Size (km): 0.4800
+Elements (0.120 km) in Layer: 4
+Normalized Element Size (adim): 0.25000
+
+Determining New Geometry with Absorbing Layer
+Determining Hypershape Layer Parameters
+Checking Current Hypershape Degree n_hyp: 5.5
+Semi-axes (km): a_hyp:2.880 - b_hyp:1.680
+Determining the Minimum Degree for Hypershape Layer
+ParHypEll - r: 1.383 - n: 2.0
+ParHypEll - r: 1.155 - n: 3.0
+ParHypEll - r: 0.967 - n: 4.0
+ParHypEll - r: 1.135 - n: 3.1
+ParHypEll - r: 1.114 - n: 3.2
+ParHypEll - r: 1.095 - n: 3.3
+ParHypEll - r: 1.076 - n: 3.4
+ParHypEll - r: 1.057 - n: 3.5
+ParHypEll - r: 1.038 - n: 3.6
+ParHypEll - r: 1.020 - n: 3.7
+ParHypEll - r: 1.002 - n: 3.8
+ParHypEll - r: 0.984 - n: 3.9
+'Harm' Superness. r: 1.057 - n: 3.5
+'Geom' Superness. r: 1.020 - n: 3.7
+'Arit' Superness. r: 0.950 - n: 4.1
+Hyperellipse Parameters. r_min: 0.950 - n_min: 4.1
+Superness Coordinates (km): (2.520, 1.320)
+Minimum Degree for Hypershape n_min: 4.1
+Determining the Maximum Degree for Hypershape Layer
+ParHypEll - r: 1.434 - n: 4.0
+ParHypEll - r: 1.338 - n: 5.0
+ParHypEll - r: 1.255 - n: 6.0
+ParHypEll - r: 1.183 - n: 7.0
+ParHypEll - r: 1.120 - n: 8.0
+ParHypEll - r: 1.065 - n: 9.0
+ParHypEll - r: 1.017 - n: 10.0
+ParHypEll - r: 0.974 - n: 11.0
+ParHypEll - r: 1.012 - n: 10.1
+ParHypEll - r: 1.008 - n: 10.2
+ParHypEll - r: 1.003 - n: 10.3
+ParHypEll - r: 0.999 - n: 10.4
+'Harm' Superness. r: 1.263 - n: 5.9
+'Geom' Superness. r: 1.157 - n: 7.4
+'Arit' Superness. r: 1.031 - n: 9.7
+Hyperellipse Parameters. r_max: 0.999 - n_max: 10.4
+Superness Coordinates (km): (2.829, 1.415)
+Maximum Degree for Hypershape n_max: 10.4
+Current Hypershape Degree n_hyp: 5.5
+Area Ratio: 1.402
+
+Generating Mesh with Absorbing Layer
+Number of Boundary Points for Complete Hyperellipse: 139
+Number of Boundary Points for Truncated Hyperellipse: 87
+Number of Boundary Points for Complete Hyperellipse: 140
+Number of Boundary Points for Truncated Hyperellipse: 89
+Number of Boundary Points for Complete Hyperellipse: 141
+Number of Boundary Points for Truncated Hyperellipse: 90
+Number of Boundary Points for Complete Hyperellipse: 142
+Number of Boundary Points for Truncated Hyperellipse: 90
+Number of Boundary Points for Complete Hyperellipse: 143
+Number of Boundary Points for Truncated Hyperellipse: 91
+Number of Boundary Points for Complete Hyperellipse: 144
+Number of Boundary Points for Truncated Hyperellipse: 91
+Number of Boundary Points for Complete Hyperellipse: 145
+Number of Boundary Points for Truncated Hyperellipse: 92
+Number of Boundary Points for Complete Hyperellipse: 146
+Number of Boundary Points for Truncated Hyperellipse: 92
+Number of Boundary Points for Complete Hyperellipse: 147
+Number of Boundary Points for Truncated Hyperellipse: 93
+Number of Boundary Points for Complete Hyperellipse: 148
+Number of Boundary Points for Truncated Hyperellipse: 94
+Number of Boundary Points for Complete Hyperellipse: 149
+Number of Boundary Points for Truncated Hyperellipse: 94
+Number of Boundary Points for Complete Hyperellipse: 150
+Number of Boundary Points for Truncated Hyperellipse: 95
+Number of Boundary Points for Complete Hyperellipse: 151
+Number of Boundary Points for Truncated Hyperellipse: 95
+Number of Boundary Points for Complete Hyperellipse: 152
+Number of Boundary Points for Truncated Hyperellipse: 96
+Number of Boundary Points for Complete Hyperellipse: 153
+Number of Boundary Points for Truncated Hyperellipse: 96
+Number of Boundary Points for Complete Hyperellipse: 154
+Number of Boundary Points for Truncated Hyperellipse: 97
+Number of Boundary Points for Complete Hyperellipse: 155
+Number of Boundary Points for Truncated Hyperellipse: 97
+Number of Boundary Points for Complete Hyperellipse: 156
+Number of Boundary Points for Truncated Hyperellipse: 99
+Number of Boundary Points for Complete Hyperellipse: 157
+Number of Boundary Points for Truncated Hyperellipse: 100
+Mesh Factor Size Inside Layer (Min): 1.00 (0.88)
+Hyperelliptical Mesh Generated Successfully
+Mesh created with 1233 points and 2316 elements
+Merged Mesh Generated Successfully
+Mesh Created with 1233 Nodes and 2316 Volume Elements
+Method: mass_lumped_triangle, Degree: 4, Dimension: 2
+Mesh Generated Successfully
+
+Updating Velocity Profile
+Clipping Coordinates Inside Layer
+Extending Profile Inside Layer
+Using Cloud Points Method to Extend Velocity Profile
+
+Solving Eigenvalue Problem
+Solver Method: KRYLOVSCH_CH
+  Eigenvalue approximations and residual norms for firedrake_5_ solve.
+  1 EPS nconv=5 first unconverged value (error) 15.5681 (8.45429896e-05)
+Frequency 0 (Hz): 0.00000
+Frequency 1 (Hz): 0.20159
+Fundamental Frequency (Hz): 0.20159
+
+Creating Damping Profile
+Critical Damping Coefficient (1/s): 1.26663
+Maximum Damping Ratio: 99.900%
+Maximum Damping Coefficient (1/s): 1.26536
+Minimum Damping Ratio: 6.796%
+Range for Minimum Damping Ratio. Min:0.06244 - Max:0.43706
+Minimum Damping Coefficient (1/s): 0.08608
+Estimated Heuristic Factor xCR: 0.272
+Range Values for xCR Factor. Min:0.250 - Max:1.748
+
+Applying Non-Reflecting Boundary Conditions
+Creating Field for NRBC: Higdon
+
+Solving Forward Problem
+Saving Pressure in: output/forward/fw_outputsn[0].pvd
+Saving acoustic_energy in: output/preamble/acoustic_pot_energy
+Simulation time is:        0.0 seconds
+Simulation time is:       0.08 seconds
+Simulation time is:       0.16 seconds
+Simulation time is:       0.24 seconds
+Simulation time is:       0.32 seconds
+Simulation time is:        0.4 seconds
+Simulation time is:       0.48 seconds
+Simulation time is:       0.56 seconds
+Simulation time is:       0.64 seconds
+Simulation time is:       0.72 seconds
+Simulation time is:        0.8 seconds
+Simulation time is:       0.88 seconds
+Simulation time is:       0.96 seconds
+Simulation time is:       1.04 seconds
+Simulation time is:       1.12 seconds
+Simulation time is:        1.2 seconds
+Simulation time is:       1.28 seconds
+Simulation time is:       1.36 seconds
+Simulation time is:       1.44 seconds
+Simulation time is:       1.52 seconds
+Simulation time is:        1.6 seconds
+Simulation time is:       1.68 seconds
+Simulation time is:       1.76 seconds
+Simulation time is:       1.84 seconds
+Simulation time is:       1.92 seconds
+Simulation time is:        2.0 seconds
+Simulation time is:       2.08 seconds
+Simulation time is:       2.16 seconds
+Simulation time is:       2.24 seconds
+Simulation time is:       2.32 seconds
+Simulation time is:        2.4 seconds
+Simulation time is:       2.48 seconds
+Simulation time is:       2.56 seconds
+Simulation time is:       2.64 seconds
+Simulation time is:       2.72 seconds
+Simulation time is:        2.8 seconds
+Simulation time is:       2.88 seconds
+Simulation time is:       2.96 seconds
+Simulation time is:       3.04 seconds
+Simulation time is:       3.12 seconds
+Simulation time is:        3.2 seconds
+Simulation time is:       3.28 seconds
+Simulation time is:       3.36 seconds
+Simulation time is:       3.44 seconds
+Simulation time is:       3.52 seconds
+Simulation time is:        3.6 seconds
+Simulation time is:       3.68 seconds
+Simulation time is:       3.76 seconds
+Simulation time is:       3.84 seconds
+Simulation time is:       3.92 seconds
+Simulation time is:        4.0 seconds
+
+Computing Error Measures
+Maximum Integral Error: 3.45%
+Maximum Peak Error: 1.59%
+Acoustic Energy: 7.83e-05
+
+--------------------------------------------------------------
+Estimating Runtime and Used Memory
+Runtime: (s):69.307, (m):1.155, (h):0.019
+Used Memory: Current (MB):21.786, Peak (MB):23.512
+--------------------------------------------------------------
+
+Iteration 0 of 1
+
+Absorbing Layer Shape: Hypershape - Degree: 7.7
+
+Loading Reference Signal from Infinite Model
+
+Determining Reference Frequency
+Reference Frequency (Hz): 5.00000
+
+Computing Size for Absorbing Layer
+Parameter z (1/s): 1.7715, Parameter a (adim): 0.3543
+Minimum Mesh Length (km): 0.1200, Reference Length (km): 1.6811
+Initial Guess for Size Parameter: 0.0357
+Options for FL: [0.2716, 0.3800, 0.4225, 0.5854, 0.6015]
+Options for CR: [0.0960, 0.0514, 0.0420, 0.0223, 0.0212]
+Options for Layer Size (km): [0.4566, 0.6389, 0.7102, 0.9841, 1.0111]
+Aprox. Number of Elements (0.120 km) in Layer: [3, 5, 5, 8, 8]
+Selected Parameter Size FL: 0.2716
+Selected Layer Size (km): 0.4566
+
+Modifying Layer Size Based on the Element Size
+Modified Parameter Size FL: 0.2855
+Modified Layer Size (km): 0.4800
+Elements (0.120 km) in Layer: 4
+Normalized Element Size (adim): 0.25000
+
+Determining New Geometry with Absorbing Layer
+Determining Hypershape Layer Parameters
+Checking Current Hypershape Degree n_hyp: 7.7
+Semi-axes (km): a_hyp:2.880 - b_hyp:1.680
+Determining the Minimum Degree for Hypershape Layer
+ParHypEll - r: 1.383 - n: 2.0
+ParHypEll - r: 1.155 - n: 3.0
+ParHypEll - r: 0.967 - n: 4.0
+ParHypEll - r: 1.135 - n: 3.1
+ParHypEll - r: 1.114 - n: 3.2
+ParHypEll - r: 1.095 - n: 3.3
+ParHypEll - r: 1.076 - n: 3.4
+ParHypEll - r: 1.057 - n: 3.5
+ParHypEll - r: 1.038 - n: 3.6
+ParHypEll - r: 1.020 - n: 3.7
+ParHypEll - r: 1.002 - n: 3.8
+ParHypEll - r: 0.984 - n: 3.9
+'Harm' Superness. r: 1.057 - n: 3.5
+'Geom' Superness. r: 1.020 - n: 3.7
+'Arit' Superness. r: 0.950 - n: 4.1
+Hyperellipse Parameters. r_min: 0.950 - n_min: 4.1
+Superness Coordinates (km): (2.520, 1.320)
+Minimum Degree for Hypershape n_min: 4.1
+Determining the Maximum Degree for Hypershape Layer
+ParHypEll - r: 1.434 - n: 4.0
+ParHypEll - r: 1.338 - n: 5.0
+ParHypEll - r: 1.255 - n: 6.0
+ParHypEll - r: 1.183 - n: 7.0
+ParHypEll - r: 1.120 - n: 8.0
+ParHypEll - r: 1.065 - n: 9.0
+ParHypEll - r: 1.017 - n: 10.0
+ParHypEll - r: 0.974 - n: 11.0
+ParHypEll - r: 1.012 - n: 10.1
+ParHypEll - r: 1.008 - n: 10.2
+ParHypEll - r: 1.003 - n: 10.3
+ParHypEll - r: 0.999 - n: 10.4
+'Harm' Superness. r: 1.263 - n: 5.9
+'Geom' Superness. r: 1.157 - n: 7.4
+'Arit' Superness. r: 1.031 - n: 9.7
+Hyperellipse Parameters. r_max: 0.999 - n_max: 10.4
+Superness Coordinates (km): (2.829, 1.415)
+Maximum Degree for Hypershape n_max: 10.4
+Current Hypershape Degree n_hyp: 7.7
+Area Ratio: 1.420
+
+Generating Mesh with Absorbing Layer
+Number of Boundary Points for Complete Hyperellipse: 143
+Number of Boundary Points for Truncated Hyperellipse: 85
+Number of Boundary Points for Complete Hyperellipse: 144
+Number of Boundary Points for Truncated Hyperellipse: 85
+Number of Boundary Points for Complete Hyperellipse: 145
+Number of Boundary Points for Truncated Hyperellipse: 86
+Mesh Factor Size Inside Layer (Min): 1.00 (0.98)
+Hyperelliptical Mesh Generated Successfully
+Mesh created with 1225 points and 2306 elements
+Merged Mesh Generated Successfully
+Mesh Created with 1225 Nodes and 2306 Volume Elements
+Method: mass_lumped_triangle, Degree: 4, Dimension: 2
+Mesh Generated Successfully
+
+Updating Velocity Profile
+Clipping Coordinates Inside Layer
+Extending Profile Inside Layer
+Using Cloud Points Method to Extend Velocity Profile
+
+Solving Eigenvalue Problem
+Solver Method: KRYLOVSCH_CH
+  Eigenvalue approximations and residual norms for firedrake_7_ solve.
+  1 EPS nconv=5 first unconverged value (error) 15.1013 (2.30944650e-04)
+Frequency 0 (Hz): 0.00000
+Frequency 1 (Hz): 0.19980
+Fundamental Frequency (Hz): 0.19980
+
+Creating Damping Profile
+Critical Damping Coefficient (1/s): 1.25537
+Maximum Damping Ratio: 99.900%
+Maximum Damping Coefficient (1/s): 1.25411
+Minimum Damping Ratio: 6.796%
+Range for Minimum Damping Ratio. Min:0.06244 - Max:0.43706
+Minimum Damping Coefficient (1/s): 0.08531
+Estimated Heuristic Factor xCR: 0.272
+Range Values for xCR Factor. Min:0.250 - Max:1.748
+
+Applying Non-Reflecting Boundary Conditions
+Creating Field for NRBC: Higdon
+
+Solving Forward Problem
+Saving Pressure in: output/forward/fw_outputsn[0].pvd
+Saving acoustic_energy in: output/preamble/acoustic_pot_energy
+Simulation time is:        0.0 seconds
+Simulation time is:       0.08 seconds
+Simulation time is:       0.16 seconds
+Simulation time is:       0.24 seconds
+Simulation time is:       0.32 seconds
+Simulation time is:        0.4 seconds
+Simulation time is:       0.48 seconds
+Simulation time is:       0.56 seconds
+Simulation time is:       0.64 seconds
+Simulation time is:       0.72 seconds
+Simulation time is:        0.8 seconds
+Simulation time is:       0.88 seconds
+Simulation time is:       0.96 seconds
+Simulation time is:       1.04 seconds
+Simulation time is:       1.12 seconds
+Simulation time is:        1.2 seconds
+Simulation time is:       1.28 seconds
+Simulation time is:       1.36 seconds
+Simulation time is:       1.44 seconds
+Simulation time is:       1.52 seconds
+Simulation time is:        1.6 seconds
+Simulation time is:       1.68 seconds
+Simulation time is:       1.76 seconds
+Simulation time is:       1.84 seconds
+Simulation time is:       1.92 seconds
+Simulation time is:        2.0 seconds
+Simulation time is:       2.08 seconds
+Simulation time is:       2.16 seconds
+Simulation time is:       2.24 seconds
+Simulation time is:       2.32 seconds
+Simulation time is:        2.4 seconds
+Simulation time is:       2.48 seconds
+Simulation time is:       2.56 seconds
+Simulation time is:       2.64 seconds
+Simulation time is:       2.72 seconds
+Simulation time is:        2.8 seconds
+Simulation time is:       2.88 seconds
+Simulation time is:       2.96 seconds
+Simulation time is:       3.04 seconds
+Simulation time is:       3.12 seconds
+Simulation time is:        3.2 seconds
+Simulation time is:       3.28 seconds
+Simulation time is:       3.36 seconds
+Simulation time is:       3.44 seconds
+Simulation time is:       3.52 seconds
+Simulation time is:        3.6 seconds
+Simulation time is:       3.68 seconds
+Simulation time is:       3.76 seconds
+Simulation time is:       3.84 seconds
+Simulation time is:       3.92 seconds
+Simulation time is:        4.0 seconds
+
+Computing Error Measures
+Maximum Integral Error: 3.17%
+Maximum Peak Error: 1.52%
+Acoustic Energy: 7.83e-05
+
+--------------------------------------------------------------
+Estimating Runtime and Used Memory
+Runtime: (s):69.984, (m):1.166, (h):0.019
+Used Memory: Current (MB):21.081, Peak (MB):22.836
+--------------------------------------------------------------
+
+Iteration 0 of 1
+
+Absorbing Layer Shape: Rectangular
+
+Loading Reference Signal from Infinite Model
+
+Determining Reference Frequency
+Reference Frequency (Hz): 5.00000
+
+Computing Size for Absorbing Layer
+Parameter z (1/s): 1.7715, Parameter a (adim): 0.3543
+Minimum Mesh Length (km): 0.1200, Reference Length (km): 1.6811
+Initial Guess for Size Parameter: 0.0357
+Options for FL: [0.2716, 0.3800, 0.4225, 0.5854, 0.6015]
+Options for CR: [0.0960, 0.0514, 0.0420, 0.0223, 0.0212]
+Options for Layer Size (km): [0.4566, 0.6389, 0.7102, 0.9841, 1.0111]
+Aprox. Number of Elements (0.120 km) in Layer: [3, 5, 5, 8, 8]
+Selected Parameter Size FL: 0.2716
+Selected Layer Size (km): 0.4566
+
+Modifying Layer Size Based on the Element Size
+Modified Parameter Size FL: 0.2855
+Modified Layer Size (km): 0.4800
+Elements (0.120 km) in Layer: 4
+Normalized Element Size (adim): 0.25000
+
+Determining New Geometry with Absorbing Layer
+Determining Rectangular Layer Parameters
+Area Ratio: 1.440
+
+Generating Mesh with Absorbing Layer
+Mesh Created with 1225 Nodes and 2304 Volume Elements
+Extended Rectangular Mesh Generated Successfully
+Method: mass_lumped_triangle, Degree: 4, Dimension: 2
+Mesh Generated Successfully
+
+Updating Velocity Profile
+Clipping Coordinates Inside Layer
+Extending Profile Inside Layer
+Using Cloud Points Method to Extend Velocity Profile
+
+Solving Eigenvalue Problem
+Solver Method: KRYLOVSCH_CH
+  Eigenvalue approximations and residual norms for firedrake_9_ solve.
+  1 EPS nconv=5 first unconverged value (error) 14.4066 (1.91450991e-05)
+Frequency 0 (Hz): 0.00000
+Frequency 1 (Hz): 0.19771
+Fundamental Frequency (Hz): 0.19771
+
+Creating Damping Profile
+Critical Damping Coefficient (1/s): 1.24227
+Maximum Damping Ratio: 99.900%
+Maximum Damping Coefficient (1/s): 1.24103
+Minimum Damping Ratio: 6.796%
+Range for Minimum Damping Ratio. Min:0.06244 - Max:0.43706
+Minimum Damping Coefficient (1/s): 0.08442
+Estimated Heuristic Factor xCR: 0.272
+Range Values for xCR Factor. Min:0.250 - Max:1.748
+
+Applying Non-Reflecting Boundary Conditions
+Creating Field for NRBC: Higdon
+
+Solving Forward Problem
+Saving Pressure in: output/forward/fw_outputsn[0].pvd
+Saving acoustic_energy in: output/preamble/acoustic_pot_energy
+Simulation time is:        0.0 seconds
+Simulation time is:       0.08 seconds
+Simulation time is:       0.16 seconds
+Simulation time is:       0.24 seconds
+Simulation time is:       0.32 seconds
+Simulation time is:        0.4 seconds
+Simulation time is:       0.48 seconds
+Simulation time is:       0.56 seconds
+Simulation time is:       0.64 seconds
+Simulation time is:       0.72 seconds
+Simulation time is:        0.8 seconds
+Simulation time is:       0.88 seconds
+Simulation time is:       0.96 seconds
+Simulation time is:       1.04 seconds
+Simulation time is:       1.12 seconds
+Simulation time is:        1.2 seconds
+Simulation time is:       1.28 seconds
+Simulation time is:       1.36 seconds
+Simulation time is:       1.44 seconds
+Simulation time is:       1.52 seconds
+Simulation time is:        1.6 seconds
+Simulation time is:       1.68 seconds
+Simulation time is:       1.76 seconds
+Simulation time is:       1.84 seconds
+Simulation time is:       1.92 seconds
+Simulation time is:        2.0 seconds
+Simulation time is:       2.08 seconds
+Simulation time is:       2.16 seconds
+Simulation time is:       2.24 seconds
+Simulation time is:       2.32 seconds
+Simulation time is:        2.4 seconds
+Simulation time is:       2.48 seconds
+Simulation time is:       2.56 seconds
+Simulation time is:       2.64 seconds
+Simulation time is:       2.72 seconds
+Simulation time is:        2.8 seconds
+Simulation time is:       2.88 seconds
+Simulation time is:       2.96 seconds
+Simulation time is:       3.04 seconds
+Simulation time is:       3.12 seconds
+Simulation time is:        3.2 seconds
+Simulation time is:       3.28 seconds
+Simulation time is:       3.36 seconds
+Simulation time is:       3.44 seconds
+Simulation time is:       3.52 seconds
+Simulation time is:        3.6 seconds
+Simulation time is:       3.68 seconds
+Simulation time is:       3.76 seconds
+Simulation time is:       3.84 seconds
+Simulation time is:       3.92 seconds
+Simulation time is:        4.0 seconds
+
+Computing Error Measures
+Maximum Integral Error: 3.16%
+Maximum Peak Error: 1.19%
+Acoustic Energy: 7.84e-05
+
+--------------------------------------------------------------
+Estimating Runtime and Used Memory
+Runtime: (s):70.372, (m):1.173, (h):0.020
+Used Memory: Current (MB):20.403, Peak (MB):22.167
+--------------------------------------------------------------
+
+
+Criterion for Heuristic Factor (1 Points): Err Sum
+HABC Reference Frequency: Boundary
+Type of the Hypereshape Degree: real
+Modal Solver for Fundamental Frequency: KRYLOVSCH_CH
+
+Iteration 0 of 1
+
+Absorbing Layer Shape: Hypershape - Degree: 2.6
+
+Loading Reference Signal from Infinite Model
+
+Determining Reference Frequency
+Frequency at Critical Point  0: 4.27932
+Frequency at Critical Point  1: 4.27932
+Frequency at Critical Point  2: 3.27948
+Frequency at Critical Point  3: 4.43929
+Frequency at Critical Point  4: 3.19949
+Frequency at Critical Point  5: 2.59958
+Frequency at Critical Point  6: 4.23932
+Reference Frequency (Hz): 2.59958
+
+Computing Size for Absorbing Layer
+Parameter z (1/s): 1.7715, Parameter a (adim): 0.6815
+Minimum Mesh Length (km): 0.1200, Reference Length (km): 1.6811
+Initial Guess for Size Parameter: 0.0357
+Options for FL: [0.5224, 0.7310, 0.8126, 1.1259, 1.1568]
+Options for CR: [0.0960, 0.0514, 0.0420, 0.0223, 0.0212]
+Options for Layer Size (km): [0.8782, 1.2288, 1.3660, 1.8928, 1.9447]
+Aprox. Number of Elements (0.120 km) in Layer: [7, 10, 11, 15, 16]
+Selected Parameter Size FL: 0.5224
+Selected Layer Size (km): 0.8782
+
+Modifying Layer Size Based on the Element Size
+Modified Parameter Size FL: 0.5711
+Modified Layer Size (km): 0.9600
+Elements (0.120 km) in Layer: 8
+Normalized Element Size (adim): 0.12500
+
+Determining New Geometry with Absorbing Layer
+Determining Hypershape Layer Parameters
+Checking Current Hypershape Degree n_hyp: 2.6
+Semi-axes (km): a_hyp:3.360 - b_hyp:2.160
+Determining the Minimum Degree for Hypershape Layer
+ParHypEll - r: 0.936 - n: 2.0
+'Harm' Superness. r: 0.936 - n: 2.0
+'Geom' Superness. r: 0.936 - n: 2.0
+'Arit' Superness. r: 0.936 - n: 2.0
+Hyperellipse Parameters. r_min: 0.936 - n_min: 2.0
+Superness Coordinates (km): (2.520, 1.320)
+Minimum Degree for Hypershape n_min: 2.0
+Determining the Maximum Degree for Hypershape Layer
+ParHypEll - r: 1.510 - n: 2.0
+ParHypEll - r: 1.341 - n: 3.0
+ParHypEll - r: 1.208 - n: 4.0
+ParHypEll - r: 1.102 - n: 5.0
+ParHypEll - r: 1.016 - n: 6.0
+ParHypEll - r: 0.946 - n: 7.0
+ParHypEll - r: 1.009 - n: 6.1
+ParHypEll - r: 1.001 - n: 6.2
+ParHypEll - r: 0.994 - n: 6.3
+'Harm' Superness. r: 1.245 - n: 3.7
+'Geom' Superness. r: 1.152 - n: 4.5
+'Arit' Superness. r: 1.032 - n: 5.8
+Hyperellipse Parameters. r_max: 0.994 - n_max: 6.3
+Superness Coordinates (km): (3.259, 1.629)
+Maximum Degree for Hypershape n_max: 6.3
+Current Hypershape Degree n_hyp: 2.6
+Area Ratio: 1.759
+
+Generating Mesh with Absorbing Layer
+Number of Boundary Points for Complete Hyperellipse: 153
+Number of Boundary Points for Truncated Hyperellipse: 100
+Number of Boundary Points for Complete Hyperellipse: 154
+Number of Boundary Points for Truncated Hyperellipse: 101
+Number of Boundary Points for Complete Hyperellipse: 155
+Number of Boundary Points for Truncated Hyperellipse: 101
+Number of Boundary Points for Complete Hyperellipse: 156
+Number of Boundary Points for Truncated Hyperellipse: 102
+Number of Boundary Points for Complete Hyperellipse: 157
+Number of Boundary Points for Truncated Hyperellipse: 104
+Mesh Factor Size Inside Layer (Min): 1.00 (0.97)
+Hyperelliptical Mesh Generated Successfully
+Mesh created with 1575 points and 2995 elements
+Merged Mesh Generated Successfully
+Mesh Created with 1575 Nodes and 2995 Volume Elements
+Method: mass_lumped_triangle, Degree: 4, Dimension: 2
+Mesh Generated Successfully
+
+Updating Velocity Profile
+Clipping Coordinates Inside Layer
+Extending Profile Inside Layer
+Using Cloud Points Method to Extend Velocity Profile
+
+Solving Eigenvalue Problem
+Solver Method: KRYLOVSCH_CH
+  Eigenvalue approximations and residual norms for firedrake_11_ solve.
+  1 EPS nconv=5 first unconverged value (error) 12.7081 (4.30430732e-05)
+Frequency 0 (Hz): 0.00000
+Frequency 1 (Hz): 0.18775
+Fundamental Frequency (Hz): 0.18775
+
+Creating Damping Profile
+Critical Damping Coefficient (1/s): 1.17968
+Maximum Damping Ratio: 99.900%
+Maximum Damping Coefficient (1/s): 1.17850
+Minimum Damping Ratio: 4.988%
+Range for Minimum Damping Ratio. Min:0.01561 - Max:0.23414
+Minimum Damping Coefficient (1/s): 0.05885
+Estimated Heuristic Factor xCR: 0.399
+Range Values for xCR Factor. Min:0.125 - Max:1.873
+
+Applying Non-Reflecting Boundary Conditions
+Creating Field for NRBC: Higdon
+
+Solving Forward Problem
+Saving Pressure in: output/forward/fw_outputsn[0].pvd
+Saving acoustic_energy in: output/preamble/acoustic_pot_energy
+Simulation time is:        0.0 seconds
+Simulation time is:       0.08 seconds
+Simulation time is:       0.16 seconds
+Simulation time is:       0.24 seconds
+Simulation time is:       0.32 seconds
+Simulation time is:        0.4 seconds
+Simulation time is:       0.48 seconds
+Simulation time is:       0.56 seconds
+Simulation time is:       0.64 seconds
+Simulation time is:       0.72 seconds
+Simulation time is:        0.8 seconds
+Simulation time is:       0.88 seconds
+Simulation time is:       0.96 seconds
+Simulation time is:       1.04 seconds
+Simulation time is:       1.12 seconds
+Simulation time is:        1.2 seconds
+Simulation time is:       1.28 seconds
+Simulation time is:       1.36 seconds
+Simulation time is:       1.44 seconds
+Simulation time is:       1.52 seconds
+Simulation time is:        1.6 seconds
+Simulation time is:       1.68 seconds
+Simulation time is:       1.76 seconds
+Simulation time is:       1.84 seconds
+Simulation time is:       1.92 seconds
+Simulation time is:        2.0 seconds
+Simulation time is:       2.08 seconds
+Simulation time is:       2.16 seconds
+Simulation time is:       2.24 seconds
+Simulation time is:       2.32 seconds
+Simulation time is:        2.4 seconds
+Simulation time is:       2.48 seconds
+Simulation time is:       2.56 seconds
+Simulation time is:       2.64 seconds
+Simulation time is:       2.72 seconds
+Simulation time is:        2.8 seconds
+Simulation time is:       2.88 seconds
+Simulation time is:       2.96 seconds
+Simulation time is:       3.04 seconds
+Simulation time is:       3.12 seconds
+Simulation time is:        3.2 seconds
+Simulation time is:       3.28 seconds
+Simulation time is:       3.36 seconds
+Simulation time is:       3.44 seconds
+Simulation time is:       3.52 seconds
+Simulation time is:        3.6 seconds
+Simulation time is:       3.68 seconds
+Simulation time is:       3.76 seconds
+Simulation time is:       3.84 seconds
+Simulation time is:       3.92 seconds
+Simulation time is:        4.0 seconds
+
+Computing Error Measures
+Maximum Integral Error: 1.77%
+Maximum Peak Error: 2.14%
+Acoustic Energy: 7.95e-05
+
+--------------------------------------------------------------
+Estimating Runtime and Used Memory
+Runtime: (s):67.702, (m):1.128, (h):0.019
+Used Memory: Current (MB):23.966, Peak (MB):25.967
+--------------------------------------------------------------
+
+Iteration 0 of 1
+
+Absorbing Layer Shape: Hypershape - Degree: 5.5
+
+Loading Reference Signal from Infinite Model
+
+Determining Reference Frequency
+Frequency at Critical Point  0: 4.27932
+Frequency at Critical Point  1: 4.27932
+Frequency at Critical Point  2: 3.27948
+Frequency at Critical Point  3: 4.43929
+Frequency at Critical Point  4: 3.19949
+Frequency at Critical Point  5: 2.59958
+Frequency at Critical Point  6: 4.23932
+Reference Frequency (Hz): 2.59958
+
+Computing Size for Absorbing Layer
+Parameter z (1/s): 1.7715, Parameter a (adim): 0.6815
+Minimum Mesh Length (km): 0.1200, Reference Length (km): 1.6811
+Initial Guess for Size Parameter: 0.0357
+Options for FL: [0.5224, 0.7310, 0.8126, 1.1259, 1.1568]
+Options for CR: [0.0960, 0.0514, 0.0420, 0.0223, 0.0212]
+Options for Layer Size (km): [0.8782, 1.2288, 1.3660, 1.8928, 1.9447]
+Aprox. Number of Elements (0.120 km) in Layer: [7, 10, 11, 15, 16]
+Selected Parameter Size FL: 0.5224
+Selected Layer Size (km): 0.8782
+
+Modifying Layer Size Based on the Element Size
+Modified Parameter Size FL: 0.5711
+Modified Layer Size (km): 0.9600
+Elements (0.120 km) in Layer: 8
+Normalized Element Size (adim): 0.12500
+
+Determining New Geometry with Absorbing Layer
+Determining Hypershape Layer Parameters
+Checking Current Hypershape Degree n_hyp: 5.5
+Semi-axes (km): a_hyp:3.360 - b_hyp:2.160
+Determining the Minimum Degree for Hypershape Layer
+ParHypEll - r: 0.936 - n: 2.0
+'Harm' Superness. r: 0.936 - n: 2.0
+'Geom' Superness. r: 0.936 - n: 2.0
+'Arit' Superness. r: 0.936 - n: 2.0
+Hyperellipse Parameters. r_min: 0.936 - n_min: 2.0
+Superness Coordinates (km): (2.520, 1.320)
+Minimum Degree for Hypershape n_min: 2.0
+Determining the Maximum Degree for Hypershape Layer
+ParHypEll - r: 1.510 - n: 2.0
+ParHypEll - r: 1.341 - n: 3.0
+ParHypEll - r: 1.208 - n: 4.0
+ParHypEll - r: 1.102 - n: 5.0
+ParHypEll - r: 1.016 - n: 6.0
+ParHypEll - r: 0.946 - n: 7.0
+ParHypEll - r: 1.009 - n: 6.1
+ParHypEll - r: 1.001 - n: 6.2
+ParHypEll - r: 0.994 - n: 6.3
+'Harm' Superness. r: 1.245 - n: 3.7
+'Geom' Superness. r: 1.152 - n: 4.5
+'Arit' Superness. r: 1.032 - n: 5.8
+Hyperellipse Parameters. r_max: 0.994 - n_max: 6.3
+Superness Coordinates (km): (3.259, 1.629)
+Maximum Degree for Hypershape n_max: 6.3
+Current Hypershape Degree n_hyp: 5.5
+Area Ratio: 1.906
+
+Generating Mesh with Absorbing Layer
+Number of Boundary Points for Complete Hyperellipse: 168
+Number of Boundary Points for Truncated Hyperellipse: 95
+Number of Boundary Points for Complete Hyperellipse: 169
+Number of Boundary Points for Truncated Hyperellipse: 96
+Number of Boundary Points for Complete Hyperellipse: 170
+Number of Boundary Points for Truncated Hyperellipse: 96
+Number of Boundary Points for Complete Hyperellipse: 171
+Number of Boundary Points for Truncated Hyperellipse: 97
+Number of Boundary Points for Complete Hyperellipse: 172
+Number of Boundary Points for Truncated Hyperellipse: 97
+Number of Boundary Points for Complete Hyperellipse: 173
+Number of Boundary Points for Truncated Hyperellipse: 98
+Number of Boundary Points for Complete Hyperellipse: 174
+Number of Boundary Points for Truncated Hyperellipse: 99
+Number of Boundary Points for Complete Hyperellipse: 175
+Number of Boundary Points for Truncated Hyperellipse: 99
+Number of Boundary Points for Complete Hyperellipse: 176
+Number of Boundary Points for Truncated Hyperellipse: 100
+Number of Boundary Points for Complete Hyperellipse: 177
+Number of Boundary Points for Truncated Hyperellipse: 100
+Number of Boundary Points for Complete Hyperellipse: 178
+Number of Boundary Points for Truncated Hyperellipse: 101
+Number of Boundary Points for Complete Hyperellipse: 179
+Number of Boundary Points for Truncated Hyperellipse: 101
+Number of Boundary Points for Complete Hyperellipse: 180
+Number of Boundary Points for Truncated Hyperellipse: 102
+Number of Boundary Points for Complete Hyperellipse: 181
+Number of Boundary Points for Truncated Hyperellipse: 102
+Number of Boundary Points for Complete Hyperellipse: 182
+Number of Boundary Points for Truncated Hyperellipse: 103
+Number of Boundary Points for Complete Hyperellipse: 183
+Number of Boundary Points for Truncated Hyperellipse: 103
+Number of Boundary Points for Complete Hyperellipse: 184
+Number of Boundary Points for Truncated Hyperellipse: 104
+Number of Boundary Points for Complete Hyperellipse: 185
+Number of Boundary Points for Truncated Hyperellipse: 104
+Number of Boundary Points for Complete Hyperellipse: 186
+Number of Boundary Points for Truncated Hyperellipse: 105
+Number of Boundary Points for Complete Hyperellipse: 187
+Number of Boundary Points for Truncated Hyperellipse: 105
+Number of Boundary Points for Complete Hyperellipse: 188
+Number of Boundary Points for Truncated Hyperellipse: 106
+Number of Boundary Points for Complete Hyperellipse: 189
+Number of Boundary Points for Truncated Hyperellipse: 106
+Number of Boundary Points for Complete Hyperellipse: 190
+Number of Boundary Points for Truncated Hyperellipse: 108
+Mesh Factor Size Inside Layer (Min): 1.00 (0.88)
+Hyperelliptical Mesh Generated Successfully
+Mesh created with 1750 points and 3324 elements
+Merged Mesh Generated Successfully
+Mesh Created with 1750 Nodes and 3324 Volume Elements
+Method: mass_lumped_triangle, Degree: 4, Dimension: 2
+Mesh Generated Successfully
+
+Updating Velocity Profile
+Clipping Coordinates Inside Layer
+Extending Profile Inside Layer
+Using Cloud Points Method to Extend Velocity Profile
+
+Solving Eigenvalue Problem
+Solver Method: KRYLOVSCH_CH
+  Eigenvalue approximations and residual norms for firedrake_13_ solve.
+  1 EPS nconv=5 first unconverged value (error) 11.7502 (2.68349298e-05)
+Frequency 0 (Hz): 0.00000
+Frequency 1 (Hz): 0.17872
+Fundamental Frequency (Hz): 0.17872
+
+Creating Damping Profile
+Critical Damping Coefficient (1/s): 1.12296
+Maximum Damping Ratio: 99.900%
+Maximum Damping Coefficient (1/s): 1.12183
+Minimum Damping Ratio: 4.988%
+Range for Minimum Damping Ratio. Min:0.01561 - Max:0.23414
+Minimum Damping Coefficient (1/s): 0.05602
+Estimated Heuristic Factor xCR: 0.399
+Range Values for xCR Factor. Min:0.125 - Max:1.873
+
+Applying Non-Reflecting Boundary Conditions
+Creating Field for NRBC: Higdon
+
+Solving Forward Problem
+Saving Pressure in: output/forward/fw_outputsn[0].pvd
+Saving acoustic_energy in: output/preamble/acoustic_pot_energy
+Simulation time is:        0.0 seconds
+Simulation time is:       0.08 seconds
+Simulation time is:       0.16 seconds
+Simulation time is:       0.24 seconds
+Simulation time is:       0.32 seconds
+Simulation time is:        0.4 seconds
+Simulation time is:       0.48 seconds
+Simulation time is:       0.56 seconds
+Simulation time is:       0.64 seconds
+Simulation time is:       0.72 seconds
+Simulation time is:        0.8 seconds
+Simulation time is:       0.88 seconds
+Simulation time is:       0.96 seconds
+Simulation time is:       1.04 seconds
+Simulation time is:       1.12 seconds
+Simulation time is:        1.2 seconds
+Simulation time is:       1.28 seconds
+Simulation time is:       1.36 seconds
+Simulation time is:       1.44 seconds
+Simulation time is:       1.52 seconds
+Simulation time is:        1.6 seconds
+Simulation time is:       1.68 seconds
+Simulation time is:       1.76 seconds
+Simulation time is:       1.84 seconds
+Simulation time is:       1.92 seconds
+Simulation time is:        2.0 seconds
+Simulation time is:       2.08 seconds
+Simulation time is:       2.16 seconds
+Simulation time is:       2.24 seconds
+Simulation time is:       2.32 seconds
+Simulation time is:        2.4 seconds
+Simulation time is:       2.48 seconds
+Simulation time is:       2.56 seconds
+Simulation time is:       2.64 seconds
+Simulation time is:       2.72 seconds
+Simulation time is:        2.8 seconds
+Simulation time is:       2.88 seconds
+Simulation time is:       2.96 seconds
+Simulation time is:       3.04 seconds
+Simulation time is:       3.12 seconds
+Simulation time is:        3.2 seconds
+Simulation time is:       3.28 seconds
+Simulation time is:       3.36 seconds
+Simulation time is:       3.44 seconds
+Simulation time is:       3.52 seconds
+Simulation time is:        3.6 seconds
+Simulation time is:       3.68 seconds
+Simulation time is:       3.76 seconds
+Simulation time is:       3.84 seconds
+Simulation time is:       3.92 seconds
+Simulation time is:        4.0 seconds
+
+Computing Error Measures
+Maximum Integral Error: 1.72%
+Maximum Peak Error: 1.07%
+Acoustic Energy: 7.95e-05
+
+--------------------------------------------------------------
+Estimating Runtime and Used Memory
+Runtime: (s):70.036, (m):1.167, (h):0.019
+Used Memory: Current (MB):25.365, Peak (MB):27.441
+--------------------------------------------------------------
+
+Iteration 0 of 1
+
+Absorbing Layer Shape: Hypershape - Degree: 7.7
+
+Loading Reference Signal from Infinite Model
+
+Determining Reference Frequency
+Frequency at Critical Point  0: 4.27932
+Frequency at Critical Point  1: 4.27932
+Frequency at Critical Point  2: 3.27948
+Frequency at Critical Point  3: 4.43929
+Frequency at Critical Point  4: 3.19949
+Frequency at Critical Point  5: 2.59958
+Frequency at Critical Point  6: 4.23932
+Reference Frequency (Hz): 2.59958
+
+Computing Size for Absorbing Layer
+Parameter z (1/s): 1.7715, Parameter a (adim): 0.6815
+Minimum Mesh Length (km): 0.1200, Reference Length (km): 1.6811
+Initial Guess for Size Parameter: 0.0357
+Options for FL: [0.5224, 0.7310, 0.8126, 1.1259, 1.1568]
+Options for CR: [0.0960, 0.0514, 0.0420, 0.0223, 0.0212]
+Options for Layer Size (km): [0.8782, 1.2288, 1.3660, 1.8928, 1.9447]
+Aprox. Number of Elements (0.120 km) in Layer: [7, 10, 11, 15, 16]
+Selected Parameter Size FL: 0.5224
+Selected Layer Size (km): 0.8782
+
+Modifying Layer Size Based on the Element Size
+Modified Parameter Size FL: 0.5711
+Modified Layer Size (km): 0.9600
+Elements (0.120 km) in Layer: 8
+Normalized Element Size (adim): 0.12500
+
+Determining New Geometry with Absorbing Layer
+Determining Hypershape Layer Parameters
+Checking Current Hypershape Degree n_hyp: 7.7
+Semi-axes (km): a_hyp:3.360 - b_hyp:2.160
+Determining the Minimum Degree for Hypershape Layer
+ParHypEll - r: 0.936 - n: 2.0
+'Harm' Superness. r: 0.936 - n: 2.0
+'Geom' Superness. r: 0.936 - n: 2.0
+'Arit' Superness. r: 0.936 - n: 2.0
+Hyperellipse Parameters. r_min: 0.936 - n_min: 2.0
+Superness Coordinates (km): (2.520, 1.320)
+Minimum Degree for Hypershape n_min: 2.0
+Determining the Maximum Degree for Hypershape Layer
+ParHypEll - r: 1.510 - n: 2.0
+ParHypEll - r: 1.341 - n: 3.0
+ParHypEll - r: 1.208 - n: 4.0
+ParHypEll - r: 1.102 - n: 5.0
+ParHypEll - r: 1.016 - n: 6.0
+ParHypEll - r: 0.946 - n: 7.0
+ParHypEll - r: 1.009 - n: 6.1
+ParHypEll - r: 1.001 - n: 6.2
+ParHypEll - r: 0.994 - n: 6.3
+'Harm' Superness. r: 1.245 - n: 3.7
+'Geom' Superness. r: 1.152 - n: 4.5
+'Arit' Superness. r: 1.032 - n: 5.8
+Hyperellipse Parameters. r_max: 0.994 - n_max: 6.3
+Superness Coordinates (km): (3.259, 1.629)
+Maximum Degree for Hypershape n_max: 6.3
+High Degree for Hypershape Layer. Setting to n_max: 6.3
+Area Ratio: 1.918
+
+Generating Mesh with Absorbing Layer
+Number of Boundary Points for Complete Hyperellipse: 170
+Number of Boundary Points for Truncated Hyperellipse: 94
+Mesh Factor Size Inside Layer (Min): 1.00 (1.00)
+Hyperelliptical Mesh Generated Successfully
+Mesh created with 1710 points and 3254 elements
+Merged Mesh Generated Successfully
+Mesh Created with 1710 Nodes and 3254 Volume Elements
+Method: mass_lumped_triangle, Degree: 4, Dimension: 2
+Mesh Generated Successfully
+
+Updating Velocity Profile
+Clipping Coordinates Inside Layer
+Extending Profile Inside Layer
+Using Cloud Points Method to Extend Velocity Profile
+
+Solving Eigenvalue Problem
+Solver Method: KRYLOVSCH_CH
+  Eigenvalue approximations and residual norms for firedrake_15_ solve.
+  1 EPS nconv=5 first unconverged value (error) 11.6025 (1.45524365e-05)
+Frequency 0 (Hz): 0.00000
+Frequency 1 (Hz): 0.17799
+Fundamental Frequency (Hz): 0.17799
+
+Creating Damping Profile
+Critical Damping Coefficient (1/s): 1.11838
+Maximum Damping Ratio: 99.900%
+Maximum Damping Coefficient (1/s): 1.11726
+Minimum Damping Ratio: 4.988%
+Range for Minimum Damping Ratio. Min:0.01561 - Max:0.23414
+Minimum Damping Coefficient (1/s): 0.05579
+Estimated Heuristic Factor xCR: 0.399
+Range Values for xCR Factor. Min:0.125 - Max:1.873
+
+Applying Non-Reflecting Boundary Conditions
+Creating Field for NRBC: Higdon
+
+Solving Forward Problem
+Saving Pressure in: output/forward/fw_outputsn[0].pvd
+Saving acoustic_energy in: output/preamble/acoustic_pot_energy
+Simulation time is:        0.0 seconds
+Simulation time is:       0.08 seconds
+Simulation time is:       0.16 seconds
+Simulation time is:       0.24 seconds
+Simulation time is:       0.32 seconds
+Simulation time is:        0.4 seconds
+Simulation time is:       0.48 seconds
+Simulation time is:       0.56 seconds
+Simulation time is:       0.64 seconds
+Simulation time is:       0.72 seconds
+Simulation time is:        0.8 seconds
+Simulation time is:       0.88 seconds
+Simulation time is:       0.96 seconds
+Simulation time is:       1.04 seconds
+Simulation time is:       1.12 seconds
+Simulation time is:        1.2 seconds
+Simulation time is:       1.28 seconds
+Simulation time is:       1.36 seconds
+Simulation time is:       1.44 seconds
+Simulation time is:       1.52 seconds
+Simulation time is:        1.6 seconds
+Simulation time is:       1.68 seconds
+Simulation time is:       1.76 seconds
+Simulation time is:       1.84 seconds
+Simulation time is:       1.92 seconds
+Simulation time is:        2.0 seconds
+Simulation time is:       2.08 seconds
+Simulation time is:       2.16 seconds
+Simulation time is:       2.24 seconds
+Simulation time is:       2.32 seconds
+Simulation time is:        2.4 seconds
+Simulation time is:       2.48 seconds
+Simulation time is:       2.56 seconds
+Simulation time is:       2.64 seconds
+Simulation time is:       2.72 seconds
+Simulation time is:        2.8 seconds
+Simulation time is:       2.88 seconds
+Simulation time is:       2.96 seconds
+Simulation time is:       3.04 seconds
+Simulation time is:       3.12 seconds
+Simulation time is:        3.2 seconds
+Simulation time is:       3.28 seconds
+Simulation time is:       3.36 seconds
+Simulation time is:       3.44 seconds
+Simulation time is:       3.52 seconds
+Simulation time is:        3.6 seconds
+Simulation time is:       3.68 seconds
+Simulation time is:       3.76 seconds
+Simulation time is:       3.84 seconds
+Simulation time is:       3.92 seconds
+Simulation time is:        4.0 seconds
+
+Computing Error Measures
+Maximum Integral Error: 1.58%
+Maximum Peak Error: 1.20%
+Acoustic Energy: 7.95e-05
+
+--------------------------------------------------------------
+Estimating Runtime and Used Memory
+Runtime: (s):70.815, (m):1.180, (h):0.020
+Used Memory: Current (MB):24.271, Peak (MB):26.515
+--------------------------------------------------------------
+
+Output Folder for Results Will Be Renamed.
+Folder '/mnt/d/spyro/output/HN7.7_BND/' Successfully Renamed to '/mnt/d/spyro/output/HN6.3_BND/'.
+Iteration 0 of 1
+
+Absorbing Layer Shape: Rectangular
+
+Loading Reference Signal from Infinite Model
+
+Determining Reference Frequency
+Frequency at Critical Point  0: 4.27932
+Frequency at Critical Point  1: 4.27932
+Frequency at Critical Point  2: 3.27948
+Frequency at Critical Point  3: 4.43929
+Frequency at Critical Point  4: 3.19949
+Frequency at Critical Point  5: 2.59958
+Frequency at Critical Point  6: 4.23932
+Reference Frequency (Hz): 2.59958
+
+Computing Size for Absorbing Layer
+Parameter z (1/s): 1.7715, Parameter a (adim): 0.6815
+Minimum Mesh Length (km): 0.1200, Reference Length (km): 1.6811
+Initial Guess for Size Parameter: 0.0357
+Options for FL: [0.5224, 0.7310, 0.8126, 1.1259, 1.1568]
+Options for CR: [0.0960, 0.0514, 0.0420, 0.0223, 0.0212]
+Options for Layer Size (km): [0.8782, 1.2288, 1.3660, 1.8928, 1.9447]
+Aprox. Number of Elements (0.120 km) in Layer: [7, 10, 11, 15, 16]
+Selected Parameter Size FL: 0.5224
+Selected Layer Size (km): 0.8782
+
+Modifying Layer Size Based on the Element Size
+Modified Parameter Size FL: 0.5711
+Modified Layer Size (km): 0.9600
+Elements (0.120 km) in Layer: 8
+Normalized Element Size (adim): 0.12500
+
+Determining New Geometry with Absorbing Layer
+Determining Rectangular Layer Parameters
+Area Ratio: 1.960
+
+Generating Mesh with Absorbing Layer
+Mesh Created with 1653 Nodes and 3136 Volume Elements
+Extended Rectangular Mesh Generated Successfully
+Method: mass_lumped_triangle, Degree: 4, Dimension: 2
+Mesh Generated Successfully
+
+Updating Velocity Profile
+Clipping Coordinates Inside Layer
+Extending Profile Inside Layer
+Using Cloud Points Method to Extend Velocity Profile
+
+Solving Eigenvalue Problem
+Solver Method: KRYLOVSCH_CH
+  Eigenvalue approximations and residual norms for firedrake_17_ solve.
+  1 EPS nconv=5 first unconverged value (error) 10.9207 (6.86606466e-05)
+Frequency 0 (Hz): 0.00000
+Frequency 1 (Hz): 0.17516
+Fundamental Frequency (Hz): 0.17516
+
+Creating Damping Profile
+Critical Damping Coefficient (1/s): 1.10057
+Maximum Damping Ratio: 99.900%
+Maximum Damping Coefficient (1/s): 1.09947
+Minimum Damping Ratio: 4.988%
+Range for Minimum Damping Ratio. Min:0.01561 - Max:0.23414
+Minimum Damping Coefficient (1/s): 0.05490
+Estimated Heuristic Factor xCR: 0.399
+Range Values for xCR Factor. Min:0.125 - Max:1.873
+
+Applying Non-Reflecting Boundary Conditions
+Creating Field for NRBC: Higdon
+
+Solving Forward Problem
+Saving Pressure in: output/forward/fw_outputsn[0].pvd
+Saving acoustic_energy in: output/preamble/acoustic_pot_energy
+Simulation time is:        0.0 seconds
+Simulation time is:       0.08 seconds
+Simulation time is:       0.16 seconds
+Simulation time is:       0.24 seconds
+Simulation time is:       0.32 seconds
+Simulation time is:        0.4 seconds
+Simulation time is:       0.48 seconds
+Simulation time is:       0.56 seconds
+Simulation time is:       0.64 seconds
+Simulation time is:       0.72 seconds
+Simulation time is:        0.8 seconds
+Simulation time is:       0.88 seconds
+Simulation time is:       0.96 seconds
+Simulation time is:       1.04 seconds
+Simulation time is:       1.12 seconds
+Simulation time is:        1.2 seconds
+Simulation time is:       1.28 seconds
+Simulation time is:       1.36 seconds
+Simulation time is:       1.44 seconds
+Simulation time is:       1.52 seconds
+Simulation time is:        1.6 seconds
+Simulation time is:       1.68 seconds
+Simulation time is:       1.76 seconds
+Simulation time is:       1.84 seconds
+Simulation time is:       1.92 seconds
+Simulation time is:        2.0 seconds
+Simulation time is:       2.08 seconds
+Simulation time is:       2.16 seconds
+Simulation time is:       2.24 seconds
+Simulation time is:       2.32 seconds
+Simulation time is:        2.4 seconds
+Simulation time is:       2.48 seconds
+Simulation time is:       2.56 seconds
+Simulation time is:       2.64 seconds
+Simulation time is:       2.72 seconds
+Simulation time is:        2.8 seconds
+Simulation time is:       2.88 seconds
+Simulation time is:       2.96 seconds
+Simulation time is:       3.04 seconds
+Simulation time is:       3.12 seconds
+Simulation time is:        3.2 seconds
+Simulation time is:       3.28 seconds
+Simulation time is:       3.36 seconds
+Simulation time is:       3.44 seconds
+Simulation time is:       3.52 seconds
+Simulation time is:        3.6 seconds
+Simulation time is:       3.68 seconds
+Simulation time is:       3.76 seconds
+Simulation time is:       3.84 seconds
+Simulation time is:       3.92 seconds
+Simulation time is:        4.0 seconds
+
+Computing Error Measures
+Maximum Integral Error: 1.32%
+Maximum Peak Error: 1.04%
+Acoustic Energy: 7.95e-05
+
+--------------------------------------------------------------
+Estimating Runtime and Used Memory
+Runtime: (s):66.707, (m):1.112, (h):0.019
+Used Memory: Current (MB):22.629, Peak (MB):26.805
+--------------------------------------------------------------
+

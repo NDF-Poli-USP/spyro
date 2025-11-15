@@ -527,31 +527,33 @@ class HABC_Wave(AcousticWave, HABC_Mesh, RectangLayer,
 
         elif layer_shape == 'hypershape':
 
-            # # Parameters for hypershape mesh
-            # if self.dimension == 2:  # 2D
-            #     par_geom = self.perim_hyp
+            # Parameters for hypershape mesh
+            if self.dimension == 2:  # 2D
+                par_geom = self.perim_hyp
 
             # if self.dimension == 3:  # 3D
             #     par_geom = self.surf_hyp
 
-            # hyp_par = (self.n_hyp, par_geom, *self.hyper_axes)
-            # mesh_habc = self.hypershape_mesh_habc(hyp_par,
-            #                                       spln=spln,
-            #                                       fmesh=fmesh)
+            hyp_par = (self.n_hyp, par_geom, *self.hyper_axes)
+            mesh_habc = self.hypershape_mesh_habc(hyp_par,
+                                                  spln=spln,
+                                                  fmesh=fmesh)
 
             # Mesh file
-            q = {"overlap_type": (fire.DistributedMeshOverlapType.NONE, 0)}
-            mesh_habc = fire.Mesh(self.filename_mesh,
-                                  distribution_parameters=q,
-                                  comm=self.comm.comm)
+            if self.dimension == 3:  # 3D
+                q = {"overlap_type": (fire.DistributedMeshOverlapType.NONE, 0)}
+                mesh_habc = fire.Mesh(self.filename_mesh,
+                                      distribution_parameters=q,
+                                      comm=self.comm.comm)
 
             # Mesh data
             print(f"Mesh Created with {mesh_habc.num_vertices()} Nodes "
                   f"and {mesh_habc.num_cells()} Volume Elements", flush=True)
 
             # Adjusting coordinates: Swap (x, y, z) -> (z, x ,y)
-            mesh_habc.coordinates.dat.data_with_halos[:, [0, 1, 2]] = \
-                mesh_habc.coordinates.dat.data_with_halos[:, [2, 0, 1]]
+            if self.dimension == 3:  # 3D
+                mesh_habc.coordinates.dat.data_with_halos[:, [0, 1, 2]] = \
+                    mesh_habc.coordinates.dat.data_with_halos[:, [2, 0, 1]]
 
         # Updating the mesh with the absorbing layer
         self.set_mesh(user_mesh=mesh_habc, mesh_parameters={})

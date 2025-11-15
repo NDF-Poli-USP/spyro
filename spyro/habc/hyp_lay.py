@@ -194,9 +194,10 @@ class HyperLayer():
 
         Returns
         -------
-        h, g, z : `float`
-            Degree of hypershape by applying criteria with
-            harmonic, geometric, and arithmetic means
+        crit_tend : `list` or `None`
+            List of hypershape degrees satisfying the central tendency
+            criteria with harmonic, geometric, and arithmetic means or
+            None if no degree satisfies the criteria
         '''
 
         # Hyperellipse semi-axes
@@ -270,7 +271,15 @@ class HyperLayer():
             print("'Arit' Superness. r: {:>5.3f} - n: {:>.1f}".format(
                 rz, z), flush=True)
 
-        return round(h, 1), round(g, 1), round(z, 1)
+        crit_tend = []
+        crit_tend.append(round(float(h), 1)) if rh <= 1 else None
+        crit_tend.append(round(float(g), 1)) if rg <= 1 else None
+        crit_tend.append(round(float(z), 1)) if rz <= 1 else None
+
+        if not crit_tend:
+            crit_tend = None
+
+        return crit_tend
 
     def loop_criteria(self, spness, n_min=2, n_max=20, monitor=False):
         '''
@@ -364,12 +373,14 @@ class HyperLayer():
                                              n_max=n_max, monitor=monitor)
 
         # Central tendency criteria to find the hyperellipse degree
-        h, g, z = self.central_tendency_criteria(spness, monitor=monitor)
+        crit_tend = self.central_tendency_criteria(spness, monitor=monitor)
 
         if lim == 'MIN':
-            n = float(np.clip(max(n, h, g, z), n_min, n_max))
+            crit_tend = n_min if crit_tend is None else max(crit_tend)
+            n = float(np.clip(max(n, crit_tend), n_min, n_max))
         elif lim == 'MAX':
-            n = float(np.clip(min(n, h, g, z), np.floor(n_min) + 1., n_max))
+            crit_tend = n_max if crit_tend is None else min(crit_tend)
+            n = float(np.clip(min(n, crit_tend), np.floor(n_min) + 1., n_max))
 
         if monitor:
 

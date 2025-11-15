@@ -112,13 +112,26 @@ def plot_function_layer_size(lay_par, freq_par, geom_par, FLpos,
         plt.scatter(FL_rt, np.zeros(len(FL_rt)), color=col, zorder=3)
 
     # Identify the roots of the criterion function
-    delta_x = FL_lim / 35
-    delta_y = abs(lim_crit) / 2
+    delta_x = FL_lim / 40.
+    delta_y = abs(lim_crit) / 2.
+    off_x = 0.5 * delta_x
+    off_y = 0.85 * delta_y
     for lay, (FL_rt, col) in enumerate(zip(F_lst, c_lst)):
-        y_FL = -1.3 * delta_y if lay == 0 else 0.8 * delta_y
+        base_y = -1.3 * delta_y if lay == 0 else 0.8 * delta_y
+        used_positions = []
 
         for rt, FL_par in enumerate(FL_rt):
             xFL = FL_par + delta_x if rt % 2 == 0 else FL_par - delta_x
+            y_FL = base_y
+
+            # Check for overlap and adjust if needed
+            for prev_x, prev_y in used_positions:
+                if abs(xFL - prev_x) < 2.6 * delta_x and \
+                        abs(y_FL - prev_y) < 0.9 * off_y:
+                    xFL += -off_x if rt % 2 == 0 else off_x
+                    y_FL += -off_y if lay == 0 else off_y
+            used_positions.append((xFL, y_FL))
+
             ax.annotate(
                 f"{FL_par:.4f}",  # Text
                 xy=(FL_par, 0),  # Point to connect to

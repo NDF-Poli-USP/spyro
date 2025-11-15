@@ -79,7 +79,7 @@ def wave_dict(dt_usu, fr_files, layer_shape, degree_layer,
     # Simulate for 2.0 seconds.
     dictionary["time_axis"] = {
         "initial_time": 0.,  # Initial time for event
-        "final_time": 1.,    # Final time for event
+        "final_time": 4.,    # Final time for event
         "dt": dt_usu,  # timestep size in seconds
         "amplitude": 0.4,  # the Ricker has an amplitude of 1.
         "output_frequency": fr_files,  # how frequently to output solution to pvds
@@ -315,19 +315,19 @@ def test_loop_patchwork_2d():
     # cpw: cells per wavelength
     # lba = minimum_velocity / source_frequency
     # edge_length = lba / cpw
-    edge_length_lst = [0.6]
+    edge_length_lst = [0.12]
 
     # Timestep size (in seconds). Initial guess: edge_length / 50
-    dt_usu_lst = [0.003]
+    dt_usu_lst = [0.0008]
 
     # Factor for the stabilizing term in Eikonal equation
-    f_est_lst = [0.09]
+    f_est_lst = [0.05]
 
     # Parameters for fitting equivalent velocity regression
     fitting_c_lst = [(1.0, 1.0, 1.0, 1.0)]
 
     # Maximum divisor of the final time
-    max_div_tf_lst = [40]
+    max_div_tf_lst = [6]
 
     # Get simulation parameters
     edge_length = edge_length_lst[case]
@@ -345,19 +345,19 @@ def test_loop_patchwork_2d():
     # ============ HABC PARAMETERS ============
 
     # Infinite model (True: Infinite model, False: HABC scheme)
-    get_ref_model = True
+    get_ref_model = False
 
     # Loop for HABC cases
     loop_modeling = not get_ref_model
 
     # Reference frequency
-    habc_reference_freq_lst = ["source"]  # ["source", "boundary"]
+    habc_reference_freq_lst = ["source", "boundary"]
 
     # Type of the hypereshape degree
     degree_type = "real"  # "integer"
 
     # Hyperellipse degrees
-    degree_layer_lst = [None]
+    degree_layer_lst = [2.6, 5.5, 7.7, None]  # n_min 4.1 for "source"
 
     # Modal solver for fundamental frequency
     modal_solver = 'KRYLOVSCH_CH'  # 'ANALYTICAL', 'RAYLEIGH'
@@ -483,15 +483,16 @@ if __name__ == "__main__":
 # lmin    f_est  eik[ms]         loc[km]
 # 400.0m   0.06  384.779 (-0.400, 0.000)
 # 200.0m   0.05  560.352 (-0.600, 0.000)
+# 120.0m   0.05  564.478 (-0.540, 0.000)
 #  85.0m   0.06  547.076 (-0.643, 0.000)
 #  80.0m   0.05  554.254 (-0.600, 0.000)
 #  75.0m   0.08  565.192 (-0.562, 0.000)
 #  37.5m   0.07  566.083 (-0.581, 0.000)
 
 
-# n_hyp  100m  62.5m  50m  25m  20m
-# n_min   2.0    2.0  2.0  2.0  2.0
-# n_max   4.4    4.8  4.7  4.7  4.6
+# n_hyp  120m
+# n_min   2.6 (4.1-S)
+# n_max   7.7 (10.4-S)
 
 # freq    N2.0    N3.0    N4.0    N4.4     REC
 # num  0.50443 0.48266 0.47423 0.47270 0.45539

@@ -354,7 +354,7 @@ def test_loop_habc_3d():
 
     # Maximum divisor of the final time
     # max_div_tf_lst = [5, 7]  # Exact eigenvalue
-    max_div_tf_lst = [9, 10]  # Approximate eigenvalue
+    max_div_tf_lst = [8, 10]  # Approximate eigenvalue
 
     # Get simulation parameters
     edge_length = edge_length_lst[case]
@@ -374,10 +374,10 @@ def test_loop_habc_3d():
     # ============ HABC PARAMETERS ============
 
     # Infinite model (True: Infinite model, False: HABC scheme)
-    get_ref_model = False
+    get_ref_model = True
 
     # Loop for HABC cases
-    loop_modeling = not get_ref_model
+    loop_modeling = get_ref_model
 
     # Reference frequency
     habc_reference_freq_lst = ["source"]  # ["source", "boundary"]
@@ -428,7 +428,7 @@ def test_loop_habc_3d():
     # ============ HABC SCHEME ============
 
     # Name of the file containing the mesh
-    Wave_obj.filename_mesh = "snapped_output.msh"
+    Wave_obj.filename_mesh = "mesh1_snapped_plane.msh"
 
     if loop_modeling:
 
