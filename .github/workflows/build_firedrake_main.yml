@@ -1,0 +1,112 @@
+name: Build Firedrake main
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+    branches:
+      - main
+  schedule:
+    - cron: '0 0 * * 0'
+# on: [push, pull_request]
+
+jobs:
+  test:
+    name: Install and test Firedrake (Linux)
+    runs-on: self-hosted
+
+    container:
+      image: ubuntu:latest
+    env:
+      OMPI_ALLOW_RUN_AS_ROOT: 1
+      OMPI_ALLOW_RUN_AS_ROOT_CONFIRM: 1
+      OMP_NUM_THREADS: 1
+      OPENBLAS_NUM_THREADS: 1
+      FIREDRAKE_CI: 1
+      PYOP2_CI_TESTS: 1
+      PYOP2_SPMD_STRICT: 1
+
+    steps:
+      - name: Fix HOME
+        # For unknown reasons GitHub actions overwrite HOME to /github/home
+        # which will break everything unless fixed
+        # (https://github.com/actions/runner/issues/863)
+        run: echo "HOME=/root" >> "$GITHUB_ENV"
+
+      - name: Pre-run cleanup
+        # Make sure the current directory is empty
+        run: find . -delete
+      
+      # Git is needed for actions/checkout and Python for firedrake-configure
+      - name: Install system dependencies (1)
+        run: |
+          apt-get update
+          apt-get -y install git python3
+
+      - uses: actions/checkout@v4
+
+      - name: Cloning firedrake and installing dependencies
+        run: |
+          git clone https://github.com/firedrakeproject/firedrake.git firedrake-repo
+          apt-get -y install \
+            $(python3 ./firedrake-repo/scripts/firedrake-configure --show-system-packages)
+          apt-get -y install python3-venv
+          apt-get -y install parallel
+      - name: Install PETSc
+        run: |
+          git clone --depth 1 https://gitlab.com/petsc/petsc.git
+          cd petsc
+          python3 ../firedrake-repo/scripts/firedrake-configure \
+            --show-petsc-configure-options | \
+            xargs -L1 ./configure --with-make-np=8 --download-slepc
+          make PETSC_DIR=/__w/spyro/spyro/petsc PETSC_ARCH=arch-firedrake-default all
+          make PETSC_DIR=/__w/spyro/spyro/petsc PETSC_ARCH=arch-firedrake-default check
+          {
+            echo "PETSC_DIR=/__w/spyro/spyro/petsc"
+            echo "PETSC_ARCH=arch-firedrake-default"
+            echo "SLEPC_DIR=/__w/spyro/spyro/petsc/arch-firedrake-default"
+          } >> "$GITHUB_ENV"
+
+      - name: Install Firedrake
+        id: install
+        run: |
+          export $(python3 ./firedrake-repo/scripts/firedrake-configure --show-env)
+          python3 -m venv venv
+          . venv/bin/activate
+
+          : # Hotfix for petsc4py build, see https://gitlab.com/petsc/petsc/-/issues/1759
+          echo 'Cython<3.1' > constraints.txt
+          export PIP_CONSTRAINT=constraints.txt
+
+          : # Force a rebuild of petsc4py as the cached one will not link to the fresh
+          : # install of PETSc.
+          pip cache remove petsc4py
+          pip cache remove slepc4py
+          pip install --verbose "$PETSC_DIR"/src/binding/petsc4py
+          pip install --verbose -r ./firedrake-repo/requirements-build.txt
+          pip install --verbose --no-build-isolation --no-deps \
+              "$PETSC_DIR"/"$PETSC_ARCH"/externalpackages/git.slepc/src/binding/slepc4py
+            pip install --no-deps ngsPETSc netgen-mesher netgen-occt
+          pip install --verbose --no-build-isolation --no-binary h5py --editable './firedrake-repo[check,slepc,vtk]'
+          firedrake-clean
+          : # Extra test dependencies
+          pip install matplotlib
+          pip list
+
+      - name: Run firedrake-check
+        run: |
+          . venv/bin/activate
+          firedrake-check
+        timeout-minutes: 5
+      
+      - name: Run spyro smoke tests
+        run: |
+          . venv/bin/activate
+          git clone --depth 1 https://github.com/NDF-Poli-USP/spyro.git spyro-repo
+          pip install --verbose ./spyro-repo
+          mpiexec -n 6 python -m pytest  spyro-repo/test_integration/
+
+      - name: Post-run cleanup
+        if: always()
+        run: find . -delete

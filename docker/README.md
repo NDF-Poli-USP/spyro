@@ -14,23 +14,21 @@ docker build -t runtag:1.0 --target spyro_release docker
 Then, the following commands gives access to a virtual environment with spyro:
 ````
 docker run -it runtag:1.0
-. firedrake/bin/activate
 ````
 
 ### Development/Testing
 
 The Dockerfile may also be used to create a development environment. First, clone the git repository and then build the development image:
 ````
-git clone https://github.com/Olender/spyro-1.git
-cd spyro-1
+git clone git@github.com:NDF-Poli-USP/spyro.git
+cd spyro
 git checkout <your_branch>
 docker build -t devtag:1.0 -f docker/Dockerfile --target spyro_development docker
 ````
 
 Then, start a container and share your local repository:
 ````
-docker run -v $PWD:/home/firedrake/shared/spyro -it devtag:1.0
-. firedrake/bin/activate
+docker run -v $PWD:/home/shared/spyro -it devtag:1.0
 ````
 
 For running the automated tests:

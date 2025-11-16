@@ -88,7 +88,7 @@ def test_forward_3d(tf=0.6):
     vp = spyro.io.interpolate(model, mesh, V, guess=False)
 
     if comm.ensemble_comm.rank == 0:
-        File("true_velocity.pvd", comm=comm.comm).write(vp)
+        VTKFile("true_velocity.pvd", comm=comm.comm).write(vp)
 
     sources = spyro.Sources(model, mesh, V, comm)
     receivers = spyro.Receivers(model, mesh, V, comm)

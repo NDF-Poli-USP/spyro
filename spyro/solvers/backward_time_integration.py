@@ -53,9 +53,10 @@ def backward_wave_propagator_no_pml(Wave_obj, dt=None):
     temp_filename = Wave_obj.forward_output_file
 
     filename, file_extension = temp_filename.split(".")
-    output_filename = "backward." + file_extension
+    # output_filename = "backward." + file_extension
 
-    output = fire.File(output_filename, comm=comm.comm)
+    # output = fire.VTKFile(output_filename)
+    # output = fire.File(output_filename, comm=comm.comm)
     comm.comm.barrier()
 
     X = fire.Function(Wave_obj.function_space)
@@ -118,8 +119,8 @@ def backward_wave_propagator_no_pml(Wave_obj, dt=None):
                 fire.norm(u_n) < 1
             ), "Numerical instability. Try reducing dt or building the \
                 mesh differently"
-            if Wave_obj.forward_output:
-                output.write(u_n, time=t, name="Pressure")
+            # if Wave_obj.forward_output:
+            #     output.write(u_n, time=t, name="Pressure")
 
             helpers.display_progress(Wave_obj.comm, t)
 
@@ -184,7 +185,7 @@ def mixed_space_backward_wave_propagator(Wave_obj, dt=None):
     filename, file_extension = temp_filename.split(".")
     output_filename = "backward." + file_extension
 
-    output = fire.File(output_filename, comm=comm.comm)
+    output = fire.VTKFile(output_filename)
     comm.comm.barrier()
 
     X = Wave_obj.X

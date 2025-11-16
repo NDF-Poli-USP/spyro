@@ -1,6 +1,7 @@
 from spyro import create_transect
-from spyro.examples.rectangle import Rectangle_acoustic
+from spyro.examples.rectangle import Rectangle_acoustic, Rectangle_acoustic_FWI
 import firedrake as fire
+import copy
 
 camembert_optimization_parameters = {
     "General": {
@@ -114,13 +115,41 @@ camembert_dictionary["camembert_options"] = {
     "outside_velocity": 1.6,
     "inside_circle_velocity": 4.6,
 }
+camembert_dictionary_fwi = copy.deepcopy(camembert_dictionary)
+camembert_dictionary_fwi["inversion"]["perform_fwi"] = True
 
 
-class Camembert_acoustic(Rectangle_acoustic):
+class CamembertVelocity:
+    def _camembert_velocity_model(self):
+        camembert_dict = self.input_dictionary["camembert_options"]
+        z = self.mesh_z
+        x = self.mesh_x
+        zc, xc = camembert_dict["circle_center"]
+        rc = camembert_dict["radius"]
+        c_salt = camembert_dict["inside_circle_velocity"]
+        c_not_salt = camembert_dict["outside_velocity"]
+        cond = fire.conditional(
+            (z - zc) ** 2 + (x - xc) ** 2 < rc**2, c_salt, c_not_salt
+        )
+        self.set_initial_velocity_model(conditional=cond, dg_velocity_model=False)
+        return None
+
+
+class Camembert_acoustic(CamembertVelocity, Rectangle_acoustic):
     """Camembert model.
     This class is a child of the Example_model class.
     It is used to create a dictionary with the parameters of the
     Camembert model.
+
+    Example Setup
+
+    These examples are intended as reusable velocity model configurations to assist in the development and testing of new methods, such as optimization algorithms, time-marching schemes, or inversion techniques.
+
+    Unlike targeted test cases, these examples do not have a specific objective or expected result. Instead, they provide standardized setups, such as Camembert, rectangular, and Marmousi velocity models, that can be quickly reused when prototyping, testing, or validating new functionality.
+
+    By isolating the setup of common velocity models, we aim to reduce boilerplate and encourage consistency across experiments.
+
+    Feel free to adapt these templates to your needs.
 
     Parameters
     ----------
@@ -135,24 +164,54 @@ class Camembert_acoustic(Rectangle_acoustic):
         dictionary=None,
         example_dictionary=camembert_dictionary,
         comm=None,
+        periodic=False,
     ):
         super().__init__(
             dictionary=dictionary,
             example_dictionary=example_dictionary,
             comm=comm,
+            periodic=False,
         )
         self._camembert_velocity_model()
 
-    def _camembert_velocity_model(self):
-        camembert_dict = self.input_dictionary["camembert_options"]
-        z = self.mesh_z
-        x = self.mesh_x
-        zc, xc = camembert_dict["circle_center"]
-        rc = camembert_dict["radius"]
-        c_salt = camembert_dict["inside_circle_velocity"]
-        c_not_salt = camembert_dict["outside_velocity"]
-        cond = fire.conditional(
-            (z - zc) ** 2 + (x - xc) ** 2 < rc**2, c_salt, c_not_salt
+
+class Camembert_acoustic_FWI(CamembertVelocity, Rectangle_acoustic_FWI):
+    """Camembert model.
+    This class is a child of the Example_model class.
+    It is used to create a dictionary with the parameters of the
+    Camembert model.
+
+    Example Setup
+
+    These examples are intended as reusable velocity model configurations to assist in the development and testing of new methods, such as optimization algorithms, time-marching schemes, or inversion techniques.
+
+    Unlike targeted test cases, these examples do not have a specific objective or expected result. Instead, they provide standardized setups, such as Camembert, rectangular, and Marmousi velocity models, that can be quickly reused when prototyping, testing, or validating new functionality.
+
+    By isolating the setup of common velocity models, we aim to reduce boilerplate and encourage consistency across experiments.
+
+    Feel free to adapt these templates to your needs.
+
+    Parameters
+    ----------
+    dictionary : dict, optional
+        Dictionary with the parameters of the model that are different from
+        the default Camembert model. The default is None.
+
+    """
+
+    def __init__(
+        self,
+        dictionary=None,
+        example_dictionary=camembert_dictionary_fwi,
+        comm=None,
+        periodic=False,
+    ):
+        super().__init__(
+            dictionary=dictionary,
+            example_dictionary=example_dictionary,
+            comm=comm,
+            periodic=False,
         )
-        self.set_initial_velocity_model(conditional=cond, dg_velocity_model=False)
-        return None
+        self._camembert_velocity_model()
+        self.real_velocity_model = self.initial_velocity_model
+        self.real_mesh = self.mesh

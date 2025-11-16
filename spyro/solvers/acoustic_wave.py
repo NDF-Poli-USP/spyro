@@ -31,15 +31,15 @@ class AcousticWave(Wave):
         super().__init__(dictionary, comm=comm)
 
         self.acoustic_energy = None
-        self.field_logger.add_functional("acoustic_energy",
-                                         lambda: fire.assemble(self.acoustic_energy))
+        self.field_logger.add_functional(
+            "acoustic_energy", lambda: fire.assemble(self.acoustic_energy))
 
     def save_current_velocity_model(self, file_name=None):
         if self.c is None:
             raise ValueError("C not loaded")
         if file_name is None:
             file_name = "velocity_model.pvd"
-        fire.File(file_name).write(
+        fire.VTKFile(file_name).write(
             self.c, name="velocity"
         )
 
@@ -62,7 +62,7 @@ class AcousticWave(Wave):
         self.solver = None
         self.rhs = None
         self.B = None
-        if abc_type is None:
+        if abc_type is None or abc_type == "hybrid":
             construct_solver_or_matrix_no_pml(self)
         elif abc_type == "PML":
             V = self.function_space
@@ -133,7 +133,7 @@ class AcousticWave(Wave):
                 )
 
             if self.debug_output:
-                fire.File("initial_velocity_model.pvd").write(
+                fire.VTKFile("initial_velocity_model.pvd").write(
                     self.initial_velocity_model, name="velocity"
                 )
 

@@ -15,12 +15,27 @@ def cells_per_wavelength(method, degree, dimension):
         'mlt5tri': 2.03,
         'mlt2tet': 6.12,
         'mlt3tet': 3.72,
+        'sem2quad': None,
+        'sem4quad': None,
+        'sem6quad': None,
+        'sem8quad': None,
+        'cg_triangle1tri': None,
     }
 
-    if dimension == 2 and (method == 'MLT' or method == 'CG'):
+    if dimension == 2 and (method == 'mass_lumped_triangle' or method == "MLT"):
         cell_type = 'tri'
-    if dimension == 3 and (method == 'MLT' or method == 'CG'):
+        method = 'mlt'
+    if dimension == 3 and (method == 'mass_lumped_triangle' or method == "MLT"):
         cell_type = 'tet'
+        method = 'mlt'
+    if dimension == 2 and method == 'spectral_quadrilateral':
+        cell_type = 'quad'
+        method = 'sem'
+    if dimension == 3 and method == 'spectral_quadrilateral':
+        cell_type = 'quad'
+        method = 'sem'
+    if method == 'CG_triangle':
+        cell_type = 'tri'
 
     key = method.lower()+str(degree)+cell_type
 
@@ -261,6 +276,8 @@ class AutomaticMesh:
         mesh : Mesh
             Mesh
         """
+        # if self.comm.rank == 0:
+        print(f"Creating {self.mesh_type} type mesh.", flush=True)
         if self.mesh_type == "firedrake_mesh":
             return self.create_firedrake_mesh()
         elif self.mesh_type == "SeismicMesh":
@@ -274,9 +291,7 @@ class AutomaticMesh:
         """
         Creates a mesh based on Firedrake meshing utilities.
         """
-        if self.dx is None:
-            raise ValueError("dx is not set")
-        elif self.dimension == 2:
+        if self.dimension == 2:
             return self.create_firedrake_2D_mesh()
         elif self.dimension == 3:
             return self.create_firedrake_3D_mesh()
@@ -287,6 +302,8 @@ class AutomaticMesh:
         """
         Creates a 2D mesh based on Firedrake meshing utilities.
         """
+        if self.dx is None and self.cpw is not None:
+            self.dx = calculate_edge_length(self.cpw, self.minimum_velocity, self.source_frequency)
         if self.abc_pad:
             nx = int((self.length_x + 2*self.abc_pad) / self.dx)
             nz = int((self.length_z + self.abc_pad) / self.dx)
@@ -364,6 +381,7 @@ class AutomaticMesh:
         """
         Creates a 2D mesh based on SeismicMesh meshing utilities.
         """
+        print(f"velocity_model{self.velocity_model}", flush=True)
         if self.velocity_model is None:
             return self.create_seismicmesh_2D_mesh_homogeneous()
         else:
@@ -373,17 +391,19 @@ class AutomaticMesh:
         if self.comm.ensemble_comm.rank == 0:
             v_min = self.minimum_velocity
             frequency = self.source_frequency
+            if self.cpw is None:
+                self.cpw = cells_per_wavelength('MLT', 4, 2)
             C = self.cpw  # cells_per_wavelength(method, degree, dimension)
 
-            Lz = self.length_z*1000
-            Lx = self.length_x*1000
-            domain_pad = self.abc_pad*1000
+            Lz = self.length_z
+            Lx = self.length_x
+            domain_pad = self.abc_pad
             lbda_min = v_min/frequency
 
             bbox = (-Lz, 0.0, 0.0, Lx)
             domain = SeismicMesh.Rectangle(bbox)
 
-            hmin = lbda_min/C*1000
+            hmin = lbda_min/C
             self.comm.comm.barrier()
 
             ef = SeismicMesh.get_sizing_function_from_segy(
@@ -414,7 +434,7 @@ class AutomaticMesh:
             if self.comm.comm.rank == 0:
                 meshio.write_points_cells(
                     "automatic_mesh.msh",
-                    points/1000.0,
+                    points,
                     [("triangle", cells)],
                     file_format="gmsh22",
                     binary=False
@@ -422,7 +442,7 @@ class AutomaticMesh:
 
                 meshio.write_points_cells(
                     "automatic_mesh.vtk",
-                    points/1000.0,
+                    points,
                     [("triangle", cells)],
                     file_format="vtk"
                 )
@@ -450,6 +470,9 @@ class AutomaticMesh:
         real_lx = Lx + 2 * pad
 
         edge_length = self.edge_length
+        if edge_length is None:
+            edge_length = self.minimum_velocity/(self.source_frequency*self.cpw)
+
         bbox = (-real_lz, 0.0, -pad, real_lx - pad)
         rectangle = SeismicMesh.Rectangle(bbox)
 
@@ -496,7 +519,6 @@ class AutomaticMesh:
         Lx = self.length_x
         Ly = self.length_y
         pad = self.abc_pad
-
         real_lz = Lz + pad
         real_lx = Lx + 2 * pad
         real_ly = Ly + 2 * pad
@@ -539,6 +561,15 @@ class AutomaticMesh:
                          distribution_parameters={
                             "overlap_type": (fire.DistributedMeshOverlapType.NONE, 0)
                         })
+
+
+def calculate_edge_length(cpw, minimum_velocity, frequency):
+    v_min = minimum_velocity
+
+    lbda_min = v_min/frequency
+
+    edge_length = lbda_min/cpw
+    return edge_length
 
 
 def RectangleMesh(nx, ny, Lx, Ly, pad=None, comm=None, quadrilateral=False):

@@ -1,5 +1,6 @@
 import spyro
 import math
+import pytest
 
 
 def test_camembert_forward():
@@ -71,11 +72,29 @@ def test_acoustic_local_abc():
     assert last_acoustic_energy < 7e-7  # The expected value was found empirically
 
 
+def test_immersed_polygon_forward():
+    from spyro.examples.immersed_polygon import Polygon_acoustic
+
+    Wave_obj = Polygon_acoustic()
+
+    # Check if velocity model is correct
+    c_wave = Wave_obj.initial_velocity_model
+    test1 = math.isclose(3.25, c_wave.at(-0.5, 0.5))
+    test2 = math.isclose(2.5, c_wave.at(-0.5, 0.1))
+
+    # Check if forward solve runs
+    Wave_obj.forward_solve()
+    test3 = True
+
+    assert all([test1, test2, test3])
+
+
 def test_camembert_elastic():
     from spyro.examples.camembert_elastic import wave
     wave.forward_solve()
 
 
+@pytest.mark.slow
 def test_elastic_cube_3D():
     from spyro.examples.elastic_cube_3D import wave
     wave.forward_solve()
@@ -84,3 +103,7 @@ def test_elastic_cube_3D():
 if __name__ == "__main__":
     test_camembert_forward()
     test_rectangle_forward()
+    test_acoustic_local_abc()
+    test_immersed_polygon_forward()
+    test_camembert_elastic()
+    test_elastic_cube_3D()
