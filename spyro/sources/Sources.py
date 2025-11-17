@@ -116,16 +116,16 @@ class Sources(Delta_projector):
         return rhs_forcing
 
 
-def timedependentSource(model, t, freq=None, delay=1.5):
+def timedependentSource(model, t, freq=None, delay=1.5, amplitude=1.0):
     if model["acquisition"]["source_type"] == "Ricker":
-        return ricker_wavelet(t, freq, delay=delay)
+        return ricker_wavelet(t, freq, delay=delay, amplitude=amplitude)
     else:
         raise ValueError("source not implemented")
 
 
 def ricker_wavelet(
     t, freq, delay=1.5, delay_type="multiples_of_minimun",
-    integral=False
+    integral=False, amplitude=1.0,
 ):
     """Creates a Ricker source function with a
     delay in term of multiples of the distance
@@ -158,9 +158,9 @@ def ricker_wavelet(
     # t = t - delay / freq
     tt = (math.pi * freq * t) ** 2
     if integral:
-        return t*math.exp((-1.0) * tt)
+        return t*math.exp((-1.0) * tt) * amplitude
     else:
-        return (1.0 - (2.0) * tt) * math.exp((-1.0) * tt)
+        return (1.0 - (2.0) * tt) * math.exp((-1.0) * tt) * amplitude
 
 
 def full_ricker_wavelet(
