@@ -192,7 +192,6 @@ if __name__ == "__main__":
         print(f"err_y = {err(U_y, u_y)}")
         print(f"err_z = {err(U_z, u_z)}")
 
-
         if moment_tensor:
             basename = "ExplosiveSource"
         else:

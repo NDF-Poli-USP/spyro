@@ -410,10 +410,12 @@ class AutomaticMesh:
             file_format="vtk",
         )
 
-        return fire.Mesh(self.output_file_name,
-                         distribution_parameters={
-                            "overlap_type": (fire.DistributedMeshOverlapType.NONE, 0)
-                        })
+        return fire.Mesh(
+            self.output_file_name,
+            distribution_parameters={
+                "overlap_type": (fire.DistributedMeshOverlapType.NONE, 0)
+            }
+        )
 
 
 def calculate_edge_length(cpw, minimum_velocity, frequency):
