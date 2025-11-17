@@ -34,7 +34,7 @@ class L2Inner(object):
     def __init__(self, Wave_obj):
         V = Wave_obj.function_space
         # print(f"Dir {dir(Wave_obj)}", flush=True)
-        dxlump = fire.dx(scheme=Wave_obj.quadrature_rule)
+        dxlump = fire.dx(**Wave_obj.quadrature_rule)
         self.A = fire.assemble(
             fire.TrialFunction(V) * fire.TestFunction(V) * dxlump,
             mat_type="matfree"
@@ -326,7 +326,7 @@ class FullWaveformInversion(AcousticWave):
     def set_real_mesh(
         self,
         user_mesh=None,
-        mesh_parameters=None,
+        input_mesh_parameters=None,
     ):
         """
         Set the mesh for the real synthetic model.
@@ -342,17 +342,17 @@ class FullWaveformInversion(AcousticWave):
         -------
         None
         """
-        mesh_parameters.setdefault("mesh_type", "firedrake_mesh")
+        input_mesh_parameters.setdefault("mesh_type", "firedrake_mesh")
         super().set_mesh(
             user_mesh=user_mesh,
-            mesh_parameters=mesh_parameters,
+            input_mesh_parameters=input_mesh_parameters,
         )
         self.real_mesh = self.get_mesh()
 
     def set_guess_mesh(
         self,
         user_mesh=None,
-        mesh_parameters={},
+        input_mesh_parameters={},
     ):
         """
         Set the mesh for the guess model.
@@ -370,7 +370,7 @@ class FullWaveformInversion(AcousticWave):
         """
         super().set_mesh(
             user_mesh=user_mesh,
-            mesh_parameters=mesh_parameters,
+            input_mesh_parameters=input_mesh_parameters,
         )
         self.guess_mesh = self.get_mesh()
 

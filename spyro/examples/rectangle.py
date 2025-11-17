@@ -118,12 +118,12 @@ class Rectangle_mesh_and_velocity:
             "length_z": mesh_dict["Lz"],
             "length_x": mesh_dict["Lx"],
             "length_y": mesh_dict["Ly"],
-            "dx": mesh_dict["h"],
+            "edge_length": mesh_dict["h"],
             "mesh_file": mesh_dict["mesh_file"],
             "mesh_type": mesh_dict["mesh_type"],
             "periodic": self.periodic,
         }
-        super().set_mesh(mesh_parameters=mesh_parameters)
+        super().set_mesh(input_mesh_parameters=mesh_parameters)
 
     def multiple_layer_velocity_model(self, z_switch, layers):
         """
