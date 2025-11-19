@@ -19,38 +19,32 @@ import spyro.habc.habc as habc
 # Local absorbing boundary conditions for the elastic wave
 # equation (Turkel et al., 2023)
 
-# Largura do domínio [m]
+# Dimensions [m]
 b = 140
-
-# Altura do domínio [m]
 h = 60
-
-# Espessura do domínio [m]
 t = 40
 
-# Tamanho do elemento [m]
+# Element size [m]
 elsize = 10
 
-# Número de elementos em x
+# Discretization
 nelx = int(b / elsize)
-
-# Número de elementos em y
 nely = int(h / elsize)
-
-# Número de elementos em y
 nelz = max(int(t / elsize), 2)
 
-# Definir malha do MEF
+# Mesh
 mesh = fire.BoxMesh(nelx, nely, nelz, b, h, t)
 
-# Espaço para a variável de estado (deslocamento)
-# V = fire.VectorFunctionSpace(mesh, "CG", 1)
-V = fire.VectorFunctionSpace(mesh, "KMV", 3)
 
-# Criando a condição de contorno de Dirichlet
+# Space functions
+V = fire.VectorFunctionSpace(mesh, "KMV", 3)
+G = fire.TensorFunctionSpace(mesh, "KMV", 3, shape=(3, 3))
+H = fire.TensorFunctionSpace(mesh, "KMV", 3, shape=(6, 6))
+
+# Dirichlet BC
 # bc = fire.DirichletBC(V, ((0., 0., 0.)), 1)
 
-# Criando dx
+# Integration domain
 # q_degree = 3
 # dx = fire.dx(metadata={'quadrature_degree': q_degree})
 quad_rule = finat.quadrature.make_quadrature(
@@ -58,7 +52,7 @@ quad_rule = finat.quadrature.make_quadrature(
 dx = fire.dx(scheme=quad_rule)
 ds = fire.ds()
 
-# Força de superfície
+# Surface tension
 # F1 = fire.Constant((0., -0.01, 0.))
 
 # Boundary nodes indices
@@ -71,10 +65,6 @@ coord = fire.Function(V).interpolate(fire.SpatialCoordinate(mesh))
 source_position = np.array([b / 2., h / 2., t / 2.])
 source_vertex = int(np.linalg.norm(
     coord.dat.data - source_position, axis=1).argmin())
-
-# Space function
-G = fire.TensorFunctionSpace(mesh, "KMV", 3, shape=(3, 3))
-H = fire.TensorFunctionSpace(mesh, "KMV", 3, shape=(6, 6))
 
 
 def c_vti_tensor(vP, vS, rho, epsilon, gamma, delta, anysotropy):
@@ -96,6 +86,8 @@ def c_vti_tensor(vP, vS, rho, epsilon, gamma, delta, anysotropy):
         Thomsen parameter gamma
     delta: `float`
         Thomsen parameter delta
+    anysotropy: `str`
+        Type of anisotropy: 'weak' or 'exact'
 
     Returns
     -------
@@ -142,13 +134,13 @@ def c_tti_tensor(C_vti, theta, phi=0., heterogeneous_field=True):
         Tilt angle in degrees
     phi: `float` or `firedrake.Function`, optional
         Azimuth angle in degrees (default is 0: 2D case)
+    heterogeneous_field: `bool`, optional
+        If True, the input angles are fields. Default is True
 
     Returns
     -------
     C_tti: `ufl.tensors.ListTensor`
         Elastic tensor for TTI anisotropy
-    comp_C_tti: `dict`
-        Non-zero components of the elastic tensor
     '''
 
     # Especial angle values
@@ -234,12 +226,21 @@ def c_tti_tensor(C_vti, theta, phi=0., heterogeneous_field=True):
     return C_tti
 
 
-def deformacoes(u):
+def strain_tensor(u):
     '''
-    Retorna o tensor de deformações em notação de Voight
-    '''
+    Compute the strain tensor in Voight notation
 
-    # Componentes do tensor de deformações
+    Parameters
+    ----------
+    u: `firedrake.Function`
+        Displacement field
+
+    Returns
+    -------
+    epsilon: `ufl.tensors.ListTensor`
+        Strain tensor in Voight notation
+    '''
+    # Components
     eps_x = u[0].dx(0)
     eps_y = u[1].dx(1)
     eps_z = u[2].dx(2)
@@ -254,154 +255,12 @@ def deformacoes(u):
     return epsilon
 
 
-def problema_direto(V):
-    '''
-    Resolve o problema direto e retorna u
-    '''
-
-    # Criar um trial function (u = N du)
-    du = fire.TrialFunction(V)
-
-    # Criar uma função de teste
-    v = fire.TestFunction(V)
-
-    # Criar uma função para representar a variável de estado
-    u = fire.Function(V, name='displacement')
-
-    # Derivada de du em relação a dx (deformações)
-    epsilon = deformacoes(du)
-
-    # Derivada de v em relação a dx
-    epsilon_v = deformacoes(v)
-
-    # Data
-    vP = 1.5  # P-wave velocity [km/s]
-    vS = 0.75  # S-wave velocity [km/s]
-    rho = 1e3  # Density [kg/m³]
-    eps1 = 0.2  # Thomsen parameter epsilon
-    gamma = 0.3  # Thomsen parameter gamma
-    delta = 0.1  # Thomsen parameter delta
-    theta = 30.  # Tilt angle in degrees
-    phi = 0.  # azimuth angle in degrees (phi = 0: 2D case)
-
-    C1_vti = c_vti_tensor(vP, vS, rho, eps1,
-                          gamma, delta, 'weak')
-    C2_vti = c_vti_tensor(1.5 * vP, vP / 4., 2.5 * rho,
-                          0.3, 0.4, 0.2, 'weak')
-
-    C1_tti = c_tti_tensor(C1_vti, theta, phi)
-    C2_tti = c_tti_tensor(C2_vti, theta, phi)
-
-    # Generate a simple model
-    x = fire.SpatialCoordinate(mesh)
-    left_region = fire.conditional(x[0] <= 0.5, 1, 0)
-
-    # Combined expression
-    # C = C1_vti * left_region + C2_vti * (1 - left_region)
-    C = C1_tti * left_region + C2_tti * (1 - left_region)
-
-    # Tensor de tensões de Cauchy
-    sigma = C * epsilon
-
-    # Problema bilinear (Princípio dos trabalhos virtuais)
-    a = fire.inner(sigma, epsilon_v) * dx
-    L = fire.inner(F1, v) * fire.ds(2)
-    form = a - L
-    # fire.solve(fire.lhs(form) == fire.rhs(form), u, bcs=bc)
-    fire.solve(fire.lhs(form) == fire.rhs(form), u)
-    # fire.solve(a == L, u)
-
-    fire.VTKFile("displacement.pvd").write(u)
-    # ipdb.set_trace()
-
-    # # Fazer o "assemble" do sistema linear
-    # A, b = assemble_system(a, L, bc)
-
-
-def static_VTI(V):
-    '''
-    VTI static problem
-    '''
-
-    # Criar um trial function (u = N du)
-    du = fire.TrialFunction(V)
-
-    # Criar uma função de teste
-    v = fire.TestFunction(V)
-
-    # Criar uma função para representar a variável de estado
-    u = fire.Function(V, name='u_VTI')
-
-    # Derivada de du em relação a dx (deformações)
-    epsilon = deformacoes(du)
-
-    # Derivada de v em relação a dx
-    epsilon_v = deformacoes(v)
-
-    # Tensor elástico
-    C_vti = c_vti_tensor(vP, vS, rho, eps1,
-                         gamma, delta, 'weak')
-
-    # Tensor de tensões de Cauchy
-    sigma = C_vti * epsilon
-
-    # # Problema bilinear (Princípio dos trabalhos virtuais)
-    a = fire.inner(sigma, epsilon_v) * dx
-    L = fire.inner(F1, v) * fire.ds(2)
-    form = a - L
-    # fire.solve(fire.lhs(form) == fire.rhs(form), u, bcs=bc)
-    fire.solve(fire.lhs(form) == fire.rhs(form), u)
-    fire.VTKFile("disp_VTI.pvd").write(u)
-
-
-def static_TTI(V):
-    '''
-    static TTI problem
-    '''
-
-    # Criar um trial function (u = N du)
-    du = fire.TrialFunction(V)
-
-    # Criar uma função de teste
-    v = fire.TestFunction(V)
-
-    # Criar uma função para representar a variável de estado
-    u = fire.Function(V, name='u_TTI')
-
-    # Derivada de du em relação a dx (deformações)
-    epsilon = deformacoes(du)
-
-    # Derivada de v em relação a dx
-    epsilon_v = deformacoes(v)
-
-    # Tensor elástico
-    C_vti = c_vti_tensor(vP, vS, rho, eps1,
-                         gamma, delta, 'weak')
-
-    C_tti = c_tti_tensor(C_vti, theta, phi)
-
-    # Tensor de tensões de Cauchy
-    sigma = C_tti * epsilon
-
-    # # Problema bilinear (Princípio dos trabalhos virtuais)
-    a = fire.inner(sigma, epsilon_v) * dx
-    L = fire.inner(F1, v) * fire.ds(2)
-    form = a - L
-    # fire.solve(fire.lhs(form) == fire.rhs(form), u, bcs=bc)
-    fire.solve(fire.lhs(form) == fire.rhs(form), u)
-    fire.VTKFile("disp_TTI.pvd").write(u)
-
-
 def nrbc_tensor(rho, Gamma, bnd_nod, G, V):
     ''''
     Constructs the NRBC tensor for the elastic ABC.
 
     Parameters
     ----------
-    vP: `float`
-        P-wave velocity [km/s]
-    vS: `float`
-        S-wave velocity [km/s]
     rho: `float`
         Density [kg/m³]
     Gamma: `ufl.tensors.ListTensor`
@@ -409,7 +268,7 @@ def nrbc_tensor(rho, Gamma, bnd_nod, G, V):
     bnd_nod : `array`
         Boundary nodes indices.
     G : `firedrake.TensorFunctionSpace`
-        Function space for the crhistoffel tensor
+        Function space for the Crhistoffel tensor
     V: `firedrake.VectorFunctionSpace`
         Function space for the displacement field
 
@@ -444,7 +303,7 @@ def nrbc_tensor(rho, Gamma, bnd_nod, G, V):
 def Crhistoffel_VTI(vP, vS, rho, epsilon, gamma, delta,
                     anysotropy, propag_vector):
     ''''
-    Constructs the crhistoffel tensor for a material with VTI anisotropy.
+    Constructs the Crhistoffel tensor for a material with VTI anisotropy.
 
     Parameters
     ----------
@@ -460,13 +319,15 @@ def Crhistoffel_VTI(vP, vS, rho, epsilon, gamma, delta,
         Thomsen parameter gamma
     delta: `float`
         Thomsen parameter delta
+    anysotropy: `str`
+        Type of anisotropy: 'weak' or 'exact'
     propag_vector: `list` or `np.array`
         Propagation vector
 
     Returns
     -------
     Gamma_vti: `ufl.tensors.ListTensor`
-        Crhistoffel tensor
+        Crhistoffel tensor for VTI anisotropy
     '''
 
     # Computing the elastic tensor components
@@ -514,7 +375,7 @@ def Crhistoffel_TTI(C_tti, propag_vector, H):
     Returns
     -------
     Gamma_tti: `ufl.tensors.ListTensor`
-        Crhistoffel tensor
+        Crhistoffel tensor for TTI anisotropy
     '''
 
     # Computing the elastic tensor components
@@ -555,6 +416,8 @@ def propag_vector(coord, source_coord, bnd_nod, V):
 
     Parameters
     ----------
+    coord : `Firedrake function`
+        Mesh coordinates
     source_coord : `Firedrake function`
         Source coordinates
     bnd_nod : `array`
@@ -623,35 +486,92 @@ phi.assign(phi_o)
 # static_TTI(V)
 
 
+def explosive_source(mesh, source_coord, W, sigma=15.0):
+    '''
+    Create properly normalized explosive source
+
+    Parameters
+    ----------
+    mesh: `firedrake.Mesh`
+        3D mesh
+    source_coord: `list` or `np.array`
+        Source coordinates
+    W: `firedrake.FunctionSpace`
+        Function space for the source
+    sigma: `float`, optional
+        Standard deviation of the Gaussian (default is 20.0)
+    '''
+    F1 = fire.Function(W, name='F')
+    x, y, z = fire.SpatialCoordinate(mesh)
+    xs, ys, zs = source_coord
+
+    # Create Gaussian
+    gaussian = fire.exp(-((x - xs)**2 + (y - ys)**2
+                          + (z - zs)**2) / (2 * sigma**2))
+    F1.interpolate(gaussian)
+
+    # Normalization
+    source_integral = fire.assemble(F1 * dx)
+    F1.assign(F1 / source_integral)
+
+    # Verify
+    # final_integral = fire.assemble(F1 * dx)
+    # assert abs(final_integral - 1.0) < 1e-10,\
+    #     f"Normalization failed: {final_integral}"
+
+    return F1
+
+
 def apply_source(t, f0, v, F1, F_sou=1.):
     '''
     Ricker source for time t
-    t: Current time
-    f0: Source central frequency
-    V: Test function space
-    F1: Load function
-    F_sou: Maximum source amplitude
+
+    Parameters
+    ----------
+    t: `float`
+        Current time
+    f0: `float`
+        Source central frequency
+    v: `firedrake.TestFunction`
+        Test function
+    F1: `firedrake.Function`
+        Source spatial distribution
+    F_sou: `float`, optional
+        Maximum source amplitude. Default is 1
     '''
 
     # Amplitude excitation
     r = (np.pi * f0 * (t - 1./f0))**2
     amp = (1. - 2. * r) * np.exp(-r) * F_sou
-
     # print('Amp: {:3.2e}'.format(amp))
 
-    # Força de superfície
+    # Traction force
     # F1 = fire.Constant((0., amp, 0.))
     # L = fire.inner(F1, v) * fire.ds(2)
 
-    F1.dat.data[source_vertex] = [0, amp, 0.]  # Point source
-    L = fire.inner(F1, v) * dx  # Source term
+    # Point load
+    # F1.dat.data[source_vertex] = [0, amp, 0.]  # Point source
+    # L = fire.inner(F1, v) * dx  # Source term
+
+    # Explosion source
+    L = -fire.Constant(amp) * F1 * fire.div(v) * dx  # Source term
+    # print(fire.assemble(L))
 
     return L
 
 
-def propagation_VTI(V, G):
+def propagation_VTI(V, G, W):
     '''
     Algorithm to solve the forward problem
+
+    Parameters
+    ----------
+    V: `firedrake.VectorFunctionSpace`
+        Function space for the displacement field
+    G : `firedrake.TensorFunctionSpace`
+        Function space for the Crhistoffel tensor
+    W : `firedrake.FunctionSpace`
+        Function space for the scalar fields
     '''
     # Final Time
     T = 2.  # s
@@ -662,31 +582,30 @@ def propagation_VTI(V, G):
     # Timestep size
     dt = round(T / steps, 6)
 
-    # Criar um trial function
+    # Trial and test functions
     du = fire.TrialFunction(V)
-
-    # Criar uma função de teste
     v = fire.TestFunction(V)
 
-    # Criar uma função para representar a variável de estado
+    # State variable functions
     u = fire.Function(V, name='u')
     u_ant1 = fire.Function(V, name='u_ant1')
     u_ant2 = fire.Function(V, name='u_ant2')
 
     # Load function
-    F1 = fire.Function(V, name='F')
+    # F1 = fire.Function(V, name='F')
+    F1 = explosive_source(mesh, source_position, W)
 
-    # Derivada de du em relação a dx (deformações)
-    epsilon = deformacoes(du)
+    # Strain tensor
+    epsilon = strain_tensor(du)
 
-    # Derivada de v em relação a dx
-    epsilon_v = deformacoes(v)
+    # Virtual strain tensor
+    epsilon_v = strain_tensor(v)
 
-    # Tensor elástico
+    # VTI elastic tensor
     C_vti = c_vti_tensor(vP, vS, rho, eps1,
                          gamma, delta, 'weak')
 
-    # Tensor de tensões de Cauchy
+    # Cauchy's stress tensor
     sigma = C_vti * epsilon
 
     # Bilinear form
@@ -719,7 +638,7 @@ def propagation_VTI(V, G):
             ntimestep, steps, t))
 
         # Ricker source for time t
-        L = apply_source(t, 5., v, F1, F_sou=1e6)
+        L = apply_source(t, 5., v, F1, F_sou=1e8)
 
         # Variational problem
         m = fire.Constant(1. / dt**2) * rho * fire.inner(
@@ -746,9 +665,20 @@ def propagation_VTI(V, G):
     print(67*'*')
 
 
-def propagation_TTI(V, G, H):
+def propagation_TTI(V, G, H, W):
     '''
     Algorithm to solve the forward problem
+
+    Parameters
+    ----------
+    V: `firedrake.VectorFunctionSpace`
+        Function space for the displacement field
+    G : `firedrake.TensorFunctionSpace`
+        Function space for the Crhistoffel tensor
+    H : `firedrake.TensorFunctionSpace`
+        Function space for the TTI elastic tensor
+    W : `firedrake.FunctionSpace`
+        Function space for the scalar fields
     '''
     # Final Time
     T = 2.  # s
@@ -759,33 +689,33 @@ def propagation_TTI(V, G, H):
     # Timestep size
     dt = round(T / steps, 6)
 
-    # Criar um trial function
+    # Trial and test functions
     du = fire.TrialFunction(V)
-
-    # Criar uma função de teste
     v = fire.TestFunction(V)
 
-    # Criar uma função para representar a variável de estado
+    # State variable functions
     u = fire.Function(V, name='u')
     u_ant1 = fire.Function(V, name='u_ant1')
     u_ant2 = fire.Function(V, name='u_ant2')
 
     # Load function
-    F1 = fire.Function(V, name='F')
+    # F1 = fire.Function(V, name='F')
+    F1 = explosive_source(mesh, source_position, W)
 
-    # Derivada de du em relação a dx (deformações)
-    epsilon = deformacoes(du)
+    # Strain tensor
+    epsilon = strain_tensor(du)
 
-    # Derivada de v em relação a dx
-    epsilon_v = deformacoes(v)
+    # Virtual strain tensor
+    epsilon_v = strain_tensor(v)
 
-    # Tensor elástico
+    # VTI elastic tensor
     C_vti = c_vti_tensor(vP, vS, rho, eps1,
                          gamma, delta, 'weak')
 
+    # TTI elastic tensor
     C_tti = c_tti_tensor(C_vti, theta, phi)
 
-    # Tensor de tensões de Cauchy
+    # Cauchy's stress tensor
     sigma = C_tti * epsilon
 
     # Bilinear form
@@ -845,9 +775,9 @@ def propagation_TTI(V, G, H):
 
 
 # print("VTI Propagation Problem")
-# propagation_VTI(V, G)
+# propagation_VTI(V, G, W)
 print("TTI Propagation Problem")
-propagation_TTI(V, G, H)
+propagation_TTI(V, G, H, W)
 
 
 # #VertexOnly functions
