@@ -1,11 +1,12 @@
 import numpy as np
 
 from firedrake import (assemble, Constant, curl, DirichletBC, div, Function,
-                       FunctionSpace, project, VectorFunctionSpace)
+                       FunctionSpace, project, VectorFunctionSpace, TensorFunctionSpace, sym, grad)
 
 from .elastic_wave import ElasticWave
 from .forms import (isotropic_elastic_without_pml,
-                    isotropic_elastic_with_pml)
+                    isotropic_elastic_with_pml,viscoelastic_kelvin_voigt_without_pml,
+                    viscoelastic_zener_without_pml, viscoelastic_gsls_without_pml)
 from .functionals import mechanical_energy_form
 from ...domains.space import FE_method
 from ...utils.typing import override
@@ -48,6 +49,8 @@ class IsotropicWave(ElasticWave):
         self.mechanical_energy = None
         self.field_logger.add_functional("mechanical_energy",
                                          lambda: assemble(self.mechanical_energy))
+                                         
+        
 
     @override
     def initialize_model_parameters_from_object(self, synthetic_data_dict: dict):
@@ -171,11 +174,44 @@ class IsotropicWave(ElasticWave):
         self.parse_initial_conditions()
         self.parse_boundary_conditions()
         self.parse_volumetric_forces()
-
-        if self.abc_boundary_layer_type is None or self.abc_boundary_layer_type == "local":
-            isotropic_elastic_without_pml(self)
-        elif self.abc_boundary_layer_type == "PML":
-            isotropic_elastic_with_pml(self)
+	
+        d = self.input_dictionary.get("viscoelasticity", False)
+        if d["viscoelastic"] == True:
+            self.viscoelastic = True
+            self.visco_type = d["visco_type"]
+            W = TensorFunctionSpace(self.function_space.mesh(), "DG", 0)
+            self.strain_space = W
+            
+            if d["visco_type"] =='kelvin_voigt':
+                self.eta = float(d["eta"])
+                self.eps_old = Function(W, name="Previous strain")
+            elif d["visco_type"] =='zener':
+                self.tau_sigma = float(d["tau_sigma"])
+                self.tau_epsilon = float(d["tau_epsilon"])
+                self.eps_old = Function(W, name="Previous strain")
+                self.sigma_old = Function(W, name="Previous stress")
+            elif d["visco_type"] =='gsls':
+                self.tau_sigmas = d["tau_sigma_gsls"]
+                self.tau_epsilons = d["tau_epsilon_gsls"]
+                num_branches = len(self.tau_epsilons)  # ou len(wave.tau_sigmas)
+                self.eps_old_list = [Function(self.strain_space, name=f"Previous strain branch {i}") for i in range(num_branches)]
+                self.sigma_old_list = [Function(self.strain_space, name=f"Previous stress branch {i}") for i in range(num_branches)]
+        else:
+            self.viscoelastic = False
+	
+        if self.viscoelastic == True:
+            if self.visco_type == 'kelvin_voigt':
+                viscoelastic_kelvin_voigt_without_pml(self)
+            elif self.visco_type == 'zener':
+                viscoelastic_zener_without_pml(self)
+            elif self.visco_type == 'gsls':
+                viscoelastic_gsls_without_pml(self)
+        else:
+            if self.abc_boundary_layer_type is None:
+                isotropic_elastic_without_pml(self)
+            elif self.abc_boundary_layer_type == "PML":
+                isotropic_elastic_with_pml(self)
+            
 
     @override
     def rhs_no_pml(self):
