@@ -534,10 +534,10 @@ class HABC_Wave(AcousticWave, HABC_Mesh, RectangLayer,
             # if self.dimension == 3:  # 3D
             #     par_geom = self.surf_hyp
 
-            hyp_par = (self.n_hyp, par_geom, *self.hyper_axes)
-            mesh_habc = self.hypershape_mesh_habc(hyp_par,
-                                                  spln=spln,
-                                                  fmesh=fmesh)
+                hyp_par = (self.n_hyp, par_geom, *self.hyper_axes)
+                mesh_habc = self.hypershape_mesh_habc(hyp_par,
+                                                      spln=spln,
+                                                      fmesh=fmesh)
 
             # Mesh file
             if self.dimension == 3:  # 3D

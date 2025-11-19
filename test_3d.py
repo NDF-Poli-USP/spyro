@@ -329,7 +329,7 @@ def test_loop_habc_3d():
     Loop for HABC in model 3D based on Fig. 8 of Salas et al. (2022)
     '''
 
-    case = 0  # Integer from 0 to 1
+    case = 1  # Integer from 0 to 1
 
     # ============ SIMULATION PARAMETERS ============
 
@@ -374,10 +374,10 @@ def test_loop_habc_3d():
     # ============ HABC PARAMETERS ============
 
     # Infinite model (True: Infinite model, False: HABC scheme)
-    get_ref_model = True
+    get_ref_model = False
 
     # Loop for HABC cases
-    loop_modeling = get_ref_model
+    loop_modeling = not get_ref_model
 
     # Reference frequency
     habc_reference_freq_lst = ["source"]  # ["source", "boundary"]
@@ -388,7 +388,7 @@ def test_loop_habc_3d():
     # Hyperellipse degrees
     degree_layer_study = [[2.8, 3.0, 3.5, 4.0, None],
                           [2.4, 3.0, 4.0, 4.2, None]]
-    degree_layer_lst = [2.8]  # degree_layer_study[case]
+    degree_layer_lst = [None]  # degree_layer_study[case]
 
     # Modal solver for fundamental frequency
     modal_solver = 'KRYLOVSCH_CH'  # 'ANALYTICAL', 'RAYLEIGH'
@@ -397,7 +397,7 @@ def test_loop_habc_3d():
     crit_opt = "err_sum"  # err_integral, err_peak
 
     # Number of points for regression (odd number)
-    n_pts = 1
+    n_pts = 3
 
     # ============ MESH AND EIKONAL ============
 
@@ -428,7 +428,7 @@ def test_loop_habc_3d():
     # ============ HABC SCHEME ============
 
     # Name of the file containing the mesh
-    Wave_obj.filename_mesh = "mesh1_snapped_plane.msh"
+    Wave_obj.filename_mesh = "try_mesh_hyp/125e.msh"
 
     if loop_modeling:
 
@@ -487,7 +487,7 @@ def test_loop_habc_3d():
                         habc_fig8(Wave_obj, modal_solver, fitting_c,
                                   dat_regr_xCR, xCR_usu=xCR_usu,
                                   plot_comparison=plot_comparison,
-                                  check_dt=True, max_divisor_tf=max_div_tf)
+                                  check_dt=False, max_divisor_tf=max_div_tf)
 
                         # Estimating computational resource usage
                         comp_cost("tfin", tRef=tRef,

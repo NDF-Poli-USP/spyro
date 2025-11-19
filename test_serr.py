@@ -13,19 +13,21 @@ def inside_hyp(x, y, z, a, b, c, n):
 
 
 edge = 1.
-pad = 0.5
+pad = 0.625  # 0.5
 Lx = edge + 2 * pad
 Ly = edge + 2 * pad
 Lz = edge + pad
 a = edge / 2. + pad
 b = edge / 2. + pad
 c = edge / 2. + pad
+nx = ny = 18  # 16  # 12
+nz = 13  # 12 # 8
 
 
 def dom_serr(n):
 
     # Mesh
-    rec_mesh = fire.BoxMesh(12, 12, 8, Lx, Ly, Lz)
+    rec_mesh = fire.BoxMesh(nx, ny, nz, Lx, Ly, Lz)
     rec_mesh.coordinates.dat.data_with_halos[:, 0] -= pad
     rec_mesh.coordinates.dat.data_with_halos[:, 1] -= pad
     rec_mesh.coordinates.dat.data_with_halos[:, 2] *= -1.
@@ -71,7 +73,7 @@ def dom_serr(n):
     coords = final_mesh.coordinates.dat.data
     cells = [("tetra", final_mesh.coordinates.cell_node_map().values)]
     mesh = meshio.Mesh(coords, cells)
-    output_filename = "try_mesh_hyp/n" + str(n) + ".msh"
+    output_filename = "try_mesh_hyp/n" + str(n) + "bnd.msh"
 
     # Use Gmsh format 2.2 which is more widely compatible
     meshio.write(output_filename, mesh, file_format="gmsh22", binary=False)
@@ -85,7 +87,7 @@ def dom_serr(n):
 
 
 def loop_serr():
-    n_list = [2.0, 2.8, 3.0, 3.5, 4.0, 4.7, 6.0]
+    n_list = [2.4, 3.0, 4.0, 4.2]
     for n in n_list:
         print(f"Generating mesh for n = {n}", flush=True)
         dom_serr(n)

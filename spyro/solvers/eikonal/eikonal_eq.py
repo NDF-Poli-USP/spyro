@@ -171,15 +171,15 @@ class Eikonal_Modeling():
 
             if self.dimension == 2:  # 2D
                 sou_ids = [np.where(np.isclose(z_data, z_s, atol=tol_node)
-                                    & np.isclose(x_data, x_s, atol=tol_node))[0]
-                           for z_s, x_s in self.source_locations]
+                                    & np.isclose(x_data, x_s, atol=tol_node)
+                                    )[0] for z_s, x_s in self.source_locations]
 
             if self.dimension == 3:  # 3D
                 y_data = node_positions[2]
                 sou_ids = [np.where(np.isclose(z_data, z_s, atol=tol_node)
                                     & np.isclose(x_data, x_s, atol=tol_node)
-                                    & np.isclose(y_data, y_s, atol=tol_node))[0]
-                           for z_s, x_s, y_s in self.source_locations]
+                                    & np.isclose(y_data, y_s, atol=tol_node)
+                                    )[0] for z_s, x_s, y_s in self.source_locations]
 
             if sou_ids[0].size:
                 break
