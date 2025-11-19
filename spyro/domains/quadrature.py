@@ -44,7 +44,7 @@ def quadrature_rules(V):
         qr_s = {}
         qr_k = {}
     elif (cell_geometry in {quadrilateral, hexahedron, TensorProductCell(quadrilateral, interval)}
-            and family <= {"Q", "DQ"}):
+            and family <= {"Q", "DQ", "TensorProductElement"}):
         # In this case, for the spectral element method we use GLL quadrature
         qr_x = {"scheme": "lump", "degree": degree}
         qr_k = qr_x
