@@ -405,10 +405,9 @@ class HABC_Mesh():
         Lx, Lz = self.dom_dim[:2]
 
         # Number of elements
-        n_pad = pad_len / self.lmin  # Elements in the layer
-        nz = int(Lz / self.lmin) + int(n_pad)
-        nx = int(Lx / self.lmin) + int(2 * n_pad)
-        nx += nx % 2
+        n_pad = round(pad_len / self.lmin)  # Elements in the layer
+        nz = int(round(Lz / self.lmin)) + int(n_pad)
+        nx = int(round(Lx / self.lmin)) + int(2 * n_pad)
 
         # New geometry with layer
         Lx_habc, Lz_habc = dom_lay[:2]
@@ -424,8 +423,7 @@ class HABC_Mesh():
 
             # Number of elements
             Ly = self.dom_dim[2]
-            ny = int(Ly / self.lmin) + int(2 * n_pad)
-            ny += ny % 2
+            ny = int(round(Ly / self.lmin)) + int(2 * n_pad)
 
             # New geometry with layer
             Ly_habc = dom_lay[2]
@@ -437,16 +435,20 @@ class HABC_Mesh():
 
             # Adjusting coordinates
             mesh_habc.coordinates.dat.data_with_halos[:, 2] -= pad_len
-            err_y = abs(mesh_habc.coordinates.dat.data_with_halos[:, 2]).min()
-            if err_y > 0.:
-                mesh_habc.coordinates.dat.data_with_halos[:, 1] -= err_y
+            min_y = mesh_habc.coordinates.dat.data_with_halos[:, 2].min()
+            if abs(min_y / pad_len) != 1.:
+                err_y = (1. - abs(min_y / pad_len)) * pad_len
+                err_y *= -np.sign(err_y)
+                mesh_habc.coordinates.dat.data_with_halos[:, 2] += err_y
 
         # Adjusting coordinates
         mesh_habc.coordinates.dat.data_with_halos[:, 0] *= -1.0
         mesh_habc.coordinates.dat.data_with_halos[:, 1] -= pad_len
-        err_x = abs(mesh_habc.coordinates.dat.data_with_halos[:, 1]).min()
-        if err_x > 0.:
-            mesh_habc.coordinates.dat.data_with_halos[:, 1] -= err_x
+        min_x = mesh_habc.coordinates.dat.data_with_halos[:, 1].min()
+        if abs(min_x / pad_len) != 1.:
+            err_x = (1. - abs(min_x / pad_len)) * pad_len
+            err_x *= -np.sign(err_x)
+            mesh_habc.coordinates.dat.data_with_halos[:, 1] += err_x
 
         # Mesh data
         print(f"Mesh Created with {mesh_habc.num_vertices()} Nodes "

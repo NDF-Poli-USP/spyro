@@ -1,6 +1,5 @@
 import firedrake as fire
 from firedrake import And, VTKFile
-import ipdb
 
 
 def apply_box(mesh, c, x1, y1, x2, y2, value, tol=1e-3, dim=2):

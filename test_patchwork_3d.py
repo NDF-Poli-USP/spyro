@@ -65,7 +65,7 @@ def wave_dict(dt_usu, fr_files, layer_shape, degree_layer, degree_type,
     dictionary["mesh"] = {
         "Lz": 2.4,  # depth in km - always positive
         "Lx": 4.8,  # width in km - always positive
-        "Ly": 0.4,  # thickness in km - always positive
+        "Ly": 1.0,  # thickness in km - always positive
         "mesh_type": "firedrake_mesh",
     }
 
@@ -75,7 +75,7 @@ def wave_dict(dt_usu, fr_files, layer_shape, degree_layer, degree_type,
     # of the domain to verify the efficiency of the absorbing layer.
     dictionary["acquisition"] = {
         "source_type": "ricker",
-        "source_locations": [(-0.6, 1.68, 0.2)],  # (0.25 * Lz, 0.75 * Lx, 0.5 * Ly)
+        "source_locations": [(-0.6, 1.68, 0.5)],  # (0.25 * Lz, 0.75 * Lx, 0.5 * Ly)
         "frequency": 5.0,  # in Hz
         "delay": 1. / 3.,
         "delay_type": "time",  # "multiples_of_minimum" or "time"
@@ -88,7 +88,7 @@ def wave_dict(dt_usu, fr_files, layer_shape, degree_layer, degree_type,
     # Simulate for 1.5 seconds.
     dictionary["time_axis"] = {
         "initial_time": 0.,  # Initial time for event
-        "final_time": 2.,    # Final time for event
+        "final_time": 2.5,    # Final time for event
         "dt": dt_usu,  # timestep size in seconds
         "amplitude": 1.,  # the Ricker has an amplitude of 1.
         "output_frequency": fr_files,  # how frequently to output solution to pvds
@@ -341,13 +341,13 @@ def test_loop_patchwork_3d():
     degree_eikonal_lst = [1]
 
     # Factor for the stabilizing term in Eikonal equation
-    f_est_lst = [0.10]
+    f_est_lst = [0.11]
 
     # Parameters for fitting equivalent velocity regression
     fitting_c_lst = [(1.0, 1.0, 1.0, 1.0)]
 
     # Maximum divisor of the final time
-    max_div_tf_lst = [2]  # Approximate eigenvalue
+    max_div_tf_lst = [1]  # Approximate eigenvalue
 
     # Get simulation parameters
     edge_length = edge_length_lst[case]
@@ -390,7 +390,7 @@ def test_loop_patchwork_3d():
     crit_opt = "err_sum"  # err_integral, err_peak
 
     # Number of points for regression (odd number)
-    n_pts = 3
+    n_pts = 1
 
     # ============ MESH AND EIKONAL ============
 
@@ -522,3 +522,12 @@ if __name__ == "__main__":
 # n_hyp            200m
 # n_min   8.6*( 8.6-SOU)
 # n_max  12.0*(12.0-SOU)
+
+
+# Identifying Critical Points on Boundaries
+# Min Eikonal on    Xmin Boundary (ms): 450.830 at (in km): (-0.600, 0.000, 0.800)
+# Min Eikonal on    Xmax Boundary (ms): 1465.197 at (in km): (-0.600, 4.800, 1.000)
+# Min Eikonal on  Bottom Boundary (ms): 796.939 at (in km): (-2.400, 1.600, 0.600)
+# Min Eikonal on    Ymin Boundary (ms): 239.245 at (in km): (-0.400, 1.200, 0.000)
+# Min Eikonal on    Ymax Boundary (ms): 189.375 at (in km): (-0.400, 1.200, 1.000)
+
