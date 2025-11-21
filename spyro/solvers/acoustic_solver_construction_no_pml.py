@@ -3,8 +3,9 @@ from firedrake import ds, dx, Constant, dot, grad
 
 
 def construct_solver_or_matrix_no_pml(Wave_object):
-    """Builds solver operators for wave object without a PML. Doesn't create mass matrices if
-    matrix_free option is on, which it is by default.
+    """
+    Builds solver operators for wave object without a PML. Doesn't create
+    mass matrices if matrix_free option is on, which it is by default.
 
     Parameters
     ----------

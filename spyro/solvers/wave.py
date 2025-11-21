@@ -313,7 +313,7 @@ class Wave(Model_parameters, metaclass=ABCMeta):
         dt = estimate_timestep(self.mesh, self.function_space, c,
                                estimate_max_eigenvalue=estimate_max_eigenvalue)
         dt *= fraction
-        nt = int(self.final_time / dt) + 1
+        nt = int(round(self.final_time / dt)) + 1
         dt = self.final_time / (nt - 1)
 
         self.dt = dt

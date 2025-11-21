@@ -195,7 +195,7 @@ def full_ricker_wavelet(
     list of float
         list of ricker values at each time step
     """
-    nt = int(final_time / dt) + 1  # number of timesteps
+    nt = int(round(final_time / dt)) + 1  # number of timesteps
     time = 0.0
     full_wavelet = np.zeros((nt,))
     for t in range(nt):

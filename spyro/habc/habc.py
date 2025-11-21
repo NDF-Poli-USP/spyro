@@ -1057,7 +1057,8 @@ class HABC_Wave(AcousticWave, HABC_Mesh, RectangLayer,
         if self.dimension == 3:  # 3D
             self.Ly_habc = self.length_y + 2 * self.pad_len
 
-    def infinite_model(self, check_dt=False, max_divisor_tf=1, mag_add=3):
+    def infinite_model(self, check_dt=False, max_divisor_tf=1,
+                       method='ANALYTICAL', mag_add=3):
         '''
         Create a reference model for the HABC scheme for comparative purposes
 
@@ -1073,9 +1074,13 @@ class HABC_Wave(AcousticWave, HABC_Mesh, RectangLayer,
             in descending order, less than or equal to the user's timestep
             size. If the value is 1, the timestep size is set as the maximum
             divisor. Default is 1
+        method : `str`, optional
+            Method to use for solving the eigenvalue problem. Default
+            is 'ANALYTICAL' method that estimates the maximum eigenvalue
+            using the Gershgorin Circle Theorem.
+            Opts: 'ANALYTICAL', 'ARNOLDI', 'LANCZOS' or 'LOBPCG'
         mag_add : `int`, optional
             Additional magnitude order to adjust the rounding of the timestep
-
 
         Returns
         -------
@@ -1085,7 +1090,7 @@ class HABC_Wave(AcousticWave, HABC_Mesh, RectangLayer,
         # Check the timestep size
         if check_dt:
             self.check_timestep_habc(
-                max_divisor_tf=max_divisor_tf, mag_add=mag_add)
+                max_divisor_tf=max_divisor_tf, method=method, mag_add=mag_add)
 
         print("\nBuilding Infinite Domain Model", flush=True)
 

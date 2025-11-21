@@ -99,7 +99,7 @@ def run_forward():
 
     t1 = timer.time()
     print("Time elapsed: ", t1 - t0)
-    nt = int(final_time / dt) + 1
+    nt = int(round(final_time / dt)) + 1
     p_r = Wave_obj.forward_solution_receivers
 
     return p_r, nt

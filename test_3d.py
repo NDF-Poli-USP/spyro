@@ -386,9 +386,9 @@ def test_loop_habc_3d():
     degree_type = "real"  # "integer"
 
     # Hyperellipse degrees
-    degree_layer_study = [[2.8, 3.0, 3.5, 4.0, None],
-                          [2.4, 3.0, 4.0, 4.2, None]]
-    degree_layer_lst = [None]  # degree_layer_study[case]
+    # degree_layer_study = [[2.8, 3.0, 3.5, 4.0, None],
+    #                       [2.4, 3.0, 4.0, 4.2, None]]
+    degree_layer_lst = [4.0]  # degree_layer_study[case]
 
     # Modal solver for fundamental frequency
     modal_solver = 'KRYLOVSCH_CH'  # 'ANALYTICAL', 'RAYLEIGH'
@@ -428,7 +428,7 @@ def test_loop_habc_3d():
     # ============ HABC SCHEME ============
 
     # Name of the file containing the mesh
-    Wave_obj.filename_mesh = "try_mesh_hyp/125e.msh"
+    Wave_obj.filename_mesh = "try_mesh_hyp/n4.0souSNAP.msh"
 
     if loop_modeling:
 

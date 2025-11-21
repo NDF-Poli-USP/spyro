@@ -1,0 +1,893 @@
+
+Mesh Size: 200.000 m
+Timestep Size: 2.500 ms
+Eikonal Degree: 1
+Eikonal Stabilizing Factor: 0.10
+Maximum Divisor of Final Time: 2
+Fitting Parameters for Analytical Solver: 1.0, 1.0, 1.0, 1.0
+
+Parallelism type: automatic
+
+Absorbing Layer Shape: Rectangular
+Method: mass_lumped_triangle, Degree: 3, Dimension: 3
+Creating firedrake_mesh type mesh.
+
+Creating Mesh and Initial Velocity Model
+Original Mesh with 975 Nodes and 3456 Volume Elements
+Domain Velocity Range (km/s): 1.500 - 4.000
+Getting Boundary Mesh Data from Original Domain
+Boundary Velocity Range (km/s): 1.500 - 4.000
+Setting Mesh Properties for Eikonal Analysis
+
+--------------------------------------------------------------
+Estimating Runtime and Used Memory
+Runtime: (s):3.832, (m):0.064, (h):0.001
+Used Memory: Current (MB):11.802, Peak (MB):15.290
+--------------------------------------------------------------
+
+
+Defining Eikonal BCs
+
+Solving Pre-Eikonal
+  0 SNES Function norm 1.275164002058e-01
+  1 SNES Function norm 2.059623890634e-14
+Solver Executed Successfully. AbsTol: 1.0e-12
+
+Solving Post-Eikonal
+Iteration for Festab: 0.10
+  0 SNES Function norm 1.372085626135e-01
+  1 SNES Function norm 3.039054462203e-02
+  2 SNES Function norm 9.337853743102e-03
+  3 SNES Function norm 3.688699041397e-03
+  4 SNES Function norm 8.528664107796e-04
+  5 SNES Function norm 7.863458014177e-05
+  6 SNES Function norm 4.339369584700e-06
+  7 SNES Function norm 2.452275557279e-08
+  8 SNES Function norm 7.963348937745e-13
+  9 SNES Function norm 4.253864056326e-17
+Solver Executed Successfully. AbsTol: 1.0e-16
+Solver Executed Successfully. Festab: 0.10
+
+Identifying Critical Points on Boundaries
+Min Eikonal on    Xmin Boundary (ms): 447.757 at (in km): (-0.600, 0.000, 0.000)
+Min Eikonal on    Xmax Boundary (ms): 1432.892 at (in km): (-0.600, 4.800, 0.400)
+Min Eikonal on  Bottom Boundary (ms): 787.757 at (in km): (-2.400, 1.600, 0.000)
+Min Eikonal on    Ymin Boundary (ms): 113.085 at (in km): (-0.600, 1.600, 0.000)
+Min Eikonal on    Ymax Boundary (ms): 120.369 at (in km): (-0.600, 1.600, 0.400)
+
+--------------------------------------------------------------
+Estimating Runtime and Used Memory
+Runtime: (s):15.041, (m):0.251, (h):0.004
+Used Memory: Current (MB):12.480, Peak (MB):18.982
+--------------------------------------------------------------
+
+
+Criterion for Heuristic Factor (3 Points): Err Sum
+HABC Reference Frequency: Source
+
+Type of the Hypereshape Degree: real
+Modal Solver for Fundamental Frequency: KRYLOVSCH_CH
+
+Iteration 0 of 3
+
+Absorbing Layer Shape: Rectangular
+
+Loading Reference Signal from Infinite Model
+
+Determining Reference Frequency
+Reference Frequency (Hz): 5.00000
+
+Computing Size for Absorbing Layer
+Parameter z (1/s): 8.8429, Parameter a (adim): 1.7686
+Minimum Mesh Length (km): 0.2000, Reference Length (km): 0.2154
+Initial Guess for Size Parameter: 0.4642
+Options for FL: [1.3558, 1.8970, 2.1088, 2.9220, 3.0022]
+Options for CR: [0.0960, 0.0514, 0.0420, 0.0223, 0.0212]
+Options for Layer Size (km): [0.2920, 0.4086, 0.4542, 0.6294, 0.6467]
+Aprox. Number of Elements (0.200 km) in Layer: [1, 2, 2, 3, 3]
+Selected Parameter Size FL: 1.3558
+Selected Layer Size (km): 0.2920
+
+Modifying Layer Size Based on the Element Size
+Modified Parameter Size FL: 1.8570
+Modified Layer Size (km): 0.4000
+Elements (0.200 km) in Layer: 2
+Normalized Element Size (adim): 0.50000
+
+Determining New Geometry with Absorbing Layer
+Determining Rectangular Layer Parameters
+Volume Ratio: 4.083
+
+Generating Mesh with Absorbing Layer
+Mesh Created with 2842 Nodes and 13104 Volume Elements
+Extended Rectangular Mesh Generated Successfully
+Method: mass_lumped_triangle, Degree: 3, Dimension: 3
+Mesh Generated Successfully
+
+Updating Velocity Profile
+Clipping Coordinates Inside Layer
+Extending Profile Inside Layer
+Using Cloud Points Method to Extend Velocity Profile
+
+Solving Eigenvalue Problem
+Solver Method: KRYLOVSCH_CH
+  Eigenvalue approximations and residual norms for firedrake_2_ solve.
+  1 EPS nconv=5 first unconverged value (error) 15.176 (1.03188433e-04)
+Frequency 0 (Hz): 0.00000
+Frequency 1 (Hz): 0.20153
+Fundamental Frequency (Hz): 0.20153
+
+Creating Damping Profile
+Critical Damping Coefficient (1/s): 1.26625
+Maximum Damping Ratio: 99.900%
+Maximum Damping Coefficient (1/s): 1.26498
+Minimum Damping Ratio: 29.217%
+Range for Minimum Damping Ratio. Min:0.24975 - Max:0.74925
+Minimum Damping Coefficient (1/s): 0.36996
+Estimated Heuristic Factor xCR: 0.584
+Range Values for xCR Factor. Min:0.499 - Max:1.498
+
+Applying Non-Reflecting Boundary Conditions
+Creating Field for NRBC: Higdon
+
+Solving Forward Problem
+Saving Pressure in: output/forward/fw_output_3dsn[0].pvd
+Saving acoustic_energy in: output/preamble/acoustic_pot_energy_3d
+Simulation time is:        0.0 seconds
+Simulation time is:      0.125 seconds
+Simulation time is:       0.25 seconds
+Simulation time is:      0.375 seconds
+Simulation time is:        0.5 seconds
+Simulation time is:      0.625 seconds
+Simulation time is:       0.75 seconds
+Simulation time is:      0.875 seconds
+Simulation time is:        1.0 seconds
+Simulation time is:      1.125 seconds
+Simulation time is:       1.25 seconds
+Simulation time is:      1.375 seconds
+Simulation time is:        1.5 seconds
+Simulation time is:      1.625 seconds
+Simulation time is:       1.75 seconds
+Simulation time is:      1.875 seconds
+Simulation time is:        2.0 seconds
+
+Computing Error Measures
+Maximum Integral Error: 41038404984654184.00%
+Maximum Peak Error: 690077236.79%
+Acoustic Energy: 2.13e-04
+
+--------------------------------------------------------------
+Estimating Runtime and Used Memory
+Runtime: (s):100.097, (m):1.668, (h):0.028
+Used Memory: Current (MB):79.451, Peak (MB):91.550
+--------------------------------------------------------------
+
+Candidates for Heuristic Factor xCR: [0.499, 1.498]
+Iteration 1 of 3
+
+Absorbing Layer Shape: Rectangular
+
+Loading Reference Signal from Infinite Model
+
+Determining Reference Frequency
+Reference Frequency (Hz): 5.00000
+
+Computing Size for Absorbing Layer
+Parameter z (1/s): 8.8429, Parameter a (adim): 1.7686
+Minimum Mesh Length (km): 0.2000, Reference Length (km): 0.2154
+Initial Guess for Size Parameter: 0.4642
+Options for FL: [1.3558, 1.8970, 2.1088, 2.9220, 3.0022]
+Options for CR: [0.0960, 0.0514, 0.0420, 0.0223, 0.0212]
+Options for Layer Size (km): [0.2920, 0.4086, 0.4542, 0.6294, 0.6467]
+Aprox. Number of Elements (0.200 km) in Layer: [1, 2, 2, 3, 3]
+Selected Parameter Size FL: 1.3558
+Selected Layer Size (km): 0.2920
+
+Modifying Layer Size Based on the Element Size
+Modified Parameter Size FL: 1.8570
+Modified Layer Size (km): 0.4000
+Elements (0.200 km) in Layer: 2
+Normalized Element Size (adim): 0.50000
+
+Determining New Geometry with Absorbing Layer
+Determining Rectangular Layer Parameters
+Volume Ratio: 4.083
+
+Generating Mesh with Absorbing Layer
+Mesh Created with 2842 Nodes and 13104 Volume Elements
+Extended Rectangular Mesh Generated Successfully
+Method: mass_lumped_triangle, Degree: 3, Dimension: 3
+Mesh Generated Successfully
+
+Updating Velocity Profile
+Clipping Coordinates Inside Layer
+Extending Profile Inside Layer
+Using Cloud Points Method to Extend Velocity Profile
+
+Solving Eigenvalue Problem
+Solver Method: KRYLOVSCH_CH
+  Eigenvalue approximations and residual norms for firedrake_4_ solve.
+  1 EPS nconv=5 first unconverged value (error) 15.176 (1.03188433e-04)
+Frequency 0 (Hz): 0.00000
+Frequency 1 (Hz): 0.20153
+Fundamental Frequency (Hz): 0.20153
+
+Creating Damping Profile
+Critical Damping Coefficient (1/s): 1.26625
+Maximum Damping Ratio: 99.900%
+Maximum Damping Coefficient (1/s): 1.26498
+Minimum Damping Ratio: 24.975%
+Range for Minimum Damping Ratio. Min:0.24975 - Max:0.74925
+Minimum Damping Coefficient (1/s): 0.31625
+Using User-Defined Heuristic Factor xCR: 0.499
+Range Values for xCR Factor. Min:0.499 - Max:1.498
+
+Applying Non-Reflecting Boundary Conditions
+Creating Field for NRBC: Higdon
+
+Solving Forward Problem
+Saving Pressure in: output/forward/fw_output_3dsn[0].pvd
+Saving acoustic_energy in: output/preamble/acoustic_pot_energy_3d
+Simulation time is:        0.0 seconds
+Simulation time is:      0.125 seconds
+Simulation time is:       0.25 seconds
+Simulation time is:      0.375 seconds
+Simulation time is:        0.5 seconds
+Simulation time is:      0.625 seconds
+Simulation time is:       0.75 seconds
+Simulation time is:      0.875 seconds
+Simulation time is:        1.0 seconds
+Simulation time is:      1.125 seconds
+Simulation time is:       1.25 seconds
+Simulation time is:      1.375 seconds
+Simulation time is:        1.5 seconds
+Simulation time is:      1.625 seconds
+Simulation time is:       1.75 seconds
+Simulation time is:      1.875 seconds
+Simulation time is:        2.0 seconds
+
+Computing Error Measures
+Maximum Integral Error: 41038404984654184.00%
+Maximum Peak Error: 690077236.79%
+Acoustic Energy: 2.17e-04
+
+--------------------------------------------------------------
+Estimating Runtime and Used Memory
+Runtime: (s):93.280, (m):1.555, (h):0.026
+Used Memory: Current (MB):52.560, Peak (MB):80.889
+--------------------------------------------------------------
+
+Iteration 2 of 3
+
+Absorbing Layer Shape: Rectangular
+
+Loading Reference Signal from Infinite Model
+
+Determining Reference Frequency
+Reference Frequency (Hz): 5.00000
+
+Computing Size for Absorbing Layer
+Parameter z (1/s): 8.8429, Parameter a (adim): 1.7686
+Minimum Mesh Length (km): 0.2000, Reference Length (km): 0.2154
+Initial Guess for Size Parameter: 0.4642
+Options for FL: [1.3558, 1.8970, 2.1088, 2.9220, 3.0022]
+Options for CR: [0.0960, 0.0514, 0.0420, 0.0223, 0.0212]
+Options for Layer Size (km): [0.2920, 0.4086, 0.4542, 0.6294, 0.6467]
+Aprox. Number of Elements (0.200 km) in Layer: [1, 2, 2, 3, 3]
+Selected Parameter Size FL: 1.3558
+Selected Layer Size (km): 0.2920
+
+Modifying Layer Size Based on the Element Size
+Modified Parameter Size FL: 1.8570
+Modified Layer Size (km): 0.4000
+Elements (0.200 km) in Layer: 2
+Normalized Element Size (adim): 0.50000
+
+Determining New Geometry with Absorbing Layer
+Determining Rectangular Layer Parameters
+Volume Ratio: 4.083
+
+Generating Mesh with Absorbing Layer
+Mesh Created with 2842 Nodes and 13104 Volume Elements
+Extended Rectangular Mesh Generated Successfully
+Method: mass_lumped_triangle, Degree: 3, Dimension: 3
+Mesh Generated Successfully
+
+Updating Velocity Profile
+Clipping Coordinates Inside Layer
+Extending Profile Inside Layer
+Using Cloud Points Method to Extend Velocity Profile
+
+Solving Eigenvalue Problem
+Solver Method: KRYLOVSCH_CH
+  Eigenvalue approximations and residual norms for firedrake_6_ solve.
+  1 EPS nconv=5 first unconverged value (error) 15.176 (1.03188433e-04)
+Frequency 0 (Hz): 0.00000
+Frequency 1 (Hz): 0.20153
+Fundamental Frequency (Hz): 0.20153
+
+Creating Damping Profile
+Critical Damping Coefficient (1/s): 1.26625
+Maximum Damping Ratio: 99.900%
+Maximum Damping Coefficient (1/s): 1.26498
+Minimum Damping Ratio: 74.925%
+Range for Minimum Damping Ratio. Min:0.24975 - Max:0.74925
+Minimum Damping Coefficient (1/s): 0.94874
+Using User-Defined Heuristic Factor xCR: 1.498
+Range Values for xCR Factor. Min:0.499 - Max:1.498
+
+Applying Non-Reflecting Boundary Conditions
+Creating Field for NRBC: Higdon
+
+Solving Forward Problem
+Saving Pressure in: output/forward/fw_output_3dsn[0].pvd
+Saving acoustic_energy in: output/preamble/acoustic_pot_energy_3d
+Simulation time is:        0.0 seconds
+Simulation time is:      0.125 seconds
+Simulation time is:       0.25 seconds
+Simulation time is:      0.375 seconds
+Simulation time is:        0.5 seconds
+Simulation time is:      0.625 seconds
+Simulation time is:       0.75 seconds
+Simulation time is:      0.875 seconds
+Simulation time is:        1.0 seconds
+Simulation time is:      1.125 seconds
+Simulation time is:       1.25 seconds
+Simulation time is:      1.375 seconds
+Simulation time is:        1.5 seconds
+Simulation time is:      1.625 seconds
+Simulation time is:       1.75 seconds
+Simulation time is:      1.875 seconds
+Simulation time is:        2.0 seconds
+
+Computing Error Measures
+Maximum Integral Error: 41038404984654184.00%
+Maximum Peak Error: 690077236.79%
+Acoustic Energy: 1.73e-04
+
+--------------------------------------------------------------
+Estimating Runtime and Used Memory
+Runtime: (s):91.759, (m):1.529, (h):0.025
+Used Memory: Current (MB):60.656, Peak (MB):80.940
+--------------------------------------------------------------
+
+Optimal Heuristic Factor xCR: 1.000
+Iteration 3 of 3
+
+Absorbing Layer Shape: Rectangular
+
+Loading Reference Signal from Infinite Model
+
+Determining Reference Frequency
+Reference Frequency (Hz): 5.00000
+
+Computing Size for Absorbing Layer
+Parameter z (1/s): 8.8429, Parameter a (adim): 1.7686
+Minimum Mesh Length (km): 0.2000, Reference Length (km): 0.2154
+Initial Guess for Size Parameter: 0.4642
+Options for FL: [1.3558, 1.8970, 2.1088, 2.9220, 3.0022]
+Options for CR: [0.0960, 0.0514, 0.0420, 0.0223, 0.0212]
+Options for Layer Size (km): [0.2920, 0.4086, 0.4542, 0.6294, 0.6467]
+Aprox. Number of Elements (0.200 km) in Layer: [1, 2, 2, 3, 3]
+Selected Parameter Size FL: 1.3558
+Selected Layer Size (km): 0.2920
+
+Modifying Layer Size Based on the Element Size
+Modified Parameter Size FL: 1.8570
+Modified Layer Size (km): 0.4000
+Elements (0.200 km) in Layer: 2
+Normalized Element Size (adim): 0.50000
+
+Determining New Geometry with Absorbing Layer
+Determining Rectangular Layer Parameters
+Volume Ratio: 4.083
+
+Generating Mesh with Absorbing Layer
+Mesh Created with 2842 Nodes and 13104 Volume Elements
+Extended Rectangular Mesh Generated Successfully
+Method: mass_lumped_triangle, Degree: 3, Dimension: 3
+Mesh Generated Successfully
+
+Updating Velocity Profile
+Clipping Coordinates Inside Layer
+Extending Profile Inside Layer
+Using Cloud Points Method to Extend Velocity Profile
+
+Solving Eigenvalue Problem
+Solver Method: KRYLOVSCH_CH
+  Eigenvalue approximations and residual norms for firedrake_8_ solve.
+  1 EPS nconv=5 first unconverged value (error) 15.176 (1.03188433e-04)
+Frequency 0 (Hz): 0.00000
+Frequency 1 (Hz): 0.20153
+Fundamental Frequency (Hz): 0.20153
+
+Creating Damping Profile
+Critical Damping Coefficient (1/s): 1.26625
+Maximum Damping Ratio: 99.900%
+Maximum Damping Coefficient (1/s): 1.26498
+Minimum Damping Ratio: 49.992%
+Range for Minimum Damping Ratio. Min:0.24975 - Max:0.74925
+Minimum Damping Coefficient (1/s): 0.63302
+Using User-Defined Heuristic Factor xCR: 1.000
+Range Values for xCR Factor. Min:0.499 - Max:1.498
+
+Applying Non-Reflecting Boundary Conditions
+Creating Field for NRBC: Higdon
+
+Solving Forward Problem
+Saving Pressure in: output/forward/fw_output_3dsn[0].pvd
+Saving acoustic_energy in: output/preamble/acoustic_pot_energy_3d
+Simulation time is:        0.0 seconds
+Simulation time is:      0.125 seconds
+Simulation time is:       0.25 seconds
+Simulation time is:      0.375 seconds
+Simulation time is:        0.5 seconds
+Simulation time is:      0.625 seconds
+Simulation time is:       0.75 seconds
+Simulation time is:      0.875 seconds
+Simulation time is:        1.0 seconds
+Simulation time is:      1.125 seconds
+Simulation time is:       1.25 seconds
+Simulation time is:      1.375 seconds
+Simulation time is:        1.5 seconds
+Simulation time is:      1.625 seconds
+Simulation time is:       1.75 seconds
+Simulation time is:      1.875 seconds
+Simulation time is:        2.0 seconds
+
+Computing Error Measures
+Maximum Integral Error: 41038404984654184.00%
+Maximum Peak Error: 690077236.79%
+Acoustic Energy: 1.92e-04
+
+Plotting Time Comparison
+
+Plotting Frequency Comparison
+
+--------------------------------------------------------------
+Estimating Runtime and Used Memory
+Runtime: (s):109.565, (m):1.826, (h):0.030
+Used Memory: Current (MB):72.477, Peak (MB):80.982
+--------------------------------------------------------------
+
+
+Criterion for Heuristic Factor (3 Points): Err Sum
+HABC Reference Frequency: Boundary
+
+Type of the Hypereshape Degree: real
+Modal Solver for Fundamental Frequency: KRYLOVSCH_CH
+
+Iteration 0 of 3
+
+Absorbing Layer Shape: Rectangular
+
+Loading Reference Signal from Infinite Model
+
+Determining Reference Frequency
+Frequency at Critical Point  0: 6.49351
+Frequency at Critical Point  1: 6.39361
+Frequency at Critical Point  2: 7.09291
+Frequency at Critical Point  3: 6.39361
+Frequency at Critical Point  4: 4.29570
+Frequency at Critical Point  5: 5.59441
+Frequency at Critical Point  6: 6.49351
+Frequency at Critical Point  7: 6.19381
+Frequency at Critical Point  8: 7.19281
+Frequency at Critical Point  9: 5.99401
+Frequency at Critical Point 10: 4.59540
+Frequency at Critical Point 11: 8.19181
+Frequency at Critical Point 12: 5.29471
+Reference Frequency (Hz): 4.29570
+
+Computing Size for Absorbing Layer
+Parameter z (1/s): 8.8429, Parameter a (adim): 2.0585
+Minimum Mesh Length (km): 0.2000, Reference Length (km): 0.2154
+Initial Guess for Size Parameter: 0.4642
+Options for FL: [1.5781, 2.2080, 2.4545, 3.4011, 3.4944]
+Options for CR: [0.0960, 0.0514, 0.0420, 0.0223, 0.0212]
+Options for Layer Size (km): [0.3399, 0.4756, 0.5287, 0.7326, 0.7527]
+Aprox. Number of Elements (0.200 km) in Layer: [1, 2, 2, 3, 3]
+Selected Parameter Size FL: 1.5781
+Selected Layer Size (km): 0.3399
+
+Modifying Layer Size Based on the Element Size
+Modified Parameter Size FL: 1.8570
+Modified Layer Size (km): 0.4000
+Elements (0.200 km) in Layer: 2
+Normalized Element Size (adim): 0.50000
+
+Determining New Geometry with Absorbing Layer
+Determining Rectangular Layer Parameters
+Volume Ratio: 4.083
+
+Generating Mesh with Absorbing Layer
+Mesh Created with 2842 Nodes and 13104 Volume Elements
+Extended Rectangular Mesh Generated Successfully
+Method: mass_lumped_triangle, Degree: 3, Dimension: 3
+Mesh Generated Successfully
+
+Updating Velocity Profile
+Clipping Coordinates Inside Layer
+Extending Profile Inside Layer
+Using Cloud Points Method to Extend Velocity Profile
+
+Solving Eigenvalue Problem
+Solver Method: KRYLOVSCH_CH
+  Eigenvalue approximations and residual norms for firedrake_10_ solve.
+  1 EPS nconv=5 first unconverged value (error) 15.176 (1.03188433e-04)
+Frequency 0 (Hz): 0.00000
+Frequency 1 (Hz): 0.20153
+Fundamental Frequency (Hz): 0.20153
+
+Creating Damping Profile
+Critical Damping Coefficient (1/s): 1.26625
+Maximum Damping Ratio: 99.900%
+Maximum Damping Coefficient (1/s): 1.26498
+Minimum Damping Ratio: 46.920%
+Range for Minimum Damping Ratio. Min:0.24975 - Max:0.74925
+Minimum Damping Coefficient (1/s): 0.59413
+Estimated Heuristic Factor xCR: 0.938
+Range Values for xCR Factor. Min:0.499 - Max:1.498
+
+Applying Non-Reflecting Boundary Conditions
+Creating Field for NRBC: Higdon
+
+Solving Forward Problem
+Saving Pressure in: output/forward/fw_output_3dsn[0].pvd
+Saving acoustic_energy in: output/preamble/acoustic_pot_energy_3d
+Simulation time is:        0.0 seconds
+Simulation time is:      0.125 seconds
+Simulation time is:       0.25 seconds
+Simulation time is:      0.375 seconds
+Simulation time is:        0.5 seconds
+Simulation time is:      0.625 seconds
+Simulation time is:       0.75 seconds
+Simulation time is:      0.875 seconds
+Simulation time is:        1.0 seconds
+Simulation time is:      1.125 seconds
+Simulation time is:       1.25 seconds
+Simulation time is:      1.375 seconds
+Simulation time is:        1.5 seconds
+Simulation time is:      1.625 seconds
+Simulation time is:       1.75 seconds
+Simulation time is:      1.875 seconds
+Simulation time is:        2.0 seconds
+
+Computing Error Measures
+Maximum Integral Error: 41038404984654184.00%
+Maximum Peak Error: 690077236.79%
+Acoustic Energy: 1.95e-04
+
+--------------------------------------------------------------
+Estimating Runtime and Used Memory
+Runtime: (s):96.982, (m):1.616, (h):0.027
+Used Memory: Current (MB):62.012, Peak (MB):81.974
+--------------------------------------------------------------
+
+Candidates for Heuristic Factor xCR: [0.499, 1.498]
+Iteration 1 of 3
+
+Absorbing Layer Shape: Rectangular
+
+Loading Reference Signal from Infinite Model
+
+Determining Reference Frequency
+Frequency at Critical Point  0: 6.49351
+Frequency at Critical Point  1: 6.39361
+Frequency at Critical Point  2: 7.09291
+Frequency at Critical Point  3: 6.39361
+Frequency at Critical Point  4: 4.29570
+Frequency at Critical Point  5: 5.59441
+Frequency at Critical Point  6: 6.49351
+Frequency at Critical Point  7: 6.19381
+Frequency at Critical Point  8: 7.19281
+Frequency at Critical Point  9: 5.99401
+Frequency at Critical Point 10: 4.59540
+Frequency at Critical Point 11: 8.19181
+Frequency at Critical Point 12: 5.29471
+Reference Frequency (Hz): 4.29570
+
+Computing Size for Absorbing Layer
+Parameter z (1/s): 8.8429, Parameter a (adim): 2.0585
+Minimum Mesh Length (km): 0.2000, Reference Length (km): 0.2154
+Initial Guess for Size Parameter: 0.4642
+Options for FL: [1.5781, 2.2080, 2.4545, 3.4011, 3.4944]
+Options for CR: [0.0960, 0.0514, 0.0420, 0.0223, 0.0212]
+Options for Layer Size (km): [0.3399, 0.4756, 0.5287, 0.7326, 0.7527]
+Aprox. Number of Elements (0.200 km) in Layer: [1, 2, 2, 3, 3]
+Selected Parameter Size FL: 1.5781
+Selected Layer Size (km): 0.3399
+
+Modifying Layer Size Based on the Element Size
+Modified Parameter Size FL: 1.8570
+Modified Layer Size (km): 0.4000
+Elements (0.200 km) in Layer: 2
+Normalized Element Size (adim): 0.50000
+
+Determining New Geometry with Absorbing Layer
+Determining Rectangular Layer Parameters
+Volume Ratio: 4.083
+
+Generating Mesh with Absorbing Layer
+Mesh Created with 2842 Nodes and 13104 Volume Elements
+Extended Rectangular Mesh Generated Successfully
+Method: mass_lumped_triangle, Degree: 3, Dimension: 3
+Mesh Generated Successfully
+
+Updating Velocity Profile
+Clipping Coordinates Inside Layer
+Extending Profile Inside Layer
+Using Cloud Points Method to Extend Velocity Profile
+
+Solving Eigenvalue Problem
+Solver Method: KRYLOVSCH_CH
+  Eigenvalue approximations and residual norms for firedrake_12_ solve.
+  1 EPS nconv=5 first unconverged value (error) 15.176 (1.03188433e-04)
+Frequency 0 (Hz): 0.00000
+Frequency 1 (Hz): 0.20153
+Fundamental Frequency (Hz): 0.20153
+
+Creating Damping Profile
+Critical Damping Coefficient (1/s): 1.26625
+Maximum Damping Ratio: 99.900%
+Maximum Damping Coefficient (1/s): 1.26498
+Minimum Damping Ratio: 24.975%
+Range for Minimum Damping Ratio. Min:0.24975 - Max:0.74925
+Minimum Damping Coefficient (1/s): 0.31625
+Using User-Defined Heuristic Factor xCR: 0.499
+Range Values for xCR Factor. Min:0.499 - Max:1.498
+
+Applying Non-Reflecting Boundary Conditions
+Creating Field for NRBC: Higdon
+
+Solving Forward Problem
+Saving Pressure in: output/forward/fw_output_3dsn[0].pvd
+Saving acoustic_energy in: output/preamble/acoustic_pot_energy_3d
+Simulation time is:        0.0 seconds
+Simulation time is:      0.125 seconds
+Simulation time is:       0.25 seconds
+Simulation time is:      0.375 seconds
+Simulation time is:        0.5 seconds
+Simulation time is:      0.625 seconds
+Simulation time is:       0.75 seconds
+Simulation time is:      0.875 seconds
+Simulation time is:        1.0 seconds
+Simulation time is:      1.125 seconds
+Simulation time is:       1.25 seconds
+Simulation time is:      1.375 seconds
+Simulation time is:        1.5 seconds
+Simulation time is:      1.625 seconds
+Simulation time is:       1.75 seconds
+Simulation time is:      1.875 seconds
+Simulation time is:        2.0 seconds
+
+Computing Error Measures
+Maximum Integral Error: 41038404984654184.00%
+Maximum Peak Error: 690077236.79%
+Acoustic Energy: 2.17e-04
+
+--------------------------------------------------------------
+Estimating Runtime and Used Memory
+Runtime: (s):94.011, (m):1.567, (h):0.026
+Used Memory: Current (MB):65.029, Peak (MB):81.417
+--------------------------------------------------------------
+
+Iteration 2 of 3
+
+Absorbing Layer Shape: Rectangular
+
+Loading Reference Signal from Infinite Model
+
+Determining Reference Frequency
+Frequency at Critical Point  0: 6.49351
+Frequency at Critical Point  1: 6.39361
+Frequency at Critical Point  2: 7.09291
+Frequency at Critical Point  3: 6.39361
+Frequency at Critical Point  4: 4.29570
+Frequency at Critical Point  5: 5.59441
+Frequency at Critical Point  6: 6.49351
+Frequency at Critical Point  7: 6.19381
+Frequency at Critical Point  8: 7.19281
+Frequency at Critical Point  9: 5.99401
+Frequency at Critical Point 10: 4.59540
+Frequency at Critical Point 11: 8.19181
+Frequency at Critical Point 12: 5.29471
+Reference Frequency (Hz): 4.29570
+
+Computing Size for Absorbing Layer
+Parameter z (1/s): 8.8429, Parameter a (adim): 2.0585
+Minimum Mesh Length (km): 0.2000, Reference Length (km): 0.2154
+Initial Guess for Size Parameter: 0.4642
+Options for FL: [1.5781, 2.2080, 2.4545, 3.4011, 3.4944]
+Options for CR: [0.0960, 0.0514, 0.0420, 0.0223, 0.0212]
+Options for Layer Size (km): [0.3399, 0.4756, 0.5287, 0.7326, 0.7527]
+Aprox. Number of Elements (0.200 km) in Layer: [1, 2, 2, 3, 3]
+Selected Parameter Size FL: 1.5781
+Selected Layer Size (km): 0.3399
+
+Modifying Layer Size Based on the Element Size
+Modified Parameter Size FL: 1.8570
+Modified Layer Size (km): 0.4000
+Elements (0.200 km) in Layer: 2
+Normalized Element Size (adim): 0.50000
+
+Determining New Geometry with Absorbing Layer
+Determining Rectangular Layer Parameters
+Volume Ratio: 4.083
+
+Generating Mesh with Absorbing Layer
+Mesh Created with 2842 Nodes and 13104 Volume Elements
+Extended Rectangular Mesh Generated Successfully
+Method: mass_lumped_triangle, Degree: 3, Dimension: 3
+Mesh Generated Successfully
+
+Updating Velocity Profile
+Clipping Coordinates Inside Layer
+Extending Profile Inside Layer
+Using Cloud Points Method to Extend Velocity Profile
+
+Solving Eigenvalue Problem
+Solver Method: KRYLOVSCH_CH
+  Eigenvalue approximations and residual norms for firedrake_14_ solve.
+  1 EPS nconv=5 first unconverged value (error) 15.176 (1.03188433e-04)
+Frequency 0 (Hz): 0.00000
+Frequency 1 (Hz): 0.20153
+Fundamental Frequency (Hz): 0.20153
+
+Creating Damping Profile
+Critical Damping Coefficient (1/s): 1.26625
+Maximum Damping Ratio: 99.900%
+Maximum Damping Coefficient (1/s): 1.26498
+Minimum Damping Ratio: 74.925%
+Range for Minimum Damping Ratio. Min:0.24975 - Max:0.74925
+Minimum Damping Coefficient (1/s): 0.94874
+Using User-Defined Heuristic Factor xCR: 1.498
+Range Values for xCR Factor. Min:0.499 - Max:1.498
+
+Applying Non-Reflecting Boundary Conditions
+Creating Field for NRBC: Higdon
+
+Solving Forward Problem
+Saving Pressure in: output/forward/fw_output_3dsn[0].pvd
+Saving acoustic_energy in: output/preamble/acoustic_pot_energy_3d
+Simulation time is:        0.0 seconds
+Simulation time is:      0.125 seconds
+Simulation time is:       0.25 seconds
+Simulation time is:      0.375 seconds
+Simulation time is:        0.5 seconds
+Simulation time is:      0.625 seconds
+Simulation time is:       0.75 seconds
+Simulation time is:      0.875 seconds
+Simulation time is:        1.0 seconds
+Simulation time is:      1.125 seconds
+Simulation time is:       1.25 seconds
+Simulation time is:      1.375 seconds
+Simulation time is:        1.5 seconds
+Simulation time is:      1.625 seconds
+Simulation time is:       1.75 seconds
+Simulation time is:      1.875 seconds
+Simulation time is:        2.0 seconds
+
+Computing Error Measures
+Maximum Integral Error: 41038404984654184.00%
+Maximum Peak Error: 690077236.79%
+Acoustic Energy: 1.73e-04
+
+--------------------------------------------------------------
+Estimating Runtime and Used Memory
+Runtime: (s):96.740, (m):1.612, (h):0.027
+Used Memory: Current (MB):66.064, Peak (MB):81.387
+--------------------------------------------------------------
+
+Optimal Heuristic Factor xCR: 1.029
+Iteration 3 of 3
+
+Absorbing Layer Shape: Rectangular
+
+Loading Reference Signal from Infinite Model
+
+Determining Reference Frequency
+Frequency at Critical Point  0: 6.49351
+Frequency at Critical Point  1: 6.39361
+Frequency at Critical Point  2: 7.09291
+Frequency at Critical Point  3: 6.39361
+Frequency at Critical Point  4: 4.29570
+Frequency at Critical Point  5: 5.59441
+Frequency at Critical Point  6: 6.49351
+Frequency at Critical Point  7: 6.19381
+Frequency at Critical Point  8: 7.19281
+Frequency at Critical Point  9: 5.99401
+Frequency at Critical Point 10: 4.59540
+Frequency at Critical Point 11: 8.19181
+Frequency at Critical Point 12: 5.29471
+Reference Frequency (Hz): 4.29570
+
+Computing Size for Absorbing Layer
+Parameter z (1/s): 8.8429, Parameter a (adim): 2.0585
+Minimum Mesh Length (km): 0.2000, Reference Length (km): 0.2154
+Initial Guess for Size Parameter: 0.4642
+Options for FL: [1.5781, 2.2080, 2.4545, 3.4011, 3.4944]
+Options for CR: [0.0960, 0.0514, 0.0420, 0.0223, 0.0212]
+Options for Layer Size (km): [0.3399, 0.4756, 0.5287, 0.7326, 0.7527]
+Aprox. Number of Elements (0.200 km) in Layer: [1, 2, 2, 3, 3]
+Selected Parameter Size FL: 1.5781
+Selected Layer Size (km): 0.3399
+
+Modifying Layer Size Based on the Element Size
+Modified Parameter Size FL: 1.8570
+Modified Layer Size (km): 0.4000
+Elements (0.200 km) in Layer: 2
+Normalized Element Size (adim): 0.50000
+
+Determining New Geometry with Absorbing Layer
+Determining Rectangular Layer Parameters
+Volume Ratio: 4.083
+
+Generating Mesh with Absorbing Layer
+Mesh Created with 2842 Nodes and 13104 Volume Elements
+Extended Rectangular Mesh Generated Successfully
+Method: mass_lumped_triangle, Degree: 3, Dimension: 3
+Mesh Generated Successfully
+
+Updating Velocity Profile
+Clipping Coordinates Inside Layer
+Extending Profile Inside Layer
+Using Cloud Points Method to Extend Velocity Profile
+
+Solving Eigenvalue Problem
+Solver Method: KRYLOVSCH_CH
+  Eigenvalue approximations and residual norms for firedrake_16_ solve.
+  1 EPS nconv=5 first unconverged value (error) 15.176 (1.03188433e-04)
+Frequency 0 (Hz): 0.00000
+Frequency 1 (Hz): 0.20153
+Fundamental Frequency (Hz): 0.20153
+
+Creating Damping Profile
+Critical Damping Coefficient (1/s): 1.26625
+Maximum Damping Ratio: 99.900%
+Maximum Damping Coefficient (1/s): 1.26498
+Minimum Damping Ratio: 51.446%
+Range for Minimum Damping Ratio. Min:0.24975 - Max:0.74925
+Minimum Damping Coefficient (1/s): 0.65144
+Using User-Defined Heuristic Factor xCR: 1.029
+Range Values for xCR Factor. Min:0.499 - Max:1.498
+
+Applying Non-Reflecting Boundary Conditions
+Creating Field for NRBC: Higdon
+
+Solving Forward Problem
+Saving Pressure in: output/forward/fw_output_3dsn[0].pvd
+Saving acoustic_energy in: output/preamble/acoustic_pot_energy_3d
+Simulation time is:        0.0 seconds
+Simulation time is:      0.125 seconds
+Simulation time is:       0.25 seconds
+Simulation time is:      0.375 seconds
+Simulation time is:        0.5 seconds
+Simulation time is:      0.625 seconds
+Simulation time is:       0.75 seconds
+Simulation time is:      0.875 seconds
+Simulation time is:        1.0 seconds
+Simulation time is:      1.125 seconds
+Simulation time is:       1.25 seconds
+Simulation time is:      1.375 seconds
+Simulation time is:        1.5 seconds
+Simulation time is:      1.625 seconds
+Simulation time is:       1.75 seconds
+Simulation time is:      1.875 seconds
+Simulation time is:        2.0 seconds
+
+Computing Error Measures
+Maximum Integral Error: 41038404984654184.00%
+Maximum Peak Error: 690077236.79%
+Acoustic Energy: 1.91e-04
+
+Plotting Time Comparison
+
+Plotting Frequency Comparison
+
+--------------------------------------------------------------
+Estimating Runtime and Used Memory
+Runtime: (s):101.386, (m):1.690, (h):0.028
+Used Memory: Current (MB):62.266, Peak (MB):82.543
+--------------------------------------------------------------
+

@@ -3,12 +3,17 @@ from firedrake import And, VTKFile
 import ipdb
 
 
-def apply_box(mesh, c, x1, y1, x2, y2, value, tol=1e-3):
+def apply_box(mesh, c, x1, y1, x2, y2, value, tol=1e-3, dim=2):
     x1r = round(x1, 2) - tol
     x2r = round(x2, 2) + tol
     y1r = -(round(2.4 - y1, 2) + tol)
     y2r = -(round(2.4 - y2, 2) - tol)
-    y, x = fire.SpatialCoordinate(mesh)
+
+    if dim == 2:
+        y, x = fire.SpatialCoordinate(mesh)
+    else:
+        y, x, z = fire.SpatialCoordinate(mesh)
+
     box = fire.conditional(
         And(And(x >= x1r, x <= x2r),
             And(y >= y1r, y <= y2r)), value, c)
@@ -17,8 +22,13 @@ def apply_box(mesh, c, x1, y1, x2, y2, value, tol=1e-3):
     return c
 
 
-def apply_slope(mesh, c, x1, y1, x3, y3, value):
-    y, x = fire.SpatialCoordinate(mesh)
+def apply_slope(mesh, c, x1, y1, x3, y3, value, dim=2):
+
+    if dim == 2:
+        y, x = fire.SpatialCoordinate(mesh)
+    else:
+        y, x, z = fire.SpatialCoordinate(mesh)
+
     y1 = round(2.4 - y1, 2)
     y3 = round(2.4 - y3, 2)
     slope = (y3 - y1) / (x3 - x1)
@@ -29,7 +39,7 @@ def apply_slope(mesh, c, x1, y1, x3, y3, value):
     return c
 
 
-def apply_vs_from_list(velmat, mesh, Lx, Ly, c):
+def apply_vs_from_list(velmat, mesh, Lx, Ly, c, dim=2):
     # (x1, y1, x2, y2, cm)
     for box in velmat:
         x1 = round(box[0] * Lx, 2)
@@ -37,12 +47,12 @@ def apply_vs_from_list(velmat, mesh, Lx, Ly, c):
         x2 = round(box[2] * Lx, 2)
         y2 = round(box[3] * Ly, 2)
         cm = box[4]
-        c = apply_box(mesh, c, x1, y1, x2, y2, cm)
+        c = apply_box(mesh, c, x1, y1, x2, y2, cm, dim=dim)
 
     return c
 
 
-def get_velocity_model(mesh, V, output=True, units='km/s'):
+def get_velocity_model(mesh, V, output=True, units='km/s', dim=2, extrude=0.3):
     if units == 'km/s':
         multiplier = 1.0
     elif units == 'm/s':
@@ -65,14 +75,17 @@ def get_velocity_model(mesh, V, output=True, units='km/s'):
     velmat.append([0.85, 0.80, 0.90, 0.95, 3.6 * multiplier])
     velmat.append([0.90, 0.65, 1.00, 1.00, 3.6 * multiplier])
 
-    Lx = 4.8
-    Ly = 2.4
+    Lx = 4.8  # in km
+    Ly = 2.4  # in km
+
+    if dim == 3:
+        Lz = extrude   # in km
 
     c = fire.Function(V)
     c.dat.data[:] = 1.5 * multiplier
     c = apply_slope(mesh, c, 0.4 * Lx, 0.3 * Ly, 0.75 * Lx, 0.65 * Ly,
-                    3.3 * multiplier)
-    c = apply_vs_from_list(velmat, mesh, Lx, Ly, c)
+                    3.3 * multiplier, dim=dim)
+    c = apply_vs_from_list(velmat, mesh, Lx, Ly, c, dim=dim)
 
     if output is True:
         VTKFile("testing.pvd").write(c)
