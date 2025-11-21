@@ -62,10 +62,11 @@ def wave_dict(dt_usu, fr_files, layer_shape, degree_layer, degree_type,
     # Define the domain size without the PML or AL. Here we'll assume a
     # 1.00 x 1.00 km domain and compute the size for the Absorbing Layer (AL)
     # to absorb outgoing waves on boundries (-z, +-x sides) of the domain.
+    Lz, Lx, Ly = [2.4, 4.8, 1.0]  # in km
     dictionary["mesh"] = {
-        "Lz": 2.4,  # depth in km - always positive
-        "Lx": 4.8,  # width in km - always positive
-        "Ly": 1.0,  # thickness in km - always positive
+        "Lz": Lz,  # depth in km - always positive
+        "Lx": Lx,  # width in km - always positive
+        "Ly": Ly,  # thickness in km - always positive
         "mesh_type": "firedrake_mesh",
     }
 
@@ -79,10 +80,10 @@ def wave_dict(dt_usu, fr_files, layer_shape, degree_layer, degree_type,
         "frequency": 5.0,  # in Hz
         "delay": 1. / 3.,
         "delay_type": "time",  # "multiples_of_minimum" or "time"
-        "receiver_locations": [(-1., 0., 0.), (-1., 1., 0.),
-                               (0., 1., 0.), (0., 0., 0),
-                               (-1., 0., 1.), (-1., 1., 1.),
-                               (0., 1., 1.), (0., 0., 1.)]
+        "receiver_locations": [(-Lz, 0., 0.), (-Lz, Lx, 0.),
+                               (0., 0., 0), (0., Lx, 0.),
+                               (-Lz, 0., Ly), (-Lz, Lx, Ly),
+                               (0., 0., Ly), (0., Lx, Ly)]
     }
 
     # Simulate for 1.5 seconds.
@@ -367,10 +368,10 @@ def test_loop_patchwork_3d():
     # ============ HABC PARAMETERS ============
 
     # Infinite model (True: Infinite model, False: HABC scheme)
-    get_ref_model = False
+    get_ref_model = True
 
     # Loop for HABC cases
-    loop_modeling = not get_ref_model
+    loop_modeling = get_ref_model
 
     # Reference frequency
     habc_reference_freq_lst = ["source", "boundary"]
@@ -390,12 +391,12 @@ def test_loop_patchwork_3d():
     crit_opt = "err_sum"  # err_integral, err_peak
 
     # Number of points for regression (odd number)
-    n_pts = 1
+    n_pts = 3
 
     # ============ MESH AND EIKONAL ============
 
     # Create dictionary with parameters for the model
-    fr_files = max(int(50 * max(dt_usu_lst) / dt_usu), 1)
+    fr_files = max(int(100 * max(dt_usu_lst) / dt_usu), 1)
     dictionary = wave_dict(dt_usu, fr_files, "rectangular", None,
                            degree_type, "source", get_ref_model, p_eik)
 
