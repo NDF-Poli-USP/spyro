@@ -61,10 +61,11 @@ def wave_dict(dt_usu, fr_files, layer_shape, degree_layer, degree_type,
     # Define the domain size without the PML or AL. Here we'll assume a
     # 1.00 x 1.00 km domain and compute the size for the Absorbing Layer (AL)
     # to absorb outgoing waves on boundries (-z, +-x sides) of the domain.
+    Lz, Lx, Ly = [1., 1., 1.]  # in km
     dictionary["mesh"] = {
-        "Lz": 1.,  # depth in km - always positive
-        "Lx": 1.,  # width in km - always positive
-        "Ly": 1.,  # thickness in km - always positive
+        "Lz": Lz,  # depth in km - always positive
+        "Lx": Lx,  # width in km - always positive
+        "Ly": Ly,  # thickness in km - always positive
         "mesh_type": "firedrake_mesh",
     }
 
@@ -78,10 +79,10 @@ def wave_dict(dt_usu, fr_files, layer_shape, degree_layer, degree_type,
         "frequency": 5.0,  # in Hz
         "delay": 1. / 3.,
         "delay_type": "time",  # "multiples_of_minimum" or "time"
-        "receiver_locations": [(-1., 0., 0.), (-1., 1., 0.),
-                               (0., 1., 0.), (0., 0., 0),
-                               (-1., 0., 1.), (-1., 1., 1.),
-                               (0., 1., 1.), (0., 0., 1.)]
+        "receiver_locations": [(-Lz, 0., 0.), (-Lz, Lx, 0.),
+                               (0., 0., 0), (0., Lx, 0.),
+                               (-Lz, 0., Ly), (-Lz, Lx, Ly),
+                               (0., 0., Ly), (0., Lx, Ly)]
     }
 
     # Simulate for 1.5 seconds.
@@ -228,8 +229,8 @@ def get_xCR_usu(Wave_obj, dat_regr_xCR, typ_xCR, n_pts):
         return xCR_opt
 
 
-def habc_fig8(Wave_obj, modal_solver, fitting_c, dat_regr_xCR, xCR_usu=None,
-              plot_comparison=True, check_dt=False, max_divisor_tf=1):
+def habc_fig8(Wave_obj, modal_solver, fitting_c, dat_regr_xCR,
+              xCR_usu=None, plot_comparison=True, max_divisor_tf=1):
     '''
     Apply the HABC to the model 3D based on Fig. 8 of Salas et al. (2022)
 
@@ -264,9 +265,6 @@ def habc_fig8(Wave_obj, modal_solver, fitting_c, dat_regr_xCR, xCR_usu=None,
     plot_comparison : `bool`, optional
         If True, the solution (time and frequency) at receivers
         and the error measures are plotted. Default is True.
-    check_dt : `bool`, optional
-        If True, check if the timestep size is appropriate for the
-        transient response. Default is False
     max_divisor_tf : `int`, optional
         Index to select the maximum divisor of the final time, converted
         to an integer according to the order of magnitude of the timestep
@@ -294,11 +292,6 @@ def habc_fig8(Wave_obj, modal_solver, fitting_c, dat_regr_xCR, xCR_usu=None,
 
     # Updating velocity model
     Wave_obj.velocity_habc()
-
-    # Check the timestep size
-    if check_dt:
-        Wave_obj.check_timestep_habc(method='LANCZOS',
-                                     set_max_dt=False)
 
     # Setting the damping profile within absorbing layer
     Wave_obj.damping_layer(xCR_usu=xCR_usu, method=modal_solver)
@@ -329,7 +322,7 @@ def test_loop_habc_3d():
     Loop for HABC in model 3D based on Fig. 8 of Salas et al. (2022)
     '''
 
-    case = 1  # Integer from 0 to 1
+    case = 0  # Integer from 0 to 1
 
     # ============ SIMULATION PARAMETERS ============
 
@@ -380,15 +373,15 @@ def test_loop_habc_3d():
     loop_modeling = not get_ref_model
 
     # Reference frequency
-    habc_reference_freq_lst = ["source"]  # ["source", "boundary"]
+    habc_reference_freq_lst = ["source", "boundary"]
 
     # Type of the hypereshape degree
     degree_type = "real"  # "integer"
 
     # Hyperellipse degrees
-    # degree_layer_study = [[2.8, 3.0, 3.5, 4.0, None],
-    #                       [2.4, 3.0, 4.0, 4.2, None]]
-    degree_layer_lst = [4.0]  # degree_layer_study[case]
+    degree_layer_study = [[2.8, 3.0, 3.5, 4.0, None],
+                          [2.4, 3.0, 4.0, 4.2, None]]
+    degree_layer_lst = degree_layer_study[case]
 
     # Modal solver for fundamental frequency
     modal_solver = 'KRYLOVSCH_CH'  # 'ANALYTICAL', 'RAYLEIGH'
@@ -428,7 +421,7 @@ def test_loop_habc_3d():
     # ============ HABC SCHEME ============
 
     # Name of the file containing the mesh
-    Wave_obj.filename_mesh = "try_mesh_hyp/n4.0souSNAP.msh"
+    # Wave_obj.filename_mesh = "try_mesh_hyp/n4.0souSNAP.msh"
 
     if loop_modeling:
 
@@ -487,7 +480,7 @@ def test_loop_habc_3d():
                         habc_fig8(Wave_obj, modal_solver, fitting_c,
                                   dat_regr_xCR, xCR_usu=xCR_usu,
                                   plot_comparison=plot_comparison,
-                                  check_dt=False, max_divisor_tf=max_div_tf)
+                                  max_divisor_tf=max_div_tf)
 
                         # Estimating computational resource usage
                         comp_cost("tfin", tRef=tRef,
