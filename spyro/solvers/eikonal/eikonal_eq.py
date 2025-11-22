@@ -156,7 +156,6 @@ class Eikonal_Modeling():
             Function marking the source locations in the mesh
         '''
 
-        import ipdb
         # Extract node positions
         z_data, x_data = node_positions[:2]
 
@@ -176,15 +175,15 @@ class Eikonal_Modeling():
 
             if self.dimension == 3:  # 3D
                 y_data = node_positions[2]
-                sou_ids = [np.where(np.isclose(z_data, z_s, atol=tol_node)
-                                    & np.isclose(x_data, x_s, atol=tol_node)
-                                    & np.isclose(y_data, y_s, atol=tol_node)
-                                    )[0] for z_s, x_s, y_s in self.source_locations]
+                sou_ids = [np.where(np.isclose(
+                    z_data, z_s, atol=tol_node)
+                    & np.isclose(x_data, x_s, atol=tol_node)
+                    & np.isclose(y_data, y_s, atol=tol_node)
+                )[0] for z_s, x_s, y_s in self.source_locations]
 
             if sou_ids[0].size:
                 break
             elif div == div_min and not sou_ids[0].size:
-                ipdb.set_trace()
                 exit("Error: Source Points Not Found!")
 
         # Define BCs for eikonal

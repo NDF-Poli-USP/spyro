@@ -57,10 +57,11 @@ def wave_dict(dt_usu, fr_files, layer_shape, degree_layer,
     # Define the domain size without the PML or AL. Here we'll assume a
     # 1.00 x 1.00 km domain and compute the size for the Absorbing Layer (AL)
     # to absorb outgoing waves on boundries (-z, +-x sides) of the domain.
+    Lz, Lx, Ly = [2.4, 4.8, 0.0]  # in km
     dictionary["mesh"] = {
-        "Lz": 2.4,  # depth in km - always positive
-        "Lx": 4.8,  # width in km - always positive
-        "Ly": 0.,  # thickness in km - always positive
+        "Lz": Lz,  # depth in km - always positive
+        "Lx": Lx,  # width in km - always positive
+        "Ly": Ly,  # thickness in km - always positive
         "mesh_type": "firedrake_mesh",
     }
 
@@ -73,7 +74,7 @@ def wave_dict(dt_usu, fr_files, layer_shape, degree_layer,
         "source_locations": [(-0.6, 1.68)],  # (0.25 * Lz, 0.75 * Lx)
         "frequency": 5.0,  # in Hz
         "delay": np.pi / np.sqrt(6),  # delay to compare with paper
-        "receiver_locations": [(-1., 0.), (-1., 1.), (0., 1.), (0., 0.)]
+        "receiver_locations": [(-Lz, 0.), (-Lz, Lx), (0., 0.), (0., Lx)],
     }
 
     # Simulate for 2.0 seconds.
@@ -499,3 +500,8 @@ if __name__ == "__main__":
 # n_hyp  120m          100m
 # n_min  2.6*(4.1-SOU) 2.3*(3.7-SOU)
 # n_max  7.7(10.4-SOU) 7.1(10.1-SOU)
+
+# Identifying Critical Points on Boundaries
+# Min Eikonal on    Left Boundary (ms): 563.235 at (in km): (-0.581, 0.000)
+# Min Eikonal on   Right Boundary (ms): 1368.146 at (in km): (-1.969, 4.800)
+# Min Eikonal on  Bottom Boundary (ms): 750.681 at (in km): (-2.400, 1.631)
