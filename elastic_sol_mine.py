@@ -13,13 +13,13 @@ import warnings
 warnings.filterwarnings("ignore", category=UserWarning, module=r"ufl\.utils\.sorting")
 
 # Domain and mesh
-Lx, Ly = 4.0, 4.0
+Lx, Ly = 1.5, 1.5
 Nx, Ny = 100, 100
 mesh = fire.PeriodicRectangleMesh(Nx, Ny, Lx, Ly)
 x, y = fire.SpatialCoordinate(mesh)
 
 # Function spaces and mass-lumped quadrature
-degree = 4
+degree = 2
 V = fire.VectorFunctionSpace(mesh, "KMV", degree)
 V_scalar = fire.FunctionSpace(mesh, "KMV", degree)
 
@@ -31,9 +31,9 @@ T  = 1.0
 dt = fire.Constant(0.001)
 t  = fire.Constant(0.0)
 
-rho   = Constant(1.0)
-lmbda = Constant(1.0)
-mu    = Constant(0.25)
+rho   = Constant(0.00015)
+lmbda = Constant(0.00033075)
+mu    = Constant(3.375e-06)
 
 alpha = float(np.sqrt((float(lmbda) + 2.0*float(mu))/float(rho)))
 beta  = float(np.sqrt(float(mu)/float(rho)))
@@ -80,9 +80,9 @@ def delta(time_expr, v, mesh, source_locations):
         Fvom_x.assign(1)
     return fire.interpolate(time_expr * v, Fvom)
 
-freq = 6.0
-amp = 5.0
-source_location = (2.0, 2.0)
+freq = 5.0
+amp = 1.0
+source_location = (0.75, 0.75+0.15)
 
 # Variational forms and solver
 def eps(w):
@@ -114,7 +114,8 @@ solver = fire.LinearSolver(A, solver_parameters={"ksp_type": "preonly", "pc_type
 
 # Rreceiver
 receptor_coords = (2.15, 2.0)
-u_numerical_history = []
+uz_numerical_history = []
+ux_numerical_history = []
 time_points = []
 receiver_evaluator = fire.PointEvaluator(mesh, [receptor_coords])
 
@@ -133,10 +134,14 @@ while float(t) < T - 1e-12:
     u_nm1.assign(u_n)
     u_n.assign(u_np1)
 
-    ux_val = float(
+    uz_val = float(
         receiver_evaluator.evaluate(u_n.sub(0))[0]
-     )
-    u_numerical_history.append(ux_val)
+    )
+    ux_val = float(
+        receiver_evaluator.evaluate(u_n.sub(1))[0]
+    )
+    uz_numerical_history.append(uz_val)
+    ux_numerical_history.append(ux_val)
     time_points.append(float(t))
 
     if step % 100 == 0:
@@ -166,7 +171,10 @@ def plot_comparison(time_points, u_numerical_history, save_path=None, show=True)
     plt.close()
 
 
-plot_path = "debug.png"
-plot_comparison(time_points, u_numerical_history, save_path=plot_path)
+plot_path = "debug_x0.png"
+plot_comparison(time_points, uz_numerical_history, save_path=plot_path)
+
+plot_path = "debug_x1.png"
+plot_comparison(time_points, ux_numerical_history, save_path=plot_path)
 
 print("END")
