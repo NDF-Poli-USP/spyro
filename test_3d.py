@@ -229,6 +229,30 @@ def get_xCR_usu(Wave_obj, dat_regr_xCR, typ_xCR, n_pts):
         return xCR_opt
 
 
+def get_range_hyp(Wave_obj):
+    '''
+    Determine the range of the hyperellipse degree for the absorbing layer.
+
+    Parameters
+    ----------
+    Wave_obj : `habc.HABC_Wave`
+        An instance of the HABC_Wave class
+
+    Returns
+    -------
+    None
+    '''
+
+    # Identifier for the current case study
+    Wave_obj.identify_habc_case()
+
+    # Acquiring reference signal
+    Wave_obj.get_reference_signal()
+
+    # Determining layer size
+    Wave_obj.size_habc_criterion(n_root=1)
+
+
 def habc_fig8(Wave_obj, modal_solver, fitting_c, dat_regr_xCR,
               xCR_usu=None, plot_comparison=True, max_divisor_tf=1):
     '''
@@ -238,7 +262,7 @@ def habc_fig8(Wave_obj, modal_solver, fitting_c, dat_regr_xCR,
     ----------
     Wave_obj : `habc.HABC_Wave`
         An instance of the HABC_Wave class
-   modal_solver : `str`
+    modal_solver : `str`
         Method to use for solving the eigenvalue problem.
         Options: 'ANALYTICAL', 'ARNOLDI', 'LANCZOS',
         'LOBPCG', 'KRYLOVSCH_CH', 'KRYLOVSCH_CG',
@@ -278,14 +302,8 @@ def habc_fig8(Wave_obj, modal_solver, fitting_c, dat_regr_xCR,
     None
     '''
 
-    # Identifier for the current case study
-    Wave_obj.identify_habc_case()
-
-    # Acquiring reference signal
-    Wave_obj.get_reference_signal()
-
-    # Determining layer size
-    Wave_obj.size_habc_criterion(n_root=1)
+    # Check hyperellipse degree
+    get_range_hyp(Wave_obj)
 
     # Creating mesh with absorbing layer
     Wave_obj.create_mesh_habc()
@@ -370,7 +388,7 @@ def test_loop_habc_3d():
     get_ref_model = False
 
     # Loop for HABC cases
-    loop_modeling = not get_ref_model
+    loop_modeling = False  # not get_ref_model
 
     # Reference frequency
     habc_reference_freq_lst = ["source", "boundary"]
@@ -423,22 +441,24 @@ def test_loop_habc_3d():
     # Name of the file containing the mesh
     # Wave_obj.filename_mesh = "try_mesh_hyp/n4.0souSNAP.msh"
 
+    # Data to print on screen
+    fref_str = "HABC Reference Frequency: {}\n"
+    degr_str = "Type of the Hypereshape Degree: {}"
+
     if loop_modeling:
 
         # Data to print on screen
         crit_str = "\nCriterion for Heuristic Factor ({:.0f} Points): {}"
-        fref_str = "HABC Reference Frequency: {}\n"
-        degr_str = "Type of the Hypereshape Degree: {}"
         mods_str = "Modal Solver for Fundamental Frequency: {}\n"
 
         # Loop for different layer shapes and degrees
         for habc_ref_freq in habc_reference_freq_lst:
 
-            # Reference frequency for sizing the hybrid absorbing layer
+            # Criterion for optinal heuristic factor xCR
             print(crit_str.format(
                 n_pts, crit_opt.replace("_", " ").title()), flush=True)
 
-            # Criterion for optinal heuristic factor xCR
+            # Reference frequency for sizing the hybrid absorbing layer
             Wave_obj.abc_reference_freq = habc_ref_freq
             print(fref_str.format(habc_ref_freq.capitalize()), flush=True)
 
@@ -503,6 +523,24 @@ def test_loop_habc_3d():
 
                 # Renaming the folder if degree_layer is modified
                 Wave_obj.rename_folder_habc()
+    else:
+
+        # Update the layer shape and its degree
+        Wave_obj.abc_boundary_layer_shape = "hypershape"
+        Wave_obj.abc_deg_layer = 2.0
+
+        # Loop for different layer shapes and degrees
+        for habc_ref_freq in habc_reference_freq_lst:
+
+            # Reference frequency for sizing the hybrid absorbing layer
+            Wave_obj.abc_reference_freq = habc_ref_freq
+            print(fref_str.format(habc_ref_freq.capitalize()), flush=True)
+
+            # Type of the hypereshape degree
+            print(degr_str.format(degree_type), flush=True)
+
+            # Run the HABC scheme
+            get_range_hyp(Wave_obj)
 
 
 # Applying HABCs to the model in Fig. 8 of Salas et al. (2022) in 3D

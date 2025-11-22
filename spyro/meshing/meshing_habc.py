@@ -436,7 +436,7 @@ class HABC_Mesh():
             # Adjusting coordinates
             mesh_habc.coordinates.dat.data_with_halos[:, 2] -= pad_len
             min_y = mesh_habc.coordinates.dat.data_with_halos[:, 2].min()
-            if abs(min_y / pad_len) != 1.:
+            if abs(min_y / pad_len) != 1.:  # Forcing node at (0,0,0)
                 err_y = (1. - abs(min_y / pad_len)) * pad_len
                 err_y *= -np.sign(err_y)
                 mesh_habc.coordinates.dat.data_with_halos[:, 2] += err_y
@@ -445,7 +445,7 @@ class HABC_Mesh():
         mesh_habc.coordinates.dat.data_with_halos[:, 0] *= -1.0
         mesh_habc.coordinates.dat.data_with_halos[:, 1] -= pad_len
         min_x = mesh_habc.coordinates.dat.data_with_halos[:, 1].min()
-        if abs(min_x / pad_len) != 1.:
+        if abs(min_x / pad_len) != 1.:  # Forcing node at (0,0)
             err_x = (1. - abs(min_x / pad_len)) * pad_len
             err_x *= -np.sign(err_x)
             mesh_habc.coordinates.dat.data_with_halos[:, 1] += err_x
@@ -760,6 +760,8 @@ class HABC_Mesh():
             hyp_mesh.coordinates.dat.data_with_halos[:, [1, 0]]
         hyp_mesh.coordinates.dat.data_with_halos[:, 0] -= Lz / 2
         hyp_mesh.coordinates.dat.data_with_halos[:, 1] += Lx / 2
+
+        # Forcing node at (0,0)
         err_m = np.sqrt(hyp_mesh.coordinates.dat.data_with_halos[:, 0]**2
                         + hyp_mesh.coordinates.dat.data_with_halos[:, 1]**2)
         if err_m.min() > 0.:

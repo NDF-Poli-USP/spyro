@@ -308,7 +308,7 @@ def test_loop_patchwork_2d():
     Loop for applying the HABC to the model in Fig. 18 of Salas et al. (2022)
     '''
 
-    case = 1  # Integer from 0 to 2
+    case = 0  # Integer from 0 to 2
 
     # ============ SIMULATION PARAMETERS ============
 
@@ -353,7 +353,7 @@ def test_loop_patchwork_2d():
     loop_modeling = not get_ref_model
 
     # Reference frequency
-    habc_reference_freq_lst = ["source", "boundary"]
+    habc_reference_freq_lst = ["source"]  # ["source", "boundary"]
 
     # Type of the hypereshape degree
     degree_type = "real"  # "integer"

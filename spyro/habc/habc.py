@@ -536,8 +536,8 @@ class HABC_Wave(AcousticWave, HABC_Mesh, RectangLayer,
 
             hyp_par = (self.n_hyp, par_geom, *self.hyper_axes)
             mesh_habc = self.hypershape_mesh_habc(hyp_par,
-                                                      spln=spln,
-                                                      fmesh=fmesh)
+                                                  spln=spln,
+                                                  fmesh=fmesh)
 
             # # Mesh file
             # if self.dimension == 3:  # 3D
@@ -546,14 +546,12 @@ class HABC_Wave(AcousticWave, HABC_Mesh, RectangLayer,
             #                           distribution_parameters=q,
             #                           comm=self.comm.comm)
 
+            #     mesh_habc.coordinates.dat.data_with_halos[:, [0, 1, 2]] = \
+            #     mesh_habc.coordinates.dat.data_with_halos[:, [2, 0, 1]]
+
             # Mesh data
             print(f"Mesh Created with {mesh_habc.num_vertices()} Nodes "
                   f"and {mesh_habc.num_cells()} Volume Elements", flush=True)
-
-            # Adjusting coordinates: Swap (x, y, z) -> (z, x ,y)
-            if self.dimension == 3:  # 3D
-                mesh_habc.coordinates.dat.data_with_halos[:, [0, 1, 2]] = \
-                    mesh_habc.coordinates.dat.data_with_halos[:, [2, 0, 1]]
 
         # Updating the mesh with the absorbing layer
         self.set_mesh(user_mesh=mesh_habc, mesh_parameters={})
