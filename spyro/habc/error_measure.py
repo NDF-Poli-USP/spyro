@@ -369,8 +369,9 @@ class HABC_Error():
             y_err = [eI + eP for eI, eP in zip(max_errIt, max_errPK)]
 
         else:
-            value_parameter_error('crit_opt', crit_opt,
-                                  ['err_difference', 'err_integral', 'err_sum'])
+            value_parameter_error(
+                'crit_opt', crit_opt,
+                ['err_difference', 'err_integral', 'err_sum'])
 
         # Limits for the heuristic factor
         xCR_inf, xCR_sup = self.xCR_lim

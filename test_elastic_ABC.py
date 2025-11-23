@@ -5,6 +5,15 @@ import scipy.sparse as ss
 import scipy.linalg as la
 import ipdb
 import spyro.habc.habc as habc
+import matplotlib.pyplot as plt
+plt.rcParams.update({"font.family": "serif"})
+plt.rcParams['text.latex.preamble'] = r'\usepackage{bm} \usepackage{amsmath}'
+plt.rcParams['font.size'] = 7
+plt.rcParams['axes.grid'] = True
+
+
+# import warnings
+# warnings.filterwarnings("ignore", category=UserWarning, module=r"ufl\.utils\.sorting")
 
 # For theoretical background, see:
 # Absorbing Boundary Conditions for Difference Approximations
@@ -65,6 +74,18 @@ coord = fire.Function(V).interpolate(fire.SpatialCoordinate(mesh))
 source_position = np.array([b / 2., h / 2., t / 2.])
 source_vertex = int(np.linalg.norm(
     coord.dat.data - source_position, axis=1).argmin())
+
+# Source central frequency [Hz]
+f0 = 5.
+
+# Final Time
+T = 2.  # s
+
+# Number of timesteps
+steps = 20  # 200
+
+# Timestep size
+dt = round(T / steps, 6)
 
 
 def c_vti_tensor(vP, vS, rho, epsilon, gamma, delta, anysotropy):
@@ -418,7 +439,7 @@ def propag_vector(coord, source_coord, bnd_nod, V):
     ----------
     coord : `Firedrake function`
         Mesh coordinates
-    source_coord : `Firedrake function`
+    source_coord: `list` or `array`
         Source coordinates
     bnd_nod : `array`
         Boundary nodes indices.
@@ -430,12 +451,9 @@ def propag_vector(coord, source_coord, bnd_nod, V):
         Unit reference vector from the source to a boundary point
     '''
 
-    # Source coordinates
-    psoux, psouy, psouz = source_coord
-
     # Unitary vector pointing to the boundary point
     unit_propag_vct = fire.Function(V, name='Propagation_Vector')
-    prop = coord.dat.data[bnd_nod] - source_position
+    prop = coord.dat.data[bnd_nod] - source_coord
     unit_propag_vct.dat.data[bnd_nod] = prop / np.linalg.norm(
         prop, axis=1)[:, np.newaxis]
 
@@ -455,35 +473,36 @@ phi_o = 0.  # azimuth angle in degrees (phi = 0: 2D case)
 # Create fields
 # W = fire.FunctionSpace(mesh, "CG", 1)
 W = fire.FunctionSpace(mesh, "KMV", 3)
-vP = fire.Function(W)
+vP = fire.Function(W, name='vP')
 vP.dat.data[:] = np.random.uniform(1.5e3, 2e3, vP.dat.data.shape)
 # vP.assign(vP_o)
-vS = fire.Function(W)
+vS = fire.Function(W, name='vS')
 vS.dat.data[:] = np.random.uniform(750, 1e3, vS.dat.data.shape)
 # vS.assign(vS_o)
-rho = fire.Function(W)
+rho = fire.Function(W, name='rho')
 rho.dat.data[:] = np.random.uniform(1e3, 2e3, rho.dat.data.shape)
 # rho.assign(rho_o)
-eps1 = fire.Function(W)
+eps1 = fire.Function(W, name='epsilon')
 eps1.dat.data[:] = np.random.uniform(0.1, 0.3, eps1.dat.data.shape)
 # eps1.assign(eps1_o)
-gamma = fire.Function(W)
+gamma = fire.Function(W, name='gamma')
 gamma.dat.data[:] = np.random.uniform(0.2, 0.4, gamma.dat.data.shape)
 # gamma.assign(gamma_o)
-delta = fire.Function(W)
+delta = fire.Function(W, name='delta')
 delta.dat.data[:] = np.random.uniform(-0.1, 0.2, delta.dat.data.shape)
 # delta.assign(delta_o)
-theta = fire.Function(W)
+theta = fire.Function(W, name='theta')
 theta.dat.data[:] = np.random.uniform(-60, 60, theta.dat.data.shape)
 # theta.assign(theta_o)
-phi = fire.Function(W)
-# phi.dat.data[:] = np.random.uniform(-180, 180, phi.dat.data.shape)
-phi.assign(phi_o)
+phi = fire.Function(W, name='phi')
+phi.dat.data[:] = np.random.uniform(-15, 15, phi.dat.data.shape)
+# phi.assign(phi_o)
 
-# print("VTI Static Problem")
-# static_VTI(V)
-# print("TTI Static Problem")
-# static_TTI(V)
+# Wave fields
+P = fire.FunctionSpace(mesh, "DG", 0)
+p_wave = fire.Function(P, name='p_wave')
+S = fire.VectorFunctionSpace(mesh, "DG", 0)
+s_wave = fire.Function(S, name='s_wave')
 
 
 def explosive_source(mesh, source_coord, W, sigma=15.0):
@@ -494,7 +513,7 @@ def explosive_source(mesh, source_coord, W, sigma=15.0):
     ----------
     mesh: `firedrake.Mesh`
         3D mesh
-    source_coord: `list` or `np.array`
+    source_coord: `list` or `array`
         Source coordinates
     W: `firedrake.FunctionSpace`
         Function space for the source
@@ -522,7 +541,7 @@ def explosive_source(mesh, source_coord, W, sigma=15.0):
     return F1
 
 
-def apply_source(t, f0, v, F1, F_sou=1.):
+def apply_source(t, f0, v, F1, F_sou=1., integral=True):
     '''
     Ricker source for time t
 
@@ -538,11 +557,24 @@ def apply_source(t, f0, v, F1, F_sou=1.):
         Source spatial distribution
     F_sou: `float`, optional
         Maximum source amplitude. Default is 1
+    integral: `bool`, optional
+        If True, returns the integral of the Ricker wavelet.
+
+    Returns
+    -------
+    L: `firedrake.Form`
+        Source term in weak form
     '''
 
+    # Shifted time
+    t_shifted = t - 1. / f0
+
+    r = (np.pi * f0 * t_shifted)**2
     # Amplitude excitation
-    r = (np.pi * f0 * (t - 1./f0))**2
-    amp = (1. - 2. * r) * np.exp(-r) * F_sou
+    if integral:
+        amp = t_shifted * np.exp(-r) * F_sou
+    else:
+        amp = (1. - 2. * r) * np.exp(-r) * F_sou
     # print('Amp: {:3.2e}'.format(amp))
 
     # Traction force
@@ -560,9 +592,125 @@ def apply_source(t, f0, v, F1, F_sou=1.):
     return L
 
 
-def propagation_VTI(V, G, W):
+def mechanical_energy_form(C_tensor, u_ant1, u):
     '''
-    Algorithm to solve the forward problem
+    Mechanical energy functional for elastic wave equation
+
+    Parameters
+    ----------
+    C_tensor: `ufl.tensors.ListTensor`
+        Elastic tensor
+    u_ant1: `firedrake.Function`
+        Displacement field at previous timestep
+    u: `firedrake.Function`
+        Displacement field at current timestep
+
+    Returns
+    -------
+    energy: `firedrake.Form`
+        Mechanical energy functional
+    '''
+
+    # Kinetic energy
+    v = (u - u_ant1) / fire.Constant(dt)
+    K = fire.Constant(1 / 2) * rho * fire.inner(v, v) * dx
+
+    # Strain energy
+    strain = strain_tensor(u)
+    sigma = C_tensor * strain
+    U = fire.Constant(1 / 2) * fire.inner(sigma, strain) * dx
+
+    return K + U
+
+
+def plot_hist_energy(E_dat, Ediss, pth_ene, show=False):
+    '''
+    Plots the history of the total energy dissipated by the NRBC.
+    The plots are saved in PDF and PNG formats.
+
+    Parameters
+    ----------
+    E_dat: `list` or `array`
+        Total energy data
+    Ediss: `float`
+        Total final dissipated energy
+    pth_ene: `str`
+        Path to save the energy plot
+    show: `bool`, optional
+        Whether to show the plot. Default is False.
+
+    Returns
+    -------
+    None
+    '''
+
+    print("\nPlotting Total Energy", flush=True)
+
+    # Time data
+    t_plt = np.linspace(0., T, steps + 1)
+
+    # Setting colormap
+    # cl_rc = (0., 1., 0., 1.)  # RGB-alpha (Green)
+    cl_rf = (1., 0., 0., 1.)  # RGB-alpha (Red)
+
+    # Plotting energy
+    e_str = r'$E_{{diss}} \; = \; {:.4f} \; \text{{J}}$'
+    ax = plt.plot(t_plt, E_dat, color=cl_rf,
+                  linewidth=2, label=e_str.format(Ediss))
+
+    # Axis format
+    plt.xlim(0, T)
+
+    plt.xlabel(r'$t \; (s)$')
+    plt.ylabel(r'$Energy \; (J)$')
+    plt.ticklabel_format(axis='y', style='scientific')
+
+    # Saving the plot
+    plt.savefig(pth_ene + ".png", bbox_inches='tight')
+    plt.savefig(pth_ene + ".pdf", bbox_inches='tight')
+    plt.show() if show else None
+    plt.close()
+
+
+def update_p_wave(u):
+    '''
+    P-wave field
+
+    Parameters
+    ----------
+    u: `firedrake.Function`
+        Displacement field
+
+    Returns
+    -------
+    p_wave: `firedrake.Function`
+        P-wave field
+    '''
+    p_wave.assign(fire.interpolate(fire.div(u), P))
+    return p_wave
+
+
+def update_s_wave(u):
+    '''
+    S-wave fields
+
+    Parameters
+    ----------
+    u: `firedrake.Function`
+        Displacement field
+
+    Returns
+    -------
+    s_wave: `firedrake.Function`
+        S-wave field
+    '''
+    s_wave.assign(fire.interpolate(fire.curl(u), S))
+    return s_wave
+
+
+def propagation_elastic(V, G, W, anisotropy, H=None):
+    '''
+    Algorithm to solve the forward problem for elastic media
 
     Parameters
     ----------
@@ -572,122 +720,11 @@ def propagation_VTI(V, G, W):
         Function space for the Crhistoffel tensor
     W : `firedrake.FunctionSpace`
         Function space for the scalar fields
-    '''
-    # Final Time
-    T = 2.  # s
-
-    # Number of timesteps
-    steps = 200
-
-    # Timestep size
-    dt = round(T / steps, 6)
-
-    # Trial and test functions
-    du = fire.TrialFunction(V)
-    v = fire.TestFunction(V)
-
-    # State variable functions
-    u = fire.Function(V, name='u')
-    u_ant1 = fire.Function(V, name='u_ant1')
-    u_ant2 = fire.Function(V, name='u_ant2')
-
-    # Load function
-    # F1 = fire.Function(V, name='F')
-    F1 = explosive_source(mesh, source_position, W)
-
-    # Strain tensor
-    epsilon = strain_tensor(du)
-
-    # Virtual strain tensor
-    epsilon_v = strain_tensor(v)
-
-    # VTI elastic tensor
-    C_vti = c_vti_tensor(vP, vS, rho, eps1,
-                         gamma, delta, 'weak')
-
-    # Cauchy's stress tensor
-    sigma = C_vti * epsilon
-
-    # Bilinear form
-    a = fire.inner(sigma, epsilon_v) * dx
-
-    # Propagation vector
-    unit_propag_vct = propag_vector(coord, source_position, bnd_nod, V)
-
-    # Crhistoffel tensor
-    Gamma_vti = Crhistoffel_VTI(vP, vS, rho, eps1, gamma,
-                                delta, 'weak', unit_propag_vct)
-
-    # NRBC tensor
-    Z_nrbc = nrbc_tensor(rho, Gamma_vti, bnd_nod, G, V)
-
-    # Current time we are solving for
-    t = 0.
-
-    # Number of timesteps solved
-    ntimestep = 0
-
-    # Save results
-    outfile = fire.VTKFile("nrbc_vti/disp_VTI.pvd")
-    # Time integration loop
-    print('Solving Forward Problem')
-    print(67*'*')
-    while True:
-        # Update the time it is solving for
-        print('Step: {:1d} of {:1d} - Time: {:1.4f} ms'.format(
-            ntimestep, steps, t))
-
-        # Ricker source for time t
-        L = apply_source(t, 5., v, F1, F_sou=1e8)
-
-        # Variational problem
-        m = fire.Constant(1. / dt**2) * rho * fire.inner(
-            du - 2 * u_ant1 + u_ant2, v) * dx
-        R = fire.inner(Z_nrbc * (du - u_ant1), v) * ds
-
-        # Complete weak form
-        form = m + a - L + R
-        # fire.solve(fire.lhs(form) == fire.rhs(form), u, bcs=bc)
-        fire.solve(fire.lhs(form) == fire.rhs(form), u)
-        outfile.write(u, time=t)
-
-        t = round(t + dt, 6)
-        ntimestep += 1
-
-        # Cycling the variables
-        print(u.dat.data.max())
-        u_ant2.assign(u_ant1)
-        u_ant1.assign(u)
-
-        if t > T:
-            break
-
-    print(67*'*')
-
-
-def propagation_TTI(V, G, H, W):
-    '''
-    Algorithm to solve the forward problem
-
-    Parameters
-    ----------
-    V: `firedrake.VectorFunctionSpace`
-        Function space for the displacement field
-    G : `firedrake.TensorFunctionSpace`
-        Function space for the Crhistoffel tensor
-    H : `firedrake.TensorFunctionSpace`
+    anisotropy: `str`
+        Type of anisotropy: 'VTI' or 'TTI'
+    H : `firedrake.TensorFunctionSpace`, optional
         Function space for the TTI elastic tensor
-    W : `firedrake.FunctionSpace`
-        Function space for the scalar fields
     '''
-    # Final Time
-    T = 2.  # s
-
-    # Number of timesteps
-    steps = 200
-
-    # Timestep size
-    dt = round(T / steps, 6)
 
     # Trial and test functions
     du = fire.TrialFunction(V)
@@ -712,23 +749,53 @@ def propagation_TTI(V, G, H, W):
     C_vti = c_vti_tensor(vP, vS, rho, eps1,
                          gamma, delta, 'weak')
 
-    # TTI elastic tensor
-    C_tti = c_tti_tensor(C_vti, theta, phi)
+    # Propagation vector
+    unit_propag_vct = propag_vector(coord, source_position, bnd_nod, V)
+
+    if anisotropy == 'VTI':
+        print("\nVTI Propagation Problem\n")
+
+        # Elastic tensor
+        C_tensor = C_vti
+
+        # Crhistoffel tensor
+        Gamma = Crhistoffel_VTI(vP, vS, rho, eps1, gamma,
+                                delta, 'weak', unit_propag_vct)
+        # Paths to save results
+        path_disp = "nrbc_vti/disp_VTI.pvd"
+        path_flds = "nrbc_vti/flds_VTI.pvd"
+
+        # Save fields
+        fire.VTKFile(path_flds).write(vP, vS, rho, eps1, gamma, delta)
+
+    if anisotropy == 'TTI':
+        print("TTI Propagation Problem")
+
+        # TTI elastic tensor
+        C_tti = c_tti_tensor(C_vti, theta, phi)
+
+        # Elastic tensor
+        C_tensor = C_tti
+
+        # Crhistoffel tensor
+        Gamma = Crhistoffel_TTI(C_tti, unit_propag_vct, H)
+
+        # Paths to save results
+        path_disp = "nrbc_tti/disp_TTI.pvd"
+        path_flds = "nrbc_tti/flds_TTI.pvd"
+
+        # Save fields
+        fire.VTKFile(path_flds).write(vP, vS, rho, eps1, gamma,
+                                      delta, theta, phi)
 
     # Cauchy's stress tensor
-    sigma = C_tti * epsilon
+    sigma = C_tensor * epsilon
 
     # Bilinear form
     a = fire.inner(sigma, epsilon_v) * dx
 
-    # Propagation vector
-    unit_propag_vct = propag_vector(coord, source_position, bnd_nod, V)
-
-    # Crhistoffel tensor
-    Gamma_tti = Crhistoffel_TTI(C_tti, unit_propag_vct, H)
-
     # NRBC tensor
-    Z_nrbc = nrbc_tensor(rho, Gamma_tti, bnd_nod, G, V)
+    Z_nrbc = nrbc_tensor(rho, Gamma, bnd_nod, G, V)
 
     # Current time we are solving for
     t = 0.
@@ -737,9 +804,11 @@ def propagation_TTI(V, G, H, W):
     ntimestep = 0
 
     # Save results
-    outfile = fire.VTKFile("nrbc_tti/disp_TTI.pvd")
+    outfile = fire.VTKFile(path_disp)
+
     # Time integration loop
-    print('Solving Forward Problem')
+    Etot = []
+    print('\nSolving Forward Problem')
     print(67*'*')
     while True:
         # Update the time it is solving for
@@ -747,7 +816,7 @@ def propagation_TTI(V, G, H, W):
             ntimestep, steps, t))
 
         # Ricker source for time t
-        L = apply_source(t, 5., v, F1, F_sou=1e6)
+        L = apply_source(t, f0, v, F1, F_sou=1e9)
 
         # Variational problem
         m = fire.Constant(1. / dt**2) * rho * fire.inner(
@@ -758,43 +827,45 @@ def propagation_TTI(V, G, H, W):
         form = m + a - L + R
         # fire.solve(fire.lhs(form) == fire.rhs(form), u, bcs=bc)
         fire.solve(fire.lhs(form) == fire.rhs(form), u)
-        outfile.write(u, time=t)
+
+        # Mechanical energy
+        E = fire.assemble(mechanical_energy_form(C_tensor, u_ant1, u))
+        Etot.append(E)
+        print(u.dat.data.max(), E)
+
+        outfile.write(u, update_p_wave(u), update_s_wave(u), time=t)
 
         t = round(t + dt, 6)
         ntimestep += 1
 
         # Cycling the variables
-        print(u.dat.data.max())
         u_ant2.assign(u_ant1)
         u_ant1.assign(u)
 
         if t > T:
             break
 
-    print(67*'*')
+    # Save total energy
+    if anisotropy == 'VTI':
+        path_energy = "nrbc_vti/energy_vti.npy"
+        path_enedss = "nrbc_vti/energy_vti"
+    if anisotropy == 'TTI':
+        path_energy = "nrbc_tti/energy_tti.npy"
+        path_enedss = "nrbc_tti/energy_tti"
+    np.save(path_energy, Etot)
+
+    # Total final dissipated energy
+    Ediss = Etot[-1]
+    print('\nTotal dissipated energy: {:3.6e} J'.format(Ediss))
+    plot_hist_energy(Etot, Ediss, path_enedss)
+
+    print(67*'*'+'\nEnd of simulation')
 
 
-# print("VTI Propagation Problem")
-# propagation_VTI(V, G, W)
-print("TTI Propagation Problem")
-propagation_TTI(V, G, H, W)
+propagation_elastic(V, G, W, "VTI")
+# propagation_elastic(V, G, W, "TTI", H=H)
 
-
-# #VertexOnly functions
-# def delta(time_expr, v, mesh, source_locations):
-#     """Creates a point source using VertexOnlyMesh approach."""
-#     vom = fire.VertexOnlyMesh(mesh, source_locations)
-#     if v.ufl_shape == ():
-#         # Scalar function space
-#         P0 = fire.FunctionSpace(vom, "DG", 0)
-#         Fvom = fire.Cofunction(P0.dual()).assign(1)
-#     else:
-#         # Vector function space
-#         P0_vec = fire.VectorFunctionSpace(vom, "DG", 0)
-#         Fvom = fire.Cofunction(P0_vec.dual())
-#         Fvom_x = Fvom.sub(1)
-#         Fvom_x.assign(1)
-#     return fire.interpolate(time_expr * v, Fvom)
-# ricker = RickerWavelet(t, freq, amp=1.0)
-# F_s = delta(ricker, v, mesh, [source_location])
-# receiver_evaluator = fire.PointEvaluator(mesh, [receptor_coords])
+# umag.interpolate(sqrt(dot(u_n, u_n)))
+# P_ind.interpolate(div(u_n))
+# S_ind.interpolate(u_n[1].dx(0) - u_n[0].dx(1))
+# vtk.write(u_n, umag, P_ind, S_ind, time=float(t))

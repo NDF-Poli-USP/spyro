@@ -184,7 +184,7 @@ def plot_hist_receivers(Wave_object, show=False):
     dt = Wave_object.dt
     tf = Wave_object.final_time
     nt = int(round(tf / dt)) + 1  # number of timesteps
-    t_rec = np.linspace(0.0, tf, nt)
+    t_rec = np.linspace(0., tf, nt)
 
     # Setting fonts
     plt.rcParams['font.size'] = 7
