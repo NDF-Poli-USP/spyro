@@ -424,6 +424,7 @@ def test_loop_patchwork_2d():
             # Modal solver for fundamental frequency
             print(mods_str.format(modal_solver), flush=True)
 
+            # Hyperellipse degrees to loop over
             degree_layer_lst = degree_layer_sou[case] if \
                 habc_ref_freq == "source" else degree_layer_bnd[case]
 

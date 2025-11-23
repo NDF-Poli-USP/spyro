@@ -688,7 +688,7 @@ class Modal_Solver():
             # Constant for power-law fit
             cn2 = f_max - fn2
 
-            return f_max - cn2 * (1 / (qn * n + 1 - 2 * qn)) ** pn
+            return f_max - cn2 * (1. / (qn * n + 1. - 2. * qn)) ** pn
 
         # Regression dataset
         n_data = np.arange(2., 100., 0.1)

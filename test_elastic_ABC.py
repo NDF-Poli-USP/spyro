@@ -364,7 +364,7 @@ def Crhistoffel_VTI(vP, vS, rho, epsilon, gamma, delta,
 
 def Crhistoffel_TTI(C_tti, propag_vector, H):
     ''''
-    Constructs the crhistoffel tensor for a material with TTI anisotropy.
+    Constructs the Crhistoffel tensor for a material with TTI anisotropy.
     Carcione (2022). Wave Fields in Real Media: Anisotropic elastic media
 
     Parameters
