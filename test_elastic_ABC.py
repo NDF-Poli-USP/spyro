@@ -29,12 +29,12 @@ plt.rcParams['axes.grid'] = True
 # equation (Turkel et al., 2023)
 
 # Dimensions [m]
-b = 140
-h = 60
-t = 40
+b = 560
+h = 240
+t = 160
 
 # Element size [m]
-elsize = 10
+elsize = 20 # 40
 
 # Discretization
 nelx = int(b / elsize)
@@ -82,7 +82,7 @@ f0 = 5.
 T = 2.  # s
 
 # Number of timesteps
-steps = 20  # 200
+steps = 200
 
 # Timestep size
 dt = round(T / steps, 6)
@@ -499,11 +499,12 @@ phi.dat.data[:] = np.random.uniform(-15, 15, phi.dat.data.shape)
 # phi.assign(phi_o)
 
 # Wave fields
-P = fire.FunctionSpace(mesh, "DG", 0)
+# P = fire.FunctionSpace(mesh, "DG", 0)
+P = fire.FunctionSpace(mesh, "CG", 1)
 p_wave = fire.Function(P, name='p_wave')
-S = fire.VectorFunctionSpace(mesh, "DG", 0)
+# S = fire.VectorFunctionSpace(mesh, "DG", 0)
+S = fire.VectorFunctionSpace(mesh, "CG", 1)
 s_wave = fire.Function(S, name='s_wave')
-
 
 def explosive_source(mesh, source_coord, W, sigma=15.0):
     '''
@@ -655,12 +656,14 @@ def plot_hist_energy(E_dat, Ediss, pth_ene, show=False):
 
     # Plotting energy
     e_str = r'$E_{{diss}} \; = \; {:.4f} \; \text{{J}}$'
-    ax = plt.plot(t_plt, E_dat, color=cl_rf,
-                  linewidth=2, label=e_str.format(Ediss))
+    plt.plot(t_plt, E_dat, color=cl_rf,
+             linewidth=2, label=e_str.format(Ediss))
+
+    # Add legend
+    plt.legend(loc='best')
 
     # Axis format
     plt.xlim(0, T)
-
     plt.xlabel(r'$t \; (s)$')
     plt.ylabel(r'$Energy \; (J)$')
     plt.ticklabel_format(axis='y', style='scientific')
@@ -686,7 +689,8 @@ def update_p_wave(u):
     p_wave: `firedrake.Function`
         P-wave field
     '''
-    p_wave.assign(fire.interpolate(fire.div(u), P))
+    # p_wave.assign(fire.interpolate(fire.div(u), P))
+    p_wave.interpolate(fire.div(u))
     return p_wave
 
 
@@ -704,7 +708,8 @@ def update_s_wave(u):
     s_wave: `firedrake.Function`
         S-wave field
     '''
-    s_wave.assign(fire.interpolate(fire.curl(u), S))
+    # s_wave.assign(fire.interpolate(fire.curl(u), S))
+    s_wave.interpolate(fire.curl(u))
     return s_wave
 
 
@@ -816,7 +821,7 @@ def propagation_elastic(V, G, W, anisotropy, H=None):
             ntimestep, steps, t))
 
         # Ricker source for time t
-        L = apply_source(t, f0, v, F1, F_sou=1e9)
+        L = apply_source(t, f0, v, F1, F_sou=1e15)
 
         # Variational problem
         m = fire.Constant(1. / dt**2) * rho * fire.inner(
@@ -863,9 +868,4 @@ def propagation_elastic(V, G, W, anisotropy, H=None):
 
 
 propagation_elastic(V, G, W, "VTI")
-# propagation_elastic(V, G, W, "TTI", H=H)
-
-# umag.interpolate(sqrt(dot(u_n, u_n)))
-# P_ind.interpolate(div(u_n))
-# S_ind.interpolate(u_n[1].dx(0) - u_n[0].dx(1))
-# vtk.write(u_n, umag, P_ind, S_ind, time=float(t))
+propagation_elastic(V, G, W, "TTI", H=H)
