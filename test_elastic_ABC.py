@@ -13,7 +13,8 @@ plt.rcParams['axes.grid'] = True
 
 
 # import warnings
-# warnings.filterwarnings("ignore", category=UserWarning, module=r"ufl\.utils\.sorting")
+# warnings.filterwarnings("ignore", category=UserWarning,
+# module=r"ufl\.utils\.sorting")
 
 # For theoretical background, see:
 # Absorbing Boundary Conditions for Difference Approximations
@@ -34,7 +35,7 @@ h = 240
 t = 160
 
 # Element size [m]
-elsize = 20 # 40
+elsize = 20  # 40
 
 # Discretization
 nelx = int(b / elsize)
@@ -505,6 +506,7 @@ p_wave = fire.Function(P, name='p_wave')
 # S = fire.VectorFunctionSpace(mesh, "DG", 0)
 S = fire.VectorFunctionSpace(mesh, "CG", 1)
 s_wave = fire.Function(S, name='s_wave')
+
 
 def explosive_source(mesh, source_coord, W, sigma=15.0):
     '''

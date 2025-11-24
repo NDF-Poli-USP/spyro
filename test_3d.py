@@ -340,7 +340,7 @@ def test_loop_habc_3d():
     Loop for HABC in model 3D based on Fig. 8 of Salas et al. (2022)
     '''
 
-    case = 0  # Integer from 0 to 1
+    case = 1  # Integer from 0 to 1
 
     # ============ SIMULATION PARAMETERS ============
 
@@ -352,7 +352,7 @@ def test_loop_habc_3d():
 
     # Timestep size (in seconds). Initial guess: edge_length / 50
     # dt_usu_lst = [0.0015, 0.0010]  # Exact eigenvalue # 1.845
-    dt_usu_lst = [0.00125, 0.00080]  # Approximate eigenvalue
+    dt_usu_lst = [0.0012, 0.0012]  # Approximate eigenvalue #0.80ms
 
     # Eikonal degree
     degree_eikonal_lst = [2, 1]
@@ -365,7 +365,7 @@ def test_loop_habc_3d():
 
     # Maximum divisor of the final time
     # max_div_tf_lst = [5, 7]  # Exact eigenvalue
-    max_div_tf_lst = [8, 10]  # Approximate eigenvalue
+    max_div_tf_lst = [8, 8]  # 10  # Approximate eigenvalue
 
     # Get simulation parameters
     edge_length = edge_length_lst[case]
@@ -388,17 +388,17 @@ def test_loop_habc_3d():
     get_ref_model = False
 
     # Loop for HABC cases
-    loop_modeling = False  # not get_ref_model
+    loop_modeling = not get_ref_model
 
     # Reference frequency
-    habc_reference_freq_lst = ["source", "boundary"]
+    habc_reference_freq_lst = ["source"]  # ["source", "boundary"]
 
     # Type of the hypereshape degree
     degree_type = "real"  # "integer"
 
     # Hyperellipse degrees
     degree_layer_study = [[2.8, 3.0, 3.5, 4.0, None],
-                          [2.4, 3.0, 4.0, 4.2, None]]
+                          [4.0]]  # [2.4, 2.8, 3.0, 4.0, 4.2, None]]
     degree_layer_lst = degree_layer_study[case]
 
     # Modal solver for fundamental frequency
@@ -439,7 +439,7 @@ def test_loop_habc_3d():
     # ============ HABC SCHEME ============
 
     # Name of the file containing the mesh
-    # Wave_obj.filename_mesh = "try_mesh_hyp/n4.0souSNAP.msh"
+    str_filename_mesh = "try_mesh_hyp/125mSOU_SNP/n{:.1f}.msh"
 
     # Data to print on screen
     fref_str = "HABC Reference Frequency: {}\n"
@@ -474,6 +474,11 @@ def test_loop_habc_3d():
                 Wave_obj.abc_boundary_layer_shape = "hypershape" \
                     if degree_layer is not None else "rectangular"
                 Wave_obj.abc_deg_layer = degree_layer
+
+                if degree_layer is not None:
+                    Wave_obj.filename_mesh = \
+                        str_filename_mesh.format(degree_layer)
+                    print(Wave_obj.filename_mesh, flush=True)  # Mesh file
 
                 # Data for regression of xCR parameter
                 dat_regr_xCR = [[] for _ in range(3)]

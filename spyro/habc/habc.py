@@ -531,23 +531,23 @@ class HABC_Wave(AcousticWave, HABC_Mesh, RectangLayer,
             if self.dimension == 2:  # 2D
                 par_geom = self.perim_hyp
 
-            if self.dimension == 3:  # 3D
-                par_geom = self.surf_hyp
-
-            hyp_par = (self.n_hyp, par_geom, *self.hyper_axes)
-            mesh_habc = self.hypershape_mesh_habc(hyp_par,
-                                                  spln=spln,
-                                                  fmesh=fmesh)
-
-            # # Mesh file
             # if self.dimension == 3:  # 3D
-            #     q = {"overlap_type": (fire.DistributedMeshOverlapType.NONE, 0)}
-            #     mesh_habc = fire.Mesh(self.filename_mesh,
-            #                           distribution_parameters=q,
-            #                           comm=self.comm.comm)
+            #     par_geom = self.surf_hyp
 
-            #     mesh_habc.coordinates.dat.data_with_halos[:, [0, 1, 2]] = \
-            #     mesh_habc.coordinates.dat.data_with_halos[:, [2, 0, 1]]
+                hyp_par = (self.n_hyp, par_geom, *self.hyper_axes)
+                mesh_habc = self.hypershape_mesh_habc(hyp_par,
+                                                      spln=spln,
+                                                      fmesh=fmesh)
+
+            # Mesh file
+            if self.dimension == 3:  # 3D
+                q = {"overlap_type": (fire.DistributedMeshOverlapType.NONE, 0)}
+                mesh_habc = fire.Mesh(self.filename_mesh,
+                                      distribution_parameters=q,
+                                      comm=self.comm.comm)
+
+                mesh_habc.coordinates.dat.data_with_halos[:, [0, 1, 2]] = \
+                    mesh_habc.coordinates.dat.data_with_halos[:, [2, 0, 1]]
 
             # Mesh data
             print(f"Mesh Created with {mesh_habc.num_vertices()} Nodes "
