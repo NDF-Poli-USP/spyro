@@ -108,7 +108,7 @@ jobs:
           : # cloning and installing Spyro from GitHub. This ensures CI runs
           : # tests against the code in the PR.
           cd "$GITHUB_WORKSPACE" || true
-          python -m pip install --verbose --no-deps -e .
+          python -m pip install --verbose -e .
           mpiexec -n 6 python -m pytest test_integration/
 
       - name: Post-run cleanup
