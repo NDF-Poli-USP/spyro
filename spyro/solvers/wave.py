@@ -432,3 +432,7 @@ class Wave(Model_parameters, metaclass=ABCMeta):
         the DOFs associated with the subspace of the original problem).
         '''
         pass
+
+    @abstractmethod
+    def check_stability(self):
+        pass

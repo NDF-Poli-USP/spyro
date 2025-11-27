@@ -21,7 +21,7 @@ def test_ricker_varies_in_time():
     # tests if ricker starts at zero
     delay = 1.5 * math.sqrt(6.0) / (math.pi * frequency)
     t = 0.0
-    r0 = spyro.sources.timedependentSource(modelRicker, t, frequency, amplitude)
+    r0 = spyro.sources.timedependentSource(modelRicker, t, frequency, amplitude=amplitude)
     test1 = math.isclose(
         r0,
         0,
@@ -32,7 +32,7 @@ def test_ricker_varies_in_time():
     minimum = -amplitude * 2 / math.exp(3.0 / 2.0)
     t = 0.0 + delay + math.sqrt(6.0) / (2.0 * math.pi * frequency)
     rmin1 = spyro.sources.timedependentSource(
-        modelRicker, t, frequency, amplitude
+        modelRicker, t, frequency, amplitude=amplitude
     )
     test2 = math.isclose(
         rmin1,
@@ -41,14 +41,14 @@ def test_ricker_varies_in_time():
 
     t = 0.0 + delay - math.sqrt(6.0) / (2.0 * math.pi * frequency)
     rmin2 = spyro.sources.timedependentSource(
-        modelRicker, t, frequency, amplitude
+        modelRicker, t, frequency, amplitude=amplitude
     )
     test3 = math.isclose(rmin2, minimum)
 
     # tests if maximum value in correct and occurs at correct location
     t = 0.0 + delay
     rmax = spyro.sources.timedependentSource(
-        modelRicker, t, frequency, amplitude
+        modelRicker, t, frequency, amplitude=amplitude
     )
     test4 = math.isclose(
         rmax,
