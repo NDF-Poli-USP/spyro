@@ -6,7 +6,8 @@ from firedrake import (assemble, Constant, curl, DirichletBC, div, Function,
 from .elastic_wave import ElasticWave
 from .forms import (isotropic_elastic_without_pml,
                     isotropic_elastic_with_pml,viscoelastic_kelvin_voigt_without_pml,
-                    viscoelastic_zener_without_pml, viscoelastic_gsls_without_pml)
+                    viscoelastic_zener_without_pml, viscoelastic_gsls_without_pml, viscoelastic_maxwell_gsls_without_pml,
+                    viscoelastic_maxwell_without_pml)
 from .functionals import mechanical_energy_form
 from ...domains.space import FE_method
 from ...utils.typing import override
@@ -54,6 +55,7 @@ class IsotropicWave(ElasticWave):
 
     @override
     def initialize_model_parameters_from_object(self, synthetic_data_dict: dict):
+        import firedrake as fire
         def constant_wrapper(value):
             if np.isscalar(value):
                 return Constant(value)
@@ -97,6 +99,13 @@ class IsotropicWave(ElasticWave):
                             f"    S-wave velocity: {bool(self.c_s)}\n"
                             "The valid options are {Density, Lame first, Lame second} "
                             "or (exclusive) {Density, P-wave velocity, S-wave velocity}")
+        
+        V = fire.FunctionSpace(self.mesh, "CG", 1)
+        f = fire.Function(V)
+        f.interpolate(self.c)
+        
+        if isinstance(f, fire.Function):
+            self.initial_velocity_model = f.copy(deepcopy=True)
 
     @override
     def initialize_model_parameters_from_file(self, synthetic_data_dict):
@@ -175,8 +184,13 @@ class IsotropicWave(ElasticWave):
         self.parse_boundary_conditions()
         self.parse_volumetric_forces()
 	
-        d = self.input_dictionary.get("viscoelasticity", False)
-        if d["viscoelastic"] == True:
+        try:
+            d = self.input_dictionary.get("viscoelasticity", False)
+            viscoelasticity = d["viscoelastic"]
+        except:
+            viscoelasticity = False
+
+        if viscoelasticity == True:
             self.viscoelastic = True
             self.visco_type = d["visco_type"]
             W = TensorFunctionSpace(self.function_space.mesh(), "DG", 0)
@@ -185,17 +199,44 @@ class IsotropicWave(ElasticWave):
             if d["visco_type"] =='kelvin_voigt':
                 self.eta = float(d["eta"])
                 self.eps_old = Function(W, name="Previous strain")
+                
             elif d["visco_type"] =='zener':
                 self.tau_sigma = float(d["tau_sigma"])
                 self.tau_epsilon = float(d["tau_epsilon"])
                 self.eps_old = Function(W, name="Previous strain")
                 self.sigma_old = Function(W, name="Previous stress")
+            
+            elif d["visco_type"] =='maxwell':
+                self.tau_sigma = float(d["tau_sigma"])
+                self.tau_epsilon = float(d["tau_epsilon"])
+                self.eps_old = Function(W, name="Previous strain")
+                self.sigma_old = Function(W, name="Previous stress")
+                self.lmbda_s = d["lmbda_s"]
+                self.mu_s = d["mu_s"]
+                
             elif d["visco_type"] =='gsls':
                 self.tau_sigmas = d["tau_sigma_gsls"]
                 self.tau_epsilons = d["tau_epsilon_gsls"]
                 num_branches = len(self.tau_epsilons)  # ou len(wave.tau_sigmas)
                 self.eps_old_list = [Function(self.strain_space, name=f"Previous strain branch {i}") for i in range(num_branches)]
                 self.sigma_old_list = [Function(self.strain_space, name=f"Previous stress branch {i}") for i in range(num_branches)]
+                
+            elif d["visco_type"] =='maxwell_gsls':
+                self.tau_sigmas = d["tau_sigma_gsls"]
+                self.tau_epsilons = d["tau_epsilon_gsls"]
+                self.lmbda_s = d["lmbda_s"]
+                self.mu_s = d["mu_s"]
+                num_branches = len(self.tau_epsilons)  # ou len(wave.tau_sigmas)
+                
+                self.eps_old_list = [Function(self.strain_space, name=f"Previous strain branch {i}") for i in range(num_branches)]
+                self.eps_np1 = Function(self.strain_space, name="eps_np1")
+                self.eps_n = Function(self.strain_space, name="eps_np1")
+
+                self.eps_n.assign(0.0)
+                
+                self.sigma_old_list = [Function(self.strain_space, name=f"Previous stress branch {i}") for i in range(num_branches)]
+                
+
         else:
             self.viscoelastic = False
 	
@@ -206,6 +247,10 @@ class IsotropicWave(ElasticWave):
                 viscoelastic_zener_without_pml(self)
             elif self.visco_type == 'gsls':
                 viscoelastic_gsls_without_pml(self)
+            elif self.visco_type == 'maxwell':
+                viscoelastic_maxwell_without_pml(self)
+            elif self.visco_type == 'maxwell_gsls':
+                viscoelastic_maxwell_gsls_without_pml(self)
         else:
             if self.abc_boundary_layer_type is None:
                 isotropic_elastic_without_pml(self)
