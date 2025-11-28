@@ -1,136 +1,17 @@
-import numpy as np
 import uuid
 from mpi4py import MPI  # noqa:F401
 from firedrake import COMM_WORLD  # noqa:
 import warnings
+from copy import deepcopy
+from ..io.dictionaryio import Read_options, Read_outputs
+from ..io.boundary_layer_io import Read_boundary_layer
+from ..io.time_io import Read_time_axis
 from .. import io
 from .. import utils
 from .. import meshing
 
-# default_optimization_parameters = {
-#     "General": {"Secant": {"Type": "Limited-Memory BFGS",
-# "Maximum Storage": 10}},
-#     "Step": {
-#         "Type": "Augmented Lagrangian",
-#         "Augmented Lagrangian": {
-#             "Subproblem Step Type": "Line Search",
-#             "Subproblem Iteration Limit": 5.0,
-#         },
-#         "Line Search": {"Descent Method": {"Type": "Quasi-Newton Step"}},
-#     },
-#     "Status Test": {
-#         "Gradient Tolerance": 1e-16,
-#         "Iteration Limit": None,
-#         "Step Tolerance": 1.0e-16,
-#     },
-# }
 
-# default_dictionary = {}
-# default_dictionary["options"] = {
-#     "cell_type": "T",  # simplexes such as triangles or tetrahedra (T)
-# or quadrilaterals (Q)
-#     "variant": 'lumped', # lumped, equispaced or DG, default is lumped
-#     "method": "MLT", # (MLT/spectral_quadrilateral/DG_triangle/
-# DG_quadrilateral) You can either specify a cell_type+variant or a method
-#     "degree": 4,  # p order
-#     "dimension": 2,  # dimension
-#     "automatic_adjoint": False,
-# OPTIONAL PARAMETERS
-#     "time_integration_scheme": "central_difference",
-#     "equation_type": "second_order_in_pressure",
-# }
-
-# # Number of cores for the shot. For simplicity, we keep things serial.
-# # spyro however supports both spatial parallelism and "shot" parallelism.
-# default_dictionary["parallelism"] = {
-# # options: automatic (same number of cores for evey processor) or spatial
-#     "type": "automatic",
-# }
-
-# # Define the domain size without the PML. Here we'll assume a 0.75 x 1.50 km
-# # domain and reserve the remaining 250 m for the Perfectly Matched Layer
-# # (PML) to absorb
-# # outgoing waves on three sides (eg., -z, +-x sides) of the domain.
-# default_dictionary["mesh"] = {
-#     "Lz": 1.0,  # depth in km - always positive
-#     "Lx": 1.0,  # width in km - always positive
-#     "Ly": 0.0,  # thickness in km - always positive
-#     "mesh_file": None,
-# }
-# #For use only if you are using a synthetic test model
-# #or a forward only simulation -adicionar discrição para modelo direto
-# default_dictionary["synthetic_data"] = {
-#     "real_mesh_file": None,
-#     "real_velocity_file": None,
-# }
-# default_dictionary["inversion"] = {
-#     "perform_fwi": False, # switch to true to make a FWI
-#     "initial_guess_model_file": None,
-#     "shot_record_file": None,
-#     "optimization_parameters": default_optimization_parameters,
-# }
-
-# # Specify a 250-m PML on the three sides of the
-# # domain to damp outgoing waves.
-# default_dictionary["absorving_boundary_conditions"] = {
-#     "status": False,  # True or false
-# #  None or non-reflective (outer boundary condition)
-#     "outer_bc": "non-reflective",
-# # polynomial, hyperbolic, shifted_hyperbolic
-#     "damping_type": "polynomial",
-#     "exponent": 2,  # damping layer has a exponent variation
-#     "cmax": 4.7,  # maximum acoustic wave velocity in PML - km/s
-#     "R": 1e-6,  # theoretical reflection coefficient
-# # thickness of the PML in the z-direction (km) - always positive
-#     "lz": 0.25,
-# # thickness of the PML in the x-direction (km) - always positive
-#     "lx": 0.25,
-# # thickness of the PML in the y-direction (km) - always positive
-#     "ly": 0.0,
-# }
-
-# # Create a source injection operator. Here we use a single source with a
-# # Ricker wavelet that has a peak frequency of 8 Hz injected at the
-# # center of the mesh.
-# # We also specify to record the solution at 101 microphones near the
-# # top of the domain.
-# # This transect of receivers is created with the helper function
-# # `create_transect`.
-# default_dictionary["acquisition"] = {
-#     "source_type": "ricker",
-#     "source_locations": [(-0.1, 0.5)],
-#     "frequency": 5.0,
-#     "delay": 1.0,
-#     "receiver_locations": spyro.create_transect(
-#         (-0.10, 0.1), (-0.10, 0.9), 20
-#     ),
-# }
-
-# # Simulate for 2.0 seconds.
-# default_dictionary["time_axis"] = {
-#     "initial_time": 0.0,  #  Initial time for event
-#     "final_time": 2.00,  # Final time for event
-#     "dt": 0.001,  # timestep size
-#     "amplitude": 1,  # the Ricker has an amplitude of 1.
-# # how frequently to output solution to pvds
-#     "output_frequency": 100,
-# # how frequently to save solution to RAM
-#     "gradient_sampling_frequency": 100,
-# }
-# default_dictionary["visualization"] = {
-#     "forward_output" : True,
-#     "output_filename": "results/forward_output.pvd",
-#     "fwi_velocity_model_output": False,
-#     "velocity_model_filename": None,
-#     "gradient_output": False,
-#     "gradient_filename": None,
-#     "adjoint_output": False,
-#     "adjoint_filename": None,
-#     "debug_output": False,
-# }
-
-
-class Model_parameters:
+class Model_parameters(Read_options, Read_boundary_layer, Read_time_axis, Read_outputs):
     """
     Class that reads and sanitizes input parameters.
 
@@ -297,41 +178,57 @@ class Model_parameters:
         # Saves inout_dictionary internally
         self.input_dictionary = dictionary
 
-        # Sanitizes method or cell_type+variant inputs
-        Options = io.dictionaryio.read_options(self.input_dictionary["options"])
-        self.cell_type = Options.cell_type
-        self.method = Options.method
-        self.variant = Options.variant
-        self.degree = Options.degree
-        self.dimension = Options.dimension
-        self.time_integrator = self._check_time_integrator()
-        self.equation_type = self._check_equation_type()
+        # some default parameters we might use in the future
+        self.input_dictionary.setdefault("equation_type", "second_order_in_pressure")
+        self.equation_type = self.input_dictionary["equation_type"]
 
-        if self.cell_type == "quadrilateral":
+        # Get options
+        Read_options.__init__(self, dictionary=self.input_dictionary)
+
+        self.sources = None
+
+        # Checks time inputs
+        Read_time_axis.__init__(self)
+
+        # Checks outputs
+        Read_outputs.__init__(self)
+
+        # Checking source and receiver inputs
+        self.input_dictionary["acquisition"].setdefault("source_type", "ricker")
+        self.source_type = self.input_dictionary["acquisition"]["source_type"]
+
+        if self.source_type == "ricker":
+            self.frequency = self.input_dictionary["acquisition"]["frequency"]
+
+        self.input_dictionary["acquisition"].setdefault("amplitude", 1.0)
+        self.amplitude = self.input_dictionary["acquisition"]["amplitude"]
+
+        self.input_dictionary["acquisition"].setdefault("delay", 1.5)
+        self.delay = self.input_dictionary["acquisition"]["delay"]
+
+        self.input_dictionary["acquisition"].setdefault("delay_type", "multiples_of_minimum")
+        self.delay_type = self.input_dictionary["acquisition"]["delay_type"]
+
+        self.input_dictionary["acquisition"].setdefault("source_locations", None)
+        self.source_locations = self.input_dictionary["acquisition"]["source_locations"]
+
+        # Setting up MPI communicator and checking parallelism:
+        self.input_dictionary.setdefault("parallelism", {})
+        self.input_dictionary["parallelism"].setdefault("type", "automatic")
+        self.parallelism_type = self.input_dictionary["parallelism"]["type"]
+
+        # Checking absorving boundary condition parameters
+        Read_boundary_layer.__init__(self)
+
+        # Checking mesh_parameters
+        if self.cell_type == "quadrilateral" or self.method == "spectral_quadrilateral":
             quadrilateral = True
         else:
             quadrilateral = False
-
-        # Checks time inputs
-        self._sanitize_time_inputs()
-
-        # Checks inversion variables, FWI and velocity model inputs and outputs
-        self.real_shot_record = None
-        self._sanitize_optimization_and_velocity()
-
-        # Checking source and receiver inputs
-        self._sanitize_acquisition()
-
-        # Setting up MPI communicator and checking parallelism:
-        self._sanitize_comm(comm)
-
-        # Checking mesh_parameters
         self.input_dictionary["mesh"].setdefault("user_mesh", None)
-        self.input_dictionary.setdefault("absorving_boundary_conditions", {})
-        self.input_dictionary["absorving_boundary_conditions"].setdefault("pad_length", None)
-        self.input_dictionary["absorving_boundary_conditions"].setdefault("status", False)
+        self.input_dictionary["mesh"].setdefault("negative_z", True)
         self.user_mesh = self.input_dictionary["mesh"]["user_mesh"]
-        mesh_parameters = meshing.MeshingParameters(
+        self.mesh_parameters = meshing.MeshingParameters(
             input_mesh_dictionary=self.input_dictionary["mesh"],
             dimension=self.dimension,
             source_frequency=self.input_dictionary["acquisition"]["frequency"],
@@ -340,195 +237,127 @@ class Model_parameters:
             method=self.method,
             degree=self.degree,
             abc_pad_length=self.input_dictionary["absorving_boundary_conditions"]["pad_length"],
+            negative_z=self.input_dictionary["mesh"]["negative_z"]
         )
-        self.mesh_parameters = mesh_parameters
 
-        # Checking absorving boundary condition parameters
-        self._sanitize_absorving_boundary_condition()
+        self.input_dictionary["acquisition"].setdefault("receiver_locations", None)
+        self.receiver_locations = self.input_dictionary["acquisition"]["receiver_locations"]
 
         # Check automatic adjoint
+        self.input_dictionary["time_axis"].setdefault("output_frequency", 99999)
+        self.gradient_sampling_frequency = self.input_dictionary["time_axis"]["gradient_sampling_frequency"]
+        self.output_frequency = self.input_dictionary["time_axis"]["output_frequency"]
         self._sanitize_automatic_adjoint()
 
-        # Sanitize output files
-        self._sanitize_output()
+        # add random string for temp files
         self.random_id_string = str(uuid.uuid4())[:10]
 
-    # default_dictionary["absorving_boundary_conditions"] = {
-    #     "status": False,  # True or false
-    # #  None or non-reflective (outer boundary condition)
-    #     "outer_bc": "non-reflective",
-    # # polynomial, hyperbolic, shifted_hyperbolic
-    #     "damping_type": "polynomial",
-    #     "exponent": 2,  # damping layer has a exponent variation
-    #     "cmax": 4.7,  # maximum acoustic wave velocity in PML - km/s
-    #     "R": 1e-6,  # theoretical reflection coefficient
-    # # thickness of the PML in the z-direction (km) - always positive
-    #     "lz": 0.25,
-    # # thickness of the PML in the x-direction (km) - always positive
-    #     "lx": 0.25,
-    # # thickness of the PML in the y-direction (km) - always positive
-    #     "ly": 0.0,
-    # }
-    def _check_time_integrator(self):
-        if "time_integration_scheme" in self.input_dictionary:
-            time_integrator = self.input_dictionary["time_integration_scheme"]
+    @property
+    def source_locations(self):
+        return self._source_locations
+
+    @source_locations.setter
+    def source_locations(self, value):
+        # Sources has to be estabilshied before mesh parameters object
+        length_z = self.input_dictionary["mesh"]["Lz"]
+        length_x = self.input_dictionary["mesh"]["Lx"]
+        if self.dimension == 2:
+            mesh_lengths = [length_z, length_x]
+        elif self.dimension == 3:
+            length_y = self.input_dictionary["mesh"]["Ly"]
+            mesh_lengths = [length_z, length_x, length_y]
+        if value is not None:
+            for source in value:
+                source_points = list(source)
+                _check_point_in_domain(source_points, mesh_lengths, True)
+            self.number_of_sources = len(value)
         else:
-            time_integrator = "central_difference"
+            self.number_of_sources = 1
 
-        if time_integrator != "central_difference":
-            raise ValueError(
-                "The time integrator specified is not implemented yet"
-            )
+        self._source_locations = value
 
-        return time_integrator
+    @property
+    def receiver_locations(self):
+        return self._receiver_locations
 
-    def _check_equation_type(self):
-        if "equation_type" in self.input_dictionary:
-            equation_type = self.input_dictionary["equation_type"]
-        else:
-            equation_type = "second_order_in_pressure"
+    @receiver_locations.setter
+    def receiver_locations(self, value):
+        if self.dimension == 2:
+            mesh_lengths = [self.mesh_parameters.length_z, self.mesh_parameters.length_x]
+        elif self.dimension == 3:
+            mesh_lengths = [self.mesh_parameters.length_z, self.mesh_parameters.length_x, self.mesh_parameters.length_y]
+        if value is not None:
+            for receiver in value:
+                receiver_points = list(receiver)
+                _check_point_in_domain(receiver_points, mesh_lengths, self.mesh_parameters.negative_z)
+            self.number_of_receivers = len(value)
 
-        if equation_type != "second_order_in_pressure":
+        self._receiver_locations = value
+
+    @property
+    def delay_type(self):
+        return self._delay_type
+
+    @delay_type.setter
+    def delay_type(self, value):
+        accepted_values = ["multiples_of_minimum", "time"]
+        _validate_enum(value, accepted_values, 'delay_type')
+        self._delay_type = value
+
+    @property
+    def source_type(self):
+        return self._source_type
+
+    @source_type.setter
+    def source_type(self, value):
+        accepted_values = ["ricker", "MMS"]
+        _validate_enum(value, accepted_values, 'source_type')
+        self._source_type = value
+
+    @property
+    def frequency(self):
+        return self._frequency
+
+    @frequency.setter
+    def frequency(self, value):
+        if value is not None:
+            if value < 1.0:
+                warnings.warn(f"Frequency of {value} too low for realistic FWI.")
+            elif value > 50:
+                warnings.warn(f"Frequency of {value} too high for efficient FWI.")
+        self._frequency = value
+
+    @property
+    def equation_type(self):
+        return self._equation_type
+
+    @equation_type.setter
+    def equation_type(self, value):
+        if value != "second_order_in_pressure":
             raise ValueError(
                 "The equation type specified is not implemented yet"
             )
+        self._equation_type = value
 
-        return equation_type
+    @property
+    def parallelism_type(self):
+        return self._parallelism_type
 
-    def _sanitize_absorving_boundary_condition(self):
-        if "absorving_boundary_conditions" not in self.input_dictionary:
-            self.input_dictionary["absorving_boundary_conditions"] = {
-                "status": False
-            }
-        dictionary = self.input_dictionary["absorving_boundary_conditions"]
-        self.abc_active = dictionary["status"]
-        BL_obj = io.boundary_layer_io.read_boundary_layer(dictionary)
-        self.abc_boundary_layer_type = BL_obj.abc_boundary_layer_type
+    @parallelism_type.setter
+    def parallelism_type(self, value):
+        accepted_values = ["custom", "automatic", "spatial", ]
+        _validate_enum(value, accepted_values, 'parallelism_type')
 
-        if BL_obj.abc_boundary_layer_type == "hybrid":
-            self.abc_boundary_layer_shape = BL_obj.abc_boundary_layer_shape
-            self.abc_deg_layer = BL_obj.abc_deg_layer
-            self.abc_reference_freq = BL_obj.abc_reference_freq
-            self.abc_get_ref_model = BL_obj.abc_get_ref_model
-            self.abc_deg_eikonal = BL_obj.abc_deg_eikonal
-            self.abc_pad_length = BL_obj.abc_pad_length
-        else:
-            self.abc_exponent = BL_obj.abc_exponent
-            self.abc_cmax = BL_obj.abc_cmax
-            self.abc_R = BL_obj.abc_R
-            self.abc_pad_length = BL_obj.abc_pad_length
-            self.absorb_top = dictionary.get("absorb_top", False)
-            self.absorb_bottom = dictionary.get("absorb_bottom", True)
-            self.absorb_right = dictionary.get("absorb_right", True)
-            self.absorb_left = dictionary.get("absorb_left", True)
-            self.absorb_front = dictionary.get("absorb_front", True)
-            self.absorb_back = dictionary.get("absorb_back", True)
+        if value == "custom":
+            self.shot_ids_per_propagation = self.input_dictionary["parallelism"]["shot_ids_per_propagation"]
+        elif value == "automatic":
+            self.shot_ids_per_propagation = [[i] for i in range(0, self.number_of_sources)]
+        elif value == "spatial":
+            self.shot_ids_per_propagation = [[i] for i in range(0, self.number_of_sources)]
 
-    def _sanitize_output(self):
-        #         default_dictionary["visualization"] = {
-        #     "forward_output" : True,
-        #     "forward_output_filename": "results/forward.pvd",
-        #     "fwi_velocity_model_output": False,
-        #     "velocity_model_filename": None,
-        #     "gradient_output": False,
-        #     "gradient_filename": None,
-        #     "adjoint_output": False,
-        #     "adjoint_filename": None,
-        # }
-        # Checking if any output should be saved
-        if "visualization" in self.input_dictionary:
-            dictionary = self.input_dictionary["visualization"]
-        else:
-            dictionary = {
-                "forward_output": False,
-                "fwi_velocity_model_output": False,
-                "gradient_output": False,
-                "adjoint_output": False,
-            }
-            self.input_dictionary["visualization"] = dictionary
-
-        self.forward_output = dictionary["forward_output"]
-
-        if "fwi_velocity_model_output" in dictionary:
-            self.fwi_velocity_model_output = dictionary[
-                "fwi_velocity_model_output"
-            ]
-        else:
-            self.fwi_velocity_model_output = False
-
-        if "gradient_output" in dictionary:
-            self.gradient_output = dictionary["gradient_output"]
-        else:
-            self.gradient_output = False
-
-        if "adjoint_output" in dictionary:
-            self.adjoint_output = dictionary["adjoint_output"]
-        else:
-            self.adjoint_output = False
-
-        # Getting output file names
-        self._sanitize_output_files()
-
-    def _sanitize_output_files(self):
-        self._sanitize_forward_output_files()
-        dictionary = self.input_dictionary["visualization"]
-
-        # Estabilishing velocity model file and setting a default
-        if "velocity_model_filename" not in dictionary:
-            self.fwi_velocity_model_output_file = (
-                "results/fwi_velocity_model.pvd"
-            )
-        elif dictionary["velocity_model_filename"] is None:
-            self.fwi_velocity_model_output_file = dictionary[
-                "velocity_model_filename"
-            ]
-        else:
-            self.fwi_velocity_model_output_file = (
-                "results/fwi_velocity_model.pvd"
-            )
-
-        self._check_debug_output()
-
-    def _sanitize_forward_output_files(self):
-        dictionary = self.input_dictionary["visualization"]
-        if "forward_output_filename" not in dictionary:
-            self.forward_output_file = "results/forward_propogation.pvd"
-        elif dictionary["forward_output_filename"] is not None:
-            self.forward_output_file = dictionary["forward_output_filename"]
-        else:
-            self.forward_output_file = "results/forward_propagation.pvd"
-
-    def _sanitize_adjoint_and_gradient_output_files(self):
-        dictionary = self.input_dictionary["visualization"]
-        # Estabilishing gradient file and setting a default
-        if "gradient_filename" not in dictionary:
-            self.gradient_output_file = "results/gradient.pvd"
-        elif dictionary["gradient_filename"] is None:
-            self.gradient_output_file = dictionary["gradient_filename"]
-        else:
-            self.gradient_output_file = "results/gradient.pvd"
-
-        # Estabilishing adjoint file and setting a default
-        if "adjoint_filename" not in dictionary:
-            self.adjoint_output_file = "results/adjoint.pvd"
-        elif dictionary["adjoint_filename"] is None:
-            self.adjoint_output_file = dictionary["adjoint_filename"]
-        else:
-            self.adjoint_output_file = "results/adjoint.pvd"
-
-    def _check_debug_output(self):
-        dictionary = self.input_dictionary["visualization"]
-        # Estabilishing debug output
-        if "debug_output" not in dictionary:
-            self.debug_output = False
-        elif dictionary["debug_output"] is None:
-            self.debug_output = False
-        elif dictionary["debug_output"] is False:
-            self.debug_output = False
-        elif dictionary["debug_output"] is True:
-            self.debug_output = True
-        else:
-            raise ValueError("Debug output not understood")
+        self._parallelism_type = value
+        self.comm = utils.mpi_init(self)
+        self.comm.comm.barrier()
 
     def _sanitize_automatic_adjoint(self):
         dictionary = self.input_dictionary
@@ -537,178 +366,15 @@ class Model_parameters:
         else:
             self.automatic_adjoint = False
 
-    def _sanitize_comm(self, comm):
-        dictionary = self.input_dictionary
-        if "parallelism" in dictionary:
-            self.parallelism_type = dictionary["parallelism"]["type"]
-        else:
-            warnings.warn("No paralellism type listed. Assuming automatic")
-            self.parallelism_type = "automatic"
-
-        if self.parallelism_type == "custom":
-            self.shot_ids_per_propagation = dictionary["parallelism"]["shot_ids_per_propagation"]
-        elif self.parallelism_type == "automatic":
-            self.shot_ids_per_propagation = [[i] for i in range(0, self.number_of_sources)]
-        elif self.parallelism_type == "spatial":
-            self.shot_ids_per_propagation = [[i] for i in range(0, self.number_of_sources)]
-
-        if comm is None:
-            self.comm = utils.mpi_init(self)
-            self.comm.comm.barrier()
-        else:
-            self.comm = comm
-
-    def _sanitize_acquisition(self):
-        dictionary = self.input_dictionary["acquisition"]
-        self.number_of_receivers = len(dictionary["receiver_locations"])
-        self.receiver_locations = dictionary["receiver_locations"]
-
-        # Check ricker source:
-        self.source_type = dictionary["source_type"]
-        if self.source_type == "Ricker":
-            self.source_type = "ricker"
-        elif self.source_type == "MMS":
-            self.number_of_sources = 1
-            self.source_locations = []
-            self.frequency = None
-            self.amplitude = None
-            self.delay = None
-            return
-
-        self.number_of_sources = len(dictionary["source_locations"])
-        self.source_locations = dictionary["source_locations"]
-        self.frequency = dictionary["frequency"]
-        if "amplitude" in dictionary:
-            self.amplitude = dictionary["amplitude"]
-        else:
-            self.amplitude = 1.0
-        if "delay" in dictionary:
-            self.delay = dictionary["delay"]
-        else:
-            self.delay = 1.5
-        self.delay_type = dictionary.get("delay_type", "multiples_of_minimun")
-        self.__check_acquisition()
-
-    def _sanitize_optimization_and_velocity(self):
-        """
-        Checks if we are doing a FWI and sorts velocity model types, inputs,
-        and outputs
-        """
-        dictionary = self.input_dictionary
-        self.velocity_model_type = "file"
-
-        # Check if we are doing a FWI and sorting output locations and
-        # velocity model inputs
-        self.running_fwi = False
-        if "inversion" not in dictionary:
-            dictionary["inversion"] = {"perform_fwi": False}
-
-        if dictionary["inversion"]["perform_fwi"]:
-            self.running_fwi = True
-
-        if self.running_fwi:
-            self._sanitize_optimization_and_velocity_for_fwi()
-        else:
-            self._sanitize_optimization_and_velocity_without_fwi()
-
-        if self.initial_velocity_model_file is None:
-            if "velocity_conditional" not in dictionary["synthetic_data"]:
-                self.velocity_model_type = None
-                warnings.warn(
-                    "No velocity model set initially. If using "
-                    "user defined conditional or expression, please "
-                    "input it in the Wave object."
-                )
-
-        if "velocity_conditional" in dictionary["synthetic_data"]:
-            self.velocity_model_type = "conditional"
-            self.velocity_conditional = dictionary["synthetic_data"][
-                "velocity_conditional"
-            ]
-
-        self.forward_output_file = "results/forward_output.pvd"
-
-    def _sanitize_optimization_and_velocity_for_fwi(self):
-        self._sanitize_optimization_and_velocity_without_fwi()
-        dictionary = self.input_dictionary
-        try:
-            self.initial_velocity_model_file = dictionary["inversion"][
-                "initial_guess_model_file"
-            ]
-        except KeyError:
-            self.initial_velocity_model_file = None
-        self.fwi_output_folder = "fwi/"
-        self.control_output_file = self.fwi_output_folder + "control"
-        self.gradient_output_file = self.fwi_output_folder + "gradient"
-        if "optimization_parameters" in dictionary["inversion"]:
-            self.optimization_parameters = dictionary["inversion"][
-                "optimization_parameters"
-            ]
-        else:
-            default_optimization_parameters = {
-                "General": {"Secant": {"Type": "Limited-Memory BFGS",
-                                       "Maximum Storage": 10}},
-                "Step": {
-                    "Type": "Augmented Lagrangian",
-                    "Augmented Lagrangian": {
-                        "Subproblem Step Type": "Line Search",
-                        "Subproblem Iteration Limit": 5.0,
-                    },
-                    "Line Search": {"Descent Method": {"Type": "Quasi-Newton Step"}},
-                },
-                "Status Test": {
-                    "Gradient Tolerance": 1e-16,
-                    "Iteration Limit": None,
-                    "Step Tolerance": 1.0e-16,
-                },
-            }
-            self.optimization_parameters = default_optimization_parameters
-
-        if "shot_record_file" in dictionary["inversion"]:
-            if dictionary["inversion"]["shot_record_file"] is not None:
-                self.real_shot_record = np.load(dictionary["inversion"]["shot_record_file"])
-
-    def _sanitize_optimization_and_velocity_without_fwi(self):
-        dictionary = self.input_dictionary
-        if "synthetic_data" in dictionary:
-            self.initial_velocity_model_file = dictionary["synthetic_data"][
-                "real_velocity_file"
-            ]
-        else:
-            dictionary["synthetic_data"] = {"real_velocity_file": None}
-            self.initial_velocity_model_file = None
-
     def _sanitize_time_inputs(self):
-        dictionary = self.input_dictionary["time_axis"]
-        self.final_time = dictionary["final_time"]
-        self._dt = dictionary["dt"]
-        if "initial_time" in dictionary:
-            self.initial_time = dictionary["initial_time"]
-        else:
-            self.initial_time = 0.0
-        self.output_frequency = dictionary["output_frequency"]
-        self.gradient_sampling_frequency = dictionary[
-            "gradient_sampling_frequency"
-        ]
-
         self.__check_time()
-
-    def __check_acquisition(self):
-        for source in self.source_locations:
-            if self.dimension == 2:
-                source_z, source_x = source
-                source_y = 0.0
-            elif self.dimension == 3:
-                source_z, source_x, source_y = source
-            else:
-                raise ValueError("Source input type not supported")
 
     def __check_time(self):
         if self.final_time < 0.0:
             raise ValueError(f"Negative time of {self.final_time} not valid.")
-        if self._dt > 1.0:
+        if self.dt > 1.0:
             warnings.warn(f"Time step of {self.dt} too big.")
-        if self._dt is None:
+        if self.dt is None:
             warnings.warn(
                 "Timestep not given. Will calculate internally when user \
                     attemps to propagate wave."
@@ -776,3 +442,48 @@ class Model_parameters:
             return io.read_mesh(self.mesh_parameters)
         else:
             return self.user_mesh
+
+
+def _validate_enum(value, accepted_values, name):
+    if value not in accepted_values:
+        raise ValueError(f"{name} of {value} not one of {accepted_values}.")
+    return value
+
+
+def _check_point_in_domain(point_coordinates, input_mesh_lengths, negative_z):
+    """
+    Checks if a point is within the mesh domain.
+
+    Parameters
+    ----------
+    point_coordinates : list
+        Coordinates of the point to check.
+    mesh_lengths : list
+        Lengths of the mesh in each dimension (always positive).
+    negative_z : bool
+        If True, the first dimension (z) is negative.
+
+    Raises
+    ------
+    ValueError
+        If the point is outside the mesh domain.
+    """
+    # avoid changing mesh lengths outside of this
+    mesh_lengths = deepcopy(input_mesh_lengths)
+    if negative_z:
+        print("DEBUG")
+        mesh_lengths[0] = -mesh_lengths[0]
+
+    for i, (coord, length) in enumerate(zip(point_coordinates, mesh_lengths)):
+        if negative_z and i == 0:
+            # For negative_z, domain is [length, 0] (length is negative)
+            if not (length <= coord <= 0):
+                raise ValueError(
+                    f"Coordinate {coord} in dimension {i} is outside the domain [{length}, 0]."
+                )
+        else:
+            # For other dimensions, domain is [0, length]
+            if not (0 <= coord <= length):
+                raise ValueError(
+                    f"Coordinate {coord} in dimension {i} is outside the domain [0, {length}]."
+                )

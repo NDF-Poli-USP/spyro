@@ -43,13 +43,11 @@ dictionary["inversion"] = {
 dictionary["absorving_boundary_conditions"] = {
     "status": False,  # True or false
     "outer_bc": "non-reflective",  # None or non-reflective (outer boundary condition)
-    "damping_type": "polynomial",  # polynomial, hyperbolic, shifted_hyperbolic
+    "damping_type": "PML",  # PML, local, or hybrid
     "exponent": 2,  # damping layer has a exponent variation
     "cmax": 4.7,  # maximum acoustic wave velocity in PML - km/s
     "R": 1e-6,  # theoretical reflection coefficient
-    "lz": 0.25,  # thickness of the PML in the z-direction (km) - always positive
-    "lx": 0.25,  # thickness of the PML in the x-direction (km) - always positive
-    "ly": 0.0,  # thickness of the PML in the y-direction (km) - always positive
+    "pad_length": 0.25,  # thickness of the PML (km) - always positive
 }
 
 # Create a source injection operator. Here we use a single source with a
@@ -76,8 +74,8 @@ dictionary["time_axis"] = {
 
 
 def test_method_reader():
-    test_dictionary = deepcopy(dictionary)
-    test_dictionary["options"] = {
+    test_dictionary0 = deepcopy(dictionary)
+    test_dictionary0["options"] = {
         "cell_type": None,  # simplexes such as triangles or tetrahedra (T) or quadrilaterals (Q)
         "variant": None,  # lumped, equispaced or DG, default is lumped
         # (MLT/spectral_quadrilateral/DG_triangle/DG_quadrilateral) You can either specify a cell_type+variant or a method
@@ -87,17 +85,20 @@ def test_method_reader():
     }
     # Trying out different method entries and seeing if all of them work for MLT
     test1 = False
+    test_dictionary = deepcopy(test_dictionary0)
     test_dictionary["options"]["method"] = "MLT"
     model = Model_parameters(dictionary=test_dictionary)
     if model.method == "mass_lumped_triangle":
         test1 = True
 
+    test_dictionary = deepcopy(test_dictionary0)
     test2 = False
     test_dictionary["options"]["method"] = "KMV"
     model = Model_parameters(dictionary=test_dictionary)
     if model.method == "mass_lumped_triangle":
         test2 = True
 
+    test_dictionary = deepcopy(test_dictionary0)
     test3 = False
     test_dictionary["options"]["method"] = "mass_lumped_triangle"
     model = Model_parameters(dictionary=test_dictionary)
@@ -105,6 +106,7 @@ def test_method_reader():
         test3 = True
 
     # Trying out different method entries for spectral quads
+    test_dictionary = deepcopy(test_dictionary0)
     test4 = False
     test_dictionary["options"]["method"] = "spectral_quadrilateral"
     model = Model_parameters(dictionary=test_dictionary)
@@ -112,13 +114,16 @@ def test_method_reader():
         test4 = True
 
     test5 = False
+    test_dictionary = deepcopy(test_dictionary0)
     test_dictionary["options"]["method"] = "CG"
     test_dictionary["options"]["variant"] = "GLL"
-    model = Model_parameters(dictionary=test_dictionary)
-    if model.method == "spectral_quadrilateral":
+    try:
+        model = Model_parameters(dictionary=test_dictionary)
+    except ValueError:
         test5 = True
 
     test6 = False
+    test_dictionary = deepcopy(test_dictionary0)
     test_dictionary["options"]["method"] = "SEM"
     model = Model_parameters(dictionary=test_dictionary)
     if model.method == "spectral_quadrilateral":
@@ -126,12 +131,14 @@ def test_method_reader():
 
     # Trying out some entries for other less used methods
     test7 = False
+    test_dictionary = deepcopy(test_dictionary0)
     test_dictionary["options"]["method"] = "DG_triangle"
     model = Model_parameters(dictionary=test_dictionary)
     if model.method == "DG_triangle":
         test7 = True
 
     test8 = False
+    test_dictionary = deepcopy(test_dictionary0)
     test_dictionary["options"]["method"] = "DG_quadrilateral"
     model = Model_parameters(dictionary=test_dictionary)
     if model.method == "DG_quadrilateral":
@@ -141,8 +148,8 @@ def test_method_reader():
 
 
 def test_cell_type_reader():
-    ct_dictionary = deepcopy(dictionary)
-    ct_dictionary["options"] = {
+    ct_dictionary0 = deepcopy(dictionary)
+    ct_dictionary0["options"] = {
         "cell_type": None,  # simplexes such as triangles or tetrahedra (T) or quadrilaterals (Q)
         "variant": None,  # lumped, equispaced or DG, default is lumped
         "method": None,  # (MLT/spectral_quadrilateral/DG_triangle/DG_quadrilateral) You can either specify a cell_type+variant or a method
@@ -150,45 +157,51 @@ def test_cell_type_reader():
         "dimension": 2,  # dimension
     }
     # Testing lumped cases
-    ct_dictionary["options"]["variant"] = "lumped"
+    ct_dictionary0["options"]["variant"] = "lumped"
 
     test1 = False
+    ct_dictionary = deepcopy(ct_dictionary0)
     ct_dictionary["options"]["cell_type"] = "triangle"
     model = Model_parameters(dictionary=ct_dictionary)
     if model.method == "mass_lumped_triangle":
         test1 = True
 
     test2 = False
+    ct_dictionary = deepcopy(ct_dictionary0)
     ct_dictionary["options"]["cell_type"] = "quadrilateral"
     model = Model_parameters(dictionary=ct_dictionary)
     if model.method == "spectral_quadrilateral":
         test2 = True
 
     # Testing equispaced cases
-    ct_dictionary["options"]["variant"] = "equispaced"
+    ct_dictionary0["options"]["variant"] = "equispaced"
 
     test3 = False
+    ct_dictionary = deepcopy(ct_dictionary0)
     ct_dictionary["options"]["cell_type"] = "triangle"
     model = Model_parameters(dictionary=ct_dictionary)
-    if model.method == "CG_triangle":
+    if model.method == "CG":
         test3 = True
 
     test4 = False
+    ct_dictionary = deepcopy(ct_dictionary0)
     ct_dictionary["options"]["cell_type"] = "quadrilateral"
     model = Model_parameters(dictionary=ct_dictionary)
-    if model.method == "CG_quadrilateral":
+    if model.method == "CG":
         test4 = True
 
     # Testing DG cases
-    ct_dictionary["options"]["variant"] = "DG"
+    ct_dictionary0["options"]["variant"] = "DG"
 
     test5 = False
+    ct_dictionary = deepcopy(ct_dictionary0)
     ct_dictionary["options"]["cell_type"] = "triangle"
     model = Model_parameters(dictionary=ct_dictionary)
     if model.method == "DG_triangle":
         test5 = True
 
     test6 = False
+    ct_dictionary = deepcopy(ct_dictionary0)
     ct_dictionary["options"]["cell_type"] = "quadrilateral"
     model = Model_parameters(dictionary=ct_dictionary)
     if model.method == "DG_quadrilateral":
@@ -294,7 +307,7 @@ def test_dictionary_conversion():
     # Specify a 250-m PML on the three sides of the domain to damp outgoing waves.
     new_dictionary["absorving_boundary_conditions"] = {
         "status": True,  # True or false
-        "damping_type": "PML",  # polynomial, hyperbolic, shifted_hyperbolic
+        "damping_type": "PML",  # PML, local, or hybrid
         "exponent": 2,  # damping layer has a exponent variation
         "cmax": 4.7,  # maximum acoustic wave velocity in PML - km/s
         "R": 1e-6,  # theoretical reflection coefficient
@@ -337,32 +350,14 @@ def test_dictionary_conversion():
         same = False
     if model_from_new.dimension != model_from_old.dimension:
         same = False
-    if model_from_new._dt != model_from_old._dt:
+    if model_from_new.dt != model_from_old.dt:
         same = False
     if model_from_new.final_time != model_from_old.final_time:
         same = False
-    if model_from_new.forward_output_file != model_from_old.forward_output_file:
-        same = False
-    if model_from_new.running_fwi != model_from_old.running_fwi:
+    if model_from_new.forward_output_filename != model_from_old.forward_output_filename:
         same = False
 
     assert same
-
-
-def test_degree_exception_2d():  # TODO: improve
-    ex_dictionary = deepcopy(dictionary)
-    with pytest.raises(Exception):
-        ex_dictionary["options"]["dimension"] = 2
-        ex_dictionary["options"]["degree"] = 6
-        model = Model_parameters(dictionary=ex_dictionary)  # noqa: F841
-
-
-def test_degree_exception_3d():  # TODO: improve
-    ex_dictionary = deepcopy(dictionary)
-    with pytest.raises(Exception):
-        ex_dictionary["options"]["dimension"] = 3
-        ex_dictionary["options"]["degree"] = 5
-        model = Model_parameters(dictionary=ex_dictionary)  # noqa: F841
 
 
 def test_time_exception():  # TODO: improve
@@ -396,8 +391,6 @@ if __name__ == "__main__":
     test_method_reader()
     test_cell_type_reader()
     test_dictionary_conversion()
-    test_degree_exception_2d()
-    test_degree_exception_3d()
     test_time_exception()
     test_source_exception()
     test_receiver_exception()

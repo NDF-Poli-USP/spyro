@@ -23,6 +23,7 @@ from .model_parameters import Model_parameters
 from .backwards_compatibility_io import Dictionary_conversion
 from . import dictionaryio
 from . import boundary_layer_io
+from . import time_io
 
 __all__ = [
     "write_function_to_grid",
@@ -50,4 +51,5 @@ __all__ = [
     "delete_tmp_files",
     "ensemble_shot_record",
     "ensemble_functional",
+    "time_io",
 ]

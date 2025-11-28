@@ -89,6 +89,7 @@ def test_immersed_polygon_forward():
     assert all([test1, test2, test3])
 
 
+@pytest.mark.slow
 def test_camembert_elastic():
     from spyro.examples.camembert_elastic import wave
     wave.forward_solve()

@@ -123,7 +123,7 @@ def timedependentSource(model, t, freq=None, amp=1, delay=1.5):
 
 
 def ricker_wavelet(
-    t, freq, amp=1.0, delay=1.5, delay_type="multiples_of_minimun"
+    t, freq, amp=1.0, delay=1.5, delay_type="multiples_of_minimum"
 ):
     """Creates a Ricker source function with a
     delay in term of multiples of the distance
@@ -142,7 +142,7 @@ def ricker_wavelet(
         between the minimums.
     delay_type: string
         Type of delay. Options are:
-        - multiples_of_minimun
+        - multiples_of_minimum
         - time
 
     Returns
@@ -150,7 +150,7 @@ def ricker_wavelet(
     float
         Value of the wavelet at time t
     """
-    if delay_type == "multiples_of_minimun":
+    if delay_type == "multiples_of_minimum":
         time_delay = delay * math.sqrt(6.0) / (math.pi * freq)
     elif delay_type == "time":
         time_delay = delay
@@ -166,7 +166,7 @@ def full_ricker_wavelet(
     frequency,
     cutoff=None,
     delay=1.5,
-    delay_type="multiples_of_minimun",
+    delay_type="multiples_of_minimum",
 ):
     """Compute the Ricker wavelet optionally applying low-pass filtering
     using cutoff frequency in Hertz.
@@ -186,7 +186,7 @@ def full_ricker_wavelet(
         between the minimums.
     delay_type: string
         Type of delay. Options are:
-        - multiples_of_minimun
+        - multiples_of_minimum
         - time
 
     Returns
