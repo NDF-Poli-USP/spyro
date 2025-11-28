@@ -103,9 +103,13 @@ jobs:
       - name: Run spyro smoke tests
         run: |
           . venv/bin/activate
-          git clone --depth 1 https://github.com/NDF-Poli-USP/spyro.git spyro-repo
-          pip install --verbose ./spyro-repo
-          mpiexec -n 6 python -m pytest  spyro-repo/test_integration/
+
+          : # Use the checked-out repository (the code under test) instead of
+          : # cloning and installing Spyro from GitHub. This ensures CI runs
+          : # tests against the code in the PR.
+          cd "$GITHUB_WORKSPACE" || true
+          python -m pip install --verbose -e .
+          mpiexec -n 6 python -m pytest test_integration/
 
       - name: Post-run cleanup
         if: always()
