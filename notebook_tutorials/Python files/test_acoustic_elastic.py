@@ -17,9 +17,9 @@ rho_f = 1.0
 K     = 4.0
 
 # solid
-rho_s = 2.0
-mu    = 8.0
-lam   = 12.0
+rho_s = 1.0
+mu    = 0.
+lam   = 4.0
 
 # mesh
 mesh = Mesh("acoustic_elastic.msh")
