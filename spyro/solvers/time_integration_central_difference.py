@@ -39,7 +39,6 @@ def central_difference(wave, source_ids=[0]):
     usol_recv = []
     save_step = 0
     for step in range(nt):
-        # Basic way of applying sources
         wave.update_source_expression(t)
         fire.assemble(wave.rhs, tensor=wave.B)
 
