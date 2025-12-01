@@ -1,6 +1,6 @@
 import numpy as np
 
-from firedrake import (assemble, Constant, curl, DirichletBC, div, Function,
+from firedrake import (assemble, norm, Constant, curl, DirichletBC, div, Function,
                        FunctionSpace, project, VectorFunctionSpace)
 
 from .elastic_wave import ElasticWave
@@ -234,3 +234,10 @@ class IsotropicWave(ElasticWave):
         self.s_wave.assign(project(curl(self.get_function()), self.C_h))
 
         return self.s_wave
+
+    @override
+    def check_stability(self):
+        assert (
+            np.isfinite(norm(self.get_function()))
+        ), "Numerical instability. Try reducing dt or building the " \
+           "mesh differently"

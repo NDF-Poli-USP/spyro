@@ -567,3 +567,21 @@ def plot_model_in_p1(Wave_object, dx=0.01, filename="model.png", abc_points=None
     new_wave_obj.set_initial_velocity_model(conditional=Wave_object.initial_velocity_model)
 
     return plot_model(new_wave_obj, filename=filename, abc_points=abc_points, show=show, flip_axis=flip_axis)
+
+
+def plot_receiver(wave, receiver_id=0, show=False, filename="receiver.png", xi=None):
+    nt = int(wave.final_time/wave.dt) + 1
+    time_vector = np.linspace(0.0, wave.final_time, nt)
+    plt.close()
+    if xi is not None:
+        title = f"Receiver {receiver_id} at direction {xi}"
+        plt.plot(time_vector, wave.receivers_output[:, receiver_id, xi])
+    else:
+        title = f"Receiver {receiver_id}"
+        plt.plot(time_vector, wave.receivers_output[:, receiver_id])
+    plt.title(title)
+    if filename is not None:
+        plt.savefig(filename)
+    if show:
+        plt.show()
+    plt.close()

@@ -492,10 +492,8 @@ def get_hexa_real_cell_node_map(V, mesh):
     cell_node_map = np.zeros(
         (layers * cells_per_layer, nodes_per_cell), dtype=int
     )
-    print(f"cnm size : {np.shape(cell_node_map)}", flush=True)
 
     for layer in range(layers):
-        print(f"layer : {layer} of {layers}", flush=True)
         for cell in range(cells_per_layer):
             cnm_base = weird_cnm[cell]
             cell_id = layer + layers * cell
