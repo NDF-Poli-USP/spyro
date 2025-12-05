@@ -184,7 +184,11 @@ class IsotropicWave(ElasticWave):
         self.parse_boundary_conditions()
         self.parse_volumetric_forces()
 	
-        
+        try:
+            d = self.input_dictionary.get("viscoelasticity", False)
+            self.viscoelastic = d["viscoelastic"]
+        except:
+            self.viscoelastic = False
 
         if self.viscoelastic == True:
             d = self.input_dictionary.get("viscoelasticity", False)
