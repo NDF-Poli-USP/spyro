@@ -46,20 +46,13 @@ class Wave(Model_parameters, metaclass=ABCMeta):
 
     Methods:
     --------
-    set_mesh()
-        Sets or calculates new mesh
-    set_solver_parameters()
-        Sets new or default solver parameters
-    get_spatial_coordinates()
-        Returns spatial coordinates of mesh
-    set_initial_velocity_model()
-        Ssets initial velocity model
-    get_and_set_maximum_dt()
-        Calculates and/or sets maximum dt
-    get_mass_matrix_diagonal()
-        Returns diagonal of mass matrix
-    set_last_solve_as_real_shot_record()
-        Sets last solve as real shot record
+    set_mesh: sets or calculates new mesh
+    set_solver_parameters: sets new or default solver parameters
+    get_spatial_coordinates: returns spatial coordinates of mesh
+    set_initial_velocity_model: sets initial velocity model
+    get_and_set_maximum_dt: calculates and/or sets maximum dt
+    get_mass_matrix_diagonal: returns diagonal of mass matrix
+    set_last_solve_as_real_shot_record: sets last solve as real shot record
     """
 
     def __init__(self, dictionary=None, comm=None):
@@ -87,7 +80,7 @@ class Wave(Model_parameters, metaclass=ABCMeta):
         if self.mesh is not None:
             self._build_function_space()
             self._map_sources_and_receivers()
-        elif self.mesh_parameters.mesh_type == "firedrake_mesh":
+        elif self.mesh_type == "firedrake_mesh":
             warnings.warn(
                 "No mesh file, Firedrake mesh will be automatically generated."
             )
@@ -97,21 +90,21 @@ class Wave(Model_parameters, metaclass=ABCMeta):
         self.source_expression = None
         # Object for efficient application of sources
 
-        self.field_logger = FieldLogger(self.comm,
-                                        self.input_dictionary["visualization"])
+        self.field_logger = FieldLogger(self.comm, self.input_dictionary["visualization"])
         self.field_logger.add_field("forward", self.get_function_name(),
                                     lambda: self.get_function())
+        try:
+            d = self.input_dictionary.get("viscoelasticity", False)
+            self.viscoelastic = d["viscoelastic"]
+        except:
+            self.viscoelastic = False
 
     def forward_solve(self):
         """Solves the forward problem."""
-
-        print("\nSolving Forward Problem")
-
         if self.function_space is None:
             self.force_rebuild_function_space()
 
-        if self.abc_boundary_layer_type != "hybrid":
-            self._initialize_model_parameters()
+        self._initialize_model_parameters()
         self.matrix_building()
         self.wave_propagator()
 
@@ -127,9 +120,9 @@ class Wave(Model_parameters, metaclass=ABCMeta):
         pass
 
     def set_mesh(
-            self,
-            user_mesh=None,
-            input_mesh_parameters={},
+        self,
+        user_mesh=None,
+        mesh_parameters=None,
     ):
         """
         Set the mesh for the solver.
@@ -140,7 +133,7 @@ class Wave(Model_parameters, metaclass=ABCMeta):
         """
         super().set_mesh(
             user_mesh=user_mesh,
-            input_mesh_parameters=input_mesh_parameters,
+            mesh_parameters=mesh_parameters,
         )
 
         self.mesh = self.get_mesh()
@@ -198,8 +191,6 @@ class Wave(Model_parameters, metaclass=ABCMeta):
         output:  bool (optional)
             If True, outputs the velocity model to a pvd file for visualization.
         """
-        if new_file is not None:
-            self.initial_velocity_model_file = new_file
         # If no mesh is set, we have to do it beforehand
         if self.mesh is None:
             self.set_mesh()
@@ -232,7 +223,6 @@ class Wave(Model_parameters, metaclass=ABCMeta):
             self.initial_velocity_model = velocity_model_function
         elif new_file is not None:
             self.initial_velocity_model_file = new_file
-            self._get_initial_velocity_model()
         elif constant is not None:
             V = self.function_space
             vp = fire.Function(V, name="velocity")
@@ -385,7 +375,7 @@ class Wave(Model_parameters, metaclass=ABCMeta):
         pass
 
     @ensemble_propagator
-    def wave_propagator(self, dt=None, final_time=None, source_nums=[0]):
+    def wave_propagator(self, dt=None, final_time=None, source_num=0):
         """Propagates the wave forward in time.
         Currently uses central differences.
 
@@ -410,8 +400,8 @@ class Wave(Model_parameters, metaclass=ABCMeta):
         if dt is not None:
             self.dt = dt
 
-        self.current_sources = source_nums
-        usol, usol_recv = time_integrator(self, source_nums)
+        self.current_source = source_num
+        usol, usol_recv = time_integrator(self, source_num)
 
         return usol, usol_recv
 
