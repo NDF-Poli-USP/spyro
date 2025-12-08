@@ -3,15 +3,11 @@ import warnings
 from scipy.optimize import minimize as scipy_minimize
 from mpi4py import MPI  # noqa: F401
 import numpy as np
-import resource
 
 from .acoustic_wave import AcousticWave
 from ..utils import compute_functional
 from ..utils import Gradient_mask_for_pml, Mask
 from ..plots import plot_model as spyro_plot_model
-from ..io.basicio import switch_serial_shot
-from ..io.basicio import load_shots, save_shots
-
 
 try:
     from ROL.firedrake_vector import FiredrakeVector as FireVector
@@ -24,17 +20,11 @@ except ImportError:
 # ROL = None
 
 
-def get_peak_memory():
-    peak_memory_kb = resource.getrusage(resource.RUSAGE_SELF).ru_maxrss
-    peak_memory_mb = peak_memory_kb / 1024
-    return peak_memory_mb
-
-
 class L2Inner(object):
     def __init__(self, Wave_obj):
         V = Wave_obj.function_space
         # print(f"Dir {dir(Wave_obj)}", flush=True)
-        dxlump = fire.dx(**Wave_obj.quadrature_rule)
+        dxlump = fire.dx(scheme=Wave_obj.quadrature_rule)
         self.A = fire.assemble(
             fire.TrialFunction(V) * fire.TestFunction(V) * dxlump,
             mat_type="matfree"
@@ -176,9 +166,6 @@ class FullWaveformInversion(AcousticWave):
         self.functional_history = []
         self.control_out = fire.VTKFile("results/control.pvd")
         self.gradient_out = fire.VTKFile("results/gradient.pvd")
-        self.real_shot_record_files = dictionary["inversion"].get("real_shot_record_files", None)
-        if self.real_shot_record_files is not None:
-            self.load_real_shot_record(filename=self.real_shot_record_files)
 
     def calculate_misfit(self, c=None):
         """
@@ -192,25 +179,15 @@ class FullWaveformInversion(AcousticWave):
         if c is not None:
             self.initial_velocity_model.dat.data[:] = c
         self.forward_solve()
-        output = fire.File("control_" + str(self.current_iteration)+".pvd")
+        output = fire.VTKFile("control_" + str(self.current_iteration)+".pvd")
         output.write(self.c)
-        np.save(f"control{self.comm.ensemble_comm.rank}_{self.comm.comm.rank}", self.c.dat.data[:])
-        if self.parallelism_type == "spatial" and self.number_of_sources > 1:
-            misfit_list = []
-            guess_shot_record_list = []
-            for snum in range(self.number_of_sources):
-                switch_serial_shot(self, snum)
-                guess_shot_record_list.append(self.forward_solution_receivers)
-                misfit_list.append(self.real_shot_record[snum] - self.forward_solution_receivers)
-            self.guess_shot_record = guess_shot_record_list
-            self.misfit = misfit_list
-        else:
-            self.guess_shot_record = self.forward_solution_receivers
-            self.guess_forward_solution = self.forward_solution
-            self.misfit = self.real_shot_record - self.guess_shot_record
+        self.guess_shot_record = self.forward_solution_receivers
+        self.guess_forward_solution = self.forward_solution
+
+        self.misfit = self.real_shot_record - self.guess_shot_record
         return self.misfit
 
-    def generate_real_shot_record(self, plot_model=False, model_filename="model.png", abc_points=None, save_shot_record=True, shot_filename="shots/shot_record_"):
+    def generate_real_shot_record(self, plot_model=False, filename=None, abc_points=None):
         """
         Generates the real synthetic shot record. Only for use in synthetic test cases.
         """
@@ -218,15 +195,12 @@ class FullWaveformInversion(AcousticWave):
         if Wave_obj_real_velocity.mesh is None and self.real_mesh is not None:
             Wave_obj_real_velocity.mesh = self.real_mesh
         if Wave_obj_real_velocity.initial_velocity_model is None:
-            print("C", flush=True)
             Wave_obj_real_velocity.initial_velocity_model = self.real_velocity_model
 
         if plot_model and Wave_obj_real_velocity.comm.comm.rank == 0 and Wave_obj_real_velocity.comm.ensemble_comm.rank == 0:
-            spyro_plot_model(Wave_obj_real_velocity, filename=model_filename, abc_points=abc_points)
+            spyro_plot_model(Wave_obj_real_velocity, filename=filename, abc_points=abc_points)
 
         Wave_obj_real_velocity.forward_solve()
-        if save_shot_record:
-            save_shots(Wave_obj_real_velocity, file_name=shot_filename)
         self.real_shot_record = Wave_obj_real_velocity.real_shot_record
         self.quadrature_rule = Wave_obj_real_velocity.quadrature_rule
 
@@ -326,7 +300,7 @@ class FullWaveformInversion(AcousticWave):
     def set_real_mesh(
         self,
         user_mesh=None,
-        input_mesh_parameters=None,
+        mesh_parameters=None,
     ):
         """
         Set the mesh for the real synthetic model.
@@ -342,17 +316,16 @@ class FullWaveformInversion(AcousticWave):
         -------
         None
         """
-        input_mesh_parameters.setdefault("mesh_type", "firedrake_mesh")
         super().set_mesh(
             user_mesh=user_mesh,
-            input_mesh_parameters=input_mesh_parameters,
+            mesh_parameters=mesh_parameters,
         )
         self.real_mesh = self.get_mesh()
 
     def set_guess_mesh(
         self,
         user_mesh=None,
-        input_mesh_parameters={},
+        mesh_parameters=None,
     ):
         """
         Set the mesh for the guess model.
@@ -370,7 +343,7 @@ class FullWaveformInversion(AcousticWave):
         """
         super().set_mesh(
             user_mesh=user_mesh,
-            input_mesh_parameters=input_mesh_parameters,
+            mesh_parameters=mesh_parameters,
         )
         self.guess_mesh = self.get_mesh()
 
@@ -389,15 +362,6 @@ class FullWaveformInversion(AcousticWave):
 
         self.functional_history.append(Jm)
         self.functional = Jm
-        peak_memory_mb = get_peak_memory()
-        # Save the functional value to a text file
-        if self.comm.ensemble_comm.rank == 0 and self.comm.comm.rank == 0:
-            print(f"Functional: {Jm} at iteration: {self.current_iteration}", flush=True)
-            with open("functional_values.txt", "a") as file:
-                file.write(f"Iteration: {self.current_iteration}, Functional: {Jm}\n")
-
-            with open("peak_memory.txt", "a") as file:
-                file.write(f"Peak memory usage: {peak_memory_mb:.2f} MB \n")
 
         return Jm
 
@@ -418,12 +382,19 @@ class FullWaveformInversion(AcousticWave):
         if calculate_functional:
             self.get_functional(c=c)
         comm.comm.barrier()
-        self.gradient = self.gradient_solve(misfit=self.misfit, forward_solution=self.guess_forward_solution)
+        dJ = self.gradient_solve(misfit=self.misfit, forward_solution=self.guess_forward_solution)
+        dJ_total = fire.Function(self.function_space)
+        comm.comm.barrier()
+        dJ_total = comm.allreduce(dJ, dJ_total)
+        dJ_total /= comm.ensemble_comm.size
+        if comm.comm.size > 1:
+            dJ_total /= comm.comm.size
+        self.gradient = dJ_total
         self._apply_gradient_mask()
-        if save:
+        if save and comm.comm.rank == 0:
             # self.gradient_out.write(dJ_total)
-            output = fire.File("gradient_" + str(self.current_iteration)+".pvd")
-            output.write(self.gradient)
+            output = fire.VTKFile("gradient_" + str(self.current_iteration)+".pvd")
+            output.write(dJ_total)
             print("DEBUG")
         self.current_iteration += 1
         comm.comm.barrier()
@@ -443,14 +414,14 @@ class FullWaveformInversion(AcousticWave):
             "scipy_options": {
                 "disp": True,
                 "eps": 1e-15,
-                "ftol": 1e-7, "maxiter": kwargs.pop("maxiter", 20),
+                "gtol": 1e-15, "maxiter": kwargs.pop("maxiter", 20),
             }
         }
         parameters.update(kwargs)
 
         vmin = parameters["vmin"]
         vmax = parameters["vmax"]
-        vp_0 = self.initial_velocity_model.vector()
+        vp_0 = self.initial_velocity_model.vector().gather()
         bounds = [(vmin, vmax) for _ in range(len(vp_0))]
         options = parameters["scipy_options"]
 
@@ -474,7 +445,7 @@ class FullWaveformInversion(AcousticWave):
         )
         vp_end = fire.Function(self.function_space)
         vp_end.dat.data[:] = result.x
-        fire.File("vp_end.pvd").write(vp_end)
+        fire.VTKFile("vp_end.pvd").write(vp_end)
 
     def run_fwi_rol(self, **kwargs):
         """
@@ -584,11 +555,6 @@ class FullWaveformInversion(AcousticWave):
         else:
             pass
 
-    def load_real_shot_record(self, filename="shots/shot_record_"):
-        load_shots(self, file_name=filename)
-        self.real_shot_record = self.forward_solution_receivers
-        self.forward_solution_receivers = None
-
 
 class SyntheticRealAcousticWave(AcousticWave):
     """
@@ -614,11 +580,4 @@ class SyntheticRealAcousticWave(AcousticWave):
 
     def forward_solve(self):
         super().forward_solve()
-        if self.parallelism_type == "spatial" and self.number_of_sources > 1:
-            real_shot_record_list = []
-            for snum in range(self.number_of_sources):
-                switch_serial_shot(self, snum)
-                real_shot_record_list.append(self.receivers_output)
-            self.real_shot_record = real_shot_record_list
-        else:
-            self.real_shot_record = self.receivers_output
+        self.real_shot_record = self.receivers_output

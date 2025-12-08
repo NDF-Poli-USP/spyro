@@ -3,14 +3,9 @@ from scipy.ndimage import gaussian_filter
 import segyio
 import numpy as np
 import matplotlib.pyplot as plt
-try:
-    from SeismicMesh import write_velocity_model
-    HAS_SEISMICMESH = True
-except ImportError:
-    HAS_SEISMICMESH = False
 
 
-def smooth_velocity_field_file(input_filename, output_filename, sigma, show=False, write_hdf5=True, i_limit=None, vp_limit=None, tol=1e-5):
+def smooth_velocity_field_file(input_filename, output_filename, sigma, show=False):
     """Smooths a velocity field using a Gaussian filter.
 
     Parameters
@@ -40,23 +35,13 @@ def smooth_velocity_field_file(input_filename, output_filename, sigma, show=Fals
     else:
         raise ValueError("Not yet implemented!")
 
-    vp_min = np.min(vp)
-    vp_max = np.max(vp)
-    print(f"Velocity model has minimum vp of {vp_min}, and max of {vp_max}")
-
     vp_smooth = gaussian_filter(vp, sigma)
     ni, nj = np.shape(vp)
-    if i_limit is None:
-        i_limit = 0
-    if vp_limit is None:
-        vp_limit = vp_min
 
     for i in range(ni):
         for j in range(nj):
-            if i < i_limit:
+            if vp[i, j] < 1.51 and i < 400:
                 vp_smooth[i, j] = vp[i, j]
-            if vp[i, j] <= vp_limit + tol:
-                vp_smooth[i, j] = vp_min
 
     spec = segyio.spec()
     spec.sorting = 2  # not sure what this means
@@ -87,11 +72,5 @@ def smooth_velocity_field_file(input_filename, output_filename, sigma, show=Fals
         ax.axis("equal")
         plt.savefig(output_filename+".png")
         plt.show()
-
-    if write_hdf5:
-        if HAS_SEISMICMESH:
-            write_velocity_model(output_filename, ofname=output_filename[:-5])
-        else:
-            print("Warning: SeismicMesh not available, skipping HDF5 writing.")
 
     return None

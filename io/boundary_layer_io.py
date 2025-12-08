@@ -34,20 +34,8 @@ class read_boundary_layer:
         Theoretical reflection coefficient
     abc_pad_length : float
         Thickness of the PML in the z-direction (km) - always positive
-    abc_boundary_layer_type : `str`
-        Type of the boundary layer. Option 'hybrid' is based on paper
-        of Salas et al. (2022). doi: https://doi.org/10.1016/j.apm.2022.09.014
-    abc_boundary_layer_shape : str
-        Shape type of pad layer. Options: 'rectangular' or 'hypershape'
-    abc_deg_layer : `int`
-        Hypershape degree
-    abc_reference_freq : `str`
-        Reference frequency for sizing the hybrid absorbing layer
-        Options: 'source' or 'boundary'
-    abc_deg_eikonal : `int`
-        Finite element order for the Eikonal analysis
-    abc_get_ref_model : `bool`
-        If True, the infinite model is created
+    abc_boundary_layer_type : str
+        Type of the boundary layer
 
     Methods
     -------
@@ -57,31 +45,21 @@ class read_boundary_layer:
 
     def __init__(self, abc_dictionary):
         self.dictionary = abc_dictionary
-        if self.dictionary["status"] is False or \
-                self.dictionary["damping_type"] == "local":
+        if self.dictionary["status"] is False or self.dictionary["damping_type"] == "local":
             self.abc_exponent = None
             self.abc_cmax = None
             self.abc_R = None
-            self.abc_pad_length = self.dictionary.get("pad_length", 0.0)
+            self.abc_pad_length = 0.0
             self.abc_boundary_layer_type = None
             pass
         elif self.dictionary["damping_type"] == "PML":
             self.abc_boundary_layer_type = self.dictionary["damping_type"]
             self.read_PML_dictionary()
-        elif self.dictionary["damping_type"] == "hybrid":
-            self.abc_boundary_layer_type = self.dictionary["damping_type"]
-            self.abc_boundary_layer_shape = self.dictionary["layer_shape"]
-            self.abc_deg_layer = None \
-                if self.dictionary["layer_shape"] == "rectangular" \
-                else self.dictionary.get("degree_layer", 2)
-            self.abc_reference_freq = self.dictionary["habc_reference_freq"]
-            self.abc_deg_eikonal = self.dictionary.get("degree_eikonal", None)
-            self.abc_get_ref_model = self.dictionary["get_ref_model"]
-            self.abc_pad_length = 0.0
         else:
             abc_type = self.dictionary["damping_type"]
             raise ValueError(
-                f"Boundary layer type of {abc_type} not recognized")
+                f"Boundary layer type of {abc_type} not recognized"
+            )
 
     def read_PML_dictionary(self):
         """

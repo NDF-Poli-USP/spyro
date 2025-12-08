@@ -1,7 +1,4 @@
 import numpy as np
-import uuid
-from mpi4py import MPI  # noqa:F401
-from firedrake import COMM_WORLD  # noqa:
 import warnings
 from .. import io
 from .. import utils
@@ -205,20 +202,6 @@ class Model_parameters:
         conditions.
     abc_pad_length: float
         Thickness of the absorbing boundary conditions.
-    abc_boundary_layer_type : `str`
-        Type of the boundary layer. Option 'hybrid' is based on paper
-        of Salas et al. (2022). doi: https://doi.org/10.1016/j.apm.2022.09.014
-    abc_boundary_layer_shape : str
-        Shape type of pad layer. Options: 'rectangular' or 'hypershape'
-    abc_deg_layer : `int`
-        Hypershape degree
-    abc_reference_freq : `str`
-        Reference frequency for sizing the hybrid absorbing layer.
-        Options: 'source' or 'boundary'
-    abc_deg_eikonal : `int`
-        Finite element order for the Eikonal analysis
-    abc_get_ref_model : `bool`
-        If True, the infinite model is created
     source_type: str
         Type of source used in the simulation. Can be "ricker" for a Ricker
         wavelet or "MMS" for a manufactured solution.
@@ -307,11 +290,6 @@ class Model_parameters:
         self.time_integrator = self._check_time_integrator()
         self.equation_type = self._check_equation_type()
 
-        if self.cell_type == "quadrilateral":
-            quadrilateral = True
-        else:
-            quadrilateral = False
-
         # Checks time inputs
         self._sanitize_time_inputs()
 
@@ -319,39 +297,34 @@ class Model_parameters:
         self.real_shot_record = None
         self._sanitize_optimization_and_velocity()
 
+        # Checking mesh_parameters
+        # self._sanitize_mesh()
+        Mesh_parameters = io.dictionaryio.read_mesh(
+            mesh_dictionary=self.input_dictionary["mesh"],
+            dimension=self.dimension,
+        )
+        self.mesh_file = Mesh_parameters.mesh_file
+        self.mesh_type = Mesh_parameters.mesh_type
+        self.length_z = Mesh_parameters.length_z
+        self.length_x = Mesh_parameters.length_x
+        self.length_y = Mesh_parameters.length_y
+        self.user_mesh = Mesh_parameters.user_mesh
+        self.firedrake_mesh = Mesh_parameters.firedrake_mesh
+
+        # Checking absorving boundary condition parameters
+        self._sanitize_absorving_boundary_condition()
+
         # Checking source and receiver inputs
         self._sanitize_acquisition()
 
         # Setting up MPI communicator and checking parallelism:
         self._sanitize_comm(comm)
 
-        # Checking mesh_parameters
-        self.input_dictionary["mesh"].setdefault("user_mesh", None)
-        self.input_dictionary.setdefault("absorving_boundary_conditions", {})
-        self.input_dictionary["absorving_boundary_conditions"].setdefault("pad_length", None)
-        self.input_dictionary["absorving_boundary_conditions"].setdefault("status", False)
-        self.user_mesh = self.input_dictionary["mesh"]["user_mesh"]
-        mesh_parameters = meshing.MeshingParameters(
-            input_mesh_dictionary=self.input_dictionary["mesh"],
-            dimension=self.dimension,
-            source_frequency=self.input_dictionary["acquisition"]["frequency"],
-            comm=self.comm,
-            quadrilateral=quadrilateral,
-            method=self.method,
-            degree=self.degree,
-            abc_pad_length=self.input_dictionary["absorving_boundary_conditions"]["pad_length"],
-        )
-        self.mesh_parameters = mesh_parameters
-
-        # Checking absorving boundary condition parameters
-        self._sanitize_absorving_boundary_condition()
-
         # Check automatic adjoint
         self._sanitize_automatic_adjoint()
 
         # Sanitize output files
         self._sanitize_output()
-        self.random_id_string = str(uuid.uuid4())[:10]
 
     # default_dictionary["absorving_boundary_conditions"] = {
     #     "status": False,  # True or false
@@ -402,27 +375,20 @@ class Model_parameters:
             }
         dictionary = self.input_dictionary["absorving_boundary_conditions"]
         self.abc_active = dictionary["status"]
+
         BL_obj = io.boundary_layer_io.read_boundary_layer(dictionary)
+        self.abc_exponent = BL_obj.abc_exponent
+        self.abc_cmax = BL_obj.abc_cmax
+        self.abc_R = BL_obj.abc_R
+        self.abc_pad_length = BL_obj.abc_pad_length
         self.abc_boundary_layer_type = BL_obj.abc_boundary_layer_type
 
-        if BL_obj.abc_boundary_layer_type == "hybrid":
-            self.abc_boundary_layer_shape = BL_obj.abc_boundary_layer_shape
-            self.abc_deg_layer = BL_obj.abc_deg_layer
-            self.abc_reference_freq = BL_obj.abc_reference_freq
-            self.abc_get_ref_model = BL_obj.abc_get_ref_model
-            self.abc_deg_eikonal = BL_obj.abc_deg_eikonal
-            self.abc_pad_length = BL_obj.abc_pad_length
-        else:
-            self.abc_exponent = BL_obj.abc_exponent
-            self.abc_cmax = BL_obj.abc_cmax
-            self.abc_R = BL_obj.abc_R
-            self.abc_pad_length = BL_obj.abc_pad_length
-            self.absorb_top = dictionary.get("absorb_top", False)
-            self.absorb_bottom = dictionary.get("absorb_bottom", True)
-            self.absorb_right = dictionary.get("absorb_right", True)
-            self.absorb_left = dictionary.get("absorb_left", True)
-            self.absorb_front = dictionary.get("absorb_front", True)
-            self.absorb_back = dictionary.get("absorb_back", True)
+        self.absorb_top = dictionary.get("absorb_top", False)
+        self.absorb_bottom = dictionary.get("absorb_bottom", True)
+        self.absorb_right = dictionary.get("absorb_right", True)
+        self.absorb_left = dictionary.get("absorb_left", True)
+        self.absorb_front = dictionary.get("absorb_front", True)
+        self.absorb_back = dictionary.get("absorb_back", True)
 
     def _sanitize_output(self):
         #         default_dictionary["visualization"] = {
@@ -545,12 +511,8 @@ class Model_parameters:
             warnings.warn("No paralellism type listed. Assuming automatic")
             self.parallelism_type = "automatic"
 
-        if self.parallelism_type == "custom":
-            self.shot_ids_per_propagation = dictionary["parallelism"]["shot_ids_per_propagation"]
-        elif self.parallelism_type == "automatic":
-            self.shot_ids_per_propagation = [[i] for i in range(0, self.number_of_sources)]
-        elif self.parallelism_type == "spatial":
-            self.shot_ids_per_propagation = [[i] for i in range(0, self.number_of_sources)]
+        if self.source_type == "MMS":
+            self.parallelism_type = "spatial"
 
         if comm is None:
             self.comm = utils.mpi_init(self)
@@ -631,12 +593,9 @@ class Model_parameters:
     def _sanitize_optimization_and_velocity_for_fwi(self):
         self._sanitize_optimization_and_velocity_without_fwi()
         dictionary = self.input_dictionary
-        try:
-            self.initial_velocity_model_file = dictionary["inversion"][
-                "initial_guess_model_file"
-            ]
-        except KeyError:
-            self.initial_velocity_model_file = None
+        self.initial_velocity_model_file = dictionary["inversion"][
+            "initial_guess_model_file"
+        ]
         self.fwi_output_folder = "fwi/"
         self.control_output_file = self.fwi_output_folder + "control"
         self.gradient_output_file = self.fwi_output_folder + "gradient"
@@ -717,7 +676,7 @@ class Model_parameters:
     def set_mesh(
         self,
         user_mesh=None,
-        input_mesh_parameters={},
+        mesh_parameters={},
     ):
         """
         Set the mesh for the model.
@@ -733,20 +692,75 @@ class Model_parameters:
         -------
         None
         """
+
+        # Setting default mesh parameters
+        mesh_parameters.setdefault("periodic", False)
+        mesh_parameters.setdefault("minimum_velocity", 1.5)
+        mesh_parameters.setdefault("edge_length", None)
+        mesh_parameters.setdefault("dx", None)
+        mesh_parameters.setdefault("length_z", self.length_z)
+        mesh_parameters.setdefault("length_x", self.length_x)
+        mesh_parameters.setdefault("length_y", self.length_y)
+        mesh_parameters.setdefault("abc_pad_length", self.abc_pad_length)
+        mesh_parameters.setdefault("mesh_file", self.mesh_file)
+        mesh_parameters.setdefault("dimension", self.dimension)
+        mesh_parameters.setdefault("mesh_type", self.mesh_type)
+        mesh_parameters.setdefault("source_frequency", self.frequency)
+        mesh_parameters.setdefault("method", self.method)
+        mesh_parameters.setdefault("degree", self.degree)
+        mesh_parameters.setdefault("velocity_model_file", self.initial_velocity_model_file)
+        mesh_parameters.setdefault("cell_type", self.cell_type)
+        mesh_parameters.setdefault("cells_per_wavelength", None)
+
+        self._set_mesh_length(
+            length_z=mesh_parameters["length_z"],
+            length_x=mesh_parameters["length_x"],
+            length_y=mesh_parameters["length_y"],
+        )
+
+        if self.mesh_type == "firedrake_mesh":
+            automatic_mesh = True
+        elif self.mesh_type == "SeismicMesh":
+            automatic_mesh = True
+        else:
+            automatic_mesh = False
+
         if user_mesh is not None:
             self.user_mesh = user_mesh
-
-        pad_length = None
-        if self.abc_active:
-            pad_length = self.abc_pad_length
-        self.mesh_parameters.set_mesh(user_mesh=user_mesh, input_mesh_parameters=input_mesh_parameters, abc_pad_length=pad_length)
-
-        if self.mesh_parameters.automatic_mesh:
-            autoMeshing = meshing.AutomaticMesh(
-                mesh_parameters=self.mesh_parameters,
+            self.mesh_type = "user_mesh"
+        elif mesh_parameters["mesh_file"] is not None:
+            self.mesh_file = mesh_parameters["mesh_file"]
+            self.mesh_type = "file"
+        elif automatic_mesh:
+            self.user_mesh = self._creating_automatic_mesh(
+                mesh_parameters=mesh_parameters
             )
 
-            self.user_mesh = autoMeshing.create_mesh()
+        if (
+            mesh_parameters["length_z"] is None
+            or mesh_parameters["length_x"] is None
+            or (mesh_parameters["length_y"] is None and self.dimension == 2)
+        ) and self.mesh_type != "firedrake_mesh":
+            warnings.warn(
+                "Mesh dimensions not completely reset from initial dictionary"
+            )
+
+    def _creating_automatic_mesh(self, mesh_parameters={}):
+        """
+        Creates an automatic mesh using the specified mesh parameters.
+
+        Args:
+            mesh_parameters (dict): A dictionary containing the parameters for meshing.
+
+        Returns:
+            Mesh: The created mesh object.
+        """
+        AutoMeshing = meshing.AutomaticMesh(
+            comm=self.comm,
+            mesh_parameters=mesh_parameters,
+        )
+
+        return AutoMeshing.create_mesh()
 
     def _set_mesh_length(
         self,
@@ -755,11 +769,11 @@ class Model_parameters:
         length_y=None,
     ):
         if length_z is not None:
-            self.mesh_parameters.length_z = length_z
+            self.length_z = length_z
         if length_x is not None:
-            self.mesh_parameters.length_x = length_x
+            self.length_x = length_x
         if length_y is not None:
-            self.mesh_parameters.length_y = length_y
+            self.length_y = length_y
 
     def get_mesh(self):
         """Reads in an external mesh and scatters it between cores.
@@ -769,10 +783,16 @@ class Model_parameters:
         mesh: Firedrake.Mesh object
             The distributed mesh across `ens_comm`
         """
-        if self.mesh_parameters.user_mesh is not None:
-            self.user_mesh = self.mesh_parameters.user_mesh
-            return self.user_mesh
-        elif self.mesh_parameters.mesh_file is not None:
-            return io.read_mesh(self.mesh_parameters)
+        if self.user_mesh is False:
+            non_file_mesh = None
         else:
-            return self.user_mesh
+            non_file_mesh = self.user_mesh
+
+        if self.mesh_file is not None:
+            return io.read_mesh(self)
+        elif (
+            self.mesh_type == "user_mesh" or self.mesh_type == "firedrake_mesh"
+        ):
+            return non_file_mesh
+        elif self.mesh_type == "SeismicMesh":
+            return non_file_mesh

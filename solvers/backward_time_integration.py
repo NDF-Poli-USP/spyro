@@ -53,10 +53,9 @@ def backward_wave_propagator_no_pml(Wave_obj, dt=None):
     temp_filename = Wave_obj.forward_output_file
 
     filename, file_extension = temp_filename.split(".")
-    # output_filename = "backward." + file_extension
+    output_filename = "backward." + file_extension
 
-    # output = fire.VTKFile(output_filename)
-    # output = fire.File(output_filename, comm=comm.comm)
+    output = fire.VTKFile(output_filename)
     comm.comm.barrier()
 
     X = fire.Function(Wave_obj.function_space)
@@ -81,12 +80,12 @@ def backward_wave_propagator_no_pml(Wave_obj, dt=None):
     # Define a gradient problem
     m_u = fire.TrialFunction(Wave_obj.function_space)
     m_v = fire.TestFunction(Wave_obj.function_space)
-    mgrad = m_u * m_v * fire.dx(**Wave_obj.quadrature_rule)
+    mgrad = m_u * m_v * fire.dx(scheme=Wave_obj.quadrature_rule)
 
     dufordt2 = fire.Function(Wave_obj.function_space)
     uadj = fire.Function(Wave_obj.function_space)  # auxiliarly function for the gradient compt.
 
-    ffG = -2 * (Wave_obj.c)**(-3) * fire.dot(dufordt2, uadj) * m_v * fire.dx(**Wave_obj.quadrature_rule)
+    ffG = -2 * (Wave_obj.c)**(-3) * fire.dot(dufordt2, uadj) * m_v * fire.dx(scheme=Wave_obj.quadrature_rule)
 
     lhsG = mgrad
     rhsG = ffG
@@ -119,8 +118,8 @@ def backward_wave_propagator_no_pml(Wave_obj, dt=None):
                 fire.norm(u_n) < 1
             ), "Numerical instability. Try reducing dt or building the \
                 mesh differently"
-            # if Wave_obj.forward_output:
-            #     output.write(u_n, time=t, name="Pressure")
+            if Wave_obj.forward_output:
+                output.write(u_n, time=t, name="Pressure")
 
             helpers.display_progress(Wave_obj.comm, t)
 
@@ -210,14 +209,14 @@ def mixed_space_backward_wave_propagator(Wave_obj, dt=None):
     # Define a gradient problem
     m_u = fire.TrialFunction(Wave_obj.function_space)
     m_v = fire.TestFunction(Wave_obj.function_space)
-    mgrad = m_u * m_v * fire.dx(**Wave_obj.quadrature_rule)
+    mgrad = m_u * m_v * fire.dx(scheme=Wave_obj.quadrature_rule)
 
     # dufordt2 = fire.Function(Wave_obj.function_space)
     ufor = fire.Function(Wave_obj.function_space)
     uadj = fire.Function(Wave_obj.function_space)  # auxiliarly function for the gradient compt.
 
-    # ffG = -2 * (Wave_obj.c)**(-3) * fire.dot(dufordt2, uadj) * m_v * fire.dx(**Wave_obj.quadrature_rule)
-    ffG = 2.0 * Wave_obj.c * fire.dot(fire.grad(uadj), fire.grad(ufor)) * m_v * fire.dx(**Wave_obj.quadrature_rule)
+    # ffG = -2 * (Wave_obj.c)**(-3) * fire.dot(dufordt2, uadj) * m_v * fire.dx(scheme=Wave_obj.quadrature_rule)
+    ffG = 2.0 * Wave_obj.c * fire.dot(fire.grad(uadj), fire.grad(ufor)) * m_v * fire.dx(scheme=Wave_obj.quadrature_rule)
 
     lhsG = mgrad
     rhsG = ffG
