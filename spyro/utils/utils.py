@@ -4,7 +4,6 @@ import numpy as np
 from mpi4py import MPI
 from scipy.signal import butter, filtfilt
 import warnings
-from ..io import ensemble_functional
 
 
 def butter_lowpass_filter(shot, cutoff, fs, order=2):
@@ -38,7 +37,6 @@ def butter_lowpass_filter(shot, cutoff, fs, order=2):
     return filtered_shot
 
 
-@ensemble_functional
 def compute_functional(Wave_object, residual):
     """Compute the functional to be optimized.
     Accepts the velocity optionally and uses
@@ -46,14 +44,19 @@ def compute_functional(Wave_object, residual):
     """
     num_receivers = Wave_object.number_of_receivers
     dt = Wave_object.dt
+    comm = Wave_object.comm
 
     J = 0
     for rn in range(num_receivers):
-        J += np.trapezoid(residual[:, rn] ** 2, dx=dt)
+        J += np.trapz(residual[:, rn] ** 2, dx=dt)
 
     J *= 0.5
 
-    return J
+    J_total = np.zeros((1))
+    J_total[0] += J
+    J_total = COMM_WORLD.allreduce(J_total, op=MPI.SUM)
+    J_total[0] /= comm.comm.size
+    return J_total[0]
 
 
 def evaluate_misfit(model, guess, exact):
@@ -85,19 +88,17 @@ def mpi_init(model):
     available_cores = COMM_WORLD.size  # noqa: F405
     print(f"Parallelism type: {model.parallelism_type}", flush=True)
     if model.parallelism_type == "automatic":
-        num_cores_per_propagation = available_cores / model.number_of_sources
+        num_cores_per_shot = available_cores / model.number_of_sources
         if available_cores % model.number_of_sources != 0:
             raise ValueError(
                 f"Available cores cannot be divided between sources equally {available_cores}/{model.number_of_sources}."
             )
     elif model.parallelism_type == "spatial":
-        num_cores_per_propagation = available_cores
+        num_cores_per_shot = available_cores
     elif model.parallelism_type == "custom":
-        shot_ids_per_propagation = model.shot_ids_per_propagation
-        num_propagations = len(shot_ids_per_propagation)
-        num_cores_per_propagation = available_cores / num_propagations
+        raise ValueError("Custom parallelism not yet implemented")
 
-    comm_ens = Ensemble(COMM_WORLD, num_cores_per_propagation)  # noqa: F405
+    comm_ens = Ensemble(COMM_WORLD, num_cores_per_shot)  # noqa: F405
     return comm_ens
 
 
@@ -290,9 +291,9 @@ class Gradient_mask_for_pml(Mask):
             raise ValueError("No PML present in wave object")
 
         # building firedrake function for mask
-        z_min = -(Wave_obj.mesh_parameters.length_z)
+        z_min = -(Wave_obj.length_z)
         x_min = 0.0
-        x_max = Wave_obj.mesh_parameters.length_x
+        x_max = Wave_obj.length_x
         boundaries = {
             "z_min": z_min,
             "x_min": x_min,
