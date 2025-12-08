@@ -16,16 +16,16 @@ def isotropic_elastic_without_pml(wave):
     lmbda = wave.lmbda
     mu = wave.mu
 
-    F_m = (rho/(dt**2))*dot(u - 2*u_n + u_nm1, v)*dx(**quad_rule)
+    F_m = (rho/(dt**2))*dot(u - 2*u_n + u_nm1, v)*dx(scheme=quad_rule)
 
     eps = lambda v: 0.5*(grad(v) + grad(v).T)
-    F_k = lmbda*div(u_n)*div(v)*dx(**quad_rule) \
-        + 2*mu*inner(eps(u_n), eps(v))*dx(**quad_rule)
+    F_k = lmbda*div(u_n)*div(v)*dx(scheme=quad_rule) \
+        + 2*mu*inner(eps(u_n), eps(v))*dx(scheme=quad_rule)
 
     F_s = 0
     b = wave.body_forces
     if b is not None:
-        F_s += dot(b, v)*dx(**quad_rule)
+        F_s += dot(b, v)*dx(scheme=quad_rule)
 
     F_t = local_abc_form(wave)
 
@@ -353,7 +353,7 @@ def viscoelastic_maxwell_gsls_without_pml(wave):
     if getattr(wave, "body_forces", None) is not None:
         F_s += dot(wave.body_forces, v) * dx(scheme=quad)
 
-    F_t = local_abc_form(wave)  
+    F_t = local_abc_form(wave)  # if already implemented
 
     # Full weak form and solver
     F = F_m + F_k_el + F_k_mem - F_s - F_t
@@ -364,6 +364,92 @@ def viscoelastic_maxwell_gsls_without_pml(wave):
 
     wave.rhs = rhs(F)
     wave.B = Cofunction(V.dual())
+
+#####################################################################################3
+def viscoelastic_maxwell(wave):
+    print("Viscoelastic Maxwell (2D/3D)")
+
+    V = wave.function_space
+    W = wave.strain_space
+    quad = wave.quadrature_rule
+
+    # Trial/test
+    u = TrialFunction(V)
+    v = TestFunction(V)
+
+    u_nm1 = wave.u_nm1
+    u_n   = wave.u_n
+    
+    dt   = Constant(wave.dt)
+    rho  = wave.rho
+    lam  = wave.lmbda
+    mu   = wave.mu
+
+    # Parâmetros por ramo
+    tau_eps = wave.tau_epsilon
+    tau_sig = wave.tau_sigma
+
+    # Estados por ramo
+    eps_old   = wave.eps_old
+    sigma_old = wave.sigma_old
+
+    # Detecta dimensão automaticamente
+    dim = V.mesh().topological_dimension()   # 2 ou 3
+    I = Identity(dim)
+
+    # Strain linear
+    eps = lambda w: 0.5*(grad(w) + grad(w).T)
+
+    # -----------------------------------------------
+    # 1) TERMO INERCIAL
+    # -----------------------------------------------
+    F_m = (rho/dt**2) * dot(u - 2*u_n + u_nm1, v) * dx(scheme=quad)
+
+    # -----------------------------------------------
+    # 2) RIGIDEZ ELÁSTICA INSTANTÂNEA
+    # -----------------------------------------------
+    eps_n = eps(u_n)
+    sigma_el_n = lam*tr(eps_n)*I + 2.0*mu*eps_n
+    F_k_el = inner(sigma_el_n, eps(v)) * dx(scheme=quad)
+
+    # -----------------------------------------------
+    # 3) CONTRIBUIÇÃO DAS MEMÓRIAS
+    # -----------------------------------------------
+    F_k_mem = 0
+    for sigma_m in sigma_old:           # loop compatível 2D/3D
+        F_k_mem += inner(sigma_m, eps(v)) * dx(scheme=quad)
+
+    # -----------------------------------------------
+    # 4) FORÇAS DE CORPO E ABSORÇÃO
+    # -----------------------------------------------
+    F_s = 0
+    if getattr(wave, "body_forces", None) is not None:
+        F_s += dot(wave.body_forces, v) * dx(scheme=quad)
+
+    F_t = local_abc_form(wave)  # se já implementado
+
+    # -----------------------------------------------
+    # 5) FORMA TOTAL E SOLVER
+    # -----------------------------------------------
+    F = F_m + F_k_el + F_k_mem - F_s - F_t
+
+    wave.lhs = lhs(F)
+    A = assemble(wave.lhs, bcs=wave.bcs, mat_type="matfree")
+    wave.solver = LinearSolver(A, solver_parameters=wave.solver_parameters)
+
+    wave.rhs = rhs(F)
+    wave.B = Cofunction(V.dual())
+
+    # -----------------------------------------------
+    # 6) Atualização das memórias (Backward-Euler)
+    # -----------------------------------------------
+    for m in range(len(sigma_old)):
+        # Atualiza ε_m explicitamente se necessário
+        eps_m = eps(u) if len(eps_old) == 1 else eps_old[m]  # pode ser único ou por ramo
+        sigma_new = Function(W)
+        # Fórmula completa Maxwell: σ_m^{n+1} = (τ_σ σ_m^n + dt * 2 μ_m ε_m^{n+1}) / (τ_σ + dt)
+        sigma_new.assign((tau_sig[m]*sigma_old[m] + dt*2*mu*eps_m) / (tau_sig[m] + dt))
+        sigma_old[m].assign(sigma_new)
 
 def isotropic_elastic_with_pml():
     raise NotImplementedError
