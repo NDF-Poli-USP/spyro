@@ -25,14 +25,14 @@ def functions(Wave_obj):
     ps = Wave_obj.abc_exponent
     cmax = Wave_obj.abc_cmax  # maximum acoustic wave velocity
     R = Wave_obj.abc_R  # theoretical reclection coefficient
-    pad_length = Wave_obj.mesh_parameters.abc_pad_length  # length of the padding
+    pad_length = Wave_obj.abc_pad_length  # length of the padding
     V = Wave_obj.function_space
     dimension = Wave_obj.dimension
     z = Wave_obj.mesh_z
     x = Wave_obj.mesh_x
     x1 = 0.0
-    x2 = Wave_obj.mesh_parameters.length_x
-    z2 = -Wave_obj.mesh_parameters.length_z
+    x2 = Wave_obj.length_x
+    z2 = -Wave_obj.length_z
 
     bar_sigma = ((3.0 * cmax) / (2.0 * pad_length)) * math.log10(1.0 / R)
     aux1 = Function(V)

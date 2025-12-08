@@ -7,6 +7,26 @@ except ImportError:
     SeismicMesh = None
 
 
+def cells_per_wavelength(method, degree, dimension):
+    cell_per_wavelength_dictionary = {
+        'mlt2tri': 7.02,
+        'mlt3tri': 3.70,
+        'mlt4tri': 2.67,
+        'mlt5tri': 2.03,
+        'mlt2tet': 6.12,
+        'mlt3tet': 3.72,
+    }
+
+    if dimension == 2 and (method == 'MLT' or method == 'CG'):
+        cell_type = 'tri'
+    if dimension == 3 and (method == 'MLT' or method == 'CG'):
+        cell_type = 'tet'
+
+    key = method.lower()+str(degree)+cell_type
+
+    return cell_per_wavelength_dictionary.get(key)
+
+
 class AutomaticMesh:
     """
     Class for automatic meshing.
@@ -61,7 +81,7 @@ class AutomaticMesh:
     """
 
     def __init__(
-        self, mesh_parameters=None
+        self, comm=None, mesh_parameters=None
     ):
         """
         Initialize the MeshingFunctions class.
@@ -103,27 +123,134 @@ class AutomaticMesh:
         - 'velocity_model_file': str, optional. File containing the velocity model.
         - 'edge_length': float, optional. Length of the mesh edges.
         """
-        self.dimension = mesh_parameters.dimension
-        self.length_z = mesh_parameters.length_z
-        self.length_x = mesh_parameters.length_x
-        self.length_y = mesh_parameters.length_y
-        self.quadrilateral = mesh_parameters.quadrilateral
-        self.comm = mesh_parameters.comm
-        self.mesh_type = mesh_parameters.mesh_type
-        self.edge_length = mesh_parameters.edge_length
-        self.abc_pad = mesh_parameters.abc_pad_length
+        self.dimension = mesh_parameters["dimension"]
+        self.length_z = mesh_parameters["length_z"]
+        self.length_x = mesh_parameters["length_x"]
+        self.length_y = mesh_parameters["length_y"]
+        self.cell_type = mesh_parameters["cell_type"]
+        self.comm = comm
+        if mesh_parameters["abc_pad_length"] is None:
+            self.abc_pad = 0.0
+        elif mesh_parameters["abc_pad_length"] >= 0.0:
+            self.abc_pad = mesh_parameters["abc_pad_length"]
+        else:
+            raise ValueError("abc_pad must be positive")
+        self.mesh_type = mesh_parameters["mesh_type"]
 
         # Firedrake mesh only parameters
-
-        self.periodic = mesh_parameters.periodic
+        self.dx = mesh_parameters["dx"]
+        self.quadrilateral = False
+        self.periodic = mesh_parameters["periodic"]
+        if self.dx is None:
+            self.dx = mesh_parameters["edge_length"]
 
         # SeismicMesh only parameters
-        self.cpw = mesh_parameters.cells_per_wavelength
-        self.source_frequency = mesh_parameters.source_frequency
-        self.minimum_velocity = mesh_parameters.minimum_velocity
+        self.cpw = mesh_parameters["cells_per_wavelength"]
+        self.source_frequency = mesh_parameters["source_frequency"]
+        self.minimum_velocity = mesh_parameters["minimum_velocity"]
         self.lbda = None
-        self.velocity_model = mesh_parameters.velocity_model
-        self.output_file_name = mesh_parameters.output_filename
+        self.velocity_model = mesh_parameters["velocity_model_file"]
+        self.edge_length = mesh_parameters["edge_length"]
+        self.output_file_name = "automatic_mesh.msh"
+
+    def set_mesh_size(self, length_z=None, length_x=None, length_y=None):
+        """
+        Parameters
+        ----------
+        length_z : float, optional
+            Length of the domain in the z direction. The default is None.
+        length_x : float, optional
+            Length of the domain in the x direction. The default is None.
+        length_y : float, optional
+            Length of the domain in the y direction. The default is None.
+
+        Returns
+        -------
+        None
+        """
+        if length_z is not None:
+            self.length_z = length_z
+        if length_x is not None:
+            self.length_x = length_x
+        if length_y is not None:
+            self.length_y = length_y
+
+    def set_meshing_parameters(self, dx=None, cell_type=None, mesh_type=None):
+        """
+        Parameters
+        ----------
+        dx : float, optional
+            Mesh size. The default is None.
+        cell_type : str, optional
+            Type of the cell. The default is None.
+        mesh_type : str, optional
+            Type of the mesh. The default is None.
+
+        Returns
+        -------
+        None
+        """
+        if cell_type is not None:
+            self.cell_type = cell_type
+        if self.cell_type == "quadrilateral":
+            self.quadrilateral = True
+        if dx is not None:
+            self.dx = dx
+        if mesh_type is not None:
+            self.mesh_type = mesh_type
+
+        if self.mesh_type != "firedrake_mesh":
+            raise ValueError("mesh_type is not supported")
+
+    def set_seismicmesh_parameters(
+        self,
+        cpw=None,
+        velocity_model=None,
+        edge_length=None,
+        output_file_name=None,
+    ):
+        """
+        Parameters
+        ----------
+        cpw : float, optional
+            Cells per wavelength parameter. The default is None.
+        velocity_model : str, optional
+            Velocity model. The default is None.
+        edge_length : float, optional
+            Edge length. The default is None.
+        output_file_name : str, optional
+            Output file name. The default is None.
+
+        Returns
+        -------
+        None
+        """
+        if SeismicMesh is None:
+            raise ImportError("SeismicMesh is not available. Please install it to use this function.")
+        if cpw is not None:
+            self.cpw = cpw
+        if velocity_model is not None:
+            self.velocity_model = velocity_model
+        if edge_length is not None:
+            self.edge_length = edge_length
+        if output_file_name is not None:
+            self.output_file_name = output_file_name
+        elif self.output_file_name is None:
+            self.output_file_name = "automatically_generated_mesh.msh"
+
+        if self.mesh_type != "SeismicMesh":
+            raise ValueError("mesh_type is not supported")
+
+    def make_periodic(self):
+        """
+        Sets the mesh boundaries periodic.
+        Only works for firedrake_mesh.
+        """
+        self.periodic = True
+        if self.mesh_type != "firedrake_mesh":
+            raise ValueError(
+                "periodic mesh is only supported for firedrake_mesh"
+            )
 
     def create_mesh(self):
         """
@@ -134,7 +261,6 @@ class AutomaticMesh:
         mesh : Mesh
             Mesh
         """
-        print(f"Creating {self.mesh_type} type mesh.", flush=True)
         if self.mesh_type == "firedrake_mesh":
             return self.create_firedrake_mesh()
         elif self.mesh_type == "SeismicMesh":
@@ -159,16 +285,20 @@ class AutomaticMesh:
         """
         Creates a 2D mesh based on Firedrake meshing utilities.
         """
-        if self.edge_length is None and self.cpw is not None:
-            self.edge_length = calculate_edge_length(self.cpw, self.minimum_velocity, self.source_frequency)
+        if self.dx is None and self.cpw is not None:
+            self.dx = calculate_edge_length(self.cpw, self.minimum_velocity, self.source_frequency)
         if self.abc_pad:
-            nx = int((self.length_x + 2*self.abc_pad) / self.edge_length)
-            nz = int((self.length_z + self.abc_pad) / self.edge_length)
+            nx = int((self.length_x + 2*self.abc_pad) / self.dx)
+            nz = int((self.length_z + self.abc_pad) / self.dx)
         else:
-            nx = int(self.length_x / self.edge_length)
-            nz = int(self.length_z / self.edge_length)
+            nx = int(self.length_x / self.dx)
+            nz = int(self.length_z / self.dx)
 
         comm = self.comm
+        if self.cell_type == "quadrilateral":
+            quadrilateral = True
+        else:
+            quadrilateral = False
 
         if self.periodic:
             return PeriodicRectangleMesh(
@@ -176,7 +306,7 @@ class AutomaticMesh:
                 nx,
                 self.length_z,
                 self.length_x,
-                quadrilateral=self.quadrilateral,
+                quadrilateral=quadrilateral,
                 comm=comm.comm,
                 pad=self.abc_pad,
             )
@@ -186,7 +316,7 @@ class AutomaticMesh:
                 nx,
                 self.length_z,
                 self.length_x,
-                quadrilateral=self.quadrilateral,
+                quadrilateral=quadrilateral,
                 comm=comm.comm,
                 pad=self.abc_pad,
             )
@@ -195,10 +325,14 @@ class AutomaticMesh:
         """
         Creates a 3D mesh based on Firedrake meshing utilities.
         """
-        dx = self.edge_length
+        dx = self.dx
         nx = int(self.length_x / dx)
         nz = int(self.length_z / dx)
         ny = int(self.length_y / dx)
+        if self.cell_type == "quadrilateral":
+            quadrilateral = True
+        else:
+            quadrilateral = False
 
         return BoxMesh(
             nz,
@@ -207,7 +341,7 @@ class AutomaticMesh:
             self.length_z,
             self.length_x,
             self.length_y,
-            quadrilateral=self.quadrilateral,
+            quadrilateral=quadrilateral,
         )
 
     def create_seismicmesh_mesh(self):
@@ -231,7 +365,6 @@ class AutomaticMesh:
         """
         Creates a 2D mesh based on SeismicMesh meshing utilities.
         """
-        print(f"velocity_model{self.velocity_model}", flush=True)
         if self.velocity_model is None:
             return self.create_seismicmesh_2D_mesh_homogeneous()
         else:
@@ -241,18 +374,17 @@ class AutomaticMesh:
         if self.comm.ensemble_comm.rank == 0:
             v_min = self.minimum_velocity
             frequency = self.source_frequency
+            C = self.cpw  # cells_per_wavelength(method, degree, dimension)
 
-            C = self.cpw
-
-            Lz = self.length_z
-            Lx = self.length_x
-            domain_pad = self.abc_pad
+            Lz = self.length_z*1000
+            Lx = self.length_x*1000
+            domain_pad = self.abc_pad*1000
             lbda_min = v_min/frequency
 
             bbox = (-Lz, 0.0, 0.0, Lx)
             domain = SeismicMesh.Rectangle(bbox)
 
-            hmin = lbda_min/C
+            hmin = lbda_min/C*1000
             self.comm.comm.barrier()
 
             ef = SeismicMesh.get_sizing_function_from_segy(
@@ -283,7 +415,7 @@ class AutomaticMesh:
             if self.comm.comm.rank == 0:
                 meshio.write_points_cells(
                     "automatic_mesh.msh",
-                    points,
+                    points/1000.0,
                     [("triangle", cells)],
                     file_format="gmsh22",
                     binary=False
@@ -291,7 +423,7 @@ class AutomaticMesh:
 
                 meshio.write_points_cells(
                     "automatic_mesh.vtk",
-                    points,
+                    points/1000.0,
                     [("triangle", cells)],
                     file_format="vtk"
                 )
@@ -315,18 +447,10 @@ class AutomaticMesh:
         Lx = self.length_x
         pad = self.abc_pad
 
-        if pad is not None:
-            real_lz = Lz + pad
-            real_lx = Lx + 2 * pad
-        else:
-            real_lz = Lz
-            real_lx = Lx
-            pad = 0.0
+        real_lz = Lz + pad
+        real_lx = Lx + 2 * pad
 
         edge_length = self.edge_length
-        if edge_length is None:
-            edge_length = self.minimum_velocity/(self.source_frequency*self.cpw)
-
         bbox = (-real_lz, 0.0, -pad, real_lx - pad)
         rectangle = SeismicMesh.Rectangle(bbox)
 
@@ -355,6 +479,7 @@ class AutomaticMesh:
         )
 
         return fire.Mesh(self.output_file_name)
+        # raise NotImplementedError("Not implemented yet")
 
 
 def calculate_edge_length(cpw, minimum_velocity, frequency):

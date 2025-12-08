@@ -69,7 +69,7 @@ class Sources(Delta_projector):
         self.number_of_points = wave_object.number_of_sources
         self.amplitude = wave_object.amplitude
         self.is_local = [0] * self.number_of_points
-        self.current_sources = None
+        self.current_source = None
         self.update_wavelet(wave_object)
         if np.isscalar(self.amplitude) or (self.amplitude.size <= 3):
             self.build_maps(order=0)
@@ -101,7 +101,7 @@ class Sources(Delta_projector):
             The right hand side of the wave equation with the source applied
         """
         for source_id in range(self.number_of_points):
-            if self.is_local[source_id] and source_id in self.current_sources:
+            if self.is_local[source_id] and source_id == self.current_source:
                 for i in range(len(self.cellNodeMaps[source_id])):
                     rhs_forcing.dat.data_with_halos[
                         int(self.cellNodeMaps[source_id][i])

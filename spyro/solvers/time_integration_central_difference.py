@@ -6,7 +6,7 @@ from . import helpers
 from .. import utils
 
 
-def central_difference(wave, source_ids=[0]):
+def central_difference(wave, source_id=0):
     """
     Perform central difference time integration for wave propagation.
 
@@ -14,8 +14,6 @@ def central_difference(wave, source_ids=[0]):
     -----------
     wave: Spyro object
         The Wave object containing the necessary data and parameters.
-    source_ids: list of ints (optional)
-        The ID of the sources being propagated. Defaults to [0].
 
     Returns:
     --------
@@ -23,10 +21,10 @@ def central_difference(wave, source_ids=[0]):
             A tuple containing the forward solution and the receiver output.
     """
     if wave.sources is not None:
-        wave.sources.current_sources = source_ids
+        wave.sources.current_source = source_id
         rhs_forcing = fire.Cofunction(wave.function_space.dual())
 
-    wave.field_logger.start_logging(source_ids)
+    wave.field_logger.start_logging(source_id)
 
     wave.comm.comm.barrier()
 
@@ -69,14 +67,14 @@ def central_difference(wave, source_ids=[0]):
                 dim = V.mesh().topological_dimension()
                 I = Identity(dim)
 
-                # Implicit elastic term (Backward Euler)
+                # Termo elástico implícito (Backward Euler)
                 elastic_part = wave.lmbda * tr(eps_new + dte * (eps_new - wave.eps_old)) * I \
                     + 2.0 * wave.mu * (eps_new + dte * (eps_new - wave.eps_old))
 
-                # Stress update (implicit relaxation)
+                # Atualização da tensão (relaxação implícita)
                 sigma_new = (elastic_part + dts * wave.sigma_old) / (1.0 + dts)
 
-                # Update of internal states
+                # Atualização dos estados internos
                 wave.eps_old.assign(project(eps_new, wave.eps_old.function_space()))
                 wave.sigma_old = (sigma_new)
 
@@ -100,23 +98,23 @@ def central_difference(wave, source_ids=[0]):
                     eps_old = wave.eps_old_list[i]
                     sigma_old = wave.sigma_old_list[i]
 
-                    # Implicit elasticity (Backward Euler)
+                    # Elasticidade implícita (Backward Euler)
                     viscous_term = dte * (eps_new - eps_old)
                     memory_term = dts * sigma_old
 
                     sigma_new = (elastic_term + viscous_term + memory_term) / (1.0 + dts)
 
-                    # Update of internal states (stable form)
+                    # Atualização dos estados internos (forma estável)
+                    # Cria funções temporárias para projetar
                     sigma_proj = Function(W)
                     eps_proj = Function(W)
 
                     sigma_proj.assign(project(sigma_new, W))
                     eps_proj.assign(project(eps_new, W))
 
-                    # Update memory variables
+                    # Atualiza as memórias
                     wave.sigma_old_list[i].assign(sigma_proj)
                     wave.eps_old_list[i].assign(eps_proj)
-
             elif wave.visco_type == 'maxwell':
                     sigma_old = wave.sigma_old
                     eps_old   = wave.eps_old
@@ -129,8 +127,8 @@ def central_difference(wave, source_ids=[0]):
                     I = Identity(dim)
                     eps = lambda w: 0.5*(grad(w) + grad(w).T)
                 
-                    # Strains at times n and n+1
-                    eps_n   = project(eps(wave.prev_vstate), W)  # ensure it is in W
+                    # Strains nos tempos n e n+1
+                    eps_n   = project(eps(wave.prev_vstate),   W)  # garantir que está em W
                     eps_np1 = project(eps(wave.vstate), W)
                     
                     lambda_m     = wave.lmbda
@@ -144,10 +142,11 @@ def central_difference(wave, source_ids=[0]):
                     tau_e = Constant(tau_eps)
                     tau_s = Constant(tau_sig)
 
-                    # Action of C_m on a tensor X: C_m:X = λ_m tr(X) I + 2 μ_m X
+                    # Ação de C_m em um tensor X: C_m:X = λ_m tr(X) I + 2 μ_m X
                     def C_m_action(X):
                         return lambda_m*tr(X)*Identity(dim) + 2.0*mu_m*X
 
+                        # σ^{n+1} = [ σ^n + C_m( ε^{n+1}(1 + dt/τ_e) - ε^n ) ] / (1 + dt/τ_s)
                     num = sigma_old + C_m_action(eps_np1*(1.0 + dt/tau_e) - eps_n)
                     sigma_np1 = project(num / (1.0 + dt/tau_s), W)
 
@@ -166,8 +165,8 @@ def central_difference(wave, source_ids=[0]):
                     I = Identity(dim)
                     eps = lambda w: 0.5*(grad(w) + grad(w).T)
                 
-                    # Strains at times n and n+1
-                    eps_n   = project(eps(wave.prev_vstate), W)  # ensure it is in W
+                    # Strains nos tempos n e n+1
+                    eps_n   = project(eps(wave.prev_vstate),   W)  # garantir que está em W
                     eps_np1 = project(eps(wave.vstate), W)
                 
                     lambda_m     = wave.lmbda_s
@@ -178,21 +177,25 @@ def central_difference(wave, source_ids=[0]):
                     sigma_old_list = wave.sigma_old_list
                     eps_old_list   = wave.eps_old_list
 
-                    # Per-branch update
+                    # Atualização por ramo
                     for i in range(len(sigma_old_list)):
                         
                         tau_e = Constant(tau_eps_list[i])
                         tau_s = Constant(tau_sig_list[i])
 
+                        # Ação de C_m em um tensor X: C_m:X = λ_m tr(X) I + 2 μ_m X
                         def C_m_action(X):
                             return lambda_m[i]*tr(X)*Identity(dim) + 2.0*mu_m[i]*X
 
-                        # Closed-form BE formula for GSLS
+                        # Fórmula fechada de BE para GSLS:
+                        # σ^{n+1} = [ σ^n + C_m( ε^{n+1}(1 + dt/τ_e) - ε^n ) ] / (1 + dt/τ_s)
                         num = sigma_old_list[i] + C_m_action(eps_np1*(1.0 + dt/tau_e) - eps_n)
                         sigma_np1 = project(num / (1.0 + dt/tau_s), W)
 
+                        # Salva σ^{n+1}
                         sigma_old_list[i].assign(sigma_np1)
 
+                        # Se você mantém ε_old por ramo, atualize também
                         eps_old_list[i].assign(eps_np1)
                 
         usol_recv.append(wave.get_receivers_output())
