@@ -2,8 +2,10 @@ from spyro import create_transect
 from spyro.examples.rectangle import Rectangle_acoustic, Rectangle_acoustic_FWI
 import firedrake as fire
 import copy
+# Adapted from Velocity model-based adapted meshes using optimal transport
+# TODO: add correct citation as soon as Thiago's paper is published
 
-camembert_optimization_parameters = {
+polygon_optimization_parameters = {
     "General": {
         "Secant": {"Type": "Limited-Memory BFGS", "Maximum Storage": 10}
     },
@@ -22,8 +24,8 @@ camembert_optimization_parameters = {
     },
 }
 
-camembert_dictionary = {}
-camembert_dictionary["options"] = {
+polygon_dictionary = {}
+polygon_dictionary["options"] = {
     "cell_type": "T",  # simplexes such as triangles or tetrahedra (T)
     # or quadrilaterals (Q)
     "variant": "lumped",  # lumped, equispaced or DG, default is lumped
@@ -34,19 +36,11 @@ camembert_dictionary["options"] = {
     "dimension": 2,  # dimension
     "automatic_adjoint": False,
 }
-
-# Number of cores for the shot. For simplicity, we keep things serial.
-# spyro however supports both spatial parallelism and "shot" parallelism.
-camembert_dictionary["parallelism"] = {
+polygon_dictionary["parallelism"] = {
     "type": "automatic",  # options: automatic (same number of cores for
     # every processor) or spatial
 }
-
-# Define the domain size without the PML. Here we'll assume a 0.75 x 1.50 km
-# domain and reserve the remaining 250 m for the Perfectly Matched Layer (PML)
-# to absorb
-# outgoing waves on three sides (eg., -z, +-x sides) of the domain.
-camembert_dictionary["mesh"] = {
+polygon_dictionary["mesh"] = {
     "Lz": 1.0,  # depth in km - always positive
     "Lx": 1.0,  # width in km - always positive
     "Ly": 0.0,  # thickness in km - always positive
@@ -54,41 +48,27 @@ camembert_dictionary["mesh"] = {
     "mesh_file": None,
     "mesh_type": "firedrake_mesh",  # options: firedrake_mesh or user_mesh
 }
-# For use only if you are using a synthetic test model
-# or a forward only simulation
-camembert_dictionary["synthetic_data"] = {
+polygon_dictionary["synthetic_data"] = {
     "real_mesh_file": None,
     "real_velocity_file": None,
 }
-camembert_dictionary["inversion"] = {
+polygon_dictionary["inversion"] = {
     "perform_fwi": False,  # switch to true to make a FWI
     "initial_guess_model_file": None,
     "shot_record_file": None,
-    "optimization_parameters": camembert_optimization_parameters,
+    "optimization_parameters": polygon_optimization_parameters,
 }
-
-# Specify a 250-m PML on the three sides of the domain to damp outgoing waves.
-camembert_dictionary["absorving_boundary_conditions"] = {
+polygon_dictionary["absorving_boundary_conditions"] = {
     "status": False,  # True or false
 }
-
-# Create a source injection operator. Here we use a single source with a
-# Ricker wavelet that has a peak frequency of 8 Hz injected at the center
-# of the mesh.
-# We also specify to record the solution at 101 microphones near the top
-# of the domain.
-# This transect of receivers is created with the helper function
-#  `create_transect`.
-camembert_dictionary["acquisition"] = {
+polygon_dictionary["acquisition"] = {
     "source_type": "ricker",
     "source_locations": [(-0.1, 0.5)],
     "frequency": 5.0,
     "delay": 1.0,
     "receiver_locations": create_transect((-0.90, 0.1), (-0.90, 0.9), 30),
 }
-
-# Simulate for 2.0 seconds.
-camembert_dictionary["time_axis"] = {
+polygon_dictionary["time_axis"] = {
     "initial_time": 0.0,  # Initial time for event
     "final_time": 1.0,  # Final time for event
     "dt": 0.0005,  # timestep size
@@ -97,10 +77,9 @@ camembert_dictionary["time_axis"] = {
     # how frequently to save solution to RAM
     "gradient_sampling_frequency": 100,
 }
-
-camembert_dictionary["visualization"] = {
+polygon_dictionary["visualization"] = {
     "forward_output": True,
-    "forward_output_filename": "results/camembert_forward_output.pvd",
+    "forward_output_filename": "results/polygon_forward_output.pvd",
     "fwi_velocity_model_output": False,
     "velocity_model_filename": None,
     "gradient_output": False,
@@ -109,37 +88,57 @@ camembert_dictionary["visualization"] = {
     "adjoint_filename": None,
     "debug_output": False,
 }
-camembert_dictionary["camembert_options"] = {
-    "radius": 0.2,
-    "circle_center": (-0.5, 0.5),
-    "outside_velocity": 1.6,
-    "inside_circle_velocity": 4.6,
+polygon_dictionary["polygon_options"] = {
+    "water_layer_is_present": True,
+    "water_layer_depth": 0.2,
+    "upper_layer": 2.0,
+    "middle_layer": 2.5,
+    "lower_layer": 3.0,
+    "polygon_layer_perturbation": 0.3,
 }
-camembert_dictionary_fwi = copy.deepcopy(camembert_dictionary)
-camembert_dictionary_fwi["inversion"]["perform_fwi"] = True
+polygon_dictionary_fwi = copy.deepcopy(polygon_dictionary)
+polygon_dictionary_fwi["inversion"]["perform_fwi"] = True
 
 
-class CamembertVelocity:
-    def _camembert_velocity_model(self):
-        camembert_dict = self.input_dictionary["camembert_options"]
+class Polygon_velocity:
+    def _polygon_velocity_model(self):
+        polygon_dict = self.input_dictionary["polygon_options"]
         z = self.mesh_z
         x = self.mesh_x
-        zc, xc = camembert_dict["circle_center"]
-        rc = camembert_dict["radius"]
-        c_salt = camembert_dict["inside_circle_velocity"]
-        c_not_salt = camembert_dict["outside_velocity"]
-        cond = fire.conditional(
-            (z - zc) ** 2 + (x - xc) ** 2 < rc**2, c_salt, c_not_salt
-        )
+
+        v0 = 1.5  # water layer
+        water_layer_depth = polygon_dict.get("water_layer_depth", 0.0)
+        water_layer_present = polygon_dict.get("water_layer_is_present", False)
+        v1 = polygon_dict["upper_layer"]
+        v2 = polygon_dict["middle_layer"]  # background vp (km/s)
+        vl = polygon_dict["lower_layer"]  # lower layer (km/s)
+        dv = polygon_dict["polygon_layer_perturbation"]*v2  # 30% of perturbation
+        d0 = -water_layer_depth
+        d1 = d0 - 0.14
+        d2 = d1 - 0.2
+
+        if water_layer_present:
+            cond = fire.conditional(z >= d0, v0, v1)
+            cond = fire.conditional(z <= d1, v2, cond)
+        else:
+            cond = fire.conditional(z <= d1, v2, v1)
+        cond = fire.conditional(z <= d2 - 0.2*x, vl, cond)
+
+        cond = fire.conditional(300*((x-0.5)*(-z-0.5))**2 + ((x-0.5)+(-z-0.5))**2 <= 0.300**2, v2+dv, cond)
+
+        if self.abc_pad_length is not None and self.abc_pad_length > 0.0:
+            middle_of_pad = -self.mesh_parameters.length_z - self.mesh_parameters.abc_pad_length*0.5
+            cond = fire.conditional(z <= middle_of_pad, v0, cond)
+
         self.set_initial_velocity_model(conditional=cond, dg_velocity_model=False)
         return None
 
 
-class Camembert_acoustic(CamembertVelocity, Rectangle_acoustic):
-    """Camembert model.
+class Polygon_acoustic(Polygon_velocity, Rectangle_acoustic):
+    """polygon model.
     This class is a child of the Example_model class.
     It is used to create a dictionary with the parameters of the
-    Camembert model.
+    polygon model.
 
     Example Setup
 
@@ -155,14 +154,14 @@ class Camembert_acoustic(CamembertVelocity, Rectangle_acoustic):
     ----------
     dictionary : dict, optional
         Dictionary with the parameters of the model that are different from
-        the default Camembert model. The default is None.
+        the default polygon model. The default is None.
 
     """
 
     def __init__(
         self,
         dictionary=None,
-        example_dictionary=camembert_dictionary,
+        example_dictionary=polygon_dictionary,
         comm=None,
         periodic=False,
     ):
@@ -170,16 +169,16 @@ class Camembert_acoustic(CamembertVelocity, Rectangle_acoustic):
             dictionary=dictionary,
             example_dictionary=example_dictionary,
             comm=comm,
-            periodic=False,
+            periodic=periodic,
         )
-        self._camembert_velocity_model()
+        self._polygon_velocity_model()
 
 
-class Camembert_acoustic_FWI(CamembertVelocity, Rectangle_acoustic_FWI):
-    """Camembert model.
+class Polygon_acoustic_FWI(Polygon_velocity, Rectangle_acoustic_FWI):
+    """polygon model.
     This class is a child of the Example_model class.
     It is used to create a dictionary with the parameters of the
-    Camembert model.
+    polygon model.
 
     Example Setup
 
@@ -195,14 +194,14 @@ class Camembert_acoustic_FWI(CamembertVelocity, Rectangle_acoustic_FWI):
     ----------
     dictionary : dict, optional
         Dictionary with the parameters of the model that are different from
-        the default Camembert model. The default is None.
+        the default polygon model. The default is None.
 
     """
 
     def __init__(
         self,
         dictionary=None,
-        example_dictionary=camembert_dictionary_fwi,
+        example_dictionary=polygon_dictionary,
         comm=None,
         periodic=False,
     ):
@@ -210,8 +209,8 @@ class Camembert_acoustic_FWI(CamembertVelocity, Rectangle_acoustic_FWI):
             dictionary=dictionary,
             example_dictionary=example_dictionary,
             comm=comm,
-            periodic=False,
+            periodic=periodic,
         )
-        self._camembert_velocity_model()
+        self._polygon_velocity_model()
         self.real_velocity_model = self.initial_velocity_model
         self.real_mesh = self.mesh
