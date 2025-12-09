@@ -54,6 +54,9 @@ def central_difference(wave, source_id=0):
         wave.prev_vstate = wave.vstate
         wave.vstate = wave.next_vstate
         
+        if not hasattr(wave, "viscoelastic"):
+            wave.viscoelastic = False
+            
         if wave.viscoelastic:
             from .viscoelasticity_functions import (sigma_visco_kelvin, epsilon)
             if wave.visco_type == 'kelvin_voigt':
