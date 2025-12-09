@@ -1,6 +1,8 @@
 from spyro import create_transect
 from spyro.examples.example_model import Example_model_acoustic
+from spyro.examples.example_model import Example_model_acoustic_FWI
 import firedrake as fire
+import copy
 
 rectangle_optimization_parameters = {
     "General": {
@@ -103,53 +105,25 @@ rectangle_dictionary["visualization"] = {
     "gradient_filename": None,
 }
 
+rectangle_dictionary_fwi = copy.deepcopy(rectangle_dictionary)
+rectangle_dictionary_fwi["inversion"] = {
+    "perform_fwi": True,  # switch to true to make a FWI
+}
 
-class Rectangle_acoustic(Example_model_acoustic):
-    """
-    Rectangle model.
-    This class is a child of the Example_model class.
-    It is used to create a dictionary with the parameters of the
-    Rectangle model.
 
-    Parameters
-    ----------
-    dictionary : dict, optional
-        Dictionary with the parameters of the model that are different from
-        the default model. The default is None.
-    comm : firedrake.mpi_comm.MPI.Intracomm, optional
-    periodic : bool, optional
-        If True, the mesh will be periodic in all directions. The default is
-        False.
-    """
-
-    def __init__(
-        self,
-        dictionary=None,
-        example_dictionary=rectangle_dictionary,
-        comm=None,
-        periodic=False,
-    ):
-        super().__init__(
-            dictionary=dictionary,
-            default_dictionary=example_dictionary,
-            comm=comm,
-        )
-        self.periodic = periodic
-
-        self._rectangle_mesh()
-
+class Rectangle_mesh_and_velocity:
     def _rectangle_mesh(self):
         mesh_dict = self.input_dictionary["mesh"]
         mesh_parameters = {
             "length_z": mesh_dict["Lz"],
             "length_x": mesh_dict["Lx"],
             "length_y": mesh_dict["Ly"],
-            "dx": mesh_dict["h"],
+            "edge_length": mesh_dict["h"],
             "mesh_file": mesh_dict["mesh_file"],
             "mesh_type": mesh_dict["mesh_type"],
             "periodic": self.periodic,
         }
-        super().set_mesh(mesh_parameters=mesh_parameters)
+        super().set_mesh(input_mesh_parameters=mesh_parameters)
 
     def multiple_layer_velocity_model(self, z_switch, layers):
         """
@@ -182,3 +156,93 @@ class Rectangle_acoustic(Example_model_acoustic):
                 )
         # cond = fire.conditional(self.mesh_z > z_switch, layer1, layer2)
         self.set_initial_velocity_model(conditional=cond)
+
+
+class Rectangle_acoustic(Rectangle_mesh_and_velocity, Example_model_acoustic):
+    """
+    Rectangle model.
+    This class is a child of the Example_model class.
+    It is used to create a dictionary with the parameters of the
+    Rectangle model.
+
+    Example Setup
+
+    These examples are intended as reusable velocity model configurations to assist in the development and testing of new methods, such as optimization algorithms, time-marching schemes, or inversion techniques.
+
+    Unlike targeted test cases, these examples do not have a specific objective or expected result. Instead, they provide standardized setups, such as Camembert, rectangular, and Marmousi velocity models, that can be quickly reused when prototyping, testing, or validating new functionality.
+
+    By isolating the setup of common velocity models, we aim to reduce boilerplate and encourage consistency across experiments.
+
+    Feel free to adapt these templates to your needs.
+
+    Parameters
+    ----------
+    dictionary : dict, optional
+        Dictionary with the parameters of the model that are different from
+        the default model. The default is None.
+    comm : firedrake.mpi_comm.MPI.Intracomm, optional
+    periodic : bool, optional
+        If True, the mesh will be periodic in all directions. The default is
+        False.
+    """
+
+    def __init__(
+        self,
+        dictionary=None,
+        example_dictionary=rectangle_dictionary,
+        comm=None,
+        periodic=False,
+    ):
+        super().__init__(
+            dictionary=dictionary,
+            default_dictionary=example_dictionary,
+            comm=comm,
+        )
+        self.periodic = periodic
+
+        self._rectangle_mesh()
+
+
+class Rectangle_acoustic_FWI(Rectangle_mesh_and_velocity, Example_model_acoustic_FWI):
+    """
+    Rectangle model.
+    This class is a child of the Example_model class.
+    It is used to create a dictionary with the parameters of the
+    Rectangle model.
+
+    Example Setup
+
+    These examples are intended as reusable velocity model configurations to assist in the development and testing of new methods, such as optimization algorithms, time-marching schemes, or inversion techniques.
+
+    Unlike targeted test cases, these examples do not have a specific objective or expected result. Instead, they provide standardized setups, such as Camembert, rectangular, and Marmousi velocity models, that can be quickly reused when prototyping, testing, or validating new functionality.
+
+    By isolating the setup of common velocity models, we aim to reduce boilerplate and encourage consistency across experiments.
+
+    Feel free to adapt these templates to your needs.
+
+    Parameters
+    ----------
+    dictionary : dict, optional
+        Dictionary with the parameters of the model that are different from
+        the default model. The default is None.
+    comm : firedrake.mpi_comm.MPI.Intracomm, optional
+    periodic : bool, optional
+        If True, the mesh will be periodic in all directions. The default is
+        False.
+    """
+
+    def __init__(
+        self,
+        dictionary=None,
+        example_dictionary=rectangle_dictionary_fwi,
+        comm=None,
+        periodic=False,
+    ):
+        super().__init__(
+            dictionary=dictionary,
+            default_dictionary=example_dictionary,
+            comm=comm,
+        )
+        self.periodic = periodic
+
+        self._rectangle_mesh()
