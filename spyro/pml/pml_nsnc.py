@@ -17,19 +17,12 @@ from spyro.plots.plots_habc import plot_function_layer_size
 from spyro.utils.error_management import value_parameter_error
 from spyro.utils.freq_tools import freq_response
 
-# Work from Ruben Andres Salas, Andre Luis Ferreira da Silva,
-# Luis Fernando Nogueira de Sá, Emilio Carlos Nelli Silva.
-# Hybrid absorbing scheme based on hyperelliptical layers with
-# non-reflecting boundary conditions in scalar wave equations.
-# Applied Mathematical Modelling (2022)
-# doi: https://doi.org/10.1016/j.apm.2022.09.014
-# With additions by Alexandre Olender
+# Work from Ruben Andres Salas and Alexandre Olender
 
 
-class HABC_Wave(AcousticWave, HABC_Mesh, RectangLayer,
-                HyperLayer, HABC_Damping, NRBC, HABC_Error):
+class PML_Wave(AcousticWave, HABC_Mesh, RectangLayer, HABC_Error):
     '''
-    Class HABC that determines absorbing layer size and parameters to be used
+    Class PML that determines PML size and parameters to be used
 
     Attributes
     ----------
@@ -39,9 +32,9 @@ class HABC_Wave(AcousticWave, HABC_Mesh, RectangLayer,
     a_par : `float`
         Adimensional propagation speed parameter (a = z / f).
         "z" parameter is the inverse of the minimum Eikonal (1 / phi_min)
-    case_habc : `str`
+    case_pml : `str`
         Label for the output files that includes the layer shape
-        ('REC' or 'HNI', I for the degree) and the reference frequency
+        ('REC', only available) and the reference frequency
         ('SOU' or 'BND'). Example: 'REC_SOU' or 'HN2_BND'
     crit_source : `tuple`
        Critical source coordinates
@@ -60,10 +53,10 @@ class HABC_Wave(AcousticWave, HABC_Mesh, RectangLayer,
         - sou_cr : Critical source coordinates
     ele_pad : `int`
         Number of elements in the layer of edge length 'lmin'
-    eta_habc : `firedrake function`
-        Damping profile within the absorbing layer
-    eta_mask : `firedrake function`
-        Mask function to identify the absorbing layer domain
+    sigma_pml : `firedrake function`
+        Damping profile within the PML
+    sigma_mask : `firedrake function`
+        Mask function to identify the PML domain
     F_L : `float`
         Size parameter of the absorbing layer
     FLpos : `list`
@@ -92,7 +85,7 @@ class HABC_Wave(AcousticWave, HABC_Mesh, RectangLayer,
         Number of receivers used in the simulation
     pad_len : `float`
         Size of the absorbing layer
-    path_case_habc : `string`
+    path_case_pml : `string`
         Path to save data for the current case study
     path_save : `string`
         Path to save data
@@ -114,12 +107,12 @@ class HABC_Wave(AcousticWave, HABC_Mesh, RectangLayer,
     -------
     check_timestep_habc()
         Check if the timestep size is appropriate for the transient response
-    create_mesh_habc()
+    create_mesh_pml()
         Create a mesh with absorbing layer based on the determined size
     critical_boundary_points()
         Determine the critical points on domain boundaries of the original
         model to size an absorbing layer using the Eikonal criterion for HABCs
-    damping_layer()
+    pml_layer()
         Set the damping profile within the absorbing layer
     det_reference_freq()
         Determine the reference frequency for a new layer size
@@ -127,11 +120,11 @@ class HABC_Wave(AcousticWave, HABC_Mesh, RectangLayer,
         Compute the fundamental frequency in Hz via modal analysis
     geometry_infinite_model()
         Determine the geometry for the infinite domain model.
-    habc_domain_dimensions()
+    pml_domain_dimensions()
         Determine the new dimensions of the domain with absorbing layer
-    habc_new_geometry()
+    pml_new_geometry ()
         Determine the new domain geometry with the absorbing layer
-    identify_habc_case()
+    identify_pml_case()
         Generate an identifier for the current case study of the HABC scheme
     infinite_model()
         Create a reference model for the HABC scheme for comparative purposes
@@ -139,9 +132,9 @@ class HABC_Wave(AcousticWave, HABC_Mesh, RectangLayer,
         Determine the domain extension size for the infinite domain model
     nrbc_on_boundary_layer()
         Apply the Higdon ABCs on the outer boundary of the absorbing layer
-    size_habc_criterion()
+    size_pml_criterion()
         Determine the size of the absorbing layer using the Eikonal criterion
-    velocity_habc()
+    velocity_pml()
         Set the velocity model for the model with absorbing layer
     '''
 
@@ -174,19 +167,19 @@ class HABC_Wave(AcousticWave, HABC_Mesh, RectangLayer,
         self.f_Nyq = 1.0 / (2.0 * self.dt)
 
         # Original domain dimensions
-        dom_dim = self.habc_domain_dimensions(only_orig_dom=True)
+        dom_dim = self.pml_domain_dimensions(only_orig_dom=True)
 
         # Initializing the Mesh class
         HABC_Mesh.__init__(
             self, dom_dim, dimension=self.dimension, comm=self.comm)
 
         # Identifier for the current case study
-        self.identify_habc_case(output_folder=output_folder)
+        self.identify_pml_case(output_folder=output_folder)
 
         # Current iteration
         self.fwi_iter = fwi_iter
 
-    def identify_habc_case(self, output_folder=None):
+    def identify_pml_case(self, output_folder=None):
         '''
         Generate an identifier for the current case study of the HABC scheme
 
@@ -201,41 +194,25 @@ class HABC_Wave(AcousticWave, HABC_Mesh, RectangLayer,
         '''
 
         # Original domain dimensions
-        dom_dim = self.habc_domain_dimensions(only_orig_dom=True)
+        dom_dim = self.pml_domain_dimensions(only_orig_dom=True)
 
         # Layer shape
         self.layer_shape = self.abc_boundary_layer_shape
-        lay_str = f"\nAbsorbing Layer Shape: {self.layer_shape.capitalize()}"
+        lay_str = f"\nPML Layer Shape: {self.layer_shape.capitalize()}"
 
-        # Labeling for the layer shape
-        if self.layer_shape == 'rectangular':  # Rectangular layer
+        # Initializing the rectangular layer
+        RectangLayer.__init__(self, dom_dim, dimension=self.dimension)
+        self.case_pml = 'REC'  # Label
 
-            # Initializing the rectangular layer
-            RectangLayer.__init__(self, dom_dim, dimension=self.dimension)
-            self.case_habc = 'REC'  # Label
-
-        elif self.layer_shape == 'hypershape':  # Hypershape layer
-
-            # Initializing the hyperelliptical layer
-            HyperLayer.__init__(self, dom_dim, n_hyp=self.abc_deg_layer,
-                                n_type=self.abc_degree_type,
-                                dimension=self.dimension)
-
-            self.case_habc = 'HN' + f"{self.abc_deg_layer:.1f}"  # Label
-            deg_str = f" - Degree: {self.abc_deg_layer}"
-            lay_str += deg_str
-
-        else:
-            value_parameter_error('layer_shape', self.layer_shape,
-                                  ['rectangular', 'hypershape'])
+        value_parameter_error('layer_shape', self.layer_shape, ['rectangular'])
         print(lay_str, flush=True)
 
         # Labeling for the reference frequency for the absorbing layer
         if self.abc_reference_freq == 'boundary':
-            self.case_habc += "_BND"
+            self.case_pml += "_BND"
 
         elif self.abc_reference_freq == 'source':
-            self.case_habc += "_SOU"
+            self.case_pml += "_SOU"
 
         else:
             value_parameter_error('abc_reference_freq',
@@ -248,18 +225,13 @@ class HABC_Wave(AcousticWave, HABC_Mesh, RectangLayer,
         else:
             self.path_save = getcwd() + "/" + output_folder + "/"
 
-        self.path_case_habc = self.path_save + self.case_habc + "/"
+        self.path_case_pml = self.path_save + self.case_pml + "/"
 
         # Initializing the error measure class
         HABC_Error.__init__(self, self.dt, self.f_Nyq,
                             self.receiver_locations,
                             output_folder=self.path_save,
-                            output_case=self.path_case_habc)
-
-        # Initializing the NRBC class
-        NRBC.__init__(self, dom_dim, self.layer_shape,
-                      dimension=self.dimension,
-                      output_folder=self.path_case_habc)
+                            output_case=self.path_case_pml)
 
     def critical_boundary_points(self):
         '''
@@ -334,7 +306,7 @@ class HABC_Wave(AcousticWave, HABC_Mesh, RectangLayer,
 
         print("Reference Frequency (Hz): {:.5f}".format(self.freq_ref))
 
-    def habc_new_geometry(self):
+    def pml_new_geometry(self):
         '''
         Determine the new domain geometry with the absorbing layer
 
@@ -353,8 +325,7 @@ class HABC_Wave(AcousticWave, HABC_Mesh, RectangLayer,
         if self.dimension == 3:  # 3D
             self.Ly_habc = self.length_y + 2 * self.pad_len
 
-    def habc_domain_dimensions(self, only_orig_dom=False,
-                               only_habc_dom=False, full_hyp=True):
+    def pml_domain_dimensions(self, only_orig_dom=False, only_habc_dom=False):
         '''
         Determine the new dimensions of the domain with absorbing layer
 
@@ -364,21 +335,14 @@ class HABC_Wave(AcousticWave, HABC_Mesh, RectangLayer,
             Return only the original domain dimensions. Default is False
         only_habc_dom : `bool`, optional
             Return only the domain dimensions with layer. Default is False
-        full_hyp : `bool`, optional
-            Option to get the domain dimensions in hypershape layers.
-            If True, the domain dimensions with layer do not include truncation
-            due to the free surface. If False, the domain dimensions with layer
-            include truncation by free surface. Default is True.
 
         Returns
         -------
         dom_dim : `tuple`
             Original domain dimensions: (Lx, Lz) for 2D or (Lx, Lz, Ly) for 3D
         dom_lay : `tuple`
-            Domain dimensions with layer. For rectangular layers, truncation
-            due to the free surface is included (n = 1). For hypershape layers,
-            truncation by free surface is not included (n = 2) if 'full_hyp' is
-            True; otherwise, it is included (n = 1). Dimensions are defined as:
+            Domain dimensions with layer. The truncation due to the free
+            surface is included (n = 1). Dimensions are defined as:
             - 2D : (Lx + 2 * pad_len, Lz + n * pad_len)
             - 3D : (Lx + 2 * pad_len, Lz + n * pad_len, Ly + 2 * pad_len)
         '''
@@ -391,13 +355,8 @@ class HABC_Wave(AcousticWave, HABC_Mesh, RectangLayer,
         if only_orig_dom:
             return dom_dim
 
-        # Domain dimension with layer w/ or w/o truncations
-        if self.layer_shape == 'rectangular':  # Rectangular layer
-            dom_lay = (self.Lx_habc, self.Lz_habc)
-
-        elif self.layer_shape == 'hypershape':  # Hypershape layer
-            dom_lay = (self.Lx_habc, self.length_z + 2 * self.pad_len) \
-                if full_hyp else (self.Lx_habc, self.Lz_habc)
+        # Domain dimension with layer
+        dom_lay = (self.Lx_habc, self.Lz_habc)
 
         if self.dimension == 3:  # 3D
             dom_lay += (self.Ly_habc,)
@@ -407,7 +366,7 @@ class HABC_Wave(AcousticWave, HABC_Mesh, RectangLayer,
 
         return dom_dim, dom_lay
 
-    def size_habc_criterion(self, fpad=4, n_root=1, layer_based_on_mesh=True):
+    def size_pml_criterion(self, fpad=4, n_root=1, layer_based_on_mesh=True):
         '''
         Determine the size of the absorbing layer using the Eikonal
         criterion for HABCs. See Salas et al (2022) for details.
@@ -447,50 +406,22 @@ class HABC_Wave(AcousticWave, HABC_Mesh, RectangLayer,
         plot_function_layer_size([self.a_par, z_par],
                                  [self.freq_ref, self.frequency],
                                  [self.lmin, self.lref], self.FLpos,
-                                 output_folder=self.path_case_habc)
+                                 output_folder=self.path_case_pml)
 
-        print("\nDetermining New Geometry with Absorbing Layer", flush=True)
+        print("\nDetermining New Geometry with PML", flush=True)
 
         # New geometry with layer
-        self.habc_new_geometry()
+        self.pml_new_geometry()
 
         # Domain dimensions without free surface truncation
-        dom_lay_full = self.habc_domain_dimensions(only_habc_dom=True)
+        dom_lay_full = self.pml_domain_dimensions(only_habc_dom=True)
 
-        if self.layer_shape == 'rectangular':
+        print("Determining Rectangular Layer Parameters", flush=True)
 
-            print("Determining Rectangular Layer Parameters", flush=True)
+        # Geometric properties of the rectangular layer
+        self.calc_rec_geom_prop(dom_lay_full, self.pad_len)
 
-            # Geometric properties of the rectangular layer
-            self.calc_rec_geom_prop(dom_lay_full, self.pad_len)
-
-        elif self.layer_shape == 'hypershape':
-
-            print("Determining Hypershape Layer Parameters", flush=True)
-
-            # Geometric properties of the hypershape layer
-            self.calc_hyp_geom_prop(dom_lay_full, self.pad_len, self.lmin)
-
-        # Domain dimensions with free surface truncation
-        dom_lay_trunc = self.habc_domain_dimensions(only_habc_dom=True,
-                                                    full_hyp=False)
-
-        # Layer parameters
-        layer_par = (self.F_L, self.a_par, self.d)
-
-        # mesh parameters
-        mesh_par = (self.lmin, self.lmax, self.alpha, self.variant)
-
-        # wave parameters
-        c_ref = min([bnd[1] for bnd in self.eik_bnd])
-        c_bnd = self.eik_bnd[0][1]
-        wave_par = (self.freq_ref, c_ref, c_bnd)
-
-        # Initializing the parent class for damping
-        HABC_Damping.__init__(self, dom_lay_trunc, layer_par, mesh_par,
-                              wave_par, dimension=self.dimension)
-
-    def create_mesh_habc(self, inf_model=False, spln=True, fmesh=1.):
+    def create_mesh_pml(self, inf_model=False, spln=True, fmesh=1.):
         '''
         Create a mesh with absorbing layer based on the determined size.
 
@@ -517,56 +448,27 @@ class HABC_Wave(AcousticWave, HABC_Mesh, RectangLayer,
             layer_shape = 'rectangular'
 
         else:
-            print("\nGenerating Mesh with Absorbing Layer", flush=True)
+            print("\nGenerating Mesh with PML", flush=True)
             layer_shape = self.layer_shape
 
         # New mesh with layer
-        if layer_shape == 'rectangular':
-            dom_lay = self.habc_domain_dimensions(only_habc_dom=True)
-            mesh_habc = self.rectangular_mesh_habc(dom_lay, self.pad_len)
-
-        elif layer_shape == 'hypershape':
-
-            # Parameters for hypershape mesh
-            if self.dimension == 2:  # 2D
-                par_geom = self.perim_hyp
-
-            # if self.dimension == 3:  # 3D
-            #     par_geom = self.surf_hyp
-
-                hyp_par = (self.n_hyp, par_geom, *self.hyper_axes)
-                mesh_habc = self.hypershape_mesh_habc(hyp_par,
-                                                      spln=spln,
-                                                      fmesh=fmesh)
-
-            # Mesh file
-            if self.dimension == 3:  # 3D
-                q = {"overlap_type": (fire.DistributedMeshOverlapType.NONE, 0)}
-                mesh_habc = fire.Mesh(self.filename_mesh,
-                                      distribution_parameters=q,
-                                      comm=self.comm.comm)
-
-                mesh_habc.coordinates.dat.data_with_halos[:, [0, 1, 2]] = \
-                    mesh_habc.coordinates.dat.data_with_halos[:, [2, 0, 1]]
-
-            # Mesh data
-            print(f"Mesh Created with {mesh_habc.num_vertices()} Nodes "
-                  f"and {mesh_habc.num_cells()} Volume Elements", flush=True)
+        dom_lay = self.pml_domain_dimensions(only_habc_dom=True)
+        mesh_pml = self.rectangular_mesh_habc(dom_lay, self.pad_len)
 
         # Updating the mesh with the absorbing layer
-        self.set_mesh(user_mesh=mesh_habc, mesh_parameters={})
+        self.set_mesh(user_mesh=mesh_pml, mesh_parameters={})
         print("Mesh Generated Successfully", flush=True)
 
         if inf_model:
             pth_mesh = self.path_save + "preamble/mesh_inf.pvd"
         else:
-            pth_mesh = self.path_case_habc + "mesh_habc.pvd"
+            pth_mesh = self.path_case_pml + "mesh_pml.pvd"
 
         # Save new mesh
         outfile = fire.VTKFile(pth_mesh)
         outfile.write(self.mesh)
 
-    def velocity_habc(self, inf_model=False, method='point_cloud'):
+    def velocity_pml(self, inf_model=False, method='point_cloud'):
         '''
         Set the velocity model for the model with absorbing layer
 
@@ -582,34 +484,6 @@ class HABC_Wave(AcousticWave, HABC_Mesh, RectangLayer,
         Returns
         -------
         None
-
-        Improvements
-        ------------
-        dx = 0.05 km (2D)
-        Pts approach: 0.699 0.599 0.717 mean = 0.672
-        Lst approach: 0.914 0.769 0.830 mean = 0.847
-        New approach: 1.602 1.495 1.588 mean = 1.562
-        Old approach: 1.982 2.124 1.961 mean = 2.022
-
-        dx = 0.02 km
-        Pts approach: 2.290 2.844 2.133 mean = 2.422
-        Lst approach: 2.784 2.726 3.085 mean = 2.865
-        New approach: 5.276 5.214 6.275 mean = 5.588
-        Old approach: 12.232 12.372 12.078 = 12.227
-
-        dx = 0.05 km (3D)
-        Pts approach: 33.234 31.697 31.598 = 32.176
-        Lst approach: 60.101 60.919 50.918 = 57.313
-
-        'point_cloud' - dx = 0.05 km (2D)
-        Estimating Runtime and Used Memory
-        Runtime: (s):18.437, (m):0.307, (h):0.005
-        Used Memory: Current (MB):18.813, Peak (MB):25.102
-
-        'nearest_point' - dx = 0.05 km (2D)
-        Estimating Runtime and Used Memory
-        Runtime: (s):20.494, (m):0.342, (h):0.006
-        Used Memory: Current (MB):18.715, Peak (MB):25.298
         '''
 
         print("\nUpdating Velocity Profile", flush=True)
@@ -638,248 +512,75 @@ class HABC_Wave(AcousticWave, HABC_Mesh, RectangLayer,
         if inf_model:
             file_name = "preamble/c_inf.pvd"
         else:
-            file_name = self.case_habc + "/c_habc.pvd"
+            file_name = self.case_pml + "/c_pml.pvd"
 
         outfile = fire.VTKFile(self.path_save + file_name)
         outfile.write(self.c)
 
-    def fundamental_frequency(self, method=None, monitor=False,
-                              fitting_c=(1., 1., 0.5, 0.5)):
+    def calc_pml_prop(self, CR=0.001):
         '''
-        Compute the fundamental frequency in Hz via modal analysis
-        considering the numerical model with Neumann BCs.
+        Calculate the maximum damping ratio for the PML layer
 
         Parameters
         ----------
-        method : `str`, optional
-            Method to use for solving the eigenvalue problem.
-            Default is None, which uses the 'KRYLOVSCH_CH' method.
-            Opts: 'ANALYTICAL', 'ARNOLDI', 'LANCZOS', 'LOBPCG', 'KRYLOVSCH_CH',
-            'KRYLOVSCH_CG', 'KRYLOVSCH_GH', 'KRYLOVSCH_GG' or 'RAYLEIGH'.
-            'ANALYTICAL' method is only available for isotropic hypershapes.
-            'RAYLEIGH' method is an approximation by Rayleigh quotient.
-            In 'KRYLOVSCH_(K)(P)' methods, (K) indicates the Krylov solver to
-            use: 'C' for Conjugate Gradient (cg) or 'G' for Generalized Minimal
-            Residual (gmres). (P) indicates the preconditioner to use: 'H' for
-            Hypre (hypre) or 'G' for Geometric Algebraic Multigrid (gamg). For
-            example, 'KRYLOVSCH_CH' uses cg solver with hypre preconditioner.
-        monitor : `bool`, optional
-            Print on screen the computed natural frequencies. Default is False
-        fitting_c : `tuple`, optional
-            Parameters for fitting equivalent velocity regression.
-            Structure: (fc1, fc2, fp1, fp2). Default is (1., 1., 0.5, 0.5)
-            - fc1 : `float`
-                Exponent factor for the minimum reference velocity
-            - fc2 : `float`
-                Exponent factor for the maximum reference velocity
-            - fp1 : `float`
-                Exponent fsctor for the minimum equivalent velocity
-            - fp2 : `float`
-                Exponent factor for the maximum equivalent velocity
+        CR : `float`, optional
+            Desired reflection coefficient at outer boundary of PML layer.
+            Default is 0.001
 
         Returns
-        ----
-        None
-
-        Verification
-        ------------
-        f in Hz, dx in km
-
-        * Homogeneous domain (Comsol)
-            - Dirichlet:
-            m  n   Theory       dx=0.05-Q   dx=0.05-T   dx=0.01-Q   dx=0.01-T
-            1  1   0.62500      0.62524     0.62531     0.62501     0.62501
-            2  1   0.90139      0.90216     0.90226     0.90142     0.90142
-            1  2   1.06800      1.0697      1.06960     1.06810     1.06810
-            3  1   1.23111      1.2336      1.23330     1.23120     1.23120
-            2  2   1.25000      1.2519      1.25240     1.25010     1.25010
-            3  2   1.50520      1.5084      1.50940     1.50530     1.50540
-
-            - Neumann:
-            dx=0.05-Q   dx=0.05-T   dx=0.01-Q   dx=0.01-T
-            3.5236E-8   2.9779E-8i  2.2652E-7   7.7750E-8
-            0.37510     0.37507     0.37500     0.37500
-            0.50023     0.50016     0.50001     0.50001
-            0.62524     0.62530     0.62501     0.62501
-            0.75077     0.75052     0.75003     0.75002
-            0.90216     0.90227     0.90142     0.90142
-
-            - Sommerfeld:
-            dx=0.05-Q   dx=0.05-T   dx=0.01-Q   dx=0.01-T
-            2.3348E-8   2.8175E-8i  2.2097E-7   7.7112E-8
-            0.37513     0.37508     0.37500     0.37500
-            0.50032     0.50021     0.50001     0.50001
-            0.62533     0.62533     0.62501     0.62501
-            0.75100     0.75065     0.75003     0.75002
-            0.90240     0.90234     0.90142     0.90142
-
-        * Bimaterial domain (Comsol)
-            - Dirichlet:
-            dx=0.05-Q   dx=0.05-T   dx=0.01-Q   dx=0.01-T
-            0.72599     0.72606     0.72562     0.72563
-            1.16740     1.16750     1.16560     1.16560
-            1.23700     1.23680     1.23490     1.23490
-            1.59320     1.59400     1.58940     1.58950
-            1.63620     1.63560     1.63030     1.63030
-            1.70870     1.70800     1.70480     1.70480
-
-            - Neumann:
-            dx=0.05-Q   dx=0.05-T   dx=0.01-Q   dx=0.01-T
-            4.5197E-8   3.8054E-8i  2.8719E-7   1.0084E-7
-            0.54939*    0.54933*    0.54922*    0.54921*
-            0.55593     0.55590     0.55570     0.55570
-            0.93184     0.93186     0.93110     0.93110
-            0.95198     0.95159     0.95084     0.95082
-            1.04450     1.04420     1.04280     1.04280
-
-            - Sommerfeld:
-            dx=0.05-Q   dx=0.05-T   dx=0.01-Q   dx=0.01-T
-            2.9482E-8   3.5721E-8i  2.7911E-7   9.8406E-8
-            0.54946     0.54937     0.54922     0.54921
-            0.55603     0.55594     0.55570     0.55570
-            0.93209     0.93195     0.93110     0.93110
-            0.95230     0.95177     0.95084     0.95082
-            1.04520     1.04460     1.04280     1.04280
-
-        * Spyro Bimaterial Neumann:
-           dx=0.05-L    %Diff-Q     %Diff-T
-           0.45593      17.01       17.00
-
-           dx=0.01-L    %Diff-Q     %Diff-T
-           0.47525      13.47       13.47
+        -------
+        sigma_max : `float`
+            Maximum damping ratio within the PML layer
         '''
 
-        print("\nSolving Eigenvalue Problem", flush=True)
-        mod_sol = eigsol.Modal_Solver(self.dimension, method=method)
+        dgr_prof = 2.  # Degree of the damping profile within the PML layer
+        sigma_max = (dgr_prof + 1) / (2. * self.pad_len) * np.log(1 / CR)
 
-        if method == 'ANALYTICAL':
+        return sigma_max
 
-            # Hypershape parameters
-            hyp_par = (self.n_hyp, *self.hyper_axes)
-
-            # Cut plane at free surface
-            Lz = self.dom_dim[1]
-            z_cut = Lz / 2.
-
-            # Cut plane percentage
-            cut_plane_perc = z_cut / self.hyper_axes[1]
-
-            # Equivalent velocity for the original model
-            c_eqref = mod_sol.c_equivalent(self.initial_velocity_model,
-                                           V=self.funct_space_eik)
-
-            Lsp = mod_sol.solve_eigenproblem(self.c, V=self.function_space,
-                                             quad_rule=self.quadrature_rule,
-                                             hyp_par=hyp_par, c_eqref=c_eqref,
-                                             fitting_c=fitting_c,
-                                             cut_plane_percent=cut_plane_perc)
-
-        elif method == 'RAYLEIGH':
-
-            # Normalized coordinates
-            coord_norm = mod_sol.generate_norm_coords(self.mesh,
-                                                      self.dom_dim,
-                                                      self.hyper_axes)
-
-            Lsp = mod_sol.solve_eigenproblem(self.c, V=self.function_space,
-                                             quad_rule=self.quadrature_rule,
-                                             coord_norm=coord_norm)
-
-        else:
-            Lsp = mod_sol.solve_eigenproblem(self.c,
-                                             V=self.function_space, shift=1e-8,
-                                             quad_rule=self.quadrature_rule)
-
-        if monitor:
-            for n_eig, eigval in enumerate(np.unique(Lsp)):
-                f_eig = np.sqrt(abs(eigval)) / (2 * np.pi)
-                print(f"Frequency {n_eig} (Hz): {f_eig:.5f}", flush=True)
-
-        # Fundamental frequency (eig = 0 is a rigid body motion)
-        min_eigval = max(np.unique(Lsp[(Lsp > 0.) & (np.imag(Lsp) == 0.)]))
-        self.fundam_freq = np.real(np.sqrt(min_eigval) / (2 * np.pi))
-        print("Fundamental Frequency (Hz): {0:.5f}".format(self.fundam_freq),
-              flush=True)
-
-    def damping_layer(self, xCR_usu=None, method=None,
-                      fitting_c=(1., 1., 0.5, 0.5)):
+    def pml_layer(self):
         '''
-        Set the damping profile within the absorbing layer.
-        Minimum damping ratio is computed as psi_min = xCR * d
-        where xCR is the heuristic factor for the minimum damping
-        ratio and d is thenormalized element size (lmin / pad_len).
-        Maximum damping ratio is psi_max =  2 * pi * f_fund * psi
-        where f_fund is the fundamental frequency and psi = 0.999.
+        Set the damping profile within the PML layer.
 
         Parameters
         ----------
-        xCR_usu : `float`, optional
-            User-defined heuristic factor for the minimum damping ratio.
-            Default is None, which defines an estimated value
-        method : `str`, optional
-            Method to use for solving the eigenvalue problem.
-            Default is None, which uses the 'KRYLOVSCH_CH' method.
-            Opts: 'ANALYTICAL', 'ARNOLDI', 'LANCZOS', 'LOBPCG', 'KRYLOVSCH_CH',
-            'KRYLOVSCH_CG', 'KRYLOVSCH_GH', 'KRYLOVSCH_GG' or 'RAYLEIGH'.
-            'ANALYTICAL' method is only available for isotropic hypershapes.
-            'RAYLEIGH' method is an approximation by Rayleigh quotient.
-            In 'KRYLOVSCH_(K)(P)' methods, (K) indicates the Krylov solver to
-            use: 'C' for Conjugate Gradient (cg) or 'G' for Generalized Minimal
-            Residual (gmres). (P) indicates the preconditioner to use: 'H' for
-            Hypre (hypre) or 'G' for Geometric Algebraic Multigrid (gamg). For
-            example, 'KRYLOVSCH_CH' uses cg solver with hypre preconditioner.
-        fitting_c : `tuple`, optional
-            Parameters for fitting equivalent velocity regression.
-            Structure: (fc1, fc2, fp1, fp2). Default is (1., 1., 0.5, 0.5)
-            - fc1 : `float`
-                Exponent factor for the minimum reference velocity
-            - fc2 : `float`
-                Exponent factor for the maximum reference velocity
-            - fp1 : `float`
-                Exponent fsctor for the minimum equivalent velocity
-            - fp2 : `float`
-                Exponent factor for the maximum equivalent velocity
+        None
 
         Returns
         -------
         None
         '''
 
-        # Estimating fundamental frequency
-        self.fundamental_frequency(method=method, monitor=True,
-                                   fitting_c=fitting_c)
+        print("\nCreating Damping PML Profile", flush=True)
 
-        print("\nCreating Damping Profile", flush=True)
-
-        # Compute the minimum damping ratio and the associated heuristic factor
-        eta_crt, self.psi_min, self.xCR, self.xCR_lim, self.CRmin\
-            = self.calc_damping_prop(self.fundam_freq, xCR_usu=xCR_usu)
+        # Compute the maximum damping coefficient
+        sigma_max = calc_pml_prop(self)
 
         # Mesh coordinates
         coords = fire.SpatialCoordinate(self.mesh)
 
         # Damping mask
         V_mask = fire.FunctionSpace(self.mesh, 'DG', 0)
-        self.eta_mask = self.layer_mask_field(coords, V_mask,
-                                              type_marker='mask',
-                                              name_mask='eta_mask')
+        self.sigma_mask = self.layer_mask_field(coords, V_mask,
+                                                type_marker='mask',
+                                                name_mask='sigma_mask')
 
         # Save damping mask
-        outfile = fire.VTKFile(self.path_case_habc + "eta_mask.pvd")
-        outfile.write(self.eta_mask)
+        outfile = fire.VTKFile(self.path_case_pml + "sigma_mask.pvd")
+        outfile.write(self.sigma_mask)
 
-        # Compute the coefficients for quadratic damping function
-        aq, bq = self.coeff_damp_fun(self.psi_min)
+        # Coefficients for quadratic PML function
+        aq, bq = 1., 0.
 
         # Damping field
-        damp_par = (self.pad_len, eta_crt, aq, bq)
-        self.eta_habc = self.layer_mask_field(
+        damp_par = (self.pad_len, sigma_max, aq, bq)
+        self.sigma_pml = self.c * self.layer_mask_field(
             coords, self.function_space, damp_par=damp_par,
             type_marker='damping', name_mask='eta [1/s])')
 
         # Save damping profile
-        outfile = fire.VTKFile(self.path_case_habc + "eta_habc.pvd")
-        outfile.write(self.eta_habc)
+        outfile = fire.VTKFile(self.path_case_pml + "sigma_pml.pvd")
+        outfile.write(self.sigma_pml)
 
     def nrbc_on_boundary_layer(self):
         '''
@@ -1096,15 +797,15 @@ class HABC_Wave(AcousticWave, HABC_Mesh, RectangLayer,
         self.geometry_infinite_model()
 
         # Creating mesh for infinite domain
-        self.create_mesh_habc(inf_model=True)
+        self.create_mesh_pml(inf_model=True)
 
         # Updating velocity model
-        self.velocity_habc(inf_model=True)
+        self.velocity_pml(inf_model=True)
 
         # Setting no damping
         self.cosHig = fire.Constant(0.)
-        self.eta_mask = fire.Constant(0.)
-        self.eta_habc = fire.Constant(0.)
+        self.sigma_mask = fire.Constant(0.)
+        self.sigma_pml = fire.Constant(0.)
 
         print("\nSolving Infinite Model", flush=True)
 
@@ -1116,7 +817,7 @@ class HABC_Wave(AcousticWave, HABC_Mesh, RectangLayer,
 
         # Deleting variables to be computed for the HABC scheme
         del self.pad_len, self.Lx_habc, self.Lz_habc
-        del self.cosHig, self.eta_mask, self.eta_habc
+        del self.cosHig, self.sigma_mask, self.sigma_pml
         if self.dimension == 3:
             del self.Ly_habc
 
@@ -1140,9 +841,9 @@ class HABC_Wave(AcousticWave, HABC_Mesh, RectangLayer,
             print("Output Folder for Results Will Be Renamed.", flush=True)
 
             # Define the current and new folder names
-            old = self.path_case_habc
-            new = self.path_case_habc[:-8] + f"{self.n_hyp:.1f}" + \
-                self.path_case_habc[-5:]
+            old = self.path_case_pml
+            new = self.path_case_pml[:-8] + f"{self.n_hyp:.1f}" + \
+                self.path_case_pml[-5:]
 
             try:
                 if path.isdir(new):

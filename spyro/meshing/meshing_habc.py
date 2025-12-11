@@ -418,6 +418,7 @@ class HABC_Mesh():
             mesh_habc = fire.RectangleMesh(nz, nx, Lz_habc, Lx_habc,
                                            distribution_parameters=q,
                                            comm=self.comm.comm)
+            typ_ele_str = "Area Elements"
 
         if self.dimension == 3:  # 3D
 
@@ -432,6 +433,7 @@ class HABC_Mesh():
             mesh_habc = fire.BoxMesh(nz, nx, ny, Lz_habc, Lx_habc, Ly_habc,
                                      distribution_parameters=q,
                                      comm=self.comm.comm)
+            typ_ele_str = "Volume Elements"
 
             # Adjusting coordinates
             mesh_habc.coordinates.dat.data_with_halos[:, 2] -= pad_len
@@ -452,7 +454,7 @@ class HABC_Mesh():
 
         # Mesh data
         print(f"Mesh Created with {mesh_habc.num_vertices()} Nodes "
-              f"and {mesh_habc.num_cells()} Volume Elements", flush=True)
+              f"and {mesh_habc.num_cells()}" + typ_ele_str, flush=True)
 
         print("Extended Rectangular Mesh Generated Successfully", flush=True)
 
@@ -1550,8 +1552,13 @@ class HABC_Mesh():
 
             # Reference distance to the original boundary
             ref = fire.sqrt(ref) / fire.Constant(pad_len)
-            ref = fire.Constant(eta_crt) * (fire.Constant(aq) * ref**2
-                                            + fire.Constant(bq) * ref)
+
+            # Quadratic damping profile
+            if bq == 0.:
+                ref = fire.Constant(eta_crt) * fire.Constant(aq) * ref**2
+            else:
+                ref = fire.Constant(eta_crt) * (fire.Constant(aq) * ref**2
+                                                + fire.Constant(bq) * ref)
 
         elif type_marker == 'mask':
             # Mask filter for layer boundary domain

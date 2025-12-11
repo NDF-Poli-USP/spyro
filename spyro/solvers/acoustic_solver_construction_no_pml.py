@@ -48,8 +48,9 @@ def construct_solver_or_matrix_no_pml(Wave_object):
     if Wave_object.abc_active:
         weak_expr_abc = dot((u_n - u_nm1) / Constant(dt), v)
 
-        f_abc = (1 / Wave_object.c) * weak_expr_abc
-        qr_s = Wave_object.surface_quadrature_rule
+        if not Wave_object.abc_boundary_layer_type == "pmlnsnc":
+            f_abc = (1 / Wave_object.c) * weak_expr_abc
+            qr_s = Wave_object.surface_quadrature_rule
 
         if Wave_object.abc_boundary_layer_type == "hybrid":
 
@@ -60,6 +61,13 @@ def construct_solver_or_matrix_no_pml(Wave_object):
             le += Wave_object.eta_mask * weak_expr_abc * \
                 (1 / (Wave_object.c * Wave_object.c)) * \
                 Wave_object.eta_habc * dx(scheme=quad_rule)
+        elif Wave_object.abc_boundary_layer_type == "pmlnsnc":
+
+            # PML
+            le += Wave_object.pml_mask * weak_expr_abc * \
+                (1 / (Wave_object.c * Wave_object.c)) * \
+                Wave_object.sigma_pml * dx(scheme=quad_rule)
+
         else:
             if Wave_object.absorb_top:
                 le += f_abc*ds(1, scheme=qr_s)
