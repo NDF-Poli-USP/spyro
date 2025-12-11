@@ -854,11 +854,11 @@ def propagation_elastic(V, G, W, anisotropy, H=None):
 
     # Save total energy
     if anisotropy == 'VTI':
-        path_energy = "nrbc_vti/energy_vti.npy"
-        path_enedss = "nrbc_vti/energy_vti"
+        path_energy = "output/3D_Elastic/nrbc_vti/energy_vti.npy"
+        path_enedss = "output/3D_Elastic/nrbc_vti/energy_vti"
     if anisotropy == 'TTI':
-        path_energy = "nrbc_tti/energy_tti.npy"
-        path_enedss = "nrbc_tti/energy_tti"
+        path_energy = "output/3D_Elastic/nrbc_tti/energy_tti.npy"
+        path_enedss = "output/3D_Elastic/nrbc_tti/energy_tti"
     np.save(path_energy, Etot)
 
     # Total final dissipated energy
