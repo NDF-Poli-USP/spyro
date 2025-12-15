@@ -3,7 +3,7 @@ from copy import deepcopy
 from firedrake import *
 import spyro
 
-from .model import dictionary as model
+from tests.on_one_core.model import dictionary as model
 model["acquisition"]["source_type"] = "MMS"
 
 
@@ -87,7 +87,8 @@ def test_isotropic_wave_2D():
 
 
 if __name__ == "__main__":
-    test_method_triangles_lumped()
-    test_method_quads_lumped()
+    # test_method_triangles_lumped()
+    # test_method_quads_lumped()
+    test_isotropic_wave_2D()
 
     print("END")

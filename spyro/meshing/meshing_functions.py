@@ -502,7 +502,7 @@ def PeriodicRectangleMesh(
     else:
         pad = 0
     mesh = fire.PeriodicRectangleMesh(
-        nx, ny, Lx, Ly, quadrilateral=quadrilateral, comm=comm
+        nx, ny, Lx, Ly, quadrilateral=quadrilateral, comm=comm, diagonal="crossed",
     )
     mesh.coordinates.dat.data[:, 0] *= -1.0
     mesh.coordinates.dat.data[:, 1] -= pad

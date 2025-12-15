@@ -2,7 +2,6 @@ import numpy as np
 import os
 import spyro
 import time
-import gmsh
 
 from firedrake.petsc import PETSc
 from math import pi as PI
@@ -28,7 +27,7 @@ smag = opts.getReal("amplitude", default=1)  # Source amplitude
 f0 = opts.getReal("frequency", default=5)     # Frequency (Hz)
 t0 = 1/f0                                      # Time delay
 
-final_time = 3.0
+final_time = 1.0
 dt = 0.0001
 tn = opts.getReal("total_time", default=final_time)  # Simulation time (s)
 nt = opts.getInt("time_steps", default=final_time/dt+1)   # Number of time steps
@@ -38,77 +37,6 @@ out_freq = int(100)
 x_s = np.r_[-L/2, L/2]   # Source location (m)
 x_r = np.r_[opts.getReal("receiver_x", default=0.0),  # Receiver relative location (m)
             opts.getReal("receiver_z", default=150.0)]
-
-
-
-def generate_gmsh_mesh(Lx, Ly, edge_size, radius=200,
-                       center=None,
-                       output_file="mesh.msh"):
-
-    gmsh.initialize()
-    gmsh.model.add("refined_mesh")
-
-    # ----------------------------
-    # 1. Center of refinement
-    # ----------------------------
-    if center is None:
-        cx, cy = -Lx/2, Ly/2
-    else:
-        cx, cy = center
-
-    # ----------------------------
-    # 2. Create rectangle (OCC)
-    # ----------------------------
-    p1 = gmsh.model.occ.addPoint(-Lx, 0, 0)
-    p2 = gmsh.model.occ.addPoint(0,   0, 0)
-    p3 = gmsh.model.occ.addPoint(0,  Ly, 0)
-    p4 = gmsh.model.occ.addPoint(-Lx, Ly, 0)
-
-    l1 = gmsh.model.occ.addLine(p1, p2)
-    l2 = gmsh.model.occ.addLine(p2, p3)
-    l3 = gmsh.model.occ.addLine(p3, p4)
-    l4 = gmsh.model.occ.addLine(p4, p1)
-
-    loop = gmsh.model.occ.addCurveLoop([l1, l2, l3, l4])
-    surf = gmsh.model.occ.addPlaneSurface([loop])
-
-    # Refinement target point (must be embedded)
-    p_center = gmsh.model.occ.addPoint(cx, cy, 0)
-    gmsh.model.occ.synchronize()
-    gmsh.model.mesh.embed(0, [p_center], 2, surf)
-
-    # ----------------------------
-    # 3. Attractor field
-    # ----------------------------
-    f_attr = gmsh.model.mesh.field.add("Attractor")
-    gmsh.model.mesh.field.setNumbers(f_attr, "NodesList", [p_center])
-
-    # ----------------------------
-    # 4. Threshold field (refinement)
-    # ----------------------------
-    f_thresh = gmsh.model.mesh.field.add("Threshold")
-    gmsh.model.mesh.field.setNumber(f_thresh, "InField", f_attr)
-    gmsh.model.mesh.field.setNumber(f_thresh, "SizeMin", edge_size * 0.2)
-    gmsh.model.mesh.field.setNumber(f_thresh, "SizeMax", edge_size)
-    gmsh.model.mesh.field.setNumber(f_thresh, "DistMin", radius * 0.3)
-    gmsh.model.mesh.field.setNumber(f_thresh, "DistMax", radius)
-
-    gmsh.model.mesh.field.setAsBackgroundMesh(f_thresh)
-
-    # Safe options that exist in all modern Gmsh versions
-    gmsh.option.setNumber("Mesh.CharacteristicLengthMin", edge_size * 0.2)
-    gmsh.option.setNumber("Mesh.CharacteristicLengthMax", edge_size)
-
-    # ----------------------------
-    # 5. Generate mesh
-    # ----------------------------
-    gmsh.model.mesh.generate(2)
-    gmsh.model.mesh.optimize("Netgen")
-
-    gmsh.write(output_file)
-    gmsh.finalize()
-
-    print(f"Mesh saved: {output_file}")
 
 
 def analytical_solution(i, j):
@@ -167,10 +95,6 @@ def numerical_solution(j):
         A0 = np.zeros(2)
         A0[j] = smag
 
-    # Generate mesh using gmsh
-    mesh_file = "elastic_mesh.msh"
-    generate_gmsh_mesh(L, L, h, output_file=mesh_file)
-
     d = {}
 
     d["options"] = {
@@ -188,8 +112,7 @@ def numerical_solution(j):
         "Lz": L,
         "Lx": L,
         "Ly": 0.0,
-        "mesh_type": "file",
-        "mesh_file": mesh_file,
+        "mesh_type": "firedrake_mesh",
     }
 
     d["acquisition"] = {
@@ -232,10 +155,12 @@ def numerical_solution(j):
     }
 
     wave = spyro.IsotropicWave(d)
+    wave.set_mesh(input_mesh_parameters={'edge_length': h, 'periodic': True})
     wave.forward_solve()
     spyro.plots.plot_receiver(wave, xi=0, filename="rec_at_dir0.png")
     spyro.plots.plot_receiver(wave, xi=1, filename="rec_at_dir1.png")
 
+    # return wave.receivers_output.reshape(nt + 1, 2)[0:-1, :]
     return wave.receivers_output
 
 
