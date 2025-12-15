@@ -39,7 +39,6 @@ def central_difference(wave, source_ids=[0]):
     usol_recv = []
     save_step = 0
     for step in range(nt):
-        # Basic way of applying sources
         wave.update_source_expression(t)
         fire.assemble(wave.rhs, tensor=wave.B)
 
@@ -61,10 +60,7 @@ def central_difference(wave, source_ids=[0]):
             save_step += 1
 
         if (step - 1) % wave.output_frequency == 0:
-            assert (
-                fire.norm(wave.get_function()) < 1
-            ), "Numerical instability. Try reducing dt or building the " \
-               "mesh differently"
+            wave.check_stability()
             wave.field_logger.log(t)
             helpers.display_progress(wave.comm, t)
 
