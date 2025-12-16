@@ -27,6 +27,7 @@ def test_mask():
     dictionary["absorving_boundary_conditions"] = {
         "status": False,
         "pad_length": 0.,
+        "damping_type": None,
     }
     dictionary["mesh"] = {
         "Lz": 1.0,
