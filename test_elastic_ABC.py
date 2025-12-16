@@ -521,7 +521,7 @@ def explosive_source(mesh, source_coord, W, sigma=15.0):
     W: `firedrake.FunctionSpace`
         Function space for the source
     sigma: `float`, optional
-        Standard deviation of the Gaussian (default is 20.0)
+        Standard deviation of the Gaussian (default is 15.0)
     '''
     F1 = fire.Function(W, name='F')
     x, y, z = fire.SpatialCoordinate(mesh)

@@ -1,9 +1,12 @@
 import firedrake as fire
 from firedrake import ds, dx, Constant, dot, grad
+from numpy import where
+
+# Modifications by Ruben Andres Salas
 
 
 def construct_solver_or_matrix_no_pml(Wave_object):
-    """
+    '''
     Builds solver operators for wave object without a PML. Doesn't create
     mass matrices if matrix_free option is on, which it is by default.
 
@@ -11,14 +14,19 @@ def construct_solver_or_matrix_no_pml(Wave_object):
     ----------
     Wave_object: :class: 'Wave' object
         Waveform object that contains all simulation parameters
-    """
+
+    Returns
+    -------
+    None
+    '''
     V = Wave_object.function_space
     quad_rule = Wave_object.quadrature_rule
 
-    # typical CG FEM in 2d/3d
+    # Test and trial functions
     u = fire.TrialFunction(V)
     v = fire.TestFunction(V)
 
+    # State variables
     u_nm1 = fire.Function(V, name="pressure t-dt")
     u_n = fire.Function(V, name="pressure")
     u_np1 = fire.Function(V, name="pressure t+dt")
@@ -58,19 +66,16 @@ def construct_solver_or_matrix_no_pml(Wave_object):
                 Wave_object.eta_habc * dx(scheme=quad_rule)
 
         else:
-            if Wave_object.absorb_top:
-                le += f_abc*ds(1, scheme=qr_s)
-            if Wave_object.absorb_bottom:
-                le += f_abc*ds(2, scheme=qr_s)
-            if Wave_object.absorb_right:
-                le += f_abc*ds(3, scheme=qr_s)
-            if Wave_object.absorb_left:
-                le += f_abc*ds(4, scheme=qr_s)
+            # Only NRBC
+            bnds = [Wave_object.absorb_top, Wave_object.absorb_bottom,
+                    Wave_object.absorb_right, Wave_object.absorb_left]
+
             if Wave_object.dimension == 3:
-                if Wave_object.absorb_front:
-                    le += f_abc*ds(5, scheme=qr_s)
-                if Wave_object.absorb_back:
-                    le += f_abc*ds(6, scheme=qr_s)
+                bnds.extend([Wave_object.absorb_front,
+                             Wave_object.absorb_back])
+
+            where_to_absorb = tuple(where(bnds)[0] + 1)  # ds starts at 1
+            le += f_abc * ds(where_to_absorb, scheme=qr_s)
 
     # form = m1 + a - le
     # Signal for le is + in derivation, see Salas et al (2022)
