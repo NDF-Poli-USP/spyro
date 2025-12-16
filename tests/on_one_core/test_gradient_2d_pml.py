@@ -108,7 +108,7 @@ def set_dictionary(PML=False):
     }
 
     dictionary["mesh"] = {
-        "Lz": 1.0,  # depth in km - always positive   # Como ver isso sem ler a malha?
+        "Lz": 1.0,  # depth in km - always positive
         "Lx": 1.0,  # width in km - always positive
         "Ly": 0.0,  # thickness in km - always positive
         "mesh_file": None,
@@ -120,7 +120,7 @@ def set_dictionary(PML=False):
         "source_locations": [(-0.1, 0.5)],
         "frequency": 5.0,
         "delay": 1.5,
-        "delay_type": "multiples_of_minimun",
+        "delay_type": "multiples_of_minimum",
         "receiver_locations": spyro.create_transect((-0.8, 0.1), (-0.8, 0.9), 10),
     }
 
@@ -129,8 +129,8 @@ def set_dictionary(PML=False):
         "final_time": final_time,  # Final time for event
         "dt": 0.0002,  # timestep size
         "amplitude": 1,  # the Ricker has an amplitude of 1.
-        "output_frequency": 100,  # how frequently to output solution to pvds - Perguntar Daiane ''post_processing_frequnecy'
-        "gradient_sampling_frequency": 1,  # how frequently to save solution to RAM    - Perguntar Daiane 'gradient_sampling_frequency'
+        "output_frequency": 100,  # how frequently to output solution to pvds
+        "gradient_sampling_frequency": 1,  # how frequently to save solution to RAM
     }
 
     dictionary["visualization"] = {

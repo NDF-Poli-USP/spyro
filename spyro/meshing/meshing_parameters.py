@@ -30,7 +30,7 @@ class MeshingParameters():
     Class that handles mesh parameter logic and mesh type/length/file handling.
     """
 
-    def __init__(self, input_mesh_dictionary=None, dimension=None, source_frequency=None, comm=None, quadrilateral=False, method=None, degree=None, velocity_model=None, abc_pad_length=None):
+    def __init__(self, input_mesh_dictionary=None, dimension=None, source_frequency=None, comm=None, quadrilateral=False, method=None, degree=None, velocity_model=None, abc_pad_length=None, negative_z=True):
         """
         Initializes the MeshingParamaters class.
 
@@ -68,6 +68,7 @@ class MeshingParameters():
         self._cells_per_wavelength = None
         self.edge_length = None
         self.cells_per_wavelength = None
+        self.negative_z = negative_z
 
     def _set_length_with_unit_check(self, attr_name, value):
         """
@@ -138,11 +139,10 @@ class MeshingParameters():
     def method(self, value):
         allowed_types = {
             "mass_lumped_triangle",
-            "CG_triangle",
             "DG_triangle",
             "spectral_quadrilateral",
-            "CG_quadrilateral",
             "DG_quadrilateral",
+            "CG",
         }
         if value is not None and value not in allowed_types:
             raise ValueError(

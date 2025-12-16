@@ -4,6 +4,7 @@ from scipy.optimize import minimize as scipy_minimize
 from mpi4py import MPI  # noqa: F401
 import numpy as np
 import resource
+import os
 
 from .acoustic_wave import AcousticWave
 from ..utils import compute_functional
@@ -160,10 +161,39 @@ class FullWaveformInversion(AcousticWave):
         None
         """
         super().__init__(dictionary=dictionary, comm=comm)
-        if self.running_fwi is False:
-            warnings.warn("Dictionary FWI options set to not run FWI.")
+        default_optimization_parameters = {
+            "General": {"Secant": {
+                "Type": "Limited-Memory BFGS",
+                "Maximum Storage": 10
+            }},
+            "Step": {
+                "Type": "Augmented Lagrangian",
+                "Augmented Lagrangian": {
+                    "Subproblem Step Type": "Line Search",
+                    "Subproblem Iteration Limit": 5.0,
+                },
+                "Line Search": {"Descent Method": {"Type": "Quasi-Newton Step"}},
+            },
+            "Status Test": {
+                "Gradient Tolerance": 1e-16,
+                "Iteration Limit": None,
+                "Step Tolerance": 1.0e-16,
+            },
+        }
+        self.input_dictionary.setdefault("inversion", {})
+        self.input_dictionary["inversion"].setdefault("initial_guess_model_file", None)
+        self.input_dictionary["inversion"].setdefault("optimization_parameters", default_optimization_parameters)
+        self.input_dictionary["inversion"].setdefault("real_shot_record_file", None)
+        self.input_dictionary["inversion"].setdefault("control_output_file", "fwi/control.pvd")
+        self.input_dictionary["inversion"].setdefault("gradient_output_file", "fwi/gradient.pvd")
+        self.input_dictionary["inversion"].setdefault("real_velocity_model_file", None)
+        inversion_dictionary = self.input_dictionary["inversion"]
+
         self.real_velocity_model = None
-        self.real_velocity_model_file = None
+        self.real_velocity_model_file = inversion_dictionary["real_velocity_model_file"]
+        self.real_shot_record_files = inversion_dictionary["real_shot_record_file"]
+        self.control_out = fire.VTKFile(inversion_dictionary["control_output_file"])
+        self.gradient_out = fire.VTKFile(inversion_dictionary["gradient_output_file"])
         self.guess_shot_record = None
         self.gradient = None
         self.current_iteration = 0
@@ -174,9 +204,30 @@ class FullWaveformInversion(AcousticWave):
         self.guess_forward_solution = None
         self.has_gradient_mask = False
         self.functional_history = []
+
+    @property
+    def real_velocity_model_file(self):
+        return self._real_velocity_model_file
+
+    @real_velocity_model_file.setter
+    def real_velocity_model_file(self, value):
+        if value is not None:
+            if not os.path.exists(value):
+                raise FileNotFoundError(f"Velocity model file '{value}' does not exist")
+        self._real_velocity_model_file = value
+
+    @property
+    def real_shot_record_files(self):
+        return self._real_shot_record_files
+
+    @real_shot_record_files.setter
+    def real_shot_record_files(self, value):
+        if value is not None:
+            if not os.path.exists(value):
+                raise FileNotFoundError(f"Shot record file '{value}' does not exist")
+        self._real_shot_record_files = value
         self.control_out = fire.VTKFile("results/control.pvd")
         self.gradient_out = fire.VTKFile("results/gradient.pvd")
-        self.real_shot_record_files = dictionary["inversion"].get("real_shot_record_files", None)
         if self.real_shot_record_files is not None:
             self.load_real_shot_record(filename=self.real_shot_record_files)
 

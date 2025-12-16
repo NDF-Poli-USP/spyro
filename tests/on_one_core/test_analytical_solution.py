@@ -18,6 +18,11 @@ def test_analytical_solution():
     dictionary = {}
     dictionary["absorving_boundary_conditions"] = {
         "status": False,
+        "damping_type": None,
+        "exponent": None,
+        "cmax": None,
+        "R": None,
+        "pad_length": None,
     }
     dictionary["mesh"] = {
         "Lz": 3.0,  # depth in km - always positive

@@ -172,7 +172,7 @@ class IsotropicWave(ElasticWave):
         self.parse_boundary_conditions()
         self.parse_volumetric_forces()
 
-        if self.abc_boundary_layer_type is None:
+        if self.abc_boundary_layer_type is None or self.abc_boundary_layer_type == "local":
             isotropic_elastic_without_pml(self)
         elif self.abc_boundary_layer_type == "PML":
             isotropic_elastic_with_pml(self)
