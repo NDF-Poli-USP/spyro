@@ -4,7 +4,8 @@ from firedrake import *  # noqa: F403
 
 
 def functions(Wave_obj):
-    """Damping functions for the perfect matched layer for 2D and 3D
+    '''
+    Damping functions for the perfect matched layer for 2D and 3D
 
     Parameters
     ----------
@@ -19,8 +20,7 @@ def functions(Wave_obj):
         Firedrake function with the damping function in the z direction
     sigma_y : obj
         Firedrake function with the damping function in the y direction
-
-    """
+    '''
 
     ps = Wave_obj.abc_exponent
     cmax = Wave_obj.abc_cmax  # maximum acoustic wave velocity

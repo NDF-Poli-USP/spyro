@@ -102,9 +102,6 @@ class HABC_Wave(AcousticWave, HABC_Mesh, RectangLayer,
         List of receiver locations
     receivers_output : `array`
         Receiver waveform data in the HABC scheme
-    rename_folder_habc()
-        Rename the folder of results if the degree for the hypershape
-        layer is out of the criterion limits
     xCR : `float`
         Heuristic factor for the minimum damping ratio
     xCR_lim: `list`
@@ -139,6 +136,9 @@ class HABC_Wave(AcousticWave, HABC_Mesh, RectangLayer,
         Determine the domain extension size for the infinite domain model
     nrbc_on_boundary_layer()
         Apply the Higdon ABCs on the outer boundary of the absorbing layer
+    rename_folder_habc()
+        Rename the folder of results if the degree for the hypershape
+        layer is out of the criterion limits
     size_habc_criterion()
         Determine the size of the absorbing layer using the Eikonal criterion
     velocity_habc()

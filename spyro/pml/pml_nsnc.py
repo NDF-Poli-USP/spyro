@@ -35,11 +35,9 @@ class PML_Wave(AcousticWave, HABC_Mesh, RectangLayer, HABC_Error):
     case_pml : `str`
         Label for the output files that includes the layer shape
         ('REC', only available) and the reference frequency
-        ('SOU' or 'BND'). Example: 'REC_SOU' or 'HN2_BND'
+        ('SOU' or 'BND'). Example: 'REC_SOU' or 'REC_BND'
     crit_source : `tuple`
        Critical source coordinates
-    CRmin : `float`
-        Minimum reflection coefficient at the minimum damping ratio
     d : `float`
         Normalized element size (lmin / pad_len)
     eik_bnd : `list`
@@ -53,10 +51,6 @@ class PML_Wave(AcousticWave, HABC_Mesh, RectangLayer, HABC_Error):
         - sou_cr : Critical source coordinates
     ele_pad : `int`
         Number of elements in the layer of edge length 'lmin'
-    sigma_pml : `firedrake function`
-        Damping profile within the PML
-    sigma_mask : `firedrake function`
-        Mask function to identify the PML domain
     F_L : `float`
         Size parameter of the absorbing layer
     FLpos : `list`
@@ -65,8 +59,6 @@ class PML_Wave(AcousticWave, HABC_Mesh, RectangLayer, HABC_Error):
         Nyquist frequency according to the time step. f_Nyq = 1 / (2 * dt)
     freq_ref : `float`
         Reference frequency of the wave at the boundary
-    fundam_freq : `float`
-        Fundamental frequency of the numerical model
     fwi_iter : `int`
         The iteration number for the Full Waveform Inversion (FWI) algorithm
     Lx_habc : `float`
@@ -89,49 +81,48 @@ class PML_Wave(AcousticWave, HABC_Mesh, RectangLayer, HABC_Error):
         Path to save data for the current case study
     path_save : `string`
         Path to save data
-    psi_min : `float`
-        Minimum damping ratio of the absorbing layer (psi_min = xCR * d)
     receiver_locations: `list`
         List of receiver locations
     receivers_output : `array`
         Receiver waveform data in the HABC scheme
-    rename_folder_habc()
-        Rename the folder of results if the degree for the hypershape
-        layer is out of the criterion limits
-    xCR : `float`
-        Heuristic factor for the minimum damping ratio
-    xCR_lim: `list`
-        Limits for the heuristic factor
+    sigma_mask : `firedrake function`
+        Mask function to identify the PML domain
+    sigma_x : `firedrake function`
+        Damping profile in the x direction within the PML layer
+    sigma_y : `firedrake function`
+        Damping profile in the y direction within the PML layer (3D)
+    sigma_z : `firedrake function`
+        Damping profile in the z direction within the PML layer
 
     Methods
     -------
-    check_timestep_habc()
+    calc_pml_damping()
+        Calculate the maximum damping coefficient for the PML layer
+    check_timestep_pml()
         Check if the timestep size is appropriate for the transient response
     create_mesh_pml()
         Create a mesh with absorbing layer based on the determined size
     critical_boundary_points()
         Determine the critical points on domain boundaries of the original
         model to size an absorbing layer using the Eikonal criterion for HABCs
-    pml_layer()
-        Set the damping profile within the absorbing layer
     det_reference_freq()
         Determine the reference frequency for a new layer size
-    fundamental_frequency()
-        Compute the fundamental frequency in Hz via modal analysis
     geometry_infinite_model()
         Determine the geometry for the infinite domain model.
-    pml_domain_dimensions()
-        Determine the new dimensions of the domain with absorbing layer
-    pml_new_geometry ()
-        Determine the new domain geometry with the absorbing layer
     identify_pml_case()
         Generate an identifier for the current case study of the HABC scheme
     infinite_model()
         Create a reference model for the HABC scheme for comparative purposes
     layer_infinite_model()
         Determine the domain extension size for the infinite domain model
-    nrbc_on_boundary_layer()
-        Apply the Higdon ABCs on the outer boundary of the absorbing layer
+    pml_domain_dimensions()
+        Determine the new dimensions of the domain with absorbing layer
+    pml_layer()
+        Set the damping profile within the absorbing layer
+    pml_new_geometry ()
+        Determine the new domain geometry with the absorbing layer
+    pml_sigma_field()
+        Generate a damping profile for the PML
     size_pml_criterion()
         Determine the size of the absorbing layer using the Eikonal criterion
     velocity_pml()
@@ -517,9 +508,9 @@ class PML_Wave(AcousticWave, HABC_Mesh, RectangLayer, HABC_Error):
         outfile = fire.VTKFile(self.path_save + file_name)
         outfile.write(self.c)
 
-    def calc_pml_prop(self, CR=0.001):
+    def calc_pml_damping(self, CR=0.001):
         '''
-        Calculate the maximum damping ratio for the PML layer
+        Calculate the maximum damping coefficient for the PML layer.
 
         Parameters
         ----------
@@ -530,13 +521,89 @@ class PML_Wave(AcousticWave, HABC_Mesh, RectangLayer, HABC_Error):
         Returns
         -------
         sigma_max : `float`
-            Maximum damping ratio within the PML layer
+            Maximum damping coefficient within the PML layer
         '''
 
         dgr_prof = 2.  # Degree of the damping profile within the PML layer
         sigma_max = (dgr_prof + 1) / (2. * self.pad_len) * np.log(1 / CR)
 
         return sigma_max
+
+    def pml_sigma_field(self, coords, V, pad_len, sigma_max):
+        '''
+        Generate a damping profile for the PML.
+
+        Parameters
+        ----------
+        coords : 'ufl.geometry.SpatialCoordinate'
+            Domain Coordinates including the absorbing layer
+        V : `firedrake function space`
+            Function space for the mask field
+        pad_len : `float`
+            Size of the absorbing layer
+        sigma_max : `float`
+            Maximum damping coefficient within the PML layer
+
+        Returns
+        -------
+        None
+        '''
+
+        # Validating input parameters
+        if pad_len <= 0:
+            raise ValueError(f"Invalid value for 'pad_len': {pad_len}. "
+                             "'pad_len' must be greater than zero.")
+        if sigma_max <= 0:
+            raise ValueError(f"Invalid value for 'sigma_max': {sigma_max}. "
+                             "'sigma_max' must be greater than zero.")
+
+        # Domain dimensions
+        Lx, Lz = self.dom_dim[:2]
+
+        # Domain coordinates
+        z, x = coords[0], coords[1]
+
+        # Conditional value
+        val_condz = (z + Lz)**2
+        val_condx1 = x**2
+        val_condx2 = (x - Lx)**2
+
+        # Conditional expressions for the profile
+        z_sqr = fire.conditional(z < -Lz, val_condz, 0.)
+        x_sqr = fire.conditional(x < 0., val_condx1, 0.) + \
+            fire.conditional(x > Lx, val_condx2, 0.)
+
+        # Quadratic damping profiles
+        ref_z = z_sqr / fire.Constant(pad_len**2)
+        ref_x = x_sqr / fire.Constant(pad_len**2)
+        self.sigma_z = fire.Function(V, name='sigma_z [1/s]')
+        self.sigma_z.interpolate(self.sigma_mask * self.c * ref_z)
+        self.sigma_x = fire.Function(V, name='sigma_x [1/s]')
+        self.sigma_x.interpolate(self.sigma_mask * self.c * ref_x)
+
+        # Save damping profile
+        outfile = fire.VTKFile(self.path_case_pml + "sigma_pml.pvd")
+        outfile.write(self.sigma_x, self.sigma_z)
+
+        if self.dimension == 3:  # 3D
+
+            # 3D dimension
+            Ly = self.dom_dim[2]
+            y = coords[2]
+
+            # Conditional value
+            val_condy1 = y**2
+            val_condy2 = (y - Ly)**2
+
+            # Conditional expressions for the profile
+            y_sqr = fire.conditional(y < 0., val_condy1, 0.) + \
+                fire.conditional(y > Ly, val_condy2, 0.)
+
+            # Quadratic damping profile
+            ref_y = y_sqr / fire.Constant(pad_len**2)
+            self.sigma_y = fire.Function(V, name='sigma_y [1/s]')
+            self.sigma_y.interpolate(self.sigma_mask * self.c * ref_y)
+            outfile.write(self.sigma_y)
 
     def pml_layer(self):
         '''
@@ -554,7 +621,7 @@ class PML_Wave(AcousticWave, HABC_Mesh, RectangLayer, HABC_Error):
         print("\nCreating Damping PML Profile", flush=True)
 
         # Compute the maximum damping coefficient
-        sigma_max = calc_pml_prop(self)
+        sigma_max = calc_pml_damping(self)
 
         # Mesh coordinates
         coords = fire.SpatialCoordinate(self.mesh)
@@ -569,49 +636,12 @@ class PML_Wave(AcousticWave, HABC_Mesh, RectangLayer, HABC_Error):
         outfile = fire.VTKFile(self.path_case_pml + "sigma_mask.pvd")
         outfile.write(self.sigma_mask)
 
-        # Coefficients for quadratic PML function
-        aq, bq = 1., 0.
+        # Damping fields
+        self.pml_sigma_field(coords, self.function_space,
+                             self.pad_len, sigma_max)
 
-        # Damping field
-        damp_par = (self.pad_len, sigma_max, aq, bq)
-        self.sigma_pml = self.c * self.layer_mask_field(
-            coords, self.function_space, damp_par=damp_par,
-            type_marker='damping', name_mask='eta [1/s])')
-
-        # Save damping profile
-        outfile = fire.VTKFile(self.path_case_pml + "sigma_pml.pvd")
-        outfile.write(self.sigma_pml)
-
-    def nrbc_on_boundary_layer(self):
-        '''
-        Apply the Higdon ABCs on the outer boundary of the absorbing layer
-
-        Parameters
-        ----------
-        None
-
-        Returns
-        -------
-        None
-        '''
-
-        print("\nApplying Non-Reflecting Boundary Conditions", flush=True)
-
-        # Getting boundary data from the layer boundaries
-        bnd_nfs, bnd_nodes_nfs = self.layer_boundary_data(self.function_space)
-
-        # Hypershape parameters
-        if self.layer_shape == 'hypershape':
-            hyp_par = (self.n_hyp, *self.hyper_axes)
-        else:
-            hyp_par = None
-
-        # Applying Higdon ABCs
-        self.cos_ang_HigdonBC(self.function_space, self.crit_source,
-                              bnd_nfs, bnd_nodes_nfs, hyp_par=hyp_par)
-
-    def check_timestep_habc(self, max_divisor_tf=1, set_max_dt=True,
-                            method='ANALYTICAL', mag_add=3):
+    def check_timestep_pml(self, max_divisor_tf=1, set_max_dt=True,
+                           method='ANALYTICAL', mag_add=3):
         '''
         Check if the timestep size is appropriate for the transient response
 
@@ -788,7 +818,7 @@ class PML_Wave(AcousticWave, HABC_Mesh, RectangLayer, HABC_Error):
 
         # Check the timestep size
         if check_dt:
-            self.check_timestep_habc(
+            self.check_timestep_pml(
                 max_divisor_tf=max_divisor_tf, method=method, mag_add=mag_add)
 
         print("\nBuilding Infinite Domain Model", flush=True)
@@ -803,9 +833,11 @@ class PML_Wave(AcousticWave, HABC_Mesh, RectangLayer, HABC_Error):
         self.velocity_pml(inf_model=True)
 
         # Setting no damping
-        self.cosHig = fire.Constant(0.)
         self.sigma_mask = fire.Constant(0.)
-        self.sigma_pml = fire.Constant(0.)
+        self.sigma_z = fire.Constant(0.)
+        self.sigma_x = fire.Constant(0.)
+        if self.dimension == 3:
+            self.sigma_y = fire.Constant(0.)
 
         print("\nSolving Infinite Model", flush=True)
 
@@ -817,41 +849,6 @@ class PML_Wave(AcousticWave, HABC_Mesh, RectangLayer, HABC_Error):
 
         # Deleting variables to be computed for the HABC scheme
         del self.pad_len, self.Lx_habc, self.Lz_habc
-        del self.cosHig, self.sigma_mask, self.sigma_pml
+        del self.sigma_mask, self.sigma_z, self.sigma_x
         if self.dimension == 3:
-            del self.Ly_habc
-
-    def rename_folder_habc(self):
-        '''
-        Rename the folder of results if the degree for the
-        hypershape layer is out of the criterion limits
-
-        Parameters
-        ----------
-        None
-
-        Returns
-        -------
-        None
-        '''
-
-        if self.n_hyp != self.abc_deg_layer and \
-                self.layer_shape == 'hypershape':
-
-            print("Output Folder for Results Will Be Renamed.", flush=True)
-
-            # Define the current and new folder names
-            old = self.path_case_pml
-            new = self.path_case_pml[:-8] + f"{self.n_hyp:.1f}" + \
-                self.path_case_pml[-5:]
-
-            try:
-                if path.isdir(new):
-                    # Remove target directory if it exists
-                    rmtree(new)
-
-                rename(old, new)  # Rename the directory
-                print(f"Folder '{old}' Successfully Renamed to '{new}'.", flush=True)
-
-            except OSError as e:
-                print(f"Error Renaming Folder: {e}", flush=True)
+            del self.Ly_habc, self.sigma_y

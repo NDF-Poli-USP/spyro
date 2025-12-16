@@ -197,7 +197,7 @@ class Wave(Model_parameters, metaclass=ABCMeta):
         new_file: str, optional
             Name of the file containing the velocity model.
         output: bool (optional)
-            If True, outputs the velocity model to a pvd file for visualization.
+            If True, save the velocity model to a pvd file for visualization.
         dg_velocity_model: bool (optional)
             If True, the space function is set to "DG" and degree "0"
         '''

@@ -30,12 +30,9 @@ def construct_solver_or_matrix_no_pml(Wave_object):
     dt = Wave_object.dt
 
     # -------------------------------------------------------
-    m1 = (
-        (1 / (Wave_object.c * Wave_object.c))
-        * ((u - 2.0 * u_n + u_nm1) / Constant(dt**2))
-        * v
-        * dx(scheme=quad_rule)
-    )
+    m1 = ((1 / (Wave_object.c * Wave_object.c))
+          * ((u - 2.0 * u_n + u_nm1) / Constant(dt**2))
+          * v * dx(scheme=quad_rule))
     a = dot(grad(u_n), grad(v)) * dx(scheme=quad_rule)  # explicit
 
     le = 0.0
@@ -47,10 +44,8 @@ def construct_solver_or_matrix_no_pml(Wave_object):
 
     if Wave_object.abc_active:
         weak_expr_abc = dot((u_n - u_nm1) / Constant(dt), v)
-
-        if not Wave_object.abc_boundary_layer_type == "pmlnsnc":
-            f_abc = (1 / Wave_object.c) * weak_expr_abc
-            qr_s = Wave_object.surface_quadrature_rule
+        f_abc = (1 / Wave_object.c) * weak_expr_abc
+        qr_s = Wave_object.surface_quadrature_rule
 
         if Wave_object.abc_boundary_layer_type == "hybrid":
 
@@ -61,12 +56,6 @@ def construct_solver_or_matrix_no_pml(Wave_object):
             le += Wave_object.eta_mask * weak_expr_abc * \
                 (1 / (Wave_object.c * Wave_object.c)) * \
                 Wave_object.eta_habc * dx(scheme=quad_rule)
-        elif Wave_object.abc_boundary_layer_type == "pmlnsnc":
-
-            # PML
-            le += Wave_object.pml_mask * weak_expr_abc * \
-                (1 / (Wave_object.c * Wave_object.c)) * \
-                Wave_object.sigma_pml * dx(scheme=quad_rule)
 
         else:
             if Wave_object.absorb_top:
@@ -93,8 +82,6 @@ def construct_solver_or_matrix_no_pml(Wave_object):
 
     A = fire.assemble(lhs, mat_type="matfree")
     Wave_object.solver = fire.LinearSolver(
-        A, solver_parameters=Wave_object.solver_parameters
-    )
-
+        A, solver_parameters=Wave_object.solver_parameters)
     Wave_object.rhs = rhs
     Wave_object.B = B
