@@ -11,7 +11,8 @@ b1 = lambda x, t: -(2*x[0]**2 + 6*x[1]**2 - 16*x[0]*x[1] + 10*x[0] - 14*x[1] + 4
 b2 = lambda x, t: -(-12*x[0]**2 - 4*x[1]**2 + 8*x[0]*x[1] - 16*x[0] + 8*x[1] - 2)*t
 b = lambda x, t: fire.as_vector([b1(x, t), b2(x, t)])
 
-dt = 1e-3
+dt = 1e-4
+h = 0.1
 fo = int(0.1/dt)
 
 dictionary = {}
@@ -38,9 +39,9 @@ dictionary["acquisition"] = {
     "delay": 1.5,
     "receiver_locations": [(-0.0, 0.5)],
     "body_forces": b,
-    "initial_condition": u,
 }
 dictionary["time_axis"] = {
+    "initial_condition": u,
     "initial_time": 0.0,  # Initial time for event
     "final_time": 1.0,  # Final time for event
     "dt": dt,  # timestep size
@@ -71,7 +72,7 @@ dictionary["boundary_conditions"] = [
 ]
 
 wave = spyro.IsotropicWave(dictionary)
-wave.set_mesh(input_mesh_parameters={"edge_length": 0.02})
+wave.set_mesh(input_mesh_parameters={"edge_length": h})
 wave.forward_solve()
 
 u_an = fire.Function(wave.function_space)
@@ -81,6 +82,8 @@ u_an.interpolate(u(x, t))
 
 e1 = fire.errornorm(wave.u_n.sub(0), u_an.sub(0))
 e2 = fire.errornorm(wave.u_n.sub(1), u_an.sub(1))
+
+print(f"For h: {h}, e1 = {e1}, e2 = {e2}")
 
 assert math.isclose(e1, 0.0, abs_tol=1e-7)
 assert math.isclose(e2, 0.0, abs_tol=1e-7)
