@@ -18,6 +18,7 @@ from spyro.utils.error_management import value_parameter_error
 from spyro.utils.freq_tools import freq_response
 
 # Work from Ruben Andres Salas and Alexandre Olender
+# non-split non-convolutional PML formulation
 
 
 class PML_Wave(AcousticWave, HABC_Mesh, RectangLayer, HABC_Error):
@@ -525,7 +526,7 @@ class PML_Wave(AcousticWave, HABC_Mesh, RectangLayer, HABC_Error):
         '''
 
         dgr_prof = 2.  # Degree of the damping profile within the PML layer
-        sigma_max = (dgr_prof + 1) / (2. * self.pad_len) * np.log(1 / CR)
+        sigma_max = (dgr_prof + 1.) / (2. * self.pad_len) * np.log(1 / CR)
 
         return sigma_max
 
@@ -583,7 +584,7 @@ class PML_Wave(AcousticWave, HABC_Mesh, RectangLayer, HABC_Error):
 
         # Save damping profile
         outfile = fire.VTKFile(self.path_case_pml + "sigma_pml.pvd")
-        outfile.write(self.sigma_x, self.sigma_z)
+        outfile.write(self.sigma_z, self.sigma_x)
 
         if self.dimension == 3:  # 3D
 

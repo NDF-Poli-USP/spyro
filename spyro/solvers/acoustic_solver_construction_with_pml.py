@@ -1,7 +1,8 @@
 import firedrake as fire
 from numpy import where
 
-# Work from Eduardo Moscatelli, Ruben Andres Salas and Alexandre Olender
+# Work from Keith Roberts, Eduardo Moscatelli,
+# Ruben Andres Salas and Alexandre Olender
 # Formulation based on:
 #   "Efficient PML for the wave equation". Grote and Sim (2010)
 #   "A Modified PML Acoustic Wave Equation". Kim (2019)
@@ -51,7 +52,8 @@ def damping_pml_2d(sigma_z, sigma_x):
         Second damping matrix
     '''
     Gamma_1 = fire.as_tensor([[sigma_z, 0.], [0., sigma_x]])
-    Gamma_2 = fire.as_tensor([[sigma_z - sigma_x, 0.], [0., sigma_x - sigma_z]])
+    Gamma_2 = fire.as_tensor([[sigma_z - sigma_x, 0.],
+                              [0., sigma_x - sigma_z]])
 
     return Gamma_1, Gamma_2
 
@@ -114,6 +116,7 @@ def Dirichlet_bc_pml(Wave_object, W):
         bnds.extend([Wave_object.absorb_front,
                      Wave_object.absorb_back])
 
+    # Tuple of boundary ids for Dirichlet BC
     where_to_absorb = tuple(where(bnds)[0] + 1)  # ds starts at 1
 
     # Boundary nodes indices
@@ -172,11 +175,12 @@ def construct_solver_or_matrix_with_pml_2d(Wave_object):
     # -------------------------------------------------------
     pml1 = c_sqr_inv * (sigma_z + sigma_x) * \
         fire.dot((u_n - u_nm1) / fire.Constant(dt), v) * dx
-    pml2 = c_sqr_inv * sigma_z * sigma_x * fire.dot(u_n, v) * dx
-    pml3 = -c_sqr_inv * fire.inner(pp_n, fire.grad(v)) * dx
+    pml2 = c_sqr_inv * sigma_z * sigma_x * fire.dot(u, v) * dx
+    # fire.dot(u_n, v) * dx
+    pml3 = -c_sqr_inv * fire.dot(fire.div(pp_n), v) * dx
     FF += pml1 + pml2 + pml3
     # -------------------------------------------------------
-    mm1 = c_sqr_inv * fire.dot((pp - pp_n) / fire.Constant(dt), qq) * dx
+    mm1 = c_sqr_inv * fire.inner((pp - pp_n) / fire.Constant(dt), qq) * dx
     mm2 = c_sqr_inv * fire.inner(fire.dot(Gamma_1, pp_n), qq) * dx
     dd = fire.inner(Gamma_2 * fire.grad(u_n), qq) * dx
     FF += mm1 + mm2 + dd
@@ -239,19 +243,19 @@ def construct_solver_or_matrix_with_pml_3d(Wave_object):
     pml1 = c_sqr_inv * (sigma_z + sigma_x + sigma_y) * \
         fire.dot((u_n - u_nm1) / fire.Constant(dt), v) * dx
     pml2 = c_sqr_inv * (sigma_z * sigma_x + sigma_x * sigma_y
-                        + sigma_z * sigma_y) * fire.dot(u_n, v) * dx
-    pml3 = -c_sqr_inv * fire.inner(pp_n, fire.grad(v)) * dx
-    pml4 = c_sqr_inv * (sigma_z * sigma_x * sigma_y) * psi_n * v * dx
+                        + sigma_z * sigma_y) * fire.dot(u, v) * dx
+    pml3 = -c_sqr_inv * fire.dot(fire.div(pp_n), v) * dx
+    pml4 = c_sqr_inv * (sigma_z * sigma_x * sigma_y) * dot(psi_n, v) * dx
     FF += pml1 + pml2 + pml3 + pml4
     # -------------------------------------------------------
     mm1 = c_sqr_inv * fire.dot((pp - pp_n) / fire.Constant(dt), qq) * dx
     mm2 = c_sqr_inv * fire.inner(fire.dot(Gamma_1, pp_n), qq) * dx
-    dd1 = fire.inner(Gamma_2 * fire.grad(u_n), qq) * dx
-    dd2 = -fire.inner(Gamma_3 * fire.grad(psi_n), qq) * dx
+    dd1 = fire.inner(dot(Gamma_2, fire.grad(u_n)), qq) * dx
+    dd2 = -fire.inner(dot(Gamma_3, fire.grad(psi_n)), qq) * dx
     FF += mm1 + mm2 + dd1 + dd2
     # -------------------------------------------------------
     mmm1 = fire.dot((psi - psi_n) / fire.Constant(dt), phi) * dx
-    uuu1 = fire.dot(-u_n * phi) * dx
+    uuu1 = -fire.dot(u_n * phi) * dx
     FF += mmm1 + uuu1
     # -------------------------------------------------------
 

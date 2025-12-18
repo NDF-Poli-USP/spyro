@@ -3,6 +3,10 @@ from firedrake import ds, dx, Constant, dot, grad
 from numpy import where
 
 # Modifications by Ruben Andres Salas
+# see Salas et al (2022)
+# doi: https://doi.org/10.1016/j.apm.2022.09.014
+# "Hybrid absorbing scheme based on hyperelliptical layers with
+# non-reflecting boundary conditions in scalar wave equations"
 
 
 def construct_solver_or_matrix_no_pml(Wave_object):
@@ -74,6 +78,7 @@ def construct_solver_or_matrix_no_pml(Wave_object):
                 bnds.extend([Wave_object.absorb_front,
                              Wave_object.absorb_back])
 
+            # Tuple of boundary ids for NRBC
             where_to_absorb = tuple(where(bnds)[0] + 1)  # ds starts at 1
             le += f_abc * ds(where_to_absorb, scheme=qr_s)
 
