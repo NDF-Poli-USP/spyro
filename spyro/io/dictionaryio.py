@@ -104,7 +104,8 @@ class Read_options:
                 either DG_triangle or DG_quadrilateral."
             )
         elif value == "CG":
-            if "variant" in self.input_dictionary["options"] and "cell_type" in self.input_dictionary["options"]:
+            if "variant" in self.input_dictionary["options"] and "cell_type" \
+                    in self.input_dictionary["options"]:
                 self._method = "CG"
             else:
                 raise ValueError("Cant use CG without specifying cell type and variant.")
@@ -140,15 +141,15 @@ class Read_options:
             canonical = "triangle"
             if self.method is not None and self.method not in triangle_methods:
                 raise ValueError(
-                    f"Cell type '{canonical}' is not compatible with method '{self.method}'."
-                )
+                    f"Cell type '{canonical}' is not "
+                    f"compatible with method '{self.method}'.")
             self._cell_type = canonical
         elif value in quadrilateral_equivalents:
             canonical = "quadrilateral"
             if self.method is not None and self.method not in quadrilateral_methods:
                 raise ValueError(
-                    f"Cell type '{canonical}' is not compatible with method '{self.method}'."
-                )
+                    f"Cell type '{canonical}' is not "
+                    f"compatible with method '{self.method}'.")
             self._cell_type = canonical
         else:
             raise ValueError(f"Cell type '{value}' is not supported.")
@@ -167,7 +168,9 @@ class Read_options:
             elif self.variant == "equispaced" and canonical == "quadrilateral":
                 self.method = "CG"
             else:
-                raise ValueError(f"Cell type of {canonical} not compatible with variant {self.variant}")
+                raise ValueError(
+                    f"Cell type of {canonical} not "
+                    f"compatible with variant {self.variant}.")
 
     @property
     def degree(self):
@@ -192,21 +195,26 @@ class Read_options:
 
 class Read_outputs:
     def __init__(self):
-        self.input_dictionary.setdefault("visualization", {})
-        self.input_dictionary["visualization"].setdefault("forward_output", False)
-        self.forward_output = self.input_dictionary["visualization"]["forward_output"]
-        self.input_dictionary["visualization"].setdefault("forward_output_filename", "results/forward.pvd")
-        self.forward_output_filename = self.input_dictionary["visualization"]["forward_output_filename"]
 
-        self.input_dictionary["visualization"].setdefault("gradient_output", False)
-        self.gradient_output = self.input_dictionary["visualization"]["gradient_output"]
-        self.input_dictionary["visualization"].setdefault("gradient_filename", "results/gradient.pvd")
-        self.gradient_filename = self.input_dictionary["visualization"]["gradient_filename"]
-
-        self.input_dictionary["visualization"].setdefault("adjoint_output", False)
-        self.adjoint_output = self.input_dictionary["visualization"]["adjoint_output"]
-        self.input_dictionary["visualization"].setdefault("adjoint_filename", "results/adjoint.pvd")
-        self.adjoint_filename = self.input_dictionary["visualization"]["adjoint_filename"]
-
-        self.input_dictionary["visualization"].setdefault("debug_output", False)
-        self.debug_output = self.input_dictionary["visualization"]["debug_output"]
+        v_str = "visualization"
+        self.input_dictionary.setdefault(v_str, {})
+        self.input_dictionary[v_str].setdefault("forward_output", False)
+        self.forward_output = self.input_dictionary[v_str]["forward_output"]
+        self.input_dictionary[v_str].setdefault("forward_output_filename",
+                                                "results/forward.pvd")
+        self.forward_output_filename = self.input_dictionary[
+            v_str]["forward_output_filename"]
+        self.input_dictionary[v_str].setdefault("gradient_output", False)
+        self.gradient_output = self.input_dictionary[v_str]["gradient_output"]
+        self.input_dictionary[v_str].setdefault("gradient_filename",
+                                                "results/gradient.pvd")
+        self.gradient_filename = self.input_dictionary[
+            v_str]["gradient_filename"]
+        self.input_dictionary[v_str].setdefault("adjoint_output", False)
+        self.adjoint_output = self.input_dictionary[v_str]["adjoint_output"]
+        self.input_dictionary[v_str].setdefault("adjoint_filename",
+                                                "results/adjoint.pvd")
+        self.adjoint_filename = self.input_dictionary[
+            v_str]["adjoint_filename"]
+        self.input_dictionary[v_str].setdefault("debug_output", False)
+        self.debug_output = self.input_dictionary[v_str]["debug_output"]

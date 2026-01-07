@@ -11,7 +11,8 @@ from .. import utils
 from .. import meshing
 
 
-class Model_parameters(Read_options, Read_boundary_layer, Read_time_axis, Read_outputs):
+class Model_parameters(Read_options, Read_boundary_layer,
+                       Read_time_axis, Read_outputs):
     """
     Class that reads and sanitizes input parameters.
 

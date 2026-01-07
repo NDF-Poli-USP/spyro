@@ -1,27 +1,52 @@
 import numpy as np
-
-from firedrake import (assemble, Constant, curl, DirichletBC, div, Function,
-                       FunctionSpace, project, VectorFunctionSpace)
-
+import firedrake as fire
 from .elastic_wave import ElasticWave
-from .forms import (isotropic_elastic_without_pml,
-                    isotropic_elastic_with_pml)
+
+from .forms import (isotropic_elastic_without_pml, isotropic_elastic_with_pml)
 from .functionals import mechanical_energy_form
 from ...domains.space import FE_method
 from ...utils.typing import override
 
 
-class IsotropicWave(ElasticWave):
-    '''Isotropic elastic wave propagator'''
+# Work from Ruben Andres Salas and Alexandre Olender
+
+
+class AnisotropicWave(ElasticWave):
+    '''
+    Class for the anisotropic elastic wave propagator.
+
+    Attributes
+    ----------
+    p_wave: `firedrake.Function`
+        P-wave field
+    s_wave: `firedrake.Function`
+        S-wave field
+
+    Methods
+    -------
+    update_p_wave()
+        Build the P-wave field
+    update_s_wave()
+        Build the S-wave fields
+
+
+
+    '''
 
     def __init__(self, dictionary, comm=None):
         super().__init__(dictionary, comm=comm)
 
-        self.rho = None   # Density
-        self.lmbda = None  # First Lame parameter
-        self.mu = None    # Second Lame parameter
-        self.c_s = None   # Secondary wave velocity
+        # Material properties
+        self.vP = None   # P-wave velocity [m/s]
+        self.vS = None  # S-wave velocity [m/s]
+        self.rho = None  # Density [kg/m³]
+        self.eps1 = None  # Thomsen parameter epsilon
+        self.gamma = None  # Thomsen parameter gamma
+        self.delta = None  # Thomsen parameter delta
+        self.theta = None  # Tilt angle in degrees
+        self.phi = None  # Azimuth angle in degrees (phi = 0: 2D case)
 
+        # State variables
         self.u_n = None   # Current displacement field
         self.u_nm1 = None  # Displacement field in previous iteration
         self.u_nm2 = None  # Displacement field at iteration n-2
@@ -35,25 +60,24 @@ class IsotropicWave(ElasticWave):
 
         # Variables for logging the P-wave
         self.p_wave = None
-        self.D_h = None
         self.field_logger.add_field("p-wave", "P-wave",
                                     lambda: self.update_p_wave())
 
         # Variables for logging the S-wave
         self.s_wave = None
-        self.C_h = None
         self.field_logger.add_field("s-wave", "S-wave",
                                     lambda: self.update_s_wave())
 
+        # Variables for logging the mechanical energy functional
         self.mechanical_energy = None
-        self.field_logger.add_functional("mechanical_energy",
-                                         lambda: assemble(self.mechanical_energy))
+        self.field_logger.add_functional(
+            "mechanical_energy", lambda: assemble(self.mechanical_energy))
 
     @override
     def initialize_model_parameters_from_object(self, synthetic_data_dict: dict):
         def constant_wrapper(value):
             if np.isscalar(value):
-                return Constant(value)
+                return fire.Constant(value)
             else:
                 return value
 
@@ -215,23 +239,44 @@ class IsotropicWave(ElasticWave):
             x_vec = self.get_spatial_coordinates()
             self.body_forces = body_forces_data(x_vec, self.time)
 
-    def update_p_wave(self):
+    def update_p_wave(self, ele_degree=0):
+        '''
+        Build the P-wave field
+
+        Parameters
+        ----------
+        ele_degree: `int`, optional
+            Finite element degree for P-wave field
+
+        Returns
+        -------
+        p_wave: `firedrake.Function`
+            P-wave field
+        '''
         if self.p_wave is None:
-            self.D_h = FunctionSpace(self.mesh, "DG", 0)
-            self.p_wave = Function(self.D_h)
+            ele_type = 'DG' if ele_degree == 0 else 'CG'
+            P = fire.FunctionSpace(self.mesh, ele_type, ele_degree)
+            self.p_wave = fire.Function(P, name='p_wave')
 
-        self.p_wave.assign(project(div(self.get_function()), self.D_h))
+        return self.p_wave.interpolate(fire.div(self.get_function()))
 
-        return self.p_wave
+    def update_s_wave(self, ele_degree=0):
+        '''
+        Build the S-wave fields
 
-    def update_s_wave(self):
+        Parameters
+        ----------
+        ele_degree: `int`, optional
+            Finite element degree for P-wave field
+
+        Returns
+        -------
+        s_wave: `firedrake.Function`
+            S-wave field
+        '''
         if self.s_wave is None:
-            if self.dimension == 2:
-                self.C_h = FunctionSpace(self.mesh, "DG", 0)
-            else:
-                self.C_h = VectorFunctionSpace(self.mesh, "DG", 0)
-            self.s_wave = Function(self.C_h)
+            ele_type = 'DG' if ele_degree == 0 else 'CG'
+            S = fire.VectorFunctionSpace(self.mesh, ele_type, ele_degree)
+            self.s_wave = fire.Function(S, name='s_wave')
 
-        self.s_wave.assign(project(curl(self.get_function()), self.C_h))
-
-        return self.s_wave
+        return self.s_wave.interpolate(fire.curl(self.get_function()))

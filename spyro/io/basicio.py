@@ -40,12 +40,15 @@ def ensemble_shot_record(func):
 
 def _ensemble_save_load_loop(obj, func, kwargs, require_rank0=False):
     """
-    Helper to loop over shots for ensemble parallelism in save or load operations.
+    Helper to loop over shots for ensemble parallelism
+    in save or load operations.
     """
     _comm = obj.comm
     if obj.parallelism_type != "spatial" or obj.number_of_sources == 1:
-        for propagation_id, shot_ids_in_propagation in enumerate(obj.shot_ids_per_propagation):
-            if is_owner(_comm, propagation_id) and (not require_rank0 or _comm.comm.rank == 0):
+        for propagation_id, shot_ids_in_propagation in \
+                enumerate(obj.shot_ids_per_propagation):
+            if is_owner(_comm, propagation_id) and \
+                    (not require_rank0 or _comm.comm.rank == 0):
                 func(obj, **dict(kwargs, shot_ids=shot_ids_in_propagation))
     else:
         for snum in range(obj.number_of_sources):
@@ -74,14 +77,18 @@ def ensemble_propagator(func):
     """Decorator for forward to distribute shots for ensemble parallelism"""
 
     def wrapper(*args, **kwargs):
-        if args[0].parallelism_type != "spatial" or args[0].number_of_sources == 1:
+        if args[0].parallelism_type != "spatial" or \
+                args[0].number_of_sources == 1:
             shot_ids_per_propagation_list = args[0].shot_ids_per_propagation
             _comm = args[0].comm
-            for propagation_id, shot_ids_in_propagation in enumerate(shot_ids_per_propagation_list):
+            for propagation_id, shot_ids_in_propagation in \
+                    enumerate(shot_ids_per_propagation_list):
                 if is_owner(_comm, propagation_id):
-                    u, u_r = func(*args, **dict(kwargs, source_nums=shot_ids_in_propagation))
+                    u, u_r = func(*args, **dict(
+                        kwargs, source_nums=shot_ids_in_propagation))
                     return u, u_r
-        elif args[0].parallelism_type == "spatial" and args[0].number_of_sources > 1:
+        elif args[0].parallelism_type == "spatial" and \
+                args[0].number_of_sources > 1:
             num = args[0].number_of_sources
             starting_time = args[0].current_time
             for snum in range(num):
@@ -116,12 +123,14 @@ def save_serial_data(wave, propagation_id):
     arrays_list = [obj.dat.data[:] for obj in wave.forward_solution]
     stacked_arrays = np.stack(arrays_list, axis=0)
     np.save(_shot_filename('tmp_shot', propagation_id, wave), stacked_arrays)
-    np.save(_shot_filename('tmp_rec', propagation_id, wave), wave.forward_solution_receivers)
+    np.save(_shot_filename('tmp_rec', propagation_id, wave),
+            wave.forward_solution_receivers)
 
 
 def switch_serial_shot(wave, propagation_id):
     """
-    Switches the current serial shot for a given wave to shot identified with propagation ID.
+    Switches the current serial shot for a given wave
+    to shot identified with propagation ID.
 
     Args:
         wave (Wave): The wave object.
@@ -130,13 +139,15 @@ def switch_serial_shot(wave, propagation_id):
     Returns:
         None
     """
-    stacked_shot_arrays = np.load(_shot_filename('tmp_shot', propagation_id, wave))
+    stacked_shot_arrays = np.load(_shot_filename('tmp_shot',
+                                                 propagation_id, wave))
     if len(wave.forward_solution) == 0:
         n_dts, n_dofs = np.shape(stacked_shot_arrays)
         rebuild_empty_forward_solution(wave, n_dts)
     for array_i, array in enumerate(stacked_shot_arrays):
         wave.forward_solution[array_i].dat.data[:] = array
-    wave.forward_solution_receivers = np.load(_shot_filename('tmp_rec', propagation_id, wave))
+    wave.forward_solution_receivers = np.load(_shot_filename(
+        'tmp_rec', propagation_id, wave))
     wave.receivers_output = wave.forward_solution_receivers
 
 
@@ -145,14 +156,16 @@ def ensemble_functional(func):
 
     def wrapper(*args, **kwargs):
         comm = args[0].comm
-        if args[0].parallelism_type != "spatial" or args[0].number_of_sources == 1:
+        if args[0].parallelism_type != "spatial" or \
+                args[0].number_of_sources == 1:
             J = func(*args, **kwargs)
             J_total = np.zeros((1))
             J_total[0] += J
             J_total = fire.COMM_WORLD.allreduce(J_total, op=MPI.SUM)
             J_total[0] /= comm.comm.size
 
-        elif args[0].parallelism_type == "spatial" and args[0].number_of_sources > 1:
+        elif args[0].parallelism_type == "spatial" and \
+                args[0].number_of_sources > 1:
             residual_list = args[1]
             J_total = np.zeros((1))
 
@@ -175,9 +188,11 @@ def ensemble_gradient(func):
 
     def wrapper(*args, **kwargs):
         comm = args[0].comm
-        if args[0].parallelism_type != "spatial" or args[0].number_of_sources == 1:
+        if args[0].parallelism_type != "spatial" or \
+                args[0].number_of_sources == 1:
             shot_ids_per_propagation_list = args[0].shot_ids_per_propagation
-            for propagation_id, shot_ids_in_propagation in enumerate(shot_ids_per_propagation_list):
+            for propagation_id, shot_ids_in_propagation in \
+                    enumerate(shot_ids_per_propagation_list):
                 if is_owner(comm, propagation_id):
                     grad = func(*args, **kwargs)
             grad_total = fire.Function(args[0].function_space)
@@ -187,7 +202,8 @@ def ensemble_gradient(func):
             grad_total /= comm.ensemble_comm.size
 
             return grad_total
-        elif args[0].parallelism_type == "spatial" and args[0].number_of_sources > 1:
+        elif args[0].parallelism_type == "spatial" and \
+                args[0].number_of_sources > 1:
             num = args[0].number_of_sources
             starting_time = args[0].current_time
             grad_total = fire.Function(args[0].function_space)
@@ -250,7 +266,8 @@ def write_function_to_grid(function, V, grid_spacing):
     try:
         z = function.dat.data[:]
     except AttributeError:
-        warnings.warn("Using numpy array instead of a firedrake function to interpolate.")
+        warnings.warn("Using numpy array instead of a "
+                      "firedrake function to interpolate.")
         z = function
 
     # target grid to interpolate to
@@ -411,12 +428,13 @@ def interpolate(Model, fname, V):
         if Model.mesh_parameters.abc_pad_length > 1e-15:
             add_pad = True
     if add_pad:
-        minz = -Model.mesh_parameters.length_z - Model.mesh_parameters.abc_pad_length
+        abc_pad_length = Model.mesh_parameters.abc_pad_length
+        minz = -Model.mesh_parameters.length_z - abc_pad_length
         maxz = 0.0
-        minx = 0.0 - Model.mesh_parameters.abc_pad_length
-        maxx = Model.mesh_parameters.length_x + Model.mesh_parameters.abc_pad_length
-        miny = 0.0 - Model.mesh_parameters.abc_pad_length
-        maxy = Model.mesh_parameters.length_y + Model.mesh_parameters.abc_pad_length
+        minx = 0.0 - abc_pad_length
+        maxx = Model.mesh_parameters.length_x + abc_pad_length
+        miny = 0.0 - abc_pad_length
+        maxy = Model.mesh_parameters.length_y + abc_pad_length
     else:
         minz = -Model.mesh_parameters.length_z
         maxz = 0.0
