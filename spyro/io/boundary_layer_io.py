@@ -56,21 +56,23 @@ class Read_boundary_layer:
     read_PML_dictionary()
         Read the PML dictionary for a perfectly matched layer
     """
-    def __init__(self, comm=None):
-        self.input_dictionary.setdefault("absorving_boundary_conditions", {})
-        self.input_dictionary["absorving_boundary_conditions"].setdefault("status", False)
-        self.abc_active = self.input_dictionary["absorving_boundary_conditions"]["status"]
-        self.input_dictionary["absorving_boundary_conditions"].setdefault("damping_type", None)
-        self.input_dictionary["absorving_boundary_conditions"].setdefault("pad_length", None)
-        self.abc_boundary_layer_type = self.input_dictionary["absorving_boundary_conditions"]["damping_type"]
-        self.abc_pad_length = self.input_dictionary["absorving_boundary_conditions"]["pad_length"]
 
-        self.absorb_top = self.input_dictionary["absorving_boundary_conditions"].get("absorb_top", False)
-        self.absorb_bottom = self.input_dictionary["absorving_boundary_conditions"].get("absorb_bottom", True)
-        self.absorb_right = self.input_dictionary["absorving_boundary_conditions"].get("absorb_right", True)
-        self.absorb_left = self.input_dictionary["absorving_boundary_conditions"].get("absorb_left", True)
-        self.absorb_front = self.input_dictionary["absorving_boundary_conditions"].get("absorb_front", True)
-        self.absorb_back = self.input_dictionary["absorving_boundary_conditions"].get("absorb_back", True)
+    def __init__(self, comm=None):
+        abc_str = "absorving_boundary_conditions"
+        self.input_dictionary.setdefault(abc_str, {})
+        self.input_dictionary[abc_str].setdefault("status", False)
+        self.abc_active = self.input_dictionary[abc_str]["status"]
+        self.input_dictionary[abc_str].setdefault("damping_type", None)
+        self.input_dictionary[abc_str].setdefault("pad_length", None)
+        self.abc_boundary_layer_type = self.input_dictionary[abc_str]["damping_type"]
+        self.abc_pad_length = self.input_dictionary[abc_str]["pad_length"]
+
+        self.absorb_top = self.input_dictionary[abc_str].get("absorb_top", False)
+        self.absorb_bottom = self.input_dictionary[abc_str].get("absorb_bottom", True)
+        self.absorb_right = self.input_dictionary[abc_str].get("absorb_right", True)
+        self.absorb_left = self.input_dictionary[abc_str].get("absorb_left", True)
+        self.absorb_front = self.input_dictionary[abc_str].get("absorb_front", True)
+        self.absorb_back = self.input_dictionary[abc_str].get("absorb_back", True)
 
     @property
     def abc_boundary_layer_type(self):

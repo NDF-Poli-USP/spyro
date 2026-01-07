@@ -24,7 +24,7 @@ from spyro.plots.plots import plot_hist_receivers, \
 
 class HABC_Wave(AcousticWave, HyperLayer, NRBCHabc):
     '''
-    class HABC that determines absorbing layer size and parameters to be used.
+    Class HABC that determines absorbing layer size and parameters to be used.
 
     Attributes
     ----------
@@ -222,7 +222,8 @@ class HABC_Wave(AcousticWave, HyperLayer, NRBCHabc):
         Determine the initial search range for the heuristic factor xCR
     '''
 
-    def __init__(self, dictionary=None, f_est=0.06, fwi_iter=0, comm=None, output_folder="results/"):
+    def __init__(self, dictionary=None, f_est=0.06, fwi_iter=0,
+                 comm=None, output_folder="results/"):
         '''
         Initialize the HABC class.
 
