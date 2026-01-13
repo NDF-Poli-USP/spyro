@@ -381,11 +381,7 @@ class Model_parameters(Read_options, Read_boundary_layer,
                     attemps to propagate wave."
             )
 
-    def set_mesh(
-        self,
-        user_mesh=None,
-        input_mesh_parameters={},
-    ):
+    def set_mesh(self, user_mesh=None, input_mesh_parameters={}):
         """
         Set the mesh for the model.
 
@@ -406,12 +402,15 @@ class Model_parameters(Read_options, Read_boundary_layer,
         pad_length = None
         if self.abc_active:
             pad_length = self.abc_pad_length
-        self.mesh_parameters.set_mesh(user_mesh=user_mesh, input_mesh_parameters=input_mesh_parameters, abc_pad_length=pad_length)
+
+        self.mesh_parameters.set_mesh(
+            user_mesh=user_mesh,
+            input_mesh_parameters=input_mesh_parameters,
+            abc_pad_length=pad_length)
 
         if self.mesh_parameters.automatic_mesh:
             autoMeshing = meshing.AutomaticMesh(
-                mesh_parameters=self.mesh_parameters,
-            )
+                mesh_parameters=self.mesh_parameters)
 
             self.user_mesh = autoMeshing.create_mesh()
 

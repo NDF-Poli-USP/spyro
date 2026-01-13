@@ -37,6 +37,7 @@ class AnisotropicWave(ElasticWave):
         super().__init__(dictionary, comm=comm)
 
         # Material properties
+        self.anisotropy = None  # Type of anisotropy
         self.vP = None   # P-wave velocity [m/s]
         self.vS = None  # S-wave velocity [m/s]
         self.rho = None  # Density [kg/m³]
@@ -74,7 +75,9 @@ class AnisotropicWave(ElasticWave):
             "mechanical_energy", lambda: assemble(self.mechanical_energy))
 
     @override
-    def initialize_model_parameters_from_object(self, synthetic_data_dict: dict):
+    def initialize_model_parameters_from_object(
+            self, synthetic_data_dict: dict):
+
         def constant_wrapper(value):
             if np.isscalar(value):
                 return fire.Constant(value)
@@ -84,40 +87,17 @@ class AnisotropicWave(ElasticWave):
         def get_value(key, default=None):
             return constant_wrapper(synthetic_data_dict.get(key, default))
 
-        self.rho = get_value("density")
-        self.lmbda = get_value("lambda", default=get_value("lame_first"))
-        self.mu = get_value("mu", get_value("lame_second"))
-        self.c = get_value("p_wave_velocity")
-        self.c_s = get_value("s_wave_velocity")
+        self.anisotropy = get_value("anisotropy", "VTI")  # Type of anisotropy
+        self.vP = get_value("vP")   # P-wave velocity [m/s]
+        self.vS = get_value("vS")  # S-wave velocity [m/s]
+        self.rho = get_value("rho")  # Density [kg/m³]
+        self.eps1 = get_value("epsilon_ani")  # Thomsen parameter epsilon
+        self.gamma = get_value("gamma_ani")  # Thomsen parameter gamma
+        self.delta = get_value("delta_ani")  # Thomsen parameter delta
 
-        # Check if {rho, lambda, mu} is set and {c, c_s} are not
-        option_1 = bool(self.rho) and \
-            bool(self.lmbda) and \
-            bool(self.mu) and \
-            not bool(self.c) and \
-            not bool(self.c_s)
-        # Check if {rho, c, c_s} is set and {lambda, mu} are not
-        option_2 = bool(self.rho) and \
-            bool(self.c) and \
-            bool(self.c_s) and \
-            not bool(self.lmbda) and \
-            not bool(self.mu)
-
-        if option_1:
-            self.c = ((self.lmbda + 2*self.mu)/self.rho)**0.5
-            self.c_s = (self.mu/self.rho)**0.5
-        elif option_2:
-            self.mu = self.rho*self.c_s**2
-            self.lmbda = self.rho*self.c**2 - 2*self.mu
-        else:
-            raise Exception(f"Inconsistent selection of isotropic elastic wave parameters:\n"
-                            f"    Density        : {bool(self.rho)}\n"
-                            f"    Lame first     : {bool(self.lmbda)}\n"
-                            f"    Lame second    : {bool(self.mu)}\n"
-                            f"    P-wave velocity: {bool(self.c)}\n"
-                            f"    S-wave velocity: {bool(self.c_s)}\n"
-                            "The valid options are {Density, Lame first, Lame second} "
-                            "or (exclusive) {Density, P-wave velocity, S-wave velocity}")
+        if self.anisotropy == "TTI":
+            self.theta = get_value("theta_ani")  # Tilt angle in degrees
+            self.phi = get_value("phi_ani")  # Azimuth angle in degrees
 
     @override
     def initialize_model_parameters_from_file(self, synthetic_data_dict):
@@ -125,8 +105,8 @@ class AnisotropicWave(ElasticWave):
 
     @override
     def _create_function_space(self):
-        return FE_method(self.mesh, self.method, self.degree,
-                         dim=self.dimension)
+        return FE_method(
+            self.mesh, self.method, self.degree, dim=self.dimension)
 
     @override
     def _set_vstate(self, vstate):
@@ -181,7 +161,8 @@ class AnisotropicWave(ElasticWave):
         self.u_np1 = Function(self.function_space,
                               name=self.get_function_name())
 
-        abc_dict = self.input_dictionary.get("absorving_boundary_conditions", None)
+        abc_dict = self.input_dictionary.get(
+            "absorving_boundary_conditions", None)
         if abc_dict is not None:
             abc_active = abc_dict.get("status", False)
             if abc_active:
@@ -229,8 +210,9 @@ class AnisotropicWave(ElasticWave):
             elif tag == "uy":
                 subspace = self.function_space.sub(2)
             else:
-                raise Exception(f"Unsupported boundary condition with tag: {tag}")
-            self.bcs.append(DirichletBC(subspace, value, idbc))
+                raise Exception(
+                    f"Unsupported boundary condition with tag: {tag}")
+            self.bcs.append(fire.DirichletBC(subspace, value, idbc))
 
     def parse_volumetric_forces(self):
         acquisition_dict = self.input_dictionary["acquisition"]
@@ -280,3 +262,7 @@ class AnisotropicWave(ElasticWave):
             self.s_wave = fire.Function(S, name='s_wave')
 
         return self.s_wave.interpolate(fire.curl(self.get_function()))
+
+
+
+
