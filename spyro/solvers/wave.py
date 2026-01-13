@@ -171,15 +171,14 @@ class Wave(Model_parameters, metaclass=ABCMeta):
             return self.mesh_z, self.mesh_x, self.mesh_y
 
     def set_initial_velocity_model(
-        self,
-        constant=None,
-        conditional=None,
-        velocity_model_function=None,
-        expression=None,
-        new_file=None,
-        output=False,
-        dg_velocity_model=True,
-    ):
+            self,
+            constant=None,
+            conditional=None,
+            velocity_model_function=None,
+            expression=None,
+            new_file=None,
+            output=False,
+            dg_velocity_model=True):
         """Method to define new user velocity model or file. It is optional.
 
         Parameters:
@@ -281,8 +280,9 @@ class Wave(Model_parameters, metaclass=ABCMeta):
             self.mesh_x = x
             self.mesh_y = y
 
-    def get_and_set_maximum_dt(self, fraction=0.7, estimate_max_eigenvalue=False):
-        """
+    def get_and_set_maximum_dt(self, fraction=0.7,
+                               estimate_max_eigenvalue=False):
+        '''
         Calculates and sets the maximum stable time step (dt) for the wave solver.
 
         Args:
@@ -293,7 +293,10 @@ class Wave(Model_parameters, metaclass=ABCMeta):
 
         Returns:
             float: The calculated maximum time step (dt).
-        """
+        '''
+
+        # TO DO: Delete this method and use the one in modal solver (habc branch by Salas)
+
         # if self.method == "mass_lumped_triangle":
         #     estimate_max_eigenvalue = True
         # elif self.method == "spectral_quadrilateral":
@@ -386,7 +389,8 @@ class Wave(Model_parameters, metaclass=ABCMeta):
 
     @ensemble_propagator
     def wave_propagator(self, dt=None, final_time=None, source_nums=[0]):
-        """Propagates the wave forward in time.
+        '''
+        Propagate the wave forward in time.
         Currently uses central differences.
 
         Parameters:
@@ -404,7 +408,7 @@ class Wave(Model_parameters, metaclass=ABCMeta):
             Wavefield at the final time.
         u_rec: numpy array
             Wavefield at the receivers across the timesteps.
-        """
+        '''
         if final_time is not None:
             self.final_time = final_time
         if dt is not None:
@@ -428,7 +432,97 @@ class Wave(Model_parameters, metaclass=ABCMeta):
     @abstractmethod
     def rhs_no_pml(self):
         '''
-        Returns the right-hand side Cofunction without PML DOFs (i.e., only
+        Return the right-hand side Cofunction without PML DOFs (i.e., only
         the DOFs associated with the subspace of the original problem).
         '''
         pass
+
+    def set_material_property(self, property_name, func_space_type,
+                              shape_func_space=None, constant=None,
+                              conditional=None, function=None,
+                              expression=None, new_file=None, output=False):
+        '''
+        Set a material property (e.g., density, etc.) in the model.
+
+        Parameters:
+        -----------
+        property_name: `str`
+            Name of the material property to be set.
+        func_space_type, `str`
+            Type of function space for the  material property.
+            Options: 'scalar', 'vector' or 'tensor'
+        shape_func_space: `tuple`, optional
+            Shape of the function space for tensorial material property
+        new_file: `str`, optional
+            Name of the file containing the material property. Default is None
+        constant: `float`, optional
+            Constant value for the material property. Default is None
+        conditional:  `firedrake conditional`, optional
+            Firedrake conditional object. Default is None
+        function: `firedrake function`, optional
+            Firedrake function in the same function space as the object.
+            Default is None.
+        expression: `str`, optional
+            If you use an expression, you can use the following variables:
+            x, y, z, pi, tanh, sqrt. Ex: "2. + 0.5 * tanh((x - 2.) / 0.1)".
+            It will be interpoalte into either the same function space as
+            the object or a DG0 function space in the same mesh.
+            Default is None
+        output: `bool`, optional
+            If True, outputs the material property to a pvd file for
+            visualization. Default is False
+        dg_property: `bool`, optional
+            If True, uses a DG0 function space for conditional and
+            expression inputs. Default is True
+        '''
+        typ_ele = 'DG' if dg_property else \
+            self.function_space.ufl_element().family()
+        dgr_ele = 0 if dg_property else \
+            self.function_space.ufl_element().degree()
+
+        # Function space for the property
+        if func_space_type == 'scalar':
+            V = fire.FunctionSpace(self.mesh, typ_ele, dgr_ele)
+        elif func_space_type == 'vector':
+            V = fire.VectorFunctionSpace(mesh, typ_ele, dgr_ele)
+        elif func_space_type == 'tensor':
+            V = fire.TensorFunctionSpace(mesh, typ_ele, dgr_ele,
+                                         shape=shape_func_space)
+
+        # If no mesh is set, we have to do it beforehand
+        if self.mesh is None:
+            self.set_mesh()
+
+
+        # try:
+
+        # except ValueError:
+
+        if conditional is not None:
+            ufl_input = conditional
+
+        elif expression is not None:
+            ufl_input = utils.eval_functions_to_ufl.generate_ufl_functions(
+                self.mesh, expression, self.dimension)
+
+        elif constant is not None:
+            ufl_input = fire.Constant(constant)
+
+        if function is not None:
+            mat_property = function
+        else:
+            mat_property = fire.Function(
+                V, name=property_name).interpolate(ufl_input)
+
+        if new_file is not None:
+            mat_property = new_file
+            self._get_initial_velocity_model()
+        else:
+            raise ValueError(f"Please specify either a conditional, "
+                             f"expression, firedrake function or new "
+                             f"file name (segy or hdf5).")
+        if output:
+            fire.VTKFile(property_name + ".pvd").write(initial_property,
+                                                       name="property_name")
+
+        return mat_property, mat_property_file
