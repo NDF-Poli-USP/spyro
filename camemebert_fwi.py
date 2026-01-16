@@ -5,11 +5,11 @@ import matplotlib.pyplot as plt
 import time
 import warnings
 import sys
-import debugpy
-from mpi4py.MPI import COMM_WORLD
-debugpy.listen(3000 + COMM_WORLD.rank)
-debugpy.wait_for_client()
-warnings.filterwarnings("ignore")
+# import debugpy
+# from mpi4py.MPI import COMM_WORLD
+# debugpy.listen(3000 + COMM_WORLD.rank)
+# debugpy.wait_for_client()
+# warnings.filterwarnings("ignore")
 
 
 # degree = int(sys.argv[2])
@@ -55,7 +55,7 @@ dictionary["mesh"] = {
 }
 dictionary["acquisition"] = {
     "source_type": "ricker",
-    "source_locations": spyro.create_transect((-0.55, 0.7), (-0.55, 1.3), 2),
+    "source_locations": spyro.create_transect((-0.55, 0.7), (-0.55, 1.3), 1),
     "frequency": frequency,
     # "frequency_filter": frequency_filter,
     "delay": 1.0/frequency,

@@ -308,13 +308,13 @@ if __name__ == "__main__":
     print("="*60)
     
     if basic_success and solver_success:
-        print("✅ ALL TESTS PASSED!")
+        print("ALL TESTS PASSED!")
         print("   - Firedrake correctly reads mesh tags")
         print("   - Tags work with dx and ds integrals") 
         print("   - Full acoustic solver compatibility confirmed")
         exit_code = 0
     else:
-        print("❌ SOME TESTS FAILED!")
+        print("SOME TESTS FAILED!")
         if not basic_success:
             print("   - Basic tag reading issues")
         if not solver_success:
