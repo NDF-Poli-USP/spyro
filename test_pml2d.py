@@ -503,9 +503,3 @@ if __name__ == "__main__":
 # from time import perf_counter  # For runtime
 # tRef = perf_counter()
 # print(f"Time: {perf_counter() - tRef:.4f} seconds")
-
-
-
-
-
-....................................................................................

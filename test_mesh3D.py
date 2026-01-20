@@ -61,6 +61,7 @@ def wave_dict(dt_usu, fr_files, layer_shape, degree_layer, degree_type,
     # Define the domain size without the PML or AL. Here we'll assume a
     # 1.00 x 1.00 km domain and compute the size for the Absorbing Layer (AL)
     # to absorb outgoing waves on boundries (-z, +-x sides) of the domain.
+    Lz, Lx, Ly = [1., 1., 1.]  # in km
     dictionary["mesh"] = {
         "Lz": 1.,  # depth in km - always positive
         "Lx": 1.,  # width in km - always positive
@@ -78,10 +79,10 @@ def wave_dict(dt_usu, fr_files, layer_shape, degree_layer, degree_type,
         "frequency": 5.0,  # in Hz
         "delay": 1. / 3.,
         "delay_type": "time",  # "multiples_of_minimum" or "time"
-        "receiver_locations": [(-1., 0., 0.), (-1., 1., 0.),
-                               (0., 1., 0.), (0., 0., 0),
-                               (-1., 0., 1.), (-1., 1., 1.),
-                               (0., 1., 1.), (0., 0., 1.)]
+        "receiver_locations": [(-Lz, 0., 0.), (-Lz, Lx, 0.),
+                               (0., 0., 0), (0., Lx, 0.),
+                               (-Lz, 0., Ly), (-Lz, Lx, Ly),
+                               (0., 0., Ly), (0., Lx, Ly)]
     }
 
     # Simulate for 1.5 seconds.
@@ -246,6 +247,9 @@ def test_loop_habc_3d():
     # Factor for the stabilizing term in Eikonal equation
     f_est_lst = [0.04]
 
+    # Maximum divisor of the final time
+    max_div_tf_lst = [8]  # 10  # Approximate eigenvalue
+
     # Get simulation parameters
     edge_length = edge_length_lst[case]
     dt_usu = dt_usu_lst[case]
@@ -279,9 +283,6 @@ def test_loop_habc_3d():
 
     # Creating mesh and performing eikonal analysis
     Wave_obj = preamble_habc(dictionary, edge_length, f_est)
-
-    # Name of the file containing the mesh
-    Wave_obj.filename_mesh = "box_gmsh.msh"
 
     # ============ HABC SCHEME ============
 

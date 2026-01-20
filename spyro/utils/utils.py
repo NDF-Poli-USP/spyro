@@ -88,7 +88,8 @@ def mpi_init(model):
         num_cores_per_propagation = available_cores / model.number_of_sources
         if available_cores % model.number_of_sources != 0:
             raise ValueError(
-                f"Available cores cannot be divided between sources equally {available_cores}/{model.number_of_sources}."
+                f"Available cores cannot be divided between sources "
+                f"equally {available_cores}/{model.number_of_sources}."
             )
     elif model.parallelism_type == "spatial":
         num_cores_per_propagation = available_cores
@@ -169,14 +170,12 @@ class Mask():
     """
 
     def __init__(self, boundaries, Wave_obj, dg=False, inverse_mask=False):
-        possible_boundaries = [
-            "z_min",
-            "z_max",
-            "x_min",
-            "x_max",
-            "y_min",
-            "y_max",
-        ]
+        possible_boundaries = ["z_min",
+                               "z_max",
+                               "x_min",
+                               "x_max",
+                               "y_min",
+                               "y_max"]
         active_boundaries = []
 
         for possible_boundary in possible_boundaries:
@@ -234,9 +233,11 @@ class Mask():
         for boundary in active_boundaries:
             axis = boundary[0]
             if boundary[-3:] == "min":
-                cond[0] = conditional(getattr(self, axis) < getattr(self, boundary), true_value[0], false_value[0])
+                cond[0] = conditional(getattr(self, axis) < getattr(
+                    self, boundary), true_value[0], false_value[0])
             elif boundary[-3:] == "max":
-                cond[0] = conditional(getattr(self, axis) > getattr(self, boundary), true_value[0], false_value[0])
+                cond[0] = conditional(getattr(self, axis) > getattr(
+                    self, boundary), true_value[0], false_value[0])
             else:
                 raise ValueError(f"Boundary of {boundary} not possible")
 
@@ -251,8 +252,10 @@ class Mask():
 
         """
         if self.in_dg:
-            raise ValueError("DG space can have different DoFs than the functional space")
-        warnings.warn("When applying a mask in a continuous space, expect some error in the element adjacent to the mask")
+            raise ValueError(f"DG space can have different"
+                             f"DoFs than the functional space")
+        warnings.warn("When applying a mask in a continuous space, "
+                      f"expect some error in the element adjacent to the mask")
         mask = Function(Wave_obj.function_space)
         mask.interpolate(self.cond)
         # Saving mask dofs
@@ -299,13 +302,3 @@ class Gradient_mask_for_pml(Mask):
             "x_max": x_max,
         }
         super().__init__(boundaries, Wave_obj)
-
-
-# def analytical_solution_for_pressure_based_on_MMS(model, mesh, time):
-#     degree = model["opts"]["degree"]
-#     V = FunctionSpace(mesh, "CG", degree)  # noqa: F405
-#     z, x = SpatialCoordinate(mesh)  # noqa: F405
-#     p = Function(V).interpolate(  # noqa: F405
-#         (time**2) * sin(pi * z) * sin(pi * x)  # noqa: F405
-#     )
-#     return p

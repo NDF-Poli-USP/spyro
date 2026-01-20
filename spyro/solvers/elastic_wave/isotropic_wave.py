@@ -52,7 +52,8 @@ class IsotropicWave(ElasticWave):
                                          lambda: assemble(self.mechanical_energy))
 
     @override
-    def initialize_model_parameters_from_object(self, synthetic_data_dict: dict):
+    def initialize_model_parameters_from_object(
+            self, synthetic_data_dict: dict):
         def constant_wrapper(value):
             if np.isscalar(value):
                 return Constant(value)

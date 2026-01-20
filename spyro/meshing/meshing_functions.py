@@ -242,7 +242,8 @@ class AutomaticMesh:
         None
         """
         if SeismicMesh is None:
-            raise ImportError("SeismicMesh is not available. Please install it to use this function.")
+            raise ImportError("SeismicMesh is not available. Please "
+                              f"install it to use this function.")
         if cpw is not None:
             self.cpw = cpw
         if velocity_model is not None:
@@ -265,8 +266,7 @@ class AutomaticMesh:
         self.periodic = True
         if self.mesh_type != "firedrake_mesh":
             raise ValueError(
-                "periodic mesh is only supported for firedrake_mesh"
-            )
+                f"periodic mesh is only supported for firedrake_mesh")
 
     def create_mesh(self):
         """
@@ -283,7 +283,8 @@ class AutomaticMesh:
             return self.create_firedrake_mesh()
         elif self.mesh_type == "SeismicMesh":
             if SeismicMesh is None:
-                raise ImportError("SeismicMesh is not available. Please install it to use this function.")
+                raise ImportError("SeismicMesh is not available. Please "
+                                  f"install it to use this function.")
             return self.create_seismicmesh_mesh()
         else:
             raise ValueError("mesh_type is not supported")

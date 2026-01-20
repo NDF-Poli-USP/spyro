@@ -97,9 +97,9 @@ def c_vti_tensor(vP, vS, rho, epsilon, gamma, delta, anysotropy):
     Parameters
     ----------
     vP: `float`
-        P-wave velocity [km/s]
+        P-wave velocity [m/s]
     vS: `float`
-        S-wave velocity [km/s]
+        S-wave velocity [m/s]
     rho: `float`
         Density [kg/m³]
     epsilon: `float`
@@ -330,9 +330,9 @@ def Crhistoffel_VTI(vP, vS, rho, epsilon, gamma, delta,
     Parameters
     ----------
     vP: `float`
-        P-wave velocity [km/s]
+        P-wave velocity [m/s]
     vS: `float`
-        S-wave velocity [km/s]
+        S-wave velocity [m/s]
     rho: `float`
         Density [kg/m³]
     epsilon: `float`
@@ -469,7 +469,7 @@ eps1_o = 0.2  # Thomsen parameter epsilon
 gamma_o = 0.3  # Thomsen parameter gamma
 delta_o = 0.1  # Thomsen parameter delta
 theta_o = 30.  # Tilt angle in degrees
-phi_o = 0.  # azimuth angle in degrees (phi = 0: 2D case)
+phi_o = 0.  # Azimuth angle in degrees (phi = 0: 2D case)
 
 # Create fields
 # W = fire.FunctionSpace(mesh, "CG", 1)

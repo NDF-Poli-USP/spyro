@@ -77,7 +77,8 @@ def dom_serr(n):
 
     # Use Gmsh format 2.2 which is more widely compatible
     meshio.write(output_filename, mesh, file_format="gmsh22", binary=False)
-    # meshio.write("ellipsoid_mesh.msh", mesh, file_format="gmsh22", binary=False)
+    # meshio.write("ellipsoid_mesh.msh", mesh,
+    #              file_format="gmsh22", binary=False)
 
     # Or try ASCII format
     # meshio.write(output_filename, mesh, file_format="gmsh-ascii")
