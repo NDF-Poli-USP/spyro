@@ -340,9 +340,9 @@ def test_loop_habc_3d():
     Loop for HABC in model 3D based on Fig. 8 of Salas et al. (2022)
     '''
 
-    case = 1  # Integer from 0 to 1
-
     # ============ SIMULATION PARAMETERS ============
+
+    case = 1  # Integer from 0 to 1
 
     # Mesh size in km
     # cpw: cells per wavelength
@@ -438,9 +438,6 @@ def test_loop_habc_3d():
 
     # ============ HABC SCHEME ============
 
-    # Name of the file containing the mesh
-    str_filename_mesh = "try_mesh_hyp/125mSOU_SNP/n{:.1f}.msh"
-
     # Data to print on screen
     fref_str = "HABC Reference Frequency: {}\n"
     degr_str = "Type of the Hypereshape Degree: {}"
@@ -474,11 +471,6 @@ def test_loop_habc_3d():
                 Wave_obj.abc_boundary_layer_shape = "hypershape" \
                     if degree_layer is not None else "rectangular"
                 Wave_obj.abc_deg_layer = degree_layer
-
-                if degree_layer is not None:
-                    Wave_obj.filename_mesh = \
-                        str_filename_mesh.format(degree_layer)
-                    print(Wave_obj.filename_mesh, flush=True)  # Mesh file
 
                 # Data for regression of xCR parameter
                 dat_regr_xCR = [[] for _ in range(3)]
@@ -544,7 +536,7 @@ def test_loop_habc_3d():
             # Type of the hypereshape degree
             print(degr_str.format(degree_type), flush=True)
 
-            # Run the HABC scheme
+            # Getting the range of the hyperellipse degrees
             get_range_hyp(Wave_obj)
 
 

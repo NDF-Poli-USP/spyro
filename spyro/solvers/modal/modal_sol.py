@@ -754,7 +754,13 @@ class Modal_Solver():
                         cut_plane_percent=1.):
         '''
         Compute an approximate frequency factor for the hypershape with
-        truncation plane at z = cut_plane_percent * b, b = Lz + pad_len
+        truncation plane at z = cut_plane_percent * b, b = Lz + pad_len.
+        The fitting parameters for the equivalent velocity regression controls:
+        - fc1: Magnitude order of the frequency
+        - fc2: Monotonicity of the frequency
+        - fp1: Rectangukar domain frequency
+        - fp2: Ellipsoidal domain frequency
+
 
         Parameters
         ----------

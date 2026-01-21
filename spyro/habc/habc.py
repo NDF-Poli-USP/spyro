@@ -657,7 +657,7 @@ class HABC_Wave(AcousticWave, HABC_Mesh, RectangLayer,
             - fc2 : `float`
                 Exponent factor for the maximum reference velocity
             - fp1 : `float`
-                Exponent fsctor for the minimum equivalent velocity
+                Exponent factor for the minimum equivalent velocity
             - fp2 : `float`
                 Exponent factor for the maximum equivalent velocity
 

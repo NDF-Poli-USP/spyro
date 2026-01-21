@@ -74,15 +74,15 @@ def wave_dict(dt_usu, fr_files, layer_shape, degree_layer,
         "source_locations": [(-0.6, 1.68)],  # (0.25 * Lz, 0.75 * Lx)
         "frequency": 5.0,  # in Hz
         "delay": np.pi / np.sqrt(6),  # delay to compare with paper
-        "receiver_locations": [(-Lz, 0.), (-Lz, Lx), (0., 0.), (0., Lx)],
+        "receiver_locations": [(-Lz, 0.), (-Lz, Lx), (0., 0.), (0., Lx)]
     }
 
-    # Simulate for 2.0 seconds.
+    # Simulate for 4. seconds.
     dictionary["time_axis"] = {
         "initial_time": 0.,  # Initial time for event
         "final_time": 4.,    # Final time for event
         "dt": dt_usu,  # timestep size in seconds
-        "amplitude": 0.4,  # the Ricker has an amplitude of 1.
+        "amplitude": 0.4,  # the Ricker has an amplitude of 0.4
         "output_frequency": fr_files,  # how frequently to output solution to pvds
         "gradient_sampling_frequency": fr_files,  # how frequently to save to RAM
     }

@@ -1,15 +1,21 @@
 import firedrake as fire
+import warnings
 import spyro.habc.habc as habc
 from spyro.utils.cost import comp_cost
+fire.parameters["loopy"] = {"silenced_warnings": ["v1_scheduler_fallback"]}
+warnings.filterwarnings("ignore", category=RuntimeWarning)
 
 
-def wave_dict():
+def wave_dict(degree_type, habc_ref_freq):
     '''
     Create a dictionary with parameters for the model
 
     Parameters
     ----------
-    None
+    degree_type : `str`
+        Type of the hypereshape degree. Options: 'real' or 'integer'
+    habc_ref_freq : str
+        Reference frequency for the layer size. Options: 'source' or 'boundary
 
     Returns
     -------
@@ -38,12 +44,13 @@ def wave_dict():
     }
 
     # Define the domain size without the PML or AL. Here we'll assume a
-    # 1.00 x 1.00 km domain and compute the size for the Absorbing Layer (AL)
+    # 1 x 1 km domain and compute the size for the Absorbing Layer (AL)
     # to absorb outgoing waves on boundries (-z, +-x sides) of the domain.
+    Lz, Lx, Ly = [1., 1., 0.]
     dictionary["mesh"] = {
-        "Lz": 1.,  # depth in km - always positive
-        "Lx": 1.,  # width in km - always positive
-        "Ly": 0.,  # thickness in km - always positive
+        "Lz": Lz,  # depth in km - always positive
+        "Lx": Lx,  # width in km - always positive
+        "Ly": Ly,  # thickness in km - always positive
         "mesh_type": "firedrake_mesh",
     }
 
@@ -53,14 +60,13 @@ def wave_dict():
     # of the domain to verify the efficiency of the absorbing layer.
     dictionary["acquisition"] = {
         "source_type": "ricker",
-        "source_locations": [(-0.5, 0.25)],
-        # "source_locations": [(-0.5, 0.25), (-0.5, 0.35), (-0.5, 0.5)], # ToDo
+        "source_locations": [(-0.5, 0.25)],  # (0.5 * Lz, 0.25 * Lx)
         "frequency": 5.0,  # in Hz
         "delay": 1.5,
-        "receiver_locations": [(-1., 0.), (-1., 1.), (0., 1.), (0., 0.)]
+        "receiver_locations": [(-Lz, 0.), (-Lz, Lx), (0., 0.), (0., Lx)]
     }
 
-    # Simulate for 2.0 seconds.
+    # Simulate for 2. seconds.
     dictionary["time_axis"] = {
         "initial_time": 0.,  # Initial time for event
         "final_time": 2.,    # Final time for event
@@ -76,21 +82,21 @@ def wave_dict():
         "damping_type": "hybrid",  # Activate HABC
         "layer_shape": "rectangular",  # Options: rectangular or hypershape
         "degree_layer": None,  # Float >= 2 (hyp) or None (rec)
-        "degree_type": "real",  # Options: real or integer
-        "habc_reference_freq": "source",  # Options: source or boundary
+        "degree_type": degree_type,  # Options: real or integer
+        "habc_reference_freq": habc_ref_freq,  # Options: source or boundary
         "degree_eikonal": 2,  # Finite element order for the Eikonal analysis
         "get_ref_model": False,  # If True, the infinite model is created
     }
 
     # Define parameters for visualization
     dictionary["visualization"] = {
-        "forward_output": True,
+        "forward_output": False,
         "forward_output_filename": "output/forward/fw_output.pvd",
         "fwi_velocity_model_output": False,
         "velocity_model_filename": None,
         "gradient_output": False,
         "gradient_filename": None,
-        "acoustic_energy": True,  # Activate energy calculation
+        "acoustic_energy": False,  # Activate energy calculation
         "acoustic_energy_filename": "output/preamble/acoustic_pot_energy",
     }
 
@@ -152,6 +158,27 @@ def preamble_modal(dictionary, edge_length, f_est):
     return Wave_obj
 
 
+def get_range_hyp(Wave_obj):
+    '''
+    Determine the range of the hyperellipse degree for the absorbing layer.
+
+    Parameters
+    ----------
+    Wave_obj : `habc.HABC_Wave`
+        An instance of the HABC_Wave class
+
+    Returns
+    -------
+    None
+    '''
+
+    # Identifier for the current case study
+    Wave_obj.identify_habc_case()
+
+    # Determining layer size
+    Wave_obj.size_habc_criterion(n_root=1)
+
+
 def modal_fig8(Wave_obj, modal_solver_lst, fitting_c):
     '''
     Apply the HABC to the model in Fig. 8 of Salas et al. (2022).
@@ -167,18 +194,20 @@ def modal_fig8(Wave_obj, modal_solver_lst, fitting_c):
         'KRYLOVSCH_GH', 'KRYLOVSCH_GG' or 'RAYLEIGH'
     fitting_c : `tuple
         Parameters for fitting equivalent velocity regression.
-        Structure: (fc1, fc2, fp1, fp2).
+        Structure: (fc1, fc2, fp1, fp2):
+        - fc1: Magnitude order
+        - fc2: Monotonicity
+        - fp1: Rectangle frequency
+        - fp2: Ellipse frequency
+
 
     Returns
     -------
     None
     '''
 
-    # Identifier for the current case study
-    Wave_obj.identify_habc_case()
-
-    # Determining layer size
-    Wave_obj.size_habc_criterion(n_root=1)
+    # Check hyperellipse degree
+    get_range_hyp(Wave_obj)
 
     # Creating mesh with absorbing layer
     Wave_obj.create_mesh_habc()
@@ -211,7 +240,7 @@ def test_loop_modal_2d():
 
     # ============ SIMULATION PARAMETERS ============
 
-    case = 0  # Integer from 0 to 4
+    case = 4  # Integer from 0 to 4
 
     # Mesh size (in km)
     # cpw: cells per wavelength
@@ -240,47 +269,72 @@ def test_loop_modal_2d():
 
     # ============ HABC PARAMETERS ============
 
-    # Hyperellipse degrees
-    degree_layer_lst = [2.0, 3.0, 4.0, 4.4, None]
+    # Loop for HABC cases (True: Modal analysis, False: Hyperellipse degree)
+    loop_modeling = True
+
+    # Reference frequency
+    habc_ref_freq = "source"  # "boundary"
 
     # Type of the hypereshape degree
     degree_type = "real"  # "integer"
 
-    # Reference frequency for sizing the hybrid absorbing layer
-    fref_str = "HABC Reference Frequency: Source\n"
+    # Hyperellipse degrees
+    degree_layer_lst = [2.0, 3.0, 4.0, 4.4, None]
 
     # ============ MESH AND EIKONAL ============
 
     # Create dictionary with parameters for the model
-    dictionary = wave_dict()
+    dictionary = wave_dict(degree_type, habc_ref_freq)
 
     # Creating mesh and performing eikonal analysis
     Wave_obj = preamble_modal(dictionary, edge_length, f_est)
 
     # ============ MODAL ANALYSIS ============
 
-    # Modal solvers
-    modal_solver_lst = ['ANALYTICAL', 'ARNOLDI', 'LANCZOS',
-                        'LOBPCG', 'KRYLOVSCH_CH', 'KRYLOVSCH_CG',
-                        'KRYLOVSCH_GH', 'KRYLOVSCH_GG', 'RAYLEIGH']
+    # Data to print on screen
+    fref_str = "HABC Reference Frequency: {}"
+    degr_str = "Type of the Hypereshape Degree: {}"
 
-    for degree_layer in degree_layer_lst:
+    # Reference frequency for sizing the hybrid absorbing layer
+    print(fref_str.format(habc_ref_freq), flush=True)
 
-        # Update the layer shape and its degree
-        Wave_obj.abc_boundary_layer_shape = "hypershape" \
-            if degree_layer is not None else "rectangular"
-        Wave_obj.abc_deg_layer = degree_layer
+    # Type of the hypereshape degree
+    print(degr_str.format(degree_type), flush=True)
 
-        try:
-            # Computing the fundamental frequency
-            modal_fig8(Wave_obj, modal_solver_lst, fitting_c)
+    if loop_modeling:
 
-        except fire.ConvergenceError as e:
-            print(f"Error Solving: {e}", flush=True)
-            break
+        # Modal solvers
+        modal_solver_lst = ['ANALYTICAL', 'ARNOLDI', 'LANCZOS',
+                            'LOBPCG', 'KRYLOVSCH_CH', 'KRYLOVSCH_CG',
+                            'KRYLOVSCH_GH', 'KRYLOVSCH_GG', 'RAYLEIGH']
 
-        # Renaming the folder if degree_layer is modified
-        Wave_obj.rename_folder_habc()
+        for degree_layer in degree_layer_lst:
+
+            # Update the layer shape and its degree
+            Wave_obj.abc_boundary_layer_shape = "hypershape" \
+                if degree_layer is not None else "rectangular"
+            Wave_obj.abc_deg_layer = degree_layer
+
+            try:
+                # Computing the fundamental frequency
+                modal_fig8(Wave_obj, modal_solver_lst, fitting_c)
+
+            except fire.ConvergenceError as e:
+                print(f"Error Solving: {e}", flush=True)
+                break
+
+            # Renaming the folder if degree_layer is modified
+            Wave_obj.rename_folder_habc()
+
+    else:
+
+        # Update the reference frequency, the layer shape and its degree
+        Wave_obj.abc_reference_freq = habc_ref_freq
+        Wave_obj.abc_boundary_layer_shape = "hypershape"
+        Wave_obj.abc_deg_layer = 2.
+
+        # Getting the range of the hyperellipse degrees
+        get_range_hyp(Wave_obj)
 
 
 # Applying HABCs to the model in Fig. 8 of Salas et al. (2022)
@@ -298,38 +352,43 @@ if __name__ == "__main__":
 #  0.07 84.160  88.977  88.207  86.292  84.613
 #  0.08 85.233  89.815  88.934  86.745  84.961
 
-# n_hyp  100m  62.5m  50m  25m  20m
-# n_min   2.0    2.0  2.0  2.0  2.0
-# n_max   4.4    4.8  4.7  4.7  4.6
+# n_hyp  100m 62.5m  50m  25m  20m
+# n_min   2.0   2.0  2.0  2.0  2.0
+# n_max   4.4   4.4  4.4  4.6  4.6
 
 # ANALYTICAL
 # Case0     REC    N4.4    N4.0    N3.0    N2.0
 # fnum  0.45539 0.47270 0.47423 0.48266 0.50443
 # fana  0.45503 0.46622 0.46541 0.47813 0.50807
+# fray  0.47634 0.49470 0.49647 0.50497 0.52785
 
 # Case1     REC    N4.4    N4.0    N3.0    N2.0
 # fnum  0.45567 0.47253 0.47463 0.48342 0.50330
 # fana  0.45183 0.45920 0.46234 0.47524 0.50658
+# fray  0.47643 0.49468 0.49680 0.50570 0.52676
 
 # Case2     REC    N4.4    N4.0    N3.0    N2.0
 # fnum  0.45576 0.47185 0.47390 0.48232 0.50292
 # fana  0.45510 0.46558 0.47201 0.47757 0.51415
+# fray  0.47686 0.49400 0.49612 0.50464 0.52642
 
 # Case3     REC    N4.4    N4.0    N3.0    N2.0
 # fnum  0.46763 0.48306 0.48550 0.49408 0.51332
 # fana  0.46534 0.47554 0.48700 0.48886 0.51947
+# fray  0.48753 0.50408 0.50656 0.51528 0.53773
 
 # Case4     REC    N4.4    N4.0    N3.0    N2.0
 # fnum  0.47498 0.49076 0.49301 0.50200 0.52376
 # fana  0.47872 0.48446 0.48689 0.49671 0.51885
+# fray  0.49448 0.51134 0.51362 0.52277 0.54570
 
-# RAYLEIGH dx = 100m
+# RAYLEIGH N2.0 dx = 100m
 # n_eigfunc       2      *4       6       8
 # freq(Hz)  0.66237 0.52785 0.51705 0.51355
 # texe(s)     0.192   1.390  18.209  35.027
 # mem(MB)     1.360   3.637  11.469  16.161
 
-
+# Preliminary computational costs
 # dx = 100m
 # Frequency[Hz]    N2.0      (texe/pmem)    N3.0      (texe/pmem)
 # ANALYTICAL    0.50807 (0.276s/2.020MB) 0.47813 (0.196s/0.569MB)

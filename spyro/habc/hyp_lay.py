@@ -634,7 +634,7 @@ class HyperLayer():
             Perimeter of the hyperellipse
         '''
 
-        def integrand(theta):
+        def line_element(theta):
             '''
             Differential arc length element to compute the perimeter
 
@@ -655,7 +655,7 @@ class HyperLayer():
             return ds
 
         # Integrate from 0 to pi/2 and multiply by 4
-        perim_hyp = 4 * quad(integrand, 0, np.pi/2)[0]
+        perim_hyp = 4 * quad(line_element, 0, np.pi/2)[0]
 
         return perim_hyp
 

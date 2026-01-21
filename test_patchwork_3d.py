@@ -76,7 +76,7 @@ def wave_dict(dt_usu, fr_files, layer_shape, degree_layer, degree_type,
     # of the domain to verify the efficiency of the absorbing layer.
     dictionary["acquisition"] = {
         "source_type": "ricker",
-        "source_locations": [(-0.6, 1.68, 0.5)],  # (0.25 * Lz, 0.75 * Lx, 0.5 * Ly)
+        "source_locations": [(-0.6, 1.68, 0.5)],  # (0.25*Lz, 0.75*Lx, 0.5*Ly)
         "frequency": 5.0,  # in Hz
         "delay": 1. / 3.,
         "delay_type": "time",  # "multiples_of_minimum" or "time"
@@ -531,4 +531,3 @@ if __name__ == "__main__":
 # Min Eikonal on  Bottom Boundary (ms): 796.939 at (in km): (-2.400, 1.600, 0.600)
 # Min Eikonal on    Ymin Boundary (ms): 239.245 at (in km): (-0.400, 1.200, 0.000)
 # Min Eikonal on    Ymax Boundary (ms): 189.375 at (in km): (-0.400, 1.200, 1.000)
-
