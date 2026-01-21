@@ -14,8 +14,8 @@ def wave_dict(degree_type, habc_ref_freq, degree_eikonal):
     ----------
     degree_type : `str`
         Type of the hypereshape degree. Options: 'real' or 'integer'
-    habc_ref_freq : str
-        Reference frequency for the layer size. Options: 'source' or 'boundary
+    habc_ref_freq : `str`
+        Reference frequency for the layer size. Options: 'source' or 'boundary'
     degree_eikonal : `int`
         Finite element order for the Eikonal equation. Should be 1 or 2.
 
