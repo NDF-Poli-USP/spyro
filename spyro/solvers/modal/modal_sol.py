@@ -758,7 +758,7 @@ class Modal_Solver():
         The fitting parameters for the equivalent velocity regression controls:
         - fc1: Magnitude order of the frequency
         - fc2: Monotonicity of the frequency
-        - fp1: Rectangukar domain frequency
+        - fp1: Rectangular domain frequency
         - fp2: Ellipsoidal domain frequency
 
 
