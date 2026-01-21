@@ -86,13 +86,13 @@ def read_gmsh_file(input_msh_path):
     with open(input_msh_path, "r", encoding="utf-8") as f:
         info_file = f.readlines()
 
-    version = detect_gmsh_version(info_file=lines)
+    version = detect_gmsh_version(info_file=info_file)
     if version is None:
         raise RuntimeError(
             f"Could not detect $Nodes layout in {input_msh_path}. "
             "Only Gmsh v2.2 and v4.x formats are supported.")
 
-    return lines
+    return info_file
 
 
 def report_mesh_quality(dim=3, quality_type=2):
