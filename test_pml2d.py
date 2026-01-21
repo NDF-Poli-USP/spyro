@@ -114,7 +114,7 @@ def wave_dict(dt_usu, fr_files, layer_shape, degree_layer,
 
 def preamble_habc(dictionary, edge_length, f_est):
     '''
-    Run the infinite model and the Rikonal analysis
+    Run the infinite model and the Eikonal analysis
 
     Parameters
     ----------
