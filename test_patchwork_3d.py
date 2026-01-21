@@ -25,8 +25,8 @@ def wave_dict(dt_usu, fr_files, layer_shape, degree_layer, degree_type,
         Degree of the hypershape layer, if applicable. If None, it is not used
     degree_type : `str`
         Type of the hypereshape degree. Options: 'real' or 'integer'
-    habc_reference_freq : str
-        Reference frequency for the layer size. Options: 'source' or 'boundary
+    habc_reference_freq : `str`
+        Reference frequency for the layer size. Options: 'source' or 'boundary'
     get_ref_model : `bool`
         If True, the infinite model is created. If False, the absorbing layer
         is created based on the model parameters.
