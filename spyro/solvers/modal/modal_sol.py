@@ -869,7 +869,7 @@ class Modal_Solver():
             - fc2 : `float`
                 Exponent factor for the maximum reference velocity
             - fp1 : `float`
-                Exponent fsctor for the minimum equivalent velocity
+                Exponent factor for the minimum equivalent velocity
             - fp2 : `float`
                 Exponent factor for the maximum equivalent velocity
         cut_plane_percent : `float`, optional
