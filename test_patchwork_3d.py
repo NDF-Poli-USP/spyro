@@ -440,7 +440,7 @@ def test_loop_patchwork_3d():
             print(crit_str.format(
                 n_pts, crit_opt.replace("_", " ").title()), flush=True)
 
-            # Criterion for optinal heuristic factor xCR
+            # Criterion for optimal heuristic factor xCR
             Wave_obj.abc_reference_freq = habc_ref_freq
             print(fref_str.format(habc_ref_freq.capitalize()), flush=True)
 
