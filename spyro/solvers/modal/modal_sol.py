@@ -758,7 +758,7 @@ class Modal_Solver():
         The fitting parameters for the equivalent velocity regression controls:
         - fc1: Magnitude order of the frequency
         - fc2: Monotonicity of the frequency
-        - fp1: Rectangukar domain frequency
+        - fp1: Rectangular domain frequency
         - fp2: Ellipsoidal domain frequency
 
 
@@ -786,7 +786,7 @@ class Modal_Solver():
             - fc2 : `float`
                 Exponent factor for the maximum reference velocity
             - fp1 : `float`
-                Exponent fsctor for the minimum equivalent velocity
+                Exponent factor for the minimum equivalent velocity
             - fp2 : `float`
                 Exponent factor for the maximum equivalent velocity
         cut_plane_percent : `float`, optional
@@ -869,7 +869,7 @@ class Modal_Solver():
             - fc2 : `float`
                 Exponent factor for the maximum reference velocity
             - fp1 : `float`
-                Exponent fsctor for the minimum equivalent velocity
+                Exponent factor for the minimum equivalent velocity
             - fp2 : `float`
                 Exponent factor for the maximum equivalent velocity
         cut_plane_percent : `float`, optional
@@ -1135,7 +1135,7 @@ class Modal_Solver():
             - fc2 : `float`
                 Exponent factor for the maximum reference velocity
             - fp1 : `float`
-                Exponent fsctor for the minimum equivalent velocity
+                Exponent factor for the minimum equivalent velocity
             - fp2 : `float`
                 Exponent factor for the maximum equivalent velocity
 

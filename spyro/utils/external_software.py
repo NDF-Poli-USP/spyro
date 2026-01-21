@@ -92,7 +92,7 @@ def read_gmsh_file(input_msh_path):
             f"Could not detect $Nodes layout in {input_msh_path}. "
             "Only Gmsh v2.2 and v4.x formats are supported.")
 
-    return lines
+    return info_file
 
 
 def report_mesh_quality(dim=3, quality_type=2):
