@@ -86,7 +86,7 @@ def read_gmsh_file(input_msh_path):
     with open(input_msh_path, "r", encoding="utf-8") as f:
         info_file = f.readlines()
 
-    version = detect_gmsh_version(info_file=lines)
+    version = detect_gmsh_version(info_file=info_file)
     if version is None:
         raise RuntimeError(
             f"Could not detect $Nodes layout in {input_msh_path}. "

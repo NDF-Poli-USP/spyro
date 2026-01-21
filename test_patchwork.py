@@ -134,6 +134,7 @@ def preamble_habc(dictionary, edge_length, f_est):
     '''
 
     # ============ MESH FEATURES ============
+
     # Reference to resource usage
     tRef = comp_cost("tini")
 
@@ -156,6 +157,7 @@ def preamble_habc(dictionary, edge_length, f_est):
               user_name=Wave_obj.path_save + "preamble/MSH_")
 
     # ============ EIKONAL ANALYSIS ============
+
     # Reference to resource usage
     tRef = comp_cost("tini")
 
