@@ -19,7 +19,7 @@ def wave_dict(dt_usu, fr_files, layer_shape, degree_layer,
     degree_layer : `float` or `None`
         Degree of the hypershape layer, if applicable. If None, it is not used
     degree_type : `str`
-        Type of the hypereshape degree. Options: 'real' or 'integer'
+        Type of the hypershape degree. Options: 'real' or 'integer'
     habc_reference_freq : str
         Reference frequency for the layer size. Options: 'source' or 'boundary'
     get_ref_model : `bool`
