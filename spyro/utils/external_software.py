@@ -1,3 +1,10 @@
+try:
+    import gmsh
+except ImportError:
+    print("Gmsh is not installed.")
+    gmsh = None
+
+
 def initialize_gmsh():
     '''
     Initialize Gmsh API if not already initialized.
@@ -7,18 +14,21 @@ def initialize_gmsh():
     None
     '''
 
-    if gmsh.isInitialized():
-        import gmsh
-        print("Gmsh is already initialized.")
-    else:
-        gmsh.initialize()
-        print("Gmsh was not initialized, now it is.")
+    if gmsh:
+        if gmsh.isInitialized():
+            print("Gmsh is already initialized.")
+        else:
+            gmsh.initialize()
+            print("Gmsh was not initialized, now it is.")
 
-    # -  0: disables all output messages
-    # -  1: minimal output
-    # -  2: default verbosity
-    # - 99: maximum verbosity
-    gmsh.option.setNumber("General.Verbosity", 1)
+        # -  0: disables all output messages
+        # -  1: minimal output
+        # -  2: default verbosity
+        # - 99: maximum verbosity
+        gmsh.option.setNumber("General.Verbosity", 1)
+
+    else:
+        print("Gmsh is not installed.")
 
 
 def detect_gmsh_version(info_file=None):
