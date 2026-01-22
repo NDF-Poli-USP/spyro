@@ -89,10 +89,10 @@ def test_firedrake_tag_reading():
     for domain_id, domain_name in [(1, "Outer"), (2, "Inner")]:
         try:
             area_domain = fire.assemble(fire.Constant(1.0) * fire.dx(domain_id, domain=mesh))
-            print(f"✓ dx({domain_id}) - {domain_name}: Area = {area_domain:.6f}")
+            print(f"ok dx({domain_id}) - {domain_name}: Area = {area_domain:.6f}")
             domain_tests.append((f"{domain_name} (tag {domain_id})", True, area_domain))
         except Exception as e:
-            print(f"✗ dx({domain_id}) - {domain_name}: {e}")
+            print(f"x dx({domain_id}) - {domain_name}: {e}")
             domain_tests.append((f"{domain_name} (tag {domain_id})", False, 0))
     
     # Check if domain areas sum correctly
@@ -115,10 +115,10 @@ def test_firedrake_tag_reading():
     try:
         perimeter_all = fire.assemble(fire.Constant(1.0) * fire.ds(domain=mesh))
         expected_perimeter = 2 * (2.0 + 3.0)  # Rectangle perimeter
-        print(f"✓ ds (all boundaries): Perimeter = {perimeter_all:.6f} (expected: {expected_perimeter:.6f})")
+        print(f"ok ds (all boundaries): Perimeter = {perimeter_all:.6f} (expected: {expected_perimeter:.6f})")
         boundary_tests.append(("All boundaries", True, perimeter_all))
     except Exception as e:
-        print(f"✗ ds (all boundaries): {e}")
+        print(f"x ds (all boundaries): {e}")
         boundary_tests.append(("All boundaries", False, 0))
     
     # Test specific boundary tags
@@ -129,10 +129,10 @@ def test_firedrake_tag_reading():
         try:
             length_boundary = fire.assemble(fire.Constant(1.0) * fire.ds(boundary_id, domain=mesh))
             expected = expected_lengths[boundary_id]
-            print(f"✓ ds({boundary_id}) - {boundary_name}: Length = {length_boundary:.6f} (expected: {expected:.6f})")
+            print(f"ok ds({boundary_id}) - {boundary_name}: Length = {length_boundary:.6f} (expected: {expected:.6f})")
             boundary_tests.append((f"{boundary_name} (tag {boundary_id})", True, length_boundary))
         except Exception as e:
-            print(f"✗ ds({boundary_id}) - {boundary_name}: {e}")
+            print(f"x ds({boundary_id}) - {boundary_name}: {e}")
             boundary_tests.append((f"{boundary_name} (tag {boundary_id})", False, 0))
     
     # Check if boundary lengths sum correctly
@@ -141,12 +141,12 @@ def test_firedrake_tag_reading():
         sum_lengths = sum(t[2] for t in boundary_tests[1:] if t[1])
         length_diff = abs(total_perimeter - sum_lengths)
         if length_diff < 1e-10:
-            print(f"✓ Perimeter conservation: Total = {total_perimeter:.6f}, Sum = {sum_lengths:.6f}")
+            print(f" Perimeter conservation: Total = {total_perimeter:.6f}, Sum = {sum_lengths:.6f}")
         else:
-            print(f"⚠️  Perimeter mismatch: Total = {total_perimeter:.6f}, Sum = {sum_lengths:.6f}, Diff = {length_diff:.6f}")
+            print(f"  Perimeter mismatch: Total = {total_perimeter:.6f}, Sum = {sum_lengths:.6f}, Diff = {length_diff:.6f}")
     
     # Test mixed integrals (like in acoustic solver)
-    print("\n🔍 TESTING ACOUSTIC SOLVER-STYLE INTEGRALS:")
+    print("\n TESTING ACOUSTIC SOLVER-STYLE INTEGRALS:")
     print("-" * 45)
     
     try:
@@ -157,12 +157,12 @@ def test_firedrake_tag_reading():
         # Mass matrix term (domain integral)
         mass_form = (1 / (c * c)) * u * v * fire.dx
         M = fire.assemble(mass_form)
-        print("✓ Mass matrix assembly (domain integral)")
+        print("ok Mass matrix assembly (domain integral)")
         
         # Stiffness matrix term (domain integral)  
         stiffness_form = fire.dot(fire.grad(u), fire.grad(v)) * fire.dx
         K = fire.assemble(stiffness_form)
-        print("✓ Stiffness matrix assembly (domain integral)")
+        print("ok Stiffness matrix assembly (domain integral)")
         
         # Absorbing boundary terms (boundary integrals)
         dt = 0.001
@@ -173,14 +173,14 @@ def test_firedrake_tag_reading():
             try:
                 abc_form = (1 / c) * u * v * fire.ds(boundary_id)  # Simplified form for testing
                 abc_matrix = fire.assemble(abc_form)
-                print(f"✓ ABC boundary {boundary_id} assembly")
+                print(f"ok ABC boundary {boundary_id} assembly")
             except Exception as e:
-                print(f"✗ ABC boundary {boundary_id}: {e}")
+                print(f"x ABC boundary {boundary_id}: {e}")
         
-        print("✓ All acoustic solver-style integrals work correctly")
+        print("ok All acoustic solver-style integrals work correctly")
         
     except Exception as e:
-        print(f"✗ Acoustic solver-style integrals failed: {e}")
+        print(f"x Acoustic solver-style integrals failed: {e}")
     
     # Summary
     print("\n" + "="*60)
@@ -194,18 +194,18 @@ def test_firedrake_tag_reading():
     print(f"Boundary (ds) integrals: {boundary_success}/{len(boundary_tests)} successful")
     
     if domain_success == len(domain_tests) and boundary_success == len(boundary_tests):
-        print("🎉 ALL TESTS PASSED! Firedrake correctly reads all mesh tags.")
+        print("ALL TESTS PASSED! Firedrake correctly reads all mesh tags.")
         success = True
     else:
-        print("❌ Some tests failed. Check mesh tag generation or Firedrake compatibility.")
+        print("Some tests failed. Check mesh tag generation or Firedrake compatibility.")
         success = False
     
     # Clean up
     if os.path.exists(mesh_file):
         os.remove(mesh_file)
-        print(f"\n🧹 Cleaned up test file: {mesh_file}")
+        print(f"\n Cleaned up test file: {mesh_file}")
     
-    return success
+    assert success
 
 
 def test_tag_compatibility_with_solver():
@@ -253,16 +253,16 @@ def test_tag_compatibility_with_solver():
         le = 0.0
         if wave_obj.absorb_top:
             le = le + f_abc * fire.ds(1)
-            print("✓ Top boundary (ds(1)) integral works")
+            print("ok Top boundary (ds(1)) integral works")
         if wave_obj.absorb_bottom:
             le = le + f_abc * fire.ds(2)
-            print("✓ Bottom boundary (ds(2)) integral works")
+            print("ok Bottom boundary (ds(2)) integral works")
         if wave_obj.absorb_right:
             le = le + f_abc * fire.ds(3)
-            print("✓ Right boundary (ds(3)) integral works")
+            print("ok Right boundary (ds(3)) integral works")
         if wave_obj.absorb_left:
             le = le + f_abc * fire.ds(4)
-            print("✓ Left boundary (ds(4)) integral works")
+            print("ok Left boundary (ds(4)) integral works")
         
         # Assemble the complete form
         form = m1 + a + le
@@ -270,7 +270,7 @@ def test_tag_compatibility_with_solver():
         rhs = fire.rhs(form)
         
         A = fire.assemble(lhs, mat_type="matfree")
-        print("✓ Complete acoustic solver form assembles successfully")
+        print("ok Complete acoustic solver form assembles successfully")
         
         # Test with linear solver (as in the actual solver)
         solver_parameters = {
@@ -278,19 +278,19 @@ def test_tag_compatibility_with_solver():
             "pc_type": "jacobi",
         }
         solver = fire.LinearSolver(A, solver_parameters=solver_parameters)
-        print("✓ Linear solver setup successful")
+        print("ok Linear solver setup successful")
         
         print("🎉 FULL ACOUSTIC SOLVER COMPATIBILITY CONFIRMED!")
         
     except Exception as e:
-        print(f"❌ Acoustic solver compatibility test failed: {e}")
-        return False
+        print(f" Acoustic solver compatibility test failed: {e}")
+        assert False
     
     # Clean up
     if os.path.exists(mesh_file):
         os.remove(mesh_file)
     
-    return True
+    assert True
 
 
 if __name__ == "__main__":
