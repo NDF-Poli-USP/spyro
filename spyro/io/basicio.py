@@ -49,7 +49,7 @@ def _ensemble_save_load_loop(obj, func, kwargs, require_rank0=False):
                 func(obj, **dict(kwargs, shot_ids=shot_ids_in_propagation))
     else:
         for snum in range(obj.number_of_sources):
-            switch_serial_shot(obj, snum, filename=kwargs.get("filename"))
+            switch_serial_shot(obj, snum, file_name=kwargs.get("file_name"))
             if not require_rank0 or _comm.comm.rank == 0:
                 func(obj, **dict(kwargs, shot_ids=[snum]))
 
@@ -102,10 +102,12 @@ def _shot_filename(propagation_id, wave, prefix='tmp', random_str_in_use=True):
         id_str = wave.random_id_string
         spatialcomm = wave.comm.comm.rank
         comm__str = f"_comm{spatialcomm}"
+        post_fix = "npy"
     else:
         id_str = ""
         comm__str = ""
-    return f"{prefix}{shot_ids}{comm__str}{id_str}.npy"
+        post_fix = "dat"
+    return f"{prefix}{shot_ids}{comm__str}{id_str}.{post_fix}"
 
 
 def save_serial_data(wave, propagation_id):
@@ -125,7 +127,7 @@ def save_serial_data(wave, propagation_id):
     np.save(_shot_filename(propagation_id, wave, prefix='tmp_rec'), wave.forward_solution_receivers)
 
 
-def switch_serial_shot(wave, propagation_id, filename=None, just_for_dat_management=False):
+def switch_serial_shot(wave, propagation_id, file_name=None, just_for_dat_management=False):
     """
     Switches the current serial shot for a given wave to shot identified with propagation ID.
 
@@ -136,7 +138,7 @@ def switch_serial_shot(wave, propagation_id, filename=None, just_for_dat_managem
     Returns:
         None
     """
-    if filename is None:
+    if file_name is None:
         stacked_shot_arrays = np.load(_shot_filename(propagation_id, wave, prefix='tmp_shot'))
         if len(wave.forward_solution) == 0:
             n_dts, n_dofs = np.shape(stacked_shot_arrays)
@@ -145,8 +147,8 @@ def switch_serial_shot(wave, propagation_id, filename=None, just_for_dat_managem
             wave.forward_solution[array_i].dat.data[:] = array
         receiver_solution_filename = _shot_filename(propagation_id, wave, prefix='tmp_rec')
     else:
-        receiver_solution_filename = _shot_filename(propagation_id, wave, prefix=filename, random_str_in_use=False)
-    wave.forward_solution_receivers = np.load(receiver_solution_filename)
+        receiver_solution_filename = _shot_filename(propagation_id, wave, prefix=file_name, random_str_in_use=False)
+    wave.forward_solution_receivers = np.load(receiver_solution_filename, allow_pickle=True)
     wave.receivers_output = wave.forward_solution_receivers
 
 
