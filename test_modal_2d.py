@@ -131,7 +131,7 @@ def preamble_modal(dictionary, edge_length, f_est):
     Wave_obj = habc.HABC_Wave(dictionary=dictionary)
 
     # Mesh
-    Wave_obj.set_mesh(mesh_parameters={"edge_length": edge_length})
+    Wave_obj.set_mesh(input_mesh_parameters={"edge_length": edge_length})
 
     # Initial velocity model
     cond = fire.conditional(Wave_obj.mesh_x < 0.5, 3.0, 1.5)
@@ -232,7 +232,7 @@ def modal_fig8(Wave_obj, modal_solver_lst, fitting_c):
         comp_cost("tfin", tRef=tRef, user_name=name_cost)
 
 
-def test_loop_modal_2d(edge_length_lst):
+def test_loop_modal_2d():
     '''
     Loop for testing modals solvers in 2D
     '''

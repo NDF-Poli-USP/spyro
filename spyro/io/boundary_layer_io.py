@@ -41,6 +41,8 @@ class Read_boundary_layer:
         of Salas et al. (2022). doi: https://doi.org/10.1016/j.apm.2022.09.014
     abc_boundary_layer_shape : str
         Shape type of pad layer. Options: 'rectangular' or 'hypershape'
+    abc_degree_type : `str`
+        Type of the hypereshape degree. Options: 'real' or 'integer'
     abc_deg_layer : `int`
         Hypershape degree
     abc_reference_freq : `str`
@@ -95,15 +97,13 @@ class Read_boundary_layer:
             self.abc_R = abc_dictionary["R"]
             self.abc_cmax = abc_dictionary["cmax"]
         if value == "hybrid":
-            abc_dictionary.setdefault("layer_shape", "rectangular")
-            abc_dictionary.setdefault("degree_eikonal", None)
-            self.abc_boundary_layer_shape = abc_dictionary["layer_shape"]
+            self.abc_boundary_layer_shape = abc_dictionary.get("layer_shape", "rectangular")
             self.abc_deg_layer = None \
                 if abc_dictionary["layer_shape"] == "rectangular" \
                 else abc_dictionary.get("degree_layer", 2)
-            self.abc_reference_freq = abc_dictionary["habc_reference_freq"]
-            self.abc_deg_eikonal = abc_dictionary.get("degree_eikonal", None)
-            self.abc_get_ref_model = abc_dictionary["get_ref_model"]
+            self.abc_reference_freq = abc_dictionary.get("habc_reference_freq","source")
+            self.abc_deg_eikonal = abc_dictionary.get("degree_eikonal", 2)
+            self.abc_get_ref_model = abc_dictionary.get("get_ref_model", False)
 
         self._abc_boundary_layer_type = value
 

@@ -244,14 +244,14 @@ class HABC_Mesh():
 
         # Boundary array
         left_boundary = np.where(x_data <= self.tol)
-        right_boundary = np.where(x_data >= self.length_x - self.tol)
-        bottom_boundary = np.where(z_data <= self.tol - self.length_z)
+        right_boundary = np.where(x_data >= self.mesh_parameters.length_x - self.tol)
+        bottom_boundary = np.where(z_data <= self.tol - self.mesh_parameters.length_z)
         bnds = (left_boundary, right_boundary, bottom_boundary)
 
         if self.dimension == 3:  # 3D
             y_data = node_positions[2]
             left_bnd_y = np.where(y_data <= self.tol)
-            right_bnd_y = np.where(y_data >= self.length_y - self.tol)
+            right_bnd_y = np.where(y_data >= self.mesh_parameters.length_y - self.tol)
             bnds += (left_bnd_y, right_bnd_y,)
 
         return bnds
