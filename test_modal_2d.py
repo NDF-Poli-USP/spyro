@@ -200,7 +200,6 @@ def modal_fig8(Wave_obj, modal_solver_lst, fitting_c):
         - fp1: Rectangle frequency
         - fp2: Ellipse frequency
 
-
     Returns
     -------
     None
@@ -233,7 +232,7 @@ def modal_fig8(Wave_obj, modal_solver_lst, fitting_c):
         comp_cost("tfin", tRef=tRef, user_name=name_cost)
 
 
-def test_loop_modal_2d():
+def test_loop_modal_2d(edge_length_lst):
     '''
     Loop for testing modals solvers in 2D
     '''
@@ -279,7 +278,7 @@ def test_loop_modal_2d():
     degree_type = "real"  # "integer"
 
     # Hyperellipse degrees
-    degree_layer_lst = [2.0]  # [2.0, 3.0, 4.0, 4.4, None]
+    degree_layer_lst = [2.0, 3.0, 4.0, 4.4, None]
 
     # ============ MESH AND EIKONAL ============
 
@@ -304,10 +303,9 @@ def test_loop_modal_2d():
     if loop_modeling:
 
         # Modal solvers
-        # modal_solver_lst = ['ANALYTICAL', 'ARNOLDI', 'LANCZOS',
-        #                     'LOBPCG', 'KRYLOVSCH_CH', 'KRYLOVSCH_CG',
-        #                     'KRYLOVSCH_GH', 'KRYLOVSCH_GG', 'RAYLEIGH']
-        modal_solver_lst = ['ANALYTICAL', 'RAYLEIGH']
+        modal_solver_lst = ['ANALYTICAL', 'ARNOLDI', 'LANCZOS',
+                            'LOBPCG', 'KRYLOVSCH_CH', 'KRYLOVSCH_CG',
+                            'KRYLOVSCH_GH', 'KRYLOVSCH_GG', 'RAYLEIGH']
 
         for degree_layer in degree_layer_lst:
 

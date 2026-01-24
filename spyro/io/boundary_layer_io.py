@@ -77,9 +77,9 @@ class read_boundary_layer:
                 if self.dictionary["layer_shape"] == "rectangular" \
                 else self.dictionary.get("degree_layer", 2.)
             self.abc_degree_type = self.dictionary.get("degree_type", "real")
-            self.abc_reference_freq = self.dictionary["habc_reference_freq"]
-            self.abc_deg_eikonal = self.dictionary.get("degree_eikonal", None)
-            self.abc_get_ref_model = self.dictionary["get_ref_model"]
+            self.abc_reference_freq = self.dictionary.get("habc_reference_freq", "source")
+            self.abc_deg_eikonal = self.dictionary.get("degree_eikonal", 2)
+            self.abc_get_ref_model = self.dictionary.get("get_ref_model", False)
             self.abc_pad_length = 0.0
         else:
             abc_type = self.dictionary["damping_type"]

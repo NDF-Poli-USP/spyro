@@ -326,7 +326,7 @@ class FullWaveformInversion(AcousticWave):
     def set_real_mesh(
         self,
         user_mesh=None,
-        mesh_parameters=None,
+        input_mesh_parameters=None,
     ):
         """
         Set the mesh for the real synthetic model.
@@ -342,17 +342,17 @@ class FullWaveformInversion(AcousticWave):
         -------
         None
         """
-        mesh_parameters.setdefault("mesh_type", "firedrake_mesh")
+        input_mesh_parameters.setdefault("mesh_type", "firedrake_mesh")
         super().set_mesh(
             user_mesh=user_mesh,
-            mesh_parameters=mesh_parameters,
+            input_mesh_parameters=input_mesh_parameters,
         )
         self.real_mesh = self.get_mesh()
 
     def set_guess_mesh(
         self,
         user_mesh=None,
-        mesh_parameters={},
+        input_mesh_parameters={},
     ):
         """
         Set the mesh for the guess model.
@@ -370,7 +370,7 @@ class FullWaveformInversion(AcousticWave):
         """
         super().set_mesh(
             user_mesh=user_mesh,
-            mesh_parameters=mesh_parameters,
+            input_mesh_parameters=input_mesh_parameters,
         )
         self.guess_mesh = self.get_mesh()
 

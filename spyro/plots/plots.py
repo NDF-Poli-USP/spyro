@@ -1,12 +1,14 @@
 # from scipy.io import savemat
 import matplotlib.pyplot as plt
-import firedrake as fire
+from PIL import Image
 import numpy as np
+import firedrake
 import copy
 from ..io import ensemble_save
-from PIL import Image
+from spyro.utils.stats_tools import coeff_of_determination
 plt.rcParams.update({"font.family": "serif"})
 plt.rcParams['text.latex.preamble'] = r'\usepackage{bm} \usepackage{amsmath}'
+__all__ = ["plot_shots", "plot_hist_receivers"]
 
 
 @ensemble_save
@@ -105,7 +107,7 @@ def plot_mesh_sizes(
     plt.rcParams['font.size'] = 12
 
     if mesh_filename is not None:
-        mesh = fire.Mesh(mesh_filename)
+        mesh = firedrake.Mesh(mesh_filename)
     elif firedrake_mesh is not None:
         mesh = firedrake_mesh
     else:
@@ -116,14 +118,14 @@ def plot_mesh_sizes(
     mesh.coordinates.dat.data[:, 0] = coordinates[:, 1]
     mesh.coordinates.dat.data[:, 1] = coordinates[:, 0]
 
-    DG0 = fire.FunctionSpace(mesh, "DG", 0)
-    f = fire.interpolate(fire.CellSize(mesh), DG0)
+    DG0 = firedrake.FunctionSpace(mesh, "DG", 0)
+    f = firedrake.interpolate(firedrake.CellSize(mesh), DG0)
 
     fig, axes = plt.subplots()
     if show_size_contour:
-        im = fire.tricontourf(f, axes=axes)
+        im = firedrake.tricontourf(f, axes=axes)
     else:
-        im = fire.triplot(mesh, axes=axes)
+        im = firedrake.triplot(mesh, axes=axes)
 
     axes.set_aspect("equal", "box")
     plt.xlabel("X (km)")
@@ -166,7 +168,7 @@ def plot_model(Wave_object, filename="model.png",
     fig.set_figwidth = 9.0
     fig.set_figheight = 9.0
     vp_object = Wave_object.initial_velocity_model
-    vp_image = fire.tripcolor(vp_object, axes=axes)
+    vp_image = firedrake.tripcolor(vp_object, axes=axes)
     for source in Wave_object.source_locations:
         z, x = source
         plt.scatter(z, x, c="green")
@@ -230,7 +232,7 @@ def plot_function(function):
     axes = fig.add_subplot(111)
     fig.set_figwidth = 9.0
     fig.set_figheight = 9.0
-    fire.tricontourf(function, axes=axes)
+    firedrake.tricontourf(function, axes=axes)
     axes.axis('equal')
 
 
@@ -284,9 +286,8 @@ def plot_model_in_p1(Wave_object, dx=0.01, filename="model.png",
     p1_obj_dict["options"]["degree"] = 1
 
     new_wave_obj = AcousticWave(dictionary=p1_obj_dict)
-    new_wave_obj.set_mesh(mesh_parameters={"dx": dx})
-    new_wave_obj.set_initial_velocity_model(
-        conditional=Wave_object.initial_velocity_model)
+    new_wave_obj.set_mesh(input_mesh_parameters={"edge_length": dx}) #ToDo
+    new_wave_obj.set_initial_velocity_model(conditional=Wave_object.initial_velocity_model)
 
     return plot_model(new_wave_obj, filename=filename,
                       abc_points=abc_points, show=show,
