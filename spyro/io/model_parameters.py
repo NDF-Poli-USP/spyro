@@ -473,7 +473,6 @@ def _check_point_in_domain(point_coordinates, input_mesh_lengths, negative_z):
     # avoid changing mesh lengths outside of this
     mesh_lengths = deepcopy(input_mesh_lengths)
     if negative_z:
-        print("DEBUG")
         mesh_lengths[0] = -mesh_lengths[0]
 
     for i, (coord, length) in enumerate(zip(point_coordinates, mesh_lengths)):
