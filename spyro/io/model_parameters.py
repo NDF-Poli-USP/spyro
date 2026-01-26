@@ -402,21 +402,17 @@ class Model_parameters(Read_options, Read_boundary_layer, Read_time_axis, Read_o
         None
         """
 
-        if user_mesh is not None:
-            self.user_mesh = user_mesh
-            return
+        if user_mesh is None:
+            pad_length = self.abc_pad_length if self.abc_active else None
+            self.mesh_parameters.set_mesh(user_mesh=user_mesh,
+                                          input_mesh_parameters=input_mesh_parameters,
+                                          abc_pad_length=pad_length)
 
-        pad_length = None
-        if self.abc_active:
-            pad_length = self.abc_pad_length
-        self.mesh_parameters.set_mesh(user_mesh=user_mesh,
-                                      input_mesh_parameters=input_mesh_parameters,
-                                      abc_pad_length=pad_length)
+        autoMeshing = None if not self.mesh_parameters.automatic_mesh else \
+            meshing.AutomaticMesh(mesh_parameters=self.mesh_parameters)
 
-        if self.mesh_parameters.automatic_mesh:
-            autoMeshing = meshing.AutomaticMesh(mesh_parameters=self.mesh_parameters)
-            self.user_mesh = autoMeshing.create_mesh()
-
+        self.user_mesh = user_mesh if user_mesh is not None \
+            else autoMeshing.create_mesh()
 
     def _set_mesh_length(
         self,
