@@ -401,20 +401,25 @@ class Model_parameters(Read_options, Read_boundary_layer, Read_time_axis, Read_o
         -------
         None
         """
+
+        import ipdb
+        ipdb.set_trace()
+
         if user_mesh is not None:
             self.user_mesh = user_mesh
 
         pad_length = None
         if self.abc_active:
             pad_length = self.abc_pad_length
-        self.mesh_parameters.set_mesh(user_mesh=user_mesh, input_mesh_parameters=input_mesh_parameters, abc_pad_length=pad_length)
+        self.mesh_parameters.set_mesh(user_mesh=user_mesh,
+                                      input_mesh_parameters=input_mesh_parameters,
+                                      abc_pad_length=pad_length)
 
         if self.mesh_parameters.automatic_mesh:
-            autoMeshing = meshing.AutomaticMesh(
-                mesh_parameters=self.mesh_parameters,
-            )
-
+            autoMeshing = meshing.AutomaticMesh(mesh_parameters=self.mesh_parameters)
             self.user_mesh = autoMeshing.create_mesh()
+
+        ipdb.set_trace()
 
     def _set_mesh_length(
         self,

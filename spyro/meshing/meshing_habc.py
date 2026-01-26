@@ -1,15 +1,10 @@
 import firedrake as fire
 import numpy as np
-import gmsh
-import meshio
 from netgen.geom2d import SplineGeometry
 from netgen.meshing import Element2D, \
     Element3D, FaceDescriptor, Mesh, MeshPoint
 from scipy.spatial import cKDTree
-from tempfile import NamedTemporaryFile
 from spyro.utils.error_management import value_parameter_error
-from spyro.utils.external_software import detect_gmsh_version, \
-    read_gmsh_file, report_mesh_quality
 
 # Work from Ruben Andres Salas, Andre Luis Ferreira da Silva,
 # Luis Fernando Nogueira de Sá, Emilio Carlos Nelli Silva.

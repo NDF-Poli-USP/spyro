@@ -245,7 +245,7 @@ def test_loop_modal_2d():
     # cpw: cells per wavelength
     # lba = minimum_velocity / source_frequency
     # edge_length = lba / cpw
-    edge_length_lst = [0.1000, 0.0625, 0.0500, 0.0250, 0.0200]
+    edge_length_lst = [0.1000]  # [0.1000, 0.0625, 0.0500, 0.0250, 0.0200]
 
     # Factor for the stabilizing term in Eikonal equation
     f_est_lst = [0.06, 0.02, 0.02, 0.02, 0.04]

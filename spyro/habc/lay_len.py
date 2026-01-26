@@ -125,7 +125,8 @@ def calc_zero(xini, a, tol, nz=1):
     return x
 
 
-def loop_roots(a, lmin, lref, max_roots, tol_rel=1e-3, show_ig=True, monitor=False):
+def loop_roots(a, lmin, lref, max_roots, tol_rel=1e-3,
+               show_ig=True, monitor=False):
     '''
     Loop to calculate the size parameter for the absorbing layer
 

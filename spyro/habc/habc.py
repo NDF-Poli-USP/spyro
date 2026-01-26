@@ -350,6 +350,7 @@ class HABC_Wave(AcousticWave, HABC_Mesh, RectangLayer,
         # New geometry with layer
         self.Lx_habc = self.mesh_parameters.length_x + 2 * self.pad_len
         self.Lz_habc = self.mesh_parameters.length_z + self.pad_len
+
         if self.dimension == 3:  # 3D
             self.Ly_habc = self.mesh_parameters.length_y + 2 * self.pad_len
 
@@ -384,7 +385,8 @@ class HABC_Wave(AcousticWave, HABC_Mesh, RectangLayer,
         '''
 
         # Original domain dimensions
-        dom_dim = (self.mesh_parameters.length_x, self.mesh_parameters.length_z)
+        dom_dim = (self.mesh_parameters.length_x,
+                   self.mesh_parameters.length_z)
         if self.dimension == 3:  # 3D
             dom_dim += (self.mesh_parameters.length_y,)
 
@@ -396,7 +398,8 @@ class HABC_Wave(AcousticWave, HABC_Mesh, RectangLayer,
             dom_lay = (self.Lx_habc, self.Lz_habc)
 
         elif self.layer_shape == 'hypershape':  # Hypershape layer
-            dom_lay = (self.Lx_habc, self.mesh_parameters.length_z + 2 * self.pad_len) \
+            dom_lay = (self.Lx_habc, self.mesh_parameters.length_z
+                       + 2 * self.pad_len) \
                 if full_hyp else (self.Lx_habc, self.Lz_habc)
 
         if self.dimension == 3:  # 3D
@@ -538,8 +541,10 @@ class HABC_Wave(AcousticWave, HABC_Mesh, RectangLayer,
             mesh_habc = self.hypershape_mesh_habc(hyp_par, spln=spln)
 
         # Updating the mesh with the absorbing layer
-        self.set_mesh(user_mesh=mesh_habc, input_mesh_parameters={})
+        self.set_mesh(user_mesh=mesh_habc)
         print("Mesh Generated Successfully")
+
+        outfile = fire.VTKFile("user_mesh.pvd").write(mesh_habc)
 
         if inf_model:
             pth_mesh = self.path_save + "preamble/mesh_inf.pvd"
@@ -1033,11 +1038,7 @@ class HABC_Wave(AcousticWave, HABC_Mesh, RectangLayer,
         print(inf_str.format(self.pad_len), flush=True)
 
         # New dimensions
-        self.Lx_habc = self.mesh_parameters.length_x + 2 * self.pad_len
-        self.Lz_habc = self.mesh_parameters.length_z + self.pad_len
-
-        if self.dimension == 3:  # 3D
-            self.Ly_habc = self.mesh_parameters.length_y + 2 * self.pad_len
+        self.habc_new_geometry()
 
     def infinite_model(self, check_dt=False, max_divisor_tf=1,
                        method='ANALYTICAL', mag_add=3):
