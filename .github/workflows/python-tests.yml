@@ -58,7 +58,6 @@ jobs:
     - name: Running serial fast tests
       run: |
         ./cleanup.sh
-        python3 -m pytest -s tests/on_one_core/test_velocity_to_grid.py
         python3 -m pytest -n 8 --cov-report=xml --cov=spyro tests/on_one_core/ --skip-slow
 
     - name: Running serial slow tests
