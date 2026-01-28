@@ -1,8 +1,8 @@
 import spyro
 import debugpy
-from mpi4py.MPI import COMM_WORLD
-debugpy.listen(3000 + COMM_WORLD.rank)
-debugpy.wait_for_client()
+# from mpi4py.MPI import COMM_WORLD
+# debugpy.listen(3000 + COMM_WORLD.rank)
+# debugpy.wait_for_client()
 
 
 def test_saving_and_loading_shot_record():
@@ -18,7 +18,7 @@ def test_saving_and_loading_shot_record():
     wave.set_mesh(input_mesh_parameters={"edge_length": 0.02})
     wave.set_initial_velocity_model(constant=1.5)
     wave.forward_solve()
-    spyro.io.save_shots(wave, filename="test_shot_record")
+    spyro.io.save_shots(wave, file_name="test_shot_record")
     shots1 = wave.forward_solution_receivers
 
     wave2 = spyro.AcousticWave(dictionary=dictionary)

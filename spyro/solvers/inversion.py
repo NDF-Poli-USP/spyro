@@ -12,7 +12,8 @@ from ..utils import compute_functional
 from ..utils import Gradient_mask_for_pml, Mask
 from ..plots import plot_model as spyro_plot_model
 from ..io.basicio import switch_serial_shot
-from ..io.basicio import load_shots, save_shots
+from ..io.basicio import load_shots, save_shots, create_segy
+from ..utils import run_in_one_core
 
 
 try:
@@ -264,7 +265,7 @@ class FullWaveformInversion(AcousticWave):
             self.misfit = self.real_shot_record - self.guess_shot_record
         return self.misfit
 
-    def generate_real_shot_record(self, plot_model=False, model_filename="model.png", abc_points=None, save_shot_record=True, shot_filename="shots/shot_record_"):
+    def generate_real_shot_record(self, plot_model=False, model_filename="model.png", abc_points=None, save_shot_record=True, shot_filename="shots/shot_record_", high_resolution_model=False):
         """
         Generates the real synthetic shot record. Only for use in synthetic test cases.
         """
@@ -275,7 +276,7 @@ class FullWaveformInversion(AcousticWave):
             Wave_obj_real_velocity.initial_velocity_model = self.real_velocity_model
 
         if plot_model and Wave_obj_real_velocity.comm.comm.rank == 0 and Wave_obj_real_velocity.comm.ensemble_comm.rank == 0:
-            spyro_plot_model(Wave_obj_real_velocity, filename=model_filename, abc_points=abc_points)
+            spyro_plot_model(Wave_obj_real_velocity, filename=model_filename, abc_points=abc_points, high_resolution=high_resolution_model)
 
         Wave_obj_real_velocity.forward_solve()
         if save_shot_record:
@@ -499,7 +500,7 @@ class FullWaveformInversion(AcousticWave):
             "scipy_options": {
                 "disp": True,
                 "eps": 1e-15,
-                "ftol": 1e-7, "maxiter": kwargs.pop("maxiter", 20),
+                "ftol": 1e-11, "maxiter": kwargs.pop("maxiter", 20),
             }
         }
         parameters.update(kwargs)
@@ -528,9 +529,12 @@ class FullWaveformInversion(AcousticWave):
             bounds=bounds,
             options=options,
         )
+        
         vp_end = fire.Function(self.function_space)
         vp_end.dat.data[:] = result.x
+        self.vp_result = vp_end
         fire.File("vp_end.pvd").write(vp_end)
+        np.save("result", result.x)
 
     def run_fwi_rol(self, **kwargs):
         """
@@ -644,6 +648,10 @@ class FullWaveformInversion(AcousticWave):
         load_shots(self, file_name=file_name)
         self.real_shot_record = self.forward_solution_receivers
         self.forward_solution_receivers = None
+
+    @run_in_one_core
+    def save_result_as_segy(self, file_name="final_vp.segy"):
+        create_segy(self.vp_result, self.function_space, 10.0/1000.0, file_name)
 
 
 class SyntheticRealAcousticWave(AcousticWave):

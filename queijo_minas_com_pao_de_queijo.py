@@ -9,7 +9,7 @@ import sys
 # from mpi4py.MPI import COMM_WORLD
 # debugpy.listen(3000 + COMM_WORLD.rank)
 # debugpy.wait_for_client()
-# warnings.filterwarnings("ignore")
+warnings.filterwarnings("ignore")
 
 
 # degree = int(sys.argv[2])
@@ -35,7 +35,7 @@ def cells_per_wavelength(degree):
     return cell_per_wavelength_dictionary.get(key)
 
 cpw = cells_per_wavelength(degree)
-final_time = 0.85
+final_time = 1.3
 
 dictionary = {}
 dictionary["options"] = {
@@ -55,12 +55,12 @@ dictionary["mesh"] = {
 }
 dictionary["acquisition"] = {
     "source_type": "ricker",
-    "source_locations": spyro.create_transect((-0.55, 0.7), (-0.55, 1.3), 1),
+    "source_locations": spyro.create_transect((-0.35, 0.5), (-0.35, 1.5), 8),
     "frequency": frequency,
     # "frequency_filter": frequency_filter,
     "delay": 1.0/frequency,
     "delay_type": "time",
-    "receiver_locations": spyro.create_transect((-1.45, 0.7), (-1.45, 1.3), 200),
+    "receiver_locations": spyro.create_transect((-1.65, 0.5), (-1.65, 1.5), 200),
 }
 dictionary["absorving_boundary_conditions"] = {
     "status": True,
@@ -101,10 +101,41 @@ def test_real_shot_record_generation_parallel():
     radius = 0.2
     mesh_z = fwi.mesh_z
     mesh_x = fwi.mesh_x
+    square_top_z   = -0.9
+    square_bot_z   = -1.1
+    square_left_x  = 0.9
+    square_right_x = 1.1
     cond = fire.conditional((mesh_z-center_z)**2 + (mesh_x-center_x)**2 < radius**2, 3.0, 2.5)
+    cond =  fire.conditional(
+        fire.And(
+            fire.And(mesh_z < square_top_z, mesh_z > square_bot_z),
+            fire.And(mesh_x > square_left_x, mesh_x < square_right_x)
+        ),
+        3.5,
+        cond,
+    )
+
+    # Create 3 irregular cheese bread-like shapes
+    # First cheese bread (main one, slightly elliptical)
+    cheese_bread0 = ((mesh_z - (-1.3))/0.18)**2 + ((mesh_x - 0.7)/0.12)**2 < 1.0
+
+    # Second cheese bread (tilted ellipse)
+    rotated_z = (mesh_z - (-0.7)) * 0.8 + (mesh_x - 0.6) * 0.6
+    rotated_x = -(mesh_z - (-0.7)) * 0.6 + (mesh_x - 0.6) * 0.8
+    cheese_bread1 = (rotated_z/0.1)**2 + (rotated_x/0.08)**2 < 1.0
+
+    # Third cheese bread (horizontal ellipse)
+    cheese_bread2 = ((mesh_z - (-1.3))/0.08)**2 + ((mesh_x - 1.4)/0.14)**2 < 1.0
+
+    # Combine all 3 cheese bread areas
+    cheese_bread_areas = fire.Or(cheese_bread0, fire.Or(cheese_bread1, cheese_bread2))
+
+    # Set conditional
+    cond = fire.conditional(cheese_bread_areas, 3.0, cond)
+
 
     fwi.set_real_velocity_model(conditional=cond, output=True, dg_velocity_model=False)
-    fwi.generate_real_shot_record(plot_model=True, save_shot_record=True, shot_filename=f"shots/shot_record_f{frequency}_")
+    fwi.generate_real_shot_record(plot_model=True, save_shot_record=True, shot_filename=f"shots/shot_record_f{frequency}_", high_resolution_model=True)
 
 
 def test_realistic_fwi():
@@ -117,13 +148,13 @@ def test_realistic_fwi():
     # Since I'm using a constant velocity model isntead of loadgin one. I'm going to first create 
     # a simple Firedrake mesh to project it into a velocity grid
     fwi.set_guess_mesh(input_mesh_parameters={"mesh_type": "firedrake_mesh", "edge_length": 0.05})
-    fwi.set_guess_velocity_model(new_file="final_vp.segy")
+    fwi.set_guess_velocity_model(constant=2.5)
     grid_data = spyro.utils.velocity_to_grid(fwi, 0.01, output=True)
     mask_boundaries = {
-        "z_min": -1.3,
-        "z_max": -0.65,
-        "x_min": 0.7,
-        "x_max": 1.3,
+        "z_min": -1.55,
+        "z_max": -0.45,
+        "x_min": 0.45,
+        "x_max": 1.55,
     }
 
     fwi.set_guess_mesh(input_mesh_parameters={
@@ -133,15 +164,14 @@ def test_realistic_fwi():
         "gradient_mask": mask_boundaries,
         # "output_filename": "test.vtk"
     })
-    fwi.set_guess_velocity_model(new_file="final_vp.segy")
+    fwi.set_guess_velocity_model(constant=2.5)
 
-    fwi.run_fwi(vmin=2.5, vmax=3.0, maxiter=1)
-    fwi.save_result_as_segy()
+    fwi.run_fwi(vmin=2.5, vmax=3.5, maxiter=10)
 
 
 if __name__ == "__main__":
     t0 = time.time()
-    # test_real_shot_record_generation_parallel()
-    test_realistic_fwi()
+    test_real_shot_record_generation_parallel()
+    # test_realistic_fwi()
     t1 = time.time()
     print(f"Total runtime{t1-t0}", flush=True)
