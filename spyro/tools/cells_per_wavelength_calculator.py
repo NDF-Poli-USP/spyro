@@ -365,7 +365,7 @@ class Meshing_parameter_calculator:
             t1 = timinglib.time()
             p_receivers = Wave_obj.forward_solution_receivers
             spyro.io.save_shots(
-                Wave_obj, filename="test_shot_record" + str(cpw)
+                Wave_obj, file_name="test_shot_record" + str(cpw)
             )
 
             error = error_calc(

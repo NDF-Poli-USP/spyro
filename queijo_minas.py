@@ -55,7 +55,7 @@ dictionary["mesh"] = {
 }
 dictionary["acquisition"] = {
     "source_type": "ricker",
-    "source_locations": spyro.create_transect((-0.35, 0.5), (-0.35, 1.5), 8),
+    "source_locations": spyro.create_transect((-0.35, 0.5), (-0.35, 1.5), 1),
     "frequency": frequency,
     # "frequency_filter": frequency_filter,
     "delay": 1.0/frequency,
@@ -117,7 +117,7 @@ def test_real_shot_record_generation_parallel():
 
 
     fwi.set_real_velocity_model(conditional=cond, output=True, dg_velocity_model=False)
-    fwi.generate_real_shot_record(plot_model=True, save_shot_record=True, shot_filename=f"shots/shot_record_f{frequency}_")
+    fwi.generate_real_shot_record(plot_model=True, save_shot_record=True, shot_filename=f"shots/shot_record_f{frequency}_", high_resolution_model=True)
 
 
 def test_realistic_fwi():
@@ -144,7 +144,7 @@ def test_realistic_fwi():
         "cells_per_wavelength": 2.7,
         "grid_velocity_data": grid_data,
         "gradient_mask": mask_boundaries,
-        # "output_filename": "test.vtk"
+        "output_filename": "test.vtk"
     })
     fwi.set_guess_velocity_model(constant=2.5)
 

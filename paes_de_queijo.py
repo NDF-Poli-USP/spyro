@@ -160,7 +160,7 @@ def test_realistic_fwi():
 
 if __name__ == "__main__":
     t0 = time.time()
-    # test_real_shot_record_generation_parallel()
-    test_realistic_fwi()
+    test_real_shot_record_generation_parallel()
+    # test_realistic_fwi()
     t1 = time.time()
     print(f"Total runtime{t1-t0}", flush=True)
