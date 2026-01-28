@@ -47,7 +47,7 @@ class HABC_Wave(AcousticWave, HABC_Mesh, RectangLayer,
        Critical source coordinates
     CRmin : `float`
         Minimum reflection coefficient at the minimum damping ratio
-    d : `float`
+    d_nomr : `float`
         Normalized element size (lmin / pad_len)
     eik_bnd : `list`
         Properties on boundaries according to minimum values of Eikonal
@@ -442,7 +442,7 @@ class HABC_Wave(AcousticWave, HABC_Mesh, RectangLayer,
         self.crit_source = self.eik_bnd[0][-1]
 
         # Computing layer sizes
-        self.F_L, self.pad_len, self.ele_pad, self.d, \
+        self.F_L, self.pad_len, self.ele_pad, self.d_norm, \
             self.a_par, self.FLpos = calc_size_lay(
                 self.freq_ref, z_par, self.lmin, self.lref,
                 n_root=n_root, layer_based_on_mesh=layer_based_on_mesh)
@@ -479,7 +479,7 @@ class HABC_Wave(AcousticWave, HABC_Mesh, RectangLayer,
                                                     full_hyp=False)
 
         # Layer parameters
-        layer_par = (self.F_L, self.a_par, self.d)
+        layer_par = (self.F_L, self.a_par, self.d_norm)
 
         # mesh parameters
         mesh_par = (self.lmin, self.lmax, self.alpha, self.variant)
@@ -999,12 +999,14 @@ class HABC_Wave(AcousticWave, HABC_Mesh, RectangLayer,
             # Candidate to minimum distance to the boundaries
             delta_z = np.abs(sources_loc[:, 0] - self.mesh_parameters.length_z)
             delta_x = np.minimum(np.abs(sources_loc[:, 1]),
-                                 np.abs(sources_loc[:, 1] - self.mesh_parameters.length_x))
+                                 np.abs(sources_loc[:, 1] -
+                                        self.mesh_parameters.length_x))
             cand_dist = (delta_z, delta_x)
 
             if self.dimension == 3:  # 3D
                 delta_y = np.minimum(np.abs(sources_loc[:, 2]),
-                                     np.abs(sources_loc[:, 2] - self.mesh_parameters.length_y))
+                                     np.abs(sources_loc[:, 2] -
+                                            self.mesh_parameters.length_y))
                 cand_dist += (delta_y,)
 
             # Minimum distance to the nearest boundary

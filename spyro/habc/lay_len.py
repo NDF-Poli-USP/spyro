@@ -222,7 +222,7 @@ def calc_size_lay(fref, z_par, lmin, lref, nz=5, n_root=1, tol_rel=1e-3,
         Size of the absorbing layer
     ele_pad : `int`
         Approximated number of elements in the layer of edge length 'lmin'
-    d : `float`
+    d_norm : `float`
         Normalized element size (lmin / pad_len)
     a : `float`
         Adimensional propagation speed parameter (a = z / f, z = c / l)
@@ -281,10 +281,10 @@ def calc_size_lay(fref, z_par, lmin, lref, nz=5, n_root=1, tol_rel=1e-3,
         F_L, pad_len, ele_pad = roundFL(lmin, lref, F_L)
 
     # Normalized element size
-    d = lmin / pad_len
-    print("Normalized Element Size (adim): {0:.5f}".format(d), flush=True)
+    d_norm = lmin / pad_len
+    print("Normalized Element Size (adim): {0:.5f}".format(d_norm), flush=True)
 
-    return F_L, pad_len, ele_pad, d, a, FLpos
+    return F_L, pad_len, ele_pad, d_norm, a, FLpos
 
 
 def roundFL(lmin, lref, F_L):

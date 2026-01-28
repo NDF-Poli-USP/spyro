@@ -39,7 +39,7 @@ class PML_Wave(AcousticWave, HABC_Mesh, RectangLayer, HABC_Error):
         ('SOU' or 'BND'). Example: 'REC_SOU' or 'REC_BND'
     crit_source : `tuple`
        Critical source coordinates
-    d : `float`
+    d_norm : `float`
         Normalized element size (lmin / pad_len)
     eik_bnd : `list`
         Properties on boundaries according to minimum values of Eikonal
@@ -390,7 +390,7 @@ class PML_Wave(AcousticWave, HABC_Mesh, RectangLayer, HABC_Error):
         self.crit_source = self.eik_bnd[0][-1]
 
         # Computing layer sizes
-        self.F_L, self.pad_len, self.ele_pad, self.d, \
+        self.F_L, self.pad_len, self.ele_pad, self.d_norm, \
             self.a_par, self.FLpos = calc_size_lay(
                 self.freq_ref, z_par, self.lmin, self.lref,
                 n_root=n_root, layer_based_on_mesh=layer_based_on_mesh)
