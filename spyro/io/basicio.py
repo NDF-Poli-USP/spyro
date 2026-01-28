@@ -38,35 +38,44 @@ def ensemble_shot_record(func):
     return wrapper
 
 
-def _ensemble_save_load_loop(obj, func, kwargs, require_rank0=False):
-    """
-    Helper to loop over shots for ensemble parallelism in save or load operations.
-    """
-    _comm = obj.comm
-    if obj.parallelism_type != "spatial" or obj.number_of_sources == 1:
-        for propagation_id, shot_ids_in_propagation in enumerate(obj.shot_ids_per_propagation):
-            if is_owner(_comm, propagation_id) and (not require_rank0 or _comm.comm.rank == 0):
-                func(obj, **dict(kwargs, shot_ids=shot_ids_in_propagation))
-    else:
-        for snum in range(obj.number_of_sources):
-            switch_serial_shot(obj, snum, file_name=kwargs.get("file_name"))
-            if not require_rank0 or _comm.comm.rank == 0:
-                func(obj, **dict(kwargs, shot_ids=[snum]))
-
-
 def ensemble_save(func):
-    """Decorator for read and write shots for ensemble parallelism"""
+    """Decorator for saving shots for ensemble parallelism.
+    
+    For spatial parallelism with multiple sources, loads from temporary files 
+    (with random strings) then saves to named files.
+    """
     def wrapper(*args, **kwargs):
         obj = args[0]
-        _ensemble_save_load_loop(obj, func, kwargs, require_rank0=True)
+        _comm = obj.comm
+        if obj.parallelism_type != "spatial" or obj.number_of_sources == 1:
+            for propagation_id, shot_ids_in_propagation in enumerate(obj.shot_ids_per_propagation):
+                if is_owner(_comm, propagation_id) and _comm.comm.rank == 0:
+                    func(obj, **dict(kwargs, shot_ids=shot_ids_in_propagation))
+        else:
+            # For spatial parallelism: load from tmp files (no file_name) then save to named files
+            for snum in range(obj.number_of_sources):
+                switch_serial_shot(obj, snum, file_name=None)  # Load from tmp files
+                if _comm.comm.rank == 0:
+                    func(obj, **dict(kwargs, shot_ids=[snum]))
     return wrapper
 
 
 def ensemble_load(func):
-    """Decorator for read and write shots for ensemble parallelism"""
+    """Decorator for loading shots for ensemble parallelism.
+    
+    For spatial parallelism with multiple sources, loads from named files directly.
+    """
     def wrapper(*args, **kwargs):
         obj = args[0]
-        _ensemble_save_load_loop(obj, func, kwargs, require_rank0=False)
+        _comm = obj.comm
+        if obj.parallelism_type != "spatial" or obj.number_of_sources == 1:
+            for propagation_id, shot_ids_in_propagation in enumerate(obj.shot_ids_per_propagation):
+                if is_owner(_comm, propagation_id):
+                    func(obj, **dict(kwargs, shot_ids=shot_ids_in_propagation))
+        else:
+            # For spatial parallelism: load directly from named files (no switch_serial_shot needed)
+            for snum in range(obj.number_of_sources):
+                func(obj, **dict(kwargs, shot_ids=[snum]))
     return wrapper
 
 
