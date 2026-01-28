@@ -5,6 +5,7 @@ import firedrake as fire
 
 
 def test_velocity_to_grid():
+    np.random.seed(1)
     final_time = 1.0
     dx = 0.006546536707079771
 
