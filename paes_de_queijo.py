@@ -99,20 +99,26 @@ def test_real_shot_record_generation_parallel():
     mesh_z = fwi.mesh_z
     mesh_x = fwi.mesh_x
 
-    # Create 3 irregular cheese bread-like shapes
+    # Create 4 irregular cheese bread-like shapes
+    # All positioned within mask_boundaries with 0.05 buffer
+    # Safe zone: z[-1.50, -0.50], x[0.30, 1.70]
+    
     # First cheese bread (main one, slightly elliptical)
-    cheese_bread0 = ((mesh_z - (-1.0))/0.18)**2 + ((mesh_x - 1.0)/0.12)**2 < 1.0
+    cheese_bread0 = ((mesh_z - (-1.0))/0.15)**2 + ((mesh_x - 1.0)/0.12)**2 < 1.0
 
     # Second cheese bread (tilted ellipse)
     rotated_z = (mesh_z - (-0.7)) * 0.8 + (mesh_x - 0.6) * 0.6
     rotated_x = -(mesh_z - (-0.7)) * 0.6 + (mesh_x - 0.6) * 0.8
-    cheese_bread1 = (rotated_z/0.1)**2 + (rotated_x/0.08)**2 < 1.0
+    cheese_bread1 = (rotated_z/0.08)**2 + (rotated_x/0.07)**2 < 1.0
 
     # Third cheese bread (horizontal ellipse)
-    cheese_bread2 = ((mesh_z - (-1.3))/0.08)**2 + ((mesh_x - 1.4)/0.14)**2 < 1.0
+    cheese_bread2 = ((mesh_z - (-1.3))/0.08)**2 + ((mesh_x - 1.4)/0.12)**2 < 1.0
 
-    # Combine all 3 cheese bread areas
-    cheese_bread_areas = fire.Or(cheese_bread0, fire.Or(cheese_bread1, cheese_bread2))
+    # Fourth cheese bread (amorphous circular shape with slight asymmetry)
+    cheese_bread3 = ((mesh_z - (-0.8))/0.10)**2 + ((mesh_x - 1.5)/0.10)**2 < 1.0
+
+    # Combine all 4 cheese bread areas
+    cheese_bread_areas = fire.Or(cheese_bread0, fire.Or(cheese_bread1, fire.Or(cheese_bread2, cheese_bread3)))
 
     # Set conditional
     cond = fire.conditional(cheese_bread_areas, 3.0, 2.5)
@@ -131,13 +137,13 @@ def test_realistic_fwi():
     # Since I'm using a constant velocity model isntead of loadgin one. I'm going to first create 
     # a simple Firedrake mesh to project it into a velocity grid
     fwi.set_guess_mesh(input_mesh_parameters={"mesh_type": "firedrake_mesh", "edge_length": 0.05})
-    fwi.set_guess_velocity_model(constant=1.5)
+    fwi.set_guess_velocity_model(constant=2.5)
     grid_data = spyro.utils.velocity_to_grid(fwi, 0.01, output=True)
     mask_boundaries = {
         "z_min": -1.55,
         "z_max": -0.45,
-        "x_min": 0.45,
-        "x_max": 1.55,
+        "x_min": 0.25,
+        "x_max": 1.75,
     }
 
     fwi.set_guess_mesh(input_mesh_parameters={
@@ -149,7 +155,7 @@ def test_realistic_fwi():
     })
     fwi.set_guess_velocity_model(constant=2.5)
 
-    fwi.run_fwi(vmin=2.5, vmax=3.5, maxiter=30)
+    fwi.run_fwi(vmin=2.5, vmax=3.0, maxiter=30)
 
 
 if __name__ == "__main__":
