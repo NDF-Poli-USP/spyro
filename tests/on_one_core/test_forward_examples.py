@@ -4,16 +4,7 @@ import pytest
 
 
 def test_camembert_forward():
-    dictionary = {}
-    dictionary["absorving_boundary_conditions"] = {
-        "status": True,
-        "damping_type": "PML",
-        "exponent": 2,
-        "cmax": 4.5,
-        "R": 1e-6,
-        "pad_length": 0.25,
-    }
-    Wave_obj = spyro.examples.Camembert_acoustic(dictionary=dictionary)
+    Wave_obj = spyro.examples.Camembert_acoustic()
 
     # Check if velocity model is correct
     c_center = 4.6
