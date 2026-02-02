@@ -170,7 +170,7 @@ class Modal_Solver():
 
         # Functions for the problem
         u, v = fire.TrialFunction(V), fire.TestFunction(V)
-        dx = fire.dx(scheme=quad_rule) if quad_rule else fire.dx
+        dx = fire.dx(**quad_rule) if quad_rule else fire.dx
 
         # Bilinear forms
         a = c * c * fire.inner(fire.grad(u), fire.grad(v)) * dx
@@ -380,7 +380,7 @@ class Modal_Solver():
         '''
 
         # Integration measure
-        dx = fire.dx(scheme=quad_rule) if quad_rule else fire.dx
+        dx = fire.dx(**quad_rule) if quad_rule else fire.dx
 
         if typ_homog == 'energy':
             # Equivalent velocity by energy-equivalent homogenization
@@ -1059,7 +1059,7 @@ class Modal_Solver():
         Msp = ss.lil_matrix((n_funcs, n_funcs))  # Mass matrix
 
         # Assemble stiffness and mass matrices
-        dx = fire.dx(scheme=quad_rule) if quad_rule else fire.dx
+        dx = fire.dx(**quad_rule) if quad_rule else fire.dx
         for i in range(n_funcs):
             for j in range(i, n_funcs):  # Only upper triangle
                 # Stiffness and mass matrix term
