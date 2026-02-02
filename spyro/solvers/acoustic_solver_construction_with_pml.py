@@ -274,8 +274,8 @@ def construct_solver_or_matrix_with_pml_2d(Wave_obj):
     Z = Wave_obj.vector_function_space
     W = V * Z
     Wave_obj.mixed_function_space = W
-    dx = fire.dx(scheme=Wave_obj.quadrature_rule)
-    # ds = fire.ds(scheme=Wave_obj.surface_quadrature_rule)
+    dx = fire.dx(**Wave_obj.quadrature_rule)
+    # ds = fire.ds(**Wave_obj.surface_quadrature_rule)
 
     u, pp = fire.TrialFunctions(W)
     v, qq = fire.TestFunctions(W)
@@ -343,8 +343,8 @@ def construct_solver_or_matrix_with_pml_3d(Wave_obj):
     Z = Wave_obj.vector_function_space
     W = V * V * Z
     Wave_obj.mixed_function_space = W
-    dx = fire.dx(scheme=Wave_obj.quadrature_rule)
-    # ds = fire.ds(scheme=Wave_obj.surface_quadrature_rule)
+    dx = fire.dx(**Wave_obj.quadrature_rule)
+    # ds = fire.ds(**Wave_obj.surface_quadrature_rule)
 
     u, psi, pp = fire.TrialFunctions(W)
     v, phi, qq = fire.TestFunctions(W)

@@ -216,7 +216,7 @@ class Eikonal_Modeling():
         elif self.ele_type == 'KMV':  # ToDo - Can I use quadrature.py?
             quad_rule = finat.quadrature.make_quadrature(
                 V.finat_element.cell, self.p_eik, self.ele_type)
-            dx = fire.dx(scheme=quad_rule)
+            dx = fire.dx(**quad_rule)
 
         return dx
 
