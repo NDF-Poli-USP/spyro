@@ -1,5 +1,5 @@
 import firedrake as fire
-from numpy import where
+from numpy import where, log
 
 # Work from Keith Roberts, Eduardo Moscatelli,
 # Ruben Andres Salas and Alexandre Olender
@@ -52,7 +52,7 @@ def calc_pml_damping(pad_len, dgr_prof=2, CR=0.001):
         Maximum damping coefficient within the PML layer
     '''
 
-    sigma_max = (dgr_prof + 1.) / (2. * pad_len) * np.log(1 / CR)
+    sigma_max = (dgr_prof + 1.) / (2. * pad_len) * log(1 / CR)
 
     return sigma_max
 
@@ -91,45 +91,45 @@ def pml_sigma_field(Wave_obj):
     z = Wave_obj.mesh_z
     x = Wave_obj.mesh_x
     x1 = 0.0
-    x2 = Wave_obj.length_x
-    z2 = -Wave_obj.length_z
+    x2 = Wave_obj.mesh_parameters.length_x
+    z2 = -Wave_obj.mesh_parameters.length_z
 
     # Compute the maximum damping coefficient
-    bar_sigma = calc_pml_damping(abc_pad_length)
+    bar_sigma = calc_pml_damping(pad_length)
 
-    aux1 = Function(V)
-    aux2 = Function(V)
+    aux1 = fire.Function(V)
+    aux2 = fire.Function(V)
 
     # Sigma X
     sigma_max_x = bar_sigma  # Max damping
     aux1.interpolate(
-        conditional(
-            And((x >= x1 - pad_length), x < x1),
+        fire.conditional(
+            fire.And((x >= x1 - pad_length), x < x1),
             ((abs(x - x1) ** (ps)) / (pad_length ** (ps))) * sigma_max_x,
             0.0,
         )
     )
     aux2.interpolate(
-        conditional(
-            And(x > x2, (x <= x2 + pad_length)),
+        fire.conditional(
+            fire.And(x > x2, (x <= x2 + pad_length)),
             ((abs(x - x2) ** (ps)) / (pad_length ** (ps))) * sigma_max_x,
             0.0,
         )
     )
-    sigma_x = Function(V, name="sigma_x").interpolate(aux1 + aux2)
+    sigma_x = fire.Function(V, name="sigma_x").interpolate(aux1 + aux2)
 
     # Sigma Z
     tol_z = 1.000001
     sigma_max_z = bar_sigma  # Max damping
     aux1.interpolate(
-        conditional(
-            And(z < z2, (z >= z2 - tol_z * pad_length)),
+        fire.conditional(
+            fire.And(z < z2, (z >= z2 - tol_z * pad_length)),
             ((abs(z - z2) ** (ps)) / (pad_length ** (ps))) * sigma_max_z,
             0.0,
         )
     )
 
-    sigma_z = Function(V, name="sigma_z").interpolate(aux1)
+    sigma_z = fire.Function(V, name="sigma_z").interpolate(aux1)
 
     if dimension == 2:
         return (sigma_x, sigma_z)
@@ -141,20 +141,20 @@ def pml_sigma_field(Wave_obj):
         y1 = 0.0
         y2 = Wave_obj.length_y
         aux1.interpolate(
-            conditional(
-                And((y >= y1 - pad_length), y < y1),
+            fire.conditional(
+                fire.And((y >= y1 - pad_length), y < y1),
                 ((abs(y - y1) ** (ps)) / (pad_length ** (ps))) * sigma_max_y,
                 0.0,
             )
         )
         aux2.interpolate(
-            conditional(
-                And(y > y2, (y <= y2 + pad_length)),
+            fire.conditional(
+                fire.And(y > y2, (y <= y2 + pad_length)),
                 ((abs(y - y2) ** (ps)) / (pad_length ** (ps))) * sigma_max_y,
                 0.0,
             )
         )
-        sigma_y = Function(V, name="sigma_y").interpolate(aux1 + aux2)
+        sigma_y = fire.Function(V, name="sigma_y").interpolate(aux1 + aux2)
         # sgm_y = VTKFile("pmlField/sigma_y.pvd")
         # sgm_y.write(sigma_y)
 
@@ -283,6 +283,7 @@ def construct_solver_or_matrix_with_pml_2d(Wave_obj):
     X = fire.Function(W)
     X_n = fire.Function(W)
     X_nm1 = fire.Function(W)
+    X_np1 = fire.Function(W)  # ToDo: Not used?
 
     u_n, pp_n = X_n.subfunctions
     u_nm1, _ = X_nm1.subfunctions
@@ -291,6 +292,7 @@ def construct_solver_or_matrix_with_pml_2d(Wave_obj):
     Wave_obj.X = X
     Wave_obj.X_n = X_n
     Wave_obj.X_nm1 = X_nm1
+    Wave_obj.X_np1 = X_np1  # ToDo: Not used?
 
     # sigma_x, sigma_z = Wave_obj.sigma_x, Wave_obj.sigma_z
     sigma_x, sigma_z = pml_sigma_field(Wave_obj)
@@ -350,6 +352,7 @@ def construct_solver_or_matrix_with_pml_3d(Wave_obj):
     X = fire.Function(W)
     X_n = fire.Function(W)
     X_nm1 = fire.Function(W)
+    X_np1 = fire.Function(W)  # ToDo: Not used?
 
     u_n, psi_n, pp_n = X_n.subfunctions
     u_nm1, psi_nm1, _ = X_nm1.subfunctions
@@ -358,6 +361,7 @@ def construct_solver_or_matrix_with_pml_3d(Wave_obj):
     Wave_obj.X = X
     Wave_obj.X_n = X_n
     Wave_obj.X_nm1 = X_nm1
+    Wave_obj.X_np1 = X_np1  # ToDo: Not used?
 
     # sigma_x, sigma_z = Wave_obj.sigma_x, Wave_obj.sigma_z
     # sigma_y = Wave_obj.sigma_y

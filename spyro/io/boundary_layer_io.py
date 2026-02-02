@@ -33,7 +33,7 @@ class Read_boundary_layer:
     abc_R : float
         Theoretical reflection coefficient
     abc_pad_length : float
-        Thickness of the PML in the z-direction (km) - always positive
+        Thickness of the PML in (km) - always positive
     damping_type : str
         Type of the boundary layer
     abc_boundary_layer_type : `str`
