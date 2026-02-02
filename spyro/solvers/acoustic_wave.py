@@ -54,14 +54,10 @@ class AcousticWave(Wave):
         self.solver = None
         self.rhs = None
         self.B = None
-        print("A")
         if abc_type is None or abc_type == "local" or abc_type == "hybrid":
-            print("A1")
             construct_solver_or_matrix_no_pml(self)
         elif abc_type == "PML":
-            print("A2")
             construct_solver_or_matrix_with_pml(self)
-        print("B")
 
         self.acoustic_energy = acoustic_energy(self)
 
