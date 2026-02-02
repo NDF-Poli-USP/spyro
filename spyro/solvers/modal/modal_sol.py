@@ -351,7 +351,8 @@ class Modal_Solver():
         eigenproblem = fire.LinearEigenproblem(a, M=m)
         eigensolver = fire.LinearEigensolver(eigenproblem, n_evals=k,
                                              solver_parameters=opts)
-        nconv = eigensolver.solve()
+        # nconv = eigensolver.solve()
+        eigensolver.solve()
         Lsp = np.asarray([eigensolver.eigenvalue(mod) for mod in range(k)])
 
         return Lsp
