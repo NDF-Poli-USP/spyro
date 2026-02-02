@@ -1,4 +1,3 @@
-import numpy as np
 from spyro.utils.error_management import value_dimension_error
 
 # Work from Ruben Andres Salas, Andre Luis Ferreira da Silva,

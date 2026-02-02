@@ -288,8 +288,8 @@ class Eikonal_Modeling():
         # Weak form
         delta = fire.Constant(float_info.epsilon)  # float_info.min
         gr_norm = fire.sqrt(fire.inner(fire.grad(u), fire.grad(u))) + delta
-        FNL = gr_norm * vy * fire.dx - f / c * vy * fire.dx + \
-            eps * fire.inner(fire.grad(u), fire.grad(vy)) * fire.dx
+        FNL = gr_norm * vy * dx - f / c * vy * dx + \
+            eps * fire.inner(fire.grad(u), fire.grad(vy)) * dx
 
         return FNL
 

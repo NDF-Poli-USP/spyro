@@ -2,15 +2,11 @@ import firedrake as fire
 import numpy as np
 import spyro.habc.eik as eik
 import spyro.solvers.modal.modal_sol as eigsol
-from os import getcwd, path, rename
-from shutil import rmtree
+from os import getcwd
 from sympy import divisors
 from spyro.solvers.acoustic_wave import AcousticWave
 from spyro.meshing.meshing_habc import HABC_Mesh
-from spyro.habc.hyp_lay import HyperLayer
 from spyro.habc.rec_lay import RectangLayer
-from spyro.habc.damp_profile import HABC_Damping
-from spyro.habc.nrbc import NRBC
 from spyro.habc.error_measure import HABC_Error
 from spyro.habc.lay_len import calc_size_lay
 from spyro.plots.plots_habc import plot_function_layer_size
@@ -378,7 +374,7 @@ class PML_Wave(AcousticWave, HABC_Mesh, RectangLayer, HABC_Error):
         '''
 
         # Determining the reference frequency
-        freq_ref_lst = self.det_reference_freq(fpad=fpad)
+        self.det_reference_freq(fpad=fpad)
 
         # Inverse of the minimum Eikonal
         z_par = self.eik_bnd[0][3]
@@ -437,11 +433,11 @@ class PML_Wave(AcousticWave, HABC_Mesh, RectangLayer, HABC_Error):
         # Checking if the mesh for infinite model is requested
         if inf_model:
             print("\nGenerating Mesh for Infinite Model", flush=True)
-            layer_shape = 'rectangular'
+            # layer_shape = 'rectangular'
 
         else:
             print("\nGenerating Mesh with PML", flush=True)
-            layer_shape = self.layer_shape
+            # layer_shape = self.layer_shape
 
         # New mesh with layer
         dom_lay = self.pml_domain_dimensions(only_habc_dom=True)
@@ -622,7 +618,7 @@ class PML_Wave(AcousticWave, HABC_Mesh, RectangLayer, HABC_Error):
         print("\nCreating Damping PML Profile", flush=True)
 
         # Compute the maximum damping coefficient
-        sigma_max = calc_pml_damping(self)
+        sigma_max = self.calc_pml_damping()
 
         # Mesh coordinates
         coords = fire.SpatialCoordinate(self.mesh)
@@ -705,7 +701,7 @@ class PML_Wave(AcousticWave, HABC_Mesh, RectangLayer, HABC_Error):
                 min(max_divisor_tf, n_div), n_div, 1e3 * self.dt, p=mag_add)
         else:
             str_dt = "Selected Timestep Size: {:.{p}f} ms\n".format(
-                n_div, 1e3 * self.dt, p=mag_add)
+                1e3 * self.dt, p=mag_add)
 
         print(str_dt, flush=True)
 

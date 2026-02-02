@@ -707,10 +707,6 @@ class HABC_Mesh():
         # Append points to the geometry
         [geo.AppendPoint(*pnt) for pnt in bnd_pts]
 
-        #  Mesh size for arc length due to the truncation operation
-        ltrunc = trunc_feat[-1]
-        fmin = ltrunc / self.lmin
-
         while True:
             try:
                 # Generate the boundary segment curves
@@ -1058,7 +1054,7 @@ class HABC_Mesh():
         coords = mesh.coordinates.dat.data_with_halos
         min_z, min_x, min_y = np.min(coords, axis=0)
         max_z, max_x, max_y = np.max(coords, axis=0)
-        print(f"Mesh Bounds Detected:", flush=True)
+        print("Mesh Bounds Detected:", flush=True)
         print(f"       X: [{min_x:.4f}, {max_x:.4f}]", flush=True)
         print(f"       Y: [{min_y:.4f}, {max_y:.4f}]", flush=True)
         print(f"       Z: [{min_z:.4f}, {max_z:.4f}]", flush=True)

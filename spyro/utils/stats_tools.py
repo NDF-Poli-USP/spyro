@@ -1,5 +1,4 @@
 import numpy as np
-import scipy.stats
 
 
 def coeff_of_determination(y_true, y_pred, p):

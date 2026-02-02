@@ -252,10 +252,10 @@ class Mask():
 
         """
         if self.in_dg:
-            raise ValueError(f"DG space can have different"
-                             f"DoFs than the functional space")
+            raise ValueError("DG space can have different "
+                             "DoFs than the functional space")
         warnings.warn("When applying a mask in a continuous space, "
-                      f"expect some error in the element adjacent to the mask")
+                      "expect some error in the element adjacent to the mask")
         mask = Function(Wave_obj.function_space)
         mask.interpolate(self.cond)
         # Saving mask dofs

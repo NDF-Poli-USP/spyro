@@ -395,7 +395,7 @@ def calculate_edge_length(cpw, minimum_velocity, frequency):
 def RectangleMesh(nx, ny, Lx, Ly, pad=None, comm=None, quadrilateral=False):
     '''
     Create a rectangle mesh based on the Firedrake mesh.
-    First axis is negative, second axis is positive. 
+    First axis is negative, second axis is positive.
     If there is a pad, both axis are dislocated by the pad.
 
     Parameters

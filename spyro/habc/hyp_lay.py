@@ -2,7 +2,9 @@ import numpy as np
 from scipy.integrate import dblquad, quad
 from scipy.special import beta, betainc, gamma
 from sys import float_info
-from spyro.utils.error_management import value_dimension_error
+from spyro.utils.error_management import \
+    value_dimension_error, value_parameter_error
+
 
 # Work from Ruben Andres Salas, Andre Luis Ferreira da Silva,
 # Luis Fernando Nogueira de Sá, Emilio Carlos Nelli Silva.
@@ -705,14 +707,14 @@ class HyperLayer():
             trig4 = np.sin(r) * np.cos(t)
 
             # Parametric equations (first octant, no abs/sgn needed)
-            x = a * (trig1)**(2 / n)
-            y = b * (trig2)**(2 / n)
-            z = c * np.cos(t)**(2 / n)
+            # x = a * (trig1)**(2 / n)
+            # y = b * (trig2)**(2 / n)
+            # z = c * np.cos(t)**(2 / n)
 
             # Partial derivatives (simplified)
             dx_dr = a * (2 / n) * (trig1)**(2/n - 1) * (-trig2)
             dy_dr = b * (2 / n) * (trig2)**(2/n - 1) * (trig1)
-            dz_dr = 0.0
+            # dz_dr = 0.0
 
             dx_dt = a * (2 / n) * (trig1)**(2 / n - 1) * (trig3)
             dy_dt = b * (2 / n) * (trig2)**(2 / n - 1) * (trig4)

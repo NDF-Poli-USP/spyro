@@ -5,10 +5,9 @@ import numpy as np
 import firedrake
 import copy
 from ..io import ensemble_save
-from spyro.utils.stats_tools import coeff_of_determination
 plt.rcParams.update({"font.family": "serif"})
 plt.rcParams['text.latex.preamble'] = r'\usepackage{bm} \usepackage{amsmath}'
-__all__ = ["plot_shots", "plot_hist_receivers"]
+__all__ = ["plot_shots"]
 
 
 @ensemble_save

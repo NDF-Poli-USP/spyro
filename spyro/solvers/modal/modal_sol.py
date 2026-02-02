@@ -1,6 +1,6 @@
 import firedrake as fire
 import numpy as np
-import scipy.linalg as sl
+# import scipy.linalg as sl
 import scipy.sparse as ss
 from scipy.optimize import broyden1, curve_fit
 from scipy.special import beta, betainc, gamma, jn_zeros, \
@@ -739,7 +739,7 @@ class Modal_Solver():
             delta_pn = pn_fit - sn.interval(0.95, loc=pn_fit, scale=perr[0])[0]
             delta_qn = qn_fit - sn.interval(0.95, loc=qn_fit, scale=perr[1])[0]
 
-            print(f"Nonlinear Curve Fit Successful!", flush=True)
+            print("Nonlinear Curve Fit Successful!", flush=True)
             print(f"Fitted Parameters: pn = {pn_fit:.6f} ± {delta_pn:.6f}, "
                   f"qn = {qn_fit:.6f} ± {delta_qn:.6f}", flush=True)
             print(f"R-Squared: {r_squared:.6f} - RMSE: {rmse:.6f}", flush=True)
@@ -1210,7 +1210,7 @@ class Modal_Solver():
 
         # Maximum eigenvalue
         if self.method == 'ANALYTICAL':
-            print(f"Estimating Maximum Eigenvalue", flush=True)
+            print("Estimating Maximum Eigenvalue", flush=True)
 
             a, m = self.weak_forms(c, V, quad_rule=quad_rule)
 
@@ -1224,7 +1224,7 @@ class Modal_Solver():
             max_eigval = np.amax(np.abs(Lsp.diagonal()))
 
         else:
-            print(f"Computing Exact Maximum Eigenvalue", flush=True)
+            print("Computing Exact Maximum Eigenvalue", flush=True)
             Lsp = self.solve_eigenproblem(
                 c, V=V, shift=shift, quad_rule=quad_rule, inv_oper=inv_oper)
             # (eig = 0 is a rigid body motion)
@@ -1232,7 +1232,7 @@ class Modal_Solver():
 
         # Maximum stable timestep
         max_dt = float(np.real(2. / np.sqrt(max_eigval)))
-        print(f"Maximum Stable Timestep Should Be Approximately "
+        print("Maximum Stable Timestep Should Be Approximately "
               f"(ms): {1e3 * max_dt:.3f}", flush=True)
 
         max_dt *= fraction

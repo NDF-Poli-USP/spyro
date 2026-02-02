@@ -95,7 +95,7 @@ def pml_sigma_field(Wave_obj):
     z2 = -Wave_obj.mesh_parameters.length_z
 
     # Compute the maximum damping coefficient
-    bar_sigma = calc_pml_damping(pad_length)
+    bar_sigma = cmax * calc_pml_damping(pad_length, CR=R)
 
     aux1 = fire.Function(V)
     aux2 = fire.Function(V)
@@ -379,13 +379,13 @@ def construct_solver_or_matrix_with_pml_3d(Wave_obj):
     pml2 = c_sqr_inv * (sigma_z * sigma_x + sigma_x * sigma_y
                         + sigma_z * sigma_y) * fire.dot(u, v) * dx
     pml3 = -c_sqr_inv * fire.dot(fire.div(pp_n), v) * dx
-    pml4 = c_sqr_inv * (sigma_z * sigma_x * sigma_y) * dot(psi_n, v) * dx
+    pml4 = c_sqr_inv * (sigma_z * sigma_x * sigma_y) * fire.dot(psi_n, v) * dx
     FF += pml1 + pml2 + pml3 + pml4
     # -------------------------------------------------------
     mm1 = c_sqr_inv * fire.dot((pp - pp_n) / fire.Constant(dt), qq) * dx
     mm2 = c_sqr_inv * fire.inner(fire.dot(Gamma_1, pp_n), qq) * dx
-    dd1 = fire.inner(dot(Gamma_2, fire.grad(u_n)), qq) * dx
-    dd2 = -fire.inner(dot(Gamma_3, fire.grad(psi_n)), qq) * dx
+    dd1 = fire.inner(fire.dot(Gamma_2, fire.grad(u_n)), qq) * dx
+    dd2 = -fire.inner(fire.dot(Gamma_3, fire.grad(psi_n)), qq) * dx
     FF += mm1 + mm2 + dd1 + dd2
     # -------------------------------------------------------
     mmm1 = fire.dot((psi - psi_n) / fire.Constant(dt), phi) * dx

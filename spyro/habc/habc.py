@@ -430,7 +430,7 @@ class HABC_Wave(AcousticWave, HABC_Mesh, RectangLayer,
         '''
 
         # Determining the reference frequency
-        freq_ref_lst = self.det_reference_freq(fpad=fpad)
+        self.det_reference_freq(fpad=fpad)
 
         # Inverse of the minimum Eikonal
         z_par = self.eik_bnd[0][3]
@@ -962,7 +962,7 @@ class HABC_Wave(AcousticWave, HABC_Mesh, RectangLayer,
                 min(max_divisor_tf, n_div), n_div, 1e3 * self.dt, p=mag_add)
         else:
             str_dt = "Selected Timestep Size: {:.{p}f} ms\n".format(
-                n_div, 1e3 * self.dt, p=mag_add)
+                1e3 * self.dt, p=mag_add)
 
         print(str_dt, flush=True)
 
@@ -999,14 +999,14 @@ class HABC_Wave(AcousticWave, HABC_Mesh, RectangLayer,
             # Candidate to minimum distance to the boundaries
             delta_z = np.abs(sources_loc[:, 0] - self.mesh_parameters.length_z)
             delta_x = np.minimum(np.abs(sources_loc[:, 1]),
-                                 np.abs(sources_loc[:, 1] -
-                                        self.mesh_parameters.length_x))
+                                 np.abs(sources_loc[:, 1]
+                                        - self.mesh_parameters.length_x))
             cand_dist = (delta_z, delta_x)
 
             if self.dimension == 3:  # 3D
                 delta_y = np.minimum(np.abs(sources_loc[:, 2]),
-                                     np.abs(sources_loc[:, 2] -
-                                            self.mesh_parameters.length_y))
+                                     np.abs(sources_loc[:, 2]
+                                            - self.mesh_parameters.length_y))
                 cand_dist += (delta_y,)
 
             # Minimum distance to the nearest boundary

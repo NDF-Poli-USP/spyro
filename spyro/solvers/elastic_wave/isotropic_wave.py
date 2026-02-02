@@ -178,7 +178,7 @@ class IsotropicWave(ElasticWave):
         print(self.abc_boundary_layer_type)
         # TODO: change name "local "to "nrbc"
         if self.abc_boundary_layer_type is None \
-                or self.abc_boundary_layer_type == "local": 
+                or self.abc_boundary_layer_type == "local":
             isotropic_elastic_without_pml(self)
         elif self.abc_boundary_layer_type == "PML":
             isotropic_elastic_with_pml(self)

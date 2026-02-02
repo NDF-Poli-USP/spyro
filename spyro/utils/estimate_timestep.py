@@ -1,6 +1,6 @@
 import scipy
 import numpy as np
-
+import finat
 import firedrake as fd
 from firedrake import dot, grad
 
@@ -42,8 +42,8 @@ def estimate_timestep(mesh, V, c, estimate_max_eigenvalue=True):
         # absolute maximum of diagonals
         max_eigval = np.amax(np.abs(Lsp.diagonal()))
     else:
-        print(f"Computing exact eigenvalues is extremely "
-              f"computationally demanding!", flush=True)
+        print("Computing exact eigenvalues is extremely "
+              "computationally demanding!", flush=True)
         max_eigval = scipy.sparse.linalg.eigs(
             Ksp, M=Asp, k=1, which="LM", return_eigenvectors=False)[0]
 
