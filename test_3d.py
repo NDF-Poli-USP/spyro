@@ -342,7 +342,7 @@ def test_loop_habc_3d():
 
     # ============ SIMULATION PARAMETERS ============
 
-    case = 0  # Integer from 0 to 2
+    case = 2  # Integer from 0 to 2
 
     # Mesh size in km
     # cpw: cells per wavelength
@@ -519,16 +519,18 @@ def test_loop_habc_3d():
                         print(f"Error Solving: {e}", flush=True)
                         break
 
-                # Renaming the folder if degree_layer is modified
+                # Renaming the folder if degree layer is modified
                 Wave_obj.rename_folder_habc()
     else:
 
-        # Update the layer shape and its degree
+        # Update the layer shape
         Wave_obj.abc_boundary_layer_shape = "hypershape"
-        Wave_obj.abc_deg_layer = 2.0
 
         # Loop for different layer shapes and degrees
         for habc_ref_freq in habc_ref_freq_lst:
+            
+            # Update the degree layer
+            Wave_obj.abc_deg_layer = 2.0
 
             # Reference frequency for sizing the hybrid absorbing layer
             Wave_obj.abc_reference_freq = habc_ref_freq
@@ -540,7 +542,7 @@ def test_loop_habc_3d():
             # Getting the range of the hyperellipse degrees
             get_range_hyp(Wave_obj)
 
-            # Renaming the folder if degree_layer is modified
+            # Renaming the folder if degree layer is modified
             Wave_obj.rename_folder_habc()
 
 
