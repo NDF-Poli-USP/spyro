@@ -44,13 +44,13 @@ def construct_solver_or_matrix_no_pml(Wave_object):
     # -------------------------------------------------------
     m1 = ((1 / (Wave_object.c * Wave_object.c))
           * ((u - 2.0 * u_n + u_nm1) / Constant(dt**2))
-          * v * dx(**quad_rule))
-    a = dot(grad(u_n), grad(v)) * dx(**quad_rule)  # explicit
+          * v * dx(scheme=quad_rule))
+    a = dot(grad(u_n), grad(v)) * dx(scheme=quad_rule)  # explicit
 
     le = 0.0
     q = Wave_object.source_expression
     if q is not None:
-        le += - q * v * dx(**quad_rule)
+        le += - q * v * dx(scheme=quad_rule)
 
     B = fire.Cofunction(V.dual())
 
@@ -62,12 +62,12 @@ def construct_solver_or_matrix_no_pml(Wave_object):
         if Wave_object.abc_boundary_layer_type == "hybrid":
 
             # NRBC
-            le += Wave_object.cosHig * f_abc * ds(**qr_s)
+            le += Wave_object.cosHig * f_abc * ds(scheme=qr_s)
 
             # Damping
             le += Wave_object.eta_mask * weak_expr_abc * \
                 (1 / (Wave_object.c * Wave_object.c)) * \
-                Wave_object.eta_habc * dx(**quad_rule)
+                Wave_object.eta_habc * dx(scheme=quad_rule)
 
         else:
             # Only NRBC
@@ -80,7 +80,7 @@ def construct_solver_or_matrix_no_pml(Wave_object):
 
             # Tuple of boundary ids for NRBC
             where_to_absorb = tuple(where(bnds)[0] + 1)  # ds starts at 1
-            le += f_abc * ds(where_to_absorb, **qr_s)
+            le += f_abc * ds(where_to_absorb, scheme=qr_s)
 
     # form = m1 + a - le
     # Signal for le is + in derivation, see Salas et al (2022)
