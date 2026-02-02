@@ -365,7 +365,7 @@ def test_loop_habc_3d():
                      (1.0, 1.0, 0.5, 0.5)]
 
     # Maximum divisor of the final time
-    max_div_tf_lst = [8]  # Approximate eigenvalue
+    max_div_tf_lst = [8, 8, 8]  # Approximate eigenvalue
 
     # Get simulation parameters
     edge_length = edge_length_lst[case]
