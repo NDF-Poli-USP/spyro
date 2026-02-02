@@ -1,6 +1,5 @@
 import firedrake as fire
 import numpy as np
-import gmsh
 from spyro.solvers.eikonal.eikonal_eq import Eikonal_Modeling
 
 # Work from Ruben Andres Salas, Andre Luis Ferreira da Silva,
