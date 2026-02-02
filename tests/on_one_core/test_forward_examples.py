@@ -30,7 +30,13 @@ def test_camembert_forward():
 
 
 def test_rectangle_forward():
-    Wave_obj = spyro.examples.Rectangle_acoustic()
+    dictionary = {}
+    dictionary["absorving_boundary_conditions"] = {
+        "status": False,
+        "damping_type": None,
+        "pad_length": 0.,
+    }
+    Wave_obj = spyro.examples.Rectangle_acoustic(dictionary=dictionary)
 
     # Check if velocity model is correct
     layer_values = [1.5, 2.0, 2.5, 3.0]

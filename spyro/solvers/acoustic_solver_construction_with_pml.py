@@ -24,7 +24,7 @@ def construct_solver_or_matrix_with_pml(Wave_object):
     solver: Firedrake 'LinearSolver'
         Linear solver for the wave equation with PML
     '''
-    V = self.function_space
+    V = Wave_object.function_space
     Z = fire.VectorFunctionSpace(V.ufl_domain(), V.ufl_element())
     Wave_object.vector_function_space = Z
     if Wave_object.dimension == 2:
