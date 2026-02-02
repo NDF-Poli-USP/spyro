@@ -50,7 +50,7 @@ def construct_solver_or_matrix_no_pml(Wave_object):
     le = 0.0
     q = Wave_object.source_expression
     if q is not None:
-        le += - q * v * dx(scheme=quad_rule)
+        le += - q * v * dx(**quad_rule)
 
     B = fire.Cofunction(V.dual())
 
@@ -62,12 +62,12 @@ def construct_solver_or_matrix_no_pml(Wave_object):
         if Wave_object.abc_boundary_layer_type == "hybrid":
 
             # NRBC
-            le += Wave_object.cosHig * f_abc * ds(scheme=qr_s)
+            le += Wave_object.cosHig * f_abc * ds(**qr_s)
 
             # Damping
             le += Wave_object.eta_mask * weak_expr_abc * \
                 (1 / (Wave_object.c * Wave_object.c)) * \
-                Wave_object.eta_habc * dx(scheme=quad_rule)
+                Wave_object.eta_habc * dx(**quad_rule)
 
         else:
             # Only NRBC
