@@ -1,6 +1,7 @@
 import spyro
 import numpy as np
 import math
+import pytest
 
 
 def error_calc(p_numerical, p_analytical, nt):
@@ -84,6 +85,7 @@ def run_forward(dt):
     return rec_out
 
 
+@pytest.mark.slow
 def test_second_order_time_convergence():
     """Test that the second order time convergence
     of the central difference method is achieved"""

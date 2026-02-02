@@ -78,11 +78,11 @@ class AcousticWave(Wave):
         """
         if misfit is not None:
             self.misfit = misfit
-        if self.real_shot_record is None:
-            warnings.warn("Please load or calculate a real shot record first")
-        if self.current_time == 0.0:
+        elif self.current_time == 0.0:
             self.forward_solve()
             self.misfit = self.real_shot_record - self.forward_solution_receivers
+        else:
+            raise ValueError("Please load or calculate a real shot record first")
         return backward_wave_propagator(self)
 
     def reset_pressure(self):

@@ -3,7 +3,6 @@ import numpy as np
 
 import firedrake as fd
 from firedrake import dot, grad
-import finat
 
 
 def estimate_timestep(mesh, V, c, estimate_max_eigenvalue=True):
