@@ -342,30 +342,30 @@ def test_loop_habc_3d():
 
     # ============ SIMULATION PARAMETERS ============
 
-    case = 1  # Integer from 0 to 2
+    case = 0  # Integer from 0 to 2
 
     # Mesh size in km
     # cpw: cells per wavelength
     # lba = minimum_velocity / source_frequency
     # edge_length = lba / cpw
-    edge_length_lst = [0.150, 0.125]
+    edge_length_lst = [0.125, 0.100, 0.080]
 
     # Timestep size (in seconds). Initial guess: edge_length / 50
-    # dt_usu_lst = [0.0015, 0.0010]  # Exact eigenvalue # 1.845
-    dt_usu_lst = [0.00125, 0.0012]  # Approximate eigenvalue #0.80ms
+    dt_usu_lst = [0.0012, 0.0012, 0.0012]  # Approximate eigenvalue
 
     # Eikonal degree
-    degree_eikonal_lst = [2, 1]
+    degree_eikonal_lst = [1, 2, 1]
+
     # Factor for the stabilizing term in Eikonal equation
-    f_est_lst = [0.04, 0.05]
+    f_est_lst = [0.05, 0.03, 0.05]
 
     # Parameters for fitting equivalent velocity regression
-    fitting_c_lst = [(1.0, 1.0, 0.1, 0.1),
-                     (1.0, 1.0, 0.1, 0.0)]
+    fitting_c_lst = [(1.0, 1.0, 0.1, 0.0),
+                     (1.0, 1.0, 0.5, 0.5),
+                     (1.0, 1.0, 0.5, 0.5)]
 
     # Maximum divisor of the final time
-    # max_div_tf_lst = [5, 7]  # Exact eigenvalue
-    max_div_tf_lst = [8, 8]  # Approximate eigenvalue
+    max_div_tf_lst = [8]  # Approximate eigenvalue
 
     # Get simulation parameters
     edge_length = edge_length_lst[case]
@@ -385,20 +385,21 @@ def test_loop_habc_3d():
     # ============ HABC PARAMETERS ============
 
     # Infinite model (True: Infinite model, False: HABC scheme)
-    get_ref_model = False
+    get_ref_model = True
 
     # Loop for HABC cases
     loop_modeling = not get_ref_model
 
     # Reference frequency
-    habc_ref_freq_lst = ["source"]  # ["source", "boundary"]
+    habc_ref_freq_lst = ["source", "boundary"]
 
     # Type of the hypereshape degree
     degree_type = "real"  # "integer"
 
     # Hyperellipse degrees
-    degree_layer_study = [[2.0],  # [2.8, 3.0, 3.5, 4.0, None],
-                          [2.4, 3.0, 4.0, 4.7, None]]
+    degree_layer_study = [[2.4, 3.0, 4.0, 4.7, None],
+                          [2.0, None],
+                          [2.0, None]]
     degree_layer_lst = degree_layer_study[case]
 
     # Modal solver for fundamental frequency
@@ -539,6 +540,9 @@ def test_loop_habc_3d():
             # Getting the range of the hyperellipse degrees
             get_range_hyp(Wave_obj)
 
+            # Renaming the folder if degree_layer is modified
+            Wave_obj.rename_folder_habc()
+
 
 # Applying HABCs to the model in Fig. 8 of Salas et al. (2022) in 3D
 if __name__ == "__main__":
@@ -551,6 +555,20 @@ if __name__ == "__main__":
 #  0.04 79.409  78.301  89.437  78.665
 #  0.05 82.273* 82.274* 93.810  83.901*
 #  0.06 85.347  86.409  97.935  88.048
+
+# SOU-1st 150m 125m 100m  80m
+# n_min    2.2  2.4  2.2  2.1
+# n_max    4.4  4.7  4.7  4.7
+
+# Data 150m
+# edge_length_lst = [0.150]
+# dt_usu_lst = [0.0015, 0.0010]  # Exact eigenvalue # 1.845
+# dt_usu_lst = [0.00125]  # Approximate eigenvalue
+# degree_eikonal_lst = [2]
+# f_est_lst = [0.04]
+# fitting_c_lst = [(1.0, 1.0, 0.1, 0.1)]
+# max_div_tf_lst = [8]  # Approximate eigenvalue
+# max_div_tf_lst = [5, 7]  # Exact eigenvalue
 
 # SOU-1st 150m 125m 100m  80m
 # n_min    2.2  2.4  2.2  2.1
@@ -599,32 +617,3 @@ if __name__ == "__main__":
 # Maximum Integral Error: 0.36%
 # Maximum Peak Error: 0.44%
 # Acoustic Energy: 2.43e-05
-
-# Optional models
-# edge_length_lst = [0.100, 0.080]
-# dt_usu_lst = [0.0018, 0.0016]
-# degree_eikonal_lst = [2, 1]
-# f_est_lst = [0.03, 0.05]
-
-# N2.8
-# Err(%)     1        2        3        4        5
-# eI     50.19   128.36   127.04    33.81    33.81
-# eP     18.60    50.81    42.68    21.69    21.69
-# Ea  1.19e-05 2.16e-05 5.22e-04 1.77e-04 1.77e-04
-
-# REC
-# Err(%)     1        2        3        4        5
-# eI     11.32     8.59     6.20     2.79     2.79
-# eP     14.06    13.10    11.33     7.47     7.47
-# Ea  1.93e-05 4.60e-05 1.03e-04 1.87e-04 1.87e-04
-
-# N2.8
-# cosHig     Hig     Som
-# eI       66.74   67.19
-# eP       28.22   28.22
-# Ea     7.03e-6 7.18e-6
-
-# Err(%)   2.0    2.8    3.0    3.5    4.0    4.7    6.0    8.0   10.0   20.0   50.0  100.0  200.0    REC
-# eI     30.33  18.66  20.62  21.74  19.47  19.27  19.27  18.28  18.21  17.08  17.07  17.84  17.84  17.49
-# eP     35.57  10.34  11.38  11.40  11.69  12.16  12.31  12.42  12.39  12.42  12.43  12.46  12.47  12.88
-# ele     3030   3720   3848   3924   4110   4188   4200   5844   5910   6562   6582   6900   6912   6912
