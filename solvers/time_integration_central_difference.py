@@ -54,146 +54,147 @@ def central_difference(wave, source_id=0):
         wave.prev_vstate = wave.vstate
         wave.vstate = wave.next_vstate
         
-        if wave.viscoelastic:
-            from .viscoelasticity_functions import (sigma_visco_kelvin, epsilon)
-            if wave.visco_type == 'kelvin_voigt':
-                wave.eps_old = epsilon(wave.vstate)
-                
-            elif wave.visco_type == "zener":    
-                V = wave.function_space
-                dte = wave.tau_epsilon / wave.dt
-                dts = wave.tau_sigma / wave.dt
-                eps_new = epsilon(wave.prev_vstate)
-                dim = V.mesh().topological_dimension()
-                I = Identity(dim)
+        if hasattr(wave, "viscoelastic"):
+            if wave.viscoelastic == True:
+                from .viscoelasticity_functions import (sigma_visco_kelvin, epsilon)
+                if wave.visco_type == 'kelvin_voigt':
+                    wave.eps_old = epsilon(wave.vstate)
+                    
+                elif wave.visco_type == "zener":    
+                    V = wave.function_space
+                    dte = wave.tau_epsilon / wave.dt
+                    dts = wave.tau_sigma / wave.dt
+                    eps_new = epsilon(wave.prev_vstate)
+                    dim = V.mesh().topological_dimension()
+                    I = Identity(dim)
 
-                # Termo elástico implícito (Backward Euler)
-                elastic_part = wave.lmbda * tr(eps_new + dte * (eps_new - wave.eps_old)) * I \
-                    + 2.0 * wave.mu * (eps_new + dte * (eps_new - wave.eps_old))
+                    # Termo elástico implícito (Backward Euler)
+                    elastic_part = wave.lmbda * tr(eps_new + dte * (eps_new - wave.eps_old)) * I \
+                        + 2.0 * wave.mu * (eps_new + dte * (eps_new - wave.eps_old))
 
-                # Atualização da tensão (relaxação implícita)
-                sigma_new = (elastic_part + dts * wave.sigma_old) / (1.0 + dts)
+                    # Atualização da tensão (relaxação implícita)
+                    sigma_new = (elastic_part + dts * wave.sigma_old) / (1.0 + dts)
 
-                # Atualização dos estados internos
-                wave.eps_old.assign(project(eps_new, wave.eps_old.function_space()))
-                wave.sigma_old = (sigma_new)
+                    # Atualização dos estados internos
+                    wave.eps_old.assign(project(eps_new, wave.eps_old.function_space()))
+                    wave.sigma_old = (sigma_new)
 
-            elif wave.visco_type == "gsls":
-                V = wave.function_space
-                W = wave.strain_space
-                eps_new = epsilon(wave.prev_vstate)
-                dim = V.mesh().topological_dimension()
-                I = Identity(dim)
-                n_branches = len(wave.tau_epsilons)
-                lmbda_share = wave.lmbda / n_branches
-                mu_share = wave.mu / n_branches
+                elif wave.visco_type == "gsls":
+                    V = wave.function_space
+                    W = wave.strain_space
+                    eps_new = epsilon(wave.prev_vstate)
+                    dim = V.mesh().topological_dimension()
+                    I = Identity(dim)
+                    n_branches = len(wave.tau_epsilons)
+                    lmbda_share = wave.lmbda / n_branches
+                    mu_share = wave.mu / n_branches
 
-                for i in range(len(wave.tau_epsilons)):
-                    dte = wave.tau_epsilons[i] / wave.dt
-                    dts = wave.tau_sigmas[i] / wave.dt
+                    for i in range(len(wave.tau_epsilons)):
+                        dte = wave.tau_epsilons[i] / wave.dt
+                        dts = wave.tau_sigmas[i] / wave.dt
 
-                    # Background elastic term
-                    elastic_term = lmbda_share * div(wave.prev_vstate) * I + 2 * mu_share * eps_new
+                        # Background elastic term
+                        elastic_term = lmbda_share * div(wave.prev_vstate) * I + 2 * mu_share * eps_new
 
-                    eps_old = wave.eps_old_list[i]
-                    sigma_old = wave.sigma_old_list[i]
+                        eps_old = wave.eps_old_list[i]
+                        sigma_old = wave.sigma_old_list[i]
 
-                    # Elasticidade implícita (Backward Euler)
-                    viscous_term = dte * (eps_new - eps_old)
-                    memory_term = dts * sigma_old
+                        # Elasticidade implícita (Backward Euler)
+                        viscous_term = dte * (eps_new - eps_old)
+                        memory_term = dts * sigma_old
 
-                    sigma_new = (elastic_term + viscous_term + memory_term) / (1.0 + dts)
+                        sigma_new = (elastic_term + viscous_term + memory_term) / (1.0 + dts)
 
-                    # Atualização dos estados internos (forma estável)
-                    # Cria funções temporárias para projetar
-                    sigma_proj = Function(W)
-                    eps_proj = Function(W)
+                        # Atualização dos estados internos (forma estável)
+                        # Cria funções temporárias para projetar
+                        sigma_proj = Function(W)
+                        eps_proj = Function(W)
 
-                    sigma_proj.assign(project(sigma_new, W))
-                    eps_proj.assign(project(eps_new, W))
+                        sigma_proj.assign(project(sigma_new, W))
+                        eps_proj.assign(project(eps_new, W))
 
-                    # Atualiza as memórias
-                    wave.sigma_old_list[i].assign(sigma_proj)
-                    wave.eps_old_list[i].assign(eps_proj)
+                        # Atualiza as memórias
+                        wave.sigma_old_list[i].assign(sigma_proj)
+                        wave.eps_old_list[i].assign(eps_proj)
 
-            elif wave.visco_type == 'maxwell':
-                    sigma_old = wave.sigma_old
-                    eps_old   = wave.eps_old
+                elif wave.visco_type == 'maxwell':
+                        sigma_old = wave.sigma_old
+                        eps_old   = wave.eps_old
+
+                        V = wave.function_space
+                        W = wave.strain_space
+
+                        dt = Constant(wave.dt)
+                        dim = V.mesh().topological_dimension()
+                        I = Identity(dim)
+                        eps = lambda w: 0.5*(grad(w) + grad(w).T)
+                    
+                        # Strains nos tempos n e n+1
+                        eps_n   = project(eps(wave.prev_vstate),   W)  # garantir que está em W
+                        eps_np1 = project(eps(wave.vstate), W)
+                        
+                        lambda_m     = wave.lmbda
+                        mu_m         = wave.mu
+                        tau_eps = wave.tau_epsilon
+                        tau_sig = wave.tau_sigma
+
+                        sigma_old = wave.sigma_old
+                        eps_old   = wave.eps_old
+
+                        tau_e = Constant(tau_eps)
+                        tau_s = Constant(tau_sig)
+
+                        # Ação de C_m em um tensor X: C_m:X = λ_m tr(X) I + 2 μ_m X
+                        def C_m_action(X):
+                            return lambda_m*tr(X)*Identity(dim) + 2.0*mu_m*X
+
+                            # σ^{n+1} = [ σ^n + C_m( ε^{n+1}(1 + dt/τ_e) - ε^n ) ] / (1 + dt/τ_s)
+                        num = sigma_old + C_m_action(eps_np1*(1.0 + dt/tau_e) - eps_n)
+                        sigma_np1 = project(num / (1.0 + dt/tau_s), W)
+
+                        sigma_old.assign(sigma_np1)
+                        eps_old.assign(eps_np1)
+                        
+                elif wave.visco_type == 'maxwell_gsls':
+                    sigma_old_list = wave.sigma_old_list
 
                     V = wave.function_space
                     W = wave.strain_space
 
                     dt = Constant(wave.dt)
+
                     dim = V.mesh().topological_dimension()
                     I = Identity(dim)
-                    eps = lambda w: 0.5*(grad(w) + grad(w).T)
-                
-                    # Strains nos tempos n e n+1
-                    eps_n   = project(eps(wave.prev_vstate),   W)  # garantir que está em W
-                    eps_np1 = project(eps(wave.vstate), W)
-                    
-                    lambda_m     = wave.lmbda
-                    mu_m         = wave.mu
-                    tau_eps = wave.tau_epsilon
-                    tau_sig = wave.tau_sigma
 
-                    sigma_old = wave.sigma_old
-                    eps_old   = wave.eps_old
+                    def eps(w):
+                        return 0.5 * (grad(w) + grad(w).T)
 
-                    tau_e = Constant(tau_eps)
-                    tau_s = Constant(tau_sig)
+                    # taxa de deformação da velocidade em n+1
+                    eps_v_np1 = project(eps(wave.vstate), W)
 
-                    # Ação de C_m em um tensor X: C_m:X = λ_m tr(X) I + 2 μ_m X
-                    def C_m_action(X):
-                        return lambda_m*tr(X)*Identity(dim) + 2.0*mu_m*X
+                    lmbda = wave.lmbda  # λ_l
+                    mu    = wave.mu      # μ_l
+                    tau_sigma_list = wave.tau_sigmas  # τ_σ,l
+                    tau = wave.taus[0]
 
-                        # σ^{n+1} = [ σ^n + C_m( ε^{n+1}(1 + dt/τ_e) - ε^n ) ] / (1 + dt/τ_s)
-                    num = sigma_old + C_m_action(eps_np1*(1.0 + dt/tau_e) - eps_n)
-                    sigma_np1 = project(num / (1.0 + dt/tau_s), W)
+                    for i in range(len(sigma_old_list)):
 
-                    sigma_old.assign(sigma_np1)
-                    eps_old.assign(eps_np1)
-                    
-            elif wave.visco_type == 'maxwell_gsls':
-                sigma_old_list = wave.sigma_old_list
+                        tau_sigma = Constant(tau_sigma_list[i])
 
-                V = wave.function_space
-                W = wave.strain_space
+                        def C_l_action(X):
+                            return lmbda*tau * tr(X) * I + 2.0 * mu *tau* X
 
-                dt = Constant(wave.dt)
+                        num = (
+                            sigma_old_list[i]
+                            - dt/tau_sigma * C_l_action(eps_v_np1)
+                        )
 
-                dim = V.mesh().topological_dimension()
-                I = Identity(dim)
+                        sigma_np1 = project(
+                            num / (1.0 + dt / tau_sigma),
+                            W
+                        )
 
-                def eps(w):
-                    return 0.5 * (grad(w) + grad(w).T)
-
-                # taxa de deformação da velocidade em n+1
-                eps_v_np1 = project(eps(wave.vstate), W)
-
-                lmbda = wave.lmbda  # λ_l
-                mu    = wave.mu      # μ_l
-                tau_sigma_list = wave.tau_sigmas  # τ_σ,l
-                tau = wave.taus[0]
-
-                for i in range(len(sigma_old_list)):
-
-                    tau_sigma = Constant(tau_sigma_list[i])
-
-                    def C_l_action(X):
-                        return lmbda*tau * tr(X) * I + 2.0 * mu *tau* X
-
-                    num = (
-                        sigma_old_list[i]
-                        - dt/tau_sigma * C_l_action(eps_v_np1)
-                    )
-
-                    sigma_np1 = project(
-                        num / (1.0 + dt / tau_sigma),
-                        W
-                    )
-
-                    sigma_old_list[i].assign(sigma_np1)
+                        sigma_old_list[i].assign(sigma_np1)
                 
         usol_recv.append(wave.get_receivers_output())
 
