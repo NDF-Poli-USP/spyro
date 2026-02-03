@@ -342,7 +342,7 @@ def test_loop_habc_3d():
 
     # ============ SIMULATION PARAMETERS ============
 
-    case = 1  # Integer from 0 to 2
+    case = 2  # Integer from 0 to 2
 
     # Mesh size in km
     # cpw: cells per wavelength
