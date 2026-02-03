@@ -223,10 +223,11 @@ class IsotropicWave(ElasticWave):
                 
             elif d["visco_type"] =='maxwell_gsls':
                 self.tau_sigmas = d["tau_sigma_gsls"]
-                self.tau_epsilons = d["tau_epsilon_gsls"]
+                self.taus = d["taus"]
+                #self.tau_epsilons = d["tau_epsilon_gsls"]
                 self.lmbda_s = d["lmbda_s"]
                 self.mu_s = d["mu_s"]
-                num_branches = len(self.tau_epsilons)  # ou len(wave.tau_sigmas)
+                num_branches = len(self.taus)  # ou len(wave.tau_sigmas)
                 
                 self.eps_old_list = [Function(self.strain_space, name=f"Previous strain branch {i}") for i in range(num_branches)]
                 self.eps_np1 = Function(self.strain_space, name="eps_np1")

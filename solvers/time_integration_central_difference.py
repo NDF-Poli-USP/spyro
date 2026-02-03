@@ -54,9 +54,6 @@ def central_difference(wave, source_id=0):
         wave.prev_vstate = wave.vstate
         wave.vstate = wave.next_vstate
         
-        if not hasattr(wave, "viscoelastic"):
-            wave.viscoelastic = False
-            
         if wave.viscoelastic:
             from .viscoelasticity_functions import (sigma_visco_kelvin, epsilon)
             if wave.visco_type == 'kelvin_voigt':
@@ -118,6 +115,7 @@ def central_difference(wave, source_id=0):
                     # Atualiza as memórias
                     wave.sigma_old_list[i].assign(sigma_proj)
                     wave.eps_old_list[i].assign(eps_proj)
+
             elif wave.visco_type == 'maxwell':
                     sigma_old = wave.sigma_old
                     eps_old   = wave.eps_old
@@ -157,49 +155,45 @@ def central_difference(wave, source_id=0):
                     eps_old.assign(eps_np1)
                     
             elif wave.visco_type == 'maxwell_gsls':
-                    sigma_old_list = wave.sigma_old_list
-                    eps_old_list   = wave.eps_old_list
+                sigma_old_list = wave.sigma_old_list
 
-                    V = wave.function_space
-                    W = wave.strain_space
+                V = wave.function_space
+                W = wave.strain_space
 
-                    dt = Constant(wave.dt)
-                    dim = V.mesh().topological_dimension()
-                    I = Identity(dim)
-                    eps = lambda w: 0.5*(grad(w) + grad(w).T)
-                
-                    # Strains nos tempos n e n+1
-                    eps_n   = project(eps(wave.prev_vstate),   W)  # garantir que está em W
-                    eps_np1 = project(eps(wave.vstate), W)
-                
-                    lambda_m     = wave.lmbda_s
-                    mu_m         = wave.mu_s
-                    tau_eps_list = wave.tau_epsilons
-                    tau_sig_list = wave.tau_sigmas
+                dt = Constant(wave.dt)
 
-                    sigma_old_list = wave.sigma_old_list
-                    eps_old_list   = wave.eps_old_list
+                dim = V.mesh().topological_dimension()
+                I = Identity(dim)
 
-                    # Atualização por ramo
-                    for i in range(len(sigma_old_list)):
-                        
-                        tau_e = Constant(tau_eps_list[i])
-                        tau_s = Constant(tau_sig_list[i])
+                def eps(w):
+                    return 0.5 * (grad(w) + grad(w).T)
 
-                        # Ação de C_m em um tensor X: C_m:X = λ_m tr(X) I + 2 μ_m X
-                        def C_m_action(X):
-                            return lambda_m[i]*tr(X)*Identity(dim) + 2.0*mu_m[i]*X
+                # taxa de deformação da velocidade em n+1
+                eps_v_np1 = project(eps(wave.vstate), W)
 
-                        # Fórmula fechada de BE para GSLS:
-                        # σ^{n+1} = [ σ^n + C_m( ε^{n+1}(1 + dt/τ_e) - ε^n ) ] / (1 + dt/τ_s)
-                        num = sigma_old_list[i] + C_m_action(eps_np1*(1.0 + dt/tau_e) - eps_n)
-                        sigma_np1 = project(num / (1.0 + dt/tau_s), W)
+                lmbda = wave.lmbda  # λ_l
+                mu    = wave.mu      # μ_l
+                tau_sigma_list = wave.tau_sigmas  # τ_σ,l
+                tau = wave.taus[0]
 
-                        # Salva σ^{n+1}
-                        sigma_old_list[i].assign(sigma_np1)
+                for i in range(len(sigma_old_list)):
 
-                        # Se você mantém ε_old por ramo, atualize também
-                        eps_old_list[i].assign(eps_np1)
+                    tau_sigma = Constant(tau_sigma_list[i])
+
+                    def C_l_action(X):
+                        return lmbda*tau * tr(X) * I + 2.0 * mu *tau* X
+
+                    num = (
+                        sigma_old_list[i]
+                        - dt/tau_sigma * C_l_action(eps_v_np1)
+                    )
+
+                    sigma_np1 = project(
+                        num / (1.0 + dt / tau_sigma),
+                        W
+                    )
+
+                    sigma_old_list[i].assign(sigma_np1)
                 
         usol_recv.append(wave.get_receivers_output())
 

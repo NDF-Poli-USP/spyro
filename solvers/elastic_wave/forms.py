@@ -2,6 +2,7 @@ from firedrake import *
 from .local_abc import local_abc_form
 
 def isotropic_elastic_without_pml(wave):
+    print("Elastic wave propagation")
     V = wave.function_space
     quad_rule = wave.quadrature_rule
 
@@ -320,17 +321,12 @@ def viscoelastic_maxwell_gsls_without_pml(wave):
 
     # Global parameters
     dt   = Constant(wave.dt)
-    rho  = wave.rho
-    lam  = wave.lmbda
-    mu   = wave.mu
-
+    rho  = Constant(wave.rho)
+    lam  = Constant(wave.lmbda)
+    mu   = Constant(wave.mu)
+    tau = Constant(wave.taus[0])
+    
     # Branch parameters
-    lambda_ms    = wave.lmbda_s      # [λ_m]
-    mu_ms        = wave.mu_s         # [μ_m]
-    tau_eps_list = wave.tau_epsilons # [τ_ε,m]
-    tau_sig_list = wave.tau_sigmas   # [τ_σ,m]
-
-    eps_old_list   = wave.eps_old_list    
     sigma_old_list = wave.sigma_old_list  
 
     dim = V.mesh().topological_dimension()
@@ -342,7 +338,7 @@ def viscoelastic_maxwell_gsls_without_pml(wave):
     F_m = (rho/dt**2) * dot(u - 2*u_n + u_nm1, v) * dx(scheme=quad)
 
     eps_n = eps(u_n)
-    sigma_el_n = lam*tr(eps_n)*I + 2.0*mu*eps_n
+    sigma_el_n = lam*(1 + tau)*tr(eps_n)*I + 2.0*mu*(1 + tau)*eps_n
     F_k_el = inner(sigma_el_n, eps(v)) * dx(scheme=quad)
 
     F_k_mem = 0
@@ -353,7 +349,7 @@ def viscoelastic_maxwell_gsls_without_pml(wave):
     if getattr(wave, "body_forces", None) is not None:
         F_s += dot(wave.body_forces, v) * dx(scheme=quad)
 
-    F_t = local_abc_form(wave)  # if already implemented
+    F_t = local_abc_form(wave) 
 
     # Full weak form and solver
     F = F_m + F_k_el + F_k_mem - F_s - F_t
