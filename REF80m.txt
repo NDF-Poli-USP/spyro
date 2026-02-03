@@ -1,0 +1,63 @@
+
+Mesh Size: 80.000 m
+Timestep Size: 1.200 ms
+Eikonal Degree: 1
+Eikonal Stabilizing Factor: 0.05
+Maximum Divisor of Final Time: 8
+Fitting Parameters for Analytical Solver: 1.0, 1.0, 0.5, 0.5
+
+Parallelism type: automatic
+
+Absorbing Layer Shape: Rectangular
+Creating firedrake_mesh type mesh.
+
+Creating Mesh and Initial Velocity Model
+Original Mesh with 2197 Nodes and 10368 Volume Elements
+Domain Velocity Range (km/s): 1.500 - 3.000
+Getting Boundary Mesh Data from Original Domain
+Boundary Velocity Range (km/s): 1.500 - 3.000
+Setting Mesh Properties for Eikonal Analysis
+
+--------------------------------------------------------------
+Estimating Runtime and Used Memory
+Runtime: (s):6.846, (m):0.114, (h):0.002
+Used Memory: Current (MB):11.921, Peak (MB):17.171
+--------------------------------------------------------------
+
+
+Defining Eikonal BCs
+
+Solving Pre-Eikonal
+  0 SNES Function norm 2.250864305985e-02
+  1 SNES Function norm 8.173544322061e-15
+Solver Executed Successfully. AbsTol: 1.0e-12
+
+Solving Post-Eikonal
+Iteration for Festab: 0.05
+  0 SNES Function norm 1.447799736207e-02
+  1 SNES Function norm 2.544588601630e-03
+  2 SNES Function norm 2.794915608218e-04
+  3 SNES Function norm 7.708648879529e-06
+  4 SNES Function norm 9.440013434356e-09
+  5 SNES Function norm 1.656716525332e-14
+  6 SNES Function norm 2.261990709251e-18
+Solver Executed Successfully. AbsTol: 1.0e-16
+Solver Executed Successfully. Festab: 0.05
+
+Identifying Critical Points on Boundaries
+Min Eikonal on    Xmin Boundary (ms):  83.901 at (in km): (-0.500, 0.000, 0.500)
+Min Eikonal on    Xmax Boundary (ms): 427.504 at (in km): (-0.500, 1.000, 0.500)
+Min Eikonal on  Bottom Boundary (ms): 176.430 at (in km): (-1.000, 0.250, 0.500)
+Min Eikonal on    Ymin Boundary (ms): 174.747 at (in km): (-0.500, 0.250, 0.000)
+Min Eikonal on    Ymax Boundary (ms): 176.439 at (in km): (-0.500, 0.250, 1.000)
+
+--------------------------------------------------------------
+Estimating Runtime and Used Memory
+Runtime: (s):16.465, (m):0.274, (h):0.005
+Used Memory: Current (MB):13.013, Peak (MB):18.978
+--------------------------------------------------------------
+
+
+Checking Timestep Size
+Solver Method: ANALYTICAL
+Estimating Maximum Eigenvalue
