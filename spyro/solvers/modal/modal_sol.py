@@ -1221,8 +1221,7 @@ class Modal_Solver():
             Asp, Msp_inv = \
                 self.assemble_sparse_matrices(a, m, return_M_inv=True)
             Lsp = Msp_inv.multiply(Asp)
-            Lsp -= shift if shift > 0. else 0.
-            max_eigval = np.amax(np.abs(Lsp.diagonal()))
+            max_eigval = np.amax(np.abs(Lsp.diagonal())) - shift
 
         else:
             print("Computing Exact Maximum Eigenvalue", flush=True)
