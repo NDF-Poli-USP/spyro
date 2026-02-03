@@ -348,10 +348,10 @@ def test_loop_habc_3d():
     # cpw: cells per wavelength
     # lba = minimum_velocity / source_frequency
     # edge_length = lba / cpw
-    edge_length_lst = [0.125, 0.100, 0.080]
+    edge_length_lst = [0.125, 0.1000, 0.080]
 
     # Timestep size (in seconds). Initial guess: edge_length / 50
-    dt_usu_lst = [0.0012, 0.0012, 0.0012]  # Approximate eigenvalue
+    dt_usu_lst = [0.0012, 0.001, 0.0008]  # Approximate eigenvalue
 
     # Eikonal degree
     degree_eikonal_lst = [1, 2, 1]
@@ -385,7 +385,7 @@ def test_loop_habc_3d():
     # ============ HABC PARAMETERS ============
 
     # Infinite model (True: Infinite model, False: HABC scheme)
-    get_ref_model = True
+    get_ref_model = False
 
     # Loop for HABC cases
     loop_modeling = not get_ref_model
@@ -399,7 +399,7 @@ def test_loop_habc_3d():
     # Hyperellipse degrees
     degree_layer_study = [[2.4, 3.0, 4.0, 4.7, None],
                           [2.0, None],
-                          [2.0, None]]
+                          [2.1, 2.5, 3.0, 3.5, None]]
     degree_layer_lst = degree_layer_study[case]
 
     # Modal solver for fundamental frequency
@@ -558,9 +558,13 @@ if __name__ == "__main__":
 #  0.05 82.273* 82.274* 93.810  83.901*
 #  0.06 85.347  86.409  97.935  88.048
 
-# SOU-1st 150m 125m 100m  80m
-# n_min    2.2  2.4  2.2  2.1
-# n_max    4.4  4.7  4.7  4.7
+# SOU-1st 125m 100m  80m
+# n_min    2.4  2.2  2.1
+# n_max    4.7  4.7  4.7
+
+# BND-1st 125m 100m  80m
+# n_min              2.0
+# n_max              3.5
 
 # Data 150m
 # edge_length_lst = [0.150]

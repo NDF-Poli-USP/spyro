@@ -20,8 +20,8 @@ Setting Mesh Properties for Eikonal Analysis
 
 --------------------------------------------------------------
 Estimating Runtime and Used Memory
-Runtime: (s):6.846, (m):0.114, (h):0.002
-Used Memory: Current (MB):11.921, Peak (MB):17.171
+Runtime: (s):6.961, (m):0.116, (h):0.002
+Used Memory: Current (MB):11.910, Peak (MB):17.158
 --------------------------------------------------------------
 
 
@@ -53,11 +53,196 @@ Min Eikonal on    Ymax Boundary (ms): 176.439 at (in km): (-0.500, 0.250, 1.000)
 
 --------------------------------------------------------------
 Estimating Runtime and Used Memory
-Runtime: (s):16.465, (m):0.274, (h):0.005
-Used Memory: Current (MB):13.013, Peak (MB):18.978
+Runtime: (s):16.416, (m):0.274, (h):0.005
+Used Memory: Current (MB):13.012, Peak (MB):18.976
 --------------------------------------------------------------
 
 
 Checking Timestep Size
 Solver Method: ANALYTICAL
 Estimating Maximum Eigenvalue
+Maximum Stable Timestep Should Be Approximately (ms): 2.657
+Selected Timestep Size (8 of 28): 0.800 ms
+
+
+Building Infinite Domain Model
+Infinite Domain Extension (km): 2.1667
+
+Generating Mesh for Infinite Model
+Mesh Created with 164775 Nodes and 933888 Volume Elements
+Extended Rectangular Mesh Generated Successfully
+Mesh Generated Successfully
+
+Updating Velocity Profile
+Clipping Coordinates Inside Layer
+Extending Profile Inside Layer
+Using Cloud Points Method to Extend Velocity Profile
+
+Solving Infinite Model
+
+Solving Forward Problem
+Saving Pressure in: output/forward/fw_output_3dsn[0].pvd
+Saving acoustic_energy in: output/preamble/acoustic_pot_energy_3d
+Simulation time is:        0.0 seconds
+Simulation time is:       0.08 seconds
+Simulation time is:       0.16 seconds
+Simulation time is:       0.24 seconds
+Simulation time is:       0.32 seconds
+Simulation time is:        0.4 seconds
+Simulation time is:       0.48 seconds
+Simulation time is:       0.56 seconds
+Simulation time is:       0.64 seconds
+Simulation time is:       0.72 seconds
+Simulation time is:        0.8 seconds
+Simulation time is:       0.88 seconds
+Simulation time is:       0.96 seconds
+Simulation time is:       1.04 seconds
+Simulation time is:       1.12 seconds
+Simulation time is:        1.2 seconds
+Simulation time is:       1.28 seconds
+Simulation time is:       1.36 seconds
+Simulation time is:       1.44 seconds
+Simulation time is:        1.5 seconds
+
+Saving Reference Output
+
+--------------------------------------------------------------
+Estimating Runtime and Used Memory
+Runtime: (s):4534.967, (m):75.583, (h):1.260
+Used Memory: Current (GB):3.094, Peak (GB):3.446
+--------------------------------------------------------------
+
+HABC Reference Frequency: Source
+
+Type of the Hypereshape Degree: real
+
+Absorbing Layer Shape: Hypershape - Degree: 2.0
+
+Loading Reference Signal from Infinite Model
+
+Determining Reference Frequency
+Reference Frequency (Hz): 5.00000
+
+Computing Size for Absorbing Layer
+Parameter z (1/s): 11.9188, Parameter a (adim): 2.3838
+Minimum Mesh Length (km): 0.0833, Reference Length (km): 0.2500
+Initial Guess for Size Parameter: 0.1667
+Options for FL: [1.8274, 2.5568, 2.8423, 3.9384, 4.0465]
+Options for CR: [0.0960, 0.0514, 0.0420, 0.0223, 0.0212]
+Options for Layer Size (km): [0.4568, 0.6392, 0.7106, 0.9846, 1.0116]
+Aprox. Number of Elements (0.083 km) in Layer: [5, 7, 8, 11, 12]
+Selected Parameter Size FL: 1.8274
+Selected Layer Size (km): 0.4568
+
+Modifying Layer Size Based on the Element Size
+Modified Parameter Size FL: 2.0000
+Modified Layer Size (km): 0.5000
+Elements (0.083 km) in Layer: 6
+Normalized Element Size (adim): 0.16667
+
+Determining New Geometry with Absorbing Layer
+Determining Hypershape Layer Parameters
+Checking Current Hypershape Degree n_hyp: 2.0
+Semi-axes (km): a_hyp:1.000 - b_hyp:1.000 - c_hyp:1.000
+Determining the Minimum Degree for Hypershape Layer
+ParHypEll - r: 1.021 - n: 2.0
+ParHypEll - r: 0.595 - n: 3.0
+ParHypEll - r: 0.967 - n: 2.1
+'Harm' Superness. r: 0.967 - n: 2.1
+'Geom' Superness. r: 0.967 - n: 2.1
+'Arit' Superness. r: 0.967 - n: 2.1
+Hyperellipsoid Parameters. r_min: 0.967 - n_min: 2.1
+Superness Coordinates (km): (0.583, 0.583, 0.583)
+Minimum Degree for Hypershape n_min: 2.1
+Determining the Maximum Degree for Hypershape Layer
+ParHypEll - r: 1.866 - n: 2.0
+ParHypEll - r: 1.472 - n: 3.0
+ParHypEll - r: 1.161 - n: 4.0
+ParHypEll - r: 0.915 - n: 5.0
+ParHypEll - r: 1.133 - n: 4.1
+ParHypEll - r: 1.107 - n: 4.2
+ParHypEll - r: 1.081 - n: 4.3
+ParHypEll - r: 1.056 - n: 4.4
+ParHypEll - r: 1.031 - n: 4.5
+ParHypEll - r: 1.007 - n: 4.6
+ParHypEll - r: 0.983 - n: 4.7
+'Harm' Superness. r: 0.983 - n: 4.7
+'Geom' Superness. r: 0.983 - n: 4.7
+'Arit' Superness. r: 0.983 - n: 4.7
+Hyperellipsoid Parameters. r_max: 0.983 - n_max: 4.7
+Superness Coordinates (km): (0.789, 0.789, 0.789)
+Maximum Degree for Hypershape n_max: 4.7
+Low Degree for Hypershape Layer. Setting to n_min: 2.1
+Volume Ratio: 3.680
+Output Folder for Results Will Be Renamed.
+Folder '/mnt/c/Users/RCGI/Documents/spyro/output/HN2.0_SOU/' Successfully Renamed to '/mnt/c/Users/RCGI/Documents/spyro/output/HN2.1_SOU/'.
+HABC Reference Frequency: Boundary
+
+Type of the Hypereshape Degree: real
+
+Absorbing Layer Shape: Hypershape - Degree: 2.0
+
+Loading Reference Signal from Infinite Model
+
+Determining Reference Frequency
+Frequency at Critical Point  0: 2.84353
+Frequency at Critical Point  1: 3.55442
+Frequency at Critical Point  2: 4.08758
+Frequency at Critical Point  3: 3.55442
+Frequency at Critical Point  4: 3.02126
+Frequency at Critical Point  5: 2.75467
+Frequency at Critical Point  6: 2.66581
+Frequency at Critical Point  7: 3.37670
+Frequency at Critical Point  8: 3.02126
+Frequency at Critical Point  9: 2.75467
+Frequency at Critical Point 10: 2.66581
+Frequency at Critical Point 11: 3.37670
+Frequency at Critical Point 12: 3.02126
+Reference Frequency (Hz): 2.66581
+
+Computing Size for Absorbing Layer
+Parameter z (1/s): 11.9188, Parameter a (adim): 4.4710
+Minimum Mesh Length (km): 0.0833, Reference Length (km): 0.2500
+Initial Guess for Size Parameter: 0.1667
+Options for FL: [3.4274, 4.7955, 5.3309, 5.3310, 7.3869]
+Options for CR: [0.0960, 0.0514, 0.0420, 0.0420, 0.0223]
+Options for Layer Size (km): [0.8569, 1.1989, 1.3327, 1.3328, 1.8467]
+Aprox. Number of Elements (0.083 km) in Layer: [10, 14, 15, 15, 22]
+Selected Parameter Size FL: 3.4274
+Selected Layer Size (km): 0.8569
+
+Modifying Layer Size Based on the Element Size
+Modified Parameter Size FL: 3.6667
+Modified Layer Size (km): 0.9167
+Elements (0.083 km) in Layer: 11
+Normalized Element Size (adim): 0.09091
+
+Determining New Geometry with Absorbing Layer
+Determining Hypershape Layer Parameters
+Checking Current Hypershape Degree n_hyp: 2.0
+Semi-axes (km): a_hyp:1.417 - b_hyp:1.417 - c_hyp:1.417
+Determining the Minimum Degree for Hypershape Layer
+ParHypEll - r: 0.509 - n: 2.0
+'Harm' Superness. r: 0.509 - n: 2.0
+'Geom' Superness. r: 0.509 - n: 2.0
+'Arit' Superness. r: 0.509 - n: 2.0
+Hyperellipsoid Parameters. r_min: 0.509 - n_min: 2.0
+Superness Coordinates (km): (0.583, 0.583, 0.583)
+Minimum Degree for Hypershape n_min: 2.0
+Determining the Maximum Degree for Hypershape Layer
+ParHypEll - r: 1.583 - n: 2.0
+ParHypEll - r: 1.150 - n: 3.0
+ParHypEll - r: 0.836 - n: 4.0
+ParHypEll - r: 1.114 - n: 3.1
+ParHypEll - r: 1.079 - n: 3.2
+ParHypEll - r: 1.045 - n: 3.3
+ParHypEll - r: 1.012 - n: 3.4
+ParHypEll - r: 0.981 - n: 3.5
+'Harm' Superness. r: 0.981 - n: 3.5
+'Geom' Superness. r: 0.981 - n: 3.5
+'Arit' Superness. r: 0.981 - n: 3.5
+Hyperellipsoid Parameters. r_max: 0.981 - n_max: 3.5
+Superness Coordinates (km): (1.029, 1.029, 1.029)
+Maximum Degree for Hypershape n_max: 3.5
+Current Hypershape Degree n_hyp: 2.0
+Volume Ratio: 8.976
