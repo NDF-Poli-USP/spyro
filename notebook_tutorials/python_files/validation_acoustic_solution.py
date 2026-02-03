@@ -52,6 +52,10 @@ vtk = VTKFile(os.path.join(outdir, "solution_acoustic_wave.pvd"))
 # Source:
 frequency = 6
 c = Constant(1.5)
+x, y = SpatialCoordinate(mesh)
+source = Constant([2.0, 2.0])
+ricker = Constant(0.0)
+ricker.assign(ricker_wavelet(time, frequency))
 
 def ricker_wavelet(time, frequency, amplitude=1.0):
     shifted_time = time - 1.0 / frequency
@@ -82,11 +86,6 @@ dxlump=dx(scheme=quadrature_rule)
 m = (u - 2.0 * u_n + u_nm1) / Constant(dt * dt) * v * dxlump
 
 a = c*c*dot(grad(u_n), grad(v)) * dx
-
-x, y = SpatialCoordinate(mesh)
-source = Constant([2.0, 2.0])
-ricker = Constant(0.0)
-ricker.assign(ricker_wavelet(time, frequency))
 
 R = Cofunction(V.dual())
 
