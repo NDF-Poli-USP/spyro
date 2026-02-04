@@ -5,14 +5,33 @@ import matplotlib.pyplot as plt
 from collections import defaultdict
 import csv
 
+
 def mms_h_convergence(dt, h):
-    u1 = lambda x, t: (x[0]**2 + x[0])*(x[1]**2 - x[1])*t
-    u2 = lambda x, t: (2*x[0]**2 + 2*x[0])*(-x[1]**2 + x[1])*t
+    u1 = lambda x, t: (
+        -t * (
+            (4*x[0]**3 + 3*x[0]**2) / 6.0 * x[1] * (x[1] - 1)
+            + (x[1]**3 * (x[1] - 1)) / 6.0 * (2*x[0] + 1)
+        )
+    )
+
+    u2 = lambda x, t: (
+        -t * (
+            (x[0]**3 * (x[0] + 1)) / 6.0 * (2*x[1] - 1)
+            + (4*x[1]**3 - 3*x[1]**2) / 6.0 * x[0] * (x[0] + 1)
+        )
+    )
+
     u = lambda x, t: fire.as_vector([u1(x, t), u2(x, t)])
 
-    b1 = lambda x, t: -(2*x[0]**2 + 6*x[1]**2 - 16*x[0]*x[1] + 10*x[0] - 14*x[1] + 4)*t
-    b2 = lambda x, t: -(-12*x[0]**2 - 4*x[1]**2 + 8*x[0]*x[1] - 16*x[0] + 8*x[1] - 2)*t
-    b = lambda x, t: fire.as_vector([b1(x, t), b2(x, t)])
+    # Corresponding MMS pressure (for verification)
+    p = lambda x, t: x[0]*(x[0]+1)*x[1]*(x[1]-1)*t
+
+    # Elastic MMS body force (μ = 0):
+    # f = rho * u_tt + grad(p)
+    # u_tt = 0 because u ∝ t → only grad(p) remains
+    b1 = lambda x, t: (2*x[0] + 1) * x[1] * (x[1] - 1) * t
+    b2 = lambda x, t: (2*x[1] - 1) * x[0] * (x[0] + 1) * t
+    b  = lambda x, t: fire.as_vector([b1(x, t), b2(x, t)])
 
     fo = int(0.1/dt)
 
@@ -76,21 +95,26 @@ def mms_h_convergence(dt, h):
     wave.set_mesh(input_mesh_parameters={"edge_length": h})
     # Lets build de matrix operator outside of the forward solve so we can
     # set previous timesteps for the MMS problem
-    wave._initialize_model_parameters()
-    wave.matrix_building()
+    # wave._initialize_model_parameters()
+    # wave.matrix_building()
     x = wave.get_spatial_coordinates()
     # wave.u_nm1.interpolate(u(x, 0.0 - 2*dt))
     # wave.u_n.interpolate(u(x, 0.0 - dt))
     # wave.u_nm2.interpolate(u(x, 0.0 - 2*dt))
 
-    wave.forward_solve(build_matrix_operator=False)
+    wave.forward_solve()
 
     u_an = fire.Function(wave.function_space)
     t = wave.current_time
     u_an.interpolate(u(x, t))
 
-    e1 = fire.errornorm(wave.u_n.sub(0), u_an.sub(0)) / fire.norm(u_an.sub(0))
-    e2 = fire.errornorm(wave.u_n.sub(1), u_an.sub(1)) / fire.norm(u_an.sub(1))
+    V  = wave.function_space.sub(0)
+    p_num = fire.project(fire.div(wave.u_n), V)
+
+    p_an  = fire.Function(wave.function_space.sub(0)).interpolate(p(x, t))
+
+    err_p = fire.errornorm(p_num, p_an) / fire.norm(p_an)
+    print("Recovered pressure MMS error:", err_p)
 
     if e1 > 1e3 or e2 > 1e3:
         raise ValueError("ERROR")
