@@ -171,7 +171,7 @@ class HABC_Wave(AcousticWave, HABC_Mesh, RectangLayer,
         AcousticWave.__init__(self, dictionary=dictionary, comm=comm)
 
         # Nyquist frequency
-        self.f_Nyq = 1.0 / (2.0 * self.dt)
+        self.f_Nyq = 1. / (2. * self.dt)
 
         # Original domain dimensions
         dom_dim = self.habc_domain_dimensions(only_orig_dom=True)
@@ -957,12 +957,16 @@ class HABC_Wave(AcousticWave, HABC_Mesh, RectangLayer,
         # Set the timestep size
         dt = max_dt if set_max_dt else min(usr_dt, max_dt)
         self.set_dt(dt)
+        dt_ms = 1e3 * self.dt
         if set_max_dt:
-            str_dt = "Selected Timestep Size ({} of {}): {:.{p}f} ms\n".format(
-                min(max_divisor_tf, n_div), n_div, 1e3 * self.dt, p=mag_add)
+            str_dt = "Selected Timestep Size ({} of {}): {:.{p}f} ms".format(
+                min(max_divisor_tf, n_div), n_div, dt_ms, p=mag_add)
         else:
-            str_dt = "Selected Timestep Size: {:.{p}f} ms\n".format(
-                1e3 * self.dt, p=mag_add)
+            str_dt = "Selected Timestep Size: {:.{p}f} ms".format(dt_ms,
+                                                                  p=mag_add)
+
+        # Updating Nyquist frequency
+        self.f_Nyq = 1. / (2. * self.dt)
 
         print(str_dt, flush=True)
 
@@ -1138,7 +1142,7 @@ class HABC_Wave(AcousticWave, HABC_Mesh, RectangLayer,
 
                 rename(old, new)  # Rename the directory
                 print(f"Folder '{old}' Successfully"
-                      f" Renamed to '{new}'.", flush=True)
+                      f" Renamed to '{new}'\n", flush=True)
 
             except OSError as e:
                 print(f"Error Renaming Folder: {e}", flush=True)

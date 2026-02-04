@@ -229,7 +229,7 @@ def get_xCR_usu(Wave_obj, dat_regr_xCR, typ_xCR, n_pts):
         return xCR_opt
 
 
-def get_range_hyp(Wave_obj):
+def get_range_hyp(Wave_obj, n_root=1):
     '''
     Determine the range of the hyperellipse degree for the absorbing layer.
 
@@ -237,6 +237,8 @@ def get_range_hyp(Wave_obj):
     ----------
     Wave_obj : `habc.HABC_Wave`
         An instance of the HABC_Wave class
+    n_root : `int`, optional
+        n-th Root selected as the size of the absorbing layer. Default is 1
 
     Returns
     -------
@@ -250,10 +252,10 @@ def get_range_hyp(Wave_obj):
     Wave_obj.get_reference_signal()
 
     # Determining layer size
-    Wave_obj.size_habc_criterion(n_root=1)
+    Wave_obj.size_habc_criterion(n_root=n_root)
 
 
-def habc_fig8(Wave_obj, modal_solver, fitting_c, dat_regr_xCR,
+def habc_fig8(Wave_obj, modal_solver, fitting_c, dat_regr_xCR, n_root=1,
               xCR_usu=None, plot_comparison=True, max_divisor_tf=1):
     '''
     Apply the HABC to the model 3D based on Fig. 8 of Salas et al. (2022)
@@ -283,6 +285,8 @@ def habc_fig8(Wave_obj, modal_solver, fitting_c, dat_regr_xCR,
           * 'err_difference' : Difference between integral and peak errors
           * 'err_integral' : Minimum integral error
           * 'err_sum' : Sum of integral and peak errors
+    n_root : `int`, optional
+        n-th Root selected as the size of the absorbing layer. Default is 1
     xCR_usu : `float`, optional
         User-defined heuristic factor for the minimum damping ratio.
         Default is None, which defines an estimated value
@@ -303,7 +307,7 @@ def habc_fig8(Wave_obj, modal_solver, fitting_c, dat_regr_xCR,
     '''
 
     # Check hyperellipse degree
-    get_range_hyp(Wave_obj)
+    get_range_hyp(Wave_obj, n_root=n_root)
 
     # Creating mesh with absorbing layer
     Wave_obj.create_mesh_habc()
@@ -342,30 +346,31 @@ def test_loop_habc_3d():
 
     # ============ SIMULATION PARAMETERS ============
 
-    case = 2  # Integer from 0 to 2
+    case = 3  # Integer from 0 to 3
 
     # Mesh size in km
     # cpw: cells per wavelength
     # lba = minimum_velocity / source_frequency
     # edge_length = lba / cpw
-    edge_length_lst = [0.125, 0.1000, 0.080]
+    edge_length_lst = [0.150, 0.125, 0.100, 0.080]
 
     # Timestep size (in seconds). Initial guess: edge_length / 50
-    dt_usu_lst = [0.0012, 0.001, 0.0008]  # Approximate eigenvalue
+    dt_usu_lst = [0.00150, 0.00125, 0.00100, 0.00075]  # Approximate eigenvalue
 
     # Eikonal degree
-    degree_eikonal_lst = [1, 2, 1]
+    degree_eikonal_lst = [2, 1, 2, 1]
 
     # Factor for the stabilizing term in Eikonal equation
-    f_est_lst = [0.05, 0.03, 0.05]
+    f_est_lst = [0.05, 0.05, 0.03, 0.05]
 
     # Parameters for fitting equivalent velocity regression
-    fitting_c_lst = [(1.0, 1.0, 0.1, 0.0),
+    fitting_c_lst = [(1.0, 1.0, 0.1, 0.1),
+                     (1.0, 1.0, 0.1, 0.0),
                      (1.0, 1.0, 0.5, 0.5),
                      (1.0, 1.0, 0.5, 0.5)]
 
     # Maximum divisor of the final time
-    max_div_tf_lst = [8, 8, 8]  # Approximate eigenvalue
+    max_div_tf_lst = [7, 7, 8, 9]  # Approximate eigenvalue
 
     # Get simulation parameters
     edge_length = edge_length_lst[case]
@@ -390,16 +395,20 @@ def test_loop_habc_3d():
     # Loop for HABC cases
     loop_modeling = not get_ref_model
 
+    # n-th Root criterion for the size of the absorbing layer
+    n_root = 1
+
     # Reference frequency
-    habc_ref_freq_lst = ["source", "boundary"]
+    habc_ref_freq_lst = ["boundary"]  # ["source", "boundary"]
 
     # Type of the hypereshape degree
     degree_type = "real"  # "integer"
 
     # Hyperellipse degrees
-    degree_layer_study = [[2.4, 3.0, 4.0, 4.7, None],
-                          [2.0, None],
-                          [2.1, 2.5, 3.0, 3.5, None]]
+    degree_layer_study = [[2.2, 2.8, 3.4, 3.9, None],
+                          [2.4, 3.0, 3.6, 4.2, None],
+                          [2.2, 2.8, 3.6, 4.2, None],
+                          [None]]  # [2.1, 2.8, 3.6, 4.3, None]]
     degree_layer_lst = degree_layer_study[case]
 
     # Modal solver for fundamental frequency
@@ -409,7 +418,7 @@ def test_loop_habc_3d():
     crit_opt = "err_sum"  # err_integral, err_peak
 
     # Number of points for regression (odd number)
-    n_pts = 3
+    n_pts = 1
 
     # ============ MESH AND EIKONAL ============
 
@@ -496,7 +505,7 @@ def test_loop_habc_3d():
                         # Run the HABC scheme
                         plot_comparison = True if itr_xCR == n_pts else False
                         habc_fig8(Wave_obj, modal_solver, fitting_c,
-                                  dat_regr_xCR, xCR_usu=xCR_usu,
+                                  dat_regr_xCR, n_root=n_root, xCR_usu=xCR_usu,
                                   plot_comparison=plot_comparison,
                                   max_divisor_tf=max_div_tf)
 
@@ -528,9 +537,9 @@ def test_loop_habc_3d():
 
         # Loop for different layer shapes and degrees
         for habc_ref_freq in habc_ref_freq_lst:
-            
+
             # Update the degree layer
-            Wave_obj.abc_deg_layer = 2.0
+            Wave_obj.abc_deg_layer = 2.
 
             # Reference frequency for sizing the hybrid absorbing layer
             Wave_obj.abc_reference_freq = habc_ref_freq
@@ -540,7 +549,7 @@ def test_loop_habc_3d():
             print(degr_str.format(degree_type), flush=True)
 
             # Getting the range of the hyperellipse degrees
-            get_range_hyp(Wave_obj)
+            get_range_hyp(Wave_obj, n_root=n_root)
 
             # Renaming the folder if degree layer is modified
             Wave_obj.rename_folder_habc()
@@ -558,28 +567,15 @@ if __name__ == "__main__":
 #  0.05 82.273* 82.274* 93.810  83.901*
 #  0.06 85.347  86.409  97.935  88.048
 
-# SOU-1st 125m 100m  80m
-# n_min    2.4  2.2  2.1
-# n_max    4.7  4.7  4.7
-
-# BND-1st 125m 100m  80m
-# n_min              2.0
-# n_max              3.5
-
-# Data 150m
-# edge_length_lst = [0.150]
-# dt_usu_lst = [0.0015, 0.0010]  # Exact eigenvalue # 1.845
-# dt_usu_lst = [0.00125]  # Approximate eigenvalue
-# degree_eikonal_lst = [2]
-# f_est_lst = [0.04]
-# fitting_c_lst = [(1.0, 1.0, 0.1, 0.1)]
-# max_div_tf_lst = [8]  # Approximate eigenvalue
-# max_div_tf_lst = [5, 7]  # Exact eigenvalue
-
-# SOU-1st 150m 125m 100m  80m
+# SOU-1st 100m 125m 100m  80m
 # n_min    2.2  2.4  2.2  2.1
 # n_max    4.4  4.7  4.7  4.7
 
+# BND-1st 100m 125m 100m  80m
+# n_min    2.0  2.0  2.0  2.0
+# n_max    3.9  4.2  4.2  4.3
+
+# Old Data 150m
 # SOU-2st 150m 125m 100m  80m
 # n_min    2.0  2.0
 # n_max    3.9  3.8

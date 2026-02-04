@@ -889,7 +889,7 @@ class HABC_Mesh():
 
         # Evaluate hyperellipsoid equation
         x, y, z = pnt
-        in_hyp = abs(x / a) ** n + abs(y / b) ** n + abs(z / c) ** n <= 1.
+        in_hyp = abs(x / a) ** n + abs(y / b) ** n + abs(z / c) ** n <= 1.1
 
         return in_hyp
 
