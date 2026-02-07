@@ -6,12 +6,16 @@ fire.parameters["loopy"] = {"silenced_warnings": ["v1_scheduler_fallback"]}
 warnings.filterwarnings("ignore", category=RuntimeWarning)
 
 
-def wave_dict(degree_type, habc_ref_freq):
+def wave_dict(layer_shape, degree_layer, degree_type, habc_ref_freq):
     '''
     Create a dictionary with parameters for the model
 
     Parameters
     ----------
+    layer_shape : `str`
+        Shape of the absorbing layer, either 'rectangular' or 'hypershape'
+    degree_layer : `int` or `None`
+        Degree of the hypershape layer, if applicable. If None, it is not used
     degree_type : `str`
         Type of the hypereshape degree. Options: 'real' or 'integer'
     habc_ref_freq : `str`
@@ -26,7 +30,7 @@ def wave_dict(degree_type, habc_ref_freq):
     dictionary = {}
     dictionary["options"] = {
         # Simplexes: triangles or tetrahedra (T) or quadrilaterals (Q)
-        "cell_type": "T",
+        "cell_type": "T",  # "Q",
         "variant": "lumped",  # Options: lumped, equispaced or DG.
         # Default is lumped "method":"MLT"
         # (MLT/spectral_quadrilateral/DG_triangle/DG_quadrilateral)
@@ -80,8 +84,8 @@ def wave_dict(degree_type, habc_ref_freq):
     dictionary["absorving_boundary_conditions"] = {
         "status": True,  # Activate ABCs
         "damping_type": "hybrid",  # Activate HABC
-        "layer_shape": "rectangular",  # Options: rectangular or hypershape
-        "degree_layer": None,  # Float >= 2 (hyp) or None (rec)
+        "layer_shape": layer_shape,  # Options: rectangular or hypershape
+        "degree_layer": degree_layer,  # Float >= 2 (hyp) or None (rec)
         "degree_type": degree_type,  # Options: real or integer
         "habc_reference_freq": habc_ref_freq,  # Options: source or boundary
         "degree_eikonal": 2,  # Finite element order for the Eikonal analysis
@@ -158,7 +162,7 @@ def preamble_modal(dictionary, edge_length, f_est):
     return Wave_obj
 
 
-def get_range_hyp(Wave_obj):
+def get_range_hyp(Wave_obj, n_root=1):
     '''
     Determine the range of the hyperellipse degree for the absorbing layer.
 
@@ -166,6 +170,8 @@ def get_range_hyp(Wave_obj):
     ----------
     Wave_obj : `habc.HABC_Wave`
         An instance of the HABC_Wave class
+    n_root : `int`, optional
+        n-th Root selected as the size of the absorbing layer. Default is 1
 
     Returns
     -------
@@ -176,10 +182,10 @@ def get_range_hyp(Wave_obj):
     Wave_obj.identify_habc_case()
 
     # Determining layer size
-    Wave_obj.size_habc_criterion(n_root=1)
+    Wave_obj.size_habc_criterion(n_root=n_root)
 
 
-def modal_fig8(Wave_obj, modal_solver_lst, fitting_c):
+def modal_fig8(Wave_obj, modal_solver_lst, fitting_c, n_root=1):
     '''
     Apply the HABC to the model in Fig. 8 of Salas et al. (2022).
 
@@ -199,6 +205,8 @@ def modal_fig8(Wave_obj, modal_solver_lst, fitting_c):
         - fc2: Monotonicity
         - fp1: Rectangle frequency
         - fp2: Ellipse frequency
+    n_root : `int`, optional
+        n-th Root selected as the size of the absorbing layer. Default is 1
 
     Returns
     -------
@@ -206,7 +214,7 @@ def modal_fig8(Wave_obj, modal_solver_lst, fitting_c):
     '''
 
     # Check hyperellipse degree
-    get_range_hyp(Wave_obj)
+    get_range_hyp(Wave_obj, n_root=n_root)
 
     # Creating mesh with absorbing layer
     Wave_obj.create_mesh_habc()
@@ -271,6 +279,9 @@ def test_loop_modal_2d():
     # Loop for HABC cases (True: Modal analysis, False: Hyperellipse degree)
     loop_modeling = True
 
+    # n-th Root criterion for the size of the absorbing layer
+    n_root = 1
+
     # Reference frequency
     habc_ref_freq = "source"  # "boundary"
 
@@ -278,12 +289,12 @@ def test_loop_modal_2d():
     degree_type = "real"  # "integer"
 
     # Hyperellipse degrees
-    degree_layer_lst = [2.0, 3.0, 4.0, 4.4, None]
+    degree_layer_lst = [2.0]  # [2.0, 3.0, 4.0, 4.4, None]
 
     # ============ MESH AND EIKONAL ============
 
     # Create dictionary with parameters for the model
-    dictionary = wave_dict(degree_type, habc_ref_freq)
+    dictionary = wave_dict("rectangular", None, degree_type, habc_ref_freq)
 
     # Creating mesh and performing eikonal analysis
     Wave_obj = preamble_modal(dictionary, edge_length, f_est)
@@ -327,13 +338,17 @@ def test_loop_modal_2d():
 
     else:
 
-        # Update the reference frequency, the layer shape and its degree
-        Wave_obj.abc_reference_freq = habc_ref_freq
+        # Update the layer shape
         Wave_obj.abc_boundary_layer_shape = "hypershape"
+
+        # Update the degree layer
         Wave_obj.abc_deg_layer = 2.
 
         # Getting the range of the hyperellipse degrees
-        get_range_hyp(Wave_obj)
+        get_range_hyp(Wave_obj, n_root=n_root)
+
+        # Renaming the folder if degree layer is modified
+        Wave_obj.rename_folder_habc()
 
 
 # Applying HABCs to the model in Fig. 8 of Salas et al. (2022)

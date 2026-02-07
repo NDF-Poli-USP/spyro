@@ -118,7 +118,6 @@ class AutomaticMesh:
         self.abc_pad = mesh_parameters.abc_pad_length
 
         # Firedrake mesh only parameters
-
         self.periodic = mesh_parameters.periodic
 
         # SeismicMesh only parameters

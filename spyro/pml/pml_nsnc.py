@@ -409,7 +409,7 @@ class PML_Wave(AcousticWave, HABC_Mesh, RectangLayer, HABC_Error):
         # Geometric properties of the rectangular layer
         self.calc_rec_geom_prop(dom_lay_full, self.pad_len)
 
-    def create_mesh_pml(self, inf_model=False, spln=True, fmesh=1.):
+    def create_mesh_pml(self, inf_model=False, spln=True):
         '''
         Create a mesh with absorbing layer based on the determined size.
 
@@ -421,9 +421,6 @@ class PML_Wave(AcousticWave, HABC_Mesh, RectangLayer, HABC_Error):
         spln : `bool`, optional
             Flag to indicate whether to use splines (True) or lines (False)
             in hypershape layer generation. Default is True
-        fmesh : `float`, optional
-            Mesh size factor for the hyperelliptical layer with respect to mesh
-            size of the original domain. Default is 1.0.
 
         Returns
         -------

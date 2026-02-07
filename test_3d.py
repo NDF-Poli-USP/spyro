@@ -271,7 +271,11 @@ def habc_fig8(Wave_obj, modal_solver, fitting_c, dat_regr_xCR, n_root=1,
         'KRYLOVSCH_GH', 'KRYLOVSCH_GG' or 'RAYLEIGH'
     fitting_c : `tuple
         Parameters for fitting equivalent velocity regression.
-        Structure: (fc1, fc2, fp1, fp2)
+        Structure: (fc1, fc2, fp1, fp2):
+        - fc1: Magnitude order
+        - fc2: Monotonicity
+        - fp1: Rectangle frequency
+        - fp2: Ellipse frequency
     data_regr_xCR: `list`
         Data for the regression of the parameter xCR.
         Structure: [xCR, max_errIt, max_errPK, crit_opt]
@@ -399,7 +403,7 @@ def test_loop_habc_3d():
     n_root = 1
 
     # Reference frequency
-    habc_ref_freq_lst = ["boundary"]  # ["source", "boundary"]
+    habc_ref_freq_lst = ["source", "boundary"]
 
     # Type of the hypereshape degree
     degree_type = "real"  # "integer"
@@ -458,6 +462,9 @@ def test_loop_habc_3d():
         crit_str = "\nCriterion for Heuristic Factor ({:.0f} Points): {}"
         mods_str = "Modal Solver for Fundamental Frequency: {}\n"
 
+        # Type of the hypereshape degree
+        print(degr_str.format(degree_type), flush=True)
+
         # Loop for different layer shapes and degrees
         for habc_ref_freq in habc_ref_freq_lst:
 
@@ -467,10 +474,7 @@ def test_loop_habc_3d():
 
             # Reference frequency for sizing the hybrid absorbing layer
             Wave_obj.abc_reference_freq = habc_ref_freq
-            print(fref_str.format(habc_ref_freq.capitalize()), flush=True)
-
-            # Type of the hypereshape degree
-            print(degr_str.format(degree_type), flush=True)
+            print(fref_str.format(habc_ref_freq), flush=True)
 
             # Modal solver for fundamental frequency
             print(mods_str.format(modal_solver), flush=True)
@@ -532,21 +536,21 @@ def test_loop_habc_3d():
                 Wave_obj.rename_folder_habc()
     else:
 
+        # Type of the hypereshape degree
+        print(degr_str.format(degree_type), flush=True)
+
         # Update the layer shape
         Wave_obj.abc_boundary_layer_shape = "hypershape"
 
         # Loop for different layer shapes and degrees
         for habc_ref_freq in habc_ref_freq_lst:
 
-            # Update the degree layer
-            Wave_obj.abc_deg_layer = 2.
-
             # Reference frequency for sizing the hybrid absorbing layer
             Wave_obj.abc_reference_freq = habc_ref_freq
-            print(fref_str.format(habc_ref_freq.capitalize()), flush=True)
+            print(fref_str.format(habc_ref_freq), flush=True)
 
-            # Type of the hypereshape degree
-            print(degr_str.format(degree_type), flush=True)
+            # Update the degree layer
+            Wave_obj.abc_deg_layer = 2.
 
             # Getting the range of the hyperellipse degrees
             get_range_hyp(Wave_obj, n_root=n_root)

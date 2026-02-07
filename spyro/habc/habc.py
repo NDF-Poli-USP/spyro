@@ -178,7 +178,8 @@ class HABC_Wave(AcousticWave, HABC_Mesh, RectangLayer,
 
         # Initializing the Mesh class
         HABC_Mesh.__init__(
-            self, dom_dim, dimension=self.dimension, comm=self.comm)
+            self, dom_dim, dimension=self.dimension,
+            quadrilateral=self.mesh_parameters.quadrilateral, comm=self.comm)
 
         # Identifier for the current case study
         self.identify_habc_case(output_folder=output_folder)
@@ -493,7 +494,7 @@ class HABC_Wave(AcousticWave, HABC_Mesh, RectangLayer,
         HABC_Damping.__init__(self, dom_lay_trunc, layer_par, mesh_par,
                               wave_par, dimension=self.dimension)
 
-    def create_mesh_habc(self, inf_model=False, spln=True, fmesh=1.):
+    def create_mesh_habc(self, inf_model=False, spln=True):
         '''
         Create a mesh with absorbing layer based on the determined size.
 
@@ -505,9 +506,6 @@ class HABC_Wave(AcousticWave, HABC_Mesh, RectangLayer,
         spln : `bool`, optional
             Flag to indicate whether to use splines (True) or lines (False)
             in hypershape layer generation. Default is True
-        fmesh : `float`, optional
-            Mesh size factor for the hyperelliptical layer with respect to mesh
-            size of the original domain. Default is 1.0.
 
         Returns
         -------
@@ -543,8 +541,6 @@ class HABC_Wave(AcousticWave, HABC_Mesh, RectangLayer,
         # Updating the mesh with the absorbing layer
         self.set_mesh(user_mesh=mesh_habc)
         print("Mesh Generated Successfully")
-
-        outfile = fire.VTKFile("user_mesh.pvd").write(mesh_habc)
 
         if inf_model:
             pth_mesh = self.path_save + "preamble/mesh_inf.pvd"
@@ -604,7 +600,18 @@ class HABC_Wave(AcousticWave, HABC_Mesh, RectangLayer,
         print("\nUpdating Velocity Profile", flush=True)
 
         # Initialize velocity field and assigning the original velocity model
-        V = fire.FunctionSpace(self.mesh, self.ele_type_c0, self.p_c0)
+        if self.quadrilateral:
+            base_mesh = self.mesh._base_mesh
+            base_cell = base_mesh.ufl_cell()
+            base_ele = fire.FiniteElement("DQ", base_cell, 0)
+            element_zx = fire.FiniteElement("DQ", base_cell, 0,
+                                            variant="spectral")
+            element_y = fire.FiniteElement("DG", fire.interval, 0)
+            tensor_element = fire.TensorProductElement(element_zx, element_y)
+            V = fire.FunctionSpace(self.mesh, tensor_element)
+        else:
+            V = fire.FunctionSpace(self.mesh, self.ele_type_c0, self.p_c0)
+
         self.c = fire.Function(V).interpolate(self.initial_velocity_model,
                                               allow_missing_dofs=True)
 

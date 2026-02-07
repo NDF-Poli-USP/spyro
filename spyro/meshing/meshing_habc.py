@@ -66,6 +66,8 @@ class HABC_Mesh():
         Finite element order for the velocity model without absorbing layer
     p_eik : `int`
         Finite element order for the Eikonal modeling
+    quadrilateral : bool
+        Flag to indicate whether to use quadrilateral/hexahedral elements
     tol : `float`
         Tolerance for searching nodes in the mesh
 
@@ -119,7 +121,7 @@ class HABC_Mesh():
         Generate the boundary points for a truncated hyperellipse
     '''
 
-    def __init__(self, dom_dim, dimension=2, comm=None):
+    def __init__(self, dom_dim, dimension=2, quadrilateral=False, comm=None):
         '''
         Initialize the HABC_Mesh class
 
@@ -129,6 +131,8 @@ class HABC_Mesh():
             Original domain dimensions: (Lx, Lz) for 2D or (Lx, Lz, Ly) for 3D
         dimension : `int`, optional
             Model dimension (2D or 3D). Default is 2D
+        quadrilateral : bool, optional
+            Flag to indicate whether to use quadrilateral/hexahedral elements
         comm : `object`, optional
             An object representing the communication interface
             for parallel processing. Default is None
@@ -143,6 +147,9 @@ class HABC_Mesh():
 
         # Model dimension
         self.dimension = dimension
+
+        # Quadrilateral/hexahedral elements
+        self.quadrilateral = quadrilateral
 
         # Communicator MPI
         self.comm = comm
@@ -239,14 +246,17 @@ class HABC_Mesh():
 
         # Boundary array
         left_boundary = np.where(x_data <= self.tol)
-        right_boundary = np.where(x_data >= self.mesh_parameters.length_x - self.tol)
-        bottom_boundary = np.where(z_data <= self.tol - self.mesh_parameters.length_z)
+        right_boundary = np.where(x_data >= self.mesh_parameters.length_x
+                                  - self.tol)
+        bottom_boundary = np.where(z_data <= self.tol
+                                   - self.mesh_parameters.length_z)
         bnds = (left_boundary, right_boundary, bottom_boundary)
 
         if self.dimension == 3:  # 3D
             y_data = node_positions[2]
             left_bnd_y = np.where(y_data <= self.tol)
-            right_bnd_y = np.where(y_data >= self.mesh_parameters.length_y - self.tol)
+            right_bnd_y = np.where(y_data >= self.mesh_parameters.length_y
+                                   - self.tol)
             bnds += (left_bnd_y, right_bnd_y,)
 
         return bnds
@@ -413,6 +423,7 @@ class HABC_Mesh():
         if self.dimension == 2:  # 2D
             mesh_habc = fire.RectangleMesh(nz, nx, Lz_habc, Lx_habc,
                                            distribution_parameters=q,
+                                           quadrilateral=self.quadrilateral,
                                            comm=self.comm.comm)
             typ_ele_str = "Area Elements"
 
@@ -426,9 +437,19 @@ class HABC_Mesh():
             Ly_habc = dom_lay[2]
 
             # Mesh
-            mesh_habc = fire.BoxMesh(nz, nx, ny, Lz_habc, Lx_habc, Ly_habc,
-                                     distribution_parameters=q,
-                                     comm=self.comm.comm)
+            if self.quadrilateral:
+                quad_habc = fire.RectangleMesh(
+                    nz, nx, Lz_habc, Lx_habc, distribution_parameters=q,
+                    quadrilateral=self.quadrilateral, comm=self.comm.comm)
+                # fire.VTKFile("output/quad_habc.pvd").write(quad_habc)
+
+                mesh_habc = fire.ExtrudedMesh(quad_habc, ny,
+                                              layer_height=Ly_habc / ny)
+                # fire.VTKFile("output/extr_habc.pvd").write(mesh_habc)
+            else:
+                mesh_habc = fire.BoxMesh(
+                    nz, nx, ny, Lz_habc, Lx_habc, Ly_habc,
+                    distribution_parameters=q, comm=self.comm.comm)
             typ_ele_str = "Volume Elements"
 
             # Adjusting coordinates
@@ -717,7 +738,10 @@ class HABC_Mesh():
 
                 # Generate the mesh using netgen library
                 hyp_mesh = geo.GenerateMesh(maxh=self.lmin,
-                                            quad_dominated=False)
+                                            quad_dominated=self.quadrilateral,
+                                            optsteps2d=10,  # Optimize mesh
+                                            )
+                hyp_mesh.Compress()
                 print("Hyperelliptical Mesh Generated Successfully",
                       flush=True)
                 break
@@ -933,13 +957,14 @@ class HABC_Mesh():
 
         # Get coordinates of the rectangular mesh
         coord_rec = rec_mesh.coordinates.dat.data_with_halos[:]
+        # fire.VTKFile("output/base_mesh.pvd").write(rec_mesh)
 
         # Add all vertices from rectangular mesh and create mapping
         rec_map = {}
         for i, coord in enumerate(coord_rec):
             z, x, y = coord
             if self.inside_hyp_3D(coord - centroid,
-                                  a_hyp, b_hyp, c_hyp, n_hyp):
+                                  b_hyp, a_hyp, c_hyp, n_hyp):
                 rec_map[i] = sharp_mesh.Add(MeshPoint((z, x, y)))
 
         # Face descriptor for the rectangular mesh
@@ -966,7 +991,7 @@ class HABC_Mesh():
             sharp_mesh = fire.Mesh(
                 sharp_mesh, distribution_parameters=q, comm=self.comm.comm)
             print("Sharp Mesh Generated Successfully", flush=True)
-            # fire.VTKFile("sharp_mesh.pvd").write(sharp_mesh)
+            # fire.VTKFile("output/sharp_mesh.pvd").write(sharp_mesh)
 
         except Exception as e:
             print(f"Error Generating Merged Mesh: {e}. Exiting.", flush=True)
@@ -1171,8 +1196,10 @@ class HABC_Mesh():
         if self.dimension == 3:  # 3D
 
             # Base rectangular mesh
-            dom_lay = self.habc_domain_dimensions(only_habc_dom=True)
-            rec_mesh = self.rectangular_mesh_habc(dom_lay, self.pad_len)
+            dom_lay_trunc = self.habc_domain_dimensions(only_habc_dom=True,
+                                                        full_hyp=False)
+            rec_mesh = self.rectangular_mesh_habc(dom_lay_trunc, self.pad_len)
+            # fire.VTKFile("output/rectang_test.pvd").write(rec_mesh)
 
             # Merging the original mesh with a hyperellipsoid layer mesh
             mesh_habc = self.build_hyp_mesh_3D(rec_mesh, hyp_par)
@@ -1319,7 +1346,19 @@ class HABC_Mesh():
         Lx, Lz = self.dom_dim[:2]
 
         # Vectorial space for auxiliar field of clipped coordinates
-        W_sp = fire.VectorFunctionSpace(self.mesh, self.ele_type_c0, self.p_c0)
+        if self.quadrilateral:
+            base_mesh = self.mesh._base_mesh
+            base_cell = base_mesh.ufl_cell()
+            base_ele = fire.FiniteElement("DQ", base_cell, 0)
+            element_zx = fire.FiniteElement("DQ", base_cell, 0,
+                                            variant="spectral")
+            element_y = fire.FiniteElement("DG", fire.interval, 0)
+            tensor_element = fire.TensorProductElement(element_zx, element_y)
+            W_sp = fire.VectorFunctionSpace(self.mesh, tensor_element)
+        else:
+            W_sp = fire.VectorFunctionSpace(self.mesh,
+                                            self.ele_type_c0,
+                                            self.p_c0)
 
         # Mesh coordinates
         coords = fire.SpatialCoordinate(self.mesh)

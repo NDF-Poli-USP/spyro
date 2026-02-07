@@ -75,7 +75,7 @@ def wave_dict(dt_usu, fr_files, layer_shape, degree_layer,
         "receiver_locations": [(-1., 0.), (-1., 1.), (0., 1.), (0., 0.)]
     }
 
-    # Simulate for 2.0 seconds.
+    # Simulate for 2. seconds.
     dictionary["time_axis"] = {
         "initial_time": 0.,  # Initial time for event
         "final_time": 2.,    # Final time for event
