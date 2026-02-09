@@ -7,7 +7,7 @@ from .elastic_wave import ElasticWave
 from .forms import (isotropic_elastic_without_pml,
                     isotropic_elastic_with_pml)
 from .functionals import mechanical_energy_form
-from ...domains.space import FE_method
+from ...domains.space import function_space
 from ...utils.typing import override
 
 
@@ -101,8 +101,8 @@ class IsotropicWave(ElasticWave):
 
     @override
     def _create_function_space(self):
-        return FE_method(self.mesh, self.method, self.degree,
-                         dim=self.dimension)
+        return function_space(self.mesh, self.method, self.degree,
+                              dim=self.dimension)
 
     @override
     def _set_vstate(self, vstate):
