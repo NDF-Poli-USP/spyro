@@ -147,7 +147,8 @@ def perform_convolution(G_history, R_history, dt):
     conv_result = convolve(G_history, R_history, mode='full') * dt
     return conv_result[:len(R_history)]
 
-R_history = np.array([ricker_wavelet(t_val, frequency, amplitude) for t_val in time_points])
+R_history = np.array([ricker_wavelet(t_val,
+                                     frequency, amplitude) for t_val in time_points])
 u_analytical_convolved = perform_convolution(G_history, R_history, dt)
 
 # ====================================================================================
