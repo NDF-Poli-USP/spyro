@@ -1,7 +1,10 @@
 import firedrake as fire
 import spyro
-from demos.with_automatic_differentiation.utils import \
-    model_settings, make_c_camembert
+try:
+    from demos.with_automatic_differentiation.utils import \
+        model_settings, make_c_camembert
+except ModuleNotFoundError:
+    from utils import model_settings, make_c_camembert
 import os
 os.environ["OMP_NUM_THREADS"] = "1"
 
@@ -13,14 +16,12 @@ model = model_settings()
 M = model["parallelism"]["num_spacial_cores"]
 my_ensemble = fire.Ensemble(fire.COMM_WORLD, M)
 mesh = fire.UnitSquareMesh(50, 50, comm=my_ensemble.comm)
-element = fire.FiniteElement(
-    model["opts"]["method"], mesh.ufl_cell(), degree=model["opts"]["degree"],
-    variant=model["opts"]["quadrature"]
+V = spyro.domains.space.function_space(
+    mesh, model["options"]["method"], model["options"]["degree"],
+    dim=1
 )
-V = fire.FunctionSpace(mesh, element)
 
-
-forward_solver = spyro.solvers.forward_ad.ForwardSolver(model, mesh, V)
+forward_solver = spyro.solvers.forward_ad.ForwardSolver(model, mesh)
 
 c_true = make_c_camembert(mesh, V)
 # Ricker wavelet

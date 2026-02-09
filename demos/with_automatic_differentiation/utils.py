@@ -15,9 +15,9 @@ def model_settings():
 
     model = {}
 
-    model["opts"] = {
-        "method": "KMV",  # either CG or mass_lumped_triangle
-        "quadrature": "KMV",  # Equi or mass_lumped_triangle
+    model["options"] = {
+        "method": "mass_lumped_triangle",  # either CG or mass_lumped_triangle
+        "quadrature": "lumped",  # Equi or mass_lumped_triangle
         "degree": 1,  # p order
         "dimension": 2,  # dimension
         "regularization": False,  # regularization is on?
