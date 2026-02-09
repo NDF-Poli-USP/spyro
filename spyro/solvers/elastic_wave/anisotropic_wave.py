@@ -105,8 +105,8 @@ class AnisotropicWave(ElasticWave):
 
     @override
     def _create_function_space(self):
-        return FE_method(
-            self.mesh, self.method, self.degree, dim=self.dimension)
+        return FE_method(self.mesh, self.method,
+                         self.degree, dim=self.dimension)
 
     @override
     def _set_vstate(self, vstate):
@@ -136,10 +136,8 @@ class AnisotropicWave(ElasticWave):
 
     @override
     def get_receivers_output(self):
-        if self.abc_boundary_layer_type == "PML":
-            raise NotImplementedError
-        else:
-            data_with_halos = self.u_n.dat.data_ro_with_halos[:]
+        data_with_halos = self.u_n.dat.data_ro_with_halos[:]
+        # Substitute by new_at()
         return self.receivers.interpolate(data_with_halos)
 
     @override
@@ -262,7 +260,3 @@ class AnisotropicWave(ElasticWave):
             self.s_wave = fire.Function(S, name='s_wave')
 
         return self.s_wave.interpolate(fire.curl(self.get_function()))
-
-
-
-

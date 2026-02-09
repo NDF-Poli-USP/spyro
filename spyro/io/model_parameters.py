@@ -207,7 +207,8 @@ class Model_parameters(Read_options, Read_boundary_layer,
         self.input_dictionary["acquisition"].setdefault("delay", 1.5)
         self.delay = self.input_dictionary["acquisition"]["delay"]
 
-        self.input_dictionary["acquisition"].setdefault("delay_type", "multiples_of_minimum")
+        self.input_dictionary["acquisition"].setdefault("delay_type",
+                                                        "multiples_of_minimum")
         self.delay_type = self.input_dictionary["acquisition"]["delay_type"]
 
         self.input_dictionary["acquisition"].setdefault("source_locations", None)
@@ -222,7 +223,8 @@ class Model_parameters(Read_options, Read_boundary_layer,
         Read_boundary_layer.__init__(self)
 
         # Checking mesh_parameters
-        if self.cell_type == "quadrilateral" or self.method == "spectral_quadrilateral":
+        if self.cell_type == "quadrilateral" or \
+                self.method == "spectral_quadrilateral":
             quadrilateral = True
         else:
             quadrilateral = False
@@ -323,9 +325,11 @@ class Model_parameters(Read_options, Read_boundary_layer,
     def frequency(self, value):
         if value is not None:
             if value < 1.0:
-                warnings.warn(f"Frequency of {value} too low for realistic FWI.")
+                warnings.warn(
+                    f"Frequency of {value} too low for realistic FWI.")
             elif value > 50:
-                warnings.warn(f"Frequency of {value} too high for efficient FWI.")
+                warnings.warn(
+                    f"Frequency of {value} too high for efficient FWI.")
         self._frequency = value
 
     @property
@@ -336,8 +340,7 @@ class Model_parameters(Read_options, Read_boundary_layer,
     def equation_type(self, value):
         if value != "second_order_in_pressure":
             raise ValueError(
-                "The equation type specified is not implemented yet"
-            )
+                "The equation type specified is not implemented yet")
         self._equation_type = value
 
     @property
@@ -350,11 +353,14 @@ class Model_parameters(Read_options, Read_boundary_layer,
         _validate_enum(value, accepted_values, 'parallelism_type')
 
         if value == "custom":
-            self.shot_ids_per_propagation = self.input_dictionary["parallelism"]["shot_ids_per_propagation"]
+            self.shot_ids_per_propagation = self.input_dictionary[
+                "parallelism"]["shot_ids_per_propagation"]
         elif value == "automatic":
-            self.shot_ids_per_propagation = [[i] for i in range(0, self.number_of_sources)]
+            self.shot_ids_per_propagation = [[i] for i in
+                                             range(0, self.number_of_sources)]
         elif value == "spatial":
-            self.shot_ids_per_propagation = [[i] for i in range(0, self.number_of_sources)]
+            self.shot_ids_per_propagation = [[i] for i in
+                                             range(0, self.number_of_sources)]
 
         self._parallelism_type = value
         self.comm = utils.mpi_init(self)
@@ -376,10 +382,8 @@ class Model_parameters(Read_options, Read_boundary_layer,
         if self.dt > 1.0:
             warnings.warn(f"Time step of {self.dt} too big.")
         if self.dt is None:
-            warnings.warn(
-                "Timestep not given. Will calculate internally when user \
-                    attemps to propagate wave."
-            )
+            warnings.warn(f"Timestep not given. Will calculate internally "
+                          f"when user attemps to propagate wave.")
 
     def set_mesh(self, user_mesh=None, input_mesh_parameters={}):
         """
@@ -451,7 +455,7 @@ def _validate_enum(value, accepted_values, name):
 
 
 def _check_point_in_domain(point_coordinates, input_mesh_lengths, negative_z):
-    """
+    '''
     Checks if a point is within the mesh domain.
 
     Parameters
@@ -467,7 +471,7 @@ def _check_point_in_domain(point_coordinates, input_mesh_lengths, negative_z):
     ------
     ValueError
         If the point is outside the mesh domain.
-    """
+    '''
     # avoid changing mesh lengths outside of this
     mesh_lengths = deepcopy(input_mesh_lengths)
     if negative_z:
@@ -478,12 +482,10 @@ def _check_point_in_domain(point_coordinates, input_mesh_lengths, negative_z):
         if negative_z and i == 0:
             # For negative_z, domain is [length, 0] (length is negative)
             if not (length <= coord <= 0):
-                raise ValueError(
-                    f"Coordinate {coord} in dimension {i} is outside the domain [{length}, 0]."
-                )
+                raise ValueError(f"Coordinate {coord} in dimension {i} "
+                                 f"is outside the domain [{length}, 0].")
         else:
             # For other dimensions, domain is [0, length]
             if not (0 <= coord <= length):
-                raise ValueError(
-                    f"Coordinate {coord} in dimension {i} is outside the domain [0, {length}]."
-                )
+                raise ValueError(f"Coordinate {coord} in dimension {i} "
+                                 f"is outside the domain [0, {length}].")

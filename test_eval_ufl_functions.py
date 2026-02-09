@@ -23,7 +23,7 @@ def run_test_eval_ufl_functions_2d():
     print("2D MODELS TEST")
     print("=" * 40)
 
-    mesh_2d = UnitSquareMesh(10, 10, quadrilateral=True)
+    mesh_2d = UnitSquareMesh(10, 10)
     dimension_2d = 2
 
     test_expressions_2d = [
@@ -63,7 +63,7 @@ def run_test_eval_ufl_functions_2d():
             ufl_expr = generate_ufl_functions(mesh_2d, expr, dimension_2d)
 
             # Create function space and interpolate
-            V = FunctionSpace(mesh_2d, "CG", 2)
+            V = FunctionSpace(mesh_2d, "KMV", 4)
             f = Function(V, name="test_field")
             f.interpolate(ufl_expr)
 
@@ -101,7 +101,7 @@ def run_test_eval_ufl_functions_3d():
     print("3D MODELS TEST")
     print("=" * 40)
 
-    mesh_3d = UnitCubeMesh(8, 8, 8)
+    mesh_3d = UnitCubeMesh(10, 10, 10)
     dimension_3d = 3
 
     test_expressions_3d = [
@@ -130,7 +130,7 @@ def run_test_eval_ufl_functions_3d():
             ufl_expr = generate_ufl_functions(mesh_3d, expr, dimension_3d)
 
             # Create function space and interpolate
-            V = FunctionSpace(mesh_3d, "CG", 1)
+            V = FunctionSpace(mesh_3d, "KMV", 3)
             f = Function(V, name="test_3d")
             f.interpolate(ufl_expr)
 
