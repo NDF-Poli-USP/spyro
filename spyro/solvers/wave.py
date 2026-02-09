@@ -126,22 +126,22 @@ class Wave(Model_parameters, metaclass=ABCMeta):
         """Builds the matrix for the forward problem."""
         pass
 
-    def set_mesh(
-            self,
-            user_mesh=None,
-            input_mesh_parameters={},
-    ):
+    def set_mesh(self, user_mesh=None,
+                 input_mesh_parameters=None):
         """
         Set the mesh for the solver.
 
         Args:
             user_mesh (optional): User-defined mesh. Defaults to None.
-            mesh_parameters (optional): Parameters for generating a mesh. Defaults to None.
+            mesh_parameters (optional): Parameters for generating a mesh.
+            Defaults to None.
         """
-        super().set_mesh(
-            user_mesh=user_mesh,
-            input_mesh_parameters=input_mesh_parameters,
-        )
+
+        if input_mesh_parameters is None:
+            input_mesh_parameters = {}
+
+        super().set_mesh(user_mesh=user_mesh,
+                         input_mesh_parameters=input_mesh_parameters)
 
         self.mesh = self.get_mesh()
         self._build_function_space()
@@ -239,8 +239,8 @@ class Wave(Model_parameters, metaclass=ABCMeta):
             self.initial_velocity_model = vp
         else:
             raise ValueError(
-                "Please specify either a conditional, expression, firedrake "
-                "function or new file name (segy or hdf5)."
+                "Please specify either a conditional, expression, "
+                "firedrake function or new file name (segy or hdf5)."
             )
         if output:
             fire.VTKFile("initial_velocity_model.pvd").write(
@@ -279,48 +279,6 @@ class Wave(Model_parameters, metaclass=ABCMeta):
             self.mesh_z = z
             self.mesh_x = x
             self.mesh_y = y
-
-    def get_and_set_maximum_dt(self, fraction=0.7,
-                               estimate_max_eigenvalue=False):
-        '''
-        Calculates and sets the maximum stable time step (dt) for the wave solver.
-
-        Args:
-            fraction (float, optional):
-                Fraction of the estimated time step to use. Defaults to 0.7.
-            estimate_max_eigenvalue (bool, optional):
-                Whether to estimate the maximum eigenvalue. Defaults to False.
-
-        Returns:
-            float: The calculated maximum time step (dt).
-        '''
-
-        # TO DO: Delete this method and use the one in modal solver (habc branch by Salas)
-
-        # if self.method == "mass_lumped_triangle":
-        #     estimate_max_eigenvalue = True
-        # elif self.method == "spectral_quadrilateral":
-        #     estimate_max_eigenvalue = True
-        # else:
-
-        if self.c is None:
-            c = self.initial_velocity_model
-        else:
-            c = self.c
-
-        dt = utils.estimate_timestep.estimate_timestep(
-            self.mesh,
-            self.function_space,
-            c,
-            estimate_max_eigenvalue=estimate_max_eigenvalue,
-        )
-        dt *= fraction
-        nt = int(self.final_time / dt) + 1
-        dt = self.final_time / (nt - 1)
-
-        self.dt = dt
-
-        return dt
 
     def get_mass_matrix_diagonal(self):
         """Builds a section of the mass matrix for debugging purposes."""
@@ -439,8 +397,9 @@ class Wave(Model_parameters, metaclass=ABCMeta):
 
     def set_material_property(self, property_name, func_space_type,
                               shape_func_space=None, constant=None,
-                              conditional=None, function=None,
-                              expression=None, new_file=None, output=False):
+                              conditional=None, fire_function=None,
+                              expression=None, new_file=None,
+                              output=False, dg_property=False):
         '''
         Set a material property (e.g., density, etc.) in the model.
 
@@ -459,7 +418,7 @@ class Wave(Model_parameters, metaclass=ABCMeta):
             Constant value for the material property. Default is None
         conditional:  `firedrake conditional`, optional
             Firedrake conditional object. Default is None
-        function: `firedrake function`, optional
+        fire_function: `firedrake function`, optional
             Firedrake function in the same function space as the object.
             Default is None.
         expression: `str`, optional
@@ -480,6 +439,10 @@ class Wave(Model_parameters, metaclass=ABCMeta):
         dgr_ele = 0 if dg_property else \
             self.function_space.ufl_element().degree()
 
+        # # Dealing with mixed function spaces
+        # family = set(V_.ufl_element().family() for V_ in V)
+        # degree = max(V_.ufl_element().degree() for V_ in V)
+
         # Function space for the property
         if func_space_type == 'scalar':
             V = fire.FunctionSpace(self.mesh, typ_ele, dgr_ele)
@@ -493,34 +456,39 @@ class Wave(Model_parameters, metaclass=ABCMeta):
         if self.mesh is None:
             self.set_mesh()
 
+        try:
+            if conditional is not None:
+                ufl_input = conditional
 
-        # try:
+            elif expression is not None:
+                ufl_input = utils.eval_functions_to_ufl.generate_ufl_functions(
+                    self.mesh, expression, self.dimension)
 
-        # except ValueError:
+            elif constant is not None:
+                ufl_input = fire.Constant(constant)
 
-        if conditional is not None:
-            ufl_input = conditional
+            if fire_function is not None:
+                if V is fire_function.function_space():
+                    mat_property = fire_function
+                else:
+                    mat_property = fire.Function(
+                        V, name=property_name).interpolate(fire_function)
 
-        elif expression is not None:
-            ufl_input = utils.eval_functions_to_ufl.generate_ufl_functions(
-                self.mesh, expression, self.dimension)
+            elif new_file is not None:
+                mat_property = new_file
+                # Substitute by new method in PR of Alexandre
+                self.initialize_material_property_from_file(new_file)
 
-        elif constant is not None:
-            ufl_input = fire.Constant(constant)
+            else:
+                mat_property = fire.Function(
+                    V, name=property_name).interpolate(ufl_input)
 
-        if function is not None:
-            mat_property = function
-        else:
-            mat_property = fire.Function(
-                V, name=property_name).interpolate(ufl_input)
+        except Exception as e:
+            raise ValueError(f"Error Setting a Material Property: {e}. "
+                             "Please specify either a conditional, "
+                             "expression, firedrake function or "
+                             " new file name (*.segy or *.hdf5).")
 
-        if new_file is not None:
-            mat_property = new_file
-            self._get_initial_velocity_model()
-        else:
-            raise ValueError(f"Please specify either a conditional, "
-                             f"expression, firedrake function or new "
-                             f"file name (segy or hdf5).")
         if output:
             fire.VTKFile(property_name + ".pvd").write(initial_property,
                                                        name="property_name")
