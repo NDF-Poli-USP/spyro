@@ -1349,7 +1349,6 @@ class HABC_Mesh():
         if self.quadrilateral:
             base_mesh = self.mesh._base_mesh
             base_cell = base_mesh.ufl_cell()
-            base_ele = fire.FiniteElement("DQ", base_cell, 0)
             element_zx = fire.FiniteElement("DQ", base_cell, 0,
                                             variant="spectral")
             element_y = fire.FiniteElement("DG", fire.interval, 0)

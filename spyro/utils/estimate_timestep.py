@@ -1,8 +1,8 @@
 import scipy
 import numpy as np
-import finat
 import firedrake as fd
 from firedrake import dot, grad
+from ..domains.quadrature import quadrature_rules
 
 
 def estimate_timestep(mesh, V, c, estimate_max_eigenvalue=True):
@@ -17,8 +17,7 @@ def estimate_timestep(mesh, V, c, estimate_max_eigenvalue=True):
     """
 
     u, v = fd.TrialFunction(V), fd.TestFunction(V)
-    quad_rule = finat.quadrature.make_quadrature(
-        V.finat_element.cell, V.ufl_element().degree(), "KMV")
+    quad_rule, _, _ = quadrature_rules(V)
     dxlump = fd.dx(**quad_rule)
 
     A = fd.assemble(u * v * dxlump)
