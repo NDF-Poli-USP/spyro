@@ -18,7 +18,7 @@ def central_difference_acoustic(forwardsolver, c, source_function):
     """
     # Acoustic linear variational solver.
     V = forwardsolver.V
-    dt = forwardsolver.model["time_axis"]["dt"]
+    dt = forwardsolver.model["timeaxis"]["dt"]
     u = fire.TrialFunction(V)
     v = fire.TestFunction(V)
     u_np1 = fire.Function(V)  # timestep n+1
@@ -30,7 +30,7 @@ def central_difference_acoustic(forwardsolver, c, source_function):
         fire.Constant(dt**2) * v * fire.dx(**qr_x)
 
     nf = 0
-    if forwardsolver.model["absorving_boundary_conditions"]["status"] is True:
+    if forwardsolver.model["BCs"]["status"] is True:
         nf = (1/c) * ((u_n - u_nm1) / dt) * v * fire.ds(**qr_s)
 
     a = fire.dot(fire.grad(u_n), fire.grad(v)) * fire.dx(**qr_x)

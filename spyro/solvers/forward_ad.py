@@ -1,7 +1,6 @@
 import firedrake as fire
 import firedrake.adjoint as fire_ad
 from .time_integration_ad import central_difference_acoustic
-from firedrake.__future__ import interpolate
 from ..domains.space import function_space
 # Note this turns off non-fatal warnings
 fire.set_log_level(fire.ERROR)
@@ -24,7 +23,8 @@ class ForwardSolver:
     def __init__(self, model, mesh):
         self.model = model
         self.mesh = mesh
-        self.V = function_space(self.mesh, self.model["opts"]["method"], self.model["opts"]["degree"])
+        self.V = function_space(
+            self.mesh, self.model["options"]["method"], self.model["options"]["degree"])
         self.receiver_mesh = fire.VertexOnlyMesh(
             self.mesh, self.model["acquisition"]["receiver_locations"])
         self.solution = None
@@ -71,7 +71,7 @@ class ForwardSolver:
         # Sources.
         source_mesh = fire.VertexOnlyMesh(
             self.mesh,
-            [self.model["acquisition"]["source_locations"][source_number]]
+            [self.model["acquisition"]["source_pos"][source_number]]
         )
         # Source function space.
         V_s = fire.FunctionSpace(source_mesh, "DG", 0)
@@ -84,12 +84,12 @@ class ForwardSolver:
         # Receivers
         V_r = fire.FunctionSpace(self.receiver_mesh, "DG", 0)
         # Interpolate object.
-        interpolate_receivers = interpolate(u_np1, V_r)
+        interpolate_receivers = fire.interpolate(u_np1, V_r)
 
         # Time execution.
         J_val = 0.0
         receiver_data = []
-        total_steps = int(self.model["time_axis"]["final_time"] / self.model["time_axis"]["dt"]) + 1
+        total_steps = int(self.model["timeaxis"]["tf"] / self.model["timeaxis"]["dt"]) + 1
         if (
             fire_ad.get_working_tape()._checkpoint_manager
             and self.model["aut_dif"]["checkpointing"]
@@ -120,9 +120,9 @@ class ForwardSolver:
                                   "for the automatic differentiation based FWI.")
 
     def _solver_parameters(self):
-        if self.model["options"]["variant"] == "lumped":
+        if self.model["options"]["quadrature"] == "lumped":
             params = {"ksp_type": "preonly", "pc_type": "jacobi"}
-        elif self.model["options"]["variant"] == "equispaced":
+        elif self.model["options"]["quadrature"] == "equispaced":
             params = {"ksp_type": "cg", "pc_type": "jacobi"}
         else:
             raise ValueError("method is not yet supported")
