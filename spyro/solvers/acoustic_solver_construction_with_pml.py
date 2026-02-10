@@ -323,7 +323,7 @@ def construct_solver_or_matrix_with_pml_2d(Wave_obj):
     bnds = [Wave_obj.absorb_top, Wave_obj.absorb_bottom,
             Wave_obj.absorb_right, Wave_obj.absorb_left]
     where_to_absorb = tuple(where(bnds)[0] + 1)  # ds starts at 1
-    le = f_abc * ds(where_to_absorb, **qr_s)  # NRBC
+    le = f_abc * fire.ds(where_to_absorb, **qr_s)  # NRBC
     FF += le
     # -------------------------------------------------------
 
@@ -410,7 +410,7 @@ def construct_solver_or_matrix_with_pml_3d(Wave_obj):
             Wave_obj.absorb_right, Wave_obj.absorb_left,
             Wave_obj.absorb_front, Wave_obj.absorb_back]
     where_to_absorb = tuple(where(bnds)[0] + 1)  # ds starts at 1
-    le = f_abc * ds(where_to_absorb, **qr_s)  # NRBC
+    le = f_abc * fire.ds(where_to_absorb, **qr_s)  # NRBC
     FF += le
     # -------------------------------------------------------
 
