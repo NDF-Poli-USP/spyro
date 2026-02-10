@@ -40,6 +40,11 @@ def test_plot():
     rectangle_dictionary["time_axis"] = {
         "final_time": 2.0,  # Final time for event
     }
+    rectangle_dictionary["absorving_boundary_conditions"] = {
+        "status": False,
+        "damping_type": None,
+        "pad_length": 0.,
+    }
     Wave_obj = spyro.examples.Rectangle_acoustic(
         dictionary=rectangle_dictionary
     )
