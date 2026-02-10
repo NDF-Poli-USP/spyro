@@ -38,16 +38,16 @@ def construct_solver_or_matrix_no_pml(Wave_object):
     Wave_object.u_n = u_n
     Wave_object.u_np1 = u_np1
 
-    Wave_object.current_time = 0.0
+    Wave_object.current_time = 0.
     dt = Wave_object.dt
 
     # -------------------------------------------------------
-    m1 = ((1 / (Wave_object.c * Wave_object.c))
-          * ((u - 2.0 * u_n + u_nm1) / Constant(dt**2))
+    m1 = ((1. / (Wave_object.c * Wave_object.c))
+          * ((u - 2. * u_n + u_nm1) / Constant(dt**2))
           * v * dx(**quad_rule))
     a = dot(grad(u_n), grad(v)) * dx(**quad_rule)  # explicit
 
-    le = 0.0
+    le = 0.
     q = Wave_object.source_expression
     if q is not None:
         le += - q * v * dx(**quad_rule)
@@ -56,7 +56,7 @@ def construct_solver_or_matrix_no_pml(Wave_object):
 
     if Wave_object.abc_active:
         weak_expr_abc = dot((u_n - u_nm1) / Constant(dt), v)
-        f_abc = (1 / Wave_object.c) * weak_expr_abc
+        f_abc = (1. / Wave_object.c) * weak_expr_abc
         qr_s = Wave_object.surface_quadrature_rule
 
         if Wave_object.abc_boundary_layer_type == "hybrid":
@@ -66,7 +66,7 @@ def construct_solver_or_matrix_no_pml(Wave_object):
 
             # Damping
             le += Wave_object.eta_mask * weak_expr_abc * \
-                (1 / (Wave_object.c * Wave_object.c)) * \
+                (1. / (Wave_object.c * Wave_object.c)) * \
                 Wave_object.eta_habc * dx(**quad_rule)
 
         else:

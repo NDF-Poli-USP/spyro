@@ -316,6 +316,16 @@ def construct_solver_or_matrix_with_pml_2d(Wave_obj):
     dd = fire.inner(Gamma_2 * fire.grad(u_n), qq) * dx
     FF += mm1 + mm2 + dd
     # -------------------------------------------------------
+    f_abc = (1. / Wave_obj.c) * fire.dot((u_n - u_nm1) / fire.Constant(dt), v)
+    qr_s = Wave_obj.surface_quadrature_rule
+
+    # Tuple of boundary ids for NRBC
+    bnds = [Wave_obj.absorb_top, Wave_obj.absorb_bottom,
+            Wave_obj.absorb_right, Wave_obj.absorb_left]
+    where_to_absorb = tuple(where(bnds)[0] + 1)  # ds starts at 1
+    le = f_abc * ds(where_to_absorb, **qr_s)  # NRBC
+    FF += le
+    # -------------------------------------------------------
 
     lhs_ = fire.lhs(FF)
     rhs_ = fire.rhs(FF)
@@ -391,6 +401,17 @@ def construct_solver_or_matrix_with_pml_3d(Wave_obj):
     mmm1 = fire.dot((psi - psi_n) / fire.Constant(dt), phi) * dx
     uuu1 = -fire.dot(u_n * phi) * dx
     FF += mmm1 + uuu1
+    # -------------------------------------------------------
+    f_abc = (1. / Wave_obj.c) * fire.dot((u_n - u_nm1) / fire.Constant(dt), v)
+    qr_s = Wave_obj.surface_quadrature_rule
+
+    # Tuple of boundary ids for NRBC
+    bnds = [Wave_obj.absorb_top, Wave_obj.absorb_bottom,
+            Wave_obj.absorb_right, Wave_obj.absorb_left,
+            Wave_obj.absorb_front, Wave_obj.absorb_back]
+    where_to_absorb = tuple(where(bnds)[0] + 1)  # ds starts at 1
+    le = f_abc * ds(where_to_absorb, **qr_s)  # NRBC
+    FF += le
     # -------------------------------------------------------
 
     lhs_ = fire.lhs(FF)
