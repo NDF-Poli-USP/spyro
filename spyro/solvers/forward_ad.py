@@ -2,7 +2,6 @@ import firedrake as fire
 import firedrake.adjoint as fire_ad
 from .time_integration_ad import central_difference_acoustic
 from firedrake.__future__ import interpolate
-from ..domains.space import function_space
 # Note this turns off non-fatal warnings
 fire.set_log_level(fire.ERROR)
 
@@ -21,10 +20,10 @@ class ForwardSolver:
         Firedrake mesh object.
     """
 
-    def __init__(self, model, mesh):
+    def __init__(self, model, mesh, function_space):
         self.model = model
         self.mesh = mesh
-        self.V = function_space(self.mesh, self.model["options"]["variant"], self.model["options"]["degree"])
+        self.V = function_space
         self.receiver_mesh = fire.VertexOnlyMesh(
             self.mesh, self.model["acquisition"]["receiver_locations"])
         self.solution = None
