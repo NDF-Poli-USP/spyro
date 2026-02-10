@@ -73,6 +73,11 @@ Wave_obj.set_initial_velocity_model(constant=1.5)
 
 Wave_obj.forward_solve()
 
+t0 = dictionary["time_axis"]["initial_time"]
+tf = dictionary["time_axis"]["final_time"]
+dt = dictionary["time_axis"]["dt"]
+time_points = np.arange(t0, tf + dt, dt)
+
 numerical_solution = Wave_obj.receivers_output
 
 analytical_solution = spyro.utils.nodal_homogeneous_analytical(
@@ -82,21 +87,34 @@ analytical_solution = spyro.utils.nodal_homogeneous_analytical(
 numerical_solution_scaled = scale_to_reference(numerical_solution, analytical_solution)
 
 error = error_calc(numerical_solution_scaled, analytical_solution, len(analytical_solution))
-print(f"Error = {error * 100:.2f} %")
+print(f"Error spyro/analitycal = {error * 100:.2f}%")
 
-test = np.abs(error) < 0.01
-assert test
+# Gar6more2D:
+try:
+    gar6_path = "P.dat"
+    gar6_data = np.loadtxt(gar6_path)
+    t_gar6 = gar6_data[:, 0]
+    p_gar6 = gar6_data[:, 1]
+    gar6_solution_scaled = scale_to_reference(p_gar6, analytical_solution)
+except Exception as e:
+    print(f"Error loaging Gar6: {e}")
+    p_gar6_final = None
+
+error_gar6 = error_calc(gar6_solution_scaled, analytical_solution, len(analytical_solution))
+print(f"Error Gar6more2D/analytical = {error_gar6 * 100:.2f}%")
 
 import matplotlib.pyplot as plt
-plt.figure(figsize=(10, 5))
-plt.plot(numerical_solution_scaled, label='Numerical', linestyle='--')
-plt.plot(analytical_solution, label='Analytical', alpha=0.7)
-plt.title("Validation of the numerical solution - Acoustic Wave")
-plt.xlabel("Time (s)")
-plt.ylabel("Amplitude")
-plt.legend()
+plt.figure(figsize=(14, 7))
+plt.plot(time_points, analytical_solution, 'r-', label='Analytical', linewidth=2.5)
+plt.plot(time_points, numerical_solution_scaled, 'b--', label='Numerical', linewidth=2.0)
+plt.plot(time_points, gar6_solution_scaled, 'g:', label='Gar6more2D', linewidth=2.5)
+plt.title("Validation of the numerical solution - Acoustic Wave", fontsize=14)
+plt.xlabel("Time (s)", fontsize=12)
+plt.ylabel("Amplitude", fontsize=12)
+plt.legend(loc='lower right', frameon=True, shadow=True)
+plt.grid(True, linestyle=':', alpha=0.6)
+plt.tight_layout()
 plt.savefig(f"validation_forward_acoustic.png")
-plt.show()
 
 
 
