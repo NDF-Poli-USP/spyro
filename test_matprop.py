@@ -1,12 +1,12 @@
 import firedrake as fire
 import warnings
-from spyro.solvers.elastic_wave import AnisotropicWave
+from spyro.solvers.elastic_wave.isotropic_wave import IsotropicWave
 from spyro.utils.cost import comp_cost
 fire.parameters["loopy"] = {"silenced_warnings": ["v1_scheduler_fallback"]}
 warnings.filterwarnings("ignore", category=RuntimeWarning)
 
 
-def wave_elast_dict(domain_dim, tf_usu, dt_usu, fr_files):
+def wave_dict(domain_dim, tf_usu, dt_usu, fr_files):
     '''
     Create a dictionary with parameters for the model.
 
@@ -63,7 +63,7 @@ def wave_elast_dict(domain_dim, tf_usu, dt_usu, fr_files):
     # injected at a specified point of the mesh. We also specify to record
     # the solution at the corners of the domain to verify the NRBC efficiency.
     dictionary["acquisition"] = {
-        "source_type": "moment",
+        "source_type": "ricker",
         "source_locations": [(-Lz / 2., Lx / 2., Ly / 2.)],
         "frequency": 5.0,  # in Hz
         "delay": 1. / 3.,
@@ -84,44 +84,88 @@ def wave_elast_dict(domain_dim, tf_usu, dt_usu, fr_files):
         "gradient_sampling_frequency": fr_files,  # how frequently to save to RAM
     }
 
-    # Define Parameters for absorving boundary conditions
-    dictionary["absorving_boundary_conditions"] = {
-        "status": True,  # Activate ABCs
-        "damping_type": "nrbc",  # Activate NRBCs
-    }
-
-    # Define parameters for visualization
-    dictionary["visualization"] = {
-        "forward_output": True,
-        "forward_output_filename": "output/forward/fw_output_3d.pvd",
-        "mechanical_energy": True,  # Activate energy calculation
-        "acoustic_energy_filename": "output/preamble/acoustic_pot_energy_3d",
-    }
-
-    dictionary["material"] = {
-        "type": "VTI",  # Anisotropic material type
-        "type_parameters": "constant",  # constant or range (provide min/max)
-        "density": (1.5e3, 2e3),  # in kg/m^3
-    }
-
     return dictionary
 
 
-def test_prop_elast_ani_3d():
+def test_constant_mat_prop():
     '''
-    Testing function for anisotropic elastic wave
-    propagation in 3D with NRBC and explosive source.
+    Test to assign constant material properties to an instance of Wave.
+
+    Material properties:
+        - vel_P: P-wave velocity [m/s]
+        - vel_S: S-wave velocity [m/s]
+        - mass_rho: Density [kg/m³]
+        - epsilonTh: Thomsen parameter epsilon
+        - gammaTh: Thomsen parameter gamma
+        - deltaTh: Thomsen parameter delta
+        - thetaTTI: Tilt angle in degrees
+        - phiTTI: Azimuth angle in degrees (phi = 0: 2D case)
     '''
 
-    domain_dim, tf_usu, dt_usu, fr_files = basic_parameters()
+    Wave_obj = instance_wave()
 
-    dictionary = wave_elast_dict(domain_dim, tf_usu, dt_usu, fr_files)
+    # Material properties for testing
+    scalar_mat_prop = ['vel_P', 'vel_S', 'mass_rho',
+                       'epsilonTh', 'gammaTh', 'deltaTh']
 
-    wave_obj = spyro.AnisotropicWave(dictionary)
-    # wave_obj.set_mesh(user_mesh=mesh, input_mesh_parameters={})
+    # Uniform initial distribution
+    vel_P_o = 1500
+    vel_S_o = 750
+    mass_rho_o = 1e3
+    epsilonTh_o = 0.2
+    gammaTh_o = 0.3
+    deltaTh_o = 0.1
+    thetaTTI_o = 30.
+    phiTTI_o = 15.
+    constant_lst = [vel_P_o, vel_S_o, mass_rho_o, epsilonTh_o,
+                    gammaTh_o, deltaTh_o, thetaTTI_o, phiTTI_o]
+
+    print("\nTesting Constant Material Properties", flush=True)
+    for property_name, constant in zip(scalar_mat_prop, constant_lst):
+        Wave_obj.set_material_property(
+            property_name, 'scalar', constant=constant,
+            output=True, foldername='/property_fields/constant/')
 
 
-def basic_parameters():
+def test_random_mat_prop():
+    '''
+    Test to assign random material properties to an instance of Wave.
+
+    Material properties:
+        - vel_P: P-wave velocity [m/s]
+        - vel_S: S-wave velocity [m/s]
+        - mass_rho: Density [kg/m³]
+        - epsilonTh: Thomsen parameter epsilon
+        - gammaTh: Thomsen parameter gamma
+        - deltaTh: Thomsen parameter delta
+        - thetaTTI: Tilt angle in degrees
+        - phiTTI: Azimuth angle in degrees (phi = 0: 2D case)
+    '''
+
+    Wave_obj = instance_wave()
+
+    # Material properties for testing
+    scalar_mat_prop = ['vel_P', 'vel_S', 'mass_rho',
+                       'epsilonTh', 'gammaTh', 'deltaTh']
+
+    # Random initial distribution
+    random_lst = [(1.5e3, 2e3), (750, 1e3), (1e3, 2e3), (0.1, 0.3),
+                  (0.2, 0.4), (-0.1, 0.2), (-60, 60), (-15, 15)]
+
+    print("\nTesting Random Material Properties", flush=True)
+    for property_name, random in zip(scalar_mat_prop, random_lst):
+        Wave_obj.set_material_property(
+            property_name, 'scalar', random=random,
+            output=True, foldername='/property_fields/random/')
+
+
+def instance_wave():
+    '''
+    Create an instance of the isotropic wave solver.
+
+    ave_obj : `wave.IsotropicWave`
+        An instance of the IsotropicWave class
+    '''
 
     # Domain dimensions
     domain_dim = [0.24, 0.56, 0.16]  # in km
@@ -138,9 +182,22 @@ def basic_parameters():
     # Time step of the simulation
     dt_usu = round(tf_usu / steps, 6)
 
-    return domain_dim, tf_usu, dt_usu, fr_files
+    # Mesh size in km
+    edge_length = 0.040
+
+    # Create dictionary with parameters for the model
+    dictionary = wave_dict(domain_dim, tf_usu, dt_usu, fr_files)
+
+    # Create a wave object
+    Wave_obj = IsotropicWave(dictionary)
+
+    # Mesh
+    Wave_obj.set_mesh(input_mesh_parameters={"edge_length": edge_length})
+
+    return Wave_obj
 
 
 # Testing anisotropy solver with NRBC and explosive source in 3D
 if __name__ == "__main__":
-    test_prop_elast_ani_3d()
+    test_constant_mat_prop()
+    test_random_mat_prop()
