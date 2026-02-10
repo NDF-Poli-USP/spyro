@@ -109,7 +109,7 @@ def test_taylor():
     )
     V = fire.FunctionSpace(mesh, element)
 
-    fwd_solver = spyro.solvers.forward_ad.ForwardSolver(model, mesh)
+    fwd_solver = spyro.solvers.forward_ad.ForwardSolver(model, mesh, V)
     # Ricker wavelet
     wavelet = spyro.full_ricker_wavelet(
         model["time_axis"]["dt"], model["time_axis"]["final_time"],
