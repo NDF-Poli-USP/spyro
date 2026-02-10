@@ -23,7 +23,9 @@ def run_forward():
     dictionary = {}
     dictionary["options"] = {
         "cell_type": "T",  # simplexes such as triangles or tetrahedra (T) or quadrilaterals (Q)
-        "variant": "lumped",  # lumped, equispaced or DG, default is lumped "method":"MLT", # (MLT/spectral_quadrilateral/DG_triangle/DG_quadrilateral) You can either specify a cell_type+variant or a method
+        "variant": "lumped",  # lumped, equispaced or DG, default is lumped "method":
+        # "MLT", # (MLT/spectral_quadrilateral/DG_triangle/DG_quadrilateral).
+        # You can either specify a cell_type+variant or a method
         "degree": 4,  # p order
         "dimension": 2,  # dimension
     }
@@ -116,7 +118,7 @@ def test_pml():
         array = np.asarray(pickle.load(f), dtype=float)
         extended_p_r = array
 
-    error = error_calc(extended_p_r, p_r[:-1,:], nt-1)
+    error = error_calc(extended_p_r, p_r[:-1, :], nt-1)
     print(f"Error of {error}")
     assert np.abs(error) < 0.05
 
