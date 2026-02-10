@@ -11,7 +11,7 @@ model = {}
 
 model["options"] = {
     "cell_type": "T",  # T or Q
-    "variant": "lumped",
+    "quadrature": "lumped",
     "degree": 1,  # p order
     "dimension": 2,  # dimension
 }
@@ -28,14 +28,14 @@ model["mesh"] = {
     "mesh_file": None,
 }
 
-model["absorving_boundary_conditions"] = {
+model["BCs"] = {
     "status": False,
     "pad_length": 0.,
 }
 
 model["acquisition"] = {
     "source_type": "ricker",
-    "source_locations": spyro.create_transect((0.2, 0.15), (0.8, 0.15), 1),
+    "source_pos": spyro.create_transect((0.2, 0.15), (0.8, 0.15), 1),
     "frequency": 7.0,
     "delay": 1.0,
     "receiver_locations": spyro.create_transect((0.2, 0.2), (0.8, 0.2), 10),
@@ -45,9 +45,9 @@ model["aut_dif"] = {
     "checkpointing": False,
 }
 
-model["time_axis"] = {
-    "initial_time": 0.0,  # Initial time for event
-    "final_time": 0.4,  # Final time for event (for test 7)
+model["timeaxis"] = {
+    "t0": 0.0,  # Initial time for event
+    "tf": 0.4,  # Final time for event (for test 7)
     "dt": 0.004,  # timestep size (divided by 2 in the test 4. dt for test 3 is 0.00050)
     "amplitude": 1,  # the Ricker has an amplitude of 1.
     "output_frequency": 20,  # (20 for dt=0.00050) how frequently to output solution to pvds
@@ -78,7 +78,7 @@ def forward(
     if annotate:
         fire_ad.continue_annotation()
         if model["aut_dif"]["checkpointing"]:
-            total_steps = int(model["time_axis"]["final_time"] / model["time_axis"]["dt"]) + 1
+            total_steps = int(model["timeaxis"]["tf"] / model["timeaxis"]["dt"]) + 1
             steps_store = int(total_steps / 10)  # Store 10% of the steps.
             tape = fire_ad.get_working_tape()
             tape.progress_bar = fire.ProgressBar
@@ -104,6 +104,7 @@ def test_taylor():
     else:
         method = "CG"
     print(f"Using {method} method")
+    model["options"]["method"] = method
     element = fire.FiniteElement(
         method, mesh.ufl_cell(), degree=model["options"]["degree"]
     )
@@ -112,7 +113,7 @@ def test_taylor():
     fwd_solver = spyro.solvers.forward_ad.ForwardSolver(model, mesh)
     # Ricker wavelet
     wavelet = spyro.full_ricker_wavelet(
-        model["time_axis"]["dt"], model["time_axis"]["final_time"],
+        model["timeaxis"]["dt"], model["timeaxis"]["tf"],
         model["acquisition"]["frequency"],
     )
     c_true = make_c_camembert(V, mesh)
