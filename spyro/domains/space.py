@@ -1,8 +1,8 @@
 from firedrake import (FiniteElement, FunctionSpace, VectorElement)
 
 
-def function_space(mesh, method, degree, dim=1):
-    """Return a Firedrake function space based on the specified
+def create_function_space(mesh, method, degree, dim=1):
+    """Create a Firedrake function space based on the specified
     finite element method.
 
     Parameters:
