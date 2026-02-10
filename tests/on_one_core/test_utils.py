@@ -21,12 +21,12 @@ def test_butter_lowpast_filter():
     shot_record = Wave_obj.forward_solution_receivers
     rec10 = shot_record[:, 10]
 
-    fs = (1.0 / Wave_obj.dt) + 1
+    fs = 1. / Wave_obj.dt
 
     # Checks if frequency with greater power density is close to 5
     (f, S) = sp.signal.periodogram(rec10, fs)
     peak_frequency = f[np.argmax(S)]
-    test1 = math.isclose(peak_frequency, 5.0, rel_tol=1e-2)
+    test1 = math.isclose(peak_frequency, 5., rel_tol=1e-2)
 
     # Checks if the new frequency is lower than the cutoff
     cutoff_frequency = 3.0
