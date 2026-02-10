@@ -99,22 +99,11 @@ try:
 except Exception as e:
     print(f"Error loaging Gar6: {e}")
     p_gar6_final = None
-
 error_gar6 = error_calc(gar6_solution_scaled, analytical_solution, len(analytical_solution))
 print(f"Error Gar6more2D/analytical = {error_gar6 * 100:.2f}%")
 
-import matplotlib.pyplot as plt
-plt.figure(figsize=(14, 7))
-plt.plot(time_points, analytical_solution, 'r-', label='Analytical', linewidth=2.5)
-plt.plot(time_points, numerical_solution_scaled, 'b--', label='Numerical', linewidth=2.0)
-plt.plot(time_points, gar6_solution_scaled, 'g:', label='Gar6more2D', linewidth=2.5)
-plt.title("Validation of the numerical solution - Acoustic Wave", fontsize=14)
-plt.xlabel("Time (s)", fontsize=12)
-plt.ylabel("Amplitude", fontsize=12)
-plt.legend(loc='lower right', frameon=True, shadow=True)
-plt.grid(True, linestyle=':', alpha=0.6)
-plt.tight_layout()
-plt.savefig(f"validation_forward_acoustic.png")
+spyro.plots.plot_validation_acoustic(time_points, analytical_solution, numerical_solution_scaled, gar6_solution_scaled)
+
 
 
 

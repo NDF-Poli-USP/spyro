@@ -567,3 +567,16 @@ def plot_model_in_p1(Wave_object, dx=0.01, filename="model.png", abc_points=None
     new_wave_obj.set_initial_velocity_model(conditional=Wave_object.initial_velocity_model)
 
     return plot_model(new_wave_obj, filename=filename, abc_points=abc_points, show=show, flip_axis=flip_axis)
+
+def plot_validation_acoustic(time_points, analytical_solution, numerical_solution_scaled, gar6_solution_scaled):
+    plt.figure(figsize=(14, 7))
+    plt.plot(time_points, analytical_solution, 'r-', label='Analytical', linewidth=2.5)
+    plt.plot(time_points, numerical_solution_scaled, 'b--', label='Numerical', linewidth=2.0)
+    plt.plot(time_points, gar6_solution_scaled, 'g:', label='Gar6more2D', linewidth=2.5)
+    plt.title("Validation of the numerical solution - Acoustic Wave", fontsize=14)
+    plt.xlabel("Time (s)", fontsize=12)
+    plt.ylabel("Amplitude", fontsize=12)
+    plt.legend(loc='lower right', frameon=True, shadow=True)
+    plt.grid(True, linestyle=':', alpha=0.6)
+    plt.tight_layout()
+    plt.savefig(f"validation_forward_acoustic.png")
