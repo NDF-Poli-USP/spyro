@@ -76,7 +76,7 @@ mesh.coordinates.dat.data[:, 2] -= 1.0
 
 comm = spyro.utils.mpi_init(model)
 
-V = spyro.domains.space.function_space(
+V = spyro.domains.space.create_function_space(
     mesh, model["opts"]["method"], model["opts"]["degree"]
 )
 
