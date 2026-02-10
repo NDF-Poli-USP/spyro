@@ -1,9 +1,12 @@
 from abc import abstractmethod, ABCMeta
 import warnings
 import firedrake as fire
-from firedrake import sin, cos, pi, tanh, sqrt  # noqa: F401
+from numpy import log10
+from numpy.random import uniform
+from os import getcwd
 
-from .time_integration_central_difference import central_difference as time_integrator
+from .time_integration_central_difference import \
+    central_difference as time_integrator
 from ..domains.quadrature import quadrature_rules
 from ..io import Model_parameters
 from ..io.basicio import ensemble_propagator
@@ -170,82 +173,82 @@ class Wave(Model_parameters, metaclass=ABCMeta):
         elif self.dimension == 3:
             return self.mesh_z, self.mesh_x, self.mesh_y
 
-    def set_initial_velocity_model(
-            self,
-            constant=None,
-            conditional=None,
-            velocity_model_function=None,
-            expression=None,
-            new_file=None,
-            output=False,
-            dg_velocity_model=True):
-        """Method to define new user velocity model or file. It is optional.
+    # def set_initial_velocity_model(
+    #         self,
+    #         constant=None,
+    #         conditional=None,
+    #         velocity_model_function=None,
+    #         expression=None,
+    #         new_file=None,
+    #         output=False,
+    #         dg_velocity_model=True):
+    #     """Method to define new user velocity model or file. It is optional.
 
-        Parameters:
-        -----------
-        conditional:  (optional)
-            Firedrake conditional object.
-        velocity_model_function: Firedrake function (optional)
-            Firedrake function to be used as the velocity model. Has to be in the same function space as the object.
-        expression:  str (optional)
-            If you use an expression, you can use the following variables:
-            x, y, z, pi, tanh, sqrt. Example: "2.0 + 0.5*tanh((x-2.0)/0.1)".
-            It will be interpoalte into either the same function space as the object or a DG0 function space
-            in the same mesh.
-        new_file:  str (optional)
-            Name of the file containing the velocity model.
-        output:  bool (optional)
-            If True, outputs the velocity model to a pvd file for visualization.
-        """
-        if new_file is not None:
-            self.initial_velocity_model_file = new_file
-        # If no mesh is set, we have to do it beforehand
-        if self.mesh is None:
-            self.set_mesh()
-        # Resseting old velocity model
-        self.initial_velocity_model = None
-        self.initial_velocity_model_file = None
+    #     Parameters:
+    #     -----------
+    #     conditional:  (optional)
+    #         Firedrake conditional object.
+    #     velocity_model_function: Firedrake function (optional)
+    #         Firedrake function to be used as the velocity model. Has to be in the same function space as the object.
+    #     expression:  str (optional)
+    #         If you use an expression, you can use the following variables:
+    #         x, y, z, pi, tanh, sqrt. Example: "2.0 + 0.5*tanh((x-2.0)/0.1)".
+    #         It will be interpoalte into either the same function space as the object or a DG0 function space
+    #         in the same mesh.
+    #     new_file:  str (optional)
+    #         Name of the file containing the velocity model.
+    #     output:  bool (optional)
+    #         If True, outputs the velocity model to a pvd file for visualization.
+    #     """
+    #     if new_file is not None:
+    #         self.initial_velocity_model_file = new_file
+    #     # If no mesh is set, we have to do it beforehand
+    #     if self.mesh is None:
+    #         self.set_mesh()
+    #     # Resseting old velocity model
+    #     self.initial_velocity_model = None
+    #     self.initial_velocity_model_file = None
 
-        if self.debug_output:
-            output = True
+    #     if self.debug_output:
+    #         output = True
 
-        if conditional is not None:
-            if dg_velocity_model:
-                V = fire.FunctionSpace(self.mesh, "DG", 0)
-            else:
-                V = self.function_space
-            vp = fire.Function(V, name="velocity")
-            vp.interpolate(conditional)
-            self.initial_velocity_model = vp
-        elif expression is not None:
-            z = self.mesh_z  # noqa: F841
-            x = self.mesh_x  # noqa: F841
-            if self.dimension == 3:
-                y = self.mesh_y  # noqa: F841
-            expression = eval(expression)
-            V = self.function_space
-            vp = fire.Function(V, name="velocity")
-            vp.interpolate(expression)
-            self.initial_velocity_model = vp
-        elif velocity_model_function is not None:
-            self.initial_velocity_model = velocity_model_function
-        elif new_file is not None:
-            self.initial_velocity_model_file = new_file
-            self._get_initial_velocity_model()
-        elif constant is not None:
-            V = self.function_space
-            vp = fire.Function(V, name="velocity")
-            vp.interpolate(fire.Constant(constant))
-            self.initial_velocity_model = vp
-        else:
-            raise ValueError(
-                "Please specify either a conditional, expression, "
-                "firedrake function or new file name (segy or hdf5)."
-            )
-        if output:
-            fire.VTKFile("initial_velocity_model.pvd").write(
-                self.initial_velocity_model, name="velocity"
-            )
+    #     if conditional is not None:
+    #         if dg_velocity_model:
+    #             V = fire.FunctionSpace(self.mesh, "DG", 0)
+    #         else:
+    #             V = self.function_space
+    #         vp = fire.Function(V, name="velocity")
+    #         vp.interpolate(conditional)
+    #         self.initial_velocity_model = vp
+    #     elif expression is not None:
+    #         z = self.mesh_z  # noqa: F841
+    #         x = self.mesh_x  # noqa: F841
+    #         if self.dimension == 3:
+    #             y = self.mesh_y  # noqa: F841
+    #         expression = eval(expression)
+    #         V = self.function_space
+    #         vp = fire.Function(V, name="velocity")
+    #         vp.interpolate(expression)
+    #         self.initial_velocity_model = vp
+    #     elif velocity_model_function is not None:
+    #         self.initial_velocity_model = velocity_model_function
+    #     elif new_file is not None:
+    #         self.initial_velocity_model_file = new_file
+    #         self._get_initial_velocity_model()
+    #     elif constant is not None:
+    #         V = self.function_space
+    #         vp = fire.Function(V, name="velocity")
+    #         vp.interpolate(fire.Constant(constant))
+    #         self.initial_velocity_model = vp
+    #     else:
+    #         raise ValueError(
+    #             "Please specify either a conditional, expression, "
+    #             "firedrake function or new file name (segy or hdf5)."
+    #         )
+    #     if output:
+    #         fire.VTKFile("initial_velocity_model.pvd").write(
+    #             self.initial_velocity_model, name="velocity"
+    #         )
 
     def _map_sources_and_receivers(self):
         if self.source_type == "ricker":
@@ -395,11 +398,54 @@ class Wave(Model_parameters, metaclass=ABCMeta):
         '''
         pass
 
+    def define_property_function_space(self, func_space_type, dg_property,
+                                       shape_func_space=None):
+        '''
+        Define the function space for a material property.
+
+        Parameters:
+        -----------
+        func_space_type, `str`
+            Type of function space for the material property.
+            Options: 'scalar', 'vector' or 'tensor'
+        dg_property: `bool`
+            If True, uses a DG0 function space for conditional and
+            expression inputs. Default is True
+        shape_func_space: `tuple`, optional
+            Shape of the function space for only tensorial material property
+
+        Returns:
+        V: `firedrake function space`
+            Function space for the material property.
+        '''
+
+        # Define the function space parameters
+        typ_ele = 'DG' if dg_property else \
+            self.function_space.ufl_element().family()
+        dgr_ele = 0 if dg_property else \
+            self.function_space.ufl_element().degree()
+
+        # Function space for the property
+        if func_space_type == 'scalar':
+            V = fire.FunctionSpace(self.mesh, typ_ele, dgr_ele)
+        elif func_space_type == 'vector':
+            V = fire.VectorFunctionSpace(self.mesh, typ_ele, dgr_ele)
+        elif func_space_type == 'tensor':
+            V = fire.TensorFunctionSpace(self.mesh, typ_ele, dgr_ele,
+                                         shape=shape_func_space)
+        else:
+            error_management.value_parameter_error(
+                'func_space_type', func_space_type,
+                ['scalar', 'vector', 'tensor'])
+
+        return V
+
     def set_material_property(self, property_name, func_space_type,
                               shape_func_space=None, constant=None,
-                              conditional=None, fire_function=None,
-                              expression=None, new_file=None,
-                              output=False, dg_property=False):
+                              random=None, conditional=None,
+                              fire_function=None, expression=None,
+                              from_file=None, output=False,
+                              dg_property=False, foldername='default'):
         '''
         Set a material property (e.g., density, etc.) in the model.
 
@@ -408,19 +454,21 @@ class Wave(Model_parameters, metaclass=ABCMeta):
         property_name: `str`
             Name of the material property to be set.
         func_space_type, `str`
-            Type of function space for the  material property.
+            Type of function space for the material property.
             Options: 'scalar', 'vector' or 'tensor'
         shape_func_space: `tuple`, optional
-            Shape of the function space for tensorial material property
-        new_file: `str`, optional
+            Shape of the function space for only tensorial material property
+        from_file: `str`, optional
             Name of the file containing the material property. Default is None
         constant: `float`, optional
             Constant value for the material property. Default is None
+        random: `tuple`, optional
+            If you want to set a random material property, specify the range of
+            values as a tuple (min, max). Default is None
         conditional:  `firedrake conditional`, optional
             Firedrake conditional object. Default is None
         fire_function: `firedrake function`, optional
-            Firedrake function in the same function space as the object.
-            Default is None.
+            Firedrake function based on the input object. Default is None.
         expression: `str`, optional
             If you use an expression, you can use the following variables:
             x, y, z, pi, tanh, sqrt. Ex: "2. + 0.5 * tanh((x - 2.) / 0.1)".
@@ -433,24 +481,13 @@ class Wave(Model_parameters, metaclass=ABCMeta):
         dg_property: `bool`, optional
             If True, uses a DG0 function space for conditional and
             expression inputs. Default is True
+        foldername : `string`, optional
+            Name of the folder where the material property is saved.
+            If default is 'default', property is saved in '/property_fields/'
         '''
-        typ_ele = 'DG' if dg_property else \
-            self.function_space.ufl_element().family()
-        dgr_ele = 0 if dg_property else \
-            self.function_space.ufl_element().degree()
 
-        # # Dealing with mixed function spaces
-        # family = set(V_.ufl_element().family() for V_ in V)
-        # degree = max(V_.ufl_element().degree() for V_ in V)
-
-        # Function space for the property
-        if func_space_type == 'scalar':
-            V = fire.FunctionSpace(self.mesh, typ_ele, dgr_ele)
-        elif func_space_type == 'vector':
-            V = fire.VectorFunctionSpace(mesh, typ_ele, dgr_ele)
-        elif func_space_type == 'tensor':
-            V = fire.TensorFunctionSpace(mesh, typ_ele, dgr_ele,
-                                         shape=shape_func_space)
+        V = self.define_property_function_space(
+            func_space_type, dg_property, shape_func_space=shape_func_space)
 
         # If no mesh is set, we have to do it beforehand
         if self.mesh is None:
@@ -460,11 +497,14 @@ class Wave(Model_parameters, metaclass=ABCMeta):
             if conditional is not None:
                 ufl_input = conditional
 
-            elif expression is not None:
+            if expression is not None:
                 ufl_input = utils.eval_functions_to_ufl.generate_ufl_functions(
                     self.mesh, expression, self.dimension)
 
-            elif constant is not None:
+            if constant is not None:
+                col = int(abs(log10(abs(constant)))) + 2
+                print(f"Assigning {property_name:>10} with a "
+                      f"constant value of {constant:>{col}}", flush=True)
                 ufl_input = fire.Constant(constant)
 
             if fire_function is not None:
@@ -474,11 +514,20 @@ class Wave(Model_parameters, metaclass=ABCMeta):
                     mat_property = fire.Function(
                         V, name=property_name).interpolate(fire_function)
 
-            elif new_file is not None:
-                mat_property = new_file
+            elif from_file is not None:
+                mat_property = from_file
                 # Substitute by new method in PR of Alexandre
-                self.initialize_material_property_from_file(new_file)
+                # self.initialize_material_property_from_file(from_file)
 
+            elif random is not None:
+                col0 = int(abs(log10(abs(random[0])))) + 2
+                col1 = int(abs(log10(abs(random[1])))) + 2
+                print(f"Assigning {property_name:>10} with a random field "
+                      f"between ({random[0]:>{col0}},{random[1]:>{col1}})",
+                       flush=True)
+                mat_property = fire.Function(V, name=property_name)
+                mat_property.dat.data[:] = uniform(random[0], random[1],
+                                                   mat_property.dat.data.shape)
             else:
                 mat_property = fire.Function(
                     V, name=property_name).interpolate(ufl_input)
@@ -490,7 +539,12 @@ class Wave(Model_parameters, metaclass=ABCMeta):
                              " new file name (*.segy or *.hdf5).")
 
         if output:
-            fire.VTKFile(property_name + ".pvd").write(initial_property,
-                                                       name="property_name")
+            # Path to save data
+            self.path_save_matprop = getcwd() + ('/property_fields/'
+                                                 if foldername == 'default'
+                                                 else foldername)
+            pth_prop = self.path_save_matprop + property_name + ".pvd"
+            print(f"Saving {property_name} to {foldername} for visualization.")
+            fire.VTKFile(pth_prop).write(mat_property, name=property_name)
 
-        return mat_property, mat_property_file
+        return mat_property
