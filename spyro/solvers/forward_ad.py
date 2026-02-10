@@ -23,8 +23,7 @@ class ForwardSolver:
     def __init__(self, model, mesh):
         self.model = model
         self.mesh = mesh
-        self.V = function_space(
-            self.mesh, self.model["options"]["method"], self.model["options"]["degree"])
+        self.V = function_space(self.mesh, self.model["options"]["method"], self.model["options"]["degree"])
         self.receiver_mesh = fire.VertexOnlyMesh(
             self.mesh, self.model["acquisition"]["receiver_locations"])
         self.solution = None
