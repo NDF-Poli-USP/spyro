@@ -289,7 +289,7 @@ def test_loop_modal_2d():
     degree_type = "real"  # "integer"
 
     # Hyperellipse degrees
-    degree_layer_lst = [2.0]  # [2.0, 3.0, 4.0, 4.4, None]
+    degree_layer_lst = [2.0, 3.0, 4.0, 4.4, None]
 
     # ============ MESH AND EIKONAL ============
 
