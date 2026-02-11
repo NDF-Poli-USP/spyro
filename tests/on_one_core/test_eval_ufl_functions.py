@@ -3,7 +3,7 @@ from firedrake import ConvergenceError, Function, \
 from spyro.utils.eval_functions_to_ufl import generate_ufl_functions
 
 
-def run_test_eval_ufl_functions():
+def test_run_eval_ufl_functions():
     '''
     Run comprehensive tests for 2D/3D models and dangerous operations.
     '''
@@ -12,12 +12,12 @@ def run_test_eval_ufl_functions():
     print("COMPREHENSIVE UFL EXPRESSION GENERATOR TEST SUITE")
     print("=" * 80)
 
-    run_test_eval_ufl_functions_2d()
-    run_test_eval_ufl_functions_3d()
-    run_test_eval_danger_ops()
+    test_run_eval_ufl_functions_2d()
+    test_run_eval_ufl_functions_3d()
+    test_run_eval_danger_ops()
 
 
-def run_test_eval_ufl_functions_2d():
+def test_run_eval_ufl_functions_2d():
     # ==================== 2D MODELS ====================
     print("\n" + "=" * 40)
     print("2D MODELS TEST")
@@ -95,7 +95,7 @@ def run_test_eval_ufl_functions_2d():
           f"({100*successes_2d/total_2d:.1f}%)")
 
 
-def run_test_eval_ufl_functions_3d():
+def test_run_eval_ufl_functions_3d():
     # ==================== 3D MODELS ====================
     print("\n" + "=" * 40)
     print("3D MODELS TEST")
@@ -160,7 +160,7 @@ def run_test_eval_ufl_functions_3d():
           f"({100*successes_3d/total_3d:.1f}%)")
 
 
-def run_test_eval_danger_ops():
+def test_run_eval_danger_ops():
 
     # ==================== DANGEROUS OPERATIONS ====================
     print("\n" + "=" * 40)
@@ -268,4 +268,4 @@ def run_test_eval_danger_ops():
 
 
 if __name__ == "__main__":
-    run_test_eval_ufl_functions()
+    test_run_eval_ufl_functions()
