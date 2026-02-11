@@ -1,7 +1,7 @@
 import numpy as np
 
 from firedrake import (assemble, norm, Constant, curl, DirichletBC, div, Function,
-                       FunctionSpace, project, VectorFunctionSpace)
+                       FunctionSpace, project, VectorFunctionSpace, interpolate)
 
 from .elastic_wave import ElasticWave
 from .forms import (isotropic_elastic_without_pml,
@@ -51,17 +51,18 @@ class IsotropicWave(ElasticWave):
 
     @override
     def initialize_model_parameters_from_object(self, synthetic_data_dict: dict):
-        def constant_wrapper(value):
+        def variable_wrapper(value, function_space=None):
             if np.isscalar(value):
                 return Constant(value)
             else:
                 return value
 
-        def get_value(key, default=None):
-            return constant_wrapper(synthetic_data_dict.get(key, default))
+        def get_value(key, default=None, function_space=None):
+            return variable_wrapper(synthetic_data_dict.get(key, default), function_space=function_space)
 
         self.rho = get_value("density")
-        self.lmbda = get_value("lambda", default=get_value("lame_first"))
+        Q = FunctionSpace(self.mesh, self.function_space.ufl_element().sub_elements[0])
+        self.lmbda = interpolate(synthetic_data_dict.get("lambda"), Q)
         self.mu = get_value("mu", get_value("lame_second"))
         self.c = get_value("p_wave_velocity")
         self.c_s = get_value("s_wave_velocity")
@@ -80,7 +81,7 @@ class IsotropicWave(ElasticWave):
             not bool(self.mu)
 
         if option_1:
-            self.c = ((self.lmbda + 2*self.mu)/self.rho)**0.5
+            self.c = self.lmbda # ((self.lmbda + 2*self.mu)/self.rho)**0.5
             self.c_s = (self.mu/self.rho)**0.5
         elif option_2:
             self.mu = self.rho*self.c_s**2
