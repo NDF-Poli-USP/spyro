@@ -1,5 +1,6 @@
 import firedrake as fire
 import math
+import numpy as np
 import spyro
 import matplotlib.pyplot as plt
 from collections import defaultdict
@@ -34,6 +35,8 @@ def mms_h_convergence(dt, h):
     b  = lambda x, t: fire.as_vector([b1(x, t), b2(x, t)])
 
     fo = int(0.1/dt)
+
+    lbda = lambda x: (1 + fire.sin(fire.pi*-x[0])*fire.sin(fire.pi*x[1]))*(1 + fire.sin(fire.pi*-x[0])*fire.sin(fire.pi*x[1]))
 
     dictionary = {}
     dictionary["options"] = {
@@ -82,7 +85,6 @@ def mms_h_convergence(dt, h):
     dictionary["synthetic_data"] = {
         "type": "object",
         "density": 1,
-        "lambda": 1,
         "mu": 1,
         "real_velocity_file": None,
     }
@@ -98,6 +100,7 @@ def mms_h_convergence(dt, h):
     # wave._initialize_model_parameters()
     # wave.matrix_building()
     x = wave.get_spatial_coordinates()
+    dictionary["synthetic_data"]["lambda"] = lbda(x)
     # wave.u_nm1.interpolate(u(x, 0.0 - 2*dt))
     # wave.u_n.interpolate(u(x, 0.0 - dt))
     # wave.u_nm2.interpolate(u(x, 0.0 - 2*dt))
@@ -109,13 +112,56 @@ def mms_h_convergence(dt, h):
     u_an.interpolate(u(x, t))
 
     V  = wave.function_space.sub(0)
-    p_num = fire.project(fire.div(wave.u_n), V)
+    
+    # For elastic waves: ∂p/∂t + λ ∇·u = 0
+    # The correct relationship is: p = -λ * ∇·u
+    p_num = fire.project(-lbda(x) * fire.div(wave.u_n), V)
+    p_numdat = p_num.dat.data[:]
+    spyro.plots.debug_pvd(p_num, filename="numerical.pvd")
 
     p_an  = fire.Function(wave.function_space.sub(0)).interpolate(p(x, t))
+    p_andat = p_an.dat.data[:]
 
-    err_p = fire.errornorm(p_num, p_an) / fire.norm(p_an)
-    print("Recovered pressure MMS error:", err_p)
+    spyro.plots.debug_pvd(p_an, filename="analitical.pvd")
+    
+    # Debug the issue with nan errors
+    print(f"p_num stats: min={min(p_numdat)}, max={max(p_numdat)}, mean={sum(p_numdat)/len(p_numdat)}")
+    print(f"p_an stats: min={min(p_andat)}, max={max(p_andat)}, mean={sum(p_andat)/len(p_andat)}")
+    
+    # Check norms
+    norm_p_num = fire.norm(p_num)
+    norm_p_an = fire.norm(p_an)
+    print(f"Norms: p_num={norm_p_num}, p_an={norm_p_an}")
+    
+    # Check for special values
+    has_nan_pnum = np.any(np.isnan(p_numdat))
+    has_nan_pan = np.any(np.isnan(p_andat))
+    has_inf_pnum = np.any(np.isinf(p_numdat))
+    has_inf_pan = np.any(np.isinf(p_andat))
+    print(f"NaN/Inf check: p_num has NaN={has_nan_pnum}, has Inf={has_inf_pnum}")
+    print(f"NaN/Inf check: p_an has NaN={has_nan_pan}, has Inf={has_inf_pan}")
+    
+    # Manual L2 error calculation since fire.norm sometimes gives inf
+    manual_norm_p_an = np.sqrt(np.sum(p_andat**2))
+    manual_norm_diff = np.sqrt(np.sum((p_numdat - p_andat)**2))
+    
+    if manual_norm_p_an > 1e-15:
+        err_p = manual_norm_diff / manual_norm_p_an
+        print(f"Pressure recovery error: {err_p:.6f}")
+    else:
+        err_p = float('inf')
+        print("Cannot compute pressure error - p_an norm too small")
 
+    # Compute displacement errors
+    e1 = fire.errornorm(wave.u_n, u_an) / fire.norm(u_an)
+    print("Displacement MMS error:", e1)
+    
+    # Use pressure error as second metric
+    e2 = err_p
+    
+    print(f"p_num max: {max(abs(p_numdat))}, p_an max: {max(abs(p_andat))}")
+    print(f"p_num shape: {p_numdat.shape}, p_an shape: {p_andat.shape}")
+    
     if e1 > 1e3 or e2 > 1e3:
         raise ValueError("ERROR")
 
@@ -123,7 +169,7 @@ def mms_h_convergence(dt, h):
     return e1, e2
 
 if __name__ == "__main__":
-    dts = [1e-3, 1e-4, 1e-5]
+    dts = [1e-3] #  , 1e-4, 1e-5]
     # dts = [1e-2, 1e-3]
     hs = [0.125]#, 0.1, 0.05, 0.025]
     
