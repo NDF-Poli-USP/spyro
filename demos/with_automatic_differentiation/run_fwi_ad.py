@@ -1,8 +1,12 @@
 import firedrake as fire
 import firedrake.adjoint as fire_ad
 from checkpoint_schedules import Revolve
+import numpy as np
 import spyro
-from demos.with_automatic_differentiation import utils
+try:
+    from demos.with_automatic_differentiation import utils
+except ModuleNotFoundError:
+    import utils
 import os
 os.environ["OMP_NUM_THREADS"] = "1"
 
@@ -74,16 +78,16 @@ def forward(
 M = model["parallelism"]["num_spacial_cores"]
 my_ensemble = fire.Ensemble(fire.COMM_WORLD, M)
 mesh = fire.UnitSquareMesh(50, 50, comm=my_ensemble.comm)
-element = fire.FiniteElement(
-    model["opts"]["method"], mesh.ufl_cell(), degree=model["opts"]["degree"],
-    variant=model["opts"]["quadrature"]
+V = spyro.domains.space.function_space(
+    mesh, model["options"]["method"], model["options"]["degree"],
+    dim=1
 )
-V = fire.FunctionSpace(mesh, element)
 
 
-forward_solver = spyro.solvers.forward_ad.ForwardSolver(model, mesh, V)
+forward_solver = spyro.solvers.forward_ad.ForwardSolver(model, mesh)
 # Camembert model.
 c_true = utils.make_c_camembert(mesh, V)
+
 # Ricker wavelet
 wavelet = spyro.full_ricker_wavelet(
     model["timeaxis"]["dt"], model["timeaxis"]["tf"],
@@ -94,19 +98,17 @@ true_rec, _ = forward(c_true)
 
 # --- FWI with AD --- #
 c_guess = utils.make_c_camembert(mesh, V, c_guess=True)
+
 guess_rec, J = forward(
     c_guess, compute_functional=True, true_data_receivers=true_rec,
     annotate=True
 )
-
 # :class:`~.EnsembleReducedFunctional` is employed to recompute in
 # parallel the functional and its gradient associated with the multiple sources
 # (3 in this case).
 J_hat = fire_ad.EnsembleReducedFunctional(
     J, fire_ad.Control(c_guess), my_ensemble)
-c_optimised = fire_ad.minimize(J_hat, method="L-BFGS-B",
-                               options={"disp": True, "maxiter": 10},
-                               bounds=(1.5, 3.5),
-                               derivative_options={"riesz_representation": 'l2'})
-
-fire.VTKFile("c_optimised.pvd").write(c_optimised)
+# fire.VTKFile("gradient.pvd").write(grad)
+fire_ad.taylor_test(
+    J_hat, c_guess, fire.Function(V).interpolate(0.01)
+)

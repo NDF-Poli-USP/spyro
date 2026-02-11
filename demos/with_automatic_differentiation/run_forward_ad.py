@@ -24,6 +24,7 @@ V = spyro.domains.space.function_space(
 forward_solver = spyro.solvers.forward_ad.ForwardSolver(model, mesh)
 
 c_true = make_c_camembert(mesh, V)
+fire.VTKFile("velocity.pvd").write(c_true)
 # Ricker wavelet
 wavelet = spyro.full_ricker_wavelet(
     model["timeaxis"]["dt"], model["timeaxis"]["tf"],
