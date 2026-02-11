@@ -78,16 +78,13 @@ def forward(
 M = model["parallelism"]["num_spacial_cores"]
 my_ensemble = fire.Ensemble(fire.COMM_WORLD, M)
 mesh = fire.UnitSquareMesh(50, 50, comm=my_ensemble.comm)
-V = spyro.domains.space.function_space(
-    mesh, model["options"]["method"], model["options"]["degree"],
-    dim=1
-)
-
 
 forward_solver = spyro.solvers.forward_ad.ForwardSolver(model, mesh)
+V = forward_solver.V
 # Camembert model.
 c_true = utils.make_c_camembert(mesh, V)
 
+fire.VTKFile("true_velocity.pvd").write(c_true)
 # Ricker wavelet
 wavelet = spyro.full_ricker_wavelet(
     model["timeaxis"]["dt"], model["timeaxis"]["tf"],
@@ -98,7 +95,7 @@ true_rec, _ = forward(c_true)
 
 # --- FWI with AD --- #
 c_guess = utils.make_c_camembert(mesh, V, c_guess=True)
-
+fire.VTKFile("initial_guess_velocity.pvd").write(c_guess)
 guess_rec, J = forward(
     c_guess, compute_functional=True, true_data_receivers=true_rec,
     annotate=True
