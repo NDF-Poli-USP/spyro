@@ -416,7 +416,11 @@ class Wave(Model_parameters, metaclass=ABCMeta):
 
         Returns:
         V: `firedrake function space`
-            Function space for the material property.
+            Function space for the material property
+        typ_ele: `str`
+            Type of element for the function space (e.g., 'DG', 'CG', 'KMV')
+        dgr_ele: `int`
+            Degree of the element for the function space
         '''
 
         # Define the function space parameters
@@ -438,7 +442,7 @@ class Wave(Model_parameters, metaclass=ABCMeta):
                 'func_space_type', func_space_type,
                 ['scalar', 'vector', 'tensor'])
 
-        return V
+        return V, typ_ele, dgr_ele
 
     def set_material_property(self, property_name, func_space_type,
                               shape_func_space=None, constant=None,
@@ -486,7 +490,7 @@ class Wave(Model_parameters, metaclass=ABCMeta):
             If default is 'default', property is saved in '/property_fields/'
         '''
 
-        V = self.define_property_function_space(
+        V, typ_ele, dgr_ele = self.define_property_function_space(
             func_space_type, dg_property, shape_func_space=shape_func_space)
 
         # If no mesh is set, we have to do it beforehand
@@ -496,7 +500,7 @@ class Wave(Model_parameters, metaclass=ABCMeta):
         try:
             if conditional is not None:
                 print(f"Assigning {property_name} with a conditional "
-                      f"field given by {conditional} ", flush=True)
+                      f"field given by {conditional}", flush=True)
                 ufl_input = conditional
 
             if expression is not None:
@@ -506,17 +510,27 @@ class Wave(Model_parameters, metaclass=ABCMeta):
                     self.mesh, expression, self.dimension)
 
             if constant is not None:
-                col = int(abs(log10(abs(constant)))) + 2
+                value = 1 if constant == 0 else abs(constant)
+                col = int(abs(log10(value))) + 2
                 print(f"Assigning {property_name} with a "
                       f"constant value of {constant:>{col}}", flush=True)
                 ufl_input = fire.Constant(constant)
 
             if fire_function is not None:
-                if V is fire_function.function_space():  # Same function space
+                e_str = f"Assigning {property_name} with a firedrake function "
+                ele_orig = self.function_space.ufl_element().family()
+                dgr_orig = self.function_space.ufl_element().degree()
+                if typ_ele == ele_orig and dgr_ele == dgr_orig:
+                    # Same function space
+                    e_str += "in the same "
                     mat_property = fire_function
-                else:
+                else:  # Different function space
+                    e_str += "in another "
                     mat_property = fire.Function(
                         V, name=property_name).interpolate(fire_function)
+
+                e_str += f"function space: {typ_ele}{dgr_ele}."
+                print(e_str, flush=True)
 
             elif from_file is not None:
                 mat_property = from_file
