@@ -96,7 +96,7 @@ from firedrake import ds, dx, Constant, dot, grad
 def construct_solver_or_matrix_no_pml(Wave_object):
     V = Wave_object.function_space
 
-    quad_rule = Wave_object.quadrature_rule # Como mudar para a que implementei no Firedrake?
+    quad_rule = Wave_object.quadrature_rule
 
     u = fire.TrialFunction(V)
     v = fire.TestFunction(V)
@@ -112,14 +112,14 @@ def construct_solver_or_matrix_no_pml(Wave_object):
     Wave_object.current_time = 0.0
     dt = Wave_object.dt
 
-    m1 = (u - 2.0 * u_n + u_nm1) / Constant(dt * dt) * v * dx(scheme=quad_rule)
+    m1 = (1/(Wave_object.c * Wave_object.c)) * (u - 2.0 * u_n + u_nm1) / Constant(dt * dt) * v * dx(scheme=quad_rule)
 
-    a = Wave_object.c * Wave_object.c * dot(grad(u_n), grad(v)) * dx(scheme=quad_rule)
+    a = dot(grad(u_n), grad(v)) * dx(scheme=quad_rule)
     
     le = 0.0
     q = Wave_object.source_expression
     if q is not None:
-        le += -q * v * dx(scheme=quad_rule) # O que está acontecendo aqui?
+        le += -q * v * dx(scheme=quad_rule)
         
     B = fire.Cofunction(V.dual())
 

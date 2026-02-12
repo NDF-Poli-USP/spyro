@@ -1,7 +1,8 @@
 import firedrake as fire
 from firedrake import ds, dx, Constant, dot, grad
+from acoustic_solver_construction_no_pml import construct_solver_or_matrix_no_pml
 
-def solver_acoustic_elastic(Wave_object): # ***AINDA NO FORMATO FIREDRAKE***
+def acoustic_elastic_solver(Wave_object):
     # mesh
     mesh = Mesh("acoustic_elastic.msh")
     fluid_id     = 1

@@ -7,14 +7,6 @@ def error_calc(p_numerical, p_analytical, nt):
     div_error_time = error_time / norm
     return div_error_time
 
-def scale_to_reference(p_numerical, p_analytical):
-    min_len = min(len(p_numerical), len(p_analytical))
-    p_num = np.asarray(p_numerical[:min_len]).flatten()
-    p_analy = np.asarray(p_analytical[:min_len]).flatten()
-    alpha = np.dot(p_analy, p_num) / np.dot(p_num, p_num)
-    p_numerical_scaled = alpha * p_num
-    return p_numerical_scaled
-
 dictionary = {}
 
 dictionary["options"] = {
@@ -78,32 +70,13 @@ tf = dictionary["time_axis"]["final_time"]
 dt = dictionary["time_axis"]["dt"]
 time_points = np.arange(t0, tf + dt, dt)
 
-numerical_solution = Wave_obj.receivers_output
+numerical_solution = Wave_obj.receivers_output.flatten()
 
 analytical_solution = spyro.utils.nodal_homogeneous_analytical(
         Wave_obj, 0.15, 1.5, n_extra=100
         )
 
-numerical_solution_scaled = scale_to_reference(numerical_solution, analytical_solution)
+error = error_calc(numerical_solution, analytical_solution, len(analytical_solution))
+print(f"Error = {error * 100:.2f}%")
 
-error = error_calc(numerical_solution_scaled, analytical_solution, len(analytical_solution))
-print(f"Error spyro/analitycal = {error * 100:.2f}%")
-
-# Gar6more2D:
-try:
-    gar6_path = "P.dat"
-    gar6_data = np.loadtxt(gar6_path)
-    t_gar6 = gar6_data[:, 0]
-    p_gar6 = gar6_data[:, 1]
-    gar6_solution_scaled = scale_to_reference(p_gar6, analytical_solution)
-except Exception as e:
-    print(f"Error loaging Gar6: {e}")
-    p_gar6_final = None
-error_gar6 = error_calc(gar6_solution_scaled, analytical_solution, len(analytical_solution))
-print(f"Error Gar6more2D/analytical = {error_gar6 * 100:.2f}%")
-
-spyro.plots.plot_validation_acoustic(time_points, analytical_solution, numerical_solution_scaled, gar6_solution_scaled)
-
-
-
-
+spyro.plots.plot_validation_acoustic(time_points, analytical_solution, numerical_solution)
