@@ -1,12 +1,11 @@
 import firedrake as fire
 import warnings
 from spyro.solvers.elastic_wave.isotropic_wave import IsotropicWave
-from spyro.utils.cost import comp_cost
 fire.parameters["loopy"] = {"silenced_warnings": ["v1_scheduler_fallback"]}
 warnings.filterwarnings("ignore", category=RuntimeWarning)
 
 
-def wave_dict(domain_dim, tf_usu, dt_usu, fr_files):
+def wave_dict(domain_dim, tf_usu, dt_usu):
     '''
     Create a dictionary with parameters for the model.
 
@@ -18,8 +17,6 @@ def wave_dict(domain_dim, tf_usu, dt_usu, fr_files):
         Final time of the simulation
     dt_usu: `float`
         Time step of the simulation
-    fr_files : `int`
-        Frequency of the output files to be saved in the simulation
 
     Returns
     -------
@@ -63,14 +60,10 @@ def wave_dict(domain_dim, tf_usu, dt_usu, fr_files):
     # injected at a specified point of the mesh. We also specify to record
     # the solution at the corners of the domain to verify the NRBC efficiency.
     dictionary["acquisition"] = {
-        "source_type": "ricker",
         "source_locations": [(-Lz / 2., Lx / 2., Ly / 2.)],
         "frequency": 5.0,  # in Hz
-        "delay": 1. / 3.,
-        "delay_type": "time",  # "multiples_of_minimum" or "time"
-        "receiver_locations": [(-Lz, 0., 0.), (-Lz, Lx, 0.),
-                               (0., 0., 0), (0., Lx, 0.),
-                               (-Lz, 0., Ly), (-Lz, Lx, Ly),
+        "receiver_locations": [(-Lz, 0., 0.), (-Lz, Lx, 0.), (0., 0., 0),
+                               (0., Lx, 0.), (-Lz, 0., Ly), (-Lz, Lx, Ly),
                                (0., 0., Ly), (0., Lx, Ly)]
     }
 
@@ -79,9 +72,6 @@ def wave_dict(domain_dim, tf_usu, dt_usu, fr_files):
         "initial_time": 0.,  # Initial time for event
         "final_time": tf_usu,    # Final time for event
         "dt": dt_usu,  # timestep size in seconds
-        "amplitude": 1.,  # the Ricker has an amplitude of 1.
-        "output_frequency": fr_files,  # how frequently to output solution to pvds
-        "gradient_sampling_frequency": fr_files,  # how frequently to save to RAM
     }
 
     return dictionary
@@ -105,8 +95,8 @@ def test_constant_mat_prop():
     Wave_obj = instance_wave()
 
     # Material properties for testing
-    scalar_mat_prop = ['vel_P', 'vel_S', 'mass_rho',
-                       'epsilonTh', 'gammaTh', 'deltaTh']
+    scalar_mat_prop = ['vel_P', 'vel_S', 'mass_rho', 'epsilonTh',
+                       'gammaTh', 'deltaTh', 'thetaTTI', 'phiTTI']
 
     # Uniform initial distribution
     vel_P_o = 1500
@@ -122,7 +112,7 @@ def test_constant_mat_prop():
 
     print("\nTesting Constant Material Properties", flush=True)
     for property_name, constant in zip(scalar_mat_prop, constant_lst):
-        Wave_obj.set_material_property(
+        mat_property = Wave_obj.set_material_property(
             property_name, 'scalar', constant=constant,
             output=True, foldername='/property_fields/constant/')
 
@@ -145,8 +135,8 @@ def test_random_mat_prop():
     Wave_obj = instance_wave()
 
     # Material properties for testing
-    scalar_mat_prop = ['vel_P', 'vel_S', 'mass_rho',
-                       'epsilonTh', 'gammaTh', 'deltaTh']
+    scalar_mat_prop = ['vel_P', 'vel_S', 'mass_rho', 'epsilonTh',
+                       'gammaTh', 'deltaTh', 'thetaTTI', 'phiTTI']
 
     # Random initial distribution
     random_lst = [(1.5e3, 2e3), (750, 1e3), (1e3, 2e3), (0.1, 0.3),
@@ -154,9 +144,91 @@ def test_random_mat_prop():
 
     print("\nTesting Random Material Properties", flush=True)
     for property_name, random in zip(scalar_mat_prop, random_lst):
-        Wave_obj.set_material_property(
+        mat_property = Wave_obj.set_material_property(
             property_name, 'scalar', random=random,
             output=True, foldername='/property_fields/random/')
+
+
+def test_conditional_mat_prop():
+    '''
+    Test to assign conditional material properties to an instance of Wave.
+
+    Material properties:
+        - vel_P: P-wave velocity [m/s]
+        - vel_S: S-wave velocity [m/s]
+        - mass_rho: Density [kg/m³]
+        - epsilonTh: Thomsen parameter epsilon
+        - gammaTh: Thomsen parameter gamma
+        - deltaTh: Thomsen parameter delta
+        - thetaTTI: Tilt angle in degrees
+        - phiTTI: Azimuth angle in degrees (phi = 0: 2D case)
+    '''
+
+    Wave_obj = instance_wave()
+
+    # Material properties for testing
+    scalar_mat_prop = ['vel_P', 'vel_S', 'mass_rho', 'epsilonTh',
+                       'gammaTh', 'deltaTh', 'thetaTTI', 'phiTTI']
+
+    # Conditional initial distribution
+    f_vel = 2. + abs(Wave_obj.mesh_z)
+    cond_Vp = fire.conditional(Wave_obj.mesh_z < -0.06, f_vel, 1.5)
+    cond_Vs = fire.conditional(Wave_obj.mesh_z < -0.06, f_vel / 2.5, 0.75)
+    f_rho = 1.7e3 + 3e3 * abs(Wave_obj.mesh_z ** 2)
+    cond_rho = fire.conditional(Wave_obj.mesh_z < -0.06, f_rho, 1e3)
+    f_TH = fire.exp(Wave_obj.mesh_x) / 10.
+    cond_eps = fire.conditional(Wave_obj.mesh_x < 0.28, f_TH, 1.5 * f_TH)
+    cond_gam = fire.conditional(Wave_obj.mesh_x < 0.28, 2.5 * f_TH, f_TH)
+    cond_del = fire.conditional(Wave_obj.mesh_x < 0.28, -f_TH / 2., f_TH)
+    f_TTI = 1e4 * (Wave_obj.mesh_y - 0.08)**2 / 2. - 2.
+    cond_the = fire.conditional(Wave_obj.mesh_y < 0.08, f_TTI, -f_TTI)
+    cond_phi = fire.conditional(Wave_obj.mesh_y < 0.08, -f_TTI, f_TTI)
+    cond_lst = [cond_Vp, cond_Vs, cond_rho, cond_eps,
+                cond_gam, cond_del, cond_the, cond_phi]
+
+    print("\nTesting Conditional Material Properties", flush=True)
+    for property_name, cond_field in zip(scalar_mat_prop, cond_lst):
+        mat_property = Wave_obj.set_material_property(
+            property_name, 'scalar', conditional=cond_field,
+            output=True, foldername='/property_fields/conditional/')
+
+
+def test_expression_mat_prop():
+    '''
+    Test to assign expressions as material properties to an instance of Wave.
+
+    Material properties:
+        - vel_P: P-wave velocity [m/s]
+        - vel_S: S-wave velocity [m/s]
+        - mass_rho: Density [kg/m³]
+        - epsilonTh: Thomsen parameter epsilon
+        - gammaTh: Thomsen parameter gamma
+        - deltaTh: Thomsen parameter delta
+        - thetaTTI: Tilt angle in degrees
+        - phiTTI: Azimuth angle in degrees (phi = 0: 2D case)
+    '''
+
+    Wave_obj = instance_wave()
+
+    # Material properties for testing
+    scalar_mat_prop = ['vel_P', 'vel_S', 'mass_rho', 'epsilonTh',  #
+                       'gammaTh', 'deltaTh', 'thetaTTI', 'phiTTI']
+
+    # Expression for initial distribution
+    expr_lst = ["1.5e3 * (1 + sqrt(x**2 + y**2 + z**2))",
+                "1e3 * (0.7 + sqrt(x**2 + y**2 + z**2))",
+                "1e3 * (1 + 5 * ln(1 + x**2 + y**2 + z**2))",
+                "sin(x)*cos(y) / 4 + sin(y)*cos(z) / 3 + 0.1",
+                "sin(y)*cos(z) / 4 + sin(z)*cos(x) / 3 + 0.3",
+                "sin(z)*cos(x) / 2 + sin(x)*cos(y) / 3 + 0.02",
+                "atan2(sqrt(z**2), x) * 180 / pi - 45",
+                "180 / pi * acos(y / (sqrt(x**2 + y**2 + z**2) + 1e-16)) - 45"]
+
+    print("\nTesting Expression as Material Properties", flush=True)
+    for property_name, expr_field in zip(scalar_mat_prop, expr_lst):
+        mat_property = Wave_obj.set_material_property(
+            property_name, 'scalar', expression=expr_field,
+            output=True, foldername='/property_fields/expression/')
 
 
 def instance_wave():
@@ -176,9 +248,6 @@ def instance_wave():
     # Number of timesteps
     steps = 200
 
-    # Frequency of output files
-    fr_files = 1
-
     # Time step of the simulation
     dt_usu = round(tf_usu / steps, 6)
 
@@ -186,7 +255,7 @@ def instance_wave():
     edge_length = 0.040
 
     # Create dictionary with parameters for the model
-    dictionary = wave_dict(domain_dim, tf_usu, dt_usu, fr_files)
+    dictionary = wave_dict(domain_dim, tf_usu, dt_usu)
 
     # Create a wave object
     Wave_obj = IsotropicWave(dictionary)
@@ -201,3 +270,5 @@ def instance_wave():
 if __name__ == "__main__":
     test_constant_mat_prop()
     test_random_mat_prop()
+    test_conditional_mat_prop()
+    test_expression_mat_prop()

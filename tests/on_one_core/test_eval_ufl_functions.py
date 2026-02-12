@@ -28,30 +28,30 @@ def test_run_eval_ufl_functions_2d():
 
     test_expressions_2d = [
         # Basic operations
-        ("2 * cos(pi * x) - sqrt(z/4)", "Basic arithmetic"),
-        ("x**2 + sin(2*pi*z)", "Polynomial with trig"),
-        ("exp(-x**2) * cos(z)", "Gaussian wave"),
-        ("sqrt(x**2 + z**2)", "Distance from origin"),
-        ("tanh(3*x) * sin(4*z)", "Soliton-like"),
+        ("2 * cos(pi * x) - sqrt(y/4)", "Basic arithmetic"),
+        ("x**2 + sin(2*pi*y)", "Polynomial with trig"),
+        ("exp(-x**2) * cos(y)", "Gaussian wave"),
+        ("sqrt(x**2 + y**2)", "Distance from origin"),
+        ("tanh(3*x) * sin(4*y)", "Soliton-like"),
 
         # Layered models (common in seismic)
         ("1.5 + 0.5*tanh((x-0.5)/0.1)", "Velocity gradient"),
-        ("2.0 + 0.3*sin(4*pi*x) + 0.2*cos(4*pi*z)", "Checkerboard"),
-        ("1.0 + 0.5*exp(-10*((x-0.3)**2 + (z-0.7)**2))", "Gaussian lens"),
+        ("2.0 + 0.3*sin(4*pi*x) + 0.2*cos(4*pi*y)", "Checkerboard"),
+        ("1.0 + 0.5*exp(-10*((x-0.3)**2 + (y-0.7)**2))", "Gaussian lens"),
 
         # More complex
-        ("atan2(2*x-1, 2*z-1)", "Angle from center"),
-        ("ln(1 + x**2 + z**2)", "Logarithmic field"),
-        ("sin(pi*x) * cos(pi*z) * exp(-(x**2 + z**2))", "Decaying wave"),
+        ("atan2(2*x-1, 2*y-1)", "Angle from center"),
+        ("ln(1 + x**2 + y**2)", "Logarithmic field"),
+        ("sin(pi*x) * cos(pi*y) * exp(-(x**2 + y**2))", "Decaying wave"),
 
         # Constants and unary operations
-        ("-x**2 + +z", "Mixed unary operators"),
-        ("pi * e * x * z", "Mathematical constants"),
+        ("-x**2 + y", "Mixed unary operators"),
+        ("pi * e * x * y", "Mathematical constants"),
 
         # Edge cases
-        ("x/(z + 1e-16)", "Division"),
-        ("(x + z) * (x - z)", "Polynomial expansion"),
-        ("sin(x)**2 + cos(z)**2", "Trig identity"),
+        ("x/(y + 1e-16)", "Division"),
+        ("(x + y) * (x - y)", "Polynomial expansion"),
+        ("sin(x)**2 + cos(y)**2", "Trig identity"),
     ]
 
     print(f"\nTesting {len(test_expressions_2d)} 2D expressions...")

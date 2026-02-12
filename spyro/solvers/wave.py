@@ -173,82 +173,82 @@ class Wave(Model_parameters, metaclass=ABCMeta):
         elif self.dimension == 3:
             return self.mesh_z, self.mesh_x, self.mesh_y
 
-    # def set_initial_velocity_model(
-    #         self,
-    #         constant=None,
-    #         conditional=None,
-    #         velocity_model_function=None,
-    #         expression=None,
-    #         new_file=None,
-    #         output=False,
-    #         dg_velocity_model=True):
-    #     """Method to define new user velocity model or file. It is optional.
+    def set_initial_velocity_model(
+            self,
+            constant=None,
+            conditional=None,
+            velocity_model_function=None,
+            expression=None,
+            new_file=None,
+            output=False,
+            dg_velocity_model=True):
+        """Method to define new user velocity model or file. It is optional.
 
-    #     Parameters:
-    #     -----------
-    #     conditional:  (optional)
-    #         Firedrake conditional object.
-    #     velocity_model_function: Firedrake function (optional)
-    #         Firedrake function to be used as the velocity model. Has to be in the same function space as the object.
-    #     expression:  str (optional)
-    #         If you use an expression, you can use the following variables:
-    #         x, y, z, pi, tanh, sqrt. Example: "2.0 + 0.5*tanh((x-2.0)/0.1)".
-    #         It will be interpoalte into either the same function space as the object or a DG0 function space
-    #         in the same mesh.
-    #     new_file:  str (optional)
-    #         Name of the file containing the velocity model.
-    #     output:  bool (optional)
-    #         If True, outputs the velocity model to a pvd file for visualization.
-    #     """
-    #     if new_file is not None:
-    #         self.initial_velocity_model_file = new_file
-    #     # If no mesh is set, we have to do it beforehand
-    #     if self.mesh is None:
-    #         self.set_mesh()
-    #     # Resseting old velocity model
-    #     self.initial_velocity_model = None
-    #     self.initial_velocity_model_file = None
+        Parameters:
+        -----------
+        conditional:  (optional)
+            Firedrake conditional object.
+        velocity_model_function: Firedrake function (optional)
+            Firedrake function to be used as the velocity model. Has to be in the same function space as the object.
+        expression:  str (optional)
+            If you use an expression, you can use the following variables:
+            x, y, z, pi, tanh, sqrt. Example: "2.0 + 0.5*tanh((x-2.0)/0.1)".
+            It will be interpoalte into either the same function space as the object or a DG0 function space
+            in the same mesh.
+        new_file:  str (optional)
+            Name of the file containing the velocity model.
+        output:  bool (optional)
+            If True, outputs the velocity model to a pvd file for visualization.
+        """
+        if new_file is not None:
+            self.initial_velocity_model_file = new_file
+        # If no mesh is set, we have to do it beforehand
+        if self.mesh is None:
+            self.set_mesh()
+        # Resseting old velocity model
+        self.initial_velocity_model = None
+        self.initial_velocity_model_file = None
 
-    #     if self.debug_output:
-    #         output = True
+        if self.debug_output:
+            output = True
 
-    #     if conditional is not None:
-    #         if dg_velocity_model:
-    #             V = fire.FunctionSpace(self.mesh, "DG", 0)
-    #         else:
-    #             V = self.function_space
-    #         vp = fire.Function(V, name="velocity")
-    #         vp.interpolate(conditional)
-    #         self.initial_velocity_model = vp
-    #     elif expression is not None:
-    #         z = self.mesh_z  # noqa: F841
-    #         x = self.mesh_x  # noqa: F841
-    #         if self.dimension == 3:
-    #             y = self.mesh_y  # noqa: F841
-    #         expression = eval(expression)
-    #         V = self.function_space
-    #         vp = fire.Function(V, name="velocity")
-    #         vp.interpolate(expression)
-    #         self.initial_velocity_model = vp
-    #     elif velocity_model_function is not None:
-    #         self.initial_velocity_model = velocity_model_function
-    #     elif new_file is not None:
-    #         self.initial_velocity_model_file = new_file
-    #         self._get_initial_velocity_model()
-    #     elif constant is not None:
-    #         V = self.function_space
-    #         vp = fire.Function(V, name="velocity")
-    #         vp.interpolate(fire.Constant(constant))
-    #         self.initial_velocity_model = vp
-    #     else:
-    #         raise ValueError(
-    #             "Please specify either a conditional, expression, "
-    #             "firedrake function or new file name (segy or hdf5)."
-    #         )
-    #     if output:
-    #         fire.VTKFile("initial_velocity_model.pvd").write(
-    #             self.initial_velocity_model, name="velocity"
-    #         )
+        if conditional is not None:
+            if dg_velocity_model:
+                V = fire.FunctionSpace(self.mesh, "DG", 0)
+            else:
+                V = self.function_space
+            vp = fire.Function(V, name="velocity")
+            vp.interpolate(conditional)
+            self.initial_velocity_model = vp
+        elif expression is not None:
+            z = self.mesh_z  # noqa: F841
+            x = self.mesh_x  # noqa: F841
+            if self.dimension == 3:
+                y = self.mesh_y  # noqa: F841
+            expression = eval(expression)
+            V = self.function_space
+            vp = fire.Function(V, name="velocity")
+            vp.interpolate(expression)
+            self.initial_velocity_model = vp
+        elif velocity_model_function is not None:
+            self.initial_velocity_model = velocity_model_function
+        elif new_file is not None:
+            self.initial_velocity_model_file = new_file
+            self._get_initial_velocity_model()
+        elif constant is not None:
+            V = self.function_space
+            vp = fire.Function(V, name="velocity")
+            vp.interpolate(fire.Constant(constant))
+            self.initial_velocity_model = vp
+        else:
+            raise ValueError(
+                "Please specify either a conditional, expression, "
+                "firedrake function or new file name (segy or hdf5)."
+            )
+        if output:
+            fire.VTKFile("initial_velocity_model.pvd").write(
+                self.initial_velocity_model, name="velocity"
+            )
 
     def _map_sources_and_receivers(self):
         if self.source_type == "ricker":
@@ -495,20 +495,24 @@ class Wave(Model_parameters, metaclass=ABCMeta):
 
         try:
             if conditional is not None:
+                print(f"Assigning {property_name} with a conditional "
+                      f"field given by {conditional} ", flush=True)
                 ufl_input = conditional
 
             if expression is not None:
+                print(f"Assigning {property_name} with an expression "
+                      f"field given by f = {expression} ", flush=True)
                 ufl_input = utils.eval_functions_to_ufl.generate_ufl_functions(
                     self.mesh, expression, self.dimension)
 
             if constant is not None:
                 col = int(abs(log10(abs(constant)))) + 2
-                print(f"Assigning {property_name:>10} with a "
+                print(f"Assigning {property_name} with a "
                       f"constant value of {constant:>{col}}", flush=True)
                 ufl_input = fire.Constant(constant)
 
             if fire_function is not None:
-                if V is fire_function.function_space():
+                if V is fire_function.function_space():  # Same function space
                     mat_property = fire_function
                 else:
                     mat_property = fire.Function(
@@ -522,9 +526,9 @@ class Wave(Model_parameters, metaclass=ABCMeta):
             elif random is not None:
                 col0 = int(abs(log10(abs(random[0])))) + 2
                 col1 = int(abs(log10(abs(random[1])))) + 2
-                print(f"Assigning {property_name:>10} with a random field "
+                print(f"Assigning {property_name} with a random field "
                       f"between ({random[0]:>{col0}},{random[1]:>{col1}})",
-                       flush=True)
+                      flush=True)
                 mat_property = fire.Function(V, name=property_name)
                 mat_property.dat.data[:] = uniform(random[0], random[1],
                                                    mat_property.dat.data.shape)
