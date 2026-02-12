@@ -110,7 +110,7 @@ Wave_obj.set_initial_velocity_model(constant=1.5)
 
 # Before propagating our wave, it is helpful to see whether our experiment setup loaded correctly. We can plot our wave object.
 
-spyro.plots.plot_model(Wave_obj, filename="model.png", flip_axis=False, show=True)
+spyro.plots.plot_model(Wave_obj, filename="model.png", flip_axis=False, show=False)
 
 # All we have to do now is call our forward solve method.
 

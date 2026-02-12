@@ -411,9 +411,10 @@ class Wave(Model_parameters, metaclass=ABCMeta):
             self.dt = dt
 
         self.current_sources = source_nums
-        usol, usol_recv = time_integrator(self, source_nums)
-
-        return usol, usol_recv
+        if not self.automatic_adjoint:
+            return time_integrator(self, source_nums)
+        else:
+            return time_integrator(self, source_nums)
 
     def get_dt(self):
         return self._dt

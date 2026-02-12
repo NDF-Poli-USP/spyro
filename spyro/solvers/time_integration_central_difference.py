@@ -79,10 +79,12 @@ def central_difference(wave, source_ids=[0]):
     )
     usol_recv = utils.utils.communicate(usol_recv, wave.comm)
     wave.receivers_output = usol_recv
-
-    wave.forward_solution = usol
+    if not wave.automatic_adjoint:
+        wave.forward_solution = usol
     wave.forward_solution_receivers = usol_recv
 
     wave.field_logger.stop_logging()
-
-    return usol, usol_recv
+    if not wave.automatic_adjoint:
+        return usol, usol_recv
+    else:
+        return usol_recv
