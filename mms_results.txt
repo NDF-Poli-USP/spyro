@@ -1,0 +1,54 @@
+================================================================================
+MMS CONVERGENCE TEST RESULTS
+================================================================================
+
+dt = 0.01
+------------------------------------------------------------
+h          e1                        e2
+------------------------------------------------------------
+0.01       Failed                    Failed
+0.025      Failed                    Failed
+0.05       Failed                    Failed
+0.1        Failed                    Failed
+0.5        1.612843e-04              1.226219e-04
+
+dt = 0.001
+------------------------------------------------------------
+h          e1                        e2
+------------------------------------------------------------
+0.01       Failed                    Failed
+0.025      1.915329e-06              1.436019e-06
+0.05       1.915312e-06              1.436026e-06
+0.1        1.914611e-06              1.436140e-06
+0.5        1.767806e-06              1.404177e-06
+
+dt = 0.0001
+------------------------------------------------------------
+h          e1                        e2
+------------------------------------------------------------
+0.01       1.935890e-08              1.456830e-08
+0.025      1.935901e-08              1.456855e-08
+0.05       1.935914e-08              1.456846e-08
+0.1        1.935333e-08              1.456966e-08
+0.5        1.786389e-08              1.425244e-08
+
+dt = 1e-05
+------------------------------------------------------------
+h          e1                        e2
+------------------------------------------------------------
+0.025      3.304003e-10              4.908308e-10
+0.05       5.036554e-10              5.879650e-10
+0.1        5.685461e-10              5.463560e-10
+0.5        6.978163e-10              9.519788e-10
+
+Exemplo mais simples (idea do Ruben) e se ater ao grau 2 inicialmente:
+- Simulação de uma barra de um único elemento, fazer convergence em h em uma unica direção da barra (parecido com artigo do Ruben de HABC). Espessura reduzida.
+- Depois converter 1d (fake2d) para teste.
+- Modelo com solução analítica seno e cosseno.
+- Se tiver problema com 2+ aumentar uma fileira de elementos.
+- Usar solução acústica
+- Olhar frequencia natural
+- Voltar para as origens!!!
+- Revisar materia antiga de elastico
+- Placa retangular para testar também.
+- Verificar convergencia de freq natural.

@@ -102,7 +102,7 @@ class Wave(Model_parameters, metaclass=ABCMeta):
         self.field_logger.add_field("forward", self.get_function_name(),
                                     lambda: self.get_function())
 
-    def forward_solve(self):
+    def forward_solve(self, build_matrix_operator=True):
         """Solves the forward problem."""
 
         print("\nSolving Forward Problem")
@@ -112,7 +112,9 @@ class Wave(Model_parameters, metaclass=ABCMeta):
 
         if self.abc_boundary_layer_type != "hybrid":
             self._initialize_model_parameters()
-        self.matrix_building()
+        
+        if build_matrix_operator:
+            self.matrix_building()
         self.wave_propagator()
 
     def force_rebuild_function_space(self):
@@ -431,4 +433,8 @@ class Wave(Model_parameters, metaclass=ABCMeta):
         Returns the right-hand side Cofunction without PML DOFs (i.e., only
         the DOFs associated with the subspace of the original problem).
         '''
+        pass
+
+    @abstractmethod
+    def check_stability(self):
         pass

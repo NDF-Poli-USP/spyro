@@ -24,7 +24,7 @@ source_locations = [[-hf, 0.5*L]]
 
 time_step = 2e-4  # [s]
 final_time = 1.5  # [s]
-out_freq = int(0.01/time_step)
+out_freq = int(0.1/time_step)
 
 n = 20
 mesh = fire.RectangleMesh(n, n, 0, L, originX=-L, diagonal='crossed')
@@ -59,7 +59,7 @@ d["acquisition"] = {
     "source_type": "ricker",
     "source_locations": source_locations,
     "frequency": freq,
-    "delay": 0,
+    "delay": 1/freq,
     "delay_type": "time",
     "amplitude": np.array([0, smag]),
     # "amplitude": smag * np.eye(2),
@@ -80,7 +80,7 @@ d["time_axis"] = {
     "final_time": final_time,
     "dt": time_step,
     "output_frequency": out_freq,
-    "gradient_sampling_frequency": 1,
+    "gradient_sampling_frequency": out_freq,
 }
 
 d["visualization"] = {

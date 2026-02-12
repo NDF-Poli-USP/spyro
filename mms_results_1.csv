@@ -1,0 +1,9 @@
+dt,h,e1,e2,status
+0.01,0.025,Error,Error,Failed
+0.01,0.05,Error,Error,Failed
+0.01,0.1,Error,Error,Failed
+0.01,0.5,1.612843e-04,1.226219e-04,Success
+0.001,0.025,1.915329e-06,1.436019e-06,Success
+0.001,0.05,1.915312e-06,1.436026e-06,Success
+0.001,0.1,1.914611e-06,1.436140e-06,Success
+0.001,0.5,1.767806e-06,1.404177e-06,Success

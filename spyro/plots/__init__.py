@@ -1,5 +1,6 @@
 from .plots import plot_shots, plot_mesh_sizes, plot_model, plot_function, plot_model_in_p1, plot_validation_acoustic
-from .plots import debug_plot, debug_pvd
+from .plots import debug_plot, debug_pvd, plot_receiver
+
 
 __all__ = [
     "plot_shots",
@@ -10,4 +11,5 @@ __all__ = [
     "debug_pvd",
     "plot_model_in_p1",
     "plot_validation_acoustic",
+    "plot_receiver",
 ]

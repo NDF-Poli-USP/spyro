@@ -579,3 +579,20 @@ def plot_validation_acoustic(time_points, analytical_solution, numerical_solutio
     plt.grid(True, linestyle=':', alpha=0.6)
     plt.tight_layout()
     plt.savefig(f"validation_forward_acoustic.png")
+
+def plot_receiver(wave, receiver_id=0, show=False, filename="receiver.png", xi=None):
+    nt = int(wave.final_time/wave.dt) + 1
+    time_vector = np.linspace(0.0, wave.final_time, nt)
+    plt.close()
+    if xi is not None:
+        title = f"Receiver {receiver_id} at direction {xi}"
+        plt.plot(time_vector, wave.receivers_output[:, receiver_id, xi])
+    else:
+        title = f"Receiver {receiver_id}"
+        plt.plot(time_vector, wave.receivers_output[:, receiver_id])
+    plt.title(title)
+    if filename is not None:
+        plt.savefig(filename)
+    if show:
+        plt.show()
+    plt.close()git
