@@ -15,7 +15,7 @@ from .acoustic_solver_construction_with_pml import (
 from .backward_time_integration import (
     backward_wave_propagator,
 )
-from ..domains.space import FE_method
+from ..domains.space import create_function_space
 from ..utils.typing import override
 from .functionals import acoustic_energy
 
@@ -62,7 +62,7 @@ class AcousticWave(Wave):
         self.solver = None
         self.rhs = None
         self.B = None
-        if abc_type is None or abc_type == "hybrid":
+        if abc_type is None or abc_type == "local" or abc_type == "hybrid":
             construct_solver_or_matrix_no_pml(self)
         elif abc_type == "PML":
             V = self.function_space
@@ -93,11 +93,11 @@ class AcousticWave(Wave):
         """
         if misfit is not None:
             self.misfit = misfit
-        if self.real_shot_record is None:
-            warnings.warn("Please load or calculate a real shot record first")
-        if self.current_time == 0.0:
+        elif self.current_time == 0.0:
             self.forward_solve()
             self.misfit = self.real_shot_record - self.forward_solution_receivers
+        else:
+            raise ValueError("Please load or calculate a real shot record first")
         return backward_wave_propagator(self)
 
     def reset_pressure(self):
@@ -202,7 +202,7 @@ class AcousticWave(Wave):
 
     @override
     def _create_function_space(self):
-        return FE_method(self.mesh, self.method, self.degree)
+        return create_function_space(self.mesh, self.method, self.degree)
 
     @override
     def rhs_no_pml(self):

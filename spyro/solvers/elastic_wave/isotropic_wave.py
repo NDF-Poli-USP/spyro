@@ -7,8 +7,8 @@ from .elastic_wave import ElasticWave
 from .forms import (isotropic_elastic_without_pml,
                     isotropic_elastic_with_pml)
 from .functionals import mechanical_energy_form
-from ...domains.space import FE_method
 from ...utils.typing import override
+from ...domains.space import create_function_space
 
 
 class IsotropicWave(ElasticWave):
@@ -101,8 +101,8 @@ class IsotropicWave(ElasticWave):
 
     @override
     def _create_function_space(self):
-        return FE_method(self.mesh, self.method, self.degree,
-                         dim=self.dimension)
+        return create_function_space(self.mesh, self.method, self.degree,
+                                     dim=self.dimension)
 
     @override
     def _set_vstate(self, vstate):
@@ -172,7 +172,7 @@ class IsotropicWave(ElasticWave):
         self.parse_boundary_conditions()
         self.parse_volumetric_forces()
 
-        if self.abc_boundary_layer_type is None:
+        if self.abc_boundary_layer_type is None or self.abc_boundary_layer_type == "local":
             isotropic_elastic_without_pml(self)
         elif self.abc_boundary_layer_type == "PML":
             isotropic_elastic_with_pml(self)

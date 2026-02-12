@@ -28,7 +28,7 @@ def check_gradient(Wave_obj_guess, dJ, rec_out_exact, Jm, plot=False):
         J_plusdm = spyro.utils.compute_functional(Wave_obj_guess, misfit_plusdm)
 
         grad_fd = (J_plusdm - Jm) / (step)
-        projnorm = fire.assemble(dJ * dm * fire.dx(scheme=Wave_obj_guess.quadrature_rule))
+        projnorm = fire.assemble(dJ * dm * fire.dx(**Wave_obj_guess.quadrature_rule))
 
         error = 100 * ((grad_fd - projnorm) / projnorm)
 
@@ -79,7 +79,7 @@ dictionary["parallelism"] = {
 }
 
 dictionary["mesh"] = {
-    "Lz": 3.0,  # depth in km - always positive   # Como ver isso sem ler a malha?
+    "Lz": 3.0,  # depth in km - always positive
     "Lx": 3.0,  # width in km - always positive
     "Ly": 0.0,  # thickness in km - always positive
     "mesh_file": None,
@@ -91,7 +91,7 @@ dictionary["acquisition"] = {
     "source_locations": [(-1.1, 1.3), (-1.1, 1.7)],
     "frequency": 5.0,
     "delay": 1.5,
-    "delay_type": "multiples_of_minimun",
+    "delay_type": "multiples_of_minimum",
     "receiver_locations": spyro.create_transect((-1.8, 1.2), (-1.8, 1.8), 10),
 }
 
@@ -100,8 +100,8 @@ dictionary["time_axis"] = {
     "final_time": final_time,  # Final time for event
     "dt": 0.0005,  # timestep size
     "amplitude": 1,  # the Ricker has an amplitude of 1.
-    "output_frequency": 100,  # how frequently to output solution to pvds - Perguntar Daiane ''post_processing_frequnecy'
-    "gradient_sampling_frequency": 1,  # how frequently to save solution to RAM    - Perguntar Daiane 'gradient_sampling_frequency'
+    "output_frequency": 100,  # how frequently to output solution to pvds
+    "gradient_sampling_frequency": 1,  # how frequently to save solution to RAM
 }
 
 dictionary["visualization"] = {
