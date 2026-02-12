@@ -30,35 +30,36 @@ def central_difference(wave, source_ids=[0]):
 
     t = wave.current_time
     nt = int(wave.final_time / wave.dt) + 1  # number of timesteps
-
-    usol = [
-        fire.Function(wave.function_space, name=wave.get_function_name())
-        for t in range(nt)
-        if t % wave.gradient_sampling_frequency == 0
-    ]
+    if not wave.automatic_adjoint:
+        usol = [
+            fire.Function(wave.function_space, name=wave.get_function_name())
+            for t in range(nt)
+            if t % wave.gradient_sampling_frequency == 0
+        ]
     usol_recv = []
     save_step = 0
     for step in range(nt):
         # Basic way of applying sources
-        wave.update_source_expression(t)
-        fire.assemble(wave.rhs, tensor=wave.B)
+        if not wave.automatic_adjoint:
+            wave.update_source_expression(t)
+            fire.assemble(wave.rhs, tensor=wave.B)
 
-        # More efficient way of applying sources
-        if wave.sources is not None:
-            f = wave.sources.apply_source(rhs_forcing, step)
-            B0 = wave.rhs_no_pml()
-            B0 += f
-
-        wave.solver.solve(wave.next_vstate, wave.B)
+            # More efficient way of applying sources
+            if wave.sources is not None:
+                f = wave.sources.apply_source(rhs_forcing, step)
+                B0 = wave.rhs_no_pml()
+                B0 += f
+                wave.solver.solve(wave.next_vstate, wave.B)
+        else:
+            wave.solver.solve()
 
         wave.prev_vstate = wave.vstate
         wave.vstate = wave.next_vstate
-
-        usol_recv.append(wave.get_receivers_output())
-
-        if step % wave.gradient_sampling_frequency == 0:
-            usol[save_step].assign(wave.get_function())
-            save_step += 1
+        if not wave.automatic_adjoint:
+            usol_recv.append(wave.get_receivers_output())
+            if step % wave.gradient_sampling_frequency == 0:
+                usol[save_step].assign(wave.get_function())
+                save_step += 1
 
         if (step - 1) % wave.output_frequency == 0:
             assert (

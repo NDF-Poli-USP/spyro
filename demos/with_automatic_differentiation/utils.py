@@ -28,7 +28,7 @@ def model_settings():
         # options:
         # `shots_parallelism`. Shots parallelism.
         # None - no shots parallelism.
-        "type": "shots_parallelism",
+        "type": "spatial",
         "num_spacial_cores": 1,  # Number of cores to use in the spatial
         # parallelism.
     }
@@ -38,9 +38,9 @@ def model_settings():
         "Lz": 1.0,  # depth in km - always positive
         "Lx": 1.0,  # width in km - always positive
         "Ly": 0.0,  # thickness in km - always positive
-        "meshfile": "not_used.msh",
-        "initmodel": "not_used.hdf5",
-        "truemodel": "not_used.hdf5",
+        "meshfile": None,
+        "initmodel": None,
+        "truemodel": None,
     }
 
     # Specify a 250-m Absorbing Boundary Layer (ABL) on the three sides of the domain to damp outgoing waves.
@@ -48,6 +48,9 @@ def model_settings():
         "status": False,  # True or False, used to turn on any type of BC
         "outer_bc": "non-reflective",  # none or non-reflective (outer boundary condition)
         "abl_bc": "none",  # none, gaussian-taper, or alid
+        "exponent": 2,
+        "cmax": 1.5,
+        "R": 1e-6,
         "lz": 0.0,  # thickness of the ABL in the z-direction (km) - always positive
         "lx": 0.0,  # thickness of the ABL in the x-direction (km) - always positive
         "ly": 0.0,  # thickness of the ABL in the y-direction (km) - always positive
@@ -55,10 +58,10 @@ def model_settings():
 
     model["acquisition"] = {
         "source_type": "Ricker",
-        "source_pos": spyro.create_transect((0.2, 0.15), (0.8, 0.15), 3),
+        "source_pos": spyro.create_transect((-0.2, 0.15), (-0.8, 0.15), 3),
         "frequency": 7.0,
         "delay": 1.0,
-        "receiver_locations": spyro.create_transect((0.2, 0.2), (0.8, 0.2), 10),
+        "receiver_locations": spyro.create_transect((-0.2, 0.2), (-0.8, 0.2), 10),
     }
     model["aut_dif"] = {
         "status": True,

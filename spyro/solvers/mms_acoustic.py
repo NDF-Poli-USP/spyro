@@ -19,10 +19,20 @@ class AcousticWaveMMS(AcousticWave):
         super().matrix_building()
         lhs = self.lhs
         bcs = fire.DirichletBC(self.function_space, 0.0, "on_boundary")
-        A = fire.assemble(lhs, bcs=bcs, mat_type="matfree")
-        self.solver = fire.LinearSolver(
-            A, solver_parameters=self.solver_parameters
-        )
+        if not self.automatic_adjoint:
+            A = fire.assemble(lhs, bcs=bcs, mat_type="matfree")
+            self.solver = fire.LinearSolver(
+                A, solver_parameters=self.solver_parameters
+            )
+        else:
+            linear_variational_problem = fire.LinearVariationalProblem(
+                lhs, self.rhs + self.B, self.u_np1, bcs=bcs
+            )
+            self.solver = fire.LinearVariationalSolver(
+                linear_variational_problem,
+                solver_parameters=self.solver_parameters
+            )
+
         dt = self.dt
         t = self.current_time
         self.u_nm1.assign(self.analytical_solution(t - 2 * dt))
