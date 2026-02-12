@@ -85,6 +85,7 @@ class Read_boundary_layer:
             "hybrid",
             None,
         ]
+        print(f"Boundary layer type: {value}")
         if value not in accepted_damping_types:
             raise ValueError(f"Damping type of {value} not recognized.")
         if value == "PML":
