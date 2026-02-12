@@ -1,6 +1,7 @@
 import firedrake as fire
 import warnings
 from spyro.solvers.elastic_wave.isotropic_wave import IsotropicWave
+from spyro.utils.eval_functions_to_ufl import generate_ufl_functions
 fire.parameters["loopy"] = {"silenced_warnings": ["v1_scheduler_fallback"]}
 warnings.filterwarnings("ignore", category=RuntimeWarning)
 
@@ -231,6 +232,38 @@ def test_expression_mat_prop():
             output=True, foldername='/property_fields/expression/')
 
 
+def test_function_mat_prop():
+    '''
+    Test to assign firedrake functione as material
+    properties to an instance of Wave.
+
+    Material properties:
+        - vel_P: P-wave velocity [m/s]
+        - vel_S: S-wave velocity [m/s]
+    '''
+
+    Wave_obj = instance_wave()
+
+    print("\nTesting Firedrake Functions as Material Properties", flush=True)
+    vel_P_expr = "1.5e3 * (1 + sqrt(x**2 + y**2 + z**2))"
+    vel_P = Wave_obj.set_material_property(
+        'vel_P', 'scalar', expression=vel_P_expr, output=True,
+        foldername='/property_fields/function/')
+
+    dummy = Wave_obj.set_material_property(
+        'vel_S', 'scalar', constant=0., output=False)
+
+    dummy.dat.data_with_halos[:] = vel_P.dat.data_with_halos[:] / 2.
+
+    vel_S = Wave_obj.set_material_property(
+        'vel_S', 'scalar', fire_function=dummy, output=True,
+        foldername='/property_fields/function/')
+
+    vel_S_dg0 = Wave_obj.set_material_property(
+        'vel_S', 'scalar', fire_function=vel_S, dg_property=True,
+        output=True, foldername='/property_fields/function/')
+
+
 def instance_wave():
     '''
     Create an instance of the isotropic wave solver.
@@ -242,8 +275,8 @@ def instance_wave():
     # Domain dimensions
     domain_dim = [0.24, 0.56, 0.16]  # in km
 
-    # Final Time
-    tf_usu = 2.  # s
+    # Final Time in s
+    tf_usu = 2.
 
     # Number of timesteps
     steps = 200
@@ -268,7 +301,8 @@ def instance_wave():
 
 # Testing anisotropy solver with NRBC and explosive source in 3D
 if __name__ == "__main__":
-    test_constant_mat_prop()
-    test_random_mat_prop()
-    test_conditional_mat_prop()
-    test_expression_mat_prop()
+    # test_constant_mat_prop()
+    # test_random_mat_prop()
+    # test_conditional_mat_prop()
+    # test_expression_mat_prop()
+    test_function_mat_prop()
