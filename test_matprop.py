@@ -301,8 +301,8 @@ def instance_wave():
 
 # Testing anisotropy solver with NRBC and explosive source in 3D
 if __name__ == "__main__":
-    # test_constant_mat_prop()
-    # test_random_mat_prop()
-    # test_conditional_mat_prop()
-    # test_expression_mat_prop()
+    test_constant_mat_prop()
+    test_random_mat_prop()
+    test_conditional_mat_prop()
+    test_expression_mat_prop()
     test_function_mat_prop()

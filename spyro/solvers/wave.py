@@ -8,13 +8,18 @@ from os import getcwd
 from .time_integration_central_difference import \
     central_difference as time_integrator
 from ..domains.quadrature import quadrature_rules
-from ..io import Model_parameters
+from ..io import Model_parameters, interpolate
 from ..io.basicio import ensemble_propagator
 from ..io.field_logger import FieldLogger
 from .. import utils
 from ..receivers.Receivers import Receivers
 from ..sources.Sources import Sources
 from .solver_parameters import get_default_parameters_for_method
+try:
+    from SeismicMesh import write_velocity_model
+    SEISMIC_MESH_AVAILABLE = True
+except ImportError:
+    SEISMIC_MESH_AVAILABLE = False
 
 fire.set_log_level(fire.ERROR)
 
@@ -415,6 +420,7 @@ class Wave(Model_parameters, metaclass=ABCMeta):
             Shape of the function space for only tensorial material property
 
         Returns:
+        -----------
         V: `firedrake function space`
             Function space for the material property
         typ_ele: `str`
@@ -444,12 +450,130 @@ class Wave(Model_parameters, metaclass=ABCMeta):
 
         return V, typ_ele, dgr_ele
 
+    def _initialize_material_property_from_ufl(self, property_name, V,
+                                               constant=None,
+                                               conditional=None,
+                                               expression=None):
+        '''
+        Initialize material property from a UFL input. This method is
+        used when the material property is defined by a constant value,
+        a conditional or an expression.
+
+        Parameters:
+        -----------
+        property_name: `str`
+            Name of the material property to be set.
+        V: `firedrake function space`
+            Function space for the material property
+        constant: `float`, optional
+            Constant value for the material property. Default is None
+        conditional:  `firedrake conditional`, optional
+            Firedrake conditional object. Default is None
+        expression: `str`, optional
+            If you use an expression, you can use the following variables:
+            x, y, z, pi, tanh, sqrt. Ex: "2. + 0.5 * tanh((x - 2.) / 0.1)".
+            It will be interpoalte into either the same function space as
+            the object or a DG0 function space in the same mesh.
+            Default is None
+
+        Returns:
+        -----------
+        mat_property: `firedrake function`
+            Material property
+        '''
+
+        if constant is not None:
+            value = 1 if constant == 0 else abs(constant)
+            col = int(abs(log10(value))) + 2
+            print(f"Assigning {property_name} with a "
+                  f"constant value of {constant:>{col}}", flush=True)
+            ufl_input = fire.Constant(constant)
+
+        if conditional is not None:
+            print(f"Assigning {property_name} with a conditional "
+                  f"field given by {conditional}", flush=True)
+            ufl_input = conditional
+
+        if expression is not None:
+            print(f"Assigning {property_name} with an expression "
+                  f"field given by f = {expression} ", flush=True)
+            ufl_input = utils.eval_functions_to_ufl.generate_ufl_functions(
+                self.mesh, expression, self.dimension)
+
+        mat_property = fire.Function(
+            V, name=property_name).interpolate(ufl_input)
+
+        return mat_property
+
+    def _initialize_material_property_from_file(property_name, from_file, V):
+        '''
+        Initialize material property from a file.
+
+        Parameters:
+        -----------
+        property_name: `str`
+            Name of the material property to be set.
+        from_file: `str`, optional
+            Name of the file containing the material property. Default is None
+        V: `firedrake function space`
+            Function space for the material property
+
+        Returns:
+        -----------
+        mat_property: `firedrake function`
+            Material property
+        '''
+
+        if from_file.endswith(".segy"):
+            if not SEISMIC_MESH_AVAILABLE:
+                raise ImportError(
+                    "SeismicMesh is required to convert segy files.")
+
+            mp_filename, mp_filetype = os.path.splitext(from_file)
+            warnings.warn("Converting segy file to hdf5")
+            # ToDo: Change method name
+            write_velocity_model(from_file, ofname=mp_filename)
+            from_file = mp_filename + ".hdf5"
+
+        if from_file.endswith((".hdf5", ".h5")):
+            mat_property = interpolate(self, from_file, V)
+
+        return mat_property
+
+    def _saving_property_to_file(self, mat_property, property_name,
+                                 foldername='default'):
+        '''
+        Save a material property to a pvd file for visualization.
+
+        Parameters:
+        -----------
+        mat_property: `firedrake function`
+            Material property
+        property_name: `str`
+            Name of the material property to be set.
+        foldername : `string`, optional
+            Name of the folder where the material property is saved.
+            If default is 'default', property is saved in '/property_fields/'
+
+        Returns:
+        -----------
+        None
+        '''
+
+        # Path to save data
+        self.path_save_matprop = getcwd() + ('/property_fields/'
+                                             if foldername == 'default'
+                                             else foldername)
+        pth_prop = self.path_save_matprop + property_name + ".pvd"
+        print(f"Saving {property_name} to {foldername} for visualization.")
+        fire.VTKFile(pth_prop).write(mat_property, name=property_name)
+
     def set_material_property(self, property_name, func_space_type,
                               shape_func_space=None, constant=None,
-                              random=None, conditional=None,
-                              fire_function=None, expression=None,
-                              from_file=None, output=False,
-                              dg_property=False, foldername='default'):
+                              conditional=None, expression=None,
+                              random=None, fire_function=None,
+                              from_file=None, dg_property=False,
+                              output=False, foldername='default'):
         '''
         Set a material property (e.g., density, etc.) in the model.
 
@@ -466,29 +590,41 @@ class Wave(Model_parameters, metaclass=ABCMeta):
             Name of the file containing the material property. Default is None
         constant: `float`, optional
             Constant value for the material property. Default is None
-        random: `tuple`, optional
-            If you want to set a random material property, specify the range of
-            values as a tuple (min, max). Default is None
         conditional:  `firedrake conditional`, optional
             Firedrake conditional object. Default is None
-        fire_function: `firedrake function`, optional
-            Firedrake function based on the input object. Default is None.
         expression: `str`, optional
             If you use an expression, you can use the following variables:
             x, y, z, pi, tanh, sqrt. Ex: "2. + 0.5 * tanh((x - 2.) / 0.1)".
             It will be interpoalte into either the same function space as
             the object or a DG0 function space in the same mesh.
             Default is None
-        output: `bool`, optional
-            If True, outputs the material property to a pvd file for
-            visualization. Default is False
+        random: `tuple`, optional
+            If you want to set a random material property, specify the range of
+            values as a tuple (min, max). Default is None
+        fire_function: `firedrake function`, optional
+            Firedrake function based on the input object. Default is None.
         dg_property: `bool`, optional
             If True, uses a DG0 function space for conditional and
             expression inputs. Default is True
+        output: `bool`, optional
+            If True, outputs the material property to a pvd file for
+            visualization. Default is False
         foldername : `string`, optional
             Name of the folder where the material property is saved.
             If default is 'default', property is saved in '/property_fields/'
+
+        Returns:
+        -----------
+        mat_property: `firedrake function`
+            Material property
         '''
+
+        if sum(x is not None for x in
+               [constant, conditional, expression,
+                fire_function, from_file, random]) > 1:
+            raise ValueError("Please specify only one of the following "
+                             "inputs: constant, conditional, expression, "
+                             "firedrake function or file name.")
 
         V, typ_ele, dgr_ele = self.define_property_function_space(
             func_space_type, dg_property, shape_func_space=shape_func_space)
@@ -498,44 +634,46 @@ class Wave(Model_parameters, metaclass=ABCMeta):
             self.set_mesh()
 
         try:
-            if conditional is not None:
-                print(f"Assigning {property_name} with a conditional "
-                      f"field given by {conditional}", flush=True)
-                ufl_input = conditional
 
-            if expression is not None:
-                print(f"Assigning {property_name} with an expression "
-                      f"field given by f = {expression} ", flush=True)
-                ufl_input = utils.eval_functions_to_ufl.generate_ufl_functions(
-                    self.mesh, expression, self.dimension)
+            if any([constant is not None, conditional is not None,
+                    expression is not None]):
 
-            if constant is not None:
-                value = 1 if constant == 0 else abs(constant)
-                col = int(abs(log10(value))) + 2
-                print(f"Assigning {property_name} with a "
-                      f"constant value of {constant:>{col}}", flush=True)
-                ufl_input = fire.Constant(constant)
+                mat_property = _initialize_material_property_from_ufl(
+                    self, property_name, V, constant=constant,
+                    conditional=conditional, expression=expression)
+
+            if fire_function is not None or from_file is not None:
+                mp_str = f"Assigning {property_name} "
+
+                if fire_function is not None:
+                    mp_str += "with a firedrake function "
+
+                elif from_file is not None:
+                    mp_str += f"from file {from_file} "
+
+                if typ_ele == ele_orig and dgr_ele == dgr_orig:
+                    # Same function space
+                    mp_str + "in the same "
+
+                else:  # Different function space
+                    mp_str + "in another "
+
+                mp_str += f"function space: {typ_ele}{dgr_ele}."
+                print(mp_str, flush=True)
 
             if fire_function is not None:
-                e_str = f"Assigning {property_name} with a firedrake function "
                 ele_orig = self.function_space.ufl_element().family()
                 dgr_orig = self.function_space.ufl_element().degree()
                 if typ_ele == ele_orig and dgr_ele == dgr_orig:
                     # Same function space
-                    e_str += "in the same "
                     mat_property = fire_function
                 else:  # Different function space
-                    e_str += "in another "
                     mat_property = fire.Function(
                         V, name=property_name).interpolate(fire_function)
 
-                e_str += f"function space: {typ_ele}{dgr_ele}."
-                print(e_str, flush=True)
-
             elif from_file is not None:
                 mat_property = from_file
-                # Substitute by new method in PR of Alexandre
-                # self.initialize_material_property_from_file(from_file)
+                self._initialize_material_property_from_file()
 
             elif random is not None:
                 col0 = int(abs(log10(abs(random[0])))) + 2
@@ -546,9 +684,6 @@ class Wave(Model_parameters, metaclass=ABCMeta):
                 mat_property = fire.Function(V, name=property_name)
                 mat_property.dat.data[:] = uniform(random[0], random[1],
                                                    mat_property.dat.data.shape)
-            else:
-                mat_property = fire.Function(
-                    V, name=property_name).interpolate(ufl_input)
 
         except Exception as e:
             raise ValueError(f"Error Setting a Material Property: {e}. "
@@ -557,12 +692,7 @@ class Wave(Model_parameters, metaclass=ABCMeta):
                              " new file name (*.segy or *.hdf5).")
 
         if output:
-            # Path to save data
-            self.path_save_matprop = getcwd() + ('/property_fields/'
-                                                 if foldername == 'default'
-                                                 else foldername)
-            pth_prop = self.path_save_matprop + property_name + ".pvd"
-            print(f"Saving {property_name} to {foldername} for visualization.")
-            fire.VTKFile(pth_prop).write(mat_property, name=property_name)
+            self._saving_property_to_file(mat_property, property_name,
+                                          foldername=foldername)
 
         return mat_property
