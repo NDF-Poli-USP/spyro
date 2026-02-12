@@ -55,7 +55,6 @@ c = Constant(1.5)
 x, y = SpatialCoordinate(mesh)
 source = Constant([2.0, 2.0])
 ricker = Constant(0.0)
-ricker.assign(ricker_wavelet(time, frequency))
 
 def ricker_wavelet(time, frequency, amplitude=1.0):
     shifted_time = time - 1.0 / frequency
@@ -79,6 +78,8 @@ def dirac_delta_approximated_by_gaussian(x0, mesh, V, sigma_x=2000.0):
 # ====================================================================================
 
 # Numerical integration:
+ricker.assign(ricker_wavelet(time, frequency))
+
 quadrature_rule = finat.quadrature.make_quadrature(V.finat_element.cell,
                                                    V.ufl_element().degree(), "KMV")
 dxlump=dx(scheme=quadrature_rule)
@@ -164,6 +165,20 @@ u_numerical_convolved_scaled = alpha * u_num
 
 # ====================================================================================
 
+# Error L2:
+def calculate_L2_error(u_numerical_history, u_analytical_convolved):
+    min_len = min(len(u_numerical_history), len(u_analytical_convolved))
+    u_num = np.array(u_numerical_history[:min_len])
+    u_conv = np.array(u_analytical_convolved[:min_len])
+    error_vector = u_num - u_conv
+    L2_error = np.linalg.norm(error_vector) / np.linalg.norm(u_conv)
+    return L2_error
+
+L2_error = calculate_L2_error(u_numerical_convolved_scaled, u_analytical_convolved)
+print(f"Error Firedrake/analytical = {L2_error * 100:.2f}%")
+    
+# ====================================================================================
+
 # Gar6more2D:
 try:
     gar6_path = "P.dat" 
@@ -182,20 +197,11 @@ except Exception as e:
     print(f"Error loading Gar6: {e}")
     u_gar6_final = None
 
+L2_error_gar6 = calculate_L2_error(u_gar6_final, u_analytical_convolved)
+print(f"Error Gar6more2D/analytical = {L2_error_gar6 * 100:.2f}%")
+
 # ====================================================================================
 
-# Error L2:
-def calculate_L2_error(u_numerical_history, u_analytical_convolved):
-    min_len = min(len(u_numerical_history), len(u_analytical_convolved))
-    u_num = np.array(u_numerical_history[:min_len])
-    u_conv = np.array(u_analytical_convolved[:min_len])
-    error_vector = u_num - u_conv
-    L2_error = np.linalg.norm(error_vector) / np.linalg.norm(u_conv)
-    return L2_error
-
-L2_error = calculate_L2_error(u_numerical_convolved_scaled, u_analytical_convolved)
-    
-# ====================================================================================
 
 # Plotting the results:
 def plot_comparison(time_points, u_numerical_history, u_analytical_convolved,
