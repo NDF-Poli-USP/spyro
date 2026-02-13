@@ -242,7 +242,7 @@ class Model_parameters(Read_options, Read_boundary_layer, Read_time_axis, Read_o
 
         self.input_dictionary["acquisition"].setdefault("receiver_locations", None)
         self.receiver_locations = self.input_dictionary["acquisition"]["receiver_locations"]
-        self.vertex_only_mesh = self.input_dictionary["acquisition"].get("vertex_only_mesh", True)
+        self.use_vertex_only_mesh = self.input_dictionary["acquisition"].get("use_vertex_only_mesh", True)
 
         # Check automatic adjoint
         self.input_dictionary["time_axis"].setdefault("output_frequency", 99999)

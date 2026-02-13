@@ -81,17 +81,7 @@ def construct_solver_or_matrix_no_pml(Wave_object):
     Wave_object.lhs = lhs
     Wave_object.rhs = fire.rhs(form)
     Wave_object.B = fire.Cofunction(V.dual())
-    if not Wave_object.automatic_adjoint:
-        A = fire.assemble(lhs, mat_type="matfree")
-        Wave_object.solver = fire.LinearSolver(
-            A, solver_parameters=Wave_object.solver_parameters
-        )
-    else:
-        linear_variational_problem = fire.LinearVariationalProblem(
-            lhs, Wave_object.rhs + Wave_object.B, Wave_object.next_vstate,
-            constant_jacobian=True
-        )
-        Wave_object.solver = fire.LinearVariationalSolver(
-            linear_variational_problem,
-            solver_parameters=Wave_object.solver_parameters
-        )
+    A = fire.assemble(lhs, mat_type="matfree")
+    Wave_object.solver = fire.LinearSolver(
+        A, solver_parameters=Wave_object.solver_parameters
+    )
