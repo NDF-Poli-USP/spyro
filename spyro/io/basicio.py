@@ -79,14 +79,9 @@ def ensemble_propagator(func):
             _comm = args[0].comm
             for propagation_id, shot_ids_in_propagation in enumerate(shot_ids_per_propagation_list):
                 if is_owner(_comm, propagation_id):
-                    # Return the forward solution if required by the caller
-                    # and the receiver data for all shots in the propagation.
-                    return func(*args, **dict(kwargs, source_nums=shot_ids_in_propagation))
-
-        elif (
-            args[0].parallelism_type == "spatial"
-            and args[0].number_of_sources > 1
-        ):
+                    u, u_r = func(*args, **dict(kwargs, source_nums=shot_ids_in_propagation))
+                    return u, u_r
+        elif args[0].parallelism_type == "spatial" and args[0].number_of_sources > 1:
             num = args[0].number_of_sources
             starting_time = args[0].current_time
             for snum in range(num):
