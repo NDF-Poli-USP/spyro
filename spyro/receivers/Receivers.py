@@ -109,35 +109,23 @@ class Receivers(Delta_projector):
 
         return rhs_forcing
 
-    def set_point_cloud(self, comm):
-        # Receivers always parallel to z-axis
+    def receiver_interpolator(self, f):
+        """Return a interpolator object.
 
-        rec_pos = self.point_locations
+        Parameters
+        ----------
+        f : firedrake.Function
+            A function to interpolate at receiver locations.
 
-        # 2D --
-        if self.dimension == 2:
-            num_rec = self.number_of_points
-            δz = np.linspace(rec_pos[0, 0], rec_pos[num_rec - 1, 0], 1)
-            δx = np.linspace(rec_pos[0, 1], rec_pos[num_rec - 1, 1], num_rec)
-
-            Z, X = np.meshgrid(δz, δx)
-            xs = np.vstack((Z.flatten(), X.flatten())).T
-
-        # 3D
-        elif self.dimension == 3:
-            δz = np.linspace(rec_pos[0][0], rec_pos[1][0], self.column_z)
-            δx = np.linspace(rec_pos[0][1], rec_pos[1][1], self.column_x)
-            δy = np.linspace(rec_pos[0][2], rec_pos[1][2], self.column_y)
-
-            Z, X, Y = np.meshgrid(δz, δx, δy)
-            xs = np.vstack((Z.flatten(), X.flatten(), Y.flatten())).T
-        else:
-            print("This dimension is not accepted.")
-            quit()
-
-        point_cloud = VertexOnlyMesh(self.mesh, xs)  # noqa: F405
-
-        return point_cloud
+        Returns
+        -------
+        firedrake.Interpolate
+            An interpolation operator object used to interpolate a firedrake function
+            at the receiver locations.
+        """
+        V_r = FunctionSpace(
+            VertexOnlyMesh(self.mesh, self.point_locations), "DG", 0)
+        return interpolate(f, V_r)
 
     def new_at(self, udat, receiver_id):
         return super().new_at(udat, receiver_id)

@@ -2,7 +2,7 @@ import math
 import numpy as np
 from scipy.signal import butter, filtfilt
 from spyro.receivers.dirac_delta_projector import Delta_projector
-
+import firedrake as fire
 
 class Sources(Delta_projector):
     """Methods that inject a wavelet into a mesh
@@ -85,7 +85,7 @@ class Sources(Delta_projector):
             delay_type=wave_object.delay_type,
         )
 
-    def apply_source(self, rhs_forcing, step):
+    def apply_source(self, rhs_forcing, step, vertex_only_mesh=False):
         """Applies source in a assembled right hand side.
 
         Parameters
@@ -111,6 +111,26 @@ class Sources(Delta_projector):
                     tmp = rhs_forcing.dat.data_with_halos[0]  # noqa: F841
 
         return rhs_forcing
+
+    def source_cofunction(self):
+        """Return a cofunction with the source applied into the domain.
+
+        Parameters
+        ----------
+        step: int
+            Time step (index of the wavelet array)
+
+        Returns
+        -------
+        source_cofunction: Firedrake.Cofunction
+            A cofunction with the source applied into the domain.
+        """
+        source_mesh = fire.VertexOnlyMesh(
+            self.mesh, [self.point_locations[self.current_sources[0]]])
+        V_s = fire.FunctionSpace(source_mesh, "DG", 0)
+        source_cofunction = fire.assemble(fire.TestFunction(V_s) * fire.dx)
+        return fire.Cofunction(
+            self.space.dual()).interpolate(source_cofunction)
 
 
 def timedependentSource(model, t, freq=None, amp=1, delay=1.5):

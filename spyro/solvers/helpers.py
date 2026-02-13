@@ -1,7 +1,7 @@
 import os
 
 import numpy as np
-from firedrake import VTKFile
+from firedrake import VTKFile, Function
 
 from .. import io
 
@@ -35,7 +35,10 @@ def fill(usol_recv, is_local, nt, nr):
         List of numpy arrays
 
     """
-    usol_recv = np.asarray(usol_recv)
+    if isinstance(usol_recv[0], Function):
+        usol_recv = np.asarray([u.dat.data_wo for u in usol_recv])
+    else:
+        usol_recv = np.asarray(usol_recv)
     for ti in range(nt):
         for rn in range(nr):
             if is_local[rn] is None:
