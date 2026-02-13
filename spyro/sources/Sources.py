@@ -85,7 +85,7 @@ class Sources(Delta_projector):
             delay_type=wave_object.delay_type,
         )
 
-    def apply_source(self, rhs_forcing, step, vertex_only_mesh=False):
+    def apply_source(self, rhs_forcing, step):
         """Applies source in a assembled right hand side.
 
         Parameters
