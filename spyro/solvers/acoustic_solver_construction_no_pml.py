@@ -88,10 +88,10 @@ def construct_solver_or_matrix_no_pml(Wave_object):
         )
     else:
         linear_variational_problem = fire.LinearVariationalProblem(
-            lhs, Wave_object.rhs + Wave_object.B, Wave_object.next_vstate
+            lhs, Wave_object.rhs + Wave_object.B, Wave_object.next_vstate,
+            constant_jacobian=True
         )
         Wave_object.solver = fire.LinearVariationalSolver(
             linear_variational_problem,
             solver_parameters=Wave_object.solver_parameters
         )
-
