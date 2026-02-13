@@ -36,6 +36,15 @@ def central_difference(wave, source_ids=[0]):
             for t in range(nt)
             if t % wave.gradient_sampling_frequency == 0
         ]
+    else:
+        print("Warning: source and receiver locations are not supported for vertex only meshes.")
+        source_mesh = fire.VertexOnlyMesh(
+            wave.mesh, [wave.source_locations[source_ids[0]]])
+        V_s = fire.FunctionSpace(source_mesh, "DG", 0)
+        source_cofunction = fire.assemble(fire.TestFunction(V_s) * fire.dx)
+        q_s = fire.Cofunction(wave.function_space.dual()).interpolate(
+            source_cofunction)
+
     usol_recv = []
     save_step = 0
     for step in range(nt):
@@ -51,6 +60,7 @@ def central_difference(wave, source_ids=[0]):
                 B0 += f
                 wave.solver.solve(wave.next_vstate, wave.B)
         else:
+            wave.B.assign(wave.sources.wavelet[step] * q_s)
             wave.solver.solve()
 
         wave.prev_vstate = wave.vstate
