@@ -41,13 +41,13 @@ def find_file_operations(root_dir="."):
     # Patterns to search for
     patterns = {
         'hdf5_read': [
-            r'h5py\.File\s*\([^,]+,\s*["\']r["\']',  # h5py.File(fname, "r")
-            r'with\s+h5py\.File\s*\([^,]+,\s*["\']r["\']',  # with h5py.File(fname, "r")
+            r'h5py\.File\s*\([^)]+?,\s*["\']r["\']',  # h5py.File(fname, "r")
+            r'with\s+h5py\.File\s*\([^)]+?,\s*["\']r["\']',  # with h5py.File(fname, "r")
         ],
         'hdf5_write': [
-            r'h5py\.File\s*\([^,]+,\s*["\']w["\']',  # h5py.File(fname, "w")
-            r'with\s+h5py\.File\s*\([^,]+,\s*["\']w["\']',  # with h5py.File(fname, "w")
-            r'h5py\.File\s*\([^,]+,\s*["\']a["\']',  # h5py.File(fname, "a") - append
+            r'h5py\.File\s*\([^)]+?,\s*["\']w["\']',  # h5py.File(fname, "w")
+            r'with\s+h5py\.File\s*\([^)]+?,\s*["\']w["\']',  # with h5py.File(fname, "w")
+            r'h5py\.File\s*\([^)]+?,\s*["\']a["\']',  # h5py.File(fname, "a") - append
         ],
         'segy_read': [
             r'segyio\.open\s*\(',  # segyio.open()
@@ -85,8 +85,9 @@ def find_file_operations(root_dir="."):
                     for line_num, line in enumerate(lines, start=1):
                         # Check each pattern category
                         for category, pattern_list in patterns.items():
+                            matched = False
                             for pattern in pattern_list:
-                                if re.search(pattern, line):
+                                if not matched and re.search(pattern, line):
                                     # Get context (few lines before and after)
                                     start = max(0, line_num - 2)
                                     end = min(len(lines), line_num + 2)
@@ -98,7 +99,8 @@ def find_file_operations(root_dir="."):
                                         'content': line.strip(),
                                         'context': context
                                     })
-                                    break  # Only match once per line per category
+                                    matched = True  # Only match once per line per category
+                                    break
                                     
                 except (UnicodeDecodeError, IOError):
                     # Skip files that can't be read
