@@ -1,5 +1,7 @@
 import firedrake as fire
 import warnings
+from os import getcwd
+from spyro.io.basicio import create_segy
 from spyro.solvers.elastic_wave.isotropic_wave import IsotropicWave
 from spyro.utils.eval_functions_to_ufl import generate_ufl_functions
 fire.parameters["loopy"] = {"silenced_warnings": ["v1_scheduler_fallback"]}
@@ -28,7 +30,7 @@ def wave_dict(domain_dim, tf_usu, dt_usu):
     dictionary = {}
     dictionary["options"] = {
         # Simplexes: triangles or tetrahedra (T) or quadrilaterals (Q)
-        "cell_type": "T",
+        "cell_type": "Q",
         "variant": "lumped",  # Options: lumped, equispaced or DG.
         # Default is lumped "method":"MLT"
         # (MLT/spectral_quadrilateral/DG_triangle/DG_quadrilateral)
@@ -245,23 +247,173 @@ def test_function_mat_prop():
     Wave_obj = instance_wave()
 
     print("\nTesting Firedrake Functions as Material Properties", flush=True)
-    vel_P_expr = "1.5e3 * (1 + sqrt(x**2 + y**2 + z**2))"
-    vel_P = Wave_obj.set_material_property(
-        'vel_P', 'scalar', expression=vel_P_expr, output=True,
-        foldername='/property_fields/function/')
-
+    dummy_expr = "7.5e2 * (1 + sqrt(x**2 + y**2 + z**2))"
     dummy = Wave_obj.set_material_property(
-        'vel_S', 'scalar', constant=0., output=False)
+        'dummy', 'scalar', expression=dummy_expr, output=False)
 
-    dummy.dat.data_with_halos[:] = vel_P.dat.data_with_halos[:] / 2.
-
+    # Same function space
     vel_S = Wave_obj.set_material_property(
         'vel_S', 'scalar', fire_function=dummy, output=True,
         foldername='/property_fields/function/')
 
+    # Different function space (DG0)
     vel_S_dg0 = Wave_obj.set_material_property(
-        'vel_S', 'scalar', fire_function=vel_S, dg_property=True,
+        'vel_S_DG0', 'scalar', fire_function=vel_S, dg_property=True,
         output=True, foldername='/property_fields/function/')
+
+
+def test_fromfile_mat_prop():
+    '''
+    Test to assign firedrake functione as material
+    properties to an instance of Wave.
+
+    Material properties:
+        - vel_P: P-wave velocity [m/s]
+        - vel_S: S-wave velocity [m/s]
+    '''
+
+    Wave_obj = instance_wave()
+
+    print("\nTesting File Inputs as Material Properties", flush=True)
+    vel_P = Wave_obj.set_material_property(
+        'vel_P', 'scalar', constant=1., output=True,
+        foldername='/property_fields/from_file/')
+
+    dummy = Wave_obj.set_material_property('dummy', 'scalar', constant=1.)
+    dummy.dat.data_with_halos[:] = vel_P.dat.data_with_halos[:] / 2.
+
+    from_file_segy = getcwd() + '/property_fields/from_file/vel_S.segy'
+    create_segy(dummy, Wave_obj.function_space.sub(0),
+                Wave_obj.mesh_parameters.edge_length, from_file_segy)
+    vel_S = Wave_obj.set_material_property(
+        'vel_S', 'scalar', from_file=from_file_segy, output=True,
+        foldername='/property_fields/from_file/')
+
+
+def test_vector_mat_prop():
+    '''
+    Test to assign vector material properties to an instance of Wave.
+
+    Material properties:
+        - alphaT: Thermal expansion vector [ppm/°C]
+    '''
+
+    Wave_obj = instance_wave()
+    print("\nTesting Vector Material Properties", flush=True)
+    print("Vector: Thermal Expansion Field", flush=True)
+
+    # Same function space
+    alphaT_o = 1.7e-5
+    print("\nTesting Constant Material Properties", flush=True)
+    alphaT_cte = Wave_obj.set_material_property(
+        "alphaT", 'vector', constant=alphaT_o, output=True,
+        foldername='/property_fields/vector_tensor/')
+
+    dummy = Wave_obj.set_material_property('dummy', 'vector', constant=0.)
+    dummy.sub(0).assign(Wave_obj.set_material_property('dummy_z', 'scalar',
+                                                       constant=alphaT_o))
+    dummy.sub(1).assign(Wave_obj.set_material_property('dummy_x', 'scalar',
+                                                       random=(1e-5, 2e-5)))
+    cond_z = fire.conditional(Wave_obj.mesh_y < 0.08, 1e-5, 1.7e-5)
+    dummy.sub(2).assign(Wave_obj.set_material_property('dummy_y', 'scalar',
+                                                       conditional=cond_z))
+
+    # Different function space (DG0)
+    alphaT_dg0 = Wave_obj.set_material_property(
+        'alphaT_DG0', 'vector', fire_function=dummy, dg_property=True,
+        output=True, foldername='/property_fields/vector_tensor/')
+
+
+def test_tensor_mat_prop():
+    '''
+    Test to assign tensor material properties to an instance of Wave.
+
+    Material properties:
+        - C: Elastic Tensor [GPa]
+    '''
+
+    Wave_obj = instance_wave()
+    print("\nTesting Tensor Material Properties", flush=True)
+    print("Vector: Elastic Anisotropic Tensor", flush=True)
+
+    C11 = 3.15
+    C33 = 2.25
+    C44 = 0.5625
+    C66 = 0.9
+    C12 = 1.35
+    C13 = 1.4656
+
+    C_elast = fire.as_tensor(((C11, C12, C13, 0, 0, 0),
+                              (C12, C11, C13, 0, 0, 0),
+                              (C13, C13, C33, 0, 0, 0),
+                              (0, 0, 0, C44, 0, 0),
+                              (0, 0, 0, 0, C44, 0),
+                              (0, 0, 0, 0, 0, C66)))
+
+    shape_func_space = C_elast.ufl_shape
+
+    # Tensor 6x6
+    dummy = Wave_obj.set_material_property('dummy', 'tensor',
+                                           shape_func_space=shape_func_space,
+                                           constant=0.)
+
+    entries = []
+    for i in range(shape_func_space[0]):
+        row = []
+        for j in range(shape_func_space[1]):
+            val = float(C_elast[i, j])
+            if val != 0.0:
+                # Only create a scalar property if the entry is nonzero
+                row.append(Wave_obj.set_material_property(
+                    f'dummy_{i+1}{j+1}', 'scalar', constant=val))
+            else:
+                # Keep an explicit zero so the tensor shape stays consistent
+                row.append(0.0)
+        entries.append(row)
+    tensor_expr = fire.as_tensor(entries)
+
+    # Interpolate into dummy
+    dummy.interpolate(tensor_expr)
+
+    # Same function space
+    Celast = Wave_obj.set_material_property(
+        'Celast', 'tensor', fire_function=dummy,
+        shape_func_space=shape_func_space)
+
+    # Tensor 2x3
+    dummy = Wave_obj.set_material_property('dummy', 'tensor',
+                                           shape_func_space=(2, 3),
+                                           constant=0.)
+
+    compC_name = ['C11', 'C33', 'C44', 'C66', 'C12', 'C13']
+    compC_val = fire.as_tensor(((C11, C33, C44),
+                                (C66, C12, C13)))
+
+    entries = []
+    for i in range(2):
+        row = []
+        for j in range(3):
+            val = float(compC_val[i, j])
+            row.append(Wave_obj.set_material_property(
+                compC_name[3 * i + j], 'scalar',
+                constant=val))
+        entries.append(row)
+    tensor_expr = fire.as_tensor(entries)
+
+    # Interpolate into dummy
+    dummy.interpolate(tensor_expr)
+
+    # Same function space
+    Celast = Wave_obj.set_material_property(
+        'Celast', 'tensor', shape_func_space=(2, 3),
+        fire_function=dummy, output=True,
+        foldername='/property_fields/vector_tensor/')
+
+    # Different function space (DG0)
+    Celast_dg0 = Wave_obj.set_material_property(
+        'Celast_DG0', 'tensor', shape_func_space=(2, 3),
+        fire_function=dummy, dg_property=True, output=True,
+        foldername='/property_fields/vector_tensor/')
 
 
 def instance_wave():
@@ -301,8 +453,11 @@ def instance_wave():
 
 # Testing anisotropy solver with NRBC and explosive source in 3D
 if __name__ == "__main__":
-    test_constant_mat_prop()
-    test_random_mat_prop()
-    test_conditional_mat_prop()
-    test_expression_mat_prop()
-    test_function_mat_prop()
+    # test_constant_mat_prop()
+    # test_random_mat_prop()
+    # test_conditional_mat_prop()
+    # test_expression_mat_prop()
+    # test_function_mat_prop()
+    # test_fromfile_mat_prop()
+    # test_vector_mat_prop()
+    test_tensor_mat_prop()

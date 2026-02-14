@@ -14,14 +14,14 @@ import warnings
 
 
 def delete_tmp_files(wave):
-    """Delete temporary numpy files associated with a wave object."""
+    '''Delete temporary numpy files associated with a wave object.'''
     str_id = f"*{wave.random_id_string}.npy"
     for file in glob.glob(str_id):
         os.remove(file)
 
 
 def _run_for_each_shot(obj, func, *args, **kwargs):
-    """Helper to run a function for each shot in spatial parallelism."""
+    '''Helper to run a function for each shot in spatial parallelism.'''
     results = []
     for snum in range(obj.number_of_sources):
         switch_serial_shot(obj, snum)
@@ -30,7 +30,7 @@ def _run_for_each_shot(obj, func, *args, **kwargs):
 
 
 def ensemble_shot_record(func):
-    """Decorator for read and write shots for ensemble parallelism"""
+    '''Decorator for read and write shots for ensemble parallelism'''
     def wrapper(*args, **kwargs):
         obj = args[0]
         if obj.parallelism_type == "spatial" and obj.number_of_sources > 1:
@@ -39,10 +39,10 @@ def ensemble_shot_record(func):
 
 
 def _ensemble_save_load_loop(obj, func, kwargs, require_rank0=False):
-    """
+    '''
     Helper to loop over shots for ensemble parallelism
     in save or load operations.
-    """
+    '''
     _comm = obj.comm
     if obj.parallelism_type != "spatial" or obj.number_of_sources == 1:
         for propagation_id, shot_ids_in_propagation in \
@@ -58,7 +58,7 @@ def _ensemble_save_load_loop(obj, func, kwargs, require_rank0=False):
 
 
 def ensemble_save(func):
-    """Decorator for read and write shots for ensemble parallelism"""
+    '''Decorator for read and write shots for ensemble parallelism'''
     def wrapper(*args, **kwargs):
         obj = args[0]
         _ensemble_save_load_loop(obj, func, kwargs, require_rank0=True)
@@ -66,7 +66,7 @@ def ensemble_save(func):
 
 
 def ensemble_load(func):
-    """Decorator for read and write shots for ensemble parallelism"""
+    '''Decorator for read and write shots for ensemble parallelism'''
     def wrapper(*args, **kwargs):
         obj = args[0]
         _ensemble_save_load_loop(obj, func, kwargs, require_rank0=False)
@@ -74,7 +74,7 @@ def ensemble_load(func):
 
 
 def ensemble_propagator(func):
-    """Decorator for forward to distribute shots for ensemble parallelism"""
+    '''Decorator for forward to distribute shots for ensemble parallelism'''
 
     def wrapper(*args, **kwargs):
         if args[0].parallelism_type != "spatial" or \
@@ -103,14 +103,14 @@ def ensemble_propagator(func):
 
 
 def _shot_filename(prefix, propagation_id, wave):
-    """Helper to construct filenames for shot/receiver data."""
+    '''Helper to construct filenames for shot/receiver data.'''
     spatialcomm = wave.comm.comm.rank
     id_str = wave.random_id_string
     return f"{prefix}{propagation_id}_comm{spatialcomm}{id_str}.npy"
 
 
 def save_serial_data(wave, propagation_id):
-    """
+    '''
     Save serial data to numpy files.
 
     Args:
@@ -119,7 +119,7 @@ def save_serial_data(wave, propagation_id):
 
     Returns:
         None
-    """
+    '''
     arrays_list = [obj.dat.data[:] for obj in wave.forward_solution]
     stacked_arrays = np.stack(arrays_list, axis=0)
     np.save(_shot_filename('tmp_shot', propagation_id, wave), stacked_arrays)
@@ -128,7 +128,7 @@ def save_serial_data(wave, propagation_id):
 
 
 def switch_serial_shot(wave, propagation_id):
-    """
+    '''
     Switches the current serial shot for a given wave
     to shot identified with propagation ID.
 
@@ -138,7 +138,7 @@ def switch_serial_shot(wave, propagation_id):
 
     Returns:
         None
-    """
+    '''
     stacked_shot_arrays = np.load(_shot_filename('tmp_shot',
                                                  propagation_id, wave))
     if len(wave.forward_solution) == 0:
@@ -152,7 +152,7 @@ def switch_serial_shot(wave, propagation_id):
 
 
 def ensemble_functional(func):
-    """Decorator for gradient to distribute shots for ensemble parallelism"""
+    '''Decorator for gradient to distribute shots for ensemble parallelism'''
 
     def wrapper(*args, **kwargs):
         comm = args[0].comm
@@ -184,7 +184,7 @@ def ensemble_functional(func):
 
 
 def ensemble_gradient(func):
-    """Decorator for gradient to distribute shots for ensemble parallelism"""
+    '''Decorator for gradient to distribute shots for ensemble parallelism'''
 
     def wrapper(*args, **kwargs):
         comm = args[0].comm
@@ -231,7 +231,8 @@ def ensemble_gradient(func):
 
 
 def write_function_to_grid(function, V, grid_spacing):
-    """Interpolate a Firedrake function to a structured grid
+    '''
+    Interpolate a Firedrake function to a structured grid
 
     Parameters
     ----------
@@ -250,7 +251,7 @@ def write_function_to_grid(function, V, grid_spacing):
         y coordinates of grid points
     zi : numpy.ndarray
         Interpolated values on grid points
-    """
+    '''
     # get DoF coordinates
     m = V.ufl_domain()
     W = fire.VectorFunctionSpace(m, V.ufl_element())
@@ -282,20 +283,24 @@ def write_function_to_grid(function, V, grid_spacing):
 
 
 def create_segy(function, V, grid_spacing, filename):
-    """Write the velocity data into a segy file named filename
+    '''
+    Write the velocity data into a segy file named filename
 
     Parameters
     ----------
-    velocity:
-        Firedrake function representing the values of the velocity
-        model to save
+    function : firedrake.Function
+        Function to interpolate
+    V : firedrake.FunctionSpace
+        Function space of function
+    grid_spacing : float
+        Spacing of grid points
     filename: str
         Name of the segy file to save
 
     Returns
     -------
     None
-    """
+    '''
     velocity = write_function_to_grid(function, V, grid_spacing)
     spec = segyio.spec()
 
@@ -316,7 +321,7 @@ def create_segy(function, V, grid_spacing, filename):
 
 @ensemble_save
 def save_shots(Wave_obj, file_name="shots/shot_record_", shot_ids=0):
-    """Save a the shot record from last forward solve to a `pickle`.
+    '''Save a the shot record from last forward solve to a `pickle`.
 
     Parameters
     ----------
@@ -331,7 +336,7 @@ def save_shots(Wave_obj, file_name="shots/shot_record_", shot_ids=0):
     -------
     None
 
-    """
+    '''
     file_name = file_name + str(shot_ids) + ".dat"
     with open(file_name, "wb") as f:
         pickle.dump(Wave_obj.forward_solution_receivers, f)
@@ -346,7 +351,7 @@ def rebuild_empty_forward_solution(wave, time_steps):
 
 @ensemble_load
 def load_shots(Wave_obj, file_name="shots/shot_record_", shot_ids=0):
-    """Load a `pickle` to a `numpy.ndarray`.
+    '''Load a `pickle` to a `numpy.ndarray`.
 
     Parameters
     ----------
@@ -362,7 +367,7 @@ def load_shots(Wave_obj, file_name="shots/shot_record_", shot_ids=0):
     array: `numpy.ndarray`
         The data
 
-    """
+    '''
     array = np.zeros(())
     file_name = file_name + str(shot_ids) + ".dat"
 
@@ -373,7 +378,7 @@ def load_shots(Wave_obj, file_name="shots/shot_record_", shot_ids=0):
 
 
 def is_owner(ens_comm, rank):
-    """Distribute shots between processors in using a modulus operator
+    '''Distribute shots between processors in using a modulus operator
 
     Parameters
     ----------
@@ -387,7 +392,7 @@ def is_owner(ens_comm, rank):
     boolean
         `True` if `rank` owns this shot
 
-    """
+    '''
     owner = ens_comm.ensemble_comm.rank == (rank % ens_comm.ensemble_comm.size)
     return owner
 
@@ -402,7 +407,7 @@ def _check_units(c):
 
 
 def interpolate(Model, fname, V):
-    """Read and interpolate a seismic velocity model stored
+    '''Read and interpolate a seismic velocity model stored
     in a HDF5 file onto the nodes of a finite element space.
 
     Parameters
@@ -420,7 +425,7 @@ def interpolate(Model, fname, V):
         P-wave seismic velocity interpolated onto the nodes
         of the finite elements.
 
-    """
+    '''
     m = V.ufl_domain()
 
     add_pad = False
@@ -503,7 +508,7 @@ def interpolate(Model, fname, V):
 
 
 def read_mesh(mesh_parameters):
-    """Reads in an external mesh and scatters it between cores.
+    '''Reads in an external mesh and scatters it between cores.
 
     Parameters
     ----------
@@ -514,7 +519,7 @@ def read_mesh(mesh_parameters):
     -------
     mesh: Firedrake.Mesh object
         The distributed mesh across `ens_comm`.
-    """
+    '''
 
     method = mesh_parameters.method
     ens_comm = mesh_parameters.comm
@@ -558,7 +563,7 @@ def read_mesh(mesh_parameters):
 
 
 def parallel_print(string, comm):
-    """
+    '''
     Just prints a string once. Without any comm it just prints,
     without ensemble_comm it prints in comm 0,
     with ensemble_comm it prints in ensemble 0 and comm 0.
@@ -569,7 +574,7 @@ def parallel_print(string, comm):
         The string to print
     comm: Firedrake.ensemble_communicator
         An ensemble communicator
-    """
+    '''
     if comm is None:
         print(string, flush=True)
     else:
@@ -582,7 +587,7 @@ def parallel_print(string, comm):
 
 
 def saving_source_and_receiver_location_in_csv(model, folder_name=None):
-    """
+    '''
     Saving the source and receiver locations in a csv file
 
     Parameters
@@ -591,7 +596,7 @@ def saving_source_and_receiver_location_in_csv(model, folder_name=None):
         Model options and parameters.
     folder_name: str, optional by default None
         The folder name to save the csv file
-    """
+    '''
     if folder_name is None:
         folder_name = "results/"
 
