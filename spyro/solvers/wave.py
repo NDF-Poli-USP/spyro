@@ -1,9 +1,10 @@
 from abc import abstractmethod, ABCMeta
 import warnings
 import firedrake as fire
-from numpy import log10
+from numpy import log10, ones
 from numpy.random import uniform
 from os import getcwd
+from os.path import splitext
 
 from .time_integration_central_difference import \
     central_difference as time_integrator
@@ -11,10 +12,11 @@ from ..domains.quadrature import quadrature_rules
 from ..io import Model_parameters, interpolate
 from ..io.basicio import ensemble_propagator
 from ..io.field_logger import FieldLogger
-from .. import utils
 from ..receivers.Receivers import Receivers
 from ..sources.Sources import Sources
 from .solver_parameters import get_default_parameters_for_method
+from ..utils import error_management
+from ..utils import eval_functions_to_ufl
 try:
     from SeismicMesh import write_velocity_model
     SEISMIC_MESH_AVAILABLE = True
@@ -415,45 +417,75 @@ class Wave(Model_parameters, metaclass=ABCMeta):
             Options: 'scalar', 'vector' or 'tensor'
         dg_property: `bool`
             If True, uses a DG0 function space for conditional and
-            expression inputs. Default is True
+            expression inputs
         shape_func_space: `tuple`, optional
-            Shape of the function space for only tensorial material property
+            Shape of the function space for only tensorial material property.
+            Default is None
 
         Returns:
         -----------
         V: `firedrake function space`
             Function space for the material property
-        typ_ele: `str`
-            Type of element for the function space (e.g., 'DG', 'CG', 'KMV')
-        dgr_ele: `int`
-            Degree of the element for the function space
         '''
 
+        # Checking input arguments
+        opts_func_space_type = ['scalar', 'vector', 'tensor']
+        if func_space_type not in opts_func_space_type:
+            error_management.value_parameter_error('func_space_type',
+                                                   func_space_type,
+                                                   opts_func_space_type)
+
         # Define the function space parameters
-        typ_ele = 'DG' if dg_property else \
-            self.function_space.ufl_element().family()
-        dgr_ele = 0 if dg_property else \
-            self.function_space.ufl_element().degree()
+        if self.mesh_parameters.quadrilateral:  # Q_Elements
+            base_mesh = self.mesh._base_mesh
+            base_cell = base_mesh.ufl_cell()
+            element = self.function_space.ufl_element()
+            ele_zx = element.sub_elements[0].sub_elements[0]
+            ele_y = element.sub_elements[1].sub_elements[1]
+            typ_ele_zx = 'DQ' if dg_property else ele_zx.family()
+            typ_ele_y = 'DG' if dg_property else ele_y.family()
+            dgr_ele = (0, 0) if dg_property else element.degree()
+            variant = element.variant()
+            element_zx = fire.FiniteElement(typ_ele_zx, base_cell, dgr_ele[0],
+                                            variant=variant)
+            element_y = fire.FiniteElement(typ_ele_y, fire.interval, dgr_ele[1],
+                                           variant=variant)
+            tensor_element = fire.TensorProductElement(element_zx, element_y)
+            V = fire.FunctionSpace(self.mesh, tensor_element)
 
-        # Function space for the property
-        if func_space_type == 'scalar':
-            V = fire.FunctionSpace(self.mesh, typ_ele, dgr_ele)
-        elif func_space_type == 'vector':
-            V = fire.VectorFunctionSpace(self.mesh, typ_ele, dgr_ele)
-        elif func_space_type == 'tensor':
-            V = fire.TensorFunctionSpace(self.mesh, typ_ele, dgr_ele,
-                                         shape=shape_func_space)
-        else:
-            error_management.value_parameter_error(
-                'func_space_type', func_space_type,
-                ['scalar', 'vector', 'tensor'])
+            # Function space for the property
+            if func_space_type == 'scalar':
+                V = fire.FunctionSpace(self.mesh, tensor_element)
+            elif func_space_type == 'vector':
+                V = fire.VectorFunctionSpace(self.mesh, tensor_element)
+            elif func_space_type == 'tensor':
+                V = fire.TensorFunctionSpace(self.mesh, tensor_element,
+                                             shape=shape_func_space)
 
-        return V, typ_ele, dgr_ele
+        else:  # T_Elements
+            typ_ele = 'DG' if dg_property else \
+                self.function_space.ufl_element().family()
+            dgr_ele = 0 if dg_property else \
+                self.function_space.ufl_element().degree()
+            V = fire.FunctionSpace(self.mesh, self.ele_type_c0, self.p_c0)
 
-    def _initialize_material_property_from_ufl(self, property_name, V,
-                                               constant=None,
-                                               conditional=None,
-                                               expression=None):
+            # Function space for the property
+            if func_space_type == 'scalar':
+                V = fire.FunctionSpace(self.mesh, typ_ele, dgr_ele)
+            elif func_space_type == 'vector':
+                V = fire.VectorFunctionSpace(self.mesh, typ_ele, dgr_ele)
+            elif func_space_type == 'tensor':
+                V = fire.TensorFunctionSpace(self.mesh, typ_ele, dgr_ele,
+                                             shape=shape_func_space)
+
+        return V
+
+    def _initialize_material_prop_from_ufl(self, property_name,
+                                           func_space_type, V,
+                                           shape_func_space=None,
+                                           constant=None,
+                                           conditional=None,
+                                           expression=None):
         '''
         Initialize material property from a UFL input. This method is
         used when the material property is defined by a constant value,
@@ -462,9 +494,15 @@ class Wave(Model_parameters, metaclass=ABCMeta):
         Parameters:
         -----------
         property_name: `str`
-            Name of the material property to be set.
+            Name of the material property to be set
+        func_space_type, `str`
+            Type of function space for the material property.
+            Options: 'scalar', 'vector' or 'tensor'
         V: `firedrake function space`
             Function space for the material property
+        shape_func_space: `tuple`, optional
+            Shape of the function space for only tensorial material property.
+            Default is None
         constant: `float`, optional
             Constant value for the material property. Default is None
         conditional:  `firedrake conditional`, optional
@@ -483,11 +521,19 @@ class Wave(Model_parameters, metaclass=ABCMeta):
         '''
 
         if constant is not None:
-            value = 1 if constant == 0 else abs(constant)
-            col = int(abs(log10(value))) + 2
+            value = 1 if constant == 0. else abs(constant)
+            col = int(abs(log10(abs(value)))) + 2
+
             print(f"Assigning {property_name} with a "
                   f"constant value of {constant:>{col}}", flush=True)
-            ufl_input = fire.Constant(constant)
+
+            if func_space_type == 'vector':
+                ufl_input = fire.as_vector((constant,) * self.dimension)
+
+            elif func_space_type == 'tensor':
+                ufl_input = fire.as_tensor(constant * ones((shape_func_space)))
+            else:
+                ufl_input = fire.Constant(constant)
 
         if conditional is not None:
             print(f"Assigning {property_name} with a conditional "
@@ -497,7 +543,7 @@ class Wave(Model_parameters, metaclass=ABCMeta):
         if expression is not None:
             print(f"Assigning {property_name} with an expression "
                   f"field given by f = {expression} ", flush=True)
-            ufl_input = utils.eval_functions_to_ufl.generate_ufl_functions(
+            ufl_input = eval_functions_to_ufl.generate_ufl_functions(
                 self.mesh, expression, self.dimension)
 
         mat_property = fire.Function(
@@ -505,16 +551,17 @@ class Wave(Model_parameters, metaclass=ABCMeta):
 
         return mat_property
 
-    def _initialize_material_property_from_file(property_name, from_file, V):
+    def _initialize_material_prop_from_func(self, property_name,
+                                            fire_function, V):
         '''
-        Initialize material property from a file.
+        Initialize material property from a firedrake function.
 
         Parameters:
         -----------
         property_name: `str`
             Name of the material property to be set.
-        from_file: `str`, optional
-            Name of the file containing the material property. Default is None
+        fire_function: `firedrake function`
+            Firedrake function based on the input object
         V: `firedrake function space`
             Function space for the material property
 
@@ -524,12 +571,94 @@ class Wave(Model_parameters, metaclass=ABCMeta):
             Material property
         '''
 
+        ele_orig = self.function_space.ufl_element().family()
+        dgr_orig = self.function_space.ufl_element().degree()
+        typ_ele = V.ufl_element().family()
+        dgr_ele = V.ufl_element().degree()
+
+        print(f"Assigning {property_name} with a firedrake function",
+              ("in the same" if typ_ele == ele_orig
+               and dgr_ele == dgr_orig else "in another"),
+              f"function space: {typ_ele} {dgr_ele}.", flush=True)
+
+        if typ_ele == ele_orig and dgr_ele == dgr_orig:
+            # Same function space
+            mat_property = fire_function
+            mat_property.rename(property_name)
+
+        else:  # Different function space
+            mat_property = fire.Function(
+                V, name=property_name).interpolate(fire_function)
+
+        return mat_property
+
+    def _initialize_random_material_prop(self, property_name, random, V):
+        '''
+        Initialize material property from a random distribution.
+
+        Parameters:
+        -----------
+        property_name: `str`
+            Name of the material property to be set.
+        random: `tuple`
+            If you want to set a random material property, specify the range of
+            values as a tuple (min, max)
+        V: `firedrake function space`
+            Function space for the material property
+
+        Returns:
+        -----------
+        mat_property: `firedrake function`
+            Material property
+        '''
+
+        col0 = int(abs(log10(abs(random[0])))) + 2
+        col1 = int(abs(log10(abs(random[1])))) + 2
+        print(f"Assigning {property_name} with a random field "
+              f"between ({random[0]:>{col0}},{random[1]:>{col1}})",
+              flush=True)
+
+        mat_property = fire.Function(V, name=property_name)
+        mat_property.dat.data[:] = uniform(random[0], random[1],
+                                           mat_property.dat.data.shape)
+
+        return mat_property
+
+    def _initialize_material_prop_from_file(self, property_name, from_file, V):
+        '''
+        Initialize material property from a file.
+
+        Parameters:
+        -----------
+        property_name: `str`
+            Name of the material property to be set.
+        from_file: `str`
+            Name of the file containing the material property
+        V: `firedrake function space`
+            Function space for the material property
+
+        Returns:
+        -----------
+        mat_property: `firedrake function`
+            Material property
+        '''
+
+        ele_orig = self.function_space.ufl_element().family()
+        dgr_orig = self.function_space.ufl_element().degree()
+        typ_ele = V.ufl_element().family()
+        dgr_ele = V.ufl_element().degree()
+
+        print(f"Assigning {property_name} from file {from_file}",
+              ("in the same" if typ_ele == ele_orig
+               and dgr_ele == dgr_orig else "in another"),
+              f"function space: {typ_ele} {dgr_ele}.", flush=True)
+
         if from_file.endswith(".segy"):
             if not SEISMIC_MESH_AVAILABLE:
                 raise ImportError(
                     "SeismicMesh is required to convert segy files.")
 
-            mp_filename, mp_filetype = os.path.splitext(from_file)
+            mp_filename, mp_filetype = splitext(from_file)
             warnings.warn("Converting segy file to hdf5")
             # ToDo: Change method name
             write_velocity_model(from_file, ofname=mp_filename)
@@ -585,7 +714,8 @@ class Wave(Model_parameters, metaclass=ABCMeta):
             Type of function space for the material property.
             Options: 'scalar', 'vector' or 'tensor'
         shape_func_space: `tuple`, optional
-            Shape of the function space for only tensorial material property
+            Shape of the function space for only tensorial material property.
+            Default is None
         from_file: `str`, optional
             Name of the file containing the material property. Default is None
         constant: `float`, optional
@@ -605,7 +735,7 @@ class Wave(Model_parameters, metaclass=ABCMeta):
             Firedrake function based on the input object. Default is None.
         dg_property: `bool`, optional
             If True, uses a DG0 function space for conditional and
-            expression inputs. Default is True
+            expression inputs. Default is False
         output: `bool`, optional
             If True, outputs the material property to a pvd file for
             visualization. Default is False
@@ -619,14 +749,26 @@ class Wave(Model_parameters, metaclass=ABCMeta):
             Material property
         '''
 
-        if sum(x is not None for x in
-               [constant, conditional, expression,
-                fire_function, from_file, random]) > 1:
-            raise ValueError("Please specify only one of the following "
-                             "inputs: constant, conditional, expression, "
-                             "firedrake function or file name.")
+        # Checking input arguments
+        val_lst = [constant, conditional, expression,
+                   random, fire_function, from_file]
 
-        V, typ_ele, dgr_ele = self.define_property_function_space(
+        if sum(value is not None for value in val_lst) > 1:
+            name_lst = ["constant", "conditional", "expression",
+                        "random", "fire_function", "from_file"]
+            name_lst[-1] += " (*.segy or *.hdf5)"
+            error_management.mutually_exclusive_parameter_error(name_lst,
+                                                                val_lst)
+        if shape_func_space is not None:
+            if func_space_type != 'tensor':
+                raise ValueError("'shape_func_space' can only be specified "
+                                 "for tensorial material properties.")
+            if shape_func_space[0] * shape_func_space[1] > 9 and output:
+                raise ValueError("Output of tensorial material "
+                                 "properties with more than 9 "
+                                 "components is not supported.")
+
+        V = self.define_property_function_space(
             func_space_type, dg_property, shape_func_space=shape_func_space)
 
         # If no mesh is set, we have to do it beforehand
@@ -635,61 +777,49 @@ class Wave(Model_parameters, metaclass=ABCMeta):
 
         try:
 
-            if any([constant is not None, conditional is not None,
-                    expression is not None]):
+            if func_space_type == 'scalar':
 
-                mat_property = _initialize_material_property_from_ufl(
-                    self, property_name, V, constant=constant,
-                    conditional=conditional, expression=expression)
+                if any(v is not None for v in val_lst[:3]):  # UFL
+                    mat_property = self._initialize_material_prop_from_ufl(
+                        property_name, func_space_type, V, constant=constant,
+                        conditional=conditional, expression=expression)
 
-            if fire_function is not None or from_file is not None:
-                mp_str = f"Assigning {property_name} "
+                if random is not None:  # Random
+                    mat_property = self._initialize_random_material_prop(
+                        property_name, random, V)
 
                 if fire_function is not None:
-                    mp_str += "with a firedrake function "
+                    mat_property = self._initialize_material_prop_from_func(
+                        property_name, fire_function, V)
 
-                elif from_file is not None:
-                    mp_str += f"from file {from_file} "
+                if from_file is not None:
+                    raise NotImplementedError("Initializing property "
+                                              "from file is currently "
+                                              "not implemented")
+                    # mat_property = self._initialize_material_prop_from_file(
+                    #     property_name, from_file, V)
 
-                if typ_ele == ele_orig and dgr_ele == dgr_orig:
-                    # Same function space
-                    mp_str + "in the same "
+            else:
 
-                else:  # Different function space
-                    mp_str + "in another "
+                print("Vectorial and Tensorial material properties are "
+                      "defined only either by constants or\nby firedrake "
+                      "functions. If use 'constant', define its components "
+                      "as scalar material\nproperties using the same property "
+                      "name followed by the component at the end.")
 
-                mp_str += f"function space: {typ_ele}{dgr_ele}."
-                print(mp_str, flush=True)
+                if constant is not None:
+                    mat_property = self._initialize_material_prop_from_ufl(
+                        property_name, func_space_type, V,
+                        shape_func_space=shape_func_space,
+                        constant=constant, conditional=None,
+                        expression=None)
 
-            if fire_function is not None:
-                ele_orig = self.function_space.ufl_element().family()
-                dgr_orig = self.function_space.ufl_element().degree()
-                if typ_ele == ele_orig and dgr_ele == dgr_orig:
-                    # Same function space
-                    mat_property = fire_function
-                else:  # Different function space
-                    mat_property = fire.Function(
-                        V, name=property_name).interpolate(fire_function)
-
-            elif from_file is not None:
-                mat_property = from_file
-                self._initialize_material_property_from_file()
-
-            elif random is not None:
-                col0 = int(abs(log10(abs(random[0])))) + 2
-                col1 = int(abs(log10(abs(random[1])))) + 2
-                print(f"Assigning {property_name} with a random field "
-                      f"between ({random[0]:>{col0}},{random[1]:>{col1}})",
-                      flush=True)
-                mat_property = fire.Function(V, name=property_name)
-                mat_property.dat.data[:] = uniform(random[0], random[1],
-                                                   mat_property.dat.data.shape)
+                if fire_function is not None:
+                    mat_property = self._initialize_material_prop_from_func(
+                        property_name, fire_function, V)
 
         except Exception as e:
-            raise ValueError(f"Error Setting a Material Property: {e}. "
-                             "Please specify either a conditional, "
-                             "expression, firedrake function or "
-                             " new file name (*.segy or *.hdf5).")
+            raise ValueError(f"Error Setting a Material Property: {e}.")
 
         if output:
             self._saving_property_to_file(mat_property, property_name,

@@ -26,10 +26,46 @@ def value_parameter_error(par_name, par_value, valid_values):
     err_str = f"Invalid {par_name}: '{par_value}'. Please use: "
     opt_str = ", ".join([f"'{val}'" for val in valid_values])
     last_comma = opt_str.rfind(',')
-    opt_str = opt_str[:last_comma] + ' or' + opt_str[last_comma + 1:] \
+    opt_str = opt_str[:last_comma] + " or" + opt_str[last_comma + 1:] \
         if len(valid_values) > 1 else opt_str
 
     raise ValueError(err_str + opt_str)
+
+
+def mutually_exclusive_parameter_error(par_name_lst, par_value_lst):
+    '''
+    Raise a ValueError with a specific error message for parameters
+    that are mutually exclusive.
+
+    Parameters
+    ----------
+    par_name_Lst : `list` of `str`
+        List of names of the parameters that are mutually exclusive
+    par_value_lst : `list`
+        List of values of the parameters that are mutually exclusive
+
+    Raises
+    ------
+    ValueError
+        If two or more parameters have been provided by the user.
+        That is, value of the parameters is not None.
+    '''
+
+    par_defined = [par for par, val in zip(par_name_lst,
+                                           par_value_lst)
+                   if val is not None]
+
+    # Error message about the invalid parameter
+    exc_str = "Parameters " + ", ".join([f"'{name}'" for name in par_defined])
+    last_comma = exc_str.rfind(',')
+    exc_str = exc_str[:last_comma] + ' and' + exc_str[last_comma + 1:]
+    exc_str += " mutually exclusive.\n"
+    err_str = "Please specify only one of these parameters: "
+    opt_str = ", ".join([f"'{val}'" for val in par_name_lst])
+    last_comma = opt_str.rfind(',')
+    opt_str = opt_str[:last_comma] + " or" + opt_str[last_comma + 1:]
+
+    raise ValueError(exc_str + err_str + opt_str)
 
 
 def value_dimension_error(par_names, par_values, expected_dim):
