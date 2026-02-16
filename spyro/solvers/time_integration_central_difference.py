@@ -47,10 +47,14 @@ def central_difference(wave, source_ids=[0]):
 
         # More efficient way of applying sources
         if wave.sources is not None:
-            f = wave.sources.apply_source(rhs_forcing, step)
-            B0 = wave.rhs_no_pml()
-            B0 += f
-            wave.solver.solve(wave.next_vstate, wave.B)
+            if wave.use_vertex_only_mesh:
+                B0 = wave.rhs_no_pml()
+                B0 += fire.assemble(
+                    wave.sources.wavelet[step] * q_s)
+            else:
+                B0 = wave.rhs_no_pml()
+                B0 += wave.sources.apply_source(rhs_forcing, step)
+        wave.solver.solve(wave.next_vstate, wave.B)
 
         wave.prev_vstate = wave.vstate
         wave.vstate = wave.next_vstate
