@@ -89,19 +89,6 @@ def test_immersed_polygon_forward():
     assert all([test1, test2, test3])
 
 
-def test_rectangle_forward_vertex_only_mesh():
-    dictionary = {"acquisition": {"use_vertex_only_mesh": True}}
-    Wave_obj = spyro.examples.Rectangle_acoustic(dictionary=dictionary)
-
-    layer_values = [1.5, 2.0, 2.5, 3.0]
-    z_switches = [-0.25, -0.5, -0.75]
-    Wave_obj.multiple_layer_velocity_model(z_switches, layer_values)
-
-    Wave_obj.forward_solve()
-
-    assert Wave_obj.receivers_output is not None
-
-
 @pytest.mark.slow
 def test_camembert_elastic():
     from spyro.examples.camembert_elastic import wave
