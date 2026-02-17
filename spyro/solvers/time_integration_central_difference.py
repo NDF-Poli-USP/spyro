@@ -88,4 +88,3 @@ def central_difference(wave, source_ids=[0]):
 
     wave.field_logger.stop_logging()
     return usol, usol_recv
-
