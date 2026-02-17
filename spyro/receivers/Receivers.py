@@ -110,7 +110,7 @@ class Receivers(Delta_projector):
         return rhs_forcing
 
     def receiver_interpolator(self, f):
-        """Return a interpolator object.
+        """Return an interpolator object.
 
         Parameters
         ----------
