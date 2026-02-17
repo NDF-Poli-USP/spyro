@@ -4,6 +4,7 @@ from scipy.signal import butter, filtfilt
 from spyro.receivers.dirac_delta_projector import Delta_projector
 import firedrake as fire
 
+
 class Sources(Delta_projector):
     """Methods that inject a wavelet into a mesh
 
@@ -114,11 +115,6 @@ class Sources(Delta_projector):
 
     def source_cofunction(self):
         """Return a cofunction with the source applied into the domain.
-
-        Parameters
-        ----------
-        step: int
-            Time step (index of the wavelet array)
 
         Returns
         -------

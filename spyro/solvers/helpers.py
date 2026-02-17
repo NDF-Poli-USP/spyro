@@ -35,7 +35,9 @@ def fill(usol_recv, is_local, nt, nr):
         List of numpy arrays
 
     """
-    if isinstance(usol_recv[0], Function):
+    if len(usol_recv) == 0:
+        usol_recv = np.asarray(usol_recv)
+    elif isinstance(usol_recv[0], Function):
         usol_recv = np.asarray([u.dat.data_wo for u in usol_recv])
     else:
         usol_recv = np.asarray(usol_recv)
