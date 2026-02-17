@@ -59,7 +59,6 @@ def backward_wave_propagator_no_pml(Wave_obj, dt=None):
     # output = fire.File(output_filename, comm=comm.comm)
     comm.comm.barrier()
 
-    X = fire.Function(Wave_obj.function_space)
     dJ = fire.Function(Wave_obj.function_space)  # , name="gradient")
 
     final_time = Wave_obj.final_time
@@ -74,9 +73,6 @@ def backward_wave_propagator_no_pml(Wave_obj, dt=None):
     u_np1 = fire.Function(Wave_obj.function_space)
 
     rhs_forcing = fire.Cofunction(Wave_obj.function_space.dual())
-
-    B = Wave_obj.B
-    rhs = Wave_obj.rhs
 
     # Define a gradient problem
     m_u = fire.TrialFunction(Wave_obj.function_space)
@@ -106,13 +102,13 @@ def backward_wave_propagator_no_pml(Wave_obj, dt=None):
 
     for step in range(nt-1, -1, -1):
         rhs_forcing.assign(0.0)
-        B = fire.assemble(rhs, tensor=B)
         f = receivers.apply_receivers_as_source(rhs_forcing, residual, step)
-        B0 = B.sub(0)
-        B0 += f
-        Wave_obj.solver.solve(X, B)
+        Wave_obj.source_function.assign(0.0)
+        sf0 = Wave_obj.rhs_no_pml_source()
+        sf0 += f
+        Wave_obj.solver.solve()
 
-        u_np1.assign(X)
+        u_np1.assign(Wave_obj.u_np1)
 
         if (step) % Wave_obj.output_frequency == 0:
             assert (
@@ -188,7 +184,6 @@ def mixed_space_backward_wave_propagator(Wave_obj, dt=None):
     output = fire.VTKFile(output_filename)
     comm.comm.barrier()
 
-    X = Wave_obj.X
     dJ = fire.Function(Wave_obj.function_space)  # , name="gradient")
 
     final_time = Wave_obj.final_time
@@ -200,12 +195,9 @@ def mixed_space_backward_wave_propagator(Wave_obj, dt=None):
 
     X_nm1 = Wave_obj.X_nm1
     X_n = Wave_obj.X_n
-    X_np1 = fire.Function(Wave_obj.mixed_function_space)
+    X_np1 = Wave_obj.X_np1
 
     rhs_forcing = fire.Cofunction(Wave_obj.function_space.dual())
-
-    B = Wave_obj.B
-    rhs = Wave_obj.rhs
 
     # Define a gradient problem
     m_u = fire.TrialFunction(Wave_obj.function_space)
@@ -237,13 +229,11 @@ def mixed_space_backward_wave_propagator(Wave_obj, dt=None):
 
     for step in range(nt-1, -1, -1):
         rhs_forcing.assign(0.0)
-        B = fire.assemble(rhs, tensor=B)
         f = receivers.apply_receivers_as_source(rhs_forcing, residual, step)
-        B0 = B.sub(0)
-        B0 += f
-        Wave_obj.solver.solve(X, B)
-
-        X_np1.assign(X)
+        Wave_obj.source_function.assign(0.0)
+        sf0 = Wave_obj.rhs_no_pml_source()
+        sf0 += f
+        Wave_obj.solver.solve()
 
         if (step) % Wave_obj.output_frequency == 0:
             if Wave_obj.forward_output:

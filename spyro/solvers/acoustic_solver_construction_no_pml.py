@@ -79,14 +79,19 @@ def construct_solver_or_matrix_no_pml(Wave_object):
     # Signal for le is + in derivation, see Salas et al (2022)
     # doi: https://doi.org/10.1016/j.apm.2022.09.014
     form = m1 + a + le
-    lhs = fire.lhs(form)
-    rhs = fire.rhs(form)
-    Wave_object.lhs = lhs
+    lhs_ = fire.lhs(form)
+    rhs_ = fire.rhs(form)
+    Wave_object.lhs = lhs_
 
-    A = fire.assemble(lhs, mat_type="matfree")
-    Wave_object.solver = fire.LinearSolver(
-        A, solver_parameters=Wave_object.solver_parameters
+    source_function = fire.Cofunction(V.dual())
+    Wave_object.source_function = source_function
+
+    lin_var = fire.LinearVariationalProblem(lhs_, rhs_ + source_function, u_np1, constant_jacobian=True)
+    solver_parameters = dict(Wave_object.solver_parameters)
+    solver_parameters["mat_type"] = "matfree"
+    Wave_object.solver = fire.LinearVariationalSolver(
+        lin_var, solver_parameters=solver_parameters,
     )
 
-    Wave_object.rhs = rhs
+    Wave_object.rhs = rhs_
     Wave_object.B = B
