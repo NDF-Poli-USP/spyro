@@ -41,15 +41,15 @@ def central_difference(wave, source_ids=[0]):
     for step in range(nt):
         # Basic way of applying sources
         wave.update_source_expression(t)
-        fire.assemble(wave.rhs, tensor=wave.B)
 
         # More efficient way of applying sources
         if wave.sources is not None:
             f = wave.sources.apply_source(rhs_forcing, step)
-            B0 = wave.rhs_no_pml()
-            B0 += f
+            wave.source_function.assign(0.0)
+            sf0 = wave.rhs_no_pml_source()
+            sf0 += f
 
-        wave.solver.solve(wave.next_vstate, wave.B)
+        wave.solver.solve()
 
         wave.prev_vstate = wave.vstate
         wave.vstate = wave.next_vstate
