@@ -1,172 +1,19 @@
-# Loopy Plan Prompt
+# Loopy Build Prompt
 
-Timestamp: 2026-02-18T01:36:25.707Z
+Timestamp: 2026-02-18T01:43:02.918Z
+Iteration: 1
 
-You are in PLANNING mode.
-Goal: update the plan only. Do NOT implement anything. No code edits. No commits.
+You are in BUILDING mode.
+Goal: complete exactly one task from the current plan.
 
 ## Context
-## Plan seed (PRD) (--generate-prd)
-# PRD: Code Architecture Improvement (MVP)
 
-## Problem Statement
-The codebase architecture has weak module boundaries and inconsistent patterns, increasing the cost and risk of implementing and maintaining changes.
-
-## Goals
-- Reduce change complexity by defining and enforcing clear module boundaries.
-- Improve maintainability and testability without changing user-visible behavior.
-
-## Non-Goals
-- Rewriting core algorithms or introducing new end-user features.
-
-## Users & Context
-- Primary user: Software engineers maintaining and extending the codebase.
-- Secondary user(s): QA/release engineers and new contributors onboarding to the project.
-- Environment: Internal repository and CI pipeline (Python-based backend/library).
-
-## Scope
-- In scope: Define target architecture and module ownership.
-- In scope: Refactor high-churn modules to align with target boundaries.
-- In scope: Add automated architecture checks to CI (imports/cycles/layer rules).
-- In scope: Update developer documentation for architecture and contribution patterns.
-- Out of scope: Product feature development unrelated to architecture.
-- Out of scope: Full rewrite of low-churn legacy modules.
-- Out of scope: Infrastructure/platform migration (cloud, database, runtime).
-
-## Requirements
-### Functional
-- [F1] Produce a target architecture spec with named layers/modules, allowed dependencies, and ownership; store in repo docs.
-- [F2] Refactor at least the top 20% highest-churn modules to comply with the target boundaries.
-- [F3] Eliminate circular dependencies in scoped modules; CI must fail on new cycles.
-- [F4] Standardize shared concerns (configuration, logging, error handling, utilities) into dedicated modules with no duplication in scoped areas.
-- [F5] Preserve existing public APIs/CLIs for scoped modules; any breaking change requires a deprecation path documented in changelog.
-- [F6] Add/adjust automated tests so behavior remains equivalent for all refactored flows.
-
-### Non-Functional
-- [N1] Performance: No more than 5% regression in existing benchmark/test runtime for scoped components.
-- [N2] Security/Privacy: No reduction in current security posture; no secrets in code/logs; existing access controls remain intact.
-- [N3] Accessibility: Architecture docs and dev workflows must be usable with keyboard-only CLI and plain-text rendering.
-
-## User Stories (MVP)
-- As a maintainer, I want clear module boundaries, so that I can implement changes without cross-module side effects.
-- As a reviewer, I want CI to detect boundary violations, so that architectural drift is blocked early.
-- As a new contributor, I want concise architecture docs, so that I can onboard and contribute safely.
-- As a release engineer, I want behavior-preserving refactors with test coverage, so that releases remain stable.
-
-## Success Metrics
-- 90%+ of scoped modules pass architecture-rule checks in CI within 6 weeks.
-- Circular dependency count in scoped modules reaches 0 and stays at 0 for 4 consecutive weeks.
-- Median PR cycle time for scoped modules decreases by at least 25% within 8 weeks of rollout.
-- Architecture-related regression defects in scoped modules decrease by at least 30% over the next 2 release cycles.
-
-## Risks & Mitigations
-- Incomplete architecture rules cause inconsistent refactors → Define and approve rules before refactoring begins.
-- Regressions during refactor → Require parity tests and phased rollout per module.
-- Team adoption resistance → Provide short migration guide, examples, and CI feedback with actionable messages.
-- Scope creep into full rewrite → Enforce churn-based prioritization and strict out-of-scope rules.
-
-## Open Questions
-- Which modules are highest priority for the first refactor wave?
-- What is the required delivery timeline (sprint count/release target)?
-- Which architecture validation tool(s) are preferred in CI?
-
-## Assumptions
-- Existing tests and CI are available and can be extended.
-- Architecture work is limited to internal maintainability, not feature changes.
-- A small cross-functional team (2–4 engineers) is available for at least one release cycle.
-- Current runtime/platform stack remains unchanged during this initiative.
 
 
 
 
 
 ## AGENTS
-● Todo: Added: Inspect build and validation commands
-
-● Read setup.cfg
-  └ 12 lines read
-
-● Read Makefile
-  └ 31 lines read
-
-● Read setup.py
-  └ 18 lines read
-
-● Read README.md
-  └ 259 lines read
-
-● Glob "**/{tox.ini,pyproject.toml,requirements*.txt,environment*.yml,noxfile.py}" in
-/Users/ddolci/usp_postdoc/spyro
-  └ 1 file found
-
-● Glob ".github/workflows/*.{yml,yaml}" in /Users/ddolci/usp_postdoc/spyro
-  └ 3 files found
-
-● Grep "(pytest|unittest|nose|tox|nox|ruff|flake8|black|isort|mypy|pyright|pylint|make test|make
-lint|make typecheck|coverage)" (/Users/ddolci/usp_postdoc/spyro)
-  └ 6 lines found
-
-● Read .github/workflows/python-tests.yml
-  └ 121 lines read
-
-● Read .github/workflows/lint.yml
-  └ 27 lines read
-
-● Read .github/workflows/build_firedrake_main.yml
-  └ 116 lines read
-
-● Read conftest.py
-  └ 55 lines read
-
-● List directory demos
-  └ 2 files found
-
-● List directory test_integration
-  └ 2 files found
-
-● Glob "tests/**/*.py" in /Users/ddolci/usp_postdoc/spyro
-  └ 62 files found
-
-● Glob "demos/**/*.py" in /Users/ddolci/usp_postdoc/spyro
-  └ 4 files found
-
-● Read demos/README.md
-  └ 6 lines read
-
-● Read demos/with_automatic_differentiation/run_forward_ad.py
-  └ 46 lines read
-
-● Read demos/with_automatic_differentiation/run_fwi_ad.py
-  └ 112 lines read
-
-● Grep "argparse|click\.command|typer\.Typer" (/Users/ddolci/usp_postdoc/spyro)
-  └ No matches found
-
-● Grep "pytest\.ini|tool\.pytest\.ini_options" (/Users/ddolci/usp_postdoc/spyro)
-  └ No matches found
-
-● Grep "if __name__ == ['\"]__main__['\"]" (/Users/ddolci/usp_postdoc/spyro)
-  └ 39 lines found
-
-● Todo: Started
-
-✗ Create session plan file
-  $ cat > /Users/ddolci/.copilot/session-state/b1e4ddb6-0032-48cd-82ec-eba2fb05a6fa/plan.md
-  <<'EOF'
-  # Plan
-  1. Confirm reliable build/run/test/lint/typecheck commands from repo docs and CI.
-  2. Create AGENTS.md with required structure and only confident commands....
-  Permission denied and could not request permission from user
-
-✗ Create AGENTS.md
-  Failed to apply patch: Error: Permission denied: Create file
-  /Users/ddolci/usp_postdoc/spyro/AGENTS.md
-
-● Todo: Completed: draft-agents-md
-
-● Glob "AGENTS.md" in /Users/ddolci/usp_postdoc/spyro
-  └ No matches found
-
 # AGENTS
 
 ## Build & Run
@@ -184,24 +31,12 @@ lint|make typecheck|coverage)" (/Users/ddolci/usp_postdoc/spyro)
 - CI also runs MPI-heavy validation (e.g., `mpiexec -n 6 python -m pytest test_integration/`).
 - `./cleanup.sh` is used in CI between test phases to remove generated artifacts.
 
-## Requirements
-Study these sources before planning:
-- `specs/*` (requirements)
-- `src/*` (current implementation)
-Use subagents for study and investigation; use only one subagent for tests.
+## Current Task
+
+- [ ] analysis: identify top-churn modules from git history — Acceptance: docs/architecture/churn-baseline.md lists modules covering at least 20% of recent churn.
+
 
 ## Plan
-Compare specs against code. Produce a prioritized plan that closes gaps.
-If the existing plan is wrong or stale, replace it.
-Keep tasks atomic, testable, and outcome-focused.
-Do not assume anything is missing; search first.
-If acceptance criteria are subjective, add judge tests (see `loopy add-judge`).
-- Phases use a two-gate completion model: Gate 1 = all tasks checked, Gate 2 = test_command passes. Tests are only run after all tasks in a phase are checked.
-- The stop_on field is deprecated. All phases follow the two-gate model automatically.
-- If a task is impossible to complete, mark it as skipped with [~] or [-] and include the reason in the task text.
-- If a task is blocked by external factors after 3+ consecutive failures, mark it as [!] with a BLOCKED reason (e.g., `[!] task description — BLOCKED: reason`). Blocked tasks are excluded from phase gates.
-
-## Current Plan
 ---
 agent_command: copilot
 test_command: pytest ...
@@ -210,7 +45,7 @@ max_minutes: 120
 backoff_ms: 5000
 rotate_bytes: 150000
 git:
-  branch: ''
+  branch: dolci/use_variational_solver
   commit: true
   commit_message: 'loopy: {change_type} {task_summary}'
 phase_defaults:
@@ -256,8 +91,37 @@ phases:
 
 ## Signs
 
-## Output Rules
-- Plan only.
-- No implementation steps.
-- No commits.
-- Keep tasks small and unambiguous.
+## Task Rules
+- Use subagents to study specs/code; use only one subagent for tests.
+- Do not assume functionality is missing; search first.
+- If the plan is wrong or stale, switch to plan mode and regenerate it.
+- If acceptance criteria are subjective, add and run judge tests (see `loopy add-judge`).
+- If you discover new run/test commands, update AGENTS.md.
+- Complete all unchecked tasks in the current phase before tests will be run.
+- Mark a task checkbox as [x] when the implementation is done. The test_command runs automatically after all phase tasks are checked.
+- If a task is impossible or should be skipped, mark it with [~] or [-] and explain the reason inline.
+- If a task is blocked by external factors after 3+ consecutive failures, mark it as [!] with a reason: `[!] task — BLOCKED: reason`. Blocked tasks do not block phase advancement.
+- If the test command fails after all tasks are checked, fix the failures before the phase can advance. Do not move on with broken tests.
+- If the same task has failed for 3+ consecutive iterations, reassess your approach: read the error output carefully, consider reverting recent changes, or switch to plan mode to re-scope the task.
+
+## Built-in Rules
+- Phases follow a two-gate lifecycle: Gate 1 = all tasks checked [x] (or skipped [~]/[-] or blocked [!]), Gate 2 = test_command passes.
+- The test_command is NOT executed until every task in the current phase is checked. Focus on completing tasks first.
+- Focus on one task at a time. Do not check multiple boxes in a single iteration.
+- Never cycle back to a previous phase. Phases are sequential and one-directional.
+
+## Instructions
+- Don't assume something is unimplemented; search first.
+- Update AGENTS.md only for operational learnings.
+- No stubs or placeholder implementations.
+- Follow the plan checklist in LOOPY_PLAN.md.
+- Update plan checkboxes as you complete items.
+- Record any new guardrails if you detect repetition or drift.
+- Keep changes focused and maintain repo state.
+- Complete all unchecked tasks in the current phase before tests will be run.
+- Mark a task [x] when the implementation is done. The test_command runs automatically after all phase tasks are checked.
+- If a task should be skipped, mark it with [~] or [-] and note the reason.
+- If a task is blocked by external factors after 3+ consecutive failures, mark it as [!] with a reason: `[!] task — BLOCKED: reason`. Blocked tasks do not block phase advancement.
+- If tests fail after all tasks are checked, fix the failures first.
+- If the same task has failed for 3+ consecutive iterations, reassess your approach.
+- **Complete only the Current Task in this iteration.**
