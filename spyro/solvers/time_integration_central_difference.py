@@ -44,10 +44,11 @@ def central_difference(wave, source_ids=[0]):
 
         # More efficient way of applying sources
         if wave.sources is not None:
-            f = wave.sources.apply_source(rhs_forcing, step)
-            wave.source_function.assign(0.0)
-            sf0 = wave.rhs_no_pml_source()
-            sf0 += f
+            # For no pml, wave.rhs_no_pml_source() returns the source
+            # function that is added to the right hand side, so we can just assign
+            # the source expression to it.
+            wave.rhs_no_pml_source().assign(
+                wave.sources.apply_source(rhs_forcing, step))
 
         wave.solver.solve()
 
