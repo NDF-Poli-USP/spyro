@@ -81,11 +81,11 @@ def construct_solver_or_matrix_no_pml(Wave_object):
     Wave_object.lhs = fire.lhs(form)
     Wave_object.B = fire.Cofunction(V.dual())
 
-    source_function = fire.Cofunction(V.dual())
-    Wave_object.source_function = source_function
+    Wave_object.source_function = fire.Cofunction(V.dual())
 
     lin_var = fire.LinearVariationalProblem(
-        Wave_object.lhs, Wave_object.rhs + source_function,
+        Wave_object.lhs,
+        Wave_object.rhs + Wave_object.source_function,
         u_np1, constant_jacobian=True)
     solver_parameters = dict(Wave_object.solver_parameters)
     solver_parameters["mat_type"] = "matfree"

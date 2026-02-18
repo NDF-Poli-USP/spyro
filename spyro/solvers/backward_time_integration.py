@@ -102,10 +102,9 @@ def backward_wave_propagator_no_pml(Wave_obj, dt=None):
 
     for step in range(nt-1, -1, -1):
         rhs_forcing.assign(0.0)
-        f = receivers.apply_receivers_as_source(rhs_forcing, residual, step)
-        Wave_obj.source_function.assign(0.0)
-        sf0 = Wave_obj.rhs_no_pml_source()
-        sf0 += f
+        Wave_obj.rhs_no_pml_source().assign(
+            receivers.apply_receivers_as_source(rhs_forcing, residual, step)
+        )
         Wave_obj.solver.solve()
 
         u_np1.assign(Wave_obj.u_np1)
@@ -229,10 +228,9 @@ def mixed_space_backward_wave_propagator(Wave_obj, dt=None):
 
     for step in range(nt-1, -1, -1):
         rhs_forcing.assign(0.0)
-        f = receivers.apply_receivers_as_source(rhs_forcing, residual, step)
-        Wave_obj.source_function.assign(0.0)
-        sf0 = Wave_obj.rhs_no_pml_source()
-        sf0 += f
+        Wave_obj.rhs_no_pml_source().assign(
+            receivers.apply_receivers_as_source(rhs_forcing, residual, step)
+        )
         Wave_obj.solver.solve()
 
         if (step) % Wave_obj.output_frequency == 0:
