@@ -42,8 +42,6 @@ def construct_solver_or_matrix_no_pml(Wave_object):
     if q is not None:
         le += - q * v * dx(**quad_rule)
 
-    B = fire.Cofunction(V.dual())
-
     if Wave_object.abc_active:
         weak_expr_abc = dot((u_n - u_nm1) / Constant(dt), v)
 
@@ -79,19 +77,18 @@ def construct_solver_or_matrix_no_pml(Wave_object):
     # Signal for le is + in derivation, see Salas et al (2022)
     # doi: https://doi.org/10.1016/j.apm.2022.09.014
     form = m1 + a + le
-    lhs_ = fire.lhs(form)
-    rhs_ = fire.rhs(form)
-    Wave_object.lhs = lhs_
+    Wave_object.rhs = fire.rhs(form)
+    Wave_object.lhs = fire.lhs(form)
+    Wave_object.B = fire.Cofunction(V.dual())
 
     source_function = fire.Cofunction(V.dual())
     Wave_object.source_function = source_function
 
-    lin_var = fire.LinearVariationalProblem(lhs_, rhs_ + source_function, u_np1, constant_jacobian=True)
+    lin_var = fire.LinearVariationalProblem(
+        Wave_object.lhs, Wave_object.rhs + source_function,
+        u_np1, constant_jacobian=True)
     solver_parameters = dict(Wave_object.solver_parameters)
     solver_parameters["mat_type"] = "matfree"
     Wave_object.solver = fire.LinearVariationalSolver(
         lin_var, solver_parameters=solver_parameters,
     )
-
-    Wave_object.rhs = rhs_
-    Wave_object.B = B
