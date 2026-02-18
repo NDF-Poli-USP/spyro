@@ -1,4 +1,5 @@
 from firedrake import *  # noqa: F403
+from firedrake.__future__ import interpolate
 from spyro.receivers.dirac_delta_projector import Delta_projector
 
 import numpy as np
