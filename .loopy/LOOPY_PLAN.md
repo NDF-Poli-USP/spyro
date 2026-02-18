@@ -6,7 +6,7 @@ max_minutes: 120
 backoff_ms: 5000
 rotate_bytes: 150000
 git:
-  branch: ''
+  branch: dolci/use_variational_solver
   commit: true
   commit_message: 'loopy: {change_type} {task_summary}'
 phase_defaults:
