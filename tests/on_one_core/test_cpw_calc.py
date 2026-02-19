@@ -69,9 +69,9 @@ def run_test_cpw_calc(FEM_method_to_evaluate, correct_cpw):
     print(f"Checked if reference solution seems correct: {test2}")
 
     # Check if cpw is within error TOL, starting search at min
-    min = Cpw_calc.find_minimum()
-    print(f"Minimum of {min}")
-    test3 = np.isclose(correct_cpw, min)
+    min_cpw = Cpw_calc.find_minimum()
+    print(f"Minimum of {min_cpw}")
+    test3 = np.isclose(correct_cpw, min_cpw)
 
     print("END")
     assert all([test1, test2, test3])

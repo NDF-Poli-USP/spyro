@@ -253,7 +253,8 @@ class Meshing_parameter_calculator:
         np.ndarray
             the reference solution
         """
-        Wave_obj = self.build_current_object(self.cpw_reference, degree=self.reference_degree)
+        Wave_obj = self.build_current_object(self.cpw_reference,
+                                             degree=self.reference_degree)
 
         Wave_obj.forward_solve()
         p_receivers = Wave_obj.forward_solution_receivers
@@ -354,8 +355,7 @@ class Meshing_parameter_calculator:
             if self.timestep_calculation != "float":
                 Wave_obj.get_and_set_maximum_dt(
                     fraction=0.2,
-                    estimate_max_eigenvalue=self.estimate_timestep
-                )
+                    estimate_max_eigenvalue=self.estimate_timestep)
             else:
                 Wave_obj.dt = self.fixed_timestep
             print("Maximum dt is ", Wave_obj.dt, flush=True)

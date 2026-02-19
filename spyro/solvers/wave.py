@@ -314,7 +314,7 @@ class Wave(Model_parameters, metaclass=ABCMeta):
         dt_solver = Modal_Solver(self.dimension, method=method,
                                  calc_max_dt=True)
         max_dt = dt_solver.estimate_timestep(c, self.function_space,
-                                             self.final_time, shift=1e-8,
+                                             self.final_time,
                                              quad_rule=self.quadrature_rule,
                                              fraction=fraction)
         self.dt = max_dt
