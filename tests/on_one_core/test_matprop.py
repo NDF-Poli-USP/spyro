@@ -595,7 +595,7 @@ def test_fromfile_mat_prop(wave_instance):
     Wave_obj = wave_instance
 
     print("\nTesting File Inputs as Material Properties", flush=True)
-    vel_P = Wave_obj.set_material_property(  # noqa: F841
+    vel_P = Wave_obj.set_material_property(
         'vel_P', 'scalar', constant=1., output=True,
         foldername='/property_fields/from_file/')
 
@@ -607,7 +607,7 @@ def test_fromfile_mat_prop(wave_instance):
                 Wave_obj.mesh_parameters.edge_length, from_file_segy)
 
     with pytest.raises(ValueError) as exc_info:
-        vel_S = Wave_obj.set_material_property(
+        vel_S = Wave_obj.set_material_property(   # noqa: F841
             'vel_S', 'scalar', from_file=from_file_segy, output=True,
             foldername='/property_fields/from_file/')
 
