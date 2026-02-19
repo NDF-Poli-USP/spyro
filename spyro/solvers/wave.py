@@ -17,6 +17,8 @@ from ..sources.Sources import Sources
 from .solver_parameters import get_default_parameters_for_method
 from ..utils import error_management
 from ..utils import eval_functions_to_ufl
+from .modal.modal_sol import Modal_Solver
+
 try:
     from SeismicMesh import write_velocity_model
     SEISMIC_MESH_AVAILABLE = True
@@ -228,15 +230,12 @@ class Wave(Model_parameters, metaclass=ABCMeta):
             vp.interpolate(conditional)
             self.initial_velocity_model = vp
         elif expression is not None:
-            z = self.mesh_z  # noqa: F841
-            x = self.mesh_x  # noqa: F841
-            if self.dimension == 3:
-                y = self.mesh_y  # noqa: F841
-            expression = eval(expression)
             V = self.function_space
-            vp = fire.Function(V, name="velocity")
-            vp.interpolate(expression)
-            self.initial_velocity_model = vp
+            vp = eval_functions_to_ufl.generate_ufl_functions(
+                self.mesh, expression, self.dimension)
+            self.initial_velocity_model = fire.Function(
+                V, name="velocity").interpolate(vp)
+
         elif velocity_model_function is not None:
             self.initial_velocity_model = velocity_model_function
         elif new_file is not None:
@@ -289,6 +288,38 @@ class Wave(Model_parameters, metaclass=ABCMeta):
             self.mesh_z = z
             self.mesh_x = x
             self.mesh_y = y
+
+    def get_and_set_maximum_dt(self, fraction=0.7,
+                               estimate_max_eigenvalue=False):
+        '''
+        Calculates and sets the maximum stable time step (dt) for the wave solver.
+
+        Args:
+            fraction (float, optional):
+                Fraction of the estimated time step to use. Defaults to 0.7.
+            estimate_max_eigenvalue (bool, optional):
+                Whether to estimate the maximum eigenvalue. Defaults to False.
+
+        Returns:
+            float: The calculated maximum time step (dt).
+        '''
+
+        if self.c is None:
+            c = self.initial_velocity_model
+        else:
+            c = self.c
+
+        # Maximum timestep size
+        method = 'ANALYTICAL' if estimate_max_eigenvalue else 'ARNOLDI'
+        dt_solver = Modal_Solver(self.dimension, method=method,
+                                 calc_max_dt=True)
+        max_dt = dt_solver.estimate_timestep(c, self.function_space,
+                                             self.final_time, shift=1e-8,
+                                             quad_rule=self.quadrature_rule,
+                                             fraction=fraction)
+        self.dt = max_dt
+
+        return max_dt
 
     def get_mass_matrix_diagonal(self):
         """Builds a section of the mass matrix for debugging purposes."""
