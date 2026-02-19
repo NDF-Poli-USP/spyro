@@ -1,4 +1,4 @@
-from dataclasses import dataclass
+from dataclasses import asdict, dataclass
 import json
 from pathlib import Path
 from typing import Any, Mapping, Union
@@ -71,6 +71,7 @@ _REQUIRED_FIELDS = {
 }
 
 _MAX_STARTUP_STABLE_DT = 1.0
+_RESOLVED_CONFIG_SNAPSHOT_FILENAME = "resolved_inversion_config.json"
 
 
 def _require_fields(section: Mapping[str, Any], fields, section_name: str) -> None:
@@ -164,6 +165,55 @@ def _resolve_config_relative_path(path_value: str, config_path: Path) -> Path:
     if not resolved_path.is_absolute():
         resolved_path = config_path.parent / resolved_path
     return resolved_path
+
+
+def _to_resolved_config_mapping(
+    config: InversionConfig, config_path: Path
+) -> Mapping[str, Any]:
+    resolved_config = asdict(config)
+    resolved_config["mesh"]["mesh_file"] = str(
+        _resolve_config_relative_path(config.mesh.mesh_file, config_path)
+    )
+    resolved_config["observed_data"]["path"] = str(
+        _resolve_config_relative_path(config.observed_data.path, config_path)
+    )
+    resolved_config["checkpoint"]["directory"] = str(
+        _resolve_config_relative_path(config.checkpoint.directory, config_path)
+    )
+    resolved_config["output"]["directory"] = str(
+        _resolve_config_relative_path(config.output.directory, config_path)
+    )
+    return resolved_config
+
+
+def persist_resolved_config_snapshot(
+    config: InversionConfig, config_path: Union[str, Path]
+) -> Path:
+    config_path_obj = Path(config_path).expanduser().resolve()
+    output_directory = _resolve_config_relative_path(
+        config.output.directory, config_path_obj
+    )
+    resolved_config = _to_resolved_config_mapping(config, config_path_obj)
+
+    try:
+        output_directory.mkdir(parents=True, exist_ok=True)
+    except OSError as exc:
+        raise ConfigValidationError(
+            f"Unable to create output directory for config snapshot: {output_directory}"
+        ) from exc
+
+    snapshot_path = output_directory / _RESOLVED_CONFIG_SNAPSHOT_FILENAME
+    try:
+        snapshot_path.write_text(
+            json.dumps(resolved_config, indent=2, sort_keys=True) + "\n",
+            encoding="utf-8",
+        )
+    except OSError as exc:
+        raise ConfigValidationError(
+            f"Unable to write resolved config snapshot: {snapshot_path}"
+        ) from exc
+
+    return snapshot_path
 
 
 def validate_startup_paths(
