@@ -76,10 +76,9 @@ mesh.coordinates.dat.data[:, 2] -= 1.0
 
 comm = spyro.utils.mpi_init(model)
 
-element = spyro.domains.space.FE_method(
+V = spyro.domains.space.create_function_space(
     mesh, model["opts"]["method"], model["opts"]["degree"]
 )
-V = FunctionSpace(mesh, element)
 
 if comm.comm.rank == 0:
     print("There are " + str(V.dim()) + " degrees of freedom", flush=True)
