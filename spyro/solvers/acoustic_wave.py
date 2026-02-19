@@ -211,6 +211,9 @@ class AcousticWave(Wave):
             return self.B
 
     def rhs_no_pml_source(self):
+        """Return the source cofunction added to the variational right-hand
+        side.
+        """
         if self.abc_boundary_layer_type == "PML":
             return self.source_function.sub(0)
         else:
