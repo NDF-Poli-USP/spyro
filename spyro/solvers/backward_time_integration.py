@@ -41,6 +41,11 @@ def backward_wave_propagator_no_pml(Wave_obj, dt=None):
     --------
     dJ: Firedrake 'Function'
         Calculated gradient
+
+    Notes:
+    ------
+    Residual forcing is injected each timestep via ``Wave_obj.rhs_no_pml_source()``
+    and the prebuilt variational solver is advanced with ``Wave_obj.solver.solve()``.
     """
     Wave_obj.reset_pressure()
     if dt is not None:
@@ -166,6 +171,11 @@ def mixed_space_backward_wave_propagator(Wave_obj, dt=None):
     --------
     dJ: Firedrake 'Function'
         Calculated gradient
+
+    Notes:
+    ------
+    For mixed PML spaces, source injection uses ``Wave_obj.rhs_no_pml_source()``
+    (pressure subspace) before calling ``Wave_obj.solver.solve()`` each timestep.
     """
     Wave_obj.reset_pressure()
     if dt is not None:

@@ -19,6 +19,11 @@ def central_difference(wave, source_ids=[0]):
     --------
         tuple:
             A tuple containing the forward solution and the receiver output.
+
+    Notes:
+    ------
+    The linear variational problem is assembled once during matrix setup; each
+    timestep only updates ``wave.rhs_no_pml_source()`` before ``wave.solver.solve()``.
     """
     if wave.sources is not None:
         wave.sources.current_sources = source_ids
