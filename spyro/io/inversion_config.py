@@ -52,6 +52,11 @@ class OutputConfig:
 
 
 @dataclass(frozen=True)
+class InitialModelConfig:
+    velocity_km_s: Any
+
+
+@dataclass(frozen=True)
 class InversionConfig:
     mesh: MeshConfig
     time: TimeConfig
@@ -60,6 +65,7 @@ class InversionConfig:
     optimizer: OptimizerConfig
     checkpoint: CheckpointConfig
     output: OutputConfig
+    initial_model: InitialModelConfig
 
 
 _REQUIRED_FIELDS = {
@@ -140,6 +146,10 @@ def load_inversion_config(config: Mapping[str, Any]) -> InversionConfig:
             raise ConfigValidationError(f"Config field '{section_name}' must be a mapping.")
         _require_fields(section, required_section_fields, section_name)
 
+    initial_model = config.get("initial_model", {})
+    if not isinstance(initial_model, Mapping):
+        raise ConfigValidationError("Config field 'initial_model' must be a mapping.")
+
     return InversionConfig(
         mesh=MeshConfig(mesh_file=config["mesh"]["mesh_file"]),
         time=TimeConfig(
@@ -162,6 +172,11 @@ def load_inversion_config(config: Mapping[str, Any]) -> InversionConfig:
             every=config["checkpoint"]["every"],
         ),
         output=OutputConfig(directory=config["output"]["directory"]),
+        initial_model=InitialModelConfig(
+            velocity_km_s=initial_model.get(
+                "velocity_km_s", _DEFAULT_FORWARD_VELOCITY_KM_S
+            )
+        ),
     )
 
 
@@ -536,9 +551,12 @@ def run_acoustic_forward_modeling_from_config(
     switch_shot: Any = None,
     cleanup_tmp_files: Any = None,
     source_frequency_hz: float = _DEFAULT_FORWARD_SOURCE_FREQUENCY_HZ,
-    velocity_model_km_s: float = _DEFAULT_FORWARD_VELOCITY_KM_S,
+    velocity_model_km_s: Any = None,
 ) -> np.ndarray:
     """Run acoustic forward modeling from validated config and return synthetic traces."""
+    if velocity_model_km_s is None:
+        velocity_model_km_s = config.initial_model.velocity_km_s
+
     model_dictionary, source_locations, receiver_locations = _build_forward_model_dictionary(
         config, config_path, source_frequency_hz
     )
@@ -701,6 +719,234 @@ def run_initial_forward_objective_evaluation(
         "objective": objective_value,
         "objective_path": str(objective_path),
     }
+
+
+def _extract_gradient_values(gradient_field: Any) -> np.ndarray:
+    if gradient_field is None:
+        raise ConfigValidationError("Gradient field is required to compute a norm.")
+
+    if hasattr(gradient_field, "dat"):
+        gradient_dat = getattr(gradient_field, "dat")
+        if hasattr(gradient_dat, "data_ro"):
+            gradient_values = np.asarray(gradient_dat.data_ro, dtype=float)
+        elif hasattr(gradient_dat, "data"):
+            gradient_values = np.asarray(gradient_dat.data, dtype=float)
+        else:
+            gradient_values = None
+
+        if gradient_values is not None:
+            if gradient_values.size == 0:
+                raise ConfigValidationError(
+                    "Gradient field is empty; unable to compute a norm."
+                )
+            return gradient_values.reshape(-1)
+
+    try:
+        gradient_values = np.asarray(gradient_field, dtype=float)
+    except (TypeError, ValueError) as exc:
+        raise ConfigValidationError(
+            "Gradient field values must be numeric to compute a norm."
+        ) from exc
+
+    if gradient_values.size == 0:
+        raise ConfigValidationError("Gradient field is empty; unable to compute a norm.")
+    return gradient_values.reshape(-1)
+
+
+def compute_gradient_norm(gradient_field: Any) -> float:
+    gradient_values = _extract_gradient_values(gradient_field)
+    if not np.all(np.isfinite(gradient_values)):
+        raise ConfigValidationError(
+            "Gradient field contains non-finite values; unable to compute a norm."
+        )
+
+    gradient_norm_value = float(np.linalg.norm(gradient_values))
+    if not np.isfinite(gradient_norm_value):
+        raise ConfigValidationError(
+            "Computed gradient norm is non-finite; check gradient values."
+        )
+    return gradient_norm_value
+
+
+def compute_and_expose_gradient_norm_each_iteration(
+    gradient_field: Any,
+    *,
+    gradient_norm_history: List[Dict[str, float]],
+    iteration: Any = None,
+) -> Dict[str, float]:
+    if not isinstance(gradient_norm_history, list):
+        raise ConfigValidationError(
+            "Gradient norm history must be a list to record per-iteration values."
+        )
+
+    if iteration is None:
+        iteration = len(gradient_norm_history)
+    try:
+        iteration_index = int(iteration)
+    except (TypeError, ValueError) as exc:
+        raise ConfigValidationError(
+            f"Gradient norm iteration index must be an integer, got {iteration!r}."
+        ) from exc
+
+    if iteration_index < 0:
+        raise ConfigValidationError(
+            f"Gradient norm iteration index must be non-negative, got {iteration_index}."
+        )
+
+    gradient_norm_value = compute_gradient_norm(gradient_field)
+    gradient_norm_record = {
+        "iteration": iteration_index,
+        "gradient_norm": gradient_norm_value,
+    }
+    gradient_norm_history.append(gradient_norm_record)
+    return gradient_norm_record
+
+
+def _load_firedrake_adjoint_symbol(symbol_name: str) -> Any:
+    try:
+        from firedrake.adjoint import Control, ReducedFunctional
+
+        return {"Control": Control, "ReducedFunctional": ReducedFunctional}[symbol_name]
+    except (ImportError, KeyError):
+        pass
+
+    try:
+        import firedrake_adjoint as fire_adjoint
+    except ImportError as exc:
+        raise ConfigValidationError(
+            "firedrake-adjoint is required to create inversion control variables."
+        ) from exc
+
+    if not hasattr(fire_adjoint, symbol_name):
+        raise ConfigValidationError(
+            f"firedrake-adjoint does not expose required symbol: {symbol_name}."
+        )
+    return getattr(fire_adjoint, symbol_name)
+
+
+def define_velocity_model_as_primary_control_variable(
+    config: InversionConfig,
+    config_path: Union[str, Path],
+    *,
+    wave_factory: Any = None,
+    control_factory: Any = None,
+    taped_functional: Any = None,
+    functional_taping_callback: Any = None,
+    reduced_functional_factory: Any = None,
+    source_frequency_hz: float = _DEFAULT_FORWARD_SOURCE_FREQUENCY_HZ,
+) -> Dict[str, Any]:
+    """Create a firedrake-adjoint control for the configured initial velocity model."""
+    model_dictionary, _source_locations, _receiver_locations = _build_forward_model_dictionary(
+        config, config_path, source_frequency_hz
+    )
+
+    if wave_factory is None:
+        import spyro
+
+        wave_factory = spyro.AcousticWave
+
+    wave = wave_factory(dictionary=model_dictionary)
+    if not hasattr(wave, "set_initial_velocity_model"):
+        raise ConfigValidationError(
+            "Wave object must define 'set_initial_velocity_model' to create controls."
+        )
+    wave.set_initial_velocity_model(constant=config.initial_model.velocity_km_s)
+
+    velocity_model = getattr(wave, "initial_velocity_model", None)
+    if velocity_model is None:
+        raise ConfigValidationError(
+            "Configured initial velocity model is unavailable for control creation."
+        )
+
+    if control_factory is None:
+        control_factory = _load_firedrake_adjoint_symbol("Control")
+    control = control_factory(velocity_model)
+
+    if taped_functional is None and functional_taping_callback is not None:
+        taped_functional = functional_taping_callback(wave)
+
+    reduced_functional = None
+    if taped_functional is not None:
+        if reduced_functional_factory is None:
+            reduced_functional_factory = _load_firedrake_adjoint_symbol(
+                "ReducedFunctional"
+            )
+        reduced_functional = reduced_functional_factory(taped_functional, control)
+
+    return {
+        "wave": wave,
+        "velocity_model": velocity_model,
+        "control": control,
+        "taped_functional": taped_functional,
+        "reduced_functional": reduced_functional,
+    }
+
+
+def tape_misfit_functional_for_automatic_differentiation(
+    config: InversionConfig,
+    config_path: Union[str, Path],
+    *,
+    wave_factory: Any = None,
+    control_factory: Any = None,
+    taped_functional: Any = None,
+    functional_taping_callback: Any = None,
+    reduced_functional_factory: Any = None,
+    source_frequency_hz: float = _DEFAULT_FORWARD_SOURCE_FREQUENCY_HZ,
+) -> Dict[str, Any]:
+    """Tape misfit functional and return firedrake-adjoint gradient."""
+    if taped_functional is None and functional_taping_callback is None:
+        raise ConfigValidationError(
+            "Provide either 'taped_functional' or 'functional_taping_callback' "
+            "to tape the misfit functional for automatic differentiation."
+        )
+
+    control_bundle = define_velocity_model_as_primary_control_variable(
+        config,
+        config_path,
+        wave_factory=wave_factory,
+        control_factory=control_factory,
+        taped_functional=taped_functional,
+        functional_taping_callback=functional_taping_callback,
+        reduced_functional_factory=reduced_functional_factory,
+        source_frequency_hz=source_frequency_hz,
+    )
+
+    reduced_functional = control_bundle["reduced_functional"]
+    if reduced_functional is None:
+        raise ConfigValidationError(
+            "Misfit functional taping did not produce a ReducedFunctional."
+        )
+
+    derivative_function = getattr(reduced_functional, "derivative", None)
+    if derivative_function is None or not callable(derivative_function):
+        raise ConfigValidationError(
+            "ReducedFunctional must provide a callable 'derivative' method."
+        )
+
+    gradient_field = derivative_function()
+    if gradient_field is None:
+        raise ConfigValidationError(
+            "firedrake-adjoint returned an empty gradient field from the taped "
+            "misfit functional."
+        )
+
+    gradient_norm_history: List[Dict[str, float]] = []
+    gradient_norm_record = compute_and_expose_gradient_norm_each_iteration(
+        gradient_field,
+        gradient_norm_history=gradient_norm_history,
+        iteration=0,
+    )
+
+    control_bundle["gradient"] = gradient_field
+    control_bundle["gradient_norm"] = gradient_norm_record["gradient_norm"]
+    control_bundle["gradient_norm_history"] = gradient_norm_history
+    return control_bundle
+
+
+def define_velocity_model_as_primary_firedrake_adjoint_control_variable(
+    *args, **kwargs
+) -> Dict[str, Any]:
+    return define_velocity_model_as_primary_control_variable(*args, **kwargs)
 
 
 def load_inversion_config_file(config_path: Union[str, Path]) -> InversionConfig:

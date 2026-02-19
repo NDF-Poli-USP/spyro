@@ -31,6 +31,16 @@ compute_scalar_objective_from_residual_traces = (
 run_initial_forward_objective_evaluation = (
     inversion_config.run_initial_forward_objective_evaluation
 )
+define_velocity_model_as_primary_control_variable = (
+    inversion_config.define_velocity_model_as_primary_control_variable
+)
+tape_misfit_functional_for_automatic_differentiation = (
+    inversion_config.tape_misfit_functional_for_automatic_differentiation
+)
+compute_gradient_norm = inversion_config.compute_gradient_norm
+compute_and_expose_gradient_norm_each_iteration = (
+    inversion_config.compute_and_expose_gradient_norm_each_iteration
+)
 
 
 SAMPLE_CONFIG = {
@@ -377,3 +387,169 @@ def test_run_initial_forward_objective_evaluation_persists_iteration_zero_object
     persisted = json.loads(objective_path.read_text(encoding="utf-8"))
     assert persisted["iteration"] == 0
     assert np.isclose(persisted["objective"], expected_objective)
+
+
+def test_load_inversion_config_defaults_initial_velocity_model():
+    normalized_config = load_inversion_config(deepcopy(SAMPLE_CONFIG))
+
+    assert normalized_config.initial_model.velocity_km_s == 1.5
+
+
+def test_define_velocity_model_as_primary_control_variable_uses_configured_initial_model(
+    tmp_path,
+):
+    config = deepcopy(SAMPLE_CONFIG)
+    config["initial_model"] = {"velocity_km_s": 2.75}
+    config_path = tmp_path / "inversion.json"
+    config_path.write_text(json.dumps(config), encoding="utf-8")
+    normalized_config = load_inversion_config(config)
+
+    velocity_model = object()
+
+    class FakeWave:
+        def __init__(self, dictionary):
+            self.dictionary = dictionary
+            self.initial_velocity_model = None
+            self.loaded_velocity = None
+
+        def set_initial_velocity_model(self, constant):
+            self.loaded_velocity = constant
+            self.initial_velocity_model = velocity_model
+
+    class FakeControl:
+        def __init__(self, variable):
+            self.variable = variable
+
+    taped_functional = object()
+    reduced_functional_calls = {}
+
+    def fake_reduced_functional_factory(functional, control):
+        reduced_functional_calls["functional"] = functional
+        reduced_functional_calls["control"] = control
+        return {"functional": functional, "control": control}
+
+    result = define_velocity_model_as_primary_control_variable(
+        normalized_config,
+        config_path,
+        wave_factory=FakeWave,
+        control_factory=FakeControl,
+        taped_functional=taped_functional,
+        reduced_functional_factory=fake_reduced_functional_factory,
+    )
+
+    assert result["wave"].loaded_velocity == 2.75
+    assert result["control"].variable is velocity_model
+    assert result["taped_functional"] is taped_functional
+    assert reduced_functional_calls["functional"] is taped_functional
+    assert reduced_functional_calls["control"] is result["control"]
+
+
+def test_tape_misfit_functional_for_automatic_differentiation_returns_gradient_field(
+    tmp_path,
+):
+    config = deepcopy(SAMPLE_CONFIG)
+    config["initial_model"] = {"velocity_km_s": 2.2}
+    config_path = tmp_path / "inversion.json"
+    config_path.write_text(json.dumps(config), encoding="utf-8")
+    normalized_config = load_inversion_config(config)
+
+    velocity_model = object()
+    taped_functional = object()
+    gradient_field = np.array([3.0, 4.0], dtype=float)
+    taping_callback_calls = {}
+
+    class FakeWave:
+        def __init__(self, dictionary):
+            self.dictionary = dictionary
+            self.initial_velocity_model = None
+
+        def set_initial_velocity_model(self, constant):
+            self.loaded_velocity = constant
+            self.initial_velocity_model = velocity_model
+
+    class FakeControl:
+        def __init__(self, variable):
+            self.variable = variable
+
+    class FakeReducedFunctional:
+        def __init__(self, functional, control):
+            self.functional = functional
+            self.control = control
+            self.derivative_calls = 0
+
+        def derivative(self):
+            self.derivative_calls += 1
+            return gradient_field
+
+    def fake_functional_taping_callback(wave):
+        taping_callback_calls["wave"] = wave
+        return taped_functional
+
+    result = tape_misfit_functional_for_automatic_differentiation(
+        normalized_config,
+        config_path,
+        wave_factory=FakeWave,
+        control_factory=FakeControl,
+        functional_taping_callback=fake_functional_taping_callback,
+        reduced_functional_factory=FakeReducedFunctional,
+    )
+
+    assert taping_callback_calls["wave"] is result["wave"]
+    assert result["control"].variable is velocity_model
+    assert result["taped_functional"] is taped_functional
+    assert result["reduced_functional"].functional is taped_functional
+    assert result["reduced_functional"].control is result["control"]
+    assert result["reduced_functional"].derivative_calls == 1
+    assert result["gradient"] is gradient_field
+    assert np.isclose(result["gradient_norm"], 5.0)
+    assert result["gradient_norm_history"] == [
+        {"iteration": 0, "gradient_norm": result["gradient_norm"]}
+    ]
+
+
+def test_tape_misfit_functional_for_automatic_differentiation_requires_taping_input(
+    tmp_path,
+):
+    config_path = tmp_path / "inversion.json"
+    config_path.write_text(json.dumps(SAMPLE_CONFIG), encoding="utf-8")
+    normalized_config = load_inversion_config(SAMPLE_CONFIG)
+
+    with pytest.raises(
+        ConfigValidationError, match=re.escape("functional_taping_callback")
+    ):
+        tape_misfit_functional_for_automatic_differentiation(
+            normalized_config,
+            config_path,
+            wave_factory=lambda dictionary: dictionary,
+            control_factory=lambda variable: variable,
+        )
+
+
+def test_compute_and_expose_gradient_norm_each_iteration_records_finite_values():
+    gradient_norm_history = []
+    gradients = [
+        np.array([3.0, 4.0], dtype=float),
+        np.array([5.0, 12.0], dtype=float),
+        np.array([8.0, 15.0], dtype=float),
+    ]
+
+    for expected_iteration, gradient_field in enumerate(gradients):
+        record = compute_and_expose_gradient_norm_each_iteration(
+            gradient_field,
+            gradient_norm_history=gradient_norm_history,
+        )
+        assert record["iteration"] == expected_iteration
+        assert np.isfinite(record["gradient_norm"])
+        assert record == gradient_norm_history[expected_iteration]
+
+    assert [record["iteration"] for record in gradient_norm_history] == [0, 1, 2]
+    assert np.all(np.isfinite([record["gradient_norm"] for record in gradient_norm_history]))
+    assert np.allclose(
+        [record["gradient_norm"] for record in gradient_norm_history],
+        [5.0, 13.0, 17.0],
+    )
+
+
+def test_compute_gradient_norm_rejects_non_finite_values():
+    with pytest.raises(ConfigValidationError, match=re.escape("non-finite")):
+        compute_gradient_norm(np.array([1.0, np.nan], dtype=float))
