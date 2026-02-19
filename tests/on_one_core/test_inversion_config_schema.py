@@ -41,6 +41,7 @@ compute_gradient_norm = inversion_config.compute_gradient_norm
 compute_and_expose_gradient_norm_each_iteration = (
     inversion_config.compute_and_expose_gradient_norm_each_iteration
 )
+build_optimizer_factory = inversion_config.build_optimizer_factory
 
 
 SAMPLE_CONFIG = {
@@ -117,7 +118,6 @@ output:
         "time",
         "geometry",
         "observed_data",
-        "optimizer",
         "checkpoint",
         "output",
         "mesh.mesh_file",
@@ -127,9 +127,6 @@ output:
         "geometry.sources",
         "geometry.receivers",
         "observed_data.path",
-        "optimizer.name",
-        "optimizer.max_iterations",
-        "optimizer.tolerance",
         "checkpoint.directory",
         "checkpoint.every",
         "output.directory",
@@ -393,6 +390,48 @@ def test_load_inversion_config_defaults_initial_velocity_model():
     normalized_config = load_inversion_config(deepcopy(SAMPLE_CONFIG))
 
     assert normalized_config.initial_model.velocity_km_s == 1.5
+
+
+def test_load_inversion_config_defaults_optimizer_when_section_missing():
+    config = deepcopy(SAMPLE_CONFIG)
+    del config["optimizer"]
+
+    normalized_config = load_inversion_config(config)
+
+    assert normalized_config.optimizer.name == "L-BFGS-B"
+    assert normalized_config.optimizer.max_iterations == 25
+    assert normalized_config.optimizer.tolerance == 1.0e-6
+
+
+def test_build_optimizer_factory_defaults_to_lbfgsb_when_optimizer_key_missing():
+    call_kwargs = {}
+
+    def fake_minimize(_objective, _x0, **kwargs):
+        call_kwargs.update(kwargs)
+        return kwargs
+
+    optimizer = build_optimizer_factory({}, minimize_callable=fake_minimize)
+    optimizer(lambda _x: 0.0, np.array([1.0], dtype=float))
+
+    assert optimizer.optimizer_name == "L-BFGS-B"
+    assert call_kwargs["method"] == "L-BFGS-B"
+
+
+def test_build_optimizer_factory_uses_configured_optimizer_override():
+    call_kwargs = {}
+
+    def fake_minimize(_objective, _x0, **kwargs):
+        call_kwargs.update(kwargs)
+        return kwargs
+
+    optimizer = build_optimizer_factory(
+        {"optimizer": {"name": "CG"}},
+        minimize_callable=fake_minimize,
+    )
+    optimizer(lambda _x: 0.0, np.array([1.0], dtype=float))
+
+    assert optimizer.optimizer_name == "CG"
+    assert call_kwargs["method"] == "CG"
 
 
 def test_define_velocity_model_as_primary_control_variable_uses_configured_initial_model(

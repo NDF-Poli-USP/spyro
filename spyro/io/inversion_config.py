@@ -83,6 +83,9 @@ _RESOLVED_CONFIG_SNAPSHOT_FILENAME = "resolved_inversion_config.json"
 _DEFAULT_FORWARD_SOURCE_FREQUENCY_HZ = 5.0
 _DEFAULT_FORWARD_VELOCITY_KM_S = 1.5
 _INITIAL_OBJECTIVE_FILENAME = "initial_objective.json"
+_DEFAULT_OPTIMIZER_NAME = "L-BFGS-B"
+_DEFAULT_OPTIMIZER_MAX_ITERATIONS = 25
+_DEFAULT_OPTIMIZER_TOLERANCE = 1.0e-6
 
 
 def _require_fields(section: Mapping[str, Any], fields, section_name: str) -> None:
@@ -90,6 +93,39 @@ def _require_fields(section: Mapping[str, Any], fields, section_name: str) -> No
         field_name = f"{section_name}.{field}" if section_name else field
         if field not in section:
             raise ConfigValidationError(f"Missing required config field: {field_name}")
+
+
+def _normalize_optimizer_name(optimizer_name: Any) -> str:
+    if not isinstance(optimizer_name, str):
+        raise ConfigValidationError(
+            "Config field 'optimizer.name' must be a non-empty string."
+        )
+    normalized_name = optimizer_name.strip()
+    if not normalized_name:
+        raise ConfigValidationError(
+            "Config field 'optimizer.name' must be a non-empty string."
+        )
+    return normalized_name
+
+
+def _resolve_optimizer_config(config: Mapping[str, Any]) -> OptimizerConfig:
+    optimizer_section = config.get("optimizer")
+    if optimizer_section is None:
+        optimizer_section = {}
+    if not isinstance(optimizer_section, Mapping):
+        raise ConfigValidationError("Config field 'optimizer' must be a mapping.")
+
+    optimizer_name = optimizer_section.get("name", _DEFAULT_OPTIMIZER_NAME)
+    max_iterations = optimizer_section.get(
+        "max_iterations", _DEFAULT_OPTIMIZER_MAX_ITERATIONS
+    )
+    tolerance = optimizer_section.get("tolerance", _DEFAULT_OPTIMIZER_TOLERANCE)
+
+    return OptimizerConfig(
+        name=_normalize_optimizer_name(optimizer_name),
+        max_iterations=max_iterations,
+        tolerance=tolerance,
+    )
 
 
 def _load_config_mapping(config_path: Path) -> Mapping[str, Any]:
@@ -138,17 +174,24 @@ def load_inversion_config(config: Mapping[str, Any]) -> InversionConfig:
     if not isinstance(config, Mapping):
         raise ConfigValidationError("Inversion config must be a mapping.")
 
-    _require_fields(config, _REQUIRED_FIELDS.keys(), "")
+    required_top_level_sections = tuple(
+        section_name for section_name in _REQUIRED_FIELDS.keys() if section_name != "optimizer"
+    )
+    _require_fields(config, required_top_level_sections, "")
 
     for section_name, required_section_fields in _REQUIRED_FIELDS.items():
-        section = config[section_name]
+        section = config.get(section_name)
+        if section is None:
+            continue
         if not isinstance(section, Mapping):
             raise ConfigValidationError(f"Config field '{section_name}' must be a mapping.")
-        _require_fields(section, required_section_fields, section_name)
+        if section_name != "optimizer":
+            _require_fields(section, required_section_fields, section_name)
 
     initial_model = config.get("initial_model", {})
     if not isinstance(initial_model, Mapping):
         raise ConfigValidationError("Config field 'initial_model' must be a mapping.")
+    optimizer = _resolve_optimizer_config(config)
 
     return InversionConfig(
         mesh=MeshConfig(mesh_file=config["mesh"]["mesh_file"]),
@@ -162,11 +205,7 @@ def load_inversion_config(config: Mapping[str, Any]) -> InversionConfig:
             receivers=config["geometry"]["receivers"],
         ),
         observed_data=ObservedDataConfig(path=config["observed_data"]["path"]),
-        optimizer=OptimizerConfig(
-            name=config["optimizer"]["name"],
-            max_iterations=config["optimizer"]["max_iterations"],
-            tolerance=config["optimizer"]["tolerance"],
-        ),
+        optimizer=optimizer,
         checkpoint=CheckpointConfig(
             directory=config["checkpoint"]["directory"],
             every=config["checkpoint"]["every"],
@@ -800,6 +839,50 @@ def compute_and_expose_gradient_norm_each_iteration(
     }
     gradient_norm_history.append(gradient_norm_record)
     return gradient_norm_record
+
+
+def build_optimizer_factory(
+    config: Union[InversionConfig, Mapping[str, Any], None],
+    *,
+    minimize_callable: Any = None,
+) -> Any:
+    if minimize_callable is None:
+        try:
+            from scipy.optimize import minimize as scipy_minimize
+        except ImportError as exc:
+            raise ConfigValidationError(
+                "SciPy is required to build the configured optimizer factory."
+            ) from exc
+        minimize_callable = scipy_minimize
+
+    if not callable(minimize_callable):
+        raise ConfigValidationError("Optimizer backend must be callable.")
+
+    if isinstance(config, InversionConfig):
+        optimizer_name = _normalize_optimizer_name(config.optimizer.name)
+    elif config is None:
+        optimizer_name = _DEFAULT_OPTIMIZER_NAME
+    elif isinstance(config, Mapping):
+        optimizer_section = config.get("optimizer")
+        if optimizer_section is None:
+            optimizer_name = _DEFAULT_OPTIMIZER_NAME
+        elif isinstance(optimizer_section, Mapping):
+            optimizer_name = _normalize_optimizer_name(
+                optimizer_section.get("name", _DEFAULT_OPTIMIZER_NAME)
+            )
+        elif isinstance(optimizer_section, str):
+            optimizer_name = _normalize_optimizer_name(optimizer_section)
+        else:
+            raise ConfigValidationError("Config field 'optimizer' must be a mapping.")
+    else:
+        raise ConfigValidationError("Optimizer factory input must be a config mapping.")
+
+    def run_optimizer(objective_function: Any, initial_guess: Any, **kwargs: Any) -> Any:
+        kwargs.setdefault("method", optimizer_name)
+        return minimize_callable(objective_function, initial_guess, **kwargs)
+
+    run_optimizer.optimizer_name = optimizer_name
+    return run_optimizer
 
 
 def _load_firedrake_adjoint_symbol(symbol_name: str) -> Any:
