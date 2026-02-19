@@ -68,10 +68,9 @@ class AcousticWave(Wave):
             V = self.function_space
             Z = fire.VectorFunctionSpace(V.ufl_domain(), V.ufl_element())
             self.vector_function_space = Z
-            self.X = None
+            self.X_np1 = None
             self.X_n = None
             self.X_nm1 = None
-            self.X_np1 = fire.Function(V * Z)
             construct_solver_or_matrix_with_pml(self)
 
         self.acoustic_energy = acoustic_energy(self)
@@ -210,3 +209,12 @@ class AcousticWave(Wave):
             return self.B.sub(0)
         else:
             return self.B
+
+    def rhs_no_pml_source(self):
+        """Return the source cofunction added to the variational right-hand
+        side.
+        """
+        if self.abc_boundary_layer_type == "PML":
+            return self.source_function.sub(0)
+        else:
+            return self.source_function
