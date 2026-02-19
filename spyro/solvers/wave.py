@@ -423,7 +423,7 @@ class Wave(Model_parameters, metaclass=ABCMeta):
             Default is None
 
         Returns:
-        -----------
+        --------
         V: `firedrake function space`
             Function space for the material property
         '''
@@ -446,10 +446,10 @@ class Wave(Model_parameters, metaclass=ABCMeta):
             typ_ele_y = 'DG' if dg_property else ele_y.family()
             dgr_ele = (0, 0) if dg_property else element.degree()
             variant = element.variant()
-            element_zx = fire.FiniteElement(typ_ele_zx, base_cell, dgr_ele[0],
-                                            variant=variant)
-            element_y = fire.FiniteElement(typ_ele_y, fire.interval, dgr_ele[1],
-                                           variant=variant)
+            element_zx = fire.FiniteElement(typ_ele_zx, base_cell,
+                                            dgr_ele[0], variant=variant)
+            element_y = fire.FiniteElement(typ_ele_y, fire.interval,
+                                           dgr_ele[1], variant=variant)
             tensor_element = fire.TensorProductElement(element_zx, element_y)
             V = fire.FunctionSpace(self.mesh, tensor_element)
 
@@ -515,7 +515,7 @@ class Wave(Model_parameters, metaclass=ABCMeta):
             Default is None
 
         Returns:
-        -----------
+        --------
         mat_property: `firedrake function`
             Material property
         '''
@@ -566,7 +566,7 @@ class Wave(Model_parameters, metaclass=ABCMeta):
             Function space for the material property
 
         Returns:
-        -----------
+        --------
         mat_property: `firedrake function`
             Material property
         '''
@@ -607,7 +607,7 @@ class Wave(Model_parameters, metaclass=ABCMeta):
             Function space for the material property
 
         Returns:
-        -----------
+        --------
         mat_property: `firedrake function`
             Material property
         '''
@@ -638,7 +638,7 @@ class Wave(Model_parameters, metaclass=ABCMeta):
             Function space for the material property
 
         Returns:
-        -----------
+        --------
         mat_property: `firedrake function`
             Material property
         '''
@@ -685,7 +685,7 @@ class Wave(Model_parameters, metaclass=ABCMeta):
             If default is 'default', property is saved in '/property_fields/'
 
         Returns:
-        -----------
+        --------
         None
         '''
 
@@ -697,61 +697,31 @@ class Wave(Model_parameters, metaclass=ABCMeta):
         print(f"Saving {property_name} to {foldername} for visualization.")
         fire.VTKFile(pth_prop).write(mat_property, name=property_name)
 
-    def set_material_property(self, property_name, func_space_type,
-                              shape_func_space=None, constant=None,
-                              conditional=None, expression=None,
-                              random=None, fire_function=None,
-                              from_file=None, dg_property=False,
-                              output=False, foldername='default'):
+    @staticmethod
+    def _check_material_property_inputs(val_lst, func_space_type,
+                                        shape_func_space, output):
         '''
-        Set a material property (e.g., density, etc.) in the model.
+        Check the inputs for setting a material property.
 
         Parameters:
         -----------
-        property_name: `str`
-            Name of the material property to be set.
+        val_lst: `list`
+            List of values for constant, conditional, expression,
+            random, fire_function and from_file.
         func_space_type, `str`
             Type of function space for the material property.
             Options: 'scalar', 'vector' or 'tensor'
         shape_func_space: `tuple`, optional
-            Shape of the function space for only tensorial material property.
-            Default is None
-        from_file: `str`, optional
-            Name of the file containing the material property. Default is None
-        constant: `float`, optional
-            Constant value for the material property. Default is None
-        conditional:  `firedrake conditional`, optional
-            Firedrake conditional object. Default is None
-        expression: `str`, optional
-            If you use an expression, you can use the following variables:
-            x, y, z, pi, tanh, sqrt. Ex: "2. + 0.5 * tanh((x - 2.) / 0.1)".
-            It will be interpoalte into either the same function space as
-            the object or a DG0 function space in the same mesh.
-            Default is None
-        random: `tuple`, optional
-            If you want to set a random material property, specify the range of
-            values as a tuple (min, max). Default is None
-        fire_function: `firedrake function`, optional
-            Firedrake function based on the input object. Default is None.
-        dg_property: `bool`, optional
-            If True, uses a DG0 function space for conditional and
-            expression inputs. Default is False
+            Shape of the function space for only tensorial material
+            property. Default is None
         output: `bool`, optional
             If True, outputs the material property to a pvd file for
             visualization. Default is False
-        foldername : `string`, optional
-            Name of the folder where the material property is saved.
-            If default is 'default', property is saved in '/property_fields/'
 
         Returns:
-        -----------
-        mat_property: `firedrake function`
-            Material property
+        --------
+        None
         '''
-
-        # Checking input arguments
-        val_lst = [constant, conditional, expression,
-                   random, fire_function, from_file]
 
         if sum(value is not None for value in val_lst) > 1:
             name_lst = ["constant", "conditional", "expression",
@@ -767,6 +737,65 @@ class Wave(Model_parameters, metaclass=ABCMeta):
                 raise ValueError("Output of tensorial material "
                                  "properties with more than 9 "
                                  "components is not supported.")
+
+    def set_material_property(self, property_name, func_space_type,
+                              shape_func_space=None, constant=None,
+                              conditional=None, expression=None,
+                              random=None, fire_function=None,
+                              from_file=None, dg_property=False,
+                              output=False, foldername='default'):
+        '''
+        Set a material property(e.g., density, etc.) in the model.
+
+        Parameters:
+        -----------
+        property_name: `str`
+            Name of the material property to be set.
+        func_space_type, `str`
+            Type of function space for the material property.
+            Options: 'scalar', 'vector' or 'tensor'
+        shape_func_space: `tuple`, optional
+            Shape of the function space for only tensorial material property.
+            Default is None
+        from_file: `str`, optional
+            Name of the file containing the material property. Default is None
+        constant: `float`, optional
+            Constant value for the material property. Default is None
+        conditional: `firedrake conditional`, optional
+            Firedrake conditional object. Default is None
+        expression: `str`, optional
+            If you use an expression, you can use the following variables:
+            x, y, z, pi, tanh, sqrt. Ex: "2. + 0.5 * tanh((x - 2.) / 0.1)".
+            It will be interpoalte into either the same function space as
+            the object or a DG0 function space in the same mesh.
+            Default is None
+        random: `tuple`, optional
+            If you want to set a random material property, specify the range of
+            values as a tuple(min, max). Default is None
+        fire_function: `firedrake function`, optional
+            Firedrake function based on the input object. Default is None.
+        dg_property: `bool`, optional
+            If True, uses a DG0 function space for conditional and
+            expression inputs. Default is False
+        output: `bool`, optional
+            If True, outputs the material property to a pvd file for
+            visualization. Default is False
+        foldername: `string`, optional
+            Name of the folder where the material property is saved.
+            If default is 'default', property is saved in '/property_fields/'
+
+        Returns:
+        -----------
+        mat_property: `firedrake function`
+            Material property
+        '''
+
+        # Checking input arguments
+        val_lst = [constant, conditional, expression,
+                   random, fire_function, from_file]
+
+        self._check_material_property_inputs(val_lst, func_space_type,
+                                             shape_func_space, output)
 
         V = self.define_property_function_space(
             func_space_type, dg_property, shape_func_space=shape_func_space)

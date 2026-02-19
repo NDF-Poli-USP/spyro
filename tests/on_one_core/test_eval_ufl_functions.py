@@ -1,3 +1,4 @@
+import pytest
 from firedrake import ConvergenceError, Function, \
     FunctionSpace, UnitSquareMesh, UnitCubeMesh
 from spyro.utils.eval_functions_to_ufl import generate_ufl_functions
