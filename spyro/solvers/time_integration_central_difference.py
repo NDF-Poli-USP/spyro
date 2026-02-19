@@ -22,8 +22,8 @@ def central_difference(wave, source_ids=[0]):
 
     Notes:
     ------
-    The linear variational problem is assembled once during matrix setup; each
-    timestep only updates ``wave.rhs_no_pml_source()`` before ``wave.solver.solve()``.
+    Use ``LinearVariationalSolver`` with per-step source updates through
+    ``wave.rhs_no_pml_source()`` before ``wave.solver.solve()``.
     """
     if wave.sources is not None:
         wave.sources.current_sources = source_ids
@@ -47,14 +47,9 @@ def central_difference(wave, source_ids=[0]):
         # Basic way of applying sources
         wave.update_source_expression(t)
 
-        # More efficient way of applying sources
         if wave.sources is not None:
-            # For no pml, wave.rhs_no_pml_source() returns the source
-            # function that is added to the right hand side, so we can just assign
-            # the source expression to it.
             wave.rhs_no_pml_source().assign(
                 wave.sources.apply_source(rhs_forcing, step))
-
         wave.solver.solve()
 
         wave.prev_vstate = wave.vstate
