@@ -1,5 +1,6 @@
 from copy import deepcopy
 import importlib.util
+import json
 from pathlib import Path
 import re
 
@@ -15,6 +16,7 @@ SPEC.loader.exec_module(inversion_config)
 
 ConfigValidationError = inversion_config.ConfigValidationError
 load_inversion_config = inversion_config.load_inversion_config
+load_inversion_config_file = inversion_config.load_inversion_config_file
 
 
 SAMPLE_CONFIG = {
@@ -45,6 +47,43 @@ def test_load_complete_inversion_config_succeeds():
     assert inversion_config.mesh.mesh_file == SAMPLE_CONFIG["mesh"]["mesh_file"]
     assert inversion_config.time.dt == SAMPLE_CONFIG["time"]["dt"]
     assert inversion_config.optimizer.name == SAMPLE_CONFIG["optimizer"]["name"]
+
+
+def test_load_yaml_and_json_configs_normalize_identically(tmp_path):
+    json_path = tmp_path / "inversion.json"
+    yaml_path = tmp_path / "inversion.yaml"
+
+    json_path.write_text(json.dumps(SAMPLE_CONFIG), encoding="utf-8")
+    yaml_path.write_text(
+        """
+mesh:
+  mesh_file: meshes/model.msh
+time:
+  initial_time: 0.0
+  final_time: 2.0
+  dt: 0.001
+geometry:
+  sources:
+    - [-0.1, 0.5]
+  receivers:
+    - [-0.1, 0.1]
+    - [-0.1, 0.2]
+observed_data:
+  path: shots/observed_shots.npy
+optimizer:
+  name: L-BFGS-B
+  max_iterations: 25
+  tolerance: 1.0e-6
+checkpoint:
+  directory: checkpoints
+  every: 5
+output:
+  directory: results
+""".strip(),
+        encoding="utf-8",
+    )
+
+    assert load_inversion_config_file(json_path) == load_inversion_config_file(yaml_path)
 
 
 @pytest.mark.parametrize(

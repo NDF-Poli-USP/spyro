@@ -1,5 +1,7 @@
 from dataclasses import dataclass
-from typing import Any, Mapping
+import json
+from pathlib import Path
+from typing import Any, Mapping, Union
 
 
 class ConfigValidationError(ValueError):
@@ -76,6 +78,47 @@ def _require_fields(section: Mapping[str, Any], fields, section_name: str) -> No
             raise ConfigValidationError(f"Missing required config field: {field_name}")
 
 
+def _load_config_mapping(config_path: Path) -> Mapping[str, Any]:
+    suffix = config_path.suffix.lower()
+    try:
+        raw_content = config_path.read_text(encoding="utf-8")
+    except OSError as exc:
+        raise ConfigValidationError(
+            f"Unable to read inversion config file: {config_path}"
+        ) from exc
+
+    if suffix == ".json":
+        try:
+            config = json.loads(raw_content)
+        except json.JSONDecodeError as exc:
+            raise ConfigValidationError(
+                f"Invalid JSON inversion config file: {config_path}"
+            ) from exc
+    elif suffix in {".yaml", ".yml"}:
+        try:
+            import yaml
+        except ImportError as exc:
+            raise ConfigValidationError(
+                "PyYAML is required to load YAML inversion config files."
+            ) from exc
+        try:
+            config = yaml.safe_load(raw_content)
+        except yaml.YAMLError as exc:
+            raise ConfigValidationError(
+                f"Invalid YAML inversion config file: {config_path}"
+            ) from exc
+    else:
+        raise ConfigValidationError(
+            "Unsupported inversion config file format. Use .json, .yaml, or .yml."
+        )
+
+    if not isinstance(config, Mapping):
+        raise ConfigValidationError(
+            "Inversion config file must define a mapping at the top level."
+        )
+    return config
+
+
 def load_inversion_config(config: Mapping[str, Any]) -> InversionConfig:
     """Validate and normalize an inversion configuration mapping."""
     if not isinstance(config, Mapping):
@@ -112,3 +155,8 @@ def load_inversion_config(config: Mapping[str, Any]) -> InversionConfig:
         ),
         output=OutputConfig(directory=config["output"]["directory"]),
     )
+
+
+def load_inversion_config_file(config_path: Union[str, Path]) -> InversionConfig:
+    """Load, validate, and normalize an inversion configuration file."""
+    return load_inversion_config(_load_config_mapping(Path(config_path)))
