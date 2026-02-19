@@ -139,8 +139,8 @@ class AutomaticMesh:
             return self.create_firedrake_mesh()
         elif self.mesh_type == "SeismicMesh":
             if SeismicMesh is None:
-                raise ImportError(f"SeismicMesh is not available. Please "
-                                  f"install it to use this function.")
+                raise ImportError("SeismicMesh is not available. Please "
+                                  + "install it to use this function.")
             return self.create_seismicmesh_mesh()
         else:
             raise ValueError("mesh_type is not supported")

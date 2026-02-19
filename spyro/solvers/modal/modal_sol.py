@@ -1,6 +1,6 @@
 import firedrake as fire
 import numpy as np
-import scipy.linalg as sl
+# import scipy.linalg as sl
 import scipy.sparse as ss
 from scipy.optimize import broyden1, curve_fit
 from scipy.special import beta, betainc, gamma, jn_zeros, \
@@ -170,7 +170,7 @@ class Modal_Solver():
 
         # Functions for the problem
         u, v = fire.TrialFunction(V), fire.TestFunction(V)
-        dx = fire.dx(scheme=quad_rule) if quad_rule else fire.dx
+        dx = fire.dx(**quad_rule) if quad_rule else fire.dx
 
         # Bilinear forms
         a = c * c * fire.inner(fire.grad(u), fire.grad(v)) * dx
@@ -351,7 +351,8 @@ class Modal_Solver():
         eigenproblem = fire.LinearEigenproblem(a, M=m)
         eigensolver = fire.LinearEigensolver(eigenproblem, n_evals=k,
                                              solver_parameters=opts)
-        nconv = eigensolver.solve()
+        # nconv = eigensolver.solve()
+        eigensolver.solve()
         Lsp = np.asarray([eigensolver.eigenvalue(mod) for mod in range(k)])
 
         return Lsp
@@ -380,7 +381,7 @@ class Modal_Solver():
         '''
 
         # Integration measure
-        dx = fire.dx(scheme=quad_rule) if quad_rule else fire.dx
+        dx = fire.dx(**quad_rule) if quad_rule else fire.dx
 
         if typ_homog == 'energy':
             # Equivalent velocity by energy-equivalent homogenization
@@ -739,7 +740,7 @@ class Modal_Solver():
             delta_pn = pn_fit - sn.interval(0.95, loc=pn_fit, scale=perr[0])[0]
             delta_qn = qn_fit - sn.interval(0.95, loc=qn_fit, scale=perr[1])[0]
 
-            print(f"Nonlinear Curve Fit Successful!", flush=True)
+            print("Nonlinear Curve Fit Successful!", flush=True)
             print(f"Fitted Parameters: pn = {pn_fit:.6f} ± {delta_pn:.6f}, "
                   f"qn = {qn_fit:.6f} ± {delta_qn:.6f}", flush=True)
             print(f"R-Squared: {r_squared:.6f} - RMSE: {rmse:.6f}", flush=True)
@@ -754,7 +755,13 @@ class Modal_Solver():
                         cut_plane_percent=1.):
         '''
         Compute an approximate frequency factor for the hypershape with
-        truncation plane at z = cut_plane_percent * b, b = Lz + pad_len
+        truncation plane at z = cut_plane_percent * b, b = Lz + pad_len.
+        The fitting parameters for the equivalent velocity regression controls:
+        - fc1: Magnitude order of the frequency
+        - fc2: Monotonicity of the frequency
+        - fp1: Rectangular domain frequency
+        - fp2: Ellipsoidal domain frequency
+
 
         Parameters
         ----------
@@ -780,7 +787,7 @@ class Modal_Solver():
             - fc2 : `float`
                 Exponent factor for the maximum reference velocity
             - fp1 : `float`
-                Exponent fsctor for the minimum equivalent velocity
+                Exponent factor for the minimum equivalent velocity
             - fp2 : `float`
                 Exponent factor for the maximum equivalent velocity
         cut_plane_percent : `float`, optional
@@ -863,7 +870,7 @@ class Modal_Solver():
             - fc2 : `float`
                 Exponent factor for the maximum reference velocity
             - fp1 : `float`
-                Exponent fsctor for the minimum equivalent velocity
+                Exponent factor for the minimum equivalent velocity
             - fp2 : `float`
                 Exponent factor for the maximum equivalent velocity
         cut_plane_percent : `float`, optional
@@ -1053,7 +1060,7 @@ class Modal_Solver():
         Msp = ss.lil_matrix((n_funcs, n_funcs))  # Mass matrix
 
         # Assemble stiffness and mass matrices
-        dx = fire.dx(scheme=quad_rule) if quad_rule else fire.dx
+        dx = fire.dx(**quad_rule) if quad_rule else fire.dx
         for i in range(n_funcs):
             for j in range(i, n_funcs):  # Only upper triangle
                 # Stiffness and mass matrix term
@@ -1129,7 +1136,7 @@ class Modal_Solver():
             - fc2 : `float`
                 Exponent factor for the maximum reference velocity
             - fp1 : `float`
-                Exponent fsctor for the minimum equivalent velocity
+                Exponent factor for the minimum equivalent velocity
             - fp2 : `float`
                 Exponent factor for the maximum equivalent velocity
 
@@ -1204,7 +1211,7 @@ class Modal_Solver():
 
         # Maximum eigenvalue
         if self.method == 'ANALYTICAL':
-            print(f"Estimating Maximum Eigenvalue", flush=True)
+            print("Estimating Maximum Eigenvalue", flush=True)
 
             a, m = self.weak_forms(c, V, quad_rule=quad_rule)
 
@@ -1213,12 +1220,11 @@ class Modal_Solver():
 
             Asp, Msp_inv = \
                 self.assemble_sparse_matrices(a, m, return_M_inv=True)
-            Lsp = Msp_inv.multiply(Asp).toarray().squeeze()
-            Lsp -= shift if shift > 0. else 0.
-            max_eigval = np.amax(np.abs(Lsp.diagonal()))
+            Lsp = Msp_inv.multiply(Asp)
+            max_eigval = np.amax(np.abs(Lsp.diagonal())) - shift
 
         else:
-            print(f"Computing Exact Maximum Eigenvalue", flush=True)
+            print("Computing Exact Maximum Eigenvalue", flush=True)
             Lsp = self.solve_eigenproblem(
                 c, V=V, shift=shift, quad_rule=quad_rule, inv_oper=inv_oper)
             # (eig = 0 is a rigid body motion)
@@ -1226,7 +1232,7 @@ class Modal_Solver():
 
         # Maximum stable timestep
         max_dt = float(np.real(2. / np.sqrt(max_eigval)))
-        print(f"Maximum Stable Timestep Should Be Approximately "
+        print("Maximum Stable Timestep Should Be Approximately "
               f"(ms): {1e3 * max_dt:.3f}", flush=True)
 
         max_dt *= fraction

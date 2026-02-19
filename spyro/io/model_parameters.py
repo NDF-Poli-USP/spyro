@@ -382,8 +382,8 @@ class Model_parameters(Read_options, Read_boundary_layer,
         if self.dt > 1.0:
             warnings.warn(f"Time step of {self.dt} too big.")
         if self.dt is None:
-            warnings.warn(f"Timestep not given. Will calculate internally "
-                          f"when user attemps to propagate wave.")
+            warnings.warn("Timestep not given. Will calculate internally "
+                          + "when user attemps to propagate wave.")
 
     def set_mesh(self, user_mesh=None, input_mesh_parameters={}):
         """
@@ -394,7 +394,8 @@ class Model_parameters(Read_options, Read_boundary_layer,
         user_mesh : spyro.Mesh, optional
             The desired mesh. The default is None.
         mesh_parameters : dict, optional
-            Additional parameters for setting up the mesh. The default is an empty dictionary.
+            Additional parameters for setting up the mesh.
+            The default is an empty dictionary.
 
         Returns
         -------
