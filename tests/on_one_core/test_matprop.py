@@ -552,7 +552,7 @@ def test_function_mat_prop(wave_instance):
         'vel_S', 'scalar', fire_function=dummy, output=True,
         foldername='/property_fields/function/')
 
-    assert vel_S is not None, f"Failed to set vel_S"
+    assert vel_S is not None, "Failed to set vel_S"
 
     # Get mesh vertices from original mesh
     coords, mask_pnt = get_only_mesh_vertices(Wave_obj)
@@ -561,15 +561,15 @@ def test_function_mat_prop(wave_instance):
     val_fun = vel_S.dat.data_with_halos[mask_pnt]
 
     assert np.allclose(val_fun, exp_fun, rtol=1e-8), \
-        f"❌ Values of the firedrake function does not match for vel_S"
-    print(f"✅ vel_S Verified: Firedrake function values", flush=True)
+        "❌ Values of the firedrake function does not match for vel_S"
+    print("✅ vel_S Verified: Firedrake function values", flush=True)
 
     # Different function space (DG0)
     vel_S_dg0 = Wave_obj.set_material_property(
         'vel_S_DG0', 'scalar', fire_function=vel_S, dg_property=True,
         output=True, foldername='/property_fields/function/')
 
-    assert vel_S_dg0 is not None, f"Failed to set vel_S_DG0"
+    assert vel_S_dg0 is not None, "Failed to set vel_S_DG0"
 
     # Coordinates of the cell centroids for DG0 interpolation
     coords_DG0 = get_coords_DG0(Wave_obj, coords)
@@ -578,8 +578,8 @@ def test_function_mat_prop(wave_instance):
     val_fun = vel_S.at(coords_DG0, dont_raise=True)
 
     assert np.allclose(val_fun, exp_fun, rtol=1e-8), \
-        f"❌ Values of the scalar function does not match for vel_S_DG0"
-    print(f"✅ vel_S_DG0 Verified: Scalar function values", flush=True)
+        "❌ Values of the scalar function does not match for vel_S_DG0"
+    print("✅ vel_S_DG0 Verified: Scalar function values", flush=True)
 
 
 def test_fromfile_mat_prop(wave_instance):
@@ -595,7 +595,7 @@ def test_fromfile_mat_prop(wave_instance):
     Wave_obj = wave_instance
 
     print("\nTesting File Inputs as Material Properties", flush=True)
-    vel_P = Wave_obj.set_material_property(
+    vel_P = Wave_obj.set_material_property(  # noqa: F841
         'vel_P', 'scalar', constant=1., output=True,
         foldername='/property_fields/from_file/')
 
@@ -640,6 +640,8 @@ def test_vector_mat_prop(wave_instance):
         "alphaT", 'vector', constant=alphaT_o, output=True,
         foldername='/property_fields/vector_tensor/')
 
+    assert alphaT_cte is not None, "Failed to set alphaT_cte"
+
     dummy = Wave_obj.set_material_property('dummy', 'vector', constant=0.)
     dummy.sub(0).assign(Wave_obj.set_material_property('dummy_z', 'scalar',
                                                        constant=alphaT_o))
@@ -653,7 +655,7 @@ def test_vector_mat_prop(wave_instance):
         'alphaT_DG0', 'vector', fire_function=dummy, dg_property=True,
         output=True, foldername='/property_fields/vector_tensor/')
 
-    assert alphaT_dg0 is not None, f"Failed to set alphaT_dg0"
+    assert alphaT_dg0 is not None, "Failed to set alphaT_dg0"
 
     # Get the mean value vectorial component to verify
     dx = fire.dx(**Wave_obj.quadrature_rule)
@@ -673,8 +675,8 @@ def test_vector_mat_prop(wave_instance):
     cond2 = np.isclose(exp_v2, val_v2, rtol=1e-8)
 
     assert cond0 and cond1 and cond2, \
-        f"❌ Values of the vectorial function does not match for alphaT_dg0"
-    print(f"✅ alphaT_dg0 Verified: Vectorial function values", flush=True)
+        "❌ Values of the vectorial function does not match for alphaT_dg0"
+    print("✅ alphaT_dg0 Verified: Vectorial function values", flush=True)
 
 
 def test_tensor_mat_prop(wave_instance):
@@ -733,8 +735,8 @@ def test_tensor_mat_prop(wave_instance):
         'Celast', 'tensor', fire_function=dummy,
         shape_func_space=shape_func_space)
 
-    assert Celast is not None, f"Failed to set Celast"
-    print(f"✅ Celast Verified: Tensorial function assign", flush=True)
+    assert Celast is not None, "Failed to set Celast"
+    print("✅ Celast Verified: Tensorial function assign", flush=True)
 
     # Tensor 2x3
     dummy = Wave_obj.set_material_property('dummy', 'tensor',
@@ -765,8 +767,8 @@ def test_tensor_mat_prop(wave_instance):
         fire_function=dummy, output=True,
         foldername='/property_fields/vector_tensor/')
 
-    assert Celast_2x3 is not None, f"Failed to set Celast_2x3"
-    print(f"✅ Celast_2x3 Verified: Tensorial function saving", flush=True)
+    assert Celast_2x3 is not None, "Failed to set Celast_2x3"
+    print("✅ Celast_2x3 Verified: Tensorial function saving", flush=True)
 
     # Different function space (DG0)
     Celast_dg0 = Wave_obj.set_material_property(
@@ -774,5 +776,5 @@ def test_tensor_mat_prop(wave_instance):
         fire_function=dummy, dg_property=True, output=True,
         foldername='/property_fields/vector_tensor/')
 
-    assert Celast_dg0 is not None, f"Failed to set Celast_dg0"
-    print(f"✅ Celast_2x3 Verified: Tensorial function saving DG0", flush=True)
+    assert Celast_dg0 is not None, "Failed to set Celast_dg0"
+    print("✅ Celast_2x3 Verified: Tensorial function saving DG0", flush=True)

@@ -1,4 +1,3 @@
-import pytest
 from firedrake import ConvergenceError, Function, \
     FunctionSpace, UnitSquareMesh, UnitCubeMesh
 from spyro.utils.eval_functions_to_ufl import generate_ufl_functions
@@ -234,10 +233,10 @@ def test_run_eval_danger_ops():
             # Use appropriate mesh based on expression
             if 'y' in expr and 'z' not in expr:
                 # Some dangerous expressions might use y as variable
-                mesh = mesh_2d
+                mesh = UnitSquareMesh(10, 10)
                 dim = 2
             else:
-                mesh = mesh_2d
+                mesh = UnitSquareMesh(10, 10)
                 dim = 2
 
             ufl_expr = generate_ufl_functions(mesh, expr, dim)

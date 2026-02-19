@@ -520,8 +520,8 @@ class HABC_Wave(AcousticWave, HyperLayer, NRBCHabc):
 
         # Check if the signal is empty
         if signal.size == 0:
-            raise ValueError(f"Input signal is empty. "
-                             f"Cannot compute frequency response.")
+            raise ValueError("Input signal is empty. "
+                             + "Cannot compute frequency response.")
 
         # Zero padding for increasing smoothing in FFT
         yt = np.concatenate([np.zeros(fpad * len(signal)), signal])
