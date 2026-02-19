@@ -403,6 +403,19 @@ def test_load_inversion_config_defaults_optimizer_when_section_missing():
     assert normalized_config.optimizer.tolerance == 1.0e-6
 
 
+def test_load_inversion_config_preserves_optimizer_step_control_settings():
+    config = deepcopy(SAMPLE_CONFIG)
+    config["optimizer"]["step_control"] = {
+        "initial_step_size": 0.25,
+        "backtracking_factor": 0.75,
+    }
+
+    normalized_config = load_inversion_config(config)
+
+    assert normalized_config.optimizer.step_control["initial_step_size"] == 0.25
+    assert normalized_config.optimizer.step_control["backtracking_factor"] == 0.75
+
+
 def test_build_optimizer_factory_defaults_to_lbfgsb_when_optimizer_key_missing():
     call_kwargs = {}
 
@@ -432,6 +445,207 @@ def test_build_optimizer_factory_uses_configured_optimizer_override():
 
     assert optimizer.optimizer_name == "CG"
     assert call_kwargs["method"] == "CG"
+
+
+def test_build_optimizer_factory_applies_configured_stop_limits_to_backend():
+    call_kwargs = {}
+
+    def fake_minimize(_objective, _x0, **kwargs):
+        call_kwargs.update(kwargs)
+        return kwargs
+
+    optimizer = build_optimizer_factory(
+        {
+            "optimizer": {
+                "name": "CG",
+                "max_iterations": 7,
+                "tolerance": 1.0e-4,
+            }
+        },
+        minimize_callable=fake_minimize,
+    )
+    optimizer(lambda _x: 0.0, np.array([1.0], dtype=float))
+
+    assert call_kwargs["options"]["maxiter"] == 7
+    assert call_kwargs["tol"] == pytest.approx(1.0e-4)
+
+
+def test_build_optimizer_factory_step_control_changes_accepted_step_sizes():
+    aggressive_config = deepcopy(SAMPLE_CONFIG)
+    aggressive_config["optimizer"]["step_control"] = {
+        "initial_step_size": 1.0,
+        "backtracking_factor": 0.5,
+        "armijo_constant": 1.0e-4,
+    }
+    conservative_config = deepcopy(SAMPLE_CONFIG)
+    conservative_config["optimizer"]["step_control"] = {
+        "initial_step_size": 0.2,
+        "backtracking_factor": 0.5,
+        "armijo_constant": 1.0e-4,
+    }
+
+    def quadratic_objective(model_vector):
+        model_vector = np.asarray(model_vector, dtype=float)
+        objective_value = float(np.dot(model_vector, model_vector))
+        gradient_vector = 2.0 * model_vector
+        return objective_value, gradient_vector
+
+    aggressive_optimizer = build_optimizer_factory(
+        load_inversion_config(aggressive_config),
+        minimize_callable=lambda *_args, **_kwargs: None,
+    )
+    conservative_optimizer = build_optimizer_factory(
+        load_inversion_config(conservative_config),
+        minimize_callable=lambda *_args, **_kwargs: None,
+    )
+
+    aggressive_result = aggressive_optimizer(
+        quadratic_objective,
+        np.array([1.0], dtype=float),
+        maxiter=1,
+    )
+    conservative_result = conservative_optimizer(
+        quadratic_objective,
+        np.array([1.0], dtype=float),
+        maxiter=1,
+    )
+
+    assert aggressive_result["accepted_step_sizes"]
+    assert conservative_result["accepted_step_sizes"]
+    assert (
+        aggressive_result["accepted_step_sizes"][0]
+        > conservative_result["accepted_step_sizes"][0]
+    )
+
+
+def test_build_optimizer_factory_step_control_stops_on_tolerance_first(caplog):
+    config = deepcopy(SAMPLE_CONFIG)
+    config["optimizer"]["max_iterations"] = 1
+    config["optimizer"]["tolerance"] = 3.0
+    config["optimizer"]["step_control"] = {
+        "initial_step_size": 1.0,
+        "backtracking_factor": 0.5,
+        "armijo_constant": 1.0e-4,
+    }
+
+    def quadratic_objective(model_vector):
+        model_vector = np.asarray(model_vector, dtype=float)
+        objective_value = float(np.dot(model_vector, model_vector))
+        gradient_vector = 2.0 * model_vector
+        return objective_value, gradient_vector
+
+    optimizer = build_optimizer_factory(
+        load_inversion_config(config),
+        minimize_callable=lambda *_args, **_kwargs: None,
+    )
+
+    with caplog.at_level("INFO", logger=inversion_config.__name__):
+        result = optimizer(quadratic_objective, np.array([1.0], dtype=float))
+
+    assert result["success"] is True
+    assert result["nit"] == 0
+    assert result["stop_reason"] == "tolerance"
+    assert result["message"] == "Gradient tolerance reached."
+    assert "Optimizer stop reason: tolerance" in caplog.text
+
+
+def test_build_optimizer_factory_step_control_stops_on_max_iterations(caplog):
+    config = deepcopy(SAMPLE_CONFIG)
+    config["optimizer"]["max_iterations"] = 1
+    config["optimizer"]["tolerance"] = 1.0e-12
+    config["optimizer"]["step_control"] = {
+        "initial_step_size": 1.0,
+        "backtracking_factor": 0.5,
+        "armijo_constant": 1.0e-4,
+    }
+
+    def quadratic_objective(model_vector):
+        model_vector = np.asarray(model_vector, dtype=float)
+        objective_value = float(np.dot(model_vector, model_vector))
+        gradient_vector = 2.0 * model_vector
+        return objective_value, gradient_vector
+
+    optimizer = build_optimizer_factory(
+        load_inversion_config(config),
+        minimize_callable=lambda *_args, **_kwargs: None,
+    )
+
+    with caplog.at_level("INFO", logger=inversion_config.__name__):
+        result = optimizer(quadratic_objective, np.array([1.0], dtype=float))
+
+    assert result["success"] is False
+    assert result["stop_reason"] == "max_iterations"
+    assert result["message"] == "Maximum iterations reached before convergence."
+    assert "Optimizer stop reason: max_iterations" in caplog.text
+
+
+def test_build_optimizer_factory_step_control_records_iteration_metrics_in_memory():
+    config = deepcopy(SAMPLE_CONFIG)
+    config["optimizer"]["max_iterations"] = 3
+    config["optimizer"]["tolerance"] = 1.0e-20
+    config["optimizer"]["step_control"] = {
+        "initial_step_size": 0.25,
+        "backtracking_factor": 0.5,
+        "armijo_constant": 1.0e-4,
+    }
+
+    def quadratic_objective(model_vector):
+        model_vector = np.asarray(model_vector, dtype=float)
+        objective_value = float(np.dot(model_vector, model_vector))
+        gradient_vector = 2.0 * model_vector
+        return objective_value, gradient_vector
+
+    optimizer = build_optimizer_factory(
+        load_inversion_config(config),
+        minimize_callable=lambda *_args, **_kwargs: None,
+    )
+    result = optimizer(quadratic_objective, np.array([1.0], dtype=float))
+
+    iteration_metrics = result["iteration_metrics"]
+    assert len(iteration_metrics) == result["nit"] == 3
+    required_fields = {"iteration", "objective", "gradient_norm", "step_size", "elapsed_time"}
+    for expected_iteration, metrics_record in enumerate(iteration_metrics):
+        assert set(metrics_record) == required_fields
+        assert metrics_record["iteration"] == expected_iteration
+        assert np.isfinite(metrics_record["objective"])
+        assert np.isfinite(metrics_record["gradient_norm"])
+        assert metrics_record["step_size"] > 0.0
+        assert metrics_record["elapsed_time"] >= 0.0
+
+
+def test_reference_synthetic_case_objective_reduces_by_thirty_percent_in_twenty_iterations():
+    config = deepcopy(SAMPLE_CONFIG)
+    config["optimizer"]["max_iterations"] = 20
+    config["optimizer"]["tolerance"] = 1.0e-20
+    config["optimizer"]["step_control"] = {
+        "initial_step_size": 0.25,
+        "backtracking_factor": 0.5,
+        "armijo_constant": 1.0e-4,
+    }
+
+    def reference_synthetic_objective(model_vector):
+        model_vector = np.asarray(model_vector, dtype=float)
+        objective_value = 0.5 * float(np.dot(model_vector, model_vector))
+        gradient_vector = model_vector
+        return objective_value, gradient_vector
+
+    initial_model = np.array([2.0, -1.0, 0.5], dtype=float)
+    initial_objective, _ = reference_synthetic_objective(initial_model)
+
+    optimizer = build_optimizer_factory(
+        load_inversion_config(config),
+        minimize_callable=lambda *_args, **_kwargs: None,
+    )
+    result = optimizer(reference_synthetic_objective, initial_model)
+
+    objective_at_iteration_20 = float(result["fun"])
+    objective_reduction = (
+        initial_objective - objective_at_iteration_20
+    ) / initial_objective
+
+    assert result["stop_reason"] == "max_iterations"
+    assert result["nit"] == 20
+    assert objective_reduction >= 0.30
 
 
 def test_define_velocity_model_as_primary_control_variable_uses_configured_initial_model(
