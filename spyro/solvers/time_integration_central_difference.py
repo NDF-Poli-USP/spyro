@@ -35,9 +35,11 @@ def central_difference(wave, source_ids=[0]):
         if t % wave.gradient_sampling_frequency == 0
     ]
     if wave.sources is not None and wave.use_vertex_only_mesh:
-        q_s = wave.sources.source_cofunction()
+        # source_cof is a cofunction that represents a point source,
+        # being one at a point and zero elsewhere.
+        source_cof = wave.sources.source_cofunction()
         interpolate_receivers = wave.receivers.receiver_interpolator(
-            wave.get_function())
+            wave.vstate)
     usol_recv = []
     save_step = 0
     for step in range(nt):
@@ -49,7 +51,8 @@ def central_difference(wave, source_ids=[0]):
         if wave.sources is not None:
             B0 = wave.rhs_no_pml()
             if wave.use_vertex_only_mesh:
-                B0 += fire.assemble(wave.sources.wavelet[step] * q_s)
+                B0 += fire.assemble(
+                    wave.sources.wavelet[step] * source_cof)
             else:
                 B0 += wave.sources.apply_source(rhs_forcing, step)
         wave.solver.solve(wave.next_vstate, wave.B)
