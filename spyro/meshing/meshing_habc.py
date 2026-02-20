@@ -1351,7 +1351,8 @@ class HABC_Mesh():
             base_cell = base_mesh.ufl_cell()
             element_zx = fire.FiniteElement("DQ", base_cell, 0,
                                             variant="spectral")
-            element_y = fire.FiniteElement("DG", fire.interval, 0)
+            element_y = fire.FiniteElement("DG", fire.interval, 0,
+                                           variant="spectral")
             tensor_element = fire.TensorProductElement(element_zx, element_y)
             W_sp = fire.VectorFunctionSpace(self.mesh, tensor_element)
         else:
