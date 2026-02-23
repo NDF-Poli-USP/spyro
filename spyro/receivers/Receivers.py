@@ -1,7 +1,7 @@
 from firedrake import *  # noqa: F403
 from firedrake.__future__ import interpolate
 from spyro.receivers.dirac_delta_projector import Delta_projector
-
+from ..utils.typing import WaveType
 import numpy as np
 
 
@@ -151,14 +151,18 @@ class Receivers(Delta_projector):
             An interpolation operator used to interpolate a firedrake
             function at the receiver locations.
         """
-        V_r = FunctionSpace(
-            VertexOnlyMesh(
-                self.mesh, self.point_locations, reorder=reorder,
-                tolerance=vom_tolerance,
-                missing_points_behaviour=vom_missing_points_behaviour,
-                redundant=vom_redundant,
-                name=vom_name), "DG", 0, 
-        )
+        vom = VertexOnlyMesh(
+            self.mesh, self.point_locations, reorder=reorder,
+            tolerance=vom_tolerance,
+            missing_points_behaviour=vom_missing_points_behaviour,
+            redundant=vom_redundant,
+            name=vom_name)
+        if WaveType.ISOTROPIC_ELASTIC:
+            V_r = VectorFunctionSpace(vom, "DG", 0)
+        elif WaveType.ISOTROPIC_ACOUSTIC:
+            V_r = FunctionSpace(vom, "DG", 0)
+        else:
+            raise ValueError("Invalid wave type")
         return interpolate(f, V_r)
 
     def new_at(self, udat, receiver_id):

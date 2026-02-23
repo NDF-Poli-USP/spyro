@@ -2,6 +2,7 @@ import math
 import numpy as np
 from scipy.signal import butter, filtfilt
 from spyro.receivers.dirac_delta_projector import Delta_projector
+from ..utils.typing import WaveType
 import firedrake as fire
 
 
@@ -123,10 +124,18 @@ class Sources(Delta_projector):
         """
         source_mesh = fire.VertexOnlyMesh(
             self.mesh, [self.point_locations[self.current_sources[0]]])
-        V_s = fire.FunctionSpace(source_mesh, "DG", 0)
-        source_cofunction = fire.assemble(fire.TestFunction(V_s) * fire.dx)
+        if WaveType.ISOTROPIC_ELASTIC:
+            V_s = fire.VectorFunctionSpace(source_mesh, "DG", 0)
+        elif WaveType.ISOTROPIC_ACOUSTIC:
+            V_s = fire.FunctionSpace(source_mesh, "DG", 0)
+        else:
+            raise ValueError("Invalid wave type")
+
+        d_s = fire.Function(V_s)
+        d_s.assign(1.0)
+        source_cofunction = fire.assemble(fire.inner(d_s, fire.TestFunction(V_s)) * fire.dx)
         return fire.Cofunction(
-            self.space.dual()).interpolate(source_cofunction)
+            self.function_space.dual()).interpolate(source_cofunction)
 
 
 def timedependentSource(model, t, freq=None, amp=1, delay=1.5):
