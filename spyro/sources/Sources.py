@@ -122,11 +122,12 @@ class Sources(Delta_projector):
         source_cofunction: Firedrake.Cofunction
             A cofunction with the source applied into the domain.
         """
+        print("Wave type:", self.wave_type)
         source_mesh = fire.VertexOnlyMesh(
             self.mesh, [self.point_locations[self.current_sources[0]]])
-        if WaveType.ISOTROPIC_ELASTIC:
+        if self.wave_type == WaveType.ISOTROPIC_ELASTIC:
             V_s = fire.VectorFunctionSpace(source_mesh, "DG", 0)
-        elif WaveType.ISOTROPIC_ACOUSTIC:
+        elif self.wave_type == WaveType.ISOTROPIC_ACOUSTIC:
             V_s = fire.FunctionSpace(source_mesh, "DG", 0)
         else:
             raise ValueError("Invalid wave type")

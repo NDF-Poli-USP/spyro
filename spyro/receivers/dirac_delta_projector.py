@@ -68,6 +68,7 @@ class Delta_projector:
         self.automatic_adjoint = wave_object.automatic_adjoint
         self.mesh = wave_object.mesh
         self.function_space = wave_object.function_space
+        self.wave_type = wave_object.wave_type
         self.space = self.function_space.sub(0)
         self.my_ensemble = wave_object.comm
         self.dimension = wave_object.dimension
