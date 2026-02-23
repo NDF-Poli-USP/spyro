@@ -110,22 +110,55 @@ class Receivers(Delta_projector):
 
         return rhs_forcing
 
-    def receiver_interpolator(self, f):
+    def receiver_interpolator(self, f, reorder=True, vom_tolerance=None,
+                              vom_missing_points_behaviour='error',
+                              vom_redundant=True, vom_name=None):
         """Return an interpolator object.
 
         Parameters
         ----------
         f : firedrake.Function
             A function to interpolate at receiver locations.
+        reorder : bool, optional
+            Flag indicating whether to reorder meshes for better cache
+            locality. If not supplied, the default value in
+            ``parameters["reorder_meshes"]`` is used.
+        vom_missing_points_behaviour : {'warn', 'error', 'ignore'}, optional
+            What to do when vertices that are outside of the mesh are
+            discarded. If ``'warn'``, a warning is printed. If ``'error'``,
+            a :class:`~.VertexOnlyMeshMissingPointsError` is raised. If
+            ``'ignore'``, nothing is done. Default is ``'error'``.
+        vom_tolerance : float, optional
+            The relative tolerance (i.e. as defined on the reference cell) for
+            the distance a point can be from a mesh cell and still be
+            considered to be in the cell. Note that this tolerance uses an L1
+            distance (aka 'manhattan', 'taxicab' or rectilinear distance), so
+            it scales with the dimension of the mesh. The default is the
+            parent mesh's ``tolerance`` property. Changing this from the
+            default causes the parent mesh's spatial index to be rebuilt,
+            which can take some time.
+        vom_redundant : bool, optional
+            If ``True``, the mesh is built using only the vertices specified on
+            rank 0. If ``False``, the mesh is built using the vertices
+            specified by each rank. Care must be taken when using
+            ``redundant=False``; see the note below for more information.
+        vom_name : str, optional
+            The name of the vertex-only mesh. Default is ``None``.
 
         Returns
         -------
         firedrake.Interpolate
-            An interpolation operator object used to interpolate a firedrake function
-            at the receiver locations.
+            An interpolation operator used to interpolate a firedrake
+            function at the receiver locations.
         """
         V_r = FunctionSpace(
-            VertexOnlyMesh(self.mesh, self.point_locations), "DG", 0)
+            VertexOnlyMesh(
+                self.mesh, self.point_locations, reorder=reorder,
+                tolerance=vom_tolerance,
+                missing_points_behaviour=vom_missing_points_behaviour,
+                redundant=vom_redundant,
+                name=vom_name), "DG", 0, 
+        )
         return interpolate(f, V_r)
 
     def new_at(self, udat, receiver_id):
