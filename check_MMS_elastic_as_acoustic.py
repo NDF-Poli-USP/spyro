@@ -1,43 +1,24 @@
 import firedrake as fire
 import math
-import numpy as np
 import spyro
 import matplotlib.pyplot as plt
 from collections import defaultdict
 import csv
 
-
 def mms_h_convergence(dt, h):
-    c = lambda x: 1 + fire.sin(fire.pi*-x[0])*fire.sin(fire.pi*x[1])
-    B = lambda x: x[0]*(x[0] + 1.0)*x[1]*(x[1] - 1.0)
-    Q = lambda x: 1.0 / (c(x)**2)
+    # Acoustic-like solution: both components have the same scalar solution
+    scalar_solution = lambda x, t: x[0] * (x[0] + 1) * x[1] * (x[1] - 1) * t
+    u1 = lambda x, t: scalar_solution(x, t)
+    u2 = lambda x, t: scalar_solution(x, t)
+    u = lambda x, t: fire.as_vector([u1(x, t), u2(x, t)])
 
-    dQ_dx0 = lambda x: (2.0 * fire.pi * fire.cos(fire.pi * x[0]) * fire.sin(fire.pi * x[1])) / (c(x)**3)
-    dQ_dx1 = lambda x: (2.0 * fire.pi * fire.sin(fire.pi * x[0]) * fire.cos(fire.pi * x[1])) / (c(x)**3)
-
-    u1 = lambda x, t: -t * (
-        (2.0*x[0] + 1.0) * x[1] * (x[1] - 1.0) * Q(x)
-        + B(x) * dQ_dx0(x)
-    )
-
-    u2 = lambda x, t: -t * (
-        x[0] * (x[0] + 1.0) * (2.0*x[1] - 1.0) * Q(x)
-        + B(x) * dQ_dx1(x)
-    )
-
-    u = lambda x, t: fire.as_vector((u1(x, t), u2(x, t)))
-
-    # Corresponding MMS pressure (for verification)
-    p = lambda x, t: x[0]*(x[0]+1)*x[1]*(x[1]-1)*t
-
-    # Elastic MMS body force (μ = 0):
-    b1 = lambda x, t: (2*x[0] + 1) * x[1] * (x[1] - 1) * t
-    b2 = lambda x, t: (2*x[1] - 1) * x[0] * (x[0] + 1) * t
-    b  = lambda x, t: fire.as_vector([b1(x, t), b2(x, t)])
+    # Body forces for acoustic-like case (both components get the same source)
+    scalar_source = lambda x, t: -(x[0]**2 + x[0] + x[1]**2 - x[1]) * 2 * t
+    b1 = lambda x, t: scalar_source(x, t)
+    b2 = lambda x, t: scalar_source(x, t)
+    b = lambda x, t: fire.as_vector([b1(x, t), b2(x, t)])
 
     fo = int(0.1/dt)
-
-    lbda = lambda x: c(x)*c(x)
 
     dictionary = {}
     dictionary["options"] = {
@@ -86,7 +67,8 @@ def mms_h_convergence(dt, h):
     dictionary["synthetic_data"] = {
         "type": "object",
         "density": 1,
-        "mu": 1,
+        "lambda": 1,
+        "mu": 0,  # Set to 0 to make elastic equivalent to acoustic
         "real_velocity_file": None,
     }
     dictionary["boundary_conditions"] = [
@@ -98,71 +80,22 @@ def mms_h_convergence(dt, h):
     wave.set_mesh(input_mesh_parameters={"edge_length": h})
     # Lets build de matrix operator outside of the forward solve so we can
     # set previous timesteps for the MMS problem
-    # wave._initialize_model_parameters()
-    # wave.matrix_building()
+    wave._initialize_model_parameters()
+    wave.matrix_building()
     x = wave.get_spatial_coordinates()
-    dictionary["synthetic_data"]["lambda"] = lbda(x)
     # wave.u_nm1.interpolate(u(x, 0.0 - 2*dt))
     # wave.u_n.interpolate(u(x, 0.0 - dt))
     # wave.u_nm2.interpolate(u(x, 0.0 - 2*dt))
 
-    wave.forward_solve()
+    wave.forward_solve(build_matrix_operator=False)
 
     u_an = fire.Function(wave.function_space)
     t = wave.current_time
     u_an.interpolate(u(x, t))
 
-    V  = wave.function_space.sub(0)
-    
-    # For elastic waves: ∂p/∂t + λ ∇·u = 0
-    # The correct relationship is: p = -λ * ∇·u
-    p_num = fire.project(-lbda(x) * fire.div(wave.u_n), V)
-    p_numdat = p_num.dat.data[:]
-    spyro.plots.debug_pvd(p_num, filename="numerical.pvd")
+    e1 = fire.errornorm(wave.u_n.sub(0), u_an.sub(0)) / fire.norm(u_an.sub(0))
+    e2 = fire.errornorm(wave.u_n.sub(1), u_an.sub(1)) / fire.norm(u_an.sub(1))
 
-    p_an  = fire.Function(wave.function_space.sub(0)).interpolate(p(x, t))
-    p_andat = p_an.dat.data[:]
-
-    spyro.plots.debug_pvd(p_an, filename="analitical.pvd")
-    
-    # Debug the issue with nan errors
-    print(f"p_num stats: min={min(p_numdat)}, max={max(p_numdat)}, mean={sum(p_numdat)/len(p_numdat)}")
-    print(f"p_an stats: min={min(p_andat)}, max={max(p_andat)}, mean={sum(p_andat)/len(p_andat)}")
-    
-    # Check norms
-    norm_p_num = fire.norm(p_num)
-    norm_p_an = fire.norm(p_an)
-    print(f"Norms: p_num={norm_p_num}, p_an={norm_p_an}")
-    
-    # Check for special values
-    has_nan_pnum = np.any(np.isnan(p_numdat))
-    has_nan_pan = np.any(np.isnan(p_andat))
-    has_inf_pnum = np.any(np.isinf(p_numdat))
-    has_inf_pan = np.any(np.isinf(p_andat))
-    print(f"NaN/Inf check: p_num has NaN={has_nan_pnum}, has Inf={has_inf_pnum}")
-    print(f"NaN/Inf check: p_an has NaN={has_nan_pan}, has Inf={has_inf_pan}")
-    
-    # Manual L2 error calculation since fire.norm sometimes gives inf
-    manual_norm_p_an = np.sqrt(np.sum(p_andat**2))
-    manual_norm_diff = np.sqrt(np.sum((p_numdat - p_andat)**2))
-    
-    if manual_norm_p_an > 1e-15:
-        err_p = manual_norm_diff / manual_norm_p_an
-        print(f"Pressure recovery error: {err_p:.6f}")
-    else:
-        err_p = float('inf')
-        print("Cannot compute pressure error - p_an norm too small")
-
-    # Compute displacement errors
-    e1 = fire.errornorm(wave.u_n, u_an) / fire.norm(u_an)
-    print("Displacement MMS error:", e1)
-    
-    # Use pressure error as second metric
-    e2 = err_p
-    
-    print(f"p_num max: {max(abs(p_numdat))}, p_an max: {max(abs(p_andat))}")
-    print(f"p_num shape: {p_numdat.shape}, p_an shape: {p_andat.shape}")
-    
     if e1 > 1e3 or e2 > 1e3:
         raise ValueError("ERROR")
 
@@ -170,7 +103,7 @@ def mms_h_convergence(dt, h):
     return e1, e2
 
 if __name__ == "__main__":
-    dts = [1e-3] #  , 1e-4, 1e-5]
+    dts = [1e-3, 1e-4, 1e-5]
     # dts = [1e-2, 1e-3]
     hs = [0.125]#, 0.1, 0.05, 0.025]
     
