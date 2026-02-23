@@ -157,9 +157,9 @@ class Receivers(Delta_projector):
             missing_points_behaviour=vom_missing_points_behaviour,
             redundant=vom_redundant,
             name=vom_name)
-        if WaveType.ISOTROPIC_ELASTIC:
+        if self.wave_type == WaveType.ISOTROPIC_ELASTIC:
             V_r = VectorFunctionSpace(vom, "DG", 0)
-        elif WaveType.ISOTROPIC_ACOUSTIC:
+        elif self.wave_type == WaveType.ISOTROPIC_ACOUSTIC:
             V_r = FunctionSpace(vom, "DG", 0)
         else:
             raise ValueError("Invalid wave type")
