@@ -1,8 +1,9 @@
-import firedrake as fire
+import pytest
 import warnings
+import firedrake as fire
+import spyro.habc.eik as eik
 from numpy import isclose
 from os import getcwd
-import spyro.habc.eik as eik
 from spyro.solvers.acoustic_wave import AcousticWave
 from spyro.meshing.meshing_habc import HABC_Mesh
 from spyro.utils.cost import comp_cost
@@ -375,13 +376,13 @@ def test_loop_eikonal_2d():
 
             thr_val = 83.333  # in ms
             assert isclose(min_eik / thr_val, 1., atol=5e-3), \
-                f"❌ Minimum Eikonal 2D Element {ele_type} " + \
+                f"❌ Minimum Eikonal 2D Element-{ele_type} " + \
                 f"→ Expected value {thr_val}, got {min_eik:.3f}"
             print(f"✅ Minimum Eikonal 2D Verified: expected "
                   f"{thr_val}, got = {min_eik:.3f}", flush=True)
 
         except fire.ConvergenceError as e:
-            pytest.fail(f"Setting {prop_name} raised an exception: {str(e)}")
+            pytest.fail(f"Checking Eikonal 2D raised an exception: {str(e)}")
 
 
 def test_loop_eikonal_3d():
@@ -442,10 +443,10 @@ def test_loop_eikonal_3d():
             thr_val = 83.333  # in ms
 
             assert isclose(min_eik / thr_val, 1., atol=3e-2), \
-                f"❌ Minimum Eikonal 3D Element {ele_type} " + \
+                f"❌ Minimum Eikonal 3D Element-{ele_type} " + \
                 f"→ Expected value {thr_val}, got {min_eik:.3f}"
             print(f"✅ Minimum Eikonal 3D Verified: expected "
                   f"{thr_val}, got = {min_eik:.3f}", flush=True)
 
         except fire.ConvergenceError as e:
-            pytest.fail(f"Setting {prop_name} raised an exception: {str(e)}")
+            pytest.fail(f"Checking Eikonal 3D raised an exception: {str(e)}")
