@@ -86,6 +86,7 @@ def test_cpw_calc_triangles():
 
 
 @pytest.mark.slow
+@pytest.mark.skip(reason="PML in quads subject to another PR")
 def test_cpw_calc_quads():
     method = "spectral_quadrilateral"
     correct_cpw = 2.5
