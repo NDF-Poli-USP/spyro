@@ -19,6 +19,7 @@ jobs:
   fast-tests:
     name: Fast Tests
     runs-on: self-hosted
+    # Runs on all pushes and pull requests for quick feedback
 
     container:
       image: firedrakeproject/firedrake:2025.4.1
@@ -58,7 +59,7 @@ jobs:
     - name: Running serial fast tests
       run: |
         ./cleanup.sh
-        python3 -m pytest -n 8 --cov-report=xml --cov=spyro tests/on_one_core/ --skip-slow
+        python3 -m pytest -n 8 --cov-report=xml --cov=spyro tests/on_one_core/ --skip-slow --durations=10
 
     - name: Post-run cleanup
       if: always()
@@ -69,6 +70,7 @@ jobs:
     runs-on: self-hosted
     needs: fast-tests
     if: github.event_name == 'pull_request'
+    # Only runs on PRs after fast tests pass - saves resources
 
     container:
       image: firedrakeproject/firedrake:2025.4.1
