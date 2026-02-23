@@ -90,8 +90,11 @@ def test_immersed_polygon_forward():
 
 
 @pytest.mark.slow
-def test_camembert_elastic():
+@pytest.mark.parametrize("use_vertex_only_mesh", [False, True])
+def test_camembert_elastic(use_vertex_only_mesh):
     from spyro.examples.camembert_elastic import wave
+    # use vertex-only mesh
+    wave.use_vertex_only_mesh = use_vertex_only_mesh
     wave.forward_solve()
 
 
