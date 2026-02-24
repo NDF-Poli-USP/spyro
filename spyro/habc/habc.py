@@ -222,7 +222,8 @@ class HABC_Wave(AcousticWave, HyperLayer, NRBCHabc):
         Determine the initial search range for the heuristic factor xCR
     '''
 
-    def __init__(self, dictionary=None, f_est=0.06, fwi_iter=0, comm=None, output_folder="results/"):
+    def __init__(self, dictionary=None, f_est=0.06, fwi_iter=0,
+                 comm=None, output_folder="results/"):
         '''
         Initialize the HABC class.
 
@@ -408,14 +409,16 @@ class HABC_Wave(AcousticWave, HyperLayer, NRBCHabc):
 
         # Boundaries
         left_boundary = np.where(x_data <= self.tol)
-        right_boundary = np.where(x_data >= self.mesh_parameters.length_x - self.tol)
+        right_boundary = np.where(x_data >= self.mesh_parameters.length_x
+                                  - self.tol)
         bottom_boundary = np.where(z_data <= self.tol - self.mesh_parameters.length_z)
 
         bnds = [left_boundary, right_boundary, bottom_boundary]
 
         if self.dimension == 3:  # 3D
             left_bnd_y = np.where(y_data <= self.tol)
-            right_bnd_y = np.where(y_data >= self.mesh_parameters.length_y - self.tol)
+            right_bnd_y = np.where(y_data >= self.mesh_parameters.length_y
+                                   - self.tol)
             bnds += [left_bnd_y, right_bnd_y]
 
         if typ_bnd == 'original':
