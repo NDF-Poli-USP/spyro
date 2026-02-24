@@ -322,16 +322,15 @@ def write_function_to_grid(function, V, grid_spacing, buffer=True):
     x, y = coords.dat.data[:, 0], coords.dat.data[:, 1]
 
     # add buffer to avoid NaN when calling griddata
-    if buffer:
-        min_x = np.amin(x) + 0.005
-        max_x = np.amax(x) - 0.005
-        min_y = np.amin(y) + 0.005
-        max_y = np.amax(y) - 0.005
-    else:
-        min_x = np.amin(x)
-        max_x = np.amax(x)
-        min_y = np.amin(y)
-        max_y = np.amax(y)
+    pad = 0.005 if buffer else 0.0
+
+    min_x = np.min(x) + pad
+    max_x = np.max(x) - pad
+    min_y = np.min(y) + pad
+    max_y = np.max(y) - pad
+
+    if min_x > max_x or min_y > max_y:
+        raise ValueError("Buffer too large for the provided coordinate range.")
 
     try:
         z = function.dat.data[:]
