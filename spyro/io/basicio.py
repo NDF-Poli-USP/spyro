@@ -303,6 +303,8 @@ def write_function_to_grid(function, V, grid_spacing, buffer=True):
         Function space of function
     grid_spacing : float
         Spacing of grid points
+    buffer: boolean
+        Determines if we use a buffer for the interpolation
 
     Returns
     -------
