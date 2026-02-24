@@ -39,13 +39,31 @@ def ensemble_shot_record(func):
 
 
 def ensemble_save(func):
-    """Decorator for saving shots for ensemble parallelism.
+    """Decorator for saving files with parallelism. Handles saving in different
+    scenarions:
+    - For ensemble parallelism or single source: iterates through propagations in
+      each core and saves when the propagation is owned by the current rank.
+    - For spatial-only parallelism with multiple sources: loads shots from temporary 
+      files using the switch_serial_shot method and saves to named output files 
     
-    For spatial parallelism with multiple sources, loads from temporary files 
-    (with random strings) then saves to named files.
+    Parameters:
+    -----------
+    func: The wrapped function that performs the actual saving operation.
+    Expected to accept a Wave based object as first argument.
+
+    Returns:
+    --------
+    wrapper: A decorator function that wraps the original saving function with 
+        parallelism logic.
+
+    Notes:
+    ------
+    - Requires object to have attributes: comm, parallelism_type, number_of_sources, 
+      and shot_ids_per_propagation
+    - Temporary files are loaded via switch_serial_shot() when using spatial-only parallelism
     """
     def wrapper(*args, **kwargs):
-        obj = args[0]
+        obj = args[0]  # Requires first arg to be an instant or subclass of Wave
         _comm = obj.comm
         if obj.parallelism_type != "spatial" or obj.number_of_sources == 1:
             for propagation_id, shot_ids_in_propagation in enumerate(obj.shot_ids_per_propagation):
@@ -64,6 +82,16 @@ def ensemble_load(func):
     """Decorator for loading shots for ensemble parallelism.
     
     For spatial parallelism with multiple sources, loads from named files directly.
+
+    Parameters:
+    -----------
+    func: The wrapped function that performs the actual loading operation.
+    Expected to accept a Wave based object as first argument.
+
+    Returns:
+    --------
+    wrapper: A decorator function that wraps the original loading function with 
+        parallelism logic.
     """
     def wrapper(*args, **kwargs):
         obj = args[0]
@@ -80,7 +108,18 @@ def ensemble_load(func):
 
 
 def ensemble_propagator(func):
-    """Decorator for forward to distribute shots for ensemble parallelism"""
+    """Decorator for forward to distribute shots for ensemble parallelism
+    
+    Parameters:
+    -----------
+    func: The wrapped function that performs the actual propagation operation.
+    Expected to accept a Wave based object as first argument.
+
+    Returns:
+    --------
+    wrapper: A decorator function that wraps the original propagator function with 
+        ensemble parallelism logic.
+    """
 
     def wrapper(*args, **kwargs):
         if args[0].parallelism_type != "spatial" or args[0].number_of_sources == 1:
@@ -105,7 +144,25 @@ def ensemble_propagator(func):
 
 
 def _shot_filename(propagation_id, wave, prefix='tmp', random_str_in_use=True):
-    """Helper to construct filenames for shot/receiver data."""
+    """
+    Helper to construct filenames for shot/receiver data based on propagation and wave information.
+
+    Parameters:
+    -----------
+    propagation_id (int): The index identifying the current propagation.
+    
+    wave (object): A Wave object containing shot and communication information. Must have attributes:
+        - shot_ids_per_propagation: A list or dict mapping propagation IDs to shot IDs.
+        - comm: The current MPI communicator.
+    prefix (str, optional): Prefix for the filename. Defaults to 'tmp'.
+    random_str_in_use (bool, optional): If True, includes a random string and communicator rank in 
+        the filename, gotten from the Wave object, and uses '.npy' extension. 
+        If False, omits these and uses '.dat' extension. Defaults to True.
+
+    Returns:
+    --------
+    str: The constructed filename.
+    """
     shot_ids = wave.shot_ids_per_propagation[propagation_id]
     if random_str_in_use:
         id_str = wave.random_id_string
