@@ -57,13 +57,15 @@ class MeshingParameters():
         self.length_x = self.input_mesh_dictionary.get("Lx", None)
         self.length_y = self.input_mesh_dictionary.get("Ly", None)
         self.user_mesh = self.input_mesh_dictionary.get("user_mesh", None)
-        self.output_filename = self.input_mesh_dictionary.get("output_filename", "automatic_mesh.msh")
+        self.output_filename = self.input_mesh_dictionary.get(
+            "output_filename", "automatic_mesh.msh")
         self.source_frequency = source_frequency
         self.abc_pad_length = abc_pad_length
         self.degree = degree
         self.minimum_velocity = None
         self.velocity_model = velocity_model
-        self.automatic_mesh = self.mesh_type in {"firedrake_mesh", "SeismicMesh"}
+        self.automatic_mesh = self.mesh_type \
+            in {"firedrake_mesh", "SeismicMesh"}
         self._edge_length = None
         self._cells_per_wavelength = None
         self.edge_length = None

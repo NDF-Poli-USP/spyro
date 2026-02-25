@@ -35,6 +35,7 @@ __all__ = [
     "create_2d_grid",
     "create_3d_grid",
     "estimate_timestep",
+    "generate_ufl_functions",
     "insert_fixed_value",
     "ricker_wavelet",
     "full_ricker_wavelet",

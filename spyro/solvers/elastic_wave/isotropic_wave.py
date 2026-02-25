@@ -27,7 +27,7 @@ class IsotropicWave(ElasticWave):
         self.u_nm2 = None  # Displacement field at iteration n-2
         self.u_np1 = None  # Displacement field in next iteration
 
-        # Volumetric sourcers (defined through UFL)
+        # Volumetric sources (defined through UFL)
         self.body_forces = None
 
         # Boundary conditions
@@ -172,7 +172,8 @@ class IsotropicWave(ElasticWave):
         self.parse_boundary_conditions()
         self.parse_volumetric_forces()
 
-        if self.abc_boundary_layer_type is None or self.abc_boundary_layer_type == "local":
+        if self.abc_boundary_layer_type is None or \
+                self.abc_boundary_layer_type == "local":
             isotropic_elastic_without_pml(self)
         elif self.abc_boundary_layer_type == "PML":
             isotropic_elastic_with_pml(self)
@@ -194,7 +195,7 @@ class IsotropicWave(ElasticWave):
 
     def parse_boundary_conditions(self):
         bc_list = self.input_dictionary.get("boundary_conditions", [])
-        for tag, id, value in bc_list:
+        for tag, idbc, value in bc_list:
             if tag == "u":
                 subspace = self.function_space
             elif tag == "uz":
@@ -205,7 +206,7 @@ class IsotropicWave(ElasticWave):
                 subspace = self.function_space.sub(2)
             else:
                 raise Exception(f"Unsupported boundary condition with tag: {tag}")
-            self.bcs.append(DirichletBC(subspace, value, id))
+            self.bcs.append(DirichletBC(subspace, value, idbc))
 
     def parse_volumetric_forces(self):
         acquisition_dict = self.input_dictionary["acquisition"]

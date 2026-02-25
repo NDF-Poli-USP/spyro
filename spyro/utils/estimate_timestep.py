@@ -39,14 +39,10 @@ def estimate_timestep(mesh, V, c, estimate_max_eigenvalue=True):
         # absolute maximum of diagonals
         max_eigval = np.amax(np.abs(Lsp.diagonal()))
     else:
-        print(
-            "Computing exact eigenvalues is extremely computationally \
-                demanding!",
-            flush=True,
-        )
+        print("Computing exact eigenvalues is extremely"
+              + "computationally demanding!", flush=True)
         max_eigval = scipy.sparse.linalg.eigs(
-            Ksp, M=Asp, k=1, which="LM", return_eigenvectors=False
-        )[0]
+            Ksp, M=Asp, k=1, which="LM", return_eigenvectors=False)[0]
 
     # print(max_eigval)
     if np.sqrt(max_eigval) > 0.0:

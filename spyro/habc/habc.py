@@ -24,7 +24,7 @@ from spyro.plots.plots import plot_hist_receivers, \
 
 class HABC_Wave(AcousticWave, HyperLayer, NRBCHabc):
     '''
-    class HABC that determines absorbing layer size and parameters to be used.
+    Class HABC that determines absorbing layer size and parameters to be used.
 
     Attributes
     ----------
@@ -222,7 +222,8 @@ class HABC_Wave(AcousticWave, HyperLayer, NRBCHabc):
         Determine the initial search range for the heuristic factor xCR
     '''
 
-    def __init__(self, dictionary=None, f_est=0.06, fwi_iter=0, comm=None, output_folder="results/"):
+    def __init__(self, dictionary=None, f_est=0.06, fwi_iter=0,
+                 comm=None, output_folder="results/"):
         '''
         Initialize the HABC class.
 
@@ -408,14 +409,17 @@ class HABC_Wave(AcousticWave, HyperLayer, NRBCHabc):
 
         # Boundaries
         left_boundary = np.where(x_data <= self.tol)
-        right_boundary = np.where(x_data >= self.mesh_parameters.length_x - self.tol)
-        bottom_boundary = np.where(z_data <= self.tol - self.mesh_parameters.length_z)
+        right_boundary = np.where(
+            x_data >= self.mesh_parameters.length_x - self.tol)
+        bottom_boundary = np.where(
+            z_data <= self.tol - self.mesh_parameters.length_z)
 
         bnds = [left_boundary, right_boundary, bottom_boundary]
 
         if self.dimension == 3:  # 3D
             left_bnd_y = np.where(y_data <= self.tol)
-            right_bnd_y = np.where(y_data >= self.mesh_parameters.length_y - self.tol)
+            right_bnd_y = np.where(
+                y_data >= self.mesh_parameters.length_y - self.tol)
             bnds += [left_bnd_y, right_bnd_y]
 
         if typ_bnd == 'original':
@@ -516,7 +520,8 @@ class HABC_Wave(AcousticWave, HyperLayer, NRBCHabc):
 
         # Check if the signal is empty
         if signal.size == 0:
-            raise ValueError("Input signal is empty. Cannot compute frequency response.")
+            raise ValueError("Input signal is empty. "
+                             + "Cannot compute frequency response.")
 
         # Zero padding for increasing smoothing in FFT
         yt = np.concatenate([np.zeros(fpad * len(signal)), signal])
@@ -603,13 +608,15 @@ class HABC_Wave(AcousticWave, HyperLayer, NRBCHabc):
         # Geometric properties of the rectangular layer
         if self.dimension == 2:  # 2D
             self.area = self.Lx_habc * self.Lz_habc
-            self.a_rat = self.area / (self.mesh_parameters.length_x * self.mesh_parameters.length_z)
+            self.a_rat = self.area / (self.mesh_parameters.length_x
+                                      * self.mesh_parameters.length_z)
             self.f_Ah = 4
             print("Area Ratio: {:5.3f}".format(self.a_rat))
 
         if self.dimension == 3:  # 3D
             self.vol = self.Lx_habc * self.Lz_habc * self.Ly_habc
-            self.v_rat = self.vol / (self.mesh_parameters.length_x * self.mesh_parameters.length_z
+            self.v_rat = self.vol / (self.mesh_parameters.length_x
+                                     * self.mesh_parameters.length_z
                                      * self.mesh_parameters.length_y)
             self.f_Vh = 8
             print("Volume Ratio: {:5.3f}".format(self.v_rat))
@@ -659,8 +666,10 @@ class HABC_Wave(AcousticWave, HyperLayer, NRBCHabc):
             print("\nDetermining Hypershape Layer Parameters")
 
             # Original domain dimensions
-            domain_dim = [self.mesh_parameters.length_x, self.mesh_parameters.length_z]
-            domain_hyp = [self.Lx_habc, self.mesh_parameters.length_z + 2 * self.pad_len]
+            domain_dim = [self.mesh_parameters.length_x,
+                          self.mesh_parameters.length_z]
+            domain_hyp = [self.Lx_habc,
+                          self.mesh_parameters.length_z + 2 * self.pad_len]
             if self.dimension == 3:  # 3D
                 domain_dim.append(self.mesh_parameters.length_y)
                 domain_hyp.append(self.Ly_habc)
@@ -1669,14 +1678,16 @@ class HABC_Wave(AcousticWave, HyperLayer, NRBCHabc):
                 psou_z = self.source_locations[nsou][0]
                 psou_x = self.source_locations[nsou][1]
                 delta_z = abs(psou_z - self.mesh_parameters.length_z)
-                delta_x = min(abs(psou_x), abs(psou_x - self.mesh_parameters.length_x))
+                delta_x = min(abs(psou_x), abs(
+                    psou_x - self.mesh_parameters.length_x))
 
                 if self.dimension == 2:  # 2D
                     dist_to_bnd = min(dist_to_bnd, delta_z, delta_x)
 
                 if self.dimension == 3:  # 3D
                     psou_y = self.source_locations[nsou][2]
-                    delta_y = min(abs(psou_y), abs(psou_y - self.mesh_parameters.length_y))
+                    delta_y = min(abs(psou_y), abs(
+                        psou_y - self.mesh_parameters.length_y))
                     dist_to_bnd = min(dist_to_bnd, delta_z, delta_x, delta_y)
 
             add_dom -= dist_to_bnd
