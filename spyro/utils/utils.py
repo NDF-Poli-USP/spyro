@@ -353,10 +353,6 @@ def run_in_one_core_and_broadcast(func):
     return wrapper
 
 
-def interpolate_shot_record(file_name, output_file_name, original_dt, new_dt):
-    pass
-
-
 @run_in_one_core_and_broadcast
 def write_hdf5_velocity_model(obj_with_comm, segy_filename):
     if SEISMIC_MESH_AVAILABLE is False:
