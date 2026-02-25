@@ -234,7 +234,7 @@ class Wave(Model_parameters, metaclass=ABCMeta):
             self.initial_velocity_model = velocity_model_function
         elif new_file is not None:
             self.initial_velocity_model_file = new_file
-            self._initialize_model_parameters()
+            self._initialize_model_parameters()  # TODO in PR206
         elif constant is not None:
             V = self.function_space
             vp = fire.Function(V, name="velocity")
