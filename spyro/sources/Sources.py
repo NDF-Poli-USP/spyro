@@ -107,7 +107,8 @@ class Sources(Delta_projector):
                 for i in range(len(self.cellNodeMaps[source_id])):
                     rhs_forcing.dat.data_with_halos[
                         int(self.cellNodeMaps[source_id][i])
-                    ] = (self.wavelet[step] * np.dot(self.amplitude, self.cell_tabulations[source_id][i]))
+                    ] = (self.wavelet[step] * np.dot(
+                        self.amplitude, self.cell_tabulations[source_id][i]))
             else:
                 for i in range(len(self.cellNodeMaps[source_id])):
                     tmp = rhs_forcing.dat.data_with_halos[0]  # noqa: F841
@@ -220,7 +221,7 @@ def full_ricker_wavelet(
     list of float
         list of ricker values at each time step
     """
-    nt = int(final_time / dt) + 1  # number of timesteps
+    nt = int(round(final_time / dt)) + 1  # number of timesteps
     time = 0.0
     full_wavelet = np.zeros((nt,))
     for t in range(nt):

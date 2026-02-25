@@ -3,6 +3,7 @@ import numpy as np
 import time as timer
 import firedrake as fire
 import pickle
+import pytest
 
 
 def error_calc(p_numerical, p_analytical, nt):
@@ -22,7 +23,9 @@ def run_forward():
     dictionary = {}
     dictionary["options"] = {
         "cell_type": "T",  # simplexes such as triangles or tetrahedra (T) or quadrilaterals (Q)
-        "variant": "lumped",  # lumped, equispaced or DG, default is lumped "method":"MLT", # (MLT/spectral_quadrilateral/DG_triangle/DG_quadrilateral) You can either specify a cell_type+variant or a method
+        "variant": "lumped",  # lumped, equispaced or DG, default is lumped "method":
+        # "MLT", # (MLT/spectral_quadrilateral/DG_triangle/DG_quadrilateral).
+        # You can either specify a cell_type+variant or a method
         "degree": 4,  # p order
         "dimension": 2,  # dimension
     }
@@ -99,12 +102,13 @@ def run_forward():
 
     t1 = timer.time()
     print("Time elapsed: ", t1 - t0)
-    nt = int(final_time / dt) + 1
+    nt = int(round(final_time / dt)) + 1
     p_r = Wave_obj.forward_solution_receivers
 
     return p_r, nt
 
 
+@pytest.mark.slow
 def test_pml():
     """Test that the second order time convergence
     of the central difference method is achieved"""
@@ -114,7 +118,7 @@ def test_pml():
         array = np.asarray(pickle.load(f), dtype=float)
         extended_p_r = array
 
-    error = error_calc(extended_p_r, p_r, nt)
+    error = error_calc(extended_p_r, p_r[:-1, :], nt-1)
     print(f"Error of {error}")
     assert np.abs(error) < 0.05
 

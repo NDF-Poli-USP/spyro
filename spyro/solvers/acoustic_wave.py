@@ -1,9 +1,7 @@
 import firedrake as fire
 import warnings
 import os
-
 from .wave import Wave
-
 from ..io.basicio import ensemble_gradient
 from ..io import interpolate
 from .acoustic_solver_construction_no_pml import (
@@ -66,13 +64,6 @@ class AcousticWave(Wave):
         if abc_type is None or abc_type == "local" or abc_type == "hybrid":
             construct_solver_or_matrix_no_pml(self)
         elif abc_type == "PML":
-            V = self.function_space
-            Z = fire.VectorFunctionSpace(V.ufl_domain(), V.ufl_element())
-            self.vector_function_space = Z
-            self.X = None
-            self.X_n = None
-            self.X_nm1 = None
-            self.X_np1 = fire.Function(V * Z)
             construct_solver_or_matrix_with_pml(self)
 
         self.acoustic_energy = acoustic_energy(self)

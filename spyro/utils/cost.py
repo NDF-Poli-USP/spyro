@@ -6,7 +6,7 @@ from tracemalloc import get_traced_memory, start, stop  # For memory usage
 
 def comp_cost(flag, tRef=None, user_name=None):
     '''
-    Estimate runtime and used memory and save them to a *.txt file.
+    Estimate runtime and used memory and save them to a *.txt file
 
     Parameters
     ----------
@@ -40,19 +40,24 @@ def comp_cost(flag, tRef=None, user_name=None):
         hifem_draw = 62
 
         # Total time
-        print('\n' + hifem_draw * '-')
-        print("Estimating Runtime and Used Memory")
+        print("\n" + hifem_draw * "-", flush=True)
+        print("Estimating Runtime and Used Memory", flush=True)
         tTotal = perf_counter() - tRef
         val_time = [tTotal, tTotal/60, tTotal/3600]
-        cad_time = 'Runtime: (s):{:3.3f}, (m):{:3.3f}, (h):{:3.3f}'
-        print(cad_time.format(*val_time))
+        cad_time = "Runtime: (s):{:3.3f}, (m):{:3.3f}, (h):{:3.3f}"
+        print(cad_time.format(*val_time), flush=True)
 
         # Memory usage
         curr, peak = get_traced_memory()
-        val_memo = [curr/1024**2, peak/1024**2]
-        cad_memo = "Used Memory: Current (MB):{:3.3f}, Peak (MB):{:3.3f}"
-        print(cad_memo.format(*val_memo))
-        print(hifem_draw * '-' + '\n')
+        if peak / 1024**2 < 1024:
+            val_memo = [curr / 1024**2, peak / 1024**2]
+            unit = "(MB):{:3.3f}"
+        else:
+            val_memo = [curr / 1024**3, peak / 1024**3]
+            unit = "(GB):{:3.3f}"
+        cad_memo = "Used Memory: Current " + unit + ", Peak " + unit
+        print(cad_memo.format(*val_memo), flush=True)
+        print(hifem_draw * "-" + "\n", flush=True)
         stop()
 
         # Save file for resource usage

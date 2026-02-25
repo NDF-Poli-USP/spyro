@@ -66,7 +66,8 @@ def backward_wave_propagator_no_pml(Wave_obj, dt=None):
     dt = Wave_obj.dt
     t = Wave_obj.current_time
     if t != final_time:
-        print(f"Current time of {t}, different than final_time of {final_time}. Setting final_time to current time in backwards propagation.", flush=True)
+        print(f"Current time of {t}, different than final_time of {final_time}."
+              f" Setting final_time to current time in backwards propagation.", flush=True)
     nt = int(t / dt) + 1  # number of timesteps
 
     u_nm1 = Wave_obj.u_nm1

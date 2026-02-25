@@ -1,5 +1,6 @@
 import numpy as np
 import warnings
+import os
 
 from firedrake import VTKFile
 
@@ -26,6 +27,7 @@ class Functional:
         self.list.append(self.callback())
 
     def save(self):
+        os.makedirs(os.path.dirname(self.filename), exist_ok=True)
         np.save(self.filename, self.list)
 
 

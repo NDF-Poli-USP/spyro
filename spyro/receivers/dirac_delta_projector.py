@@ -91,7 +91,7 @@ class Delta_projector:
     def build_maps(self, order=0):
         """Calculates and stores tabulations for interpolation
 
-        Is always automatticaly called when initializing the class,
+        Is always automatically called when initializing the class,
         therefore should only be called again if a mesh related attribute
         changes.
 
@@ -112,13 +112,9 @@ class Delta_projector:
                                             tolerance=1e-6)
             self.is_local[rid] = cell_id
 
-        (
-            self.cellIDs,
-            self.cellVertices,
-            self.cellNodeMaps,
-        ) = self.__point_locator()
+        (self.cellIDs, self.cellVertices,
+            self.cellNodeMaps) = self.__point_locator()
         self.cell_tabulations = self.__func_build_cell_tabulations(order)
-
         self.number_of_points = len(self.point_locations)
 
     def interpolate(self, field):
@@ -491,9 +487,8 @@ def get_hexa_real_cell_node_map(V, mesh):
     ufl_element = V.ufl_element()
     _, p = ufl_element.degree()
 
-    cell_node_map = np.zeros(
-        (layers * cells_per_layer, nodes_per_cell), dtype=int
-    )
+    cell_node_map = np.zeros((layers * cells_per_layer, nodes_per_cell),
+                             dtype=int)
     print(f"cnm size : {np.shape(cell_node_map)}", flush=True)
 
     for layer in range(layers):

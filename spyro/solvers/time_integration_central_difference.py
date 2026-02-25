@@ -20,6 +20,7 @@ def central_difference(wave, source_ids=[0]):
         tuple:
             A tuple containing the forward solution and the receiver output.
     """
+
     if wave.sources is not None:
         wave.sources.current_sources = source_ids
         rhs_forcing = fire.Cofunction(wave.function_space.dual())
@@ -28,7 +29,8 @@ def central_difference(wave, source_ids=[0]):
     wave.comm.comm.barrier()
 
     t = wave.current_time
-    nt = int(wave.final_time / wave.dt) + 1  # number of timesteps
+    nt = int(round(wave.final_time / wave.dt)) + 1  # number of timesteps
+
     usol = [
         fire.Function(wave.function_space, name=wave.get_function_name())
         for t in range(nt)
@@ -42,8 +44,10 @@ def central_difference(wave, source_ids=[0]):
             wave.vstate)
     usol_recv = []
     save_step = 0
+
     for step in range(nt):
         # Basic way of applying sources
+
         wave.update_source_expression(t)
         fire.assemble(wave.rhs, tensor=wave.B)
 
@@ -69,10 +73,9 @@ def central_difference(wave, source_ids=[0]):
             save_step += 1
 
         if (step - 1) % wave.output_frequency == 0:
-            assert (
-                fire.norm(wave.get_function()) < 1
-            ), "Numerical instability. Try reducing dt or building the " \
-               "mesh differently"
+            assert (fire.norm(wave.get_function()) < 1), \
+                "Numerical instability. Try reducing dt " \
+                "or building the mesh differently"
             wave.field_logger.log(t)
             helpers.display_progress(wave.comm, t)
 
@@ -80,9 +83,9 @@ def central_difference(wave, source_ids=[0]):
 
     wave.current_time = t
     helpers.display_progress(wave.comm, t)
-    usol_recv = helpers.fill(
-        usol_recv, wave.receivers.is_local, nt, wave.receivers.number_of_points
-    )
+
+    usol_recv = helpers.fill(usol_recv, wave.receivers.is_local,
+                             nt, wave.receivers.number_of_points)
     usol_recv = utils.utils.communicate(usol_recv, wave.comm)
 
     wave.receivers_output = usol_recv

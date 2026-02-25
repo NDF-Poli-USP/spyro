@@ -93,7 +93,7 @@ if comm.ensemble_comm.rank == 0:
 quad_rule = finat.quadrature.make_quadrature(
     V.finat_element.cell, V.ufl_element().degree(), "KMV"
 )
-dxlump = dx(scheme=quad_rule)
+dxlump = dx(**quad_rule)
 
 water = np.where(vp.dat.data[:] < 1.51)
 
@@ -117,8 +117,8 @@ def regularize_gradient(vp, dJ):
     """Tikhonov regularization"""
     m_u = TrialFunction(V)
     m_v = TestFunction(V)
-    mgrad = m_u * m_v * dx(scheme=quad_rule)
-    ffG = dot(grad(vp), grad(m_v)) * dx(scheme=quad_rule)
+    mgrad = m_u * m_v * dx(**quad_rule)
+    ffG = dot(grad(vp), grad(m_v)) * dx(**quad_rule)
     G = mgrad - ffG
     lhsG, rhsG = lhs(G), rhs(G)
     gradreg = Function(V)

@@ -1,8 +1,8 @@
 import scipy
 import numpy as np
-
 import firedrake as fd
 from firedrake import dot, grad
+from ..domains.quadrature import quadrature_rules
 
 
 def estimate_timestep(mesh, V, c, estimate_max_eigenvalue=True):
@@ -17,7 +17,9 @@ def estimate_timestep(mesh, V, c, estimate_max_eigenvalue=True):
     """
 
     u, v = fd.TrialFunction(V), fd.TestFunction(V)
-    dxlump = fd.dx(scheme="KMV", degree=V.ufl_element().degree())
+    quad_rule, _, _ = quadrature_rules(V)
+    dxlump = fd.dx(**quad_rule)
+
     A = fd.assemble(u * v * dxlump)
     ai, aj, av = A.petscmat.getValuesCSR()
     av_inv = []
@@ -39,14 +41,10 @@ def estimate_timestep(mesh, V, c, estimate_max_eigenvalue=True):
         # absolute maximum of diagonals
         max_eigval = np.amax(np.abs(Lsp.diagonal()))
     else:
-        print(
-            "Computing exact eigenvalues is extremely computationally \
-                demanding!",
-            flush=True,
-        )
+        print("Computing exact eigenvalues is extremely "
+              "computationally demanding!", flush=True)
         max_eigval = scipy.sparse.linalg.eigs(
-            Ksp, M=Asp, k=1, which="LM", return_eigenvectors=False
-        )[0]
+            Ksp, M=Asp, k=1, which="LM", return_eigenvectors=False)[0]
 
     # print(max_eigval)
     if np.sqrt(max_eigval) > 0.0:

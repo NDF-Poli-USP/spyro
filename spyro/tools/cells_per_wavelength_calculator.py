@@ -277,7 +277,7 @@ class Meshing_parameter_calculator:
         number_of_receivers = Wave_obj.number_of_receivers
         dt = Wave_obj.dt
         final_time = Wave_obj.final_time
-        num_t = int(final_time / dt + 1)
+        num_t = int(round(final_time / dt)) + 1
         analytical_solution = np.zeros((num_t, number_of_receivers))
 
         # Solving analytical solution for each receiver

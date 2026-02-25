@@ -28,7 +28,7 @@ def nodal_homogeneous_analytical(Wave_object, offset, c_value, n_extra=5000):
     # Generating extended ricker wavelet
     dt = Wave_object.dt
     final_time = Wave_object.final_time
-    num_t = int(final_time / dt + 1)
+    num_t = int(round(final_time / dt)) + 1
 
     extended_final_time = n_extra * final_time
 

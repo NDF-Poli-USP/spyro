@@ -6,11 +6,13 @@ from ...utils.typing import override
 
 
 class ElasticWave(Wave, metaclass=ABCMeta):
-    '''Base class for elastic wave propagators'''
+    '''
+    Base class for elastic wave propagators
+    '''
 
     def __init__(self, dictionary, comm=None):
         super().__init__(dictionary, comm=comm)
-        self.time = Constant(0)  # Time variable
+        self.time = Constant(0.)  # Time variable
 
     @override
     def _initialize_model_parameters(self):
