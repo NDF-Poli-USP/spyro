@@ -414,13 +414,13 @@ class HABC_Damping():
         # Critical damping coefficient
         eta_crt = 2 * np.pi * fundam_freq
         eta_max = psi_damp * eta_crt
-        parallel_print("Critical Damping Coefficient (1/s): {0:.5f}".format(eta_crt),
-              self.comm)
+        parallel_print(
+            f"Critical Damping Coefficient (1/s): {eta_crt:.5f}", self.comm)
 
         # Maximum damping ratio and coefficient
-        parallel_print("Maximum Damping Ratio: {0:.3%}".format(psi_damp), self.comm)
-        parallel_print("Maximum Damping Coefficient (1/s): {0:.5f}".format(eta_max),
-              self.comm)
+        parallel_print(f"Maximum Damping Ratio: {psi_damp:.3%}", self.comm)
+        parallel_print(
+            f"Maximum Damping Coefficient (1/s): {eta_max:.5f}", self.comm)
 
         # Minimum damping ratio and the associated heuristic factor
         psi_min, xCR_est, xCR_lim, CRmin = self.est_min_damping()
@@ -437,12 +437,14 @@ class HABC_Damping():
 
         # Minimum damping ratio and coefficient
         eta_min = psi_min * eta_crt
-        parallel_print("Minimum Damping Ratio: {:.3%}".format(psi_min), self.comm)
-        psi_str = "Range for Minimum Damping Ratio. Min:{:.5f} - Max:{:.5f}"
-        parallel_print(psi_str.format(xCR_inf * self.d_norm,
-                             xCR_sup * self.d_norm), self.comm)
-        parallel_print("Minimum Damping Coefficient (1/s): {0:.5f}".format(eta_min),
-              self.comm)
+        parallel_print(
+            "Minimum Damping Ratio: {:.3%}".format(psi_min), self.comm)
+        psi_str = "Range for Minimum Damping Ratio. " \
+            + f"Min:{xCR_inf * self.d_norm:.5f} - " \
+            + f"Max:{xCR_sup * self.d_norm:.5f}"
+        parallel_print(psi_str, self.comm)
+        parallel_print(
+            f"Minimum Damping Coefficient (1/s): {eta_min:.5f}", self.comm)
 
         # Heuristic factor and its range
         parallel_print(xcr_str.format(xCR), self.comm)
