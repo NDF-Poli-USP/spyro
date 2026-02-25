@@ -1,4 +1,5 @@
 import numpy as np
+from ..io.basicio import parallel_print
 from spyro.utils.error_management import value_parameter_error
 
 # Work from Ruben Andres Salas, Andre Luis Ferreira da Silva,
@@ -18,6 +19,9 @@ class HABC_Damping():
     ----------
     alpha : `float`
         Ratio between the representative mesh dimensions
+    comm : `object`
+            An object representing the communication interface
+            for parallel processing. Default is None
     d_norm : `float`
         Normalized element size (lmin / pad_len)
     dimension : `int`
@@ -43,7 +47,7 @@ class HABC_Damping():
     -------
     adim_reflection_parameters()
         Compute the adimensional parameters for the reflection coefficient
-    calc_damping_prop()
+    calc_damping_properties()
         Compute the damping properties for the absorbing layer
     coeff_damp_fun()
         Compute the coefficients for quadratic damping function
@@ -59,7 +63,7 @@ class HABC_Damping():
         Determine the initial search range for the heuristic factor xCR
     '''
 
-    def __init__(self, dom_lay, layer_par, mesh_par, wave_par, dimension=2):
+    def __init__(self, dom_lay, layer_par, mesh_par, wave_par, dimension=2, comm=None):
         '''
         Initialize the HABC_Damping class
 
@@ -87,12 +91,15 @@ class HABC_Damping():
             - c_bnd : Propagation speed at critical point with minimum Eikonal
         dimension : `int`, optional
             Model dimension (2D or 3D). Default is 2D
+        comm : `object`, optional
+            An object representing the communication interface
+            for parallel processing. Default is None
 
         Returns
         -------
         None
         '''
-
+        self.comm = comm  # dummy attribute for future comm use
         # Domain dimensions with layer
         self.Lx_habc = dom_lay[0]  # Length in x direction
         self.Lz_habc = dom_lay[1]  # Length in z direction
@@ -125,7 +132,7 @@ class HABC_Damping():
             - F_L : Size parameter of the absorbing layer
             - a : Adimensional propagation speed parameter (a = z / f).
         mesh_par : `tuple`
-            Mesh parameters. (lmin, lmax, alpha, variant)
+            Mesh parameters. (lmin, lmax)
             - lmin : Minimum mesh size
             - lmax : Maximum mesh size
         wave_par : `tuple`
@@ -374,7 +381,7 @@ class HABC_Damping():
 
         return psi_min, xCR_est, xCR_lim[:2], CRmin
 
-    def calc_damping_prop(self, fundam_freq, xCR_usu=None, psi_damp=0.999, m=1):
+    def calc_damping_properties(self, fundam_freq, xCR_usu=None, psi_damp=0.999, m=1):
         '''
         Compute the damping properties for the absorbing layer.
 
@@ -407,13 +414,13 @@ class HABC_Damping():
         # Critical damping coefficient
         eta_crt = 2 * np.pi * fundam_freq
         eta_max = psi_damp * eta_crt
-        print("Critical Damping Coefficient (1/s): {0:.5f}".format(eta_crt),
-              flush=True)
+        parallel_print("Critical Damping Coefficient (1/s): {0:.5f}".format(eta_crt),
+              self.comm)
 
         # Maximum damping ratio and coefficient
-        print("Maximum Damping Ratio: {0:.3%}".format(psi_damp), flush=True)
-        print("Maximum Damping Coefficient (1/s): {0:.5f}".format(eta_max),
-              flush=True)
+        parallel_print("Maximum Damping Ratio: {0:.3%}".format(psi_damp), self.comm)
+        parallel_print("Maximum Damping Coefficient (1/s): {0:.5f}".format(eta_max),
+              self.comm)
 
         # Minimum damping ratio and the associated heuristic factor
         psi_min, xCR_est, xCR_lim, CRmin = self.est_min_damping()
@@ -430,17 +437,17 @@ class HABC_Damping():
 
         # Minimum damping ratio and coefficient
         eta_min = psi_min * eta_crt
-        print("Minimum Damping Ratio: {:.3%}".format(psi_min), flush=True)
+        parallel_print("Minimum Damping Ratio: {:.3%}".format(psi_min), self.comm)
         psi_str = "Range for Minimum Damping Ratio. Min:{:.5f} - Max:{:.5f}"
-        print(psi_str.format(xCR_inf * self.d_norm,
-                             xCR_sup * self.d_norm), flush=True)
-        print("Minimum Damping Coefficient (1/s): {0:.5f}".format(eta_min),
-              flush=True)
+        parallel_print(psi_str.format(xCR_inf * self.d_norm,
+                             xCR_sup * self.d_norm), self.comm)
+        parallel_print("Minimum Damping Coefficient (1/s): {0:.5f}".format(eta_min),
+              self.comm)
 
         # Heuristic factor and its range
-        print(xcr_str.format(xCR), flush=True)
+        parallel_print(xcr_str.format(xCR), self.comm)
         xrg_str = "Range Values for xCR Factor. Min:{:.3f} - Max:{:.3f}"
-        print(xrg_str.format(xCR_inf, xCR_sup), flush=True)
+        parallel_print(xrg_str.format(xCR_inf, xCR_sup), self.comm)
 
         return eta_crt, psi_min, xCR, xCR_lim, CRmin
 
@@ -552,7 +559,7 @@ class HABC_Damping():
         xCR_max = np.clip(xCR_max * fmax, xCR_inf, xCR_sup)
 
         lim_str = "Initial Range for xCR Factor. Min:{:.3f} - Max:{:.3f}"
-        print(lim_str.format(xCR_min, xCR_max), flush=True)
+        parallel_print(lim_str.format(xCR_min, xCR_max), self.comm)
 
         # ToDo: Use for update xCR in FWI iterations
         return (xCR_min, xCR_max)

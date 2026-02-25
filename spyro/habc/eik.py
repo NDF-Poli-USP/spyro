@@ -210,7 +210,7 @@ class HABC_Eikonal(Eikonal_Modeling):
             bnds_str = ['Xmin Boundary', 'Xmax Boundary', 'Bottom Boundary',
                         'Ymin Boundary', 'Ymax Boundary', ]
 
-        print("\nIdentifying Critical Points on Boundaries")
+        print("\nIdentifying Critical Points on Boundaries", flush=True)
 
         # Loop over boundaries
         eik_bnd = []
@@ -231,7 +231,7 @@ class HABC_Eikonal(Eikonal_Modeling):
             c_bnd = np.float64(self.c.at(pt_cr).item())
 
             # Print critical point coordinates
-            print((eik_str + pnt_str).format(bnd_str, 1e3 * eikmin, *pt_cr))
+            print((eik_str + pnt_str).format(bnd_str, 1e3 * eikmin, *pt_cr), flush=True)
 
             # Identify closest source
             lref_allsou = np.linalg.norm(

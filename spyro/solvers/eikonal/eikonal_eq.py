@@ -326,7 +326,7 @@ class Eikonal_Modeling():
         Tolerance Types
         ---------------
         atol: F(x) ≤ atol
-        rtol: F(x) ≤ rtol∗F(x0)
+        rtol: F(x) ≤ rtol*F(x0)
         stol: || delta x || < stol*|| x ||
         haptol: lhs - rhs < haptol
         haptol < atol < rtol < stol

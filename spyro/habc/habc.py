@@ -849,7 +849,7 @@ class HABC_Wave(AcousticWave, HABC_Mesh, RectangLayer,
 
         # Compute the minimum damping ratio and the associated heuristic factor
         eta_crt, self.psi_min, self.xCR, self.xCR_lim, self.CRmin\
-            = self.calc_damping_prop(self.fundam_freq, xCR_usu=xCR_usu)
+            = self.calc_damping_properties(self.fundam_freq, xCR_usu=xCR_usu)
 
         # Mesh coordinates
         coords = fire.SpatialCoordinate(self.mesh)
