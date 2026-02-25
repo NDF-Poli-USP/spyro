@@ -1,10 +1,10 @@
 import firedrake as fire
 import numpy as np
-from netgen.geom2d import SplineGeometry
-from netgen.meshing import Element2D, \
-    Element3D, FaceDescriptor, Mesh, MeshPoint
-from scipy.spatial import cKDTree
-from spyro.utils.error_management import value_parameter_error
+# from netgen.geom2d import SplineGeometry
+# from netgen.meshing import Element2D, \
+#     Element3D, FaceDescriptor, Mesh, MeshPoint
+# from scipy.spatial import cKDTree
+# from spyro.utils.error_management import value_parameter_error
 
 # Work from Ruben Andres Salas, Andre Luis Ferreira da Silva,
 # Luis Fernando Nogueira de Sá, Emilio Carlos Nelli Silva.
