@@ -138,8 +138,10 @@ class Wave(Model_parameters, metaclass=ABCMeta):
         Set the mesh for the solver.
 
         Args:
-            user_mesh (optional): User-defined mesh. Defaults to None.
-            mesh_parameters (optional): Parameters for generating a mesh. Defaults to None.
+        user_mesh (optional):
+            User-defined mesh. Defaults to None.
+        mesh_parameters (optional):
+            Parameters for generating a mesh. Defaults to None.
         """
         super().set_mesh(
             user_mesh=user_mesh,
