@@ -36,6 +36,12 @@ def central_difference(wave, source_ids=[0]):
         for t in range(nt)
         if t % wave.gradient_sampling_frequency == 0
     ]
+    if wave.sources is not None and wave.use_vertex_only_mesh:
+        # source_cof is a cofunction that represents a point source,
+        # being one at a point and zero elsewhere.
+        source_cof = wave.sources.source_cofunction()
+        interpolate_receivers = wave.receivers.receiver_interpolator(
+            wave.vstate)
     usol_recv = []
     save_step = 0
 
@@ -47,16 +53,20 @@ def central_difference(wave, source_ids=[0]):
 
         # More efficient way of applying sources
         if wave.sources is not None:
-            f = wave.sources.apply_source(rhs_forcing, step)
             B0 = wave.rhs_no_pml()
-            B0 += f
-
+            if wave.use_vertex_only_mesh:
+                B0 += fire.assemble(
+                    wave.sources.wavelet[step] * source_cof)
+            else:
+                B0 += wave.sources.apply_source(rhs_forcing, step)
         wave.solver.solve(wave.next_vstate, wave.B)
 
         wave.prev_vstate = wave.vstate
         wave.vstate = wave.next_vstate
-
-        usol_recv.append(wave.get_receivers_output())
+        if wave.use_vertex_only_mesh:
+            usol_recv.append(fire.assemble(interpolate_receivers))
+        else:
+            usol_recv.append(wave.get_receivers_output())
 
         if step % wave.gradient_sampling_frequency == 0:
             usol[save_step].assign(wave.get_function())
@@ -77,11 +87,10 @@ def central_difference(wave, source_ids=[0]):
     usol_recv = helpers.fill(usol_recv, wave.receivers.is_local,
                              nt, wave.receivers.number_of_points)
     usol_recv = utils.utils.communicate(usol_recv, wave.comm)
-    wave.receivers_output = usol_recv
 
+    wave.receivers_output = usol_recv
     wave.forward_solution = usol
     wave.forward_solution_receivers = usol_recv
 
     wave.field_logger.stop_logging()
-
     return usol, usol_recv

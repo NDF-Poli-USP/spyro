@@ -249,10 +249,9 @@ class Model_parameters(Read_options, Read_boundary_layer,
             negative_z=self.input_dictionary["mesh"]["negative_z"]
         )
 
-        self.input_dictionary["acquisition"].setdefault(
-            "receiver_locations", None)
-        self.receiver_locations = self.input_dictionary[
-            "acquisition"]["receiver_locations"]
+        self.input_dictionary["acquisition"].setdefault("receiver_locations", None)
+        self.receiver_locations = self.input_dictionary["acquisition"]["receiver_locations"]
+        self.use_vertex_only_mesh = self.input_dictionary["acquisition"].get("use_vertex_only_mesh", False)
 
         # Check automatic adjoint
         self.input_dictionary["time_axis"].setdefault(
