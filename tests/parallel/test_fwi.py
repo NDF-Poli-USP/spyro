@@ -39,6 +39,7 @@ dictionary["acquisition"] = {
     "delay": 0.2,
     "delay_type": "time",
     "receiver_locations": spyro.create_transect((-1.45, 0.7), (-1.45, 1.3), 200),
+    "use_vertex_only_mesh": False,
 }
 dictionary["time_axis"] = {
     "initial_time": 0.0,  # Initial time for event
@@ -66,8 +67,9 @@ dictionary["inversion"] = {
 }
 
 
+@pytest.mark.parametrize("use_vertex_only_mesh", [False, True])
 @pytest.mark.parallel(6)
-def test_fwi(load_real_shot=False, use_rol=False):
+def test_fwi(use_vertex_only_mesh, load_real_shot=False, use_rol=False):
     """
     Run the Full Waveform Inversion (FWI) test.
 
@@ -75,6 +77,7 @@ def test_fwi(load_real_shot=False, use_rol=False):
     ----------
         load_real_shot (bool, optional): Whether to load a real shot record or not. Defaults to False.
     """
+    dictionary["acquisition"]["use_vertex_only_mesh"] = use_vertex_only_mesh
 
     # Setting up to run synthetic real problem
     if load_real_shot is False:
@@ -134,9 +137,9 @@ def test_fwi(load_real_shot=False, use_rol=False):
 @pytest.mark.skip()
 @pytest.mark.parallel(6)
 def test_fwi_with_rol(load_real_shot=False, use_rol=True):
-    test_fwi(load_real_shot=load_real_shot, use_rol=use_rol)
+    test_fwi(use_vertex_only_mesh=False, load_real_shot=load_real_shot, use_rol=use_rol)
 
 
 if __name__ == "__main__":
-    test_fwi(load_real_shot=False)
+    test_fwi(use_vertex_only_mesh=False, load_real_shot=False)
     test_fwi_with_rol()
