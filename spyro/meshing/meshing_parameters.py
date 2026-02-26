@@ -1,8 +1,27 @@
 import warnings
 import os
+from spyro.utils.error_management import value_parameter_error
 
 
 def cells_per_wavelength(method, degree, dimension):
+    '''
+    Returns recommended number of cells per wavelength based on method,
+    degree, and dimension of finite element model.
+
+    Parameters
+    ----------
+    method : str
+        The method used for meshing.
+    degree : int
+        The degree of the finite element.
+    dimension : int
+        The dimension of the mesh.
+
+    Returns
+    -------
+    float or None
+        Recommended number of cells per wavelength, or None if not specified.
+    '''
     cell_per_wavelength_dictionary = {
         'mass_lumped_triangle2dim2': 7.02,
         'mass_lumped_triangle3dim2': 3.70,
@@ -26,26 +45,40 @@ def cells_per_wavelength(method, degree, dimension):
 
 
 class MeshingParameters():
-    """
+    '''
     Class that handles mesh parameter logic and mesh type/length/file handling.
-    """
+    '''
 
     def __init__(self, input_mesh_dictionary=None, dimension=None,
                  source_frequency=None, comm=None, quadrilateral=False,
                  method=None, degree=None, velocity_model=None,
                  abc_pad_length=None, negative_z=True):
-        """
+        '''
         Initializes the MeshingParamaters class.
 
         Parameters
         ----------
-        mesh_dictionary : dict, optional
+        input_mesh_dictionary : dict, optional
             Dictionary containing mesh parameters.
-        dimension : int, optional
+        dimensional : int, optional
             Dimension of the mesh.
+        source_frequency : float, optional
+            Source frequency.
         comm : MPI communicator, optional
             MPI communicator.
-        """
+        quadrilateral : bool, optional
+            Whether to use quadrilateral elements. The default is False.
+        method : str, optional
+            Method for mesh generation.
+        degree : int, optional
+            Degree of the finite element.
+        velocity_model: str, optional.
+            File containing the velocity model.
+        abc_pad_length : float, optional
+            Length of the absorbing pad.
+        negative_z : bool, optional
+            Whether to use negative z coordinates. The default is True.
+        '''
         self.input_mesh_dictionary = input_mesh_dictionary or {}
         self.dimension = dimension
         self.comm = comm
@@ -60,8 +93,8 @@ class MeshingParameters():
         self.length_x = self.input_mesh_dictionary.get("Lx", None)
         self.length_y = self.input_mesh_dictionary.get("Ly", None)
         self.user_mesh = self.input_mesh_dictionary.get("user_mesh", None)
-        self.output_filename = self.input_mesh_dictionary.get("output_filename",
-                                                              "automatic_mesh.msh")
+        self.output_filename = self.input_mesh_dictionary.get(
+            "output_filename", "automatic_mesh.msh")
         self.source_frequency = source_frequency
         self.abc_pad_length = abc_pad_length
         self.degree = degree
@@ -76,9 +109,9 @@ class MeshingParameters():
         self.negative_z = negative_z
 
     def _set_length_with_unit_check(self, attr_name, value):
-        """
+        '''
         Checks if all dimensions are in the same unit (meters or km)
-        """
+        '''
         if value is not None:
             if value > 100:
                 new_unit = "meters"
@@ -90,12 +123,13 @@ class MeshingParameters():
             self._unit = new_unit
         elif new_unit != self._unit and value is not None:
             warnings.warn(
-                f"{attr_name} value ({value}) appears to be in {new_unit}, "
-                f"but the current unit is {self._unit}. Please check for consistency."
+                f"{attr_name} value ({value}) appears to be "
+                f"in {new_unit}, but the current unit is "
+                f"{self._unit}. Please check for consistency."
             )
-        if value is not None:
-            if value < 0.0:
-                raise ValueError(f"Please do not use negative value for {attr_name}")
+        if value is not None and value < 0.0:
+            raise ValueError(
+                f"Please do not use negative value for {attr_name}")
         setattr(self, attr_name, value)
 
     @property
@@ -117,9 +151,12 @@ class MeshingParameters():
     def edge_length(self, value):
         if self.cells_per_wavelength is not None:
             warnings.warn(
-                "Mutual exclusion: Both 'edge_length' and 'cells_per_wavelength' control mesh size, "
-                "but only one can be set at a time. Setting 'edge_length' will override and remove the "
-                "previously set 'cells_per_wavelength'. If you wish to use 'cells_per_wavelength' instead, "
+                "Mutual exclusion: Both 'edge_length' and "
+                "'cells_per_wavelength' control mesh size, "
+                "but only one can be set at a time. Setting "
+                "'edge_length' will override and remove the "
+                "previously set 'cells_per_wavelength'. If "
+                "you wish to use 'cells_per_wavelength' instead, "
                 "set it after setting 'edge_length'."
             )
             self.cells_per_wavelength = None
@@ -132,7 +169,8 @@ class MeshingParameters():
     @cells_per_wavelength.setter
     def cells_per_wavelength(self, value):
         if self.edge_length is not None:
-            warnings.warn("Setting cells_per_wavelength removes edge_length parameter")
+            warnings.warn("Setting cells_per_wavelength"
+                          "removes edge_length parameter")
             self.edge_length = None
         self._cells_per_wavelength = value
 
@@ -142,17 +180,15 @@ class MeshingParameters():
 
     @method.setter
     def method(self, value):
-        allowed_types = {
-            "mass_lumped_triangle",
-            "DG_triangle",
-            "spectral_quadrilateral",
-            "DG_quadrilateral",
-            "CG",
-        }
+        allowed_types = ["mass_lumped_triangle",
+                         "DG_triangle",
+                         "spectral_quadrilateral",
+                         "DG_quadrilateral",
+                         "CG"]
+
         if value is not None and value not in allowed_types:
-            raise ValueError(
-                f"method must be one of {allowed_types}, got '{value}'"
-            )
+            value_parameter_error('method', value, allowed_types)
+
         self._method = value
 
     @property
@@ -192,12 +228,15 @@ class MeshingParameters():
         if value is None:
             self._source_frequency = value
         elif not isinstance(value, (int, float)):
-            raise TypeError(f"Source frequency must be a number, got {type(value).__name__}")
+            raise TypeError("Source frequency must be a number"
+                            f", got {type(value).__name__}")
         else:
             if value < 1.5:
-                warnings.warn(f"Source frequency of {value} too low for realistic FWI case")
+                warnings.warn(f"Source frequency of {value} "
+                              "too low for realistic FWI case")
             elif value > 50:
-                warnings.warn(f"Source frequency of {value} too high for realistic FWI case, please low-pass filter")
+                warnings.warn(f"Source frequency of {value} too high for "
+                              "realistic FWI case, please low-pass filter")
             self._source_frequency = value
 
     @property
@@ -249,16 +288,15 @@ class MeshingParameters():
     @periodic.setter
     def periodic(self, value):
         if self.mesh_type != "firedrake_mesh" and value is True:
-            raise ValueError("Periodic meshes are only supported with Firedrake meshes for now.")
+            raise ValueError("Periodic meshes are only supported "
+                             "with Firedrake meshes for now.")
         self._periodic = value
 
-    def set_mesh(
-        self,
-        user_mesh=None,
-        input_mesh_parameters={},
-        abc_pad_length=None,
-    ):
-        """
+    def set_mesh(self,
+                 user_mesh=None,
+                 input_mesh_parameters={},
+                 abc_pad_length=None):
+        '''
         Set the mesh for the model.
 
         Parameters
@@ -266,18 +304,20 @@ class MeshingParameters():
         user_mesh : spyro.Mesh, optional
             The desired mesh. The default is None.
         input_mesh_parameters : dict, optional
-            Additional parameters for setting up the mesh. The default is an empty dictionary.
+            Additional parameters for setting up the mesh.
+            The default is an empty dictionary.
 
         Returns
         -------
         None
-        """
+        '''
         if abc_pad_length is not None:
             self.abc_pad_length = abc_pad_length
 
         # Setting default mesh parameters
         input_mesh_parameters.setdefault("periodic", self.periodic)
-        input_mesh_parameters.setdefault("minimum_velocity", self.minimum_velocity)
+        input_mesh_parameters.setdefault("minimum_velocity",
+                                         self.minimum_velocity)
         input_mesh_parameters.setdefault("length_z", self.length_z)
         input_mesh_parameters.setdefault("length_x", self.length_x)
         input_mesh_parameters.setdefault("length_y", self.length_y)
@@ -285,7 +325,8 @@ class MeshingParameters():
         input_mesh_parameters.setdefault("mesh_file", self.mesh_file)
         input_mesh_parameters.setdefault("dimension", self.dimension)
         input_mesh_parameters.setdefault("mesh_type", self.mesh_type)
-        input_mesh_parameters.setdefault("source_frequency", self.source_frequency)
+        input_mesh_parameters.setdefault("source_frequency",
+                                         self.source_frequency)
         input_mesh_parameters.setdefault("method", self.method)
         input_mesh_parameters.setdefault("degree", self.degree)
         input_mesh_parameters.setdefault("quadrilateral", self.quadrilateral)
