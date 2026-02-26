@@ -492,7 +492,7 @@ class HABC_Wave(AcousticWave, HABC_Mesh, RectangLayer,
 
         # Initializing the parent class for damping
         HABC_Damping.__init__(self, dom_lay_trunc, layer_par, mesh_par,
-                              wave_par, dimension=self.dimension)
+                              wave_par, dimension=self.dimension, comm=self.comm)
 
     def create_mesh_habc(self, inf_model=False, spln=True):
         '''

@@ -1,5 +1,6 @@
 import pytest
 import warnings
+import numpy as np
 import firedrake as fire
 import spyro.habc.habc as habc
 from spyro.utils.cost import comp_cost
@@ -242,10 +243,10 @@ def modal_fig8(Wave_obj, modal_solver_lst, fitting_c, exp_val_lst, n_root=1):
         name_cost = Wave_obj.path_case_habc + modal_solver + "_"
         comp_cost("tfin", tRef=tRef, user_name=name_cost)
 
-        cmp_str = f"Expected {expected_freq:.5f}, got = {self.fundam_freq:.5f}"
-        assert isclose(self.fundam_freq / expected_freq, 1., atol=5e-3), \
-            "❌ Fundamental Frequency 2D → " + cmp_str
-        print("✅ Fundamental Frequency 2D Verified: " + cmp_str, flush=True)
+        cmp_str = f"Expected {expected_freq:.5f}, got = {Wave_obj.fundam_freq:.5f}"
+        assert np.isclose(Wave_obj.fundam_freq / expected_freq, 1., atol=5e-3), \
+            "Fundamental Frequency 2D → " + cmp_str
+        print("Fundamental Frequency 2D Verified: " + cmp_str, flush=True)
 
 
 def test_loop_modal_2d():
