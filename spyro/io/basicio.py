@@ -11,6 +11,7 @@ import segyio
 import glob
 import os
 import warnings
+from ..utils.velocity_to_grid import change_scalar_field_resolution
 
 
 def delete_tmp_files(wave):
@@ -292,7 +293,7 @@ def ensemble_gradient(func):
     return wrapper
 
 
-def write_function_to_grid(function, V, grid_spacing, buffer=True):
+def write_function_to_grid(function, V, grid_spacing, buffer=False):
     """Interpolate a Firedrake function to a structured grid
 
     Parameters
