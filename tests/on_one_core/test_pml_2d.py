@@ -3,6 +3,7 @@ import numpy as np
 import time as timer
 import firedrake as fire
 import pickle
+import pytest
 
 
 def error_calc(p_numerical, p_analytical, nt):
@@ -105,6 +106,7 @@ def run_forward():
     return p_r, nt
 
 
+@pytest.mark.slow
 def test_pml():
     """Test that the second order time convergence
     of the central difference method is achieved"""

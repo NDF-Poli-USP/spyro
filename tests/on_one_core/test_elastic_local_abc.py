@@ -19,6 +19,7 @@ def has_sufficient_memory():
     return total_memory_gb > 16
 
 
+@pytest.mark.slow
 @pytest.mark.skipif(not has_sufficient_memory(), reason="Insufficient memory")
 def test_stacey_abc():
     wave = build_solver("Stacey", "backward")
@@ -35,6 +36,7 @@ def test_clayton_engquist_abc():
     assert last_mechanical_energy < expected_mechanical_energy
 
 
+@pytest.mark.slow
 @pytest.mark.skipif(not has_sufficient_memory(), reason="Insufficient memory")
 def test_with_central():
     wave = build_solver("Stacey", "central")
