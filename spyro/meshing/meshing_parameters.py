@@ -212,9 +212,8 @@ class MeshingParameters():
     def mesh_type(self, value):
         allowed_types = {"firedrake_mesh", "user_mesh", "SeismicMesh", "file"}
         if value is not None and value not in allowed_types:
-            raise ValueError(
-                f"mesh_type must be one of {allowed_types}, got '{value}'"
-            )
+            value_parameter_error('mesh_type', value, allowed_types)
+
         if value == "SeismicMesh" and self.quadrilateral:
             raise ValueError("SeismicMesh does not work with quads.")
         self._mesh_type = value
