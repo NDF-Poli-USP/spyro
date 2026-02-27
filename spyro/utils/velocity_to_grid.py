@@ -37,8 +37,8 @@ def change_scalar_field_resolution(scalar_field, wave_obj, grid_spacing):
     """
     CHange a scalar field to a different resolution with a grid (structured mesh).
 
-    This function creates a new structured mesh with the specified grid spacing 
-    and interpolates the velocity model from the original wave object onto this 
+    This function creates a new structured mesh with the specified grid spacing
+    and interpolates the velocity model from the original wave object onto this
     new mesh using continuous Galerkin (CG1) elements. The original object can
     be in any mesh type or degree order.
 
@@ -49,7 +49,7 @@ def change_scalar_field_resolution(scalar_field, wave_obj, grid_spacing):
     ----------
     scalar_field: FIredrake.function
     wave_obj : object
-        Wave object containing the original mesh parameters and initial 
+        Wave object containing the original mesh parameters and initial
         velocity model to be re-gridded.
     grid_spacing : float
         Desired grid spacing (edge length) for the new structured mesh resolution.
