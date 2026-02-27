@@ -1,19 +1,11 @@
-import spyro
 import numpy as np
-import math
-import pytest
+from scipy.interpolate import RegularGridInterpolator
+import spyro
+import firedrake as fire
 
 
-def error_calc(p_numerical, p_analytical, nt):
-    norm = np.linalg.norm(p_numerical, 2) / np.sqrt(nt)
-    error_time = np.linalg.norm(p_analytical - p_numerical, 2) / np.sqrt(nt)
-    div_error_time = error_time / norm
-    return div_error_time
-
-
-def run_forward(dt):
-    # dt = float(sys.argv[1])
-
+def test_velocity_to_grid():
+    np.random.seed(1)
     final_time = 1.0
     dx = 0.006546536707079771
 
@@ -59,7 +51,7 @@ def run_forward(dt):
     dictionary["time_axis"] = {
         "initial_time": 0.0,  # Initial time for event
         "final_time": final_time,  # Final time for event
-        "dt": dt,  # timestep size
+        "dt": 0.001,  # timestep size
         "amplitude": 1,  # the Ricker has an amplitude of 1.
         "output_frequency": 100,  # how frequently to output solution to pvds
         "gradient_sampling_frequency": 100,  # how frequently to save solution to RAM
@@ -74,49 +66,66 @@ def run_forward(dt):
         "gradient_filename": None,
     }
 
-    Wave_obj = spyro.AcousticWave(dictionary=dictionary)
-    Wave_obj.set_mesh(input_mesh_parameters={"edge_length": 0.02, "periodic": True})
+    wave_obj = spyro.AcousticWave(dictionary=dictionary)
+    wave_obj.set_mesh(input_mesh_parameters={"edge_length": 0.02})
+    z = wave_obj.mesh_z
+    x = wave_obj.mesh_x
+    zc = -1.5
+    xc = 1.5
+    rc = 0.7
+    cond = fire.conditional(
+        (z - zc) ** 2 + (x - xc) ** 2 < rc**2, 2.0, 1.5
+    )
+    wave_obj.set_initial_velocity_model(conditional=cond)
+    grid_velocity_data = spyro.utils.velocity_to_grid(wave_obj, 0.02)
 
-    Wave_obj.set_initial_velocity_model(constant=1.5)
-    Wave_obj.forward_solve()
+    vp = grid_velocity_data["vp_values"]
+    nz, nx = vp.shape
+    z_grid = np.linspace(-grid_velocity_data["length_z"], 0.0, nz, dtype=np.float32)
+    x_grid = np.linspace(0.0, grid_velocity_data["length_x"], nx, dtype=np.float32)
+    interpolator = RegularGridInterpolator(
+        (z_grid, x_grid), vp, bounds_error=False
+    )
 
-    rec_out = Wave_obj.receivers_output
+    # Generate random points inside and outside the circle
+    # Generate 5 random points inside the circle
+    points_inside = []
+    tol = 1e-5
+    while len(points_inside) < 5:
+        # Generate random point within a square around the circle
+        z_rand = np.random.uniform(zc - rc, zc + rc)
+        x_rand = np.random.uniform(xc - rc, xc + rc)
 
-    return rec_out
+        # Check if point is inside circle (excluding boundary)
+        distance_squared = (z_rand - zc)**2 + (x_rand - xc)**2
+        if distance_squared + tol < rc**2:  # Strictly inside (no boundary)
+            points_inside.append((z_rand, x_rand))
 
+    # Generate 5 random points outside the circle
+    points_outside = []
+    domain_z_min, domain_z_max = -3.0, 0.0
+    domain_x_min, domain_x_max = 0.0, 3.0
 
-@pytest.mark.slow
-def test_second_order_time_convergence():
-    """Test that the second order time convergence
-    of the central difference method is achieved"""
+    while len(points_outside) < 5:
+        # Generate random point within the domain
+        z_rand = np.random.uniform(domain_z_min, domain_z_max)
+        x_rand = np.random.uniform(domain_x_min, domain_x_max)
 
-    dts = [
-        0.0005,
-        0.0001,
-    ]
+        # Check if point is outside circle (excluding boundary)
+        distance_squared = (z_rand - zc)**2 + (x_rand - xc)**2
+        if distance_squared > rc**2 + tol:  # Strictly outside (no boundary)
+            points_outside.append((z_rand, x_rand))
 
-    analytical_files = [
-        "tests/inputfiles/analytical_solution_dt_0.0005.npy",
-        "tests/inputfiles/analytical_solution_dt_0.0001.npy",
-    ]
+    for point in points_inside:
+        velocity = float(interpolator(point))
+        assert np.isclose(velocity, 2.0)
 
-    numerical_results = []
-    errors = []
+    for point in points_outside:
+        velocity = float(interpolator(point))
+        assert np.isclose(velocity, 1.5)
 
-    for i in range(len(dts)):
-        dt = dts[i]
-        rec_out = run_forward(dt)
-        rec_anal = np.load(analytical_files[i])
-        time = np.linspace(0.0, 1.0, int(1.0 / dts[i]) + 1)
-        nt = len(time)
-        numerical_results.append(rec_out.flatten())
-        errors.append(error_calc(rec_out.flatten(), rec_anal, nt))
-
-    theory = [t**2 for t in dts]
-    theory = [errors[0] * th / theory[0] for th in theory]
-
-    assert math.isclose(np.log(theory[-1]), np.log(errors[-1]), rel_tol=1e-2)
+    print("END")
 
 
 if __name__ == "__main__":
-    test_second_order_time_convergence()
+    test_velocity_to_grid()

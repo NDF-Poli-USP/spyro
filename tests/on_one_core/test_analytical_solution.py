@@ -27,8 +27,8 @@ def test_analytical_solution(use_vertex_only_mesh):
         "pad_length": None,
     }
     dictionary["mesh"] = {
-        "Lz": 3.0,  # depth in km - always positive
-        "Lx": 3.0,  # width in km - always positive
+        "length_z": 3.0,  # depth in km - always positive
+        "length_x": 3.0,  # width in km - always positive
     }
     dictionary["acquisition"] = {
         "delay_type": "time",

@@ -1,9 +1,7 @@
-import importlib
-import pkgutil
+from .eikonal_eq import Dir_Point_BC, Eikonal_Modeling
 
-__all__ = []
-for module_info in pkgutil.walk_packages(__path__):
-    module_name = module_info.name
-    __all__.append(module_name)
-    module = importlib.import_module(f"{__name__}.{module_name}")
-    globals()[module_name] = module
+
+__all__ = [
+    "Dir_Point_BC",
+    "Eikonal_Modeling",
+]

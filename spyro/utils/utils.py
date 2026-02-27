@@ -2,9 +2,16 @@ import copy
 from firedrake import *  # noqa: F403
 import numpy as np
 from mpi4py import MPI
+import os
 from scipy.signal import butter, filtfilt
 import warnings
 from ..io import ensemble_functional
+from ..io import parallel_print
+try:
+    from SeismicMesh import write_velocity_model
+    SEISMIC_MESH_AVAILABLE = True
+except ImportError:
+    SEISMIC_MESH_AVAILABLE = False
 
 
 def butter_lowpass_filter(shot, cutoff, fs, order=2):
@@ -83,7 +90,6 @@ def mpi_init(model):
     # rank = myrank()
     # size = mysize()
     available_cores = COMM_WORLD.size  # noqa: F405
-    print(f"Parallelism type: {model.parallelism_type}", flush=True)
     if model.parallelism_type == "automatic":
         num_cores_per_propagation = available_cores / model.number_of_sources
         if available_cores % model.number_of_sources != 0:
@@ -98,6 +104,7 @@ def mpi_init(model):
         num_cores_per_propagation = available_cores / num_propagations
 
     comm_ens = Ensemble(COMM_WORLD, num_cores_per_propagation)  # noqa: F405
+    parallel_print(f"Parallelism type: {model.parallelism_type}", comm=comm_ens)
     return comm_ens
 
 
@@ -299,6 +306,66 @@ class Gradient_mask_for_pml(Mask):
             "x_max": x_max,
         }
         super().__init__(boundaries, Wave_obj)
+
+
+def run_in_one_core(func):
+    """Decorator to run something in serial if first argument has a comm object as an attribute"""
+
+    def wrapper(*args, **kwargs):
+        comm = args[0].comm
+        if comm is None:
+            return func(*args, **kwargs)
+        else:
+            if getattr(comm, "ensemble_comm", None) is not None:
+                if comm.ensemble_comm.rank == 0 and comm.comm.rank == 0:
+                    return func(*args, **kwargs)
+            elif getattr(comm, "rank", None) is not None:
+                if comm.rank == 0:
+                    return func(*args, **kwargs)
+
+    return wrapper
+
+
+def run_in_one_core_and_broadcast(func):
+    """Decorator to run something in serial on rank 0 and broadcast result to all cores"""
+
+    def wrapper(*args, **kwargs):
+        comm = args[0].comm
+        if comm is None:
+            return func(*args, **kwargs)
+        else:
+            result = None
+            if getattr(comm, "ensemble_comm", None) is not None:
+                # Handle ensemble communicator
+                if comm.ensemble_comm.rank == 0 and comm.comm.rank == 0:
+                    result = func(*args, **kwargs)
+                # Broadcast within ensemble
+                result = comm.ensemble_comm.bcast(result, root=0)
+                # Broadcast within spatial communicator
+                result = comm.comm.bcast(result, root=0)
+            elif getattr(comm, "rank", None) is not None:
+                # Handle regular communicator
+                if comm.rank == 0:
+                    result = func(*args, **kwargs)
+                result = comm.bcast(result, root=0)
+            return result
+
+    return wrapper
+
+
+@run_in_one_core_and_broadcast
+def write_hdf5_velocity_model(obj_with_comm, segy_filename):
+    if SEISMIC_MESH_AVAILABLE is False:
+        raise ValueError("Segy to HDF5 not yet implemented natively. Please install SeismicMesh")
+    vp_filename, vp_filetype = os.path.splitext(
+        segy_filename
+    )
+    warnings.warn("Converting segy file to hdf5")
+    write_velocity_model(
+        segy_filename, ofname=vp_filename
+    )
+    output_filename = vp_filename + ".hdf5"
+    return output_filename
 
 
 # def analytical_solution_for_pressure_based_on_MMS(model, mesh, time):

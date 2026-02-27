@@ -1,20 +1,26 @@
 name: Build Firedrake main
 
 on:
-  push:
-    branches:
-      - main
-  pull_request:
-    branches:
-      - main
   schedule:
     - cron: '0 0 * * 0'
-# on: [push, pull_request]
+  workflow_run:
+    workflows: ["Python tests"]
+    types:
+      - completed
 
 jobs:
   test:
     name: Install and test Firedrake (Linux)
     runs-on: self-hosted
+    # Only run if:
+    # 1. It's a scheduled run, OR
+    # 2. The Python tests workflow completed successfully on a PR or push to main
+    if: >
+      github.event_name == 'schedule' ||
+      (github.event_name == 'workflow_run' && 
+       github.event.workflow_run.conclusion == 'success' &&
+       (github.event.workflow_run.event == 'pull_request' || 
+        (github.event.workflow_run.event == 'push' && github.event.workflow_run.head_branch == 'main')))
 
     container:
       image: ubuntu:latest

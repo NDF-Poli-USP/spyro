@@ -105,9 +105,9 @@ class Dictionary_conversion:
         Convert the mesh section of dictionary
         """
         self.new_dictionary["mesh"] = {
-            "Lz": self.old_dictionary["mesh"]["Lz"],
-            "Lx": self.old_dictionary["mesh"]["Lx"],
-            "Ly": self.old_dictionary["mesh"]["Ly"],
+            "length_z": self.old_dictionary["mesh"]["Lz"],
+            "length_x": self.old_dictionary["mesh"]["Lx"],
+            "length_y": self.old_dictionary["mesh"]["Ly"],
             "mesh_file": self.old_dictionary["mesh"]["meshfile"],
         }
 

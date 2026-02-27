@@ -25,9 +25,9 @@ model["parallelism"] = {
 }
 
 model["mesh"] = {
-    "Lz": 8.0,  # depth in km - always positive
-    "Lx": 8.0,  # width in km - always positive
-    "Ly": 8.0,  # thickness in km - always positive
+    "length_z": 8.0,  # depth in km - always positive
+    "length_x": 8.0,  # width in km - always positive
+    "length_y": 8.0,  # thickness in km - always positive
     "meshfile": "not_used.msh",
     "initmodel": "not_used.hdf5",
     "truemodel": "not_used.hdf5",
@@ -82,9 +82,9 @@ elif model['opts']['degree'] == 3:
     M = 3.1
 
 edge_length = 0.286/M
-Real_Lz = model["mesh"]["Lz"] + model["BCs"]["lz"]
-Lx = model["mesh"]["Lx"]
-Ly = model["mesh"]["Ly"]
+Real_Lz = model["mesh"]["length_z"] + model["BCs"]["lz"]
+Lx = model["mesh"]["length_x"]
+Ly = model["mesh"]["length_y"]
 pad = model["BCs"]["lz"]
 
 bbox = (-Real_Lz, 0.0, -pad, Lx+pad, -pad, Ly+pad)

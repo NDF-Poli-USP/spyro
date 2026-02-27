@@ -56,9 +56,9 @@ def wave_dict(dt_usu, layer_shape, degree_layer,
     # 1.00 x 1.00 km domain and compute the size for the Absorbing Layer (AL)
     # to absorb outgoing waves on boundries (-z, +-x sides) of the domain.
     dictionary["mesh"] = {
-        "Lz": 1.0,  # depth in km - always positive
-        "Lx": 1.0,  # width in km - always positive
-        "Ly": 0.0,  # thickness in km - always positive
+        "length_z": 1.0,  # depth in km - always positive
+        "length_x": 1.0,  # width in km - always positive
+        "length_y": 0.0,  # thickness in km - always positive
         "mesh_type": "firedrake_mesh",
     }
 

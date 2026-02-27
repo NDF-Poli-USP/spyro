@@ -30,10 +30,7 @@ class MeshingParameters():
     Class that handles mesh parameter logic and mesh type/length/file handling.
     """
 
-    def __init__(self, input_mesh_dictionary=None, dimension=None,
-                 source_frequency=None, comm=None, quadrilateral=False,
-                 method=None, degree=None, velocity_model=None,
-                 abc_pad_length=None, negative_z=True):
+    def __init__(self, input_mesh_dictionary={}, dimension=None, source_frequency=None, comm=None, quadrilateral=False, method=None, degree=None, velocity_model=None, abc_pad_length=None, negative_z=True, use_defaults=True):
         """
         Initializes the MeshingParamaters class.
 
@@ -56,9 +53,9 @@ class MeshingParameters():
         self.method = method
         self.periodic = False
         self.mesh_file = self.input_mesh_dictionary.get("mesh_file", None)
-        self.length_z = self.input_mesh_dictionary.get("Lz", None)
-        self.length_x = self.input_mesh_dictionary.get("Lx", None)
-        self.length_y = self.input_mesh_dictionary.get("Ly", None)
+        self.length_z = self.input_mesh_dictionary.get("length_z", None)
+        self.length_x = self.input_mesh_dictionary.get("length_x", None)
+        self.length_y = self.input_mesh_dictionary.get("length_y", None)
         self.user_mesh = self.input_mesh_dictionary.get("user_mesh", None)
         self.output_filename = self.input_mesh_dictionary.get("output_filename",
                                                               "automatic_mesh.msh")
@@ -67,13 +64,16 @@ class MeshingParameters():
         self.degree = degree
         self.minimum_velocity = None
         self.velocity_model = velocity_model
-        self.automatic_mesh = self.mesh_type in {"firedrake_mesh",
-                                                 "SeismicMesh"}
+        self.automatic_mesh = self.mesh_type in {"firedrake_mesh", "SeismicMesh", "spyro_mesh"}
         self._edge_length = None
         self._cells_per_wavelength = None
         self.edge_length = None
         self.cells_per_wavelength = None
+        self.grid_velocity_data = None
+        self.gradient_mask = None
         self.negative_z = negative_z
+        if use_defaults:
+            self.set_mesh(input_mesh_parameters=input_mesh_dictionary)
 
     def _set_length_with_unit_check(self, attr_name, value):
         """
@@ -99,13 +99,28 @@ class MeshingParameters():
         setattr(self, attr_name, value)
 
     @property
+    def grid_velocity_data(self):
+        return self._grid_velocity_data
+
+    @grid_velocity_data.setter
+    def grid_velocity_data(self, value):
+        if value is not None:
+            necessary_keys = ["vp_values", "grid_spacing"]
+            for necessary_key in necessary_keys:
+                if necessary_key not in value:
+                    raise ValueError(f"Grid velocity data needs {necessary_key} key.")
+        self._grid_velocity_data = value
+
+    @property
     def output_filename(self):
         return self._output_filename
 
     @output_filename.setter
     def output_filename(self, value):
         if value is not None:
-            if not (isinstance(value, str) and value.endswith('.msh')):
+            if isinstance(value, str) and value.endswith('.vtk'):
+                warnings.warn("VTK meshes for visualization only, will not run a simulation.")
+            elif not (isinstance(value, str) and value.endswith('.msh')):
                 raise ValueError(f"mesh_file '{value}' must be a .msh file")
         self._output_filename = value
 
@@ -174,7 +189,7 @@ class MeshingParameters():
 
     @mesh_type.setter
     def mesh_type(self, value):
-        allowed_types = {"firedrake_mesh", "user_mesh", "SeismicMesh", "file"}
+        allowed_types = {"firedrake_mesh", "user_mesh", "SeismicMesh", "file", "spyro_mesh"}
         if value is not None and value not in allowed_types:
             raise ValueError(
                 f"mesh_type must be one of {allowed_types}, got '{value}'"
@@ -300,4 +315,4 @@ class MeshingParameters():
             if value is not None and hasattr(self, key):
                 setattr(self, key, value)
 
-        self.automatic_mesh = self.mesh_type in {"firedrake_mesh", "SeismicMesh"}
+        self.automatic_mesh = self.mesh_type in {"firedrake_mesh", "SeismicMesh", "spyro_mesh"}
