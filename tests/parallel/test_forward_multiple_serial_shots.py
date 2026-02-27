@@ -28,7 +28,7 @@ def test_forward_3_shots():
         "shot_ids_per_propagation": [[0], [1]],
     }
     dictionary["mesh"] = {
-        "length_z": 2.0,  # depth in km - always positive   # Como ver isso sem ler a malha?
+        "length_z": 2.0,  # depth in km - always positive
         "length_x": 2.0,  # width in km - always positive
         "length_y": 0.0,  # thickness in km - always positive
         "mesh_file": None,
@@ -47,7 +47,7 @@ def test_forward_3_shots():
         "final_time": final_time,  # Final time for event
         "dt": 0.0005,  # timestep size
         "amplitude": 1,  # the Ricker has an amplitude of 1.
-        "output_frequency": 100,  # how frequently to output solution to pvds - Perguntar Daiane ''post_processing_frequnecy'
+        "output_frequency": 100,  # how frequently to output solution to pvds
         "gradient_sampling_frequency": 1,
     }
     dictionary["visualization"] = {

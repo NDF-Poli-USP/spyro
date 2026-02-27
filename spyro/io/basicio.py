@@ -490,7 +490,6 @@ def interpolate(Model, fname, V):
         of the finite elements.
 
     """
-    sd = V.mesh().geometric_dimension()
     m = V.ufl_domain()
 
     add_pad = False
@@ -515,6 +514,7 @@ def interpolate(Model, fname, V):
     W = fire.VectorFunctionSpace(m, V.ufl_element())
     coords = fire.interpolate(m.coordinates, W)
     # (z,x) or (z,x,y)
+    sd = coords.dat.data.shape[1]
     if sd == 2:
         qp_z, qp_x = coords.dat.data[:, 0], coords.dat.data[:, 1]
     elif sd == 3:

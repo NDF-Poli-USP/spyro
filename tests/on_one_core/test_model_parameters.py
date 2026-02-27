@@ -43,12 +43,11 @@ dictionary["inversion"] = {
 dictionary["absorving_boundary_conditions"] = {
     "status": False,  # True or false
     "outer_bc": "non-reflective",  # None or non-reflective (outer boundary condition)
-    "damping_type": "PML",  # polynomial, hyperbolic, shifted_hyperbolic
+    "damping_type": "PML",  # PML, local, or hybrid
     "exponent": 2,  # damping layer has a exponent variation
     "cmax": 4.7,  # maximum acoustic wave velocity in PML - km/s
     "R": 1e-6,  # theoretical reflection coefficient
-    "pad_length": 0.25,  # thickness of the PML in the x-direction (km) - always positive
-    "ly": 0.0,  # thickness of the PML in the y-direction (km) - always positive
+    "pad_length": 0.25,  # thickness of the PML (km) - always positive
 }
 
 # Create a source injection operator. Here we use a single source with a
@@ -308,7 +307,7 @@ def test_dictionary_conversion():
     # Specify a 250-m PML on the three sides of the domain to damp outgoing waves.
     new_dictionary["absorving_boundary_conditions"] = {
         "status": True,  # True or false
-        "damping_type": "PML",  # polynomial, hyperbolic, shifted_hyperbolic
+        "damping_type": "PML",  # PML, local, or hybrid
         "exponent": 2,  # damping layer has a exponent variation
         "cmax": 4.7,  # maximum acoustic wave velocity in PML - km/s
         "R": 1e-6,  # theoretical reflection coefficient

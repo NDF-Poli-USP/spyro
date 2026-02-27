@@ -16,9 +16,10 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  build:
-
+  fast-tests:
+    name: Fast Tests
     runs-on: self-hosted
+    # Runs on all pushes and pull requests for quick feedback
 
     container:
       image: firedrakeproject/firedrake:2025.4.1
@@ -58,7 +59,53 @@ jobs:
     - name: Running serial fast tests
       run: |
         ./cleanup.sh
-        python3 -m pytest -n 8 --cov-report=xml --cov=spyro tests/on_one_core/ --skip-slow
+        python3 -m pytest -n 8 --cov-report=xml --cov=spyro tests/on_one_core/ --skip-slow --durations=10
+
+    - name: Post-run cleanup
+      if: always()
+      run: find . -delete
+
+  slow-tests:
+    name: Slow Tests and Parallel Tests
+    runs-on: self-hosted
+    needs: fast-tests
+    if: github.event_name == 'pull_request'
+    # Only runs on PRs after fast tests pass - saves resources
+
+    container:
+      image: firedrakeproject/firedrake:2025.4.1
+      options: --user root  # Ensures it can install packages if needed
+
+    steps:
+
+    - name: Pre-run cleanup
+        # Make sure the current directory is empty
+      run: find . -delete
+
+    - uses: actions/checkout@v4
+
+    - name: Install dependencies
+      run: |
+        apt-get update \
+        && apt-get -y install git python3 \
+        && apt-get -y install gmsh patchelf \
+        && pip3 install segyio \
+        && apt-get update && apt-get install -y libgmp3-dev libmpfr-dev libcgal-dev python3-tk \
+        && pip3 install --no-dependencies git+https://github.com/NDF-Poli-USP/SeismicMesh.git \
+        && pip3 install pyamg \
+        && pip3 install meshio \
+        && pip3 install -U memory_profiler \
+        && pip3 install pytest pytest-cov \
+        && pip3 install pytest-sugar
+
+    - name: Clear all firedrake-related caches
+      run: |
+        rm -rf ~/.cache/loopy \
+               ~/.loopy_kernel_cache \
+               ~/.cache/pyop2 \
+               ~/.cache/tsfc \
+               .pytest_cache
+        find . -name '*.pkl' -delete || true
 
     - name: Running serial slow tests
       run: |

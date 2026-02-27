@@ -54,7 +54,7 @@ def check_gradient(Wave_obj_guess, dJ, rec_out_exact, Jm, plot=False):
         J_plusdm = spyro.utils.compute_functional(Wave_obj_guess, misfit_plusdm)
 
         grad_fd = (J_plusdm - Jm) / (step)
-        projnorm = fire.assemble(dJ * dm * fire.dx(scheme=Wave_obj_guess.quadrature_rule))
+        projnorm = fire.assemble(dJ * dm * fire.dx(**Wave_obj_guess.quadrature_rule))
 
         error = np.abs(100 * ((grad_fd - projnorm) / projnorm))
 
@@ -107,7 +107,7 @@ def set_dictionary(PML=False):
     }
 
     dictionary["mesh"] = {
-        "length_z": 1.0,  # depth in km - always positive   # Como ver isso sem ler a malha?
+        "length_z": 1.0,  # depth in km - always positive
         "length_x": 1.0,  # width in km - always positive
         "length_y": 0.0,  # thickness in km - always positive
         "mesh_file": None,
@@ -119,7 +119,7 @@ def set_dictionary(PML=False):
         "source_locations": [(-0.1, 0.5)],
         "frequency": 5.0,
         "delay": 1.5,
-        "delay_type": "multiples_of_minimun",
+        "delay_type": "multiples_of_minimum",
         "receiver_locations": spyro.create_transect((-0.8, 0.1), (-0.8, 0.9), 10),
     }
 
@@ -128,8 +128,8 @@ def set_dictionary(PML=False):
         "final_time": final_time,  # Final time for event
         "dt": 0.0002,  # timestep size
         "amplitude": 1,  # the Ricker has an amplitude of 1.
-        "output_frequency": 100,  # how frequently to output solution to pvds - Perguntar Daiane ''post_processing_frequnecy'
-        "gradient_sampling_frequency": 1,  # how frequently to save solution to RAM    - Perguntar Daiane 'gradient_sampling_frequency'
+        "output_frequency": 100,  # how frequently to output solution to pvds
+        "gradient_sampling_frequency": 1,  # how frequently to save solution to RAM
     }
 
     dictionary["visualization"] = {
