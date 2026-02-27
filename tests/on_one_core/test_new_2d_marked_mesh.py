@@ -10,13 +10,13 @@ def test_2d_gradient_marked_mesh():
     frequency = 5.0
     cells_per_wavelength = 2.7
     input_mesh_parameters = {
-            "length_z": 2.0,
-            "length_x": 2.0,
-            "dimension": 2,
-            "mesh_type": "firedrake_mesh",
-            "output_filename": "trial01.msh",
-            "edge_length": 0.05,
-        }
+        "length_z": 2.0,
+        "length_x": 2.0,
+        "dimension": 2,
+        "mesh_type": "firedrake_mesh",
+        "output_filename": "trial01.msh",
+        "edge_length": 0.05,
+    }
 
     mesh_parameters = spyro.meshing.MeshingParameters(input_mesh_dictionary=input_mesh_parameters)
     meshing_obj = spyro.meshing.AutomaticMesh(mesh_parameters)
@@ -27,12 +27,12 @@ def test_2d_gradient_marked_mesh():
     r_c = 0.5
     center_z = -1.0
     center_x = 1.0
-    square_top_z   = -0.9
-    square_bot_z   = -1.1
-    square_left_x  = 0.9
+    square_top_z = -0.9
+    square_bot_z = -1.1
+    square_left_x = 0.9
     square_right_x = 1.1
     cond = fire.conditional((mesh_z-center_z)**2 + (mesh_x-center_x)**2 < r_c**2, circle_vp, outside_vp)
-    cond =  fire.conditional(
+    cond = fire.conditional(
         fire.And(
             fire.And(mesh_z < square_top_z, mesh_z > square_bot_z),
             fire.And(mesh_x > square_left_x, mesh_x < square_right_x)
@@ -47,13 +47,13 @@ def test_2d_gradient_marked_mesh():
 
     grid_spacing = 0.01
     input_mesh_parameters = {
-            "length_z": 2.0,
-            "length_x": 2.0,
-            "dimension": 2,
-            "mesh_type": "firedrake_mesh",
-            "output_filename": "trial.msh",
-            "edge_length": grid_spacing,
-        }
+        "length_z": 2.0,
+        "length_x": 2.0,
+        "dimension": 2,
+        "mesh_type": "firedrake_mesh",
+        "output_filename": "trial.msh",
+        "edge_length": grid_spacing,
+    }
 
     mesh_parameters = spyro.meshing.MeshingParameters(input_mesh_dictionary=input_mesh_parameters)
     meshing_obj = spyro.meshing.AutomaticMesh(mesh_parameters)
@@ -72,11 +72,11 @@ def test_2d_gradient_marked_mesh():
     mesh_parameters.grid_velocity_data = grid_velocity_data
 
     mask_boundaries = {
-            "z_min": -1.3,
-            "z_max": -0.7,
-            "x_min": 0.7,
-            "x_max": 1.3,
-        }
+        "z_min": -1.3,
+        "z_max": -0.7,
+        "x_min": 0.7,
+        "x_max": 1.3,
+    }
     mesh_parameters.gradient_mask = mask_boundaries
     mesh_parameters.cells_per_wavelength = cells_per_wavelength
     mesh_parameters.source_frequency = frequency

@@ -529,7 +529,7 @@ class FullWaveformInversion(AcousticWave):
             bounds=bounds,
             options=options,
         )
-        
+
         vp_end = fire.Function(self.function_space)
         vp_end.dat.data[:] = result.x
         self.vp_result = vp_end

@@ -1,6 +1,5 @@
 import firedrake as fire
 import warnings
-import os
 
 from .wave import Wave
 

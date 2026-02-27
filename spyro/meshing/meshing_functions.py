@@ -656,7 +656,7 @@ def build_big_rect_with_inner_element_group(mesh_parameters):
     # Create physical groups for boundary edges (for absorbing boundary conditions)
     for edge_tag, boundary_id in boundary_tag_map.items():
         # Set physical group ID explicitly to match ds() tags (1=top, 2=bottom, 3=right, 4=left)
-        pg_boundary = gmsh.model.addPhysicalGroup(1, [edge_tag], boundary_id)
+        pg_boundary = gmsh.model.addPhysicalGroup(1, [edge_tag], boundary_id)  # noqa: F841
         boundary_names = {1: "Top", 2: "Bottom", 3: "Right", 4: "Left"}
         gmsh.model.setPhysicalName(1, boundary_id, f"Boundary_{boundary_names.get(boundary_id, boundary_id)}")
         # This ensures ds(1), ds(2), ds(3), ds(4) work correctly
@@ -669,7 +669,7 @@ def build_big_rect_with_inner_element_group(mesh_parameters):
     for edge_tag, boundary_id in boundary_tag_map.items():
         boundary_names = {1: "Top", 2: "Bottom", 3: "Right", 4: "Left"}
         print(f"  Edge {edge_tag} -> Boundary {boundary_id} ({boundary_names.get(boundary_id, 'Unknown')})")
-    
+
     if mesh_parameters.gradient_mask is not None:
         print(f"Geometric surface tag      (Outer): {surf_tag}")
         print(f"Discrete surface tag       (Inner): {inner_surf_tag}")

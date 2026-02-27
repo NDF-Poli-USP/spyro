@@ -43,9 +43,9 @@ def ensemble_save(func):
     scenarions:
     - For ensemble parallelism or single source: iterates through propagations in
       each core and saves when the propagation is owned by the current rank.
-    - For spatial-only parallelism with multiple sources: loads shots from temporary 
-      files using the switch_serial_shot method and saves to named output files 
-    
+    - For spatial-only parallelism with multiple sources: loads shots from temporary
+      files using the switch_serial_shot method and saves to named output files
+
     Parameters:
     -----------
     func: The wrapped function that performs the actual saving operation.
@@ -53,12 +53,12 @@ def ensemble_save(func):
 
     Returns:
     --------
-    wrapper: A decorator function that wraps the original saving function with 
+    wrapper: A decorator function that wraps the original saving function with
         parallelism logic.
 
     Notes:
     ------
-    - Requires object to have attributes: comm, parallelism_type, number_of_sources, 
+    - Requires object to have attributes: comm, parallelism_type, number_of_sources,
       and shot_ids_per_propagation
     - Temporary files are loaded via switch_serial_shot() when using spatial-only parallelism
     """
@@ -80,7 +80,7 @@ def ensemble_save(func):
 
 def ensemble_load(func):
     """Decorator for loading shots for ensemble parallelism.
-    
+
     For spatial parallelism with multiple sources, loads from named files directly.
 
     Parameters:
@@ -90,7 +90,7 @@ def ensemble_load(func):
 
     Returns:
     --------
-    wrapper: A decorator function that wraps the original loading function with 
+    wrapper: A decorator function that wraps the original loading function with
         parallelism logic.
     """
     def wrapper(*args, **kwargs):
@@ -109,7 +109,7 @@ def ensemble_load(func):
 
 def ensemble_propagator(func):
     """Decorator for forward to distribute shots for ensemble parallelism
-    
+
     Parameters:
     -----------
     func: The wrapped function that performs the actual propagation operation.
@@ -117,7 +117,7 @@ def ensemble_propagator(func):
 
     Returns:
     --------
-    wrapper: A decorator function that wraps the original propagator function with 
+    wrapper: A decorator function that wraps the original propagator function with
         ensemble parallelism logic.
     """
 
@@ -150,13 +150,13 @@ def _shot_filename(propagation_id, wave, prefix='tmp', random_str_in_use=True):
     Parameters:
     -----------
     propagation_id (int): The index identifying the current propagation.
-    
+
     wave (object): A Wave object containing shot and communication information. Must have attributes:
         - shot_ids_per_propagation: A list or dict mapping propagation IDs to shot IDs.
         - comm: The current MPI communicator.
     prefix (str, optional): Prefix for the filename. Defaults to 'tmp'.
-    random_str_in_use (bool, optional): If True, includes a random string and communicator rank in 
-        the filename, gotten from the Wave object, and uses '.npy' extension. 
+    random_str_in_use (bool, optional): If True, includes a random string and communicator rank in
+        the filename, gotten from the Wave object, and uses '.npy' extension.
         If False, omits these and uses '.dat' extension. Defaults to True.
 
     Returns:
