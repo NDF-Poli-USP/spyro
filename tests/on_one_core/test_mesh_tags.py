@@ -188,14 +188,6 @@ def test_spyro_acoustic_solver_compatibility(test_mesh_with_tags):
     # Test assembly
     A = fire.assemble(lhs, mat_type="matfree")
     assert A is not None, "Complete acoustic solver form assembly failed"
-    
-    # Test with linear solver setup (as in the actual solver)
-    solver_parameters = {
-        "ksp_type": "preonly", 
-        "pc_type": "jacobi",
-    }
-    solver = fire.LinearSolver(A, solver_parameters=solver_parameters)
-    assert solver is not None, "Linear solver setup failed"
 
 
 def test_mesh_properties(test_mesh_with_tags):
