@@ -148,7 +148,7 @@ def test_invalid_mesh_type_raises():
             "mesh_type": "invalid_mesh_type",
         }
     }
-    with pytest.raises(ValueError, match="mesh_type must be one of"):
+    with pytest.raises(ValueError, match="Invalid mesh_type: 'invalid_mesh_type'."):
         spyro.meshing.MeshingParameters(
             input_mesh_dictionary=dictionary["mesh"],
             dimension=2,
@@ -168,7 +168,7 @@ def test_invalid_method_raises():
             "mesh_type": "firedrake_mesh",
         }
     }
-    with pytest.raises(ValueError, match="method must be one of"):
+    with pytest.raises(ValueError, match="Invalid method: 'invalid_method'."):
         spyro.meshing.MeshingParameters(
             input_mesh_dictionary=dictionary["mesh"],
             dimension=2,
