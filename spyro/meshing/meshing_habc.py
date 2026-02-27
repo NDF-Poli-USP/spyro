@@ -761,10 +761,6 @@ class HABC_Mesh():
 
         # Mesh is transformed into a firedrake mesh
         q = {"overlap_type": (fire.DistributedMeshOverlapType.NONE, 0)}
-        # if self.comm is None:
-        #     meshcomm = self.comm
-        # else:
-        #     meshcomm = 
         hyp_mesh = fire.Mesh(
             hyp_mesh, distribution_parameters=q, comm=self.comm.comm)
 
