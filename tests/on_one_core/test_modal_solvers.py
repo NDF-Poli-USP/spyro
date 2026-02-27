@@ -339,8 +339,8 @@ def modal_fig8(Wave_obj, modal_solver_lst, fitting_c, exp_val_lst, n_root=1):
         met_str += f"Method {modal_solver}"
         cmp_str = f"Expected {exp_freq:.5f}, got = {Wave_obj.fundam_freq:.5f}"
         assert np.isclose(Wave_obj.fundam_freq / exp_freq, 1., atol=5e-3), \
-            f"❌ " + met_str + "  → " + cmp_str
-        print(f"✅ " + met_str + " Verified: " + cmp_str, flush=True)
+            "❌ " + met_str + "  → " + cmp_str
+        print("✅ " + met_str + " Verified: " + cmp_str, flush=True)
 
 
 def test_loop_modal_2d():
@@ -461,20 +461,8 @@ def test_loop_modal_3d():
 
     # ============ HABC PARAMETERS ============
 
-    # Loop for HABC cases (True: Modal analysis, False: Hyperellipse degree)
-    loop_modeling = True
-
-    # n-th Root criterion for the size of the absorbing layer
-    n_root = 1
-
-    # Reference frequency
-    habc_ref_freq = "source"  # "boundary"
-
-    # Type of the hypereshape degree
-    degree_type = "real"  # "integer"
-
     # Hyperellipse degrees
-    degree_layer_lst = [None]  # [2.4, None]
+    degree_layer_lst = [2.4, None]
 
     # ============ MESH AND EIKONAL ============
 
