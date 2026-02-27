@@ -383,6 +383,9 @@ class Modal_Solver():
         # Integration measure
         dx = fire.dx(**quad_rule) if quad_rule else fire.dx
 
+        # State variable
+        u = fire.Function(V)
+
         if typ_homog == 'energy':
             # Equivalent velocity by energy-equivalent homogenization
 
@@ -390,7 +393,6 @@ class Modal_Solver():
             a, L = self.weak_forms(c, V, quad_rule=quad_rule, source=True)
 
             # Compute the energy
-            u = fire.Function(V)
             fire.solve(a == L, u)
             energy = fire.assemble(
                 fire.Constant(0.5) * c * c * fire.inner(fire.grad(u),
@@ -405,7 +407,8 @@ class Modal_Solver():
             # Equivalent velocity by volume-average homogenization
 
             # Compute the volume
-            volume = fire.assemble(fire.Constant(1.) * (c / c) * dx)
+            u.assign(1.)
+            volume = fire.assemble(u * dx)
 
             # Compute the equivalent velocity
             c_eq = fire.assemble(c * dx) / volume
