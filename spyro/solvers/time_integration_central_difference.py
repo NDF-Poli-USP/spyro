@@ -57,7 +57,7 @@ def central_difference(wave, source_ids=[0]):
                     wave.sources.wavelet[step] * source_cof))
             else:
                 wave.rhs_no_pml_source().assign(
-                wave.sources.apply_source(rhs_forcing, step))
+                    wave.sources.apply_source(rhs_forcing, step))
         wave.solver.solve()
 
         wave.prev_vstate = wave.vstate
