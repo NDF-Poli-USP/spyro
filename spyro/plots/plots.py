@@ -5,7 +5,7 @@ import numpy as np
 import firedrake
 import copy
 from ..io import ensemble_save
-from ..utils import change_vp_resolution
+from ..utils import change_scalar_field_resolution
 from spyro.utils.stats_tools import coeff_of_determination
 plt.rcParams.update({"font.family": "serif"})
 plt.rcParams['text.latex.preamble'] = r'\usepackage{bm} \usepackage{amsmath}'
@@ -169,7 +169,7 @@ def plot_model(Wave_object, filename="model.png",
     fig.set_figwidth = 9.0
     fig.set_figheight = 9.0
     if high_resolution:
-        vp_object, _ = change_vp_resolution(Wave_object, 0.01)
+        vp_object, _ = change_scalar_field_resolution(Wave_object, 0.01)
 
     else:
         vp_object = Wave_object.initial_velocity_model

@@ -1,6 +1,6 @@
 import firedrake as fire
 import numpy as np
-from spyro.solvers.eikonal.eikonal_eq import Eikonal_Modeling
+from ..solvers.eikonal.eikonal_eq import Eikonal_Modeling
 
 # Work from Ruben Andres Salas, Andre Luis Ferreira da Silva,
 # Luis Fernando Nogueira de Sá, Emilio Carlos Nelli Silva.

@@ -11,7 +11,6 @@ import segyio
 import glob
 import os
 import warnings
-from ..utils.velocity_to_grid import change_scalar_field_resolution
 
 
 def delete_tmp_files(wave):
