@@ -25,7 +25,7 @@ dictionary["parallelism"] = {
     "type": "automatic",  # options: automatic (same number of cores for evey processor) or spatial
 }
 dictionary["mesh"] = {
-    "length_z": 2.0,  # depth in km - always positive   # Como ver isso sem ler a malha?
+    "length_z": 2.0,  # depth in km - always positive
     "length_x": 2.0,  # width in km - always positive
     "length_y": 0.0,  # thickness in km - always positive
     "mesh_file": None,
@@ -39,14 +39,15 @@ dictionary["acquisition"] = {
     "delay": 0.2,
     "delay_type": "time",
     "receiver_locations": spyro.create_transect((-1.45, 0.7), (-1.45, 1.3), 200),
+    "use_vertex_only_mesh": False,
 }
 dictionary["time_axis"] = {
     "initial_time": 0.0,  # Initial time for event
     "final_time": final_time,  # Final time for event
     "dt": 0.001,  # timestep size
     "amplitude": 1,  # the Ricker has an amplitude of 1.
-    "output_frequency": 100,  # how frequently to output solution to pvds - Perguntar Daiane ''post_processing_frequnecy'
-    "gradient_sampling_frequency": 1,  # how frequently to save solution to RAM    - Perguntar Daiane 'gradient_sampling_frequency'
+    "output_frequency": 100,  # how frequently to output solution to pvds
+    "gradient_sampling_frequency": 1,  # how frequently to save solution to RAM
 }
 dictionary["visualization"] = {
     "forward_output": False,
@@ -66,8 +67,9 @@ dictionary["inversion"] = {
 }
 
 
+@pytest.mark.parametrize("use_vertex_only_mesh", [False, True])
 @pytest.mark.parallel(6)
-def test_fwi(load_real_shot=False, use_rol=False):
+def test_fwi(use_vertex_only_mesh, load_real_shot=False, use_rol=False):
     """
     Run the Full Waveform Inversion (FWI) test.
 
@@ -75,6 +77,7 @@ def test_fwi(load_real_shot=False, use_rol=False):
     ----------
         load_real_shot (bool, optional): Whether to load a real shot record or not. Defaults to False.
     """
+    dictionary["acquisition"]["use_vertex_only_mesh"] = use_vertex_only_mesh
 
     # Setting up to run synthetic real problem
     if load_real_shot is False:
@@ -134,9 +137,9 @@ def test_fwi(load_real_shot=False, use_rol=False):
 @pytest.mark.skip()
 @pytest.mark.parallel(6)
 def test_fwi_with_rol(load_real_shot=False, use_rol=True):
-    test_fwi(load_real_shot=load_real_shot, use_rol=use_rol)
+    test_fwi(use_vertex_only_mesh=False, load_real_shot=load_real_shot, use_rol=use_rol)
 
 
 if __name__ == "__main__":
-    test_fwi(load_real_shot=False)
+    test_fwi(use_vertex_only_mesh=False, load_real_shot=False)
     test_fwi_with_rol()

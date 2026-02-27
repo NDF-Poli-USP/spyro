@@ -180,11 +180,13 @@ class AutomaticMesh:
         if self.edge_length is None and self.cpw is not None:
             self.edge_length = calculate_edge_length(self.cpw, self.minimum_velocity, self.source_frequency)
         if self.abc_pad:
-            nx = int((self.length_x + 2*self.abc_pad) / self.edge_length)
-            nz = int((self.length_z + self.abc_pad) / self.edge_length)
+            nx = int(round((self.length_x + 2*self.abc_pad)
+                           / self.edge_length, 0))
+            nz = int(round((self.length_z + self.abc_pad)
+                           / self.edge_length, 0))
         else:
-            nx = int(self.length_x / self.edge_length)
-            nz = int(self.length_z / self.edge_length)
+            nx = int(round(self.length_x / self.edge_length, 0))
+            nz = int(round(self.length_z / self.edge_length, 0))
 
         if self.comm is not None:
             comm = self.comm.comm
@@ -217,9 +219,9 @@ class AutomaticMesh:
         Creates a 3D mesh based on Firedrake meshing utilities.
         """
         dx = self.edge_length
-        nx = int(self.length_x / dx)
-        nz = int(self.length_z / dx)
-        ny = int(self.length_y / dx)
+        nx = int(round(self.length_x / dx, 0))
+        nz = int(round(self.length_z / dx, 0))
+        ny = int(round(self.length_y / dx, 0))
 
         return BoxMesh(
             nz,

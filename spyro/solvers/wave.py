@@ -12,6 +12,7 @@ from ..io.field_logger import FieldLogger
 from .. import utils
 from ..receivers.Receivers import Receivers
 from ..sources.Sources import Sources
+from ..utils.typing import WaveType
 from .solver_parameters import get_default_parameters_for_method
 
 fire.set_log_level(fire.ERROR)
@@ -77,6 +78,7 @@ class Wave(Model_parameters, metaclass=ABCMeta):
         super().__init__(dictionary=dictionary, comm=comm)
         self.initial_velocity_model = None
         self.mask_available = False
+        self.wave_type = WaveType.NONE
 
         self.function_space = None
         self.forward_solution_receivers = None

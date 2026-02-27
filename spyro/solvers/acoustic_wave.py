@@ -15,8 +15,8 @@ from .acoustic_solver_construction_with_pml import (
 from .backward_time_integration import (
     backward_wave_propagator,
 )
-from ..domains.space import FE_method
-from ..utils.typing import override
+from ..domains.space import create_function_space
+from ..utils.typing import override, WaveType
 from ..utils import write_hdf5_velocity_model
 from .functionals import acoustic_energy
 
@@ -24,6 +24,7 @@ from .functionals import acoustic_energy
 class AcousticWave(Wave):
     def __init__(self, dictionary, comm=None):
         super().__init__(dictionary, comm=comm)
+        self.wave_type = WaveType.ISOTROPIC_ACOUSTIC
 
         self.acoustic_energy = None
         self.field_logger.add_functional(
@@ -188,7 +189,7 @@ class AcousticWave(Wave):
 
     @override
     def _create_function_space(self):
-        return FE_method(self.mesh, self.method, self.degree)
+        return create_function_space(self.mesh, self.method, self.degree)
 
     @override
     def rhs_no_pml(self):

@@ -206,7 +206,7 @@ class Model_parameters(Read_options, Read_boundary_layer, Read_time_axis, Read_o
         self.input_dictionary["acquisition"].setdefault("delay", 1.5)
         self.delay = self.input_dictionary["acquisition"]["delay"]
 
-        self.input_dictionary["acquisition"].setdefault("delay_type", "multiples_of_minimun")
+        self.input_dictionary["acquisition"].setdefault("delay_type", "multiples_of_minimum")
         self.delay_type = self.input_dictionary["acquisition"]["delay_type"]
 
         self.input_dictionary["acquisition"].setdefault("source_locations", None)
@@ -242,6 +242,7 @@ class Model_parameters(Read_options, Read_boundary_layer, Read_time_axis, Read_o
 
         self.input_dictionary["acquisition"].setdefault("receiver_locations", None)
         self.receiver_locations = self.input_dictionary["acquisition"]["receiver_locations"]
+        self.use_vertex_only_mesh = self.input_dictionary["acquisition"].get("use_vertex_only_mesh", False)
 
         # Check automatic adjoint
         self.input_dictionary["time_axis"].setdefault("output_frequency", 99999)
@@ -300,7 +301,7 @@ class Model_parameters(Read_options, Read_boundary_layer, Read_time_axis, Read_o
 
     @delay_type.setter
     def delay_type(self, value):
-        accepted_values = ["multiples_of_minimun", "time"]
+        accepted_values = ["multiples_of_minimum", "time"]
         _validate_enum(value, accepted_values, 'delay_type')
         self._delay_type = value
 

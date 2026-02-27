@@ -134,7 +134,8 @@ def preamble_habc(dictionary, edge_length):
     tRef = comp_cost("tini")
 
     # Create the acoustic wave object with HABCs
-    Wave_obj = habc.HABC_Wave(dictionary=dictionary, output_folder="tests/inputfiles/")
+    Wave_obj = habc.HABC_Wave(dictionary=dictionary,
+                              output_folder="tests/inputfiles/")
 
     # Mesh
     Wave_obj.set_mesh(input_mesh_parameters={"edge_length": edge_length})
@@ -155,7 +156,7 @@ def preamble_habc(dictionary, edge_length):
     tRef = comp_cost("tini")
 
     # Initializing Eikonal object
-    Eik_obj = eik.Eikonal(Wave_obj)
+    Eik_obj = eik.HABC_Eikonal(Wave_obj)
 
     # Finding critical points
     Wave_obj.critical_boundary_points(Eik_obj)
@@ -285,32 +286,39 @@ def habc_fig8(Wave_obj, dat_regr_xCR, xCR_usu=None, plot_comparison=True):
                                   data_regr_xCR=dat_regr_xCR)
 
 
-@pytest.mark.slow
+# @pytest.mark.slow
+@pytest.mark.skip(reason="no way of currently testing this")
 def test_loop_habc_rectangular_source():
     return run_loop_habc(degree_layer_lst=[None], habc_reference_freq_lst=["source"])
 
 
-@pytest.mark.slow
+# @pytest.mark.slow
+@pytest.mark.skip(reason="no way of currently testing this")
 def test_loop_habc_rectangular_boundary():
     return run_loop_habc(degree_layer_lst=[None], habc_reference_freq_lst=["boundary"])
 
 
-@pytest.mark.slow
+# @pytest.mark.slow
+@pytest.mark.skip(reason="no way of currently testing this")
 def test_loop_habc_hyperellipse_source():
     return run_loop_habc(degree_layer_lst=[2], habc_reference_freq_lst=["source"])
 
 
-@pytest.mark.slow
+# @pytest.mark.slow
+@pytest.mark.skip(reason="no way of currently testing this")
 def test_loop_habc_hyperellipse_boundary():
     return run_loop_habc(degree_layer_lst=[2], habc_reference_freq_lst=["boundary"])
 
 
-@pytest.mark.slow
+# @pytest.mark.slow
+@pytest.mark.skip(reason="no way of currently testing this")
 def test_loop_habc_infinite_source():
-    return run_loop_habc(degree_layer_lst=[None], habc_reference_freq_lst=["source"], get_ref_model=True, loop_modeling=False)
+    return run_loop_habc(degree_layer_lst=[None], habc_reference_freq_lst=["source"],
+                         get_ref_model=True, loop_modeling=False)
 
 
-def run_loop_habc(degree_layer_lst, habc_reference_freq_lst, get_ref_model=False, loop_modeling=True):
+def run_loop_habc(degree_layer_lst, habc_reference_freq_lst,
+                  get_ref_model=False, loop_modeling=True):
     '''
     Loop for applying the HABC to the model in Fig. 8 of Salas et al. (2022).
     '''

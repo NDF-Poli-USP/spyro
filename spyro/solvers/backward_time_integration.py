@@ -85,7 +85,7 @@ def backward_wave_propagator_no_pml(Wave_obj, dt=None):
     # Define a gradient problem
     m_u = fire.TrialFunction(Wave_obj.function_space)
     m_v = fire.TestFunction(Wave_obj.function_space)
-    
+
     if mask_available:
         # Use masked integration over inner region only
         mgrad = m_u * m_v * fire.dx(2, scheme=Wave_obj.quadrature_rule)

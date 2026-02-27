@@ -56,7 +56,7 @@ def test_misfit_2d():
         "source_locations": [(-0.5, 1.5)],
         "frequency": 5.0,
         "delay": 1.5,
-        "delay_type": "multiples_of_minimun",
+        "delay_type": "multiples_of_minimum",
         "receiver_locations": spyro.create_transect((-2.9, 0.1), (-2.9, 2.9), 100),
     }
 
@@ -66,8 +66,8 @@ def test_misfit_2d():
         "final_time": 1.00,  # Final time for event
         "dt": 0.001,  # timestep size
         "amplitude": 1,  # the Ricker has an amplitude of 1.
-        "output_frequency": 100,  # how frequently to output solution to pvds - Perguntar Daiane ''post_processing_frequnecy'
-        "gradient_sampling_frequency": 1,  # how frequently to save solution to RAM    - Perguntar Daiane 'gradient_sampling_frequency'
+        "output_frequency": 100,  # how frequently to output solution to pvds
+        "gradient_sampling_frequency": 1,  # how frequently to save solution to RAM
     }
     dictionary["visualization"] = {
         "forward_output": True,
