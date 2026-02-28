@@ -335,7 +335,8 @@ def modal_fig8(Wave_obj, modal_solver_lst, fitting_c, exp_val_lst, n_root=1):
         name_cost = Wave_obj.path_case_habc + modal_solver + "_"
         comp_cost("tfin", tRef=tRef, user_name=name_cost)
 
-        met_str = f"Fundamental Frequency {Wave_obj.dimension}D. "
+        lay_str = Wave_obj.path_case_habc.split("output/")[1].rstrip("/")[:-4]
+        met_str = f"Fundamental Frequency {lay_str} {Wave_obj.dimension}D. "
         met_str += f"Method {modal_solver}"
         cmp_str = f"Expected {exp_freq:.5f}, got = {Wave_obj.fundam_freq:.5f}"
         assert np.isclose(Wave_obj.fundam_freq / exp_freq, 1., atol=5e-2), \
@@ -498,6 +499,10 @@ def test_loop_modal_3d():
                           0.42562,
                           0.44942]
 
+    # modal_solver_lst = ['ANALYTICAL']
+    # expect_hypershape = [0.52709]
+    # expect_rectangular = [0.42136]
+
     expect_values_lst = [expect_hypershape, expect_rectangular]
 
     for degree_layer, exp_val_lst in zip(degree_layer_lst, expect_values_lst):
@@ -516,6 +521,11 @@ def test_loop_modal_3d():
 
         except fire.ConvergenceError as e:
             pytest.fail(f"Checking Modal 2D raised an exception: {str(e)}")
+
+
+if __name__ == "__main__":
+    test_loop_modal_2d()
+    test_loop_modal_3d()
 
 
 '''
