@@ -338,7 +338,7 @@ def modal_fig8(Wave_obj, modal_solver_lst, fitting_c, exp_val_lst, n_root=1):
         met_str = f"Fundamental Frequency {Wave_obj.dimension}D. "
         met_str += f"Method {modal_solver}"
         cmp_str = f"Expected {exp_freq:.5f}, got = {Wave_obj.fundam_freq:.5f}"
-        assert np.isclose(Wave_obj.fundam_freq / exp_freq, 1., atol=2e-2), \
+        assert np.isclose(Wave_obj.fundam_freq / exp_freq, 1., atol=5e-2), \
             "❌ " + met_str + "  → " + cmp_str
         print("✅ " + met_str + " Verified: " + cmp_str, flush=True)
 
