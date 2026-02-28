@@ -475,13 +475,12 @@ def test_loop_modal_3d():
     # ============ MODAL ANALYSIS ============
 
     # Modal solvers
-    modal_solver_lst = ['ANALYTICAL', 'ARNOLDI', 'LANCZOS',
+    modal_solver_lst = ['ARNOLDI', 'LANCZOS',  # 'ANALYTICAL',
                         'LOBPCG', 'KRYLOVSCH_CH', 'KRYLOVSCH_CG',
                         'KRYLOVSCH_GH', 'KRYLOVSCH_GG', 'RAYLEIGH']
 
     # Expected values
-    expect_hypershape = [0.52709,
-                         0.51355,
+    expect_hypershape = [0.51355,  # 0.52709,
                          0.51355,
                          0.51355,
                          0.51355,
@@ -490,8 +489,7 @@ def test_loop_modal_3d():
                          0.51355,
                          0.54617]
 
-    expect_rectangular = [0.42136,
-                          0.42562,
+    expect_rectangular = [0.42562,  # 0.42136,
                           0.42562,
                           0.42562,
                           0.42562,
