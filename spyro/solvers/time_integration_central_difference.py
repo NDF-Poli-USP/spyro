@@ -19,6 +19,11 @@ def central_difference(wave, source_ids=[0]):
     --------
         tuple:
             A tuple containing the forward solution and the receiver output.
+
+    Notes:
+    ------
+    Use ``LinearVariationalSolver`` with per-step source updates through
+    ``wave.rhs_no_pml_source()`` before ``wave.solver.solve()``.
     """
     if wave.sources is not None:
         wave.sources.current_sources = source_ids
@@ -45,17 +50,15 @@ def central_difference(wave, source_ids=[0]):
     for step in range(nt):
         # Basic way of applying sources
         wave.update_source_expression(t)
-        fire.assemble(wave.rhs, tensor=wave.B)
 
-        # More efficient way of applying sources
         if wave.sources is not None:
-            B0 = wave.rhs_no_pml()
             if wave.use_vertex_only_mesh:
-                B0 += fire.assemble(
-                    wave.sources.wavelet[step] * source_cof)
+                wave.rhs_no_pml_source().assign(fire.assemble(
+                    wave.sources.wavelet[step] * source_cof))
             else:
-                B0 += wave.sources.apply_source(rhs_forcing, step)
-        wave.solver.solve(wave.next_vstate, wave.B)
+                wave.rhs_no_pml_source().assign(
+                    wave.sources.apply_source(rhs_forcing, step))
+        wave.solver.solve()
 
         wave.prev_vstate = wave.vstate
         wave.vstate = wave.next_vstate
