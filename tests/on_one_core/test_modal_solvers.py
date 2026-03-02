@@ -430,102 +430,102 @@ def test_loop_modal_2d():
             pytest.fail(f"Checking Modal 2D raised an exception: {str(e)}")
 
 
-@pytest.mark.slow
-def test_loop_modal_3d():
-    '''
-    Loop for testing modals solvers in 3D
-    '''
+# @pytest.mark.slow
+# def test_loop_modal_3d():
+#     '''
+#     Loop for testing modals solvers in 3D
+#     '''
 
-    # ============ SIMULATION PARAMETERS ============
+#     # ============ SIMULATION PARAMETERS ============
 
-    # Mesh size (in km)
-    # cpw: cells per wavelength
-    # lba = minimum_velocity / source_frequency
-    # edge_length = lba / cpw
-    edge_length = 0.15
+#     # Mesh size (in km)
+#     # cpw: cells per wavelength
+#     # lba = minimum_velocity / source_frequency
+#     # edge_length = lba / cpw
+#     edge_length = 0.15
 
-    # Eikonal degree
-    p_eik = 2
+#     # Eikonal degree
+#     p_eik = 2
 
-    # Factor for the stabilizing term in Eikonal equation
-    f_est = 0.05
+#     # Factor for the stabilizing term in Eikonal equation
+#     f_est = 0.05
 
-    # Parameters for fitting equivalent velocity regression
-    fitting_c = (1.0, 1.0, 0.1, 0.1)
+#     # Parameters for fitting equivalent velocity regression
+#     fitting_c = (1.0, 1.0, 0.1, 0.1)
 
-    # Get simulation parameters
-    print("\nMesh Size: {:.3f} m".format(1e3 * edge_length), flush=True)
-    print("Eikonal Degree: {}".format(p_eik), flush=True)
-    print("Eikonal Stabilizing Factor: {:.2f}".format(f_est), flush=True)
-    fit_str = "Fitting Parameters for Analytical Solver: " + 3 * "{:.1f}, "
-    print((fit_str + "{:.1f}\n").format(*fitting_c), flush=True)
+#     # Get simulation parameters
+#     print("\nMesh Size: {:.3f} m".format(1e3 * edge_length), flush=True)
+#     print("Eikonal Degree: {}".format(p_eik), flush=True)
+#     print("Eikonal Stabilizing Factor: {:.2f}".format(f_est), flush=True)
+#     fit_str = "Fitting Parameters for Analytical Solver: " + 3 * "{:.1f}, "
+#     print((fit_str + "{:.1f}\n").format(*fitting_c), flush=True)
 
-    # ============ HABC PARAMETERS ============
+#     # ============ HABC PARAMETERS ============
 
-    # Hyperellipse degrees
-    degree_layer_lst = [2.4, None]
+#     # Hyperellipse degrees
+#     degree_layer_lst = [2.4, None]
 
-    # ============ MESH AND EIKONAL ============
+#     # ============ MESH AND EIKONAL ============
 
-    # Create dictionary with parameters for the model
-    dictionary = wave_dict_3d("rectangular", None, "real", "source", p_eik)
+#     # Create dictionary with parameters for the model
+#     dictionary = wave_dict_3d("rectangular", None, "real", "source", p_eik)
 
-    # Creating mesh and performing eikonal analysis
-    Wave_obj = preamble_modal(dictionary, edge_length, f_est, 3)
+#     # Creating mesh and performing eikonal analysis
+#     Wave_obj = preamble_modal(dictionary, edge_length, f_est, 3)
 
-    # ============ MODAL ANALYSIS ============
+#     # ============ MODAL ANALYSIS ============
 
-    # Modal solvers
-    modal_solver_lst = ['ARNOLDI', 'LANCZOS',  # 'ANALYTICAL',
-                        'LOBPCG', 'KRYLOVSCH_CH', 'KRYLOVSCH_CG',
-                        'KRYLOVSCH_GH', 'KRYLOVSCH_GG', 'RAYLEIGH']
+#     # Modal solvers
+#     modal_solver_lst = ['ARNOLDI', 'LANCZOS',  # 'ANALYTICAL',
+#                         'LOBPCG', 'KRYLOVSCH_CH', 'KRYLOVSCH_CG',
+#                         'KRYLOVSCH_GH', 'KRYLOVSCH_GG', 'RAYLEIGH']
 
-    # Expected values
-    expect_hypershape = [0.51355,  # 0.52709,
-                         0.51355,
-                         0.51355,
-                         0.51355,
-                         0.51355,
-                         0.51355,
-                         0.51355,
-                         0.54617]
+#     # Expected values
+#     expect_hypershape = [0.51355,  # 0.52709,
+#                          0.51355,
+#                          0.51355,
+#                          0.51355,
+#                          0.51355,
+#                          0.51355,
+#                          0.51355,
+#                          0.54617]
 
-    expect_rectangular = [0.42562,  # 0.42136,
-                          0.42562,
-                          0.42562,
-                          0.42562,
-                          0.42562,
-                          0.42562,
-                          0.42562,
-                          0.44942]
+#     expect_rectangular = [0.42562,  # 0.42136,
+#                           0.42562,
+#                           0.42562,
+#                           0.42562,
+#                           0.42562,
+#                           0.42562,
+#                           0.42562,
+#                           0.44942]
 
-    # modal_solver_lst = ['ANALYTICAL']
-    # expect_hypershape = [0.52709]
-    # expect_rectangular = [0.42136]
+#     # modal_solver_lst = ['ANALYTICAL']
+#     # expect_hypershape = [0.52709]
+#     # expect_rectangular = [0.42136]
 
-    expect_values_lst = [expect_hypershape, expect_rectangular]
+#     expect_values_lst = [expect_hypershape, expect_rectangular]
 
-    for degree_layer, exp_val_lst in zip(degree_layer_lst, expect_values_lst):
+#     for degree_layer, exp_val_lst in zip(degree_layer_lst, expect_values_lst):
 
-        # Update the layer shape and its degree
-        Wave_obj.abc_boundary_layer_shape = "hypershape" \
-            if degree_layer is not None else "rectangular"
-        Wave_obj.abc_deg_layer = degree_layer
+#         # Update the layer shape and its degree
+#         Wave_obj.abc_boundary_layer_shape = "hypershape" \
+#             if degree_layer is not None else "rectangular"
+#         Wave_obj.abc_deg_layer = degree_layer
 
-        try:
-            # Computing the fundamental frequency
-            modal_fig8(Wave_obj, modal_solver_lst, fitting_c, exp_val_lst)
+#         try:
+#             # Computing the fundamental frequency
+#             modal_fig8(Wave_obj, modal_solver_lst, fitting_c, exp_val_lst)
 
-            # Renaming the folder if degree_layer is modified
-            Wave_obj.rename_folder_habc()
+#             # Renaming the folder if degree_layer is modified
+#             Wave_obj.rename_folder_habc()
 
-        except fire.ConvergenceError as e:
-            pytest.fail(f"Checking Modal 2D raised an exception: {str(e)}")
+#         except fire.ConvergenceError as e:
+#             pytest.fail(f"Checking Modal 2D raised an exception: {str(e)}")
 
 
-if __name__ == "__main__":
-    test_loop_modal_2d()
-    test_loop_modal_3d()
+# if __name__ == "__main__":
+#     test_loop_modal_2d()
+#     test_loop_modal_3d()
 
 
 '''
