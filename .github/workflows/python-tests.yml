@@ -59,7 +59,6 @@ jobs:
     - name: Running serial fast tests
       run: |
         ./cleanup.sh
-        #python3 -m pytest -n 8 --cov-report=xml --cov=spyro tests/on_one_core/ --skip-slow --durations=10
         python3 -m pytest -n 8 --cov-report=xml --cov=spyro -s tests/on_one_core/test_modal_solvers.py   
 
     - name: Post-run cleanup
