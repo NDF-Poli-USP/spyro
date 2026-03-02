@@ -70,7 +70,6 @@ def construct_solver_or_matrix_with_pml_2d(Wave_object):
 
     Wave_object.lhs = fire.lhs(FF)
     Wave_object.rhs = fire.rhs(FF)
-    Wave_object.B = fire.Cofunction(W.dual())
     Wave_object.source_function = fire.Cofunction(W.dual())
 
     lin_var = fire.LinearVariationalProblem(
