@@ -59,7 +59,13 @@ jobs:
     - name: Running serial fast tests
       run: |
         ./cleanup.sh
-        python3 -m pytest -n 8 --cov-report=xml --cov=spyro -vv --capture=tee-sys tests/on_one_core/test_modal_solvers.py > /home/olender/logs/pytest.log 2>&1
+        python3 -m pytest -n 8 \
+        --cov-report=xml \
+        --cov=spyro \
+        -vv \
+        --capture=tee-sys \
+        tests/on_one_core/test_modal_solvers.py \
+        > /home/olender/logs/pytest.log 2>&1
 
     - name: Post-run cleanup
       if: always()
