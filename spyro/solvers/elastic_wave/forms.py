@@ -1,5 +1,6 @@
-from firedrake import (assemble, Cofunction, Constant, div, dot, dx, grad,
-                       inner, lhs, LinearSolver, rhs, TestFunction, TrialFunction)
+from firedrake import (Cofunction, Constant, LinearVariationalProblem,
+                       LinearVariationalSolver, div, dot, dx, grad, inner,
+                       lhs, rhs, TestFunction, TrialFunction)
 
 from .local_abc import local_abc_form
 
@@ -35,11 +36,22 @@ def isotropic_elastic_without_pml(wave):
     F = F_m + F_k - F_s - F_t
 
     wave.lhs = lhs(F)
-    A = assemble(wave.lhs, bcs=wave.bcs, mat_type="matfree")
-    wave.solver = LinearSolver(A, solver_parameters=wave.solver_parameters)
-
     wave.rhs = rhs(F)
     wave.B = Cofunction(V.dual())
+    wave.source_function = Cofunction(V.dual())
+
+    lin_var = LinearVariationalProblem(
+        wave.lhs,
+        wave.rhs + wave.source_function,
+        wave.u_np1,
+        bcs=wave.bcs,
+        constant_jacobian=True,
+    )
+    solver_parameters = dict(wave.solver_parameters)
+    solver_parameters["mat_type"] = "matfree"
+    wave.solver = LinearVariationalSolver(
+        lin_var, solver_parameters=solver_parameters
+    )
 
 
 def isotropic_elastic_with_pml():
