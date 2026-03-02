@@ -79,7 +79,6 @@ def construct_solver_or_matrix_no_pml(Wave_object):
     form = m1 + a + le
     Wave_object.rhs = fire.rhs(form)
     Wave_object.lhs = fire.lhs(form)
-    Wave_object.B = fire.Cofunction(V.dual())
 
     Wave_object.source_function = fire.Cofunction(V.dual())
 
