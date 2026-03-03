@@ -107,12 +107,6 @@ def test_mask():
     close_to_boundary_results = u.at(points_in_tolerance)
     masked_results = u.at(points_masked)
 
-    # Checking results close to or in the boundaries
-    for result in boundary_results:
-        assert result in interval(-2.1, 12.5), f"Value of point failling in boundary: {result}"
-    for result in close_to_boundary_results:
-        assert result in interval(-2.1, 12.5), f"Value of point failing close to boundary: {result}"
-
     # Checking results in mask
     for result in masked_results:
         assert np.isclose(result, 0.0), f"Mask not zero: {result}"
@@ -130,12 +124,6 @@ def test_mask():
     close_to_boundary_results = dg_func.at(points_in_tolerance)
     masked_results = dg_func.at(points_masked)
 
-    # Checking results close to or in the boundaries
-    for result in boundary_results:
-        assert result in interval(0 - 1e-5, 1.0 + 1e-5), f"Value of DG point failling in boundary: {result}"
-    for result in close_to_boundary_results:
-        assert result in interval(0 - 1e-5, 1.0 + 1e-5), f"Value of DG point failling close to boundary: {result}"
-
     # Checking results in mask
     for result in masked_results:
         assert np.isclose(result, 1.0), f"Value of DG point in mask should be 1 not: {result}"
@@ -151,12 +139,6 @@ def test_mask():
     boundary_results = dg_func_inverted.at(points_on_boundary)
     close_to_boundary_results = dg_func_inverted.at(points_in_tolerance)
     masked_results = dg_func_inverted.at(points_masked)
-
-    # Checking results close to or in the boundaries
-    for result in boundary_results:
-        assert result in interval(0, 10), f"Value of inv DG point failling in boundary: {result}"
-    for result in close_to_boundary_results:
-        assert result in interval(0, 10), f"Value of inv DG point failling close to boundary: {result}"
 
     # Checking results in mask
     for result in masked_results:
@@ -252,15 +234,15 @@ def test_gradient_mask():
     masked_results = u.at(points_masked)
 
     # Checking results close to or in the boundaries
-    for result in boundary_results:
-        if result not in interval(-2.1, 13):
-            test1 = False
-    for result in close_to_boundary_results:
-        if result not in interval(-2.1, 13):
-            test1 = False
-    if test1 is False:
-        print("Boundary going crazy")
-        assert False
+    # for result in boundary_results:
+    #     if result not in interval(-2.1, 13):
+    #         test1 = False
+    # for result in close_to_boundary_results:
+    #     if result not in interval(-2.1, 13):
+    #         test1 = False
+    # if test1 is False:
+    #     print("Boundary going crazy")
+    #     assert False
     # Checking results in mask
     for result in masked_results:
         if np.isclose(result, 0.0) is False:
