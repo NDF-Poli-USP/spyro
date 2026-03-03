@@ -57,15 +57,6 @@ def test_velocity_to_grid():
         "gradient_sampling_frequency": 100,  # how frequently to save solution to RAM
     }
 
-    dictionary["visualization"] = {
-        "forward_output": True,
-        "forward_output_filename": "results/forward_output.pvd",
-        "fwi_velocity_model_output": False,
-        "velocity_model_filename": None,
-        "gradient_output": False,
-        "gradient_filename": None,
-    }
-
     wave_obj = spyro.AcousticWave(dictionary=dictionary)
     wave_obj.set_mesh(input_mesh_parameters={"edge_length": 0.02})
     z = wave_obj.mesh_z
@@ -73,8 +64,10 @@ def test_velocity_to_grid():
     zc = -1.5
     xc = 1.5
     rc = 0.7
+    vmax = 2.0
+    vmin = 1.5
     cond = fire.conditional(
-        (z - zc) ** 2 + (x - xc) ** 2 < rc**2, 2.0, 1.5
+        (z - zc) ** 2 + (x - xc) ** 2 < rc**2, vmax, vmin
     )
     wave_obj.set_initial_velocity_model(conditional=cond)
     grid_velocity_data = spyro.utils.velocity_to_grid(wave_obj, 0.02)
@@ -118,11 +111,11 @@ def test_velocity_to_grid():
 
     for point in points_inside:
         velocity = float(interpolator(point))
-        assert np.isclose(velocity, 2.0)
+        assert np.isclose(velocity, vmax)
 
     for point in points_outside:
         velocity = float(interpolator(point))
-        assert np.isclose(velocity, 1.5)
+        assert np.isclose(velocity, vmin)
 
     print("END")
 
