@@ -3,12 +3,15 @@ import numpy as np
 import firedrake as fire
 
 
-def test_2d_gradient_marked_mesh():
+def test_2d_wave_adapted_marked_mesh():
+    # Making a firedrake type mesh to store the initial
+    # velocity model. This isnt the velocity grid we will use
+    # in the interpolation. Rather it is a velocity model
+    # that has to be converted into the velocity grid for interpolation
     outside_vp = 1.5
     circle_vp = 2.0
     square_vp = 3.0
     frequency = 5.0
-    cells_per_wavelength = 2.7
     input_mesh_parameters = {
         "length_z": 2.0,
         "length_x": 2.0,
@@ -40,11 +43,19 @@ def test_2d_gradient_marked_mesh():
         square_vp,
         cond,
     )
+
+    # This is the velocity model used
+    # it was generated with a coarses mesh on a MLT4tri element
+    # similar to the control variable calculated internally in
+    # a multiscale FWI process
     u_ho = fire.Function(V_ho)
     u_ho.interpolate(cond)
     output_file = fire.VTKFile("debug_ho.pvd")
     output_file.write(u_ho)
 
+
+    # Making a grid like the one we can use to save a .segy file
+    # this is usually 0.01 or 0.02 km on a structured mesh
     grid_spacing = 0.01
     input_mesh_parameters = {
         "length_z": 2.0,
@@ -64,25 +75,34 @@ def test_2d_gradient_marked_mesh():
     output_file = fire.VTKFile("debug.pvd")
     output_file.write(u)
 
+    # Creading a grid velocity data dictionary, this can be used to7
+    # create a wave-adapted mesh later on and is similar to the data
+    # read from a segy file
     z = spyro.io.write_function_to_grid(u, V, grid_spacing, buffer=True)
     grid_velocity_data = {
         "vp_values": z,
         "grid_spacing": grid_spacing,
     }
+    # This below is the attribute that the mesh_parameters object uses for
+    # any mesh adaption currently programmed in spyro
     mesh_parameters.grid_velocity_data = grid_velocity_data
 
+    # Let us add our mask boundaries
     mask_boundaries = {
         "z_min": -1.3,
         "z_max": -0.7,
         "x_min": 0.7,
         "x_max": 1.3,
     }
+    cells_per_wavelength = 2.7
     mesh_parameters.gradient_mask = mask_boundaries
     mesh_parameters.cells_per_wavelength = cells_per_wavelength
     mesh_parameters.source_frequency = frequency
     mesh_parameters.mesh_type = "spyro_mesh"
     meshing_obj = spyro.meshing.AutomaticMesh(mesh_parameters)
-    mesh = meshing_obj.create_mesh()
+    mesh = meshing_obj.create_mesh() # This is our mesh adapted to the velocity model
+
+    ## LEt us check if our wave adapted mesh is wave adapted
 
     # Getting mesh cell diameters
     V = fire.FunctionSpace(mesh, "CG", 1)
@@ -106,7 +126,8 @@ def test_2d_gradient_marked_mesh():
     # Checking largest value
     assert (expected_circle_cd < reduced_cd[-1]) and (reduced_cd[-1] < expected_square_cd)
 
-    # Checking mask
+    ## Let us check mask if the mask was applied
+
     dx = fire.dx
     V = fire.FunctionSpace(mesh, "DG", 0)
     u = fire.Function(V)
@@ -130,4 +151,4 @@ def test_2d_gradient_marked_mesh():
 
 
 if __name__ == "__main__":
-    test_2d_gradient_marked_mesh()
+    test_2d_wave_adapted_marked_mesh()
