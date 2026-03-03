@@ -53,7 +53,6 @@ def test_2d_wave_adapted_marked_mesh():
     output_file = fire.VTKFile("debug_ho.pvd")
     output_file.write(u_ho)
 
-
     # Making a grid like the one we can use to save a .segy file
     # this is usually 0.01 or 0.02 km on a structured mesh
     grid_spacing = 0.01
@@ -100,9 +99,10 @@ def test_2d_wave_adapted_marked_mesh():
     mesh_parameters.source_frequency = frequency
     mesh_parameters.mesh_type = "spyro_mesh"
     meshing_obj = spyro.meshing.AutomaticMesh(mesh_parameters)
-    mesh = meshing_obj.create_mesh() # This is our mesh adapted to the velocity model
+    mesh = meshing_obj.create_mesh()  # This is our mesh adapted to the velocity model
 
-    ## LEt us check if our wave adapted mesh is wave adapted
+    # LEt us check if our wave adapted mesh is wave adapted
+    # ---------------------------------------------------------
 
     # Getting mesh cell diameters
     V = fire.FunctionSpace(mesh, "CG", 1)
@@ -126,7 +126,8 @@ def test_2d_wave_adapted_marked_mesh():
     # Checking largest value
     assert (expected_circle_cd < reduced_cd[-1]) and (reduced_cd[-1] < expected_square_cd)
 
-    ## Let us check mask if the mask was applied
+    # Let us check mask if the mask was applied
+    # ------------------------------------------------
 
     dx = fire.dx
     V = fire.FunctionSpace(mesh, "DG", 0)
