@@ -11,5 +11,5 @@ __all__ = [
     "AcousticWaveMMS",
     "FullWaveformInversion",
     "elastic_wave",
-    "AutomaticDifferentiationSolver",
+    "SpyroReducedFunctional",
 ]

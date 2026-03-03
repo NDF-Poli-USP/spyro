@@ -1,8 +1,9 @@
 import firedrake.adjoint as fire_adj
 import firedrake as fire
+from pyadjoint import ReducedFunctional
 
 
-class AutomaticDifferentiationSolver:
+class SpyroReducedFunctional(ReducedFunctional):
     """Automatic differentiation solver for seismic inversion.
 
     This class provides an interface to compute the gradient of a functional
@@ -20,17 +21,13 @@ class AutomaticDifferentiationSolver:
     def __init__(self, functional, control):
         self.gradient = None
         self._control = control
-        self._reduced_functional = fire_adj.ReducedFunctional(
-            functional, fire_adj.Control(self._control))
+        super().__init__(functional, fire_adj.Control(control))
 
-    def compute_gradient(self, control_value=None, apply_riesz=True):
+    def compute_gradient(self):
         """Compute the gradient with respect to the control.
 
         Parameters
         ----------
-        control_value : firedrake.Function, optional
-            Control value where the reduced functional is evaluated
-            before taking the derivative.
         apply_riesz : bool, optional
             If True, return the primal gradient (Riesz representer).
 
@@ -39,20 +36,12 @@ class AutomaticDifferentiationSolver:
         gradient : firedrake.Function
             Gradient of the objective function with respect to the control.
         """
-        if control_value is not None:
-            self._reduced_functional(control_value)
-        self.gradient = self._reduced_functional.derivative(
-            apply_riesz=apply_riesz)
-        return self.gradient
+        return self.derivative(apply_riesz=True)
 
-    def compute_derivative(self, control_value=None, apply_riesz=False):
-        return self.compute_gradient(
-            control_value=control_value, apply_riesz=apply_riesz)
-
-    @property
-    def reduced_functional(self):
-        """Reduced functional object associated with the current control."""
-        return self._reduced_functional
+    def compute_derivative(self):
+        """Compute the derivative with respect to the control.
+        """
+        return self.derivative(apply_riesz=False)
 
     @property
     def control(self):
@@ -64,7 +53,7 @@ class AutomaticDifferentiationSolver:
 
         Parameters
         ----------
-        control_value : firedrake.Function, optional
+        control_value : firedrake.Function or list of firedrake.Functions, optional
             Expansion point for the Taylor test.
         direction : firedrake.Function, optional
             Perturbation direction used by the Taylor test.
@@ -79,5 +68,4 @@ class AutomaticDifferentiationSolver:
         if direction is None:
             direction = control_value.copy(deepcopy=True)
             direction.interpolate(1.0)
-        return fire_adj.taylor_test(
-            self._reduced_functional, control_value, direction)
+        return fire_adj.taylor_test(self, control_value, direction)
