@@ -89,12 +89,14 @@ class Read_boundary_layer:
         if value not in accepted_damping_types:
             raise ValueError(f"Damping type of {value} not recognized.")
         if value == "PML":
-            self.abc_exponent = abc_dictionary.get("exponent", 2)
-            self.abc_R = abc_dictionary.get("R", 1e-6)
-            self.abc_cmax = abc_dictionary.get("cmax", 4.7)
+            abc_dictionary.setdefault("exponent", 2)
+            self.abc_exponent = abc_dictionary["exponent"]
+            abc_dictionary.setdefault("R", 1e-6)
+            self.abc_R = abc_dictionary["R"]
+            abc_dictionary.setdefault("cmax", 4.7)
+            self.abc_cmax = abc_dictionary["cmax"]
         if value == "hybrid":
-            self.abc_boundary_layer_shape = abc_dictionary.get("layer_shape",
-                                                               "rectangular")
+            self.abc_boundary_layer_shape = abc_dictionary.get("layer_shape", "rectangular")
             self.abc_degree_type = abc_dictionary.get("degree_type", "real")
             self.abc_deg_layer = None \
                 if self.abc_boundary_layer_shape == "rectangular" \
