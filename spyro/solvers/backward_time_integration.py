@@ -91,7 +91,7 @@ def backward_wave_propagator_no_pml(Wave_obj, dt=None):
         mgrad = m_u * m_v * fire.dx(2, scheme=Wave_obj.quadrature_rule)
     else:
         # Fall back to full domain
-        mgrad = m_u * m_v * fire.dx(scheme=Wave_obj.quadrature_rule)
+        mgrad = m_u * m_v * fire.dx(**Wave_obj.quadrature_rule)
 
     dufordt2 = fire.Function(Wave_obj.function_space)
     uadj = fire.Function(Wave_obj.function_space)  # auxiliarly function for the gradient compt.
@@ -101,7 +101,7 @@ def backward_wave_propagator_no_pml(Wave_obj, dt=None):
         if comm.comm.rank == 0:
             print("Applying gradient mask: gradients will be computed only in inside region", flush=True)
     else:
-        ffG = -2 * (Wave_obj.c)**(-3) * fire.dot(dufordt2, uadj) * m_v * fire.dx(scheme=Wave_obj.quadrature_rule)
+        ffG = -2 * (Wave_obj.c)**(-3) * fire.dot(dufordt2, uadj) * m_v * fire.dx(**Wave_obj.quadrature_rule)
         if comm.comm.rank == 0:
             print("No gradient mask found: computing gradients over full domain", flush=True)
 
