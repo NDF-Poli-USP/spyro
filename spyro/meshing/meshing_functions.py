@@ -162,11 +162,13 @@ class AutomaticMesh:
         if self.edge_length is None and self.cpw is not None:
             self.edge_length = calculate_edge_length(self.cpw, self.minimum_velocity, self.source_frequency)
         if self.abc_pad:
-            nx = int((self.length_x + 2*self.abc_pad) / self.edge_length)
-            nz = int((self.length_z + self.abc_pad) / self.edge_length)
+            nx = int(round((self.length_x + 2*self.abc_pad)
+                           / self.edge_length, 0))
+            nz = int(round((self.length_z + self.abc_pad)
+                           / self.edge_length, 0))
         else:
-            nx = int(self.length_x / self.edge_length)
-            nz = int(self.length_z / self.edge_length)
+            nx = int(round(self.length_x / self.edge_length, 0))
+            nz = int(round(self.length_z / self.edge_length, 0))
 
         comm = self.comm
 
@@ -196,9 +198,9 @@ class AutomaticMesh:
         Creates a 3D mesh based on Firedrake meshing utilities.
         """
         dx = self.edge_length
-        nx = int(self.length_x / dx)
-        nz = int(self.length_z / dx)
-        ny = int(self.length_y / dx)
+        nx = int(round(self.length_x / dx, 0))
+        nz = int(round(self.length_z / dx, 0))
+        ny = int(round(self.length_y / dx, 0))
 
         return BoxMesh(
             nz,
@@ -417,7 +419,8 @@ def RectangleMesh(nx, ny, Lx, Ly, pad=None, comm=None, quadrilateral=False):
         Ly += 2 * pad
     else:
         pad = 0
-    mesh = fire.RectangleMesh(nx, ny, Lx, Ly, quadrilateral=quadrilateral, comm=comm)
+    mesh = fire.RectangleMesh(nx, ny, Lx, Ly,
+                              quadrilateral=quadrilateral, comm=comm)
     mesh.coordinates.dat.data[:, 0] *= -1.0
     mesh.coordinates.dat.data[:, 1] -= pad
 

@@ -56,6 +56,7 @@ class Read_boundary_layer:
     read_PML_dictionary()
         Read the PML dictionary for a perfectly matched layer
     """
+
     def __init__(self, comm=None):
         self.input_dictionary.setdefault("absorving_boundary_conditions", {})
         self.input_dictionary["absorving_boundary_conditions"].setdefault("status", False)
@@ -88,22 +89,20 @@ class Read_boundary_layer:
         if value not in accepted_damping_types:
             raise ValueError(f"Damping type of {value} not recognized.")
         if value == "PML":
-            abc_dictionary.setdefault("exponent", 2)
-            abc_dictionary.setdefault("R", 1e-6)
-            abc_dictionary.setdefault("cmax", 4.7)
-            self.abc_exponent = abc_dictionary["exponent"]
-            self.abc_R = abc_dictionary["R"]
-            self.abc_cmax = abc_dictionary["cmax"]
+            self.abc_exponent = abc_dictionary.get("exponent", 2)
+            self.abc_R = abc_dictionary.get("R", 1e-6)
+            self.abc_cmax = abc_dictionary.get("cmax", 4.7)
         if value == "hybrid":
-            abc_dictionary.setdefault("layer_shape", "rectangular")
-            abc_dictionary.setdefault("degree_eikonal", None)
-            self.abc_boundary_layer_shape = abc_dictionary["layer_shape"]
+            self.abc_boundary_layer_shape = abc_dictionary.get("layer_shape",
+                                                               "rectangular")
+            self.abc_degree_type = abc_dictionary.get("degree_type", "real")
             self.abc_deg_layer = None \
-                if abc_dictionary["layer_shape"] == "rectangular" \
+                if self.abc_boundary_layer_shape == "rectangular" \
                 else abc_dictionary.get("degree_layer", 2)
-            self.abc_reference_freq = abc_dictionary["habc_reference_freq"]
-            self.abc_deg_eikonal = abc_dictionary.get("degree_eikonal", None)
-            self.abc_get_ref_model = abc_dictionary["get_ref_model"]
+            self.abc_reference_freq = abc_dictionary.get("habc_reference_freq",
+                                                         "source")
+            self.abc_deg_eikonal = abc_dictionary.get("degree_eikonal", 2)
+            self.abc_get_ref_model = abc_dictionary.get("get_ref_model", False)
 
         self._abc_boundary_layer_type = value
 
