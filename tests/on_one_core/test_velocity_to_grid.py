@@ -7,7 +7,7 @@ import firedrake as fire
 def test_velocity_to_grid():
     np.random.seed(1)
     final_time = 1.0
-    dx = 0.006546536707079771
+    delta_x = 0.006546536707079771
 
     dictionary = {}
     dictionary["options"] = {
@@ -40,10 +40,10 @@ def test_velocity_to_grid():
     # This transect of receivers is created with the helper function `create_transect`.
     dictionary["acquisition"] = {
         "source_type": "ricker",
-        "source_locations": [(-1.5 - dx, 1.5 + dx)],
+        "source_locations": [(-1.5 - delta_x, 1.5 + delta_x)],
         "frequency": 5.0,
         "delay": 0.3,
-        "receiver_locations": [(-1.5 - dx, 2.0 + dx)],
+        "receiver_locations": [(-1.5 - delta_x, 2.0 + delta_x)],
         "delay_type": "time",
     }
 
