@@ -762,7 +762,8 @@ class HABC_Wave(AcousticWave, HABC_Mesh, RectangLayer,
 
             # Equivalent velocity for the original model
             c_eqref = mod_sol.c_equivalent(self.initial_velocity_model,
-                                           V=self.funct_space_eik)
+                                           V=self.funct_space_eik,
+                                           quad_rule=self.quadrature_rule)
 
             Lsp = mod_sol.solve_eigenproblem(self.c, V=self.function_space,
                                              quad_rule=self.quadrature_rule,
