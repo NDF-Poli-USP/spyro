@@ -401,10 +401,6 @@ class Modal_Solver():
             # Compute the equivalent velocity
             c_eq = np.sqrt(energy / fire.assemble(bilinear_term * dx))
 
-            import importlib.metadata
-            print(quad_rule, energy, fire.assemble(bilinear_term * dx),
-                  importlib.metadata.version('firedrake'))
-
         elif typ_homog == 'volume':
             # Equivalent velocity by volume-average homogenization
 
@@ -806,7 +802,7 @@ class Modal_Solver():
             Approximate equivalent velocity for the hypershape
         '''
 
-        n_hyp = 6 if n_hyp is None else n_hyp
+        n_hyp = 330 if n_hyp is None else n_hyp
         c_eqref = c_eq if c_eqref is None else c_eqref
 
         # Regression for hypershape geometry factor
@@ -910,7 +906,7 @@ class Modal_Solver():
             n_hyp, f_rec, f_ell, c_eq, bc=bc, c_eqref=c_eqref,
             fitting_c=fitting_c, cut_plane_percent=cut_plane_percent)
 
-        print(f"Hypershape Equivalent Velocity c_eq (km/s) = {c_eq:.3f}",
+        print(f"Hypershape Equivalent Velocity c_eq (km/s) = {c_reg:.3f}",
               flush=True)
         print(f"Hypershape Frequency factor f_hyp (1/km): {f_hyp:.3f}",
               flush=True)
