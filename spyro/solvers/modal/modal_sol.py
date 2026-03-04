@@ -394,14 +394,14 @@ class Modal_Solver():
 
             # Compute the energy
             fire.solve(a == L, u)
-            energy = fire.assemble(
-                fire.Constant(0.5) * c * c * fire.inner(fire.grad(u),
-                                                        fire.grad(u)) * dx)
+            bilinear_term = fire.Constant(0.5) * fire.inner(fire.grad(u),
+                                                            fire.grad(u))
+            energy = fire.assemble(c * c * bilinear_term * dx)
 
             # Compute the equivalent velocity
-            c_eq = np.sqrt(energy / fire.assemble(
-                fire.Constant(0.5) * fire.inner(fire.grad(u),
-                                                fire.grad(u)) * dx))
+            c_eq = np.sqrt(energy / fire.assemble(bilinear_term * dx))
+
+            print(quad_rule, energy, fire.assemble(bilinear_term * dx))
 
         elif typ_homog == 'volume':
             # Equivalent velocity by volume-average homogenization
