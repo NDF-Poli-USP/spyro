@@ -236,7 +236,7 @@ def mixed_space_backward_wave_propagator(Wave_obj, dt=None):
         mask_available = True
     else:
         # Fall back to full domain
-        mgrad = m_u * m_v * fire.dx(scheme=Wave_obj.quadrature_rule)
+        mgrad = m_u * m_v * fire.dx(**Wave_obj.quadrature_rule)
         mask_available = False
 
     # dufordt2 = fire.Function(Wave_obj.function_space)
@@ -249,7 +249,7 @@ def mixed_space_backward_wave_propagator(Wave_obj, dt=None):
         if comm.comm.rank == 0:
             print("Applying gradient mask: gradients will be computed only in 'Inner' region (mixed space)", flush=True)
     else:
-        ffG = 2.0 * Wave_obj.c * fire.dot(fire.grad(uadj), fire.grad(ufor)) * m_v * fire.dx(scheme=Wave_obj.quadrature_rule)
+        ffG = 2.0 * Wave_obj.c * fire.dot(fire.grad(uadj), fire.grad(ufor)) * m_v * fire.dx(**Wave_obj.quadrature_rule)
         if comm.comm.rank == 0:
             print("No gradient mask found: computing gradients over full domain (mixed space)", flush=True)
 
