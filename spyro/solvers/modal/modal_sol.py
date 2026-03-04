@@ -401,7 +401,9 @@ class Modal_Solver():
             # Compute the equivalent velocity
             c_eq = np.sqrt(energy / fire.assemble(bilinear_term * dx))
 
-            print(quad_rule, energy, fire.assemble(bilinear_term * dx))
+            import importlib.metadata
+            print(quad_rule, energy, fire.assemble(bilinear_term * dx),
+                  importlib.metadata.version('firedrake'))
 
         elif typ_homog == 'volume':
             # Equivalent velocity by volume-average homogenization
