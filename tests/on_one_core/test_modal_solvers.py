@@ -356,6 +356,22 @@ def loop_modal(parameters, dictionary, degree_layer_lst,
 
     Parameters
     ----------
+    parameters : `list`
+        List containing the parameters for the model.
+        Structure: [edge_length, f_est, fitting_c]
+        - edge_length : `float`
+            Mesh size in km
+        - f_est : `float`, optional
+            Factor for the stabilizing term in Eikonal Eq.
+        - fitting_c : `tuple`
+            Parameters for fitting equivalent velocity regression
+    dictionary : `dict`
+        Dictionary containing the parameters for the model
+    degree_layer_lst : `list`
+        List of hypershape degrees for the absorbing layer
+    expect_values_lst : `list`
+        List of expected values for the fundamental frequency
+
     homogeneous : `bool`
         If True, the velocity model is homogeneous.
         If False, it is heterogeneous.
@@ -369,9 +385,10 @@ def loop_modal(parameters, dictionary, degree_layer_lst,
     edge_length, f_est, fitting_c = parameters
 
     # Modal solvers
-    modal_solver_lst = ['ANALYTICAL', 'ARNOLDI', 'LANCZOS',
-                        'LOBPCG', 'KRYLOVSCH_CH', 'KRYLOVSCH_CG',
-                        'KRYLOVSCH_GH', 'KRYLOVSCH_GG', 'RAYLEIGH']
+    modal_solver_lst = ['ANALYTICAL']
+    # modal_solver_lst = ['ANALYTICAL', 'ARNOLDI', 'LANCZOS',
+    #                     'LOBPCG', 'KRYLOVSCH_CH', 'KRYLOVSCH_CG',
+    #                     'KRYLOVSCH_GH', 'KRYLOVSCH_GG', 'RAYLEIGH']
 
     # Creating mesh and performing eikonal analysis
     Wave_obj = preamble_modal(dictionary, edge_length, f_est, 2,
@@ -426,7 +443,8 @@ def model_2d(homogeneous):
     if homogeneous:
         fitting_c = (0.0, 0.0, 0.0, 0.0)
     else:
-        fitting_c = (2.0, 1.8, 1.6, 0.6)
+        # fitting_c = (2.0, 1.8, 1.6, 0.6)
+        fitting_c = (0.0, 0.4, 0.2, 0.0)
 
     # Get simulation parameters
     print("\nMesh Size: {:.3f} m".format(1e3 * edge_length), flush=True)
@@ -464,10 +482,9 @@ def model_2d(homogeneous):
 
 
 def test_loop_modal_2d():
-    homogeneous = True
-    model_2d(homogeneous)
-    # homogeneous = False
-    # model_2d(homogeneous)
+
+    for homogeneous in [True, False]:
+        model_2d(homogeneous)
 
 
 if __name__ == "__main__":
