@@ -385,9 +385,9 @@ def test_loop_modal_2d():
     # ============ MODAL ANALYSIS ============
 
     # Modal solvers
-    modal_solver_lst = ['ANALYTICAL',] # 'ARNOLDI', 'LANCZOS',
-                        # 'LOBPCG', 'KRYLOVSCH_CH', 'KRYLOVSCH_CG',
-                        # 'KRYLOVSCH_GH', 'KRYLOVSCH_GG', 'RAYLEIGH']
+    modal_solver_lst = ['ANALYTICAL', ]  # 'ARNOLDI', 'LANCZOS',
+    # 'LOBPCG', 'KRYLOVSCH_CH', 'KRYLOVSCH_CG',
+    # 'KRYLOVSCH_GH', 'KRYLOVSCH_GG', 'RAYLEIGH']
 
     expect_hypershape = 0.50440
     expect_rectangular = 0.45539
