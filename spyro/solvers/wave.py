@@ -85,6 +85,7 @@ class Wave(Model_parameters, metaclass=ABCMeta):
 
         self.mesh = self.get_mesh()
         self.c = None
+        self.functional_evaluation = None
         self.sources = None
         if self.mesh is not None:
             self._build_function_space()
@@ -104,7 +105,10 @@ class Wave(Model_parameters, metaclass=ABCMeta):
         self.field_logger.add_field("forward", self.get_function_name(),
                                     lambda: self.get_function())
 
-    def forward_solve(self):
+    def forward_solve(
+            self, store_receivers_output=True, compute_functional=False,
+            **kwargs
+    ):
         """Solves the forward problem."""
 
         print("\nSolving Forward Problem")
@@ -115,7 +119,12 @@ class Wave(Model_parameters, metaclass=ABCMeta):
         if self.abc_boundary_layer_type != "hybrid":
             self._initialize_model_parameters()
         self.matrix_building()
-        self.wave_propagator()
+        J_m = self.wave_propagator(
+            store_receivers_output,
+            compute_functional,
+            **kwargs
+        )
+        self.functional_evaluation = J_m
 
     def force_rebuild_function_space(self):
         if self.mesh is None:
@@ -387,7 +396,10 @@ class Wave(Model_parameters, metaclass=ABCMeta):
         pass
 
     @ensemble_propagator
-    def wave_propagator(self, dt=None, final_time=None, source_nums=[0]):
+    def wave_propagator(
+        self, store_receivers_output, compute_functional,
+        dt=None, final_time=None, source_nums=[0], **kwargs
+    ):
         """Propagates the wave forward in time.
         Currently uses central differences.
 
@@ -413,9 +425,12 @@ class Wave(Model_parameters, metaclass=ABCMeta):
             self.dt = dt
 
         self.current_sources = source_nums
-        usol, usol_recv = time_integrator(self, source_nums)
-
-        return usol, usol_recv
+        # Results are the wave solution in the entire domain and the receiver output across time
+        # if store_receivers_output is True, otherwise only the wave solution in the entire domain is returned.
+        results = time_integrator(
+            self, store_receivers_output,
+            compute_functional, source_nums, **kwargs)
+        return results
 
     def get_dt(self):
         return self._dt

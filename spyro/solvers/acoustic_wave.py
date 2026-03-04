@@ -3,6 +3,7 @@ import warnings
 import os
 
 from .wave import Wave
+from .automatic_differentiation_solver import SpyroReducedFunctional
 
 from ..io.basicio import ensemble_gradient
 from ..io import interpolate
@@ -77,7 +78,11 @@ class AcousticWave(Wave):
         self.acoustic_energy = acoustic_energy(self)
 
     @ensemble_gradient
-    def gradient_solve(self, guess=None, misfit=None, forward_solution=None):
+    def gradient_solve(
+        self, store_receivers_output=True,
+        compute_functional=False, guess=None, misfit=None,
+        forward_solution=None, **kwargs
+    ):
         """Solves the adjoint problem to calculate de gradient.
 
         Parameters:
@@ -91,14 +96,24 @@ class AcousticWave(Wave):
         dJ: Firedrake 'Function'
             Gradient of the cost functional.
         """
-        if misfit is not None:
-            self.misfit = misfit
-        elif self.current_time == 0.0:
-            self.forward_solve()
-            self.misfit = self.real_shot_record - self.forward_solution_receivers
+        if self.automatic_adjoint:
+            Jm = self.forward_solve(
+                store_receivers_output=False, compute_functional=True, **kwargs)
+            reduced_functional = SpyroReducedFunctional(
+                self.acoustic_energy, self.c)
+            return reduced_functional.compute_gradient()
+            
         else:
-            raise ValueError("Please load or calculate a real shot record first")
-        return backward_wave_propagator(self)
+            if misfit is not None:
+                self.misfit = misfit
+            elif self.current_time == 0.0:
+                self.forward_solve(
+                    store_receivers_output, compute_functional, **kwargs)
+                if not self.automatic_adjoint:
+                    self.misfit = self.real_shot_record - self.forward_solution_receivers
+            else:
+                raise ValueError("Please load or calculate a real shot record first")
+            return backward_wave_propagator(self)
 
     def reset_pressure(self):
         try:

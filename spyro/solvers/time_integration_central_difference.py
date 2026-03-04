@@ -2,9 +2,13 @@ import firedrake as fire
 
 from . import helpers
 from .. import utils
+import numpy as np
 
 
-def central_difference(wave, source_ids=[0]):
+def central_difference(
+        wave, store_receivers_output, compute_functional, source_ids=[0],
+        **kwargs
+):
     """
     Perform central difference time integration for wave propagation.
 
@@ -47,6 +51,8 @@ def central_difference(wave, source_ids=[0]):
             wave.vstate)
     usol_recv = []
     save_step = 0
+    if compute_functional:
+        Jm = 0.
     for step in range(nt):
         # Basic way of applying sources
         wave.update_source_expression(t)
@@ -63,7 +69,25 @@ def central_difference(wave, source_ids=[0]):
         wave.prev_vstate = wave.vstate
         wave.vstate = wave.next_vstate
         if wave.use_vertex_only_mesh:
-            usol_recv.append(fire.assemble(interpolate_receivers))
+            recv = fire.assemble(interpolate_receivers)
+            if store_receivers_output:
+                usol_recv.append(recv)
+            # check if compute_functional is True
+            if compute_functional:
+                true_recv = kwargs.get("true_recv", None)
+                if isinstance(true_recv, list):
+                    rec_out_exact = fire.Function(interpolate_receivers.target_space)
+                    if isinstance(true_recv[step], fire.Function):
+                        rec_out_exact.dat.data_wo[:] = true_recv[step].dat.data_ro[:]
+                    elif isinstance(true_recv[step], np.ndarray):
+                        rec_out_exact.dat.data_wo[:] = true_recv[step]
+                    else:
+                        raise ValueError("Elements of true_recv should be either Firedrake Functions or numpy arrays.")
+                else:
+                    raise ValueError("true_recv should be a list when compute_functional is True.")
+                misfit = rec_out_exact - recv
+                Jm += 0.5 * fire.assemble(fire.inner(misfit, misfit) * fire.dx)
+
         else:
             usol_recv.append(wave.get_receivers_output())
 
@@ -83,14 +107,17 @@ def central_difference(wave, source_ids=[0]):
 
     wave.current_time = t
     helpers.display_progress(wave.comm, t)
-    usol_recv = helpers.fill(
-        usol_recv, wave.receivers.is_local, nt, wave.receivers.number_of_points
-    )
-    usol_recv = utils.utils.communicate(usol_recv, wave.comm)
+    if store_receivers_output:
+        wave.receivers_output = usol_recv
+        usol_recv = helpers.fill(
+            usol_recv, wave.receivers.is_local, nt, wave.receivers.number_of_points
+        )
+        usol_recv = utils.utils.communicate(usol_recv, wave.comm)
 
-    wave.receivers_output = usol_recv
-    wave.forward_solution = usol
-    wave.forward_solution_receivers = usol_recv
+        wave.forward_solution = usol
+        wave.forward_solution_receivers = usol_recv
 
-    wave.field_logger.stop_logging()
-    return usol, usol_recv
+        wave.field_logger.stop_logging()
+        return usol, usol_recv
+    if compute_functional:
+        return Jm
