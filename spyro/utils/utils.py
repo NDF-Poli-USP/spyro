@@ -360,7 +360,6 @@ def write_hdf5_velocity_model(obj_with_comm, segy_filename):
     vp_filename, vp_filetype = os.path.splitext(
         segy_filename
     )
-    warnings.warn("Converting segy file to hdf5")
     write_velocity_model(
         segy_filename, ofname=vp_filename
     )

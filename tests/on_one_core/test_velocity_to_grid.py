@@ -70,7 +70,8 @@ def test_velocity_to_grid():
         (z - zc) ** 2 + (x - xc) ** 2 < rc**2, vmax, vmin
     )
     wave_obj.set_initial_velocity_model(conditional=cond)
-    grid_velocity_data = spyro.utils.velocity_to_grid(wave_obj, 0.02)
+    grid_spacing = 0.02
+    grid_velocity_data = spyro.utils.velocity_to_grid(wave_obj, grid_spacing)
 
     vp = grid_velocity_data["vp_values"]
     nz, nx = vp.shape
