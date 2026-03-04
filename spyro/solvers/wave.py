@@ -323,7 +323,7 @@ class Wave(Model_parameters, metaclass=ABCMeta):
 
     def get_mass_matrix_diagonal(self):
         """Builds a section of the mass matrix for debugging purposes."""
-        A = self.solver.A
+        A = fire.assemble(self.lhs, mat_type="aij")
         petsc_matrix = A.petscmat
         diagonal = petsc_matrix.getDiagonal()
         return diagonal.array
