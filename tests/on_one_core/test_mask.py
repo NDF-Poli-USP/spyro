@@ -2,8 +2,8 @@ from spyro.utils import Mask
 from spyro.utils import Gradient_mask_for_pml
 from spyro.examples.rectangle import Rectangle_acoustic
 import firedrake as fire
-from random import uniform as rand
 import numpy as np
+# from random import uniform as rand
 
 
 class Interval(object):
@@ -57,18 +57,18 @@ def test_mask():
         (-0.1-tol, 0.8-tol),
         (-0.9+tol, 0.8-tol),
     ]
-    points_on_boundary = [
-        # Vertices
-        (-0.1, 0.2),
-        (-0.9, 0.2),
-        (-0.1, 0.8),
-        (-0.9, 0.8),
-        # Edges
-        (-0.1, 0.3),
-        (-0.9, 0.6),
-        (-0.5, 0.2),
-        (-0.7, 0.8),
-    ]
+    # points_on_boundary = [
+    #     # Vertices
+    #     (-0.1, 0.2),
+    #     (-0.9, 0.2),
+    #     (-0.1, 0.8),
+    #     (-0.9, 0.8),
+    #     # Edges
+    #     (-0.1, 0.3),
+    #     (-0.9, 0.6),
+    #     (-0.5, 0.2),
+    #     (-0.7, 0.8),
+    # ]
     points_masked = [
         # Inside pml
         (-0.05, 0.25),
@@ -82,18 +82,18 @@ def test_mask():
         (-0.1+tol, 0.8+tol),
         (-0.9-tol, 0.8+tol),
     ]
-    points_in_tolerance = [
-        # Vertices
-        (-0.1+tol*rand(-1, 1), 0.2+tol*rand(-1, 1)),
-        (-0.9+tol*rand(-1, 1), 0.2+tol*rand(-1, 1)),
-        (-0.1+tol*rand(-1, 1), 0.8+tol*rand(-1, 1)),
-        (-0.9+tol*rand(-1, 1), 0.8+tol*rand(-1, 1)),
-        # Edges
-        (-0.1+tol*rand(-1, 1), rand(0.2, 0.8)),
-        (-0.9+tol*rand(-1, 1), rand(0.2, 0.8)),
-        (rand(-0.1, -0.9), 0.2+tol*rand(-1, 1)),
-        (rand(-0.1, -0.9), 0.8+tol*rand(-1, 1)),
-    ]
+    # points_in_tolerance = [
+    #     # Vertices
+    #     (-0.1+tol*rand(-1, 1), 0.2+tol*rand(-1, 1)),
+    #     (-0.9+tol*rand(-1, 1), 0.2+tol*rand(-1, 1)),
+    #     (-0.1+tol*rand(-1, 1), 0.8+tol*rand(-1, 1)),
+    #     (-0.9+tol*rand(-1, 1), 0.8+tol*rand(-1, 1)),
+    #     # Edges
+    #     (-0.1+tol*rand(-1, 1), rand(0.2, 0.8)),
+    #     (-0.9+tol*rand(-1, 1), rand(0.2, 0.8)),
+    #     (rand(-0.1, -0.9), 0.2+tol*rand(-1, 1)),
+    #     (rand(-0.1, -0.9), 0.8+tol*rand(-1, 1)),
+    # ]
 
     # Testing mask that applies zeros to a function in the objects space
     Mask_not_dg = Mask(boundaries, Wave_obj)
@@ -103,8 +103,8 @@ def test_mask():
     u = Mask_not_dg.apply_mask(u)
 
     unmasked_results = u.at(points_not_masked)
-    boundary_results = u.at(points_on_boundary)
-    close_to_boundary_results = u.at(points_in_tolerance)
+    # boundary_results = u.at(points_on_boundary)
+    # close_to_boundary_results = u.at(points_in_tolerance)
     masked_results = u.at(points_masked)
 
     # Checking results in mask
@@ -120,8 +120,8 @@ def test_mask():
     dg_func = Mask_dg.dg_mask
 
     unmasked_results = dg_func.at(points_not_masked)
-    boundary_results = dg_func.at(points_on_boundary)
-    close_to_boundary_results = dg_func.at(points_in_tolerance)
+    # boundary_results = dg_func.at(points_on_boundary)
+    # close_to_boundary_results = dg_func.at(points_in_tolerance)
     masked_results = dg_func.at(points_masked)
 
     # Checking results in mask
@@ -136,8 +136,8 @@ def test_mask():
     dg_func_inverted = Mask_dg.dg_mask
 
     unmasked_results = dg_func_inverted.at(points_not_masked)
-    boundary_results = dg_func_inverted.at(points_on_boundary)
-    close_to_boundary_results = dg_func_inverted.at(points_in_tolerance)
+    # boundary_results = dg_func_inverted.at(points_on_boundary)
+    # close_to_boundary_results = dg_func_inverted.at(points_in_tolerance)
     masked_results = dg_func_inverted.at(points_masked)
 
     # Checking results in mask
@@ -181,18 +181,18 @@ def test_gradient_mask():
         (-0.-tol, 1.0-tol),
         (-1.0+tol, 1.0-tol),
     ]
-    points_on_boundary = [
-        # Vertices
-        (-0., 0.),
-        (-1., 0.),
-        (-0., 1.),
-        (-1., 1.),
-        # Edges
-        (-0., 0.3),
-        (-1., 0.6),
-        (-0.5, 0.),
-        (-0.7, 1.),
-    ]
+    # points_on_boundary = [
+    #     # Vertices
+    #     (-0., 0.),
+    #     (-1., 0.),
+    #     (-0., 1.),
+    #     (-1., 1.),
+    #     # Edges
+    #     (-0., 0.3),
+    #     (-1., 0.6),
+    #     (-0.5, 0.),
+    #     (-0.7, 1.),
+    # ]
     points_masked = [
         # Inside pml
         (-0.05, -0.1),
@@ -206,18 +206,18 @@ def test_gradient_mask():
         (-0.-tol, 1.+tol),
         (-1.-tol, 1.+tol),
     ]
-    points_in_tolerance = [
-        # Vertices
-        (-0., 0.+tol*rand(-1, 1)),
-        (-1.+tol*rand(-1, 1), 0.+tol*rand(-1, 1)),
-        (-0., 1.+tol*rand(-1, 1)),
-        (-1.+tol*rand(-1, 1), 1.+tol*rand(-1, 1)),
-        # Edges
-        (-0., rand(0.2, 0.8)),
-        (-1.+tol*rand(-1, 1), rand(0.2, 0.8)),
-        (rand(-0.1, -0.9), 0.+tol*rand(-1, 1)),
-        (rand(-0.1, -0.9), 1.+tol*rand(-1, 1)),
-    ]
+    # points_in_tolerance = [
+    #     # Vertices
+    #     (-0., 0.+tol*rand(-1, 1)),
+    #     (-1.+tol*rand(-1, 1), 0.+tol*rand(-1, 1)),
+    #     (-0., 1.+tol*rand(-1, 1)),
+    #     (-1.+tol*rand(-1, 1), 1.+tol*rand(-1, 1)),
+    #     # Edges
+    #     (-0., rand(0.2, 0.8)),
+    #     (-1.+tol*rand(-1, 1), rand(0.2, 0.8)),
+    #     (rand(-0.1, -0.9), 0.+tol*rand(-1, 1)),
+    #     (rand(-0.1, -0.9), 1.+tol*rand(-1, 1)),
+    # ]
 
     # Testing mask that applies zeros to a function in the objects space
     test1 = True
@@ -229,8 +229,8 @@ def test_gradient_mask():
     u = Mask_not_dg.apply_mask(u)
 
     unmasked_results = u.at(points_not_masked)
-    boundary_results = u.at(points_on_boundary)
-    close_to_boundary_results = u.at(points_in_tolerance)
+    # boundary_results = u.at(points_on_boundary)
+    # close_to_boundary_results = u.at(points_in_tolerance)
     masked_results = u.at(points_masked)
 
     # Checking results close to or in the boundaries
