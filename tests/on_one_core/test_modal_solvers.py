@@ -279,7 +279,7 @@ def get_range_hyp(Wave_obj, n_root=1):
     Wave_obj.size_habc_criterion(n_root=n_root)
 
 
-def modal_fig8(Wave_obj, modal_solver_lst, fitting_c, exp_val_lst, n_root=1):
+def modal_fig8(Wave_obj, modal_solver_lst, fitting_c, exp_value, n_root=1):
     '''
     Apply the HABC to the model in Fig. 8 of Salas et al. (2022).
 
@@ -299,8 +299,8 @@ def modal_fig8(Wave_obj, modal_solver_lst, fitting_c, exp_val_lst, n_root=1):
         - fc2: Monotonicity
         - fp1: Rectangle frequency
         - fp2: Ellipse frequency
-    exp_val_lst : `list`
-        List of expected values for the fundamental frequency for each solver
+    exp_value : `float`
+        Expected value for the fundamental frequency
     n_root : `int`, optional
         n-th Root selected as the size of the absorbing layer. Default is 1
 
@@ -319,7 +319,7 @@ def modal_fig8(Wave_obj, modal_solver_lst, fitting_c, exp_val_lst, n_root=1):
     Wave_obj.velocity_habc()
 
     # Loop for different modal solvers
-    for modal_solver, exp_freq in zip(modal_solver_lst, exp_val_lst):
+    for modal_solver in modal_solver_lst:
 
         # Modal solver
         print("\nModal Solver: {}".format(modal_solver), flush=True)
@@ -338,8 +338,8 @@ def modal_fig8(Wave_obj, modal_solver_lst, fitting_c, exp_val_lst, n_root=1):
         lay_str = Wave_obj.path_case_habc.split("output/")[1].rstrip("/")[:-4]
         met_str = f"Fundamental Frequency {lay_str} {Wave_obj.dimension}D. "
         met_str += f"Method {modal_solver}"
-        cmp_str = f"Expected {exp_freq:.5f}, got = {Wave_obj.fundam_freq:.5f}"
-        assert np.isclose(Wave_obj.fundam_freq / exp_freq, 1., atol=5e-2), \
+        cmp_str = f"Expected {exp_value:.5f}, got = {Wave_obj.fundam_freq:.5f}"
+        assert np.isclose(Wave_obj.fundam_freq / exp_value, 1., atol=5e-2), \
             "❌ " + met_str + "  → " + cmp_str
         print("✅ " + met_str + " Verified: " + cmp_str, flush=True)
 
@@ -361,10 +361,10 @@ def test_loop_modal_2d():
     f_est = 0.06
 
     # Parameters for fitting equivalent velocity regression
-    fitting_c = (2.0, 1.8, 1.1, 0.4)
+    fitting_c = (2.0, 1.8, 1.6, 0.6)
 
     # Get simulation parameters
-    print("\nMesh Size: {:.4f} m".format(1e3 * edge_length), flush=True)
+    print("\nMesh Size: {:.3f} m".format(1e3 * edge_length), flush=True)
     print("Eikonal Stabilizing Factor: {:.2f}".format(f_est), flush=True)
     fit_str = "Fitting Parameters for Analytical Solver: " + 3 * "{:.1f}, "
     print((fit_str + "{:.1f}\n").format(*fitting_c), flush=True)
@@ -389,30 +389,11 @@ def test_loop_modal_2d():
                         'LOBPCG', 'KRYLOVSCH_CH', 'KRYLOVSCH_CG',
                         'KRYLOVSCH_GH', 'KRYLOVSCH_GG', 'RAYLEIGH']
 
-    # Expected values
-    expect_hypershape = [0.50807,
-                         0.50443,
-                         0.50443,
-                         0.50443,
-                         0.50443,
-                         0.50443,
-                         0.50443,
-                         0.50443,
-                         0.52785]
-
-    expect_rectangular = [0.45503,
-                          0.45539,
-                          0.45539,
-                          0.45539,
-                          0.45539,
-                          0.45539,
-                          0.45539,
-                          0.45539,
-                          0.47634]
-
+    expect_hypershape = 0.50440
+    expect_rectangular = 0.45539
     expect_values_lst = [expect_hypershape, expect_rectangular]
 
-    for degree_layer, exp_val_lst in zip(degree_layer_lst, expect_values_lst):
+    for degree_layer, exp_value in zip(degree_layer_lst, expect_values_lst):
 
         # Update the layer shape and its degree
         Wave_obj.abc_boundary_layer_shape = "hypershape" \
@@ -421,7 +402,7 @@ def test_loop_modal_2d():
 
         try:
             # Computing the fundamental frequency
-            modal_fig8(Wave_obj, modal_solver_lst, fitting_c, exp_val_lst)
+            modal_fig8(Wave_obj, modal_solver_lst, fitting_c, exp_value)
 
             # Renaming the folder if degree_layer is modified
             Wave_obj.rename_folder_habc()
@@ -527,7 +508,6 @@ def test_loop_modal_2d():
 #     test_loop_modal_2d()
 #     test_loop_modal_3d()
 
-
 '''
 DATA FOR 2D MODEL Δx = 100m
 ---------------------------
@@ -547,24 +527,24 @@ f_est  eik[ms]
 *RESULTS
 Frequency[Hz]    N2.0      (texe/pmem)     REC      (texe/pmem)
 ANALYTICAL    0.50807 (0.273s/2.205MB) 0.45503 (0.111s/0.525MB)
-ARNOLDI       0.50443 (0.109s/6.685MB) 0.45539 (0.057s/6.780MB)
-LANCZOS       0.50443 (0.064s/5.967MB) 0.45539 (0.050s/6.364MB)
-LOBPCG        0.50443 (3.946s/6.009MB) 0.45539 (3.219s/6.177MB)
-KRYLOVSCH_CH  0.50443 (0.067s/0.085MB) 0.45539 (0.053s/0.085MB)
-KRYLOVSCH_CG  0.50443 (0.053s/0.076MB) 0.45539 (0.043s/0.075MB)
-KRYLOVSCH_GH  0.50443 (0.048s/0.086MB) 0.45539 (0.042s/0.085MB)
-KRYLOVSCH_GG  0.50443 (0.048s/0.100MB) 0.45539 (0.044s/0.107MB)
-RAYLEIGH      0.52785 (1.956s/3.792MB) 0.47634 (1.162s/1.926MB)
+ARNOLDI       0.50440 (0.109s/6.685MB) 0.45539 (0.057s/6.780MB)
+LANCZOS       0.50440 (0.064s/5.967MB) 0.45539 (0.050s/6.364MB)
+LOBPCG        0.50440 (3.946s/6.009MB) 0.45539 (3.219s/6.177MB)
+KRYLOVSCH_CH  0.50440 (0.067s/0.085MB) 0.45539 (0.053s/0.085MB)
+KRYLOVSCH_CG  0.50440 (0.053s/0.076MB) 0.45539 (0.043s/0.075MB)
+KRYLOVSCH_GH  0.50440 (0.048s/0.086MB) 0.45539 (0.042s/0.085MB)
+KRYLOVSCH_GG  0.50440 (0.048s/0.100MB) 0.45539 (0.044s/0.107MB)
+RAYLEIGH      0.52783 (1.956s/3.792MB) 0.47634 (1.162s/1.926MB)
 
 *ANALYTICAL
    Case0     REC*    N4.4    N4.0    N3.0   N2.0*
-fnum[Hz]  0.45539 0.47270 0.47423 0.48266 0.50443
+fnum[Hz]  0.45539 0.47270 0.47423 0.48266 0.50440
 fana[Hz]  0.45503 0.46622 0.46541 0.47813 0.50807
-fray[Hz]  0.47634 0.49470 0.49647 0.50497 0.52785
+fray[Hz]  0.47634 0.49470 0.49647 0.50497 0.52783
 
 *RAYLEIGH N2.0
 n_eigfunc       2      *4       6       8
-freq[Hz]  0.66237 0.52785 0.51705 0.51355
+freq[Hz]  0.66237 0.52783 0.51705 0.51355
 texe[s]     0.263   1.956   5.947  17.152
 mem[MB]     1.359   3.792   8.075  13.311
 
