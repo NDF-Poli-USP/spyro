@@ -198,7 +198,7 @@ def wave_dict_3d(layer_shape, degree_layer, degree_type,
     return dictionary
 
 
-def preamble_modal(dictionary, edge_length, f_est, dimension):
+def preamble_modal(dictionary, edge_length, f_est, dimension, homogeneous=True):
     '''
     Run the infinite model and the Eikonal analysis
 
@@ -232,8 +232,13 @@ def preamble_modal(dictionary, edge_length, f_est, dimension):
     Wave_obj.set_mesh(input_mesh_parameters={"edge_length": edge_length})
 
     # Initial velocity model
-    cond = fire.conditional(Wave_obj.mesh_x < 0.5, 3.0, 1.5)
-    Wave_obj.set_initial_velocity_model(conditional=cond)
+
+    if homogeneous:
+        Wave_obj.set_initial_velocity_model(constant=1.5)
+
+    else:
+        cond = fire.conditional(Wave_obj.mesh_x < 0.5, 3.0, 1.5)
+        Wave_obj.set_initial_velocity_model(conditional=cond)
 
     # Preamble mesh operations
     Wave_obj.preamble_mesh_operations(f_est=f_est)
@@ -279,7 +284,7 @@ def get_range_hyp(Wave_obj, n_root=1):
     Wave_obj.size_habc_criterion(n_root=n_root)
 
 
-def modal_fig8(Wave_obj, modal_solver_lst, fitting_c, exp_value, n_root=1):
+def run_modal(Wave_obj, modal_solver_lst, fitting_c, exp_value, n_root=1):
     '''
     Apply the HABC to the model in Fig. 8 of Salas et al. (2022).
 
@@ -344,9 +349,66 @@ def modal_fig8(Wave_obj, modal_solver_lst, fitting_c, exp_value, n_root=1):
         print("✅ " + met_str + " Verified: " + cmp_str, flush=True)
 
 
-def test_loop_modal_2d():
+def loop_modal(parameters, dictionary, degree_layer_lst,
+               expect_values_lst, homogeneous):
     '''
-    Loop for testing modals solvers in 2D
+    Loop for testing modals solvers.
+
+    Parameters
+    ----------
+    homogeneous : `bool`
+        If True, the velocity model is homogeneous.
+        If False, it is heterogeneous.
+
+    Returns
+    -------
+    None
+    '''
+
+    # Model parameters
+    edge_length, f_est, fitting_c = parameters
+
+    # Modal solvers
+    modal_solver_lst = ['ANALYTICAL', 'ARNOLDI', 'LANCZOS',
+                        'LOBPCG', 'KRYLOVSCH_CH', 'KRYLOVSCH_CG',
+                        'KRYLOVSCH_GH', 'KRYLOVSCH_GG', 'RAYLEIGH']
+
+    # Creating mesh and performing eikonal analysis
+    Wave_obj = preamble_modal(dictionary, edge_length, f_est, 2,
+                              homogeneous=homogeneous)
+
+    for degree_layer, exp_value in zip(degree_layer_lst, expect_values_lst):
+
+        # Update the layer shape and its degree
+        Wave_obj.abc_boundary_layer_shape = "hypershape" \
+            if degree_layer is not None else "rectangular"
+        Wave_obj.abc_deg_layer = degree_layer
+
+        try:
+            # Computing the fundamental frequency
+            run_modal(Wave_obj, modal_solver_lst, fitting_c, exp_value)
+
+            # Renaming the folder if degree_layer is modified
+            Wave_obj.rename_folder_habc()
+
+        except fire.ConvergenceError as e:
+            pytest.fail(f"Checking Modal 2D raised an exception: {str(e)}")
+
+
+def model_2d(homogeneous):
+    '''
+    Model data for 2D case
+
+
+    Parameters
+    ----------
+    homogeneous : `bool`
+        If True, the velocity model is homogeneous.
+        If False, it is heterogeneous.
+
+    Returns
+    -------
+    None
     '''
 
     # ============ SIMULATION PARAMETERS ============
@@ -361,13 +423,19 @@ def test_loop_modal_2d():
     f_est = 0.06
 
     # Parameters for fitting equivalent velocity regression
-    fitting_c = (2.0, 1.8, 1.6, 0.6)
+    if homogeneous:
+        fitting_c = (0.0, 0.0, 0.0, 0.0)
+    else:
+        fitting_c = (2.0, 1.8, 1.6, 0.6)
 
     # Get simulation parameters
     print("\nMesh Size: {:.3f} m".format(1e3 * edge_length), flush=True)
     print("Eikonal Stabilizing Factor: {:.2f}".format(f_est), flush=True)
     fit_str = "Fitting Parameters for Analytical Solver: " + 3 * "{:.1f}, "
     print((fit_str + "{:.1f}\n").format(*fitting_c), flush=True)
+
+    # Model parameters
+    parameters = [edge_length, f_est, fitting_c]
 
     # ============ HABC PARAMETERS ============
 
@@ -379,36 +447,31 @@ def test_loop_modal_2d():
     # Create dictionary with parameters for the model
     dictionary = wave_dict_2d("rectangular", None, "real", "source")
 
-    # Creating mesh and performing eikonal analysis
-    Wave_obj = preamble_modal(dictionary, edge_length, f_est, 2)
+    # ============ EXPECTED VALUES ============
 
-    # ============ MODAL ANALYSIS ============
-
-    # Modal solvers
-    modal_solver_lst = ['ANALYTICAL', ]  # 'ARNOLDI', 'LANCZOS',
-    # 'LOBPCG', 'KRYLOVSCH_CH', 'KRYLOVSCH_CG',
-    # 'KRYLOVSCH_GH', 'KRYLOVSCH_GG', 'RAYLEIGH']
-
-    expect_hypershape = 0.50440
-    expect_rectangular = 0.45539
+    # Expected values
+    if homogeneous:
+        expect_hypershape = 0.51046
+        expect_rectangular = 0.46875
+    else:
+        expect_hypershape = 0.50440
+        expect_rectangular = 0.45539
     expect_values_lst = [expect_hypershape, expect_rectangular]
 
-    for degree_layer, exp_value in zip(degree_layer_lst, expect_values_lst):
+    # ============ MODAL ANALYSIS ============
+    loop_modal(parameters, dictionary, degree_layer_lst,
+               expect_values_lst, homogeneous)
 
-        # Update the layer shape and its degree
-        Wave_obj.abc_boundary_layer_shape = "hypershape" \
-            if degree_layer is not None else "rectangular"
-        Wave_obj.abc_deg_layer = degree_layer
 
-        try:
-            # Computing the fundamental frequency
-            modal_fig8(Wave_obj, modal_solver_lst, fitting_c, exp_value)
+def test_loop_modal_2d():
+    homogeneous = True
+    model_2d(homogeneous)
+    # homogeneous = False
+    # model_2d(homogeneous)
 
-            # Renaming the folder if degree_layer is modified
-            Wave_obj.rename_folder_habc()
 
-        except fire.ConvergenceError as e:
-            pytest.fail(f"Checking Modal 2D raised an exception: {str(e)}")
+if __name__ == "__main__":
+    test_loop_modal_2d()
 
 
 # @pytest.mark.slow
@@ -495,7 +558,7 @@ def test_loop_modal_2d():
 
 #         try:
 #             # Computing the fundamental frequency
-#             modal_fig8(Wave_obj, modal_solver_lst, fitting_c, exp_val_lst)
+#             run_modal(Wave_obj, modal_solver_lst, fitting_c, exp_val_lst)
 
 #             # Renaming the folder if degree_layer is modified
 #             Wave_obj.rename_folder_habc()
@@ -507,7 +570,6 @@ def test_loop_modal_2d():
 # if __name__ == "__main__":
 #     test_loop_modal_2d()
 #     test_loop_modal_3d()
-
 '''
 DATA FOR 2D MODEL Δx = 100m
 ---------------------------
