@@ -12,7 +12,6 @@ from .solvers.inversion import FullWaveformInversion
 from .solvers.mms_acoustic import AcousticWaveMMS
 from .utils.geometry_creation import create_transect, create_2d_grid
 from .utils.geometry_creation import insert_fixed_value, create_3d_grid
-from .utils.estimate_timestep import estimate_timestep
 from . import utils
 from . import io
 from . import solvers
@@ -34,7 +33,6 @@ __all__ = [
     "create_transect",
     "create_2d_grid",
     "create_3d_grid",
-    "estimate_timestep",
     "generate_ufl_functions",
     "insert_fixed_value",
     "ricker_wavelet",
