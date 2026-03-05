@@ -62,7 +62,8 @@ def test_initialize_mesh_pam():
     test_length_x = (meshing_pam.length_z == dictionary["mesh"]["Lx"])
     test_length_y = (meshing_pam.length_y == dictionary["mesh"]["Ly"])
     test_degree = (meshing_pam.degree == dictionary["options"]["degree"])
-    test_source_frequency = (meshing_pam.source_frequency == dictionary["acquisition"]["frequency"])
+    test_source_frequency = (meshing_pam.source_frequency == dictionary[
+        "acquisition"]["frequency"])
     test_mesh_type = (meshing_pam.mesh_type == "firedrake_mesh")
     test_method = (meshing_pam.method == "mass_lumped_triangle")
 
@@ -148,7 +149,7 @@ def test_invalid_mesh_type_raises():
             "mesh_type": "invalid_mesh_type",
         }
     }
-    with pytest.raises(ValueError, match="mesh_type must be one of"):
+    with pytest.raises(ValueError, match="Invalid mesh_type: 'invalid_mesh_type'."):
         spyro.meshing.MeshingParameters(
             input_mesh_dictionary=dictionary["mesh"],
             dimension=2,
@@ -168,7 +169,7 @@ def test_invalid_method_raises():
             "mesh_type": "firedrake_mesh",
         }
     }
-    with pytest.raises(ValueError, match="method must be one of"):
+    with pytest.raises(ValueError, match="Invalid method: 'invalid_method'."):
         spyro.meshing.MeshingParameters(
             input_mesh_dictionary=dictionary["mesh"],
             dimension=2,
