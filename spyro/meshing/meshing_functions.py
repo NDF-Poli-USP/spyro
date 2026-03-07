@@ -8,7 +8,7 @@ except ImportError:
 
 
 class AutomaticMesh:
-    '''
+    """
     Class for automatic meshing.
 
     Attributes
@@ -58,12 +58,12 @@ class AutomaticMesh:
         Creates a 2D mesh based on SeismicMesh meshing utilities.
     create_seismicmesh_2D_mesh_homogeneous()
         Creates a 2D mesh homogeneous velocity mesh based on SeismicMesh meshing utilities.
-    '''
+    """
 
     def __init__(
         self, mesh_parameters=None
     ):
-        '''
+        """
         Initialize the MeshingFunctions class.
 
         Parameters
@@ -102,7 +102,7 @@ class AutomaticMesh:
         - 'minimum_velocity': float, optional. Minimum velocity.
         - 'velocity_model_file': str, optional. File containing the velocity model.
         - 'edge_length': float, optional. Length of the mesh edges.
-        '''
+        """
         self.dimension = mesh_parameters.dimension
         self.length_z = mesh_parameters.length_z
         self.length_x = mesh_parameters.length_x
@@ -126,14 +126,14 @@ class AutomaticMesh:
         self.output_file_name = mesh_parameters.output_filename
 
     def create_mesh(self):
-        '''
+        """
         Creates the mesh.
 
         Returns
         -------
         mesh : Mesh
             Mesh
-        '''
+        """
         print(f"Creating {self.mesh_type} type mesh.", flush=True)
         if self.mesh_type == "firedrake_mesh":
             return self.create_firedrake_mesh()
@@ -146,9 +146,9 @@ class AutomaticMesh:
             raise ValueError("mesh_type is not supported")
 
     def create_firedrake_mesh(self):
-        '''
+        """
         Creates a mesh based on Firedrake meshing utilities.
-        '''
+        """
         if self.dimension == 2:
             return self.create_firedrake_2D_mesh()
         elif self.dimension == 3:
@@ -157,9 +157,9 @@ class AutomaticMesh:
             raise ValueError("dimension is not supported")
 
     def create_firedrake_2D_mesh(self):
-        '''
+        """
         Creates a 2D mesh based on Firedrake meshing utilities.
-        '''
+        """
         if self.edge_length is None and self.cpw is not None:
             self.edge_length = calculate_edge_length(
                 self.cpw, self.minimum_velocity, self.source_frequency)
@@ -196,9 +196,9 @@ class AutomaticMesh:
             )
 
     def create_firedrake_3D_mesh(self):
-        '''
+        """
         Creates a 3D mesh based on Firedrake meshing utilities.
-        '''
+        """
         dx = self.edge_length
         nx = int(round(self.length_x / dx, 0))
         nz = int(round(self.length_z / dx, 0))
@@ -215,14 +215,14 @@ class AutomaticMesh:
         )
 
     def create_seismicmesh_mesh(self):
-        '''
+        """
         Creates a mesh based on SeismicMesh meshing utilities.
 
         Returns
         -------
         mesh : Mesh
             Mesh
-        '''
+        """
         if self.dimension == 2:
             return self.create_seimicmesh_2d_mesh()
         elif self.dimension == 3:
@@ -232,9 +232,9 @@ class AutomaticMesh:
             raise ValueError("dimension is not supported")
 
     def create_seimicmesh_2d_mesh(self):
-        '''
+        """
         Creates a 2D mesh based on SeismicMesh meshing utilities.
-        '''
+        """
         print(f"velocity_model{self.velocity_model}", flush=True)
         if self.velocity_model is None:
             return self.create_seismicmesh_2D_mesh_homogeneous()
@@ -242,10 +242,10 @@ class AutomaticMesh:
             return self.create_seismicmesh_2D_mesh_with_velocity_model()
 
     def create_seismicmesh_2D_mesh_with_velocity_model(self):
-        '''
+        """
         Creates a 2D mesh based on SeismicMesh meshing utilities,
         with velocity model from SEG-Y file.
-        '''
+        """
         if self.comm.ensemble_comm.rank == 0:
             v_min = self.minimum_velocity
             frequency = self.source_frequency
@@ -316,10 +316,9 @@ class AutomaticMesh:
         return mesh
 
     def create_seismicmesh_2D_mesh_homogeneous(self):
-        '''
-        Creates a 2D mesh based on SeismicMesh meshing utilities,
-        with homogeneous velocity model.
-        '''
+        """
+        Creates a 2D mesh based on SeismicMesh meshing utilities, with homogeneous velocity model.
+        """
         Lz = self.length_z
         Lx = self.length_x
         pad = self.abc_pad
@@ -367,7 +366,7 @@ class AutomaticMesh:
 
 
 def calculate_edge_length(cpw, minimum_velocity, frequency):
-    '''
+    """
     Calculate the edge length based on the cells per wavelength,
     minimum velocity and frequency.
 
@@ -384,7 +383,7 @@ def calculate_edge_length(cpw, minimum_velocity, frequency):
     -------
     edge_length : float
         Edge length
-    '''
+    """
     v_min = minimum_velocity
 
     lbda_min = v_min/frequency
@@ -394,7 +393,7 @@ def calculate_edge_length(cpw, minimum_velocity, frequency):
 
 
 def RectangleMesh(nx, ny, Lx, Ly, pad=None, comm=None, quadrilateral=False):
-    '''
+    """
     Create a rectangle mesh based on the Firedrake mesh.
     First axis is negative, second axis is positive. If there is a pad, both
     axis are dislocated by the pad.
@@ -420,7 +419,7 @@ def RectangleMesh(nx, ny, Lx, Ly, pad=None, comm=None, quadrilateral=False):
     -------
     mesh : Firedrake Mesh
         Mesh
-    '''
+    """
     if pad is not None:
         Lx += pad
         Ly += 2 * pad
@@ -434,9 +433,10 @@ def RectangleMesh(nx, ny, Lx, Ly, pad=None, comm=None, quadrilateral=False):
     return mesh
 
 
-def PeriodicRectangleMesh(nx, ny, Lx, Ly, pad=None,
-                          comm=None, quadrilateral=False):
-    '''
+def PeriodicRectangleMesh(
+    nx, ny, Lx, Ly, pad=None, comm=None, quadrilateral=False
+):
+    """
     Create a periodic rectangle mesh based on the Firedrake mesh.
     First axis is negative, second axis is positive. If there is a pad, both
     axis are dislocated by the pad.
@@ -463,7 +463,7 @@ def PeriodicRectangleMesh(nx, ny, Lx, Ly, pad=None,
     mesh : Firedrake Mesh
         Mesh
 
-    '''
+    """
     if pad is not None:
         Lx += pad
         Ly += 2 * pad
@@ -479,7 +479,7 @@ def PeriodicRectangleMesh(nx, ny, Lx, Ly, pad=None,
 
 
 def BoxMesh(nx, ny, nz, Lx, Ly, Lz, pad=None, quadrilateral=False):
-    '''
+    """
     Create a box mesh based on the Firedrake mesh.
     First axis is negative, second and third are positive. If there is a pad,
     both axis are dislocated by the pad.
@@ -507,7 +507,7 @@ def BoxMesh(nx, ny, nz, Lx, Ly, Lz, pad=None, quadrilateral=False):
     -------
     mesh : Firedrake Mesh
         Mesh
-    '''
+    """
     if pad is not None:
         Lx += pad
         Ly += 2 * pad
