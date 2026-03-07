@@ -341,7 +341,8 @@ class Model_parameters(Read_options, Read_boundary_layer,
     def equation_type(self, value):
         if value != "second_order_in_pressure":
             raise ValueError(
-                "The equation type specified is not implemented yet")
+                "The equation type specified is not implemented yet"
+            )
         self._equation_type = value
 
     @property
@@ -383,10 +384,16 @@ class Model_parameters(Read_options, Read_boundary_layer,
         if self.dt > 1.0:
             warnings.warn(f"Time step of {self.dt} too big.")
         if self.dt is None:
-            warnings.warn("Timestep not given. Will calculate internally "
-                          + "when user attemps to propagate wave.")
+            warnings.warn(
+                "Timestep not given. Will calculate internally when user \
+                    attemps to propagate wave."
+            )
 
-    def set_mesh(self, user_mesh=None, input_mesh_parameters={}):
+    def set_mesh(
+        self,
+        user_mesh=None,
+        input_mesh_parameters={},
+    ):
         """
         Set the mesh for the model.
 
@@ -412,7 +419,8 @@ class Model_parameters(Read_options, Read_boundary_layer,
         self.mesh_parameters.set_mesh(
             user_mesh=user_mesh,
             input_mesh_parameters=input_mesh_parameters,
-            abc_pad_length=pad_length)
+            abc_pad_length=pad_length,
+        )
 
         if self.mesh_parameters.automatic_mesh:
             autoMeshing = meshing.AutomaticMesh(
@@ -457,7 +465,7 @@ def _validate_enum(value, accepted_values, name):
 
 
 def _check_point_in_domain(point_coordinates, input_mesh_lengths, negative_z):
-    '''
+    """
     Checks if a point is within the mesh domain.
 
     Parameters
@@ -473,7 +481,7 @@ def _check_point_in_domain(point_coordinates, input_mesh_lengths, negative_z):
     ------
     ValueError
         If the point is outside the mesh domain.
-    '''
+    """
     # avoid changing mesh lengths outside of this
     mesh_lengths = deepcopy(input_mesh_lengths)
     if negative_z:

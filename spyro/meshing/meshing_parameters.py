@@ -4,7 +4,7 @@ from spyro.utils.error_management import value_parameter_error
 
 
 def cells_per_wavelength(method, degree, dimension):
-    '''
+    """
     Returns recommended number of cells per wavelength based on method,
     degree, and dimension of finite element model.
 
@@ -21,7 +21,7 @@ def cells_per_wavelength(method, degree, dimension):
     -------
     float or None
         Recommended number of cells per wavelength, or None if not specified.
-    '''
+    """
     cell_per_wavelength_dictionary = {
         'mass_lumped_triangle2dim2': 7.02,
         'mass_lumped_triangle3dim2': 3.70,
@@ -45,15 +45,15 @@ def cells_per_wavelength(method, degree, dimension):
 
 
 class MeshingParameters():
-    '''
+    """
     Class that handles mesh parameter logic and mesh type/length/file handling.
-    '''
+    """
 
     def __init__(self, input_mesh_dictionary=None, dimension=None,
                  source_frequency=None, comm=None, quadrilateral=False,
                  method=None, degree=None, velocity_model=None,
                  abc_pad_length=None, negative_z=True):
-        '''
+        """
         Initializes the MeshingParamaters class.
 
         Parameters
@@ -78,7 +78,7 @@ class MeshingParameters():
             Length of the absorbing pad.
         negative_z : bool, optional
             Whether to use negative z coordinates. The default is True.
-        '''
+        """
         self.input_mesh_dictionary = input_mesh_dictionary or {}
         self.dimension = dimension
         self.comm = comm
@@ -109,9 +109,9 @@ class MeshingParameters():
         self.negative_z = negative_z
 
     def _set_length_with_unit_check(self, attr_name, value):
-        '''
+        """
         Checks if all dimensions are in the same unit (meters or km)
-        '''
+        """
         if value is not None:
             if value > 100:
                 new_unit = "meters"
@@ -127,9 +127,9 @@ class MeshingParameters():
                 f"in {new_unit}, but the current unit is "
                 f"{self._unit}. Please check for consistency."
             )
-        if value is not None and value < 0.0:
-            raise ValueError(
-                f"Please do not use negative value for {attr_name}")
+        if value is not None:
+            if value < 0.0:
+                raise ValueError(f"Please do not use negative value for {attr_name}")
         setattr(self, attr_name, value)
 
     @property
@@ -180,11 +180,13 @@ class MeshingParameters():
 
     @method.setter
     def method(self, value):
-        allowed_types = ["mass_lumped_triangle",
-                         "DG_triangle",
-                         "spectral_quadrilateral",
-                         "DG_quadrilateral",
-                         "CG"]
+        allowed_types = [
+            "mass_lumped_triangle",
+            "DG_triangle",
+            "spectral_quadrilateral",
+            "DG_quadrilateral",
+            "CG",
+        ]
 
         if value is not None and value not in allowed_types:
             value_parameter_error('method', value, allowed_types)
@@ -291,11 +293,13 @@ class MeshingParameters():
                              "with Firedrake meshes for now.")
         self._periodic = value
 
-    def set_mesh(self,
-                 user_mesh=None,
-                 input_mesh_parameters={},
-                 abc_pad_length=None):
-        '''
+    def set_mesh(
+        self,
+        user_mesh=None,
+        input_mesh_parameters={},
+        abc_pad_length=None,
+    ):
+        """
         Set the mesh for the model.
 
         Parameters
@@ -309,7 +313,7 @@ class MeshingParameters():
         Returns
         -------
         None
-        '''
+        """
         if abc_pad_length is not None:
             self.abc_pad_length = abc_pad_length
 

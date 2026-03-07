@@ -140,8 +140,11 @@ class Wave(Model_parameters, metaclass=ABCMeta):
         """Builds the matrix for the forward problem."""
         pass
 
-    def set_mesh(self, user_mesh=None,
-                 input_mesh_parameters=None):
+    def set_mesh(
+            self,
+            user_mesh=None,
+            input_mesh_parameters=None,
+    ):
         """
         Set the mesh for the solver.
 
@@ -154,8 +157,10 @@ class Wave(Model_parameters, metaclass=ABCMeta):
         if input_mesh_parameters is None:
             input_mesh_parameters = {}
 
-        super().set_mesh(user_mesh=user_mesh,
-                         input_mesh_parameters=input_mesh_parameters)
+        super().set_mesh(
+            user_mesh=user_mesh,
+            input_mesh_parameters=input_mesh_parameters,
+        )
 
         self.mesh = self.get_mesh()
         self._build_function_space()
@@ -185,14 +190,15 @@ class Wave(Model_parameters, metaclass=ABCMeta):
             return self.mesh_z, self.mesh_x, self.mesh_y
 
     def set_initial_velocity_model(
-            self,
-            constant=None,
-            conditional=None,
-            velocity_model_function=None,
-            expression=None,
-            new_file=None,
-            output=False,
-            dg_velocity_model=True):
+        self,
+        constant=None,
+        conditional=None,
+        velocity_model_function=None,
+        expression=None,
+        new_file=None,
+        output=False,
+        dg_velocity_model=True,
+    ):
         """Method to define new user velocity model or file. It is optional.
 
         Parameters:
@@ -293,7 +299,7 @@ class Wave(Model_parameters, metaclass=ABCMeta):
 
     def get_and_set_maximum_dt(self, fraction=0.7,
                                estimate_max_eigenvalue=False):
-        '''
+        """
         Calculates and sets the maximum stable time step (dt) for the wave solver.
 
         Args:
@@ -304,7 +310,7 @@ class Wave(Model_parameters, metaclass=ABCMeta):
 
         Returns:
             float: The calculated maximum time step (dt).
-        '''
+        """
 
         if self.c is None:
             c = self.initial_velocity_model
@@ -390,7 +396,7 @@ class Wave(Model_parameters, metaclass=ABCMeta):
 
     @ensemble_propagator
     def wave_propagator(self, dt=None, final_time=None, source_nums=[0]):
-        '''
+        """
         Propagate the wave forward in time.
         Currently uses central differences.
 
@@ -409,7 +415,7 @@ class Wave(Model_parameters, metaclass=ABCMeta):
             Wavefield at the final time.
         u_rec: numpy array
             Wavefield at the receivers across the timesteps.
-        '''
+        """
         if final_time is not None:
             self.final_time = final_time
         if dt is not None:
@@ -432,15 +438,15 @@ class Wave(Model_parameters, metaclass=ABCMeta):
 
     @abstractmethod
     def rhs_no_pml(self):
-        '''
+        """
         Return the right-hand side Cofunction without PML DOFs (i.e., only
         the DOFs associated with the subspace of the original problem).
-        '''
+        """
         pass
 
     def define_property_function_space(self, func_space_type, dg_property,
                                        shape_func_space=None):
-        '''
+        """
         Define the function space for a material property.
 
         Parameters:
@@ -459,7 +465,7 @@ class Wave(Model_parameters, metaclass=ABCMeta):
         --------
         V: `firedrake function space`
             Function space for the material property
-        '''
+        """
 
         # Checking input arguments
         opts_func_space_type = ['scalar', 'vector', 'tensor']
@@ -517,7 +523,7 @@ class Wave(Model_parameters, metaclass=ABCMeta):
                                            constant=None,
                                            conditional=None,
                                            expression=None):
-        '''
+        """
         Initialize material property from a UFL input. This method is
         used when the material property is defined by a constant value,
         a conditional or an expression.
@@ -549,7 +555,7 @@ class Wave(Model_parameters, metaclass=ABCMeta):
         --------
         mat_property: `firedrake function`
             Material property
-        '''
+        """
 
         if constant is not None:
             value = 1 if constant == 0. else abs(constant)
@@ -584,7 +590,7 @@ class Wave(Model_parameters, metaclass=ABCMeta):
 
     def _initialize_material_prop_from_func(self, property_name,
                                             fire_function, V):
-        '''
+        """
         Initialize material property from a firedrake function.
 
         Parameters:
@@ -600,7 +606,7 @@ class Wave(Model_parameters, metaclass=ABCMeta):
         --------
         mat_property: `firedrake function`
             Material property
-        '''
+        """
 
         ele_orig = self.function_space.ufl_element().family()
         dgr_orig = self.function_space.ufl_element().degree()
@@ -624,7 +630,7 @@ class Wave(Model_parameters, metaclass=ABCMeta):
         return mat_property
 
     def _initialize_random_material_prop(self, property_name, random, V):
-        '''
+        """
         Initialize material property from a random distribution.
 
         Parameters:
@@ -641,7 +647,7 @@ class Wave(Model_parameters, metaclass=ABCMeta):
         --------
         mat_property: `firedrake function`
             Material property
-        '''
+        """
 
         col0 = int(abs(log10(abs(random[0])))) + 2
         col1 = int(abs(log10(abs(random[1])))) + 2
@@ -656,7 +662,7 @@ class Wave(Model_parameters, metaclass=ABCMeta):
         return mat_property
 
     def _initialize_material_prop_from_file(self, property_name, from_file, V):
-        '''
+        """
         Initialize material property from a file.
 
         Parameters:
@@ -672,7 +678,7 @@ class Wave(Model_parameters, metaclass=ABCMeta):
         --------
         mat_property: `firedrake function`
             Material property
-        '''
+        """
 
         ele_orig = self.function_space.ufl_element().family()
         dgr_orig = self.function_space.ufl_element().degree()
@@ -702,7 +708,7 @@ class Wave(Model_parameters, metaclass=ABCMeta):
 
     def _saving_property_to_file(self, mat_property, property_name,
                                  foldername='default'):
-        '''
+        """
         Save a material property to a pvd file for visualization.
 
         Parameters:
@@ -718,7 +724,7 @@ class Wave(Model_parameters, metaclass=ABCMeta):
         Returns:
         --------
         None
-        '''
+        """
 
         # Path to save data
         self.path_save_matprop = getcwd() + ('/property_fields/'
@@ -731,7 +737,7 @@ class Wave(Model_parameters, metaclass=ABCMeta):
     @staticmethod
     def _check_material_property_inputs(val_lst, func_space_type,
                                         shape_func_space, output):
-        '''
+        """
         Check the inputs for setting a material property.
 
         Parameters:
@@ -752,7 +758,7 @@ class Wave(Model_parameters, metaclass=ABCMeta):
         Returns:
         --------
         None
-        '''
+        """
 
         if sum(value is not None for value in val_lst) > 1:
             name_lst = ["constant", "conditional", "expression",
@@ -775,7 +781,7 @@ class Wave(Model_parameters, metaclass=ABCMeta):
                               random=None, fire_function=None,
                               from_file=None, dg_property=False,
                               output=False, foldername='default'):
-        '''
+        """
         Set a material property(e.g., density, etc.) in the model.
 
         Parameters:
@@ -819,7 +825,7 @@ class Wave(Model_parameters, metaclass=ABCMeta):
         -----------
         mat_property: `firedrake function`
             Material property
-        '''
+        """
 
         # Checking input arguments
         val_lst = [constant, conditional, expression,
