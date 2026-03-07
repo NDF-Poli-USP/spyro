@@ -484,7 +484,6 @@ class Wave(Model_parameters, metaclass=ABCMeta):
             element_y = fire.FiniteElement(typ_ele_y, fire.interval,
                                            dgr_ele[1], variant=variant)
             tensor_element = fire.TensorProductElement(element_zx, element_y)
-            V = fire.FunctionSpace(self.mesh, tensor_element)
 
             # Function space for the property
             if func_space_type == 'scalar':
@@ -500,7 +499,6 @@ class Wave(Model_parameters, metaclass=ABCMeta):
                 self.function_space.ufl_element().family()
             dgr_ele = 0 if dg_property else \
                 self.function_space.ufl_element().degree()
-            V = fire.FunctionSpace(self.mesh, self.ele_type_c0, self.p_c0)
 
             # Function space for the property
             if func_space_type == 'scalar':
