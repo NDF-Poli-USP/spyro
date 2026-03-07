@@ -9,12 +9,15 @@ fire.parameters["loopy"] = {"silenced_warnings": ["v1_scheduler_fallback"]}
 warnings.filterwarnings("ignore", category=RuntimeWarning)
 
 
-def wave_dict(domain_dim, tf_usu, dt_usu):
+def wave_dict(cell_type, domain_dim, tf_usu, dt_usu):
     '''
     Create a dictionary with parameters for the model.
 
     Parameters
     ----------
+    cell_type : `str`
+        Type of cell for the mesh. Options: "T" for triangle or tetrahedra,
+        "Q" for quadrilateral or hexahedra.
     domain_dim : `list`
         List containing the domain dimensions [Lz, Lx, Ly] in km
     tf_usu : `float`
@@ -31,7 +34,7 @@ def wave_dict(domain_dim, tf_usu, dt_usu):
     dictionary = {}
     dictionary["options"] = {
         # Simplexes: triangles or tetrahedra (T) or quadrilaterals (Q)
-        "cell_type": "Q",
+        "cell_type": cell_type,
         "variant": "lumped",  # Options: lumped, equispaced or DG.
         # Default is lumped "method":"MLT"
         # (MLT/spectral_quadrilateral/DG_triangle/DG_quadrilateral)
@@ -82,10 +85,18 @@ def wave_dict(domain_dim, tf_usu, dt_usu):
 
 
 @pytest.fixture(scope="function")
-def wave_instance():
+def wave_instance(cell_type):
     '''
     Create an instance of the isotropic wave solver.
 
+    Parameters
+    ----------
+    cell_type : `str`
+        Type of cell for the mesh. Options: "T" for triangle or tetrahedra,
+        "Q" for quadrilateral or hexahedra.
+
+    Returns
+    -------
     Wave_obj : `wave.IsotropicWave`
         An instance of the IsotropicWave class
     '''
@@ -106,7 +117,7 @@ def wave_instance():
     edge_length = 0.040
 
     # Create dictionary with parameters for the model
-    dictionary = wave_dict(domain_dim, tf_usu, dt_usu)
+    dictionary = wave_dict(cell_type, domain_dim, tf_usu, dt_usu)
 
     # Create a wave object
     Wave_obj = IsotropicWave(dictionary)
@@ -117,7 +128,8 @@ def wave_instance():
     return Wave_obj
 
 
-def test_constant_mat_prop(wave_instance):
+@pytest.mark.parametrize("cell_type", ["T", "Q"])
+def test_constant_mat_prop(wave_instance, cell_type):
     '''
     Test to assign constant material properties to an instance of Wave.
 
@@ -176,7 +188,8 @@ def test_constant_mat_prop(wave_instance):
             pytest.fail(f"Setting {prop_name} raised an exception: {str(e)}")
 
 
-def test_random_mat_prop(wave_instance):
+@pytest.mark.parametrize("cell_type", ["T", "Q"])
+def test_random_mat_prop(wave_instance, cell_type):
     '''
     Test to assign random material properties to an instance of Wave.
 
@@ -310,7 +323,8 @@ def get_only_mesh_vertices(Wave_obj):
     return coords, mask_pnt
 
 
-def test_conditional_mat_prop(wave_instance):
+@pytest.mark.parametrize("cell_type", ["T", "Q"])
+def test_conditional_mat_prop(wave_instance, cell_type):
     '''
     Test to assign conditional material properties to an instance of Wave.
 
@@ -449,7 +463,8 @@ def numerical_values_expr(prop_name, coords):
     return exp_num
 
 
-def test_expression_mat_prop(wave_instance):
+@pytest.mark.parametrize("cell_type", ["T", "Q"])
+def test_expression_mat_prop(wave_instance, cell_type):
     '''
     Test to assign expressions as material properties to an instance of Wave.
 
@@ -530,7 +545,8 @@ def get_coords_DG0(Wave_obj, coords):
     return coords_DG0
 
 
-def test_function_mat_prop(wave_instance):
+@pytest.mark.parametrize("cell_type", ["T", "Q"])
+def test_function_mat_prop(wave_instance, cell_type):
     '''
     Test to assign firedrake functione as material
     properties to an instance of Wave.
@@ -582,7 +598,8 @@ def test_function_mat_prop(wave_instance):
     print("✅ vel_S_DG0 Verified: Scalar function values", flush=True)
 
 
-def test_fromfile_mat_prop(wave_instance):
+@pytest.mark.parametrize("cell_type", ["T", "Q"])
+def test_fromfile_mat_prop(wave_instance, cell_type):
     '''
     Test to assign firedrake functione as material
     properties to an instance of Wave.
@@ -621,7 +638,8 @@ def test_fromfile_mat_prop(wave_instance):
           f"NotImplementedError: {exc_info.value}", flush=True)
 
 
-def test_vector_mat_prop(wave_instance):
+@pytest.mark.parametrize("cell_type", ["T", "Q"])
+def test_vector_mat_prop(wave_instance, cell_type):
     '''
     Test to assign vector material properties to an instance of Wave.
 
@@ -679,7 +697,8 @@ def test_vector_mat_prop(wave_instance):
     print("✅ alphaT_dg0 Verified: Vectorial function values", flush=True)
 
 
-def test_tensor_mat_prop(wave_instance):
+@pytest.mark.parametrize("cell_type", ["T", "Q"])
+def test_tensor_mat_prop(wave_instance, cell_type):
     '''
     Test to assign tensor material properties to an instance of Wave.
 

@@ -211,7 +211,8 @@ class IsotropicWave(ElasticWave):
             elif tag == "uy":
                 subspace = self.function_space.sub(2)
             else:
-                raise Exception(f"Unsupported boundary condition with tag: {tag}")
+                raise Exception(
+                    f"Unsupported boundary condition with tag: {tag}")
             self.bcs.append(DirichletBC(subspace, value, idbc))
 
     def parse_volumetric_forces(self):
