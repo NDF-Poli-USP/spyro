@@ -176,7 +176,7 @@ class Modal_Solver():
         a = c * c * fire.inner(fire.grad(u), fire.grad(v)) * dx
 
         if source:
-            L = fire.Constant(1.0) * v * dx  # Source term
+            L = fire.Constant(1.) * v * dx  # Source term
             return a, L
 
         m = fire.inner(u, v) * dx
