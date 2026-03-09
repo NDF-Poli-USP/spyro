@@ -1,5 +1,4 @@
-from firedrake import ConvergenceError, Function, \
-    FunctionSpace, UnitSquareMesh, UnitCubeMesh
+from firedrake import Function, FunctionSpace, UnitSquareMesh, UnitCubeMesh
 import numpy as np
 from spyro.utils.eval_functions_to_ufl import generate_ufl_functions
 
@@ -75,7 +74,7 @@ def test_run_eval_ufl_functions_2d():
 
     # Assert that all tests passed
     total_2d = len(test_expressions_2d)
-    assert success_2d == total_2d, f"Only {successes}/{total_2d} tests passed"
+    assert success_2d == total_2d, f"Only {success_2d}/{total_2d} tests passed"
     print(f"\n2D Models: {success_2d}/{total_2d} successful "
           f"({100*success_2d/total_2d:.1f}%)")
 
