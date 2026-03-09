@@ -215,7 +215,8 @@ def ensemble_gradient(func):
 
 
 def write_function_to_grid(function, V, grid_spacing):
-    """Interpolate a Firedrake function to a structured grid
+    """
+    Interpolate a Firedrake function to a structured grid
 
     Parameters
     ----------
@@ -265,13 +266,17 @@ def write_function_to_grid(function, V, grid_spacing):
 
 
 def create_segy(function, V, grid_spacing, filename):
-    """Write the velocity data into a segy file named filename
+    """
+    Write the velocity data into a segy file named filename
 
     Parameters
     ----------
-    velocity:
-        Firedrake function representing the values of the velocity
-        model to save
+    function : firedrake.Function
+        Function to interpolate
+    V : firedrake.FunctionSpace
+        Function space of function
+    grid_spacing : float
+        Spacing of grid points
     filename: str
         Name of the segy file to save
 
@@ -299,7 +304,8 @@ def create_segy(function, V, grid_spacing, filename):
 
 @ensemble_save
 def save_shots(Wave_obj, file_name="shots/shot_record_", shot_ids=0):
-    """Save a the shot record from last forward solve to a `pickle`.
+    """
+    Save a the shot record from last forward solve to a `pickle`.
 
     Parameters
     ----------
@@ -411,12 +417,13 @@ def interpolate(Model, fname, V):
         if Model.mesh_parameters.abc_pad_length > 1e-15:
             add_pad = True
     if add_pad:
-        minz = -Model.mesh_parameters.length_z - Model.mesh_parameters.abc_pad_length
+        abc_pad_length = Model.mesh_parameters.abc_pad_length
+        minz = -Model.mesh_parameters.length_z - abc_pad_length
         maxz = 0.0
-        minx = 0.0 - Model.mesh_parameters.abc_pad_length
-        maxx = Model.mesh_parameters.length_x + Model.mesh_parameters.abc_pad_length
-        miny = 0.0 - Model.mesh_parameters.abc_pad_length
-        maxy = Model.mesh_parameters.length_y + Model.mesh_parameters.abc_pad_length
+        minx = 0.0 - abc_pad_length
+        maxx = Model.mesh_parameters.length_x + abc_pad_length
+        miny = 0.0 - abc_pad_length
+        maxy = Model.mesh_parameters.length_y + abc_pad_length
     else:
         minz = -Model.mesh_parameters.length_z
         maxz = 0.0

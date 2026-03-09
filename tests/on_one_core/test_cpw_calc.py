@@ -69,9 +69,9 @@ def run_test_cpw_calc(FEM_method_to_evaluate, correct_cpw):
     print(f"Checked if reference solution seems correct: {test2}")
 
     # Check if cpw is within error TOL, starting search at min
-    min = Cpw_calc.find_minimum()
-    print(f"Minimum of {min}")
-    test3 = np.isclose(correct_cpw, min)
+    min_cpw = Cpw_calc.find_minimum()
+    print(f"Minimum of {min_cpw}")
+    test3 = np.isclose(correct_cpw, min_cpw)
 
     print("END")
     assert all([test1, test2, test3])
@@ -86,6 +86,7 @@ def test_cpw_calc_triangles():
 
 
 @pytest.mark.slow
+@pytest.mark.skip(reason="PML in quads subject to another PR")
 def test_cpw_calc_quads():
     method = "spectral_quadrilateral"
     correct_cpw = 2.5

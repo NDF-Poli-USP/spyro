@@ -13,7 +13,7 @@ from .. import meshing
 
 class Model_parameters(Read_options, Read_boundary_layer,
                        Read_time_axis, Read_outputs):
-    '''
+    """
     Class that reads and sanitizes input parameters.
 
     Attributes
@@ -156,10 +156,10 @@ class Model_parameters(Read_options, Read_boundary_layer,
         Sets the mesh.
     get_mesh()
         Reads in a mesh and scatters it between cores.
-    '''
+    """
 
     def __init__(self, dictionary=None, comm=None):
-        '''
+        """
         Initializes class that reads and sanitizes input parameters.
         A dictionary can be used.
 
@@ -174,7 +174,7 @@ class Model_parameters(Read_options, Read_boundary_layer,
         Returns
         -------
         model_parameters: :class: 'model_parameters' object
-        '''
+        """
         # Converts old dictionary to new one. Deprecated feature
         if "opts" in dictionary:
             warnings.warn("Old deprecated dictionary style in usage.")
@@ -345,9 +345,11 @@ class Model_parameters(Read_options, Read_boundary_layer,
         if value is not None:
             freq_str = f"Frequency of {value} too "
             if value < 1.0:
-                warnings.warn(freq_str + "low for realistic FWI.")
+                warnings.warn(
+                    f"Frequency of {value} too low for realistic FWI.")
             elif value > 50:
-                warnings.warn(freq_str + "high for efficient FWI.")
+                warnings.warn(
+                    f"Frequency of {value} too high for efficient FWI.")
         self._frequency = value
 
     @property
@@ -429,7 +431,8 @@ class Model_parameters(Read_options, Read_boundary_layer,
             self.mesh_parameters.set_mesh(
                 user_mesh=user_mesh,
                 input_mesh_parameters=input_mesh_parameters,
-                abc_pad_length=pad_length)
+                abc_pad_length=pad_length,
+            )
 
         autoMeshing = None if not self.mesh_parameters.automatic_mesh else \
             meshing.AutomaticMesh(mesh_parameters=self.mesh_parameters)
@@ -517,8 +520,10 @@ def _check_point_in_domain(point_coordinates, input_mesh_lengths, negative_z):
         if negative_z and i == 0:
             # For negative_z, domain is [length, 0] (length is negative)
             if not (length <= coord <= 0):
-                raise ValueError(coo_str + f"[{length}, 0].")
+                raise ValueError(f"Coordinate {coord} in dimension {i} "
+                                 f"is outside the domain [{length}, 0].")
         else:
             # For other dimensions, domain is [0, length]
             if not (0 <= coord <= length):
-                raise ValueError(coo_str + f"[0, {length}].")
+                raise ValueError(f"Coordinate {coord} in dimension {i} "
+                                 f"is outside the domain [0, {length}].")
