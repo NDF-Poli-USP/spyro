@@ -4,7 +4,7 @@ from spyro.utils.error_management import value_parameter_error
 
 
 def cells_per_wavelength(method, degree, dimension):
-    '''
+    """
     Returns recommended number of cells per wavelength based on method,
     degree, and dimension of finite element model.
 
@@ -21,7 +21,7 @@ def cells_per_wavelength(method, degree, dimension):
     -------
     float or None
         Recommended number of cells per wavelength, or None if not specified.
-    '''
+    """
     cell_per_wavelength_dictionary = {
         'mass_lumped_triangle2dim2': 7.02,
         'mass_lumped_triangle3dim2': 3.70,
@@ -53,7 +53,7 @@ class MeshingParameters():
                  source_frequency=None, comm=None, quadrilateral=False,
                  method=None, degree=None, velocity_model=None,
                  abc_pad_length=None, negative_z=True):
-        '''
+        """
         Initializes the MeshingParamaters class.
 
         Parameters
@@ -78,7 +78,7 @@ class MeshingParameters():
             Length of the absorbing pad.
         negative_z : bool, optional
             Whether to use negative z coordinates. The default is True.
-        '''
+        """
         self.input_mesh_dictionary = input_mesh_dictionary or {}
         self.dimension = dimension
         self.comm = comm
@@ -180,11 +180,13 @@ class MeshingParameters():
 
     @method.setter
     def method(self, value):
-        allowed_types = ["mass_lumped_triangle",
-                         "DG_triangle",
-                         "spectral_quadrilateral",
-                         "DG_quadrilateral",
-                         "CG"]
+        allowed_types = [
+            "mass_lumped_triangle",
+            "DG_triangle",
+            "spectral_quadrilateral",
+            "DG_quadrilateral",
+            "CG",
+        ]
 
         if value is not None and value not in allowed_types:
             value_parameter_error('method', value, allowed_types)

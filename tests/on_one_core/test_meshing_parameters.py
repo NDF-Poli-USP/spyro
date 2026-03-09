@@ -62,7 +62,8 @@ def test_initialize_mesh_pam():
     test_length_x = (meshing_pam.length_z == dictionary["mesh"]["Lx"])
     test_length_y = (meshing_pam.length_y == dictionary["mesh"]["Ly"])
     test_degree = (meshing_pam.degree == dictionary["options"]["degree"])
-    test_source_frequency = (meshing_pam.source_frequency == dictionary["acquisition"]["frequency"])
+    test_source_frequency = (meshing_pam.source_frequency == dictionary[
+        "acquisition"]["frequency"])
     test_mesh_type = (meshing_pam.mesh_type == "firedrake_mesh")
     test_method = (meshing_pam.method == "mass_lumped_triangle")
 
