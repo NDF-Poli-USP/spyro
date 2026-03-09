@@ -180,8 +180,8 @@ def test_constant_mat_prop(wave_instance, cell_type):
             mean_val = fire.assemble(mat_property * dx) / volume
 
             assert np.isclose(mean_val, constant, rtol=1e-8), \
-                f"❌ {prop_name}: Expected value {constant}, got {mean_val}"
-            print(f"✅ {prop_name} Verified: expected "
+                f"{prop_name}: Expected value {constant}, got {mean_val}"
+            print(f"{prop_name} Verified: expected "
                   f"{constant}, got = {round(mean_val, 10)}", flush=True)
 
         except fire.ConvergenceError as e:
@@ -229,12 +229,12 @@ def test_random_mat_prop(wave_instance, cell_type):
             max_val = random[1]
 
             assert np.all(mat_property_data >= min_val - 1e-8), \
-                f"❌ Values below minimum {min_val} for {prop_name}"
-            print(f"✅ {prop_name} Verified: Values "
+                f"Values below minimum {min_val} for {prop_name}"
+            print(f"{prop_name} Verified: Values "
                   f">= minimum {min_val}", flush=True)
             assert np.all(mat_property_data <= max_val + 1e-8), \
-                f"❌ Values above maximum {max_val} for {prop_name}"
-            print(f"✅ {prop_name} Verified: Values "
+                f"Values above maximum {max_val} for {prop_name}"
+            print(f"{prop_name} Verified: Values "
                   f"<= maximum {max_val}", flush=True)
 
         except fire.ConvergenceError as e:
@@ -406,14 +406,14 @@ def test_conditional_mat_prop(wave_instance, cell_type):
             cnd_above = mat_property.dat.data_with_halos[mask_pnt][above_thrs]
 
             assert np.allclose(exp_below, cnd_below, rtol=1e-8), \
-                f"❌ Values does not match for {prop_name}" + \
+                f"Values does not match for {prop_name}" + \
                 f" for {coord_thrs} < {threshold}"
-            print(f"✅ {prop_name} Verified: Conditional values "
+            print(f"{prop_name} Verified: Conditional values "
                   f"{coord_thrs} < {threshold}", flush=True)
             assert np.allclose(exp_above, cnd_above, rtol=1e-8), \
-                f"❌ Values does not match for {prop_name}" + \
+                f"Values does not match for {prop_name}" + \
                 f" for {coord_thrs} >= {threshold}"
-            print(f"✅ {prop_name} Verified: Conditional values "
+            print(f"{prop_name} Verified: Conditional values "
                   f"{coord_thrs} >= {threshold}", flush=True)
 
         except fire.ConvergenceError as e:
@@ -511,8 +511,8 @@ def test_expression_mat_prop(wave_instance, cell_type):
             val_exp = mat_property.dat.data_with_halos[mask_pnt]
 
             assert np.allclose(val_exp, exp_exp, rtol=1e-8), \
-                f"❌ Values of the expression does not match for {prop_name}"
-            print(f"✅ {prop_name} Verified: Expression values", flush=True)
+                f"Values of the expression does not match for {prop_name}"
+            print(f"{prop_name} Verified: Expression values", flush=True)
 
         except fire.ConvergenceError as e:
             pytest.fail(f"Setting {prop_name} raised an exception: {str(e)}")
@@ -577,8 +577,8 @@ def test_function_mat_prop(wave_instance, cell_type):
     val_fun = vel_S.dat.data_with_halos[mask_pnt]
 
     assert np.allclose(val_fun, exp_fun, rtol=1e-8), \
-        "❌ Values of the firedrake function does not match for vel_S"
-    print("✅ vel_S Verified: Firedrake function values", flush=True)
+        "Values of the firedrake function does not match for vel_S"
+    print("vel_S Verified: Firedrake function values", flush=True)
 
     # Different function space (DG0)
     vel_S_dg0 = Wave_obj.set_material_property(
@@ -594,8 +594,8 @@ def test_function_mat_prop(wave_instance, cell_type):
     val_fun = vel_S.at(coords_DG0, dont_raise=True)
 
     assert np.allclose(val_fun, exp_fun, rtol=1e-8), \
-        "❌ Values of the scalar function does not match for vel_S_DG0"
-    print("✅ vel_S_DG0 Verified: Scalar function values", flush=True)
+        "Values of the scalar function does not match for vel_S_DG0"
+    print("vel_S_DG0 Verified: Scalar function values", flush=True)
 
 
 @pytest.mark.parametrize("cell_type", ["T", "Q"])
@@ -632,9 +632,9 @@ def test_fromfile_mat_prop(wave_instance, cell_type):
     expected_message = "Error Setting a Material Property: " + \
         "Initializing property from file is currently not implemented"
     assert expected_message in str(exc_info.value), \
-        f"❌ Unexpected error message: {str(exc_info.value)}"
+        f"Unexpected error message: {str(exc_info.value)}"
 
-    print(" ✅ Material Property from file: Correctly raised "
+    print("Material Property from file: Correctly raised "
           f"NotImplementedError: {exc_info.value}", flush=True)
 
 
@@ -693,8 +693,8 @@ def test_vector_mat_prop(wave_instance, cell_type):
     cond2 = np.isclose(exp_v2, val_v2, rtol=1e-8)
 
     assert cond0 and cond1 and cond2, \
-        "❌ Values of the vectorial function does not match for alphaT_dg0"
-    print("✅ alphaT_dg0 Verified: Vectorial function values", flush=True)
+        "Values of the vectorial function does not match for alphaT_dg0"
+    print("alphaT_dg0 Verified: Vectorial function values", flush=True)
 
 
 @pytest.mark.parametrize("cell_type", ["T", "Q"])
@@ -755,7 +755,7 @@ def test_tensor_mat_prop(wave_instance, cell_type):
         shape_func_space=shape_func_space)
 
     assert Celast is not None, "Failed to set Celast"
-    print("✅ Celast Verified: Tensorial function assign", flush=True)
+    print("Celast Verified: Tensorial function assign", flush=True)
 
     # Tensor 2x3
     dummy = Wave_obj.set_material_property('dummy', 'tensor',
@@ -787,7 +787,7 @@ def test_tensor_mat_prop(wave_instance, cell_type):
         foldername='/property_fields/vector_tensor/')
 
     assert Celast_2x3 is not None, "Failed to set Celast_2x3"
-    print("✅ Celast_2x3 Verified: Tensorial function saving", flush=True)
+    print("Celast_2x3 Verified: Tensorial function saving", flush=True)
 
     # Different function space (DG0)
     Celast_dg0 = Wave_obj.set_material_property(
@@ -796,4 +796,4 @@ def test_tensor_mat_prop(wave_instance, cell_type):
         foldername='/property_fields/vector_tensor/')
 
     assert Celast_dg0 is not None, "Failed to set Celast_dg0"
-    print("✅ Celast_2x3 Verified: Tensorial function saving DG0", flush=True)
+    print("Celast_2x3 Verified: Tensorial function saving DG0", flush=True)
