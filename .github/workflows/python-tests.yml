@@ -40,11 +40,11 @@ jobs:
         && apt-get -y install gmsh patchelf \
         && pip3 install segyio \
         && apt-get update && apt-get install -y libgmp3-dev libmpfr-dev libcgal-dev python3-tk \
-        && pip3 install --no-dependencies git+https://github.com/NDF-Poli-USP/SeismicMesh.git \
+        && pip3 install --no-deps git+https://github.com/NDF-Poli-USP/SeismicMesh.git \
         && pip3 install pyamg \
         && pip3 install meshio \
         && pip3 install -U memory_profiler \
-        && pip3 install pytest pytest-cov \
+        && pip3 install pytest pytest-cov pytest-xdist  \
         && pip3 install pytest-sugar
 
     - name: Clear all firedrake-related caches
@@ -91,11 +91,11 @@ jobs:
         && apt-get -y install gmsh patchelf \
         && pip3 install segyio \
         && apt-get update && apt-get install -y libgmp3-dev libmpfr-dev libcgal-dev python3-tk \
-        && pip3 install --no-dependencies git+https://github.com/NDF-Poli-USP/SeismicMesh.git \
+        && pip3 install --no-deps git+https://github.com/NDF-Poli-USP/SeismicMesh.git \
         && pip3 install pyamg \
         && pip3 install meshio \
         && pip3 install -U memory_profiler \
-        && pip3 install pytest pytest-cov \
+        && pip3 install pytest pytest-cov pytest-xdist  \
         && pip3 install pytest-sugar
 
     - name: Clear all firedrake-related caches
