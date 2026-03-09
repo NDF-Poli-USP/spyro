@@ -115,11 +115,11 @@ jobs:
     - name: Running parallel tests for forward problem only
       run: |
           ./cleanup.sh
-          mpiexec -n 6 pytest tests/three_dimension/test_hexahedral_convergence.py
-          mpiexec -n 6 pytest tests/parallel/test_forward.py
-          mpiexec -n 6 pytest tests/parallel/test_forward_supershot.py
-          mpiexec -n 2 pytest tests/parallel/test_parallel_io.py
-          mpiexec -n 2 pytest tests/parallel/test_forward_multiple_serial_shots.py
+          mpiexec -n 6 python3 -m pytest tests/three_dimension/test_hexahedral_convergence.py
+          mpiexec -n 6 python3 -m pytest tests/parallel/test_forward.py
+          mpiexec -n 6 python3 -m pytest tests/parallel/test_forward_supershot.py
+          mpiexec -n 2 python3 -m pytest tests/parallel/test_parallel_io.py
+          mpiexec -n 2 python3 -m pytest tests/parallel/test_forward_multiple_serial_shots.py
 
 
 
