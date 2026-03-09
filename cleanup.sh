@@ -10,13 +10,18 @@ rm -f *.pdf
 rm -f *.dat
 rm -f *.segy
 rm -f *.hdf5
+
+# Remove test outputs
 rm -f results/*.vtu
 rm -f results/*.pvd
 rm -f results/*.pvtu
 rm -f shots/*.dat
+
+# Remove coverage files
 rm -f .coverage
 rm -f .coverage.*
 
+# Remove generated directories
 rm -rf velocity_models/test*
 rm -rf results/shot*
 rm -rf results/gradient
