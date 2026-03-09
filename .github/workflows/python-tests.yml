@@ -114,30 +114,34 @@ jobs:
 
     - name: Running parallel tests for forward problem only
       run: |
-          ./cleanup.sh
-          mpiexec -n 6 python3 -m pytest tests/three_dimension/test_hexahedral_convergence.py
-          mpiexec -n 6 python3 -m pytest tests/parallel/test_forward.py
-          mpiexec -n 6 python3 -m pytest tests/parallel/test_forward_supershot.py
-          mpiexec -n 2 python3 -m pytest tests/parallel/test_parallel_io.py
-          mpiexec -n 2 python3 -m pytest tests/parallel/test_forward_multiple_serial_shots.py
+        ./cleanup.sh
+        mpiexec -n 6 python3 -m pytest --cov=spyro --cov-append tests/three_dimension/test_hexahedral_convergence.py
+        mpiexec -n 6 python3 -m pytest --cov=spyro --cov-append tests/parallel/test_forward.py
+        mpiexec -n 6 python3 -m pytest --cov=spyro --cov-append tests/parallel/test_forward_supershot.py
+        mpiexec -n 2 python3 -m pytest --cov=spyro --cov-append tests/parallel/test_parallel_io.py
+        mpiexec -n 2 python3 -m pytest --cov=spyro --cov-append tests/parallel/test_forward_multiple_serial_shots.py
 
 
 
     - name: Running parallel tests for inversion
       run: |
-          ./cleanup.sh
-          mpiexec -n 6 python3 -m pytest tests/parallel/test_fwi.py
-          mpiexec -n 3 python3 -m pytest tests/parallel/test_supershot_grad.py
-          mpiexec -n 2 python3 -m pytest tests/parallel/test_gradient_serialshots.py
-    
+        ./cleanup.sh
+        mpiexec -n 6 python3 -m pytest --cov=spyro --cov-append tests/parallel/test_fwi.py
+        mpiexec -n 3 python3 -m pytest --cov=spyro --cov-append tests/parallel/test_supershot_grad.py
+        mpiexec -n 2 python3 -m pytest --cov=spyro --cov-append tests/parallel/test_gradient_serialshots.py
+        
 
 
-    - name: Combine coverage data
+    - name: Combine coverage
       run: |
-        python3 -m coverage combine
-        python3 -m coverage xml
-        python3 -m coverage report -m
-
+        if ls .coverage* 1> /dev/null 2>&1; then
+          echo "Coverage files found"
+          python3 -m coverage combine
+          python3 -m coverage xml
+          python3 -m coverage report -m
+        else
+          echo "No coverage files found; skipping combine."
+        fi
 
     - name: Uploading coverage to Codecov
       run: |
