@@ -841,51 +841,46 @@ class Wave(Model_parameters, metaclass=ABCMeta):
         if self.mesh is None:
             self.set_mesh()
 
-        try:
+        if func_space_type == 'scalar':
 
-            if func_space_type == 'scalar':
+            if any(v is not None for v in val_lst[:3]):  # UFL
+                mat_property = self._initialize_material_prop_from_ufl(
+                    property_name, func_space_type, V, constant=constant,
+                    conditional=conditional, expression=expression)
 
-                if any(v is not None for v in val_lst[:3]):  # UFL
-                    mat_property = self._initialize_material_prop_from_ufl(
-                        property_name, func_space_type, V, constant=constant,
-                        conditional=conditional, expression=expression)
+            if random is not None:  # Random
+                mat_property = self._initialize_random_material_prop(
+                    property_name, random, V)
 
-                if random is not None:  # Random
-                    mat_property = self._initialize_random_material_prop(
-                        property_name, random, V)
+            if fire_function is not None:
+                mat_property = self._initialize_material_prop_from_func(
+                    property_name, fire_function, V)
 
-                if fire_function is not None:
-                    mat_property = self._initialize_material_prop_from_func(
-                        property_name, fire_function, V)
+            if from_file is not None:
+                raise NotImplementedError("Initializing property "
+                                            "from file is currently "
+                                            "not implemented")
+                # mat_property = self._initialize_material_prop_from_file(
+                #     property_name, from_file, V)
 
-                if from_file is not None:
-                    raise NotImplementedError("Initializing property "
-                                              "from file is currently "
-                                              "not implemented")
-                    # mat_property = self._initialize_material_prop_from_file(
-                    #     property_name, from_file, V)
+        else:
 
-            else:
+            print("Vectorial and Tensorial material properties are "
+                    "defined only either by constants or\nby firedrake "
+                    "functions. If use 'constant', define its components "
+                    "as scalar material\nproperties using the same property "
+                    "name followed by the component at the end.")
 
-                print("Vectorial and Tensorial material properties are "
-                      "defined only either by constants or\nby firedrake "
-                      "functions. If use 'constant', define its components "
-                      "as scalar material\nproperties using the same property "
-                      "name followed by the component at the end.")
+            if constant is not None:
+                mat_property = self._initialize_material_prop_from_ufl(
+                    property_name, func_space_type, V,
+                    shape_func_space=shape_func_space,
+                    constant=constant, conditional=None,
+                    expression=None)
 
-                if constant is not None:
-                    mat_property = self._initialize_material_prop_from_ufl(
-                        property_name, func_space_type, V,
-                        shape_func_space=shape_func_space,
-                        constant=constant, conditional=None,
-                        expression=None)
-
-                if fire_function is not None:
-                    mat_property = self._initialize_material_prop_from_func(
-                        property_name, fire_function, V)
-
-        except Exception as e:
-            raise ValueError(f"Error Setting a Material Property: {e}.")
+            if fire_function is not None:
+                mat_property = self._initialize_material_prop_from_func(
+                    property_name, fire_function, V)
 
         if output:
             self._saving_property_to_file(mat_property, property_name,
