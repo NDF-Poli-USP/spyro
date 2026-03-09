@@ -120,13 +120,16 @@ jobs:
           mpiexec -n 6 pytest tests/parallel/test_forward_supershot.py
           mpiexec -n 2 pytest tests/parallel/test_parallel_io.py
           mpiexec -n 2 pytest tests/parallel/test_forward_multiple_serial_shots.py
-    
+
+
+
     - name: Running parallel tests for inversion
       run: |
           ./cleanup.sh
-          mpiexec -n 6 pytest tests/parallel/test_fwi.py
-          mpiexec -n 3 pytest tests/parallel/test_supershot_grad.py
-          mpiexec -n 2 pytest tests/parallel/test_gradient_serialshots.py
+          mpiexec -n 6 python3 -m pytest tests/parallel/test_fwi.py
+          mpiexec -n 3 python3 -m pytest tests/parallel/test_supershot_grad.py
+          mpiexec -n 2 python3 -m pytest tests/parallel/test_gradient_serialshots.py
+    
 
     - name: Covering parallel 3D forward test
       continue-on-error: true
@@ -159,7 +162,7 @@ jobs:
     - name: Covering spatially parallelized shots in serial
       continue-on-error: true
       run: |
-          mpiexec -n 2 pytest --cov-report=xml --cov-append --cov=spyro tests/parallel/test_test_gradient_serialshots.py
+          mpiexec -n 2 pytest --cov-report=xml --cov-append --cov=spyro tests/parallel/test_gradient_serialshots.py
     - name: Uploading coverage to Codecov
       run: |
         export CODECOV_TOKEN="6cd21147-54f7-4b77-94ad-4b138053401d" && curl -s https://codecov.io/bash | bash
