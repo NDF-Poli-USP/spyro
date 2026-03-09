@@ -1,19 +1,22 @@
 #!/bin/bash
-rm *.msh
-rm *.vtk
-rm *.png
-rm *.vtu
-rm *.pvtu
-rm *.pvd
-rm *.npy
-rm *.pdf
-rm *.dat
-rm *.segy
-rm *.hdf5
-rm results/*.vtu
-rm results/*.pvd
-rm results/*.pvtu
-rm shots/*.dat
+rm -f *.msh
+rm -f *.vtk
+rm -f *.png
+rm -f *.vtu
+rm -f *.pvtu
+rm -f *.pvd
+rm -f *.npy
+rm -f *.pdf
+rm -f *.dat
+rm -f *.segy
+rm -f *.hdf5
+rm -f results/*.vtu
+rm -f results/*.pvd
+rm -f results/*.pvtu
+rm -f shots/*.dat
+rm -f .coverage
+rm -f .coverage.*
+
 rm -rf velocity_models/test*
 rm -rf results/shot*
 rm -rf results/gradient
