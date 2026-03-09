@@ -1,0 +1,10 @@
+[run]
+source = spyro
+branch = true
+parallel = true
+patch = subprocess
+
+[report]
+omit =
+    tests/*
+    test_integration/*
