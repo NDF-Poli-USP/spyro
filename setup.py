@@ -14,5 +14,7 @@ setup(
         "matplotlib",
         "segyio",
         "meshio",
+        "gmsh",
         "mpi-pytest"],
 )
+
