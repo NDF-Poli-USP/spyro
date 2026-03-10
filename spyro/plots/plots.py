@@ -27,36 +27,58 @@ def plot_shots(
     out_index=None,
 ):
     """
-    Plot a shot record and save the image to disk. Note that
-    this automatically will rename shots when ensmeble paralleism is
-    activated.
+    Plot shot records and save to disk.
+
+    Creates a contour plot of seismic shot records showing receiver responses
+    over time. The plot is automatically saved with a filename that includes
+    the shot IDs, and the @ensemble_save decorator handles naming when using
+    ensemble parallelism.
 
     Parameters
     ----------
-    model: `dictionary`
-        Contains model parameters and options.
-    comm:A Firedrake commmunicator
-        The communicator you get from calling spyro.utils.mpi_init()
-    arr: array-like
-        An array in which rows are intervals in time and columns are receivers
-    show: `boolean`, optional
-        Should the images appear on screen?
-    file_name: string, optional
-        The name of the saved image
-    vmin: float, optional
-        The minimum value to plot on the colorscale
-    vmax: float, optional
-        The maximum value to plot on the colorscale
-    file_format: string, optional
-        File format, pdf or png
-    start_index: integer, optional
-        The index of the first receiver to plot
-    end_index: integer, optional
-        The index of the last receiver to plot
+    Wave_object : Wave
+        Wave simulation object containing the shot record data in the
+        receivers_output attribute, along with timing and receiver information.
+    show : bool, optional
+        If True, display the plot interactively. Default is False.
+    file_name : str, optional
+        Base name for the saved image file (without extension).
+        Default is "plot_of_shot".
+    shot_ids : list of int, optional
+        List of shot IDs to include in the filename. Default is [0].
+    vmin : float, optional
+        Minimum value for the colorscale. Default is -1e-5.
+    vmax : float, optional
+        Maximum value for the colorscale. Default is 1e-5.
+    contour_lines : int, optional
+        Number of contour lines to plot. Default is 700.
+    file_format : str, optional
+        Output file format, either "pdf" or "png". Default is "pdf".
+    start_index : int, optional
+        Index of the first receiver to plot. Default is 0.
+    end_index : int, optional
+        Index of the last receiver to plot. If 0, uses all receivers.
+        Default is 0.
+    out_index : int, optional
+        Index for selecting a specific output dimension from receivers_output.
+        If None, uses the entire array. Default is None.
 
     Returns
     -------
     None
+        The function saves the plot to disk and returns None.
+
+    Notes
+    -----
+    The plot uses a grayscale colormap with time on the y-axis (inverted,
+    with 0 at top) and receiver number on the x-axis. The @ensemble_save
+    decorator automatically modifies the filename when running with ensemble
+    parallelism.
+
+    Examples
+    --------
+    >>> plot_shots(wave_obj, show=True, file_name="my_shot", shot_ids=[0, 1])
+    >>> plot_shots(wave_obj, vmin=-1e-3, vmax=1e-3, file_format="png")
     """
     file_name = file_name + str(shot_ids) + "." + file_format
     num_recvs = Wave_object.number_of_receivers
