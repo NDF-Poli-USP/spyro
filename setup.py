@@ -17,4 +17,3 @@ setup(
         "gmsh",
         "mpi-pytest"],
 )
-
