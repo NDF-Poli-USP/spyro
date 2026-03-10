@@ -28,8 +28,10 @@ jobs:
     steps:
 
     - name: Pre-run cleanup
-        # Make sure the current directory is empty
-      run: find . -delete
+      run: |
+        rm -rf .pytest_cache
+        rm -f .coverage .coverage.*
+        find . -name '*.pkl' -delete || true
 
     - uses: actions/checkout@v4
 
@@ -59,11 +61,23 @@ jobs:
     - name: Running serial fast tests
       run: |
         ./cleanup.sh
-        python3 -m pytest -n 8 --cov-report=xml --cov=spyro tests/on_one_core/ --skip-slow --durations=10
+        python3 -m pytest -n 8 --cov-report=xml --cov-report=term-missing --cov=spyro tests/on_one_core/ --skip-slow --durations=10
 
     - name: Post-run cleanup
       if: always()
-      run: find . -delete
+      run: |
+        rm -rf .pytest_cache
+        find . -name '*.pkl' -delete || true
+      
+    - name: Upload fast coverage artifact
+      uses: actions/upload-artifact@v4
+      with:
+        name: coverage-fast
+        path: |
+          .coverage
+          coverage.xml
+        if-no-files-found: ignore
+
 
   slow-tests:
     name: Slow Tests and Parallel Tests
@@ -79,8 +93,10 @@ jobs:
     steps:
 
     - name: Pre-run cleanup
-        # Make sure the current directory is empty
-      run: find . -delete
+      run: |
+          rm -rf .pytest_cache
+          rm -f .coverage .coverage.*
+          find . -name '*.pkl' -delete || true
 
     - uses: actions/checkout@v4
 
@@ -110,25 +126,42 @@ jobs:
     - name: Running serial slow tests
       run: |
         ./cleanup.sh
+        export COVERAGE_FILE=".coverage.slow"
         python3 -m pytest -n 8 --cov-report=xml --cov-append --cov=spyro tests/on_one_core/  --only-slow
 
     - name: Running parallel tests for forward problem only
       run: |
         ./cleanup.sh
-        mpiexec -n 6 python3 -m pytest --cov=spyro --cov-append tests/three_dimension/test_hexahedral_convergence.py
-        mpiexec -n 6 python3 -m pytest --cov=spyro --cov-append tests/parallel/test_forward.py
-        mpiexec -n 6 python3 -m pytest --cov=spyro --cov-append tests/parallel/test_forward_supershot.py
-        mpiexec -n 2 python3 -m pytest --cov=spyro --cov-append tests/parallel/test_parallel_io.py
-        mpiexec -n 2 python3 -m pytest --cov=spyro --cov-append tests/parallel/test_forward_multiple_serial_shots.py
+           export COVERAGE_RCFILE=/dev/null
+    
+           COVERAGE_FILE=".coverage.hexa.%p" \
+           mpiexec -n 6 python3 -m coverage run --parallel-mode -m pytest tests/three_dimension/test_hexahedral_convergence.py
+    
+            COVERAGE_FILE=".coverage.forward.%p" \
+           mpiexec -n 6 python3 -m coverage run --parallel-mode -m pytest tests/parallel/test_forward.py
+    
+           COVERAGE_FILE=".coverage.supershot.%p" \
+           mpiexec -n 6 python3 -m coverage run --parallel-mode -m pytest tests/parallel/test_forward_supershot.py
+    
+           COVERAGE_FILE=".coverage.parallelio.%p" \
+           mpiexec -n 2 python3 -m coverage run --parallel-mode -m pytest tests/parallel/test_parallel_io.py
+           
+            COVERAGE_FILE=".coverage.multishots.%p" \
+            mpiexec -n 2 python3 -m coverage run --parallel-mode -m pytest tests/parallel/test_forward_multiple_serial_shots.py
 
 
 
     - name: Running parallel tests for inversion
       run: |
         ./cleanup.sh
-        mpiexec -n 6 python3 -m pytest --cov=spyro --cov-append tests/parallel/test_fwi.py
-        mpiexec -n 3 python3 -m pytest --cov=spyro --cov-append tests/parallel/test_supershot_grad.py
-        mpiexec -n 2 python3 -m pytest --cov=spyro --cov-append tests/parallel/test_gradient_serialshots.py
+         COVERAGE_FILE=".coverage.fwi.%p" \
+         mpiexec -n 6 python3 -m coverage run --parallel-mode -m pytest tests/parallel/test_fwi.py
+  
+         COVERAGE_FILE=".coverage.supershotgrad.%p" \
+        mpiexec -n 3 python3 -m coverage run --parallel-mode -m pytest tests/parallel/test_supershot_grad.py
+  
+         COVERAGE_FILE=".coverage.gradserial.%p" \
+         mpiexec -n 2 python3 -m coverage run --parallel-mode -m pytest tests/parallel/test_gradient_serialshots.py
         
 
 
@@ -144,8 +177,15 @@ jobs:
         fi
 
     - name: Uploading coverage to Codecov
-      run: |
-          export CODECOV_TOKEN="6cd21147-54f7-4b77-94ad-4b138053401d" && curl -s https://codecov.io/bash | bash
+      uses: codecov/codecov-action@v4
+      with:
+        files: ./coverage.xml
+        fail_ci_if_error: true
+        verbose: true
+      env:
+        CODECOV_TOKEN: ${{ secrets.CODECOV_TOKEN }}
+
+
     - name: Post-run cleanup
       if: always()
       run: find . -delete
