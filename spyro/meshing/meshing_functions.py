@@ -739,7 +739,7 @@ def build_big_rect_with_inner_element_group(mesh_parameters):
     gmsh.option.setNumber("Mesh.MeshSizeFromCurvature", 0)
     gmsh.option.setNumber("Mesh.MeshSizeExtendFromBoundary", 0)
 
-    # --- Geometry: onlength_x the big rectangle ---
+    # --- Geometry: on length_x the big rectangle ---
     surf_tag = gmsh.model.occ.addRectangle(-length_z, 0.0, 0.0, length_z, length_x)
     gmsh.model.occ.synchronize()
 
