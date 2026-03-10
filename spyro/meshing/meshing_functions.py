@@ -165,6 +165,16 @@ class AutomaticMesh:
     def create_firedrake_mesh(self):
         """
         Creates a mesh based on Firedrake meshing utilities.
+
+        Returns
+        -------
+        mesh : Firedrake Mesh
+            The generated mesh.
+
+        Raises
+        ------
+        ValueError
+            If dimension is not supported (must be 2 or 3).
         """
         if self.dimension == 2:
             return self.create_firedrake_2D_mesh()
@@ -176,6 +186,17 @@ class AutomaticMesh:
     def create_firedrake_2D_mesh(self):
         """
         Creates a 2D mesh based on Firedrake meshing utilities.
+
+        Returns
+        -------
+        mesh : Firedrake Mesh
+            The generated 2D mesh.
+
+        Notes
+        -----
+        If edge_length is not specified but cells_per_wavelength (cpw) is provided,
+        the edge length will be calculated automatically. The method creates either
+        a periodic or non-periodic rectangular mesh based on the periodic attribute.
         """
         if self.edge_length is None and self.cpw is not None:
             self.edge_length = calculate_edge_length(self.cpw, self.minimum_velocity, self.source_frequency)
@@ -215,6 +236,16 @@ class AutomaticMesh:
     def create_firedrake_3D_mesh(self):
         """
         Creates a 3D mesh based on Firedrake meshing utilities.
+
+        Returns
+        -------
+        mesh : Firedrake Mesh
+            The generated 3D box mesh.
+
+        Notes
+        -----
+        Uses the edge_length parameter to determine the number of elements
+        in each direction (x, y, z).
         """
         dx = self.edge_length
         nx = int(round(self.length_x / dx, 0))
@@ -251,6 +282,16 @@ class AutomaticMesh:
     def create_seimicmesh_2d_mesh(self):
         """
         Creates a 2D mesh based on SeismicMesh meshing utilities.
+
+        Returns
+        -------
+        mesh : Firedrake Mesh
+            The generated 2D mesh.
+
+        Notes
+        -----
+        If a velocity model is provided, the mesh will be refined based on
+        the velocity model. Otherwise, a homogeneous mesh is created.
         """
         print(f"velocity_model{self.velocity_model}", flush=True)
         if self.velocity_model is None:
@@ -259,6 +300,22 @@ class AutomaticMesh:
             return self.create_seismicmesh_2D_mesh_with_velocity_model()
 
     def create_seismicmesh_2D_mesh_with_velocity_model(self):
+        """
+        Creates a 2D mesh with velocity-based refinement using SeismicMesh.
+
+        Returns
+        -------
+        mesh : Firedrake Mesh
+            The generated 2D mesh with velocity-based sizing.
+
+        Notes
+        -----
+        This method uses the velocity model to determine the mesh element sizes,
+        ensuring appropriate resolution for wave propagation. The sizing function
+        is derived from the velocity model SEGY file. Only the ensemble rank 0
+        performs the mesh generation, and the mesh is then distributed across
+        all processes.
+        """
         if self.comm.ensemble_comm.rank == 0:
             v_min = self.minimum_velocity
             frequency = self.source_frequency
@@ -331,6 +388,18 @@ class AutomaticMesh:
     def create_seismicmesh_2D_mesh_homogeneous(self):
         """
         Creates a 2D mesh based on SeismicMesh meshing utilities, with homogeneous velocity model.
+
+        Returns
+        -------
+        mesh : Firedrake Mesh
+            The generated 2D mesh with uniform element sizes.
+
+        Notes
+        -----
+        This method creates a rectangular mesh with uniform element sizing.
+        The edge length is either user-specified or calculated based on the
+        minimum velocity, source frequency, and cells per wavelength.
+        Boundary entities with low quality are removed to improve mesh quality.
         """
         length_z = self.length_z
         length_x = self.length_x
@@ -378,6 +447,26 @@ class AutomaticMesh:
         return fire.Mesh(self.output_file_name)
 
     def create_spyro_mesh(self):
+        """
+        Creates a mesh using spyro's internal meshing utilities based on gmsh calls. This
+        mesh has tags that define the dx integration in Firedrake.
+
+        Returns
+        -------
+        mesh : Firedrake Mesh
+            The generated mesh.
+
+        Raises
+        ------
+        ValueError
+            If dimension is not supported (must be 2).
+        NotImplementedError
+            If dimension is 3 (3D meshing not yet implemented).
+
+        Notes
+        -----
+        Currently only 2D meshing is implemented via build_big_rect_with_inner_element_group.
+        """
         if self.dimension == 2:
             return build_big_rect_with_inner_element_group(self.mesh_parameters)
         elif self.dimension == 3:
@@ -388,6 +477,23 @@ class AutomaticMesh:
 
 
 def calculate_edge_length(cpw, minimum_velocity, frequency):
+    """
+    Calculate the edge length for mesh generation.
+
+    Parameters
+    ----------
+    cpw : float
+        Cells per wavelength.
+    minimum_velocity : float
+        Minimum velocity in the domain.
+    frequency : float
+        Source frequency.
+
+    Returns
+    -------
+    edge_length : float
+        Calculated edge length for mesh elements.
+    """
     v_min = minimum_velocity
 
     lbda_min = v_min/frequency
@@ -484,6 +590,40 @@ def PeriodicRectangleMesh(
 
 
 def BoxMesh(nx, ny, nz, length_x, length_y, length_z, pad=None, quadrilateral=False):
+    """
+    Create a 3D box mesh based on Firedrake mesh utilities.
+
+    Parameters
+    ----------
+    nx : int
+        Number of elements in the x direction.
+    ny : int
+        Number of elements in the y direction.
+    nz : int
+        Number of elements in the z direction.
+    length_x : float
+        Length of the domain in the x direction.
+    length_y : float
+        Length of the domain in the y direction.
+    length_z : float
+        Length of the domain in the z direction.
+    pad : float, optional
+        Padding to be added to the domain. The default is None.
+    quadrilateral : bool, optional
+        If True, the mesh is created by extruding a quadrilateral mesh.
+        The default is False.
+
+    Returns
+    -------
+    mesh : Firedrake Mesh
+        The generated 3D box mesh.
+
+    Notes
+    -----
+    The first coordinate is negated (multiplied by -1) to match the expected
+    coordinate system. If quadrilateral is True, the mesh is created by
+    extruding a 2D quadrilateral mesh in the z direction.
+    """
     if pad is not None:
         length_x += pad
         length_y += 2 * pad
@@ -504,6 +644,34 @@ def BoxMesh(nx, ny, nz, length_x, length_y, length_z, pad=None, quadrilateral=Fa
 
 
 def vp_to_sizing(vp, cpw, frequency):
+    """
+    Convert velocity field to mesh sizing function.
+
+    Parameters
+    ----------
+    vp : numpy.ndarray
+        P-wave velocity field.
+    cpw : float
+        Cells per wavelength (must be positive).
+    frequency : float
+        Source frequency in Hz (must be positive).
+
+    Returns
+    -------
+    sizing : numpy.ndarray
+        Mesh element sizes corresponding to the velocity field.
+
+    Raises
+    ------
+    ValueError
+        If cpw or frequency is not positive.
+
+    Notes
+    -----
+    The mesh size is calculated as: size = vp / (frequency * cpw)
+    This ensures that the mesh has the specified number of cells per
+    wavelength throughout the domain.
+    """
     if cpw < 0.0 or cpw == 0.0:
         raise ValueError(f"Cells-per-wavelength value of {cpw} not supported.")
     if frequency < 0.0 or frequency == 0.0:
@@ -514,6 +682,51 @@ def vp_to_sizing(vp, cpw, frequency):
 
 @run_in_one_core
 def build_big_rect_with_inner_element_group(mesh_parameters):
+    """
+    Build a rectangular mesh with optional inner element group using GMSH.
+
+    Parameters
+    ----------
+    mesh_parameters : object
+        Object containing mesh parameters with the following attributes:
+        - length_z : float
+            Length of domain in z direction.
+        - length_x : float
+            Length of domain in x direction.
+        - output_filename : str
+            Path for output mesh file.
+        - edge_length : float, optional
+            Uniform edge length (if grid_velocity_data is None).
+        - grid_velocity_data : dict, optional
+            Dictionary with 'vp_values' key containing velocity field for
+            adaptive meshing.
+        - source_frequency : float, optional
+            Source frequency for adaptive meshing.
+        - cells_per_wavelength : float, optional
+            Cells per wavelength for adaptive meshing.
+        - gradient_mask : dict, optional
+            Dictionary with keys 'z_min', 'z_max', 'x_min', 'x_max' defining
+            a rectangular region to be marked as an inner element group.
+
+    Returns
+    -------
+    None
+        Writes mesh to file specified by mesh_parameters.output_filename.
+
+    Notes
+    -----
+    This function creates a 2D rectangular mesh with:
+    - Adaptive sizing based on velocity field (if provided)
+    - Physical boundary groups for absorbing boundary conditions
+      (1=Top, 2=Bottom, 3=Right, 4=Left)
+    - Optional inner element group for gradient masking
+
+    The function uses GMSH for mesh generation and supports velocity-based
+    mesh refinement through interpolation of a regular grid velocity model.
+    If a gradient_mask is provided, elements within the specified region
+    are separated into an 'Inner' physical group, while elements outside
+    are placed in an 'Outer' physical group.
+    """
 
     length_z = mesh_parameters.length_z
     length_x = mesh_parameters.length_x
