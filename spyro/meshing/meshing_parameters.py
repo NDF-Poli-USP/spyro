@@ -129,7 +129,7 @@ class MeshingParameters():
     -----
     The class enforces mutual exclusivity between 'edge_length' and
     'cells_per_wavelength' parameters. Setting one will clear the other.
-    
+
     Mesh dimensions (length_x, length_y, length_z, abc_pad_length) are
     checked for unit consistency (meters vs kilometers) and must all use
     the same unit system.
@@ -153,7 +153,7 @@ class MeshingParameters():
         comm : MPI communicator, optional
             MPI communicator for parallel mesh operations. Default is None.
         quadrilateral : bool, optional
-            If True, uses quadrilateral or hexahedral elements; if False, 
+            If True, uses quadrilateral or hexahedral elements; if False,
             uses triangular or tetrahedral elements. Default is False.
         method : str, optional
             Finite element method. Options: 'mass_lumped_triangle',
@@ -180,8 +180,8 @@ class MeshingParameters():
         during initialization to configure the mesh with default values where
         there are missing parameters.
         """
-        if input_mesh_dictionary is None:  
-            input_mesh_dictionary = {}  
+        if input_mesh_dictionary is None:
+            input_mesh_dictionary = {}
         self.input_mesh_dictionary = input_mesh_dictionary or {}
         self.dimension = dimension
         self.comm = comm
@@ -760,7 +760,7 @@ class MeshingParameters():
         Notes
         -----
         This method performs the following steps:
-        
+
         1. Sets abc_pad_length if provided
         2. Populates input_mesh_parameters with default values from current
            attributes for any unspecified keys
