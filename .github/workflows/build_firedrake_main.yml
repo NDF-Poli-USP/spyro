@@ -1,4 +1,4 @@
-name: Build Firedrake main / build
+name: Build Firedrake main
 
 on:
   schedule:
@@ -9,6 +9,9 @@ on:
       - completed
 
 jobs:
+  build:
+    name: build
+    runs-on: self-hosted
   test:
     name: Install and test Firedrake (Linux)
     runs-on: self-hosted
