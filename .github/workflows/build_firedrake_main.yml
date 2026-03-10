@@ -9,9 +9,6 @@ on:
       - completed
 
 jobs:
-  build:
-    name: build
-    runs-on: self-hosted
   test:
     name: Install and test Firedrake (Linux)
     runs-on: self-hosted
