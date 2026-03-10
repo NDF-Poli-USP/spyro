@@ -48,8 +48,39 @@ def butter_lowpass_filter(shot, cutoff, fs, order=2):
 @ensemble_functional
 def compute_functional(Wave_object, residual):
     """Compute the functional to be optimized.
-    Accepts the velocity optionally and uses
-    it if regularization is enabled
+
+    Computes the L2 norm of the residual at receiver locations,
+    integrated over time using the trapezoidal rule. This functional
+    is commonly used in classical full waveform inversion (FWI) as the
+    measure to be minimized.
+
+    Parameters
+    ----------
+    Wave_object : object
+        Wave propagation object containing simulation parameters.
+        Must have attributes:
+        - number_of_receivers : int
+            Number of receivers in the simulation.
+        - dt : float
+            Time step size.
+    residual : numpy.ndarray
+        Residual array of shape (n_time_steps, n_receivers) containing
+        the difference between observed and real (or synthetic) data.
+
+    Returns
+    -------
+    float
+        The computed functional value.
+
+    Notes
+    -----
+    The functional is computed as:
+
+    .. math::
+        J = \\frac{1}{2} \\sum_{r=1}^{N_r} \\int_0^T (residual_r(t))^2 dt
+
+    where :math:`N_r` is the number of receivers and :math:`T` is the
+    total simulation time.
     """
     num_receivers = Wave_object.number_of_receivers
     dt = Wave_object.dt
@@ -64,8 +95,34 @@ def compute_functional(Wave_object, residual):
 
 
 def evaluate_misfit(model, guess, exact):
-    """Compute the difference between the guess and exact
-    at the receiver locations given downsampling"""
+    """Compute the difference between synthetic and observed data.
+
+    Calculates the residual (misfit) between the exact (observed) and
+    guess (synthetic) data at receiver locations, accounting for temporal
+    downsampling specified in the model configuration.
+
+    Parameters
+    ----------
+    model : dict
+        Model configuration dictionary. If model['timeaxis']['skip'] exists,
+        it specifies the downsampling factor for the exact data.
+    guess : numpy.ndarray
+        Synthetic data array of shape (n_time_steps, n_receivers).
+    exact : numpy.ndarray
+        Observed data array of shape (n_time_steps, n_receivers) before
+        downsampling.
+
+    Returns
+    -------
+    numpy.ndarray
+        Residual array of shape (n_downsampled_time_steps, n_receivers)
+        computed as downsampled_exact - guess.
+
+    Notes
+    -----
+    The exact data is downsampled by taking every `skip`-th sample,
+    while the guess data is assumed to already be at the correct sampling rate.
+    """
 
     if "skip" in model["timeaxis"]:
         skip = model["timeaxis"]["skip"]
@@ -78,15 +135,75 @@ def evaluate_misfit(model, guess, exact):
 
 
 def myrank(COMM=COMM_SELF):  # noqa: F405
+    """Get the rank of the current MPI process.
+
+    Parameters
+    ----------
+    COMM : MPI communicator, optional
+        MPI communicator object. Default is COMM_SELF.
+
+    Returns
+    -------
+    int
+        Rank of the current process in the communicator.
+    """
     return COMM.Get_rank()
 
 
 def mysize(COMM=COMM_SELF):  # noqa: F405
+    """Get the total number of MPI processes.
+
+    Parameters
+    ----------
+    COMM : MPI communicator, optional
+        MPI communicator object. Default is COMM_SELF.
+
+    Returns
+    -------
+    int
+        Total number of processes in the communicator.
+    """
     return COMM.Get_size()
 
 
 def mpi_init(model):
-    """Initialize computing environment"""
+    """Initialize MPI computing environment for wave propagation simulations.
+
+    Sets up parallel computing environment based on the parallelism type
+    specified in the model. Creates appropriate ensemble communicators
+    for distributing sources across available cores.
+
+    Parameters
+    ----------
+    model : object
+        Wave object containing parallelism configuration. Must have attributes:
+        - parallelism_type : str
+            Type of parallelism: 'automatic', 'spatial', or 'custom'.
+        - number_of_sources : int
+            Number of sources (required for 'automatic' mode).
+        - shot_ids_per_propagation : list of lists
+            Shot IDs for each propagation (required for 'custom' mode).
+
+    Returns
+    -------
+    firedrake.ensemble.Ensemble
+        Ensemble communicator configured for the specified parallelism type.
+
+    Raises
+    ------
+    ValueError
+        If available cores cannot be divided equally among sources in
+        'automatic' mode.
+
+    Notes
+    -----
+    Parallelism types:
+    - 'automatic': Divides cores equally among sources.
+    - 'spatial': Uses all cores for each source (sequential source processing).
+    - 'custom': Uses user-defined shot distribution, allowing multiple shots in
+        individual propagations. These propagations can be parallelized using
+        ensemble paralelism with internal spatial paralelism.
+    """
     # rank = myrank()
     # size = mysize()
     available_cores = COMM_WORLD.size  # noqa: F405
@@ -108,39 +225,32 @@ def mpi_init(model):
     return comm_ens
 
 
-def mpi_init_simple(number_of_sources):
-    """Initialize computing environment"""
-    rank = myrank()  # noqa: F841
-    size = mysize()  # noqa: F841
-    available_cores = COMM_WORLD.size  # noqa: F405
-
-    num_cores_per_shot = available_cores / number_of_sources
-    if available_cores % number_of_sources != 0:
-        raise ValueError(
-            "Available cores cannot be divided between sources equally."
-        )
-
-    comm_ens = Ensemble(COMM_WORLD, num_cores_per_shot)  # noqa: F405
-    return comm_ens
-
-
 def communicate(array, my_ensemble):
-    """Communicate shot record to all processors
+    """Communicate shot record to all processors.
+
+    Performs an all-reduce operation with MAX reduction across spatial
+    communicators within an ensemble. This is used to gather shot records
+    from distributed computations in parallel wave simulations.
 
     Parameters
     ----------
-    array: array-like
-        Array of data to all-reduce across both ensemble
-        and spatial communicators.
-    comm: Firedrake.comm
-        A Firedrake ensemble communicator
+    array : array-like
+        Array of data to all-reduce across both ensemble and spatial
+        communicators.
+    my_ensemble : firedrake.ensemble.Ensemble
+        A Firedrake ensemble communicator containing both ensemble and
+        spatial communicators.
 
     Returns
     -------
-    array_reduced: array-like
-        Array of data max all-reduced
-        amongst the ensemble communicator
+    array_reduced : array-like
+        Array of data with MAX all-reduce applied amongst the spatial
+        communicator. Has the same shape and dtype as input array.
 
+    Notes
+    -----
+    If spatial parallelism is used (my_ensemble.comm.size > 1), the
+    function reduces data to rank 0 of the spatial communicator.
     """
     array_reduced = copy.copy(array)
 
@@ -154,25 +264,70 @@ def communicate(array, my_ensemble):
 
 class Mask():
     """
-    A class representing a mask for a wave object.
+    DEPRECATED: Spatial mask for selective gradient updates in wave simulations.
 
-    Parameters:
-    - boundaries (dict): A dictionary containing the boundaries to be applied.
-    - Wave_obj (object): An optional wave object.
-    - dg (bool): Flag indicating whether to use DG space for the mask. Default is False.
-    - inverse_mask (bool): Flag indicating whether to invert the mask. Default is False.
+    Creates a spatial mask to selectively zero out degrees of freedom in
+    specified regions of the computational domain. Useful for gradient
+    masking in full waveform inversion and restricting updates to regions
+    of interest.
 
-    Attributes:
-    - active_boundaries (list): A list of active boundaries.
-    - z (array): The z coordinates of the wave object's mesh.
-    - x (array): The x coordinates of the wave object's mesh.
-    - y (array): The y coordinates of the wave object's mesh (if applicable).
-    - mask_dofs (array): Contains the indices of the mask degrees of freedom.
+    Parameters
+    ----------
+    boundaries : dict
+        Dictionary containing spatial boundaries for the mask. Valid keys are
+        'z_min', 'z_max', 'x_min', 'x_max', 'y_min', 'y_max', with float
+        values specifying the boundary locations.
+    Wave_obj : object
+        Wave object containing mesh information. Must have attributes:
+        - mesh : firedrake.mesh.MeshGeometry
+            Computational mesh.
+        - mesh_z, mesh_x, mesh_y : firedrake.SpatialCoordinate
+            Coordinate functions for the mesh.
+        - function_space : firedrake.functionspace.FunctionSpace
+            Function space for wave simulation (for continuous masks).
+    dg : bool, optional
+        If True, creates a DG (discontinuous Galerkin) mask; if False,
+        creates a continuous mask. Default is False.
+    inverse_mask : bool, optional
+        If True, inverts the mask (nonzero inside boundaries, zero outside);
+        if False, uses standard mask (zero inside boundaries, nonzero outside).
+        Default is False.
 
-    Methods:
-    - _calculate_mask_dofs(Wave_obj): Calculates the mask degrees of freedom.
-    - apply_mask(dJ): Applies the mask to the given Firedrake function.
+    Attributes
+    ----------
+    active_boundaries : list of str
+        List of active boundary keys from the boundaries dictionary.
+    z : firedrake.SpatialCoordinate
+        Z-coordinate function from the mesh.
+    x : firedrake.SpatialCoordinate
+        X-coordinate function from the mesh.
+    y : firedrake.SpatialCoordinate
+        Y-coordinate function from the mesh (3D only).
+    mask_dofs : numpy.ndarray
+        Indices of degrees of freedom in the masked region (continuous masks).
+    dg_mask : firedrake.Function
+        DG function representing the mask (DG masks only).
+    cond : firedrake.Conditional
+        UFL conditional expression defining the mask region.
+    in_dg : bool
+        Flag indicating whether the mask is in DG space.
 
+    Warnings
+    --------
+    When using continuous masks, there may be small errors in elements
+    adjacent to the mask boundary due to the need to interpolate the mask
+    to discrete function space.
+
+    This class is deprecated. We are switching to use either mesh related
+    tags (already implemented) and submesh related tags (to be implemented)
+
+    Examples
+    --------
+    Create a mask to zero gradients below z=-5.0 and outside x=[0, 10]:
+
+    >>> boundaries = {'z_min': -5.0, 'x_min': 0.0, 'x_max': 10.0}
+    >>> mask = Mask(boundaries, wave_obj)
+    >>> masked_gradient = mask.apply_mask(gradient)
     """
 
     def __init__(self, boundaries, Wave_obj, dg=False, inverse_mask=False):
@@ -200,12 +355,23 @@ class Mask():
             self._calculate_dg_mask(Wave_obj)
 
     def _calculate_dg_mask(self, Wave_obj):
-        """
-        Calculates the DG mask.
+        """Calculate the discontinuous Galerkin (DG) mask.
 
-        Parameters:
-        - Wave_obj (object): The wave object containing the necessary data.
+        Creates a DG0 function space mask by interpolating the mask
+        conditional onto piecewise constant elements.
 
+        Parameters
+        ----------
+        Wave_obj : object
+            Wave object containing the mesh on which to create the DG mask.
+            Must have attribute:
+            - mesh : firedrake.mesh.MeshGeometry
+                Computational mesh.
+
+        Notes
+        -----
+        Sets the `dg_mask` attribute to a DG0 function containing the
+        interpolated mask values.
         """
         V_dg = FunctionSpace(Wave_obj.mesh, "DG", 0)
         dg_mask = Function(V_dg)
@@ -213,13 +379,35 @@ class Mask():
         self.dg_mask = dg_mask
 
     def _calculate_mask_conditional(self, Wave_obj, inverted=False):
-        """
-        Calculates the mask degrees of freedom based on the active boundaries.
+        """Calculate the UFL conditional expression for the mask.
 
-        Parameters:
-        - Wave_obj (object): The wave object containing the necessary data.
-        - inverted (bool, optional): If True gives nonzero value inside the boundaries
+        Constructs a UFL conditional that evaluates to 1 (or 0 if inverted)
+        inside the masked region and 0 (or 1 if inverted) outside.
 
+        Parameters
+        ----------
+        Wave_obj : object
+            Wave object containing mesh coordinate functions. Must have:
+            - mesh_z : firedrake.SpatialCoordinate
+                Z-coordinate function.
+            - mesh_x : firedrake.SpatialCoordinate
+                X-coordinate function.
+            - mesh_y : firedrake.SpatialCoordinate
+                Y-coordinate function (if y boundaries are active).
+        inverted : bool, optional
+            If True, gives nonzero value inside the boundaries and zero outside;
+            if False, gives zero inside boundaries and nonzero outside.
+            Default is False.
+
+        Raises
+        ------
+        ValueError
+            If a boundary name does not end with 'min' or 'max'.
+
+        Notes
+        -----
+        Sets the `cond` attribute to a UFL conditional expression and
+        `z`, `x`, and optionally `y` attributes to the coordinate functions.
         """
         # Getting necessary data from wave object
         active_boundaries = self.active_boundaries
@@ -250,12 +438,34 @@ class Mask():
         self.cond = cond[0]
 
     def _calculate_mask_dofs(self, Wave_obj):
-        """
-        Calculates the mask degrees of freedom.
+        """Calculate degrees of freedom indices for the mask application.
 
-        Parameters:
-        - Wave_obj (object): The wave object containing the necessary data.
+        Interpolates the mask conditional onto the wave function space and
+        identifies which degrees of freedom lie within the masked region.
 
+        Parameters
+        ----------
+        Wave_obj : object
+            Wave object containing the function space for mask interpolation.
+            Must have attribute:
+            - function_space : firedrake.functionspace.FunctionSpace
+                Function space for the wave simulation.
+
+        Raises
+        ------
+        ValueError
+            If the mask is in DG space, as DG spaces may have different
+            degrees of freedom than the functional space.
+
+        Warnings
+        --------
+        Warns that there may be errors in elements adjacent to the mask
+        boundary when using continuous function spaces.
+
+        Notes
+        -----
+        Sets the `mask_dofs` attribute to a tuple containing the indices
+        of degrees of freedom where the mask value exceeds 0.3.
         """
         if self.in_dg:
             raise ValueError("DG space can have different DoFs than the functional space")
@@ -266,30 +476,69 @@ class Mask():
         self.mask_dofs = np.where(mask.dat.data[:] > 0.3)
 
     def apply_mask(self, dJ):
-        """
-        Applies the mask to the given data.
+        """Apply the mask to a Firedrake function.
 
-        Parameters:
-        - dJ (object): Firedrake function.
+        Zeros out the degrees of freedom in the masked region of the
+        provided function. Typically used to mask gradients in inversions.
 
-        Returns:
-        - object: The masked data Firedrake.
+        Parameters
+        ----------
+        dJ : firedrake.Function
+            Firedrake function to which the mask will be applied.
+            Modified in-place.
 
+        Returns
+        -------
+        firedrake.Function
+            The masked function (same object as input, modified in-place).
+
+        Notes
+        -----
+        This method sets dJ.dat.data[mask_dofs] = 0.0, effectively zeroing
+        all degrees of freedom identified during mask initialization.
         """
         dJ.dat.data[self.mask_dofs] = 0.0
         return dJ
 
 
 class Gradient_mask_for_pml(Mask):
-    """
-    A class representing a gradient mask for the Perfectly Matched Layer (PML).
+    """Gradient mask for Perfectly Matched Layer (PML) regions.
 
-    Args:
-        Wave_obj (optional): An object representing a wave. Defaults to None.
+    Automatically creates a mask that zeros gradients in the PML absorbing
+    boundary layer regions. Prevents unphysical updates to velocity models
+    in the PML during inversion.
 
-    Attributes:
-        boundaries (dict): A dictionary containing the boundaries of the mask.
+    Parameters
+    ----------
+    Wave_obj : object
+        Wave object with active PML boundary conditions. Must have:
+        - abc_active : bool
+            Must be True; indicates PML is active.
+        - mesh_parameters : object with attributes:
+            - length_z : float
+                Total length of the domain in z-direction.
+            - length_x : float
+                Total length of the domain in x-direction.
 
+    Raises
+    ------
+    ValueError
+        If Wave_obj.abc_active is False (no PML present).
+
+    Notes
+    -----
+    The mask automatically sets boundaries to exclude the PML regions:
+    - z_min: Bottom of the domain (-length_z)
+    - x_min: Left edge of the domain (0.0)
+    - x_max: Right edge of the domain (length_x)
+
+    These boundaries are passed to the parent Mask class to create the
+    appropriate masking region.
+
+    Examples
+    --------
+    >>> gradient_mask = Gradient_mask_for_pml(wave_obj)
+    >>> masked_gradient = gradient_mask.apply_mask(gradient)
     """
 
     def __init__(self, Wave_obj):
@@ -309,7 +558,45 @@ class Gradient_mask_for_pml(Mask):
 
 
 def run_in_one_core(func):
-    """Decorator to run something in serial if first argument has a comm object as an attribute"""
+    """Decorator to execute function only on rank 0.
+
+    Ensures the decorated function runs only on the root process (rank 0)
+    of the communicator. Other processes skip execution. Useful for I/O
+    operations and serial tasks in parallel environments.
+
+    Parameters
+    ----------
+    func : callable
+        Function to decorate. The first argument of func must be an object
+        with a 'comm' attribute containing an MPI communicator.
+
+    Returns
+    -------
+    callable
+        Wrapped function that executes only on rank 0.
+
+    Notes
+    -----
+    The function checks for two types of communicators:
+    - Ensemble communicator: Runs only if both ensemble_comm.rank == 0
+      and comm.rank == 0.
+    - Regular communicator: Runs only if comm.rank == 0.
+    - If comm is None, the function runs normally without restrictions.
+
+    The function does not broadcast results to other processes.
+
+    See Also
+    --------
+    run_in_one_core_and_broadcast : Similar decorator that also broadcasts results.
+
+    Examples
+    --------
+    >>> @run_in_one_core
+    ... def save_file(obj, filename):
+    ...     # Only rank 0 writes the file
+    ...     with open(filename, 'w') as f:
+    ...         f.write(str(obj.data))
+    """
 
     def wrapper(*args, **kwargs):
         comm = args[0].comm
@@ -327,7 +614,47 @@ def run_in_one_core(func):
 
 
 def run_in_one_core_and_broadcast(func):
-    """Decorator to run something in serial on rank 0 and broadcast result to all cores"""
+    """Decorator to execute function on rank 0 and broadcast result.
+
+    Ensures the decorated function runs only on the root process (rank 0)
+    and broadcasts the return value to all other processes. Useful for
+    file reading and other operations that should be performed once but
+    shared across all processes.
+
+    Parameters
+    ----------
+    func : callable
+        Function to decorate. The first argument of func must be an object
+        with a 'comm' attribute containing an MPI communicator.
+
+    Returns
+    -------
+    callable
+        Wrapped function that executes on rank 0 and broadcasts the result
+        to all processes.
+
+    Notes
+    -----
+    The function handles two types of communicators:
+    - Ensemble communicator: Executes on rank (0,0), broadcasts within
+      ensemble, then within spatial communicator.
+    - Regular communicator: Executes on rank 0, broadcasts to all.
+    - If comm is None, the function runs normally without MPI operations.
+
+    All processes receive the same return value from the broadcast.
+
+    See Also
+    --------
+    run_in_one_core : Similar decorator without broadcasting.
+
+    Examples
+    --------
+    >>> @run_in_one_core_and_broadcast
+    ... def load_config(obj, filename):
+    ...     # Only rank 0 reads the file, result shared with all
+    ...     with open(filename, 'r') as f:
+    ...         return json.load(f)
+    """
 
     def wrapper(*args, **kwargs):
         comm = args[0].comm
@@ -355,6 +682,51 @@ def run_in_one_core_and_broadcast(func):
 
 @run_in_one_core_and_broadcast
 def write_hdf5_velocity_model(obj_with_comm, segy_filename):
+    """Convert SEG-Y velocity model to HDF5 format.
+
+    Converts a SEG-Y format velocity model file to HDF5 format using
+    SeismicMesh. The conversion is performed on rank 0 and the output
+    filename is broadcast to all processes.
+
+    Parameters
+    ----------
+    obj_with_comm : object
+        Object with a 'comm' attribute containing an MPI communicator.
+        Used by the decorator to determine which process performs the
+        conversion.
+    segy_filename : str
+        Path to the input SEG-Y velocity model file.
+
+    Returns
+    -------
+    str
+        Path to the output HDF5 file (input basename with .hdf5 extension).
+
+    Raises
+    ------
+    ValueError
+        If SeismicMesh is not installed.
+
+    Notes
+    -----
+    This is just a wrapper for the equivelant SeismicMesh method. We
+    need to substitute this with our own method, since it is not related
+    to mesh generation.
+
+    This function requires the SeismicMesh package to be installed.
+    The output filename is constructed by replacing the input file
+    extension with '.hdf5'.
+
+    Due to the @run_in_one_core_and_broadcast decorator, only rank 0
+    performs the actual file conversion, but all processes receive
+    the output filename.
+
+    Examples
+    --------
+    >>> output_file = write_hdf5_velocity_model(wave_obj, 'velocity.segy')
+    >>> print(output_file)
+    'velocity.hdf5'
+    """
     if SEISMIC_MESH_AVAILABLE is False:
         raise ValueError("Segy to HDF5 not yet implemented natively. Please install SeismicMesh")
     vp_filename, vp_filetype = os.path.splitext(
