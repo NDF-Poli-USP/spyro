@@ -908,12 +908,13 @@ class FullWaveformInversion(AcousticWave):
         >>> fwi.run_fwi(maxiter=100, vmin=1.5, vmax=5.0)
         """
         parameters = {
-            "vmin": 1.429,
-            "vmax": 6.0,
+            "vmin": kwargs.pop("vmin", 1.429),
+            "vmax": kwargs.pop("vmax", 6.0),
             "scipy_options": {
                 "disp": True,
-                "eps": 1e-15,
-                "ftol": 1e-11, "maxiter": kwargs.pop("maxiter", 20),
+                "eps": kwargs.pop("eps", 1e-15),
+                "ftol": kwargs.pop("ftol", 1e-11),
+                "maxiter": kwargs.pop("maxiter", 20),
             }
         }
         parameters.update(kwargs)
