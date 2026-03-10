@@ -51,7 +51,7 @@ def backward_wave_propagator_no_pml(Wave_obj, dt=None):
     and the prebuilt variational solver is advanced with ``Wave_obj.solver.solve()``.
     """
     Wave_obj.reset_pressure()
-    mask_available = Wave_obj.mask_available
+    mask_available = Wave_obj.gradient_mask_available
     if dt is not None:
         Wave_obj.dt = dt
 
@@ -195,7 +195,7 @@ def mixed_space_backward_wave_propagator(Wave_obj, dt=None):
     (pressure subspace) before calling ``Wave_obj.solver.solve()`` each timestep.
     """
     Wave_obj.reset_pressure()
-    mask_available = Wave_obj.mask_available
+    mask_available = Wave_obj.gradient_mask_available
     if dt is not None:
         Wave_obj.dt = dt
 
