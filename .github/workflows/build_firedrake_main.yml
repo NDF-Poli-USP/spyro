@@ -1,4 +1,4 @@
-name: Build Firedrake main
+name: Build Firedrake main / build
 
 on:
   schedule:
