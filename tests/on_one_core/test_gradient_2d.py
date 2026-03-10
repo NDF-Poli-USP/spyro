@@ -1,20 +1,27 @@
 import numpy as np
 import math
 import matplotlib.pyplot as plt
-from copy import deepcopy
-from firedrake import VTKFile
 import firedrake as fire
 import spyro
+import pytest
 
 
-def check_gradient(Wave_obj_guess, dJ, rec_out_exact, Jm, plot=False):
+def check_gradient(
+    Wave_obj_guess,
+    dJ,
+    rec_out_exact,
+    Jm,
+    plot=False,
+    check_first_order=True,
+):
     steps = [1e-3, 1e-4, 1e-5]  # step length
 
     errors = []
     V_c = Wave_obj_guess.function_space
     dm = fire.Function(V_c)
     size, = np.shape(dm.dat.data[:])
-    dm_data = np.random.rand(size)
+    rng = np.random.default_rng(seed=1)
+    dm_data = rng.random(size)
     dm.dat.data[:] = dm_data
     # dm.assign(dJ)
 
@@ -23,7 +30,7 @@ def check_gradient(Wave_obj_guess, dJ, rec_out_exact, Jm, plot=False):
         Wave_obj_guess.reset_pressure()
         c_guess = fire.Constant(2.0) + step*dm
         Wave_obj_guess.initial_velocity_model = c_guess
-        Wave_obj_guess.forward_solve()
+        Wave_obj_guess.forward_solve(compute_functional=False)
         misfit_plusdm = rec_out_exact - Wave_obj_guess.receivers_output
         J_plusdm = spyro.utils.compute_functional(Wave_obj_guess, misfit_plusdm)
 
@@ -56,7 +63,14 @@ def check_gradient(Wave_obj_guess, dJ, rec_out_exact, Jm, plot=False):
     print(f"Last gradient error less than 1 percent: {test1}")
 
     # Checking if error follows expected finite difference error convergence
-    test2 = math.isclose(np.log(theory[-1]), np.log(errors[-1]), rel_tol=1e-1)
+    if check_first_order:
+        test2 = math.isclose(
+            np.log(abs(theory[-1])),
+            np.log(abs(errors[-1])),
+            rel_tol=1e-1,
+        )
+    else:
+        test2 = True
 
     print(f"Gradient error behaved as expected: {test2}")
 
@@ -71,6 +85,7 @@ dictionary["options"] = {
     "variant": "lumped",  # lumped, equispaced or DG, default is lumped
     "degree": 4,  # p order
     "dimension": 2,  # dimension
+    "automatic_adjoint": False,
 }
 
 dictionary["parallelism"] = {
@@ -94,6 +109,7 @@ dictionary["acquisition"] = {
     "delay": 1.5,
     "delay_type": "multiples_of_minimum",
     "receiver_locations": spyro.create_transect((-1.8, 1.2), (-1.8, 1.8), 10),
+    "use_vertex_only_mesh": False,
     # "receiver_locations": [(-2.0, 2.5) , (-2.3, 2.5), (-3.0, 2.5), (-3.5, 2.5)],
 }
 
@@ -119,7 +135,10 @@ dictionary["visualization"] = {
 }
 
 
-def get_forward_model(load_true=False):
+def get_forward_model(load_true=False, automatic_adjoint=False):
+    dictionary["options"]["automatic_adjoint"] = automatic_adjoint
+    dictionary["acquisition"]["use_vertex_only_mesh"] = automatic_adjoint
+
     if load_true is False:
         Wave_obj_exact = spyro.AcousticWave(dictionary=dictionary)
         Wave_obj_exact.set_mesh(input_mesh_parameters={"edge_length": 0.1})
@@ -129,7 +148,6 @@ def get_forward_model(load_true=False):
             conditional=cond,
             # output=True
         )
-        spyro.plots.plot_model(Wave_obj_exact, abc_points=[(-1, 1), (-2, 1), (-2, 4), (-1, 2)])
         Wave_obj_exact.forward_solve()
         # forward_solution_exact = Wave_obj_exact.forward_solution
         rec_out_exact = Wave_obj_exact.receivers_output
@@ -141,28 +159,76 @@ def get_forward_model(load_true=False):
     Wave_obj_guess = spyro.AcousticWave(dictionary=dictionary)
     Wave_obj_guess.set_mesh(input_mesh_parameters={"edge_length": 0.1})
     Wave_obj_guess.set_initial_velocity_model(constant=2.0)
-    Wave_obj_guess.forward_solve()
-    rec_out_guess = Wave_obj_guess.receivers_output
+    Wave_obj_guess.true_receivers = rec_out_exact
+    Wave_obj_guess.compute_functional = automatic_adjoint
 
-    return rec_out_exact, rec_out_guess, Wave_obj_guess
+    return rec_out_exact, Wave_obj_guess
 
 
-def test_gradient():
-    rec_out_exact, rec_out_guess, Wave_obj_guess = get_forward_model(load_true=False)
-    forward_solution = Wave_obj_guess.forward_solution
-    forward_solution_guess = deepcopy(forward_solution)
+@pytest.mark.slow
+@pytest.mark.parametrize("automatic_adjoint", [False, True])
+def test_gradient(automatic_adjoint):
+    rec_out_exact, Wave_obj_guess = get_forward_model(
+        load_true=False,
+        automatic_adjoint=automatic_adjoint,
+    )
 
-    misfit = rec_out_exact - rec_out_guess
+    assert hasattr(Wave_obj_guess, "compute_functional")
+    assert hasattr(Wave_obj_guess, "true_receivers")
+    assert Wave_obj_guess.compute_functional is automatic_adjoint
+    assert Wave_obj_guess.true_receivers is rec_out_exact
 
-    Jm = spyro.utils.compute_functional(Wave_obj_guess, misfit)
-    print(f"Cost functional : {Jm}")
+    dJ = Wave_obj_guess.compute_gradient()
 
-    # compute the gradient of the control (to be verified)
-    dJ = Wave_obj_guess.gradient_solve(misfit=misfit, forward_solution=forward_solution_guess)
-    VTKFile("gradient.pvd").write(dJ)
+    assert Wave_obj_guess.forward_solution_receivers is not None
+    assert Wave_obj_guess.receivers_output is not None
+    assert len(Wave_obj_guess.forward_solution) > 0
 
-    check_gradient(Wave_obj_guess, dJ, rec_out_exact, Jm, plot=True)
+    if automatic_adjoint:
+        Jm = float(Wave_obj_guess.functional_evaluation)
+        reduced_functional = spyro.solvers.SpyroReducedFunctional(
+            Wave_obj_guess.functional_evaluation,
+            Wave_obj_guess.c,
+        )
+        assert reduced_functional.verify_gradient() > 1.7
+    else:
+        Jm = spyro.utils.compute_functional(
+            Wave_obj_guess,
+            rec_out_exact - Wave_obj_guess.forward_solution_receivers,
+        )
+
+    check_gradient(
+        Wave_obj_guess,
+        dJ,
+        rec_out_exact,
+        Jm,
+        plot=False,
+        check_first_order=not automatic_adjoint,
+    )
+
+
+@pytest.mark.slow
+@pytest.mark.parametrize("automatic_adjoint", [False, True])
+def test_forward_solve_stores_receivers_output_when_not_returned(
+    automatic_adjoint,
+):
+    rec_out_exact, Wave_obj_guess = get_forward_model(
+        load_true=False,
+        automatic_adjoint=automatic_adjoint,
+    )
+
+    Wave_obj_guess.forward_solve(
+        store_receivers_output=False,
+        compute_functional=automatic_adjoint,
+    )
+
+    assert Wave_obj_guess.forward_solution_receivers is not None
+    assert Wave_obj_guess.receivers_output is not None
+    assert len(Wave_obj_guess.forward_solution) > 0
+    assert fire.norm(
+        Wave_obj_guess.get_function() - Wave_obj_guess.forward_solution[-1]
+    ) == pytest.approx(0.0)
 
 
 if __name__ == "__main__":
-    test_gradient()
+    test_gradient(automatic_adjoint=False)

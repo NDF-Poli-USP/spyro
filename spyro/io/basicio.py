@@ -84,13 +84,14 @@ def ensemble_propagator(func):
         elif args[0].parallelism_type == "spatial" and args[0].number_of_sources > 1:
             num = args[0].number_of_sources
             starting_time = args[0].current_time
+            result = None
             for snum in range(num):
                 args[0].reset_pressure()
                 args[0].current_time = starting_time
-                u, u_r = func(*args, **dict(kwargs, source_nums=[snum]))
+                result = func(*args, **dict(kwargs, source_nums=[snum]))
                 save_serial_data(args[0], snum)
 
-            return u, u_r
+            return result
 
     return wrapper
 

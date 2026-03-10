@@ -2,7 +2,11 @@ import firedrake as fire
 from . import helpers
 
 
-def backward_wave_propagator(Wave_obj, dt=None):
+def _copy_forward_solution(forward_solution):
+    return [state.copy(deepcopy=True) for state in forward_solution]
+
+
+def backward_wave_propagator(Wave_obj, dt=None, forward_solution=None):
     """Propagates the adjoint wave backwards in time.
     Currently uses central differences.
 
@@ -20,12 +24,20 @@ def backward_wave_propagator(Wave_obj, dt=None):
         Calculated gradient
     """
     if Wave_obj.abc_active is False:
-        return backward_wave_propagator_no_pml(Wave_obj, dt=dt)
+        return backward_wave_propagator_no_pml(
+            Wave_obj,
+            dt=dt,
+            forward_solution=forward_solution,
+        )
     elif Wave_obj.abc_active:
-        return mixed_space_backward_wave_propagator(Wave_obj, dt=dt)
+        return mixed_space_backward_wave_propagator(
+            Wave_obj,
+            dt=dt,
+            forward_solution=forward_solution,
+        )
 
 
-def backward_wave_propagator_no_pml(Wave_obj, dt=None):
+def backward_wave_propagator_no_pml(Wave_obj, dt=None, forward_solution=None):
     """Propagates the adjoint wave backwards in time.
     Currently uses central differences. Does not have any PML.
 
@@ -51,7 +63,10 @@ def backward_wave_propagator_no_pml(Wave_obj, dt=None):
     if dt is not None:
         Wave_obj.dt = dt
 
-    forward_solution = Wave_obj.forward_solution
+    if forward_solution is None:
+        forward_solution = _copy_forward_solution(Wave_obj.forward_solution)
+    else:
+        forward_solution = _copy_forward_solution(forward_solution)
     receivers = Wave_obj.receivers
     residual = Wave_obj.misfit
     comm = Wave_obj.comm
@@ -154,7 +169,7 @@ def backward_wave_propagator_no_pml(Wave_obj, dt=None):
     return dJ
 
 
-def mixed_space_backward_wave_propagator(Wave_obj, dt=None):
+def mixed_space_backward_wave_propagator(Wave_obj, dt=None, forward_solution=None):
     """Propagates the adjoint wave backwards in time.
     Currently uses central differences. Based on the
     mixed space implementation of PML.
@@ -181,7 +196,10 @@ def mixed_space_backward_wave_propagator(Wave_obj, dt=None):
     if dt is not None:
         Wave_obj.dt = dt
 
-    forward_solution = Wave_obj.forward_solution
+    if forward_solution is None:
+        forward_solution = _copy_forward_solution(Wave_obj.forward_solution)
+    else:
+        forward_solution = _copy_forward_solution(forward_solution)
     receivers = Wave_obj.receivers
     residual = Wave_obj.misfit
     comm = Wave_obj.comm
