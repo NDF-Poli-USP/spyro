@@ -265,12 +265,12 @@ class AutomaticMesh:
 
             C = self.cpw
 
-            Lz = self.length_z
-            Lx = self.length_x
+            length_z = self.length_z
+            length_x = self.length_x
             domain_pad = self.abc_pad
             lbda_min = v_min/frequency
 
-            bbox = (-Lz, 0.0, 0.0, Lx)
+            bbox = (-length_z, 0.0, 0.0, length_x)
             domain = SeismicMesh.Rectangle(bbox)
 
             hmin = lbda_min/C
@@ -332,16 +332,16 @@ class AutomaticMesh:
         """
         Creates a 2D mesh based on SeismicMesh meshing utilities, with homogeneous velocity model.
         """
-        Lz = self.length_z
-        Lx = self.length_x
+        length_z = self.length_z
+        length_x = self.length_x
         pad = self.abc_pad
 
         if pad is not None:
-            real_lz = Lz + pad
-            real_lx = Lx + 2 * pad
+            real_lz = length_z + pad
+            real_lx = length_x + 2 * pad
         else:
-            real_lz = Lz
-            real_lx = Lx
+            real_lz = length_z
+            real_lx = length_x
             pad = 0.0
 
         edge_length = self.edge_length
@@ -396,16 +396,16 @@ def calculate_edge_length(cpw, minimum_velocity, frequency):
     return edge_length
 
 
-def RectangleMesh(nx, ny, Lx, Ly, pad=None, comm=None, quadrilateral=False):
+def RectangleMesh(nx, ny, length_x, length_y, pad=None, comm=None, quadrilateral=False):
     """Create a rectangle mesh based on the Firedrake mesh.
     First axis is negative, second axis is positive. If there is a pad, both
     axis are dislocated by the pad.
 
     Parameters
     ----------
-    Lx : float
+    length_x : float
         Length of the domain in the x direction.
-    Ly : float
+    length_y : float
         Length of the domain in the y direction.
     nx : int
         Number of elements in the x direction.
@@ -424,15 +424,15 @@ def RectangleMesh(nx, ny, Lx, Ly, pad=None, comm=None, quadrilateral=False):
         Mesh
     """
     if pad is not None:
-        Lx += pad
-        Ly += 2 * pad
+        length_x += pad
+        length_y += 2 * pad
     else:
         pad = 0
 
     if comm is None:
-        mesh = fire.RectangleMesh(nx, ny, Lx, Ly, quadrilateral=quadrilateral)
+        mesh = fire.RectangleMesh(nx, ny, length_x, length_y, quadrilateral=quadrilateral)
     else:
-        mesh = fire.RectangleMesh(nx, ny, Lx, Ly, quadrilateral=quadrilateral, comm=comm)
+        mesh = fire.RectangleMesh(nx, ny, length_x, length_y, quadrilateral=quadrilateral, comm=comm)
     mesh.coordinates.dat.data[:, 0] *= -1.0
     mesh.coordinates.dat.data[:, 1] -= pad
 
@@ -440,7 +440,7 @@ def RectangleMesh(nx, ny, Lx, Ly, pad=None, comm=None, quadrilateral=False):
 
 
 def PeriodicRectangleMesh(
-    nx, ny, Lx, Ly, pad=None, comm=None, quadrilateral=False
+    nx, ny, length_x, length_y, pad=None, comm=None, quadrilateral=False
 ):
     """Create a periodic rectangle mesh based on the Firedrake mesh.
     First axis is negative, second axis is positive. If there is a pad, both
@@ -448,9 +448,9 @@ def PeriodicRectangleMesh(
 
     Parameters
     ----------
-    Lx : float
+    length_x : float
         Length of the domain in the x direction.
-    Ly : float
+    length_y : float
         Length of the domain in the y direction.
     nx : int
         Number of elements in the x direction.
@@ -470,12 +470,12 @@ def PeriodicRectangleMesh(
 
     """
     if pad is not None:
-        Lx += pad
-        Ly += 2 * pad
+        length_x += pad
+        length_y += 2 * pad
     else:
         pad = 0
     mesh = fire.PeriodicRectangleMesh(
-        nx, ny, Lx, Ly, quadrilateral=quadrilateral, comm=comm
+        nx, ny, length_x, length_y, quadrilateral=quadrilateral, comm=comm
     )
     mesh.coordinates.dat.data[:, 0] *= -1.0
     mesh.coordinates.dat.data[:, 1] -= pad
@@ -483,21 +483,21 @@ def PeriodicRectangleMesh(
     return mesh
 
 
-def BoxMesh(nx, ny, nz, Lx, Ly, Lz, pad=None, quadrilateral=False):
+def BoxMesh(nx, ny, nz, length_x, length_y, length_z, pad=None, quadrilateral=False):
     if pad is not None:
-        Lx += pad
-        Ly += 2 * pad
-        Lz += 2 * pad
+        length_x += pad
+        length_y += 2 * pad
+        length_z += 2 * pad
     else:
         pad = 0
     if quadrilateral:
-        quad_mesh = fire.RectangleMesh(nx, ny, Lx, Ly, quadrilateral=quadrilateral)
+        quad_mesh = fire.RectangleMesh(nx, ny, length_x, length_y, quadrilateral=quadrilateral)
         quad_mesh.coordinates.dat.data[:, 0] *= -1.0
         quad_mesh.coordinates.dat.data[:, 1] -= pad
-        layer_height = Lz / nz
+        layer_height = length_z / nz
         mesh = fire.ExtrudedMesh(quad_mesh, nz, layer_height=layer_height)
     else:
-        mesh = fire.BoxMesh(nx, ny, nz, Lx, Ly, Lz)
+        mesh = fire.BoxMesh(nx, ny, nz, length_x, length_y, length_z)
         mesh.coordinates.dat.data[:, 0] *= -1.0
 
     return mesh
