@@ -858,18 +858,18 @@ class Wave(Model_parameters, metaclass=ABCMeta):
 
             if from_file is not None:
                 raise NotImplementedError("Initializing property "
-                                            "from file is currently "
-                                            "not implemented")
+                                          "from file is currently "
+                                          "not implemented")
                 # mat_property = self._initialize_material_prop_from_file(
                 #     property_name, from_file, V)
 
         else:
 
             print("Vectorial and Tensorial material properties are "
-                    "defined only either by constants or\nby firedrake "
-                    "functions. If use 'constant', define its components "
-                    "as scalar material\nproperties using the same property "
-                    "name followed by the component at the end.")
+                  "defined only either by constants or\nby firedrake "
+                  "functions. If use 'constant', define its components "
+                  "as scalar material\nproperties using the same property "
+                  "name followed by the component at the end.")
 
             if constant is not None:
                 mat_property = self._initialize_material_prop_from_ufl(

@@ -1,20 +1,6 @@
-from firedrake import ConvergenceError, Function, \
-    FunctionSpace, UnitSquareMesh, UnitCubeMesh
+from firedrake import Function, FunctionSpace, UnitSquareMesh, UnitCubeMesh
+import numpy as np
 from spyro.utils.eval_functions_to_ufl import generate_ufl_functions
-
-
-def test_run_eval_ufl_functions():
-    '''
-    Run comprehensive tests for 2D/3D models and dangerous operations.
-    '''
-
-    print("=" * 80)
-    print("COMPREHENSIVE UFL EXPRESSION GENERATOR TEST SUITE")
-    print("=" * 80)
-
-    test_run_eval_ufl_functions_2d()
-    test_run_eval_ufl_functions_3d()
-    test_run_eval_danger_ops()
 
 
 def test_run_eval_ufl_functions_2d():
@@ -57,32 +43,28 @@ def test_run_eval_ufl_functions_2d():
     print(f"\nTesting {len(test_expressions_2d)} 2D expressions...")
     print("-" * 80)
 
-    successes_2d = 0
+    success_2d = 0
     for expr, description in test_expressions_2d:
-        try:
-            ufl_expr = generate_ufl_functions(mesh_2d, expr, dimension_2d)
 
-            # Create function space and interpolate
-            V = FunctionSpace(mesh_2d, "KMV", 4)
-            f = Function(V, name="test_field")
-            f.interpolate(ufl_expr)
+        # Generate expression
+        ufl_expr = generate_ufl_functions(mesh_2d, expr, dimension_2d)
 
-            # Compute some statistics
-            data = f.dat.data
-            success_msg = (
-                f"✅ {description}\n"
-                f"   Expression: {expr}\n"
-                f"   Type: {type(ufl_expr).__name__}\n"
-                f"   Range: [{data.min():.4f}, {data.max():.4f}]\n"
-                f"   Mean: {data.mean():.4f}"
-            )
-            print(success_msg)
-            successes_2d += 1
+        # Create function space and interpolate
+        V = FunctionSpace(mesh_2d, "KMV", 4)
+        f = Function(V, name="test_field")
+        f.interpolate(ufl_expr)
+        data = f.dat.data
 
-        except ConvergenceError as e:
-            print(f"❌ {description}")
-            print(f"   Expression: {expr}")
-            print(f"   Error: {e}")
+        # Checking interpolated data (assertion for non-inf and non-nan)
+        assert np.all(np.isfinite(data)), f"❌ Invalid data in {description}" \
+            + f"   Expression: {expr}"
+        success_msg = (f"✅ {description}\n"
+                       f"   Expression: {expr}\n"
+                       f"   Type: {type(ufl_expr).__name__}\n"
+                       f"   Range: [{data.min():.4f}, {data.max():.4f}]\n"
+                       f"   Mean: {data.mean():.4f}")
+        print(success_msg)
+        success_2d += 1
         print("-" * 80)
 
     # ==================== SUMMARY ====================
@@ -90,9 +72,11 @@ def test_run_eval_ufl_functions_2d():
     print("TEST SUMMARY")
     print("=" * 40)
 
+    # Assert that all tests passed
     total_2d = len(test_expressions_2d)
-    print(f"\n2D Models: {successes_2d}/{total_2d} successful "
-          f"({100*successes_2d/total_2d:.1f}%)")
+    assert success_2d == total_2d, f"Only {success_2d}/{total_2d} tests passed"
+    print(f"\n2D Models: {success_2d}/{total_2d} successful "
+          f"({100*success_2d/total_2d:.1f}%)")
 
 
 def test_run_eval_ufl_functions_3d():
@@ -124,30 +108,27 @@ def test_run_eval_ufl_functions_3d():
     print(f"\nTesting {len(test_expressions_3d)} 3D expressions...")
     print("-" * 80)
 
-    successes_3d = 0
+    success_3d = 0
     for expr, description in test_expressions_3d:
-        try:
-            ufl_expr = generate_ufl_functions(mesh_3d, expr, dimension_3d)
 
-            # Create function space and interpolate
-            V = FunctionSpace(mesh_3d, "KMV", 3)
-            f = Function(V, name="test_3d")
-            f.interpolate(ufl_expr)
+        # Generate expression
+        ufl_expr = generate_ufl_functions(mesh_3d, expr, dimension_3d)
 
-            data = f.dat.data
-            success_msg = (
-                f"✅ {description}\n"
-                f"   Expression: {expr}\n"
-                f"   Type: {type(ufl_expr).__name__}\n"
-                f"   Range: [{data.min():.4f}, {data.max():.4f}]"
-            )
-            print(success_msg)
-            successes_3d += 1
+        # Create function space and interpolate
+        V = FunctionSpace(mesh_3d, "KMV", 3)
+        f = Function(V, name="test_3d")
+        f.interpolate(ufl_expr)
+        data = f.dat.data
 
-        except ConvergenceError as e:
-            print(f"❌ {description}")
-            print(f"   Expression: {expr}")
-            print(f"   Error: {e}")
+        # Checking interpolated data (assertion for non-inf and non-nan)
+        assert np.all(np.isfinite(data)), f"❌ Invalid data in {description}" \
+            + f"   Expression: {expr}"
+        success_msg = (f"✅ {description}\n"
+                       f"   Expression: {expr}\n"
+                       f"   Type: {type(ufl_expr).__name__}\n"
+                       f"   Range: [{data.min():.4f}, {data.max():.4f}]")
+        print(success_msg)
+        success_3d += 1
         print("-" * 80)
 
     # ==================== SUMMARY ====================
@@ -155,9 +136,11 @@ def test_run_eval_ufl_functions_3d():
     print("TEST SUMMARY")
     print("=" * 40)
 
+    # Assert that all tests passed
     total_3d = len(test_expressions_3d)
-    print(f"3D Models: {successes_3d}/{total_3d} successful "
-          f"({100*successes_3d/total_3d:.1f}%)")
+    assert success_3d == total_3d, f"Only {success_3d}/{total_3d} tests passed"
+    print(f"3D Models: {success_3d}/{total_3d} successful "
+          f"({100*success_3d/total_3d:.1f}%)")
 
 
 def test_run_eval_danger_ops():
@@ -227,34 +210,36 @@ def test_run_eval_danger_ops():
           f"dangerous expressions (should all fail)...")
     print("-" * 80)
 
+    # Generate mesh
+    mesh = UnitCubeMesh(10, 10, 10)
+    dim = 3
+
     blocked_dangerous = 0
     for expr, description in dangerous_expressions:
-        try:
-            # Use appropriate mesh based on expression
-            if 'y' in expr and 'z' not in expr:
-                # Some dangerous expressions might use y as variable
-                mesh = UnitSquareMesh(10, 10)
-                dim = 2
-            else:
-                mesh = UnitSquareMesh(10, 10)
-                dim = 2
 
+        # Initialize variables
+        block_ufl = False
+        ufl_expr = None
+        fail_msg = ""
+        block_msg = ""
+
+        try:
             ufl_expr = generate_ufl_functions(mesh, expr, dim)
-            print(f"❌ FAILED TO BLOCK: {description}")
-            print(f"   Expression: {expr}")
-            print(f"   Created: {type(ufl_expr)}")
+            fail_msg = (f"❌ FAILED TO BLOCK: {description}\n"
+                        f"   Expression: {expr}\n"
+                        f"   Created: {type(ufl_expr)}\n")
 
         except ValueError as e:
-            print(f"✅ BLOCKED: {description}")
-            print(f"   Expression: {expr}")
-            print(f"   Reason: {str(e)[:60]}...")
+            block_msg = (f"✅ BLOCKED: {description}\n"
+                         f"   Expression: {expr}\n"
+                         f"   Type: {type(ufl_expr).__name__}\n"
+                         f"   Error type: {type(e).__name__}")
+            block_ufl = True
             blocked_dangerous += 1
-        except Exception as e:
-            # Other exceptions (syntax errors, etc.) also count as blocked
-            print(f"✅ BLOCKED: {description}")
-            print(f"   Expression: {expr}")
-            print(f"   Error type: {type(e).__name__}")
-            blocked_dangerous += 1
+
+        # Checking criation of ufl expression
+        assert block_ufl, fail_msg
+        print(block_msg)
         print("-" * 80)
 
     # ==================== SUMMARY ====================
@@ -263,9 +248,21 @@ def test_run_eval_danger_ops():
     print("=" * 40)
 
     total_dangerous = len(dangerous_expressions)
+    assert blocked_dangerous == total_dangerous, f"Only {blocked_dangerous}" \
+        + f"/{total_dangerous} tests passed"
     print(f"Dangerous ops: {blocked_dangerous}/{total_dangerous} blocked "
           f"({100*blocked_dangerous/total_dangerous:.1f}%)")
 
 
 if __name__ == "__main__":
-    test_run_eval_ufl_functions()
+    '''
+    Run comprehensive tests for 2D/3D models and dangerous operations.
+    '''
+
+    print("\n" + "=" * 80)
+    print("COMPREHENSIVE UFL EXPRESSION GENERATOR TEST SUITE")
+    print("=" * 80)
+
+    test_run_eval_ufl_functions_2d()
+    test_run_eval_ufl_functions_3d()
+    test_run_eval_danger_ops()

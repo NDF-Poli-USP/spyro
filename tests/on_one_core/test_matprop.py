@@ -623,15 +623,14 @@ def test_fromfile_mat_prop(wave_instance, cell_type):
     create_segy(dummy, Wave_obj.function_space.sub(0),
                 Wave_obj.mesh_parameters.edge_length, from_file_segy)
 
-    with pytest.raises(ValueError) as exc_info:
+    with pytest.raises(NotImplementedError) as exc_info:
         vel_S = Wave_obj.set_material_property(   # noqa: F841
             'vel_S', 'scalar', from_file=from_file_segy, output=True,
             foldername='/property_fields/from_file/')
 
     # Verify the error message
-    expected_message = "Error Setting a Material Property: " + \
-        "Initializing property from file is currently not implemented"
-    assert expected_message in str(exc_info.value), \
+    expect_msg = "Initializing property from file is currently not implemented"
+    assert expect_msg in str(exc_info.value), \
         f"Unexpected error message: {str(exc_info.value)}"
 
     print("Material Property from file: Correctly raised "
