@@ -763,14 +763,7 @@ class HABC_Wave(AcousticWave, HABC_Mesh, RectangLayer,
             # Mesh coordinates
             coords = fire.SpatialCoordinate(self.mesh)
 
-            # Domain coordinates
-            z, x = coords[0], coords[1]
-
-            if self.dimension == 3:  # 3D
-                y = coords[2]
-
             # Define the load for the energy-equivalent homogenization
-
             # Static load for HABC model
             q_lay = self.set_material_property("q_lay", 'scalar',
                                                constant=0.)

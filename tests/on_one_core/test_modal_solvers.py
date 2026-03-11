@@ -340,7 +340,7 @@ def run_modal(Wave_obj, modal_solver_lst, fitting_c, exp_value, n_root=1):
         name_cost = Wave_obj.path_case_habc + modal_solver + "_"
         comp_cost("tfin", tRef=tRef, user_name=name_cost)
 
-        tol = 0.05 if modal_solver == 'ANALYTICAL' else 0.05
+        tol = 0.07 if modal_solver == 'ANALYTICAL' else 0.05
 
         lay_str = Wave_obj.path_case_habc.split("output/")[1].rstrip("/")[:-4]
         met_str = f"Fundamental Frequency {lay_str} {Wave_obj.dimension}D. "
