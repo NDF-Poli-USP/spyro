@@ -84,13 +84,14 @@ def ensemble_propagator(func):
         elif args[0].parallelism_type == "spatial" and args[0].number_of_sources > 1:
             num = args[0].number_of_sources
             starting_time = args[0].current_time
+            result = None
             for snum in range(num):
                 args[0].reset_pressure()
                 args[0].current_time = starting_time
-                u, u_r = func(*args, **dict(kwargs, source_nums=[snum]))
+                result = func(*args, **dict(kwargs, source_nums=[snum]))
                 save_serial_data(args[0], snum)
 
-            return u, u_r
+            return result
 
     return wrapper
 
@@ -116,7 +117,7 @@ def save_serial_data(wave, propagation_id):
     arrays_list = [obj.dat.data[:] for obj in wave.forward_solution]
     stacked_arrays = np.stack(arrays_list, axis=0)
     np.save(_shot_filename('tmp_shot', propagation_id, wave), stacked_arrays)
-    np.save(_shot_filename('tmp_rec', propagation_id, wave), wave.forward_solution_receivers)
+    np.save(_shot_filename('tmp_rec', propagation_id, wave), wave.receivers_data)
 
 
 def switch_serial_shot(wave, propagation_id):
@@ -136,8 +137,7 @@ def switch_serial_shot(wave, propagation_id):
         rebuild_empty_forward_solution(wave, n_dts)
     for array_i, array in enumerate(stacked_shot_arrays):
         wave.forward_solution[array_i].dat.data[:] = array
-    wave.forward_solution_receivers = np.load(_shot_filename('tmp_rec', propagation_id, wave))
-    wave.receivers_output = wave.forward_solution_receivers
+    wave.receivers_data = np.load(_shot_filename('tmp_rec', propagation_id, wave))
 
 
 def ensemble_functional(func):
@@ -317,7 +317,7 @@ def save_shots(Wave_obj, file_name="shots/shot_record_", shot_ids=0):
     """
     file_name = file_name + str(shot_ids) + ".dat"
     with open(file_name, "wb") as f:
-        pickle.dump(Wave_obj.forward_solution_receivers, f)
+        pickle.dump(Wave_obj.receivers_data, f)
     return None
 
 
@@ -351,7 +351,7 @@ def load_shots(Wave_obj, file_name="shots/shot_record_", shot_ids=0):
 
     with open(file_name, "rb") as f:
         array = np.asarray(pickle.load(f), dtype=float)
-        Wave_obj.forward_solution_receivers = array
+        Wave_obj.receivers_data = array
     return None
 
 

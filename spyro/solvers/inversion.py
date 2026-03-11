@@ -118,9 +118,6 @@ class FullWaveformInversion(AcousticWave):
         The inner product. Default is 'L2'.
     misfit:
         The misfit between the current forward shot record and the real observed data.
-    guess_forward_solution:
-        The guess forward solution.
-
     Methods:
     --------
     __init__(self, dictionary=None, comm=None):
@@ -201,7 +198,6 @@ class FullWaveformInversion(AcousticWave):
         self.iteration_limit = 100
         self.inner_product = 'L2'
         self.misfit = None
-        self.guess_forward_solution = None
         self.has_gradient_mask = False
         self.functional_history = []
 
@@ -243,7 +239,7 @@ class FullWaveformInversion(AcousticWave):
         if c is not None:
             self.initial_velocity_model.dat.data[:] = c
         self.forward_solve()
-        output = fire.File("control_" + str(self.current_iteration)+".pvd")
+        output = fire.VTKFile("control_" + str(self.current_iteration)+".pvd")
         output.write(self.c)
         np.save(f"control{self.comm.ensemble_comm.rank}_{self.comm.comm.rank}", self.c.dat.data[:])
         if self.parallelism_type == "spatial" and self.number_of_sources > 1:
@@ -251,13 +247,12 @@ class FullWaveformInversion(AcousticWave):
             guess_shot_record_list = []
             for snum in range(self.number_of_sources):
                 switch_serial_shot(self, snum)
-                guess_shot_record_list.append(self.forward_solution_receivers)
-                misfit_list.append(self.real_shot_record[snum] - self.forward_solution_receivers)
+                guess_shot_record_list.append(self.receivers_data)
+                misfit_list.append(self.real_shot_record[snum] - self.receivers_data)
             self.guess_shot_record = guess_shot_record_list
             self.misfit = misfit_list
         else:
-            self.guess_shot_record = self.forward_solution_receivers
-            self.guess_forward_solution = self.forward_solution
+            self.guess_shot_record = self.receivers_data
             self.misfit = self.real_shot_record - self.guess_shot_record
         return self.misfit
 
@@ -469,11 +464,11 @@ class FullWaveformInversion(AcousticWave):
         if calculate_functional:
             self.get_functional(c=c)
         comm.comm.barrier()
-        self.gradient = self.gradient_solve(misfit=self.misfit, forward_solution=self.guess_forward_solution)
+        self.gradient = self.gradient_solve(misfit=self.misfit)
         self._apply_gradient_mask()
         if save:
             # self.gradient_out.write(dJ_total)
-            output = fire.File("gradient_" + str(self.current_iteration)+".pvd")
+            output = fire.VTKFile("gradient_" + str(self.current_iteration)+".pvd")
             output.write(self.gradient)
         self.current_iteration += 1
         comm.comm.barrier()
@@ -524,7 +519,7 @@ class FullWaveformInversion(AcousticWave):
         )
         vp_end = fire.Function(self.function_space)
         vp_end.dat.data[:] = result.x
-        fire.File("vp_end.pvd").write(vp_end)
+        fire.VTKFile("vp_end.pvd").write(vp_end)
 
     def run_fwi_rol(self, **kwargs):
         """
@@ -636,8 +631,8 @@ class FullWaveformInversion(AcousticWave):
 
     def load_real_shot_record(self, filename="shots/shot_record_"):
         load_shots(self, file_name=filename)
-        self.real_shot_record = self.forward_solution_receivers
-        self.forward_solution_receivers = None
+        self.real_shot_record = self.receivers_data
+        self.receivers_data = None
 
 
 class SyntheticRealAcousticWave(AcousticWave):
@@ -668,7 +663,7 @@ class SyntheticRealAcousticWave(AcousticWave):
             real_shot_record_list = []
             for snum in range(self.number_of_sources):
                 switch_serial_shot(self, snum)
-                real_shot_record_list.append(self.receivers_output)
+                real_shot_record_list.append(self.receivers_data)
             self.real_shot_record = real_shot_record_list
         else:
-            self.real_shot_record = self.receivers_output
+            self.real_shot_record = self.receivers_data

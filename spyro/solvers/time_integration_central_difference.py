@@ -21,8 +21,7 @@ def central_difference(
 
     Returns:
     --------
-        tuple:
-            A tuple containing the forward solution and the receiver output.
+        None
 
     Notes:
     ------
@@ -48,10 +47,16 @@ def central_difference(
         # being one at a point and zero elsewhere.
         source_cof = wave.sources.source_cofunction()
         interpolate_receivers = wave.receivers.receiver_interpolator(
-            wave.vstate)
+            wave.get_function())
     usol_recv = []
     save_step = 0
+    wave.functional = None
     if compute_functional:
+        if not wave.use_vertex_only_mesh:
+            raise ValueError(
+                "compute_functional=True requires use_vertex_only_mesh=True "
+                "so the receiver-space functional can be annotated."
+            )
         Jm = 0.
     for step in range(nt):
         # Basic way of applying sources
@@ -70,12 +75,11 @@ def central_difference(
         wave.vstate = wave.next_vstate
         if wave.use_vertex_only_mesh:
             recv = fire.assemble(interpolate_receivers)
-            if store_receivers_output:
-                usol_recv.append(recv)
+            usol_recv.append(recv)
             # check if compute_functional is True
             if compute_functional:
                 true_recv = kwargs.get("true_recv", None)
-                if isinstance(true_recv, list):
+                if isinstance(true_recv, (list, np.ndarray)):
                     rec_out_exact = fire.Function(interpolate_receivers.target_space)
                     if isinstance(true_recv[step], fire.Function):
                         rec_out_exact.dat.data_wo[:] = true_recv[step].dat.data_ro[:]
@@ -84,7 +88,10 @@ def central_difference(
                     else:
                         raise ValueError("Elements of true_recv should be either Firedrake Functions or numpy arrays.")
                 else:
-                    raise ValueError("true_recv should be a list when compute_functional is True.")
+                    raise ValueError(
+                        "true_recv should be a list or numpy array when "
+                        "compute_functional is True."
+                    )
                 misfit = rec_out_exact - recv
                 Jm += 0.5 * fire.assemble(fire.inner(misfit, misfit) * fire.dx)
 
@@ -107,17 +114,14 @@ def central_difference(
 
     wave.current_time = t
     helpers.display_progress(wave.comm, t)
-    if store_receivers_output:
-        wave.receivers_output = usol_recv
-        usol_recv = helpers.fill(
-            usol_recv, wave.receivers.is_local, nt, wave.receivers.number_of_points
-        )
-        usol_recv = utils.utils.communicate(usol_recv, wave.comm)
-
-        wave.forward_solution = usol
-        wave.forward_solution_receivers = usol_recv
-
-        wave.field_logger.stop_logging()
-        return usol, usol_recv
     if compute_functional:
-        return Jm
+        wave.functional = Jm
+
+    wave.receivers_data = usol_recv
+    usol_recv = helpers.fill(
+        usol_recv, wave.receivers.is_local, nt, wave.receivers.number_of_points
+    )
+    wave.receivers_data = utils.utils.communicate(usol_recv, wave.comm)
+    wave.forward_solution = usol
+
+    wave.field_logger.stop_logging()

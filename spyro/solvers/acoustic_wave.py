@@ -80,16 +80,9 @@ class AcousticWave(Wave):
     @ensemble_gradient
     def gradient_solve(
         self, store_receivers_output=True,
-        compute_functional=False, guess=None, misfit=None,
-        forward_solution=None, **kwargs
+        compute_functional=False, misfit=None, **kwargs
     ):
         """Solves the adjoint problem to calculate de gradient.
-
-        Parameters:
-        -----------
-        guess: Firedrake 'Function' (optional)
-            Initial guess for the velocity model. If not mentioned uses the
-            one currently in the wave object.
 
         Returns:
         --------
@@ -97,12 +90,15 @@ class AcousticWave(Wave):
             Gradient of the cost functional.
         """
         if self.automatic_adjoint:
-            Jm = self.forward_solve(
-                store_receivers_output=False, compute_functional=True, **kwargs)
+            self.forward_solve(
+                store_receivers_output=store_receivers_output,
+                compute_functional=True,
+                **kwargs,
+            )
             reduced_functional = SpyroReducedFunctional(
-                self.acoustic_energy, self.c)
+                self.functional, self.c)
             return reduced_functional.compute_gradient()
-            
+
         else:
             if misfit is not None:
                 self.misfit = misfit
@@ -110,7 +106,7 @@ class AcousticWave(Wave):
                 self.forward_solve(
                     store_receivers_output, compute_functional, **kwargs)
                 if not self.automatic_adjoint:
-                    self.misfit = self.real_shot_record - self.forward_solution_receivers
+                    self.misfit = self.real_shot_record - self.receivers_data
             else:
                 raise ValueError("Please load or calculate a real shot record first")
             return backward_wave_propagator(self)

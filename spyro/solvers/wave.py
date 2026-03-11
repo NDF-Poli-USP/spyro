@@ -79,13 +79,14 @@ class Wave(Model_parameters, metaclass=ABCMeta):
         self.wave_type = WaveType.NONE
 
         self.function_space = None
-        self.forward_solution_receivers = None
+        self.forward_solution = []
+        self._receivers_data = None
         self.current_time = 0.0
         self.set_solver_parameters()
 
         self.mesh = self.get_mesh()
         self.c = None
-        self.functional_evaluation = None
+        self._functional = None
         self.sources = None
         if self.mesh is not None:
             self._build_function_space()
@@ -109,7 +110,7 @@ class Wave(Model_parameters, metaclass=ABCMeta):
             self, store_receivers_output=True, compute_functional=False,
             **kwargs
     ):
-        """Solves the forward problem."""
+        """Solve the forward problem and persist the resulting wave state."""
 
         print("\nSolving Forward Problem")
 
@@ -119,12 +120,12 @@ class Wave(Model_parameters, metaclass=ABCMeta):
         if self.abc_boundary_layer_type != "hybrid":
             self._initialize_model_parameters()
         self.matrix_building()
-        J_m = self.wave_propagator(
+        self.functional = None
+        self.wave_propagator(
             store_receivers_output,
             compute_functional,
             **kwargs
         )
-        self.functional_evaluation = J_m
 
     def force_rebuild_function_space(self):
         if self.mesh is None:
@@ -340,7 +341,39 @@ class Wave(Model_parameters, metaclass=ABCMeta):
     def set_last_solve_as_real_shot_record(self):
         if self.current_time == 0.0:
             raise ValueError("No previous solve to set as real shot record.")
-        self.real_shot_record = self.forward_solution_receivers
+        self.real_shot_record = self.receivers_data
+
+    @property
+    def receivers_data(self):
+        return self._receivers_data
+
+    @receivers_data.setter
+    def receivers_data(self, value):
+        self._receivers_data = value
+
+    @property
+    def receivers_output(self):
+        return self.receivers_data
+
+    @receivers_output.setter
+    def receivers_output(self, value):
+        self.receivers_data = value
+
+    @property
+    def forward_solution_receivers(self):
+        return self.receivers_data
+
+    @forward_solution_receivers.setter
+    def forward_solution_receivers(self, value):
+        self.receivers_data = value
+
+    @property
+    def functional(self):
+        return self._functional
+
+    @functional.setter
+    def functional(self, value):
+        self._functional = value
 
     @abstractmethod
     def _set_vstate(self, vstate):
@@ -414,10 +447,7 @@ class Wave(Model_parameters, metaclass=ABCMeta):
 
         Returns:
         --------
-        usol: Firedrake 'Function'
-            Wavefield at the final time.
-        u_rec: numpy array
-            Wavefield at the receivers across the timesteps.
+        None
         """
         if final_time is not None:
             self.final_time = final_time
@@ -425,12 +455,11 @@ class Wave(Model_parameters, metaclass=ABCMeta):
             self.dt = dt
 
         self.current_sources = source_nums
-        # Results are the wave solution in the entire domain and the receiver output across time
-        # if store_receivers_output is True, otherwise only the wave solution in the entire domain is returned.
-        results = time_integrator(
+        # Receiver data is always persisted on the wave object. The
+        # store_receivers_output flag remains only for compatibility.
+        time_integrator(
             self, store_receivers_output,
             compute_functional, source_nums, **kwargs)
-        return results
 
     def get_dt(self):
         return self._dt

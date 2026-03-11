@@ -361,11 +361,10 @@ class Model_parameters(Read_options, Read_boundary_layer, Read_time_axis, Read_o
         self.comm.comm.barrier()
 
     def _sanitize_automatic_adjoint(self):
-        dictionary = self.input_dictionary
-        if "automatic_adjoint" in dictionary:
-            self.automatic_adjoint = True
-        else:
-            self.automatic_adjoint = False
+        options_dictionary = self.input_dictionary.setdefault("options", {})
+        self.automatic_adjoint = bool(
+            options_dictionary.get("automatic_adjoint", False)
+        )
 
     def _sanitize_time_inputs(self):
         self.__check_time()
