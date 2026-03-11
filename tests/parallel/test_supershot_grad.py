@@ -1,7 +1,6 @@
 import numpy as np
 import math
 import matplotlib.pyplot as plt
-from copy import deepcopy
 from firedrake import File
 import firedrake as fire
 import spyro
@@ -147,8 +146,6 @@ def get_forward_model(load_true=False):
 
 def test_gradient_supershot():
     rec_out_exact, rec_out_guess, Wave_obj_guess = get_forward_model(load_true=False)
-    forward_solution = Wave_obj_guess.forward_solution
-    forward_solution_guess = deepcopy(forward_solution)
 
     misfit = rec_out_exact - rec_out_guess
 
@@ -156,7 +153,7 @@ def test_gradient_supershot():
     print(f"Cost functional : {Jm}")
 
     # compute the gradient of the control (to be verified)
-    dJ = Wave_obj_guess.gradient_solve(misfit=misfit, forward_solution=forward_solution_guess)
+    dJ = Wave_obj_guess.gradient_solve(misfit=misfit)
     File("gradient.pvd").write(dJ)
 
     check_gradient(Wave_obj_guess, dJ, rec_out_exact, Jm, plot=True)

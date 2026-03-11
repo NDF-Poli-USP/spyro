@@ -1,121 +1,48 @@
 import numpy as np
-import matplotlib.pyplot as plt
-from copy import deepcopy
-from firedrake import VTKFile
 import firedrake as fire
-from pyadjoint import continue_annotation
-import spyro
 import pytest
+import spyro
+from pyadjoint import Tape, continue_annotation, set_working_tape
 
 
-class Gradient_mask_for_pml():
-    def __init__(self, Wave_obj=None):
-        if Wave_obj.abc_active is False:
-            pass
+def check_manual_gradient(wave_obj_guess, dJ, rec_out_exact, Jm):
+    step = 1e-3
+    direction = fire.Function(wave_obj_guess.function_space)
+    direction.assign(dJ)
 
-        # Gatting necessary data from wave object
-        pad = Wave_obj.mesh_parameters.abc_pad_length  # noqa: F841
-        z = Wave_obj.mesh_z
-        x = Wave_obj.mesh_x
-        V = Wave_obj.function_space
+    wave_obj_guess.reset_pressure()
+    wave_obj_guess.initial_velocity_model = fire.Constant(2.0) + step * direction
+    assert wave_obj_guess.forward_solve() is None
 
-        # building firedrake function for mask
-        z_min = -(Wave_obj.mesh_parameters.length_z)
-        x_min = 0.0
-        x_max = Wave_obj.mesh_parameters.length_x
-        mask = fire.Function(V)
-        cond = fire.conditional(z < z_min, 1, 0)
-        cond = fire.conditional(x < x_min, 1, cond)
-        cond = fire.conditional(x > x_max, 1, cond)
-        mask.interpolate(cond)
+    misfit_plusdm = rec_out_exact - wave_obj_guess.receivers_data
+    J_plusdm = spyro.utils.compute_functional(wave_obj_guess, misfit_plusdm)
 
-        # saving mask dofs
-        self.mask_dofs = np.where(mask.dat.data[:] > 0.95)
+    grad_fd = (J_plusdm - Jm) / step
+    projnorm = fire.assemble(
+        dJ * direction * fire.dx(**wave_obj_guess.quadrature_rule)
+    )
+    error = np.abs(100 * ((grad_fd - projnorm) / projnorm))
 
-    def apply_mask(self, dJ):
-        dJ.dat.data[self.mask_dofs] = 0.0
-        return dJ
+    assert error < 5
 
 
-def check_gradient(Wave_obj_guess, dJ, rec_out_exact, Jm, plot=False):
-    steps = [1e-3]  # step length
-
-    errors = []
-    V_c = Wave_obj_guess.function_space
-    dm = fire.Function(V_c)
-    dm.assign(dJ)
-
-    for step in steps:
-
-        Wave_obj_guess.reset_pressure()
-        c_guess = fire.Constant(2.0) + step*dm
-        Wave_obj_guess.initial_velocity_model = c_guess
-        Wave_obj_guess.forward_solve()
-        misfit_plusdm = rec_out_exact - Wave_obj_guess.receivers_output
-        J_plusdm = spyro.utils.compute_functional(Wave_obj_guess, misfit_plusdm)
-
-        grad_fd = (J_plusdm - Jm) / (step)
-        projnorm = fire.assemble(dJ * dm * fire.dx(**Wave_obj_guess.quadrature_rule))
-
-        error = np.abs(100 * ((grad_fd - projnorm) / projnorm))
-
-        errors.append(error)
-
-    errors = np.array(errors)
-
-    # Checking if error is first order in step
-    theory = [t for t in steps]
-    theory = [errors[0] * th / theory[0] for th in theory]
-    if plot:
-        plt.close()
-        plt.plot(steps, errors, label="Error")
-        plt.plot(steps, theory, "--", label="first order")
-        plt.legend()
-        plt.title(" Adjoint gradient versus finite difference gradient")
-        plt.xlabel("Step")
-        plt.ylabel("Error %")
-        plt.savefig("gradient_error_verification.png")
-        plt.close()
-
-    # Checking if every error is less than 5 percent
-
-    test1 = (abs(errors[-1]) < 5)
-    print(f"Gradient error less than 5 percent: {test1}")
-    print(f"Error of {errors}")
-
-    # Checking if error follows expected finite difference error convergence
-    # this is not done in PML yet. A samll percentage error is present here and in old spyro
-    # test2 = math.isclose(np.log(theory[-1]), np.log(errors[-1]), rel_tol=1e-1)
-
-    # print(f"Gradient error behaved as expected: {test2}")
-
-    assert all([test1])
-
-
-def set_dictionary(PML=False):
-    final_time = 1.0
-
+def set_dictionary(automatic_adjoint):
     dictionary = {}
     dictionary["options"] = {
-        "cell_type": "T",  # simplexes such as triangles or tetrahedra (T) or quadrilaterals (Q)
-        "variant": "lumped",  # lumped, equispaced or DG, default is lumped
-        "degree": 4,  # p order
-        "dimension": 2,  # dimension
-        "automatic_adjoint": None,  # This variable will be set to True or False depending on the test.
+        "cell_type": "T",
+        "variant": "lumped",
+        "degree": 4,
+        "dimension": 2,
+        "automatic_adjoint": automatic_adjoint,
     }
-
-    dictionary["parallelism"] = {
-        "type": "automatic",  # options: automatic (same number of cores for evey processor) or spatial
-    }
-
+    dictionary["parallelism"] = {"type": "automatic"}
     dictionary["mesh"] = {
-        "Lz": 1.0,  # depth in km - always positive
-        "Lx": 1.0,  # width in km - always positive
-        "Ly": 0.0,  # thickness in km - always positive
+        "Lz": 1.0,
+        "Lx": 1.0,
+        "Ly": 0.0,
         "mesh_file": None,
         "mesh_type": "firedrake_mesh",
     }
-
     dictionary["acquisition"] = {
         "source_type": "ricker",
         "source_locations": [(-0.1, 0.5)],
@@ -125,16 +52,14 @@ def set_dictionary(PML=False):
         "receiver_locations": spyro.create_transect((-0.8, 0.1), (-0.8, 0.9), 10),
         "use_vertex_only_mesh": True,
     }
-
     dictionary["time_axis"] = {
-        "initial_time": 0.0,  # Initial time for event
-        "final_time": final_time,  # Final time for event
-        "dt": 0.0002,  # timestep size
-        "amplitude": 1,  # the Ricker has an amplitude of 1.
-        "output_frequency": 100,  # how frequently to output solution to pvds
-        "gradient_sampling_frequency": 1,  # how frequently to save solution to RAM
+        "initial_time": 0.0,
+        "final_time": 1.0,
+        "dt": 0.0002,
+        "amplitude": 1,
+        "output_frequency": 100,
+        "gradient_sampling_frequency": 1,
     }
-
     dictionary["visualization"] = {
         "forward_output": False,
         "forward_output_filename": "results/forward_output.pvd",
@@ -146,87 +71,57 @@ def set_dictionary(PML=False):
         "adjoint_filename": None,
         "debug_output": False,
     }
-    if PML:
-        dictionary["absorving_boundary_conditions"] = {
-            "status": True,
-            "damping_type": "PML",
-            "exponent": 2,
-            "cmax": 4.5,
-            "R": 1e-6,
-            "pad_length": 0.25,
-        }
+    dictionary["absorving_boundary_conditions"] = {
+        "status": True,
+        "damping_type": "PML",
+        "exponent": 2,
+        "cmax": 4.5,
+        "R": 1e-6,
+        "pad_length": 0.25,
+    }
     return dictionary
 
 
-def get_forward_model(dictionary=None):
+def build_models(automatic_adjoint):
+    dictionary = set_dictionary(automatic_adjoint)
 
-    # Exact model
-    Wave_obj_exact = spyro.AcousticWave(dictionary=dictionary)
-    Wave_obj_exact.set_mesh(input_mesh_parameters={"edge_length": 0.03})
-    cond = fire.conditional(Wave_obj_exact.mesh_z > -0.5, 1.5, 3.5)
-    Wave_obj_exact.set_initial_velocity_model(
+    wave_obj_exact = spyro.AcousticWave(dictionary=dictionary)
+    wave_obj_exact.set_mesh(input_mesh_parameters={"edge_length": 0.03})
+    cond = fire.conditional(wave_obj_exact.mesh_z > -0.5, 1.5, 3.5)
+    wave_obj_exact.set_initial_velocity_model(
         conditional=cond,
         dg_velocity_model=False,
     )
-    spyro.plots.plot_model(Wave_obj_exact, filename="pml_grad_test_model.png", abc_points=[(-0, 0), (-1, 0), (-1, 1), (-0, 1)])
-    Wave_obj_exact.forward_solve()
-    rec_out_exact = Wave_obj_exact.receivers_output
+    assert wave_obj_exact.forward_solve() is None
+    rec_out_exact = wave_obj_exact.receivers_data
 
-    # Guess model
-    if dictionary["options"]["automatic_adjoint"]:
-        # To tape the forward solver operations,
-        # we need to call continue_annotation() before the forward solve.
-        continue_annotation()
-    Wave_obj_guess = spyro.AcousticWave(dictionary=dictionary)
-    Wave_obj_guess.set_mesh(input_mesh_parameters={"edge_length": 0.03})
-    Wave_obj_guess.set_initial_velocity_model(constant=2.0)
-    Wave_obj_guess.forward_solve(
-        store_receivers_output=False, compute_functional=True,
-        true_recv=rec_out_exact)
-    # rec_out_guess = Wave_obj_guess.receivers_output
-
-    return Wave_obj_guess.functional_evaluation, rec_out_exact, Wave_obj_guess
-
-
-@pytest.mark.slow
-@pytest.mark.parametrize("automatic_adjoint", [True, False])
-def test_gradient(PML=False, automatic_adjoint=None):
-    dictionary = set_dictionary(PML=PML)
-    dictionary["options"]["automatic_adjoint"] = True
-    # automatic_adjoint
     if automatic_adjoint:
-        # Automated gradient works only with vertex-only mesh
-        # to model sources and receivers.
-        dictionary["acquisition"].get("use_vertex_only_mesh", True)
+        set_working_tape(Tape())
+        continue_annotation()
 
-    J_m, rec_out_exact, Wave_obj_guess = get_forward_model(dictionary=dictionary)
-    Wave_obj_guess.automatic_adjoint = automatic_adjoint
-    
-    # if not automatic_adjoint:
-    #     forward_solution = Wave_obj_guess.forward_solution
-    #     forward_solution_guess = deepcopy(forward_solution)
-    #     misfit = rec_out_exact - rec_out_guess
+    wave_obj_guess = spyro.AcousticWave(dictionary=dictionary)
+    wave_obj_guess.set_mesh(input_mesh_parameters={"edge_length": 0.03})
+    wave_obj_guess.set_initial_velocity_model(constant=2.0)
 
-    #     Jm = spyro.utils.compute_functional(Wave_obj_guess, misfit)
-    #     print(f"Cost functional : {Jm}")
-
-    #     # compute the gradient of the control (to be verified)
-    #     dJ = Wave_obj_guess.gradient_solve(misfit=misfit, forward_solution=forward_solution_guess)
-    # else:
-    rf = spyro.solvers.SpyroReducedFunctional(J_m, Wave_obj_guess.c)
-    rf.verify_gradient()
-    VTKFile("gradient_premask.pvd").write(dJ)
-    Mask_data = Gradient_mask_for_pml(Wave_obj=Wave_obj_guess)
-    dJ = Mask_data.apply_mask(dJ)
-    VTKFile("gradient.pvd").write(dJ)
-
-    check_gradient(Wave_obj_guess, dJ, rec_out_exact, Jm, plot=True)
+    return rec_out_exact, wave_obj_guess
 
 
 @pytest.mark.slow
-def test_gradient_pml():
-    return test_gradient(PML=True)
+@pytest.mark.parametrize("automatic_adjoint", [False, True])
+def test_gradient_pml(automatic_adjoint):
+    rec_out_exact, wave_obj_guess = build_models(automatic_adjoint)
 
+    if automatic_adjoint:
+        dJ = wave_obj_guess.gradient_solve(
+            true_recv=rec_out_exact,
+        )
+        assert wave_obj_guess.functional is not None
+    else:
+        assert wave_obj_guess.forward_solve() is None
+        misfit = rec_out_exact - wave_obj_guess.receivers_data
+        Jm = spyro.utils.compute_functional(wave_obj_guess, misfit)
+        dJ = wave_obj_guess.gradient_solve(misfit=misfit)
+        check_manual_gradient(wave_obj_guess, dJ, rec_out_exact, Jm)
 
-if __name__ == "__main__":
-    test_gradient(automatic_adjoint=True)
+    assert wave_obj_guess.receivers_data is not None
+    assert dJ is not None
