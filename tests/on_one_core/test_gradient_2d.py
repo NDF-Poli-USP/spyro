@@ -1,10 +1,16 @@
+from contextlib import contextmanager
 from copy import deepcopy
 
 import firedrake as fire
 import numpy as np
 import pytest
 import spyro
-from pyadjoint import continue_annotation, pause_annotation
+from pyadjoint import (
+    Tape,
+    continue_annotation,
+    pause_annotation,
+    set_working_tape,
+)
 from pyadjoint.tape import get_working_tape
 
 
@@ -75,6 +81,44 @@ def stop_new_annotation():
     tape = get_working_tape()
     if tape is not None:
         tape.clear_tape()
+
+
+@contextmanager
+def python_execution_tape():
+    pause_annotation()
+    with set_working_tape(Tape()):
+        try:
+            yield
+        finally:
+            pause_annotation()
+            tape = get_working_tape()
+            if tape is not None:
+                tape.clear_tape()
+
+
+def get_solver_case_id(solver_case):
+    if not solver_case["automatic_adjoint"]:
+        return "implemented"
+    return f'automatic-{solver_case["true_recv_format"]}'
+
+
+def plot_gradient_errors(errors, steps, solver_case):
+    import matplotlib.pyplot as plt
+
+    theory = [errors[0] * step / steps[0] for step in steps]
+    case_id = get_solver_case_id(solver_case)
+    output = f"gradient_error_verification_{case_id}.png"
+
+    plt.close()
+    plt.plot(steps, errors, "o-", label="Error")
+    plt.plot(steps, theory, "--", label="first order")
+    plt.legend()
+    plt.title("Adjoint gradient versus finite difference gradient")
+    plt.xlabel("Step")
+    plt.ylabel("Error %")
+    plt.savefig(output)
+    plt.close()
+    print(f"Saved gradient error plot to {output}")
 
 
 def build_wave(automatic_adjoint):
@@ -162,7 +206,9 @@ def get_gradient_and_functional(wave_obj_guess, rec_out_exact, solver_case):
     return dJ, Jm
 
 
-def check_gradient(wave_obj_guess, dJ, Jm, rec_out_exact, solver_case):
+def check_gradient(
+    wave_obj_guess, dJ, Jm, rec_out_exact, solver_case, plot=False
+):
     errors = []
     direction = fire.Function(wave_obj_guess.function_space)
     rng = np.random.default_rng(0)
@@ -190,12 +236,37 @@ def check_gradient(wave_obj_guess, dJ, Jm, rec_out_exact, solver_case):
             wave_obj_guess, rec_out_exact, solver_case
         )
         grad_fd = (J_plusdm - Jm) / step
-        errors.append(abs(100 * ((grad_fd - projnorm) / projnorm)))
+        error = abs(100 * ((grad_fd - projnorm) / projnorm))
+        errors.append(float(error))
+
+    if plot:
+        plot_gradient_errors(errors, STEPS, solver_case)
 
     wave_obj_guess.initial_velocity_model = base_velocity
 
     assert errors[-1] < 1
     assert errors[-1] < errors[0]
+
+
+def run_gradient_case(solver_case, plot=False):
+    rec_out_exact = build_exact_receivers()
+    wave_obj_guess = build_wave(
+        automatic_adjoint=solver_case["automatic_adjoint"]
+    )
+    wave_obj_guess.set_initial_velocity_model(constant=2.0)
+
+    dJ, Jm = get_gradient_and_functional(
+        wave_obj_guess, rec_out_exact, solver_case
+    )
+
+    assert isinstance(dJ, fire.Function)
+    assert wave_obj_guess.receivers_data is not None
+    if solver_case["automatic_adjoint"]:
+        assert wave_obj_guess.functional is not None
+
+    check_gradient(
+        wave_obj_guess, dJ, Jm, rec_out_exact, solver_case, plot=plot
+    )
 
 
 @pytest.mark.slow
@@ -217,19 +288,12 @@ def check_gradient(wave_obj_guess, dJ, Jm, rec_out_exact, solver_case):
     ],
 )
 def test_gradient(solver_case):
-    rec_out_exact = build_exact_receivers()
-    wave_obj_guess = build_wave(
-        automatic_adjoint=solver_case["automatic_adjoint"]
-    )
-    wave_obj_guess.set_initial_velocity_model(constant=2.0)
+    run_gradient_case(solver_case)
 
-    dJ, Jm = get_gradient_and_functional(
-        wave_obj_guess, rec_out_exact, solver_case
-    )
 
-    assert isinstance(dJ, fire.Function)
-    assert wave_obj_guess.receivers_data is not None
-    if solver_case["automatic_adjoint"]:
-        assert wave_obj_guess.functional is not None
-
-    check_gradient(wave_obj_guess, dJ, Jm, rec_out_exact, solver_case)
+if __name__ == "__main__":
+    with python_execution_tape():
+        run_gradient_case(
+            {"automatic_adjoint": True, "true_recv_format": "array"},
+            plot=True,
+        )
