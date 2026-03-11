@@ -4,10 +4,16 @@ import firedrake as fire
 import numpy as np
 import pytest
 import spyro
-from pyadjoint import Tape, continue_annotation, set_working_tape
+from pyadjoint import continue_annotation, pause_annotation
+from pyadjoint.tape import get_working_tape
 
 
 STEPS = (1e-3, 1e-4, 1e-5)
+
+
+@pytest.fixture(autouse=True)
+def autouse_set_test_tape(set_test_tape):
+    _ = set_test_tape
 
 
 def set_dictionary(automatic_adjoint):
@@ -61,8 +67,14 @@ def set_dictionary(automatic_adjoint):
 
 
 def start_new_annotation():
-    set_working_tape(Tape())
     continue_annotation()
+
+
+def stop_new_annotation():
+    pause_annotation()
+    tape = get_working_tape()
+    if tape is not None:
+        tape.clear_tape()
 
 
 def build_wave(automatic_adjoint):
@@ -73,11 +85,21 @@ def build_wave(automatic_adjoint):
     return wave_obj
 
 
+def assert_forward_solution_length(wave_obj):
+    expected_length = sum(
+        1
+        for step in range(int(wave_obj.final_time / wave_obj.dt) + 1)
+        if step % wave_obj.gradient_sampling_frequency == 0
+    )
+    assert len(wave_obj.forward_solution) == expected_length
+
+
 def build_exact_receivers():
     wave_obj_exact = build_wave(automatic_adjoint=False)
     cond = fire.conditional(wave_obj_exact.mesh_z > -1.5, 1.5, 3.5)
     wave_obj_exact.set_initial_velocity_model(conditional=cond)
     assert wave_obj_exact.forward_solve() is None
+    assert_forward_solution_length(wave_obj_exact)
     return wave_obj_exact.receivers_data
 
 
@@ -95,9 +117,11 @@ def compute_functional(wave_obj_guess, true_recv):
     wave_obj_guess.compute_functional = True
     try:
         assert wave_obj_guess.forward_solve(true_recv=true_recv) is None
-        return wave_obj_guess.functional
+        assert_forward_solution_length(wave_obj_guess)
+        return float(wave_obj_guess.functional)
     finally:
         wave_obj_guess.compute_functional = previous_compute_functional
+        stop_new_annotation()
 
 
 def compute_functional_value(wave_obj_guess, rec_out_exact, solver_case):
@@ -115,12 +139,19 @@ def compute_functional_value(wave_obj_guess, rec_out_exact, solver_case):
 def get_gradient_and_functional(wave_obj_guess, rec_out_exact, solver_case):
     if solver_case["automatic_adjoint"]:
         start_new_annotation()
-        dJ = wave_obj_guess.gradient_solve(
-            true_recv=build_true_recv(rec_out_exact, solver_case["true_recv_format"])
-        )
-        Jm = wave_obj_guess.functional
+        try:
+            dJ = wave_obj_guess.gradient_solve(
+                true_recv=build_true_recv(
+                    rec_out_exact, solver_case["true_recv_format"]
+                )
+            )
+            assert_forward_solution_length(wave_obj_guess)
+            Jm = wave_obj_guess.functional
+        finally:
+            stop_new_annotation()
     else:
         assert wave_obj_guess.forward_solve() is None
+        assert_forward_solution_length(wave_obj_guess)
         misfit = rec_out_exact - wave_obj_guess.receivers_data
         Jm = spyro.utils.compute_functional(wave_obj_guess, misfit)
         dJ = wave_obj_guess.gradient_solve(
@@ -137,7 +168,9 @@ def check_gradient(wave_obj_guess, dJ, Jm, rec_out_exact, solver_case):
     rng = np.random.default_rng(0)
     direction.dat.data[:] = rng.random(direction.dat.data.shape)
 
-    base_velocity = fire.Function(wave_obj_guess.function_space, name="velocity")
+    base_velocity = fire.Function(
+        wave_obj_guess.function_space, name="velocity"
+    )
     base_velocity.assign(wave_obj_guess.c)
 
     projnorm = fire.assemble(

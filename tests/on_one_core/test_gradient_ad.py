@@ -1,8 +1,14 @@
 import firedrake as fire
+from pyadjoint import continue_annotation, pause_annotation
 import pytest
 import spyro
-from pyadjoint import Tape, continue_annotation, set_working_tape
+
 from spyro.solvers import acoustic_wave as acoustic_wave_module
+
+
+@pytest.fixture(autouse=True)
+def autouse_set_test_tape(set_test_tape):
+    _ = set_test_tape
 
 
 def set_dictionary():
@@ -10,7 +16,7 @@ def set_dictionary():
     dictionary["options"] = {
         "cell_type": "T",
         "variant": "lumped",
-        "degree": 3,
+        "degree": 1,
         "dimension": 2,
         "automatic_adjoint": True,
     }
@@ -28,13 +34,15 @@ def set_dictionary():
         "frequency": 5.0,
         "delay": 1.5,
         "delay_type": "multiples_of_minimum",
-        "receiver_locations": spyro.create_transect((-0.8, 0.1), (-0.8, 0.9), 8),
+        "receiver_locations": spyro.create_transect(
+            (-0.8, 0.1), (-0.8, 0.9), 8
+        ),
         "use_vertex_only_mesh": True,
     }
     dictionary["time_axis"] = {
         "initial_time": 0.0,
         "final_time": 0.6,
-        "dt": 0.0003,
+        "dt": 0.001,
         "amplitude": 1,
         "output_frequency": 100,
         "gradient_sampling_frequency": 1,
@@ -67,8 +75,11 @@ def build_exact_receivers():
 
 
 def start_new_annotation():
-    set_working_tape(Tape())
     continue_annotation()
+
+
+def stop_new_annotation():
+    pause_annotation()
 
 
 @pytest.mark.slow
@@ -80,13 +91,14 @@ def test_gradient_ad_uses_reduced_functional(monkeypatch, true_recv_format):
         true_recv = [row.copy() for row in rec_out_exact]
 
     dictionary = set_dictionary()
-    start_new_annotation()
     wave_obj_guess = spyro.AcousticWave(dictionary=dictionary)
     wave_obj_guess.set_mesh(input_mesh_parameters={"edge_length": 0.04})
     wave_obj_guess.set_initial_velocity_model(constant=2.0)
 
     calls = {"count": 0}
-    original_compute_gradient = acoustic_wave_module.SpyroReducedFunctional.compute_gradient
+    original_compute_gradient = (
+        acoustic_wave_module.SpyroReducedFunctional.compute_gradient
+    )
 
     def wrapped_compute_gradient(self):
         calls["count"] += 1
@@ -99,8 +111,11 @@ def test_gradient_ad_uses_reduced_functional(monkeypatch, true_recv_format):
     )
 
     assert wave_obj_guess.automatic_adjoint is True
-    gradient = wave_obj_guess.gradient_solve(true_recv=true_recv)
-
+    start_new_annotation()
+    try:
+        gradient = wave_obj_guess.gradient_solve(true_recv=true_recv)
+    finally:
+        stop_new_annotation()
     assert calls["count"] == 1
     assert wave_obj_guess.receivers_data is not None
     assert wave_obj_guess.functional is not None
