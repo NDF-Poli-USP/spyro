@@ -12,7 +12,7 @@ on:
 
 jobs:
   test:
-    name: Install and test Firedrake (Linux)
+    name: build
     runs-on: self-hosted
     # Only run if:
     # 1. It's a scheduled run, OR
