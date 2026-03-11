@@ -242,7 +242,7 @@ class FullWaveformInversion(AcousticWave):
             self.initial_velocity_model = self.guess_velocity_model
         if c is not None:
             self.initial_velocity_model.dat.data[:] = c
-        self.forward_solve(compute_functional=False)
+        self.forward_solve()
         output = fire.File("control_" + str(self.current_iteration)+".pvd")
         output.write(self.c)
         np.save(f"control{self.comm.ensemble_comm.rank}_{self.comm.comm.rank}", self.c.dat.data[:])
@@ -259,8 +259,6 @@ class FullWaveformInversion(AcousticWave):
             self.guess_shot_record = self.forward_solution_receivers
             self.guess_forward_solution = self.forward_solution
             self.misfit = self.real_shot_record - self.guess_shot_record
-
-        self.true_receivers = self.real_shot_record
         return self.misfit
 
     def generate_real_shot_record(self, plot_model=False, model_filename="model.png", abc_points=None, save_shot_record=True, shot_filename="shots/shot_record_"):
@@ -471,18 +469,7 @@ class FullWaveformInversion(AcousticWave):
         if calculate_functional:
             self.get_functional(c=c)
         comm.comm.barrier()
-        if self.automatic_adjoint:
-            self.compute_functional = True
-            self.true_receivers = self.real_shot_record
-            self.gradient = self.compute_gradient(
-                compute_functional=True,
-                true_receivers=self.true_receivers,
-            )
-        else:
-            self.gradient = self.compute_gradient(
-                misfit=self.misfit,
-                forward_solution=self.guess_forward_solution,
-            )
+        self.gradient = self.gradient_solve(misfit=self.misfit, forward_solution=self.guess_forward_solution)
         self._apply_gradient_mask()
         if save:
             # self.gradient_out.write(dJ_total)
@@ -650,6 +637,7 @@ class FullWaveformInversion(AcousticWave):
     def load_real_shot_record(self, filename="shots/shot_record_"):
         load_shots(self, file_name=filename)
         self.real_shot_record = self.forward_solution_receivers
+        self.forward_solution_receivers = None
 
 
 class SyntheticRealAcousticWave(AcousticWave):

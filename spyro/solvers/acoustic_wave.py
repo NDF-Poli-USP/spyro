@@ -1,12 +1,11 @@
 import firedrake as fire
-import firedrake.adjoint as fire_adj
 import warnings
 import os
 
 from .wave import Wave
 from .automatic_differentiation_solver import SpyroReducedFunctional
 
-from ..io.basicio import ensemble_gradient, switch_serial_shot
+from ..io.basicio import ensemble_gradient
 from ..io import interpolate
 from .acoustic_solver_construction_no_pml import (
     construct_solver_or_matrix_no_pml,
@@ -78,115 +77,13 @@ class AcousticWave(Wave):
 
         self.acoustic_energy = acoustic_energy(self)
 
-    def _resolve_true_receivers(self, true_receivers=None):
-        if true_receivers is not None:
-            self.true_receivers = true_receivers
-        elif self.true_receivers is None and hasattr(self, "real_shot_record"):
-            self.true_receivers = self.real_shot_record
-
-        return self.true_receivers
-
-    def _build_misfit_from_observed_receivers(self, observed_receivers):
-        if observed_receivers is None:
-            raise ValueError(
-                "Please set wave.true_receivers or wave.real_shot_record before computing the gradient."
-            )
-
-        if self.parallelism_type == "spatial" and self.number_of_sources > 1:
-            misfit = []
-            for source_number in range(self.number_of_sources):
-                switch_serial_shot(self, source_number)
-                misfit.append(
-                    observed_receivers[source_number] - self.forward_solution_receivers
-                )
-            return misfit
-
-        return observed_receivers - self.forward_solution_receivers
-
-    def _validate_automatic_adjoint_gradient_inputs(self):
-        if not self.compute_functional:
-            raise ValueError(
-                "Set wave.compute_functional to True before calling compute_gradient() with automatic adjoint."
-            )
-
-        if self.abc_boundary_layer_type == "PML":
-            raise NotImplementedError(
-                "Automatic adjoint with SpyroReducedFunctional is not supported for PML acoustic waves."
-            )
-
-        if self._resolve_true_receivers() is None:
-            raise ValueError(
-                "Set wave.true_receivers before calling compute_gradient() with automatic adjoint."
-            )
-
-        if not self.use_vertex_only_mesh:
-            raise ValueError(
-                "Automatic adjoint requires acquisition.use_vertex_only_mesh=True."
-            )
-
-        if self.number_of_sources != 1:
-            raise NotImplementedError(
-                "Automatic adjoint currently supports only single-source propagations."
-            )
-
-    def _compute_gradient_with_automatic_adjoint(
-        self,
-        store_receivers_output=True,
-        **kwargs,
-    ):
-        self._validate_automatic_adjoint_gradient_inputs()
-
-        fire_adj.pause_annotation()
-        tape = fire_adj.get_working_tape()
-        if tape is not None:
-            tape.clear_tape()
-
-        fire_adj.continue_annotation()
-        try:
-            self.forward_solve(
-                store_receivers_output=store_receivers_output,
-                compute_functional=True,
-                true_receivers=self.true_receivers,
-                **kwargs,
-            )
-        finally:
-            fire_adj.pause_annotation()
-
-        if self.functional_evaluation is None:
-            raise RuntimeError(
-                "Forward solve did not produce a functional evaluation for automatic adjoint differentiation."
-            )
-
-        self.misfit = self.true_receivers - self.forward_solution_receivers
-        reduced_functional = SpyroReducedFunctional(
-            self.functional_evaluation,
-            self.c,
-        )
-        return reduced_functional.compute_gradient()
-
     @ensemble_gradient
-    def _compute_gradient_with_discrete_adjoint(
-        self,
-        misfit,
-        forward_solution=None,
+    def gradient_solve(
+        self, store_receivers_output=True,
+        compute_functional=False, guess=None, misfit=None,
+        forward_solution=None, **kwargs
     ):
-        self.misfit = misfit
-        if forward_solution is None:
-            forward_solution = self.forward_solution
-
-        return backward_wave_propagator(self, forward_solution=forward_solution)
-
-    def compute_gradient(
-        self,
-        store_receivers_output=True,
-        compute_functional=None,
-        true_receivers=None,
-        guess=None,
-        misfit=None,
-        forward_solution=None,
-        **kwargs,
-    ):
-        """Compute the gradient with either the discrete or automatic adjoint.
+        """Solves the adjoint problem to calculate de gradient.
 
         Parameters:
         -----------
@@ -199,58 +96,24 @@ class AcousticWave(Wave):
         dJ: Firedrake 'Function'
             Gradient of the cost functional.
         """
-        if guess is not None:
-            self.initial_velocity_model = guess
-
-        if compute_functional is not None:
-            self.compute_functional = compute_functional
-
-        observed_receivers = self._resolve_true_receivers(true_receivers)
-
         if self.automatic_adjoint:
-            return self._compute_gradient_with_automatic_adjoint(
-                store_receivers_output=store_receivers_output,
-                **kwargs,
-            )
-
-        needs_forward_propagation = (
-            forward_solution is None and len(self.forward_solution) == 0
-        ) or (misfit is None and self.forward_solution_receivers is None)
-
-        if needs_forward_propagation:
-            self.forward_solve(
-                store_receivers_output=store_receivers_output,
-                compute_functional=False,
-                **kwargs,
-            )
-
-        if misfit is None:
-            misfit = self._build_misfit_from_observed_receivers(observed_receivers)
-
-        return self._compute_gradient_with_discrete_adjoint(
-            misfit=misfit,
-            forward_solution=forward_solution,
-        )
-
-    def gradient_solve(
-        self,
-        store_receivers_output=True,
-        compute_functional=None,
-        guess=None,
-        misfit=None,
-        forward_solution=None,
-        true_receivers=None,
-        **kwargs,
-    ):
-        return self.compute_gradient(
-            store_receivers_output=store_receivers_output,
-            compute_functional=compute_functional,
-            true_receivers=true_receivers,
-            guess=guess,
-            misfit=misfit,
-            forward_solution=forward_solution,
-            **kwargs,
-        )
+            Jm = self.forward_solve(
+                store_receivers_output=False, compute_functional=True, **kwargs)
+            reduced_functional = SpyroReducedFunctional(
+                self.acoustic_energy, self.c)
+            return reduced_functional.compute_gradient()
+            
+        else:
+            if misfit is not None:
+                self.misfit = misfit
+            elif self.current_time == 0.0:
+                self.forward_solve(
+                    store_receivers_output, compute_functional, **kwargs)
+                if not self.automatic_adjoint:
+                    self.misfit = self.real_shot_record - self.forward_solution_receivers
+            else:
+                raise ValueError("Please load or calculate a real shot record first")
+            return backward_wave_propagator(self)
 
     def reset_pressure(self):
         try:

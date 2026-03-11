@@ -79,11 +79,7 @@ class Wave(Model_parameters, metaclass=ABCMeta):
         self.wave_type = WaveType.NONE
 
         self.function_space = None
-        self.forward_solution = []
-        self.receivers_output = None
         self.forward_solution_receivers = None
-        self.compute_functional = False
-        self.true_receivers = None
         self.current_time = 0.0
         self.set_solver_parameters()
 
@@ -110,8 +106,7 @@ class Wave(Model_parameters, metaclass=ABCMeta):
                                     lambda: self.get_function())
 
     def forward_solve(
-            self, store_receivers_output=True, compute_functional=None,
-            true_receivers=None,
+            self, store_receivers_output=True, compute_functional=False,
             **kwargs
     ):
         """Solves the forward problem."""
@@ -121,50 +116,15 @@ class Wave(Model_parameters, metaclass=ABCMeta):
         if self.function_space is None:
             self.force_rebuild_function_space()
 
-        if compute_functional is None:
-            compute_functional = self.compute_functional
-
-        true_receivers_alias = kwargs.pop("true_recv", None)
-        true_data_receivers = kwargs.pop("true_data_receivers", None)
-        if true_receivers is None:
-            true_receivers = true_receivers_alias
-        elif (
-            true_receivers_alias is not None
-            and true_receivers is not true_receivers_alias
-        ):
-            raise ValueError("Specify observed receiver data only once.")
-
-        if true_receivers is None:
-            true_receivers = true_data_receivers
-        elif (
-            true_data_receivers is not None
-            and true_receivers is not true_data_receivers
-        ):
-            raise ValueError("Specify observed receiver data only once.")
-
-        if true_receivers is not None:
-            self.true_receivers = true_receivers
-
-        self.compute_functional = compute_functional
-
-        if self.compute_functional and self.true_receivers is None:
-            raise ValueError(
-                "true_receivers must be set before computing the functional."
-            )
-
         if self.abc_boundary_layer_type != "hybrid":
             self._initialize_model_parameters()
         self.matrix_building()
-        propagation_result = self.wave_propagator(
+        J_m = self.wave_propagator(
             store_receivers_output,
             compute_functional,
             **kwargs
         )
-        if compute_functional:
-            self.functional_evaluation = propagation_result
-        else:
-            self.functional_evaluation = None
-        return propagation_result
+        self.functional_evaluation = J_m
 
     def force_rebuild_function_space(self):
         if self.mesh is None:
@@ -381,11 +341,6 @@ class Wave(Model_parameters, metaclass=ABCMeta):
         if self.current_time == 0.0:
             raise ValueError("No previous solve to set as real shot record.")
         self.real_shot_record = self.forward_solution_receivers
-
-    def compute_gradient(self, **kwargs):
-        raise NotImplementedError(
-            f"{type(self).__name__} does not implement compute_gradient()."
-        )
 
     @abstractmethod
     def _set_vstate(self, vstate):

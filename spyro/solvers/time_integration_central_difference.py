@@ -5,37 +5,6 @@ from .. import utils
 import numpy as np
 
 
-def _observed_receivers_at_step(true_receivers, step, target_space):
-    if true_receivers is None:
-        raise ValueError(
-            "wave.true_receivers must be set when compute_functional is True."
-        )
-
-    if isinstance(true_receivers, np.ndarray):
-        receiver_step = true_receivers[step]
-    elif isinstance(true_receivers, (list, tuple)):
-        receiver_step = true_receivers[step]
-    else:
-        raise ValueError(
-            "wave.true_receivers should be either a NumPy array or a per-step sequence."
-        )
-
-    observed_receivers = fire.Function(target_space)
-    if isinstance(receiver_step, fire.Function):
-        observed_receivers.dat.data_wo[:] = receiver_step.dat.data_ro[:]
-    else:
-        try:
-            observed_receivers.dat.data_wo[:] = np.asarray(
-                receiver_step, dtype=float
-            )
-        except (TypeError, ValueError) as exc:
-            raise ValueError(
-                "Each entry of wave.true_receivers should be either a Firedrake Function or array-like receiver data."
-            ) from exc
-
-    return observed_receivers
-
-
 def central_difference(
         wave, store_receivers_output, compute_functional, source_ids=[0],
         **kwargs
@@ -79,7 +48,7 @@ def central_difference(
         # being one at a point and zero elsewhere.
         source_cof = wave.sources.source_cofunction()
         interpolate_receivers = wave.receivers.receiver_interpolator(
-            wave.get_function())
+            wave.vstate)
     usol_recv = []
     save_step = 0
     if compute_functional:
@@ -101,21 +70,23 @@ def central_difference(
         wave.vstate = wave.next_vstate
         if wave.use_vertex_only_mesh:
             recv = fire.assemble(interpolate_receivers)
-            usol_recv.append(recv)
+            if store_receivers_output:
+                usol_recv.append(recv)
             # check if compute_functional is True
             if compute_functional:
-                rec_out_exact = _observed_receivers_at_step(
-                    wave.true_receivers,
-                    step,
-                    interpolate_receivers.target_space,
-                )
+                true_recv = kwargs.get("true_recv", None)
+                if isinstance(true_recv, list):
+                    rec_out_exact = fire.Function(interpolate_receivers.target_space)
+                    if isinstance(true_recv[step], fire.Function):
+                        rec_out_exact.dat.data_wo[:] = true_recv[step].dat.data_ro[:]
+                    elif isinstance(true_recv[step], np.ndarray):
+                        rec_out_exact.dat.data_wo[:] = true_recv[step]
+                    else:
+                        raise ValueError("Elements of true_recv should be either Firedrake Functions or numpy arrays.")
+                else:
+                    raise ValueError("true_recv should be a list when compute_functional is True.")
                 misfit = rec_out_exact - recv
-                time_weight = 0.25 if step in (0, nt - 1) else 0.5
-                Jm += (
-                    time_weight
-                    * float(wave.dt)
-                    * fire.assemble(fire.inner(misfit, misfit) * fire.dx)
-                )
+                Jm += 0.5 * fire.assemble(fire.inner(misfit, misfit) * fire.dx)
 
         else:
             usol_recv.append(wave.get_receivers_output())
@@ -136,23 +107,17 @@ def central_difference(
 
     wave.current_time = t
     helpers.display_progress(wave.comm, t)
-
-    if len(usol_recv) > 0:
-        receivers_output = helpers.fill(
+    if store_receivers_output:
+        wave.receivers_output = usol_recv
+        usol_recv = helpers.fill(
             usol_recv, wave.receivers.is_local, nt, wave.receivers.number_of_points
         )
-        receivers_output = utils.utils.communicate(receivers_output, wave.comm)
-    else:
-        receivers_output = None
+        usol_recv = utils.utils.communicate(usol_recv, wave.comm)
 
-    wave.forward_solution = usol
-    wave.receivers_output = receivers_output
-    wave.forward_solution_receivers = receivers_output
+        wave.forward_solution = usol
+        wave.forward_solution_receivers = usol_recv
 
-    wave.field_logger.stop_logging()
-
+        wave.field_logger.stop_logging()
+        return usol, usol_recv
     if compute_functional:
         return Jm
-    if store_receivers_output:
-        return usol, receivers_output
-    return usol
