@@ -178,6 +178,7 @@ class HABC_Mesh():
 
         # Minimum and maximum mesh size for habc parameters
         diam = fire.Function(self.function_space).interpolate(self.diam_mesh)
+        # diam = fire.interpolate(self.diam_mesh, self.function_space)
         self.lmin = round(diam.dat.data_with_halos.min() / fdim, 6)
         self.lmax = round(diam.dat.data_with_halos.max() / fdim, 6)
 

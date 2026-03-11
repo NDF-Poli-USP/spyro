@@ -109,6 +109,10 @@ class Modal_Solver():
         calc_max_dt : `bool`
             Option to estimate the maximum stable timestep for the computation
             of the transient response. Default is False
+        static_load_for_ceq : `firedrake function`, optional
+            Static load for the energy-equivalent homogenization.
+            Only used for the 'ANALYTICAL' method. Default is None, in which
+            a small constant load is applied over the entire domain.
 
         Returns
         -------
@@ -140,7 +144,7 @@ class Modal_Solver():
         print(f"Solver Method: {self.method}", flush=True)
 
     @staticmethod
-    def weak_forms(c, V, quad_rule=None, source=False):
+    def weak_forms(c, V, quad_rule=None, source=False, user_load=None):
         '''
         Generate the bilinear forms for the modal problem.
         Also, it can generate a source term in weak form
@@ -156,6 +160,9 @@ class Modal_Solver():
             Default is None, which uses the default quadrature rule
         source : `bool`, optional
             Option to get a source term in weak form. Default is False
+        user_load : `firedrake function`, optional
+            User-defined load for the source term. Default is None, in
+            which a small constant load is applied over the entire domain.
 
         Returns
         -------
@@ -175,8 +182,13 @@ class Modal_Solver():
         # Bilinear forms
         a = c * c * fire.inner(fire.grad(u), fire.grad(v)) * dx
 
-        if source:
-            L = fire.Constant(1.0) * v * dx  # Source term
+        if source:  # Source term
+            if user_load is None:
+                q = fire.Constant(1.e-3)
+            else:
+                q = user_load
+
+            L = q * v * dx
             return a, L
 
         m = fire.inner(u, v) * dx
@@ -357,7 +369,8 @@ class Modal_Solver():
 
         return Lsp
 
-    def c_equivalent(self, c, V, quad_rule=None, typ_homog='energy'):
+    def c_equivalent(self, c, V, quad_rule=None, typ_homog='energy',
+                     static_load_for_ceq=None):
         '''
         Compute an equivalent homogeneous velocity for an inhomogeneneous
         velocity model using an energy-equivalent homogenization
@@ -373,6 +386,10 @@ class Modal_Solver():
             Default is None, which uses the default quadrature rule
         typ_homog : `str`, optional
             Type of homogenization: 'energy' or 'volume'. Default is 'energy'
+        static_load_for_ceq : `firedrake function`, optional
+            Static load for the energy-equivalent homogenization.
+            Only used if 'typ_homog'='energy'. Default is None, in which
+            a small constant load is applied over the entire domain.
 
         Returns
         -------
@@ -390,7 +407,8 @@ class Modal_Solver():
             # Equivalent velocity by energy-equivalent homogenization
 
             # Weak forms
-            a, L = self.weak_forms(c, V, quad_rule=quad_rule, source=True)
+            a, L = self.weak_forms(c, V, quad_rule=quad_rule, source=True,
+                                   user_load=static_load_for_ceq)
 
             # Compute the energy
             fire.solve(a == L, u)
@@ -752,7 +770,7 @@ class Modal_Solver():
             print(f"Nonlinear Curve Fit Failed: {e}", flush=True)
 
     def freq_factor_hyp(self, n_hyp, f_rec, f_ell, c_eq, bc='Neumann',
-                        c_eqref=None, fitting_c=(1., 1., 0.5, 0.5),
+                        c_eqref=None, fitting_c=(0., 0., 0., 0.),
                         cut_plane_percent=1.):
         '''
         Compute an approximate frequency factor for the hypershape with
@@ -782,7 +800,7 @@ class Modal_Solver():
             velocity model without an absorbing layer. Default is None
         fitting_c : `list`, optional
             Parameters for fitting equivalent velocity regression.
-            Structure: (fc1, fc2, fp1, fp2). Default is (1., 1., 0.5, 0.5)
+            Structure: (fc1, fc2, fp1, fp2). Default is (0., 0., 0., 0.)
             - fc1 : `float`
                 Exponent factor for the minimum reference velocity
             - fc2 : `float`
@@ -836,7 +854,7 @@ class Modal_Solver():
         return f_hyp, c_reg
 
     def solver_analytical(self, c_eq, hyp_par, bc='Neumann', c_eqref=None,
-                          fitting_c=(1., 1., 0.5, 0.5), cut_plane_percent=1.):
+                          fitting_c=(0., 0., 0., 0.), cut_plane_percent=1.):
         '''
         Compute the analytical solution for the eigenvalue problem with
         Neumann or Dirichlet boundary conditions for isotropic hypershapes
@@ -865,7 +883,7 @@ class Modal_Solver():
             velocity model without an absorbing layer. Default is None
         fitting_c : `tuple`, optional
             Parameters for fitting equivalent velocity regression.
-            Structure: (fc1, fc2, fp1, fp2). Default is (1., 1., 0.5, 0.5)
+            Structure: (fc1, fc2, fp1, fp2). Default is (0., 0., 0., 0.)
             - fc1 : `float`
                 Exponent factor for the minimum reference velocity
             - fc2 : `float`
@@ -1089,7 +1107,8 @@ class Modal_Solver():
                            quad_rule=None, inv_oper=False,
                            coord_norm=None, hyp_par=None,
                            cut_plane_percent=1., c_eqref=None,
-                           fitting_c=(1., 1., 0.5, 0.5)):
+                           fitting_c=(0., 0., 0., 0.),
+                           static_load_for_ceq=None):
         '''
         Solve the eigenvalue problem with Neumann boundary conditions
 
@@ -1131,7 +1150,7 @@ class Modal_Solver():
             velocity model without an absorbing layer. Default is None
         fitting_c : `tuple`, optional
             Parameters for fitting equivalent velocity regression.
-            Structure: (fc1, fc2, fp1, fp2). Default is (1., 1., 0.5, 0.5)
+            Structure: (fc1, fc2, fp1, fp2). Default is (0., 0., 0., 0.)
             - fc1 : `float`
                 Exponent factor for the minimum reference velocity
             - fc2 : `float`
@@ -1140,6 +1159,10 @@ class Modal_Solver():
                 Exponent factor for the minimum equivalent velocity
             - fp2 : `float`
                 Exponent factor for the maximum equivalent velocity
+        static_load_for_ceq : `firedrake function`, optional
+            Static load for the energy-equivalent homogenization.
+            Only used if 'typ_homog'='energy'. Default is None, in which
+            a small constant load is applied over the entire domain.
 
         Returns
         -------
@@ -1149,7 +1172,11 @@ class Modal_Solver():
         '''
 
         if self.method == 'ANALYTICAL':
-            c_eq = self.c_equivalent(c, V, quad_rule=quad_rule)
+
+            # Compute equivalent velocity for the hypershape
+            c_eq = self.c_equivalent(c, V, quad_rule=quad_rule,
+                                     static_load_for_ceq=static_load_for_ceq)
+
             Lsp = self.solver_analytical(c_eq, hyp_par,
                                          c_eqref=c_eqref, fitting_c=fitting_c,
                                          cut_plane_percent=cut_plane_percent)

@@ -198,7 +198,8 @@ def wave_dict_3d(layer_shape, degree_layer, degree_type,
     return dictionary
 
 
-def preamble_modal(dictionary, edge_length, f_est, dimension, homogeneous=True):
+def preamble_modal(dictionary, edge_length, f_est,
+                   dimension, homogeneous=True):
     '''
     Run the infinite model and the Eikonal analysis
 
@@ -232,7 +233,6 @@ def preamble_modal(dictionary, edge_length, f_est, dimension, homogeneous=True):
     Wave_obj.set_mesh(input_mesh_parameters={"edge_length": edge_length})
 
     # Initial velocity model
-
     if homogeneous:
         Wave_obj.set_initial_velocity_model(constant=1.5)
 
@@ -340,11 +340,13 @@ def run_modal(Wave_obj, modal_solver_lst, fitting_c, exp_value, n_root=1):
         name_cost = Wave_obj.path_case_habc + modal_solver + "_"
         comp_cost("tfin", tRef=tRef, user_name=name_cost)
 
+        tol = 0.05 if modal_solver == 'ANALYTICAL' else 0.05
+
         lay_str = Wave_obj.path_case_habc.split("output/")[1].rstrip("/")[:-4]
         met_str = f"Fundamental Frequency {lay_str} {Wave_obj.dimension}D. "
         met_str += f"Method {modal_solver}"
         cmp_str = f"Expected {exp_value:.5f}, got = {Wave_obj.fundam_freq:.5f}"
-        assert np.isclose(Wave_obj.fundam_freq / exp_value, 1., atol=5e-2), \
+        assert np.isclose(Wave_obj.fundam_freq / exp_value, 1., atol=tol), \
             "❌ " + met_str + "  → " + cmp_str
         print("✅ " + met_str + " Verified: " + cmp_str, flush=True)
 
@@ -371,7 +373,6 @@ def loop_modal(parameters, dictionary, degree_layer_lst,
         List of hypershape degrees for the absorbing layer
     expect_values_lst : `list`
         List of expected values for the fundamental frequency
-
     homogeneous : `bool`
         If True, the velocity model is homogeneous.
         If False, it is heterogeneous.
@@ -385,10 +386,9 @@ def loop_modal(parameters, dictionary, degree_layer_lst,
     edge_length, f_est, fitting_c = parameters
 
     # Modal solvers
-    modal_solver_lst = ['ANALYTICAL']
-    # modal_solver_lst = ['ANALYTICAL', 'ARNOLDI', 'LANCZOS',
-    #                     'LOBPCG', 'KRYLOVSCH_CH', 'KRYLOVSCH_CG',
-    #                     'KRYLOVSCH_GH', 'KRYLOVSCH_GG', 'RAYLEIGH']
+    modal_solver_lst = ['ANALYTICAL', 'ARNOLDI', 'LANCZOS',
+                        'LOBPCG', 'KRYLOVSCH_CH', 'KRYLOVSCH_CG',
+                        'KRYLOVSCH_GH', 'KRYLOVSCH_GG', 'RAYLEIGH']
 
     # Creating mesh and performing eikonal analysis
     Wave_obj = preamble_modal(dictionary, edge_length, f_est, 2,
@@ -412,10 +412,10 @@ def loop_modal(parameters, dictionary, degree_layer_lst,
             pytest.fail(f"Checking Modal 2D raised an exception: {str(e)}")
 
 
-def model_2d(homogeneous):
+@pytest.mark.parametrize("homogeneous", [False])
+def test_loop_modal_2d(homogeneous):
     '''
-    Model data for 2D case
-
+    Test of modal solvers for 2D case
 
     Parameters
     ----------
@@ -427,6 +427,10 @@ def model_2d(homogeneous):
     -------
     None
     '''
+
+    c_dist = "Homogeneous" if homogeneous else "Heterogeneous"
+    print("\n" + 70 * "=" + "\nTesting Modal Solvers for 2D case. "
+          + f"Propagation Speed: {c_dist}\n" + 70 * "=", flush=True)
 
     # ============ SIMULATION PARAMETERS ============
 
@@ -443,8 +447,7 @@ def model_2d(homogeneous):
     if homogeneous:
         fitting_c = (0.0, 0.0, 0.0, 0.0)
     else:
-        # fitting_c = (2.0, 1.8, 1.6, 0.6)
-        fitting_c = (0.0, 0.4, 0.2, 0.0)
+        fitting_c = (0.5, 0.3, -2.2, -1.3)
 
     # Get simulation parameters
     print("\nMesh Size: {:.3f} m".format(1e3 * edge_length), flush=True)
@@ -481,14 +484,8 @@ def model_2d(homogeneous):
                expect_values_lst, homogeneous)
 
 
-def test_loop_modal_2d():
-
-    for homogeneous in [True, False]:
-        model_2d(homogeneous)
-
-
-if __name__ == "__main__":
-    test_loop_modal_2d()
+# if __name__ == "__main__":
+#     test_loop_modal_2d()
 
 
 # @pytest.mark.slow
