@@ -640,7 +640,7 @@ class HABC_Wave(AcousticWave, HABC_Mesh, RectangLayer,
         outfile.write(self.c)
 
     def fundamental_frequency(self, method=None, monitor=False,
-                              fitting_c=(1., 1., 0.5, 0.5)):
+                              fitting_c=(0., 0., 0., 0.)):
         '''
         Compute the fundamental frequency in Hz via modal analysis
         considering the numerical model with Neumann BCs.
@@ -760,16 +760,40 @@ class HABC_Wave(AcousticWave, HABC_Mesh, RectangLayer,
             # Cut plane percentage
             cut_plane_perc = z_cut / self.hyper_axes[1]
 
+            # Mesh coordinates
+            coords = fire.SpatialCoordinate(self.mesh)
+
+            # Domain coordinates
+            z, x = coords[0], coords[1]
+
+            if self.dimension == 3:  # 3D
+                y = coords[2]
+
+            # Define the load for the energy-equivalent homogenization
+
+            # Static load for HABC model
+            q_lay = self.set_material_property("q_lay", 'scalar',
+                                               constant=0.)
+            q_lay.dat.data_with_halos[
+                self.sources.cellNodeMaps.flatten().astype(int)] = \
+                self.sources.cell_tabulations.flatten()
+
+            # Static load for Reference model
+            q_ref = fire.Function(self.funct_space_eik)
+            q_ref.interpolate(q_lay, allow_missing_dofs=True)
+
             # Equivalent velocity for the original model
             c_eqref = mod_sol.c_equivalent(self.initial_velocity_model,
                                            V=self.funct_space_eik,
-                                           quad_rule=self.quadrature_rule)
+                                           quad_rule=self.quadrature_rule,
+                                           static_load_for_ceq=q_ref)
 
             Lsp = mod_sol.solve_eigenproblem(self.c, V=self.function_space,
                                              quad_rule=self.quadrature_rule,
                                              hyp_par=hyp_par, c_eqref=c_eqref,
                                              fitting_c=fitting_c,
-                                             cut_plane_percent=cut_plane_perc)
+                                             cut_plane_percent=cut_plane_perc,
+                                             static_load_for_ceq=q_lay)
 
         elif method == 'RAYLEIGH':
 
@@ -799,7 +823,7 @@ class HABC_Wave(AcousticWave, HABC_Mesh, RectangLayer,
               flush=True)
 
     def damping_layer(self, xCR_usu=None, method=None,
-                      fitting_c=(1., 1., 0.5, 0.5)):
+                      fitting_c=(0., 0., 0., 0.)):
         '''
         Set the damping profile within the absorbing layer.
         Minimum damping ratio is computed as psi_min = xCR * d
