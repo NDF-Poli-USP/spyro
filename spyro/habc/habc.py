@@ -760,9 +760,6 @@ class HABC_Wave(AcousticWave, HABC_Mesh, RectangLayer,
             # Cut plane percentage
             cut_plane_perc = z_cut / self.hyper_axes[1]
 
-            # Mesh coordinates
-            coords = fire.SpatialCoordinate(self.mesh)
-
             # Define the load for the energy-equivalent homogenization
             # Static load for HABC model
             q_lay = self.set_material_property("q_lay", 'scalar',
