@@ -1,5 +1,4 @@
 import firedrake.adjoint as fire_adj
-import firedrake as fire
 from pyadjoint import ReducedFunctional
 
 
