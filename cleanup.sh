@@ -20,9 +20,7 @@ rm -f results/*.pvd
 rm -f results/*.pvtu
 rm -f shots/*.dat
 
-# Remove coverage files
-rm -f .coverage
-rm -f .coverage.*
+
 
 # Remove generated directories
 rm -rf velocity_models/test*
