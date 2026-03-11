@@ -22,6 +22,21 @@ class SpyroReducedFunctional(ReducedFunctional):
         self._control = control
         super().__init__(functional, fire_adj.Control(control))
 
+    def recompute_functional(self, control_value):
+        """Recompute the forward solution to reduce memory usage.
+
+        Parameters
+        ----------
+        control_value : firedrake.Function
+            The control value at which to recompute the functional.
+
+        Returns
+        -------
+        float
+            The value of the functional at the given control value.
+        """
+        return self.functional(control_value)
+
     def compute_gradient(self):
         """Compute the gradient with respect to the control.
 
@@ -68,3 +83,15 @@ class SpyroReducedFunctional(ReducedFunctional):
             direction = control_value.copy(deepcopy=True)
             direction.interpolate(1.0)
         return fire_adj.taylor_test(self, control_value, direction)
+
+    def clear_tape(self):
+        """Clear the adjoint tape to free memory."""
+        fire_adj.get_working_tape().clear()
+
+    def stop_recording(self):
+        """Stop recording operations on the adjoint tape."""
+        fire_adj.stop_annotation()
+
+    def start_recording(self):
+        """Start recording operations on the adjoint tape."""
+        fire_adj.start_annotation()
