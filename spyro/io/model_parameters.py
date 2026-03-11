@@ -345,11 +345,9 @@ class Model_parameters(Read_options, Read_boundary_layer,
         if value is not None:
             freq_str = f"Frequency of {value} too "
             if value < 1.0:
-                warnings.warn(
-                    f"Frequency of {value} too low for realistic FWI.")
+                warnings.warn(freq_str + "low for realistic FWI.")
             elif value > 50:
-                warnings.warn(
-                    f"Frequency of {value} too high for efficient FWI.")
+                warnings.warn(freq_str + "high for efficient FWI.")
         self._frequency = value
 
     @property
@@ -520,10 +518,8 @@ def _check_point_in_domain(point_coordinates, input_mesh_lengths, negative_z):
         if negative_z and i == 0:
             # For negative_z, domain is [length, 0] (length is negative)
             if not (length <= coord <= 0):
-                raise ValueError(f"Coordinate {coord} in dimension {i} "
-                                 f"is outside the domain [{length}, 0].")
+                raise ValueError(coo_str + f"[{length}, 0].")
         else:
             # For other dimensions, domain is [0, length]
             if not (0 <= coord <= length):
-                raise ValueError(f"Coordinate {coord} in dimension {i} "
-                                 f"is outside the domain [0, {length}].")
+                raise ValueError(coo_str + f"[0, {length}].")
