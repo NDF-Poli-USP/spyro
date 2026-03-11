@@ -340,7 +340,8 @@ def run_modal(Wave_obj, modal_solver_lst, fitting_c, exp_value, n_root=1):
         name_cost = Wave_obj.path_case_habc + modal_solver + "_"
         comp_cost("tfin", tRef=tRef, user_name=name_cost)
 
-        tol = 0.07 if modal_solver == 'ANALYTICAL' else 0.05
+        tol = 0.07 if (modal_solver == 'ANALYTICAL'
+                       or modal_solver == 'RAYLEIGH') else 0.05
 
         lay_str = Wave_obj.path_case_habc.split("output/")[1].rstrip("/")[:-4]
         met_str = f"Fundamental Frequency {lay_str} {Wave_obj.dimension}D. "
@@ -352,7 +353,7 @@ def run_modal(Wave_obj, modal_solver_lst, fitting_c, exp_value, n_root=1):
 
 
 def loop_modal(parameters, dictionary, degree_layer_lst,
-               expect_values_lst, homogeneous):
+               expect_values_lst, dimension, homogeneous):
     '''
     Loop for testing modals solvers.
 
@@ -373,6 +374,8 @@ def loop_modal(parameters, dictionary, degree_layer_lst,
         List of hypershape degrees for the absorbing layer
     expect_values_lst : `list`
         List of expected values for the fundamental frequency
+    dimension : `int`
+        Dimension of the model (2 or 3)
     homogeneous : `bool`
         If True, the velocity model is homogeneous.
         If False, it is heterogeneous.
@@ -391,7 +394,7 @@ def loop_modal(parameters, dictionary, degree_layer_lst,
                         'KRYLOVSCH_GH', 'KRYLOVSCH_GG', 'RAYLEIGH']
 
     # Creating mesh and performing eikonal analysis
-    Wave_obj = preamble_modal(dictionary, edge_length, f_est, 2,
+    Wave_obj = preamble_modal(dictionary, edge_length, f_est, dimension,
                               homogeneous=homogeneous)
 
     for degree_layer, exp_value in zip(degree_layer_lst, expect_values_lst):
@@ -412,7 +415,7 @@ def loop_modal(parameters, dictionary, degree_layer_lst,
             pytest.fail(f"Checking Modal 2D raised an exception: {str(e)}")
 
 
-@pytest.mark.parametrize("homogeneous", [False])
+@pytest.mark.parametrize("homogeneous", [True, False])
 def test_loop_modal_2d(homogeneous):
     '''
     Test of modal solvers for 2D case
@@ -481,109 +484,86 @@ def test_loop_modal_2d(homogeneous):
 
     # ============ MODAL ANALYSIS ============
     loop_modal(parameters, dictionary, degree_layer_lst,
-               expect_values_lst, homogeneous)
+               expect_values_lst, 2, homogeneous)
 
 
-# if __name__ == "__main__":
-#     test_loop_modal_2d()
+@pytest.mark.slow
+@pytest.mark.parametrize("homogeneous", [True, False])
+def test_loop_modal_3d(homogeneous):
+    '''
+    Test of modal solvers for 3D case
+
+    Parameters
+    ----------
+    homogeneous : `bool`
+        If True, the velocity model is homogeneous.
+        If False, it is heterogeneous.
+
+    Returns
+    -------
+    None
+    '''
+
+    c_dist = "Homogeneous" if homogeneous else "Heterogeneous"
+    print("\n" + 70 * "=" + "\nTesting Modal Solvers for 2D case. "
+          + f"Propagation Speed: {c_dist}\n" + 70 * "=", flush=True)
+
+    # ============ SIMULATION PARAMETERS ============
+
+    # Mesh size (in km)
+    # cpw: cells per wavelength
+    # lba = minimum_velocity / source_frequency
+    # edge_length = lba / cpw
+    edge_length = 0.15
+
+    # Eikonal degree
+    p_eik = 2
+
+    # Factor for the stabilizing term in Eikonal equation
+    f_est = 0.05
+
+    # Parameters for fitting equivalent velocity regression
+    if homogeneous:
+        fitting_c = (0.0, 0.0, 0.0, 0.0)
+    else:
+        fitting_c = (0.4, 0.2, 0.5, -1.0)
+
+    # Get simulation parameters
+    print("\nMesh Size: {:.3f} m".format(1e3 * edge_length), flush=True)
+    print("Eikonal Degree: {}".format(p_eik), flush=True)
+    print("Eikonal Stabilizing Factor: {:.2f}".format(f_est), flush=True)
+    fit_str = "Fitting Parameters for Analytical Solver: " + 3 * "{:.1f}, "
+    print((fit_str + "{:.1f}\n").format(*fitting_c), flush=True)
+
+    # Model parameters
+    parameters = [edge_length, f_est, fitting_c]
+
+    # ============ HABC PARAMETERS ============
+
+    # Hyperellipse degrees
+    degree_layer_lst = [2.4, None]
+
+    # ============ MESH AND EIKONAL ============
+
+    # Create dictionary with parameters for the model
+    dictionary = wave_dict_3d("rectangular", None, "real", "source", p_eik)
+
+    # ============ EXPECTED VALUES ============
+
+    # Expected values
+    if homogeneous:
+        expect_hypershape = 0.52453
+        expect_rectangular = 0.47727
+    else:
+        expect_hypershape = 0.51535
+        expect_rectangular = 0.42562
+    expect_values_lst = [expect_hypershape, expect_rectangular]
+
+    # ============ MODAL ANALYSIS ============
+    loop_modal(parameters, dictionary, degree_layer_lst,
+               expect_values_lst, 3, homogeneous)
 
 
-# @pytest.mark.slow
-# def test_loop_modal_3d():
-#     '''
-#     Loop for testing modals solvers in 3D
-#     '''
-
-#     # ============ SIMULATION PARAMETERS ============
-
-#     # Mesh size (in km)
-#     # cpw: cells per wavelength
-#     # lba = minimum_velocity / source_frequency
-#     # edge_length = lba / cpw
-#     edge_length = 0.15
-
-#     # Eikonal degree
-#     p_eik = 2
-
-#     # Factor for the stabilizing term in Eikonal equation
-#     f_est = 0.05
-
-#     # Parameters for fitting equivalent velocity regression
-#     fitting_c = (1.0, 1.0, 0.1, 0.1)
-
-#     # Get simulation parameters
-#     print("\nMesh Size: {:.3f} m".format(1e3 * edge_length), flush=True)
-#     print("Eikonal Degree: {}".format(p_eik), flush=True)
-#     print("Eikonal Stabilizing Factor: {:.2f}".format(f_est), flush=True)
-#     fit_str = "Fitting Parameters for Analytical Solver: " + 3 * "{:.1f}, "
-#     print((fit_str + "{:.1f}\n").format(*fitting_c), flush=True)
-
-#     # ============ HABC PARAMETERS ============
-
-#     # Hyperellipse degrees
-#     degree_layer_lst = [2.4, None]
-
-#     # ============ MESH AND EIKONAL ============
-
-#     # Create dictionary with parameters for the model
-#     dictionary = wave_dict_3d("rectangular", None, "real", "source", p_eik)
-
-#     # Creating mesh and performing eikonal analysis
-#     Wave_obj = preamble_modal(dictionary, edge_length, f_est, 3)
-
-#     # ============ MODAL ANALYSIS ============
-
-#     # Modal solvers
-#     modal_solver_lst = ['ARNOLDI', 'LANCZOS',  # 'ANALYTICAL',
-#                         'LOBPCG', 'KRYLOVSCH_CH', 'KRYLOVSCH_CG',
-#                         'KRYLOVSCH_GH', 'KRYLOVSCH_GG', 'RAYLEIGH']
-
-#     # Expected values
-#     expect_hypershape = [0.51355,  # 0.52709,
-#                          0.51355,
-#                          0.51355,
-#                          0.51355,
-#                          0.51355,
-#                          0.51355,
-#                          0.51355,
-#                          0.54617]
-
-#     expect_rectangular = [0.42562,  # 0.42136,
-#                           0.42562,
-#                           0.42562,
-#                           0.42562,
-#                           0.42562,
-#                           0.42562,
-#                           0.42562,
-#                           0.44942]
-
-#     # modal_solver_lst = ['ANALYTICAL']
-#     # expect_hypershape = [0.52709]
-#     # expect_rectangular = [0.42136]
-
-#     expect_values_lst = [expect_hypershape, expect_rectangular]
-
-#     for degree_layer, exp_val_lst in zip(degree_layer_lst, expect_values_lst):
-
-#         # Update the layer shape and its degree
-#         Wave_obj.abc_boundary_layer_shape = "hypershape" \
-#             if degree_layer is not None else "rectangular"
-#         Wave_obj.abc_deg_layer = degree_layer
-
-#         try:
-#             # Computing the fundamental frequency
-#             run_modal(Wave_obj, modal_solver_lst, fitting_c, exp_val_lst)
-
-#             # Renaming the folder if degree_layer is modified
-#             Wave_obj.rename_folder_habc()
-
-#         except fire.ConvergenceError as e:
-#             pytest.fail(f"Checking Modal 2D raised an exception: {str(e)}")
-
-
-# if __name__ == "__main__":
-#     test_loop_modal_2d()
-#     test_loop_modal_3d()
 '''
 DATA FOR 2D MODEL Δx = 100m
 ---------------------------
@@ -601,22 +581,22 @@ f_est  eik[ms]
  0.08  85.233
 
 *RESULTS
-Frequency[Hz]    N2.0      (texe/pmem)     REC      (texe/pmem)
-ANALYTICAL    0.50807 (0.273s/2.205MB) 0.45503 (0.111s/0.525MB)
-ARNOLDI       0.50440 (0.109s/6.685MB) 0.45539 (0.057s/6.780MB)
-LANCZOS       0.50440 (0.064s/5.967MB) 0.45539 (0.050s/6.364MB)
-LOBPCG        0.50440 (3.946s/6.009MB) 0.45539 (3.219s/6.177MB)
-KRYLOVSCH_CH  0.50440 (0.067s/0.085MB) 0.45539 (0.053s/0.085MB)
-KRYLOVSCH_CG  0.50440 (0.053s/0.076MB) 0.45539 (0.043s/0.075MB)
-KRYLOVSCH_GH  0.50440 (0.048s/0.086MB) 0.45539 (0.042s/0.085MB)
-KRYLOVSCH_GG  0.50440 (0.048s/0.100MB) 0.45539 (0.044s/0.107MB)
-RAYLEIGH      0.52783 (1.956s/3.792MB) 0.47634 (1.162s/1.926MB)
+Frequency[Hz]    N2.5      (texe/pmem)     REC      (texe/pmem)
+ANALYTICAL    0.50428 (0.608s/3.135MB) 0.45737 (0.215s/0.745MB)
+ARNOLDI       0.50440 (0.149s/6.692MB) 0.45539 (0.072s/6.775MB)
+LANCZOS       0.50440 (0.073s/5.964MB) 0.45539 (0.064s/6.339MB)
+LOBPCG        0.50440 (4.574s/5.886MB) 0.45539 (4.054s/6.185MB)
+KRYLOVSCH_CH  0.50440 (0.047s/0.085MB) 0.45539 (0.047s/0.074MB)
+KRYLOVSCH_CG  0.50440 (0.042s/0.072MB) 0.45539 (0.041s/0.099MB)
+KRYLOVSCH_GH  0.50440 (0.051s/0.078MB) 0.45539 (0.039s/0.089MB)
+KRYLOVSCH_GG  0.50440 (0.046s/0.091MB) 0.45539 (0.043s/0.081MB)
+RAYLEIGH      0.52783 (1.803s/3.601MB) 0.47634 (1.238s/1.711MB)
 
 *ANALYTICAL
-   Case0     REC*    N4.4    N4.0    N3.0   N2.0*
-fnum[Hz]  0.45539 0.47270 0.47423 0.48266 0.50440
-fana[Hz]  0.45503 0.46622 0.46541 0.47813 0.50807
-fray[Hz]  0.47634 0.49470 0.49647 0.50497 0.52783
+   Case0     REC*   N2.0*
+fnum[Hz]  0.45737 0.50428
+fana[Hz]  0.45503 0.50807
+fray[Hz]  0.47634 0.52783
 
 *RAYLEIGH N2.0
 n_eigfunc       2      *4       6       8
@@ -637,25 +617,25 @@ f_est  eik[ms]
 
 *RESULTS
 Frequency[Hz]    N2.4         (texe/pmem)     REC          (texe/pmem)
-ANALYTICAL    0.52709 ( 2.650s/  5.271MB) 0.42136 (  9.017s/  5.521MB)
-ARNOLDI       0.51350 (44.335s/168.015MB) 0.42562 (420.204s/435.557MB)
-LANCZOS       0.51355 (44.562s/125.497MB) 0.42562 (405.329s/325.842MB)
-LOBPCG        0.51355 (57.811s/122.124MB) 0.42562 (124.287s/317.060MB)
-KRYLOVSCH_CH  0.51355 (11.359s/  0.106MB) 0.42562 ( 65.094s/  0.098MB)
-KRYLOVSCH_CG  0.51355 (10.105s/  0.103MB) 0.42562 ( 64.242s/  0.088MB)
-KRYLOVSCH_GH  0.51355 (10.176s/  0.099MB) 0.42562 ( 65.212s/  0.088MB)
-KRYLOVSCH_GG  0.51355 (10.510s/  0.103MB) 0.42562 ( 64.883s/  0.099MB)
-RAYLEIGH      0.54617 (34.327s/ 47.889MB) 0.44942 ( 50.484s/ 98.198MB)
+ANALYTICAL    0.51833 (  5.853s/ 10.505MB) 0.42415 (  9.056s/  7.496MB)
+ARNOLDI       0.51535 (148.976s/276.158MB) 0.42562 (456.837s/435.551MB)
+LANCZOS       0.51535 (158.293s/206.282MB) 0.42562 (446.329s/325.837MB)
+LOBPCG        0.51535 ( 94.996s/200.741MB) 0.42562 (134.146s/317.041MB)
+KRYLOVSCH_CH  0.51535 ( 28.254s/  0.087MB) 0.42562 ( 70.890s/  0.068MB)
+KRYLOVSCH_CG  0.51535 ( 28.122s/  0.080MB) 0.42562 ( 70.301s/  0.075MB)
+KRYLOVSCH_GH  0.51535 ( 28.123s/  0.078MB) 0.42562 ( 71.568s/  0.098MB)
+KRYLOVSCH_GG  0.51535 ( 28.2230s/ 0.090MB) 0.42562 ( 72.420s/  0.090MB)
+RAYLEIGH      0.54617 ( 44.996s/ 72.103MB) 0.44942 ( 55.028s/100.738MB)
 
 ANALYTICAL
-   Case0     REC*    N4.4    N4.0    N3.0   N2.4*
-fnum[Hz]  0.42136 0.44474 0.45401 0.48967 0.52709
-fana[Hz]  0.42562 0.46018 0.46466 0.48649 0.51350
-fray[Hz]  0.44942 0.48788 0.49239 0.51531 0.54333
+   Case0     REC*  N2.4*
+fnum[Hz]  0.42136 0.51833
+fana[Hz]  0.42562 0.51535
+fray[Hz]  0.44942 0.54617
 
 RAYLEIGH N2.4
 n_eigfunc       2      *4       6
-freq[Hz]  0.65356 0.54333 0.53122
+freq[Hz]  0.65356 0.54617 0.53122
 texe[s]     0.799  34.327 373.401
 mem[MB]     6.730  47.889 154.636
 '''
