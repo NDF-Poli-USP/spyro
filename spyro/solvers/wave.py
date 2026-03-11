@@ -81,6 +81,7 @@ class Wave(Model_parameters, metaclass=ABCMeta):
         self.function_space = None
         self.forward_solution = []
         self._receivers_data = None
+        self.compute_functional = False
         self.current_time = 0.0
         self.set_solver_parameters()
 
@@ -106,11 +107,30 @@ class Wave(Model_parameters, metaclass=ABCMeta):
         self.field_logger.add_field("forward", self.get_function_name(),
                                     lambda: self.get_function())
 
-    def forward_solve(
-            self, store_receivers_output=True, compute_functional=False,
-            **kwargs
-    ):
+    def _validate_solve_kwargs(self, kwargs, method_name):
+        removed_kwargs = {
+            "store_receivers_output": (
+                "receiver data is always stored on the wave object"
+            ),
+            "compute_functional": (
+                "set wave.compute_functional before solving instead"
+            ),
+        }
+        invalid_kwargs = [
+            name for name in removed_kwargs if name in kwargs
+        ]
+        if invalid_kwargs:
+            details = "; ".join(
+                f"{name}: {removed_kwargs[name]}" for name in invalid_kwargs
+            )
+            raise TypeError(
+                f"{method_name} no longer accepts "
+                f"{', '.join(invalid_kwargs)} ({details})."
+            )
+
+    def forward_solve(self, **kwargs):
         """Solve the forward problem and persist the resulting wave state."""
+        self._validate_solve_kwargs(kwargs, "forward_solve")
 
         print("\nSolving Forward Problem")
 
@@ -121,11 +141,7 @@ class Wave(Model_parameters, metaclass=ABCMeta):
             self._initialize_model_parameters()
         self.matrix_building()
         self.functional = None
-        self.wave_propagator(
-            store_receivers_output,
-            compute_functional,
-            **kwargs
-        )
+        self.wave_propagator(**kwargs)
 
     def force_rebuild_function_space(self):
         if self.mesh is None:
@@ -430,8 +446,7 @@ class Wave(Model_parameters, metaclass=ABCMeta):
 
     @ensemble_propagator
     def wave_propagator(
-        self, store_receivers_output, compute_functional,
-        dt=None, final_time=None, source_nums=[0], **kwargs
+        self, dt=None, final_time=None, source_nums=[0], **kwargs
     ):
         """Propagates the wave forward in time.
         Currently uses central differences.
@@ -454,12 +469,9 @@ class Wave(Model_parameters, metaclass=ABCMeta):
         if dt is not None:
             self.dt = dt
 
+        self._validate_solve_kwargs(kwargs, "wave_propagator")
         self.current_sources = source_nums
-        # Receiver data is always persisted on the wave object. The
-        # store_receivers_output flag remains only for compatibility.
-        time_integrator(
-            self, store_receivers_output,
-            compute_functional, source_nums, **kwargs)
+        time_integrator(self, source_nums, **kwargs)
 
     def get_dt(self):
         return self._dt

@@ -5,10 +5,7 @@ from .. import utils
 import numpy as np
 
 
-def central_difference(
-        wave, store_receivers_output, compute_functional, source_ids=[0],
-        **kwargs
-):
+def central_difference(wave, source_ids=[0], **kwargs):
     """
     Perform central difference time integration for wave propagation.
 
@@ -37,6 +34,7 @@ def central_difference(
 
     t = wave.current_time
     nt = int(wave.final_time / wave.dt) + 1  # number of timesteps
+    compute_functional = wave.compute_functional
     usol = [
         fire.Function(wave.function_space, name=wave.get_function_name())
         for t in range(nt)
@@ -51,11 +49,18 @@ def central_difference(
     usol_recv = []
     save_step = 0
     wave.functional = None
+    true_recv = None
     if compute_functional:
         if not wave.use_vertex_only_mesh:
             raise ValueError(
                 "compute_functional=True requires use_vertex_only_mesh=True "
                 "so the receiver-space functional can be annotated."
+            )
+        true_recv = kwargs.get("true_recv", None)
+        if not isinstance(true_recv, (list, np.ndarray)):
+            raise ValueError(
+                "true_recv should be a list or numpy array when "
+                "wave.compute_functional is True."
             )
         Jm = 0.
     for step in range(nt):
@@ -76,21 +81,16 @@ def central_difference(
         if wave.use_vertex_only_mesh:
             recv = fire.assemble(interpolate_receivers)
             usol_recv.append(recv)
-            # check if compute_functional is True
             if compute_functional:
-                true_recv = kwargs.get("true_recv", None)
-                if isinstance(true_recv, (list, np.ndarray)):
-                    rec_out_exact = fire.Function(interpolate_receivers.target_space)
-                    if isinstance(true_recv[step], fire.Function):
-                        rec_out_exact.dat.data_wo[:] = true_recv[step].dat.data_ro[:]
-                    elif isinstance(true_recv[step], np.ndarray):
-                        rec_out_exact.dat.data_wo[:] = true_recv[step]
-                    else:
-                        raise ValueError("Elements of true_recv should be either Firedrake Functions or numpy arrays.")
+                rec_out_exact = fire.Function(interpolate_receivers.target_space)
+                if isinstance(true_recv[step], fire.Function):
+                    rec_out_exact.dat.data_wo[:] = true_recv[step].dat.data_ro[:]
+                elif isinstance(true_recv[step], np.ndarray):
+                    rec_out_exact.dat.data_wo[:] = true_recv[step]
                 else:
                     raise ValueError(
-                        "true_recv should be a list or numpy array when "
-                        "compute_functional is True."
+                        "Elements of true_recv should be either Firedrake "
+                        "Functions or numpy arrays."
                     )
                 misfit = rec_out_exact - recv
                 Jm += 0.5 * fire.assemble(fire.inner(misfit, misfit) * fire.dx)

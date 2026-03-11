@@ -78,10 +78,7 @@ class AcousticWave(Wave):
         self.acoustic_energy = acoustic_energy(self)
 
     @ensemble_gradient
-    def gradient_solve(
-        self, store_receivers_output=True,
-        compute_functional=False, misfit=None, **kwargs
-    ):
+    def gradient_solve(self, misfit=None, **kwargs):
         """Solves the adjoint problem to calculate de gradient.
 
         Returns:
@@ -89,12 +86,17 @@ class AcousticWave(Wave):
         dJ: Firedrake 'Function'
             Gradient of the cost functional.
         """
+        forward_solution = kwargs.pop("forward_solution", None)
+        if forward_solution is not None:
+            self.forward_solution = forward_solution
+        self._validate_solve_kwargs(kwargs, "gradient_solve")
         if self.automatic_adjoint:
-            self.forward_solve(
-                store_receivers_output=store_receivers_output,
-                compute_functional=True,
-                **kwargs,
-            )
+            previous_compute_functional = self.compute_functional
+            self.compute_functional = True
+            try:
+                self.forward_solve(**kwargs)
+            finally:
+                self.compute_functional = previous_compute_functional
             reduced_functional = SpyroReducedFunctional(
                 self.functional, self.c)
             return reduced_functional.compute_gradient()
@@ -103,10 +105,8 @@ class AcousticWave(Wave):
             if misfit is not None:
                 self.misfit = misfit
             elif self.current_time == 0.0:
-                self.forward_solve(
-                    store_receivers_output, compute_functional, **kwargs)
-                if not self.automatic_adjoint:
-                    self.misfit = self.real_shot_record - self.receivers_data
+                self.forward_solve(**kwargs)
+                self.misfit = self.real_shot_record - self.receivers_data
             else:
                 raise ValueError("Please load or calculate a real shot record first")
             return backward_wave_propagator(self)

@@ -84,13 +84,13 @@ def get_gradient(parallelism_type, points):
     Wave_obj_guess.forward_solve()
 
     if parallelism_type == "automatic":
-        misfit = Wave_obj_exact.receivers_data - Wave_obj_guess.receivers_data
+        misfit = Wave_obj_exact.forward_solution_receivers - Wave_obj_guess.forward_solution_receivers
     elif parallelism_type == "spatial":
         misfit_list = []
         for source_id in range(len(dictionary["acquisition"]["source_locations"])):
             spyro.io.switch_serial_shot(Wave_obj_exact, source_id)
             spyro.io.switch_serial_shot(Wave_obj_guess, source_id)
-            misfit_list.append(Wave_obj_exact.receivers_data - Wave_obj_guess.receivers_data)
+            misfit_list.append(Wave_obj_exact.forward_solution_receivers - Wave_obj_guess.forward_solution_receivers)
         misfit = misfit_list
 
     gradient = Wave_obj_guess.gradient_solve(misfit=misfit)

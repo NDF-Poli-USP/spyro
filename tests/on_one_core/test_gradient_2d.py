@@ -1,6 +1,7 @@
 import numpy as np
 import math
 import matplotlib.pyplot as plt
+from copy import deepcopy
 from firedrake import VTKFile
 import firedrake as fire
 import spyro
@@ -23,7 +24,7 @@ def check_gradient(Wave_obj_guess, dJ, rec_out_exact, Jm, plot=False):
         c_guess = fire.Constant(2.0) + step*dm
         Wave_obj_guess.initial_velocity_model = c_guess
         Wave_obj_guess.forward_solve()
-        misfit_plusdm = rec_out_exact - Wave_obj_guess.receivers_data
+        misfit_plusdm = rec_out_exact - Wave_obj_guess.receivers_output
         J_plusdm = spyro.utils.compute_functional(Wave_obj_guess, misfit_plusdm)
 
         grad_fd = (J_plusdm - Jm) / (step)
@@ -131,7 +132,7 @@ def get_forward_model(load_true=False):
         spyro.plots.plot_model(Wave_obj_exact, abc_points=[(-1, 1), (-2, 1), (-2, 4), (-1, 2)])
         Wave_obj_exact.forward_solve()
         # forward_solution_exact = Wave_obj_exact.forward_solution
-        rec_out_exact = Wave_obj_exact.receivers_data
+        rec_out_exact = Wave_obj_exact.receivers_output
         # np.save("rec_out_exact", rec_out_exact)
 
     else:
@@ -141,20 +142,23 @@ def get_forward_model(load_true=False):
     Wave_obj_guess.set_mesh(input_mesh_parameters={"edge_length": 0.1})
     Wave_obj_guess.set_initial_velocity_model(constant=2.0)
     Wave_obj_guess.forward_solve()
-    rec_out_guess = Wave_obj_guess.receivers_data
+    rec_out_guess = Wave_obj_guess.receivers_output
 
     return rec_out_exact, rec_out_guess, Wave_obj_guess
 
 
 def test_gradient():
     rec_out_exact, rec_out_guess, Wave_obj_guess = get_forward_model(load_true=False)
+    forward_solution = Wave_obj_guess.forward_solution
+    forward_solution_guess = deepcopy(forward_solution)
+
     misfit = rec_out_exact - rec_out_guess
 
     Jm = spyro.utils.compute_functional(Wave_obj_guess, misfit)
     print(f"Cost functional : {Jm}")
 
     # compute the gradient of the control (to be verified)
-    dJ = Wave_obj_guess.gradient_solve(misfit=misfit)
+    dJ = Wave_obj_guess.gradient_solve(misfit=misfit, forward_solution=forward_solution_guess)
     VTKFile("gradient.pvd").write(dJ)
 
     check_gradient(Wave_obj_guess, dJ, rec_out_exact, Jm, plot=True)
