@@ -11,6 +11,8 @@ import segyio
 import glob
 import os
 import warnings
+from firedrake.__future__ import interpolate
+fire.interpolate = interpolate
 
 
 def delete_tmp_files(wave):
@@ -239,7 +241,7 @@ def write_function_to_grid(function, V, grid_spacing):
     # get DoF coordinates
     m = V.ufl_domain()
     W = fire.VectorFunctionSpace(m, V.ufl_element())
-    coords = fire.interpolate(m.coordinates, W)
+    coords = fire.assemble(fire.interpolate(m.coordinates, W))
     x, y = coords.dat.data[:, 0], coords.dat.data[:, 1]
 
     # add buffer to avoid NaN when calling griddata
