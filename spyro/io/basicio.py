@@ -435,7 +435,7 @@ def interpolate(Model, fname, V):
         maxy = Model.mesh_parameters.length_y
 
     W = fire.VectorFunctionSpace(m, V.ufl_element())
-    coords = fire.interpolate(m.coordinates, W)
+    coords = fire.assemble(fire.interpolate(m.coordinates, W))
     # (z,x) or (z,x,y)
     sd = coords.dat.data.shape[1]
     if sd == 2:
