@@ -1,10 +1,12 @@
 import firedrake as fire
+from firedrake.__future__ import interpolate
 import numpy as np
 from netgen.geom2d import SplineGeometry
 from netgen.meshing import Element2D, \
     Element3D, FaceDescriptor, Mesh, MeshPoint
 from scipy.spatial import cKDTree
 from spyro.utils.error_management import value_parameter_error
+fire.interpolate = interpolate
 
 # Work from Ruben Andres Salas, Andre Luis Ferreira da Silva,
 # Luis Fernando Nogueira de Sá, Emilio Carlos Nelli Silva.
@@ -177,8 +179,8 @@ class HABC_Mesh():
             fdim = 3**0.5
 
         # Minimum and maximum mesh size for habc parameters
-        diam = fire.Function(self.function_space).interpolate(self.diam_mesh)
-        # diam = fire.interpolate(self.diam_mesh, self.function_space)
+        diam = fire.assemble(fire.interpolate(self.diam_mesh,
+                                              self.function_space))
         self.lmin = round(diam.dat.data_with_halos.min() / fdim, 6)
         self.lmax = round(diam.dat.data_with_halos.max() / fdim, 6)
 
@@ -206,14 +208,14 @@ class HABC_Mesh():
         '''
 
         # Extract node positions
-        z_f = fire.Function(func_space).interpolate(self.mesh_z)
-        x_f = fire.Function(func_space).interpolate(self.mesh_x)
+        z_f = fire.assemble(fire.interpolate(self.mesh_z, func_space))
+        x_f = fire.assemble(fire.interpolate(self.mesh_x, func_space))
         z_data = z_f.dat.data_with_halos[:]
         x_data = x_f.dat.data_with_halos[:]
         node_positions = (z_data, x_data)
 
         if self.dimension == 3:  # 3D
-            y_f = fire.Function(func_space).interpolate(self.mesh_y)
+            y_f = fire.assemble(fire.interpolate(self.mesh_y, func_space))
             y_data = y_f.dat.data_with_halos[:]
             node_positions += (y_data,)
 
@@ -363,7 +365,8 @@ class HABC_Mesh():
 
         # Velocity profile model
         self.c = fire.Function(self.function_space, name='c_orig [km/s])')
-        self.c.interpolate(self.initial_velocity_model)
+        self.c.assign(fire.assemble(fire.interpolate(
+            self.initial_velocity_model, self.function_space)))
 
         # Get finite element data from the velocity model
         self.ele_type_c0 = self.initial_velocity_model.ufl_element().family()
@@ -601,6 +604,7 @@ class HABC_Mesh():
             filt_bnd_pts = np.insert(filt_bnd_pts, ini_trunc + 1,
                                      new_pnts, axis=0)
             end_trunc = ini_trunc + 5
+
             # Points before and after truncation
             pnt_bef_trunc = len(filt_bnd_pts[:ini_trunc + 1])
             pnt_aft_trunc = len(filt_bnd_pts[end_trunc:])
@@ -1320,7 +1324,7 @@ class HABC_Mesh():
                                   ['damping', 'mask'])
 
         layer_mask = fire.Function(V, name=name_mask)
-        layer_mask.interpolate(ref)
+        layer_mask.assign(fire.assemble(fire.interpolate(ref, V)))
 
         return layer_mask
 
@@ -1365,7 +1369,8 @@ class HABC_Mesh():
         coords = fire.SpatialCoordinate(self.mesh)
 
         # Clipping coordinates
-        lay_field = fire.Function(W_sp).interpolate(coords)
+        lay_field = fire.Function(W_sp)
+        lay_field.assign(fire.assemble(fire.interpolate(coords, W_sp)))
         lay_arr = lay_field.dat.data_with_halos[:]
         lay_arr[:, 0] = np.clip(lay_arr[:, 0], -Lz, 0.)
         lay_arr[:, 1] = np.clip(lay_arr[:, 1], 0., Lx)
@@ -1382,7 +1387,8 @@ class HABC_Mesh():
         layer_mask = self.layer_mask_field(coords, V, type_marker='mask')
 
         # Field with clipped coordinates only in the absorbing layer
-        lay_field = fire.Function(W_sp).interpolate(lay_field * layer_mask)
+        lay_field.assign(fire.assemble(fire.interpolate(
+            lay_field * layer_mask, W_sp)))
 
         return lay_field, layer_mask
 
@@ -1414,14 +1420,13 @@ class HABC_Mesh():
 
         # Cloud field
         V0 = fire.FunctionSpace(pts_mesh, "DG", 0)
-        f_int = fire.Interpolator(parent_field, V0, allow_missing_dofs=True)
-        f_pts = fire.assemble(f_int.interpolate())
-        del f_int
+        f_pts = fire.assemble(fire.interpolate(parent_field, V0))
 
         # Ensuring correct assemble
         V1 = fire.FunctionSpace(pts_mesh.input_ordering, "DG", 0)
         del pts_mesh
-        cloud_field = fire.Function(V1).interpolate(f_pts)
+        cloud_field = fire.Function(V1)
+        cloud_field.assign(fire.assemble(fire.interpolate(f_pts, V1)))
         del f_pts
 
         return cloud_field

@@ -353,7 +353,8 @@ def run_modal(Wave_obj, modal_solver_lst, fitting_c, exp_value, n_root=1):
 
 
 def loop_modal(parameters, dictionary, degree_layer_lst,
-               expect_values_lst, dimension, homogeneous):
+               expect_values_lst, dimension,
+               homogeneous, modal_solver_lst):
     '''
     Loop for testing modals solvers.
 
@@ -379,6 +380,11 @@ def loop_modal(parameters, dictionary, degree_layer_lst,
     homogeneous : `bool`
         If True, the velocity model is homogeneous.
         If False, it is heterogeneous.
+    modal_solver_lst : `list`
+        List of methods to be used to solve the eigenvalue problem.
+        Options: 'ANALYTICAL', 'ARNOLDI', 'LANCZOS',
+        'LOBPCG', 'KRYLOVSCH_CH', 'KRYLOVSCH_CG',
+        'KRYLOVSCH_GH', 'KRYLOVSCH_GG' or 'RAYLEIGH'
 
     Returns
     -------
@@ -387,11 +393,6 @@ def loop_modal(parameters, dictionary, degree_layer_lst,
 
     # Model parameters
     edge_length, f_est, fitting_c = parameters
-
-    # Modal solvers
-    modal_solver_lst = ['ANALYTICAL', 'ARNOLDI', 'LANCZOS',
-                        'LOBPCG', 'KRYLOVSCH_CH', 'KRYLOVSCH_CG',
-                        'KRYLOVSCH_GH', 'KRYLOVSCH_GG', 'RAYLEIGH']
 
     # Creating mesh and performing eikonal analysis
     Wave_obj = preamble_modal(dictionary, edge_length, f_est, dimension,
@@ -412,7 +413,8 @@ def loop_modal(parameters, dictionary, degree_layer_lst,
             Wave_obj.rename_folder_habc()
 
         except fire.ConvergenceError as e:
-            pytest.fail(f"Checking Modal 2D raised an exception: {str(e)}")
+            pytest.fail(f"Checking Modal {dimension}D "
+                        f"raised an exception: {str(e)}")
 
 
 @pytest.mark.parametrize("homogeneous", [True, False])
@@ -432,8 +434,8 @@ def test_loop_modal_2d(homogeneous):
     '''
 
     c_dist = "Homogeneous" if homogeneous else "Heterogeneous"
-    print("\n" + 70 * "=" + "\nTesting Modal Solvers for 2D case. "
-          + f"Propagation Speed: {c_dist}\n" + 70 * "=", flush=True)
+    print("\n" + 70 * "=" + "\nTesting Modal Solvers and T elements for "
+          + f"2D case. Propagation Speed: {c_dist}\n" + 70 * "=", flush=True)
 
     # ============ SIMULATION PARAMETERS ============
 
@@ -483,13 +485,19 @@ def test_loop_modal_2d(homogeneous):
     expect_values_lst = [expect_hypershape, expect_rectangular]
 
     # ============ MODAL ANALYSIS ============
+
+    # Modal solvers
+    modal_solver_lst = ['ANALYTICAL', 'ARNOLDI', 'LANCZOS',
+                        'LOBPCG', 'KRYLOVSCH_CH', 'KRYLOVSCH_CG',
+                        'KRYLOVSCH_GH', 'KRYLOVSCH_GG', 'RAYLEIGH']
+
     loop_modal(parameters, dictionary, degree_layer_lst,
-               expect_values_lst, 2, homogeneous)
+               expect_values_lst, 2, homogeneous, modal_solver_lst)
 
 
-@pytest.mark.slow
+# @pytest.mark.slow
 @pytest.mark.parametrize("homogeneous", [True, False])
-def test_loop_modal_3d(homogeneous):
+def test_loop_modal_3d_with_Tele(homogeneous):
     '''
     Test of modal solvers for 3D case
 
@@ -505,8 +513,8 @@ def test_loop_modal_3d(homogeneous):
     '''
 
     c_dist = "Homogeneous" if homogeneous else "Heterogeneous"
-    print("\n" + 70 * "=" + "\nTesting Modal Solvers for 2D case. "
-          + f"Propagation Speed: {c_dist}\n" + 70 * "=", flush=True)
+    print("\n" + 70 * "=" + "\nTesting Modal Solvers and T elements for "
+          + f"3D case. Propagation Speed: {c_dist}\n" + 70 * "=", flush=True)
 
     # ============ SIMULATION PARAMETERS ============
 
@@ -560,11 +568,100 @@ def test_loop_modal_3d(homogeneous):
     expect_values_lst = [expect_hypershape, expect_rectangular]
 
     # ============ MODAL ANALYSIS ============
+
+    # Modal solvers
+    modal_solver_lst = ['ANALYTICAL', 'KRYLOVSCH_CH',
+                        'KRYLOVSCH_GH', 'RAYLEIGH']
+
     loop_modal(parameters, dictionary, degree_layer_lst,
-               expect_values_lst, 3, homogeneous)
+               expect_values_lst, 3, homogeneous, modal_solver_lst)
+
+
+# @pytest.mark.slow
+@pytest.mark.parametrize("homogeneous", [True, False])
+def test_loop_modal_3d_with_Qele(homogeneous):
+    '''
+    Test of modal solvers for 3D case
+
+    Parameters
+    ----------
+    homogeneous : `bool`
+        If True, the velocity model is homogeneous.
+        If False, it is heterogeneous.
+
+    Returns
+    -------
+    None
+    '''
+
+    c_dist = "Homogeneous" if homogeneous else "Heterogeneous"
+    print("\n" + 70 * "=" + "\nTesting Modal Solvers for 2D case. "
+          + f"Propagation Speed: {c_dist}.\nTest only the rectangular "
+          + "case with Q elements as the hypershape  layer is not "
+          + "supported for Q elements yet.\n" + 70 * "=", flush=True)
+
+    # ============ SIMULATION PARAMETERS ============
+
+    # Mesh size (in km)
+    # cpw: cells per wavelength
+    # lba = minimum_velocity / source_frequency
+    # edge_length = lba / cpw
+    edge_length = 0.15
+
+    # Eikonal degree
+    p_eik = 2
+
+    # Factor for the stabilizing term in Eikonal equation
+    f_est = 0.08
+
+    # Parameters for fitting equivalent velocity regression
+    if homogeneous:
+        fitting_c = (0.0, 0.0, 0.0, 0.0)
+    else:
+        fitting_c = (0.3, 0.0, 0.5, -1.0)
+
+    # Get simulation parameters
+    print("\nMesh Size: {:.3f} m".format(1e3 * edge_length), flush=True)
+    print("Eikonal Degree: {}".format(p_eik), flush=True)
+    print("Eikonal Stabilizing Factor: {:.2f}".format(f_est), flush=True)
+    fit_str = "Fitting Parameters for Analytical Solver: " + 3 * "{:.1f}, "
+    print((fit_str + "{:.1f}\n").format(*fitting_c), flush=True)
+
+    # Model parameters
+    parameters = [edge_length, f_est, fitting_c]
+
+    # ============ HABC PARAMETERS ============
+
+    # Hyperellipse degrees
+    degree_layer_lst = [None]
+
+    # ============ MESH AND EIKONAL ============
+
+    # Create dictionary with parameters for the model
+    dictionary = wave_dict_3d("rectangular", None, "real", "source", p_eik)
+    dictionary["options"]["cell_type"] = "Q"
+
+    # ============ EXPECTED VALUES ============
+
+    # Expected values
+    if homogeneous:
+        expect_rectangular = 0.47727
+    else:
+        expect_rectangular = 0.41127
+    expect_values_lst = [expect_rectangular]
+
+    # ============ MODAL ANALYSIS ============
+
+    # Modal solvers
+    modal_solver_lst = ['ANALYTICAL', 'ARNOLDI', 'LANCZOS', 'LOBPCG',
+                        'KRYLOVSCH_CG', 'KRYLOVSCH_GG', 'RAYLEIGH']
+
+    loop_modal(parameters, dictionary, degree_layer_lst,
+               expect_values_lst, 3, homogeneous, modal_solver_lst)
 
 
 '''
+=================================================================
 DATA FOR 2D MODEL Δx = 100m
 ---------------------------
 
@@ -604,8 +701,9 @@ freq[Hz]  0.66237 0.52783 0.51705 0.51355
 texe[s]     0.263   1.956   5.947  17.152
 mem[MB]     1.359   3.792   8.075  13.311
 
-DATA FOR 3D MODEL Δx = 150m
----------------------------
+=================================================================
+DATA FOR 3D MODEL Δx = 150m - Ele = T
+--------------------------------------
 
 *EIKONAL
 eik_min = 83.333 ms
@@ -638,4 +736,44 @@ n_eigfunc       2      *4       6
 freq[Hz]  0.65356 0.54617 0.53122
 texe[s]     0.799  34.327 373.401
 mem[MB]     6.730  47.889 154.636
+
+=================================================================
+DATA FOR 3D MODEL Δx = 150m - Ele = Q
+--------------------------------------
+
+*EIKONAL
+eik_min = 83.333 ms
+f_est  eik[ms]
+ 0.02  69.442
+ 0.03  70.974
+ 0.04  73.179
+ 0.05  75.766
+ 0.06  78.548
+ 0.07  81.431
+ 0.08  84.377*
+ 0.09  87.376
+
+*RESULTS
+Frequency[Hz]     REC          (texe/pmem)
+ANALYTICAL    0.41373 ( 5.035s/ 11.136MB)
+ARNOLDI       0.41127 (34.776s/327.425MB)
+LANCZOS       0.41127 (32.790s/218.837MB)
+LOBPCG        0.41127 (36.293s/215.606MB)
+KRYLOVSCH_CH  0.41127 (25.936s/  0.102MB)
+KRYLOVSCH_CG  0.41127 (25.432s/  0.086MB)
+KRYLOVSCH_GH  0.41127 (25.274s/  0.085MB)
+KRYLOVSCH_GG  0.41127 (25.735s/  0.105MB)
+RAYLEIGH      0.43304 (25.615s/ 51.299MB)
+
+ANALYTICAL
+   Case0     REC*
+fnum[Hz]  0.41127
+fana[Hz]  0.41373
+fray[Hz]  0.43304
+
+RAYLEIGH REC
+n_eigfunc       2      *4       6
+freq[Hz]  0.50637 0.43304 0.42081
+texe[s]     0.859  25.615 497.458
+mem[MB]     8.168  51.299 185.377
 '''
