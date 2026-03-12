@@ -5,6 +5,8 @@ from numpy import log10, ones
 from numpy.random import uniform
 from os import getcwd
 from os.path import splitext
+from finat.ufl.mixedelement import VectorElement
+from finat.ufl.tensorproductelement import TensorProductElement
 
 from .time_integration_central_difference import \
     central_difference as time_integrator
@@ -479,8 +481,16 @@ class Wave(Model_parameters, metaclass=ABCMeta):
             base_mesh = self.mesh._base_mesh
             base_cell = base_mesh.ufl_cell()
             element = self.function_space.ufl_element()
-            ele_zx = element.sub_elements[0].sub_elements[0]
-            ele_y = element.sub_elements[1].sub_elements[1]
+
+            if isinstance(element, VectorElement):
+                ele_zx = element.sub_elements[0].sub_elements[0]
+                ele_y = element.sub_elements[1].sub_elements[1]
+            elif isinstance(element, TensorProductElement):
+                ele_zx = element.sub_elements[0]
+                ele_y = element.sub_elements[1]
+            else:
+                NotImplementedError("Unknown element type")
+
             typ_ele_zx = 'DQ' if dg_property else ele_zx.family()
             typ_ele_y = 'DG' if dg_property else ele_y.family()
             dgr_ele = (0, 0) if dg_property else element.degree()

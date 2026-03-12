@@ -2,6 +2,7 @@ import firedrake as fire
 import numpy as np
 # import scipy.linalg as sl
 import scipy.sparse as ss
+import warnings
 from scipy.optimize import broyden1, curve_fit
 from scipy.special import beta, betainc, gamma, jn_zeros, \
     jnp_zeros, mathieu_modcem1, spherical_jn
@@ -9,6 +10,8 @@ from scipy.stats import norm as sn
 from sys import float_info
 from spyro.utils.error_management import value_parameter_error
 from spyro.utils.stats_tools import coeff_of_determination
+fire.parameters["loopy"] = {"silenced_warnings": ["v1_scheduler_fallback"]}
+warnings.filterwarnings("ignore", category=RuntimeWarning)
 
 # Work from Ruben Andres Salas, Andre Luis Ferreira da Silva,
 # Luis Fernando Nogueira de Sá, Emilio Carlos Nelli Silva.
