@@ -6,6 +6,7 @@ import matplotlib.pyplot as plt
 from firedrake.__future__ import interpolate
 fire.interpolate = interpolate
 
+
 def get_vp_from_2dsegy(filename):
     """
     Extracts velocity profile (vp) data from a 2D SEG-Y file.
