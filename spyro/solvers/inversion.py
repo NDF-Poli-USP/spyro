@@ -5,6 +5,9 @@ from mpi4py import MPI  # noqa: F401
 import numpy as np
 import resource
 import os
+from contextlib import contextmanager
+from pyadjoint import Tape, continue_annotation, pause_annotation, set_working_tape
+from pyadjoint.tape import get_working_tape
 
 from .acoustic_wave import AcousticWave
 from ..utils import compute_functional
@@ -447,6 +450,36 @@ class FullWaveformInversion(AcousticWave):
 
         return Jm
 
+    def _validate_automatic_adjoint_fwi(self):
+        if not self.automatic_adjoint:
+            return
+
+        if self.comm.comm.size != 1 or self.comm.ensemble_comm.size != 1:
+            raise NotImplementedError(
+                "Automatic-adjoint FWI currently supports only one-core "
+                "serial execution; parallel spatial and ensemble workflows "
+                "are not supported."
+            )
+
+        if self.number_of_sources > 1 and self.parallelism_type != "spatial":
+            raise NotImplementedError(
+                "Automatic-adjoint FWI with multiple sources currently "
+                "requires the serial-shot spatial workflow."
+            )
+
+    @contextmanager
+    def _fresh_adjoint_tape(self):
+        pause_annotation()
+        with set_working_tape(Tape()):
+            continue_annotation()
+            try:
+                yield
+            finally:
+                pause_annotation()
+                tape = get_working_tape()
+                if tape is not None:
+                    tape.clear_tape()
+
     def get_gradient(self, c=None, save=True, calculate_functional=True):
         """
         Calculates the gradient of the functional with respect to the model parameters.
@@ -461,10 +494,23 @@ class FullWaveformInversion(AcousticWave):
         Firedrake function
         """
         comm = self.comm
+        if self.automatic_adjoint:
+            self._validate_automatic_adjoint_fwi()
         if calculate_functional:
             self.get_functional(c=c)
+        elif c is not None:
+            self.initial_velocity_model.dat.data[:] = c
         comm.comm.barrier()
-        self.gradient = self.gradient_solve(misfit=self.misfit)
+        functional_value = self.functional
+        gradient_kwargs = {"misfit": self.misfit}
+        if self.automatic_adjoint:
+            gradient_kwargs = {
+                "true_recv": self.real_shot_record,
+                "ad_tape_context_factory": self._fresh_adjoint_tape,
+            }
+
+        self.gradient = self.gradient_solve(**gradient_kwargs)
+        self.functional = functional_value
         self._apply_gradient_mask()
         if save:
             # self.gradient_out.write(dJ_total)
@@ -482,6 +528,7 @@ class FullWaveformInversion(AcousticWave):
         """
         Run the full waveform inversion.
         """
+        self._validate_automatic_adjoint_fwi()
         parameters = {
             "vmin": 1.429,
             "vmax": 6.0,
@@ -495,7 +542,7 @@ class FullWaveformInversion(AcousticWave):
 
         vmin = parameters["vmin"]
         vmax = parameters["vmax"]
-        vp_0 = self.initial_velocity_model.vector()
+        vp_0 = self.initial_velocity_model.dat.data_ro.copy()
         bounds = [(vmin, vmax) for _ in range(len(vp_0))]
         options = parameters["scipy_options"]
 
@@ -519,6 +566,11 @@ class FullWaveformInversion(AcousticWave):
         )
         vp_end = fire.Function(self.function_space)
         vp_end.dat.data[:] = result.x
+        self.initial_velocity_model.assign(vp_end)
+        self.guess_velocity_model = self.initial_velocity_model
+        self.functional = float(result.fun)
+        if not self.functional_history or self.functional_history[-1] != self.functional:
+            self.functional_history.append(self.functional)
         fire.VTKFile("vp_end.pvd").write(vp_end)
 
     def run_fwi_rol(self, **kwargs):

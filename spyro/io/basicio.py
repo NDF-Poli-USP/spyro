@@ -74,6 +74,8 @@ def ensemble_propagator(func):
     """Decorator for forward to distribute shots for ensemble parallelism"""
 
     def wrapper(*args, **kwargs):
+        if "source_nums" in kwargs:
+            return func(*args, **kwargs)
         if args[0].parallelism_type != "spatial" or args[0].number_of_sources == 1:
             shot_ids_per_propagation_list = args[0].shot_ids_per_propagation
             _comm = args[0].comm
@@ -175,11 +177,20 @@ def ensemble_gradient(func):
 
     def wrapper(*args, **kwargs):
         comm = args[0].comm
+        ad_tape_context_factory = kwargs.pop("ad_tape_context_factory", None)
+
+        def run_gradient(**gradient_kwargs):
+            if ad_tape_context_factory is None:
+                return func(*args, **gradient_kwargs)
+
+            with ad_tape_context_factory():
+                return func(*args, **gradient_kwargs)
+
         if args[0].parallelism_type != "spatial" or args[0].number_of_sources == 1:
             shot_ids_per_propagation_list = args[0].shot_ids_per_propagation
             for propagation_id, shot_ids_in_propagation in enumerate(shot_ids_per_propagation_list):
                 if is_owner(comm, propagation_id):
-                    grad = func(*args, **kwargs)
+                    grad = run_gradient(**kwargs)
             grad_total = fire.Function(args[0].function_space)
 
             comm.comm.barrier()
@@ -192,18 +203,26 @@ def ensemble_gradient(func):
             starting_time = args[0].current_time
             grad_total = fire.Function(args[0].function_space)
             misfit_list = kwargs.get("misfit")
+            true_recv_list = kwargs.get("true_recv")
 
             for snum in range(num):
                 switch_serial_shot(args[0], snum)
-                current_misfit = misfit_list[snum]
                 args[0].reset_pressure()
                 args[0].current_time = starting_time
-                grad = func(*args,
-                            **dict(
-                                kwargs,
-                                misfit=current_misfit,
-                            )
-                            )
+                if misfit_list is not None:
+                    gradient_kwargs = dict(kwargs, misfit=misfit_list[snum])
+                elif true_recv_list is not None:
+                    gradient_kwargs = dict(
+                        kwargs,
+                        true_recv=true_recv_list[snum],
+                        source_nums=[snum],
+                    )
+                else:
+                    raise ValueError(
+                        "Serial-shot gradient evaluation requires either "
+                        "misfit or true_recv data for each shot."
+                    )
+                grad = run_gradient(**gradient_kwargs)
                 grad_total += grad
 
             grad_total /= num
