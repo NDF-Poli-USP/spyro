@@ -344,14 +344,14 @@ def run_modal(Wave_obj, modal_solver_lst, fitting_c, exp_value, n_root=1):
     # Updating velocity model
     Wave_obj.velocity_habc()
 
+    # Create the output folder if it does not exist
+    create_folder(Wave_obj.path_case_habc)
+
     # Loop for different modal solvers
     for modal_solver in modal_solver_lst:
 
         # Modal solver
         print("\nModal Solver: {}".format(modal_solver), flush=True)
-
-        # Create the output folder if it does not exist
-        create_folder(Wave_obj.path_case_habc)
 
         # Reference to resource usage
         tRef = comp_cost("tini")
@@ -362,6 +362,10 @@ def run_modal(Wave_obj, modal_solver_lst, fitting_c, exp_value, n_root=1):
 
         # Estimating computational resource usage
         name_cost = Wave_obj.path_case_habc + modal_solver + "_"
+        cost_file_dir = path.dirname(name_cost)
+        if cost_file_dir:
+            # Only create if there's a directory component
+            create_folder(cost_file_dir)
         comp_cost("tfin", tRef=tRef, user_name=name_cost)
 
         tol = 0.07 if (modal_solver == 'ANALYTICAL'
