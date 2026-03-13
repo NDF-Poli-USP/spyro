@@ -298,7 +298,8 @@ def get_range_hyp(Wave_obj, n_root=1):
     '''
 
     # Identifier for the current case study
-    Wave_obj.identify_habc_case()
+    Wave_obj.identify_habc_case(
+        output_folder=f"output/modal_test{Wave_obj.dimension}d")
 
     # Determining layer size
     Wave_obj.size_habc_criterion(n_root=n_root)
@@ -366,8 +367,8 @@ def run_modal(Wave_obj, modal_solver_lst, fitting_c, exp_value, n_root=1):
         tol = 0.07 if (modal_solver == 'ANALYTICAL'
                        or modal_solver == 'RAYLEIGH') else 0.05
 
-        lay_str = Wave_obj.path_case_habc.split("output/")[1].rstrip("/")[:-4]
-        met_str = f"Fundamental Frequency {lay_str} {Wave_obj.dimension}D. "
+        met_str = f"Fundamental Frequency {Wave_obj.case_habc[:-4]} " \
+            + f"{Wave_obj.dimension}D. "
         met_str += f"Method {modal_solver}"
         cmp_str = f"Expected {exp_value:.5f}, got = {Wave_obj.fundam_freq:.5f}"
         assert np.isclose(Wave_obj.fundam_freq / exp_value, 1., atol=tol), \
@@ -421,6 +422,9 @@ def loop_modal(parameters, dictionary, degree_layer_lst,
     Wave_obj = preamble_modal(dictionary, edge_length, f_est, dimension,
                               homogeneous=homogeneous)
 
+    # Create the output folder if it does not exist
+    create_folder(f"output/modal_test{dimension}d")
+
     for degree_layer, exp_value in zip(degree_layer_lst, expect_values_lst):
 
         # Update the layer shape and its degree
@@ -457,8 +461,8 @@ def test_loop_modal_2d(homogeneous):
     '''
 
     c_dist = "Homogeneous" if homogeneous else "Heterogeneous"
-    print("\n" + 70 * "=" + "\nTesting Modal Solvers and T elements for "
-          + f"2D case. Propagation Speed: {c_dist}\n" + 70 * "=", flush=True)
+    print("\n" + 85 * "=" + "\nTesting Modal Solvers and T elements for "
+          + f"2D case. Propagation Speed: {c_dist}\n" + 85 * "=", flush=True)
 
     # ============ SIMULATION PARAMETERS ============
 
@@ -469,7 +473,7 @@ def test_loop_modal_2d(homogeneous):
     edge_length = 0.1
 
     # Factor for the stabilizing term in Eikonal equation
-    f_est = 0.06
+    f_est = 0.01 if homogeneous else 0.06
 
     # Parameters for fitting equivalent velocity regression
     if homogeneous:
@@ -518,7 +522,6 @@ def test_loop_modal_2d(homogeneous):
                expect_values_lst, 2, homogeneous, modal_solver_lst)
 
 
-# @pytest.mark.slow
 @pytest.mark.parametrize("homogeneous", [True, False])
 def test_loop_modal_3d_with_Tele(homogeneous):
     '''
@@ -536,8 +539,8 @@ def test_loop_modal_3d_with_Tele(homogeneous):
     '''
 
     c_dist = "Homogeneous" if homogeneous else "Heterogeneous"
-    print("\n" + 70 * "=" + "\nTesting Modal Solvers and T elements for "
-          + f"3D case. Propagation Speed: {c_dist}\n" + 70 * "=", flush=True)
+    print("\n" + 85 * "=" + "\nTesting Modal Solvers and T elements for "
+          + f"3D case. Propagation Speed: {c_dist}\n" + 85 * "=", flush=True)
 
     # ============ SIMULATION PARAMETERS ============
 
@@ -551,7 +554,7 @@ def test_loop_modal_3d_with_Tele(homogeneous):
     p_eik = 2
 
     # Factor for the stabilizing term in Eikonal equation
-    f_est = 0.05
+    f_est = 0.02 if homogeneous else 0.05
 
     # Parameters for fitting equivalent velocity regression
     if homogeneous:
@@ -600,7 +603,6 @@ def test_loop_modal_3d_with_Tele(homogeneous):
                expect_values_lst, 3, homogeneous, modal_solver_lst)
 
 
-# @pytest.mark.slow
 @pytest.mark.parametrize("homogeneous", [True, False])
 def test_loop_modal_3d_with_Qele(homogeneous):
     '''
@@ -618,10 +620,10 @@ def test_loop_modal_3d_with_Qele(homogeneous):
     '''
 
     c_dist = "Homogeneous" if homogeneous else "Heterogeneous"
-    print("\n" + 70 * "=" + "\nTesting Modal Solvers for 2D case. "
-          + f"Propagation Speed: {c_dist}.\nTest only the rectangular "
-          + "case with Q elements as the hypershape  layer is not "
-          + "supported for Q elements yet.\n" + 70 * "=", flush=True)
+    print("\n" + 95 * "=" + "\nTesting Modal Solvers for 2D case. "
+          + f"Propagation Speed: {c_dist}.\nTest only the "
+          + "rectangular case with Q elements as the hypershape "
+          + "case is not supported yet.\n" + 95 * "=", flush=True)
 
     # ============ SIMULATION PARAMETERS ============
 
@@ -635,7 +637,7 @@ def test_loop_modal_3d_with_Qele(homogeneous):
     p_eik = 2
 
     # Factor for the stabilizing term in Eikonal equation
-    f_est = 0.08
+    f_est = 0.02 if homogeneous else 0.08
 
     # Parameters for fitting equivalent velocity regression
     if homogeneous:
@@ -688,7 +690,13 @@ def test_loop_modal_3d_with_Qele(homogeneous):
 DATA FOR 2D MODEL Δx = 100m
 ---------------------------
 
-*EIKONAL
+*EIKONAL HOMOGENEOUS
+eik_min = 83.333 ms
+f_est  eik[ms]
+ 0.01  128.447*
+ 0.02  145.478
+
+*EIKONAL HETEROGENEOUS
 eik_min = 83.333 ms
 f_est  eik[ms]
  0.01  66.836
@@ -700,7 +708,7 @@ f_est  eik[ms]
  0.07  84.160
  0.08  85.233
 
-*RESULTS
+*RESULTS HETEROGENEOUS
 Frequency[Hz]    N2.5      (texe/pmem)     REC      (texe/pmem)
 ANALYTICAL    0.50428 (0.608s/3.135MB) 0.45737 (0.215s/0.745MB)
 ARNOLDI       0.50440 (0.149s/6.692MB) 0.45539 (0.072s/6.775MB)
@@ -728,7 +736,13 @@ mem[MB]     1.359   3.792   8.075  13.311
 DATA FOR 3D MODEL Δx = 150m - Ele = T
 --------------------------------------
 
-*EIKONAL
+*EIKONAL HOMOGENEOUS
+eik_min = 83.333 ms
+f_est  eik[ms]
+ 0.02  146.002*
+ 0.03  153.839
+
+*EIKONAL HETEROGENEOUS
 eik_min = 83.333 ms
 f_est  eik[ms]
  0.03 76.777
@@ -736,7 +750,7 @@ f_est  eik[ms]
  0.05 82.273*
  0.06 85.347
 
-*RESULTS
+*RESULTS HETEROGENEOUS
 Frequency[Hz]    N2.4         (texe/pmem)     REC          (texe/pmem)
 ANALYTICAL    0.51833 (  5.853s/ 10.505MB) 0.42415 (  9.056s/  7.496MB)
 ARNOLDI       0.51535 (148.976s/276.158MB) 0.42562 (456.837s/435.551MB)
@@ -764,7 +778,13 @@ mem[MB]     6.730  47.889 154.636
 DATA FOR 3D MODEL Δx = 150m - Ele = Q
 --------------------------------------
 
-*EIKONAL
+*EIKONAL HOMOGENEOUS
+eik_min = 83.333 ms
+f_est  eik[ms]
+ 0.02  138.931*
+ 0.02  142.020 
+
+*EIKONAL HETEROGENEOUS
 eik_min = 83.333 ms
 f_est  eik[ms]
  0.02  69.442
@@ -776,7 +796,7 @@ f_est  eik[ms]
  0.08  84.377*
  0.09  87.376
 
-*RESULTS
+*RESULTS HETEROGENEOUS
 Frequency[Hz]     REC          (texe/pmem)
 ANALYTICAL    0.41373 ( 5.035s/ 11.136MB)
 ARNOLDI       0.41127 (34.776s/327.425MB)
