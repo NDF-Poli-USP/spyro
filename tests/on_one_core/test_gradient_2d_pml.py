@@ -4,8 +4,6 @@ import firedrake as fire
 import numpy as np
 import pytest
 import spyro
-from pyadjoint import continue_annotation, pause_annotation
-from pyadjoint.tape import get_working_tape
 
 
 STEPS = (1e-3,)
@@ -72,17 +70,6 @@ def set_dictionary(automatic_adjoint):
     return dictionary
 
 
-def start_new_annotation():
-    continue_annotation()
-
-
-def stop_new_annotation():
-    pause_annotation()
-    tape = get_working_tape()
-    if tape is not None:
-        tape.clear_tape()
-
-
 def build_wave(automatic_adjoint):
     wave_obj = spyro.AcousticWave(
         dictionary=set_dictionary(automatic_adjoint=automatic_adjoint)
@@ -121,16 +108,23 @@ def build_true_recv(rec_out_exact, true_recv_format):
 
 
 def compute_functional(wave_obj_guess, true_recv):
-    start_new_annotation()
+    control = wave_obj_guess.c
+    if control is None:
+        control = wave_obj_guess.initial_velocity_model
+    automated_adjoint = spyro.solvers.AutomatedAdjoint(control)
     previous_compute_functional = wave_obj_guess.compute_functional
     wave_obj_guess.compute_functional = True
     try:
-        assert wave_obj_guess.forward_solve(true_recv=true_recv) is None
-        assert_forward_solution_length(wave_obj_guess)
-        return float(wave_obj_guess.functional)
+        with automated_adjoint.fresh_tape():
+            automated_adjoint.start_recording()
+            try:
+                assert wave_obj_guess.forward_solve(true_recv=true_recv) is None
+                assert_forward_solution_length(wave_obj_guess)
+            finally:
+                automated_adjoint.stop_recording()
     finally:
         wave_obj_guess.compute_functional = previous_compute_functional
-        stop_new_annotation()
+    return float(wave_obj_guess.functional)
 
 
 def compute_functional_value(wave_obj_guess, rec_out_exact, solver_case):
@@ -163,17 +157,13 @@ def apply_pml_gradient_mask(wave_obj, gradient):
 
 def get_gradient_and_functional(wave_obj_guess, rec_out_exact, solver_case):
     if solver_case["automatic_adjoint"]:
-        start_new_annotation()
-        try:
-            dJ = wave_obj_guess.gradient_solve(
-                true_recv=build_true_recv(
-                    rec_out_exact, solver_case["true_recv_format"]
-                )
+        dJ = wave_obj_guess.gradient_solve(
+            true_recv=build_true_recv(
+                rec_out_exact, solver_case["true_recv_format"]
             )
-            assert_forward_solution_length(wave_obj_guess)
-            Jm = wave_obj_guess.functional
-        finally:
-            stop_new_annotation()
+        )
+        assert_forward_solution_length(wave_obj_guess)
+        Jm = wave_obj_guess.functional
     else:
         assert wave_obj_guess.forward_solve() is None
         assert_forward_solution_length(wave_obj_guess)

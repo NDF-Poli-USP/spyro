@@ -1,17 +1,9 @@
-from contextlib import contextmanager
 from copy import deepcopy
 
 import firedrake as fire
 import numpy as np
 import pytest
 import spyro
-from pyadjoint import (
-    Tape,
-    continue_annotation,
-    pause_annotation,
-    set_working_tape,
-)
-from pyadjoint.tape import get_working_tape
 
 
 STEPS = (1e-3, 1e-4, 1e-5)
@@ -70,30 +62,6 @@ def set_dictionary(automatic_adjoint):
         "debug_output": False,
     }
     return dictionary
-
-
-def start_new_annotation():
-    continue_annotation()
-
-
-def stop_new_annotation():
-    pause_annotation()
-    tape = get_working_tape()
-    if tape is not None:
-        tape.clear_tape()
-
-
-@contextmanager
-def python_execution_tape():
-    pause_annotation()
-    with set_working_tape(Tape()):
-        try:
-            yield
-        finally:
-            pause_annotation()
-            tape = get_working_tape()
-            if tape is not None:
-                tape.clear_tape()
 
 
 def get_solver_case_id(solver_case):
@@ -156,16 +124,23 @@ def build_true_recv(rec_out_exact, true_recv_format):
 
 
 def compute_functional(wave_obj_guess, true_recv):
-    start_new_annotation()
+    control = wave_obj_guess.c
+    if control is None:
+        control = wave_obj_guess.initial_velocity_model
+    automated_adjoint = spyro.solvers.AutomatedAdjoint(control)
     previous_compute_functional = wave_obj_guess.compute_functional
     wave_obj_guess.compute_functional = True
     try:
-        assert wave_obj_guess.forward_solve(true_recv=true_recv) is None
-        assert_forward_solution_length(wave_obj_guess)
-        return float(wave_obj_guess.functional)
+        with automated_adjoint.fresh_tape():
+            automated_adjoint.start_recording()
+            try:
+                assert wave_obj_guess.forward_solve(true_recv=true_recv) is None
+                assert_forward_solution_length(wave_obj_guess)
+            finally:
+                automated_adjoint.stop_recording()
     finally:
         wave_obj_guess.compute_functional = previous_compute_functional
-        stop_new_annotation()
+    return float(wave_obj_guess.functional)
 
 
 def compute_functional_value(wave_obj_guess, rec_out_exact, solver_case):
@@ -182,17 +157,13 @@ def compute_functional_value(wave_obj_guess, rec_out_exact, solver_case):
 
 def get_gradient_and_functional(wave_obj_guess, rec_out_exact, solver_case):
     if solver_case["automatic_adjoint"]:
-        start_new_annotation()
-        try:
-            dJ = wave_obj_guess.gradient_solve(
-                true_recv=build_true_recv(
-                    rec_out_exact, solver_case["true_recv_format"]
-                )
+        dJ = wave_obj_guess.gradient_solve(
+            true_recv=build_true_recv(
+                rec_out_exact, solver_case["true_recv_format"]
             )
-            assert_forward_solution_length(wave_obj_guess)
-            Jm = wave_obj_guess.functional
-        finally:
-            stop_new_annotation()
+        )
+        assert_forward_solution_length(wave_obj_guess)
+        Jm = wave_obj_guess.functional
     else:
         assert wave_obj_guess.forward_solve() is None
         assert_forward_solution_length(wave_obj_guess)
@@ -292,8 +263,7 @@ def test_gradient(solver_case):
 
 
 if __name__ == "__main__":
-    with python_execution_tape():
-        run_gradient_case(
-            {"automatic_adjoint": True, "true_recv_format": "array"},
-            plot=True,
-        )
+    run_gradient_case(
+        {"automatic_adjoint": True, "true_recv_format": "array"},
+        plot=True,
+    )

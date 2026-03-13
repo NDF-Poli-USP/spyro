@@ -3,7 +3,7 @@ import warnings
 import os
 
 from .wave import Wave
-from .automatic_differentiation_solver import SpyroReducedFunctional
+from .automatic_differentiation_solver import AutomatedAdjoint
 
 from ..io.basicio import ensemble_gradient
 from ..io import interpolate
@@ -87,19 +87,34 @@ class AcousticWave(Wave):
             Gradient of the cost functional.
         """
         forward_solution = kwargs.pop("forward_solution", None)
+        automated_adjoint = kwargs.pop("automated_adjoint", None)
         if forward_solution is not None:
             self.forward_solution = forward_solution
         self._validate_solve_kwargs(kwargs, "gradient_solve")
         if self.automatic_adjoint:
+            if automated_adjoint is None:
+                control = self.c
+                if control is None:
+                    control = self.initial_velocity_model
+                automated_adjoint = AutomatedAdjoint(control)
+            self.automated_adjoint = automated_adjoint
+
             previous_compute_functional = self.compute_functional
             self.compute_functional = True
             try:
-                self.forward_solve(**kwargs)
+                with self.automated_adjoint.fresh_tape():
+                    self.automated_adjoint.start_recording()
+                    try:
+                        self.forward_solve(**kwargs)
+                    finally:
+                        self.compute_functional = previous_compute_functional
+                        self.automated_adjoint.stop_recording()
+                    self.automated_adjoint.create_reduced_functional(
+                        self.functional
+                    )
             finally:
                 self.compute_functional = previous_compute_functional
-            reduced_functional = SpyroReducedFunctional(
-                self.functional, self.c)
-            return reduced_functional.compute_gradient()
+            return self.automated_adjoint.compute_gradient()
 
         else:
             if misfit is not None:

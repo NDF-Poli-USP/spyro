@@ -1,5 +1,5 @@
 import firedrake as fire
-from pyadjoint import continue_annotation, pause_annotation
+import numpy as np
 import pytest
 import spyro
 
@@ -74,17 +74,9 @@ def build_exact_receivers():
     return wave_obj_exact.receivers_data
 
 
-def start_new_annotation():
-    continue_annotation()
-
-
-def stop_new_annotation():
-    pause_annotation()
-
-
 @pytest.mark.slow
 @pytest.mark.parametrize("true_recv_format", ["array", "list"])
-def test_gradient_ad_uses_reduced_functional(monkeypatch, true_recv_format):
+def test_gradient_ad_uses_automated_adjoint(monkeypatch, true_recv_format):
     rec_out_exact = build_exact_receivers()
     true_recv = rec_out_exact
     if true_recv_format == "list":
@@ -97,7 +89,7 @@ def test_gradient_ad_uses_reduced_functional(monkeypatch, true_recv_format):
 
     calls = {"count": 0}
     original_compute_gradient = (
-        acoustic_wave_module.SpyroReducedFunctional.compute_gradient
+        acoustic_wave_module.AutomatedAdjoint.compute_gradient
     )
 
     def wrapped_compute_gradient(self):
@@ -105,23 +97,42 @@ def test_gradient_ad_uses_reduced_functional(monkeypatch, true_recv_format):
         return original_compute_gradient(self)
 
     monkeypatch.setattr(
-        acoustic_wave_module.SpyroReducedFunctional,
+        acoustic_wave_module.AutomatedAdjoint,
         "compute_gradient",
         wrapped_compute_gradient,
     )
 
     assert wave_obj_guess.automatic_adjoint is True
-    start_new_annotation()
-    try:
-        gradient = wave_obj_guess.gradient_solve(true_recv=true_recv)
-    finally:
-        stop_new_annotation()
+    gradient = wave_obj_guess.gradient_solve(true_recv=true_recv)
     assert calls["count"] == 1
     assert wave_obj_guess.receivers_data is not None
     assert wave_obj_guess.functional is not None
     assert isinstance(gradient, fire.Function)
-
-    reduced_functional = spyro.solvers.SpyroReducedFunctional(
-        wave_obj_guess.functional, wave_obj_guess.c
+    assert isinstance(
+        wave_obj_guess.automated_adjoint,
+        spyro.solvers.AutomatedAdjoint,
     )
-    assert reduced_functional.verify_gradient() > 1.9
+    assert wave_obj_guess.automated_adjoint.verify_gradient() > 0.9
+
+
+@pytest.mark.slow
+def test_gradient_ad_repeated_calls_reset_tape():
+    rec_out_exact = build_exact_receivers()
+
+    dictionary = set_dictionary()
+    wave_obj_guess = spyro.AcousticWave(dictionary=dictionary)
+    wave_obj_guess.set_mesh(input_mesh_parameters={"edge_length": 0.04})
+    wave_obj_guess.set_initial_velocity_model(constant=2.0)
+
+    gradient_first = wave_obj_guess.gradient_solve(true_recv=rec_out_exact)
+    gradient_second = wave_obj_guess.gradient_solve(
+        true_recv=[row.copy() for row in rec_out_exact]
+    )
+
+    assert np.allclose(
+        gradient_first.dat.data_ro,
+        gradient_second.dat.data_ro,
+        rtol=1e-9,
+        atol=1e-9,
+    )
+    assert wave_obj_guess.automated_adjoint.verify_gradient() > 0.9

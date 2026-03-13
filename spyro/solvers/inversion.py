@@ -5,9 +5,6 @@ from mpi4py import MPI  # noqa: F401
 import numpy as np
 import resource
 import os
-from contextlib import contextmanager
-from pyadjoint import Tape, continue_annotation, pause_annotation, set_working_tape
-from pyadjoint.tape import get_working_tape
 
 from .acoustic_wave import AcousticWave
 from ..utils import compute_functional
@@ -467,19 +464,6 @@ class FullWaveformInversion(AcousticWave):
                 "requires the serial-shot spatial workflow."
             )
 
-    @contextmanager
-    def _fresh_adjoint_tape(self):
-        pause_annotation()
-        with set_working_tape(Tape()):
-            continue_annotation()
-            try:
-                yield
-            finally:
-                pause_annotation()
-                tape = get_working_tape()
-                if tape is not None:
-                    tape.clear_tape()
-
     def get_gradient(self, c=None, save=True, calculate_functional=True):
         """
         Calculates the gradient of the functional with respect to the model parameters.
@@ -506,7 +490,6 @@ class FullWaveformInversion(AcousticWave):
         if self.automatic_adjoint:
             gradient_kwargs = {
                 "true_recv": self.real_shot_record,
-                "ad_tape_context_factory": self._fresh_adjoint_tape,
             }
 
         self.gradient = self.gradient_solve(**gradient_kwargs)
