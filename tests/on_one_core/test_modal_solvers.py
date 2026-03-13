@@ -349,6 +349,9 @@ def run_modal(Wave_obj, modal_solver_lst, fitting_c, exp_value, n_root=1):
         # Modal solver
         print("\nModal Solver: {}".format(modal_solver), flush=True)
 
+        # Create the output folder if it does not exist
+        create_folder("output/")
+
         # Reference to resource usage
         tRef = comp_cost("tini")
 
@@ -410,9 +413,6 @@ def loop_modal(parameters, dictionary, degree_layer_lst,
     -------
     None
     '''
-
-    # Create the output folder if it does not exist
-    create_folder("output/")
 
     # Model parameters
     edge_length, f_est, fitting_c = parameters
