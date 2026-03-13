@@ -3,6 +3,7 @@ import warnings
 import numpy as np
 import firedrake as fire
 import spyro.habc.habc as habc
+from os import makedirs, path
 from spyro.utils.cost import comp_cost
 fire.parameters["loopy"] = {"silenced_warnings": ["v1_scheduler_fallback"]}
 warnings.filterwarnings("ignore", category=RuntimeWarning)
@@ -198,6 +199,25 @@ def wave_dict_3d(layer_shape, degree_layer, degree_type,
     return dictionary
 
 
+def create_folder(folder):
+    '''
+    Verify if a folder exists, if not, it creates the folder
+
+    Parameters
+    ----------
+    folder: `str`
+        Path to the folder to be created
+
+    Returns
+    -------
+    None
+    '''
+
+    # Create the folder if it does not exist
+    if not path.isdir(folder):
+        makedirs(folder)
+
+
 def preamble_modal(dictionary, edge_length, f_est,
                    dimension, homogeneous=True):
     '''
@@ -390,6 +410,9 @@ def loop_modal(parameters, dictionary, degree_layer_lst,
     -------
     None
     '''
+
+    # Create the output folder if it does not exist
+    create_folder("output/")
 
     # Model parameters
     edge_length, f_est, fitting_c = parameters
