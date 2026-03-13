@@ -782,7 +782,7 @@ DATA FOR 3D MODEL Δx = 150m - Ele = Q
 eik_min = 83.333 ms
 f_est  eik[ms]
  0.02  138.931*
- 0.02  142.020 
+ 0.02  142.020
 
 *EIKONAL HETEROGENEOUS
 eik_min = 83.333 ms
