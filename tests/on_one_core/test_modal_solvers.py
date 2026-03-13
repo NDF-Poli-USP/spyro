@@ -350,7 +350,7 @@ def run_modal(Wave_obj, modal_solver_lst, fitting_c, exp_value, n_root=1):
         print("\nModal Solver: {}".format(modal_solver), flush=True)
 
         # Create the output folder if it does not exist
-        create_folder("output/")
+        create_folder(Wave_obj.path_case_habc)
 
         # Reference to resource usage
         tRef = comp_cost("tini")
