@@ -157,13 +157,26 @@ def apply_pml_gradient_mask(wave_obj, gradient):
 
 def get_gradient_and_functional(wave_obj_guess, rec_out_exact, solver_case):
     if solver_case["automatic_adjoint"]:
+        true_recv = build_true_recv(
+            rec_out_exact, solver_case["true_recv_format"]
+        )
         dJ = wave_obj_guess.gradient_solve(
+            true_recv=true_recv
+        )
+        assert_forward_solution_length(wave_obj_guess)
+        Jm = wave_obj_guess.functional
+        repeated_dJ = wave_obj_guess.gradient_solve(
             true_recv=build_true_recv(
                 rec_out_exact, solver_case["true_recv_format"]
             )
         )
-        assert_forward_solution_length(wave_obj_guess)
-        Jm = wave_obj_guess.functional
+        assert wave_obj_guess.automated_adjoint.reduced_functional is not None
+        assert np.allclose(
+            dJ.dat.data_ro,
+            repeated_dJ.dat.data_ro,
+            rtol=1e-2,
+            atol=1e-10,
+        )
     else:
         assert wave_obj_guess.forward_solve() is None
         assert_forward_solution_length(wave_obj_guess)

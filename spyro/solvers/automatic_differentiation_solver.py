@@ -14,21 +14,36 @@ from pyadjoint.tape import get_working_tape
 class AutomatedAdjoint:
     """Automatic differentiation wrapper for seismic inversion."""
 
-    def __init__(self, control):
-        self._control = control
+    def __init__(self, control, model_control_index=0):
+        if isinstance(control, (list, tuple)):
+            controls = tuple(control)
+        else:
+            controls = (control,)
+        if len(controls) == 0:
+            raise ValueError("AutomatedAdjoint requires at least one control.")
+        if not 0 <= model_control_index < len(controls):
+            raise ValueError("model_control_index is out of range for controls.")
+
+        self._controls = controls
+        self._model_control_index = model_control_index
         self._functional = None
         self._reduced_functional = None
         self._tape = None
 
     @property
     def control(self):
-        """Control object associated with the reduced functional."""
-        return self._control
+        """Primary model control associated with the reduced functional."""
+        return self._controls[self._model_control_index]
+
+    @property
+    def controls(self):
+        """All controls associated with the reduced functional."""
+        return self._controls
 
     @property
     def reduced_functional(self):
-        """Reduced functional object for the current control."""
-        return self._require_reduced_functional()
+        """Reduced functional object for the current controls."""
+        return self._reduced_functional
 
     @contextmanager
     def fresh_tape(self):
@@ -52,9 +67,20 @@ class AutomatedAdjoint:
                 "working tape before creating the reduced functional."
             )
         self._functional = functional
+        controls = [
+            fire_adj.Control(control)
+            for control in self._controls
+        ]
+        derivative_components = None
+        if len(controls) > 1:
+            derivative_components = (self._model_control_index,)
+            reduced_controls = controls
+        else:
+            reduced_controls = controls[0]
         self._reduced_functional = ReducedFunctional(
             functional,
-            fire_adj.Control(self._control),
+            reduced_controls,
+            derivative_components=derivative_components,
             tape=self._tape,
         )
         return self._reduced_functional
@@ -69,22 +95,40 @@ class AutomatedAdjoint:
 
     def recompute_functional(self, control_value):
         """Recompute the functional at a control value."""
-        return self._require_reduced_functional()(control_value)
+        return self._require_reduced_functional()(
+            self._normalize_control_value(control_value)
+        )
 
     def compute_gradient(self):
         """Compute the Riesz-represented gradient for the control."""
-        return self._require_reduced_functional().derivative(apply_riesz=True)
+        gradient = self._require_reduced_functional().derivative(
+            apply_riesz=True
+        )
+        return self._extract_model_component(gradient)
 
     def compute_derivative(self):
         """Compute the derivative with respect to the control."""
-        return self._require_reduced_functional().derivative(apply_riesz=False)
+        derivative = self._require_reduced_functional().derivative(
+            apply_riesz=False
+        )
+        return self._extract_model_component(derivative)
 
     def verify_gradient(self, control_value=None, direction=None):
         """Run a first-order Taylor test for the reduced functional."""
         reduced_functional = self._require_reduced_functional()
         if control_value is None:
-            control_value = self._control
+            if len(self._controls) > 1:
+                raise NotImplementedError(
+                    "verify_gradient requires explicit control_value and "
+                    "direction when multiple controls are used."
+                )
+            control_value = self.control
         if direction is None:
+            if len(self._controls) > 1:
+                raise NotImplementedError(
+                    "verify_gradient requires explicit control_value and "
+                    "direction when multiple controls are used."
+                )
             direction = control_value.copy(deepcopy=True)
             direction.interpolate(1.0)
         return fire_adj.taylor_test(
@@ -92,6 +136,39 @@ class AutomatedAdjoint:
             control_value,
             direction,
         )
+
+    def _normalize_control_value(self, control_value):
+        if len(self._controls) == 1:
+            if isinstance(control_value, (list, tuple)):
+                if len(control_value) != 1:
+                    raise ValueError(
+                        "Expected a single control value for the reduced "
+                        "functional."
+                    )
+                return control_value[0]
+            return control_value
+
+        if not isinstance(control_value, (list, tuple)):
+            raise TypeError(
+                "Expected a list or tuple of control values for the reduced "
+                "functional."
+            )
+        if len(control_value) != len(self._controls):
+            raise ValueError(
+                "Control value list must match the number of reduced "
+                "functional controls."
+            )
+        return list(control_value)
+
+    def _extract_model_component(self, value):
+        if len(self._controls) == 1:
+            return value
+        if not isinstance(value, (list, tuple)):
+            raise TypeError(
+                "Expected a list or tuple result for a multi-control reduced "
+                "functional derivative."
+            )
+        return value[self._model_control_index]
 
     def clear_tape(self):
         """Clear the stored tape and drop the reduced functional."""

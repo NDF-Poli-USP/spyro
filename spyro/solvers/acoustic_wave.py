@@ -88,32 +88,18 @@ class AcousticWave(Wave):
         """
         forward_solution = kwargs.pop("forward_solution", None)
         automated_adjoint = kwargs.pop("automated_adjoint", None)
+        source_nums = kwargs.pop("source_nums", None)
+        true_recv = kwargs.pop("true_recv", None)
         if forward_solution is not None:
             self.forward_solution = forward_solution
         self._validate_solve_kwargs(kwargs, "gradient_solve")
         if self.automatic_adjoint:
-            if automated_adjoint is None:
-                control = self.c
-                if control is None:
-                    control = self.initial_velocity_model
-                automated_adjoint = AutomatedAdjoint(control)
-            self.automated_adjoint = automated_adjoint
-
-            previous_compute_functional = self.compute_functional
-            self.compute_functional = True
-            try:
-                with self.automated_adjoint.fresh_tape():
-                    self.automated_adjoint.start_recording()
-                    try:
-                        self.forward_solve(**kwargs)
-                    finally:
-                        self.compute_functional = previous_compute_functional
-                        self.automated_adjoint.stop_recording()
-                    self.automated_adjoint.create_reduced_functional(
-                        self.functional
-                    )
-            finally:
-                self.compute_functional = previous_compute_functional
+            self._evaluate_automatic_functional(
+                true_recv=true_recv,
+                automated_adjoint=automated_adjoint,
+                source_nums=source_nums,
+                **kwargs,
+            )
             return self.automated_adjoint.compute_gradient()
 
         else:
@@ -125,6 +111,104 @@ class AcousticWave(Wave):
             else:
                 raise ValueError("Please load or calculate a real shot record first")
             return backward_wave_propagator(self)
+
+    def _automatic_model_control(self, c=None):
+        control = self.c
+        if control is None:
+            control = self.initial_velocity_model
+        if control is None:
+            raise ValueError("No velocity model is available for AD control.")
+        if c is None:
+            return control
+
+        if isinstance(c, fire.Function):
+            control.assign(c)
+        else:
+            control.dat.data[:] = c
+        return control
+
+    def _uses_serial_shot_source_control(self):
+        return (
+            self.use_vertex_only_mesh
+            and self.parallelism_type == "spatial"
+            and self.number_of_sources > 1
+            and self.sources is not None
+        )
+
+    def _automatic_control_values(self, source_nums=None, c=None):
+        model_control = self._automatic_model_control(c=c)
+        if not self._uses_serial_shot_source_control():
+            return model_control
+        source_control = self.update_source_control(source_nums=source_nums)
+        return [model_control, source_control]
+
+    def _get_or_create_automated_adjoint(
+        self,
+        control_values,
+        automated_adjoint=None,
+    ):
+        if automated_adjoint is None:
+            automated_adjoint = self.automated_adjoint
+
+        if isinstance(control_values, list):
+            num_controls = len(control_values)
+            model_control = control_values[0]
+        else:
+            num_controls = 1
+            model_control = control_values
+
+        if (
+            automated_adjoint is None
+            or automated_adjoint.control is not model_control
+            or len(automated_adjoint.controls) != num_controls
+        ):
+            automated_adjoint = AutomatedAdjoint(control_values)
+
+        self.automated_adjoint = automated_adjoint
+        return automated_adjoint
+
+    def _evaluate_automatic_functional(
+        self,
+        true_recv,
+        automated_adjoint=None,
+        source_nums=None,
+        c=None,
+        **kwargs,
+    ):
+        control_values = self._automatic_control_values(
+            source_nums=source_nums,
+            c=c,
+        )
+        automated_adjoint = self._get_or_create_automated_adjoint(
+            control_values,
+            automated_adjoint=automated_adjoint,
+        )
+
+        previous_compute_functional = self.compute_functional
+        self.compute_functional = True
+        try:
+            if automated_adjoint.reduced_functional is None:
+                with automated_adjoint.fresh_tape():
+                    automated_adjoint.start_recording()
+                    try:
+                        solve_kwargs = dict(kwargs, true_recv=true_recv)
+                        if source_nums is not None:
+                            solve_kwargs["source_nums"] = source_nums
+                        self.forward_solve(**solve_kwargs)
+                    finally:
+                        automated_adjoint.stop_recording()
+                    automated_adjoint.create_reduced_functional(self.functional)
+            else:
+                self.update_true_receiver_data(true_recv)
+                if self._uses_serial_shot_source_control():
+                    self.update_source_control(source_nums=source_nums)
+                self.functional = automated_adjoint.recompute_functional(
+                    control_values
+                )
+        finally:
+            self.compute_functional = previous_compute_functional
+
+        return self.functional
 
     def reset_pressure(self):
         try:

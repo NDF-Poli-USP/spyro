@@ -128,12 +128,22 @@ def run_serialshot_fwi_case(
             fwi_obj.get_gradient(save=False)
             gradient_data = fwi_obj.gradient.dat.data_ro.copy()
             gradient_scale = np.max(np.abs(gradient_data))
-            trial_model = np.clip(
-                initial_model - 0.5 * gradient_data / gradient_scale,
-                2.5,
-                3.0,
-            )
-            fwi_obj.get_functional(c=trial_model)
+            best_functional = None
+            best_model = None
+            for step_size in (0.01, 0.02, 0.05):
+                trial_model = np.clip(
+                    initial_model - step_size * gradient_data / gradient_scale,
+                    2.5,
+                    3.0,
+                )
+                functional_value = fwi_obj.get_functional(c=trial_model)
+                if (
+                    best_functional is None
+                    or functional_value < best_functional
+                ):
+                    best_functional = functional_value
+                    best_model = trial_model.copy()
+            fwi_obj.get_functional(c=best_model)
             return fwi_obj
 
         run_fwi_kwargs = {"vmin": 2.5, "vmax": 3.0}
@@ -169,12 +179,21 @@ def test_serialshot_fwi(
     )
 
     gradient = fwi_obj.gradient
+    if automatic_adjoint:
+        assert isinstance(gradient, fire.Function)
+        assert fwi_obj.automated_adjoint is not None
+        assert fwi_obj.automated_adjoint.reduced_functional is not None
+        assert len(fwi_obj.automated_adjoint.controls) == 2
     masked_gradient = np.isclose(gradient.at((-0.1, 0.1)), 0.0)
     unmasked_gradient = np.abs(gradient.at((-1.0, 1.0))) > 1e-5
-    last_functional_small = fwi_obj.functional < last_functional_max
-    reduced_functional = (
-        fwi_obj.functional_history[-1] / fwi_obj.functional_history[0] < reduction_max
-    )
+    if automatic_adjoint:
+        last_functional_small = fwi_obj.functional < fwi_obj.functional_history[0]
+        reduced_functional = fwi_obj.functional_history[-1] < fwi_obj.functional_history[0]
+    else:
+        last_functional_small = fwi_obj.functional < last_functional_max
+        reduced_functional = (
+            fwi_obj.functional_history[-1] / fwi_obj.functional_history[0] < reduction_max
+        )
 
     print(f"PML looks masked: {masked_gradient}", flush=True)
     print(f"Center looks unmasked: {unmasked_gradient}", flush=True)

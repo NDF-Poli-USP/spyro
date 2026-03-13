@@ -1,6 +1,7 @@
 from abc import abstractmethod, ABCMeta
 import warnings
 import firedrake as fire
+import numpy as np
 from firedrake import sin, cos, pi, tanh, sqrt  # noqa: F401
 
 from .time_integration_central_difference import central_difference as time_integrator
@@ -89,6 +90,10 @@ class Wave(Model_parameters, metaclass=ABCMeta):
         self.c = None
         self._functional = None
         self.sources = None
+        self.current_sources = None
+        self.automated_adjoint = None
+        self.source_control = None
+        self.true_receiver_functions = None
         if self.mesh is not None:
             self._build_function_space()
             self._map_sources_and_receivers()
@@ -146,6 +151,7 @@ class Wave(Model_parameters, metaclass=ABCMeta):
     def force_rebuild_function_space(self):
         if self.mesh is None:
             self.mesh = self.get_mesh()
+        self.invalidate_automatic_adjoint_state()
         self._build_function_space()
         self._map_sources_and_receivers()
 
@@ -172,6 +178,7 @@ class Wave(Model_parameters, metaclass=ABCMeta):
         )
 
         self.mesh = self.get_mesh()
+        self.invalidate_automatic_adjoint_state()
         self._build_function_space()
         self._map_sources_and_receivers()
 
@@ -280,6 +287,83 @@ class Wave(Model_parameters, metaclass=ABCMeta):
         if self.source_type == "ricker":
             self.sources = Sources(self)
         self.receivers = Receivers(self)
+
+    def invalidate_automatic_adjoint_state(self):
+        if self.automated_adjoint is not None:
+            self.automated_adjoint.clear_tape()
+        self.automated_adjoint = None
+        self.source_control = None
+        self.true_receiver_functions = None
+
+    def set_active_sources(self, source_nums):
+        if source_nums is None:
+            active_sources = None
+        elif isinstance(source_nums, int):
+            active_sources = [source_nums]
+        else:
+            active_sources = list(source_nums)
+        self.current_sources = active_sources
+        if self.sources is not None:
+            self.sources.current_sources = active_sources
+
+    def update_source_control(self, source_nums=None):
+        if source_nums is not None:
+            self.set_active_sources(source_nums)
+        if self.sources is None or not self.use_vertex_only_mesh:
+            self.source_control = None
+            return None
+        if self.current_sources is None:
+            raise ValueError("No active source is set for source control update.")
+
+        source_control = self.sources.source_cofunction()
+        if self.source_control is None:
+            self.source_control = source_control
+        else:
+            self.source_control.assign(source_control)
+        return self.source_control
+
+    def update_true_receiver_data(self, true_recv, target_space=None):
+        if not isinstance(true_recv, (list, np.ndarray)):
+            raise ValueError(
+                "true_recv should be a list or numpy array when "
+                "wave.compute_functional is True."
+            )
+        if target_space is None:
+            if self.true_receiver_functions:
+                target_space = self.true_receiver_functions[0].function_space()
+            else:
+                interpolator = self.receivers.receiver_interpolator(
+                    self.get_function()
+                )
+                target_space = interpolator.target_space
+
+        nt = int(self.final_time / self.dt) + 1
+        needs_rebuild = self.true_receiver_functions is None
+        if not needs_rebuild:
+            needs_rebuild = len(self.true_receiver_functions) != nt
+        if not needs_rebuild:
+            needs_rebuild = (
+                self.true_receiver_functions[0].function_space() is not target_space
+            )
+        if needs_rebuild:
+            self.true_receiver_functions = [
+                fire.Function(target_space, name="true_receiver")
+                for _ in range(nt)
+            ]
+
+        for step in range(nt):
+            receiver_values = true_recv[step]
+            rec_out_exact = self.true_receiver_functions[step]
+            if isinstance(receiver_values, fire.Function):
+                rec_out_exact.assign(receiver_values)
+            elif isinstance(receiver_values, np.ndarray):
+                rec_out_exact.dat.data_wo[:] = receiver_values
+            else:
+                raise ValueError(
+                    "Elements of true_recv should be either Firedrake "
+                    "Functions or numpy arrays."
+                )
+        return self.true_receiver_functions
 
     @abstractmethod
     def _initialize_model_parameters(self):
@@ -470,7 +554,7 @@ class Wave(Model_parameters, metaclass=ABCMeta):
             self.dt = dt
 
         self._validate_solve_kwargs(kwargs, "wave_propagator")
-        self.current_sources = source_nums
+        self.set_active_sources(source_nums)
         time_integrator(self, source_nums, **kwargs)
 
     def get_dt(self):

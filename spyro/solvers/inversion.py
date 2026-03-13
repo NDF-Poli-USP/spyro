@@ -430,8 +430,12 @@ class FullWaveformInversion(AcousticWave):
         Returns:
             float: The functional value.
         """
-        self.calculate_misfit(c=c)
-        Jm = compute_functional(self, self.misfit)
+        if self.automatic_adjoint:
+            self._validate_automatic_adjoint_fwi()
+            Jm = self._evaluate_automatic_fwi_functional(c=c)
+        else:
+            self.calculate_misfit(c=c)
+            Jm = compute_functional(self, self.misfit)
 
         self.functional_history.append(Jm)
         self.functional = Jm
@@ -446,6 +450,34 @@ class FullWaveformInversion(AcousticWave):
                 file.write(f"Peak memory usage: {peak_memory_mb:.2f} MB \n")
 
         return Jm
+
+    def _evaluate_automatic_fwi_functional(self, c=None):
+        starting_time = self.current_time
+        if self.parallelism_type == "spatial" and self.number_of_sources > 1:
+            functional_total = 0.0
+            for snum in range(self.number_of_sources):
+                switch_serial_shot(self, snum)
+                self.reset_pressure()
+                self.current_time = starting_time
+                functional_total += float(
+                    self._evaluate_automatic_functional(
+                        true_recv=self.real_shot_record[snum],
+                        source_nums=[snum],
+                        c=c,
+                    )
+                )
+            self.misfit = None
+            return functional_total / self.number_of_sources
+
+        self.reset_pressure()
+        self.current_time = starting_time
+        self.misfit = None
+        return float(
+            self._evaluate_automatic_functional(
+                true_recv=self.real_shot_record,
+                c=c,
+            )
+        )
 
     def _validate_automatic_adjoint_fwi(self):
         if not self.automatic_adjoint:

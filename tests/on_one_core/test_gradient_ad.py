@@ -112,11 +112,12 @@ def test_gradient_ad_uses_automated_adjoint(monkeypatch, true_recv_format):
         wave_obj_guess.automated_adjoint,
         spyro.solvers.AutomatedAdjoint,
     )
+    assert wave_obj_guess.automated_adjoint.reduced_functional is not None
     assert wave_obj_guess.automated_adjoint.verify_gradient() > 0.9
 
 
 @pytest.mark.slow
-def test_gradient_ad_repeated_calls_reset_tape():
+def test_gradient_ad_repeated_calls_reuse_reduced_functional(monkeypatch):
     rec_out_exact = build_exact_receivers()
 
     dictionary = set_dictionary()
@@ -124,11 +125,41 @@ def test_gradient_ad_repeated_calls_reset_tape():
     wave_obj_guess.set_mesh(input_mesh_parameters={"edge_length": 0.04})
     wave_obj_guess.set_initial_velocity_model(constant=2.0)
 
+    calls = {"forward": 0, "recompute": 0}
+    original_forward_solve = acoustic_wave_module.AcousticWave.forward_solve
+    original_recompute = (
+        acoustic_wave_module.AutomatedAdjoint.recompute_functional
+    )
+
+    def wrapped_forward_solve(self, **kwargs):
+        calls["forward"] += 1
+        return original_forward_solve(self, **kwargs)
+
+    def wrapped_recompute(self, control_value):
+        calls["recompute"] += 1
+        return original_recompute(self, control_value)
+
+    monkeypatch.setattr(
+        acoustic_wave_module.AcousticWave,
+        "forward_solve",
+        wrapped_forward_solve,
+    )
+    monkeypatch.setattr(
+        acoustic_wave_module.AutomatedAdjoint,
+        "recompute_functional",
+        wrapped_recompute,
+    )
+
     gradient_first = wave_obj_guess.gradient_solve(true_recv=rec_out_exact)
+    automated_adjoint = wave_obj_guess.automated_adjoint
     gradient_second = wave_obj_guess.gradient_solve(
         true_recv=[row.copy() for row in rec_out_exact]
     )
 
+    assert calls["forward"] == 1
+    assert calls["recompute"] == 1
+    assert wave_obj_guess.automated_adjoint is automated_adjoint
+    assert wave_obj_guess.automated_adjoint.reduced_functional is not None
     assert np.allclose(
         gradient_first.dat.data_ro,
         gradient_second.dat.data_ro,

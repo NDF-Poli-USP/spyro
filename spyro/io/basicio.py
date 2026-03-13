@@ -133,13 +133,27 @@ def switch_serial_shot(wave, propagation_id):
     Returns:
         None
     """
-    stacked_shot_arrays = np.load(_shot_filename('tmp_shot', propagation_id, wave))
+    wave.set_active_sources([propagation_id])
+    if wave.use_vertex_only_mesh:
+        wave.update_source_control()
+
+    shot_filename = _shot_filename('tmp_shot', propagation_id, wave)
+    receiver_filename = _shot_filename('tmp_rec', propagation_id, wave)
+    if not os.path.exists(shot_filename) or not os.path.exists(receiver_filename):
+        if wave.automatic_adjoint:
+            return
+        raise FileNotFoundError(
+            "Serial-shot data is unavailable for the requested propagation "
+            f"{propagation_id}."
+        )
+
+    stacked_shot_arrays = np.load(shot_filename)
     if len(wave.forward_solution) == 0:
         n_dts, n_dofs = np.shape(stacked_shot_arrays)
         rebuild_empty_forward_solution(wave, n_dts)
     for array_i, array in enumerate(stacked_shot_arrays):
         wave.forward_solution[array_i].dat.data[:] = array
-    wave.receivers_data = np.load(_shot_filename('tmp_rec', propagation_id, wave))
+    wave.receivers_data = np.load(receiver_filename)
 
 
 def ensemble_functional(func):

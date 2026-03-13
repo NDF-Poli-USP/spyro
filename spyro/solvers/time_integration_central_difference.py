@@ -26,7 +26,7 @@ def central_difference(wave, source_ids=[0], **kwargs):
     ``wave.rhs_no_pml_source()`` before ``wave.solver.solve()``.
     """
     if wave.sources is not None:
-        wave.sources.current_sources = source_ids
+        wave.set_active_sources(source_ids)
         rhs_forcing = fire.Cofunction(wave.function_space.dual())
 
     wave.field_logger.start_logging(source_ids)
@@ -43,7 +43,7 @@ def central_difference(wave, source_ids=[0], **kwargs):
     if wave.sources is not None and wave.use_vertex_only_mesh:
         # source_cof is a cofunction that represents a point source,
         # being one at a point and zero elsewhere.
-        source_cof = wave.sources.source_cofunction()
+        source_cof = wave.update_source_control(source_ids)
         interpolate_receivers = wave.receivers.receiver_interpolator(
             wave.get_function())
     usol_recv = []
@@ -62,6 +62,10 @@ def central_difference(wave, source_ids=[0], **kwargs):
                 "true_recv should be a list or numpy array when "
                 "wave.compute_functional is True."
             )
+        true_recv_functions = wave.update_true_receiver_data(
+            true_recv,
+            target_space=interpolate_receivers.target_space,
+        )
         Jm = 0.
     for step in range(nt):
         # Basic way of applying sources
@@ -82,16 +86,7 @@ def central_difference(wave, source_ids=[0], **kwargs):
             recv = fire.assemble(interpolate_receivers)
             usol_recv.append(recv)
             if compute_functional:
-                rec_out_exact = fire.Function(interpolate_receivers.target_space)
-                if isinstance(true_recv[step], fire.Function):
-                    rec_out_exact.dat.data_wo[:] = true_recv[step].dat.data_ro[:]
-                elif isinstance(true_recv[step], np.ndarray):
-                    rec_out_exact.dat.data_wo[:] = true_recv[step]
-                else:
-                    raise ValueError(
-                        "Elements of true_recv should be either Firedrake "
-                        "Functions or numpy arrays."
-                    )
+                rec_out_exact = true_recv_functions[step]
                 misfit = rec_out_exact - recv
                 Jm += 0.5 * fire.assemble(fire.inner(misfit, misfit) * fire.dx)
 
