@@ -193,18 +193,10 @@ def ensemble_gradient(func):
         comm = args[0].comm
 
         if args[0].parallelism_type != "spatial" or args[0].number_of_sources == 1:
-            grad = None
             shot_ids_per_propagation_list = args[0].shot_ids_per_propagation
             for propagation_id, shot_ids_in_propagation in enumerate(shot_ids_per_propagation_list):
                 if is_owner(comm, propagation_id):
                     grad = func(*args, **kwargs)
-            if grad is None:
-                raise RuntimeError(
-                    "No ensemble rank evaluated the gradient for the current "
-                    "automatic-adjoint propagation."
-                )
-            if args[0].automatic_adjoint:
-                return grad
             grad_total = fire.Function(args[0].function_space)
 
             comm.comm.barrier()

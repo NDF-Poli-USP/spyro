@@ -1,7 +1,6 @@
 import firedrake as fire
 import warnings
 import os
-from mpi4py import MPI
 
 from .wave import Wave
 from .automatic_differentiation_solver import AutomatedAdjoint
@@ -162,12 +161,8 @@ class AcousticWave(Wave):
             automated_adjoint is None
             or automated_adjoint.control is not model_control
             or len(automated_adjoint.controls) != num_controls
-            or automated_adjoint.ensemble is not self.comm
         ):
-            automated_adjoint = AutomatedAdjoint(
-                control_values,
-                ensemble=self.comm,
-            )
+            automated_adjoint = AutomatedAdjoint(control_values)
 
         self.automated_adjoint = automated_adjoint
         return automated_adjoint
@@ -178,7 +173,6 @@ class AcousticWave(Wave):
         automated_adjoint=None,
         source_nums=None,
         c=None,
-        reduce_output=False,
         **kwargs,
     ):
         control_values = self._automatic_control_values(
@@ -204,14 +198,6 @@ class AcousticWave(Wave):
                     finally:
                         automated_adjoint.stop_recording()
                     automated_adjoint.create_reduced_functional(self.functional)
-                    if reduce_output and self.comm.ensemble_comm.size > 1:
-                        self.functional = (
-                            self.comm.ensemble_comm.allreduce(
-                                float(self.functional),
-                                op=MPI.SUM,
-                            )
-                            * automated_adjoint.reduction_scale
-                        )
             else:
                 self.update_true_receiver_data(true_recv)
                 if self._uses_serial_shot_source_control():

@@ -476,7 +476,6 @@ class FullWaveformInversion(AcousticWave):
             self._evaluate_automatic_functional(
                 true_recv=self.real_shot_record,
                 c=c,
-                reduce_output=True,
             )
         )
 
@@ -484,17 +483,17 @@ class FullWaveformInversion(AcousticWave):
         if not self.automatic_adjoint:
             return
 
-        if not self.use_vertex_only_mesh:
-            raise ValueError(
-                "Automatic-adjoint FWI requires use_vertex_only_mesh=True so "
-                "the receiver-space functional can be annotated."
+        if self.comm.comm.size != 1 or self.comm.ensemble_comm.size != 1:
+            raise NotImplementedError(
+                "Automatic-adjoint FWI currently supports only one-core "
+                "serial execution; parallel spatial and ensemble workflows "
+                "are not supported."
             )
 
-        if self.number_of_sources > 1 and self.parallelism_type == "custom":
+        if self.number_of_sources > 1 and self.parallelism_type != "spatial":
             raise NotImplementedError(
                 "Automatic-adjoint FWI with multiple sources currently "
-                "supports only automatic shot-parallel or serial-shot spatial "
-                "execution."
+                "requires the serial-shot spatial workflow."
             )
 
     def get_gradient(self, c=None, save=True, calculate_functional=True):

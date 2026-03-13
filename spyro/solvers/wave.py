@@ -338,11 +338,6 @@ class Wave(Model_parameters, metaclass=ABCMeta):
                 target_space = interpolator.target_space
 
         nt = int(self.final_time / self.dt) + 1
-        if len(true_recv) != nt:
-            raise ValueError(
-                "true_recv has an unexpected number of timesteps: "
-                f"expected {nt}, received {len(true_recv)}."
-            )
         needs_rebuild = self.true_receiver_functions is None
         if not needs_rebuild:
             needs_rebuild = len(self.true_receiver_functions) != nt

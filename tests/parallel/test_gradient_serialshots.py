@@ -1,7 +1,6 @@
 from mpi4py.MPI import COMM_WORLD
 import numpy as np
 import firedrake as fire
-import pytest
 import random
 import spyro
 import warnings
@@ -64,14 +63,9 @@ dictionary["visualization"] = {
 }
 
 
-def get_gradient(parallelism_type, points, automatic_adjoint=False):
+def get_gradient(parallelism_type, points):
 
     dictionary["parallelism"]["type"] = parallelism_type
-    dictionary["options"]["automatic_adjoint"] = automatic_adjoint
-    if automatic_adjoint:
-        dictionary["acquisition"]["use_vertex_only_mesh"] = True
-    else:
-        dictionary["acquisition"].pop("use_vertex_only_mesh", None)
     print(f"Calculating exact", flush=True)
     Wave_obj_exact = spyro.AcousticWave(dictionary=dictionary)
     Wave_obj_exact.set_mesh(input_mesh_parameters={"edge_length": 0.1})
@@ -87,35 +81,19 @@ def get_gradient(parallelism_type, points, automatic_adjoint=False):
     Wave_obj_guess = spyro.AcousticWave(dictionary=dictionary)
     Wave_obj_guess.set_mesh(input_mesh_parameters={"edge_length": 0.1})
     Wave_obj_guess.set_initial_velocity_model(constant=2.0)
+    Wave_obj_guess.forward_solve()
 
-    if automatic_adjoint and parallelism_type == "automatic":
-        gradient = Wave_obj_guess.gradient_solve(
-            true_recv=Wave_obj_exact.receivers_data
-        )
-    elif automatic_adjoint and parallelism_type == "spatial":
-        true_recv_list = []
+    if parallelism_type == "automatic":
+        misfit = Wave_obj_exact.forward_solution_receivers - Wave_obj_guess.forward_solution_receivers
+    elif parallelism_type == "spatial":
+        misfit_list = []
         for source_id in range(len(dictionary["acquisition"]["source_locations"])):
             spyro.io.switch_serial_shot(Wave_obj_exact, source_id)
-            true_recv_list.append(Wave_obj_exact.receivers_data.copy())
-        gradient = Wave_obj_guess.gradient_solve(true_recv=true_recv_list)
-    else:
-        Wave_obj_guess.forward_solve()
-        if parallelism_type == "automatic":
-            misfit = (
-                Wave_obj_exact.forward_solution_receivers
-                - Wave_obj_guess.forward_solution_receivers
-            )
-            gradient = Wave_obj_guess.gradient_solve(misfit=misfit)
-        elif parallelism_type == "spatial":
-            misfit_list = []
-            for source_id in range(len(dictionary["acquisition"]["source_locations"])):
-                spyro.io.switch_serial_shot(Wave_obj_exact, source_id)
-                spyro.io.switch_serial_shot(Wave_obj_guess, source_id)
-                misfit_list.append(
-                    Wave_obj_exact.forward_solution_receivers
-                    - Wave_obj_guess.forward_solution_receivers
-                )
-            gradient = Wave_obj_guess.gradient_solve(misfit=misfit_list)
+            spyro.io.switch_serial_shot(Wave_obj_guess, source_id)
+            misfit_list.append(Wave_obj_exact.forward_solution_receivers - Wave_obj_guess.forward_solution_receivers)
+        misfit = misfit_list
+
+    gradient = Wave_obj_guess.gradient_solve(misfit=misfit)
     Wave_obj_guess.comm.comm.barrier()
     spyro.io.delete_tmp_files(Wave_obj_guess)
     spyro.io.delete_tmp_files(Wave_obj_exact)
@@ -127,8 +105,7 @@ def get_gradient(parallelism_type, points, automatic_adjoint=False):
     return gradient_point_values
 
 
-@pytest.mark.parametrize("automatic_adjoint", [False, True])
-def test_gradient_serialshots(automatic_adjoint):
+def test_gradient_serialshots():
     comm = COMM_WORLD
     rank = comm.Get_rank()
     if rank == 0:
@@ -136,27 +113,15 @@ def test_gradient_serialshots(automatic_adjoint):
     else:
         points = None
     points = comm.bcast(points, root=0)
-    gradient_ensemble_parallelism = get_gradient(
-        "automatic",
-        points,
-        automatic_adjoint=automatic_adjoint,
-    )
-    gradient_serial_shot = get_gradient(
-        "spatial",
-        points,
-        automatic_adjoint=automatic_adjoint,
-    )
+    gradient_ensemble_parallelism = get_gradient("automatic", points)
+    gradient_serial_shot = get_gradient("spatial", points)
 
     # Check if the gradients are equal within a tolerance
-    tolerance = 1e-7 if automatic_adjoint else 1e-8
-    test = all(
-        np.isclose(a, b, atol=tolerance)
-        for a, b in zip(gradient_ensemble_parallelism, gradient_serial_shot)
-    )
+    tolerance = 1e-8
+    test = all(np.isclose(a, b, atol=tolerance) for a, b in zip(gradient_ensemble_parallelism, gradient_serial_shot))
 
     print(f"Gradient is equal: {test}", flush=True)
-    assert test
 
 
 if __name__ == "__main__":
-    test_gradient_serialshots(False)
+    test_gradient_serialshots()

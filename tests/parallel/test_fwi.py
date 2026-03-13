@@ -1,4 +1,3 @@
-import copy
 import numpy as np
 import firedrake as fire
 import spyro
@@ -133,62 +132,6 @@ def test_fwi(use_vertex_only_mesh, load_real_shot=False, use_rol=False):
 
     print("END", flush=True)
     assert all([test0, test1, test2, test3])
-
-
-@pytest.mark.parallel(2)
-def test_fwi_automatic_adjoint_parallel():
-    automatic_dictionary = copy.deepcopy(dictionary)
-    automatic_dictionary["options"]["automatic_adjoint"] = True
-    automatic_dictionary["acquisition"]["use_vertex_only_mesh"] = True
-    automatic_dictionary["acquisition"]["source_locations"] = spyro.create_transect(
-        (-0.55, 0.85), (-0.55, 1.15), 2
-    )
-    automatic_dictionary["acquisition"]["receiver_locations"] = spyro.create_transect(
-        (-1.45, 0.8), (-1.45, 1.2), 100
-    )
-
-    fwi_obj = spyro.FullWaveformInversion(dictionary=automatic_dictionary)
-    try:
-        fwi_obj.set_real_mesh(input_mesh_parameters={"edge_length": 0.1})
-        cond = fire.conditional(
-            (fwi_obj.mesh_z + 1.0) ** 2 + (fwi_obj.mesh_x - 1.0) ** 2 < 0.2 ** 2,
-            3.0,
-            2.5,
-        )
-        fwi_obj.set_real_velocity_model(
-            conditional=cond,
-            output=False,
-            dg_velocity_model=False,
-        )
-        fwi_obj.generate_real_shot_record(save_shot_record=False)
-
-        fwi_obj.set_guess_mesh(input_mesh_parameters={"edge_length": 0.1})
-        fwi_obj.set_guess_velocity_model(constant=2.5)
-        fwi_obj.set_gradient_mask(
-            boundaries={
-                "z_min": -1.3,
-                "z_max": -0.7,
-                "x_min": 0.7,
-                "x_max": 1.3,
-            }
-        )
-        fwi_obj.run_fwi(vmin=2.5, vmax=3.0, maxiter=2)
-
-        gradient = fwi_obj.gradient
-        masked_gradient = np.isclose(gradient.at((-0.1, 0.1)), 0.0)
-        unmasked_gradient = np.abs(gradient.at((-1.0, 1.0))) > 1e-5
-        reduced_functional = (
-            len(fwi_obj.functional_history) >= 2
-            and fwi_obj.functional_history[-1] < fwi_obj.functional_history[0]
-        )
-
-        assert fwi_obj.automated_adjoint is not None
-        assert fwi_obj.automated_adjoint.reduced_functional is not None
-        assert masked_gradient
-        assert unmasked_gradient
-        assert reduced_functional
-    finally:
-        spyro.io.delete_tmp_files(fwi_obj)
 
 
 @pytest.mark.skip()
