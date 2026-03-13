@@ -167,3 +167,15 @@ def test_gradient_ad_repeated_calls_reuse_reduced_functional(monkeypatch):
         atol=1e-9,
     )
     assert wave_obj_guess.automated_adjoint.verify_gradient() > 0.9
+
+
+def test_gradient_ad_validates_true_receiver_timestep_count():
+    rec_out_exact = build_exact_receivers()
+
+    dictionary = set_dictionary()
+    wave_obj_guess = spyro.AcousticWave(dictionary=dictionary)
+    wave_obj_guess.set_mesh(input_mesh_parameters={"edge_length": 0.04})
+    wave_obj_guess.set_initial_velocity_model(constant=2.0)
+
+    with pytest.raises(ValueError, match="unexpected number of timesteps"):
+        wave_obj_guess.gradient_solve(true_recv=rec_out_exact[:-1])
