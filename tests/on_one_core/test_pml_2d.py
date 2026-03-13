@@ -1,6 +1,6 @@
 import spyro
 import numpy as np
-import time as timer
+from spyro.utils.cost import comp_cost
 import firedrake as fire
 import pickle
 
@@ -15,7 +15,8 @@ def error_calc(p_numerical, p_analytical, nt):
 def run_forward():
     dt = 0.0001
 
-    t0 = timer.time()
+    # Reference to resource usage
+    tRef = comp_cost("tini")
 
     final_time = 1.4
 
@@ -97,8 +98,9 @@ def run_forward():
     Wave_obj.set_initial_velocity_model(conditional=cond)
     Wave_obj.forward_solve()
 
-    t1 = timer.time()
-    print("Time elapsed: ", t1 - t0)
+    # Estimating computational resource usage
+    comp_cost("tfin", tRef=tRef, save_time=False)
+
     nt = int(final_time / dt) + 1
     p_r = Wave_obj.forward_solution_receivers
 
