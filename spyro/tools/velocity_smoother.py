@@ -10,24 +10,81 @@ except ImportError:
     HAS_SEISMICMESH = False
 
 
-def smooth_velocity_field_file(input_filename, output_filename, sigma, show=False, write_hdf5=True, i_limit=None, vp_limit=None, tol=1e-5):
-    """Smooths a velocity field using a Gaussian filter.
+def smooth_velocity_field_file(
+        input_filename,
+        output_filename,
+        sigma,
+        save_fig=False,
+        show=False,
+        write_hdf5=True,
+        i_limit=None,
+        vp_limit=None,
+        tol=1e-5,
+    ):
+    """Smooth a velocity field from a SEG-Y file using a Gaussian filter.
+
+    Reads a velocity model from a SEG-Y file, applies a Gaussian smoothing
+    filter, optionally preserves shallow-layer values and water-column
+    velocities, writes the result back as a SEG-Y file, and optionally exports
+    an HDF5 file via SeismicMesh.
 
     Parameters
     ----------
-    input_filename : string
-        The name of the input file.
-    output_filename : string
-        The name of the output file.
+    input_filename : str
+        Path to the input SEG-Y velocity file.
+    output_filename : str
+        Path for the output (smoothed) SEG-Y velocity file.
     sigma : float
-        The standard deviation of the Gaussian filter.
-    show : boolean, optional
-        Should the plot image appear on screen
+        Standard deviation (in grid cells) for the Gaussian filter.  Larger
+        values produce stronger smoothing.
+    save_fig : bool, optional
+        If ``True``, save a PNG image of the smoothed model next to
+        *output_filename*. Default is ``False``.
+    show : bool, optional
+        If ``True``, display the smoothed model interactively with
+        ``matplotlib``. Default is ``False``.
+    write_hdf5 : bool, optional
+        If ``True`` and SeismicMesh is available, write an HDF5 version of
+        the smoothed model using
+        :func:`SeismicMesh.write_velocity_model`. Default is ``True``.
+    i_limit : int or None, optional
+        Row index below which smoothing is **not** applied; rows
+        ``0 … i_limit-1`` retain their original values.  ``None`` disables
+        this protection (equivalent to ``i_limit=0``). Default is ``None``.
+    vp_limit : float or None, optional
+        Velocity threshold used to identify water/air cells.  Any cell whose
+        original velocity is at or below ``vp_limit + tol`` is reset to the
+        global minimum velocity after smoothing.  ``None`` uses the global
+        minimum (i.e., no cells are reset). Default is ``None``.
+    tol : float, optional
+        Tolerance added to *vp_limit* when testing whether a cell belongs to
+        the water/air layer. Default is ``1e-5``.
 
     Returns
     -------
     None
+        The function writes its results to *output_filename* (and optionally
+        to an HDF5 file and a PNG image) as side effects.
 
+    Raises
+    ------
+    ValueError
+        If *input_filename* does not have a ``.segy`` extension.
+
+    Notes
+    -----
+    SEG-Y traces are assumed to be stored column-major (each trace corresponds
+    to one *x*-column of the 2-D velocity grid).
+
+    Examples
+    --------
+    Basic smoothing with a standard deviation of 5 grid cells:
+
+    >>> smooth_velocity_field_file(
+    ...     "marmousi.segy",
+    ...     "marmousi_smooth.segy",
+    ...     sigma=5,
+    ... )
     """
     f, filetype = os.path.splitext(input_filename)
 
@@ -71,7 +128,7 @@ def smooth_velocity_field_file(input_filename, output_filename, sigma, show=Fals
         for tr, il in enumerate(spec.ilines):
             f.trace[tr] = vp_smooth[:, tr]
 
-    if show is True:
+    if save_fig is True or show is True:
         with segyio.open(output_filename, ignore_geometry=True) as f:
             nz, nx = len(f.samples), len(f.trace)
             show_vp = np.zeros(shape=(nz, nx))
@@ -85,8 +142,10 @@ def smooth_velocity_field_file(input_filename, output_filename, sigma, show=Fals
         plt.xlabel("x-direction (m)")
         plt.ylabel("z-direction (m)")
         ax.axis("equal")
-        plt.savefig(output_filename+".png")
-        plt.show()
+        if save_fig:
+            plt.savefig(output_filename+".png")
+        if show:
+            plt.show()
 
     if write_hdf5:
         if HAS_SEISMICMESH:

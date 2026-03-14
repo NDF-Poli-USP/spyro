@@ -58,7 +58,7 @@ def test_write_segy_and_smooth(show=False):
         plt.savefig("nonsmoothedtest.png")
         plt.show()
 
-    spyro.tools.smooth_velocity_field_file(segy_file, smoothed_file, 5, show=show)
+    spyro.tools.smooth_velocity_field_file(segy_file, smoothed_file, 5, show=show, save_fig=True)
 
     smoothed_vp = get_vp_from_2dsegy(smoothed_file)
     check_boundary = np.isclose(original_vp[0, 0], smoothed_vp[0, 0])
