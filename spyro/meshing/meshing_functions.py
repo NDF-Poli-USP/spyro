@@ -1,10 +1,15 @@
 import firedrake as fire
 import meshio
-import gmsh
 import numpy as np
 from scipy.interpolate import RegularGridInterpolator
 from ..io import parallel_print
 from ..utils import run_in_one_core
+
+try:
+    import gmsh
+except ImportError:
+    gmsh = None
+
 
 try:
     import SeismicMesh
@@ -729,6 +734,8 @@ def build_big_rect_with_inner_element_group(mesh_parameters):
     are separated into an 'Inner' physical group, while elements outside
     are placed in an 'Outer' physical group.
     """
+    if gmsh is None:
+        raise ImportError("gmsh is not available. Please install it to use this function.")
 
     length_z = mesh_parameters.length_z
     length_x = mesh_parameters.length_x
