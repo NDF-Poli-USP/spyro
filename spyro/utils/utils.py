@@ -568,7 +568,7 @@ def run_in_one_core(func):
     ----------
     func : callable
         Function to decorate. The first argument of func must be an object
-        with a 'comm' attribute containing an MPI communicator.
+        with a `comm` attribute containing an MPI communicator.
 
     Returns
     -------
@@ -578,7 +578,7 @@ def run_in_one_core(func):
     Notes
     -----
     The function checks for two types of communicators:
-    - Ensemble communicator: Runs only if both ensemble_comm.rank == 0
+    - Ensemble communicator: Runs only if both `ensemble_comm.rank` == 0
       and comm.rank == 0.
     - Regular communicator: Runs only if comm.rank == 0.
     - If comm is None, the function runs normally without restrictions.

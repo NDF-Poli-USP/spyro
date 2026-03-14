@@ -39,17 +39,12 @@ def ensemble_shot_record(func):
 
 
 def ensemble_save(func):
-    """Decorator for saving files with parallelism. Handles saving in different
-    scenarions:
-    - For ensemble parallelism or single source: iterates through propagations in
-      each core and saves when the propagation is owned by the current rank.
-    - For spatial-only parallelism with multiple sources: loads shots from temporary
-      files using the switch_serial_shot method and saves to named output files
+    """Decorator for saving files with parallelism.
 
     Parameters:
     -----------
     func: The wrapped function that performs the actual saving operation.
-    Expected to accept a Wave based object as first argument.
+    Expected to accept a :class:`Wave` based object as first argument.
 
     Returns:
     --------
@@ -58,9 +53,14 @@ def ensemble_save(func):
 
     Notes:
     ------
-    - Requires object to have attributes: comm, parallelism_type, number_of_sources,
-      and shot_ids_per_propagation
-    - Temporary files are loaded via switch_serial_shot() when using spatial-only parallelism
+    Handles saving in different scenarions:
+    - For ensemble parallelism or single source: iterates through propagations in
+      each core and saves when the propagation is owned by the current rank.
+    - For spatial-only parallelism with multiple sources: loads shots from temporary
+      files using the switch_serial_shot method and saves to named output files
+    - Requires first object to have attributes: `comm`, `parallelism_type`, `number_of_sources`,
+      and `shot_ids_per_propagation`.
+    - Temporary files are loaded via :meth:`switch_serial_shot()` when using spatial-only parallelism
     """
     def wrapper(*args, **kwargs):
         obj = args[0]  # Requires first arg to be an instant or subclass of Wave
@@ -70,7 +70,7 @@ def ensemble_save(func):
                 if is_owner(_comm, propagation_id) and _comm.comm.rank == 0:
                     func(obj, **dict(kwargs, shot_ids=shot_ids_in_propagation))
         else:
-            # For spatial parallelism: load from tmp files (no file_name) then save to named files
+            # For spatial parallelism: load propagation data from tmp files (no file_name) then save wanted data to named files
             for snum in range(obj.number_of_sources):
                 switch_serial_shot(obj, snum, file_name=None)  # Load from tmp files
                 if _comm.comm.rank == 0:
@@ -86,7 +86,7 @@ def ensemble_load(func):
     Parameters:
     -----------
     func: The wrapped function that performs the actual loading operation.
-    Expected to accept a Wave based object as first argument.
+    Expected to accept a :class:`Wave` based object as first argument.
 
     Returns:
     --------
@@ -101,7 +101,7 @@ def ensemble_load(func):
                 if is_owner(_comm, propagation_id):
                     func(obj, **dict(kwargs, shot_ids=shot_ids_in_propagation))
         else:
-            # For spatial parallelism: load directly from named files (no switch_serial_shot needed)
+            # For spatial parallelism: load data directly from named files (no switch_serial_shot needed)
             for snum in range(obj.number_of_sources):
                 func(obj, **dict(kwargs, shot_ids=[snum]))
     return wrapper
@@ -113,7 +113,7 @@ def ensemble_propagator(func):
     Parameters:
     -----------
     func: The wrapped function that performs the actual propagation operation.
-    Expected to accept a Wave based object as first argument.
+    Expected to accept a :class:`Wave` based object as first argument.
 
     Returns:
     --------
@@ -151,7 +151,7 @@ def _shot_filename(propagation_id, wave, prefix='tmp', random_str_in_use=True):
     -----------
     propagation_id (int): The index identifying the current propagation.
 
-    wave (object): A Wave object containing shot and communication information. Must have attributes:
+    wave (object): A :class:`Wave` object containing shot and communication information. Must have attributes:
         - shot_ids_per_propagation: A list or dict mapping propagation IDs to shot IDs.
         - comm: The current MPI communicator.
     prefix (str, optional): Prefix for the filename. Defaults to 'tmp'.
@@ -181,7 +181,7 @@ def save_serial_data(wave, propagation_id):
     Save serial data to numpy files.
 
     Args:
-        wave (Wave): The wave object containing the forward solution.
+        wave (:class:`Wave`): The wave object containing the forward solution.
         propagation_id (int): The propagation ID.
 
     Returns:
@@ -198,7 +198,7 @@ def switch_serial_shot(wave, propagation_id, file_name=None, just_for_dat_manage
     Switches the current serial shot for a given wave to shot identified with propagation ID.
 
     Args:
-        wave (Wave): The wave object.
+        wave (:class:`Wave`): The wave object.
         propagation_id (int): The propagation ID.
 
     Returns:
@@ -355,7 +355,7 @@ def create_segy(function, V, grid_spacing, filename):
     Parameters
     ----------
     velocity:
-        Firedrake function representing the values of the velocity
+        firedrake.Function representing the values of the velocity
         model to save
     filename: str
         Name of the segy file to save
@@ -388,8 +388,8 @@ def save_shots(Wave_obj, file_name="shots/shot_record_", shot_ids=0):
 
     Parameters
     ----------
-    Wave_obj: `spyro.Wave` object
-        A `spyro.Wave` object
+    Wave_obj: :class:`Wave` object
+        A :class:`Wave` object
     source_id: int, optional by default 0
         The source number
     file_name: str, optional by default shot_number_#.dat
@@ -418,8 +418,8 @@ def load_shots(Wave_obj, file_name="shots/shot_record_", shot_ids=0):
 
     Parameters
     ----------
-    Wave_obj: `spyro.Wave` object
-        A `spyro.Wave` object
+    Wave_obj: :class:`Wave` object
+        A :class:`Wave` object
     source_id: int, optional by default 0
         The source number
     filename: str, optional by default shot_number_#.dat
