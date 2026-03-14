@@ -209,14 +209,14 @@ def plot_mesh_sizes(
 
 
 def plot_model(
-        Wave_object,
-        filename="model.png",
-        abc_points=None,
-        show=False,
-        flip_axis=True,
-        high_resolution=False,
-        high_resolution_grid_value=0.01,
-    ):
+    Wave_object,
+    filename="model.png",
+    abc_points=None,
+    show=False,
+    flip_axis=True,
+    high_resolution=False,
+    high_resolution_grid_value=0.01,
+):
     """
     Plot the velocity model with source and receiver locations.
 
