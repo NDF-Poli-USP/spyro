@@ -27,7 +27,6 @@ clean-pyc:
 clean-root:
 	@rm -f *.msh *.vtk *.png *.vtu *.pvtu *.pvd *.npy *.pdf *.dat *.segy *.hdf5
 	@rm -rf asn*/ bsn*/
-	@rm .coverage.*
 
 clean-data:
 	@rm -f shots/*.dat
