@@ -1,4 +1,4 @@
-name: Build Firedrake main
+name: build
 
 on:
   push:
