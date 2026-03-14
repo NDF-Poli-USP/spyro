@@ -217,8 +217,7 @@ def ensemble_gradient(func):
 
 
 def write_function_to_grid(function, V, grid_spacing):
-    """
-    Interpolate a Firedrake function to a structured grid
+    """Interpolate a Firedrake function to a structured grid
 
     Parameters
     ----------
@@ -268,17 +267,13 @@ def write_function_to_grid(function, V, grid_spacing):
 
 
 def create_segy(function, V, grid_spacing, filename):
-    """
-    Write the velocity data into a segy file named filename
+    """Write the velocity data into a segy file named filename
 
     Parameters
     ----------
-    function : firedrake.Function
-        Function to interpolate
-    V : firedrake.FunctionSpace
-        Function space of function
-    grid_spacing : float
-        Spacing of grid points
+    velocity:
+        Firedrake function representing the values of the velocity
+        model to save
     filename: str
         Name of the segy file to save
 
@@ -306,8 +301,7 @@ def create_segy(function, V, grid_spacing, filename):
 
 @ensemble_save
 def save_shots(Wave_obj, file_name="shots/shot_record_", shot_ids=0):
-    """
-    Save a the shot record from last forward solve to a `pickle`.
+    """Save a the shot record from last forward solve to a `pickle`.
 
     Parameters
     ----------
