@@ -11,16 +11,16 @@ except ImportError:
 
 
 def smooth_velocity_field_file(
-        input_filename,
-        output_filename,
-        sigma,
-        save_fig=False,
-        show=False,
-        write_hdf5=True,
-        i_limit=None,
-        vp_limit=None,
-        tol=1e-5,
-    ):
+    input_filename,
+    output_filename,
+    sigma,
+    save_fig=False,
+    show=False,
+    write_hdf5=True,
+    i_limit=None,
+    vp_limit=None,
+    tol=1e-5,
+):
     """Smooth a velocity field from a SEG-Y file using a Gaussian filter.
 
     Reads a velocity model from a SEG-Y file, applies a Gaussian smoothing
