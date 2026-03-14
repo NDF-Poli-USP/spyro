@@ -184,6 +184,12 @@ class IsotropicWave(ElasticWave):
         else:
             return self.B
 
+    def rhs_no_pml_source(self):
+        if self.abc_boundary_layer_type == "PML":
+            raise NotImplementedError
+        else:
+            return self.source_function
+
     def parse_initial_conditions(self):
         time_dict = self.input_dictionary["time_axis"]
         initial_condition = time_dict.get("initial_condition", None)
