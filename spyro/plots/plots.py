@@ -208,8 +208,15 @@ def plot_mesh_sizes(
     mesh.coordinates.dat.data[:, 1] = coordinates[:, 0]
 
 
-def plot_model(Wave_object, filename="model.png",
-               abc_points=None, show=False, flip_axis=True, high_resolution=False):
+def plot_model(
+        Wave_object,
+        filename="model.png",
+        abc_points=None,
+        show=False,
+        flip_axis=True,
+        high_resolution=False,
+        high_resolution_grid_value=0.01,
+    ):
     """
     Plot the velocity model with source and receiver locations.
 
@@ -237,6 +244,8 @@ def plot_model(Wave_object, filename="model.png",
     high_resolution : bool, optional
         If True, interpolates the velocity model to a finer resolution (0.01 km)
         before plotting. Default is False.
+    high_resolution_grid_value: float, optional
+        High resolution visualization value. Default is 0.01 km.
 
     Returns
     -------
@@ -257,7 +266,7 @@ def plot_model(Wave_object, filename="model.png",
     fig.set_figwidth = 9.0
     fig.set_figheight = 9.0
     if high_resolution:
-        vp_object, _ = change_scalar_field_resolution(Wave_object, 0.01)
+        vp_object, _ = change_scalar_field_resolution(Wave_object, high_resolution_grid_value)
 
     else:
         vp_object = Wave_object.initial_velocity_model

@@ -504,6 +504,7 @@ def calculate_edge_length(cpw, minimum_velocity, frequency):
 
 def RectangleMesh(nx, ny, length_x, length_y, pad=None, comm=None, quadrilateral=False):
     """Create a rectangle mesh based on the Firedrake mesh.
+
     First axis is negative, second axis is positive. If there is a pad, both
     axis are dislocated by the pad.
 
@@ -549,6 +550,7 @@ def PeriodicRectangleMesh(
     nx, ny, length_x, length_y, pad=None, comm=None, quadrilateral=False
 ):
     """Create a periodic rectangle mesh based on the Firedrake mesh.
+
     First axis is negative, second axis is positive. If there is a pad, both
     axis are dislocated by the pad.
 
@@ -668,7 +670,7 @@ def vp_to_sizing(vp, cpw, frequency):
 
     Notes
     -----
-    The mesh size is calculated as: size = vp / (frequency * cpw)
+    The mesh size is calculated as: `size = vp / (frequency * cpw)`
     This ensures that the mesh has the specified number of cells per
     wavelength throughout the domain.
     """

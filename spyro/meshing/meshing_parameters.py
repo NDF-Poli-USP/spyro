@@ -274,7 +274,7 @@ class MeshingParameters():
 
     @grid_velocity_data.setter
     def grid_velocity_data(self, value):
-        """Set the gridded velocity data.
+        """Set attribute of the velocity data.
 
         Parameters
         ----------

@@ -285,8 +285,8 @@ class FullWaveformInversion(AcousticWave):
         Complete forward solution from the guess velocity model.
     has_gradient_mask : bool
         Whether a gradient mask has been set.
-    mask_available : bool
-        Whether mask functionality is available.
+    gradient_mask_available : bool
+        Whether gradient mask functionality is available.
     functional_history : list
         History of functional values at each iteration.
     control_out : firedrake.VTKFile
@@ -740,7 +740,7 @@ class FullWaveformInversion(AcousticWave):
     def set_guess_mesh(
         self,
         user_mesh=None,
-        input_mesh_parameters={},
+        input_mesh_parameters=None,
     ):
         """
         Set the mesh for the guess/inversion model.
@@ -761,6 +761,8 @@ class FullWaveformInversion(AcousticWave):
         If "gradient_mask" is present in input_mesh_parameters, sets
         self.gradient_mask_available to True.
         """
+        if input_mesh_parameters is None:
+            input_mesh_parameters = {}
         if input_mesh_parameters.get("gradient_mask") is not None:
             self.gradient_mask_available = True
         super().set_mesh(
@@ -1131,7 +1133,7 @@ class FullWaveformInversion(AcousticWave):
         self.forward_solution_receivers = None
 
     @run_in_one_core
-    def save_result_as_segy(self, file_name="final_vp.segy"):
+    def save_result_as_segy(self, file_name="final_vp.segy", grid_spacing=0.01):
         """
         Save the final velocity model result as a SEG-Y file.
 
@@ -1143,6 +1145,8 @@ class FullWaveformInversion(AcousticWave):
         ----------
         file_name : str, optional
             Output SEG-Y file name. Default is "final_vp.segy".
+        grid_spacing: float, optional
+            Segy grid spacing, default is 0.01 km.
 
         Notes
         -----
@@ -1150,7 +1154,6 @@ class FullWaveformInversion(AcousticWave):
         The @run_in_one_core decorator ensures this operation runs on a single
         MPI rank to avoid conflicts.
         """
-        grid_spacing = 0.01
         create_segy(self.vp_result, self.function_space, grid_spacing, file_name)
 
 
