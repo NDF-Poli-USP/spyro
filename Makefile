@@ -18,11 +18,27 @@ upload:
 
 publish: tag upload
 
-clean:
+clean-pyc:
 	@find . | grep -E "(__pycache__|\.pyc|\.pyo$\)" | xargs rm -rf
 	@rm -rf build/*
 	@rm -rf spyro.egg-info/
 	@rm -rf dist/
+
+clean-root:
+	@rm -f *.msh *.vtk *.png *.vtu *.pvtu *.pvd *.npy *.pdf *.dat *.segy *.hdf5
+	@rm -rf asn*/ bsn*/
+	@rm .coverage.*
+
+clean-data:
+	@rm -f shots/*.dat
+	@rm -f *.txt
+
+clean-output:
+	@rm -rf velocity_models/test*
+	@rm -rf results/*
+	@rm -rf control_*/ gradient*/ initial_velocity_model/ output*/ vp_end*/ test_debug*/
+
+clean: clean-pyc clean-root clean-data clean-output
 
 format:
 	autopep8 --in-place --global-config setup.cfg --recursive .
