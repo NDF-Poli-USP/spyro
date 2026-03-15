@@ -1,4 +1,4 @@
-name: build
+name: Build Firedrake main
 
 on:
   push:
@@ -17,7 +17,7 @@ concurrency:
 
 jobs:
   test:
-    name: Install and test Firedrake (Linux)
+    name: build
     runs-on: self-hosted
 
     container:
