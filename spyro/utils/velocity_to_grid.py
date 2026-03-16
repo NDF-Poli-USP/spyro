@@ -8,13 +8,13 @@ def velocity_to_grid(wave_obj, grid_spacing, output=False):
     """
     Convert velocity model to a regular grid with specified spacing.
 
-    Interpolates the velocity model from a Wave object onto a structured grid
+    Interpolates the velocity model from a :class:`Wave` object onto a structured grid
     with uniform spacing. This is useful for visualization, creating SEG-Y
     outputs, or interfacing with other software that requires regular grids.
 
     Parameters
     ----------
-    wave_obj : Wave
+    wave_obj : `spyro.Wave`
         Wave object containing the velocity model and mesh information.
     grid_spacing : float
         Desired uniform grid spacing in all dimensions (km).
@@ -93,7 +93,7 @@ def change_scalar_field_resolution(scalar_field, wave_obj, grid_spacing):
     ----------
     scalar_field : firedrake.Function
         The scalar field to be re-gridded (typically a velocity model).
-    wave_obj : Wave
+    wave_obj : spyro.Wave
         Wave object containing the original mesh parameters.
     grid_spacing : float
         Desired grid spacing (edge length) for the new structured mesh (km).
