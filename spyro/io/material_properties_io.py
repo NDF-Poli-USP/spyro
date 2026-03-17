@@ -57,53 +57,9 @@ def define_property_function_space(wave, func_space_type, dg_property,
         return point_to_dg_scalar_wave_function_space(wave)
     elif dg_property and func_space_type == "vector":
         return point_to_dg_vector_wave_function_space(wave)
-    
-    if func_space_type == "tensor" and wave.tensor_function_space is not None:
-        return wave.tensor_function_space
-    elif func_space_type == "tensor":
-        # Define the function space parameters
-        if wave.mesh_parameters.quadrilateral:  # Q_Elements
-            base_mesh = wave.mesh._base_mesh
-            base_cell = base_mesh.ufl_cell()
-            element = wave.function_space.ufl_element()
-            ele_zx = element.sub_elements[0].sub_elements[0]
-            ele_y = element.sub_elements[1].sub_elements[1]
-            zx_family = "DQ" if dg_property else ele_zx.family()
-            y_family = "DG" if dg_property else ele_y.family()
-            element_degree = (0, 0) if dg_property else element.degree()
-            variant = element.variant()
-            element_zx = fire.FiniteElement(
-                zx_family,
-                base_cell,
-                element_degree[0],
-                variant=variant,
-            )
-            element_y = fire.FiniteElement(
-                y_family,
-                fire.interval,
-                element_degree[1],
-                variant=variant,
-            )
-            tensor_element = fire.TensorProductElement(element_zx, element_y)
 
-            # Function space for the property
-            V = fire.TensorFunctionSpace(wave.mesh,
-                                         tensor_element, shape=shape_func_space)
-            wave.tensor_function_space = V
-            return V
-
-        else:  # T_Elements
-            element_family = "DG" if dg_property else \
-                wave.function_space.ufl_element().family()
-            element_degree = 0 if dg_property else \
-                wave.function_space.ufl_element().degree()
-
-            # Function space for the property
-            V = fire.TensorFunctionSpace(wave.mesh, element_family,
-                                         element_degree,
-                                         shape=shape_func_space)
-            wave.tensor_function_space = V
-            return V
+    if func_space_type == "tensor":
+        return point_to_correct_tensor_space(wave, shape_func_space, dg_property)
 
 
 def _initialize_material_property_from_ufl(wave, property_name,
@@ -527,3 +483,74 @@ def point_to_dg_vector_wave_function_space(wave):
     else:
         wave.dg0_vector_function_space = fire.VectorFunctionSpace(wave.function_space.mesh(), "DG", 0)
         return wave.dg0_vector_function_space
+
+
+def point_to_correct_tensor_space(wave, shape_func_space, is_dg):
+    if wave.tensor_function_space0 is None:
+        wave.tensor_function_space0_shape = shape_func_space
+        wave.tensor_function_space0 = set_tensor_function_space(wave, shape_func_space, is_dg)
+        return wave.tensor_function_space0
+    elif wave.tensor_function_space0_shape == shape_func_space:
+        return wave.tensor_function_space0
+    elif wave.tensor_function_space1 is None:
+        wave.tensor_function_space1_shape = shape_func_space
+        wave.tensor_function_space1 = set_tensor_function_space(wave, shape_func_space, is_dg)
+        return wave.tensor_function_space1
+    elif wave.tensor_function_space1_shape == shape_func_space:
+        return wave.tensor_function_space1
+    else:
+        tensor_function_spaces_lst = [wave.tensor_function_space0, wave.tensor_function_space1]
+        tensor_space_shapes_lst = [wave.tensor_function_space0_shape, wave.tensor_function_space1_shape]
+        for space_id in range(len(tensor_function_spaces_lst)):
+            if shape_func_space == tensor_space_shapes_lst[space_id]:
+                return tensor_function_spaces_lst[space_id]
+        raise ValueError("More than 2 tensor function spaces not yet supported")
+
+
+def set_tensor_function_space(wave, shape_func_space, is_dg):
+    if wave.mesh_parameters.quadrilateral:  # Q_Elements
+        base_mesh = wave.mesh._base_mesh
+        base_cell = base_mesh.ufl_cell()
+        element = wave.function_space.ufl_element()
+        ele_zx = element.sub_elements[0].sub_elements[0]
+        ele_y = element.sub_elements[1].sub_elements[1]
+        zx_family = "DQ" if is_dg else ele_zx.family()
+        y_family = "DG" if is_dg else ele_y.family()
+        element_degree = (0, 0) if is_dg else element.degree()
+        variant = element.variant()
+        element_zx = fire.FiniteElement(
+            zx_family,
+            base_cell,
+            element_degree[0],
+            variant=variant,
+        )
+        element_y = fire.FiniteElement(
+            y_family,
+            fire.interval,
+            element_degree[1],
+            variant=variant,
+        )
+        tensor_element = fire.TensorProductElement(element_zx, element_y)
+
+        # Function space for the property
+        V = fire.TensorFunctionSpace(
+            wave.mesh,
+            tensor_element,
+            shape=shape_func_space,
+        )
+        return V
+
+    else:  # T_Elements
+        element_family = "DG" if is_dg else \
+            wave.function_space.ufl_element().family()
+        element_degree = 0 if is_dg else \
+            wave.function_space.ufl_element().degree()
+
+        # Function space for the property
+        V = fire.TensorFunctionSpace(
+            wave.mesh,
+            element_family,
+            element_degree,
+            shape=shape_func_space,
+        )
+        return V
