@@ -128,6 +128,5 @@ def central_difference(wave, source_ids=None):
     if wave.store_forward_time_steps:
         wave.forward_solution = usol
     if wave.compute_functional:
-        print(f"Functional value: {J}")
         wave.functional_value = J
     wave.field_logger.stop_logging()

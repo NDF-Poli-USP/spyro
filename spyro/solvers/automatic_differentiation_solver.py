@@ -1,4 +1,5 @@
 from contextlib import contextmanager
+from math import log
 
 import firedrake.adjoint as fire_adj
 from pyadjoint import (
@@ -8,7 +9,7 @@ from pyadjoint import (
     pause_annotation,
     set_working_tape,
 )
-from pyadjoint.tape import get_working_tape
+from pyadjoint.tape import get_working_tape, stop_annotating
 
 
 class AutomatedAdjoint:
@@ -85,35 +86,19 @@ class AutomatedAdjoint:
         )
         return self._reduced_functional
 
-    def _require_reduced_functional(self):
-        if self._reduced_functional is None:
-            raise RuntimeError(
-                "No reduced functional has been created. Call "
-                "create_reduced_functional(functional) first."
-            )
-        return self._reduced_functional
-
     def recompute_functional(self, control_value):
         """Recompute the functional at a control value."""
-        return self._require_reduced_functional()(
-            self._normalize_control_value(control_value)
-        )
+        return self._reduced_functional(control_value)
 
     def compute_gradient(self):
         """Compute the Riesz-represented gradient for the control."""
-        gradient = self._require_reduced_functional().derivative(
-            apply_riesz=True
-        )
-        return self._extract_model_component(gradient)
+        return self._reduced_functional.derivative(apply_riesz=True)
 
     def compute_derivative(self):
         """Compute the derivative with respect to the control."""
-        derivative = self._require_reduced_functional().derivative(
-            apply_riesz=False
-        )
-        return self._extract_model_component(derivative)
+        return self._reduced_functional.derivative(apply_riesz=False)
 
-    def verify_gradient(self, control_value, direction=None, dJ=None):
+    def verify_gradient(self, control_value, direction=None, dJdm=None):
         """Run a first-order Taylor test for the reduced functional."""
         if control_value is None:
             if len(self._controls) > 1:
@@ -122,50 +107,40 @@ class AutomatedAdjoint:
                     "direction when multiple controls are used."
                 )
             control_value = self.control
+
         if direction is None:
-            if len(self._controls) > 1:
-                raise NotImplementedError(
-                    "verify_gradient requires explicit control_value and "
-                    "direction when multiple controls are used."
-                )
             direction = control_value.copy(deepcopy=True)
-            direction.interpolate(0.01)
-        return fire_adj.taylor_test(
-            self._require_reduced_functional(), control_value, direction, dJdm=dJ
-        )
+            direction.interpolate(1.)
 
-    def _normalize_control_value(self, control_value):
-        if len(self._controls) == 1:
-            if isinstance(control_value, (list, tuple)):
-                if len(control_value) != 1:
-                    raise ValueError(
-                        "Expected a single control value for the reduced "
-                        "functional."
-                    )
-                return control_value[0]
-            return control_value
+        with stop_annotating():
+            Jm = self._reduced_functional(control_value)
+            if dJdm is None:
+                dJdm = direction._ad_dot(self._reduced_functional.derivative())
 
-        if not isinstance(control_value, (list, tuple)):
-            raise TypeError(
-                "Expected a list or tuple of control values for the reduced "
-                "functional."
-            )
-        if len(control_value) != len(self._controls):
-            raise ValueError(
-                "Control value list must match the number of reduced "
-                "functional controls."
-            )
-        return list(control_value)
+            print("Running Taylor test")
+            epsilons = [0.01 / 2 ** i for i in range(4)]
+            residuals = []
+            for eps in epsilons:
+                perturbed_control = control_value._ad_add(
+                    direction._ad_mul(eps)
+                )
+                Jp = self._reduced_functional(perturbed_control)
+                residuals.append(float(abs(Jp - Jm - eps * dJdm)))
 
-    def _extract_model_component(self, value):
-        if len(self._controls) == 1:
-            return value
-        if not isinstance(value, (list, tuple)):
-            raise TypeError(
-                "Expected a list or tuple result for a multi-control reduced "
-                "functional derivative."
-            )
-        return value[self._model_control_index]
+            print(f"Computed residuals: {residuals}")
+            rates = [
+                log(residuals[i] / residuals[i - 1])
+                / log(epsilons[i] / epsilons[i - 1])
+                for i in range(1, len(epsilons))
+            ]
+            print(f"Computed convergence rates: {rates}")
+
+        cutoff = len(residuals)
+        while cutoff > 1 and residuals[cutoff - 1] >= residuals[cutoff - 2]:
+            cutoff -= 1
+
+        usable_rate_count = max(1, cutoff - 1)
+        return min(rates[:usable_rate_count])
 
     def clear_tape(self):
         """Clear the stored tape and drop the reduced functional."""

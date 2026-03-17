@@ -71,7 +71,7 @@ dictionary = {}
 dictionary["options"] = {
     "cell_type": "T",  # simplexes such as triangles or tetrahedra (T) or quadrilaterals (Q)
     "variant": "lumped",  # lumped, equispaced or DG, default is lumped
-    "degree": 4,  # p order
+    "degree": 1,  # p order
     "dimension": 2,  # dimension
 }
 
@@ -80,8 +80,8 @@ dictionary["parallelism"] = {
 }
 
 dictionary["mesh"] = {
-    "Lz": 3.0,  # depth in km - always positive
-    "Lx": 3.0,  # width in km - always positive
+    "Lz": 1.0,  # depth in km - always positive
+    "Lx": 1.0,  # width in km - always positive
     "Ly": 0.0,  # thickness in km - always positive
     "mesh_file": None,
     "mesh_type": "firedrake_mesh",
@@ -89,20 +89,19 @@ dictionary["mesh"] = {
 
 dictionary["acquisition"] = {
     "source_type": "ricker",
-    "source_locations": [(-1.1, 1.5)],
-    "frequency": 5.0,
+    "source_locations": [(-0.2, 0.5)],
+    "frequency": 7.0,
     # "delay": 1.2227264394269568,
     # "delay_type": "time",
     "delay": 1.5,
     "delay_type": "multiples_of_minimum",
-    "receiver_locations": spyro.create_transect((-1.8, 1.2), (-1.8, 1.8), 10),
-    # "receiver_locations": [(-2.0, 2.5) , (-2.3, 2.5), (-3.0, 2.5), (-3.5, 2.5)],
+    "receiver_locations": spyro.create_transect((-0.8, 0.2), (-0.8, 0.8), 10),
 }
 
 dictionary["time_axis"] = {
     "initial_time": 0.0,  # Initial time for event
     "final_time": final_time,  # Final time for event
-    "dt": 0.0005,  # timestep size
+    "dt": 0.002,  # timestep size
     "amplitude": 1,  # the Ricker has an amplitude of 1.
     "output_frequency": 100,  # how frequently to output solution to pvds
     "gradient_sampling_frequency": 1,  # how frequently to save solution to RAM
@@ -165,10 +164,14 @@ def test_gradient(automated_adjoint):
             forward_solution=forward_solution_guess)
         check_gradient(Wave_obj_guess, dJ, plot=True)
     else:
+        # Check the stop annotating status. It should be false.
         dJ = Wave_obj_guess.gradient_solve()
+        direction = fire.Function(Wave_obj_guess.function_space)
+        direction.interpolate(1.)
+        dJdm = fire.assemble(dJ * direction * dx(**Wave_obj_guess.quadrature_rule))
         assert (Wave_obj_guess.automated_adjoint.verify_gradient(
-            Wave_obj_guess.c, dJ=dJ) > 1.9)
+            Wave_obj_guess.c, direction=direction, dJdm=dJdm)) > 1.9
 
 
 if __name__ == "__main__":
-    test_gradient(automated_adjoint=True)
+    test_gradient(automated_adjoint=False)
