@@ -82,9 +82,11 @@ class Wave(Model_parameters, metaclass=ABCMeta):
         self.wave_type = WaveType.NONE
 
         self.function_space = None
-        self.dg0_function_space = None
+        self.dg0_scalar_function_space = None
+        self.dg0_vector_function_space = None
         self.scalar_function_space = None
         self.vector_function_space = None
+        self.tensor_function_space = None
         self.forward_solution_receivers = None
         self.current_time = 0.0
         self.set_solver_parameters()
