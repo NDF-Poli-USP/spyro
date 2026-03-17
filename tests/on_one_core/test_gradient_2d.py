@@ -137,7 +137,6 @@ def get_forward_model(automated_adjoint, load_true=False):
             )
         Wave_obj_exact.forward_solve()
         rec_out_exact = Wave_obj_exact.receivers_data
-
     else:
         rec_out_exact = np.load("rec_out_exact.npy")
 
@@ -150,7 +149,6 @@ def get_forward_model(automated_adjoint, load_true=False):
     else:
         Wave_obj_guess.enable_spyro_adjoint()
         Wave_obj_guess.forward_solve()
-
     return Wave_obj_guess
 
 
@@ -167,8 +165,9 @@ def test_gradient(automated_adjoint):
             forward_solution=forward_solution_guess)
         check_gradient(Wave_obj_guess, dJ, plot=True)
     else:
+        dJ = Wave_obj_guess.gradient_solve()
         assert (Wave_obj_guess.automated_adjoint.verify_gradient(
-            Wave_obj_guess.c, dJ=Wave_obj_guess.gradient_solve()) > 1.9)
+            Wave_obj_guess.c, dJ=dJ) > 1.9)
 
 
 if __name__ == "__main__":
