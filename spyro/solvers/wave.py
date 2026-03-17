@@ -481,14 +481,14 @@ class Wave(Model_parameters, metaclass=ABCMeta):
             element = self.function_space.ufl_element()
             ele_zx = element.sub_elements[0].sub_elements[0]
             ele_y = element.sub_elements[1].sub_elements[1]
-            typ_ele_zx = 'DQ' if dg_property else ele_zx.family()
-            typ_ele_y = 'DG' if dg_property else ele_y.family()
-            dgr_ele = (0, 0) if dg_property else element.degree()
+            zx_family = 'DQ' if dg_property else ele_zx.family()
+            y_family = 'DG' if dg_property else ele_y.family()
+            element_degree = (0, 0) if dg_property else element.degree()
             variant = element.variant()
-            element_zx = fire.FiniteElement(typ_ele_zx, base_cell,
-                                            dgr_ele[0], variant=variant)
-            element_y = fire.FiniteElement(typ_ele_y, fire.interval,
-                                           dgr_ele[1], variant=variant)
+            element_zx = fire.FiniteElement(zx_family, base_cell,
+                                            element_degree[0], variant=variant)
+            element_y = fire.FiniteElement(y_family, fire.interval,
+                                           element_degree[1], variant=variant)
             tensor_element = fire.TensorProductElement(element_zx, element_y)
 
             # Function space for the property
@@ -501,18 +501,18 @@ class Wave(Model_parameters, metaclass=ABCMeta):
                                              shape=shape_func_space)
 
         else:  # T_Elements
-            typ_ele = 'DG' if dg_property else \
+            element_family = 'DG' if dg_property else \
                 self.function_space.ufl_element().family()
-            dgr_ele = 0 if dg_property else \
+            element_degree = 0 if dg_property else \
                 self.function_space.ufl_element().degree()
 
             # Function space for the property
             if func_space_type == 'scalar':
-                V = fire.FunctionSpace(self.mesh, typ_ele, dgr_ele)
+                V = fire.FunctionSpace(self.mesh, element_family, element_degree)
             elif func_space_type == 'vector':
-                V = fire.VectorFunctionSpace(self.mesh, typ_ele, dgr_ele)
+                V = fire.VectorFunctionSpace(self.mesh, element_family, element_degree)
             elif func_space_type == 'tensor':
-                V = fire.TensorFunctionSpace(self.mesh, typ_ele, dgr_ele,
+                V = fire.TensorFunctionSpace(self.mesh, element_family, element_degree,
                                              shape=shape_func_space)
 
         return V
@@ -608,17 +608,17 @@ class Wave(Model_parameters, metaclass=ABCMeta):
             Material property
         """
 
-        ele_orig = self.function_space.ufl_element().family()
-        dgr_orig = self.function_space.ufl_element().degree()
-        typ_ele = V.ufl_element().family()
-        dgr_ele = V.ufl_element().degree()
+        original_family = self.function_space.ufl_element().family()
+        original_degree = self.function_space.ufl_element().degree()
+        element_family = V.ufl_element().family()
+        element_degree = V.ufl_element().degree()
 
         print(f"Assigning {property_name} with a firedrake function",
-              ("in the same" if typ_ele == ele_orig
-               and dgr_ele == dgr_orig else "in another"),
-              f"function space: {typ_ele} {dgr_ele}.", flush=True)
+              ("in the same" if element_family == original_family
+               and element_degree == original_degree else "in another"),
+              f"function space: {element_family} {element_degree}.", flush=True)
 
-        if typ_ele == ele_orig and dgr_ele == dgr_orig:
+        if element_family == original_family and element_degree == original_degree:
             # Same function space
             mat_property = fire_function
             mat_property.rename(property_name)
@@ -680,15 +680,15 @@ class Wave(Model_parameters, metaclass=ABCMeta):
             Material property
         """
 
-        ele_orig = self.function_space.ufl_element().family()
-        dgr_orig = self.function_space.ufl_element().degree()
-        typ_ele = V.ufl_element().family()
-        dgr_ele = V.ufl_element().degree()
+        original_family = self.function_space.ufl_element().family()
+        original_degree = self.function_space.ufl_element().degree()
+        element_family = V.ufl_element().family()
+        element_degree = V.ufl_element().degree()
 
         print(f"Assigning {property_name} from file {from_file}",
-              ("in the same" if typ_ele == ele_orig
-               and dgr_ele == dgr_orig else "in another"),
-              f"function space: {typ_ele} {dgr_ele}.", flush=True)
+              ("in the same" if element_family == original_family
+               and element_degree == original_degree else "in another"),
+              f"function space: {element_family} {element_degree}.", flush=True)
 
         if from_file.endswith(".segy"):
             if not SEISMIC_MESH_AVAILABLE:
@@ -696,7 +696,6 @@ class Wave(Model_parameters, metaclass=ABCMeta):
                     "SeismicMesh is required to convert segy files.")
 
             mp_filename, mp_filetype = splitext(from_file)
-            warnings.warn("Converting segy file to hdf5")
             # ToDo: Change method name
             write_velocity_model(from_file, ofname=mp_filename)
             from_file = mp_filename + ".hdf5"
