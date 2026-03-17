@@ -93,7 +93,7 @@ def define_property_function_space(wave, func_space_type, dg_property,
 	return V
 
 
-def _initialize_material_prop_from_ufl(wave, property_name,
+def _initialize_material_property_from_ufl(wave, property_name,
 									   func_space_type, V,
 									   shape_func_space=None,
 									   constant=None,
@@ -165,7 +165,7 @@ def _initialize_material_prop_from_ufl(wave, property_name,
 	return mat_property
 
 
-def _initialize_material_prop_from_func(wave, property_name,
+def _initialize_material_property_from_func(wave, property_name,
 										fire_function, V):
 	"""
 	Initialize material property from a firedrake function.
@@ -240,7 +240,7 @@ def _initialize_random_material_prop(property_name, random, V):
 	return mat_property
 
 
-def _initialize_material_prop_from_file(wave, property_name, from_file, V):
+def _initialize_material_property_from_file(wave, property_name, from_file, V):
 	"""
 	Initialize material property from a file.
 
@@ -424,7 +424,7 @@ def set_material_property(wave, property_name, func_space_type,
 	if func_space_type == "scalar":
 
 		if any(v is not None for v in val_lst[:3]):  # UFL
-			mat_property = _initialize_material_prop_from_ufl(
+			mat_property = _initialize_material_property_from_ufl(
 				wave, property_name, func_space_type, V, constant=constant,
 				conditional=conditional, expression=expression)
 
@@ -433,14 +433,14 @@ def set_material_property(wave, property_name, func_space_type,
 				property_name, random, V)
 
 		if fire_function is not None:
-			mat_property = _initialize_material_prop_from_func(
+			mat_property = _initialize_material_property_from_func(
 				wave, property_name, fire_function, V)
 
 		if from_file is not None:
 			raise NotImplementedError("Initializing property "
 									  "from file is currently "
 									  "not implemented")
-			# mat_property = _initialize_material_prop_from_file(
+			# mat_property = _initialize_material_property_from_file(
 			#     wave, property_name, from_file, V)
 
 	else:
@@ -452,14 +452,14 @@ def set_material_property(wave, property_name, func_space_type,
 			  "name followed by the component at the end.")
 
 		if constant is not None:
-			mat_property = _initialize_material_prop_from_ufl(
+			mat_property = _initialize_material_property_from_ufl(
 				wave, property_name, func_space_type, V,
 				shape_func_space=shape_func_space,
 				constant=constant, conditional=None,
 				expression=None)
 
 		if fire_function is not None:
-			mat_property = _initialize_material_prop_from_func(
+			mat_property = _initialize_material_property_from_func(
 				wave, property_name, fire_function, V)
 
 	if output:
