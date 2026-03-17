@@ -13,3 +13,10 @@ class WaveType(Enum):
     NONE = 0
     ISOTROPIC_ACOUSTIC = 1
     ISOTROPIC_ELASTIC = 2
+
+
+class AdjointType(Enum):
+    """Enum for the type of adjoint solver to use."""
+    NONE = 0
+    AUTOMATED_ADJOINT = 1
+    SPYRO_ADJOINT = 2

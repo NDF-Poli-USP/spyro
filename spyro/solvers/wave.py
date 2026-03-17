@@ -1,9 +1,11 @@
 from abc import abstractmethod, ABCMeta
+import sys
 import warnings
 import firedrake as fire
-from firedrake import sin, cos, pi, tanh, sqrt  # noqa: F401
+from .automatic_differentiation_solver import AutomatedAdjoint
 
-from .time_integration_central_difference import central_difference as time_integrator
+from .time_integration_central_difference import (
+    central_difference as time_integrator)
 from ..domains.quadrature import quadrature_rules
 from ..io import Model_parameters
 from ..io.basicio import ensemble_propagator
@@ -11,7 +13,7 @@ from ..io.field_logger import FieldLogger
 from .. import utils
 from ..receivers.Receivers import Receivers
 from ..sources.Sources import Sources
-from ..utils.typing import WaveType
+from ..utils.typing import WaveType, AdjointType
 from .solver_parameters import get_default_parameters_for_method
 
 fire.set_log_level(fire.ERROR)
@@ -21,71 +23,95 @@ class Wave(Model_parameters, metaclass=ABCMeta):
     """
     Base class for wave equation solvers.
 
-    Attributes:
-    -----------
-    comm: MPI communicator
+    Attributes
+    ----------
+    comm : MPI communicator
+        Communicator used by the solver.
+    initial_velocity_model : firedrake.Function or None
+        Initial velocity model used to initialize ``c``.
+    function_space : firedrake.FunctionSpace or None
+        Function space used by the wave equation.
+    current_time : float
+        Current simulation time.
+    solver_parameters : dict
+        Solver options for linear/nonlinear solves.
+    real_shot_record : list or numpy.ndarray or None
+        Observed receiver data used in inversion workflows.
+    mesh : firedrake.Mesh or None
+        Mesh used in the simulation (2D or 3D).
+    sources : Sources or None
+        Source manager.
+    receivers : Receivers or None
+        Receiver manager.
+    adjoint_type : AdjointType
+        Active adjoint mode (none, Spyro adjoint, or automated adjoint).
 
-    initial_velocity_model: firedrake function
-        Initial velocity model
-    function_space: firedrake function space
-        Function space for the wave equation
-    current_time: float
-        Current time of the simulation
-    solver_parameters: Python object
-        Contains solver parameters
-    real_shot_record: firedrake function
-        Real shot record
-    mesh: firedrake mesh
-        Mesh used in the simulation (2D or 3D)
-    mesh_z: symbolic coordinate z of the mesh object
-    mesh_x: symbolic coordinate x of the mesh object
-    mesh_y: symbolic coordinate y of the mesh object
-    sources: Sources object
-        Contains information about sources
-    receivers: Receivers object
-        Contains information about receivers
-
-    Methods:
-    --------
-    set_mesh()
-        Sets or calculates new mesh
-    set_solver_parameters()
-        Sets new or default solver parameters
-    get_spatial_coordinates()
-        Returns spatial coordinates of mesh
-    set_initial_velocity_model()
-        Ssets initial velocity model
-    get_and_set_maximum_dt()
-        Calculates and/or sets maximum dt
-    get_mass_matrix_diagonal()
-        Returns diagonal of mass matrix
+    Methods
+    -------
+    set_mesh(...)
+        Set or rebuild the mesh and dependent objects.
+    set_solver_parameters(...)
+        Set custom solver parameters or defaults.
+    set_initial_velocity_model(...)
+        Set the initial velocity model.
+    forward_solve()
+        Build operators and propagate the forward wave.
+    enable_automated_adjoint()
+        Enable Firedrake automated adjoint mode.
+    enable_spyro_adjoint()
+        Enable Spyro native adjoint mode.
+    get_and_set_maximum_dt(...)
+        Estimate and set a stable time step.
     set_last_solve_as_real_shot_record()
-        Sets last solve as real shot record
+        Store the last simulated data as observed data.
     """
 
-    def __init__(self, dictionary=None, comm=None):
-        """Wave object solver. Contains both the forward solver
-        and gradient calculator methods.
+    def __init__(self, dictionary=None, comm=None, real_shot_record=None):
+        """Initialize a wave solver with forward and adjoint capabilities.
 
-        Parameters:
-        -----------
-        comm: MPI communicator
+        Parameters
+        ----------
+        dictionary : dict, optional
+            Input model dictionary with options, mesh, acquisition,
+            parallelism, time-axis, and visualization entries.
+        comm : MPI communicator, optional
+            Communicator used to build distributed solver objects.
+        real_shot_record : list or numpy.ndarray, optional
+            Receiver data to be used in inversion workflows. This data can
+            come from a previous forward simulation or from field measurements.
+            If not provided, it can be set later using the ``real_shot_record``
+            property setter.
 
-        model_parameters: Python object
-            Contains model parameters
+        Notes
+        -----
+        Initializes core state (mesh, function space, sources/receivers,
+        logging hooks, and adjoint mode flags).
         """
         super().__init__(dictionary=dictionary, comm=comm)
         self.initial_velocity_model = None
         self.wave_type = WaveType.NONE
 
         self.function_space = None
-        self.forward_solution_receivers = None
+        self.lhs = None
+        self.rhs = None
+        self.forward_solution = None
+        self.receivers_data = None
         self.current_time = 0.0
         self.set_solver_parameters()
 
         self.mesh = self.get_mesh()
         self.c = None
         self.sources = None
+        self._compute_functional = False
+        self._functional_value = None
+
+        self.current_sources = None
+        self.automated_adjoint = False
+        self._store_misfit = False
+        self._real_shot_record = real_shot_record
+        self.store_forward_time_steps = False
+        self.adjoint_type = AdjointType.NONE
+        self.misfit = None
         if self.mesh is not None:
             self._build_function_space()
             self._map_sources_and_receivers()
@@ -105,9 +131,14 @@ class Wave(Model_parameters, metaclass=ABCMeta):
                                     lambda: self.get_function())
 
     def forward_solve(self):
-        """Solves the forward problem."""
+        """Solve one forward wave simulation.
 
-        print("\nSolving Forward Problem")
+        Ensures a valid function space and model parameters are available,
+        builds the solver operators, and advances the wavefield in time.
+        """
+
+        if "-s" in sys.argv or bool(sys.flags.no_user_site):
+            print("\nSolving Forward Problem")
 
         if self.function_space is None:
             self.force_rebuild_function_space()
@@ -331,7 +362,7 @@ class Wave(Model_parameters, metaclass=ABCMeta):
     def set_last_solve_as_real_shot_record(self):
         if self.current_time == 0.0:
             raise ValueError("No previous solve to set as real shot record.")
-        self.real_shot_record = self.forward_solution_receivers
+        self._real_shot_record = self.receivers_data
 
     @abstractmethod
     def _set_vstate(self, vstate):
@@ -387,35 +418,35 @@ class Wave(Model_parameters, metaclass=ABCMeta):
         pass
 
     @ensemble_propagator
-    def wave_propagator(self, dt=None, final_time=None, source_nums=[0]):
-        """Propagates the wave forward in time.
-        Currently uses central differences.
+    def wave_propagator(self, dt=None, final_time=None, source_nums=None):
+        """Propagate the wavefield forward in time.
 
-        Parameters:
-        -----------
-        dt: Python 'float' (optional)
-            Time step to be used explicitly. If not mentioned uses the default,
-            that was estabilished in the wave object.
-        final_time: Python 'float' (optional)
-            Time which simulation ends. If not mentioned uses the default,
-            that was estabilished in the wave object.
+        Parameters
+        ----------
+        dt : float, optional
+            Time step to use for this propagation.
+            If omitted, uses ``self.dt``.
+        final_time : float, optional
+            Final simulation time.
+            If omitted, uses ``self.final_time``.
+        source_nums : list[int], optional
+            Source indices to activate during this propagation. When ``None``,
+            defaults to ``[0]``.
 
-        Returns:
-        --------
-        usol: Firedrake 'Function'
-            Wavefield at the final time.
-        u_rec: numpy array
-            Wavefield at the receivers across the timesteps.
+        Notes
+        -----
+        This method is wrapped by ``ensemble_propagator`` to support ensemble
+        and spatial source parallelism.
         """
+        if source_nums is None:
+            source_nums = [0]
         if final_time is not None:
             self.final_time = final_time
         if dt is not None:
             self.dt = dt
 
         self.current_sources = source_nums
-        usol, usol_recv = time_integrator(self, source_nums)
-
-        return usol, usol_recv
+        time_integrator(self, source_nums)
 
     def get_dt(self):
         return self._dt
@@ -434,3 +465,72 @@ class Wave(Model_parameters, metaclass=ABCMeta):
         the DOFs associated with the subspace of the original problem).
         '''
         pass
+
+    def enable_automated_adjoint(self):
+        """Enable the automated adjoint from the Firedrake adjoint module."""
+        control = self.c if self.c is not None else self.initial_velocity_model
+        if control is None:
+            raise ValueError(
+                "Set an initial velocity model before enabling the adjoint."
+            )
+        self.automated_adjoint = AutomatedAdjoint(control)
+        self.use_vertex_only_mesh = True
+        self._compute_functional = True
+        self.store_forward_time_steps = False
+        self.adjoint_type = AdjointType.AUTOMATED_ADJOINT
+
+    def enable_spyro_adjoint(self):
+        """Enable the Spyro implemented adjoint."""
+        self.automated_adjoint = False
+        self._compute_functional = True
+        self.enable_store_misfit()
+        self.store_forward_time_steps = True
+        self.adjoint_type = AdjointType.SPYRO_ADJOINT
+
+    @property
+    def real_shot_record(self):
+        """Returns the real shot record."""
+        return self._real_shot_record
+
+    @real_shot_record.setter
+    def real_shot_record(self, real_data):
+        """Set the real shot record.
+
+        Parameters
+        ----------
+        real_data : list of firedrake functions or numpy arrays
+            The real shot record data to be set.
+        """
+        self._real_shot_record = real_data
+
+    @property
+    def compute_functional(self):
+        """Return whether the computation of the cost functional is enabled."""
+        return self._compute_functional
+
+    def enable_compute_functional(self):
+        """Enable the computation of the cost functional during wave propagation."""
+        self._compute_functional = True
+
+    @property
+    def store_misfit(self):
+        """Return whether the storage of the misfit is enabled."""
+        return self._store_misfit
+
+    def enable_store_misfit(self):
+        """Enable the storage of the misfit at each time step during wave propagation."""
+        self._store_misfit = True
+
+    def disable_store_misfit(self):
+        """Disable the storage of the misfit at each time step during wave propagation."""
+        self._store_misfit = False
+
+    @property
+    def functional_value(self):
+        """Returns the current value of the cost functional."""
+        return self._functional_value
+
+    @functional_value.setter
+    def functional_value(self, value):
+        """Set the value of the cost functional."""
+        self._functional_value = value

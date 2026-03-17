@@ -16,7 +16,7 @@ from .backward_time_integration import (
     backward_wave_propagator,
 )
 from ..domains.space import create_function_space
-from ..utils.typing import override, WaveType
+from ..utils.typing import override, WaveType, AdjointType
 from .functionals import acoustic_energy
 
 try:
@@ -27,8 +27,10 @@ except ImportError:
 
 
 class AcousticWave(Wave):
-    def __init__(self, dictionary, comm=None):
-        super().__init__(dictionary, comm=comm)
+    """Acoustic wave solver with forward and adjoint capabilities."""
+    def __init__(self, dictionary, comm=None, real_shot_record=None):
+        super().__init__(
+            dictionary, comm=comm, real_shot_record=real_shot_record)
         self.wave_type = WaveType.ISOTROPIC_ACOUSTIC
 
         self.acoustic_energy = None
@@ -77,7 +79,7 @@ class AcousticWave(Wave):
         self.acoustic_energy = acoustic_energy(self)
 
     @ensemble_gradient
-    def gradient_solve(self, guess=None, misfit=None, forward_solution=None):
+    def gradient_solve(self, guess=None, forward_solution=None):
         """Solves the adjoint problem to calculate de gradient.
 
         Parameters:
@@ -91,14 +93,21 @@ class AcousticWave(Wave):
         dJ: Firedrake 'Function'
             Gradient of the cost functional.
         """
-        if misfit is not None:
-            self.misfit = misfit
-        elif self.current_time == 0.0:
-            self.forward_solve()
-            self.misfit = self.real_shot_record - self.forward_solution_receivers
+        if self.adjoint_type == AdjointType.SPYRO_ADJOINT:
+            if self.misfit is None:
+                self.forward_solve()
+            return backward_wave_propagator(self)
+        elif self.adjoint_type == AdjointType.AUTOMATED_ADJOINT:
+            if self.automated_adjoint.reduced_functional is None:
+                self.forward_solve()
+                self.automated_adjoint.create_reduced_functional(
+                    self.functional_value
+                )
+            else:
+                self.automated_adjoint.recompute_functional(self.c)
+            return self.automated_adjoint.compute_gradient()
         else:
-            raise ValueError("Please load or calculate a real shot record first")
-        return backward_wave_propagator(self)
+            raise ValueError("Adjoint type not recognized. Set wave.adjoint_type to a valid value.")
 
     def reset_pressure(self):
         try:

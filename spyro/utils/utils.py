@@ -39,21 +39,40 @@ def butter_lowpass_filter(shot, cutoff, fs, order=2):
 
 
 @ensemble_functional
-def compute_functional(Wave_object, residual):
-    """Compute the functional to be optimized.
-    Accepts the velocity optionally and uses
-    it if regularization is enabled
+def compute_functional(Wave_object, residual, step, nsteps):
+    """Compute the functional contribution at one time step.
+
+    Parameters
+    ----------
+    Wave_object: Spyro wave object
+        The wave object containing the necessary data and parameters.
+    residual: Firedrake function or numpy array
+        The residual at the current time step.
+    step: int
+        The current time step index.
+    nsteps: int
+        The total number of time steps.
+
+    Returns
+    -------
+    float
+        The contribution to the functional from the current time step.
     """
-    num_receivers = Wave_object.number_of_receivers
     dt = Wave_object.dt
+    weight = 0.5 if step == 0 or step == nsteps - 1 else 1.0
 
-    J = 0
-    for rn in range(num_receivers):
-        J += np.trapezoid(residual[:, rn] ** 2, dx=dt)
+    if Wave_object.use_vertex_only_mesh:
+        return assemble(0.5 * dt * weight * inner(residual, residual) * dx)
 
-    J *= 0.5
-
-    return J
+    else:
+        residual_array = np.asarray(residual)
+        if residual_array.ndim != 1:
+            raise ValueError(
+                "Expected one residual vector with shape "
+                "(num_receivers,) for the current time step."
+            )
+        g_n = np.sum(residual_array**2)
+        return g_n * (0.5 * dt * weight)
 
 
 def evaluate_misfit(model, guess, exact):
