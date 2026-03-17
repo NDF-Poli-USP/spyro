@@ -49,11 +49,18 @@ def define_property_function_space(wave, func_space_type, dg_property,
                                                opts_func_space_type)
 
     if dg_property is False and func_space_type == "scalar":
-        return scalar_point_to_wave_function_space(wave)
+        return point_to_scalar_wave_function_space(wave)
     elif dg_property is False and func_space_type == "vector":
-        return vector_point_to_wave_function_space(wave)
+        return point_to_vector_wave_function_space(wave)
 
-    if dg_property or func_space_type == "tensor":
+    if dg_property and func_space_type == "scalar":
+        return point_to_dg_scalar_wave_function_space(wave)
+    elif dg_property and func_space_type == "vector":
+        return point_to_dg_vector_wave_function_space(wave)
+    
+    if func_space_type == "tensor" and wave.tensor_function_space is not None:
+        return wave.tensor_function_space
+    elif func_space_type == "tensor":
         # Define the function space parameters
         if wave.mesh_parameters.quadrilateral:  # Q_Elements
             base_mesh = wave.mesh._base_mesh
@@ -80,13 +87,10 @@ def define_property_function_space(wave, func_space_type, dg_property,
             tensor_element = fire.TensorProductElement(element_zx, element_y)
 
             # Function space for the property
-            if func_space_type == "scalar":
-                V = fire.FunctionSpace(wave.mesh, tensor_element)
-            elif func_space_type == "vector":
-                V = fire.VectorFunctionSpace(wave.mesh, tensor_element)
-            elif func_space_type == "tensor":
-                V = fire.TensorFunctionSpace(wave.mesh,
-                                             tensor_element, shape=shape_func_space)
+            V = fire.TensorFunctionSpace(wave.mesh,
+                                         tensor_element, shape=shape_func_space)
+            wave.tensor_function_space = V
+            return V
 
         else:  # T_Elements
             element_family = "DG" if dg_property else \
@@ -95,17 +99,11 @@ def define_property_function_space(wave, func_space_type, dg_property,
                 wave.function_space.ufl_element().degree()
 
             # Function space for the property
-            if func_space_type == "scalar":
-                V = fire.FunctionSpace(wave.mesh, element_family, element_degree)
-            elif func_space_type == "vector":
-                V = fire.VectorFunctionSpace(wave.mesh, element_family,
-                                             element_degree)
-            elif func_space_type == "tensor":
-                V = fire.TensorFunctionSpace(wave.mesh, element_family,
-                                             element_degree,
-                                             shape=shape_func_space)
-
-    return V
+            V = fire.TensorFunctionSpace(wave.mesh, element_family,
+                                         element_degree,
+                                         shape=shape_func_space)
+            wave.tensor_function_space = V
+            return V
 
 
 def _initialize_material_property_from_ufl(wave, property_name,
@@ -489,7 +487,7 @@ def set_material_properties(wave, *args, **kwargs):
     return set_material_property(wave, *args, **kwargs)
 
 
-def scalar_point_to_wave_function_space(wave):
+def point_to_scalar_wave_function_space(wave):
     # Check if wave.function_space is a generates vector os scalar fields:
     original_function_space_type = check_function_space_type(wave.function_space)
     if wave.scalar_function_space is not None:
@@ -503,7 +501,7 @@ def scalar_point_to_wave_function_space(wave):
         raise ValueError(f"Should not create a new FunctionSpace from {original_function_space_type}")
 
 
-def vector_point_to_wave_function_space(wave):
+def point_to_vector_wave_function_space(wave):
     # Check if wave.function_space is a generates vector os scalar fields:
     original_function_space_type = check_function_space_type(wave.function_space)
     if wave.vector_function_space is not None:
@@ -513,3 +511,19 @@ def vector_point_to_wave_function_space(wave):
         return wave.vector_function_space
     else:
         raise ValueError(f"Should not create a new VectorFunctionSpace from {original_function_space_type}")
+
+
+def point_to_dg_scalar_wave_function_space(wave):
+    if wave.dg0_scalar_function_space is not None:
+        return wave.dg0_scalar_function_space
+    else:
+        wave.dg0_scalar_function_space = fire.FunctionSpace(wave.function_space.mesh(), "DG", 0)
+        return wave.dg0_scalar_function_space
+
+
+def point_to_dg_vector_wave_function_space(wave):
+    if wave.dg0_vector_function_space is not None:
+        return wave.dg0_vector_function_space
+    else:
+        wave.dg0_vector_function_space = fire.VectorFunctionSpace(wave.function_space.mesh(), "DG", 0)
+        return wave.dg0_vector_function_space
