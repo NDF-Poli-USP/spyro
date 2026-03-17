@@ -163,13 +163,13 @@ def test_constant_mat_prop(wave_instance, cell_type):
                     gammaTh_o, deltaTh_o, thetaTTI_o, phiTTI_o]
 
     print("\nTesting Constant Material Properties", flush=True)
-    for prop_name, constant in zip(scalar_mat_prop, constant_lst):
+    for property_name, constant in zip(scalar_mat_prop, constant_lst):
         try:
             mat_property = Wave_obj.set_material_property(
-                prop_name, 'scalar', constant=constant,
+                property_name, 'scalar', constant=constant,
                 output=True, foldername='/property_fields/constant/')
 
-            assert mat_property is not None, f"Failed to set {prop_name}"
+            assert mat_property is not None, f"Failed to set {property_name}"
 
             # Get the mean value function to verify
             dx = fire.dx(**Wave_obj.quadrature_rule)
@@ -180,12 +180,12 @@ def test_constant_mat_prop(wave_instance, cell_type):
             mean_val = fire.assemble(mat_property * dx) / volume
 
             assert np.isclose(mean_val, constant, rtol=1e-8), \
-                f"{prop_name}: Expected value {constant}, got {mean_val}"
-            print(f"{prop_name} Verified: expected "
+                f"{property_name}: Expected value {constant}, got {mean_val}"
+            print(f"{property_name} Verified: expected "
                   f"{constant}, got = {round(mean_val, 10)}", flush=True)
 
         except fire.ConvergenceError as e:
-            pytest.fail(f"Setting {prop_name} raised an exception: {str(e)}")
+            pytest.fail(f"Setting {property_name} raised an exception: {str(e)}")
 
 
 @pytest.mark.parametrize("cell_type", ["T", "Q"])
@@ -215,13 +215,13 @@ def test_random_mat_prop(wave_instance, cell_type):
                   (0.2, 0.4), (-0.1, 0.2), (-60, 60), (-15, 15)]
 
     print("\nTesting Random Material Properties", flush=True)
-    for prop_name, random in zip(scalar_mat_prop, random_lst):
+    for property_name, random in zip(scalar_mat_prop, random_lst):
         try:
             mat_property = Wave_obj.set_material_property(
-                prop_name, 'scalar', random=random,
+                property_name, 'scalar', random=random,
                 output=True, foldername='/property_fields/random/')
 
-            assert mat_property is not None, f"Failed to set {prop_name}"
+            assert mat_property is not None, f"Failed to set {property_name}"
 
             # Verify values are within range
             mat_property_data = mat_property.dat.data_with_halos
@@ -229,19 +229,19 @@ def test_random_mat_prop(wave_instance, cell_type):
             max_val = random[1]
 
             assert np.all(mat_property_data >= min_val - 1e-8), \
-                f"Values below minimum {min_val} for {prop_name}"
-            print(f"{prop_name} Verified: Values "
+                f"Values below minimum {min_val} for {property_name}"
+            print(f"{property_name} Verified: Values "
                   f">= minimum {min_val}", flush=True)
             assert np.all(mat_property_data <= max_val + 1e-8), \
-                f"Values above maximum {max_val} for {prop_name}"
-            print(f"{prop_name} Verified: Values "
+                f"Values above maximum {max_val} for {property_name}"
+            print(f"{property_name} Verified: Values "
                   f"<= maximum {max_val}", flush=True)
 
         except fire.ConvergenceError as e:
-            pytest.fail(f"Setting {prop_name} raised an exception: {str(e)}")
+            pytest.fail(f"Setting {property_name} raised an exception: {str(e)}")
 
 
-def numerical_values_cond(prop_name, coords, below_thrs, above_thrs):
+def numerical_values_cond(property_name, coords, below_thrs, above_thrs):
     '''
     Compute the expected numerical values for the conditional material
     property based on the provided coordinates and property name.
@@ -268,28 +268,28 @@ def numerical_values_cond(prop_name, coords, below_thrs, above_thrs):
     x = coords[:, 1]
     y = coords[:, 2]
 
-    if prop_name == 'vel_P':
+    if property_name == 'vel_P':
         exp_below = 2. + abs(z[below_thrs])
         exp_above = 1.5
-    elif prop_name == 'vel_S':
+    elif property_name == 'vel_S':
         exp_below = (2. + abs(z[below_thrs])) / 2.5
         exp_above = 0.75
-    elif prop_name == 'mass_rho':
+    elif property_name == 'mass_rho':
         exp_below = 1.7e3 + 3e3 * abs(z[below_thrs]) ** 2
         exp_above = 1e3
-    elif prop_name == 'epsilonTh':
+    elif property_name == 'epsilonTh':
         exp_below = np.exp(x[below_thrs]) / 10.
         exp_above = 0.15 * np.exp(x[above_thrs])
-    elif prop_name == 'gammaTh':
+    elif property_name == 'gammaTh':
         exp_below = 2.5 * np.exp(x[below_thrs]) / 10.
         exp_above = np.exp(x[above_thrs]) / 10.
-    elif prop_name == 'deltaTh':
+    elif property_name == 'deltaTh':
         exp_below = -np.exp(x[below_thrs]) / 20.
         exp_above = np.exp(x[above_thrs]) / 10.
-    elif prop_name == 'thetaTTI':
+    elif property_name == 'thetaTTI':
         exp_below = 1e4 * (y[below_thrs] - 0.08)**2 / 2. - 2.
         exp_above = -(1e4 * (y[above_thrs] - 0.08)**2 / 2. - 2.)
-    elif prop_name == 'phiTTI':
+    elif property_name == 'phiTTI':
         exp_below = -1e4 * (y[below_thrs] - 0.08)**2 / 2. + 2.
         exp_above = -(-1e4 * (y[above_thrs] - 0.08)**2 / 2. + 2.)
 
@@ -375,52 +375,52 @@ def test_conditional_mat_prop(wave_instance, cell_type):
     coords, mask_pnt = get_only_mesh_vertices(Wave_obj)
 
     print("\nTesting Conditional Material Properties", flush=True)
-    for prop_name, cond_field in zip(scalar_mat_prop, cond_lst):
+    for property_name, cond_field in zip(scalar_mat_prop, cond_lst):
         try:
             mat_property = Wave_obj.set_material_property(
-                prop_name, 'scalar', conditional=cond_field,
+                property_name, 'scalar', conditional=cond_field,
                 output=True, foldername='/property_fields/conditional/')
 
-            assert mat_property is not None, f"Failed to set {prop_name}"
+            assert mat_property is not None, f"Failed to set {property_name}"
 
-            threshold = threshold_dict[prop_name]
+            threshold = threshold_dict[property_name]
 
-            if prop_name in ['vel_P', 'vel_S', 'mass_rho']:
+            if property_name in ['vel_P', 'vel_S', 'mass_rho']:
                 below_thrs = coords[:, 0] < threshold
                 above_thrs = coords[:, 0] >= threshold
                 coord_thrs = 'z'
 
-            if prop_name in ['epsilonTh', 'gammaTh', 'deltaTh']:
+            if property_name in ['epsilonTh', 'gammaTh', 'deltaTh']:
                 below_thrs = coords[:, 1] < threshold
                 above_thrs = coords[:, 1] >= threshold
                 coord_thrs = 'x'
 
-            if prop_name in ['thetaTTI', 'phiTTI']:
+            if property_name in ['thetaTTI', 'phiTTI']:
                 below_thrs = coords[:, 2] < threshold
                 above_thrs = coords[:, 2] >= threshold
                 coord_thrs = 'y'
 
             exp_below, exp_above = numerical_values_cond(
-                prop_name, coords, below_thrs, above_thrs)
+                property_name, coords, below_thrs, above_thrs)
             cnd_below = mat_property.dat.data_with_halos[mask_pnt][below_thrs]
             cnd_above = mat_property.dat.data_with_halos[mask_pnt][above_thrs]
 
             assert np.allclose(exp_below, cnd_below, rtol=1e-8), \
-                f"Values does not match for {prop_name}" + \
+                f"Values does not match for {property_name}" + \
                 f" for {coord_thrs} < {threshold}"
-            print(f"{prop_name} Verified: Conditional values "
+            print(f"{property_name} Verified: Conditional values "
                   f"{coord_thrs} < {threshold}", flush=True)
             assert np.allclose(exp_above, cnd_above, rtol=1e-8), \
-                f"Values does not match for {prop_name}" + \
+                f"Values does not match for {property_name}" + \
                 f" for {coord_thrs} >= {threshold}"
-            print(f"{prop_name} Verified: Conditional values "
+            print(f"{property_name} Verified: Conditional values "
                   f"{coord_thrs} >= {threshold}", flush=True)
 
         except fire.ConvergenceError as e:
-            pytest.fail(f"Setting {prop_name} raised an exception: {str(e)}")
+            pytest.fail(f"Setting {property_name} raised an exception: {str(e)}")
 
 
-def numerical_values_expr(prop_name, coords):
+def numerical_values_expr(property_name, coords):
     '''
     Compute the expected numerical values for the expression material
     property based on the provided coordinates and property name.
@@ -441,21 +441,21 @@ def numerical_values_expr(prop_name, coords):
     x = coords[:, 1]
     y = coords[:, 2]
 
-    if prop_name == 'vel_P':
+    if property_name == 'vel_P':
         exp_num = 1.5e3 * (1 + np.sqrt(x**2 + y**2 + z**2))
-    elif prop_name == 'vel_S':
+    elif property_name == 'vel_S':
         exp_num = 1e3 * (0.7 + np.sqrt(x**2 + y**2 + z**2))
-    elif prop_name == 'mass_rho':
+    elif property_name == 'mass_rho':
         exp_num = 1e3 * (1 + 5 * np.log(1 + x**2 + y**2 + z**2))
-    elif prop_name == 'epsilonTh':
+    elif property_name == 'epsilonTh':
         exp_num = np.sin(x) * np.cos(y) / 4 + np.sin(y) * np.cos(z) / 3 + 0.1
-    elif prop_name == 'gammaTh':
+    elif property_name == 'gammaTh':
         exp_num = np.sin(y) * np.cos(z) / 4 + np.sin(z) * np.cos(x) / 3 + 0.3
-    elif prop_name == 'deltaTh':
+    elif property_name == 'deltaTh':
         exp_num = np.sin(z) * np.cos(x) / 2 + np.sin(x) * np.cos(y) / 3 + 0.02
-    elif prop_name == 'thetaTTI':
+    elif property_name == 'thetaTTI':
         exp_num = np.atan2(np.abs(z), x) * 180 / np.pi - 45
-    elif prop_name == 'phiTTI':
+    elif property_name == 'phiTTI':
         d = 1e-16  # Small constant to avoid division by zero
         f = 180 / np.pi
         exp_num = f * np.acos(y / (np.sqrt(x**2 + y**2 + z**2) + d)) - 45
@@ -499,23 +499,23 @@ def test_expression_mat_prop(wave_instance, cell_type):
     coords, mask_pnt = get_only_mesh_vertices(Wave_obj)
 
     print("\nTesting Expression as Material Properties", flush=True)
-    for prop_name, expr_field in zip(scalar_mat_prop, expr_lst):
+    for property_name, expr_field in zip(scalar_mat_prop, expr_lst):
         try:
             mat_property = Wave_obj.set_material_property(
-                prop_name, 'scalar', expression=expr_field,
+                property_name, 'scalar', expression=expr_field,
                 output=True, foldername='/property_fields/expression/')
 
-            assert mat_property is not None, f"Failed to set {prop_name}"
+            assert mat_property is not None, f"Failed to set {property_name}"
 
-            exp_exp = numerical_values_expr(prop_name, coords)
+            exp_exp = numerical_values_expr(property_name, coords)
             val_exp = mat_property.dat.data_with_halos[mask_pnt]
 
             assert np.allclose(val_exp, exp_exp, rtol=1e-8), \
-                f"Values of the expression does not match for {prop_name}"
-            print(f"{prop_name} Verified: Expression values", flush=True)
+                f"Values of the expression does not match for {property_name}"
+            print(f"{property_name} Verified: Expression values", flush=True)
 
         except fire.ConvergenceError as e:
-            pytest.fail(f"Setting {prop_name} raised an exception: {str(e)}")
+            pytest.fail(f"Setting {property_name} raised an exception: {str(e)}")
 
 
 def get_coords_DG0(Wave_obj, coords):
