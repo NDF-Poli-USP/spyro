@@ -7,6 +7,7 @@ generation based on wavelength constraints.
 
 import warnings
 import os
+from ..utils.error_management import value_parameter_error
 
 
 def cells_per_wavelength(method, degree, dimension):
@@ -511,11 +512,9 @@ class MeshingParameters():
             'SeismicMesh' is selected with quadrilateral elements
             (not supported).
         """
-        allowed_types = {"firedrake_mesh", "user_mesh", "SeismicMesh", "file", "spyro_mesh"}
+        allowed_types = ["firedrake_mesh", "user_mesh", "SeismicMesh", "file", "spyro_mesh"]
         if value is not None and value not in allowed_types:
-            raise ValueError(
-                f"mesh_type must be one of {allowed_types}, got '{value}'"
-            )
+            value_parameter_error("mesh_type", value, allowed_types)
         if value == "SeismicMesh" and self.quadrilateral:
             raise ValueError("SeismicMesh does not work with quads.")
         self._mesh_type = value
