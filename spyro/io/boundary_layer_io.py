@@ -1,3 +1,4 @@
+from spyro.utils.error_management import value_parameter_error
 # # Specify a 250-m PML on the three sides of the
 # # domain to damp outgoing waves.
 # default_dictionary["absorving_boundary_conditions"] = {
@@ -72,6 +73,7 @@ class Read_boundary_layer:
         self.abc_pad_length = self.input_dictionary[
             "absorving_boundary_conditions"]["pad_length"]
 
+        # Absorbing boundaries
         self.absorb_top = self.input_dictionary[
             "absorving_boundary_conditions"].get("absorb_top", False)
         self.absorb_bottom = self.input_dictionary[
@@ -99,11 +101,12 @@ class Read_boundary_layer:
             None,
         ]
         if value not in accepted_damping_types:
-            raise ValueError(f"Damping type of {value} not recognized.")
+            value_parameter_error('damping_type', value,
+                                  accepted_damping_types)
         if value == "PML":
             self.abc_exponent = abc_dictionary.get("exponent", 2)
             self.abc_R = abc_dictionary.get("R", 1e-6)
-            self.abc_cmax = abc_dictionary.get("cmax", 4.7)
+            self.abc_boundary_layer_shape = "rectangular"
         if value == "hybrid":
             self.abc_boundary_layer_shape = abc_dictionary.get("layer_shape",
                                                                "rectangular")
@@ -111,12 +114,12 @@ class Read_boundary_layer:
             self.abc_deg_layer = None \
                 if self.abc_boundary_layer_shape == "rectangular" \
                 else abc_dictionary.get("degree_layer", 2.)
-            self.abc_reference_freq = abc_dictionary.get("habc_reference_freq",
-                                                         "source")
-            self.abc_deg_eikonal = abc_dictionary.get("degree_eikonal", 2)
-            self.abc_get_ref_model = abc_dictionary.get("get_ref_model", False)
 
         self._abc_boundary_layer_type = value
+        self.abc_reference_freq = abc_dictionary.get("habc_reference_freq",
+                                                     "source")
+        self.abc_deg_eikonal = abc_dictionary.get("degree_eikonal", 2)
+        self.abc_get_ref_model = abc_dictionary.get("get_ref_model", False)
 
     @property
     def abc_pad_length(self):
@@ -124,6 +127,13 @@ class Read_boundary_layer:
 
     @abc_pad_length.setter
     def abc_pad_length(self, value):
-        if (value is None or value == 0) and self.abc_boundary_layer_type == "PML":
-            raise ValueError("No pad not compatible with PML")
+
+        if isinstance(value, (int, float)) and value <= 0:
+            raise ValueError("Pad length must be positive")
+
+        if value is None:
+            print("Pad length will be determined with HABC criterion",
+                  flush=True)
+            value = 0.
+
         self._abc_pad_length = value

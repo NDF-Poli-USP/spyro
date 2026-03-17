@@ -229,7 +229,7 @@ def plot_hist_receivers(Wave_object, show=False):
             axes[rec].set_xlabel(r'$t \; (s)$')
 
     # Saving the plot
-    time_str = Wave_object.path_case_habc + "time"
+    time_str = Wave_object.path_case_abc + "time"
     plt.savefig(time_str + ".png", bbox_inches='tight')
     plt.savefig(time_str + ".pdf", bbox_inches='tight')
     plt.show() if show else None
@@ -333,7 +333,7 @@ def plot_rfft_receivers(Wave_object, fxlim=4., show=False):
                 if f_sou != Wave_object.freq_ref else None
 
     # Saving the plot
-    time_str = Wave_object.path_case_habc + "freq"
+    time_str = Wave_object.path_case_abc + "freq"
     plt.savefig(time_str + ".png", bbox_inches='tight')
     plt.savefig(time_str + ".pdf", bbox_inches='tight')
     plt.show() if show else None
@@ -438,7 +438,7 @@ def plot_xCR_opt(Wave_object, data_regr_xCR, show=False):
     plt.ylabel(r'$e_I \; | \; e_P \; (\%)$')
 
     # Saving the plot
-    xcr_str = Wave_object.path_case_habc + "xCR"
+    xcr_str = Wave_object.path_case_abc + "xCR"
     plt.savefig(xcr_str + '.png', bbox_inches='tight')
     plt.savefig(xcr_str + '.pdf', bbox_inches='tight')
     plt.show() if show else None

@@ -59,7 +59,7 @@ def pml_sigma_field(Wave_obj):
     '''
 
     ps = Wave_obj.abc_exponent
-    cmax = Wave_obj.abc_cmax  # maximum acoustic wave velocity
+    cmax = Wave_obj.c_max  # maximum acoustic wave velocity
     R = Wave_obj.abc_R  # theoretical reclection coefficient
     pad_length = Wave_obj.abc_pad_length  # length of the padding
     V = Wave_obj.function_space
@@ -71,7 +71,8 @@ def pml_sigma_field(Wave_obj):
     z2 = -Wave_obj.mesh_parameters.length_z
 
     # Compute the maximum damping coefficient
-    bar_sigma = cmax * calc_pml_damping(pad_length, CR=R)
+    bar_sigma = cmax * (0. if Wave_obj.abc_get_ref_model else
+                        calc_pml_damping(pad_length, CR=R))
 
     aux1 = fire.Function(V)
     aux2 = fire.Function(V)
@@ -223,7 +224,6 @@ def forms_pml(Wave_obj, W, bc_type="nrbc"):
     c = Wave_obj.c
     c_sqr_inv = 1. / (Wave_obj.c * Wave_obj.c)
     dx = fire.dx(**Wave_obj.quadrature_rule)
-    qr_s = Wave_obj.surface_quadrature_rule
 
     if Wave_obj.dimension == 2:
         u, pp = fire.TrialFunctions(W)
@@ -231,73 +231,81 @@ def forms_pml(Wave_obj, W, bc_type="nrbc"):
         u_n, pp_n = Wave_obj.X_n.subfunctions
         u_nm1, _ = Wave_obj.X_nm1.subfunctions
 
-        sigma_x, sigma_z = pml_sigma_field(Wave_obj)
-        Gamma_1, Gamma_2 = damping_pml_2d(sigma_z, sigma_x)
-
     elif Wave_obj.dimension == 3:
         u, psi, pp = fire.TrialFunctions(W)
         v, phi, qq = fire.TestFunctions(W)
         u_n, psi_n, pp_n = Wave_obj.X_n.subfunctions
         u_nm1, psi_nm1, _ = Wave_obj.X_nm1.subfunctions
 
-        sigma_x, sigma_y, sigma_z = pml_sigma_field(Wave_obj)
-        Gamma_1, Gamma_2, Gamma_3 = damping_pml_3d(sigma_z, sigma_x, sigma_y)
-
     # Acoustic form
     m1 = (c_sqr_inv * (u - 2. * u_n + u_nm1) / fire.Constant(dt**2)) * v
     a = fire.dot(fire.grad(u_n), fire.grad(v))  # explicit
     FF = (m1 + a) * dx
 
-    # Tuple of boundary ids for NRBC
-    bnds = [Wave_obj.absorb_top, Wave_obj.absorb_bottom,
-            Wave_obj.absorb_right, Wave_obj.absorb_left]
+    if not Wave_obj.abc_get_ref_model:
 
-    # PML forms
-    if Wave_obj.dimension == 2:
-        pml1 = (sigma_z + sigma_x) * \
-            fire.dot((u_n - u_nm1) / fire.Constant(dt), v)
-        pml2 = sigma_z * sigma_x * fire.dot(u, v)
-        # fire.dot(u_n, v) * dx
-        pml3 = -fire.dot(fire.div(pp_n), v)
-        FF += c_sqr_inv * (pml1 + pml2 + pml3) * dx
-        # -------------------------------------------------------
-        mm1 = fire.inner((pp - pp_n) / fire.Constant(dt), qq)
-        mm2 = fire.inner(fire.dot(Gamma_1, pp_n), qq)
-        dd = fire.inner(Gamma_2 * fire.grad(u_n), qq)
-        FF += (c_sqr_inv * (mm1 + mm2) + dd) * dx
+        if Wave_obj.dimension == 2:
+            sigma_x, sigma_z = pml_sigma_field(Wave_obj)
+            Gamma_1, Gamma_2 = damping_pml_2d(sigma_z, sigma_x)
 
-    elif Wave_obj.dimension == 3:
-        pml1 = (sigma_z + sigma_x + sigma_y) * \
-            fire.dot((u_n - u_nm1) / fire.Constant(dt), v)
-        pml2 = (sigma_z * sigma_x + sigma_x * sigma_y
-                + sigma_z * sigma_y) * fire.dot(u, v)
-        pml3 = -fire.dot(fire.div(pp_n), v)
-        pml4 = (sigma_z * sigma_x * sigma_y) * fire.dot(psi_n, v)
-        FF += c_sqr_inv * (pml1 + pml2 + pml3 + pml4) * dx
-        # -------------------------------------------------------
-        mm1 = fire.dot((pp - pp_n) / fire.Constant(dt), qq)
-        mm2 = fire.inner(fire.dot(Gamma_1, pp_n), qq)
-        dd1 = fire.inner(fire.dot(Gamma_2, fire.grad(u_n)), qq)
-        dd2 = -fire.inner(fire.dot(Gamma_3, fire.grad(psi_n)), qq)
-        FF += (c_sqr_inv * (mm1 + mm2) + dd1 + dd2) * dx
-        # -------------------------------------------------------
-        mmm1 = fire.dot((psi - psi_n) / fire.Constant(dt), phi)
-        uuu1 = -fire.dot(u_n * phi)
-        FF += (mmm1 + uuu1) * dx
-        # -------------------------------------------------------
+        elif Wave_obj.dimension == 3:
+            sigma_x, sigma_y, sigma_z = pml_sigma_field(Wave_obj)
+            Gamma_1, Gamma_2, Gamma_3 = damping_pml_3d(sigma_z, sigma_x, sigma_y)
+
         # Tuple of boundary ids for NRBC
-        bnds.extend([Wave_obj.absorb_front, Wave_obj.absorb_back])
+        bnds = [Wave_obj.absorb_top, Wave_obj.absorb_bottom,
+                Wave_obj.absorb_right, Wave_obj.absorb_left]
 
-    # Apply boundary conditions to the PML boundaries.
-    where_to_absorb = tuple(where(bnds)[0] + 1)  # ds starts at 1
-    if bc_type == "nrbc":  # NRBC: Higdon or Sommerfeld
-        f_abc = (1. / c) * fire.dot((u_n - u_nm1) / fire.Constant(dt), v)
-        le = Wave_obj.cosHig * f_abc * fire.ds(where_to_absorb, **qr_s)
-        FF += le
+        # PML forms
+        if Wave_obj.dimension == 2:
+            pml1 = (sigma_z + sigma_x) * \
+                fire.dot((u_n - u_nm1) / fire.Constant(dt), v)
+            pml2 = sigma_z * sigma_x * fire.dot(u, v)
+            # fire.dot(u_n, v) * dx
+            pml3 = -fire.dot(fire.div(pp_n), v)
+            FF += c_sqr_inv * (pml1 + pml2 + pml3) * dx
+            # -------------------------------------------------------
+            mm1 = fire.inner((pp - pp_n) / fire.Constant(dt), qq)
+            mm2 = fire.inner(fire.dot(Gamma_1, pp_n), qq)
+            dd = fire.inner(Gamma_2 * fire.grad(u_n), qq)
+            FF += (c_sqr_inv * (mm1 + mm2) + dd) * dx
+
+        elif Wave_obj.dimension == 3:
+            pml1 = (sigma_z + sigma_x + sigma_y) * \
+                fire.dot((u_n - u_nm1) / fire.Constant(dt), v)
+            pml2 = (sigma_z * sigma_x + sigma_x * sigma_y
+                    + sigma_z * sigma_y) * fire.dot(u, v)
+            pml3 = -fire.dot(fire.div(pp_n), v)
+            pml4 = (sigma_z * sigma_x * sigma_y) * fire.dot(psi_n, v)
+            FF += c_sqr_inv * (pml1 + pml2 + pml3 + pml4) * dx
+            # -------------------------------------------------------
+            mm1 = fire.dot((pp - pp_n) / fire.Constant(dt), qq)
+            mm2 = fire.inner(fire.dot(Gamma_1, pp_n), qq)
+            dd1 = fire.inner(fire.dot(Gamma_2, fire.grad(u_n)), qq)
+            dd2 = -fire.inner(fire.dot(Gamma_3, fire.grad(psi_n)), qq)
+            FF += (c_sqr_inv * (mm1 + mm2) + dd1 + dd2) * dx
+            # -------------------------------------------------------
+            mmm1 = fire.dot((psi - psi_n) / fire.Constant(dt), phi)
+            uuu1 = -fire.dot(u_n * phi)
+            FF += (mmm1 + uuu1) * dx
+            # -------------------------------------------------------
+            # Tuple of boundary ids for NRBC
+            bnds.extend([Wave_obj.absorb_front, Wave_obj.absorb_back])
+
+        # Apply boundary conditions to the PML boundaries.
+        where_to_absorb = tuple(where(bnds)[0] + 1)  # ds starts at 1
+        if bc_type == "nrbc":  # NRBC: Higdon or Sommerfeld
+            qr_s = Wave_obj.surface_quadrature_rule
+            f_abc = (1. / c) * fire.dot((u_n - u_nm1) / fire.Constant(dt), v)
+            le = Wave_obj.cosHig * f_abc * fire.ds(where_to_absorb, **qr_s)
+            FF += le
+            fix_bnd = None
+        elif bc_type == "dirichlet":
+            fix_bnd = fire.DirichletBC(
+                W.sub(0), fire.Constant(0.), where_to_absorb)
+
+    else:
         fix_bnd = None
-    elif bc_type == "dirichlet":
-        fix_bnd = fire.DirichletBC(
-            W.sub(0), fire.Constant(0.), where_to_absorb)
 
     return FF, fix_bnd
 
@@ -318,7 +326,8 @@ def construct_solver_or_matrix_with_pml(Wave_obj):
     None
     '''
 
-    Wave_obj.cosHig = fire.Constant(1.)
+    if not Wave_obj.abc_get_ref_model:
+        Wave_obj.cosHig = fire.Constant(1.)
 
     V = Wave_obj.function_space
     Z = fire.VectorFunctionSpace(V.ufl_domain(), V.ufl_element())
@@ -346,7 +355,7 @@ def construct_solver_or_matrix_with_pml(Wave_obj):
     Wave_obj.X_n = X_n
     Wave_obj.X_nm1 = X_nm1
 
-    FF, fix_bnd = forms_pml(Wave_obj, W, bc_type="dirichlet")
+    FF, fix_bnd = forms_pml(Wave_obj, W, bc_type="nrbc")
 
     Wave_obj.lhs = fire.lhs(FF)
     Wave_obj.rhs = fire.rhs(FF)
