@@ -5,6 +5,7 @@ import firedrake as fire
 from .time_integration_central_difference import \
     central_difference as time_integrator
 from ..domains.quadrature import quadrature_rules
+from ..domains.space import check_function_space_type
 from ..io import Model_parameters
 from ..io import material_properties_io
 from ..io.basicio import ensemble_propagator
@@ -82,6 +83,8 @@ class Wave(Model_parameters, metaclass=ABCMeta):
 
         self.function_space = None
         self.dg0_function_space = None
+        self.scalar_function_space = None
+        self.vector_function_space = None
         self.forward_solution_receivers = None
         self.current_time = 0.0
         self.set_solver_parameters()
@@ -270,6 +273,14 @@ class Wave(Model_parameters, metaclass=ABCMeta):
 
     def _build_function_space(self):
         self.function_space = self._create_function_space()
+        function_space_type = check_function_space_type(self.function_space)
+        if function_space_type == "scalar":
+            self.scalar_function_space = self.function_space
+        elif function_space_type == "mixed":
+            self.scalar_function_space = self.function_space.sub(0)
+            self.vector_function_space = self.function_space.sub(1)
+        elif function_space_type == "vector":
+            self.vector_function_space = self.function_space
 
         quad_rule, k_rule, s_rule = quadrature_rules(self.function_space)
         self.quadrature_rule = quad_rule
@@ -437,9 +448,11 @@ class Wave(Model_parameters, metaclass=ABCMeta):
 
     def set_material_properties(self, *args, **kwargs):
         """Wrapper for material_properties_io.set_material_property."""
-        return material_properties_io.set_material_property(self,
-                                                            *args,
-                                                            **kwargs)
+        return material_properties_io.set_material_property(
+            self,
+            *args,
+            **kwargs
+        )
 
     def set_material_property(self, *args, **kwargs):
         """Backward-compatible alias for set_material_properties."""
