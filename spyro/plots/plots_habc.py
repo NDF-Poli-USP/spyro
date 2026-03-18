@@ -44,7 +44,7 @@ def plot_function_layer_size(lay_par, freq_par, geom_par, FLpos,
         Parameters of the frequency:
         - reference_frequency : `float`
             Reference frequency of the wave
-        - fsou: `float`
+        - source_frequency: `float`
             Source frequency
     geom_par: `list`
         Parameters of the domain geometry:
