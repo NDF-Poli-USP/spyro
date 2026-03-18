@@ -2,7 +2,30 @@ import firedrake as fire
 from . import helpers
 
 
-def backward_wave_propagator(Wave_obj, dt=None):
+def _expected_num_stored_states(num_timesteps, sampling_frequency):
+    return len(range(0, num_timesteps, sampling_frequency))
+
+
+def _get_forward_solution(
+    Wave_obj,
+    forward_solution,
+    num_timesteps,
+    sampling_frequency,
+):
+    if forward_solution is None:
+        forward_solution = Wave_obj.forward_solution
+
+    expected_length = _expected_num_stored_states(num_timesteps, sampling_frequency)
+    if len(forward_solution) != expected_length:
+        raise ValueError(
+            "forward_solution has an unexpected number of stored states: "
+            f"expected {expected_length}, got {len(forward_solution)}"
+        )
+
+    return forward_solution
+
+
+def backward_wave_propagator(Wave_obj, dt=None, forward_solution=None):
     """Propagates the adjoint wave backwards in time.
     Currently uses central differences.
 
@@ -20,12 +43,20 @@ def backward_wave_propagator(Wave_obj, dt=None):
         Calculated gradient
     """
     if Wave_obj.abc_active is False:
-        return backward_wave_propagator_no_pml(Wave_obj, dt=dt)
+        return backward_wave_propagator_no_pml(
+            Wave_obj,
+            dt=dt,
+            forward_solution=forward_solution,
+        )
     elif Wave_obj.abc_active:
-        return mixed_space_backward_wave_propagator(Wave_obj, dt=dt)
+        return mixed_space_backward_wave_propagator(
+            Wave_obj,
+            dt=dt,
+            forward_solution=forward_solution,
+        )
 
 
-def backward_wave_propagator_no_pml(Wave_obj, dt=None):
+def backward_wave_propagator_no_pml(Wave_obj, dt=None, forward_solution=None):
     """Propagates the adjoint wave backwards in time.
     Currently uses central differences. Does not have any PML.
 
@@ -51,7 +82,6 @@ def backward_wave_propagator_no_pml(Wave_obj, dt=None):
     if dt is not None:
         Wave_obj.dt = dt
 
-    forward_solution = Wave_obj.forward_solution
     receivers = Wave_obj.receivers
     residual = Wave_obj.misfit
     comm = Wave_obj.comm
@@ -72,10 +102,19 @@ def backward_wave_propagator_no_pml(Wave_obj, dt=None):
     if t != final_time:
         print(f"Current time of {t}, different than final_time of {final_time}. Setting final_time to current time in backwards propagation.", flush=True)
     nt = int(t / dt) + 1  # number of timesteps
+    sampling_frequency = Wave_obj.gradient_sampling_frequency
+    forward_solution = _get_forward_solution(
+        Wave_obj,
+        forward_solution,
+        nt,
+        sampling_frequency,
+    )
+    num_forward_states = len(forward_solution)
 
     u_nm1 = Wave_obj.u_nm1
     u_n = Wave_obj.u_n
     u_np1 = fire.Function(Wave_obj.function_space)
+    zero_state = fire.Function(Wave_obj.function_space)
 
     rhs_forcing = fire.Cofunction(Wave_obj.function_space.dual())
 
@@ -124,20 +163,34 @@ def backward_wave_propagator_no_pml(Wave_obj, dt=None):
 
             helpers.display_progress(Wave_obj.comm, t)
 
-        if step % Wave_obj.gradient_sampling_frequency == 0:
-            # duadjdt2.assign( ((u_np1 - 2.0 * u_n + u_nm1) / fire.Constant(dt**2)) )
+        if step % sampling_frequency == 0:
             uadj.assign(u_np1)
-            if len(forward_solution) > 2:
+            sample_index = step // sampling_frequency
+            if sample_index > 1:
                 dufordt2.assign(
-                    (forward_solution.pop() - 2.0 * forward_solution[-1] + forward_solution[-2]) / fire.Constant(dt**2)
+                    (
+                        forward_solution[sample_index]
+                        - 2.0 * forward_solution[sample_index - 1]
+                        + forward_solution[sample_index - 2]
+                    )
+                    / fire.Constant(dt**2)
+                )
+            elif sample_index == 1:
+                dufordt2.assign(
+                    (
+                        forward_solution[sample_index]
+                        - 2.0 * forward_solution[sample_index - 1]
+                        + zero_state
+                    )
+                    / fire.Constant(dt**2)
                 )
             else:
                 dufordt2.assign(
-                    (forward_solution.pop() - 2.0 * 0.0 + 0.0) / fire.Constant(dt**2)
+                    forward_solution[sample_index] / fire.Constant(dt**2)
                 )
 
             grad_solver.solve()
-            if step == nt-1 or step == 0:
+            if sample_index == num_forward_states - 1 or sample_index == 0:
                 dJ += gradi
             else:
                 dJ += 2*gradi
@@ -150,11 +203,11 @@ def backward_wave_propagator_no_pml(Wave_obj, dt=None):
     Wave_obj.current_time = t
     helpers.display_progress(Wave_obj.comm, t)
 
-    dJ.dat.data_with_halos[:] *= (dt/2)
+    dJ.dat.data_with_halos[:] *= (dt / 2)
     return dJ
 
 
-def mixed_space_backward_wave_propagator(Wave_obj, dt=None):
+def mixed_space_backward_wave_propagator(Wave_obj, dt=None, forward_solution=None):
     """Propagates the adjoint wave backwards in time.
     Currently uses central differences. Based on the
     mixed space implementation of PML.
@@ -181,7 +234,6 @@ def mixed_space_backward_wave_propagator(Wave_obj, dt=None):
     if dt is not None:
         Wave_obj.dt = dt
 
-    forward_solution = Wave_obj.forward_solution
     receivers = Wave_obj.receivers
     residual = Wave_obj.misfit
     comm = Wave_obj.comm
@@ -201,6 +253,14 @@ def mixed_space_backward_wave_propagator(Wave_obj, dt=None):
     if t != final_time:
         print(f"Current time of {t}, different than final_time of {final_time}. Setting final_time to current time in backwards propagation.", flush=True)
     nt = int(t / dt) + 1  # number of timesteps
+    sampling_frequency = Wave_obj.gradient_sampling_frequency
+    forward_solution = _get_forward_solution(
+        Wave_obj,
+        forward_solution,
+        nt,
+        sampling_frequency,
+    )
+    num_forward_states = len(forward_solution)
 
     X_nm1 = Wave_obj.X_nm1
     X_n = Wave_obj.X_n
@@ -249,13 +309,13 @@ def mixed_space_backward_wave_propagator(Wave_obj, dt=None):
 
             helpers.display_progress(Wave_obj.comm, t)
 
-        if step % Wave_obj.gradient_sampling_frequency == 0:
-            # duadjdt2.assign( ((u_np1 - 2.0 * u_n + u_nm1) / fire.Constant(dt**2)) )
+        if step % sampling_frequency == 0:
             uadj.assign(X_np1.sub(0))
-            ufor.assign(forward_solution.pop())
+            sample_index = step // sampling_frequency
+            ufor.assign(forward_solution[sample_index])
 
             grad_solver.solve()
-            if step == nt-1 or step == 0:
+            if sample_index == num_forward_states - 1 or sample_index == 0:
                 dJ += gradi
             else:
                 dJ += 2*gradi
@@ -268,5 +328,5 @@ def mixed_space_backward_wave_propagator(Wave_obj, dt=None):
     Wave_obj.current_time = t
     helpers.display_progress(Wave_obj.comm, t)
 
-    dJ.dat.data_with_halos[:] *= (dt/2)
+    dJ.dat.data_with_halos[:] *= (dt / 2)
     return dJ

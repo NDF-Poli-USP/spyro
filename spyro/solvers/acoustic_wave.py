@@ -98,7 +98,10 @@ class AcousticWave(Wave):
             self.misfit = self.real_shot_record - self.forward_solution_receivers
         else:
             raise ValueError("Please load or calculate a real shot record first")
-        return backward_wave_propagator(self)
+        return backward_wave_propagator(
+            self,
+            forward_solution=forward_solution,
+        )
 
     def reset_pressure(self):
         try:
