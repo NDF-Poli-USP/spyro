@@ -51,8 +51,8 @@ d["parallelism"] = {
 
 d["mesh"] = {
     "user_mesh": mesh,
-    "Lz": L,
-    "Lx": L,
+    "length_z": L,
+    "length_x": L,
 }
 
 d["acquisition"] = {

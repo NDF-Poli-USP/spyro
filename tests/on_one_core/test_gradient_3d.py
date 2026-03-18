@@ -48,9 +48,9 @@ def _test_gradient(options, pml=False):
     # print(dt, flush=True)
 
     z, x, y = SpatialCoordinate(mesh)
-    Lx = model_pml["mesh"]["Lx"]
-    Lz = model_pml["mesh"]["Lz"]
-    Ly = model_pml["mesh"]["Ly"]
+    Lx = model_pml["mesh"]["length_x"]
+    Lz = model_pml["mesh"]["length_z"]
+    Ly = model_pml["mesh"]["length_y"]
     x1 = 0.0
     z2 = -Lz
     y1 = 0.0

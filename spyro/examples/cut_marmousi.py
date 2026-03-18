@@ -42,9 +42,9 @@ cut_marmousi_dictionary["parallelism"] = {
 # to absorb
 # outgoing waves on three sides (eg., -z, +-x sides) of the domain.
 cut_marmousi_dictionary["mesh"] = {
-    "Lz": 2.0,  # depth in km - always positive
-    "Lx": 4.0,  # width in km - always positive
-    "Ly": 0.0,  # thickness in km - always positive
+    "length_z": 2.0,  # depth in km - always positive
+    "length_x": 4.0,  # width in km - always positive
+    "length_y": 0.0,  # thickness in km - always positive
     "mesh_file": "meshes/cut_marmousi_small_p=2_M=7.02.msh",
 }
 cut_marmousi_dictionary[
