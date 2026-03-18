@@ -587,7 +587,7 @@ def PeriodicRectangleMesh(
         Mesh
 
     """
-   if pad is not None:
+    if pad is not None:
         length_x += pad
         length_y += 2 * pad
     else:
