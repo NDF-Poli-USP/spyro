@@ -531,7 +531,9 @@ def calculate_edge_length(cpw, minimum_velocity, frequency):
     return edge_length
 
 
-<<<<<<< ruben/modal
+<< << << < ruben/modal
+
+
 def RectangleMesh(nx, ny, Lx, Ly, pad=None, comm=None, quadrilateral=False):
     """
     Create a rectangle mesh based on the Firedrake mesh.
@@ -539,31 +541,32 @@ def RectangleMesh(nx, ny, Lx, Ly, pad=None, comm=None, quadrilateral=False):
 def RectangleMesh(nx, ny, length_x, length_y, pad=None, comm=None, quadrilateral=False):
     """Create a rectangle mesh based on the Firedrake mesh.
 
->>>>>>> main
-    First axis is negative, second axis is positive. If there is a pad, both
-    axis are dislocated by the pad.
+
+>>>>>> > main
+  First axis is negative, second axis is positive. If there is a pad, both
+   axis are dislocated by the pad.
 
     Parameters
     ----------
-    length_x : float
-        Length of the domain in the x direction.
-    length_y : float
-        Length of the domain in the y direction.
-    nx : int
-        Number of elements in the x direction.
-    ny : int
-        Number of elements in the y direction.
-    pad : float, optional
-        Padding to be added to the domain. The default is None.
-    comm : MPI communicator, optional
-        MPI communicator. The default is None.
-    quadrilateral : bool, optional
-        If True, the mesh is quadrilateral. The default is False.
+    length_x: float
+      Length of the domain in the x direction.
+    length_y: float
+      Length of the domain in the y direction.
+    nx: int
+      Number of elements in the x direction.
+    ny: int
+      Number of elements in the y direction.
+    pad: float, optional
+      Padding to be added to the domain. The default is None.
+    comm: MPI communicator, optional
+      MPI communicator. The default is None.
+    quadrilateral: bool, optional
+      If True, the mesh is quadrilateral. The default is False.
 
     Returns
     -------
-    mesh : Firedrake Mesh
-        Mesh
+    mesh: Firedrake Mesh
+      Mesh
     """
     if pad is not None:
         length_x += pad
@@ -587,8 +590,8 @@ def PeriodicRectangleMesh(
 <<<<<<< ruben/modal
     """
     Create a periodic rectangle mesh based on the Firedrake mesh.
-=======
-    """Create a periodic rectangle mesh based on the Firedrake mesh.
+== == == =
+  """Create a periodic rectangle mesh based on the Firedrake mesh.
 
 >>>>>>> main
     First axis is negative, second axis is positive. If there is a pad, both
@@ -617,7 +620,7 @@ def PeriodicRectangleMesh(
         Mesh
 
     """
-    if pad is not None:
+   if pad is not None:
         length_x += pad
         length_y += 2 * pad
     else:
@@ -631,41 +634,18 @@ def PeriodicRectangleMesh(
     return mesh
 
 
-<<<<<<< ruben/modal
-def BoxMesh(nx, ny, nz, Lx, Ly, Lz, pad=None, quadrilateral=False):
-    """
-    Create a box mesh based on the Firedrake mesh.
-    First axis is negative, second and third are positive. If there is a pad,
-    both axis are dislocated by the pad.
-
-    Parameters
-    ----------
-    Lx : float
-        Length of the domain in the x direction.
-    Ly : float
-        Length of the domain in the y direction.
-    Lz : float
-        Length of the domain in the z direction.
-=======
 def BoxMesh(nx, ny, nz, length_x, length_y, length_z, pad=None, quadrilateral=False):
     """
     Create a 3D box mesh based on Firedrake mesh utilities.
 
     Parameters
     ----------
->>>>>>> main
     nx : int
         Number of elements in the x direction.
     ny : int
         Number of elements in the y direction.
     nz : int
         Number of elements in the z direction.
-<<<<<<< ruben/modal
-    pad : float, optional
-        Padding to be added to the domain. The default is None.
-    quadrilateral : bool, optional
-        If True, the mesh is quadrilateral. The default is False.
-=======
     length_x : float
         Length of the domain in the x direction.
     length_y : float
@@ -677,14 +657,10 @@ def BoxMesh(nx, ny, nz, length_x, length_y, length_z, pad=None, quadrilateral=Fa
     quadrilateral : bool, optional
         If True, the mesh is created by extruding a quadrilateral mesh.
         The default is False.
->>>>>>> main
 
     Returns
     -------
     mesh : Firedrake Mesh
-<<<<<<< ruben/modal
-        Mesh
-=======
         The generated 3D box mesh.
 
     Notes
@@ -692,7 +668,6 @@ def BoxMesh(nx, ny, nz, length_x, length_y, length_z, pad=None, quadrilateral=Fa
     The first coordinate is negated (multiplied by -1) to match the expected
     coordinate system. If quadrilateral is True, the mesh is created by
     extruding a 2D quadrilateral mesh in the z direction.
->>>>>>> main
     """
     if pad is not None:
         length_x += pad
@@ -701,12 +676,7 @@ def BoxMesh(nx, ny, nz, length_x, length_y, length_z, pad=None, quadrilateral=Fa
     else:
         pad = 0
     if quadrilateral:
-<<<<<<< ruben/modal
-        quad_mesh = fire.RectangleMesh(nx, ny, Lx, Ly,
-                                       quadrilateral=quadrilateral)
-=======
         quad_mesh = fire.RectangleMesh(nx, ny, length_x, length_y, quadrilateral=quadrilateral)
->>>>>>> main
         quad_mesh.coordinates.dat.data[:, 0] *= -1.0
         quad_mesh.coordinates.dat.data[:, 1] -= pad
         layer_height = length_z / nz
