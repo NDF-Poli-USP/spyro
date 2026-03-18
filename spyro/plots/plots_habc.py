@@ -44,7 +44,7 @@ def plot_function_layer_size(lay_par, freq_par, geom_par, FLpos,
         Parameters of the frequency:
         - reference_frequency : `float`
             Reference frequency of the wave
-        - source_frequency: `float`
+        - source_frequency : `float`
             Source frequency
     geom_par: `list`
         Parameters of the domain geometry:
@@ -69,16 +69,16 @@ def plot_function_layer_size(lay_par, freq_par, geom_par, FLpos,
 
     # Unpack the parameters
     a, z = lay_par
-    fref, fsou = freq_par
+    reference_frequency, source_frequency = freq_par
     lmin, lref = geom_par
 
     # Prepare the data for the plot
     a_lst = [a]
     F_lst = [FLpos]
-    l_lst = ["{:.2f}".format(fref)]
+    l_lst = ["{:.2f}".format(reference_frequency)]
     c_lst = ['C0']
 
-    if fsou == fref:
+    if source_frequency == reference_frequency:
 
         # Layer size based on source frequency
         FLsou = []
@@ -87,11 +87,11 @@ def plot_function_layer_size(lay_par, freq_par, geom_par, FLpos,
     else:
 
         # Calculate the size parameter for the source frequency
-        a_sou = z / fsou  # Adimensional parameter
+        a_sou = z / source_frequency   # Adimensional parameter
         FLsou = loop_roots(a_sou, lmin, lref, len(FLpos), show_ig=False)
         a_lst.append(a_sou)
         F_lst.append(FLsou)
-        l_lst.append("{:.2f}".format(fsou))
+        l_lst.append("{:.2f}".format(source_frequency))
         c_lst.append('C1')
         w_lst = ['f_{{bnd}}', 'f_{{sou}}']
 

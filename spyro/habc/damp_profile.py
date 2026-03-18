@@ -121,7 +121,8 @@ class HABC_Damping():
         # Adimensional wave numbers
         self.adim_reflection_parameters(layer_par[:2], mesh_par[:2], wave_par)
 
-    def adim_reflection_parameters(self, layer_par, mesh_par, wave_par, m=1):
+    def adim_reflection_parameters(self, layer_par, mesh_par,
+                                   wave_par, vibration_mode=1):
         '''
         Compute the adimensional parameters for the reflection coefficient
 
@@ -140,7 +141,7 @@ class HABC_Damping():
             - freq_ref : Reference frequency at the minimum Eikonal point
             - c_ref : Minimum propagation speed among all critical points
             - c_bnd : Propagation speed at critical point with minimum Eikonal
-        m : `int`, optional
+        vibration_mode : `int`, optional
             Vibration mode. Default is 1 (Fundamental mode)
 
         Returns
@@ -163,7 +164,7 @@ class HABC_Damping():
         self.f_correct_pwave = a / F_L
 
         # Adimensional parameter in the reflection coefficient
-        kCR = 4 * F_L / (a * m)
+        kCR = 4 * F_L / (a * vibration_mode)
         self.kCR = kCR * c_bnd / c_ref
 
     @staticmethod
@@ -318,10 +319,13 @@ class HABC_Damping():
 
         # Roots of the quadratic equation
         roots = np.roots(z)
+        real_roots = [r.real for r in roots if np.isreal(r)]
+        max_root = max(real_roots) if len(real_roots) == 2 else 0.
+
+        # Vertex of parabola
+        xCR_vtx = -z[1] / (2 * z[0]) if len(real_roots) == 2 else 0.
 
         # Vertex or minimum positive root
-        xCR_vtx = -z[1] / (2 * z[0])
-        max_root = max(roots)
         xCR_est = xCR_vtx if xCR_vtx > xCR_inf else (
             max_root if max_root > xCR_inf else xCR_ini)
         xCR_est = np.clip(xCR_est, xCR_inf, xCR_sup)
@@ -332,7 +336,7 @@ class HABC_Damping():
 
         return psi_min, xCR_est, CRmin
 
-    def est_min_damping(self, psi_damp=0.999, m=1):
+    def est_min_damping(self, psi_damp=0.999):
         '''
         Estimate the minimum damping ratio and the associated heuristic factor.
         Obs: The reflection coefficient is not zero because there are always
@@ -342,8 +346,6 @@ class HABC_Damping():
         ----------
         psi_damp : `float`, optional
             Damping ratio. Default is 0.999
-        m : `int`, optional
-            Vibration mode. Default is 1 (Fundamental mode)
 
         Returns
         -------
@@ -381,7 +383,7 @@ class HABC_Damping():
 
         return psi_min, xCR_est, xCR_lim[:2], CRmin
 
-    def calc_damping_properties(self, fundam_freq, xCR_usu=None, psi_damp=0.999, m=1):
+    def calc_damping_properties(self, fundam_freq, xCR_usu=None, psi_damp=0.999):
         '''
         Compute the damping properties for the absorbing layer.
 
@@ -394,8 +396,6 @@ class HABC_Damping():
             Default is None, which defines an estimated value
         psi_damp : `float`, optional
             Damping ratio. Default is 0.999
-        m : `int`, optional
-            Vibration mode. Default is 1 (Fundamental mode)
 
         Returns
         -------
