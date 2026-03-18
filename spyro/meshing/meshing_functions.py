@@ -490,38 +490,21 @@ class AutomaticMesh:
 
 def calculate_edge_length(cpw, minimum_velocity, frequency):
     """
-<<<<<<< ruben/modal
-    Calculate the edge length based on the cells per wavelength,
-    minimum velocity and frequency.
-=======
     Calculate the edge length for mesh generation.
->>>>>>> main
 
     Parameters
     ----------
     cpw : float
-<<<<<<< ruben/modal
-        Cells per wavelength.\
-    minimum_velocity : float
-        Minimum velocity
-    frequency : float
-        Frequency
-=======
         Cells per wavelength.
     minimum_velocity : float
         Minimum velocity in the domain.
     frequency : float
         Source frequency.
->>>>>>> main
 
     Returns
     -------
     edge_length : float
-<<<<<<< ruben/modal
-        Edge length
-=======
         Calculated edge length for mesh elements.
->>>>>>> main
     """
     v_min = minimum_velocity
 
@@ -531,18 +514,8 @@ def calculate_edge_length(cpw, minimum_velocity, frequency):
     return edge_length
 
 
-<< << << < ruben/modal
-
-
-def RectangleMesh(nx, ny, Lx, Ly, pad=None, comm=None, quadrilateral=False):
-    """
-    Create a rectangle mesh based on the Firedrake mesh.
-=======
 def RectangleMesh(nx, ny, length_x, length_y, pad=None, comm=None, quadrilateral=False):
     """Create a rectangle mesh based on the Firedrake mesh.
-
-
->>>>>> > main
   First axis is negative, second axis is positive. If there is a pad, both
    axis are dislocated by the pad.
 
@@ -587,36 +560,30 @@ def RectangleMesh(nx, ny, length_x, length_y, pad=None, comm=None, quadrilateral
 def PeriodicRectangleMesh(
     nx, ny, length_x, length_y, pad=None, comm=None, quadrilateral=False
 ):
-<<<<<<< ruben/modal
-    """
-    Create a periodic rectangle mesh based on the Firedrake mesh.
-== == == =
   """Create a periodic rectangle mesh based on the Firedrake mesh.
-
->>>>>>> main
     First axis is negative, second axis is positive. If there is a pad, both
     axis are dislocated by the pad.
 
     Parameters
     ----------
-    length_x : float
+    length_x: float
         Length of the domain in the x direction.
-    length_y : float
+    length_y: float
         Length of the domain in the y direction.
-    nx : int
+    nx: int
         Number of elements in the x direction.
-    ny : int
+    ny: int
         Number of elements in the y direction.
-    pad : float, optional
+    pad: float, optional
         Padding to be added to the domain. The default is None.
-    comm : MPI communicator, optional
+    comm: MPI communicator, optional
         MPI communicator. The default is None.
-    quadrilateral : bool, optional
+    quadrilateral: bool, optional
         If True, the mesh is quadrilateral. The default is False.
 
     Returns
     -------
-    mesh : Firedrake Mesh
+    mesh: Firedrake Mesh
         Mesh
 
     """
@@ -640,32 +607,32 @@ def BoxMesh(nx, ny, nz, length_x, length_y, length_z, pad=None, quadrilateral=Fa
 
     Parameters
     ----------
-    nx : int
+    nx: int
         Number of elements in the x direction.
-    ny : int
+    ny: int
         Number of elements in the y direction.
-    nz : int
+    nz: int
         Number of elements in the z direction.
-    length_x : float
+    length_x: float
         Length of the domain in the x direction.
-    length_y : float
+    length_y: float
         Length of the domain in the y direction.
-    length_z : float
+    length_z: float
         Length of the domain in the z direction.
-    pad : float, optional
+    pad: float, optional
         Padding to be added to the domain. The default is None.
-    quadrilateral : bool, optional
+    quadrilateral: bool, optional
         If True, the mesh is created by extruding a quadrilateral mesh.
         The default is False.
 
     Returns
     -------
-    mesh : Firedrake Mesh
+    mesh: Firedrake Mesh
         The generated 3D box mesh.
 
     Notes
     -----
-    The first coordinate is negated (multiplied by -1) to match the expected
+    The first coordinate is negated(multiplied by - 1) to match the expected
     coordinate system. If quadrilateral is True, the mesh is created by
     extruding a 2D quadrilateral mesh in the z direction.
     """
@@ -694,16 +661,16 @@ def vp_to_sizing(vp, cpw, frequency):
 
     Parameters
     ----------
-    vp : numpy.ndarray
+    vp: numpy.ndarray
         P-wave velocity field.
-    cpw : float
-        Cells per wavelength (must be positive).
-    frequency : float
-        Source frequency in Hz (must be positive).
+    cpw: float
+        Cells per wavelength(must be positive).
+    frequency: float
+        Source frequency in Hz(must be positive).
 
     Returns
     -------
-    sizing : numpy.ndarray
+    sizing: numpy.ndarray
         Mesh element sizes corresponding to the velocity field.
 
     Raises
@@ -732,24 +699,24 @@ def build_big_rect_with_inner_element_group(mesh_parameters):
 
     Parameters
     ----------
-    mesh_parameters : object
+    mesh_parameters: object
         Object containing mesh parameters with the following attributes:
-        - length_z : float
+        - length_z: float
             Length of domain in z direction.
-        - length_x : float
+        - length_x: float
             Length of domain in x direction.
-        - output_filename : str
+        - output_filename: str
             Path for output mesh file.
-        - edge_length : float, optional
-            Uniform edge length (if grid_velocity_data is None).
-        - grid_velocity_data : dict, optional
+        - edge_length: float, optional
+            Uniform edge length(if grid_velocity_data is None).
+        - grid_velocity_data: dict, optional
             Dictionary with 'vp_values' key containing velocity field for
             adaptive meshing.
-        - source_frequency : float, optional
+        - source_frequency: float, optional
             Source frequency for adaptive meshing.
-        - cells_per_wavelength : float, optional
+        - cells_per_wavelength: float, optional
             Cells per wavelength for adaptive meshing.
-        - gradient_mask : dict, optional
+        - gradient_mask: dict, optional
             Dictionary with keys 'z_min', 'z_max', 'x_min', 'x_max' defining
             a rectangular region to be marked as an inner element group.
 
@@ -761,7 +728,7 @@ def build_big_rect_with_inner_element_group(mesh_parameters):
     Notes
     -----
     This function creates a 2D rectangular mesh with:
-    - Adaptive sizing based on velocity field (if provided)
+    - Adaptive sizing based on velocity field(if provided)
     - Physical boundary groups for absorbing boundary conditions
       (1=Top, 2=Bottom, 3=Right, 4=Left)
     - Optional inner element group for gradient masking

@@ -7,32 +7,15 @@ generation based on wavelength constraints.
 
 import warnings
 import os
-<<<<<<< ruben/modal
-from spyro.utils.error_management import value_parameter_error
-
-
-def cells_per_wavelength(method, degree, dimension):
-    """
-    Returns recommended number of cells per wavelength based on method,
-    degree, and dimension of finite element model.
-=======
 from ..utils.error_management import value_parameter_error
 
 
 def cells_per_wavelength(method, degree, dimension):
     """Retrieve the number of cells per wavelength for a given method configuration.
->>>>>>> main
 
     Parameters
     ----------
     method : str
-<<<<<<< ruben/modal
-        The method used for meshing.
-    degree : int
-        The degree of the finite element.
-    dimension : int
-        The dimension of the mesh.
-=======
         The finite element method to use. Options include:
         'mass_lumped_triangle' or 'spectral_quadrilateral'.
     degree : int
@@ -40,14 +23,10 @@ def cells_per_wavelength(method, degree, dimension):
         Valid values are 2, 3, 4, 5, 6, or 8 depending on the method.
     dimension : int
         The spatial dimension of the problem (2 or 3).
->>>>>>> main
 
     Returns
     -------
     float or None
-<<<<<<< ruben/modal
-        Recommended number of cells per wavelength, or None if not specified.
-=======
         The number of cells per wavelength for the specified configuration.
         Returns None if the configuration is not defined in the dictionary.
 
@@ -63,7 +42,6 @@ def cells_per_wavelength(method, degree, dimension):
     7.02
     >>> cells_per_wavelength('mass_lumped_triangle', 3, 3)
     3.72
->>>>>>> main
     """
     cell_per_wavelength_dictionary = {
         'mass_lumped_triangle2dim2': 7.02,
@@ -88,11 +66,7 @@ def cells_per_wavelength(method, degree, dimension):
 
 
 class MeshingParameters():
-<<<<<<< ruben/modal
-    '''
-    Class that handles mesh parameter logic and mesh type/length/file handling.
-    '''
-=======
+
     """Manage mesh parameters and configuration for seismic wave simulations.
 
     This class handles all aspects of mesh configuration including mesh type
@@ -162,7 +136,6 @@ class MeshingParameters():
     checked for unit consistency (meters vs kilometers) and must all use
     the same unit system.
     """
->>>>>>> main
 
     def __init__(self, input_mesh_dictionary=None, dimension=None, source_frequency=None, comm=None, quadrilateral=False, method=None, degree=None, velocity_model=None, abc_pad_length=None, negative_z=True, use_defaults=True):
         """Initialize the MeshingParameters class.
@@ -170,27 +143,6 @@ class MeshingParameters():
         Parameters
         ----------
         input_mesh_dictionary : dict, optional
-<<<<<<< ruben/modal
-            Dictionary containing mesh parameters.
-        dimensional : int, optional
-            Dimension of the mesh.
-        source_frequency : float, optional
-            Source frequency.
-        comm : MPI communicator, optional
-            MPI communicator.
-        quadrilateral : bool, optional
-            Whether to use quadrilateral elements. The default is False.
-        method : str, optional
-            Method for mesh generation.
-        degree : int, optional
-            Degree of the finite element.
-        velocity_model: str, optional.
-            File containing the velocity model.
-        abc_pad_length : float, optional
-            Length of the absorbing pad.
-        negative_z : bool, optional
-            Whether to use negative z coordinates. The default is True.
-=======
             Dictionary containing initial mesh parameters. Can include keys
             such as 'mesh_type', 'mesh_file', 'length_x', 'length_y',
             'length_z', 'user_mesh', and 'output_filename'. Default is None.
@@ -229,8 +181,8 @@ class MeshingParameters():
         If use_defaults is True, the set_mesh method is automatically called
         during initialization to configure the mesh with default values where
         there are missing parameters.
->>>>>>> main
         """
+
         if input_mesh_dictionary is None:
             input_mesh_dictionary = {}
         self.input_mesh_dictionary = input_mesh_dictionary or {}
@@ -247,12 +199,7 @@ class MeshingParameters():
         self.length_x = self.input_mesh_dictionary.get("length_x", None)
         self.length_y = self.input_mesh_dictionary.get("length_y", None)
         self.user_mesh = self.input_mesh_dictionary.get("user_mesh", None)
-<<<<<<< ruben/modal
-        self.output_filename = self.input_mesh_dictionary.get(
-            "output_filename", "automatic_mesh.msh")
-=======
         self.output_filename = self.input_mesh_dictionary.get("output_filename", "automatic_mesh.msh")
->>>>>>> main
         self.source_frequency = source_frequency
         self.abc_pad_length = abc_pad_length
         self.degree = degree
@@ -270,11 +217,6 @@ class MeshingParameters():
             self.set_mesh(input_mesh_parameters=input_mesh_dictionary)
 
     def _set_length_with_unit_check(self, attr_name, value):
-<<<<<<< ruben/modal
-        '''
-        Checks if all dimensions are in the same unit (meters or km)
-        '''
-=======
         """Set a length attribute with automatic unit consistency checking.
 
         Parameters
@@ -302,7 +244,7 @@ class MeshingParameters():
         The unit is inferred from the magnitude: values > 100 are assumed to
         be in meters, while values <= 100 are assumed to be in kilometers.
         """
->>>>>>> main
+
         if value is not None:
             if value > 100:
                 new_unit = "meters"
@@ -488,9 +430,6 @@ class MeshingParameters():
 
     @method.setter
     def method(self, value):
-<<<<<<< ruben/modal
-        allowed_types = [
-=======
         """Set the finite element method.
 
         Parameters
@@ -505,8 +444,7 @@ class MeshingParameters():
         ValueError
             If value is not None and not one of the allowed method types.
         """
-        allowed_types = {
->>>>>>> main
+        allowed_types = [
             "mass_lumped_triangle",
             "DG_triangle",
             "spectral_quadrilateral",
@@ -515,7 +453,7 @@ class MeshingParameters():
         ]
 
         if value is not None and value not in allowed_types:
-            value_parameter_error('method', value, allowed_types)
+            value_parameter_error("method", value, allowed_types)
 
         self._method = value
 
@@ -584,12 +522,8 @@ class MeshingParameters():
         """
         allowed_types = ["firedrake_mesh", "user_mesh", "SeismicMesh", "file", "spyro_mesh"]
         if value is not None and value not in allowed_types:
-<<<<<<< ruben/modal
-            value_parameter_error('mesh_type', value, allowed_types)
-
-=======
             value_parameter_error("mesh_type", value, allowed_types)
->>>>>>> main
+
         if value == "SeismicMesh" and self.quadrilateral:
             raise ValueError("SeismicMesh does not work with quads.")
         self._mesh_type = value
@@ -810,14 +744,6 @@ class MeshingParameters():
                              "with Firedrake meshes for now.")
         self._periodic = value
 
-<<<<<<< ruben/modal
-    def set_mesh(self,
-                 user_mesh=None,
-                 input_mesh_parameters={},
-                 abc_pad_length=None):
-        '''
-        Set the mesh for the model.
-=======
     def set_mesh(
         self,
         user_mesh=None,
@@ -829,22 +755,12 @@ class MeshingParameters():
         This method updates mesh parameters by merging user-provided values
         with current attribute values, ensuring all necessary mesh
         configuration is complete.
->>>>>>> main
 
         Parameters
         ----------
         user_mesh : spyro.Mesh, optional
             A user-provided mesh object. Default is None.
         input_mesh_parameters : dict, optional
-<<<<<<< ruben/modal
-            Additional parameters for setting up the mesh.
-            The default is an empty dictionary.
-
-        Returns
-        -------
-        None
-        '''
-=======
             Dictionary of mesh parameters to set. Can include any attribute
             of the MeshingParameters class. Unspecified parameters will use
             current attribute values as defaults.
@@ -874,7 +790,7 @@ class MeshingParameters():
         ...                                     'length_x': 10.0,
         ...                                     'length_z': 5.0})
         """
->>>>>>> main
+
         if abc_pad_length is not None:
             self.abc_pad_length = abc_pad_length
 
