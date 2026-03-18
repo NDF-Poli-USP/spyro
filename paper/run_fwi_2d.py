@@ -37,9 +37,9 @@ model["parallelism"] = {
     "type": "automatic",
 }
 model["mesh"] = {
-    "Lz": 3.5,  # depth in km - always positive
-    "Lx": 17.0,  # width in km - always positive
-    "Ly": 0.0,  # thickness in km - always positive
+    "length_z": 3.5,  # depth in km - always positive
+    "length_x": 17.0,  # width in km - always positive
+    "length_y": 0.0,  # thickness in km - always positive
     "meshfile": "meshes/marmousi_guess.msh",
     "initmodel": "velocity_models/marmousi_guess.hdf5",
     "truemodel": "not_used.hdf5",
