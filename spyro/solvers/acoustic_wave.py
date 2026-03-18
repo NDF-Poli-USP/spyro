@@ -96,7 +96,9 @@ class AcousticWave(Wave):
         if self.adjoint_type == AdjointType.IMPLEMENTED_ADJOINT:
             if self.misfit is None:
                 self.forward_solve()
-            return backward_wave_propagator(self)
+                forward_solution = self.forward_solution
+            return backward_wave_propagator(
+                self, forward_solution=forward_solution)
         elif self.adjoint_type == AdjointType.AUTOMATED_ADJOINT:
             if self.automated_adjoint.reduced_functional is None:
                 self.forward_solve()

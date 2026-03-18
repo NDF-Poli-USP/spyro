@@ -2,7 +2,7 @@ import firedrake as fire
 from . import helpers
 
 
-def backward_wave_propagator(Wave_obj, dt=None):
+def backward_wave_propagator(Wave_obj, dt=None, forward_solution=None):
     """Propagates the adjoint wave backwards in time.
     Currently uses central differences.
 
@@ -20,12 +20,12 @@ def backward_wave_propagator(Wave_obj, dt=None):
         Calculated gradient
     """
     if Wave_obj.abc_active is False:
-        return backward_wave_propagator_no_pml(Wave_obj, dt=dt)
+        return backward_wave_propagator_no_pml(Wave_obj, dt=dt, forward_solution=forward_solution)
     elif Wave_obj.abc_active:
-        return mixed_space_backward_wave_propagator(Wave_obj, dt=dt)
+        return mixed_space_backward_wave_propagator(Wave_obj, dt=dt, forward_solution=forward_solution)
 
 
-def backward_wave_propagator_no_pml(Wave_obj, dt=None):
+def backward_wave_propagator_no_pml(Wave_obj, dt=None, forward_solution=None):
     """Propagates the adjoint wave backwards in time.
     Currently uses central differences. Does not have any PML.
 
@@ -51,7 +51,6 @@ def backward_wave_propagator_no_pml(Wave_obj, dt=None):
     if dt is not None:
         Wave_obj.dt = dt
 
-    forward_solution = Wave_obj.forward_solution
     receivers = Wave_obj.receivers
     residual = Wave_obj.misfit
     comm = Wave_obj.comm
@@ -129,12 +128,13 @@ def backward_wave_propagator_no_pml(Wave_obj, dt=None):
             uadj.assign(u_np1)
             if len(forward_solution) > 2:
                 dufordt2.assign(
-                    (forward_solution.pop() - 2.0 * forward_solution[-1] + forward_solution[-2]) / fire.Constant(dt**2)
+                    (forward_solution[-1] - 2.0 * forward_solution[-2] + forward_solution[-3]) / fire.Constant(dt**2)
                 )
             else:
                 dufordt2.assign(
-                    (forward_solution.pop() - 2.0 * 0.0 + 0.0) / fire.Constant(dt**2)
+                    (forward_solution[-1] - 2.0 * 0.0 + 0.0) / fire.Constant(dt**2)
                 )
+            forward_solution.pop()
 
             grad_solver.solve()
             if step == nt-1 or step == 0:
@@ -154,7 +154,7 @@ def backward_wave_propagator_no_pml(Wave_obj, dt=None):
     return dJ
 
 
-def mixed_space_backward_wave_propagator(Wave_obj, dt=None):
+def mixed_space_backward_wave_propagator(Wave_obj, dt=None, forward_solution=None):
     """Propagates the adjoint wave backwards in time.
     Currently uses central differences. Based on the
     mixed space implementation of PML.
