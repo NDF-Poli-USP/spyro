@@ -461,9 +461,9 @@
 #         print("Entering mesh generation", flush=True)
 #     M = grid_point_to_mesh_point_converter_for_seismicmesh(model, G)
 
-#     Lz = model["mesh"]["Lz"]
+#     Lz = model["mesh"]["length_z"]
 #     lz = model["BCs"]["lz"]
-#     Lx = model["mesh"]["Lx"]
+#     Lx = model["mesh"]["length_x"]
 #     lx = model["BCs"]["lx"]
 
 #     Real_Lz = Lz + lz
@@ -580,11 +580,11 @@
 #     M = grid_point_to_mesh_point_converter_for_seismicmesh(model, G)
 #     method = model["opts"]["method"]
 
-#     Lz = model["mesh"]["Lz"]
+#     Lz = model["mesh"]["length_z"]
 #     lz = model["BCs"]["lz"]
-#     Lx = model["mesh"]["Lx"]
+#     Lx = model["mesh"]["length_x"]
 #     lx = model["BCs"]["lx"]
-#     Ly = model["mesh"]["Ly"]
+#     Ly = model["mesh"]["length_y"]
 #     ly = model["BCs"]["ly"]
 
 #     Real_Lz = Lz + lz
