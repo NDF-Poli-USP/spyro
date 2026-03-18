@@ -42,7 +42,7 @@ def plot_function_layer_size(lay_par, freq_par, geom_par, FLpos,
             Inverse of min. Eikonal (1 / phi_min, equivalent to c_bound/lref)
     freq_par: `list`
         Parameters of the frequency:
-        - fref : `float`
+        - reference_frequency : `float`
             Reference frequency of the wave
         - fsou: `float`
             Source frequency
