@@ -93,7 +93,7 @@ class AcousticWave(Wave):
         dJ: Firedrake 'Function'
             Gradient of the cost functional.
         """
-        if self.adjoint_type == AdjointType.SPYRO_ADJOINT:
+        if self.adjoint_type == AdjointType.IMPLEMENTED_ADJOINT:
             if self.misfit is None:
                 self.forward_solve()
             return backward_wave_propagator(self)

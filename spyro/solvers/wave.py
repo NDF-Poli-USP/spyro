@@ -473,7 +473,7 @@ class Wave(Model_parameters, metaclass=ABCMeta):
             raise ValueError(
                 "Set an initial velocity model before enabling the adjoint."
             )
-        self.automated_adjoint = AutomatedAdjoint(control)
+        self.automated_adjoint = AutomatedAdjoint(control, self.comm)
         self.use_vertex_only_mesh = True
         self._compute_functional = True
         self.store_forward_time_steps = False
@@ -485,7 +485,7 @@ class Wave(Model_parameters, metaclass=ABCMeta):
         self._compute_functional = True
         self.enable_store_misfit()
         self.store_forward_time_steps = True
-        self.adjoint_type = AdjointType.SPYRO_ADJOINT
+        self.adjoint_type = AdjointType.IMPLEMENTED_ADJOINT
 
     @property
     def real_shot_record(self):

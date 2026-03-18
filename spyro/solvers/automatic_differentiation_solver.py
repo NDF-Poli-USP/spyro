@@ -2,7 +2,6 @@ from contextlib import contextmanager
 
 import firedrake.adjoint as fire_adj
 from pyadjoint import (
-    ReducedFunctional,
     Tape,
     continue_annotation,
     pause_annotation,
@@ -14,7 +13,7 @@ from pyadjoint.tape import get_working_tape
 class AutomatedAdjoint:
     """Automatic differentiation wrapper for seismic inversion."""
 
-    def __init__(self, control, model_control_index=0):
+    def __init__(self, control, ensemble, model_control_index=0):
         if isinstance(control, (list, tuple)):
             controls = tuple(control)
         else:
@@ -25,6 +24,7 @@ class AutomatedAdjoint:
             raise ValueError("model_control_index is out of range for controls.")
 
         self._controls = controls
+        self._ensemble = ensemble
         self._model_control_index = model_control_index
         self._functional = None
         self._reduced_functional = None
@@ -77,9 +77,10 @@ class AutomatedAdjoint:
             reduced_controls = controls
         else:
             reduced_controls = controls[0]
-        self._reduced_functional = ReducedFunctional(
+        self._reduced_functional = fire_adj.EnsembleReducedFunctional(
             functional,
             reduced_controls,
+            self._ensemble,
             derivative_components=derivative_components,
             tape=self._tape,
         )
