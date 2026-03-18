@@ -560,32 +560,31 @@ def RectangleMesh(nx, ny, length_x, length_y, pad=None, comm=None, quadrilateral
 def PeriodicRectangleMesh(
     nx, ny, length_x, length_y, pad=None, comm=None, quadrilateral=False
 ):
-  """Create a periodic rectangle mesh based on the Firedrake mesh.
-    First axis is negative, second axis is positive. If there is a pad, both
-    axis are dislocated by the pad.
+    """Create a periodic rectangle mesh based on the Firedrake mesh.
+      First axis is negative, second axis is positive. If there is a pad, both
+      axis are dislocated by the pad.
 
-    Parameters
-    ----------
-    length_x: float
-        Length of the domain in the x direction.
-    length_y: float
-        Length of the domain in the y direction.
-    nx: int
-        Number of elements in the x direction.
-    ny: int
-        Number of elements in the y direction.
-    pad: float, optional
-        Padding to be added to the domain. The default is None.
-    comm: MPI communicator, optional
-        MPI communicator. The default is None.
-    quadrilateral: bool, optional
-        If True, the mesh is quadrilateral. The default is False.
+      Parameters
+      ----------
+      length_x: float
+          Length of the domain in the x direction.
+      length_y: float
+          Length of the domain in the y direction.
+      nx: int
+          Number of elements in the x direction.
+      ny: int
+          Number of elements in the y direction.
+      pad: float, optional
+          Padding to be added to the domain. The default is None.
+      comm: MPI communicator, optional
+          MPI communicator. The default is None.
+      quadrilateral: bool, optional
+          If True, the mesh is quadrilateral. The default is False.
 
-    Returns
-    -------
-    mesh: Firedrake Mesh
-        Mesh
-
+      Returns
+      -------
+      mesh: Firedrake Mesh
+          Mesh
     """
     if pad is not None:
         length_x += pad
