@@ -47,6 +47,8 @@ def central_difference(wave, source_ids=None):
             for step_index in range(nt)
             if step_index % wave.gradient_sampling_frequency == 0
         ]
+    if wave.adjoint_type == AdjointType.AUTOMATED_ADJOINT:
+        wave.automated_adjoint.start_recording()
     if wave.sources is not None and wave.use_vertex_only_mesh:
         # source_cof is a cofunction that represents a point source,
         # being one at a point and zero elsewhere.
@@ -56,8 +58,6 @@ def central_difference(wave, source_ids=None):
         )
     usol_recv = []
     save_step = 0
-    if wave.adjoint_type == AdjointType.AUTOMATED_ADJOINT:
-        wave.automated_adjoint.start_recording()
     if wave.compute_functional:
         J = 0.0
     if wave.store_misfit:

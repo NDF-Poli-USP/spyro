@@ -1,5 +1,4 @@
 from contextlib import contextmanager
-from math import log
 
 import firedrake.adjoint as fire_adj
 from pyadjoint import (
@@ -9,7 +8,7 @@ from pyadjoint import (
     pause_annotation,
     set_working_tape,
 )
-from pyadjoint.tape import get_working_tape, stop_annotating
+from pyadjoint.tape import get_working_tape
 
 
 class AutomatedAdjoint:
@@ -99,7 +98,7 @@ class AutomatedAdjoint:
         return self._reduced_functional.derivative(apply_riesz=False)
 
     def verify_gradient(self, control_value, direction=None, dJdm=None):
-        """Run a first-order Taylor test for the reduced functional."""
+        """Run a Taylor test for the reduced functional."""
         if control_value is None:
             if len(self._controls) > 1:
                 raise NotImplementedError(
@@ -112,35 +111,12 @@ class AutomatedAdjoint:
             direction = control_value.copy(deepcopy=True)
             direction.interpolate(1.)
 
-        with stop_annotating():
-            Jm = self._reduced_functional(control_value)
-            if dJdm is None:
-                dJdm = direction._ad_dot(self._reduced_functional.derivative())
-
-            print("Running Taylor test")
-            epsilons = [0.01 / 2 ** i for i in range(4)]
-            residuals = []
-            for eps in epsilons:
-                perturbed_control = control_value._ad_add(
-                    direction._ad_mul(eps)
-                )
-                Jp = self._reduced_functional(perturbed_control)
-                residuals.append(float(abs(Jp - Jm - eps * dJdm)))
-
-            print(f"Computed residuals: {residuals}")
-            rates = [
-                log(residuals[i] / residuals[i - 1])
-                / log(epsilons[i] / epsilons[i - 1])
-                for i in range(1, len(epsilons))
-            ]
-            print(f"Computed convergence rates: {rates}")
-
-        cutoff = len(residuals)
-        while cutoff > 1 and residuals[cutoff - 1] >= residuals[cutoff - 2]:
-            cutoff -= 1
-
-        usable_rate_count = max(1, cutoff - 1)
-        return min(rates[:usable_rate_count])
+        return fire_adj.taylor_test(
+            self._reduced_functional,
+            control_value,
+            direction,
+            dJdm=dJdm,
+        )
 
     def clear_tape(self):
         """Clear the stored tape and drop the reduced functional."""

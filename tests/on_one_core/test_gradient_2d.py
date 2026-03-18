@@ -7,6 +7,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 import pytest
 import spyro
+from firedrake import dx
 
 
 def check_gradient(Wave_obj_guess, dJ, plot=False):
@@ -164,14 +165,17 @@ def test_gradient(automated_adjoint):
             forward_solution=forward_solution_guess)
         check_gradient(Wave_obj_guess, dJ, plot=True)
     else:
-        # Check the stop annotating status. It should be false.
         dJ = Wave_obj_guess.gradient_solve()
+        assert isinstance(dJ, fire.Function)
         direction = fire.Function(Wave_obj_guess.function_space)
-        direction.interpolate(1.)
-        dJdm = fire.assemble(dJ * direction * dx(**Wave_obj_guess.quadrature_rule))
-        assert (Wave_obj_guess.automated_adjoint.verify_gradient(
-            Wave_obj_guess.c, direction=direction, dJdm=dJdm)) > 1.9
+        np.random.seed(1)
+        direction.dat.data[:] = np.random.rand(direction.dat.data.size)
+        rate = Wave_obj_guess.automated_adjoint.verify_gradient(
+            Wave_obj_guess.c,
+            direction=direction,
+        )
+        assert math.isclose(rate, 2.0, rel_tol=1e-2)
 
 
 if __name__ == "__main__":
-    test_gradient(automated_adjoint=False)
+    test_gradient(automated_adjoint=True)
