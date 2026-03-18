@@ -294,7 +294,7 @@ class HABC_Damping():
 
         Parameters
         ----------
-         xCR_reg : `tuple`
+        xCR_reg : `tuple`
             Values of the heuristic factor for regression
         CRmin_reg : `tuple`
             Values of the minimum damping ratio for regression
