@@ -188,3 +188,4 @@ __pycache__/
 fw_outputs*.*
 output/
 forgotten_files/
+PacMeshIgnore/
