@@ -171,13 +171,13 @@ class ABC_Layer_Wave(AcousticWave, HABC_Mesh, RectangLayer,
         '''
 
         # Layer type
-        if self._abc_boundary_layer_type == "hybrid":
+        if self.abc_boundary_layer_type == "hybrid":
             abc_layer_str = "Absorbing" if for_prints else "habc"
-        elif self._abc_boundary_layer_type == "PML":
+        elif self.abc_boundary_layer_type == "PML":
             abc_layer_str = "PML" if for_prints else "pml"
         else:
             value_parameter_error('abc_layer_str',
-                                  self._abc_boundary_layer_type,
+                                  self.abc_boundary_layer_type,
                                   ["hybrid", "PML"])
 
         formatted_str = str_to_format.format(abc_layer_str)
@@ -821,11 +821,11 @@ class ABC_Layer_Wave(AcousticWave, HABC_Mesh, RectangLayer,
 
         # Setting no damping
         self.cosHig = fire.Constant(0.)
-        if self._abc_boundary_layer_type == "hybrid":
+        if self.abc_boundary_layer_type == "hybrid":
             self.eta_mask = fire.Constant(0.)
             self.eta_habc = fire.Constant(0.)
 
-        elif self._abc_boundary_layer_type == "PML":
+        elif self.abc_boundary_layer_type == "PML":
             self.sigma_mask = fire.Constant(0.)
             self.sigma_z = fire.Constant(0.)
             self.sigma_x = fire.Constant(0.)
@@ -844,9 +844,9 @@ class ABC_Layer_Wave(AcousticWave, HABC_Mesh, RectangLayer,
         del self.Lx_abc, self.Lz_abc
         if self.dimension == 3:
             del self.Ly_abc
-        if self._abc_boundary_layer_type == "hybrid":
+        if self.abc_boundary_layer_type == "hybrid":
             del self.cosHig, self.eta_mask, self.eta_habc
-        elif self._abc_boundary_layer_type == "PML":
+        elif self.abc_boundary_layer_type == "PML":
             del self.sigma_mask, self.sigma_z, self.sigma_x
             if self.dimension == 3:
                 del self.sigma_y

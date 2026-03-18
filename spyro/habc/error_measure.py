@@ -31,8 +31,8 @@ class HABC_Error():
         - errPk : Peak error
         - pkMax : Maximum reference peak
         - final_energy : Dissipated energy in the HABC scheme
-    f_Nyq : `float`
-        Nyquist frequency according to the time step. f_Nyq = 1 / (2 * dt)
+    f_Nyquist : `float`
+        Nyquist frequency according to the time step. f_Nyquist = 1 / (2 * dt)
     max_errIt : `float`
         Maximum integral error at the receivers for the HABC scheme
     max_errPK : `float`
@@ -70,7 +70,7 @@ class HABC_Error():
         Save the reference signal for the HABC scheme
     '''
 
-    def __init__(self, dt, f_Nyq, receiver_locations, receivers_output=None,
+    def __init__(self, dt, f_Nyquist, receiver_locations, receivers_output=None,
                  output_folder=None, output_case=None):
         '''
         Initialize the HABC_Error class.
@@ -79,8 +79,8 @@ class HABC_Error():
         ----------
         dt : `float`
             Time step used in the simulation
-        f_Nyq : `float`
-            Nyquist frequency according to the time step. f_Nyq = 1 / (2 * dt)
+        f_Nyquist : `float`
+            Nyquist frequency according to the time step. f_Nyquist = 1 / (2 * dt)
         receiver_locations: `list`
             List of receiver locations
         receivers_output : `array`, optional
@@ -99,7 +99,7 @@ class HABC_Error():
         self.dt = dt
 
         # Nyquist frequency
-        self.f_Nyq = f_Nyq
+        self.f_Nyquist = f_Nyquist
 
         # Receivers data and initialization
         self.receiver_locations = receiver_locations
@@ -144,7 +144,7 @@ class HABC_Error():
         self.receivers_ref_fft = []
         for rec in range(self.number_of_receivers):
             signal = self.receivers_reference[:, rec]
-            yf = freq_response(signal, self.f_Nyq)
+            yf = freq_response(signal, self.f_Nyquist)
             self.receivers_ref_fft.append(yf)
         np.save(pth_str + "habc_fft.npy", self.receivers_ref_fft)
 
@@ -281,7 +281,7 @@ class HABC_Error():
         self.receivers_out_fft = []
         for rec in range(self.number_of_receivers):
             signal = self.receivers_output[:, rec]
-            yf = freq_response(signal, self.f_Nyq)
+            yf = freq_response(signal, self.f_Nyquist)
             self.receivers_out_fft.append(yf)
         self.receivers_out_fft = np.asarray(self.receivers_out_fft).T
 
