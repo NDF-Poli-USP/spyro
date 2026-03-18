@@ -8,195 +8,6 @@ from numpy import where, log
 #   "A Modified PML Acoustic Wave Equation". Kim (2019)
 
 
-def calc_pml_damping(pad_len, dgr_prof=2, CR=0.001):
-    '''
-    Calculate the maximum damping coefficient for the PML layer.
-
-    Parameters
-    ----------
-    pad_len : `float`
-        Length of the PML layer
-    dgr_prof : `int`, optional
-        Degree of the damping profile within the PML layer.
-    CR : `float`, optional
-        Desired reflection coefficient at outer boundary of PML layer.
-        Default is 0.001
-
-    Returns
-    -------
-    sigma_max : `float`
-        Maximum damping coefficient within the PML layer
-    '''
-
-    sigma_max = (dgr_prof + 1.) / (2. * pad_len) * log(1 / CR)
-
-    return sigma_max
-
-
-def pml_sigma_field(Wave_obj):
-    '''
-    Generate a damping profile for the PML.
-
-    Parameters
-    ----------
-    coords : 'ufl.geometry.SpatialCoordinate'
-        Domain Coordinates including the absorbing layer
-    V : `firedrake function space`
-        Function space for the mask field
-    pad_len : `float`
-        Length of the PML layer
-    sigma_max : `float`
-        Maximum damping coefficient within the PML layer
-
-    Returns
-    -------
-    sigma_x : obj
-        Firedrake function with the damping function in the x direction
-    sigma_z : obj
-        Firedrake function with the damping function in the z direction
-    sigma_y : obj
-        Firedrake function with the damping function in the y direction
-    '''
-
-    ps = Wave_obj.abc_exponent
-    cmax = Wave_obj.c_max  # maximum acoustic wave velocity
-    R = Wave_obj.abc_R  # theoretical reclection coefficient
-    pad_length = Wave_obj.abc_pad_length  # length of the padding
-    V = Wave_obj.function_space
-    dimension = Wave_obj.dimension
-    z = Wave_obj.mesh_z
-    x = Wave_obj.mesh_x
-    x1 = 0.0
-    x2 = Wave_obj.mesh_parameters.length_x
-    z2 = -Wave_obj.mesh_parameters.length_z
-
-    # Compute the maximum damping coefficient
-    bar_sigma = cmax * (0. if Wave_obj.abc_get_ref_model else
-                        calc_pml_damping(pad_length, CR=R))
-
-    aux1 = fire.Function(V)
-    aux2 = fire.Function(V)
-
-    # Sigma X
-    sigma_max_x = bar_sigma  # Max damping
-    aux1.interpolate(
-        fire.conditional(
-            fire.And((x >= x1 - pad_length), x < x1),
-            ((abs(x - x1) ** (ps)) / (pad_length ** (ps))) * sigma_max_x,
-            0.0,
-        )
-    )
-    aux2.interpolate(
-        fire.conditional(
-            fire.And(x > x2, (x <= x2 + pad_length)),
-            ((abs(x - x2) ** (ps)) / (pad_length ** (ps))) * sigma_max_x,
-            0.0,
-        )
-    )
-    sigma_x = fire.Function(V, name="sigma_x").interpolate(aux1 + aux2)
-
-    # Sigma Z
-    tol_z = 1.000001
-    sigma_max_z = bar_sigma  # Max damping
-    aux1.interpolate(
-        fire.conditional(
-            fire.And(z < z2, (z >= z2 - tol_z * pad_length)),
-            ((abs(z - z2) ** (ps)) / (pad_length ** (ps))) * sigma_max_z,
-            0.0,
-        )
-    )
-
-    sigma_z = fire.Function(V, name="sigma_z").interpolate(aux1)
-
-    if dimension == 2:
-        return (sigma_x, sigma_z)
-
-    elif dimension == 3:
-        # Sigma Y
-        sigma_max_y = bar_sigma  # Max damping
-        y = Wave_obj.mesh_y
-        y1 = 0.0
-        y2 = Wave_obj.length_y
-        aux1.interpolate(
-            fire.conditional(
-                fire.And((y >= y1 - pad_length), y < y1),
-                ((abs(y - y1) ** (ps)) / (pad_length ** (ps))) * sigma_max_y,
-                0.0,
-            )
-        )
-        aux2.interpolate(
-            fire.conditional(
-                fire.And(y > y2, (y <= y2 + pad_length)),
-                ((abs(y - y2) ** (ps)) / (pad_length ** (ps))) * sigma_max_y,
-                0.0,
-            )
-        )
-        sigma_y = fire.Function(V, name="sigma_y").interpolate(aux1 + aux2)
-        # sgm_y = VTKFile("pmlField/sigma_y.pvd")
-        # sgm_y.write(sigma_y)
-
-        return (sigma_x, sigma_y, sigma_z)
-
-
-def damping_pml_2d(sigma_z, sigma_x):
-    '''
-    Build damping matrices for a two-dimensional problem using PML.
-
-    Parameters
-    ----------
-    sigma_z: Firedrake 'Function'
-        Damping profile in the z direction
-    sigma_x: Firedrake 'Function'
-        Damping profile in the x direction
-
-    Returns
-    -------
-    Gamma_1: Firedrake 'TensorFunction'
-        First damping matrix
-    Gamma_2: Firedrake 'TensorFunction'
-        Second damping matrix
-    '''
-    Gamma_1 = fire.as_tensor([[sigma_z, 0.], [0., sigma_x]])
-    Gamma_2 = fire.as_tensor([[sigma_z - sigma_x, 0.],
-                              [0., sigma_x - sigma_z]])
-
-    return Gamma_1, Gamma_2
-
-
-def damping_pml_3d(sigma_z, sigma_x, sigma_y):
-    '''
-    Build  Damping matrices for a three-dimensional problem using PML.
-
-    Parameters
-    ----------
-    sigma_z: Firedrake 'Function'
-        Damping profile in the z direction
-    sigma_x: Firedrake 'Function'
-        Damping profile in the x direction
-    sigma_y: Firedrake 'Function'
-        Damping profile in the y direction
-
-    Returns
-    -------
-    Gamma_1: Firedrake 'TensorFunction'
-        First damping matrix
-    Gamma_2: Firedrake 'TensorFunction'
-        Second damping matrix
-    Gamma_3: Firedrake 'TensorFunction'
-        Third damping matrix
-    '''
-    Gamma_1 = fire.as_tensor([
-        [sigma_z, 0., 0.], [0., sigma_x, 0.], [0., 0., sigma_y]])
-    Gamma_2 = fire.as_tensor([[sigma_z - sigma_x - sigma_y, 0., 0.],
-                              [0., sigma_x - sigma_z - sigma_y, 0.],
-                              [0., 0., sigma_y - sigma_x - sigma_z]])
-    Gamma_3 = fire.as_tensor([[sigma_x * sigma_y, 0., 0.],
-                              [0., sigma_z * sigma_y, 0.],
-                              [0., 0., sigma_z * sigma_x]])
-
-    return Gamma_1, Gamma_2, Gamma_3
-
-
 def forms_pml(Wave_obj, W, bc_type="nrbc"):
     '''
     Build the variational form for the wave equation with a PML.
@@ -244,13 +55,14 @@ def forms_pml(Wave_obj, W, bc_type="nrbc"):
 
     if not Wave_obj.abc_get_ref_model:
 
+        # Damping profiles and matrices
+        sigma_x, sigma_z = Wave_obj.sigma_x, Wave_obj.sigma_z
         if Wave_obj.dimension == 2:
-            sigma_x, sigma_z = pml_sigma_field(Wave_obj)
-            Gamma_1, Gamma_2 = damping_pml_2d(sigma_z, sigma_x)
+            Gamma_1, Gamma_2 = Wave_obj.damping_pml_2d()
 
         elif Wave_obj.dimension == 3:
-            sigma_x, sigma_y, sigma_z = pml_sigma_field(Wave_obj)
-            Gamma_1, Gamma_2, Gamma_3 = damping_pml_3d(sigma_z, sigma_x, sigma_y)
+            sigma_y = Wave_obj.sigma_y
+            Gamma_1, Gamma_2, Gamma_3 = Wave_obj.damping_pml_3d()
 
         # Tuple of boundary ids for NRBC
         bnds = [Wave_obj.absorb_top, Wave_obj.absorb_bottom,
@@ -326,9 +138,7 @@ def construct_solver_or_matrix_with_pml(Wave_obj):
     None
     '''
 
-    if not Wave_obj.abc_get_ref_model:
-        Wave_obj.cosHig = fire.Constant(1.)
-
+    # Build mixed function space
     V = Wave_obj.function_space
     Z = fire.VectorFunctionSpace(V.ufl_domain(), V.ufl_element())
     Wave_obj.vector_function_space = Z
@@ -355,7 +165,7 @@ def construct_solver_or_matrix_with_pml(Wave_obj):
     Wave_obj.X_n = X_n
     Wave_obj.X_nm1 = X_nm1
 
-    FF, fix_bnd = forms_pml(Wave_obj, W, bc_type="nrbc")
+    FF, fix_bnd = forms_pml(Wave_obj, W, bc_type="dirichlet")
 
     Wave_obj.lhs = fire.lhs(FF)
     Wave_obj.rhs = fire.rhs(FF)

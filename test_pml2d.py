@@ -194,11 +194,11 @@ def pml_fig8(Wave_obj, modal_solver):
     # Updating velocity model
     Wave_obj.velocity_abc()
 
-    # # Setting the damping profile within absorbing layer
-    # Wave_obj.damping_layer(xCR_usu=xCR_usu, method=modal_solver)
+    # Setting the damping profile within absorbing layer
+    Wave_obj.pml_layer()
 
-    # # Applying NRBCs on outer boundary layer
-    # Wave_obj.nrbc_on_boundary_layer()
+    # Applying NRBCs on outer boundary layer
+    Wave_obj.nrbc_on_boundary_layer(sommerfeld_bc=True)
 
     # Solving the forward problem
     Wave_obj.forward_solve()

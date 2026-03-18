@@ -15,8 +15,10 @@ class PML_Wave(ABC_Layer_Wave):
 
     Attributes
     ----------
-    sigma_mask : `firedrake function`
+    pml_mask : `firedrake function`
         Mask function to identify the PML domain
+    sigma_max : `float`
+        Maximum damping coefficient within the PML layer
     sigma_x : `firedrake function`
         Damping profile in the x direction within the PML layer
     sigma_y : `firedrake function`
@@ -60,28 +62,38 @@ class PML_Wave(ABC_Layer_Wave):
         ABC_Layer_Wave.__init__(self, dictionary=dictionary, fwi_iter=fwi_iter,
                                 comm=comm, output_folder=output_folder)
 
-    def calc_pml_damping(self, CR=0.001):
+    def calc_pml_damping(self, dgr_prof=2):
         '''
         Calculate the maximum damping coefficient for the PML layer.
 
         Parameters
         ----------
-        CR : `float`, optional
-            Desired reflection coefficient at outer boundary of PML layer.
-            Default is 0.001
+        dgr_prof : `int`, optional
+            Degree of the damping profile within the PML layer.
 
         Returns
         -------
-        sigma_max : `float`
-            Maximum damping coefficient within the PML layer
+        None
+
         '''
 
-        dgr_prof = 2.  # Degree of the damping profile within the PML layer
-        sigma_max = (dgr_prof + 1.) / (2. * self.pad_len) * np.log(1 / CR)
+        # Validating input parameters
+        pad_len = self.abc_pad_length
+        if pad_len <= 0:
+            raise ValueError(f"Invalid value for 'abc_pad_length': {pad_len}. "
+                             "'abc_pad_length' must be greater than zero.")
 
-        return sigma_max
+        # Desired reflection coefficient at outer boundary of PML layer.
+        CR = np.clip(self.abc_R, 1e-8, 1e-3)
 
-    def pml_sigma_field(self, coords, V, pad_len, sigma_max):
+        # Degree of the damping profile within the PML layer.
+        dgr_prof = max(1, dgr_prof)
+
+        # Maximum damping coefficient within the PML layer
+        self.sigma_max = 0. if self.abc_get_ref_model else \
+            self.c_max * (dgr_prof + 1.) / (2. * pad_len) * np.log(1. / CR)
+
+    def pml_sigma_field(self, coords, V):
         '''
         Generate a damping profile for the PML.
 
@@ -91,26 +103,21 @@ class PML_Wave(ABC_Layer_Wave):
             Domain Coordinates including the absorbing layer
         V : `firedrake function space`
             Function space for the mask field
-        pad_len : `float`
-            Size of the absorbing layer
-        sigma_max : `float`
-            Maximum damping coefficient within the PML layer
 
         Returns
         -------
         None
         '''
 
+        pad_len = self.abc_pad_length
+
         # Validating input parameters
         if pad_len <= 0:
             raise ValueError(f"Invalid value for 'pad_len': {pad_len}. "
                              "'pad_len' must be greater than zero.")
-        if sigma_max <= 0:
-            raise ValueError(f"Invalid value for 'sigma_max': {sigma_max}. "
-                             "'sigma_max' must be greater than zero.")
 
         # Domain dimensions
-        Lx, Lz = self.dom_dim[:2]
+        Lx, Lz = self.domain_dim[:2]
 
         # Domain coordinates
         z, x = coords[0], coords[1]
@@ -129,18 +136,18 @@ class PML_Wave(ABC_Layer_Wave):
         ref_z = z_sqr / fire.Constant(pad_len**2)
         ref_x = x_sqr / fire.Constant(pad_len**2)
         self.sigma_z = fire.Function(V, name='sigma_z [1/s]')
-        self.sigma_z.interpolate(self.sigma_mask * self.c * ref_z)
+        self.sigma_z.interpolate(self.pml_mask * self.sigma_max * ref_z)
         self.sigma_x = fire.Function(V, name='sigma_x [1/s]')
-        self.sigma_x.interpolate(self.sigma_mask * self.c * ref_x)
+        self.sigma_x.interpolate(self.pml_mask * self.sigma_max * ref_x)
 
         # Save damping profile
-        outfile = fire.VTKFile(self.path_case_pml + "sigma_pml.pvd")
+        outfile = fire.VTKFile(self.path_case_abc + "sigma_pml.pvd")
         outfile.write(self.sigma_z, self.sigma_x)
 
         if self.dimension == 3:  # 3D
 
             # 3D dimension
-            Ly = self.dom_dim[2]
+            Ly = self.domain_dim[2]
             y = coords[2]
 
             # Conditional value
@@ -154,7 +161,7 @@ class PML_Wave(ABC_Layer_Wave):
             # Quadratic damping profile
             ref_y = y_sqr / fire.Constant(pad_len**2)
             self.sigma_y = fire.Function(V, name='sigma_y [1/s]')
-            self.sigma_y.interpolate(self.sigma_mask * self.c * ref_y)
+            self.sigma_y.interpolate(self.pml_mask * self.sigma_max * ref_y)
             outfile.write(self.sigma_y)
 
     def pml_layer(self):
@@ -173,21 +180,74 @@ class PML_Wave(ABC_Layer_Wave):
         print("\nCreating Damping PML Profile", flush=True)
 
         # Compute the maximum damping coefficient
-        sigma_max = self.calc_pml_damping()
+
+        self.calc_pml_damping()
 
         # Mesh coordinates
         coords = fire.SpatialCoordinate(self.mesh)
 
         # Damping mask
         V_mask = fire.FunctionSpace(self.mesh, 'DG', 0)
-        self.sigma_mask = self.layer_mask_field(coords, V_mask,
-                                                type_marker='mask',
-                                                name_mask='sigma_mask')
+        self.pml_mask = self.layer_mask_field(coords, V_mask,
+                                              type_marker='mask',
+                                              name_mask='pml_mask')
 
         # Save damping mask
-        outfile = fire.VTKFile(self.path_case_pml + "sigma_mask.pvd")
-        outfile.write(self.sigma_mask)
+        outfile = fire.VTKFile(self.path_case_abc + "pml_mask.pvd")
+        outfile.write(self.pml_mask)
 
         # Damping fields
-        self.pml_sigma_field(coords, self.function_space,
-                             self.pad_len, sigma_max)
+        self.pml_sigma_field(coords, self.function_space)
+
+    def damping_pml_2d(self):
+        '''
+        Build damping matrices for a two-dimensional problem using PML.
+
+        Parameters
+        ----------
+        sigma_z: Firedrake 'Function'
+            Damping profile in the z direction
+        sigma_x: Firedrake 'Function'
+            Damping profile in the x direction
+
+        Returns
+        -------
+        Gamma_1: Firedrake 'TensorFunction'
+            First damping matrix
+        Gamma_2: Firedrake 'TensorFunction'
+            Second damping matrix
+        '''
+        Gamma_1 = fire.as_tensor([[self.sigma_z, 0.], [0., self.sigma_x]])
+        Gamma_2 = fire.as_tensor([[self.sigma_z - self.sigma_x, 0.],
+                                  [0., self.sigma_x - self.sigma_z]])
+
+        return Gamma_1, Gamma_2
+
+    def damping_pml_3d(self):
+        '''
+        Build  Damping matrices for a three-dimensional problem using PML.
+
+        Parameters
+        ----------
+        None
+
+        Returns
+        -------
+        Gamma_1: Firedrake 'TensorFunction'
+            First damping matrix
+        Gamma_2: Firedrake 'TensorFunction'
+            Second damping matrix
+        Gamma_3: Firedrake 'TensorFunction'
+            Third damping matrix
+        '''
+        Gamma_1 = fire.as_tensor([[self.sigma_z, 0., 0.],
+                                  [0., self.sigma_x, 0.],
+                                  [0., 0., self.sigma_y]])
+        Gamma_2 = fire.as_tensor([[self.sigma_z - self.sigma_x - self.sigma_y, 0., 0.],
+                                  [0., self.sigma_x - self.sigma_z - self.sigma_y, 0.],
+                                  [0., 0., self.sigma_y - self.sigma_x - self.sigma_z]])
+        Gamma_3 = fire.as_tensor([[self.sigma_x * self.sigma_y, 0., 0.],
+                                  [0., self.sigma_z * self.sigma_y, 0.],
+                                  [0., 0., self.sigma_z * self.sigma_x]])
+
+        return Gamma_1, Gamma_2, Gamma_3

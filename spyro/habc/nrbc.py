@@ -237,7 +237,7 @@ class NRBC():
 
         if sommerfeld_bc:  # Sommerfeld BC
             self.nrbc = "Sommerfeld"
-            cos_Hig = 1.
+            self.cosHig.assign(fire.Constant(1.))
 
         else:  # Higdon BC
 
@@ -283,7 +283,7 @@ class NRBC():
             cos_Hig[cos_Hig < self.cos_min] = (
                 1. - cos_Hig[cos_Hig < self.cos_min]**2)**0.5
 
-        self.cosHig.dat.data_with_halos[bnd_nfs] = cos_Hig
+            self.cosHig.dat.data_with_halos[bnd_nfs] = cos_Hig
 
         # Save boundary profile of cosine of incidence angle
         outfile = fire.VTKFile(self.path_save_nrbc + "cosHig.pvd")

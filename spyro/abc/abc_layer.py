@@ -8,6 +8,7 @@ from spyro.solvers.acoustic_wave import AcousticWave
 from spyro.meshing.meshing_habc import HABC_Mesh
 from spyro.abc.hyp_lay import HyperLayer
 from spyro.abc.rec_lay import RectangLayer
+from spyro.habc.nrbc import NRBC
 from spyro.habc.error_measure import HABC_Error
 from spyro.habc.lay_len import calc_size_lay
 from spyro.plots.plots_habc import plot_function_layer_size
@@ -16,7 +17,7 @@ from spyro.utils.freq_tools import freq_response
 
 
 class ABC_Layer_Wave(AcousticWave, HABC_Mesh, RectangLayer,
-                     HyperLayer, HABC_Error):
+                     HyperLayer, NRBC, HABC_Error):
     '''
     Class PML that determines PML size and parameters to be used
 
@@ -143,14 +144,27 @@ class ABC_Layer_Wave(AcousticWave, HABC_Mesh, RectangLayer,
         domain_dim = self.abc_domain_dimensions(only_orig_dom=True)
 
         # Initializing the Mesh class for ABC scheme
-        HABC_Mesh.__init__(
-            self, domain_dim, dimension=self.dimension, comm=self.comm)
+        HABC_Mesh.__init__(self, domain_dim,
+                           dimension=self.dimension,
+                           comm=self.comm)
 
         # Identifier for the current case study
         self.identify_abc_layer_case(output_folder=output_folder)
 
         # Current iteration
         self.fwi_iter = fwi_iter
+
+        # Initializing the error measure class
+        HABC_Error.__init__(self, self.dt, self.f_Nyquist,
+                            self.receiver_locations,
+                            output_folder=self.path_save,
+                            output_case=self.path_case_abc)
+
+        # Initializing the NRBC class
+        NRBC.__init__(self, domain_dim,
+                      self.abc_boundary_layer_shape,
+                      dimension=self.dimension,
+                      output_folder=self.path_case_abc)
 
     def formatting_abc_layer_type(self, str_to_format, for_prints=True):
         '''
@@ -250,12 +264,6 @@ class ABC_Layer_Wave(AcousticWave, HABC_Mesh, RectangLayer,
             self.path_save = getcwd() + "/" + output_folder + "/"
 
         self.path_case_abc = self.path_save + self.case + "/"
-
-        # Initializing the error measure class
-        HABC_Error.__init__(self, self.dt, self.f_Nyquist,
-                            self.receiver_locations,
-                            output_folder=self.path_save,
-                            output_case=self.path_case_abc)
 
     def critical_boundary_points(self):
         '''
@@ -624,6 +632,37 @@ class ABC_Layer_Wave(AcousticWave, HABC_Mesh, RectangLayer,
 
         outfile = fire.VTKFile(self.path_save + file_name)
         outfile.write(self.c)
+
+    def nrbc_on_boundary_layer(self, sommerfeld_bc=False):
+        '''
+        Apply the Higdon ABCs on the outer boundary of the absorbing layer
+
+        Parameters
+        ----------
+        sommerfeld_bc : `bool`, optional
+            If True, use Sommerfeld BC instead of Higdon BC. Default is False
+
+        Returns
+        -------
+        None
+        '''
+
+        print("\nApplying Non-Reflecting Boundary Conditions", flush=True)
+
+        # Getting boundary data from the layer boundaries
+        bnd_nfs, bnd_nodes_nfs = self.layer_boundary_data(self.function_space)
+
+        # Hypershape parameters
+        layer_shape = self.abc_boundary_layer_shape
+        if layer_shape == 'hypershape':
+            hyp_par = (self.n_hyp, *self.hyper_axes)
+        else:
+            hyp_par = None
+
+        # Applying Higdon ABCs
+        self.cos_ang_HigdonBC(self.function_space, self.crit_source, bnd_nfs,
+                              bnd_nodes_nfs, hyp_par=hyp_par,
+                              sommerfeld_bc=sommerfeld_bc)
 
     def check_timestep_abc(self, max_divisor_tf=1, set_max_dt=True,
                            method='ANALYTICAL', mag_add=3):

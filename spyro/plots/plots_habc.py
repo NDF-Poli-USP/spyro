@@ -260,7 +260,7 @@ def plot_rfft_receivers(Wave_object, fxlim=4., show=False):
     print("\nPlotting Frequency Comparison", flush=True)
 
     # Frequency data
-    f_Nyq = Wave_object.f_Nyq
+    f_Nyq = Wave_object.f_Nyquist
     f_sou = Wave_object.frequency
     pfft = Wave_object.receivers_out_fft.shape[0] - 1
     df = f_Nyq / pfft
