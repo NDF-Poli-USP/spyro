@@ -32,7 +32,7 @@ class HyperLayer():
         Area ratio to the area of the original domain. a_rat = area / a_orig
     dimension : `int`
         Model dimension (2D or 3D). Default is 2D
-    dom_dim : `tuple`
+    domain_dim : `tuple`
         Original domain dimensions: (Lx, Lz) for 2D or (Lx, Lz, Ly) for 3D
     f_Ah : `float`
         Hyperelliptical area factor. f_Ah = area / (a_hyp b_hyp)
@@ -84,13 +84,13 @@ class HyperLayer():
         Compute the truncated volume of hyperellipsoid for 0 <= z0 / b <= 1
     '''
 
-    def __init__(self, dom_dim, n_hyp=2, n_type='real', dimension=2):
+    def __init__(self, domain_dim, n_hyp=2., n_type='real', dimension=2):
         '''
         Initialize the HyperLayer class
 
         Parameters
         ----------
-        dom_dim : `tuple`
+        domain_dim : `tuple`
             Original domain dimensions: (Lx, Lz) for 2D or (Lx, Lz, Ly) for 3D
         n_hyp : `int`, optional
             Hypershape degree. Default is 2
@@ -105,11 +105,29 @@ class HyperLayer():
         None
         '''
 
+        # Validate input arguments
+        if not isinstance(domain_dim, tuple):
+            raise TypeError("domain_dim must be a tuple, "
+                            f"got {type(domain_dim).__name__}.")
+
+        if not isinstance(n_hyp, (int, float)):
+            raise TypeError("n_hyp must be a number (int or float), "
+                            f"got {type(n_hyp).__name__}.")
+
+        if n_hyp < 2.:
+            raise ValueError(f"n_hyp must be >= 2, got {n_hyp}")
+
+        if n_type not in ['real', 'integer']:
+            value_parameter_error('n_type', n_type, ['real', 'integer'])
+
+        if dimension not in [2, 3]:
+            value_parameter_error('dimension', dimension, [2, 3])
+
         # Original domain dimensions
-        self.dom_dim = dom_dim
+        self.domain_dim = domain_dim
 
         # Hypershape degree
-        self.n_hyp = n_hyp
+        self.n_hyp = float(n_hyp)
 
         # Model dimension
         self.dimension = dimension
@@ -117,16 +135,13 @@ class HyperLayer():
         # Type of the hypereshape degree
         self.n_type = n_type
 
-        if n_type not in ['real', 'integer']:
-            value_parameter_error('n_type', n_type, ['real', 'integer'])
-
-    def define_hyperaxes(self, dom_hyp):
+    def define_hyperaxes(self, domain_hyp):
         '''
         Define the hyperlayer semi-axes
 
         Parameters
         ----------
-        dom_hyp : `tuple`
+        domain_hyp : `tuple`
             Domain dimension with layer without truncation by free surface.
             - 2D : (Lx + 2 * pad_len, Lz + 2 * pad_len)
             - 3D : (Lx + 2 * pad_len, Lz + 2 * pad_len, Ly + 2 * pad_len)
@@ -137,12 +152,12 @@ class HyperLayer():
         '''
 
         # Hypershape semi-axes
-        a_hyp = 0.5 * dom_hyp[0]
-        b_hyp = 0.5 * dom_hyp[1]
+        a_hyp = 0.5 * domain_hyp[0]
+        b_hyp = 0.5 * domain_hyp[1]
         self.hyper_axes = (a_hyp, b_hyp)
 
         if self.dimension == 3:  # 3D
-            c_hyp = 0.5 * dom_hyp[2]
+            c_hyp = 0.5 * domain_hyp[2]
             self.hyper_axes += (c_hyp,)
 
     def radial_parameter(self, rel_coordinates, n):
@@ -428,7 +443,7 @@ class HyperLayer():
         '''
 
         # Domain dimensions
-        Lx, Lz = self.dom_dim[:2]
+        Lx, Lz = self.domain_dim[:2]
 
         # Hyperellipse degree
         n_hyp = self.n_hyp
@@ -438,7 +453,7 @@ class HyperLayer():
         print(ndeg_str.format(n_hyp), flush=True)
         axes_str = "Semi-axes (km): a_hyp:{:5.3f} - b_hyp:{:5.3f}"
         if self.dimension == 3:  # 3D
-            Ly = self.dom_dim[2]
+            Ly = self.domain_dim[2]
             axes_str += " - c_hyp:{:5.3f}"
         print(axes_str.format(*self.hyper_axes), flush=True)
 
@@ -491,7 +506,7 @@ class HyperLayer():
         self.n_hyp = np.clip(n_hyp, n_min, n_max)
         self.n_bounds = (n_min, n_max)
 
-    @staticmethod
+    @ staticmethod
     def trunc_half_hyp_area(a, b, n, z0):
         '''
         Compute the truncated area of hyperellipse for 0 <= z0 / b <= 1.
@@ -526,7 +541,7 @@ class HyperLayer():
 
         return A_tr
 
-    @staticmethod
+    @ staticmethod
     def half_hyp_area(a, b, n):
         '''
         Compute half the area of the hyperellipse.
@@ -551,7 +566,7 @@ class HyperLayer():
 
         return A_hf
 
-    @staticmethod
+    @ staticmethod
     def trunc_half_hyp_volume(a, b, c, n, z0):
         '''
         Compute the truncated volume of hyperellipsoid for 0 <= z0 / b <= 1.
@@ -589,7 +604,7 @@ class HyperLayer():
 
         return V_tr
 
-    @staticmethod
+    @ staticmethod
     def half_hyp_volume(a, b, c, n):
         '''
         Compute half the volume of the hyperellipsoid.
@@ -616,7 +631,7 @@ class HyperLayer():
 
         return V_hf
 
-    @staticmethod
+    @ staticmethod
     def hyp_full_perimeter(a, b, n):
         '''
         Compute perimeter of a hyperellipse
@@ -661,7 +676,7 @@ class HyperLayer():
 
         return perim_hyp
 
-    @staticmethod
+    @ staticmethod
     def hyp_full_surf_area(a, b, c, n):
         '''
         Compute the surface area of a hyperellipsoid.
@@ -736,13 +751,13 @@ class HyperLayer():
 
         return 8 * surf_hyp
 
-    def calc_hyp_geom_prop(self, dom_hyp, pad_len, lmin):
+    def calc_hyp_geom_prop(self, domain_hyp, pad_len, lmin):
         '''
         Calculate the geometric properties for the hypershape layer
 
         Parameters
         ----------
-        dom_hyp : `tuple`
+        domain_hyp : `tuple`
             Domain dimension with layer without truncation by free surface.
             - 2D : (Lx + 2 * pad_len, Lz + 2 * pad_len)
             - 3D : (Lx + 2 * pad_len, Lz + 2 * pad_len, Ly + 2 * pad_len)
@@ -757,21 +772,21 @@ class HyperLayer():
         '''
 
         # Domain dimensions w/o layer
-        chk_domd = len(self.dom_dim)
-        chk_habc = len(dom_hyp)
+        chk_domd = len(self.domain_dim)
+        chk_habc = len(domain_hyp)
         if self.dimension != chk_domd or self.dimension != chk_habc:
-            value_dimension_error(('dom_dim', 'dom_hyp'),
+            value_dimension_error(('domain_dim', 'domain_hyp'),
                                   (chk_domd, chk_habc), self.dimension)
 
         # Defining the hypershape semi-axes
-        self.define_hyperaxes(dom_hyp)
+        self.define_hyperaxes(domain_hyp)
 
         # Degree of the hypershape layer
         self.define_hyperlayer(pad_len, lmin, monitor=True)
 
         # Hypershape semi-axes and domain dimensions
         a_hyp, b_hyp = self.hyper_axes[:2]
-        Lx, Lz = self.dom_dim[:2]
+        Lx, Lz = self.domain_dim[:2]
 
         # Hyperellipse degree
         n_hyp = self.n_hyp
@@ -795,7 +810,7 @@ class HyperLayer():
 
         if self.dimension == 3:  # 3D
             c_hyp = self.hyper_axes[2]
-            Ly = self.dom_dim[2]
+            Ly = self.domain_dim[2]
 
             # Volume
             self.vol = self.half_hyp_volume(a_hyp, b_hyp, c_hyp, n_hyp) + \
