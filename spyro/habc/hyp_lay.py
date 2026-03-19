@@ -506,7 +506,7 @@ class HyperLayer():
         self.n_hyp = np.clip(n_hyp, n_min, n_max)
         self.n_bounds = (n_min, n_max)
 
-    @ staticmethod
+    @staticmethod
     def trunc_half_hyp_area(a, b, n, z0):
         '''
         Compute the truncated area of hyperellipse for 0 <= z0 / b <= 1.
@@ -541,7 +541,7 @@ class HyperLayer():
 
         return A_tr
 
-    @ staticmethod
+    @staticmethod
     def half_hyp_area(a, b, n):
         '''
         Compute half the area of the hyperellipse.
@@ -566,7 +566,7 @@ class HyperLayer():
 
         return A_hf
 
-    @ staticmethod
+    @staticmethod
     def trunc_half_hyp_volume(a, b, c, n, z0):
         '''
         Compute the truncated volume of hyperellipsoid for 0 <= z0 / b <= 1.
@@ -604,7 +604,7 @@ class HyperLayer():
 
         return V_tr
 
-    @ staticmethod
+    @staticmethod
     def half_hyp_volume(a, b, c, n):
         '''
         Compute half the volume of the hyperellipsoid.
@@ -631,7 +631,7 @@ class HyperLayer():
 
         return V_hf
 
-    @ staticmethod
+    @staticmethod
     def hyp_full_perimeter(a, b, n):
         '''
         Compute perimeter of a hyperellipse
@@ -676,7 +676,7 @@ class HyperLayer():
 
         return perim_hyp
 
-    @ staticmethod
+    @staticmethod
     def hyp_full_surf_area(a, b, c, n):
         '''
         Compute the surface area of a hyperellipsoid.
