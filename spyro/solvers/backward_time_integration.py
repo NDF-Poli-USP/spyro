@@ -104,6 +104,7 @@ def _backward_propagation(Wave_obj, dt=None, pml=False):
     variational solver is advanced with ``Wave_obj.solver.solve()``.
     """
     Wave_obj.reset_pressure()
+    mask_available = Wave_obj.gradient_mask_available
     if dt is not None:
         Wave_obj.dt = dt
 
