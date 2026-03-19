@@ -35,9 +35,9 @@ def model_settings():
 
     # Define the domain size without the ABL.
     model["mesh"] = {
-        "Lz": 1.0,  # depth in km - always positive
-        "Lx": 1.0,  # width in km - always positive
-        "Ly": 0.0,  # thickness in km - always positive
+        "length_z": 1.0,  # depth in km - always positive
+        "length_x": 1.0,  # width in km - always positive
+        "length_y": 0.0,  # thickness in km - always positive
         "meshfile": "not_used.msh",
         "initmodel": "not_used.hdf5",
         "truemodel": "not_used.hdf5",
