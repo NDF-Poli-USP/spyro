@@ -38,9 +38,9 @@ d["parallelism"] = {
 }
 
 d["mesh"] = {
-    "Lz": L,
-    "Lx": L,
-    "Ly": L,
+    "length_z": L,
+    "length_x": L,
+    "length_y": L,
     "h": h,
     "mesh_file": None,
     "mesh_type": "firedrake_mesh",

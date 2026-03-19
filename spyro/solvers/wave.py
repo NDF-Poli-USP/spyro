@@ -1,5 +1,4 @@
 from abc import abstractmethod, ABCMeta
-import sys
 import warnings
 import firedrake as fire
 from .automatic_differentiation_solver import AutomatedAdjoint
@@ -9,6 +8,7 @@ from .time_integration_central_difference import (
 from ..domains.quadrature import quadrature_rules
 from ..io import Model_parameters
 from ..io.basicio import ensemble_propagator
+from ..io import parallel_print
 from ..io.field_logger import FieldLogger
 from .. import utils
 from ..receivers.Receivers import Receivers
@@ -89,6 +89,7 @@ class Wave(Model_parameters, metaclass=ABCMeta):
         """
         super().__init__(dictionary=dictionary, comm=comm)
         self.initial_velocity_model = None
+        self.gradient_mask_available = False
         self.wave_type = WaveType.NONE
 
         self.function_space = None
@@ -136,9 +137,7 @@ class Wave(Model_parameters, metaclass=ABCMeta):
         Ensures a valid function space and model parameters are available,
         builds the solver operators, and advances the wavefield in time.
         """
-
-        if "-s" in sys.argv or bool(sys.flags.no_user_site):
-            print("\nSolving Forward Problem")
+        parallel_print("\nSolving Forward Problem", comm=self.comm)
 
         if self.function_space is None:
             self.force_rebuild_function_space()
@@ -231,14 +230,14 @@ class Wave(Model_parameters, metaclass=ABCMeta):
         output:  bool (optional)
             If True, outputs the velocity model to a pvd file for visualization.
         """
+        # Resseting old velocity model
+        self.initial_velocity_model = None
+        self.initial_velocity_model_file = None
         if new_file is not None:
             self.initial_velocity_model_file = new_file
         # If no mesh is set, we have to do it beforehand
         if self.mesh is None:
             self.set_mesh()
-        # Resseting old velocity model
-        self.initial_velocity_model = None
-        self.initial_velocity_model_file = None
 
         if self.debug_output:
             output = True
@@ -265,7 +264,7 @@ class Wave(Model_parameters, metaclass=ABCMeta):
             self.initial_velocity_model = velocity_model_function
         elif new_file is not None:
             self.initial_velocity_model_file = new_file
-            self._get_initial_velocity_model()
+            self._initialize_model_parameters()  # TODO in PR206
         elif constant is not None:
             V = self.function_space
             vp = fire.Function(V, name="velocity")

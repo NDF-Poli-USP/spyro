@@ -18,9 +18,9 @@ dummy_dict = {
         "gradient_sampling_frequency": 1,
     },
     "mesh": {
-        "Lz": 1.0,
-        "Lx": 1.0,
-        "Ly": 1.0,
+        "length_z": 1.0,
+        "length_x": 1.0,
+        "length_y": 1.0,
         "mesh_file": None,
         "mesh_type": "firedrake_mesh",
     },
@@ -81,9 +81,9 @@ def test_initialize_model_parameters_from_object_redundant():
 def test_parse_boundary_conditions():
     d = dummy_dict.copy()
     d["mesh"] = {
-        "Lz": 1.0,
-        "Lx": 1.0,
-        "Ly": 1.0,
+        "length_z": 1.0,
+        "length_x": 1.0,
+        "length_y": 1.0,
         "mesh_file": None,
         "mesh_type": "firedrake_mesh",
     }
@@ -109,9 +109,9 @@ def test_parse_boundary_conditions():
 def test_parse_boundary_conditions_exception():
     d = dummy_dict.copy()
     d["mesh"] = {
-        "Lz": 1.0,
-        "Lx": 1.0,
-        "Ly": 1.0,
+        "length_z": 1.0,
+        "length_x": 1.0,
+        "length_y": 1.0,
         "mesh_file": None,
         "mesh_type": "firedrake_mesh",
     }

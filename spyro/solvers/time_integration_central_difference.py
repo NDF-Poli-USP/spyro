@@ -4,7 +4,6 @@ import numpy as np
 from . import helpers
 from .. import utils
 from ..utils.typing import AdjointType
-from .automatic_differentiation_solver import AutomatedAdjoint
 
 
 def central_difference(wave, source_ids=None):
@@ -105,11 +104,14 @@ def central_difference(wave, source_ids=None):
                 elif isinstance(wave.real_shot_record[step], fire.Function):
                     residual_step = wave.real_shot_record[step] - usol_recv[-1]
                 else:
-                    raise ValueError("Unsupported type for real_shot_record." \
-                    "Must be either a numpy array or a Firedrake Function.")
-            else:
-                # Both usol_recv[-1] and wave.real_shot_record[step] are 1D arrays of receiver values.
-                residual_step = wave.real_shot_record[step] - usol_recv[-1]
+                    raise ValueError(
+                        "Unsupported type for real_shot_record. "
+                        "Must be either a numpy array or a "
+                        "Firedrake Function."
+                    )
+        else:
+            # Both usol_recv[-1] and wave.real_shot_record[step] are 1D arrays of receiver values.
+            residual_step = wave.real_shot_record[step] - usol_recv[-1]
 
             J += utils.compute_functional(wave, residual_step, step, nt)
             if wave.store_misfit:
