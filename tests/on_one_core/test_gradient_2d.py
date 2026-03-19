@@ -10,6 +10,7 @@ def check_gradient(Wave_obj_guess, dJ, rec_out_exact, Jm, plot=False):
     steps = [1e-3, 1e-4, 1e-5]  # step length
 
     errors = []
+    remainders = []
     V_c = Wave_obj_guess.function_space
     dm = fire.Function(V_c)
     rng = np.random.default_rng(0)
@@ -31,18 +32,16 @@ def check_gradient(Wave_obj_guess, dJ, rec_out_exact, Jm, plot=False):
         projnorm = fire.assemble(dJ * dm * fire.dx(**Wave_obj_guess.quadrature_rule))
 
         error = 100 * ((grad_fd - projnorm) / projnorm)
+        remainder = abs(J_plusdm - Jm - step * projnorm)
 
         errors.append(error)
+        remainders.append(remainder)
 
     errors = np.array(errors)
-
-    # Checking if error is first order in step
-    theory = [t for t in steps]
-    theory = [errors[0] * th / theory[0] for th in theory]
+    remainders = np.array(remainders)
     if plot:
         plt.close()
         plt.plot(steps, errors, label="Error")
-        plt.plot(steps, theory, "--", label="first order")
         plt.legend()
         plt.title(" Adjoint gradient versus finite difference gradient")
         plt.xlabel("Step")
@@ -56,7 +55,13 @@ def check_gradient(Wave_obj_guess, dJ, rec_out_exact, Jm, plot=False):
     print(f"Gradient error less than 1 percent for all steps: {test1}")
     print(f"Error of {errors}")
 
-    assert all([test1])
+    # Check that the first-order Taylor remainder shrinks at least linearly
+    # with the step length, without relying on the sign of the directional error.
+    test2 = np.all(remainders[1:] < 0.2 * remainders[:-1])
+    print(f"Taylor remainder shrinks with step size: {test2}")
+    print(f"Taylor remainders {remainders}")
+
+    assert all([test1, test2])
 
 
 final_time = 1.0
