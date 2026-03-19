@@ -55,9 +55,9 @@ def wave_dict_2d(layer_shape, degree_layer, degree_type, habc_ref_freq):
     # to absorb outgoing waves on boundries (-z, +-x sides) of the domain.
     Lz, Lx, Ly = [1., 1., 0.]
     dictionary["mesh"] = {
-        "Lz": Lz,  # depth in km - always positive
-        "Lx": Lx,  # width in km - always positive
-        "Ly": Ly,  # thickness in km - always positive
+        "length_z": Lz,  # depth in km - always positive
+        "length_x": Lx,  # width in km - always positive
+        "length_y": Ly,  # thickness in km - always positive
         "mesh_type": "firedrake_mesh",
     }
 

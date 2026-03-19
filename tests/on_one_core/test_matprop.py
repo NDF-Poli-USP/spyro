@@ -56,9 +56,9 @@ def wave_dict(cell_type, domain_dim, tf_usu, dt_usu):
     # to absorb outgoing waves on boundries (-z, +-x sides) of the domain.
     Lz, Lx, Ly = domain_dim  # in km
     dictionary["mesh"] = {
-        "Lz": Lz,  # depth in km - always positive
-        "Lx": Lx,  # width in km - always positive
-        "Ly": Ly,  # thickness in km - always positive
+        "length_z": Lz,  # depth in km - always positive
+        "length_x": Lx,  # width in km - always positive
+        "length_y": Ly,  # thickness in km - always positive
         "mesh_type": "firedrake_mesh",
     }
 
