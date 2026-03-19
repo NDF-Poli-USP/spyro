@@ -280,6 +280,9 @@ class Wave(Model_parameters, metaclass=ABCMeta):
         if function_space_type == "scalar":
             self.scalar_function_space = self.function_space
         elif function_space_type == "mixed":
+            scalar_function_space_type = check_function_space_type(self.function_space.sub(0))
+            if scalar_function_space_type != "scalar":
+                raise ValueError("Do not change mixed space order, use scalar first!!! (ノಠ益ಠ)ノ彡┻━┻")
             self.scalar_function_space = self.function_space.sub(0)
             self.vector_function_space = self.function_space.sub(1)
         elif function_space_type == "vector":
