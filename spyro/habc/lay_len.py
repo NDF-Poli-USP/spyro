@@ -13,7 +13,7 @@ import numpy as np
 
 def f_layer(x, a, m=1, s=0.999, typ='FL'):
     '''
-    Function whose zeros are solution for the parameter size of the layer
+    Function whose zeros are solution for the parameter size of the layer.
 
     Parameters
     ----------
@@ -77,7 +77,7 @@ def f_layer(x, a, m=1, s=0.999, typ='FL'):
 
 def calc_zero(xini, a, tol, nz=1):
     '''
-    Compute several parameter sizes for the absorbing layer
+    Compute several parameter sizes for the absorbing layer.
 
     Parameters
     ----------
@@ -128,7 +128,7 @@ def calc_zero(xini, a, tol, nz=1):
 def loop_roots(a, lmin, lref, max_roots, tol_rel=1e-3,
                show_ig=True, monitor=False):
     '''
-    Loop to calculate the size parameter for the absorbing layer
+    Loop to calculate the size parameter for the absorbing layer.
 
     Parameters
     ----------
@@ -193,7 +193,7 @@ def loop_roots(a, lmin, lref, max_roots, tol_rel=1e-3,
 def calc_size_lay(fref, z_par, lmin, lref, nz=5, n_root=1, tol_rel=1e-3,
                   layer_based_on_mesh=True, monitor=False):
     '''
-    Calculate the lenght of the absorbing layer
+    Calculate the lenght of the absorbing layer.
 
     Parameters
     ----------
@@ -290,7 +290,7 @@ def calc_size_lay(fref, z_par, lmin, lref, nz=5, n_root=1, tol_rel=1e-3,
 def roundFL(lmin, lref, F_L):
     '''
     Adjust the layer parameter based on the element size to get
-    an integer number of elements within the layer
+    an integer number of elements within the layer.
 
     Parameters
     ----------

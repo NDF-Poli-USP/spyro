@@ -255,7 +255,7 @@ def test_trunc_half_hyp_volume_less_than_half():
     assert 0 < trunc < full
 
 # ---------------------------------------------------------------------------
-# hyp_full_perimeter
+# hyp_full_perimeter  (docstring: hyp_full_perimeter(1,1,2) == 2*pi)
 # ---------------------------------------------------------------------------
 
 
@@ -372,7 +372,7 @@ def test_calc_hyp_geom_prop_2d_positive_area(layer_2d):
     lmin = 0.01
     layer_2d.calc_hyp_geom_prop(domain_hyp, pad_len, lmin)
     assert layer_2d.area > 0
-    assert layer_2d.a_rat > 0
+    assert layer_2d.area_ratio > 0
     assert layer_2d.f_Ah > 0
     assert layer_2d.perim_hyp > 0
 
@@ -383,7 +383,7 @@ def test_calc_hyp_geom_prop_2d_area_ratio_above_one(layer_2d):
     pad_len = 0.25
     lmin = 0.01
     layer_2d.calc_hyp_geom_prop(domain_hyp, pad_len, lmin)
-    assert layer_2d.a_rat > 1.0
+    assert layer_2d.area_ratio > 1.0
 
 
 def test_calc_hyp_geom_prop_3d_positive_volume(layer_3d):
@@ -392,7 +392,7 @@ def test_calc_hyp_geom_prop_3d_positive_volume(layer_3d):
     lmin = 0.01
     layer_3d.calc_hyp_geom_prop(domain_hyp, pad_len, lmin)
     assert layer_3d.vol > 0
-    assert layer_3d.v_rat > 0
+    assert layer_3d.vol_ratio > 0
     assert layer_3d.f_Vh > 0
     assert layer_3d.surf_hyp > 0
 
@@ -402,4 +402,4 @@ def test_calc_hyp_geom_prop_3d_volume_ratio_above_one(layer_3d):
     pad_len = 0.25
     lmin = 0.01
     layer_3d.calc_hyp_geom_prop(domain_hyp, pad_len, lmin)
-    assert layer_3d.v_rat > 1.0
+    assert layer_3d.vol_ratio > 1.0

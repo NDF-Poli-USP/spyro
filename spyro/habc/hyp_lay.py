@@ -28,8 +28,8 @@ class HyperLayer():
     ----------
     area : `float`
         Area of the domain with hyperelliptical layer
-    a_rat : `float`
-        Area ratio to the area of the original domain. a_rat = area / a_orig
+    area_ratio : `float`
+        Area ratio to the area of the original domain. area_ratio = area / a_orig
     dimension : `int`
         Model dimension (2D or 3D). Default is 2D
     domain_dim : `tuple`
@@ -41,7 +41,7 @@ class HyperLayer():
     hyper_axes : `tuple`
         Semi-axes of the hypershape layer (a, b) (2D) or (a, b, c) (3D)
     n_hyp: `float`
-        Degree of the hypershape pad layer (n >= 2). Default is 2
+        Degree of the hypershape pad layer (n >= 2.). Default is 2.
     n_bounds: `tuple`
         Bounds for the hypershape layer degree. (n_min, n_max)
         - n_min ensures to add lmin in the domain diagonal direction
@@ -55,8 +55,8 @@ class HyperLayer():
         Surface area of the full hyperellipsoid (only 3D)
     vol : `float`
         Volume of the domain with hyperellipsoidal layer
-    v_rat : `float`
-        Volume ratio to the volume of the original domain. v_rat = vol / v_orig
+    vol_ratio : `float`
+        Volume ratio to the volume of the original domain. vol_ratio = vol / v_orig
 
     Methods
     -------
@@ -92,7 +92,7 @@ class HyperLayer():
         ----------
         domain_dim : `tuple`
             Original domain dimensions: (Lx, Lz) for 2D or (Lx, Lz, Ly) for 3D
-        n_hyp : `int`, optional
+        n_hyp : `float`, optional
             Hypershape degree. Default is 2
         n_type : `str`, optional
             Type of the hypereshape degree ('real' or 'integer').
@@ -362,7 +362,9 @@ class HyperLayer():
         '''
         Define the limits for the hypershape degree. See Salas et al (2022).
         The condition r = 1 ensures that the point is on the layer boundary.
-        The condition r < 1 ensures that the point is inside the layer
+        The condition r < 1 ensures that the point is inside the layer.
+        Central tendency criterion is adopted if it satisfies the loop criterion
+        limits. Otherwise, loop criterion is adopted
 
         Parameters
         ----------
@@ -370,7 +372,7 @@ class HyperLayer():
             Superness coordinates relative to the hypershape centroid
             - 2D : (xs, ys)
             - 3D : (xs, ys, zs)
-        lim : `str`
+        limit_type : `str`
             Limit for the hypershape degree ('MIN' or 'MAX')
         n_min : `float`, optional
             Minimum allowed degree. Default is 2
@@ -385,17 +387,18 @@ class HyperLayer():
             Hypereshape degree
         '''
 
-        # Loop criteria to find the hyperellipse degree
+        # Loop criterion to find the hyperellipse degree
         n, n_min, n_max = self.loop_criteria(spness, n_min=n_min,
                                              n_max=n_max, monitor=monitor)
 
-        # Central tendency criteria to find the hyperellipse degree
+        # Central tendency criterion to find the hyperellipse degree
         crit_tend = self.central_tendency_criteria(spness, monitor=monitor)
 
-        if lim == 'MIN':
+        # Define limits for the hypershape degree
+        if limit_type == 'MIN':
             crit_tend = n_min if crit_tend is None else max(crit_tend)
             n = float(np.clip(max(n, crit_tend), n_min, n_max))
-        elif lim == 'MAX':
+        elif limit_type == 'MAX':
             crit_tend = n_max if crit_tend is None else min(crit_tend)
             n = float(np.clip(min(n, crit_tend), np.floor(n_min) + 1., n_max))
 
@@ -410,7 +413,7 @@ class HyperLayer():
             if self.dimension == 3:  # 3D
                 shp_str = "Hyperellipsoid"
 
-            lim_str = "min" if lim == 'MIN' else "max"
+            lim_str = "min" if limit_type == 'MIN' else "max"
             pr0_str = shp_str + " Parameters. r_" + lim_str
             pr1_str = ": {:>5.3f} - n_" + lim_str + ": {:>.1f}"
             print(pr0_str + pr1_str.format(r, n), flush=True)
@@ -510,7 +513,6 @@ class HyperLayer():
     def trunc_half_hyp_area(a, b, n, z0):
         '''
         Compute the truncated area of hyperellipse for 0 <= z0 / b <= 1.
-        Verify with self.trunc_half_hyp_area(1, 1, 2, 1) = pi / 2
 
         Parameters
         ----------
@@ -527,6 +529,10 @@ class HyperLayer():
         -------
         A_tr : `float`
             Truncated area of the hyperellipse
+
+        Examples
+        --------
+        trunc_half_hyp_area(1, 1, 2, 1) = pi / 2
         '''
 
         if z0 < 0 or z0 > b:
@@ -545,7 +551,6 @@ class HyperLayer():
     def half_hyp_area(a, b, n):
         '''
         Compute half the area of the hyperellipse.
-        Verify with self.half_hyp_area(1, 1, 2) = pi / 2
 
         Parameters
         ----------
@@ -560,6 +565,10 @@ class HyperLayer():
         -------
         A_hf : `float`
             Half the area of the hyperellipse
+
+        Examples
+        --------
+        half_hyp_area(1, 1, 2) = pi / 2
         '''
 
         A_hf = 2 * a * b * gamma(1 + 1 / n)**2 / gamma(1 + 2 / n)
@@ -570,7 +579,6 @@ class HyperLayer():
     def trunc_half_hyp_volume(a, b, c, n, z0):
         '''
         Compute the truncated volume of hyperellipsoid for 0 <= z0 / b <= 1.
-        Verify with self.trunc_half_hyp_volume(1, 1, 1, 2, 1) = 2 * pi / 3
 
         Parameters
         ----------
@@ -589,6 +597,10 @@ class HyperLayer():
         -------
         A_tr : `float`
             Truncated volume of the hyperellipsoid
+
+        Examples
+        --------
+        trunc_half_hyp_volume(1, 1, 1, 2, 1) = 2 * pi / 3
         '''
 
         if z0 < 0 or z0 > b:
@@ -608,7 +620,6 @@ class HyperLayer():
     def half_hyp_volume(a, b, c, n):
         '''
         Compute half the volume of the hyperellipsoid.
-        Verify with self.half_hyp_volume(1, 1, 1, 2) = 2 * pi / 3
 
         Parameters
         ----------
@@ -625,6 +636,10 @@ class HyperLayer():
         -------
         V_hf : `float`
             Half the volume of the hyperellipsoid
+
+        Examples
+        --------
+        half_hyp_volume(1, 1, 1, 2) = 2 * pi / 3
         '''
 
         V_hf = 4 * a * b * c * gamma(1 + 1 / n)**3 / gamma(1 + 3 / n)
@@ -649,6 +664,10 @@ class HyperLayer():
         -------
         perim_hyp : `float`
             Perimeter of the hyperellipse
+
+        Examples
+        --------
+        hyp_full_perimeter(1, 1, 2) = 2 * pi
         '''
 
         def line_element(theta):
@@ -662,14 +681,14 @@ class HyperLayer():
 
             Returns
             -------
-            ds : `float`
+            ds_hyp : `float`
                 Differential arc length element
             '''
-            dx = -(2 * a / n) * np.cos(theta)**(2 / n - 1) * np.sin(theta)
-            dy = (2 * b / n) * np.sin(theta)**(2 / n - 1) * np.cos(theta)
-            ds = np.sqrt(dx**2 + dy**2)
+            dx_hyp = -(2 * a / n) * np.cos(theta)**(2 / n - 1) * np.sin(theta)
+            dy_hyp = (2 * b / n) * np.sin(theta)**(2 / n - 1) * np.cos(theta)
+            ds_hyp = np.sqrt(dx_hyp**2 + dy_hyp**2)
 
-            return ds
+            return ds_hyp
 
         # Integrate from 0 to pi/2 and multiply by 4
         perim_hyp = 4 * quad(line_element, 0, np.pi/2)[0]
@@ -711,7 +730,7 @@ class HyperLayer():
 
             Returns
             -------
-            dS : `float`
+            dS_hyp : `float`
                 Differential surface area element
             '''
 
@@ -739,9 +758,9 @@ class HyperLayer():
             F1 = dy_dr * dz_dt  # dz_dr = 0
             F2 = -dx_dr * dz_dt  # dz_dr = 0
             F3 = dx_dr * dy_dt - dy_dr * dx_dt
-            dS = np.sqrt(F1**2 + F2**2 + F3**2)
+            dS_hyp = np.sqrt(F1**2 + F2**2 + F3**2)
 
-            return dS
+            return dS_hyp
 
         # Integrate over first octant and multiply by 8
         # r ∈ [0, π/2] and t ∈ [0, π/2]
@@ -799,8 +818,8 @@ class HyperLayer():
                 self.trunc_half_hyp_area(a_hyp, b_hyp, n_hyp, Lz / 2)
 
             # Area ratio
-            self.a_rat = self.area / (Lx * Lz)
-            print("Area Ratio: {:5.3f}".format(self.a_rat), flush=True)
+            self.area_ratio = self.area / (Lx * Lz)
+            print("Area Ratio: {:5.3f}".format(self.area_ratio), flush=True)
 
             # Area factor
             self.f_Ah = self.area / (a_hyp * b_hyp)
@@ -817,8 +836,8 @@ class HyperLayer():
                 self.trunc_half_hyp_volume(a_hyp, b_hyp, c_hyp, n_hyp, Lz / 2)
 
             # Volume ratio
-            self.v_rat = self.vol / (Lx * Lz * Ly)
-            print("Volume Ratio: {:5.3f}".format(self.v_rat), flush=True)
+            self.vol_ratio = self.vol / (Lx * Lz * Ly)
+            print("Volume Ratio: {:5.3f}".format(self.vol_ratio), flush=True)
 
             # Volume factor
             self.f_Vh = self.vol / (a_hyp * b_hyp * c_hyp)
