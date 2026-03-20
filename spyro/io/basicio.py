@@ -366,7 +366,7 @@ def create_segy(function, V, grid_spacing, filename):
     -------
     None
     """
-    velocity = write_function_to_grid(function, V, grid_spacing)
+    velocity = write_function_to_grid(function, V, grid_spacing, buffer=True)
     spec = segyio.spec()
 
     velocity = np.flipud(velocity.T)
