@@ -1,5 +1,4 @@
 import firedrake as fire
-from numpy import where, log
 
 # Work from Keith Roberts, Eduardo Moscatelli,
 # Ruben Andres Salas and Alexandre Olender
@@ -8,7 +7,7 @@ from numpy import where, log
 #   "A Modified PML Acoustic Wave Equation". Kim (2019)
 
 
-def forms_pml(Wave_obj, W, bc_type="nrbc"):
+def forms_pml(Wave_obj, W):
     '''
     Build the variational form for the wave equation with a PML.
 
@@ -18,10 +17,6 @@ def forms_pml(Wave_obj, W, bc_type="nrbc"):
         An instance of the HABC_Wave class
     W : Firedrake 'MixedFunctionSpace'
         Mixed function space for the wave equation with PML
-    bc_type : `str`, optional
-        Type of boundary condition to apply on the PML boundaries. Options are
-        "nrbc" for non-reflecting boundary conditions (Higdon or Sommerfeld)
-        and "dirichlet" for Dirichlet boundary conditions. Default is "nrbc".
 
     Returns
     -------
@@ -34,8 +29,10 @@ def forms_pml(Wave_obj, W, bc_type="nrbc"):
     dt = Wave_obj.dt
     c = Wave_obj.c
     c_sqr_inv = 1. / (Wave_obj.c * Wave_obj.c)
-    dx = fire.dx(**Wave_obj.quadrature_rule)
+    q_rule = Wave_obj.quadrature_rule
+    dx = fire.dx(**q_rule) if q_rule else fire.dx
 
+    # Trial and test functions, and state variables
     if Wave_obj.dimension == 2:
         u, pp = fire.TrialFunctions(W)
         v, qq = fire.TestFunctions(W)
@@ -64,16 +61,11 @@ def forms_pml(Wave_obj, W, bc_type="nrbc"):
             sigma_y = Wave_obj.sigma_y
             Gamma_1, Gamma_2, Gamma_3 = Wave_obj.damping_pml_3d()
 
-        # Tuple of boundary ids for NRBC
-        bnds = [Wave_obj.absorb_top, Wave_obj.absorb_bottom,
-                Wave_obj.absorb_right, Wave_obj.absorb_left]
-
         # PML forms
         if Wave_obj.dimension == 2:
             pml1 = (sigma_z + sigma_x) * \
                 fire.dot((u_n - u_nm1) / fire.Constant(dt), v)
             pml2 = sigma_z * sigma_x * fire.dot(u, v)
-            # fire.dot(u_n, v) * dx
             pml3 = -fire.dot(fire.div(pp_n), v)
             FF += c_sqr_inv * (pml1 + pml2 + pml3) * dx
             # -------------------------------------------------------
@@ -98,26 +90,22 @@ def forms_pml(Wave_obj, W, bc_type="nrbc"):
             FF += (c_sqr_inv * (mm1 + mm2) + dd1 + dd2) * dx
             # -------------------------------------------------------
             mmm1 = fire.dot((psi - psi_n) / fire.Constant(dt), phi)
-            uuu1 = -fire.dot(u_n * phi)
+            uuu1 = -fire.dot(u_n, phi)
             FF += (mmm1 + uuu1) * dx
-            # -------------------------------------------------------
-            # Tuple of boundary ids for NRBC
-            bnds.extend([Wave_obj.absorb_front, Wave_obj.absorb_back])
 
-        # Apply boundary conditions to the PML boundaries.
-        where_to_absorb = tuple(where(bnds)[0] + 1)  # ds starts at 1
-        if bc_type == "nrbc":  # NRBC: Higdon or Sommerfeld
-            qr_s = Wave_obj.surface_quadrature_rule
-            f_abc = (1. / c) * fire.dot((u_n - u_nm1) / fire.Constant(dt), v)
-            le = Wave_obj.cosHig * f_abc * fire.ds(where_to_absorb, **qr_s)
+        # Apply NRBCs (Higdon or Sommerfeld) at PML boundaries
+        abc_surf = Wave_obj.where_to_absorb
+        if not Wave_obj.bc_boundary_pml == "Dirichlet":
+            ds = fire.ds(abc_surf, **q_rule) if q_rule else fire.ds(abc_surf)
+            f_abc = (fire.Constant(1.) / c) * fire.dot((
+                u_n - u_nm1) / fire.Constant(dt), v)
+            le = Wave_obj.cosHig * f_abc * ds
             FF += le
-            fix_bnd = None
-        elif bc_type == "dirichlet":
-            fix_bnd = fire.DirichletBC(
-                W.sub(0), fire.Constant(0.), where_to_absorb)
 
-    else:
-        fix_bnd = None
+    # Dirichlet BCs for PML model or Neumann BCs for the reference model
+    fix_bnd = fire.DirichletBC(W.sub(0), fire.Constant(0.), abc_surf) \
+        if Wave_obj.bc_boundary_pml == "Dirichlet" and \
+        not Wave_obj.abc_get_ref_model else None
 
     return FF, fix_bnd
 
@@ -150,6 +138,7 @@ def construct_solver_or_matrix_with_pml(Wave_obj):
 
     Wave_obj.mixed_function_space = W
 
+    # State variables
     X_np1 = fire.Function(W)
     X_n = fire.Function(W)
     X_nm1 = fire.Function(W)
@@ -165,12 +154,13 @@ def construct_solver_or_matrix_with_pml(Wave_obj):
     Wave_obj.X_n = X_n
     Wave_obj.X_nm1 = X_nm1
 
-    FF, fix_bnd = forms_pml(Wave_obj, W, bc_type="dirichlet")
-
+    # Build variational forms
+    FF, fix_bnd = forms_pml(Wave_obj, W)
     Wave_obj.lhs = fire.lhs(FF)
     Wave_obj.rhs = fire.rhs(FF)
     Wave_obj.source_function = fire.Cofunction(W.dual())
 
+    # Build solver
     lin_var = fire.LinearVariationalProblem(
         Wave_obj.lhs, Wave_obj.rhs + Wave_obj.source_function,
         X_np1, bcs=fix_bnd, constant_jacobian=True)

@@ -8,7 +8,7 @@ from spyro.solvers.acoustic_wave import AcousticWave
 from spyro.meshing.meshing_habc import HABC_Mesh
 from spyro.abc.hyp_lay import HyperLayer
 from spyro.abc.rec_lay import RectangLayer
-from spyro.habc.nrbc import NRBC
+from spyro.abc.nrbc import NRBC
 from spyro.habc.error_measure import HABC_Error
 from spyro.habc.lay_len import calc_size_lay
 from spyro.plots.plots_habc import plot_function_layer_size
@@ -859,13 +859,12 @@ class ABC_Layer_Wave(AcousticWave, HABC_Mesh, RectangLayer,
         self.velocity_abc(inf_model=True)
 
         # Setting no damping
-        self.cosHig = fire.Constant(0.)
         if self.abc_boundary_layer_type == "hybrid":
+            self.cosHig = fire.Constant(0.)
             self.eta_mask = fire.Constant(0.)
             self.eta_habc = fire.Constant(0.)
 
         elif self.abc_boundary_layer_type == "PML":
-            self.sigma_mask = fire.Constant(0.)
             self.sigma_z = fire.Constant(0.)
             self.sigma_x = fire.Constant(0.)
             if self.dimension == 3:
@@ -886,6 +885,6 @@ class ABC_Layer_Wave(AcousticWave, HABC_Mesh, RectangLayer,
         if self.abc_boundary_layer_type == "hybrid":
             del self.cosHig, self.eta_mask, self.eta_habc
         elif self.abc_boundary_layer_type == "PML":
-            del self.sigma_mask, self.sigma_z, self.sigma_x
+            del self.sigma_z, self.sigma_x
             if self.dimension == 3:
                 del self.sigma_y

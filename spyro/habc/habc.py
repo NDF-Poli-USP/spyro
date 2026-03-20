@@ -9,8 +9,8 @@ from spyro.solvers.acoustic_wave import AcousticWave
 from spyro.meshing.meshing_habc import HABC_Mesh
 from spyro.abc.hyp_lay import HyperLayer
 from spyro.abc.rec_lay import RectangLayer
+from spyro.abc.nrbc import NRBC
 from spyro.habc.damp_profile import HABC_Damping
-from spyro.habc.nrbc import NRBC
 from spyro.habc.error_measure import HABC_Error
 from spyro.habc.lay_len import calc_size_lay
 from spyro.plots.plots_habc import plot_function_layer_size
