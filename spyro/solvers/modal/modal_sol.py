@@ -1,6 +1,5 @@
 import firedrake as fire
 import numpy as np
-# import scipy.linalg as sl
 import scipy.sparse as ss
 import warnings
 from scipy.optimize import broyden1, curve_fit
@@ -113,10 +112,6 @@ class Modal_Solver():
         calc_max_dt : `bool`
             Option to estimate the maximum stable timestep for the computation
             of the transient response. Default is False
-        static_load_for_ceq : `firedrake function`, optional
-            Static load for the energy-equivalent homogenization.
-            Only used for the 'ANALYTICAL' method. Default is None, in which
-            a small constant load is applied over the entire domain.
 
         Returns
         -------
@@ -155,26 +150,26 @@ class Modal_Solver():
 
         Parameters
         ----------
-        c : `firedrake function`
+        c : `firedrake.Function`
             Velocity model
-        V : `firedrake function space`
+        V : `firedrake.FunctionSpace`
             Function space for the modal problem
         quad_rule : `str`, optional
             Quadrature rule to use for the integration.
             Default is None, which uses the default quadrature rule
         source : `bool`, optional
             Option to get a source term in weak form. Default is False
-        user_load : `firedrake function`, optional
+        user_load : `firedrake.Function`, optional
             User-defined load for the source term. Default is None, in
             which a small constant load is applied over the entire domain.
 
         Returns
         -------
-        a : `firedrake form`
+        a : `firedrake.Form`
             Weak form representing the stiffness matrix
-        m : `firedrake form`
+        m : `firedrake.Form`
             Weak form  representing the mass matrix
-        L : `firedrake form`, optional
+        L : `firedrake.Form`, optional
             Weak form representing a source term.
             Returned only if 'source'=True
         '''
@@ -206,9 +201,9 @@ class Modal_Solver():
 
         Parameters
         ----------
-        a : `firedrake form`
+        a : `firedrake.Form`
             Weak form representing the stiffness matrix
-        m : `firedrake form`
+        m : `firedrake.Form`
             Weak form  representing the mass matrix
         return_M_inv : `bool`, optional
             Option to return the inverse mass matrix instead of the mass
@@ -294,8 +289,7 @@ class Modal_Solver():
                                       OPinv=OPinv, return_eigenvectors=False)
 
         if method == 'LOBPCG':
-            # Initialize random vectors for LOBPCG
-            # X = sl.orth(np.random.rand(Msp.shape[0], k))
+            # Initialize LI vectors for LOBPCG
             X = np.eye(Msp.shape[0], k)
 
             # Solve the eigenproblem using LOBPCG (iterative method)
@@ -321,9 +315,9 @@ class Modal_Solver():
 
         Parameters
         ----------
-        a : `firedrake form`
+        a : `firedrake.Form`
             Weak form representing the stiffness matrix
-        m : `firedrake form`
+        m : `firedrake.Form`
             Weak form  representing the mass matrix
         k : `int`, optional
             Number of eigenvalues to compute. Default is 2
@@ -367,7 +361,6 @@ class Modal_Solver():
         eigenproblem = fire.LinearEigenproblem(a, M=m)
         eigensolver = fire.LinearEigensolver(eigenproblem, n_evals=k,
                                              solver_parameters=opts)
-        # nconv = eigensolver.solve()
         eigensolver.solve()
         Lsp = np.asarray([eigensolver.eigenvalue(mod) for mod in range(k)])
 
@@ -381,16 +374,16 @@ class Modal_Solver():
 
         Parameters
         ----------
-        c : `firedrake function`
+        c : `firedrake.Function`
             Velocity model
-        V : `firedrake function space`
+        V : `firedrake.FunctionSpace`
             Function space for the modal problem
         quad_rule : `str`, optional
             Quadrature rule to use for the integration.
             Default is None, which uses the default quadrature rule
         typ_homog : `str`, optional
             Type of homogenization: 'energy' or 'volume'. Default is 'energy'
-        static_load_for_ceq : `firedrake function`, optional
+        static_load_for_ceq : `firedrake.Function`, optional
             Static load for the energy-equivalent homogenization.
             Only used if 'typ_homog'='energy'. Default is None, in which
             a small constant load is applied over the entire domain.
@@ -638,14 +631,12 @@ class Modal_Solver():
             # Sum and return square root
             return sum(f_ell_arr)**0.5
 
-    def reg_geometry_hyp(self, n_fix, cut_plane_percent=1.):
+    def reg_geometry_hyp(self, cut_plane_percent=1.):
         '''
         Perform the nonlinear regression for the hypershape geometry factor
 
         Parameters
         ----------
-        n_fix : `float`
-            Fixed hypershape degree for the regression
         cut_plane_percent : `float`, optional
             Percentage of the cut plane (0 to 1). Default is 1 (no cut)
 
@@ -828,8 +819,8 @@ class Modal_Solver():
         c_eqref = c_eq if c_eqref is None else c_eqref
 
         # Regression for hypershape geometry factor
-        pn, qn, fr_ell, fr_rec = self.reg_geometry_hyp(
-            n_hyp, cut_plane_percent=cut_plane_percent)
+        pn, qn, fr_ell, fr_rec = \
+            self.reg_geometry_hyp(cut_plane_percent=cut_plane_percent)
 
         if bc == 'Dirichlet':
             f_min = f_rec / fr_rec
@@ -938,7 +929,7 @@ class Modal_Solver():
 
         return Lsp
 
-    def generate_norm_coords(self, mesh, dom_dim, hyp_axes):
+    def generate_norm_coords(self, mesh, domain_dim, hyp_axes):
         '''
         Generate the normalized mesh coordinates w.r.t. the hypershape centroid
 
@@ -946,10 +937,10 @@ class Modal_Solver():
         ----------
         mesh : `firedrake mesh`
             Mesh for the modal problem
-        dom_dim : `tuple`
+        domain_dim : `tuple`
             Original domain dimensions (Lx, Lz) for 2D or (Lx, Lz, Ly) for 3D
         hyp_axes : `tuple`
-            Semi-axes of the hyperellipse [a, b] or hyperellipsoid [a, b, c]
+            Semi-axes of the hyperellipse (a, b) or hyperellipsoid (a, b, c)
 
         Returns
         -------
@@ -959,7 +950,7 @@ class Modal_Solver():
         '''
 
         # Original domain dimensions
-        Lx, Lz = dom_dim[:2]
+        Lx, Lz = domain_dim[:2]
 
         # Hypershape semi-axes
         a, b = hyp_axes[:2]
@@ -973,7 +964,7 @@ class Modal_Solver():
         z_e = (z + fire.Constant(Lz / 2.)) / fire.Constant(2. * b)
         coord_norm = (x_e, z_e)
         if self.dimension == 3:  # 3D
-            Ly, c, y = dom_dim[2], hyp_axes[2], coord[2]
+            Ly, c, y = domain_dim[2], hyp_axes[2], coord[2]
             y_e = (y - fire.Constant(Ly / 2.)) / fire.Constant(2. * c)
             coord_norm += (y_e,)
 
@@ -988,7 +979,7 @@ class Modal_Solver():
         coord_norm : `tuple`
             Normalized coordinates w.r.t. the hypershape centroid.
             Structure: (xn, zn) for 2D and (xn, zn, yn) for 3D
-        V : `firedrake function space`
+        V : `firedrake.FunctionSpace`
             Function space for the modal problem
         k : `int`, optional
             Number of eigenvalues to compute. Default is 2
@@ -1055,12 +1046,12 @@ class Modal_Solver():
 
         Parameters
         ----------
-        c : `firedrake function` or `float`
+        c : `firedrake.Function` or `float`
             Velocity model
         coord_norm : `tuple`
             Normalized coordinates w.r.t. the hypershape centroid.
             Structure: (xn, zn) for 2D and (xn, zn, yn) for 3D
-        V : `firedrake function space`
+        V : `firedrake.FunctionSpace`
             Function space for the modal problem
         k : `int`, optional
             Number of eigenvalues to compute. Default is 2
@@ -1118,9 +1109,9 @@ class Modal_Solver():
 
         Parameters
         ----------
-        c : `firedrake function` or `float`
+        c : `firedrake.Function` or `float`
             Velocity model
-        V : `firedrake function space`, optional
+        V : `firedrake.FunctionSpace`, optional
             Function space for the modal problem. Default is None
         k : `int`, optional
             Number of eigenvalues to compute. Default is 2
@@ -1163,7 +1154,7 @@ class Modal_Solver():
                 Exponent factor for the minimum equivalent velocity
             - fp2 : `float`
                 Exponent factor for the maximum equivalent velocity
-        static_load_for_ceq : `firedrake function`, optional
+        static_load_for_ceq : `firedrake.Function`, optional
             Static load for the energy-equivalent homogenization.
             Only used if 'typ_homog'='energy'. Default is None, in which
             a small constant load is applied over the entire domain.
@@ -1218,9 +1209,9 @@ class Modal_Solver():
 
         Parameters
         ----------
-        c : `firedrake function`
+        c : `firedrake.Function`
             Velocity model
-        V : `firedrake function space`
+        V : `firedrake.FunctionSpace`
             Function space for the modal problem
         final_time : `float`
             Final time for the transient simulation
