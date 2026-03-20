@@ -13,6 +13,7 @@ from spyro.utils.error_management import value_parameter_error
 # non-reflecting boundary conditions in scalar wave equations.
 # Applied Mathematical Modelling (2022)
 # doi: https://doi.org/10.1016/j.apm.2022.09.014
+# TODO: add citation
 # With additions by Alexandre Olender
 
 
