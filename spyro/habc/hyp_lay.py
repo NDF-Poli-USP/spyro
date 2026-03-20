@@ -357,7 +357,7 @@ class HyperLayer():
 
         return round(float(n), 1), n_min, n_max
 
-    def calc_degree_hypershape(self, spness, lim, n_min=2,
+    def calc_degree_hypershape(self, spness, limit_type, n_min=2,
                                n_max=20, monitor=False):
         '''
         Define the limits for the hypershape degree. See Salas et al (2022).
