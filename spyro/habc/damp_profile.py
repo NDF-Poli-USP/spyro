@@ -233,6 +233,7 @@ class HABC_Damping():
 
         elif typ_CR == 'CR_FEM':
             # Unidimensional spourious reflection in FEM (Laier, 2020)
+            # TODO: Add citation
             def Zi(p, alpha, ele_type):
                 '''
                 Compute the Z parameter in the spurious reflection coefficient.
