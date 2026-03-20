@@ -95,7 +95,8 @@ def forms_pml(Wave_obj, W):
 
         # Apply NRBCs (Higdon or Sommerfeld) at PML boundaries
         abc_surf = Wave_obj.where_to_absorb
-        if not Wave_obj.bc_boundary_pml == "Dirichlet":
+        bc_type = Wave_obj.bc_boundary_pml
+        if not (bc_type == "Dirichlet" or bc_type == "Neumann"):
             ds = fire.ds(abc_surf, **q_rule) if q_rule else fire.ds(abc_surf)
             f_abc = (fire.Constant(1.) / c) * fire.dot((
                 u_n - u_nm1) / fire.Constant(dt), v)

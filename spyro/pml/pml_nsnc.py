@@ -19,7 +19,7 @@ class PML_Wave(ABC_Layer_Wave):
     bc_boundary_pml : `str`
         Type of boundary condition to apply on the PML boundaries.
         Options are "Higdon" or "Sommerfeld" for Non-Reflecting BCs,
-        or "Dirichlet" for Dirichlet BCs. Default is "Higdon".
+        or "Dirichlet" or "Neumann" for typical BCs. Default is "Higdon"
     pml_mask : `firedrake function`
         Mask function to identify the PML domain
     sigma_max : `float`
@@ -52,7 +52,7 @@ class PML_Wave(ABC_Layer_Wave):
     def __init__(self, dictionary=None, bc_boundary_pml="Higdon",
                  fwi_iter=0, comm=None, output_folder=None):
         '''
-        Initialize the HABC class
+        Initialize the HABC class.
 
         Parameters
         ----------
@@ -61,7 +61,7 @@ class PML_Wave(ABC_Layer_Wave):
         bc_boundary_pml : `str`, optional
             Type of boundary condition to apply on the PML boundaries.
             Options are "Higdon" or "Sommerfeld" for Non-Reflecting BCs,
-            or "Dirichlet" for Dirichlet BCs. Default is "Higdon".
+            or "Dirichlet" or "Neumann" for typical BCs. Default is "Higdon"
         fwi_iter : int, optional
             The iteration number for the FWI algorithm. Default is 0
         comm : `object`, optional
@@ -82,9 +82,11 @@ class PML_Wave(ABC_Layer_Wave):
         # Type of boundary condition to apply on the PML boundaries
         self.bc_boundary_pml = bc_boundary_pml
 
-        if self.bc_boundary_pml not in ["Higdon", "Sommerfeld", "Dirichlet"]:
+        if self.bc_boundary_pml not in ["Higdon", "Sommerfeld",
+                                        "Dirichlet", "Neumann"]:
             value_parameter_error('bc_boundary_pml', self.bc_boundary_pml,
-                                  ["Higdon", "Sommerfeld", "Dirichlet"])
+                                  ["Higdon", "Sommerfeld",
+                                   "Dirichlet", "Neumann"])
 
     def calc_pml_damping(self, dgr_prof=2):
         '''
@@ -93,7 +95,7 @@ class PML_Wave(ABC_Layer_Wave):
         Parameters
         ----------
         dgr_prof : `int`, optional
-            Degree of the damping profile within the PML layer.
+            Degree of the damping profile within the PML layer
 
         Returns
         -------
@@ -211,7 +213,8 @@ class PML_Wave(ABC_Layer_Wave):
         self.where_to_absorb = tuple(np.where(bnds)[0] + 1)  # ds starts at 1
 
         # Apply boundary conditions to the PML boundaries.
-        if not self.bc_boundary_pml == "Dirichlet":
+        type_bc = self.bc_boundary_pml
+        if not (type_bc == "Dirichlet" or type_bc == "Neumann"):
 
             sommerfeld_bc = True if self.bc_boundary_pml == \
                 "Sommerfeld" else False

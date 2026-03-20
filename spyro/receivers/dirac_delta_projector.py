@@ -112,13 +112,9 @@ class Delta_projector:
                                             tolerance=1e-6)
             self.is_local[rid] = cell_id
 
-        (
-            self.cellIDs,
-            self.cellVertices,
-            self.cellNodeMaps,
-        ) = self.__point_locator()
+        (self.cellIDs, self.cellVertices,
+            self.cellNodeMaps) = self.__point_locator()
         self.cell_tabulations = self.__func_build_cell_tabulations(order)
-
         self.number_of_points = len(self.point_locations)
 
     def interpolate(self, field):
@@ -336,6 +332,7 @@ class Delta_projector:
                 cellId_maps[receiver_id] = cell_id
                 cellNodeMaps[receiver_id, :] = cell_node_map[cell_id, :]
                 for vertex_number in range(0, end_vertex_id):
+
                     cellVertices[receiver_id].append([])
                     z = node_locations[
                         cell_node_map[cell_id, cell_ends[vertex_number]], 0

@@ -239,7 +239,7 @@ def preamble_pml(dictionary, edge_length, f_est, dimension):
 
     # Create the acoustic wave object with HABCs
     Wave_obj = pml.PML_Wave(dictionary=dictionary,
-                            bc_boundary_pml="Dirichlet",
+                            bc_boundary_pml="Higdon",
                             output_folder=f"output/pml_test{dimension}d")
 
     # Mesh
@@ -545,8 +545,8 @@ def test_loop_pml_3d():
 
 # Applying HABCs to the model in Fig. 8 of Salas et al. (2022)
 if __name__ == "__main__":
-    # test_loop_pml_2d()
-    test_loop_pml_3d()
+    test_loop_pml_2d()
+    # test_loop_pml_3d()
 
 
 '''
