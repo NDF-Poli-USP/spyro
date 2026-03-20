@@ -268,6 +268,7 @@ class HABC_Damping():
                 return Z_fem
 
             # Spurious reflection coefficient in FDM (Kar and Turco, 1995)
+            # TODO: Add citation 
             CRfdm = np.tan(self.p1 / 4)**2
 
             # Minimum damping ratio for the spurious reflection
