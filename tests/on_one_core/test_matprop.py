@@ -19,7 +19,7 @@ def wave_dict(cell_type, domain_dim, tf_usu, dt_usu):
         Type of cell for the mesh. Options: "T" for triangle or tetrahedra,
         "Q" for quadrilateral or hexahedra.
     domain_dim : `list`
-        List containing the domain dimensions [Lz, Lx, Ly] in km
+        List containing the domain dimensions [length_z, length_x, length_y] in km
     tf_usu : `float`
         Final time of the simulation
     dt_usu: `float`
@@ -54,11 +54,11 @@ def wave_dict(cell_type, domain_dim, tf_usu, dt_usu):
     # Define the domain size without the PML or AL. Here we'll assume a
     # 1.00 x 1.00 km domain and compute the size for the Absorbing Layer (AL)
     # to absorb outgoing waves on boundries (-z, +-x sides) of the domain.
-    Lz, Lx, Ly = domain_dim  # in km
+    length_z, length_x, length_y = domain_dim  # in km
     dictionary["mesh"] = {
-        "Lz": Lz,  # depth in km - always positive
-        "Lx": Lx,  # width in km - always positive
-        "Ly": Ly,  # thickness in km - always positive
+        "length_z": length_z,  # depth in km - always positive
+        "length_x": length_x,  # width in km - always positive
+        "length_y": length_y,  # thickness in km - always positive
         "mesh_type": "firedrake_mesh",
     }
 
@@ -67,11 +67,11 @@ def wave_dict(cell_type, domain_dim, tf_usu, dt_usu):
     # injected at a specified point of the mesh. We also specify to record
     # the solution at the corners of the domain to verify the NRBC efficiency.
     dictionary["acquisition"] = {
-        "source_locations": [(-Lz / 2., Lx / 2., Ly / 2.)],
+        "source_locations": [(-length_z / 2., length_x / 2., length_y / 2.)],
         "frequency": 5.0,  # in Hz
-        "receiver_locations": [(-Lz, 0., 0.), (-Lz, Lx, 0.), (0., 0., 0),
-                               (0., Lx, 0.), (-Lz, 0., Ly), (-Lz, Lx, Ly),
-                               (0., 0., Ly), (0., Lx, Ly)]
+        "receiver_locations": [(-length_z, 0., 0.), (-length_z, length_x, 0.), (0., 0., 0),
+                               (0., length_x, 0.), (-length_z, 0., length_y), (-length_z, length_x, length_y),
+                               (0., 0., length_y), (0., length_x, length_y)]
     }
 
     # Simulate for 1.5 seconds.
