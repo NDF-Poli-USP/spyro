@@ -51,9 +51,9 @@ def wave_dict_2d(element_type):
     # to absorb outgoing waves on boundries (-z, +-x sides) of the domain.
     Lz, Lx, Ly = [1., 1., 0.]
     dictionary["mesh"] = {
-        "Lz": Lz,  # depth in km - always positive
-        "Lx": Lx,  # width in km - always positive
-        "Ly": Ly,  # thickness in km - always positive
+        "length_z": Lz,  # depth in km - always positive
+        "length_x": Lx,  # width in km - always positive
+        "length_y": Ly,  # thickness in km - always positive
         "mesh_type": "firedrake_mesh",
     }
 
@@ -133,9 +133,9 @@ def wave_dict_3d(element_type, degree_eikonal):
     # to absorb outgoing waves on boundries (-z, +-x, +-y sides) of the domain.
     Lz, Lx, Ly = [1., 1., 1.]  # in km
     dictionary["mesh"] = {
-        "Lz": Lz,  # depth in km - always positive
-        "Lx": Lx,  # width in km - always positive
-        "Ly": Ly,  # thickness in km - always positive
+        "length_z": Lz,  # depth in km - always positive
+        "length_x": Lx,  # width in km - always positive
+        "length_y": Ly,  # thickness in km - always positive
         "mesh_type": "firedrake_mesh",
     }
 

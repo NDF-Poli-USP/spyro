@@ -36,9 +36,9 @@ def build_solver(local_abc, dt_scheme):
     }
 
     d["mesh"] = {
-        "Lz": L,
-        "Lx": L,
-        "Ly": 0,
+        "length_z": L,
+        "length_x": L,
+        "length_y": 0,
         "h": h,
         "mesh_file": None,
         "mesh_type": "firedrake_mesh",

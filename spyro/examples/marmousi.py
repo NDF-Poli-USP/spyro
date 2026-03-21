@@ -45,9 +45,9 @@ marmousi_dictionary["parallelism"] = {
 # to absorb
 # outgoing waves on three sides (eg., -z, +-x sides) of the domain.
 marmousi_dictionary["mesh"] = {
-    "Lz": 1.0,  # depth in km - always positive
-    "Lx": 1.0,  # width in km - always positive
-    "Ly": 0.0,  # thickness in km - always positive
+    "length_z": 1.0,  # depth in km - always positive
+    "length_x": 1.0,  # width in km - always positive
+    "length_y": 0.0,  # thickness in km - always positive
     "mesh_file": None,
 }
 marmousi_dictionary[
