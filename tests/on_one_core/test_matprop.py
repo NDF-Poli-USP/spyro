@@ -9,7 +9,7 @@ fire.parameters["loopy"] = {"silenced_warnings": ["v1_scheduler_fallback"]}
 warnings.filterwarnings("ignore", category=RuntimeWarning)
 
 
-def wave_dict(cell_type, domain_dim, tf_usu, dt_usu):
+def wave_dict(cell_type, domain_dimensions, tf_usu, dt_usu):
     '''
     Create a dictionary with parameters for the model.
 
@@ -18,7 +18,7 @@ def wave_dict(cell_type, domain_dim, tf_usu, dt_usu):
     cell_type : `str`
         Type of cell for the mesh. Options: "T" for triangle or tetrahedra,
         "Q" for quadrilateral or hexahedra.
-    domain_dim : `list`
+    domain_dimensions : `list`
         List containing the domain dimensions [length_z, length_x, length_y] in km
     tf_usu : `float`
         Final time of the simulation
@@ -54,7 +54,7 @@ def wave_dict(cell_type, domain_dim, tf_usu, dt_usu):
     # Define the domain size without the PML or AL. Here we'll assume a
     # 1.00 x 1.00 km domain and compute the size for the Absorbing Layer (AL)
     # to absorb outgoing waves on boundries (-z, +-x sides) of the domain.
-    length_z, length_x, length_y = domain_dim  # in km
+    length_z, length_x, length_y = domain_dimensions  # in km
     dictionary["mesh"] = {
         "length_z": length_z,  # depth in km - always positive
         "length_x": length_x,  # width in km - always positive
@@ -102,7 +102,7 @@ def wave_instance(cell_type):
     '''
 
     # Domain dimensions
-    domain_dim = [0.24, 0.56, 0.16]  # in km
+    domain_dimensions = [0.24, 0.56, 0.16]  # in km
 
     # Final Time in s
     tf_usu = 2.
@@ -117,7 +117,7 @@ def wave_instance(cell_type):
     edge_length = 0.040
 
     # Create dictionary with parameters for the model
-    dictionary = wave_dict(cell_type, domain_dim, tf_usu, dt_usu)
+    dictionary = wave_dict(cell_type, domain_dimensions, tf_usu, dt_usu)
 
     # Create a wave object
     Wave_obj = IsotropicWave(dictionary)
