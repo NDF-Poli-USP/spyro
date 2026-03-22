@@ -1,6 +1,5 @@
 import firedrake as fire
 import warnings
-import os
 
 from .wave import Wave
 
@@ -16,19 +15,15 @@ from .backward_time_integration import (
     backward_wave_propagator,
 )
 from ..domains.space import create_function_space
-from ..utils.typing import override
+from ..utils.typing import override, WaveType
+from ..utils import write_hdf5_velocity_model
 from .functionals import acoustic_energy
-
-try:
-    from SeismicMesh import write_velocity_model
-    SEISMIC_MESH_AVAILABLE = True
-except ImportError:
-    SEISMIC_MESH_AVAILABLE = False
 
 
 class AcousticWave(Wave):
     def __init__(self, dictionary, comm=None):
         super().__init__(dictionary, comm=comm)
+        self.wave_type = WaveType.ISOTROPIC_ACOUSTIC
 
         self.acoustic_energy = None
         self.field_logger.add_functional(
@@ -68,10 +63,9 @@ class AcousticWave(Wave):
             V = self.function_space
             Z = fire.VectorFunctionSpace(V.ufl_domain(), V.ufl_element())
             self.vector_function_space = Z
-            self.X = None
+            self.X_np1 = None
             self.X_n = None
             self.X_nm1 = None
-            self.X_np1 = fire.Function(V * Z)
             construct_solver_or_matrix_with_pml(self)
 
         self.acoustic_energy = acoustic_energy(self)
@@ -114,16 +108,7 @@ class AcousticWave(Wave):
                 raise ValueError("No velocity model or velocity file to load.")
 
             if self.initial_velocity_model_file.endswith(".segy"):
-                if not SEISMIC_MESH_AVAILABLE:
-                    raise ImportError("SeismicMesh is required to convert segy files.")
-                vp_filename, vp_filetype = os.path.splitext(
-                    self.initial_velocity_model_file
-                )
-                warnings.warn("Converting segy file to hdf5")
-                write_velocity_model(
-                    self.initial_velocity_model_file, ofname=vp_filename
-                )
-                self.initial_velocity_model_file = vp_filename + ".hdf5"
+                self.initial_velocity_model_file = write_hdf5_velocity_model(self, self.initial_velocity_model_file)
 
             if self.initial_velocity_model_file.endswith((".hdf5", ".h5")):
                 self.initial_velocity_model = interpolate(
@@ -210,3 +195,12 @@ class AcousticWave(Wave):
             return self.B.sub(0)
         else:
             return self.B
+
+    def rhs_no_pml_source(self):
+        """Return the source cofunction added to the variational right-hand
+        side.
+        """
+        if self.abc_boundary_layer_type == "PML":
+            return self.source_function.sub(0)
+        else:
+            return self.source_function
