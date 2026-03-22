@@ -67,7 +67,9 @@ class Delta_projector:
         """
         self.automatic_adjoint = wave_object.automatic_adjoint
         self.mesh = wave_object.mesh
-        self.space = wave_object.function_space.sub(0)
+        self.function_space = wave_object.function_space
+        self.wave_type = wave_object.wave_type
+        self.space = self.function_space.sub(0)
         self.my_ensemble = wave_object.comm
         self.dimension = wave_object.dimension
         self.degree = wave_object.degree
@@ -201,7 +203,7 @@ class Delta_projector:
 
         return cell_tabulations
 
-    def __reference_element(self, id):
+    def __reference_element(self, ident):
         if self.dimension == 2 and self.quadrilateral is False:
             n_v = 3
             change_to_reference = change_to_reference_triangle
@@ -217,8 +219,8 @@ class Delta_projector:
         else:
             raise ValueError
 
-        p = self.point_locations[id]
-        cell_vertices = self.cellVertices[id][0:n_v]
+        p = self.point_locations[ident]  # "id" is a reserved word in Python
+        cell_vertices = self.cellVertices[ident][0:n_v]
         return change_to_reference(p, cell_vertices)
 
     def __build_local_nodes(self):
@@ -490,8 +492,7 @@ def get_hexa_real_cell_node_map(V, mesh):
     _, p = ufl_element.degree()
 
     cell_node_map = np.zeros(
-        (layers * cells_per_layer, nodes_per_cell), dtype=int
-    )
+        (layers * cells_per_layer, nodes_per_cell), dtype=int)
     print(f"cnm size : {np.shape(cell_node_map)}", flush=True)
 
     for layer in range(layers):

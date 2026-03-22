@@ -28,9 +28,9 @@ def test_forward_3_shots():
         "shot_ids_per_propagation": [[0], [1]],
     }
     dictionary["mesh"] = {
-        "Lz": 2.0,  # depth in km - always positive
-        "Lx": 2.0,  # width in km - always positive
-        "Ly": 0.0,  # thickness in km - always positive
+        "length_z": 2.0,  # depth in km - always positive
+        "length_x": 2.0,  # width in km - always positive
+        "length_y": 0.0,  # thickness in km - always positive
         "mesh_file": None,
         "mesh_type": "firedrake_mesh",
     }

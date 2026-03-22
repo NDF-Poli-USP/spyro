@@ -16,6 +16,18 @@ To use spyro, you'll need to have some knowledge of Python and some basic concep
 
 If you want to know more or cite our code please see our open access publication: https://gmd.copernicus.org/articles/15/8639/2022/gmd-15-8639-2022.html
 
+Development branch warning
+==========================
+
+**Warning:** this repository state corresponds to a private development branch and may contain interfaces and behaviors that are still being stabilized.
+Use with care for research and production workflows.
+
+The following functionalities are available in this branch, have test coverage, but are **not yet completely verified**:
+
+* Isotropic elastic wave solver (`spyro.IsotropicWave`) in 2D and 3D, including elastic examples such as `spyro/examples/camembert_elastic.py` and `spyro/examples/elastic_cube_3D.py`.
+* Elastic local absorbing boundary conditions (for example `Stacey` and `CE_A1`) and related time integration variants exercised in `spyro/examples/elastic_local_abc.py` and `tests/on_one_core/test_elastic_local_abc.py`.
+* Elastic model parameter initialization paths (Lame parameters and velocity-based parameterizations) covered in `tests/on_one_core/test_isotropic_wave.py`.
+
 Installation
 =============
 This section is aimed at Linux users. However, we can also use spyro on Windows with WSL by following the instructions on our [wiki](https://github.com/NDF-Poli-USP/spyro/wiki/Installing-spyro-in-Windows-with-WSL). There's also the option of using our Docker container, which works in any operating system. If you are a Visual Studio Code user with WSL installed in Windows, this docker should be built automatically after installing the Dev Container VS Code extension.
@@ -160,11 +172,11 @@ dictionary["parallelism"] = {
 # Define the domain size without the PML. Here we'll assume a 0.75 x 1.50 km
 dictionary["mesh"] = {
     # depth in km - always positive
-    "Lz": 0.75,
+    "length_z": 0.75,
     # width in km - always positive
-    "Lx": 1.50,
+    "length_x": 1.50,
     # thickness in km - always positive
-    "Ly": 0.0,
+    "length_y": 0.0,
     # If we are loading and external .msh mesh file
     "mesh_file": None,
     # options: None (default), firedrake_mesh, user_mesh, or SeismicMesh

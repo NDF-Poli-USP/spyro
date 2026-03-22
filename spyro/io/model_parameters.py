@@ -242,6 +242,7 @@ class Model_parameters(Read_options, Read_boundary_layer, Read_time_axis, Read_o
 
         self.input_dictionary["acquisition"].setdefault("receiver_locations", None)
         self.receiver_locations = self.input_dictionary["acquisition"]["receiver_locations"]
+        self.use_vertex_only_mesh = self.input_dictionary["acquisition"].get("use_vertex_only_mesh", False)
 
         # Check automatic adjoint
         self.input_dictionary["time_axis"].setdefault("output_frequency", 99999)
@@ -259,12 +260,12 @@ class Model_parameters(Read_options, Read_boundary_layer, Read_time_axis, Read_o
     @source_locations.setter
     def source_locations(self, value):
         # Sources has to be estabilshied before mesh parameters object
-        length_z = self.input_dictionary["mesh"]["Lz"]
-        length_x = self.input_dictionary["mesh"]["Lx"]
+        length_z = self.input_dictionary["mesh"]["length_z"]
+        length_x = self.input_dictionary["mesh"]["length_x"]
         if self.dimension == 2:
             mesh_lengths = [length_z, length_x]
         elif self.dimension == 3:
-            length_y = self.input_dictionary["mesh"]["Ly"]
+            length_y = self.input_dictionary["mesh"]["length_y"]
             mesh_lengths = [length_z, length_x, length_y]
         if value is not None:
             for source in value:
@@ -367,9 +368,9 @@ class Model_parameters(Read_options, Read_boundary_layer, Read_time_axis, Read_o
             self.automatic_adjoint = False
 
     def _sanitize_time_inputs(self):
-        self.__check_time()
+        self._check_time()
 
-    def __check_time(self):
+    def _check_time(self):
         if self.final_time < 0.0:
             raise ValueError(f"Negative time of {self.final_time} not valid.")
         if self.dt > 1.0:
@@ -471,7 +472,6 @@ def _check_point_in_domain(point_coordinates, input_mesh_lengths, negative_z):
     # avoid changing mesh lengths outside of this
     mesh_lengths = deepcopy(input_mesh_lengths)
     if negative_z:
-        print("DEBUG")
         mesh_lengths[0] = -mesh_lengths[0]
 
     for i, (coord, length) in enumerate(zip(point_coordinates, mesh_lengths)):

@@ -89,9 +89,9 @@ def test_input_models_receivers():
         grid_point_calculator_parameters, 4
     )
 
-    Lz = model["mesh"]["Lz"]
+    Lz = model["mesh"]["length_z"]
     lz = model["BCs"]["lz"]
-    Lx = model["mesh"]["Lx"]
+    Lx = model["mesh"]["length_x"]
     lx = model["BCs"]["lx"]
 
     Real_Lz = Lz + lz
@@ -203,9 +203,9 @@ def test_input_models_receivers_heterogeneous():
         grid_point_calculator_parameters, 4
     )
 
-    Lz = model["mesh"]["Lz"]
+    Lz = model["mesh"]["length_z"]
     lz = model["BCs"]["lz"]
-    Lx = model["mesh"]["Lx"]
+    Lx = model["mesh"]["length_x"]
     lx = model["BCs"]["lx"]
 
     Real_Lz = Lz + lz
@@ -254,9 +254,9 @@ def test_input_models_receivers_heterogeneous():
         grid_point_calculator_parameters, 4
     )
 
-    Lz = model["mesh"]["Lz"]
+    Lz = model["mesh"]["length_z"]
     lz = model["BCs"]["lz"]
-    Lx = model["mesh"]["Lx"]
+    Lx = model["mesh"]["length_x"]
     lx = model["BCs"]["lx"]
 
     Real_Lz = Lz + lz
