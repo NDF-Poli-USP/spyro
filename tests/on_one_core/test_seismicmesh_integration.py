@@ -23,8 +23,10 @@ def mean_edge_length(triangle):
     return (l0+l1+l2)/3.0
 
 
-# @pytest.mark.skipif(not is_seismicmesh_installed(), reason="SeismicMesh is not installed")
-@pytest.mark.skip(reason="error in SeismicMesh using firedrake 4.2 version")
+@pytest.mark.skipif(not is_seismicmesh_installed(), reason="SeismicMesh is not installed")
+@pytest.mark.xfail(
+    reason="Waiting for seismicmesh update for compatibility",
+)
 def test_spyro_seimicmesh_2d_homogeneous_generation():
     Lz = 1.0
     Lx = 2.0
