@@ -483,3 +483,7 @@ class Wave(Model_parameters, metaclass=ABCMeta):
     def receivers_output(self):
         return self._receivers_output
 
+    @receivers_output.setter
+    def receivers_output(self, value):
+        self._receivers_output = value
+
