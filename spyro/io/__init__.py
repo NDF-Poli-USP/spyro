@@ -17,7 +17,8 @@ from .basicio import (
     ensemble_load,
     delete_tmp_files,
     ensemble_shot_record,
-    ensemble_functional
+    ensemble_functional,
+    ensemble_functional_gradient,
 )
 from .model_parameters import Model_parameters
 from .backwards_compatibility_io import Dictionary_conversion
@@ -51,5 +52,6 @@ __all__ = [
     "delete_tmp_files",
     "ensemble_shot_record",
     "ensemble_functional",
+    "ensemble_functional_gradient",
     "time_io",
 ]

@@ -1,4 +1,5 @@
 import numpy as np
+import copy
 import firedrake as fire
 import spyro
 import pytest
@@ -66,18 +67,24 @@ dictionary["inversion"] = {
     "perform_fwi": True,  # switch to true to make a FWI
     "initial_guess_model_file": None,
     "shot_record_file": None,
+    "automated_adjoint": False,
 }
 
 
 @pytest.mark.slow
-def test_fwi(load_real_shot=False, use_rol=False):
+@pytest.mark.parametrize("automated_adjoint", [True, False])
+def test_fwi(automated_adjoint, load_real_shot=False, use_rol=False):
     """
     Run the Full Waveform Inversion (FWI) test.
 
     Parameters
     ----------
         load_real_shot (bool, optional): Whether to load a real shot record or not. Defaults to False.
+        automated_adjoint (bool, optional): Whether to use the automated adjoint. Defaults to False.
     """
+    dictionary["inversion"]["automated_adjoint"] = automated_adjoint
+    if automated_adjoint:
+        use_rol = False  # Only for scipy.
 
     # Setting up to run synthetic real problem
     if load_real_shot is False:
@@ -90,7 +97,8 @@ def test_fwi(load_real_shot=False, use_rol=False):
         mesh_x = FWI_obj.mesh_x
         cond = fire.conditional((mesh_z-center_z)**2 + (mesh_x-center_x)**2 < .2**2, 3.0, 2.5)
 
-        FWI_obj.set_real_velocity_model(conditional=cond, output=True, dg_velocity_model=False)
+        FWI_obj.set_real_velocity_model(
+            conditional=cond, output=True, dg_velocity_model=False)
         FWI_obj.generate_real_shot_record(
             plot_model=True,
             model_filename="True_experiment.png",
@@ -121,7 +129,7 @@ def test_fwi(load_real_shot=False, use_rol=False):
     grad_test = FWI_obj.gradient
     test0 = np.isclose(grad_test.at((-0.1, 0.1)), 0.0)
     print(f"PML looks masked: {test0}", flush=True)
-    test1 = np.abs(grad_test.at((-1.0, 1.0))) > 1e-5
+    test1 = not np.isclose(grad_test.at((-1.0, 1.0)), 0.0)
     print(f"Center looks unmasked: {test1}", flush=True)
 
     # quick look at functional and if it reduced
@@ -141,5 +149,5 @@ def test_fwi_with_rol(load_real_shot=False, use_rol=True):
 
 
 if __name__ == "__main__":
-    test_fwi(load_real_shot=False)
-    test_fwi_with_rol()
+    test_fwi(load_real_shot=False, automated_adjoint=True)
+    # test_fwi_with_rol()

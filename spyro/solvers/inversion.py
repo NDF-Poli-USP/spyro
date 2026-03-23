@@ -13,7 +13,9 @@ from ..utils import Gradient_mask_for_pml, Mask
 from ..plots import plot_model as spyro_plot_model
 from ..io.basicio import switch_serial_shot
 from ..io.basicio import load_shots, save_shots, create_segy
+from ..io.basicio import ensemble_functional_gradient
 from ..utils import run_in_one_core
+from ..utils.typing import OptmisationLibrary, RieszMapType, AdjointType
 
 
 try:
@@ -404,6 +406,25 @@ class FullWaveformInversion(AcousticWave):
         self.has_gradient_mask = False
         self.gradient_mask_available = False
         self.functional_history = []
+        self._mass_diagonal = None
+
+    # def _enable_automated_adjoint(self):
+    #     """
+    #     Enable the automated adjoint functionality.
+
+    #     This method sets up the necessary configurations to use the automated
+    #     adjoint for gradient computation. It ensures that the forward solution
+    #     is not stored in memory, as the automated adjoint will handle the
+    #     necessary computations without needing to access the full forward solution.
+    #     """
+    #     if (
+    #         self.comm.ensemble_size == 1 and self.number_of_sources > 1 
+    #         and self.parallelism_type == "spatial"
+    #     ):
+    #             controls = [self.c, self.sources.source_cofunction()]
+    #     else:
+    #         controls = self.c
+    #     self.enable_automated_adjoint(controls=controls)
 
     @property
     def real_velocity_model_file(self):
@@ -811,7 +832,34 @@ class FullWaveformInversion(AcousticWave):
 
         return Jm
 
-    def get_gradient(self, c=None, save=True, calculate_functional=True):
+    def _gradient_to_derivative(self, gradient):
+        """Convert the L2 Riesz gradient to the Euclidean derivative.
+
+        The implemented adjoint (``backward_wave_propagator``) returns the L2
+        Riesz representative of the gradient, i.e. it solves
+        ``M g = R`` and returns ``g``.  Scipy and other derivative-based
+        optimizers need ``R`` (the derivative).  For the lumped mass-matrix
+        variant this is simply ``R = M_diag * g`` (element-wise).
+        """
+        if self._mass_diagonal is None:
+            V = self.function_space
+            u = fire.TrialFunction(V)
+            v = fire.TestFunction(V)
+            ones = fire.Function(V)
+            ones.assign(1.0)
+            M_form = fire.inner(u, v) * fire.dx(**self.quadrature_rule)
+            self._mass_diagonal = fire.assemble(fire.action(M_form, ones))
+        derivative = fire.Function(self.function_space)
+        derivative.dat.data[:] = (
+            gradient.dat.data_ro[:] * self._mass_diagonal.dat.data_ro[:]
+        )
+        return derivative
+
+    @ensemble_functional_gradient
+    def get_functional_gradient(
+            self, c=None, save=True, calculate_functional=True, riesz_map=None,
+            source_id=None,
+    ):
         """
         Calculate the gradient of the objective functional.
 
@@ -822,34 +870,85 @@ class FullWaveformInversion(AcousticWave):
         Parameters
         ----------
         c : array_like, optional
-            Velocity model values to use. If provided and calculate_functional
-            is True, updates the model before computing the functional.
+            Velocity model values to use. If provided and
+            ``calculate_functional`` is True, the model is updated before
+            computing the functional.
         save : bool, optional
             If True, save the gradient to a VTK file for visualization.
             Default is True.
         calculate_functional : bool, optional
-            If True, calculate the functional (and misfit) before computing
+            If True, calculate the functional and misfit before computing
             the gradient. Default is True.
+        riesz_map : RieszMapType, optional
+            The type of Riesz map to apply to the gradient.
+        source_id : int, optional
+            When provided, computes the gradient for a single source only.
+            Used internally by the ``ensemble_functional_gradient`` decorator
+            during its per-source loop.
 
         Notes
         -----
         This method increments the current_iteration counter and applies any
         gradient mask that has been set. The gradient is computed using the
         adjoint-state method implemented in gradient_solve().
+
+        When called with ``source_id``, the forward solution and receivers
+        must already be loaded (e.g. via ``switch_serial_shot``). The method
+        returns early without applying the gradient mask, saving, or
+        incrementing the iteration counter, as those are handled by the
+        decorator.
         """
         comm = self.comm
-        self.gradient = self.gradient_solve(
-            forward_solution=self.guess_forward_solution
-        )
+        if self.input_dictionary["inversion"]["automated_adjoint"]:
+            controls = self.c
+            if (
+                self.comm.ensemble_size == 1 and self.number_of_sources > 1 
+                and self.parallelism_type == "spatial"
+            ):
+                # If using spatial parallelism with multiple sources, controls
+                # should include both the velocity model and source terms.
+                if self.source_cofunction is None:
+                    self.source_cofunction = fire.Cofunction(self.function_space.dual())
+                controls = [self.c, self.source_cofunction]
+            self.enable_automated_adjoint(controls=controls)
+            self.gradient = self.gradient_solve(riesz_map=riesz_map)
+        elif source_id is not None:
+            # Single source mode: called from ensemble_functional_gradient
+            self._active_source_id = source_id
+            misfit = (
+                self.real_shot_record[source_id]
+                - self.forward_solution_receivers
+            )
+            self.functional_value = compute_functional(self, misfit)
+            self.gradient = self.gradient_solve(
+                misfit=misfit,
+                forward_solution=self.forward_solution,
+                riesz_map=riesz_map,
+            )
+            if riesz_map is RieszMapType.l2:
+                self.gradient = self._gradient_to_derivative(self.gradient)
+            self._active_source_id = None
+            return self.functional_value, self.gradient.dat.data_ro[:]
+        else:
+            if calculate_functional:
+                self.get_functional(c=c)
+            self.gradient = self.gradient_solve(
+                misfit=self.misfit,
+                forward_solution=self.guess_forward_solution,
+                riesz_map=riesz_map,
+            )
+            if riesz_map is RieszMapType.l2:
+                self.gradient = self._gradient_to_derivative(self.gradient)
         self._apply_gradient_mask()
         if save:
-            # self.gradient_out.write(dJ_total)
             output = fire.VTKFile("gradient_" + str(self.current_iteration)+".pvd")
             output.write(self.gradient)
         self.current_iteration += 1
         comm.comm.barrier()
+        return self.functional_value, self.gradient.dat.data_ro[:]
 
-    def return_functional_and_gradient(self, c):
+    def return_functional_and_gradient(
+            self, c, optimisation_library=OptmisationLibrary.SCIPY):
         """
         Compute and return both the functional value and gradient.
 
@@ -869,9 +968,12 @@ class FullWaveformInversion(AcousticWave):
         dJ : ndarray
             The gradient of the functional with respect to the velocity model.
         """
-        self.get_gradient(c=c)
-        dJ = self.gradient.dat.data[:]
-        return self.functional, dJ
+        riesz_map = RieszMapType[self.inner_product]
+        if optimisation_library is OptmisationLibrary.SCIPY:
+            # Scipy deals only with derivatives (Euclidean gradient).
+            riesz_map = RieszMapType.l2
+        return self.get_functional_gradient(
+            c=c, calculate_functional=False, riesz_map=riesz_map)
 
     def run_fwi(self, **kwargs):
         """
