@@ -21,8 +21,11 @@ def backward_wave_propagator(Wave_obj, dt=None):
     """
     if Wave_obj.abc_active is False:
         return backward_wave_propagator_no_pml(Wave_obj, dt=dt)
-    elif Wave_obj.abc_active:
+    elif Wave_obj.abc_active and Wave_obj.abc_boundary_layer_type == "PML":
         return mixed_space_backward_wave_propagator(Wave_obj, dt=dt)
+    else:
+        # For local ABC or other non-PML types
+        return backward_wave_propagator_no_pml(Wave_obj, dt=dt)
 
 
 def backward_wave_propagator_no_pml(Wave_obj, dt=None):
@@ -41,8 +44,14 @@ def backward_wave_propagator_no_pml(Wave_obj, dt=None):
     --------
     dJ: Firedrake 'Function'
         Calculated gradient
+
+    Notes:
+    ------
+    Residual forcing is injected each timestep via ``Wave_obj.rhs_no_pml_source()``
+    and the prebuilt variational solver is advanced with ``Wave_obj.solver.solve()``.
     """
     Wave_obj.reset_pressure()
+    mask_available = Wave_obj.gradient_mask_available
     if dt is not None:
         Wave_obj.dt = dt
 
@@ -59,7 +68,6 @@ def backward_wave_propagator_no_pml(Wave_obj, dt=None):
     # output = fire.File(output_filename, comm=comm.comm)
     comm.comm.barrier()
 
-    X = fire.Function(Wave_obj.function_space)
     dJ = fire.Function(Wave_obj.function_space)  # , name="gradient")
 
     final_time = Wave_obj.final_time
@@ -75,18 +83,28 @@ def backward_wave_propagator_no_pml(Wave_obj, dt=None):
 
     rhs_forcing = fire.Cofunction(Wave_obj.function_space.dual())
 
-    B = Wave_obj.B
-    rhs = Wave_obj.rhs
-
     # Define a gradient problem
     m_u = fire.TrialFunction(Wave_obj.function_space)
     m_v = fire.TestFunction(Wave_obj.function_space)
-    mgrad = m_u * m_v * fire.dx(**Wave_obj.quadrature_rule)
+
+    if mask_available:
+        # Use masked integration over inner region only
+        mgrad = m_u * m_v * fire.dx(2, scheme=Wave_obj.quadrature_rule)
+    else:
+        # Fall back to full domain
+        mgrad = m_u * m_v * fire.dx(**Wave_obj.quadrature_rule)
 
     dufordt2 = fire.Function(Wave_obj.function_space)
     uadj = fire.Function(Wave_obj.function_space)  # auxiliarly function for the gradient compt.
 
-    ffG = -2 * (Wave_obj.c)**(-3) * fire.dot(dufordt2, uadj) * m_v * fire.dx(**Wave_obj.quadrature_rule)
+    if mask_available:
+        ffG = -2 * (Wave_obj.c)**(-3) * fire.dot(dufordt2, uadj) * m_v * fire.dx(2, scheme=Wave_obj.quadrature_rule)
+        if comm.comm.rank == 0:
+            print("Applying gradient mask: gradients will be computed only in inside region", flush=True)
+    else:
+        ffG = -2 * (Wave_obj.c)**(-3) * fire.dot(dufordt2, uadj) * m_v * fire.dx(**Wave_obj.quadrature_rule)
+        if comm.comm.rank == 0:
+            print("No gradient mask found: computing gradients over full domain", flush=True)
 
     lhsG = mgrad
     rhsG = ffG
@@ -106,13 +124,12 @@ def backward_wave_propagator_no_pml(Wave_obj, dt=None):
 
     for step in range(nt-1, -1, -1):
         rhs_forcing.assign(0.0)
-        B = fire.assemble(rhs, tensor=B)
-        f = receivers.apply_receivers_as_source(rhs_forcing, residual, step)
-        B0 = B.sub(0)
-        B0 += f
-        Wave_obj.solver.solve(X, B)
+        Wave_obj.rhs_no_pml_source().assign(
+            receivers.apply_receivers_as_source(rhs_forcing, residual, step)
+        )
+        Wave_obj.solver.solve()
 
-        u_np1.assign(X)
+        u_np1.assign(Wave_obj.u_np1)
 
         if (step) % Wave_obj.output_frequency == 0:
             assert (
@@ -171,8 +188,14 @@ def mixed_space_backward_wave_propagator(Wave_obj, dt=None):
     --------
     dJ: Firedrake 'Function'
         Calculated gradient
+
+    Notes:
+    ------
+    For mixed PML spaces, source injection uses ``Wave_obj.rhs_no_pml_source()``
+    (pressure subspace) before calling ``Wave_obj.solver.solve()`` each timestep.
     """
     Wave_obj.reset_pressure()
+    mask_available = Wave_obj.gradient_mask_available
     if dt is not None:
         Wave_obj.dt = dt
 
@@ -188,7 +211,6 @@ def mixed_space_backward_wave_propagator(Wave_obj, dt=None):
     output = fire.VTKFile(output_filename)
     comm.comm.barrier()
 
-    X = Wave_obj.X
     dJ = fire.Function(Wave_obj.function_space)  # , name="gradient")
 
     final_time = Wave_obj.final_time
@@ -200,24 +222,36 @@ def mixed_space_backward_wave_propagator(Wave_obj, dt=None):
 
     X_nm1 = Wave_obj.X_nm1
     X_n = Wave_obj.X_n
-    X_np1 = fire.Function(Wave_obj.mixed_function_space)
+    X_np1 = Wave_obj.X_np1
 
     rhs_forcing = fire.Cofunction(Wave_obj.function_space.dual())
-
-    B = Wave_obj.B
-    rhs = Wave_obj.rhs
 
     # Define a gradient problem
     m_u = fire.TrialFunction(Wave_obj.function_space)
     m_v = fire.TestFunction(Wave_obj.function_space)
-    mgrad = m_u * m_v * fire.dx(**Wave_obj.quadrature_rule)
+
+    if mask_available:
+        # Use masked integration over inner region only
+        mgrad = m_u * m_v * fire.dx(2, scheme=Wave_obj.quadrature_rule)
+        mask_available = True
+    else:
+        # Fall back to full domain
+        mgrad = m_u * m_v * fire.dx(**Wave_obj.quadrature_rule)
+        mask_available = False
 
     # dufordt2 = fire.Function(Wave_obj.function_space)
     ufor = fire.Function(Wave_obj.function_space)
     uadj = fire.Function(Wave_obj.function_space)  # auxiliarly function for the gradient compt.
 
-    # ffG = -2 * (Wave_obj.c)**(-3) * fire.dot(dufordt2, uadj) * m_v * fire.dx(**Wave_obj.quadrature_rule)
-    ffG = 2.0 * Wave_obj.c * fire.dot(fire.grad(uadj), fire.grad(ufor)) * m_v * fire.dx(**Wave_obj.quadrature_rule)
+    # ffG = -2 * (Wave_obj.c)**(-3) * fire.dot(dufordt2, uadj) * m_v * fire.dx(scheme=Wave_obj.quadrature_rule)
+    if mask_available:
+        ffG = 2.0 * Wave_obj.c * fire.dot(fire.grad(uadj), fire.grad(ufor)) * m_v * fire.dx("Inner", scheme=Wave_obj.quadrature_rule)
+        if comm.comm.rank == 0:
+            print("Applying gradient mask: gradients will be computed only in 'Inner' region (mixed space)", flush=True)
+    else:
+        ffG = 2.0 * Wave_obj.c * fire.dot(fire.grad(uadj), fire.grad(ufor)) * m_v * fire.dx(**Wave_obj.quadrature_rule)
+        if comm.comm.rank == 0:
+            print("No gradient mask found: computing gradients over full domain (mixed space)", flush=True)
 
     lhsG = mgrad
     rhsG = ffG
@@ -237,13 +271,10 @@ def mixed_space_backward_wave_propagator(Wave_obj, dt=None):
 
     for step in range(nt-1, -1, -1):
         rhs_forcing.assign(0.0)
-        B = fire.assemble(rhs, tensor=B)
-        f = receivers.apply_receivers_as_source(rhs_forcing, residual, step)
-        B0 = B.sub(0)
-        B0 += f
-        Wave_obj.solver.solve(X, B)
-
-        X_np1.assign(X)
+        Wave_obj.rhs_no_pml_source().assign(
+            receivers.apply_receivers_as_source(rhs_forcing, residual, step)
+        )
+        Wave_obj.solver.solve()
 
         if (step) % Wave_obj.output_frequency == 0:
             if Wave_obj.forward_output:
