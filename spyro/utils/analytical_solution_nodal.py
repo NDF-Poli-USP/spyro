@@ -84,7 +84,7 @@ def analytical_solution(ricker_wavelet, c_value, final_time, offset):
 
 def analytical_solution_elastic(
         source_type,
-        offset,
+        offsets,
         alpha,
         beta,
         rho,
@@ -93,40 +93,53 @@ def analytical_solution_elastic(
         time_delay,
         final_time,
         dt,
+        force_direction=None,
+        dimension=3,
     ):
+    if dimension != 3:
+        raise ValueError("2D or weird dimensions not yet supported")
+    if force_direction is None and source_type == "force_source":
+        raise ValueError(f"Can not use {source_type} with no force_direction")
+
     result_tuple = None
     nt = int(final_time/dt + 1)
     final_time = dt*(nt-1)
     time_vector = np.linspace(0.0, final_time, nt)
+    u = np.zeros(nt, 3)
     if source_type == "force_source":
-        result_tuple = analytical_force_source(
-            offset,
-            time_vector,
-            alpha,
-            beta,
-            rho,
-            amplitude,
-            frequency,
-            time_delay,
-        )
+        for i in range(dimension):
+            u[:, i] = analytical_force_source(
+                offsets,
+                time_vector,
+                alpha,
+                beta,
+                rho,
+                amplitude,
+                frequency,
+                time_delay,
+                force_direction,
+                i,
+            )
     elif source_type == "explosive_source":
-        result_tuple = analytical_explosive_source(
-            offset,
-            time_vector,
-            alpha,
-            rho,
-            amplitude,
-            frequency,
-            time_delay,
-        )
+        for i in range(dimension):
+            u[:, i] = analytical_explosive_source(
+                offsets,
+                time_vector,
+                alpha,
+                rho,
+                amplitude,
+                frequency,
+                time_delay,
+                i,
+            )
     else:
         raise ValueError(f"Source type of {source_type} not valid")
 
-    return result_tuple
+    return (u[:,0], u[:,1], u[:,2])
 
 
 def analytical_force_source(
-        offset,
+        offsets,
         time_vector,
         alpha,
         beta, 
@@ -134,6 +147,8 @@ def analytical_force_source(
         amplitude,
         frequency,
         time_delay,
+        force_direction,
+        displacement_direction,
     ):
     """
     Analytical solution for force source based on Aki and Richards (2002)
@@ -164,10 +179,13 @@ def analytical_force_source(
         (ux, uy, uz) displacement components
     """
     nt = len(time_vector)
-    r = offset
-    
-    # Assuming receiver is at (r, 0, 0) relative to source for simplicity
-    # This gives gamma_x = 1, gamma_y = 0, gamma_z = 0
+    r = np.linalg.norm(offsets)
+    i = displacement_direction
+    j = force_direction
+
+    gamma_i = offsets[i]/r
+    gamma_j = offsets[j]/r
+    delta_ij = 1 if i == j else 0
     
     def X0(t):
         """Source time function (Ricker wavelet derivative)"""
@@ -175,55 +193,35 @@ def analytical_force_source(
         return (1 - 2*a**2) * np.exp(-a**2)
     
     # Initialize displacement components
-    ux = np.zeros(nt)
-    uy = np.zeros(nt) 
-    uz = np.zeros(nt)
-    
-    # For a force source in x-direction, we compute u_x
-    # Using i=0, j=0 (x-component): gamma_i*gamma_j = 1, delta_ij = 1
+    ui = np.zeros(nt)
+
     for k in range(nt):
         t = time_vector[k]
         
         # Near field contribution (integral term)
         res = quad(lambda tau: tau*X0(t - tau), r/alpha, r/beta)
-        u_near = amplitude * (1./(4*PI*rho)) * (3*1*1 - 1) * (1./r**3) * res[0]
+        u_near = amplitude * (1./(4*PI*rho)) * (3*gamma_i * gamma_j - delta_ij) * (1./r**3) * res[0]
         
         # P-wave far-field
-        P_far = amplitude * (1./(4*PI*rho*alpha**2)) * 1 * 1 * (1./r) * X0(t - r/alpha)
+        P_far = amplitude * (1./(4*PI*rho*alpha**2)) * gamma_i * gamma_j* (1./r) * X0(t - r/alpha)
         
         # S-wave far field  
-        S_far = amplitude * (1./(4*PI*rho*beta**2)) * (1*1 - 1) * (1./r) * X0(t - r/beta)
+        S_far = amplitude * (1./(4*PI*rho*beta**2)) * (gamma_i*gamma_j - delta_ij) * (1./r) * X0(t - r/beta)
         
-        ux[k] = u_near + P_far - S_far
+        ui[k] = u_near + P_far - S_far
     
-    # For y and z components with force in x-direction
-    # Using i=1,j=0 and i=2,j=0: gamma_i*gamma_j = 0, delta_ij = 0
-    for k in range(nt):
-        t = time_vector[k]
-        
-        # Near field (no contribution since 3*0 - 0 = 0)
-        u_near = 0.0
-        
-        # P-wave far-field (no contribution since gamma_i*gamma_j = 0)
-        P_far = 0.0
-        
-        # S-wave far field (no contribution since 0 - 0 = 0)
-        S_far = 0.0
-        
-        uy[k] = u_near + P_far - S_far  # = 0
-        uz[k] = u_near + P_far - S_far  # = 0
-    
-    return (ux, uy, uz)
+    return ui
 
 
 def analytical_explosive_source(
-        offset,
+        offsets,
         time_vector,
         alpha,
         rho,
         amplitude, 
         frequency,
         time_delay,
+        displacement_direction,
     ):
     """
     Analytical solution for explosive source based on Aki and Richards (2002)
@@ -252,11 +250,10 @@ def analytical_explosive_source(
         (ux, uy, uz) displacement components
     """
     nt = len(time_vector)
-    r = offset
-    
-    # Assuming receiver is at (r, 0, 0) relative to source
-    # This gives gamma_x = 1, gamma_y = 0, gamma_z = 0
-    
+    i = displacement_direction
+    r = np.linalg.norm(offsets)
+    gamma_i = offsets[i]/r
+
     def w(t):
         """Source time function (integral of Ricker wavelet)"""
         a = PI * frequency * (t - time_delay)
@@ -268,27 +265,20 @@ def analytical_explosive_source(
         return (1 - 2*a**2) * np.exp(-a**2)
     
     # Initialize displacement components
-    ux = np.zeros(nt)
-    uy = np.zeros(nt)
-    uz = np.zeros(nt)
-    
-    # For explosive source, only x-component has non-zero displacement
-    # (assuming receiver at (r,0,0))
+    ui = np.zeros(nt)
+
     for k in range(nt):
         t = time_vector[k]
         
         # P wave intermediate field
-        P_mid = amplitude * (1/(4*PI*rho*alpha**2)) * (1./r**2) * w(t - r/alpha)
+        P_mid = amplitude * (gamma_i/(4*PI*rho*alpha**2)) * (1./r**2) * w(t - r/alpha)
         
         # P wave far field
-        P_far = amplitude * (1/(4*PI*rho*alpha**3)) * (1./r) * w_dot(t - r/alpha)
+        P_far = amplitude * (gamma_i/(4*PI*rho*alpha**3)) * (1./r) * w_dot(t - r/alpha)
         
-        ux[k] = P_mid + P_far
+        ui[k] = P_mid + P_far
     
-    # y and z components are zero for explosive source with receiver at (r,0,0)
-    # (since gamma_y = gamma_z = 0)
-    
-    return (ux, uy, uz)
+    return ui
 
 
 def plot_analytical_displacement_components(
@@ -391,7 +381,7 @@ def demo_analytical_solutions():
     Parameters match those from from_eduardos_Code.py
     """
     # Parameters matching from_eduardos_Code.py defaults
-    offset = np.sqrt(100**2 + 0**2 + 100**2)  # Distance calculated from receiver position (100, 0, 100)
+    offsets = [100., 0., 100.]  # Distance calculated from receiver position (100, 0, 100)
     alpha = 1500.0  # P-wave velocity in m/s (matches default)
     beta = 1000.0   # S-wave velocity in m/s (matches default)
     rho = 2000.0    # Density in kg/m³ (matches default)
@@ -404,7 +394,7 @@ def demo_analytical_solutions():
     
     print("Computing analytical solutions...")
     print(f"Parameters:")
-    print(f"  Offset: {offset:.1f} m")
+    print(f"  Offsets: {offsets:.1f} m")
     print(f"  P-wave velocity (alpha): {alpha} m/s")
     print(f"  S-wave velocity (beta): {beta} m/s")
     print(f"  Density (rho): {rho} kg/m³")
@@ -419,7 +409,7 @@ def demo_analytical_solutions():
     print("\n1. Force Source:")
     force_result = analytical_solution_elastic(
         source_type="force_source",
-        offset=offset,
+        offsets=offsets,
         alpha=alpha,
         beta=beta,
         rho=rho,
@@ -444,7 +434,7 @@ def demo_analytical_solutions():
     print("\n2. Explosive Source:")
     explosive_result = analytical_solution_elastic(
         source_type="explosive_source",
-        offset=offset,
+        offsets=offsets,
         alpha=alpha,
         beta=beta,  # Not used for explosive source
         rho=rho,
