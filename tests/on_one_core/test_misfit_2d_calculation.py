@@ -1,5 +1,13 @@
+import firedrake as fire
 import numpy as np
 import spyro
+
+
+def expected_functional(residual, dt):
+    weights = np.ones(residual.shape[0])
+    weights[0] = 0.5
+    weights[-1] = 0.5
+    return 0.5 * dt * np.sum(weights * np.sum(residual**2, axis=1))
 
 
 def test_misfit_2d():
@@ -41,7 +49,7 @@ def test_misfit_2d():
     # domain and reserve the remaining 250 m for the Perfectly Matched Layer (PML) to absorb
     # outgoing waves on three sides (eg., -z, +-x sides) of the domain.
     dictionary["mesh"] = {
-        "length_z": 3.0,  # depth in km - always positive   # Como ver isso sem ler a malha?
+        "length_z": 3.0,  # depth in km - always positive
         "length_x": 3.0,  # width in km - always positive
         "length_y": 0.0,  # thickness in km - always positive
         "mesh_file": None,
@@ -90,39 +98,60 @@ def test_misfit_2d():
     # Using FWI Object
     FWI_obj = spyro.FullWaveformInversion(dictionary=dictionary)
     FWI_obj.set_real_mesh(input_mesh_parameters={"edge_length": 0.05})
+    center_z = -1.5
+    center_x = 1.5
+    cond = fire.conditional(
+        (FWI_obj.mesh_z - center_z)**2 + (FWI_obj.mesh_x - center_x)**2 < 0.5**2,
+        5.0,
+        4.0,
+    )
     FWI_obj.set_real_velocity_model(
-        expression="4.0 + 1.0 * tanh(10.0 * (0.5 - sqrt((x - 1.5) ** 2 + (z + 1.5) ** 2)))",
+        conditional=cond,
+        dg_velocity_model=False,
     )
     FWI_obj.generate_real_shot_record()
+    rec_out_exact = FWI_obj.real_shot_record
 
     FWI_obj.set_guess_mesh(input_mesh_parameters={"edge_length": 0.05})
     FWI_obj.set_guess_velocity_model(constant=4.0)
-    misfit = FWI_obj.calculate_misfit()
-
-    # Using only wave objects
-    Wave_obj_exact = spyro.AcousticWave(dictionary=dictionary)
-    Wave_obj_exact.set_mesh(input_mesh_parameters={"edge_length": 0.05})
-    Wave_obj_exact.set_initial_velocity_model(
-        expression="4.0 + 1.0 * tanh(10.0 * (0.5 - sqrt((x - 1.5) ** 2 + (z + 1.5) ** 2)))",
-        output=True
-    )
-    Wave_obj_exact.forward_solve()
-    rec_out_exact = Wave_obj_exact.receivers_output
+    FWI_obj.enable_compute_functional()
+    FWI_obj.forward_solve()
+    misfit = FWI_obj.real_shot_record - FWI_obj.forward_solution_receivers
 
     Wave_obj_guess = spyro.AcousticWave(dictionary=dictionary)
     Wave_obj_guess.set_mesh(input_mesh_parameters={"edge_length": 0.05})
     Wave_obj_guess.set_initial_velocity_model(constant=4.0)
+    Wave_obj_guess.real_shot_record = rec_out_exact
+    Wave_obj_guess.enable_compute_functional()
     Wave_obj_guess.forward_solve()
-    rec_out_guess = Wave_obj_guess.receivers_output
+    rec_out_guess = Wave_obj_guess.forward_solution_receivers
 
     misfit_second_calc = rec_out_exact - rec_out_guess
+    functional_second_calc = expected_functional(
+        misfit_second_calc,
+        Wave_obj_guess.dt,
+    )
 
     arevaluesclose = np.isclose(misfit, misfit_second_calc)
     test = arevaluesclose.all()
+    functional_matches_wave = np.isclose(
+        Wave_obj_guess.functional_value,
+        functional_second_calc,
+    )
+    functional_matches_fwi = np.isclose(
+        FWI_obj.functional_value,
+        functional_second_calc,
+    )
 
     print(f"Misfit calculated with FWI object is close to the individually calculated: {test}")
+    print(
+        "Functional accumulated during forward solve matches manual calculation: "
+        f"{functional_matches_wave and functional_matches_fwi}"
+    )
 
     assert test
+    assert functional_matches_wave
+    assert functional_matches_fwi
 
 
 if __name__ == "__main__":

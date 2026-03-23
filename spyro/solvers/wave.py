@@ -3,6 +3,7 @@ import warnings
 import firedrake as fire
 from firedrake import sin, cos, pi, tanh, sqrt  # noqa: F401
 
+from .automatic_differentiation_solver import AutomatedAdjoint
 from .time_integration_central_difference import central_difference as time_integrator
 from ..domains.quadrature import quadrature_rules
 from ..io import Model_parameters
@@ -12,7 +13,7 @@ from ..io.field_logger import FieldLogger
 from .. import utils
 from ..receivers.Receivers import Receivers
 from ..sources.Sources import Sources
-from ..utils.typing import WaveType
+from ..utils.typing import WaveType, AdjointType
 from .solver_parameters import get_default_parameters_for_method
 
 fire.set_log_level(fire.ERROR)
@@ -82,6 +83,11 @@ class Wave(Model_parameters, metaclass=ABCMeta):
 
         self.function_space = None
         self.forward_solution_receivers = None
+        self.automated_adjoint = None
+        self.adjoint_type = AdjointType.NONE
+        self.store_forward_time_steps = True
+        self._compute_functional = False
+        self._store_misfit = False
         self.current_time = 0.0
         self.set_solver_parameters()
 
@@ -436,3 +442,31 @@ class Wave(Model_parameters, metaclass=ABCMeta):
         the DOFs associated with the subspace of the original problem).
         '''
         pass
+
+    def enable_compute_functional(self):
+        self._compute_functional = True
+
+    def enable_store_misfit(self):
+        self._store_misfit = True
+
+    def disable_store_misfit(self):
+        self._store_misfit = False
+
+    def enable_automated_adjoint(self):
+        control = self.c if self.c is not None else self.initial_velocity_model
+        if control is None:
+            raise ValueError(
+                "Set an initial velocity model before enabling the adjoint."
+            )
+        self.automated_adjoint = AutomatedAdjoint(control, self.comm)
+        self.use_vertex_only_mesh = True
+        self._compute_functional = True
+        self.store_forward_time_steps = False
+        self.adjoint_type = AdjointType.AUTOMATED_ADJOINT
+
+    def enable_spyro_adjoint(self):
+        self.automated_adjoint = None
+        self._compute_functional = True
+        self.enable_store_misfit()
+        self.store_forward_time_steps = True
+        self.adjoint_type = AdjointType.IMPLEMENTED_ADJOINT

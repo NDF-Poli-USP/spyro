@@ -838,10 +838,14 @@ class FullWaveformInversion(AcousticWave):
         adjoint-state method implemented in gradient_solve().
         """
         comm = self.comm
+        if getattr(self, "adjoint_type", None) is None or self.adjoint_type.name == "NONE":
+            self.enable_spyro_adjoint()
         if calculate_functional:
             self.get_functional(c=c)
         comm.comm.barrier()
-        self.gradient = self.gradient_solve(misfit=self.misfit, forward_solution=self.guess_forward_solution)
+        self.gradient = self.gradient_solve(
+            forward_solution=self.guess_forward_solution
+        )
         self._apply_gradient_mask()
         if save:
             # self.gradient_out.write(dJ_total)

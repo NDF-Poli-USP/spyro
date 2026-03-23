@@ -15,7 +15,7 @@ from .backward_time_integration import (
     backward_wave_propagator,
 )
 from ..domains.space import create_function_space
-from ..utils.typing import override, WaveType
+from ..utils.typing import override, WaveType, AdjointType
 from ..utils import write_hdf5_velocity_model
 from .functionals import acoustic_energy
 
@@ -85,11 +85,24 @@ class AcousticWave(Wave):
         dJ: Firedrake 'Function'
             Gradient of the cost functional.
         """
+        if forward_solution is not None:
+            self.forward_solution = forward_solution
+        if self.adjoint_type == AdjointType.AUTOMATED_ADJOINT:
+            if self.automated_adjoint.reduced_functional is None:
+                self.forward_solve()
+                self.automated_adjoint.create_reduced_functional(
+                    self.functional_value
+                )
+            else:
+                self.automated_adjoint.recompute_functional(self.c)
+            return self.automated_adjoint.compute_gradient()
         if misfit is not None:
             self.misfit = misfit
         elif self.current_time == 0.0:
             self.forward_solve()
             self.misfit = self.real_shot_record - self.forward_solution_receivers
+        elif self.misfit is not None:
+            pass
         else:
             raise ValueError("Please load or calculate a real shot record first")
         return backward_wave_propagator(self)

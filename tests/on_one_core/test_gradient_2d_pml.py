@@ -36,7 +36,7 @@ class Gradient_mask_for_pml():
         return dJ
 
 
-def check_gradient(Wave_obj_guess, dJ, rec_out_exact, Jm, plot=False):
+def check_gradient(Wave_obj_guess, dJ, Jm, plot=False):
     steps = [1e-3]  # step length
 
     errors = []
@@ -50,8 +50,7 @@ def check_gradient(Wave_obj_guess, dJ, rec_out_exact, Jm, plot=False):
         c_guess = fire.Constant(2.0) + step*dm
         Wave_obj_guess.initial_velocity_model = c_guess
         Wave_obj_guess.forward_solve()
-        misfit_plusdm = rec_out_exact - Wave_obj_guess.receivers_output
-        J_plusdm = spyro.utils.compute_functional(Wave_obj_guess, misfit_plusdm)
+        J_plusdm = Wave_obj_guess.functional_value
 
         grad_fd = (J_plusdm - Jm) / (step)
         projnorm = fire.assemble(dJ * dm * fire.dx(**Wave_obj_guess.quadrature_rule))
@@ -107,7 +106,7 @@ def set_dictionary(PML=False):
     }
 
     dictionary["mesh"] = {
-        "length_z": 1.0,  # depth in km - always positive
+        "length_z": 1.0,  # depth in km - always positive   # Como ver isso sem ler a malha?
         "length_x": 1.0,  # width in km - always positive
         "length_y": 0.0,  # thickness in km - always positive
         "mesh_file": None,
@@ -167,38 +166,36 @@ def get_forward_model(dictionary=None):
     )
     spyro.plots.plot_model(Wave_obj_exact, filename="pml_grad_test_model.png", abc_points=[(-0, 0), (-1, 0), (-1, 1), (-0, 1)])
     Wave_obj_exact.forward_solve()
-    rec_out_exact = Wave_obj_exact.receivers_output
+    rec_out_exact = Wave_obj_exact.forward_solution_receivers
 
     # Guess model
     Wave_obj_guess = spyro.AcousticWave(dictionary=dictionary)
     Wave_obj_guess.set_mesh(input_mesh_parameters={"edge_length": 0.03})
     Wave_obj_guess.set_initial_velocity_model(constant=2.0)
+    Wave_obj_guess.real_shot_record = rec_out_exact
+    Wave_obj_guess.enable_spyro_adjoint()
     Wave_obj_guess.forward_solve()
-    rec_out_guess = Wave_obj_guess.receivers_output
 
-    return rec_out_exact, rec_out_guess, Wave_obj_guess
+    return Wave_obj_guess
 
 
 @pytest.mark.slow
 def test_gradient(PML=False):
     dictionary = set_dictionary(PML=PML)
-    rec_out_exact, rec_out_guess, Wave_obj_guess = get_forward_model(dictionary=dictionary)
+    Wave_obj_guess = get_forward_model(dictionary=dictionary)
     forward_solution = Wave_obj_guess.forward_solution
     forward_solution_guess = deepcopy(forward_solution)
-
-    misfit = rec_out_exact - rec_out_guess
-
-    Jm = spyro.utils.compute_functional(Wave_obj_guess, misfit)
+    Jm = Wave_obj_guess.functional_value
     print(f"Cost functional : {Jm}")
 
     # compute the gradient of the control (to be verified)
-    dJ = Wave_obj_guess.gradient_solve(misfit=misfit, forward_solution=forward_solution_guess)
+    dJ = Wave_obj_guess.gradient_solve(forward_solution=forward_solution_guess)
     VTKFile("gradient_premask.pvd").write(dJ)
     Mask_data = Gradient_mask_for_pml(Wave_obj=Wave_obj_guess)
     dJ = Mask_data.apply_mask(dJ)
     VTKFile("gradient.pvd").write(dJ)
 
-    check_gradient(Wave_obj_guess, dJ, rec_out_exact, Jm, plot=True)
+    check_gradient(Wave_obj_guess, dJ, Jm, plot=True)
 
 
 @pytest.mark.slow
