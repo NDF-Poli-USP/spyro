@@ -1,6 +1,7 @@
 from firedrake import *  # noqa: F403
+from firedrake.__future__ import interpolate
 from spyro.receivers.dirac_delta_projector import Delta_projector
-
+from ..utils.typing import WaveType
 import numpy as np
 
 
@@ -109,35 +110,60 @@ class Receivers(Delta_projector):
 
         return rhs_forcing
 
-    def set_point_cloud(self, comm):
-        # Receivers always parallel to z-axis
+    def receiver_interpolator(self, f, reorder=True, vom_tolerance=None,
+                              vom_missing_points_behaviour='error',
+                              vom_redundant=True, vom_name=None):
+        """Return an interpolator object.
 
-        rec_pos = self.point_locations
+        Parameters
+        ----------
+        f : firedrake.Function
+            A function to interpolate at receiver locations.
+        reorder : bool, optional
+            Flag indicating whether to reorder meshes for better cache
+            locality. If not supplied, the default value in
+            ``parameters["reorder_meshes"]`` is used.
+        vom_missing_points_behaviour : {'warn', 'error', 'ignore'}, optional
+            What to do when vertices that are outside of the mesh are
+            discarded. If ``'warn'``, a warning is printed. If ``'error'``,
+            a :class:`~.VertexOnlyMeshMissingPointsError` is raised. If
+            ``'ignore'``, nothing is done. Default is ``'error'``.
+        vom_tolerance : float, optional
+            The relative tolerance (i.e. as defined on the reference cell) for
+            the distance a point can be from a mesh cell and still be
+            considered to be in the cell. Note that this tolerance uses an L1
+            distance (aka 'manhattan', 'taxicab' or rectilinear distance), so
+            it scales with the dimension of the mesh. The default is the
+            parent mesh's ``tolerance`` property. Changing this from the
+            default causes the parent mesh's spatial index to be rebuilt,
+            which can take some time.
+        vom_redundant : bool, optional
+            If ``True``, the mesh is built using only the vertices specified on
+            rank 0. If ``False``, the mesh is built using the vertices
+            specified by each rank. Care must be taken when using
+            ``redundant=False``; see the note below for more information.
+        vom_name : str, optional
+            The name of the vertex-only mesh. Default is ``None``.
 
-        # 2D --
-        if self.dimension == 2:
-            num_rec = self.number_of_points
-            δz = np.linspace(rec_pos[0, 0], rec_pos[num_rec - 1, 0], 1)
-            δx = np.linspace(rec_pos[0, 1], rec_pos[num_rec - 1, 1], num_rec)
-
-            Z, X = np.meshgrid(δz, δx)
-            xs = np.vstack((Z.flatten(), X.flatten())).T
-
-        # 3D
-        elif self.dimension == 3:
-            δz = np.linspace(rec_pos[0][0], rec_pos[1][0], self.column_z)
-            δx = np.linspace(rec_pos[0][1], rec_pos[1][1], self.column_x)
-            δy = np.linspace(rec_pos[0][2], rec_pos[1][2], self.column_y)
-
-            Z, X, Y = np.meshgrid(δz, δx, δy)
-            xs = np.vstack((Z.flatten(), X.flatten(), Y.flatten())).T
+        Returns
+        -------
+        firedrake.Interpolate
+            An interpolation operator used to interpolate a firedrake
+            function at the receiver locations.
+        """
+        vom = VertexOnlyMesh(
+            self.mesh, self.point_locations, reorder=reorder,
+            tolerance=vom_tolerance,
+            missing_points_behaviour=vom_missing_points_behaviour,
+            redundant=vom_redundant,
+            name=vom_name)
+        if self.wave_type == WaveType.ISOTROPIC_ELASTIC:
+            V_r = VectorFunctionSpace(vom, "DG", 0)
+        elif self.wave_type == WaveType.ISOTROPIC_ACOUSTIC:
+            V_r = FunctionSpace(vom, "DG", 0)
         else:
-            print("This dimension is not accepted.")
-            quit()
-
-        point_cloud = VertexOnlyMesh(self.mesh, xs)  # noqa: F405
-
-        return point_cloud
+            raise ValueError("Invalid wave type")
+        return interpolate(f, V_r)
 
     def new_at(self, udat, receiver_id):
         return super().new_at(udat, receiver_id)

@@ -45,9 +45,9 @@ rectangle_dictionary["parallelism"] = {
 # to absorb
 # outgoing waves on three sides (eg., -z, +-x sides) of the domain.
 rectangle_dictionary["mesh"] = {
-    "Lz": 1.0,  # depth in km - always positive
-    "Lx": 1.0,  # width in km - always positive
-    "Ly": 0.0,  # thickness in km - always positive
+    "length_z": 1.0,  # depth in km - always positive
+    "length_x": 1.0,  # width in km - always positive
+    "length_y": 0.0,  # thickness in km - always positive
     "h": 0.05,  # mesh size in km
     "mesh_file": None,
     "mesh_type": "firedrake_mesh",  # options: firedrake_mesh or user_mesh
@@ -115,9 +115,9 @@ class Rectangle_mesh_and_velocity:
     def _rectangle_mesh(self):
         mesh_dict = self.input_dictionary["mesh"]
         mesh_parameters = {
-            "length_z": mesh_dict["Lz"],
-            "length_x": mesh_dict["Lx"],
-            "length_y": mesh_dict["Ly"],
+            "length_z": mesh_dict["length_z"],
+            "length_x": mesh_dict["length_x"],
+            "length_y": mesh_dict["length_y"],
             "edge_length": mesh_dict["h"],
             "mesh_file": mesh_dict["mesh_file"],
             "mesh_type": mesh_dict["mesh_type"],

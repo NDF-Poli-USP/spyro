@@ -3,6 +3,7 @@ import numpy as np
 import time as timer
 import firedrake as fire
 import pickle
+import pytest
 
 
 def error_calc(p_numerical, p_analytical, nt):
@@ -37,9 +38,9 @@ def run_forward():
     # domain and reserve the remaining 250 m for the Perfectly Matched Layer (PML) to absorb
     # outgoing waves on three sides (eg., -z, +-x sides) of the domain.
     dictionary["mesh"] = {
-        "Lz": 1.0,  # depth in km - always positive
-        "Lx": 1.0,  # width in km - always positive
-        "Ly": 0.0,  # thickness in km - always positive
+        "length_z": 1.0,  # depth in km - always positive
+        "length_x": 1.0,  # width in km - always positive
+        "length_y": 0.0,  # thickness in km - always positive
         "mesh_file": None,
         "mesh_type": "firedrake_mesh",  # options: firedrake_mesh or user_mesh
     }
@@ -105,6 +106,7 @@ def run_forward():
     return p_r, nt
 
 
+@pytest.mark.slow
 def test_pml():
     """Test that the second order time convergence
     of the central difference method is achieved"""

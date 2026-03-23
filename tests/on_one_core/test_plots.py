@@ -28,8 +28,8 @@ def get_wave_obj():
 def test_plot():
     rectangle_dictionary = {}
     rectangle_dictionary["mesh"] = {
-        "Lz": 0.75,  # depth in km - always positive
-        "Lx": 1.5,
+        "length_z": 0.75,  # depth in km - always positive
+        "length_x": 1.5,
         "h": 0.05,
     }
     rectangle_dictionary["acquisition"] = {
