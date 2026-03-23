@@ -82,7 +82,7 @@ class Wave(Model_parameters, metaclass=ABCMeta):
         self.wave_type = WaveType.NONE
 
         self.function_space = None
-        self.forward_solution_receivers = None
+        self._receivers_output = None
         self.automated_adjoint = None
         self.adjoint_type = AdjointType.NONE
         self.store_forward_time_steps = True
@@ -94,6 +94,8 @@ class Wave(Model_parameters, metaclass=ABCMeta):
         self.mesh = self.get_mesh()
         self.c = None
         self.sources = None
+        self.functional_value = None
+        self.misfit = None
         if self.mesh is not None:
             self._build_function_space()
             self._map_sources_and_receivers()
@@ -449,9 +451,6 @@ class Wave(Model_parameters, metaclass=ABCMeta):
     def enable_store_misfit(self):
         self._store_misfit = True
 
-    def disable_store_misfit(self):
-        self._store_misfit = False
-
     def enable_automated_adjoint(self):
         control = self.c if self.c is not None else self.initial_velocity_model
         if control is None:
@@ -464,9 +463,23 @@ class Wave(Model_parameters, metaclass=ABCMeta):
         self.store_forward_time_steps = False
         self.adjoint_type = AdjointType.AUTOMATED_ADJOINT
 
-    def enable_spyro_adjoint(self):
-        self.automated_adjoint = None
-        self._compute_functional = True
-        self.enable_store_misfit()
-        self.store_forward_time_steps = True
+    def enable_implemented_adjoint(self, misfit=None, forward_solution=None):
         self.adjoint_type = AdjointType.IMPLEMENTED_ADJOINT
+        if misfit is None:
+            self._compute_functional = True
+            self.enable_store_misfit()
+        else:
+            self.misfit = misfit
+        if forward_solution is None:
+            self.store_forward_time_steps = True
+        else:
+            self.forward_solution = forward_solution
+
+    @property
+    def forward_solution_receivers(self):
+        return self._receivers_output
+
+    @property
+    def receivers_output(self):
+        return self._receivers_output
+

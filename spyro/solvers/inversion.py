@@ -511,7 +511,7 @@ class FullWaveformInversion(AcousticWave):
         if c is not None:
             self.initial_velocity_model.dat.data[:] = c
         self.forward_solve()
-        output = fire.File("control_" + str(self.current_iteration)+".pvd")
+        output = fire.VTKFile("control_" + str(self.current_iteration)+".pvd")
         output.write(self.c)
         np.save(f"control{self.comm.ensemble_comm.rank}_{self.comm.comm.rank}", self.c.dat.data[:])
         if self.parallelism_type == "spatial" and self.number_of_sources > 1:
@@ -838,18 +838,13 @@ class FullWaveformInversion(AcousticWave):
         adjoint-state method implemented in gradient_solve().
         """
         comm = self.comm
-        if getattr(self, "adjoint_type", None) is None or self.adjoint_type.name == "NONE":
-            self.enable_spyro_adjoint()
-        if calculate_functional:
-            self.get_functional(c=c)
-        comm.comm.barrier()
         self.gradient = self.gradient_solve(
             forward_solution=self.guess_forward_solution
         )
         self._apply_gradient_mask()
         if save:
             # self.gradient_out.write(dJ_total)
-            output = fire.File("gradient_" + str(self.current_iteration)+".pvd")
+            output = fire.VTKFile("gradient_" + str(self.current_iteration)+".pvd")
             output.write(self.gradient)
         self.current_iteration += 1
         comm.comm.barrier()
@@ -927,19 +922,10 @@ class FullWaveformInversion(AcousticWave):
 
         vmin = parameters["vmin"]
         vmax = parameters["vmax"]
-        vp_0 = self.initial_velocity_model.vector()
+        vp_0 = self.initial_velocity_model.dat.data[:]
         bounds = [(vmin, vmax) for _ in range(len(vp_0))]
         options = parameters["scipy_options"]
 
-        # if self.running_fwi is False:
-        #     warnings.warn("Dictionary FWI options set to not run FWI.")
-        # if self.current_iteration < self.iteration_limit:
-        #     self.get_gradient()
-        #     self.update_guess_model()
-        #     self.current_iteration += 1
-        # else:
-        #     warnings.warn("Iteration limit reached. FWI stopped.")
-        #     self.running_fwi = False
         result = scipy_minimize(
             self.return_functional_and_gradient,
             vp_0,
@@ -953,7 +939,7 @@ class FullWaveformInversion(AcousticWave):
         vp_end = fire.Function(self.function_space)
         vp_end.dat.data[:] = result.x
         self.vp_result = vp_end
-        fire.File("vp_end.pvd").write(vp_end)
+        fire.VTKFile("vp_end.pvd").write(vp_end)
         np.save("result", result.x)
 
     def run_fwi_rol(self, **kwargs):

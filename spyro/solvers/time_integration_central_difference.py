@@ -126,6 +126,10 @@ def central_difference(wave, source_ids=[0]):
 
     if adjoint_type == AdjointType.AUTOMATED_ADJOINT:
         wave.automated_adjoint.stop_recording()
+        wave.forward_solution = wave.vstate
+    else:
+        wave.forward_solution = usol
+
     wave.current_time = t
     helpers.display_progress(wave.comm, t)
     usol_recv = helpers.fill(
@@ -134,10 +138,8 @@ def central_difference(wave, source_ids=[0]):
     usol_recv = utils.utils.communicate(usol_recv, wave.comm)
 
     wave.receivers_output = usol_recv
-    wave.forward_solution = usol
-    wave.forward_solution_receivers = usol_recv
+    
     if compute_functional:
         wave.functional_value = J
 
     wave.field_logger.stop_logging()
-    return usol, usol_recv
