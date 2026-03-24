@@ -70,10 +70,10 @@ def construct_solver_or_matrix_with_pml_2d(Wave_object):
 
     Wave_object.lhs = fire.lhs(FF)
     Wave_object.rhs = fire.rhs(FF)
-    Wave_object.source_function = fire.Cofunction(W.dual())
-
+    if Wave_object.source_cofunction is None:
+        Wave_object.source_cofunction = fire.Cofunction(W.dual())
     lin_var = fire.LinearVariationalProblem(
-        Wave_object.lhs, Wave_object.rhs + Wave_object.source_function,
+        Wave_object.lhs, Wave_object.rhs + Wave_object.source_cofunction,
         X_np1, constant_jacobian=True)
     solver_parameters = dict(Wave_object.solver_parameters)
     solver_parameters["mat_type"] = "matfree"
@@ -143,6 +143,9 @@ def construct_solver_or_matrix_with_pml_3d(Wave_object):
     FF = m1 + a + nf
 
     B = fire.Cofunction(W.dual())
+    if Wave_object.source_cofunction is None:
+        Wave_object.source_cofunction = fire.Cofunction(W.dual())
+
 
     FF += pml1 + pml2 + pml3 + pml4
     # -------------------------------------------------------
@@ -159,10 +162,12 @@ def construct_solver_or_matrix_with_pml_3d(Wave_object):
     lhs_ = fire.lhs(FF)
     rhs_ = fire.rhs(FF)
 
-    source_function = fire.Cofunction(W.dual())
-    Wave_object.source_function = source_function
+    if Wave_object.source_cofunction is None:
+        Wave_object.source_cofunction = fire.Cofunction(W.dual())
 
-    lin_var = fire.LinearVariationalProblem(lhs_, rhs_ + source_function, X_np1, constant_jacobian=True)
+    lin_var = fire.LinearVariationalProblem(
+        lhs_, rhs_ + Wave_object.source_cofunction, X_np1,
+        constant_jacobian=True)
     solver_parameters = dict(Wave_object.solver_parameters)
     solver_parameters["mat_type"] = "matfree"
     solver = fire.LinearVariationalSolver(

@@ -131,11 +131,21 @@ def ensemble_propagator(func):
         elif args[0].parallelism_type == "spatial" and args[0].number_of_sources > 1:
             num = args[0].number_of_sources
             starting_time = args[0].current_time
+            functional_total = None
+            accumulate_functional = args[0]._compute_functional
             for snum in range(num):
                 args[0].reset_pressure()
                 args[0].current_time = starting_time
                 func(*args, **dict(kwargs, source_nums=[snum]))
+                if accumulate_functional:
+                    if functional_total is None:
+                        functional_total = args[0].functional_value
+                    else:
+                        functional_total += args[0].functional_value
                 save_serial_data(args[0], snum)
+            if accumulate_functional and functional_total is not None:
+                args[0].functional_value = functional_total / num
+
     return wrapper
 
 
@@ -183,10 +193,14 @@ def save_serial_data(wave, propagation_id):
     Returns:
         None
     """
+    np.save(_shot_filename(propagation_id, wave, prefix='tmp_rec'), wave.forward_solution_receivers)
+    if not isinstance(wave.forward_solution, (list, tuple)):
+        return
+    if len(wave.forward_solution) == 0:
+        return
     arrays_list = [obj.dat.data[:] for obj in wave.forward_solution]
     stacked_arrays = np.stack(arrays_list, axis=0)
     np.save(_shot_filename(propagation_id, wave, prefix='tmp_shot'), stacked_arrays)
-    np.save(_shot_filename(propagation_id, wave, prefix='tmp_rec'), wave.forward_solution_receivers)
 
 
 def switch_serial_shot(wave, propagation_id, file_name=None, just_for_dat_management=False):

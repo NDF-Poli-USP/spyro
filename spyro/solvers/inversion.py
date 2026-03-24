@@ -911,9 +911,17 @@ class FullWaveformInversion(AcousticWave):
                     self.source_cofunction = fire.Cofunction(self.function_space.dual())
                 controls = [self.c, self.source_cofunction]
             self.enable_automated_adjoint(controls=controls)
-            self.gradient = self.gradient_solve(riesz_map=riesz_map)
+            gradient_riesz_map = riesz_map
+            if riesz_map is RieszMapType.l2:
+                gradient_riesz_map = RieszMapType.L2
+                self.gradient = self.gradient_solve(riesz_map=gradient_riesz_map)
+
+            self.functional = self.functional_value
+            self.functional_history.append(self.functional_value)
         elif source_id is not None:
-            # Single source mode: called from ensemble_functional_gradient
+            previous_store_forward_time_steps = self.store_forward_time_steps
+            previous_compute_functional = self._compute_functional
+            previous_store_misfit = self._store_misfit
             self._active_source_id = source_id
             misfit = (
                 self.real_shot_record[source_id]

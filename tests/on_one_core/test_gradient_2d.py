@@ -178,4 +178,4 @@ def test_gradient(automated_adjoint):
 
 
 if __name__ == "__main__":
-    test_gradient(automated_adjoint=False)
+    test_gradient(automated_adjoint=True)

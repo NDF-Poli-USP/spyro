@@ -6,7 +6,35 @@ from .. import utils
 from ..utils.typing import AdjointType
 
 
-def central_difference(wave, source_ids=[0]):
+def _get_real_shot_step(wave, step):
+    real_shot_record = wave.real_shot_record
+
+    if (
+        wave.current_sources is not None
+        and isinstance(real_shot_record, np.ndarray)
+    ):
+        if real_shot_record.ndim == 3:
+            return real_shot_record[wave.current_sources[0], step]
+        if real_shot_record.ndim == 2:
+            return real_shot_record[step]
+
+    if (
+        wave.current_sources is not None
+        and isinstance(real_shot_record, (list, tuple))
+    ):
+        current_source = wave.current_sources[0]
+        if len(real_shot_record) > current_source:
+            source_record = real_shot_record[current_source]
+            if (
+                isinstance(source_record, np.ndarray)
+                and source_record.ndim == 2
+            ):
+                return source_record[step]
+
+    return real_shot_record[step]
+
+
+def central_difference(wave, source_ids=None):
     """
     Perform central difference time integration for wave propagation.
 
@@ -27,14 +55,19 @@ def central_difference(wave, source_ids=[0]):
     Use ``LinearVariationalSolver`` with per-step source updates through
     ``wave.rhs_no_pml_source()`` before ``wave.solver.solve()``.
     """
-    store_forward_time_steps = getattr(wave, "store_forward_time_steps", True)
-    compute_functional = getattr(wave, "_compute_functional", False)
-    store_misfit = getattr(wave, "_store_misfit", False)
-    adjoint_type = getattr(wave, "adjoint_type", AdjointType.NONE)
+    if source_ids is None:
+        source_ids = [0]
+
+    store_forward_time_steps = wave.store_forward_time_steps
+    compute_functional = wave._compute_functional
+    store_misfit = wave._store_misfit
+    adjoint_type = wave.adjoint_type
+    # Interpator if using vertex-only mesh with sources and receivers.
+    # Will be None otherwise.
+    interpolate_receivers = None
 
     if wave.sources is not None:
         wave.sources.current_sources = source_ids
-        rhs_forcing = fire.Cofunction(wave.function_space.dual())
 
     wave.field_logger.start_logging(source_ids)
     wave.comm.comm.barrier()
@@ -50,10 +83,10 @@ def central_difference(wave, source_ids=[0]):
         ]
     if adjoint_type == AdjointType.AUTOMATED_ADJOINT:
         wave.automated_adjoint.start_recording()
-    if wave.sources is not None and wave.use_vertex_only_mesh:
+    if wave.use_vertex_only_mesh:
         # source_cof is a cofunction that represents a point source,
+        wave.source_cofunction.assign(wave.sources.source_cofunction())
         # being one at a point and zero elsewhere.
-        source_cof = wave.sources.source_cofunction()
         interpolate_receivers = wave.receivers.receiver_interpolator(
             wave.vstate)
     usol_recv = []
@@ -63,16 +96,15 @@ def central_difference(wave, source_ids=[0]):
     if store_misfit:
         wave.misfit = []
     for step in range(nt):
-        # Basic way of applying sources
-        wave.update_source_expression(t)
-
         if wave.sources is not None:
             if wave.use_vertex_only_mesh:
                 wave.rhs_no_pml_source().assign(fire.assemble(
-                    wave.sources.wavelet[step] * source_cof))
+                    wave.sources.wavelet[step] * wave.source_cofunction))
             else:
+                # Basic way of applying sources
+                wave.update_source_expression(t)
                 wave.rhs_no_pml_source().assign(
-                    wave.sources.apply_source(rhs_forcing, step))
+                    wave.sources.apply_source(wave.source_cofunction, step))
         wave.solver.solve()
 
         wave.prev_vstate = wave.vstate
@@ -82,7 +114,10 @@ def central_difference(wave, source_ids=[0]):
         else:
             usol_recv.append(wave.get_receivers_output())
 
-        if store_forward_time_steps and step % wave.gradient_sampling_frequency == 0:
+        if (
+            store_forward_time_steps
+            and step % wave.gradient_sampling_frequency == 0
+        ):
             usol[save_step].assign(wave.get_function())
             save_step += 1
 
@@ -110,15 +145,9 @@ def central_difference(wave, source_ids=[0]):
                         "Must be either a numpy array or a Firedrake Function."
                     )
             else:
-                residual_step = wave.real_shot_record[step] - usol_recv[-1]
-
-            weight = 0.5 if step == 0 or step == nt - 1 else 1.0
-            if wave.use_vertex_only_mesh:
-                J += fire.assemble(
-                    0.5 * weight * fire.inner(residual_step, residual_step) * fire.dx
-                ) * wave.dt
-            else:
-                J += 0.5 * weight * np.sum(residual_step ** 2) * wave.dt
+                residual_step = observed_step - usol_recv[-1]
+            J += utils.compute_functional(
+                wave, residual_step, per_step=True, step=step, nsteps=nt)
             if store_misfit:
                 wave.misfit.append(residual_step)
 
@@ -138,7 +167,7 @@ def central_difference(wave, source_ids=[0]):
     usol_recv = utils.utils.communicate(usol_recv, wave.comm)
 
     wave.receivers_output = usol_recv
-    
+
     if compute_functional:
         wave.functional_value = J
 

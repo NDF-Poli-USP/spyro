@@ -15,7 +15,7 @@ from .backward_time_integration import (
     backward_wave_propagator,
 )
 from ..domains.space import create_function_space
-from ..utils.typing import override, WaveType, AdjointType
+from ..utils.typing import override, WaveType, AdjointType, RieszMapType
 from ..utils import write_hdf5_velocity_model
 from .functionals import acoustic_energy
 
@@ -71,14 +71,35 @@ class AcousticWave(Wave):
         self.acoustic_energy = acoustic_energy(self)
 
     @ensemble_gradient
-    def gradient_solve(self, guess=None, misfit=None, forward_solution=None):
+    def gradient_solve(
+        self, misfit=None, forward_solution=None, riesz_map=RieszMapType.L2
+    ):
         """Solves the adjoint problem to calculate de gradient.
 
         Parameters:
         -----------
-        guess: Firedrake 'Function' (optional)
-            Initial guess for the velocity model. If not mentioned uses the
-            one currently in the wave object.
+        misfit: list of Firedrake Functions or list of numpy arrays
+            A list containing the misfit at each time step.
+            If not provided, it will be calculated as the difference between
+            the real shot record and the forward solution shots at the
+            receiver locations.
+        forward_solution: list of Firedrake Functions or list of numpy arrays
+            A list containing the forward solution at each time step.
+            If not provided, the forward problem will be solved to obtain it.
+        riesz_map: RieszMapType, optional
+            The type of Riesz map to apply to the gradient. If using the
+            automated adjoint and the optimization library is scipy, this will
+            be set to RieszMapType.l2 regardless of the value passed here,
+            since scipy's optimizers expect derivatives rather than gradients.
+            Default is RieszMapType.L2, which applies the L2 Riesz map to
+            the computed derivative to obtain the gradient in the appropriate
+            inner product space.
+
+        Notes:
+        ------
+        - For automated adjoint, the misfit and forward_solution are not needed
+        as they are handled internally by the recording and recomputation
+        mechanism.
 
         Returns:
         --------
@@ -92,8 +113,39 @@ class AcousticWave(Wave):
                     self.functional_value
                 )
             else:
-                self.automated_adjoint.recompute_functional(self.c)
-            return self.automated_adjoint.compute_gradient()
+                if self.comm.ensemble_size == 1 and self.number_of_sources > 1:
+                    # In serial runs, the source cofunction must be passed back
+                    # into the reduced functional so it is refreshed with the
+                    # current source values before recomputing the functional.
+                    # The returned derivative is still taken only with respect
+                    # to the velocity-model control: in
+                    # ``AutomatedAdjoint.create_reduced_functional()``, both
+                    # controls are registered, but ``derivative_components`` is
+                    # set to ``(model_control_index,)``. That keeps the source
+                    # cofunction synchronized during recomputation while
+                    # restricting the reported gradient to ``self.c``.
+                    controls = [self.c, self.source_cofunction]
+                else:
+                    controls = self.c
+                self.automated_adjoint.recompute_functional(controls)
+            if riesz_map == RieszMapType.L2:
+                gradient = self.automated_adjoint.compute_gradient()
+            elif riesz_map == RieszMapType.l2:
+                gradient = self.automated_adjoint.compute_derivative()
+            else:
+                raise ValueError(f"Unsupported Riesz map type: {riesz_map}")
+            if isinstance(gradient, (list, tuple)):
+                if len(gradient) == 0:
+                    raise ValueError(
+                        "Automated adjoint returned no derivative "
+                        "components for the model control."
+                    )
+                gradient = gradient[0]
+            if isinstance(gradient, fire.Cofunction):
+                gradient_function = fire.Function(self.function_space)
+                gradient_function.dat.data[:] = gradient.dat.data_ro[:]
+                return gradient_function
+            return gradient
         # Implemented adjoint case
         self.enable_implemented_adjoint(
             misfit=misfit, forward_solution=forward_solution)
@@ -117,7 +169,8 @@ class AcousticWave(Wave):
                 raise ValueError("No velocity model or velocity file to load.")
 
             if self.initial_velocity_model_file.endswith(".segy"):
-                self.initial_velocity_model_file = write_hdf5_velocity_model(self, self.initial_velocity_model_file)
+                self.initial_velocity_model_file = write_hdf5_velocity_model(
+                    self, self.initial_velocity_model_file)
 
             if self.initial_velocity_model_file.endswith((".hdf5", ".h5")):
                 self.initial_velocity_model = interpolate(
@@ -210,6 +263,6 @@ class AcousticWave(Wave):
         side.
         """
         if self.abc_boundary_layer_type == "PML":
-            return self.source_function.sub(0)
+            return self.source_cofunction.sub(0)
         else:
-            return self.source_function
+            return self.source_cofunction

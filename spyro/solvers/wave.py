@@ -85,7 +85,7 @@ class Wave(Model_parameters, metaclass=ABCMeta):
         self._receivers_output = None
         self.automated_adjoint = None
         self.adjoint_type = AdjointType.NONE
-        self.store_forward_time_steps = True
+        self.store_forward_time_steps = False
         self._compute_functional = False
         self._store_misfit = False
         self.current_time = 0.0
@@ -107,6 +107,8 @@ class Wave(Model_parameters, metaclass=ABCMeta):
             warnings.warn("No mesh found. Please define a mesh.")
         # Expression to define sources through UFL (less efficient)
         self.source_expression = None
+        # Cofunction to apply sources.
+        self.source_cofunction = None
         # Object for efficient application of sources
 
         self.field_logger = FieldLogger(self.comm,
@@ -423,9 +425,7 @@ class Wave(Model_parameters, metaclass=ABCMeta):
             self.dt = dt
 
         self.current_sources = source_nums
-        usol, usol_recv = time_integrator(self, source_nums)
-
-        return usol, usol_recv
+        time_integrator(self, source_nums)
 
     def get_dt(self):
         return self._dt
@@ -451,13 +451,14 @@ class Wave(Model_parameters, metaclass=ABCMeta):
     def enable_store_misfit(self):
         self._store_misfit = True
 
-    def enable_automated_adjoint(self):
-        control = self.c if self.c is not None else self.initial_velocity_model
-        if control is None:
-            raise ValueError(
-                "Set an initial velocity model before enabling the adjoint."
-            )
-        self.automated_adjoint = AutomatedAdjoint(control, self.comm)
+    def enable_automated_adjoint(self, controls=None):
+        if controls is None:
+            controls = self.c if self.c is not None else self.initial_velocity_model
+            if controls is None:
+                raise ValueError(
+                    "Set an initial velocity model before enabling the adjoint."
+                )
+        self.automated_adjoint = AutomatedAdjoint(controls, self.comm)
         self.use_vertex_only_mesh = True
         self._compute_functional = True
         self.store_forward_time_steps = False

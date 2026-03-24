@@ -91,7 +91,8 @@ class AutomatedAdjoint:
         return self._reduced_functional(control_value)
 
     def compute_gradient(self):
-        """Compute the Riesz-represented gradient for the control."""
+        """Compute the Riesz-represented gradient for the control.
+        """
         return self._reduced_functional.derivative(apply_riesz=True)
 
     def compute_derivative(self):

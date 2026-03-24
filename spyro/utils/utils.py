@@ -46,7 +46,7 @@ def butter_lowpass_filter(shot, cutoff, fs, order=2):
 
 
 @ensemble_functional
-def compute_functional(Wave_object, residual):
+def compute_functional(Wave_object, residual, per_step=False, step=None, nsteps=None):
     """Compute the functional to be optimized.
 
     Computes the L2 norm of the residual at receiver locations,
@@ -82,11 +82,36 @@ def compute_functional(Wave_object, residual):
     where :math:`N_r` is the number of receivers and :math:`T` is the
     total simulation time.
     """
-    num_receivers = Wave_object.number_of_receivers
     dt = Wave_object.dt
+    if per_step:
+        weight = 0.5 if step == 0 or step == nsteps - 1 else 1.0
 
+        if Wave_object.use_vertex_only_mesh:
+            return assemble(0.5 * dt * weight * inner(residual, residual) * dx)
+
+        else:
+            residual_array = np.asarray(residual)
+            if residual_array.ndim != 1:
+                raise ValueError(
+                    "Expected one residual vector with shape "
+                    "(num_receivers,) for the current time step."
+                )
+            g_n = np.sum(residual_array**2)
+            return g_n * (0.5 * dt * weight)
+
+    # Check if residual is a 2D array with shape (n_time_steps, n_receivers)
+    if (
+        residual.ndim != 2
+        or residual.shape[1] != Wave_object.number_of_receivers
+        or (residual.shape[0] != int(Wave_object.current_time / Wave_object.dt)
+        + 1)
+    ):
+        raise ValueError(
+            "Expected residual to be a 2D array with shape "
+            "(n_time_steps, n_receivers)."
+        )
     J = 0
-    for rn in range(num_receivers):
+    for rn in range(Wave_object.number_of_receivers):
         J += np.trapezoid(residual[:, rn] ** 2, dx=dt)
 
     J *= 0.5
