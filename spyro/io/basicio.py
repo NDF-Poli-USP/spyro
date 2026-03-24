@@ -127,24 +127,35 @@ def ensemble_propagator(func):
             _comm = args[0].comm
             for propagation_id, shot_ids_in_propagation in enumerate(shot_ids_per_propagation_list):
                 if is_owner(_comm, propagation_id):
-                    func(*args, **dict(kwargs, source_nums=shot_ids_in_propagation))
-        elif args[0].parallelism_type == "spatial" and args[0].number_of_sources > 1:
+                    return func(*args, **dict(kwargs, source_nums=shot_ids_in_propagation))
+        elif (
+            args[0].parallelism_type == "spatial"
+            and args[0].number_of_sources > 1
+        ):
+            if args[0].automated_adjoint:
+                return func(*args, **dict(kwargs, source_nums=[0]))
+
             num = args[0].number_of_sources
             starting_time = args[0].current_time
-            functional_total = None
-            accumulate_functional = args[0]._compute_functional
+            receivers_snapshots = []
             for snum in range(num):
                 args[0].reset_pressure()
                 args[0].current_time = starting_time
                 func(*args, **dict(kwargs, source_nums=[snum]))
-                if accumulate_functional:
-                    if functional_total is None:
-                        functional_total = args[0].functional_value
-                    else:
-                        functional_total += args[0].functional_value
-                save_serial_data(args[0], snum)
-            if accumulate_functional and functional_total is not None:
-                args[0].functional_value = functional_total / num
+                if (
+                    args[0].store_forward_solution_on_disk and
+                    not args[0].use_vertex_only_mesh
+                ):
+                    save_serial_data(args[0], snum)
+                elif (
+                    not args[0].store_forward_solution_on_disk
+                    and args[0].use_vertex_only_mesh
+                ):
+                    receivers_snapshots.append(args[0].receivers_output)
+                else:
+                    raise NotImplementedError("Not handling with current settings for store_forward_solution_on_disk and use_vertex_only_mesh.")
+            if args[0].use_vertex_only_mesh:
+                return receivers_snapshots
 
     return wrapper
 
@@ -193,14 +204,37 @@ def save_serial_data(wave, propagation_id):
     Returns:
         None
     """
-    np.save(_shot_filename(propagation_id, wave, prefix='tmp_rec'), wave.forward_solution_receivers)
-    if not isinstance(wave.forward_solution, (list, tuple)):
-        return
-    if len(wave.forward_solution) == 0:
-        return
-    arrays_list = [obj.dat.data[:] for obj in wave.forward_solution]
-    stacked_arrays = np.stack(arrays_list, axis=0)
-    np.save(_shot_filename(propagation_id, wave, prefix='tmp_shot'), stacked_arrays)
+    if wave.store_forward_solution_on_disk:
+        # Always persist receiver traces for this source.
+        np.save(
+            _shot_filename(propagation_id, wave, prefix='tmp_rec'),
+            wave.forward_solution_receivers,
+        )
+
+        forward_solution = wave.forward_solution
+
+        if isinstance(forward_solution, list):
+            stacked_arrays = np.stack(
+                [obj.dat.data_ro[:] for obj in forward_solution],
+                axis=0,
+            )
+            np.save(
+                _shot_filename(propagation_id, wave, prefix='tmp_shot'),
+                stacked_arrays,
+            )
+            return
+
+        if isinstance(forward_solution, fire.Function):
+            np.save(
+                _shot_filename(propagation_id, wave, prefix='tmp_shot'),
+                forward_solution.dat.data_ro[:],
+            )
+            return
+
+    raise ValueError(
+        "wave.forward_solution must be a list of Functions or a single "
+        "Function."
+    )
 
 
 def switch_serial_shot(wave, propagation_id, file_name=None, just_for_dat_management=False):
@@ -224,7 +258,8 @@ def switch_serial_shot(wave, propagation_id, file_name=None, just_for_dat_manage
         receiver_solution_filename = _shot_filename(propagation_id, wave, prefix='tmp_rec')
     else:
         receiver_solution_filename = _shot_filename(propagation_id, wave, prefix=file_name, random_str_in_use=False)
-    wave.receivers_output = np.load(receiver_solution_filename, allow_pickle=True)
+    wave.forward_solution_receivers = np.load(receiver_solution_filename, allow_pickle=True)
+    wave.receivers_output = wave.forward_solution_receivers
 
 
 def ensemble_functional(func):
@@ -232,11 +267,6 @@ def ensemble_functional(func):
 
     def wrapper(*args, **kwargs):
         comm = args[0].comm
-        if args[0].automated_adjoint:
-            return func(*args, **kwargs)
-        if getattr(args[0], '_active_source_id', None) is not None:
-            return func(*args, **kwargs)
-
         if args[0].parallelism_type != "spatial" or args[0].number_of_sources == 1:
             J = func(*args, **kwargs)
             J_total = np.zeros((1))
@@ -267,11 +297,6 @@ def ensemble_gradient(func):
 
     def wrapper(*args, **kwargs):
         comm = args[0].comm
-        if args[0].automated_adjoint:
-            return func(*args, **kwargs)
-        if getattr(args[0], '_active_source_id', None) is not None:
-            return func(*args, **kwargs)
-
         if args[0].parallelism_type != "spatial" or args[0].number_of_sources == 1:
             shot_ids_per_propagation_list = args[0].shot_ids_per_propagation
             for propagation_id, shot_ids_in_propagation in enumerate(shot_ids_per_propagation_list):
@@ -307,96 +332,6 @@ def ensemble_gradient(func):
             comm.comm.barrier()
 
             return grad_total
-
-    return wrapper
-
-
-def ensemble_functional_gradient(func):
-    """Decorator for get_functional_gradient to distribute sources.
-
-    Handles source distribution for the complete forward-propagation and
-    gradient computation cycle. For automated adjoint,
-    ``EnsembleReducedFunctional`` handles source parallelization internally
-    so the decorator passes through. For other adjoint solvers (e.g.
-    implemented adjoint), the decorator manages serial (spatial parallelism)
-    and parallel (ensemble parallelism) source distribution.
-
-    Parameters
-    ----------
-    func : callable
-        The wrapped function that computes the functional and its gradient.
-        Expected to accept a :class:`FullWaveformInversion` object as first
-        argument and an optional ``source_id`` keyword for single-source
-        computation within the decorator's loop.
-
-    Returns
-    -------
-    wrapper : callable
-        Decorated function with ensemble source distribution.
-    """
-
-    def wrapper(*args, **kwargs):
-        obj = args[0]
-        comm = obj.comm
-
-        # Automated adjoint: EnsembleReducedFunctional handles parallelization
-        if obj.input_dictionary["inversion"]["automated_adjoint"]:
-            return func(*args, **kwargs)
-
-        # Ensemble parallelism or single source: inner decorators handle it
-        if obj.parallelism_type != "spatial" or obj.number_of_sources == 1:
-            return func(*args, **kwargs)
-
-        # Spatial parallelism with multiple sources, non-automated adjoint
-        num = obj.number_of_sources
-
-        # Update velocity model if provided
-        c = kwargs.get('c', None)
-        if c is not None:
-            obj.initial_velocity_model.dat.data[:] = c
-
-        # Forward solve all sources (ensemble_propagator saves to tmp files)
-        obj.forward_solve()
-        starting_time = obj.current_time
-
-        grad_total = fire.Function(obj.function_space)
-        J_total = 0.0
-
-        # Compute gradient for each source using saved forward solutions
-        inner_kwargs = dict(kwargs, c=None, save=False)
-        for snum in range(num):
-            switch_serial_shot(obj, snum)
-            obj.reset_pressure()
-            obj.current_time = starting_time
-            J, dJ = func(*args, **dict(inner_kwargs, source_id=snum))
-            grad_total.dat.data[:] += dJ
-            J_total += J
-
-        grad_total /= num
-        J_total /= num
-        obj.gradient = grad_total
-        obj.functional_value = J_total
-        obj.functional_history.append(J_total)
-        obj.functional = J_total
-
-        if comm.ensemble_comm.rank == 0 and comm.comm.rank == 0:
-            print(
-                f"Functional: {J_total} at iteration: "
-                f"{obj.current_iteration}",
-                flush=True,
-            )
-
-        # Post-processing
-        obj._apply_gradient_mask()
-        save = kwargs.get('save', True)
-        if save:
-            output = fire.VTKFile(
-                "gradient_" + str(obj.current_iteration) + ".pvd"
-            )
-            output.write(obj.gradient)
-        obj.current_iteration += 1
-        comm.comm.barrier()
-        return J_total, grad_total.dat.data_ro[:]
 
     return wrapper
 

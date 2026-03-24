@@ -7,7 +7,6 @@ import matplotlib.pyplot as plt
 import numpy as np
 import pytest
 import spyro
-from firedrake import dx
 
 
 def check_gradient(Wave_obj_guess, dJ, plot=False):
@@ -139,13 +138,13 @@ def get_forward_model(automated_adjoint, load_true=False):
     Wave_obj_guess.real_shot_record = rec_out_exact
     if automated_adjoint:
         Wave_obj_guess.enable_automated_adjoint()
-        assert Wave_obj_guess.store_forward_time_steps is False
+        assert Wave_obj_guess._store_forward_time_steps is False
     else:
         Wave_obj_guess.enable_store_misfit()
         assert Wave_obj_guess._store_misfit is True
         # Store forward solution time steps for gradient calculation
         # is `True` by default in spyro.
-        assert Wave_obj_guess.store_forward_time_steps is True
+        Wave_obj_guess.store_forward_time_steps = True
         Wave_obj_guess.forward_solve()
     return Wave_obj_guess
 

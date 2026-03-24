@@ -34,6 +34,27 @@ def _get_real_shot_step(wave, step):
     return real_shot_record[step]
 
 
+def _compute_functional_per_step(wave, residual_step, step, nsteps):
+    weight = 0.5 if step == 0 or step == nsteps - 1 else 1.0
+
+    if wave.use_vertex_only_mesh:
+        return fire.assemble(
+            0.5
+            * wave.dt
+            * weight
+            * fire.inner(residual_step, residual_step)
+            * fire.dx
+        )
+
+    residual_array = np.asarray(residual_step)
+    if residual_array.ndim != 1:
+        raise ValueError(
+            "Expected one residual vector with shape "
+            "(num_receivers,) for the current time step."
+        )
+    return np.sum(residual_array**2) * (0.5 * wave.dt * weight)
+
+
 def central_difference(wave, source_ids=None):
     """
     Perform central difference time integration for wave propagation.
@@ -130,15 +151,16 @@ def central_difference(wave, source_ids=None):
             helpers.display_progress(wave.comm, t)
 
         if compute_functional:
+            observed_step = _get_real_shot_step(wave, step)
             if wave.use_vertex_only_mesh:
-                if isinstance(wave.real_shot_record[step], np.ndarray):
+                if isinstance(observed_step, np.ndarray):
                     real_shot = fire.Function(
                         usol_recv[-1].function_space(),
-                        val=wave.real_shot_record[step],
+                        val=observed_step,
                     )
                     residual_step = real_shot - usol_recv[-1]
-                elif isinstance(wave.real_shot_record[step], fire.Function):
-                    residual_step = wave.real_shot_record[step] - usol_recv[-1]
+                elif isinstance(observed_step, fire.Function):
+                    residual_step = observed_step - usol_recv[-1]
                 else:
                     raise ValueError(
                         "Unsupported type for real_shot_record. "
@@ -146,17 +168,22 @@ def central_difference(wave, source_ids=None):
                     )
             else:
                 residual_step = observed_step - usol_recv[-1]
-            J += utils.compute_functional(
-                wave, residual_step, per_step=True, step=step, nsteps=nt)
+            J += _compute_functional_per_step(wave, residual_step, step, nt)
             if store_misfit:
                 wave.misfit.append(residual_step)
 
         t = step * float(wave.dt)
 
-    if adjoint_type == AdjointType.AUTOMATED_ADJOINT:
-        wave.automated_adjoint.stop_recording()
+    if (
+        adjoint_type == AdjointType.AUTOMATED_ADJOINT
+        or adjoint_type == AdjointType.NONE
+    ):
         wave.forward_solution = wave.vstate
+        if adjoint_type == AdjointType.AUTOMATED_ADJOINT:
+            wave.automated_adjoint.stop_recording()
     else:
+        # For implemented adjoint, we need to store the forward solution
+        # at each time step for the backward (or adjoint-based gradient) solve.
         wave.forward_solution = usol
 
     wave.current_time = t

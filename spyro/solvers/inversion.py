@@ -13,9 +13,8 @@ from ..utils import Gradient_mask_for_pml, Mask
 from ..plots import plot_model as spyro_plot_model
 from ..io.basicio import switch_serial_shot
 from ..io.basicio import load_shots, save_shots, create_segy
-from ..io.basicio import ensemble_functional_gradient
 from ..utils import run_in_one_core
-from ..utils.typing import OptmisationLibrary, RieszMapType, AdjointType
+from ..utils.typing import OptmisationLibrary
 
 
 try:
@@ -406,25 +405,9 @@ class FullWaveformInversion(AcousticWave):
         self.has_gradient_mask = False
         self.gradient_mask_available = False
         self.functional_history = []
-        self._mass_diagonal = None
-
-    # def _enable_automated_adjoint(self):
-    #     """
-    #     Enable the automated adjoint functionality.
-
-    #     This method sets up the necessary configurations to use the automated
-    #     adjoint for gradient computation. It ensures that the forward solution
-    #     is not stored in memory, as the automated adjoint will handle the
-    #     necessary computations without needing to access the full forward solution.
-    #     """
-    #     if (
-    #         self.comm.ensemble_size == 1 and self.number_of_sources > 1 
-    #         and self.parallelism_type == "spatial"
-    #     ):
-    #             controls = [self.c, self.sources.source_cofunction()]
-    #     else:
-    #         controls = self.c
-    #     self.enable_automated_adjoint(controls=controls)
+        self.real_shot_record = None
+        self.optimisation_library = OptmisationLibrary.SCIPY
+        self.iteration = None
 
     @property
     def real_velocity_model_file(self):
@@ -532,7 +515,7 @@ class FullWaveformInversion(AcousticWave):
         if c is not None:
             self.initial_velocity_model.dat.data[:] = c
         self.forward_solve()
-        output = fire.VTKFile("control_" + str(self.current_iteration)+".pvd")
+        output = fire.File("control_" + str(self.current_iteration)+".pvd")
         output.write(self.c)
         np.save(f"control{self.comm.ensemble_comm.rank}_{self.comm.comm.rank}", self.c.dat.data[:])
         if self.parallelism_type == "spatial" and self.number_of_sources > 1:
@@ -819,7 +802,7 @@ class FullWaveformInversion(AcousticWave):
         Jm = compute_functional(self, self.misfit)
 
         self.functional_history.append(Jm)
-        self.functional = Jm
+        self.functional_value = Jm
         peak_memory_mb = get_peak_memory()
         # Save the functional value to a text file
         if self.comm.ensemble_comm.rank == 0 and self.comm.comm.rank == 0:
@@ -832,34 +815,7 @@ class FullWaveformInversion(AcousticWave):
 
         return Jm
 
-    def _gradient_to_derivative(self, gradient):
-        """Convert the L2 Riesz gradient to the Euclidean derivative.
-
-        The implemented adjoint (``backward_wave_propagator``) returns the L2
-        Riesz representative of the gradient, i.e. it solves
-        ``M g = R`` and returns ``g``.  Scipy and other derivative-based
-        optimizers need ``R`` (the derivative).  For the lumped mass-matrix
-        variant this is simply ``R = M_diag * g`` (element-wise).
-        """
-        if self._mass_diagonal is None:
-            V = self.function_space
-            u = fire.TrialFunction(V)
-            v = fire.TestFunction(V)
-            ones = fire.Function(V)
-            ones.assign(1.0)
-            M_form = fire.inner(u, v) * fire.dx(**self.quadrature_rule)
-            self._mass_diagonal = fire.assemble(fire.action(M_form, ones))
-        derivative = fire.Function(self.function_space)
-        derivative.dat.data[:] = (
-            gradient.dat.data_ro[:] * self._mass_diagonal.dat.data_ro[:]
-        )
-        return derivative
-
-    @ensemble_functional_gradient
-    def get_functional_gradient(
-            self, c=None, save=True, calculate_functional=True, riesz_map=None,
-            source_id=None,
-    ):
+    def get_gradient(self, c=None, save=True, calculate_functional=True):
         """
         Calculate the gradient of the objective functional.
 
@@ -870,93 +826,169 @@ class FullWaveformInversion(AcousticWave):
         Parameters
         ----------
         c : array_like, optional
-            Velocity model values to use. If provided and
-            ``calculate_functional`` is True, the model is updated before
-            computing the functional.
+            Velocity model values to use. If provided and calculate_functional
+            is True, updates the model before computing the functional.
         save : bool, optional
             If True, save the gradient to a VTK file for visualization.
             Default is True.
         calculate_functional : bool, optional
-            If True, calculate the functional and misfit before computing
+            If True, calculate the functional (and misfit) before computing
             the gradient. Default is True.
-        riesz_map : RieszMapType, optional
-            The type of Riesz map to apply to the gradient.
-        source_id : int, optional
-            When provided, computes the gradient for a single source only.
-            Used internally by the ``ensemble_functional_gradient`` decorator
-            during its per-source loop.
 
         Notes
         -----
         This method increments the current_iteration counter and applies any
         gradient mask that has been set. The gradient is computed using the
         adjoint-state method implemented in gradient_solve().
-
-        When called with ``source_id``, the forward solution and receivers
-        must already be loaded (e.g. via ``switch_serial_shot``). The method
-        returns early without applying the gradient mask, saving, or
-        incrementing the iteration counter, as those are handled by the
-        decorator.
         """
         comm = self.comm
-        if self.input_dictionary["inversion"]["automated_adjoint"]:
-            controls = self.c
-            if (
-                self.comm.ensemble_size == 1 and self.number_of_sources > 1 
-                and self.parallelism_type == "spatial"
-            ):
-                # If using spatial parallelism with multiple sources, controls
-                # should include both the velocity model and source terms.
-                if self.source_cofunction is None:
-                    self.source_cofunction = fire.Cofunction(self.function_space.dual())
-                controls = [self.c, self.source_cofunction]
-            self.enable_automated_adjoint(controls=controls)
-            gradient_riesz_map = riesz_map
-            if riesz_map is RieszMapType.l2:
-                gradient_riesz_map = RieszMapType.L2
-                self.gradient = self.gradient_solve(riesz_map=gradient_riesz_map)
-
-            self.functional = self.functional_value
-            self.functional_history.append(self.functional_value)
-        elif source_id is not None:
-            previous_store_forward_time_steps = self.store_forward_time_steps
-            previous_compute_functional = self._compute_functional
-            previous_store_misfit = self._store_misfit
-            self._active_source_id = source_id
-            misfit = (
-                self.real_shot_record[source_id]
-                - self.forward_solution_receivers
-            )
-            self.functional_value = compute_functional(self, misfit)
-            self.gradient = self.gradient_solve(
-                misfit=misfit,
-                forward_solution=self.forward_solution,
-                riesz_map=riesz_map,
-            )
-            if riesz_map is RieszMapType.l2:
-                self.gradient = self._gradient_to_derivative(self.gradient)
-            self._active_source_id = None
-            return self.functional_value, self.gradient.dat.data_ro[:]
-        else:
-            if calculate_functional:
-                self.get_functional(c=c)
-            self.gradient = self.gradient_solve(
-                misfit=self.misfit,
-                forward_solution=self.guess_forward_solution,
-                riesz_map=riesz_map,
-            )
-            if riesz_map is RieszMapType.l2:
-                self.gradient = self._gradient_to_derivative(self.gradient)
+        if calculate_functional:
+            self.get_functional(c=c)
+        comm.comm.barrier()
+        self.gradient = self.gradient_solve(misfit=self.misfit, forward_solution=self.guess_forward_solution)
         self._apply_gradient_mask()
         if save:
-            output = fire.VTKFile("gradient_" + str(self.current_iteration)+".pvd")
+            # self.gradient_out.write(dJ_total)
+            output = fire.File("gradient_" + str(self.current_iteration)+".pvd")
             output.write(self.gradient)
         self.current_iteration += 1
         comm.comm.barrier()
-        return self.functional_value, self.gradient.dat.data_ro[:]
 
-    def return_functional_and_gradient(
-            self, c, optimisation_library=OptmisationLibrary.SCIPY):
+    def _get_automated_adjoint_gradient_data(self):
+        """Return the current taped derivative in the optimizer format.
+
+        The automated-adjoint backend can expose either a Firedrake
+        ``Cofunction`` or a Firedrake ``Function`` depending on the selected
+        optimization library. This helper normalizes both cases to a NumPy view
+        so the caller can accumulate gradients across sources without branching
+        on the library type.
+        """
+        if self.optimisation_library is OptmisationLibrary.SCIPY:
+            derivative = self.automated_adjoint.compute_derivative()
+            return derivative.dat.data_ro[:]
+
+        if self.optimisation_library is OptmisationLibrary.ROL:
+            gradient = self.automated_adjoint.compute_gradient()
+            return gradient.dat.data_ro[:]
+
+        raise ValueError(
+            "Unsupported optimization library for automated adjoint."
+        )
+
+    def _get_automated_adjoint_controls(
+        self,
+        c_function,
+        serial_multi_source,
+        source_number=0,
+    ):
+        """Build the control list for one automated-adjoint evaluation.
+
+        Parameters
+        ----------
+        c_function : firedrake.Function
+            Current inversion control represented in the model function space.
+        serial_multi_source : bool
+            Whether sources are processed serially on the same ensemble rank.
+        source_number : int, optional
+            Source index to activate when source controls must be updated.
+
+        Returns
+        -------
+        list
+            Control objects to pass to the automated-adjoint driver.
+
+        Notes
+        -----
+        In serial multi-source mode the source term itself is part of the
+        taped controls. This helper updates ``self.sources.current_sources`` and
+        refreshes ``self.source_cofunction`` so each replay uses the correct
+        source before calling ``recompute_functional()``.
+        """
+        controls = [c_function]
+
+        if not serial_multi_source:
+            return controls
+
+        self.sources.current_sources = [source_number]
+        if self.source_cofunction is None:
+            self.source_cofunction = fire.Cofunction(
+                self.function_space.dual()
+            )
+        self.source_cofunction.assign(self.sources.source_cofunction())
+        controls.append(self.source_cofunction)
+        return controls
+
+    def _run_automated_adjoint_functional_and_gradient(self, c):
+        """Evaluate the functional and gradient using the taped forward solve.
+
+        The first call initializes automated adjoint, runs ``forward_solve()``
+        once, and creates the reduced functional from that taped execution.
+        Later calls do not rebuild the tape. Actually, they update the controls and use
+        ``recompute_functional()`` to replay the taped forward solve.
+
+        In serial multi-source mode source ``0`` is used for the initial taped
+        run, then the remaining sources are replayed one by one and their
+        functional and gradient contributions are accumulated. At the end the
+        active source index is reset to ``[0]`` so the object remains in the
+        same baseline state expected by subsequent solves.
+        """
+        c_function = fire.Function(self.function_space, val=c)
+        serial_multi_source = (
+            self.comm.ensemble_size == 1 and self.number_of_sources > 1
+        )
+        first_iteration = self.iteration is None
+        controls = self._get_automated_adjoint_controls(
+            c_function,
+            serial_multi_source,
+            source_number=0,
+        )
+
+        if first_iteration:
+            self.enable_automated_adjoint(controls=controls)
+            # This solver will run the forward equation for the source number
+            # corresponding to zero position when sources are processed
+            # serially.
+            self.forward_solve()
+
+            if self.functional_value is None:
+                raise ValueError(
+                    "Functional value must be computed before creating "
+                    "reduced functional for automated adjoint."
+                )
+            total_functional = self.functional_value
+            self.automated_adjoint.create_reduced_functional(
+                self.functional_value
+            )
+        else:
+            total_functional = self.automated_adjoint.recompute_functional(
+                controls
+            )
+            self.functional_value = total_functional
+
+        gradient_data = self._get_automated_adjoint_gradient_data()
+
+        if serial_multi_source:
+            for snum in range(1, self.number_of_sources):
+                source_controls = self._get_automated_adjoint_controls(
+                    c_function,
+                    serial_multi_source,
+                    source_number=snum,
+                )
+                total_functional += self.automated_adjoint.recompute_functional(
+                    source_controls
+                )
+                gradient_data += self._get_automated_adjoint_gradient_data()
+
+            # Restore the default source so later solves start from the same
+            # taped baseline configuration used for source 0.
+            self.sources.current_sources = [0]
+
+        self.functional_value = total_functional
+        self.iteration = 0 if first_iteration else self.iteration + 1
+
+        return self.functional_value, gradient_data
+
+    def return_functional_and_gradient(self, c):
         """
         Compute and return both the functional value and gradient.
 
@@ -976,12 +1008,12 @@ class FullWaveformInversion(AcousticWave):
         dJ : ndarray
             The gradient of the functional with respect to the velocity model.
         """
-        riesz_map = RieszMapType[self.inner_product]
-        if optimisation_library is OptmisationLibrary.SCIPY:
-            # Scipy deals only with derivatives (Euclidean gradient).
-            riesz_map = RieszMapType.l2
-        return self.get_functional_gradient(
-            c=c, calculate_functional=False, riesz_map=riesz_map)
+        if self.input_dictionary["inversion"]["automated_adjoint"]:
+            return self._run_automated_adjoint_functional_and_gradient(c)
+        
+        self.get_gradient(c=c)
+        dJ = self.gradient.dat.data[:]
+        return self.functional_value, dJ
 
     def run_fwi(self, **kwargs):
         """
@@ -1032,7 +1064,7 @@ class FullWaveformInversion(AcousticWave):
 
         vmin = parameters["vmin"]
         vmax = parameters["vmax"]
-        vp_0 = self.initial_velocity_model.dat.data[:]
+        vp_0 = self.initial_velocity_model.dat.data_ro[:]
         bounds = [(vmin, vmax) for _ in range(len(vp_0))]
         options = parameters["scipy_options"]
 
@@ -1049,7 +1081,7 @@ class FullWaveformInversion(AcousticWave):
         vp_end = fire.Function(self.function_space)
         vp_end.dat.data[:] = result.x
         self.vp_result = vp_end
-        fire.VTKFile("vp_end.pvd").write(vp_end)
+        fire.File("vp_end.pvd").write(vp_end)
         np.save("result", result.x)
 
     def run_fwi_rol(self, **kwargs):
@@ -1088,6 +1120,7 @@ class FullWaveformInversion(AcousticWave):
         The ROL library provided advanced optimization algorithms but is no
         longer maintained. Consider using run_fwi() with scipy instead.
         """
+        self.optimisation_library = OptmisationLibrary.ROL
         if ROL is None:
             raise ImportError("The ROL module is not available.")
         parameters = {
@@ -1301,12 +1334,17 @@ class SyntheticRealAcousticWave(AcousticWave):
         -------
         None
         """
-        super().forward_solve()
         if self.parallelism_type == "spatial" and self.number_of_sources > 1:
-            real_shot_record_list = []
-            for snum in range(self.number_of_sources):
-                switch_serial_shot(self, snum)
-                real_shot_record_list.append(self.receivers_output)
+            if not self.store_forward_solution_on_disk and self.use_vertex_only_mesh:
+                real_shot_record_list = super().forward_solve()
+            elif self.store_forward_solution_on_disk and not self.use_vertex_only_mesh:
+                real_shot_record_list = []
+                for snum in range(self.number_of_sources):
+                    switch_serial_shot(self, snum)
+                    real_shot_record_list.append(self.receivers_output)
+            else:
+                raise NotImplementedError("Not handling with current settings for store_forward_solution_on_disk and use_vertex_only_mesh.")
             self.real_shot_record = real_shot_record_list
         else:
+            super().forward_solve()
             self.real_shot_record = self.receivers_output

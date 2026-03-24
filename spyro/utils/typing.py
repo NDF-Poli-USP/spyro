@@ -34,3 +34,4 @@ class OptmisationLibrary(Enum):
     SCIPY = 0
     ROL = 1
     PETSC_TAO = 2
+    NONE = 3

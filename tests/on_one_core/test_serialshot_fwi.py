@@ -43,6 +43,7 @@ dictionary["acquisition"] = {
     "delay": 0.2,
     "delay_type": "time",
     "receiver_locations": spyro.create_transect((-1.45, 0.7), (-1.45, 1.3), 200),
+    "use_vertex_only_mesh": True,
 }
 dictionary["time_axis"] = {
     "initial_time": 0.0,  # Initial time for event
@@ -100,11 +101,11 @@ def test_fwi(automated_adjoint, load_real_shot=False, use_rol=False):
         FWI_obj.set_real_velocity_model(
             conditional=cond, output=True, dg_velocity_model=False)
         FWI_obj.generate_real_shot_record(
-            plot_model=True,
+            plot_model=False,
             model_filename="True_experiment.png",
-            abc_points=[(-0.5, 0.5), (-1.5, 0.5), (-1.5, 1.5), (-0.5, 1.5)]
+            abc_points=[(-0.5, 0.5), (-1.5, 0.5), (-1.5, 1.5), (-0.5, 1.5)],
+            save_shot_record=False,
         )
-        np.save("real_shot_record", FWI_obj.real_shot_record)
 
     else:
         dictionary["inversion"]["shot_record_file"] = "real_shot_record.npy"

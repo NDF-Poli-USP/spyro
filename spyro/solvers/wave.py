@@ -85,7 +85,8 @@ class Wave(Model_parameters, metaclass=ABCMeta):
         self._receivers_output = None
         self.automated_adjoint = None
         self.adjoint_type = AdjointType.NONE
-        self.store_forward_time_steps = False
+        self._store_forward_time_steps = False
+        self.store_forward_solution_on_disk = False
         self._compute_functional = False
         self._store_misfit = False
         self.current_time = 0.0
@@ -96,6 +97,7 @@ class Wave(Model_parameters, metaclass=ABCMeta):
         self.sources = None
         self.functional_value = None
         self.misfit = None
+        self.real_shot_record = None
         if self.mesh is not None:
             self._build_function_space()
             self._map_sources_and_receivers()
@@ -109,6 +111,7 @@ class Wave(Model_parameters, metaclass=ABCMeta):
         self.source_expression = None
         # Cofunction to apply sources.
         self.source_cofunction = None
+        self.forward_solution = None
         # Object for efficient application of sources
 
         self.field_logger = FieldLogger(self.comm,
@@ -127,7 +130,7 @@ class Wave(Model_parameters, metaclass=ABCMeta):
         if self.abc_boundary_layer_type != "hybrid":
             self._initialize_model_parameters()
         self.matrix_building()
-        self.wave_propagator()
+        return self.wave_propagator()
 
     def force_rebuild_function_space(self):
         if self.mesh is None:
@@ -343,7 +346,7 @@ class Wave(Model_parameters, metaclass=ABCMeta):
     def set_last_solve_as_real_shot_record(self):
         if self.current_time == 0.0:
             raise ValueError("No previous solve to set as real shot record.")
-        self.real_shot_record = self.forward_solution_receivers
+        self.real_shot_record = self.receivers_output
 
     @abstractmethod
     def _set_vstate(self, vstate):
@@ -399,7 +402,7 @@ class Wave(Model_parameters, metaclass=ABCMeta):
         pass
 
     @ensemble_propagator
-    def wave_propagator(self, dt=None, final_time=None, source_nums=[0]):
+    def wave_propagator(self, dt=None, final_time=None, source_nums=None):
         """Propagates the wave forward in time.
         Currently uses central differences.
 
@@ -419,6 +422,8 @@ class Wave(Model_parameters, metaclass=ABCMeta):
         u_rec: numpy array
             Wavefield at the receivers across the timesteps.
         """
+        if source_nums is None:
+            source_nums = [0]
         if final_time is not None:
             self.final_time = final_time
         if dt is not None:
@@ -448,10 +453,46 @@ class Wave(Model_parameters, metaclass=ABCMeta):
     def enable_compute_functional(self):
         self._compute_functional = True
 
+    @property
+    def store_forward_time_steps(self):
+        """Whether to store forward solution time steps for gradient
+        calculation."""
+        return self._store_forward_time_steps
+
     def enable_store_misfit(self):
+        """Whether to store misfit at each time step for gradient
+        calculation."""
         self._store_misfit = True
 
+    @store_forward_time_steps.setter
+    def store_forward_time_steps(self, value):
+        """Whether to store forward solution time steps for gradient
+        calculation.
+
+        Parameters:
+        value: bool
+            If True, forward solution time steps will be stored for
+            adjoint-based gradient calculation. Default is False, since storing
+            forward time steps can consume an excessive amount of memory.
+        """
+        # Check if is a boolean value
+        if not isinstance(value, bool):
+            raise ValueError("store_forward_time_steps must be a boolean value.")
+        self._store_forward_time_steps = value
+
     def enable_automated_adjoint(self, controls=None):
+        """Enable the automated adjoint for gradient calculation.
+
+        Parameters
+        ----------
+        controls : Pyadjoint Overloaded type, optional
+            The controls for the automated adjoint. If None, defaults to the initial velocity model.
+
+        Raises
+        ------
+        ValueError
+            If no initial velocity model is set and controls is None.
+        """
         if controls is None:
             controls = self.c if self.c is not None else self.initial_velocity_model
             if controls is None:
@@ -461,10 +502,26 @@ class Wave(Model_parameters, metaclass=ABCMeta):
         self.automated_adjoint = AutomatedAdjoint(controls, self.comm)
         self.use_vertex_only_mesh = True
         self._compute_functional = True
-        self.store_forward_time_steps = False
+        self._store_forward_time_steps = False
         self.adjoint_type = AdjointType.AUTOMATED_ADJOINT
 
     def enable_implemented_adjoint(self, misfit=None, forward_solution=None):
+        """Enable the implemented adjoint for gradient calculation.
+
+        Parameters
+        ----------
+        misfit : Firedrake Function, optional
+            The misfit for the implemented adjoint. If None, defaults to
+            computing the misfit.
+        forward_solution : Firedrake Function, optional
+            The forward solution from the guess model, which is required for
+            the implemented adjoint-based gradient calculation. If None, the
+            forward problem will be solved to obtain it.
+         Raises
+         ------
+         ValueError
+             If no initial velocity model is set and controls is None.
+        """
         self.adjoint_type = AdjointType.IMPLEMENTED_ADJOINT
         if misfit is None:
             self._compute_functional = True
@@ -479,6 +536,10 @@ class Wave(Model_parameters, metaclass=ABCMeta):
     @property
     def forward_solution_receivers(self):
         return self._receivers_output
+
+    @forward_solution_receivers.setter
+    def forward_solution_receivers(self, value):
+        self._receivers_output = value
 
     @property
     def receivers_output(self):
