@@ -1,4 +1,3 @@
-from firedrake.petsc import PETSc
 from math import pi as PI
 from mpi4py import MPI
 import numpy as np
@@ -7,7 +6,7 @@ import os
 from scipy.integrate import quad
 from scipy.special import hankel2
 import matplotlib.pyplot as plt
-from spyro.sources import full_ricker_wavelet
+from ..sources import full_ricker_wavelet
 
 
 def nodal_homogeneous_analytical(Wave_object, offset, c_value, n_extra=5000):
@@ -105,7 +104,7 @@ def analytical_solution_elastic(
     nt = int(final_time/dt + 1)
     final_time = dt*(nt-1)
     time_vector = np.linspace(0.0, final_time, nt)
-    u = np.zeros(nt, 3)
+    u = np.zeros((nt, 3))
     if source_type == "force_source":
         for i in range(dimension):
             u[:, i] = analytical_force_source(
@@ -279,185 +278,3 @@ def analytical_explosive_source(
         ui[k] = P_mid + P_far
     
     return ui
-
-
-def plot_analytical_displacement_components(
-        time_vector,
-        displacement_tuple,
-        source_type="Unknown",
-        save_plots=False,
-        output_dir="."
-    ):
-    """
-    Plot analytical displacement components (ux, uy, uz) over time.
-    
-    Parameters:
-    ----------
-    time_vector : numpy array
-        Time vector
-    displacement_tuple : tuple of numpy arrays
-        (ux, uy, uz) displacement components
-    source_type : str, optional
-        Type of source ("force_source", "explosive_source", etc.)
-    save_plots : bool, optional
-        Whether to save plots to files
-    output_dir : str, optional
-        Directory to save plots if save_plots is True
-        
-    Returns:
-    -------
-    None
-        Creates matplotlib figures
-    """
-    ux, uy, uz = displacement_tuple
-    
-    # Create the plot with separated subplots
-    plt.figure(figsize=(12, 8))
-    
-    # Plot all three components
-    plt.subplot(3, 1, 1)
-    plt.plot(time_vector, ux, 'b-', linewidth=2, label='Ux (displacement in x)')
-    plt.xlabel('Time (s)')
-    plt.ylabel('Amplitude')
-    plt.title(f'Displacement Component Ux - {source_type}')
-    plt.grid(True, alpha=0.3)
-    plt.legend()
-    
-    plt.subplot(3, 1, 2)
-    plt.plot(time_vector, uy, 'r-', linewidth=2, label='Uy (displacement in y)')
-    plt.xlabel('Time (s)')
-    plt.ylabel('Amplitude')
-    plt.title(f'Displacement Component Uy - {source_type}')
-    plt.grid(True, alpha=0.3)
-    plt.legend()
-    
-    plt.subplot(3, 1, 3)
-    plt.plot(time_vector, uz, 'g-', linewidth=2, label='Uz (displacement in z)')
-    plt.xlabel('Time (s)')
-    plt.ylabel('Amplitude')
-    plt.title(f'Displacement Component Uz - {source_type}')
-    plt.grid(True, alpha=0.3)
-    plt.legend()
-    
-    plt.tight_layout()
-    
-    # Also create a combined plot
-    plt.figure(figsize=(12, 6))
-    plt.plot(time_vector, ux, 'b-', linewidth=2, label='Ux')
-    plt.plot(time_vector, uy, 'r-', linewidth=2, label='Uy')
-    plt.plot(time_vector, uz, 'g-', linewidth=2, label='Uz')
-    plt.xlabel('Time (s)')
-    plt.ylabel('Amplitude')
-    plt.title(f'All Displacement Components - {source_type}')
-    plt.legend()
-    plt.grid(True, alpha=0.3)
-    
-    if save_plots:
-        import os
-        
-        # Ensure output directory exists
-        os.makedirs(output_dir, exist_ok=True)
-        
-        basename = source_type.replace(" ", "_")
-        
-        # Save plots
-        plt.figure(1)  # Select the first figure (subplots)
-        plt.savefig(os.path.join(output_dir, f"analytical_{basename}_displacement_components_separated.png"), 
-                   dpi=300, bbox_inches='tight')
-        
-        plt.figure(2)  # Select the second figure (combined)
-        plt.savefig(os.path.join(output_dir, f"analytical_{basename}_displacement_components_combined.png"), 
-                   dpi=300, bbox_inches='tight')
-        
-        print(f"Plots saved to {output_dir}")
-    
-    plt.show()
-
-
-def demo_analytical_solutions():
-    """
-    Demonstration function to show how to use the analytical solutions
-    and create plots for both force source and explosive source.
-    Parameters match those from from_eduardos_Code.py
-    """
-    # Parameters matching from_eduardos_Code.py defaults
-    offsets = [100., 0., 100.]  # Distance calculated from receiver position (100, 0, 100)
-    alpha = 1500.0  # P-wave velocity in m/s (matches default)
-    beta = 1000.0   # S-wave velocity in m/s (matches default)
-    rho = 2000.0    # Density in kg/m³ (matches default)
-    amplitude = 1e3 # Source amplitude (matches default)
-    frequency = 20.0 # Source frequency in Hz (matches default)
-    time_delay = 1/frequency # Time delay = 1/f0 (matches from_eduardos_Code.py)
-    final_time = 0.3 # Final time in seconds (matches default)
-    nt = 750 + 1
-    dt = final_time/(nt - 1) # Time step calculated from final_time/nt
-    
-    print("Computing analytical solutions...")
-    print(f"Parameters:")
-    print(f"  Offsets: {offsets:.1f} m")
-    print(f"  P-wave velocity (alpha): {alpha} m/s")
-    print(f"  S-wave velocity (beta): {beta} m/s")
-    print(f"  Density (rho): {rho} kg/m³")
-    print(f"  Source amplitude: {amplitude}")
-    print(f"  Frequency: {frequency} Hz")
-    print(f"  Time delay: {time_delay:.3f} s")
-    print(f"  Final time: {final_time} s")
-    print(f"  Number of time steps: {nt}")
-    print(f"  Time step (dt): {dt:.6f} s")
-    
-    # Force source
-    print("\n1. Force Source:")
-    force_result = analytical_solution_elastic(
-        source_type="force_source",
-        offsets=offsets,
-        alpha=alpha,
-        beta=beta,
-        rho=rho,
-        amplitude=amplitude,
-        frequency=frequency,
-        time_delay=time_delay,
-        final_time=final_time,
-        dt=dt
-    )
-    
-    time_vector = np.linspace(0.0, final_time, nt)
-    
-    plot_analytical_displacement_components(
-        time_vector,
-        force_result,
-        source_type="Force Source",
-        save_plots=True,
-        output_dir="analytical_plots"
-    )
-    
-    # Explosive source
-    print("\n2. Explosive Source:")
-    explosive_result = analytical_solution_elastic(
-        source_type="explosive_source",
-        offsets=offsets,
-        alpha=alpha,
-        beta=beta,  # Not used for explosive source
-        rho=rho,
-        amplitude=amplitude,
-        frequency=frequency,
-        time_delay=time_delay,
-        final_time=final_time,
-        dt=dt
-    )
-    
-    plot_analytical_displacement_components(
-        time_vector,
-        explosive_result,
-        source_type="Explosive Source",
-        save_plots=True,
-        output_dir="analytical_plots"
-    )
-    
-    print("\nDemo completed! Check the 'analytical_plots' directory for saved figures.")
-    print("Parameters match those used in from_eduardos_Code.py")
-
-
-if __name__ == "__main__":
-    # Run the demo when script is executed directly
-    demo_analytical_solutions()
-
