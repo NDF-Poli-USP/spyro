@@ -308,10 +308,6 @@ class AutomaticMesh:
 
     def create_seismicmesh_2D_mesh_with_velocity_model(self):
         """
-<<<<<<< ruben/modal
-        Creates a 2D mesh based on SeismicMesh meshing utilities,
-        with velocity model from SEG-Y file.
-=======
         Creates a 2D mesh with velocity-based refinement using SeismicMesh.
 
         Returns
@@ -326,7 +322,6 @@ class AutomaticMesh:
         is derived from the velocity model SEGY file. Only the ensemble rank 0
         performs the mesh generation, and the mesh is then distributed across
         all processes.
->>>>>>> main
         """
         if self.comm.ensemble_comm.rank == 0:
             v_min = self.minimum_velocity
@@ -516,6 +511,7 @@ def calculate_edge_length(cpw, minimum_velocity, frequency):
 
 def RectangleMesh(nx, ny, length_x, length_y, pad=None, comm=None, quadrilateral=False):
     """Create a rectangle mesh based on the Firedrake mesh.
+
     First axis is negative, second axis is positive. If there is a pad, both
     axis are dislocated by the pad.
 
@@ -561,30 +557,31 @@ def PeriodicRectangleMesh(
     nx, ny, length_x, length_y, pad=None, comm=None, quadrilateral=False
 ):
     """Create a periodic rectangle mesh based on the Firedrake mesh.
-      First axis is negative, second axis is positive. If there is a pad, both
-      axis are dislocated by the pad.
 
-      Parameters
-      ----------
-      length_x: float
-          Length of the domain in the x direction.
-      length_y: float
-          Length of the domain in the y direction.
-      nx: int
-          Number of elements in the x direction.
-      ny: int
-          Number of elements in the y direction.
-      pad: float, optional
-          Padding to be added to the domain. The default is None.
-      comm: MPI communicator, optional
-          MPI communicator. The default is None.
-      quadrilateral: bool, optional
-          If True, the mesh is quadrilateral. The default is False.
+    First axis is negative, second axis is positive. If there is a pad, both
+    axis are dislocated by the pad.
 
-      Returns
-      -------
-      mesh: Firedrake Mesh
-          Mesh
+    Parameters
+    ----------
+    length_x : float
+        Length of the domain in the x direction.
+    length_y : float
+        Length of the domain in the y direction.
+    nx : int
+        Number of elements in the x direction.
+    ny : int
+        Number of elements in the y direction.
+    pad : float, optional
+        Padding to be added to the domain. The default is None.
+    comm : MPI communicator, optional
+        MPI communicator. The default is None.
+    quadrilateral : bool, optional
+        If True, the mesh is quadrilateral. The default is False.
+
+    Returns
+    -------
+    mesh : Firedrake Mesh
+        Mesh
     """
     if pad is not None:
         length_x += pad
@@ -606,7 +603,7 @@ def BoxMesh(nx, ny, nz, length_x, length_y, length_z, pad=None, quadrilateral=Fa
 
     Parameters
     ----------
-    nx: int
+    nx : int
         Number of elements in the x direction.
     ny: int
         Number of elements in the y direction.
