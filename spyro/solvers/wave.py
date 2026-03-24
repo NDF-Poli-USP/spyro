@@ -1,19 +1,22 @@
 from abc import abstractmethod, ABCMeta
 import warnings
 import firedrake as fire
-from firedrake import sin, cos, pi, tanh, sqrt  # noqa: F401
 
-from .time_integration_central_difference import central_difference as time_integrator
+from .time_integration_central_difference import \
+    central_difference as time_integrator
 from ..domains.quadrature import quadrature_rules
+from ..domains.space import check_function_space_type
 from ..io import Model_parameters
+from ..io import material_properties_io
 from ..io.basicio import ensemble_propagator
 from ..io import parallel_print
 from ..io.field_logger import FieldLogger
-from .. import utils
 from ..receivers.Receivers import Receivers
 from ..sources.Sources import Sources
 from ..utils.typing import WaveType
 from .solver_parameters import get_default_parameters_for_method
+from ..utils import eval_functions_to_ufl
+from .modal.modal_sol import Modal_Solver
 
 fire.set_log_level(fire.ERROR)
 
@@ -81,6 +84,12 @@ class Wave(Model_parameters, metaclass=ABCMeta):
         self.wave_type = WaveType.NONE
 
         self.function_space = None
+        self.dg0_scalar_function_space = None
+        self.dg0_vector_function_space = None
+        self.scalar_function_space = None
+        self.vector_function_space = None
+        self.tensor_function_space0 = None
+        self.tensor_function_space1 = None
         self.forward_solution_receivers = None
         self.current_time = 0.0
         self.set_solver_parameters()
@@ -133,15 +142,20 @@ class Wave(Model_parameters, metaclass=ABCMeta):
     def set_mesh(
             self,
             user_mesh=None,
-            input_mesh_parameters={},
+            input_mesh_parameters=None,
     ):
         """
         Set the mesh for the solver.
 
         Args:
             user_mesh (optional): User-defined mesh. Defaults to None.
-            mesh_parameters (optional): Parameters for generating a mesh. Defaults to None.
+            mesh_parameters (optional): Parameters for generating a mesh.
+            Defaults to None.
         """
+
+        if input_mesh_parameters is None:
+            input_mesh_parameters = {}
+
         super().set_mesh(
             user_mesh=user_mesh,
             input_mesh_parameters=input_mesh_parameters,
@@ -223,15 +237,12 @@ class Wave(Model_parameters, metaclass=ABCMeta):
             vp.interpolate(conditional)
             self.initial_velocity_model = vp
         elif expression is not None:
-            z = self.mesh_z  # noqa: F841
-            x = self.mesh_x  # noqa: F841
-            if self.dimension == 3:
-                y = self.mesh_y  # noqa: F841
-            expression = eval(expression)
             V = self.function_space
-            vp = fire.Function(V, name="velocity")
-            vp.interpolate(expression)
-            self.initial_velocity_model = vp
+            vp = eval_functions_to_ufl.generate_ufl_functions(
+                self.mesh, expression, self.dimension)
+            self.initial_velocity_model = fire.Function(
+                V, name="velocity").interpolate(vp)
+
         elif velocity_model_function is not None:
             self.initial_velocity_model = velocity_model_function
         elif new_file is not None:
@@ -244,8 +255,8 @@ class Wave(Model_parameters, metaclass=ABCMeta):
             self.initial_velocity_model = vp
         else:
             raise ValueError(
-                "Please specify either a conditional, expression, firedrake "
-                "function or new file name (segy or hdf5)."
+                "Please specify either a conditional, expression, "
+                "firedrake function or new file name (segy or hdf5)."
             )
         if output:
             fire.VTKFile("initial_velocity_model.pvd").write(
@@ -267,6 +278,17 @@ class Wave(Model_parameters, metaclass=ABCMeta):
 
     def _build_function_space(self):
         self.function_space = self._create_function_space()
+        function_space_type = check_function_space_type(self.function_space)
+        if function_space_type == "scalar":
+            self.scalar_function_space = self.function_space
+        elif function_space_type == "mixed":
+            scalar_function_space_type = check_function_space_type(self.function_space.sub(0))
+            if scalar_function_space_type != "scalar":
+                raise ValueError("Do not change mixed space order, use scalar first!!! (ノಠ益ಠ)ノ彡┻━┻")
+            self.scalar_function_space = self.function_space.sub(0)
+            self.vector_function_space = self.function_space.sub(1)
+        elif function_space_type == "vector":
+            self.vector_function_space = self.function_space
 
         quad_rule, k_rule, s_rule = quadrature_rules(self.function_space)
         self.quadrature_rule = quad_rule
@@ -285,7 +307,8 @@ class Wave(Model_parameters, metaclass=ABCMeta):
             self.mesh_x = x
             self.mesh_y = y
 
-    def get_and_set_maximum_dt(self, fraction=0.7, estimate_max_eigenvalue=False):
+    def get_and_set_maximum_dt(self, fraction=0.7,
+                               estimate_max_eigenvalue=False):
         """
         Calculates and sets the maximum stable time step (dt) for the wave solver.
 
@@ -298,30 +321,23 @@ class Wave(Model_parameters, metaclass=ABCMeta):
         Returns:
             float: The calculated maximum time step (dt).
         """
-        # if self.method == "mass_lumped_triangle":
-        #     estimate_max_eigenvalue = True
-        # elif self.method == "spectral_quadrilateral":
-        #     estimate_max_eigenvalue = True
-        # else:
 
         if self.c is None:
             c = self.initial_velocity_model
         else:
             c = self.c
 
-        dt = utils.estimate_timestep.estimate_timestep(
-            self.mesh,
-            self.function_space,
-            c,
-            estimate_max_eigenvalue=estimate_max_eigenvalue,
-        )
-        dt *= fraction
-        nt = int(self.final_time / dt) + 1
-        dt = self.final_time / (nt - 1)
+        # Maximum timestep size
+        method = 'ANALYTICAL' if estimate_max_eigenvalue else 'ARNOLDI'
+        dt_solver = Modal_Solver(self.dimension, method=method,
+                                 calc_max_dt=True)
+        max_dt = dt_solver.estimate_timestep(c, self.function_space,
+                                             self.final_time,
+                                             quad_rule=self.quadrature_rule,
+                                             fraction=fraction)
+        self.dt = max_dt
 
-        self.dt = dt
-
-        return dt
+        return max_dt
 
     def get_mass_matrix_diagonal(self):
         """Builds a section of the mass matrix for debugging purposes."""
@@ -390,7 +406,8 @@ class Wave(Model_parameters, metaclass=ABCMeta):
 
     @ensemble_propagator
     def wave_propagator(self, dt=None, final_time=None, source_nums=[0]):
-        """Propagates the wave forward in time.
+        """
+        Propagate the wave forward in time.
         Currently uses central differences.
 
         Parameters:
@@ -431,8 +448,20 @@ class Wave(Model_parameters, metaclass=ABCMeta):
 
     @abstractmethod
     def rhs_no_pml(self):
-        '''
-        Returns the right-hand side Cofunction without PML DOFs (i.e., only
+        """
+        Return the right-hand side Cofunction without PML DOFs (i.e., only
         the DOFs associated with the subspace of the original problem).
-        '''
+        """
         pass
+
+    def set_material_properties(self, *args, **kwargs):
+        """Wrapper for material_properties_io.set_material_property."""
+        return material_properties_io.set_material_property(
+            self,
+            *args,
+            **kwargs
+        )
+
+    def set_material_property(self, *args, **kwargs):
+        """Backward-compatible alias for set_material_properties."""
+        return self.set_material_properties(*args, **kwargs)
