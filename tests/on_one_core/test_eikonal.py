@@ -229,7 +229,7 @@ class HABC_Wave(AcousticWave, HABC_Mesh):
         HABC_Mesh.__init__(
             self, dom_dim, dimension=self.dimension,
             quadrilateral=self.mesh_parameters.quadrilateral,
-            p_eik=self.abc_deg_eikonal, comm=self.comm)
+            comm=self.comm)
 
 
 def critical_boundary_points(Wave_obj):
