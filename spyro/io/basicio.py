@@ -316,7 +316,7 @@ def write_function_to_grid(function, V, grid_spacing, buffer=False):
     # get DoF coordinates
     m = V.ufl_domain()
     W = fire.VectorFunctionSpace(m, V.ufl_element())
-    coords = fire.interpolate(m.coordinates, W)
+    coords = fire.assemble(fire.interpolate(m.coordinates, W))
     dimension, = coords.ufl_shape
     if dimension == 2:
         x, y = coords.dat.data[:, 0], coords.dat.data[:, 1]
