@@ -310,18 +310,20 @@ def write_function_to_grid(function, V, grid_spacing, buffer=False):
 
     Returns
     -------
-    xi : numpy.ndarray
-        x coordinates of grid points
-    yi : numpy.ndarray
-        y coordinates of grid points
-    zi : numpy.ndarray
+    vi : numpy.ndarray
         Interpolated values on grid points
     """
     # get DoF coordinates
     m = V.ufl_domain()
     W = fire.VectorFunctionSpace(m, V.ufl_element())
-    coords = fire.assemble(fire.interpolate(m.coordinates, W))
-    x, y = coords.dat.data[:, 0], coords.dat.data[:, 1]
+    coords = fire.interpolate(m.coordinates, W)
+    dimension, = coords.ufl_shape
+    if dimension == 2:
+        x, y = coords.dat.data[:, 0], coords.dat.data[:, 1]
+    elif dimension == 3:
+        x, y, z = coords.dat.data[:, 0], coords.dat.data[:, 1], coords.dat.data[:, 2]
+    else:
+        raise ValueError(f"Dimension of {dimension}, not supported, what are you doing?")
 
     # add buffer to avoid NaN when calling griddata
     pad = 0.005 if buffer else 0.0
@@ -330,25 +332,39 @@ def write_function_to_grid(function, V, grid_spacing, buffer=False):
     max_x = np.max(x) - pad
     min_y = np.min(y) + pad
     max_y = np.max(y) - pad
+    if dimension == 3:
+        min_z = np.min(z) + pad
+        max_z = np.max(z) - pad
 
     if min_x > max_x or min_y > max_y:
         raise ValueError("Buffer too large for the provided coordinate range.")
 
+    if dimension == 3:
+        if min_z > max_z:
+            raise ValueError("Buffer too large for the provided coordinate range.")
+
     try:
-        z = function.dat.data[:]
+        v = function.dat.data[:]
     except AttributeError:
         warnings.warn("Using numpy array instead of a firedrake function to interpolate.")
-        z = function
+        v = function
 
     # target grid to interpolate to
     xi = np.arange(min_x, max_x, grid_spacing)
     yi = np.arange(min_y, max_y, grid_spacing)
-    xi, yi = np.meshgrid(xi, yi)
+    if dimension == 2:
+        xi, yi = np.meshgrid(xi, yi)
+    elif dimension == 3:
+        zi = np.arange(min_z, max_z, grid_spacing)
+        xi, yi, zi = np.meshgrid(xi, yi, zi)
 
     # interpolate
-    zi = griddata((x, y), z, (xi, yi), method="linear")
+    if dimension == 2:
+        vi = griddata((x, y), v, (xi, yi), method="linear")
+    elif dimension == 3:
+        vi = griddata((x, y, z), v, (xi, yi, zi), method="linear")
 
-    return zi
+    return vi
 
 
 def create_segy(function, V, grid_spacing, filename):
@@ -356,9 +372,12 @@ def create_segy(function, V, grid_spacing, filename):
 
     Parameters
     ----------
-    velocity:
-        firedrake.Function representing the values of the velocity
-        model to save
+    function : firedrake.Function
+        Function to interpolate
+    V : firedrake.FunctionSpace
+        Function space of function
+    grid_spacing : float
+        Spacing of grid points
     filename: str
         Name of the segy file to save
 
