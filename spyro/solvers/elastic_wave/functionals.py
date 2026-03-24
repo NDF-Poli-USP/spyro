@@ -11,11 +11,11 @@ def mechanical_energy_form(wave):
     mu = wave.mu
 
     # Kinetic energy
-    v = (u_n - u_nm1)/dt
-    K = (rho/2)*inner(v, v)*dx
+    v = (u_n - u_nm1) / dt
+    K = (rho / 2) * inner(v, v)*dx
 
     # Strain energy
-    eps = lambda v: 0.5*(grad(v) + grad(v).T)
-    U = (lmbda*div(u_n)*div(u_n) + 2*mu*inner(eps(u_n), eps(u_n)))*dx
+    eps = lambda du: 0.5 * (grad(du) + grad(du).T)
+    U = (lmbda * div(u_n)*div(u_n) + 2 * mu * inner(eps(u_n), eps(u_n))) * dx
 
     return K + U

@@ -16,6 +16,7 @@ class IsotropicWave(ElasticWave):
 
     def __init__(self, dictionary, comm=None):
         super().__init__(dictionary, comm=comm)
+
         self.wave_type = WaveType.ISOTROPIC_ELASTIC
         self.rho = None   # Density
         self.lmbda = None  # First Lame parameter
@@ -48,6 +49,8 @@ class IsotropicWave(ElasticWave):
         self.mechanical_energy = None
         self.field_logger.add_functional("mechanical_energy",
                                          lambda: assemble(self.mechanical_energy))
+
+        self._initialize_model_parameters()
 
     @override
     def initialize_model_parameters_from_object(self, synthetic_data_dict: dict):
