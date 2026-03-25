@@ -87,13 +87,18 @@ def test_fwi(automated_adjoint, load_real_shot=False, use_rol=False):
     if automated_adjoint:
         use_rol = False  # Only for scipy.
 
+    center_z = -1.0
+    center_x = 1.0
+    square_top_z = -0.9
+    square_bot_z = -1.1
+    square_left_x = 0.9
+    square_right_x = 1.1
+
     # Setting up to run synthetic real problem
     if load_real_shot is False:
         FWI_obj = spyro.FullWaveformInversion(dictionary=dictionary)
 
         FWI_obj.set_real_mesh(input_mesh_parameters={"edge_length": 0.1})
-        center_z = -1.0
-        center_x = 1.0
         mesh_z = FWI_obj.mesh_z
         mesh_x = FWI_obj.mesh_x
         cond = fire.conditional((mesh_z-center_z)**2 + (mesh_x-center_x)**2 < .2**2, 3.0, 2.5)
@@ -126,15 +131,28 @@ def test_fwi(automated_adjoint, load_real_shot=False, use_rol=False):
     else:
         FWI_obj.run_fwi(vmin=2.5, vmax=3.0, maxiter=5)
 
-    # simple mask test
+    # Verify the mask exactly where it is applied and check for non-zero
+    # gradient energy inside the anomaly region.
     grad_test = FWI_obj.gradient
-    test0 = np.isclose(grad_test.at((-0.1, 0.1)), 0.0)
-    print(f"PML looks masked: {test0}", flush=True)
-    test1 = not np.isclose(grad_test.at((-1.0, 1.0)), 0.0)
-    print(f"Center looks unmasked: {test1}", flush=True)
+    masked_dofs = FWI_obj.mask_obj.mask_dofs[0]
+    masked_values = grad_test.dat.data_ro[masked_dofs]
+    test0 = masked_values.size > 0 and np.allclose(masked_values, 0.0)
+    print(f"Masked gradient DoFs are zero: {test0}", flush=True)
+
+    dof_coords = FWI_obj.function_space.tabulate_dof_coordinates().reshape((-1, 2))
+    center_dofs = (
+        (dof_coords[:, 0] > square_bot_z)
+        & (dof_coords[:, 0] < square_top_z)
+        & (dof_coords[:, 1] > square_left_x)
+        & (dof_coords[:, 1] < square_right_x)
+    )
+    center_values = grad_test.dat.data_ro[center_dofs]
+    center_max = np.max(np.abs(center_values)) if center_values.size > 0 else 0.0
+    test1 = center_values.size > 0 and center_max > 1e-5
+    print(f"Center box has non-zero gradient DoFs: {test1}", flush=True)
 
     # quick look at functional and if it reduced
-    test2 = FWI_obj.functional < 1e-3
+    test2 = FWI_obj.functional_value < 1e-3
     print(f"Last functional small: {test2}", flush=True)
     test3 = FWI_obj.functional_history[-1]/FWI_obj.functional_history[0] < 1e-2
     print(f"Considerable functional reduction during test: {test3}", flush=True)

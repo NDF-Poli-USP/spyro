@@ -140,7 +140,7 @@ def get_forward_model(automated_adjoint, load_true=False):
         Wave_obj_guess.enable_automated_adjoint()
         assert Wave_obj_guess._store_forward_time_steps is False
     else:
-        Wave_obj_guess.enable_store_misfit()
+        Wave_obj_guess.enable_implemented_adjoint()
         assert Wave_obj_guess._store_misfit is True
         # Store forward solution time steps for gradient calculation
         # is `True` by default in spyro.

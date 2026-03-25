@@ -513,7 +513,7 @@ class FullWaveformInversion(AcousticWave):
         if self.initial_velocity_model is None:
             self.initial_velocity_model = self.guess_velocity_model
         if c is not None:
-            self.initial_velocity_model.dat.data[:] = c
+            self.initial_velocity_model.dat.data_wo[:] = c
         self.forward_solve()
         output = fire.File("control_" + str(self.current_iteration)+".pvd")
         output.write(self.c)
@@ -864,12 +864,12 @@ class FullWaveformInversion(AcousticWave):
         on the library type.
         """
         if self.optimisation_library is OptmisationLibrary.SCIPY:
-            derivative = self.automated_adjoint.compute_derivative()
-            return derivative.dat.data_ro[:]
+            self.gradient = self.automated_adjoint.compute_derivative()[0]
+            return self.gradient.dat.data_wo[:]
 
         if self.optimisation_library is OptmisationLibrary.ROL:
-            gradient = self.automated_adjoint.compute_gradient()
-            return gradient.dat.data_ro[:]
+            self.gradient = self.automated_adjoint.compute_gradient()[0]
+            return self.gradient.dat.data_wo[:]
 
         raise ValueError(
             "Unsupported optimization library for automated adjoint."
@@ -932,13 +932,23 @@ class FullWaveformInversion(AcousticWave):
         active source index is reset to ``[0]`` so the object remains in the
         same baseline state expected by subsequent solves.
         """
-        c_function = fire.Function(self.function_space, val=c)
+        if self.initial_velocity_model is None:
+            self.initial_velocity_model = fire.Function(
+                self.function_space, val=c)
+        else:
+            if len(c) != len(self.initial_velocity_model.dat.data):
+                raise ValueError(
+                    f"Length of input array c ({len(c)}) does not match "
+                    f"number of velocity model degrees of freedom "
+                    f"({len(self.initial_velocity_model.dat.data)})."
+                )
+            self.initial_velocity_model.dat.data_wo[:] = c
         serial_multi_source = (
             self.comm.ensemble_size == 1 and self.number_of_sources > 1
         )
         first_iteration = self.iteration is None
         controls = self._get_automated_adjoint_controls(
-            c_function,
+            self.initial_velocity_model,
             serial_multi_source,
             source_number=0,
         )
@@ -970,7 +980,7 @@ class FullWaveformInversion(AcousticWave):
         if serial_multi_source:
             for snum in range(1, self.number_of_sources):
                 source_controls = self._get_automated_adjoint_controls(
-                    c_function,
+                    self.initial_velocity_model,
                     serial_multi_source,
                     source_number=snum,
                 )
@@ -985,7 +995,7 @@ class FullWaveformInversion(AcousticWave):
 
         self.functional_value = total_functional
         self.iteration = 0 if first_iteration else self.iteration + 1
-
+        self.functional_history.append(total_functional)
         return self.functional_value, gradient_data
 
     def return_functional_and_gradient(self, c):
@@ -1081,7 +1091,7 @@ class FullWaveformInversion(AcousticWave):
         vp_end = fire.Function(self.function_space)
         vp_end.dat.data[:] = result.x
         self.vp_result = vp_end
-        fire.File("vp_end.pvd").write(vp_end)
+        fire.VTKFile("vp_end.pvd").write(vp_end)
         np.save("result", result.x)
 
     def run_fwi_rol(self, **kwargs):
