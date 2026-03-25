@@ -175,12 +175,17 @@ class Model_parameters(Read_options, Read_boundary_layer,
         -------
         model_parameters: :class: 'model_parameters' object
         """
+
+        # Initialize a dictionary if it does not exist
+        if dictionary is None:
+            dictionary = {}
+
         # Converts old dictionary to new one. Deprecated feature
         if "opts" in dictionary:
             warnings.warn("Old deprecated dictionary style in usage.")
             dictionary = io.Dictionary_conversion(dictionary).new_dictionary
 
-        # Saves inout_dictionary internally
+        # Saves input_dictionary internally
         self.input_dictionary = dictionary
 
         # some default parameters we might use in the future

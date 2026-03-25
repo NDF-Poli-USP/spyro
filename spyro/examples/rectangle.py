@@ -1,6 +1,7 @@
 from spyro import create_transect
 from spyro.examples.example_model import Example_model_acoustic
 from spyro.examples.example_model import Example_model_acoustic_FWI
+from spyro.pml.pml_nsnc import PML_Wave
 import firedrake as fire
 import copy
 
@@ -156,9 +157,35 @@ class Rectangle_mesh_and_velocity:
                 )
         # cond = fire.conditional(self.mesh_z > z_switch, layer1, layer2)
         self.set_initial_velocity_model(conditional=cond)
+        self.wrapper_for_pml_methods()
+
+    def wrapper_for_pml_methods(self):
+        '''
+        Adds specific attributes and methods to the Wave_obj when simple models
+        are creted with the example scripts, to allow them to run the PML solver.
+
+        Parameters
+        ----------
+        None
+
+        Returns
+        -------
+        None
+        '''
+
+        # Add specific attributes for run PML solver
+        self.c = self.initial_velocity_model
+        self.c_max = 4.5  # self.c.dat.data_with_halos.max()
+        self.bc_boundary_pml = "Dirichlet"
+        self.crit_source = self.sources.point_locations
+        self.domain_dim = self.abc_domain_dimensions(only_orig_dom=True)
+
+        # Building the PML layer (damping and BCs)
+        self.representative_mesh_dimensions()
+        self.pml_layer()
 
 
-class Rectangle_acoustic(Rectangle_mesh_and_velocity, Example_model_acoustic):
+class Rectangle_acoustic(Rectangle_mesh_and_velocity, Example_model_acoustic, PML_Wave):
     """
     Rectangle model.
     This class is a child of the Example_model class.

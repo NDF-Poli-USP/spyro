@@ -13,8 +13,8 @@ def forms_pml(Wave_obj, W):
 
     Parameters
     ----------
-    Wave_obj : `habc.HABC_Wave`
-        An instance of the HABC_Wave class
+    Wave_obj : `pml.PML_Wave`
+        An instance of the PML_Wave class
     W : Firedrake 'MixedFunctionSpace'
         Mixed function space for the wave equation with PML
 
@@ -28,7 +28,7 @@ def forms_pml(Wave_obj, W):
 
     dt = Wave_obj.dt
     c = Wave_obj.c
-    c_sqr_inv = 1. / (Wave_obj.c * Wave_obj.c)
+    c_sqr_inv = 1. / (c * c)
     q_rule = Wave_obj.quadrature_rule
     dx = fire.dx(**q_rule) if q_rule else fire.dx
 

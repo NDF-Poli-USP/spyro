@@ -51,6 +51,9 @@ class Read_boundary_layer:
         Finite element order for the Eikonal analysis
     abc_get_ref_model : `bool`
         If True, the infinite model is created
+    abc_user_pad_length : `bool`
+        If True, the pad length is provided by the user. If False,
+        the pad length is determined with the HABC criterion.
 
     Methods
     -------
@@ -127,13 +130,31 @@ class Read_boundary_layer:
 
     @abc_pad_length.setter
     def abc_pad_length(self, value):
+        """
+        Set the pad length for the absorbing boundary condition.
+
+        Parameters
+        ----------
+        value : float or None
+            The pad length in kilometers. If None, the pad length will be
+            determined using the HABC criterion.
+
+        Returns
+        -------
+        None
+        """
 
         if isinstance(value, (int, float)) and value <= 0:
             raise ValueError("Pad length must be positive")
+
+        self.abc_user_pad_len = True
 
         if value is None:
             print("Pad length will be determined with HABC criterion",
                   flush=True)
             value = 0.
+            self.abc_user_pad_len = False
+
+        print(f"Pad length provided by user (km): {value}", flush=True)
 
         self._abc_pad_length = value

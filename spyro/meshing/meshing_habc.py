@@ -48,7 +48,7 @@ class HABC_Mesh():
         Mesh cell diameters
     dimension : `int`
         Model dimension (2D or 3D). Default is 2D
-    dom_dim : `tuple`
+    domain_dim : `tuple`
         Original domain dimensions: (Lx, Lz) for 2D or (Lx, Lz, Ly) for 3D
     ele_type_c0 : `string`
         Finite element type for the velocity model without absorbing layer
@@ -123,13 +123,13 @@ class HABC_Mesh():
         Generate the boundary points for a truncated hyperellipse
     '''
 
-    def __init__(self, dom_dim, dimension=2, quadrilateral=False, comm=None):
+    def __init__(self, domain_dim, dimension=2, quadrilateral=False, comm=None):
         '''
         Initialize the HABC_Mesh class
 
         Parameters
         ----------
-        dom_dim : `tuple`
+        domain_dim : `tuple`
             Original domain dimensions: (Lx, Lz) for 2D or (Lx, Lz, Ly) for 3D
         dimension : `int`, optional
             Model dimension (2D or 3D). Default is 2D
@@ -145,7 +145,7 @@ class HABC_Mesh():
         '''
 
         # Original domain dimensions
-        self.dom_dim = dom_dim
+        self.domain_dim = domain_dim
 
         # Model dimension
         self.dimension = dimension
@@ -335,14 +335,14 @@ class HABC_Mesh():
         # Factor for the stabilizing term in Eikonal equation
         self.f_est = f_est
 
-    def preamble_mesh_operations(self, f_est=0.03):
+    def preamble_mesh_operations(self, f_est=0.01):
         '''
         Perform mesh operations previous to size an absorbing layer
 
         Parameters
         ----------
         f_est : `float`, optional
-            Factor for the stabilizing term in Eikonal Eq. Default is 0.03
+            Factor for the stabilizing term in Eikonal Eq. Default is 0.01
 
         Returns
         -------
@@ -412,7 +412,7 @@ class HABC_Mesh():
         '''
 
         # Domain dimensions
-        Lx, Lz = self.dom_dim[:2]
+        Lx, Lz = self.domain_dim[:2]
 
         # Number of elements
         n_pad = round(pad_len / self.lmin)  # Elements in the layer
@@ -434,7 +434,7 @@ class HABC_Mesh():
         if self.dimension == 3:  # 3D
 
             # Number of elements
-            Ly = self.dom_dim[2]
+            Ly = self.domain_dim[2]
             ny = int(round(Ly / self.lmin)) + int(2 * n_pad)
 
             # New geometry with layer
@@ -722,7 +722,7 @@ class HABC_Mesh():
         '''
 
         # Domain dimensions
-        Lx, Lz = self.dom_dim[:2]
+        Lx, Lz = self.domain_dim[:2]
 
         # Generate the hyperellipse boundary points
         bnd_pts, trunc_feat = self.trunc_hyp_bndpts_2D(hyp_par, Lx / 2, Lz / 2)
@@ -1142,7 +1142,7 @@ class HABC_Mesh():
         '''
 
         # Original domain dimensions
-        Lx, Lz, Ly = self.dom_dim
+        Lx, Lz, Ly = self.domain_dim
 
         # Centroid of the hyperellipsoid
         centroid = np.array([-Lz / 2, Lx / 2., Ly / 2.])
@@ -1255,7 +1255,7 @@ class HABC_Mesh():
         '''
 
         # Domain dimensions
-        Lx, Lz = self.dom_dim[:2]
+        Lx, Lz = self.domain_dim[:2]
 
         # Domain coordinates
         z, x = coords[0], coords[1]
@@ -1274,7 +1274,7 @@ class HABC_Mesh():
         if self.dimension == 3:  # 3D
 
             # 3D dimension
-            Ly = self.dom_dim[2]
+            Ly = self.domain_dim[2]
             y = coords[2]
 
             # Conditional value
@@ -1348,7 +1348,7 @@ class HABC_Mesh():
         print("Clipping Coordinates Inside Layer", flush=True)
 
         # Domain dimensions
-        Lx, Lz = self.dom_dim[:2]
+        Lx, Lz = self.domain_dim[:2]
 
         # Vectorial space for auxiliar field of clipped coordinates
         if self.quadrilateral:
@@ -1378,7 +1378,7 @@ class HABC_Mesh():
         if self.dimension == 3:  # 3D
 
             # 3D dimension
-            Ly = self.dom_dim[2]
+            Ly = self.domain_dim[2]
 
             # Clipping coordinates
             lay_arr[:, 2] = np.clip(lay_arr[:, 2], 0., Ly)

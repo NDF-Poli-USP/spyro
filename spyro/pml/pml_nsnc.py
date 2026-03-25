@@ -52,12 +52,12 @@ class PML_Wave(ABC_Layer_Wave):
     def __init__(self, dictionary=None, bc_boundary_pml="Higdon",
                  fwi_iter=0, comm=None, output_folder=None):
         '''
-        Initialize the HABC class.
+        Initialize the PML class.
 
         Parameters
         ----------
         dictionary : `dict`, optional
-            A dictionary containing the input parameters for the HABC class
+            A dictionary containing the input parameters for the PML class
         bc_boundary_pml : `str`, optional
             Type of boundary condition to apply on the PML boundaries.
             Options are "Higdon" or "Sommerfeld" for Non-Reflecting BCs,
@@ -166,11 +166,6 @@ class PML_Wave(ABC_Layer_Wave):
         self.sigma_x = fire.Function(V, name='sigma_x [1/s]')
         self.sigma_x.interpolate(self.pml_mask * self.sigma_max * ref_x)
 
-        # Save damping profile
-        outfile = fire.VTKFile(self.path_case_abc + "sigma_pml.pvd")
-        if self.dimension == 2:  # 2D
-            outfile.write(self.sigma_z, self.sigma_x)
-
         if self.dimension == 3:  # 3D
 
             # 3D dimension
@@ -189,7 +184,14 @@ class PML_Wave(ABC_Layer_Wave):
             ref_y = y_sqr / fire.Constant(pad_len**2)
             self.sigma_y = fire.Function(V, name='sigma_y [1/s]')
             self.sigma_y.interpolate(self.pml_mask * self.sigma_max * ref_y)
-            outfile.write(self.sigma_z, self.sigma_x, self.sigma_y)
+
+        # Save damping profile
+        if hasattr(self, 'path_case_abc'):
+            outfile = fire.VTKFile(self.path_case_abc + "sigma_pml.pvd")
+            if self.dimension == 2:  # 2D
+                outfile.write(self.sigma_z, self.sigma_x)
+            if self.dimension == 3:  # 3D
+                outfile.write(self.sigma_z, self.sigma_x, self.sigma_y)
 
     def pml_parameters_boundary_conditions(self):
         '''
@@ -251,8 +253,9 @@ class PML_Wave(ABC_Layer_Wave):
                                               name_mask='pml_mask')
 
         # Save damping mask
-        outfile = fire.VTKFile(self.path_case_abc + "pml_mask.pvd")
-        outfile.write(self.pml_mask)
+        if hasattr(self, 'path_case_abc'):
+            outfile = fire.VTKFile(self.path_case_abc + "pml_mask.pvd")
+            outfile.write(self.pml_mask)
 
         # Damping fields
         self.pml_sigma_field(coords, self.function_space)

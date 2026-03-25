@@ -36,7 +36,10 @@ class Read_options:
     """
 
     def __init__(self, dictionary={}):
-        options_dictionary = dictionary["options"]
+
+        # Check if dictionary is empty or doesn't have 'options'
+        options_dictionary = dictionary.get("options", {})
+
         options_dictionary.setdefault("method", None)
         options_dictionary.setdefault("cell_type", None)
         options_dictionary.setdefault("variant", None)
