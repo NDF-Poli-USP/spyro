@@ -38,9 +38,9 @@ def run_forward():
     # domain and reserve the remaining 250 m for the Perfectly Matched Layer (PML) to absorb
     # outgoing waves on three sides (eg., -z, +-x sides) of the domain.
     dictionary["mesh"] = {
-        "length_z": 1.0,  # depth in km - always positive
-        "length_x": 1.0,  # width in km - always positive
-        "length_y": 0.0,  # thickness in km - always positive
+        "Lz": 1.0,  # depth in km - always positive
+        "Lx": 1.0,  # width in km - always positive
+        "Ly": 0.0,  # thickness in km - always positive
         "mesh_file": None,
         "mesh_type": "firedrake_mesh",  # options: firedrake_mesh or user_mesh
     }
@@ -54,9 +54,7 @@ def run_forward():
         "source_locations": [(-0.1, 0.5)],
         "frequency": 5.0,
         "delay": 0.3,
-        "receiver_locations": spyro.create_transect(
-            (-0.15, 0.1), (-0.15, 0.9), 50
-        ),
+        "receiver_locations": spyro.create_transect((-0.15, 0.1), (-0.15, 0.9), 50),
         "delay_type": "time",
     }
 
@@ -92,9 +90,7 @@ def run_forward():
     Wave_obj.set_mesh(input_mesh_parameters={"edge_length": 0.02})
 
     z = Wave_obj.mesh_z
-    cond = fire.conditional(
-        z > -0.333, 1.5, fire.conditional(z > -0.667, 3.0, 4.5)
-    )
+    cond = fire.conditional(z > -0.333, 1.5, fire.conditional(z > -0.667, 3.0, 4.5))
     Wave_obj.set_initial_velocity_model(conditional=cond)
     Wave_obj.forward_solve()
 
