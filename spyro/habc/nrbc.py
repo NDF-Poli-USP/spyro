@@ -1,5 +1,6 @@
 import firedrake as fire
 import numpy as np
+from os import getcwd
 
 # Work from Ruben Andres Salas, Andre Luis Ferreira da Silva,
 # Luis Fernando Nogueira de Sá, Emilio Carlos Nelli Silva.
@@ -10,183 +11,282 @@ import numpy as np
 # With additions by Alexandre Olender
 
 
-class NRBCHabc():
+class NRBC():
     '''
     class for NRBCs applied to outer boundary absorbing layer in HABC scheme.
 
     Attributes
     ----------
     angle_max : `float`
-        Maximum incidence angle considered. Default is pi/4 (45°).
+        Maximum incidence angle considered. Default is pi/4 (45°)
     cos_Hig : `firedrake function`
         Profile of the cosine of incidence angle for 1^st-order Higdon BC.
         Free surfaces and interior nodes are set to 0
-    cos_max : `float`
-        Maximum value of the cosine of the incidence angle
+    cos_min : `float`
+        Minimum value of the cosine of the incidence angle
+    dimension : `int`
+        Model dimension (2D or 3D). Default is 2D
+    dom_dim : `tuple`
+        Original domain dimensions: (Lx, Lz) for 2D or (Lx, Lz, Ly) for 3D
+    layer_shape : `string`
+        Shape type of pad layer. Options: 'rectangular' or 'hypershape'
     nrbc : `str`
         Type of NRBC used. Either "Higdon" or "Sommerfeld"
+    path_save_nrbc : `str`
+        Path to save field for the NRBC
 
     Methods
     -------
     cos_ang_HigdonBC()
-        Compute the cosine of the incidence angle for first order Higdon BC.
-    hyperellipse_normal_vector()
-        Compute the normal vector to a hyperellipse
+        Compute the cosine of the incidence angle for first-order Higdon BC
+    hypershape_normal_vector()
+        Compute the normal vector to a hypershape at a boundary point
+    source_to_bnd_reference_vector()
+        Compute a unitary reference vector from the source to a boundary point
+
+
     '''
 
-    def __init__(self, angle_max=np.pi/4.):
+    def __init__(self, dom_dim, layer_shape, angle_max=np.pi/4.,
+                 dimension=2, output_folder=None):
         '''
-        Initialize the NRBCHabc class.
+        Initialize the NRBC class.
 
         Parameters
         ----------
-        None
+        dom_dim : `tuple`
+            Original domain dimensions: (Lx, Lz) for 2D or (Lx, Lz, Ly) for 3D
+        layer_shape : `string`
+            Shape type of pad layer. Options: 'rectangular' or 'hypershape'
+        angle_max : `float`, optional
+            Maximum incidence angle considered. Default is pi/4 (45°)
+        dimension : `int`, optional
+            Model dimension (2D or 3D). Default is 2D
+        output_folder : str, optional
+            The folder where output data will be saved. Default is None
 
         Returns
         -------
         None
         '''
+
+        # Original domain dimensions
+        self.dom_dim = dom_dim
+
+        # Shape type of pad layer
+        self.layer_shape = layer_shape
 
         # Maximum incidence angle considered
         self.angle_max = angle_max
 
         # Maximum value of the cosine of the incidence angle
-        self.cos_max = np.cos(angle_max)
+        self.cos_min = np.cos(angle_max)
 
-    @staticmethod
-    def hyperellipse_normal_vector(x, y, a, b, n):
+        # Model dimension
+        self.dimension = dimension
+
+        # Path to save data
+        if output_folder is None:
+            self.path_save_nrbc = getcwd() + "/output/"
+        else:
+            self.path_save_nrbc = output_folder
+
+    def source_to_bnd_reference_vector(self, source_coord, bnd_nodes_nfs):
         '''
-        Compute the normal vector to a hyperellipse |x/a|^n + |y/b|^n = 1.
+        Compute a unitary reference vector from the source to a boundary point
+
+        Parameters
+        ----------
+        source_coord : `tuple`
+            Source coordinates
+        bnd_nodes_nfs : `tuple`
+            Mesh node coordinates on non-free surfaces.
+            - (z_data[nfs_idx], x_data[nfs_idx]) for 2D
+            - (z_data[nfs_idx], x_data[nfs_idx], y_data[nfs_idx]) for 3D
+
+        Returns
+        -------
+        unit_ref_vct : `array`
+            Unit reference vector from the source to a boundary point
+        '''
+
+        # Boundary node data
+        bnd_z, bnd_x = bnd_nodes_nfs[:2]
+
+        # Source coordinates
+        psouz = source_coord[0]
+        psoux = source_coord[1]
+
+        # Components of the vector pointing to the boundary point
+        ref_x = bnd_x - psoux
+        ref_z = bnd_z - psouz
+        ref_vct = [ref_x, ref_z]
+
+        if self.dimension == 3:  # 3D
+
+            # Third component of the vector pointing to the boundary point
+            bnd_y = bnd_nodes_nfs[2]
+            psouy = source_coord[2]
+            ref_y = bnd_y - psouy
+            ref_vct.append(ref_y)
+
+        # Unitary vector pointing to the boundary point
+        unit_ref_vct = np.asarray(ref_vct) / np.linalg.norm(ref_vct, axis=0)
+
+        return unit_ref_vct
+
+    def hypershape_normal_vector(self, bnd_pnts, hyper_axes, n):
+        '''
+        Compute the normal vector to a hyperellipse (|x/a|^n + |y/b|^n = 1)
+        or a hyperellipsoid (|x/a|^n + |y/b|^n + |z/c|^n = 1) at a boundary
+        point. The hypershape must have the center at the origin.
 
         Observations:
         Let f(x, y) = |x/a|^n - |y/b|^n -1 = 0 a level curve (level set for
         two variables) for f(x, y, z) at z = 0. The gradient of the function
         f given by ∇f(x,y) = [∂f/∂x, ∂f/∂y] is a normal vector to the curve.
+        The normal vector is given by the partial derivatives of the function
 
         Parameters
         ----------
-        x : `float`
-            x-coordinate of the point
-        y : `float`
-            y-coordinate of the point
-        a : `float`
-            semi-axis in the x-direction
-        b : `float`
-            semi-axis in the y-direction
-        n : `int`
-            degree of the hyperellipse
+        bnd_pnts : `list`
+            Boundary hypershape points where the normal vector is computed.
+            Structure: [x, y] for 2D and [x, y, z] for 3D
+        hyper_axes : `list`
+            Semi-axes of the hyperellipse [a, b] or hyperellipsoid [a, b, c]
+        n : `float`
+            Degree of the hyperellipse
 
         Returns
         -------
-        nx : `float`
-            x-component of the normal vector
-        ny : `float`
-            y-component of the normal vector
+        unit_nrm_vct : `array`
+            Unitary normal vector to the hypershape at the boundary point
         '''
+
+        # Point coordinates
+        x, y = bnd_pnts[:2]
+
+        # Hypershape semi-axes
+        a, b = hyper_axes[:2]
 
         # Compute partial derivatives
         df_dx = (n / (a**n)) * np.sign(x) * abs(x)**(n - 1)
         df_dy = (n / (b**n)) * np.sign(y) * abs(y)**(n - 1)
 
-        # Normalize
-        norm = (df_dx**2 + df_dy**2)**0.5
-        nx = df_dx / norm
-        ny = df_dy / norm
+        nrm_vct = [df_dx, df_dy]
 
-        return nx, ny
+        if self.dimension == 3:  # 3D
 
-    def cos_ang_HigdonBC(self, sommerfeld=False):
+            # Third coordinate
+            z = bnd_pnts[2]
+
+            # Third hypershape semi-axis
+            c = hyper_axes[2]
+
+            # Partial derivative with respect to third coordinate
+            df_dz = (n / (c**n)) * np.sign(z) * abs(z)**(n - 1)
+
+            nrm_vct.append(df_dz)
+
+        # Unitary hypershape normal vector
+        unit_nrm_vct = np.asarray(nrm_vct) / np.linalg.norm(nrm_vct, axis=0)
+
+        return unit_nrm_vct
+
+    def cos_ang_HigdonBC(self, V, source_coord, bnd_nfs, bnd_nodes_nfs,
+                         hyp_par=None, sommerfeld_bc=False):
         '''
-        Compute the cosine of the incidence angle for first order Higdon BC.
+        Compute the cosine of the incidence angle for first-order Higdon BC.
 
         Parameters
         ----------
-        sommerfeld : `bool`, optional
-            If True, use Sommerfeld BC instead of Higdon BC. Default is False.
+        V : `firedrake function space`
+            Function space where the cosine of the incidence angle is defined
+        source_coord : `tuple`
+            Source coordinates
+        bnd_nfs : 'array'
+            Mesh node indices on non-free surfaces
+        bnd_nodes_nfs : `tuple`
+            Mesh node coordinates on non-free surfaces.
+            - (z_data[nfs_idx], x_data[nfs_idx]) for 2D
+            - (z_data[nfs_idx], x_data[nfs_idx], y_data[nfs_idx]) for 3D
+        hyp_par : `tuple`, optional
+            Hyperellipse parameters. Structure:
+            (n_hyp, a_hyp, b_hyp) for 2D or (n_hyp, a_hyp, b_hyp, b_hyp) for 3D
+            - n_hyp : `float`
+                Degree of the hyperellipse
+            - a_hyp : `float`
+                Hyperellipse semi-axis in direction x
+            - b_hyp : `float`
+                Hyperellipse semi-axis in direction z
+            - c_hyp : `float`
+                Hyperellipse semi-axis in direction y (3D only)
+        sommerfeld_bc : `bool`, optional
+            If True, use Sommerfeld BC instead of Higdon BC. Default is False
 
         Returns
         -------
         None
         '''
 
+        nrbc_str = "Sommerfeld" if sommerfeld_bc else "Higdon"
+        print("Creating Field for NRBC:", nrbc_str, flush=True)
+
         # Initialize field for the cosine of the incidence angle
-        print("\nCreating Field for Higdon BC")
-        self.cosHig = fire.Function(self.function_space, name='cosHig')
+        self.cosHig = fire.Function(V, name='cosHig')
 
-        # Boundary nodes
-        bnd_nod = fire.DirichletBC(self.function_space, 0, "on_boundary").nodes
-
-        # Node coordinates - To do: refactor
-        z_f = fire.Function(self.function_space).interpolate(self.mesh_z)
-        x_f = fire.Function(self.function_space).interpolate(self.mesh_x)
-        bnd_z = z_f.dat.data_with_halos[bnd_nod]
-        bnd_x = x_f.dat.data_with_halos[bnd_nod]
-
-        # Include nodes at a distance from the domain >= the minimum mesh size
-        no_free_surf = ~(abs(bnd_z) <= self.tol)
-
-        if sommerfeld:  # Sommerfeld BC
-            cos_Hig = 1.
+        if sommerfeld_bc:  # Sommerfeld BC
             self.nrbc = "Sommerfeld"
+            cos_Hig = 1.
 
         else:  # Higdon BC
 
             self.nrbc = "Higdon"
 
-            # Identify source locations
-            possou = self.eik_bnd[0][-1]
-            psouz = possou[0]
-            psoux = possou[1]
+            # Unitary reference vector pointing to the boundary point
+            unit_ref_vct = self.source_to_bnd_reference_vector(source_coord,
+                                                               bnd_nodes_nfs)
 
-            # Compute cosine of the incidence angle with dot product
-            if self.dimension == 2:  # 2D
-                # Vector pointing to the boundary point
-                ref_z = bnd_z[no_free_surf] - psouz
-                ref_x = bnd_x[no_free_surf] - psoux
-                norm_ref = (ref_z**2 + ref_x**2)**0.5
+            # Normal vector to the boundary
+            if self.layer_shape == 'rectangular':
+                # Normal vector to the boundary is a orthonormal vector, then
+                # cosine on incidence angle can be estimated from a projection
+                # of the reference vector to boundary onto the orthonormal
+                # vectors ([1, 0, 0] (2D), [0, 1, 0] (2D), [0, 0, 1] (3D))
+                cos_Hig = np.maximum.reduce(abs(unit_ref_vct))
+
+            if self.layer_shape == 'hypershape':
+
+                # Original domain dimensions
+                Lx, Lz = self.dom_dim[:2]
+
+                # Hypershape degree and semi-axes
+                n_hyp, hyp_axes = hyp_par[0], hyp_par[1:]
+
+                # Boundary points of the hypershape centered at the origin
+                bnd_z, bnd_x = bnd_nodes_nfs[:2]  # Boundary node data
+                bnd_pnts = [bnd_x - Lx / 2, bnd_z + Lz / 2]
+                if self.dimension == 3:  # 3D
+                    Ly = self.dom_dim[2]
+                    bnd_y = bnd_nodes_nfs[2]
+                    bnd_pnts.append(bnd_y - Ly / 2)
 
                 # Normal vector to the boundary
-                if self.layer_shape == 'rectangular':
-                    # Normal vector to the boundary is a orthonormal vector, then
-                    # cosine on incidence angle can be estimated from a projection
-                    # of the reference vector to boundary onto the vector [1, 0]
-                    cos_Hig = abs(ref_z / norm_ref)
-                    cos_Hig[cos_Hig < self.cos_max] = (1. - cos_Hig[
-                        cos_Hig < self.cos_max]**2)**0.5
+                unit_nrm_vct = self.hypershape_normal_vector(bnd_pnts,
+                                                             hyp_axes,
+                                                             n_hyp)
 
-                elif self.layer_shape == 'hypershape':
+                # Cosine of the incidence angle
+                cos_Hig = np.sum(unit_ref_vct * unit_nrm_vct, axis=0)
 
-                    # Hypershape semi-axes and domain dimensions
-                    a_hyp = self.hyper_axes[0]
-                    b_hyp = self.hyper_axes[1]
+            # Adjust values to minimum cosine of incidence angle
+            cos_Hig[cos_Hig < self.cos_min] = (
+                1. - cos_Hig[cos_Hig < self.cos_min]**2)**0.5
 
-                    # Hyperellipse degree
-                    n_hyp = self.n_hyp
-
-                    # Unitary vector pointing to the boundary point
-                    nz_r = ref_z / norm_ref
-                    nx_r = ref_x / norm_ref
-
-                    # Normal vector to the boundary
-                    nz_h, nx_h = self.hyperellipse_normal_vector(
-                        ref_z, ref_x, a_hyp, b_hyp, n_hyp)
-
-                    # Cosine of the incidence angle
-                    cos_Hig = abs(nz_r * nz_h + nx_r * nx_h)
-
-            if self.dimension == 3:  # 3D
-                pass
-                # y_f = fire.Function(self.function_space).interpolate(self.mesh_y)
-                # bnd_y = y_f.dat.data_with_halos[bnd_nod]
-                # To Do: Complete
-
-            cos_Hig[cos_Hig < self.cos_max] = (1. - cos_Hig[
-                cos_Hig < self.cos_max]**2)**0.5
-
-        self.cosHig.dat.data_with_halos[bnd_nod[no_free_surf]] = cos_Hig
+        self.cosHig.dat.data_with_halos[bnd_nfs] = cos_Hig
 
         # Save boundary profile of cosine of incidence angle
-        outfile = fire.VTKFile(self.path_save + self.case_habc + "/cosHig.pvd")
+        outfile = fire.VTKFile(self.path_save_nrbc + "cosHig.pvd")
         outfile.write(self.cosHig)
 
 # dx = 0.1 km REC
@@ -204,7 +304,6 @@ class NRBCHabc():
 # 6l = 0.53% - 0.80%
 # 10l = 0.53% - 0.80%
 # free_surf = 0.43% - 0.80%
-
 
 # dx = 0.1 km HYP n = 2
 # W/O = 323.65% - 18.53%
