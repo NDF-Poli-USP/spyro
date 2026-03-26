@@ -14,7 +14,7 @@ from ..plots import plot_model as spyro_plot_model
 from ..io.basicio import switch_serial_shot
 from ..io.basicio import load_shots, save_shots, create_segy
 from ..utils import run_in_one_core
-from ..utils.typing import OptmisationLibrary
+from ..utils.typing import AdjointType, OptmisationLibrary
 
 
 try:
@@ -514,11 +514,28 @@ class FullWaveformInversion(AcousticWave):
             self.initial_velocity_model = self.guess_velocity_model
         if c is not None:
             self.initial_velocity_model.dat.data_wo[:] = c
-        self.forward_solve()
-        output = fire.File("control_" + str(self.current_iteration)+".pvd")
+        forward_result = self.forward_solve()
+        output = fire.VTKFile("control_" + str(self.current_iteration)+".pvd")
         output.write(self.c)
         np.save(f"control{self.comm.ensemble_comm.rank}_{self.comm.comm.rank}", self.c.dat.data[:])
         if self.parallelism_type == "spatial" and self.number_of_sources > 1:
+            if not self.store_forward_solution_on_disk and self.use_vertex_only_mesh:
+                if forward_result is None:
+                    raise RuntimeError(
+                        "Expected in-memory receiver snapshots for spatial "
+                        "vertex-only-mesh forward solve."
+                    )
+                self.guess_shot_record = list(forward_result)
+                self.guess_forward_solution = getattr(
+                    self,
+                    "serial_forward_solutions",
+                    None,
+                )
+                self.misfit = [
+                    self.real_shot_record[snum] - self.guess_shot_record[snum]
+                    for snum in range(self.number_of_sources)
+                ]
+                return self.misfit
             misfit_list = []
             guess_shot_record_list = []
             for snum in range(self.number_of_sources):
@@ -842,17 +859,39 @@ class FullWaveformInversion(AcousticWave):
         adjoint-state method implemented in gradient_solve().
         """
         comm = self.comm
-        if calculate_functional:
-            self.get_functional(c=c)
-        comm.comm.barrier()
-        self.gradient = self.gradient_solve(misfit=self.misfit, forward_solution=self.guess_forward_solution)
-        self._apply_gradient_mask()
-        if save:
-            # self.gradient_out.write(dJ_total)
-            output = fire.File("gradient_" + str(self.current_iteration)+".pvd")
-            output.write(self.gradient)
-        self.current_iteration += 1
-        comm.comm.barrier()
+        needs_vom_multishot_forward_history = (
+            not self.input_dictionary["inversion"]["automated_adjoint"]
+            and self.parallelism_type == "spatial"
+            and self.number_of_sources > 1
+            and self.use_vertex_only_mesh
+        )
+        previous_store_forward_time_steps = self.store_forward_time_steps
+        previous_adjoint_type = self.adjoint_type
+
+        try:
+            if needs_vom_multishot_forward_history:
+                self.adjoint_type = AdjointType.IMPLEMENTED_ADJOINT
+                self.store_forward_time_steps = True
+            if calculate_functional:
+                self.get_functional(c=c)
+            comm.comm.barrier()
+            self.gradient = self.gradient_solve(
+                misfit=self.misfit,
+                forward_solution=self.guess_forward_solution,
+            )
+            self._apply_gradient_mask()
+            if save:
+                # self.gradient_out.write(dJ_total)
+                output = fire.VTKFile(
+                    "gradient_" + str(self.current_iteration) + ".pvd"
+                )
+                output.write(self.gradient)
+            self.current_iteration += 1
+            comm.comm.barrier()
+        finally:
+            if needs_vom_multishot_forward_history:
+                self.store_forward_time_steps = previous_store_forward_time_steps
+                self.adjoint_type = previous_adjoint_type
 
     def _get_automated_adjoint_gradient_data(self):
         """Return the current taped derivative in the optimizer format.

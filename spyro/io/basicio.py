@@ -138,10 +138,21 @@ def ensemble_propagator(func):
             num = args[0].number_of_sources
             starting_time = args[0].current_time
             receivers_snapshots = []
+            forward_solution_snapshots = []
             for snum in range(num):
                 args[0].reset_pressure()
                 args[0].current_time = starting_time
                 func(*args, **dict(kwargs, source_nums=[snum]))
+                if args[0].store_forward_time_steps:
+                    current_forward_solution = args[0].forward_solution
+                    if isinstance(current_forward_solution, list):
+                        forward_solution_snapshots.append(
+                            [state.copy(deepcopy=True) for state in current_forward_solution]
+                        )
+                    elif isinstance(current_forward_solution, fire.Function):
+                        forward_solution_snapshots.append(
+                            current_forward_solution.copy(deepcopy=True)
+                        )
                 if (
                     args[0].store_forward_solution_on_disk and
                     not args[0].use_vertex_only_mesh
@@ -155,6 +166,9 @@ def ensemble_propagator(func):
                 else:
                     raise NotImplementedError("Not handling with current settings for store_forward_solution_on_disk and use_vertex_only_mesh.")
             if args[0].use_vertex_only_mesh:
+                args[0].serial_forward_solutions = (
+                    forward_solution_snapshots if forward_solution_snapshots else None
+                )
                 return receivers_snapshots
 
     return wrapper
@@ -279,7 +293,11 @@ def ensemble_functional(func):
             J_total = np.zeros((1))
 
             for snum in range(args[0].number_of_sources):
-                switch_serial_shot(args[0], snum)
+                if not (
+                    args[0].use_vertex_only_mesh
+                    and not args[0].store_forward_solution_on_disk
+                ):
+                    switch_serial_shot(args[0], snum)
                 current_residual = residual_list[snum]
                 J = func(args[0], current_residual)
                 J_total += J
@@ -314,9 +332,14 @@ def ensemble_gradient(func):
             starting_time = args[0].current_time
             grad_total = fire.Function(args[0].function_space)
             misfit_list = kwargs.get("misfit")
+            forward_solution_list = kwargs.get("forward_solution")
 
             for snum in range(num):
-                switch_serial_shot(args[0], snum)
+                current_forward_solution = None
+                if forward_solution_list is None:
+                    switch_serial_shot(args[0], snum)
+                else:
+                    current_forward_solution = forward_solution_list[snum]
                 current_misfit = misfit_list[snum]
                 args[0].reset_pressure()
                 args[0].current_time = starting_time
@@ -324,6 +347,7 @@ def ensemble_gradient(func):
                             **dict(
                                 kwargs,
                                 misfit=current_misfit,
+                                forward_solution=current_forward_solution,
                             )
                             )
                 grad_total += grad

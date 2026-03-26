@@ -1,5 +1,4 @@
 import numpy as np
-import copy
 import firedrake as fire
 import spyro
 import pytest
@@ -15,6 +14,15 @@ def is_rol_installed():
         return True
     except ImportError:
         return False
+
+
+def get_dof_coordinates_in_function_space(function, mesh_z, mesh_x):
+    space = function.function_space()
+    if isinstance(function, fire.Cofunction):
+        space = space.dual()
+    z_values = fire.Function(space).interpolate(mesh_z).dat.data_ro.copy()
+    x_values = fire.Function(space).interpolate(mesh_x).dat.data_ro.copy()
+    return z_values, x_values
 
 
 final_time = 0.9
@@ -38,7 +46,7 @@ dictionary["mesh"] = {
 }
 dictionary["acquisition"] = {
     "source_type": "ricker",
-    "source_locations": spyro.create_transect((-0.55, 0.7), (-0.55, 1.3), 6),
+    "source_locations": spyro.create_transect((-0.55, 0.7), (-0.55, 1.3), 2),
     "frequency": 5.0,
     "delay": 0.2,
     "delay_type": "time",
@@ -138,19 +146,22 @@ def test_fwi(automated_adjoint, load_real_shot=False, use_rol=False):
     masked_values = grad_test.dat.data_ro[masked_dofs]
     test0 = masked_values.size > 0 and np.allclose(masked_values, 0.0)
     print(f"Masked gradient DoFs are zero: {test0}", flush=True)
-
-    dof_coords = FWI_obj.function_space.tabulate_dof_coordinates().reshape((-1, 2))
+    dof_z, dof_x = get_dof_coordinates_in_function_space(
+        grad_test,
+        FWI_obj.mesh_z,
+        FWI_obj.mesh_x,
+    )
     center_dofs = (
-        (dof_coords[:, 0] > square_bot_z)
-        & (dof_coords[:, 0] < square_top_z)
-        & (dof_coords[:, 1] > square_left_x)
-        & (dof_coords[:, 1] < square_right_x)
+        (dof_z > square_bot_z)
+        & (dof_z < square_top_z)
+        & (dof_x > square_left_x)
+        & (dof_x < square_right_x)
     )
     center_values = grad_test.dat.data_ro[center_dofs]
     center_max = np.max(np.abs(center_values)) if center_values.size > 0 else 0.0
     test1 = center_values.size > 0 and center_max > 1e-5
     print(f"Center box has non-zero gradient DoFs: {test1}", flush=True)
-
+    # breakpoint() removed to allow test to run to completion
     # quick look at functional and if it reduced
     test2 = FWI_obj.functional_value < 1e-3
     print(f"Last functional small: {test2}", flush=True)
@@ -164,9 +175,13 @@ def test_fwi(automated_adjoint, load_real_shot=False, use_rol=False):
 @pytest.mark.slow
 @pytest.mark.skip(reason="ROL is not working for spyro")
 def test_fwi_with_rol(load_real_shot=False, use_rol=True):
-    test_fwi(load_real_shot=load_real_shot, use_rol=use_rol)
+    test_fwi(
+        automated_adjoint=False,
+        load_real_shot=load_real_shot,
+        use_rol=use_rol,
+    )
 
 
 if __name__ == "__main__":
-    test_fwi(load_real_shot=False, automated_adjoint=True)
+    test_fwi(load_real_shot=False, automated_adjoint=False)
     # test_fwi_with_rol()

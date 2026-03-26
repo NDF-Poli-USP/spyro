@@ -117,13 +117,12 @@ def central_difference(wave, source_ids=None):
     if store_misfit:
         wave.misfit = []
     for step in range(nt):
+        wave.update_source_expression(t)
         if wave.sources is not None:
             if wave.use_vertex_only_mesh:
                 wave.rhs_no_pml_source().assign(fire.assemble(
                     wave.sources.wavelet[step] * wave.source_cofunction))
             else:
-                # Basic way of applying sources
-                wave.update_source_expression(t)
                 wave.rhs_no_pml_source().assign(
                     wave.sources.apply_source(wave.source_cofunction, step))
         wave.solver.solve()

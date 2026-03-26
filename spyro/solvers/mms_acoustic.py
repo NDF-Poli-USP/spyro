@@ -22,7 +22,7 @@ class AcousticWaveMMS(AcousticWave):
 
         lin_var = fire.LinearVariationalProblem(
             lhs,
-            self.rhs + self.source_function,
+            self.rhs + self.source_cofunction,
             self.u_np1,
             bcs=bcs,
             constant_jacobian=True,
