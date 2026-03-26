@@ -118,15 +118,15 @@ jobs:
                .pytest_cache
         find . -name '*.pkl' -delete || true
 
-    # - name: Download coverage data
-    #   uses: actions/download-artifact@v4
-    #   with:
-    #     name: coverage
+    - name: Download coverage data
+      uses: actions/download-artifact@v4
+      with:
+        name: coverage
 
-    # - name: Rename coverage file
-    #   # This is necessary because .coverage was renamed since upload-artifact doesnt recognize hidden files
-    #   run: |
-    #     cp cov-data .coverage
+    - name: Rename coverage file
+      # This is necessary because .coverage was renamed since upload-artifact doesnt recognize hidden files
+      run: |
+        cp cov-data .coverage
 
     - name: Running serial slow tests
       run: |
