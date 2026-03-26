@@ -566,3 +566,18 @@ class Wave(Model_parameters, metaclass=ABCMeta):
                 f"Expected an instance of FunctionalEvaluationMode enum."
             )
         self._functional_evaluation_mode = mode
+
+    def get_control_parameters(self):
+        raise NotImplementedError(
+            f"{type(self).__name__} does not expose inversion control parameters.",
+        )
+
+    def set_control_parameters(self, controls):
+        raise NotImplementedError(
+            f"{type(self).__name__} cannot assign inversion control parameters.",
+        )
+
+    def get_control_parameter_function_space(self):
+        raise NotImplementedError(
+            f"{type(self).__name__} does not define a control parameter function space.",
+        )
