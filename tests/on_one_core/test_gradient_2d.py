@@ -71,7 +71,7 @@ dictionary = {}
 dictionary["options"] = {
     "cell_type": "T",  # simplexes such as triangles or tetrahedra (T) or quadrilaterals (Q)
     "variant": "lumped",  # lumped, equispaced or DG, default is lumped
-    "degree": 4,  # p order
+    "degree": 1,  # p order
     "dimension": 2,  # dimension
 }
 
@@ -99,7 +99,7 @@ dictionary["acquisition"] = {
 dictionary["time_axis"] = {
     "initial_time": 0.0,  # Initial time for event
     "final_time": final_time,  # Final time for event
-    "dt": 0.0005,  # timestep size
+    "dt": 0.001,  # timestep size
     "amplitude": 1,  # the Ricker has an amplitude of 1.
     "output_frequency": 100,  # how frequently to output solution to pvds
     "gradient_sampling_frequency": 1,  # how frequently to save solution to RAM
@@ -132,6 +132,7 @@ def get_forward_model(load_true=False):
             filename="pml_grad_test_model.png",
             abc_points=[(-0, 0), (-1, 0), (-1, 1), (-0, 1)],
         )
+        spyro.plots.plot_model(Wave_obj_exact, abc_points=[(-1, 1), (-2, 1), (-2, 4), (-1, 2)])
         Wave_obj_exact.forward_solve()
         rec_out_exact = Wave_obj_exact.receivers_output
 

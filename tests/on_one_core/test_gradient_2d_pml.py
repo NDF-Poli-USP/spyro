@@ -7,35 +7,6 @@ import spyro
 import pytest
 
 
-class Gradient_mask_for_pml():
-    def __init__(self, Wave_obj=None):
-        if Wave_obj.abc_active is False:
-            pass
-
-        # Gatting necessary data from wave object
-        pad = Wave_obj.mesh_parameters.abc_pad_length  # noqa: F841
-        z = Wave_obj.mesh_z
-        x = Wave_obj.mesh_x
-        V = Wave_obj.function_space
-
-        # building firedrake function for mask
-        z_min = -(Wave_obj.mesh_parameters.length_z)
-        x_min = 0.0
-        x_max = Wave_obj.mesh_parameters.length_x
-        mask = fire.Function(V)
-        cond = fire.conditional(z < z_min, 1, 0)
-        cond = fire.conditional(x < x_min, 1, cond)
-        cond = fire.conditional(x > x_max, 1, cond)
-        mask.interpolate(cond)
-
-        # saving mask dofs
-        self.mask_dofs = np.where(mask.dat.data[:] > 0.95)
-
-    def apply_mask(self, dJ):
-        dJ.dat.data[self.mask_dofs] = 0.0
-        return dJ
-
-
 def check_gradient(Wave_obj_guess, dJ, rec_out_exact, Jm, plot=False, tol=1.0):
     steps = [1e-3, 1e-4, 1e-5]  # step length
 
@@ -128,7 +99,7 @@ def set_dictionary(PML=False):
     dictionary["time_axis"] = {
         "initial_time": 0.0,  # Initial time for event
         "final_time": final_time,  # Final time for event
-        "dt": 0.0002,  # timestep size
+        "dt": 0.0003,  # timestep size
         "amplitude": 1,  # the Ricker has an amplitude of 1.
         "output_frequency": 100,  # how frequently to output solution to pvds
         "gradient_sampling_frequency": 1,  # how frequently to save solution to RAM
@@ -161,7 +132,7 @@ def get_forward_model(dictionary=None):
 
     # Exact model
     Wave_obj_exact = spyro.AcousticWave(dictionary=dictionary)
-    Wave_obj_exact.set_mesh(input_mesh_parameters={"edge_length": 0.03})
+    Wave_obj_exact.set_mesh(input_mesh_parameters={"edge_length": 0.1})
     cond = fire.conditional(Wave_obj_exact.mesh_z > -0.5, 1.5, 3.5)
     Wave_obj_exact.set_initial_velocity_model(
         conditional=cond,
@@ -204,11 +175,8 @@ def test_gradient(PML=False):
     print(f"Cost functional : {Jm}")
 
     # compute the gradient of the control (to be verified)
-    dJ = Wave_obj_guess.gradient_solve(misfit=misfit, forward_solution=forward_solution_guess)
-    VTKFile("gradient_premask.pvd").write(dJ)
-    if not PML:
-        Mask_data = Gradient_mask_for_pml(Wave_obj=Wave_obj_guess)
-        dJ = Mask_data.apply_mask(dJ)
+    dJ = Wave_obj_guess.gradient_solve(
+        misfit=misfit, forward_solution=forward_solution_guess)
     VTKFile("gradient.pvd").write(dJ)
 
     tol = 5.0
