@@ -71,7 +71,7 @@ dictionary = {}
 dictionary["options"] = {
     "cell_type": "T",  # simplexes such as triangles or tetrahedra (T) or quadrilaterals (Q)
     "variant": "lumped",  # lumped, equispaced or DG, default is lumped
-    "degree": 1,  # p order
+    "degree": 4,  # p order
     "dimension": 2,  # dimension
 }
 
@@ -99,7 +99,7 @@ dictionary["acquisition"] = {
 dictionary["time_axis"] = {
     "initial_time": 0.0,  # Initial time for event
     "final_time": final_time,  # Final time for event
-    "dt": 0.001,  # timestep size
+    "dt": 0.0005,  # timestep size
     "amplitude": 1,  # the Ricker has an amplitude of 1.
     "output_frequency": 100,  # how frequently to output solution to pvds
     "gradient_sampling_frequency": 1,  # how frequently to save solution to RAM
