@@ -195,8 +195,7 @@ def _backward_propagation(Wave_obj, dt=None, pml=False):
     residual = Wave_obj.misfit
 
     output = None
-    if pml:
-        output = _create_adjoint_output(Wave_obj)
+    output = _create_adjoint_output(Wave_obj)
 
     for step in range(nt - 1, -1, -1):
         rhs_forcing.assign(0.0)
