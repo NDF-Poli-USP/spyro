@@ -323,6 +323,7 @@ def eikonal_analysis(dictionary, edge_length, f_est):
     return min_eik
 
 
+@pytest.mark.slow
 def test_loop_eikonal_2d():
     '''
     Loop for testing eikonal solver in 2D with the model
