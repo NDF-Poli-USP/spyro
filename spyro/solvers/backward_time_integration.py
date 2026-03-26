@@ -25,14 +25,14 @@ def backward_wave_propagator(Wave_obj, dt=None):
         return _backward_propagation(Wave_obj, dt=dt, pml=False)
 
 
-def _build_gradient_solver(Wave_obj, mask_available):
-    """Assemble the gradient variational problem ``-2/c³ * ü_fwd * u_adj``.
+def _build_gradient_solver(Wave_obj, mask_available, pml):
+    """Assemble the gradient variational problem.
 
     Returns:
     --------
-    grad_solver, dufordt2, uadj, gradi
+    grad_solver, forward_field, uadj, gradi
     """
-    V = Wave_obj.function_space
+    V = Wave_obj.get_second_order_function_space()
     qr = Wave_obj.quadrature_rule
 
     m_u = fire.TrialFunction(V)
@@ -46,17 +46,65 @@ def _build_gradient_solver(Wave_obj, mask_available):
         mgrad = m_u * m_v * fire.dx(**qr)
         mask_available = False
 
-    dufordt2 = fire.Function(V)
+    forward_field = fire.Function(V)
     uadj = fire.Function(V)
 
-    if mask_available:
-        ffG = -2 * (Wave_obj.c)**(-3) * fire.dot(dufordt2, uadj) * m_v * fire.dx(2, scheme=qr)
+    if pml and mask_available:
+        ffG = (
+            2.0
+            * Wave_obj.c
+            * fire.dot(fire.grad(uadj), fire.grad(forward_field))
+            * m_v
+            * fire.dx(2, scheme=qr)
+        )
         if Wave_obj.comm.comm.rank == 0:
-            print("Applying gradient mask: gradients will be computed only in inside region", flush=True)
+            print(
+                "Applying gradient mask: gradients will be computed only "
+                "in inside region (mixed space)",
+                flush=True,
+            )
+    elif pml:
+        ffG = (
+            2.0
+            * Wave_obj.c
+            * fire.dot(fire.grad(uadj), fire.grad(forward_field))
+            * m_v
+            * fire.dx(**qr)
+        )
+        if Wave_obj.comm.comm.rank == 0:
+            print(
+                "No gradient mask found: computing gradients over full "
+                "domain (mixed space)",
+                flush=True,
+            )
+    elif mask_available:
+        ffG = (
+            -2
+            * (Wave_obj.c) ** (-3)
+            * fire.dot(forward_field, uadj)
+            * m_v
+            * fire.dx(2, scheme=qr)
+        )
+        if Wave_obj.comm.comm.rank == 0:
+            print(
+                "Applying gradient mask: gradients will be computed only "
+                "in inside region",
+                flush=True,
+            )
     else:
-        ffG = -2 * (Wave_obj.c)**(-3) * fire.dot(dufordt2, uadj) * m_v * fire.dx(**qr)
+        ffG = (
+            -2
+            * (Wave_obj.c) ** (-3)
+            * fire.dot(forward_field, uadj)
+            * m_v
+            * fire.dx(**qr)
+        )
         if Wave_obj.comm.comm.rank == 0:
-            print("No gradient mask found: computing gradients over full domain", flush=True)
+            print(
+                "No gradient mask found: computing gradients over full "
+                "domain",
+                flush=True,
+            )
 
     gradi = fire.Function(V)
     grad_prob = fire.LinearVariationalProblem(mgrad, ffG, gradi)
@@ -67,7 +115,7 @@ def _build_gradient_solver(Wave_obj, mask_available):
         },
     )
 
-    return grad_solver, dufordt2, uadj, gradi
+    return grad_solver, forward_field, uadj, gradi
 
 
 def _compute_dufordt2(forward_solution, dt):
@@ -110,7 +158,9 @@ def _backward_propagation(Wave_obj, dt=None, pml=False):
 
     Notes:
     ------
-    Both PML and no-PML paths use the gradient form ``-2/c³ * ü_fwd * u_adj``.
+    The PML path uses the mixed-space gradient form
+    ``2c * ∇u_adj · ∇u_fwd`` while the no-PML path uses
+    ``-2/c³ * ü_fwd * u_adj``.
     Source injection uses ``Wave_obj.rhs_no_pml_source()`` and the prebuilt
     variational solver is advanced with ``Wave_obj.solver.solve()``.
     """
@@ -132,21 +182,21 @@ def _backward_propagation(Wave_obj, dt=None, pml=False):
 
     Wave_obj.comm.comm.barrier()
 
-    dJ = fire.Function(Wave_obj.function_space)
-    rhs_forcing = fire.Cofunction(Wave_obj.function_space.dual())
+    gradient_space = Wave_obj.get_second_order_function_space()
+    dJ = fire.Function(gradient_space)
+    rhs_forcing = fire.Cofunction(gradient_space.dual())
 
-    grad_solver, dufordt2, uadj, gradi = _build_gradient_solver(Wave_obj, mask_available)
+    grad_solver, forward_field, uadj, gradi = _build_gradient_solver(
+        Wave_obj, mask_available, pml,
+    )
 
     forward_solution = Wave_obj.forward_solution
     receivers = Wave_obj.receivers
     residual = Wave_obj.misfit
 
+    output = None
     if pml:
         output = _create_adjoint_output(Wave_obj)
-
-    # No-PML uses separate scalar fields; PML uses mixed-space sub-functions
-    if not pml:
-        u_np1 = fire.Function(Wave_obj.function_space)
 
     for step in range(nt - 1, -1, -1):
         rhs_forcing.assign(0.0)
@@ -155,19 +205,16 @@ def _backward_propagation(Wave_obj, dt=None, pml=False):
         )
         Wave_obj.solver.solve()
 
-        if not pml:
-            u_np1.assign(Wave_obj.u_np1)
-
         if step % Wave_obj.output_frequency == 0:
             _output_step(Wave_obj, t, pml, output=output if pml else None)
 
         if step % Wave_obj.gradient_sampling_frequency == 0:
-            if pml:
-                uadj.assign(Wave_obj.X_np1.sub(0))
-            else:
-                uadj.assign(u_np1)
+            uadj.assign(Wave_obj.get_second_order_state(Wave_obj.next_vstate))
 
-            dufordt2.assign(_compute_dufordt2(forward_solution, dt))
+            if pml:
+                forward_field.assign(forward_solution.pop())
+            else:
+                forward_field.assign(_compute_dufordt2(forward_solution, dt))
             grad_solver.solve()
             _trapezoidal_gradient_integration(dJ, gradi, step, nt)
 
@@ -176,7 +223,7 @@ def _backward_propagation(Wave_obj, dt=None, pml=False):
             Wave_obj.X_n.assign(Wave_obj.X_np1)
         else:
             Wave_obj.u_nm1.assign(Wave_obj.u_n)
-            Wave_obj.u_n.assign(u_np1)
+            Wave_obj.u_n.assign(Wave_obj.u_np1)
         t = step * float(dt)
 
     Wave_obj.current_time = t
@@ -195,9 +242,8 @@ def _create_adjoint_output(Wave_obj):
 
 def _output_step(Wave_obj, t, pml, output=None):
     """Handle per-step output and stability checks."""
-    if pml:
-        if Wave_obj.forward_output:
-            output.write(Wave_obj.X_n.sub(0), time=t, name="Pressure")
+    if Wave_obj.forward_output:
+        output.write(Wave_obj.get_function(), time=t, name="Pressure")
     else:
         assert (
             fire.norm(Wave_obj.u_n) < 1

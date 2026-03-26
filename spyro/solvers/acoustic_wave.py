@@ -181,6 +181,25 @@ class AcousticWave(Wave):
         else:
             return self.u_n
 
+    def get_second_order_function_space(self):
+        """Return the scalar space where the pressure equation is solved."""
+        return self.scalar_function_space
+
+    def get_second_order_state(self, state=None):
+        """Return the pressure field from a full solver state.
+
+        For PML runs the solver state is mixed, with the pressure stored in the
+        first component. For non-PML runs the state is already the pressure
+        field.
+        """
+        if state is None:
+            return self.get_function()
+
+        if self.abc_boundary_layer_type == "PML" and hasattr(state, "sub"):
+            return state.sub(0)
+
+        return state
+
     @override
     def get_function_name(self):
         return "Pressure"
