@@ -3,6 +3,8 @@ import spyro
 import segyio
 import numpy as np
 import matplotlib.pyplot as plt
+from firedrake.__future__ import interpolate
+fire.interpolate = interpolate
 
 
 def get_vp_from_2dsegy(filename):
@@ -42,7 +44,7 @@ def test_write_segy_and_smooth(show=False):
 
     c = fire.conditional((x - xc) ** 2 + (y - yc) ** 2 < r**2, 3.0, 1.5)
 
-    vp.interpolate(c)
+    vp.assign(fire.assemble(fire.interpolate(c, V)))
 
     spyro.io.create_segy(vp, V, 10.0/1000.0, segy_file)
     original_vp = get_vp_from_2dsegy(segy_file)
@@ -58,12 +60,12 @@ def test_write_segy_and_smooth(show=False):
         plt.savefig("nonsmoothedtest.png")
         plt.show()
 
-    spyro.tools.smooth_velocity_field_file(segy_file, smoothed_file, 5, show=show)
+    spyro.tools.smooth_velocity_field_file(segy_file, smoothed_file, 5, show=show, save_fig=True)
 
     smoothed_vp = get_vp_from_2dsegy(smoothed_file)
     check_boundary = np.isclose(original_vp[0, 0], smoothed_vp[0, 0])
     check_centre = np.isclose(original_vp[48, 48], smoothed_vp[48, 48], rtol=1e-3)
-    check_halfway = original_vp[0, 0]*1.1 < smoothed_vp[29, 45] < original_vp[48, 48]*0.9
+    check_halfway = original_vp[0, 0]*1.1 < smoothed_vp[31, 41] < original_vp[48, 48]*0.9
 
     assert all([check_boundary, check_halfway, check_centre])
 

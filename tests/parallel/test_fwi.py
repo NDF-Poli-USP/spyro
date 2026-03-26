@@ -25,9 +25,9 @@ dictionary["parallelism"] = {
     "type": "automatic",  # options: automatic (same number of cores for evey processor) or spatial
 }
 dictionary["mesh"] = {
-    "Lz": 2.0,  # depth in km - always positive
-    "Lx": 2.0,  # width in km - always positive
-    "Ly": 0.0,  # thickness in km - always positive
+    "length_z": 2.0,  # depth in km - always positive
+    "length_x": 2.0,  # width in km - always positive
+    "length_y": 0.0,  # thickness in km - always positive
     "mesh_file": None,
     "mesh_type": "firedrake_mesh",
 }
