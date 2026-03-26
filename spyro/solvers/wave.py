@@ -17,6 +17,8 @@ from ..utils.typing import WaveType
 from .solver_parameters import get_default_parameters_for_method
 from ..utils import eval_functions_to_ufl
 from .modal.modal_sol import Modal_Solver
+from ..io import interpolate
+from ..utils import write_hdf5_velocity_model
 
 fire.set_log_level(fire.ERROR)
 
@@ -123,8 +125,6 @@ class Wave(Model_parameters, metaclass=ABCMeta):
         if self.function_space is None:
             self.force_rebuild_function_space()
 
-        if self.abc_boundary_layer_type != "hybrid":
-            self._initialize_model_parameters()
         self.matrix_building()
         self.wave_propagator()
 
@@ -247,7 +247,15 @@ class Wave(Model_parameters, metaclass=ABCMeta):
             self.initial_velocity_model = velocity_model_function
         elif new_file is not None:
             self.initial_velocity_model_file = new_file
-            self._initialize_model_parameters()  # TODO in PR206
+            if self.initial_velocity_model_file.endswith(".segy"):
+                self.initial_velocity_model_file = write_hdf5_velocity_model(self, self.initial_velocity_model_file)
+
+            if self.initial_velocity_model_file.endswith((".hdf5", ".h5")):
+                self.initial_velocity_model = interpolate(
+                    self,
+                    self.initial_velocity_model_file,
+                    self.function_space.sub(0),
+                )
         elif constant is not None:
             V = self.function_space
             vp = fire.Function(V, name="velocity")
@@ -262,6 +270,7 @@ class Wave(Model_parameters, metaclass=ABCMeta):
             fire.VTKFile("initial_velocity_model.pvd").write(
                 self.initial_velocity_model, name="velocity"
             )
+        self.c = self.initial_velocity_model
 
     def _map_sources_and_receivers(self):
         if self.source_type == "ricker":
