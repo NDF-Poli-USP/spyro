@@ -32,7 +32,7 @@ def _build_gradient_solver(Wave_obj, mask_available, pml):
     --------
     grad_solver, forward_field, uadj, gradi
     """
-    V = Wave_obj.get_second_order_function_space()
+    V = Wave_obj.get_scalar_function_space()
     qr = Wave_obj.quadrature_rule
 
     m_u = fire.TrialFunction(V)
@@ -182,7 +182,7 @@ def _backward_propagation(Wave_obj, dt=None, pml=False):
 
     Wave_obj.comm.comm.barrier()
 
-    gradient_space = Wave_obj.get_second_order_function_space()
+    gradient_space = Wave_obj.get_scalar_function_space()
     dJ = fire.Function(gradient_space)
     rhs_forcing = fire.Cofunction(gradient_space.dual())
 
@@ -208,7 +208,7 @@ def _backward_propagation(Wave_obj, dt=None, pml=False):
             _output_step(Wave_obj, t, pml, output=output if pml else None)
 
         if step % Wave_obj.gradient_sampling_frequency == 0:
-            uadj.assign(Wave_obj.get_second_order_state(Wave_obj.next_vstate))
+            uadj.assign(Wave_obj.get_wave_equation_state(Wave_obj.next_vstate))
 
             if pml:
                 forward_field.assign(forward_solution.pop())
