@@ -102,14 +102,21 @@ def central_difference(wave, source_ids=None):
             for t in range(nt)
             if t % wave.gradient_sampling_frequency == 0
         ]
-    if adjoint_type == AdjointType.AUTOMATED_ADJOINT:
-        wave.automated_adjoint.start_recording()
+    use_vertex_only_source_shape = (
+        wave.use_vertex_only_mesh
+        and adjoint_type == AdjointType.AUTOMATED_ADJOINT
+        and wave.number_of_sources == 1
+    )
+    vertex_only_source_shape = None
     if wave.use_vertex_only_mesh:
-        # source_cof is a cofunction that represents a point source,
-        wave.source_cofunction.assign(wave.sources.source_cofunction())
-        # being one at a point and zero elsewhere.
+        if use_vertex_only_source_shape:
+            vertex_only_source_shape = wave.sources.source_cofunction()
+        else:
+            wave.source_cofunction.assign(wave.sources.source_cofunction())
         interpolate_receivers = wave.receivers.receiver_interpolator(
             wave.vstate)
+    if adjoint_type == AdjointType.AUTOMATED_ADJOINT:
+        wave.automated_adjoint.start_recording()
     usol_recv = []
     save_step = 0
     if compute_functional:
@@ -119,7 +126,10 @@ def central_difference(wave, source_ids=None):
     for step in range(nt):
         wave.update_source_expression(t)
         if wave.sources is not None:
-            if wave.use_vertex_only_mesh:
+            if use_vertex_only_source_shape:
+                wave.rhs_no_pml_source().assign(fire.assemble(
+                    wave.sources.wavelet[step] * vertex_only_source_shape))
+            elif wave.use_vertex_only_mesh:
                 wave.rhs_no_pml_source().assign(fire.assemble(
                     wave.sources.wavelet[step] * wave.source_cofunction))
             else:

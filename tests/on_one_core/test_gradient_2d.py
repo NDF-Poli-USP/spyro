@@ -113,29 +113,31 @@ dictionary["visualization"] = {
 }
 
 
-def get_forward_model(automated_adjoint, load_true=False):
-
+def get_real_shot_record(load_true=False):
     if load_true is False:
         Wave_obj_exact = spyro.AcousticWave(dictionary=dictionary)
         Wave_obj_exact.set_mesh(input_mesh_parameters={"edge_length": 0.1})
-        # Wave_obj_exact.set_initial_velocity_model(constant=3.0)
         cond = fire.conditional(Wave_obj_exact.mesh_z > -1.5, 1.5, 3.5)
         Wave_obj_exact.set_initial_velocity_model(
             conditional=cond,
-            # output=True
         )
-        spyro.plots.plot_model(Wave_obj_exact, abc_points=[
-            (-1, 1), (-2, 1), (-2, 4), (-1, 2)]
-            )
+        spyro.plots.plot_model(
+            Wave_obj_exact,
+            abc_points=[(-1, 1), (-2, 1), (-2, 4), (-1, 2)],
+        )
         Wave_obj_exact.forward_solve()
-        rec_out_exact = Wave_obj_exact.forward_solution_receivers
-    else:
-        rec_out_exact = np.load("rec_out_exact.npy")
+        return Wave_obj_exact.forward_solution_receivers
 
+    return np.load("rec_out_exact.npy")
+
+
+def get_forward_model(automated_adjoint, load_true=False, real_shot_record=None):
+    if real_shot_record is None:
+        real_shot_record = get_real_shot_record(load_true=load_true)
     Wave_obj_guess = spyro.AcousticWave(dictionary=dictionary)
     Wave_obj_guess.set_mesh(input_mesh_parameters={"edge_length": 0.1})
     Wave_obj_guess.set_initial_velocity_model(constant=2.0)
-    Wave_obj_guess.real_shot_record = rec_out_exact
+    Wave_obj_guess.real_shot_record = real_shot_record
     if automated_adjoint:
         Wave_obj_guess.enable_automated_adjoint()
         assert Wave_obj_guess._store_forward_time_steps is False
@@ -147,6 +149,32 @@ def get_forward_model(automated_adjoint, load_true=False):
         Wave_obj_guess.store_forward_time_steps = True
         Wave_obj_guess.forward_solve()
     return Wave_obj_guess
+
+
+def get_functional_value(automated_adjoint, real_shot_record):
+    Wave_obj_guess = get_forward_model(
+        automated_adjoint,
+        load_true=False,
+        real_shot_record=real_shot_record,
+    )
+    if automated_adjoint:
+        with Wave_obj_guess.automated_adjoint.fresh_tape():
+            Wave_obj_guess.forward_solve()
+        Wave_obj_guess.automated_adjoint.clear_tape()
+    return Wave_obj_guess.functional_value
+
+
+def test_functional_value_matches_between_adjoint_modes():
+    real_shot_record = get_real_shot_record(load_true=False)
+    implemented_value = get_functional_value(False, real_shot_record)
+    automated_value = get_functional_value(True, real_shot_record)
+
+    assert math.isclose(
+        implemented_value,
+        automated_value,
+        rel_tol=1e-12,
+        abs_tol=1e-12,
+    )
 
 
 @pytest.mark.parametrize("automated_adjoint", [False, True])
@@ -173,8 +201,8 @@ def test_gradient(automated_adjoint):
         assert isinstance(forward_solution_guess, list)
         dJ = Wave_obj_guess.gradient_solve(
             forward_solution=forward_solution_guess)
-        check_gradient(Wave_obj_guess, dJ, plot=True) 
+        check_gradient(Wave_obj_guess, dJ, plot=True)
 
 
 if __name__ == "__main__":
-    test_gradient(automated_adjoint=True)
+    test_gradient(automated_adjoint=False)
