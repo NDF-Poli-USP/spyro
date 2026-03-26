@@ -66,6 +66,7 @@ def cells_per_wavelength(method, degree, dimension):
 
 
 class MeshingParameters():
+
     """Manage mesh parameters and configuration for seismic wave simulations.
 
     This class handles all aspects of mesh configuration including mesh type
@@ -181,6 +182,7 @@ class MeshingParameters():
         during initialization to configure the mesh with default values where
         there are missing parameters.
         """
+
         if input_mesh_dictionary is None:
             input_mesh_dictionary = {}
         self.input_mesh_dictionary = input_mesh_dictionary or {}
@@ -242,6 +244,7 @@ class MeshingParameters():
         The unit is inferred from the magnitude: values > 100 are assumed to
         be in meters, while values <= 100 are assumed to be in kilometers.
         """
+
         if value is not None:
             if value > 100:
                 new_unit = "meters"
@@ -253,12 +256,13 @@ class MeshingParameters():
             self._unit = new_unit
         elif new_unit != self._unit and value is not None:
             warnings.warn(
-                f"{attr_name} value ({value}) appears to be in {new_unit}, "
-                f"but the current unit is {self._unit}. Please check for consistency."
+                f"{attr_name} value ({value}) appears to be "
+                f"in {new_unit}, but the current unit is "
+                f"{self._unit}. Please check for consistency."
             )
-        if value is not None:
-            if value < 0.0:
-                raise ValueError(f"Please do not use negative value for {attr_name}")
+        if value is not None and value < 0.0:
+            raise ValueError(
+                f"Please do not use negative value for {attr_name}")
         setattr(self, attr_name, value)
 
     @property
@@ -366,9 +370,12 @@ class MeshingParameters():
         """
         if self.cells_per_wavelength is not None:
             warnings.warn(
-                "Mutual exclusion: Both 'edge_length' and 'cells_per_wavelength' control mesh size, "
-                "but only one can be set at a time. Setting 'edge_length' will override and remove the "
-                "previously set 'cells_per_wavelength'. If you wish to use 'cells_per_wavelength' instead, "
+                "Mutual exclusion: Both 'edge_length' and "
+                "'cells_per_wavelength' control mesh size, "
+                "but only one can be set at a time. Setting "
+                "'edge_length' will override and remove the "
+                "previously set 'cells_per_wavelength'. If "
+                "you wish to use 'cells_per_wavelength' instead, "
                 "set it after setting 'edge_length'."
             )
             self.cells_per_wavelength = None
@@ -405,7 +412,8 @@ class MeshingParameters():
         Setting this property will automatically set edge_length to None.
         """
         if self.edge_length is not None:
-            warnings.warn("Setting cells_per_wavelength removes edge_length parameter")
+            warnings.warn("Setting cells_per_wavelength"
+                          "removes edge_length parameter")
             self.edge_length = None
         self._cells_per_wavelength = value
 
@@ -436,17 +444,17 @@ class MeshingParameters():
         ValueError
             If value is not None and not one of the allowed method types.
         """
-        allowed_types = {
+        allowed_types = [
             "mass_lumped_triangle",
             "DG_triangle",
             "spectral_quadrilateral",
             "DG_quadrilateral",
             "CG",
-        }
+        ]
+
         if value is not None and value not in allowed_types:
-            raise ValueError(
-                f"method must be one of {allowed_types}, got '{value}'"
-            )
+            value_parameter_error("method", value, allowed_types)
+
         self._method = value
 
     @property
@@ -515,6 +523,7 @@ class MeshingParameters():
         allowed_types = ["firedrake_mesh", "user_mesh", "SeismicMesh", "file", "spyro_mesh"]
         if value is not None and value not in allowed_types:
             value_parameter_error("mesh_type", value, allowed_types)
+
         if value == "SeismicMesh" and self.quadrilateral:
             raise ValueError("SeismicMesh does not work with quads.")
         self._mesh_type = value
@@ -553,12 +562,15 @@ class MeshingParameters():
         if value is None:
             self._source_frequency = value
         elif not isinstance(value, (int, float)):
-            raise TypeError(f"Source frequency must be a number, got {type(value).__name__}")
+            raise TypeError("Source frequency must be a number"
+                            f", got {type(value).__name__}")
         else:
             if value < 1.5:
-                warnings.warn(f"Source frequency of {value} too low for realistic FWI case")
+                warnings.warn(f"Source frequency of {value} "
+                              "too low for realistic FWI case")
             elif value > 50:
-                warnings.warn(f"Source frequency of {value} too high for realistic FWI case, please low-pass filter")
+                warnings.warn(f"Source frequency of {value} too high for "
+                              "realistic FWI case, please low-pass filter")
             self._source_frequency = value
 
     @property
@@ -728,7 +740,8 @@ class MeshingParameters():
             as periodic meshes are only supported with Firedrake meshes.
         """
         if self.mesh_type != "firedrake_mesh" and value is True:
-            raise ValueError("Periodic meshes are only supported with Firedrake meshes for now.")
+            raise ValueError("Periodic meshes are only supported "
+                             "with Firedrake meshes for now.")
         self._periodic = value
 
     def set_mesh(
@@ -777,12 +790,14 @@ class MeshingParameters():
         ...                                     'length_x': 10.0,
         ...                                     'length_z': 5.0})
         """
+
         if abc_pad_length is not None:
             self.abc_pad_length = abc_pad_length
 
         # Setting default mesh parameters
         input_mesh_parameters.setdefault("periodic", self.periodic)
-        input_mesh_parameters.setdefault("minimum_velocity", self.minimum_velocity)
+        input_mesh_parameters.setdefault("minimum_velocity",
+                                         self.minimum_velocity)
         input_mesh_parameters.setdefault("length_z", self.length_z)
         input_mesh_parameters.setdefault("length_x", self.length_x)
         input_mesh_parameters.setdefault("length_y", self.length_y)
@@ -790,7 +805,8 @@ class MeshingParameters():
         input_mesh_parameters.setdefault("mesh_file", self.mesh_file)
         input_mesh_parameters.setdefault("dimension", self.dimension)
         input_mesh_parameters.setdefault("mesh_type", self.mesh_type)
-        input_mesh_parameters.setdefault("source_frequency", self.source_frequency)
+        input_mesh_parameters.setdefault("source_frequency",
+                                         self.source_frequency)
         input_mesh_parameters.setdefault("method", self.method)
         input_mesh_parameters.setdefault("degree", self.degree)
         input_mesh_parameters.setdefault("quadrilateral", self.quadrilateral)

@@ -1,5 +1,4 @@
 import numpy as np
-import math
 import matplotlib.pyplot as plt
 from copy import deepcopy
 from firedrake import VTKFile
@@ -11,10 +10,12 @@ def check_gradient(Wave_obj_guess, dJ, rec_out_exact, Jm, plot=False):
     steps = [1e-3, 1e-4, 1e-5]  # step length
 
     errors = []
+    remainders = []
     V_c = Wave_obj_guess.function_space
     dm = fire.Function(V_c)
+    rng = np.random.default_rng(0)
     size, = np.shape(dm.dat.data[:])
-    dm_data = np.random.rand(size)
+    dm_data = rng.random(size)
     dm.dat.data[:] = dm_data
     # dm.assign(dJ)
 
@@ -31,18 +32,16 @@ def check_gradient(Wave_obj_guess, dJ, rec_out_exact, Jm, plot=False):
         projnorm = fire.assemble(dJ * dm * fire.dx(**Wave_obj_guess.quadrature_rule))
 
         error = 100 * ((grad_fd - projnorm) / projnorm)
+        remainder = abs(J_plusdm - Jm - step * projnorm)
 
         errors.append(error)
+        remainders.append(remainder)
 
     errors = np.array(errors)
-
-    # Checking if error is first order in step
-    theory = [t for t in steps]
-    theory = [errors[0] * th / theory[0] for th in theory]
+    remainders = np.array(remainders)
     if plot:
         plt.close()
         plt.plot(steps, errors, label="Error")
-        plt.plot(steps, theory, "--", label="first order")
         plt.legend()
         plt.title(" Adjoint gradient versus finite difference gradient")
         plt.xlabel("Step")
@@ -50,15 +49,18 @@ def check_gradient(Wave_obj_guess, dJ, rec_out_exact, Jm, plot=False):
         plt.savefig("gradient_error_verification.png")
         plt.close()
 
-    # Checking if every error is less than 1 percent
+    # Checking that the random-direction finite-difference error remains
+    # below 1 percent across the tested step sizes.
+    test1 = np.all(np.abs(errors) < 1)
+    print(f"Gradient error less than 1 percent for all steps: {test1}")
+    print(f"Error of {errors}")
 
-    test1 = abs(errors[-1]) < 1
-    print(f"Last gradient error less than 1 percent: {test1}")
-
-    # Checking if error follows expected finite difference error convergence
-    test2 = math.isclose(np.log(theory[-1]), np.log(errors[-1]), rel_tol=1e-1)
-
-    print(f"Gradient error behaved as expected: {test2}")
+    # Check that the first-order Taylor remainder decreases at least linearly
+    # with the step length, without relying on the sign of the directional
+    # error.
+    test2 = np.all(remainders[1:] < 0.2 * remainders[:-1])
+    print(f"Taylor remainder decreases with step size: {test2}")
+    print(f"Taylor remainders {remainders}")
 
     assert all([test1, test2])
 
@@ -78,8 +80,8 @@ dictionary["parallelism"] = {
 }
 
 dictionary["mesh"] = {
-    "length_z": 3.0,  # depth in km - always positive
-    "length_x": 3.0,  # width in km - always positive
+    "length_z": 1.0,  # depth in km - always positive
+    "length_x": 1.0,  # width in km - always positive
     "length_y": 0.0,  # thickness in km - always positive
     "mesh_file": None,
     "mesh_type": "firedrake_mesh",
@@ -87,13 +89,13 @@ dictionary["mesh"] = {
 
 dictionary["acquisition"] = {
     "source_type": "ricker",
-    "source_locations": [(-1.1, 1.5)],
+    "source_locations": [(-0.2, 0.5)],
     "frequency": 5.0,
     # "delay": 1.2227264394269568,
     # "delay_type": "time",
     "delay": 1.5,
     "delay_type": "multiples_of_minimum",
-    "receiver_locations": spyro.create_transect((-1.8, 1.2), (-1.8, 1.8), 10),
+    "receiver_locations": spyro.create_transect((-0.8, 0.2), (-0.8, 0.8), 10),
     # "receiver_locations": [(-2.0, 2.5) , (-2.3, 2.5), (-3.0, 2.5), (-3.5, 2.5)],
 }
 

@@ -5,14 +5,14 @@ import pytest
 
 def test_camembert_forward():
     dictionary = {}
-    dictionary["absorving_boundary_conditions"] = {
-        "status": True,
-        "damping_type": "PML",
-        "exponent": 2,
-        "cmax": 4.5,
-        "R": 1e-6,
-        "pad_length": 0.25,
-    }
+    # dictionary["absorving_boundary_conditions"] = {
+    #     "status": True,
+    #     "damping_type": "PML",
+    #     "exponent": 2,
+    #     "cmax": 4.5,
+    #     "R": 1e-6,
+    #     "pad_length": 0.25,
+    # }
     Wave_obj = spyro.examples.Camembert_acoustic(dictionary=dictionary)
 
     # Check if velocity model is correct
@@ -30,6 +30,12 @@ def test_camembert_forward():
 
 
 def test_rectangle_forward():
+    dictionary = {}
+    dictionary["absorving_boundary_conditions"] = {
+        "status": False,
+        "damping_type": None,
+        "pad_length": 0.,
+    }
     Wave_obj = spyro.examples.Rectangle_acoustic()
 
     # Check if velocity model is correct

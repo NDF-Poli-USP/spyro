@@ -43,3 +43,20 @@ def create_function_space(mesh, method, degree, dim=1):
         element = VectorElement(element, dim=dim)
 
     return FunctionSpace(mesh, element)
+
+
+def check_function_space_type(function_space):
+    # Check if wave.function_space is a generates vector os scalar fields:
+    if function_space.value_size == 1:
+        return "scalar"
+    elif function_space.value_size > 1:
+        if len(function_space.topological.subspaces) == 1:
+            return "vector"
+        elif len(function_space.topological.subspaces) > 1:
+            return "mixed"
+        else:
+            raise ValueError(
+                f"Function space topology of {function_space.topological} not supported",
+            )
+    else:
+        raise ValueError(f"Function space size of {function_space.value_size} not supported")

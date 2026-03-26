@@ -3,6 +3,8 @@ import spyro
 import segyio
 import numpy as np
 import matplotlib.pyplot as plt
+from firedrake.__future__ import interpolate
+fire.interpolate = interpolate
 
 
 def get_vp_from_2dsegy(filename):
@@ -42,7 +44,7 @@ def test_write_segy_and_smooth(show=False):
 
     c = fire.conditional((x - xc) ** 2 + (y - yc) ** 2 < r**2, 3.0, 1.5)
 
-    vp.interpolate(c)
+    vp.assign(fire.assemble(fire.interpolate(c, V)))
 
     spyro.io.create_segy(vp, V, 10.0/1000.0, segy_file)
     original_vp = get_vp_from_2dsegy(segy_file)
