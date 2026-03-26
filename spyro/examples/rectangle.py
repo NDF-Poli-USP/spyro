@@ -175,7 +175,7 @@ class Rectangle_mesh_and_velocity:
 
         # Add specific attributes for run PML solver
         self.c = self.initial_velocity_model
-        self.c_max = 4.5  # self.c.dat.data_with_halos.max()
+        self.c_max = self.c.dat.data_with_halos.max()
         self.bc_boundary_pml = "Dirichlet"
         self.crit_source = self.sources.point_locations
         self.domain_dim = self.abc_domain_dimensions(only_orig_dom=True)
