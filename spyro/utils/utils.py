@@ -87,7 +87,12 @@ def compute_functional(Wave_object, residual):
 
     J = 0
     for rn in range(num_receivers):
-        J += np.trapezoid(residual[:, rn] ** 2, dx=dt)
+        receiver_residual = np.asarray(residual[:, rn])
+        if receiver_residual.ndim == 1:
+            squared_residual = receiver_residual ** 2
+        else:
+            squared_residual = np.sum(receiver_residual ** 2, axis=-1)
+        J += np.trapezoid(squared_residual, dx=dt)
 
     J *= 0.5
 

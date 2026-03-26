@@ -465,3 +465,18 @@ class Wave(Model_parameters, metaclass=ABCMeta):
     def set_material_property(self, *args, **kwargs):
         """Backward-compatible alias for set_material_properties."""
         return self.set_material_properties(*args, **kwargs)
+
+    def get_control_parameters(self):
+        raise NotImplementedError(
+            f"{type(self).__name__} does not expose inversion control parameters.",
+        )
+
+    def set_control_parameters(self, controls):
+        raise NotImplementedError(
+            f"{type(self).__name__} cannot assign inversion control parameters.",
+        )
+
+    def get_control_parameter_function_space(self):
+        raise NotImplementedError(
+            f"{type(self).__name__} does not define a control parameter function space.",
+        )
