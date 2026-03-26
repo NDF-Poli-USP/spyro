@@ -161,7 +161,7 @@ def get_forward_model(dictionary=None):
 
     # Exact model
     Wave_obj_exact = spyro.AcousticWave(dictionary=dictionary)
-    Wave_obj_exact.set_mesh(input_mesh_parameters={"edge_length": 0.1})
+    Wave_obj_exact.set_mesh(input_mesh_parameters={"edge_length": 0.03})
     cond = fire.conditional(Wave_obj_exact.mesh_z > -0.5, 1.5, 3.5)
     Wave_obj_exact.set_initial_velocity_model(
         conditional=cond,
@@ -173,7 +173,7 @@ def get_forward_model(dictionary=None):
 
     # Guess model
     Wave_obj_guess = spyro.AcousticWave(dictionary=dictionary)
-    Wave_obj_guess.set_mesh(input_mesh_parameters={"edge_length": 0.1})
+    Wave_obj_guess.set_mesh(input_mesh_parameters={"edge_length": 0.03})
     Wave_obj_guess.set_initial_velocity_model(constant=2.0)
     Wave_obj_guess.forward_solve()
     rec_out_guess = Wave_obj_guess.receivers_output
@@ -216,14 +216,9 @@ def test_gradient(PML=False):
 
 
 @pytest.mark.slow
-# @pytest.mark.xfail(
-#     reason="PML gradient error exceeds tolerance — needs investigation "
-#            "into the compatible adjoint that is potentially causing errors.",
-#     strict=False,
-# )
 def test_gradient_pml():
     return test_gradient(PML=True)
 
 
 if __name__ == "__main__":
-    test_gradient(PML=True)
+    test_gradient_pml()

@@ -89,17 +89,17 @@ dictionary["mesh"] = {
 
 dictionary["acquisition"] = {
     "source_type": "ricker",
-    "source_locations": [(-0.1, 0.5)],
+    "source_locations": [(-0.2, 0.5)],
     "frequency": 5.0,
     "delay": 1.5,
     "delay_type": "multiples_of_minimum",
-    "receiver_locations": spyro.create_transect((-0.8, 0.1), (-0.8, 0.9), 10),
+    "receiver_locations": spyro.create_transect((-0.8, 0.2), (-0.8, 0.8), 10),
 }
 
 dictionary["time_axis"] = {
     "initial_time": 0.0,  # Initial time for event
     "final_time": final_time,  # Final time for event
-    "dt": 0.0002,  # timestep size
+    "dt": 0.0005,  # timestep size
     "amplitude": 1,  # the Ricker has an amplitude of 1.
     "output_frequency": 100,  # how frequently to output solution to pvds
     "gradient_sampling_frequency": 1,  # how frequently to save solution to RAM
