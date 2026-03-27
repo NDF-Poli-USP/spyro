@@ -155,6 +155,6 @@ class Read_boundary_layer:
             value = 0.
             self.abc_user_pad_len = False
 
-        print(f"Pad length provided by user (km): {value}", flush=True)
+        print(f"Pad length provided by user (km): {value:.4f}", flush=True)
 
         self._abc_pad_length = value

@@ -1,0 +1,101 @@
+# Install py-spy
+pip install py-spy
+
+# Install memory_profiler
+pip install memory_profiler
+
+# Clone flamegraph to /opt
+git clone https://github.com/brendangregg/FlameGraph.git /opt/FlameGraph
+
+# Create a symlink in /usr/local/bin
+ln -s /opt/FlameGraph/flamegraph.pl /usr/local/bin/flamegraph.pl
+
+# Using pyinstrument (native in python) for general profiling (Plot type: Tree, i option is sample frequency)
+pyinstrument -i 0.05 -r pyisession -o pml_session.pyisession tests/on_one_core/test_pml.py
+pyinstrument --load pml_session.pyisession -r html -o pml_profile.html
+pyinstrument --load pml_session.pyisession -r text -o pml_profile.txt
+
+# Using py-spy (requires installation and flamegraph) for general profiling (Plot type: Flame graph)
+py-spy record -o prof_gral_pml.txt --format raw --native --rate 10 -- python3 tests/on_one_core/test_pml.py
+flamegraph.pl --countname us prof_gral_pml.txt > prof_gral_pml.svg
+
+# Run your script for PETSc (requires flamegraph)  profiling (us: microseconds)
+python3 tests/on_one_core/test_pml.py -log_view :pml_prof.txt:ascii_flamegraph
+flamegraph.pl --countname us pml_prof.txt > pml_prof.svg
+
+# Usign mprof (requires memory_profiler) for memory usage
+mprof run python3 tests/on_one_core/test_pml.py && mprof plot -o pml_mem_prof.png
+
+===============================================================================================================
+Total Memory (mprof) = Python heap (tracemalloc) +:
+                       - C extensions memory (PETSc, Firedrake, NumPy)
+                       - Memory mapped files
+                       - Shared libraries
+                       - Stack memory
+                       - Overhead
+
+py-spy does not work in parallel
+mprof works in parallel with $ mprof run --include-children mpiexec -n 4 python3 tests/on_one_core/test_pml.py && mprof plot -o pml_mem_prof.png
+
+Method 1: Using the Python API (Recommended)
+Create a script that profiles both CPU time and memory in a single run:
+
+#!/usr/bin/env python3
+# save as combined_profile.py
+
+from pyinstrument import Profiler
+from memory_profiler import profile
+import sys
+import tests.on_one_core.test_pml  # Your test module
+
+# Memory profiling - use decorator on specific functions
+@profile
+def run_with_memory_profile():
+    # Call your actual test function here
+    tests.on_one_core.test_pml.test_pml_2d()
+
+# CPU/Time profiling with pyinstrument
+profiler = Profiler(interval=0.05)  # 20 Hz sampling
+profiler.start()
+
+# Run the memory-profiled function
+run_with_memory_profile()
+
+profiler.stop()
+
+# Save CPU profile
+with open('cpu_profile.html', 'w') as f:
+    f.write(profiler.output_html())
+with open('cpu_profile.txt', 'w') as f:
+    f.write(profiler.output_text())
+
+print("CPU profile saved to cpu_profile.html and cpu_profile.txt")
+print("Memory profile output will appear above")
+
+
+
+from pyinstrument import Profiler
+from memory_profiler import memory_usage
+import sys
+import tests.on_one_core.test_pml
+
+# Start CPU profiler
+profiler = Profiler(interval=0.05)
+profiler.start()
+
+# Track memory usage
+def run_test():
+    tests.on_one_core.test_pml.test_pml_2d()
+
+mem_usage = memory_usage(run_test, interval=0.1, include_children=True)
+
+profiler.stop()
+
+# Save CPU profile
+with open('cpu_profile.html', 'w') as f:
+    f.write(profiler.output_html())
+
+# Save memory data
+with open('memory_usage.txt', 'w') as f:
+    f.write(f"Peak memory: {max(mem_usage):.2f} MiB\n")
+    f.write(f"Average memory: {sum(mem_usage)/len(mem_usage):.2f} MiB\n")

@@ -484,7 +484,7 @@ def test_pml_3d():
 # Applying HABCs to the model in Fig. 8 of Salas et al. (2022)
 if __name__ == "__main__":
     test_pml_2d()
-    test_pml_3d()
+    # test_pml_3d()
 
 
 '''
