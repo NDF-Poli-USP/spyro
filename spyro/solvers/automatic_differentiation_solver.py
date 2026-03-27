@@ -66,6 +66,8 @@ class AutomatedAdjoint:
                 "No adjoint tape is available. Use fresh_tape() or set a "
                 "working tape before creating the reduced functional."
             )
+        else:
+            set_working_tape(self._tape)
         self._functional = functional
         controls = [
             fire_adj.Control(control)
@@ -122,8 +124,10 @@ class AutomatedAdjoint:
 
     def clear_tape(self):
         """Clear the stored tape and drop the reduced functional."""
+        pause_annotation()
         if self._tape is not None:
             self._tape.clear_tape()
+        set_working_tape(Tape())
         self._functional = None
         self._tape = None
         self._reduced_functional = None
@@ -135,7 +139,8 @@ class AutomatedAdjoint:
     def start_recording(self):
         """Start recording operations on the adjoint tape."""
         if self._tape is None:
-            self._tape = get_working_tape()
+            self._tape = Tape()
+        set_working_tape(self._tape)
         if self._tape is None:
             raise RuntimeError(
                 "No adjoint tape is available. Use fresh_tape() or set a "

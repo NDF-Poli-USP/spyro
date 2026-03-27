@@ -102,17 +102,26 @@ def central_difference(wave, source_ids=None):
             for t in range(nt)
             if t % wave.gradient_sampling_frequency == 0
         ]
-    use_vertex_only_source_shape = (
-        wave.use_vertex_only_mesh
-        and adjoint_type == AdjointType.AUTOMATED_ADJOINT
-        and wave.number_of_sources == 1
-    )
     vertex_only_source_shape = None
     if wave.use_vertex_only_mesh:
-        if use_vertex_only_source_shape:
-            vertex_only_source_shape = wave.sources.source_cofunction()
-        else:
-            wave.source_cofunction.assign(wave.sources.source_cofunction())
+        if wave.sources is not None:
+            if not (
+                adjoint_type == AdjointType.AUTOMATED_ADJOINT
+                and wave.number_of_sources > 1
+            ):
+                wave.source_cofunction.assign(wave.sources.source_cofunction())
+
+            # Keep an immutable copy of the active VOM source shape for this
+            # solve. The timestep loop rescales ``wave.source_cofunction`` by
+            # the wavelet amplitude, so reusing that object as the multiplier
+            # would compound source amplitudes across timesteps. In automated
+            # serial multi-source mode, the copy is taken from the active
+            # ``wave.source_cofunction`` control so reduced-functional replays
+            # can still refresh the source shape between shots.
+            vertex_only_source_shape = fire.Cofunction(
+                wave.function_space.dual()
+            )
+            vertex_only_source_shape.assign(wave.source_cofunction)
         interpolate_receivers = wave.receivers.receiver_interpolator(
             wave.vstate)
     if adjoint_type == AdjointType.AUTOMATED_ADJOINT:
@@ -126,15 +135,15 @@ def central_difference(wave, source_ids=None):
     for step in range(nt):
         wave.update_source_expression(t)
         if wave.sources is not None:
-            if use_vertex_only_source_shape:
+            if wave.use_vertex_only_mesh:
                 wave.rhs_no_pml_source().assign(fire.assemble(
                     wave.sources.wavelet[step] * vertex_only_source_shape))
-            elif wave.use_vertex_only_mesh:
-                wave.rhs_no_pml_source().assign(fire.assemble(
-                    wave.sources.wavelet[step] * wave.source_cofunction))
             else:
                 wave.rhs_no_pml_source().assign(
-                    wave.sources.apply_source(wave.source_cofunction, step))
+                    wave.sources.apply_source(
+                        wave.rhs_no_pml_source(),
+                        step,
+                    ))
         wave.solver.solve()
 
         wave.prev_vstate = wave.vstate

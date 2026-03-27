@@ -408,6 +408,7 @@ class FullWaveformInversion(AcousticWave):
         self.real_shot_record = None
         self.optimisation_library = OptmisationLibrary.SCIPY
         self.iteration = None
+        self._mass_diagonal = None
 
     @property
     def real_velocity_model_file(self):
@@ -832,6 +833,28 @@ class FullWaveformInversion(AcousticWave):
 
         return Jm
 
+    def _gradient_to_derivative(self, gradient):
+        """Convert an L2 Riesz gradient to the Euclidean derivative.
+
+        The implemented adjoint solves ``M g = R`` and stores the L2 gradient
+        ``g`` in function space. SciPy expects the coefficient-space derivative
+        ``R`` instead, so we apply the lumped mass diagonal element-wise.
+        """
+        if self._mass_diagonal is None:
+            V = self.function_space
+            u = fire.TrialFunction(V)
+            v = fire.TestFunction(V)
+            ones = fire.Function(V)
+            ones.assign(1.0)
+            mass_form = fire.inner(u, v) * fire.dx(**self.quadrature_rule)
+            self._mass_diagonal = fire.assemble(fire.action(mass_form, ones))
+
+        derivative = fire.Function(self.function_space)
+        derivative.dat.data[:] = (
+            gradient.dat.data_ro[:] * self._mass_diagonal.dat.data_ro[:]
+        )
+        return derivative
+
     def get_gradient(self, c=None, save=True, calculate_functional=True):
         """
         Calculate the gradient of the objective functional.
@@ -914,6 +937,20 @@ class FullWaveformInversion(AcousticWave):
             "Unsupported optimization library for automated adjoint."
         )
 
+    def _copy_optimizer_gradient(self, gradient):
+        """Return a writable copy of an optimizer-space gradient object."""
+        if self.optimisation_library is OptmisationLibrary.SCIPY:
+            gradient_copy = fire.Cofunction(self.function_space.dual())
+        elif self.optimisation_library is OptmisationLibrary.ROL:
+            gradient_copy = fire.Function(self.function_space)
+        else:
+            raise ValueError(
+                "Unsupported optimization library for automated adjoint."
+            )
+
+        gradient_copy.assign(gradient)
+        return gradient_copy
+
     def _get_automated_adjoint_controls(
         self,
         c_function,
@@ -949,6 +986,7 @@ class FullWaveformInversion(AcousticWave):
             return controls
 
         self.sources.current_sources = [source_number]
+        self.current_sources = [source_number]
         if self.source_cofunction is None:
             self.source_cofunction = fire.Cofunction(
                 self.function_space.dual()
@@ -1014,7 +1052,8 @@ class FullWaveformInversion(AcousticWave):
             )
             self.functional_value = total_functional
 
-        gradient_data = self._get_automated_adjoint_gradient_data()
+        self._get_automated_adjoint_gradient_data()
+        total_gradient = self._copy_optimizer_gradient(self.gradient)
 
         if serial_multi_source:
             for snum in range(1, self.number_of_sources):
@@ -1026,16 +1065,20 @@ class FullWaveformInversion(AcousticWave):
                 total_functional += self.automated_adjoint.recompute_functional(
                     source_controls
                 )
-                gradient_data += self._get_automated_adjoint_gradient_data()
+                self._get_automated_adjoint_gradient_data()
+                total_gradient.dat.data[:] += self.gradient.dat.data_ro[:]
 
             # Restore the default source so later solves start from the same
             # taped baseline configuration used for source 0.
             self.sources.current_sources = [0]
+            self.current_sources = [0]
 
         self.functional_value = total_functional
+        self.gradient = total_gradient
+        self._apply_gradient_mask()
         self.iteration = 0 if first_iteration else self.iteration + 1
         self.functional_history.append(total_functional)
-        return self.functional_value, gradient_data
+        return self.functional_value, self.gradient.dat.data_ro.copy()
 
     def return_functional_and_gradient(self, c):
         """
@@ -1059,9 +1102,13 @@ class FullWaveformInversion(AcousticWave):
         """
         if self.input_dictionary["inversion"]["automated_adjoint"]:
             return self._run_automated_adjoint_functional_and_gradient(c)
-        
+
         self.get_gradient(c=c)
-        dJ = self.gradient.dat.data[:]
+        if self.optimisation_library is OptmisationLibrary.SCIPY:
+            derivative = self._gradient_to_derivative(self.gradient)
+            dJ = derivative.dat.data_ro.copy()
+        else:
+            dJ = self.gradient.dat.data_ro.copy()
         return self.functional_value, dJ
 
     def run_fwi(self, **kwargs):

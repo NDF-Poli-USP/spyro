@@ -352,7 +352,6 @@ def ensemble_gradient(func):
                             )
                 grad_total += grad
 
-            grad_total /= num
             comm.comm.barrier()
 
             return grad_total

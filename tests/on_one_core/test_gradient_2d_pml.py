@@ -173,7 +173,7 @@ def get_forward_model(dictionary=None):
     Wave_obj_guess.set_mesh(input_mesh_parameters={"edge_length": 0.03})
     Wave_obj_guess.set_initial_velocity_model(constant=2.0)
     Wave_obj_guess.real_shot_record = rec_out_exact
-    Wave_obj_guess.enable_spyro_adjoint()
+    Wave_obj_guess.enable_implemented_adjoint()
     Wave_obj_guess.forward_solve()
 
     return Wave_obj_guess
