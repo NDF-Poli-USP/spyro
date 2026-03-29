@@ -448,6 +448,7 @@ def loop_modal(parameters, dictionary, degree_layer_lst,
                         f"raised an exception: {str(e)}")
 
 
+@pytest.mark.slow
 @pytest.mark.parametrize("homogeneous", [True, False])
 def test_loop_modal_2d(homogeneous):
     '''
@@ -526,6 +527,7 @@ def test_loop_modal_2d(homogeneous):
                expect_values_lst, 2, homogeneous, modal_solver_lst)
 
 
+@pytest.mark.slow
 @pytest.mark.parametrize("homogeneous", [True, False])
 def test_loop_modal_3d_with_Tele(homogeneous):
     '''
@@ -607,6 +609,7 @@ def test_loop_modal_3d_with_Tele(homogeneous):
                expect_values_lst, 3, homogeneous, modal_solver_lst)
 
 
+@pytest.mark.slow
 @pytest.mark.parametrize("homogeneous", [True, False])
 def test_loop_modal_3d_with_Qele(homogeneous):
     '''
