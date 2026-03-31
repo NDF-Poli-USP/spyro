@@ -174,11 +174,11 @@ class HABC_Wave(AcousticWave, HABC_Mesh, RectangLayer,
         self.f_Nyq = 1. / (2. * self.dt)
 
         # Original domain dimensions
-        dom_dim = self.habc_domain_dimensions(only_orig_dom=True)
+        domain_dim = self.habc_domain_dimensions(only_orig_dom=True)
 
         # Initializing the Mesh class
         HABC_Mesh.__init__(
-            self, dom_dim, dimension=self.dimension,
+            self, domain_dim, dimension=self.dimension,
             quadrilateral=self.mesh_parameters.quadrilateral, comm=self.comm)
 
         # Identifier for the current case study
@@ -202,7 +202,7 @@ class HABC_Wave(AcousticWave, HABC_Mesh, RectangLayer,
         '''
 
         # Original domain dimensions
-        dom_dim = self.habc_domain_dimensions(only_orig_dom=True)
+        domain_dim = self.habc_domain_dimensions(only_orig_dom=True)
 
         # Layer shape
         self.layer_shape = self.abc_boundary_layer_shape
@@ -212,13 +212,13 @@ class HABC_Wave(AcousticWave, HABC_Mesh, RectangLayer,
         if self.layer_shape == 'rectangular':  # Rectangular layer
 
             # Initializing the rectangular layer
-            RectangLayer.__init__(self, dom_dim, dimension=self.dimension)
+            RectangLayer.__init__(self, domain_dim, dimension=self.dimension)
             self.case_habc = 'REC'  # Label
 
         elif self.layer_shape == 'hypershape':  # Hypershape layer
 
             # Initializing the hyperelliptical layer
-            HyperLayer.__init__(self, dom_dim, n_hyp=self.abc_deg_layer,
+            HyperLayer.__init__(self, domain_dim, n_hyp=self.abc_deg_layer,
                                 n_type=self.abc_degree_type,
                                 dimension=self.dimension)
 
@@ -258,7 +258,7 @@ class HABC_Wave(AcousticWave, HABC_Mesh, RectangLayer,
                             output_case=self.path_case_habc)
 
         # Initializing the NRBC class
-        NRBC.__init__(self, dom_dim, self.layer_shape,
+        NRBC.__init__(self, domain_dim, self.layer_shape,
                       dimension=self.dimension,
                       output_folder=self.path_case_habc)
 
@@ -374,7 +374,7 @@ class HABC_Wave(AcousticWave, HABC_Mesh, RectangLayer,
 
         Returns
         -------
-        dom_dim : `tuple`
+        domain_dim : `tuple`
             Original domain dimensions: (Lx, Lz) for 2D or (Lx, Lz, Ly) for 3D
         dom_lay : `tuple`
             Domain dimensions with layer. For rectangular layers, truncation
@@ -386,13 +386,13 @@ class HABC_Wave(AcousticWave, HABC_Mesh, RectangLayer,
         '''
 
         # Original domain dimensions
-        dom_dim = (self.mesh_parameters.length_x,
-                   self.mesh_parameters.length_z)
+        domain_dim = (self.mesh_parameters.length_x,
+                      self.mesh_parameters.length_z)
         if self.dimension == 3:  # 3D
-            dom_dim += (self.mesh_parameters.length_y,)
+            domain_dim += (self.mesh_parameters.length_y,)
 
         if only_orig_dom:
-            return dom_dim
+            return domain_dim
 
         # Domain dimension with layer w/ or w/o truncations
         if self.layer_shape == 'rectangular':  # Rectangular layer
@@ -409,7 +409,7 @@ class HABC_Wave(AcousticWave, HABC_Mesh, RectangLayer,
         if only_habc_dom:
             return dom_lay
 
-        return dom_dim, dom_lay
+        return domain_dim, dom_lay
 
     def size_habc_criterion(self, fpad=4, n_root=1, layer_based_on_mesh=True):
         '''
@@ -754,7 +754,7 @@ class HABC_Wave(AcousticWave, HABC_Mesh, RectangLayer,
             hyp_par = (self.n_hyp, *self.hyper_axes)
 
             # Cut plane at free surface
-            Lz = self.dom_dim[1]
+            Lz = self.domain_dim[1]
             z_cut = Lz / 2.
 
             # Cut plane percentage
@@ -789,7 +789,7 @@ class HABC_Wave(AcousticWave, HABC_Mesh, RectangLayer,
 
             # Normalized coordinates
             coord_norm = mod_sol.generate_norm_coords(self.mesh,
-                                                      self.dom_dim,
+                                                      self.domain_dim,
                                                       self.hyper_axes)
 
             Lsp = mod_sol.solve_eigenproblem(self.c, V=self.function_space,
