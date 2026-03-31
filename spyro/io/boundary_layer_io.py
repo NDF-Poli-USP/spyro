@@ -144,7 +144,7 @@ class Read_boundary_layer:
         None
         """
 
-        if isinstance(value, (int, float)) and value <= 0:
+        if isinstance(value, (int, float)) and value < 0:
             raise ValueError("Pad length must be positive")
 
         self.abc_user_pad_len = True
