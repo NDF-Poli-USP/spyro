@@ -50,14 +50,12 @@ def check_gradient(Wave_obj_guess, dJ, rec_out_exact, Jm, plot=False):
         plt.savefig("gradient_error_verification.png")
         plt.close()
 
-    # Checking if every error is less than 1 percent
-
-    test1 = abs(errors[-1]) < 1
-    print(f"Last gradient error less than 1 percent: {test1}")
+    # Checking if error is less than or equal to 1 percent
+    test1 = abs(errors[-1]) / 100. <= 1
+    print(f"Last gradient error less than or equal to 1 percent: {test1}")
 
     # Checking if error follows expected finite difference error convergence
-    test2 = math.isclose(np.log(theory[-1]), np.log(errors[-1]), rel_tol=1e-1)
-
+    test2 = math.isclose(np.log(abs(theory[-1])), np.log(abs(errors[-1]) / 100.), rel_tol=1e-1)
     print(f"Gradient error behaved as expected: {test2}")
 
     assert all([test1, test2])

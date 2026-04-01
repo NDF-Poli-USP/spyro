@@ -37,7 +37,7 @@ def test_initialize_model_parameters_from_object_missing_parameters():
     synthetic_dict = {
         "type": "object",
     }
-    wave = IsotropicWave(dummy_dict)
+    wave = IsotropicWave(dummy_dict, empty_set_property=True)
     with pytest.raises(Exception) as e:  # noqa: F841
         wave.initialize_model_parameters_from_object(synthetic_dict)
 
@@ -49,7 +49,7 @@ def test_initialize_model_parameters_from_object_first_option():
         "lambda": 2,
         "mu": 3,
     }
-    wave = IsotropicWave(dummy_dict)
+    wave = IsotropicWave(dummy_dict, empty_set_property=True)
     wave.initialize_model_parameters_from_object(synthetic_dict)
 
 
@@ -60,7 +60,7 @@ def test_initialize_model_parameters_from_object_second_option():
         "p_wave_velocity": 2,
         "s_wave_velocity": 3,
     }
-    wave = IsotropicWave(dummy_dict)
+    wave = IsotropicWave(dummy_dict, empty_set_property=True)
     wave.initialize_model_parameters_from_object(synthetic_dict)
 
 
@@ -73,7 +73,7 @@ def test_initialize_model_parameters_from_object_redundant():
         "p_wave_velocity": 2,
         "s_wave_velocity": 3,
     }
-    wave = IsotropicWave(dummy_dict)
+    wave = IsotropicWave(dummy_dict, empty_set_property=True)
     with pytest.raises(Exception) as e:  # noqa: F841
         wave.initialize_model_parameters_from_object(synthetic_dict)
 
@@ -93,7 +93,7 @@ def test_parse_boundary_conditions():
         ("ux", 3, fire.Constant(3)),         # y == 0:  3 (x in spyro)
         ("uy", 4, fire.Constant(4)),         # y == Ly: 4 (x in spyro)
     ]
-    wave = IsotropicWave(d)
+    wave = IsotropicWave(d, empty_set_property=True)
     wave.set_mesh(input_mesh_parameters={"edge_length": 0.2, "periodic": True})
     wave.parse_boundary_conditions()
     u = fire.Function(wave.function_space)
@@ -118,7 +118,7 @@ def test_parse_boundary_conditions_exception():
     d["boundary_conditions"] = [
         ("?", 2, fire.Constant(2)),
     ]
-    wave = IsotropicWave(d)
+    wave = IsotropicWave(d, empty_set_property=True)
     wave.set_mesh(input_mesh_parameters={"edge_length": 0.2, "periodic": True})
     with pytest.raises(Exception) as e:  # noqa: F841
         wave.parse_boundary_conditions()
@@ -128,7 +128,7 @@ def test_initialize_model_parameters_from_file_notimplemented():
     synthetic_dict = {
         "type": "file",
     }
-    wave = IsotropicWave(dummy_dict)
+    wave = IsotropicWave(dummy_dict, empty_set_property=True)
     with pytest.raises(NotImplementedError) as e:  # noqa: F841
         wave.initialize_model_parameters_from_file(synthetic_dict)
 
