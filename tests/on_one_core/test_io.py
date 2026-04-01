@@ -88,6 +88,7 @@ def test_saving_and_loading_shot_record():
     wave_obj_saving = spyro.AcousticWave(dictionary=dictionary)
     wave_obj_saving.set_mesh(input_mesh_parameters={"edge_length": 0.02})
     wave_obj_saving.set_initial_velocity_model(constant=1.5)
+    wave_obj_saving.c = wave_obj_saving.initial_velocity_model
     wave_obj_saving.forward_solve()
     spyro.io.save_shots(wave_obj_saving, file_name="test_shot_record")
 

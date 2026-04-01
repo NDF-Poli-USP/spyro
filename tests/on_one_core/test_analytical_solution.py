@@ -47,6 +47,7 @@ def test_analytical_solution(use_vertex_only_mesh):
     )
 
     time_vector = np.linspace(0.0, 1.0, int(1.0 / Wave_obj.dt) + 1)
+    Wave_obj.c = Wave_obj.initial_velocity_model
     Wave_obj.forward_solve()
     numerical_p = Wave_obj.receivers_output
     numerical_p = numerical_p.flatten()

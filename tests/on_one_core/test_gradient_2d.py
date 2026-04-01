@@ -129,6 +129,7 @@ def get_forward_model(load_true=False):
             conditional=cond,
             # output=True
         )
+        Wave_obj_exact.c = Wave_obj_exact.initial_velocity_model
         spyro.plots.plot_model(Wave_obj_exact, abc_points=[(-1, 1), (-2, 1), (-2, 4), (-1, 2)])
         Wave_obj_exact.forward_solve()
         # forward_solution_exact = Wave_obj_exact.forward_solution
@@ -141,6 +142,7 @@ def get_forward_model(load_true=False):
     Wave_obj_guess = spyro.AcousticWave(dictionary=dictionary)
     Wave_obj_guess.set_mesh(input_mesh_parameters={"edge_length": 0.1})
     Wave_obj_guess.set_initial_velocity_model(constant=2.0)
+    Wave_obj_guess.c = Wave_obj_guess.initial_velocity_model
     Wave_obj_guess.forward_solve()
     rec_out_guess = Wave_obj_guess.receivers_output
 

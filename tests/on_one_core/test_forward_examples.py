@@ -23,6 +23,7 @@ def test_camembert_forward():
     test2 = math.isclose(c_outside_center, c_wave.at(-0.1, 0.5))
 
     # Check if forward solve runs
+    Wave_obj.c = Wave_obj.initial_velocity_model
     Wave_obj.forward_solve()
     test3 = True
 
@@ -51,6 +52,7 @@ def test_rectangle_forward():
     test2 = math.isclose(c2, c_wave.at(-0.6, 0.5))
 
     # Check if forward solve runs
+    Wave_obj.c = Wave_obj.initial_velocity_model
     Wave_obj.forward_solve()
     test3 = True
 
@@ -89,6 +91,7 @@ def test_immersed_polygon_forward():
     test2 = math.isclose(2.5, c_wave.at(-0.5, 0.1))
 
     # Check if forward solve runs
+    Wave_obj.c = Wave_obj.initial_velocity_model
     Wave_obj.forward_solve()
     test3 = True
 
