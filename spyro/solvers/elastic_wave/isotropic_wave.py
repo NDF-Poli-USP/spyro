@@ -14,14 +14,15 @@ from ...domains.space import create_function_space
 class IsotropicWave(ElasticWave):
     '''Isotropic elastic wave propagator'''
 
-    def __init__(self, dictionary, comm=None):
+    def __init__(self, dictionary, empty_set_property=False, comm=None):
         super().__init__(dictionary, comm=comm)
 
         self.wave_type = WaveType.ISOTROPIC_ELASTIC
         self.rho = None   # Density
         self.lmbda = None  # First Lame parameter
         self.mu = None    # Second Lame parameter
-        self.c_s = None   # Secondary wave velocity
+        self.c = None     # P-wave velocity
+        self.c_s = None   # S-wave velocity
 
         self.u_n = None   # Current displacement field
         self.u_nm1 = None  # Displacement field in previous iteration
@@ -50,7 +51,8 @@ class IsotropicWave(ElasticWave):
         self.field_logger.add_functional("mechanical_energy",
                                          lambda: assemble(self.mechanical_energy))
 
-        self._initialize_model_parameters()
+        if not empty_set_property:
+            self._initialize_model_parameters()
 
     @override
     def initialize_model_parameters_from_object(self, synthetic_data_dict: dict):

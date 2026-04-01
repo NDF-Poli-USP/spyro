@@ -120,7 +120,7 @@ def wave_instance(cell_type):
     dictionary = wave_dict(cell_type, domain_dim, tf_usu, dt_usu)
 
     # Create a wave object
-    Wave_obj = IsotropicWave(dictionary)
+    Wave_obj = IsotropicWave(dictionary, empty_set_property=True)
 
     # Mesh
     Wave_obj.set_mesh(input_mesh_parameters={"edge_length": edge_length})
