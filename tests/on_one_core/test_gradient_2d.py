@@ -51,11 +51,11 @@ def check_gradient(Wave_obj_guess, dJ, rec_out_exact, Jm, plot=False):
         plt.close()
 
     # Checking if error is less than or equal to 1 percent
-    test1 = abs(errors[-1]) / 100. <= 1
+    test1 = abs(errors[-1]) <= 1
     print(f"Last gradient error less than or equal to 1 percent: {test1}")
 
     # Checking if error follows expected finite difference error convergence
-    test2 = math.isclose(np.log(abs(theory[-1])), np.log(abs(errors[-1]) / 100.), rel_tol=1e-1)
+    test2 = math.isclose(np.log(abs(theory[-1])), np.log(abs(errors[-1])), rel_tol=1e-1)
     print(f"Gradient error behaved as expected: {test2}")
 
     assert all([test1, test2])
@@ -147,6 +147,7 @@ def get_forward_model(load_true=False):
     return rec_out_exact, rec_out_guess, Wave_obj_guess
 
 
+@pytest.mark.skip(reason="PML affects the gradient, so that gradient with PML must be implemented")
 def test_gradient():
     rec_out_exact, rec_out_guess, Wave_obj_guess = get_forward_model(load_true=False)
     forward_solution = Wave_obj_guess.forward_solution

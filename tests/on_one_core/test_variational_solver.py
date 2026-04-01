@@ -33,7 +33,10 @@ def wrapper_for_pml_methods(wave):
 
     Parameters
     ----------
-    None
+    wave : PMLWave
+        A wave object created with the example scripts, with the PML
+        parameters specified in the dictionary.
+
 
     Returns
     -------

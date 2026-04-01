@@ -3,6 +3,7 @@ import time as timinglib
 import copy
 from .input_models import create_initial_model_for_meshing_parameter
 import spyro
+from spyro.pml.pml_nsnc import PML_Wave
 
 
 class Meshing_parameter_calculator:
@@ -222,7 +223,7 @@ class Meshing_parameter_calculator:
         """
         dictionary = create_initial_model_for_meshing_parameter(self)
         self.initial_dictionary = dictionary
-        return spyro.AcousticWave(dictionary)
+        return PML_Wave(dictionary)
 
     def get_reference_solution(self):
         """
@@ -254,7 +255,6 @@ class Meshing_parameter_calculator:
             the reference solution
         """
         Wave_obj = self.build_current_object(self.cpw_reference, degree=self.reference_degree)
-
         Wave_obj.forward_solve()
         p_receivers = Wave_obj.forward_solution_receivers
 
@@ -385,6 +385,33 @@ class Meshing_parameter_calculator:
 
         return cpw - dif
 
+    @staticmethod
+    def wrapper_for_pml_methods(Wave_obj):
+        '''
+        Adds specific attributes and methods to the Wave_obj when simple models
+        are creted with the example scripts, to allow them to run the PML solver.
+
+        Parameters
+        ----------
+        Wave_obj : spyro.PMLWave
+            The wave object to which the attributes and methods will be added
+
+        Returns
+        -------
+        None
+        '''
+
+        # Add specific attributes for run PML solver
+        Wave_obj.c = Wave_obj.initial_velocity_model
+        Wave_obj.c_max = Wave_obj.c.dat.data_with_halos.max()
+        Wave_obj.bc_boundary_pml = "Neumann"
+        Wave_obj.crit_source = Wave_obj.sources.point_locations
+        Wave_obj.domain_dim = Wave_obj.abc_domain_dimensions(only_orig_dom=True)
+
+        # Building the PML layer (damping and BCs)
+        Wave_obj.representative_mesh_dimensions()
+        Wave_obj.pml_layer()
+
     def build_current_object(self, cpw, degree=None):
         """
         Builds the current acoustic wave solver object.
@@ -405,7 +432,7 @@ class Meshing_parameter_calculator:
         dictionary["mesh"]["cells_per_wavelength"] = cpw
         if degree is not None:
             dictionary["options"]["degree"] = degree
-        Wave_obj = spyro.AcousticWave(dictionary)
+        Wave_obj = PML_Wave(dictionary)
         if self.velocity_profile_type == "homogeneous":
             lba = self.minimum_velocity / self.source_frequency
             edge_length = lba / cpw
@@ -413,6 +440,8 @@ class Meshing_parameter_calculator:
             Wave_obj.set_initial_velocity_model(constant=self.minimum_velocity)
         elif self.velocity_profile_type == "heterogeneous":
             Wave_obj.set_mesh(input_mesh_parameters={"cells_per_wavelength": cpw})
+        self.wrapper_for_pml_methods(Wave_obj)
+
         return Wave_obj
 
     def _saving_file(self, savetxt, info):
