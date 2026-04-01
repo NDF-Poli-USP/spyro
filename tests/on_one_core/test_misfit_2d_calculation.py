@@ -94,7 +94,6 @@ def test_misfit_2d():
         expression="4.0 + 1.0 * tanh(10.0 * (0.5 - sqrt((x - 1.5) ** 2 + (z + 1.5) ** 2)))",
     )
     FWI_obj.generate_real_shot_record()
-
     FWI_obj.set_guess_mesh(input_mesh_parameters={"edge_length": 0.05})
     FWI_obj.set_guess_velocity_model(constant=4.0)
     misfit = FWI_obj.calculate_misfit()

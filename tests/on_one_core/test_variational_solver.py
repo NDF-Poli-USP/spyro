@@ -6,6 +6,7 @@ import spyro
 
 from spyro.solvers.elastic_wave.isotropic_wave import IsotropicWave
 from .model import dictionary as acoustic_model
+from spyro.pml.pml_nsnc import PML_Wave
 
 
 def test_mass_matrix_diagonal_from_lhs():
@@ -23,6 +24,32 @@ def test_mass_matrix_diagonal_from_lhs():
     diagonal = wave.get_mass_matrix_diagonal()
     assert diagonal.size > 0
     assert np.all(diagonal > 0.0)
+
+
+def wrapper_for_pml_methods(wave):
+    '''
+    Adds specific attributes and methods to the Wave_obj when simple models
+    are creted with the example scripts, to allow them to run the PML solver.
+
+    Parameters
+    ----------
+    None
+
+    Returns
+    -------
+    None
+    '''
+
+    # Add specific attributes for run PML solver
+    wave.c = wave.initial_velocity_model
+    wave.c_max = wave.c.dat.data_with_halos.max()
+    wave.bc_boundary_pml = "Dirichlet"
+    wave.crit_source = wave.sources.point_locations
+    wave.domain_dim = wave.abc_domain_dimensions(only_orig_dom=True)
+
+    # Building the PML layer (damping and BCs)
+    wave.representative_mesh_dimensions()
+    wave.pml_layer()
 
 
 def test_pml_3d_matrix_building_variational_setup():
@@ -74,13 +101,14 @@ def test_pml_3d_matrix_building_variational_setup():
         },
     }
 
-    wave = spyro.AcousticWave(dictionary=model)
+    wave = PML_Wave(dictionary=model)
     wave.set_mesh(input_mesh_parameters={"edge_length": 0.5})
     wave.length_x = wave.mesh_parameters.length_x
     wave.length_y = wave.mesh_parameters.length_y
     wave.length_z = wave.mesh_parameters.length_z
     wave.set_initial_velocity_model(constant=1.5)
     wave._initialize_model_parameters()
+    wrapper_for_pml_methods(wave)
     wave.matrix_building()
 
     assert isinstance(wave.solver, fire.LinearVariationalSolver)

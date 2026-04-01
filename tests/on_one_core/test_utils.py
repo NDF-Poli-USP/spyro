@@ -20,7 +20,10 @@ def test_butter_lowpast_filter():
     # Checks if frequency with greater power density is close to 5
     (f, S) = sp.signal.periodogram(rec10, fs)
     peak_frequency = f[np.argmax(S)]
-    test1 = math.isclose(peak_frequency, 5.0, rel_tol=1e-1)
+    max80 = np.max(S) * 0.8
+    max80_idx = np.where(S >= max80)[0]
+    max80_freq = f[max80_idx]
+    test1 = (max80_freq.min() - 0.01 <= 5.0 <= max80_freq.max() + 0.01)
 
     # Checks if the new frequency is lower than the cutoff
     cutoff_frequency = 3.0
