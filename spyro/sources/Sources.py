@@ -69,7 +69,7 @@ class Sources(Delta_projector):
 
         self.point_locations = wave_object.source_locations
         self.number_of_points = wave_object.number_of_sources
-        self.amplitude = wave_object.amplitude
+        self.amplitude = self._normalize_amplitude(wave_object.amplitude)
         self.is_local = [0] * self.number_of_points
         self.current_sources = None
         self.update_wavelet(wave_object)
@@ -77,6 +77,12 @@ class Sources(Delta_projector):
             self.build_maps(order=0)
         else:
             self.build_maps(order=1)
+
+    @staticmethod
+    def _normalize_amplitude(amplitude):
+        if np.isscalar(amplitude):
+            return amplitude
+        return np.asarray(amplitude)
 
     def update_wavelet(self, wave_object):
         self.wavelet = full_ricker_wavelet(
@@ -122,9 +128,15 @@ class Sources(Delta_projector):
         source_cofunction: Firedrake.Cofunction
             A cofunction with the source applied into the domain.
         """
-        print("Wave type:", self.wave_type)
-        source_mesh = fire.VertexOnlyMesh(
-            self.mesh, [self.point_locations[self.current_sources[0]]])
+        if self.current_sources is None or len(self.current_sources) == 0:
+            raise ValueError(
+                "VertexOnlyMesh source assembly requires at least one active source."
+            )
+
+        source_locations = [
+            self.point_locations[source_id] for source_id in self.current_sources
+        ]
+        source_mesh = fire.VertexOnlyMesh(self.mesh, source_locations)
         if self.wave_type == WaveType.ISOTROPIC_ELASTIC:
             V_s = fire.VectorFunctionSpace(source_mesh, "DG", 0)
         elif self.wave_type == WaveType.ISOTROPIC_ACOUSTIC:
@@ -132,11 +144,49 @@ class Sources(Delta_projector):
         else:
             raise ValueError("Invalid wave type")
 
-        d_s = fire.Function(V_s)
-        d_s.assign(1.0)
+        d_s = fire.Function(V_s, val=self._vertex_only_source_values())
         source_cofunction = fire.assemble(fire.inner(d_s, fire.TestFunction(V_s)) * fire.dx)
         return fire.Cofunction(
             self.function_space.dual()).interpolate(source_cofunction)
+
+    def _vertex_only_source_values(self):
+        num_sources = len(self.current_sources)
+
+        if self.wave_type == WaveType.ISOTROPIC_ACOUSTIC:
+            return np.full(num_sources, self._scalar_vertex_only_amplitude())
+
+        if self.wave_type == WaveType.ISOTROPIC_ELASTIC:
+            amplitude = self._elastic_vertex_only_amplitude()
+            return np.tile(amplitude, (num_sources, 1))
+
+        raise ValueError("Invalid wave type")
+
+    def _scalar_vertex_only_amplitude(self):
+        if np.isscalar(self.amplitude):
+            return float(self.amplitude)
+
+        amplitude = np.asarray(self.amplitude, dtype=float)
+        if amplitude.ndim == 0:
+            return float(amplitude)
+        if amplitude.ndim == 1 and amplitude.size == 1:
+            return float(amplitude[0])
+        raise ValueError("Acoustic VertexOnlyMesh sources require a scalar amplitude.")
+
+    def _elastic_vertex_only_amplitude(self):
+        if np.isscalar(self.amplitude):
+            return np.full(self.dimension, float(self.amplitude))
+
+        amplitude = np.asarray(self.amplitude, dtype=float)
+        if amplitude.ndim == 0:
+            return np.full(self.dimension, float(amplitude))
+        if amplitude.ndim == 1 and amplitude.size == 1:
+            return np.full(self.dimension, float(amplitude[0]))
+        if amplitude.ndim == 1 and amplitude.size == self.dimension:
+            return amplitude
+        raise NotImplementedError(
+            "Elastic VertexOnlyMesh sources only support scalar amplitudes "
+            "or one amplitude component per spatial dimension."
+        )
 
 
 def timedependentSource(model, t, freq=None, amp=1, delay=1.5):
