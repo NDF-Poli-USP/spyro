@@ -218,6 +218,7 @@ class MeshingParameters():
         self.output_filename = self.input_mesh_dictionary.get("output_filename", "automatic_mesh.msh")
         self.cells_per_wavelength = self.input_mesh_dictionary.get("cells_per_wavelength", None)
         self.edge_length = self.input_mesh_dictionary.get("edge_length", None)
+        self.gradient_mask = self.input_mesh_dictionary.get("gradient_mask", None)
 
         self.automatic_mesh = self.mesh_type in {"firedrake_mesh", "SeismicMesh", "spyro_mesh"}
         self.is_complete = None
