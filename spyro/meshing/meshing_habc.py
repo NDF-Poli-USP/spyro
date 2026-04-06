@@ -23,8 +23,6 @@ class HABC_Mesh():
 
     Attributes
     ----------
-    alpha : `float`
-        Ratio between the representative mesh dimensions
     bnds : 'array'
         Mesh node indices on boundaries of the original domain
     bnd_nodes : `tuple`
@@ -44,8 +42,6 @@ class HABC_Mesh():
     comm : object
         An object representing the communication interface
         for parallel processing. Default is None
-    diam_mesh : `ufl.geometry.CellDiameter`
-        Mesh cell diameters
     dimension : `int`
         Model dimension (2D or 3D). Default is 2D
     dom_dim : `tuple`
@@ -58,10 +54,6 @@ class HABC_Mesh():
         Factor for the stabilizing term in Eikonal Eq. Default is 0.03
     funct_space_eik: `firedrake function space`
         Function space for the Eikonal modeling
-    lmin : `float`
-        Minimum mesh size
-    lmax : `float`
-        Maxmum mesh size
     mesh_original : `firedrake mesh`
         Original mesh without absorbing layer
     p_c0 : `int`
@@ -70,8 +62,7 @@ class HABC_Mesh():
         Finite element order for the Eikonal modeling
     quadrilateral : bool
         Flag to indicate whether to use quadrilateral/hexahedral elements
-    tol : `float`
-        Tolerance for searching nodes in the mesh
+
 
     Methods
     -------
@@ -112,8 +103,6 @@ class HABC_Mesh():
         Project a point radially onto the hyperellipsoid surface
     rectangular_mesh_habc()
         Generate a rectangular mesh with an absorbing layer
-    representative_mesh_dimensions()
-        Get the representative mesh dimensions from original mesh
     sharp_mesh_3D()
         Generate a sharp mesh by cutting the rectangular mesh
         with the hyperellipsoid surface
@@ -155,40 +144,6 @@ class HABC_Mesh():
 
         # Communicator MPI
         self.comm = comm
-
-    def representative_mesh_dimensions(self):
-        '''
-        Get the representative mesh dimensions from original mesh
-
-        Parameters
-        ----------
-        None
-
-        Returns
-        -------
-        None
-        '''
-
-        # Mesh cell diameters
-        self.diam_mesh = fire.CellDiameter(self.mesh)
-
-        if self.dimension == 2:  # 2D
-            fdim = 2**0.5
-
-        if self.dimension == 3:  # 3D
-            fdim = 3**0.5
-
-        # Minimum and maximum mesh size for habc parameters
-        diam = fire.assemble(fire.interpolate(self.diam_mesh,
-                                              self.function_space))
-        self.lmin = round(diam.dat.data_with_halos.min() / fdim, 6)
-        self.lmax = round(diam.dat.data_with_halos.max() / fdim, 6)
-
-        # Ratio between the representative mesh dimensions
-        self.alpha = self.lmax / self.lmin
-
-        # Tolerance for searching nodes in the mesh
-        self.tol = 10**(min(int(np.log10(self.lmin / 10)), -6))
 
     def extract_node_positions(self, func_space):
         '''
@@ -354,9 +309,6 @@ class HABC_Mesh():
         # Mesh data
         print(f"Original Mesh with {self.mesh.num_vertices()} Nodes "
               f"and {self.mesh.num_cells()} Volume Elements", flush=True)
-
-        # Get mesh parameters from original mesh
-        self.representative_mesh_dimensions()
 
         # Save a copy of the original mesh
         self.mesh_original = self.mesh
