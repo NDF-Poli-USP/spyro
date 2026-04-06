@@ -234,7 +234,7 @@ class MeshingParameters():
         For automatic meshes (firedrake_mesh, SeismicMesh, spyro_mesh):
             - Requires either edge_length or cells_per_wavelength
             - If using cells_per_wavelength, also requires source_frequency
-              and minimum_velocity
+              and either minimum_velocity or grid velocity data
 
         For file-based meshes:
             - Requires mesh_file to be set
@@ -245,7 +245,7 @@ class MeshingParameters():
         Notes
         -----
         The is_complete flag indicates readiness for mesh generation.
-        A mesh is considered complete when all required parameters for
+        It is considered complete when all required parameters for
         its mesh_type are present.
         """
         if self.mesh_type is None:
@@ -255,8 +255,8 @@ class MeshingParameters():
         if self.automatic_mesh:
             # For automatic meshes, need either edge_length or cells_per_wavelength
             has_size_param = (
-                self.edge_length is not None or
-                self.cells_per_wavelength is not None
+                self.edge_length is not None
+                or self.cells_per_wavelength is not None
             )
             if not has_size_param:
                 self.is_complete = False
@@ -264,8 +264,13 @@ class MeshingParameters():
 
             # If using cells_per_wavelength, need frequency and velocity
             if self.cells_per_wavelength is not None:
-                if self.source_frequency is None or \
-                    (self.minimum_velocity is None and self.grid_velocity_data is None):
+                if (
+                    self.source_frequency is None
+                    or (
+                        self.minimum_velocity is None
+                        and self.grid_velocity_data is None
+                    )
+                ):
                     self.is_complete = False
                     return
 
