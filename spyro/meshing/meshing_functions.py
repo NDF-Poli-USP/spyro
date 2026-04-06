@@ -43,17 +43,6 @@ class AutomaticMesh:
         Type of the mesh.
     abc_pad : float
         Padding to be added to the domain.
-    alpha : `float`
-        Ratio between the representative mesh dimensions
-    diam_mesh : `ufl.geometry.CellDiameter`
-        Mesh cell diameters
-    lmin : `float`
-        Minimum mesh size
-    lmax : `float`
-        Maxmum mesh size
-    tol : `float`
-        Tolerance for searching nodes in the mesh
-
 
     Methods
     -------
@@ -79,8 +68,6 @@ class AutomaticMesh:
         Creates a 2D mesh based on SeismicMesh meshing utilities.
     create_seismicmesh_2D_mesh_homogeneous()
         Creates a 2D mesh homogeneous velocity mesh based on SeismicMesh meshing utilities.
-    representative_mesh_dimensions()
-        Get the representative mesh dimensions from original mesh
     """
 
     def __init__(
@@ -149,47 +136,13 @@ class AutomaticMesh:
         self.velocity_model = mesh_parameters.velocity_model
         self.output_file_name = mesh_parameters.output_filename
 
-    def representative_mesh_dimensions(self):
-        '''
-        Get the representative mesh dimensions from mesh
-
-        Parameters
-        ----------
-        None
-
-        Returns
-        -------
-        None
-        '''
-
-        # Mesh cell diameters
-        self.diam_mesh = fire.CellDiameter(self.mesh)
-
-        if self.dimension == 2:  # 2D
-            fdim = 2**0.5
-
-        if self.dimension == 3:  # 3D
-            fdim = 3**0.5
-
-        # Minimum and maximum mesh size for habc parameters
-        diam = fire.assemble(fire.interpolate(self.diam_mesh,
-                                              self.function_space))
-        self.lmin = round(diam.dat.data_with_halos.min() / fdim, 6)
-        self.lmax = round(diam.dat.data_with_halos.max() / fdim, 6)
-
-        # Ratio between the representative mesh dimensions
-        self.alpha = self.lmax / self.lmin
-
-        # Tolerance for searching nodes in the mesh
-        self.tol = 10**(min(int(np.log10(self.lmin / 10)), -6))
-
     def create_mesh(self):
         """
         Creates the mesh.
 
         Returns
         -------
-        mesh : Mesh
+        mesh: Mesh
             Mesh
         """
         parallel_print(f"Creating {self.mesh_type} type mesh.", comm=self.comm)
@@ -215,22 +168,19 @@ class AutomaticMesh:
         else:
             raise ValueError("mesh_type is not supported")
 
-        # Get the representative mesh dimensions from current mesh
-        self.representative_mesh_dimensions()
-
     def create_firedrake_mesh(self):
         """
         Creates a mesh based on Firedrake meshing utilities.
 
         Returns
         -------
-        mesh : Firedrake Mesh
+        mesh: Firedrake Mesh
             The generated mesh.
 
         Raises
         ------
         ValueError
-            If dimension is not supported (must be 2 or 3).
+            If dimension is not supported(must be 2 or 3).
         """
         if self.dimension == 2:
             return self.create_firedrake_2D_mesh()
@@ -245,12 +195,12 @@ class AutomaticMesh:
 
         Returns
         -------
-        mesh : Firedrake Mesh
+        mesh: Firedrake Mesh
             The generated 2D mesh.
 
         Notes
         -----
-        If edge_length is not specified but cells_per_wavelength (cpw) is provided,
+        If edge_length is not specified but cells_per_wavelength(cpw) is provided,
         the edge length will be calculated automatically. The method creates either
         a periodic or non-periodic rectangular mesh based on the periodic attribute.
         """
@@ -296,13 +246,13 @@ class AutomaticMesh:
 
         Returns
         -------
-        mesh : Firedrake Mesh
+        mesh: Firedrake Mesh
             The generated 3D box mesh.
 
         Notes
         -----
         Uses the edge_length parameter to determine the number of elements
-        in each direction (x, y, z).
+        in each direction(x, y, z).
         """
         dx = self.edge_length
         nx = int(round(self.length_x / dx, 0))
@@ -325,7 +275,7 @@ class AutomaticMesh:
 
         Returns
         -------
-        mesh : Mesh
+        mesh: Mesh
             Mesh
         """
         if self.dimension == 2:
@@ -342,7 +292,7 @@ class AutomaticMesh:
 
         Returns
         -------
-        mesh : Firedrake Mesh
+        mesh: Firedrake Mesh
             The generated 2D mesh.
 
         Notes
@@ -362,7 +312,7 @@ class AutomaticMesh:
 
         Returns
         -------
-        mesh : Firedrake Mesh
+        mesh: Firedrake Mesh
             The generated 2D mesh with velocity-based sizing.
 
         Notes
@@ -448,7 +398,7 @@ class AutomaticMesh:
 
         Returns
         -------
-        mesh : Firedrake Mesh
+        mesh: Firedrake Mesh
             The generated 2D mesh with uniform element sizes.
 
         Notes
@@ -510,13 +460,13 @@ class AutomaticMesh:
 
         Returns
         -------
-        mesh : Firedrake Mesh
+        mesh: Firedrake Mesh
             The generated mesh.
 
         Raises
         ------
         ValueError
-            If dimension is not supported (must be 2).
+            If dimension is not supported(must be 2).
         NotImplementedError
             If dimension is 3 (3D meshing not yet implemented).
 
@@ -539,16 +489,16 @@ def calculate_edge_length(cpw, minimum_velocity, frequency):
 
     Parameters
     ----------
-    cpw : float
+    cpw: float
         Cells per wavelength.
-    minimum_velocity : float
+    minimum_velocity: float
         Minimum velocity in the domain.
-    frequency : float
+    frequency: float
         Source frequency.
 
     Returns
     -------
-    edge_length : float
+    edge_length: float
         Calculated edge length for mesh elements.
     """
     v_min = minimum_velocity
@@ -613,24 +563,24 @@ def PeriodicRectangleMesh(
 
     Parameters
     ----------
-    length_x : float
+    length_x: float
         Length of the domain in the x direction.
-    length_y : float
+    length_y: float
         Length of the domain in the y direction.
-    nx : int
+    nx: int
         Number of elements in the x direction.
-    ny : int
+    ny: int
         Number of elements in the y direction.
-    pad : float, optional
+    pad: float, optional
         Padding to be added to the domain. The default is None.
-    comm : MPI communicator, optional
+    comm: MPI communicator, optional
         MPI communicator. The default is None.
-    quadrilateral : bool, optional
+    quadrilateral: bool, optional
         If True, the mesh is quadrilateral. The default is False.
 
     Returns
     -------
-    mesh : Firedrake Mesh
+    mesh: Firedrake Mesh
         Mesh
     """
     if pad is not None:
@@ -653,7 +603,7 @@ def BoxMesh(nx, ny, nz, length_x, length_y, length_z, pad=None, quadrilateral=Fa
 
     Parameters
     ----------
-    nx : int
+    nx: int
         Number of elements in the x direction.
     ny: int
         Number of elements in the y direction.

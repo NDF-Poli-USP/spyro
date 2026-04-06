@@ -1,6 +1,9 @@
 import uuid
 from mpi4py import MPI  # noqa:F401
 from firedrake import COMM_WORLD  # noqa:
+from firedrake import assemble, CellDiameter
+from firedrake.__future__ import interpolate
+from numpy import log10
 import warnings
 from copy import deepcopy
 from ..io.dictionaryio import Read_options, Read_outputs
@@ -147,6 +150,16 @@ class Model_parameters(Read_options, Read_boundary_layer,
         Type of equation used in the simulation. Can be "second_order_in_pressure".
     time_integrator: str
         Type of time integrator used in the simulation. Can be "central_difference".
+    alpha : `float`
+        Ratio between the representative mesh dimensions
+    diam_mesh : `ufl.geometry.CellDiameter`
+        Mesh cell diameters
+    lmin : `float`
+        Minimum mesh size
+    lmax : `float`
+        Maxmum mesh size
+    tol : `float`
+        Tolerance for searching nodes in the mesh
 
     Methods
     -------
@@ -156,6 +169,8 @@ class Model_parameters(Read_options, Read_boundary_layer,
         Sets the mesh.
     get_mesh()
         Reads in a mesh and scatters it between cores.
+    reprsentative_mesh_dimensions()
+        Get the representative mesh dimensions from original mesh
     """
 
     def __init__(self, dictionary=None, comm=None):
@@ -482,6 +497,40 @@ class Model_parameters(Read_options, Read_boundary_layer,
             return io.read_mesh(self.mesh_parameters)
         else:
             return self.user_mesh
+
+    def representative_mesh_dimensions(self):
+        """
+        Get the representative mesh dimensions from mesh.
+
+        Parameters
+        ----------
+        None
+
+        Returns
+        -------
+        None
+        """
+
+        # Mesh cell diameters
+        self.diam_mesh = CellDiameter(self.mesh)
+
+        if self.dimension == 2:  # 2D
+            fdim = 2**0.5
+
+        if self.dimension == 3:  # 3D
+            fdim = 3**0.5
+
+        # Minimum and maximum mesh size for habc parameters
+        diam = assemble(interpolate(self.diam_mesh,
+                                    self.function_space))
+        self.lmin = round(diam.dat.data_with_halos.min() / fdim, 6)
+        self.lmax = round(diam.dat.data_with_halos.max() / fdim, 6)
+
+        # Ratio between the representative mesh dimensions
+        self.alpha = self.lmax / self.lmin
+
+        # Tolerance for searching nodes in the mesh
+        self.tol = 10**(min(int(log10(self.lmin / 10)), -6))
 
 
 def _validate_enum(value, accepted_values, name):

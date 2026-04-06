@@ -98,8 +98,7 @@ class Wave(Model_parameters, metaclass=ABCMeta):
         self.c = None
         self.sources = None
         if self.mesh is not None:
-            self._build_function_space()
-            self._map_sources_and_receivers()
+            self.building_mesh_derived_paramenters()
         elif self.mesh_parameters.mesh_type == "firedrake_mesh":
             warnings.warn(
                 "No mesh file, Firedrake mesh will be automatically generated."
@@ -131,13 +130,18 @@ class Wave(Model_parameters, metaclass=ABCMeta):
     def force_rebuild_function_space(self):
         if self.mesh is None:
             self.mesh = self.get_mesh()
-        self._build_function_space()
-        self._map_sources_and_receivers()
+        self.building_mesh_derived_paramenters()
 
     @abstractmethod
     def matrix_building(self):
         """Builds the matrix for the forward problem."""
         pass
+
+    def building_mesh_derived_paramenters(self):
+        """Build parameters that are derived from the mesh."""
+        self._build_function_space()
+        self._map_sources_and_receivers()
+        self.representative_mesh_dimensions()
 
     def set_mesh(
             self,
@@ -162,8 +166,7 @@ class Wave(Model_parameters, metaclass=ABCMeta):
         )
 
         self.mesh = self.get_mesh()
-        self._build_function_space()
-        self._map_sources_and_receivers()
+        self.building_mesh_derived_paramenters()
 
     def set_solver_parameters(self, parameters=None):
         """

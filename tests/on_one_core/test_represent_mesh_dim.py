@@ -1,105 +1,150 @@
 import pytest
+import warnings
 import firedrake as fire
-import numpy as np
-from spyro.meshing.meshing_functions import AutomaticMesh
+from numpy import isclose
+from spyro.solvers.acoustic_wave import AcousticWave
+fire.parameters["loopy"] = {"silenced_warnings": ["v1_scheduler_fallback"]}
+warnings.filterwarnings("ignore", category=RuntimeWarning)
 
 
-class WrapperMeshParameters:
-    """Wrapper for mesh parameters."""
+def wave_dict(element_type, dimension):
+    '''
+    Create a dictionary with parameters for the model
 
-    def __init__(self, dimension, quadrilateral):
-        self.length_z = 1.
-        self.length_x = 1.
-        self.length_y = 1.
-        self.mesh_type = "firedrake_mesh"
-        self.dimension = dimension
-        self.quadrilateral = quadrilateral
-        self.comm = None
-        self.edge_length = 0.1
-        self.abc_pad_length = 0.0
-        self.periodic = False
-        self.cells_per_wavelength = None
-        self.source_frequency = None
-        self.minimum_velocity = None
-        self.velocity_model = None
-        self.output_filename = None
+    Parameters
+    ----------
+    element_type : `str`
+        Type of finite element. 'T' for triangles or 'Q' for quadrilaterals
+    dimension : `int`
+        Dimension of the problem. 2 for 2D and 3 for 3D
+    degree : `int`
+        Degree of the finite element. p<=4 for 2D and p<=3 for 3D
+
+    Returns
+    -------
+    dictionary : `dict`
+        Dictionary containing the parameters for the model
+    '''
+
+    dictionary = {}
+    dictionary["options"] = {
+        # Simplexes: triangles or tetrahedra (T) or quadrilaterals (Q)
+        "cell_type": element_type,
+        "variant": "lumped",  # Options: lumped, equispaced or DG.
+        # Default is lumped "method":"MLT"
+        # (MLT/spectral_quadrilateral/DG_triangle/DG_quadrilateral)
+        # You can either specify a cell_type+variant or a method
+        # accepted_variants = ["lumped", "equispaced", "DG"]
+        "degree": 4 if dimension == 2 else 3,  # p<=4 for 2D and p<=3 for 3D
+        "dimension": dimension,  # dimension
+    }
+
+    # Number of cores for the shot. For simplicity, we keep things serial.
+    # spyro however supports both spatial parallelism and "shot" parallelism.
+    # Options: automatic (same number of cores for evey processor) or spatial
+    dictionary["parallelism"] = {
+        "type": "automatic",
+    }
+
+    # Define the domain size without the PML or AL.
+    if dimension == 2:
+        Lz, Lx, Ly = [1., 1., 0.]
+    elif dimension == 3:
+        Lz, Lx, Ly = [1., 1., 1.]  # in km
+    dictionary["mesh"] = {
+        "length_z": Lz,  # depth in km - always positive
+        "length_x": Lx,  # width in km - always positive
+        "length_y": Ly,  # thickness in km - always positive
+        "mesh_type": "firedrake_mesh",
+    }
+
+    # Create a source injection operator. Here we use a single source with a
+    # Ricker wavelet that has a peak frequency of 5 Hz injected at a specified
+    # point of the mesh. We also specify to record the solution at the corners
+    # of the domain to verify the efficiency of the absorbing layer.
+    dictionary["acquisition"] = {
+        "source_type": "ricker",
+        "source_locations": ([(-0.5, 0.25)] if dimension == 2
+                             else [(-0.5, 0.25, 0.5)]),
+        "frequency": 5.,  # in Hz
+        "delay": 1.5,
+        "receiver_locations": ([(-Lz, 0.), (-Lz, Lx), (0., 0.), (0., Lx)]
+                               if dimension == 2
+                               else [(-Lz, 0., 0.), (-Lz, Lx, 0.),
+                                     (0., 0., 0), (0., Lx, 0.),
+                                     (-Lz, 0., Ly), (-Lz, Lx, Ly),
+                                     (0., 0., Ly), (0., Lx, Ly)])
+    }
+
+    # Simulate for 1. seconds.
+    dictionary["time_axis"] = {
+        "initial_time": 0.,  # Initial time for event
+        "final_time": 2.,    # Final time for event
+        "dt": 0.001,  # timestep size in seconds
+        "amplitude": 1.,  # The Ricker has an amplitude of 1.
+        "output_frequency": 100,  # How frequently to output solution to pvds
+        "gradient_sampling_frequency": 100,  # How frequently to save to RAM
+    }
+
+    # Define Parameters for absorbing boundary conditions
+    dictionary["absorving_boundary_conditions"] = {
+        "status": False,  # Activate ABCs
+    }
+
+    # Define parameters for visualization
+    dictionary["visualization"] = {}
+
+    return dictionary
 
 
-def define_function_space(quadrilateral, mesh, ele_family, ele_degree):
-    """Create a function space for the mesh."""
-
-    if quadrilateral:  # Q_Elements
-        element = fire.FiniteElement("CG", mesh.ufl_cell(),
-                                     degree=ele_degree,
-                                     variant="spectral")
-        V = fire.FunctionSpace(mesh, element)
-
-    else:  # T_Elements
-        V = fire.FunctionSpace(mesh, "KMV", ele_degree)
-
-    return V
-
-
-@pytest.mark.parametrize('quadrilateral, dimension', [
-    (False, 2),   # Triangular 2D
-    (True, 2),    # Quadrilateral 2D
-    (False, 3),   # Tetrahedral 3D
-    (True, 3)])   # Hexahedral 3D
-def test_representative_mesh_dimensions_2d(quadrilateral, dimension):
+@pytest.mark.parametrize('element_type, dimension', [
+    ("T", 2),   # Triangular 2D
+    ("Q", 2),    # Quadrilateral 2D
+    ("T", 3),   # Tetrahedral 3D
+    ("Q", 3)])   # Hexahedral 3D
+def test_representative_mesh_dimensions_2d(element_type, dimension):
     """Test representative_mesh_dimensions for 2D and 3D meshes."""
 
-    mesh_params = WrapperMeshParameters(dimension, quadrilateral)
-    automatic_mesh = AutomaticMesh(mesh_parameters=mesh_params)
-    n_div = 10
-    # Create appropriate mesh and funcion space for dimension
-    q = {"overlap_type": (fire.DistributedMeshOverlapType.NONE, 0)}
-    if dimension == 2:
-        automatic_mesh.mesh = fire.RectangleMesh(
-            n_div, n_div, automatic_mesh.length_z, automatic_mesh.length_x,
-            quadrilateral=automatic_mesh.quadrilateral,
-            distribution_parameters=q)
+    # Create dictionary with parameters for the model
+    dictionary = wave_dict(element_type, dimension)
 
-        automatic_mesh.function_space = define_function_space(
-            quadrilateral, automatic_mesh.mesh, "KMV", 4)
-    else:
-        automatic_mesh.mesh = fire.BoxMesh(
-            n_div, n_div, n_div, automatic_mesh.length_z,
-            automatic_mesh.length_x, automatic_mesh.length_y,
-            distribution_parameters=q)
+    # Create the acoustic wave object
+    Wave_obj = AcousticWave(dictionary=dictionary)
 
-        automatic_mesh.function_space = define_function_space(
-            quadrilateral, automatic_mesh.mesh, "CG", 3)
+    # Mesh the domain with the specified edge length
+    edge_length = 0.1
+    Wave_obj.set_mesh(input_mesh_parameters={"edge_length": edge_length})
 
     # Call the method
-    automatic_mesh.representative_mesh_dimensions()
+    Wave_obj.representative_mesh_dimensions()
 
     # Print mesh info and computed values
     print(f"\nMesh Information:")
-    print(f"  - Mesh type: {'Quadrilateral' if quadrilateral else 'Triangular'}")
-    print(f"  - Number of cells: {automatic_mesh.mesh.num_cells()}")
-    print(f"  - Number of vertices: {automatic_mesh.mesh.num_vertices()}")
+    print(f"  - Mesh type: {element_type}")
+    print(f"  - Number of cells: {Wave_obj.mesh.num_cells()}")
+    print(f"  - Number of vertices: {Wave_obj.mesh.num_vertices()}")
     print(f"\nComputed representative mesh dimensions:")
-    print(f"  - diam_mesh: {automatic_mesh.diam_mesh}")
-    print(f"  - lmin (minimum cell diameter): {automatic_mesh.lmin:.8f}")
-    print(f"  - lmax (maximum cell diameter): {automatic_mesh.lmax:.8f}")
-    print(f"  - alpha (lmax/lmin ratio): {automatic_mesh.alpha:.6f}")
-    print(f"  - tol (tolerance): {automatic_mesh.tol:.2e}")
+    print(f"  - diam_mesh: {Wave_obj.diam_mesh}")
+    print(f"  - lmin (minimum cell diameter): {Wave_obj.lmin:.8f}")
+    print(f"  - lmax (maximum cell diameter): {Wave_obj.lmax:.8f}")
+    print(f"  - alpha (lmax/lmin ratio): {Wave_obj.alpha:.6f}")
+    print(f"  - tol (tolerance): {Wave_obj.tol:.2e}")
 
     # Verify attributes are set
-    assert hasattr(automatic_mesh, 'diam_mesh'), "diam_mesh attribute not set"
-    assert hasattr(automatic_mesh, 'lmin'), "lmin attribute not set"
-    assert hasattr(automatic_mesh, 'lmax'), "lmax attribute not set"
-    assert hasattr(automatic_mesh, 'alpha'), "alpha attribute not set"
-    assert hasattr(automatic_mesh, 'tol'), "tol attribute not set"
+    assert hasattr(Wave_obj, 'diam_mesh'), "diam_mesh attribute not set"
+    assert hasattr(Wave_obj, 'lmin'), "lmin attribute not set"
+    assert hasattr(Wave_obj, 'lmax'), "lmax attribute not set"
+    assert hasattr(Wave_obj, 'alpha'), "alpha attribute not set"
+    assert hasattr(Wave_obj, 'tol'), "tol attribute not set"
 
     # Verify values are reasonable
-    assert automatic_mesh.lmin > 0, f"lmin should be positive, got {automatic_mesh.lmin}"
-    assert automatic_mesh.lmax > 0, f"lmax should be positive, got {automatic_mesh.lmax}"
-    assert automatic_mesh.lmin <= automatic_mesh.lmax, \
-        f"lmin ({automatic_mesh.lmin}) should be <= lmax ({automatic_mesh.lmax})"
-    assert automatic_mesh.alpha >= 1., f"alpha should be >= 1, got {automatic_mesh.alpha}"
-    assert automatic_mesh.tol > 0, f"tol should be positive, got {automatic_mesh.tol}"
-    assert automatic_mesh.tol <= 1e-6, f"tol should be small, got {automatic_mesh.tol}"
+    assert Wave_obj.lmin > 0, f"lmin should be positive, got {Wave_obj.lmin}"
+    assert Wave_obj.lmax > 0, f"lmax should be positive, got {Wave_obj.lmax}"
+    assert Wave_obj.lmin <= Wave_obj.lmax, \
+        f"lmin ({Wave_obj.lmin}) should be <= lmax ({Wave_obj.lmax})"
+    assert Wave_obj.alpha >= 1., f"alpha should be >= 1, got {Wave_obj.alpha}"
+    assert Wave_obj.tol > 0, f"tol should be positive, got {Wave_obj.tol}"
+    assert Wave_obj.tol <= 1e-6, f"tol should be small, got {Wave_obj.tol}"
     expected_lmin = expected_lmax = 0.1
-    assert np.isclose(automatic_mesh.lmin, expected_lmin, rtol=1e-6)
-    assert np.isclose(automatic_mesh.lmax, expected_lmax, rtol=1e-6)
+    assert isclose(Wave_obj.lmin, expected_lmin, rtol=1e-6)
+    assert isclose(Wave_obj.lmax, expected_lmax, rtol=1e-6)
