@@ -220,6 +220,64 @@ class MeshingParameters():
         self.edge_length = self.input_mesh_dictionary.get("edge_length", None)
 
         self.automatic_mesh = self.mesh_type in {"firedrake_mesh", "SeismicMesh", "spyro_mesh"}
+        self.is_complete = None
+        self.check_completeness()
+
+    def check_completeness(self):
+        """Check if mesh parameters are complete for mesh generation.
+
+        Sets the `is_complete` attribute to True if all required parameters
+        are present for the configured mesh type, False otherwise.
+
+        For automatic meshes (firedrake_mesh, SeismicMesh, spyro_mesh):
+            - Requires either edge_length or cells_per_wavelength
+            - If using cells_per_wavelength, also requires source_frequency
+              and minimum_velocity
+
+        For file-based meshes:
+            - Requires mesh_file to be set
+
+        For user-provided meshes:
+            - Requires user_mesh to be set
+
+        Notes
+        -----
+        The is_complete flag indicates readiness for mesh generation.
+        A mesh is considered complete when all required parameters for
+        its mesh_type are present.
+        """
+        if self.mesh_type is None:
+            self.is_complete = False
+            return
+
+        if self.automatic_mesh:
+            # For automatic meshes, need either edge_length or cells_per_wavelength
+            has_size_param = (
+                self.edge_length is not None or
+                self.cells_per_wavelength is not None
+            )
+            if not has_size_param:
+                self.is_complete = False
+                return
+
+            # If using cells_per_wavelength, need frequency and velocity
+            if self.cells_per_wavelength is not None:
+                if self.source_frequency is None or self.minimum_velocity is None:
+                    self.is_complete = False
+                    return
+
+            self.is_complete = True
+
+        elif self.mesh_type == "file":
+            # For file-based meshes, need mesh_file
+            self.is_complete = self.mesh_file is not None
+
+        elif self.mesh_type == "user_mesh":
+            # For user-provided meshes, need user_mesh object
+            self.is_complete = self.user_mesh is not None
+
+        else:
+            self.is_complete = False
 
     def _set_length_with_unit_check(self, attr_name, value):
         """Set a length attribute with automatic unit consistency checking.
@@ -385,6 +443,8 @@ class MeshingParameters():
             )
             self.cells_per_wavelength = None
         self._edge_length = value
+        if hasattr(self, 'is_complete'):
+            self.check_completeness()
 
     @property
     def cells_per_wavelength(self):
@@ -421,6 +481,8 @@ class MeshingParameters():
                           "removes edge_length parameter")
             self.edge_length = None
         self._cells_per_wavelength = value
+        if hasattr(self, 'is_complete'):
+            self.check_completeness()
 
     @property
     def method(self):
@@ -496,6 +558,8 @@ class MeshingParameters():
             if not os.path.exists(value):
                 raise FileNotFoundError(f"mesh_file '{value}' does not exist")
         self._mesh_file = value
+        if hasattr(self, 'is_complete'):
+            self.check_completeness()
 
     @property
     def mesh_type(self):
@@ -532,6 +596,8 @@ class MeshingParameters():
         if value == "SeismicMesh" and self.quadrilateral:
             raise ValueError("SeismicMesh does not work with quads.")
         self._mesh_type = value
+        if hasattr(self, 'is_complete'):
+            self.check_completeness()
 
     @property
     def source_frequency(self):
@@ -577,6 +643,8 @@ class MeshingParameters():
                 warnings.warn(f"Source frequency of {value} too high for "
                               "realistic FWI case, please low-pass filter")
             self._source_frequency = value
+        if hasattr(self, 'is_complete'):
+            self.check_completeness()
 
     @property
     def abc_pad_length(self):
@@ -717,6 +785,8 @@ class MeshingParameters():
         if value is not None:
             self.mesh_type = "user_mesh"
         self._user_mesh = value
+        if hasattr(self, 'is_complete'):
+            self.check_completeness()
 
     @property
     def periodic(self):
