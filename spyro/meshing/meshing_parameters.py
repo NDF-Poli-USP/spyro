@@ -264,7 +264,8 @@ class MeshingParameters():
 
             # If using cells_per_wavelength, need frequency and velocity
             if self.cells_per_wavelength is not None:
-                if self.source_frequency is None or self.minimum_velocity is None:
+                if self.source_frequency is None or \
+                    (self.minimum_velocity is None and self.grid_velocity_data is None):
                     self.is_complete = False
                     return
 
