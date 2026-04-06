@@ -137,7 +137,7 @@ class MeshingParameters():
     the same unit system.
     """
 
-    def __init__(self, input_mesh_dictionary=None, dimension=None, source_frequency=None, comm=None, quadrilateral=False, method=None, degree=None, velocity_model=None, abc_pad_length=None, negative_z=True, use_defaults=True):
+    def __init__(self, input_mesh_dictionary=None, dimension=None, source_frequency=None, comm=None, quadrilateral=False, method=None, degree=None, velocity_model=None, abc_pad_length=None, negative_z=True):
         """Initialize the MeshingParameters class.
 
         Parameters
@@ -172,15 +172,6 @@ class MeshingParameters():
         negative_z : bool, optional
             If True, z-axis points downward; if False, z-axis points upward.
             Default is True.
-        use_defaults : bool, optional
-            If True, automatically call set_mesh with default parameters.
-            Default is True.
-
-        Notes
-        -----
-        If use_defaults is True, the set_mesh method is automatically called
-        during initialization to configure the mesh with default values where
-        there are missing parameters.
         """
 
         if input_mesh_dictionary is None:
@@ -189,32 +180,46 @@ class MeshingParameters():
         self.dimension = dimension
         self.comm = comm
 
-        # Set mesh parameters from dictionary or defaults
+        # Initialize private attributes for properties
+        self._edge_length = None
+        self._cells_per_wavelength = None
+        self._method = None
+        self._mesh_file = None
+        self._mesh_type = None
+        self._source_frequency = None
+        self._abc_pad_length = None
+        self._length_z = None
+        self._length_x = None
+        self._length_y = None
+        self._user_mesh = None
+        self._periodic = False
+        self._unit = None
+        self._output_filename = "automatic_mesh.msh"
+        self._grid_velocity_data = None
+
+        # Set basic attributes
         self.quadrilateral = quadrilateral
-        self.mesh_type = self.input_mesh_dictionary.get("mesh_type", None)
         self.method = method
-        self.periodic = False
+        self.minimum_velocity = None
+        self.velocity_model = velocity_model
+        self.gradient_mask = None
+        self.negative_z = negative_z
+
+        # Apply parameters from input_mesh_dictionary and direct arguments
+        self.source_frequency = source_frequency
+        self.abc_pad_length = abc_pad_length
+        self.degree = degree
+        self.mesh_type = self.input_mesh_dictionary.get("mesh_type", None)
         self.mesh_file = self.input_mesh_dictionary.get("mesh_file", None)
         self.length_z = self.input_mesh_dictionary.get("length_z", None)
         self.length_x = self.input_mesh_dictionary.get("length_x", None)
         self.length_y = self.input_mesh_dictionary.get("length_y", None)
         self.user_mesh = self.input_mesh_dictionary.get("user_mesh", None)
         self.output_filename = self.input_mesh_dictionary.get("output_filename", "automatic_mesh.msh")
-        self.source_frequency = source_frequency
-        self.abc_pad_length = abc_pad_length
-        self.degree = degree
-        self.minimum_velocity = None
-        self.velocity_model = velocity_model
+        self.cells_per_wavelength = self.input_mesh_dictionary.get("cells_per_wavelength", None)
+        self.edge_length = self.input_mesh_dictionary.get("edge_length", None)
+
         self.automatic_mesh = self.mesh_type in {"firedrake_mesh", "SeismicMesh", "spyro_mesh"}
-        self._edge_length = None
-        self._cells_per_wavelength = None
-        self.edge_length = None
-        self.cells_per_wavelength = None
-        self.grid_velocity_data = None
-        self.gradient_mask = None
-        self.negative_z = negative_z
-        if use_defaults:
-            self.set_mesh(input_mesh_parameters=input_mesh_dictionary)
 
     def _set_length_with_unit_check(self, attr_name, value):
         """Set a length attribute with automatic unit consistency checking.
@@ -747,41 +752,25 @@ class MeshingParameters():
     def set_mesh(
         self,
         user_mesh=None,
-        input_mesh_parameters={},
+        input_mesh_parameters=None,
         abc_pad_length=None,
     ):
-        """Configure mesh parameters with user-provided values and defaults.
+        """Update mesh parameters after initialization.
 
-        This method updates mesh parameters by merging user-provided values
-        with current attribute values, ensuring all necessary mesh
-        configuration is complete.
+        This method updates mesh parameters by applying user-provided values,
+        useful for modifying settings after the object has been created.
 
         Parameters
         ----------
         user_mesh : spyro.Mesh, optional
             A user-provided mesh object. Default is None.
         input_mesh_parameters : dict, optional
-            Dictionary of mesh parameters to set. Can include any attribute
-            of the MeshingParameters class. Unspecified parameters will use
-            current attribute values as defaults.
+            Dictionary of mesh parameters to update. Can include any attribute
+            of the MeshingParameters class. Default is None.
         abc_pad_length : float, optional
             Length of absorbing boundary condition padding layer.
             Overrides the value from input_mesh_parameters if provided.
             Default is None.
-
-        Notes
-        -----
-        This method performs the following steps:
-
-        1. Sets abc_pad_length if provided
-        2. Populates input_mesh_parameters with default values from current
-           attributes for any unspecified keys
-        3. Updates all class attributes that have non-None values in
-           input_mesh_parameters
-        4. Updates the automatic_mesh flag based on the final mesh_type
-
-        The method only sets attributes that already exist in the class and
-        have non-None values in the input_mesh_parameters dictionary.
 
         Examples
         --------
@@ -790,35 +779,19 @@ class MeshingParameters():
         ...                                     'length_x': 10.0,
         ...                                     'length_z': 5.0})
         """
+        if input_mesh_parameters is None:
+            input_mesh_parameters = {}
 
         if abc_pad_length is not None:
             self.abc_pad_length = abc_pad_length
 
-        # Setting default mesh parameters
-        input_mesh_parameters.setdefault("periodic", self.periodic)
-        input_mesh_parameters.setdefault("minimum_velocity",
-                                         self.minimum_velocity)
-        input_mesh_parameters.setdefault("length_z", self.length_z)
-        input_mesh_parameters.setdefault("length_x", self.length_x)
-        input_mesh_parameters.setdefault("length_y", self.length_y)
-        input_mesh_parameters.setdefault("abc_pad_length", self.abc_pad_length)
-        input_mesh_parameters.setdefault("mesh_file", self.mesh_file)
-        input_mesh_parameters.setdefault("dimension", self.dimension)
-        input_mesh_parameters.setdefault("mesh_type", self.mesh_type)
-        input_mesh_parameters.setdefault("source_frequency",
-                                         self.source_frequency)
-        input_mesh_parameters.setdefault("method", self.method)
-        input_mesh_parameters.setdefault("degree", self.degree)
-        input_mesh_parameters.setdefault("quadrilateral", self.quadrilateral)
-        input_mesh_parameters.setdefault("velocity_model", self.velocity_model)
+        if user_mesh is not None:
+            self.user_mesh = user_mesh
 
-        # Mesh length based parameters
-        input_mesh_parameters.setdefault("cells_per_wavelength", None)
-        input_mesh_parameters.setdefault("edge_length", None)
-
-        # Set all parameters that are not None
+        # Apply all provided parameters
         for key, value in input_mesh_parameters.items():
             if value is not None and hasattr(self, key):
                 setattr(self, key, value)
 
+        # Update automatic_mesh flag based on final mesh_type
         self.automatic_mesh = self.mesh_type in {"firedrake_mesh", "SeismicMesh", "spyro_mesh"}
