@@ -215,6 +215,7 @@ class MeshingParameters():
         self.length_x = self.input_mesh_dictionary.get("length_x", None)
         self.length_y = self.input_mesh_dictionary.get("length_y", None)
         self.user_mesh = self.input_mesh_dictionary.get("user_mesh", None)
+        self.dimension = self.input_mesh_dictionary.get("dimension", self.dimension)
         self.output_filename = self.input_mesh_dictionary.get("output_filename", "automatic_mesh.msh")
         self.cells_per_wavelength = self.input_mesh_dictionary.get("cells_per_wavelength", None)
         self.edge_length = self.input_mesh_dictionary.get("edge_length", None)
