@@ -43,6 +43,17 @@ class AutomaticMesh:
         Type of the mesh.
     abc_pad : float
         Padding to be added to the domain.
+    alpha : `float`
+        Ratio between the representative mesh dimensions
+    diam_mesh : `ufl.geometry.CellDiameter`
+        Mesh cell diameters
+    lmin : `float`
+        Minimum mesh size
+    lmax : `float`
+        Maxmum mesh size
+    tol : `float`
+        Tolerance for searching nodes in the mesh
+
 
     Methods
     -------
@@ -68,6 +79,8 @@ class AutomaticMesh:
         Creates a 2D mesh based on SeismicMesh meshing utilities.
     create_seismicmesh_2D_mesh_homogeneous()
         Creates a 2D mesh homogeneous velocity mesh based on SeismicMesh meshing utilities.
+    representative_mesh_dimensions()
+        Get the representative mesh dimensions from original mesh
     """
 
     def __init__(
@@ -136,6 +149,40 @@ class AutomaticMesh:
         self.velocity_model = mesh_parameters.velocity_model
         self.output_file_name = mesh_parameters.output_filename
 
+    def representative_mesh_dimensions(self):
+        '''
+        Get the representative mesh dimensions from mesh
+
+        Parameters
+        ----------
+        None
+
+        Returns
+        -------
+        None
+        '''
+
+        # Mesh cell diameters
+        self.diam_mesh = fire.CellDiameter(self.mesh)
+
+        if self.dimension == 2:  # 2D
+            fdim = 2**0.5
+
+        if self.dimension == 3:  # 3D
+            fdim = 3**0.5
+
+        # Minimum and maximum mesh size for habc parameters
+        diam = fire.assemble(fire.interpolate(self.diam_mesh,
+                                              self.function_space))
+        self.lmin = round(diam.dat.data_with_halos.min() / fdim, 6)
+        self.lmax = round(diam.dat.data_with_halos.max() / fdim, 6)
+
+        # Ratio between the representative mesh dimensions
+        self.alpha = self.lmax / self.lmin
+
+        # Tolerance for searching nodes in the mesh
+        self.tol = 10**(min(int(np.log10(self.lmin / 10)), -6))
+
     def create_mesh(self):
         """
         Creates the mesh.
@@ -167,6 +214,9 @@ class AutomaticMesh:
                 return fire.Mesh(self.output_file_name)
         else:
             raise ValueError("mesh_type is not supported")
+
+        # Get the representative mesh dimensions from current mesh
+        self.representative_mesh_dimensions()
 
     def create_firedrake_mesh(self):
         """
