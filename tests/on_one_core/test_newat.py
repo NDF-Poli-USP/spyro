@@ -10,16 +10,15 @@ from ..inputfiles.Model1_3d_CG import model as oldmodel3D
 
 def triangle_area(p1, p2, p3):
     """Simple function to calculate triangle area based on its 3 vertices."""
-    (x1, y1) = p1
-    (x2, y2) = p2
-    (x3, y3) = p3
+    x1, y1 = p1
+    x2, y2 = p2
+    x3, y3 = p3
 
     return abs(x1 * (y2 - y3) + x2 * (y3 - y1) + x3 * (y1 - y2)) / 2
 
 
 def test_correct_receiver_location_generation2D():
-    """Tests if receiver locations where generated correctly"""
-
+    """Tests if receiver locations where generated correctly."""
     receivers = spyro.create_transect((-0.1, 0.3), (-0.1, 0.9), 3)
     answer = np.array([[-0.1, 0.3], [-0.1, 0.6], [-0.1, 0.9]])
 
@@ -27,8 +26,7 @@ def test_correct_receiver_location_generation2D():
 
 
 def test_correct_receiver_to_cell_location2D():
-    """Tests if the receivers where located in the correct cell"""
-
+    """Tests if the receivers where located in the correct cell."""
     oldmodel["opts"]["degree"] = 3
     recvs = spyro.create_transect((-0.1, 0.3), (-0.1, 0.9), 3)
     oldmodel["acquisition"]["receiver_locations"] = recvs
@@ -159,10 +157,10 @@ def test_correct_at_value2D_quad():
 
 
 def tetrahedral_volume(p1, p2, p3, p4):
-    (x1, y1, z1) = p1
-    (x2, y2, z2) = p2
-    (x3, y3, z3) = p3
-    (x4, y4, z4) = p4
+    x1, y1, z1 = p1
+    x2, y2, z2 = p2
+    x3, y3, z3 = p3
+    x4, y4, z4 = p4
 
     A = np.array([x1, y1, z1])
     B = np.array([x2, y2, z2])
@@ -175,8 +173,7 @@ def tetrahedral_volume(p1, p2, p3, p4):
 
 
 def test_correct_receiver_location_generation3D():
-    """Tests if receiver locations where generated correctly"""
-
+    """Tests if receiver locations where generated correctly."""
     oldtest_model = deepcopy(oldmodel3D)
     receivers = spyro.create_transect((-0.05, 0.3, 0.5), (-0.05, 0.9, 0.5), 3)
     oldtest_model["acquisition"]["receiver_locations"] = receivers
@@ -190,8 +187,7 @@ def test_correct_receiver_location_generation3D():
 
 
 def test_correct_receiver_to_cell_location3D():
-    """Tests if the receivers where located in the correct cell"""
-
+    """Tests if the receivers where located in the correct cell."""
     oldtest_model1 = deepcopy(oldmodel3D)
     rec = spyro.create_transect((-0.05, 0.1, 0.5), (-0.05, 0.9, 0.5), 3)
     oldtest_model1["acquisition"]["receiver_locations"] = rec

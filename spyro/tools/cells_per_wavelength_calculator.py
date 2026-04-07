@@ -84,8 +84,8 @@ class Meshing_parameter_calculator:
     """
 
     def __init__(self, parameters_dictionary):
-        """
-        Initializes the Meshing_parameter_calculator class with a dictionary of parameters.
+        """Initializes the Meshing_parameter_calculator class with a dictionary
+        of parameters.
 
         Parameters
         ----------
@@ -145,9 +145,7 @@ class Meshing_parameter_calculator:
         self.reference_solution = self.get_reference_solution()
 
     def _setting_up_testing_options(self):
-        """
-        Sets up the testing options.
-        """
+        """Sets up the testing options."""
         if "testing" in self.parameters_dictionary:
             self.reduced_obj_for_testing = self.parameters_dictionary["testing"]
         else:
@@ -166,7 +164,9 @@ class Meshing_parameter_calculator:
 
     def _setting_up_time_step(self):
         if "time-step_calculation" in self.parameters_dictionary:
-            self.timestep_calculation = self.parameters_dictionary["time-step_calculation"]
+            self.timestep_calculation = self.parameters_dictionary[
+                "time-step_calculation"
+            ]
         else:
             self.timestep_calculation = "exact"
         self.fixed_timestep = None
@@ -212,8 +212,7 @@ class Meshing_parameter_calculator:
             raise ValueError("Length in x direction must be positive")
 
     def build_initial_guess_model(self):
-        """
-        Builds the initial guess spyro acoustic wave solver object.
+        """Builds the initial guess spyro acoustic wave solver object.
 
         Returns
         -------
@@ -225,8 +224,8 @@ class Meshing_parameter_calculator:
         return spyro.AcousticWave(dictionary)
 
     def get_reference_solution(self):
-        """
-        Calculates or loads the reference solution to be used for error calculation.
+        """Calculates or loads the reference solution to be used for error
+        calculation.
 
         Returns
         -------
@@ -245,15 +244,17 @@ class Meshing_parameter_calculator:
             return self.calculate_analytical_solution()
 
     def calculate_reference_solution(self):
-        """
-        Calculates the numerical reference solution for heterogeneous models, using cpw and degree values in parameters dictionary.
+        """Calculates the numerical reference solution for heterogeneous models,
+        using cpw and degree values in parameters dictionary.
 
         Returns
         -------
         np.ndarray
             the reference solution
         """
-        Wave_obj = self.build_current_object(self.cpw_reference, degree=self.reference_degree)
+        Wave_obj = self.build_current_object(
+            self.cpw_reference, degree=self.reference_degree
+        )
 
         Wave_obj.forward_solve()
         p_receivers = Wave_obj.forward_solution_receivers
@@ -264,8 +265,7 @@ class Meshing_parameter_calculator:
         return p_receivers
 
     def calculate_analytical_solution(self):
-        """
-        Calculates the analytical reference solution for homogeneous models.
+        """Calculates the analytical reference solution for homogeneous models.
 
         Returns
         -------
@@ -302,9 +302,11 @@ class Meshing_parameter_calculator:
 
         return analytical_solution
 
-    def find_minimum(self, starting_cpw=None, TOL=None, accuracy=None, savetxt=False):
-        """
-        Finds the minimum cells-per-wavelength meshing parameter that is still below the error threshold.
+    def find_minimum(
+        self, starting_cpw=None, TOL=None, accuracy=None, savetxt=False
+    ):
+        """Finds the minimum cells-per-wavelength meshing parameter that is
+        still below the error threshold.
 
         Parameters
         ----------
@@ -353,8 +355,7 @@ class Meshing_parameter_calculator:
             # Setting up time-step
             if self.timestep_calculation != "float":
                 Wave_obj.get_and_set_maximum_dt(
-                    fraction=0.2,
-                    estimate_max_eigenvalue=self.estimate_timestep
+                    fraction=0.2, estimate_max_eigenvalue=self.estimate_timestep
                 )
             else:
                 Wave_obj.dt = self.fixed_timestep
@@ -386,8 +387,7 @@ class Meshing_parameter_calculator:
         return cpw - dif
 
     def build_current_object(self, cpw, degree=None):
-        """
-        Builds the current acoustic wave solver object.
+        """Builds the current acoustic wave solver object.
 
         Parameters
         ----------
@@ -409,26 +409,28 @@ class Meshing_parameter_calculator:
         if self.velocity_profile_type == "homogeneous":
             lba = self.minimum_velocity / self.source_frequency
             edge_length = lba / cpw
-            Wave_obj.set_mesh(input_mesh_parameters={"edge_length": edge_length})
+            Wave_obj.set_mesh(
+                input_mesh_parameters={"edge_length": edge_length}
+            )
             Wave_obj.set_initial_velocity_model(constant=self.minimum_velocity)
         elif self.velocity_profile_type == "heterogeneous":
-            Wave_obj.set_mesh(input_mesh_parameters={"cells_per_wavelength": cpw})
+            Wave_obj.set_mesh(
+                input_mesh_parameters={"cells_per_wavelength": cpw}
+            )
         return Wave_obj
 
     def _saving_file(self, savetxt, info):
-        """
-        Saves the results to a text file.
-        """
+        """Saves the results to a text file."""
         if savetxt:
             np.savetxt(
-                "p"+str(self.initial_guess_object.degree)+"_cpw_results.txt",
+                "p"
+                + str(self.initial_guess_object.degree)
+                + "_cpw_results.txt",
                 info,
             )
 
     def _updating_cpw_error_and_dif(self, cpw, error, dif):
-        """
-        Updates the cells-per-wavelength parameter.
-        """
+        """Updates the cells-per-wavelength parameter."""
         if error < self.accepted_error_threshold and dif > self.cpw_accuracy:
             cpw -= dif
             error = 100.0
@@ -439,15 +441,17 @@ class Meshing_parameter_calculator:
             )
             self.fast_loop = False
         else:
-            dif = calculate_dif(cpw, self.cpw_accuracy, fast_loop=self.fast_loop)
+            dif = calculate_dif(
+                cpw, self.cpw_accuracy, fast_loop=self.fast_loop
+            )
             cpw += dif
 
         return cpw, error, dif
 
 
 def calculate_dif(cpw, accuracy, fast_loop=False):
-    """
-    Calculates the difference between consecutive cells-per-wavelength to be used in the search.
+    """Calculates the difference between consecutive cells-per-wavelength to be
+    used in the search.
 
     Parameters
     ----------
@@ -472,8 +476,7 @@ def calculate_dif(cpw, accuracy, fast_loop=False):
 
 
 def error_calc(receivers, analytical, dt):
-    """
-    Calculates the error between the numerical and analytical solutions.
+    """Calculates the error between the numerical and analytical solutions.
 
     Parameters
     ----------

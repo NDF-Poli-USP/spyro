@@ -40,7 +40,9 @@ def test_forward_3_shots():
         "frequency": 5.0,
         "delay": 0.2,
         "delay_type": "time",
-        "receiver_locations": spyro.create_transect((-1.3, 1.2), (-1.3, 1.8), 301),
+        "receiver_locations": spyro.create_transect(
+            (-1.3, 1.2), (-1.3, 1.8), 301
+        ),
     }
     dictionary["time_axis"] = {
         "initial_time": 0.0,  # Initial time for event
@@ -93,7 +95,10 @@ def test_forward_3_shots():
 
     error = error_calc(arr0[:430], analytical_p[:430], 430)
     if comm.comm.rank == 0:
-        print(f"Error for shot {Wave_obj.current_sources} is {error} and test has passed equals {np.abs(error) < 0.01}", flush=True)
+        print(
+            f"Error for shot {Wave_obj.current_sources} is {error} and test has passed equals {np.abs(error) < 0.01}",
+            flush=True,
+        )
     error_all = COMM_WORLD.allreduce(error, op=MPI.SUM)
     error_all /= 3
 

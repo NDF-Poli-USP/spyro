@@ -19,8 +19,7 @@
 
 
 class Read_boundary_layer:
-    """
-    Read the boundary layer dictionary
+    """Read the boundary layer dictionary.
 
     Attributes
     ----------
@@ -59,31 +58,43 @@ class Read_boundary_layer:
 
     def __init__(self, comm=None):
         self.input_dictionary.setdefault("absorving_boundary_conditions", {})
-        self.input_dictionary[
-            "absorving_boundary_conditions"].setdefault("status", False)
+        self.input_dictionary["absorving_boundary_conditions"].setdefault(
+            "status", False
+        )
         self.abc_active = self.input_dictionary[
-            "absorving_boundary_conditions"]["status"]
-        self.input_dictionary[
-            "absorving_boundary_conditions"].setdefault("damping_type", None)
-        self.input_dictionary[
-            "absorving_boundary_conditions"].setdefault("pad_length", None)
+            "absorving_boundary_conditions"
+        ]["status"]
+        self.input_dictionary["absorving_boundary_conditions"].setdefault(
+            "damping_type", None
+        )
+        self.input_dictionary["absorving_boundary_conditions"].setdefault(
+            "pad_length", None
+        )
         self.abc_boundary_layer_type = self.input_dictionary[
-            "absorving_boundary_conditions"]["damping_type"]
+            "absorving_boundary_conditions"
+        ]["damping_type"]
         self.abc_pad_length = self.input_dictionary[
-            "absorving_boundary_conditions"]["pad_length"]
+            "absorving_boundary_conditions"
+        ]["pad_length"]
 
         self.absorb_top = self.input_dictionary[
-            "absorving_boundary_conditions"].get("absorb_top", False)
+            "absorving_boundary_conditions"
+        ].get("absorb_top", False)
         self.absorb_bottom = self.input_dictionary[
-            "absorving_boundary_conditions"].get("absorb_bottom", True)
+            "absorving_boundary_conditions"
+        ].get("absorb_bottom", True)
         self.absorb_right = self.input_dictionary[
-            "absorving_boundary_conditions"].get("absorb_right", True)
+            "absorving_boundary_conditions"
+        ].get("absorb_right", True)
         self.absorb_left = self.input_dictionary[
-            "absorving_boundary_conditions"].get("absorb_left", True)
+            "absorving_boundary_conditions"
+        ].get("absorb_left", True)
         self.absorb_front = self.input_dictionary[
-            "absorving_boundary_conditions"].get("absorb_front", True)
+            "absorving_boundary_conditions"
+        ].get("absorb_front", True)
         self.absorb_back = self.input_dictionary[
-            "absorving_boundary_conditions"].get("absorb_back", True)
+            "absorving_boundary_conditions"
+        ].get("absorb_back", True)
 
     @property
     def abc_boundary_layer_type(self):
@@ -91,7 +102,7 @@ class Read_boundary_layer:
 
     @abc_boundary_layer_type.setter
     def abc_boundary_layer_type(self, value):
-        abc_dictionary = self.input_dictionary['absorving_boundary_conditions']
+        abc_dictionary = self.input_dictionary["absorving_boundary_conditions"]
         accepted_damping_types = [
             "PML",
             "local",
@@ -108,13 +119,18 @@ class Read_boundary_layer:
             abc_dictionary.setdefault("cmax", 4.7)
             self.abc_cmax = abc_dictionary["cmax"]
         if value == "hybrid":
-            self.abc_boundary_layer_shape = abc_dictionary.get("layer_shape", "rectangular")
+            self.abc_boundary_layer_shape = abc_dictionary.get(
+                "layer_shape", "rectangular"
+            )
             self.abc_degree_type = abc_dictionary.get("degree_type", "real")
-            self.abc_deg_layer = None \
-                if self.abc_boundary_layer_shape == "rectangular" \
-                else abc_dictionary.get("degree_layer", 2.)
-            self.abc_reference_freq = abc_dictionary.get("habc_reference_freq",
-                                                         "source")
+            self.abc_deg_layer = (
+                None
+                if self.abc_boundary_layer_shape == "rectangular"
+                else abc_dictionary.get("degree_layer", 2.0)
+            )
+            self.abc_reference_freq = abc_dictionary.get(
+                "habc_reference_freq", "source"
+            )
             self.abc_deg_eikonal = abc_dictionary.get("degree_eikonal", 2)
             self.abc_get_ref_model = abc_dictionary.get("get_ref_model", False)
 
@@ -126,6 +142,8 @@ class Read_boundary_layer:
 
     @abc_pad_length.setter
     def abc_pad_length(self, value):
-        if (value is None or value == 0) and self.abc_boundary_layer_type == "PML":
+        if (
+            value is None or value == 0
+        ) and self.abc_boundary_layer_type == "PML":
             raise ValueError("No pad not compatible with PML")
         self._abc_pad_length = value

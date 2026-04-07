@@ -5,8 +5,7 @@ from ..io import write_function_to_grid
 
 
 def velocity_to_grid(wave_obj, grid_spacing, output=False):
-    """
-    Convert velocity model to a regular grid with specified spacing.
+    """Convert velocity model to a regular grid with specified spacing.
 
     Interpolates the velocity model from a :class:`Wave` object onto a structured grid
     with uniform spacing. This is useful for visualization, creating SEG-Y
@@ -50,7 +49,6 @@ def velocity_to_grid(wave_obj, grid_spacing, output=False):
     >>> grid_data = velocity_to_grid(wave_obj, grid_spacing=0.01, output=True)
     >>> vp_gridded = grid_data['vp_values']
     """
-
     mesh_parameters_original = wave_obj.mesh_parameters
     u, V = change_scalar_field_resolution(
         wave_obj.initial_velocity_model,
@@ -79,8 +77,7 @@ def velocity_to_grid(wave_obj, grid_spacing, output=False):
 
 
 def change_scalar_field_resolution(scalar_field, wave_obj, grid_spacing):
-    """
-    Change a scalar field to a different resolution using a structured grid.
+    """Change a scalar field to a different resolution using a structured grid.
 
     Creates a new structured mesh with specified grid spacing and interpolates
     the scalar field onto this new mesh using continuous Galerkin (CG1)
@@ -126,11 +123,11 @@ def change_scalar_field_resolution(scalar_field, wave_obj, grid_spacing):
         "length_y": mesh_parameters_original.length_y,
         "mesh_type": "firedrake_mesh",
         "edge_length": grid_spacing,
-        "abc_pad_length": mesh_parameters_original.abc_pad_length
+        "abc_pad_length": mesh_parameters_original.abc_pad_length,
     }
     meshing_parameters_cg1 = MeshingParameters(
         input_mesh_dictionary=input_mesh_parameters_cg1,
-        comm=mesh_parameters_original.comm
+        comm=mesh_parameters_original.comm,
     )
     meshing_obj = AutomaticMesh(meshing_parameters_cg1)
     mesh = meshing_obj.create_mesh()

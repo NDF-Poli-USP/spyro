@@ -110,11 +110,8 @@ marmousi_dictionary["time_axis"] = {
 
 
 class Marmousi_acoustic(Example_model_acoustic):
-    """
-    Marmousi model.
-    This class is a child of the Example_model class.
-    It is used to create a dictionary with the parameters of the
-    Marmousi model.
+    """Marmousi model. This class is a child of the Example_model class. It is
+    used to create a dictionary with the parameters of the Marmousi model.
 
     Example Setup
 

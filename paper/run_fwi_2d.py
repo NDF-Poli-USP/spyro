@@ -62,7 +62,9 @@ model["acquisition"] = {
     "frequency": 5.0,
     "delay": 1.0,
     "num_receivers": 500,
-    "receiver_locations": spyro.create_transect((-0.10, 0.1), (-0.10, 17.0), 500),
+    "receiver_locations": spyro.create_transect(
+        (-0.10, 0.1), (-0.10, 17.0), 500
+    ),
 }
 model["timeaxis"] = {
     "t0": 0.0,  # Initial time for event
@@ -114,7 +116,7 @@ class L2Inner(object):
 
 
 def regularize_gradient(vp, dJ):
-    """Tikhonov regularization"""
+    """Tikhonov regularization."""
     m_u = TrialFunction(V)
     m_v = TestFunction(V)
     mgrad = m_u * m_v * dx(scheme=quad_rule)
@@ -145,7 +147,7 @@ class Objective(ROL.Objective):
         self.p_exact_recv = spyro.io.load_shots(model, comm)
 
     def value(self, x, tol):
-        """Compute the functional"""
+        """Compute the functional."""
         J_total = np.zeros((1))
         self.p_guess, p_guess_recv = spyro.solvers.forward(
             model,
@@ -159,7 +161,9 @@ class Objective(ROL.Objective):
         self.misfit = spyro.utils.evaluate_misfit(
             model, p_guess_recv, self.p_exact_recv
         )
-        J_total[0] += spyro.utils.compute_functional(model, self.misfit, velocity=vp)
+        J_total[0] += spyro.utils.compute_functional(
+            model, self.misfit, velocity=vp
+        )
         J_total = COMM_WORLD.allreduce(J_total, op=MPI.SUM)
         J_total[0] /= comm.ensemble_comm.size
         if comm.comm.size > 1:
@@ -174,7 +178,7 @@ class Objective(ROL.Objective):
         return J_total[0]
 
     def gradient(self, g, x, tol):
-        """Compute the gradient of the functional"""
+        """Compute the gradient of the functional."""
         dJ = Function(V, name="gradient")
         dJ_local = spyro.solvers.gradient(
             model,
@@ -212,7 +216,9 @@ class Objective(ROL.Objective):
 
 
 paramsDict = {
-    "General": {"Secant": {"Type": "Limited-Memory BFGS", "Maximum Storage": 10}},
+    "General": {
+        "Secant": {"Type": "Limited-Memory BFGS", "Maximum Storage": 10}
+    },
     "Step": {
         "Type": "Augmented Lagrangian",
         "Augmented Lagrangian": {

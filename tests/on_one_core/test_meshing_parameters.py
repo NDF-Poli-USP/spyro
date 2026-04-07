@@ -57,15 +57,16 @@ def test_initialize_mesh_pam():
     )
 
     # Testing correct values:
-    test_unit = (meshing_pam._unit == "km")
-    test_length_z = (meshing_pam.length_z == dictionary["mesh"]["length_z"])
-    test_length_x = (meshing_pam.length_z == dictionary["mesh"]["length_x"])
-    test_length_y = (meshing_pam.length_y == dictionary["mesh"]["length_y"])
-    test_degree = (meshing_pam.degree == dictionary["options"]["degree"])
-    test_source_frequency = (meshing_pam.source_frequency == dictionary[
-        "acquisition"]["frequency"])
-    test_mesh_type = (meshing_pam.mesh_type == "firedrake_mesh")
-    test_method = (meshing_pam.method == "mass_lumped_triangle")
+    test_unit = meshing_pam._unit == "km"
+    test_length_z = meshing_pam.length_z == dictionary["mesh"]["length_z"]
+    test_length_x = meshing_pam.length_z == dictionary["mesh"]["length_x"]
+    test_length_y = meshing_pam.length_y == dictionary["mesh"]["length_y"]
+    test_degree = meshing_pam.degree == dictionary["options"]["degree"]
+    test_source_frequency = (
+        meshing_pam.source_frequency == dictionary["acquisition"]["frequency"]
+    )
+    test_mesh_type = meshing_pam.mesh_type == "firedrake_mesh"
+    test_method = meshing_pam.method == "mass_lumped_triangle"
 
     assert test_unit, "Expected unit 'km'"
     assert test_length_z, "Expected length_z to match input"
@@ -89,7 +90,9 @@ def test_negative_length_z_raises():
             "mesh_type": "firedrake_mesh",
         }
     }
-    with pytest.raises(ValueError, match="Please do not use negative value for _length_z"):
+    with pytest.raises(
+        ValueError, match="Please do not use negative value for _length_z"
+    ):
         spyro.meshing.MeshingParameters(
             input_mesh_dictionary=dictionary["mesh"],
             dimension=2,
@@ -109,7 +112,9 @@ def test_negative_length_x_raises():
             "mesh_type": "firedrake_mesh",
         }
     }
-    with pytest.raises(ValueError, match="Please do not use negative value for _length_x"):
+    with pytest.raises(
+        ValueError, match="Please do not use negative value for _length_x"
+    ):
         spyro.meshing.MeshingParameters(
             input_mesh_dictionary=dictionary["mesh"],
             dimension=2,
@@ -129,7 +134,9 @@ def test_negative_length_y_raises():
             "mesh_type": "firedrake_mesh",
         }
     }
-    with pytest.raises(ValueError, match="Please do not use negative value for _length_y"):
+    with pytest.raises(
+        ValueError, match="Please do not use negative value for _length_y"
+    ):
         spyro.meshing.MeshingParameters(
             input_mesh_dictionary=dictionary["mesh"],
             dimension=2,
@@ -180,13 +187,13 @@ def test_invalid_method_raises():
 
 
 def test_cells_per_wavelength_known_key():
-    assert cells_per_wavelength('mass_lumped_triangle', 2, 2) == 7.02
-    assert cells_per_wavelength('mass_lumped_triangle', 3, 2) == 3.70
-    assert cells_per_wavelength('spectral_quadrilateral', 2, 2) is None
+    assert cells_per_wavelength("mass_lumped_triangle", 2, 2) == 7.02
+    assert cells_per_wavelength("mass_lumped_triangle", 3, 2) == 3.70
+    assert cells_per_wavelength("spectral_quadrilateral", 2, 2) is None
 
 
 def test_cells_per_wavelength_unknown_key():
-    assert cells_per_wavelength('unknown', 1, 1) is None
+    assert cells_per_wavelength("unknown", 1, 1) is None
 
 
 def test_meshing_parameters_init_defaults():

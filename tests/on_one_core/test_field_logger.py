@@ -23,7 +23,7 @@ def logger():
     d = {
         a_str + "_output": True,
         b_str + "_output": True,
-        c_str + "_output": False
+        c_str + "_output": False,
     }
     logger = FieldLogger(comm, d)
     logger.rnd_str = rnd_str

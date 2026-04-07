@@ -46,8 +46,7 @@ class Sources(Delta_projector):
     """
 
     def __init__(self, wave_object):
-        """Initializes class and gets all receiver parameters from
-        input file.
+        """Initializes class and gets all receiver parameters from input file.
 
         Parameters
         ----------
@@ -63,7 +62,6 @@ class Sources(Delta_projector):
         Returns
         -------
         Sources: :class: 'Source' object
-
         """
         super().__init__(wave_object)
 
@@ -107,7 +105,9 @@ class Sources(Delta_projector):
                 for i in range(len(self.cellNodeMaps[source_id])):
                     rhs_forcing.dat.data_with_halos[
                         int(self.cellNodeMaps[source_id][i])
-                    ] = (self.wavelet[step] * np.dot(self.amplitude, self.cell_tabulations[source_id][i]))
+                    ] = self.wavelet[step] * np.dot(
+                        self.amplitude, self.cell_tabulations[source_id][i]
+                    )
             else:
                 for i in range(len(self.cellNodeMaps[source_id])):
                     tmp = rhs_forcing.dat.data_with_halos[0]  # noqa: F841
@@ -124,7 +124,8 @@ class Sources(Delta_projector):
         """
         print("Wave type:", self.wave_type)
         source_mesh = fire.VertexOnlyMesh(
-            self.mesh, [self.point_locations[self.current_sources[0]]])
+            self.mesh, [self.point_locations[self.current_sources[0]]]
+        )
         if self.wave_type == WaveType.ISOTROPIC_ELASTIC:
             V_s = fire.VectorFunctionSpace(source_mesh, "DG", 0)
         elif self.wave_type == WaveType.ISOTROPIC_ACOUSTIC:
@@ -134,9 +135,12 @@ class Sources(Delta_projector):
 
         d_s = fire.Function(V_s)
         d_s.assign(1.0)
-        source_cofunction = fire.assemble(fire.inner(d_s, fire.TestFunction(V_s)) * fire.dx)
-        return fire.Cofunction(
-            self.function_space.dual()).interpolate(source_cofunction)
+        source_cofunction = fire.assemble(
+            fire.inner(d_s, fire.TestFunction(V_s)) * fire.dx
+        )
+        return fire.Cofunction(self.function_space.dual()).interpolate(
+            source_cofunction
+        )
 
 
 def timedependentSource(model, t, freq=None, amp=1, delay=1.5):
@@ -151,9 +155,8 @@ def timedependentSource(model, t, freq=None, amp=1, delay=1.5):
 def ricker_wavelet(
     t, freq, amp=1.0, delay=1.5, delay_type="multiples_of_minimum"
 ):
-    """Creates a Ricker source function with a
-    delay in term of multiples of the distance
-    between the minimums.
+    """Creates a Ricker source function with a delay in term of multiples of the
+    distance between the minimums.
 
     Parameters
     ----------
@@ -194,8 +197,8 @@ def full_ricker_wavelet(
     delay=1.5,
     delay_type="multiples_of_minimum",
 ):
-    """Compute the Ricker wavelet optionally applying low-pass filtering
-    using cutoff frequency in Hertz.
+    """Compute the Ricker wavelet optionally applying low-pass filtering using
+    cutoff frequency in Hertz.
 
     Parameters
     ----------

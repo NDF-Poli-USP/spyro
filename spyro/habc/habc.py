@@ -26,10 +26,17 @@ from spyro.utils.freq_tools import freq_response
 # With additions by Alexandre Olender
 
 
-class HABC_Wave(AcousticWave, HABC_Mesh, RectangLayer,
-                HyperLayer, HABC_Damping, NRBC, HABC_Error):
-    '''
-    Class HABC that determines absorbing layer size and parameters to be used
+class HABC_Wave(
+    AcousticWave,
+    HABC_Mesh,
+    RectangLayer,
+    HyperLayer,
+    HABC_Damping,
+    NRBC,
+    HABC_Error,
+):
+    """Class HABC that determines absorbing layer size and parameters to be
+    used.
 
     Attributes
     ----------
@@ -143,12 +150,12 @@ class HABC_Wave(AcousticWave, HABC_Mesh, RectangLayer,
         Determine the size of the absorbing layer using the Eikonal criterion
     velocity_habc()
         Set the velocity model for the model with absorbing layer
-    '''
+    """
 
-    def __init__(self, dictionary=None, fwi_iter=0,
-                 comm=None, output_folder=None):
-        '''
-        Initialize the HABC class
+    def __init__(
+        self, dictionary=None, fwi_iter=0, comm=None, output_folder=None
+    ):
+        """Initialize the HABC class.
 
         Parameters
         ----------
@@ -165,21 +172,24 @@ class HABC_Wave(AcousticWave, HABC_Mesh, RectangLayer,
         Returns
         -------
         None
-        '''
-
+        """
         # Initializing the Wave class
         AcousticWave.__init__(self, dictionary=dictionary, comm=comm)
 
         # Nyquist frequency
-        self.f_Nyq = 1. / (2. * self.dt)
+        self.f_Nyq = 1.0 / (2.0 * self.dt)
 
         # Original domain dimensions
         dom_dim = self.habc_domain_dimensions(only_orig_dom=True)
 
         # Initializing the Mesh class
         HABC_Mesh.__init__(
-            self, dom_dim, dimension=self.dimension,
-            quadrilateral=self.mesh_parameters.quadrilateral, comm=self.comm)
+            self,
+            dom_dim,
+            dimension=self.dimension,
+            quadrilateral=self.mesh_parameters.quadrilateral,
+            comm=self.comm,
+        )
 
         # Identifier for the current case study
         self.identify_habc_case(output_folder=output_folder)
@@ -188,8 +198,7 @@ class HABC_Wave(AcousticWave, HABC_Mesh, RectangLayer,
         self.fwi_iter = fwi_iter
 
     def identify_habc_case(self, output_folder=None):
-        '''
-        Generate an identifier for the current case study of the HABC scheme
+        """Generate an identifier for the current case study of the HABC scheme.
 
         Parameters
         ----------
@@ -199,8 +208,7 @@ class HABC_Wave(AcousticWave, HABC_Mesh, RectangLayer,
         Returns
         -------
         None
-        '''
-
+        """
         # Original domain dimensions
         dom_dim = self.habc_domain_dimensions(only_orig_dom=True)
 
@@ -209,39 +217,46 @@ class HABC_Wave(AcousticWave, HABC_Mesh, RectangLayer,
         lay_str = f"\nAbsorbing Layer Shape: {self.layer_shape.capitalize()}"
 
         # Labeling for the layer shape
-        if self.layer_shape == 'rectangular':  # Rectangular layer
+        if self.layer_shape == "rectangular":  # Rectangular layer
 
             # Initializing the rectangular layer
             RectangLayer.__init__(self, dom_dim, dimension=self.dimension)
-            self.case_habc = 'REC'  # Label
+            self.case_habc = "REC"  # Label
 
-        elif self.layer_shape == 'hypershape':  # Hypershape layer
+        elif self.layer_shape == "hypershape":  # Hypershape layer
 
             # Initializing the hyperelliptical layer
-            HyperLayer.__init__(self, dom_dim, n_hyp=self.abc_deg_layer,
-                                n_type=self.abc_degree_type,
-                                dimension=self.dimension)
+            HyperLayer.__init__(
+                self,
+                dom_dim,
+                n_hyp=self.abc_deg_layer,
+                n_type=self.abc_degree_type,
+                dimension=self.dimension,
+            )
 
-            self.case_habc = 'HN' + f"{self.abc_deg_layer:.1f}"  # Label
+            self.case_habc = "HN" + f"{self.abc_deg_layer:.1f}"  # Label
             deg_str = f" - Degree: {self.abc_deg_layer}"
             lay_str += deg_str
 
         else:
-            value_parameter_error('layer_shape', self.layer_shape,
-                                  ['rectangular', 'hypershape'])
+            value_parameter_error(
+                "layer_shape", self.layer_shape, ["rectangular", "hypershape"]
+            )
         print(lay_str, flush=True)
 
         # Labeling for the reference frequency for the absorbing layer
-        if self.abc_reference_freq == 'boundary':
+        if self.abc_reference_freq == "boundary":
             self.case_habc += "_BND"
 
-        elif self.abc_reference_freq == 'source':
+        elif self.abc_reference_freq == "source":
             self.case_habc += "_SOU"
 
         else:
-            value_parameter_error('abc_reference_freq',
-                                  self.abc_reference_freq,
-                                  ['boundary', 'source'])
+            value_parameter_error(
+                "abc_reference_freq",
+                self.abc_reference_freq,
+                ["boundary", "source"],
+            )
 
         # Path to save data
         if output_folder is None:
@@ -252,19 +267,26 @@ class HABC_Wave(AcousticWave, HABC_Mesh, RectangLayer,
         self.path_case_habc = self.path_save + self.case_habc + "/"
 
         # Initializing the error measure class
-        HABC_Error.__init__(self, self.dt, self.f_Nyq,
-                            self.receiver_locations,
-                            output_folder=self.path_save,
-                            output_case=self.path_case_habc)
+        HABC_Error.__init__(
+            self,
+            self.dt,
+            self.f_Nyq,
+            self.receiver_locations,
+            output_folder=self.path_save,
+            output_case=self.path_case_habc,
+        )
 
         # Initializing the NRBC class
-        NRBC.__init__(self, dom_dim, self.layer_shape,
-                      dimension=self.dimension,
-                      output_folder=self.path_case_habc)
+        NRBC.__init__(
+            self,
+            dom_dim,
+            self.layer_shape,
+            dimension=self.dimension,
+            output_folder=self.path_case_habc,
+        )
 
     def critical_boundary_points(self):
-        '''
-        Determine the critical points on domain boundaries of the original
+        """Determine the critical points on domain boundaries of the original
         model to size an absorbing layer using the Eikonal criterion for HABCs.
         See Salas et al (2022) for details.
 
@@ -275,8 +297,7 @@ class HABC_Wave(AcousticWave, HABC_Mesh, RectangLayer,
         Returns
         -------
         None
-        '''
-
+        """
         # Initializing Eikonal object
         Eikonal = eik.HABC_Eikonal(self)
 
@@ -292,8 +313,7 @@ class HABC_Wave(AcousticWave, HABC_Mesh, RectangLayer,
         self.number_of_receivers = len(self.receiver_locations)
 
     def det_reference_freq(self, fpad=4):
-        '''
-        Determine the reference frequency for a new layer size
+        """Determine the reference frequency for a new layer size.
 
         Parameters
         ----------
@@ -303,19 +323,21 @@ class HABC_Wave(AcousticWave, HABC_Mesh, RectangLayer,
         Returns
         -------
         None
-        '''
-
+        """
         print("\nDetermining Reference Frequency", flush=True)
 
-        abc_reference_freq = self.abc_reference_freq \
-            if hasattr(self, 'receivers_reference') else 'source'
+        abc_reference_freq = (
+            self.abc_reference_freq
+            if hasattr(self, "receivers_reference")
+            else "source"
+        )
 
-        if self.abc_reference_freq == 'source':  # Initial guess
+        if self.abc_reference_freq == "source":  # Initial guess
 
             # Theorical central Ricker source frequency
             self.freq_ref = self.frequency
 
-        elif abc_reference_freq == 'boundary':
+        elif abc_reference_freq == "boundary":
 
             # Reference frequency of the wave at the boundary
             self.freq_ref = np.inf
@@ -326,18 +348,22 @@ class HABC_Wave(AcousticWave, HABC_Mesh, RectangLayer,
                 histPcrit = self.receivers_reference[:, n_crit]
 
                 # Get the minimum frequency excited at each critical point
-                freq_ref = freq_response(histPcrit, self.f_Nyq,
-                                         fpad=fpad, get_max_freq=True)
-                print("Frequency at Critical Point {:>2.0f}: {:.5f}".format(
-                    n_crit, freq_ref), flush=True)
+                freq_ref = freq_response(
+                    histPcrit, self.f_Nyq, fpad=fpad, get_max_freq=True
+                )
+                print(
+                    "Frequency at Critical Point {:>2.0f}: {:.5f}".format(
+                        n_crit, freq_ref
+                    ),
+                    flush=True,
+                )
 
                 self.freq_ref = min(self.freq_ref, freq_ref)
 
         print("Reference Frequency (Hz): {:.5f}".format(self.freq_ref))
 
     def habc_new_geometry(self):
-        '''
-        Determine the new domain geometry with the absorbing layer
+        """Determine the new domain geometry with the absorbing layer.
 
         Parameters
         ----------
@@ -346,8 +372,7 @@ class HABC_Wave(AcousticWave, HABC_Mesh, RectangLayer,
         Returns
         -------
         None
-        '''
-
+        """
         # New geometry with layer
         self.Lx_habc = self.mesh_parameters.length_x + 2 * self.pad_len
         self.Lz_habc = self.mesh_parameters.length_z + self.pad_len
@@ -355,10 +380,10 @@ class HABC_Wave(AcousticWave, HABC_Mesh, RectangLayer,
         if self.dimension == 3:  # 3D
             self.Ly_habc = self.mesh_parameters.length_y + 2 * self.pad_len
 
-    def habc_domain_dimensions(self, only_orig_dom=False,
-                               only_habc_dom=False, full_hyp=True):
-        '''
-        Determine the new dimensions of the domain with absorbing layer
+    def habc_domain_dimensions(
+        self, only_orig_dom=False, only_habc_dom=False, full_hyp=True
+    ):
+        """Determine the new dimensions of the domain with absorbing layer.
 
         Parameters
         ----------
@@ -383,11 +408,9 @@ class HABC_Wave(AcousticWave, HABC_Mesh, RectangLayer,
             True; otherwise, it is included (n = 1). Dimensions are defined as:
             - 2D : (Lx + 2 * pad_len, Lz + n * pad_len)
             - 3D : (Lx + 2 * pad_len, Lz + n * pad_len, Ly + 2 * pad_len)
-        '''
-
+        """
         # Original domain dimensions
-        dom_dim = (self.mesh_parameters.length_x,
-                   self.mesh_parameters.length_z)
+        dom_dim = (self.mesh_parameters.length_x, self.mesh_parameters.length_z)
         if self.dimension == 3:  # 3D
             dom_dim += (self.mesh_parameters.length_y,)
 
@@ -395,13 +418,15 @@ class HABC_Wave(AcousticWave, HABC_Mesh, RectangLayer,
             return dom_dim
 
         # Domain dimension with layer w/ or w/o truncations
-        if self.layer_shape == 'rectangular':  # Rectangular layer
+        if self.layer_shape == "rectangular":  # Rectangular layer
             dom_lay = (self.Lx_habc, self.Lz_habc)
 
-        elif self.layer_shape == 'hypershape':  # Hypershape layer
-            dom_lay = (self.Lx_habc, self.mesh_parameters.length_z
-                       + 2 * self.pad_len) \
-                if full_hyp else (self.Lx_habc, self.Lz_habc)
+        elif self.layer_shape == "hypershape":  # Hypershape layer
+            dom_lay = (
+                (self.Lx_habc, self.mesh_parameters.length_z + 2 * self.pad_len)
+                if full_hyp
+                else (self.Lx_habc, self.Lz_habc)
+            )
 
         if self.dimension == 3:  # 3D
             dom_lay += (self.Ly_habc,)
@@ -412,9 +437,8 @@ class HABC_Wave(AcousticWave, HABC_Mesh, RectangLayer,
         return dom_dim, dom_lay
 
     def size_habc_criterion(self, fpad=4, n_root=1, layer_based_on_mesh=True):
-        '''
-        Determine the size of the absorbing layer using the Eikonal
-        criterion for HABCs. See Salas et al (2022) for details.
+        """Determine the size of the absorbing layer using the Eikonal criterion
+        for HABCs. See Salas et al (2022) for details.
 
         Parameters
         ----------
@@ -428,8 +452,7 @@ class HABC_Wave(AcousticWave, HABC_Mesh, RectangLayer,
         Returns
         -------
         None
-        '''
-
+        """
         # Determining the reference frequency
         self.det_reference_freq(fpad=fpad)
 
@@ -443,15 +466,29 @@ class HABC_Wave(AcousticWave, HABC_Mesh, RectangLayer,
         self.crit_source = self.eik_bnd[0][-1]
 
         # Computing layer sizes
-        self.F_L, self.pad_len, self.ele_pad, self.d_norm, \
-            self.a_par, self.FLpos = calc_size_lay(
-                self.freq_ref, z_par, self.lmin, self.lref,
-                n_root=n_root, layer_based_on_mesh=layer_based_on_mesh)
+        (
+            self.F_L,
+            self.pad_len,
+            self.ele_pad,
+            self.d_norm,
+            self.a_par,
+            self.FLpos,
+        ) = calc_size_lay(
+            self.freq_ref,
+            z_par,
+            self.lmin,
+            self.lref,
+            n_root=n_root,
+            layer_based_on_mesh=layer_based_on_mesh,
+        )
 
-        plot_function_layer_size([self.a_par, z_par],
-                                 [self.freq_ref, self.frequency],
-                                 [self.lmin, self.lref], self.FLpos,
-                                 output_folder=self.path_case_habc)
+        plot_function_layer_size(
+            [self.a_par, z_par],
+            [self.freq_ref, self.frequency],
+            [self.lmin, self.lref],
+            self.FLpos,
+            output_folder=self.path_case_habc,
+        )
 
         print("\nDetermining New Geometry with Absorbing Layer", flush=True)
 
@@ -461,14 +498,14 @@ class HABC_Wave(AcousticWave, HABC_Mesh, RectangLayer,
         # Domain dimensions without free surface truncation
         dom_lay_full = self.habc_domain_dimensions(only_habc_dom=True)
 
-        if self.layer_shape == 'rectangular':
+        if self.layer_shape == "rectangular":
 
             print("Determining Rectangular Layer Parameters", flush=True)
 
             # Geometric properties of the rectangular layer
             self.calc_rec_geom_prop(dom_lay_full, self.pad_len)
 
-        elif self.layer_shape == 'hypershape':
+        elif self.layer_shape == "hypershape":
 
             print("Determining Hypershape Layer Parameters", flush=True)
 
@@ -476,8 +513,9 @@ class HABC_Wave(AcousticWave, HABC_Mesh, RectangLayer,
             self.calc_hyp_geom_prop(dom_lay_full, self.pad_len, self.lmin)
 
         # Domain dimensions with free surface truncation
-        dom_lay_trunc = self.habc_domain_dimensions(only_habc_dom=True,
-                                                    full_hyp=False)
+        dom_lay_trunc = self.habc_domain_dimensions(
+            only_habc_dom=True, full_hyp=False
+        )
 
         # Layer parameters
         layer_par = (self.F_L, self.a_par, self.d_norm)
@@ -491,12 +529,18 @@ class HABC_Wave(AcousticWave, HABC_Mesh, RectangLayer,
         wave_par = (self.freq_ref, c_ref, c_bnd)
 
         # Initializing the parent class for damping
-        HABC_Damping.__init__(self, dom_lay_trunc, layer_par, mesh_par,
-                              wave_par, dimension=self.dimension, comm=self.comm)
+        HABC_Damping.__init__(
+            self,
+            dom_lay_trunc,
+            layer_par,
+            mesh_par,
+            wave_par,
+            dimension=self.dimension,
+            comm=self.comm,
+        )
 
     def create_mesh_habc(self, inf_model=False, spln=True):
-        '''
-        Create a mesh with absorbing layer based on the determined size.
+        """Create a mesh with absorbing layer based on the determined size.
 
         Parameters
         ----------
@@ -510,23 +554,22 @@ class HABC_Wave(AcousticWave, HABC_Mesh, RectangLayer,
         Returns
         -------
         None
-        '''
-
+        """
         # Checking if the mesh for infinite model is requested
         if inf_model:
             print("\nGenerating Mesh for Infinite Model", flush=True)
-            layer_shape = 'rectangular'
+            layer_shape = "rectangular"
 
         else:
             print("\nGenerating Mesh with Absorbing Layer", flush=True)
             layer_shape = self.layer_shape
 
         # New mesh with layer
-        if layer_shape == 'rectangular':
+        if layer_shape == "rectangular":
             dom_lay = self.habc_domain_dimensions(only_habc_dom=True)
             mesh_habc = self.rectangular_mesh_habc(dom_lay, self.pad_len)
 
-        elif layer_shape == 'hypershape':
+        elif layer_shape == "hypershape":
 
             # Parameters for hypershape mesh
             if self.dimension == 2:  # 2D
@@ -551,9 +594,8 @@ class HABC_Wave(AcousticWave, HABC_Mesh, RectangLayer,
         outfile = fire.VTKFile(pth_mesh)
         outfile.write(self.mesh)
 
-    def velocity_habc(self, inf_model=False, method='point_cloud'):
-        '''
-        Set the velocity model for the model with absorbing layer
+    def velocity_habc(self, inf_model=False, method="point_cloud"):
+        """Set the velocity model for the model with absorbing layer.
 
         Parameters
         ----------
@@ -595,25 +637,27 @@ class HABC_Wave(AcousticWave, HABC_Mesh, RectangLayer,
         Estimating Runtime and Used Memory
         Runtime: (s):20.494, (m):0.342, (h):0.006
         Used Memory: Current (MB):18.715, Peak (MB):25.298
-        '''
-
+        """
         print("\nUpdating Velocity Profile", flush=True)
 
         # Initialize velocity field and assigning the original velocity model
         if self.quadrilateral:
             base_mesh = self.mesh._base_mesh
             base_cell = base_mesh.ufl_cell()
-            element_zx = fire.FiniteElement("DQ", base_cell, 0,
-                                            variant="spectral")
-            element_y = fire.FiniteElement("DG", fire.interval, 0,
-                                           variant="spectral")
+            element_zx = fire.FiniteElement(
+                "DQ", base_cell, 0, variant="spectral"
+            )
+            element_y = fire.FiniteElement(
+                "DG", fire.interval, 0, variant="spectral"
+            )
             tensor_element = fire.TensorProductElement(element_zx, element_y)
             V = fire.FunctionSpace(self.mesh, tensor_element)
         else:
             V = fire.FunctionSpace(self.mesh, self.ele_type_c0, self.p_c0)
 
-        self.c = fire.Function(V).interpolate(self.initial_velocity_model,
-                                              allow_missing_dofs=True)
+        self.c = fire.Function(V).interpolate(
+            self.initial_velocity_model, allow_missing_dofs=True
+        )
 
         # Clipping coordinates to the layer domain
         lay_field, layer_mask = self.clipping_coordinates_lay_field(V)
@@ -622,13 +666,16 @@ class HABC_Wave(AcousticWave, HABC_Mesh, RectangLayer,
         self.extend_velocity_profile(lay_field, layer_mask, method=method)
 
         # Interpolating the velocity model in the layer
-        self.c.interpolate(lay_field.sub(0) * layer_mask + (
-            1. - layer_mask) * self.c, allow_missing_dofs=True)
+        self.c.interpolate(
+            lay_field.sub(0) * layer_mask + (1.0 - layer_mask) * self.c,
+            allow_missing_dofs=True,
+        )
         del layer_mask, lay_field
 
         # Interpolating in the space function of the problem
-        self.c = fire.Function(self.function_space,
-                               name='c [km/s])').interpolate(self.c)
+        self.c = fire.Function(
+            self.function_space, name="c [km/s])"
+        ).interpolate(self.c)
 
         # Save new velocity model
         if inf_model:
@@ -639,10 +686,10 @@ class HABC_Wave(AcousticWave, HABC_Mesh, RectangLayer,
         outfile = fire.VTKFile(self.path_save + file_name)
         outfile.write(self.c)
 
-    def fundamental_frequency(self, method=None, monitor=False,
-                              fitting_c=(0., 0., 0., 0.)):
-        '''
-        Compute the fundamental frequency in Hz via modal analysis
+    def fundamental_frequency(
+        self, method=None, monitor=False, fitting_c=(0.0, 0.0, 0.0, 0.0)
+    ):
+        """Compute the fundamental frequency in Hz via modal analysis
         considering the numerical model with Neumann BCs.
 
         Parameters
@@ -674,7 +721,7 @@ class HABC_Wave(AcousticWave, HABC_Mesh, RectangLayer,
                 Exponent factor for the maximum equivalent velocity
 
         Returns
-        ----
+        -------
         None
 
         Verification
@@ -743,63 +790,73 @@ class HABC_Wave(AcousticWave, HABC_Mesh, RectangLayer,
 
            dx=0.01-L    %Diff-Q     %Diff-T
            0.47525      13.47       13.47
-        '''
-
+        """
         print("\nSolving Eigenvalue Problem", flush=True)
         mod_sol = eigsol.Modal_Solver(self.dimension, method=method)
 
-        if method == 'ANALYTICAL':
+        if method == "ANALYTICAL":
 
             # Hypershape parameters
             hyp_par = (self.n_hyp, *self.hyper_axes)
 
             # Cut plane at free surface
             Lz = self.dom_dim[1]
-            z_cut = Lz / 2.
+            z_cut = Lz / 2.0
 
             # Cut plane percentage
             cut_plane_perc = z_cut / self.hyper_axes[1]
 
             # Define the load for the energy-equivalent homogenization
             # Static load for HABC model
-            q_lay = self.set_material_property("q_lay", 'scalar',
-                                               constant=0.)
+            q_lay = self.set_material_property("q_lay", "scalar", constant=0.0)
             q_lay.dat.data_with_halos[
-                self.sources.cellNodeMaps.flatten().astype(int)] = \
-                self.sources.cell_tabulations.flatten()
+                self.sources.cellNodeMaps.flatten().astype(int)
+            ] = self.sources.cell_tabulations.flatten()
 
             # Static load for Reference model
             q_ref = fire.Function(self.funct_space_eik)
             q_ref.interpolate(q_lay, allow_missing_dofs=True)
 
             # Equivalent velocity for the original model
-            c_eqref = mod_sol.c_equivalent(self.initial_velocity_model,
-                                           V=self.funct_space_eik,
-                                           quad_rule=self.quadrature_rule,
-                                           static_load_for_ceq=q_ref)
+            c_eqref = mod_sol.c_equivalent(
+                self.initial_velocity_model,
+                V=self.funct_space_eik,
+                quad_rule=self.quadrature_rule,
+                static_load_for_ceq=q_ref,
+            )
 
-            Lsp = mod_sol.solve_eigenproblem(self.c, V=self.function_space,
-                                             quad_rule=self.quadrature_rule,
-                                             hyp_par=hyp_par, c_eqref=c_eqref,
-                                             fitting_c=fitting_c,
-                                             cut_plane_percent=cut_plane_perc,
-                                             static_load_for_ceq=q_lay)
+            Lsp = mod_sol.solve_eigenproblem(
+                self.c,
+                V=self.function_space,
+                quad_rule=self.quadrature_rule,
+                hyp_par=hyp_par,
+                c_eqref=c_eqref,
+                fitting_c=fitting_c,
+                cut_plane_percent=cut_plane_perc,
+                static_load_for_ceq=q_lay,
+            )
 
-        elif method == 'RAYLEIGH':
+        elif method == "RAYLEIGH":
 
             # Normalized coordinates
-            coord_norm = mod_sol.generate_norm_coords(self.mesh,
-                                                      self.dom_dim,
-                                                      self.hyper_axes)
+            coord_norm = mod_sol.generate_norm_coords(
+                self.mesh, self.dom_dim, self.hyper_axes
+            )
 
-            Lsp = mod_sol.solve_eigenproblem(self.c, V=self.function_space,
-                                             quad_rule=self.quadrature_rule,
-                                             coord_norm=coord_norm)
+            Lsp = mod_sol.solve_eigenproblem(
+                self.c,
+                V=self.function_space,
+                quad_rule=self.quadrature_rule,
+                coord_norm=coord_norm,
+            )
 
         else:
-            Lsp = mod_sol.solve_eigenproblem(self.c,
-                                             V=self.function_space, shift=1e-8,
-                                             quad_rule=self.quadrature_rule)
+            Lsp = mod_sol.solve_eigenproblem(
+                self.c,
+                V=self.function_space,
+                shift=1e-8,
+                quad_rule=self.quadrature_rule,
+            )
 
         if monitor:
             for n_eig, eigval in enumerate(np.unique(Lsp)):
@@ -807,17 +864,20 @@ class HABC_Wave(AcousticWave, HABC_Mesh, RectangLayer,
                 print(f"Frequency {n_eig} (Hz): {f_eig:.5f}", flush=True)
 
         # Fundamental frequency (eig = 0 is a rigid body motion)
-        min_eigval = max(np.unique(Lsp[(Lsp > 0.) & (np.imag(Lsp) == 0.)]))
+        min_eigval = max(np.unique(Lsp[(Lsp > 0.0) & (np.imag(Lsp) == 0.0)]))
         self.fundam_freq = np.real(np.sqrt(min_eigval) / (2 * np.pi))
-        print("Fundamental Frequency (Hz): {0:.5f}".format(self.fundam_freq),
-              flush=True)
+        print(
+            "Fundamental Frequency (Hz): {0:.5f}".format(self.fundam_freq),
+            flush=True,
+        )
 
-    def damping_layer(self, xCR_usu=None, method=None,
-                      fitting_c=(0., 0., 0., 0.)):
-        '''
-        Set the damping profile within the absorbing layer.
-        Minimum damping ratio is computed as psi_min = xCR * d
-        where xCR is the heuristic factor for the minimum damping
+    def damping_layer(
+        self, xCR_usu=None, method=None, fitting_c=(0.0, 0.0, 0.0, 0.0)
+    ):
+        """Set the damping profile within the absorbing layer. Minimum damping
+        ratio is computed as psi_min = xCR * d where xCR is the heuristic factor
+        for the minimum damping.
+
         ratio and d is thenormalized element size (lmin / pad_len).
         Maximum damping ratio is psi_max =  2 * pi * f_fund * psi
         where f_fund is the fundamental frequency and psi = 0.999.
@@ -854,26 +914,27 @@ class HABC_Wave(AcousticWave, HABC_Mesh, RectangLayer,
         Returns
         -------
         None
-        '''
-
+        """
         # Estimating fundamental frequency
-        self.fundamental_frequency(method=method, monitor=True,
-                                   fitting_c=fitting_c)
+        self.fundamental_frequency(
+            method=method, monitor=True, fitting_c=fitting_c
+        )
 
         print("\nCreating Damping Profile", flush=True)
 
         # Compute the minimum damping ratio and the associated heuristic factor
-        eta_crt, self.psi_min, self.xCR, self.xCR_lim, self.CRmin\
-            = self.calc_damping_properties(self.fundam_freq, xCR_usu=xCR_usu)
+        eta_crt, self.psi_min, self.xCR, self.xCR_lim, self.CRmin = (
+            self.calc_damping_properties(self.fundam_freq, xCR_usu=xCR_usu)
+        )
 
         # Mesh coordinates
         coords = fire.SpatialCoordinate(self.mesh)
 
         # Damping mask
-        V_mask = fire.FunctionSpace(self.mesh, 'DG', 0)
-        self.eta_mask = self.layer_mask_field(coords, V_mask,
-                                              type_marker='mask',
-                                              name_mask='eta_mask')
+        V_mask = fire.FunctionSpace(self.mesh, "DG", 0)
+        self.eta_mask = self.layer_mask_field(
+            coords, V_mask, type_marker="mask", name_mask="eta_mask"
+        )
 
         # Save damping mask
         outfile = fire.VTKFile(self.path_case_habc + "eta_mask.pvd")
@@ -885,16 +946,19 @@ class HABC_Wave(AcousticWave, HABC_Mesh, RectangLayer,
         # Damping field
         damp_par = (self.pad_len, eta_crt, aq, bq)
         self.eta_habc = self.layer_mask_field(
-            coords, self.function_space, damp_par=damp_par,
-            type_marker='damping', name_mask='eta [1/s])')
+            coords,
+            self.function_space,
+            damp_par=damp_par,
+            type_marker="damping",
+            name_mask="eta [1/s])",
+        )
 
         # Save damping profile
         outfile = fire.VTKFile(self.path_case_habc + "eta_habc.pvd")
         outfile.write(self.eta_habc)
 
     def nrbc_on_boundary_layer(self):
-        '''
-        Apply the Higdon ABCs on the outer boundary of the absorbing layer
+        """Apply the Higdon ABCs on the outer boundary of the absorbing layer.
 
         Parameters
         ----------
@@ -903,27 +967,31 @@ class HABC_Wave(AcousticWave, HABC_Mesh, RectangLayer,
         Returns
         -------
         None
-        '''
-
+        """
         print("\nApplying Non-Reflecting Boundary Conditions", flush=True)
 
         # Getting boundary data from the layer boundaries
         bnd_nfs, bnd_nodes_nfs = self.layer_boundary_data(self.function_space)
 
         # Hypershape parameters
-        if self.layer_shape == 'hypershape':
+        if self.layer_shape == "hypershape":
             hyp_par = (self.n_hyp, *self.hyper_axes)
         else:
             hyp_par = None
 
         # Applying Higdon ABCs
-        self.cos_ang_HigdonBC(self.function_space, self.crit_source,
-                              bnd_nfs, bnd_nodes_nfs, hyp_par=hyp_par)
+        self.cos_ang_HigdonBC(
+            self.function_space,
+            self.crit_source,
+            bnd_nfs,
+            bnd_nodes_nfs,
+            hyp_par=hyp_par,
+        )
 
-    def check_timestep_habc(self, max_divisor_tf=1, set_max_dt=True,
-                            method='ANALYTICAL', mag_add=3):
-        '''
-        Check if the timestep size is appropriate for the transient response
+    def check_timestep_habc(
+        self, max_divisor_tf=1, set_max_dt=True, method="ANALYTICAL", mag_add=3
+    ):
+        """Check if the timestep size is appropriate for the transient response.
 
         Parameters
         ----------
@@ -951,8 +1019,7 @@ class HABC_Wave(AcousticWave, HABC_Mesh, RectangLayer,
 
         # Estimation: 2.770 (Old), 2.768 (New) (Scipy-sparse)
         # Exact: 1.842 (Old), 1.842 (New) (Scipy)
-        '''
-
+        """
         print("\nChecking Timestep Size", flush=True)
 
         # User timestep
@@ -960,10 +1027,16 @@ class HABC_Wave(AcousticWave, HABC_Mesh, RectangLayer,
 
         # Maximum timestep size
         dt_sol = eigsol.Modal_Solver(
-            self.dimension, method=method, calc_max_dt=True)
+            self.dimension, method=method, calc_max_dt=True
+        )
         max_dt = dt_sol.estimate_timestep(
-            self.c, self.function_space, self.final_time, shift=1e-8,
-            quad_rule=self.quadrature_rule, fraction=1.)
+            self.c,
+            self.function_space,
+            self.final_time,
+            shift=1e-8,
+            quad_rule=self.quadrature_rule,
+            fraction=1.0,
+        )
 
         # Rounding power
         pot = int(abs(np.ceil(np.log10(max_dt))) + mag_add)
@@ -974,7 +1047,7 @@ class HABC_Wave(AcousticWave, HABC_Mesh, RectangLayer,
         max_div = [d for d in divisors(val_int_tf) if d < val_int_dt]
         n_div = len(max_div)
         index_div = min(max_divisor_tf, n_div)
-        max_dt = round(10**(-pot) * max_div[-index_div], pot)
+        max_dt = round(10 ** (-pot) * max_div[-index_div], pot)
 
         # Set the timestep size
         dt = max_dt if set_max_dt else min(usr_dt, max_dt)
@@ -982,19 +1055,20 @@ class HABC_Wave(AcousticWave, HABC_Mesh, RectangLayer,
         dt_ms = 1e3 * self.dt
         if set_max_dt:
             str_dt = "Selected Timestep Size ({} of {}): {:.{p}f} ms".format(
-                min(max_divisor_tf, n_div), n_div, dt_ms, p=mag_add)
+                min(max_divisor_tf, n_div), n_div, dt_ms, p=mag_add
+            )
         else:
-            str_dt = "Selected Timestep Size: {:.{p}f} ms".format(dt_ms,
-                                                                  p=mag_add)
+            str_dt = "Selected Timestep Size: {:.{p}f} ms".format(
+                dt_ms, p=mag_add
+            )
 
         # Updating Nyquist frequency
-        self.f_Nyq = 1. / (2. * self.dt)
+        self.f_Nyq = 1.0 / (2.0 * self.dt)
 
         print(str_dt, flush=True)
 
     def layer_infinite_model(self):
-        '''
-        Determine the domain extension size for the infinite domain model
+        """Determine the domain extension size for the infinite domain model.
 
         Parameters
         ----------
@@ -1004,19 +1078,18 @@ class HABC_Wave(AcousticWave, HABC_Mesh, RectangLayer,
         -------
         infinite_pad_len : `float`
             Size of the domain extension for the infinite domain model
-        '''
-
+        """
         # Size of the domain extension
-        add_dom = self.c_bnd_max * self.final_time / 2.
+        add_dom = self.c_bnd_max * self.final_time / 2.0
 
         # Distance already travelled by the wave
-        if hasattr(self, 'eik_bnd'):
+        if hasattr(self, "eik_bnd"):
 
             # If Eikonal analysis was performed
             eikmin = self.eik_bnd[0][2]
 
             # Minimum distance to the nearest boundary
-            dist_to_bnd = self.c_bnd_max * eikmin / 2.
+            dist_to_bnd = self.c_bnd_max * eikmin / 2.0
         else:
 
             # If Eikonal analysis was not performed
@@ -1024,15 +1097,17 @@ class HABC_Wave(AcousticWave, HABC_Mesh, RectangLayer,
 
             # Candidate to minimum distance to the boundaries
             delta_z = np.abs(sources_loc[:, 0] - self.mesh_parameters.length_z)
-            delta_x = np.minimum(np.abs(sources_loc[:, 1]),
-                                 np.abs(sources_loc[:, 1]
-                                        - self.mesh_parameters.length_x))
+            delta_x = np.minimum(
+                np.abs(sources_loc[:, 1]),
+                np.abs(sources_loc[:, 1] - self.mesh_parameters.length_x),
+            )
             cand_dist = (delta_z, delta_x)
 
             if self.dimension == 3:  # 3D
-                delta_y = np.minimum(np.abs(sources_loc[:, 2]),
-                                     np.abs(sources_loc[:, 2]
-                                            - self.mesh_parameters.length_y))
+                delta_y = np.minimum(
+                    np.abs(sources_loc[:, 2]),
+                    np.abs(sources_loc[:, 2] - self.mesh_parameters.length_y),
+                )
                 cand_dist += (delta_y,)
 
             # Minimum distance to the nearest boundary
@@ -1047,8 +1122,7 @@ class HABC_Wave(AcousticWave, HABC_Mesh, RectangLayer,
         return infinite_pad_len
 
     def geometry_infinite_model(self):
-        '''
-        Determine the geometry for the infinite domain model.
+        """Determine the geometry for the infinite domain model.
 
         Parameters
         ----------
@@ -1057,8 +1131,7 @@ class HABC_Wave(AcousticWave, HABC_Mesh, RectangLayer,
         Returns
         -------
         None
-        '''
-
+        """
         # Size of the domain extension
         self.pad_len = self.layer_infinite_model()
 
@@ -1068,10 +1141,11 @@ class HABC_Wave(AcousticWave, HABC_Mesh, RectangLayer,
         # New dimensions
         self.habc_new_geometry()
 
-    def infinite_model(self, check_dt=False, max_divisor_tf=1,
-                       method='ANALYTICAL', mag_add=3):
-        '''
-        Create a reference model for the HABC scheme for comparative purposes
+    def infinite_model(
+        self, check_dt=False, max_divisor_tf=1, method="ANALYTICAL", mag_add=3
+    ):
+        """Create a reference model for the HABC scheme for comparative
+        purposes.
 
         Parameters
         ----------
@@ -1096,12 +1170,12 @@ class HABC_Wave(AcousticWave, HABC_Mesh, RectangLayer,
         Returns
         -------
         None
-        '''
-
+        """
         # Check the timestep size
         if check_dt:
             self.check_timestep_habc(
-                max_divisor_tf=max_divisor_tf, method=method, mag_add=mag_add)
+                max_divisor_tf=max_divisor_tf, method=method, mag_add=mag_add
+            )
 
         print("\nBuilding Infinite Domain Model", flush=True)
 
@@ -1115,9 +1189,9 @@ class HABC_Wave(AcousticWave, HABC_Mesh, RectangLayer,
         self.velocity_habc(inf_model=True)
 
         # Setting no damping
-        self.cosHig = fire.Constant(0.)
-        self.eta_mask = fire.Constant(0.)
-        self.eta_habc = fire.Constant(0.)
+        self.cosHig = fire.Constant(0.0)
+        self.eta_mask = fire.Constant(0.0)
+        self.eta_habc = fire.Constant(0.0)
 
         print("\nSolving Infinite Model", flush=True)
 
@@ -1134,9 +1208,8 @@ class HABC_Wave(AcousticWave, HABC_Mesh, RectangLayer,
             del self.Ly_habc
 
     def rename_folder_habc(self):
-        '''
-        Rename the folder of results if the degree for the
-        hypershape layer is out of the criterion limits
+        """Rename the folder of results if the degree for the hypershape layer
+        is out of the criterion limits.
 
         Parameters
         ----------
@@ -1145,17 +1218,21 @@ class HABC_Wave(AcousticWave, HABC_Mesh, RectangLayer,
         Returns
         -------
         None
-        '''
-
-        if self.n_hyp != self.abc_deg_layer and \
-                self.layer_shape == 'hypershape':
+        """
+        if (
+            self.n_hyp != self.abc_deg_layer
+            and self.layer_shape == "hypershape"
+        ):
 
             print("Output Folder for Results Will Be Renamed.", flush=True)
 
             # Define the current and new folder names
             old = self.path_case_habc
-            new = self.path_case_habc[:-8] + f"{self.n_hyp:.1f}" + \
-                self.path_case_habc[-5:]
+            new = (
+                self.path_case_habc[:-8]
+                + f"{self.n_hyp:.1f}"
+                + self.path_case_habc[-5:]
+            )
 
             try:
                 if path.isdir(new):
@@ -1163,8 +1240,10 @@ class HABC_Wave(AcousticWave, HABC_Mesh, RectangLayer,
                     rmtree(new)
 
                 rename(old, new)  # Rename the directory
-                print(f"Folder '{old}' Successfully"
-                      f" Renamed to '{new}'\n", flush=True)
+                print(
+                    f"Folder '{old}' Successfully" f" Renamed to '{new}'\n",
+                    flush=True,
+                )
 
             except OSError as e:
                 print(f"Error Renaming Folder: {e}", flush=True)

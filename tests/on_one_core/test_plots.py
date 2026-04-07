@@ -7,6 +7,7 @@ import os
 def is_seismicmesh_installed():
     try:
         import SeismicMesh  # noqa: F401
+
         return True
     except ImportError:
         return False
@@ -47,7 +48,9 @@ def test_plot():
     z_switches = [-0.5]
     Wave_obj.multiple_layer_velocity_model(z_switches, layer_values)
     Wave_obj.forward_solve()
-    spyro.plots.plot_shots(Wave_obj, show=False, file_name="test_plot", file_format="png")
+    spyro.plots.plot_shots(
+        Wave_obj, show=False, file_name="test_plot", file_format="png"
+    )
     expected_file = "test_plot[0].png"
     assert os.path.exists(expected_file)
 
@@ -68,7 +71,7 @@ def test_plot_mesh_sizes():
     Lx = 2.0
     c = 1.5
     freq = 5.0
-    lbda = c/freq
+    lbda = c / freq
     pad = 0.3
     cpw = 3
 
@@ -87,7 +90,7 @@ def test_plot_mesh_sizes():
         "abc_pad_length": pad,
         "lbda": lbda,
         "dimension": 2,
-        "edge_length": lbda/cpw,
+        "edge_length": lbda / cpw,
         "output_filename": mesh_filename,
     }
 
@@ -101,7 +104,11 @@ def test_plot_mesh_sizes():
     mesh = Mesh_obj.create_mesh()  # noqa: F841
 
     image_output_filename = "mesh_size.png"
-    spyro.plots.plot_mesh_sizes(mesh_filename=mesh_filename, output_filename=image_output_filename, show=False)
+    spyro.plots.plot_mesh_sizes(
+        mesh_filename=mesh_filename,
+        output_filename=image_output_filename,
+        show=False,
+    )
     assert os.path.exists(str(image_output_filename))
 
 

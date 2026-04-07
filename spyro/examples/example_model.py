@@ -23,6 +23,7 @@ def recursive_dictionary_substitution(dictionary, default):
 
 class ExampleModelBase:
     """Base class for example models with dictionary handling."""
+
     def __init__(self, dictionary=None, default_dictionary=None, comm=None):
         self.optional_dictionary = deepcopy(dictionary)
         self.default_dictionary = default_dictionary
@@ -35,10 +36,8 @@ class ExampleModelBase:
 class Example_model_acoustic(ExampleModelBase, AcousticWave):
     """Sets up a basic model parameter class for examples and test case models.
     It has the option of reading a dictionary, and if any parameter is missing
-    from
-    this dictioanry it calls on a default value, that should be defined in the
-    relevant
-    example file.
+    from this dictioanry it calls on a default value, that should be defined in
+    the relevant example file.
 
     Example Setup
 
@@ -50,30 +49,32 @@ class Example_model_acoustic(ExampleModelBase, AcousticWave):
 
     Feel free to adapt these templates to your needs.
 
-    Parameters:
-    -----------
+    Parameters
+    ----------
     dictionary: 'python dictionary' (optional): dictionary with changes to the
     default parameters
 
     default_dictionary: python 'dictionary': default parameters
 
-    Returns:
-    --------
+    Returns
+    -------
     Example_model
     """
 
     def __init__(self, dictionary=None, default_dictionary=None, comm=None):
-        super().__init__(dictionary=dictionary, default_dictionary=default_dictionary, comm=comm)
+        super().__init__(
+            dictionary=dictionary,
+            default_dictionary=default_dictionary,
+            comm=comm,
+        )
         AcousticWave.__init__(self, dictionary=self.input_dictionary, comm=comm)
 
 
 class Example_model_acoustic_FWI(ExampleModelBase, FullWaveformInversion):
     """Sets up a basic model parameter class for examples and test case models.
     It has the option of reading a dictionary, and if any parameter is missing
-    from
-    this dictioanry it calls on a default value, that should be defined in the
-    relevant
-    example file.
+    from this dictioanry it calls on a default value, that should be defined in
+    the relevant example file.
 
     Example Setup
 
@@ -85,18 +86,24 @@ class Example_model_acoustic_FWI(ExampleModelBase, FullWaveformInversion):
 
     Feel free to adapt these templates to your needs.
 
-    Parameters:
-    -----------
+    Parameters
+    ----------
     dictionary: 'python dictionary' (optional): dictionary with changes to the
     default parameters
 
     default_dictionary: python 'dictionary': default parameters
 
-    Returns:
-    --------
+    Returns
+    -------
     Example_model
     """
 
     def __init__(self, dictionary=None, default_dictionary=None, comm=None):
-        super().__init__(dictionary=dictionary, default_dictionary=default_dictionary, comm=comm)
-        FullWaveformInversion.__init__(self, dictionary=self.input_dictionary, comm=comm)
+        super().__init__(
+            dictionary=dictionary,
+            default_dictionary=default_dictionary,
+            comm=comm,
+        )
+        FullWaveformInversion.__init__(
+            self, dictionary=self.input_dictionary, comm=comm
+        )

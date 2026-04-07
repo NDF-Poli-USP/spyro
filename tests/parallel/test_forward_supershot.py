@@ -1,11 +1,11 @@
 from mpi4py.MPI import COMM_WORLD
 from mpi4py import MPI
+
 # import debugpy
 # debugpy.listen(3000 + COMM_WORLD.rank)
 # debugpy.wait_for_client()
 import spyro
 import numpy as np
-import math
 
 
 def error_calc(p_numerical, p_analytical, nt):
@@ -47,11 +47,15 @@ def test_forward_supershot():
     }
     dictionary["acquisition"] = {
         "source_type": "ricker",
-        "source_locations": spyro.create_transect((-0.55, 0.7), (-0.55, 1.3), 2),
+        "source_locations": spyro.create_transect(
+            (-0.55, 0.7), (-0.55, 1.3), 2
+        ),
         "frequency": 5.0,
         "delay": 0.2,
         "delay_type": "time",
-        "receiver_locations": spyro.create_transect((-0.55, 0.5), (-0.55, 1.5), 200),
+        "receiver_locations": spyro.create_transect(
+            (-0.55, 0.5), (-0.55, 1.5), 200
+        ),
     }
 
     # Simulate for 2.0 seconds.
@@ -74,7 +78,9 @@ def test_forward_supershot():
     }
 
     Wave_obj = spyro.AcousticWave(dictionary=dictionary)
-    Wave_obj.set_mesh(input_mesh_parameters={"edge_length": 0.02, "periodic": True})
+    Wave_obj.set_mesh(
+        input_mesh_parameters={"edge_length": 0.02, "periodic": True}
+    )
 
     Wave_obj.set_initial_velocity_model(constant=1.5)
     Wave_obj.forward_solve()
@@ -82,7 +88,9 @@ def test_forward_supershot():
 
     rec_out = Wave_obj.receivers_output
     if comm.comm.rank == 0:
-        analytical_p = spyro.utils.nodal_homogeneous_analytical(Wave_obj, 0.2, 1.5, n_extra=100)
+        analytical_p = spyro.utils.nodal_homogeneous_analytical(
+            Wave_obj, 0.2, 1.5, n_extra=100
+        )
     else:
         analytical_p = None
 
@@ -101,7 +109,10 @@ def test_forward_supershot():
     comm.comm.barrier()
 
     if comm.comm.rank == 0:
-        print(f"Combined error for shots {Wave_obj.current_sources} is {error_all} and test has passed equals {np.abs(error_all) < 0.01}", flush=True)
+        print(
+            f"Combined error for shots {Wave_obj.current_sources} is {error_all} and test has passed equals {np.abs(error_all) < 0.01}",
+            flush=True,
+        )
 
     test = np.abs(error_all) < 0.01
 

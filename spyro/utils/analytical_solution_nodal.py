@@ -4,8 +4,7 @@ from ..sources import full_ricker_wavelet
 
 
 def nodal_homogeneous_analytical(Wave_object, offset, c_value, n_extra=5000):
-    """
-    This function calculates the analytical solution for an homogeneous
+    """This function calculates the analytical solution for an homogeneous
     medium with a single source and receiver.
 
     Parameters
@@ -24,7 +23,6 @@ def nodal_homogeneous_analytical(Wave_object, offset, c_value, n_extra=5000):
     u_analytical: numpy array
         Analytical solution for the wave equation.
     """
-
     # Generating extended ricker wavelet
     dt = Wave_object.dt
     final_time = Wave_object.final_time

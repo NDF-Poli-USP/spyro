@@ -5,23 +5,22 @@ from .. import utils
 
 
 def central_difference(wave, source_ids=[0]):
-    """
-    Perform central difference time integration for wave propagation.
+    """Perform central difference time integration for wave propagation.
 
-    Parameters:
-    -----------
+    Parameters
+    ----------
     wave: Spyro object
         The Wave object containing the necessary data and parameters.
     source_ids: list of ints (optional)
         The ID of the sources being propagated. Defaults to [0].
 
-    Returns:
-    --------
+    Returns
+    -------
         tuple:
             A tuple containing the forward solution and the receiver output.
 
-    Notes:
-    ------
+    Notes
+    -----
     Use ``LinearVariationalSolver`` with per-step source updates through
     ``wave.rhs_no_pml_source()`` before ``wave.solver.solve()``.
     """
@@ -44,7 +43,8 @@ def central_difference(wave, source_ids=[0]):
         # being one at a point and zero elsewhere.
         source_cof = wave.sources.source_cofunction()
         interpolate_receivers = wave.receivers.receiver_interpolator(
-            wave.vstate)
+            wave.vstate
+        )
     usol_recv = []
     save_step = 0
     for step in range(nt):
@@ -53,11 +53,13 @@ def central_difference(wave, source_ids=[0]):
 
         if wave.sources is not None:
             if wave.use_vertex_only_mesh:
-                wave.rhs_no_pml_source().assign(fire.assemble(
-                    wave.sources.wavelet[step] * source_cof))
+                wave.rhs_no_pml_source().assign(
+                    fire.assemble(wave.sources.wavelet[step] * source_cof)
+                )
             else:
                 wave.rhs_no_pml_source().assign(
-                    wave.sources.apply_source(rhs_forcing, step))
+                    wave.sources.apply_source(rhs_forcing, step)
+                )
         wave.solver.solve()
 
         wave.prev_vstate = wave.vstate
@@ -72,10 +74,10 @@ def central_difference(wave, source_ids=[0]):
             save_step += 1
 
         if (step - 1) % wave.output_frequency == 0:
-            assert (
-                fire.norm(wave.get_function()) < 1
-            ), "Numerical instability. Try reducing dt or building the " \
-               "mesh differently"
+            assert fire.norm(wave.get_function()) < 1, (
+                "Numerical instability. Try reducing dt or building the "
+                "mesh differently"
+            )
             wave.field_logger.log(t)
             helpers.display_progress(wave.comm, t)
 

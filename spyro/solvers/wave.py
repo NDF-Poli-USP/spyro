@@ -2,8 +2,9 @@ from abc import abstractmethod, ABCMeta
 import warnings
 import firedrake as fire
 
-from .time_integration_central_difference import \
-    central_difference as time_integrator
+from .time_integration_central_difference import (
+    central_difference as time_integrator,
+)
 from ..domains.quadrature import quadrature_rules
 from ..domains.space import check_function_space_type
 from ..io import Model_parameters
@@ -22,11 +23,10 @@ fire.set_log_level(fire.ERROR)
 
 
 class Wave(Model_parameters, metaclass=ABCMeta):
-    """
-    Base class for wave equation solvers.
+    """Base class for wave equation solvers.
 
-    Attributes:
-    -----------
+    Attributes
+    ----------
     comm: MPI communicator
 
     initial_velocity_model: firedrake function
@@ -49,8 +49,8 @@ class Wave(Model_parameters, metaclass=ABCMeta):
     receivers: Receivers object
         Contains information about receivers
 
-    Methods:
-    --------
+    Methods
+    -------
     set_mesh()
         Sets or calculates new mesh
     set_solver_parameters()
@@ -68,11 +68,11 @@ class Wave(Model_parameters, metaclass=ABCMeta):
     """
 
     def __init__(self, dictionary=None, comm=None):
-        """Wave object solver. Contains both the forward solver
-        and gradient calculator methods.
+        """Wave object solver. Contains both the forward solver and gradient
+        calculator methods.
 
-        Parameters:
-        -----------
+        Parameters
+        ----------
         comm: MPI communicator
 
         model_parameters: Python object
@@ -110,14 +110,15 @@ class Wave(Model_parameters, metaclass=ABCMeta):
         self.source_expression = None
         # Object for efficient application of sources
 
-        self.field_logger = FieldLogger(self.comm,
-                                        self.input_dictionary["visualization"])
-        self.field_logger.add_field("forward", self.get_function_name(),
-                                    lambda: self.get_function())
+        self.field_logger = FieldLogger(
+            self.comm, self.input_dictionary["visualization"]
+        )
+        self.field_logger.add_field(
+            "forward", self.get_function_name(), lambda: self.get_function()
+        )
 
     def forward_solve(self):
         """Solves the forward problem."""
-
         parallel_print("\nSolving Forward Problem", comm=self.comm)
 
         if self.function_space is None:
@@ -140,19 +141,17 @@ class Wave(Model_parameters, metaclass=ABCMeta):
         pass
 
     def set_mesh(
-            self,
-            user_mesh=None,
-            input_mesh_parameters=None,
+        self,
+        user_mesh=None,
+        input_mesh_parameters=None,
     ):
-        """
-        Set the mesh for the solver.
+        """Set the mesh for the solver.
 
         Args:
             user_mesh (optional): User-defined mesh. Defaults to None.
             mesh_parameters (optional): Parameters for generating a mesh.
             Defaults to None.
         """
-
         if input_mesh_parameters is None:
             input_mesh_parameters = {}
 
@@ -166,13 +165,13 @@ class Wave(Model_parameters, metaclass=ABCMeta):
         self._map_sources_and_receivers()
 
     def set_solver_parameters(self, parameters=None):
-        """
-        Set the solver parameters.
+        """Set the solver parameters.
 
         Args:
             parameters (dict): A dictionary containing the solver parameters.
 
-        Returns:
+        Returns
+        -------
             None
         """
         if parameters is not None:
@@ -200,8 +199,8 @@ class Wave(Model_parameters, metaclass=ABCMeta):
     ):
         """Method to define new user velocity model or file. It is optional.
 
-        Parameters:
-        -----------
+        Parameters
+        ----------
         conditional:  (optional)
             Firedrake conditional object.
         velocity_model_function: Firedrake function (optional)
@@ -239,9 +238,11 @@ class Wave(Model_parameters, metaclass=ABCMeta):
         elif expression is not None:
             V = self.function_space
             vp = eval_functions_to_ufl.generate_ufl_functions(
-                self.mesh, expression, self.dimension)
+                self.mesh, expression, self.dimension
+            )
             self.initial_velocity_model = fire.Function(
-                V, name="velocity").interpolate(vp)
+                V, name="velocity"
+            ).interpolate(vp)
 
         elif velocity_model_function is not None:
             self.initial_velocity_model = velocity_model_function
@@ -282,9 +283,13 @@ class Wave(Model_parameters, metaclass=ABCMeta):
         if function_space_type == "scalar":
             self.scalar_function_space = self.function_space
         elif function_space_type == "mixed":
-            scalar_function_space_type = check_function_space_type(self.function_space.sub(0))
+            scalar_function_space_type = check_function_space_type(
+                self.function_space.sub(0)
+            )
             if scalar_function_space_type != "scalar":
-                raise ValueError("Do not change mixed space order, use scalar first!!! (ノಠ益ಠ)ノ彡┻━┻")
+                raise ValueError(
+                    "Do not change mixed space order, use scalar first!!! (ノಠ益ಠ)ノ彡┻━┻"
+                )
             self.scalar_function_space = self.function_space.sub(0)
             self.vector_function_space = self.function_space.sub(1)
         elif function_space_type == "vector":
@@ -307,10 +312,11 @@ class Wave(Model_parameters, metaclass=ABCMeta):
             self.mesh_x = x
             self.mesh_y = y
 
-    def get_and_set_maximum_dt(self, fraction=0.7,
-                               estimate_max_eigenvalue=False):
-        """
-        Calculates and sets the maximum stable time step (dt) for the wave solver.
+    def get_and_set_maximum_dt(
+        self, fraction=0.7, estimate_max_eigenvalue=False
+    ):
+        """Calculates and sets the maximum stable time step (dt) for the wave
+        solver.
 
         Args:
             fraction (float, optional):
@@ -318,23 +324,27 @@ class Wave(Model_parameters, metaclass=ABCMeta):
             estimate_max_eigenvalue (bool, optional):
                 Whether to estimate the maximum eigenvalue. Defaults to False.
 
-        Returns:
+        Returns
+        -------
             float: The calculated maximum time step (dt).
         """
-
         if self.c is None:
             c = self.initial_velocity_model
         else:
             c = self.c
 
         # Maximum timestep size
-        method = 'ANALYTICAL' if estimate_max_eigenvalue else 'ARNOLDI'
-        dt_solver = Modal_Solver(self.dimension, method=method,
-                                 calc_max_dt=True)
-        max_dt = dt_solver.estimate_timestep(c, self.function_space,
-                                             self.final_time,
-                                             quad_rule=self.quadrature_rule,
-                                             fraction=fraction)
+        method = "ANALYTICAL" if estimate_max_eigenvalue else "ARNOLDI"
+        dt_solver = Modal_Solver(
+            self.dimension, method=method, calc_max_dt=True
+        )
+        max_dt = dt_solver.estimate_timestep(
+            c,
+            self.function_space,
+            self.final_time,
+            quad_rule=self.quadrature_rule,
+            fraction=fraction,
+        )
         self.dt = max_dt
 
         return max_dt
@@ -376,12 +386,18 @@ class Wave(Model_parameters, metaclass=ABCMeta):
         pass
 
     # Managed attributes to access state variables in current, previous and next iteration
-    vstate = property(fget=lambda self: self._get_vstate(),
-                      fset=lambda self, value: self._set_vstate(value))
-    prev_vstate = property(fget=lambda self: self._get_prev_vstate(),
-                           fset=lambda self, value: self._set_prev_vstate(value))
-    next_vstate = property(fget=lambda self: self._get_next_vstate(),
-                           fset=lambda self, value: self._set_next_vstate(value))
+    vstate = property(
+        fget=lambda self: self._get_vstate(),
+        fset=lambda self, value: self._set_vstate(value),
+    )
+    prev_vstate = property(
+        fget=lambda self: self._get_prev_vstate(),
+        fset=lambda self, value: self._set_prev_vstate(value),
+    )
+    next_vstate = property(
+        fget=lambda self: self._get_next_vstate(),
+        fset=lambda self, value: self._set_next_vstate(value),
+    )
 
     @abstractmethod
     def get_receivers_output(self):
@@ -389,29 +405,33 @@ class Wave(Model_parameters, metaclass=ABCMeta):
 
     @abstractmethod
     def get_function(self):
-        '''Returns the function (e.g., pressure or displacement) associated with
-        the wave object without additional variables (e.g., PML variables)'''
+        """Returns the function (e.g., pressure or displacement) associated with
+        the wave object without additional variables (e.g., PML variables)
+        """
         pass
 
     @abstractmethod
     def get_function_name(self):
-        '''Returns the string representing the function of the wave object
-        (e.g., "pressure" or "displacement")'''
+        """Returns the string representing the function of the wave object
+        (e.g., "pressure" or "displacement")
+        """
         pass
 
     def update_source_expression(self, t):
-        '''Update the source expression during wave propagation. This method must be
-        implemented only by subclasses that make use of the source term'''
+        """Update the source expression during wave propagation.
+
+        This method must be implemented only by subclasses that make use of the
+        source term
+        """
         pass
 
     @ensemble_propagator
     def wave_propagator(self, dt=None, final_time=None, source_nums=[0]):
-        """
-        Propagate the wave forward in time.
-        Currently uses central differences.
+        """Propagate the wave forward in time. Currently uses central
+        differences.
 
-        Parameters:
-        -----------
+        Parameters
+        ----------
         dt: Python 'float' (optional)
             Time step to be used explicitly. If not mentioned uses the default,
             that was estabilished in the wave object.
@@ -419,8 +439,8 @@ class Wave(Model_parameters, metaclass=ABCMeta):
             Time which simulation ends. If not mentioned uses the default,
             that was estabilished in the wave object.
 
-        Returns:
-        --------
+        Returns
+        -------
         usol: Firedrake 'Function'
             Wavefield at the final time.
         u_rec: numpy array
@@ -448,8 +468,7 @@ class Wave(Model_parameters, metaclass=ABCMeta):
 
     @abstractmethod
     def rhs_no_pml(self):
-        """
-        Return the right-hand side Cofunction without PML DOFs (i.e., only
+        """Return the right-hand side Cofunction without PML DOFs (i.e., only
         the DOFs associated with the subspace of the original problem).
         """
         pass
@@ -457,9 +476,7 @@ class Wave(Model_parameters, metaclass=ABCMeta):
     def set_material_properties(self, *args, **kwargs):
         """Wrapper for material_properties_io.set_material_property."""
         return material_properties_io.set_material_property(
-            self,
-            *args,
-            **kwargs
+            self, *args, **kwargs
         )
 
     def set_material_property(self, *args, **kwargs):

@@ -7,13 +7,13 @@ def quadrature_rules(V):
     """Quadrature rule - Gauss-Lobatto-Legendre, Gauss-Legendre and Equi
     spaced, KMV
 
-    Parameters:
-    -----------
+    Parameters
+    ----------
     V: Firedrake FunctionSpace
         Function space to be used in the quadrature rule.
 
-    Returns:
-    --------
+    Returns
+    -------
     qr_x: FIAT quadrature rule
         Quadrature rule for the spatial domain.
     qr_s: FIAT quadrature rule
@@ -36,8 +36,10 @@ def quadrature_rules(V):
     except TypeError:
         pass
 
-    if (cell_geometry in {triangle, tetrahedron}
-            and family <= {"Lagrange", "Discontinuous Lagrange"}):
+    if cell_geometry in {triangle, tetrahedron} and family <= {
+        "Lagrange",
+        "Discontinuous Lagrange",
+    }:
         qr_x = {}
         qr_s = {}
         qr_k = {}
@@ -45,8 +47,11 @@ def quadrature_rules(V):
         qr_x = {"scheme": "KMV", "degree": degree}
         qr_s = {}
         qr_k = {}
-    elif (cell_geometry in {quadrilateral, hexahedron, TensorProductCell(quadrilateral, interval)}
-            and family <= {"Q", "DQ", "TensorProductElement"}):
+    elif cell_geometry in {
+        quadrilateral,
+        hexahedron,
+        TensorProductCell(quadrilateral, interval),
+    } and family <= {"Q", "DQ", "TensorProductElement"}:
         dimension = cell_geometry._tdim
         # In this case, for the spectral element method we use GLL quadrature
         qr_x_rule = gauss_lobatto_legendre_cube_rule(
@@ -70,7 +75,7 @@ def quadrature_rules(V):
 # Spectral method - Gauss-Lobatto-Legendre rule
 # 1D
 def gauss_lobatto_legendre_line_rule(degree):
-    """Returns GLL quad rule for a given degree in a line
+    """Returns GLL quad rule for a given degree in a line.
 
     Parameters
     ----------
@@ -91,7 +96,7 @@ def gauss_lobatto_legendre_line_rule(degree):
 
 # 3D
 def gauss_lobatto_legendre_cube_rule(dimension, degree):
-    """Returns GLL quad rule for a given degree in a multidimensional space
+    """Returns GLL quad rule for a given degree in a multidimensional space.
 
     Parameters
     ----------

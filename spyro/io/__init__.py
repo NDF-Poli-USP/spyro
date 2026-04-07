@@ -17,7 +17,7 @@ from .basicio import (
     ensemble_load,
     delete_tmp_files,
     ensemble_shot_record,
-    ensemble_functional
+    ensemble_functional,
 )
 from .model_parameters import Model_parameters
 from .backwards_compatibility_io import Dictionary_conversion

@@ -7,7 +7,7 @@ import spyro
 import pytest
 
 
-class Gradient_mask_for_pml():
+class Gradient_mask_for_pml:
     def __init__(self, Wave_obj=None):
         if Wave_obj.abc_active is False:
             pass
@@ -43,21 +43,23 @@ def check_gradient(Wave_obj_guess, dJ, rec_out_exact, Jm, plot=False, tol=1.0):
     remainders = []
     V_c = Wave_obj_guess.function_space
     dm = fire.Function(V_c)
-    size, = np.shape(dm.dat.data[:])
+    (size,) = np.shape(dm.dat.data[:])
     dm_data = np.random.default_rng(0).random(size)
     dm.dat.data[:] = dm_data
 
     for step in steps:
 
         Wave_obj_guess.reset_pressure()
-        c_guess = fire.Constant(2.0) + step*dm
+        c_guess = fire.Constant(2.0) + step * dm
         Wave_obj_guess.initial_velocity_model = c_guess
         Wave_obj_guess.forward_solve()
         misfit_plusdm = rec_out_exact - Wave_obj_guess.receivers_output
         J_plusdm = spyro.utils.compute_functional(Wave_obj_guess, misfit_plusdm)
 
         grad_fd = (J_plusdm - Jm) / (step)
-        projnorm = fire.assemble(dJ * dm * fire.dx(**Wave_obj_guess.quadrature_rule))
+        projnorm = fire.assemble(
+            dJ * dm * fire.dx(**Wave_obj_guess.quadrature_rule)
+        )
 
         error = 100 * ((grad_fd - projnorm) / projnorm)
         remainder = abs(J_plusdm - Jm - step * projnorm)
@@ -122,7 +124,9 @@ def set_dictionary(PML=False):
         "frequency": 5.0,
         "delay": 1.5,
         "delay_type": "multiples_of_minimum",
-        "receiver_locations": spyro.create_transect((-0.8, 0.1), (-0.8, 0.9), 10),
+        "receiver_locations": spyro.create_transect(
+            (-0.8, 0.1), (-0.8, 0.9), 10
+        ),
     }
 
     dictionary["time_axis"] = {
@@ -167,7 +171,11 @@ def get_forward_model(dictionary=None):
         conditional=cond,
         dg_velocity_model=False,
     )
-    spyro.plots.plot_model(Wave_obj_exact, filename="pml_grad_test_model.png", abc_points=[(-0, 0), (-1, 0), (-1, 1), (-0, 1)])
+    spyro.plots.plot_model(
+        Wave_obj_exact,
+        filename="pml_grad_test_model.png",
+        abc_points=[(-0, 0), (-1, 0), (-1, 1), (-0, 1)],
+    )
     Wave_obj_exact.forward_solve()
     rec_out_exact = Wave_obj_exact.receivers_output
 
@@ -189,7 +197,9 @@ def get_forward_model(dictionary=None):
 @pytest.mark.slow
 def test_gradient(PML=False):
     dictionary = set_dictionary(PML=PML)
-    rec_out_exact, rec_out_guess, Wave_obj_guess = get_forward_model(dictionary=dictionary)
+    rec_out_exact, rec_out_guess, Wave_obj_guess = get_forward_model(
+        dictionary=dictionary
+    )
     forward_solution = Wave_obj_guess.forward_solution
     forward_solution_guess = deepcopy(forward_solution)
 
@@ -199,7 +209,9 @@ def test_gradient(PML=False):
     print(f"Cost functional : {Jm}")
 
     # compute the gradient of the control (to be verified)
-    dJ = Wave_obj_guess.gradient_solve(misfit=misfit, forward_solution=forward_solution_guess)
+    dJ = Wave_obj_guess.gradient_solve(
+        misfit=misfit, forward_solution=forward_solution_guess
+    )
     VTKFile("gradient_premask.pvd").write(dJ)
     Mask_data = Gradient_mask_for_pml(Wave_obj=Wave_obj_guess)
     dJ = Mask_data.apply_mask(dJ)
@@ -211,7 +223,7 @@ def test_gradient(PML=False):
 @pytest.mark.slow
 @pytest.mark.xfail(
     reason="PML gradient error exceeds tolerance — needs investigation "
-           "into the compatible adjoint that is potentially causing errors.",
+    "into the compatible adjoint that is potentially causing errors.",
     strict=False,
 )
 def test_gradient_pml():

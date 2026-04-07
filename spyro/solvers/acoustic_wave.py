@@ -27,22 +27,22 @@ class AcousticWave(Wave):
 
         self.acoustic_energy = None
         self.field_logger.add_functional(
-            "acoustic_energy", lambda: fire.assemble(self.acoustic_energy))
+            "acoustic_energy", lambda: fire.assemble(self.acoustic_energy)
+        )
 
     def save_current_velocity_model(self, file_name=None):
         if self.c is None:
             raise ValueError("C not loaded")
         if file_name is None:
             file_name = "velocity_model.pvd"
-        fire.VTKFile(file_name).write(
-            self.c, name="velocity"
-        )
+        fire.VTKFile(file_name).write(self.c, name="velocity")
 
     @override
     def matrix_building(self):
-        """Builds solver operators. Doesn't create mass matrices if
-        matrix_free option is on,
-        which it is by default.
+        """Builds solver operators.
+
+        Doesn't create mass matrices if matrix_free option is on, which it is by
+        default.
         """
         self.current_time = 0.0
 
@@ -74,14 +74,14 @@ class AcousticWave(Wave):
     def gradient_solve(self, guess=None, misfit=None, forward_solution=None):
         """Solves the adjoint problem to calculate de gradient.
 
-        Parameters:
-        -----------
+        Parameters
+        ----------
         guess: Firedrake 'Function' (optional)
             Initial guess for the velocity model. If not mentioned uses the
             one currently in the wave object.
 
-        Returns:
-        --------
+        Returns
+        -------
         dJ: Firedrake 'Function'
             Gradient of the cost functional.
         """
@@ -89,9 +89,13 @@ class AcousticWave(Wave):
             self.misfit = misfit
         elif self.current_time == 0.0:
             self.forward_solve()
-            self.misfit = self.real_shot_record - self.forward_solution_receivers
+            self.misfit = (
+                self.real_shot_record - self.forward_solution_receivers
+            )
         else:
-            raise ValueError("Please load or calculate a real shot record first")
+            raise ValueError(
+                "Please load or calculate a real shot record first"
+            )
         return backward_wave_propagator(self)
 
     def reset_pressure(self):
@@ -108,7 +112,9 @@ class AcousticWave(Wave):
                 raise ValueError("No velocity model or velocity file to load.")
 
             if self.initial_velocity_model_file.endswith(".segy"):
-                self.initial_velocity_model_file = write_hdf5_velocity_model(self, self.initial_velocity_model_file)
+                self.initial_velocity_model_file = write_hdf5_velocity_model(
+                    self, self.initial_velocity_model_file
+                )
 
             if self.initial_velocity_model_file.endswith((".hdf5", ".h5")):
                 self.initial_velocity_model = interpolate(

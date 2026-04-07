@@ -21,8 +21,7 @@ import numpy as np
 
 
 class Delta_projector:
-    """
-    Class that interpolates the solution to the receiver coordinates
+    """Class that interpolates the solution to the receiver coordinates.
 
     Attributes
     ----------
@@ -57,8 +56,7 @@ class Delta_projector:
     """
 
     def __init__(self, wave_object):
-        """
-        Initializes the class
+        """Initializes the class.
 
         Parameters
         ----------
@@ -89,7 +87,7 @@ class Delta_projector:
         self.is_local = None
 
     def build_maps(self, order=0):
-        """Calculates and stores tabulations for interpolation
+        """Calculates and stores tabulations for interpolation.
 
         Is always automatticaly called when initializing the class,
         therefore should only be called again if a mesh related attribute
@@ -106,10 +104,10 @@ class Delta_projector:
         cell_tabulations: list
             List of tabulations for each receiver
         """
-
         for rid in range(self.number_of_points):
-            cell_id = self.mesh.locate_cell(self.point_locations[rid],
-                                            tolerance=1e-6)
+            cell_id = self.mesh.locate_cell(
+                self.point_locations[rid], tolerance=1e-6
+            )
             self.is_local[rid] = cell_id
 
         (
@@ -122,8 +120,8 @@ class Delta_projector:
         self.number_of_points = len(self.point_locations)
 
     def interpolate(self, field):
-        """Interpolate the solution to the receiver coordinates for
-        one simulation timestep.
+        """Interpolate the solution to the receiver coordinates for one
+        simulation timestep.
 
         Parameters
         ----------
@@ -139,8 +137,9 @@ class Delta_projector:
         return [self.new_at(field, rn) for rn in range(self.number_of_points)]
 
     def new_at(self, udat, receiver_id):
-        """Function that evaluates the receiver value given its id.
-        For 2D simplices only.
+        """Function that evaluates the receiver value given its id. For 2D
+        simplices only.
+
         Parameters
         ----------
         udat: array-like
@@ -153,7 +152,6 @@ class Delta_projector:
         -------
         at: Function value at given receiver
         """
-
         if self.is_local is not None:
             # Getting relevant receiver points
             u = udat[np.int_(self.cellNodeMaps[receiver_id, :])]
@@ -175,7 +173,11 @@ class Delta_projector:
         if order == 0:
             tab_shape = (self.number_of_points, self.nodes_per_cell)
         elif order == 1:
-            tab_shape = (self.number_of_points, self.nodes_per_cell, self.dimension)
+            tab_shape = (
+                self.number_of_points,
+                self.nodes_per_cell,
+                self.dimension,
+            )
         cell_tabulations = np.zeros(tab_shape)
 
         for receiver_id in range(self.number_of_points):
@@ -224,7 +226,7 @@ class Delta_projector:
         return change_to_reference(p, cell_vertices)
 
     def __build_local_nodes(self):
-        """Builds local element nodes, locations and I,J,K numbering"""
+        """Builds local element nodes, locations and I,J,K numbering."""
         if self.dimension == 2:
             return self.__build_local_nodes_2D()
         elif self.dimension == 3:
@@ -233,9 +235,9 @@ class Delta_projector:
             raise ValueError
 
     def __func_node_locations(self):
-        """Function that returns a list which includes a numpy matrix
-        where line n has the x and y values of the nth degree of freedom,
-        and a numpy matrix of the vertex coordinates.
+        """Function that returns a list which includes a numpy matrix where line
+        n has the x and y values of the nth degree of freedom, and a numpy
+        matrix of the vertex coordinates.
         """
         if self.dimension == 2:
             return self.__func_node_locations_2D()
@@ -245,9 +247,9 @@ class Delta_projector:
             raise ValueError
 
     def __func_node_locations_2D(self):
-        """Function that returns a list which includes a numpy matrix
-        where line n has the x and y values of the nth degree of freedom,
-        and a numpy matrix of the vertex coordinates.
+        """Function that returns a list which includes a numpy matrix where line
+        n has the x and y values of the nth degree of freedom, and a numpy
+        matrix of the vertex coordinates.
         """
         z, x = SpatialCoordinate(self.mesh)  # noqa: F405
         ux = Function(self.space).interpolate(x)  # noqa: F405
@@ -261,10 +263,9 @@ class Delta_projector:
         return node_locations
 
     def __func_node_locations_3D(self):
-        """Function that returns a list which includes a numpy matrix
-        where line n has the x and y values of the nth degree of freedom,
-        and a numpy matrix of the vertex coordinates.
-
+        """Function that returns a list which includes a numpy matrix where line
+        n has the x and y values of the nth degree of freedom, and a numpy
+        matrix of the vertex coordinates.
         """
         x, y, z = SpatialCoordinate(self.mesh)  # noqa: F405
         ux = Function(self.space).interpolate(x)  # noqa: F405
@@ -280,12 +281,12 @@ class Delta_projector:
         return node_locations
 
     def __point_locator(self):
-        """Function that returns a list of tuples and a matrix
-        the list of tuples has in line n the receiver position
-        and the position of the nodes in the element that contains
-        the receiver.
-        The matrix has the deegres of freedom of the nodes inside
-        same element as the receiver.
+        """Function that returns a list of tuples and a matrix the list of
+        tuples has in line n the receiver position and the position of the nodes
+        in the element that contains the receiver.
+
+        The matrix has the deegres of freedom of the nodes inside same element
+        as the receiver.
         """
         if self.dimension == 2:
             return self.__point_locator_2D()
@@ -295,18 +296,18 @@ class Delta_projector:
             raise ValueError
 
     def __point_locator_2D(self):
-        """Function that returns a list of tuples and a matrix
-        the list of tuples has in line n the receiver position
-        and the position of the nodes in the element that contains
-        the receiver.
-        The matrix has the deegres of freedom of the nodes inside
-        same element as the receiver.
+        """Function that returns a list of tuples and a matrix the list of
+        tuples has in line n the receiver position and the position of the nodes
+        in the element that contains the receiver.
+
+        The matrix has the deegres of freedom of the nodes inside same element
+        as the receiver.
         """
         num_recv = self.number_of_points
 
         fdrake_cell_node_map = self.space.cell_node_map()
         cell_node_map = fdrake_cell_node_map.values_with_halo
-        (num_cells, nodes_per_cell) = cell_node_map.shape
+        num_cells, nodes_per_cell = cell_node_map.shape
         node_locations = self.__func_node_locations()
         self.nodes_per_cell = nodes_per_cell
 
@@ -348,13 +349,12 @@ class Delta_projector:
         return cellId_maps, cellVertices, cellNodeMaps
 
     def __point_locator_3D(self):
-        """Function that returns a list of tuples and a matrix
-        the list of tuples has in line n the receiver position
-        and the position of the nodes in the element that contains
-        the receiver.
-        The matrix has the deegres of freedom of the nodes inside
-        same element as the receiver.
+        """Function that returns a list of tuples and a matrix the list of
+        tuples has in line n the receiver position and the position of the nodes
+        in the element that contains the receiver.
 
+        The matrix has the deegres of freedom of the nodes inside same element
+        as the receiver.
         """
         num_recv = self.number_of_points
 
@@ -362,7 +362,7 @@ class Delta_projector:
         cell_node_map = fdrake_cell_node_map.values_with_halo
         if self.quadrilateral is True:
             cell_node_map = get_hexa_real_cell_node_map(self.space, self.mesh)
-        (num_cells, nodes_per_cell) = cell_node_map.shape
+        num_cells, nodes_per_cell = cell_node_map.shape
         node_locations = self.__func_node_locations()
         self.nodes_per_cell = nodes_per_cell
 
@@ -422,8 +422,7 @@ class Delta_projector:
 
 
 def choosing_geometry(cell_geometry):
-    """
-    Chooses UFC reference element geometry based on desired function space
+    """Chooses UFC reference element geometry based on desired function space.
 
     Parameters
     ----------
@@ -454,8 +453,8 @@ def choosing_geometry(cell_geometry):
 
 
 def choosing_element(V, degree):
-    """Chooses UFL element based on desired function space
-    and degree of interpolation.
+    """Chooses UFL element based on desired function space and degree of
+    interpolation.
 
     Parameters
     ----------
@@ -492,7 +491,8 @@ def get_hexa_real_cell_node_map(V, mesh):
     _, p = ufl_element.degree()
 
     cell_node_map = np.zeros(
-        (layers * cells_per_layer, nodes_per_cell), dtype=int)
+        (layers * cells_per_layer, nodes_per_cell), dtype=int
+    )
     print(f"cnm size : {np.shape(cell_node_map)}", flush=True)
 
     for layer in range(layers):

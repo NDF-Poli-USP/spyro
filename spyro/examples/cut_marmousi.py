@@ -105,8 +105,7 @@ cut_marmousi_dictionary["time_axis"] = {
 
 
 class Cut_marmousi_acoustic(Example_model_acoustic):
-    """
-    Class for the cut marmousi model.
+    """Class for the cut marmousi model.
 
     Example Setup
 

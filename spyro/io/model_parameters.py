@@ -1,6 +1,5 @@
 import uuid
 from mpi4py import MPI  # noqa:F401
-from firedrake import COMM_WORLD  # noqa:
 import warnings
 from copy import deepcopy
 from ..io.dictionaryio import Read_options, Read_outputs
@@ -11,10 +10,10 @@ from .. import utils
 from .. import meshing
 
 
-class Model_parameters(Read_options, Read_boundary_layer,
-                       Read_time_axis, Read_outputs):
-    """
-    Class that reads and sanitizes input parameters.
+class Model_parameters(
+    Read_options, Read_boundary_layer, Read_time_axis, Read_outputs
+):
+    """Class that reads and sanitizes input parameters.
 
     Attributes
     ----------
@@ -159,9 +158,8 @@ class Model_parameters(Read_options, Read_boundary_layer,
     """
 
     def __init__(self, dictionary=None, comm=None):
-        """
-        Initializes class that reads and sanitizes input parameters.
-        A dictionary can be used.
+        """Initializes class that reads and sanitizes input parameters. A
+        dictionary can be used.
 
         Parameters
         ----------
@@ -184,8 +182,9 @@ class Model_parameters(Read_options, Read_boundary_layer,
         self.input_dictionary = dictionary
 
         # some default parameters we might use in the future
-        self.input_dictionary.setdefault("equation_type",
-                                         "second_order_in_pressure")
+        self.input_dictionary.setdefault(
+            "equation_type", "second_order_in_pressure"
+        )
         self.equation_type = self.input_dictionary["equation_type"]
 
         # Get options
@@ -212,14 +211,17 @@ class Model_parameters(Read_options, Read_boundary_layer,
         self.input_dictionary["acquisition"].setdefault("delay", 1.5)
         self.delay = self.input_dictionary["acquisition"]["delay"]
 
-        self.input_dictionary["acquisition"].setdefault("delay_type",
-                                                        "multiples_of_minimum")
+        self.input_dictionary["acquisition"].setdefault(
+            "delay_type", "multiples_of_minimum"
+        )
         self.delay_type = self.input_dictionary["acquisition"]["delay_type"]
 
-        self.input_dictionary["acquisition"].setdefault("source_locations",
-                                                        None)
-        self.source_locations = self.input_dictionary[
-            "acquisition"]["source_locations"]
+        self.input_dictionary["acquisition"].setdefault(
+            "source_locations", None
+        )
+        self.source_locations = self.input_dictionary["acquisition"][
+            "source_locations"
+        ]
 
         # Setting up MPI communicator and checking parallelism:
         self.input_dictionary.setdefault("parallelism", {})
@@ -230,8 +232,10 @@ class Model_parameters(Read_options, Read_boundary_layer,
         Read_boundary_layer.__init__(self)
 
         # Checking mesh_parameters
-        if self.cell_type == "quadrilateral" or \
-                self.method == "spectral_quadrilateral":
+        if (
+            self.cell_type == "quadrilateral"
+            or self.method == "spectral_quadrilateral"
+        ):
             quadrilateral = True
         else:
             quadrilateral = False
@@ -247,24 +251,29 @@ class Model_parameters(Read_options, Read_boundary_layer,
             method=self.method,
             degree=self.degree,
             abc_pad_length=self.input_dictionary[
-                "absorving_boundary_conditions"]["pad_length"],
-            negative_z=self.input_dictionary["mesh"]["negative_z"]
+                "absorving_boundary_conditions"
+            ]["pad_length"],
+            negative_z=self.input_dictionary["mesh"]["negative_z"],
         )
 
         self.input_dictionary["acquisition"].setdefault(
-            "receiver_locations", None)
-        self.receiver_locations = self.input_dictionary[
-            "acquisition"]["receiver_locations"]
-        self.use_vertex_only_mesh = self.input_dictionary[
-            "acquisition"].get("use_vertex_only_mesh", False)
+            "receiver_locations", None
+        )
+        self.receiver_locations = self.input_dictionary["acquisition"][
+            "receiver_locations"
+        ]
+        self.use_vertex_only_mesh = self.input_dictionary["acquisition"].get(
+            "use_vertex_only_mesh", False
+        )
 
         # Check automatic adjoint
-        self.input_dictionary["time_axis"].setdefault(
-            "output_frequency", 99999)
-        self.gradient_sampling_frequency = self.input_dictionary[
-            "time_axis"]["gradient_sampling_frequency"]
-        self.output_frequency = self.input_dictionary[
-            "time_axis"]["output_frequency"]
+        self.input_dictionary["time_axis"].setdefault("output_frequency", 99999)
+        self.gradient_sampling_frequency = self.input_dictionary["time_axis"][
+            "gradient_sampling_frequency"
+        ]
+        self.output_frequency = self.input_dictionary["time_axis"][
+            "output_frequency"
+        ]
         self._sanitize_automatic_adjoint()
 
         # add random string for temp files
@@ -301,17 +310,24 @@ class Model_parameters(Read_options, Read_boundary_layer,
     @receiver_locations.setter
     def receiver_locations(self, value):
         if self.dimension == 2:
-            mesh_lengths = [self.mesh_parameters.length_z,
-                            self.mesh_parameters.length_x]
+            mesh_lengths = [
+                self.mesh_parameters.length_z,
+                self.mesh_parameters.length_x,
+            ]
         elif self.dimension == 3:
-            mesh_lengths = [self.mesh_parameters.length_z,
-                            self.mesh_parameters.length_x,
-                            self.mesh_parameters.length_y]
+            mesh_lengths = [
+                self.mesh_parameters.length_z,
+                self.mesh_parameters.length_x,
+                self.mesh_parameters.length_y,
+            ]
         if value is not None:
             for receiver in value:
                 receiver_points = list(receiver)
-                _check_point_in_domain(receiver_points, mesh_lengths,
-                                       self.mesh_parameters.negative_z)
+                _check_point_in_domain(
+                    receiver_points,
+                    mesh_lengths,
+                    self.mesh_parameters.negative_z,
+                )
             self.number_of_receivers = len(value)
 
         self._receiver_locations = value
@@ -323,7 +339,7 @@ class Model_parameters(Read_options, Read_boundary_layer,
     @delay_type.setter
     def delay_type(self, value):
         accepted_values = ["multiples_of_minimum", "time"]
-        _validate_enum(value, accepted_values, 'delay_type')
+        _validate_enum(value, accepted_values, "delay_type")
         self._delay_type = value
 
     @property
@@ -333,7 +349,7 @@ class Model_parameters(Read_options, Read_boundary_layer,
     @source_type.setter
     def source_type(self, value):
         accepted_values = ["ricker", "MMS"]
-        _validate_enum(value, accepted_values, 'source_type')
+        _validate_enum(value, accepted_values, "source_type")
         self._source_type = value
 
     @property
@@ -358,7 +374,8 @@ class Model_parameters(Read_options, Read_boundary_layer,
     def equation_type(self, value):
         if value != "second_order_in_pressure":
             raise ValueError(
-                "The equation type specified is not implemented yet")
+                "The equation type specified is not implemented yet"
+            )
         self._equation_type = value
 
     @property
@@ -367,18 +384,25 @@ class Model_parameters(Read_options, Read_boundary_layer,
 
     @parallelism_type.setter
     def parallelism_type(self, value):
-        accepted_values = ["custom", "automatic", "spatial", ]
-        _validate_enum(value, accepted_values, 'parallelism_type')
+        accepted_values = [
+            "custom",
+            "automatic",
+            "spatial",
+        ]
+        _validate_enum(value, accepted_values, "parallelism_type")
 
         if value == "custom":
             self.shot_ids_per_propagation = self.input_dictionary[
-                "parallelism"]["shot_ids_per_propagation"]
+                "parallelism"
+            ]["shot_ids_per_propagation"]
         elif value == "automatic":
-            self.shot_ids_per_propagation = [[i] for i in
-                                             range(0, self.number_of_sources)]
+            self.shot_ids_per_propagation = [
+                [i] for i in range(0, self.number_of_sources)
+            ]
         elif value == "spatial":
-            self.shot_ids_per_propagation = [[i] for i in
-                                             range(0, self.number_of_sources)]
+            self.shot_ids_per_propagation = [
+                [i] for i in range(0, self.number_of_sources)
+            ]
 
         self._parallelism_type = value
         self.comm = utils.mpi_init(self)
@@ -405,11 +429,8 @@ class Model_parameters(Read_options, Read_boundary_layer,
                     attemps to propagate wave."
             )
 
-    def set_mesh(self,
-                 user_mesh=None,
-                 input_mesh_parameters={}):
-        '''
-        Set the mesh for the model.
+    def set_mesh(self, user_mesh=None, input_mesh_parameters={}):
+        """Set the mesh for the model.
 
         Parameters
         ----------
@@ -422,8 +443,7 @@ class Model_parameters(Read_options, Read_boundary_layer,
         Returns
         -------
         None
-        '''
-
+        """
         if user_mesh is None:
             pad_length = self.abc_pad_length if self.abc_active else None
             self.mesh_parameters.set_mesh(
@@ -432,18 +452,18 @@ class Model_parameters(Read_options, Read_boundary_layer,
                 abc_pad_length=pad_length,
             )
 
-        autoMeshing = None if not self.mesh_parameters.automatic_mesh else \
-            meshing.AutomaticMesh(mesh_parameters=self.mesh_parameters)
+        autoMeshing = (
+            None
+            if not self.mesh_parameters.automatic_mesh
+            else meshing.AutomaticMesh(mesh_parameters=self.mesh_parameters)
+        )
 
-        self.user_mesh = user_mesh if user_mesh is not None \
-            else autoMeshing.create_mesh()
+        self.user_mesh = (
+            user_mesh if user_mesh is not None else autoMeshing.create_mesh()
+        )
 
-    def _set_mesh_length(self,
-                         length_z=None,
-                         length_x=None,
-                         length_y=None):
-        '''
-        Sets the mesh lengths.
+    def _set_mesh_length(self, length_z=None, length_x=None, length_y=None):
+        """Sets the mesh lengths.
 
         Parameters
         ----------
@@ -457,8 +477,7 @@ class Model_parameters(Read_options, Read_boundary_layer,
         Returns
         -------
         None
-        '''
-
+        """
         if length_z is not None:
             self.mesh_parameters.length_z = length_z
         if length_x is not None:
@@ -467,14 +486,13 @@ class Model_parameters(Read_options, Read_boundary_layer,
             self.mesh_parameters.length_y = length_y
 
     def get_mesh(self):
-        '''
-        Reads in an external mesh and scatters it between cores.
+        """Reads in an external mesh and scatters it between cores.
 
         Returns
         -------
         mesh: Firedrake.Mesh object
             The distributed mesh across `ens_comm`
-        '''
+        """
         if self.mesh_parameters.user_mesh is not None:
             self.user_mesh = self.mesh_parameters.user_mesh
             return self.user_mesh
@@ -483,7 +501,9 @@ class Model_parameters(Read_options, Read_boundary_layer,
         elif self.user_mesh is not None:
             return self.user_mesh
         elif self.mesh_parameters.automatic_mesh:
-            autoMeshing = meshing.AutomaticMesh(mesh_parameters=self.mesh_parameters)
+            autoMeshing = meshing.AutomaticMesh(
+                mesh_parameters=self.mesh_parameters
+            )
             self.user_mesh = autoMeshing.create_mesh()
             return self.user_mesh
         else:
@@ -497,8 +517,7 @@ def _validate_enum(value, accepted_values, name):
 
 
 def _check_point_in_domain(point_coordinates, input_mesh_lengths, negative_z):
-    '''
-    Checks if a point is within the mesh domain.
+    """Checks if a point is within the mesh domain.
 
     Parameters
     ----------
@@ -513,7 +532,7 @@ def _check_point_in_domain(point_coordinates, input_mesh_lengths, negative_z):
     ------
     ValueError
         If the point is outside the mesh domain.
-    '''
+    """
     # Avoid changing mesh lengths outside of this
     mesh_lengths = deepcopy(input_mesh_lengths)
     if negative_z:

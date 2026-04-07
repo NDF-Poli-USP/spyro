@@ -19,21 +19,17 @@ def test_run_eval_ufl_functions_2d():
         ("exp(-x**2) * cos(z)", "Gaussian wave"),
         ("sqrt(x**2 + z**2)", "Distance from origin"),
         ("tanh(3*x) * sin(4*z)", "Soliton-like"),
-
         # Layered models (common in seismic)
         ("1.5 + 0.5*tanh((x-0.5)/0.1)", "Velocity gradient"),
         ("2.0 + 0.3*sin(4*pi*x) + 0.2*cos(4*pi*z)", "Checkerboard"),
         ("1.0 + 0.5*exp(-10*((x-0.3)**2 + (z-0.7)**2))", "Gaussian lens"),
-
         # More complex
         ("atan2(2*x-1, 2*z-1)", "Angle from center"),
         ("ln(1 + x**2 + z**2)", "Logarithmic field"),
         ("sin(pi*x) * cos(pi*z) * exp(-(x**2 + z**2))", "Decaying wave"),
-
         # Constants and unary operations
         ("-x**2 + z", "Mixed unary operators"),
         ("pi * e * x * z", "Mathematical constants"),
-
         # Edge cases
         ("x/(z + 1e-16)", "Division"),
         ("(x + z) * (x - z)", "Polynomial expansion"),
@@ -56,13 +52,16 @@ def test_run_eval_ufl_functions_2d():
         data = f.dat.data
 
         # Checking interpolated data (assertion for non-inf and non-nan)
-        assert np.all(np.isfinite(data)), f"❌ Invalid data in {description}" \
-            + f"   Expression: {expr}"
-        success_msg = (f"✅ {description}\n"
-                       f"   Expression: {expr}\n"
-                       f"   Type: {type(ufl_expr).__name__}\n"
-                       f"   Range: [{data.min():.4f}, {data.max():.4f}]\n"
-                       f"   Mean: {data.mean():.4f}")
+        assert np.all(np.isfinite(data)), (
+            f"❌ Invalid data in {description}" + f"   Expression: {expr}"
+        )
+        success_msg = (
+            f"✅ {description}\n"
+            f"   Expression: {expr}\n"
+            f"   Type: {type(ufl_expr).__name__}\n"
+            f"   Range: [{data.min():.4f}, {data.max():.4f}]\n"
+            f"   Mean: {data.mean():.4f}"
+        )
         print(success_msg)
         success_2d += 1
         print("-" * 80)
@@ -75,8 +74,10 @@ def test_run_eval_ufl_functions_2d():
     # Assert that all tests passed
     total_2d = len(test_expressions_2d)
     assert success_2d == total_2d, f"Only {success_2d}/{total_2d} tests passed"
-    print(f"\n2D Models: {success_2d}/{total_2d} successful "
-          f"({100*success_2d/total_2d:.1f}%)")
+    print(
+        f"\n2D Models: {success_2d}/{total_2d} successful "
+        f"({100*success_2d/total_2d:.1f}%)"
+    )
 
 
 def test_run_eval_ufl_functions_3d():
@@ -93,12 +94,10 @@ def test_run_eval_ufl_functions_3d():
         ("sqrt(x**2 + y**2 + z**2)", "3D distance from origin"),
         ("sin(pi*x) * cos(pi*y) * tanh(pi*z)", "3D wave"),
         ("exp(-(x**2 + y**2 + z**2))", "3D Gaussian"),
-
         # Geophysical models
         ("2.0 + 0.5*tanh((z-0.5)/0.2)", "Layered earth model"),
         ("1.5 + 0.3*sin(2*pi*x)*cos(2*pi*y)*sin(2*pi*z)", "3D checkerboard"),
         ("atan2(y, x)", "Azimuthal angle"),
-
         # Complex 3D
         ("ln(1 + x**2 + y**2 + z**2)", "3D logarithmic"),
         ("x*y*z", "Triple product"),
@@ -121,12 +120,15 @@ def test_run_eval_ufl_functions_3d():
         data = f.dat.data
 
         # Checking interpolated data (assertion for non-inf and non-nan)
-        assert np.all(np.isfinite(data)), f"❌ Invalid data in {description}" \
-            + f"   Expression: {expr}"
-        success_msg = (f"✅ {description}\n"
-                       f"   Expression: {expr}\n"
-                       f"   Type: {type(ufl_expr).__name__}\n"
-                       f"   Range: [{data.min():.4f}, {data.max():.4f}]")
+        assert np.all(np.isfinite(data)), (
+            f"❌ Invalid data in {description}" + f"   Expression: {expr}"
+        )
+        success_msg = (
+            f"✅ {description}\n"
+            f"   Expression: {expr}\n"
+            f"   Type: {type(ufl_expr).__name__}\n"
+            f"   Range: [{data.min():.4f}, {data.max():.4f}]"
+        )
         print(success_msg)
         success_3d += 1
         print("-" * 80)
@@ -139,8 +141,10 @@ def test_run_eval_ufl_functions_3d():
     # Assert that all tests passed
     total_3d = len(test_expressions_3d)
     assert success_3d == total_3d, f"Only {success_3d}/{total_3d} tests passed"
-    print(f"3D Models: {success_3d}/{total_3d} successful "
-          f"({100*success_3d/total_3d:.1f}%)")
+    print(
+        f"3D Models: {success_3d}/{total_3d} successful "
+        f"({100*success_3d/total_3d:.1f}%)"
+    )
 
 
 def test_run_eval_danger_ops():
@@ -156,17 +160,14 @@ def test_run_eval_danger_ops():
         ("eval('1+1')", "Nested eval call"),
         ("exec('import os')", "Exec statement"),
         ("open('/etc/passwd').read()", "File access"),
-
         # Attribute access
         ("x.__class__", "Class access"),
         ("x.__dict__", "Dict access"),
         ("cos.__code__", "Function code access"),
-
         # Complex control flow
         ("[i for i in range(10)]", "List comprehension"),
         ("x if x > 0 else 0", "Conditional expression"),
         ("lambda x: x**2", "Lambda function"),
-
         # Unauthorized operators
         ("x // 2", "Floor division"),
         ("x % 2", "Modulo operator"),
@@ -176,38 +177,34 @@ def test_run_eval_danger_ops():
         ("x << 1", "Bit shift"),
         ("x >> 1", "Right shift"),
         ("x @ y", "Matrix multiply"),
-
         # Subscripting and slicing
         ("x[0]", "Subscript"),
         ("x[0:2]", "Slice"),
-
         # Comparisons (if not explicitly allowed)
         ("x > 0", "Comparison"),
         ("x == y", "Equality"),
-
         # Unauthorized functions
         ("abs(x)", "abs function"),
         ("round(x)", "round function"),
         ("pow(x, 2)", "pow function"),
-
         # Invalid syntax patterns
         ("x, y", "Tuple"),
         ("x; y", "Multiple statements"),
         ("{x: y}", "Dictionary"),
         ("[x, y]", "List"),
-
         # Undefined variables
         ("unknown_var + x", "Undefined variable"),
         ("some_function(x)", "Undefined function"),
-
         # Nested/dangerous calls
         ("cos(cos.__name__)", "Meta programming"),
         ("globals()", "Global namespace"),
         ("locals()", "Local namespace"),
     ]
 
-    print(f"\nTesting {len(dangerous_expressions)} "
-          f"dangerous expressions (should all fail)...")
+    print(
+        f"\nTesting {len(dangerous_expressions)} "
+        f"dangerous expressions (should all fail)..."
+    )
     print("-" * 80)
 
     # Generate mesh
@@ -225,15 +222,19 @@ def test_run_eval_danger_ops():
 
         try:
             ufl_expr = generate_ufl_functions(mesh, expr, dim)
-            fail_msg = (f"❌ FAILED TO BLOCK: {description}\n"
-                        f"   Expression: {expr}\n"
-                        f"   Created: {type(ufl_expr)}\n")
+            fail_msg = (
+                f"❌ FAILED TO BLOCK: {description}\n"
+                f"   Expression: {expr}\n"
+                f"   Created: {type(ufl_expr)}\n"
+            )
 
         except ValueError as e:
-            block_msg = (f"✅ BLOCKED: {description}\n"
-                         f"   Expression: {expr}\n"
-                         f"   Type: {type(ufl_expr).__name__}\n"
-                         f"   Error type: {type(e).__name__}")
+            block_msg = (
+                f"✅ BLOCKED: {description}\n"
+                f"   Expression: {expr}\n"
+                f"   Type: {type(ufl_expr).__name__}\n"
+                f"   Error type: {type(e).__name__}"
+            )
             block_ufl = True
             blocked_dangerous += 1
 
@@ -248,16 +249,17 @@ def test_run_eval_danger_ops():
     print("=" * 40)
 
     total_dangerous = len(dangerous_expressions)
-    assert blocked_dangerous == total_dangerous, f"Only {blocked_dangerous}" \
-        + f"/{total_dangerous} tests passed"
-    print(f"Dangerous ops: {blocked_dangerous}/{total_dangerous} blocked "
-          f"({100*blocked_dangerous/total_dangerous:.1f}%)")
+    assert blocked_dangerous == total_dangerous, (
+        f"Only {blocked_dangerous}" + f"/{total_dangerous} tests passed"
+    )
+    print(
+        f"Dangerous ops: {blocked_dangerous}/{total_dangerous} blocked "
+        f"({100*blocked_dangerous/total_dangerous:.1f}%)"
+    )
 
 
 if __name__ == "__main__":
-    '''
-    Run comprehensive tests for 2D/3D models and dangerous operations.
-    '''
+    """Run comprehensive tests for 2D/3D models and dangerous operations."""
 
     print("\n" + "=" * 80)
     print("COMPREHENSIVE UFL EXPRESSION GENERATOR TEST SUITE")

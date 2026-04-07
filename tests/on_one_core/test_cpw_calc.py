@@ -6,6 +6,7 @@ import spyro
 def is_seismicmesh_installed():
     try:
         import SeismicMesh  # noqa: F401
+
         return True
     except ImportError:
         return False
@@ -81,7 +82,9 @@ def run_test_cpw_calc(FEM_method_to_evaluate, correct_cpw):
 @pytest.mark.xfail(
     reason="Waiting for seismicmesh update for compatibility",
 )
-@pytest.mark.skipif(not is_seismicmesh_installed(), reason="SeismicMesh is not installed")
+@pytest.mark.skipif(
+    not is_seismicmesh_installed(), reason="SeismicMesh is not installed"
+)
 def test_cpw_calc_triangles():
     method = "mass_lumped_triangle"
     correct_cpw = 2.3

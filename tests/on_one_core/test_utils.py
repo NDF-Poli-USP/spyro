@@ -18,7 +18,7 @@ def test_butter_lowpast_filter():
     fs = 1.0 / Wave_obj.dt
 
     # Checks if frequency with greater power density is close to 5
-    (f, S) = sp.signal.periodogram(rec10, fs)
+    f, S = sp.signal.periodogram(rec10, fs)
     peak_frequency = f[np.argmax(S)]
     test1 = math.isclose(peak_frequency, 5.0, rel_tol=1e-2)
 
@@ -29,7 +29,7 @@ def test_butter_lowpast_filter():
     )
     filtered_rec10 = filtered_shot[:, 10]
 
-    (filt_f, filt_S) = sp.signal.periodogram(filtered_rec10, fs)
+    filt_f, filt_S = sp.signal.periodogram(filtered_rec10, fs)
     filtered_peak_frequency = filt_f[np.argmax(filt_S)]
     test2 = filtered_peak_frequency < cutoff_frequency
 

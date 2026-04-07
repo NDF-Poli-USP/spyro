@@ -4,13 +4,13 @@ import numpy as np
 from os import makedirs, path
 from spyro.habc.lay_len import f_layer, loop_roots
 from spyro.utils.stats_tools import coeff_of_determination
+
 plt.rcParams.update({"font.family": "serif"})
-plt.rcParams['text.latex.preamble'] = r'\usepackage{bm} \usepackage{amsmath}'
+plt.rcParams["text.latex.preamble"] = r"\usepackage{bm} \usepackage{amsmath}"
 
 
 def create_folder(folder):
-    '''
-    Verify if a folder exists, if not, it creates the folder
+    """Verify if a folder exists, if not, it creates the folder.
 
     Parameters
     ----------
@@ -20,17 +20,16 @@ def create_folder(folder):
     Returns
     -------
     None
-    '''
-
+    """
     # Create the folder if it does not exist
     if not path.isdir(folder):
         makedirs(folder)
 
 
-def plot_function_layer_size(lay_par, freq_par, geom_par, FLpos,
-                             output_folder="output/", show=False):
-    '''
-    Plot the function of the layer size criterion for the HABC scheme
+def plot_function_layer_size(
+    lay_par, freq_par, geom_par, FLpos, output_folder="output/", show=False
+):
+    """Plot the function of the layer size criterion for the HABC scheme.
 
     Parameters
     ----------
@@ -62,8 +61,7 @@ def plot_function_layer_size(lay_par, freq_par, geom_par, FLpos,
     Returns
     -------
     None
-    '''
-
+    """
     # Create the output folder if it does not exist
     create_folder(output_folder)
 
@@ -76,24 +74,24 @@ def plot_function_layer_size(lay_par, freq_par, geom_par, FLpos,
     a_lst = [a]
     F_lst = [FLpos]
     l_lst = ["{:.2f}".format(reference_frequency)]
-    c_lst = ['C0']
+    c_lst = ["C0"]
 
     if source_frequency == reference_frequency:
 
         # Layer size based on source frequency
         FLsou = []
-        w_lst = ['f_{{sou}}']
+        w_lst = ["f_{{sou}}"]
 
     else:
 
         # Calculate the size parameter for the source frequency
-        a_sou = z / source_frequency   # Adimensional parameter
+        a_sou = z / source_frequency  # Adimensional parameter
         FLsou = loop_roots(a_sou, lmin, lref, len(FLpos), show_ig=False)
         a_lst.append(a_sou)
         F_lst.append(FLsou)
         l_lst.append("{:.2f}".format(source_frequency))
-        c_lst.append('C1')
-        w_lst = ['f_{{bnd}}', 'f_{{sou}}']
+        c_lst.append("C1")
+        w_lst = ["f_{{bnd}}", "f_{{sou}}"]
 
     # Calculate the maximum layer size for the plot
     FL_max = max(FLpos + FLsou) + 0.4
@@ -107,13 +105,18 @@ def plot_function_layer_size(lay_par, freq_par, geom_par, FLpos,
     for a_pr, FL_rt, lab, col, w_str in zip(a_lst, F_lst, l_lst, c_lst, w_lst):
         crit = f_layer(F_L, a_pr)
         lim_crit = min(lim_crit, crit.min())
-        plt.plot(F_L, crit, color=col, zorder=2,
-                 label=r'$\Psi_{{F_L}}({}={}\text{{Hz}})$'.format(w_str, lab))
+        plt.plot(
+            F_L,
+            crit,
+            color=col,
+            zorder=2,
+            label=r"$\Psi_{{F_L}}({}={}\text{{Hz}})$".format(w_str, lab),
+        )
         plt.scatter(FL_rt, np.zeros(len(FL_rt)), color=col, zorder=3)
 
     # Identify the roots of the criterion function
-    delta_x = FL_lim / 40.
-    delta_y = abs(lim_crit) / 2.
+    delta_x = FL_lim / 40.0
+    delta_y = abs(lim_crit) / 2.0
     off_x = 0.5 * delta_x
     off_y = 0.85 * delta_y
     for lay, (FL_rt, col) in enumerate(zip(F_lst, c_lst)):
@@ -126,8 +129,10 @@ def plot_function_layer_size(lay_par, freq_par, geom_par, FLpos,
 
             # Check for overlap and adjust if needed
             for prev_x, prev_y in used_positions:
-                if abs(xFL - prev_x) < 2.6 * delta_x and \
-                        abs(y_FL - prev_y) < 0.9 * off_y:
+                if (
+                    abs(xFL - prev_x) < 2.6 * delta_x
+                    and abs(y_FL - prev_y) < 0.9 * off_y
+                ):
                     xFL += -off_x if rt % 2 == 0 else off_x
                     y_FL += -off_y if lay == 0 else off_y
             used_positions.append((xFL, y_FL))
@@ -136,16 +141,24 @@ def plot_function_layer_size(lay_par, freq_par, geom_par, FLpos,
                 f"{FL_par:.4f}",  # Text
                 xy=(FL_par, 0),  # Point to connect to
                 xytext=(xFL, y_FL),  # Text position
-                ha='center', va='bottom', zorder=4,
+                ha="center",
+                va="bottom",
+                zorder=4,
                 bbox=dict(facecolor=col, alpha=0.9),
-                arrowprops=dict(arrowstyle='-', color='black', linewidth=0.8,
-                                alpha=0.9, connectionstyle="arc3,rad=0."))
+                arrowprops=dict(
+                    arrowstyle="-",
+                    color="black",
+                    linewidth=0.8,
+                    alpha=0.9,
+                    connectionstyle="arc3,rad=0.",
+                ),
+            )
 
     # Formatting the plot
-    FL_str = r'$F_L \; (L_{{\xi}} \; = \; L_{{ref}} \, F_L \;$'
-    lref_str = r'$\therefore \; L_{{ref}} \; = \; {:.4f}\text{{km}})$'
+    FL_str = r"$F_L \; (L_{{\xi}} \; = \; L_{{ref}} \, F_L \;$"
+    lref_str = r"$\therefore \; L_{{ref}} \; = \; {:.4f}\text{{km}})$"
     plt.xlabel((FL_str + lref_str).format(lref))
-    plt.ylabel(r'$\Psi_{{F_L}} \; = \; |C_{Rmin}| \; - \; R$')
+    plt.ylabel(r"$\Psi_{{F_L}} \; = \; |C_{Rmin}| \; - \; R$")
     plt.xticks(np.arange(0, FL_lim + 0.01, 0.5 if FL_lim > 1 else 0.2))
     plt.xlim((0, FL_lim))
     plt.ylim((lim_crit - 0.01, 1.01))
@@ -154,17 +167,16 @@ def plot_function_layer_size(lay_par, freq_par, geom_par, FLpos,
 
     # Saving the plot
     layer_str = output_folder + "layer_opts"
-    plt.savefig(layer_str + ".png", bbox_inches='tight')
-    plt.savefig(layer_str + ".pdf", bbox_inches='tight')
+    plt.savefig(layer_str + ".png", bbox_inches="tight")
+    plt.savefig(layer_str + ".pdf", bbox_inches="tight")
     plt.show() if show else None
     plt.close()
 
 
 def plot_hist_receivers(Wave_object, show=False):
-    '''
-    Plot the comparison of the time-domain response at the
-    receivers between the reference model and the HABC scheme.
-    The plots are saved in PDF and PNG formats.
+    """Plot the comparison of the time-domain response at the receivers between
+    the reference model and the HABC scheme. The plots are saved in PDF and PNG
+    formats.
 
     Parameters
     ----------
@@ -176,46 +188,52 @@ def plot_hist_receivers(Wave_object, show=False):
     Returns
     -------
     None
-    '''
-
+    """
     print("\nPlotting Time Comparison", flush=True)
 
     # Time data
     dt = Wave_object.dt
     tf = Wave_object.final_time
     nt = int(round(tf / dt)) + 1  # number of timesteps
-    t_rec = np.linspace(0., tf, nt)
+    t_rec = np.linspace(0.0, tf, nt)
 
     # Setting fonts
-    plt.rcParams['font.size'] = 7
+    plt.rcParams["font.size"] = 7
 
     # Setting subplots
     num_recvs = Wave_object.number_of_receivers
-    plt.rcParams['axes.grid'] = True
+    plt.rcParams["axes.grid"] = True
     fig, axes = plt.subplots(nrows=num_recvs, ncols=1)
     fig.subplots_adjust(hspace=0.6)
 
     # Setting colormap
-    cl_rc = (0., 1., 0., 1.)  # RGB-alpha (Green)
-    cl_rf = (1., 0., 0., 1.)  # RGB-alpha (Red)
+    cl_rc = (0.0, 1.0, 0.0, 1.0)  # RGB-alpha (Green)
+    cl_rf = (1.0, 0.0, 0.0, 1.0)  # RGB-alpha (Red)
 
     for rec in range(num_recvs):
 
         # Plot the receiver data
         rc_dat = Wave_object.receivers_output[:, rec]
         rf_dat = Wave_object.receivers_reference[:, rec]
-        axes[rec].plot(t_rec, rc_dat, color=cl_rc, linestyle='-', linewidth=2)
-        axes[rec].plot(t_rec, rf_dat, color=cl_rf, linestyle='--', linewidth=2)
+        axes[rec].plot(t_rec, rc_dat, color=cl_rc, linestyle="-", linewidth=2)
+        axes[rec].plot(t_rec, rf_dat, color=cl_rf, linestyle="--", linewidth=2)
 
         # Adding the receiver number label
-        axes[rec].text(0.995, 0.9, "R" + str(rec + 1), fontsize=8.5,
-                       transform=axes[rec].transAxes, fontweight='bold',
-                       verticalalignment='top', horizontalalignment='right',
-                       bbox=dict(facecolor='none', edgecolor='none'))
+        axes[rec].text(
+            0.995,
+            0.9,
+            "R" + str(rec + 1),
+            fontsize=8.5,
+            transform=axes[rec].transAxes,
+            fontweight="bold",
+            verticalalignment="top",
+            horizontalalignment="right",
+            bbox=dict(facecolor="none", edgecolor="none"),
+        )
 
         # Centered title
         if rec == num_recvs // 2:
-            axes[rec].set_ylabel(r'$sol \; recs$')
+            axes[rec].set_ylabel(r"$sol \; recs$")
 
         # Hide all the xticks for receiver different of the last one
         hide_xticks = False if rec < num_recvs - 1 else True
@@ -224,23 +242,23 @@ def plot_hist_receivers(Wave_object, show=False):
         # Axis format
         axes[rec].set_xlim(0, tf)
         axes[rec].ticklabel_format(
-            axis='y', style='scientific', scilimits=(-2, 2))
+            axis="y", style="scientific", scilimits=(-2, 2)
+        )
         if rec == num_recvs - 1:
-            axes[rec].set_xlabel(r'$t \; (s)$')
+            axes[rec].set_xlabel(r"$t \; (s)$")
 
     # Saving the plot
     time_str = Wave_object.path_case_habc + "time"
-    plt.savefig(time_str + ".png", bbox_inches='tight')
-    plt.savefig(time_str + ".pdf", bbox_inches='tight')
+    plt.savefig(time_str + ".png", bbox_inches="tight")
+    plt.savefig(time_str + ".pdf", bbox_inches="tight")
     plt.show() if show else None
     plt.close()
 
 
-def plot_rfft_receivers(Wave_object, fxlim=4., show=False):
-    '''
-    Plot the comparison of the frequency-domain response at the
-    receivers between the reference model and the HABC scheme.
-    The plots are saved in PDF and PNG formats.
+def plot_rfft_receivers(Wave_object, fxlim=4.0, show=False):
+    """Plot the comparison of the frequency-domain response at the receivers
+    between the reference model and the HABC scheme. The plots are saved in PDF
+    and PNG formats.
 
     Parameters
     ----------
@@ -255,8 +273,7 @@ def plot_rfft_receivers(Wave_object, fxlim=4., show=False):
     Returns
     -------
     None
-    '''
-
+    """
     print("\nPlotting Frequency Comparison", flush=True)
 
     # Frequency data
@@ -264,53 +281,60 @@ def plot_rfft_receivers(Wave_object, fxlim=4., show=False):
     f_sou = Wave_object.frequency
     pfft = Wave_object.receivers_out_fft.shape[0] - 1
     df = f_Nyq / pfft
-    limf = round(min(max(fxlim, 2.) * f_sou, f_Nyq), 1)
+    limf = round(min(max(fxlim, 2.0) * f_sou, f_Nyq), 1)
     idx_lim = int(limf / df) + 1
     f_rec = np.linspace(0, df * idx_lim, idx_lim)
 
     # Setting fonts
-    plt.rcParams['font.size'] = 7
+    plt.rcParams["font.size"] = 7
 
     # Setting subplots
     num_recvs = Wave_object.number_of_receivers
-    plt.rcParams['axes.grid'] = True
+    plt.rcParams["axes.grid"] = True
     fig, axes = plt.subplots(nrows=num_recvs, ncols=1)
     fig.subplots_adjust(hspace=0.6)
 
     # Setting colormap
-    cl_rc = (0., 1., 0., 1.)  # RGB-alpha (Green)
-    cl_rf = (1., 0., 0., 1.)  # RGB-alpha (Red)
+    cl_rc = (0.0, 1.0, 0.0, 1.0)  # RGB-alpha (Green)
+    cl_rf = (1.0, 0.0, 0.0, 1.0)  # RGB-alpha (Red)
 
     for rec in range(num_recvs):
 
         # Plot the receiver data
         rc_dat = Wave_object.receivers_out_fft[:idx_lim, rec]
         rf_dat = Wave_object.receivers_ref_fft[:idx_lim, rec]
-        axes[rec].plot(f_rec, rc_dat, color=cl_rc, linestyle='-', linewidth=2)
-        axes[rec].plot(f_rec, rf_dat, color=cl_rf, linestyle='--', linewidth=2)
+        axes[rec].plot(f_rec, rc_dat, color=cl_rc, linestyle="-", linewidth=2)
+        axes[rec].plot(f_rec, rf_dat, color=cl_rf, linestyle="--", linewidth=2)
 
         # Add a vertical line at f_ref and f_sou
         if f_sou == Wave_object.freq_ref:
             f_ref = f_sou
-            f_str = r'$f_{ref} = f_{sou}$'
+            f_str = r"$f_{ref} = f_{sou}$"
         else:
             f_ref = Wave_object.freq_ref
-            f_str = r'$f_{ref}$'
+            f_str = r"$f_{ref}$"
             axes[rec].axvline(
-                x=f_sou, color='black', linestyle='-', linewidth=1.25)
+                x=f_sou, color="black", linestyle="-", linewidth=1.25
+            )
 
-        axes[rec].axvline(
-            x=f_ref, color='black', linestyle='-', linewidth=1.25)
+        axes[rec].axvline(x=f_ref, color="black", linestyle="-", linewidth=1.25)
 
         # Adding the receiver number label
-        axes[rec].text(0.995, 0.9, "R" + str(rec + 1), fontsize=8.5,
-                       transform=axes[rec].transAxes, fontweight='bold',
-                       verticalalignment='top', horizontalalignment='right',
-                       bbox=dict(facecolor='none', edgecolor='none'))
+        axes[rec].text(
+            0.995,
+            0.9,
+            "R" + str(rec + 1),
+            fontsize=8.5,
+            transform=axes[rec].transAxes,
+            fontweight="bold",
+            verticalalignment="top",
+            horizontalalignment="right",
+            bbox=dict(facecolor="none", edgecolor="none"),
+        )
 
         # Centered title
         if rec == num_recvs // 2:
-            axes[rec].set_ylabel(r'$FFT \; recs_{norm}$')
+            axes[rec].set_ylabel(r"$FFT \; recs_{norm}$")
 
         # Hide all the xticks for receiver different of the last one
         hide_xticks = False if rec < num_recvs - 1 else True
@@ -319,30 +343,47 @@ def plot_rfft_receivers(Wave_object, fxlim=4., show=False):
         # Axis format
         axes[rec].set_xlim(0, limf)
         axes[rec].ticklabel_format(
-            axis='y', style='scientific', scilimits=(-2, 2))
+            axis="y", style="scientific", scilimits=(-2, 2)
+        )
         if rec == num_recvs - 1:
-            axes[rec].set_xlabel(r'$f \; (Hz)$')
+            axes[rec].set_xlabel(r"$f \; (Hz)$")
 
             # Adding the frequency labels
-            axes[rec].text(f_ref - limf / 500., axes[rec].get_ylim()[0] * 1.05,
-                           f_str, color='black', fontsize=8, fontweight='bold',
-                           ha='right', va='bottom')
-            axes[rec].text(f_sou + limf / 500., axes[rec].get_ylim()[0] * 1.05,
-                           r'$f_{sou}$', color='black', fontsize=8,
-                           fontweight='bold', ha='left', va='bottom') \
-                if f_sou != Wave_object.freq_ref else None
+            axes[rec].text(
+                f_ref - limf / 500.0,
+                axes[rec].get_ylim()[0] * 1.05,
+                f_str,
+                color="black",
+                fontsize=8,
+                fontweight="bold",
+                ha="right",
+                va="bottom",
+            )
+            (
+                axes[rec].text(
+                    f_sou + limf / 500.0,
+                    axes[rec].get_ylim()[0] * 1.05,
+                    r"$f_{sou}$",
+                    color="black",
+                    fontsize=8,
+                    fontweight="bold",
+                    ha="left",
+                    va="bottom",
+                )
+                if f_sou != Wave_object.freq_ref
+                else None
+            )
 
     # Saving the plot
     time_str = Wave_object.path_case_habc + "freq"
-    plt.savefig(time_str + ".png", bbox_inches='tight')
-    plt.savefig(time_str + ".pdf", bbox_inches='tight')
+    plt.savefig(time_str + ".png", bbox_inches="tight")
+    plt.savefig(time_str + ".pdf", bbox_inches="tight")
     plt.show() if show else None
     plt.close()
 
 
 def plot_xCR_opt(Wave_object, data_regr_xCR, show=False):
-    '''
-    Plot the regression curve for the optimal xCR value.
+    """Plot the regression curve for the optimal xCR value.
 
     Parameters
     ----------
@@ -367,8 +408,7 @@ def plot_xCR_opt(Wave_object, data_regr_xCR, show=False):
     Returns
     -------
     None
-    '''
-
+    """
     # Data for regression
     xCR, max_errIt, max_errPk, crit_opt = data_regr_xCR
     xCR_opt = xCR[-1]
@@ -386,17 +426,27 @@ def plot_xCR_opt(Wave_object, data_regr_xCR, show=False):
     r2_eP = coeff_of_determination(y_eP_true, y_eP_pred, p)
 
     # Format equations
-    qua_reg = r'${:.3e} x^{{2}} + {:.3e} x + {:.3e}, R^{{2}} = {:.3f}$'
+    qua_reg = r"${:.3e} x^{{2}} + {:.3e} x + {:.3e}, R^{{2}} = {:.3f}$"
     eq_str_eI = (
-        r'$e_I = $' + qua_reg).format(*eq_eI, r2_eI).replace("+ -", "- ")
+        (r"$e_I = $" + qua_reg).format(*eq_eI, r2_eI).replace("+ -", "- ")
+    )
     eq_str_eP = (
-        r'$e_P = $' + qua_reg).format(*eq_eP, r2_eP).replace("+ -", "- ")
+        (r"$e_P = $" + qua_reg).format(*eq_eP, r2_eP).replace("+ -", "- ")
+    )
 
     # Regression points
-    plt.plot(xCR[:-1], 100 * np.asarray(max_errIt[:-1]), 'ro',
-             label=r'Integral Error: ' + eq_str_eI)
-    plt.plot(xCR[:-1], 100 * np.asarray(max_errPk[:-1]), 'bo',
-             label=r'Peak Error: ' + eq_str_eP)
+    plt.plot(
+        xCR[:-1],
+        100 * np.asarray(max_errIt[:-1]),
+        "ro",
+        label=r"Integral Error: " + eq_str_eI,
+    )
+    plt.plot(
+        xCR[:-1],
+        100 * np.asarray(max_errPk[:-1]),
+        "bo",
+        label=r"Peak Error: " + eq_str_eP,
+    )
 
     # xCR limits
     xCR_inf, xCR_sup = Wave_object.xCR_lim
@@ -405,41 +455,48 @@ def plot_xCR_opt(Wave_object, data_regr_xCR, show=False):
     xgraf = np.linspace(xCR_inf, xCR_sup, int((xCR_sup - xCR_inf) / 0.1))
     y_eI = np.polyval(eq_eI, xgraf)
     y_eP = np.polyval(eq_eP, xgraf)
-    plt.plot(xgraf, 100 * y_eI, color='r', linestyle='--')
-    plt.plot(xgraf, 100 * y_eP, color='b', linestyle='--')
+    plt.plot(xgraf, 100 * y_eI, color="r", linestyle="--")
+    plt.plot(xgraf, 100 * y_eP, color="b", linestyle="--")
 
     # Locating the optimal value
-    plt.plot([xCR_opt, xCR_opt], [0., 100 * err_opt], 'k-')
-    xopt_str = r'Optimized Heuristic Factor: $X^{{*}}_{{C_{{R}}}} = {:.3f}$'
+    plt.plot([xCR_opt, xCR_opt], [0.0, 100 * err_opt], "k-")
+    xopt_str = r"Optimized Heuristic Factor: $X^{{*}}_{{C_{{R}}}} = {:.3f}$"
     if round(100 * np.polyval(eq_eI, xCR_opt), 2) == round(
-            100 * np.polyval(eq_eP, xCR_opt), 2):
-        xopt_str += r' | $e_{{I}} = e_{{P}} = {:.2f}\%$'
+        100 * np.polyval(eq_eP, xCR_opt), 2
+    ):
+        xopt_str += r" | $e_{{I}} = e_{{P}} = {:.2f}\%$"
         label = xopt_str.format(xCR_opt, 100 * err_opt)
     else:
-        xopt_str += r' | $e_{{I}} = {:.2f}\%$ | $e_{{P}} = {:.2f}\%$'
+        xopt_str += r" | $e_{{I}} = {:.2f}\%$ | $e_{{P}} = {:.2f}\%$"
         label = xopt_str.format(xCR_opt, 100 * err_opt, 100 * max_errPk[-1])
-    plt.plot(xCR_opt, 100 * err_opt, marker=r'$\ast$', color='k',
-             markersize=10, label=label)
+    plt.plot(
+        xCR_opt,
+        100 * err_opt,
+        marker=r"$\ast$",
+        color="k",
+        markersize=10,
+        label=label,
+    )
     plt.legend(loc="best", fontsize=8.5)
 
     # Formatting the plot
     max_err = max(max(max_errIt[:-1]), max(max_errPk[:-1]))
     plt.xlim(0, round(xCR_sup, 1) + 0.1)
     plt.ylim(0, round(100 * max_err, 1) + 0.1)
-    if crit_opt == 'err_difference':
-        str_crt = r' (Criterion: Min $(e_I - e_P)$)'
-    elif crit_opt == 'err_integral':
-        str_crt = r' (Criterion: Min $e_I$)'
-    elif crit_opt == 'err_sum':
-        str_crt = r' (Criterion: Min $(e_I + e_P)$)'
+    if crit_opt == "err_difference":
+        str_crt = r" (Criterion: Min $(e_I - e_P)$)"
+    elif crit_opt == "err_integral":
+        str_crt = r" (Criterion: Min $e_I$)"
+    elif crit_opt == "err_sum":
+        str_crt = r" (Criterion: Min $(e_I + e_P)$)"
 
-    plt.xlabel(r'$X_{C_{R}}$' + str_crt)
+    plt.xlabel(r"$X_{C_{R}}$" + str_crt)
     plt.tight_layout(pad=2)
-    plt.ylabel(r'$e_I \; | \; e_P \; (\%)$')
+    plt.ylabel(r"$e_I \; | \; e_P \; (\%)$")
 
     # Saving the plot
     xcr_str = Wave_object.path_case_habc + "xCR"
-    plt.savefig(xcr_str + '.png', bbox_inches='tight')
-    plt.savefig(xcr_str + '.pdf', bbox_inches='tight')
+    plt.savefig(xcr_str + ".png", bbox_inches="tight")
+    plt.savefig(xcr_str + ".pdf", bbox_inches="tight")
     plt.show() if show else None
     plt.close()

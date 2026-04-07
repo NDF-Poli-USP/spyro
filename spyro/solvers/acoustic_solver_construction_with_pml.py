@@ -5,9 +5,10 @@ from ..pml import damping
 
 
 def construct_solver_or_matrix_with_pml(Wave_object):
-    """
-    Builds solver operators for wave propagator with a PML. Doesn't create mass matrices if
-    matrix_free option is on, which it is by default.
+    """Builds solver operators for wave propagator with a PML.
+
+    Doesn't create mass matrices if matrix_free option is on, which it is by
+    default.
     """
     if Wave_object.dimension == 2:
         return construct_solver_or_matrix_with_pml_2d(Wave_object)
@@ -16,9 +17,10 @@ def construct_solver_or_matrix_with_pml(Wave_object):
 
 
 def construct_solver_or_matrix_with_pml_2d(Wave_object):
-    """
-    Builds solver operators for 2D wave propagator with a PML. Doesn't create mass matrices if
-    matrix_free option is on, which it is by default.
+    """Builds solver operators for 2D wave propagator with a PML.
+
+    Doesn't create mass matrices if matrix_free option is on, which it is by
+    default.
     """
     dt = Wave_object.dt
     c = Wave_object.c
@@ -73,19 +75,24 @@ def construct_solver_or_matrix_with_pml_2d(Wave_object):
     Wave_object.source_function = fire.Cofunction(W.dual())
 
     lin_var = fire.LinearVariationalProblem(
-        Wave_object.lhs, Wave_object.rhs + Wave_object.source_function,
-        X_np1, constant_jacobian=True)
+        Wave_object.lhs,
+        Wave_object.rhs + Wave_object.source_function,
+        X_np1,
+        constant_jacobian=True,
+    )
     solver_parameters = dict(Wave_object.solver_parameters)
     solver_parameters["mat_type"] = "matfree"
     Wave_object.solver = fire.LinearVariationalSolver(
-        lin_var, solver_parameters=solver_parameters,
+        lin_var,
+        solver_parameters=solver_parameters,
     )
 
 
 def construct_solver_or_matrix_with_pml_3d(Wave_object):
-    """
-    Builds solver operators for 3D wave propagator with a PML. Doesn't create mass matrices if
-    matrix_free option is on, which it is by default.
+    """Builds solver operators for 3D wave propagator with a PML.
+
+    Doesn't create mass matrices if matrix_free option is on, which it is by
+    default.
     """
     dt = Wave_object.dt
     c = Wave_object.c
@@ -162,11 +169,14 @@ def construct_solver_or_matrix_with_pml_3d(Wave_object):
     source_function = fire.Cofunction(W.dual())
     Wave_object.source_function = source_function
 
-    lin_var = fire.LinearVariationalProblem(lhs_, rhs_ + source_function, X_np1, constant_jacobian=True)
+    lin_var = fire.LinearVariationalProblem(
+        lhs_, rhs_ + source_function, X_np1, constant_jacobian=True
+    )
     solver_parameters = dict(Wave_object.solver_parameters)
     solver_parameters["mat_type"] = "matfree"
     solver = fire.LinearVariationalSolver(
-        lin_var, solver_parameters=solver_parameters,
+        lin_var,
+        solver_parameters=solver_parameters,
     )
     Wave_object.solver = solver
     Wave_object.rhs = rhs_

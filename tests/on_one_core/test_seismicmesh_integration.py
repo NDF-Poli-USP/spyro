@@ -7,23 +7,24 @@ import pytest
 def is_seismicmesh_installed():
     try:
         import SeismicMesh  # noqa: F401
+
         return True
     except ImportError:
         return False
 
 
 def mean_edge_length(triangle):
-    """
-    Compute the mean edge length of a triangle
-    """
+    """Compute the mean edge length of a triangle."""
     (x0, y0), (x1, y1), (x2, y2) = triangle
-    l0 = np.sqrt((x1-x0)**2+(y1-y0)**2)
-    l1 = np.sqrt((x2-x1)**2+(y2-y1)**2)
-    l2 = np.sqrt((x0-x2)**2+(y0-y2)**2)
-    return (l0+l1+l2)/3.0
+    l0 = np.sqrt((x1 - x0) ** 2 + (y1 - y0) ** 2)
+    l1 = np.sqrt((x2 - x1) ** 2 + (y2 - y1) ** 2)
+    l2 = np.sqrt((x0 - x2) ** 2 + (y0 - y2) ** 2)
+    return (l0 + l1 + l2) / 3.0
 
 
-@pytest.mark.skipif(not is_seismicmesh_installed(), reason="SeismicMesh is not installed")
+@pytest.mark.skipif(
+    not is_seismicmesh_installed(), reason="SeismicMesh is not installed"
+)
 @pytest.mark.xfail(
     reason="Waiting for seismicmesh update for compatibility",
 )
@@ -32,7 +33,7 @@ def test_spyro_seimicmesh_2d_homogeneous_generation():
     Lx = 2.0
     c = 1.5
     freq = 5.0
-    lbda = c/freq
+    lbda = c / freq
     pad = 0.3
     cpw = 3
 
@@ -50,7 +51,7 @@ def test_spyro_seimicmesh_2d_homogeneous_generation():
         "abc_pad_length": pad,
         "lbda": lbda,
         "dimension": 2,
-        "edge_length": lbda/cpw,
+        "edge_length": lbda / cpw,
         "output_file_name": "test.msh",
     }
     mesh_parameters = spyro.meshing.MeshingParameters()
@@ -71,8 +72,8 @@ def test_spyro_seimicmesh_2d_homogeneous_generation():
     x = ux.dat.data[:]
 
     # Testing if boundaries are correct
-    test1 = (np.isclose(np.amin(z), -Lz-pad))
-    test1 = test1 and (np.isclose(np.amax(x), Lx+pad))
+    test1 = np.isclose(np.amin(z), -Lz - pad)
+    test1 = test1 and (np.isclose(np.amax(x), Lx + pad))
     test1 = test1 and (np.isclose(np.amax(z), 0.0))
     test1 = test1 and (np.isclose(np.amin(x), -pad))
     print(f"Boundary values are correct: {test1}")
@@ -84,7 +85,7 @@ def test_spyro_seimicmesh_2d_homogeneous_generation():
     p2 = (z[node_ids[2]], x[node_ids[2]])
 
     le = mean_edge_length((p0, p1, p2))
-    le_expected = lbda/cpw
+    le_expected = lbda / cpw
     test2 = np.isclose(le, le_expected, rtol=1e-1)
     print(f"Edge length is correct: {test2}")
 

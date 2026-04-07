@@ -18,8 +18,7 @@ except ImportError:
 
 
 class AutomaticMesh:
-    """
-    Class for automatic meshing.
+    """Class for automatic meshing.
 
     Attributes
     ----------
@@ -70,11 +69,8 @@ class AutomaticMesh:
         Creates a 2D mesh homogeneous velocity mesh based on SeismicMesh meshing utilities.
     """
 
-    def __init__(
-        self, mesh_parameters=None
-    ):
-        """
-        Initialize the MeshingFunctions class.
+    def __init__(self, mesh_parameters=None):
+        """Initialize the MeshingFunctions class.
 
         Parameters
         ----------
@@ -137,8 +133,7 @@ class AutomaticMesh:
         self.output_file_name = mesh_parameters.output_filename
 
     def create_mesh(self):
-        """
-        Creates the mesh.
+        """Creates the mesh.
 
         Returns
         -------
@@ -146,22 +141,27 @@ class AutomaticMesh:
             Mesh
         """
         if self.mesh_parameters.is_complete is False:
-            parallel_print("Skipping mesh generation, since we don't have all the parameters", comm=self.comm)
+            parallel_print(
+                "Skipping mesh generation, since we don't have all the parameters",
+                comm=self.comm,
+            )
             return None
         parallel_print(f"Creating {self.mesh_type} type mesh.", comm=self.comm)
         if self.mesh_type == "firedrake_mesh":
             return self.create_firedrake_mesh()
         elif self.mesh_type == "SeismicMesh":
             if SeismicMesh is None:
-                raise ImportError("SeismicMesh is not available. Please "
-                                  + "install it to use this function.")
+                raise ImportError(
+                    "SeismicMesh is not available. Please "
+                    + "install it to use this function."
+                )
             return self.create_seismicmesh_mesh()
         elif self.mesh_type == "spyro_mesh":
             self.create_spyro_mesh()
             if self.comm is not None:
                 # Ensure all processes wait for mesh creation to complete
                 # Need to sync both ensemble and spatial communicators
-                if hasattr(self.comm, 'ensemble_comm'):
+                if hasattr(self.comm, "ensemble_comm"):
                     self.comm.ensemble_comm.barrier()
                 self.comm.comm.barrier()
                 parallel_print("Loading mesh.", comm=self.comm)
@@ -172,8 +172,7 @@ class AutomaticMesh:
             raise ValueError("mesh_type is not supported")
 
     def create_firedrake_mesh(self):
-        """
-        Creates a mesh based on Firedrake meshing utilities.
+        """Creates a mesh based on Firedrake meshing utilities.
 
         Returns
         -------
@@ -193,8 +192,7 @@ class AutomaticMesh:
             raise ValueError("dimension is not supported")
 
     def create_firedrake_2D_mesh(self):
-        """
-        Creates a 2D mesh based on Firedrake meshing utilities.
+        """Creates a 2D mesh based on Firedrake meshing utilities.
 
         Returns
         -------
@@ -209,10 +207,15 @@ class AutomaticMesh:
         """
         if self.edge_length is None and self.cpw is not None:
             self.edge_length = calculate_edge_length(
-                self.cpw, self.minimum_velocity, self.source_frequency)
+                self.cpw, self.minimum_velocity, self.source_frequency
+            )
         if self.abc_pad:
-            nx = int(round((self.length_x + 2*self.abc_pad) / self.edge_length, 0))
-            nz = int(round((self.length_z + self.abc_pad) / self.edge_length, 0))
+            nx = int(
+                round((self.length_x + 2 * self.abc_pad) / self.edge_length, 0)
+            )
+            nz = int(
+                round((self.length_z + self.abc_pad) / self.edge_length, 0)
+            )
         else:
             nx = int(round(self.length_x / self.edge_length, 0))
             nz = int(round(self.length_z / self.edge_length, 0))
@@ -244,8 +247,7 @@ class AutomaticMesh:
             )
 
     def create_firedrake_3D_mesh(self):
-        """
-        Creates a 3D mesh based on Firedrake meshing utilities.
+        """Creates a 3D mesh based on Firedrake meshing utilities.
 
         Returns
         -------
@@ -273,8 +275,7 @@ class AutomaticMesh:
         )
 
     def create_seismicmesh_mesh(self):
-        """
-        Creates a mesh based on SeismicMesh meshing utilities.
+        """Creates a mesh based on SeismicMesh meshing utilities.
 
         Returns
         -------
@@ -290,8 +291,7 @@ class AutomaticMesh:
             raise ValueError("dimension is not supported")
 
     def create_seimicmesh_2d_mesh(self):
-        """
-        Creates a 2D mesh based on SeismicMesh meshing utilities.
+        """Creates a 2D mesh based on SeismicMesh meshing utilities.
 
         Returns
         -------
@@ -310,8 +310,7 @@ class AutomaticMesh:
             return self.create_seismicmesh_2D_mesh_with_velocity_model()
 
     def create_seismicmesh_2D_mesh_with_velocity_model(self):
-        """
-        Creates a 2D mesh with velocity-based refinement using SeismicMesh.
+        """Creates a 2D mesh with velocity-based refinement using SeismicMesh.
 
         Returns
         -------
@@ -335,12 +334,12 @@ class AutomaticMesh:
             length_z = self.length_z
             length_x = self.length_x
             domain_pad = self.abc_pad
-            lbda_min = v_min/frequency
+            lbda_min = v_min / frequency
 
             bbox = (-length_z, 0.0, 0.0, length_x)
             domain = SeismicMesh.Rectangle(bbox)
 
-            hmin = lbda_min/C
+            hmin = lbda_min / C
             self.comm.comm.barrier()
 
             ef = SeismicMesh.get_sizing_function_from_segy(
@@ -352,7 +351,7 @@ class AutomaticMesh:
                 grade=0.15,
                 domain_pad=domain_pad,
                 pad_style="edge",
-                units='km/s',
+                units="km/s",
                 comm=self.comm.comm,
             )
             self.comm.comm.barrier()
@@ -367,26 +366,26 @@ class AutomaticMesh:
             )
             self.comm.comm.barrier()
 
-            print('entering spatial rank 0 after mesh generation')
+            print("entering spatial rank 0 after mesh generation")
             if self.comm.comm.rank == 0:
                 meshio.write_points_cells(
                     "automatic_mesh.msh",
                     points,
                     [("triangle", cells)],
                     file_format="gmsh22",
-                    binary=False
+                    binary=False,
                 )
 
                 meshio.write_points_cells(
                     "automatic_mesh.vtk",
                     points,
                     [("triangle", cells)],
-                    file_format="vtk"
+                    file_format="vtk",
                 )
 
         self.comm.comm.barrier()
         mesh = fire.Mesh(
-            'automatic_mesh.msh',
+            "automatic_mesh.msh",
             distribution_parameters={
                 "overlap_type": (fire.DistributedMeshOverlapType.NONE, 0)
             },
@@ -396,8 +395,8 @@ class AutomaticMesh:
         return mesh
 
     def create_seismicmesh_2D_mesh_homogeneous(self):
-        """
-        Creates a 2D mesh based on SeismicMesh meshing utilities, with homogeneous velocity model.
+        """Creates a 2D mesh based on SeismicMesh meshing utilities, with
+        homogeneous velocity model.
 
         Returns
         -------
@@ -425,7 +424,9 @@ class AutomaticMesh:
 
         edge_length = self.edge_length
         if edge_length is None:
-            edge_length = self.minimum_velocity/(self.source_frequency*self.cpw)
+            edge_length = self.minimum_velocity / (
+                self.source_frequency * self.cpw
+            )
 
         bbox = (-real_lz, 0.0, -pad, real_lx - pad)
         rectangle = SeismicMesh.Rectangle(bbox)
@@ -457,9 +458,8 @@ class AutomaticMesh:
         return fire.Mesh(self.output_file_name)
 
     def create_spyro_mesh(self):
-        """
-        Creates a mesh using spyro's internal meshing utilities based on gmsh calls. This
-        mesh has tags that define the dx integration in Firedrake.
+        """Creates a mesh using spyro's internal meshing utilities based on gmsh
+        calls. This mesh has tags that define the dx integration in Firedrake.
 
         Returns
         -------
@@ -487,8 +487,7 @@ class AutomaticMesh:
 
 
 def calculate_edge_length(cpw, minimum_velocity, frequency):
-    """
-    Calculate the edge length for mesh generation.
+    """Calculate the edge length for mesh generation.
 
     Parameters
     ----------
@@ -506,13 +505,15 @@ def calculate_edge_length(cpw, minimum_velocity, frequency):
     """
     v_min = minimum_velocity
 
-    lbda_min = v_min/frequency
+    lbda_min = v_min / frequency
 
-    edge_length = lbda_min/cpw
+    edge_length = lbda_min / cpw
     return edge_length
 
 
-def RectangleMesh(nx, ny, length_x, length_y, pad=None, comm=None, quadrilateral=False):
+def RectangleMesh(
+    nx, ny, length_x, length_y, pad=None, comm=None, quadrilateral=False
+):
     """Create a rectangle mesh based on the Firedrake mesh.
 
     First axis is negative, second axis is positive. If there is a pad, both
@@ -547,9 +548,13 @@ def RectangleMesh(nx, ny, length_x, length_y, pad=None, comm=None, quadrilateral
         pad = 0
 
     if comm is None:
-        mesh = fire.RectangleMesh(nx, ny, length_x, length_y, quadrilateral=quadrilateral)
+        mesh = fire.RectangleMesh(
+            nx, ny, length_x, length_y, quadrilateral=quadrilateral
+        )
     else:
-        mesh = fire.RectangleMesh(nx, ny, length_x, length_y, quadrilateral=quadrilateral, comm=comm)
+        mesh = fire.RectangleMesh(
+            nx, ny, length_x, length_y, quadrilateral=quadrilateral, comm=comm
+        )
     mesh.coordinates.dat.data[:, 0] *= -1.0
     mesh.coordinates.dat.data[:, 1] -= pad
 
@@ -600,9 +605,10 @@ def PeriodicRectangleMesh(
     return mesh
 
 
-def BoxMesh(nx, ny, nz, length_x, length_y, length_z, pad=None, quadrilateral=False):
-    """
-    Create a 3D box mesh based on Firedrake mesh utilities.
+def BoxMesh(
+    nx, ny, nz, length_x, length_y, length_z, pad=None, quadrilateral=False
+):
+    """Create a 3D box mesh based on Firedrake mesh utilities.
 
     Parameters
     ----------
@@ -642,7 +648,9 @@ def BoxMesh(nx, ny, nz, length_x, length_y, length_z, pad=None, quadrilateral=Fa
     else:
         pad = 0
     if quadrilateral:
-        quad_mesh = fire.RectangleMesh(nx, ny, length_x, length_y, quadrilateral=quadrilateral)
+        quad_mesh = fire.RectangleMesh(
+            nx, ny, length_x, length_y, quadrilateral=quadrilateral
+        )
         quad_mesh.coordinates.dat.data[:, 0] *= -1.0
         quad_mesh.coordinates.dat.data[:, 1] -= pad
         layer_height = length_z / nz
@@ -655,8 +663,7 @@ def BoxMesh(nx, ny, nz, length_x, length_y, length_z, pad=None, quadrilateral=Fa
 
 
 def vp_to_sizing(vp, cpw, frequency):
-    """
-    Convert velocity field to mesh sizing function.
+    """Convert velocity field to mesh sizing function.
 
     Parameters
     ----------
@@ -686,15 +693,16 @@ def vp_to_sizing(vp, cpw, frequency):
     if cpw < 0.0 or cpw == 0.0:
         raise ValueError(f"Cells-per-wavelength value of {cpw} not supported.")
     if frequency < 0.0 or frequency == 0.0:
-        raise ValueError(f"Frequency must be positive and non zero, not {frequency}")
+        raise ValueError(
+            f"Frequency must be positive and non zero, not {frequency}"
+        )
 
     return vp / (frequency * cpw)
 
 
 @run_in_one_core
 def build_big_rect_with_inner_element_group(mesh_parameters):
-    """
-    Build a rectangular mesh with optional inner element group using GMSH.
+    """Build a rectangular mesh with optional inner element group using GMSH.
 
     Parameters
     ----------
@@ -739,7 +747,9 @@ def build_big_rect_with_inner_element_group(mesh_parameters):
     are placed in an 'Outer' physical group.
     """
     if gmsh is None:
-        raise ImportError("gmsh is not available. Please install it to use this function.")
+        raise ImportError(
+            "gmsh is not available. Please install it to use this function."
+        )
 
     length_z = mesh_parameters.length_z
     length_x = mesh_parameters.length_x
@@ -753,12 +763,16 @@ def build_big_rect_with_inner_element_group(mesh_parameters):
     gmsh.option.setNumber("Mesh.MeshSizeExtendFromBoundary", 0)
 
     # --- Geometry: on length_x the big rectangle ---
-    surf_tag = gmsh.model.occ.addRectangle(-length_z, 0.0, 0.0, length_z, length_x)
+    surf_tag = gmsh.model.occ.addRectangle(
+        -length_z, 0.0, 0.0, length_z, length_x
+    )
     gmsh.model.occ.synchronize()
 
     # Get boundary edges for tagging
     boundary_entities = gmsh.model.getBoundary([(2, surf_tag)], oriented=False)
-    edge_tags = [abs(entity[1]) for entity in boundary_entities if entity[0] == 1]
+    edge_tags = [
+        abs(entity[1]) for entity in boundary_entities if entity[0] == 1
+    ]
 
     # Identify boundary edges by their geometric center
     boundary_tag_map = {}
@@ -788,6 +802,7 @@ def build_big_rect_with_inner_element_group(mesh_parameters):
         def mesh_size_callback(dim, tag, x, y, z, lc):
             h = x + y
             return float(h)
+
     else:
         frequency = mesh_parameters.source_frequency
         cpw = mesh_parameters.cells_per_wavelength
@@ -804,6 +819,7 @@ def build_big_rect_with_inner_element_group(mesh_parameters):
         def mesh_size_callback(dim, tag, x, y, z, lc):
             size = float(interpolator([[x, y]])[0])
             return size
+
     gmsh.model.mesh.setSizeCallback(mesh_size_callback)
 
     # --- Mesh the single surface ---
@@ -835,17 +851,26 @@ def build_big_rect_with_inner_element_group(mesh_parameters):
         for t, tags, conn in zip(types, elemTags, nodeTags):
             tags = np.array(tags, dtype=np.int64)
             # number of nodes per element type t:
-            nPer = gmsh.model.mesh.getElementProperties(t)[3]  # returns (name, dim, order, numNodes, ...)[3]
+            nPer = gmsh.model.mesh.getElementProperties(t)[
+                3
+            ]  # returns (name, dim, order, numNodes, ...)[3]
             conn = np.array(conn, dtype=np.int64).reshape(-1, nPer)
 
             # Compute centroids
             # (x_c, y_c) = average of node coords
-            xyz = coords[[id2idx[int(n)] for n in conn.flatten()]].reshape(-1, nPer, 3)
+            xyz = coords[[id2idx[int(n)] for n in conn.flatten()]].reshape(
+                -1, nPer, 3
+            )
             centroids = xyz.mean(axis=1)  # (nelem, 3)
             cz_e = centroids[:, 0]
             cx_e = centroids[:, 1]
 
-            inside = (cz_e >= z_min) & (cz_e <= z_max) & (cx_e >= x_min) & (cx_e <= x_max)
+            inside = (
+                (cz_e >= z_min)
+                & (cz_e <= z_max)
+                & (cx_e >= x_min)
+                & (cx_e <= x_max)
+            )
 
             inner_elem_by_type.append(tags[inside])
             inner_conn_by_type.append(conn[inside])
@@ -861,7 +886,9 @@ def build_big_rect_with_inner_element_group(mesh_parameters):
         for t, tags, conn in zip(types, outer_elem_by_type, outer_conn_by_type):
             if tags.size == 0:
                 continue
-            gmsh.model.mesh.addElements(2, surf_tag, [t], [tags.tolist()], [conn.flatten().tolist()])
+            gmsh.model.mesh.addElements(
+                2, surf_tag, [t], [tags.tolist()], [conn.flatten().tolist()]
+            )
 
         # 3) Create a discrete surface and add the inner elements
         inner_surf_tag = gmsh.model.addDiscreteEntity(2)
@@ -869,7 +896,13 @@ def build_big_rect_with_inner_element_group(mesh_parameters):
         for t, tags, conn in zip(types, inner_elem_by_type, inner_conn_by_type):
             if tags.size == 0:
                 continue
-            gmsh.model.mesh.addElements(2, inner_surf_tag, [t], [tags.tolist()], [conn.flatten().tolist()])
+            gmsh.model.mesh.addElements(
+                2,
+                inner_surf_tag,
+                [t],
+                [tags.tolist()],
+                [conn.flatten().tolist()],
+            )
 
         # --- Define Physical groups on entities ---
         pg_outer = gmsh.model.addPhysicalGroup(2, [surf_tag])
@@ -880,9 +913,15 @@ def build_big_rect_with_inner_element_group(mesh_parameters):
     # Create physical groups for boundary edges (for absorbing boundary conditions)
     for edge_tag, boundary_id in boundary_tag_map.items():
         # Set physical group ID explicitly to match ds() tags (1=top, 2=bottom, 3=right, 4=left)
-        pg_boundary = gmsh.model.addPhysicalGroup(1, [edge_tag], boundary_id)  # noqa: F841
+        pg_boundary = gmsh.model.addPhysicalGroup(
+            1, [edge_tag], boundary_id
+        )  # noqa: F841
         boundary_names = {1: "Top", 2: "Bottom", 3: "Right", 4: "Left"}
-        gmsh.model.setPhysicalName(1, boundary_id, f"Boundary_{boundary_names.get(boundary_id, boundary_id)}")
+        gmsh.model.setPhysicalName(
+            1,
+            boundary_id,
+            f"Boundary_{boundary_names.get(boundary_id, boundary_id)}",
+        )
         # This ensures ds(1), ds(2), ds(3), ds(4) work correctly
 
     # Save
@@ -892,7 +931,9 @@ def build_big_rect_with_inner_element_group(mesh_parameters):
     print(f"Boundary tags created: {len(boundary_tag_map)} edges")
     for edge_tag, boundary_id in boundary_tag_map.items():
         boundary_names = {1: "Top", 2: "Bottom", 3: "Right", 4: "Left"}
-        print(f"  Edge {edge_tag} -> Boundary {boundary_id} ({boundary_names.get(boundary_id, 'Unknown')})")
+        print(
+            f"  Edge {edge_tag} -> Boundary {boundary_id} ({boundary_names.get(boundary_id, 'Unknown')})"
+        )
 
     if mesh_parameters.gradient_mask is not None:
         print(f"Geometric surface tag      (Outer): {surf_tag}")

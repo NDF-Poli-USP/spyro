@@ -7,13 +7,13 @@ from os import getcwd
 from spyro.solvers.acoustic_wave import AcousticWave
 from spyro.meshing.meshing_habc import HABC_Mesh
 from spyro.utils.cost import comp_cost
+
 fire.parameters["loopy"] = {"silenced_warnings": ["v1_scheduler_fallback"]}
 warnings.filterwarnings("ignore", category=RuntimeWarning)
 
 
 def wave_dict_2d(element_type):
-    '''
-    Create a dictionary with parameters for the model
+    """Create a dictionary with parameters for the model.
 
     Parameters
     ----------
@@ -24,8 +24,7 @@ def wave_dict_2d(element_type):
     -------
     dictionary : `dict`
         Dictionary containing the parameters for the model
-    '''
-
+    """
     dictionary = {}
     dictionary["options"] = {
         # Simplexes: triangles or tetrahedra (T) or quadrilaterals (Q)
@@ -49,7 +48,7 @@ def wave_dict_2d(element_type):
     # Define the domain size without the PML or AL. Here we'll assume a
     # 1 x 1 km domain and compute the size for the Absorbing Layer (AL)
     # to absorb outgoing waves on boundries (-z, +-x sides) of the domain.
-    Lz, Lx, Ly = [1., 1., 0.]
+    Lz, Lx, Ly = [1.0, 1.0, 0.0]
     dictionary["mesh"] = {
         "length_z": Lz,  # depth in km - always positive
         "length_x": Lx,  # width in km - always positive
@@ -64,17 +63,17 @@ def wave_dict_2d(element_type):
     dictionary["acquisition"] = {
         "source_type": "ricker",
         "source_locations": [(-0.5, 0.25)],  # (0.5 * Lz, 0.25 * Lx)
-        "frequency": 5.,  # in Hz
+        "frequency": 5.0,  # in Hz
         "delay": 1.5,
-        "receiver_locations": [(-Lz, 0.), (-Lz, Lx), (0., 0.), (0., Lx)]
+        "receiver_locations": [(-Lz, 0.0), (-Lz, Lx), (0.0, 0.0), (0.0, Lx)],
     }
 
     # Simulate for 2. seconds.
     dictionary["time_axis"] = {
-        "initial_time": 0.,  # Initial time for event
-        "final_time": 2.,    # Final time for event
+        "initial_time": 0.0,  # Initial time for event
+        "final_time": 2.0,  # Final time for event
         "dt": 0.001,  # timestep size in seconds
-        "amplitude": 1.,  # The Ricker has an amplitude of 1.
+        "amplitude": 1.0,  # The Ricker has an amplitude of 1.
         "output_frequency": 100,  # How frequently to output solution to pvds
         "gradient_sampling_frequency": 100,  # How frequently to save to RAM
     }
@@ -92,8 +91,7 @@ def wave_dict_2d(element_type):
 
 
 def wave_dict_3d(element_type, degree_eikonal):
-    '''
-    Create a dictionary with parameters for the model
+    """Create a dictionary with parameters for the model.
 
     Parameters
     ----------
@@ -106,8 +104,7 @@ def wave_dict_3d(element_type, degree_eikonal):
     -------
     dictionary : `dict`
         Dictionary containing the parameters for the model
-    '''
-
+    """
     dictionary = {}
     dictionary["options"] = {
         # Simplexes: triangles or tetrahedra (T) or quadrilaterals (Q)
@@ -131,7 +128,7 @@ def wave_dict_3d(element_type, degree_eikonal):
     # Define the domain size without the PML or AL. Here we'll assume a
     # 1 x 1 x 1 km domain and compute the size for the Absorbing Layer (AL)
     # to absorb outgoing waves on boundries (-z, +-x, +-y sides) of the domain.
-    Lz, Lx, Ly = [1., 1., 1.]  # in km
+    Lz, Lx, Ly = [1.0, 1.0, 1.0]  # in km
     dictionary["mesh"] = {
         "length_z": Lz,  # depth in km - always positive
         "length_x": Lx,  # width in km - always positive
@@ -146,20 +143,26 @@ def wave_dict_3d(element_type, degree_eikonal):
     dictionary["acquisition"] = {
         "source_type": "ricker",
         "source_locations": [(-0.5, 0.25, 0.5)],  # (0.5*Lz, 0.25*Lx, 0.25*Ly)
-        "frequency": 5.,  # in Hz
+        "frequency": 5.0,  # in Hz
         "delay": 1.5,
-        "receiver_locations": [(-Lz, 0., 0.), (-Lz, Lx, 0.),
-                               (0., 0., 0), (0., Lx, 0.),
-                               (-Lz, 0., Ly), (-Lz, Lx, Ly),
-                               (0., 0., Ly), (0., Lx, Ly)]
+        "receiver_locations": [
+            (-Lz, 0.0, 0.0),
+            (-Lz, Lx, 0.0),
+            (0.0, 0.0, 0),
+            (0.0, Lx, 0.0),
+            (-Lz, 0.0, Ly),
+            (-Lz, Lx, Ly),
+            (0.0, 0.0, Ly),
+            (0.0, Lx, Ly),
+        ],
     }
 
     # Simulate for 1.5 seconds.
     dictionary["time_axis"] = {
-        "initial_time": 0.,  # Initial time for event
-        "final_time": 1.5,    # Final time for event
+        "initial_time": 0.0,  # Initial time for event
+        "final_time": 1.5,  # Final time for event
         "dt": 0.001,  # timestep size in seconds
-        "amplitude": 1.,  # The Ricker has an amplitude of 1.
+        "amplitude": 1.0,  # The Ricker has an amplitude of 1.
         "output_frequency": 100,  # How frequently to output solution to pvds
         "gradient_sampling_frequency": 100,  # How frequently to save to RAM
     }
@@ -178,8 +181,8 @@ def wave_dict_3d(element_type, degree_eikonal):
 
 
 class HABC_Wave(AcousticWave, HABC_Mesh):
-    '''
-    Class HABC that determines absorbing layer size and parameters to be used
+    """Class HABC that determines absorbing layer size and parameters to be
+    used.
 
     Attributes
     ----------
@@ -189,11 +192,10 @@ class HABC_Wave(AcousticWave, HABC_Mesh):
     Methods
     -------
     None added to the ones inherited from AcousticWave and HABC_Mesh
-    '''
+    """
 
     def __init__(self, dictionary=None, comm=None):
-        '''
-        Initialize the HABC class
+        """Initialize the HABC class.
 
         Parameters
         ----------
@@ -206,8 +208,7 @@ class HABC_Wave(AcousticWave, HABC_Mesh):
         Returns
         -------
         None
-        '''
-
+        """
         # Initializing the Wave class
         AcousticWave.__init__(self, dictionary=dictionary, comm=comm)
 
@@ -215,8 +216,7 @@ class HABC_Wave(AcousticWave, HABC_Mesh):
         self.path_save = getcwd() + "/output/eikonal_test"
 
         # Original domain dimensions
-        dom_dim = (self.mesh_parameters.length_x,
-                   self.mesh_parameters.length_z)
+        dom_dim = (self.mesh_parameters.length_x, self.mesh_parameters.length_z)
 
         if self.dimension == 2:  # 2D
             self.path_save += "2d/"
@@ -227,16 +227,18 @@ class HABC_Wave(AcousticWave, HABC_Mesh):
 
         # Initializing the Mesh class
         HABC_Mesh.__init__(
-            self, dom_dim, dimension=self.dimension,
+            self,
+            dom_dim,
+            dimension=self.dimension,
             quadrilateral=self.mesh_parameters.quadrilateral,
-            comm=self.comm)
+            comm=self.comm,
+        )
 
 
 def critical_boundary_points(Wave_obj):
-    '''
-    Determine the critical points on domain boundaries of the original
-    model to size an absorbing layer using the Eikonal criterion for HABCs.
-    See Salas et al (2022) for details.
+    """Determine the critical points on domain boundaries of the original model
+    to size an absorbing layer using the Eikonal criterion for HABCs. See Salas
+    et al (2022) for details.
 
     Parameters
     ----------
@@ -253,8 +255,7 @@ def critical_boundary_points(Wave_obj):
         - eikmin : Eikonal value in seconds
         - z_par : Inverse of minimum Eikonal (Equivalent to c_bound / lref)
         - lref : Distance to the closest source
-    '''
-
+    """
     # Initializing Eikonal object
     Eikonal = eik.HABC_Eikonal(Wave_obj)
 
@@ -268,8 +269,7 @@ def critical_boundary_points(Wave_obj):
 
 
 def eikonal_analysis(dictionary, edge_length, f_est):
-    '''
-    Run the the Eikonal analysis
+    """Run the the Eikonal analysis.
 
     Parameters
     ----------
@@ -284,8 +284,7 @@ def eikonal_analysis(dictionary, edge_length, f_est):
     -------
     min_eik : `float`
         Minimum Eikonal value in miliseconds
-    '''
-
+    """
     # ============ MESH FEATURES ============
 
     # Reference to resource usage
@@ -325,9 +324,8 @@ def eikonal_analysis(dictionary, edge_length, f_est):
 
 @pytest.mark.slow
 def test_loop_eikonal_2d():
-    '''
-    Loop for testing eikonal solver in 2D with the model
-    in Fig. 8 of Salas et al. (2022)
+    """Loop for testing eikonal solver in 2D with the model in Fig. 8 of Salas
+    et al. (2022)
 
     eik_min = 83.333 ms (Theoretical value)
     f_est  T-ele   Q-ele
@@ -339,8 +337,7 @@ def test_loop_eikonal_2d():
      0.06 82.942* 85.118
      0.07 84.160  86.345
      0.08 85.233  87.480
-    '''
-
+    """
     # ============ SIMULATION PARAMETERS ============
 
     # Mesh size (in km)
@@ -376,20 +373,23 @@ def test_loop_eikonal_2d():
             min_eik = round(eikonal_analysis(dict_2d, edge_length, f_est), 3)
 
             thr_val = 83.333  # in ms
-            assert isclose(min_eik / thr_val, 1., atol=5e-3), \
-                f"❌ Minimum Eikonal 2D Element-{ele_type} " + \
-                f"→ Expected value {thr_val}, got {min_eik:.3f}"
-            print(f"✅ Minimum Eikonal 2D Verified: expected "
-                  f"{thr_val}, got = {min_eik:.3f}", flush=True)
+            assert isclose(min_eik / thr_val, 1.0, atol=5e-3), (
+                f"❌ Minimum Eikonal 2D Element-{ele_type} "
+                + f"→ Expected value {thr_val}, got {min_eik:.3f}"
+            )
+            print(
+                f"✅ Minimum Eikonal 2D Verified: expected "
+                f"{thr_val}, got = {min_eik:.3f}",
+                flush=True,
+            )
 
         except fire.ConvergenceError as e:
             pytest.fail(f"Checking Eikonal 2D raised an exception: {str(e)}")
 
 
 def test_loop_eikonal_3d():
-    '''
-    Loop for testing eikonal solver in 3D with the model
-    in Fig. 8 of Salas et al. (2022)
+    """Loop for testing eikonal solver in 3D with the model in Fig. 8 of Salas
+    et al. (2022)
 
     eik_min = 83.333 ms (Theoretical value)
     f_est  T-ele   Q-ele
@@ -400,8 +400,7 @@ def test_loop_eikonal_3d():
      0.06 85.347  78.548
      0.07 88.562  81.431*
      0.08 91.876  84.377
-    '''
-
+    """
     # ============ SIMULATION PARAMETERS ============
 
     # Mesh size (in km)
@@ -443,11 +442,15 @@ def test_loop_eikonal_3d():
 
             thr_val = 83.333  # in ms
 
-            assert isclose(min_eik / thr_val, 1., atol=3e-2), \
-                f"❌ Minimum Eikonal 3D Element-{ele_type} " + \
-                f"→ Expected value {thr_val}, got {min_eik:.3f}"
-            print(f"✅ Minimum Eikonal 3D Verified: expected "
-                  f"{thr_val}, got = {min_eik:.3f}", flush=True)
+            assert isclose(min_eik / thr_val, 1.0, atol=3e-2), (
+                f"❌ Minimum Eikonal 3D Element-{ele_type} "
+                + f"→ Expected value {thr_val}, got {min_eik:.3f}"
+            )
+            print(
+                f"✅ Minimum Eikonal 3D Verified: expected "
+                f"{thr_val}, got = {min_eik:.3f}",
+                flush=True,
+            )
 
         except fire.ConvergenceError as e:
             pytest.fail(f"Checking Eikonal 3D raised an exception: {str(e)}")

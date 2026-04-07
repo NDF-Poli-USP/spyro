@@ -4,8 +4,7 @@ import warnings
 
 
 def build_on_top_of_base_dictionary(variables):
-    """
-    Builds a model dictionary on top of the base dictionary.
+    """Builds a model dictionary on top of the base dictionary.
 
     Parameters
     ----------
@@ -51,7 +50,9 @@ def build_on_top_of_base_dictionary(variables):
         "dimension": variables["dimension"],
         "automatic_adjoint": False,
     }
-    model_dictionary["parallelism"] = {"type": "automatic", }
+    model_dictionary["parallelism"] = {
+        "type": "automatic",
+    }
     model_dictionary["mesh"] = {
         "length_z": variables["length_z"],
         "length_x": variables["length_x"],
@@ -93,8 +94,7 @@ def build_on_top_of_base_dictionary(variables):
 
 
 def set_mesh_type(method):
-    """
-    Sets the mesh type based on the method.
+    """Sets the mesh type based on the method.
 
     Parameters
     ----------
@@ -111,13 +111,15 @@ def set_mesh_type(method):
     elif method == "spectral_quadrilateral":
         mesh_type = "firedrake_mesh"
     else:
-        raise ValueError("Method is not mass_lumped_triangle or spectral_quadrilateral")
+        raise ValueError(
+            "Method is not mass_lumped_triangle or spectral_quadrilateral"
+        )
     return mesh_type
 
 
 def create_initial_model_for_meshing_parameter(Meshing_calc_obj):
-    """
-    Creates an initial model dictionary for the meshing parameter calculation.
+    """Creates an initial model dictionary for the meshing parameter
+    calculation.
 
     Parameters
     ----------
@@ -139,8 +141,8 @@ def create_initial_model_for_meshing_parameter(Meshing_calc_obj):
 
 
 def create_initial_model_for_meshing_parameter_2D(Meshing_calc_obj):
-    """
-    Creates an initial model dictionary for the meshing parameter calculation in 2D.
+    """Creates an initial model dictionary for the meshing parameter calculation
+    in 2D.
 
     Parameters
     ----------
@@ -158,16 +160,20 @@ def create_initial_model_for_meshing_parameter_2D(Meshing_calc_obj):
             Meshing_calc_obj
         )
     elif velocity_profile_type == "heterogeneous":
-        return create_initial_model_for_meshing_parameter_2D_heterogeneous(Meshing_calc_obj)
+        return create_initial_model_for_meshing_parameter_2D_heterogeneous(
+            Meshing_calc_obj
+        )
     else:
         raise ValueError(
             "Velocity profile type is not homogeneous or heterogeneous"
         )
 
 
-def create_initial_model_for_meshing_parameter_2D_heterogeneous(Meshing_calc_obj):
-    """
-    Creates an initial model dictionary for the meshing parameter calculation in 2D with a heterogeneous velocity model.
+def create_initial_model_for_meshing_parameter_2D_heterogeneous(
+    Meshing_calc_obj,
+):
+    """Creates an initial model dictionary for the meshing parameter calculation
+    in 2D with a heterogeneous velocity model.
 
     Parameters
     ----------
@@ -202,8 +208,8 @@ def create_initial_model_for_meshing_parameter_2D_heterogeneous(Meshing_calc_obj
     source_locations = [(source_z, source_x)]
 
     # Receiver calculations
-    receiver_bin_center1 = 2000.0/1000
-    receiver_bin_center2 = 10000.0/1000
+    receiver_bin_center1 = 2000.0 / 1000
+    receiver_bin_center2 = 10000.0 / 1000
     receiver_quantity = 500
 
     bin1_startZ = source_z
@@ -212,9 +218,7 @@ def create_initial_model_for_meshing_parameter_2D_heterogeneous(Meshing_calc_obj
     bin1_endX = source_x + receiver_bin_center2
 
     receiver_locations = spyro.create_transect(
-        (bin1_startZ, bin1_startX),
-        (bin1_endZ, bin1_endX),
-        receiver_quantity
+        (bin1_startZ, bin1_startX), (bin1_endZ, bin1_endX), receiver_quantity
     )
 
     # Time axis calculations
@@ -247,8 +251,8 @@ def create_initial_model_for_meshing_parameter_2D_heterogeneous(Meshing_calc_obj
 
 
 def create_initial_model_for_meshing_parameter_3D(Meshing_calc_obj):
-    """
-    Creates an initial model dictionary for the meshing parameter calculation in 3D.
+    """Creates an initial model dictionary for the meshing parameter calculation
+    in 3D.
 
     Parameters
     ----------
@@ -274,8 +278,8 @@ def create_initial_model_for_meshing_parameter_3D(Meshing_calc_obj):
 
 
 def create_initial_model_for_meshing_parameter_2D_homogeneous(Meshing_calc_obj):
-    """
-    Creates an initial model dictionary for the meshing parameter calculation in 2D with a homogeneous velocity model.
+    """Creates an initial model dictionary for the meshing parameter calculation
+    in 2D with a homogeneous velocity model.
 
     Parameters
     ----------

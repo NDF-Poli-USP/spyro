@@ -7,16 +7,18 @@ from scipy.signal import butter, filtfilt
 import warnings
 from ..io import ensemble_functional
 from ..io import parallel_print
+
 try:
     from SeismicMesh import write_velocity_model
+
     SEISMIC_MESH_AVAILABLE = True
 except ImportError:
     SEISMIC_MESH_AVAILABLE = False
 
 
 def butter_lowpass_filter(shot, cutoff, fs, order=2):
-    """Low-pass filter the shot record with sampling-rate fs Hz
-    and cutoff freq. Hz
+    """Low-pass filter the shot record with sampling-rate fs Hz and cutoff freq.
+    Hz.
 
     Parameters
     ----------
@@ -123,7 +125,6 @@ def evaluate_misfit(model, guess, exact):
     The exact data is downsampled by taking every `skip`-th sample,
     while the guess data is assumed to already be at the correct sampling rate.
     """
-
     if "skip" in model["timeaxis"]:
         skip = model["timeaxis"]["skip"]
     else:
@@ -262,7 +263,7 @@ def communicate(array, my_ensemble):
     return array_reduced
 
 
-class Mask():
+class Mask:
     """
     DEPRECATED: Spatial mask for selective gradient updates in wave simulations.
 
@@ -429,9 +430,17 @@ class Mask():
         for boundary in active_boundaries:
             axis = boundary[0]
             if boundary[-3:] == "min":
-                cond[0] = conditional(getattr(self, axis) < getattr(self, boundary), true_value[0], false_value[0])
+                cond[0] = conditional(
+                    getattr(self, axis) < getattr(self, boundary),
+                    true_value[0],
+                    false_value[0],
+                )
             elif boundary[-3:] == "max":
-                cond[0] = conditional(getattr(self, axis) > getattr(self, boundary), true_value[0], false_value[0])
+                cond[0] = conditional(
+                    getattr(self, axis) > getattr(self, boundary),
+                    true_value[0],
+                    false_value[0],
+                )
             else:
                 raise ValueError(f"Boundary of {boundary} not possible")
 
@@ -468,8 +477,12 @@ class Mask():
         of degrees of freedom where the mask value exceeds 0.3.
         """
         if self.in_dg:
-            raise ValueError("DG space can have different DoFs than the functional space")
-        warnings.warn("When applying a mask in a continuous space, expect some error in the element adjacent to the mask")
+            raise ValueError(
+                "DG space can have different DoFs than the functional space"
+            )
+        warnings.warn(
+            "When applying a mask in a continuous space, expect some error in the element adjacent to the mask"
+        )
         mask = Function(Wave_obj.function_space)
         mask.interpolate(self.cond)
         # Saving mask dofs
@@ -728,13 +741,11 @@ def write_hdf5_velocity_model(obj_with_comm, segy_filename):
     'velocity.hdf5'
     """
     if SEISMIC_MESH_AVAILABLE is False:
-        raise ValueError("Segy to HDF5 not yet implemented natively. Please install SeismicMesh")
-    vp_filename, vp_filetype = os.path.splitext(
-        segy_filename
-    )
-    write_velocity_model(
-        segy_filename, ofname=vp_filename
-    )
+        raise ValueError(
+            "Segy to HDF5 not yet implemented natively. Please install SeismicMesh"
+        )
+    vp_filename, vp_filetype = os.path.splitext(segy_filename)
+    write_velocity_model(segy_filename, ofname=vp_filename)
     output_filename = vp_filename + ".hdf5"
     return output_filename
 

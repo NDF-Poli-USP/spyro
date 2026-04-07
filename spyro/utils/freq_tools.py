@@ -5,8 +5,7 @@ from scipy.fft import fft
 
 
 def freq_response(signal, f_Nyq, fpad=4, get_max_freq=False):
-    '''
-    Calculate the response in frequency domain of a time signal via FFT
+    """Calculate the response in frequency domain of a time signal via FFT.
 
     Parameters
     ----------
@@ -26,8 +25,7 @@ def freq_response(signal, f_Nyq, fpad=4, get_max_freq=False):
         Normalized frequency spectrum with respect to the maximum magnitude
     max_freq : `float`, optional
         Maximum frequency of the spectrum
-    '''
-
+    """
     # Check if the signal is empty
     if signal.size == 0:
         er = "Input signal is empty. Cannot compute frequency response."
@@ -64,7 +62,7 @@ def freq_response(signal, f_Nyq, fpad=4, get_max_freq=False):
     else:
 
         # Normalized frequency spectrum
-        yf *= (1 / yf.max())
+        yf *= 1 / yf.max()
 
         # Return the normalized spectrum
         return yf

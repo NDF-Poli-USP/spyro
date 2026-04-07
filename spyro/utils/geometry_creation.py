@@ -2,8 +2,7 @@ import numpy as np
 
 
 def create_transect(start, end, num):
-    """Create a line of `num` of points between coordinates
-    `start` and `end`
+    """Create a line of `num` of points between coordinates `start` and `end`
 
     Parameters
     ----------
@@ -17,14 +16,13 @@ def create_transect(start, end, num):
     Returns
     -------
     receiver_locations: array-like
-
     """
     return np.linspace(start, end, num)
 
 
 def create_2d_grid(start1, end1, start2, end2, num):
-    """Create a 2d grid of `num**2` points between `start1`
-    and `end1` and `start2` and `end2`
+    """Create a 2d grid of `num**2` points between `start1` and `end1` and
+    `start2` and `end2`
 
     Parameters
     ----------
@@ -42,7 +40,6 @@ def create_2d_grid(start1, end1, start2, end2, num):
     Returns
     -------
     receiver_locations: a list of tuples
-
     """
     x = np.linspace(start1, end1, num)
     y = np.linspace(start2, end2, num)
@@ -52,8 +49,8 @@ def create_2d_grid(start1, end1, start2, end2, num):
 
 
 def create_3d_grid(start, end, num):
-    """Create a 3d grid of `num**3` points between `start1`
-    and `end1` and `start2` and `end2`
+    """Create a 3d grid of `num**3` points between `start1` and `end1` and
+    `start2` and `end2`
 
     Parameters
     ----------
@@ -67,10 +64,9 @@ def create_3d_grid(start, end, num):
     Returns
     -------
     receiver_locations: a list of tuples
-
     """
-    (start1, start2, start3) = start
-    (end1, end2, end3) = end
+    start1, start2, start3 = start
+    end1, end2, end3 = end
     x = np.linspace(start1, end1, num)
     y = np.linspace(start2, end2, num)
     z = np.linspace(start3, end3, num)
@@ -80,8 +76,7 @@ def create_3d_grid(start, end, num):
 
 
 def insert_fixed_value(points, value, insert):
-    """Insert a fixed `value` in each
-    tuple at index `insert`.
+    """Insert a fixed `value` in each tuple at index `insert`.
 
     Parameters
     ----------

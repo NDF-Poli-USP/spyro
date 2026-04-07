@@ -354,7 +354,10 @@ def test_dictionary_conversion():
         same = False
     if model_from_new.final_time != model_from_old.final_time:
         same = False
-    if model_from_new.forward_output_filename != model_from_old.forward_output_filename:
+    if (
+        model_from_new.forward_output_filename
+        != model_from_old.forward_output_filename
+    ):
         same = False
 
     assert same

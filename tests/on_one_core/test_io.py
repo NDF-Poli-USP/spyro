@@ -31,7 +31,7 @@ def test_read_and_write_segy():
 
     vp.interpolate(c)
 
-    spyro.io.create_segy(vp, V, 10.0/1000.0, segy_file)
+    spyro.io.create_segy(vp, V, 10.0 / 1000.0, segy_file)
     write_velocity_model(segy_file, vp_name)
 
     model = {}

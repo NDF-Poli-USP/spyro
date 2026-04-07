@@ -1,8 +1,5 @@
-
-
 class Read_options:
-    """
-    Read the options section of the dictionary.
+    """Read the options section of the dictionary.
 
     Attributes
     ----------
@@ -99,16 +96,18 @@ class Read_options:
             self._method = "DG_quadrilateral"
             self.cell_type = "quadrilateral"
         elif value == "DG":
-            raise ValueError(
-                "DG is not a valid method. Please specify \
-                either DG_triangle or DG_quadrilateral."
-            )
+            raise ValueError("DG is not a valid method. Please specify \
+                either DG_triangle or DG_quadrilateral.")
         elif value == "CG":
-            if "variant" in self.input_dictionary["options"] and "cell_type" \
-                    in self.input_dictionary["options"]:
+            if (
+                "variant" in self.input_dictionary["options"]
+                and "cell_type" in self.input_dictionary["options"]
+            ):
                 self._method = "CG"
             else:
-                raise ValueError("Cant use CG without specifying cell type and variant.")
+                raise ValueError(
+                    "Cant use CG without specifying cell type and variant."
+                )
         elif value is None:
             self._method = None
         else:
@@ -121,16 +120,24 @@ class Read_options:
     @cell_type.setter
     def cell_type(self, value):
         triangle_equivalents = [
-            "T", "triangle", "triangles", "tetrahedra", "tetrahedron"
+            "T",
+            "triangle",
+            "triangles",
+            "tetrahedra",
+            "tetrahedron",
         ]
-        triangle_methods = [
-            "mass_lumped_triangle", "DG_triangle", "CG"
-        ]
+        triangle_methods = ["mass_lumped_triangle", "DG_triangle", "CG"]
         quadrilateral_equivalents = [
-            "Q", "quadrilateral", "quadrilaterals", "hexahedra", "hexahedron"
+            "Q",
+            "quadrilateral",
+            "quadrilaterals",
+            "hexahedra",
+            "hexahedron",
         ]
         quadrilateral_methods = [
-            "spectral_quadrilateral", "DG_quadrilateral", "CG"
+            "spectral_quadrilateral",
+            "DG_quadrilateral",
+            "CG",
         ]
 
         if value is None:
@@ -142,14 +149,19 @@ class Read_options:
             if self.method is not None and self.method not in triangle_methods:
                 raise ValueError(
                     f"Cell type '{canonical}' is not "
-                    f"compatible with method '{self.method}'.")
+                    f"compatible with method '{self.method}'."
+                )
             self._cell_type = canonical
         elif value in quadrilateral_equivalents:
             canonical = "quadrilateral"
-            if self.method is not None and self.method not in quadrilateral_methods:
+            if (
+                self.method is not None
+                and self.method not in quadrilateral_methods
+            ):
                 raise ValueError(
                     f"Cell type '{canonical}' is not "
-                    f"compatible with method '{self.method}'.")
+                    f"compatible with method '{self.method}'."
+                )
             self._cell_type = canonical
         else:
             raise ValueError(f"Cell type '{value}' is not supported.")
@@ -170,7 +182,8 @@ class Read_options:
             else:
                 raise ValueError(
                     f"Cell type of {canonical} not "
-                    f"compatible with variant {self.variant}.")
+                    f"compatible with variant {self.variant}."
+                )
 
     @property
     def degree(self):
@@ -200,21 +213,25 @@ class Read_outputs:
         self.input_dictionary.setdefault(v_str, {})
         self.input_dictionary[v_str].setdefault("forward_output", False)
         self.forward_output = self.input_dictionary[v_str]["forward_output"]
-        self.input_dictionary[v_str].setdefault("forward_output_filename",
-                                                "results/forward.pvd")
-        self.forward_output_filename = self.input_dictionary[
-            v_str]["forward_output_filename"]
+        self.input_dictionary[v_str].setdefault(
+            "forward_output_filename", "results/forward.pvd"
+        )
+        self.forward_output_filename = self.input_dictionary[v_str][
+            "forward_output_filename"
+        ]
         self.input_dictionary[v_str].setdefault("gradient_output", False)
         self.gradient_output = self.input_dictionary[v_str]["gradient_output"]
-        self.input_dictionary[v_str].setdefault("gradient_filename",
-                                                "results/gradient.pvd")
-        self.gradient_filename = self.input_dictionary[
-            v_str]["gradient_filename"]
+        self.input_dictionary[v_str].setdefault(
+            "gradient_filename", "results/gradient.pvd"
+        )
+        self.gradient_filename = self.input_dictionary[v_str][
+            "gradient_filename"
+        ]
         self.input_dictionary[v_str].setdefault("adjoint_output", False)
         self.adjoint_output = self.input_dictionary[v_str]["adjoint_output"]
-        self.input_dictionary[v_str].setdefault("adjoint_filename",
-                                                "results/adjoint.pvd")
-        self.adjoint_filename = self.input_dictionary[
-            v_str]["adjoint_filename"]
+        self.input_dictionary[v_str].setdefault(
+            "adjoint_filename", "results/adjoint.pvd"
+        )
+        self.adjoint_filename = self.input_dictionary[v_str]["adjoint_filename"]
         self.input_dictionary[v_str].setdefault("debug_output", False)
         self.debug_output = self.input_dictionary[v_str]["debug_output"]

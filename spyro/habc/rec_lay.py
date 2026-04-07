@@ -9,9 +9,8 @@ from spyro.utils.error_management import value_dimension_error
 # With additions by Alexandre Olender
 
 
-class RectangLayer():
-    '''
-    Define a rectangular layer in 2D or parallelepided in 3D.
+class RectangLayer:
+    """Define a rectangular layer in 2D or parallelepided in 3D.
 
     Attributes
     ----------
@@ -41,11 +40,10 @@ class RectangLayer():
     -------
     calc_rec_geom_prop()
         Calculate the geometric properties for the rectangular layer
-    '''
+    """
 
     def __init__(self, dom_dim, dimension=2):
-        '''
-        Initialize the HyperLayer class.
+        """Initialize the HyperLayer class.
 
         Parameters
         ----------
@@ -57,8 +55,7 @@ class RectangLayer():
         Returns
         -------
         None
-        '''
-
+        """
         # Original domain dimensions
         self.dom_dim = dom_dim
 
@@ -69,8 +66,7 @@ class RectangLayer():
         self.n_hyp = None
 
     def calc_rec_geom_prop(self, dom_lay, pad_len):
-        '''
-        Calculate the geometric properties for the rectangular layer.
+        """Calculate the geometric properties for the rectangular layer.
 
         Parameters
         ----------
@@ -84,15 +80,14 @@ class RectangLayer():
         Returns
         -------
         None
-        '''
-
+        """
         # Domain dimensions w/o layer
         chk_domd = len(self.dom_dim)
         chk_habc = len(dom_lay)
         if self.dimension != chk_domd or self.dimension != chk_habc:
-            value_dimension_error(('dom_dim', 'dom_lay'),
-                                  (chk_domd, chk_habc),
-                                  self.dimension)
+            value_dimension_error(
+                ("dom_dim", "dom_lay"), (chk_domd, chk_habc), self.dimension
+            )
 
         Lx, Lz = self.dom_dim[:2]
         Lx_habc, Lz_habc = dom_lay[:2]

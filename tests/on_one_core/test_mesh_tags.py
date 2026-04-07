@@ -1,6 +1,5 @@
-"""
-Test script to verify that Firedrake correctly reads physical tags
-from GMSH meshes for dx and ds integrals.
+"""Test script to verify that Firedrake correctly reads physical tags from GMSH
+meshes for dx and ds integrals.
 
 This tests:
 1. Domain tags (2D physical groups) for dx integrals
@@ -14,13 +13,14 @@ import os
 import tempfile
 import firedrake as fire
 from spyro.meshing.meshing_parameters import MeshingParameters
-from spyro.meshing.meshing_functions import build_big_rect_with_inner_element_group
+from spyro.meshing.meshing_functions import (
+    build_big_rect_with_inner_element_group,
+)
 
 
 @pytest.fixture
 def test_mesh_with_tags():
     """Create a test mesh with both boundary and domain tags."""
-
     # Use temporary file
     with tempfile.NamedTemporaryFile(suffix=".msh", delete=False) as tmp_file:
         output_filename = tmp_file.name
@@ -42,7 +42,9 @@ def test_mesh_with_tags():
         },
     }
 
-    mesh_parameters = MeshingParameters(input_mesh_dictionary=input_mesh_parameters)
+    mesh_parameters = MeshingParameters(
+        input_mesh_dictionary=input_mesh_parameters
+    )
     build_big_rect_with_inner_element_group(mesh_parameters)
 
     yield output_filename
@@ -53,8 +55,9 @@ def test_mesh_with_tags():
 
 
 def test_firedrake_domain_tags(test_mesh_with_tags):
-    """Test if Firedrake can correctly read and use domain tags for dx integrals."""
-
+    """Test if Firedrake can correctly read and use domain tags for dx
+    integrals.
+    """
     mesh_file = test_mesh_with_tags
     mesh = fire.Mesh(mesh_file)
 
@@ -72,12 +75,15 @@ def test_firedrake_domain_tags(test_mesh_with_tags):
     # Check area conservation
     total_area_sum = area_outer + area_inner
     area_diff = abs(area_all - total_area_sum)
-    assert area_diff < 1e-10, f"Area conservation failed: {area_all} != {total_area_sum}"
+    assert (
+        area_diff < 1e-10
+    ), f"Area conservation failed: {area_all} != {total_area_sum}"
 
 
 def test_firedrake_boundary_tags(test_mesh_with_tags):
-    """Test if Firedrake can correctly read and use boundary tags for ds integrals."""
-
+    """Test if Firedrake can correctly read and use boundary tags for ds
+    integrals.
+    """
     mesh_file = test_mesh_with_tags
     mesh = fire.Mesh(mesh_file)
 
@@ -85,8 +91,9 @@ def test_firedrake_boundary_tags(test_mesh_with_tags):
     perimeter_all = fire.assemble(fire.Constant(1.0) * fire.ds(domain=mesh))
     expected_perimeter = 2 * (2.0 + 3.0)  # Rectangle perimeter
 
-    assert abs(perimeter_all - expected_perimeter) < 1e-10, \
-        f"Total perimeter mismatch: {perimeter_all} != {expected_perimeter}"
+    assert (
+        abs(perimeter_all - expected_perimeter) < 1e-10
+    ), f"Total perimeter mismatch: {perimeter_all} != {expected_perimeter}"
 
     # Test specific boundary tags
     # boundary_names = {1: "Top", 2: "Bottom", 3: "Right", 4: "Left"}
@@ -94,20 +101,23 @@ def test_firedrake_boundary_tags(test_mesh_with_tags):
 
     total_boundary_sum = 0
     for boundary_id, expected_length in expected_lengths.items():
-        length_boundary = fire.assemble(fire.Constant(1.0) * fire.ds(boundary_id, domain=mesh))
-        assert abs(length_boundary - expected_length) < 1e-10, \
-            f"Boundary {boundary_id} length mismatch: {length_boundary} != {expected_length}"
+        length_boundary = fire.assemble(
+            fire.Constant(1.0) * fire.ds(boundary_id, domain=mesh)
+        )
+        assert (
+            abs(length_boundary - expected_length) < 1e-10
+        ), f"Boundary {boundary_id} length mismatch: {length_boundary} != {expected_length}"
         total_boundary_sum += length_boundary
 
     # Check perimeter conservation
     perimeter_diff = abs(perimeter_all - total_boundary_sum)
-    assert perimeter_diff < 1e-10, \
-        f"Perimeter conservation failed: {perimeter_all} != {total_boundary_sum}"
+    assert (
+        perimeter_diff < 1e-10
+    ), f"Perimeter conservation failed: {perimeter_all} != {total_boundary_sum}"
 
 
 def test_acoustic_solver_style_integrals(test_mesh_with_tags):
     """Test integrals similar to what's used in the acoustic solver."""
-
     mesh_file = test_mesh_with_tags
     mesh = fire.Mesh(mesh_file)
 
@@ -141,12 +151,13 @@ def test_acoustic_solver_style_integrals(test_mesh_with_tags):
     for boundary_id in [1, 2, 3, 4]:
         abc_form = f_abc * fire.ds(boundary_id)
         abc_vector = fire.assemble(abc_form)
-        assert abc_vector is not None, f"ABC boundary {boundary_id} assembly failed"
+        assert (
+            abc_vector is not None
+        ), f"ABC boundary {boundary_id} assembly failed"
 
 
 def test_spyro_acoustic_solver_compatibility(test_mesh_with_tags):
     """Test full compatibility with spyro's acoustic solver expectations."""
-
     mesh_file = test_mesh_with_tags
     mesh = fire.Mesh(mesh_file)
 
@@ -175,7 +186,12 @@ def test_spyro_acoustic_solver_compatibility(test_mesh_with_tags):
     f_abc = (1 / c) * weak_expr_abc
 
     # Combine all boundary terms
-    le = f_abc * fire.ds(1) + f_abc * fire.ds(2) + f_abc * fire.ds(3) + f_abc * fire.ds(4)
+    le = (
+        f_abc * fire.ds(1)
+        + f_abc * fire.ds(2)
+        + f_abc * fire.ds(3)
+        + f_abc * fire.ds(4)
+    )
 
     # Assemble the complete form (as in actual solver)
     form = m1 + a + le
@@ -187,7 +203,6 @@ def test_spyro_acoustic_solver_compatibility(test_mesh_with_tags):
 
 def test_mesh_properties(test_mesh_with_tags):
     """Test basic mesh properties and structure."""
-
     mesh_file = test_mesh_with_tags
     mesh = fire.Mesh(mesh_file)
 

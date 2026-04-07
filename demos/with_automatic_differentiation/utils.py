@@ -4,8 +4,7 @@ import spyro
 
 
 def model_settings():
-    """Model settings for forward and Full Waveform Inversion (FWI)
-    simulations.
+    """Model settings for forward and Full Waveform Inversion (FWI) simulations.
 
     Returns
     -------
@@ -97,7 +96,10 @@ def make_c_camembert(mesh, function_space, c_guess=False, plot_c=False):
     else:
         c = fire.Function(function_space).interpolate(
             2.5
-            + 1 * fire.tanh(100 * (0.125 - fire.sqrt((x - 0.5) ** 2 + (z - 0.5) ** 2)))
+            + 1
+            * fire.tanh(
+                100 * (0.125 - fire.sqrt((x - 0.5) ** 2 + (z - 0.5) ** 2))
+            )
         )
     if plot_c:
         outfile = fire.VTKFile("acoustic_cp.pvd")

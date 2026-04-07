@@ -13,7 +13,7 @@ def check_gradient(Wave_obj_guess, dJ, rec_out_exact, Jm, plot=False):
     errors = []
     V_c = Wave_obj_guess.function_space
     dm = fire.Function(V_c)
-    size, = np.shape(dm.dat.data[:])
+    (size,) = np.shape(dm.dat.data[:])
     dm_data = np.random.rand(size)
     dm.dat.data[:] = dm_data
     # dm.assign(dJ)
@@ -21,14 +21,16 @@ def check_gradient(Wave_obj_guess, dJ, rec_out_exact, Jm, plot=False):
     for step in steps:
 
         Wave_obj_guess.reset_pressure()
-        c_guess = fire.Constant(2.0) + step*dm
+        c_guess = fire.Constant(2.0) + step * dm
         Wave_obj_guess.initial_velocity_model = c_guess
         Wave_obj_guess.forward_solve()
         misfit_plusdm = rec_out_exact - Wave_obj_guess.receivers_output
         J_plusdm = spyro.utils.compute_functional(Wave_obj_guess, misfit_plusdm)
 
         grad_fd = (J_plusdm - Jm) / (step)
-        projnorm = fire.assemble(dJ * dm * fire.dx(**Wave_obj_guess.quadrature_rule))
+        projnorm = fire.assemble(
+            dJ * dm * fire.dx(**Wave_obj_guess.quadrature_rule)
+        )
 
         error = 100 * ((grad_fd - projnorm) / projnorm)
 
@@ -56,7 +58,9 @@ def check_gradient(Wave_obj_guess, dJ, rec_out_exact, Jm, plot=False):
     print(f"Last gradient error less than 1 percent: {test1}")
 
     # Checking if error follows expected finite difference error convergence
-    test2 = math.isclose(np.log(abs(theory[-1])), np.log(abs(errors[-1])), rel_tol=1e-1)
+    test2 = math.isclose(
+        np.log(abs(theory[-1])), np.log(abs(errors[-1])), rel_tol=1e-1
+    )
 
     print(f"Gradient error behaved as expected: {test2}")
 
@@ -146,7 +150,9 @@ def get_forward_model(load_true=False):
 
 
 def test_gradient_supershot():
-    rec_out_exact, rec_out_guess, Wave_obj_guess = get_forward_model(load_true=False)
+    rec_out_exact, rec_out_guess, Wave_obj_guess = get_forward_model(
+        load_true=False
+    )
     forward_solution = Wave_obj_guess.forward_solution
     forward_solution_guess = deepcopy(forward_solution)
 
@@ -156,7 +162,9 @@ def test_gradient_supershot():
     print(f"Cost functional : {Jm}")
 
     # compute the gradient of the control (to be verified)
-    dJ = Wave_obj_guess.gradient_solve(misfit=misfit, forward_solution=forward_solution_guess)
+    dJ = Wave_obj_guess.gradient_solve(
+        misfit=misfit, forward_solution=forward_solution_guess
+    )
     File("gradient.pvd").write(dJ)
 
     check_gradient(Wave_obj_guess, dJ, rec_out_exact, Jm, plot=True)

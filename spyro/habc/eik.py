@@ -12,8 +12,7 @@ from ..solvers.eikonal.eikonal_eq import Eikonal_Modeling
 
 
 class HABC_Eikonal(Eikonal_Modeling):
-    '''
-    Class for the Nonlinear Eikonal used for HABC.
+    """Class for the Nonlinear Eikonal used for HABC.
 
     Attributes
     ----------
@@ -58,11 +57,10 @@ class HABC_Eikonal(Eikonal_Modeling):
         Identify Eikonal minimum values on boundary
     solve_eik()
         Solve the nonlinear Eikonal
-    '''
+    """
 
     def __init__(self, Wave):
-        '''
-        Initialize the Eikonal class.
+        """Initialize the Eikonal class.
 
         Parameters
         ----------
@@ -72,11 +70,15 @@ class HABC_Eikonal(Eikonal_Modeling):
         Returns
         -------
         None
-        '''
-
+        """
         Eikonal_Modeling.__init__(
-            self, Wave.dimension, Wave.sources.point_locations,
-            ele_type=Wave.ele_type_eik, p_eik=Wave.p_eik, f_est=Wave.f_est)
+            self,
+            Wave.dimension,
+            Wave.sources.point_locations,
+            ele_type=Wave.ele_type_eik,
+            p_eik=Wave.p_eik,
+            f_est=Wave.f_est,
+        )
 
         # Communicator MPI
         self.comm = Wave.comm
@@ -103,8 +105,9 @@ class HABC_Eikonal(Eikonal_Modeling):
         self.node_positions = Wave.extract_node_positions(self.funct_space_eik)
 
         # Extract boundary node indices
-        self.bnds = Wave.extract_bnd_node_indices(self.node_positions,
-                                                  self.funct_space_eik)
+        self.bnds = Wave.extract_bnd_node_indices(
+            self.node_positions, self.funct_space_eik
+        )
 
         # Path to save data
         self.path_save = Wave.path_save + "preamble/"
@@ -113,8 +116,7 @@ class HABC_Eikonal(Eikonal_Modeling):
         self.define_bcs()
 
     def define_bcs(self):
-        '''
-        Impose Dirichlet BCs for eikonal equation.
+        """Impose Dirichlet BCs for eikonal equation.
 
         Parameters
         ----------
@@ -123,20 +125,19 @@ class HABC_Eikonal(Eikonal_Modeling):
         Returns
         -------
         None
-        '''
-
+        """
         print("\nDefining Eikonal BCs")
 
         self.bcs_eik, sou_marker = self.eikonal_bcs(
-            self.node_positions, self.funct_space_eik, self.lmin)
+            self.node_positions, self.funct_space_eik, self.lmin
+        )
 
         # Save source marker
         outfile = fire.VTKFile(self.path_save + "souEik.pvd")
         outfile.write(sou_marker)
 
     def solve_eik(self):
-        '''
-        Solve the nonlinear Eikonal.
+        """Solve the nonlinear Eikonal.
 
         Parameters
         ----------
@@ -145,20 +146,18 @@ class HABC_Eikonal(Eikonal_Modeling):
         Returns
         -------
         None
-        '''
-
+        """
         # Eikonal solution
-        self.yp = self.eikonal_solver(self.c, self.c_min,
-                                      self.funct_space_eik,
-                                      self.diam_mesh)
+        self.yp = self.eikonal_solver(
+            self.c, self.c_min, self.funct_space_eik, self.diam_mesh
+        )
 
         # Save Eikonal results
         eikonal_file = fire.VTKFile(self.path_save + "Eik.pvd")
         eikonal_file.write(self.yp)
 
     def ident_eik_on_bnd(self, boundary):
-        '''
-        Identify Eikonal minimum values on a boundary.
+        """Identify Eikonal minimum values on a boundary.
 
         Parameters
         ----------
@@ -171,8 +170,7 @@ class HABC_Eikonal(Eikonal_Modeling):
             Minimum eikonal value
         idxmin : 'int'
             Array index corresponding to the minimum eikonal value
-        '''
-
+        """
         boundary_eik = self.yp.dat.data_with_halos[boundary]
         idxbnd = boundary_eik.argmin()
         eikmin = boundary_eik[idxbnd]  # Minimum Eikonal
@@ -181,8 +179,7 @@ class HABC_Eikonal(Eikonal_Modeling):
         return eikmin, idxmin
 
     def ident_crit_eik(self):
-        '''
-        Identify the critical points at boundaries subject to reflections
+        """Identify the critical points at boundaries subject to reflections.
 
         Parameters
         ----------
@@ -199,16 +196,20 @@ class HABC_Eikonal(Eikonal_Modeling):
             - z_par : Inverse of minimum Eikonal (Equivalent to c_bound/lref)
             - lref : Distance to the closest source from critical point
             - sou_cr : Critical source coordinates
-        '''
-
+        """
         # Node positions and boundary strings
         z_data, x_data = self.node_positions[:2]
         if self.dimension == 2:  # 2D
-            bnds_str = ['Left Boundary', 'Right Boundary', 'Bottom Boundary']
+            bnds_str = ["Left Boundary", "Right Boundary", "Bottom Boundary"]
         if self.dimension == 3:  # 3D
             y_data = self.node_positions[2]
-            bnds_str = ['Xmin Boundary', 'Xmax Boundary', 'Bottom Boundary',
-                        'Ymin Boundary', 'Ymax Boundary', ]
+            bnds_str = [
+                "Xmin Boundary",
+                "Xmax Boundary",
+                "Bottom Boundary",
+                "Ymin Boundary",
+                "Ymax Boundary",
+            ]
 
         print("\nIdentifying Critical Points on Boundaries")
 
@@ -235,11 +236,12 @@ class HABC_Eikonal(Eikonal_Modeling):
 
             # Identify closest source
             lref_allsou = np.linalg.norm(
-                np.asarray(pt_cr) - np.asarray(self.source_locations), axis=1)
+                np.asarray(pt_cr) - np.asarray(self.source_locations), axis=1
+            )
             idxsou = np.argmin(lref_allsou)
             lref = lref_allsou[idxsou]
             sou_cr = self.source_locations[idxsou]
-            z_par = 1. / eikmin
+            z_par = 1.0 / eikmin
 
             # Grouping properties
             eik_bnd.append([pt_cr, c_bnd, eikmin, z_par, lref, sou_cr])

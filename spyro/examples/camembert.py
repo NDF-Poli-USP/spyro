@@ -131,15 +131,15 @@ class CamembertVelocity:
         cond = fire.conditional(
             (z - zc) ** 2 + (x - xc) ** 2 < rc**2, c_salt, c_not_salt
         )
-        self.set_initial_velocity_model(conditional=cond, dg_velocity_model=False)
+        self.set_initial_velocity_model(
+            conditional=cond, dg_velocity_model=False
+        )
         return None
 
 
 class Camembert_acoustic(CamembertVelocity, Rectangle_acoustic):
-    """Camembert model.
-    This class is a child of the Example_model class.
-    It is used to create a dictionary with the parameters of the
-    Camembert model.
+    """Camembert model. This class is a child of the Example_model class. It is
+    used to create a dictionary with the parameters of the Camembert model.
 
     Example Setup
 
@@ -156,7 +156,6 @@ class Camembert_acoustic(CamembertVelocity, Rectangle_acoustic):
     dictionary : dict, optional
         Dictionary with the parameters of the model that are different from
         the default Camembert model. The default is None.
-
     """
 
     def __init__(
@@ -176,10 +175,8 @@ class Camembert_acoustic(CamembertVelocity, Rectangle_acoustic):
 
 
 class Camembert_acoustic_FWI(CamembertVelocity, Rectangle_acoustic_FWI):
-    """Camembert model.
-    This class is a child of the Example_model class.
-    It is used to create a dictionary with the parameters of the
-    Camembert model.
+    """Camembert model. This class is a child of the Example_model class. It is
+    used to create a dictionary with the parameters of the Camembert model.
 
     Example Setup
 
@@ -196,7 +193,6 @@ class Camembert_acoustic_FWI(CamembertVelocity, Rectangle_acoustic_FWI):
     dictionary : dict, optional
         Dictionary with the parameters of the model that are different from
         the default Camembert model. The default is None.
-
     """
 
     def __init__(

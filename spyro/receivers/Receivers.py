@@ -6,9 +6,8 @@ import numpy as np
 
 
 class Receivers(Delta_projector):
-    """Project data defined on a triangular mesh to a
-    set of 2D/3D coordinates for variable spatial order
-    using Lagrange interpolation.
+    """Project data defined on a triangular mesh to a set of 2D/3D coordinates
+    for variable spatial order using Lagrange interpolation.
 
     Can interpolate receiveir values that do not coincide with
     mesh or DOF points
@@ -49,12 +48,13 @@ class Receivers(Delta_projector):
     """
 
     def __init__(self, wave_object):
-        """Initializes class and gets all receiver parameters from
-        input file.
+        """Initializes class and gets all receiver parameters from input file.
+
         Parameters
         ----------
         wave_object: :class: 'Wave' object
             Waveform object that contains all simulation parameters
+
         Returns
         -------
         Receivers: :class: 'Receiver' object
@@ -110,9 +110,15 @@ class Receivers(Delta_projector):
 
         return rhs_forcing
 
-    def receiver_interpolator(self, f, reorder=True, vom_tolerance=None,
-                              vom_missing_points_behaviour='error',
-                              vom_redundant=True, vom_name=None):
+    def receiver_interpolator(
+        self,
+        f,
+        reorder=True,
+        vom_tolerance=None,
+        vom_missing_points_behaviour="error",
+        vom_redundant=True,
+        vom_name=None,
+    ):
         """Return an interpolator object.
 
         Parameters
@@ -152,11 +158,14 @@ class Receivers(Delta_projector):
             function at the receiver locations.
         """
         vom = VertexOnlyMesh(
-            self.mesh, self.point_locations, reorder=reorder,
+            self.mesh,
+            self.point_locations,
+            reorder=reorder,
             tolerance=vom_tolerance,
             missing_points_behaviour=vom_missing_points_behaviour,
             redundant=vom_redundant,
-            name=vom_name)
+            name=vom_name,
+        )
         if self.wave_type == WaveType.ISOTROPIC_ELASTIC:
             V_r = VectorFunctionSpace(vom, "DG", 0)
         elif self.wave_type == WaveType.ISOTROPIC_ACOUSTIC:

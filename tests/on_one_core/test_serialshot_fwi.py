@@ -4,13 +4,13 @@ import spyro
 import pytest
 import warnings
 
-
 warnings.filterwarnings("ignore")
 
 
 def is_rol_installed():
     try:
         import ROL  # noqa:F401
+
         return True
     except ImportError:
         return False
@@ -41,7 +41,9 @@ dictionary["acquisition"] = {
     "frequency": 5.0,
     "delay": 0.2,
     "delay_type": "time",
-    "receiver_locations": spyro.create_transect((-1.45, 0.7), (-1.45, 1.3), 200),
+    "receiver_locations": spyro.create_transect(
+        (-1.45, 0.7), (-1.45, 1.3), 200
+    ),
 }
 dictionary["time_axis"] = {
     "initial_time": 0.0,  # Initial time for event
@@ -71,14 +73,12 @@ dictionary["inversion"] = {
 
 @pytest.mark.slow
 def test_fwi(load_real_shot=False, use_rol=False):
-    """
-    Run the Full Waveform Inversion (FWI) test.
+    """Run the Full Waveform Inversion (FWI) test.
 
     Parameters
     ----------
         load_real_shot (bool, optional): Whether to load a real shot record or not. Defaults to False.
     """
-
     # Setting up to run synthetic real problem
     if load_real_shot is False:
         FWI_obj = spyro.FullWaveformInversion(dictionary=dictionary)
@@ -88,13 +88,19 @@ def test_fwi(load_real_shot=False, use_rol=False):
         center_x = 1.0
         mesh_z = FWI_obj.mesh_z
         mesh_x = FWI_obj.mesh_x
-        cond = fire.conditional((mesh_z-center_z)**2 + (mesh_x-center_x)**2 < .2**2, 3.0, 2.5)
+        cond = fire.conditional(
+            (mesh_z - center_z) ** 2 + (mesh_x - center_x) ** 2 < 0.2**2,
+            3.0,
+            2.5,
+        )
 
-        FWI_obj.set_real_velocity_model(conditional=cond, output=True, dg_velocity_model=False)
+        FWI_obj.set_real_velocity_model(
+            conditional=cond, output=True, dg_velocity_model=False
+        )
         FWI_obj.generate_real_shot_record(
             plot_model=True,
             model_filename="True_experiment.png",
-            abc_points=[(-0.5, 0.5), (-1.5, 0.5), (-1.5, 1.5), (-0.5, 1.5)]
+            abc_points=[(-0.5, 0.5), (-1.5, 0.5), (-1.5, 1.5), (-0.5, 1.5)],
         )
         np.save("real_shot_record", FWI_obj.real_shot_record)
 
@@ -127,7 +133,9 @@ def test_fwi(load_real_shot=False, use_rol=False):
     # quick look at functional and if it reduced
     test2 = FWI_obj.functional < 1e-3
     print(f"Last functional small: {test2}", flush=True)
-    test3 = FWI_obj.functional_history[-1]/FWI_obj.functional_history[0] < 1e-2
+    test3 = (
+        FWI_obj.functional_history[-1] / FWI_obj.functional_history[0] < 1e-2
+    )
     print(f"Considerable functional reduction during test: {test3}", flush=True)
 
     print("END", flush=True)

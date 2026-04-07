@@ -1,12 +1,12 @@
-from firedrake import (FiniteElement, FunctionSpace, VectorElement)
+from firedrake import FiniteElement, FunctionSpace, VectorElement
 
 
 def create_function_space(mesh, method, degree, dim=1):
-    """Create a Firedrake function space based on the specified
-    finite element method.
+    """Create a Firedrake function space based on the specified finite element
+    method.
 
-    Parameters:
-    -----------
+    Parameters
+    ----------
     mesh: Firedrake Mesh
         Mesh to be used in the finite element space.
     method: str
@@ -16,28 +16,25 @@ def create_function_space(mesh, method, degree, dim=1):
     dim: int
         Number of degrees of freedom per node.
 
-    Returns:
-    --------
+    Returns
+    -------
     function_space: Firedrake FunctionSpace
         Function space.
     """
-
     if method == "mass_lumped_triangle":
         element = FiniteElement(
-            "KMV", mesh.ufl_cell(), degree=degree,
+            "KMV",
+            mesh.ufl_cell(),
+            degree=degree,
         )
     elif method == "spectral_quadrilateral":
         element = FiniteElement(
             "CG", mesh.ufl_cell(), degree=degree, variant="spectral"
         )
     elif method == "DG_triangle" or "DG_quadrilateral" or "DG":
-        element = FiniteElement(
-            "DG", mesh.ufl_cell(), degree=degree
-        )
+        element = FiniteElement("DG", mesh.ufl_cell(), degree=degree)
     elif method == "CG_triangle" or "CG_quadrilateral" or "CG":
-        element = FiniteElement(
-            "CG", mesh.ufl_cell(), degree=degree
-        )
+        element = FiniteElement("CG", mesh.ufl_cell(), degree=degree)
 
     if dim > 1:
         element = VectorElement(element, dim=dim)
@@ -59,4 +56,6 @@ def check_function_space_type(function_space):
                 f"Function space topology of {function_space.topological} not supported",
             )
     else:
-        raise ValueError(f"Function space size of {function_space.value_size} not supported")
+        raise ValueError(
+            f"Function space size of {function_space.value_size} not supported"
+        )

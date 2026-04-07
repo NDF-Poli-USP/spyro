@@ -5,7 +5,6 @@ from numpy.random import rand
 from checkpoint_schedules import Revolve
 import pytest
 
-
 # --- Basid setup to run a forward simulation with AD --- #
 model = {}
 
@@ -30,7 +29,7 @@ model["mesh"] = {
 
 model["absorving_boundary_conditions"] = {
     "status": False,
-    "pad_length": 0.,
+    "pad_length": 0.0,
 }
 
 model["acquisition"] = {
@@ -56,14 +55,17 @@ model["time_axis"] = {
 
 
 def make_c_camembert(V, mesh, c_guess=False, plot_c=False):
-    """Acoustic velocity model"""
+    """Acoustic velocity model."""
     x, z = fire.SpatialCoordinate(mesh)
     if c_guess:
         c = fire.Function(V).interpolate(1.5 + 0.0 * x)
     else:
         c = fire.Function(V).interpolate(
             2.5
-            + 1 * fire.tanh(100 * (0.125 - fire.sqrt((x - 0.5) ** 2 + (z - 0.5) ** 2)))
+            + 1
+            * fire.tanh(
+                100 * (0.125 - fire.sqrt((x - 0.5) ** 2 + (z - 0.5) ** 2))
+            )
         )
     if plot_c:
         outfile = fire.VTKFile("acoustic_cp.pvd")
@@ -72,13 +74,21 @@ def make_c_camembert(V, mesh, c_guess=False, plot_c=False):
 
 
 def forward(
-        c, fwd_solver, wavelet, ensemble,
-        compute_functional=False, true_data_receivers=None, annotate=False
+    c,
+    fwd_solver,
+    wavelet,
+    ensemble,
+    compute_functional=False,
+    true_data_receivers=None,
+    annotate=False,
 ):
     if annotate:
         fire_ad.continue_annotation()
         if model["aut_dif"]["checkpointing"]:
-            total_steps = int(model["time_axis"]["final_time"] / model["time_axis"]["dt"]) + 1
+            total_steps = (
+                int(model["time_axis"]["final_time"] / model["time_axis"]["dt"])
+                + 1
+            )
             steps_store = int(total_steps / 10)  # Store 10% of the steps.
             tape = fire_ad.get_working_tape()
             tape.progress_bar = fire.ProgressBar
@@ -86,9 +96,11 @@ def forward(
     # source_number based on the ensemble.ensemble_comm.rank
     source_number = ensemble.ensemble_comm.rank
     receiver_data, J = fwd_solver.execute_acoustic(
-        c, source_number, wavelet,
+        c,
+        source_number,
+        wavelet,
         compute_functional=compute_functional,
-        true_data_receivers=true_data_receivers
+        true_data_receivers=true_data_receivers,
     )
     return receiver_data, J
 
@@ -112,7 +124,8 @@ def test_taylor():
     fwd_solver = spyro.solvers.forward_ad.ForwardSolver(model, mesh, V)
     # Ricker wavelet
     wavelet = spyro.full_ricker_wavelet(
-        model["time_axis"]["dt"], model["time_axis"]["final_time"],
+        model["time_axis"]["dt"],
+        model["time_axis"]["final_time"],
         model["acquisition"]["frequency"],
     )
     c_true = make_c_camembert(V, mesh)
@@ -121,15 +134,20 @@ def test_taylor():
     # --- Gradient with AD --- #
     c_guess = make_c_camembert(V, mesh, c_guess=True)
     _, J = forward(
-        c_guess, fwd_solver, wavelet, my_ensemble,
+        c_guess,
+        fwd_solver,
+        wavelet,
+        my_ensemble,
         compute_functional=True,
-        true_data_receivers=true_rec, annotate=True
+        true_data_receivers=true_rec,
+        annotate=True,
     )
 
     # :class:`~.EnsembleReducedFunctional` is employed to recompute in
     # parallel the functional and its gradient associated.
     J_hat = fire_ad.EnsembleReducedFunctional(
-        J, fire_ad.Control(c_guess), my_ensemble)
+        J, fire_ad.Control(c_guess), my_ensemble
+    )
     h = fire.Function(V)
     h.dat.data[:] = rand(V.dim())
     assert fire_ad.taylor_test(J_hat, c_guess, h) > 1.9

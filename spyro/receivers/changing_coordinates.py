@@ -2,8 +2,7 @@ import numpy as np
 
 
 def change_to_reference_triangle(p, cell_vertices):
-    """
-    Changes variables to reference triangle
+    """Changes variables to reference triangle.
 
     Parameters
     ----------
@@ -17,10 +16,10 @@ def change_to_reference_triangle(p, cell_vertices):
     tuple
         Point location in reference triangle
     """
-    (xa, ya) = cell_vertices[0]
-    (xb, yb) = cell_vertices[1]
-    (xc, yc) = cell_vertices[2]
-    (px, py) = p
+    xa, ya = cell_vertices[0]
+    xb, yb = cell_vertices[1]
+    xc, yc = cell_vertices[2]
+    px, py = p
 
     xna = 0.0
     yna = 0.0
@@ -68,8 +67,7 @@ def change_to_reference_triangle(p, cell_vertices):
 def change_to_reference_tetrahedron(
     p, cell_vertices, reference_coordinates=None
 ):
-    """
-    Changes variables to reference tetrahedron
+    """Changes variables to reference tetrahedron.
 
     Parameters
     ----------
@@ -85,11 +83,11 @@ def change_to_reference_tetrahedron(
     tuple
         Point location in reference tetrahedron
     """
-    (xa, ya, za) = cell_vertices[0]
-    (xb, yb, zb) = cell_vertices[1]
-    (xc, yc, zc) = cell_vertices[2]
-    (xd, yd, zd) = cell_vertices[3]
-    (px, py, pz) = p
+    xa, ya, za = cell_vertices[0]
+    xb, yb, zb = cell_vertices[1]
+    xc, yc, zc = cell_vertices[2]
+    xd, yd, zd = cell_vertices[3]
+    px, py, pz = p
 
     if reference_coordinates is None:
         ra = (0.0, 0.0, 0.0)
@@ -383,8 +381,7 @@ def change_to_reference_tetrahedron(
 
 
 def change_to_reference_quad(p, cell_vertices):
-    """
-    Changes varibales to reference quadrilateral
+    """Changes varibales to reference quadrilateral.
 
     Parameters
     ----------
@@ -398,12 +395,12 @@ def change_to_reference_quad(p, cell_vertices):
     tuple
         Point location in reference quadrilateral
     """
-    (px, py) = p
+    px, py = p
     # Irregular quad
-    (x0, y0) = cell_vertices[0]
-    (x1, y1) = cell_vertices[1]
-    (x2, y2) = cell_vertices[2]
-    (x3, y3) = cell_vertices[3]
+    x0, y0 = cell_vertices[0]
+    x1, y1 = cell_vertices[1]
+    x2, y2 = cell_vertices[2]
+    x3, y3 = cell_vertices[3]
 
     # Reference quad
     # xn0 = 0.0
@@ -460,8 +457,8 @@ def change_to_reference_quad(p, cell_vertices):
 
 
 def change_to_reference_hexa(p, cell_vertices, based_on_extruded=True):
-    """
-    Changes variables to reference hexahedron.
+    """Changes variables to reference hexahedron.
+
     Parameters
     ----------
     p : tuple
@@ -474,7 +471,6 @@ def change_to_reference_hexa(p, cell_vertices, based_on_extruded=True):
     tuple
         Point location in reference hexahedron
     """
-
     if based_on_extruded:
         a = cell_vertices[0]
         b = cell_vertices[1]

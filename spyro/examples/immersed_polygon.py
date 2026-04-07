@@ -2,6 +2,7 @@ from spyro import create_transect
 from spyro.examples.rectangle import Rectangle_acoustic, Rectangle_acoustic_FWI
 import firedrake as fire
 import copy
+
 # Adapted from Velocity model-based adapted meshes using optimal transport
 # TODO: add correct citation as soon as Thiago's paper is published
 
@@ -112,7 +113,9 @@ class Polygon_velocity:
         v1 = polygon_dict["upper_layer"]
         v2 = polygon_dict["middle_layer"]  # background vp (km/s)
         vl = polygon_dict["lower_layer"]  # lower layer (km/s)
-        dv = polygon_dict["polygon_layer_perturbation"]*v2  # 30% of perturbation
+        dv = (
+            polygon_dict["polygon_layer_perturbation"] * v2
+        )  # 30% of perturbation
         d0 = -water_layer_depth
         d1 = d0 - 0.14
         d2 = d1 - 0.2
@@ -122,23 +125,31 @@ class Polygon_velocity:
             cond = fire.conditional(z <= d1, v2, cond)
         else:
             cond = fire.conditional(z <= d1, v2, v1)
-        cond = fire.conditional(z <= d2 - 0.2*x, vl, cond)
+        cond = fire.conditional(z <= d2 - 0.2 * x, vl, cond)
 
-        cond = fire.conditional(300*((x-0.5)*(-z-0.5))**2 + ((x-0.5)+(-z-0.5))**2 <= 0.300**2, v2+dv, cond)
+        cond = fire.conditional(
+            300 * ((x - 0.5) * (-z - 0.5)) ** 2 + ((x - 0.5) + (-z - 0.5)) ** 2
+            <= 0.300**2,
+            v2 + dv,
+            cond,
+        )
 
         if self.abc_pad_length is not None and self.abc_pad_length > 0.0:
-            middle_of_pad = -self.mesh_parameters.length_z - self.mesh_parameters.abc_pad_length*0.5
+            middle_of_pad = (
+                -self.mesh_parameters.length_z
+                - self.mesh_parameters.abc_pad_length * 0.5
+            )
             cond = fire.conditional(z <= middle_of_pad, v0, cond)
 
-        self.set_initial_velocity_model(conditional=cond, dg_velocity_model=False)
+        self.set_initial_velocity_model(
+            conditional=cond, dg_velocity_model=False
+        )
         return None
 
 
 class Polygon_acoustic(Polygon_velocity, Rectangle_acoustic):
-    """polygon model.
-    This class is a child of the Example_model class.
-    It is used to create a dictionary with the parameters of the
-    polygon model.
+    """Polygon model. This class is a child of the Example_model class. It is
+    used to create a dictionary with the parameters of the polygon model.
 
     Example Setup
 
@@ -155,7 +166,6 @@ class Polygon_acoustic(Polygon_velocity, Rectangle_acoustic):
     dictionary : dict, optional
         Dictionary with the parameters of the model that are different from
         the default polygon model. The default is None.
-
     """
 
     def __init__(
@@ -175,10 +185,8 @@ class Polygon_acoustic(Polygon_velocity, Rectangle_acoustic):
 
 
 class Polygon_acoustic_FWI(Polygon_velocity, Rectangle_acoustic_FWI):
-    """polygon model.
-    This class is a child of the Example_model class.
-    It is used to create a dictionary with the parameters of the
-    polygon model.
+    """Polygon model. This class is a child of the Example_model class. It is
+    used to create a dictionary with the parameters of the polygon model.
 
     Example Setup
 
@@ -195,7 +203,6 @@ class Polygon_acoustic_FWI(Polygon_velocity, Rectangle_acoustic_FWI):
     dictionary : dict, optional
         Dictionary with the parameters of the model that are different from
         the default polygon model. The default is None.
-
     """
 
     def __init__(

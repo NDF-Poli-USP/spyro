@@ -5,10 +5,10 @@ import pytest
 
 
 def tetrahedral_volume(p1, p2, p3, p4):
-    (x1, y1, z1) = p1
-    (x2, y2, z2) = p2
-    (x3, y3, z3) = p3
-    (x4, y4, z4) = p4
+    x1, y1, z1 = p1
+    x2, y2, z2 = p2
+    x3, y3, z3 = p3
+    x4, y4, z4 = p4
 
     A = np.array([x1, y1, z1])
     B = np.array([x2, y2, z2])
@@ -22,9 +22,9 @@ def tetrahedral_volume(p1, p2, p3, p4):
 
 def triangle_area(p1, p2, p3):
     """Simple function to calculate triangle area based on its 3 vertices."""
-    (x1, y1) = p1
-    (x2, y2) = p2
-    (x3, y3) = p3
+    x1, y1 = p1
+    x2, y2 = p2
+    x3, y3 = p3
 
     return abs(x1 * (y2 - y3) + x2 * (y3 - y1) + x3 * (y1 - y2)) / 2
 
