@@ -1,0 +1,29 @@
+[tool.black]
+line-length = 80
+target-version = ["py39"]
+include = "\\.pyi?$"
+extend-exclude = '''
+/(
+    \.git
+  | \.venv
+  | build
+  | dist
+  | __pycache__
+)/
+'''
+
+[tool.ruff]
+line-length = 80
+target-version = "py39"
+
+[tool.ruff.lint]
+select = ["E", "F", "D"]
+
+[tool.ruff.lint.pydocstyle]
+convention = "numpy"
+
+[tool.docformatter]
+wrap-summaries = 80
+wrap-descriptions = 80
+recursive = true
+in-place = true
