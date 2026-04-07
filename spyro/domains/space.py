@@ -1,9 +1,12 @@
+"""Function-space construction and classification helpers."""
+
 from firedrake import FiniteElement, FunctionSpace, VectorElement
 
 
 def create_function_space(mesh, method, degree, dim=1):
-    """Create a Firedrake function space based on the specified finite element
-    method.
+    """Create a Firedrake function space.
+
+    The finite-element method selects the underlying element family.
 
     Parameters
     ----------
@@ -43,6 +46,7 @@ def create_function_space(mesh, method, degree, dim=1):
 
 
 def check_function_space_type(function_space):
+    """Return whether a function space is scalar, vector, or mixed."""
     # Check if wave.function_space is a generates vector os scalar fields:
     if function_space.value_size == 1:
         return "scalar"
@@ -53,7 +57,8 @@ def check_function_space_type(function_space):
             return "mixed"
         else:
             raise ValueError(
-                f"Function space topology of {function_space.topological} not supported",
+                "Function space topology of "
+                f"{function_space.topological} not supported"
             )
     else:
         raise ValueError(

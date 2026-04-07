@@ -19,6 +19,9 @@ target-version = "py39"
 [tool.ruff.lint]
 select = ["E", "F", "D"]
 
+[tool.ruff.lint.per-file-ignores]
+"spyro/domains/quadrature.py" = ["F405"]
+
 [tool.ruff.lint.pydocstyle]
 convention = "numpy"
 

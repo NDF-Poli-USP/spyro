@@ -1,11 +1,14 @@
+"""Quadrature rule builders for supported finite-element families."""
+
 import FIAT
 import finat
 from firedrake import *  # noqa:F403
 
 
 def quadrature_rules(V):
-    """Quadrature rule - Gauss-Lobatto-Legendre, Gauss-Legendre and Equi
-    spaced, KMV
+    """Select quadrature rules for supported element families.
+
+    Supports Gauss-Lobatto-Legendre, Gauss-Legendre, and KMV schemes.
 
     Parameters
     ----------
@@ -75,7 +78,7 @@ def quadrature_rules(V):
 # Spectral method - Gauss-Lobatto-Legendre rule
 # 1D
 def gauss_lobatto_legendre_line_rule(degree):
-    """Returns GLL quad rule for a given degree in a line.
+    """Return a GLL quadrature rule for a 1D line.
 
     Parameters
     ----------
@@ -96,7 +99,7 @@ def gauss_lobatto_legendre_line_rule(degree):
 
 # 3D
 def gauss_lobatto_legendre_cube_rule(dimension, degree):
-    """Returns GLL quad rule for a given degree in a multidimensional space.
+    """Return a GLL quadrature rule for a multidimensional tensor grid.
 
     Parameters
     ----------
