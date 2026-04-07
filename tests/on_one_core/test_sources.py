@@ -95,16 +95,28 @@ def _base_visualization():
     }
 
 
-def _build_elastic_wave(amplitude, source_locations, dimension=2):
+def _build_wave(
+    wave_class,
+    amplitude,
+    source_locations,
+    *,
+    dimension,
+    degree,
+    synthetic_data=None,
+    initial_velocity=None,
+):
     receiver_location = (-0.2, 0.6) if dimension == 2 else (-0.2, 0.6, 0.6)
     model = {
         "options": {
             "cell_type": "T",
             "variant": "lumped",
-            "degree": 1,
+            "degree": degree,
             "dimension": dimension,
         },
-        "parallelism": {"type": "custom", "shot_ids_per_propagation": [list(range(len(source_locations)))]},
+        "parallelism": {
+            "type": "custom",
+            "shot_ids_per_propagation": [list(range(len(source_locations)))],
+        },
         "mesh": _base_mesh(dimension),
         "acquisition": {
             "source_type": "ricker",
@@ -116,50 +128,46 @@ def _build_elastic_wave(amplitude, source_locations, dimension=2):
             "use_vertex_only_mesh": True,
         },
         "time_axis": _base_time_axis(),
-        "synthetic_data": {
+        "visualization": _base_visualization(),
+    }
+
+    if synthetic_data is not None:
+        model["synthetic_data"] = synthetic_data
+
+    wave = wave_class(model)
+    wave.set_mesh(input_mesh_parameters={"edge_length": 0.05})
+    if initial_velocity is not None:
+        wave.set_initial_velocity_model(constant=initial_velocity)
+    wave.sources.current_sources = list(range(len(source_locations)))
+    return wave
+
+
+def _build_elastic_wave(amplitude, source_locations, dimension=2):
+    return _build_wave(
+        IsotropicWave,
+        amplitude,
+        source_locations,
+        dimension=dimension,
+        degree=1,
+        synthetic_data={
             "type": "object",
             "density": 1.0,
             "lambda": 1.0,
             "mu": 1.0,
             "real_velocity_file": None,
         },
-        "visualization": _base_visualization(),
-    }
-
-    wave = IsotropicWave(model)
-    wave.set_mesh(input_mesh_parameters={"edge_length": 0.05})
-    wave.sources.current_sources = list(range(len(source_locations)))
-    return wave
+    )
 
 
 def _build_acoustic_wave(amplitude, source_locations):
-    model = {
-        "options": {
-            "cell_type": "T",
-            "variant": "lumped",
-            "degree": 4,
-            "dimension": 2,
-        },
-        "parallelism": {"type": "custom", "shot_ids_per_propagation": [list(range(len(source_locations)))]},
-        "mesh": _base_mesh(2),
-        "acquisition": {
-            "source_type": "ricker",
-            "source_locations": source_locations,
-            "frequency": 5.0,
-            "delay": 1.0,
-            "amplitude": amplitude,
-            "receiver_locations": [(-0.2, 0.6)],
-            "use_vertex_only_mesh": True,
-        },
-        "time_axis": _base_time_axis(),
-        "visualization": _base_visualization(),
-    }
-
-    wave = AcousticWave(model)
-    wave.set_mesh(input_mesh_parameters={"edge_length": 0.05})
-    wave.set_initial_velocity_model(constant=1.5)
-    wave.sources.current_sources = list(range(len(source_locations)))
-    return wave
+    return _build_wave(
+        AcousticWave,
+        amplitude,
+        source_locations,
+        dimension=2,
+        degree=4,
+        initial_velocity=1.5,
+    )
 
 
 def _check_cofunction_values(wave, source_locations, test_exprs):
