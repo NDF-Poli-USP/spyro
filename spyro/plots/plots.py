@@ -1,3 +1,5 @@
+"""General plotting routines for simulation data and diagnostic outputs."""
+
 # from scipy.io import savemat
 import matplotlib.pyplot as plt
 from PIL import Image
@@ -331,7 +333,8 @@ def plot_model(
 def plot_function(function):
     """Plot a Firedrake function using filled contour visualization.
 
-    Creates a filled contour plot of a Firedrake function with equal aspect ratio.
+    Create a filled contour plot of a Firedrake function with equal
+    aspect ratio.
 
     Parameters
     ----------

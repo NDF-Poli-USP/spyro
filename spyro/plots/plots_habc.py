@@ -1,3 +1,5 @@
+"""Plotting utilities for HABC analysis and receiver diagnostics."""
+
 # This file contains methods for plotting results from the HABC scheme
 import matplotlib.pyplot as plt
 import numpy as np
@@ -174,9 +176,10 @@ def plot_function_layer_size(
 
 
 def plot_hist_receivers(Wave_object, show=False):
-    """Plot the comparison of the time-domain response at the receivers between
-    the reference model and the HABC scheme. The plots are saved in PDF and PNG
-    formats.
+    """Plot receiver time-domain comparisons.
+
+    Compare receiver responses between the reference model and the HABC
+    scheme. The plots are saved in PDF and PNG formats.
 
     Parameters
     ----------
@@ -256,9 +259,10 @@ def plot_hist_receivers(Wave_object, show=False):
 
 
 def plot_rfft_receivers(Wave_object, fxlim=4.0, show=False):
-    """Plot the comparison of the frequency-domain response at the receivers
-    between the reference model and the HABC scheme. The plots are saved in PDF
-    and PNG formats.
+    """Plot receiver frequency-domain comparisons.
+
+    Compare receiver spectra between the reference model and the HABC
+    scheme. The plots are saved in PDF and PNG formats.
 
     Parameters
     ----------

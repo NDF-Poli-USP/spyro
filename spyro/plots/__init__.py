@@ -1,3 +1,5 @@
+"""Plotting helpers for wave simulation outputs."""
+
 from .plots import (
     plot_shots,
     plot_mesh_sizes,
