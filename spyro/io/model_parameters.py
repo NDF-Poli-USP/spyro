@@ -480,8 +480,14 @@ class Model_parameters(Read_options, Read_boundary_layer,
             return self.user_mesh
         elif self.mesh_parameters.mesh_file is not None:
             return io.read_mesh(self.mesh_parameters)
-        else:
+        elif self.user_mesh is not None:
             return self.user_mesh
+        elif self.mesh_parameters.automatic_mesh:
+            autoMeshing = meshing.AutomaticMesh(mesh_parameters=self.mesh_parameters)
+            self.user_mesh = autoMeshing.create_mesh()
+            return self.user_mesh
+        else:
+            return None
 
 
 def _validate_enum(value, accepted_values, name):
