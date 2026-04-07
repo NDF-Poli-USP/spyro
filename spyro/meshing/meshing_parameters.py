@@ -174,8 +174,6 @@ class MeshingParameters():
             Default is True.
         """
 
-        if input_mesh_dictionary is None:
-            input_mesh_dictionary = {}
         self.input_mesh_dictionary = input_mesh_dictionary or {}
         self.dimension = dimension
         self.comm = comm
@@ -209,17 +207,17 @@ class MeshingParameters():
         self.source_frequency = source_frequency
         self.abc_pad_length = abc_pad_length
         self.degree = degree
-        self.mesh_type = self.input_mesh_dictionary.get("mesh_type", None)
-        self.mesh_file = self.input_mesh_dictionary.get("mesh_file", None)
-        self.length_z = self.input_mesh_dictionary.get("length_z", None)
-        self.length_x = self.input_mesh_dictionary.get("length_x", None)
-        self.length_y = self.input_mesh_dictionary.get("length_y", None)
-        self.user_mesh = self.input_mesh_dictionary.get("user_mesh", None)
+        self.mesh_type = self.input_mesh_dictionary.get("mesh_type")
+        self.mesh_file = self.input_mesh_dictionary.get("mesh_file")
+        self.length_z = self.input_mesh_dictionary.get("length_z")
+        self.length_x = self.input_mesh_dictionary.get("length_x")
+        self.length_y = self.input_mesh_dictionary.get("length_y")
+        self.user_mesh = self.input_mesh_dictionary.get("user_mesh")
         self.dimension = self.input_mesh_dictionary.get("dimension", self.dimension)
         self.output_filename = self.input_mesh_dictionary.get("output_filename", "automatic_mesh.msh")
-        self.cells_per_wavelength = self.input_mesh_dictionary.get("cells_per_wavelength", None)
-        self.edge_length = self.input_mesh_dictionary.get("edge_length", None)
-        self.gradient_mask = self.input_mesh_dictionary.get("gradient_mask", None)
+        self.cells_per_wavelength = self.input_mesh_dictionary.get("cells_per_wavelength")
+        self.edge_length = self.input_mesh_dictionary.get("edge_length")
+        self.gradient_mask = self.input_mesh_dictionary.get("gradient_mask")
 
         self.automatic_mesh = self.mesh_type in {"firedrake_mesh", "SeismicMesh", "spyro_mesh"}
         self.is_complete = None
