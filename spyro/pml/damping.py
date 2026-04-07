@@ -1,3 +1,5 @@
+"""Damping profiles and matrices for perfectly matched layers (PML)."""
+
 import math
 
 from firedrake import *  # noqa: F403
