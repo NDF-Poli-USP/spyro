@@ -1,3 +1,5 @@
+"""Top-level orchestration of hybrid absorbing boundary condition workflows."""
+
 import firedrake as fire
 import numpy as np
 import spyro.habc.eik as eik
@@ -35,8 +37,7 @@ class HABC_Wave(
     NRBC,
     HABC_Error,
 ):
-    """Class HABC that determines absorbing layer size and parameters to be
-    used.
+    """Determine absorbing-layer size and parameters for HABC simulations.
 
     Attributes
     ----------
@@ -286,8 +287,9 @@ class HABC_Wave(
         )
 
     def critical_boundary_points(self):
-        """Determine the critical points on domain boundaries of the original
-        model to size an absorbing layer using the Eikonal criterion for HABCs.
+        """Determine critical boundary points using the Eikonal criterion.
+
+        Use original-domain boundaries to size the absorbing layer.
         See Salas et al (2022) for details.
 
         Parameters
@@ -437,8 +439,9 @@ class HABC_Wave(
         return dom_dim, dom_lay
 
     def size_habc_criterion(self, fpad=4, n_root=1, layer_based_on_mesh=True):
-        """Determine the size of the absorbing layer using the Eikonal criterion
-        for HABCs. See Salas et al (2022) for details.
+        """Determine absorbing-layer size using the Eikonal criterion.
+
+        For HABCS. See Salas et al (2022) for details.
 
         Parameters
         ----------
@@ -689,7 +692,8 @@ class HABC_Wave(
     def fundamental_frequency(
         self, method=None, monitor=False, fitting_c=(0.0, 0.0, 0.0, 0.0)
     ):
-        """Compute the fundamental frequency in Hz via modal analysis
+        """Compute the fundamental frequency in Hz via modal analysis.
+
         considering the numerical model with Neumann BCs.
 
         Parameters
@@ -874,11 +878,11 @@ class HABC_Wave(
     def damping_layer(
         self, xCR_usu=None, method=None, fitting_c=(0.0, 0.0, 0.0, 0.0)
     ):
-        """Set the damping profile within the absorbing layer. Minimum damping
-        ratio is computed as psi_min = xCR * d where xCR is the heuristic factor
-        for the minimum damping.
+        """Set the damping profile within the absorbing layer.
 
-        ratio and d is thenormalized element size (lmin / pad_len).
+        Minimum damping ratio is computed as psi_min = xCR * d, where xCR is
+        a heuristic factor and d is the normalized element size
+        (lmin / pad_len).
         Maximum damping ratio is psi_max =  2 * pi * f_fund * psi
         where f_fund is the fundamental frequency and psi = 0.999.
 
@@ -1144,8 +1148,7 @@ class HABC_Wave(
     def infinite_model(
         self, check_dt=False, max_divisor_tf=1, method="ANALYTICAL", mag_add=3
     ):
-        """Create a reference model for the HABC scheme for comparative
-        purposes.
+        """Create a reference model for HABC comparisons.
 
         Parameters
         ----------
@@ -1208,8 +1211,7 @@ class HABC_Wave(
             del self.Ly_habc
 
     def rename_folder_habc(self):
-        """Rename the folder of results if the degree for the hypershape layer
-        is out of the criterion limits.
+        """Rename results folder if hypershape degree is out of limits.
 
         Parameters
         ----------

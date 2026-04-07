@@ -1,3 +1,5 @@
+"""Rectangular absorbing-layer geometry utilities for HABC."""
+
 from spyro.utils.error_management import value_dimension_error
 
 # Work from Ruben Andres Salas, Andre Luis Ferreira da Silva,

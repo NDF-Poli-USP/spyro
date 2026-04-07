@@ -1,3 +1,5 @@
+"""Eikonal modeling helpers used by HABC setup routines."""
+
 import firedrake as fire
 import numpy as np
 from ..solvers.eikonal.eikonal_eq import Eikonal_Modeling

@@ -1,3 +1,5 @@
+"""Error metrics and comparison utilities for HABC validation."""
+
 import numpy as np
 from os import getcwd
 from firedrake import assemble
@@ -179,8 +181,8 @@ class HABC_Error:
         self.receivers_ref_fft = np.load(pth_str + "habc_fft.npy").T
 
     def error_measures_habc(self):
-        """
-        Compute the error measures at the receivers for the HABC scheme.
+        """Compute error measures at receivers for the HABC scheme.
+
         Error measures as in Salas et al. (2022) Sec. 2.5.
         Obs: If you get an error during running in find_peaks means that
         the transient time of the simulation must be increased.

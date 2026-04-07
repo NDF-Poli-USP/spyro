@@ -1,3 +1,5 @@
+"""Hybrid absorbing boundary condition (HABC) components."""
+
 import importlib
 import pkgutil
 

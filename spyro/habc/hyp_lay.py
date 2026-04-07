@@ -1,3 +1,5 @@
+"""Hyperelliptic layer geometry and metrics for HABC."""
+
 import numpy as np
 from scipy.integrate import dblquad, quad
 from scipy.special import beta, betainc, gamma
@@ -17,7 +19,8 @@ from spyro.utils.error_management import (
 
 
 class HyperLayer:
-    """Define a hyperlliptical layer in 2D or hyperellipsoidal in 3D.
+    """Define a hyperelliptical layer in 2D or hyperellipsoidal in 3D.
+
     Hyperellipse Eq. (2D): |x/a|^n + |y/b|^n = 1.
 
     Hyperellipsoid Eq. (3D): |x/a|^n + |y/b|^n + |z/c|^n = 1.
@@ -30,7 +33,8 @@ class HyperLayer:
     area : `float`
         Area of the domain with hyperelliptical layer
     area_ratio : `float`
-        Area ratio to the area of the original domain. area_ratio = area / a_orig
+        Area ratio to the area of the original domain.
+        area_ratio = area / a_orig
     dimension : `int`
         Model dimension (2D or 3D). Default is 2D
     domain_dim : `tuple`
@@ -57,7 +61,8 @@ class HyperLayer:
     vol : `float`
         Volume of the domain with hyperellipsoidal layer
     vol_ratio : `float`
-        Volume ratio to the volume of the original domain. vol_ratio = vol / v_orig
+        Volume ratio to the volume of the original domain.
+        vol_ratio = vol / v_orig
 
     Methods
     -------
@@ -195,8 +200,9 @@ class HyperLayer:
         return r
 
     def central_tendency_criteria(self, spness, monitor=False):
-        """Central tendency criteria to find the hypershape degree. See Salas et
-        al (2022)
+        """Apply central-tendency criteria to choose the hypershape degree.
+
+        See Salas et al (2022).
 
         Parameters
         ----------
@@ -365,7 +371,9 @@ class HyperLayer:
     def calc_degree_hypershape(
         self, spness, limit_type, n_min=2, n_max=20, monitor=False
     ):
-        """Define the limits for the hypershape degree. See Salas et al (2022).
+        """Define the limits for the hypershape degree.
+
+        See Salas et al (2022).
         The condition r = 1 ensures that the point is on the layer boundary. The
         condition r < 1 ensures that the point is inside the layer. Central
         tendency criterion is adopted if it satisfies the loop criterion limits.
@@ -676,7 +684,7 @@ class HyperLayer:
         """
 
         def line_element(theta):
-            """Differential arc length element to compute the perimeter.
+            """Compute differential arc length for perimeter integration.
 
             Parameters
             ----------
@@ -721,7 +729,7 @@ class HyperLayer:
         """
 
         def surface_element(r, t):
-            """Differential surface element to compute the surface area.
+            """Compute differential surface element for area integration.
 
             Parameters
             ----------

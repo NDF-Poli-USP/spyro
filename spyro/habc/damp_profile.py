@@ -1,3 +1,5 @@
+"""Damping-parameter estimation utilities for the HABC layer."""
+
 import numpy as np
 from ..io.basicio import parallel_print
 from spyro.utils.error_management import value_parameter_error
@@ -232,8 +234,7 @@ class HABC_Damping:
             # Unidimensional spourious reflection in FEM (Laier, 2020)
             # TODO: Add citation
             def Zi(p, alpha, ele_type):
-                """Compute the Z parameter in the spurious reflection
-                coefficient.
+                """Compute the Z parameter in the spurious reflection model.
 
                 Parameters
                 ----------
@@ -342,8 +343,8 @@ class HABC_Damping:
         return psi_min, xCR_est, CRmin
 
     def est_min_damping(self, psi_damp=0.999):
-        """
-        Estimate the minimum damping ratio and the associated heuristic factor.
+        """Estimate the minimum damping ratio and heuristic factor.
+
         Obs: The reflection coefficient is not zero because there are always
         both reflections: physical and spurious
 

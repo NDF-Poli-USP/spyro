@@ -1,3 +1,5 @@
+"""Absorbing-layer size calculations for HABC."""
+
 # This file contains methods for sizing an absorbing layer
 
 import numpy as np
@@ -12,7 +14,7 @@ import numpy as np
 
 
 def f_layer(x, a, m=1, s=0.999, typ="FL"):
-    """Function whose zeros are solution for the parameter size of the layer.
+    """Compute the layer-size criterion function.
 
     Parameters
     ----------
@@ -301,8 +303,7 @@ def calc_size_lay(
 
 
 def roundFL(lmin, lref, F_L):
-    """Adjust the layer parameter based on the element size to get an integer
-    number of elements within the layer.
+    """Adjust layer parameter to enforce an integer number of elements.
 
     Parameters
     ----------

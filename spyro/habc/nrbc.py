@@ -1,3 +1,5 @@
+"""Non-reflecting boundary condition helpers for HABC."""
+
 import firedrake as fire
 import numpy as np
 from os import getcwd
@@ -93,8 +95,7 @@ class NRBC:
             self.path_save_nrbc = output_folder
 
     def source_to_bnd_reference_vector(self, source_coord, bnd_nodes_nfs):
-        """Compute a unitary reference vector from the source to a boundary
-        point.
+        """Compute a unit reference vector from source to boundary point.
 
         Parameters
         ----------
@@ -136,9 +137,10 @@ class NRBC:
         return unit_ref_vct
 
     def hypershape_normal_vector(self, bnd_pnts, hyper_axes, n):
-        """Compute the normal vector to a hyperellipse (|x/a|^n + |y/b|^n = 1)
-        or a hyperellipsoid (|x/a|^n + |y/b|^n + |z/c|^n = 1) at a boundary
-        point. The hypershape must have the center at the origin.
+        """Compute the normal vector to a boundary point of a hypershape.
+
+        The hypershape can be a hyperellipse or hyperellipsoid centered at
+        the origin.
 
         Observations:
         Let f(x, y) = |x/a|^n - |y/b|^n -1 = 0 a level curve (level set for
