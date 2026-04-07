@@ -119,11 +119,11 @@ def test_representative_mesh_dimensions_2d(element_type, dimension):
     Wave_obj.representative_mesh_dimensions()
 
     # Print mesh info and computed values
-    print(f"\nMesh Information:")
+    print("\nMesh Information:")
     print(f"  - Mesh type: {element_type}")
     print(f"  - Number of cells: {Wave_obj.mesh.num_cells()}")
     print(f"  - Number of vertices: {Wave_obj.mesh.num_vertices()}")
-    print(f"\nComputed representative mesh dimensions:")
+    print("\nComputed representative mesh dimensions:")
     print(f"  - diam_mesh: {Wave_obj.diam_mesh}")
     print(f"  - lmin (minimum cell diameter): {Wave_obj.lmin:.8f}")
     print(f"  - lmax (maximum cell diameter): {Wave_obj.lmax:.8f}")
