@@ -10,9 +10,9 @@ def backward_wave_propagator(Wave_obj, dt=None):
     -----------
     Wave_obj: Spyro wave object
         Wave object that already propagated a forward wave.
-    dt: 'float' (optional)
+    dt: Python 'float' (optional)
         Time step to be used explicitly. If not mentioned uses the default,
-        that was estabilished in the wave object.
+        that was estabilished in the wave object for the adjoint model.
 
     Returns:
     --------
