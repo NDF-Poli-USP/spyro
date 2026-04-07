@@ -127,9 +127,7 @@ def _build_elastic_wave(amplitude, source_locations, dimension=2):
     }
 
     wave = IsotropicWave(model)
-    wave.set_mesh(input_mesh_parameters={"edge_length": 0.5})
-    wave._initialize_model_parameters()
-    wave.matrix_building()
+    wave.set_mesh(input_mesh_parameters={"edge_length": 0.05})
     wave.sources.current_sources = list(range(len(source_locations)))
     return wave
 
@@ -139,7 +137,7 @@ def _build_acoustic_wave(amplitude, source_locations):
         "options": {
             "cell_type": "T",
             "variant": "lumped",
-            "degree": 1,
+            "degree": 4,
             "dimension": 2,
         },
         "parallelism": {"type": "custom", "shot_ids_per_propagation": [list(range(len(source_locations)))]},
@@ -158,53 +156,62 @@ def _build_acoustic_wave(amplitude, source_locations):
     }
 
     wave = AcousticWave(model)
-    wave.set_mesh(input_mesh_parameters={"edge_length": 0.5})
+    wave.set_mesh(input_mesh_parameters={"edge_length": 0.05})
     wave.set_initial_velocity_model(constant=1.5)
-    wave._initialize_model_parameters()
-    wave.matrix_building()
     wave.sources.current_sources = list(range(len(source_locations)))
     return wave
 
 
-def _source_action(source_cofunction, field):
-    return fire.assemble(fire.action(source_cofunction, field))
+def _check_cofunction_values(wave, source_locations, test_exprs):
+    """Check that the cofunction action on each test function matches the
+    expected value for each source individually."""
+    for source_id, sl in enumerate(source_locations):
+        wave.sources.point_locations = [sl]
+        wave.sources.current_sources = [0]
+        cofunction = wave.sources.source_cofunction()
+
+        for f, expected_fn in test_exprs:
+            expected = expected_fn(sl)
+            action = np.dot(cofunction.dat.data_ro.ravel(), f.dat.data_ro.ravel())
+            assert math.isclose(action, expected, abs_tol=1e-6), \
+                f"Source {source_id} at {sl}: <c, f> = {action}, expected {expected}"
 
 
-def test_elastic_vertex_only_mesh_preserves_amplitude_vector():
-    amplitude = [0.25, -0.5]
-    wave = _build_elastic_wave(amplitude, [(-0.2, 0.5)])
+def test_cofunction_values_acoustic():
+    """Test if the cofunction correctly represents delta functions at source
+    locations by checking its action on known functions."""
+    np.random.seed(42)
+    source_locations = [(-np.random.rand(), np.random.rand()) for _ in range(5)]
+    wave = _build_acoustic_wave(1.0, source_locations)
+    V = wave.function_space
+    x = fire.SpatialCoordinate(wave.mesh)
 
-    source_cofunction = wave.sources.source_cofunction()
-    field = fire.Function(wave.function_space).interpolate(fire.as_vector((2.0, 3.0)))
-
-    expected = np.dot(np.asarray(amplitude, dtype=float), np.array([2.0, 3.0]))
-    assert np.isclose(_source_action(source_cofunction, field), expected)
-
-
-def test_elastic_vertex_only_mesh_sums_multiple_active_sources():
-    amplitude = np.array([0.25, -0.5])
-    source_locations = [(-0.2, 0.5), (-0.8, 0.5)]
-    wave = _build_elastic_wave(amplitude, source_locations)
-
-    source_cofunction = wave.sources.source_cofunction()
-    field = fire.Function(wave.function_space).interpolate(fire.as_vector((2.0, 3.0)))
-
-    expected_per_source = np.dot(amplitude, np.array([2.0, 3.0]))
-    assert np.isclose(
-        _source_action(source_cofunction, field),
-        len(source_locations) * expected_per_source,
-    )
+    test_exprs = [
+        (fire.Function(V).interpolate(1.0), lambda sl: 1.0),
+        (fire.Function(V).interpolate(x[0]), lambda sl: sl[0]),
+        (fire.Function(V).interpolate(x[1]), lambda sl: sl[1]),
+        (fire.Function(V).interpolate(x[0]**2 + x[1]**2), lambda sl: sl[0]**2 + sl[1]**2),
+    ]
+    _check_cofunction_values(wave, source_locations, test_exprs)
 
 
-def test_acoustic_vertex_only_mesh_uses_scalar_amplitude():
-    amplitude = 2.5
-    source_locations = [(-0.2, 0.5), (-0.8, 0.5)]
-    wave = _build_acoustic_wave(amplitude, source_locations)
+def test_cofunction_values_elastic():
+    """Test if the elastic cofunction correctly represents delta functions at
+    source locations by checking its action on known vector functions."""
+    np.random.seed(42)
+    source_locations = [(-np.random.rand(), np.random.rand()) for _ in range(5)]
+    wave = _build_elastic_wave(1.0, source_locations)
+    V = wave.function_space
+    x = fire.SpatialCoordinate(wave.mesh)
 
-    source_cofunction = wave.sources.source_cofunction()
-    field = fire.Function(wave.function_space).assign(3.0)
-
-    assert np.isclose(_source_action(source_cofunction, field), len(source_locations) * amplitude * 3.0)
+    test_exprs = [
+        (fire.Function(V).interpolate(fire.as_vector([1.0, 0.0])), lambda sl: 1.0),
+        (fire.Function(V).interpolate(fire.as_vector([0.0, 1.0])), lambda sl: 1.0),
+        (fire.Function(V).interpolate(fire.as_vector([x[0], 0.0])), lambda sl: sl[0]),
+        (fire.Function(V).interpolate(fire.as_vector([0.0, x[1]])), lambda sl: sl[1]),
+        (fire.Function(V).interpolate(fire.as_vector([x[0], x[1]])), lambda sl: sl[0] + sl[1]),
+    ]
+    _check_cofunction_values(wave, source_locations, test_exprs)
 
 
 if __name__ == "__main__":
