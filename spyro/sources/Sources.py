@@ -1,3 +1,5 @@
+"""Source utilities for injecting wavelets into simulation meshes."""
+
 import math
 import numpy as np
 from scipy.signal import butter, filtfilt
@@ -7,7 +9,7 @@ import firedrake as fire
 
 
 class Sources(Delta_projector):
-    """Methods that inject a wavelet into a mesh
+    """Inject a wavelet into a mesh.
 
     ...
 
@@ -46,7 +48,7 @@ class Sources(Delta_projector):
     """
 
     def __init__(self, wave_object):
-        """Initializes class and gets all receiver parameters from input file.
+        """Initialize the class and load source parameters.
 
         Parameters
         ----------
@@ -77,6 +79,7 @@ class Sources(Delta_projector):
             self.build_maps(order=1)
 
     def update_wavelet(self, wave_object):
+        """Update the cached wavelet from the current wave settings."""
         self.wavelet = full_ricker_wavelet(
             dt=wave_object.dt,
             final_time=wave_object.final_time,
@@ -86,7 +89,7 @@ class Sources(Delta_projector):
         )
 
     def apply_source(self, rhs_forcing, step):
-        """Applies source in a assembled right hand side.
+        """Apply the source to an assembled right-hand side.
 
         Parameters
         ----------
@@ -144,6 +147,26 @@ class Sources(Delta_projector):
 
 
 def timedependentSource(model, t, freq=None, amp=1, delay=1.5):
+    """Return the configured time-dependent source value.
+
+    Parameters
+    ----------
+    model : dict
+        Simulation configuration dictionary.
+    t : float
+        Current time.
+    freq : float, optional
+        Source frequency.
+    amp : float, default=1
+        Source amplitude.
+    delay : float, default=1.5
+        Delay multiplier for the source wavelet.
+
+    Returns
+    -------
+    float
+        Source amplitude evaluated at time ``t``.
+    """
     if model["acquisition"]["source_type"] == "Ricker":
         return ricker_wavelet(t, freq, amp, delay=delay)
     # elif model["acquisition"]["source_type"] == "MMS":
@@ -155,8 +178,10 @@ def timedependentSource(model, t, freq=None, amp=1, delay=1.5):
 def ricker_wavelet(
     t, freq, amp=1.0, delay=1.5, delay_type="multiples_of_minimum"
 ):
-    """Creates a Ricker source function with a delay in term of multiples of the
-    distance between the minimums.
+    """Create a delayed Ricker source function.
+
+    The delay is expressed in either multiples of the distance between minima or
+    in time.
 
     Parameters
     ----------
@@ -197,8 +222,9 @@ def full_ricker_wavelet(
     delay=1.5,
     delay_type="multiples_of_minimum",
 ):
-    """Compute the Ricker wavelet optionally applying low-pass filtering using
-    cutoff frequency in Hertz.
+    """Compute the Ricker wavelet, optionally applying low-pass filtering.
+
+    Cutoff frequency in Hertz.
 
     Parameters
     ----------
