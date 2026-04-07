@@ -170,6 +170,15 @@ def _build_acoustic_wave(amplitude, source_locations):
     )
 
 
+def _random_source_locations(dimension, count=5):
+    locations = []
+    for _ in range(count):
+        point = [-np.random.rand()]
+        point.extend(np.random.rand(dimension - 1))
+        locations.append(tuple(point))
+    return locations
+
+
 def _check_cofunction_values(wave, source_locations, test_exprs):
     """Check that the cofunction action on each test function matches the
     expected value for each source individually."""
@@ -189,7 +198,7 @@ def test_cofunction_values_acoustic():
     """Test if the cofunction correctly represents delta functions at source
     locations by checking its action on known functions."""
     np.random.seed(42)
-    source_locations = [(-np.random.rand(), np.random.rand()) for _ in range(5)]
+    source_locations = _random_source_locations(2)
     wave = _build_acoustic_wave(1.0, source_locations)
     V = wave.function_space
     x = fire.SpatialCoordinate(wave.mesh)
@@ -207,7 +216,7 @@ def test_cofunction_values_elastic():
     """Test if the elastic cofunction correctly represents delta functions at
     source locations by checking its action on known vector functions."""
     np.random.seed(42)
-    source_locations = [(-np.random.rand(), np.random.rand()) for _ in range(5)]
+    source_locations = _random_source_locations(2)
     wave = _build_elastic_wave(1.0, source_locations)
     V = wave.function_space
     x = fire.SpatialCoordinate(wave.mesh)
@@ -218,6 +227,48 @@ def test_cofunction_values_elastic():
         (fire.Function(V).interpolate(fire.as_vector([x[0], 0.0])), lambda sl: sl[0]),
         (fire.Function(V).interpolate(fire.as_vector([0.0, x[1]])), lambda sl: sl[1]),
         (fire.Function(V).interpolate(fire.as_vector([x[0], x[1]])), lambda sl: sl[0] + sl[1]),
+    ]
+    _check_cofunction_values(wave, source_locations, test_exprs)
+
+
+def test_cofunction_values_elastic_3d():
+    """Test if the 3D elastic cofunction correctly represents delta functions
+    at source locations by checking its action on known vector functions."""
+    np.random.seed(42)
+    source_locations = _random_source_locations(3)
+    wave = _build_elastic_wave(1.0, source_locations, dimension=3)
+    V = wave.function_space
+    x = fire.SpatialCoordinate(wave.mesh)
+
+    test_exprs = [
+        (
+            fire.Function(V).interpolate(fire.as_vector([1.0, 0.0, 0.0])),
+            lambda sl: 1.0,
+        ),
+        (
+            fire.Function(V).interpolate(fire.as_vector([0.0, 1.0, 0.0])),
+            lambda sl: 1.0,
+        ),
+        (
+            fire.Function(V).interpolate(fire.as_vector([0.0, 0.0, 1.0])),
+            lambda sl: 1.0,
+        ),
+        (
+            fire.Function(V).interpolate(fire.as_vector([x[0], 0.0, 0.0])),
+            lambda sl: sl[0],
+        ),
+        (
+            fire.Function(V).interpolate(fire.as_vector([0.0, x[1], 0.0])),
+            lambda sl: sl[1],
+        ),
+        (
+            fire.Function(V).interpolate(fire.as_vector([0.0, 0.0, x[2]])),
+            lambda sl: sl[2],
+        ),
+        (
+            fire.Function(V).interpolate(fire.as_vector([x[0], x[1], x[2]])),
+            lambda sl: sl[0] + sl[1] + sl[2],
+        ),
     ]
     _check_cofunction_values(wave, source_locations, test_exprs)
 
