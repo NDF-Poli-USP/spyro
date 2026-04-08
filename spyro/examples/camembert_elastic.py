@@ -1,4 +1,4 @@
-"""From Mohammad Mehdi Ghorbani's dissertation:
+"""From Mohammad Mehdi Ghorbani's dissertation.
 
 https://www.teses.usp.br/teses/disponiveis/3/3152/tde-16032023-085210/pt-br.php
 """
@@ -34,9 +34,8 @@ z, x = fire.SpatialCoordinate(mesh)
 zc = 250  # [m]
 xc = 250  # [m]
 ri = 50  # [m]
-camembert = lambda v_inside, v_outside: fire.conditional(
-    (z - zc) ** 2 + (x - xc) ** 2 < ri**2, v_inside, v_outside
-)
+def _camembert(v_inside, v_outside):
+    return fire.conditional((z - zc) ** 2 + (x - xc) ** 2 < ri**2, v_inside, v_outside)
 
 d = {}
 
@@ -72,8 +71,8 @@ d["acquisition"] = {
 d["synthetic_data"] = {
     "type": "object",
     "density": fire.Constant(rho),
-    "lambda": camembert(lambda_in, lambda_out),
-    "mu": camembert(mu_in, mu_out),
+    "lambda": _camembert(lambda_in, lambda_out),
+    "mu": _camembert(mu_in, mu_out),
     "real_velocity_file": None,
 }
 
