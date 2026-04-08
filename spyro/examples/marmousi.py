@@ -1,3 +1,9 @@
+"""Marmousi example models for acoustic forward and FWI workflows.
+
+This module defines reusable dictionary configurations and helper classes for
+setting up a 2D acoustic Marmousi propagation in spyro.
+"""
+
 from spyro import create_transect
 from spyro.examples.example_model import Example_model_acoustic
 
@@ -108,16 +114,21 @@ marmousi_dictionary["time_axis"] = {
 
 
 class Marmousi_acoustic(Example_model_acoustic):
-    """Marmousi model. This class is a child of the Example_model class. It is used to
+    """Marmousi acoustic model.
+
+    This class is a child of the Example_model class. It is used to
     create a dictionary with the parameters of the Marmousi model.
 
     Example Setup
 
-    These examples are intended as reusable velocity model configurations to assist in the development and testing of new methods, such as optimization algorithms, time-marching schemes, or inversion techniques.
+    Notes
+    -----
+    This example is intended as a reusable model configuration for
+    development and testing of numerical methods. It does not represent a
+    targeted validation case with a single expected output.
 
-    Unlike targeted test cases, these examples do not have a specific objective or expected result. Instead, they provide standardized setups, such as Camembert, rectangular, and Marmousi velocity models, that can be quickly reused when prototyping, testing, or validating new functionality.
-
-    By isolating the setup of common velocity models, we aim to reduce boilerplate and encourage consistency across experiments.
+    By isolating common model setup logic, this class reduces boilerplate and
+    encourages consistency across experiments.
 
     Feel free to adapt these templates to your needs.
 

@@ -147,7 +147,7 @@ class Polygon_velocity:
 
 class Polygon_acoustic(Polygon_velocity, Rectangle_acoustic):
     """Immersed Polygon acoustic model.
-    
+
     This class is a child of the Example_model class. It is used to
     create a dictionary with the parameters of the polygon model.
 
@@ -189,7 +189,7 @@ class Polygon_acoustic(Polygon_velocity, Rectangle_acoustic):
 
 class Polygon_acoustic_FWI(Polygon_velocity, Rectangle_acoustic_FWI):
     """Immersed Polygon acoustic FWI model.
-    
+
     This class is a child of the Example_model class. It is used to
     create a dictionary with the parameters of the polygon model.
 

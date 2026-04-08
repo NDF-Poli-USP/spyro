@@ -1,3 +1,10 @@
+"""Rectangle-based example models for acoustic forward and FWI workflows.
+
+This module defines reusable dictionary configurations and helper classes for
+setting up a 2D acoustic propagation in spyro. These rectangle models have
+adicional dictionary inputs for multiple layer configurations.
+"""
+
 from spyro import create_transect
 from spyro.examples.example_model import Example_model_acoustic
 from spyro.examples.example_model import Example_model_acoustic_FWI
@@ -110,6 +117,8 @@ rectangle_dictionary_fwi["inversion"] = {
 
 
 class Rectangle_mesh_and_velocity:
+    """Mixin that builds the rectangle mesh and layer velocity models."""
+
     def _rectangle_mesh(self):
         mesh_dict = self.input_dictionary["mesh"]
         mesh_parameters = {
@@ -124,7 +133,8 @@ class Rectangle_mesh_and_velocity:
         super().set_mesh(input_mesh_parameters=mesh_parameters)
 
     def multiple_layer_velocity_model(self, z_switch, layers):
-        """Sets the heterogeneous velocity model to be split into horizontal layers.
+        """Set the heterogeneous velocity model to be split into horizontal layers.
+
         Each layer's velocity value is defined by the corresponding value in the layers
         list. The layers are separated by the values in the z_switch list.
 
@@ -154,16 +164,21 @@ class Rectangle_mesh_and_velocity:
 
 
 class Rectangle_acoustic(Rectangle_mesh_and_velocity, Example_model_acoustic):
-    """Rectangle model. This class is a child of the Example_model class. It is used to
+    """Rectangle acoustic model.
+
+    This class is a child of the Example_model class. It is used to
     create a dictionary with the parameters of the Rectangle model.
 
     Example Setup
 
-    These examples are intended as reusable velocity model configurations to assist in the development and testing of new methods, such as optimization algorithms, time-marching schemes, or inversion techniques.
+    Notes
+    -----
+    This example is intended as a reusable model configuration for
+    development and testing of numerical methods. It does not represent a
+    targeted validation case with a single expected output.
 
-    Unlike targeted test cases, these examples do not have a specific objective or expected result. Instead, they provide standardized setups, such as Camembert, rectangular, and Marmousi velocity models, that can be quickly reused when prototyping, testing, or validating new functionality.
-
-    By isolating the setup of common velocity models, we aim to reduce boilerplate and encourage consistency across experiments.
+    By isolating common model setup logic, this class reduces boilerplate and
+    encourages consistency across experiments.
 
     Feel free to adapt these templates to your needs.
 
@@ -196,16 +211,21 @@ class Rectangle_acoustic(Rectangle_mesh_and_velocity, Example_model_acoustic):
 
 
 class Rectangle_acoustic_FWI(Rectangle_mesh_and_velocity, Example_model_acoustic_FWI):
-    """Rectangle model. This class is a child of the Example_model class. It is used to
+    """Rectangle model acoustic FWI.
+
+    This class is a child of the Example_model class. It is used to
     create a dictionary with the parameters of the Rectangle model.
 
     Example Setup
 
-    These examples are intended as reusable velocity model configurations to assist in the development and testing of new methods, such as optimization algorithms, time-marching schemes, or inversion techniques.
+    Notes
+    -----
+    This example is intended as a reusable model configuration for
+    development and testing of numerical methods. It does not represent a
+    targeted validation case with a single expected output.
 
-    Unlike targeted test cases, these examples do not have a specific objective or expected result. Instead, they provide standardized setups, such as Camembert, rectangular, and Marmousi velocity models, that can be quickly reused when prototyping, testing, or validating new functionality.
-
-    By isolating the setup of common velocity models, we aim to reduce boilerplate and encourage consistency across experiments.
+    By isolating common model setup logic, this class reduces boilerplate and
+    encourages consistency across experiments.
 
     Feel free to adapt these templates to your needs.
 

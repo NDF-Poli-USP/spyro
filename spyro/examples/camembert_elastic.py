@@ -34,8 +34,11 @@ z, x = fire.SpatialCoordinate(mesh)
 zc = 250  # [m]
 xc = 250  # [m]
 ri = 50  # [m]
+
+
 def _camembert(v_inside, v_outside):
     return fire.conditional((z - zc) ** 2 + (x - xc) ** 2 < ri**2, v_inside, v_outside)
+
 
 d = {}
 
