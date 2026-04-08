@@ -1,5 +1,6 @@
 import math
 from copy import deepcopy
+import pytest
 import firedrake as fire
 import numpy as np
 import spyro
@@ -104,11 +105,12 @@ def _build_wave(
     degree,
     synthetic_data=None,
     initial_velocity=None,
+    cell_type="T",
 ):
     receiver_location = (-0.2, 0.6) if dimension == 2 else (-0.2, 0.6, 0.6)
     model = {
         "options": {
-            "cell_type": "T",
+            "cell_type": cell_type,
             "variant": "lumped",
             "degree": degree,
             "dimension": dimension,
@@ -135,20 +137,20 @@ def _build_wave(
         model["synthetic_data"] = synthetic_data
 
     wave = wave_class(model)
-    wave.set_mesh(input_mesh_parameters={"edge_length": 0.05})
+    wave.set_mesh(input_mesh_parameters={"edge_length": 0.5})
     if initial_velocity is not None:
         wave.set_initial_velocity_model(constant=initial_velocity)
     wave.sources.current_sources = list(range(len(source_locations)))
     return wave
 
 
-def _build_elastic_wave(amplitude, source_locations, dimension=2):
+def _build_elastic_wave(amplitude, source_locations, dimension=2, cell_type="T"):
     return _build_wave(
         IsotropicWave,
         amplitude,
         source_locations,
         dimension=dimension,
-        degree=1,
+        degree=3,
         synthetic_data={
             "type": "object",
             "density": 1.0,
@@ -159,7 +161,7 @@ def _build_elastic_wave(amplitude, source_locations, dimension=2):
     )
 
 
-def _build_acoustic_wave(amplitude, source_locations):
+def _build_acoustic_wave(amplitude, source_locations, cell_type="T"):
     return _build_wave(
         AcousticWave,
         amplitude,
@@ -167,6 +169,7 @@ def _build_acoustic_wave(amplitude, source_locations):
         dimension=2,
         degree=4,
         initial_velocity=1.5,
+        cell_type=cell_type,
     )
 
 
@@ -194,12 +197,13 @@ def _check_cofunction_values(wave, source_locations, test_exprs):
                 f"Source {source_id} at {sl}: <c, f> = {action}, expected {expected}"
 
 
-def test_cofunction_values_acoustic():
+@pytest.mark.parametrize("cell_type", ["T", "Q"])
+def test_cofunction_values_acoustic(cell_type):
     """Test if the cofunction correctly represents delta functions at source
     locations by checking its action on known functions."""
     np.random.seed(42)
     source_locations = _random_source_locations(2)
-    wave = _build_acoustic_wave(1.0, source_locations)
+    wave = _build_acoustic_wave(1.0, source_locations, cell_type=cell_type)
     V = wave.function_space
     x = fire.SpatialCoordinate(wave.mesh)
 
@@ -212,12 +216,13 @@ def test_cofunction_values_acoustic():
     _check_cofunction_values(wave, source_locations, test_exprs)
 
 
-def test_cofunction_values_elastic():
+@pytest.mark.parametrize("cell_type", ["T", "Q"])
+def test_cofunction_values_elastic(cell_type):
     """Test if the elastic cofunction correctly represents delta functions at
     source locations by checking its action on known vector functions."""
     np.random.seed(42)
     source_locations = _random_source_locations(2)
-    wave = _build_elastic_wave(1.0, source_locations)
+    wave = _build_elastic_wave(1.0, source_locations, cell_type=cell_type)
     V = wave.function_space
     x = fire.SpatialCoordinate(wave.mesh)
 
@@ -231,12 +236,13 @@ def test_cofunction_values_elastic():
     _check_cofunction_values(wave, source_locations, test_exprs)
 
 
-def test_cofunction_values_elastic_3d():
+@pytest.mark.parametrize("cell_type", ["T", "Q"])
+def test_cofunction_values_elastic_3d(cell_type):
     """Test if the 3D elastic cofunction correctly represents delta functions
     at source locations by checking its action on known vector functions."""
     np.random.seed(42)
     source_locations = _random_source_locations(3)
-    wave = _build_elastic_wave(1.0, source_locations, dimension=3)
+    wave = _build_elastic_wave(1.0, source_locations, dimension=3, cell_type=cell_type)
     V = wave.function_space
     x = fire.SpatialCoordinate(wave.mesh)
 
