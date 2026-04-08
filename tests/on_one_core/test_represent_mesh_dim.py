@@ -2,7 +2,7 @@ import pytest
 import warnings
 import firedrake as fire
 from numpy import isclose
-from spyro.solvers.acoustic_wave import AcousticWave
+from spyro.habc.habc import HABC_Wave
 fire.parameters["loopy"] = {"silenced_warnings": ["v1_scheduler_fallback"]}
 warnings.filterwarnings("ignore", category=RuntimeWarning)
 
@@ -89,6 +89,7 @@ def wave_dict(element_type, dimension):
     # Define Parameters for absorbing boundary conditions
     dictionary["absorving_boundary_conditions"] = {
         "status": False,  # Activate ABCs
+        "damping_type": "hybrid",  # Activate HABC
     }
 
     # Define parameters for visualization
@@ -109,7 +110,7 @@ def test_representative_mesh_dimensions_2d(element_type, dimension):
     dictionary = wave_dict(element_type, dimension)
 
     # Create the acoustic wave object
-    Wave_obj = AcousticWave(dictionary=dictionary)
+    Wave_obj = HABC_Wave(dictionary=dictionary)
 
     # Mesh the domain with the specified edge length
     edge_length = 0.1
