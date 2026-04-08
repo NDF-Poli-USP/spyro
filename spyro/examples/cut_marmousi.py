@@ -1,3 +1,5 @@
+"""Cut Marmousi acoustic example configuration."""
+
 from spyro import create_transect
 from spyro.examples.example_model import Example_model_acoustic
 
@@ -107,11 +109,17 @@ class Cut_marmousi_acoustic(Example_model_acoustic):
 
     Example Setup
 
-    These examples are intended as reusable velocity model configurations to assist in the development and testing of new methods, such as optimization algorithms, time-marching schemes, or inversion techniques.
+    These examples are intended as reusable velocity model configurations to
+    assist in the development and testing of new methods, such as optimization
+    algorithms, time-marching schemes, or inversion techniques.
 
-    Unlike targeted test cases, these examples do not have a specific objective or expected result. Instead, they provide standardized setups, such as Camembert, rectangular, and Marmousi velocity models, that can be quickly reused when prototyping, testing, or validating new functionality.
+    Unlike targeted test cases, these examples do not have a specific objective
+    or expected result. Instead, they provide standardized setups, such as
+    Camembert, rectangular, and Marmousi velocity models, that can be quickly
+    reused when prototyping, testing, or validating new functionality.
 
-    By isolating the setup of common velocity models, we aim to reduce boilerplate and encourage consistency across experiments.
+    By isolating the setup of common velocity models, we aim to reduce
+    boilerplate and encourage consistency across experiments.
 
     Feel free to adapt these templates to your needs.
 

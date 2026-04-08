@@ -1,3 +1,5 @@
+"""Elastic example with local ABCs, it is not reusable."""
+
 import numpy as np
 import spyro
 
@@ -21,6 +23,7 @@ out_freq = int(0.01 / time_step)
 
 
 def build_solver(local_abc, dt_scheme):
+    """Build an elastic solver with local ABCs."""
     d = {}
 
     d["options"] = {
@@ -68,13 +71,13 @@ def build_solver(local_abc, dt_scheme):
         "output_frequency": out_freq,
         "gradient_sampling_frequency": 1,
     }
-
+    mech_energy_filename = f"{output_dir}/mechanical_energy_{local_abc}_{dt_scheme}.npy"
     d["visualization"] = {
         "forward_output": False,
         "time": True,
         "time_filename": f"{output_dir}/time.npy",
         "mechanical_energy": True,
-        "mechanical_energy_filename": f"{output_dir}/mechanical_energy_{local_abc}_{dt_scheme}.npy",
+        "mechanical_energy_filename": mech_energy_filename,
     }
 
     if local_abc is not None:

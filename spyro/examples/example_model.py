@@ -1,9 +1,12 @@
+"""Reusable example model wrappers for forward and FWI workflows."""
+
 from ..solvers.acoustic_wave import AcousticWave
 from ..solvers.inversion import FullWaveformInversion
 from copy import deepcopy
 
 
 def get_list(dictionary):
+    """Return the keys of a dictionary as a list."""
     list = []
     for key in dictionary.keys():
         list.append(key)
@@ -12,6 +15,7 @@ def get_list(dictionary):
 
 
 def recursive_dictionary_substitution(dictionary, default):
+    """Recursively fill missing keys in ``dictionary`` using ``default``."""
     keys = get_list(default)
     for key in keys:
         if key not in dictionary:
@@ -34,18 +38,26 @@ class ExampleModelBase:
 
 
 class Example_model_acoustic(ExampleModelBase, AcousticWave):
-    """Sets up a basic model parameter class for examples and test case models. It has
+    """Set up a basic model parameter class for example and test-case models.
+
+    It has
     the option of reading a dictionary, and if any parameter is missing from this
-    dictioanry it calls on a default value, that should be defined in the relevant
+    dictionary it calls on a default value, that should be defined in the relevant
     example file.
 
     Example Setup
 
-    These examples are intended as reusable velocity model configurations to assist in the development and testing of new methods, such as optimization algorithms, time-marching schemes, or inversion techniques.
+    These examples are intended as reusable velocity model configurations to
+    assist in the development and testing of new methods, such as optimization
+    algorithms, time-marching schemes, or inversion techniques.
 
-    Unlike targeted test cases, these examples do not have a specific objective or expected result. Instead, they provide standardized setups, such as Camembert, rectangular, and Marmousi velocity models, that can be quickly reused when prototyping, testing, or validating new functionality.
+    Unlike targeted test cases, these examples do not have a specific objective
+    or expected result. Instead, they provide standardized setups, such as
+    Camembert, rectangular, and Marmousi velocity models, that can be quickly
+    reused when prototyping, testing, or validating new functionality.
 
-    By isolating the setup of common velocity models, we aim to reduce boilerplate and encourage consistency across experiments.
+    By isolating the setup of common velocity models, we aim to reduce
+    boilerplate and encourage consistency across experiments.
 
     Feel free to adapt these templates to your needs.
 
@@ -71,18 +83,26 @@ class Example_model_acoustic(ExampleModelBase, AcousticWave):
 
 
 class Example_model_acoustic_FWI(ExampleModelBase, FullWaveformInversion):
-    """Sets up a basic model parameter class for examples and test case models. It has
+    """Set up a basic model parameter class for example and test-case models.
+
+    It has
     the option of reading a dictionary, and if any parameter is missing from this
-    dictioanry it calls on a default value, that should be defined in the relevant
+    dictionary it calls on a default value, that should be defined in the relevant
     example file.
 
     Example Setup
 
-    These examples are intended as reusable velocity model configurations to assist in the development and testing of new methods, such as optimization algorithms, time-marching schemes, or inversion techniques.
+    These examples are intended as reusable velocity model configurations to
+    assist in the development and testing of new methods, such as optimization
+    algorithms, time-marching schemes, or inversion techniques.
 
-    Unlike targeted test cases, these examples do not have a specific objective or expected result. Instead, they provide standardized setups, such as Camembert, rectangular, and Marmousi velocity models, that can be quickly reused when prototyping, testing, or validating new functionality.
+    Unlike targeted test cases, these examples do not have a specific objective
+    or expected result. Instead, they provide standardized setups, such as
+    Camembert, rectangular, and Marmousi velocity models, that can be quickly
+    reused when prototyping, testing, or validating new functionality.
 
-    By isolating the setup of common velocity models, we aim to reduce boilerplate and encourage consistency across experiments.
+    By isolating the setup of common velocity models, we aim to reduce
+    boilerplate and encourage consistency across experiments.
 
     Feel free to adapt these templates to your needs.
 
