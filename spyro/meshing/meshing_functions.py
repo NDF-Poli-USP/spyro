@@ -145,6 +145,9 @@ class AutomaticMesh:
         mesh: Mesh
             Mesh
         """
+        if self.mesh_parameters.is_complete is False:
+            parallel_print("Skipping mesh generation, since we don't have all the parameters", comm=self.comm)
+            return None
         parallel_print(f"Creating {self.mesh_type} type mesh.", comm=self.comm)
         if self.mesh_type == "firedrake_mesh":
             return self.create_firedrake_mesh()
