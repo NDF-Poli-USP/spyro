@@ -377,9 +377,9 @@ def test_loop_eikonal_2d():
 
             thr_val = 83.333  # in ms
             assert isclose(min_eik / thr_val, 1., atol=5e-3), \
-                f"❌ Minimum Eikonal 2D Element-{ele_type} " + \
+                f"✗ Minimum Eikonal 2D Element-{ele_type} " + \
                 f"→ Expected value {thr_val}, got {min_eik:.3f}"
-            print(f"✅ Minimum Eikonal 2D Verified: expected "
+            print(f"✓ Minimum Eikonal 2D Verified: expected "
                   f"{thr_val}, got = {min_eik:.3f}", flush=True)
 
         except fire.ConvergenceError as e:

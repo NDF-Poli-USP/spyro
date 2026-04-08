@@ -141,10 +141,6 @@ class Wave(Model_parameters, metaclass=ABCMeta):
         """Build parameters that are derived from the mesh."""
         self._build_function_space()
         self._map_sources_and_receivers()
-        element = self.function_space.ufl_element()
-        space_dim = element.reference_value_size
-        if space_dim == 1:
-            self.representative_mesh_dimensions()
 
     def set_mesh(
             self,
