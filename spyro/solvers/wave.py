@@ -399,13 +399,15 @@ class Wave(Model_parameters, metaclass=ABCMeta):
     @abstractmethod
     def get_function(self):
         """Returns the function (e.g., pressure or displacement) associated with the
-        wave object without additional variables (e.g., PML variables)"""
+        wave object without additional variables (e.g., PML variables)
+        """
         pass
 
     @abstractmethod
     def get_function_name(self):
         """Returns the string representing the function of the wave object (e.g.,
-        "pressure" or "displacement")"""
+        "pressure" or "displacement")
+        """
         pass
 
     def update_source_expression(self, t):
@@ -459,7 +461,8 @@ class Wave(Model_parameters, metaclass=ABCMeta):
     @abstractmethod
     def rhs_no_pml(self):
         """Return the right-hand side Cofunction without PML DOFs (i.e., only the DOFs
-        associated with the subspace of the original problem)."""
+        associated with the subspace of the original problem).
+        """
         pass
 
     def set_material_properties(self, *args, **kwargs):

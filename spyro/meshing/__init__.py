@@ -1,4 +1,4 @@
-"Meshing based components."
+"""Meshing based components."""
 
 from .meshing_functions import RectangleMesh  # noqa: F401
 from .meshing_functions import PeriodicRectangleMesh, BoxMesh  # noqa: F401

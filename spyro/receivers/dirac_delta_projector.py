@@ -235,7 +235,8 @@ class Delta_projector:
     def __func_node_locations(self):
         """Function that returns a list which includes a numpy matrix where line n has
         the x and y values of the nth degree of freedom, and a numpy matrix of the
-        vertex coordinates."""
+        vertex coordinates.
+        """
         if self.dimension == 2:
             return self.__func_node_locations_2D()
         elif self.dimension == 3:
@@ -246,7 +247,8 @@ class Delta_projector:
     def __func_node_locations_2D(self):
         """Function that returns a list which includes a numpy matrix where line n has
         the x and y values of the nth degree of freedom, and a numpy matrix of the
-        vertex coordinates."""
+        vertex coordinates.
+        """
         z, x = SpatialCoordinate(self.mesh)  # noqa: F405
         ux = Function(self.space).interpolate(x)  # noqa: F405
         uz = Function(self.space).interpolate(z)  # noqa: F405
@@ -261,7 +263,8 @@ class Delta_projector:
     def __func_node_locations_3D(self):
         """Function that returns a list which includes a numpy matrix where line n has
         the x and y values of the nth degree of freedom, and a numpy matrix of the
-        vertex coordinates."""
+        vertex coordinates.
+        """
         x, y, z = SpatialCoordinate(self.mesh)  # noqa: F405
         ux = Function(self.space).interpolate(x)  # noqa: F405
         uy = Function(self.space).interpolate(y)  # noqa: F405
