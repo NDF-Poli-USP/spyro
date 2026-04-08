@@ -88,10 +88,10 @@ class HABC_Eikonal(Eikonal_Modeling):
         self.funct_space_eik = Wave.funct_space_eik
 
         # Mesh cell diameters
-        self.diam_mesh = Wave.diam_mesh
+        self.diam_mesh = Wave.mesh_parameters.diam_mesh
 
         # Minimum mesh size
-        self.lmin = Wave.lmin
+        self.lmin = Wave.mesh_parameters.lmin
 
         # Velocity profile model
         self.c = Wave.c

@@ -116,8 +116,15 @@ def test_representative_mesh_dimensions_2d(element_type, dimension):
     edge_length = 0.1
     Wave_obj.set_mesh(input_mesh_parameters={"edge_length": edge_length})
 
-    # Call the method
-    Wave_obj.representative_mesh_dimensions()
+    # Call the method and assign the outputs to the mesh_parameters object
+    mesh_derived_parameters = \
+        Wave_obj.mesh_ops.representative_mesh_dimensions(Wave_obj.mesh,
+                                                         Wave_obj.function_space)
+    Wave_obj.mesh_parameters.diam_mesh = mesh_derived_parameters[0]
+    Wave_obj.mesh_parameters.lmin = mesh_derived_parameters[1]
+    Wave_obj.mesh_parameters.lmax = mesh_derived_parameters[2]
+    Wave_obj.mesh_parameters.alpha = mesh_derived_parameters[3]
+    Wave_obj.mesh_parameters.tol = mesh_derived_parameters[4]
 
     # Print mesh info and computed values
     print("\nMesh Information:")
@@ -125,27 +132,32 @@ def test_representative_mesh_dimensions_2d(element_type, dimension):
     print(f"  - Number of cells: {Wave_obj.mesh.num_cells()}")
     print(f"  - Number of vertices: {Wave_obj.mesh.num_vertices()}")
     print("\nComputed representative mesh dimensions:")
-    print(f"  - diam_mesh: {Wave_obj.diam_mesh}")
-    print(f"  - lmin (minimum cell diameter): {Wave_obj.lmin:.8f}")
-    print(f"  - lmax (maximum cell diameter): {Wave_obj.lmax:.8f}")
-    print(f"  - alpha (lmax/lmin ratio): {Wave_obj.alpha:.6f}")
-    print(f"  - tol (tolerance): {Wave_obj.tol:.2e}")
+    print(f"  - lmin (minimum mesh size): {Wave_obj.mesh_parameters.lmin:.6f}")
+    print(f"  - lmax (maximum mesh size): {Wave_obj.mesh_parameters.lmax:.6f}")
+    print(f"  - alpha (lmax/lmin ratio): {Wave_obj.mesh_parameters.alpha:.6f}")
+    print(f"  - tol (tolerance): {Wave_obj.mesh_parameters.tol:.2e}")
 
     # Verify attributes are set
-    assert hasattr(Wave_obj, 'diam_mesh'), "diam_mesh attribute not set"
-    assert hasattr(Wave_obj, 'lmin'), "lmin attribute not set"
-    assert hasattr(Wave_obj, 'lmax'), "lmax attribute not set"
-    assert hasattr(Wave_obj, 'alpha'), "alpha attribute not set"
-    assert hasattr(Wave_obj, 'tol'), "tol attribute not set"
+    assert hasattr(Wave_obj.mesh_parameters, 'diam_mesh'), "'diam_mesh' not set"
+    assert hasattr(Wave_obj.mesh_parameters, 'lmin'), "'lmin' not set"
+    assert hasattr(Wave_obj.mesh_parameters, 'lmax'), "'lmax' not set"
+    assert hasattr(Wave_obj.mesh_parameters, 'alpha'), "'alpha' not set"
+    assert hasattr(Wave_obj.mesh_parameters, 'tol'), "'tol' not set"
 
     # Verify values are reasonable
-    assert Wave_obj.lmin > 0, f"lmin should be positive, got {Wave_obj.lmin}"
-    assert Wave_obj.lmax > 0, f"lmax should be positive, got {Wave_obj.lmax}"
-    assert Wave_obj.lmin <= Wave_obj.lmax, \
-        f"lmin ({Wave_obj.lmin}) should be <= lmax ({Wave_obj.lmax})"
-    assert Wave_obj.alpha >= 1., f"alpha should be >= 1, got {Wave_obj.alpha}"
-    assert Wave_obj.tol > 0, f"tol should be positive, got {Wave_obj.tol}"
-    assert Wave_obj.tol <= 1e-6, f"tol should be small, got {Wave_obj.tol}"
+    assert Wave_obj.mesh_parameters.lmin > 0, \
+        f"lmin should be positive, got {Wave_obj.mesh_parameters.lmin}"
+    assert Wave_obj.mesh_parameters.lmax > 0,\
+        f"lmax should be positive, got {Wave_obj.mesh_parameters.lmax}"
+    assert Wave_obj.mesh_parameters.lmin <= Wave_obj.mesh_parameters.lmax, \
+        f"lmin ({Wave_obj.mesh_parameters.lmin}) should " + \
+        f"be <= lmax ({Wave_obj.mesh_parameters.lmax})"
+    assert Wave_obj.mesh_parameters.alpha >= 1., \
+        f"alpha should be >= 1, got {Wave_obj.mesh_parameters.alpha}"
+    assert Wave_obj.mesh_parameters.tol > 0,\
+        f"tol should be positive, got {Wave_obj.mesh_parameters.tol}"
+    assert Wave_obj.mesh_parameters.tol <= 1e-6,\
+        f"tol should be small, got {Wave_obj.mesh_parameters.tol}"
     expected_lmin = expected_lmax = 0.1
-    assert isclose(Wave_obj.lmin, expected_lmin, rtol=1e-6)
-    assert isclose(Wave_obj.lmax, expected_lmax, rtol=1e-6)
+    assert isclose(Wave_obj.mesh_parameters.lmin, expected_lmin, rtol=1e-6)
+    assert isclose(Wave_obj.mesh_parameters.lmax, expected_lmax, rtol=1e-6)

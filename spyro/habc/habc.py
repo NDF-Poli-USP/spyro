@@ -445,12 +445,12 @@ class HABC_Wave(AcousticWave, HABC_Mesh, RectangLayer,
         # Computing layer sizes
         self.F_L, self.pad_len, self.ele_pad, self.d_norm, \
             self.a_par, self.FLpos = calc_size_lay(
-                self.freq_ref, z_par, self.lmin, self.lref,
+                self.freq_ref, z_par, self.mesh_parameters.lmin, self.lref,
                 n_root=n_root, layer_based_on_mesh=layer_based_on_mesh)
 
         plot_function_layer_size([self.a_par, z_par],
                                  [self.freq_ref, self.frequency],
-                                 [self.lmin, self.lref], self.FLpos,
+                                 [self.mesh_parameters.lmin, self.lref], self.FLpos,
                                  output_folder=self.path_case_habc)
 
         print("\nDetermining New Geometry with Absorbing Layer", flush=True)
@@ -473,7 +473,8 @@ class HABC_Wave(AcousticWave, HABC_Mesh, RectangLayer,
             print("Determining Hypershape Layer Parameters", flush=True)
 
             # Geometric properties of the hypershape layer
-            self.calc_hyp_geom_prop(dom_lay_full, self.pad_len, self.lmin)
+            self.calc_hyp_geom_prop(dom_lay_full, self.pad_len,
+                                    self.mesh_parameters.lmin)
 
         # Domain dimensions with free surface truncation
         dom_lay_trunc = self.habc_domain_dimensions(only_habc_dom=True,
@@ -483,7 +484,8 @@ class HABC_Wave(AcousticWave, HABC_Mesh, RectangLayer,
         layer_par = (self.F_L, self.a_par, self.d_norm)
 
         # mesh parameters
-        mesh_par = (self.lmin, self.lmax, self.alpha, self.variant)
+        mesh_par = (self.mesh_parameters.lmin, self.mesh_parameters.lmax,
+                    self.mesh_parameters.alpha, self.variant)
 
         # wave parameters
         c_ref = min([bnd[1] for bnd in self.eik_bnd])
@@ -1042,7 +1044,8 @@ class HABC_Wave(AcousticWave, HABC_Mesh, RectangLayer,
         add_dom -= dist_to_bnd
 
         # Pad length for the infinite domain extension
-        infinite_pad_len = self.lmin * np.ceil(add_dom / self.lmin)
+        infinite_pad_len = self.mesh_parameters.lmin * \
+            np.ceil(add_dom / self.mesh_parameters.lmin)
 
         return infinite_pad_len
 
