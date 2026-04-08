@@ -147,16 +147,16 @@ def test_representative_mesh_dimensions_2d(element_type, dimension):
     # Verify values are reasonable
     assert Wave_obj.mesh_parameters.lmin > 0, \
         f"lmin should be positive, got {Wave_obj.mesh_parameters.lmin}"
-    assert Wave_obj.mesh_parameters.lmax > 0,\
+    assert Wave_obj.mesh_parameters.lmax > 0, \
         f"lmax should be positive, got {Wave_obj.mesh_parameters.lmax}"
     assert Wave_obj.mesh_parameters.lmin <= Wave_obj.mesh_parameters.lmax, \
         f"lmin ({Wave_obj.mesh_parameters.lmin}) should " + \
         f"be <= lmax ({Wave_obj.mesh_parameters.lmax})"
     assert Wave_obj.mesh_parameters.alpha >= 1., \
         f"alpha should be >= 1, got {Wave_obj.mesh_parameters.alpha}"
-    assert Wave_obj.mesh_parameters.tol > 0,\
+    assert Wave_obj.mesh_parameters.tol > 0, \
         f"tol should be positive, got {Wave_obj.mesh_parameters.tol}"
-    assert Wave_obj.mesh_parameters.tol <= 1e-6,\
+    assert Wave_obj.mesh_parameters.tol <= 1e-6, \
         f"tol should be small, got {Wave_obj.mesh_parameters.tol}"
     expected_lmin = expected_lmax = 0.1
     assert isclose(Wave_obj.mesh_parameters.lmin, expected_lmin, rtol=1e-6)
