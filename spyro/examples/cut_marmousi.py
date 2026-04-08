@@ -2,9 +2,7 @@ from spyro import create_transect
 from spyro.examples.example_model import Example_model_acoustic
 
 cut_marmousi_optimization_parameters = {
-    "General": {
-        "Secant": {"Type": "Limited-Memory BFGS", "Maximum Storage": 10}
-    },
+    "General": {"Secant": {"Type": "Limited-Memory BFGS", "Maximum Storage": 10}},
     "Step": {
         "Type": "Augmented Lagrangian",
         "Augmented Lagrangian": {

@@ -154,10 +154,7 @@ class Read_options:
             self._cell_type = canonical
         elif value in quadrilateral_equivalents:
             canonical = "quadrilateral"
-            if (
-                self.method is not None
-                and self.method not in quadrilateral_methods
-            ):
+            if self.method is not None and self.method not in quadrilateral_methods:
                 raise ValueError(
                     f"Cell type '{canonical}' is not "
                     f"compatible with method '{self.method}'."
@@ -224,9 +221,7 @@ class Read_outputs:
         self.input_dictionary[v_str].setdefault(
             "gradient_filename", "results/gradient.pvd"
         )
-        self.gradient_filename = self.input_dictionary[v_str][
-            "gradient_filename"
-        ]
+        self.gradient_filename = self.input_dictionary[v_str]["gradient_filename"]
         self.input_dictionary[v_str].setdefault("adjoint_output", False)
         self.adjoint_output = self.input_dictionary[v_str]["adjoint_output"]
         self.input_dictionary[v_str].setdefault(

@@ -96,10 +96,7 @@ class ForwardSolver:
         J_val = 0.0
         receiver_data = []
         total_steps = (
-            int(
-                self.model["time_axis"]["final_time"]
-                / self.model["time_axis"]["dt"]
-            )
+            int(self.model["time_axis"]["final_time"] / self.model["time_axis"]["dt"])
             + 1
         )
         if (
@@ -122,13 +119,10 @@ class ForwardSolver:
             if compute_functional:
                 if not true_data_receivers:
                     raise ValueError(
-                        "True receiver data is required for"
-                        "computing the functional."
+                        "True receiver data is required for" "computing the functional."
                     )
                 misfit = rec_data - true_data_receivers[step]
-                J_val += fire.assemble(
-                    0.5 * fire.inner(misfit, misfit) * fire.dx
-                )
+                J_val += fire.assemble(0.5 * fire.inner(misfit, misfit) * fire.dx)
         self.solution = u_np1
         return receiver_data, J_val
 

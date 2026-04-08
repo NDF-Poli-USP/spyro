@@ -44,16 +44,12 @@ class IsotropicWave(ElasticWave):
         # Variables for logging the P-wave
         self.p_wave = None
         self.D_h = None
-        self.field_logger.add_field(
-            "p-wave", "P-wave", lambda: self.update_p_wave()
-        )
+        self.field_logger.add_field("p-wave", "P-wave", lambda: self.update_p_wave())
 
         # Variables for logging the S-wave
         self.s_wave = None
         self.C_h = None
-        self.field_logger.add_field(
-            "s-wave", "S-wave", lambda: self.update_s_wave()
-        )
+        self.field_logger.add_field("s-wave", "S-wave", lambda: self.update_s_wave())
 
         self.mechanical_energy = None
         self.field_logger.add_functional(
@@ -61,9 +57,7 @@ class IsotropicWave(ElasticWave):
         )
 
     @override
-    def initialize_model_parameters_from_object(
-        self, synthetic_data_dict: dict
-    ):
+    def initialize_model_parameters_from_object(self, synthetic_data_dict: dict):
         def constant_wrapper(value):
             if np.isscalar(value):
                 return Constant(value)
@@ -171,16 +165,10 @@ class IsotropicWave(ElasticWave):
         self.current_time = 0.0
 
         self.u_n = Function(self.function_space, name=self.get_function_name())
-        self.u_nm1 = Function(
-            self.function_space, name=self.get_function_name()
-        )
-        self.u_np1 = Function(
-            self.function_space, name=self.get_function_name()
-        )
+        self.u_nm1 = Function(self.function_space, name=self.get_function_name())
+        self.u_np1 = Function(self.function_space, name=self.get_function_name())
 
-        abc_dict = self.input_dictionary.get(
-            "absorving_boundary_conditions", None
-        )
+        abc_dict = self.input_dictionary.get("absorving_boundary_conditions", None)
         if abc_dict is not None:
             abc_active = abc_dict.get("status", False)
             if abc_active:
@@ -237,9 +225,7 @@ class IsotropicWave(ElasticWave):
             elif tag == "uy":
                 subspace = self.function_space.sub(2)
             else:
-                raise Exception(
-                    f"Unsupported boundary condition with tag: {tag}"
-                )
+                raise Exception(f"Unsupported boundary condition with tag: {tag}")
             self.bcs.append(DirichletBC(subspace, value, idbc))
 
     def parse_volumetric_forces(self):

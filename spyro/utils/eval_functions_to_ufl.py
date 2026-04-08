@@ -84,14 +84,10 @@ def generate_ufl_functions(mesh, expression, dimension):
         )
 
         if not isinstance(node, allowed_node_types):
-            raise ValueError(
-                f"Disallowed syntax element: {type(node).__name__}"
-            )
+            raise ValueError(f"Disallowed syntax element: {type(node).__name__}")
 
         if not isinstance(node, allowed_node_types):
-            raise ValueError(
-                f"Disallowed syntax element: {type(node).__name__}"
-            )
+            raise ValueError(f"Disallowed syntax element: {type(node).__name__}")
 
         # Validate function calls
         if isinstance(node, ast.Call):

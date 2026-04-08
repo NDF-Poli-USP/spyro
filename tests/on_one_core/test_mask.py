@@ -143,15 +143,11 @@ def test_mask():
 
     # Checking results in mask
     for result in masked_results:
-        assert np.isclose(
-            result, 0.0
-        ), f"Inverted DG mask not zero, but {result}"
+        assert np.isclose(result, 0.0), f"Inverted DG mask not zero, but {result}"
 
     # Checking interior points
     for result in unmasked_results:
-        assert np.isclose(
-            result, 1.0
-        ), f"Inverted DG mask interior not 1, but {result}"
+        assert np.isclose(result, 1.0), f"Inverted DG mask interior not 1, but {result}"
 
     assert True
 

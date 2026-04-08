@@ -54,9 +54,7 @@ model["acquisition"] = {
     "frequency": 5.0,
     "delay": 1.0,
     "num_receivers": 15,
-    "receiver_locations": spyro.create_transect(
-        (-5.72, 6.29), (-5.72, 14.29), 15
-    ),
+    "receiver_locations": spyro.create_transect((-5.72, 6.29), (-5.72, 14.29), 15),
 }
 
 # Simulate for 1.0 seconds.
@@ -115,9 +113,7 @@ if comm.comm.rank == 0:
 
 mesh = fire.Mesh(
     "meshes/benchmark_2d.msh",
-    distribution_parameters={
-        "overlap_type": (fire.DistributedMeshOverlapType.NONE, 0)
-    },
+    distribution_parameters={"overlap_type": (fire.DistributedMeshOverlapType.NONE, 0)},
 )
 
 method = model["opts"]["method"]
@@ -126,9 +122,7 @@ degree = model["opts"]["degree"]
 if comm.ensemble_comm.rank == 0 and comm.comm.rank == 0:
     print(f"Setting up {method} a {degree}tetra element", flush=True)
 
-element = fire.FiniteElement(
-    method, mesh.ufl_cell(), degree=degree, variant="KMV"
-)
+element = fire.FiniteElement(method, mesh.ufl_cell(), degree=degree, variant="KMV")
 
 V = fire.FunctionSpace(mesh, element)
 
@@ -150,7 +144,5 @@ wavelet = spyro.full_ricker_wavelet(
 )
 
 t1 = time.time()
-p, p_r = spyro.solvers.forward(
-    model, mesh, comm, vp, sources, wavelet, receivers
-)
+p, p_r = spyro.solvers.forward(model, mesh, comm, vp, sources, wavelet, receivers)
 print(time.time() - t1, flush=True)

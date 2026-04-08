@@ -62,10 +62,7 @@ def make_c_camembert(V, mesh, c_guess=False, plot_c=False):
     else:
         c = fire.Function(V).interpolate(
             2.5
-            + 1
-            * fire.tanh(
-                100 * (0.125 - fire.sqrt((x - 0.5) ** 2 + (z - 0.5) ** 2))
-            )
+            + 1 * fire.tanh(100 * (0.125 - fire.sqrt((x - 0.5) ** 2 + (z - 0.5) ** 2)))
         )
     if plot_c:
         outfile = fire.VTKFile("acoustic_cp.pvd")
@@ -86,8 +83,7 @@ def forward(
         fire_ad.continue_annotation()
         if model["aut_dif"]["checkpointing"]:
             total_steps = (
-                int(model["time_axis"]["final_time"] / model["time_axis"]["dt"])
-                + 1
+                int(model["time_axis"]["final_time"] / model["time_axis"]["dt"]) + 1
             )
             steps_store = int(total_steps / 10)  # Store 10% of the steps.
             tape = fire_ad.get_working_tape()
@@ -145,9 +141,7 @@ def test_taylor():
 
     # :class:`~.EnsembleReducedFunctional` is employed to recompute in
     # parallel the functional and its gradient associated.
-    J_hat = fire_ad.EnsembleReducedFunctional(
-        J, fire_ad.Control(c_guess), my_ensemble
-    )
+    J_hat = fire_ad.EnsembleReducedFunctional(J, fire_ad.Control(c_guess), my_ensemble)
     h = fire.Function(V)
     h.dat.data[:] = rand(V.dim())
     assert fire_ad.taylor_test(J_hat, c_guess, h) > 1.9

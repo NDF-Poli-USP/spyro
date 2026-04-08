@@ -105,9 +105,7 @@ class Delta_projector:
             List of tabulations for each receiver
         """
         for rid in range(self.number_of_points):
-            cell_id = self.mesh.locate_cell(
-                self.point_locations[rid], tolerance=1e-6
-            )
+            cell_id = self.mesh.locate_cell(self.point_locations[rid], tolerance=1e-6)
             self.is_local[rid] = cell_id
 
         (
@@ -436,9 +434,7 @@ def choosing_geometry(cell_geometry):
     """
     if cell_geometry == quadrilateral:  # noqa: F405
         T = UFCQuadrilateral()
-        raise ValueError(
-            "Point interpolation for quads implemented somewhere else."
-        )
+        raise ValueError("Point interpolation for quads implemented somewhere else.")
 
     elif cell_geometry == triangle:  # noqa: F405
         T = UFCTriangle()
@@ -490,9 +486,7 @@ def get_hexa_real_cell_node_map(V, mesh):
     ufl_element = V.ufl_element()
     _, p = ufl_element.degree()
 
-    cell_node_map = np.zeros(
-        (layers * cells_per_layer, nodes_per_cell), dtype=int
-    )
+    cell_node_map = np.zeros((layers * cells_per_layer, nodes_per_cell), dtype=int)
     print(f"cnm size : {np.shape(cell_node_map)}", flush=True)
 
     for layer in range(layers):

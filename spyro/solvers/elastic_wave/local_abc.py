@@ -46,9 +46,7 @@ def local_abc_form(Wave):
         uz_dt = (u[iz] - u_nm1[iz]) / (2 * dt)
         ux_dt = (u[ix] - u_nm1[ix]) / (2 * dt)
     else:
-        raise NotImplementedError(
-            f"Unsupported time discretization: {dt_scheme}"
-        )
+        raise NotImplementedError(f"Unsupported time discretization: {dt_scheme}")
     uz_dz = u_n[iz].dx(iz)
     uz_dx = u_n[iz].dx(ix)
     ux_dz = u_n[ix].dx(iz)
@@ -175,22 +173,14 @@ def clayton_engquist_A1_terms(
         # Plane y = 0
         sig_zy = rho * c_s * uz_dt + rho * (c_s**2) * uy_dz
         sig_xy = rho * c_s * ux_dt + rho * (c_s**2) * uy_dx
-        sig_yy = rho * c_p * uy_dt + rho * (c_p**2 - 2 * c_s**2) * (
-            uz_dz + ux_dx
-        )
-        F_t += -(sig_zy * v[iz] + sig_xy * v[ix] + sig_yy * v[iy]) * ds(
-            5, **qr_s
-        )
+        sig_yy = rho * c_p * uy_dt + rho * (c_p**2 - 2 * c_s**2) * (uz_dz + ux_dx)
+        F_t += -(sig_zy * v[iz] + sig_xy * v[ix] + sig_yy * v[iy]) * ds(5, **qr_s)
 
         # Plane y = L_y + 2*pad
         sig_zy = -rho * c_s * uz_dt + rho * (c_s**2) * uy_dz
         sig_xy = -rho * c_s * ux_dt + rho * (c_s**2) * uy_dx
-        sig_yy = -rho * c_p * uy_dt + rho * (c_p**2 - 2 * c_s**2) * (
-            uz_dz + ux_dx
-        )
-        F_t += (sig_zy * v[iz] + sig_xy * v[ix] + sig_yy * v[iy]) * ds(
-            6, **qr_s
-        )
+        sig_yy = -rho * c_p * uy_dt + rho * (c_p**2 - 2 * c_s**2) * (uz_dz + ux_dx)
+        F_t += (sig_zy * v[iz] + sig_xy * v[ix] + sig_yy * v[iy]) * ds(6, **qr_s)
 
     return F_t
 
@@ -265,21 +255,13 @@ def stacey_terms(
         # Plane y = 0
         sig_zy = rho * c_s * uz_dt - rho * c_s * (c_p - 2 * c_s) * uy_dz
         sig_xy = rho * c_s * ux_dt - rho * c_s * (c_p - 2 * c_s) * uy_dx
-        sig_yy = rho * c_p * uy_dt + rho * c_s * (c_p - 2 * c_s) * (
-            uz_dz + ux_dx
-        )
-        F_t += -(sig_zy * v[iz] + sig_xy * v[ix] + sig_yy * v[iy]) * ds(
-            5, **qr_s
-        )
+        sig_yy = rho * c_p * uy_dt + rho * c_s * (c_p - 2 * c_s) * (uz_dz + ux_dx)
+        F_t += -(sig_zy * v[iz] + sig_xy * v[ix] + sig_yy * v[iy]) * ds(5, **qr_s)
 
         # Plane y = L_y + 2*pad
         sig_zy = -rho * c_s * uz_dt - rho * c_s * (c_p - 2 * c_s) * uy_dz
         sig_xy = -rho * c_s * ux_dt - rho * c_s * (c_p - 2 * c_s) * uy_dx
-        sig_yy = -rho * c_p * uy_dt + rho * c_s * (c_p - 2 * c_s) * (
-            uz_dz + ux_dx
-        )
-        F_t += (sig_zy * v[iz] + sig_xy * v[ix] + sig_yy * v[iy]) * ds(
-            6, **qr_s
-        )
+        sig_yy = -rho * c_p * uy_dt + rho * c_s * (c_p - 2 * c_s) * (uz_dz + ux_dx)
+        F_t += (sig_zy * v[iz] + sig_xy * v[ix] + sig_yy * v[iy]) * ds(6, **qr_s)
 
     return F_t

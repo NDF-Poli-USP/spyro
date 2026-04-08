@@ -230,9 +230,7 @@ class Objective(RObjective):
         """
         vp = self.inversion_obj.initial_velocity_model
         vp.assign(
-            fire.Function(
-                self.inversion_obj.function_space, x.vec, name="velocity"
-            )
+            fire.Function(self.inversion_obj.function_space, x.vec, name="velocity")
         )
 
 
@@ -362,9 +360,7 @@ class FullWaveformInversion(AcousticWave):
                     "Subproblem Step Type": "Line Search",
                     "Subproblem Iteration Limit": 5.0,
                 },
-                "Line Search": {
-                    "Descent Method": {"Type": "Quasi-Newton Step"}
-                },
+                "Line Search": {"Descent Method": {"Type": "Quasi-Newton Step"}},
             },
             "Status Test": {
                 "Gradient Tolerance": 1e-16,
@@ -373,39 +369,25 @@ class FullWaveformInversion(AcousticWave):
             },
         }
         self.input_dictionary.setdefault("inversion", {})
-        self.input_dictionary["inversion"].setdefault(
-            "initial_guess_model_file", None
-        )
+        self.input_dictionary["inversion"].setdefault("initial_guess_model_file", None)
         self.input_dictionary["inversion"].setdefault(
             "optimization_parameters", default_optimization_parameters
         )
-        self.input_dictionary["inversion"].setdefault(
-            "real_shot_record_file", None
-        )
+        self.input_dictionary["inversion"].setdefault("real_shot_record_file", None)
         self.input_dictionary["inversion"].setdefault(
             "control_output_file", "fwi/control.pvd"
         )
         self.input_dictionary["inversion"].setdefault(
             "gradient_output_file", "fwi/gradient.pvd"
         )
-        self.input_dictionary["inversion"].setdefault(
-            "real_velocity_model_file", None
-        )
+        self.input_dictionary["inversion"].setdefault("real_velocity_model_file", None)
         inversion_dictionary = self.input_dictionary["inversion"]
 
         self.real_velocity_model = None
-        self.real_velocity_model_file = inversion_dictionary[
-            "real_velocity_model_file"
-        ]
-        self.real_shot_record_files = inversion_dictionary[
-            "real_shot_record_file"
-        ]
-        self.control_out = fire.VTKFile(
-            inversion_dictionary["control_output_file"]
-        )
-        self.gradient_out = fire.VTKFile(
-            inversion_dictionary["gradient_output_file"]
-        )
+        self.real_velocity_model_file = inversion_dictionary["real_velocity_model_file"]
+        self.real_shot_record_files = inversion_dictionary["real_shot_record_file"]
+        self.control_out = fire.VTKFile(inversion_dictionary["control_output_file"])
+        self.gradient_out = fire.VTKFile(inversion_dictionary["gradient_output_file"])
         self.guess_shot_record = None
         self.gradient = None
         self.current_iteration = 0
@@ -445,9 +427,7 @@ class FullWaveformInversion(AcousticWave):
         """
         if value is not None:
             if not os.path.exists(value):
-                raise FileNotFoundError(
-                    f"Velocity model file '{value}' does not exist"
-                )
+                raise FileNotFoundError(f"Velocity model file '{value}' does not exist")
         self._real_velocity_model_file = value
 
     @property
@@ -481,9 +461,7 @@ class FullWaveformInversion(AcousticWave):
         if value is not None:
             # Check if it's a file prefix pattern by looking for matching files
             if not os.path.exists(value) and not glob.glob(value + "*"):
-                raise FileNotFoundError(
-                    f"Shot record file '{value}' does not exist"
-                )
+                raise FileNotFoundError(f"Shot record file '{value}' does not exist")
         self._real_shot_record_files = value
         self.control_out = fire.VTKFile("results/control.pvd")
         self.gradient_out = fire.VTKFile("results/gradient.pvd")
@@ -536,8 +514,7 @@ class FullWaveformInversion(AcousticWave):
                 switch_serial_shot(self, snum)
                 guess_shot_record_list.append(self.forward_solution_receivers)
                 misfit_list.append(
-                    self.real_shot_record[snum]
-                    - self.forward_solution_receivers
+                    self.real_shot_record[snum] - self.forward_solution_receivers
                 )
             self.guess_shot_record = guess_shot_record_list
             self.misfit = misfit_list
@@ -589,9 +566,7 @@ class FullWaveformInversion(AcousticWave):
         if Wave_obj_real_velocity.mesh is None and self.real_mesh is not None:
             Wave_obj_real_velocity.mesh = self.real_mesh
         if Wave_obj_real_velocity.initial_velocity_model is None:
-            Wave_obj_real_velocity.initial_velocity_model = (
-                self.real_velocity_model
-            )
+            Wave_obj_real_velocity.initial_velocity_model = self.real_velocity_model
 
         if (
             plot_model
@@ -839,9 +814,7 @@ class FullWaveformInversion(AcousticWave):
                 flush=True,
             )
             with open("functional_values.txt", "a") as file:
-                file.write(
-                    f"Iteration: {self.current_iteration}, Functional: {Jm}\n"
-                )
+                file.write(f"Iteration: {self.current_iteration}, Functional: {Jm}\n")
 
             with open("peak_memory.txt", "a") as file:
                 file.write(f"Peak memory usage: {peak_memory_mb:.2f} MB \n")
@@ -883,9 +856,7 @@ class FullWaveformInversion(AcousticWave):
         self._apply_gradient_mask()
         if save:
             # self.gradient_out.write(dJ_total)
-            output = fire.File(
-                "gradient_" + str(self.current_iteration) + ".pvd"
-            )
+            output = fire.File("gradient_" + str(self.current_iteration) + ".pvd")
             output.write(self.gradient)
         self.current_iteration += 1
         comm.comm.barrier()
@@ -1043,9 +1014,7 @@ class FullWaveformInversion(AcousticWave):
                         "Subproblem Step Type": "Line Search",
                         "Subproblem Iteration Limit": 5.0,
                     },
-                    "Line Search": {
-                        "Descent Method": {"Type": "Quasi-Newton Step"}
-                    },
+                    "Line Search": {"Descent Method": {"Type": "Quasi-Newton Step"}},
                 },
                 "Status Test": {
                     "Gradient Tolerance": 1e-16,
@@ -1128,9 +1097,7 @@ class FullWaveformInversion(AcousticWave):
         self.has_gradient_mask = True
 
         if self.abc_active is False and boundaries is None:
-            raise ValueError(
-                "If no abc boundary please define boundaries for the mask"
-            )
+            raise ValueError("If no abc boundary please define boundaries for the mask")
         elif self.abc_active and boundaries is None:
             mask_obj = Gradient_mask_for_pml(self)
         elif self.abc_active and boundaries is not None:
@@ -1201,9 +1168,7 @@ class FullWaveformInversion(AcousticWave):
         The @run_in_one_core decorator ensures this operation runs on a single
         MPI rank to avoid conflicts.
         """
-        create_segy(
-            self.vp_result, self.function_space, grid_spacing, file_name
-        )
+        create_segy(self.vp_result, self.function_space, grid_spacing, file_name)
 
 
 class SyntheticRealAcousticWave(AcousticWave):

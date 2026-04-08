@@ -54,9 +54,7 @@ def run_forward():
         "source_locations": [(-0.1, 0.5)],
         "frequency": 5.0,
         "delay": 0.3,
-        "receiver_locations": spyro.create_transect(
-            (-0.15, 0.1), (-0.15, 0.9), 50
-        ),
+        "receiver_locations": spyro.create_transect((-0.15, 0.1), (-0.15, 0.9), 50),
         "delay_type": "time",
     }
 
@@ -92,9 +90,7 @@ def run_forward():
     Wave_obj.set_mesh(input_mesh_parameters={"edge_length": 0.02})
 
     z = Wave_obj.mesh_z
-    cond = fire.conditional(
-        z > -0.333, 1.5, fire.conditional(z > -0.667, 3.0, 4.5)
-    )
+    cond = fire.conditional(z > -0.333, 1.5, fire.conditional(z > -0.667, 3.0, 4.5))
     Wave_obj.set_initial_velocity_model(conditional=cond)
     Wave_obj.forward_solve()
 

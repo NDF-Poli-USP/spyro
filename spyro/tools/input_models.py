@@ -111,9 +111,7 @@ def set_mesh_type(method):
     elif method == "spectral_quadrilateral":
         mesh_type = "firedrake_mesh"
     else:
-        raise ValueError(
-            "Method is not mass_lumped_triangle or spectral_quadrilateral"
-        )
+        raise ValueError("Method is not mass_lumped_triangle or spectral_quadrilateral")
     return mesh_type
 
 
@@ -164,9 +162,7 @@ def create_initial_model_for_meshing_parameter_2D(Meshing_calc_obj):
             Meshing_calc_obj
         )
     else:
-        raise ValueError(
-            "Velocity profile type is not homogeneous or heterogeneous"
-        )
+        raise ValueError("Velocity profile type is not homogeneous or heterogeneous")
 
 
 def create_initial_model_for_meshing_parameter_2D_heterogeneous(
@@ -272,9 +268,7 @@ def create_initial_model_for_meshing_parameter_3D(Meshing_calc_obj):
         raise NotImplementedError("Not yet implemented")
         # return create_initial_model_for_meshing_parameter_3D_heterogeneous(Meshing_calc_obj)
     else:
-        raise ValueError(
-            "Velocity profile type is not homogeneous or heterogeneous"
-        )
+        raise ValueError("Velocity profile type is not homogeneous or heterogeneous")
 
 
 def create_initial_model_for_meshing_parameter_2D_homogeneous(Meshing_calc_obj):

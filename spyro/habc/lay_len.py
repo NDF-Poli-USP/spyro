@@ -69,9 +69,7 @@ def f_layer(x, a, m=1, s=0.999, typ="FL"):
     ax2 = s / ax1
     ax3 = (2 * np.pi * x / a) * AS
     RF = abs(
-        np.exp(-s * ax0)
-        * (np.cos(ax1 * ax0) + ax2 * np.sin(ax1 * ax0))
-        * np.cos(ax3)
+        np.exp(-s * ax0) * (np.cos(ax1 * ax0) + ax2 * np.sin(ax1 * ax0)) * np.cos(ax3)
     )
 
     if typ == "FL":
@@ -111,8 +109,7 @@ def calc_zero(xini, a, tol, nz=1):
 
         # Identifying neighborhood of the root
         if (
-            abs(f_layer(x, a)) <= f_tol
-            or f_layer(x, a) * f_layer(x - f_tol, a) < 0
+            abs(f_layer(x, a)) <= f_tol or f_layer(x, a) * f_layer(x - f_tol, a) < 0
         ) and x > xini + f_tol:
 
             # Adjusting initial guess and tolerance
@@ -127,9 +124,7 @@ def calc_zero(xini, a, tol, nz=1):
     return x
 
 
-def loop_roots(
-    a, lmin, lref, max_roots, tol_rel=1e-3, show_ig=True, monitor=False
-):
+def loop_roots(a, lmin, lref, max_roots, tol_rel=1e-3, show_ig=True, monitor=False):
     """Loop to calculate the size parameter for the absorbing layer.
 
     Parameters
@@ -158,9 +153,7 @@ def loop_roots(
     # Initial guess
     FLmin = 0.5 * lmin / lref
     if show_ig:
-        print(
-            "Initial Guess for Size Parameter: {:.4f}".format(FLmin), flush=True
-        )
+        print("Initial Guess for Size Parameter: {:.4f}".format(FLmin), flush=True)
 
     # Number of digits to round the size parameter
     dig_x = 13
@@ -274,9 +267,7 @@ def calc_size_lay(
     print("Options for Layer Size (km): [{}]".format(format_lay), flush=True)
     format_ele = [int(x * lref / lmin) for x in FLpos]
     print(
-        "Aprox. Number of Elements ({:.3f} km) in Layer: {}".format(
-            lmin, format_ele
-        ),
+        "Aprox. Number of Elements ({:.3f} km) in Layer: {}".format(lmin, format_ele),
         flush=True,
     )
 

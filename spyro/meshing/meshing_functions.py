@@ -210,12 +210,8 @@ class AutomaticMesh:
                 self.cpw, self.minimum_velocity, self.source_frequency
             )
         if self.abc_pad:
-            nx = int(
-                round((self.length_x + 2 * self.abc_pad) / self.edge_length, 0)
-            )
-            nz = int(
-                round((self.length_z + self.abc_pad) / self.edge_length, 0)
-            )
+            nx = int(round((self.length_x + 2 * self.abc_pad) / self.edge_length, 0))
+            nz = int(round((self.length_z + self.abc_pad) / self.edge_length, 0))
         else:
             nx = int(round(self.length_x / self.edge_length, 0))
             nz = int(round(self.length_z / self.edge_length, 0))
@@ -424,9 +420,7 @@ class AutomaticMesh:
 
         edge_length = self.edge_length
         if edge_length is None:
-            edge_length = self.minimum_velocity / (
-                self.source_frequency * self.cpw
-            )
+            edge_length = self.minimum_velocity / (self.source_frequency * self.cpw)
 
         bbox = (-real_lz, 0.0, -pad, real_lx - pad)
         rectangle = SeismicMesh.Rectangle(bbox)
@@ -511,9 +505,7 @@ def calculate_edge_length(cpw, minimum_velocity, frequency):
     return edge_length
 
 
-def RectangleMesh(
-    nx, ny, length_x, length_y, pad=None, comm=None, quadrilateral=False
-):
+def RectangleMesh(nx, ny, length_x, length_y, pad=None, comm=None, quadrilateral=False):
     """Create a rectangle mesh based on the Firedrake mesh.
 
     First axis is negative, second axis is positive. If there is a pad, both
@@ -605,9 +597,7 @@ def PeriodicRectangleMesh(
     return mesh
 
 
-def BoxMesh(
-    nx, ny, nz, length_x, length_y, length_z, pad=None, quadrilateral=False
-):
+def BoxMesh(nx, ny, nz, length_x, length_y, length_z, pad=None, quadrilateral=False):
     """Create a 3D box mesh based on Firedrake mesh utilities.
 
     Parameters
@@ -693,9 +683,7 @@ def vp_to_sizing(vp, cpw, frequency):
     if cpw < 0.0 or cpw == 0.0:
         raise ValueError(f"Cells-per-wavelength value of {cpw} not supported.")
     if frequency < 0.0 or frequency == 0.0:
-        raise ValueError(
-            f"Frequency must be positive and non zero, not {frequency}"
-        )
+        raise ValueError(f"Frequency must be positive and non zero, not {frequency}")
 
     return vp / (frequency * cpw)
 
@@ -763,16 +751,12 @@ def build_big_rect_with_inner_element_group(mesh_parameters):
     gmsh.option.setNumber("Mesh.MeshSizeExtendFromBoundary", 0)
 
     # --- Geometry: on length_x the big rectangle ---
-    surf_tag = gmsh.model.occ.addRectangle(
-        -length_z, 0.0, 0.0, length_z, length_x
-    )
+    surf_tag = gmsh.model.occ.addRectangle(-length_z, 0.0, 0.0, length_z, length_x)
     gmsh.model.occ.synchronize()
 
     # Get boundary edges for tagging
     boundary_entities = gmsh.model.getBoundary([(2, surf_tag)], oriented=False)
-    edge_tags = [
-        abs(entity[1]) for entity in boundary_entities if entity[0] == 1
-    ]
+    edge_tags = [abs(entity[1]) for entity in boundary_entities if entity[0] == 1]
 
     # Identify boundary edges by their geometric center
     boundary_tag_map = {}
@@ -858,18 +842,13 @@ def build_big_rect_with_inner_element_group(mesh_parameters):
 
             # Compute centroids
             # (x_c, y_c) = average of node coords
-            xyz = coords[[id2idx[int(n)] for n in conn.flatten()]].reshape(
-                -1, nPer, 3
-            )
+            xyz = coords[[id2idx[int(n)] for n in conn.flatten()]].reshape(-1, nPer, 3)
             centroids = xyz.mean(axis=1)  # (nelem, 3)
             cz_e = centroids[:, 0]
             cx_e = centroids[:, 1]
 
             inside = (
-                (cz_e >= z_min)
-                & (cz_e <= z_max)
-                & (cx_e >= x_min)
-                & (cx_e <= x_max)
+                (cz_e >= z_min) & (cz_e <= z_max) & (cx_e >= x_min) & (cx_e <= x_max)
             )
 
             inner_elem_by_type.append(tags[inside])

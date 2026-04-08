@@ -100,9 +100,7 @@ def wave_dict_2d(layer_shape, degree_layer, degree_type, habc_ref_freq):
     return dictionary
 
 
-def wave_dict_3d(
-    layer_shape, degree_layer, degree_type, habc_ref_freq, degree_eikonal
-):
+def wave_dict_3d(layer_shape, degree_layer, degree_type, habc_ref_freq, degree_eikonal):
     """Create a dictionary with parameters for the 3D model.
 
     Parameters
@@ -294,9 +292,7 @@ def get_range_hyp(Wave_obj, n_root=1):
     None
     """
     # Identifier for the current case study
-    Wave_obj.identify_habc_case(
-        output_folder=f"output/modal_test{Wave_obj.dimension}d"
-    )
+    Wave_obj.identify_habc_case(output_folder=f"output/modal_test{Wave_obj.dimension}d")
 
     # Determining layer size
     Wave_obj.size_habc_criterion(n_root=n_root)

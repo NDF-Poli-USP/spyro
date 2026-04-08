@@ -29,12 +29,8 @@ def change_to_reference_triangle(p, cell_vertices):
     ync = 1.0
 
     div = xa * yb - xb * ya - xa * yc + xc * ya + xb * yc - xc * yb
-    a11 = (
-        -(xnb * ya - xnc * ya - xna * yb + xnc * yb + xna * yc - xnb * yc) / div
-    )
-    a12 = (
-        xa * xnb - xa * xnc - xb * xna + xb * xnc + xc * xna - xc * xnb
-    ) / div
+    a11 = -(xnb * ya - xnc * ya - xna * yb + xnc * yb + xna * yc - xnb * yc) / div
+    a12 = (xa * xnb - xa * xnc - xb * xna + xb * xnc + xc * xna - xc * xnb) / div
     a13 = (
         xa * xnc * yb
         - xb * xnc * ya
@@ -43,12 +39,8 @@ def change_to_reference_triangle(p, cell_vertices):
         + xb * xna * yc
         - xc * xna * yb
     ) / div
-    a21 = (
-        -(ya * ynb - ya * ync - yb * yna + yb * ync + yc * yna - yc * ynb) / div
-    )
-    a22 = (
-        xa * ynb - xa * ync - xb * yna + xb * ync + xc * yna - xc * ynb
-    ) / div
+    a21 = -(ya * ynb - ya * ync - yb * yna + yb * ync + yc * yna - yc * ynb) / div
+    a22 = (xa * ynb - xa * ync - xb * yna + xb * ync + xc * yna - xc * ynb) / div
     a23 = (
         xa * yb * ync
         - xb * ya * ync
@@ -64,9 +56,7 @@ def change_to_reference_triangle(p, cell_vertices):
     return (pnx, pny)
 
 
-def change_to_reference_tetrahedron(
-    p, cell_vertices, reference_coordinates=None
-):
+def change_to_reference_tetrahedron(p, cell_vertices, reference_coordinates=None):
     """Changes variables to reference tetrahedron.
 
     Parameters
@@ -133,34 +123,22 @@ def change_to_reference_tetrahedron(
         + xd * yc * zb
     )
     a11 = (
-        (xnc * (ya * zb - yb * za - ya * zd + yd * za + yb * zd - yd * zb))
-        / det
-        - (xnd * (ya * zb - yb * za - ya * zc + yc * za + yb * zc - yc * zb))
-        / det
-        - (xnb * (ya * zc - yc * za - ya * zd + yd * za + yc * zd - yd * zc))
-        / det
-        + (xna * (yb * zc - yc * zb - yb * zd + yd * zb + yc * zd - yd * zc))
-        / det
+        (xnc * (ya * zb - yb * za - ya * zd + yd * za + yb * zd - yd * zb)) / det
+        - (xnd * (ya * zb - yb * za - ya * zc + yc * za + yb * zc - yc * zb)) / det
+        - (xnb * (ya * zc - yc * za - ya * zd + yd * za + yc * zd - yd * zc)) / det
+        + (xna * (yb * zc - yc * zb - yb * zd + yd * zb + yc * zd - yd * zc)) / det
     )
     a12 = (
-        (xnd * (xa * zb - xb * za - xa * zc + xc * za + xb * zc - xc * zb))
-        / det
-        - (xnc * (xa * zb - xb * za - xa * zd + xd * za + xb * zd - xd * zb))
-        / det
-        + (xnb * (xa * zc - xc * za - xa * zd + xd * za + xc * zd - xd * zc))
-        / det
-        - (xna * (xb * zc - xc * zb - xb * zd + xd * zb + xc * zd - xd * zc))
-        / det
+        (xnd * (xa * zb - xb * za - xa * zc + xc * za + xb * zc - xc * zb)) / det
+        - (xnc * (xa * zb - xb * za - xa * zd + xd * za + xb * zd - xd * zb)) / det
+        + (xnb * (xa * zc - xc * za - xa * zd + xd * za + xc * zd - xd * zc)) / det
+        - (xna * (xb * zc - xc * zb - xb * zd + xd * zb + xc * zd - xd * zc)) / det
     )
     a13 = (
-        (xnc * (xa * yb - xb * ya - xa * yd + xd * ya + xb * yd - xd * yb))
-        / det
-        - (xnd * (xa * yb - xb * ya - xa * yc + xc * ya + xb * yc - xc * yb))
-        / det
-        - (xnb * (xa * yc - xc * ya - xa * yd + xd * ya + xc * yd - xd * yc))
-        / det
-        + (xna * (xb * yc - xc * yb - xb * yd + xd * yb + xc * yd - xd * yc))
-        / det
+        (xnc * (xa * yb - xb * ya - xa * yd + xd * ya + xb * yd - xd * yb)) / det
+        - (xnd * (xa * yb - xb * ya - xa * yc + xc * ya + xb * yc - xc * yb)) / det
+        - (xnb * (xa * yc - xc * ya - xa * yd + xd * ya + xc * yd - xd * yc)) / det
+        + (xna * (xb * yc - xc * yb - xb * yd + xd * yb + xc * yd - xd * yc)) / det
     )
     a14 = (
         (
@@ -213,34 +191,22 @@ def change_to_reference_tetrahedron(
         / det
     )
     a21 = (
-        (ync * (ya * zb - yb * za - ya * zd + yd * za + yb * zd - yd * zb))
-        / det
-        - (ynd * (ya * zb - yb * za - ya * zc + yc * za + yb * zc - yc * zb))
-        / det
-        - (ynb * (ya * zc - yc * za - ya * zd + yd * za + yc * zd - yd * zc))
-        / det
-        + (yna * (yb * zc - yc * zb - yb * zd + yd * zb + yc * zd - yd * zc))
-        / det
+        (ync * (ya * zb - yb * za - ya * zd + yd * za + yb * zd - yd * zb)) / det
+        - (ynd * (ya * zb - yb * za - ya * zc + yc * za + yb * zc - yc * zb)) / det
+        - (ynb * (ya * zc - yc * za - ya * zd + yd * za + yc * zd - yd * zc)) / det
+        + (yna * (yb * zc - yc * zb - yb * zd + yd * zb + yc * zd - yd * zc)) / det
     )
     a22 = (
-        (ynd * (xa * zb - xb * za - xa * zc + xc * za + xb * zc - xc * zb))
-        / det
-        - (ync * (xa * zb - xb * za - xa * zd + xd * za + xb * zd - xd * zb))
-        / det
-        + (ynb * (xa * zc - xc * za - xa * zd + xd * za + xc * zd - xd * zc))
-        / det
-        - (yna * (xb * zc - xc * zb - xb * zd + xd * zb + xc * zd - xd * zc))
-        / det
+        (ynd * (xa * zb - xb * za - xa * zc + xc * za + xb * zc - xc * zb)) / det
+        - (ync * (xa * zb - xb * za - xa * zd + xd * za + xb * zd - xd * zb)) / det
+        + (ynb * (xa * zc - xc * za - xa * zd + xd * za + xc * zd - xd * zc)) / det
+        - (yna * (xb * zc - xc * zb - xb * zd + xd * zb + xc * zd - xd * zc)) / det
     )
     a23 = (
-        (ync * (xa * yb - xb * ya - xa * yd + xd * ya + xb * yd - xd * yb))
-        / det
-        - (ynd * (xa * yb - xb * ya - xa * yc + xc * ya + xb * yc - xc * yb))
-        / det
-        - (ynb * (xa * yc - xc * ya - xa * yd + xd * ya + xc * yd - xd * yc))
-        / det
-        + (yna * (xb * yc - xc * yb - xb * yd + xd * yb + xc * yd - xd * yc))
-        / det
+        (ync * (xa * yb - xb * ya - xa * yd + xd * ya + xb * yd - xd * yb)) / det
+        - (ynd * (xa * yb - xb * ya - xa * yc + xc * ya + xb * yc - xc * yb)) / det
+        - (ynb * (xa * yc - xc * ya - xa * yd + xd * ya + xc * yd - xd * yc)) / det
+        + (yna * (xb * yc - xc * yb - xb * yd + xd * yb + xc * yd - xd * yc)) / det
     )
     a24 = (
         (
@@ -293,34 +259,22 @@ def change_to_reference_tetrahedron(
         / det
     )
     a31 = (
-        (znc * (ya * zb - yb * za - ya * zd + yd * za + yb * zd - yd * zb))
-        / det
-        - (znd * (ya * zb - yb * za - ya * zc + yc * za + yb * zc - yc * zb))
-        / det
-        - (znb * (ya * zc - yc * za - ya * zd + yd * za + yc * zd - yd * zc))
-        / det
-        + (zna * (yb * zc - yc * zb - yb * zd + yd * zb + yc * zd - yd * zc))
-        / det
+        (znc * (ya * zb - yb * za - ya * zd + yd * za + yb * zd - yd * zb)) / det
+        - (znd * (ya * zb - yb * za - ya * zc + yc * za + yb * zc - yc * zb)) / det
+        - (znb * (ya * zc - yc * za - ya * zd + yd * za + yc * zd - yd * zc)) / det
+        + (zna * (yb * zc - yc * zb - yb * zd + yd * zb + yc * zd - yd * zc)) / det
     )
     a32 = (
-        (znd * (xa * zb - xb * za - xa * zc + xc * za + xb * zc - xc * zb))
-        / det
-        - (znc * (xa * zb - xb * za - xa * zd + xd * za + xb * zd - xd * zb))
-        / det
-        + (znb * (xa * zc - xc * za - xa * zd + xd * za + xc * zd - xd * zc))
-        / det
-        - (zna * (xb * zc - xc * zb - xb * zd + xd * zb + xc * zd - xd * zc))
-        / det
+        (znd * (xa * zb - xb * za - xa * zc + xc * za + xb * zc - xc * zb)) / det
+        - (znc * (xa * zb - xb * za - xa * zd + xd * za + xb * zd - xd * zb)) / det
+        + (znb * (xa * zc - xc * za - xa * zd + xd * za + xc * zd - xd * zc)) / det
+        - (zna * (xb * zc - xc * zb - xb * zd + xd * zb + xc * zd - xd * zc)) / det
     )
     a33 = (
-        (znc * (xa * yb - xb * ya - xa * yd + xd * ya + xb * yd - xd * yb))
-        / det
-        - (znd * (xa * yb - xb * ya - xa * yc + xc * ya + xb * yc - xc * yb))
-        / det
-        - (znb * (xa * yc - xc * ya - xa * yd + xd * ya + xc * yd - xd * yc))
-        / det
-        + (zna * (xb * yc - xc * yb - xb * yd + xd * yb + xc * yd - xd * yc))
-        / det
+        (znc * (xa * yb - xb * ya - xa * yd + xd * ya + xb * yd - xd * yb)) / det
+        - (znd * (xa * yb - xb * ya - xa * yc + xc * ya + xb * yc - xc * yb)) / det
+        - (znb * (xa * yc - xc * ya - xa * yd + xd * ya + xc * yd - xd * yc)) / det
+        + (zna * (xb * yc - xc * yb - xb * yd + xd * yb + xc * yd - xd * yc)) / det
     )
     a34 = (
         (

@@ -42,9 +42,7 @@ def test_mesh_with_tags():
         },
     }
 
-    mesh_parameters = MeshingParameters(
-        input_mesh_dictionary=input_mesh_parameters
-    )
+    mesh_parameters = MeshingParameters(input_mesh_dictionary=input_mesh_parameters)
     build_big_rect_with_inner_element_group(mesh_parameters)
 
     yield output_filename
@@ -151,9 +149,7 @@ def test_acoustic_solver_style_integrals(test_mesh_with_tags):
     for boundary_id in [1, 2, 3, 4]:
         abc_form = f_abc * fire.ds(boundary_id)
         abc_vector = fire.assemble(abc_form)
-        assert (
-            abc_vector is not None
-        ), f"ABC boundary {boundary_id} assembly failed"
+        assert abc_vector is not None, f"ABC boundary {boundary_id} assembly failed"
 
 
 def test_spyro_acoustic_solver_compatibility(test_mesh_with_tags):

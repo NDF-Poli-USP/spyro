@@ -257,9 +257,7 @@ def test_dictionary_conversion():
         "source_pos": [(-0.1, 0.75)],
         "frequency": 8.0,
         "delay": 1.0,
-        "receiver_locations": spyro.create_transect(
-            (-0.10, 0.1), (-0.10, 1.4), 100
-        ),
+        "receiver_locations": spyro.create_transect((-0.10, 0.1), (-0.10, 1.4), 100),
     }
     # Simulate for 2.0 seconds.
     old_dictionary["timeaxis"] = {
@@ -323,9 +321,7 @@ def test_dictionary_conversion():
         "source_locations": [(-0.1, 0.75)],
         "frequency": 8.0,
         "delay": 1.0,
-        "receiver_locations": spyro.create_transect(
-            (-0.10, 0.1), (-0.10, 1.4), 100
-        ),
+        "receiver_locations": spyro.create_transect((-0.10, 0.1), (-0.10, 1.4), 100),
     }
 
     # Simulate for 2.0 seconds.
@@ -354,10 +350,7 @@ def test_dictionary_conversion():
         same = False
     if model_from_new.final_time != model_from_old.final_time:
         same = False
-    if (
-        model_from_new.forward_output_filename
-        != model_from_old.forward_output_filename
-    ):
+    if model_from_new.forward_output_filename != model_from_old.forward_output_filename:
         same = False
 
     assert same

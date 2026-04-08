@@ -7,9 +7,7 @@ import pytest
 import os
 
 
-def wave_dict(
-    dt_usu, layer_shape, degree_layer, habc_reference_freq, get_ref_model
-):
+def wave_dict(dt_usu, layer_shape, degree_layer, habc_reference_freq, get_ref_model):
     """Create a dictionary with parameters for the model.
 
     Parameters
@@ -136,9 +134,7 @@ def preamble_habc(dictionary, edge_length):
     tRef = comp_cost("tini")
 
     # Create the acoustic wave object with HABCs
-    Wave_obj = habc.HABC_Wave(
-        dictionary=dictionary, output_folder="tests/inputfiles/"
-    )
+    Wave_obj = habc.HABC_Wave(dictionary=dictionary, output_folder="tests/inputfiles/")
 
     # Mesh
     Wave_obj.set_mesh(input_mesh_parameters={"edge_length": edge_length})
@@ -278,41 +274,31 @@ def habc_fig8(Wave_obj, dat_regr_xCR, xCR_usu=None, plot_comparison=True):
     if plot_comparison:
 
         # Plotting the solution at receivers and the error measures
-        Wave_obj.comparison_plots(
-            regression_xCR=True, data_regr_xCR=dat_regr_xCR
-        )
+        Wave_obj.comparison_plots(regression_xCR=True, data_regr_xCR=dat_regr_xCR)
 
 
 # @pytest.mark.slow
 @pytest.mark.skip(reason="no way of currently testing this")
 def test_loop_habc_rectangular_source():
-    return run_loop_habc(
-        degree_layer_lst=[None], habc_reference_freq_lst=["source"]
-    )
+    return run_loop_habc(degree_layer_lst=[None], habc_reference_freq_lst=["source"])
 
 
 # @pytest.mark.slow
 @pytest.mark.skip(reason="no way of currently testing this")
 def test_loop_habc_rectangular_boundary():
-    return run_loop_habc(
-        degree_layer_lst=[None], habc_reference_freq_lst=["boundary"]
-    )
+    return run_loop_habc(degree_layer_lst=[None], habc_reference_freq_lst=["boundary"])
 
 
 # @pytest.mark.slow
 @pytest.mark.skip(reason="no way of currently testing this")
 def test_loop_habc_hyperellipse_source():
-    return run_loop_habc(
-        degree_layer_lst=[2], habc_reference_freq_lst=["source"]
-    )
+    return run_loop_habc(degree_layer_lst=[2], habc_reference_freq_lst=["source"])
 
 
 # @pytest.mark.slow
 @pytest.mark.skip(reason="no way of currently testing this")
 def test_loop_habc_hyperellipse_boundary():
-    return run_loop_habc(
-        degree_layer_lst=[2], habc_reference_freq_lst=["boundary"]
-    )
+    return run_loop_habc(degree_layer_lst=[2], habc_reference_freq_lst=["boundary"])
 
 
 # @pytest.mark.slow
@@ -394,9 +380,7 @@ def run_loop_habc(
         Wave_obj.abc_get_ref_model = False
 
         # Estimating computational resource usage
-        comp_cost(
-            "tfin", tRef=tRef, user_name=Wave_obj.path_save + "preamble/INF_"
-        )
+        comp_cost("tfin", tRef=tRef, user_name=Wave_obj.path_save + "preamble/INF_")
 
     # ============ HABC SCHEME ============
     if loop_modeling:

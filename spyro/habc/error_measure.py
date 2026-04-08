@@ -241,9 +241,7 @@ class HABC_Error:
         self.err_habc = [errIt, errPk, pkMax, final_energy]
         self.max_errIt = max(errIt)
         self.max_errPK = max(errPk)
-        print(
-            "Maximum Integral Error: {:.2%}".format(self.max_errIt), flush=True
-        )
+        print("Maximum Integral Error: {:.2%}".format(self.max_errIt), flush=True)
         print("Maximum Peak Error: {:.2%}".format(self.max_errPK), flush=True)
         print("Acoustic Energy: {:.2e}".format(final_energy), flush=True)
 
@@ -409,8 +407,6 @@ class HABC_Error:
             vtx = -eq_xCR[1] / (2 * eq_xCR[0])
             xCR_opt = np.clip(vtx, xCR_inf, xCR_sup)
 
-        print(
-            "Optimal Heuristic Factor xCR: {:.3f}".format(xCR_opt), flush=True
-        )
+        print("Optimal Heuristic Factor xCR: {:.3f}".format(xCR_opt), flush=True)
 
         return xCR_opt

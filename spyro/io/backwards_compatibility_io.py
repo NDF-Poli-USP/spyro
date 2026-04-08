@@ -116,10 +116,8 @@ class Dictionary_conversion:
             self.fwi_running = True
 
         if self.fwi_running is False:
-            warnings.warn(
-                "Assuming parameters set for forward only propagation, will \
-                    use velocity model from old_dictionary truemodel."
-            )
+            warnings.warn("Assuming parameters set for forward only propagation, will \
+                    use velocity model from old_dictionary truemodel.")
 
     def convert_synthetic_data(self):
         """Convert the synthetic_data section of dictionary."""
@@ -161,9 +159,7 @@ class Dictionary_conversion:
                     "Subproblem Step Type": "Line Search",
                     "Subproblem Iteration Limit": 5.0,
                 },
-                "Line Search": {
-                    "Descent Method": {"Type": "Quasi-Newton Step"}
-                },
+                "Line Search": {"Descent Method": {"Type": "Quasi-Newton Step"}},
             },
             "Status Test": {
                 "Gradient Tolerance": 1e-16,
@@ -177,9 +173,7 @@ class Dictionary_conversion:
             shot_record_file = old_default_shot_record_file
         self.new_dictionary["inversion"] = {
             "perform_fwi": True,  # switch to true to make a FWI
-            "initial_guess_model_file": self.old_dictionary["mesh"][
-                "initmodel"
-            ],
+            "initial_guess_model_file": self.old_dictionary["mesh"]["initmodel"],
             "shot_record_file": shot_record_file,
             "optimization_parameters": default_optimization_parameters,
         }
@@ -225,9 +219,7 @@ class Dictionary_conversion:
             source_type = "ricker"
         self.new_dictionary["acquisition"] = {
             "source_type": source_type,
-            "source_locations": self.old_dictionary["acquisition"][
-                "source_pos"
-            ],
+            "source_locations": self.old_dictionary["acquisition"]["source_pos"],
             "frequency": self.old_dictionary["acquisition"]["frequency"],
             "delay": self.old_dictionary["acquisition"]["delay"],
             "amplitude": self.old_dictionary["timeaxis"]["amplitude"],
@@ -242,9 +234,7 @@ class Dictionary_conversion:
             "initial_time": self.old_dictionary["timeaxis"][
                 "t0"
             ],  # Initial time for event
-            "final_time": self.old_dictionary["timeaxis"][
-                "tf"
-            ],  # Final time for event
+            "final_time": self.old_dictionary["timeaxis"]["tf"],  # Final time for event
             "dt": self.old_dictionary["timeaxis"]["dt"],  # timestep size
             "output_frequency": self.old_dictionary["timeaxis"][
                 "nspool"

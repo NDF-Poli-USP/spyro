@@ -94,9 +94,7 @@ def test_create_initial_model_for_meshing_parameter_dispatches_3d(monkeypatch):
     )
 
     obj = _base_meshing_obj(dimension=3)
-    assert (
-        input_models.create_initial_model_for_meshing_parameter(obj) == expected
-    )
+    assert input_models.create_initial_model_for_meshing_parameter(obj) == expected
 
 
 def test_create_initial_model_for_meshing_parameter_rejects_invalid_dimension():
@@ -116,10 +114,7 @@ def test_create_initial_model_for_meshing_parameter_2d_dispatches_homogeneous(
     )
 
     obj = _base_meshing_obj(velocity_profile_type="homogeneous")
-    assert (
-        input_models.create_initial_model_for_meshing_parameter_2D(obj)
-        == expected
-    )
+    assert input_models.create_initial_model_for_meshing_parameter_2D(obj) == expected
 
 
 def test_create_initial_model_for_meshing_parameter_2d_dispatches_heterogeneous(
@@ -133,10 +128,7 @@ def test_create_initial_model_for_meshing_parameter_2d_dispatches_heterogeneous(
     )
 
     obj = _base_meshing_obj(velocity_profile_type="heterogeneous")
-    assert (
-        input_models.create_initial_model_for_meshing_parameter_2D(obj)
-        == expected
-    )
+    assert input_models.create_initial_model_for_meshing_parameter_2D(obj) == expected
 
 
 def test_create_initial_model_for_meshing_parameter_2d_rejects_invalid_profile():
@@ -166,9 +158,7 @@ def test_create_initial_model_for_meshing_parameter_2d_heterogeneous_sets_core_f
     assert model["mesh"]["length_z"] == 12.0
     assert model["mesh"]["length_x"] == 30.0
     assert model["mesh"]["cells_per_wavelength"] == 2.8
-    assert model["absorving_boundary_conditions"][
-        "pad_length"
-    ] == pytest.approx(0.2)
+    assert model["absorving_boundary_conditions"]["pad_length"] == pytest.approx(0.2)
     assert model["synthetic_data"]["real_velocity_file"] == "my_model.segy"
 
     receivers = model["acquisition"]["receiver_locations"]
@@ -177,9 +167,7 @@ def test_create_initial_model_for_meshing_parameter_2d_heterogeneous_sets_core_f
     assert tuple(receivers[-1]) == pytest.approx((-0.3, 13.0))
 
 
-@pytest.mark.parametrize(
-    "reduced, expected_receivers", [(True, 4), (False, 36)]
-)
+@pytest.mark.parametrize("reduced, expected_receivers", [(True, 4), (False, 36)])
 def test_create_initial_model_for_meshing_parameter_2d_homogeneous_reduced_flag(
     reduced, expected_receivers
 ):
@@ -193,18 +181,12 @@ def test_create_initial_model_for_meshing_parameter_2d_homogeneous_reduced_flag(
         reduced_obj_for_testing=reduced,
     )
 
-    model = (
-        input_models.create_initial_model_for_meshing_parameter_2D_homogeneous(
-            obj
-        )
-    )
+    model = input_models.create_initial_model_for_meshing_parameter_2D_homogeneous(obj)
 
     lbda = obj.minimum_velocity / obj.source_frequency
     assert model["mesh"]["length_z"] == pytest.approx(40 * lbda)
     assert model["mesh"]["length_x"] == pytest.approx(30 * lbda)
-    assert model["absorving_boundary_conditions"][
-        "pad_length"
-    ] == pytest.approx(lbda)
+    assert model["absorving_boundary_conditions"]["pad_length"] == pytest.approx(lbda)
     assert model["time_axis"]["final_time"] == pytest.approx(
         20 * (1.0 / obj.source_frequency)
     )
@@ -219,9 +201,7 @@ def test_create_initial_model_for_meshing_parameter_2d_homogeneous_warns_for_lar
     )
 
     with pytest.warns(UserWarning, match="Velocity in meters per second"):
-        input_models.create_initial_model_for_meshing_parameter_2D_homogeneous(
-            obj
-        )
+        input_models.create_initial_model_for_meshing_parameter_2D_homogeneous(obj)
 
 
 @pytest.mark.parametrize("profile", ["homogeneous", "heterogeneous"])

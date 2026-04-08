@@ -244,9 +244,7 @@ def plot_hist_receivers(Wave_object, show=False):
 
         # Axis format
         axes[rec].set_xlim(0, tf)
-        axes[rec].ticklabel_format(
-            axis="y", style="scientific", scilimits=(-2, 2)
-        )
+        axes[rec].ticklabel_format(axis="y", style="scientific", scilimits=(-2, 2))
         if rec == num_recvs - 1:
             axes[rec].set_xlabel(r"$t \; (s)$")
 
@@ -317,9 +315,7 @@ def plot_rfft_receivers(Wave_object, fxlim=4.0, show=False):
         else:
             f_ref = Wave_object.freq_ref
             f_str = r"$f_{ref}$"
-            axes[rec].axvline(
-                x=f_sou, color="black", linestyle="-", linewidth=1.25
-            )
+            axes[rec].axvline(x=f_sou, color="black", linestyle="-", linewidth=1.25)
 
         axes[rec].axvline(x=f_ref, color="black", linestyle="-", linewidth=1.25)
 
@@ -346,9 +342,7 @@ def plot_rfft_receivers(Wave_object, fxlim=4.0, show=False):
 
         # Axis format
         axes[rec].set_xlim(0, limf)
-        axes[rec].ticklabel_format(
-            axis="y", style="scientific", scilimits=(-2, 2)
-        )
+        axes[rec].ticklabel_format(axis="y", style="scientific", scilimits=(-2, 2))
         if rec == num_recvs - 1:
             axes[rec].set_xlabel(r"$f \; (Hz)$")
 
@@ -431,12 +425,8 @@ def plot_xCR_opt(Wave_object, data_regr_xCR, show=False):
 
     # Format equations
     qua_reg = r"${:.3e} x^{{2}} + {:.3e} x + {:.3e}, R^{{2}} = {:.3f}$"
-    eq_str_eI = (
-        (r"$e_I = $" + qua_reg).format(*eq_eI, r2_eI).replace("+ -", "- ")
-    )
-    eq_str_eP = (
-        (r"$e_P = $" + qua_reg).format(*eq_eP, r2_eP).replace("+ -", "- ")
-    )
+    eq_str_eI = (r"$e_I = $" + qua_reg).format(*eq_eI, r2_eI).replace("+ -", "- ")
+    eq_str_eP = (r"$e_P = $" + qua_reg).format(*eq_eP, r2_eP).replace("+ -", "- ")
 
     # Regression points
     plt.plot(

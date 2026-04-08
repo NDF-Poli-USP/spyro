@@ -46,7 +46,5 @@ class Read_time_axis:
     @time_integrator.setter
     def time_integrator(self, value):
         if value != "central_difference":
-            raise ValueError(
-                f"The time integrator of {value} is not implemented yet"
-            )
+            raise ValueError(f"The time integrator of {value} is not implemented yet")
         self._time_integrator = value

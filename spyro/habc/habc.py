@@ -153,9 +153,7 @@ class HABC_Wave(
         Set the velocity model for the model with absorbing layer
     """
 
-    def __init__(
-        self, dictionary=None, fwi_iter=0, comm=None, output_folder=None
-    ):
+    def __init__(self, dictionary=None, fwi_iter=0, comm=None, output_folder=None):
         """Initialize the HABC class.
 
         Parameters
@@ -516,9 +514,7 @@ class HABC_Wave(
             self.calc_hyp_geom_prop(dom_lay_full, self.pad_len, self.lmin)
 
         # Domain dimensions with free surface truncation
-        dom_lay_trunc = self.habc_domain_dimensions(
-            only_habc_dom=True, full_hyp=False
-        )
+        dom_lay_trunc = self.habc_domain_dimensions(only_habc_dom=True, full_hyp=False)
 
         # Layer parameters
         layer_par = (self.F_L, self.a_par, self.d_norm)
@@ -647,12 +643,8 @@ class HABC_Wave(
         if self.quadrilateral:
             base_mesh = self.mesh._base_mesh
             base_cell = base_mesh.ufl_cell()
-            element_zx = fire.FiniteElement(
-                "DQ", base_cell, 0, variant="spectral"
-            )
-            element_y = fire.FiniteElement(
-                "DG", fire.interval, 0, variant="spectral"
-            )
+            element_zx = fire.FiniteElement("DQ", base_cell, 0, variant="spectral")
+            element_y = fire.FiniteElement("DG", fire.interval, 0, variant="spectral")
             tensor_element = fire.TensorProductElement(element_zx, element_y)
             V = fire.FunctionSpace(self.mesh, tensor_element)
         else:
@@ -676,9 +668,9 @@ class HABC_Wave(
         del layer_mask, lay_field
 
         # Interpolating in the space function of the problem
-        self.c = fire.Function(
-            self.function_space, name="c [km/s])"
-        ).interpolate(self.c)
+        self.c = fire.Function(self.function_space, name="c [km/s])").interpolate(
+            self.c
+        )
 
         # Save new velocity model
         if inf_model:
@@ -875,9 +867,7 @@ class HABC_Wave(
             flush=True,
         )
 
-    def damping_layer(
-        self, xCR_usu=None, method=None, fitting_c=(0.0, 0.0, 0.0, 0.0)
-    ):
+    def damping_layer(self, xCR_usu=None, method=None, fitting_c=(0.0, 0.0, 0.0, 0.0)):
         """Set the damping profile within the absorbing layer.
 
         Minimum damping ratio is computed as psi_min = xCR * d, where xCR is
@@ -920,9 +910,7 @@ class HABC_Wave(
         None
         """
         # Estimating fundamental frequency
-        self.fundamental_frequency(
-            method=method, monitor=True, fitting_c=fitting_c
-        )
+        self.fundamental_frequency(method=method, monitor=True, fitting_c=fitting_c)
 
         print("\nCreating Damping Profile", flush=True)
 
@@ -1030,9 +1018,7 @@ class HABC_Wave(
         usr_dt = self.get_dt()
 
         # Maximum timestep size
-        dt_sol = eigsol.Modal_Solver(
-            self.dimension, method=method, calc_max_dt=True
-        )
+        dt_sol = eigsol.Modal_Solver(self.dimension, method=method, calc_max_dt=True)
         max_dt = dt_sol.estimate_timestep(
             self.c,
             self.function_space,
@@ -1062,9 +1048,7 @@ class HABC_Wave(
                 min(max_divisor_tf, n_div), n_div, dt_ms, p=mag_add
             )
         else:
-            str_dt = "Selected Timestep Size: {:.{p}f} ms".format(
-                dt_ms, p=mag_add
-            )
+            str_dt = "Selected Timestep Size: {:.{p}f} ms".format(dt_ms, p=mag_add)
 
         # Updating Nyquist frequency
         self.f_Nyq = 1.0 / (2.0 * self.dt)
@@ -1221,10 +1205,7 @@ class HABC_Wave(
         -------
         None
         """
-        if (
-            self.n_hyp != self.abc_deg_layer
-            and self.layer_shape == "hypershape"
-        ):
+        if self.n_hyp != self.abc_deg_layer and self.layer_shape == "hypershape":
 
             print("Output Folder for Results Will Be Renamed.", flush=True)
 

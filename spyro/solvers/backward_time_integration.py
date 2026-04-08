@@ -178,8 +178,7 @@ def backward_wave_propagator_no_pml(Wave_obj, dt=None):
                 )
             else:
                 dufordt2.assign(
-                    (forward_solution.pop() - 2.0 * 0.0 + 0.0)
-                    / fire.Constant(dt**2)
+                    (forward_solution.pop() - 2.0 * 0.0 + 0.0) / fire.Constant(dt**2)
                 )
 
             grad_solver.solve()

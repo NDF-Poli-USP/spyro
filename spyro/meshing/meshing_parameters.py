@@ -224,9 +224,7 @@ class MeshingParameters:
         self.length_x = self.input_mesh_dictionary.get("length_x")
         self.length_y = self.input_mesh_dictionary.get("length_y")
         self.user_mesh = self.input_mesh_dictionary.get("user_mesh")
-        self.dimension = self.input_mesh_dictionary.get(
-            "dimension", self.dimension
-        )
+        self.dimension = self.input_mesh_dictionary.get("dimension", self.dimension)
         self.output_filename = self.input_mesh_dictionary.get(
             "output_filename", "automatic_mesh.msh"
         )
@@ -274,8 +272,7 @@ class MeshingParameters:
         if self.automatic_mesh:
             # For automatic meshes, need either edge_length or cells_per_wavelength
             has_size_param = (
-                self.edge_length is not None
-                or self.cells_per_wavelength is not None
+                self.edge_length is not None or self.cells_per_wavelength is not None
             )
             if not has_size_param:
                 self.is_complete = False
@@ -284,8 +281,7 @@ class MeshingParameters:
             # If using cells_per_wavelength, need frequency and velocity
             if self.cells_per_wavelength is not None:
                 if self.source_frequency is None or (
-                    self.minimum_velocity is None
-                    and self.grid_velocity_data is None
+                    self.minimum_velocity is None and self.grid_velocity_data is None
                 ):
                     self.is_complete = False
                     return
@@ -347,9 +343,7 @@ class MeshingParameters:
                 f"{self._unit}. Please check for consistency."
             )
         if value is not None and value < 0.0:
-            raise ValueError(
-                f"Please do not use negative value for {attr_name}"
-            )
+            raise ValueError(f"Please do not use negative value for {attr_name}")
         setattr(self, attr_name, value)
 
     @property
@@ -384,9 +378,7 @@ class MeshingParameters:
             necessary_keys = ["vp_values", "grid_spacing"]
             for necessary_key in necessary_keys:
                 if necessary_key not in value:
-                    raise ValueError(
-                        f"Grid velocity data needs {necessary_key} key."
-                    )
+                    raise ValueError(f"Grid velocity data needs {necessary_key} key.")
         self._grid_velocity_data = value
 
     @property
@@ -669,14 +661,12 @@ class MeshingParameters:
             self._source_frequency = value
         elif not isinstance(value, (int, float)):
             raise TypeError(
-                "Source frequency must be a number"
-                f", got {type(value).__name__}"
+                "Source frequency must be a number" f", got {type(value).__name__}"
             )
         else:
             if value < 1.5:
                 warnings.warn(
-                    f"Source frequency of {value} "
-                    "too low for realistic FWI case"
+                    f"Source frequency of {value} " "too low for realistic FWI case"
                 )
             elif value > 50:
                 warnings.warn(
@@ -857,8 +847,7 @@ class MeshingParameters:
         """
         if self.mesh_type != "firedrake_mesh" and value is True:
             raise ValueError(
-                "Periodic meshes are only supported "
-                "with Firedrake meshes for now."
+                "Periodic meshes are only supported " "with Firedrake meshes for now."
             )
         self._periodic = value
 

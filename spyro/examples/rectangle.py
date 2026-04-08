@@ -5,9 +5,7 @@ import firedrake as fire
 import copy
 
 rectangle_optimization_parameters = {
-    "General": {
-        "Secant": {"Type": "Limited-Memory BFGS", "Maximum Storage": 10}
-    },
+    "General": {"Secant": {"Type": "Limited-Memory BFGS", "Maximum Storage": 10}},
     "Step": {
         "Type": "Augmented Lagrangian",
         "Augmented Lagrangian": {
@@ -151,9 +149,7 @@ class Rectangle_mesh_and_velocity:
                     self.mesh_z > z_switch[i], layers[i], layers[i + 1]
                 )
             else:
-                cond = fire.conditional(
-                    self.mesh_z > z_switch[i], cond, layers[i + 1]
-                )
+                cond = fire.conditional(self.mesh_z > z_switch[i], cond, layers[i + 1])
         # cond = fire.conditional(self.mesh_z > z_switch, layer1, layer2)
         self.set_initial_velocity_model(conditional=cond)
 
@@ -200,9 +196,7 @@ class Rectangle_acoustic(Rectangle_mesh_and_velocity, Example_model_acoustic):
         self._rectangle_mesh()
 
 
-class Rectangle_acoustic_FWI(
-    Rectangle_mesh_and_velocity, Example_model_acoustic_FWI
-):
+class Rectangle_acoustic_FWI(Rectangle_mesh_and_velocity, Example_model_acoustic_FWI):
     """Rectangle model. This class is a child of the Example_model class. It is
     used to create a dictionary with the parameters of the Rectangle model.
 

@@ -58,9 +58,7 @@ def define_property_function_space(
         return point_to_dg_vector_wave_function_space(wave)
 
     if func_space_type == "tensor":
-        return point_to_correct_tensor_space(
-            wave, shape_func_space, dg_property
-        )
+        return point_to_correct_tensor_space(wave, shape_func_space, dg_property)
 
 
 def _initialize_material_property_from_ufl(
@@ -110,8 +108,7 @@ def _initialize_material_property_from_ufl(
         col = int(abs(log10(abs(value)))) + 2
 
         print(
-            f"Assigning {property_name} with a "
-            f"constant value of {constant:>{col}}",
+            f"Assigning {property_name} with a " f"constant value of {constant:>{col}}",
             flush=True,
         )
 
@@ -146,9 +143,7 @@ def _initialize_material_property_from_ufl(
     return mat_property
 
 
-def _initialize_material_property_from_func(
-    wave, property_name, fire_function, V
-):
+def _initialize_material_property_from_func(wave, property_name, fire_function, V):
     """Initialize material property from a firedrake function.
 
     Parameters
@@ -174,8 +169,7 @@ def _initialize_material_property_from_func(
         f"Assigning {property_name} with a firedrake function",
         (
             "in the same"
-            if element_family == original_family
-            and element_degree == original_degree
+            if element_family == original_family and element_degree == original_degree
             else "in another"
         ),
         f"function space: {element_family} {element_degree}.",
@@ -188,9 +182,7 @@ def _initialize_material_property_from_func(
         mat_property.rename(property_name)
 
     else:  # Different function space
-        mat_property = fire.Function(V, name=property_name).interpolate(
-            fire_function
-        )
+        mat_property = fire.Function(V, name=property_name).interpolate(fire_function)
 
     return mat_property
 
@@ -255,8 +247,7 @@ def _initialize_material_property_from_file(wave, property_name, from_file, V):
         f"Assigning {property_name} from file {from_file}",
         (
             "in the same"
-            if element_family == original_family
-            and element_degree == original_degree
+            if element_family == original_family and element_degree == original_degree
             else "in another"
         ),
         f"function space: {element_family} {element_degree}.",
@@ -278,9 +269,7 @@ def _initialize_material_property_from_file(wave, property_name, from_file, V):
     return mat_property
 
 
-def _saving_property_to_file(
-    wave, mat_property, property_name, foldername="default"
-):
+def _saving_property_to_file(wave, mat_property, property_name, foldername="default"):
     """Save a material property to a pvd file for visualization.
 
     Parameters
@@ -306,9 +295,7 @@ def _saving_property_to_file(
     fire.VTKFile(pth_prop).write(mat_property, name=property_name)
 
 
-def _check_material_property_inputs(
-    val_lst, func_space_type, shape_func_space, output
-):
+def _check_material_property_inputs(val_lst, func_space_type, shape_func_space, output):
     """Check the inputs for setting a material property.
 
     Parameters
@@ -424,9 +411,7 @@ def set_material_property(
         from_file,
     ]
 
-    _check_material_property_inputs(
-        val_lst, func_space_type, shape_func_space, output
-    )
+    _check_material_property_inputs(val_lst, func_space_type, shape_func_space, output)
 
     V = define_property_function_space(
         wave, func_space_type, dg_property, shape_func_space=shape_func_space
@@ -450,9 +435,7 @@ def set_material_property(
             )
 
         if random is not None:  # Random
-            mat_property = _initialize_random_material_prop(
-                property_name, random, V
-            )
+            mat_property = _initialize_random_material_prop(property_name, random, V)
 
         if fire_function is not None:
             mat_property = _initialize_material_property_from_func(
@@ -461,9 +444,7 @@ def set_material_property(
 
         if from_file is not None:
             raise NotImplementedError(
-                "Initializing property "
-                "from file is currently "
-                "not implemented"
+                "Initializing property " "from file is currently " "not implemented"
             )
             # mat_property = _initialize_material_property_from_file(
             #     wave, property_name, from_file, V)
@@ -510,9 +491,7 @@ def set_material_properties(wave, *args, **kwargs):
 
 def point_to_scalar_wave_function_space(wave):
     # Check if wave.function_space is a generates vector os scalar fields:
-    original_function_space_type = check_function_space_type(
-        wave.function_space
-    )
+    original_function_space_type = check_function_space_type(wave.function_space)
     if wave.scalar_function_space is not None:
         return wave.scalar_function_space
     elif original_function_space_type == "vector":
@@ -530,9 +509,7 @@ def point_to_scalar_wave_function_space(wave):
 
 def point_to_vector_wave_function_space(wave):
     # Check if wave.function_space is a generates vector os scalar fields:
-    original_function_space_type = check_function_space_type(
-        wave.function_space
-    )
+    original_function_space_type = check_function_space_type(wave.function_space)
     if wave.vector_function_space is not None:
         return wave.vector_function_space
     elif original_function_space_type == "scalar":
@@ -632,12 +609,8 @@ def set_tensor_function_space(wave, shape_func_space, is_dg):
         return V
 
     else:  # T_Elements
-        element_family = (
-            "DG" if is_dg else wave.function_space.ufl_element().family()
-        )
-        element_degree = (
-            0 if is_dg else wave.function_space.ufl_element().degree()
-        )
+        element_family = "DG" if is_dg else wave.function_space.ufl_element().family()
+        element_degree = 0 if is_dg else wave.function_space.ufl_element().degree()
 
         # Function space for the property
         V = fire.TensorFunctionSpace(

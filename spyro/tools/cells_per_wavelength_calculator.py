@@ -103,19 +103,13 @@ class Meshing_parameter_calculator:
         """
         self.parameters_dictionary = parameters_dictionary
         self.source_frequency = parameters_dictionary["source_frequency"]
-        self.minimum_velocity = parameters_dictionary[
-            "minimum_velocity_in_the_domain"
-        ]
-        self.velocity_profile_type = parameters_dictionary[
-            "velocity_profile_type"
-        ]
+        self.minimum_velocity = parameters_dictionary["minimum_velocity_in_the_domain"]
+        self.velocity_profile_type = parameters_dictionary["velocity_profile_type"]
         self.velocity_model_file_name = parameters_dictionary[
             "velocity_model_file_name"
         ]
         self._check_velocity_profile_type()
-        self.FEM_method_to_evaluate = parameters_dictionary[
-            "FEM_method_to_evaluate"
-        ]
+        self.FEM_method_to_evaluate = parameters_dictionary["FEM_method_to_evaluate"]
         self.dimension = parameters_dictionary["dimension"]
         self.receiver_setup = parameters_dictionary["receiver_setup"]
         self.accepted_error_threshold = parameters_dictionary[
@@ -302,9 +296,7 @@ class Meshing_parameter_calculator:
 
         return analytical_solution
 
-    def find_minimum(
-        self, starting_cpw=None, TOL=None, accuracy=None, savetxt=False
-    ):
+    def find_minimum(self, starting_cpw=None, TOL=None, accuracy=None, savetxt=False):
         """Finds the minimum cells-per-wavelength meshing parameter that is
         still below the error threshold.
 
@@ -365,13 +357,9 @@ class Meshing_parameter_calculator:
             Wave_obj.forward_solve()
             t1 = timinglib.time()
             p_receivers = Wave_obj.forward_solution_receivers
-            spyro.io.save_shots(
-                Wave_obj, file_name="test_shot_record" + str(cpw)
-            )
+            spyro.io.save_shots(Wave_obj, file_name="test_shot_record" + str(cpw))
 
-            error = error_calc(
-                p_receivers, self.reference_solution, Wave_obj.dt
-            )
+            error = error_calc(p_receivers, self.reference_solution, Wave_obj.dt)
             print("Error is ", error, flush=True)
             cpws.append(cpw)
             dts.append(Wave_obj.dt)
@@ -409,23 +397,17 @@ class Meshing_parameter_calculator:
         if self.velocity_profile_type == "homogeneous":
             lba = self.minimum_velocity / self.source_frequency
             edge_length = lba / cpw
-            Wave_obj.set_mesh(
-                input_mesh_parameters={"edge_length": edge_length}
-            )
+            Wave_obj.set_mesh(input_mesh_parameters={"edge_length": edge_length})
             Wave_obj.set_initial_velocity_model(constant=self.minimum_velocity)
         elif self.velocity_profile_type == "heterogeneous":
-            Wave_obj.set_mesh(
-                input_mesh_parameters={"cells_per_wavelength": cpw}
-            )
+            Wave_obj.set_mesh(input_mesh_parameters={"cells_per_wavelength": cpw})
         return Wave_obj
 
     def _saving_file(self, savetxt, info):
         """Saves the results to a text file."""
         if savetxt:
             np.savetxt(
-                "p"
-                + str(self.initial_guess_object.degree)
-                + "_cpw_results.txt",
+                "p" + str(self.initial_guess_object.degree) + "_cpw_results.txt",
                 info,
             )
 
@@ -441,9 +423,7 @@ class Meshing_parameter_calculator:
             )
             self.fast_loop = False
         else:
-            dif = calculate_dif(
-                cpw, self.cpw_accuracy, fast_loop=self.fast_loop
-            )
+            dif = calculate_dif(cpw, self.cpw_accuracy, fast_loop=self.fast_loop)
             cpw += dif
 
         return cpw, error, dif
@@ -500,9 +480,7 @@ def error_calc(receivers, analytical, dt):
     time_vector_ana = np.linspace(0.0, final_time, len(analytical[:, 0]))
     ana = np.zeros(np.shape(receivers))
     for i in range(num_rec):
-        ana[:, i] = np.interp(
-            time_vector_rec, time_vector_ana, analytical[:, i]
-        )
+        ana[:, i] = np.interp(time_vector_rec, time_vector_ana, analytical[:, i])
 
     total_numerator = 0.0
     total_denumenator = 0.0

@@ -29,9 +29,7 @@ def check_gradient(Wave_obj_guess, dJ, rec_out_exact, Jm, plot=False):
         J_plusdm = spyro.utils.compute_functional(Wave_obj_guess, misfit_plusdm)
 
         grad_fd = (J_plusdm - Jm) / (step)
-        projnorm = fire.assemble(
-            dJ * dm * fire.dx(**Wave_obj_guess.quadrature_rule)
-        )
+        projnorm = fire.assemble(dJ * dm * fire.dx(**Wave_obj_guess.quadrature_rule))
 
         error = 100 * ((grad_fd - projnorm) / projnorm)
         remainder = abs(J_plusdm - Jm - step * projnorm)
@@ -154,9 +152,7 @@ def get_forward_model(load_true=False):
 
 
 def test_gradient():
-    rec_out_exact, rec_out_guess, Wave_obj_guess = get_forward_model(
-        load_true=False
-    )
+    rec_out_exact, rec_out_guess, Wave_obj_guess = get_forward_model(load_true=False)
     forward_solution = Wave_obj_guess.forward_solution
     forward_solution_guess = deepcopy(forward_solution)
 

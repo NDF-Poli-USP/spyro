@@ -46,9 +46,7 @@ class FieldLogger:
             self.__time_enabled = self.vis_dict.get("time", False)
             if self.__time_enabled:
                 self.__time = []
-                self.__time_filename = self.vis_dict.get(
-                    "time_filename", "time.npy"
-                )
+                self.__time_filename = self.vis_dict.get("time_filename", "time.npy")
                 print(f"Saving time in: {self.__time_filename}")
 
     def add_field(self, key, name, callback):
@@ -60,18 +58,14 @@ class FieldLogger:
 
     def start_logging(self, source_id):
         if self.__source_id is not None:
-            warnings.warn(
-                "Started a new record without stopping the previous one"
-            )
+            warnings.warn("Started a new record without stopping the previous one")
 
         self.__source_id = source_id
         self.__enabled_fields = []
         for key, name, callback in self.__wave_data:
             enabled = self.vis_dict.get(key + "_output", False)
             if enabled:
-                fullname = self.vis_dict.get(
-                    key + "_output_filename", key + ".pvd"
-                )
+                fullname = self.vis_dict.get(key + "_output_filename", key + ".pvd")
                 prefix, extension = fullname.split(".")
                 filename = prefix + "sn" + str(source_id) + "." + extension
 
@@ -87,13 +81,9 @@ class FieldLogger:
             for key, callback in self.__func_data.items():
                 enabled = self.vis_dict.get(key, False)
                 if enabled:
-                    filename = self.vis_dict.get(
-                        key + "_filename", key + ".npy"
-                    )
+                    filename = self.vis_dict.get(key + "_filename", key + ".npy")
                     print(f"Saving {key} in: {filename}")
-                    self.__enabled_functionals[key] = Functional(
-                        filename, callback
-                    )
+                    self.__enabled_functionals[key] = Functional(filename, callback)
 
     def stop_logging(self):
         self.__source_id = None

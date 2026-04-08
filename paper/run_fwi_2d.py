@@ -62,9 +62,7 @@ model["acquisition"] = {
     "frequency": 5.0,
     "delay": 1.0,
     "num_receivers": 500,
-    "receiver_locations": spyro.create_transect(
-        (-0.10, 0.1), (-0.10, 17.0), 500
-    ),
+    "receiver_locations": spyro.create_transect((-0.10, 0.1), (-0.10, 17.0), 500),
 }
 model["timeaxis"] = {
     "t0": 0.0,  # Initial time for event
@@ -161,9 +159,7 @@ class Objective(ROL.Objective):
         self.misfit = spyro.utils.evaluate_misfit(
             model, p_guess_recv, self.p_exact_recv
         )
-        J_total[0] += spyro.utils.compute_functional(
-            model, self.misfit, velocity=vp
-        )
+        J_total[0] += spyro.utils.compute_functional(model, self.misfit, velocity=vp)
         J_total = COMM_WORLD.allreduce(J_total, op=MPI.SUM)
         J_total[0] /= comm.ensemble_comm.size
         if comm.comm.size > 1:
@@ -216,9 +212,7 @@ class Objective(ROL.Objective):
 
 
 paramsDict = {
-    "General": {
-        "Secant": {"Type": "Limited-Memory BFGS", "Maximum Storage": 10}
-    },
+    "General": {"Secant": {"Type": "Limited-Memory BFGS", "Maximum Storage": 10}},
     "Step": {
         "Type": "Augmented Lagrangian",
         "Augmented Lagrangian": {

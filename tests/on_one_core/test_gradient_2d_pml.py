@@ -57,9 +57,7 @@ def check_gradient(Wave_obj_guess, dJ, rec_out_exact, Jm, plot=False, tol=1.0):
         J_plusdm = spyro.utils.compute_functional(Wave_obj_guess, misfit_plusdm)
 
         grad_fd = (J_plusdm - Jm) / (step)
-        projnorm = fire.assemble(
-            dJ * dm * fire.dx(**Wave_obj_guess.quadrature_rule)
-        )
+        projnorm = fire.assemble(dJ * dm * fire.dx(**Wave_obj_guess.quadrature_rule))
 
         error = 100 * ((grad_fd - projnorm) / projnorm)
         remainder = abs(J_plusdm - Jm - step * projnorm)
@@ -124,9 +122,7 @@ def set_dictionary(PML=False):
         "frequency": 5.0,
         "delay": 1.5,
         "delay_type": "multiples_of_minimum",
-        "receiver_locations": spyro.create_transect(
-            (-0.8, 0.1), (-0.8, 0.9), 10
-        ),
+        "receiver_locations": spyro.create_transect((-0.8, 0.1), (-0.8, 0.9), 10),
     }
 
     dictionary["time_axis"] = {

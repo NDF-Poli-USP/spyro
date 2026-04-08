@@ -182,9 +182,7 @@ class Objective(ROL.Objective):
         self.misfit = spyro.utils.evaluate_misfit(
             model, p_guess_recv, self.p_exact_recv
         )
-        J_total[0] += spyro.utils.compute_functional(
-            model, self.misfit, velocity=vp
-        )
+        J_total[0] += spyro.utils.compute_functional(model, self.misfit, velocity=vp)
         J_total = COMM_WORLD.allreduce(J_total, op=MPI.SUM)
         J_total[0] /= comm.ensemble_comm.size
         if comm.comm.size > 1:
@@ -242,9 +240,7 @@ class Objective(ROL.Objective):
 
 
 paramsDict = {
-    "General": {
-        "Secant": {"Type": "Limited-Memory BFGS", "Maximum Storage": 10}
-    },
+    "General": {"Secant": {"Type": "Limited-Memory BFGS", "Maximum Storage": 10}},
     "Step": {
         "Type": "Augmented Lagrangian",
         "Augmented Lagrangian": {

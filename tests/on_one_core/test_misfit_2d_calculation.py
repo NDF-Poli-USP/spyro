@@ -4,9 +4,7 @@ import spyro
 
 def test_misfit_2d():
     default_optimization_parameters = {
-        "General": {
-            "Secant": {"Type": "Limited-Memory BFGS", "Maximum Storage": 10}
-        },
+        "General": {"Secant": {"Type": "Limited-Memory BFGS", "Maximum Storage": 10}},
         "Step": {
             "Type": "Augmented Lagrangian",
             "Augmented Lagrangian": {
@@ -57,9 +55,7 @@ def test_misfit_2d():
         "frequency": 5.0,
         "delay": 1.5,
         "delay_type": "multiples_of_minimum",
-        "receiver_locations": spyro.create_transect(
-            (-2.9, 0.1), (-2.9, 2.9), 100
-        ),
+        "receiver_locations": spyro.create_transect((-2.9, 0.1), (-2.9, 2.9), 100),
     }
 
     # Simulate for 2.0 seconds.

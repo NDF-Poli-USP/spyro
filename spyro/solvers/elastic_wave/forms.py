@@ -62,9 +62,7 @@ def isotropic_elastic_without_pml(wave):
     )
     solver_parameters = dict(wave.solver_parameters)
     solver_parameters["mat_type"] = "matfree"
-    wave.solver = LinearVariationalSolver(
-        lin_var, solver_parameters=solver_parameters
-    )
+    wave.solver = LinearVariationalSolver(lin_var, solver_parameters=solver_parameters)
 
 
 def isotropic_elastic_with_pml():

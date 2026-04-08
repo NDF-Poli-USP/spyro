@@ -69,13 +69,9 @@ def test_write_segy_and_smooth(show=False):
 
     smoothed_vp = get_vp_from_2dsegy(smoothed_file)
     check_boundary = np.isclose(original_vp[0, 0], smoothed_vp[0, 0])
-    check_centre = np.isclose(
-        original_vp[48, 48], smoothed_vp[48, 48], rtol=1e-3
-    )
+    check_centre = np.isclose(original_vp[48, 48], smoothed_vp[48, 48], rtol=1e-3)
     check_halfway = (
-        original_vp[0, 0] * 1.1
-        < smoothed_vp[31, 41]
-        < original_vp[48, 48] * 0.9
+        original_vp[0, 0] * 1.1 < smoothed_vp[31, 41] < original_vp[48, 48] * 0.9
     )
 
     assert all([check_boundary, check_halfway, check_centre])

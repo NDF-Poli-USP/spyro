@@ -109,9 +109,7 @@ def test_input_models_receivers():
         area2 = triangle_area(p1, p3, r)
         area3 = triangle_area(p3, p4, r)
         area4 = triangle_area(p2, p4, r)
-        test = math.isclose(
-            (area1 + area2 + area3 + area4), areaSquare, rel_tol=1e-09
-        )
+        test = math.isclose((area1 + area2 + area3 + area4), areaSquare, rel_tol=1e-09)
         if test is False:
             test1 = False
 
@@ -223,9 +221,7 @@ def test_input_models_receivers_heterogeneous():
         area2 = triangle_area(p1, p3, r)
         area3 = triangle_area(p3, p4, r)
         area4 = triangle_area(p2, p4, r)
-        test = math.isclose(
-            (area1 + area2 + area3 + area4), areaSquare, rel_tol=1e-09
-        )
+        test = math.isclose((area1 + area2 + area3 + area4), areaSquare, rel_tol=1e-09)
         if test is False:
             test1 = False
 
@@ -274,9 +270,7 @@ def test_input_models_receivers_heterogeneous():
         area2 = triangle_area(p1, p3, r)
         area3 = triangle_area(p3, p4, r)
         area4 = triangle_area(p2, p4, r)
-        test = math.isclose(
-            (area1 + area2 + area3 + area4), areaSquare, rel_tol=1e-09
-        )
+        test = math.isclose((area1 + area2 + area3 + area4), areaSquare, rel_tol=1e-09)
         if test is False:
             test2 = False
 
@@ -306,9 +300,7 @@ def test_grid_calc2d():
         "g_accuracy": 1e-1,
     }
 
-    G = spyro.tools.minimum_grid_point_calculator(
-        grid_point_calculator_parameters
-    )
+    G = spyro.tools.minimum_grid_point_calculator(grid_point_calculator_parameters)
     inside = 6.9 < G and G < 8.0
     print(G)
     assert inside

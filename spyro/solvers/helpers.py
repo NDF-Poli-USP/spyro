@@ -129,10 +129,7 @@ def receivers_local(mesh, dimension, receiver_locations):
         List of receiver locations in cells
     """
     if dimension == 2:
-        return [
-            mesh.locate_cell([z, x], tolerance=0.01)
-            for z, x in receiver_locations
-        ]
+        return [mesh.locate_cell([z, x], tolerance=0.01) for z, x in receiver_locations]
     elif dimension == 3:
         return [
             mesh.locate_cell([z, x, y], tolerance=0.01)

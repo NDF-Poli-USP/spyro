@@ -44,9 +44,7 @@ if model["parallelism"]["type"] is None:
 else:
     # source_number based on the ensemble.ensemble_comm.rank
     source_number = my_ensemble.ensemble_comm.rank
-    rec_data, _ = forward_solver.execute_acoustic(
-        c_true, source_number, wavelet
-    )
+    rec_data, _ = forward_solver.execute_acoustic(c_true, source_number, wavelet)
     sol = forward_solver.solution
     fire.VTKFile(
         "solution_" + str(source_number) + ".pvd", comm=my_ensemble.comm

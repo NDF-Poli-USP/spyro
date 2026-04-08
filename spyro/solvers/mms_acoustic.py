@@ -75,9 +75,7 @@ class AcousticWaveMMS(AcousticWave):
             self.analytical.interpolate(x * (x + 1) * y * (y - 1) * t)
         elif self.dimension == 3:
             z = self.mesh_y
-            self.analytical.interpolate(
-                x * (x + 1) * y * (y - 1) * z * (z - 1) * t
-            )
+            self.analytical.interpolate(x * (x + 1) * y * (y - 1) * z * (z - 1) * t)
         # self.analytical.assign(analytical)
 
         return self.analytical

@@ -109,7 +109,5 @@ def clean_inst_num(data_arr):
     data_arr : `array`
         An array with null or positive components
     """
-    data_arr[
-        np.where(np.isnan(data_arr) | np.isinf(data_arr) | (data_arr < 0.0))
-    ] = 0.0
+    data_arr[np.where(np.isnan(data_arr) | np.isinf(data_arr) | (data_arr < 0.0))] = 0.0
     return data_arr

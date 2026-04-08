@@ -125,9 +125,7 @@ class Eikonal_Modeling:
         self.ele_type = ele_type
 
         # Finite element order for the Eikonal analysis
-        self.p_eik = (
-            p_eik if p_eik is not None else (2 if self.dimension == 2 else 1)
-        )
+        self.p_eik = p_eik if p_eik is not None else (2 if self.dimension == 2 else 1)
 
         # Factor for the stabilizing term in Eikonal equation
         self.f_est = f_est
@@ -557,9 +555,7 @@ class Eikonal_Modeling:
 
                 # Final parameters
                 solv_ok = "Solver Executed Successfully. "
-                print(
-                    (solv_ok + "AbsTol: {:.1e}").format(user_atol), flush=True
-                )
+                print((solv_ok + "AbsTol: {:.1e}").format(user_atol), flush=True)
 
                 return yp
 
@@ -568,9 +564,7 @@ class Eikonal_Modeling:
 
                 # Adjusting tolerance
                 user_atol = (
-                    user_atol * 10
-                    if user_atol < 1e-5
-                    else round(user_atol + 1e-5, 5)
+                    user_atol * 10 if user_atol < 1e-5 else round(user_atol + 1e-5, 5)
                 )
                 if user_atol > 1e-4:
                     print("Tolerance too high. Exiting.", flush=True)
@@ -630,9 +624,9 @@ class Eikonal_Modeling:
 
         if lin_sol is None:
             # Initial guess for nonlinear Eikonal
-            data_eikL = self.initial_guess(
-                c, c_min, V, diam_mesh
-            ).dat.data_with_halos[:]
+            data_eikL = self.initial_guess(c, c_min, V, diam_mesh).dat.data_with_halos[
+                :
+            ]
         else:
             # Clean numerical instabilities
             data_eikL = clean_inst_num(lin_sol.dat.data_with_halos[:])
@@ -655,23 +649,17 @@ class Eikonal_Modeling:
                     user_iter=user_iter,
                 )
                 # Linear Eikonal
-                FeikNL = self.nonlinear_eik(
-                    yp, vy, c, V, diam_mesh, f_est=user_est
-                )
+                FeikNL = self.nonlinear_eik(yp, vy, c, V, diam_mesh, f_est=user_est)
 
                 # Jacobian of the nonlinear Eikonal
                 J = fire.derivative(FeikNL, yp)
 
                 # Solving NL Eikonal
-                fire.solve(
-                    FeikNL == 0, yp, bcs=self.bcs_eik, solver_parameters=p, J=J
-                )
+                fire.solve(FeikNL == 0, yp, bcs=self.bcs_eik, solver_parameters=p, J=J)
 
                 # Final parameters
                 solv_ok = "Solver Executed Successfully. "
-                print(
-                    (solv_ok + "AbsTol: {:.1e}").format(user_atol), flush=True
-                )
+                print((solv_ok + "AbsTol: {:.1e}").format(user_atol), flush=True)
                 print((solv_ok + "Festab: {:.2f}").format(user_est), flush=True)
 
                 return yp

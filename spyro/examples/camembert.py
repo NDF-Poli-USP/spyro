@@ -4,9 +4,7 @@ import firedrake as fire
 import copy
 
 camembert_optimization_parameters = {
-    "General": {
-        "Secant": {"Type": "Limited-Memory BFGS", "Maximum Storage": 10}
-    },
+    "General": {"Secant": {"Type": "Limited-Memory BFGS", "Maximum Storage": 10}},
     "Step": {
         "Type": "Augmented Lagrangian",
         "Augmented Lagrangian": {
@@ -131,9 +129,7 @@ class CamembertVelocity:
         cond = fire.conditional(
             (z - zc) ** 2 + (x - xc) ** 2 < rc**2, c_salt, c_not_salt
         )
-        self.set_initial_velocity_model(
-            conditional=cond, dg_velocity_model=False
-        )
+        self.set_initial_velocity_model(conditional=cond, dg_velocity_model=False)
         return None
 
 

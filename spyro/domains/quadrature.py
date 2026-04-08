@@ -57,9 +57,7 @@ def quadrature_rules(V):
     } and family <= {"Q", "DQ", "TensorProductElement"}:
         dimension = cell_geometry._tdim
         # In this case, for the spectral element method we use GLL quadrature
-        qr_x_rule = gauss_lobatto_legendre_cube_rule(
-            dimension=dimension, degree=degree
-        )
+        qr_x_rule = gauss_lobatto_legendre_cube_rule(dimension=dimension, degree=degree)
         qr_s_rule = gauss_lobatto_legendre_cube_rule(
             dimension=(dimension - 1), degree=degree
         )

@@ -89,9 +89,7 @@ def get_gradient(parallelism_type, points):
         )
     elif parallelism_type == "spatial":
         misfit_list = []
-        for source_id in range(
-            len(dictionary["acquisition"]["source_locations"])
-        ):
+        for source_id in range(len(dictionary["acquisition"]["source_locations"])):
             spyro.io.switch_serial_shot(Wave_obj_exact, source_id)
             spyro.io.switch_serial_shot(Wave_obj_guess, source_id)
             misfit_list.append(
@@ -116,9 +114,7 @@ def test_gradient_serialshots():
     comm = COMM_WORLD
     rank = comm.Get_rank()
     if rank == 0:
-        points = [
-            (random.uniform(-3, 0), random.uniform(0, 3)) for _ in range(20)
-        ]
+        points = [(random.uniform(-3, 0), random.uniform(0, 3)) for _ in range(20)]
     else:
         points = None
     points = comm.bcast(points, root=0)

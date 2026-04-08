@@ -47,15 +47,11 @@ def test_forward_supershot():
     }
     dictionary["acquisition"] = {
         "source_type": "ricker",
-        "source_locations": spyro.create_transect(
-            (-0.55, 0.7), (-0.55, 1.3), 2
-        ),
+        "source_locations": spyro.create_transect((-0.55, 0.7), (-0.55, 1.3), 2),
         "frequency": 5.0,
         "delay": 0.2,
         "delay_type": "time",
-        "receiver_locations": spyro.create_transect(
-            (-0.55, 0.5), (-0.55, 1.5), 200
-        ),
+        "receiver_locations": spyro.create_transect((-0.55, 0.5), (-0.55, 1.5), 200),
     }
 
     # Simulate for 2.0 seconds.
@@ -78,9 +74,7 @@ def test_forward_supershot():
     }
 
     Wave_obj = spyro.AcousticWave(dictionary=dictionary)
-    Wave_obj.set_mesh(
-        input_mesh_parameters={"edge_length": 0.02, "periodic": True}
-    )
+    Wave_obj.set_mesh(input_mesh_parameters={"edge_length": 0.02, "periodic": True})
 
     Wave_obj.set_initial_velocity_model(constant=1.5)
     Wave_obj.forward_solve()

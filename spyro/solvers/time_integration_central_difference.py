@@ -42,9 +42,7 @@ def central_difference(wave, source_ids=[0]):
         # source_cof is a cofunction that represents a point source,
         # being one at a point and zero elsewhere.
         source_cof = wave.sources.source_cofunction()
-        interpolate_receivers = wave.receivers.receiver_interpolator(
-            wave.vstate
-        )
+        interpolate_receivers = wave.receivers.receiver_interpolator(wave.vstate)
     usol_recv = []
     save_step = 0
     for step in range(nt):

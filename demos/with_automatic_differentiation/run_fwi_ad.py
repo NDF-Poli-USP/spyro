@@ -11,9 +11,7 @@ os.environ["OMP_NUM_THREADS"] = "1"
 model = utils.model_settings()
 
 
-def forward(
-    c, compute_functional=False, true_data_receivers=None, annotate=False
-):
+def forward(c, compute_functional=False, true_data_receivers=None, annotate=False):
     """Time-stepping acoustic forward solver.
 
     The time integration is done using a central difference scheme.
@@ -110,9 +108,7 @@ guess_rec, J = forward(
 # :class:`~.EnsembleReducedFunctional` is employed to recompute in
 # parallel the functional and its gradient associated with the multiple sources
 # (3 in this case).
-J_hat = fire_ad.EnsembleReducedFunctional(
-    J, fire_ad.Control(c_guess), my_ensemble
-)
+J_hat = fire_ad.EnsembleReducedFunctional(J, fire_ad.Control(c_guess), my_ensemble)
 c_optimised = fire_ad.minimize(
     J_hat,
     method="L-BFGS-B",

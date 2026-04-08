@@ -278,9 +278,7 @@ class NRBC:
                     bnd_pnts.append(bnd_y - Ly / 2)
 
                 # Normal vector to the boundary
-                unit_nrm_vct = self.hypershape_normal_vector(
-                    bnd_pnts, hyp_axes, n_hyp
-                )
+                unit_nrm_vct = self.hypershape_normal_vector(bnd_pnts, hyp_axes, n_hyp)
 
                 # Cosine of the incidence angle
                 cos_Hig = np.sum(unit_ref_vct * unit_nrm_vct, axis=0)

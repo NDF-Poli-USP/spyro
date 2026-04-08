@@ -75,9 +75,7 @@ def test_acoustic_local_abc():
     wave = spyro.examples.Camembert_acoustic(dictionary=dictionary)
     wave.forward_solve()
     last_acoustic_energy = wave.field_logger.get("acoustic_energy")
-    assert (
-        last_acoustic_energy < 7e-7
-    )  # The expected value was found empirically
+    assert last_acoustic_energy < 7e-7  # The expected value was found empirically
 
 
 def test_immersed_polygon_forward():

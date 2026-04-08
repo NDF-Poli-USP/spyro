@@ -1,5 +1,5 @@
 [tool.black]
-line-length = 80
+line-length = 88
 target-version = ["py39"]
 include = "\\.pyi?$"
 extend-exclude = '''

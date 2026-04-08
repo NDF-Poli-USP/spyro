@@ -36,15 +36,11 @@ def test_forward_3_shots():
     }
     dictionary["acquisition"] = {
         "source_type": "ricker",
-        "source_locations": spyro.create_transect(
-            (-0.55, 0.7), (-0.55, 1.3), 3
-        ),
+        "source_locations": spyro.create_transect((-0.55, 0.7), (-0.55, 1.3), 3),
         "frequency": 5.0,
         "delay": 0.2,
         "delay_type": "time",
-        "receiver_locations": spyro.create_transect(
-            (-0.75, 0.7), (-0.75, 1.3), 200
-        ),
+        "receiver_locations": spyro.create_transect((-0.75, 0.7), (-0.75, 1.3), 200),
     }
     dictionary["time_axis"] = {
         "initial_time": 0.0,  # Initial time for event
@@ -88,9 +84,7 @@ def test_forward_3_shots():
 
     for i in range(Wave_obj.number_of_sources):
         plt.close()
-        plt.plot(
-            time_vector[:cutoff], analytical_p[:cutoff], "--", label="analyt"
-        )
+        plt.plot(time_vector[:cutoff], analytical_p[:cutoff], "--", label="analyt")
         spyro.io.switch_serial_shot(Wave_obj, i)
         rec_out = Wave_obj.forward_solution_receivers
         if i == 0:

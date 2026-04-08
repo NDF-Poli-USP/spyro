@@ -64,9 +64,7 @@ class HABC_Damping:
         Determine the initial search range for the heuristic factor xCR
     """
 
-    def __init__(
-        self, dom_lay, layer_par, mesh_par, wave_par, dimension=2, comm=None
-    ):
+    def __init__(self, dom_lay, layer_par, mesh_par, wave_par, dimension=2, comm=None):
         """Initialize the HABC_Damping class.
 
         Parameters
@@ -216,9 +214,7 @@ class HABC_Damping:
             Heuristic factor for the minimum damping ratio
         """
         if typ_CR not in ["CR_PSI", "CR_FEM", "CR_ERR"]:
-            value_parameter_error(
-                "typ_CR", typ_CR, ["CR_PSI", "CR_FEM", "CR_ERR"]
-            )
+            value_parameter_error("typ_CR", typ_CR, ["CR_PSI", "CR_FEM", "CR_ERR"])
 
         if typ_CR == "CR_PSI":
             # Minimum coefficient reflection
@@ -261,11 +257,7 @@ class HABC_Damping:
                         "ele_type", ele_type, ["lumped", "consistent"]
                     )
 
-                Z_fem = (
-                    m2
-                    * (np.cos(alpha * p) - 1)
-                    / (m1 * (np.cos(alpha * p) + 1))
-                )
+                Z_fem = m2 * (np.cos(alpha * p) - 1) / (m1 * (np.cos(alpha * p) + 1))
 
                 return Z_fem
 
@@ -383,15 +375,11 @@ class HABC_Damping:
         xCR_reg = (xCR_inf, xCR_sup, xCR_ini, xCR_fem)
         CRmin_reg = (CRmin_inf, CRmin_sup, CRmin_ini, CRmin_fem)
         xCR_lim = (xCR_inf, xCR_sup, xCR_ini)
-        psi_min, xCR_est, CRmin = self.regression_CRmin(
-            xCR_reg, CRmin_reg, xCR_lim
-        )
+        psi_min, xCR_est, CRmin = self.regression_CRmin(xCR_reg, CRmin_reg, xCR_lim)
 
         return psi_min, xCR_est, xCR_lim[:2], CRmin
 
-    def calc_damping_properties(
-        self, fundam_freq, xCR_usu=None, psi_damp=0.999
-    ):
+    def calc_damping_properties(self, fundam_freq, xCR_usu=None, psi_damp=0.999):
         """Compute the damping properties for the absorbing layer.
 
         Parameters
@@ -420,15 +408,11 @@ class HABC_Damping:
         # Critical damping coefficient
         eta_crt = 2 * np.pi * fundam_freq
         eta_max = psi_damp * eta_crt
-        parallel_print(
-            f"Critical Damping Coefficient (1/s): {eta_crt:.5f}", self.comm
-        )
+        parallel_print(f"Critical Damping Coefficient (1/s): {eta_crt:.5f}", self.comm)
 
         # Maximum damping ratio and coefficient
         parallel_print(f"Maximum Damping Ratio: {psi_damp:.3%}", self.comm)
-        parallel_print(
-            f"Maximum Damping Coefficient (1/s): {eta_max:.5f}", self.comm
-        )
+        parallel_print(f"Maximum Damping Coefficient (1/s): {eta_max:.5f}", self.comm)
 
         # Minimum damping ratio and the associated heuristic factor
         psi_min, xCR_est, xCR_lim, CRmin = self.est_min_damping()
@@ -445,18 +429,14 @@ class HABC_Damping:
 
         # Minimum damping ratio and coefficient
         eta_min = psi_min * eta_crt
-        parallel_print(
-            "Minimum Damping Ratio: {:.3%}".format(psi_min), self.comm
-        )
+        parallel_print("Minimum Damping Ratio: {:.3%}".format(psi_min), self.comm)
         psi_str = (
             "Range for Minimum Damping Ratio. "
             + f"Min:{xCR_inf * self.d_norm:.5f} - "
             + f"Max:{xCR_sup * self.d_norm:.5f}"
         )
         parallel_print(psi_str, self.comm)
-        parallel_print(
-            f"Minimum Damping Coefficient (1/s): {eta_min:.5f}", self.comm
-        )
+        parallel_print(f"Minimum Damping Coefficient (1/s): {eta_min:.5f}", self.comm)
 
         # Heuristic factor and its range
         parallel_print(xcr_str.format(xCR), self.comm)
@@ -558,9 +538,7 @@ class HABC_Damping:
             fainv = 1 / fa
             fb = (1 + Rab**2 * (1 + Rbc**2)) ** 0.5 / Rab  # Factoring 1/b^2
             fbinv = 1 / fb
-            fc = (Rac**2 + (Rac * Rbc) ** 2 + Rbc**2) ** 0.5 / (
-                Rac * Rbc
-            )  # 1/c^2
+            fc = (Rac**2 + (Rac * Rbc) ** 2 + Rbc**2) ** 0.5 / (Rac * Rbc)  # 1/c^2
             fcinv = 1 / fc
             fmin = f_Vh / 8 * min(fainv, fbinv, min(fc, fcinv))
             fmax = 8 / f_Vh * max(fa, fb, max(fc, 1 / fc))

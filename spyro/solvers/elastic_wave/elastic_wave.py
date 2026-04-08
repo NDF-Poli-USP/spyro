@@ -23,9 +23,7 @@ class ElasticWave(Wave, metaclass=ABCMeta):
             else:
                 raise Exception(f"Invalid synthetic data type: {d['type']}")
         else:
-            raise Exception(
-                "Input dictionary must contain ['synthetic_data']['type']"
-            )
+            raise Exception("Input dictionary must contain ['synthetic_data']['type']")
 
     @abstractmethod
     def initialize_model_parameters_from_object(self, synthetic_data_dict):

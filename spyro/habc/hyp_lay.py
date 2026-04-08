@@ -112,14 +112,12 @@ class HyperLayer:
         # Validate input arguments
         if not isinstance(domain_dim, tuple):
             raise TypeError(
-                "domain_dim must be a tuple, "
-                f"got {type(domain_dim).__name__}."
+                "domain_dim must be a tuple, " f"got {type(domain_dim).__name__}."
             )
 
         if not isinstance(n_hyp, (int, float)):
             raise TypeError(
-                "n_hyp must be a number (int or float), "
-                f"got {type(n_hyp).__name__}."
+                "n_hyp must be a number (int or float), " f"got {type(n_hyp).__name__}."
             )
 
         if n_hyp < 2.0:
@@ -504,9 +502,7 @@ class HyperLayer:
                 0.5 * Ly + pad_len * np.cos(phi),
             )
 
-        n_max = self.calc_degree_hypershape(
-            x_max, "MAX", n_min=n_min, monitor=monitor
-        )
+        n_max = self.calc_degree_hypershape(x_max, "MAX", n_min=n_min, monitor=monitor)
         print(
             "Maximum Degree for Hypershape n_max: {:>.1f}".format(n_max),
             flush=True,
@@ -520,13 +516,9 @@ class HyperLayer:
         else:
             hyp_str = "Degree for Hypershape Layer. Setting to"
             if n_hyp < n_min:
-                print(
-                    "Low", hyp_str, "n_min: {:>.1f}".format(n_min), flush=True
-                )
+                print("Low", hyp_str, "n_min: {:>.1f}".format(n_min), flush=True)
             elif n_hyp > n_max:
-                print(
-                    "High", hyp_str, "n_max: {:>.1f}".format(n_max), flush=True
-                )
+                print("High", hyp_str, "n_max: {:>.1f}".format(n_max), flush=True)
 
         self.n_hyp = np.clip(n_hyp, n_min, n_max)
         self.n_bounds = (n_min, n_max)

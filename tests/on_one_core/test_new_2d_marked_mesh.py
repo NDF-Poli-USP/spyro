@@ -107,9 +107,7 @@ def test_2d_wave_adapted_marked_mesh():
     mesh_parameters.source_frequency = frequency
     mesh_parameters.mesh_type = "spyro_mesh"
     meshing_obj = spyro.meshing.AutomaticMesh(mesh_parameters)
-    mesh = (
-        meshing_obj.create_mesh()
-    )  # This is our mesh adapted to the velocity model
+    mesh = meshing_obj.create_mesh()  # This is our mesh adapted to the velocity model
 
     # LEt us check if our wave adapted mesh is wave adapted
     # ---------------------------------------------------------

@@ -211,9 +211,7 @@ def test_constant_mat_prop(wave_instance, cell_type):
             )
 
         except fire.ConvergenceError as e:
-            pytest.fail(
-                f"Setting {property_name} raised an exception: {str(e)}"
-            )
+            pytest.fail(f"Setting {property_name} raised an exception: {str(e)}")
 
 
 @pytest.mark.parametrize("cell_type", ["T", "Q"])
@@ -290,9 +288,7 @@ def test_random_mat_prop(wave_instance, cell_type):
             )
 
         except fire.ConvergenceError as e:
-            pytest.fail(
-                f"Setting {property_name} raised an exception: {str(e)}"
-            )
+            pytest.fail(f"Setting {property_name} raised an exception: {str(e)}")
 
 
 def numerical_values_cond(property_name, coords, below_thrs, above_thrs):
@@ -369,9 +365,7 @@ def get_only_mesh_vertices(wave_obj):
         wave_obj.mesh.coordinates
     )
     coords = wave_obj.mesh.coordinates.dat.data_with_halos
-    mask_pnt = np.where(
-        np.isin(mesh_f.dat.data_with_halos, coords).all(axis=1)
-    )[0]
+    mask_pnt = np.where(np.isin(mesh_f.dat.data_with_halos, coords).all(axis=1))[0]
 
     return coords, mask_pnt
 
@@ -499,9 +493,7 @@ def test_conditional_mat_prop(wave_instance, cell_type):
             )
 
         except fire.ConvergenceError as e:
-            pytest.fail(
-                f"Setting {property_name} raised an exception: {str(e)}"
-            )
+            pytest.fail(f"Setting {property_name} raised an exception: {str(e)}")
 
 
 def numerical_values_expr(property_name, coords):
@@ -611,9 +603,7 @@ def test_expression_mat_prop(wave_instance, cell_type):
             print(f"{property_name} Verified: Expression values", flush=True)
 
         except fire.ConvergenceError as e:
-            pytest.fail(
-                f"Setting {property_name} raised an exception: {str(e)}"
-            )
+            pytest.fail(f"Setting {property_name} raised an exception: {str(e)}")
 
 
 def get_coords_DG0(wave_obj, coords):
@@ -786,14 +776,10 @@ def test_vector_mat_prop(wave_instance, cell_type):
         wave_obj.set_material_property("dummy_z", "scalar", constant=alphaT_o)
     )
     dummy.sub(1).assign(
-        wave_obj.set_material_property(
-            "dummy_x", "scalar", constant=2 * alphaT_o
-        )
+        wave_obj.set_material_property("dummy_x", "scalar", constant=2 * alphaT_o)
     )
     dummy.sub(2).assign(
-        wave_obj.set_material_property(
-            "dummy_y", "scalar", constant=3 * alphaT_o
-        )
+        wave_obj.set_material_property("dummy_y", "scalar", constant=3 * alphaT_o)
     )
 
     # Different function space (DG0)
@@ -810,9 +796,7 @@ def test_vector_mat_prop(wave_instance, cell_type):
 
     # Get the mean value vectorial component to verify
     dx = fire.dx(**wave_obj.quadrature_rule)
-    dummy_vol = wave_obj.set_material_property(
-        "dummy_vol", "scalar", constant=1.0
-    )
+    dummy_vol = wave_obj.set_material_property("dummy_vol", "scalar", constant=1.0)
     volume = fire.assemble(dummy_vol * dx)
 
     exp_v0 = fire.assemble(dummy.sub(0) * dx) / volume

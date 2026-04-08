@@ -38,9 +38,7 @@ model["acquisition"] = {
     "frequency": 5.0,
     "delay": 1.0,
     "num_receivers": 500,
-    "receiver_locations": spyro.create_transect(
-        (-0.10, 0.1), (-0.10, 17.0), 500
-    ),
+    "receiver_locations": spyro.create_transect((-0.10, 0.1), (-0.10, 17.0), 500),
 }
 model["timeaxis"] = {
     "t0": 0.0,  # Initial time for event
@@ -62,8 +60,6 @@ wavelet = spyro.full_ricker_wavelet(
     tf=model["timeaxis"]["tf"],
     freq=model["acquisition"]["frequency"],
 )
-p, p_r = spyro.solvers.forward(
-    model, mesh, comm, vp, sources, wavelet, receivers
-)
+p, p_r = spyro.solvers.forward(model, mesh, comm, vp, sources, wavelet, receivers)
 spyro.plots.plot_shots(model, comm, p_r, vmin=-1e-3, vmax=1e-3)
 spyro.io.save_shots(model, comm, p_r)

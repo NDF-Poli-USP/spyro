@@ -451,9 +451,7 @@ class Modal_Solver:
 
             # Compute the energy
             fire.solve(a == L, u)
-            bilinear_term = fire.Constant(0.5) * fire.inner(
-                fire.grad(u), fire.grad(u)
-            )
+            bilinear_term = fire.Constant(0.5) * fire.inner(fire.grad(u), fire.grad(u))
             energy = fire.assemble(c * c * bilinear_term * dx)
 
             # Compute the equivalent velocity
@@ -746,9 +744,7 @@ class Modal_Solver:
             f_max = 2.0 * fax_trunc
             fn2 = area_function(2.0, cut_plane_percent)
             fr_ell = fn2 / area_function(2.0, 1.0)
-            fr_rec = area_function(100.0, cut_plane_percent) / area_function(
-                100.0, 1.0
-            )
+            fr_rec = area_function(100.0, cut_plane_percent) / area_function(100.0, 1.0)
             f_data = area_function(n_data, cut_plane_percent)
 
         if self.dimension == 3:  # 3D
@@ -971,9 +967,7 @@ class Modal_Solver:
 
         # Frequency factors
         f_rec = self.freq_factor_rec(hyp_axes, bc=bc)
-        f_ell = self.freq_factor_ell(
-            hyp_axes, bc=bc, all_axes_equal=all_axes_equal
-        )
+        f_ell = self.freq_factor_ell(hyp_axes, bc=bc, all_axes_equal=all_axes_equal)
         f_hyp, c_reg = self.freq_factor_hyp(
             n_hyp,
             f_rec,
@@ -989,9 +983,7 @@ class Modal_Solver:
             f"Hypershape Equivalent Velocity c_eq (km/s) = {c_reg:.3f}",
             flush=True,
         )
-        print(
-            f"Hypershape Frequency factor f_hyp (1/km): {f_hyp:.3f}", flush=True
-        )
+        print(f"Hypershape Frequency factor f_hyp (1/km): {f_hyp:.3f}", flush=True)
 
         # Eigenvalue
         Lsp = (c_reg * f_hyp) ** 2
@@ -1145,9 +1137,7 @@ class Modal_Solver:
                 A_term = fire.assemble(
                     c * c * fire.inner(grad_eig[i], grad_eig[j]) * dx
                 )
-                M_term = fire.assemble(
-                    fire.inner(eig_funcs[i], eig_funcs[j]) * dx
-                )
+                M_term = fire.assemble(fire.inner(eig_funcs[i], eig_funcs[j]) * dx)
 
                 # Set symmetric entries
                 Asp[i, j] = A_term
@@ -1330,9 +1320,7 @@ class Modal_Solver:
             if shift > 0:
                 a += fire.Constant(shift) * m
 
-            Asp, Msp_inv = self.assemble_sparse_matrices(
-                a, m, return_M_inv=True
-            )
+            Asp, Msp_inv = self.assemble_sparse_matrices(a, m, return_M_inv=True)
             Lsp = Msp_inv.multiply(Asp)
             max_eigval = np.amax(np.abs(Lsp.diagonal())) - shift
 
@@ -1342,9 +1330,7 @@ class Modal_Solver:
                 c, V=V, shift=shift, quad_rule=quad_rule, inv_oper=inv_oper
             )
             # (eig = 0 is a rigid body motion)
-            max_eigval = max(
-                np.unique(Lsp[(Lsp > 0.0) & (np.imag(Lsp) == 0.0)])
-            )
+            max_eigval = max(np.unique(Lsp[(Lsp > 0.0) & (np.imag(Lsp) == 0.0)]))
 
         # Maximum stable timestep
         max_dt = float(np.real(2.0 / np.sqrt(max_eigval)))

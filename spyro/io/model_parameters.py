@@ -10,9 +10,7 @@ from .. import utils
 from .. import meshing
 
 
-class Model_parameters(
-    Read_options, Read_boundary_layer, Read_time_axis, Read_outputs
-):
+class Model_parameters(Read_options, Read_boundary_layer, Read_time_axis, Read_outputs):
     """Class that reads and sanitizes input parameters.
 
     Attributes
@@ -182,9 +180,7 @@ class Model_parameters(
         self.input_dictionary = dictionary
 
         # some default parameters we might use in the future
-        self.input_dictionary.setdefault(
-            "equation_type", "second_order_in_pressure"
-        )
+        self.input_dictionary.setdefault("equation_type", "second_order_in_pressure")
         self.equation_type = self.input_dictionary["equation_type"]
 
         # Get options
@@ -216,12 +212,8 @@ class Model_parameters(
         )
         self.delay_type = self.input_dictionary["acquisition"]["delay_type"]
 
-        self.input_dictionary["acquisition"].setdefault(
-            "source_locations", None
-        )
-        self.source_locations = self.input_dictionary["acquisition"][
-            "source_locations"
-        ]
+        self.input_dictionary["acquisition"].setdefault("source_locations", None)
+        self.source_locations = self.input_dictionary["acquisition"]["source_locations"]
 
         # Setting up MPI communicator and checking parallelism:
         self.input_dictionary.setdefault("parallelism", {})
@@ -232,10 +224,7 @@ class Model_parameters(
         Read_boundary_layer.__init__(self)
 
         # Checking mesh_parameters
-        if (
-            self.cell_type == "quadrilateral"
-            or self.method == "spectral_quadrilateral"
-        ):
+        if self.cell_type == "quadrilateral" or self.method == "spectral_quadrilateral":
             quadrilateral = True
         else:
             quadrilateral = False
@@ -250,15 +239,13 @@ class Model_parameters(
             quadrilateral=quadrilateral,
             method=self.method,
             degree=self.degree,
-            abc_pad_length=self.input_dictionary[
-                "absorving_boundary_conditions"
-            ]["pad_length"],
+            abc_pad_length=self.input_dictionary["absorving_boundary_conditions"][
+                "pad_length"
+            ],
             negative_z=self.input_dictionary["mesh"]["negative_z"],
         )
 
-        self.input_dictionary["acquisition"].setdefault(
-            "receiver_locations", None
-        )
+        self.input_dictionary["acquisition"].setdefault("receiver_locations", None)
         self.receiver_locations = self.input_dictionary["acquisition"][
             "receiver_locations"
         ]
@@ -271,9 +258,7 @@ class Model_parameters(
         self.gradient_sampling_frequency = self.input_dictionary["time_axis"][
             "gradient_sampling_frequency"
         ]
-        self.output_frequency = self.input_dictionary["time_axis"][
-            "output_frequency"
-        ]
+        self.output_frequency = self.input_dictionary["time_axis"]["output_frequency"]
         self._sanitize_automatic_adjoint()
 
         # add random string for temp files
@@ -373,9 +358,7 @@ class Model_parameters(
     @equation_type.setter
     def equation_type(self, value):
         if value != "second_order_in_pressure":
-            raise ValueError(
-                "The equation type specified is not implemented yet"
-            )
+            raise ValueError("The equation type specified is not implemented yet")
         self._equation_type = value
 
     @property
@@ -392,9 +375,9 @@ class Model_parameters(
         _validate_enum(value, accepted_values, "parallelism_type")
 
         if value == "custom":
-            self.shot_ids_per_propagation = self.input_dictionary[
-                "parallelism"
-            ]["shot_ids_per_propagation"]
+            self.shot_ids_per_propagation = self.input_dictionary["parallelism"][
+                "shot_ids_per_propagation"
+            ]
         elif value == "automatic":
             self.shot_ids_per_propagation = [
                 [i] for i in range(0, self.number_of_sources)
@@ -424,10 +407,8 @@ class Model_parameters(
         if self.dt > 1.0:
             warnings.warn(f"Time step of {self.dt} too big.")
         if self.dt is None:
-            warnings.warn(
-                "Timestep not given. Will calculate internally when user \
-                    attemps to propagate wave."
-            )
+            warnings.warn("Timestep not given. Will calculate internally when user \
+                    attemps to propagate wave.")
 
     def set_mesh(self, user_mesh=None, input_mesh_parameters={}):
         """Set the mesh for the model.
@@ -501,9 +482,7 @@ class Model_parameters(
         elif self.user_mesh is not None:
             return self.user_mesh
         elif self.mesh_parameters.automatic_mesh:
-            autoMeshing = meshing.AutomaticMesh(
-                mesh_parameters=self.mesh_parameters
-            )
+            autoMeshing = meshing.AutomaticMesh(mesh_parameters=self.mesh_parameters)
             self.user_mesh = autoMeshing.create_mesh()
             return self.user_mesh
         else:

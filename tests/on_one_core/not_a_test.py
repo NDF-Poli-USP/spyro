@@ -87,9 +87,7 @@ def test_gradient_talyor_remainder_v2():
                 receivers,
                 output=False,
             )
-            self.misfit = spyro.utils.evaluate_misfit(
-                model, p_guess_recv, p_exact_recv
-            )
+            self.misfit = spyro.utils.evaluate_misfit(model, p_guess_recv, p_exact_recv)
             J = spyro.utils.compute_functional(model, self.misfit)
             return J
 

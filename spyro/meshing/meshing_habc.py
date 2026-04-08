@@ -174,9 +174,7 @@ class HABC_Mesh:
             fdim = 3**0.5
 
         # Minimum and maximum mesh size for habc parameters
-        diam = fire.assemble(
-            fire.interpolate(self.diam_mesh, self.function_space)
-        )
+        diam = fire.assemble(fire.interpolate(self.diam_mesh, self.function_space))
         self.lmin = round(diam.dat.data_with_halos.min() / fdim, 6)
         self.lmax = round(diam.dat.data_with_halos.max() / fdim, 6)
 
@@ -241,20 +239,14 @@ class HABC_Mesh:
 
         # Boundary array
         left_boundary = np.where(x_data <= self.tol)
-        right_boundary = np.where(
-            x_data >= self.mesh_parameters.length_x - self.tol
-        )
-        bottom_boundary = np.where(
-            z_data <= self.tol - self.mesh_parameters.length_z
-        )
+        right_boundary = np.where(x_data >= self.mesh_parameters.length_x - self.tol)
+        bottom_boundary = np.where(z_data <= self.tol - self.mesh_parameters.length_z)
         bnds = (left_boundary, right_boundary, bottom_boundary)
 
         if self.dimension == 3:  # 3D
             y_data = node_positions[2]
             left_bnd_y = np.where(y_data <= self.tol)
-            right_bnd_y = np.where(
-                y_data >= self.mesh_parameters.length_y - self.tol
-            )
+            right_bnd_y = np.where(y_data >= self.mesh_parameters.length_y - self.tol)
             bnds += (
                 left_bnd_y,
                 right_bnd_y,
@@ -277,9 +269,7 @@ class HABC_Mesh:
         node_positions = self.extract_node_positions(self.function_space)
 
         # Extract boundary node indices
-        bnds = self.extract_bnd_node_indices(
-            node_positions, self.function_space
-        )
+        bnds = self.extract_bnd_node_indices(node_positions, self.function_space)
         self.bnds = np.unique(
             np.concatenate([idxs for idx_list in bnds for idxs in idx_list])
         )
@@ -367,9 +357,7 @@ class HABC_Mesh:
         self.c = fire.Function(self.function_space, name="c_orig [km/s])")
         self.c.assign(
             fire.assemble(
-                fire.interpolate(
-                    self.initial_velocity_model, self.function_space
-                )
+                fire.interpolate(self.initial_velocity_model, self.function_space)
             )
         )
 
@@ -461,9 +449,7 @@ class HABC_Mesh:
                 )
                 # fire.VTKFile("output/quad_habc.pvd").write(quad_habc)
 
-                mesh_habc = fire.ExtrudedMesh(
-                    quad_habc, ny, layer_height=Ly_habc / ny
-                )
+                mesh_habc = fire.ExtrudedMesh(quad_habc, ny, layer_height=Ly_habc / ny)
                 # fire.VTKFile("output/extr_habc.pvd").write(mesh_habc)
             else:
                 mesh_habc = fire.BoxMesh(
@@ -609,9 +595,7 @@ class HABC_Mesh:
             bnd_pts = self.bnd_pnts_hyp_2D(a_hyp, b_hyp, n_hyp, num_bnd_pts)
 
             # Filter hyperellipse points based on the truncation plane z0
-            filt_bnd_pts = np.array(
-                [point for point in bnd_pts if point[1] <= z0]
-            )
+            filt_bnd_pts = np.array([point for point in bnd_pts if point[1] <= z0])
             print(
                 pnt_str,
                 f"Truncated Hyperellipse: {len(filt_bnd_pts)}",
@@ -628,12 +612,8 @@ class HABC_Mesh:
             filt_bnd_pts[ini_trunc + 1] = np.array([-x0, z0])
 
             # Insert new points to create a rectangular trunc
-            new_pnts = np.array(
-                [[xdom, z0], [xdom, -z0], [-xdom, -z0], [-xdom, z0]]
-            )
-            filt_bnd_pts = np.insert(
-                filt_bnd_pts, ini_trunc + 1, new_pnts, axis=0
-            )
+            new_pnts = np.array([[xdom, z0], [xdom, -z0], [-xdom, -z0], [-xdom, z0]])
+            filt_bnd_pts = np.insert(filt_bnd_pts, ini_trunc + 1, new_pnts, axis=0)
             end_trunc = ini_trunc + 5
 
             # Points before and after truncation
@@ -794,16 +774,12 @@ class HABC_Mesh:
                     spln = False
 
                 else:
-                    print(
-                        f"Error Meshing with Lines: {e}. Exiting.", flush=True
-                    )
+                    print(f"Error Meshing with Lines: {e}. Exiting.", flush=True)
                     break
 
         # Mesh is transformed into a firedrake mesh
         q = {"overlap_type": (fire.DistributedMeshOverlapType.NONE, 0)}
-        hyp_mesh = fire.Mesh(
-            hyp_mesh, distribution_parameters=q, comm=self.comm.comm
-        )
+        hyp_mesh = fire.Mesh(hyp_mesh, distribution_parameters=q, comm=self.comm.comm)
 
         # Adjusting coordinates: Swap (x,z) -> (z,x) and apply offsets
         hyp_mesh.coordinates.dat.data_with_halos[:, [0, 1]] = (
@@ -849,9 +825,7 @@ class HABC_Mesh:
         coord_rec = rec_mesh.coordinates.dat.data_with_halos
 
         # Create KDTree for efficient nearest neighbor search
-        boundary_coords = np.column_stack(
-            (self.bnd_nodes[0], self.bnd_nodes[1])
-        )
+        boundary_coords = np.column_stack((self.bnd_nodes[0], self.bnd_nodes[1]))
         boundary_tree = cKDTree(boundary_coords)
 
         # Add all vertices from rectangular mesh and create mapping
@@ -864,9 +838,7 @@ class HABC_Mesh:
 
             # Check if the point is on the original boundary
             if (
-                boundary_tree.query(
-                    coord, distance_upper_bound=self.tol, workers=-1
-                )[0]
+                boundary_tree.query(coord, distance_upper_bound=self.tol, workers=-1)[0]
                 <= self.tol
             ):
                 boundary_coords.append(coord)
@@ -1322,9 +1294,9 @@ class HABC_Mesh:
             val_condy2 = (y - Ly) ** 2 if type_marker == "damping" else 1.0
 
             # Conditional expressions for the mask
-            y_pd = fire.conditional(
-                y < 0.0, val_condy1, 0.0
-            ) + fire.conditional(y > Ly, val_condy2, 0.0)
+            y_pd = fire.conditional(y < 0.0, val_condy1, 0.0) + fire.conditional(
+                y > Ly, val_condy2, 0.0
+            )
             ref += y_pd
 
         # Final value for the mask
@@ -1368,9 +1340,7 @@ class HABC_Mesh:
             ref = fire.conditional(ref > 0, 1.0, 0.0)
 
         else:
-            value_parameter_error(
-                "type_marker", type_marker, ["damping", "mask"]
-            )
+            value_parameter_error("type_marker", type_marker, ["damping", "mask"])
 
         layer_mask = fire.Function(V, name=name_mask)
         layer_mask.assign(fire.assemble(fire.interpolate(ref, V)))
@@ -1401,18 +1371,12 @@ class HABC_Mesh:
         if self.quadrilateral:
             base_mesh = self.mesh._base_mesh
             base_cell = base_mesh.ufl_cell()
-            element_zx = fire.FiniteElement(
-                "DQ", base_cell, 0, variant="spectral"
-            )
-            element_y = fire.FiniteElement(
-                "DG", fire.interval, 0, variant="spectral"
-            )
+            element_zx = fire.FiniteElement("DQ", base_cell, 0, variant="spectral")
+            element_y = fire.FiniteElement("DG", fire.interval, 0, variant="spectral")
             tensor_element = fire.TensorProductElement(element_zx, element_y)
             W_sp = fire.VectorFunctionSpace(self.mesh, tensor_element)
         else:
-            W_sp = fire.VectorFunctionSpace(
-                self.mesh, self.ele_type_c0, self.p_c0
-            )
+            W_sp = fire.VectorFunctionSpace(self.mesh, self.ele_type_c0, self.p_c0)
 
         # Mesh coordinates
         coords = fire.SpatialCoordinate(self.mesh)
@@ -1436,9 +1400,7 @@ class HABC_Mesh:
         layer_mask = self.layer_mask_field(coords, V, type_marker="mask")
 
         # Field with clipped coordinates only in the absorbing layer
-        lay_field.assign(
-            fire.assemble(fire.interpolate(lay_field * layer_mask, W_sp))
-        )
+        lay_field.assign(fire.assemble(fire.interpolate(lay_field * layer_mask, W_sp)))
 
         return lay_field, layer_mask
 
@@ -1484,9 +1446,7 @@ class HABC_Mesh:
 
         return cloud_field
 
-    def extend_velocity_profile(
-        self, lay_field, layer_mask, method="point_cloud"
-    ):
+    def extend_velocity_profile(self, lay_field, layer_mask, method="point_cloud"):
         """Extend the velocity profile inside the absorbing layer.
 
         Parameters
@@ -1538,9 +1498,7 @@ class HABC_Mesh:
             del pts_to_extend
 
         else:
-            value_parameter_error(
-                "method", method, ["point_cloud", "nearest_point"]
-            )
+            value_parameter_error("method", method, ["point_cloud", "nearest_point"])
 
         # Velocity profile inside the layer
         lay_field.dat.data_with_halos[ind_nodes, 0] = vel_to_extend

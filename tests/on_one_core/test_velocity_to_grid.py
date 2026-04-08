@@ -72,15 +72,9 @@ def test_velocity_to_grid():
 
     vp = grid_velocity_data["vp_values"]
     nz, nx = vp.shape
-    z_grid = np.linspace(
-        -grid_velocity_data["length_z"], 0.0, nz, dtype=np.float32
-    )
-    x_grid = np.linspace(
-        0.0, grid_velocity_data["length_x"], nx, dtype=np.float32
-    )
-    interpolator = RegularGridInterpolator(
-        (z_grid, x_grid), vp, bounds_error=False
-    )
+    z_grid = np.linspace(-grid_velocity_data["length_z"], 0.0, nz, dtype=np.float32)
+    x_grid = np.linspace(0.0, grid_velocity_data["length_x"], nx, dtype=np.float32)
+    interpolator = RegularGridInterpolator((z_grid, x_grid), vp, bounds_error=False)
 
     # Generate random points inside and outside the circle
     # Generate 5 random points inside the circle

@@ -177,9 +177,7 @@ class Wave(Model_parameters, metaclass=ABCMeta):
         if parameters is not None:
             self.solver_parameters = parameters
         elif parameters is None:
-            self.solver_parameters = get_default_parameters_for_method(
-                self.method
-            )
+            self.solver_parameters = get_default_parameters_for_method(self.method)
 
     def get_spatial_coordinates(self):
         if self.dimension == 2:
@@ -240,9 +238,9 @@ class Wave(Model_parameters, metaclass=ABCMeta):
             vp = eval_functions_to_ufl.generate_ufl_functions(
                 self.mesh, expression, self.dimension
             )
-            self.initial_velocity_model = fire.Function(
-                V, name="velocity"
-            ).interpolate(vp)
+            self.initial_velocity_model = fire.Function(V, name="velocity").interpolate(
+                vp
+            )
 
         elif velocity_model_function is not None:
             self.initial_velocity_model = velocity_model_function
@@ -312,9 +310,7 @@ class Wave(Model_parameters, metaclass=ABCMeta):
             self.mesh_x = x
             self.mesh_y = y
 
-    def get_and_set_maximum_dt(
-        self, fraction=0.7, estimate_max_eigenvalue=False
-    ):
+    def get_and_set_maximum_dt(self, fraction=0.7, estimate_max_eigenvalue=False):
         """Calculates and sets the maximum stable time step (dt) for the wave
         solver.
 
@@ -335,9 +331,7 @@ class Wave(Model_parameters, metaclass=ABCMeta):
 
         # Maximum timestep size
         method = "ANALYTICAL" if estimate_max_eigenvalue else "ARNOLDI"
-        dt_solver = Modal_Solver(
-            self.dimension, method=method, calc_max_dt=True
-        )
+        dt_solver = Modal_Solver(self.dimension, method=method, calc_max_dt=True)
         max_dt = dt_solver.estimate_timestep(
             c,
             self.function_space,
@@ -475,9 +469,7 @@ class Wave(Model_parameters, metaclass=ABCMeta):
 
     def set_material_properties(self, *args, **kwargs):
         """Wrapper for material_properties_io.set_material_property."""
-        return material_properties_io.set_material_property(
-            self, *args, **kwargs
-        )
+        return material_properties_io.set_material_property(self, *args, **kwargs)
 
     def set_material_property(self, *args, **kwargs):
         """Backward-compatible alias for set_material_properties."""

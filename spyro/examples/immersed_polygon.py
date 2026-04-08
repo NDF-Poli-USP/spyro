@@ -7,9 +7,7 @@ import copy
 # TODO: add correct citation as soon as Thiago's paper is published
 
 polygon_optimization_parameters = {
-    "General": {
-        "Secant": {"Type": "Limited-Memory BFGS", "Maximum Storage": 10}
-    },
+    "General": {"Secant": {"Type": "Limited-Memory BFGS", "Maximum Storage": 10}},
     "Step": {
         "Type": "Augmented Lagrangian",
         "Augmented Lagrangian": {
@@ -113,9 +111,7 @@ class Polygon_velocity:
         v1 = polygon_dict["upper_layer"]
         v2 = polygon_dict["middle_layer"]  # background vp (km/s)
         vl = polygon_dict["lower_layer"]  # lower layer (km/s)
-        dv = (
-            polygon_dict["polygon_layer_perturbation"] * v2
-        )  # 30% of perturbation
+        dv = polygon_dict["polygon_layer_perturbation"] * v2  # 30% of perturbation
         d0 = -water_layer_depth
         d1 = d0 - 0.14
         d2 = d1 - 0.2
@@ -141,9 +137,7 @@ class Polygon_velocity:
             )
             cond = fire.conditional(z <= middle_of_pad, v0, cond)
 
-        self.set_initial_velocity_model(
-            conditional=cond, dg_velocity_model=False
-        )
+        self.set_initial_velocity_model(conditional=cond, dg_velocity_model=False)
         return None
 
 

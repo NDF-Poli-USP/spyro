@@ -28,9 +28,7 @@ def check_gradient(Wave_obj_guess, dJ, rec_out_exact, Jm, plot=False):
         J_plusdm = spyro.utils.compute_functional(Wave_obj_guess, misfit_plusdm)
 
         grad_fd = (J_plusdm - Jm) / (step)
-        projnorm = fire.assemble(
-            dJ * dm * fire.dx(**Wave_obj_guess.quadrature_rule)
-        )
+        projnorm = fire.assemble(dJ * dm * fire.dx(**Wave_obj_guess.quadrature_rule))
 
         error = 100 * ((grad_fd - projnorm) / projnorm)
 
@@ -58,9 +56,7 @@ def check_gradient(Wave_obj_guess, dJ, rec_out_exact, Jm, plot=False):
     print(f"Last gradient error less than 1 percent: {test1}")
 
     # Checking if error follows expected finite difference error convergence
-    test2 = math.isclose(
-        np.log(abs(theory[-1])), np.log(abs(errors[-1])), rel_tol=1e-1
-    )
+    test2 = math.isclose(np.log(abs(theory[-1])), np.log(abs(errors[-1])), rel_tol=1e-1)
 
     print(f"Gradient error behaved as expected: {test2}")
 
@@ -150,9 +146,7 @@ def get_forward_model(load_true=False):
 
 
 def test_gradient_supershot():
-    rec_out_exact, rec_out_guess, Wave_obj_guess = get_forward_model(
-        load_true=False
-    )
+    rec_out_exact, rec_out_guess, Wave_obj_guess = get_forward_model(load_true=False)
     forward_solution = Wave_obj_guess.forward_solution
     forward_solution_guess = deepcopy(forward_solution)
 

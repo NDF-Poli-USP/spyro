@@ -123,17 +123,11 @@ def construct_solver_or_matrix_with_pml_3d(Wave_object):
     Gamma_1, Gamma_2, Gamma_3 = damping.matrices_3D(sigma_x, sigma_y, sigma_z)
 
     pml1 = (
-        (sigma_x + sigma_y + sigma_z)
-        * ((u - u_nm1) / Constant(2.0 * dt))
-        * v
-        * dxlump
+        (sigma_x + sigma_y + sigma_z) * ((u - u_nm1) / Constant(2.0 * dt)) * v * dxlump
     )
 
     pml2 = (
-        (sigma_x * sigma_y + sigma_x * sigma_z + sigma_y * sigma_z)
-        * u_n
-        * v
-        * dxlump
+        (sigma_x * sigma_y + sigma_x * sigma_z + sigma_y * sigma_z) * u_n * v * dxlump
     )
 
     pml3 = (sigma_x * sigma_y * sigma_z) * psi_n * v * dxlump

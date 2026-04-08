@@ -41,9 +41,7 @@ dictionary["acquisition"] = {
     "frequency": 5.0,
     "delay": 0.2,
     "delay_type": "time",
-    "receiver_locations": spyro.create_transect(
-        (-1.45, 0.7), (-1.45, 1.3), 200
-    ),
+    "receiver_locations": spyro.create_transect((-1.45, 0.7), (-1.45, 1.3), 200),
 }
 dictionary["time_axis"] = {
     "initial_time": 0.0,  # Initial time for event
@@ -133,9 +131,7 @@ def test_fwi(load_real_shot=False, use_rol=False):
     # quick look at functional and if it reduced
     test2 = FWI_obj.functional < 1e-3
     print(f"Last functional small: {test2}", flush=True)
-    test3 = (
-        FWI_obj.functional_history[-1] / FWI_obj.functional_history[0] < 1e-2
-    )
+    test3 = FWI_obj.functional_history[-1] / FWI_obj.functional_history[0] < 1e-2
     print(f"Considerable functional reduction during test: {test3}", flush=True)
 
     print("END", flush=True)

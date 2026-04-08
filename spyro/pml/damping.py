@@ -25,9 +25,7 @@ def functions(Wave_obj):
     ps = Wave_obj.abc_exponent
     cmax = Wave_obj.abc_cmax  # maximum acoustic wave velocity
     R = Wave_obj.abc_R  # theoretical reclection coefficient
-    pad_length = (
-        Wave_obj.mesh_parameters.abc_pad_length
-    )  # length of the padding
+    pad_length = Wave_obj.mesh_parameters.abc_pad_length  # length of the padding
     V = Wave_obj.function_space
     dimension = Wave_obj.dimension
     z = Wave_obj.mesh_z
@@ -111,9 +109,7 @@ def matrices_2D(sigma_x, sigma_y):
 
 def matrices_3D(sigma_x, sigma_y, sigma_z):
     """Damping matrices for a three-dimensional problem."""
-    Gamma_1 = as_tensor(
-        [[sigma_x, 0.0, 0.0], [0.0, sigma_y, 0.0], [0.0, 0.0, sigma_z]]
-    )
+    Gamma_1 = as_tensor([[sigma_x, 0.0, 0.0], [0.0, sigma_y, 0.0], [0.0, 0.0, sigma_z]])
     Gamma_2 = as_tensor(
         [
             [sigma_x - sigma_y - sigma_z, 0.0, 0.0],

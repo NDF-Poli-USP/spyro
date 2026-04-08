@@ -80,9 +80,7 @@ def ensemble_save(func):
         else:
             # For spatial parallelism: load propagation data from tmp files (no file_name) then save wanted data to named files
             for snum in range(obj.number_of_sources):
-                switch_serial_shot(
-                    obj, snum, file_name=None
-                )  # Load from tmp files
+                switch_serial_shot(obj, snum, file_name=None)  # Load from tmp files
                 if _comm.comm.rank == 0:
                     func(obj, **dict(kwargs, shot_ids=[snum]))
 
@@ -137,10 +135,7 @@ def ensemble_propagator(func):
     """
 
     def wrapper(*args, **kwargs):
-        if (
-            args[0].parallelism_type != "spatial"
-            or args[0].number_of_sources == 1
-        ):
+        if args[0].parallelism_type != "spatial" or args[0].number_of_sources == 1:
             shot_ids_per_propagation_list = args[0].shot_ids_per_propagation
             _comm = args[0].comm
             for propagation_id, shot_ids_in_propagation in enumerate(
@@ -152,10 +147,7 @@ def ensemble_propagator(func):
                         **dict(kwargs, source_nums=shot_ids_in_propagation),
                     )
                     return u, u_r
-        elif (
-            args[0].parallelism_type == "spatial"
-            and args[0].number_of_sources > 1
-        ):
+        elif args[0].parallelism_type == "spatial" and args[0].number_of_sources > 1:
             num = args[0].number_of_sources
             starting_time = args[0].current_time
             for snum in range(num):
@@ -215,9 +207,7 @@ def save_serial_data(wave, propagation_id):
     """
     arrays_list = [obj.dat.data[:] for obj in wave.forward_solution]
     stacked_arrays = np.stack(arrays_list, axis=0)
-    np.save(
-        _shot_filename(propagation_id, wave, prefix="tmp_shot"), stacked_arrays
-    )
+    np.save(_shot_filename(propagation_id, wave, prefix="tmp_shot"), stacked_arrays)
     np.save(
         _shot_filename(propagation_id, wave, prefix="tmp_rec"),
         wave.forward_solution_receivers,
@@ -265,20 +255,14 @@ def ensemble_functional(func):
 
     def wrapper(*args, **kwargs):
         comm = args[0].comm
-        if (
-            args[0].parallelism_type != "spatial"
-            or args[0].number_of_sources == 1
-        ):
+        if args[0].parallelism_type != "spatial" or args[0].number_of_sources == 1:
             J = func(*args, **kwargs)
             J_total = np.zeros((1))
             J_total[0] += J
             J_total = fire.COMM_WORLD.allreduce(J_total, op=MPI.SUM)
             J_total[0] /= comm.comm.size
 
-        elif (
-            args[0].parallelism_type == "spatial"
-            and args[0].number_of_sources > 1
-        ):
+        elif args[0].parallelism_type == "spatial" and args[0].number_of_sources > 1:
             residual_list = args[1]
             J_total = np.zeros((1))
 
@@ -301,10 +285,7 @@ def ensemble_gradient(func):
 
     def wrapper(*args, **kwargs):
         comm = args[0].comm
-        if (
-            args[0].parallelism_type != "spatial"
-            or args[0].number_of_sources == 1
-        ):
+        if args[0].parallelism_type != "spatial" or args[0].number_of_sources == 1:
             shot_ids_per_propagation_list = args[0].shot_ids_per_propagation
             for propagation_id, shot_ids_in_propagation in enumerate(
                 shot_ids_per_propagation_list
@@ -318,10 +299,7 @@ def ensemble_gradient(func):
             grad_total /= comm.ensemble_comm.size
 
             return grad_total
-        elif (
-            args[0].parallelism_type == "spatial"
-            and args[0].number_of_sources > 1
-        ):
+        elif args[0].parallelism_type == "spatial" and args[0].number_of_sources > 1:
             num = args[0].number_of_sources
             starting_time = args[0].current_time
             grad_total = fire.Function(args[0].function_space)
@@ -402,9 +380,7 @@ def write_function_to_grid(function, V, grid_spacing, buffer=False):
 
     if dimension == 3:
         if min_z > max_z:
-            raise ValueError(
-                "Buffer too large for the provided coordinate range."
-            )
+            raise ValueError("Buffer too large for the provided coordinate range.")
 
     try:
         v = function.dat.data[:]
@@ -617,12 +593,8 @@ def interpolate(Model, fname, V):
             x = np.linspace(minx, maxx, ncol)
 
             # make sure no out-of-bounds
-            qp_z2 = [
-                minz if z < minz else maxz if z > maxz else z for z in qp_z
-            ]
-            qp_x2 = [
-                minx if x < minx else maxx if x > maxx else x for x in qp_x
-            ]
+            qp_z2 = [minz if z < minz else maxz if z > maxz else z for z in qp_z]
+            qp_x2 = [minx if x < minx else maxx if x > maxx else x for x in qp_x]
 
             interpolant = RegularGridInterpolator((z, x), Z)
             tmp = interpolant((qp_z2, qp_x2))
@@ -633,15 +605,9 @@ def interpolate(Model, fname, V):
             y = np.linspace(miny, maxy, ncol2)
 
             # make sure no out-of-bounds
-            qp_z2 = [
-                minz if z < minz else maxz if z > maxz else z for z in qp_z
-            ]
-            qp_x2 = [
-                minx if x < minx else maxx if x > maxx else x for x in qp_x
-            ]
-            qp_y2 = [
-                miny if y < miny else maxy if y > maxy else y for y in qp_y
-            ]
+            qp_z2 = [minz if z < minz else maxz if z > maxz else z for z in qp_z]
+            qp_x2 = [minx if x < minx else maxx if x > maxx else x for x in qp_x]
+            qp_y2 = [miny if y < miny else maxy if y > maxy else y for y in qp_y]
 
             interpolant = RegularGridInterpolator((z, x, y), Z)
             tmp = interpolant((qp_z2, qp_x2, qp_y2))
