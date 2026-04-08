@@ -1172,8 +1172,8 @@ class FullWaveformInversion(AcousticWave):
 
 
 class SyntheticRealAcousticWave(AcousticWave):
-    """The SyntheticRealAcousticWave class is a subclass of the AcousticWave
-    class. It is used to generate synthetic real acoustic wave data.
+    """The SyntheticRealAcousticWave class is a subclass of the AcousticWave class. It
+    is used to generate synthetic real acoustic wave data.
 
     Attributes
     ----------

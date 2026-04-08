@@ -68,8 +68,8 @@ class Wave(Model_parameters, metaclass=ABCMeta):
     """
 
     def __init__(self, dictionary=None, comm=None):
-        """Wave object solver. Contains both the forward solver and gradient
-        calculator methods.
+        """Wave object solver. Contains both the forward solver and gradient calculator
+        methods.
 
         Parameters
         ----------
@@ -311,8 +311,7 @@ class Wave(Model_parameters, metaclass=ABCMeta):
             self.mesh_y = y
 
     def get_and_set_maximum_dt(self, fraction=0.7, estimate_max_eigenvalue=False):
-        """Calculates and sets the maximum stable time step (dt) for the wave
-        solver.
+        """Calculates and sets the maximum stable time step (dt) for the wave solver.
 
         Args:
             fraction (float, optional):
@@ -399,30 +398,27 @@ class Wave(Model_parameters, metaclass=ABCMeta):
 
     @abstractmethod
     def get_function(self):
-        """Returns the function (e.g., pressure or displacement) associated with
-        the wave object without additional variables (e.g., PML variables)
-        """
+        """Returns the function (e.g., pressure or displacement) associated with the
+        wave object without additional variables (e.g., PML variables)"""
         pass
 
     @abstractmethod
     def get_function_name(self):
-        """Returns the string representing the function of the wave object
-        (e.g., "pressure" or "displacement")
-        """
+        """Returns the string representing the function of the wave object (e.g.,
+        "pressure" or "displacement")"""
         pass
 
     def update_source_expression(self, t):
         """Update the source expression during wave propagation.
 
-        This method must be implemented only by subclasses that make use of the
-        source term
+        This method must be implemented only by subclasses that make use of the source
+        term
         """
         pass
 
     @ensemble_propagator
     def wave_propagator(self, dt=None, final_time=None, source_nums=[0]):
-        """Propagate the wave forward in time. Currently uses central
-        differences.
+        """Propagate the wave forward in time. Currently uses central differences.
 
         Parameters
         ----------
@@ -462,9 +458,8 @@ class Wave(Model_parameters, metaclass=ABCMeta):
 
     @abstractmethod
     def rhs_no_pml(self):
-        """Return the right-hand side Cofunction without PML DOFs (i.e., only
-        the DOFs associated with the subspace of the original problem).
-        """
+        """Return the right-hand side Cofunction without PML DOFs (i.e., only the DOFs
+        associated with the subspace of the original problem)."""
         pass
 
     def set_material_properties(self, *args, **kwargs):

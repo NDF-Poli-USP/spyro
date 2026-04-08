@@ -13,7 +13,7 @@ extend-exclude = '''
 '''
 
 [tool.ruff]
-line-length = 80
+line-length = 88
 target-version = "py39"
 
 [tool.ruff.lint]
@@ -27,7 +27,7 @@ select = ["E", "F", "D"]
 convention = "numpy"
 
 [tool.docformatter]
-wrap-summaries = 80
-wrap-descriptions = 80
+wrap-summaries = 88
+wrap-descriptions = 88
 recursive = true
 in-place = true

@@ -181,8 +181,7 @@ def wave_dict_3d(element_type, degree_eikonal):
 
 
 class HABC_Wave(AcousticWave, HABC_Mesh):
-    """Class HABC that determines absorbing layer size and parameters to be
-    used.
+    """Class HABC that determines absorbing layer size and parameters to be used.
 
     Attributes
     ----------
@@ -236,9 +235,9 @@ class HABC_Wave(AcousticWave, HABC_Mesh):
 
 
 def critical_boundary_points(Wave_obj):
-    """Determine the critical points on domain boundaries of the original model
-    to size an absorbing layer using the Eikonal criterion for HABCs. See Salas
-    et al (2022) for details.
+    """Determine the critical points on domain boundaries of the original model to size
+    an absorbing layer using the Eikonal criterion for HABCs. See Salas et al (2022) for
+    details.
 
     Parameters
     ----------
@@ -324,8 +323,8 @@ def eikonal_analysis(dictionary, edge_length, f_est):
 
 @pytest.mark.slow
 def test_loop_eikonal_2d():
-    """Loop for testing eikonal solver in 2D with the model in Fig. 8 of Salas
-    et al. (2022)
+    """Loop for testing eikonal solver in 2D with the model in Fig. 8 of Salas et al.
+    (2022)
 
     eik_min = 83.333 ms (Theoretical value)
     f_est  T-ele   Q-ele
@@ -388,8 +387,8 @@ def test_loop_eikonal_2d():
 
 
 def test_loop_eikonal_3d():
-    """Loop for testing eikonal solver in 3D with the model in Fig. 8 of Salas
-    et al. (2022)
+    """Loop for testing eikonal solver in 3D with the model in Fig. 8 of Salas et al.
+    (2022)
 
     eik_min = 83.333 ms (Theoretical value)
     f_est  T-ele   Q-ele

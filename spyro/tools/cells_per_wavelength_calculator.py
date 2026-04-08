@@ -84,8 +84,8 @@ class Meshing_parameter_calculator:
     """
 
     def __init__(self, parameters_dictionary):
-        """Initializes the Meshing_parameter_calculator class with a dictionary
-        of parameters.
+        """Initializes the Meshing_parameter_calculator class with a dictionary of
+        parameters.
 
         Parameters
         ----------
@@ -218,8 +218,7 @@ class Meshing_parameter_calculator:
         return spyro.AcousticWave(dictionary)
 
     def get_reference_solution(self):
-        """Calculates or loads the reference solution to be used for error
-        calculation.
+        """Calculates or loads the reference solution to be used for error calculation.
 
         Returns
         -------
@@ -238,8 +237,8 @@ class Meshing_parameter_calculator:
             return self.calculate_analytical_solution()
 
     def calculate_reference_solution(self):
-        """Calculates the numerical reference solution for heterogeneous models,
-        using cpw and degree values in parameters dictionary.
+        """Calculates the numerical reference solution for heterogeneous models, using
+        cpw and degree values in parameters dictionary.
 
         Returns
         -------
@@ -297,8 +296,8 @@ class Meshing_parameter_calculator:
         return analytical_solution
 
     def find_minimum(self, starting_cpw=None, TOL=None, accuracy=None, savetxt=False):
-        """Finds the minimum cells-per-wavelength meshing parameter that is
-        still below the error threshold.
+        """Finds the minimum cells-per-wavelength meshing parameter that is still below
+        the error threshold.
 
         Parameters
         ----------
@@ -430,8 +429,8 @@ class Meshing_parameter_calculator:
 
 
 def calculate_dif(cpw, accuracy, fast_loop=False):
-    """Calculates the difference between consecutive cells-per-wavelength to be
-    used in the search.
+    """Calculates the difference between consecutive cells-per-wavelength to be used in
+    the search.
 
     Parameters
     ----------

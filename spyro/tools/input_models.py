@@ -116,8 +116,7 @@ def set_mesh_type(method):
 
 
 def create_initial_model_for_meshing_parameter(Meshing_calc_obj):
-    """Creates an initial model dictionary for the meshing parameter
-    calculation.
+    """Creates an initial model dictionary for the meshing parameter calculation.
 
     Parameters
     ----------
@@ -139,8 +138,7 @@ def create_initial_model_for_meshing_parameter(Meshing_calc_obj):
 
 
 def create_initial_model_for_meshing_parameter_2D(Meshing_calc_obj):
-    """Creates an initial model dictionary for the meshing parameter calculation
-    in 2D.
+    """Creates an initial model dictionary for the meshing parameter calculation in 2D.
 
     Parameters
     ----------
@@ -168,8 +166,8 @@ def create_initial_model_for_meshing_parameter_2D(Meshing_calc_obj):
 def create_initial_model_for_meshing_parameter_2D_heterogeneous(
     Meshing_calc_obj,
 ):
-    """Creates an initial model dictionary for the meshing parameter calculation
-    in 2D with a heterogeneous velocity model.
+    """Creates an initial model dictionary for the meshing parameter calculation in 2D
+    with a heterogeneous velocity model.
 
     Parameters
     ----------
@@ -247,8 +245,7 @@ def create_initial_model_for_meshing_parameter_2D_heterogeneous(
 
 
 def create_initial_model_for_meshing_parameter_3D(Meshing_calc_obj):
-    """Creates an initial model dictionary for the meshing parameter calculation
-    in 3D.
+    """Creates an initial model dictionary for the meshing parameter calculation in 3D.
 
     Parameters
     ----------
@@ -272,8 +269,8 @@ def create_initial_model_for_meshing_parameter_3D(Meshing_calc_obj):
 
 
 def create_initial_model_for_meshing_parameter_2D_homogeneous(Meshing_calc_obj):
-    """Creates an initial model dictionary for the meshing parameter calculation
-    in 2D with a homogeneous velocity model.
+    """Creates an initial model dictionary for the meshing parameter calculation in 2D
+    with a homogeneous velocity model.
 
     Parameters
     ----------

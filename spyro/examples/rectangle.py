@@ -124,10 +124,9 @@ class Rectangle_mesh_and_velocity:
         super().set_mesh(input_mesh_parameters=mesh_parameters)
 
     def multiple_layer_velocity_model(self, z_switch, layers):
-        """Sets the heterogeneous velocity model to be split into horizontal
-        layers. Each layer's velocity value is defined by the corresponding
-        value in the layers list. The layers are separated by the values in the
-        z_switch list.
+        """Sets the heterogeneous velocity model to be split into horizontal layers.
+        Each layer's velocity value is defined by the corresponding value in the layers
+        list. The layers are separated by the values in the z_switch list.
 
         Parameters
         ----------
@@ -155,8 +154,8 @@ class Rectangle_mesh_and_velocity:
 
 
 class Rectangle_acoustic(Rectangle_mesh_and_velocity, Example_model_acoustic):
-    """Rectangle model. This class is a child of the Example_model class. It is
-    used to create a dictionary with the parameters of the Rectangle model.
+    """Rectangle model. This class is a child of the Example_model class. It is used to
+    create a dictionary with the parameters of the Rectangle model.
 
     Example Setup
 
@@ -197,8 +196,8 @@ class Rectangle_acoustic(Rectangle_mesh_and_velocity, Example_model_acoustic):
 
 
 class Rectangle_acoustic_FWI(Rectangle_mesh_and_velocity, Example_model_acoustic_FWI):
-    """Rectangle model. This class is a child of the Example_model class. It is
-    used to create a dictionary with the parameters of the Rectangle model.
+    """Rectangle model. This class is a child of the Example_model class. It is used to
+    create a dictionary with the parameters of the Rectangle model.
 
     Example Setup
 

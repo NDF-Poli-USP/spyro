@@ -155,8 +155,8 @@ class Modal_Solver:
 
     @staticmethod
     def weak_forms(c, V, quad_rule=None, source=False, user_load=None):
-        """Generate the bilinear forms for the modal problem. Also, it can
-        generate a source term in weak form.
+        """Generate the bilinear forms for the modal problem. Also, it can generate a
+        source term in weak form.
 
         Parameters
         ----------
@@ -407,8 +407,8 @@ class Modal_Solver:
     def c_equivalent(
         self, c, V, quad_rule=None, typ_homog="energy", static_load_for_ceq=None
     ):
-        """Compute an equivalent homogeneous velocity for an inhomogeneneous
-        velocity model using an energy-equivalent homogenization.
+        """Compute an equivalent homogeneous velocity for an inhomogeneneous velocity
+        model using an energy-equivalent homogenization.
 
         Parameters
         ----------
@@ -814,8 +814,8 @@ class Modal_Solver:
         fitting_c=(0.0, 0.0, 0.0, 0.0),
         cut_plane_percent=1.0,
     ):
-        """Compute an approximate frequency factor for the hypershape with
-        truncation plane at z = cut_plane_percent * b, b = Lz + pad_len.
+        """Compute an approximate frequency factor for the hypershape with truncation
+        plane at z = cut_plane_percent * b, b = Lz + pad_len.
 
         The fitting parameters for the equivalent velocity regression controls:
         - fc1: Magnitude order of the frequency
@@ -904,8 +904,8 @@ class Modal_Solver:
         fitting_c=(0.0, 0.0, 0.0, 0.0),
         cut_plane_percent=1.0,
     ):
-        """Compute the analytical solution for the eigenvalue problem with
-        Neumann or Dirichlet boundary conditions for isotropic hypershapes.
+        """Compute the analytical solution for the eigenvalue problem with Neumann or
+        Dirichlet boundary conditions for isotropic hypershapes.
 
         Parameters
         ----------
@@ -991,8 +991,7 @@ class Modal_Solver:
         return Lsp
 
     def generate_norm_coords(self, mesh, domain_dim, hyp_axes):
-        """Generate the normalized mesh coordinates w.r.t. the hypershape
-        centroid.
+        """Generate the normalized mesh coordinates w.r.t. the hypershape centroid.
 
         Parameters
         ----------
@@ -1282,10 +1281,10 @@ class Modal_Solver:
         inv_oper=False,
         fraction=0.7,
     ):
-        """Estimate the maximum stable timestep based on the spectral radius
-        using optionally the Gershgorin Circle Theorem to estimate the maximum
-        generalized eigenvalue ('ANALYTICAL' method). Otherwise computes the
-        maximum generalized eigenvalue exactly.
+        """Estimate the maximum stable timestep based on the spectral radius using
+        optionally the Gershgorin Circle Theorem to estimate the maximum generalized
+        eigenvalue ('ANALYTICAL' method). Otherwise computes the maximum generalized
+        eigenvalue exactly.
 
         Parameters
         ----------

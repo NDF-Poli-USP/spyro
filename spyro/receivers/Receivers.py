@@ -6,8 +6,8 @@ import numpy as np
 
 
 class Receivers(Delta_projector):
-    """Project data defined on a triangular mesh to a set of 2D/3D coordinates
-    for variable spatial order using Lagrange interpolation.
+    """Project data defined on a triangular mesh to a set of 2D/3D coordinates for
+    variable spatial order using Lagrange interpolation.
 
     Can interpolate receiveir values that do not coincide with
     mesh or DOF points

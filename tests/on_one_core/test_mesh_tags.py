@@ -1,5 +1,5 @@
-"""Test script to verify that Firedrake correctly reads physical tags from GMSH
-meshes for dx and ds integrals.
+"""Test script to verify that Firedrake correctly reads physical tags from GMSH meshes
+for dx and ds integrals.
 
 This tests:
 1. Domain tags (2D physical groups) for dx integrals
@@ -53,9 +53,7 @@ def test_mesh_with_tags():
 
 
 def test_firedrake_domain_tags(test_mesh_with_tags):
-    """Test if Firedrake can correctly read and use domain tags for dx
-    integrals.
-    """
+    """Test if Firedrake can correctly read and use domain tags for dx integrals."""
     mesh_file = test_mesh_with_tags
     mesh = fire.Mesh(mesh_file)
 
@@ -79,9 +77,7 @@ def test_firedrake_domain_tags(test_mesh_with_tags):
 
 
 def test_firedrake_boundary_tags(test_mesh_with_tags):
-    """Test if Firedrake can correctly read and use boundary tags for ds
-    integrals.
-    """
+    """Test if Firedrake can correctly read and use boundary tags for ds integrals."""
     mesh_file = test_mesh_with_tags
     mesh = fire.Mesh(mesh_file)
 

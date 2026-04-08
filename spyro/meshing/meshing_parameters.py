@@ -1,8 +1,8 @@
 """Meshing parameters module for Spyro.
 
-This module provides classes and functions for managing mesh parameters,
-including mesh type selection, dimension handling, and automatic mesh generation
-based on wavelength constraints.
+This module provides classes and functions for managing mesh parameters, including mesh
+type selection, dimension handling, and automatic mesh generation based on wavelength
+constraints.
 """
 
 import warnings
@@ -11,8 +11,7 @@ from ..utils.error_management import value_parameter_error
 
 
 def cells_per_wavelength(method, degree, dimension):
-    """Retrieve the number of cells per wavelength for a given method
-    configuration.
+    """Retrieve the number of cells per wavelength for a given method configuration.
 
     Parameters
     ----------

@@ -292,8 +292,8 @@ def test_random_mat_prop(wave_instance, cell_type):
 
 
 def numerical_values_cond(property_name, coords, below_thrs, above_thrs):
-    """Compute the expected numerical values for the conditional material
-    property based on the provided coordinates and property name.
+    """Compute the expected numerical values for the conditional material property based
+    on the provided coordinates and property name.
 
     Parameters
     ----------
@@ -346,8 +346,8 @@ def numerical_values_cond(property_name, coords, below_thrs, above_thrs):
 
 
 def get_only_mesh_vertices(wave_obj):
-    """Get the coordinates of the mesh vertices and the indices for the points
-    in the mesh function.
+    """Get the coordinates of the mesh vertices and the indices for the points in the
+    mesh function.
 
     Parameters
     ----------
@@ -497,8 +497,8 @@ def test_conditional_mat_prop(wave_instance, cell_type):
 
 
 def numerical_values_expr(property_name, coords):
-    """Compute the expected numerical values for the expression material
-    property based on the provided coordinates and property name.
+    """Compute the expected numerical values for the expression material property based
+    on the provided coordinates and property name.
 
     Parameters
     ----------
@@ -633,8 +633,7 @@ def get_coords_DG0(wave_obj, coords):
 
 @pytest.mark.parametrize("cell_type", ["T", "Q"])
 def test_function_mat_prop(wave_instance, cell_type):
-    """Test to assign firedrake functione as material properties to an instance
-    of Wave.
+    """Test to assign firedrake functione as material properties to an instance of Wave.
 
     Material properties:
         - vel_P: P-wave velocity [m/s]
@@ -696,8 +695,7 @@ def test_function_mat_prop(wave_instance, cell_type):
 
 @pytest.mark.parametrize("cell_type", ["T", "Q"])
 def test_fromfile_mat_prop(wave_instance, cell_type):
-    """Test to assign firedrake functione as material properties to an instance
-    of Wave.
+    """Test to assign firedrake functione as material properties to an instance of Wave.
 
     Material properties:
         - vel_P: P-wave velocity [m/s]

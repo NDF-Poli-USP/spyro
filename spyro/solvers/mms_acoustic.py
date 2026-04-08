@@ -4,12 +4,12 @@ from ..utils.typing import override
 
 
 class AcousticWaveMMS(AcousticWave):
-    """Class for solving the acoustic wave equation in 2D or 3D using the finite
-    element method.
+    """Class for solving the acoustic wave equation in 2D or 3D using the finite element
+    method.
 
-    This class inherits from the AcousticWave class and overwrites the
-    matrix_building method to use source propagated along the whole domain,
-    which generates a known solution for comparison.
+    This class inherits from the AcousticWave class and overwrites the matrix_building
+    method to use source propagated along the whole domain, which generates a known
+    solution for comparison.
     """
 
     @override

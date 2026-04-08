@@ -71,9 +71,8 @@ def _initialize_material_property_from_ufl(
     conditional=None,
     expression=None,
 ):
-    """Initialize material property from a UFL input. This method is used when
-    the material property is defined by a constant value, a conditional or an
-    expression.
+    """Initialize material property from a UFL input. This method is used when the
+    material property is defined by a constant value, a conditional or an expression.
 
     Parameters
     ----------

@@ -34,10 +34,10 @@ class ExampleModelBase:
 
 
 class Example_model_acoustic(ExampleModelBase, AcousticWave):
-    """Sets up a basic model parameter class for examples and test case models.
-    It has the option of reading a dictionary, and if any parameter is missing
-    from this dictioanry it calls on a default value, that should be defined in
-    the relevant example file.
+    """Sets up a basic model parameter class for examples and test case models. It has
+    the option of reading a dictionary, and if any parameter is missing from this
+    dictioanry it calls on a default value, that should be defined in the relevant
+    example file.
 
     Example Setup
 
@@ -71,10 +71,10 @@ class Example_model_acoustic(ExampleModelBase, AcousticWave):
 
 
 class Example_model_acoustic_FWI(ExampleModelBase, FullWaveformInversion):
-    """Sets up a basic model parameter class for examples and test case models.
-    It has the option of reading a dictionary, and if any parameter is missing
-    from this dictioanry it calls on a default value, that should be defined in
-    the relevant example file.
+    """Sets up a basic model parameter class for examples and test case models. It has
+    the option of reading a dictionary, and if any parameter is missing from this
+    dictioanry it calls on a default value, that should be defined in the relevant
+    example file.
 
     Example Setup
 

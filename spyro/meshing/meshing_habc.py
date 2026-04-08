@@ -214,8 +214,8 @@ class HABC_Mesh:
         return node_positions
 
     def extract_bnd_node_indices(self, node_positions, func_space):
-        """Extract boundary node indices on boundaries of the domain excluding
-        the free surface at the top boundary.
+        """Extract boundary node indices on boundaries of the domain excluding the free
+        surface at the top boundary.
 
         Parameters
         ----------
@@ -939,8 +939,8 @@ class HABC_Mesh:
         return in_hyp
 
     def sharp_mesh_3D(self, rec_mesh, hyp_par, centroid):
-        """Generate a sharp mesh by cutting the rectangular mesh with the
-        hyperellipsoid surface.
+        """Generate a sharp mesh by cutting the rectangular mesh with the hyperellipsoid
+        surface.
 
         Parameters
         ----------
@@ -1126,8 +1126,7 @@ class HABC_Mesh:
         return mesh
 
     def build_hyp_mesh_3D(self, rec_mesh, hyp_par, plane_tol=1e-5):
-        """Build a hyperellipsoidal mesh from a box mesh by snapping the
-        boundary.
+        """Build a hyperellipsoidal mesh from a box mesh by snapping the boundary.
 
         Parameters
         ----------
@@ -1227,10 +1226,10 @@ class HABC_Mesh:
     def layer_mask_field(
         self, coords, V, damp_par=None, type_marker="damping", name_mask=None
     ):
-        """Generate a mask for the absorbing layer. The mask is defined for
-        conditional expressions to identify the domain of the layer (option:
-        'mask') or the reference to the original boundary (option: 'damping')
-        used to compute the damping profile.
+        """Generate a mask for the absorbing layer. The mask is defined for conditional
+        expressions to identify the domain of the layer (option: 'mask') or the
+        reference to the original boundary (option: 'damping') used to compute the
+        damping profile.
 
         Parameters
         ----------

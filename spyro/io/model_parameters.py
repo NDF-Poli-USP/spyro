@@ -156,8 +156,8 @@ class Model_parameters(Read_options, Read_boundary_layer, Read_time_axis, Read_o
     """
 
     def __init__(self, dictionary=None, comm=None):
-        """Initializes class that reads and sanitizes input parameters. A
-        dictionary can be used.
+        """Initializes class that reads and sanitizes input parameters. A dictionary can
+        be used.
 
         Parameters
         ----------

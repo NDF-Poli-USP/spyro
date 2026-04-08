@@ -391,8 +391,8 @@ class AutomaticMesh:
         return mesh
 
     def create_seismicmesh_2D_mesh_homogeneous(self):
-        """Creates a 2D mesh based on SeismicMesh meshing utilities, with
-        homogeneous velocity model.
+        """Creates a 2D mesh based on SeismicMesh meshing utilities, with homogeneous
+        velocity model.
 
         Returns
         -------
@@ -452,8 +452,8 @@ class AutomaticMesh:
         return fire.Mesh(self.output_file_name)
 
     def create_spyro_mesh(self):
-        """Creates a mesh using spyro's internal meshing utilities based on gmsh
-        calls. This mesh has tags that define the dx integration in Firedrake.
+        """Creates a mesh using spyro's internal meshing utilities based on gmsh calls.
+        This mesh has tags that define the dx integration in Firedrake.
 
         Returns
         -------

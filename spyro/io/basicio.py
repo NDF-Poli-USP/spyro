@@ -162,8 +162,8 @@ def ensemble_propagator(func):
 
 
 def _shot_filename(propagation_id, wave, prefix="tmp", random_str_in_use=True):
-    """Helper to construct filenames for shot/receiver data based on propagation
-    and wave information.
+    """Helper to construct filenames for shot/receiver data based on propagation and
+    wave information.
 
     Parameters
     ----------
@@ -529,8 +529,8 @@ def _check_units(c):
 
 
 def interpolate(Model, fname, V):
-    """Read and interpolate a seismic velocity model stored in a HDF5 file onto
-    the nodes of a finite element space.
+    """Read and interpolate a seismic velocity model stored in a HDF5 file onto the
+    nodes of a finite element space.
 
     Parameters
     ----------
@@ -673,9 +673,8 @@ def read_mesh(mesh_parameters):
 
 
 def parallel_print(string, comm):
-    """Just prints a string once. Without any comm it just prints, without
-    ensemble_comm it prints in comm 0, with ensemble_comm it prints in ensemble
-    0 and comm 0.
+    """Just prints a string once. Without any comm it just prints, without ensemble_comm
+    it prints in comm 0, with ensemble_comm it prints in ensemble 0 and comm 0.
 
     Parameters
     ----------
