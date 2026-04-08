@@ -1,3 +1,5 @@
+"Helpers focused on input and output operations."
+
 from .basicio import (
     write_function_to_grid,
     create_segy,
