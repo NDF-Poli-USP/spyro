@@ -1,9 +1,6 @@
 import uuid
 from mpi4py import MPI  # noqa:F401
 from firedrake import COMM_WORLD  # noqa:
-from firedrake import assemble, CellDiameter
-from firedrake.__future__ import interpolate
-from numpy import log10
 import warnings
 from copy import deepcopy
 from ..io.dictionaryio import Read_options, Read_outputs
