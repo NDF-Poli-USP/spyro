@@ -1,3 +1,5 @@
+"""Immersed polygon example model for acoustic forward and FWI workflows."""
+
 from spyro import create_transect
 from spyro.examples.rectangle import Rectangle_acoustic, Rectangle_acoustic_FWI
 import firedrake as fire
@@ -100,6 +102,8 @@ polygon_dictionary_fwi["inversion"]["perform_fwi"] = True
 
 
 class Polygon_velocity:
+    """Mixin that builds the polygon velocity distribution."""
+
     def _polygon_velocity_model(self):
         polygon_dict = self.input_dictionary["polygon_options"]
         z = self.mesh_z
@@ -142,16 +146,21 @@ class Polygon_velocity:
 
 
 class Polygon_acoustic(Polygon_velocity, Rectangle_acoustic):
-    """Polygon model. This class is a child of the Example_model class. It is used to
+    """Immersed Polygon acoustic model.
+    
+    This class is a child of the Example_model class. It is used to
     create a dictionary with the parameters of the polygon model.
 
     Example Setup
 
-    These examples are intended as reusable velocity model configurations to assist in the development and testing of new methods, such as optimization algorithms, time-marching schemes, or inversion techniques.
+    Notes
+    -----
+    This example is intended as a reusable model configuration for
+    development and testing of numerical methods. It does not represent a
+    targeted validation case with a single expected output.
 
-    Unlike targeted test cases, these examples do not have a specific objective or expected result. Instead, they provide standardized setups, such as Camembert, rectangular, and Marmousi velocity models, that can be quickly reused when prototyping, testing, or validating new functionality.
-
-    By isolating the setup of common velocity models, we aim to reduce boilerplate and encourage consistency across experiments.
+    By isolating common model setup logic, this class reduces boilerplate and
+    encourages consistency across experiments.
 
     Feel free to adapt these templates to your needs.
 
@@ -179,16 +188,19 @@ class Polygon_acoustic(Polygon_velocity, Rectangle_acoustic):
 
 
 class Polygon_acoustic_FWI(Polygon_velocity, Rectangle_acoustic_FWI):
-    """Polygon model. This class is a child of the Example_model class. It is used to
+    """Immersed Polygon acoustic FWI model.
+    
+    This class is a child of the Example_model class. It is used to
     create a dictionary with the parameters of the polygon model.
 
-    Example Setup
+    Notes
+    -----
+    This example is intended as a reusable model configuration for
+    development and testing of numerical methods. It does not represent a
+    targeted validation case with a single expected output.
 
-    These examples are intended as reusable velocity model configurations to assist in the development and testing of new methods, such as optimization algorithms, time-marching schemes, or inversion techniques.
-
-    Unlike targeted test cases, these examples do not have a specific objective or expected result. Instead, they provide standardized setups, such as Camembert, rectangular, and Marmousi velocity models, that can be quickly reused when prototyping, testing, or validating new functionality.
-
-    By isolating the setup of common velocity models, we aim to reduce boilerplate and encourage consistency across experiments.
+    By isolating common model setup logic, this class reduces boilerplate and
+    encourages consistency across experiments.
 
     Feel free to adapt these templates to your needs.
 
