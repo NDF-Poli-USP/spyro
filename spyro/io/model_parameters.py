@@ -489,6 +489,29 @@ class Model_parameters(Read_options, Read_boundary_layer,
         else:
             return None
 
+    def domain_dimensions(self):
+        """
+        Return the dimensions of the domain as a tuple.
+
+        Parameters
+        ----------
+        None
+
+        Returns
+        -------
+        domain_dim : `tuple`
+            Domain dimensions: (length_z, length_x) for 2D
+            or (length_z, length_x, length_y) for 3D
+        """
+
+        # Domain dimensions
+        domain_dim = (self.mesh_parameters.length_z,
+                      self.mesh_parameters.length_x)
+        if self.dimension == 3:  # 3D
+            domain_dim += (self.mesh_parameters.length_y,)
+
+        return domain_dim
+
 
 def _validate_enum(value, accepted_values, name):
     if value not in accepted_values:

@@ -7,7 +7,7 @@ fire.interpolate = interpolate
 
 class MeshOps():
     """
-    Class for mesh operations for domains w/o an absorbing layer.
+    Class for general mesh operations for domains w/o an absorbing layer.
 
     Attributes
     ----------
@@ -36,7 +36,7 @@ class MeshOps():
         Mesh cell diameters
     dimension : `int`
         Model dimension (2D or 3D). Default is 2D
-    dom_dim : `tuple`
+    domain_dim : `tuple`
         Original domain dimensions: (Lx, Lz) for 2D or (Lx, Lz, Ly) for 3D
     ele_type_c0 : `string`
         Finite element type for the velocity model without absorbing layer
@@ -84,13 +84,13 @@ class MeshOps():
         Get the representative mesh dimensions from original mesh
     """
 
-    def __init__(self, dom_dim, dimension=2, quadrilateral=False, comm=None):
+    def __init__(self, domain_dim, dimension=2, quadrilateral=False, comm=None):
         """
         Initialize the HABC_Mesh class.
 
         Parameters
         ----------
-        dom_dim : `tuple`
+        domain_dim : `tuple`
             Original domain dimensions: (Lx, Lz) for 2D or (Lx, Lz, Ly) for 3D
         dimension : `int`, optional
             Model dimension (2D or 3D). Default is 2D
@@ -106,7 +106,7 @@ class MeshOps():
         """
 
         # Original domain dimensions
-        self.dom_dim = dom_dim
+        self.domain_dim = domain_dim
 
         # Model dimension
         self.dimension = dimension
@@ -116,6 +116,37 @@ class MeshOps():
 
         # Communicator MPI
         self.comm = comm
+
+    def _set_spatial_coordinates(self, mesh):
+        """
+        Set the coordinates of a mesh.
+
+        Parameters
+        ----------
+        mesh : `FiredrakeMesh`
+            Current mesh
+
+        Returns
+        -------
+        mesh_z : `ufl.geometry.SpatialCoordinate`
+            Symbolic coordinate z of the mesh object
+        mesh_x: `ufl.geometry.SpatialCoordinate`
+            Symbolic coordinate x of the mesh object
+        mesh_y: `ufl.geometry.SpatialCoordinate` 
+            Symbolic coordinate y of the mesh object
+        """
+        if self.dimension == 2:
+            z, x = fire.SpatialCoordinate(mesh)
+            mesh_z = z
+            mesh_x = x
+            return mesh_z, mesh_x
+
+        elif self.dimension == 3:
+            z, x, y = fire.SpatialCoordinate(mesh)
+            mesh_z = z
+            mesh_x = x
+            mesh_y = y
+            return mesh_z, mesh_x, mesh_y
 
     def representative_mesh_dimensions(self, mesh, function_space):
         """
@@ -302,7 +333,7 @@ class MeshOps():
         """
 
         # Domain dimensions
-        Lx, Lz = self.dom_dim[:2]
+        Lx, Lz = self.domain_dim[:2]
 
         # Number of elements
         n_pad = round(pad_len / self.lmin)  # Elements in the layer
@@ -324,7 +355,7 @@ class MeshOps():
         if self.dimension == 3:  # 3D
 
             # Number of elements
-            Ly = self.dom_dim[2]
+            Ly = self.domain_dim[2]
             ny = int(round(Ly / self.lmin)) + int(2 * n_pad)
 
             # New geometry with layer
@@ -414,7 +445,7 @@ class MeshOps():
         """
 
         # Domain dimensions
-        Lx, Lz = self.dom_dim[:2]
+        Lx, Lz = self.domain_dim[:2]
 
         # Domain coordinates
         z, x = coords[0], coords[1]
@@ -433,7 +464,7 @@ class MeshOps():
         if self.dimension == 3:  # 3D
 
             # 3D dimension
-            Ly = self.dom_dim[2]
+            Ly = self.domain_dim[2]
             y = coords[2]
 
             # Conditional value
@@ -507,7 +538,7 @@ class MeshOps():
         print("Clipping Coordinates Inside Layer", flush=True)
 
         # Domain dimensions
-        Lx, Lz = self.dom_dim[:2]
+        Lx, Lz = self.domain_dim[:2]
 
         # Vectorial space for auxiliar field of clipped coordinates
         if self.quadrilateral:
@@ -537,7 +568,7 @@ class MeshOps():
         if self.dimension == 3:  # 3D
 
             # 3D dimension
-            Ly = self.dom_dim[2]
+            Ly = self.domain_dim[2]
 
             # Clipping coordinates
             lay_arr[:, 2] = np.clip(lay_arr[:, 2], 0., Ly)
