@@ -1,3 +1,5 @@
+"""Class to convert old dictionary from 2020 to newer model."""
+
 from genericpath import exists
 import warnings
 
