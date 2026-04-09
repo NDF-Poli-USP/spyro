@@ -103,7 +103,7 @@ def wave_dict(element_type, dimension):
     ("Q", 2),    # Quadrilateral 2D
     ("T", 3),   # Tetrahedral 3D
     ("Q", 3)])   # Hexahedral 3D
-def test_representative_mesh_dimensions_2d(element_type, dimension):
+def test_representative_mesh_dimensions(element_type, dimension):
     """Test representative_mesh_dimensions for 2D and 3D meshes."""
 
     # Create dictionary with parameters for the model
