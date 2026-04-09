@@ -101,6 +101,12 @@ class Wave(Model_parameters, metaclass=ABCMeta):
         self.mesh = self.get_mesh()
         self.c = None
         self.sources = None
+
+        # Creating mesh operations manager
+        self.mesh_ops = mshops.MeshOps(self.domain_dimensions(), dimension=self.dimension,
+                                       quadrilateral=self.mesh_parameters.quadrilateral,
+                                       comm=self.comm)
+
         if self.mesh is not None:
             self.building_mesh_derived_paramenters()
         elif self.mesh_parameters.mesh_type == "firedrake_mesh":
@@ -111,11 +117,6 @@ class Wave(Model_parameters, metaclass=ABCMeta):
             warnings.warn("No mesh found. Please define a mesh.")
         # Expression to define sources through UFL (less efficient)
         self.source_expression = None
-
-        # Creating mesh operations manager
-        self.mesh_ops = mshops.MeshOps(self.domain_dimensions(), dimension=self.dimension,
-                                       quadrilateral=self.mesh_parameters.quadrilateral,
-                                       comm=self.comm)
 
         self.field_logger = FieldLogger(self.comm,
                                         self.input_dictionary["visualization"])
