@@ -44,7 +44,7 @@ class Wave(Model_parameters, metaclass=ABCMeta):
         Mesh used in the simulation (2D or 3D)
     mesh_x: `ufl.geometry.SpatialCoordinate`
         Symbolic coordinate x of the mesh object
-    mesh_y: `ufl.geometry.SpatialCoordinate` 
+    mesh_y: `ufl.geometry.SpatialCoordinate`
         Symbolic coordinate y of the mesh object
     mesh_z : `ufl.geometry.SpatialCoordinate`
         Symbolic coordinate z of the mesh object
@@ -211,7 +211,7 @@ class Wave(Model_parameters, metaclass=ABCMeta):
             Symbolic coordinate z of the mesh object
         mesh_x: `ufl.geometry.SpatialCoordinate`
             Symbolic coordinate x of the mesh object
-        mesh_y: `ufl.geometry.SpatialCoordinate` 
+        mesh_y: `ufl.geometry.SpatialCoordinate`
             Symbolic coordinate y of the mesh object
         """
         if self.dimension == 2:

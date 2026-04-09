@@ -2,7 +2,6 @@ import math
 from copy import deepcopy
 from firedrake import *
 import spyro
-import spyro.meshing.meshing_operations as mshops
 
 from .model import dictionary as model
 model["acquisition"]["source_type"] = "MMS"

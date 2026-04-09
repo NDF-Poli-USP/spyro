@@ -132,7 +132,7 @@ class MeshOps():
             Symbolic coordinate z of the mesh object
         mesh_x: `ufl.geometry.SpatialCoordinate`
             Symbolic coordinate x of the mesh object
-        mesh_y: `ufl.geometry.SpatialCoordinate` 
+        mesh_y: `ufl.geometry.SpatialCoordinate`
             Symbolic coordinate y of the mesh object
         """
         if self.dimension == 2:
