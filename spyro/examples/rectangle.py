@@ -1,8 +1,8 @@
 """Rectangle-based example models for acoustic forward and FWI workflows.
 
-This module defines reusable dictionary configurations and helper classes for
-setting up a 2D acoustic propagation in spyro. These rectangle models have
-adicional dictionary inputs for multiple layer configurations.
+This module defines reusable dictionary configurations and helper classes for setting up
+a 2D acoustic propagation in spyro. These rectangle models have adicional dictionary
+inputs for multiple layer configurations.
 """
 
 from spyro import create_transect

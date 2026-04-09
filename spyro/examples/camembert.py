@@ -1,7 +1,7 @@
 """Camembert example models for acoustic forward and FWI workflows.
 
-This module defines reusable dictionary configurations and helper classes for
-setting up a 2D acoustic Camembert velocity model in spyro.
+This module defines reusable dictionary configurations and helper classes for setting up
+a 2D acoustic Camembert velocity model in spyro.
 """
 
 from spyro import create_transect

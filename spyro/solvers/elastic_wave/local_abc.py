@@ -3,8 +3,7 @@ from firedrake import Constant, ds, TestFunction, TrialFunction
 
 def local_abc_form(Wave):
     """Returns the linear form associated with the traction loads when combined with
-    local absorbing boundary conditions.
-    """
+    local absorbing boundary conditions."""
     abc_dict = Wave.input_dictionary.get("absorving_boundary_conditions", None)
     if abc_dict is None:
         return 0
