@@ -3,6 +3,7 @@ from firedrake.__future__ import interpolate
 import numpy as np
 # from spyro.utils.error_management import value_parameter_error
 fire.interpolate = interpolate
+from spyro.utils.eval_functions_to_ufl import generate_ufl_functions
 
 
 class MeshOps():
@@ -21,7 +22,7 @@ class MeshOps():
         or (length_z, length_x, length_y) for 3D
     func_space_type, `str`
         Type of function space for the state variable.
-        Options: 'scalar' or 'vector'. Default is 'scalar'
+        Options: 'scalar' or 'vector'. Default is None
     quadrilateral : bool
         Flag to indicate whether to use quadrilateral/hexahedral elements
 
@@ -91,7 +92,7 @@ class MeshOps():
     """
 
     def __init__(self, domain_dim, dimension=2, quadrilateral=False,
-                 func_space_type='scalar', comm=None):
+                 func_space_type=None, comm=None):
         """
         Initialize the HABC_Mesh class.
 
@@ -106,7 +107,7 @@ class MeshOps():
             Flag to indicate whether to use quadrilateral/hexahedral elements
         func_space_type, `str`, optional
             Type of function space for the state variable.
-            Options: 'scalar' or 'vector'. Default is 'scalar'
+            Options: 'scalar' or 'vector'. Default is None
         comm : `object`, optional
             An object representing the communication interface
             for parallel processing. Default is None
@@ -234,7 +235,7 @@ class MeshOps():
 
         return min_coordinates, max_coordinates
 
-    def extract_node_positions(self, symb_coordinates, function_space):
+    def extract_node_positions(self, mesh, function_space):
         '''
         Extract the node positions from the mesh and return as a tuple of arrays.
 
@@ -251,26 +252,36 @@ class MeshOps():
             - (z_data, x_data, y_data) for 3D
         '''
 
-        # Get the symbolic coordinates of the mesh
-        mesh_z, mesh_x = symb_coordinates[:2]
+        # Interpolate the coordinates according to the function space
+        coords = []
+        coord_expression = ['z', 'x', 'y']
+        for i in range(self.dimension):
+            ufl_input = generate_ufl_functions(mesh, coord_expression[i],
+                                               self.dimension)
 
-        # Extract node positions
-        z_f = fire.assemble(fire.interpolate(mesh_z, function_space))
-        x_f = fire.assemble(fire.interpolate(mesh_x, function_space))
-        z_data = z_f.dat.data_with_halos[:]
-        x_data = x_f.dat.data_with_halos[:]
+            import ipdb
+            ipdb.set_trace()
+
+            if self.func_space_type == 'scalar':
+                V = function_space
+
+            if self.func_space_type == 'vector':
+                V = function_space.sub(i)
+
+            coords.append(fire.assemble(fire.interpolate(ufl_input, V)))
+
+        # Get the node positions
+        z_data = coords[0].dat.data_with_halos[:]
+        x_data = coords[1].dat.data_with_halos[:]
         node_positions = (z_data, x_data)
-
         if self.dimension == 3:  # 3D
-            mesh_y = symb_coordinates[2]
-            y_f = fire.assemble(fire.interpolate(mesh_y, function_space))
-            y_data = y_f.dat.data_with_halos[:]
+            y_data = coords[2].dat.data_with_halos[:]
             node_positions += (y_data,)
+        del coords
 
         return node_positions
 
-    def mapping_boundary_ids(self, mesh, function_space, symb_coordinates,
-                             boundaries, box_domain=True):
+    def mapping_boundary_ids(self, mesh, function_space, boundaries, box_domain=True):
         """
         Map the boundaries of the a mesh
 
@@ -280,10 +291,6 @@ class MeshOps():
             Current mesh
         function_space : `FiredrakeFunctionSpace`
             Function space for the state variable
-        symb_coordinates : `tuple`
-            Tuple containing the symbolic coordinates of the mesh.
-            - (mesh_z, mesh_x) for 2D
-            - (mesh_z, mesh_x, mesh_y) for 3D
         boundaries : `tuple`
             Tuple containing the boundary boolean labels for applying absorbing BCs.
             - (absorb_top, absorb_bottom, absorb_right, absorb_left) for 2D
@@ -305,7 +312,7 @@ class MeshOps():
             if self.func_space_type == "scalar":
                 bc_val = 0.
             else:
-                bc_val = (0., 0.) if self.dimension == 2 else (0., 0., 0.)
+                bc_val = fire.as_vector((0.,) * self.dimension)
 
             num_boundaries = 4
             min_coordinates, max_coordinates = self.extract_extreme_coordinates(mesh)
@@ -318,8 +325,7 @@ class MeshOps():
                 max_y = max_coordinates[2]
                 absorb_front, absorb_back = boundaries[4:]
 
-            node_positions = self.extract_node_positions(symb_coordinates,
-                                                         function_space)
+            node_positions = self.extract_node_positions(mesh, function_space)
 
             # Boundary nodes indices
             boundary_idx_map = {}
