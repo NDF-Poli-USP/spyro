@@ -329,8 +329,9 @@ class MeshOps():
                 # exterior_markers = set(mesh.exterior_facets.unique_markers)
                 # print("Available boundary markers:", exterior_markers)
 
-                idx_bdn = "bottom" if self.quadrilateral and idx_bdn == 5 else idx_bdn
-                idx_bdn = "top" if self.quadrilateral and idx_bdn == 6 else idx_bdn
+                if self.dimension == 3 and self.quadrilateral:
+                    idx_bdn = "bottom" if idx_bdn == 5 else idx_bdn
+                    idx_bdn = "top" if idx_bdn == 6 else idx_bdn
 
                 bnd_node_ids = fire.DirichletBC(function_space, bc_val, idx_bdn).nodes
                 idx_test = np.linspace(0, len(bnd_node_ids) - 1, 10, dtype=int)
