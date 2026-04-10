@@ -1,7 +1,7 @@
 import firedrake as fire
 from firedrake.__future__ import interpolate
 import numpy as np
-from spyro.utils.error_management import value_parameter_error
+# from spyro.utils.error_management import value_parameter_error
 fire.interpolate = interpolate
 
 
@@ -287,7 +287,7 @@ class MeshOps():
         boundaries : `tuple`
             Tuple containing the boundary boolean labels for applying absorbing BCs.
             - (absorb_top, absorb_bottom, absorb_right, absorb_left) for 2D
-            - (absorb_top, absorb_bottom, absorb_right, 
+            - (absorb_top, absorb_bottom, absorb_right,
                 absorb_left, absorb_front, absorb_back) for 3D
         box_domain : `bool`, optional
             Flag to indicate whether the domain is a box (Rectangle or Parallelepiped).
