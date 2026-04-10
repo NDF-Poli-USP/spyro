@@ -28,8 +28,10 @@ class Wave(Model_parameters, metaclass=ABCMeta):
 
     Attributes:
     -----------
-    comm: MPI communicator
-
+    comm : `object`
+        An object representing the communication interface
+    boundary_idx_map: dict
+        Mapping of boundary IDs for applying absorbing boundary conditions
     initial_velocity_model: firedrake function
         Initial velocity model
     function_space: firedrake function space
@@ -103,9 +105,9 @@ class Wave(Model_parameters, metaclass=ABCMeta):
         self.sources = None
 
         # Creating mesh operations manager
-        self.mesh_ops = mshops.MeshOps(self.domain_dimensions(), dimension=self.dimension,
-                                       quadrilateral=self.mesh_parameters.quadrilateral,
-                                       comm=self.comm)
+        self.mesh_ops = mshops.MeshOps(
+            self.domain_dimensions(), dimension=self.dimension,
+            quadrilateral=self.mesh_parameters.quadrilateral, comm=self.comm)
 
         if self.mesh is not None:
             self.building_mesh_derived_paramenters()
@@ -154,6 +156,18 @@ class Wave(Model_parameters, metaclass=ABCMeta):
             self.mesh_y = coordinates[2]
         self._build_function_space()
         self._map_sources_and_receivers()
+
+        # ToDo: Create a flag for other domains that are not of type box
+        symb_coordinates = self.get_spatial_coordinates()
+        boundaries = [self.absorb_top, self.absorb_bottom,
+                      self.absorb_right, self.absorb_left]
+        if self.dimension == 3:
+            boundaries.extend([self.absorb_front,
+                               self.absorb_back])
+        self.boundary_idx_map = \
+            self.mesh_ops.mapping_boundary_ids(self.mesh, self.function_space,
+                                               symb_coordinates, boundaries,
+                                               box_domain=True)
 
     def set_mesh(
             self,
