@@ -326,9 +326,14 @@ class MeshOps():
 
             # Verify numerical ids
             exterior_markers = set(mesh.exterior_facets.unique_markers)
-            print("Available boundary markers:", exterior_markers)
+            # print("Available boundary markers:", exterior_markers)
 
             # Boundary nodes indices
+            if len(exterior_markers) == 0:
+                boundary_idx_map = {idx_bdn: None for idx_bdn
+                                    in range(1, num_boundaries + 1)}
+                return boundary_idx_map
+
             boundary_idx_map = {}
             for idx_bdn in range(1, num_boundaries + 1):
 
@@ -336,6 +341,7 @@ class MeshOps():
                     idx_bdn = "bottom" if idx_bdn == 5 else idx_bdn
                     idx_bdn = "top" if idx_bdn == 6 else idx_bdn
 
+                # Applying a dummy Dirichlet BC
                 bnd_node_ids = fire.DirichletBC(function_space, bc_val, idx_bdn).nodes
 
                 if len(bnd_node_ids) == 0:
