@@ -259,9 +259,6 @@ class MeshOps():
             ufl_input = generate_ufl_functions(mesh, coord_expression[i],
                                                self.dimension)
 
-            import ipdb
-            ipdb.set_trace()
-
             if self.func_space_type == 'scalar':
                 V = function_space
 
