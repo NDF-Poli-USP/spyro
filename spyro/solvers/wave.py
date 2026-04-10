@@ -159,7 +159,7 @@ class Wave(Model_parameters, metaclass=ABCMeta):
 
         # ToDo: Create a flag for other domains that are not of type box
         self.mesh_ops.func_space_type = 'scalar' \
-            if self.wave_type.value == 1 else 'vector'
+            if len(self.function_space.value_shape) == 0 else 'vector'
         boundaries = [self.absorb_top, self.absorb_bottom,
                       self.absorb_right, self.absorb_left]
         if self.dimension == 3:
