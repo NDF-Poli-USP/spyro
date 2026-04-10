@@ -57,6 +57,16 @@ class HABC_Mesh():
         Function space for the Eikonal modeling
     mesh_original : `firedrake mesh`
         Original mesh without absorbing layer
+    mesh_parameters.alpha : `float`
+        Ratio between the representative mesh dimensions
+    mesh_parameters.diam_mesh : `ufl.geometry.CellDiameter`
+        Mesh cell diameters
+    mesh_parameters.lmin : `float`
+        Minimum mesh size
+    mesh_parameters.lmax : `float`
+        Maxmum mesh size
+    mesh_parameters.tol : `float`
+        Tolerance for searching nodes in the mesh
     p_c0 : `int`
         Finite element order for the velocity model without absorbing layer
     p_eik : `int`
