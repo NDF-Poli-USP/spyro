@@ -1,3 +1,5 @@
+"""UFL-based forms used in the Elastic wave solvers."""
+
 from firedrake import (
     Cofunction,
     Constant,
@@ -18,6 +20,13 @@ from .local_abc import local_abc_form
 
 
 def isotropic_elastic_without_pml(wave):
+    """Set up forms for isotropic elastic wave equation without PML.
+    
+    Parameters
+    ----------
+    wave : object
+        Wave object containing function space, quadrature rule, and material properties.
+    """
     V = wave.function_space
     quad_rule = wave.quadrature_rule
 
@@ -34,7 +43,21 @@ def isotropic_elastic_without_pml(wave):
 
     F_m = (rho / (dt**2)) * dot(u - 2 * u_n + u_nm1, v) * dx(**quad_rule)
 
-    eps = lambda v: 0.5 * (grad(v) + grad(v).T)
+    def eps(v):
+        """Compute strain rate tensor.
+        
+        Parameters
+        ----------
+        v : object
+            Displacement field.
+            
+        Returns
+        -------
+        object
+            Symmetric strain rate tensor.
+        """
+        return 0.5 * (grad(v) + grad(v).T)
+
     F_k = lmbda * div(u_n) * div(v) * dx(**quad_rule) + 2 * mu * inner(
         eps(u_n), eps(v)
     ) * dx(**quad_rule)
@@ -66,4 +89,11 @@ def isotropic_elastic_without_pml(wave):
 
 
 def isotropic_elastic_with_pml():
+    """Set up forms for isotropic elastic wave equation with PML.
+    
+    Raises
+    ------
+    NotImplementedError
+        This functionality is not yet implemented.
+    """
     raise NotImplementedError

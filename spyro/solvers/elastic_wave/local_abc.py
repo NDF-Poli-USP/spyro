@@ -1,9 +1,17 @@
+"""Local absorbing boundary conditions implementation for elastic wave equations.
+
+This module provides implementations of different local ABC schemes including
+Stacey and Clayton-Engquist ABCs.
+"""
 from firedrake import Constant, ds, TestFunction, TrialFunction
 
 
 def local_abc_form(Wave):
-    """Returns the linear form associated with the traction loads when combined with
-    local absorbing boundary conditions."""
+    """Return the linear form associated with the traction loads and local ABCs.
+
+    Compute the linear form for traction loads when combined with local
+    absorbing boundary conditions.
+    """
     abc_dict = Wave.input_dictionary.get("absorving_boundary_conditions", None)
     if abc_dict is None:
         return 0
@@ -125,7 +133,58 @@ def clayton_engquist_A1_terms(
     ux_dy,
     uy_dy,
 ):
+    """Compute Clayton-Engquist A1 boundary condition terms.
 
+    Parameters
+    ----------
+    ndim : int
+        Number of spatial dimensions (2 or 3).
+    rho : firedrake.Function
+        Density field.
+    c_p : firedrake.Function
+        P-wave velocity field.
+    c_s : firedrake.Function
+        S-wave velocity field.
+    v : firedrake.TestFunction
+        Test function in the function space.
+    iz : int
+        Index of z-component (0).
+    ix : int
+        Index of x-component (1).
+    iy : int
+        Index of y-component (2).
+    qr_s : dict
+        Surface quadrature rule.
+    uz_dt : firedrake.Function
+        Time derivative of z-displacement.
+    ux_dt : firedrake.Function
+        Time derivative of x-displacement.
+    uy_dt : firedrake.Function or None
+        Time derivative of y-displacement (only for 3D).
+    uz_dz : firedrake.Function
+        Spatial z-derivative of z-displacement.
+    ux_dz : firedrake.Function
+        Spatial z-derivative of x-displacement.
+    uy_dz : firedrake.Function or None
+        Spatial z-derivative of y-displacement (only for 3D).
+    uz_dx : firedrake.Function
+        Spatial x-derivative of z-displacement.
+    ux_dx : firedrake.Function
+        Spatial x-derivative of x-displacement.
+    uy_dx : firedrake.Function or None
+        Spatial x-derivative of y-displacement (only for 3D).
+    uz_dy : firedrake.Function or None
+        Spatial y-derivative of z-displacement (only for 3D).
+    ux_dy : firedrake.Function or None
+        Spatial y-derivative of x-displacement (only for 3D).
+    uy_dy : firedrake.Function or None
+        Spatial y-derivative of y-displacement (only for 3D).
+
+    Returns
+    -------
+    firedrake.Form
+        The linear form representing Clayton-Engquist A1 boundary conditions.
+    """
     F_t = 0
 
     # Plane z = -(Lz + pad)
@@ -207,7 +266,58 @@ def stacey_terms(
     ux_dy,
     uy_dy,
 ):
+    """Compute Stacey boundary condition terms.
 
+    Parameters
+    ----------
+    ndim : int
+        Number of spatial dimensions (2 or 3).
+    rho : firedrake.Function
+        Density field.
+    c_p : firedrake.Function
+        P-wave velocity field.
+    c_s : firedrake.Function
+        S-wave velocity field.
+    v : firedrake.TestFunction
+        Test function in the function space.
+    iz : int
+        Index of z-component (0).
+    ix : int
+        Index of x-component (1).
+    iy : int
+        Index of y-component (2).
+    qr_s : dict
+        Surface quadrature rule.
+    uz_dt : firedrake.Function
+        Time derivative of z-displacement.
+    ux_dt : firedrake.Function
+        Time derivative of x-displacement.
+    uy_dt : firedrake.Function or None
+        Time derivative of y-displacement (only for 3D).
+    uz_dz : firedrake.Function
+        Spatial z-derivative of z-displacement.
+    ux_dz : firedrake.Function
+        Spatial z-derivative of x-displacement.
+    uy_dz : firedrake.Function or None
+        Spatial z-derivative of y-displacement (only for 3D).
+    uz_dx : firedrake.Function
+        Spatial x-derivative of z-displacement.
+    ux_dx : firedrake.Function
+        Spatial x-derivative of x-displacement.
+    uy_dx : firedrake.Function or None
+        Spatial x-derivative of y-displacement (only for 3D).
+    uz_dy : firedrake.Function or None
+        Spatial y-derivative of z-displacement (only for 3D).
+    ux_dy : firedrake.Function or None
+        Spatial y-derivative of x-displacement (only for 3D).
+    uy_dy : firedrake.Function or None
+        Spatial y-derivative of y-displacement (only for 3D).
+
+    Returns
+    -------
+    firedrake.Form
+        The linear form representing Stacey boundary conditions.
+    """
     F_t = 0
 
     # Plane z = -(Lz + pad)

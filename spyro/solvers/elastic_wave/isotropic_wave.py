@@ -1,3 +1,9 @@
+"""Isotropic elastic wave propagator solver.
+
+This module implements the isotropic elastic wave equation solver,
+handling density and Lame parameter conversions, displacement fields,
+and wave decomposition into P-wave and S-wave components.
+"""
 import numpy as np
 
 from firedrake import (
@@ -58,6 +64,22 @@ class IsotropicWave(ElasticWave):
 
     @override
     def initialize_model_parameters_from_object(self, synthetic_data_dict: dict):
+        """Initialize model parameters from a dictionary.
+
+        Parameters
+        ----------
+        synthetic_data_dict : dict
+            Dictionary containing model parameters such as density,
+            Lame parameters, or wave velocities.
+
+        Raises
+        ------
+        Exception
+            If the selection of parameters is inconsistent. Valid options are
+            {Density, Lame first, Lame second} or {Density, P-wave velocity,
+            S-wave velocity}.
+
+        """
         def constant_wrapper(value):
             if np.isscalar(value):
                 return Constant(value)
@@ -110,6 +132,19 @@ class IsotropicWave(ElasticWave):
 
     @override
     def initialize_model_parameters_from_file(self, synthetic_data_dict):
+        """Initialize model parameters from file.
+
+        Parameters
+        ----------
+        synthetic_data_dict : dict
+            Dictionary with file paths to model parameters.
+
+        Raises
+        ------
+        NotImplementedError
+            This method is not yet implemented.
+
+        """
         raise NotImplementedError
 
     @override
@@ -146,6 +181,19 @@ class IsotropicWave(ElasticWave):
 
     @override
     def get_receivers_output(self):
+        """Obtain displacement data at receiver locations.
+
+        Returns
+        -------
+        array
+            Interpolated displacement values at receiver coordinates.
+
+        Raises
+        ------
+        NotImplementedError
+            If PML absorbing boundary conditions are active.
+
+        """
         if self.abc_boundary_layer_type == "PML":
             raise NotImplementedError
         else:
@@ -154,14 +202,37 @@ class IsotropicWave(ElasticWave):
 
     @override
     def get_function(self):
+        """Return the displacement field.
+
+        Returns
+        -------
+        Function
+            The current displacement field.
+
+        """
         return self.u_n
 
     @override
     def get_function_name(self):
+        """Return the name of the primary solution field.
+
+        Returns
+        -------
+        str
+            The name "Displacement".
+
+        """
         return "Displacement"
 
     @override
     def matrix_building(self):
+        """Build the time marching matrix operator and initialize fields.
+
+        Create displacement fields, set up absorbing boundary conditions,
+        parse initial conditions, boundary conditions, and volumetric forces.
+        Additionally, set up either standard or PML-based elastic wave equations.
+
+        """
         self.current_time = 0.0
 
         self.u_n = Function(self.function_space, name=self.get_function_name())
@@ -194,18 +265,50 @@ class IsotropicWave(ElasticWave):
 
     @override
     def rhs_no_pml(self):
+        """Return the right-hand side for time integration.
+
+        Returns
+        -------
+        UFL.CoFunction
+            The right-hand side B for time stepping.
+
+        Raises
+        ------
+        NotImplementedError
+            If PML absorbing boundary conditions are active.
+
+        """
         if self.abc_boundary_layer_type == "PML":
             raise NotImplementedError
         else:
             return self.B
 
     def rhs_no_pml_source(self):
+        """Return the source term for the elastic wave equation.
+
+        Returns
+        -------
+        Function
+            The source function for the wave equation.
+
+        Raises
+        ------
+        NotImplementedError
+            If PML absorbing boundary conditions are active.
+
+        """
         if self.abc_boundary_layer_type == "PML":
             raise NotImplementedError
         else:
             return self.source_function
 
     def parse_initial_conditions(self):
+        """Parse and set initial displacement conditions from input dictionary.
+
+        Interpolates initial conditions onto displacement fields u_n and u_nm1
+        based on the specified initial_condition function.
+
+        """
         time_dict = self.input_dictionary["time_axis"]
         initial_condition = time_dict.get("initial_condition", None)
         if initial_condition is not None:
@@ -214,6 +317,18 @@ class IsotropicWave(ElasticWave):
             self.u_nm1.interpolate(initial_condition(x_vec, 0 - 2 * self.dt))
 
     def parse_boundary_conditions(self):
+        """Parse and apply Dirichlet boundary conditions.
+
+        Processes boundary condition specifications from the input dictionary,
+        supporting individual component constraints (ux, uy, uz) or full
+        displacement vector constraints (u).
+
+        Raises
+        ------
+        Exception
+            If an unsupported boundary condition tag is encountered.
+
+        """
         bc_list = self.input_dictionary.get("boundary_conditions", [])
         for tag, idbc, value in bc_list:
             if tag == "u":
@@ -229,6 +344,12 @@ class IsotropicWave(ElasticWave):
             self.bcs.append(DirichletBC(subspace, value, idbc))
 
     def parse_volumetric_forces(self):
+        """Parse body forces from acquisition dictionary.
+
+        Extract body force data and initialize the body_forces field
+        with the specified spatial and temporal variation.
+
+        """
         acquisition_dict = self.input_dictionary["acquisition"]
         body_forces_data = acquisition_dict.get("body_forces", None)
         if body_forces_data is not None:
@@ -236,6 +357,17 @@ class IsotropicWave(ElasticWave):
             self.body_forces = body_forces_data(x_vec, self.time)
 
     def update_p_wave(self):
+        """Compute and return the P-wave component.
+
+        Project the divergence of the displacement field onto a DG-0 function
+        space to extract the P-wave component.
+
+        Returns
+        -------
+        Firedrake.function
+            The P-wave field as the divergence of displacement.
+
+        """
         if self.p_wave is None:
             self.D_h = FunctionSpace(self.mesh, "DG", 0)
             self.p_wave = Function(self.D_h)
@@ -245,6 +377,18 @@ class IsotropicWave(ElasticWave):
         return self.p_wave
 
     def update_s_wave(self):
+        """Compute and return the S-wave (curl) component.
+
+        Project the curl of the displacement field onto a DG-0 function space
+        to extract the S-wave component. In 2D, this returns a scalar field;
+        in 3D, a vector field.
+
+        Returns
+        -------
+        Firedrake.function
+            The S-wave field as the curl of displacement.
+
+        """
         if self.s_wave is None:
             if self.dimension == 2:
                 self.C_h = FunctionSpace(self.mesh, "DG", 0)

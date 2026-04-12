@@ -1,3 +1,8 @@
+"""Base Elastic wave abstract class.
+
+Add everything wave-related and common to all elastic wave solvers here.
+"""
+
 from abc import abstractmethod, ABCMeta
 from firedrake import Constant
 
@@ -27,12 +32,15 @@ class ElasticWave(Wave, metaclass=ABCMeta):
 
     @abstractmethod
     def initialize_model_parameters_from_object(self, synthetic_data_dict):
+        """Initilize model parameters from object, based on this abstract method."""
         pass
 
     @abstractmethod
     def initialize_model_parameters_from_file(self, synthetic_data_dict):
+        """Initilize model parameters from file, based on this abstract method."""
         pass
 
     @override
     def update_source_expression(self, t):
+        """Update source expression based on the time."""
         self.time.assign(t)
