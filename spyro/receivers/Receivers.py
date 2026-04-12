@@ -78,7 +78,7 @@ class Receivers(Delta_projector):
 
     def apply_receivers_as_source(self, rhs_forcing, residual, IT):
         """Inject receivers as a source.
-        
+
         The adjoint operation of interpolation (injection).
 
         Injects residual, and timestep IT, at receiver locations

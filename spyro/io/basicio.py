@@ -487,7 +487,7 @@ def save_shots(Wave_obj, file_name="shots/shot_record_", shot_ids=0):
 
     Parameters
     ----------
-    Wave_obj : :class:`Wave` 
+    Wave_obj : :class:`Wave`
         A :class:`Wave`  object.
     file_name : str, optional
         The filename to save the data to. Default is 'shots/shot_record_'.
@@ -509,7 +509,7 @@ def rebuild_empty_forward_solution(wave, time_steps):
 
     Parameters
     ----------
-    wave : :class:`Wave` 
+    wave : :class:`Wave`
         The :class:`Wave` object to rebuild.
     time_steps : int
         Number of time steps to create functions for.
@@ -529,7 +529,7 @@ def load_shots(Wave_obj, file_name="shots/shot_record_", shot_ids=0):
 
     Parameters
     ----------
-    Wave_obj : :class:`Wave` 
+    Wave_obj : :class:`Wave`
         A :class:`Wave`  object.
     file_name : str, optional
         The filename to load the data from. Default is 'shots/shot_record_'.

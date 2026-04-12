@@ -1,5 +1,6 @@
 """Class for reading option section int he input dictionary."""
 
+
 class Read_options:
     """Read the options section of the dictionary.
 

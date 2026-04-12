@@ -4,6 +4,7 @@ This module implements the isotropic elastic wave equation solver,
 handling density and Lame parameter conversions, displacement fields,
 and wave decomposition into P-wave and S-wave components.
 """
+
 import numpy as np
 
 from firedrake import (
@@ -80,6 +81,7 @@ class IsotropicWave(ElasticWave):
             S-wave velocity}.
 
         """
+
         def constant_wrapper(value):
             if np.isscalar(value):
                 return Constant(value)

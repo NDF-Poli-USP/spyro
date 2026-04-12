@@ -21,7 +21,7 @@ from .local_abc import local_abc_form
 
 def isotropic_elastic_without_pml(wave):
     """Set up forms for isotropic elastic wave equation without PML.
-    
+
     Parameters
     ----------
     wave : object
@@ -45,12 +45,12 @@ def isotropic_elastic_without_pml(wave):
 
     def eps(v):
         """Compute strain rate tensor.
-        
+
         Parameters
         ----------
         v : object
             Displacement field.
-            
+
         Returns
         -------
         object
@@ -90,7 +90,7 @@ def isotropic_elastic_without_pml(wave):
 
 def isotropic_elastic_with_pml():
     """Set up forms for isotropic elastic wave equation with PML.
-    
+
     Raises
     ------
     NotImplementedError
