@@ -1,3 +1,5 @@
+"""Modal solver package."""
+
 import importlib
 import pkgutil
 

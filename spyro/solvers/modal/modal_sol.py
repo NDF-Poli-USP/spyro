@@ -1,3 +1,5 @@
+"""Modal solver utilities for eigenvalue estimation and timestep bounds."""
+
 import firedrake as fire
 import numpy as np
 import scipy.sparse as ss
@@ -155,8 +157,9 @@ class Modal_Solver:
 
     @staticmethod
     def weak_forms(c, V, quad_rule=None, source=False, user_load=None):
-        """Generate the bilinear forms for the modal problem. Also, it can generate a
-        source term in weak form.
+        """Generate bilinear forms for the modal problem.
+
+        Also generates a source term in weak form when requested.
 
         Parameters
         ----------
@@ -407,8 +410,9 @@ class Modal_Solver:
     def c_equivalent(
         self, c, V, quad_rule=None, typ_homog="energy", static_load_for_ceq=None
     ):
-        """Compute an equivalent homogeneous velocity for an inhomogeneneous velocity
-        model using an energy-equivalent homogenization.
+        """Compute equivalent homogeneous velocity for an inhomogeneous model.
+
+        Uses an energy-equivalent homogenization by default.
 
         Parameters
         ----------
@@ -471,8 +475,8 @@ class Modal_Solver:
 
     @staticmethod
     def freq_factor_rec(hyper_axes, bc="Neumann"):
-        """
-        Compute the frequency factor for rectangular or prismatic geometries
+        """Compute the frequency factor for rectangular or prismatic geometries.
+
         - Rectangular layer:
             https://www.sc.ehu.es/sbweb/fisica3/ondas/membrana_1/membrana_1.html
 
@@ -501,8 +505,8 @@ class Modal_Solver:
         return f_rec
 
     def freq_factor_ell(self, hyper_axes, bc="Neumann", all_axes_equal=False):
-        """
-        Compute the frequency factor for elliptical or ellipsoidal geometries
+        """Compute the frequency factor for elliptical or ellipsoidal geometries.
+
         - Elliptical layer:
             https://docs.scipy.org/doc/scipy/reference/generated/
             scipy.special.mathieu_modcem1.html#scipy.special.mathieu_modcem1
@@ -814,8 +818,9 @@ class Modal_Solver:
         fitting_c=(0.0, 0.0, 0.0, 0.0),
         cut_plane_percent=1.0,
     ):
-        """Compute an approximate frequency factor for the hypershape with truncation
-        plane at z = cut_plane_percent * b, b = Lz + pad_len.
+        """Compute an approximate frequency factor for a truncated hypershape.
+
+        The truncation plane is at z = cut_plane_percent * b, with b = Lz + pad_len.
 
         The fitting parameters for the equivalent velocity regression controls:
         - fc1: Magnitude order of the frequency
@@ -904,8 +909,9 @@ class Modal_Solver:
         fitting_c=(0.0, 0.0, 0.0, 0.0),
         cut_plane_percent=1.0,
     ):
-        """Compute the analytical solution for the eigenvalue problem with Neumann or
-        Dirichlet boundary conditions for isotropic hypershapes.
+        """Compute the analytical eigenvalue solution for isotropic hypershapes.
+
+        Supports Neumann or Dirichlet boundary conditions.
 
         Parameters
         ----------
@@ -1281,10 +1287,10 @@ class Modal_Solver:
         inv_oper=False,
         fraction=0.7,
     ):
-        """Estimate the maximum stable timestep based on the spectral radius using
-        optionally the Gershgorin Circle Theorem to estimate the maximum generalized
-        eigenvalue ('ANALYTICAL' method). Otherwise computes the maximum generalized
-        eigenvalue exactly.
+        """Estimate the maximum stable timestep from the spectral radius.
+
+        Optionally uses Gershgorin Circle Theorem in the analytical method,
+        otherwise computes the maximum generalized eigenvalue exactly.
 
         Parameters
         ----------
