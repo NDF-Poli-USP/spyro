@@ -1,3 +1,4 @@
+"""Boundary layer inpiut output helpers."""
 # # Specify a 250-m PML on the three sides of the
 # # domain to damp outgoing waves.
 # default_dictionary["absorving_boundary_conditions"] = {
@@ -98,6 +99,13 @@ class Read_boundary_layer:
 
     @property
     def abc_boundary_layer_type(self):
+        """Get the type of absorbing boundary condition.
+
+        Returns
+        -------
+        str or None
+            The damping type: 'PML', 'local', 'hybrid', or None.
+        """
         return self._abc_boundary_layer_type
 
     @abc_boundary_layer_type.setter
@@ -138,6 +146,12 @@ class Read_boundary_layer:
 
     @property
     def abc_pad_length(self):
+        """Get the length of the absorbing boundary condition.
+
+        Returns
+        -------
+        float or None
+        """
         return self._abc_pad_length
 
     @abc_pad_length.setter

@@ -1,3 +1,9 @@
+"""Helpers for reading material properties in the domain.
+
+This is a unified way that works for acoustic and elastic variables,
+be them scalar velocity fields, vector fields or tensors.
+"""
+
 from os import getcwd
 from os.path import splitext
 
@@ -71,7 +77,9 @@ def _initialize_material_property_from_ufl(
     conditional=None,
     expression=None,
 ):
-    """Initialize material property from a UFL input. This method is used when the
+    """Initialize material property from a UFL input.
+
+    This method is used when the
     material property is defined by a constant value, a conditional or an expression.
 
     Parameters
@@ -489,6 +497,19 @@ def set_material_properties(wave, *args, **kwargs):
 
 
 def point_to_scalar_wave_function_space(wave):
+    """Return the scalar space associated with ``wave.function_space``.
+
+    Parameters
+    ----------
+    wave : object
+        Wave object that stores cached scalar/vector spaces and the main
+        function space.
+
+    Returns
+    -------
+    firedrake.FunctionSpace
+        Scalar function space compatible with the wave mesh.
+    """
     # Check if wave.function_space is a generates vector os scalar fields:
     original_function_space_type = check_function_space_type(wave.function_space)
     if wave.scalar_function_space is not None:
@@ -507,6 +528,19 @@ def point_to_scalar_wave_function_space(wave):
 
 
 def point_to_vector_wave_function_space(wave):
+    """Return the vector space associated with ``wave.function_space``.
+
+    Parameters
+    ----------
+    wave : object
+        Wave object that stores cached scalar/vector spaces and the main
+        function space.
+
+    Returns
+    -------
+    firedrake.VectorFunctionSpace
+        Vector function space compatible with the wave mesh.
+    """
     # Check if wave.function_space is a generates vector os scalar fields:
     original_function_space_type = check_function_space_type(wave.function_space)
     if wave.vector_function_space is not None:
@@ -518,11 +552,24 @@ def point_to_vector_wave_function_space(wave):
         return wave.vector_function_space
     else:
         raise ValueError(
-            f"Should not create a new VectorFunctionSpace from {original_function_space_type}"
+            "Should not create a new VectorFunctionSpace from "
+            f"{original_function_space_type}"
         )
 
 
 def point_to_dg_scalar_wave_function_space(wave):
+    """Return the cached DG0 scalar space, creating it if needed.
+
+    Parameters
+    ----------
+    wave : object
+        Wave object containing the base mesh and cached DG0 scalar space.
+
+    Returns
+    -------
+    firedrake.FunctionSpace
+        DG0 scalar function space.
+    """
     if wave.dg0_scalar_function_space is not None:
         return wave.dg0_scalar_function_space
     else:
@@ -533,6 +580,18 @@ def point_to_dg_scalar_wave_function_space(wave):
 
 
 def point_to_dg_vector_wave_function_space(wave):
+    """Return the cached DG0 vector space, creating it if needed.
+
+    Parameters
+    ----------
+    wave : object
+        Wave object containing the base mesh and cached DG0 vector space.
+
+    Returns
+    -------
+    firedrake.VectorFunctionSpace
+        DG0 vector function space.
+    """
     if wave.dg0_vector_function_space is not None:
         return wave.dg0_vector_function_space
     else:
@@ -543,6 +602,22 @@ def point_to_dg_vector_wave_function_space(wave):
 
 
 def point_to_correct_tensor_space(wave, shape_func_space, is_dg):
+    """Return a cached tensor space with the requested shape and continuity.
+
+    Parameters
+    ----------
+    wave : object
+        Wave object with mesh and tensor-space caches.
+    shape_func_space : tuple[int, int]
+        Tensor shape for the target function space.
+    is_dg : bool
+        If ``True``, build/use a DG tensor function space.
+
+    Returns
+    -------
+    firedrake.TensorFunctionSpace
+        Tensor function space matching ``shape_func_space`` and ``is_dg``.
+    """
     if wave.tensor_function_space0 is None:
         wave.tensor_function_space0_shape = shape_func_space
         wave.tensor_function_space0 = set_tensor_function_space(
@@ -575,6 +650,23 @@ def point_to_correct_tensor_space(wave, shape_func_space, is_dg):
 
 
 def set_tensor_function_space(wave, shape_func_space, is_dg):
+    """Create a tensor function space for quadrilateral or simplex meshes.
+
+    Parameters
+    ----------
+    wave : object
+        Wave object with mesh, mesh-parameter metadata, and base function
+        space.
+    shape_func_space : tuple[int, int]
+        Tensor shape for the new function space.
+    is_dg : bool
+        If ``True``, create a DG tensor function space.
+
+    Returns
+    -------
+    firedrake.TensorFunctionSpace
+        Tensor function space for material-property fields.
+    """
     if wave.mesh_parameters.quadrilateral:  # Q_Elements
         base_mesh = wave.mesh._base_mesh
         base_cell = base_mesh.ufl_cell()

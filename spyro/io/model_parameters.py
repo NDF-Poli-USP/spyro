@@ -1,3 +1,5 @@
+"""Model parameter parsing and validation utilities for Spyro runs."""
+
 import uuid
 from mpi4py import MPI  # noqa:F401
 import warnings
@@ -156,8 +158,9 @@ class Model_parameters(Read_options, Read_boundary_layer, Read_time_axis, Read_o
     """
 
     def __init__(self, dictionary=None, comm=None):
-        """Initializes class that reads and sanitizes input parameters. A dictionary can
-        be used.
+        """Initialize class that reads and sanitizes input parameters.
+        
+        A dictionary can be used.
 
         Parameters
         ----------
@@ -266,6 +269,7 @@ class Model_parameters(Read_options, Read_boundary_layer, Read_time_axis, Read_o
 
     @property
     def source_locations(self):
+        """list[tuple[float, ...]] | None: Source coordinates in physical space."""
         return self._source_locations
 
     @source_locations.setter
@@ -290,6 +294,7 @@ class Model_parameters(Read_options, Read_boundary_layer, Read_time_axis, Read_o
 
     @property
     def receiver_locations(self):
+        """list[tuple[float, ...]] | None: Receiver coordinates in physical space."""
         return self._receiver_locations
 
     @receiver_locations.setter
@@ -319,6 +324,7 @@ class Model_parameters(Read_options, Read_boundary_layer, Read_time_axis, Read_o
 
     @property
     def delay_type(self):
+        """str: Delay interpretation mode for source time function."""
         return self._delay_type
 
     @delay_type.setter
@@ -329,6 +335,7 @@ class Model_parameters(Read_options, Read_boundary_layer, Read_time_axis, Read_o
 
     @property
     def source_type(self):
+        """str: Wavelet/source model name used during propagation."""
         return self._source_type
 
     @source_type.setter
@@ -339,6 +346,7 @@ class Model_parameters(Read_options, Read_boundary_layer, Read_time_axis, Read_o
 
     @property
     def frequency(self):
+        """Float | None: Dominant source frequency in hertz."""
         return self._frequency
 
     @frequency.setter
@@ -353,6 +361,7 @@ class Model_parameters(Read_options, Read_boundary_layer, Read_time_axis, Read_o
 
     @property
     def equation_type(self):
+        """str: Governing equation identifier for the simulation."""
         return self._equation_type
 
     @equation_type.setter
@@ -363,6 +372,7 @@ class Model_parameters(Read_options, Read_boundary_layer, Read_time_axis, Read_o
 
     @property
     def parallelism_type(self):
+        """str: Parallelism strategy used to distribute shot propagations."""
         return self._parallelism_type
 
     @parallelism_type.setter
@@ -444,7 +454,7 @@ class Model_parameters(Read_options, Read_boundary_layer, Read_time_axis, Read_o
         )
 
     def _set_mesh_length(self, length_z=None, length_x=None, length_y=None):
-        """Sets the mesh lengths.
+        """Set the mesh lengths.
 
         Parameters
         ----------
@@ -467,7 +477,7 @@ class Model_parameters(Read_options, Read_boundary_layer, Read_time_axis, Read_o
             self.mesh_parameters.length_y = length_y
 
     def get_mesh(self):
-        """Reads in an external mesh and scatters it between cores.
+        """Read an external mesh and scatters it between cores.
 
         Returns
         -------
@@ -496,7 +506,7 @@ def _validate_enum(value, accepted_values, name):
 
 
 def _check_point_in_domain(point_coordinates, input_mesh_lengths, negative_z):
-    """Checks if a point is within the mesh domain.
+    """Check if a point is within the mesh domain.
 
     Parameters
     ----------

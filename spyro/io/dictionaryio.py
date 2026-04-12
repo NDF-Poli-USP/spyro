@@ -1,3 +1,5 @@
+"""Class for reading option section int he input dictionary."""
+
 class Read_options:
     """Read the options section of the dictionary.
 
@@ -51,6 +53,13 @@ class Read_options:
 
     @property
     def variant(self):
+        """Get the type of element variant for each cell.
+
+        Returns
+        -------
+        str or None
+            The variant type: 'lumped', 'equispaced', 'DG', or None
+        """
         return self._variant
 
     @variant.setter
@@ -62,6 +71,19 @@ class Read_options:
 
     @property
     def method(self):
+        """Get the FE method used for wave propagation.
+
+        Returns
+        -------
+        str or None
+            The method:
+            'mass_lumped_triangle',
+            'spectral_quadrilateral',
+            'DG_triangle',
+            'DG_quadrilateral',
+            'CG', or
+            None.
+        """
         return self._method
 
     @method.setter
@@ -115,6 +137,16 @@ class Read_options:
 
     @property
     def cell_type(self):
+        """Get the cell type used for wave propagation.
+
+        Returns
+        -------
+        str or None
+            The cell geometry:
+            'triangle',
+            'quadrilateral', or
+            None.
+        """
         return self._cell_type
 
     @cell_type.setter
@@ -184,6 +216,12 @@ class Read_options:
 
     @property
     def degree(self):
+        """Get the FEM polynomial basis degree.
+
+        Returns
+        -------
+        int
+        """
         return self._degree
 
     @degree.setter
@@ -194,6 +232,13 @@ class Read_options:
 
     @property
     def dimension(self):
+        """Get the geometric dimension.
+
+        Returns
+        -------
+        int
+            2 or 3.
+        """
         return self._dimension
 
     @dimension.setter
@@ -204,8 +249,36 @@ class Read_options:
 
 
 class Read_outputs:
-    def __init__(self):
+    """Read and normalize visualization/output options.
 
+    This reader fills default values in ``self.input_dictionary["visualization"]``
+    and exposes them as attributes for downstream use.
+
+    Attributes
+    ----------
+    forward_output : bool
+        Whether forward wavefield output should be written.
+    forward_output_filename : str
+        Output filename used for forward results.
+    gradient_output : bool
+        Whether gradient output should be written.
+    gradient_filename : str
+        Output filename used for gradient results.
+    adjoint_output : bool
+        Whether adjoint wavefield output should be written.
+    adjoint_filename : str
+        Output filename used for adjoint results.
+    debug_output : bool
+        Whether debug output should be written.
+
+    Notes
+    -----
+    ``self.input_dictionary`` is expected to exist before initialization and
+    contain the global input dictionary used by the I/O readers.
+    """
+
+    def __init__(self):
+        """Populate visualization/output options with defaults."""
         v_str = "visualization"
         self.input_dictionary.setdefault(v_str, {})
         self.input_dictionary[v_str].setdefault("forward_output", False)
