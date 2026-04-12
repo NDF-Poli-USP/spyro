@@ -1,3 +1,5 @@
+"""Receivers class for evaluating efficiently poitn data."""
+
 from firedrake import *  # noqa: F403
 from firedrake.__future__ import interpolate
 from spyro.receivers.dirac_delta_projector import Delta_projector
@@ -6,11 +8,10 @@ import numpy as np
 
 
 class Receivers(Delta_projector):
-    """Project data defined on a triangular mesh to a set of 2D/3D coordinates for
-    variable spatial order using Lagrange interpolation.
+    """Eveluate data at points based on Dirac Delta projection.
 
-    Can interpolate receiveir values that do not coincide with
-    mesh or DOF points
+    Can interpolate receiver values that do not coincide with
+    mesh or DOF points.
 
     ...
 
@@ -48,7 +49,7 @@ class Receivers(Delta_projector):
     """
 
     def __init__(self, wave_object):
-        """Initializes class and gets all receiver parameters from input file.
+        """Initialize class and gets all receiver parameters from input file.
 
         Parameters
         ----------
@@ -76,7 +77,9 @@ class Receivers(Delta_projector):
             self.build_maps()
 
     def apply_receivers_as_source(self, rhs_forcing, residual, IT):
-        """The adjoint operation of interpolation (injection)
+        """Inject receivers as a source.
+        
+        The adjoint operation of interpolation (injection).
 
         Injects residual, and timestep IT, at receiver locations
         as source and stores their value in the right hand side
@@ -175,4 +178,5 @@ class Receivers(Delta_projector):
         return interpolate(f, V_r)
 
     def new_at(self, udat, receiver_id):
+        """Evaluate data at a point."""
         return super().new_at(udat, receiver_id)

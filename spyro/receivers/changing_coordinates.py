@@ -1,8 +1,10 @@
+"""Methods for changing to reference element."""
+
 import numpy as np
 
 
 def change_to_reference_triangle(p, cell_vertices):
-    """Changes variables to reference triangle.
+    """Change variables to reference triangle.
 
     Parameters
     ----------
@@ -57,7 +59,7 @@ def change_to_reference_triangle(p, cell_vertices):
 
 
 def change_to_reference_tetrahedron(p, cell_vertices, reference_coordinates=None):
-    """Changes variables to reference tetrahedron.
+    """Change variables to reference tetrahedron.
 
     Parameters
     ----------
@@ -335,7 +337,7 @@ def change_to_reference_tetrahedron(p, cell_vertices, reference_coordinates=None
 
 
 def change_to_reference_quad(p, cell_vertices):
-    """Changes varibales to reference quadrilateral.
+    """Change varibales to reference quadrilateral.
 
     Parameters
     ----------
@@ -411,7 +413,7 @@ def change_to_reference_quad(p, cell_vertices):
 
 
 def change_to_reference_hexa(p, cell_vertices, based_on_extruded=True):
-    """Changes variables to reference hexahedron.
+    """Change variables to reference hexahedron.
 
     Parameters
     ----------
