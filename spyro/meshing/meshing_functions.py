@@ -1,3 +1,5 @@
+"""Common meshing classes, functions or API calls for seismic-based problems."""
+
 import firedrake as fire
 import meshio
 import numpy as np
@@ -66,7 +68,8 @@ class AutomaticMesh:
     create_seimicmesh_2d_mesh()
         Creates a 2D mesh based on SeismicMesh meshing utilities.
     create_seismicmesh_2D_mesh_homogeneous()
-        Creates a 2D mesh homogeneous velocity mesh based on SeismicMesh meshing utilities.
+        Creates a 2D homogeneous velocity mesh based on SeismicMesh
+        meshing utilities.
     """
 
     def __init__(self, mesh_parameters=None):
@@ -95,7 +98,8 @@ class AutomaticMesh:
         - 'mesh_type': str, optional. Type of the mesh.
 
         For mesh with absorbing layer only:
-        - 'abc_pad_length': float, optional. Length of the absorbing boundary condition padding.
+                - 'abc_pad_length': float, optional. Length of the absorbing
+                    boundary condition padding.
 
         For Firedrake mesh only:
         - 'dx': float, optional. Mesh element size.
@@ -133,7 +137,7 @@ class AutomaticMesh:
         self.output_file_name = mesh_parameters.output_filename
 
     def create_mesh(self):
-        """Creates the mesh.
+        """Create the mesh.
 
         Returns
         -------
@@ -172,7 +176,7 @@ class AutomaticMesh:
             raise ValueError("mesh_type is not supported")
 
     def create_firedrake_mesh(self):
-        """Creates a mesh based on Firedrake meshing utilities.
+        """Create a mesh based on Firedrake meshing utilities.
 
         Returns
         -------
@@ -192,7 +196,7 @@ class AutomaticMesh:
             raise ValueError("dimension is not supported")
 
     def create_firedrake_2D_mesh(self):
-        """Creates a 2D mesh based on Firedrake meshing utilities.
+        """Create a 2D mesh based on Firedrake meshing utilities.
 
         Returns
         -------
@@ -243,7 +247,7 @@ class AutomaticMesh:
             )
 
     def create_firedrake_3D_mesh(self):
-        """Creates a 3D mesh based on Firedrake meshing utilities.
+        """Create a 3D mesh based on Firedrake meshing utilities.
 
         Returns
         -------
@@ -271,7 +275,7 @@ class AutomaticMesh:
         )
 
     def create_seismicmesh_mesh(self):
-        """Creates a mesh based on SeismicMesh meshing utilities.
+        """Create a mesh based on SeismicMesh meshing utilities.
 
         Returns
         -------
@@ -287,7 +291,7 @@ class AutomaticMesh:
             raise ValueError("dimension is not supported")
 
     def create_seimicmesh_2d_mesh(self):
-        """Creates a 2D mesh based on SeismicMesh meshing utilities.
+        """Create a 2D mesh based on SeismicMesh meshing utilities.
 
         Returns
         -------
@@ -306,7 +310,7 @@ class AutomaticMesh:
             return self.create_seismicmesh_2D_mesh_with_velocity_model()
 
     def create_seismicmesh_2D_mesh_with_velocity_model(self):
-        """Creates a 2D mesh with velocity-based refinement using SeismicMesh.
+        """Create a 2D mesh with velocity-based refinement using SeismicMesh.
 
         Returns
         -------
@@ -391,8 +395,9 @@ class AutomaticMesh:
         return mesh
 
     def create_seismicmesh_2D_mesh_homogeneous(self):
-        """Creates a 2D mesh based on SeismicMesh meshing utilities, with homogeneous
-        velocity model.
+        """Create a homogeneous 2D mesh based on SeismicMesh meshing utilities.
+
+        Use a homogeneous velocity model.
 
         Returns
         -------
@@ -452,7 +457,8 @@ class AutomaticMesh:
         return fire.Mesh(self.output_file_name)
 
     def create_spyro_mesh(self):
-        """Creates a mesh using spyro's internal meshing utilities based on gmsh calls.
+        """Create a mesh using spyro's internal meshing utilities based on gmsh calls.
+
         This mesh has tags that define the dx integration in Firedrake.
 
         Returns
@@ -469,7 +475,8 @@ class AutomaticMesh:
 
         Notes
         -----
-        Currently only 2D meshing is implemented via build_big_rect_with_inner_element_group.
+        Currently only 2D meshing is implemented via
+        build_big_rect_with_inner_element_group.
         """
         if self.dimension == 2:
             return build_big_rect_with_inner_element_group(self.mesh_parameters)
@@ -889,12 +896,11 @@ def build_big_rect_with_inner_element_group(mesh_parameters):
         pg_inner = gmsh.model.addPhysicalGroup(2, [inner_surf_tag])
         gmsh.model.setPhysicalName(2, pg_inner, "Inner")
 
-    # Create physical groups for boundary edges (for absorbing boundary conditions)
+    # Create physical groups for boundary edges.
+    # These IDs are used by absorbing boundary condition integrals.
     for edge_tag, boundary_id in boundary_tag_map.items():
-        # Set physical group ID explicitly to match ds() tags (1=top, 2=bottom, 3=right, 4=left)
-        pg_boundary = gmsh.model.addPhysicalGroup(
-            1, [edge_tag], boundary_id
-        )  # noqa: F841
+        # Match ds() tags: 1=top, 2=bottom, 3=right, 4=left.
+        gmsh.model.addPhysicalGroup(1, [edge_tag], boundary_id)
         boundary_names = {1: "Top", 2: "Bottom", 3: "Right", 4: "Left"}
         gmsh.model.setPhysicalName(
             1,
@@ -911,7 +917,9 @@ def build_big_rect_with_inner_element_group(mesh_parameters):
     for edge_tag, boundary_id in boundary_tag_map.items():
         boundary_names = {1: "Top", 2: "Bottom", 3: "Right", 4: "Left"}
         print(
-            f"  Edge {edge_tag} -> Boundary {boundary_id} ({boundary_names.get(boundary_id, 'Unknown')})"
+            "  Edge "
+            f"{edge_tag} -> Boundary {boundary_id} "
+            f"({boundary_names.get(boundary_id, 'Unknown')})"
         )
 
     if mesh_parameters.gradient_mask is not None:

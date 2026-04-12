@@ -1,3 +1,5 @@
+"""HABC meshing classes and functions."""
+
 import firedrake as fire
 from firedrake.__future__ import interpolate
 import numpy as np
@@ -214,8 +216,9 @@ class HABC_Mesh:
         return node_positions
 
     def extract_bnd_node_indices(self, node_positions, func_space):
-        """Extract boundary node indices on boundaries of the domain excluding the free
-        surface at the top boundary.
+        """Extract boundary node indices on boundaries of the domain.
+
+        Excludies the free surface at the top boundary.
 
         Parameters
         ----------
@@ -939,7 +942,9 @@ class HABC_Mesh:
         return in_hyp
 
     def sharp_mesh_3D(self, rec_mesh, hyp_par, centroid):
-        """Generate a sharp mesh by cutting the rectangular mesh with the hyperellipsoid
+        """Generate a sharp mesh by cutting with hyperellipsoid.
+
+        The rectangular mesh is cut with the hyperellipsoid
         surface.
 
         Parameters
@@ -1226,7 +1231,9 @@ class HABC_Mesh:
     def layer_mask_field(
         self, coords, V, damp_par=None, type_marker="damping", name_mask=None
     ):
-        """Generate a mask for the absorbing layer. The mask is defined for conditional
+        """Generate a mask for the absorbing layer.
+
+        The mask is defined for conditional
         expressions to identify the domain of the layer (option: 'mask') or the
         reference to the original boundary (option: 'damping') used to compute the
         damping profile.
