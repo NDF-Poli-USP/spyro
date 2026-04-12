@@ -22,6 +22,7 @@ select = ["E", "F", "D"]
 [tool.ruff.lint.per-file-ignores]
 "spyro/domains/quadrature.py" = ["F405"]
 "spyro/pml/damping.py" = ["F405"]
+"spyro/receivers/Receivers.py" = ["F405"]
 
 [tool.ruff.lint.pydocstyle]
 convention = "numpy"
