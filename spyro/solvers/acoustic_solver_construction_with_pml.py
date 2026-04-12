@@ -1,3 +1,5 @@
+"""Constructs Firedrake solver for the acosutic wave with a PML."""
+
 import firedrake as fire
 from firedrake import dx, ds, Constant, dot, grad, inner
 
@@ -5,7 +7,7 @@ from ..pml import damping
 
 
 def construct_solver_or_matrix_with_pml(Wave_object):
-    """Builds solver operators for wave propagator with a PML.
+    """Build solver operators for wave propagator with a PML.
 
     Doesn't create mass matrices if matrix_free option is on, which it is by default.
     """
@@ -16,7 +18,7 @@ def construct_solver_or_matrix_with_pml(Wave_object):
 
 
 def construct_solver_or_matrix_with_pml_2d(Wave_object):
-    """Builds solver operators for 2D wave propagator with a PML.
+    """Build solver operators for 2D wave propagator with a PML.
 
     Doesn't create mass matrices if matrix_free option is on, which it is by default.
     """
@@ -87,7 +89,7 @@ def construct_solver_or_matrix_with_pml_2d(Wave_object):
 
 
 def construct_solver_or_matrix_with_pml_3d(Wave_object):
-    """Builds solver operators for 3D wave propagator with a PML.
+    """Build solver operators for 3D wave propagator with a PML.
 
     Doesn't create mass matrices if matrix_free option is on, which it is by default.
     """
