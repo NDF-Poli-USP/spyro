@@ -1,3 +1,5 @@
+"""Time marching scheme used in wave propagators."""
+
 import firedrake as fire
 
 from . import helpers

@@ -1,3 +1,5 @@
+"""Time marching schemes for use in the adjoint equations."""
+
 import firedrake as fire
 from ..domains import quadrature
 

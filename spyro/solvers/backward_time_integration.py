@@ -1,10 +1,13 @@
+"""Backward wave propagator."""
+
 import firedrake as fire
 from . import helpers
 
 
 def backward_wave_propagator(Wave_obj, dt=None):
-    """Propagates the adjoint wave backwards in time. Currently uses central
-    differences.
+    """Propagate the adjoint wave backwards in time.
+
+    Currently uses central differences.
 
     Parameters
     ----------
@@ -29,8 +32,9 @@ def backward_wave_propagator(Wave_obj, dt=None):
 
 
 def backward_wave_propagator_no_pml(Wave_obj, dt=None):
-    """Propagates the adjoint wave backwards in time. Currently uses central
-    differences. Does not have any PML.
+    """Propagate the adjoint wave backwards in time.
+
+    Currently uses central differences. Does not have any PML.
 
     Parameters
     ----------
@@ -75,7 +79,10 @@ def backward_wave_propagator_no_pml(Wave_obj, dt=None):
     t = Wave_obj.current_time
     if t != final_time:
         print(
-            f"Current time of {t}, different than final_time of {final_time}. Setting final_time to current time in backwards propagation.",
+            (
+                f"Current time of {t}, different than final_time of {final_time}."
+                "Setting final_time to current time in backwards propagation."
+            ),
             flush=True,
         )
     nt = int(t / dt) + 1  # number of timesteps
@@ -112,7 +119,10 @@ def backward_wave_propagator_no_pml(Wave_obj, dt=None):
         )
         if comm.comm.rank == 0:
             print(
-                "Applying gradient mask: gradients will be computed only in inside region",
+                (
+                    "Applying gradient mask: gradients will "
+                    "be computed only in inside region"
+                ),
                 flush=True,
             )
     else:
@@ -200,8 +210,10 @@ def backward_wave_propagator_no_pml(Wave_obj, dt=None):
 
 
 def mixed_space_backward_wave_propagator(Wave_obj, dt=None):
-    """Propagates the adjoint wave backwards in time. Currently uses central
-    differences. Based on the mixed space implementation of PML.
+    """Propagate the adjoint wave backward in time.
+
+    Currently uses central differences.
+    Based on the mixed space implementation of PML.
 
     Parameters
     ----------
@@ -245,7 +257,10 @@ def mixed_space_backward_wave_propagator(Wave_obj, dt=None):
     t = Wave_obj.current_time
     if t != final_time:
         print(
-            f"Current time of {t}, different than final_time of {final_time}. Setting final_time to current time in backwards propagation.",
+            (
+                f"Current time of {t}, different than final_time of {final_time}."
+                "Setting final_time to current time in backwards propagation."
+            ),
             flush=True,
         )
     nt = int(t / dt) + 1  # number of timesteps
@@ -275,7 +290,8 @@ def mixed_space_backward_wave_propagator(Wave_obj, dt=None):
         Wave_obj.function_space
     )  # auxiliarly function for the gradient compt.
 
-    # ffG = -2 * (Wave_obj.c)**(-3) * fire.dot(dufordt2, uadj) * m_v * fire.dx(scheme=Wave_obj.quadrature_rule)
+    # ffG = -2 * (Wave_obj.c)**(-3) * fire.dot(dufordt2, uadj) * m_v * \
+    # fire.dx(scheme=Wave_obj.quadrature_rule)
     if mask_available:
         ffG = (
             2.0
@@ -286,7 +302,10 @@ def mixed_space_backward_wave_propagator(Wave_obj, dt=None):
         )
         if comm.comm.rank == 0:
             print(
-                "Applying gradient mask: gradients will be computed only in 'Inner' region (mixed space)",
+                (
+                    "Applying gradient mask: gradients will be computed only "
+                    "in 'Inner' region (mixed space)"
+                ),
                 flush=True,
             )
     else:
@@ -299,7 +318,10 @@ def mixed_space_backward_wave_propagator(Wave_obj, dt=None):
         )
         if comm.comm.rank == 0:
             print(
-                "No gradient mask found: computing gradients over full domain (mixed space)",
+                (
+                    "No gradient mask found: "
+                    "computing gradients over full domain (mixed space)"
+                ),
                 flush=True,
             )
 
