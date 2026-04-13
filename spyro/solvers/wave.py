@@ -107,7 +107,8 @@ class Wave(Model_parameters, metaclass=ABCMeta):
         # Creating mesh operations manager
         self.mesh_ops = mshops.MeshOps(
             self.domain_dimensions(), dimension=self.dimension,
-            quadrilateral=self.mesh_parameters.quadrilateral, comm=self.comm)
+            quadrilateral=self.mesh_parameters.quadrilateral,
+            comm=self.mesh_parameters.comm)
 
         if self.mesh is not None:
             self.building_mesh_derived_paramenters()
@@ -157,7 +158,7 @@ class Wave(Model_parameters, metaclass=ABCMeta):
         self._build_function_space()
         self._map_sources_and_receivers()
 
-        # ToDo: Create a flag for other domains that are not of type box
+        # TODO: Create a flag for other domains that are not of type box
         if self.mesh_ops.func_space_type is None:
             self.mesh_ops.func_space_type = 'scalar' \
                 if len(self.function_space.value_shape) == 0 else 'vector'
@@ -167,7 +168,7 @@ class Wave(Model_parameters, metaclass=ABCMeta):
             boundaries.extend([self.absorb_front,
                                self.absorb_back])
 
-        # Ask to Alexandre what is the right object to collect the boundary ids
+        # Build the boundary ID mapping
         self.mesh_parameters.boundary_idx_map = \
             self.mesh_ops.mapping_boundary_ids(self.mesh, self.function_space,
                                                boundaries, box_domain=True)
