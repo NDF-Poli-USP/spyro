@@ -1,3 +1,5 @@
+"""Wave equation solver base classes and utilities."""
+
 from abc import abstractmethod, ABCMeta
 import warnings
 import firedrake as fire
@@ -68,7 +70,8 @@ class Wave(Model_parameters, metaclass=ABCMeta):
     """
 
     def __init__(self, dictionary=None, comm=None):
-        """Wave object solver. Contains both the forward solver and gradient calculator
+        """Wave object solver. Contains both the forward solver and gradient calculator.
+
         methods.
 
         Parameters
@@ -130,6 +133,7 @@ class Wave(Model_parameters, metaclass=ABCMeta):
         self.wave_propagator()
 
     def force_rebuild_function_space(self):
+        """Rebuild the function space and remap sources and receivers."""
         if self.mesh is None:
             self.mesh = self.get_mesh()
         self._build_function_space()
@@ -137,7 +141,7 @@ class Wave(Model_parameters, metaclass=ABCMeta):
 
     @abstractmethod
     def matrix_building(self):
-        """Builds the matrix for the forward problem."""
+        """Build the matrix for the forward problem."""
         pass
 
     def set_mesh(
@@ -180,6 +184,7 @@ class Wave(Model_parameters, metaclass=ABCMeta):
             self.solver_parameters = get_default_parameters_for_method(self.method)
 
     def get_spatial_coordinates(self):
+        """Return the UFL simbolic spatial coordinates of the mesh."""
         if self.dimension == 2:
             return self.mesh_z, self.mesh_x
         elif self.dimension == 3:
@@ -195,19 +200,20 @@ class Wave(Model_parameters, metaclass=ABCMeta):
         output=False,
         dg_velocity_model=True,
     ):
-        """Method to define new user velocity model or file. It is optional.
+        """Set a user-defined initial velocity model.
 
         Parameters
         ----------
         conditional:  (optional)
             Firedrake conditional object.
         velocity_model_function: Firedrake function (optional)
-            Firedrake function to be used as the velocity model. Has to be in the same function space as the object.
+            Firedrake function to be used as the velocity model. Has to be in the
+            same function space as the object.
         expression:  str (optional)
             If you use an expression, you can use the following variables:
             x, y, z, pi, tanh, sqrt. Example: "2.0 + 0.5*tanh((x-2.0)/0.1)".
-            It will be interpoalte into either the same function space as the object or a DG0 function space
-            in the same mesh.
+            It will be interpolated into either the same function space as the
+            object or a DG0 function space in the same mesh.
         new_file:  str (optional)
             Name of the file containing the velocity model.
         output:  bool (optional)
@@ -286,7 +292,8 @@ class Wave(Model_parameters, metaclass=ABCMeta):
             )
             if scalar_function_space_type != "scalar":
                 raise ValueError(
-                    "Do not change mixed space order, use scalar first!!! (ノಠ益ಠ)ノ彡┻━┻"
+                    "Do not change mixed space order, use scalar first!!! "
+                    "(ノಠ益ಠ)ノ彡┻━┻"
                 )
             self.scalar_function_space = self.function_space.sub(0)
             self.vector_function_space = self.function_space.sub(1)
@@ -311,7 +318,7 @@ class Wave(Model_parameters, metaclass=ABCMeta):
             self.mesh_y = y
 
     def get_and_set_maximum_dt(self, fraction=0.7, estimate_max_eigenvalue=False):
-        """Calculates and sets the maximum stable time step (dt) for the wave solver.
+        """Calculate and set the maximum stable time step for the wave solver.
 
         Args:
             fraction (float, optional):
@@ -343,13 +350,14 @@ class Wave(Model_parameters, metaclass=ABCMeta):
         return max_dt
 
     def get_mass_matrix_diagonal(self):
-        """Builds a section of the mass matrix for debugging purposes."""
+        """Build a section of the mass matrix for debugging purposes."""
         A = fire.assemble(self.lhs, mat_type="aij")
         petsc_matrix = A.petscmat
         diagonal = petsc_matrix.getDiagonal()
         return diagonal.array
 
     def set_last_solve_as_real_shot_record(self):
+        """Store the latest forward solve as the real shot record."""
         if self.current_time == 0.0:
             raise ValueError("No previous solve to set as real shot record.")
         self.real_shot_record = self.forward_solution_receivers
@@ -378,7 +386,8 @@ class Wave(Model_parameters, metaclass=ABCMeta):
     def _get_next_vstate(self):
         pass
 
-    # Managed attributes to access state variables in current, previous and next iteration
+    # Managed attributes to access state variables in the current, previous,
+    # and next iteration.
     vstate = property(
         fget=lambda self: self._get_vstate(),
         fset=lambda self, value: self._set_vstate(value),
@@ -394,18 +403,25 @@ class Wave(Model_parameters, metaclass=ABCMeta):
 
     @abstractmethod
     def get_receivers_output(self):
+        """Return the receivers output."""
         pass
 
     @abstractmethod
     def get_function(self):
-        """Returns the function (e.g., pressure or displacement) associated with the
-        wave object without additional variables (e.g., PML variables)"""
+        """Return the function associated with the wave object.
+
+        Such as pressure or displacement.
+
+        This excludes additional variables such as PML variables.
+        """
         pass
 
     @abstractmethod
     def get_function_name(self):
-        """Returns the string representing the function of the wave object (e.g.,
-        "pressure" or "displacement")"""
+        """Return the name of the wave function associated with what we are solving for.
+
+        Examples include "pressure" and "displacement".
+        """
         pass
 
     def update_source_expression(self, t):
@@ -447,9 +463,11 @@ class Wave(Model_parameters, metaclass=ABCMeta):
         return usol, usol_recv
 
     def get_dt(self):
+        """Return the current time step."""
         return self._dt
 
     def set_dt(self, dt):
+        """Set the current time step and refresh source wavelets."""
         self._dt = dt
         if self.sources is not None:
             self.sources.update_wavelet(self)
@@ -458,12 +476,15 @@ class Wave(Model_parameters, metaclass=ABCMeta):
 
     @abstractmethod
     def rhs_no_pml(self):
-        """Return the right-hand side Cofunction without PML DOFs (i.e., only the DOFs
-        associated with the subspace of the original problem)."""
+        """Return the right-hand side Cofunction without PML degrees of freedom.
+
+        Only the degrees of freedom associated with the subspace of the original
+        problem are included.
+        """
         pass
 
     def set_material_properties(self, *args, **kwargs):
-        """Wrapper for material_properties_io.set_material_property."""
+        """Set material properties using the I/O helper."""
         return material_properties_io.set_material_property(self, *args, **kwargs)
 
     def set_material_property(self, *args, **kwargs):
