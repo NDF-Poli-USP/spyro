@@ -55,7 +55,18 @@ def construct_solver_or_matrix_with_pml_2d(Wave_object):
     m1 = ((u - 2.0 * u_n + u_nm1) / Constant(dt**2)) * v * dxlump
     a = c * c * dot(grad(u_n), grad(v)) * dxlump  # explicit
 
-    nf = c * ((u_n - u_nm1) / dt) * v * dslump
+    # First-order ABC on outer PML boundaries only (not the free surface).
+    # 2-D boundary labels for spyro RectangleMesh:
+    #   1 = top (z = 0, free surface), 2 = bottom, 3 = left, 4 = right
+    qr_s = Wave_object.surface_quadrature_rule
+    abc_expr = c * ((u_n - u_nm1) / dt) * v
+    nf = (
+        abc_expr * ds(2, **qr_s)
+        + abc_expr * ds(3, **qr_s)
+        + abc_expr * ds(4, **qr_s)
+    )
+    if Wave_object.absorb_top:
+        nf += abc_expr * ds(1, **qr_s)
 
     FF = m1 + a + nf
 
@@ -138,7 +149,18 @@ def construct_solver_or_matrix_with_pml_3d(Wave_object):
     m1 = ((u - 2.0 * u_n + u_nm1) / Constant(dt**2)) * v * dxlump
     a = c * c * dot(grad(u_n), grad(v)) * dxlump  # explicit
 
-    nf = c * ((u_n - u_nm1) / dt) * v * dslump
+    # First-order ABC on outer PML boundaries only (not the free surface).
+    qr_s = Wave_object.surface_quadrature_rule
+    abc_expr = c * ((u_n - u_nm1) / dt) * v
+    nf = (
+        abc_expr * ds(2, **qr_s)
+        + abc_expr * ds(3, **qr_s)
+        + abc_expr * ds(4, **qr_s)
+        + abc_expr * ds(5, **qr_s)
+        + abc_expr * ds(6, **qr_s)
+    )
+    if Wave_object.absorb_top:
+        nf += abc_expr * ds(1, **qr_s)
 
     FF = m1 + a + nf
 

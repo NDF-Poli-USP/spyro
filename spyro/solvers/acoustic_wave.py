@@ -95,11 +95,18 @@ class AcousticWave(Wave):
         return backward_wave_propagator(self)
 
     def reset_pressure(self):
-        try:
-            self.u_nm1.assign(0.0)
-            self.u_n.assign(0.0)
-        except Exception:
-            warnings.warn("No pressure to reset")
+        if self.abc_boundary_layer_type == "PML":
+            try:
+                self.X_n.assign(0.0)
+                self.X_nm1.assign(0.0)
+            except Exception:
+                warnings.warn("No pressure to reset")
+        else:
+            try:
+                self.u_nm1.assign(0.0)
+                self.u_n.assign(0.0)
+            except Exception:
+                warnings.warn("No pressure to reset")
 
     @override
     def _initialize_model_parameters(self):

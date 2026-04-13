@@ -25,6 +25,25 @@ def backward_wave_propagator(Wave_obj, dt=None):
         return _backward_propagation(Wave_obj, dt=dt, pml=False)
 
 
+def _pml_interior_indicator(Wave_obj):
+    """UFL indicator: 1 inside the physical domain, 0 in the PML layer."""
+    z = Wave_obj.mesh_z
+    x = Wave_obj.mesh_x
+    z_min = -(Wave_obj.mesh_parameters.length_z)
+    x_min = 0.0
+    x_max = Wave_obj.mesh_parameters.length_x
+
+    inside = fire.And(fire.And(z >= z_min, x >= x_min), x <= x_max)
+
+    if Wave_obj.dimension == 3:
+        y = Wave_obj.mesh_y
+        y_min = 0.0
+        y_max = Wave_obj.mesh_parameters.length_y
+        inside = fire.And(inside, fire.And(y >= y_min, y <= y_max))
+
+    return fire.conditional(inside, 1.0, 0.0)
+
+
 def _build_gradient_solver(Wave_obj, mask_available, pml):
     """Assemble the gradient variational problem.
 
@@ -64,17 +83,18 @@ def _build_gradient_solver(Wave_obj, mask_available, pml):
                 flush=True,
             )
     elif pml:
+        indicator = _pml_interior_indicator(Wave_obj)
         ffG = (
             2.0
             * Wave_obj.c
+            * indicator
             * fire.dot(fire.grad(uadj), fire.grad(forward_field))
             * m_v
             * fire.dx(**qr)
         )
         if Wave_obj.comm.comm.rank == 0:
             print(
-                "No gradient mask found: computing gradients over full "
-                "domain (mixed space)",
+                "Excluding PML region from gradient (mixed space)",
                 flush=True,
             )
     elif mask_available:
@@ -211,7 +231,14 @@ def _backward_propagation(Wave_obj, dt=None, pml=False):
             uadj.assign(Wave_obj.get_wave_equation_state(Wave_obj.next_vstate))
 
             if pml:
-                forward_field.assign(forward_solution.pop())
+                # Pop to keep the list in sync, but use the element one
+                # step behind so that u_fwd and u_adj are at the same
+                # physical time (usol[k] = u^{k+1}; we need u^k).
+                forward_solution.pop()
+                if len(forward_solution) > 0:
+                    forward_field.assign(forward_solution[-1])
+                else:
+                    forward_field.assign(0.0)
             else:
                 forward_field.assign(_compute_dufordt2(forward_solution, dt))
             grad_solver.solve()

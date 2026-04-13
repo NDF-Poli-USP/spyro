@@ -181,9 +181,9 @@ def test_gradient(PML=False):
     check_gradient(Wave_obj_guess, dJ, rec_out_exact, Jm)
 
 
-# @pytest.mark.slow
-# def test_gradient_pml():
-#     return test_gradient(PML=True)
+@pytest.mark.slow
+def test_gradient_pml():
+    return test_gradient(PML=True)
 
 
 if __name__ == "__main__":
