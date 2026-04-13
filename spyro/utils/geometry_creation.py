@@ -53,7 +53,7 @@ def create_2d_grid(start1, end1, start2, end2, num):
 
 def create_3d_grid(start, end, num):
     """Create a 3d grid of `num**3` points.
-    
+
     Grid between `start1` and `end1` and `start2` and `end2`
 
     Parameters
