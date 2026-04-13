@@ -1,8 +1,10 @@
+"""Geometry calculation utils for things like receiver grids."""
+
 import numpy as np
 
 
 def create_transect(start, end, num):
-    """Create a line of `num` of points between coordinates `start` and `end`
+    """Create a line of `num` of points between coordinates `start` and `end`.
 
     Parameters
     ----------
@@ -21,8 +23,9 @@ def create_transect(start, end, num):
 
 
 def create_2d_grid(start1, end1, start2, end2, num):
-    """Create a 2d grid of `num**2` points between `start1` and `end1` and `start2` and
-    `end2`
+    """Create a 2d grid of `num**2` points.
+
+    Grid between `start1` and `end1` and `start2` and `end2`
 
     Parameters
     ----------
@@ -49,8 +52,9 @@ def create_2d_grid(start1, end1, start2, end2, num):
 
 
 def create_3d_grid(start, end, num):
-    """Create a 3d grid of `num**3` points between `start1` and `end1` and `start2` and
-    `end2`
+    """Create a 3d grid of `num**3` points.
+    
+    Grid between `start1` and `end1` and `start2` and `end2`
 
     Parameters
     ----------

@@ -1,27 +1,39 @@
+"""Analytical solvers for nodal acoustic wavefield validation.
+
+This module provides utilities to build reference traces for homogeneous
+media, mainly for comparisons against numerical solutions.
+"""
+
 import numpy as np
 from scipy.special import hankel2
 from ..sources import full_ricker_wavelet
 
 
 def nodal_homogeneous_analytical(Wave_object, offset, c_value, n_extra=5000):
-    """This function calculates the analytical solution for an homogeneous medium with a
-    single source and receiver.
+    """Compute an analytical nodal trace for a homogeneous medium.
+
+    The solution considers a single source-receiver pair and extends the
+    source wavelet duration before truncating the final result to the original
+    simulation time window.
 
     Parameters
     ----------
-    Wave_object: spyro.Wave
-        Wave object
-    offset: float
+    Wave_object : spyro.Wave
+        Wave object containing temporal and source parameters (`dt`,
+        `final_time`, `frequency`, `delay`, and `delay_type`).
+    offset : float
         Offset between source and receiver.
-    c_value: float
+    c_value : float
         Velocity of the homogeneous medium.
-    n_extra: int (optional)
-        Multiplied factor for the final time.
+    n_extra : int, default=5000
+        Multiplicative factor used to extend ``final_time`` when generating
+        the source wavelet and analytical response.
 
     Returns
     -------
-    u_analytical: numpy array
-        Analytical solution for the wave equation.
+    numpy.ndarray
+        Analytical displacement/pressure time series restricted to the
+        original number of time samples.
     """
     # Generating extended ricker wavelet
     dt = Wave_object.dt
@@ -52,13 +64,35 @@ def nodal_homogeneous_analytical(Wave_object, offset, c_value, n_extra=5000):
 
 
 def analytical_solution(ricker_wavelet, c_value, final_time, offset):
+    """Compute the analytical response from a source wavelet in frequency space.
+
+    This routine applies a 2D Green's function in the Fourier domain using a
+    zeroth-order Hankel function of the second kind.
+
+    Parameters
+    ----------
+    ricker_wavelet : numpy.ndarray
+        Time-domain source wavelet samples.
+    c_value : float
+        Propagation velocity of the homogeneous medium.
+    final_time : float
+        Total modeled time associated with ``ricker_wavelet``.
+    offset : float
+        Source-receiver distance.
+
+    Returns
+    -------
+    numpy.ndarray
+        Real-valued analytical time series with the same length as
+        ``ricker_wavelet``.
+    """
     num_t = len(ricker_wavelet)
 
-    # Constantes de Fourier
+    # Fourier-domain frequencies.
     nf = int(num_t / 2 + 1)
     frequency_axis = (1.0 / final_time) * np.arange(nf)
 
-    # FOurier tranform of ricker wavelet
+    # Fourier transform of the source wavelet (positive frequencies).
     fft_rw = np.fft.fft(ricker_wavelet)
     fft_rw = fft_rw[0:nf]
 

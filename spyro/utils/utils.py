@@ -1,3 +1,5 @@
+"""General utilities."""
+
 import copy
 from firedrake import *  # noqa: F403
 import numpy as np
@@ -48,7 +50,7 @@ def butter_lowpass_filter(shot, cutoff, fs, order=2):
 
 @ensemble_functional
 def compute_functional(Wave_object, residual):
-    """Compute the functional to be optimized.
+    r"""Compute the functional to be optimized.
 
     Computes the L2 norm of the residual at receiver locations,
     integrated over time using the trapezoidal rule. This functional
@@ -211,7 +213,8 @@ def mpi_init(model):
         num_cores_per_propagation = available_cores / model.number_of_sources
         if available_cores % model.number_of_sources != 0:
             raise ValueError(
-                f"Available cores cannot be divided between sources equally {available_cores}/{model.number_of_sources}."
+                f"Available cores cannot be divided between sources equally "
+                f"{available_cores}/{model.number_of_sources}."
             )
     elif model.parallelism_type == "spatial":
         num_cores_per_propagation = available_cores
@@ -480,7 +483,8 @@ class Mask:
                 "DG space can have different DoFs than the functional space"
             )
         warnings.warn(
-            "When applying a mask in a continuous space, expect some error in the element adjacent to the mask"
+            "When applying a mask in a continuous space, "
+            "expect some error in the element adjacent to the mask"
         )
         mask = Function(Wave_obj.function_space)
         mask.interpolate(self.cond)
@@ -570,7 +574,9 @@ class Gradient_mask_for_pml(Mask):
 
 
 def run_in_one_core(func):
-    """Decorator to execute function only on rank 0.
+    """Execute function only on rank 0.
+
+    Decorator.
 
     Ensures the decorated function runs only on the root process (rank 0)
     of the communicator. Other processes skip execution. Useful for I/O
@@ -626,7 +632,9 @@ def run_in_one_core(func):
 
 
 def run_in_one_core_and_broadcast(func):
-    """Decorator to execute function on rank 0 and broadcast result.
+    """Execute function on rank 0 and broadcast result.
+
+    Decorator.
 
     Ensures the decorated function runs only on the root process (rank 0)
     and broadcasts the return value to all other processes. Useful for

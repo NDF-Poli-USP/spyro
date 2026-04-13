@@ -1,4 +1,4 @@
-# This file contains methods for calculating the frequency response of a signal
+"""Contains methods for calculating the frequency response of a signal."""
 
 import numpy as np
 from scipy.fft import fft

@@ -1,3 +1,5 @@
+"""Error management utilities."""
+
 # This file contains methods for handling errors in Spyro, either to send
 # messages to the user or to prevent numerical instability in objects.
 import numpy as np
@@ -34,8 +36,7 @@ def value_parameter_error(par_name, par_value, valid_values):
 
 
 def mutually_exclusive_parameter_error(par_name_lst, par_value_lst):
-    """Raise a ValueError with a specific error message for parameters that are mutually
-    exclusive.
+    """Raise a ValueError for parameters that are mutually exclusive.
 
     Parameters
     ----------
@@ -68,8 +69,7 @@ def mutually_exclusive_parameter_error(par_name_lst, par_value_lst):
 
 
 def value_dimension_error(par_names, par_values, expected_dim):
-    """Raise a ValueError if the dimensions of the parameters do not match the expected
-    dimension.
+    """Raise ValueError if the dimensions of parameters do not match expected dimension.
 
     Parameters
     ----------

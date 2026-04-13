@@ -1,3 +1,5 @@
+"""Compute the coefficient of determination (R^2) for regression models."""
+
 import numpy as np
 
 

@@ -1,3 +1,5 @@
+"""MEthods that help conversion of functions in FEM spaces to FD-like grids."""
+
 from copy import deepcopy
 import firedrake as fire
 from ..meshing import MeshingParameters, AutomaticMesh

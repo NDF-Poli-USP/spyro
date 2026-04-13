@@ -1,3 +1,10 @@
+"""Utilities to safely evaluate expression strings into UFL objects.
+
+This module validates a user-provided mathematical expression with Python's
+AST before evaluating it in a restricted namespace containing Firedrake/UFL
+functions, constants, and spatial coordinates.
+"""
+
 import ast
 from firedrake import (
     SpatialCoordinate,
@@ -21,7 +28,22 @@ from firedrake import (
 
 
 def available_functions_to_eval(mesh, dimension):
+    """Build the allowed namespace for expression evaluation.
 
+    Parameters
+    ----------
+    mesh : firedrake.mesh.MeshGeometry
+        Firedrake mesh used to obtain spatial coordinates.
+    dimension : int
+        Spatial dimension of the problem. Supported values are ``2`` and ``3``.
+
+    Returns
+    -------
+    dict[str, object]
+        Mapping from allowed symbol names to UFL-compatible objects. The
+        namespace includes mathematical functions/constants and coordinate
+        symbols ``z`` and ``x`` (plus ``y`` for 3D).
+    """
     namespace = {
         "acos": acos,
         "asin": asin,
@@ -53,7 +75,33 @@ def available_functions_to_eval(mesh, dimension):
 
 
 def generate_ufl_functions(mesh, expression, dimension):
-    """Use AST to validate expression structure before eval."""
+    """Validate and evaluate an expression string into a UFL object.
+
+    The expression is parsed with ``ast.parse`` and checked node-by-node to
+    allow only basic arithmetic, unary operators, names, constants, and simple
+    function calls from the approved namespace.
+
+    Parameters
+    ----------
+    mesh : firedrake.mesh.MeshGeometry
+        Firedrake mesh used to define spatial coordinates.
+    expression : str
+        Mathematical expression to evaluate, for example
+        ``"sin(pi*x) * exp(-z)"``.
+    dimension : int
+        Spatial dimension of the problem. Supported values are ``2`` and ``3``.
+
+    Returns
+    -------
+    object
+        Evaluated UFL expression built from the validated string.
+
+    Raises
+    ------
+    ValueError
+        If the expression has invalid syntax, uses disallowed AST nodes,
+        references unknown names, or calls unknown functions.
+    """
     # Get available functions and variables
     namespace = available_functions_to_eval(mesh, dimension)
 

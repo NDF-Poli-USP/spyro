@@ -1,3 +1,5 @@
+"""Computational cost calculators."""
+
 from numpy import savetxt
 from os import getcwd
 from time import perf_counter  # For runtime
