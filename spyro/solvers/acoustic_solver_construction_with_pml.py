@@ -28,7 +28,6 @@ def construct_solver_or_matrix_with_pml_2d(Wave_object):
     W = V * Z
     Wave_object.mixed_function_space = W
     dxlump = dx(**Wave_object.quadrature_rule)
-    dslump = ds(**Wave_object.surface_quadrature_rule)
 
     u, pp = fire.TrialFunctions(W)
     v, qq = fire.TestFunctions(W)
@@ -106,7 +105,6 @@ def construct_solver_or_matrix_with_pml_3d(Wave_object):
     W = V * V * Z
     Wave_object.mixed_function_space = W
     dxlump = dx(**Wave_object.quadrature_rule)
-    dslump = ds(**Wave_object.surface_quadrature_rule)
 
     u, psi, pp = fire.TrialFunctions(W)
     v, phi, qq = fire.TestFunctions(W)
