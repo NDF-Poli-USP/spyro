@@ -125,25 +125,30 @@ class Sources(Delta_projector):
         source_cofunction: Firedrake.Cofunction
             A cofunction with the source applied into the domain.
         """
-        print("Wave type:", self.wave_type)
-        source_mesh = fire.VertexOnlyMesh(
-            self.mesh, [self.point_locations[self.current_sources[0]]]
-        )
+        if self.current_sources is None or len(self.current_sources) == 0:
+            raise ValueError(
+                "VertexOnlyMesh source assembly requires at least one active source."
+            )
+
+        source_locations = [
+            self.point_locations[source_id] for source_id in self.current_sources
+        ]
+        source_mesh = fire.VertexOnlyMesh(self.mesh, source_locations)
         if self.wave_type == WaveType.ISOTROPIC_ELASTIC:
             V_s = fire.VectorFunctionSpace(source_mesh, "DG", 0)
+            R_s = fire.VectorFunctionSpace(source_mesh, "R", 0)
         elif self.wave_type == WaveType.ISOTROPIC_ACOUSTIC:
             V_s = fire.FunctionSpace(source_mesh, "DG", 0)
+            R_s = fire.FunctionSpace(source_mesh, "R", 0)
         else:
             raise ValueError("Invalid wave type")
 
-        d_s = fire.Function(V_s)
-        d_s.assign(1.0)
-        source_cofunction = fire.assemble(
-            fire.inner(d_s, fire.TestFunction(V_s)) * fire.dx
-        )
-        return fire.Cofunction(self.function_space.dual()).interpolate(
-            source_cofunction
-        )
+        ones = fire.Function(R_s, val=[1.0 for _ in range(V_s.value_size)])
+        source_form = fire.inner(fire.TestFunction(V_s), ones) * fire.dx
+
+        return fire.Cofunction(
+            self.function_space.dual()).interpolate(
+                fire.assemble(source_form))
 
 
 def timedependentSource(model, t, freq=None, amp=1, delay=1.5):
