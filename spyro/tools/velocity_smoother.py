@@ -1,3 +1,9 @@
+"""Smoother for when we use synthetic velocity models in FWI.
+
+Since we suppose FWI has a good starting guess we can apply the smoother on the
+synthetic model.
+"""
+
 import os
 from scipy.ndimage import gaussian_filter
 import segyio

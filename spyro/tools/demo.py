@@ -1,3 +1,5 @@
+"""Depecrated cells-per-wae calculator demo."""
+
 # # Demo to illustrate how a grid point density calcultor runs the experiments
 # import spyro
 

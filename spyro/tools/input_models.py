@@ -1,17 +1,21 @@
+"""Input models for use in the grid point calculator."""
+
 import numpy as np
 import spyro
 import warnings
 
 
 def build_on_top_of_base_dictionary(variables):
-    """Builds a model dictionary on top of the base dictionary.
+    """Build a model dictionary on top of the base dictionary.
 
     Parameters
     ----------
     variables : dict
-        Dictionary containing the variables to be used in the model dictionary. It should include:
+        Dictionary containing the variables to be used in the model dictionary.
+        It should include:
             - method: string
-                The finite element method to be used. Either "mass_lumped_triangle" or "spectral_quadrilateral".
+                The finite element method to be used.
+                Either "mass_lumped_triangle" or "spectral_quadrilateral".
             - degree: int
                 The spatial polynomial degree of the finite element method
             - dimension: int
@@ -94,12 +98,13 @@ def build_on_top_of_base_dictionary(variables):
 
 
 def set_mesh_type(method):
-    """Sets the mesh type based on the method.
+    """Set the mesh type based on the method.
 
     Parameters
     ----------
     method : string
-        The finite element method to be used. Either "mass_lumped_triangle" or "spectral_quadrilateral".
+        The finite element method to be used.
+        Either "mass_lumped_triangle" or "spectral_quadrilateral".
 
     Returns
     -------
@@ -116,7 +121,7 @@ def set_mesh_type(method):
 
 
 def create_initial_model_for_meshing_parameter(Meshing_calc_obj):
-    """Creates an initial model dictionary for the meshing parameter calculation.
+    """Create an initial model dictionary for the meshing parameter calculation.
 
     Parameters
     ----------
@@ -138,7 +143,7 @@ def create_initial_model_for_meshing_parameter(Meshing_calc_obj):
 
 
 def create_initial_model_for_meshing_parameter_2D(Meshing_calc_obj):
-    """Creates an initial model dictionary for the meshing parameter calculation in 2D.
+    """Create an initial model dictionary for the meshing parameter calculation in 2D.
 
     Parameters
     ----------
@@ -166,8 +171,7 @@ def create_initial_model_for_meshing_parameter_2D(Meshing_calc_obj):
 def create_initial_model_for_meshing_parameter_2D_heterogeneous(
     Meshing_calc_obj,
 ):
-    """Creates an initial model dictionary for the meshing parameter calculation in 2D
-    with a heterogeneous velocity model.
+    """Create an initial model dictionary for C calc in 2D heterogeneous vp.
 
     Parameters
     ----------
@@ -245,7 +249,7 @@ def create_initial_model_for_meshing_parameter_2D_heterogeneous(
 
 
 def create_initial_model_for_meshing_parameter_3D(Meshing_calc_obj):
-    """Creates an initial model dictionary for the meshing parameter calculation in 3D.
+    """Create an initial model dictionary for the meshing parameter calculation in 3D.
 
     Parameters
     ----------
@@ -260,17 +264,20 @@ def create_initial_model_for_meshing_parameter_3D(Meshing_calc_obj):
     velocity_profile_type = Meshing_calc_obj.velocity_profile_type
     if velocity_profile_type == "homogeneous":
         raise NotImplementedError("Not yet implemented")
-        # return create_initial_model_for_meshing_parameter_3D_homogeneous(Meshing_calc_obj)
+        # return create_initial_model_for_meshing_parameter_3D_homogeneous(
+        #   Meshing_calc_obj
+        # )
     elif velocity_profile_type == "heterogeneous":
         raise NotImplementedError("Not yet implemented")
-        # return create_initial_model_for_meshing_parameter_3D_heterogeneous(Meshing_calc_obj)
+        # return create_initial_model_for_meshing_parameter_3D_heterogeneous(
+        #   Meshing_calc_obj
+        # )
     else:
         raise ValueError("Velocity profile type is not homogeneous or heterogeneous")
 
 
 def create_initial_model_for_meshing_parameter_2D_homogeneous(Meshing_calc_obj):
-    """Creates an initial model dictionary for the meshing parameter calculation in 2D
-    with a homogeneous velocity model.
+    """Create an initial model dictionary for the C calculation in 2D homogeneous.
 
     Parameters
     ----------

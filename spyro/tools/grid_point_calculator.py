@@ -1,3 +1,5 @@
+"""Old grid point calculator for reference."""
+
 # from mpi4py import MPI
 # import numpy as np
 # from scipy import interpolate
@@ -14,13 +16,14 @@
 #     Parameters
 #     ----------
 #     grid_point_calculator_parameters: Python 'dictionary'
-#         Has all parameters related to the experiment. An example is provided in the demo file.
+#         Has all parameters related to the experiment. An example is provided in the
+#         demo file.
 
 #     Returns
 #     -------
 #     G: `float`
-#         Minimum grid point density necessary for a `experiment_type` mesh with a FEM whith
-#         the degree and method specified within the specified error tolerance
+#         Minimum grid point density necessary for a `experiment_type` mesh with a FEM
+#         whith the degree and method specified within the specified error tolerance
 #     """
 #     G_reference = grid_point_calculator_parameters["G_reference"]
 #     degree_reference = grid_point_calculator_parameters["reference_degree"]
