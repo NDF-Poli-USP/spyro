@@ -347,7 +347,7 @@ class MeshOps():
                 bnd_node_ids = fire.DirichletBC(function_space, bc_val, idx_bdn).nodes
 
                 if len(bnd_node_ids) == 0:
-                    # For DG spaces, DirichletBC doesn't work (Do we need it in DG??)
+                    # For DG spaces, DirichletBC doesn't work
                     boundary_idx_map[idx_bdn] = None
                     continue
 
