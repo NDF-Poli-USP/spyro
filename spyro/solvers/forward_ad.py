@@ -1,3 +1,5 @@
+"""Fowrad solver to be used in the automatic adjoint."""
+
 import firedrake as fire
 import firedrake.adjoint as fire_ad
 from .time_integration_ad import central_difference_acoustic
@@ -127,6 +129,7 @@ class ForwardSolver:
         return receiver_data, J_val
 
     def execute_elastic(self):
+        """Execute the elastic wave equation."""
         raise NotImplementedError(
             "Elastic wave equation is not yet implemented"
             "for the automatic differentiation based FWI."
