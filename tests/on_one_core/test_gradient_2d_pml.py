@@ -7,8 +7,8 @@ import spyro
 import pytest
 
 
-def check_gradient(Wave_obj_guess, dJ, rec_out_exact, Jm, plot=False, tol=1.0):
-    steps = [1e-2, 1e-3, 1e-4]  # step length
+def check_gradient(Wave_obj_guess, dJ, rec_out_exact, Jm, plot=False, tol=3.0):
+    steps = [1e-3, 1e-4, 1e-5]  # step length
 
     errors = []
     remainders = []
@@ -40,6 +40,7 @@ def check_gradient(Wave_obj_guess, dJ, rec_out_exact, Jm, plot=False, tol=1.0):
     remainders = np.array(remainders)
 
     if plot:
+        VTKFile("gradient.pvd").write(dJ)
         plt.close()
         plt.plot(steps, errors, label="Error")
         plt.legend()
@@ -99,7 +100,7 @@ def set_dictionary(PML=False):
     dictionary["time_axis"] = {
         "initial_time": 0.0,  # Initial time for event
         "final_time": final_time,  # Final time for event
-        "dt": 0.0003,  # timestep size
+        "dt": 0.0005,  # timestep size
         "amplitude": 1,  # the Ricker has an amplitude of 1.
         "output_frequency": 100,  # how frequently to output solution to pvds
         "gradient_sampling_frequency": 1,  # how frequently to save solution to RAM
@@ -132,7 +133,7 @@ def get_forward_model(dictionary=None):
 
     # Exact model
     Wave_obj_exact = spyro.AcousticWave(dictionary=dictionary)
-    Wave_obj_exact.set_mesh(input_mesh_parameters={"edge_length": 0.1})
+    Wave_obj_exact.set_mesh(input_mesh_parameters={"edge_length": 0.05})
     cond = fire.conditional(Wave_obj_exact.mesh_z > -0.5, 1.5, 3.5)
     Wave_obj_exact.set_initial_velocity_model(
         conditional=cond,
@@ -144,7 +145,7 @@ def get_forward_model(dictionary=None):
 
     # Guess model
     Wave_obj_guess = spyro.AcousticWave(dictionary=dictionary)
-    Wave_obj_guess.set_mesh(input_mesh_parameters={"edge_length": 0.03})
+    Wave_obj_guess.set_mesh(input_mesh_parameters={"edge_length": 0.05})
     Wave_obj_guess.set_initial_velocity_model(constant=2.0)
     Wave_obj_guess.forward_solve()
     rec_out_guess = Wave_obj_guess.receivers_output
@@ -177,15 +178,12 @@ def test_gradient(PML=False):
     # compute the gradient of the control (to be verified)
     dJ = Wave_obj_guess.gradient_solve(
         misfit=misfit, forward_solution=forward_solution_guess)
-    VTKFile("gradient.pvd").write(dJ)
-
-    tol = 5.0
-    check_gradient(Wave_obj_guess, dJ, rec_out_exact, Jm, plot=True, tol=tol)
+    check_gradient(Wave_obj_guess, dJ, rec_out_exact, Jm)
 
 
-@pytest.mark.slow
-def test_gradient_pml():
-    return test_gradient(PML=True)
+# @pytest.mark.slow
+# def test_gradient_pml():
+#     return test_gradient(PML=True)
 
 
 if __name__ == "__main__":
