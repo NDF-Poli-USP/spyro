@@ -1,3 +1,5 @@
+"""Full waveform inversion solver."""
+
 import firedrake as fire
 import warnings
 from scipy.optimize import minimize as scipy_minimize
@@ -235,7 +237,7 @@ class Objective(RObjective):
 
 
 class FullWaveformInversion(AcousticWave):
-    """Classical Full waveform inversion for acoustic wave data.
+    r"""Classical Full waveform inversion for acoustic wave data.
 
     This class implements full waveform inversion (FWI) as a subclass of
     AcousticWave. FWI is an optimization-based method for reconstructing
@@ -1028,7 +1030,8 @@ class FullWaveformInversion(AcousticWave):
         vmax = parameters["vmax"]
 
         warnings.warn(
-            "This functionality is deprecated, since the pyROL library is no longer supported."
+            "This functionality is deprecated,"
+            "since the pyROL library is no longer supported."
         )
         params = ROL.ParameterList(parameters["ROL_options"], "Parameters")
 
@@ -1057,8 +1060,9 @@ class FullWaveformInversion(AcousticWave):
         algo.run(opt, obj, bnd)
 
     def set_gradient_mask(self, boundaries=None):
-        """
-        DEPRECATED: Set a gradient mask to zero out gradients outside defined boundaries.
+        """Set a gradient mask to zero out gradients outside defined boundaries.
+
+        DEPRECATED!
 
         The gradient mask is used to restrict updates to certain regions of
         the model domain, which is useful for excluding absorbing boundary
@@ -1111,7 +1115,9 @@ class FullWaveformInversion(AcousticWave):
         self.mask_obj = mask_obj
 
     def _apply_gradient_mask(self):
-        """DEPRECATED Apply the gradient mask to the computed gradient.
+        """Apply the gradient mask to the computed gradient.
+
+        DEPRECATED!
 
         If a gradient mask has been set via set_gradient_mask(), this method
         applies the mask to zero out gradient values outside the defined region.
@@ -1172,8 +1178,9 @@ class FullWaveformInversion(AcousticWave):
 
 
 class SyntheticRealAcousticWave(AcousticWave):
-    """The SyntheticRealAcousticWave class is a subclass of the AcousticWave class. It
-    is used to generate synthetic real acoustic wave data.
+    """Ggenerate synthetic real acoustic wave data.
+
+    The SyntheticRealAcousticWave class is a subclass of the AcousticWave class.
 
     Attributes
     ----------
