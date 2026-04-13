@@ -61,18 +61,17 @@ def wave_dict(element_type, dimension):
     # Ricker wavelet that has a peak frequency of 5 Hz injected at a specified
     # point of the mesh. We also specify to record the solution at the corners
     # of the domain to verify the efficiency of the absorbing layer.
-    fn = 1. if negative_z else -1.
     dictionary["acquisition"] = {
         "source_type": "ricker",
-        "source_locations": ([(-fn * 0.5, 0.25)] if dimension == 2
-                             else [(-fn * 0.5, 0.25, 0.5)]),
+        "source_locations": ([(-0.5, 0.25)] if dimension == 2
+                             else [(-0.5, 0.25, 0.5)]),
         "frequency": 5.,  # in Hz
         "delay": 1.5,
-        "receiver_locations": ([(-fn * Lz, 0.), (-fn * Lz, Lx), (0., 0.), (0., Lx)]
+        "receiver_locations": ([(-Lz, 0.), (-Lz, Lx), (0., 0.), (0., Lx)]
                                if dimension == 2
-                               else [(-fn * Lz, 0., 0.), (-fn * Lz, Lx, 0.),
+                               else [(-Lz, 0., 0.), (-Lz, Lx, 0.),
                                      (0., 0., 0), (0., Lx, 0.),
-                                     (-fn * Lz, 0., Ly), (-fn * Lz, Lx, Ly),
+                                     (-Lz, 0., Ly), (-Lz, Lx, Ly),
                                      (0., 0., Ly), (0., Lx, Ly)])
     }
 

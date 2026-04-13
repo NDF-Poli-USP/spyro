@@ -380,7 +380,7 @@ class MeshOps():
                                       "domains are supported. The numbering the "
                                       "future boundary ids must start at 7.")
 
-    def extract_bnd_node_indices(self, mesh, func_space):
+    def extract_bnd_node_indices(self, mesh, function_space):
         """
         Extract boundary node indices on boundaries of the domain
         excluding the free surface at the top boundary
@@ -391,7 +391,7 @@ class MeshOps():
             Tuple containing the node positions in the mesh.
             - (z_data, x_data) for 2D
             - (z_data, x_data, y_data) for 3D
-        func_space : `firedrake function space`
+        function_space : `FiredrakeFunctionSpace`
             Function space to extract node positions
 
         Returns
