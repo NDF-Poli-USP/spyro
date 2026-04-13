@@ -1,11 +1,15 @@
+"""Solves the acoustic case using the Method of Manufactured Solutions.
+
+This is done only to verify part of the implementation.
+"""
+
 import firedrake as fire
 from .acoustic_wave import AcousticWave
 from ..utils.typing import override
 
 
 class AcousticWaveMMS(AcousticWave):
-    """Class for solving the acoustic wave equation in 2D or 3D using the finite element
-    method.
+    """Class for solving the acoustic wave equation in 2D or 3D.
 
     This class inherits from the AcousticWave class and overwrites the matrix_building
     method to use source propagated along the whole domain, which generates a known
@@ -14,6 +18,7 @@ class AcousticWaveMMS(AcousticWave):
 
     @override
     def matrix_building(self):
+        """Construct a solver object that has DirichletBCs and a MMS source."""
         self.mms_source_in_space()
         self.q_t = fire.Constant(0)
         self.source_expression = self.q_t * self.q_xy
@@ -40,6 +45,7 @@ class AcousticWaveMMS(AcousticWave):
         self.u_n.assign(self.analytical_solution(t - dt))
 
     def mms_source_in_space(self):
+        """Calculate the x dependent part of the source term."""
         V = self.function_space
         self.q_xy = fire.Function(V)
         x = self.mesh_z
@@ -65,6 +71,7 @@ class AcousticWaveMMS(AcousticWave):
         # self.q_xy.interpolate(sin(pi*x)*sin(pi*y))
 
     def analytical_solution(self, t):
+        """Calculate the MMS analytical solution based on time."""
         self.analytical = fire.Function(self.function_space)
         x = self.mesh_z
         y = self.mesh_x
@@ -82,4 +89,5 @@ class AcousticWaveMMS(AcousticWave):
 
     @override
     def update_source_expression(self, t):
+        """Update the time-dependent source expression."""
         self.q_t.assign(2 * t)
