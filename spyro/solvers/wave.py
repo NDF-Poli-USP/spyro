@@ -158,14 +158,17 @@ class Wave(Model_parameters, metaclass=ABCMeta):
         self._map_sources_and_receivers()
 
         # ToDo: Create a flag for other domains that are not of type box
-        self.mesh_ops.func_space_type = 'scalar' \
-            if len(self.function_space.value_shape) == 0 else 'vector'
+        if self.mesh_ops.func_space_type is None:
+            self.mesh_ops.func_space_type = 'scalar' \
+                if len(self.function_space.value_shape) == 0 else 'vector'
         boundaries = [self.absorb_top, self.absorb_bottom,
                       self.absorb_right, self.absorb_left]
         if self.dimension == 3:
             boundaries.extend([self.absorb_front,
                                self.absorb_back])
-        self.boundary_idx_map = \
+
+        # Ask to Alexandre what is the right object to collect the boundary ids
+        self.mesh_parameters.boundary_idx_map = \
             self.mesh_ops.mapping_boundary_ids(self.mesh, self.function_space,
                                                boundaries, box_domain=True)
 

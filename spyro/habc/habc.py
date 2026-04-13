@@ -177,9 +177,9 @@ class HABC_Wave(AcousticWave, HABC_Mesh, RectangLayer,
         dom_dim = self.habc_domain_dimensions(only_orig_dom=True)
 
         # Initializing the Mesh class
-        HABC_Mesh.__init__(
-            self, dom_dim, dimension=self.dimension,
-            quadrilateral=self.mesh_parameters.quadrilateral, comm=self.comm)
+        HABC_Mesh.__init__(self, dom_dim, dimension=self.dimension,
+                           quadrilateral=self.mesh_parameters.quadrilateral,
+                           func_space_type='scalar', comm=self.comm)
 
         # Identifier for the current case study
         self.identify_habc_case(output_folder=output_folder)

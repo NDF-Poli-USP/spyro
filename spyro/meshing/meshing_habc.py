@@ -24,6 +24,10 @@ class HABC_Mesh():
 
     Attributes
     ----------
+    func_space_type, `str`
+        Type of function space for the state variable.
+        Options: 'scalar' or 'vector'. Default is None
+
     bnds : 'array'
         Mesh node indices on boundaries of the original domain
     bnd_nodes : `tuple`
@@ -55,6 +59,7 @@ class HABC_Mesh():
         Factor for the stabilizing term in Eikonal Eq. Default is 0.03
     funct_space_eik: `firedrake function space`
         Function space for the Eikonal modeling
+
     mesh_original : `firedrake mesh`
         Original mesh without absorbing layer
     mesh_parameters.alpha : `float`
@@ -122,7 +127,8 @@ class HABC_Mesh():
         Generate the boundary points for a truncated hyperellipse
     '''
 
-    def __init__(self, dom_dim, dimension=2, quadrilateral=False, comm=None):
+    def __init__(self, dom_dim, dimension=2, quadrilateral=False,
+                 func_space_type=None, comm=None):
         '''
         Initialize the HABC_Mesh class
 
@@ -134,6 +140,9 @@ class HABC_Mesh():
             Model dimension (2D or 3D). Default is 2D
         quadrilateral : bool, optional
             Flag to indicate whether to use quadrilateral/hexahedral elements
+        func_space_type, `str`, optional
+            Type of function space for the state variable.
+            Options: 'scalar' or 'vector'. Default is None
         comm : `object`, optional
             An object representing the communication interface
             for parallel processing. Default is None
@@ -152,42 +161,17 @@ class HABC_Mesh():
         # Quadrilateral/hexahedral elements
         self.quadrilateral = quadrilateral
 
+        # Type of function space
+        self.func_space_type = func_space_type
+
         # Communicator MPI
         self.comm = comm
 
-        self.mesh_ops = mshops.MeshOps(dom_dim, dimension=dimension,
-                                       quadrilateral=quadrilateral, comm=comm)
-
-    def extract_node_positions(self, func_space):
-        '''
-        Extract node positions from the mesh
-
-        Parameters
-        ----------
-        func_space : `firedrake function space`
-            Function space to extract node positions
-
-        Returns
-        -------
-        node_positions : `tuple`
-            Tuple containing the node positions in the mesh.
-            - (z_data, x_data) for 2D
-            - (z_data, x_data, y_data) for 3D
-        '''
-
-        # Extract node positions
-        z_f = fire.assemble(fire.interpolate(self.mesh_z, func_space))
-        x_f = fire.assemble(fire.interpolate(self.mesh_x, func_space))
-        z_data = z_f.dat.data_with_halos[:]
-        x_data = x_f.dat.data_with_halos[:]
-        node_positions = (z_data, x_data)
-
-        if self.dimension == 3:  # 3D
-            y_f = fire.assemble(fire.interpolate(self.mesh_y, func_space))
-            y_data = y_f.dat.data_with_halos[:]
-            node_positions += (y_data,)
-
-        return node_positions
+        if not hasattr(self, "mesh_ops"):
+            self.mesh_ops = mshops.MeshOps(dom_dim, dimension=dimension,
+                                           quadrilateral=quadrilateral,
+                                           func_space_type=func_space_type,
+                                           comm=comm)
 
     def extract_bnd_node_indices(self, node_positions, func_space):
         '''
@@ -246,7 +230,8 @@ class HABC_Mesh():
         '''
 
         # Extract node positions
-        node_positions = self.extract_node_positions(self.function_space)
+        node_positions = self.mesh_ops.extract_node_positions(self.mesh,
+                                                              self.function_space)
 
         # Extract boundary node indices
         bnds = self.extract_bnd_node_indices(node_positions,
@@ -1486,7 +1471,7 @@ class HABC_Mesh():
         bnd_nod = fire.DirichletBC(V, 0., "on_boundary").nodes
 
         # Extract node positions
-        node_positions = self.extract_node_positions(V)
+        node_positions = self.mesh_ops.extract_node_positions(self.mesh, V)
 
         # Boundary node coordinates
         z_f, x_f = node_positions[:2]

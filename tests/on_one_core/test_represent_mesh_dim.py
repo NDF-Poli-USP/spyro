@@ -3,6 +3,7 @@ import warnings
 import firedrake as fire
 from numpy import isclose
 from spyro.habc.habc import HABC_Wave
+import spyro.meshing.meshing_operations as mshops
 fire.parameters["loopy"] = {"silenced_warnings": ["v1_scheduler_fallback"]}
 warnings.filterwarnings("ignore", category=RuntimeWarning)
 
@@ -17,8 +18,6 @@ def wave_dict(element_type, dimension):
         Type of finite element. 'T' for triangles or 'Q' for quadrilaterals
     dimension : `int`
         Dimension of the problem. 2 for 2D and 3 for 3D
-    degree : `int`
-        Degree of the finite element. p<=4 for 2D and p<=3 for 3D
 
     Returns
     -------
@@ -62,17 +61,18 @@ def wave_dict(element_type, dimension):
     # Ricker wavelet that has a peak frequency of 5 Hz injected at a specified
     # point of the mesh. We also specify to record the solution at the corners
     # of the domain to verify the efficiency of the absorbing layer.
+    fn = 1. if negative_z else -1.
     dictionary["acquisition"] = {
         "source_type": "ricker",
-        "source_locations": ([(-0.5, 0.25)] if dimension == 2
-                             else [(-0.5, 0.25, 0.5)]),
+        "source_locations": ([(-fn * 0.5, 0.25)] if dimension == 2
+                             else [(-fn * 0.5, 0.25, 0.5)]),
         "frequency": 5.,  # in Hz
         "delay": 1.5,
-        "receiver_locations": ([(-Lz, 0.), (-Lz, Lx), (0., 0.), (0., Lx)]
+        "receiver_locations": ([(-fn * Lz, 0.), (-fn * Lz, Lx), (0., 0.), (0., Lx)]
                                if dimension == 2
-                               else [(-Lz, 0., 0.), (-Lz, Lx, 0.),
+                               else [(-fn * Lz, 0., 0.), (-fn * Lz, Lx, 0.),
                                      (0., 0., 0), (0., Lx, 0.),
-                                     (-Lz, 0., Ly), (-Lz, Lx, Ly),
+                                     (-fn * Lz, 0., Ly), (-fn * Lz, Lx, Ly),
                                      (0., 0., Ly), (0., Lx, Ly)])
     }
 
@@ -161,3 +161,65 @@ def test_representative_mesh_dimensions(element_type, dimension):
     expected_lmin = expected_lmax = 0.1
     assert isclose(Wave_obj.mesh_parameters.lmin, expected_lmin, rtol=1e-6)
     assert isclose(Wave_obj.mesh_parameters.lmax, expected_lmax, rtol=1e-6)
+
+
+@pytest.mark.parametrize('element_type, dimension', [
+    ("T", 2),   # Triangular 2D
+    ("Q", 2),    # Quadrilateral 2D
+    ("T", 3),   # Tetrahedral 3D
+    ("Q", 3)])   # Hexahedral 3D
+def test_boundary_ids(element_type, dimension):
+    """Test representative_mesh_dimensions for 2D and 3D meshes."""
+
+    # Crete object for mesh operations
+    domain_dim = (1., 1.) if dimension == 2 else (1., 1., 1.)
+    quadrilateral = True if element_type == "Q" else False
+    mesh_ops = mshops.MeshOps(domain_dim, dimension=dimension,
+                              quadrilateral=quadrilateral,
+                              func_space_type='scalar')
+
+    # Assuming Spyro's system coordinates: (z, x, y)
+    # Boundaries2D = [top (zmax, 2), bottom(zmin, 1), right(xmax, 4), left(xmin, 3)]
+    boundaries = [False, True, False, True]
+    expected_map = [True, False, True, False]
+    expected_ids = [1, 2, 3, 4]
+    if dimension == 3:
+        # Boundaries3D = Boundaries2D + [front (ymin, 5), back(ymax, 6)]
+        boundaries.extend([True, False])
+        expected_map.extend([True, False])
+        expected_ids.extend([5, 6]) if element_type == "T" \
+            else expected_ids.extend(['bottom', 'top'])
+
+    # Mesh parameters
+    degree_ele = 4 if dimension == 2 else 3
+    family = "CG" if element_type == "Q" else "KMV"
+
+    # Create mesh
+    if quadrilateral:
+        mesh = fire.UnitSquareMesh(10, 10, quadrilateral=quadrilateral)
+        if dimension == 3:
+            quad_mesh = mesh
+            layer_height = 1. / 10
+            mesh = fire.ExtrudedMesh(quad_mesh, 10, layer_height=layer_height)
+        element = fire.FiniteElement(family, mesh.ufl_cell(),
+                                     degree=degree_ele, variant="spectral")
+        V = fire.FunctionSpace(mesh, element)
+    else:
+        mesh = fire.UnitSquareMesh(10, 10) if dimension == 2 \
+            else fire.UnitCubeMesh(10, 10, 10)
+        V = fire.FunctionSpace(mesh, family, degree_ele)
+
+    # Build the boundary ID mapping
+    boundary_idx_map = mesh_ops.mapping_boundary_ids(mesh, V,
+                                                     boundaries,
+                                                     box_domain=True)
+
+    # Checking the mapping
+    assert len(boundary_idx_map) == (4 if dimension == 2 else 6)
+    for key, expected_value in zip(expected_ids, expected_map):
+        assert key in boundary_idx_map, f"✗ Boundary ID {key} not found in the map"
+        assert boundary_idx_map[key] == expected_value, \
+            f"✗ Boundary ID {key} expected to be {expected_value} " + \
+            f"but got {boundary_idx_map[key]}"
+    print(f"✓ Boundary ID mapping for {element_type} {dimension}D mesh is correct.",
+          flush=True)
