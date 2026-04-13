@@ -279,6 +279,7 @@ class Model_parameters(Read_options, Read_boundary_layer,
         # Sources has to be estabilshied before mesh parameters object
         length_z = self.input_dictionary["mesh"]["length_z"]
         length_x = self.input_dictionary["mesh"]["length_x"]
+        negative_z = self.input_dictionary["mesh"]["negative_z"]
         if self.dimension == 2:
             mesh_lengths = [length_z, length_x]
         elif self.dimension == 3:
@@ -287,7 +288,7 @@ class Model_parameters(Read_options, Read_boundary_layer,
         if value is not None:
             for source in value:
                 source_points = list(source)
-                _check_point_in_domain(source_points, mesh_lengths, True)
+                _check_point_in_domain(source_points, mesh_lengths, negative_z)
             self.number_of_sources = len(value)
         else:
             self.number_of_sources = 1
