@@ -34,6 +34,8 @@ exclude = [
   "test_integration",
   "paper",
   "benchmarks",
+  "tmp_*",
+  "demos",
 ]
 extend-exclude = ["*.ipynb"]
 

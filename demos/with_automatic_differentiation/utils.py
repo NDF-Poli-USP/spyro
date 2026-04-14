@@ -11,7 +11,6 @@ def model_settings():
     model : dict
         Dictionary containing the model settings.
     """
-
     model = {}
 
     model["opts"] = {
