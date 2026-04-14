@@ -56,3 +56,8 @@ quote-style = "double"
 indent-style = "space"
 skip-magic-trailing-comma = false
 line-ending = "auto"
+
+[tool.pydocstringformatter]
+write = true
+style = "numpydoc"
+exclude = "setup.py"

@@ -7,7 +7,7 @@ import spyro
 from spyro.solvers.acoustic_wave import AcousticWave
 from spyro.solvers.elastic_wave.isotropic_wave import IsotropicWave
 
-"""Read in an external mesh and interpolate velocity to it"""
+"""Read in an external mesh and interpolate velocity to it."""
 from ..inputfiles.Model1_2d_CG import model as oldmodel
 
 
@@ -178,7 +178,8 @@ def _random_source_locations(dimension, count=5):
 
 def _check_cofunction_values(wave, source_locations, test_exprs):
     """Check that the cofunction action on each test function matches the
-    expected value for each source individually."""
+    expected value for each source individually.
+    """
     for source_id, sl in enumerate(source_locations):
         wave.sources.point_locations = [sl]
         wave.sources.current_sources = [0]
@@ -195,7 +196,8 @@ def _check_cofunction_values(wave, source_locations, test_exprs):
 @pytest.mark.parametrize("cell_type", ["T", "Q"])
 def test_cofunction_values_acoustic(cell_type):
     """Test if the cofunction correctly represents delta functions at source
-    locations by checking its action on known functions."""
+    locations by checking its action on known functions.
+    """
     np.random.seed(42)
     source_locations = _random_source_locations(2)
     wave = _build_acoustic_wave(1.0, source_locations, cell_type=cell_type)
@@ -217,7 +219,8 @@ def test_cofunction_values_acoustic(cell_type):
 @pytest.mark.parametrize("cell_type", ["T", "Q"])
 def test_cofunction_values_elastic(cell_type):
     """Test if the elastic cofunction correctly represents delta functions at
-    source locations by checking its action on known vector functions."""
+    source locations by checking its action on known vector functions.
+    """
     np.random.seed(42)
     source_locations = _random_source_locations(2)
     wave = _build_elastic_wave(1.0, source_locations, cell_type=cell_type)
@@ -240,7 +243,8 @@ def test_cofunction_values_elastic(cell_type):
 @pytest.mark.parametrize("cell_type", ["T", "Q"])
 def test_cofunction_values_elastic_3d(cell_type):
     """Test if the 3D elastic cofunction correctly represents delta functions
-    at source locations by checking its action on known vector functions."""
+    at source locations by checking its action on known vector functions.
+    """
     np.random.seed(42)
     source_locations = _random_source_locations(3)
     wave = _build_elastic_wave(1.0, source_locations, dimension=3, cell_type=cell_type)

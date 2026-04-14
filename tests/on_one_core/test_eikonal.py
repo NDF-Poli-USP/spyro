@@ -324,7 +324,7 @@ def eikonal_analysis(dictionary, edge_length, f_est):
 @pytest.mark.slow
 def test_loop_eikonal_2d():
     """Loop for testing eikonal solver in 2D with the model in Fig. 8 of Salas et al.
-    (2022)
+    (2022).
 
     eik_min = 83.333 ms (Theoretical value)
     f_est  T-ele   Q-ele
@@ -388,7 +388,7 @@ def test_loop_eikonal_2d():
 
 def test_loop_eikonal_3d():
     """Loop for testing eikonal solver in 3D with the model in Fig. 8 of Salas et al.
-    (2022)
+    (2022).
 
     eik_min = 83.333 ms (Theoretical value)
     f_est  T-ele   Q-ele

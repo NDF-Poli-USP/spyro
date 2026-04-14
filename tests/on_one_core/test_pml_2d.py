@@ -105,7 +105,8 @@ def run_forward():
 @pytest.mark.slow
 def test_pml():
     """Test that the second order time convergence of the central difference method is
-    achieved."""
+    achieved.
+    """
     p_r, nt = run_forward()
     with open("tests/inputfiles/extended_pml_receveirs.pck", "rb") as f:
         array = np.asarray(pickle.load(f), dtype=float)

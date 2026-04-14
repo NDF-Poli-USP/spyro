@@ -206,7 +206,7 @@ def create_folder(folder):
 
     Parameters
     ----------
-    folder: `str`
+    folder : `str`
         Path to the folder to be created
 
     Returns

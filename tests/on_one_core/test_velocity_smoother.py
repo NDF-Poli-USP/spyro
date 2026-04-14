@@ -13,11 +13,11 @@ def get_vp_from_2dsegy(filename):
 
     Parameters
     ----------
-    filename (str): The path to the SEG-Y file.
+    filename (str) : The path to the SEG-Y file.
 
     Returns
     -------
-    np.ndarray: A 2D numpy array containing the velocity profile data,
+    np.ndarray : A 2D numpy array containing the velocity profile data,
                 with shape (nz, nx) where nz is the number of samples
                 and nx is the number of traces.
     """

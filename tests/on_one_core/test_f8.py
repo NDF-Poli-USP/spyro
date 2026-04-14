@@ -12,7 +12,7 @@ def wave_dict(dt_usu, layer_shape, degree_layer, habc_reference_freq, get_ref_mo
 
     Parameters
     ----------
-    dt_usu: `float`
+    dt_usu : `float`
         Time step of the simulation
     layer_shape : `str`
         Shape of the absorbing layer, either 'rectangular' or 'hypershape'
@@ -172,7 +172,7 @@ def get_xCR_usu(Wave_obj, dat_regr_xCR, typ_xCR, n_pts):
     ----------
     Wave_obj : `habc.HABC_Wave`
         An instance of the HABC_Wave class
-    data_regr_xCR: `list`
+    data_regr_xCR : `list`
         Data for the regression of the parameter xCR.
         Structure: [xCR, max_errIt, max_errPK, crit_opt]
         - xCR: Values of xCR used in the regression.
@@ -219,7 +219,7 @@ def habc_fig8(Wave_obj, dat_regr_xCR, xCR_usu=None, plot_comparison=True):
     ----------
     Wave_obj : `habc.HABC_Wave`
         An instance of the HABC_Wave class
-    data_regr_xCR: `list`
+    data_regr_xCR : `list`
         Data for the regression of the parameter xCR.
         Structure: [xCR, max_errIt, max_errPK, crit_opt]
         - xCR: Values of xCR used in the regression.

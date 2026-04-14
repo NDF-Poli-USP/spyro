@@ -22,7 +22,7 @@ def wave_dict(cell_type, domain_dimensions, final_time, dt):
         List containing the domain dimensions [length_z, length_x, length_y] in km
     final_time : `float`
         Final time of the simulation
-    dt: `float`
+    dt : `float`
         Time step of the simulation
 
     Returns
@@ -297,7 +297,7 @@ def numerical_values_cond(property_name, coords, below_thrs, above_thrs):
 
     Parameters
     ----------
-    property_name: `str`
+    property_name : `str`
             Name of the material property to be se
     coords : `numpy.ndarray`
         Array of coordinates (z, x, y) for the mesh points
@@ -502,7 +502,7 @@ def numerical_values_expr(property_name, coords):
 
     Parameters
     ----------
-    property_name: `str`
+    property_name : `str`
             Name of the material property to be se
     coords : `numpy.ndarray`
         Array of coordinates (z, x, y) for the mesh vertices

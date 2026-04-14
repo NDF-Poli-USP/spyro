@@ -88,7 +88,8 @@ def run_forward(dt):
 @pytest.mark.slow
 def test_second_order_time_convergence():
     """Test that the second order time convergence of the central difference method is
-    achieved."""
+    achieved.
+    """
     dts = [
         0.0005,
         0.0001,
