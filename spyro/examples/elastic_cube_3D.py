@@ -1,6 +1,5 @@
-"""From Turkel et al.
+"""From Turkel et al (2023).
 
-(2023):
 https://doi.org/10.1016/j.wavemoti.2022.103109
 """
 
