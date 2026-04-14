@@ -55,7 +55,7 @@ class Read_options:
 
     @property
     def variant(self):
-        """Type of element variant for each cell.
+        """Str | None: Type of element variant for each cell.
 
         Accepted variants are:
             "lumped": Mass lumping, works for SEM and MLT
@@ -74,7 +74,7 @@ class Read_options:
 
     @property
     def method(self):
-        """FE method used for wave propagation.
+        """Str | None: FE method used for wave propagation.
 
         Accepted methods:
             'mass_lumped_triangle',
@@ -145,7 +145,7 @@ class Read_options:
 
     @property
     def cell_type(self):
-        """Cell type used for wave propagation.
+        """Str | None: Cell type used for wave propagation.
 
         Accepted cell geometry:
             'triangle',
@@ -239,7 +239,10 @@ class Read_options:
 
     @property
     def dimension(self):
-        """Int: Geometric dimension."""
+        """Int: Geometric dimension.
+
+        Should only be 2 or 3.
+        """
         return self._dimension
 
     @dimension.setter

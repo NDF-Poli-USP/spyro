@@ -324,7 +324,10 @@ class Model_parameters(Read_options, Read_boundary_layer, Read_time_axis, Read_o
 
     @property
     def delay_type(self):
-        """Str: Delay interpretation mode for source time function."""
+        """Str: Delay interpretation mode for source time function.
+
+        Accepted values: "multiples_of_minimum", "time"
+        """
         return self._delay_type
 
     @delay_type.setter
@@ -335,7 +338,10 @@ class Model_parameters(Read_options, Read_boundary_layer, Read_time_axis, Read_o
 
     @property
     def source_type(self):
-        """Str: Wavelet/source model name used during propagation."""
+        """Str: Wavelet/source model name used during propagation.
+
+        Accepted values: "ricker", "MMS"
+        """
         return self._source_type
 
     @source_type.setter

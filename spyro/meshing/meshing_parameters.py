@@ -432,7 +432,7 @@ class MeshingParameters:
 
     @property
     def method(self):
-        """Finite element method.
+        """Str: Finite element method.
 
         The finite element method to use. Must be one of:
             'mass_lumped_triangle', 'DG_triangle', 'spectral_quadrilateral',
@@ -457,7 +457,7 @@ class MeshingParameters:
 
     @property
     def mesh_file(self):
-        """Str | None: Get the path to the mesh file.
+        """Str | None: Path to the mesh file.
 
         Raises
         ------

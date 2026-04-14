@@ -101,7 +101,7 @@ class Read_boundary_layer:
 
     @property
     def abc_boundary_layer_type(self):
-        """Type of absorbing boundary condition.
+        """Str | None: Type of absorbing boundary condition.
 
         Valid types are: 'PML', 'local', 'hybrid', or None.
         """
@@ -145,7 +145,7 @@ class Read_boundary_layer:
 
     @property
     def abc_pad_length(self):
-        """Float: Length of the absorbing boundary condition."""
+        """Float | None: Length of the absorbing boundary condition."""
         return self._abc_pad_length
 
     @abc_pad_length.setter
