@@ -27,6 +27,7 @@ def backward_wave_propagator(Wave_obj, dt=None):
 
 def _pml_interior_indicator(Wave_obj):
     """UFL indicator: 1 inside the physical domain, 0 in the PML layer."""
+    # TODO: This is a bit hacky, will be not needed when submeshes are enabled in Spyro.
     z = Wave_obj.mesh_z
     x = Wave_obj.mesh_x
     z_min = -(Wave_obj.mesh_parameters.length_z)
@@ -68,22 +69,13 @@ def _build_gradient_solver(Wave_obj, mask_available, pml):
     forward_field = fire.Function(V)
     uadj = fire.Function(V)
 
-    if pml and mask_available:
-        ffG = (
-            2.0
-            * Wave_obj.c
-            * fire.dot(fire.grad(uadj), fire.grad(forward_field))
-            * m_v
-            * fire.dx(2, scheme=qr)
-        )
-        if Wave_obj.comm.comm.rank == 0:
-            print(
-                "Applying gradient mask: gradients will be computed only "
-                "in inside region (mixed space)",
-                flush=True,
-            )
-    elif pml:
+    if pml:
+        # Always exclude PML region from gradient.
+        # This is necessary once the gradient expression is not considering
+        # the PML auxiliary variables. In addition, we are not interested
+        # in the gradient in the PML region.
         indicator = _pml_interior_indicator(Wave_obj)
+        # Computes de gradient only in the physical domain.
         ffG = (
             2.0
             * Wave_obj.c
