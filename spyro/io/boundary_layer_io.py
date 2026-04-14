@@ -60,7 +60,6 @@ class Read_boundary_layer:
 
     def __init__(self, comm=None):
         """Initialize Read_boundary_layer class."""
-
         self.input_dictionary.setdefault("absorving_boundary_conditions", {})
         self.input_dictionary["absorving_boundary_conditions"].setdefault(
             "status", False
@@ -114,7 +113,6 @@ class Read_boundary_layer:
     @abc_boundary_layer_type.setter
     def abc_boundary_layer_type(self, value):
         """Set absorbing boundary condition type and configure its parameters."""
-
         abc_dictionary = self.input_dictionary["absorving_boundary_conditions"]
         accepted_damping_types = [
             "PML",
@@ -171,7 +169,6 @@ class Read_boundary_layer:
         ------
         ValueError: If value is None or 0 while the PML boundary type is active.
         """
-
         if (value is None or value == 0) and self.abc_boundary_layer_type == "PML":
             raise ValueError("No pad not compatible with PML")
         self._abc_pad_length = value

@@ -37,7 +37,6 @@ class Read_options:
 
     def __init__(self, dictionary={}):
         """Initialize Read_options class."""
-
         options_dictionary = dictionary["options"]
         options_dictionary.setdefault("method", None)
         options_dictionary.setdefault("cell_type", None)
@@ -107,7 +106,6 @@ class Read_options:
     @method.setter
     def method(self, value):
         """Set the FE method used for wave propagation."""
-
         mlt_equivalents = [
             "KMV",
             "MLT",
@@ -172,7 +170,6 @@ class Read_options:
     @cell_type.setter
     def cell_type(self, value):
         """Set the cell type used for wave propagation."""
-
         triangle_equivalents = [
             "T",
             "triangle",
@@ -249,7 +246,6 @@ class Read_options:
     @degree.setter
     def degree(self, value):
         """Set the FEM polynomial basis degree."""
-
         if not isinstance(value, int):
             raise ValueError("Degree has to be integer")
         self._degree = value
@@ -268,7 +264,6 @@ class Read_options:
     @dimension.setter
     def dimension(self, value):
         """Set the geometric dimension."""
-
         if value not in {2, 3}:
             raise ValueError(f"Dimension of {value} not 2 or 3.")
         self._dimension = value

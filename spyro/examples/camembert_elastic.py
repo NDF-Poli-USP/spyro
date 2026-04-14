@@ -38,7 +38,6 @@ ri = 50  # [m]
 
 def _camembert(v_inside, v_outside):
     """Define material distribution conditionally in Camembert model."""
-
     return fire.conditional((z - zc) ** 2 + (x - xc) ** 2 < ri**2, v_inside, v_outside)
 
 

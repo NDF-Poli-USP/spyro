@@ -53,7 +53,6 @@ def check_function_space_type(function_space):
     function_space: Firedrake FunctionSpace
         Function space.
     """
-
     # Check if wave.function_space is a generates vector os scalar fields:
     if function_space.value_size == 1:
         return "scalar"
