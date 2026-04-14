@@ -218,6 +218,11 @@ class Model_parameters(Read_options, Read_boundary_layer,
 
         self.input_dictionary["acquisition"].setdefault("source_locations",
                                                         None)
+
+        # We need this here to initialize the source locations before
+        # the mesh parameters object is created, since the source
+        # locations need to be checked to be within the mesh domain
+        self.input_dictionary["mesh"].setdefault("negative_z", True)
         self.source_locations = self.input_dictionary[
             "acquisition"]["source_locations"]
 
@@ -236,7 +241,6 @@ class Model_parameters(Read_options, Read_boundary_layer,
         else:
             quadrilateral = False
         self.input_dictionary["mesh"].setdefault("user_mesh", None)
-        self.input_dictionary["mesh"].setdefault("negative_z", True)
         self.user_mesh = self.input_dictionary["mesh"]["user_mesh"]
         self.mesh_parameters = meshing.MeshingParameters(
             input_mesh_dictionary=self.input_dictionary["mesh"],
