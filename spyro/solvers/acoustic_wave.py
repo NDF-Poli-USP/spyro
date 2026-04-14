@@ -190,7 +190,12 @@ class AcousticWave(Wave):
 
     def get_scalar_function_space(self):
         """Return the scalar space where the pressure equation is solved."""
-        return self.scalar_function_space
+        if self.scalar_function_space is not None:
+            return self.scalar_function_space
+        if self.abc_boundary_layer_type == "PML":
+            return self.function_space.sub(0)
+        else:
+            return self.function_space
 
     def get_wave_equation_state(self, state=None):
         """Return the pressure field from a full solver state.
