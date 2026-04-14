@@ -40,10 +40,9 @@ class ExampleModelBase:
 class Example_model_acoustic(ExampleModelBase, AcousticWave):
     """Set up a basic model parameter class for example and test-case models.
 
-    It has
-    the option of reading a dictionary, and if any parameter is missing from this
-    dictionary it calls on a default value, that should be defined in the relevant
-    example file.
+    It has the option of reading a dictionary, and if any parameter is
+    missing from this dictionary, it calls on a default value, which
+    should be defined in the relevant example file.
 
     Example Setup
 
@@ -53,7 +52,7 @@ class Example_model_acoustic(ExampleModelBase, AcousticWave):
 
     Unlike targeted test cases, these examples do not have a specific objective
     or expected result. Instead, they provide standardized setups, such as
-    Camembert, rectangular, and Marmousi velocity models, that can be quickly
+    Camembert, rectangular, and Marmousi velocity models, which can be quickly
     reused when prototyping, testing, or validating new functionality.
 
     By isolating the setup of common velocity models, we aim to reduce
@@ -85,11 +84,10 @@ class Example_model_acoustic(ExampleModelBase, AcousticWave):
 class Example_model_acoustic_FWI(ExampleModelBase, FullWaveformInversion):
     """Set up a basic model parameter class for example and test-case models.
 
-    It has
-    the option of reading a dictionary, and if any parameter is missing from this
-    dictionary it calls on a default value, that should be defined in the relevant
-    example file.
-
+    It has the option of reading a dictionary, and if any parameter is
+    missing from this dictionary, it calls on a default value, which
+    should be defined in the relevant example file.
+    
     Example Setup
 
     These examples are intended as reusable velocity model configurations to
@@ -98,7 +96,7 @@ class Example_model_acoustic_FWI(ExampleModelBase, FullWaveformInversion):
 
     Unlike targeted test cases, these examples do not have a specific objective
     or expected result. Instead, they provide standardized setups, such as
-    Camembert, rectangular, and Marmousi velocity models, that can be quickly
+    Camembert, rectangular, and Marmousi velocity models, which can be quickly
     reused when prototyping, testing, or validating new functionality.
 
     By isolating the setup of common velocity models, we aim to reduce
