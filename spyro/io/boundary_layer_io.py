@@ -163,7 +163,7 @@ class Read_boundary_layer:
 
         Parameters
         ----------
-        value: Pad length (int or None). Must be non-zero when using PML.
+        value : Pad length (int or None). Must be non-zero when using PML.
 
         Raises
         ------

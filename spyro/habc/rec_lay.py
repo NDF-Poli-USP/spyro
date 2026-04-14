@@ -30,7 +30,7 @@ class RectangLayer:
         Hyperellipsoidal volume factor. f_Vh = 8 (n_hyp is considered infinite)
     hyper_axes : `tuple`
         Semi-axes of the rectangular layer (a, b) (2D) or (a, b, c) (3D)
-    n_hyp: `float`
+    n_hyp : `float`
         Degree of the hyperelliptical pad layer. n_hyp is set to None because
         this attribute is not applicable to rectangular layers
     vol : `float`

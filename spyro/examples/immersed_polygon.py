@@ -153,6 +153,12 @@ class Polygon_acoustic(Polygon_velocity, Rectangle_acoustic):
 
     Example Setup
 
+    Parameters
+    ----------
+    dictionary : dict, optional
+        Dictionary with the parameters of the model that are different from
+        the default polygon model. The default is None.
+
     Notes
     -----
     This example is intended as a reusable model configuration for
@@ -163,12 +169,6 @@ class Polygon_acoustic(Polygon_velocity, Rectangle_acoustic):
     encourages consistency across experiments.
 
     Feel free to adapt these templates to your needs.
-
-    Parameters
-    ----------
-    dictionary : dict, optional
-        Dictionary with the parameters of the model that are different from
-        the default polygon model. The default is None.
     """
 
     def __init__(
@@ -193,6 +193,12 @@ class Polygon_acoustic_FWI(Polygon_velocity, Rectangle_acoustic_FWI):
     This class is a child of the Example_model class. It is used to
     create a dictionary with the parameters of the polygon model.
 
+    Parameters
+    ----------
+    dictionary : dict, optional
+        Dictionary with the parameters of the model that are different from
+        the default polygon model. The default is None.
+
     Notes
     -----
     This example is intended as a reusable model configuration for
@@ -203,12 +209,6 @@ class Polygon_acoustic_FWI(Polygon_velocity, Rectangle_acoustic_FWI):
     encourages consistency across experiments.
 
     Feel free to adapt these templates to your needs.
-
-    Parameters
-    ----------
-    dictionary : dict, optional
-        Dictionary with the parameters of the model that are different from
-        the default polygon model. The default is None.
     """
 
     def __init__(

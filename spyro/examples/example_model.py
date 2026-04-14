@@ -62,10 +62,10 @@ class Example_model_acoustic(ExampleModelBase, AcousticWave):
 
     Parameters
     ----------
-    dictionary: 'python dictionary' (optional): dictionary with changes to the
+    dictionary : 'python dictionary' (optional): dictionary with changes to the
     default parameters
 
-    default_dictionary: python 'dictionary': default parameters
+    default_dictionary : python 'dictionary': default parameters
 
     Returns
     -------
@@ -106,10 +106,10 @@ class Example_model_acoustic_FWI(ExampleModelBase, FullWaveformInversion):
 
     Parameters
     ----------
-    dictionary: 'python dictionary' (optional): dictionary with changes to the
+    dictionary : 'python dictionary' (optional): dictionary with changes to the
     default parameters
 
-    default_dictionary: python 'dictionary': default parameters
+    default_dictionary : python 'dictionary': default parameters
 
     Returns
     -------

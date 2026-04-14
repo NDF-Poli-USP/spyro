@@ -61,7 +61,7 @@ class Eikonal_Modeling:
             Factor for the stabilizing term in Eikonal Eq. Default is 0.03
     p_eik : `int`
         Finite element order
-    source_locations: `list`of `tuples`
+    source_locations : `list`of `tuples`
         Source locations as tuples of coordinates
     tol : `float`, optional
         User solver tolerance. Default is 1e-16
@@ -103,7 +103,7 @@ class Eikonal_Modeling:
         ----------
         dimension : `int`
             The spatial dimension of the problem
-        source_locations: `list`of `tuples`
+        source_locations : `list`of `tuples`
             List of tuples containing all source locations
         ele_type : `string`, optional
             Finite element type. 'CG' or 'KMV'. Default is 'CG'
@@ -278,7 +278,7 @@ class Eikonal_Modeling:
 
         Returns
         -------
-        FNL: `firedrake form`
+        FNL : `firedrake form`
             Nonlinear Eikonal equation
         """
         # Parameters
@@ -324,7 +324,7 @@ class Eikonal_Modeling:
 
         Returns
         -------
-        param_solver: `dict`
+        param_solver : `dict`
             Solver parameters
 
         PETSC Documentation

@@ -244,7 +244,7 @@ def plot_model(
     high_resolution : bool, optional
         If True, interpolates the velocity model to a finer resolution (0.01 km)
         before plotting. Default is False.
-    high_resolution_grid_value: float, optional
+    high_resolution_grid_value : float, optional
         High resolution visualization value. Default is 0.01 km.
 
     Returns
@@ -849,6 +849,10 @@ def plot_model_in_p1(
     result
         The return value from the plot_model function.
 
+    See Also
+    --------
+    plot_model : The underlying plotting function.
+
     Notes
     -----
     This function:
@@ -858,10 +862,6 @@ def plot_model_in_p1(
     4. Sets up a new mesh with the specified edge length
     5. Projects the original velocity model onto the new P1 space
     6. Calls plot_model to generate the visualization
-
-    See Also
-    --------
-    plot_model : The underlying plotting function.
     """
     # Local import to avoid circular import
     from ..solvers import AcousticWave

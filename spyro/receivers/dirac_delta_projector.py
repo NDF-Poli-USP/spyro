@@ -27,33 +27,33 @@ class Delta_projector:
 
     Attributes
     ----------
-    mesh: firedrake.Mesh
+    mesh : firedrake.Mesh
         Mesh object
-    space: firedrake.FunctionSpace
+    space : firedrake.FunctionSpace
         Function space to be used
-    my_ensemble: mpi4py.MPI.Intracomm
+    my_ensemble : mpi4py.MPI.Intracomm
         MPI communicator
-    dimension: int
+    dimension : int
         Dimension of the mesh
-    degree: int
+    degree : int
         Degree of FEM space
-    point_locations: list
+    point_locations : list
         List of tuples of point locations
-    number_of_points: int
+    number_of_points : int
         Number of points
-    cellIDs: list
+    cellIDs : list
         List of cell IDs for each point
-    cellVertices: list
+    cellVertices : list
         List of vertices for each cell containing a point
-    cell_tabulations: list
+    cell_tabulations : list
         List of tabulations for each point in a cell
-    cellNodeMaps: list
+    cellNodeMaps : list
         List of node maps for each cell
-    nodes_per_cell: int
+    nodes_per_cell : int
         Number of nodes per cell
-    quadrilateral: bool
+    quadrilateral : bool
         True if mesh is quadrilateral
-    is_local: list
+    is_local : list
         List of cell IDs local to the processor
     """
 
@@ -62,7 +62,7 @@ class Delta_projector:
 
         Parameters
         ----------
-        wave_object: spyro.wave.Wave
+        wave_object : spyro.wave.Wave
             Wave object
         """
         self.automatic_adjoint = wave_object.automatic_adjoint
@@ -97,13 +97,13 @@ class Delta_projector:
 
         Returns
         -------
-        cellIDs: list
+        cellIDs : list
             List of cell IDs for each receiver
-        cellVertices: list
+        cellVertices : list
             List of vertices for each receiver
-        cellNodeMaps: list
+        cellNodeMaps : list
             List of node maps for each receiver
-        cell_tabulations: list
+        cell_tabulations : list
             List of tabulations for each receiver
         """
         for rid in range(self.number_of_points):

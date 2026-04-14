@@ -92,13 +92,13 @@ class AcousticWave(Wave):
 
         Parameters
         ----------
-        guess: Firedrake 'Function' (optional)
+        guess : Firedrake 'Function' (optional)
             Initial guess for the velocity model. If not mentioned uses the
             one currently in the wave object.
 
         Returns
         -------
-        dJ: Firedrake 'Function'
+        dJ : Firedrake 'Function'
             Gradient of the cost functional.
         """
         if misfit is not None:

@@ -520,24 +520,24 @@ def RectangleMesh(nx, ny, length_x, length_y, pad=None, comm=None, quadrilateral
 
     Parameters
     ----------
-    length_x: float
+    length_x : float
       Length of the domain in the x direction.
-    length_y: float
+    length_y : float
       Length of the domain in the y direction.
-    nx: int
+    nx : int
       Number of elements in the x direction.
-    ny: int
+    ny : int
       Number of elements in the y direction.
-    pad: float, optional
+    pad : float, optional
       Padding to be added to the domain. The default is None.
-    comm: MPI communicator, optional
+    comm : MPI communicator, optional
       MPI communicator. The default is None.
-    quadrilateral: bool, optional
+    quadrilateral : bool, optional
       If True, the mesh is quadrilateral. The default is False.
 
     Returns
     -------
-    mesh: Firedrake Mesh
+    mesh : Firedrake Mesh
       Mesh
     """
     if pad is not None:
@@ -611,25 +611,25 @@ def BoxMesh(nx, ny, nz, length_x, length_y, length_z, pad=None, quadrilateral=Fa
     ----------
     nx : int
         Number of elements in the x direction.
-    ny: int
+    ny : int
         Number of elements in the y direction.
-    nz: int
+    nz : int
         Number of elements in the z direction.
-    length_x: float
+    length_x : float
         Length of the domain in the x direction.
-    length_y: float
+    length_y : float
         Length of the domain in the y direction.
-    length_z: float
+    length_z : float
         Length of the domain in the z direction.
-    pad: float, optional
+    pad : float, optional
         Padding to be added to the domain. The default is None.
-    quadrilateral: bool, optional
+    quadrilateral : bool, optional
         If True, the mesh is created by extruding a quadrilateral mesh.
         The default is False.
 
     Returns
     -------
-    mesh: Firedrake Mesh
+    mesh : Firedrake Mesh
         The generated 3D box mesh.
 
     Notes
@@ -664,16 +664,16 @@ def vp_to_sizing(vp, cpw, frequency):
 
     Parameters
     ----------
-    vp: numpy.ndarray
+    vp : numpy.ndarray
         P-wave velocity field.
-    cpw: float
+    cpw : float
         Cells per wavelength(must be positive).
-    frequency: float
+    frequency : float
         Source frequency in Hz(must be positive).
 
     Returns
     -------
-    sizing: numpy.ndarray
+    sizing : numpy.ndarray
         Mesh element sizes corresponding to the velocity field.
 
     Raises
@@ -701,7 +701,7 @@ def build_big_rect_with_inner_element_group(mesh_parameters):
 
     Parameters
     ----------
-    mesh_parameters: object
+    mesh_parameters : object
         Object containing mesh parameters with the following attributes:
         - length_z: float
             Length of domain in z direction.

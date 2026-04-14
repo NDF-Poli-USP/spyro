@@ -16,7 +16,7 @@ def create_folder(folder):
 
     Parameters
     ----------
-    folder: `str`
+    folder : `str`
         Path to the folder to be created
 
     Returns
@@ -35,29 +35,29 @@ def plot_function_layer_size(
 
     Parameters
     ----------
-    lay_par: `list`
+    lay_par : `list`
         Parameters of the layer:
         - a : `float`
             Adimensional propagation speed parameter (a = z / f, z = c / l)
         - z_par : `float`
             Inverse of min. Eikonal (1 / phi_min, equivalent to c_bound/lref)
-    freq_par: `list`
+    freq_par : `list`
         Parameters of the frequency:
         - reference_frequency : `float`
             Reference frequency of the wave
         - source_frequency : `float`
             Source frequency
-    geom_par: `list`
+    geom_par : `list`
         Parameters of the domain geometry:
         - lmin : `float`
             Minimal dimension of finite element in mesh
         - lref : `float`
             Reference length for the size of the absorbing layer
-    FLpos: `list`
+    FLpos : `list`
         List of size parameters for the reference frequency
-    output_folder: `str`, optional
+    output_folder : `str`, optional
         Folder to save the output plots. Default is "output/".
-    show: `bool`, optional
+    show : `bool`, optional
         Whether to show the plot. Default is False.
 
     Returns
@@ -183,9 +183,9 @@ def plot_hist_receivers(Wave_object, show=False):
 
     Parameters
     ----------
-    Wave_object: `wave`
+    Wave_object : `wave`
         The Wave object containing the simulation results.
-    show: `bool`, optional
+    show : `bool`, optional
         Whether to show the plot. Default is False.
 
     Returns
@@ -264,12 +264,12 @@ def plot_rfft_receivers(Wave_object, fxlim=4.0, show=False):
 
     Parameters
     ----------
-    Wave_object: `wave`
+    Wave_object : `wave`
         Wave object containing the simulation results.
-    fxlim: `float`, optional
+    fxlim : `float`, optional
         Factor to set the x-axis limits in the plots realtive to
         the source frequency. Default is 4 and the minimum is 2.
-    show: `bool`, optional
+    show : `bool`, optional
         Whether to show the plot. Default is False.
 
     Returns
@@ -385,9 +385,9 @@ def plot_xCR_opt(Wave_object, data_regr_xCR, show=False):
 
     Parameters
     ----------
-    Wave_object: `wave`
+    Wave_object : `wave`
         The Wave object containing the simulation results
-    data_regr_xCR: `list`
+    data_regr_xCR : `list`
         Data for the regression of the parameter xCR.
         Structure: [xCR, max_errIt, max_errPK, crit_opt]
         - xCR: Values of xCR used in the regression.
@@ -400,7 +400,7 @@ def plot_xCR_opt(Wave_object, data_regr_xCR, show=False):
           * 'err_difference' : Difference between integral and peak errors
           * 'err_integral' : Minimum integral error
           * 'err_sum' : Sum of integral and peak errors
-    show: `bool`, optional
+    show : `bool`, optional
         Whether to show the plot. Default is False.
 
     Returns

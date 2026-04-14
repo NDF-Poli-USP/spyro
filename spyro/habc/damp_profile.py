@@ -476,7 +476,7 @@ class HABC_Damping:
             Minimum reflection coefficient at the minimum damping
         xCR_lim : `tuple`
             Limits for the heuristic factor. (xCR_inf, xCR_sup)
-        f_geom  : `float`
+        f_geom : `float`
             Geometric factor for area (2D) or volume (3D) of the domain
 
         Returns

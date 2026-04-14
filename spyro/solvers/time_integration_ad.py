@@ -9,7 +9,7 @@ def central_difference_acoustic(forwardsolver, c, source_function):
 
     Parameters
     ----------
-    forwardsolver: Spyro object
+    forwardsolver : Spyro object
         The Wave object containing the necessary data and parameters.
 
     Returns

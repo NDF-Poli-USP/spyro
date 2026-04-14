@@ -11,9 +11,9 @@ def central_difference(wave, source_ids=[0]):
 
     Parameters
     ----------
-    wave: Spyro object
+    wave : Spyro object
         The Wave object containing the necessary data and parameters.
-    source_ids: list of ints (optional)
+    source_ids : list of ints (optional)
         The ID of the sources being propagated. Defaults to [0].
 
     Returns

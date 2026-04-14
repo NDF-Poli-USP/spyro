@@ -34,16 +34,16 @@ def define_property_function_space(
     func_space_type, `str`
         Type of function space for the material property.
         Options: 'scalar', 'vector' or 'tensor'
-    dg_property: `bool`
+    dg_property : `bool`
         If True, uses a DG0 function space for conditional and
         expression inputs
-    shape_func_space: `tuple`, optional
+    shape_func_space : `tuple`, optional
         Shape of the function space for only tensorial material property.
         Default is None
 
     Returns
     -------
-    V: `firedrake function space`
+    V : `firedrake function space`
         Function space for the material property
     """
     # Checking input arguments
@@ -84,21 +84,21 @@ def _initialize_material_property_from_ufl(
 
     Parameters
     ----------
-    property_name: `str`
+    property_name : `str`
         Name of the material property to be set
     func_space_type, `str`
         Type of function space for the material property.
         Options: 'scalar', 'vector' or 'tensor'
-    V: `firedrake function space`
+    V : `firedrake function space`
         Function space for the material property
-    shape_func_space: `tuple`, optional
+    shape_func_space : `tuple`, optional
         Shape of the function space for only tensorial material property.
         Default is None
-    constant: `float`, optional
+    constant : `float`, optional
         Constant value for the material property. Default is None
-    conditional:  `firedrake conditional`, optional
+    conditional : `firedrake conditional`, optional
         Firedrake conditional object. Default is None
-    expression: `str`, optional
+    expression : `str`, optional
         If you use an expression, you can use the following variables:
         x, y, z, pi, tanh, sqrt. Ex: "2. + 0.5 * tanh((x - 2.) / 0.1)".
         It will be interpoalte into either the same function space as
@@ -107,7 +107,7 @@ def _initialize_material_property_from_ufl(
 
     Returns
     -------
-    mat_property: `firedrake function`
+    mat_property : `firedrake function`
         Material property
     """
     if constant is not None:
@@ -115,7 +115,7 @@ def _initialize_material_property_from_ufl(
         col = int(abs(log10(abs(value)))) + 2
 
         print(
-            f"Assigning {property_name} with a " f"constant value of {constant:>{col}}",
+            f"Assigning {property_name} with a "  f"constant value of {constant:>{col}}",
             flush=True,
         )
 
@@ -155,16 +155,16 @@ def _initialize_material_property_from_func(wave, property_name, fire_function, 
 
     Parameters
     ----------
-    property_name: `str`
+    property_name : `str`
         Name of the material property to be set.
-    fire_function: `firedrake function`
+    fire_function : `firedrake function`
         Firedrake function based on the input object
-    V: `firedrake function space`
+    V : `firedrake function space`
         Function space for the material property
 
     Returns
     -------
-    mat_property: `firedrake function`
+    mat_property : `firedrake function`
         Material property
     """
     original_family = wave.function_space.ufl_element().family()
@@ -199,17 +199,17 @@ def _initialize_random_material_prop(property_name, random, V):
 
     Parameters
     ----------
-    property_name: `str`
+    property_name : `str`
         Name of the material property to be set.
-    random: `tuple`
+    random : `tuple`
         If you want to set a random material property, specify the range of
         values as a tuple (min, max)
-    V: `firedrake function space`
+    V : `firedrake function space`
         Function space for the material property
 
     Returns
     -------
-    mat_property: `firedrake function`
+    mat_property : `firedrake function`
         Material property
     """
     col0 = int(abs(log10(abs(random[0])))) + 2
@@ -233,16 +233,16 @@ def _initialize_material_property_from_file(wave, property_name, from_file, V):
 
     Parameters
     ----------
-    property_name: `str`
+    property_name : `str`
         Name of the material property to be set.
-    from_file: `str`
+    from_file : `str`
         Name of the file containing the material property
-    V: `firedrake function space`
+    V : `firedrake function space`
         Function space for the material property
 
     Returns
     -------
-    mat_property: `firedrake function`
+    mat_property : `firedrake function`
         Material property
     """
     original_family = wave.function_space.ufl_element().family()
@@ -281,9 +281,9 @@ def _saving_property_to_file(wave, mat_property, property_name, foldername="defa
 
     Parameters
     ----------
-    mat_property: `firedrake function`
+    mat_property : `firedrake function`
         Material property
-    property_name: `str`
+    property_name : `str`
         Name of the material property to be set.
     foldername : `string`, optional
         Name of the folder where the material property is saved.
@@ -307,16 +307,16 @@ def _check_material_property_inputs(val_lst, func_space_type, shape_func_space, 
 
     Parameters
     ----------
-    val_lst: `list`
+    val_lst : `list`
         List of values for constant, conditional, expression,
         random, fire_function and from_file.
     func_space_type, `str`
         Type of function space for the material property.
         Options: 'scalar', 'vector' or 'tensor'
-    shape_func_space: `tuple`, optional
+    shape_func_space : `tuple`, optional
         Shape of the function space for only tensorial material
         property. Default is None
-    output: `bool`, optional
+    output : `bool`, optional
         If True, outputs the material property to a pvd file for
         visualization. Default is False
 
@@ -368,44 +368,44 @@ def set_material_property(
 
     Parameters
     ----------
-    property_name: `str`
+    property_name : `str`
         Name of the material property to be set.
     func_space_type, `str`
         Type of function space for the material property.
         Options: 'scalar', 'vector' or 'tensor'
-    shape_func_space: `tuple`, optional
+    shape_func_space : `tuple`, optional
         Shape of the function space for only tensorial material property.
         Default is None
-    from_file: `str`, optional
+    from_file : `str`, optional
         Name of the file containing the material property. Default is None
-    constant: `float`, optional
+    constant : `float`, optional
         Constant value for the material property. Default is None
-    conditional: `firedrake conditional`, optional
+    conditional : `firedrake conditional`, optional
         Firedrake conditional object. Default is None
-    expression: `str`, optional
+    expression : `str`, optional
         If you use an expression, you can use the following variables:
         x, y, z, pi, tanh, sqrt. Ex: "2. + 0.5 * tanh((x - 2.) / 0.1)".
         It will be interpoalte into either the same function space as
         the object or a DG0 function space in the same mesh.
         Default is None
-    random: `tuple`, optional
+    random : `tuple`, optional
         If you want to set a random material property, specify the range of
         values as a tuple(min, max). Default is None
-    fire_function: `firedrake function`, optional
+    fire_function : `firedrake function`, optional
         Firedrake function based on the input object. Default is None.
-    dg_property: `bool`, optional
+    dg_property : `bool`, optional
         If True, uses a DG0 function space for conditional and
         expression inputs. Default is False
-    output: `bool`, optional
+    output : `bool`, optional
         If True, outputs the material property to a pvd file for
         visualization. Default is False
-    foldername: `string`, optional
+    foldername : `string`, optional
         Name of the folder where the material property is saved.
         If default is 'default', property is saved in '/property_fields/'
 
     Returns
     -------
-    mat_property: `firedrake function`
+    mat_property : `firedrake function`
         Material property
     """
     # Checking input arguments
@@ -451,7 +451,7 @@ def set_material_property(
 
         if from_file is not None:
             raise NotImplementedError(
-                "Initializing property " "from file is currently " "not implemented"
+                "Initializing property "  "from file is currently "  "not implemented"
             )
             # mat_property = _initialize_material_property_from_file(
             #     wave, property_name, from_file, V)

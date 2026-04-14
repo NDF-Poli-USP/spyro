@@ -57,7 +57,7 @@ class HABC_Mesh:
         Finite element type for the Eikonal modeling. 'CG' or 'KMV'
     f_est : `float`
         Factor for the stabilizing term in Eikonal Eq. Default is 0.03
-    funct_space_eik: `firedrake function space`
+    funct_space_eik : `firedrake function space`
         Function space for the Eikonal modeling
     lmin : `float`
         Minimum mesh size
@@ -499,8 +499,14 @@ class HABC_Mesh:
     def bnd_pnts_hyp_2D(a, b, n, num_pts):
         """Generate points on the boundary of a hyperellipse.
 
+        Returns
+        -------
+        bnd_pnts : `array`
+            Array of shape (num_pts, 2) containing the coordinates
+            of the hyperellipse boundary points
+
         'Parameters
-        ----------
+        -----------
         a : `float`
             Hyperellipse semi-axis in direction 1
         b : `float`
@@ -509,12 +515,6 @@ class HABC_Mesh:
             Degree of the hyperellipse
         num_pts : `int`
             Number of points to generate on the hyperellipse boundary
-
-        Returns
-        -------
-        bnd_pnts : `array`
-            Array of shape (num_pts, 2) containing the coordinates
-            of the hyperellipse boundary points
         """
         # Generate angle values for the parametric equations
         theta = np.linspace(0.0, 2.0 * np.pi, num_pts)

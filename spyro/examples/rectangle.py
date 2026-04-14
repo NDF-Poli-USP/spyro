@@ -171,6 +171,16 @@ class Rectangle_acoustic(Rectangle_mesh_and_velocity, Example_model_acoustic):
 
     Example Setup
 
+    Parameters
+    ----------
+    dictionary : dict, optional
+        Dictionary with the parameters of the model that are different from
+        the default model. The default is None.
+    comm : firedrake.mpi_comm.MPI.Intracomm, optional
+    periodic : bool, optional
+        If True, the mesh will be periodic in all directions. The default is
+        False.
+
     Notes
     -----
     This example is intended as a reusable model configuration for
@@ -181,16 +191,6 @@ class Rectangle_acoustic(Rectangle_mesh_and_velocity, Example_model_acoustic):
     encourages consistency across experiments.
 
     Feel free to adapt these templates to your needs.
-
-    Parameters
-    ----------
-    dictionary : dict, optional
-        Dictionary with the parameters of the model that are different from
-        the default model. The default is None.
-    comm : firedrake.mpi_comm.MPI.Intracomm, optional
-    periodic : bool, optional
-        If True, the mesh will be periodic in all directions. The default is
-        False.
     """
 
     def __init__(
@@ -218,6 +218,16 @@ class Rectangle_acoustic_FWI(Rectangle_mesh_and_velocity, Example_model_acoustic
 
     Example Setup
 
+    Parameters
+    ----------
+    dictionary : dict, optional
+        Dictionary with the parameters of the model that are different from
+        the default model. The default is None.
+    comm : firedrake.mpi_comm.MPI.Intracomm, optional
+    periodic : bool, optional
+        If True, the mesh will be periodic in all directions. The default is
+        False.
+
     Notes
     -----
     This example is intended as a reusable model configuration for
@@ -228,16 +238,6 @@ class Rectangle_acoustic_FWI(Rectangle_mesh_and_velocity, Example_model_acoustic
     encourages consistency across experiments.
 
     Feel free to adapt these templates to your needs.
-
-    Parameters
-    ----------
-    dictionary : dict, optional
-        Dictionary with the parameters of the model that are different from
-        the default model. The default is None.
-    comm : firedrake.mpi_comm.MPI.Intracomm, optional
-    periodic : bool, optional
-        If True, the mesh will be periodic in all directions. The default is
-        False.
     """
 
     def __init__(

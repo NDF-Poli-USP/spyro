@@ -42,13 +42,13 @@ class HABC_Error:
         Maximum integral error at the receivers for the HABC scheme
     max_errPK : `float`
         Maximum peak error at the receivers for the HABC scheme
-    number_of_receivers: `int`
+    number_of_receivers : `int`
         Number of receivers used in the simulation
     path_save_error : `string`
         Path to save data
     path_save_err_case : `string`
         Path to save data for the current case study
-    receiver_locations: `list`
+    receiver_locations : `list`
         List of receiver locations
     receivers_output : `array`
         Receiver waveform data in the HABC scheme
@@ -92,7 +92,7 @@ class HABC_Error:
             Time step used in the simulation
         f_Nyq : `float`
             Nyquist frequency according to the time step. f_Nyq = 1 / (2 * dt)
-        receiver_locations: `list`
+        receiver_locations : `list`
             List of receiver locations
         receivers_output : `array`, optional
             Receiver waveform data in the HABC scheme. Default is None
@@ -261,7 +261,7 @@ class HABC_Error:
         regression_xCR : `bool`, optional
             If True, Plot the regression for the error measure vs xCR
             Default is False.
-        data_regr_xCR: `list`
+        data_regr_xCR : `list`
             Data for the regression of the parameter xCR.
             Structure: [xCR, max_errIt, max_errPK, crit_opt]
             - xCR: Values of xCR used in the regression.

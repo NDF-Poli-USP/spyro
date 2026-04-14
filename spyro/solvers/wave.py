@@ -29,26 +29,26 @@ class Wave(Model_parameters, metaclass=ABCMeta):
 
     Attributes
     ----------
-    comm: MPI communicator
+    comm : MPI communicator
 
-    initial_velocity_model: firedrake function
+    initial_velocity_model : firedrake function
         Initial velocity model
-    function_space: firedrake function space
+    function_space : firedrake function space
         Function space for the wave equation
-    current_time: float
+    current_time : float
         Current time of the simulation
-    solver_parameters: Python object
+    solver_parameters : Python object
         Contains solver parameters
-    real_shot_record: firedrake function
+    real_shot_record : firedrake function
         Real shot record
-    mesh: firedrake mesh
+    mesh : firedrake mesh
         Mesh used in the simulation (2D or 3D)
-    mesh_z: symbolic coordinate z of the mesh object
-    mesh_x: symbolic coordinate x of the mesh object
-    mesh_y: symbolic coordinate y of the mesh object
-    sources: Sources object
+    mesh_z : symbolic coordinate z of the mesh object
+    mesh_x : symbolic coordinate x of the mesh object
+    mesh_y : symbolic coordinate y of the mesh object
+    sources : Sources object
         Contains information about sources
-    receivers: Receivers object
+    receivers : Receivers object
         Contains information about receivers
 
     Methods
@@ -70,15 +70,17 @@ class Wave(Model_parameters, metaclass=ABCMeta):
     """
 
     def __init__(self, dictionary=None, comm=None):
-        """Wave object solver. Contains both the forward solver and gradient calculator.
+        """Wave object solver.
+
+        Contains both the forward solver and gradient calculator.
 
         methods.
 
         Parameters
         ----------
-        comm: MPI communicator
+        comm : MPI communicator
 
-        model_parameters: Python object
+        model_parameters : Python object
             Contains model parameters
         """
         super().__init__(dictionary=dictionary, comm=comm)
@@ -204,19 +206,19 @@ class Wave(Model_parameters, metaclass=ABCMeta):
 
         Parameters
         ----------
-        conditional:  (optional)
+        conditional : (optional)
             Firedrake conditional object.
-        velocity_model_function: Firedrake function (optional)
+        velocity_model_function : Firedrake function (optional)
             Firedrake function to be used as the velocity model. Has to be in the
             same function space as the object.
-        expression:  str (optional)
+        expression : str (optional)
             If you use an expression, you can use the following variables:
             x, y, z, pi, tanh, sqrt. Example: "2.0 + 0.5*tanh((x-2.0)/0.1)".
             It will be interpolated into either the same function space as the
             object or a DG0 function space in the same mesh.
-        new_file:  str (optional)
+        new_file : str (optional)
             Name of the file containing the velocity model.
-        output:  bool (optional)
+        output : bool (optional)
             If True, outputs the velocity model to a pvd file for visualization.
         """
         # Resseting old velocity model
@@ -438,18 +440,18 @@ class Wave(Model_parameters, metaclass=ABCMeta):
 
         Parameters
         ----------
-        dt: Python 'float' (optional)
+        dt : Python 'float' (optional)
             Time step to be used explicitly. If not mentioned uses the default,
             that was estabilished in the wave object.
-        final_time: Python 'float' (optional)
+        final_time : Python 'float' (optional)
             Time which simulation ends. If not mentioned uses the default,
             that was estabilished in the wave object.
 
         Returns
         -------
-        usol: Firedrake 'Function'
+        usol : Firedrake 'Function'
             Wavefield at the final time.
-        u_rec: numpy array
+        u_rec : numpy array
             Wavefield at the receivers across the timesteps.
         """
         if final_time is not None:

@@ -79,7 +79,6 @@ class IsotropicWave(ElasticWave):
             If the selection of parameters is inconsistent. Valid options are
             {Density, Lame first, Lame second} or {Density, P-wave velocity,
             S-wave velocity}.
-
         """
 
         def constant_wrapper(value):
@@ -145,7 +144,6 @@ class IsotropicWave(ElasticWave):
         ------
         NotImplementedError
             This method is not yet implemented.
-
         """
         raise NotImplementedError
 
@@ -194,7 +192,6 @@ class IsotropicWave(ElasticWave):
         ------
         NotImplementedError
             If PML absorbing boundary conditions are active.
-
         """
         if self.abc_boundary_layer_type == "PML":
             raise NotImplementedError
@@ -210,7 +207,6 @@ class IsotropicWave(ElasticWave):
         -------
         Function
             The current displacement field.
-
         """
         return self.u_n
 
@@ -222,7 +218,6 @@ class IsotropicWave(ElasticWave):
         -------
         str
             The name "Displacement".
-
         """
         return "Displacement"
 
@@ -233,7 +228,6 @@ class IsotropicWave(ElasticWave):
         Create displacement fields, set up absorbing boundary conditions,
         parse initial conditions, boundary conditions, and volumetric forces.
         Additionally, set up either standard or PML-based elastic wave equations.
-
         """
         self.current_time = 0.0
 
@@ -278,7 +272,6 @@ class IsotropicWave(ElasticWave):
         ------
         NotImplementedError
             If PML absorbing boundary conditions are active.
-
         """
         if self.abc_boundary_layer_type == "PML":
             raise NotImplementedError
@@ -297,7 +290,6 @@ class IsotropicWave(ElasticWave):
         ------
         NotImplementedError
             If PML absorbing boundary conditions are active.
-
         """
         if self.abc_boundary_layer_type == "PML":
             raise NotImplementedError
@@ -309,7 +301,6 @@ class IsotropicWave(ElasticWave):
 
         Interpolates initial conditions onto displacement fields u_n and u_nm1
         based on the specified initial_condition function.
-
         """
         time_dict = self.input_dictionary["time_axis"]
         initial_condition = time_dict.get("initial_condition", None)
@@ -329,7 +320,6 @@ class IsotropicWave(ElasticWave):
         ------
         Exception
             If an unsupported boundary condition tag is encountered.
-
         """
         bc_list = self.input_dictionary.get("boundary_conditions", [])
         for tag, idbc, value in bc_list:
@@ -350,7 +340,6 @@ class IsotropicWave(ElasticWave):
 
         Extract body force data and initialize the body_forces field
         with the specified spatial and temporal variation.
-
         """
         acquisition_dict = self.input_dictionary["acquisition"]
         body_forces_data = acquisition_dict.get("body_forces", None)
@@ -368,7 +357,6 @@ class IsotropicWave(ElasticWave):
         -------
         Firedrake.function
             The P-wave field as the divergence of displacement.
-
         """
         if self.p_wave is None:
             self.D_h = FunctionSpace(self.mesh, "DG", 0)
@@ -389,7 +377,6 @@ class IsotropicWave(ElasticWave):
         -------
         Firedrake.function
             The S-wave field as the curl of displacement.
-
         """
         if self.s_wave is None:
             if self.dimension == 2:

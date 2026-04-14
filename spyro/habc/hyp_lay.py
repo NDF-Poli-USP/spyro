@@ -45,9 +45,9 @@ class HyperLayer:
         Hyperellipsoidal volume factor. f_Vh = vol / (a_hyp b_hyp c_hyp)
     hyper_axes : `tuple`
         Semi-axes of the hypershape layer (a, b) (2D) or (a, b, c) (3D)
-    n_hyp: `float`
+    n_hyp : `float`
         Degree of the hypershape pad layer (n >= 2.). Default is 2.
-    n_bounds: `tuple`
+    n_bounds : `tuple`
         Bounds for the hypershape layer degree. (n_min, n_max)
         - n_min ensures to add lmin in the domain diagonal direction
         - n_max ensures to add pad_len in the domain diagonal direction
@@ -112,12 +112,12 @@ class HyperLayer:
         # Validate input arguments
         if not isinstance(domain_dim, tuple):
             raise TypeError(
-                "domain_dim must be a tuple, " f"got {type(domain_dim).__name__}."
+                "domain_dim must be a tuple, "  f"got {type(domain_dim).__name__}."
             )
 
         if not isinstance(n_hyp, (int, float)):
             raise TypeError(
-                "n_hyp must be a number (int or float), " f"got {type(n_hyp).__name__}."
+                "n_hyp must be a number (int or float), "  f"got {type(n_hyp).__name__}."
             )
 
         if n_hyp < 2.0:

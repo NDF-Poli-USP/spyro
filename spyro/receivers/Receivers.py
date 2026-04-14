@@ -19,21 +19,21 @@ class Receivers(Delta_projector):
     ----------
     mesh : Firedrake.mesh
         mesh where receivers are located
-    V: Firedrake.FunctionSpace object
+    V : Firedrake.FunctionSpace object
         The space of the finite elements
-    my_ensemble: Firedrake.ensemble_communicator
+    my_ensemble : Firedrake.ensemble_communicator
         An ensemble communicator
-    dimension: int
+    dimension : int
         The dimension of the space
-    degree: int
+    degree : int
         Degree of the function space
-    receiver_locations: list
+    receiver_locations : list
         List of tuples containing all receiver locations
-    num_receivers: int
+    num_receivers : int
         Number of receivers
-    quadrilateral: boolean
+    quadrilateral : boolean
         Boolean that specifies if cells are quadrilateral
-    is_local: list of booleans
+    is_local : list of booleans
         List that checks if receivers are present in cores
         spatial paralelism
 
@@ -53,12 +53,12 @@ class Receivers(Delta_projector):
 
         Parameters
         ----------
-        wave_object: :class: 'Wave' object
+        wave_object : :class: 'Wave' object
             Waveform object that contains all simulation parameters
 
         Returns
         -------
-        Receivers: :class: 'Receiver' object
+        Receivers : :class: 'Receiver' object
         """
         super().__init__(wave_object)
         self.point_locations = wave_object.receiver_locations
@@ -87,17 +87,17 @@ class Receivers(Delta_projector):
 
         Parameters
         ----------
-        rhs_forcing: object
+        rhs_forcing : object
             Firedrake assembled right hand side operator to store values
-        residual: list
+        residual : list
             List of residual values at different receiver locations
             and timesteps
-        IT: int
+        IT : int
             Desired time step number to get residual value from
 
         Returns
         -------
-        rhs_forcing: object
+        rhs_forcing : object
             Firedrake assembled right hand side operator with injected values
         """
         for rid in range(self.number_of_points):

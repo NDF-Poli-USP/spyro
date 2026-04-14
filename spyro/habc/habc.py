@@ -94,9 +94,9 @@ class HABC_Wave(
         Shape type of pad layer. Options: 'rectangular' or 'hypershape'
     lref : `float`
         Reference length for the size of the absorbing layer
-    mesh: `firedrake mesh`
+    mesh : `firedrake mesh`
         Mesh used in the simulation (HABC or Infinite Model)
-    number_of_receivers: `int`
+    number_of_receivers : `int`
         Number of receivers used in the simulation
     pad_len : `float`
         Size of the absorbing layer
@@ -106,13 +106,13 @@ class HABC_Wave(
         Path to save data
     psi_min : `float`
         Minimum damping ratio of the absorbing layer (psi_min = xCR * d)
-    receiver_locations: `list`
+    receiver_locations : `list`
         List of receiver locations
     receivers_output : `array`
         Receiver waveform data in the HABC scheme
     xCR : `float`
         Heuristic factor for the minimum damping ratio
-    xCR_lim: `list`
+    xCR_lim : `list`
         Limits for the heuristic factor
 
     Methods
@@ -1009,8 +1009,8 @@ class HABC_Wave(
         -------
         None
 
-        # Estimation: 2.770 (Old), 2.768 (New) (Scipy-sparse)
-        # Exact: 1.842 (Old), 1.842 (New) (Scipy)
+        # Estimation : 2.770 (Old), 2.768 (New) (Scipy-sparse)
+        # Exact : 1.842 (Old), 1.842 (New) (Scipy)
         """
         print("\nChecking Timestep Size", flush=True)
 
@@ -1224,7 +1224,7 @@ class HABC_Wave(
 
                 rename(old, new)  # Rename the directory
                 print(
-                    f"Folder '{old}' Successfully" f" Renamed to '{new}'\n",
+                    f"Folder '{old}' Successfully"  f" Renamed to '{new}'\n",
                     flush=True,
                 )
 

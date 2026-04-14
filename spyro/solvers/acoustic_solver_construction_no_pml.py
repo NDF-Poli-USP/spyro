@@ -12,7 +12,7 @@ def construct_solver_or_matrix_no_pml(Wave_object):
 
     Parameters
     ----------
-    Wave_object: :class: 'Wave' object
+    Wave_object : :class: 'Wave' object
         Waveform object that contains all simulation parameters
     """
     V = Wave_object.function_space

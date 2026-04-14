@@ -17,24 +17,24 @@ class Sources(Delta_projector):
     ----------
     mesh : Firedrake.mesh
         mesh where receivers are located
-    V: Firedrake.FunctionSpace object
+    V : Firedrake.FunctionSpace object
         The space of the finite elements
-    my_ensemble: Firedrake.ensemble_communicator
+    my_ensemble : Firedrake.ensemble_communicator
         An ensemble communicator
-    dimension: int
+    dimension : int
         The dimension of the space
-    degree: int
+    degree : int
         Degree of the function space
-    source_locations: list
+    source_locations : list
         List of tuples containing all source locations
-    num_sources: int
+    num_sources : int
         Number of sources
-    quadrilateral: boolean
+    quadrilateral : boolean
         Boolean that specifies if cells are quadrilateral
-    is_local: list of booleans
+    is_local : list of booleans
         List that checks if sources are present in cores
         spatial paralelism
-    wavelet: list of floats
+    wavelet : list of floats
         Values at timesteps of wavelet used in the simulation
 
     Methods
@@ -52,18 +52,18 @@ class Sources(Delta_projector):
 
         Parameters
         ----------
-        model: `dictionary`
+        model : `dictionary`
             Contains simulation parameters and options.
-        mesh: a Firedrake.mesh
+        mesh : a Firedrake.mesh
             2D/3D simplicial mesh read in by Firedrake.Mesh
-        V: Firedrake.FunctionSpace object
+        V : Firedrake.FunctionSpace object
             The space of the finite elements
-        my_ensemble: Firedrake.ensemble_communicator
+        my_ensemble : Firedrake.ensemble_communicator
             An ensemble communicator
 
         Returns
         -------
-        Sources: :class: 'Source' object
+        Sources : :class: 'Source' object
         """
         super().__init__(wave_object)
 
@@ -93,14 +93,14 @@ class Sources(Delta_projector):
 
         Parameters
         ----------
-        rhs_forcing: Firedrake.Function
+        rhs_forcing : Firedrake.Function
             The right hand side of the wave equation
-        step: int
+        step : int
             Time step (index of the wavelet array)
 
         Returns
         -------
-        rhs_forcing: Firedrake.Function
+        rhs_forcing : Firedrake.Function
             The right hand side of the wave equation with the source applied
         """
         for source_id in range(self.number_of_points):
@@ -122,7 +122,7 @@ class Sources(Delta_projector):
 
         Returns
         -------
-        source_cofunction: Firedrake.Cofunction
+        source_cofunction : Firedrake.Cofunction
             A cofunction with the source applied into the domain.
         """
         if self.current_sources is None or len(self.current_sources) == 0:
@@ -188,16 +188,16 @@ def ricker_wavelet(t, freq, amp=1.0, delay=1.5, delay_type="multiples_of_minimum
 
     Parameters
     ----------
-    t: float
+    t : float
         Time
-    freq: float
+    freq : float
         Frequency of the wavelet
-    amp: float
+    amp : float
         Amplitude of the wavelet
-    delay: float
+    delay : float
         Delay in term of multiples of the distance
         between the minimums.
-    delay_type: string
+    delay_type : string
         Type of delay. Options are:
         - multiples_of_minimum
         - time
@@ -231,18 +231,18 @@ def full_ricker_wavelet(
 
     Parameters
     ----------
-    dt: float
+    dt : float
         Time step
-    final_time: float
+    final_time : float
         Final time
-    frequency: float
+    frequency : float
         Frequency of the wavelet
-    cutoff: float
+    cutoff : float
         Cutoff frequency in Hertz
-    delay: float
+    delay : float
         Delay in term of multiples of the distance
         between the minimums.
-    delay_type: string
+    delay_type : string
         Type of delay. Options are:
         - multiples_of_minimum
         - time

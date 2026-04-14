@@ -17,7 +17,7 @@ def comp_cost(flag, tRef=None, user_name=None):
         - 'tfin' to finish the timer and print the results
     tRef : `float`, optional
         Reference time in seconds. Default is None
-    user_name: `str`, optional
+    user_name : `str`, optional
         User name or path to save the computational cost data
 
     Returns

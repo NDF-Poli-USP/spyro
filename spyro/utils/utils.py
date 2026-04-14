@@ -19,7 +19,9 @@ except ImportError:
 
 
 def butter_lowpass_filter(shot, cutoff, fs, order=2):
-    """Low-pass filter the shot record with sampling-rate fs Hz and cutoff freq. Hz.
+    """Low-pass filter the shot record with sampling-rate fs Hz and cutoff freq.
+
+    Hz.
 
     Parameters
     ----------
@@ -593,6 +595,10 @@ def run_in_one_core(func):
     callable
         Wrapped function that executes only on rank 0.
 
+    See Also
+    --------
+    run_in_one_core_and_broadcast : Similar decorator that also broadcasts results.
+
     Notes
     -----
     The function checks for two types of communicators:
@@ -602,10 +608,6 @@ def run_in_one_core(func):
     - If comm is None, the function runs normally without restrictions.
 
     The function does not broadcast results to other processes.
-
-    See Also
-    --------
-    run_in_one_core_and_broadcast : Similar decorator that also broadcasts results.
 
     Examples
     --------
@@ -653,6 +655,10 @@ def run_in_one_core_and_broadcast(func):
         Wrapped function that executes on rank 0 and broadcasts the result
         to all processes.
 
+    See Also
+    --------
+    run_in_one_core : Similar decorator without broadcasting.
+
     Notes
     -----
     The function handles two types of communicators:
@@ -662,10 +668,6 @@ def run_in_one_core_and_broadcast(func):
     - If comm is None, the function runs normally without MPI operations.
 
     All processes receive the same return value from the broadcast.
-
-    See Also
-    --------
-    run_in_one_core : Similar decorator without broadcasting.
 
     Examples
     --------

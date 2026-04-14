@@ -17,74 +17,74 @@ class Model_parameters(Read_options, Read_boundary_layer, Read_time_axis, Read_o
 
     Attributes
     ----------
-    input_dictionary: dictionary
+    input_dictionary : dictionary
         Contains all input parameters already organized based on examples
         from github.
-    cell_type: str
+    cell_type : str
         Type of cell used in meshing. Can be "T" for triangles or "Q" for
         quadrilaterals.
-    method: str
+    method : str
         Method used in meshing. Can be "MLT" for mass lumped triangles,
         "spectral_quadrilateral" for spectral quadrilaterals, "DG_triangle"
         for discontinuous Galerkin triangles, or "DG_quadrilateral" for
         discontinuous Galerkin quadrilaterals.
-    variant: str
+    variant : str
         Variant used in meshing. Can be "lumped" for lumped mass matrices,
         "equispaced" for equispaced nodes, or "DG" for discontinuous Galerkin
         nodes.
-    degree: int
+    degree : int
         Degree of the basis functions used in the FEM.
-    dimension: int
+    dimension : int
         Dimension of the mesh.
-    final_time: float
+    final_time : float
         Final time of the simulation.
-    dt: float
+    dt : float
         Time step of the simulation.
-    initial_time: float
+    initial_time : float
         Initial time of the simulation.
-    output_frequency: int
+    output_frequency : int
         Frequency of outputting the solution to pvd files.
-    gradient_sampling_frequency: int
+    gradient_sampling_frequency : int
         Frequency of saving the solution to RAM.
-    number_of_sources: int
+    number_of_sources : int
         Number of sources used in the simulation.
-    source_locations: list
+    source_locations : list
         List of source locations.
-    frequency: float
+    frequency : float
         Frequency of the source.
-    amplitude: float
+    amplitude : float
         Amplitude of the source.
-    delay: float
+    delay : float
         Delay of the source.
-    number_of_receivers: int
+    number_of_receivers : int
         Number of receivers used in the simulation.
-    receiver_locations: list
+    receiver_locations : list
         List of receiver locations.
-    parallelism_type: str
+    parallelism_type : str
         Type of parallelism used in the simulation. Can be "automatic" for
         automatic parallelism or "spatial" for spatial parallelism.
-    mesh_file: str
+    mesh_file : str
         Path to the mesh file.
-    length_z: float
+    length_z : float
         Length of the domain in the z-direction.
-    length_x: float
+    length_x : float
         Length of the domain in the x-direction.
-    length_y: float
+    length_y : float
         Length of the domain in the y-direction.
-    user_mesh: spyro.Mesh
+    user_mesh : spyro.Mesh
         User defined mesh.
-    firedrake_mesh: firedrake.Mesh
+    firedrake_mesh : firedrake.Mesh
         Firedrake mesh.
-    abc_active: bool
+    abc_active : bool
         Whether or not the absorbing boundary conditions are used.
-    abc_exponent: int
+    abc_exponent : int
         Exponent of the absorbing boundary conditions.
-    abc_cmax: float
+    abc_cmax : float
         Maximum acoustic wave velocity in the absorbing boundary conditions.
-    abc_R: float
+    abc_R : float
         Theoretical reflection coefficient of the absorbing boundary
         conditions.
-    abc_pad_length: float
+    abc_pad_length : float
         Thickness of the absorbing boundary conditions.
     abc_boundary_layer_type : `str`
         Type of the boundary layer. Option 'hybrid' is based on paper
@@ -102,49 +102,49 @@ class Model_parameters(Read_options, Read_boundary_layer, Read_time_axis, Read_o
         Finite element order for the Eikonal analysis
     abc_get_ref_model : `bool`
         If True, the infinite model is created
-    source_type: str
+    source_type : str
         Type of source used in the simulation. Can be "ricker" for a Ricker
         wavelet or "MMS" for a manufactured solution.
-    running_fwi: bool
+    running_fwi : bool
         Whether or not the simulation is a FWI.
-    initial_velocity_model_file: str
+    initial_velocity_model_file : str
         Path to the initial velocity model file.
-    fwi_output_folder: str
+    fwi_output_folder : str
         Path to the FWI output folder.
-    control_output_file: str
+    control_output_file : str
         Path to the control output file.
-    gradient_output_file: str
+    gradient_output_file : str
         Path to the gradient output file.
-    optimization_parameters: dict
+    optimization_parameters : dict
         Dictionary of the optimization parameters.
-    automatic_adjoint: bool
+    automatic_adjoint : bool
         Whether or not the adjoint is calculated automatically.
-    forward_output: bool
+    forward_output : bool
         Whether or not the forward output is saved.
-    fwi_velocity_model_output: bool
+    fwi_velocity_model_output : bool
         Whether or not the FWI velocity model output is saved.
-    gradient_output: bool
+    gradient_output : bool
         Whether or not the gradient output is saved.
-    adjoint_output: bool
+    adjoint_output : bool
         Whether or not the adjoint output is saved.
-    forward_output_file: str
+    forward_output_file : str
         Path to the forward output file.
-    fwi_velocity_model_output_file: str
+    fwi_velocity_model_output_file : str
         Path to the FWI velocity model output file.
-    gradient_output_file: str
+    gradient_output_file : str
         Path to the gradient output file.
-    adjoint_output_file: str
+    adjoint_output_file : str
         Path to the adjoint output file.
-    comm: MPI communicator
+    comm : MPI communicator
         MPI communicator.
-    velocity_model_type: str
+    velocity_model_type : str
         Type of velocity model used in the simulation. Can be "file" for a
         file, "conditional" for a conditional, or None for no velocity model.
-    velocity_conditional: str
+    velocity_conditional : str
         Conditional used for the velocity model.
-    equation_type: str
+    equation_type : str
         Type of equation used in the simulation. Can be "second_order_in_pressure".
-    time_integrator: str
+    time_integrator : str
         Type of time integrator used in the simulation. Can be "central_difference".
 
     Methods
@@ -164,15 +164,15 @@ class Model_parameters(Read_options, Read_boundary_layer, Read_time_axis, Read_o
 
         Parameters
         ----------
-        dictionary: 'dictionary' (optional)
+        dictionary : 'dictionary' (optional)
             Contains all input parameters already organized based on examples
             from github.
-        comm: MPI communicator (optional)
+        comm : MPI communicator (optional)
             MPI comunicator. If None is given model_parameters creates one.
 
         Returns
         -------
-        model_parameters: :class: 'model_parameters' object
+        model_parameters : :class: 'model_parameters' object
         """
         # Converts old dictionary to new one. Deprecated feature
         if "opts" in dictionary:
@@ -269,7 +269,7 @@ class Model_parameters(Read_options, Read_boundary_layer, Read_time_axis, Read_o
 
     @property
     def source_locations(self):
-        """list[tuple[float, ...]] | None: Source coordinates in physical space."""
+        """List[tuple[float, ...]] | None: Source coordinates in physical space."""
         return self._source_locations
 
     @source_locations.setter
@@ -294,7 +294,7 @@ class Model_parameters(Read_options, Read_boundary_layer, Read_time_axis, Read_o
 
     @property
     def receiver_locations(self):
-        """list[tuple[float, ...]] | None: Receiver coordinates in physical space."""
+        """List[tuple[float, ...]] | None: Receiver coordinates in physical space."""
         return self._receiver_locations
 
     @receiver_locations.setter
@@ -324,7 +324,7 @@ class Model_parameters(Read_options, Read_boundary_layer, Read_time_axis, Read_o
 
     @property
     def delay_type(self):
-        """str: Delay interpretation mode for source time function."""
+        """Str: Delay interpretation mode for source time function."""
         return self._delay_type
 
     @delay_type.setter
@@ -335,7 +335,7 @@ class Model_parameters(Read_options, Read_boundary_layer, Read_time_axis, Read_o
 
     @property
     def source_type(self):
-        """str: Wavelet/source model name used during propagation."""
+        """Str: Wavelet/source model name used during propagation."""
         return self._source_type
 
     @source_type.setter
@@ -361,7 +361,7 @@ class Model_parameters(Read_options, Read_boundary_layer, Read_time_axis, Read_o
 
     @property
     def equation_type(self):
-        """str: Governing equation identifier for the simulation."""
+        """Str: Governing equation identifier for the simulation."""
         return self._equation_type
 
     @equation_type.setter
@@ -372,7 +372,7 @@ class Model_parameters(Read_options, Read_boundary_layer, Read_time_axis, Read_o
 
     @property
     def parallelism_type(self):
-        """str: Parallelism strategy used to distribute shot propagations."""
+        """Str: Parallelism strategy used to distribute shot propagations."""
         return self._parallelism_type
 
     @parallelism_type.setter
@@ -481,7 +481,7 @@ class Model_parameters(Read_options, Read_boundary_layer, Read_time_axis, Read_o
 
         Returns
         -------
-        mesh: Firedrake.Mesh object
+        mesh : Firedrake.Mesh object
             The distributed mesh across `ens_comm`
         """
         if self.mesh_parameters.user_mesh is not None:

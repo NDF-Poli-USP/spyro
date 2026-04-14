@@ -70,7 +70,7 @@ class Read_options:
 
         Parameters
         ----------
-        value: `string` or None
+        value : `string` or None
             Variant name:
             "lumped": Mass lumping
             "equispaced": Equispaced nodes

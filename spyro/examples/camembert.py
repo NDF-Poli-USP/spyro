@@ -159,6 +159,20 @@ class Camembert_acoustic(CamembertVelocity, Rectangle_acoustic):
     This class provides a reusable setup for a Camembert velocity model in
     forward acoustic simulations.
 
+    Parameters
+    ----------
+    dictionary : dict, optional
+        Dictionary containing values that override entries in the default
+        Camembert example configuration.
+    example_dictionary : dict, optional
+        Base dictionary used to configure the simulation. Defaults to
+        ``camembert_dictionary``.
+    comm : mpi4py.MPI.Comm, optional
+        MPI communicator passed to the parent model class.
+    periodic : bool, optional
+        Whether periodic boundaries are requested. This example currently
+        forwards ``False`` to the parent implementation.
+
     Notes
     -----
     This example is intended as a reusable model configuration for
@@ -167,20 +181,6 @@ class Camembert_acoustic(CamembertVelocity, Rectangle_acoustic):
 
     By isolating common model setup logic, this class reduces boilerplate and
     encourages consistency across experiments.
-
-    Parameters
-    ----------
-    dictionary: dict, optional
-        Dictionary containing values that override entries in the default
-        Camembert example configuration.
-    example_dictionary: dict, optional
-        Base dictionary used to configure the simulation. Defaults to
-        ``camembert_dictionary``.
-    comm: mpi4py.MPI.Comm, optional
-        MPI communicator passed to the parent model class.
-    periodic: bool, optional
-        Whether periodic boundaries are requested. This example currently
-        forwards ``False`` to the parent implementation.
     """
 
     def __init__(
@@ -205,15 +205,6 @@ class Camembert_acoustic_FWI(CamembertVelocity, Rectangle_acoustic_FWI):
     This class provides a reusable Camembert setup for full-waveform
     inversion workflows.
 
-    Notes
-    -----
-    This example is intended as a reusable model configuration for
-    development and testing of inversion methods. It does not represent a
-    targeted validation case with a single expected output.
-
-    By isolating common model setup logic, this class reduces boilerplate and
-    encourages consistency across experiments.
-
     Parameters
     ----------
     dictionary : dict, optional
@@ -227,6 +218,15 @@ class Camembert_acoustic_FWI(CamembertVelocity, Rectangle_acoustic_FWI):
     periodic : bool, optional
         Whether periodic boundaries are requested. This example currently
         forwards ``False`` to the parent implementation.
+
+    Notes
+    -----
+    This example is intended as a reusable model configuration for
+    development and testing of inversion methods. It does not represent a
+    targeted validation case with a single expected output.
+
+    By isolating common model setup logic, this class reduces boilerplate and
+    encourages consistency across experiments.
     """
 
     def __init__(

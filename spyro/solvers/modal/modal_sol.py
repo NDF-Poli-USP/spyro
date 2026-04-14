@@ -45,7 +45,7 @@ class Modal_Solver:
     method : `str`
         Method to use for solving the eigenvalue problem.
         Default is None, which uses the 'KRYLOVSCH_CH' method
-    valid_methods: `list`
+    valid_methods : `list`
         List of valid methods for solving the eigenproblem
         Options: 'ANALYTICAL', 'ARNOLDI', 'LANCZOS', 'LOBPCG', 'KRYLOVSCH_CH',
         'KRYLOVSCH_CG', 'KRYLOVSCH_GH', 'KRYLOVSCH_GG' or 'RAYLEIGH'.
@@ -828,7 +828,6 @@ class Modal_Solver:
         - fp1: Rectangular domain frequency
         - fp2: Ellipsoidal domain frequency
 
-
         Parameters
         ----------
         n_hyp : `float`
@@ -997,7 +996,9 @@ class Modal_Solver:
         return Lsp
 
     def generate_norm_coords(self, mesh, domain_dim, hyp_axes):
-        """Generate the normalized mesh coordinates w.r.t. the hypershape centroid.
+        """Generate the normalized mesh coordinates w.r.t.
+
+        the hypershape centroid.
 
         Parameters
         ----------
@@ -1184,7 +1185,7 @@ class Modal_Solver:
             Function space for the modal problem. Default is None
         k : `int`, optional
             Number of eigenvalues to compute. Default is 2
-        shift: `float`, optional
+        shift : `float`, optional
             Value to stabilize the Neumann BC null space. Default is 0
         quad_rule : `str`, optional
             Quadrature rule to use for the integration.
@@ -1300,7 +1301,7 @@ class Modal_Solver:
             Function space for the modal problem
         final_time : `float`
             Final time for the transient simulation
-        shift: `float`, optional
+        shift : `float`, optional
             Value to stabilize the Neumann BC null space. Default is 0
         quad_rule : `str`, optional
             Quadrature rule to use for the integration.

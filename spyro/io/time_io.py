@@ -83,7 +83,7 @@ class Read_time_axis:
 
     @property
     def time_integrator(self):
-        """str: Time integration scheme."""
+        """Str: Time integration scheme."""
         return self._time_integrator
 
     @time_integrator.setter

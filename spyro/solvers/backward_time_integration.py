@@ -11,15 +11,15 @@ def backward_wave_propagator(Wave_obj, dt=None):
 
     Parameters
     ----------
-    Wave_obj: Spyro wave object
+    Wave_obj : Spyro wave object
         Wave object that already propagated a forward wave.
-    dt: Python 'float' (optional)
+    dt : Python 'float' (optional)
         Time step to be used explicitly. If not mentioned uses the default,
         that was estabilished in the wave object for the adjoint model.
 
     Returns
     -------
-    dJ: Firedrake 'Function'
+    dJ : Firedrake 'Function'
         Calculated gradient
     """
     if Wave_obj.abc_active is False:
@@ -38,15 +38,15 @@ def backward_wave_propagator_no_pml(Wave_obj, dt=None):
 
     Parameters
     ----------
-    Wave_obj: Spyro wave object
+    Wave_obj : Spyro wave object
         Wave object that already propagated a forward wave.
-    dt: Python 'float' (optional)
+    dt : Python 'float' (optional)
         Time step to be used explicitly. If not mentioned uses the default,
         that was estabilished in the wave object for the adjoint model.
 
     Returns
     -------
-    dJ: Firedrake 'Function'
+    dJ : Firedrake 'Function'
         Calculated gradient
 
     Notes
@@ -217,15 +217,15 @@ def mixed_space_backward_wave_propagator(Wave_obj, dt=None):
 
     Parameters
     ----------
-    Wave_obj: Spyro wave object
+    Wave_obj : Spyro wave object
         Wave object that already propagated a forward wave.
-    dt: Python 'float' (optional)
+    dt : Python 'float' (optional)
         Time step to be used explicitly. If not mentioned uses the default,
         that was estabilished in the wave object for the adjoint model.
 
     Returns
     -------
-    dJ: Firedrake 'Function'
+    dJ : Firedrake 'Function'
         Calculated gradient
 
     Notes

@@ -1165,7 +1165,7 @@ class FullWaveformInversion(AcousticWave):
         ----------
         file_name : str, optional
             Output SEG-Y file name. Default is "final_vp.segy".
-        grid_spacing: float, optional
+        grid_spacing : float, optional
             Segy grid spacing, default is 0.01 km.
 
         Notes
@@ -1184,9 +1184,9 @@ class SyntheticRealAcousticWave(AcousticWave):
 
     Attributes
     ----------
-    dictionary: (dict)
+    dictionary : (dict)
         A dictionary containing parameters for the inversion.
-    comm: MPI communicator
+    comm : MPI communicator
 
     Methods
     -------

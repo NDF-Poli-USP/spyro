@@ -10,18 +10,18 @@ def create_function_space(mesh, method, degree, dim=1):
 
     Parameters
     ----------
-    mesh: Firedrake Mesh
+    mesh : Firedrake Mesh
         Mesh to be used in the finite element space.
-    method: str
+    method : str
         Method to be used for the finite element space.
-    degree: int
+    degree : int
         Degree of the finite element space.
-    dim: int
+    dim : int
         Number of degrees of freedom per node.
 
     Returns
     -------
-    function_space: Firedrake FunctionSpace
+    function_space : Firedrake FunctionSpace
         Function space.
     """
     if method == "mass_lumped_triangle":
@@ -50,7 +50,7 @@ def check_function_space_type(function_space):
 
     Parameters
     ----------
-    function_space: Firedrake FunctionSpace
+    function_space : Firedrake FunctionSpace
         Function space.
     """
     # Check if wave.function_space is a generates vector os scalar fields:

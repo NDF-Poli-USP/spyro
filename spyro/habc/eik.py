@@ -34,11 +34,11 @@ class HABC_Eikonal(Eikonal_Modeling):
         for parallel processing. Default is None
     diam_mesh : `ufl.geometry.CellDiameter`
         Mesh cell diameters
-    funct_space_eik: `firedrake function space`
+    funct_space_eik : `firedrake function space`
         Function space for the Eikonal modeling
     lmin : `float`
         Minimum mesh size
-    mesh: `firedrake mesh`
+    mesh : `firedrake mesh`
         Original mesh without absorbing layer
     node_positions : `tuple`
         Tuple containing the node positions in the mesh.
@@ -189,7 +189,7 @@ class HABC_Eikonal(Eikonal_Modeling):
 
         Returns
         -------
-        eik_bnd: `list`
+        eik_bnd : `list`
             Properties on boundaries according to minimum values of Eikonal
             Structure sublist: [pt_cr, c_bnd, eikmin, z_par, lref, sou_cr]
             - pt_cr : Critical point coordinates

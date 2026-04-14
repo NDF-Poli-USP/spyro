@@ -35,7 +35,7 @@ def f_layer(x, a, m=1, s=0.999, typ="FL"):
     -------
     CritFL = CR - RF : `float`
         Value of the function for the size criterion
-    CR: `float`
+    CR : `float`
         Value for the reflection coefficient4
 
     Examples

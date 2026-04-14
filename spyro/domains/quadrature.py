@@ -12,16 +12,16 @@ def quadrature_rules(V):
 
     Parameters
     ----------
-    V: Firedrake FunctionSpace
+    V : Firedrake FunctionSpace
         Function space to be used in the quadrature rule.
 
     Returns
     -------
-    qr_x: FIAT quadrature rule
+    qr_x : FIAT quadrature rule
         Quadrature rule for the spatial domain.
-    qr_s: FIAT quadrature rule
+    qr_s : FIAT quadrature rule
         Quadrature rule for the boundary of the spatial domain.
-    qr_k: FIAT quadrature rule
+    qr_k : FIAT quadrature rule
         Quadrature rule for the spatial domain stiffness matrix.
     """
     cell_geometry = V.mesh().ufl_cell()
