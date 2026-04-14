@@ -26,6 +26,18 @@ class Field:
     """
 
     def __init__(self, name, file, callback):
+        """Initialize Field class.
+
+        Parameters
+        ----------
+        name : str
+            Name used when writing the field to the VTK output.
+        file : firedrake.output.vtk_output.VTKFile
+            Open VTK file handle used for output writes.
+        callback : callable
+            Zero-argument callable that returns the field object to be written.
+        """
+        
         self.name = name
         self.file = file
         self.callback = callback
@@ -53,16 +65,28 @@ class Functional:
     """
 
     def __init__(self, filename, callback):
+        """Initialize Functional class.
+
+        Parameters
+        ----------
+        filename : str
+            Destination ``.npy`` filename used to save sampled values.
+        callback : callable
+            Zero-argument callable that returns the current scalar sample.
+        """
+        
         self.filename = filename
         self.callback = callback
         self.list = []
 
     def sample(self):
         """Append the current callback value to the internal sample list."""
+        
         self.list.append(self.callback())
 
     def save(self):
         """Save all collected samples to the configured NumPy file."""
+        
         np.save(self.filename, self.list)
 
 
@@ -79,6 +103,16 @@ class FieldLogger:
     """
 
     def __init__(self, comm, vis_dict):
+        """Initialize FieldLogger class.
+        
+        Parameters
+        ----------
+        comm : object
+            Communication wrapper with ``comm`` MPI communicator and rank support.
+        vis_dict : dict
+            Visualization and logging configuration dictionary. Keys control which
+            outputs are enabled and the associated output filenames.
+        """
         self.comm = comm
         self.vis_dict = vis_dict
 
@@ -167,6 +201,7 @@ class FieldLogger:
 
     def stop_logging(self):
         """Finalize the current logging session and persist accumulated data."""
+        
         self.__source_id = None
 
         if self.__rank == 0:
@@ -214,4 +249,5 @@ class FieldLogger:
         IndexError
             If no samples have been recorded yet for the requested functional.
         """
+        
         return self.__enabled_functionals[key].list[-1]
