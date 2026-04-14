@@ -218,7 +218,7 @@ class HABC_Mesh:
     def extract_bnd_node_indices(self, node_positions, func_space):
         """Extract boundary node indices on boundaries of the domain.
 
-        Excludies the free surface at the top boundary.
+        Exclude the free surface at the top boundary.
 
         Parameters
         ----------
