@@ -146,9 +146,9 @@ class Sources(Delta_projector):
         ones = fire.Function(R_s, val=[1.0 for _ in range(V_s.value_size)])
         source_form = fire.inner(fire.TestFunction(V_s), ones) * fire.dx
 
-        return fire.Cofunction(
-            self.function_space.dual()).interpolate(
-                fire.assemble(source_form))
+        return fire.Cofunction(self.function_space.dual()).interpolate(
+            fire.assemble(source_form)
+        )
 
 
 def timedependentSource(model, t, freq=None, amp=1, delay=1.5):

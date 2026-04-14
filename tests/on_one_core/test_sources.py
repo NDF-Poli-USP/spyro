@@ -187,8 +187,9 @@ def _check_cofunction_values(wave, source_locations, test_exprs):
         for f, expected_fn in test_exprs:
             expected = expected_fn(sl)
             action = np.dot(cofunction.dat.data_ro.ravel(), f.dat.data_ro.ravel())
-            assert math.isclose(action, expected, abs_tol=1e-6), \
-                f"Source {source_id} at {sl}: <c, f> = {action}, expected {expected}"
+            assert math.isclose(
+                action, expected, abs_tol=1e-6
+            ), f"Source {source_id} at {sl}: <c, f> = {action}, expected {expected}"
 
 
 @pytest.mark.parametrize("cell_type", ["T", "Q"])
@@ -205,7 +206,10 @@ def test_cofunction_values_acoustic(cell_type):
         (fire.Function(V).interpolate(1.0), lambda sl: 1.0),
         (fire.Function(V).interpolate(x[0]), lambda sl: sl[0]),
         (fire.Function(V).interpolate(x[1]), lambda sl: sl[1]),
-        (fire.Function(V).interpolate(x[0]**2 + x[1]**2), lambda sl: sl[0]**2 + sl[1]**2),
+        (
+            fire.Function(V).interpolate(x[0] ** 2 + x[1] ** 2),
+            lambda sl: sl[0] ** 2 + sl[1] ** 2,
+        ),
     ]
     _check_cofunction_values(wave, source_locations, test_exprs)
 
@@ -225,7 +229,10 @@ def test_cofunction_values_elastic(cell_type):
         (fire.Function(V).interpolate(fire.as_vector([0.0, 1.0])), lambda sl: 1.0),
         (fire.Function(V).interpolate(fire.as_vector([x[0], 0.0])), lambda sl: sl[0]),
         (fire.Function(V).interpolate(fire.as_vector([0.0, x[1]])), lambda sl: sl[1]),
-        (fire.Function(V).interpolate(fire.as_vector([x[0], x[1]])), lambda sl: sl[0] + sl[1]),
+        (
+            fire.Function(V).interpolate(fire.as_vector([x[0], x[1]])),
+            lambda sl: sl[0] + sl[1],
+        ),
     ]
     _check_cofunction_values(wave, source_locations, test_exprs)
 

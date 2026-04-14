@@ -26,7 +26,7 @@ fire.interpolate = interpolate
 
 def delete_tmp_files(wave):
     """Delete temporary numpy files associated with a wave object."""
-    
+
     str_id = f"*{wave.random_id_string}.npy"
     for file in glob.glob(str_id):
         os.remove(file)
@@ -34,7 +34,7 @@ def delete_tmp_files(wave):
 
 def _run_for_each_shot(obj, func, *args, **kwargs):
     """Run a function for each shot in spatial parallelism."""
-    
+
     results = []
     for snum in range(obj.number_of_sources):
         switch_serial_shot(obj, snum)
@@ -85,7 +85,7 @@ def ensemble_save(func):
 
     def wrapper(*args, **kwargs):
         """Define the decorator function."""
-        
+
         obj = args[0]  # Requires first arg to be an instant or subclass of Wave
         _comm = obj.comm
         if obj.parallelism_type != "spatial" or obj.number_of_sources == 1:
@@ -126,7 +126,7 @@ def ensemble_load(func):
 
     def wrapper(*args, **kwargs):
         """Define the decorator function."""
-        
+
         obj = args[0]
         _comm = obj.comm
         if obj.parallelism_type != "spatial" or obj.number_of_sources == 1:
@@ -162,7 +162,7 @@ def ensemble_propagator(func):
 
     def wrapper(*args, **kwargs):
         """Define the decorator function."""
-        
+
         if args[0].parallelism_type != "spatial" or args[0].number_of_sources == 1:
             shot_ids_per_propagation_list = args[0].shot_ids_per_propagation
             _comm = args[0].comm
@@ -300,7 +300,7 @@ def ensemble_functional(func):
 
     def wrapper(*args, **kwargs):
         """Define the decorator function."""
-        
+
         comm = args[0].comm
         if args[0].parallelism_type != "spatial" or args[0].number_of_sources == 1:
             J = func(*args, **kwargs)
@@ -332,7 +332,7 @@ def ensemble_gradient(func):
 
     def wrapper(*args, **kwargs):
         """Define the decorator function."""
-        
+
         comm = args[0].comm
         if args[0].parallelism_type != "spatial" or args[0].number_of_sources == 1:
             shot_ids_per_propagation_list = args[0].shot_ids_per_propagation

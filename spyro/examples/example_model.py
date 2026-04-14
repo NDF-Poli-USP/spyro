@@ -87,7 +87,7 @@ class Example_model_acoustic_FWI(ExampleModelBase, FullWaveformInversion):
     It has the option of reading a dictionary, and if any parameter is
     missing from this dictionary, it calls on a default value, which
     should be defined in the relevant example file.
-    
+
     Example Setup
 
     These examples are intended as reusable velocity model configurations to
