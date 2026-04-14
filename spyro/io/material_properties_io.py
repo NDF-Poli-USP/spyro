@@ -115,7 +115,7 @@ def _initialize_material_property_from_ufl(
         col = int(abs(log10(abs(value)))) + 2
 
         print(
-            f"Assigning {property_name} with a "  f"constant value of {constant:>{col}}",
+            f"Assigning {property_name} with a " f"constant value of {constant:>{col}}",
             flush=True,
         )
 
@@ -451,7 +451,7 @@ def set_material_property(
 
         if from_file is not None:
             raise NotImplementedError(
-                "Initializing property "  "from file is currently "  "not implemented"
+                "Initializing property " "from file is currently " "not implemented"
             )
             # mat_property = _initialize_material_property_from_file(
             #     wave, property_name, from_file, V)

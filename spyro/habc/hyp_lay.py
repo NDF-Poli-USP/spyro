@@ -112,12 +112,12 @@ class HyperLayer:
         # Validate input arguments
         if not isinstance(domain_dim, tuple):
             raise TypeError(
-                "domain_dim must be a tuple, "  f"got {type(domain_dim).__name__}."
+                "domain_dim must be a tuple, " f"got {type(domain_dim).__name__}."
             )
 
         if not isinstance(n_hyp, (int, float)):
             raise TypeError(
-                "n_hyp must be a number (int or float), "  f"got {type(n_hyp).__name__}."
+                "n_hyp must be a number (int or float), " f"got {type(n_hyp).__name__}."
             )
 
         if n_hyp < 2.0:

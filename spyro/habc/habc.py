@@ -1224,7 +1224,7 @@ class HABC_Wave(
 
                 rename(old, new)  # Rename the directory
                 print(
-                    f"Folder '{old}' Successfully"  f" Renamed to '{new}'\n",
+                    f"Folder '{old}' Successfully" f" Renamed to '{new}'\n",
                     flush=True,
                 )
 
