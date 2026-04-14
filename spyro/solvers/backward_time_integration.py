@@ -1,5 +1,6 @@
 import firedrake as fire
 from . import helpers
+from ..io.basicio import parallel_print
 
 
 def backward_wave_propagator(Wave_obj, dt=None):
@@ -84,11 +85,9 @@ def _build_gradient_solver(Wave_obj, mask_available, pml):
             * m_v
             * fire.dx(**qr)
         )
-        if Wave_obj.comm.comm.rank == 0:
-            print(
-                "Excluding PML region from gradient (mixed space)",
-                flush=True,
-            )
+        parallel_print(
+            Wave_obj.comm, "Excluding PML region from gradient (mixed space)"
+        )
     elif mask_available:
         ffG = (
             -2
@@ -97,12 +96,9 @@ def _build_gradient_solver(Wave_obj, mask_available, pml):
             * m_v
             * fire.dx(2, scheme=qr)
         )
-        if Wave_obj.comm.comm.rank == 0:
-            print(
-                "Applying gradient mask: gradients will be computed only "
-                "in inside region",
-                flush=True,
-            )
+        parallel_print(
+            Wave_obj.comm, "Applying gradient mask: gradients will be computed only in inside region"
+        )
     else:
         ffG = (
             -2
@@ -111,12 +107,9 @@ def _build_gradient_solver(Wave_obj, mask_available, pml):
             * m_v
             * fire.dx(**qr)
         )
-        if Wave_obj.comm.comm.rank == 0:
-            print(
-                "No gradient mask found: computing gradients over full "
-                "domain",
-                flush=True,
-            )
+        parallel_print(
+            Wave_obj.comm, "No gradient mask found: computing gradients over full domain"
+        )
 
     gradi = fire.Function(V)
     grad_prob = fire.LinearVariationalProblem(mgrad, ffG, gradi)
@@ -184,11 +177,11 @@ def _backward_propagation(Wave_obj, dt=None, pml=False):
     dt = Wave_obj.dt
     t = Wave_obj.current_time
     if t != Wave_obj.final_time:
-        print(
+        parallel_print(
+            Wave_obj.comm,
             f"Current time of {t}, different than final_time of "
             f"{Wave_obj.final_time}. Setting final_time to current time "
-            f"in backwards propagation.",
-            flush=True,
+            f"in backwards propagation."
         )
     nt = int(t / dt) + 1
 
