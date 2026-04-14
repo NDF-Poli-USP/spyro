@@ -37,7 +37,6 @@ class Field:
         callback : callable
             Zero-argument callable that returns the field object to be written.
         """
-        
         self.name = name
         self.file = file
         self.callback = callback
@@ -74,19 +73,16 @@ class Functional:
         callback : callable
             Zero-argument callable that returns the current scalar sample.
         """
-        
         self.filename = filename
         self.callback = callback
         self.list = []
 
     def sample(self):
         """Append the current callback value to the internal sample list."""
-        
         self.list.append(self.callback())
 
     def save(self):
         """Save all collected samples to the configured NumPy file."""
-        
         np.save(self.filename, self.list)
 
 
@@ -104,7 +100,7 @@ class FieldLogger:
 
     def __init__(self, comm, vis_dict):
         """Initialize FieldLogger class.
-        
+
         Parameters
         ----------
         comm : object
@@ -201,7 +197,6 @@ class FieldLogger:
 
     def stop_logging(self):
         """Finalize the current logging session and persist accumulated data."""
-        
         self.__source_id = None
 
         if self.__rank == 0:
@@ -249,5 +244,4 @@ class FieldLogger:
         IndexError
             If no samples have been recorded yet for the requested functional.
         """
-        
         return self.__enabled_functionals[key].list[-1]
