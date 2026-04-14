@@ -1,4 +1,4 @@
-"""Fowrad solver to be used in the automatic adjoint."""
+"""Forward solver to be used in the automatic adjoint."""
 
 import firedrake as fire
 import firedrake.adjoint as fire_ad
@@ -12,7 +12,7 @@ fire.set_log_level(fire.ERROR)
 class ForwardSolver:
     """Wave equation forward solver.
 
-    This forward solver is prepared to work with the automatic
+    This forward solver is prepared to work with automatic
     differentiation. Only the acoustic wave equation is implemented.
 
     Parameters
