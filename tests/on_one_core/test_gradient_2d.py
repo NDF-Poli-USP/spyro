@@ -7,7 +7,7 @@ import spyro
 
 
 def check_gradient(Wave_obj_guess, dJ, rec_out_exact, Jm, plot=False):
-    steps = [1e-3, 1e-4, 1e-5]  # step length
+    steps = [1e-2, 1e-3, 1e-4]  # step length
 
     errors = []
     remainders = []
