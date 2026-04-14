@@ -46,7 +46,14 @@ def create_function_space(mesh, method, degree, dim=1):
 
 
 def check_function_space_type(function_space):
-    """Return whether a function space is scalar, vector, or mixed."""
+    """Return whether a function space is scalar, vector, or mixed.
+
+    Parameters
+    ----------
+    function_space: Firedrake FunctionSpace
+        Function space.
+    """
+    
     # Check if wave.function_space is a generates vector os scalar fields:
     if function_space.value_size == 1:
         return "scalar"
