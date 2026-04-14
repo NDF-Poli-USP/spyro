@@ -101,18 +101,14 @@ class Read_boundary_layer:
 
     @property
     def abc_boundary_layer_type(self):
-        """Get the type of absorbing boundary condition.
+        """Type of absorbing boundary condition.
 
-        Returns
-        -------
-        str or None
-            The damping type: 'PML', 'local', 'hybrid', or None.
+        Valid types are: 'PML', 'local', 'hybrid', or None.
         """
         return self._abc_boundary_layer_type
 
     @abc_boundary_layer_type.setter
     def abc_boundary_layer_type(self, value):
-        """Set absorbing boundary condition type and configure its parameters."""
         abc_dictionary = self.input_dictionary["absorving_boundary_conditions"]
         accepted_damping_types = [
             "PML",
@@ -149,26 +145,11 @@ class Read_boundary_layer:
 
     @property
     def abc_pad_length(self):
-        """Get the length of the absorbing boundary condition.
-
-        Returns
-        -------
-        float or None
-        """
+        """Float: Length of the absorbing boundary condition."""
         return self._abc_pad_length
 
     @abc_pad_length.setter
     def abc_pad_length(self, value):
-        """Set the absorbing boundary condition (ABC) pad length.
-
-        Parameters
-        ----------
-        value : Pad length (int or None). Must be non-zero when using PML.
-
-        Raises
-        ------
-        ValueError: If value is None or 0 while the PML boundary type is active.
-        """
         if (value is None or value == 0) and self.abc_boundary_layer_type == "PML":
             raise ValueError("No pad not compatible with PML")
         self._abc_pad_length = value

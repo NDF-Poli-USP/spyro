@@ -55,32 +55,18 @@ class Read_options:
 
     @property
     def variant(self):
-        """Get the type of element variant for each cell.
+        """Type of element variant for each cell.
 
-        Returns
-        -------
-        str or None
-            The variant type: 'lumped', 'equispaced', 'DG', or None
+        Accepted variants are:
+            "lumped": Mass lumping, works for SEM and MLT
+            "equispaced": Equispaced nodes
+            "DG": Discontinuous Galerkin method
+            None: Default/unspecified variant
         """
         return self._variant
 
     @variant.setter
     def variant(self, value):
-        """Set the discretization variant.
-
-        Parameters
-        ----------
-        value : `string` or None
-            Variant name:
-            "lumped": Mass lumping
-            "equispaced": Equispaced nodes
-            "DG": Discontinuous Galerkin method
-            None: Default/unspecified variant
-
-        Raises
-        ------
-            ValueError: If value is not in the accepted variants
-        """
         accepted_variants = ["lumped", "equispaced", "DG", None]
         if value not in accepted_variants:
             raise ValueError(f"Variant of {value} is not valid.")
@@ -88,24 +74,28 @@ class Read_options:
 
     @property
     def method(self):
-        """Get the FE method used for wave propagation.
+        """FE method used for wave propagation.
 
-        Returns
-        -------
-        str or None
-            The method:
+        Accepted methods:
             'mass_lumped_triangle',
             'spectral_quadrilateral',
             'DG_triangle',
             'DG_quadrilateral',
             'CG', or
             None.
+
+        Notes
+        -----
+        ----_
+        The 'mass_lumped_triangle' has equivalents:
+            -"KMV", "MLT", "mass_lumped_triangle", "mass_lumped_tetrahedra".
+        The 'spectral_quadrilateral' has equivalents:
+            -"spectral", "SEM", "spectral_quadrilateral".
         """
         return self._method
 
     @method.setter
     def method(self, value):
-        """Set the FE method used for wave propagation."""
         mlt_equivalents = [
             "KMV",
             "MLT",
@@ -155,21 +145,24 @@ class Read_options:
 
     @property
     def cell_type(self):
-        """Get the cell type used for wave propagation.
+        """Cell type used for wave propagation.
 
-        Returns
-        -------
-        str or None
-            The cell geometry:
+        Accepted cell geometry:
             'triangle',
             'quadrilateral', or
             None.
+
+        Notes
+        -----
+        The 'triangle' geometry has equivalents:
+        - "T", "triangle", "triangles", "tetrahedra", "tetrahedron".
+        The 'quadrilateral' geometry has equivalents:
+        - "Q", "quadrilateral", "quadrilaterals", "hexahedra", "hexahedron".
         """
         return self._cell_type
 
     @cell_type.setter
     def cell_type(self, value):
-        """Set the cell type used for wave propagation."""
         triangle_equivalents = [
             "T",
             "triangle",
@@ -235,35 +228,22 @@ class Read_options:
 
     @property
     def degree(self):
-        """Get the FEM polynomial basis degree.
-
-        Returns
-        -------
-        int
-        """
+        """Int: FEM polynomial basis degree."""
         return self._degree
 
     @degree.setter
     def degree(self, value):
-        """Set the FEM polynomial basis degree."""
         if not isinstance(value, int):
             raise ValueError("Degree has to be integer")
         self._degree = value
 
     @property
     def dimension(self):
-        """Get the geometric dimension.
-
-        Returns
-        -------
-        int
-            2 or 3.
-        """
+        """Int: Geometric dimension."""
         return self._dimension
 
     @dimension.setter
     def dimension(self, value):
-        """Set the geometric dimension."""
         if value not in {2, 3}:
             raise ValueError(f"Dimension of {value} not 2 or 3.")
         self._dimension = value

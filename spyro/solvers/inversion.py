@@ -404,29 +404,17 @@ class FullWaveformInversion(AcousticWave):
 
     @property
     def real_velocity_model_file(self):
-        """Get the real velocity model file path.
-
-        Returns
-        -------
-        str or None
-            Path to the real velocity model file.
-        """
-        return self._real_velocity_model_file
-
-    @real_velocity_model_file.setter
-    def real_velocity_model_file(self, value):
-        """Set the real velocity model file path.
-
-        Parameters
-        ----------
-        value : str or None
-            Path to the real velocity model file.
+        """Str | None: Real velocity model file path.
 
         Raises
         ------
         FileNotFoundError
             If the specified file does not exist.
         """
+        return self._real_velocity_model_file
+
+    @real_velocity_model_file.setter
+    def real_velocity_model_file(self, value):
         if value is not None:
             if not os.path.exists(value):
                 raise FileNotFoundError(f"Velocity model file '{value}' does not exist")
@@ -434,32 +422,20 @@ class FullWaveformInversion(AcousticWave):
 
     @property
     def real_shot_record_files(self):
-        """Get the real shot record file path or pattern.
+        """Str | None: Real shot record file path or pattern.
 
-        Returns
-        -------
-        str or None
-            Path or prefix pattern for the real shot record files.
-        """
-        return self._real_shot_record_files
-
-    @real_shot_record_files.setter
-    def real_shot_record_files(self, value):
-        """Set the real shot record file path or pattern.
-
-        This setter also initializes the control and gradient output files
+        This also initializes the control and gradient output files
         and loads the real shot record if a valid path is provided.
-
-        Parameters
-        ----------
-        value : str or None
-            Path or prefix pattern for the real shot record files.
 
         Raises
         ------
         FileNotFoundError
             If the specified file or files matching the pattern do not exist.
         """
+        return self._real_shot_record_files
+
+    @real_shot_record_files.setter
+    def real_shot_record_files(self, value):
         if value is not None:
             # Check if it's a file prefix pattern by looking for matching files
             if not os.path.exists(value) and not glob.glob(value + "*"):
