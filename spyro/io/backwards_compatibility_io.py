@@ -89,6 +89,7 @@ class Dictionary_conversion:
 
     def convert_parallelism(self):
         """Convert the parallelism section of dictionary."""
+        
         self.new_dictionary["parallelism"] = {
             "type": self.old_dictionary["parallelism"][
                 # options: automatic (same number of cores for evey processor)
@@ -126,6 +127,7 @@ class Dictionary_conversion:
 
     def convert_synthetic_data(self):
         """Convert the synthetic_data section of dictionary."""
+        
         if self.fwi_running:
             self.new_dictionary["synthetic_data"] = {
                 "real_velocity_file": self.old_dictionary["mesh"]["truemodel"],
