@@ -492,7 +492,7 @@ def calculate_edge_length(cpw, minimum_velocity, frequency):
 
     Parameters
     ----------
-    cpw: float
+    cpw : float
         Cells per wavelength.
     minimum_velocity: float
         Minimum velocity in the domain.
