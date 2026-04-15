@@ -295,7 +295,7 @@ class AutomaticMesh:
 
         Returns
         -------
-        mesh: Firedrake Mesh
+        mesh : Firedrake Mesh
             The generated 2D mesh.
 
         Notes
