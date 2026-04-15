@@ -231,7 +231,6 @@ class Delta_projector:
 
     def __build_local_nodes(self):
         """Build local element nodes, locations and I,J,K numbering."""
-        
         if self.dimension == 2:
             return self.__build_local_nodes_2D()
         elif self.dimension == 3:

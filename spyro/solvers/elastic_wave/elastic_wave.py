@@ -36,13 +36,13 @@ class ElasticWave(Wave, metaclass=ABCMeta):
     @override
     def _initialize_model_parameters(self):
         """Initialize model parameters using synthetic data configuration.
-        
+
         This method reads the 'synthetic_data' entry from the input dictionary
         and initializes model parameters based on the specified data type.
-        
+
         Raises
         ------
-        Exception: 
+        Exception:
             If 'synthetic_data' key is missing, if 'type' is not present,
             or if an invalid synthetic data type is specified.
         """
@@ -59,12 +59,12 @@ class ElasticWave(Wave, metaclass=ABCMeta):
 
     @abstractmethod
     def initialize_model_parameters_from_object(self, synthetic_data_dict):
-        """ Initialize model parameters from object, based on this abstract method."""
+        """Initialize model parameters from object, based on this abstract method."""
         pass
 
     @abstractmethod
     def initialize_model_parameters_from_file(self, synthetic_data_dict):
-        """ Initialize model parameters from file, based on this abstract method."""
+        """Initialize model parameters from file, based on this abstract method."""
         pass
 
     @override

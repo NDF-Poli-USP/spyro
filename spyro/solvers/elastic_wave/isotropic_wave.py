@@ -30,8 +30,7 @@ class IsotropicWave(ElasticWave):
     """Isotropic elastic wave propagator."""
 
     def __init__(self, dictionary, comm=None):
-        """Initializes the IsotropicWave.""""
-        
+        """Initialize the IsotropicWave."""
         super().__init__(dictionary, comm=comm)
         self.wave_type = WaveType.ISOTROPIC_ELASTIC
         self.rho = None  # Density
