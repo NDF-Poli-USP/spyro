@@ -463,7 +463,7 @@ class AutomaticMesh:
 
         Returns
         -------
-        mesh: Firedrake Mesh
+        mesh : Firedrake Mesh
             The generated mesh.
 
         Raises
