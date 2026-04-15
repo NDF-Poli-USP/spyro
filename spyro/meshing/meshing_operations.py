@@ -393,7 +393,17 @@ class MeshOps():
             - (z_data, x_data) for 2D
             - (z_data, x_data, y_data) for 3D
         function_space : `FiredrakeFunctionSpace`
-            Function space to extract node positions
+            Function space to extract node positions.
+        mesh_parameters : `MeshParameters`
+            Mesh parameters for the problem.
+            - length_z : float
+                Mesh length in the z-direction.
+            - length_x : float
+                Mesh length in the x-direction.
+            - length_y : float
+                Mesh length in the y-direction (for 3D meshes).
+            - tol : `float`
+                Tolerance for searching nodes in the mesh.
 
         Returns
         -------
