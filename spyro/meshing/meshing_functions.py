@@ -278,7 +278,7 @@ class AutomaticMesh:
 
         Returns
         -------
-        mesh: Mesh
+        mesh : Mesh
             Mesh
         """
         if self.dimension == 2:
