@@ -52,7 +52,7 @@ def butter_lowpass_filter(shot, cutoff, fs, order=2):
 
 @ensemble_functional
 def compute_functional(Wave_object, residual):
-    r"""Compute the functional to be optimized.
+    """Compute the functional to be optimized.
 
     Computes the L2 norm of the residual at receiver locations,
     integrated over time using the trapezoidal rule. This functional
@@ -336,6 +336,7 @@ class Mask:
     """
 
     def __init__(self, boundaries, Wave_obj, dg=False, inverse_mask=False):
+        """"Initialize Mask Class."""
         possible_boundaries = [
             "z_min",
             "z_max",
@@ -560,6 +561,8 @@ class Gradient_mask_for_pml(Mask):
     """
 
     def __init__(self, Wave_obj):
+        """Initialize the Gradient_mask_for_pml class."""
+        
         if Wave_obj.abc_active is False:
             raise ValueError("No PML present in wave object")
 
