@@ -279,7 +279,7 @@ class MeshOps():
         del coords
 
         # TODO: either put wave's similar method here or just remove the one from wave
-        #to decouple it from wave altogether.
+        # to decouple it from wave altogether.
         return node_positions
 
     def mapping_boundary_ids(self, mesh, function_space, boundaries, box_domain=True):
