@@ -142,7 +142,7 @@ class AutomaticMesh:
 
         Returns
         -------
-        mesh: Mesh
+        mesh : Mesh
             Mesh
         """
         if self.mesh_parameters.is_complete is False:
