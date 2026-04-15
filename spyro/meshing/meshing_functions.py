@@ -496,19 +496,19 @@ def calculate_edge_length(cpw, minimum_velocity, frequency):
         Cells per wavelength.
     minimum_velocity : float
         Minimum velocity in the domain.
-    frequency: float
+    frequency : float
         Source frequency.
 
     Returns
     -------
-    edge_length: float
+    edge_length : float
         Calculated edge length for mesh elements.
     """
     v_min = minimum_velocity
 
-    lbda_min = v_min/frequency
+    lbda_min = v_min / frequency
 
-    edge_length = lbda_min/cpw
+    edge_length = lbda_min / cpw
     return edge_length
 
 
@@ -532,7 +532,7 @@ def RectangleMesh(nx, ny, length_x, length_y, pad=None, comm=None, quadrilateral
       Padding to be added to the domain. The default is None.
     comm : MPI communicator, optional
       MPI communicator. The default is None.
-    quadrilateral: bool, optional
+    quadrilateral : bool, optional
       If True, the mesh is quadrilateral. The default is False.
 
     Returns
