@@ -173,50 +173,6 @@ class HABC_Mesh():
                                            func_space_type=func_space_type,
                                            comm=comm)
 
-    # def extract_bnd_node_indices(self, node_positions, func_space):
-    #     '''
-    #     # TODO: call from mesh_opts
-    #     Extract boundary node indices on boundaries of the domain
-    #     excluding the free surface at the top boundary
-
-    #     Parameters
-    #     ----------
-    #     node_positions : `tuple`
-    #         Tuple containing the node positions in the mesh.
-    #         - (z_data, x_data) for 2D
-    #         - (z_data, x_data, y_data) for 3D
-    #     func_space : `firedrake function space`
-    #         Function space to extract node positions
-
-    #     Returns
-    #     -------
-    #     bnds : `tuple` of 'arrays'
-    #         Mesh node indices on boundaries of the domain.
-    #         - (left_boundary, right_boundary, bottom_boundary) for 2D
-    #         - (left_boundary, right_boundary, bottom_boundary,
-    #             left_bnd_y, right_bnd_y) for 3D
-    #     '''
-
-    #     # Extract node positions
-    #     z_data, x_data = node_positions[0:2]
-
-    #     # Boundary array
-    #     left_boundary = np.where(x_data <= self.mesh_parameters.tol)
-    #     right_boundary = np.where(x_data >= self.mesh_parameters.length_x
-    #                               - self.mesh_parameters.tol)
-    #     bottom_boundary = np.where(z_data <= self.mesh_parameters.tol
-    #                                - self.mesh_parameters.length_z)
-    #     bnds = (left_boundary, right_boundary, bottom_boundary)
-
-    #     if self.dimension == 3:  # 3D
-    #         y_data = node_positions[2]
-    #         left_bnd_y = np.where(y_data <= self.mesh_parameters.tol)
-    #         right_bnd_y = np.where(y_data >= self.mesh_parameters.length_y
-    #                                - self.mesh_parameters.tol)
-    #         bnds += (left_bnd_y, right_bnd_y,)
-
-    #     return bnds
-
     def original_boundary_data(self):
         '''
         Generate the boundary data from the original domain mesh
