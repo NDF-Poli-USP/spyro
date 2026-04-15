@@ -401,7 +401,7 @@ class AutomaticMesh:
 
         Returns
         -------
-        mesh: Firedrake Mesh
+        mesh : Firedrake Mesh
             The generated 2D mesh with uniform element sizes.
 
         Notes
