@@ -469,7 +469,7 @@ class AutomaticMesh:
         Raises
         ------
         ValueError
-            If dimension is not supported(must be 2).
+            If dimension is not supported (must be 2).
         NotImplementedError
             If dimension is 3 (3D meshing not yet implemented).
 
