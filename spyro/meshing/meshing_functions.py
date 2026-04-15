@@ -583,7 +583,7 @@ def PeriodicRectangleMesh(
 
     Returns
     -------
-    mesh: Firedrake Mesh
+    mesh : Firedrake Mesh
         Mesh
     """
     if pad is not None:
