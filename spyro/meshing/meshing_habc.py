@@ -173,48 +173,49 @@ class HABC_Mesh():
                                            func_space_type=func_space_type,
                                            comm=comm)
 
-    def extract_bnd_node_indices(self, node_positions, func_space):
-        '''
-        Extract boundary node indices on boundaries of the domain
-        excluding the free surface at the top boundary
+    # def extract_bnd_node_indices(self, node_positions, func_space):
+    #     '''
+    #     # TODO: call from mesh_opts
+    #     Extract boundary node indices on boundaries of the domain
+    #     excluding the free surface at the top boundary
 
-        Parameters
-        ----------
-        node_positions : `tuple`
-            Tuple containing the node positions in the mesh.
-            - (z_data, x_data) for 2D
-            - (z_data, x_data, y_data) for 3D
-        func_space : `firedrake function space`
-            Function space to extract node positions
+    #     Parameters
+    #     ----------
+    #     node_positions : `tuple`
+    #         Tuple containing the node positions in the mesh.
+    #         - (z_data, x_data) for 2D
+    #         - (z_data, x_data, y_data) for 3D
+    #     func_space : `firedrake function space`
+    #         Function space to extract node positions
 
-        Returns
-        -------
-        bnds : `tuple` of 'arrays'
-            Mesh node indices on boundaries of the domain.
-            - (left_boundary, right_boundary, bottom_boundary) for 2D
-            - (left_boundary, right_boundary, bottom_boundary,
-                left_bnd_y, right_bnd_y) for 3D
-        '''
+    #     Returns
+    #     -------
+    #     bnds : `tuple` of 'arrays'
+    #         Mesh node indices on boundaries of the domain.
+    #         - (left_boundary, right_boundary, bottom_boundary) for 2D
+    #         - (left_boundary, right_boundary, bottom_boundary,
+    #             left_bnd_y, right_bnd_y) for 3D
+    #     '''
 
-        # Extract node positions
-        z_data, x_data = node_positions[0:2]
+    #     # Extract node positions
+    #     z_data, x_data = node_positions[0:2]
 
-        # Boundary array
-        left_boundary = np.where(x_data <= self.mesh_parameters.tol)
-        right_boundary = np.where(x_data >= self.mesh_parameters.length_x
-                                  - self.mesh_parameters.tol)
-        bottom_boundary = np.where(z_data <= self.mesh_parameters.tol
-                                   - self.mesh_parameters.length_z)
-        bnds = (left_boundary, right_boundary, bottom_boundary)
+    #     # Boundary array
+    #     left_boundary = np.where(x_data <= self.mesh_parameters.tol)
+    #     right_boundary = np.where(x_data >= self.mesh_parameters.length_x
+    #                               - self.mesh_parameters.tol)
+    #     bottom_boundary = np.where(z_data <= self.mesh_parameters.tol
+    #                                - self.mesh_parameters.length_z)
+    #     bnds = (left_boundary, right_boundary, bottom_boundary)
 
-        if self.dimension == 3:  # 3D
-            y_data = node_positions[2]
-            left_bnd_y = np.where(y_data <= self.mesh_parameters.tol)
-            right_bnd_y = np.where(y_data >= self.mesh_parameters.length_y
-                                   - self.mesh_parameters.tol)
-            bnds += (left_bnd_y, right_bnd_y,)
+    #     if self.dimension == 3:  # 3D
+    #         y_data = node_positions[2]
+    #         left_bnd_y = np.where(y_data <= self.mesh_parameters.tol)
+    #         right_bnd_y = np.where(y_data >= self.mesh_parameters.length_y
+    #                                - self.mesh_parameters.tol)
+    #         bnds += (left_bnd_y, right_bnd_y,)
 
-        return bnds
+    #     return bnds
 
     def original_boundary_data(self):
         '''
@@ -234,8 +235,9 @@ class HABC_Mesh():
                                                               self.function_space)
 
         # Extract boundary node indices
-        bnds = self.extract_bnd_node_indices(node_positions,
-                                             self.function_space)
+        bnds = self.mesh_ops.extract_bnd_node_indices(self.mesh,
+                                                      self.function_space,
+                                                      self.mesh_parameters)
         self.bnds = np.unique(np.concatenate([idxs for idx_list in bnds
                                               for idxs in idx_list]))
 

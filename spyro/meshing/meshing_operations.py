@@ -382,7 +382,7 @@ class MeshOps():
                                       "domains are supported. The numbering the "
                                       "future boundary ids must start at 7.")
 
-    def extract_bnd_node_indices(self, mesh, function_space):
+    def extract_bnd_node_indices(self, mesh, function_space, mesh_parameters):
         """
         Extract boundary node indices the domain excluding the free surface at the top.
 
@@ -410,18 +410,18 @@ class MeshOps():
         z_data, x_data = node_positions[0:2]
 
         # Boundary array
-        left_boundary = np.where(x_data <= self.tol)
-        right_boundary = np.where(x_data >= self.mesh_parameters.length_x
-                                  - self.tol)
-        bottom_boundary = np.where(z_data <= self.tol
-                                   - self.mesh_parameters.length_z)
+        left_boundary = np.where(x_data <= mesh_parameters.tol)
+        right_boundary = np.where(x_data >= mesh_parameters.length_x
+                                  - mesh_parameters.tol)
+        bottom_boundary = np.where(z_data <= mesh_parameters.tol
+                                   - mesh_parameters.length_z)
         bnds = (left_boundary, right_boundary, bottom_boundary)
 
         if self.dimension == 3:  # 3D
             y_data = node_positions[2]
-            left_bnd_y = np.where(y_data <= self.tol)
-            right_bnd_y = np.where(y_data >= self.mesh_parameters.length_y
-                                   - self.tol)
+            left_bnd_y = np.where(y_data <= mesh_parameters.tol)
+            right_bnd_y = np.where(y_data >= mesh_parameters.length_y
+                                   - mesh_parameters.tol)
             bnds += (left_bnd_y, right_bnd_y,)
 
         return bnds
