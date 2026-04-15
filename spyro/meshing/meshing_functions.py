@@ -606,7 +606,7 @@ def BoxMesh(nx, ny, nz, length_x, length_y, length_z, pad=None, quadrilateral=Fa
 
     Parameters
     ----------
-    nx: int
+    nx : int
         Number of elements in the x direction.
     ny: int
         Number of elements in the y direction.
