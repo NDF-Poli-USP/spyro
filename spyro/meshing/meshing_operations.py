@@ -278,6 +278,8 @@ class MeshOps():
             node_positions += (y_data,)
         del coords
 
+        # TODO: either put wave's similar method here or just remove the one from wave
+        #to decouple it from wave altogether.
         return node_positions
 
     def mapping_boundary_ids(self, mesh, function_space, boundaries, box_domain=True):
@@ -286,9 +288,9 @@ class MeshOps():
 
         Parameters
         ----------
-        mesh : `FiredrakeMesh`
+        mesh : `Firedrake.Mesh`
             Current mesh
-        function_space : `FiredrakeFunctionSpace`
+        function_space : `Firedrake.FunctionSpace`
             Function space for the state variable
         boundaries : `tuple`
             Tuple containing the boundary boolean labels for applying absorbing BCs.
@@ -382,8 +384,7 @@ class MeshOps():
 
     def extract_bnd_node_indices(self, mesh, function_space):
         """
-        Extract boundary node indices on boundaries of the domain
-        excluding the free surface at the top boundary
+        Extract boundary node indices the domain excluding the free surface at the top.
 
         Parameters
         ----------
