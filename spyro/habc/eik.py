@@ -104,13 +104,14 @@ class HABC_Eikonal(Eikonal_Modeling):
         self.c_min = Wave.c_min
 
         # # Extract node positions
-        self.node_positions = Wave.mesh_ops.extract_node_positions(self.mesh,
-                                                                   self.funct_space_eik)
+        self.node_positions = Wave.mesh_ops.extract_node_positions(
+            self.mesh, self.funct_space_eik
+        )
 
         # Extract boundary node indices
-        self.bnds = Wave.mesh_ops.extract_bnd_node_indices(self.mesh,
-                                                           self.funct_space_eik,
-                                                           Wave.mesh_parameters)
+        self.bnds = Wave.mesh_ops.extract_bnd_node_indices(
+            self.mesh, self.funct_space_eik, Wave.mesh_parameters
+        )
 
         # Path to save data
         self.path_save = Wave.path_save + "preamble/"

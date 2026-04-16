@@ -182,9 +182,14 @@ class HABC_Wave(
         dom_dim = self.habc_domain_dimensions(only_orig_dom=True)
 
         # Initializing the Mesh class
-        HABC_Mesh.__init__(self, dom_dim, dimension=self.dimension,
-                           quadrilateral=self.mesh_parameters.quadrilateral,
-                           func_space_type='scalar', comm=self.comm)
+        HABC_Mesh.__init__(
+            self,
+            dom_dim,
+            dimension=self.dimension,
+            quadrilateral=self.mesh_parameters.quadrilateral,
+            func_space_type="scalar",
+            comm=self.comm,
+        )
 
         # Identifier for the current case study
         self.identify_habc_case(output_folder=output_folder)
@@ -463,15 +468,24 @@ class HABC_Wave(
         self.crit_source = self.eik_bnd[0][-1]
 
         # Computing layer sizes
-        self.F_L, self.pad_len, self.ele_pad, self.d_norm, \
-            self.a_par, self.FLpos = calc_size_lay(
-                self.freq_ref, z_par, self.mesh_parameters.lmin, self.lref,
-                n_root=n_root, layer_based_on_mesh=layer_based_on_mesh)
+        self.F_L, self.pad_len, self.ele_pad, self.d_norm, self.a_par, self.FLpos = (
+            calc_size_lay(
+                self.freq_ref,
+                z_par,
+                self.mesh_parameters.lmin,
+                self.lref,
+                n_root=n_root,
+                layer_based_on_mesh=layer_based_on_mesh,
+            )
+        )
 
-        plot_function_layer_size([self.a_par, z_par],
-                                 [self.freq_ref, self.frequency],
-                                 [self.mesh_parameters.lmin, self.lref], self.FLpos,
-                                 output_folder=self.path_case_habc)
+        plot_function_layer_size(
+            [self.a_par, z_par],
+            [self.freq_ref, self.frequency],
+            [self.mesh_parameters.lmin, self.lref],
+            self.FLpos,
+            output_folder=self.path_case_habc,
+        )
 
         print("\nDetermining New Geometry with Absorbing Layer", flush=True)
 
@@ -493,8 +507,9 @@ class HABC_Wave(
             print("Determining Hypershape Layer Parameters", flush=True)
 
             # Geometric properties of the hypershape layer
-            self.calc_hyp_geom_prop(dom_lay_full, self.pad_len,
-                                    self.mesh_parameters.lmin)
+            self.calc_hyp_geom_prop(
+                dom_lay_full, self.pad_len, self.mesh_parameters.lmin
+            )
 
         # Domain dimensions with free surface truncation
         dom_lay_trunc = self.habc_domain_dimensions(only_habc_dom=True, full_hyp=False)
@@ -503,8 +518,12 @@ class HABC_Wave(
         layer_par = (self.F_L, self.a_par, self.d_norm)
 
         # mesh parameters
-        mesh_par = (self.mesh_parameters.lmin, self.mesh_parameters.lmax,
-                    self.mesh_parameters.alpha, self.variant)
+        mesh_par = (
+            self.mesh_parameters.lmin,
+            self.mesh_parameters.lmax,
+            self.mesh_parameters.alpha,
+            self.variant,
+        )
 
         # wave parameters
         c_ref = min([bnd[1] for bnd in self.eik_bnd])
@@ -1089,8 +1108,9 @@ class HABC_Wave(
         add_dom -= dist_to_bnd
 
         # Pad length for the infinite domain extension
-        infinite_pad_len = self.mesh_parameters.lmin * \
-            np.ceil(add_dom / self.mesh_parameters.lmin)
+        infinite_pad_len = self.mesh_parameters.lmin * np.ceil(
+            add_dom / self.mesh_parameters.lmin
+        )
 
         return infinite_pad_len
 

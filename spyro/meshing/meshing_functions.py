@@ -98,7 +98,8 @@ class AutomaticMesh:
         - 'mesh_type' : str, optional. Type of the mesh.
 
         For mesh with absorbing layer only:
-        - 'abc_pad_length' : float, optional. Length of the absorbing boundary condition padding.
+        - 'abc_pad_length' : float, optional.
+        Length of the absorbing boundary condition padding.
 
         For Firedrake mesh only:
         - 'dx' : float, optional. Mesh element size.
@@ -581,7 +582,7 @@ def PeriodicRectangleMesh(
         Padding to be added to the domain. The default is None.
     comm : MPI communicator, optional
         MPI communicator. The default is None.
-    quadrilateral: bool, optional
+    quadrilateral : bool, optional
         If True, the mesh is quadrilateral. The default is False.
 
     Returns

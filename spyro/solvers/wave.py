@@ -28,13 +28,13 @@ fire.set_log_level(fire.ERROR)
 class Wave(Model_parameters, metaclass=ABCMeta):
     """Base class for wave equation solvers.
 
-    Attributes:
-    -----------
+    Attributes
+    ----------
     comm : `object`
         An object representing the communication interface
-    boundary_idx_map: dict
+    boundary_idx_map : dict
         Mapping of boundary IDs for applying absorbing boundary conditions
-    initial_velocity_model: firedrake function
+    initial_velocity_model : firedrake function
         Initial velocity model
     function_space : firedrake function space
         Function space for the wave equation
@@ -46,19 +46,19 @@ class Wave(Model_parameters, metaclass=ABCMeta):
         Real shot record
     mesh : firedrake mesh
         Mesh used in the simulation (2D or 3D)
-    mesh_x: `ufl.geometry.SpatialCoordinate`
+    mesh_x : `ufl.geometry.SpatialCoordinate`
         Symbolic coordinate x of the mesh object
-    mesh_y: `ufl.geometry.SpatialCoordinate`
+    mesh_y : `ufl.geometry.SpatialCoordinate`
         Symbolic coordinate y of the mesh object
     mesh_z : `ufl.geometry.SpatialCoordinate`
         Symbolic coordinate z of the mesh object
-    sources: Sources object
+    sources : Sources object
         Contains information about sources
     receivers : Receivers object
         Contains information about receivers
 
-    Methods:
-    --------
+    Methods
+    -------
     get_and_set_maximum_dt()
         Calculates and/or sets maximum dt
     get_mass_matrix_diagonal()
@@ -111,9 +111,11 @@ class Wave(Model_parameters, metaclass=ABCMeta):
 
         # Creating mesh operations manager
         self.mesh_ops = mshops.MeshOps(
-            self.domain_dimensions(), dimension=self.dimension,
+            self.domain_dimensions(),
+            dimension=self.dimension,
             quadrilateral=self.mesh_parameters.quadrilateral,
-            comm=self.mesh_parameters.comm)
+            comm=self.mesh_parameters.comm,
+        )
 
         if self.mesh is not None:
             self.building_mesh_derived_paramenters()
@@ -167,18 +169,22 @@ class Wave(Model_parameters, metaclass=ABCMeta):
 
         # TODO: Create a flag for other domains that are not of type box
         if self.mesh_ops.func_space_type is None:
-            self.mesh_ops.func_space_type = 'scalar' \
-                if len(self.function_space.value_shape) == 0 else 'vector'
-        boundaries = [self.absorb_top, self.absorb_bottom,
-                      self.absorb_right, self.absorb_left]
+            self.mesh_ops.func_space_type = (
+                "scalar" if len(self.function_space.value_shape) == 0 else "vector"
+            )
+        boundaries = [
+            self.absorb_top,
+            self.absorb_bottom,
+            self.absorb_right,
+            self.absorb_left,
+        ]
         if self.dimension == 3:
-            boundaries.extend([self.absorb_front,
-                               self.absorb_back])
+            boundaries.extend([self.absorb_front, self.absorb_back])
 
         # Build the boundary ID mapping
-        self.mesh_parameters.boundary_idx_map = \
-            self.mesh_ops.mapping_boundary_ids(self.mesh, self.function_space,
-                                               boundaries, box_domain=True)
+        self.mesh_parameters.boundary_idx_map = self.mesh_ops.mapping_boundary_ids(
+            self.mesh, self.function_space, boundaries, box_domain=True
+        )
 
     def set_mesh(
         self,
@@ -233,9 +239,9 @@ class Wave(Model_parameters, metaclass=ABCMeta):
         -------
         mesh_z : `ufl.geometry.SpatialCoordinate`
             Symbolic coordinate z of the mesh object
-        mesh_x: `ufl.geometry.SpatialCoordinate`
+        mesh_x : `ufl.geometry.SpatialCoordinate`
             Symbolic coordinate x of the mesh object
-        mesh_y: `ufl.geometry.SpatialCoordinate`
+        mesh_y : `ufl.geometry.SpatialCoordinate`
             Symbolic coordinate y of the mesh object
         """
         if self.dimension == 2:
@@ -358,8 +364,7 @@ class Wave(Model_parameters, metaclass=ABCMeta):
         self.stiffness_quadrature_rule = k_rule
         self.surface_quadrature_rule = s_rule
 
-    def get_and_set_maximum_dt(self, fraction=0.7,
-                               estimate_max_eigenvalue=False):
+    def get_and_set_maximum_dt(self, fraction=0.7, estimate_max_eigenvalue=False):
         """
         Calculate and set the maximum stable time step (dt) for the wave solver.
 

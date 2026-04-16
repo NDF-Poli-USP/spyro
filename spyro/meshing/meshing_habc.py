@@ -5,8 +5,7 @@ import spyro.meshing.meshing_operations as mshops
 import numpy as np
 from netgen.geom2d import SplineGeometry
 from firedrake.__future__ import interpolate
-from netgen.meshing import Element2D, \
-    Element3D, FaceDescriptor, Mesh, MeshPoint
+from netgen.meshing import Element2D, Element3D, FaceDescriptor, Mesh, MeshPoint
 from scipy.spatial import cKDTree
 from spyro.utils.error_management import value_parameter_error
 
@@ -129,8 +128,9 @@ class HABC_Mesh:
         Generate the boundary points for a truncated hyperellipse
     """
 
-    def __init__(self, dom_dim, dimension=2, quadrilateral=False,
-                 func_space_type=None, comm=None):
+    def __init__(
+        self, dom_dim, dimension=2, quadrilateral=False, func_space_type=None, comm=None
+    ):
         """
         Initialize the HABC_Mesh class.
 
@@ -169,10 +169,13 @@ class HABC_Mesh:
         self.comm = comm
 
         if not hasattr(self, "mesh_ops"):
-            self.mesh_ops = mshops.MeshOps(dom_dim, dimension=dimension,
-                                           quadrilateral=quadrilateral,
-                                           func_space_type=func_space_type,
-                                           comm=comm)
+            self.mesh_ops = mshops.MeshOps(
+                dom_dim,
+                dimension=dimension,
+                quadrilateral=quadrilateral,
+                func_space_type=func_space_type,
+                comm=comm,
+            )
 
     def original_boundary_data(self):
         """Generate the boundary data from the original domain mesh.
@@ -186,15 +189,17 @@ class HABC_Mesh:
         None
         """
         # Extract node positions
-        node_positions = self.mesh_ops.extract_node_positions(self.mesh,
-                                                              self.function_space)
+        node_positions = self.mesh_ops.extract_node_positions(
+            self.mesh, self.function_space
+        )
 
         # Extract boundary node indices
-        bnds = self.mesh_ops.extract_bnd_node_indices(self.mesh,
-                                                      self.function_space,
-                                                      self.mesh_parameters)
-        self.bnds = np.unique(np.concatenate([idxs for idx_list in bnds
-                                              for idxs in idx_list]))
+        bnds = self.mesh_ops.extract_bnd_node_indices(
+            self.mesh, self.function_space, self.mesh_parameters
+        )
+        self.bnds = np.unique(
+            np.concatenate([idxs for idx_list in bnds for idxs in idx_list])
+        )
 
         # Extract boundary node positions
         z_data, x_data = node_positions[0:2]
@@ -268,9 +273,9 @@ class HABC_Mesh:
         )
 
         # Get mesh parameters from original mesh
-        mesh_derived_parameters = \
-            self.mesh_ops.representative_mesh_dimensions(self.mesh,
-                                                         self.function_space)
+        mesh_derived_parameters = self.mesh_ops.representative_mesh_dimensions(
+            self.mesh, self.function_space
+        )
         self.mesh_parameters.diam_mesh = mesh_derived_parameters[0]
         self.mesh_parameters.lmin = mesh_derived_parameters[1]
         self.mesh_parameters.lmax = mesh_derived_parameters[2]
@@ -685,10 +690,11 @@ class HABC_Mesh:
                 ]
 
                 # Generate the mesh using netgen library
-                hyp_mesh = geo.GenerateMesh(maxh=self.mesh_parameters.lmin,
-                                            quad_dominated=self.quadrilateral,
-                                            optsteps2d=10,  # Optimize mesh
-                                            )
+                hyp_mesh = geo.GenerateMesh(
+                    maxh=self.mesh_parameters.lmin,
+                    quad_dominated=self.quadrilateral,
+                    optsteps2d=10,  # Optimize mesh
+                )
                 hyp_mesh.Compress()
                 print("Hyperelliptical Mesh Generated Successfully", flush=True)
                 break
@@ -765,9 +771,12 @@ class HABC_Mesh:
             rec_map[i] = final_mesh.Add(MeshPoint((z, x, 0.0)))  # y = 0 for 2D
 
             # Check if the point is on the original boundary
-            if boundary_tree.query(
-                coord, distance_upper_bound=self.mesh_parameters.tol,
-                    workers=-1)[0] <= self.mesh_parameters.tol:
+            if (
+                boundary_tree.query(
+                    coord, distance_upper_bound=self.mesh_parameters.tol, workers=-1
+                )[0]
+                <= self.mesh_parameters.tol
+            ):
                 boundary_coords.append(coord)
                 boundary_points.append(rec_map[i])
 
@@ -794,7 +803,8 @@ class HABC_Mesh:
 
             # Check if the point is on the original boundary
             dist, idx = boundary_tree.query(
-                coord, distance_upper_bound=self.mesh_parameters.tol, workers=-1)
+                coord, distance_upper_bound=self.mesh_parameters.tol, workers=-1
+            )
 
             if dist <= self.mesh_parameters.tol:
                 # Reuse the existing point
@@ -1353,8 +1363,13 @@ class HABC_Mesh:
         """
         # Creating a point cloud field from the parent mesh
         pts_mesh = fire.VertexOnlyMesh(
-            parent_mesh, pts_cloud, reorder=True, tolerance=self.mesh_parameters.tol,
-            missing_points_behaviour='error', redundant=False)
+            parent_mesh,
+            pts_cloud,
+            reorder=True,
+            tolerance=self.mesh_parameters.tol,
+            missing_points_behaviour="error",
+            redundant=False,
+        )
         del pts_cloud
 
         # Cloud field

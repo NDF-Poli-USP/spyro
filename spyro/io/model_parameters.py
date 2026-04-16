@@ -215,15 +215,13 @@ class Model_parameters(Read_options, Read_boundary_layer, Read_time_axis, Read_o
         )
         self.delay_type = self.input_dictionary["acquisition"]["delay_type"]
 
-        self.input_dictionary["acquisition"].setdefault("source_locations",
-                                                        None)
+        self.input_dictionary["acquisition"].setdefault("source_locations", None)
 
         # We need this here to initialize the source locations before
         # the mesh parameters object is created, since the source
         # locations need to be checked to be within the mesh domain
         self.input_dictionary["mesh"].setdefault("negative_z", True)
-        self.source_locations = self.input_dictionary[
-            "acquisition"]["source_locations"]
+        self.source_locations = self.input_dictionary["acquisition"]["source_locations"]
 
         # Setting up MPI communicator and checking parallelism:
         self.input_dictionary.setdefault("parallelism", {})
@@ -525,10 +523,8 @@ class Model_parameters(Read_options, Read_boundary_layer, Read_time_axis, Read_o
             Domain dimensions: (length_z, length_x) for 2D
             or (length_z, length_x, length_y) for 3D
         """
-
         # Domain dimensions
-        domain_dim = (self.mesh_parameters.length_z,
-                      self.mesh_parameters.length_x)
+        domain_dim = (self.mesh_parameters.length_z, self.mesh_parameters.length_x)
         if self.dimension == 3:  # 3D
             domain_dim += (self.mesh_parameters.length_y,)
 
