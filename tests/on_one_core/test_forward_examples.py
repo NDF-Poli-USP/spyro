@@ -34,7 +34,7 @@ def test_rectangle_forward():
     dictionary["absorving_boundary_conditions"] = {
         "status": False,
         "damping_type": None,
-        "pad_length": 0.,
+        "pad_length": 0.0,
     }
     Wave_obj = spyro.examples.Rectangle_acoustic()
 
@@ -99,6 +99,7 @@ def test_immersed_polygon_forward():
 @pytest.mark.parametrize("use_vertex_only_mesh", [False, True])
 def test_camembert_elastic(use_vertex_only_mesh):
     from spyro.examples.camembert_elastic import wave
+
     # use vertex-only mesh
     wave.use_vertex_only_mesh = use_vertex_only_mesh
     wave.forward_solve()
@@ -107,6 +108,7 @@ def test_camembert_elastic(use_vertex_only_mesh):
 @pytest.mark.slow
 def test_elastic_cube_3D():
     from spyro.examples.elastic_cube_3D import wave
+
     wave.forward_solve()
 
 

@@ -65,9 +65,7 @@ def test_velocity_to_grid():
     rc = 0.7
     vmax = 2.0
     vmin = 1.5
-    cond = fire.conditional(
-        (z - zc) ** 2 + (x - xc) ** 2 < rc**2, vmax, vmin
-    )
+    cond = fire.conditional((z - zc) ** 2 + (x - xc) ** 2 < rc**2, vmax, vmin)
     wave_obj.set_initial_velocity_model(conditional=cond)
     grid_spacing = 0.02
     grid_velocity_data = spyro.utils.velocity_to_grid(wave_obj, grid_spacing)
@@ -76,9 +74,7 @@ def test_velocity_to_grid():
     nz, nx = vp.shape
     z_grid = np.linspace(-grid_velocity_data["length_z"], 0.0, nz, dtype=np.float32)
     x_grid = np.linspace(0.0, grid_velocity_data["length_x"], nx, dtype=np.float32)
-    interpolator = RegularGridInterpolator(
-        (z_grid, x_grid), vp, bounds_error=False
-    )
+    interpolator = RegularGridInterpolator((z_grid, x_grid), vp, bounds_error=False)
 
     # Generate random points inside and outside the circle
     # Generate 5 random points inside the circle
@@ -90,7 +86,7 @@ def test_velocity_to_grid():
         x_rand = np.random.uniform(xc - rc, xc + rc)
 
         # Check if point is inside circle (excluding boundary)
-        distance_squared = (z_rand - zc)**2 + (x_rand - xc)**2
+        distance_squared = (z_rand - zc) ** 2 + (x_rand - xc) ** 2
         if distance_squared + tol < rc**2:  # Strictly inside (no boundary)
             points_inside.append((z_rand, x_rand))
 
@@ -105,7 +101,7 @@ def test_velocity_to_grid():
         x_rand = np.random.uniform(domain_x_min, domain_x_max)
 
         # Check if point is outside circle (excluding boundary)
-        distance_squared = (z_rand - zc)**2 + (x_rand - xc)**2
+        distance_squared = (z_rand - zc) ** 2 + (x_rand - xc) ** 2
         if distance_squared > rc**2 + tol:  # Strictly outside (no boundary)
             points_outside.append((z_rand, x_rand))
 

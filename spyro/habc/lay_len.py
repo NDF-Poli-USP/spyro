@@ -1,3 +1,5 @@
+"""Absorbing-layer size calculations for HABC."""
+
 # This file contains methods for sizing an absorbing layer
 
 import numpy as np
@@ -11,9 +13,8 @@ import numpy as np
 # With additions by Alexandre Olender
 
 
-def f_layer(x, a, m=1, s=0.999, typ='FL'):
-    '''
-    Function whose zeros are solution for the parameter size of the layer.
+def f_layer(x, a, m=1, s=0.999, typ="FL"):
+    """Compute the layer-size criterion function.
 
     Parameters
     ----------
@@ -34,11 +35,11 @@ def f_layer(x, a, m=1, s=0.999, typ='FL'):
     -------
     CritFL = CR - RF : `float`
         Value of the function for the size criterion
-    CR: `float`
+    CR : `float`
         Value for the reflection coefficient4
 
     Examples
-    -------
+    --------
     Let c = 1.5 km/s, l = 1.2 km, m=1, s=0.999
 
     Zeros for  f = 5Hz, a = 0.25
@@ -54,30 +55,29 @@ def f_layer(x, a, m=1, s=0.999, typ='FL'):
     Tol 1e-3: F_L1=0.4259, F_L2=0.5959, F_L3=0.6624, F_L4=0.9179, F_L5=0.9431
     Tol 1e-4: F_L1=0.4259, F_L2=0.5959, F_L3=0.6624, F_L4=0.9179, F_L5=0.9431
     Tol 1e-5: F_L1=0.4259, F_L2=0.5959, F_L3=0.6624, F_L4=0.9179, F_L5=0.9431
-    '''
-
+    """
     # Reflection coefficient
-    CR = abs(s**2 / (s**2 + (4 * x / (m * a))**2))
+    CR = abs(s**2 / (s**2 + (4 * x / (m * a)) ** 2))
 
-    if typ == 'CR':
+    if typ == "CR":
         return CR
 
     # Attenuation amplitude factor
-    AS = 1 + (1 / 8) * (s * m * a / x)**2
+    AS = 1 + (1 / 8) * (s * m * a / x) ** 2
     ax0 = m * np.pi * AS
-    ax1 = (1 - s**2)**0.5
+    ax1 = (1 - s**2) ** 0.5
     ax2 = s / ax1
     ax3 = (2 * np.pi * x / a) * AS
-    RF = abs(np.exp(-s * ax0) * (np.cos(ax1 * ax0)
-                                 + ax2 * np.sin(ax1 * ax0)) * np.cos(ax3))
+    RF = abs(
+        np.exp(-s * ax0) * (np.cos(ax1 * ax0) + ax2 * np.sin(ax1 * ax0)) * np.cos(ax3)
+    )
 
-    if typ == 'FL':
+    if typ == "FL":
         return CR - RF
 
 
 def calc_zero(xini, a, tol, nz=1):
-    '''
-    Compute several parameter sizes for the absorbing layer.
+    """Compute several parameter sizes for the absorbing layer.
 
     Parameters
     ----------
@@ -95,8 +95,7 @@ def calc_zero(xini, a, tol, nz=1):
     -------
     x : `float`
         Size  parameter of the absorbing layer (F_L)
-    '''
-
+    """
     if nz == 1:
         x = tol * round(xini / tol)
     else:
@@ -109,9 +108,9 @@ def calc_zero(xini, a, tol, nz=1):
     while abs(f_layer(x, a)) > f_tol or f_tol > tol_ref:
 
         # Identifying neighborhood of the root
-        if (abs(f_layer(x, a)) <= f_tol
-            or f_layer(x, a) * f_layer(x - f_tol, a) < 0) \
-                and x > xini + f_tol:
+        if (
+            abs(f_layer(x, a)) <= f_tol or f_layer(x, a) * f_layer(x - f_tol, a) < 0
+        ) and x > xini + f_tol:
 
             # Adjusting initial guess and tolerance
             x = f_tol * np.floor((x - f_tol) / f_tol)
@@ -125,10 +124,8 @@ def calc_zero(xini, a, tol, nz=1):
     return x
 
 
-def loop_roots(a, lmin, lref, max_roots, tol_rel=1e-3,
-               show_ig=True, monitor=False):
-    '''
-    Loop to calculate the size parameter for the absorbing layer.
+def loop_roots(a, lmin, lref, max_roots, tol_rel=1e-3, show_ig=True, monitor=False):
+    """Loop to calculate the size parameter for the absorbing layer.
 
     Parameters
     ----------
@@ -152,19 +149,17 @@ def loop_roots(a, lmin, lref, max_roots, tol_rel=1e-3,
     -------
     FLpos : `list`
         Possible size parameters for the absorbing layer without rounding
-    '''
-
+    """
     # Initial guess
     FLmin = 0.5 * lmin / lref
     if show_ig:
-        print("Initial Guess for Size Parameter: {:.4f}".format(
-            FLmin), flush=True)
+        print("Initial Guess for Size Parameter: {:.4f}".format(FLmin), flush=True)
 
     # Number of digits to round the size parameter
     dig_x = 13
 
     # Root Tolerance
-    tol = 10**int(np.log10(tol_rel * FLmin))
+    tol = 10 ** int(np.log10(tol_rel * FLmin))
 
     x = FLmin
     FLpos = []  # Size parameter
@@ -184,16 +179,26 @@ def loop_roots(a, lmin, lref, max_roots, tol_rel=1e-3,
         # Monitoring the size parameter
         if monitor:
             print("**************** Possible FL ****************", flush=True)
-            print(f"Root {i + 1}: {x_rnd: >} - Res: {f_layer(x_rnd, a): >}",
-                  flush=True)
+            print(
+                f"Root {i + 1}: {x_rnd: >} - Res: {f_layer(x_rnd, a): >}",
+                flush=True,
+            )
 
     return FLpos
 
 
-def calc_size_lay(fref, z_par, lmin, lref, nz=5, n_root=1, tol_rel=1e-3,
-                  layer_based_on_mesh=True, monitor=False):
-    '''
-    Calculate the lenght of the absorbing layer.
+def calc_size_lay(
+    fref,
+    z_par,
+    lmin,
+    lref,
+    nz=5,
+    n_root=1,
+    tol_rel=1e-3,
+    layer_based_on_mesh=True,
+    monitor=False,
+):
+    """Calculate the lenght of the absorbing layer.
 
     Parameters
     ----------
@@ -229,8 +234,7 @@ def calc_size_lay(fref, z_par, lmin, lref, nz=5, n_root=1, tol_rel=1e-3,
         Also, "z" parameter is the inverse of the minimum Eikonal (1 / phi_min)
     FLpos : `list`
         Possible size parameters for the absorbing layer without rounding
-    '''
-
+    """
     # Visualizing parameters for computing layer size
     print("\nComputing Size for Absorbing Layer", flush=True)
 
@@ -255,15 +259,17 @@ def calc_size_lay(fref, z_par, lmin, lref, nz=5, n_root=1, tol_rel=1e-3,
     CRpos = np.round(np.array([f_layer(x, a, typ="CR") for x in FLpos]), 4)
 
     # Visualizing options for layer size
-    format_FL = ', '.join(['{:.4f}'.format(x) for x in FLpos])
+    format_FL = ", ".join(["{:.4f}".format(x) for x in FLpos])
     print("Options for FL: [{}]".format(format_FL), flush=True)
-    format_CR = ', '.join(['{:.4f}'.format(x) for x in CRpos])
+    format_CR = ", ".join(["{:.4f}".format(x) for x in CRpos])
     print("Options for CR: [{}]".format(format_CR), flush=True)
-    format_lay = ', '.join(['{:.4f}'.format(x * lref) for x in FLpos])
+    format_lay = ", ".join(["{:.4f}".format(x * lref) for x in FLpos])
     print("Options for Layer Size (km): [{}]".format(format_lay), flush=True)
     format_ele = [int(x * lref / lmin) for x in FLpos]
-    print("Aprox. Number of Elements ({:.3f} km) in Layer: {}".format(
-        lmin, format_ele), flush=True)
+    print(
+        "Aprox. Number of Elements ({:.3f} km) in Layer: {}".format(lmin, format_ele),
+        flush=True,
+    )
 
     # Selecting a size
     F_L = FLpos[n_root - 1]
@@ -288,9 +294,7 @@ def calc_size_lay(fref, z_par, lmin, lref, nz=5, n_root=1, tol_rel=1e-3,
 
 
 def roundFL(lmin, lref, F_L):
-    '''
-    Adjust the layer parameter based on the element size to get
-    an integer number of elements within the layer.
+    """Adjust layer parameter to enforce an integer number of elements.
 
     Parameters
     ----------
@@ -309,8 +313,7 @@ def roundFL(lmin, lref, F_L):
         Modified size of the absorbing layer
     ele_pad : `int`
         Number of elements in the layer of edge length 'lmin'
-    '''
-
+    """
     # Adjusting the parameter size of the layer
     F_L = (lmin / lref) * np.ceil(lref * F_L / lmin)
 
@@ -323,7 +326,6 @@ def roundFL(lmin, lref, F_L):
     print("\nModifying Layer Size Based on the Element Size", flush=True)
     print("Modified Parameter Size FL: {:.4f}".format(F_L), flush=True)
     print("Modified Layer Size (km): {:.4f}".format(pad_len), flush=True)
-    print("Elements ({:.3f} km) in Layer: {}".format(
-        lmin, ele_pad), flush=True)
+    print("Elements ({:.3f} km) in Layer: {}".format(lmin, ele_pad), flush=True)
 
     return F_L, pad_len, ele_pad

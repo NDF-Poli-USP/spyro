@@ -14,7 +14,7 @@ def check_gradient(Wave_obj_guess, dJ, rec_out_exact, Jm, plot=False):
     V_c = Wave_obj_guess.function_space
     dm = fire.Function(V_c)
     rng = np.random.default_rng(0)
-    size, = np.shape(dm.dat.data[:])
+    (size,) = np.shape(dm.dat.data[:])
     dm_data = rng.random(size)
     dm.dat.data[:] = dm_data
     # dm.assign(dJ)
@@ -22,7 +22,7 @@ def check_gradient(Wave_obj_guess, dJ, rec_out_exact, Jm, plot=False):
     for step in steps:
 
         Wave_obj_guess.reset_pressure()
-        c_guess = fire.Constant(2.0) + step*dm
+        c_guess = fire.Constant(2.0) + step * dm
         Wave_obj_guess.initial_velocity_model = c_guess
         Wave_obj_guess.forward_solve()
         misfit_plusdm = rec_out_exact - Wave_obj_guess.receivers_output
@@ -131,7 +131,9 @@ def get_forward_model(load_true=False):
             conditional=cond,
             # output=True
         )
-        spyro.plots.plot_model(Wave_obj_exact, abc_points=[(-1, 1), (-2, 1), (-2, 4), (-1, 2)])
+        spyro.plots.plot_model(
+            Wave_obj_exact, abc_points=[(-1, 1), (-2, 1), (-2, 4), (-1, 2)]
+        )
         Wave_obj_exact.forward_solve()
         # forward_solution_exact = Wave_obj_exact.forward_solution
         rec_out_exact = Wave_obj_exact.receivers_output
@@ -160,7 +162,9 @@ def test_gradient():
     print(f"Cost functional : {Jm}")
 
     # compute the gradient of the control (to be verified)
-    dJ = Wave_obj_guess.gradient_solve(misfit=misfit, forward_solution=forward_solution_guess)
+    dJ = Wave_obj_guess.gradient_solve(
+        misfit=misfit, forward_solution=forward_solution_guess
+    )
     VTKFile("gradient.pvd").write(dJ)
 
     check_gradient(Wave_obj_guess, dJ, rec_out_exact, Jm, plot=True)

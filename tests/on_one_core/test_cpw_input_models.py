@@ -103,7 +103,9 @@ def test_create_initial_model_for_meshing_parameter_rejects_invalid_dimension():
         input_models.create_initial_model_for_meshing_parameter(obj)
 
 
-def test_create_initial_model_for_meshing_parameter_2d_dispatches_homogeneous(monkeypatch):
+def test_create_initial_model_for_meshing_parameter_2d_dispatches_homogeneous(
+    monkeypatch,
+):
     expected = {"profile": "homogeneous"}
     monkeypatch.setattr(
         input_models,
@@ -115,7 +117,9 @@ def test_create_initial_model_for_meshing_parameter_2d_dispatches_homogeneous(mo
     assert input_models.create_initial_model_for_meshing_parameter_2D(obj) == expected
 
 
-def test_create_initial_model_for_meshing_parameter_2d_dispatches_heterogeneous(monkeypatch):
+def test_create_initial_model_for_meshing_parameter_2d_dispatches_heterogeneous(
+    monkeypatch,
+):
     expected = {"profile": "heterogeneous"}
     monkeypatch.setattr(
         input_models,
@@ -145,7 +149,9 @@ def test_create_initial_model_for_meshing_parameter_2d_heterogeneous_sets_core_f
         velocity_model_file_name="my_model.segy",
     )
 
-    model = input_models.create_initial_model_for_meshing_parameter_2D_heterogeneous(obj)
+    model = input_models.create_initial_model_for_meshing_parameter_2D_heterogeneous(
+        obj
+    )
 
     assert model["options"]["method"] == "spectral_quadrilateral"
     assert model["options"]["degree"] == 5
@@ -181,7 +187,9 @@ def test_create_initial_model_for_meshing_parameter_2d_homogeneous_reduced_flag(
     assert model["mesh"]["length_z"] == pytest.approx(40 * lbda)
     assert model["mesh"]["length_x"] == pytest.approx(30 * lbda)
     assert model["absorving_boundary_conditions"]["pad_length"] == pytest.approx(lbda)
-    assert model["time_axis"]["final_time"] == pytest.approx(20 * (1.0 / obj.source_frequency))
+    assert model["time_axis"]["final_time"] == pytest.approx(
+        20 * (1.0 / obj.source_frequency)
+    )
     assert len(model["acquisition"]["receiver_locations"]) == expected_receivers
 
 

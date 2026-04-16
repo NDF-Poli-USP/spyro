@@ -4,20 +4,23 @@ import segyio
 import numpy as np
 import matplotlib.pyplot as plt
 from firedrake.__future__ import interpolate
+
 fire.interpolate = interpolate
 
 
 def get_vp_from_2dsegy(filename):
-    """
-    Extracts velocity profile (vp) data from a 2D SEG-Y file.
-    Parameters:
-    filename (str): The path to the SEG-Y file.
-    Returns:
-    np.ndarray: A 2D numpy array containing the velocity profile data,
+    """Extracts velocity profile (vp) data from a 2D SEG-Y file.
+
+    Parameters
+    ----------
+    filename (str) : The path to the SEG-Y file.
+
+    Returns
+    -------
+    np.ndarray : A 2D numpy array containing the velocity profile data,
                 with shape (nz, nx) where nz is the number of samples
                 and nx is the number of traces.
     """
-
     with segyio.open(filename, ignore_geometry=True) as f:
         nz, nx = len(f.samples), len(f.trace)
         show_vp = np.zeros(shape=(nz, nx))
@@ -46,7 +49,7 @@ def test_write_segy_and_smooth(show=False):
 
     vp.assign(fire.assemble(fire.interpolate(c, V)))
 
-    spyro.io.create_segy(vp, V, 10.0/1000.0, segy_file)
+    spyro.io.create_segy(vp, V, 10.0 / 1000.0, segy_file)
     original_vp = get_vp_from_2dsegy(segy_file)
 
     if show is True:
@@ -60,12 +63,16 @@ def test_write_segy_and_smooth(show=False):
         plt.savefig("nonsmoothedtest.png")
         plt.show()
 
-    spyro.tools.smooth_velocity_field_file(segy_file, smoothed_file, 5, show=show, save_fig=True)
+    spyro.tools.smooth_velocity_field_file(
+        segy_file, smoothed_file, 5, show=show, save_fig=True
+    )
 
     smoothed_vp = get_vp_from_2dsegy(smoothed_file)
     check_boundary = np.isclose(original_vp[0, 0], smoothed_vp[0, 0])
     check_centre = np.isclose(original_vp[48, 48], smoothed_vp[48, 48], rtol=1e-3)
-    check_halfway = original_vp[0, 0]*1.1 < smoothed_vp[31, 41] < original_vp[48, 48]*0.9
+    check_halfway = (
+        original_vp[0, 0] * 1.1 < smoothed_vp[31, 41] < original_vp[48, 48] * 0.9
+    )
 
     assert all([check_boundary, check_halfway, check_centre])
 

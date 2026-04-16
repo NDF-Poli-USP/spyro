@@ -1,7 +1,10 @@
+"""Forward solver to be used in the automatic adjoint."""
+
 import firedrake as fire
 import firedrake.adjoint as fire_ad
 from .time_integration_ad import central_difference_acoustic
 from firedrake.__future__ import interpolate
+
 # Note this turns off non-fatal warnings
 fire.set_log_level(fire.ERROR)
 
@@ -9,7 +12,7 @@ fire.set_log_level(fire.ERROR)
 class ForwardSolver:
     """Wave equation forward solver.
 
-    This forward solver is prepared to work with the automatic
+    This forward solver is prepared to work with automatic
     differentiation. Only the acoustic wave equation is implemented.
 
     Parameters
@@ -25,12 +28,17 @@ class ForwardSolver:
         self.mesh = mesh
         self.V = function_space
         self.receiver_mesh = fire.VertexOnlyMesh(
-            self.mesh, self.model["acquisition"]["receiver_locations"])
+            self.mesh, self.model["acquisition"]["receiver_locations"]
+        )
         self.solution = None
 
     def execute_acoustic(
-            self, c, source_number, wavelet, compute_functional=False,
-            true_data_receivers=None
+        self,
+        c,
+        source_number,
+        wavelet,
+        compute_functional=False,
+        true_data_receivers=None,
     ):
         """Time-stepping acoustic forward solver.
 
@@ -66,11 +74,12 @@ class ForwardSolver:
         # RHS
         source_function = fire.Cofunction(self.V.dual())
         solver, u_np1, u_n, u_nm1 = central_difference_acoustic(
-            self, c, source_function)
+            self, c, source_function
+        )
         # Sources.
         source_mesh = fire.VertexOnlyMesh(
             self.mesh,
-            [self.model["acquisition"]["source_locations"][source_number]]
+            [self.model["acquisition"]["source_locations"][source_number]],
         )
         # Source function space.
         V_s = fire.FunctionSpace(source_mesh, "DG", 0)
@@ -88,13 +97,17 @@ class ForwardSolver:
         # Time execution.
         J_val = 0.0
         receiver_data = []
-        total_steps = int(self.model["time_axis"]["final_time"] / self.model["time_axis"]["dt"]) + 1
+        total_steps = (
+            int(self.model["time_axis"]["final_time"] / self.model["time_axis"]["dt"])
+            + 1
+        )
         if (
             fire_ad.get_working_tape()._checkpoint_manager
             and self.model["aut_dif"]["checkpointing"]
         ):
             time_range = fire_ad.get_working_tape().timestepper(
-                iter(range(total_steps)))
+                iter(range(total_steps))
+            )
         else:
             time_range = range(total_steps)
 
@@ -107,16 +120,20 @@ class ForwardSolver:
             receiver_data.append(rec_data)
             if compute_functional:
                 if not true_data_receivers:
-                    raise ValueError("True receiver data is required for"
-                                     "computing the functional.")
+                    raise ValueError(
+                        "True receiver data is required for" "computing the functional."
+                    )
                 misfit = rec_data - true_data_receivers[step]
                 J_val += fire.assemble(0.5 * fire.inner(misfit, misfit) * fire.dx)
         self.solution = u_np1
         return receiver_data, J_val
 
     def execute_elastic(self):
-        raise NotImplementedError("Elastic wave equation is not yet implemented"
-                                  "for the automatic differentiation based FWI.")
+        """Execute the elastic wave equation."""
+        raise NotImplementedError(
+            "Elastic wave equation is not yet implemented"
+            "for the automatic differentiation based FWI."
+        )
 
     def _solver_parameters(self):
         if self.model["options"]["variant"] == "lumped":

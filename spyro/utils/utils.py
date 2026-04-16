@@ -1,3 +1,5 @@
+"""General utilities."""
+
 import copy
 from firedrake import *  # noqa: F403
 import numpy as np
@@ -7,16 +9,19 @@ from scipy.signal import butter, filtfilt
 import warnings
 from ..io import ensemble_functional
 from ..io import parallel_print
+
 try:
     from SeismicMesh import write_velocity_model
+
     SEISMIC_MESH_AVAILABLE = True
 except ImportError:
     SEISMIC_MESH_AVAILABLE = False
 
 
 def butter_lowpass_filter(shot, cutoff, fs, order=2):
-    """Low-pass filter the shot record with sampling-rate fs Hz
-    and cutoff freq. Hz
+    """Low-pass filter the shot record with sampling-rate fs Hz and cutoff freq.
+
+    Hz.
 
     Parameters
     ----------
@@ -47,7 +52,7 @@ def butter_lowpass_filter(shot, cutoff, fs, order=2):
 
 @ensemble_functional
 def compute_functional(Wave_object, residual):
-    """Compute the functional to be optimized.
+    r"""Compute the functional to be optimized.
 
     Computes the L2 norm of the residual at receiver locations,
     integrated over time using the trapezoidal rule. This functional
@@ -123,7 +128,6 @@ def evaluate_misfit(model, guess, exact):
     The exact data is downsampled by taking every `skip`-th sample,
     while the guess data is assumed to already be at the correct sampling rate.
     """
-
     if "skip" in model["timeaxis"]:
         skip = model["timeaxis"]["skip"]
     else:
@@ -211,7 +215,8 @@ def mpi_init(model):
         num_cores_per_propagation = available_cores / model.number_of_sources
         if available_cores % model.number_of_sources != 0:
             raise ValueError(
-                f"Available cores cannot be divided between sources equally {available_cores}/{model.number_of_sources}."
+                f"Available cores cannot be divided between sources equally "
+                f"{available_cores}/{model.number_of_sources}."
             )
     elif model.parallelism_type == "spatial":
         num_cores_per_propagation = available_cores
@@ -262,7 +267,7 @@ def communicate(array, my_ensemble):
     return array_reduced
 
 
-class Mask():
+class Mask:
     """
     DEPRECATED: Spatial mask for selective gradient updates in wave simulations.
 
@@ -331,6 +336,7 @@ class Mask():
     """
 
     def __init__(self, boundaries, Wave_obj, dg=False, inverse_mask=False):
+        """Initialize Mask Class."""
         possible_boundaries = [
             "z_min",
             "z_max",
@@ -429,9 +435,17 @@ class Mask():
         for boundary in active_boundaries:
             axis = boundary[0]
             if boundary[-3:] == "min":
-                cond[0] = conditional(getattr(self, axis) < getattr(self, boundary), true_value[0], false_value[0])
+                cond[0] = conditional(
+                    getattr(self, axis) < getattr(self, boundary),
+                    true_value[0],
+                    false_value[0],
+                )
             elif boundary[-3:] == "max":
-                cond[0] = conditional(getattr(self, axis) > getattr(self, boundary), true_value[0], false_value[0])
+                cond[0] = conditional(
+                    getattr(self, axis) > getattr(self, boundary),
+                    true_value[0],
+                    false_value[0],
+                )
             else:
                 raise ValueError(f"Boundary of {boundary} not possible")
 
@@ -468,8 +482,13 @@ class Mask():
         of degrees of freedom where the mask value exceeds 0.3.
         """
         if self.in_dg:
-            raise ValueError("DG space can have different DoFs than the functional space")
-        warnings.warn("When applying a mask in a continuous space, expect some error in the element adjacent to the mask")
+            raise ValueError(
+                "DG space can have different DoFs than the functional space"
+            )
+        warnings.warn(
+            "When applying a mask in a continuous space, "
+            "expect some error in the element adjacent to the mask"
+        )
         mask = Function(Wave_obj.function_space)
         mask.interpolate(self.cond)
         # Saving mask dofs
@@ -542,6 +561,7 @@ class Gradient_mask_for_pml(Mask):
     """
 
     def __init__(self, Wave_obj):
+        """Initialize the Gradient_mask_for_pml class."""
         if Wave_obj.abc_active is False:
             raise ValueError("No PML present in wave object")
 
@@ -558,7 +578,9 @@ class Gradient_mask_for_pml(Mask):
 
 
 def run_in_one_core(func):
-    """Decorator to execute function only on rank 0.
+    """Execute function only on rank 0.
+
+    Decorator.
 
     Ensures the decorated function runs only on the root process (rank 0)
     of the communicator. Other processes skip execution. Useful for I/O
@@ -575,6 +597,10 @@ def run_in_one_core(func):
     callable
         Wrapped function that executes only on rank 0.
 
+    See Also
+    --------
+    run_in_one_core_and_broadcast : Similar decorator that also broadcasts results.
+
     Notes
     -----
     The function checks for two types of communicators:
@@ -584,10 +610,6 @@ def run_in_one_core(func):
     - If comm is None, the function runs normally without restrictions.
 
     The function does not broadcast results to other processes.
-
-    See Also
-    --------
-    run_in_one_core_and_broadcast : Similar decorator that also broadcasts results.
 
     Examples
     --------
@@ -614,7 +636,9 @@ def run_in_one_core(func):
 
 
 def run_in_one_core_and_broadcast(func):
-    """Decorator to execute function on rank 0 and broadcast result.
+    """Execute function on rank 0 and broadcast result.
+
+    Decorator.
 
     Ensures the decorated function runs only on the root process (rank 0)
     and broadcasts the return value to all other processes. Useful for
@@ -633,6 +657,10 @@ def run_in_one_core_and_broadcast(func):
         Wrapped function that executes on rank 0 and broadcasts the result
         to all processes.
 
+    See Also
+    --------
+    run_in_one_core : Similar decorator without broadcasting.
+
     Notes
     -----
     The function handles two types of communicators:
@@ -642,10 +670,6 @@ def run_in_one_core_and_broadcast(func):
     - If comm is None, the function runs normally without MPI operations.
 
     All processes receive the same return value from the broadcast.
-
-    See Also
-    --------
-    run_in_one_core : Similar decorator without broadcasting.
 
     Examples
     --------
@@ -728,13 +752,11 @@ def write_hdf5_velocity_model(obj_with_comm, segy_filename):
     'velocity.hdf5'
     """
     if SEISMIC_MESH_AVAILABLE is False:
-        raise ValueError("Segy to HDF5 not yet implemented natively. Please install SeismicMesh")
-    vp_filename, vp_filetype = os.path.splitext(
-        segy_filename
-    )
-    write_velocity_model(
-        segy_filename, ofname=vp_filename
-    )
+        raise ValueError(
+            "Segy to HDF5 not yet implemented natively. Please install SeismicMesh"
+        )
+    vp_filename, vp_filetype = os.path.splitext(segy_filename)
+    write_velocity_model(segy_filename, ofname=vp_filename)
     output_filename = vp_filename + ".hdf5"
     return output_filename
 

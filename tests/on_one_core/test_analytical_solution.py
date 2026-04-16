@@ -38,13 +38,9 @@ def test_analytical_solution(use_vertex_only_mesh):
         "receiver_locations": [(-1.5 - offset, 1.5)],
         "use_vertex_only_mesh": use_vertex_only_mesh,
     }
-    Wave_obj = spyro.examples.Rectangle_acoustic(
-        dictionary=dictionary, periodic=True
-    )
+    Wave_obj = spyro.examples.Rectangle_acoustic(dictionary=dictionary, periodic=True)
     Wave_obj.set_initial_velocity_model(constant=c_value)
-    analytical_p = spyro.utils.nodal_homogeneous_analytical(
-        Wave_obj, offset, c_value
-    )
+    analytical_p = spyro.utils.nodal_homogeneous_analytical(Wave_obj, offset, c_value)
 
     time_vector = np.linspace(0.0, 1.0, int(1.0 / Wave_obj.dt) + 1)
     Wave_obj.forward_solve()

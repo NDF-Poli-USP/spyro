@@ -6,7 +6,7 @@ from ..inputfiles.Model1_gradient_2d import model
 
 
 def _make_vp_exact(V, mesh):
-    """Create a circle with higher velocity in the center"""
+    """Create a circle with higher velocity in the center."""
     z, x = SpatialCoordinate(mesh)
     vp_exact = Function(V).interpolate(
         4.0 + 1.0 * tanh(10.0 * (0.5 - sqrt((z - 1.5) ** 2 + (x + 1.5) ** 2)))
@@ -16,7 +16,7 @@ def _make_vp_exact(V, mesh):
 
 
 def _make_vp_guess(V, mesh):
-    """The guess is a uniform velocity of 4.0 km/s"""
+    """The guess is a uniform velocity of 4.0 km/s."""
     z, x = SpatialCoordinate(mesh)
     vp_guess = Function(V).interpolate(4.0 + 0.0 * x)
     VTKFile("guess_vel.pvd").write(vp_guess)
@@ -76,7 +76,7 @@ def test_gradient_talyor_remainder_v2():
             self.misfit = None
 
         def value(self, x, tol):
-            """Compute the functional"""
+            """Compute the functional."""
             self.p_guess, p_guess_recv = spyro.solvers.forward(
                 model,
                 mesh,
@@ -87,9 +87,7 @@ def test_gradient_talyor_remainder_v2():
                 receivers,
                 output=False,
             )
-            self.misfit = spyro.utils.evaluate_misfit(
-                model, p_guess_recv, p_exact_recv
-            )
+            self.misfit = spyro.utils.evaluate_misfit(model, p_guess_recv, p_exact_recv)
             J = spyro.utils.compute_functional(model, self.misfit)
             return J
 

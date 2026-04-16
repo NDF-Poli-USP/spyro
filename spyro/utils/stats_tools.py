@@ -1,9 +1,10 @@
+"""Compute the coefficient of determination (R^2) for regression models."""
+
 import numpy as np
 
 
 def coeff_of_determination(y_true, y_pred, p):
-    '''
-    Compute the coefficient of determination (R^2) for regression models.
+    """Compute the coefficient of determination (R^2) for regression models.
 
     Parameters
     ----------
@@ -20,8 +21,7 @@ def coeff_of_determination(y_true, y_pred, p):
     -------
     r2_adj : `float`
         Adjusted R^2 value
-    '''
-
+    """
     # Observations
     n = len(y_true)
 

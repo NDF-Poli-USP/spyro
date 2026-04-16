@@ -2,6 +2,7 @@ import meshio
 import firedrake as fire
 import spyro
 import time
+
 try:
     import SeismicMesh
 except ImportError:
@@ -54,9 +55,8 @@ model["acquisition"] = {
     "delay": 1.0,
     "num_receivers": 216,
     "receiver_locations": spyro.create_3d_grid(
-        (-4.715, 2.574, 3.285),
-        (-3.285, 4.004, 4.715),
-        6),
+        (-4.715, 2.574, 3.285), (-3.285, 4.004, 4.715), 6
+    ),
 }
 
 # Simulate for 1.0 seconds.
@@ -75,26 +75,26 @@ comm = spyro.utils.mpi_init(model)
 # in order to not have to
 # when testing multiple cores.
 
-print('Entering mesh generation', flush=True)
-if model['opts']['degree'] == 2:
+print("Entering mesh generation", flush=True)
+if model["opts"]["degree"] == 2:
     M = 5.1
-elif model['opts']['degree'] == 3:
+elif model["opts"]["degree"] == 3:
     M = 3.1
 
-edge_length = 0.286/M
+edge_length = 0.286 / M
 Real_Lz = model["mesh"]["length_z"] + model["BCs"]["lz"]
 Lx = model["mesh"]["length_x"]
 Ly = model["mesh"]["length_y"]
 pad = model["BCs"]["lz"]
 
-bbox = (-Real_Lz, 0.0, -pad, Lx+pad, -pad, Ly+pad)
+bbox = (-Real_Lz, 0.0, -pad, Lx + pad, -pad, Ly + pad)
 cube = SeismicMesh.Cube(bbox)
 points, cells = SeismicMesh.generate_mesh(
     domain=cube,
     edge_length=edge_length,
     max_iter=80,
     comm=comm.ensemble_comm,
-    verbose=2
+    verbose=2,
 )
 
 points, cells = SeismicMesh.sliver_removal(
@@ -103,7 +103,7 @@ points, cells = SeismicMesh.sliver_removal(
     max_iter=100,
     domain=cube,
     edge_length=edge_length,
-    preserve=True
+    preserve=True,
 )
 
 meshio.write_points_cells(
@@ -111,16 +111,14 @@ meshio.write_points_cells(
     points,
     [("tetra", cells)],
     file_format="gmsh22",
-    binary=False
+    binary=False,
 )
 
 # Mesh generation finishes here.
 
 mesh = fire.Mesh(
     "meshes/benchmark_3d.msh",
-    distribution_parameters={
-        "overlap_type": (fire.DistributedMeshOverlapType.NONE, 0)
-    },
+    distribution_parameters={"overlap_type": (fire.DistributedMeshOverlapType.NONE, 0)},
 )
 
 method = model["opts"]["method"]
@@ -129,12 +127,7 @@ degree = model["opts"]["degree"]
 if comm.ensemble_comm.rank == 0 and comm.comm.rank == 0:
     print(f"Setting up {method} a {degree}tetra element", flush=True)
 
-element = fire.FiniteElement(
-    method,
-    mesh.ufl_cell(),
-    degree=degree,
-    variant="KMV"
-)
+element = fire.FiniteElement(method, mesh.ufl_cell(), degree=degree, variant="KMV")
 
 V = fire.FunctionSpace(mesh, element)
 
@@ -156,13 +149,5 @@ wavelet = spyro.full_ricker_wavelet(
 )
 
 t1 = time.time()
-p, p_r = spyro.solvers.forward(
-    model,
-    mesh,
-    comm,
-    vp,
-    sources,
-    wavelet,
-    receivers
-)
+p, p_r = spyro.solvers.forward(model, mesh, comm, vp, sources, wavelet, receivers)
 print(time.time() - t1, flush=True)

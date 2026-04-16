@@ -1,3 +1,5 @@
+"""spyro setup."""
+
 from setuptools import setup, find_packages
 
 setup(
@@ -5,7 +7,7 @@ setup(
     version="0.9.1",
     license="LGPL v3",
     description="Wave modeling with the finite element method",
-    author="Keith J. Roberts, Alexandre F. G. Olender, Ruben Andres Salas, Eduardo Moscatelli de Souza, Daiane I. Dolci, Thiago Dias dos Santos, Lucas Franceschini",
+    author="Keith J. Roberts, Alexandre F. G. Olender, Ruben Andres Salas, Eduardo Moscatelli de Souza, Daiane I. Dolci, Thiago Dias dos Santos, Lucas Franceschini",  # noqa: E501
     url="https://github.com/NDF-Poli-USP/spyro",
     packages=find_packages(),
     install_requires=[
@@ -14,5 +16,6 @@ setup(
         "matplotlib",
         "segyio",
         "meshio",
-        "mpi-pytest"],
+        "mpi-pytest",
+    ],
 )

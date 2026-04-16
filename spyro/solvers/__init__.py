@@ -1,3 +1,5 @@
+"""Wave solvers."""
+
 from .wave import Wave
 from .acoustic_wave import AcousticWave
 from .mms_acoustic import AcousticWaveMMS

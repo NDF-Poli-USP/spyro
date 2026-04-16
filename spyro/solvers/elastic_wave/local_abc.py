@@ -1,11 +1,18 @@
-from firedrake import (Constant, ds, TestFunction, TrialFunction)
+"""Local absorbing boundary conditions implementation for elastic wave equations.
+
+This module provides implementations of different local ABC schemes including
+Stacey and Clayton-Engquist ABCs.
+"""
+
+from firedrake import Constant, ds, TestFunction, TrialFunction
 
 
 def local_abc_form(Wave):
-    '''
-    Returns the linear form associated with the traction loads
-    when combined with local absorbing boundary conditions.
-    '''
+    """Return the linear form associated with the traction loads and local ABCs.
+
+    Compute the linear form for traction loads when combined with local
+    absorbing boundary conditions.
+    """
     abc_dict = Wave.input_dictionary.get("absorving_boundary_conditions", None)
     if abc_dict is None:
         return 0
@@ -36,30 +43,29 @@ def local_abc_form(Wave):
 
     # Partial derivatives
     if dt_scheme == "backward":
-        uz_dt = (u_n[iz] - u_nm1[iz])/dt
-        ux_dt = (u_n[ix] - u_nm1[ix])/dt
+        uz_dt = (u_n[iz] - u_nm1[iz]) / dt
+        ux_dt = (u_n[ix] - u_nm1[ix]) / dt
     elif dt_scheme == "backward_2nd":
         u_nm2 = Wave.u_nm2
-        uz_dt = (3*u_n[iz] - 4*u_nm1[iz] + u_nm2[iz])/(2*dt)
-        ux_dt = (3*u_n[ix] - 4*u_nm1[ix] + u_nm2[ix])/(2*dt)
+        uz_dt = (3 * u_n[iz] - 4 * u_nm1[iz] + u_nm2[iz]) / (2 * dt)
+        ux_dt = (3 * u_n[ix] - 4 * u_nm1[ix] + u_nm2[ix]) / (2 * dt)
     elif dt_scheme == "central":
         u = TrialFunction(V)
-        uz_dt = (u[iz] - u_nm1[iz])/(2*dt)
-        ux_dt = (u[ix] - u_nm1[ix])/(2*dt)
+        uz_dt = (u[iz] - u_nm1[iz]) / (2 * dt)
+        ux_dt = (u[ix] - u_nm1[ix]) / (2 * dt)
     else:
-        raise NotImplementedError(
-            f"Unsupported time discretization: {dt_scheme}")
+        raise NotImplementedError(f"Unsupported time discretization: {dt_scheme}")
     uz_dz = u_n[iz].dx(iz)
     uz_dx = u_n[iz].dx(ix)
     ux_dz = u_n[ix].dx(iz)
     ux_dx = u_n[ix].dx(ix)
     if Wave.dimension == 3:
         if dt_scheme == "backward":
-            uy_dt = (u_n[iy] - u_nm1[iy])/dt
+            uy_dt = (u_n[iy] - u_nm1[iy]) / dt
         elif dt_scheme == "backward_2nd":
-            uy_dt = (3*u_n[iy] - 4*u_nm1[iy] + u_nm2[iy])/(2*dt)
+            uy_dt = (3 * u_n[iy] - 4 * u_nm1[iy] + u_nm2[iy]) / (2 * dt)
         elif dt_scheme == "central":
-            uy_dt = (u[iy] - u_nm1[iy])/(2*dt)
+            uy_dt = (u[iy] - u_nm1[iy]) / (2 * dt)
         uz_dy = u_n[iz].dx(iy)
         ux_dy = u_n[ix].dx(iy)
         uy_dz = u_n[iy].dx(iz)
@@ -80,139 +86,292 @@ def local_abc_form(Wave):
     else:
         raise NotImplementedError(f"Unsupported local ABC: {abc_type}")
 
-    return callback(Wave.dimension, rho, c_p, c_s,
-                    v, iz, ix, iy, qr_s,
-                    uz_dt, ux_dt, uy_dt,
-                    uz_dz, ux_dz, uy_dz,
-                    uz_dx, ux_dx, uy_dx,
-                    uz_dy, ux_dy, uy_dy)
+    return callback(
+        Wave.dimension,
+        rho,
+        c_p,
+        c_s,
+        v,
+        iz,
+        ix,
+        iy,
+        qr_s,
+        uz_dt,
+        ux_dt,
+        uy_dt,
+        uz_dz,
+        ux_dz,
+        uy_dz,
+        uz_dx,
+        ux_dx,
+        uy_dx,
+        uz_dy,
+        ux_dy,
+        uy_dy,
+    )
 
 
-def clayton_engquist_A1_terms(ndim, rho, c_p, c_s,
-                              v, iz, ix, iy, qr_s,
-                              uz_dt, ux_dt, uy_dt,
-                              uz_dz, ux_dz, uy_dz,
-                              uz_dx, ux_dx, uy_dx,
-                              uz_dy, ux_dy, uy_dy):
+def clayton_engquist_A1_terms(
+    ndim,
+    rho,
+    c_p,
+    c_s,
+    v,
+    iz,
+    ix,
+    iy,
+    qr_s,
+    uz_dt,
+    ux_dt,
+    uy_dt,
+    uz_dz,
+    ux_dz,
+    uy_dz,
+    uz_dx,
+    ux_dx,
+    uy_dx,
+    uz_dy,
+    ux_dy,
+    uy_dy,
+):
+    """Compute Clayton-Engquist A1 boundary condition terms.
 
+    Parameters
+    ----------
+    ndim : int
+        Number of spatial dimensions (2 or 3).
+    rho : firedrake.Function
+        Density field.
+    c_p : firedrake.Function
+        P-wave velocity field.
+    c_s : firedrake.Function
+        S-wave velocity field.
+    v : firedrake.TestFunction
+        Test function in the function space.
+    iz : int
+        Index of z-component (0).
+    ix : int
+        Index of x-component (1).
+    iy : int
+        Index of y-component (2).
+    qr_s : dict
+        Surface quadrature rule.
+    uz_dt : firedrake.Function
+        Time derivative of z-displacement.
+    ux_dt : firedrake.Function
+        Time derivative of x-displacement.
+    uy_dt : firedrake.Function or None
+        Time derivative of y-displacement (only for 3D).
+    uz_dz : firedrake.Function
+        Spatial z-derivative of z-displacement.
+    ux_dz : firedrake.Function
+        Spatial z-derivative of x-displacement.
+    uy_dz : firedrake.Function or None
+        Spatial z-derivative of y-displacement (only for 3D).
+    uz_dx : firedrake.Function
+        Spatial x-derivative of z-displacement.
+    ux_dx : firedrake.Function
+        Spatial x-derivative of x-displacement.
+    uy_dx : firedrake.Function or None
+        Spatial x-derivative of y-displacement (only for 3D).
+    uz_dy : firedrake.Function or None
+        Spatial y-derivative of z-displacement (only for 3D).
+    ux_dy : firedrake.Function or None
+        Spatial y-derivative of x-displacement (only for 3D).
+    uy_dy : firedrake.Function or None
+        Spatial y-derivative of y-displacement (only for 3D).
+
+    Returns
+    -------
+    firedrake.Form
+        The linear form representing Clayton-Engquist A1 boundary conditions.
+    """
     F_t = 0
 
     # Plane z = -(Lz + pad)
-    sig_zz = rho*c_p*uz_dt + rho*(c_p**2 - 2*c_s**2)*ux_dx
+    sig_zz = rho * c_p * uz_dt + rho * (c_p**2 - 2 * c_s**2) * ux_dx
     if ndim == 3:
-        sig_zz += rho*(c_p**2 - 2*c_s**2)*uy_dy
-    sig_xz = rho*c_s*ux_dt + rho*(c_s**2)*uz_dx
-    F_t += -(sig_zz*v[iz] + sig_xz*v[ix])*ds(1, **qr_s)
+        sig_zz += rho * (c_p**2 - 2 * c_s**2) * uy_dy
+    sig_xz = rho * c_s * ux_dt + rho * (c_s**2) * uz_dx
+    F_t += -(sig_zz * v[iz] + sig_xz * v[ix]) * ds(1, **qr_s)
     if ndim == 3:
-        sig_yz = rho*c_s*uy_dt + rho*(c_s**2)*uz_dy
-        F_t += -sig_yz*v[iy]*ds(1, **qr_s)
+        sig_yz = rho * c_s * uy_dt + rho * (c_s**2) * uz_dy
+        F_t += -sig_yz * v[iy] * ds(1, **qr_s)
 
     # Plane z = 0
-    sig_zz = -rho*c_p*uz_dt + rho*(c_p**2 - 2*c_s**2)*ux_dx
+    sig_zz = -rho * c_p * uz_dt + rho * (c_p**2 - 2 * c_s**2) * ux_dx
     if ndim == 3:
-        sig_zz += rho*(c_p**2 - 2*c_s**2)*uy_dy
-    sig_xz = -rho*c_s*ux_dt + rho*(c_s**2)*uz_dx
-    F_t += (sig_zz*v[iz] + sig_xz*v[ix])*ds(2, **qr_s)
+        sig_zz += rho * (c_p**2 - 2 * c_s**2) * uy_dy
+    sig_xz = -rho * c_s * ux_dt + rho * (c_s**2) * uz_dx
+    F_t += (sig_zz * v[iz] + sig_xz * v[ix]) * ds(2, **qr_s)
     if ndim == 3:
-        sig_yz = -rho*c_s*uy_dt + rho*(c_s**2)*uz_dy
-        F_t += sig_yz*v[iy]*ds(2, **qr_s)
+        sig_yz = -rho * c_s * uy_dt + rho * (c_s**2) * uz_dy
+        F_t += sig_yz * v[iy] * ds(2, **qr_s)
 
     # Plane x = -pad
-    sig_zx = rho*c_s*uz_dt + rho*(c_s**2)*ux_dz
-    sig_xx = rho*c_p*ux_dt + rho*(c_p**2 - 2*c_s**2)*uz_dz
+    sig_zx = rho * c_s * uz_dt + rho * (c_s**2) * ux_dz
+    sig_xx = rho * c_p * ux_dt + rho * (c_p**2 - 2 * c_s**2) * uz_dz
     if ndim == 3:
-        sig_xx += rho*(c_p**2 - 2*c_s**2)*uy_dy
-    F_t += -(sig_zx*v[iz] + sig_xx*v[ix])*ds(3, **qr_s)
+        sig_xx += rho * (c_p**2 - 2 * c_s**2) * uy_dy
+    F_t += -(sig_zx * v[iz] + sig_xx * v[ix]) * ds(3, **qr_s)
     if ndim == 3:
-        sig_yx = rho*c_s*uy_dt + rho*(c_s**2)*ux_dy
-        F_t += -sig_yx*v[iy]*ds(3, **qr_s)
+        sig_yx = rho * c_s * uy_dt + rho * (c_s**2) * ux_dy
+        F_t += -sig_yx * v[iy] * ds(3, **qr_s)
 
     # Plane x = Lx + pad
-    sig_zx = -rho*c_s*uz_dt + rho*(c_s**2)*ux_dz
-    sig_xx = -rho*c_p*ux_dt + rho*(c_p**2 - 2*c_s**2)*uz_dz
+    sig_zx = -rho * c_s * uz_dt + rho * (c_s**2) * ux_dz
+    sig_xx = -rho * c_p * ux_dt + rho * (c_p**2 - 2 * c_s**2) * uz_dz
     if ndim == 3:
-        sig_xx += rho*(c_p**2 - 2*c_s**2)*uy_dy
-    F_t += (sig_zx*v[iz] + sig_xx*v[ix])*ds(4, **qr_s)
+        sig_xx += rho * (c_p**2 - 2 * c_s**2) * uy_dy
+    F_t += (sig_zx * v[iz] + sig_xx * v[ix]) * ds(4, **qr_s)
     if ndim == 3:
-        sig_yx = -rho*c_s*uy_dt + rho*(c_s**2)*ux_dy
-        F_t += sig_yx*v[iy]*ds(4, **qr_s)
+        sig_yx = -rho * c_s * uy_dt + rho * (c_s**2) * ux_dy
+        F_t += sig_yx * v[iy] * ds(4, **qr_s)
 
     if ndim == 3:
         # Plane y = 0
-        sig_zy = rho*c_s*uz_dt + rho*(c_s**2)*uy_dz
-        sig_xy = rho*c_s*ux_dt + rho*(c_s**2)*uy_dx
-        sig_yy = rho*c_p*uy_dt + rho*(c_p**2 - 2*c_s**2)*(uz_dz + ux_dx)
-        F_t += -(sig_zy*v[iz] + sig_xy*v[ix] + sig_yy*v[iy])*ds(5, **qr_s)
+        sig_zy = rho * c_s * uz_dt + rho * (c_s**2) * uy_dz
+        sig_xy = rho * c_s * ux_dt + rho * (c_s**2) * uy_dx
+        sig_yy = rho * c_p * uy_dt + rho * (c_p**2 - 2 * c_s**2) * (uz_dz + ux_dx)
+        F_t += -(sig_zy * v[iz] + sig_xy * v[ix] + sig_yy * v[iy]) * ds(5, **qr_s)
 
         # Plane y = L_y + 2*pad
-        sig_zy = -rho*c_s*uz_dt + rho*(c_s**2)*uy_dz
-        sig_xy = -rho*c_s*ux_dt + rho*(c_s**2)*uy_dx
-        sig_yy = -rho*c_p*uy_dt + rho*(c_p**2 - 2*c_s**2)*(uz_dz + ux_dx)
-        F_t += (sig_zy*v[iz] + sig_xy*v[ix] + sig_yy*v[iy])*ds(6, **qr_s)
+        sig_zy = -rho * c_s * uz_dt + rho * (c_s**2) * uy_dz
+        sig_xy = -rho * c_s * ux_dt + rho * (c_s**2) * uy_dx
+        sig_yy = -rho * c_p * uy_dt + rho * (c_p**2 - 2 * c_s**2) * (uz_dz + ux_dx)
+        F_t += (sig_zy * v[iz] + sig_xy * v[ix] + sig_yy * v[iy]) * ds(6, **qr_s)
 
     return F_t
 
 
-def stacey_terms(ndim, rho, c_p, c_s,
-                 v, iz, ix, iy, qr_s,
-                 uz_dt, ux_dt, uy_dt,
-                 uz_dz, ux_dz, uy_dz,
-                 uz_dx, ux_dx, uy_dx,
-                 uz_dy, ux_dy, uy_dy):
+def stacey_terms(
+    ndim,
+    rho,
+    c_p,
+    c_s,
+    v,
+    iz,
+    ix,
+    iy,
+    qr_s,
+    uz_dt,
+    ux_dt,
+    uy_dt,
+    uz_dz,
+    ux_dz,
+    uy_dz,
+    uz_dx,
+    ux_dx,
+    uy_dx,
+    uz_dy,
+    ux_dy,
+    uy_dy,
+):
+    """Compute Stacey boundary condition terms.
 
+    Parameters
+    ----------
+    ndim : int
+        Number of spatial dimensions (2 or 3).
+    rho : firedrake.Function
+        Density field.
+    c_p : firedrake.Function
+        P-wave velocity field.
+    c_s : firedrake.Function
+        S-wave velocity field.
+    v : firedrake.TestFunction
+        Test function in the function space.
+    iz : int
+        Index of z-component (0).
+    ix : int
+        Index of x-component (1).
+    iy : int
+        Index of y-component (2).
+    qr_s : dict
+        Surface quadrature rule.
+    uz_dt : firedrake.Function
+        Time derivative of z-displacement.
+    ux_dt : firedrake.Function
+        Time derivative of x-displacement.
+    uy_dt : firedrake.Function or None
+        Time derivative of y-displacement (only for 3D).
+    uz_dz : firedrake.Function
+        Spatial z-derivative of z-displacement.
+    ux_dz : firedrake.Function
+        Spatial z-derivative of x-displacement.
+    uy_dz : firedrake.Function or None
+        Spatial z-derivative of y-displacement (only for 3D).
+    uz_dx : firedrake.Function
+        Spatial x-derivative of z-displacement.
+    ux_dx : firedrake.Function
+        Spatial x-derivative of x-displacement.
+    uy_dx : firedrake.Function or None
+        Spatial x-derivative of y-displacement (only for 3D).
+    uz_dy : firedrake.Function or None
+        Spatial y-derivative of z-displacement (only for 3D).
+    ux_dy : firedrake.Function or None
+        Spatial y-derivative of x-displacement (only for 3D).
+    uy_dy : firedrake.Function or None
+        Spatial y-derivative of y-displacement (only for 3D).
+
+    Returns
+    -------
+    firedrake.Form
+        The linear form representing Stacey boundary conditions.
+    """
     F_t = 0
 
     # Plane z = -(Lz + pad)
-    sig_zz = rho*c_p*uz_dt + rho*c_s*(c_p - 2*c_s)*ux_dx
+    sig_zz = rho * c_p * uz_dt + rho * c_s * (c_p - 2 * c_s) * ux_dx
     if ndim == 3:
-        sig_zz += rho*c_s*(c_p - 2*c_s)*uy_dy
-    sig_xz = rho*c_s*ux_dt - rho*c_s*(c_p - 2*c_s)*uz_dx
-    F_t += -(sig_zz*v[iz] + sig_xz*v[ix])*ds(1, **qr_s)
+        sig_zz += rho * c_s * (c_p - 2 * c_s) * uy_dy
+    sig_xz = rho * c_s * ux_dt - rho * c_s * (c_p - 2 * c_s) * uz_dx
+    F_t += -(sig_zz * v[iz] + sig_xz * v[ix]) * ds(1, **qr_s)
     if ndim == 3:
-        sig_yz = rho*c_s*uy_dt - rho*c_s*(c_p - 2*c_s)*uz_dy
-        F_t += -sig_yz*v[iy]*ds(1, **qr_s)
+        sig_yz = rho * c_s * uy_dt - rho * c_s * (c_p - 2 * c_s) * uz_dy
+        F_t += -sig_yz * v[iy] * ds(1, **qr_s)
 
     # Plane z = 0
-    sig_zz = -rho*c_p*uz_dt + rho*c_s*(c_p - 2*c_s)*ux_dx
+    sig_zz = -rho * c_p * uz_dt + rho * c_s * (c_p - 2 * c_s) * ux_dx
     if ndim == 3:
-        sig_zz += rho*c_s*(c_p - 2*c_s)*uy_dy
-    sig_xz = -rho*c_s*ux_dt - rho*c_s*(c_p - 2*c_s)*uz_dx
-    F_t += (sig_zz*v[iz] + sig_xz*v[ix])*ds(2, **qr_s)
+        sig_zz += rho * c_s * (c_p - 2 * c_s) * uy_dy
+    sig_xz = -rho * c_s * ux_dt - rho * c_s * (c_p - 2 * c_s) * uz_dx
+    F_t += (sig_zz * v[iz] + sig_xz * v[ix]) * ds(2, **qr_s)
     if ndim == 3:
-        sig_yz = -rho*c_s*uy_dt - rho*c_s*(c_p - 2*c_s)*uz_dy
-        F_t += sig_yz*v[iy]*ds(2, **qr_s)
+        sig_yz = -rho * c_s * uy_dt - rho * c_s * (c_p - 2 * c_s) * uz_dy
+        F_t += sig_yz * v[iy] * ds(2, **qr_s)
 
     # Plane x = -pad
-    sig_zx = rho*c_s*uz_dt - rho*c_s*(c_p - 2*c_s)*ux_dz
-    sig_xx = rho*c_p*ux_dt + rho*c_s*(c_p - 2*c_s)*uz_dz
+    sig_zx = rho * c_s * uz_dt - rho * c_s * (c_p - 2 * c_s) * ux_dz
+    sig_xx = rho * c_p * ux_dt + rho * c_s * (c_p - 2 * c_s) * uz_dz
     if ndim == 3:
-        sig_xx += rho*c_s*(c_p - 2*c_s)*uy_dy
-    F_t += -(sig_zx*v[iz] + sig_xx*v[ix])*ds(3, **qr_s)
+        sig_xx += rho * c_s * (c_p - 2 * c_s) * uy_dy
+    F_t += -(sig_zx * v[iz] + sig_xx * v[ix]) * ds(3, **qr_s)
     if ndim == 3:
-        sig_yx = rho*c_s*uy_dt - rho*c_s*(c_p - 2*c_s)*ux_dy
-        F_t += -sig_yx*v[iy]*ds(3, **qr_s)
+        sig_yx = rho * c_s * uy_dt - rho * c_s * (c_p - 2 * c_s) * ux_dy
+        F_t += -sig_yx * v[iy] * ds(3, **qr_s)
 
     # Plane x = Lx + pad
-    sig_zx = -rho*c_s*uz_dt - rho*c_s*(c_p - 2*c_s)*ux_dz
-    sig_xx = -rho*c_p*ux_dt + rho*c_s*(c_p - 2*c_s)*uz_dz
+    sig_zx = -rho * c_s * uz_dt - rho * c_s * (c_p - 2 * c_s) * ux_dz
+    sig_xx = -rho * c_p * ux_dt + rho * c_s * (c_p - 2 * c_s) * uz_dz
     if ndim == 3:
-        sig_xx += rho*c_s*(c_p - 2*c_s)*uy_dy
-    F_t += (sig_zx*v[iz] + sig_xx*v[ix])*ds(4, **qr_s)
+        sig_xx += rho * c_s * (c_p - 2 * c_s) * uy_dy
+    F_t += (sig_zx * v[iz] + sig_xx * v[ix]) * ds(4, **qr_s)
     if ndim == 3:
-        sig_yx = -rho*c_s*uy_dt - rho*c_s*(c_p - 2*c_s)*ux_dy
-        F_t += sig_yx*v[iy]*ds(4, **qr_s)
+        sig_yx = -rho * c_s * uy_dt - rho * c_s * (c_p - 2 * c_s) * ux_dy
+        F_t += sig_yx * v[iy] * ds(4, **qr_s)
 
     if ndim == 3:
         # Plane y = 0
-        sig_zy = rho*c_s*uz_dt - rho*c_s*(c_p - 2*c_s)*uy_dz
-        sig_xy = rho*c_s*ux_dt - rho*c_s*(c_p - 2*c_s)*uy_dx
-        sig_yy = rho*c_p*uy_dt + rho*c_s*(c_p - 2*c_s)*(uz_dz + ux_dx)
-        F_t += -(sig_zy*v[iz] + sig_xy*v[ix] + sig_yy*v[iy])*ds(5, **qr_s)
+        sig_zy = rho * c_s * uz_dt - rho * c_s * (c_p - 2 * c_s) * uy_dz
+        sig_xy = rho * c_s * ux_dt - rho * c_s * (c_p - 2 * c_s) * uy_dx
+        sig_yy = rho * c_p * uy_dt + rho * c_s * (c_p - 2 * c_s) * (uz_dz + ux_dx)
+        F_t += -(sig_zy * v[iz] + sig_xy * v[ix] + sig_yy * v[iy]) * ds(5, **qr_s)
 
         # Plane y = L_y + 2*pad
-        sig_zy = -rho*c_s*uz_dt - rho*c_s*(c_p - 2*c_s)*uy_dz
-        sig_xy = -rho*c_s*ux_dt - rho*c_s*(c_p - 2*c_s)*uy_dx
-        sig_yy = -rho*c_p*uy_dt + rho*c_s*(c_p - 2*c_s)*(uz_dz + ux_dx)
-        F_t += (sig_zy*v[iz] + sig_xy*v[ix] + sig_yy*v[iy])*ds(6, **qr_s)
+        sig_zy = -rho * c_s * uz_dt - rho * c_s * (c_p - 2 * c_s) * uy_dz
+        sig_xy = -rho * c_s * ux_dt - rho * c_s * (c_p - 2 * c_s) * uy_dx
+        sig_yy = -rho * c_p * uy_dt + rho * c_s * (c_p - 2 * c_s) * (uz_dz + ux_dx)
+        F_t += (sig_zy * v[iz] + sig_xy * v[ix] + sig_yy * v[iy]) * ds(6, **qr_s)
 
     return F_t

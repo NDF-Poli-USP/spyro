@@ -3,7 +3,6 @@ import time
 import numpy as np
 import spyro
 
-
 line1 = spyro.create_transect((0.25, 0.25), (0.25, 7.25), 4)
 line2 = spyro.create_transect((2.0, 0.25), (2.0, 7.25), 4)
 line3 = spyro.create_transect((3.75, 0.25), (3.75, 7.25), 4)

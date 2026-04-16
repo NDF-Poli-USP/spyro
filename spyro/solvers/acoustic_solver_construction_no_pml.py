@@ -1,14 +1,18 @@
+"""Constructs Firedrake solver for the acosutic wave without a PML."""
+
 import firedrake as fire
 from firedrake import ds, dx, Constant, dot, grad
 
 
 def construct_solver_or_matrix_no_pml(Wave_object):
-    """Builds solver operators for wave object without a PML. Doesn't create mass matrices if
-    matrix_free option is on, which it is by default.
+    """Build solver operators for wave object without a PML.
+
+    Doesn't create mass
+    matrices if matrix_free option is on, which it is by default.
 
     Parameters
     ----------
-    Wave_object: :class: 'Wave' object
+    Wave_object : :class: 'Wave' object
         Waveform object that contains all simulation parameters
     """
     V = Wave_object.function_space
@@ -40,7 +44,7 @@ def construct_solver_or_matrix_no_pml(Wave_object):
     le = 0.0
     q = Wave_object.source_expression
     if q is not None:
-        le += - q * v * dx(**quad_rule)
+        le += -q * v * dx(**quad_rule)
 
     if Wave_object.abc_active:
         weak_expr_abc = dot((u_n - u_nm1) / Constant(dt), v)
@@ -54,24 +58,28 @@ def construct_solver_or_matrix_no_pml(Wave_object):
             le += Wave_object.cosHig * f_abc * ds(**qr_s)
 
             # Damping
-            le += Wave_object.eta_mask * weak_expr_abc * \
-                (1 / (Wave_object.c * Wave_object.c)) * \
-                Wave_object.eta_habc * dx(**quad_rule)
+            le += (
+                Wave_object.eta_mask
+                * weak_expr_abc
+                * (1 / (Wave_object.c * Wave_object.c))
+                * Wave_object.eta_habc
+                * dx(**quad_rule)
+            )
 
         else:
             if Wave_object.absorb_top:
-                le += f_abc*ds(1, **qr_s)
+                le += f_abc * ds(1, **qr_s)
             if Wave_object.absorb_bottom:
-                le += f_abc*ds(2, **qr_s)
+                le += f_abc * ds(2, **qr_s)
             if Wave_object.absorb_right:
-                le += f_abc*ds(3, **qr_s)
+                le += f_abc * ds(3, **qr_s)
             if Wave_object.absorb_left:
-                le += f_abc*ds(4, **qr_s)
+                le += f_abc * ds(4, **qr_s)
             if Wave_object.dimension == 3:
                 if Wave_object.absorb_front:
-                    le += f_abc*ds(5, **qr_s)
+                    le += f_abc * ds(5, **qr_s)
                 if Wave_object.absorb_back:
-                    le += f_abc*ds(6, **qr_s)
+                    le += f_abc * ds(6, **qr_s)
 
     # form = m1 + a - le
     # Signal for le is + in derivation, see Salas et al (2022)
@@ -85,9 +93,12 @@ def construct_solver_or_matrix_no_pml(Wave_object):
     lin_var = fire.LinearVariationalProblem(
         Wave_object.lhs,
         Wave_object.rhs + Wave_object.source_function,
-        u_np1, constant_jacobian=True)
+        u_np1,
+        constant_jacobian=True,
+    )
     solver_parameters = dict(Wave_object.solver_parameters)
     solver_parameters["mat_type"] = "matfree"
     Wave_object.solver = fire.LinearVariationalSolver(
-        lin_var, solver_parameters=solver_parameters,
+        lin_var,
+        solver_parameters=solver_parameters,
     )

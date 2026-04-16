@@ -5,13 +5,13 @@ import firedrake as fire
 import spyro.habc.habc as habc
 from os import makedirs, path
 from spyro.utils.cost import comp_cost
+
 fire.parameters["loopy"] = {"silenced_warnings": ["v1_scheduler_fallback"]}
 warnings.filterwarnings("ignore", category=RuntimeWarning)
 
 
 def wave_dict_2d(layer_shape, degree_layer, degree_type, habc_ref_freq):
-    '''
-    Create a dictionary with parameters for the 2D model
+    """Create a dictionary with parameters for the 2D model.
 
     Parameters
     ----------
@@ -28,8 +28,7 @@ def wave_dict_2d(layer_shape, degree_layer, degree_type, habc_ref_freq):
     -------
     dictionary : `dict`
         Dictionary containing the parameters for the model
-    '''
-
+    """
     dictionary = {}
     dictionary["options"] = {
         # Simplexes: triangles or tetrahedra (T) or quadrilaterals (Q)
@@ -53,7 +52,7 @@ def wave_dict_2d(layer_shape, degree_layer, degree_type, habc_ref_freq):
     # Define the domain size without the PML or AL. Here we'll assume a
     # 1 x 1 km domain and compute the size for the Absorbing Layer (AL)
     # to absorb outgoing waves on boundries (-z, +-x sides) of the domain.
-    Lz, Lx, Ly = [1., 1., 0.]
+    Lz, Lx, Ly = [1.0, 1.0, 0.0]
     dictionary["mesh"] = {
         "length_z": Lz,  # depth in km - always positive
         "length_x": Lx,  # width in km - always positive
@@ -70,15 +69,15 @@ def wave_dict_2d(layer_shape, degree_layer, degree_type, habc_ref_freq):
         "source_locations": [(-0.5, 0.25)],  # (0.5 * Lz, 0.25 * Lx)
         "frequency": 5.0,  # in Hz
         "delay": 1.5,
-        "receiver_locations": [(-Lz, 0.), (-Lz, Lx), (0., 0.), (0., Lx)]
+        "receiver_locations": [(-Lz, 0.0), (-Lz, Lx), (0.0, 0.0), (0.0, Lx)],
     }
 
     # Simulate for 2. seconds.
     dictionary["time_axis"] = {
-        "initial_time": 0.,  # Initial time for event
-        "final_time": 2.,    # Final time for event
+        "initial_time": 0.0,  # Initial time for event
+        "final_time": 2.0,  # Final time for event
         "dt": 0.001,  # timestep size in seconds
-        "amplitude": 1.,  # the Ricker has an amplitude of 1.
+        "amplitude": 1.0,  # the Ricker has an amplitude of 1.
         "output_frequency": 100,  # how frequently to output solution to pvds
         "gradient_sampling_frequency": 100,  # how frequently to save to RAM
     }
@@ -101,10 +100,8 @@ def wave_dict_2d(layer_shape, degree_layer, degree_type, habc_ref_freq):
     return dictionary
 
 
-def wave_dict_3d(layer_shape, degree_layer, degree_type,
-                 habc_ref_freq, degree_eikonal):
-    '''
-    Create a dictionary with parameters for the 3D model
+def wave_dict_3d(layer_shape, degree_layer, degree_type, habc_ref_freq, degree_eikonal):
+    """Create a dictionary with parameters for the 3D model.
 
     Parameters
     ----------
@@ -123,8 +120,7 @@ def wave_dict_3d(layer_shape, degree_layer, degree_type,
     -------
     dictionary : `dict`
         Dictionary containing the parameters for the model
-    '''
-
+    """
     dictionary = {}
     dictionary["options"] = {
         # Simplexes: triangles or tetrahedra (T) or quadrilaterals (Q)
@@ -148,7 +144,7 @@ def wave_dict_3d(layer_shape, degree_layer, degree_type,
     # Define the domain size without the PML or AL. Here we'll assume a
     # 1 x 1 x 1 km domain and compute the size for the Absorbing Layer (AL)
     # to absorb outgoing waves on boundries (-z, +-x, +-y sides) of the domain.
-    Lz, Lx, Ly = [1., 1., 1.]  # in km
+    Lz, Lx, Ly = [1.0, 1.0, 1.0]  # in km
     dictionary["mesh"] = {
         "length_z": Lz,  # depth in km - always positive
         "length_x": Lx,  # width in km - always positive
@@ -163,20 +159,26 @@ def wave_dict_3d(layer_shape, degree_layer, degree_type,
     dictionary["acquisition"] = {
         "source_type": "ricker",
         "source_locations": [(-0.5, 0.25, 0.5)],  # (0.5*Lz, 0.25*Lx, 0.25*Ly)
-        "frequency": 5.,  # in Hz
+        "frequency": 5.0,  # in Hz
         "delay": 1.5,
-        "receiver_locations": [(-Lz, 0., 0.), (-Lz, Lx, 0.),
-                               (0., 0., 0), (0., Lx, 0.),
-                               (-Lz, 0., Ly), (-Lz, Lx, Ly),
-                               (0., 0., Ly), (0., Lx, Ly)]
+        "receiver_locations": [
+            (-Lz, 0.0, 0.0),
+            (-Lz, Lx, 0.0),
+            (0.0, 0.0, 0),
+            (0.0, Lx, 0.0),
+            (-Lz, 0.0, Ly),
+            (-Lz, Lx, Ly),
+            (0.0, 0.0, Ly),
+            (0.0, Lx, Ly),
+        ],
     }
 
     # Simulate for 1.5 seconds.
     dictionary["time_axis"] = {
-        "initial_time": 0.,  # Initial time for event
-        "final_time": 1.5,    # Final time for event
+        "initial_time": 0.0,  # Initial time for event
+        "final_time": 1.5,  # Final time for event
         "dt": 0.001,  # timestep size in seconds
-        "amplitude": 1.,  # The Ricker has an amplitude of 1.
+        "amplitude": 1.0,  # The Ricker has an amplitude of 1.
         "output_frequency": 100,  # How frequently to output solution to pvds
         "gradient_sampling_frequency": 100,  # How frequently to save to RAM
     }
@@ -200,28 +202,24 @@ def wave_dict_3d(layer_shape, degree_layer, degree_type,
 
 
 def create_folder(folder):
-    '''
-    Verify if a folder exists, if not, it creates the folder
+    """Verify if a folder exists, if not, it creates the folder.
 
     Parameters
     ----------
-    folder: `str`
+    folder : `str`
         Path to the folder to be created
 
     Returns
     -------
     None
-    '''
-
+    """
     # Create the folder if it does not exist
     if not path.isdir(folder):
         makedirs(folder)
 
 
-def preamble_modal(dictionary, edge_length, f_est,
-                   dimension, homogeneous=True):
-    '''
-    Run the infinite model and the Eikonal analysis
+def preamble_modal(dictionary, edge_length, f_est, dimension, homogeneous=True):
+    """Run the infinite model and the Eikonal analysis.
 
     Parameters
     ----------
@@ -238,16 +236,16 @@ def preamble_modal(dictionary, edge_length, f_est,
     -------
     Wave_obj : `habc.HABC_Wave`
         An instance of the HABC_Wave class
-    '''
-
+    """
     # ============ MESH FEATURES ============
 
     # Reference to resource usage
     tRef = comp_cost("tini")
 
     # Create the acoustic wave object with HABCs
-    Wave_obj = habc.HABC_Wave(dictionary=dictionary,
-                              output_folder=f"output/modal_test{dimension}d")
+    Wave_obj = habc.HABC_Wave(
+        dictionary=dictionary, output_folder=f"output/modal_test{dimension}d"
+    )
 
     # Mesh
     Wave_obj.set_mesh(input_mesh_parameters={"edge_length": edge_length})
@@ -264,8 +262,7 @@ def preamble_modal(dictionary, edge_length, f_est,
     Wave_obj.preamble_mesh_operations(f_est=f_est)
 
     # Estimating computational resource usage
-    comp_cost("tfin", tRef=tRef,
-              user_name=Wave_obj.path_save + "preamble/MSH_")
+    comp_cost("tfin", tRef=tRef, user_name=Wave_obj.path_save + "preamble/MSH_")
 
     # ============ EIKONAL ANALYSIS ============
     # Reference to resource usage
@@ -275,15 +272,13 @@ def preamble_modal(dictionary, edge_length, f_est,
     Wave_obj.critical_boundary_points()
 
     # Estimating computational resource usage
-    comp_cost("tfin", tRef=tRef,
-              user_name=Wave_obj.path_save + "preamble/EIK_")
+    comp_cost("tfin", tRef=tRef, user_name=Wave_obj.path_save + "preamble/EIK_")
 
     return Wave_obj
 
 
 def get_range_hyp(Wave_obj, n_root=1):
-    '''
-    Determine the range of the hyperellipse degree for the absorbing layer.
+    """Determine the range of the hyperellipse degree for the absorbing layer.
 
     Parameters
     ----------
@@ -295,19 +290,16 @@ def get_range_hyp(Wave_obj, n_root=1):
     Returns
     -------
     None
-    '''
-
+    """
     # Identifier for the current case study
-    Wave_obj.identify_habc_case(
-        output_folder=f"output/modal_test{Wave_obj.dimension}d")
+    Wave_obj.identify_habc_case(output_folder=f"output/modal_test{Wave_obj.dimension}d")
 
     # Determining layer size
     Wave_obj.size_habc_criterion(n_root=n_root)
 
 
 def run_modal(Wave_obj, modal_solver_lst, fitting_c, exp_value, n_root=1):
-    '''
-    Apply the HABC to the model in Fig. 8 of Salas et al. (2022).
+    """Apply the HABC to the model in Fig. 8 of Salas et al. (2022).
 
     Parameters
     ----------
@@ -333,8 +325,7 @@ def run_modal(Wave_obj, modal_solver_lst, fitting_c, exp_value, n_root=1):
     Returns
     -------
     None
-    '''
-
+    """
     # Check hyperellipse degree
     get_range_hyp(Wave_obj, n_root=n_root)
 
@@ -358,7 +349,8 @@ def run_modal(Wave_obj, modal_solver_lst, fitting_c, exp_value, n_root=1):
 
         # Computing fundamental frequency
         Wave_obj.fundamental_frequency(
-            method=modal_solver, monitor=True, fitting_c=fitting_c)
+            method=modal_solver, monitor=True, fitting_c=fitting_c
+        )
 
         # Estimating computational resource usage
         name_cost = Wave_obj.path_case_habc + modal_solver + "_"
@@ -368,23 +360,34 @@ def run_modal(Wave_obj, modal_solver_lst, fitting_c, exp_value, n_root=1):
             create_folder(cost_file_dir)
         comp_cost("tfin", tRef=tRef, user_name=name_cost)
 
-        tol = 0.07 if (modal_solver == 'ANALYTICAL'
-                       or modal_solver == 'RAYLEIGH') else 0.05
+        tol = (
+            0.07
+            if (modal_solver == "ANALYTICAL" or modal_solver == "RAYLEIGH")
+            else 0.05
+        )
 
-        met_str = f"Fundamental Frequency {Wave_obj.case_habc[:-4]} " \
+        met_str = (
+            f"Fundamental Frequency {Wave_obj.case_habc[:-4]} "
             + f"{Wave_obj.dimension}D. "
+        )
         met_str += f"Method {modal_solver}"
         cmp_str = f"Expected {exp_value:.5f}, got = {Wave_obj.fundam_freq:.5f}"
-        assert np.isclose(Wave_obj.fundam_freq / exp_value, 1., atol=tol), \
+        assert np.isclose(Wave_obj.fundam_freq / exp_value, 1.0, atol=tol), (
             "✗ " + met_str + "  → " + cmp_str
+        )
         print("✓ " + met_str + " Verified: " + cmp_str, flush=True)
 
 
-def loop_modal(parameters, dictionary, degree_layer_lst,
-               expect_values_lst, dimension,
-               homogeneous, modal_solver_lst):
-    '''
-    Loop for testing modals solvers.
+def loop_modal(
+    parameters,
+    dictionary,
+    degree_layer_lst,
+    expect_values_lst,
+    dimension,
+    homogeneous,
+    modal_solver_lst,
+):
+    """Loop for testing modals solvers.
 
     Parameters
     ----------
@@ -417,14 +420,14 @@ def loop_modal(parameters, dictionary, degree_layer_lst,
     Returns
     -------
     None
-    '''
-
+    """
     # Model parameters
     edge_length, f_est, fitting_c = parameters
 
     # Creating mesh and performing eikonal analysis
-    Wave_obj = preamble_modal(dictionary, edge_length, f_est, dimension,
-                              homogeneous=homogeneous)
+    Wave_obj = preamble_modal(
+        dictionary, edge_length, f_est, dimension, homogeneous=homogeneous
+    )
 
     # Create the output folder if it does not exist
     create_folder(f"output/modal_test{dimension}d")
@@ -432,8 +435,9 @@ def loop_modal(parameters, dictionary, degree_layer_lst,
     for degree_layer, exp_value in zip(degree_layer_lst, expect_values_lst):
 
         # Update the layer shape and its degree
-        Wave_obj.abc_boundary_layer_shape = "hypershape" \
-            if degree_layer is not None else "rectangular"
+        Wave_obj.abc_boundary_layer_shape = (
+            "hypershape" if degree_layer is not None else "rectangular"
+        )
         Wave_obj.abc_deg_layer = degree_layer
 
         try:
@@ -444,15 +448,15 @@ def loop_modal(parameters, dictionary, degree_layer_lst,
             Wave_obj.rename_folder_habc()
 
         except fire.ConvergenceError as e:
-            pytest.fail(f"Checking Modal {dimension}D "
-                        f"raised an exception: {str(e)}")
+            pytest.fail(
+                f"Checking Modal {dimension}D " f"raised an exception: {str(e)}"
+            )
 
 
 @pytest.mark.slow
 @pytest.mark.parametrize("homogeneous", [True, False])
 def test_loop_modal_2d(homogeneous):
-    '''
-    Test of modal solvers for 2D case
+    """Test of modal solvers for 2D case.
 
     Parameters
     ----------
@@ -463,11 +467,16 @@ def test_loop_modal_2d(homogeneous):
     Returns
     -------
     None
-    '''
-
+    """
     c_dist = "Homogeneous" if homogeneous else "Heterogeneous"
-    print("\n" + 85 * "=" + "\nTesting Modal Solvers and T elements for "
-          + f"2D case. Propagation Speed: {c_dist}\n" + 85 * "=", flush=True)
+    print(
+        "\n"
+        + 85 * "="
+        + "\nTesting Modal Solvers and T elements for "
+        + f"2D case. Propagation Speed: {c_dist}\n"
+        + 85 * "=",
+        flush=True,
+    )
 
     # ============ SIMULATION PARAMETERS ============
 
@@ -519,19 +528,33 @@ def test_loop_modal_2d(homogeneous):
     # ============ MODAL ANALYSIS ============
 
     # Modal solvers
-    modal_solver_lst = ['ANALYTICAL', 'ARNOLDI', 'LANCZOS',
-                        'LOBPCG', 'KRYLOVSCH_CH', 'KRYLOVSCH_CG',
-                        'KRYLOVSCH_GH', 'KRYLOVSCH_GG', 'RAYLEIGH']
+    modal_solver_lst = [
+        "ANALYTICAL",
+        "ARNOLDI",
+        "LANCZOS",
+        "LOBPCG",
+        "KRYLOVSCH_CH",
+        "KRYLOVSCH_CG",
+        "KRYLOVSCH_GH",
+        "KRYLOVSCH_GG",
+        "RAYLEIGH",
+    ]
 
-    loop_modal(parameters, dictionary, degree_layer_lst,
-               expect_values_lst, 2, homogeneous, modal_solver_lst)
+    loop_modal(
+        parameters,
+        dictionary,
+        degree_layer_lst,
+        expect_values_lst,
+        2,
+        homogeneous,
+        modal_solver_lst,
+    )
 
 
 @pytest.mark.slow
 @pytest.mark.parametrize("homogeneous", [True, False])
 def test_loop_modal_3d_with_Tele(homogeneous):
-    '''
-    Test of modal solvers for 3D case
+    """Test of modal solvers for 3D case.
 
     Parameters
     ----------
@@ -542,11 +565,16 @@ def test_loop_modal_3d_with_Tele(homogeneous):
     Returns
     -------
     None
-    '''
-
+    """
     c_dist = "Homogeneous" if homogeneous else "Heterogeneous"
-    print("\n" + 85 * "=" + "\nTesting Modal Solvers and T elements for "
-          + f"3D case. Propagation Speed: {c_dist}\n" + 85 * "=", flush=True)
+    print(
+        "\n"
+        + 85 * "="
+        + "\nTesting Modal Solvers and T elements for "
+        + f"3D case. Propagation Speed: {c_dist}\n"
+        + 85 * "=",
+        flush=True,
+    )
 
     # ============ SIMULATION PARAMETERS ============
 
@@ -602,18 +630,28 @@ def test_loop_modal_3d_with_Tele(homogeneous):
     # ============ MODAL ANALYSIS ============
 
     # Modal solvers
-    modal_solver_lst = ['ANALYTICAL', 'KRYLOVSCH_CH',
-                        'KRYLOVSCH_GH', 'RAYLEIGH']
+    modal_solver_lst = [
+        "ANALYTICAL",
+        "KRYLOVSCH_CH",
+        "KRYLOVSCH_GH",
+        "RAYLEIGH",
+    ]
 
-    loop_modal(parameters, dictionary, degree_layer_lst,
-               expect_values_lst, 3, homogeneous, modal_solver_lst)
+    loop_modal(
+        parameters,
+        dictionary,
+        degree_layer_lst,
+        expect_values_lst,
+        3,
+        homogeneous,
+        modal_solver_lst,
+    )
 
 
 @pytest.mark.slow
 @pytest.mark.parametrize("homogeneous", [True, False])
 def test_loop_modal_3d_with_Qele(homogeneous):
-    '''
-    Test of modal solvers for 3D case
+    """Test of modal solvers for 3D case.
 
     Parameters
     ----------
@@ -624,13 +662,18 @@ def test_loop_modal_3d_with_Qele(homogeneous):
     Returns
     -------
     None
-    '''
-
+    """
     c_dist = "Homogeneous" if homogeneous else "Heterogeneous"
-    print("\n" + 95 * "=" + "\nTesting Modal Solvers for 2D case. "
-          + f"Propagation Speed: {c_dist}.\nTest only the "
-          + "rectangular case with Q elements as the hypershape "
-          + "case is not supported yet.\n" + 95 * "=", flush=True)
+    print(
+        "\n"
+        + 95 * "="
+        + "\nTesting Modal Solvers for 2D case. "
+        + f"Propagation Speed: {c_dist}.\nTest only the "
+        + "rectangular case with Q elements as the hypershape "
+        + "case is not supported yet.\n"
+        + 95 * "=",
+        flush=True,
+    )
 
     # ============ SIMULATION PARAMETERS ============
 
@@ -685,14 +728,28 @@ def test_loop_modal_3d_with_Qele(homogeneous):
     # ============ MODAL ANALYSIS ============
 
     # Modal solvers
-    modal_solver_lst = ['ANALYTICAL', 'ARNOLDI', 'LANCZOS', 'LOBPCG',
-                        'KRYLOVSCH_CG', 'KRYLOVSCH_GG', 'RAYLEIGH']
+    modal_solver_lst = [
+        "ANALYTICAL",
+        "ARNOLDI",
+        "LANCZOS",
+        "LOBPCG",
+        "KRYLOVSCH_CG",
+        "KRYLOVSCH_GG",
+        "RAYLEIGH",
+    ]
 
-    loop_modal(parameters, dictionary, degree_layer_lst,
-               expect_values_lst, 3, homogeneous, modal_solver_lst)
+    loop_modal(
+        parameters,
+        dictionary,
+        degree_layer_lst,
+        expect_values_lst,
+        3,
+        homogeneous,
+        modal_solver_lst,
+    )
 
 
-'''
+"""
 =================================================================
 DATA FOR 2D MODEL Δx = 100m
 ---------------------------
@@ -826,4 +883,4 @@ n_eigfunc       2      *4       6
 freq[Hz]  0.50637 0.43304 0.42081
 texe[s]     0.859  25.615 497.458
 mem[MB]     8.168  51.299 185.377
-'''
+"""

@@ -5,7 +5,6 @@ import random
 import spyro
 import warnings
 
-
 warnings.filterwarnings("ignore")
 
 
@@ -66,7 +65,7 @@ dictionary["visualization"] = {
 def get_gradient(parallelism_type, points):
 
     dictionary["parallelism"]["type"] = parallelism_type
-    print(f"Calculating exact", flush=True)
+    print("Calculating exact", flush=True)
     Wave_obj_exact = spyro.AcousticWave(dictionary=dictionary)
     Wave_obj_exact.set_mesh(input_mesh_parameters={"edge_length": 0.1})
 
@@ -77,20 +76,26 @@ def get_gradient(parallelism_type, points):
 
     Wave_obj_exact.forward_solve()
 
-    print(f"Calculating guess", flush=True)
+    print("Calculating guess", flush=True)
     Wave_obj_guess = spyro.AcousticWave(dictionary=dictionary)
     Wave_obj_guess.set_mesh(input_mesh_parameters={"edge_length": 0.1})
     Wave_obj_guess.set_initial_velocity_model(constant=2.0)
     Wave_obj_guess.forward_solve()
 
     if parallelism_type == "automatic":
-        misfit = Wave_obj_exact.forward_solution_receivers - Wave_obj_guess.forward_solution_receivers
+        misfit = (
+            Wave_obj_exact.forward_solution_receivers
+            - Wave_obj_guess.forward_solution_receivers
+        )
     elif parallelism_type == "spatial":
         misfit_list = []
         for source_id in range(len(dictionary["acquisition"]["source_locations"])):
             spyro.io.switch_serial_shot(Wave_obj_exact, source_id)
             spyro.io.switch_serial_shot(Wave_obj_guess, source_id)
-            misfit_list.append(Wave_obj_exact.forward_solution_receivers - Wave_obj_guess.forward_solution_receivers)
+            misfit_list.append(
+                Wave_obj_exact.forward_solution_receivers
+                - Wave_obj_guess.forward_solution_receivers
+            )
         misfit = misfit_list
 
     gradient = Wave_obj_guess.gradient_solve(misfit=misfit)
@@ -118,7 +123,10 @@ def test_gradient_serialshots():
 
     # Check if the gradients are equal within a tolerance
     tolerance = 1e-8
-    test = all(np.isclose(a, b, atol=tolerance) for a, b in zip(gradient_ensemble_parallelism, gradient_serial_shot))
+    test = all(
+        np.isclose(a, b, atol=tolerance)
+        for a, b in zip(gradient_ensemble_parallelism, gradient_serial_shot)
+    )
 
     print(f"Gradient is equal: {test}", flush=True)
 

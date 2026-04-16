@@ -1,3 +1,5 @@
+"""Acoustic wave solver."""
+
 import firedrake as fire
 import warnings
 
@@ -21,27 +23,41 @@ from .functionals import acoustic_energy
 
 
 class AcousticWave(Wave):
+    """Solve isotropic acoustic wave propagation and related adjoint tasks."""
+
     def __init__(self, dictionary, comm=None):
         super().__init__(dictionary, comm=comm)
         self.wave_type = WaveType.ISOTROPIC_ACOUSTIC
         self.acoustic_energy = None
         self.field_logger.add_functional(
-            "acoustic_energy", lambda: fire.assemble(self.acoustic_energy))
+            "acoustic_energy", lambda: fire.assemble(self.acoustic_energy)
+        )
 
     def save_current_velocity_model(self, file_name=None):
+        """Write the current velocity model to a VTK file.
+
+        Parameters
+        ----------
+        file_name : str, optional
+            Output filename. Uses ``"velocity_model.pvd"`` when not provided.
+
+        Raises
+        ------
+        ValueError
+            If the current velocity model is not initialized.
+        """
         if self.c is None:
             raise ValueError("C not loaded")
         if file_name is None:
             file_name = "velocity_model.pvd"
-        fire.VTKFile(file_name).write(
-            self.c, name="velocity"
-        )
+        fire.VTKFile(file_name).write(self.c, name="velocity")
 
     @override
     def matrix_building(self):
-        """Builds solver operators. Doesn't create mass matrices if
-        matrix_free option is on,
-        which it is by default.
+        """Build solver operators.
+
+        Doesn't create mass matrices if matrix_free option is on, which it is by
+        default.
         """
         self.current_time = 0.0
 
@@ -71,17 +87,17 @@ class AcousticWave(Wave):
 
     @ensemble_gradient
     def gradient_solve(self, guess=None, misfit=None, forward_solution=None):
-        """Solves the adjoint problem to calculate de gradient.
+        """Solve the adjoint problem to calculate the gradient.
 
-        Parameters:
-        -----------
-        guess: Firedrake 'Function' (optional)
+        Parameters
+        ----------
+        guess : Firedrake 'Function' (optional)
             Initial guess for the velocity model. If not mentioned uses the
             one currently in the wave object.
 
-        Returns:
-        --------
-        dJ: Firedrake 'Function'
+        Returns
+        -------
+        dJ : Firedrake 'Function'
             Gradient of the cost functional.
         """
         if misfit is not None:
@@ -94,6 +110,12 @@ class AcousticWave(Wave):
         return backward_wave_propagator(self)
 
     def reset_pressure(self):
+        """Reset pressure fields at the current and previous time levels.
+
+        Notes
+        -----
+        Emits a warning if pressure state variables are not available.
+        """
         try:
             self.u_nm1.assign(0.0)
             self.u_n.assign(0.0)
@@ -107,7 +129,9 @@ class AcousticWave(Wave):
                 raise ValueError("No velocity model or velocity file to load.")
 
             if self.initial_velocity_model_file.endswith(".segy"):
-                self.initial_velocity_model_file = write_hdf5_velocity_model(self, self.initial_velocity_model_file)
+                self.initial_velocity_model_file = write_hdf5_velocity_model(
+                    self, self.initial_velocity_model_file
+                )
 
             if self.initial_velocity_model_file.endswith((".hdf5", ".h5")):
                 self.initial_velocity_model = interpolate(
@@ -167,6 +191,13 @@ class AcousticWave(Wave):
 
     @override
     def get_receivers_output(self):
+        """Interpolate the current pressure field at receiver locations.
+
+        Returns
+        -------
+        numpy.ndarray
+            Receiver traces sampled from the current state.
+        """
         if self.abc_boundary_layer_type == "PML":
             data_with_halos = self.X_n.dat.data_ro_with_halos[0][:]
         else:
@@ -175,6 +206,14 @@ class AcousticWave(Wave):
 
     @override
     def get_function(self):
+        """Return the function for output and diagnostics.
+
+        Returns
+        -------
+        firedrake.Function
+            Pressure field function. For PML, this is the first component of
+            the mixed state.
+        """
         if self.abc_boundary_layer_type == "PML":
             return self.X_n.sub(0)
         else:
@@ -182,6 +221,13 @@ class AcousticWave(Wave):
 
     @override
     def get_function_name(self):
+        """Return the physical name of the primary solved field.
+
+        Returns
+        -------
+        str
+            The string ``"Pressure"``.
+        """
         return "Pressure"
 
     @override
@@ -190,15 +236,20 @@ class AcousticWave(Wave):
 
     @override
     def rhs_no_pml(self):
+        """Return the right-hand-side cofunction associated with pressure.
+
+        Returns
+        -------
+        firedrake.Cofunction
+            RHS cofunction. For PML, this returns only the pressure component.
+        """
         if self.abc_boundary_layer_type == "PML":
             return self.B.sub(0)
         else:
             return self.B
 
     def rhs_no_pml_source(self):
-        """Return the source cofunction added to the variational right-hand
-        side.
-        """
+        """Return the source cofunction added to the variational right-hand side."""
         if self.abc_boundary_layer_type == "PML":
             return self.source_function.sub(0)
         else:

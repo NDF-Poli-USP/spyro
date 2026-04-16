@@ -19,7 +19,7 @@ def run_forward_hexahedral(dt, final_time, offset):
         # simplexes such as triangles or tetrahedra (T) or quadrilaterals (Q)
         "cell_type": "Q",
         # lumped, equispaced or DG, default is lumped "method":"MLT", # (MLT/spectral_quadrilateral/DG_triangle/DG_quadrilateral) You can either specify a cell_type+variant or a method
-        "variant": 'lumped',
+        "variant": "lumped",
         # p order
         "degree": 4,
         # dimension
@@ -94,16 +94,17 @@ def run_forward_hexahedral(dt, final_time, offset):
     output = rec_out.flatten()
     my_ensemble = Wave_obj.comm
     if my_ensemble.comm.rank == 0 and my_ensemble.ensemble_comm.rank == 0:
-        np.save("dofs_3D_quads_rec_out"+str(dt)+".npy", output)
+        np.save("dofs_3D_quads_rec_out" + str(dt) + ".npy", output)
 
     return output
 
 
 def analytical_solution(dt, final_time, offset):
-    amplitude = 1/(4*np.pi*offset)
-    delay = offset/1.5 + 1.5 * np.sqrt(6.0) / (np.pi * 5.0)
+    amplitude = 1 / (4 * np.pi * offset)
+    delay = offset / 1.5 + 1.5 * np.sqrt(6.0) / (np.pi * 5.0)
     p_analytic = amplitude * spyro.full_ricker_wavelet(
-        dt, final_time,
+        dt,
+        final_time,
         5.0,
         delay=delay,
         delay_type="time",

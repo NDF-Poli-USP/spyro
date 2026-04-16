@@ -1,28 +1,29 @@
-'''
-From Turkel et al. (2023):
+"""From Turkel et al (2023).
+
 https://doi.org/10.1016/j.wavemoti.2022.103109
-'''
+"""
+
 import numpy as np
 import spyro
 
-L = 2000   # Size of the edges of the cube [m]
-N = 5      # Number of elements in each direction
-h = L/N    # Element size [m]
+L = 2000  # Size of the edges of the cube [m]
+N = 5  # Number of elements in each direction
+h = L / N  # Element size [m]
 
 c_p = 5000  # P-wave velocity [m/s]
 c_s = 2500  # S-wave velocity [m/s]
 rho = 1000  # Density [kg/m3]
 
 smag = 1e9  # Source magnitude
-freq = 1   # Source frequency [Hz]
+freq = 1  # Source frequency [Hz]
 
 final_time = 2
 time_step = 5e-4
-out_freq = (0.01/time_step)
+out_freq = 0.01 / time_step
 
-print(f'Element size: {h} m')
-print(f'Cross time  : {h/c_p} s')
-print(f'Time step   : {time_step} s')
+print(f"Element size: {h} m")
+print(f"Cross time  : {h/c_p} s")
+print(f"Time step   : {time_step} s")
 
 d = {}
 
@@ -48,7 +49,7 @@ d["mesh"] = {
 
 d["acquisition"] = {
     "source_type": "ricker",
-    "source_locations": [[-L/2, L/2, L/2]],
+    "source_locations": [[-L / 2, L / 2, L / 2]],
     "frequency": freq,
     "delay": 0,
     "delay_type": "time",
@@ -87,4 +88,4 @@ d["absorving_boundary_conditions"] = {
 }
 
 wave = spyro.IsotropicWave(d)
-wave.set_mesh(input_mesh_parameters={'edge_length': h})
+wave.set_mesh(input_mesh_parameters={"edge_length": h})

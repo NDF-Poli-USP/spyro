@@ -1,8 +1,8 @@
+"""Class for reading option section int he input dictionary."""
 
 
 class Read_options:
-    """
-    Read the options section of the dictionary.
+    """Read the options section of the dictionary.
 
     Attributes
     ----------
@@ -36,6 +36,7 @@ class Read_options:
     """
 
     def __init__(self, dictionary={}):
+        """Initialize Read_options class."""
         options_dictionary = dictionary["options"]
         options_dictionary.setdefault("method", None)
         options_dictionary.setdefault("cell_type", None)
@@ -54,6 +55,14 @@ class Read_options:
 
     @property
     def variant(self):
+        """Str | None: Type of element variant for each cell.
+
+        Accepted variants are:
+            "lumped": Mass lumping, works for SEM and MLT
+            "equispaced": Equispaced nodes
+            "DG": Discontinuous Galerkin method
+            None: Default/unspecified variant
+        """
         return self._variant
 
     @variant.setter
@@ -65,6 +74,24 @@ class Read_options:
 
     @property
     def method(self):
+        """Str | None: FE method used for wave propagation.
+
+        Accepted methods:
+            'mass_lumped_triangle',
+            'spectral_quadrilateral',
+            'DG_triangle',
+            'DG_quadrilateral',
+            'CG', or
+            None.
+
+        Notes
+        -----
+        ----_
+        The 'mass_lumped_triangle' has equivalents:
+            -"KMV", "MLT", "mass_lumped_triangle", "mass_lumped_tetrahedra".
+        The 'spectral_quadrilateral' has equivalents:
+            -"spectral", "SEM", "spectral_quadrilateral".
+        """
         return self._method
 
     @method.setter
@@ -99,16 +126,18 @@ class Read_options:
             self._method = "DG_quadrilateral"
             self.cell_type = "quadrilateral"
         elif value == "DG":
-            raise ValueError(
-                "DG is not a valid method. Please specify \
-                either DG_triangle or DG_quadrilateral."
-            )
+            raise ValueError("DG is not a valid method. Please specify \
+                either DG_triangle or DG_quadrilateral.")
         elif value == "CG":
-            if "variant" in self.input_dictionary["options"] and "cell_type" \
-                    in self.input_dictionary["options"]:
+            if (
+                "variant" in self.input_dictionary["options"]
+                and "cell_type" in self.input_dictionary["options"]
+            ):
                 self._method = "CG"
             else:
-                raise ValueError("Cant use CG without specifying cell type and variant.")
+                raise ValueError(
+                    "Cant use CG without specifying cell type and variant."
+                )
         elif value is None:
             self._method = None
         else:
@@ -116,21 +145,43 @@ class Read_options:
 
     @property
     def cell_type(self):
+        """Str | None: Cell type used for wave propagation.
+
+        Accepted cell geometry:
+            'triangle',
+            'quadrilateral', or
+            None.
+
+        Notes
+        -----
+        The 'triangle' geometry has equivalents:
+        - "T", "triangle", "triangles", "tetrahedra", "tetrahedron".
+        The 'quadrilateral' geometry has equivalents:
+        - "Q", "quadrilateral", "quadrilaterals", "hexahedra", "hexahedron".
+        """
         return self._cell_type
 
     @cell_type.setter
     def cell_type(self, value):
         triangle_equivalents = [
-            "T", "triangle", "triangles", "tetrahedra", "tetrahedron"
+            "T",
+            "triangle",
+            "triangles",
+            "tetrahedra",
+            "tetrahedron",
         ]
-        triangle_methods = [
-            "mass_lumped_triangle", "DG_triangle", "CG"
-        ]
+        triangle_methods = ["mass_lumped_triangle", "DG_triangle", "CG"]
         quadrilateral_equivalents = [
-            "Q", "quadrilateral", "quadrilaterals", "hexahedra", "hexahedron"
+            "Q",
+            "quadrilateral",
+            "quadrilaterals",
+            "hexahedra",
+            "hexahedron",
         ]
         quadrilateral_methods = [
-            "spectral_quadrilateral", "DG_quadrilateral", "CG"
+            "spectral_quadrilateral",
+            "DG_quadrilateral",
+            "CG",
         ]
 
         if value is None:
@@ -142,14 +193,16 @@ class Read_options:
             if self.method is not None and self.method not in triangle_methods:
                 raise ValueError(
                     f"Cell type '{canonical}' is not "
-                    f"compatible with method '{self.method}'.")
+                    f"compatible with method '{self.method}'."
+                )
             self._cell_type = canonical
         elif value in quadrilateral_equivalents:
             canonical = "quadrilateral"
             if self.method is not None and self.method not in quadrilateral_methods:
                 raise ValueError(
                     f"Cell type '{canonical}' is not "
-                    f"compatible with method '{self.method}'.")
+                    f"compatible with method '{self.method}'."
+                )
             self._cell_type = canonical
         else:
             raise ValueError(f"Cell type '{value}' is not supported.")
@@ -170,10 +223,12 @@ class Read_options:
             else:
                 raise ValueError(
                     f"Cell type of {canonical} not "
-                    f"compatible with variant {self.variant}.")
+                    f"compatible with variant {self.variant}."
+                )
 
     @property
     def degree(self):
+        """Int: FEM polynomial basis degree."""
         return self._degree
 
     @degree.setter
@@ -184,6 +239,10 @@ class Read_options:
 
     @property
     def dimension(self):
+        """Int: Geometric dimension.
+
+        Should only be 2 or 3.
+        """
         return self._dimension
 
     @dimension.setter
@@ -194,27 +253,57 @@ class Read_options:
 
 
 class Read_outputs:
-    def __init__(self):
+    """Read and normalize visualization/output options.
 
+    This reader fills default values in ``self.input_dictionary["visualization"]``
+    and exposes them as attributes for downstream use.
+
+    Attributes
+    ----------
+    forward_output : bool
+        Whether forward wavefield output should be written.
+    forward_output_filename : str
+        Output filename used for forward results.
+    gradient_output : bool
+        Whether gradient output should be written.
+    gradient_filename : str
+        Output filename used for gradient results.
+    adjoint_output : bool
+        Whether adjoint wavefield output should be written.
+    adjoint_filename : str
+        Output filename used for adjoint results.
+    debug_output : bool
+        Whether debug output should be written.
+
+    Notes
+    -----
+    ``self.input_dictionary`` is expected to exist before initialization and
+    contain the global input dictionary used by the I/O readers.
+    """
+
+    def __init__(self):
+        """Populate visualization/output options with defaults."""
         v_str = "visualization"
         self.input_dictionary.setdefault(v_str, {})
         self.input_dictionary[v_str].setdefault("forward_output", False)
         self.forward_output = self.input_dictionary[v_str]["forward_output"]
-        self.input_dictionary[v_str].setdefault("forward_output_filename",
-                                                "results/forward.pvd")
-        self.forward_output_filename = self.input_dictionary[
-            v_str]["forward_output_filename"]
+        self.input_dictionary[v_str].setdefault(
+            "forward_output_filename", "results/forward.pvd"
+        )
+        self.forward_output_filename = self.input_dictionary[v_str][
+            "forward_output_filename"
+        ]
         self.input_dictionary[v_str].setdefault("gradient_output", False)
         self.gradient_output = self.input_dictionary[v_str]["gradient_output"]
-        self.input_dictionary[v_str].setdefault("gradient_filename",
-                                                "results/gradient.pvd")
-        self.gradient_filename = self.input_dictionary[
-            v_str]["gradient_filename"]
+        self.input_dictionary[v_str].setdefault(
+            "gradient_filename", "results/gradient.pvd"
+        )
+        self.gradient_filename = self.input_dictionary[v_str]["gradient_filename"]
         self.input_dictionary[v_str].setdefault("adjoint_output", False)
         self.adjoint_output = self.input_dictionary[v_str]["adjoint_output"]
-        self.input_dictionary[v_str].setdefault("adjoint_filename",
-                                                "results/adjoint.pvd")
-        self.adjoint_filename = self.input_dictionary[
-            v_str]["adjoint_filename"]
+        self.input_dictionary[v_str].setdefault(
+            "adjoint_filename", "results/adjoint.pvd"
+        )
+        self.adjoint_filename = self.input_dictionary[v_str]["adjoint_filename"]
         self.input_dictionary[v_str].setdefault("debug_output", False)
         self.debug_output = self.input_dictionary[v_str]["debug_output"]

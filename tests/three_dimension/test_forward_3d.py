@@ -1,4 +1,3 @@
-from firedrake import File
 import numpy as np
 import pytest
 import spyro

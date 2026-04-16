@@ -4,9 +4,7 @@ import spyro
 
 def test_misfit_2d():
     default_optimization_parameters = {
-        "General": {
-            "Secant": {"Type": "Limited-Memory BFGS", "Maximum Storage": 10}
-        },
+        "General": {"Secant": {"Type": "Limited-Memory BFGS", "Maximum Storage": 10}},
         "Step": {
             "Type": "Augmented Lagrangian",
             "Augmented Lagrangian": {
@@ -104,7 +102,7 @@ def test_misfit_2d():
     Wave_obj_exact.set_mesh(input_mesh_parameters={"edge_length": 0.05})
     Wave_obj_exact.set_initial_velocity_model(
         expression="4.0 + 1.0 * tanh(10.0 * (0.5 - sqrt((x - 1.5) ** 2 + (z + 1.5) ** 2)))",
-        output=True
+        output=True,
     )
     Wave_obj_exact.forward_solve()
     rec_out_exact = Wave_obj_exact.receivers_output
@@ -120,7 +118,9 @@ def test_misfit_2d():
     arevaluesclose = np.isclose(misfit, misfit_second_calc)
     test = arevaluesclose.all()
 
-    print(f"Misfit calculated with FWI object is close to the individually calculated: {test}")
+    print(
+        f"Misfit calculated with FWI object is close to the individually calculated: {test}"
+    )
 
     assert test
 

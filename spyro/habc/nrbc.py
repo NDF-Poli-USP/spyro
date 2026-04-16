@@ -1,3 +1,5 @@
+"""Non-reflecting boundary condition helpers for HABC."""
+
 import firedrake as fire
 import numpy as np
 from os import getcwd
@@ -11,9 +13,8 @@ from os import getcwd
 # With additions by Alexandre Olender
 
 
-class NRBC():
-    '''
-    class for NRBCs applied to outer boundary absorbing layer in HABC scheme.
+class NRBC:
+    """Class for NRBCs applied to outer boundary absorbing layer in HABC scheme.
 
     Attributes
     ----------
@@ -43,14 +44,17 @@ class NRBC():
         Compute the normal vector to a hypershape at a boundary point
     source_to_bnd_reference_vector()
         Compute a unitary reference vector from the source to a boundary point
+    """
 
-
-    '''
-
-    def __init__(self, dom_dim, layer_shape, angle_max=np.pi/4.,
-                 dimension=2, output_folder=None):
-        '''
-        Initialize the NRBC class.
+    def __init__(
+        self,
+        dom_dim,
+        layer_shape,
+        angle_max=np.pi / 4.0,
+        dimension=2,
+        output_folder=None,
+    ):
+        """Initialize the NRBC class.
 
         Parameters
         ----------
@@ -68,8 +72,7 @@ class NRBC():
         Returns
         -------
         None
-        '''
-
+        """
         # Original domain dimensions
         self.dom_dim = dom_dim
 
@@ -92,8 +95,7 @@ class NRBC():
             self.path_save_nrbc = output_folder
 
     def source_to_bnd_reference_vector(self, source_coord, bnd_nodes_nfs):
-        '''
-        Compute a unitary reference vector from the source to a boundary point
+        """Compute a unit reference vector from source to boundary point.
 
         Parameters
         ----------
@@ -108,8 +110,7 @@ class NRBC():
         -------
         unit_ref_vct : `array`
             Unit reference vector from the source to a boundary point
-        '''
-
+        """
         # Boundary node data
         bnd_z, bnd_x = bnd_nodes_nfs[:2]
 
@@ -136,10 +137,10 @@ class NRBC():
         return unit_ref_vct
 
     def hypershape_normal_vector(self, bnd_pnts, hyper_axes, n):
-        '''
-        Compute the normal vector to a hyperellipse (|x/a|^n + |y/b|^n = 1)
-        or a hyperellipsoid (|x/a|^n + |y/b|^n + |z/c|^n = 1) at a boundary
-        point. The hypershape must have the center at the origin.
+        """Compute the normal vector to a boundary point of a hypershape.
+
+        The hypershape can be a hyperellipse or hyperellipsoid centered at
+        the origin.
 
         Observations:
         Let f(x, y) = |x/a|^n - |y/b|^n -1 = 0 a level curve (level set for
@@ -161,8 +162,7 @@ class NRBC():
         -------
         unit_nrm_vct : `array`
             Unitary normal vector to the hypershape at the boundary point
-        '''
-
+        """
         # Point coordinates
         x, y = bnd_pnts[:2]
 
@@ -170,8 +170,8 @@ class NRBC():
         a, b = hyper_axes[:2]
 
         # Compute partial derivatives
-        df_dx = (n / (a**n)) * np.sign(x) * abs(x)**(n - 1)
-        df_dy = (n / (b**n)) * np.sign(y) * abs(y)**(n - 1)
+        df_dx = (n / (a**n)) * np.sign(x) * abs(x) ** (n - 1)
+        df_dy = (n / (b**n)) * np.sign(y) * abs(y) ** (n - 1)
 
         nrm_vct = [df_dx, df_dy]
 
@@ -184,7 +184,7 @@ class NRBC():
             c = hyper_axes[2]
 
             # Partial derivative with respect to third coordinate
-            df_dz = (n / (c**n)) * np.sign(z) * abs(z)**(n - 1)
+            df_dz = (n / (c**n)) * np.sign(z) * abs(z) ** (n - 1)
 
             nrm_vct.append(df_dz)
 
@@ -193,10 +193,16 @@ class NRBC():
 
         return unit_nrm_vct
 
-    def cos_ang_HigdonBC(self, V, source_coord, bnd_nfs, bnd_nodes_nfs,
-                         hyp_par=None, sommerfeld_bc=False):
-        '''
-        Compute the cosine of the incidence angle for first-order Higdon BC.
+    def cos_ang_HigdonBC(
+        self,
+        V,
+        source_coord,
+        bnd_nfs,
+        bnd_nodes_nfs,
+        hyp_par=None,
+        sommerfeld_bc=False,
+    ):
+        """Compute the cosine of the incidence angle for first-order Higdon BC.
 
         Parameters
         ----------
@@ -227,35 +233,35 @@ class NRBC():
         Returns
         -------
         None
-        '''
-
+        """
         nrbc_str = "Sommerfeld" if sommerfeld_bc else "Higdon"
         print("Creating Field for NRBC:", nrbc_str, flush=True)
 
         # Initialize field for the cosine of the incidence angle
-        self.cosHig = fire.Function(V, name='cosHig')
+        self.cosHig = fire.Function(V, name="cosHig")
 
         if sommerfeld_bc:  # Sommerfeld BC
             self.nrbc = "Sommerfeld"
-            cos_Hig = 1.
+            cos_Hig = 1.0
 
         else:  # Higdon BC
 
             self.nrbc = "Higdon"
 
             # Unitary reference vector pointing to the boundary point
-            unit_ref_vct = self.source_to_bnd_reference_vector(source_coord,
-                                                               bnd_nodes_nfs)
+            unit_ref_vct = self.source_to_bnd_reference_vector(
+                source_coord, bnd_nodes_nfs
+            )
 
             # Normal vector to the boundary
-            if self.layer_shape == 'rectangular':
+            if self.layer_shape == "rectangular":
                 # Normal vector to the boundary is a orthonormal vector, then
                 # cosine on incidence angle can be estimated from a projection
                 # of the reference vector to boundary onto the orthonormal
                 # vectors ([1, 0, 0] (2D), [0, 1, 0] (2D), [0, 0, 1] (3D))
                 cos_Hig = np.maximum.reduce(abs(unit_ref_vct))
 
-            if self.layer_shape == 'hypershape':
+            if self.layer_shape == "hypershape":
 
                 # Original domain dimensions
                 Lx, Lz = self.dom_dim[:2]
@@ -272,22 +278,22 @@ class NRBC():
                     bnd_pnts.append(bnd_y - Ly / 2)
 
                 # Normal vector to the boundary
-                unit_nrm_vct = self.hypershape_normal_vector(bnd_pnts,
-                                                             hyp_axes,
-                                                             n_hyp)
+                unit_nrm_vct = self.hypershape_normal_vector(bnd_pnts, hyp_axes, n_hyp)
 
                 # Cosine of the incidence angle
                 cos_Hig = np.sum(unit_ref_vct * unit_nrm_vct, axis=0)
 
             # Adjust values to minimum cosine of incidence angle
             cos_Hig[cos_Hig < self.cos_min] = (
-                1. - cos_Hig[cos_Hig < self.cos_min]**2)**0.5
+                1.0 - cos_Hig[cos_Hig < self.cos_min] ** 2
+            ) ** 0.5
 
         self.cosHig.dat.data_with_halos[bnd_nfs] = cos_Hig
 
         # Save boundary profile of cosine of incidence angle
         outfile = fire.VTKFile(self.path_save_nrbc + "cosHig.pvd")
         outfile.write(self.cosHig)
+
 
 # dx = 0.1 km REC
 # W/O = 107.72% - 0.80%

@@ -1,3 +1,8 @@
+"""General display helpers with some mixed utils.
+
+Should be moved to io folder and utils.
+"""
+
 import os
 
 import numpy as np
@@ -15,8 +20,7 @@ __all__ = [
 
 
 def fill(usol_recv, is_local, nt, nr):
-    """Fills usol_recv with -99999 value
-    when it isn't local to any core
+    """Fill usol_recv with -99999 value when it isn't local to any core.
 
     Parameters
     ----------
@@ -33,7 +37,6 @@ def fill(usol_recv, is_local, nt, nr):
     -------
     usol_recv : list
         List of numpy arrays
-
     """
     if len(usol_recv) == 0:
         usol_recv = np.asarray(usol_recv)
@@ -49,7 +52,7 @@ def fill(usol_recv, is_local, nt, nr):
 
 
 def create_output_file(name, comm, source_num):
-    """Saves shots in output file
+    """Save shots in output file.
 
     Parameters
     ----------
@@ -79,7 +82,7 @@ def create_output_file(name, comm, source_num):
 
 
 def display(comm, source_num):
-    """Displays current shot and ensemble in terminal
+    """Display current shot and ensemble in terminal.
 
     Parameters
     ----------
@@ -87,7 +90,6 @@ def display(comm, source_num):
         MPI communicator
     source_num : int
         Source number
-
     """
     if comm.comm.rank == 0:
         print(
@@ -101,7 +103,7 @@ def display(comm, source_num):
 
 
 def display_progress(comm, t):
-    """Displays progress time
+    """Display progress time.
 
     Parameters
     ----------
@@ -115,7 +117,7 @@ def display_progress(comm, t):
 
 
 def receivers_local(mesh, dimension, receiver_locations):
-    """Locates receivers in cells
+    """Locate receivers in cells.
 
     Parameters
     ----------
@@ -132,10 +134,7 @@ def receivers_local(mesh, dimension, receiver_locations):
         List of receiver locations in cells
     """
     if dimension == 2:
-        return [
-            mesh.locate_cell([z, x], tolerance=0.01)
-            for z, x in receiver_locations
-        ]
+        return [mesh.locate_cell([z, x], tolerance=0.01) for z, x in receiver_locations]
     elif dimension == 3:
         return [
             mesh.locate_cell([z, x, y], tolerance=0.01)

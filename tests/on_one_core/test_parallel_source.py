@@ -9,7 +9,6 @@ import spyro
 
 from ..inputfiles.Model1_parallel_2d import model as options
 
-
 # forward = spyro.solvers.forward
 # gradient = spyro.solvers.gradient
 functional = spyro.utils.compute_functional

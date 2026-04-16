@@ -1,3 +1,5 @@
+"""Calculate the minimum cells to use in each FEM method."""
+
 import numpy as np
 import time as timinglib
 import copy
@@ -6,8 +8,7 @@ import spyro
 
 
 class Meshing_parameter_calculator:
-    """
-    A class used to calculate meshing parameter C (cells-per-wavelength).
+    """A class used to calculate meshing parameter C (cells-per-wavelength).
 
     ...
 
@@ -24,7 +25,8 @@ class Meshing_parameter_calculator:
     velocity_model_file_name : str
         the file name of the velocity model .segy file
     FEM_method_to_evaluate : str
-        the Finite Element Method to be evaluated, either "mass_lumped_triangle" or "spectral_quadrilateral"
+        the Finite Element Method to be evaluated,
+        either "mass_lumped_triangle" or "spectral_quadrilateral"
     dimension : int
         the spatial dimension of the problem (either 2 or 3)
     receiver_setup : str
@@ -37,7 +39,8 @@ class Meshing_parameter_calculator:
     reference_degree : int
         the polynomial degree to be used for the calculation of the reference case
     cpw_reference : float
-        the cells-per-wavelength to be used for mesh generation of the reference solution
+        the cells-per-wavelength to be used for mesh generation of the reference
+        solution
     cpw_initial : float
         the initial guess for the cells-per-wavelength parameter
     cpw_accuracy : float
@@ -47,11 +50,14 @@ class Meshing_parameter_calculator:
     save_reference : bool
         a boolean to chose to save the reference solution
     load_reference : bool
-        a boolean to load the reference solution, if used paramters_dictionary should also have a "reference_solution_file" key.
+        a boolean to load the reference solution,
+        if used paramters_dictionary should also have a "reference_solution_file" key.
     timestep_calculation : str
-        a string to define the time-step calculation method, either "exact", "estimate", or "float".
+        a string to define the time-step calculation method,
+        either "exact", "estimate", or "float".
     fixed_timestep : float
-        a float to define the fixed time-step if the time-step calculation method is "float"
+        a float to define the fixed time-step, only uses fixed
+        if the time-step calculation method is "float"
     estimate_timestep : bool
         a boolean to define if the time-step should be estimated
     initial_guess_object : spyro.AcousticWave
@@ -84,38 +90,32 @@ class Meshing_parameter_calculator:
     """
 
     def __init__(self, parameters_dictionary):
-        """
-        Initializes the Meshing_parameter_calculator class with a dictionary of parameters.
+        """Initialize the Meshing_parameter_calculator class with a dictionary.
 
         Parameters
         ----------
         parameters_dictionary : dict
-            A dictionary containing all the parameters needed for the calculation. It should include:
+            A dictionary containing all the parameters needed for the calculation.
+            It should include:
             - "source_frequency": float, the source frequency for the calculation
-            - "minimum_velocity_in_the_domain": float, the minimum velocity in the domain for the calculation
-            - "velocity_profile_type": str, the type of velocity profile for the calculation
-            - "velocity_model_file_name": str, the file name of the velocity model for the calculation
-            - "FEM_method_to_evaluate": str, the Finite Element Method to be evaluated for the calculation
+            - "minimum_velocity_in_the_domain": float, the minimum velocity in thedomain
+            - "velocity_profile_type": str, the type of velocity profile
+            - "velocity_model_file_name": str, the file name of the velocity model
+            - "FEM_method_to_evaluate": str, the Finite Element Method to be evaluated
             - "dimension": int, the dimension of the problem
             - "receiver_setup": str, the setup of the receiver
-            - "accepted_error_threshold": float, the accepted error threshold for the calculation
+            - "accepted_error_threshold": float, the accepted error threshold
             - "desired_degree": int, the desired degree for the calculation
         """
         self.parameters_dictionary = parameters_dictionary
         self.source_frequency = parameters_dictionary["source_frequency"]
-        self.minimum_velocity = parameters_dictionary[
-            "minimum_velocity_in_the_domain"
-        ]
-        self.velocity_profile_type = parameters_dictionary[
-            "velocity_profile_type"
-        ]
+        self.minimum_velocity = parameters_dictionary["minimum_velocity_in_the_domain"]
+        self.velocity_profile_type = parameters_dictionary["velocity_profile_type"]
         self.velocity_model_file_name = parameters_dictionary[
             "velocity_model_file_name"
         ]
         self._check_velocity_profile_type()
-        self.FEM_method_to_evaluate = parameters_dictionary[
-            "FEM_method_to_evaluate"
-        ]
+        self.FEM_method_to_evaluate = parameters_dictionary["FEM_method_to_evaluate"]
         self.dimension = parameters_dictionary["dimension"]
         self.receiver_setup = parameters_dictionary["receiver_setup"]
         self.accepted_error_threshold = parameters_dictionary[
@@ -145,9 +145,7 @@ class Meshing_parameter_calculator:
         self.reference_solution = self.get_reference_solution()
 
     def _setting_up_testing_options(self):
-        """
-        Sets up the testing options.
-        """
+        """Set up the testing options."""
         if "testing" in self.parameters_dictionary:
             self.reduced_obj_for_testing = self.parameters_dictionary["testing"]
         else:
@@ -166,7 +164,9 @@ class Meshing_parameter_calculator:
 
     def _setting_up_time_step(self):
         if "time-step_calculation" in self.parameters_dictionary:
-            self.timestep_calculation = self.parameters_dictionary["time-step_calculation"]
+            self.timestep_calculation = self.parameters_dictionary[
+                "time-step_calculation"
+            ]
         else:
             self.timestep_calculation = "exact"
         self.fixed_timestep = None
@@ -189,7 +189,7 @@ class Meshing_parameter_calculator:
             self._check_heterogenous_mesh_lengths()
             if self.velocity_model_file_name is None:
                 raise ValueError(
-                    "Velocity model file name should be defined for heterogeneous models"
+                    "Velocity model file name should be defined for heterogeneous model"
                 )
         else:
             raise ValueError(
@@ -212,8 +212,7 @@ class Meshing_parameter_calculator:
             raise ValueError("Length in x direction must be positive")
 
     def build_initial_guess_model(self):
-        """
-        Builds the initial guess spyro acoustic wave solver object.
+        """Build the initial guess spyro acoustic wave solver object.
 
         Returns
         -------
@@ -225,8 +224,7 @@ class Meshing_parameter_calculator:
         return spyro.AcousticWave(dictionary)
 
     def get_reference_solution(self):
-        """
-        Calculates or loads the reference solution to be used for error calculation.
+        """Calculate or load the reference solution to be used for error calculation.
 
         Returns
         -------
@@ -245,15 +243,18 @@ class Meshing_parameter_calculator:
             return self.calculate_analytical_solution()
 
     def calculate_reference_solution(self):
-        """
-        Calculates the numerical reference solution for heterogeneous models, using cpw and degree values in parameters dictionary.
+        """Calculate the numerical reference solution for heterogeneous models.
+
+        Uses cpw and degree values in parameters dictionary.
 
         Returns
         -------
         np.ndarray
             the reference solution
         """
-        Wave_obj = self.build_current_object(self.cpw_reference, degree=self.reference_degree)
+        Wave_obj = self.build_current_object(
+            self.cpw_reference, degree=self.reference_degree
+        )
 
         Wave_obj.forward_solve()
         p_receivers = Wave_obj.forward_solution_receivers
@@ -264,8 +265,7 @@ class Meshing_parameter_calculator:
         return p_receivers
 
     def calculate_analytical_solution(self):
-        """
-        Calculates the analytical reference solution for homogeneous models.
+        """Calculate the analytical reference solution for homogeneous models.
 
         Returns
         -------
@@ -303,26 +303,28 @@ class Meshing_parameter_calculator:
         return analytical_solution
 
     def find_minimum(self, starting_cpw=None, TOL=None, accuracy=None, savetxt=False):
-        """
-        Finds the minimum cells-per-wavelength meshing parameter that is still below the error threshold.
+        """Find the minimum cells-per-wavelength meshing parameter below threshold.
 
         Parameters
         ----------
         starting_cpw : float (optional)
-            the starting cells-per-wavelength parameter to be used in the search. If None,
-            the value from paramters_dictionary is used.
+            the starting cells-per-wavelength parameter to be used in the search.
+            If None, the value from paramters_dictionary is used.
         TOL : float (optional)
-            the accepted error threshold for the calculation. The cpw calculation stops when
-            the error is below this threshold. Usually 0.05. If None, the value from paramters_dictionary is used.
+            the accepted error threshold for the calculation. The cpw calculation stops
+            when the error is below this threshold. Usually 0.05.
+            If None, the value from paramters_dictionary is used.
         accuracy : float (optional)
-            the accuracy of the cells-per-wavelength parameter. If None, the value from paramters_dictionary is used.
+            the accuracy of the cells-per-wavelength parameter.
+            If None, the value from paramters_dictionary is used.
         savetxt : bool (optional)
             a boolean to chose to save the results to a text file
 
         Returns
         -------
         cpw : float
-            the minimum cells-per-wavelength parameter that is still below the error threshold
+            the minimum cells-per-wavelength parameter that is still below
+            the error threshold
         """
         if starting_cpw is None:
             starting_cpw = self.cpw_initial
@@ -348,13 +350,13 @@ class Meshing_parameter_calculator:
 
             # Running forward model
             Wave_obj = self.build_current_object(cpw)
-            Wave_obj._initialize_model_parameters()  # TO REVIEW: call to protected method
+            # TO REVIEW: call to protected method
+            Wave_obj._initialize_model_parameters()
 
             # Setting up time-step
             if self.timestep_calculation != "float":
                 Wave_obj.get_and_set_maximum_dt(
-                    fraction=0.2,
-                    estimate_max_eigenvalue=self.estimate_timestep
+                    fraction=0.2, estimate_max_eigenvalue=self.estimate_timestep
                 )
             else:
                 Wave_obj.dt = self.fixed_timestep
@@ -364,13 +366,9 @@ class Meshing_parameter_calculator:
             Wave_obj.forward_solve()
             t1 = timinglib.time()
             p_receivers = Wave_obj.forward_solution_receivers
-            spyro.io.save_shots(
-                Wave_obj, file_name="test_shot_record" + str(cpw)
-            )
+            spyro.io.save_shots(Wave_obj, file_name="test_shot_record" + str(cpw))
 
-            error = error_calc(
-                p_receivers, self.reference_solution, Wave_obj.dt
-            )
+            error = error_calc(p_receivers, self.reference_solution, Wave_obj.dt)
             print("Error is ", error, flush=True)
             cpws.append(cpw)
             dts.append(Wave_obj.dt)
@@ -386,15 +384,15 @@ class Meshing_parameter_calculator:
         return cpw - dif
 
     def build_current_object(self, cpw, degree=None):
-        """
-        Builds the current acoustic wave solver object.
+        """Build the current acoustic wave solver object.
 
         Parameters
         ----------
         cpw : float
             the current cells-per-wavelength parameter
         degree : int (optional)
-            the polynomial degree to be used in the calculation. If None, the value from paramters_dictionary is used.
+            the polynomial degree to be used in the calculation.
+            If None, the value from paramters_dictionary is used.
 
         Returns
         -------
@@ -416,19 +414,15 @@ class Meshing_parameter_calculator:
         return Wave_obj
 
     def _saving_file(self, savetxt, info):
-        """
-        Saves the results to a text file.
-        """
+        """Save the results to a text file."""
         if savetxt:
             np.savetxt(
-                "p"+str(self.initial_guess_object.degree)+"_cpw_results.txt",
+                "p" + str(self.initial_guess_object.degree) + "_cpw_results.txt",
                 info,
             )
 
     def _updating_cpw_error_and_dif(self, cpw, error, dif):
-        """
-        Updates the cells-per-wavelength parameter.
-        """
+        """Updatec the cells-per-wavelength parameter."""
         if error < self.accepted_error_threshold and dif > self.cpw_accuracy:
             cpw -= dif
             error = 100.0
@@ -446,8 +440,9 @@ class Meshing_parameter_calculator:
 
 
 def calculate_dif(cpw, accuracy, fast_loop=False):
-    """
-    Calculates the difference between consecutive cells-per-wavelength to be used in the search.
+    """Calculate the difference between consecutive cells-per-wavelength.
+
+    To be used in the search algorithm.
 
     Parameters
     ----------
@@ -472,8 +467,7 @@ def calculate_dif(cpw, accuracy, fast_loop=False):
 
 
 def error_calc(receivers, analytical, dt):
-    """
-    Calculates the error between the numerical and analytical solutions.
+    """Calculate the error between the numerical and analytical solutions.
 
     Parameters
     ----------
@@ -497,9 +491,7 @@ def error_calc(receivers, analytical, dt):
     time_vector_ana = np.linspace(0.0, final_time, len(analytical[:, 0]))
     ana = np.zeros(np.shape(receivers))
     for i in range(num_rec):
-        ana[:, i] = np.interp(
-            time_vector_rec, time_vector_ana, analytical[:, i]
-        )
+        ana[:, i] = np.interp(time_vector_rec, time_vector_ana, analytical[:, i])
 
     total_numerator = 0.0
     total_denumenator = 0.0

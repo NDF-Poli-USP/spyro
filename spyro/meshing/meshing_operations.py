@@ -1,12 +1,15 @@
+"""General mesh operations for domains w/o an absorbing layer."""
+
 import firedrake as fire
 from firedrake.__future__ import interpolate
 import numpy as np
-# from spyro.utils.error_management import value_parameter_error
-fire.interpolate = interpolate
 from spyro.utils.eval_functions_to_ufl import generate_ufl_functions
 
+# from spyro.utils.error_management import value_parameter_error
+fire.interpolate = interpolate
 
-class MeshOps():
+
+class MeshOps:
     """
     Class for general mesh operations for domains w/o an absorbing layer.
 
@@ -50,7 +53,7 @@ class MeshOps():
         Finite element type for the Eikonal modeling. 'CG' or 'KMV'
     f_est : `float`
         Factor for the stabilizing term in Eikonal Eq. Default is 0.03
-    funct_space_eik: `firedrake function space`
+    funct_space_eik : `firedrake function space`
         Function space for the Eikonal modeling
     mesh_original : `firedrake mesh`
         Original mesh without absorbing layer
@@ -69,8 +72,6 @@ class MeshOps():
         Extract the node positions from the mesh and return as a tuple of arrays.
     representative_mesh_dimensions()
         Get the representative mesh dimensions from a mesh.
-
-
 
     clipping_coordinates_lay_field()
         Generate a field with clipping coordinates to the original boundary
@@ -91,8 +92,14 @@ class MeshOps():
         Generate a rectangular mesh with an absorbing layer
     """
 
-    def __init__(self, domain_dim, dimension=2, quadrilateral=False,
-                 func_space_type=None, comm=None):
+    def __init__(
+        self,
+        domain_dim,
+        dimension=2,
+        quadrilateral=False,
+        func_space_type=None,
+        comm=None,
+    ):
         """
         Initialize the HABC_Mesh class.
 
@@ -116,7 +123,6 @@ class MeshOps():
         -------
         None
         """
-
         # Original domain dimensions
         self.domain_dim = domain_dim
 
@@ -145,9 +151,9 @@ class MeshOps():
         -------
         mesh_z : `ufl.geometry.SpatialCoordinate`
             Symbolic coordinate z of the mesh object
-        mesh_x: `ufl.geometry.SpatialCoordinate`
+        mesh_x : `ufl.geometry.SpatialCoordinate`
             Symbolic coordinate x of the mesh object
-        mesh_y: `ufl.geometry.SpatialCoordinate`
+        mesh_y : `ufl.geometry.SpatialCoordinate`
             Symbolic coordinate y of the mesh object
         """
         if self.dimension == 2:
@@ -187,7 +193,6 @@ class MeshOps():
         tol : `float`
             Tolerance for searching nodes in the mesh
         """
-
         # Mesh cell diameters
         diam_mesh = fire.CellDiameter(mesh)
 
@@ -198,8 +203,7 @@ class MeshOps():
             fdim = 3**0.5
 
         # Minimum and maximum mesh size for habc parameters
-        diam = fire.assemble(fire.interpolate(diam_mesh,
-                                              function_space))
+        diam = fire.assemble(fire.interpolate(diam_mesh, function_space))
         lmin = round(diam.dat.data_with_halos.min() / fdim, 6)
         lmax = round(diam.dat.data_with_halos.max() / fdim, 6)
 
@@ -207,7 +211,7 @@ class MeshOps():
         alpha = lmax / lmin
 
         # Tolerance for searching nodes in the mesh
-        tol = 10**(min(int(np.log10(lmin / 10)), -6))
+        tol = 10 ** (min(int(np.log10(lmin / 10)), -6))
 
         return (diam, lmin, lmax, alpha, tol)
 
@@ -228,7 +232,6 @@ class MeshOps():
         max_coordinates : `array`
             Array containing the maximum coordinates in each dimension
         """
-
         coords = mesh.coordinates.dat.data_with_halos
         min_coordinates = np.min(coords, axis=0)
         max_coordinates = np.max(coords, axis=0)
@@ -236,7 +239,7 @@ class MeshOps():
         return min_coordinates, max_coordinates
 
     def extract_node_positions(self, mesh, function_space):
-        '''
+        """
         Extract the node positions from the mesh and return as a tuple of arrays.
 
         Parameters
@@ -252,19 +255,19 @@ class MeshOps():
             Tuple containing the node positions in the mesh.
             - (z_data, x_data) for 2D
             - (z_data, x_data, y_data) for 3D
-        '''
-
+        """
         # Interpolate the coordinates according to the function space
         coords = []
-        coord_expression = ['z', 'x', 'y']
+        coord_expression = ["z", "x", "y"]
         for i in range(self.dimension):
-            ufl_input = generate_ufl_functions(mesh, coord_expression[i],
-                                               self.dimension)
+            ufl_input = generate_ufl_functions(
+                mesh, coord_expression[i], self.dimension
+            )
 
-            if self.func_space_type == 'scalar':
+            if self.func_space_type == "scalar":
                 V = function_space
 
-            if self.func_space_type == 'vector':
+            if self.func_space_type == "vector":
                 V = function_space.sub(i)
 
             coords.append(fire.assemble(fire.interpolate(ufl_input, V)))
@@ -284,7 +287,7 @@ class MeshOps():
 
     def mapping_boundary_ids(self, mesh, function_space, boundaries, box_domain=True):
         """
-        Map the boundaries of the a mesh
+        Map the boundaries of the a mesh.
 
         Parameters
         ----------
@@ -303,17 +306,16 @@ class MeshOps():
 
         Returns
         -------
-        boundary_idx_map: dict
+        boundary_idx_map : dict
             Mapping of boundary IDs for applying absorbing boundary conditions
         """
-
         if box_domain:
 
             # Simulating a Dirichlet BC in every boundary
             if self.func_space_type == "scalar":
-                bc_val = 0.
+                bc_val = 0.0
             else:
-                bc_val = fire.as_vector((0.,) * self.dimension)
+                bc_val = fire.as_vector((0.0,) * self.dimension)
 
             num_boundaries = 4
             min_coordinates, max_coordinates = self.extract_extreme_coordinates(mesh)
@@ -334,8 +336,9 @@ class MeshOps():
 
             # Boundary nodes indices
             if len(exterior_markers) == 0:
-                boundary_idx_map = {idx_bdn: None for idx_bdn
-                                    in range(1, num_boundaries + 1)}
+                boundary_idx_map = {
+                    idx_bdn: None for idx_bdn in range(1, num_boundaries + 1)
+                }
                 return boundary_idx_map
 
             boundary_idx_map = {}
@@ -377,10 +380,12 @@ class MeshOps():
 
             return boundary_idx_map
         else:
-            raise NotImplementedError("Mapping of boundary ids for other type of "
-                                      "domains is not implemented yet. Only box "
-                                      "domains are supported. The numbering the "
-                                      "future boundary ids must start at 7.")
+            raise NotImplementedError(
+                "Mapping of boundary ids for other type of "
+                "domains is not implemented yet. Only box "
+                "domains are supported. The numbering the "
+                "future boundary ids must start at 7."
+            )
 
     def extract_bnd_node_indices(self, mesh, function_space, mesh_parameters):
         """
@@ -413,7 +418,6 @@ class MeshOps():
             - (left_boundary, right_boundary, bottom_boundary,
                 left_bnd_y, right_bnd_y) for 3D
         """
-
         node_positions = self.extract_node_positions(mesh, function_space)
 
         # Extract node positions
@@ -421,18 +425,24 @@ class MeshOps():
 
         # Boundary array
         left_boundary = np.where(x_data <= mesh_parameters.tol)
-        right_boundary = np.where(x_data >= mesh_parameters.length_x
-                                  - mesh_parameters.tol)
-        bottom_boundary = np.where(z_data <= mesh_parameters.tol
-                                   - mesh_parameters.length_z)
+        right_boundary = np.where(
+            x_data >= mesh_parameters.length_x - mesh_parameters.tol
+        )
+        bottom_boundary = np.where(
+            z_data <= mesh_parameters.tol - mesh_parameters.length_z
+        )
         bnds = (left_boundary, right_boundary, bottom_boundary)
 
         if self.dimension == 3:  # 3D
             y_data = node_positions[2]
             left_bnd_y = np.where(y_data <= mesh_parameters.tol)
-            right_bnd_y = np.where(y_data >= mesh_parameters.length_y
-                                   - mesh_parameters.tol)
-            bnds += (left_bnd_y, right_bnd_y,)
+            right_bnd_y = np.where(
+                y_data >= mesh_parameters.length_y - mesh_parameters.tol
+            )
+            bnds += (
+                left_bnd_y,
+                right_bnd_y,
+            )
 
         return bnds
 

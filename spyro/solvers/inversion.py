@@ -1,3 +1,5 @@
+"""Full waveform inversion solver."""
+
 import firedrake as fire
 import warnings
 from scipy.optimize import minimize as scipy_minimize
@@ -15,10 +17,10 @@ from ..io.basicio import switch_serial_shot
 from ..io.basicio import load_shots, save_shots, create_segy
 from ..utils import run_in_one_core
 
-
 try:
     from ROL.firedrake_vector import FiredrakeVector as FireVector
     import ROL
+
     RObjective = ROL.Objective
 except ImportError:
     ROL = None
@@ -28,8 +30,7 @@ except ImportError:
 
 
 def get_peak_memory():
-    """
-    Get the peak memory usage of the current process.
+    """Get the peak memory usage of the current process.
 
     Returns
     -------
@@ -71,9 +72,9 @@ class L2Inner(object):
     eval(_u, _v)
         Evaluate the L2 inner product between two functions.
     """
+
     def __init__(self, Wave_obj):
-        """
-        Initialize the L2 inner product operator.
+        """Initialize the L2 inner product operator.
 
         Parameters
         ----------
@@ -85,13 +86,12 @@ class L2Inner(object):
         dxlump = fire.dx(**Wave_obj.quadrature_rule)
         self.A = fire.assemble(
             fire.TrialFunction(V) * fire.TestFunction(V) * dxlump,
-            mat_type="matfree"
+            mat_type="matfree",
         )
         self.Ap = fire.as_backend_type(self.A).mat()
 
     def eval(self, _u, _v):
-        """
-        Evaluate the L2 inner product between two functions.
+        """Evaluate the L2 inner product between two functions.
 
         Parameters
         ----------
@@ -113,8 +113,7 @@ class L2Inner(object):
 
 
 class Objective(RObjective):
-    """
-    DEPRECATED ROL-compatible objective function for FWI.
+    """DEPRECATED ROL-compatible objective function for FWI.
 
     This class wraps the full waveform inversion objective function for use
     with the ROL (Rapid Optimization Library) optimization framework. It
@@ -152,9 +151,9 @@ class Objective(RObjective):
     update(x, flag, iteration)
         Update the velocity model with new optimization iterate.
     """
+
     def __init__(self, inner_product, FWI_obj):
-        """
-        Initialize the objective function.
+        """Initialize the objective function.
 
         Parameters
         ----------
@@ -179,8 +178,7 @@ class Objective(RObjective):
         self.comm = FWI_obj.comm
 
     def value(self, x, tol):
-        """
-        Compute the objective functional value.
+        """Compute the objective functional value.
 
         Parameters
         ----------
@@ -204,8 +202,7 @@ class Objective(RObjective):
         return J_total[0]
 
     def gradient(self, g, x, tol):
-        """
-        Compute the gradient of the objective functional.
+        """Compute the gradient of the objective functional.
 
         Parameters
         ----------
@@ -222,8 +219,7 @@ class Objective(RObjective):
         g.vec += dJ
 
     def update(self, x, flag, iteration):
-        """
-        Update the velocity model with new optimization iterate.
+        """Update the velocity model with new optimization iterate.
 
         Parameters
         ----------
@@ -235,16 +231,13 @@ class Objective(RObjective):
             Current iteration number.
         """
         vp = self.inversion_obj.initial_velocity_model
-        vp.assign(fire.Function(
-            self.inversion_obj.function_space,
-            x.vec,
-            name="velocity")
+        vp.assign(
+            fire.Function(self.inversion_obj.function_space, x.vec, name="velocity")
         )
 
 
 class FullWaveformInversion(AcousticWave):
-    """
-    Classical Full waveform inversion for acoustic wave data.
+    r"""Classical Full waveform inversion for acoustic wave data.
 
     This class implements full waveform inversion (FWI) as a subclass of
     AcousticWave. FWI is an optimization-based method for reconstructing
@@ -346,8 +339,7 @@ class FullWaveformInversion(AcousticWave):
     """
 
     def __init__(self, dictionary=None, comm=None):
-        """
-        Initialize a FullWaveformInversion instance.
+        """Initialize a FullWaveformInversion instance.
 
         Sets up the FWI problem with default optimization parameters and
         initializes all necessary attributes for the inversion process.
@@ -361,10 +353,9 @@ class FullWaveformInversion(AcousticWave):
         """
         super().__init__(dictionary=dictionary, comm=comm)
         default_optimization_parameters = {
-            "General": {"Secant": {
-                "Type": "Limited-Memory BFGS",
-                "Maximum Storage": 10
-            }},
+            "General": {
+                "Secant": {"Type": "Limited-Memory BFGS", "Maximum Storage": 10}
+            },
             "Step": {
                 "Type": "Augmented Lagrangian",
                 "Augmented Lagrangian": {
@@ -381,10 +372,16 @@ class FullWaveformInversion(AcousticWave):
         }
         self.input_dictionary.setdefault("inversion", {})
         self.input_dictionary["inversion"].setdefault("initial_guess_model_file", None)
-        self.input_dictionary["inversion"].setdefault("optimization_parameters", default_optimization_parameters)
+        self.input_dictionary["inversion"].setdefault(
+            "optimization_parameters", default_optimization_parameters
+        )
         self.input_dictionary["inversion"].setdefault("real_shot_record_file", None)
-        self.input_dictionary["inversion"].setdefault("control_output_file", "fwi/control.pvd")
-        self.input_dictionary["inversion"].setdefault("gradient_output_file", "fwi/gradient.pvd")
+        self.input_dictionary["inversion"].setdefault(
+            "control_output_file", "fwi/control.pvd"
+        )
+        self.input_dictionary["inversion"].setdefault(
+            "gradient_output_file", "fwi/gradient.pvd"
+        )
         self.input_dictionary["inversion"].setdefault("real_velocity_model_file", None)
         inversion_dictionary = self.input_dictionary["inversion"]
 
@@ -398,7 +395,7 @@ class FullWaveformInversion(AcousticWave):
         self.current_iteration = 0
         self.mesh_iteration = 0
         self.iteration_limit = 100
-        self.inner_product = 'L2'
+        self.inner_product = "L2"
         self.misfit = None
         self.guess_forward_solution = None
         self.has_gradient_mask = False
@@ -407,31 +404,17 @@ class FullWaveformInversion(AcousticWave):
 
     @property
     def real_velocity_model_file(self):
-        """
-        Get the real velocity model file path.
-
-        Returns
-        -------
-        str or None
-            Path to the real velocity model file.
-        """
-        return self._real_velocity_model_file
-
-    @real_velocity_model_file.setter
-    def real_velocity_model_file(self, value):
-        """
-        Set the real velocity model file path.
-
-        Parameters
-        ----------
-        value : str or None
-            Path to the real velocity model file.
+        """Str | None: Real velocity model file path.
 
         Raises
         ------
         FileNotFoundError
             If the specified file does not exist.
         """
+        return self._real_velocity_model_file
+
+    @real_velocity_model_file.setter
+    def real_velocity_model_file(self, value):
         if value is not None:
             if not os.path.exists(value):
                 raise FileNotFoundError(f"Velocity model file '{value}' does not exist")
@@ -439,34 +422,20 @@ class FullWaveformInversion(AcousticWave):
 
     @property
     def real_shot_record_files(self):
-        """
-        Get the real shot record file path or pattern.
+        """Str | None: Real shot record file path or pattern.
 
-        Returns
-        -------
-        str or None
-            Path or prefix pattern for the real shot record files.
-        """
-        return self._real_shot_record_files
-
-    @real_shot_record_files.setter
-    def real_shot_record_files(self, value):
-        """
-        Set the real shot record file path or pattern.
-
-        This setter also initializes the control and gradient output files
+        This also initializes the control and gradient output files
         and loads the real shot record if a valid path is provided.
-
-        Parameters
-        ----------
-        value : str or None
-            Path or prefix pattern for the real shot record files.
 
         Raises
         ------
         FileNotFoundError
             If the specified file or files matching the pattern do not exist.
         """
+        return self._real_shot_record_files
+
+    @real_shot_record_files.setter
+    def real_shot_record_files(self, value):
         if value is not None:
             # Check if it's a file prefix pattern by looking for matching files
             if not os.path.exists(value) and not glob.glob(value + "*"):
@@ -478,8 +447,7 @@ class FullWaveformInversion(AcousticWave):
             self.load_real_shot_record(file_name=self.real_shot_record_files)
 
     def calculate_misfit(self, c=None):
-        """
-        Calculate the misfit between observed and simulated data.
+        """Calculate the misfit between observed and simulated data.
 
         Runs the forward model with the current velocity model and computes
         the difference between the simulated shot records and the real/observed
@@ -511,16 +479,21 @@ class FullWaveformInversion(AcousticWave):
         if c is not None:
             self.initial_velocity_model.dat.data[:] = c
         self.forward_solve()
-        output = fire.File("control_" + str(self.current_iteration)+".pvd")
+        output = fire.File("control_" + str(self.current_iteration) + ".pvd")
         output.write(self.c)
-        np.save(f"control{self.comm.ensemble_comm.rank}_{self.comm.comm.rank}", self.c.dat.data[:])
+        np.save(
+            f"control{self.comm.ensemble_comm.rank}_{self.comm.comm.rank}",
+            self.c.dat.data[:],
+        )
         if self.parallelism_type == "spatial" and self.number_of_sources > 1:
             misfit_list = []
             guess_shot_record_list = []
             for snum in range(self.number_of_sources):
                 switch_serial_shot(self, snum)
                 guess_shot_record_list.append(self.forward_solution_receivers)
-                misfit_list.append(self.real_shot_record[snum] - self.forward_solution_receivers)
+                misfit_list.append(
+                    self.real_shot_record[snum] - self.forward_solution_receivers
+                )
             self.guess_shot_record = guess_shot_record_list
             self.misfit = misfit_list
         else:
@@ -529,9 +502,16 @@ class FullWaveformInversion(AcousticWave):
             self.misfit = self.real_shot_record - self.guess_shot_record
         return self.misfit
 
-    def generate_real_shot_record(self, plot_model=False, model_filename="model.png", abc_points=None, save_shot_record=True, shot_filename="shots/shot_record_", high_resolution_model=False):
-        """
-        Generate synthetic shot records from the true velocity model.
+    def generate_real_shot_record(
+        self,
+        plot_model=False,
+        model_filename="model.png",
+        abc_points=None,
+        save_shot_record=True,
+        shot_filename="shots/shot_record_",
+        high_resolution_model=False,
+    ):
+        """Generate synthetic shot records from the true velocity model.
 
         Creates a SyntheticRealAcousticWave object with the true velocity model,
         solves the forward problem, and optionally saves the shot records and
@@ -558,14 +538,25 @@ class FullWaveformInversion(AcousticWave):
         This method creates observed data for synthetic inversion tests. The
         generated shot records are stored in self.real_shot_record.
         """
-        Wave_obj_real_velocity = SyntheticRealAcousticWave(dictionary=self.input_dictionary, comm=self.comm)
+        Wave_obj_real_velocity = SyntheticRealAcousticWave(
+            dictionary=self.input_dictionary, comm=self.comm
+        )
         if Wave_obj_real_velocity.mesh is None and self.real_mesh is not None:
             Wave_obj_real_velocity.mesh = self.real_mesh
         if Wave_obj_real_velocity.initial_velocity_model is None:
             Wave_obj_real_velocity.initial_velocity_model = self.real_velocity_model
 
-        if plot_model and Wave_obj_real_velocity.comm.comm.rank == 0 and Wave_obj_real_velocity.comm.ensemble_comm.rank == 0:
-            spyro_plot_model(Wave_obj_real_velocity, filename=model_filename, abc_points=abc_points, high_resolution=high_resolution_model)
+        if (
+            plot_model
+            and Wave_obj_real_velocity.comm.comm.rank == 0
+            and Wave_obj_real_velocity.comm.ensemble_comm.rank == 0
+        ):
+            spyro_plot_model(
+                Wave_obj_real_velocity,
+                filename=model_filename,
+                abc_points=abc_points,
+                high_resolution=high_resolution_model,
+            )
 
         Wave_obj_real_velocity.forward_solve()
         if save_shot_record:
@@ -574,8 +565,7 @@ class FullWaveformInversion(AcousticWave):
         self.quadrature_rule = Wave_obj_real_velocity.quadrature_rule
 
     def set_smooth_guess_velocity_model(self, real_velocity_model_file=None):
-        """
-        Set a smoothed initial guess based on the true velocity model.
+        """Set a smoothed initial guess based on the true velocity model.
 
         This method is intended to create a smooth initial guess from a known
         true velocity model for synthetic tests. Currently a placeholder.
@@ -606,8 +596,7 @@ class FullWaveformInversion(AcousticWave):
         output=False,
         dg_velocity_model=True,
     ):
-        """
-        Set the true velocity model for synthetic test cases.
+        """Set the true velocity model for synthetic test cases.
 
         This method sets the real/true velocity model that is used only for
         generating synthetic observed data. It wraps the parent class's
@@ -660,8 +649,7 @@ class FullWaveformInversion(AcousticWave):
         output=False,
         dg_velocity_model=True,
     ):
-        """
-        Set the initial guess velocity model for inversion.
+        """Set the initial guess velocity model for inversion.
 
         This method sets the starting velocity model for the FWI optimization.
         It wraps the parent class's set_initial_velocity_model method and
@@ -711,8 +699,7 @@ class FullWaveformInversion(AcousticWave):
         user_mesh=None,
         input_mesh_parameters=None,
     ):
-        """
-        Set the mesh for the true/real velocity model.
+        """Set the mesh for the true/real velocity model.
 
         This method sets up the mesh used for generating synthetic observed
         data from the true velocity model.
@@ -742,8 +729,7 @@ class FullWaveformInversion(AcousticWave):
         user_mesh=None,
         input_mesh_parameters=None,
     ):
-        """
-        Set the mesh for the guess/inversion model.
+        """Set the mesh for the guess/inversion model.
 
         This method sets up the mesh used for the FWI optimization. It also
         checks for gradient mask options in the mesh parameters.
@@ -772,8 +758,7 @@ class FullWaveformInversion(AcousticWave):
         self.guess_mesh = self.get_mesh()
 
     def get_functional(self, c=None):
-        """
-        Calculate and return the objective functional value.
+        """Calculate and return the objective functional value.
 
         Computes the misfit if needed, then evaluates the objective functional.
         Also tracks the functional history and peak memory usage.
@@ -802,7 +787,10 @@ class FullWaveformInversion(AcousticWave):
         peak_memory_mb = get_peak_memory()
         # Save the functional value to a text file
         if self.comm.ensemble_comm.rank == 0 and self.comm.comm.rank == 0:
-            print(f"Functional: {Jm} at iteration: {self.current_iteration}", flush=True)
+            print(
+                f"Functional: {Jm} at iteration: {self.current_iteration}",
+                flush=True,
+            )
             with open("functional_values.txt", "a") as file:
                 file.write(f"Iteration: {self.current_iteration}, Functional: {Jm}\n")
 
@@ -812,8 +800,7 @@ class FullWaveformInversion(AcousticWave):
         return Jm
 
     def get_gradient(self, c=None, save=True, calculate_functional=True):
-        """
-        Calculate the gradient of the objective functional.
+        """Calculate the gradient of the objective functional.
 
         Computes the gradient with respect to the velocity model using the
         adjoint method. Optionally calculates the functional value first and
@@ -841,18 +828,19 @@ class FullWaveformInversion(AcousticWave):
         if calculate_functional:
             self.get_functional(c=c)
         comm.comm.barrier()
-        self.gradient = self.gradient_solve(misfit=self.misfit, forward_solution=self.guess_forward_solution)
+        self.gradient = self.gradient_solve(
+            misfit=self.misfit, forward_solution=self.guess_forward_solution
+        )
         self._apply_gradient_mask()
         if save:
             # self.gradient_out.write(dJ_total)
-            output = fire.File("gradient_" + str(self.current_iteration)+".pvd")
+            output = fire.File("gradient_" + str(self.current_iteration) + ".pvd")
             output.write(self.gradient)
         self.current_iteration += 1
         comm.comm.barrier()
 
     def return_functional_and_gradient(self, c):
-        """
-        Compute and return both the functional value and gradient.
+        """Compute and return both the functional value and gradient.
 
         This method is used as the objective function for scipy.optimize.minimize.
         It computes the gradient (which also computes the functional) and returns
@@ -875,8 +863,7 @@ class FullWaveformInversion(AcousticWave):
         return self.functional, dJ
 
     def run_fwi(self, **kwargs):
-        """
-        Run full waveform inversion using scipy L-BFGS-B optimizer.
+        """Run full waveform inversion using scipy L-BFGS-B optimizer.
 
         Performs the complete FWI optimization using scipy.optimize.minimize
         with the L-BFGS-B method. The optimization minimizes the misfit between
@@ -917,7 +904,7 @@ class FullWaveformInversion(AcousticWave):
                 "eps": kwargs.pop("eps", 1e-15),
                 "ftol": kwargs.pop("ftol", 1e-11),
                 "maxiter": kwargs.pop("maxiter", 20),
-            }
+            },
         }
         parameters.update(kwargs)
 
@@ -953,8 +940,7 @@ class FullWaveformInversion(AcousticWave):
         np.save("result", result.x)
 
     def run_fwi_rol(self, **kwargs):
-        """
-        Run full waveform inversion using ROL optimizer (deprecated).
+        """Run full waveform inversion using ROL optimizer (deprecated).
 
         Performs FWI optimization using the Rapid Optimization Library (ROL).
         This method is deprecated as the pyROL library is no longer supported.
@@ -994,7 +980,12 @@ class FullWaveformInversion(AcousticWave):
             "vmin": 1.429,
             "vmax": 6.0,
             "ROL_options": {
-                "General": {"Secant": {"Type": "Limited-Memory BFGS", "Maximum Storage": 10}},
+                "General": {
+                    "Secant": {
+                        "Type": "Limited-Memory BFGS",
+                        "Maximum Storage": 10,
+                    }
+                },
                 "Step": {
                     "Type": "Augmented Lagrangian",
                     "Augmented Lagrangian": {
@@ -1008,20 +999,25 @@ class FullWaveformInversion(AcousticWave):
                     "Iteration Limit": kwargs.pop("maxiter", 20),
                     "Step Tolerance": 1.0e-16,
                 },
-            }
+            },
         }
         parameters.update(kwargs)
         vmin = parameters["vmin"]
         vmax = parameters["vmax"]
 
-        warnings.warn("This functionality is deprecated, since the pyROL library is no longer supported.")
+        warnings.warn(
+            "This functionality is deprecated,"
+            "since the pyROL library is no longer supported."
+        )
         params = ROL.ParameterList(parameters["ROL_options"], "Parameters")
 
         inner_product = L2Inner(self)
 
         obj = Objective(inner_product, self)
 
-        u = fire.Function(self.function_space, name="velocity").assign(self.guess_velocity_model)
+        u = fire.Function(self.function_space, name="velocity").assign(
+            self.guess_velocity_model
+        )
         opt = FireVector(u.vector(), inner_product)
 
         # Add control bounds to the problem (uses more RAM)
@@ -1040,8 +1036,9 @@ class FullWaveformInversion(AcousticWave):
         algo.run(opt, obj, bnd)
 
     def set_gradient_mask(self, boundaries=None):
-        """
-        DEPRECATED: Set a gradient mask to zero out gradients outside defined boundaries.
+        """Set a gradient mask to zero out gradients outside defined boundaries.
+
+        DEPRECATED!
 
         The gradient mask is used to restrict updates to certain regions of
         the model domain, which is useful for excluding absorbing boundary
@@ -1094,8 +1091,9 @@ class FullWaveformInversion(AcousticWave):
         self.mask_obj = mask_obj
 
     def _apply_gradient_mask(self):
-        """
-        DEPRECATED Apply the gradient mask to the computed gradient.
+        """Apply the gradient mask to the computed gradient.
+
+        DEPRECATED!
 
         If a gradient mask has been set via set_gradient_mask(), this method
         applies the mask to zero out gradient values outside the defined region.
@@ -1112,8 +1110,7 @@ class FullWaveformInversion(AcousticWave):
             pass
 
     def load_real_shot_record(self, file_name="shots/shot_record_"):
-        """
-        Load real/observed shot records from files.
+        """Load real/observed shot records from files.
 
         This method loads previously saved shot records and assigns them as
         the real shot record data for the inversion.
@@ -1134,8 +1131,7 @@ class FullWaveformInversion(AcousticWave):
 
     @run_in_one_core
     def save_result_as_segy(self, file_name="final_vp.segy", grid_spacing=0.01):
-        """
-        Save the final velocity model result as a SEG-Y file.
+        """Save the final velocity model result as a SEG-Y file.
 
         This method exports the final inverted velocity model to SEG-Y format,
         which is a standard format for seismic data. The operation is performed
@@ -1145,7 +1141,7 @@ class FullWaveformInversion(AcousticWave):
         ----------
         file_name : str, optional
             Output SEG-Y file name. Default is "final_vp.segy".
-        grid_spacing: float, optional
+        grid_spacing : float, optional
             Segy grid spacing, default is 0.01 km.
 
         Notes
@@ -1158,18 +1154,18 @@ class FullWaveformInversion(AcousticWave):
 
 
 class SyntheticRealAcousticWave(AcousticWave):
-    """
+    """Generate synthetic real acoustic wave data.
+
     The SyntheticRealAcousticWave class is a subclass of the AcousticWave class.
-    It is used to generate synthetic real acoustic wave data.
 
-    Attributes:
-    -----------
-    dictionary: (dict)
+    Attributes
+    ----------
+    dictionary : (dict)
         A dictionary containing parameters for the inversion.
-    comm: MPI communicator
+    comm : MPI communicator
 
-    Methods:
-    --------
+    Methods
+    -------
     __init__(self, dictionary=None, comm=None):
         Initializes a new instance of the SyntheticRealAcousticWave class.
     forward_solve():
@@ -1177,8 +1173,7 @@ class SyntheticRealAcousticWave(AcousticWave):
     """
 
     def __init__(self, dictionary=None, comm=None):
-        """
-        Initialize a SyntheticRealAcousticWave instance.
+        """Initialize a SyntheticRealAcousticWave instance.
 
         Parameters
         ----------
@@ -1190,8 +1185,7 @@ class SyntheticRealAcousticWave(AcousticWave):
         super().__init__(dictionary=dictionary, comm=comm)
 
     def forward_solve(self):
-        """
-        Solve the forward acoustic wave problem.
+        """Solve the forward acoustic wave problem.
 
         This method solves the forward problem for the real/true velocity model
         to generate synthetic observed data. It simply calls the parent class's

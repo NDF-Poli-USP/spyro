@@ -107,7 +107,10 @@ def test_forward_3_shots():
     comm.comm.barrier()
 
     if comm.comm.rank == 0:
-        print(f"Combined error for all shots is {error_all} and test has passed equals {np.abs(error_all) < 0.01}", flush=True)
+        print(
+            f"Combined error for all shots is {error_all} and test has passed equals {np.abs(error_all) < 0.01}",
+            flush=True,
+        )
 
     test = np.abs(error_all) < 0.01
 

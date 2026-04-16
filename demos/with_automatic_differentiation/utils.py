@@ -4,15 +4,13 @@ import spyro
 
 
 def model_settings():
-    """Model settings for forward and Full Waveform Inversion (FWI)
-    simulations.
+    """Model settings for forward and Full Waveform Inversion (FWI) simulations.
 
     Returns
     -------
     model : dict
         Dictionary containing the model settings.
     """
-
     model = {}
 
     model["opts"] = {

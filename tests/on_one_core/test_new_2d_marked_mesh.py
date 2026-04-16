@@ -21,7 +21,9 @@ def test_2d_wave_adapted_marked_mesh():
         "edge_length": 0.05,
     }
 
-    mesh_parameters = spyro.meshing.MeshingParameters(input_mesh_dictionary=input_mesh_parameters)
+    mesh_parameters = spyro.meshing.MeshingParameters(
+        input_mesh_dictionary=input_mesh_parameters
+    )
     meshing_obj = spyro.meshing.AutomaticMesh(mesh_parameters)
     mesh_ho = meshing_obj.create_mesh()
     mesh_z, mesh_x = fire.SpatialCoordinate(mesh_ho)
@@ -34,11 +36,15 @@ def test_2d_wave_adapted_marked_mesh():
     square_bot_z = -1.1
     square_left_x = 0.9
     square_right_x = 1.1
-    cond = fire.conditional((mesh_z-center_z)**2 + (mesh_x-center_x)**2 < r_c**2, circle_vp, outside_vp)
+    cond = fire.conditional(
+        (mesh_z - center_z) ** 2 + (mesh_x - center_x) ** 2 < r_c**2,
+        circle_vp,
+        outside_vp,
+    )
     cond = fire.conditional(
         fire.And(
             fire.And(mesh_z < square_top_z, mesh_z > square_bot_z),
-            fire.And(mesh_x > square_left_x, mesh_x < square_right_x)
+            fire.And(mesh_x > square_left_x, mesh_x < square_right_x),
         ),
         square_vp,
         cond,
@@ -65,7 +71,9 @@ def test_2d_wave_adapted_marked_mesh():
         "edge_length": grid_spacing,
     }
 
-    mesh_parameters = spyro.meshing.MeshingParameters(input_mesh_dictionary=input_mesh_parameters)
+    mesh_parameters = spyro.meshing.MeshingParameters(
+        input_mesh_dictionary=input_mesh_parameters
+    )
     meshing_obj = spyro.meshing.AutomaticMesh(mesh_parameters)
     mesh = meshing_obj.create_mesh()
 
@@ -124,7 +132,9 @@ def test_2d_wave_adapted_marked_mesh():
     assert np.isclose(reduced_cd[0], expected_smallest_cd, rtol=1e-1)
 
     # Checking largest value
-    assert (expected_circle_cd < reduced_cd[-1]) and (reduced_cd[-1] < expected_square_cd)
+    assert (expected_circle_cd < reduced_cd[-1]) and (
+        reduced_cd[-1] < expected_square_cd
+    )
 
     # Let us check mask if the mask was applied
     # ------------------------------------------------
@@ -136,14 +146,14 @@ def test_2d_wave_adapted_marked_mesh():
 
     # Calculating area outside mask
     area_out = 2**2 - 0.6**2
-    form_out = u*dx(1)
+    form_out = u * dx(1)
     area_out_fire = fire.assemble(form_out)
 
     assert np.isclose(area_out, area_out_fire, rtol=1e-2)
 
     # Calculating area inside mask
     area_in = 0.6**2
-    form_in = u*dx(2)
+    form_in = u * dx(2)
     area_in_fire = fire.assemble(form_in)
 
     assert np.isclose(area_in, area_in_fire, rtol=1e-1)

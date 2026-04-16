@@ -16,7 +16,7 @@ functional = spyro.utils.compute_functional
 
 
 def _make_vp_exact_pml(V, mesh):
-    """Create a half space"""
+    """Create a half space."""
     z, x, y = SpatialCoordinate(mesh)
     velocity = conditional(z > -0.5, 1.5, 4.0)
     vp_exact = Function(V, name="vp").interpolate(velocity)
@@ -25,7 +25,7 @@ def _make_vp_exact_pml(V, mesh):
 
 
 def _make_vp_guess(V, mesh):
-    """The guess is a uniform velocity of 4.0 km/s"""
+    """The guess is a uniform velocity of 4.0 km/s."""
     z, x, y = SpatialCoordinate(mesh)
     vp_guess = Function(V).interpolate(4.0 + 0.0 * x)
     VTKFile("guess_vel.pvd").write(vp_guess)

@@ -2,6 +2,7 @@ import meshio
 import firedrake as fire
 import spyro
 import time
+
 try:
     import SeismicMesh
 except ImportError:
@@ -53,10 +54,7 @@ model["acquisition"] = {
     "frequency": 5.0,
     "delay": 1.0,
     "num_receivers": 15,
-    "receiver_locations": spyro.create_transect(
-        (-5.72, 6.29),
-        (-5.72, 14.29),
-        15),
+    "receiver_locations": spyro.create_transect((-5.72, 6.29), (-5.72, 14.29), 15),
 }
 
 # Simulate for 1.0 seconds.
@@ -75,29 +73,26 @@ comm = spyro.utils.mpi_init(model)
 # in order to not have to
 # when testing multiple cores.
 
-print('Entering mesh generation', flush=True)
-if model['opts']['degree'] == 2:
+print("Entering mesh generation", flush=True)
+if model["opts"]["degree"] == 2:
     M = 5.85
-elif model['opts']['degree'] == 3:
+elif model["opts"]["degree"] == 3:
     M = 3.08
-elif model['opts']['degree'] == 4:
+elif model["opts"]["degree"] == 4:
     M = 2.22
-elif model['opts']['degree'] == 5:
+elif model["opts"]["degree"] == 5:
     M = 1.69
 
-edge_length = 0.286/M
+edge_length = 0.286 / M
 Real_Lz = model["mesh"]["length_z"] + model["BCs"]["lz"]
 Lx = model["mesh"]["length_x"]
 pad = model["BCs"]["lz"]
 
-bbox = (-Real_Lz, 0.0, -pad, Lx+pad)
+bbox = (-Real_Lz, 0.0, -pad, Lx + pad)
 rec = SeismicMesh.Rectangle(bbox)
 if comm.comm.rank == 0:
     points, cells = SeismicMesh.generate_mesh(
-        domain=rec,
-        edge_length=edge_length,
-        comm=comm.ensemble_comm,
-        verbose=0
+        domain=rec, edge_length=edge_length, comm=comm.ensemble_comm, verbose=0
     )
 
     points, cells = SeismicMesh.geometry.delete_boundary_entities(
@@ -108,18 +103,17 @@ if comm.comm.rank == 0:
 
     meshio.write_points_cells(
         "meshes/benchmark_2d.msh",
-        points, [("triangle", cells)],
+        points,
+        [("triangle", cells)],
         file_format="gmsh22",
-        binary=False
+        binary=False,
     )
 
 # Mesh generation finishes here.
 
 mesh = fire.Mesh(
     "meshes/benchmark_2d.msh",
-    distribution_parameters={
-        "overlap_type": (fire.DistributedMeshOverlapType.NONE, 0)
-    },
+    distribution_parameters={"overlap_type": (fire.DistributedMeshOverlapType.NONE, 0)},
 )
 
 method = model["opts"]["method"]
@@ -128,12 +122,7 @@ degree = model["opts"]["degree"]
 if comm.ensemble_comm.rank == 0 and comm.comm.rank == 0:
     print(f"Setting up {method} a {degree}tetra element", flush=True)
 
-element = fire.FiniteElement(
-    method,
-    mesh.ufl_cell(),
-    degree=degree,
-    variant="KMV"
-)
+element = fire.FiniteElement(method, mesh.ufl_cell(), degree=degree, variant="KMV")
 
 V = fire.FunctionSpace(mesh, element)
 
@@ -155,13 +144,5 @@ wavelet = spyro.full_ricker_wavelet(
 )
 
 t1 = time.time()
-p, p_r = spyro.solvers.forward(
-    model,
-    mesh,
-    comm,
-    vp,
-    sources,
-    wavelet,
-    receivers
-)
+p, p_r = spyro.solvers.forward(model, mesh, comm, vp, sources, wavelet, receivers)
 print(time.time() - t1, flush=True)

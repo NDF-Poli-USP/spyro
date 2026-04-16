@@ -1,3 +1,5 @@
+"""Delta projector class to inject or evaluate point data."""
+
 from firedrake import *  # noqa: F403
 from FIAT.reference_element import (
     UFCTriangle,
@@ -21,48 +23,46 @@ import numpy as np
 
 
 class Delta_projector:
-    """
-    Class that interpolates the solution to the receiver coordinates
+    """Class that interpolates the solution to the receiver coordinates.
 
     Attributes
     ----------
-    mesh: firedrake.Mesh
+    mesh : firedrake.Mesh
         Mesh object
-    space: firedrake.FunctionSpace
+    space : firedrake.FunctionSpace
         Function space to be used
-    my_ensemble: mpi4py.MPI.Intracomm
+    my_ensemble : mpi4py.MPI.Intracomm
         MPI communicator
-    dimension: int
+    dimension : int
         Dimension of the mesh
-    degree: int
+    degree : int
         Degree of FEM space
-    point_locations: list
+    point_locations : list
         List of tuples of point locations
-    number_of_points: int
+    number_of_points : int
         Number of points
-    cellIDs: list
+    cellIDs : list
         List of cell IDs for each point
-    cellVertices: list
+    cellVertices : list
         List of vertices for each cell containing a point
-    cell_tabulations: list
+    cell_tabulations : list
         List of tabulations for each point in a cell
-    cellNodeMaps: list
+    cellNodeMaps : list
         List of node maps for each cell
-    nodes_per_cell: int
+    nodes_per_cell : int
         Number of nodes per cell
-    quadrilateral: bool
+    quadrilateral : bool
         True if mesh is quadrilateral
-    is_local: list
+    is_local : list
         List of cell IDs local to the processor
     """
 
     def __init__(self, wave_object):
-        """
-        Initializes the class
+        """Initialize the Delta_projector class.
 
         Parameters
         ----------
-        wave_object: spyro.wave.Wave
+        wave_object : spyro.wave.Wave
             Wave object
         """
         self.automatic_adjoint = wave_object.automatic_adjoint
@@ -89,7 +89,7 @@ class Delta_projector:
         self.is_local = None
 
     def build_maps(self, order=0):
-        """Calculates and stores tabulations for interpolation
+        """Calculate and store tabulations for interpolation.
 
         Is always automatticaly called when initializing the class,
         therefore should only be called again if a mesh related attribute
@@ -97,19 +97,17 @@ class Delta_projector:
 
         Returns
         -------
-        cellIDs: list
+        cellIDs : list
             List of cell IDs for each receiver
-        cellVertices: list
+        cellVertices : list
             List of vertices for each receiver
-        cellNodeMaps: list
+        cellNodeMaps : list
             List of node maps for each receiver
-        cell_tabulations: list
+        cell_tabulations : list
             List of tabulations for each receiver
         """
-
         for rid in range(self.number_of_points):
-            cell_id = self.mesh.locate_cell(self.point_locations[rid],
-                                            tolerance=1e-6)
+            cell_id = self.mesh.locate_cell(self.point_locations[rid], tolerance=1e-6)
             self.is_local[rid] = cell_id
 
         (
@@ -122,38 +120,42 @@ class Delta_projector:
         self.number_of_points = len(self.point_locations)
 
     def interpolate(self, field):
-        """Interpolate the solution to the receiver coordinates for
-        one simulation timestep.
+        """Interpolate the solution to receiver coordinates.
+
+        Evaluate the field at all configured receiver locations for one
+        simulation timestep.
 
         Parameters
         ----------
-        field: array-like
+        field : array-like
             An array of the solution at a given timestep at all nodes
 
         Returns
         -------
-        solution_at_receivers: list
+        solution_at_receivers : list
             Solution interpolated to the list of receiver coordinates
             for the given timestep.
         """
         return [self.new_at(field, rn) for rn in range(self.number_of_points)]
 
     def new_at(self, udat, receiver_id):
-        """Function that evaluates the receiver value given its id.
-        For 2D simplices only.
+        """Evaluate a receiver value by receiver ID.
+
+        This method currently supports 2D simplicial elements.
+
         Parameters
         ----------
-        udat: array-like
+        udat : array-like
             An array of the solution at a given timestep at all nodes
-        receiver_id: a list of integers
-            A list of receiver ids, ranging from 0 to total receivers
-            minus one.
+        receiver_id : int
+            Receiver index, ranging from 0 to the number of receivers minus
+            one.
 
         Returns
         -------
-        at: Function value at given receiver
+        at : float or numpy.ndarray
+            Function value at the given receiver.
         """
-
         if self.is_local is not None:
             # Getting relevant receiver points
             u = udat[np.int_(self.cellNodeMaps[receiver_id, :])]
@@ -175,7 +177,11 @@ class Delta_projector:
         if order == 0:
             tab_shape = (self.number_of_points, self.nodes_per_cell)
         elif order == 1:
-            tab_shape = (self.number_of_points, self.nodes_per_cell, self.dimension)
+            tab_shape = (
+                self.number_of_points,
+                self.nodes_per_cell,
+                self.dimension,
+            )
         cell_tabulations = np.zeros(tab_shape)
 
         for receiver_id in range(self.number_of_points):
@@ -224,7 +230,7 @@ class Delta_projector:
         return change_to_reference(p, cell_vertices)
 
     def __build_local_nodes(self):
-        """Builds local element nodes, locations and I,J,K numbering"""
+        """Build local element nodes, locations and I,J,K numbering."""
         if self.dimension == 2:
             return self.__build_local_nodes_2D()
         elif self.dimension == 3:
@@ -233,9 +239,10 @@ class Delta_projector:
             raise ValueError
 
     def __func_node_locations(self):
-        """Function that returns a list which includes a numpy matrix
-        where line n has the x and y values of the nth degree of freedom,
-        and a numpy matrix of the vertex coordinates.
+        """Return nodal coordinates for the active mesh dimension.
+
+        Dispatch to the 2D or 3D implementation based on
+        ``self.dimension``.
         """
         if self.dimension == 2:
             return self.__func_node_locations_2D()
@@ -245,9 +252,9 @@ class Delta_projector:
             raise ValueError
 
     def __func_node_locations_2D(self):
-        """Function that returns a list which includes a numpy matrix
-        where line n has the x and y values of the nth degree of freedom,
-        and a numpy matrix of the vertex coordinates.
+        """Return 2D nodal coordinates for the current function space.
+
+        The returned array stores coordinates as ``(z, x)`` per node.
         """
         z, x = SpatialCoordinate(self.mesh)  # noqa: F405
         ux = Function(self.space).interpolate(x)  # noqa: F405
@@ -261,10 +268,9 @@ class Delta_projector:
         return node_locations
 
     def __func_node_locations_3D(self):
-        """Function that returns a list which includes a numpy matrix
-        where line n has the x and y values of the nth degree of freedom,
-        and a numpy matrix of the vertex coordinates.
+        """Return 3D nodal coordinates for the current function space.
 
+        The returned array stores coordinates as ``(x, y, z)`` per node.
         """
         x, y, z = SpatialCoordinate(self.mesh)  # noqa: F405
         ux = Function(self.space).interpolate(x)  # noqa: F405
@@ -280,12 +286,10 @@ class Delta_projector:
         return node_locations
 
     def __point_locator(self):
-        """Function that returns a list of tuples and a matrix
-        the list of tuples has in line n the receiver position
-        and the position of the nodes in the element that contains
-        the receiver.
-        The matrix has the deegres of freedom of the nodes inside
-        same element as the receiver.
+        """Return receiver-to-cell lookup data.
+
+        Dispatch to the 2D or 3D implementation based on
+        ``self.dimension``.
         """
         if self.dimension == 2:
             return self.__point_locator_2D()
@@ -295,18 +299,16 @@ class Delta_projector:
             raise ValueError
 
     def __point_locator_2D(self):
-        """Function that returns a list of tuples and a matrix
-        the list of tuples has in line n the receiver position
-        and the position of the nodes in the element that contains
-        the receiver.
-        The matrix has the deegres of freedom of the nodes inside
-        same element as the receiver.
+        """Build receiver-to-cell lookup data in 2D.
+
+        Compute containing-cell IDs, element-node maps, and cell vertex
+        coordinates for each receiver.
         """
         num_recv = self.number_of_points
 
         fdrake_cell_node_map = self.space.cell_node_map()
         cell_node_map = fdrake_cell_node_map.values_with_halo
-        (num_cells, nodes_per_cell) = cell_node_map.shape
+        num_cells, nodes_per_cell = cell_node_map.shape
         node_locations = self.__func_node_locations()
         self.nodes_per_cell = nodes_per_cell
 
@@ -348,13 +350,10 @@ class Delta_projector:
         return cellId_maps, cellVertices, cellNodeMaps
 
     def __point_locator_3D(self):
-        """Function that returns a list of tuples and a matrix
-        the list of tuples has in line n the receiver position
-        and the position of the nodes in the element that contains
-        the receiver.
-        The matrix has the deegres of freedom of the nodes inside
-        same element as the receiver.
+        """Build receiver-to-cell lookup data in 3D.
 
+        Compute containing-cell IDs, element-node maps, and cell vertex
+        coordinates for each receiver.
         """
         num_recv = self.number_of_points
 
@@ -362,7 +361,7 @@ class Delta_projector:
         cell_node_map = fdrake_cell_node_map.values_with_halo
         if self.quadrilateral is True:
             cell_node_map = get_hexa_real_cell_node_map(self.space, self.mesh)
-        (num_cells, nodes_per_cell) = cell_node_map.shape
+        num_cells, nodes_per_cell = cell_node_map.shape
         node_locations = self.__func_node_locations()
         self.nodes_per_cell = nodes_per_cell
 
@@ -404,6 +403,13 @@ class Delta_projector:
         return cellId_maps, cellVertices, cellNodeMaps
 
     def choose_element(self):
+        """Choose the FIAT element used for point tabulation.
+
+        Returns
+        -------
+        element : FIAT.finite_element.CiarletElement
+            Element used to tabulate basis functions at receiver points.
+        """
         if not self.quadrilateral:
             element = choosing_element(self.space, self.degree)
         else:
@@ -422,8 +428,7 @@ class Delta_projector:
 
 
 def choosing_geometry(cell_geometry):
-    """
-    Chooses UFC reference element geometry based on desired function space
+    """Choose UFC reference element geometry based on desired function space.
 
     Parameters
     ----------
@@ -437,9 +442,7 @@ def choosing_geometry(cell_geometry):
     """
     if cell_geometry == quadrilateral:  # noqa: F405
         T = UFCQuadrilateral()
-        raise ValueError(
-            "Point interpolation for quads implemented somewhere else."
-        )
+        raise ValueError("Point interpolation for quads implemented somewhere else.")
 
     elif cell_geometry == triangle:  # noqa: F405
         T = UFCTriangle()
@@ -454,8 +457,7 @@ def choosing_geometry(cell_geometry):
 
 
 def choosing_element(V, degree):
-    """Chooses UFL element based on desired function space
-    and degree of interpolation.
+    """Choose UFL element based on desired function space and degree of interpolation.
 
     Parameters
     ----------
@@ -484,6 +486,21 @@ def choosing_element(V, degree):
 
 
 def get_hexa_real_cell_node_map(V, mesh):
+    """Build a layer-expanded cell-to-node map for hexahedral extruded meshes.
+
+    Parameters
+    ----------
+    V : firedrake.FunctionSpace
+        Function space whose cell-node map is used as the base map.
+    mesh : firedrake.Mesh
+        Extruded mesh associated with ``V``.
+
+    Returns
+    -------
+    numpy.ndarray
+        Integer array with shape ``(num_cells, nodes_per_cell)`` containing
+        global node indices for each cell in all layers.
+    """
     weird_cnm_func = V.cell_node_map()
     weird_cnm = weird_cnm_func.values_with_halo
     cells_per_layer, nodes_per_cell = np.shape(weird_cnm)
@@ -491,8 +508,7 @@ def get_hexa_real_cell_node_map(V, mesh):
     ufl_element = V.ufl_element()
     _, p = ufl_element.degree()
 
-    cell_node_map = np.zeros(
-        (layers * cells_per_layer, nodes_per_cell), dtype=int)
+    cell_node_map = np.zeros((layers * cells_per_layer, nodes_per_cell), dtype=int)
     print(f"cnm size : {np.shape(cell_node_map)}", flush=True)
 
     for layer in range(layers):

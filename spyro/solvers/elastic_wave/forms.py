@@ -1,11 +1,32 @@
-from firedrake import (Cofunction, Constant, LinearVariationalProblem,
-                       LinearVariationalSolver, div, dot, dx, grad, inner,
-                       lhs, rhs, TestFunction, TrialFunction)
+"""UFL-based forms used in the Elastic wave solvers."""
+
+from firedrake import (
+    Cofunction,
+    Constant,
+    LinearVariationalProblem,
+    LinearVariationalSolver,
+    div,
+    dot,
+    dx,
+    grad,
+    inner,
+    lhs,
+    rhs,
+    TestFunction,
+    TrialFunction,
+)
 
 from .local_abc import local_abc_form
 
 
 def isotropic_elastic_without_pml(wave):
+    """Set up forms for isotropic elastic wave equation without PML.
+
+    Parameters
+    ----------
+    wave : object
+        Wave object containing function space, quadrature rule, and material properties.
+    """
     V = wave.function_space
     quad_rule = wave.quadrature_rule
 
@@ -20,16 +41,31 @@ def isotropic_elastic_without_pml(wave):
     lmbda = wave.lmbda
     mu = wave.mu
 
-    F_m = (rho/(dt**2))*dot(u - 2*u_n + u_nm1, v)*dx(**quad_rule)
+    F_m = (rho / (dt**2)) * dot(u - 2 * u_n + u_nm1, v) * dx(**quad_rule)
 
-    eps = lambda v: 0.5*(grad(v) + grad(v).T)
-    F_k = lmbda*div(u_n)*div(v)*dx(**quad_rule) \
-        + 2*mu*inner(eps(u_n), eps(v))*dx(**quad_rule)
+    def eps(v):
+        """Compute strain rate tensor.
+
+        Parameters
+        ----------
+        v : object
+            Displacement field.
+
+        Returns
+        -------
+        object
+            Symmetric strain rate tensor.
+        """
+        return 0.5 * (grad(v) + grad(v).T)
+
+    F_k = lmbda * div(u_n) * div(v) * dx(**quad_rule) + 2 * mu * inner(
+        eps(u_n), eps(v)
+    ) * dx(**quad_rule)
 
     F_s = 0
     b = wave.body_forces
     if b is not None:
-        F_s += dot(b, v)*dx(**quad_rule)
+        F_s += dot(b, v) * dx(**quad_rule)
 
     F_t = local_abc_form(wave)
 
@@ -49,10 +85,15 @@ def isotropic_elastic_without_pml(wave):
     )
     solver_parameters = dict(wave.solver_parameters)
     solver_parameters["mat_type"] = "matfree"
-    wave.solver = LinearVariationalSolver(
-        lin_var, solver_parameters=solver_parameters
-    )
+    wave.solver = LinearVariationalSolver(lin_var, solver_parameters=solver_parameters)
 
 
 def isotropic_elastic_with_pml():
+    """Set up forms for isotropic elastic wave equation with PML.
+
+    Raises
+    ------
+    NotImplementedError
+        This functionality is not yet implemented.
+    """
     raise NotImplementedError

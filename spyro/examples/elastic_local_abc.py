@@ -1,27 +1,29 @@
+"""Elastic example with local ABCs, it is not reusable."""
+
 import numpy as np
 import spyro
-
 
 output_dir = "results"
 
 L = 3000  # Edge size [m]
-n = 60    # Number of elements in each direction
-h = L/n   # Element size [m]
+n = 60  # Number of elements in each direction
+h = L / n  # Element size [m]
 
-rho = 2700     # Density [kg/m3]
-Vp = 3000      # P wave velocity [m/s]
-Vs = 1732      # S wave velocity [m/s]
+rho = 2700  # Density [kg/m3]
+Vp = 3000  # P wave velocity [m/s]
+Vs = 1732  # S wave velocity [m/s]
 
 smag = 1e6
 freq = 10  # Central frequency of Ricker wavelet [Hz]
-source_locations = [[-L/2, L/2]]
+source_locations = [[-L / 2, L / 2]]
 
 time_step = 2e-4  # [s]
 final_time = 2.0  # [s]
-out_freq = int(0.01/time_step)
+out_freq = int(0.01 / time_step)
 
 
 def build_solver(local_abc, dt_scheme):
+    """Build an elastic solver with local ABCs."""
     d = {}
 
     d["options"] = {
@@ -69,13 +71,13 @@ def build_solver(local_abc, dt_scheme):
         "output_frequency": out_freq,
         "gradient_sampling_frequency": 1,
     }
-
+    mech_energy_filename = f"{output_dir}/mechanical_energy_{local_abc}_{dt_scheme}.npy"
     d["visualization"] = {
         "forward_output": False,
         "time": True,
         "time_filename": f"{output_dir}/time.npy",
         "mechanical_energy": True,
-        "mechanical_energy_filename": f"{output_dir}/mechanical_energy_{local_abc}_{dt_scheme}.npy",
+        "mechanical_energy_filename": mech_energy_filename,
     }
 
     if local_abc is not None:
@@ -89,6 +91,6 @@ def build_solver(local_abc, dt_scheme):
         }
 
     wave = spyro.IsotropicWave(d)
-    wave.set_mesh(input_mesh_parameters={'edge_length': h})
+    wave.set_mesh(input_mesh_parameters={"edge_length": h})
 
     return wave

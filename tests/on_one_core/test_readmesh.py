@@ -2,7 +2,7 @@ import numpy as np
 
 import spyro
 
-"""Read in an external mesh and interpolate velocity to it"""
+"""Read in an external mesh and interpolate velocity to it."""
 
 
 def test_readmesh2():

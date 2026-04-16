@@ -1,10 +1,18 @@
+"""Smoother for when we use synthetic velocity models in FWI.
+
+Since we suppose FWI has a good starting guess we can apply the smoother on the
+synthetic model.
+"""
+
 import os
 from scipy.ndimage import gaussian_filter
 import segyio
 import numpy as np
 import matplotlib.pyplot as plt
+
 try:
     from SeismicMesh import write_velocity_model
+
     HAS_SEISMICMESH = True
 except ImportError:
     HAS_SEISMICMESH = False
@@ -143,7 +151,7 @@ def smooth_velocity_field_file(
         plt.ylabel("z-direction (m)")
         ax.axis("equal")
         if save_fig:
-            plt.savefig(output_filename+".png")
+            plt.savefig(output_filename + ".png")
         if show:
             plt.show()
 

@@ -13,7 +13,7 @@ def check_gradient(Wave_obj_guess, dJ, rec_out_exact, Jm, plot=False):
     errors = []
     V_c = Wave_obj_guess.function_space
     dm = fire.Function(V_c)
-    size, = np.shape(dm.dat.data[:])
+    (size,) = np.shape(dm.dat.data[:])
     dm_data = np.random.rand(size)
     dm.dat.data[:] = dm_data
     # dm.assign(dJ)
@@ -21,7 +21,7 @@ def check_gradient(Wave_obj_guess, dJ, rec_out_exact, Jm, plot=False):
     for step in steps:
 
         Wave_obj_guess.reset_pressure()
-        c_guess = fire.Constant(2.0) + step*dm
+        c_guess = fire.Constant(2.0) + step * dm
         Wave_obj_guess.initial_velocity_model = c_guess
         Wave_obj_guess.forward_solve()
         misfit_plusdm = rec_out_exact - Wave_obj_guess.receivers_output
@@ -156,7 +156,9 @@ def test_gradient_supershot():
     print(f"Cost functional : {Jm}")
 
     # compute the gradient of the control (to be verified)
-    dJ = Wave_obj_guess.gradient_solve(misfit=misfit, forward_solution=forward_solution_guess)
+    dJ = Wave_obj_guess.gradient_solve(
+        misfit=misfit, forward_solution=forward_solution_guess
+    )
     File("gradient.pvd").write(dJ)
 
     check_gradient(Wave_obj_guess, dJ, rec_out_exact, Jm, plot=True)

@@ -4,6 +4,7 @@ from firedrake import *
 import spyro
 
 from .model import dictionary as model
+
 model["acquisition"]["source_type"] = "MMS"
 
 
@@ -42,16 +43,26 @@ def test_method_quads_lumped():
 
 
 def test_isotropic_wave_2D():
-    u1 = lambda x, t: (x[0]**2 + x[0])*(x[1]**2 - x[1])*t
-    u2 = lambda x, t: (2*x[0]**2 + 2*x[0])*(-x[1]**2 + x[1])*t
+    u1 = lambda x, t: (x[0] ** 2 + x[0]) * (x[1] ** 2 - x[1]) * t
+    u2 = lambda x, t: (2 * x[0] ** 2 + 2 * x[0]) * (-x[1] ** 2 + x[1]) * t
     u = lambda x, t: as_vector([u1(x, t), u2(x, t)])
 
-    b1 = lambda x, t: -(2*x[0]**2 + 6*x[1]**2 - 16*x[0]*x[1] + 10*x[0] - 14*x[1] + 4)*t
-    b2 = lambda x, t: -(-12*x[0]**2 - 4*x[1]**2 + 8*x[0]*x[1] - 16*x[0] + 8*x[1] - 2)*t
+    b1 = (
+        lambda x, t: -(
+            2 * x[0] ** 2 + 6 * x[1] ** 2 - 16 * x[0] * x[1] + 10 * x[0] - 14 * x[1] + 4
+        )
+        * t
+    )
+    b2 = (
+        lambda x, t: -(
+            -12 * x[0] ** 2 - 4 * x[1] ** 2 + 8 * x[0] * x[1] - 16 * x[0] + 8 * x[1] - 2
+        )
+        * t
+    )
     b = lambda x, t: as_vector([b1(x, t), b2(x, t)])
 
     dt = 1e-3
-    fo = int(0.1/dt)
+    fo = int(0.1 / dt)
 
     d = deepcopy(model)
     d["acquisition"]["body_forces"] = b

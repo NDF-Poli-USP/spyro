@@ -1,10 +1,10 @@
+"""Cut Marmousi acoustic example configuration."""
+
 from spyro import create_transect
 from spyro.examples.example_model import Example_model_acoustic
 
 cut_marmousi_optimization_parameters = {
-    "General": {
-        "Secant": {"Type": "Limited-Memory BFGS", "Maximum Storage": 10}
-    },
+    "General": {"Secant": {"Type": "Limited-Memory BFGS", "Maximum Storage": 10}},
     "Step": {
         "Type": "Augmented Lagrangian",
         "Augmented Lagrangian": {
@@ -105,16 +105,21 @@ cut_marmousi_dictionary["time_axis"] = {
 
 
 class Cut_marmousi_acoustic(Example_model_acoustic):
-    """
-    Class for the cut marmousi model.
+    """Class for the cut marmousi model.
 
     Example Setup
 
-    These examples are intended as reusable velocity model configurations to assist in the development and testing of new methods, such as optimization algorithms, time-marching schemes, or inversion techniques.
+    These examples are intended as reusable velocity model configurations to
+    assist in the development and testing of new methods, such as optimization
+    algorithms, time-marching schemes, or inversion techniques.
 
-    Unlike targeted test cases, these examples do not have a specific objective or expected result. Instead, they provide standardized setups, such as Camembert, rectangular, and Marmousi velocity models, that can be quickly reused when prototyping, testing, or validating new functionality.
+    Unlike targeted test cases, these examples do not have a specific objective
+    or expected result. Instead, they provide standardized setups, such as
+    Camembert, rectangular, and Marmousi velocity models, that can be quickly
+    reused when prototyping, testing, or validating new functionality.
 
-    By isolating the setup of common velocity models, we aim to reduce boilerplate and encourage consistency across experiments.
+    By isolating the setup of common velocity models, we aim to reduce
+    boilerplate and encourage consistency across experiments.
 
     Feel free to adapt these templates to your needs.
 

@@ -3,6 +3,7 @@ from spyro.utils import Gradient_mask_for_pml
 from spyro.examples.rectangle import Rectangle_acoustic
 import firedrake as fire
 import numpy as np
+
 # from random import uniform as rand
 
 
@@ -26,14 +27,10 @@ def test_mask():
     }
     dictionary["absorving_boundary_conditions"] = {
         "status": False,
-        "pad_length": 0.,
+        "pad_length": 0.0,
         "damping_type": None,
     }
-    dictionary["mesh"] = {
-        "length_z": 1.0,
-        "length_x": 1.0,
-        "h": 0.03
-    }
+    dictionary["mesh"] = {"length_z": 1.0, "length_x": 1.0, "h": 0.03}
     Wave_obj = Rectangle_acoustic(dictionary=dictionary)
     boundaries = {
         "z_min": -0.9,
@@ -52,10 +49,10 @@ def test_mask():
         (-0.3, 0.6),
         (-0.4, 0.7),
         # Vertices plus tol
-        (-0.1-tol, 0.2+tol),
-        (-0.9+tol, 0.2+tol),
-        (-0.1-tol, 0.8-tol),
-        (-0.9+tol, 0.8-tol),
+        (-0.1 - tol, 0.2 + tol),
+        (-0.9 + tol, 0.2 + tol),
+        (-0.1 - tol, 0.8 - tol),
+        (-0.9 + tol, 0.8 - tol),
     ]
     # points_on_boundary = [
     #     # Vertices
@@ -77,10 +74,10 @@ def test_mask():
         (-0.3, 0.9),
         (-0.02, 0.7),
         # Vertices plus tol
-        (-0.1+tol, 0.2-tol),
-        (-0.9-tol, 0.2-tol),
-        (-0.1+tol, 0.8+tol),
-        (-0.9-tol, 0.8+tol),
+        (-0.1 + tol, 0.2 - tol),
+        (-0.9 - tol, 0.2 - tol),
+        (-0.1 + tol, 0.8 + tol),
+        (-0.9 - tol, 0.8 + tol),
     ]
     # points_in_tolerance = [
     #     # Vertices
@@ -126,10 +123,14 @@ def test_mask():
 
     # Checking results in mask
     for result in masked_results:
-        assert np.isclose(result, 1.0), f"Value of DG point in mask should be 1 not: {result}"
+        assert np.isclose(
+            result, 1.0
+        ), f"Value of DG point in mask should be 1 not: {result}"
     # Checking interior points
     for result in unmasked_results:
-        assert np.isclose(result, 0.0), f"Value of DG point unmask should be zero not: {result}"
+        assert np.isclose(
+            result, 0.0
+        ), f"Value of DG point unmask should be zero not: {result}"
 
     # Testing DG inverse mask for 0 in mask and 1 outside
     Mask_dg = Mask(boundaries, Wave_obj, dg=True, inverse_mask=True)
@@ -160,11 +161,7 @@ def test_gradient_mask():
         "status": True,
         "pad_length": 0.2,
     }
-    dictionary["mesh"] = {
-        "length_z": 1.0,
-        "length_x": 1.0,
-        "h": 0.03
-    }
+    dictionary["mesh"] = {"length_z": 1.0, "length_x": 1.0, "h": 0.03}
     Wave_obj = Rectangle_acoustic(dictionary=dictionary)
     # Points we are going to check
     tol = Wave_obj.input_dictionary["mesh"]["h"]
@@ -176,10 +173,10 @@ def test_gradient_mask():
         (-0.3, 0.6),
         (-0.4, 0.7),
         # Vertices plus tol
-        (-0.-tol, 0.+tol),
-        (-1.0+tol, 0.+tol),
-        (-0.-tol, 1.0-tol),
-        (-1.0+tol, 1.0-tol),
+        (-0.0 - tol, 0.0 + tol),
+        (-1.0 + tol, 0.0 + tol),
+        (-0.0 - tol, 1.0 - tol),
+        (-1.0 + tol, 1.0 - tol),
     ]
     # points_on_boundary = [
     #     # Vertices
@@ -201,10 +198,10 @@ def test_gradient_mask():
         (-0.3, 1.12),
         (-1.13, 1.15),
         # Vertices plus tol
-        (-0.-tol, 0.-tol),
-        (-1.-tol, 0.-tol),
-        (-0.-tol, 1.+tol),
-        (-1.-tol, 1.+tol),
+        (-0.0 - tol, 0.0 - tol),
+        (-1.0 - tol, 0.0 - tol),
+        (-0.0 - tol, 1.0 + tol),
+        (-1.0 - tol, 1.0 + tol),
     ]
     # points_in_tolerance = [
     #     # Vertices

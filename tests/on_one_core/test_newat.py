@@ -10,16 +10,15 @@ from ..inputfiles.Model1_3d_CG import model as oldmodel3D
 
 def triangle_area(p1, p2, p3):
     """Simple function to calculate triangle area based on its 3 vertices."""
-    (x1, y1) = p1
-    (x2, y2) = p2
-    (x3, y3) = p3
+    x1, y1 = p1
+    x2, y2 = p2
+    x3, y3 = p3
 
     return abs(x1 * (y2 - y3) + x2 * (y3 - y1) + x3 * (y1 - y2)) / 2
 
 
 def test_correct_receiver_location_generation2D():
-    """Tests if receiver locations where generated correctly"""
-
+    """Tests if receiver locations where generated correctly."""
     receivers = spyro.create_transect((-0.1, 0.3), (-0.1, 0.9), 3)
     answer = np.array([[-0.1, 0.3], [-0.1, 0.6], [-0.1, 0.9]])
 
@@ -27,8 +26,7 @@ def test_correct_receiver_location_generation2D():
 
 
 def test_correct_receiver_to_cell_location2D():
-    """Tests if the receivers where located in the correct cell"""
-
+    """Tests if the receivers where located in the correct cell."""
     oldmodel["opts"]["degree"] = 3
     recvs = spyro.create_transect((-0.1, 0.3), (-0.1, 0.9), 3)
     oldmodel["acquisition"]["receiver_locations"] = recvs
@@ -103,9 +101,7 @@ def test_correct_at_value2D():
     z, x = SpatialCoordinate(mesh)
 
     u1 = Function(V).interpolate(x + z)
-    test1 = math.isclose(
-        (pz + px), receivers.new_at(u1.dat.data[:], 0), rel_tol=1e-09
-    )
+    test1 = math.isclose((pz + px), receivers.new_at(u1.dat.data[:], 0), rel_tol=1e-09)
 
     u1 = Function(V).interpolate(sin(x) * z * 2)
     test2 = math.isclose(
@@ -128,9 +124,7 @@ def test_correct_at_value2D_quad():
     recvs = spyro.create_transect((pz, px), (pz, px), 3)
 
     oldmodel_quad["acquisition"]["receiver_locations"] = recvs
-    new_dictionary = spyro.io.Dictionary_conversion(
-        oldmodel_quad
-    ).new_dictionary
+    new_dictionary = spyro.io.Dictionary_conversion(oldmodel_quad).new_dictionary
     new_dictionary["mesh"]["mesh_file"] = None
     new_dictionary["mesh"]["mesh_type"] = "firedrake_mesh"
     new_dictionary["options"]["cell_type"] = "quadrilateral"
@@ -144,9 +138,7 @@ def test_correct_at_value2D_quad():
     z, x = SpatialCoordinate(mesh)
 
     u1 = Function(V).interpolate(x + z)
-    test1 = math.isclose(
-        (pz + px), receivers.new_at(u1.dat.data[:], 0), rel_tol=1e-09
-    )
+    test1 = math.isclose((pz + px), receivers.new_at(u1.dat.data[:], 0), rel_tol=1e-09)
 
     u1 = Function(V).interpolate(sin(x) * z * 2)
     test2 = math.isclose(
@@ -159,10 +151,10 @@ def test_correct_at_value2D_quad():
 
 
 def tetrahedral_volume(p1, p2, p3, p4):
-    (x1, y1, z1) = p1
-    (x2, y2, z2) = p2
-    (x3, y3, z3) = p3
-    (x4, y4, z4) = p4
+    x1, y1, z1 = p1
+    x2, y2, z2 = p2
+    x3, y3, z3 = p3
+    x4, y4, z4 = p4
 
     A = np.array([x1, y1, z1])
     B = np.array([x2, y2, z2])
@@ -175,8 +167,7 @@ def tetrahedral_volume(p1, p2, p3, p4):
 
 
 def test_correct_receiver_location_generation3D():
-    """Tests if receiver locations where generated correctly"""
-
+    """Tests if receiver locations where generated correctly."""
     oldtest_model = deepcopy(oldmodel3D)
     receivers = spyro.create_transect((-0.05, 0.3, 0.5), (-0.05, 0.9, 0.5), 3)
     oldtest_model["acquisition"]["receiver_locations"] = receivers
@@ -190,8 +181,7 @@ def test_correct_receiver_location_generation3D():
 
 
 def test_correct_receiver_to_cell_location3D():
-    """Tests if the receivers where located in the correct cell"""
-
+    """Tests if the receivers where located in the correct cell."""
     oldtest_model1 = deepcopy(oldmodel3D)
     rec = spyro.create_transect((-0.05, 0.1, 0.5), (-0.05, 0.9, 0.5), 3)
     oldtest_model1["acquisition"]["receiver_locations"] = rec
@@ -210,9 +200,7 @@ def test_correct_receiver_to_cell_location3D():
     z = receivers.point_locations[0, 2]
     p = (x, y, z)
 
-    volumeT = tetrahedral_volume(
-        cell_vertex1, cell_vertex2, cell_vertex3, cell_vertex4
-    )
+    volumeT = tetrahedral_volume(cell_vertex1, cell_vertex2, cell_vertex3, cell_vertex4)
     volume1 = tetrahedral_volume(p, cell_vertex2, cell_vertex3, cell_vertex4)
     volume2 = tetrahedral_volume(cell_vertex1, p, cell_vertex3, cell_vertex4)
     volume3 = tetrahedral_volume(cell_vertex1, cell_vertex2, p, cell_vertex4)
@@ -232,9 +220,7 @@ def test_correct_receiver_to_cell_location3D():
     z = receivers.point_locations[1, 2]
     p = (x, y, z)
 
-    volumeT = tetrahedral_volume(
-        cell_vertex1, cell_vertex2, cell_vertex3, cell_vertex4
-    )
+    volumeT = tetrahedral_volume(cell_vertex1, cell_vertex2, cell_vertex3, cell_vertex4)
     volume1 = tetrahedral_volume(p, cell_vertex2, cell_vertex3, cell_vertex4)
     volume2 = tetrahedral_volume(cell_vertex1, p, cell_vertex3, cell_vertex4)
     volume3 = tetrahedral_volume(cell_vertex1, cell_vertex2, p, cell_vertex4)
@@ -254,9 +240,7 @@ def test_correct_receiver_to_cell_location3D():
     z = receivers.point_locations[2, 2]
     p = (x, y, z)
 
-    volumeT = tetrahedral_volume(
-        cell_vertex1, cell_vertex2, cell_vertex3, cell_vertex4
-    )
+    volumeT = tetrahedral_volume(cell_vertex1, cell_vertex2, cell_vertex3, cell_vertex4)
     volume1 = tetrahedral_volume(p, cell_vertex2, cell_vertex3, cell_vertex4)
     volume2 = tetrahedral_volume(cell_vertex1, p, cell_vertex3, cell_vertex4)
     volume3 = tetrahedral_volume(cell_vertex1, cell_vertex2, p, cell_vertex4)
@@ -283,9 +267,7 @@ def test_correct_at_value3D():
 
     x_real, y_real, z_real = x_start, y_start, z_start
 
-    recvs = spyro.create_transect(
-        (z_start, x_start, y_start), (z_end, x_end, y_end), 3
-    )
+    recvs = spyro.create_transect((z_start, x_start, y_start), (z_end, x_end, y_end), 3)
     oldtest_model2["acquisition"]["receiver_locations"] = recvs
 
     test_model2 = spyro.AcousticWave(dictionary=oldtest_model2)
@@ -296,15 +278,11 @@ def test_correct_at_value3D():
 
     u1 = Function(V).interpolate(x + z + y)
     realvalue = x_real + y_real + z_real
-    test1 = math.isclose(
-        realvalue, receivers.new_at(u1.dat.data[:], 0), rel_tol=1e-09
-    )
+    test1 = math.isclose(realvalue, receivers.new_at(u1.dat.data[:], 0), rel_tol=1e-09)
 
     u1 = Function(V).interpolate(sin(x) * (z + 1) ** 2 * cos(y))
     realvalue = sin(x_real) * (z_real + 1) ** 2 * cos(y_real)
-    test2 = math.isclose(
-        realvalue, receivers.new_at(u1.dat.data[:], 0), rel_tol=1e-05
-    )
+    test2 = math.isclose(realvalue, receivers.new_at(u1.dat.data[:], 0), rel_tol=1e-05)
 
     assert all([test1, test2])
 

@@ -136,7 +136,7 @@ class L2Inner(object):
 
 
 def regularize_gradient(vp, dJ):
-    """Tikhonov regularization"""
+    """Tikhonov regularization."""
     m_u = TrialFunction(V)
     m_v = TestFunction(V)
     mgrad = m_u * m_v * dx(scheme=quad_rule)
@@ -167,7 +167,7 @@ class Objective(ROL.Objective):
         self.p_exact_recv = spyro.io.load_shots(model, comm)
 
     def value(self, x, tol):
-        """Compute the functional"""
+        """Compute the functional."""
         J_total = np.zeros((1))
         # print('about to start timestepping...',flush=True)
         self.p_guess, p_guess_recv = spyro.solvers.forward(
@@ -199,7 +199,7 @@ class Objective(ROL.Objective):
         return J_total[0]
 
     def gradient(self, g, x, tol):
-        """Compute the gradient of the functional"""
+        """Compute the gradient of the functional."""
         dJ = Function(V, name="gradient")
         dJ_local = spyro.solvers.gradient(
             model,

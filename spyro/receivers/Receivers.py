@@ -1,3 +1,5 @@
+"""Receivers class for evaluating efficiently poitn data."""
+
 from firedrake import *  # noqa: F403
 from firedrake.__future__ import interpolate
 from spyro.receivers.dirac_delta_projector import Delta_projector
@@ -6,12 +8,10 @@ import numpy as np
 
 
 class Receivers(Delta_projector):
-    """Project data defined on a triangular mesh to a
-    set of 2D/3D coordinates for variable spatial order
-    using Lagrange interpolation.
+    """Eveluate data at points based on Dirac Delta projection.
 
-    Can interpolate receiveir values that do not coincide with
-    mesh or DOF points
+    Can interpolate receiver values at any point in the domain.
+    These points do not need to coincide with points of the mesh or DOFs.
 
     ...
 
@@ -19,21 +19,21 @@ class Receivers(Delta_projector):
     ----------
     mesh : Firedrake.mesh
         mesh where receivers are located
-    V: Firedrake.FunctionSpace object
+    V : Firedrake.FunctionSpace object
         The space of the finite elements
-    my_ensemble: Firedrake.ensemble_communicator
+    my_ensemble : Firedrake.ensemble_communicator
         An ensemble communicator
-    dimension: int
+    dimension : int
         The dimension of the space
-    degree: int
+    degree : int
         Degree of the function space
-    receiver_locations: list
+    receiver_locations : list
         List of tuples containing all receiver locations
-    num_receivers: int
+    num_receivers : int
         Number of receivers
-    quadrilateral: boolean
+    quadrilateral : boolean
         Boolean that specifies if cells are quadrilateral
-    is_local: list of booleans
+    is_local : list of booleans
         List that checks if receivers are present in cores
         spatial paralelism
 
@@ -49,15 +49,16 @@ class Receivers(Delta_projector):
     """
 
     def __init__(self, wave_object):
-        """Initializes class and gets all receiver parameters from
-        input file.
+        """Initialize class and gets all receiver parameters from input file.
+
         Parameters
         ----------
-        wave_object: :class: 'Wave' object
+        wave_object : :class: 'Wave' object
             Waveform object that contains all simulation parameters
+
         Returns
         -------
-        Receivers: :class: 'Receiver' object
+        Receivers : :class: 'Receiver' object
         """
         super().__init__(wave_object)
         self.point_locations = wave_object.receiver_locations
@@ -76,7 +77,9 @@ class Receivers(Delta_projector):
             self.build_maps()
 
     def apply_receivers_as_source(self, rhs_forcing, residual, IT):
-        """The adjoint operation of interpolation (injection)
+        """Inject receivers as a source.
+
+        The adjoint operation of interpolation (injection).
 
         Injects residual, and timestep IT, at receiver locations
         as source and stores their value in the right hand side
@@ -84,17 +87,17 @@ class Receivers(Delta_projector):
 
         Parameters
         ----------
-        rhs_forcing: object
+        rhs_forcing : object
             Firedrake assembled right hand side operator to store values
-        residual: list
+        residual : list
             List of residual values at different receiver locations
             and timesteps
-        IT: int
+        IT : int
             Desired time step number to get residual value from
 
         Returns
         -------
-        rhs_forcing: object
+        rhs_forcing : object
             Firedrake assembled right hand side operator with injected values
         """
         for rid in range(self.number_of_points):
@@ -110,9 +113,15 @@ class Receivers(Delta_projector):
 
         return rhs_forcing
 
-    def receiver_interpolator(self, f, reorder=True, vom_tolerance=None,
-                              vom_missing_points_behaviour='error',
-                              vom_redundant=True, vom_name=None):
+    def receiver_interpolator(
+        self,
+        f,
+        reorder=True,
+        vom_tolerance=None,
+        vom_missing_points_behaviour="error",
+        vom_redundant=True,
+        vom_name=None,
+    ):
         """Return an interpolator object.
 
         Parameters
@@ -152,11 +161,14 @@ class Receivers(Delta_projector):
             function at the receiver locations.
         """
         vom = VertexOnlyMesh(
-            self.mesh, self.point_locations, reorder=reorder,
+            self.mesh,
+            self.point_locations,
+            reorder=reorder,
             tolerance=vom_tolerance,
             missing_points_behaviour=vom_missing_points_behaviour,
             redundant=vom_redundant,
-            name=vom_name)
+            name=vom_name,
+        )
         if self.wave_type == WaveType.ISOTROPIC_ELASTIC:
             V_r = VectorFunctionSpace(vom, "DG", 0)
         elif self.wave_type == WaveType.ISOTROPIC_ACOUSTIC:
@@ -166,4 +178,5 @@ class Receivers(Delta_projector):
         return interpolate(f, V_r)
 
     def new_at(self, udat, receiver_id):
+        """Evaluate data at a point."""
         return super().new_at(udat, receiver_id)

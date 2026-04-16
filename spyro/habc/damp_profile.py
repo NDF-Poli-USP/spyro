@@ -1,3 +1,5 @@
+"""Damping-parameter estimation utilities for the HABC layer."""
+
 import numpy as np
 from ..io.basicio import parallel_print
 from spyro.utils.error_management import value_parameter_error
@@ -11,9 +13,8 @@ from spyro.utils.error_management import value_parameter_error
 # With additions by Alexandre Olender
 
 
-class HABC_Damping():
-    '''
-    Class for HABC damping profile inside the absorbing layer
+class HABC_Damping:
+    """Class for HABC damping profile inside the absorbing layer.
 
     Attributes
     ----------
@@ -61,11 +62,10 @@ class HABC_Damping():
         Define the minimum damping ratio and the associated heuristic factor
     xCR_search_range()
         Determine the initial search range for the heuristic factor xCR
-    '''
+    """
 
     def __init__(self, dom_lay, layer_par, mesh_par, wave_par, dimension=2, comm=None):
-        '''
-        Initialize the HABC_Damping class
+        """Initialize the HABC_Damping class.
 
         Parameters
         ----------
@@ -98,7 +98,7 @@ class HABC_Damping():
         Returns
         -------
         None
-        '''
+        """
         self.comm = comm  # dummy attribute for future comm use
         # Domain dimensions with layer
         self.Lx_habc = dom_lay[0]  # Length in x direction
@@ -121,10 +121,10 @@ class HABC_Damping():
         # Adimensional wave numbers
         self.adim_reflection_parameters(layer_par[:2], mesh_par[:2], wave_par)
 
-    def adim_reflection_parameters(self, layer_par, mesh_par,
-                                   wave_par, vibration_mode=1):
-        '''
-        Compute the adimensional parameters for the reflection coefficient
+    def adim_reflection_parameters(
+        self, layer_par, mesh_par, wave_par, vibration_mode=1
+    ):
+        """Compute the adimensional parameters for the reflection coefficient.
 
         Parameters
         ----------
@@ -147,8 +147,7 @@ class HABC_Damping():
         Returns
         -------
         None
-        '''
-
+        """
         # Layer parameters
         F_L, a = layer_par
 
@@ -169,8 +168,7 @@ class HABC_Damping():
 
     @staticmethod
     def psi_from_CR(CR, kCR):
-        '''
-        Compute the damping ratio from the reflection coefficient
+        """Compute the damping ratio from the reflection coefficient.
 
         Parameters
         ----------
@@ -183,19 +181,18 @@ class HABC_Damping():
         -------
         psi_damp : `float`
             Damping ratio
-        '''
+        """
         if CR == 0:
             psi_damp = 0
         elif CR >= 1:
             psi_damp = 0.999
         else:
-            psi_damp = kCR / (1 / CR - 1)**0.5
+            psi_damp = kCR / (1 / CR - 1) ** 0.5
 
         return psi_damp
 
-    def min_reflection(self, psi_damp=None, CR_err=None, typ_CR='CR_PSI'):
-        '''
-        Compute a minimum reflection coefficient for the quadratic damping.
+    def min_reflection(self, psi_damp=None, CR_err=None, typ_CR="CR_PSI"):
+        """Compute a minimum reflection coefficient for the quadratic damping.
 
         Parameters
         ----------
@@ -215,28 +212,25 @@ class HABC_Damping():
             Minimum reflection coefficient at the minimum damping
         xCRmin : `float`
             Heuristic factor for the minimum damping ratio
-        '''
+        """
+        if typ_CR not in ["CR_PSI", "CR_FEM", "CR_ERR"]:
+            value_parameter_error("typ_CR", typ_CR, ["CR_PSI", "CR_FEM", "CR_ERR"])
 
-        if typ_CR not in ['CR_PSI', 'CR_FEM', 'CR_ERR']:
-            value_parameter_error('typ_CR', typ_CR,
-                                  ['CR_PSI', 'CR_FEM', 'CR_ERR'])
-
-        if typ_CR == 'CR_PSI':
+        if typ_CR == "CR_PSI":
             # Minimum coefficient reflection
             psimin = psi_damp
             CRmin = psimin**2 / (self.kCR**2 + psimin**2)
 
-        elif typ_CR == 'CR_ERR':
+        elif typ_CR == "CR_ERR":
             # Minimum damping ratio for correction in reflection parameters
             CRmin = CR_err
             psimin = self.psi_from_CR(CR_err, self.kCR)
 
-        elif typ_CR == 'CR_FEM':
+        elif typ_CR == "CR_FEM":
             # Unidimensional spourious reflection in FEM (Laier, 2020)
             # TODO: Add citation
             def Zi(p, alpha, ele_type):
-                '''
-                Compute the Z parameter in the spurious reflection coefficient.
+                """Compute the Z parameter in the spurious reflection model.
 
                 Parameters
                 ----------
@@ -251,31 +245,31 @@ class HABC_Damping():
                 -------
                 Z_fem : `float`
                     Parameter for the spurious reflection coefficient in FEM
-                '''
-                if ele_type == 'lumped':
+                """
+                if ele_type == "lumped":
                     m1 = 1 / 2
-                    m2 = 0.
-                elif ele_type == 'consistent':
+                    m2 = 0.0
+                elif ele_type == "consistent":
                     m1 = 1 / 3
                     m2 = 1 / 6
                 else:
-                    value_parameter_error('ele_type', ele_type,
-                                          ['lumped', 'consistent'])
+                    value_parameter_error(
+                        "ele_type", ele_type, ["lumped", "consistent"]
+                    )
 
-                Z_fem = m2 * (np.cos(alpha * p) - 1) / (
-                    m1 * (np.cos(alpha * p) + 1))
+                Z_fem = m2 * (np.cos(alpha * p) - 1) / (m1 * (np.cos(alpha * p) + 1))
 
                 return Z_fem
 
             # Spurious reflection coefficient in FDM (Kar and Turco, 1995)
             # TODO: Add citation
-            CRfdm = np.tan(self.p1 / 4)**2
+            CRfdm = np.tan(self.p1 / 4) ** 2
 
             # Minimum damping ratio for the spurious reflection
             psimin = self.psi_from_CR(CRfdm, self.kCR)
 
             # Correction for the dimensionless wavenumbers due to the damping
-            self.p2 *= (1 + 1 / 8 * (psimin * self.f_correct_pwave)**2)
+            self.p2 *= 1 + 1 / 8 * (psimin * self.f_correct_pwave) ** 2
 
             # Zi parameters for the spurious reflection coefficient
             Z1 = Zi(self.p1, self.alpha, self.variant)
@@ -292,8 +286,7 @@ class HABC_Damping():
         return CRmin, xCRmin
 
     def regression_CRmin(self, xCR_reg, CRmin_reg, xCR_lim):
-        '''
-        Define the minimum damping ratio and the associated heuristic factor.
+        """Define the minimum damping ratio and the associated heuristic factor.
 
         Parameters
         ----------
@@ -312,8 +305,7 @@ class HABC_Damping():
             Estimated heuristic factor for the minimum damping ratio
         CRmin : `float`
             Minimum reflection coefficient at the minimum damping ratio
-        '''
-
+        """
         # Limits for the heuristic factor
         xCR_inf, xCR_sup, xCR_ini = xCR_lim
 
@@ -323,14 +315,17 @@ class HABC_Damping():
         # Roots of the quadratic equation
         roots = np.roots(z)
         real_roots = [r.real for r in roots if np.isreal(r)]
-        max_root = max(real_roots) if len(real_roots) == 2 else 0.
+        max_root = max(real_roots) if len(real_roots) == 2 else 0.0
 
         # Vertex of parabola
-        xCR_vtx = -z[1] / (2 * z[0]) if len(real_roots) == 2 else 0.
+        xCR_vtx = -z[1] / (2 * z[0]) if len(real_roots) == 2 else 0.0
 
         # Vertex or minimum positive root
-        xCR_est = xCR_vtx if xCR_vtx > xCR_inf else (
-            max_root if max_root > xCR_inf else xCR_ini)
+        xCR_est = (
+            xCR_vtx
+            if xCR_vtx > xCR_inf
+            else (max_root if max_root > xCR_inf else xCR_ini)
+        )
         xCR_est = np.clip(xCR_est, xCR_inf, xCR_sup)
 
         # Minimum damping ratio
@@ -340,8 +335,8 @@ class HABC_Damping():
         return psi_min, xCR_est, CRmin
 
     def est_min_damping(self, psi_damp=0.999):
-        '''
-        Estimate the minimum damping ratio and the associated heuristic factor.
+        """Estimate the minimum damping ratio and heuristic factor.
+
         Obs: The reflection coefficient is not zero because there are always
         both reflections: physical and spurious
 
@@ -360,35 +355,32 @@ class HABC_Damping():
             Limits for the heuristic factor. (xCR_inf, xCR_sup)
         CRmin : `float`
             Minimum reflection coefficient at the minimum damping ratio
-        '''
-
+        """
         # Lower Limit for the minimum damping ratio
         psimin_inf = psi_damp * self.d_norm**2
         CRmin_inf, xCR_inf = self.min_reflection(psi_damp=psimin_inf)
 
         # Upper Limit for the minimum damping ratio
-        psimin_sup = psi_damp * (2. * self.d_norm - self.d_norm**2)
+        psimin_sup = psi_damp * (2.0 * self.d_norm - self.d_norm**2)
         CRmin_sup, xCR_sup = self.min_reflection(psi_damp=psimin_sup)
 
         # Initial guess
-        psimin_ini = psi_damp * (self.d_norm**2 + self.d_norm) / 2.
+        psimin_ini = psi_damp * (self.d_norm**2 + self.d_norm) / 2.0
         CRmin_ini, xCR_ini = self.min_reflection(psi_damp=psimin_ini)
 
         # Spurious reflection
-        CRmin_fem, xCR_fem = self.min_reflection(typ_CR='CR_FEM')
+        CRmin_fem, xCR_fem = self.min_reflection(typ_CR="CR_FEM")
 
         # Minimum damping ratio
         xCR_reg = (xCR_inf, xCR_sup, xCR_ini, xCR_fem)
         CRmin_reg = (CRmin_inf, CRmin_sup, CRmin_ini, CRmin_fem)
         xCR_lim = (xCR_inf, xCR_sup, xCR_ini)
-        psi_min, xCR_est, CRmin = \
-            self.regression_CRmin(xCR_reg, CRmin_reg, xCR_lim)
+        psi_min, xCR_est, CRmin = self.regression_CRmin(xCR_reg, CRmin_reg, xCR_lim)
 
         return psi_min, xCR_est, xCR_lim[:2], CRmin
 
     def calc_damping_properties(self, fundam_freq, xCR_usu=None, psi_damp=0.999):
-        '''
-        Compute the damping properties for the absorbing layer.
+        """Compute the damping properties for the absorbing layer.
 
         Parameters
         ----------
@@ -412,18 +404,15 @@ class HABC_Damping():
             Limits for the heuristic factor. (xCR_inf, xCR_sup)
         CRmin : `float`
             Minimum reflection coefficient at the minimum damping ratio
-        '''
-
+        """
         # Critical damping coefficient
         eta_crt = 2 * np.pi * fundam_freq
         eta_max = psi_damp * eta_crt
-        parallel_print(
-            f"Critical Damping Coefficient (1/s): {eta_crt:.5f}", self.comm)
+        parallel_print(f"Critical Damping Coefficient (1/s): {eta_crt:.5f}", self.comm)
 
         # Maximum damping ratio and coefficient
         parallel_print(f"Maximum Damping Ratio: {psi_damp:.3%}", self.comm)
-        parallel_print(
-            f"Maximum Damping Coefficient (1/s): {eta_max:.5f}", self.comm)
+        parallel_print(f"Maximum Damping Coefficient (1/s): {eta_max:.5f}", self.comm)
 
         # Minimum damping ratio and the associated heuristic factor
         psi_min, xCR_est, xCR_lim, CRmin = self.est_min_damping()
@@ -440,14 +429,14 @@ class HABC_Damping():
 
         # Minimum damping ratio and coefficient
         eta_min = psi_min * eta_crt
-        parallel_print(
-            "Minimum Damping Ratio: {:.3%}".format(psi_min), self.comm)
-        psi_str = "Range for Minimum Damping Ratio. " \
-            + f"Min:{xCR_inf * self.d_norm:.5f} - " \
+        parallel_print("Minimum Damping Ratio: {:.3%}".format(psi_min), self.comm)
+        psi_str = (
+            "Range for Minimum Damping Ratio. "
+            + f"Min:{xCR_inf * self.d_norm:.5f} - "
             + f"Max:{xCR_sup * self.d_norm:.5f}"
+        )
         parallel_print(psi_str, self.comm)
-        parallel_print(
-            f"Minimum Damping Coefficient (1/s): {eta_min:.5f}", self.comm)
+        parallel_print(f"Minimum Damping Coefficient (1/s): {eta_min:.5f}", self.comm)
 
         # Heuristic factor and its range
         parallel_print(xcr_str.format(xCR), self.comm)
@@ -457,8 +446,7 @@ class HABC_Damping():
         return eta_crt, psi_min, xCR, xCR_lim, CRmin
 
     def coeff_damp_fun(self, psi_min, psi_damp=0.999):
-        '''
-        Compute the coefficients for quadratic damping function
+        """Compute the coefficients for quadratic damping function.
 
         Parameters
         ----------
@@ -473,17 +461,14 @@ class HABC_Damping():
             Coefficient for quadratic term in the damping function
         bq : `float`
             Coefficient bq for linear term in the damping function
-        '''
-
-        aq = (psi_min - self.d_norm * psi_damp) / (
-            self.d_norm**2 - self.d_norm)
+        """
+        aq = (psi_min - self.d_norm * psi_damp) / (self.d_norm**2 - self.d_norm)
         bq = psi_damp - aq
 
         return aq, bq
 
     def xCR_search_range(self, CRmin, xCR_lim, f_geom):
-        '''
-        Determine the initial search range for the heuristic factor xCR.
+        """Determine the initial search range for the heuristic factor xCR.
 
         Parameters
         ----------
@@ -491,7 +476,7 @@ class HABC_Damping():
             Minimum reflection coefficient at the minimum damping
         xCR_lim : `tuple`
             Limits for the heuristic factor. (xCR_inf, xCR_sup)
-        f_geom  : `float`
+        f_geom : `float`
             Geometric factor for area (2D) or volume (3D) of the domain
 
         Returns
@@ -500,8 +485,7 @@ class HABC_Damping():
             Initial search range for the heuristic factor. (xCR_min, xCR_max)
             - xCR_min : Lower bound on the search range
             - xCR_max : Upper bound on the search range
-        '''
-
+        """
         # Limits for the heuristic factor
         xCR_inf, xCR_sup = xCR_lim
 
@@ -511,9 +495,9 @@ class HABC_Damping():
 
         # Correction by spurious reflection
         CR_err_min = CRmin * (1 - min(err1, err2))
-        xCR_lb = self.min_reflection(CR_err=CR_err_min, typ_CR='CR_ERR')[1]
+        xCR_lb = self.min_reflection(CR_err=CR_err_min, typ_CR="CR_ERR")[1]
         CR_err_max = CRmin * (1 + max(err1, err2))
-        xCR_ub = self.min_reflection(CR_err=CR_err_max, typ_CR='CR_ERR')[1]
+        xCR_ub = self.min_reflection(CR_err=CR_err_max, typ_CR="CR_ERR")[1]
         xCR_min = np.clip(max(xCR_lb, xCR_inf), xCR_inf, xCR_sup)
         xCR_max = np.clip(min(xCR_ub, xCR_sup), xCR_inf, xCR_sup)
 
@@ -530,9 +514,9 @@ class HABC_Damping():
             f_Ah = f_geom
 
             # Factors and their inverses from sqrt(1/a^2 + 1/b^2)
-            fa = (1 + Rab**2)**0.5  # Factoring 1/a^2
+            fa = (1 + Rab**2) ** 0.5  # Factoring 1/a^2
             fainv = 1 / fa
-            fb = (1 + Rab**2)**0.5 / Rab  # Factoring 1/b^2
+            fb = (1 + Rab**2) ** 0.5 / Rab  # Factoring 1/b^2
             fbinv = 1 / fb
             fmin = f_Ah / 4 * min(fainv, fbinv)
             fmax = 4 / f_Ah * max(fa, fb)
@@ -550,11 +534,11 @@ class HABC_Damping():
             f_Vh = f_geom
 
             # Factors and their inverses from sqrt(1/a^2 + 1/b^2 + 1/c^2)
-            fa = (1 + Rab**2 + Rac**2)**0.5  # Factoring 1/a^2
+            fa = (1 + Rab**2 + Rac**2) ** 0.5  # Factoring 1/a^2
             fainv = 1 / fa
-            fb = (1 + Rab**2*(1 + Rbc**2))**0.5 / Rab  # Factoring 1/b^2
+            fb = (1 + Rab**2 * (1 + Rbc**2)) ** 0.5 / Rab  # Factoring 1/b^2
             fbinv = 1 / fb
-            fc = (Rac**2 + (Rac * Rbc)**2 + Rbc**2)**0.5 / (Rac * Rbc)  # 1/c^2
+            fc = (Rac**2 + (Rac * Rbc) ** 2 + Rbc**2) ** 0.5 / (Rac * Rbc)  # 1/c^2
             fcinv = 1 / fc
             fmin = f_Vh / 8 * min(fainv, fbinv, min(fc, fcinv))
             fmax = 8 / f_Vh * max(fa, fb, max(fc, 1 / fc))

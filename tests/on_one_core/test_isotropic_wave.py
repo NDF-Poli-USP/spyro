@@ -89,9 +89,9 @@ def test_parse_boundary_conditions():
     }
     d["boundary_conditions"] = [
         ("u", 1, fire.Constant((1, 1, 1))),  # x == 0:  1 (z in spyro)
-        ("uz", 2, fire.Constant(2)),         # x == Lx: 2 (z in spyro)
-        ("ux", 3, fire.Constant(3)),         # y == 0:  3 (x in spyro)
-        ("uy", 4, fire.Constant(4)),         # y == Ly: 4 (x in spyro)
+        ("uz", 2, fire.Constant(2)),  # x == Lx: 2 (z in spyro)
+        ("ux", 3, fire.Constant(3)),  # y == 0:  3 (x in spyro)
+        ("uy", 4, fire.Constant(4)),  # y == Ly: 4 (x in spyro)
     ]
     wave = IsotropicWave(d)
     wave.set_mesh(input_mesh_parameters={"edge_length": 0.2, "periodic": True})

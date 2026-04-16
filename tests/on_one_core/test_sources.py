@@ -7,17 +7,17 @@ import spyro
 from spyro.solvers.acoustic_wave import AcousticWave
 from spyro.solvers.elastic_wave.isotropic_wave import IsotropicWave
 
-"""Read in an external mesh and interpolate velocity to it"""
+"""Read in an external mesh and interpolate velocity to it."""
 from ..inputfiles.Model1_2d_CG import model as oldmodel
 
 
 def test_ricker_varies_in_time():
-    """This test ricker time variation when applied to a time-
-    dependent PDE (acoustic wave second order in pressure) in
-    firedrake. It tests if the right hand side varies in time
-    and if the applied ricker function behaves correctly
-    """
+    """This test ricker time variation when applied to a time- dependent PDE (acoustic
+    wave second order in pressure) in firedrake.
 
+    It tests if the right hand side varies in time and if the applied ricker function
+    behaves correctly
+    """
     # initial ricker tests
     modelRicker = deepcopy(oldmodel)
     frequency = 2
@@ -36,25 +36,19 @@ def test_ricker_varies_in_time():
     # tests if the minimum value is correct and occurs at correct locations
     minimum = -amplitude * 2 / math.exp(3.0 / 2.0)
     t = 0.0 + delay + math.sqrt(6.0) / (2.0 * math.pi * frequency)
-    rmin1 = spyro.sources.timedependentSource(
-        modelRicker, t, frequency, amplitude
-    )
+    rmin1 = spyro.sources.timedependentSource(modelRicker, t, frequency, amplitude)
     test2 = math.isclose(
         rmin1,
         minimum,
     )
 
     t = 0.0 + delay - math.sqrt(6.0) / (2.0 * math.pi * frequency)
-    rmin2 = spyro.sources.timedependentSource(
-        modelRicker, t, frequency, amplitude
-    )
+    rmin2 = spyro.sources.timedependentSource(modelRicker, t, frequency, amplitude)
     test3 = math.isclose(rmin2, minimum)
 
     # tests if maximum value in correct and occurs at correct location
     t = 0.0 + delay
-    rmax = spyro.sources.timedependentSource(
-        modelRicker, t, frequency, amplitude
-    )
+    rmax = spyro.sources.timedependentSource(modelRicker, t, frequency, amplitude)
     test4 = math.isclose(
         rmax,
         amplitude,
@@ -184,7 +178,8 @@ def _random_source_locations(dimension, count=5):
 
 def _check_cofunction_values(wave, source_locations, test_exprs):
     """Check that the cofunction action on each test function matches the
-    expected value for each source individually."""
+    expected value for each source individually.
+    """
     for source_id, sl in enumerate(source_locations):
         wave.sources.point_locations = [sl]
         wave.sources.current_sources = [0]
@@ -193,14 +188,16 @@ def _check_cofunction_values(wave, source_locations, test_exprs):
         for f, expected_fn in test_exprs:
             expected = expected_fn(sl)
             action = np.dot(cofunction.dat.data_ro.ravel(), f.dat.data_ro.ravel())
-            assert math.isclose(action, expected, abs_tol=1e-6), \
-                f"Source {source_id} at {sl}: <c, f> = {action}, expected {expected}"
+            assert math.isclose(
+                action, expected, abs_tol=1e-6
+            ), f"Source {source_id} at {sl}: <c, f> = {action}, expected {expected}"
 
 
 @pytest.mark.parametrize("cell_type", ["T", "Q"])
 def test_cofunction_values_acoustic(cell_type):
     """Test if the cofunction correctly represents delta functions at source
-    locations by checking its action on known functions."""
+    locations by checking its action on known functions.
+    """
     np.random.seed(42)
     source_locations = _random_source_locations(2)
     wave = _build_acoustic_wave(1.0, source_locations, cell_type=cell_type)
@@ -211,7 +208,10 @@ def test_cofunction_values_acoustic(cell_type):
         (fire.Function(V).interpolate(1.0), lambda sl: 1.0),
         (fire.Function(V).interpolate(x[0]), lambda sl: sl[0]),
         (fire.Function(V).interpolate(x[1]), lambda sl: sl[1]),
-        (fire.Function(V).interpolate(x[0]**2 + x[1]**2), lambda sl: sl[0]**2 + sl[1]**2),
+        (
+            fire.Function(V).interpolate(x[0] ** 2 + x[1] ** 2),
+            lambda sl: sl[0] ** 2 + sl[1] ** 2,
+        ),
     ]
     _check_cofunction_values(wave, source_locations, test_exprs)
 
@@ -219,7 +219,8 @@ def test_cofunction_values_acoustic(cell_type):
 @pytest.mark.parametrize("cell_type", ["T", "Q"])
 def test_cofunction_values_elastic(cell_type):
     """Test if the elastic cofunction correctly represents delta functions at
-    source locations by checking its action on known vector functions."""
+    source locations by checking its action on known vector functions.
+    """
     np.random.seed(42)
     source_locations = _random_source_locations(2)
     wave = _build_elastic_wave(1.0, source_locations, cell_type=cell_type)
@@ -231,7 +232,10 @@ def test_cofunction_values_elastic(cell_type):
         (fire.Function(V).interpolate(fire.as_vector([0.0, 1.0])), lambda sl: 1.0),
         (fire.Function(V).interpolate(fire.as_vector([x[0], 0.0])), lambda sl: sl[0]),
         (fire.Function(V).interpolate(fire.as_vector([0.0, x[1]])), lambda sl: sl[1]),
-        (fire.Function(V).interpolate(fire.as_vector([x[0], x[1]])), lambda sl: sl[0] + sl[1]),
+        (
+            fire.Function(V).interpolate(fire.as_vector([x[0], x[1]])),
+            lambda sl: sl[0] + sl[1],
+        ),
     ]
     _check_cofunction_values(wave, source_locations, test_exprs)
 
@@ -239,7 +243,8 @@ def test_cofunction_values_elastic(cell_type):
 @pytest.mark.parametrize("cell_type", ["T", "Q"])
 def test_cofunction_values_elastic_3d(cell_type):
     """Test if the 3D elastic cofunction correctly represents delta functions
-    at source locations by checking its action on known vector functions."""
+    at source locations by checking its action on known vector functions.
+    """
     np.random.seed(42)
     source_locations = _random_source_locations(3)
     wave = _build_elastic_wave(1.0, source_locations, dimension=3, cell_type=cell_type)

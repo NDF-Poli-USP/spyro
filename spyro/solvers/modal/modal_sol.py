@@ -1,14 +1,24 @@
+"""Modal solver utilities for eigenvalue estimation and timestep bounds."""
+
 import firedrake as fire
 import numpy as np
 import scipy.sparse as ss
 import warnings
 from scipy.optimize import broyden1, curve_fit
-from scipy.special import beta, betainc, gamma, jn_zeros, \
-    jnp_zeros, mathieu_modcem1, spherical_jn
+from scipy.special import (
+    beta,
+    betainc,
+    gamma,
+    jn_zeros,
+    jnp_zeros,
+    mathieu_modcem1,
+    spherical_jn,
+)
 from scipy.stats import norm as sn
 from sys import float_info
 from spyro.utils.error_management import value_parameter_error
 from spyro.utils.stats_tools import coeff_of_determination
+
 fire.parameters["loopy"] = {"silenced_warnings": ["v1_scheduler_fallback"]}
 warnings.filterwarnings("ignore", category=RuntimeWarning)
 
@@ -22,9 +32,8 @@ warnings.filterwarnings("ignore", category=RuntimeWarning)
 # With additions by Alexandre Olender
 
 
-class Modal_Solver():
-    '''
-    Class for the Modal problem with Neumann boundary conditions
+class Modal_Solver:
+    """Class for the Modal problem with Neumann boundary conditions.
 
     Attributes
     ----------
@@ -36,7 +45,7 @@ class Modal_Solver():
     method : `str`
         Method to use for solving the eigenvalue problem.
         Default is None, which uses the 'KRYLOVSCH_CH' method
-    valid_methods: `list`
+    valid_methods : `list`
         List of valid methods for solving the eigenproblem
         Options: 'ANALYTICAL', 'ARNOLDI', 'LANCZOS', 'LOBPCG', 'KRYLOVSCH_CH',
         'KRYLOVSCH_CG', 'KRYLOVSCH_GH', 'KRYLOVSCH_GG' or 'RAYLEIGH'.
@@ -87,11 +96,10 @@ class Modal_Solver():
     weak_forms()
         Generate the bilinear forms for the modal problem.
         Also, it can generate a source term in weak form
-    '''
+    """
 
     def __init__(self, dimension, method=None, calc_max_dt=False):
-        '''
-        Initialize the Modal_Solver class
+        """Initialize the Modal_Solver class.
 
         Parameters
         ----------
@@ -116,8 +124,7 @@ class Modal_Solver():
         Returns
         -------
         None
-        '''
-
+        """
         # Dimension of the problem
         self.dimension = dimension
 
@@ -126,27 +133,33 @@ class Modal_Solver():
 
         # Default methods
         if method is None:
-            self.method = 'KRYLOVSCH_CH'
+            self.method = "KRYLOVSCH_CH"
         else:
             self.method = method
 
         # Valid methods for solving the eigenproblem
-        self.valid_methods = ['ANALYTICAL', 'ARNOLDI', 'LANCZOS', 'LOBPCG']
+        self.valid_methods = ["ANALYTICAL", "ARNOLDI", "LANCZOS", "LOBPCG"]
         if not self.calc_max_dt:
-            self.valid_methods.extend(['KRYLOVSCH_CH', 'KRYLOVSCH_CG',
-                                       'KRYLOVSCH_GH', 'KRYLOVSCH_GG',
-                                       'RAYLEIGH'])
+            self.valid_methods.extend(
+                [
+                    "KRYLOVSCH_CH",
+                    "KRYLOVSCH_CG",
+                    "KRYLOVSCH_GH",
+                    "KRYLOVSCH_GG",
+                    "RAYLEIGH",
+                ]
+            )
 
         if self.method not in self.valid_methods:
-            value_parameter_error('method', method, self.valid_methods)
+            value_parameter_error("method", method, self.valid_methods)
 
         print(f"Solver Method: {self.method}", flush=True)
 
     @staticmethod
     def weak_forms(c, V, quad_rule=None, source=False, user_load=None):
-        '''
-        Generate the bilinear forms for the modal problem.
-        Also, it can generate a source term in weak form
+        """Generate bilinear forms for the modal problem.
+
+        Also generates a source term in weak form when requested.
 
         Parameters
         ----------
@@ -172,8 +185,7 @@ class Modal_Solver():
         L : `firedrake.Form`, optional
             Weak form representing a source term.
             Returned only if 'source'=True
-        '''
-
+        """
         # Functions for the problem
         u, v = fire.TrialFunction(V), fire.TestFunction(V)
         dx = fire.dx(**quad_rule) if quad_rule else fire.dx
@@ -183,7 +195,7 @@ class Modal_Solver():
 
         if source:  # Source term
             if user_load is None:
-                q = fire.Constant(1.e-3)
+                q = fire.Constant(1.0e-3)
             else:
                 q = user_load
 
@@ -196,8 +208,7 @@ class Modal_Solver():
 
     @staticmethod
     def assemble_sparse_matrices(a, m, return_M_inv=False):
-        '''
-        Assemble the sparse matrices for SciPy solvers
+        """Assemble the sparse matrices for SciPy solvers.
 
         Parameters
         ----------
@@ -217,8 +228,7 @@ class Modal_Solver():
         Msp_inv : `csr matrix`, optional
             Sparse matrix representing the inverse mass matrix.
             Returned only if 'return_M_inv'=True
-        '''
-
+        """
         # Assemble the stiffness matrix
         A = fire.assemble(a)
         a_ptr, a_ind, a_val = A.petscmat.getValuesCSR()
@@ -232,15 +242,14 @@ class Modal_Solver():
         if return_M_inv:
             # Assemble the inverse mass matrix
             m_val_inv = np.array(m_val)
-            m_val_inv[m_val_inv != 0.] = 1. / m_val_inv[m_val_inv != 0.]
+            m_val_inv[m_val_inv != 0.0] = 1.0 / m_val_inv[m_val_inv != 0.0]
             Msp_inv = ss.csr_matrix((m_val_inv, m_ind, m_ptr), M.petscmat.size)
             return Asp, Msp_inv
 
         return Asp, Msp
 
     def solver_with_sparse_matrix(self, Asp, Msp, method, k=2, inv_oper=False):
-        '''
-        Solve the eigenvalue problem with sparse matrices using Scipy
+        """Solve the eigenvalue problem with sparse matrices using Scipy.
 
         Parameters
         ----------
@@ -261,34 +270,61 @@ class Modal_Solver():
         -------
         Lsp : `array`
             Array containing the computed eigenvalues
-        '''
-
-        if method == 'ARNOLDI' or method == 'LANCZOS':
+        """
+        if method == "ARNOLDI" or method == "LANCZOS":
             # Inverse operator for improving convergence
             M_ilu = ss.linalg.spilu(Msp) if inv_oper else None
             Minv = M_ilu.solve if inv_oper else None
             A_ilu = ss.linalg.spilu(Asp) if inv_oper else None
             OPinv = A_ilu.solve if inv_oper else None
 
-        if method == 'ARNOLDI':
+        if method == "ARNOLDI":
             # Solve the eigenproblem using ARNOLDI (ARPACK)
             if self.calc_max_dt:
-                Lsp = ss.linalg.eigs(Asp, k=k, M=Msp, which='LM', Minv=Minv,
-                                     OPinv=OPinv, return_eigenvectors=False)
+                Lsp = ss.linalg.eigs(
+                    Asp,
+                    k=k,
+                    M=Msp,
+                    which="LM",
+                    Minv=Minv,
+                    OPinv=OPinv,
+                    return_eigenvectors=False,
+                )
             else:
-                Lsp = ss.linalg.eigs(Asp, k=k, M=Msp, sigma=0.0, Minv=Minv,
-                                     OPinv=OPinv, return_eigenvectors=False)
+                Lsp = ss.linalg.eigs(
+                    Asp,
+                    k=k,
+                    M=Msp,
+                    sigma=0.0,
+                    Minv=Minv,
+                    OPinv=OPinv,
+                    return_eigenvectors=False,
+                )
 
-        if method == 'LANCZOS':
+        if method == "LANCZOS":
             # Solve the eigenproblem using LANCZOS (ARPACK)
             if self.calc_max_dt:
-                Lsp = ss.linalg.eigsh(Asp, k=k, M=Msp, which='LM', Minv=Minv,
-                                      OPinv=OPinv, return_eigenvectors=False)
+                Lsp = ss.linalg.eigsh(
+                    Asp,
+                    k=k,
+                    M=Msp,
+                    which="LM",
+                    Minv=Minv,
+                    OPinv=OPinv,
+                    return_eigenvectors=False,
+                )
             else:
-                Lsp = ss.linalg.eigsh(Asp, k=k, M=Msp, sigma=0.0, Minv=Minv,
-                                      OPinv=OPinv, return_eigenvectors=False)
+                Lsp = ss.linalg.eigsh(
+                    Asp,
+                    k=k,
+                    M=Msp,
+                    sigma=0.0,
+                    Minv=Minv,
+                    OPinv=OPinv,
+                    return_eigenvectors=False,
+                )
 
-        if method == 'LOBPCG':
+        if method == "LOBPCG":
             # Initialize LI vectors for LOBPCG
             X = np.eye(Msp.shape[0], k)
 
@@ -297,9 +333,15 @@ class Modal_Solver():
             it_ext = 2
             mag = True if self.calc_max_dt else False
             for it in range(it_ext):
-                Lsp, X, resid = ss.linalg.lobpcg(Asp, X, B=Msp, tol=5e-4,
-                                                 maxiter=it_mod, largest=mag,
-                                                 retResidualNormsHistory=True)
+                Lsp, X, resid = ss.linalg.lobpcg(
+                    Asp,
+                    X,
+                    B=Msp,
+                    tol=5e-4,
+                    maxiter=it_mod,
+                    largest=mag,
+                    retResidualNormsHistory=True,
+                )
 
                 it_mod //= 2  # Reduce iterations for next loop
                 rmin = np.array(resid)[:, 1].min()
@@ -310,8 +352,7 @@ class Modal_Solver():
         return Lsp
 
     def solver_with_ufl(self, a, m, k=2):
-        '''
-        Solve the eigenvalue problem using UFL forms with SLEPc
+        """Solve the eigenvalue problem using UFL forms with SLEPc.
 
         Parameters
         ----------
@@ -326,8 +367,7 @@ class Modal_Solver():
         -------
         Lsp : `array`
             Array containing the computed eigenvalues
-        '''
-
+        """
         if self.method[-2] == "C":
             ksp_type = "cg"
         elif self.method[-2] == "G":
@@ -339,15 +379,15 @@ class Modal_Solver():
             pc_type = "gamg"
 
         opts = {
-            "eps_gen_hermitian": None,       # Problem is Hermitian
-            "eps_type": "krylovschur",       # Robust, widely used eigensolver
-            "eps_tol": 1e-6,                 # Tight tolerance for accuracy
-            "eps_max_it": 200,               # Reasonable iteration cap
-            "st_shift": 1e-6,                # Stabilizes Neumann BC null space
-            "st_type": "sinvert",            # Useful for interior eigenvalues
-            "eps_monitor": "ascii",          # Print convergence info
-            "ksp_type": ksp_type,            # Options for large problems
-            "pc_type": pc_type               # Options for large problems
+            "eps_gen_hermitian": None,  # Problem is Hermitian
+            "eps_type": "krylovschur",  # Robust, widely used eigensolver
+            "eps_tol": 1e-6,  # Tight tolerance for accuracy
+            "eps_max_it": 200,  # Reasonable iteration cap
+            "st_shift": 1e-6,  # Stabilizes Neumann BC null space
+            "st_type": "sinvert",  # Useful for interior eigenvalues
+            "eps_monitor": "ascii",  # Print convergence info
+            "ksp_type": ksp_type,  # Options for large problems
+            "pc_type": pc_type,  # Options for large problems
         }
 
         if self.calc_max_dt:
@@ -359,18 +399,20 @@ class Modal_Solver():
             opts.update({"eps_smallest_magnitude": None})
 
         eigenproblem = fire.LinearEigenproblem(a, M=m)
-        eigensolver = fire.LinearEigensolver(eigenproblem, n_evals=k,
-                                             solver_parameters=opts)
+        eigensolver = fire.LinearEigensolver(
+            eigenproblem, n_evals=k, solver_parameters=opts
+        )
         eigensolver.solve()
         Lsp = np.asarray([eigensolver.eigenvalue(mod) for mod in range(k)])
 
         return Lsp
 
-    def c_equivalent(self, c, V, quad_rule=None, typ_homog='energy',
-                     static_load_for_ceq=None):
-        '''
-        Compute an equivalent homogeneous velocity for an inhomogeneneous
-        velocity model using an energy-equivalent homogenization
+    def c_equivalent(
+        self, c, V, quad_rule=None, typ_homog="energy", static_load_for_ceq=None
+    ):
+        """Compute equivalent homogeneous velocity for an inhomogeneous model.
+
+        Uses an energy-equivalent homogenization by default.
 
         Parameters
         ----------
@@ -392,35 +434,38 @@ class Modal_Solver():
         -------
         c_eq : `float`
             Equivalent homogeneous velocity
-        '''
-
+        """
         # Integration measure
         dx = fire.dx(**quad_rule) if quad_rule else fire.dx
 
         # State variable
         u = fire.Function(V)
 
-        if typ_homog == 'energy':
+        if typ_homog == "energy":
             # Equivalent velocity by energy-equivalent homogenization
 
             # Weak forms
-            a, L = self.weak_forms(c, V, quad_rule=quad_rule, source=True,
-                                   user_load=static_load_for_ceq)
+            a, L = self.weak_forms(
+                c,
+                V,
+                quad_rule=quad_rule,
+                source=True,
+                user_load=static_load_for_ceq,
+            )
 
             # Compute the energy
             fire.solve(a == L, u)
-            bilinear_term = fire.Constant(0.5) * fire.inner(fire.grad(u),
-                                                            fire.grad(u))
+            bilinear_term = fire.Constant(0.5) * fire.inner(fire.grad(u), fire.grad(u))
             energy = fire.assemble(c * c * bilinear_term * dx)
 
             # Compute the equivalent velocity
             c_eq = np.sqrt(energy / fire.assemble(bilinear_term * dx))
 
-        elif typ_homog == 'volume':
+        elif typ_homog == "volume":
             # Equivalent velocity by volume-average homogenization
 
             # Compute the volume
-            u.assign(1.)
+            u.assign(1.0)
             volume = fire.assemble(u * dx)
 
             # Compute the equivalent velocity
@@ -429,9 +474,9 @@ class Modal_Solver():
         return c_eq
 
     @staticmethod
-    def freq_factor_rec(hyper_axes, bc='Neumann'):
-        '''
-        Compute the frequency factor for rectangular or prismatic geometries
+    def freq_factor_rec(hyper_axes, bc="Neumann"):
+        """Compute the frequency factor for rectangular or prismatic geometries.
+
         - Rectangular layer:
             https://www.sc.ehu.es/sbweb/fisica3/ondas/membrana_1/membrana_1.html
 
@@ -447,22 +492,21 @@ class Modal_Solver():
         -------
         f_rec : `float`
             Fundamental frequency factor for rectangular or prismatic geometry
-        '''
-
-        if bc == 'Neumann':
-            f_rec = 1. / max(hyper_axes)
-        elif bc == 'Dirichlet':
-            f_rec = sum(1. / np.asarray(hyper_axes)**2)**0.5
+        """
+        if bc == "Neumann":
+            f_rec = 1.0 / max(hyper_axes)
+        elif bc == "Dirichlet":
+            f_rec = sum(1.0 / np.asarray(hyper_axes) ** 2) ** 0.5
         else:
-            value_parameter_error('bc', bc, ['Dirichlet', 'Neumann'])
+            value_parameter_error("bc", bc, ["Dirichlet", "Neumann"])
 
-        f_rec *= np.pi / 2.
+        f_rec *= np.pi / 2.0
 
         return f_rec
 
-    def freq_factor_ell(self, hyper_axes, bc='Neumann', all_axes_equal=False):
-        '''
-        Compute the frequency factor for elliptical or ellipsoidal geometries
+    def freq_factor_ell(self, hyper_axes, bc="Neumann", all_axes_equal=False):
+        """Compute the frequency factor for elliptical or ellipsoidal geometries.
+
         - Elliptical layer:
             https://docs.scipy.org/doc/scipy/reference/generated/
             scipy.special.mathieu_modcem1.html#scipy.special.mathieu_modcem1
@@ -483,14 +527,12 @@ class Modal_Solver():
         -------
         f_ell : `float`
             Fundamental frequency factor for elliptical or ellipsoidal geometry
-        '''
-
-        if bc not in ['Dirichlet', 'Neumann']:
-            value_parameter_error('bc', bc, ['Dirichlet', 'Neumann'])
+        """
+        if bc not in ["Dirichlet", "Neumann"]:
+            value_parameter_error("bc", bc, ["Dirichlet", "Neumann"])
 
         def MMF(q):
-            '''
-            Compute the Modified Mathieiu's Function (MMF) or its derivative
+            """Compute the Modified Mathieiu's Function (MMF) or its derivative.
 
             Parameters
             ----------
@@ -506,23 +548,21 @@ class Modal_Solver():
                 mathieu_modcem1(m, q, psi0)[1] for its derivative
 
             Examples
-            -------
+            --------
             mathieu_modcem1(m=0, q=2.6750449521966490,
                 psi0=np.arccosh(2/(3)**0.5))[0]= 5.363046165143026e-17
             mathieu_modcem1(m=0, q=1.6748563428285737,
                 psi0=0.7061880927645094)[0] = 4.036310483679603e-16
-            '''
-
+            """
             # Eccentricity parameter: psi0 = arccosh(a/f), f = sqrt(a^2 - b^2)
             psi0 = np.arccosh(a0 / f0)
-            idx = int(bc == 'Neumann')
-            m = 1 if bc == 'Neumann' else 0  # Order of the MMF
+            idx = int(bc == "Neumann")
+            m = 1 if bc == "Neumann" else 0  # Order of the MMF
             print(bc, m, psi0, q, mathieu_modcem1(m, q, psi0)[idx], flush=True)
             return mathieu_modcem1(m, q, psi0)[idx]
 
         def ZBF(m=0, n=1):
-            '''
-            Compute zeros of the Bessel's Function (BF) or its derivative
+            """Compute zeros of the Bessel's Function (BF) or its derivative.
 
             Parameters
             ----------
@@ -535,15 +575,14 @@ class Modal_Solver():
             -------
             Jmz : `array`
                 First n zeros of the Bessel function or its derivative
-            '''
-            deriv = (bc == 'Neumann')
+            """
+            deriv = bc == "Neumann"
             Jmz = jnp_zeros(m, n) if deriv else jn_zeros(m, n)
 
             return Jmz
 
         def SBF(q, m=0):
-            '''
-            Compute the Spherical Bessel's Function (SBF) or its derivative
+            """Compute the Spherical Bessel's Function (SBF) or its derivative.
 
             Parameters
             ----------
@@ -557,9 +596,9 @@ class Modal_Solver():
                 Value of the SBF or its derivative at the value q
                 spherical_jn(m, q, derivative=False) for the SBF and
                 spherical_jn(m, q, derivative=True) for its derivative
-            '''
-            deriv = (bc == 'Neumann')
-            m = 1 if bc == 'Neumann' else 0  # Order of the SBF
+            """
+            deriv = bc == "Neumann"
+            m = 1 if bc == "Neumann" else 0  # Order of the SBF
             # print(bc, m, q, spherical_jn(m, q, derivative=deriv))
             return spherical_jn(m, q, derivative=deriv)
 
@@ -570,13 +609,13 @@ class Modal_Solver():
         f_rec = self.freq_factor_rec(hyper_axes, bc=bc)
 
         # Initial guess
-        igss = f_rec if bc == 'Neumann' else 0.
+        igss = f_rec if bc == "Neumann" else 0.0
 
         # Circular or spherical case
         if all_axes_equal:
             # 1st root for the mth-order Bessel's function
             if self.dimension == 2:  # 2D circular
-                m = 1 if bc == 'Neumann' else 0
+                m = 1 if bc == "Neumann" else 0
                 J01 = ZBF(m=m, n=1)[0]
 
             if self.dimension == 3:  # 3D spherical
@@ -591,7 +630,7 @@ class Modal_Solver():
             a, b = sorted(hyper_axes, reverse=True)
 
             # Ellipse eccentricity
-            f0 = (a**2 - b**2)**0.5
+            f0 = (a**2 - b**2) ** 0.5
 
             # 1st root or the mth-order Modified Mathieu's Function
             a0 = a
@@ -607,11 +646,13 @@ class Modal_Solver():
             a, b, c = sorted(hyper_axes, reverse=True)
 
             # Eccentricities for each pair of semi-axes
-            ecc_arr = [(a, b, (a**2 - b**2)**0.5 if a > b else 0.),
-                       (b, c, (b**2 - c**2)**0.5 if b > c else 0.),
-                       (a, c, (a**2 - c**2)**0.5 if a > c else 0.)]
+            ecc_arr = [
+                (a, b, (a**2 - b**2) ** 0.5 if a > b else 0.0),
+                (b, c, (b**2 - c**2) ** 0.5 if b > c else 0.0),
+                (a, c, (a**2 - c**2) ** 0.5 if a > c else 0.0),
+            ]
 
-            if bc == 'Neumann':
+            if bc == "Neumann":
                 # Only use the pair with maximum eccentricity
                 max_ecc_idx = np.argmax([ecc for _, _, ecc in ecc_arr])
                 ecc_arr = [ecc_arr[max_ecc_idx]]
@@ -621,7 +662,7 @@ class Modal_Solver():
                 if f0 == 0:  # Circular cross-section
                     # 1st root for the mth-order Bessel's function
                     J01 = ZBF(m=0, n=1)[0]
-                    f_ell_arr.append((J01 / a0)**2)
+                    f_ell_arr.append((J01 / a0) ** 2)
 
                 else:  # Elliptical cross-section
                     # 1st root or the mth-order Modified Mathieu's Function
@@ -629,11 +670,10 @@ class Modal_Solver():
                     f_ell_arr.append(4 * M01 / f0**2)
 
             # Sum and return square root
-            return sum(f_ell_arr)**0.5
+            return sum(f_ell_arr) ** 0.5
 
-    def reg_geometry_hyp(self, cut_plane_percent=1.):
-        '''
-        Perform the nonlinear regression for the hypershape geometry factor
+    def reg_geometry_hyp(self, cut_plane_percent=1.0):
+        """Perform the nonlinear regression for the hypershape geometry factor.
 
         Parameters
         ----------
@@ -652,82 +692,76 @@ class Modal_Solver():
         fr_rec : `float`
             Ratio between the area or volume of the
             truncated and full rectangle or prism
-        '''
-
+        """
         # Verify cutting plane measurement is between 0 and 1
-        cut_plane_percent = np.clip(cut_plane_percent, 0., 1.)
+        cut_plane_percent = np.clip(cut_plane_percent, 0.0, 1.0)
 
         def area_function(n, cut_plane_percent):
-            '''
-            Area function for hiperellipses
-            '''
-            fA = 2. * gamma(1 + 1 / n)**2 / gamma(1 + 2 / n)
-            if cut_plane_percent == 1.:
-                fA *= 2.
+            """Area function for hiperellipses."""
+            fA = 2.0 * gamma(1 + 1 / n) ** 2 / gamma(1 + 2 / n)
+            if cut_plane_percent == 1.0:
+                fA *= 2.0
             else:
                 eps = float_info.min
-                w = np.maximum(cut_plane_percent ** n, eps)  # w <= 1
+                w = np.maximum(cut_plane_percent**n, eps)  # w <= 1
                 p = 1 / n
                 q = 1 + 1 / n
                 B_w = beta(p, q) * betainc(p, q, w)  # Non-regularized Beta
-                fA += (2. / n) * B_w
+                fA += (2.0 / n) * B_w
 
             return fA
 
         def volume_function(n, cut_plane_percent):
-            '''
-            Volume function for hiperellipsoids
-            '''
-            fV = 4. * gamma(1 + 1 / n)**3 / gamma(1 + 3 / n)
-            if cut_plane_percent == 1.:
-                fV *= 2.
+            """Volume function for hiperellipsoids."""
+            fV = 4.0 * gamma(1 + 1 / n) ** 3 / gamma(1 + 3 / n)
+            if cut_plane_percent == 1.0:
+                fV *= 2.0
             else:
                 eps = float_info.min
-                w = np.maximum(cut_plane_percent ** n, eps)  # w <= 1
+                w = np.maximum(cut_plane_percent**n, eps)  # w <= 1
                 p = 1 / n
                 q = 1 + 1 / n
-                A_f = gamma(1 + p)**2 / gamma(q)
+                A_f = gamma(1 + p) ** 2 / gamma(q)
                 B_w = beta(p, q) * betainc(p, q, w)  # Non-regularized Beta
-                fV += (4. / n) * A_f * B_w
+                fV += (4.0 / n) * A_f * B_w
 
             return fV
 
         def fit_function(n, pn, qn):
-            '''
-            Define the fit function for the area or volume regression.
+            """Define the fit function for the area or volume regression.
+
             Fit function:
                 A or V = f_max - cn2 * (1 / (qn * n + 1 - 2 * qn)) ** pn
                 cn2 = f_max - fn2
-            '''
-
+            """
             # Constant for power-law fit
             cn2 = f_max - fn2
 
-            return f_max - cn2 * (1. / (qn * n + 1. - 2. * qn)) ** pn
+            return f_max - cn2 * (1.0 / (qn * n + 1.0 - 2.0 * qn)) ** pn
 
         # Regression dataset
-        n_data = np.arange(2., 100., 0.1)
+        n_data = np.arange(2.0, 100.0, 0.1)
 
         # Pre-compute constants
-        fax_trunc = cut_plane_percent + 1.
+        fax_trunc = cut_plane_percent + 1.0
         if self.dimension == 2:  # 2D
-            f_max = 2. * fax_trunc
-            fn2 = area_function(2., cut_plane_percent)
-            fr_ell = fn2 / area_function(2., 1.)
-            fr_rec = area_function(100., cut_plane_percent
-                                   ) / area_function(100., 1.)
+            f_max = 2.0 * fax_trunc
+            fn2 = area_function(2.0, cut_plane_percent)
+            fr_ell = fn2 / area_function(2.0, 1.0)
+            fr_rec = area_function(100.0, cut_plane_percent) / area_function(100.0, 1.0)
             f_data = area_function(n_data, cut_plane_percent)
 
         if self.dimension == 3:  # 3D
-            f_max = 4. * fax_trunc
-            fn2 = volume_function(2., cut_plane_percent)
-            fr_ell = fn2 / volume_function(2., 1.)
-            fr_rec = volume_function(100., cut_plane_percent
-                                     ) / area_function(100., 1.)
+            f_max = 4.0 * fax_trunc
+            fn2 = volume_function(2.0, cut_plane_percent)
+            fr_ell = fn2 / volume_function(2.0, 1.0)
+            fr_rec = volume_function(100.0, cut_plane_percent) / area_function(
+                100.0, 1.0
+            )
             f_data = volume_function(n_data, cut_plane_percent)
 
         # Initial guess
-        init_guess = np.array([1/3, 1/3])
+        init_guess = np.array([1 / 3, 1 / 3])
 
         # Parameter bounds pn >= 0, qn >= 0
         low_bnds = [0, 0]
@@ -738,8 +772,14 @@ class Modal_Solver():
 
         try:
             # Perform nonlinear curve fitting
-            popt, pcov = curve_fit(fit_function, n_data, f_data, p0=init_guess,
-                                   bounds=(low_bnds, upp_bnds), maxfev=it_max)
+            popt, pcov = curve_fit(
+                fit_function,
+                n_data,
+                f_data,
+                p0=init_guess,
+                bounds=(low_bnds, upp_bnds),
+                maxfev=it_max,
+            )
             pn_fit, qn_fit = popt
 
             # Calculate goodness of fit metrics (RMSE: Root-Mean-Square error)
@@ -755,8 +795,11 @@ class Modal_Solver():
             delta_qn = qn_fit - sn.interval(0.95, loc=qn_fit, scale=perr[1])[0]
 
             print("Nonlinear Curve Fit Successful!", flush=True)
-            print(f"Fitted Parameters: pn = {pn_fit:.6f} ± {delta_pn:.6f}, "
-                  f"qn = {qn_fit:.6f} ± {delta_qn:.6f}", flush=True)
+            print(
+                f"Fitted Parameters: pn = {pn_fit:.6f} ± {delta_pn:.6f}, "
+                f"qn = {qn_fit:.6f} ± {delta_qn:.6f}",
+                flush=True,
+            )
             print(f"R-Squared: {r_squared:.6f} - RMSE: {rmse:.6f}", flush=True)
 
             return pn_fit, qn_fit, fr_ell, fr_rec
@@ -764,18 +807,26 @@ class Modal_Solver():
         except fire.ConvergenceError as e:
             print(f"Nonlinear Curve Fit Failed: {e}", flush=True)
 
-    def freq_factor_hyp(self, n_hyp, f_rec, f_ell, c_eq, bc='Neumann',
-                        c_eqref=None, fitting_c=(0., 0., 0., 0.),
-                        cut_plane_percent=1.):
-        '''
-        Compute an approximate frequency factor for the hypershape with
-        truncation plane at z = cut_plane_percent * b, b = Lz + pad_len.
+    def freq_factor_hyp(
+        self,
+        n_hyp,
+        f_rec,
+        f_ell,
+        c_eq,
+        bc="Neumann",
+        c_eqref=None,
+        fitting_c=(0.0, 0.0, 0.0, 0.0),
+        cut_plane_percent=1.0,
+    ):
+        """Compute an approximate frequency factor for a truncated hypershape.
+
+        The truncation plane is at z = cut_plane_percent * b, with b = Lz + pad_len.
+
         The fitting parameters for the equivalent velocity regression controls:
         - fc1: Magnitude order of the frequency
         - fc2: Monotonicity of the frequency
         - fp1: Rectangular domain frequency
         - fp2: Ellipsoidal domain frequency
-
 
         Parameters
         ----------
@@ -813,33 +864,33 @@ class Modal_Solver():
             Approximate frequency factor for the hypershape
         c_reg : `float` or `None`
             Approximate equivalent velocity for the hypershape
-        '''
-
+        """
         n_hyp = 330 if n_hyp is None else n_hyp
         c_eqref = c_eq if c_eqref is None else c_eqref
 
         # Regression for hypershape geometry factor
-        pn, qn, fr_ell, fr_rec = \
-            self.reg_geometry_hyp(cut_plane_percent=cut_plane_percent)
+        pn, qn, fr_ell, fr_rec = self.reg_geometry_hyp(
+            cut_plane_percent=cut_plane_percent
+        )
 
-        if bc == 'Dirichlet':
+        if bc == "Dirichlet":
             f_min = f_rec / fr_rec
             cn2 = f_min - f_ell / fr_ell
 
-        if bc == 'Neumann':
+        if bc == "Neumann":
             f_min = f_rec
             cn2 = f_min - f_ell
 
         # Hypershape frequency factor
-        pot_term = (1. / (qn * n_hyp + 1 - 2 * qn)) ** pn
+        pot_term = (1.0 / (qn * n_hyp + 1 - 2 * qn)) ** pn
         f_hyp = f_min - cn2 * pot_term
 
         # Adjusting equivalent velocity for the hypershape
         fc1, fc2, fp1, fp2 = fitting_c
         f1 = fr_ell / fr_rec
         f2 = f_ell / f_rec
-        f3 = 1. / f2
-        c_ref = max(c_eq * f3 ** fc1, c_eqref * f3 ** fc2)
+        f3 = 1.0 / f2
+        c_ref = max(c_eq * f3**fc1, c_eqref * f3**fc2)
         c_min = c_ref * min(f1, f2) ** (fp1 * pn)
         cc2 = c_min - c_ref * max(f1, f2) ** (fp2 * pn)
 
@@ -848,11 +899,18 @@ class Modal_Solver():
 
         return f_hyp, c_reg
 
-    def solver_analytical(self, c_eq, hyp_par, bc='Neumann', c_eqref=None,
-                          fitting_c=(0., 0., 0., 0.), cut_plane_percent=1.):
-        '''
-        Compute the analytical solution for the eigenvalue problem with
-        Neumann or Dirichlet boundary conditions for isotropic hypershapes
+    def solver_analytical(
+        self,
+        c_eq,
+        hyp_par,
+        bc="Neumann",
+        c_eqref=None,
+        fitting_c=(0.0, 0.0, 0.0, 0.0),
+        cut_plane_percent=1.0,
+    ):
+        """Compute the analytical eigenvalue solution for isotropic hypershapes.
+
+        Supports Neumann or Dirichlet boundary conditions.
 
         Parameters
         ----------
@@ -894,44 +952,53 @@ class Modal_Solver():
         -------
         Lsp : `float`
             First eigenvalue of the hypershape with Neumann or Dirichlet BCs
-        '''
-
+        """
         # Check if the velocity model is a float
         if not isinstance(c_eq, float):
-            raise TypeError("For 'ANALYTICAL' method, the isotropic "
-                            "velocity 'c_eq' must be a float number.")
+            raise TypeError(
+                "For 'ANALYTICAL' method, the isotropic "
+                "velocity 'c_eq' must be a float number."
+            )
 
         # Hyperellipse parameters
         n_hyp, hyp_axes = hyp_par[0], hyp_par[1:]
         a, b = hyp_axes[:2]
         if self.dimension == 2:  # 2D
-            all_axes_equal = (a == b)
+            all_axes_equal = a == b
 
         if self.dimension == 3:  # 3D
             c = hyp_axes[2]
-            all_axes_equal = (a == b == c)
+            all_axes_equal = a == b == c
 
         # Frequency factors
         f_rec = self.freq_factor_rec(hyp_axes, bc=bc)
-        f_ell = self.freq_factor_ell(
-            hyp_axes, bc=bc, all_axes_equal=all_axes_equal)
+        f_ell = self.freq_factor_ell(hyp_axes, bc=bc, all_axes_equal=all_axes_equal)
         f_hyp, c_reg = self.freq_factor_hyp(
-            n_hyp, f_rec, f_ell, c_eq, bc=bc, c_eqref=c_eqref,
-            fitting_c=fitting_c, cut_plane_percent=cut_plane_percent)
+            n_hyp,
+            f_rec,
+            f_ell,
+            c_eq,
+            bc=bc,
+            c_eqref=c_eqref,
+            fitting_c=fitting_c,
+            cut_plane_percent=cut_plane_percent,
+        )
 
-        print(f"Hypershape Equivalent Velocity c_eq (km/s) = {c_reg:.3f}",
-              flush=True)
-        print(f"Hypershape Frequency factor f_hyp (1/km): {f_hyp:.3f}",
-              flush=True)
+        print(
+            f"Hypershape Equivalent Velocity c_eq (km/s) = {c_reg:.3f}",
+            flush=True,
+        )
+        print(f"Hypershape Frequency factor f_hyp (1/km): {f_hyp:.3f}", flush=True)
 
         # Eigenvalue
-        Lsp = (c_reg * f_hyp)**2
+        Lsp = (c_reg * f_hyp) ** 2
 
         return Lsp
 
     def generate_norm_coords(self, mesh, domain_dim, hyp_axes):
-        '''
-        Generate the normalized mesh coordinates w.r.t. the hypershape centroid
+        """Generate the normalized mesh coordinates w.r.t.
+
+        the hypershape centroid.
 
         Parameters
         ----------
@@ -947,8 +1014,7 @@ class Modal_Solver():
         coord_norm : `tuple`
             Normalized coordinates w.r.t. the hypershape centroid.
             Structure: (xn, zn) for 2D and (xn, zn, yn) for 3D
-        '''
-
+        """
         # Original domain dimensions
         Lx, Lz = domain_dim[:2]
 
@@ -960,19 +1026,18 @@ class Modal_Solver():
         x, z = coord[0], coord[1]
 
         # Normalized coordinates w.r.t. the hypershape centroid
-        x_e = (x - fire.Constant(Lx / 2.)) / fire.Constant(2. * a)
-        z_e = (z + fire.Constant(Lz / 2.)) / fire.Constant(2. * b)
+        x_e = (x - fire.Constant(Lx / 2.0)) / fire.Constant(2.0 * a)
+        z_e = (z + fire.Constant(Lz / 2.0)) / fire.Constant(2.0 * b)
         coord_norm = (x_e, z_e)
         if self.dimension == 3:  # 3D
             Ly, c, y = domain_dim[2], hyp_axes[2], coord[2]
-            y_e = (y - fire.Constant(Ly / 2.)) / fire.Constant(2. * c)
+            y_e = (y - fire.Constant(Ly / 2.0)) / fire.Constant(2.0 * c)
             coord_norm += (y_e,)
 
         return coord_norm
 
-    def generate_eigenfunctions(self, coord_norm, V, k=2, bc='Neumann'):
-        '''
-        Generate eigenfunctions for the Rayleigh Quotient method
+    def generate_eigenfunctions(self, coord_norm, V, k=2, bc="Neumann"):
+        """Generate eigenfunctions for the Rayleigh Quotient method.
 
         Parameters
         ----------
@@ -993,8 +1058,7 @@ class Modal_Solver():
             Eigenfunctions computed as Firedrake functions
         grad_eig : `list`
             Eigenfunction gradients computed as Firedrake functions
-        '''
-
+        """
         # Number of eigenfunctions to use
         n_eigfunc = max(2 * k, 2)
 
@@ -1002,19 +1066,19 @@ class Modal_Solver():
         xn, zn = coord_norm[:2]
 
         # Precompute cosine values for efficiency
-        if bc == 'Neumann':
+        if bc == "Neumann":
             fi_lst = [fire.cos(i * fire.pi * xn) for i in range(n_eigfunc)]
             fj_lst = [fire.cos(j * fire.pi * zn) for j in range(n_eigfunc)]
 
-        if bc == 'Dirichlet':
+        if bc == "Dirichlet":
             fi_lst = [fire.sin(i * fire.pi * xn) for i in range(n_eigfunc)]
             fj_lst = [fire.sin(j * fire.pi * zn) for j in range(n_eigfunc)]
 
         if self.dimension == 3:  # 3D
             yn = coord_norm[2]
-            if bc == 'Neumann':
+            if bc == "Neumann":
                 fk_lst = [fire.cos(k * fire.pi * yn) for k in range(n_eigfunc)]
-            if bc == 'Dirichlet':
+            if bc == "Dirichlet":
                 fk_lst = [fire.sin(k * fire.pi * yn) for k in range(n_eigfunc)]
 
         # Create eigenfunctions
@@ -1041,8 +1105,7 @@ class Modal_Solver():
         return eig_funcs, grad_eig
 
     def solver_rayleigh_quotient(self, c, coord_norm, V, k=2, quad_rule=None):
-        '''
-        Solve the eigenvalue problem using the Rayleigh Quotient method
+        """Solve the eigenvalue problem using the Rayleigh Quotient method.
 
         Parameters
         ----------
@@ -1063,8 +1126,7 @@ class Modal_Solver():
         -------
         Lsp : `array`
             Array containing the computed eigenvalues
-        '''
-
+        """
         # Create eigenfunctions
         eig_funcs, grad_eig = self.generate_eigenfunctions(coord_norm, V, k=k)
 
@@ -1078,10 +1140,10 @@ class Modal_Solver():
         for i in range(n_funcs):
             for j in range(i, n_funcs):  # Only upper triangle
                 # Stiffness and mass matrix term
-                A_term = fire.assemble(c * c * fire.inner(grad_eig[i],
-                                                          grad_eig[j]) * dx)
-                M_term = fire.assemble(fire.inner(eig_funcs[i],
-                                                  eig_funcs[j]) * dx)
+                A_term = fire.assemble(
+                    c * c * fire.inner(grad_eig[i], grad_eig[j]) * dx
+                )
+                M_term = fire.assemble(fire.inner(eig_funcs[i], eig_funcs[j]) * dx)
 
                 # Set symmetric entries
                 Asp[i, j] = A_term
@@ -1094,18 +1156,26 @@ class Modal_Solver():
         Msp = Msp.tocsr()
 
         # Solve the generalized eigenvalue problem
-        Lsp = self.solver_with_sparse_matrix(Asp, Msp, 'ARNOLDI', k=k)
+        Lsp = self.solver_with_sparse_matrix(Asp, Msp, "ARNOLDI", k=k)
 
         return Lsp
 
-    def solve_eigenproblem(self, c, V=None, k=2, shift=0.,
-                           quad_rule=None, inv_oper=False,
-                           coord_norm=None, hyp_par=None,
-                           cut_plane_percent=1., c_eqref=None,
-                           fitting_c=(0., 0., 0., 0.),
-                           static_load_for_ceq=None):
-        '''
-        Solve the eigenvalue problem with Neumann boundary conditions
+    def solve_eigenproblem(
+        self,
+        c,
+        V=None,
+        k=2,
+        shift=0.0,
+        quad_rule=None,
+        inv_oper=False,
+        coord_norm=None,
+        hyp_par=None,
+        cut_plane_percent=1.0,
+        c_eqref=None,
+        fitting_c=(0.0, 0.0, 0.0, 0.0),
+        static_load_for_ceq=None,
+    ):
+        """Solve the eigenvalue problem with Neumann boundary conditions.
 
         Parameters
         ----------
@@ -1115,7 +1185,7 @@ class Modal_Solver():
             Function space for the modal problem. Default is None
         k : `int`, optional
             Number of eigenvalues to compute. Default is 2
-        shift: `float`, optional
+        shift : `float`, optional
             Value to stabilize the Neumann BC null space. Default is 0
         quad_rule : `str`, optional
             Quadrature rule to use for the integration.
@@ -1164,21 +1234,29 @@ class Modal_Solver():
         Lsp : `array` or `float`
             Array containing the computed eigenvalues or the first
             eigenvalue of the hypershape with Neumann or Dirichlet BCs
-        '''
-
-        if self.method == 'ANALYTICAL':
+        """
+        if self.method == "ANALYTICAL":
 
             # Compute equivalent velocity for the hypershape
-            c_eq = self.c_equivalent(c, V, quad_rule=quad_rule,
-                                     static_load_for_ceq=static_load_for_ceq)
+            c_eq = self.c_equivalent(
+                c,
+                V,
+                quad_rule=quad_rule,
+                static_load_for_ceq=static_load_for_ceq,
+            )
 
-            Lsp = self.solver_analytical(c_eq, hyp_par,
-                                         c_eqref=c_eqref, fitting_c=fitting_c,
-                                         cut_plane_percent=cut_plane_percent)
+            Lsp = self.solver_analytical(
+                c_eq,
+                hyp_par,
+                c_eqref=c_eqref,
+                fitting_c=fitting_c,
+                cut_plane_percent=cut_plane_percent,
+            )
 
-        elif self.method == 'RAYLEIGH':
-            Lsp = self.solver_rayleigh_quotient(c, coord_norm, V, k=k,
-                                                quad_rule=quad_rule)
+        elif self.method == "RAYLEIGH":
+            Lsp = self.solver_rayleigh_quotient(
+                c, coord_norm, V, k=k, quad_rule=quad_rule
+            )
         else:
             # Get bilinear forms
             a, m = self.weak_forms(c, V, quad_rule=quad_rule)
@@ -1187,25 +1265,33 @@ class Modal_Solver():
             if shift > 0:
                 a += fire.Constant(shift) * m
 
-        if self.method[:-3] == 'KRYLOVSCH':
+        if self.method[:-3] == "KRYLOVSCH":
             Lsp = self.solver_with_ufl(a, m, k=k)
 
-        elif not (self.method == 'ANALYTICAL' or self.method == 'RAYLEIGH'):
+        elif not (self.method == "ANALYTICAL" or self.method == "RAYLEIGH"):
             Asp, Msp = self.assemble_sparse_matrices(a, m)
-            Lsp = self.solver_with_sparse_matrix(Asp, Msp, self.method,
-                                                 k=k, inv_oper=inv_oper)
+            Lsp = self.solver_with_sparse_matrix(
+                Asp, Msp, self.method, k=k, inv_oper=inv_oper
+            )
 
-        Lsp -= shift if shift > 0. else 0.
+        Lsp -= shift if shift > 0.0 else 0.0
 
         return Lsp
 
-    def estimate_timestep(self, c, V, final_time, shift=0., quad_rule=None,
-                          inv_oper=False, fraction=0.7):
-        '''
-        Estimate the maximum stable timestep based on the spectral radius
-        using optionally the Gershgorin Circle Theorem to estimate
-        the maximum generalized eigenvalue ('ANALYTICAL' method).
-        Otherwise computes the maximum generalized eigenvalue exactly
+    def estimate_timestep(
+        self,
+        c,
+        V,
+        final_time,
+        shift=0.0,
+        quad_rule=None,
+        inv_oper=False,
+        fraction=0.7,
+    ):
+        """Estimate the maximum stable timestep from the spectral radius.
+
+        Optionally uses Gershgorin Circle Theorem in the analytical method,
+        otherwise computes the maximum generalized eigenvalue exactly.
 
         Parameters
         ----------
@@ -1215,7 +1301,7 @@ class Modal_Solver():
             Function space for the modal problem
         final_time : `float`
             Final time for the transient simulation
-        shift: `float`, optional
+        shift : `float`, optional
             Value to stabilize the Neumann BC null space. Default is 0
         quad_rule : `str`, optional
             Quadrature rule to use for the integration.
@@ -1230,10 +1316,9 @@ class Modal_Solver():
         -------
         max_dt : `float`
             Estimated maximum stable timestep
-        '''
-
+        """
         # Maximum eigenvalue
-        if self.method == 'ANALYTICAL':
+        if self.method == "ANALYTICAL":
             print("Estimating Maximum Eigenvalue", flush=True)
 
             a, m = self.weak_forms(c, V, quad_rule=quad_rule)
@@ -1241,22 +1326,25 @@ class Modal_Solver():
             if shift > 0:
                 a += fire.Constant(shift) * m
 
-            Asp, Msp_inv = \
-                self.assemble_sparse_matrices(a, m, return_M_inv=True)
+            Asp, Msp_inv = self.assemble_sparse_matrices(a, m, return_M_inv=True)
             Lsp = Msp_inv.multiply(Asp)
             max_eigval = np.amax(np.abs(Lsp.diagonal())) - shift
 
         else:
             print("Computing Exact Maximum Eigenvalue", flush=True)
             Lsp = self.solve_eigenproblem(
-                c, V=V, shift=shift, quad_rule=quad_rule, inv_oper=inv_oper)
+                c, V=V, shift=shift, quad_rule=quad_rule, inv_oper=inv_oper
+            )
             # (eig = 0 is a rigid body motion)
-            max_eigval = max(np.unique(Lsp[(Lsp > 0.) & (np.imag(Lsp) == 0.)]))
+            max_eigval = max(np.unique(Lsp[(Lsp > 0.0) & (np.imag(Lsp) == 0.0)]))
 
         # Maximum stable timestep
-        max_dt = float(np.real(2. / np.sqrt(max_eigval)))
-        print("Maximum Stable Timestep Should Be Approximately "
-              f"(ms): {1e3 * max_dt:.3f}", flush=True)
+        max_dt = float(np.real(2.0 / np.sqrt(max_eigval)))
+        print(
+            "Maximum Stable Timestep Should Be Approximately "
+            f"(ms): {1e3 * max_dt:.3f}",
+            flush=True,
+        )
 
         max_dt *= fraction
         nt = int(final_time / max_dt) + 1
