@@ -10,8 +10,8 @@ import numpy as np
 class Receivers(Delta_projector):
     """Eveluate data at points based on Dirac Delta projection.
 
-    Can interpolate receiver values that do not coincide with
-    mesh or DOF points.
+    Can interpolate receiver values at any point in the domain.
+    These points do not need to coincide with points of the mesh or DOFs.
 
     ...
 
