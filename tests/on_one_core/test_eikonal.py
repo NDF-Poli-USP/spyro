@@ -372,15 +372,11 @@ def test_loop_eikonal_2d():
             min_eik = round(eikonal_analysis(dict_2d, edge_length, f_est), 3)
 
             thr_val = 83.333  # in ms
-            assert isclose(min_eik / thr_val, 1.0, atol=5e-3), (
-                f"❌ Minimum Eikonal 2D Element-{ele_type} "
-                + f"→ Expected value {thr_val}, got {min_eik:.3f}"
-            )
-            print(
-                f"✅ Minimum Eikonal 2D Verified: expected "
-                f"{thr_val}, got = {min_eik:.3f}",
-                flush=True,
-            )
+            assert isclose(min_eik / thr_val, 1., atol=5e-3), \
+                f"✗ Minimum Eikonal 2D Element-{ele_type} " + \
+                f"→ Expected value {thr_val}, got {min_eik:.3f}"
+            print(f"✓ Minimum Eikonal 2D Verified: expected "
+                  f"{thr_val}, got = {min_eik:.3f}", flush=True)
 
         except fire.ConvergenceError as e:
             pytest.fail(f"Checking Eikonal 2D raised an exception: {str(e)}")
@@ -441,15 +437,11 @@ def test_loop_eikonal_3d():
 
             thr_val = 83.333  # in ms
 
-            assert isclose(min_eik / thr_val, 1.0, atol=3e-2), (
-                f"❌ Minimum Eikonal 3D Element-{ele_type} "
-                + f"→ Expected value {thr_val}, got {min_eik:.3f}"
-            )
-            print(
-                f"✅ Minimum Eikonal 3D Verified: expected "
-                f"{thr_val}, got = {min_eik:.3f}",
-                flush=True,
-            )
+            assert isclose(min_eik / thr_val, 1., atol=3e-2), \
+                f"✗ Minimum Eikonal 3D Element-{ele_type} " + \
+                f"→ Expected value {thr_val}, got {min_eik:.3f}"
+            print(f"✓ Minimum Eikonal 3D Verified: expected "
+                  f"{thr_val}, got = {min_eik:.3f}", flush=True)
 
         except fire.ConvergenceError as e:
             pytest.fail(f"Checking Eikonal 3D raised an exception: {str(e)}")

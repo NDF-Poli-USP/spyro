@@ -52,16 +52,13 @@ def test_run_eval_ufl_functions_2d():
         data = f.dat.data
 
         # Checking interpolated data (assertion for non-inf and non-nan)
-        assert np.all(np.isfinite(data)), (
-            f"❌ Invalid data in {description}" + f"   Expression: {expr}"
-        )
-        success_msg = (
-            f"✅ {description}\n"
-            f"   Expression: {expr}\n"
-            f"   Type: {type(ufl_expr).__name__}\n"
-            f"   Range: [{data.min():.4f}, {data.max():.4f}]\n"
-            f"   Mean: {data.mean():.4f}"
-        )
+        assert np.all(np.isfinite(data)), f"✗ Invalid data in {description}" \
+            + f"   Expression: {expr}"
+        success_msg = (f"✓ {description}\n"
+                       f"   Expression: {expr}\n"
+                       f"   Type: {type(ufl_expr).__name__}\n"
+                       f"   Range: [{data.min():.4f}, {data.max():.4f}]\n"
+                       f"   Mean: {data.mean():.4f}")
         print(success_msg)
         success_2d += 1
         print("-" * 80)
@@ -120,15 +117,12 @@ def test_run_eval_ufl_functions_3d():
         data = f.dat.data
 
         # Checking interpolated data (assertion for non-inf and non-nan)
-        assert np.all(np.isfinite(data)), (
-            f"❌ Invalid data in {description}" + f"   Expression: {expr}"
-        )
-        success_msg = (
-            f"✅ {description}\n"
-            f"   Expression: {expr}\n"
-            f"   Type: {type(ufl_expr).__name__}\n"
-            f"   Range: [{data.min():.4f}, {data.max():.4f}]"
-        )
+        assert np.all(np.isfinite(data)), f"✗ Invalid data in {description}" \
+            + f"   Expression: {expr}"
+        success_msg = (f"✓ {description}\n"
+                       f"   Expression: {expr}\n"
+                       f"   Type: {type(ufl_expr).__name__}\n"
+                       f"   Range: [{data.min():.4f}, {data.max():.4f}]")
         print(success_msg)
         success_3d += 1
         print("-" * 80)
@@ -222,19 +216,15 @@ def test_run_eval_danger_ops():
 
         try:
             ufl_expr = generate_ufl_functions(mesh, expr, dim)
-            fail_msg = (
-                f"❌ FAILED TO BLOCK: {description}\n"
-                f"   Expression: {expr}\n"
-                f"   Created: {type(ufl_expr)}\n"
-            )
+            fail_msg = (f"✗ FAILED TO BLOCK: {description}\n"
+                        f"   Expression: {expr}\n"
+                        f"   Created: {type(ufl_expr)}\n")
 
         except ValueError as e:
-            block_msg = (
-                f"✅ BLOCKED: {description}\n"
-                f"   Expression: {expr}\n"
-                f"   Type: {type(ufl_expr).__name__}\n"
-                f"   Error type: {type(e).__name__}"
-            )
+            block_msg = (f"✓ BLOCKED: {description}\n"
+                         f"   Expression: {expr}\n"
+                         f"   Type: {type(ufl_expr).__name__}\n"
+                         f"   Error type: {type(e).__name__}")
             block_ufl = True
             blocked_dangerous += 1
 

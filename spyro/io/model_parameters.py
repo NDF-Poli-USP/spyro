@@ -215,8 +215,15 @@ class Model_parameters(Read_options, Read_boundary_layer, Read_time_axis, Read_o
         )
         self.delay_type = self.input_dictionary["acquisition"]["delay_type"]
 
-        self.input_dictionary["acquisition"].setdefault("source_locations", None)
-        self.source_locations = self.input_dictionary["acquisition"]["source_locations"]
+        self.input_dictionary["acquisition"].setdefault("source_locations",
+                                                        None)
+
+        # We need this here to initialize the source locations before
+        # the mesh parameters object is created, since the source
+        # locations need to be checked to be within the mesh domain
+        self.input_dictionary["mesh"].setdefault("negative_z", True)
+        self.source_locations = self.input_dictionary[
+            "acquisition"]["source_locations"]
 
         # Setting up MPI communicator and checking parallelism:
         self.input_dictionary.setdefault("parallelism", {})
@@ -232,7 +239,6 @@ class Model_parameters(Read_options, Read_boundary_layer, Read_time_axis, Read_o
         else:
             quadrilateral = False
         self.input_dictionary["mesh"].setdefault("user_mesh", None)
-        self.input_dictionary["mesh"].setdefault("negative_z", True)
         self.user_mesh = self.input_dictionary["mesh"]["user_mesh"]
         self.mesh_parameters = meshing.MeshingParameters(
             input_mesh_dictionary=self.input_dictionary["mesh"],
@@ -277,6 +283,7 @@ class Model_parameters(Read_options, Read_boundary_layer, Read_time_axis, Read_o
         # Sources has to be estabilshied before mesh parameters object
         length_z = self.input_dictionary["mesh"]["length_z"]
         length_x = self.input_dictionary["mesh"]["length_x"]
+        negative_z = self.input_dictionary["mesh"]["negative_z"]
         if self.dimension == 2:
             mesh_lengths = [length_z, length_x]
         elif self.dimension == 3:
@@ -285,7 +292,7 @@ class Model_parameters(Read_options, Read_boundary_layer, Read_time_axis, Read_o
         if value is not None:
             for source in value:
                 source_points = list(source)
-                _check_point_in_domain(source_points, mesh_lengths, True)
+                _check_point_in_domain(source_points, mesh_lengths, negative_z)
             self.number_of_sources = len(value)
         else:
             self.number_of_sources = 1
@@ -503,6 +510,29 @@ class Model_parameters(Read_options, Read_boundary_layer, Read_time_axis, Read_o
             return self.user_mesh
         else:
             return None
+
+    def domain_dimensions(self):
+        """
+        Return the dimensions of the domain as a tuple.
+
+        Parameters
+        ----------
+        None
+
+        Returns
+        -------
+        domain_dim : `tuple`
+            Domain dimensions: (length_z, length_x) for 2D
+            or (length_z, length_x, length_y) for 3D
+        """
+
+        # Domain dimensions
+        domain_dim = (self.mesh_parameters.length_z,
+                      self.mesh_parameters.length_x)
+        if self.dimension == 3:  # 3D
+            domain_dim += (self.mesh_parameters.length_y,)
+
+        return domain_dim
 
 
 def _validate_enum(value, accepted_values, name):
