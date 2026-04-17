@@ -174,7 +174,7 @@ class AcousticWave(Wave):
         return self.receivers.interpolate(data_with_halos)
 
     @override
-    def get_function(self, state=None):
+    def get_function(self, state: fire.Function = None) -> fire.Function:
         """Return the wave equation solution.
 
         If `state` is provided, return the wave field corresponding to that
@@ -204,7 +204,7 @@ class AcousticWave(Wave):
             else:
                 return state
 
-    def get_scalar_function_space(self):
+    def get_scalar_function_space(self) -> fire.FunctionSpace:
         """Return the scalar space where the pressure equation is solved."""
         if self.scalar_function_space is not None:
             return self.scalar_function_space

@@ -1,24 +1,25 @@
 import firedrake as fire
 from . import helpers
+from .wave import Wave
 from ..io.basicio import parallel_print
 
 
-def backward_wave_propagator(Wave_obj, dt=None):
+def backward_wave_propagator(Wave_obj: Wave, dt: float = None) -> fire.Function:
     """Propagates the adjoint wave backwards in time.
 
     Currently uses central differences.
 
     Parameters:
     -----------
-    Wave_obj : Spyro wave object
+    Wave_obj : Wave
         Wave object that already propagated a forward wave.
-    dt : 'float' (optional)
+    dt : float (optional)
         Time step to be used explicitly. If not mentioned uses the default,
         that was estabilished in the wave object for the adjoint model.
 
     Returns:
     --------
-    dJ: Firedrake 'Function'
+    dJ : Firedrake 'Function'
         Calculated gradient
 
     Notes:
@@ -106,7 +107,7 @@ def backward_wave_propagator(Wave_obj, dt=None):
     return dJ
 
 
-def _pml_interior_indicator(Wave_obj):
+def _pml_interior_indicator(Wave_obj: Wave) -> fire.UFL.conditional:
     """UFL indicator: 1 inside the physical domain, 0 in the PML layer."""
     # TODO: This is a bit hacky, will be not needed when submeshes are enabled in Spyro.
     z = Wave_obj.mesh_z
@@ -126,8 +127,19 @@ def _pml_interior_indicator(Wave_obj):
     return fire.conditional(inside, 1.0, 0.0)
 
 
-def _build_gradient_solver(Wave_obj, mask_available):
+def _build_gradient_solver(Wave_obj: Wave, mask_available: bool) -> tuple[
+        fire.LinearVariationalSolver, fire.Function, fire.Function, fire.Function
+]:
     """Assemble the gradient variational problem.
+
+    Parameters:
+    -----------
+    Wave_obj : Wave
+        The wave object containing the forward and adjoint solutions, as well as the
+        velocity model and other parameters needed to build the gradient problem.
+    mask_available : bool
+        Flag indicating whether a gradient mask is available. If True, the gradient
+        will be computed only in the inner region of the domain.
 
     Returns:
     --------
@@ -185,7 +197,7 @@ def _build_gradient_solver(Wave_obj, mask_available):
     return grad_solver, forward_field, uadj, gradi
 
 
-def _compute_dufordt2(forward_solution, dt):
+def _compute_dufordt2(forward_solution: list, dt: float) -> fire.Function:
     """Second time-derivative via 3-point central finite differences."""
     if len(forward_solution) > 2:
         return (
@@ -197,22 +209,36 @@ def _compute_dufordt2(forward_solution, dt):
         return forward_solution.pop() / fire.Constant(dt**2)
 
 
-def _trapezoidal_gradient_integration(dJ, gradi, step, nt):
-    """Trapezoidal-rule gradient accumulation."""
+def _trapezoidal_gradient_integration(
+        dJ: fire.Function, gradi: fire.Function, step: int, nt: int) -> None:
+    """Trapezoidal-rule gradient accumulation.
+
+    Parameters:
+    -----------
+    dJ : Firedrake 'Function'
+        The accumulated gradient.
+    gradi : Firedrake 'Function'
+        The gradient at the current time step.
+    step : int
+        The current time step.
+    nt : int
+        The total number of time steps.
+    """
+
     if step == nt - 1 or step == 0:
         dJ += gradi
     else:
         dJ += 2 * gradi
 
 
-def _create_adjoint_output(Wave_obj):
+def _create_adjoint_output(Wave_obj: Wave) -> fire.VTKFile:
     """Create VTK output file for adjoint propagation."""
     temp_filename = Wave_obj.forward_output_filename
     _, file_extension = temp_filename.split(".")
     return fire.VTKFile("adjoint." + file_extension)
 
 
-def _output_step(Wave_obj, t, output=None):
+def _output_step(Wave_obj: Wave, t: float, output: fire.VTKFile = None) -> None:
     """Handle per-step output and stability checks."""
     if Wave_obj.forward_output:
         output.write(Wave_obj.get_function(), time=t, name="Pressure")
