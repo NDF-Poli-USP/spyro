@@ -56,9 +56,9 @@ def test_run_eval_ufl_functions_2d():
         data = f.dat.data
 
         # Checking interpolated data (assertion for non-inf and non-nan)
-        assert np.all(np.isfinite(data)), f"❌ Invalid data in {description}" \
+        assert np.all(np.isfinite(data)), f"✗ Invalid data in {description}" \
             + f"   Expression: {expr}"
-        success_msg = (f"✅ {description}\n"
+        success_msg = (f"✓ {description}\n"
                        f"   Expression: {expr}\n"
                        f"   Type: {type(ufl_expr).__name__}\n"
                        f"   Range: [{data.min():.4f}, {data.max():.4f}]\n"
@@ -121,9 +121,9 @@ def test_run_eval_ufl_functions_3d():
         data = f.dat.data
 
         # Checking interpolated data (assertion for non-inf and non-nan)
-        assert np.all(np.isfinite(data)), f"❌ Invalid data in {description}" \
+        assert np.all(np.isfinite(data)), f"✗ Invalid data in {description}" \
             + f"   Expression: {expr}"
-        success_msg = (f"✅ {description}\n"
+        success_msg = (f"✓ {description}\n"
                        f"   Expression: {expr}\n"
                        f"   Type: {type(ufl_expr).__name__}\n"
                        f"   Range: [{data.min():.4f}, {data.max():.4f}]")
@@ -225,12 +225,12 @@ def test_run_eval_danger_ops():
 
         try:
             ufl_expr = generate_ufl_functions(mesh, expr, dim)
-            fail_msg = (f"❌ FAILED TO BLOCK: {description}\n"
+            fail_msg = (f"✗ FAILED TO BLOCK: {description}\n"
                         f"   Expression: {expr}\n"
                         f"   Created: {type(ufl_expr)}\n")
 
         except ValueError as e:
-            block_msg = (f"✅ BLOCKED: {description}\n"
+            block_msg = (f"✓ BLOCKED: {description}\n"
                          f"   Expression: {expr}\n"
                          f"   Type: {type(ufl_expr).__name__}\n"
                          f"   Error type: {type(e).__name__}")

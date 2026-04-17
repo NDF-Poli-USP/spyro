@@ -1,6 +1,7 @@
 from abc import abstractmethod, ABCMeta
 import warnings
 import firedrake as fire
+import spyro.meshing.meshing_operations as mshops
 
 from .time_integration_central_difference import \
     central_difference as time_integrator
@@ -27,8 +28,10 @@ class Wave(Model_parameters, metaclass=ABCMeta):
 
     Attributes:
     -----------
-    comm: MPI communicator
-
+    comm : `object`
+        An object representing the communication interface
+    boundary_idx_map: dict
+        Mapping of boundary IDs for applying absorbing boundary conditions
     initial_velocity_model: firedrake function
         Initial velocity model
     function_space: firedrake function space
@@ -41,9 +44,12 @@ class Wave(Model_parameters, metaclass=ABCMeta):
         Real shot record
     mesh: firedrake mesh
         Mesh used in the simulation (2D or 3D)
-    mesh_z: symbolic coordinate z of the mesh object
-    mesh_x: symbolic coordinate x of the mesh object
-    mesh_y: symbolic coordinate y of the mesh object
+    mesh_x: `ufl.geometry.SpatialCoordinate`
+        Symbolic coordinate x of the mesh object
+    mesh_y: `ufl.geometry.SpatialCoordinate`
+        Symbolic coordinate y of the mesh object
+    mesh_z : `ufl.geometry.SpatialCoordinate`
+        Symbolic coordinate z of the mesh object
     sources: Sources object
         Contains information about sources
     receivers: Receivers object
@@ -51,20 +57,20 @@ class Wave(Model_parameters, metaclass=ABCMeta):
 
     Methods:
     --------
-    set_mesh()
-        Sets or calculates new mesh
-    set_solver_parameters()
-        Sets new or default solver parameters
-    get_spatial_coordinates()
-        Returns spatial coordinates of mesh
-    set_initial_velocity_model()
-        Ssets initial velocity model
     get_and_set_maximum_dt()
         Calculates and/or sets maximum dt
     get_mass_matrix_diagonal()
         Returns diagonal of mass matrix
+    get_spatial_coordinates()
+        Get the coordinates of the mesh.
+    set_mesh()
+        Sets or calculates new mesh
+    set_initial_velocity_model()
+        Sets initial velocity model
     set_last_solve_as_real_shot_record()
         Sets last solve as real shot record
+    set_solver_parameters()
+        Sets new or default solver parameters
     """
 
     def __init__(self, dictionary=None, comm=None):
@@ -97,9 +103,15 @@ class Wave(Model_parameters, metaclass=ABCMeta):
         self.mesh = self.get_mesh()
         self.c = None
         self.sources = None
+
+        # Creating mesh operations manager
+        self.mesh_ops = mshops.MeshOps(
+            self.domain_dimensions(), dimension=self.dimension,
+            quadrilateral=self.mesh_parameters.quadrilateral,
+            comm=self.mesh_parameters.comm)
+
         if self.mesh is not None:
-            self._build_function_space()
-            self._map_sources_and_receivers()
+            self.building_mesh_derived_paramenters()
         elif self.mesh_parameters.mesh_type == "firedrake_mesh":
             warnings.warn(
                 "No mesh file, Firedrake mesh will be automatically generated."
@@ -108,7 +120,6 @@ class Wave(Model_parameters, metaclass=ABCMeta):
             warnings.warn("No mesh found. Please define a mesh.")
         # Expression to define sources through UFL (less efficient)
         self.source_expression = None
-        # Object for efficient application of sources
 
         self.field_logger = FieldLogger(self.comm,
                                         self.input_dictionary["visualization"])
@@ -131,13 +142,36 @@ class Wave(Model_parameters, metaclass=ABCMeta):
     def force_rebuild_function_space(self):
         if self.mesh is None:
             self.mesh = self.get_mesh()
-        self._build_function_space()
-        self._map_sources_and_receivers()
+        self.building_mesh_derived_paramenters()
 
     @abstractmethod
     def matrix_building(self):
         """Builds the matrix for the forward problem."""
         pass
+
+    def building_mesh_derived_paramenters(self):
+        """Build parameters that are derived from the mesh."""
+        coordinates = self.mesh_ops._set_spatial_coordinates(self.mesh)
+        self.mesh_z, self.mesh_x = coordinates[0], coordinates[1]
+        if self.dimension == 3:
+            self.mesh_y = coordinates[2]
+        self._build_function_space()
+        self._map_sources_and_receivers()
+
+        # TODO: Create a flag for other domains that are not of type box
+        if self.mesh_ops.func_space_type is None:
+            self.mesh_ops.func_space_type = 'scalar' \
+                if len(self.function_space.value_shape) == 0 else 'vector'
+        boundaries = [self.absorb_top, self.absorb_bottom,
+                      self.absorb_right, self.absorb_left]
+        if self.dimension == 3:
+            boundaries.extend([self.absorb_front,
+                               self.absorb_back])
+
+        # Build the boundary ID mapping
+        self.mesh_parameters.boundary_idx_map = \
+            self.mesh_ops.mapping_boundary_ids(self.mesh, self.function_space,
+                                               boundaries, box_domain=True)
 
     def set_mesh(
             self,
@@ -162,8 +196,7 @@ class Wave(Model_parameters, metaclass=ABCMeta):
         )
 
         self.mesh = self.get_mesh()
-        self._build_function_space()
-        self._map_sources_and_receivers()
+        self.building_mesh_derived_paramenters()
 
     def set_solver_parameters(self, parameters=None):
         """
@@ -183,6 +216,23 @@ class Wave(Model_parameters, metaclass=ABCMeta):
             )
 
     def get_spatial_coordinates(self):
+        """
+        Get the coordinates of the mesh.
+
+        Parameters
+        ----------
+        mesh : `FiredrakeMesh`
+            Current mesh
+
+        Returns
+        -------
+        mesh_z : `ufl.geometry.SpatialCoordinate`
+            Symbolic coordinate z of the mesh object
+        mesh_x: `ufl.geometry.SpatialCoordinate`
+            Symbolic coordinate x of the mesh object
+        mesh_y: `ufl.geometry.SpatialCoordinate`
+            Symbolic coordinate y of the mesh object
+        """
         if self.dimension == 2:
             return self.mesh_z, self.mesh_x
         elif self.dimension == 3:
@@ -294,18 +344,6 @@ class Wave(Model_parameters, metaclass=ABCMeta):
         self.quadrature_rule = quad_rule
         self.stiffness_quadrature_rule = k_rule
         self.surface_quadrature_rule = s_rule
-
-        # TO REVIEW: why are the mesh coordinates assigned here? I believe they
-        # should be copied when the mesh is assigned
-        if self.dimension == 2:
-            z, x = fire.SpatialCoordinate(self.mesh)
-            self.mesh_z = z
-            self.mesh_x = x
-        elif self.dimension == 3:
-            z, x, y = fire.SpatialCoordinate(self.mesh)
-            self.mesh_z = z
-            self.mesh_x = x
-            self.mesh_y = y
 
     def get_and_set_maximum_dt(self, fraction=0.7,
                                estimate_max_eigenvalue=False):

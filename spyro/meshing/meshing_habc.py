@@ -1,7 +1,8 @@
 import firedrake as fire
-from firedrake.__future__ import interpolate
+import spyro.meshing.meshing_operations as mshops
 import numpy as np
 from netgen.geom2d import SplineGeometry
+from firedrake.__future__ import interpolate
 from netgen.meshing import Element2D, \
     Element3D, FaceDescriptor, Mesh, MeshPoint
 from scipy.spatial import cKDTree
@@ -23,8 +24,10 @@ class HABC_Mesh():
 
     Attributes
     ----------
-    alpha : `float`
-        Ratio between the representative mesh dimensions
+    func_space_type, `str`
+        Type of function space for the state variable.
+        Options: 'scalar' or 'vector'. Default is None
+
     bnds : 'array'
         Mesh node indices on boundaries of the original domain
     bnd_nodes : `tuple`
@@ -44,8 +47,6 @@ class HABC_Mesh():
     comm : object
         An object representing the communication interface
         for parallel processing. Default is None
-    diam_mesh : `ufl.geometry.CellDiameter`
-        Mesh cell diameters
     dimension : `int`
         Model dimension (2D or 3D). Default is 2D
     dom_dim : `tuple`
@@ -58,20 +59,25 @@ class HABC_Mesh():
         Factor for the stabilizing term in Eikonal Eq. Default is 0.03
     funct_space_eik: `firedrake function space`
         Function space for the Eikonal modeling
-    lmin : `float`
-        Minimum mesh size
-    lmax : `float`
-        Maxmum mesh size
+
     mesh_original : `firedrake mesh`
         Original mesh without absorbing layer
+    mesh_parameters.alpha : `float`
+        Ratio between the representative mesh dimensions
+    mesh_parameters.diam_mesh : `ufl.geometry.CellDiameter`
+        Mesh cell diameters
+    mesh_parameters.lmin : `float`
+        Minimum mesh size
+    mesh_parameters.lmax : `float`
+        Maxmum mesh size
+    mesh_parameters.tol : `float`
+        Tolerance for searching nodes in the mesh
     p_c0 : `int`
         Finite element order for the velocity model without absorbing layer
     p_eik : `int`
         Finite element order for the Eikonal modeling
     quadrilateral : bool
         Flag to indicate whether to use quadrilateral/hexahedral elements
-    tol : `float`
-        Tolerance for searching nodes in the mesh
 
     Methods
     -------
@@ -112,8 +118,6 @@ class HABC_Mesh():
         Project a point radially onto the hyperellipsoid surface
     rectangular_mesh_habc()
         Generate a rectangular mesh with an absorbing layer
-    representative_mesh_dimensions()
-        Get the representative mesh dimensions from original mesh
     sharp_mesh_3D()
         Generate a sharp mesh by cutting the rectangular mesh
         with the hyperellipsoid surface
@@ -123,7 +127,8 @@ class HABC_Mesh():
         Generate the boundary points for a truncated hyperellipse
     '''
 
-    def __init__(self, dom_dim, dimension=2, quadrilateral=False, comm=None):
+    def __init__(self, dom_dim, dimension=2, quadrilateral=False,
+                 func_space_type=None, comm=None):
         '''
         Initialize the HABC_Mesh class
 
@@ -135,6 +140,9 @@ class HABC_Mesh():
             Model dimension (2D or 3D). Default is 2D
         quadrilateral : bool, optional
             Flag to indicate whether to use quadrilateral/hexahedral elements
+        func_space_type, `str`, optional
+            Type of function space for the state variable.
+            Options: 'scalar' or 'vector'. Default is None
         comm : `object`, optional
             An object representing the communication interface
             for parallel processing. Default is None
@@ -153,116 +161,17 @@ class HABC_Mesh():
         # Quadrilateral/hexahedral elements
         self.quadrilateral = quadrilateral
 
+        # Type of function space
+        self.func_space_type = func_space_type
+
         # Communicator MPI
         self.comm = comm
 
-    def representative_mesh_dimensions(self):
-        '''
-        Get the representative mesh dimensions from original mesh
-
-        Parameters
-        ----------
-        None
-
-        Returns
-        -------
-        None
-        '''
-
-        # Mesh cell diameters
-        self.diam_mesh = fire.CellDiameter(self.mesh)
-
-        if self.dimension == 2:  # 2D
-            fdim = 2**0.5
-
-        if self.dimension == 3:  # 3D
-            fdim = 3**0.5
-
-        # Minimum and maximum mesh size for habc parameters
-        diam = fire.assemble(fire.interpolate(self.diam_mesh,
-                                              self.function_space))
-        self.lmin = round(diam.dat.data_with_halos.min() / fdim, 6)
-        self.lmax = round(diam.dat.data_with_halos.max() / fdim, 6)
-
-        # Ratio between the representative mesh dimensions
-        self.alpha = self.lmax / self.lmin
-
-        # Tolerance for searching nodes in the mesh
-        self.tol = 10**(min(int(np.log10(self.lmin / 10)), -6))
-
-    def extract_node_positions(self, func_space):
-        '''
-        Extract node positions from the mesh
-
-        Parameters
-        ----------
-        func_space : `firedrake function space`
-            Function space to extract node positions
-
-        Returns
-        -------
-        node_positions : `tuple`
-            Tuple containing the node positions in the mesh.
-            - (z_data, x_data) for 2D
-            - (z_data, x_data, y_data) for 3D
-        '''
-
-        # Extract node positions
-        z_f = fire.assemble(fire.interpolate(self.mesh_z, func_space))
-        x_f = fire.assemble(fire.interpolate(self.mesh_x, func_space))
-        z_data = z_f.dat.data_with_halos[:]
-        x_data = x_f.dat.data_with_halos[:]
-        node_positions = (z_data, x_data)
-
-        if self.dimension == 3:  # 3D
-            y_f = fire.assemble(fire.interpolate(self.mesh_y, func_space))
-            y_data = y_f.dat.data_with_halos[:]
-            node_positions += (y_data,)
-
-        return node_positions
-
-    def extract_bnd_node_indices(self, node_positions, func_space):
-        '''
-        Extract boundary node indices on boundaries of the domain
-        excluding the free surface at the top boundary
-
-        Parameters
-        ----------
-        node_positions : `tuple`
-            Tuple containing the node positions in the mesh.
-            - (z_data, x_data) for 2D
-            - (z_data, x_data, y_data) for 3D
-        func_space : `firedrake function space`
-            Function space to extract node positions
-
-        Returns
-        -------
-        bnds : `tuple` of 'arrays'
-            Mesh node indices on boundaries of the domain.
-            - (left_boundary, right_boundary, bottom_boundary) for 2D
-            - (left_boundary, right_boundary, bottom_boundary,
-                left_bnd_y, right_bnd_y) for 3D
-        '''
-
-        # Extract node positions
-        z_data, x_data = node_positions[0:2]
-
-        # Boundary array
-        left_boundary = np.where(x_data <= self.tol)
-        right_boundary = np.where(x_data >= self.mesh_parameters.length_x
-                                  - self.tol)
-        bottom_boundary = np.where(z_data <= self.tol
-                                   - self.mesh_parameters.length_z)
-        bnds = (left_boundary, right_boundary, bottom_boundary)
-
-        if self.dimension == 3:  # 3D
-            y_data = node_positions[2]
-            left_bnd_y = np.where(y_data <= self.tol)
-            right_bnd_y = np.where(y_data >= self.mesh_parameters.length_y
-                                   - self.tol)
-            bnds += (left_bnd_y, right_bnd_y,)
-
-        return bnds
+        if not hasattr(self, "mesh_ops"):
+            self.mesh_ops = mshops.MeshOps(dom_dim, dimension=dimension,
+                                           quadrilateral=quadrilateral,
+                                           func_space_type=func_space_type,
+                                           comm=comm)
 
     def original_boundary_data(self):
         '''
@@ -278,11 +187,13 @@ class HABC_Mesh():
         '''
 
         # Extract node positions
-        node_positions = self.extract_node_positions(self.function_space)
+        node_positions = self.mesh_ops.extract_node_positions(self.mesh,
+                                                              self.function_space)
 
         # Extract boundary node indices
-        bnds = self.extract_bnd_node_indices(node_positions,
-                                             self.function_space)
+        bnds = self.mesh_ops.extract_bnd_node_indices(self.mesh,
+                                                      self.function_space,
+                                                      self.mesh_parameters)
         self.bnds = np.unique(np.concatenate([idxs for idx_list in bnds
                                               for idxs in idx_list]))
 
@@ -356,7 +267,14 @@ class HABC_Mesh():
               f"and {self.mesh.num_cells()} Volume Elements", flush=True)
 
         # Get mesh parameters from original mesh
-        self.representative_mesh_dimensions()
+        mesh_derived_parameters = \
+            self.mesh_ops.representative_mesh_dimensions(self.mesh,
+                                                         self.function_space)
+        self.mesh_parameters.diam_mesh = mesh_derived_parameters[0]
+        self.mesh_parameters.lmin = mesh_derived_parameters[1]
+        self.mesh_parameters.lmax = mesh_derived_parameters[2]
+        self.mesh_parameters.alpha = mesh_derived_parameters[3]
+        self.mesh_parameters.tol = mesh_derived_parameters[4]
 
         # Save a copy of the original mesh
         self.mesh_original = self.mesh
@@ -415,9 +333,9 @@ class HABC_Mesh():
         Lx, Lz = self.dom_dim[:2]
 
         # Number of elements
-        n_pad = round(pad_len / self.lmin)  # Elements in the layer
-        nz = int(round(Lz / self.lmin)) + int(n_pad)
-        nx = int(round(Lx / self.lmin)) + int(2 * n_pad)
+        n_pad = round(pad_len / self.mesh_parameters.lmin)  # Elements in the layer
+        nz = int(round(Lz / self.mesh_parameters.lmin)) + int(n_pad)
+        nx = int(round(Lx / self.mesh_parameters.lmin)) + int(2 * n_pad)
 
         # New geometry with layer
         Lx_habc, Lz_habc = dom_lay[:2]
@@ -435,7 +353,7 @@ class HABC_Mesh():
 
             # Number of elements
             Ly = self.dom_dim[2]
-            ny = int(round(Ly / self.lmin)) + int(2 * n_pad)
+            ny = int(round(Ly / self.mesh_parameters.lmin)) + int(2 * n_pad)
 
             # New geometry with layer
             Ly_habc = dom_lay[2]
@@ -569,7 +487,7 @@ class HABC_Mesh():
         n_hyp, perimeter, a_hyp, b_hyp = hyp_par
 
         # Boundary points: Use 16 or 24 as a minimum
-        lmin = self.lmin
+        lmin = self.mesh_parameters.lmin
         num_bnd_pts = int(max(np.ceil(perimeter / lmin), 16)) - 1
 
         # Generate the hyperellipse boundary points
@@ -672,7 +590,7 @@ class HABC_Mesh():
                 if idp == ini_trunc or idp == end_trunc - 1:
                     curves.append(["line", p1, p2, ltrunc])
                 else:
-                    curves.append(["line", p1, p2, self.lmin])
+                    curves.append(["line", p1, p2, self.mesh_parameters.lmin])
 
             for idp in range(end_trunc, num_bnd_pts - 1, 2):
                 p1 = geo.PointData()[2][idp]
@@ -689,7 +607,7 @@ class HABC_Mesh():
                 # print(p1, p2)
 
                 if ini_trunc + 1 <= idp <= end_trunc - 2:
-                    curves.append(["line", p1, p2, self.lmin])
+                    curves.append(["line", p1, p2, self.mesh_parameters.lmin])
                 else:
                     curves.append(["line", p1, p2, ltrunc])
 
@@ -742,7 +660,7 @@ class HABC_Mesh():
                             rightdomain=0) for c in curves]
 
                 # Generate the mesh using netgen library
-                hyp_mesh = geo.GenerateMesh(maxh=self.lmin,
+                hyp_mesh = geo.GenerateMesh(maxh=self.mesh_parameters.lmin,
                                             quad_dominated=self.quadrilateral,
                                             optsteps2d=10,  # Optimize mesh
                                             )
@@ -826,8 +744,8 @@ class HABC_Mesh():
 
             # Check if the point is on the original boundary
             if boundary_tree.query(
-                coord, distance_upper_bound=self.tol,
-                    workers=-1)[0] <= self.tol:
+                coord, distance_upper_bound=self.mesh_parameters.tol,
+                    workers=-1)[0] <= self.mesh_parameters.tol:
                 boundary_coords.append(coord)
                 boundary_points.append(rec_map[i])
 
@@ -854,9 +772,9 @@ class HABC_Mesh():
 
             # Check if the point is on the original boundary
             dist, idx = boundary_tree.query(
-                coord, distance_upper_bound=self.tol, workers=-1)
+                coord, distance_upper_bound=self.mesh_parameters.tol, workers=-1)
 
-            if dist <= self.tol:
+            if dist <= self.mesh_parameters.tol:
                 # Reuse the existing point
                 hyp_map[i] = boundary_points[idx]
             else:
@@ -1414,7 +1332,7 @@ class HABC_Mesh():
 
         # Creating a point cloud field from the parent mesh
         pts_mesh = fire.VertexOnlyMesh(
-            parent_mesh, pts_cloud, reorder=True, tolerance=self.tol,
+            parent_mesh, pts_cloud, reorder=True, tolerance=self.mesh_parameters.tol,
             missing_points_behaviour='error', redundant=False)
         del pts_cloud
 
@@ -1511,7 +1429,7 @@ class HABC_Mesh():
         bnd_nod = fire.DirichletBC(V, 0., "on_boundary").nodes
 
         # Extract node positions
-        node_positions = self.extract_node_positions(V)
+        node_positions = self.mesh_ops.extract_node_positions(self.mesh, V)
 
         # Boundary node coordinates
         z_f, x_f = node_positions[:2]
@@ -1519,7 +1437,7 @@ class HABC_Mesh():
         bnd_x = x_f[bnd_nod]
 
         # Identify non-free surfaces (remain unchanged)
-        no_free_surf = ~(abs(bnd_z) <= self.tol)
+        no_free_surf = ~(abs(bnd_z) <= self.mesh_parameters.tol)
 
         bnd_nodes_nfs = (bnd_z[no_free_surf], bnd_x[no_free_surf])
         if self.dimension == 3:  # 3D

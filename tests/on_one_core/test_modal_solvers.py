@@ -376,8 +376,8 @@ def run_modal(Wave_obj, modal_solver_lst, fitting_c, exp_value, n_root=1):
         met_str += f"Method {modal_solver}"
         cmp_str = f"Expected {exp_value:.5f}, got = {Wave_obj.fundam_freq:.5f}"
         assert np.isclose(Wave_obj.fundam_freq / exp_value, 1., atol=tol), \
-            "❌ " + met_str + "  → " + cmp_str
-        print("✅ " + met_str + " Verified: " + cmp_str, flush=True)
+            "✗ " + met_str + "  → " + cmp_str
+        print("✓ " + met_str + " Verified: " + cmp_str, flush=True)
 
 
 def loop_modal(parameters, dictionary, degree_layer_lst,
