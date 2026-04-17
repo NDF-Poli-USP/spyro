@@ -221,8 +221,7 @@ class Wave(Model_parameters, metaclass=ABCMeta):
 
         Parameters
         ----------
-        mesh : `FiredrakeMesh`
-            Current mesh
+        None
 
         Returns
         -------

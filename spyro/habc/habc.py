@@ -12,8 +12,11 @@ from spyro.habc.rec_lay import RectangLayer
 from spyro.habc.damp_profile import HABC_Damping
 from spyro.habc.nrbc import NRBC
 from spyro.habc.error_measure import HABC_Error
+from spyro.domains.space import create_function_space
 from spyro.habc.lay_len import calc_size_lay
 from spyro.plots.plots_habc import plot_function_layer_size
+from spyro.tools.habc_tools import (clipping_coordinates_lay_field,
+                                    extend_scalar_field_profile)
 from spyro.utils.error_management import value_parameter_error
 from spyro.utils.freq_tools import freq_response
 
@@ -601,30 +604,29 @@ class HABC_Wave(AcousticWave, HABC_Mesh, RectangLayer,
 
         print("\nUpdating Velocity Profile", flush=True)
 
-        # Initialize velocity field and assigning the original velocity model
-        if self.quadrilateral:
-            base_mesh = self.mesh._base_mesh
-            base_cell = base_mesh.ufl_cell()
-            element_zx = fire.FiniteElement("DQ", base_cell, 0,
-                                            variant="spectral")
-            element_y = fire.FiniteElement("DG", fire.interval, 0,
-                                           variant="spectral")
-            tensor_element = fire.TensorProductElement(element_zx, element_y)
-            V = fire.FunctionSpace(self.mesh, tensor_element)
-        else:
-            V = fire.FunctionSpace(self.mesh, self.ele_type_c0, self.p_c0)
+        # Scalar space for auxiliar field of clipped coordinates
+        method_element = "DQ" if self.quadrilateral else "DG"
+        V = create_function_space(self.mesh, method_element, 0)
 
+        # Initialize velocity field and assigning the original velocity model
         self.c = fire.Function(V).interpolate(self.initial_velocity_model,
                                               allow_missing_dofs=True)
 
         # Clipping coordinates to the layer domain
-        lay_field, layer_mask = self.clipping_coordinates_lay_field(V)
+        ufl_coordinates_habc = self.get_spatial_coordinates_habc()
+        lay_field, layer_mask = \
+            clipping_coordinates_lay_field(self.mesh_ops.domain_dim, self.mesh,
+                                           self.dimension, ufl_coordinates_habc,
+                                           V, quadrilateral=self.quadrilateral)
 
         # Extending velocity model within the absorbing layer
-        self.extend_velocity_profile(lay_field, layer_mask, method=method)
+        extended_velocity = \
+            extend_scalar_field_profile(self.mesh_original, self.initial_velocity_model,
+                                        lay_field, layer_mask, self.mesh_parameters.tol,
+                                        method=method, name_prop="Velocity")
 
         # Interpolating the velocity model in the layer
-        self.c.interpolate(lay_field.sub(0) * layer_mask + (
+        self.c.interpolate(extended_velocity * layer_mask + (
             1. - layer_mask) * self.c, allow_missing_dofs=True)
         del layer_mask, lay_field
 
