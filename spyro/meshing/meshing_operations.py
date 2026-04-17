@@ -3,6 +3,7 @@ from firedrake.__future__ import interpolate
 import numpy as np
 # from spyro.utils.error_management import value_parameter_error
 fire.interpolate = interpolate
+from spyro.utils.error_management import value_parameter_error
 from spyro.utils.eval_functions_to_ufl import generate_ufl_functions
 
 
@@ -151,16 +152,11 @@ class MeshOps():
             Symbolic coordinate y of the mesh object
         """
         if self.dimension == 2:
-            z, x = fire.SpatialCoordinate(mesh)
-            mesh_z = z
-            mesh_x = x
+            mesh_z, mesh_x = fire.SpatialCoordinate(mesh)
             return mesh_z, mesh_x
 
         elif self.dimension == 3:
-            z, x, y = fire.SpatialCoordinate(mesh)
-            mesh_z = z
-            mesh_x = x
-            mesh_y = y
+            mesh_z, mesh_x, mesh_y = fire.SpatialCoordinate(mesh)
             return mesh_z, mesh_x, mesh_y
 
     def representative_mesh_dimensions(self, mesh, function_space):
@@ -235,7 +231,7 @@ class MeshOps():
 
         return min_coordinates, max_coordinates
 
-    def extract_node_positions(self, mesh, function_space):
+    def extract_node_positions(self, mesh, function_space, output_type="tuple"):
         '''
         Extract the node positions from the mesh and return as a tuple of arrays.
 
@@ -245,6 +241,9 @@ class MeshOps():
             Current mesh
         function_space : `FiredrakeFunctionSpace`
             Function space to extract node positions
+        output_type : `str`, optional
+            Output type for node positions. Options are "tuple" or "array".
+            Default is "tuple".
 
         Returns
         -------
@@ -270,12 +269,20 @@ class MeshOps():
             coords.append(fire.assemble(fire.interpolate(ufl_input, V)))
 
         # Get the node positions
-        z_data = coords[0].dat.data_with_halos[:]
-        x_data = coords[1].dat.data_with_halos[:]
-        node_positions = (z_data, x_data)
-        if self.dimension == 3:  # 3D
-            y_data = coords[2].dat.data_with_halos[:]
-            node_positions += (y_data,)
+        if output_type == "tuple":
+            z_data = coords[0].dat.data_with_halos[:]
+            x_data = coords[1].dat.data_with_halos[:]
+            node_positions = (z_data, x_data)
+            if self.dimension == 3:  # 3D
+                y_data = coords[2].dat.data_with_halos[:]
+                node_positions += (y_data,)
+
+        elif output_type == "array":
+            node_positions = np.column_stack([comp.dat.data_with_halos[:]
+                                              for comp in coords])
+
+        else:
+            value_parameter_error('output_type', output_type, ["tuple", "array"])
         del coords
 
         # TODO: either put wave's similar method here or just remove the one from wave
