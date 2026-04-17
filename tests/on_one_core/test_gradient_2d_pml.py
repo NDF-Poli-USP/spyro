@@ -153,16 +153,6 @@ def get_forward_model(dictionary=None):
     return rec_out_exact, rec_out_guess, Wave_obj_guess
 
 
-def test_second_order_state_uses_pressure_subspace_for_pml():
-    dictionary = set_dictionary(PML=True)
-    _, _, wave_obj = get_forward_model(dictionary=dictionary)
-
-    pressure_state = wave_obj.get_wave_equation_state(wave_obj.X_n)
-
-    assert wave_obj.get_scalar_function_space() == wave_obj.scalar_function_space
-    assert pressure_state.function_space() == wave_obj.get_scalar_function_space()
-
-
 @pytest.mark.slow
 def test_gradient(PML=False):
     dictionary = set_dictionary(PML=PML)
