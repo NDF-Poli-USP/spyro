@@ -200,12 +200,7 @@ def run_tools(wave_obj, n_root=1):
     # Expected values
     expect_xmhalf = 3.
     expect_xphalf = 1.5
-    tol = 0.01
-
-    # Domain dimensions
-    Lz, Lx = wave_obj.mesh_ops.domain_dim[:2]
-    if wave_obj.dimension == 3:  # 3D
-        Ly = wave_obj.mesh_ops.domain_dim[2]
+    tolerance = 0.03  # 3% tolerance
 
     # Create layer mask
     method_element = "DQ" if wave_obj.quadrilateral else "DG"
@@ -214,8 +209,6 @@ def run_tools(wave_obj, n_root=1):
                                   wave_obj.dimension,
                                   wave_obj.get_spatial_coordinates_habc(), V,
                                   type_marker='mask', name_mask='test_mask')
-    # Mask values
-    mask_values = layer_mask.dat.data_with_halos[:]
 
     # Extracting nodes from the layer field
     mask_nodes = wave_obj.mesh_ops.extract_node_positions(wave_obj.mesh, V,
@@ -241,14 +234,13 @@ def run_tools(wave_obj, n_root=1):
                                            wave_obj.mesh_parameters.tol)
     # Verify cloud values
     met_str = f"HABC Tools {ele_str} {wave_obj.case_habc[:-4]} {wave_obj.dimension}D. "
-    expected_values = [3.0, 1.5, 3.0, 1.5]
+    expected_values = [expect_xmhalf, expect_xphalf, expect_xmhalf, expect_xphalf]
     mean_val = [layer_cloud_xlt.dat.data_with_halos.mean(),
                 layer_cloud_xge.dat.data_with_halos.mean(),
                 original_cloud_xlt.dat.data_with_halos.mean(),
                 original_cloud_xge.dat.data_with_halos.mean()]
     region_names = ["Layer x<0.5", "Layer x>=0.5", "Original x<0.5", "Original x>=0.5"]
 
-    tolerance = 0.03  # 3% tolerance
     for region, exp_value, mean_val in zip(region_names, expected_values, mean_val):
         cmp_str = f"{region}: Expected {exp_value:.5f}, got = {mean_val:.5f}"
         assert np.isclose(mean_val / exp_value, 1., atol=tolerance), \
