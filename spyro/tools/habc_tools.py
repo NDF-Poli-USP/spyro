@@ -51,7 +51,7 @@ def generate_conditional_value_for_layer(domain_dim, mesh, dimension,
 
     # Conditional value
     exprz = f"(z + {Lz})**2" if type_marker == 'damping' else "1"
-    exprx1 = f"x**2" if type_marker == 'damping' else "1"
+    exprx1 = "x**2" if type_marker == 'damping' else "1"
     exprx2 = f"(x - {Lx})**2" if type_marker == 'damping' else "1"
     valz = generate_ufl_functions(mesh, exprz, dimension)
     valx1 = generate_ufl_functions(mesh, exprx1, dimension)
@@ -72,7 +72,7 @@ def generate_conditional_value_for_layer(domain_dim, mesh, dimension,
         condy2 = y > Ly
 
         # Conditional value
-        expry1 = f"y**2" if type_marker == 'damping' else "1"
+        expry1 = "y**2" if type_marker == 'damping' else "1"
         expry2 = f"(y - {Ly})**2" if type_marker == 'damping' else "1"
         valy1 = generate_ufl_functions(mesh, expry1, dimension)
         valy2 = generate_ufl_functions(mesh, expry2, dimension)
@@ -333,7 +333,7 @@ def extend_scalar_field_profile(mesh_original, field_to_extend, lay_field, layer
         print(f"Using Nearest Point Method to Extend {name_prop} Profile", flush=True)
 
         # Set the property of the nearest point on the original boundary
-        vel_to_extend = original_property.at(pts_to_extend, dont_raise=True)
+        vel_to_extend = field_to_extend.at(pts_to_extend, dont_raise=True)
         del pts_to_extend
 
     else:

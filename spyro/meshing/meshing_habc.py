@@ -7,7 +7,6 @@ from netgen.meshing import Element2D, \
     Element3D, FaceDescriptor, Mesh, MeshPoint
 from scipy.spatial import cKDTree
 from spyro.tools.habc_tools import point_cloud_field
-from spyro.utils.error_management import value_parameter_error
 fire.interpolate = interpolate
 
 # Work from Ruben Andres Salas, Andre Luis Ferreira da Silva,
