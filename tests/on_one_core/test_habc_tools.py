@@ -12,8 +12,7 @@ warnings.filterwarnings("ignore", category=DeprecationWarning)
 
 
 def wave_dict(element_type, dimension, degree_layer):
-    '''
-    Create a dictionary with parameters for the model
+    """Create a dictionary with parameters for the model.
 
     Parameters
     ----------
@@ -28,7 +27,7 @@ def wave_dict(element_type, dimension, degree_layer):
     -------
     dictionary : `dict`
         Dictionary containing the parameters for the model
-    '''
+    """
 
     dictionary = {}
     dictionary["options"] = {
@@ -106,8 +105,7 @@ def wave_dict(element_type, dimension, degree_layer):
 
 
 def preamble_tools(dictionary, edge_length, f_est, dimension):
-    '''
-    Run the infinite model and the Eikonal analysis
+    """Build the mesh and run the Eikonal analysis.
 
     Parameters
     ----------
@@ -124,7 +122,7 @@ def preamble_tools(dictionary, edge_length, f_est, dimension):
     -------
     wave_obj : `habc.HABC_Wave`
         An instance of the HABC_Wave class
-    '''
+    """
 
     # ============ MESH FEATURES ============
 
@@ -161,24 +159,25 @@ def preamble_tools(dictionary, edge_length, f_est, dimension):
     return wave_obj
 
 
-def run_tools(wave_obj, n_root=1):
-    '''
-    Apply the HABC to the model in Fig. 8 of Salas et al. (2022).
+def run_tools(wave_obj, method_extend, n_root=1):
+    """Test the HABC tools in a bi-material model.
 
     Parameters
     ----------
     wave_obj : `habc.HABC_Wave`
         An instance of the HABC_Wave class
+    method_extend : `str`
+        Method to extend the velocity profile. Options: 'point_cloud' or 'nearest_point'
     n_root : `int`, optional
         n-th Root selected as the size of the absorbing layer. Default is 1
 
     Returns
     -------
     None
-    '''
+    """
 
     # Identifier for the current case study
-    wave_obj.identify_habc_case(output_folder=f"output/modal_test{wave_obj.dimension}d")
+    wave_obj.identify_habc_case(output_folder=f"output/habc_tools{wave_obj.dimension}d")
 
     # Determining layer size
     wave_obj.size_habc_criterion(n_root=n_root)
@@ -190,11 +189,12 @@ def run_tools(wave_obj, n_root=1):
     wave_obj.create_mesh_habc()
 
     # Updating velocity model
-    wave_obj.velocity_habc()
+    wave_obj.velocity_habc(method=method_extend)
 
     # Estimating computational resource usage
     ele_str = "Q" if wave_obj.quadrilateral else "T"
-    name_cost = wave_obj.path_case_habc + ele_str + "_"
+    ext_str = "CLOUD" if method_extend == "point_cloud" else "NEARP"
+    name_cost = wave_obj.path_case_habc + ele_str + "_" + ext_str + "_"
     comp_cost("tfin", tRef=tRef, user_name=name_cost)
 
     # Expected values
@@ -233,7 +233,8 @@ def run_tools(wave_obj, n_root=1):
     original_cloud_xge = point_cloud_field(wave_obj.mesh, pts_original_xge, wave_obj.c,
                                            wave_obj.mesh_parameters.tol)
     # Verify cloud values
-    met_str = f"HABC Tools {ele_str} {wave_obj.case_habc[:-4]} {wave_obj.dimension}D. "
+    met_str = f"HABC Tools {ele_str}-{ext_str}" + \
+        f" {wave_obj.case_habc[:-4]} {wave_obj.dimension}D. "
     expected_values = [expect_xmhalf, expect_xphalf, expect_xmhalf, expect_xphalf]
     mean_val = [layer_cloud_xlt.dat.data_with_halos.mean(),
                 layer_cloud_xge.dat.data_with_halos.mean(),
@@ -250,13 +251,18 @@ def run_tools(wave_obj, n_root=1):
 
 @pytest.mark.parametrize("element_type", ["T", "Q"])
 @pytest.mark.parametrize("dimension", [2, 3])
-def test_habc_tools(element_type, dimension):
-    """Test of HABC tools for 2D case.
+@pytest.mark.parametrize("method_extend", ['point_cloud', 'nearest_point'])
+def test_habc_tools(element_type, dimension, method_extend):
+    """Test of HABC tools for 2D and 3D case.
 
     Parameters
     ----------
     element_type : `str`
         Type of finite element. 'T' for triangles or 'Q' for quadrilaterals
+    dimension : `int`
+        Dimension of the model (2 or 3)
+    method_extend : `str`
+        Method to extend the velocity profile. Options: 'point_cloud' or 'nearest_point'
 
     Returns
     -------
@@ -300,7 +306,7 @@ def test_habc_tools(element_type, dimension):
 
     try:
         # Testing tools for the HABC implementation
-        run_tools(wave_obj)
+        run_tools(wave_obj, method_extend)
 
         # Renaming the folder if degree_layer is modified
         wave_obj.rename_folder_habc()
