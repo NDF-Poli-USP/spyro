@@ -30,13 +30,17 @@ def create_function_space(mesh, method, degree, dim=1):
         element = FiniteElement(
             "CG", mesh.ufl_cell(), degree=degree, variant="spectral"
         )
-    elif method == "DG_triangle" or "DG_quadrilateral" or "DG":
+    elif method in ["DG_triangle", "DG_quadrilateral", "DG"]:
         element = FiniteElement(
             "DG", mesh.ufl_cell(), degree=degree
         )
-    elif method == "CG_triangle" or "CG_quadrilateral" or "CG":
+    elif method in ["CG_triangle", "CG_quadrilateral", "CG"]:
         element = FiniteElement(
             "CG", mesh.ufl_cell(), degree=degree
+        )
+    elif method in ["DQ_quadrilateral", "DQ"]:
+        element = FiniteElement(
+            "DQ", mesh.ufl_cell(), degree=degree, variant="spectral"
         )
 
     if dim > 1:
