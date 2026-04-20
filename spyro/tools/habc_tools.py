@@ -203,7 +203,7 @@ def clipping_coordinates_lay_field(domain_dim, mesh, dimension,
     -------
     lay_field : `Firedrake.Function`
         Field with clipped coordinates only in the absorbing layer
-    layer_mask : `FiredrakeFunction`
+    layer_mask : `Firedrake.Function`
         Mask for the absorbing layer
     """
 
