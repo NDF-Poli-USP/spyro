@@ -107,7 +107,7 @@ def backward_wave_propagator(Wave_obj: Wave, dt: float = None) -> fire.Function:
     return dJ
 
 
-def _pml_interior_indicator(Wave_obj: Wave) -> fire.UFL.conditional:
+def _pml_interior_indicator(Wave_obj: Wave) -> fire.conditional:
     """UFL indicator: 1 inside the physical domain, 0 in the PML layer."""
     # TODO: This is a bit hacky, will be not needed when submeshes are enabled in Spyro.
     z = Wave_obj.mesh_z
