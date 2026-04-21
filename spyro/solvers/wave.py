@@ -137,7 +137,7 @@ class Wave(Model_parameters, metaclass=ABCMeta):
         if self.abc_boundary_layer_type != "hybrid":
             self._initialize_model_parameters()
         self.matrix_building()
-        self.wave_propagator()
+        return self.wave_propagator()
 
     def force_rebuild_function_space(self):
         if self.mesh is None:
