@@ -3,6 +3,7 @@ import warnings
 from scipy.optimize import minimize as scipy_minimize
 from mpi4py import MPI  # noqa: F401
 import numpy as np
+import copy
 import resource
 import glob
 import os
@@ -242,128 +243,36 @@ class Objective(RObjective):
         )
 
 
-class FullWaveformInversion(AcousticWave):
-    """
-    Classical Full waveform inversion for acoustic wave data.
+class FullWaveformInversion:
+    """FWI driver composed around a wave solver.
 
-    This class implements full waveform inversion (FWI) as a subclass of
-    AcousticWave. FWI is an optimization-based method for reconstructing
-    subsurface velocity models from seismic data by minimizing the misfit
-    between observed and simulated waveforms.
-
-    Parameters
-    ----------
-    dictionary : dict, optional
-        Dictionary containing parameters for the inversion, including mesh,
-        timestepping, source/receiver configuration, and inversion options.
-    comm : MPI.Comm, optional
-        MPI communicator for parallel execution.
-
-    Attributes
-    ----------
-    real_velocity_model : firedrake.Function or None
-        The true velocity model, used only for generating synthetic data.
-    real_velocity_model_file : str or None
-        Path to file containing the true velocity model for synthetic tests.
-    real_shot_record_files : str or None
-        Path or prefix pattern for real/observed shot record files.
-    guess_shot_record : array_like or None
-        Shot records from the current guess velocity model.
-    gradient : firedrake.Function or None
-        Most recently computed gradient of the objective functional.
-    current_iteration : int
-        Current FWI iteration number, starts at 0.
-    mesh_iteration : int
-        Current mesh iteration for multiscale remeshing (default FWI doesn't use this).
-    iteration_limit : int
-        Maximum number of iterations, default is 100.
-    inner_product : str
-        Type of inner product for optimization, default is 'L2', only used in ROL.
-    misfit : array_like or None
-        Misfit between current forward solution and real observed data.
-    guess_forward_solution : firedrake.Function or None
-        Complete forward solution from the guess velocity model.
-    has_gradient_mask : bool
-        Whether a gradient mask has been set.
-    gradient_mask_available : bool
-        Whether gradient mask functionality is available.
-    functional_history : list
-        History of functional values at each iteration.
-    control_out : firedrake.VTKFile
-        VTK file object for saving velocity model iterates.
-    gradient_out : firedrake.VTKFile
-        VTK file object for saving gradient fields.
-
-    Methods
-    -------
-    calculate_misfit(c=None)
-        Calculate misfit between observed and simulated data.
-    generate_real_shot_record(plot_model=False, ...)
-        Generate synthetic shot records from the true velocity model.
-    set_smooth_guess_velocity_model(real_velocity_model_file=None)
-        Set a smoothed initial guess based on the true model.
-    set_real_velocity_model(constant=None, ...)
-        Set the true velocity model for synthetic tests.
-    set_guess_velocity_model(constant=None, ...)
-        Set the initial guess velocity model.
-    set_real_mesh(user_mesh=None, input_mesh_parameters=None)
-        Set the mesh for the true model.
-    set_guess_mesh(user_mesh=None, input_mesh_parameters=None)
-        Set the mesh for the guess/inversion model.
-    get_functional(c=None)
-        Compute the objective functional value.
-    get_gradient(c=None, save=True, calculate_functional=True)
-        Compute the gradient of the objective functional.
-    return_functional_and_gradient(c)
-        Compute and return both functional and gradient.
-    run_fwi(**kwargs)
-        Run the full waveform inversion using scipy.optimize.
-    run_fwi_rol(**kwargs)
-        Run the full waveform inversion using ROL (deprecated).
-    set_gradient_mask(boundaries=None)
-        Set a mask to zero out gradient values in certain regions.
-    load_real_shot_record(file_name=\"shots/shot_record_\")
-        Load observed shot records from files.
-    save_result_as_segy(file_name=\"final_vp.segy\")
-        Save the final inverted velocity model as SEG-Y.
-
-    See Also
-    --------
-    AcousticWave : Parent class for acoustic wave simulation.
-
-    Notes
-    -----
-    The inversion can be run using either scipy.optimize.minimize (L-BFGS-B)
-    via run_fwi() or the deprecated ROL library via run_fwi_rol().
-
-    Examples
-    --------
-    >>> fwi = FullWaveformInversion(dictionary=config_dict, comm=comm)
-    >>> fwi.set_guess_mesh(input_mesh_parameters={'edge_length': 0.1})
-    >>> fwi.set_guess_velocity_model(constant=2.0)
-    >>> fwi.load_real_shot_record(\"shots/observed_\")
-    >>> fwi.run_fwi(maxiter=50, vmin=1.5, vmax=4.5)
+    By default, the inversion driver uses :class:`AcousticWave`, but any wave
+    solver that implements ``forward_solve()``, ``get_control_parameters()``
+    and ``set_control_parameters()`` can be used for data misfit evaluation.
+    Gradient-based optimization additionally requires ``gradient_solve()``.
     """
 
-    def __init__(self, dictionary=None, comm=None):
-        """
-        Initialize a FullWaveformInversion instance.
+    def __init__(
+        self,
+        dictionary=None,
+        comm=None,
+        wave_class=AcousticWave,
+        wave=None,
+    ):
+        if wave is not None:
+            self.wave = wave
+            self.wave_class = type(wave)
+        else:
+            self.wave_class = AcousticWave if wave_class is None else wave_class
+            self.wave = self.wave_class(dictionary=dictionary, comm=comm)
 
-        Sets up the FWI problem with default optimization parameters and
-        initializes all necessary attributes for the inversion process.
+        self.input_dictionary = self.wave.input_dictionary
+        self.comm = self.wave.comm
 
-        Parameters
-        ----------
-        dictionary : dict, optional
-            Dictionary containing parameters for the inversion.
-        comm : MPI.Comm, optional
-            MPI communicator for parallel execution.
-        """
-        super().__init__(dictionary=dictionary, comm=comm)
         default_optimization_parameters = {
             "General": {"Secant": {
                 "Type": "Limited-Memory BFGS",
-                "Maximum Storage": 10
+                "Maximum Storage": 10,
             }},
             "Step": {
                 "Type": "Augmented Lagrangian",
@@ -380,217 +289,353 @@ class FullWaveformInversion(AcousticWave):
             },
         }
         self.input_dictionary.setdefault("inversion", {})
-        self.input_dictionary["inversion"].setdefault("initial_guess_model_file", None)
-        self.input_dictionary["inversion"].setdefault("optimization_parameters", default_optimization_parameters)
-        self.input_dictionary["inversion"].setdefault("real_shot_record_file", None)
-        self.input_dictionary["inversion"].setdefault("control_output_file", "fwi/control.pvd")
-        self.input_dictionary["inversion"].setdefault("gradient_output_file", "fwi/gradient.pvd")
-        self.input_dictionary["inversion"].setdefault("real_velocity_model_file", None)
         inversion_dictionary = self.input_dictionary["inversion"]
+        inversion_dictionary.setdefault("initial_guess_model_file", None)
+        inversion_dictionary.setdefault(
+            "optimization_parameters",
+            default_optimization_parameters,
+        )
+        inversion_dictionary.setdefault("real_shot_record_file", None)
+        inversion_dictionary.setdefault("control_output_file", "fwi/control.pvd")
+        inversion_dictionary.setdefault("gradient_output_file", "fwi/gradient.pvd")
+        inversion_dictionary.setdefault("real_velocity_model_file", None)
 
+        self.real_mesh = None
+        self.guess_mesh = None
+        self.real_control = None
+        self.guess_control = None
         self.real_velocity_model = None
-        self.real_velocity_model_file = inversion_dictionary["real_velocity_model_file"]
-        self.real_shot_record_files = inversion_dictionary["real_shot_record_file"]
+        self.guess_velocity_model = None
+
         self.control_out = fire.VTKFile(inversion_dictionary["control_output_file"])
         self.gradient_out = fire.VTKFile(inversion_dictionary["gradient_output_file"])
+        self.real_velocity_model_file = inversion_dictionary["real_velocity_model_file"]
+        self.real_shot_record = None
+        self.real_shot_record_files = inversion_dictionary["real_shot_record_file"]
+
         self.guess_shot_record = None
         self.gradient = None
+        self.control_result = None
+        self.vp_result = None
         self.current_iteration = 0
         self.mesh_iteration = 0
         self.iteration_limit = 100
-        self.inner_product = 'L2'
+        self.inner_product = "L2"
         self.misfit = None
+        self.functional = None
         self.guess_forward_solution = None
         self.has_gradient_mask = False
         self.gradient_mask_available = False
         self.functional_history = []
 
+    def __getattr__(self, name):
+        wave = self.__dict__.get("wave")
+        if wave is not None and hasattr(wave, name):
+            return getattr(wave, name)
+        raise AttributeError(f"{type(self).__name__} has no attribute '{name}'")
+
+    def _create_wave_solver(self):
+        return self.wave_class(dictionary=self.input_dictionary, comm=self.comm)
+
+    def _control_items(self, control):
+        if isinstance(control, dict):
+            return list(control.items())
+        if isinstance(control, list):
+            return list(enumerate(control))
+        if isinstance(control, tuple):
+            return list(enumerate(control))
+        return [("control", control)]
+
+    def _constant_array(self, value):
+        try:
+            return np.asarray(value.values(), dtype=float)
+        except AttributeError:
+            return np.asarray(value, dtype=float)
+
+    def _copy_control_value(self, value):
+        if isinstance(value, fire.Function):
+            copied = fire.Function(value.function_space(), name=value.name())
+            copied.assign(value)
+            return copied
+        if isinstance(value, fire.Constant):
+            constant_data = self._constant_array(value)
+            if constant_data.shape == ():
+                return fire.Constant(float(constant_data))
+            return fire.Constant(constant_data)
+        return copy.deepcopy(value)
+
+    def _copy_control_structure(self, control):
+        if control is None:
+            return None
+        if isinstance(control, dict):
+            return {
+                key: self._copy_control_value(value)
+                for key, value in control.items()
+            }
+        if isinstance(control, list):
+            return [self._copy_control_value(value) for value in control]
+        if isinstance(control, tuple):
+            return tuple(self._copy_control_value(value) for value in control)
+        return self._copy_control_value(control)
+
+    def _flatten_control_value(self, value):
+        if isinstance(value, fire.Function):
+            return np.asarray(value.dat.data_ro, dtype=float).reshape(-1)
+        if isinstance(value, fire.Constant):
+            return self._constant_array(value).reshape(-1)
+        return np.atleast_1d(np.asarray(value, dtype=float)).reshape(-1)
+
+    def _rebuild_control_value(self, template, flat_values):
+        flat_values = np.asarray(flat_values, dtype=float).reshape(-1)
+        if isinstance(template, fire.Function):
+            rebuilt = self._copy_control_value(template)
+            template_shape = np.asarray(template.dat.data_ro).shape
+            rebuilt.dat.data[:] = flat_values.reshape(template_shape)
+            return rebuilt
+        if isinstance(template, fire.Constant):
+            if flat_values.size == 1:
+                return fire.Constant(float(flat_values[0]))
+            return fire.Constant(flat_values)
+        if np.isscalar(template):
+            if flat_values.size != 1:
+                raise ValueError("Scalar controls must rebuild from one value.")
+            return float(flat_values[0])
+        template_array = np.asarray(template)
+        return flat_values.reshape(template_array.shape)
+
+    def _flatten_control(self, control):
+        if control is None:
+            raise ValueError("No control parameter has been configured.")
+        flattened = [
+            self._flatten_control_value(value)
+            for _, value in self._control_items(control)
+        ]
+        return np.concatenate(flattened) if flattened else np.zeros((0,), dtype=float)
+
+    def _rebuild_control_from_vector(self, template, flat_vector):
+        flat_vector = np.asarray(flat_vector, dtype=float).reshape(-1)
+        offset = 0
+        rebuilt_items = []
+        for key, template_value in self._control_items(template):
+            size = self._flatten_control_value(template_value).size
+            rebuilt_value = self._rebuild_control_value(
+                template_value,
+                flat_vector[offset:offset + size],
+            )
+            rebuilt_items.append((key, rebuilt_value))
+            offset += size
+
+        if offset != flat_vector.size:
+            raise ValueError("Control vector size does not match the configured control.")
+
+        if isinstance(template, dict):
+            return {key: value for key, value in rebuilt_items}
+        if isinstance(template, list):
+            return [value for _, value in rebuilt_items]
+        if isinstance(template, tuple):
+            return tuple(value for _, value in rebuilt_items)
+        return rebuilt_items[0][1]
+
+    def _control_functions(self, control):
+        return [
+            value
+            for _, value in self._control_items(control)
+            if isinstance(value, fire.Function)
+        ]
+
+    def _write_control_snapshot(self, control, filename):
+        if control is None:
+            return
+        functions = self._control_functions(control)
+        if functions:
+            fire.VTKFile(filename).write(*functions)
+
+    def _guess_control_template(self):
+        template = self.guess_control
+        if template is None:
+            template = self.wave.get_control_parameters()
+        if template is None:
+            raise ValueError("No guess control parameter has been configured.")
+        return template
+
+    def _expand_bound(self, bound, template_value):
+        size = self._flatten_control_value(template_value).size
+        if np.isscalar(bound):
+            return np.full(size, float(bound))
+
+        bound_array = np.asarray(bound, dtype=float).reshape(-1)
+        if bound_array.size == 1:
+            return np.full(size, float(bound_array[0]))
+        if bound_array.size != size:
+            raise ValueError("Control bounds do not match the control size.")
+        return bound_array
+
+    def _extract_bound(self, bound, key, template_value):
+        if isinstance(bound, dict):
+            if key not in bound:
+                raise KeyError(f"Missing bound for control '{key}'.")
+            return self._expand_bound(bound[key], template_value)
+        return self._expand_bound(bound, template_value)
+
+    def _build_bounds(self, vmin, vmax, template):
+        lower = []
+        upper = []
+        for key, value in self._control_items(template):
+            lower.append(self._extract_bound(vmin, key, value))
+            upper.append(self._extract_bound(vmax, key, value))
+        return list(zip(np.concatenate(lower), np.concatenate(upper)))
+
+    def get_control_vector(self, control=None):
+        if control is None:
+            control = self._guess_control_template()
+        return self._flatten_control(control)
+
+    def set_real_control(self, control):
+        self.wave.set_control_parameters(self._copy_control_structure(control))
+        self.real_mesh = self.wave.get_mesh()
+        self.real_control = self._copy_control_structure(
+            self.wave.get_control_parameters(),
+        )
+        self.real_velocity_model = (
+            self._copy_control_structure(self.real_control)
+            if isinstance(self.real_control, fire.Function)
+            else None
+        )
+
+    def set_guess_control(self, control):
+        self.wave.set_control_parameters(self._copy_control_structure(control))
+        self.guess_mesh = self.wave.get_mesh()
+        self.guess_control = self._copy_control_structure(
+            self.wave.get_control_parameters(),
+        )
+        self.guess_velocity_model = (
+            self._copy_control_structure(self.guess_control)
+            if isinstance(self.guess_control, fire.Function)
+            else None
+        )
+        self.misfit = None
+
     @property
     def real_velocity_model_file(self):
-        """
-        Get the real velocity model file path.
-
-        Returns
-        -------
-        str or None
-            Path to the real velocity model file.
-        """
         return self._real_velocity_model_file
 
     @real_velocity_model_file.setter
     def real_velocity_model_file(self, value):
-        """
-        Set the real velocity model file path.
-
-        Parameters
-        ----------
-        value : str or None
-            Path to the real velocity model file.
-
-        Raises
-        ------
-        FileNotFoundError
-            If the specified file does not exist.
-        """
-        if value is not None:
-            if not os.path.exists(value):
-                raise FileNotFoundError(f"Velocity model file '{value}' does not exist")
+        if value is not None and not os.path.exists(value):
+            raise FileNotFoundError(
+                f"Velocity model file '{value}' does not exist",
+            )
         self._real_velocity_model_file = value
 
     @property
     def real_shot_record_files(self):
-        """
-        Get the real shot record file path or pattern.
-
-        Returns
-        -------
-        str or None
-            Path or prefix pattern for the real shot record files.
-        """
         return self._real_shot_record_files
 
     @real_shot_record_files.setter
     def real_shot_record_files(self, value):
-        """
-        Set the real shot record file path or pattern.
-
-        This setter also initializes the control and gradient output files
-        and loads the real shot record if a valid path is provided.
-
-        Parameters
-        ----------
-        value : str or None
-            Path or prefix pattern for the real shot record files.
-
-        Raises
-        ------
-        FileNotFoundError
-            If the specified file or files matching the pattern do not exist.
-        """
         if value is not None:
-            # Check if it's a file prefix pattern by looking for matching files
             if not os.path.exists(value) and not glob.glob(value + "*"):
-                raise FileNotFoundError(f"Shot record file '{value}' does not exist")
+                raise FileNotFoundError(
+                    f"Shot record file '{value}' does not exist",
+                )
         self._real_shot_record_files = value
-        self.control_out = fire.VTKFile("results/control.pvd")
-        self.gradient_out = fire.VTKFile("results/gradient.pvd")
-        if self.real_shot_record_files is not None:
-            self.load_real_shot_record(file_name=self.real_shot_record_files)
+        if value is not None:
+            self.load_real_shot_record(file_name=value)
 
     def calculate_misfit(self, c=None):
-        """
-        Calculate the misfit between observed and simulated data.
+        if self.wave.mesh is None and self.guess_mesh is not None:
+            self.wave.set_mesh(user_mesh=self.guess_mesh, input_mesh_parameters={})
 
-        Runs the forward model with the current velocity model and computes
-        the difference between the simulated shot records and the real/observed
-        shot records. If the forward model has already been solved, uses the
-        existing solution.
-
-        Parameters
-        ----------
-        c : array_like, optional
-            Velocity model values to use. If provided, updates the initial
-            velocity model before running the forward solve.
-
-        Returns
-        -------
-        misfit : ndarray or list of ndarray
-            Misfit between real and simulated shot records. Returns a list
-            if using spatial parallelism with multiple sources, otherwise
-            returns a single array.
-
-        Notes
-        -----
-        This method also saves the current velocity model and shot records
-        to disk for debugging and checkpoint purposes.
-        """
-        if self.mesh is None and self.guess_mesh is not None:
-            self.mesh = self.guess_mesh
-        if self.initial_velocity_model is None:
-            self.initial_velocity_model = self.guess_velocity_model
         if c is not None:
-            self.initial_velocity_model.dat.data[:] = c
-        self.forward_solve()
-        output = fire.File("control_" + str(self.current_iteration)+".pvd")
-        output.write(self.c)
-        np.save(f"control{self.comm.ensemble_comm.rank}_{self.comm.comm.rank}", self.c.dat.data[:])
+            updated_control = self._rebuild_control_from_vector(
+                self._guess_control_template(),
+                c,
+            )
+            self.set_guess_control(updated_control)
+        elif self.guess_control is not None:
+            self.wave.set_control_parameters(
+                self._copy_control_structure(self.guess_control),
+            )
+        elif self.wave.get_control_parameters() is None:
+            raise ValueError("No guess control parameter has been configured.")
+
+        self.wave.forward_solve()
+        current_control = self.wave.get_control_parameters()
+        self._write_control_snapshot(
+            current_control,
+            f"control_{self.current_iteration}.pvd",
+        )
+        np.save(
+            f"control{self.comm.ensemble_comm.rank}_{self.comm.comm.rank}",
+            self._flatten_control(current_control),
+        )
+
         if self.parallelism_type == "spatial" and self.number_of_sources > 1:
             misfit_list = []
             guess_shot_record_list = []
             for snum in range(self.number_of_sources):
-                switch_serial_shot(self, snum)
-                guess_shot_record_list.append(self.forward_solution_receivers)
-                misfit_list.append(self.real_shot_record[snum] - self.forward_solution_receivers)
+                switch_serial_shot(self.wave, snum)
+                guess_shot_record_list.append(self.wave.forward_solution_receivers)
+                misfit_list.append(
+                    self.real_shot_record[snum] - self.wave.forward_solution_receivers,
+                )
             self.guess_shot_record = guess_shot_record_list
             self.misfit = misfit_list
         else:
-            self.guess_shot_record = self.forward_solution_receivers
-            self.guess_forward_solution = self.forward_solution
+            self.guess_shot_record = self.wave.forward_solution_receivers
+            self.guess_forward_solution = self.wave.forward_solution
             self.misfit = self.real_shot_record - self.guess_shot_record
         return self.misfit
 
-    def generate_real_shot_record(self, plot_model=False, model_filename="model.png", abc_points=None, save_shot_record=True, shot_filename="shots/shot_record_", high_resolution_model=False):
-        """
-        Generate synthetic shot records from the true velocity model.
+    def generate_real_shot_record(
+        self,
+        plot_model=False,
+        model_filename="model.png",
+        abc_points=None,
+        save_shot_record=True,
+        shot_filename="shots/shot_record_",
+        high_resolution_model=False,
+    ):
+        real_wave = self._create_wave_solver()
+        if self.real_mesh is not None:
+            real_wave.set_mesh(user_mesh=self.real_mesh, input_mesh_parameters={})
 
-        Creates a SyntheticRealAcousticWave object with the true velocity model,
-        solves the forward problem, and optionally saves the shot records and
-        plots the model. This is used only for synthetic test cases.
+        if self.real_control is not None:
+            real_wave.set_control_parameters(self._copy_control_structure(self.real_control))
+        elif (
+            hasattr(real_wave, "initial_velocity_model_file")
+            and self.real_velocity_model_file is not None
+        ):
+            real_wave.initial_velocity_model_file = self.real_velocity_model_file
+        else:
+            raise ValueError("No real control parameter has been configured.")
 
-        Parameters
-        ----------
-        plot_model : bool, optional
-            If True, plot and save the velocity model. Default is False.
-        model_filename : str, optional
-            Filename for the model plot. Default is "model.png".
-        abc_points : list of tuple, optional
-            Points defining absorbing boundary condition markers for plotting.
-            Default is None.
-        save_shot_record : bool, optional
-            If True, save the shot records to files. Default is True.
-        shot_filename : str, optional
-            Prefix for shot record file names. Default is "shots/shot_record_".
-        high_resolution_model : bool, optional
-            If True, use high resolution for model plotting. Default is False.
+        if (
+            plot_model
+            and real_wave.comm.comm.rank == 0
+            and real_wave.comm.ensemble_comm.rank == 0
+        ):
+            spyro_plot_model(
+                real_wave,
+                filename=model_filename,
+                abc_points=abc_points,
+                high_resolution=high_resolution_model,
+            )
 
-        Notes
-        -----
-        This method creates observed data for synthetic inversion tests. The
-        generated shot records are stored in self.real_shot_record.
-        """
-        Wave_obj_real_velocity = SyntheticRealAcousticWave(dictionary=self.input_dictionary, comm=self.comm)
-        if Wave_obj_real_velocity.mesh is None and self.real_mesh is not None:
-            Wave_obj_real_velocity.mesh = self.real_mesh
-        if Wave_obj_real_velocity.initial_velocity_model is None:
-            Wave_obj_real_velocity.initial_velocity_model = self.real_velocity_model
-
-        if plot_model and Wave_obj_real_velocity.comm.comm.rank == 0 and Wave_obj_real_velocity.comm.ensemble_comm.rank == 0:
-            spyro_plot_model(Wave_obj_real_velocity, filename=model_filename, abc_points=abc_points, high_resolution=high_resolution_model)
-
-        Wave_obj_real_velocity.forward_solve()
+        real_wave.forward_solve()
         if save_shot_record:
-            save_shots(Wave_obj_real_velocity, file_name=shot_filename)
-        self.real_shot_record = Wave_obj_real_velocity.real_shot_record
-        self.quadrature_rule = Wave_obj_real_velocity.quadrature_rule
+            save_shots(real_wave, file_name=shot_filename)
+
+        if real_wave.parallelism_type == "spatial" and real_wave.number_of_sources > 1:
+            real_shot_record_list = []
+            for snum in range(real_wave.number_of_sources):
+                switch_serial_shot(real_wave, snum)
+                real_shot_record_list.append(real_wave.receivers_output)
+            self.real_shot_record = real_shot_record_list
+        else:
+            self.real_shot_record = real_wave.receivers_output
 
     def set_smooth_guess_velocity_model(self, real_velocity_model_file=None):
-        """
-        Set a smoothed initial guess based on the true velocity model.
-
-        This method is intended to create a smooth initial guess from a known
-        true velocity model for synthetic tests. Currently a placeholder.
-
-        Parameters
-        ----------
-        real_velocity_model_file : str, optional
-            Path to the file containing the true velocity model. If not provided,
-            uses self.real_velocity_model_file.
-
-        Notes
-        -----
-        TODOThis method currently does not implement the smoothing operation and
-        may need to be completed for actual use.
-        """
         if real_velocity_model_file is not None:
             real_velocity_model_file = real_velocity_model_file
         else:
@@ -606,40 +651,7 @@ class FullWaveformInversion(AcousticWave):
         output=False,
         dg_velocity_model=True,
     ):
-        """
-        Set the true velocity model for synthetic test cases.
-
-        This method sets the real/true velocity model that is used only for
-        generating synthetic observed data. It wraps the parent class's
-        set_initial_velocity_model method.
-
-        Parameters
-        ----------
-        constant : float, optional
-            Constant velocity value for a homogeneous model.
-        conditional : firedrake.Conditional, optional
-            Firedrake conditional object defining the velocity distribution.
-        velocity_model_function : firedrake.Function, optional
-            Firedrake function to use as the velocity model. Must be in the
-            same function space as the object.
-        expression : str, optional
-            Mathematical expression string for the velocity model. Can use
-            variables: x, y, z, pi, tanh, sqrt. Example: "2.0 + 0.5*tanh((x-2.0)/0.1)".
-            Will be interpolated into the function space.
-        new_file : str, optional
-            Path to file containing the velocity model.
-        output : bool, optional
-            If True, output the velocity model to a pvd file for visualization.
-            Default is False.
-        dg_velocity_model : bool, optional
-            If True, use DG0 function space. Default is True.
-
-        Notes
-        -----
-        Only one of the parameters (constant, conditional, velocity_model_function,
-        expression, or new_file) should be provided.
-        """
-        super().set_initial_velocity_model(
+        self.wave.set_initial_velocity_model(
             constant=constant,
             conditional=conditional,
             velocity_model_function=velocity_model_function,
@@ -648,7 +660,13 @@ class FullWaveformInversion(AcousticWave):
             output=output,
             dg_velocity_model=dg_velocity_model,
         )
-        self.real_velocity_model = self.initial_velocity_model
+        self.real_mesh = self.wave.get_mesh()
+        self.real_velocity_model = self.wave.initial_velocity_model
+        self.real_control = self._copy_control_structure(
+            self.wave.get_control_parameters(),
+        )
+        if new_file is not None:
+            self.real_velocity_model_file = new_file
 
     def set_guess_velocity_model(
         self,
@@ -660,41 +678,7 @@ class FullWaveformInversion(AcousticWave):
         output=False,
         dg_velocity_model=True,
     ):
-        """
-        Set the initial guess velocity model for inversion.
-
-        This method sets the starting velocity model for the FWI optimization.
-        It wraps the parent class's set_initial_velocity_model method and
-        resets the misfit.
-
-        Parameters
-        ----------
-        constant : float, optional
-            Constant velocity value for a homogeneous initial model.
-        conditional : firedrake.Conditional, optional
-            Firedrake conditional object defining the velocity distribution.
-        velocity_model_function : firedrake.Function, optional
-            Firedrake function to use as the velocity model. Must be in the
-            same function space as the object.
-        expression : str, optional
-            Mathematical expression string for the velocity model. Can use
-            variables: x, y, z, pi, tanh, sqrt. Example: "2.0 + 0.5*tanh((x-2.0)/0.1)".
-            Will be interpolated into the function space.
-        new_file : str, optional
-            Path to file containing the velocity model.
-        output : bool, optional
-            If True, output the velocity model to a pvd file for visualization.
-            Default is False.
-        dg_velocity_model : bool, optional
-            If True, use DG0 function space. Default is True.
-
-        Notes
-        -----
-        Only one of the parameters (constant, conditional, velocity_model_function,
-        expression, or new_file) should be provided. Setting a new guess model
-        will reset the misfit to None.
-        """
-        super().set_initial_velocity_model(
+        self.wave.set_initial_velocity_model(
             constant=constant,
             conditional=conditional,
             velocity_model_function=velocity_model_function,
@@ -703,108 +687,51 @@ class FullWaveformInversion(AcousticWave):
             output=output,
             dg_velocity_model=dg_velocity_model,
         )
-        self.guess_velocity_model = self.initial_velocity_model
+        self.guess_mesh = self.wave.get_mesh()
+        self.guess_velocity_model = self.wave.initial_velocity_model
+        self.guess_control = self._copy_control_structure(
+            self.wave.get_control_parameters(),
+        )
         self.misfit = None
 
-    def set_real_mesh(
-        self,
-        user_mesh=None,
-        input_mesh_parameters=None,
-    ):
-        """
-        Set the mesh for the true/real velocity model.
-
-        This method sets up the mesh used for generating synthetic observed
-        data from the true velocity model.
-
-        Parameters
-        ----------
-        user_mesh : spyro.Mesh, optional
-            User-provided mesh object. Default is None.
-        input_mesh_parameters : dict, optional
-            Dictionary of mesh parameters. Default is None, which will be
-            converted to an empty dictionary internally.
-
-        Notes
-        -----
-        The mesh type defaults to "firedrake_mesh" if not specified in
-        input_mesh_parameters.
-        """
+    def set_real_mesh(self, user_mesh=None, input_mesh_parameters=None):
+        if input_mesh_parameters is None:
+            input_mesh_parameters = {}
         input_mesh_parameters.setdefault("mesh_type", "firedrake_mesh")
-        super().set_mesh(
+        self.wave.set_mesh(
             user_mesh=user_mesh,
             input_mesh_parameters=input_mesh_parameters,
         )
-        self.real_mesh = self.get_mesh()
+        self.real_mesh = self.wave.get_mesh()
 
-    def set_guess_mesh(
-        self,
-        user_mesh=None,
-        input_mesh_parameters=None,
-    ):
-        """
-        Set the mesh for the guess/inversion model.
-
-        This method sets up the mesh used for the FWI optimization. It also
-        checks for gradient mask options in the mesh parameters.
-
-        Parameters
-        ----------
-        user_mesh : spyro.Mesh, optional
-            User-provided mesh object. Default is None.
-        input_mesh_parameters : dict, optional
-            Dictionary of mesh parameters. Can include "gradient_mask" to
-            enable masking functionality. Default is an empty dictionary.
-
-        Notes
-        -----
-        If "gradient_mask" is present in input_mesh_parameters, sets
-        self.gradient_mask_available to True.
-        """
+    def set_guess_mesh(self, user_mesh=None, input_mesh_parameters=None):
         if input_mesh_parameters is None:
             input_mesh_parameters = {}
         if input_mesh_parameters.get("gradient_mask") is not None:
             self.gradient_mask_available = True
-        super().set_mesh(
+            self.wave.gradient_mask_available = True
+        self.wave.set_mesh(
             user_mesh=user_mesh,
             input_mesh_parameters=input_mesh_parameters,
         )
-        self.guess_mesh = self.get_mesh()
+        self.guess_mesh = self.wave.get_mesh()
 
     def get_functional(self, c=None):
-        """
-        Calculate and return the objective functional value.
-
-        Computes the misfit if needed, then evaluates the objective functional.
-        Also tracks the functional history and peak memory usage.
-
-        Parameters
-        ----------
-        c : array_like, optional
-            Velocity model values to use for the calculation. If provided,
-            updates the initial velocity model.
-
-        Returns
-        -------
-        Jm : float
-            The objective functional value (typically L2 norm of misfit).
-
-        Notes
-        -----
-        This method writes the functional value and memory usage to text files
-        for tracking convergence and resource consumption.
-        """
         self.calculate_misfit(c=c)
-        Jm = compute_functional(self, self.misfit)
+        Jm = compute_functional(self.wave, self.misfit)
 
         self.functional_history.append(Jm)
         self.functional = Jm
         peak_memory_mb = get_peak_memory()
-        # Save the functional value to a text file
         if self.comm.ensemble_comm.rank == 0 and self.comm.comm.rank == 0:
-            print(f"Functional: {Jm} at iteration: {self.current_iteration}", flush=True)
+            print(
+                f"Functional: {Jm} at iteration: {self.current_iteration}",
+                flush=True,
+            )
             with open("functional_values.txt", "a") as file:
-                file.write(f"Iteration: {self.current_iteration}, Functional: {Jm}\n")
+                file.write(
+                    f"Iteration: {self.current_iteration}, Functional: {Jm}\n",
+                )
 
             with open("peak_memory.txt", "a") as file:
                 file.write(f"Peak memory usage: {peak_memory_mb:.2f} MB \n")
@@ -812,103 +739,40 @@ class FullWaveformInversion(AcousticWave):
         return Jm
 
     def get_gradient(self, c=None, save=True, calculate_functional=True):
-        """
-        Calculate the gradient of the objective functional.
+        if not hasattr(self.wave, "gradient_solve"):
+            raise NotImplementedError(
+                f"{type(self.wave).__name__} does not implement gradient_solve().",
+            )
 
-        Computes the gradient with respect to the velocity model using the
-        adjoint method. Optionally calculates the functional value first and
-        saves the gradient to a VTK file.
-
-        Parameters
-        ----------
-        c : array_like, optional
-            Velocity model values to use. If provided and calculate_functional
-            is True, updates the model before computing the functional.
-        save : bool, optional
-            If True, save the gradient to a VTK file for visualization.
-            Default is True.
-        calculate_functional : bool, optional
-            If True, calculate the functional (and misfit) before computing
-            the gradient. Default is True.
-
-        Notes
-        -----
-        This method increments the current_iteration counter and applies any
-        gradient mask that has been set. The gradient is computed using the
-        adjoint-state method implemented in gradient_solve().
-        """
         comm = self.comm
         if calculate_functional:
             self.get_functional(c=c)
+        elif c is not None:
+            updated_control = self._rebuild_control_from_vector(
+                self._guess_control_template(),
+                c,
+            )
+            self.set_guess_control(updated_control)
+
         comm.comm.barrier()
-        self.gradient = self.gradient_solve(misfit=self.misfit, forward_solution=self.guess_forward_solution)
+        self.gradient = self.wave.gradient_solve(
+            misfit=self.misfit,
+            forward_solution=self.guess_forward_solution,
+        )
         self._apply_gradient_mask()
         if save:
-            # self.gradient_out.write(dJ_total)
-            output = fire.File("gradient_" + str(self.current_iteration)+".pvd")
-            output.write(self.gradient)
+            self._write_control_snapshot(
+                self.gradient,
+                f"gradient_{self.current_iteration}.pvd",
+            )
         self.current_iteration += 1
         comm.comm.barrier()
 
     def return_functional_and_gradient(self, c):
-        """
-        Compute and return both the functional value and gradient.
-
-        This method is used as the objective function for scipy.optimize.minimize.
-        It computes the gradient (which also computes the functional) and returns
-        both values.
-
-        Parameters
-        ----------
-        c : array_like
-            Current velocity model values.
-
-        Returns
-        -------
-        functional : float
-            The objective functional value.
-        dJ : ndarray
-            The gradient of the functional with respect to the velocity model.
-        """
         self.get_gradient(c=c)
-        dJ = self.gradient.dat.data[:]
-        return self.functional, dJ
+        return self.functional, self._flatten_control(self.gradient)
 
     def run_fwi(self, **kwargs):
-        """
-        Run full waveform inversion using scipy L-BFGS-B optimizer.
-
-        Performs the complete FWI optimization using scipy.optimize.minimize
-        with the L-BFGS-B method. The optimization minimizes the misfit between
-        observed and simulated data by updating the velocity model.
-
-        Parameters
-        ----------
-        **kwargs : dict
-            Keyword arguments for customizing the optimization:
-
-            vmin : float, optional
-                Minimum velocity bound. Default is 1.429 km/s.
-            vmax : float, optional
-                Maximum velocity bound. Default is 6.0 km/s.
-            maxiter : int, optional
-                Maximum number of iterations. Default is 20.
-            scipy_options : dict, optional
-                Additional options passed to scipy.optimize.minimize.
-                Default includes disp=True, eps=1e-15, ftol=1e-11.
-
-        Notes
-        -----
-        The final inverted velocity model is stored in self.vp_result and saved
-        to "vp_end.pvd". The raw result array is also saved to "result.npy".
-
-        This method uses the L-BFGS-B algorithm which is well-suited for
-        large-scale bound-constrained optimization problems.
-
-        Examples
-        --------
-        >>> fwi.run_fwi(maxiter=100, vmin=1.5, vmax=5.0)
-        """
         parameters = {
             "vmin": kwargs.pop("vmin", 1.429),
             "vmax": kwargs.pop("vmax", 6.0),
@@ -917,28 +781,18 @@ class FullWaveformInversion(AcousticWave):
                 "eps": kwargs.pop("eps", 1e-15),
                 "ftol": kwargs.pop("ftol", 1e-11),
                 "maxiter": kwargs.pop("maxiter", 20),
-            }
+            },
         }
         parameters.update(kwargs)
 
-        vmin = parameters["vmin"]
-        vmax = parameters["vmax"]
-        vp_0 = self.initial_velocity_model.vector()
-        bounds = [(vmin, vmax) for _ in range(len(vp_0))]
+        template = self._guess_control_template()
+        bounds = self._build_bounds(parameters["vmin"], parameters["vmax"], template)
+        control_0 = self.get_control_vector(template)
         options = parameters["scipy_options"]
 
-        # if self.running_fwi is False:
-        #     warnings.warn("Dictionary FWI options set to not run FWI.")
-        # if self.current_iteration < self.iteration_limit:
-        #     self.get_gradient()
-        #     self.update_guess_model()
-        #     self.current_iteration += 1
-        # else:
-        #     warnings.warn("Iteration limit reached. FWI stopped.")
-        #     self.running_fwi = False
         result = scipy_minimize(
             self.return_functional_and_gradient,
-            vp_0,
+            control_0,
             method="L-BFGS-B",
             jac=True,
             tol=1e-15,
@@ -946,50 +800,30 @@ class FullWaveformInversion(AcousticWave):
             options=options,
         )
 
-        vp_end = fire.Function(self.function_space)
-        vp_end.dat.data[:] = result.x
-        self.vp_result = vp_end
-        fire.File("vp_end.pvd").write(vp_end)
+        self.control_result = self._rebuild_control_from_vector(template, result.x)
+        self.set_guess_control(self.control_result)
+
+        if isinstance(self.control_result, fire.Function):
+            self.vp_result = self._copy_control_structure(self.control_result)
+            fire.VTKFile("vp_end.pvd").write(self.vp_result)
+        else:
+            self.vp_result = None
+            self._write_control_snapshot(self.control_result, "vp_end.pvd")
+
         np.save("result", result.x)
+        return result
 
     def run_fwi_rol(self, **kwargs):
         """
         Run full waveform inversion using ROL optimizer (deprecated).
-
-        Performs FWI optimization using the Rapid Optimization Library (ROL).
-        This method is deprecated as the pyROL library is no longer supported.
-
-        Parameters
-        ----------
-        **kwargs : dict
-            Keyword arguments for customizing the optimization:
-
-            vmin : float, optional
-                Minimum velocity bound. Default is 1.429 km/s.
-            vmax : float, optional
-                Maximum velocity bound. Default is 6.0 km/s.
-            maxiter : int, optional
-                Maximum number of iterations. Default is 20.
-            ROL_options : dict, optional
-                ROL-specific optimization parameters.
-
-        Raises
-        ------
-        ImportError
-            If the ROL module is not available.
-
-        Warnings
-        --------
-        DeprecationWarning
-            This method is deprecated. Use run_fwi() instead.
-
-        Notes
-        -----
-        The ROL library provided advanced optimization algorithms but is no
-        longer maintained. Consider using run_fwi() with scipy instead.
         """
         if ROL is None:
             raise ImportError("The ROL module is not available.")
+        if not isinstance(self._guess_control_template(), fire.Function):
+            raise NotImplementedError(
+                "ROL inversion only supports a single Firedrake Function control.",
+            )
+
         parameters = {
             "vmin": 1.429,
             "vmax": 6.0,
@@ -1008,23 +842,24 @@ class FullWaveformInversion(AcousticWave):
                     "Iteration Limit": kwargs.pop("maxiter", 20),
                     "Step Tolerance": 1.0e-16,
                 },
-            }
+            },
         }
         parameters.update(kwargs)
         vmin = parameters["vmin"]
         vmax = parameters["vmax"]
 
-        warnings.warn("This functionality is deprecated, since the pyROL library is no longer supported.")
+        warnings.warn(
+            "This functionality is deprecated, since the pyROL library is no longer supported.",
+        )
         params = ROL.ParameterList(parameters["ROL_options"], "Parameters")
 
-        inner_product = L2Inner(self)
+        inner_product = L2Inner(self.wave)
 
         obj = Objective(inner_product, self)
 
         u = fire.Function(self.function_space, name="velocity").assign(self.guess_velocity_model)
         opt = FireVector(u.vector(), inner_product)
 
-        # Add control bounds to the problem (uses more RAM)
         xlo = fire.Function(self.function_space)
         xlo.interpolate(fire.Constant(vmin))
         x_lo = FireVector(xlo.vector(), inner_product)
@@ -1154,7 +989,16 @@ class FullWaveformInversion(AcousticWave):
         The @run_in_one_core decorator ensures this operation runs on a single
         MPI rank to avoid conflicts.
         """
-        create_segy(self.vp_result, self.function_space, grid_spacing, file_name)
+        if self.vp_result is None:
+            raise ValueError(
+                "SEG-Y export requires a single scalar inversion control result.",
+            )
+        create_segy(
+            self.vp_result,
+            self.vp_result.function_space(),
+            grid_spacing,
+            file_name,
+        )
 
 
 class SyntheticRealAcousticWave(AcousticWave):
