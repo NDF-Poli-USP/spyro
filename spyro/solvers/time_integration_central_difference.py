@@ -1,7 +1,55 @@
 import firedrake as fire
+import numpy as np
 
 from . import helpers
 from .. import utils
+
+
+def _get_real_shot_step(wave, step):
+    real_shot_record = wave.real_shot_record
+
+    if real_shot_record is None:
+        raise ValueError(
+            "Set wave.real_shot_record before enabling functional "
+            "accumulation during the forward solve."
+        )
+
+    if isinstance(real_shot_record, np.ndarray):
+        if real_shot_record.ndim == 3:
+            return real_shot_record[wave.sources.current_sources[0], step]
+        if real_shot_record.ndim == 2:
+            return real_shot_record[step]
+
+    if isinstance(real_shot_record, (list, tuple)):
+        if (
+            wave.sources is not None
+            and wave.sources.current_sources is not None
+            and len(real_shot_record) > wave.sources.current_sources[0]
+        ):
+            source_record = real_shot_record[wave.sources.current_sources[0]]
+            if isinstance(source_record, np.ndarray) and source_record.ndim == 2:
+                return source_record[step]
+
+    return real_shot_record[step]
+
+
+def _compute_functional_per_step(wave, residual_step, step, nsteps):
+    weight = 0.5 if step == 0 or step == nsteps - 1 else 1.0
+
+    if wave.use_vertex_only_mesh:
+        return fire.assemble(
+            0.5 * wave.dt * weight
+            * fire.inner(residual_step, residual_step) * fire.dx
+        )
+
+    residual_array = np.asarray(residual_step)
+    if residual_array.ndim != 1:
+        raise ValueError(
+            "Expected one residual vector with shape (num_receivers,) "
+            "for the current time step."
+        )
+
+    return np.sum(residual_array**2) * (0.5 * wave.dt * weight)
 
 
 def central_difference(wave, source_ids=[0]):
@@ -32,6 +80,7 @@ def central_difference(wave, source_ids=[0]):
     wave.field_logger.start_logging(source_ids)
     wave.comm.comm.barrier()
 
+    compute_functional = wave._compute_functional
     t = wave.current_time
     nt = int(wave.final_time / wave.dt) + 1  # number of timesteps
     usol = [
@@ -47,6 +96,8 @@ def central_difference(wave, source_ids=[0]):
             wave.vstate)
     usol_recv = []
     save_step = 0
+    if compute_functional:
+        J = 0.0
     for step in range(nt):
         # Basic way of applying sources
         wave.update_source_expression(t)
@@ -79,6 +130,26 @@ def central_difference(wave, source_ids=[0]):
             wave.field_logger.log(t)
             helpers.display_progress(wave.comm, t)
 
+        if compute_functional:
+            observed_step = _get_real_shot_step(wave, step)
+            if wave.use_vertex_only_mesh:
+                if isinstance(observed_step, np.ndarray):
+                    real_shot = fire.Function(
+                        usol_recv[-1].function_space(),
+                        val=observed_step,
+                    )
+                    residual_step = real_shot - usol_recv[-1]
+                elif isinstance(observed_step, fire.Function):
+                    residual_step = observed_step - usol_recv[-1]
+                else:
+                    raise ValueError(
+                        "Unsupported type for real_shot_record. Must be "
+                        "either a numpy array or a Firedrake Function."
+                    )
+            else:
+                residual_step = observed_step - usol_recv[-1]
+            J += _compute_functional_per_step(wave, residual_step, step, nt)
+
         t = step * float(wave.dt)
 
     wave.current_time = t
@@ -91,6 +162,8 @@ def central_difference(wave, source_ids=[0]):
     wave.receivers_output = usol_recv
     wave.forward_solution = usol
     wave.forward_solution_receivers = usol_recv
+    if compute_functional:
+        wave.functional_value = J
 
     wave.field_logger.stop_logging()
     return usol, usol_recv

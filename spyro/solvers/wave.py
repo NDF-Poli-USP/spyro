@@ -97,6 +97,7 @@ class Wave(Model_parameters, metaclass=ABCMeta):
         self.tensor_function_space0 = None
         self.tensor_function_space1 = None
         self.forward_solution_receivers = None
+        self._compute_functional = False
         self.current_time = 0.0
         self.set_solver_parameters()
 
@@ -120,6 +121,8 @@ class Wave(Model_parameters, metaclass=ABCMeta):
             warnings.warn("No mesh found. Please define a mesh.")
         # Expression to define sources through UFL (less efficient)
         self.source_expression = None
+        self.functional_value = None
+        self.real_shot_record = None
 
         self.field_logger = FieldLogger(self.comm,
                                         self.input_dictionary["visualization"])
@@ -502,3 +505,7 @@ class Wave(Model_parameters, metaclass=ABCMeta):
     def set_material_property(self, *args, **kwargs):
         """Backward-compatible alias for set_material_properties."""
         return self.set_material_properties(*args, **kwargs)
+
+    def enable_compute_functional(self):
+        """Enable accumulation of the data-misfit functional during solves."""
+        self._compute_functional = True
