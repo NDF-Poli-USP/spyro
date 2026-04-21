@@ -14,10 +14,11 @@ from ..io import parallel_print
 from ..io.field_logger import FieldLogger
 from ..receivers.Receivers import Receivers
 from ..sources.Sources import Sources
-from ..utils.typing import WaveType
+from ..utils.typing import AdjointType, WaveType
 from .solver_parameters import get_default_parameters_for_method
 from ..utils import eval_functions_to_ufl
 from .modal.modal_sol import Modal_Solver
+from .automatic_differentiation_solver import AutomatedAdjoint
 
 fire.set_log_level(fire.ERROR)
 
@@ -98,6 +99,8 @@ class Wave(Model_parameters, metaclass=ABCMeta):
         self.tensor_function_space1 = None
         self._receivers_output = None
         self._compute_functional = False
+        self._store_forward_time_steps = True
+        self._store_misfit = False
         self.current_time = 0.0
         self.set_solver_parameters()
 
@@ -123,6 +126,10 @@ class Wave(Model_parameters, metaclass=ABCMeta):
         self.source_expression = None
         self.functional_value = None
         self.real_shot_record = None
+        self.forward_solution = None
+        self.misfit = None
+        self.automated_adjoint = None
+        self.adjoint_type = AdjointType.NONE
 
         self.field_logger = FieldLogger(self.comm,
                                         self.input_dictionary["visualization"])
@@ -509,6 +516,36 @@ class Wave(Model_parameters, metaclass=ABCMeta):
     def enable_compute_functional(self):
         """Enable accumulation of the data-misfit functional during solves."""
         self._compute_functional = True
+
+    @property
+    def store_forward_time_steps(self):
+        return self._store_forward_time_steps
+
+    @store_forward_time_steps.setter
+    def store_forward_time_steps(self, value):
+        self._store_forward_time_steps = value
+
+    def enable_store_misfit(self):
+        self._store_misfit = True
+        self.misfit = []
+
+    def enable_automated_adjoint(self):
+        self.enable_compute_functional()
+        self.store_forward_time_steps = False
+        self._store_misfit = False
+        self.misfit = None
+        self.automatic_adjoint = True
+        self.adjoint_type = AdjointType.AUTOMATED_ADJOINT
+        self.use_vertex_only_mesh = True
+        controls = self.c if self.c is not None else self.initial_velocity_model
+        self.automated_adjoint = AutomatedAdjoint(controls)
+
+    def enable_implemented_adjoint(self):
+        self.enable_compute_functional()
+        self.enable_store_misfit()
+        self.store_forward_time_steps = True
+        self.automatic_adjoint = False
+        self.adjoint_type = AdjointType.IMPLEMENTED_ADJOINT
 
     @property
     def forward_solution_receivers(self):
