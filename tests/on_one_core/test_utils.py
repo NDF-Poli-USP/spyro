@@ -1,7 +1,9 @@
+import firedrake as fire
 import spyro
 import scipy as sp
 import numpy as np
 import math
+from spyro.solvers.inversion import FullWaveformInversion
 
 
 def test_butter_lowpast_filter():
@@ -59,6 +61,29 @@ def test_geometry_creation():
     print("Geometry creation test 6: ", test6)
 
     assert all([test0, test1, test2, test3, test4, test5, test6])
+
+
+def test_gradient_to_derivative_uses_lumped_mass_diagonal():
+    mesh = fire.UnitSquareMesh(1, 1)
+    V = fire.FunctionSpace(mesh, "CG", 1)
+
+    dummy = type("DummyFWI", (), {})()
+    dummy.function_space = V
+    dummy.quadrature_rule = {}
+    dummy._mass_diagonal = None
+
+    gradient = fire.Function(V)
+    gradient.dat.data[:] = np.arange(1, V.dim() + 1, dtype=float)
+
+    derivative = FullWaveformInversion._gradient_to_derivative(dummy, gradient)
+
+    u = fire.TrialFunction(V)
+    v = fire.TestFunction(V)
+    ones = fire.Function(V).assign(1.0)
+    mass_diagonal = fire.assemble(fire.action(fire.inner(u, v) * fire.dx, ones))
+    expected = gradient.dat.data_ro[:] * mass_diagonal.dat.data_ro[:]
+
+    assert np.allclose(derivative.dat.data_ro[:], expected)
 
 
 if __name__ == "__main__":

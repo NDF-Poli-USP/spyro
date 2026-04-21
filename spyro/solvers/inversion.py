@@ -404,6 +404,7 @@ class FullWaveformInversion(AcousticWave):
         self.has_gradient_mask = False
         self.gradient_mask_available = False
         self.functional_history = []
+        self._mass_diagonal = None
 
     @property
     def real_velocity_model_file(self):
@@ -811,6 +812,28 @@ class FullWaveformInversion(AcousticWave):
 
         return Jm
 
+    def _gradient_to_derivative(self, gradient):
+        """Convert the L2 Riesz gradient to the Euclidean derivative.
+
+        The implemented adjoint returns the gradient in the function-space
+        inner product. SciPy expects the coefficient-space derivative, so this
+        method applies the lumped mass diagonal element-wise.
+        """
+        if self._mass_diagonal is None:
+            V = self.function_space
+            u = fire.TrialFunction(V)
+            v = fire.TestFunction(V)
+            ones = fire.Function(V)
+            ones.assign(1.0)
+            mass_form = fire.inner(u, v) * fire.dx(**self.quadrature_rule)
+            self._mass_diagonal = fire.assemble(fire.action(mass_form, ones))
+
+        derivative = fire.Function(self.function_space)
+        derivative.dat.data[:] = (
+            gradient.dat.data_ro[:] * self._mass_diagonal.dat.data_ro[:]
+        )
+        return derivative
+
     def get_gradient(self, c=None, save=True, calculate_functional=True):
         """
         Calculate the gradient of the objective functional.
@@ -871,7 +894,8 @@ class FullWaveformInversion(AcousticWave):
             The gradient of the functional with respect to the velocity model.
         """
         self.get_gradient(c=c)
-        dJ = self.gradient.dat.data[:]
+        derivative = self._gradient_to_derivative(self.gradient)
+        dJ = derivative.dat.data_ro.copy()
         return self.functional, dJ
 
     def run_fwi(self, **kwargs):
