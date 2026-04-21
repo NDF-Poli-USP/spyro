@@ -3,6 +3,7 @@ import numpy as np
 
 from . import helpers
 from .. import utils
+from ..utils.typing import AdjointType
 
 
 def _get_real_shot_step(wave, step):
@@ -80,14 +81,19 @@ def central_difference(wave, source_ids=[0]):
     wave.field_logger.start_logging(source_ids)
     wave.comm.comm.barrier()
 
+    adjoint_type = getattr(wave, "adjoint_type", AdjointType.NONE)
     compute_functional = wave._compute_functional
+    store_forward_time_steps = wave.store_forward_time_steps
+    store_misfit = getattr(wave, "_store_misfit", False)
     t = wave.current_time
     nt = int(wave.final_time / wave.dt) + 1  # number of timesteps
-    usol = [
-        fire.Function(wave.function_space, name=wave.get_function_name())
-        for t in range(nt)
-        if t % wave.gradient_sampling_frequency == 0
-    ]
+    usol = []
+    if store_forward_time_steps:
+        usol = [
+            fire.Function(wave.function_space, name=wave.get_function_name())
+            for t in range(nt)
+            if t % wave.gradient_sampling_frequency == 0
+        ]
     if wave.sources is not None and wave.use_vertex_only_mesh:
         # source_cof is a cofunction that represents a point source,
         # being one at a point and zero elsewhere.
@@ -98,6 +104,10 @@ def central_difference(wave, source_ids=[0]):
     save_step = 0
     if compute_functional:
         J = 0.0
+    if store_misfit:
+        wave.misfit = []
+    if adjoint_type == AdjointType.AUTOMATED_ADJOINT:
+        wave.automated_adjoint.start_recording()
     for step in range(nt):
         # Basic way of applying sources
         wave.update_source_expression(t)
@@ -118,7 +128,7 @@ def central_difference(wave, source_ids=[0]):
         else:
             usol_recv.append(wave.get_receivers_output())
 
-        if step % wave.gradient_sampling_frequency == 0:
+        if store_forward_time_steps and step % wave.gradient_sampling_frequency == 0:
             usol[save_step].assign(wave.get_function())
             save_step += 1
 
@@ -148,6 +158,8 @@ def central_difference(wave, source_ids=[0]):
                     )
             else:
                 residual_step = observed_step - usol_recv[-1]
+            if store_misfit:
+                wave.misfit.append(residual_step)
             J += _compute_functional_per_step(wave, residual_step, step, nt)
 
         t = step * float(wave.dt)
@@ -160,8 +172,12 @@ def central_difference(wave, source_ids=[0]):
     usol_recv = utils.utils.communicate(usol_recv, wave.comm)
 
     wave.receivers_output = usol_recv
-    wave.forward_solution = usol
     wave.forward_solution_receivers = usol_recv
+    if adjoint_type == AdjointType.AUTOMATED_ADJOINT:
+        wave.automated_adjoint.stop_recording()
+        wave.forward_solution = wave.vstate
+    else:
+        wave.forward_solution = usol
     if compute_functional:
         wave.functional_value = J
 
