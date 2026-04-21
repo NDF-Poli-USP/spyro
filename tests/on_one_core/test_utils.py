@@ -61,6 +61,18 @@ def test_geometry_creation():
     assert all([test0, test1, test2, test3, test4, test5, test6])
 
 
+def test_receivers_output_aliases_forward_solution_receivers():
+    wave = spyro.examples.Rectangle_acoustic()
+    data = np.array([[1.0, 2.0], [3.0, 4.0]])
+
+    wave.receivers_output = data
+    assert wave.forward_solution_receivers is data
+
+    replacement = np.array([[5.0]])
+    wave.forward_solution_receivers = replacement
+    assert wave.receivers_output is replacement
+
+
 if __name__ == "__main__":
     test_butter_lowpast_filter()
     test_geometry_creation()

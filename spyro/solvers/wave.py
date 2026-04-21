@@ -96,7 +96,7 @@ class Wave(Model_parameters, metaclass=ABCMeta):
         self.vector_function_space = None
         self.tensor_function_space0 = None
         self.tensor_function_space1 = None
-        self.forward_solution_receivers = None
+        self._receivers_output = None
         self.current_time = 0.0
         self.set_solver_parameters()
 
@@ -502,3 +502,19 @@ class Wave(Model_parameters, metaclass=ABCMeta):
     def set_material_property(self, *args, **kwargs):
         """Backward-compatible alias for set_material_properties."""
         return self.set_material_properties(*args, **kwargs)
+
+    @property
+    def forward_solution_receivers(self):
+        return self._receivers_output
+
+    @forward_solution_receivers.setter
+    def forward_solution_receivers(self, value):
+        self._receivers_output = value
+
+    @property
+    def receivers_output(self):
+        return self._receivers_output
+
+    @receivers_output.setter
+    def receivers_output(self, value):
+        self._receivers_output = value
