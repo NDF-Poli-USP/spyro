@@ -111,8 +111,8 @@ class MeshingParameters():
         Polynomial degree of finite element basis functions.
     minimum_velocity : float
         Minimum velocity in the model for mesh size calculations.
-    velocity_model : object or str
-        Velocity model object or path to SEGY file for mesh adaptation.
+    velocity_model : object
+        Velocity model object for mesh adaptation.
     automatic_mesh : bool
         Whether mesh is automatically generated.
     edge_length : float
@@ -127,13 +127,13 @@ class MeshingParameters():
     negative_z : bool
         Whether z-axis points is always negative (True) or is positive (False).
     padding_type : str
-        Type of domain padding for gmsh meshing. Options: 'rectangular', 'elliptical', None.
+        Type of domain padding for gmsh meshing. Options: 'rectangular', 'hyperelliptical', None.
     padding_x : float
         Size of padding in the x-direction.
     padding_z : float
         Size of padding in the z-direction.
-    ellipse_n : float
-        Ellipse exponent for elliptical padding.
+    hyper_n : float
+        Hyperellipse exponent for hyperelliptical padding.
     hmin_segy : float
         Minimum Element size for SEGY interpolation.
     grade : float
@@ -141,7 +141,7 @@ class MeshingParameters():
     water_interface : bool
         If True, detects and implements the water interface curve.
     water_search_value : float
-        The physical value to search for to trace the water interface.
+        Value of the water speed that the water interface generator will use to find the bathymetry
     vp_water : float
         Substitute Water speed value if vs = 0.0.
     structured_mesh : bool
@@ -150,6 +150,8 @@ class MeshingParameters():
         Element size constraint for structured mesh spacing.
     winslow_implementation : str
         Winslow smoothing version to use. Options: 'default', 'fast', 'numba'.
+    apply_winslow : bool
+        Whether to apply Winslow smoothing to the generated mesh.
     winslow_iterations : int
         Number of iterations for Winslow Smoothing.
     winslow_omega : float
@@ -196,8 +198,8 @@ class MeshingParameters():
         degree : int, optional
             Polynomial degree of finite element basis functions.
             Default is None.
-        velocity_model : object or str, optional
-            Velocity model object or SEGY file path for mesh adaptation. Default is None.
+        velocity_model : object, optional
+            Velocity model object for mesh adaptation. Default is None.
         abc_pad_length : float, optional
             Length of absorbing boundary condition padding layer.
             Default is None.
@@ -226,13 +228,14 @@ class MeshingParameters():
         self._unit = None
         self._output_filename = "automatic_mesh.msh"
         self._grid_velocity_data = None
-        
+
         # Initialize private attributes for gmsh mesh properties
         self._padding_x = None
         self._padding_z = None
         self._h_padding = None
         self._padding_type = None
         self._winslow_implementation = None
+        self._apply_winslow = None
 
         # Set basic attributes
         self.quadrilateral = quadrilateral
@@ -240,10 +243,10 @@ class MeshingParameters():
         self.minimum_velocity = None
         self.gradient_mask = None
         self.negative_z = negative_z
+        self.velocity_model = velocity_model
 
-        self.velocity_model = self.input_mesh_dictionary.get("velocity_model", velocity_model)
         self.minimum_velocity = self.input_mesh_dictionary.get("minimum_velocity", None)
-        self.ellipse_n = self.input_mesh_dictionary.get("ellipse_n", 3.0)
+        self.hyper_n = self.input_mesh_dictionary.get("hyper_n", 3.0)
         self.hmin_segy = self.input_mesh_dictionary.get("hmin_segy", 0.0)
         self.grade = self.input_mesh_dictionary.get("grade", 0.9)
         self.water_interface = self.input_mesh_dictionary.get("water_interface", False)
@@ -254,6 +257,7 @@ class MeshingParameters():
         self.winslow_iterations = self.input_mesh_dictionary.get("winslow_iterations", 5000)
         self.winslow_omega = self.input_mesh_dictionary.get("winslow_omega", 0.5)
         self.extend_segy = self.input_mesh_dictionary.get("extend_segy", True)
+        self.apply_winslow = self.input_mesh_dictionary.get("apply_winslow", True)
 
         # Apply parameters from input_mesh_dictionary and direct arguments
         self.source_frequency = self.input_mesh_dictionary.get("source_frequency", source_frequency)
@@ -306,10 +310,11 @@ class MeshingParameters():
         its mesh_type are present.
 
         verbose : bool
-            If True, prints out the parameter that is missing. 
+            If True, prints out the parameter that is missing.
         """
         if self.mesh_type is None:
-            if verbose: print("Mesh incomplete: 'mesh_type' is not set.")
+            if verbose:
+                print("Mesh incomplete: 'mesh_type' is not set.")
             self.is_complete = False
             return
 
@@ -320,25 +325,28 @@ class MeshingParameters():
                 or self.cells_per_wavelength is not None
             )
             if not has_size_param:
-                if verbose: print(f"Mesh incomplete: '{self.mesh_type}' requires either 'edge_length' or 'cells_per_wavelength'.")
+                if verbose:
+                    print(f"Mesh incomplete: '{self.mesh_type}' requires either 'edge_length' or 'cells_per_wavelength'.")
                 self.is_complete = False
                 return
 
             # If using cells_per_wavelength, need frequency and some form of velocity definition
             if self.cells_per_wavelength is not None:
                 if self.source_frequency is None:
-                    if verbose: print(f"Mesh incomplete: 'cells_per_wavelength' requires 'source_frequency'.")
+                    if verbose:
+                        print("Mesh incomplete: 'cells_per_wavelength' requires 'source_frequency'.")
                     self.is_complete = False
                     return
-                    
+
                 has_velocity = (
                     self.minimum_velocity is not None
                     or self.grid_velocity_data is not None
                     or self.velocity_model is not None  # Accepts a string path for SEGY
                 )
-                
+
                 if not has_velocity:
-                    if verbose: print(f"Mesh incomplete: 'cells_per_wavelength' requires 'minimum_velocity', 'grid_velocity_data', or 'velocity_model'.")
+                    if verbose:
+                        print("Mesh incomplete: 'cells_per_wavelength' requires 'minimum_velocity', 'grid_velocity_data', or 'velocity_model'.")
                     self.is_complete = False
                     return
 
@@ -347,7 +355,8 @@ class MeshingParameters():
         elif self.mesh_type == "file":
             # For file-based meshes, need mesh_file
             if self.mesh_file is None:
-                if verbose: print("Mesh incomplete: 'mesh_type' is 'file' but 'mesh_file' is not set.")
+                if verbose:
+                    print("Mesh incomplete: 'mesh_type' is 'file' but 'mesh_file' is not set.")
                 self.is_complete = False
             else:
                 self.is_complete = True
@@ -355,13 +364,15 @@ class MeshingParameters():
         elif self.mesh_type == "user_mesh":
             # For user-provided meshes, need user_mesh object
             if self.user_mesh is None:
-                if verbose: print("Mesh incomplete: 'mesh_type' is 'user_mesh' but 'user_mesh' object is not set.")
+                if verbose:
+                    print("Mesh incomplete: 'mesh_type' is 'user_mesh' but 'user_mesh' object is not set.")
                 self.is_complete = False
             else:
                 self.is_complete = True
 
         else:
-            if verbose: print(f"Mesh incomplete: Unknown mesh_type '{self.mesh_type}'.")
+            if verbose:
+                print("Mesh incomplete: Unknown mesh_type '{self.mesh_type}'.")
             self.is_complete = False
 
     def _set_length_with_unit_check(self, attr_name, value):
@@ -516,18 +527,18 @@ class MeshingParameters():
         Only one of edge_length or cells_per_wavelength can be set at a time.
         Setting this property will automatically set cells_per_wavelength to None.
         """
-        if self.mesh_type=="SeismicMesh":
-            if self.cells_per_wavelength is not None:
-                warnings.warn(
-                    "Mutual exclusion: Both 'edge_length' and "
-                    "'cells_per_wavelength' control mesh size, "
-                    "but only one can be set at a time. Setting "
-                    "'edge_length' will override and remove the "
-                    "previously set 'cells_per_wavelength'. If "
-                    "you wish to use 'cells_per_wavelength' instead, "
-                    "set it after setting 'edge_length'."
-                )
-                self.cells_per_wavelength = None
+        if value is not None and self.cells_per_wavelength is not None:
+            warnings.warn(
+                "Mutual exclusion: Both 'edge_length' and "
+                "'cells_per_wavelength' control mesh size, "
+                "but only one can be set at a time. Setting "
+                "'edge_length' will override and remove the "
+                "previously set 'cells_per_wavelength'. If "
+                "you wish to use 'cells_per_wavelength' instead, "
+                "set it after setting 'edge_length'."
+            )
+            self._cells_per_wavelength = None
+
         self._edge_length = value
         if hasattr(self, 'is_complete'):
             self.check_completeness()
@@ -562,10 +573,11 @@ class MeshingParameters():
         Only one of cells_per_wavelength or edge_length can be set at a time.
         Setting this property will automatically set edge_length to None.
         """
-        if self.edge_length is not None:
-            warnings.warn("Setting cells_per_wavelength"
+        if value is not None and self.edge_length is not None:
+            warnings.warn("Setting cells_per_wavelength "
                           "removes edge_length parameter")
-            self.edge_length = None
+            self._edge_length = None
+
         self._cells_per_wavelength = value
         if hasattr(self, 'is_complete'):
             self.check_completeness()
@@ -996,7 +1008,7 @@ class MeshingParameters():
         Returns
         -------
         str or None
-            The padding type ('rectangular', 'elliptical', or None).
+            The padding type ('rectangular', 'hyperelliptical', or None).
         """
         return self._padding_type
 
@@ -1007,14 +1019,14 @@ class MeshingParameters():
         Parameters
         ----------
         value : str or None
-            The padding type. Must be one of: 'rectangular', 'elliptical', or None.
+            The padding type. Must be one of: 'rectangular', 'hyperelliptical', or None.
 
         Raises
         ------
         ValueError
             If value is not one of the allowed padding types.
         """
-        allowed_types = [None, "rectangular", "elliptical"]
+        allowed_types = [None, "rectangular", "hyperelliptical"]
         if value not in allowed_types:
             value_parameter_error("padding_type", value, allowed_types)
         self._padding_type = value
@@ -1048,6 +1060,36 @@ class MeshingParameters():
         if value is not None and value not in allowed_types:
             value_parameter_error("winslow_implementation", value, allowed_types)
         self._winslow_implementation = value
+
+    @property
+    def apply_winslow(self):
+        """Get the flag indicating whether to apply Winslow smoothing.
+
+        Returns
+        -------
+        bool
+            True if Winslow smoothing is enabled, False otherwise.
+        """
+        return self._apply_winslow
+
+    @apply_winslow.setter
+    def apply_winslow(self, value):
+        """Set the flag indicating whether to apply Winslow smoothing.
+
+        Parameters
+        ----------
+        value : bool
+            Whether to apply Winslow smoothing to the generated mesh.
+
+        Raises
+        ------
+        TypeError
+            If the provided value is not a boolean.
+        """
+        if value is not None and not isinstance(value, bool):
+            raise TypeError(f"apply_winslow must be a boolean, got {type(value).__name__}")
+
+        self._apply_winslow = value
 
     def set_mesh(
         self,
