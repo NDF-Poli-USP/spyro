@@ -92,16 +92,6 @@ def test_compute_functional_accepts_after_solve_mode():
     assert wave.functional_evaluation_mode == FunctionalEvaluationMode.AFTER_SOLVE
 
 
-def test_disable_compute_functional_removes_configuration():
-    wave = _build_wave()
-    wave.compute_functional = FunctionalEvaluationMode.PER_TIMESTEP
-
-    wave.disable_compute_functional()
-
-    assert wave.compute_functional is None
-    assert wave.functional_evaluation_mode is None
-
-
 def _base_functional_dictionary():
     return {
         "options": {

@@ -511,10 +511,6 @@ class Wave(Model_parameters, metaclass=ABCMeta):
         """Enable functional evaluation during forward solves."""
         self.functional_evaluation_mode = mode
 
-    def disable_compute_functional(self):
-        """Disable functional evaluation during forward solves."""
-        self.functional_evaluation_mode = None
-
     @property
     def functional_evaluation_mode(self):
         """Get the current functional evaluation mode."""
