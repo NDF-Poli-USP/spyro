@@ -5,8 +5,10 @@ from mpi4py import MPI
 import os
 from scipy.signal import butter, filtfilt
 import warnings
+
 from ..io import ensemble_functional
 from ..io import parallel_print
+from .typing import FunctionalType
 try:
     from SeismicMesh import write_velocity_model
     SEISMIC_MESH_AVAILABLE = True
@@ -46,17 +48,20 @@ def butter_lowpass_filter(shot, cutoff, fs, order=2):
 
 
 @ensemble_functional
-def compute_functional(Wave_object, residual):
-    """Compute the functional to be optimized.
+def compute_functional(
+    wave_object, residual, per_step=False, step=None, nsteps=None,
+    functional_form=FunctionalType.L2Norm
+):
+    """Compute the functional value for the given residual at receiver
+    locations.
 
-    Computes the L2 norm of the residual at receiver locations,
-    integrated over time using the trapezoidal rule. This functional
-    is commonly used in classical full waveform inversion (FWI) as the
+    This functional is commonly used in classical full waveform inversion (FWI)
+    as the
     measure to be minimized.
 
     Parameters
     ----------
-    Wave_object : object
+    wave_object : object
         Wave propagation object containing simulation parameters.
         Must have attributes:
         - number_of_receivers : int
@@ -82,8 +87,27 @@ def compute_functional(Wave_object, residual):
     where :math:`N_r` is the number of receivers and :math:`T` is the
     total simulation time.
     """
-    num_receivers = Wave_object.number_of_receivers
-    dt = Wave_object.dt
+    if functional_form != FunctionalType.L2Norm:
+        raise NotImplementedError(
+            f"Functional form {functional_form} not implemented. Only L2Norm"
+            " is currently supported.")
+    if per_step:
+        weight = 0.5 if step == 0 or step == nsteps - 1 else 1.0
+
+        if wave_object.use_vertex_only_mesh:
+            return assemble(
+                0.5 * wave_object.dt * weight
+                * inner(residual, residual) * dx
+            )
+        elif isinstance(residual, np.ndarray):
+            return np.sum(residual**2) * (0.5 * wave_object.dt * weight)
+        else:
+            raise ValueError(
+                "Expected residual to be a numpy array when not using vertex-only mesh."
+            )
+
+    num_receivers = wave_object.number_of_receivers
+    dt = wave_object.dt
 
     J = 0
     for rn in range(num_receivers):

@@ -4,7 +4,7 @@ import firedrake as fire
 import spyro.meshing.meshing_operations as mshops
 
 from .time_integration_central_difference import \
-    central_difference as time_integrator
+    _propagate_forward_with_central_difference as _forward_time_integrator
 from ..domains.quadrature import quadrature_rules
 from ..domains.space import check_function_space_type
 from ..io import Model_parameters
@@ -14,7 +14,7 @@ from ..io import parallel_print
 from ..io.field_logger import FieldLogger
 from ..receivers.Receivers import Receivers
 from ..sources.Sources import Sources
-from ..utils.typing import WaveType
+from ..utils.typing import FunctionalEvaluationMode, WaveType
 from .solver_parameters import get_default_parameters_for_method
 from ..utils import eval_functions_to_ufl
 from .modal.modal_sol import Modal_Solver
@@ -97,7 +97,6 @@ class Wave(Model_parameters, metaclass=ABCMeta):
         self.tensor_function_space0 = None
         self.tensor_function_space1 = None
         self.forward_solution_receivers = None
-        self._compute_functional = False
         self.current_time = 0.0
         self.set_solver_parameters()
 
@@ -445,7 +444,9 @@ class Wave(Model_parameters, metaclass=ABCMeta):
         pass
 
     @ensemble_propagator
-    def wave_propagator(self, dt=None, final_time=None, source_nums=[0]):
+    def wave_propagator(
+        self, dt=None, final_time=None, shot_ids=None, source_nums=None,
+    ):
         """
         Propagate the wave forward in time.
         Currently uses central differences.
@@ -458,6 +459,10 @@ class Wave(Model_parameters, metaclass=ABCMeta):
         final_time: Python 'float' (optional)
             Time which simulation ends. If not mentioned uses the default,
             that was estabilished in the wave object.
+        shot_ids: list of int (optional)
+            Source IDs to propagate. Defaults to ``[0]``.
+        source_nums: list of int (optional)
+            Backward-compatible alias for ``shot_ids``.
 
         Returns:
         --------
@@ -470,11 +475,13 @@ class Wave(Model_parameters, metaclass=ABCMeta):
             self.final_time = final_time
         if dt is not None:
             self.dt = dt
+        if shot_ids is not None and source_nums is not None:
+            raise ValueError("Use either shot_ids or source_nums, not both.")
+        if shot_ids is None:
+            shot_ids = source_nums if source_nums is not None else [0]
 
-        self.current_sources = source_nums
-        usol, usol_recv = time_integrator(self, source_nums)
-
-        return usol, usol_recv
+        self.current_sources = shot_ids
+        _forward_time_integrator(self, shot_ids=shot_ids)
 
     def get_dt(self):
         return self._dt
@@ -506,6 +513,45 @@ class Wave(Model_parameters, metaclass=ABCMeta):
         """Backward-compatible alias for set_material_properties."""
         return self.set_material_properties(*args, **kwargs)
 
-    def enable_compute_functional(self):
-        """Enable accumulation of the data-misfit functional during solves."""
-        self._compute_functional = True
+    def enable_compute_functional(
+        self, mode=FunctionalEvaluationMode.PER_TIMESTEP
+    ):
+        """Enable functional evaluation during forward solves."""
+        self.functional_evaluation_mode = mode
+
+    def disable_compute_functional(self):
+        """Disable functional evaluation during forward solves."""
+        self.functional_evaluation_mode = None
+
+    @property
+    def functional_evaluation_mode(self):
+        """Get the current functional evaluation mode."""
+        try:
+            return self._functional_evaluation_mode
+        except AttributeError:
+            return None
+
+    @functional_evaluation_mode.setter
+    def functional_evaluation_mode(self, mode: FunctionalEvaluationMode):
+        if mode is None:
+            try:
+                del self._functional_evaluation_mode
+            except AttributeError:
+                pass
+            return
+
+        if not isinstance(mode, FunctionalEvaluationMode):
+            raise ValueError(
+                f"Invalid functional evaluation mode: {mode}. "
+                f"Expected an instance of FunctionalEvaluationMode enum."
+            )
+        self._functional_evaluation_mode = mode
+
+    @property
+    def compute_functional(self):
+        """Backward-compatible alias for functional_evaluation_mode."""
+        return self.functional_evaluation_mode
+
+    @compute_functional.setter
+    def compute_functional(self, mode: FunctionalEvaluationMode):
+        self.functional_evaluation_mode = mode
