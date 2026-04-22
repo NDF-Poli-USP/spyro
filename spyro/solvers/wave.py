@@ -4,7 +4,7 @@ import firedrake as fire
 import spyro.meshing.meshing_operations as mshops
 
 from .time_integration_central_difference import \
-    _propagate_forward_with_central_difference as _forward_time_integrator
+    _propagate_forward_central_difference as _forward_time_integrator
 from ..domains.quadrature import quadrature_rules
 from ..domains.space import check_function_space_type
 from ..io import Model_parameters
@@ -444,9 +444,7 @@ class Wave(Model_parameters, metaclass=ABCMeta):
         pass
 
     @ensemble_propagator
-    def wave_propagator(
-        self, dt=None, final_time=None, shot_ids=None, source_nums=None,
-    ):
+    def wave_propagator(self, dt=None, final_time=None, source_nums=None):
         """
         Propagate the wave forward in time.
         Currently uses central differences.
@@ -459,10 +457,8 @@ class Wave(Model_parameters, metaclass=ABCMeta):
         final_time: Python 'float' (optional)
             Time which simulation ends. If not mentioned uses the default,
             that was estabilished in the wave object.
-        shot_ids: list of int (optional)
-            Source IDs to propagate. Defaults to ``[0]``.
         source_nums: list of int (optional)
-            Backward-compatible alias for ``shot_ids``.
+            List of source numbers to be simulated. If not mentioned, simulates all sources.
 
         Returns:
         --------
@@ -475,13 +471,9 @@ class Wave(Model_parameters, metaclass=ABCMeta):
             self.final_time = final_time
         if dt is not None:
             self.dt = dt
-        if shot_ids is not None and source_nums is not None:
-            raise ValueError("Use either shot_ids or source_nums, not both.")
-        if shot_ids is None:
-            shot_ids = source_nums if source_nums is not None else [0]
 
-        self.current_sources = shot_ids
-        _forward_time_integrator(self, shot_ids=shot_ids)
+        self.current_sources = source_nums
+        _forward_time_integrator(self, source_ids=source_nums)
 
     def get_dt(self):
         return self._dt
