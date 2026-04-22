@@ -97,6 +97,7 @@ class Wave(Model_parameters, metaclass=ABCMeta):
         self.tensor_function_space0 = None
         self.tensor_function_space1 = None
         self.forward_solution_receivers = None
+        self.adjoint_solution = None
         self.current_time = 0.0
         self.set_solver_parameters()
 
