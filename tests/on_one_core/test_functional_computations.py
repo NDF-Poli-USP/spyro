@@ -2,7 +2,6 @@ from copy import deepcopy
 from types import SimpleNamespace
 
 import numpy as np
-import pytest
 
 from spyro.solvers.acoustic_wave import AcousticWave
 from spyro.solvers.wave import Wave
