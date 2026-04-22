@@ -57,12 +57,11 @@ def backward_wave_propagator(wave_obj: Wave, dt: float = None) -> fire.Function:
 
     forward_solution = wave_obj.forward_solution
     receivers = wave_obj.receivers
-    residual = wave_obj.misfit
 
     for step in range(nt - 1, -1, -1):
         rhs_forcing.assign(0.0)
         wave_obj.rhs_no_pml_source().assign(
-            receivers.apply_receivers_as_source(rhs_forcing, residual, step)
+            receivers.apply_receivers_as_source(rhs_forcing, wave_obj.misfit, step)
         )
         wave_obj.solver.solve()
 
@@ -163,7 +162,7 @@ def _build_gradient_solver(wave_obj: Wave, mask_available: bool) -> tuple[
         # the PML auxiliary variables. In addition, we are not interested
         # in the gradient in the PML region.
         indicator = _pml_interior_indicator(wave_obj)
-        # Computes de gradient only in the physical domain.
+        # Compute the gradient only in the physical domain.
         ffG = (
             2.0 * wave_obj.c * indicator * fire.dot(
                 fire.grad(uadj), fire.grad(forward_field)) * m_v * dx
