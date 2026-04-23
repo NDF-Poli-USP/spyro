@@ -2,7 +2,6 @@ import firedrake as fire
 import numpy as np
 
 from spyro.solvers import wave
-from spyro.utils.utils import compute_functional
 
 from . import helpers
 from .. import utils

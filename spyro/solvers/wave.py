@@ -14,11 +14,7 @@ from ..io import parallel_print
 from ..io.field_logger import FieldLogger
 from ..receivers.Receivers import Receivers
 from ..sources.Sources import Sources
-<<<<<<< HEAD
-from ..utils.typing import AdjointType, WaveType
-=======
-from ..utils.typing import FunctionalEvaluationMode, WaveType
->>>>>>> origin
+from ..utils.typing import AdjointType, WaveType, FunctionalEvaluationMode
 from .solver_parameters import get_default_parameters_for_method
 from ..utils import eval_functions_to_ufl
 from .modal.modal_sol import Modal_Solver
@@ -101,15 +97,12 @@ class Wave(Model_parameters, metaclass=ABCMeta):
         self.vector_function_space = None
         self.tensor_function_space0 = None
         self.tensor_function_space1 = None
-<<<<<<< HEAD
         self._receivers_output = None
         self._compute_functional = False
         self._store_forward_time_steps = True
         self._store_misfit = False
-=======
         self.forward_solution_receivers = None
         self.adjoint_solution = None
->>>>>>> origin
         self.current_time = 0.0
         self.set_solver_parameters()
 
@@ -133,16 +126,13 @@ class Wave(Model_parameters, metaclass=ABCMeta):
             warnings.warn("No mesh found. Please define a mesh.")
         # Expression to define sources through UFL (less efficient)
         self.source_expression = None
-<<<<<<< HEAD
         self.functional_value = None
         self.real_shot_record = None
         self.forward_solution = None
         self.misfit = None
         self.automated_adjoint = None
         self.adjoint_type = AdjointType.NONE
-=======
         self.real_shot_record = None
->>>>>>> origin
 
         self.field_logger = FieldLogger(self.comm,
                                         self.input_dictionary["visualization"])
@@ -526,10 +516,6 @@ class Wave(Model_parameters, metaclass=ABCMeta):
     def set_material_property(self, *args, **kwargs):
         """Backward-compatible alias for set_material_properties."""
         return self.set_material_properties(*args, **kwargs)
-
-    def enable_compute_functional(self):
-        """Enable accumulation of the data-misfit functional during solves."""
-        self._compute_functional = True
 
     @property
     def store_forward_time_steps(self):
