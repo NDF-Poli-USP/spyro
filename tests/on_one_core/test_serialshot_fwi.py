@@ -1,3 +1,4 @@
+from copy import deepcopy
 import numpy as np
 import firedrake as fire
 import spyro
@@ -69,6 +70,16 @@ dictionary["inversion"] = {
 }
 
 
+def build_vom_serialshot_dictionary():
+    test_dictionary = deepcopy(dictionary)
+    test_dictionary["acquisition"]["source_locations"] = (
+        dictionary["acquisition"]["source_locations"][:2]
+    )
+    test_dictionary["acquisition"]["use_vertex_only_mesh"] = True
+    test_dictionary["time_axis"]["final_time"] = 0.1
+    return test_dictionary
+
+
 @pytest.mark.slow
 def test_fwi(load_real_shot=False, use_rol=False):
     """
@@ -132,6 +143,50 @@ def test_fwi(load_real_shot=False, use_rol=False):
 
     print("END", flush=True)
     assert all([test0, test1, test2, test3])
+
+
+@pytest.mark.slow
+def test_vom_serialshot_keeps_forward_histories_for_gradient():
+    test_dictionary = build_vom_serialshot_dictionary()
+    fwi = spyro.FullWaveformInversion(dictionary=test_dictionary)
+
+    fwi.set_real_mesh(input_mesh_parameters={"edge_length": 0.15})
+    center_z = -1.0
+    center_x = 1.0
+    mesh_z = fwi.mesh_z
+    mesh_x = fwi.mesh_x
+    cond = fire.conditional(
+        (mesh_z - center_z) ** 2 + (mesh_x - center_x) ** 2 < 0.2 ** 2,
+        3.0,
+        2.5,
+    )
+    fwi.set_real_velocity_model(conditional=cond, output=False, dg_velocity_model=False)
+    fwi.generate_real_shot_record(plot_model=False, save_shot_record=False)
+
+    fwi.set_guess_mesh(input_mesh_parameters={"edge_length": 0.15})
+    fwi.set_guess_velocity_model(constant=2.5)
+
+    misfit = fwi.calculate_misfit()
+
+    assert isinstance(misfit, list)
+    assert len(misfit) == fwi.number_of_sources
+    assert isinstance(fwi.guess_forward_solution, list)
+    assert len(fwi.guess_forward_solution) == fwi.number_of_sources
+    assert all(isinstance(history, list) and len(history) > 0 for history in fwi.guess_forward_solution)
+    assert all(
+        np.allclose(
+            misfit[snum],
+            fwi.real_shot_record[snum] - fwi.guess_shot_record[snum],
+        )
+        for snum in range(fwi.number_of_sources)
+    )
+
+    gradient = fwi.gradient_solve(
+        misfit=misfit,
+        forward_solution=fwi.guess_forward_solution,
+    )
+
+    assert isinstance(gradient, fire.Function)
 
 
 @pytest.mark.slow

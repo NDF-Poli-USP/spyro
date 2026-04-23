@@ -85,6 +85,8 @@ class AcousticWave(Wave):
         """
         if misfit is not None:
             self.misfit = misfit
+            if forward_solution is not None:
+                self.forward_solution = forward_solution
         elif self.current_time == 0.0:
             self.forward_solve()
             self.misfit = self.real_shot_record - self.forward_solution_receivers

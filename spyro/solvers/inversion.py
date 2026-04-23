@@ -510,11 +510,23 @@ class FullWaveformInversion(AcousticWave):
             self.initial_velocity_model = self.guess_velocity_model
         if c is not None:
             self.initial_velocity_model.dat.data[:] = c
-        self.forward_solve()
-        output = fire.File("control_" + str(self.current_iteration)+".pvd")
+        forward_result = self.forward_solve()
+        output = fire.VTKFile("control_" + str(self.current_iteration)+".pvd")
         output.write(self.c)
         np.save(f"control{self.comm.ensemble_comm.rank}_{self.comm.comm.rank}", self.c.dat.data[:])
         if self.parallelism_type == "spatial" and self.number_of_sources > 1:
+            if self.use_vertex_only_mesh:
+                if forward_result is None:
+                    raise RuntimeError(
+                        "Expected in-memory forward data for spatial "
+                        "vertex-only-mesh misfit calculation."
+                    )
+                self.guess_forward_solution, self.guess_shot_record = forward_result
+                self.misfit = [
+                    self.real_shot_record[snum] - self.guess_shot_record[snum]
+                    for snum in range(self.number_of_sources)
+                ]
+                return self.misfit
             misfit_list = []
             guess_shot_record_list = []
             for snum in range(self.number_of_sources):
@@ -1201,12 +1213,16 @@ class SyntheticRealAcousticWave(AcousticWave):
         -------
         None
         """
-        super().forward_solve()
         if self.parallelism_type == "spatial" and self.number_of_sources > 1:
-            real_shot_record_list = []
-            for snum in range(self.number_of_sources):
-                switch_serial_shot(self, snum)
-                real_shot_record_list.append(self.receivers_output)
+            forward_result = super().forward_solve()
+            if self.use_vertex_only_mesh:
+                _, real_shot_record_list = forward_result
+            else:
+                real_shot_record_list = []
+                for snum in range(self.number_of_sources):
+                    switch_serial_shot(self, snum)
+                    real_shot_record_list.append(self.receivers_output)
             self.real_shot_record = real_shot_record_list
         else:
+            super().forward_solve()
             self.real_shot_record = self.receivers_output

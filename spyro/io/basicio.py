@@ -134,11 +134,22 @@ def ensemble_propagator(func):
         elif args[0].parallelism_type == "spatial" and args[0].number_of_sources > 1:
             num = args[0].number_of_sources
             starting_time = args[0].current_time
+            forward_solution_snapshots = []
+            receivers_snapshots = []
             for snum in range(num):
                 args[0].reset_pressure()
                 args[0].current_time = starting_time
                 u, u_r = func(*args, **dict(kwargs, source_nums=[snum]))
-                save_serial_data(args[0], snum)
+                if args[0].use_vertex_only_mesh:
+                    forward_solution_snapshots.append(
+                        [state.copy(deepcopy=True) for state in args[0].forward_solution]
+                    )
+                    receivers_snapshots.append(np.array(u_r, copy=True))
+                else:
+                    save_serial_data(args[0], snum)
+
+            if args[0].use_vertex_only_mesh:
+                return forward_solution_snapshots, receivers_snapshots
 
             return u, u_r
 
@@ -237,7 +248,8 @@ def ensemble_functional(func):
             J_total = np.zeros((1))
 
             for snum in range(args[0].number_of_sources):
-                switch_serial_shot(args[0], snum)
+                if not args[0].use_vertex_only_mesh:
+                    switch_serial_shot(args[0], snum)
                 current_residual = residual_list[snum]
                 J = func(args[0], current_residual)
                 J_total += J
@@ -272,9 +284,14 @@ def ensemble_gradient(func):
             starting_time = args[0].current_time
             grad_total = fire.Function(args[0].function_space)
             misfit_list = kwargs.get("misfit")
+            forward_solution_list = kwargs.get("forward_solution")
 
             for snum in range(num):
-                switch_serial_shot(args[0], snum)
+                current_forward_solution = None
+                if forward_solution_list is None:
+                    switch_serial_shot(args[0], snum)
+                else:
+                    current_forward_solution = forward_solution_list[snum]
                 current_misfit = misfit_list[snum]
                 args[0].reset_pressure()
                 args[0].current_time = starting_time
@@ -282,6 +299,7 @@ def ensemble_gradient(func):
                             **dict(
                                 kwargs,
                                 misfit=current_misfit,
+                                forward_solution=current_forward_solution,
                             )
                             )
                 grad_total += grad
