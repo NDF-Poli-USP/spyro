@@ -516,7 +516,9 @@ class Wave(Model_parameters, metaclass=ABCMeta):
             The mode in which to evaluate the functional.
             Default is :attribute:`FunctionalEvaluationMode.PER_TIMESTEP`.
         """
+        # Create the Wave attributes required to compute functional.
         self.functional_evaluation_mode = mode
+        self.functional_value = None
 
     @property
     def functional_evaluation_mode(self):
