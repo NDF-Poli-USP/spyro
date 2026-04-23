@@ -107,7 +107,7 @@ def test_misfit_2d():
     FWI_obj.set_guess_velocity_model(constant=4.0)
     FWI_obj.enable_compute_functional()
     FWI_obj.forward_solve()
-    misfit = FWI_obj.real_shot_record - FWI_obj.forward_solution_receivers
+    misfit = FWI_obj.calculate_misfit()
 
     # Using only wave objects
     Wave_obj_exact = spyro.AcousticWave(dictionary=dictionary)
@@ -153,6 +153,9 @@ def test_misfit_2d():
     assert test
     assert functional_matches_wave
     assert functional_matches_fwi
+    print("functional value from FWI object:", FWI_obj.functional_value)
+    print("functional value from wave object:", Wave_obj_guess.functional_value)
+    print("functional value from manual calculation:", functional_second_calc)
 
 
 if __name__ == "__main__":
