@@ -888,7 +888,7 @@ class MeshingParameters():
 
     @property
     def periodic(self):
-        """Get the periodic boundary condition flag.
+        """Periodic boundary condition flag.
 
         Returns
         -------
@@ -919,94 +919,71 @@ class MeshingParameters():
 
     @property
     def padding_x(self):
-        """Get the padding length in the x-direction.
-
-        Returns
-        -------
+        """Pad length in the x-direction.
+        
         float or None
             The padding length in the x-direction, or None if not set.
+            If None and abc_pad_length is set it returns it.
+        
+        Raises
+        ------
+        ValueError
+            If value is negative or if the inferred unit appears inconsistent
+            with other dimension attributes.
         """
+        if self._padding_x is None:
+            return self._abc_pad_length
         return self._padding_x
 
     @padding_x.setter
     def padding_x(self, value):
-        """Set the padding length in the x-direction.
-
-        Parameters
-        ----------
-        value : float or None
-            The padding length in the x-direction. Must be non-negative.
-
-        Raises
-        ------
-        ValueError
-            If value is negative or if the inferred unit appears inconsistent
-            with other dimension attributes.
-        """
         self._set_length_with_unit_check("_padding_x", value)
 
     @property
     def padding_z(self):
-        """Get the padding length in the z-direction.
-
-        Returns
-        -------
+        """Pad length in the z-direction.
+        
         float or None
             The padding length in the z-direction, or None if not set.
-        """
-        return self._padding_z
-
-    @padding_z.setter
-    def padding_z(self, value):
-        """Set the padding length in the z-direction.
-
-        Parameters
-        ----------
-        value : float or None
-            The padding length in the z-direction. Must be non-negative.
-
+            If None and abc_pad_length is set it returns it.
+        
         Raises
         ------
         ValueError
             If value is negative or if the inferred unit appears inconsistent
             with other dimension attributes.
         """
+        if self._padding_z is None:
+            return self._abc_pad_length
+        return self._padding_z
+
+    @padding_z.setter
+    def padding_z(self, value):
         self._set_length_with_unit_check("_padding_z", value)
 
     @property
     def h_padding(self):
-        """Get the constant padding element size.
+        """Constant padding element size.
 
-        Returns
-        -------
         float or None
             The padding element size, or None if not set.
+        
+        Raises
+        ------
+        ValueError
+            If value is negative or if the inferred unit appears inconsistent
+            with other dimension attributes.
         """
         return self._h_padding
 
     @h_padding.setter
     def h_padding(self, value):
-        """Set the constant padding element size.
-
-        Parameters
-        ----------
-        value : float or None
-            The constant padding element size. Must be non-negative.
-
-        Raises
-        ------
-        ValueError
-            If value is negative or if the inferred unit appears inconsistent
-            with other dimension attributes.
-        """
         self._set_length_with_unit_check("_h_padding", value)
 
     @property
     def padding_type(self):
-        """Get the type of padding applied to the gmsh mesh.
+        """Type of padding applied to the gmsh mesh.
 
-        Returns
-        -------
         str or None
             The padding type ('rectangular', 'hyperelliptical', or None).
         """
@@ -1014,18 +991,6 @@ class MeshingParameters():
 
     @padding_type.setter
     def padding_type(self, value):
-        """Set the type of padding for the gmsh mesh.
-
-        Parameters
-        ----------
-        value : str or None
-            The padding type. Must be one of: 'rectangular', 'hyperelliptical', or None.
-
-        Raises
-        ------
-        ValueError
-            If value is not one of the allowed padding types.
-        """
         allowed_types = [None, "rectangular", "hyperelliptical"]
         if value not in allowed_types:
             value_parameter_error("padding_type", value, allowed_types)
@@ -1033,29 +998,20 @@ class MeshingParameters():
 
     @property
     def winslow_implementation(self):
-        """Get the implementation method used for Winslow smoothing.
+        """The implementation method used for Winslow smoothing.
 
-        Returns
-        -------
         str or None
             The implementation method ('default', 'fast', 'numba', or None).
-        """
-        return self._winslow_implementation
-
-    @winslow_implementation.setter
-    def winslow_implementation(self, value):
-        """Set the implementation method for Winslow smoothing.
-
-        Parameters
-        ----------
-        value : str or None
-            The implementation method. Must be one of: 'default', 'fast', or 'numba'.
-
+        
         Raises
         ------
         ValueError
             If value is not None and not one of the allowed implementations.
         """
+        return self._winslow_implementation
+
+    @winslow_implementation.setter
+    def winslow_implementation(self, value):
         allowed_types = ["default", "fast", "numba"]
         if value is not None and value not in allowed_types:
             value_parameter_error("winslow_implementation", value, allowed_types)
@@ -1063,10 +1019,8 @@ class MeshingParameters():
 
     @property
     def apply_winslow(self):
-        """Get the flag indicating whether to apply Winslow smoothing.
-
-        Returns
-        -------
+        """Flag indicating whether to apply Winslow smoothing.
+        
         bool
             True if Winslow smoothing is enabled, False otherwise.
         """
@@ -1074,18 +1028,6 @@ class MeshingParameters():
 
     @apply_winslow.setter
     def apply_winslow(self, value):
-        """Set the flag indicating whether to apply Winslow smoothing.
-
-        Parameters
-        ----------
-        value : bool
-            Whether to apply Winslow smoothing to the generated mesh.
-
-        Raises
-        ------
-        TypeError
-            If the provided value is not a boolean.
-        """
         if value is not None and not isinstance(value, bool):
             raise TypeError(f"apply_winslow must be a boolean, got {type(value).__name__}")
 
