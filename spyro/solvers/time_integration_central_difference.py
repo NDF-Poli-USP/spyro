@@ -87,18 +87,19 @@ def _propagate_forward_central_difference(wave_obj, source_ids):
                         usol_recv[-1].function_space(),
                         val=observed_step,
                     )
-                    residual_step = real_shot - usol_recv[-1]
+                    misfit_step = real_shot - usol_recv[-1]
                 elif isinstance(observed_step, fire.Function):
-                    residual_step = observed_step - usol_recv[-1]
+                    misfit_step = observed_step - usol_recv[-1]
                 else:
                     raise ValueError(
                         "Unsupported type for real_shot_record. Must be "
                         "either a numpy array or a Firedrake Function."
                     )
             else:
-                residual_step = observed_step - usol_recv[-1]
+                misfit_step = observed_step - usol_recv[-1]
             J += utils.compute_functional(
-                wave_obj, residual_step, per_step=True, step=step, nsteps=nt
+                wave_obj, misfit_step, evaluation_mode=FunctionalEvaluationMode.PER_TIMESTEP,
+                step=step, nsteps=nt
             )
 
         t = step * float(wave_obj.dt)
@@ -115,8 +116,8 @@ def _propagate_forward_central_difference(wave_obj, source_ids):
     wave_obj.forward_solution_receivers = usol_recv
     if functional_mode is FunctionalEvaluationMode.AFTER_SOLVE:
         observed_shot = utils.get_real_shot_record(wave_obj)
-        residual = observed_shot - usol_recv
-        J = utils.compute_functional(wave_obj, residual)
+        misfit = observed_shot - usol_recv
+        J = utils.compute_functional(wave_obj, misfit)
     if compute_functional:
         wave_obj.functional_value = J
     else:

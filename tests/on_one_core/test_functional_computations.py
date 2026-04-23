@@ -76,7 +76,7 @@ def test_enable_compute_functional_defaults_to_per_timestep():
     wave = _build_wave()
 
     wave.enable_compute_functional()
-    assert wave.functional_evaluation_mode == FunctionalEvaluationMode.PER_TIMESTEP
+    assert wave.functional_evaluation_mode == FunctionalEvaluationMode.AFTER_SOLVE
 
 
 def test_compute_functional_accepts_after_solve_mode():

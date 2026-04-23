@@ -506,7 +506,7 @@ class Wave(Model_parameters, metaclass=ABCMeta):
         return self.set_material_properties(*args, **kwargs)
 
     def enable_compute_functional(
-        self, mode=FunctionalEvaluationMode.PER_TIMESTEP
+        self, mode=FunctionalEvaluationMode.AFTER_SOLVE
     ):
         """Enable functional evaluation during forward solves.
 
@@ -514,7 +514,7 @@ class Wave(Model_parameters, metaclass=ABCMeta):
         -----------
         mode: FunctionalEvaluationMode, optional
             The mode in which to evaluate the functional.
-            Default is :attribute:`FunctionalEvaluationMode.PER_TIMESTEP`.
+            Default is :attribute:`FunctionalEvaluationMode.AFTER_SOLVE`.
         """
         # Create the Wave attributes required to compute functional.
         self.functional_evaluation_mode = mode
