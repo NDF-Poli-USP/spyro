@@ -612,16 +612,14 @@ def RectangleMesh(nx, ny, length_x, length_y, pad=None, comm=None, quadrilateral
     else:
         pad = 0
 
-    dist_par = {"overlap_type": (fire.DistributedMeshOverlapType.NONE, 0)}
     if comm is None:
         mesh = fire.RectangleMesh(nx, ny, length_x, length_y,
-                                  quadrilateral=quadrilateral,
-                                  distribution_parameters=dist_par)
+                                  quadrilateral=quadrilateral)
     else:
         mesh = fire.RectangleMesh(nx, ny, length_x, length_y,
-                                  quadrilateral=quadrilateral,
-                                  distribution_parameters=dist_par,
-                                  comm=comm)
+                                  quadrilateral=quadrilateral, comm=comm)
+
+    # Adjusting to Spyro's reference system (z, x) with origin at (0, 0)
     mesh.coordinates.dat.data[:, 0] *= -1.0
     mesh.coordinates.dat.data[:, 1] -= pad
 
@@ -663,10 +661,15 @@ def PeriodicRectangleMesh(
         length_y += 2 * pad
     else:
         pad = 0
-    dist_par = {"overlap_type": (fire.DistributedMeshOverlapType.NONE, 0)}
-    mesh = fire.PeriodicRectangleMesh(nx, ny, length_x, length_y,
-                                      quadrilateral=quadrilateral,
-                                      distribution_parameters=dist_par, comm=comm)
+
+    if comm is None:
+        mesh = fire.PeriodicRectangleMesh(nx, ny, length_x, length_y,
+                                          quadrilateral=quadrilateral)
+    else:
+        mesh = fire.PeriodicRectangleMesh(nx, ny, length_x, length_y,
+                                          quadrilateral=quadrilateral, comm=comm)
+
+    # Adjusting to Spyro's reference system (z, x) with origin at (0, 0)
     mesh.coordinates.dat.data[:, 0] *= -1.0
     mesh.coordinates.dat.data[:, 1] -= pad
 
@@ -718,19 +721,30 @@ def BoxMesh(nx, ny, nz, length_x, length_y, length_z, pad=None,
     else:
         pad = 0
 
-    dist_par = {"overlap_type": (fire.DistributedMeshOverlapType.NONE, 0)}
     if quadrilateral:
-        quad_mesh = fire.RectangleMesh(nx, ny, length_x, length_y,
-                                       quadrilateral=quadrilateral,
-                                       distribution_parameters=dist_par,
-                                       comm=comm)
+
+        if comm is None:
+            quad_mesh = fire.RectangleMesh(nx, ny, length_x, length_y,
+                                           quadrilateral=quadrilateral)
+
+        else:
+            quad_mesh = fire.RectangleMesh(nx, ny, length_x, length_y,
+                                           quadrilateral=quadrilateral, comm=comm)
+
+        # Adjusting to Spyro's reference system (z, x, y) with origin at (0, 0, 0)
         quad_mesh.coordinates.dat.data[:, 0] *= -1.0
         quad_mesh.coordinates.dat.data[:, 1] -= pad
         layer_height = length_z / nz
         mesh = fire.ExtrudedMesh(quad_mesh, nz, layer_height=layer_height)
     else:
-        mesh = fire.BoxMesh(nx, ny, nz, length_x, length_y, length_z,
-                            distribution_parameters=dist_par, comm=comm)
+
+        if comm is None:
+            mesh = fire.BoxMesh(nx, ny, nz, length_x, length_y, length_z)
+
+        else:
+            mesh = fire.BoxMesh(nx, ny, nz, length_x, length_y, length_z, comm=comm)
+
+        # Adjusting to Spyro's reference system (z, x, y) with origin at (0, 0, 0)
         mesh.coordinates.dat.data[:, 0] *= -1.0
         mesh.coordinates.dat.data[:, 1] -= pad
 
