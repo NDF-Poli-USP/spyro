@@ -1,4 +1,4 @@
-from . import geometry_creation, estimate_timestep
+from . import geometry_creation
 from .utils import mpi_init, compute_functional, Mask, Gradient_mask_for_pml, run_in_one_core, write_hdf5_velocity_model
 from .analytical_solution_nodal import nodal_homogeneous_analytical
 from .velocity_to_grid import velocity_to_grid, change_scalar_field_resolution
@@ -7,7 +7,7 @@ from .analytical_solution_nodal import analytical_solution_elastic
 
 __all__ = [
     "geometry_creation",
-    "estimate_timestep",
+    "eval_functions_to_ufl",
     "mpi_init",
     "compute_functional",
     "nodal_homogeneous_analytical",

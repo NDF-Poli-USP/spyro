@@ -91,27 +91,27 @@ class AutomaticMesh:
         Notes
         -----
         The `mesh_parameters` dictionary should contain the following keys:
-        - 'dimension': int, optional. Dimension of the mesh. The default is 2.
-        - 'length_z': float, optional. Length of the mesh in the z-direction.
-        - 'length_x': float, optional. Length of the mesh in the x-direction.
-        - 'length_y': float, optional. Length of the mesh in the y-direction.
-        - 'cell_type': str, optional. Type of the mesh cells.
-        - 'mesh_type': str, optional. Type of the mesh.
+        - 'dimension' : int, optional. Dimension of the mesh. The default is 2.
+        - 'length_z' : float, optional. Length of the mesh in the z-direction.
+        - 'length_x' : float, optional. Length of the mesh in the x-direction.
+        - 'length_y' : float, optional. Length of the mesh in the y-direction.
+        - 'cell_type' : str, optional. Type of the mesh cells.
+        - 'mesh_type' : str, optional. Type of the mesh.
 
         For mesh with absorbing layer only:
-        - 'abc_pad_length': float, optional. Length of the absorbing boundary condition padding.
+        - 'abc_pad_length' : float, optional. Length of the absorbing boundary condition padding.
 
         For Firedrake mesh only:
-        - 'dx': float, optional. Mesh element size.
-        - 'periodic': bool, optional. Whether the mesh is periodic.
-        - 'edge_length': float, optional. Length of the mesh edges.
+        - 'dx' : float, optional. Mesh element size.
+        - 'periodic' : bool, optional. Whether the mesh is periodic.
+        - 'edge_length' : float, optional. Length of the mesh edges.
 
         For SeismicMesh only:
-        - 'cells_per_wavelength': float, optional. Number of cells per wavelength.
-        - 'source_frequency': float, optional. Frequency of the source.
-        - 'minimum_velocity': float, optional. Minimum velocity.
-        - 'velocity_model_file': str, optional. File containing the velocity model.
-        - 'edge_length': float, optional. Length of the mesh edges.
+        - 'cells_per_wavelength' : float, optional. Number of cells per wavelength.
+        - 'source_frequency' : float, optional. Frequency of the source.
+        - 'minimum_velocity' : float, optional. Minimum velocity.
+        - 'velocity_model_file' : str, optional. File containing the velocity model.
+        - 'edge_length' : float, optional. Length of the mesh edges.
         """
         self.dimension = mesh_parameters.dimension
         self.length_z = mesh_parameters.length_z
@@ -145,12 +145,16 @@ class AutomaticMesh:
         mesh : Mesh
             Mesh
         """
+        if self.mesh_parameters.is_complete is False:
+            parallel_print("Skipping mesh generation, since we don't have all the parameters", comm=self.comm)
+            return None
         parallel_print(f"Creating {self.mesh_type} type mesh.", comm=self.comm)
         if self.mesh_type == "firedrake_mesh":
             return self.create_firedrake_mesh()
         elif self.mesh_type == "SeismicMesh":
             if SeismicMesh is None:
-                raise ImportError("SeismicMesh is not available. Please install it to use this function.")
+                raise ImportError("SeismicMesh is not available. Please "
+                                  + "install it to use this function.")
             return self.create_seismicmesh_mesh()
         elif self.mesh_type == "spyro_mesh":
             self.create_spyro_mesh()
@@ -179,7 +183,7 @@ class AutomaticMesh:
         Raises
         ------
         ValueError
-            If dimension is not supported (must be 2 or 3).
+            If the dimension is not supported (must be 2 or 3).
         """
         if self.dimension == 2:
             return self.create_firedrake_2D_mesh()
@@ -199,12 +203,13 @@ class AutomaticMesh:
 
         Notes
         -----
-        If edge_length is not specified but cells_per_wavelength (cpw) is provided,
+        If edge_length is not specified but cells_per_wavelength(cpw) is provided,
         the edge length will be calculated automatically. The method creates either
         a periodic or non-periodic rectangular mesh based on the periodic attribute.
         """
         if self.edge_length is None and self.cpw is not None:
-            self.edge_length = calculate_edge_length(self.cpw, self.minimum_velocity, self.source_frequency)
+            self.edge_length = calculate_edge_length(
+                self.cpw, self.minimum_velocity, self.source_frequency)
         if self.abc_pad:
             nx = int(round((self.length_x + 2*self.abc_pad) / self.edge_length, 0))
             nz = int(round((self.length_z + self.abc_pad) / self.edge_length, 0))
@@ -250,7 +255,7 @@ class AutomaticMesh:
         Notes
         -----
         Uses the edge_length parameter to determine the number of elements
-        in each direction (x, y, z).
+        in each direction(x, y, z).
         """
         dx = self.edge_length
         nx = int(round(self.length_x / dx, 0))
@@ -470,7 +475,7 @@ class AutomaticMesh:
 
         Notes
         -----
-        Currently only 2D meshing is implemented via build_big_rect_with_inner_element_group.
+        Currently, only 2D meshing is implemented via build_big_rect_with_inner_element_group.
         """
         if self.dimension == 2:
             return build_big_rect_with_inner_element_group(self.mesh_parameters)
@@ -501,9 +506,9 @@ def calculate_edge_length(cpw, minimum_velocity, frequency):
     """
     v_min = minimum_velocity
 
-    lbda_min = v_min/frequency
+    lbda_min = v_min / frequency
 
-    edge_length = lbda_min/cpw
+    edge_length = lbda_min / cpw
     return edge_length
 
 
@@ -516,24 +521,24 @@ def RectangleMesh(nx, ny, length_x, length_y, pad=None, comm=None, quadrilateral
     Parameters
     ----------
     length_x : float
-        Length of the domain in the x direction.
+      Length of the domain in the x direction.
     length_y : float
-        Length of the domain in the y direction.
+      Length of the domain in the y direction.
     nx : int
-        Number of elements in the x direction.
+      Number of elements in the x direction.
     ny : int
-        Number of elements in the y direction.
+      Number of elements in the y direction.
     pad : float, optional
-        Padding to be added to the domain. The default is None.
+      Padding to be added to the domain. The default is None.
     comm : MPI communicator, optional
-        MPI communicator. The default is None.
+      MPI communicator. The default is None.
     quadrilateral : bool, optional
-        If True, the mesh is quadrilateral. The default is False.
+      If True, the mesh is quadrilateral. The default is False.
 
     Returns
     -------
     mesh : Firedrake Mesh
-        Mesh
+      Mesh
     """
     if pad is not None:
         length_x += pad
@@ -573,14 +578,13 @@ def PeriodicRectangleMesh(
         Padding to be added to the domain. The default is None.
     comm : MPI communicator, optional
         MPI communicator. The default is None.
-    quadrilateral : bool, optional
+    quadrilateral: bool, optional
         If True, the mesh is quadrilateral. The default is False.
 
     Returns
     -------
     mesh : Firedrake Mesh
         Mesh
-
     """
     if pad is not None:
         length_x += pad
@@ -627,7 +631,7 @@ def BoxMesh(nx, ny, nz, length_x, length_y, length_z, pad=None, quadrilateral=Fa
 
     Notes
     -----
-    The first coordinate is negated (multiplied by -1) to match the expected
+    The first coordinate is negated(multiplied by - 1) to match the expected
     coordinate system. If quadrilateral is True, the mesh is created by
     extruding a 2D quadrilateral mesh in the z direction.
     """
@@ -659,9 +663,9 @@ def vp_to_sizing(vp, cpw, frequency):
     vp : numpy.ndarray
         P-wave velocity field.
     cpw : float
-        Cells per wavelength (must be positive).
+        Cells per wavelength(must be positive).
     frequency : float
-        Source frequency in Hz (must be positive).
+        Source frequency in Hz(must be positive).
 
     Returns
     -------
@@ -703,7 +707,7 @@ def build_big_rect_with_inner_element_group(mesh_parameters):
         - output_filename : str
             Path for output mesh file.
         - edge_length : float, optional
-            Uniform edge length (if grid_velocity_data is None).
+            Uniform edge length(if grid_velocity_data is None).
         - grid_velocity_data : dict, optional
             Dictionary with 'vp_values' key containing velocity field for
             adaptive meshing.
@@ -723,7 +727,7 @@ def build_big_rect_with_inner_element_group(mesh_parameters):
     Notes
     -----
     This function creates a 2D rectangular mesh with:
-    - Adaptive sizing based on velocity field (if provided)
+    - Adaptive sizing based on velocity field(if provided)
     - Physical boundary groups for absorbing boundary conditions
       (1=Top, 2=Bottom, 3=Right, 4=Left)
     - Optional inner element group for gradient masking
