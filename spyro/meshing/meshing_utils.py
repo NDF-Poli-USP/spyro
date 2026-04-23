@@ -10,6 +10,20 @@ except ImportError:
     gmsh = None
 
 
+def check_gmsh(func):
+    """Decorator for gmsh check.
+
+    If gmsh isn't available returns ImportError
+    """
+    def wrapper(*args, **kwargs):
+        if gmsh is None:
+            raise ImportError("Please install gmsh to use this function.")
+        else:
+            return func(*args, **kwargs)
+
+    return wrapper
+
+
 def create_sizing_function(fname, hmin=None, bbox=None, wl=10, freq=2, pad_type=None, pad_size_x=-1.0, pad_size_z=-1.0, grade=None, vp_water=None):
     """Create a mesh sizing function from a SEGY velocity model.
 
@@ -596,17 +610,3 @@ def align_water_columns_to_interface_x(points_2d, water_surface_nodes, interface
                     points_2d[idx, 0] = spline_x
                     snapped += 1
     return points_2d, snapped, n_cols
-
-
-def check_gmsh(func):
-    """Decorator for gmsh check.
-
-    If gmsh isn't available returns ImportError
-    """
-    def wrapper(*args, **kwargs):
-        if gmsh is None:
-            raise ImportError("Please install gmsh to use this function.")
-        else:
-            return func(*args, **kwargs)
-    
-    return wrapper
