@@ -1,9 +1,13 @@
 import numpy as np
-import gmsh
 import segyio
 from scipy.signal import savgol_filter
 from scipy.interpolate import RegularGridInterpolator
 from pathlib import Path
+
+try:
+    import gmsh
+except ImportError:
+    gmsh = None
 
 
 def create_sizing_function(fname, hmin=None, bbox=None, wl=10, freq=2, pad_type=None, pad_size_x=-1.0, pad_size_z=-1.0, grade=None, vp_water=None):
@@ -388,6 +392,7 @@ def generate_water_profile_from_segy(segy_path, z_min, z_max, x_min, x_max, valu
 
 
 # Functions for water block alignment
+@check_gmsh
 def get_surface_entities_by_physical_name(name):
     """Retrieve Gmsh surface entity tags belonging to a specified physical group.
 
@@ -409,6 +414,7 @@ def get_surface_entities_by_physical_name(name):
     return entities
 
 
+@check_gmsh
 def get_nodes_on_surface_entities(tag_to_index, surface_entities):
     """Find node indices belonging to specific geometric surfaces.
 
@@ -433,6 +439,7 @@ def get_nodes_on_surface_entities(tag_to_index, surface_entities):
     return nodes
 
 
+@check_gmsh
 def get_water_interface_node_indices(tag_to_index, water_surface_entities, length_x, tol=1e-8):
     """Identify node indices lying on the water interface.
 
@@ -589,3 +596,17 @@ def align_water_columns_to_interface_x(points_2d, water_surface_nodes, interface
                     points_2d[idx, 0] = spline_x
                     snapped += 1
     return points_2d, snapped, n_cols
+
+
+def check_gmsh(func):
+    """Decorator for gmsh check.
+
+    If gmsh isn't available returns ImportError
+    """
+    def wrapper(*args, **kwargs):
+        if gmsh is None:
+            raise ImportError("Please install gmsh to use this function.")
+        else:
+            return func(*args, **kwargs)
+    
+    return wrapper
