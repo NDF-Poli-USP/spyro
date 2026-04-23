@@ -1,305 +1,225 @@
 import firedrake as fire
 from . import helpers
+from .wave import Wave
+from ..io.basicio import parallel_print
 
 
-def backward_wave_propagator(Wave_obj, dt=None):
+def backward_wave_propagator(wave_obj: Wave, dt: float = None) -> fire.Function:
     """Propagates the adjoint wave backwards in time.
+
     Currently uses central differences.
 
     Parameters:
     -----------
-    Wave_obj: Spyro wave object
+    wave_obj : Wave
         Wave object that already propagated a forward wave.
-    dt: Python 'float' (optional)
+    dt : float (optional)
         Time step to be used explicitly. If not mentioned uses the default,
         that was estabilished in the wave object for the adjoint model.
 
     Returns:
     --------
-    dJ: Firedrake 'Function'
-        Calculated gradient
-    """
-    if Wave_obj.abc_active is False:
-        return backward_wave_propagator_no_pml(Wave_obj, dt=dt)
-    elif Wave_obj.abc_active and Wave_obj.abc_boundary_layer_type == "PML":
-        return mixed_space_backward_wave_propagator(Wave_obj, dt=dt)
-    else:
-        # For local ABC or other non-PML types
-        return backward_wave_propagator_no_pml(Wave_obj, dt=dt)
-
-
-def backward_wave_propagator_no_pml(Wave_obj, dt=None):
-    """Propagates the adjoint wave backwards in time.
-    Currently uses central differences. Does not have any PML.
-
-    Parameters:
-    -----------
-    Wave_obj: Spyro wave object
-        Wave object that already propagated a forward wave.
-    dt: Python 'float' (optional)
-        Time step to be used explicitly. If not mentioned uses the default,
-        that was estabilished in the wave object for the adjoint model.
-
-    Returns:
-    --------
-    dJ: Firedrake 'Function'
+    dJ : Firedrake 'Function'
         Calculated gradient
 
     Notes:
     ------
-    Residual forcing is injected each timestep via ``Wave_obj.rhs_no_pml_source()``
-    and the prebuilt variational solver is advanced with ``Wave_obj.solver.solve()``.
+    This is an unified backward wave propagation for both PML and no-PML cases.
+    The PML path uses the mixed-space gradient form ``2c * ∇u_adj · ∇u_fwd``
+    while the no-PML path uses ``-2/c³ * ü_fwd * u_adj``.
+    Source injection uses ``wave_obj.rhs_no_pml_source()`` and the prebuilt
+    variational solver is advanced with ``wave_obj.solver.solve()``.
     """
-    Wave_obj.reset_pressure()
-    mask_available = Wave_obj.gradient_mask_available
+    wave_obj.reset_pressure()
+    mask_available = wave_obj.gradient_mask_available
     if dt is not None:
-        Wave_obj.dt = dt
+        wave_obj.dt = dt
 
-    forward_solution = Wave_obj.forward_solution
-    receivers = Wave_obj.receivers
-    residual = Wave_obj.misfit
-    comm = Wave_obj.comm
-    temp_filename = Wave_obj.forward_output_filename
+    dt = wave_obj.dt
+    t = wave_obj.current_time
+    if t != wave_obj.final_time:
+        parallel_print(
+            f"Current time of {t}, different than final_time of "
+            f"{wave_obj.final_time}. Setting final_time to current time "
+            f"in backwards propagation.", wave_obj.comm,
+        )
+    nt = int(t / dt) + 1
 
-    filename, file_extension = temp_filename.split(".")
-    # output_filename = "backward." + file_extension
+    wave_obj.comm.comm.barrier()
 
-    # output = fire.VTKFile(output_filename)
-    # output = fire.File(output_filename, comm=comm.comm)
-    comm.comm.barrier()
+    gradient_space = wave_obj.get_scalar_function_space()
+    dJ = fire.Function(gradient_space)
+    rhs_forcing = fire.Cofunction(gradient_space.dual())
 
-    dJ = fire.Function(Wave_obj.function_space)  # , name="gradient")
-
-    final_time = Wave_obj.final_time
-    dt = Wave_obj.dt
-    t = Wave_obj.current_time
-    if t != final_time:
-        print(f"Current time of {t}, different than final_time of {final_time}. Setting final_time to current time in backwards propagation.", flush=True)
-    nt = int(t / dt) + 1  # number of timesteps
-
-    u_nm1 = Wave_obj.u_nm1
-    u_n = Wave_obj.u_n
-    u_np1 = fire.Function(Wave_obj.function_space)
-
-    rhs_forcing = fire.Cofunction(Wave_obj.function_space.dual())
-
-    # Define a gradient problem
-    m_u = fire.TrialFunction(Wave_obj.function_space)
-    m_v = fire.TestFunction(Wave_obj.function_space)
-
-    if mask_available:
-        # Use masked integration over inner region only
-        mgrad = m_u * m_v * fire.dx(2, scheme=Wave_obj.quadrature_rule)
-    else:
-        # Fall back to full domain
-        mgrad = m_u * m_v * fire.dx(**Wave_obj.quadrature_rule)
-
-    dufordt2 = fire.Function(Wave_obj.function_space)
-    uadj = fire.Function(Wave_obj.function_space)  # auxiliarly function for the gradient compt.
-
-    if mask_available:
-        ffG = -2 * (Wave_obj.c)**(-3) * fire.dot(dufordt2, uadj) * m_v * fire.dx(2, scheme=Wave_obj.quadrature_rule)
-        if comm.comm.rank == 0:
-            print("Applying gradient mask: gradients will be computed only in inside region", flush=True)
-    else:
-        ffG = -2 * (Wave_obj.c)**(-3) * fire.dot(dufordt2, uadj) * m_v * fire.dx(**Wave_obj.quadrature_rule)
-        if comm.comm.rank == 0:
-            print("No gradient mask found: computing gradients over full domain", flush=True)
-
-    lhsG = mgrad
-    rhsG = ffG
-
-    gradi = fire.Function(Wave_obj.function_space)
-    grad_prob = fire.LinearVariationalProblem(lhsG, rhsG, gradi)
-    grad_solver = fire.LinearVariationalSolver(
-        grad_prob,
-        solver_parameters={
-            "ksp_type": "preonly",
-            "pc_type": "jacobi",
-            "mat_type": "matfree",
-        },
+    grad_solver, forward_field, uadj, gradi = _build_gradient_solver(
+        wave_obj, mask_available,
     )
 
-    # assembly_callable = create_assembly_callable(rhs, tensor=B)
+    forward_solution = wave_obj.forward_solution
+    receivers = wave_obj.receivers
 
-    for step in range(nt-1, -1, -1):
+    for step in range(nt - 1, -1, -1):
         rhs_forcing.assign(0.0)
-        Wave_obj.rhs_no_pml_source().assign(
-            receivers.apply_receivers_as_source(rhs_forcing, residual, step)
+        wave_obj.rhs_no_pml_source().assign(
+            receivers.apply_receivers_as_source(rhs_forcing, wave_obj.misfit, step)
         )
-        Wave_obj.solver.solve()
+        wave_obj.solver.solve()
 
-        u_np1.assign(Wave_obj.u_np1)
+        if step % wave_obj.gradient_sampling_frequency == 0:
+            # Assign the adjoint solution at the step `np1` to `uadj`.
+            uadj.assign(wave_obj.get_function(state=wave_obj.next_vstate))
 
-        if (step) % Wave_obj.output_frequency == 0:
-            assert (
-                fire.norm(u_n) < 1
-            ), "Numerical instability. Try reducing dt or building the \
-                mesh differently"
-            # if Wave_obj.forward_output:
-            #     output.write(u_n, time=t, name="Pressure")
-
-            helpers.display_progress(Wave_obj.comm, t)
-
-        if step % Wave_obj.gradient_sampling_frequency == 0:
-            # duadjdt2.assign( ((u_np1 - 2.0 * u_n + u_nm1) / fire.Constant(dt**2)) )
-            uadj.assign(u_np1)
-            if len(forward_solution) > 2:
-                dufordt2.assign(
-                    (forward_solution.pop() - 2.0 * forward_solution[-1] + forward_solution[-2]) / fire.Constant(dt**2)
-                )
+            if wave_obj.abc_boundary_layer_type == "PML":
+                # Pop to keep the list in sync, but use the element one
+                # step behind so that u_fwd and u_adj are at the same
+                # physical time (usol[k] = u^{k+1}; we need u^k).
+                forward_solution.pop()
+                if len(forward_solution) > 0:
+                    forward_field.assign(forward_solution[-1])
+                else:
+                    forward_field.assign(0.0)
             else:
-                dufordt2.assign(
-                    (forward_solution.pop() - 2.0 * 0.0 + 0.0) / fire.Constant(dt**2)
-                )
-
+                forward_field.assign(_compute_dufordt2(forward_solution, dt))
             grad_solver.solve()
-            if step == nt-1 or step == 0:
-                dJ += gradi
-            else:
-                dJ += 2*gradi
+            _trapezoidal_gradient_integration(dJ, gradi, step, nt)
 
-        u_nm1.assign(u_n)
-        u_n.assign(u_np1)
-
+        if wave_obj.abc_boundary_layer_type == "PML":
+            wave_obj.X_nm1.assign(wave_obj.X_n)
+            wave_obj.X_n.assign(wave_obj.X_np1)
+        else:
+            wave_obj.u_nm1.assign(wave_obj.u_n)
+            wave_obj.u_n.assign(wave_obj.u_np1)
         t = step * float(dt)
 
-    Wave_obj.current_time = t
-    helpers.display_progress(Wave_obj.comm, t)
+    wave_obj.adjoint_solution = uadj
+    wave_obj.current_time = t
 
-    dJ.dat.data_with_halos[:] *= (dt/2)
+    helpers.display_progress(wave_obj.comm, t)
+
+    dJ.dat.data_with_halos[:] *= dt / 2
     return dJ
 
 
-def mixed_space_backward_wave_propagator(Wave_obj, dt=None):
-    """Propagates the adjoint wave backwards in time.
-    Currently uses central differences. Based on the
-    mixed space implementation of PML.
+def _pml_interior_indicator(wave_obj: Wave) -> fire.conditional:
+    """UFL indicator: 1 inside the physical domain, 0 in the PML layer."""
+    # TODO: This is a bit hacky, will be not needed when submeshes are enabled in Spyro.
+    z = wave_obj.mesh_z
+    x = wave_obj.mesh_x
+    z_min = -(wave_obj.mesh_parameters.length_z)
+    x_min = 0.0
+    x_max = wave_obj.mesh_parameters.length_x
+
+    inside = fire.And(fire.And(z >= z_min, x >= x_min), x <= x_max)
+
+    if wave_obj.dimension == 3:
+        y = wave_obj.mesh_y
+        y_min = 0.0
+        y_max = wave_obj.mesh_parameters.length_y
+        inside = fire.And(inside, fire.And(y >= y_min, y <= y_max))
+
+    return fire.conditional(inside, 1.0, 0.0)
+
+
+def _build_gradient_solver(wave_obj: Wave, mask_available: bool) -> tuple[
+        fire.LinearVariationalSolver, fire.Function, fire.Function, fire.Function
+]:
+    """Assemble the gradient variational problem.
 
     Parameters:
     -----------
-    Wave_obj: Spyro wave object
-        Wave object that already propagated a forward wave.
-    dt: Python 'float' (optional)
-        Time step to be used explicitly. If not mentioned uses the default,
-        that was estabilished in the wave object for the adjoint model.
+    wave_obj : Wave
+        The wave object containing the forward and adjoint solutions, as well
+        as the velocity model and other parameters needed to build the
+        gradient problem.
+    mask_available : bool
+        Flag indicating whether a gradient mask is available. If True, the
+        gradient will be computed only in the inner region of the domain.
 
     Returns:
     --------
-    dJ: Firedrake 'Function'
-        Calculated gradient
-
-    Notes:
-    ------
-    For mixed PML spaces, source injection uses ``Wave_obj.rhs_no_pml_source()``
-    (pressure subspace) before calling ``Wave_obj.solver.solve()`` each timestep.
+    grad_solver, forward_field, uadj, gradi
     """
-    Wave_obj.reset_pressure()
-    mask_available = Wave_obj.gradient_mask_available
-    if dt is not None:
-        Wave_obj.dt = dt
+    V = wave_obj.get_scalar_function_space()
+    qr = wave_obj.quadrature_rule
 
-    forward_solution = Wave_obj.forward_solution
-    receivers = Wave_obj.receivers
-    residual = Wave_obj.misfit
-    comm = Wave_obj.comm
-    temp_filename = Wave_obj.forward_output_filename
-
-    filename, file_extension = temp_filename.split(".")
-    output_filename = "backward." + file_extension
-
-    output = fire.VTKFile(output_filename)
-    comm.comm.barrier()
-
-    dJ = fire.Function(Wave_obj.function_space)  # , name="gradient")
-
-    final_time = Wave_obj.final_time
-    dt = Wave_obj.dt
-    t = Wave_obj.current_time
-    if t != final_time:
-        print(f"Current time of {t}, different than final_time of {final_time}. Setting final_time to current time in backwards propagation.", flush=True)
-    nt = int(t / dt) + 1  # number of timesteps
-
-    X_nm1 = Wave_obj.X_nm1
-    X_n = Wave_obj.X_n
-    X_np1 = Wave_obj.X_np1
-
-    rhs_forcing = fire.Cofunction(Wave_obj.function_space.dual())
-
-    # Define a gradient problem
-    m_u = fire.TrialFunction(Wave_obj.function_space)
-    m_v = fire.TestFunction(Wave_obj.function_space)
-
+    m_u = fire.TrialFunction(V)
+    m_v = fire.TestFunction(V)
     if mask_available:
         # Use masked integration over inner region only
-        mgrad = m_u * m_v * fire.dx(2, scheme=Wave_obj.quadrature_rule)
+        dx = fire.dx(2, scheme=qr)
         mask_available = True
     else:
-        # Fall back to full domain
-        mgrad = m_u * m_v * fire.dx(**Wave_obj.quadrature_rule)
+        dx = fire.dx(**qr)
         mask_available = False
 
-    # dufordt2 = fire.Function(Wave_obj.function_space)
-    ufor = fire.Function(Wave_obj.function_space)
-    uadj = fire.Function(Wave_obj.function_space)  # auxiliarly function for the gradient compt.
+    mgrad = m_u * m_v * dx
+    forward_field = fire.Function(V)
+    uadj = fire.Function(V)
 
-    # ffG = -2 * (Wave_obj.c)**(-3) * fire.dot(dufordt2, uadj) * m_v * fire.dx(scheme=Wave_obj.quadrature_rule)
-    if mask_available:
-        ffG = 2.0 * Wave_obj.c * fire.dot(fire.grad(uadj), fire.grad(ufor)) * m_v * fire.dx("Inner", scheme=Wave_obj.quadrature_rule)
-        if comm.comm.rank == 0:
-            print("Applying gradient mask: gradients will be computed only in 'Inner' region (mixed space)", flush=True)
+    if wave_obj.abc_boundary_layer_type == "PML":
+        # Always exclude PML region from gradient.
+        # This is necessary once the gradient expression is not considering
+        # the PML auxiliary variables. In addition, we are not interested
+        # in the gradient in the PML region.
+        indicator = _pml_interior_indicator(wave_obj)
+        # Compute the gradient only in the physical domain.
+        ffG = (
+            2.0 * wave_obj.c * indicator * fire.dot(
+                fire.grad(uadj), fire.grad(forward_field)) * m_v * dx
+        )
+        parallel_print(
+            "Excluding PML region from gradient (mixed space)", wave_obj.comm
+        )
     else:
-        ffG = 2.0 * Wave_obj.c * fire.dot(fire.grad(uadj), fire.grad(ufor)) * m_v * fire.dx(**Wave_obj.quadrature_rule)
-        if comm.comm.rank == 0:
-            print("No gradient mask found: computing gradients over full domain (mixed space)", flush=True)
+        ffG = (
+            -2 * (wave_obj.c) ** (-3) * fire.dot(forward_field, uadj) * m_v * dx
+        )
+        parallel_print(
+            "No gradient mask found: computing gradients over full domain",
+            wave_obj.comm,
+        )
 
-    lhsG = mgrad
-    rhsG = ffG
-
-    gradi = fire.Function(Wave_obj.function_space)
-    grad_prob = fire.LinearVariationalProblem(lhsG, rhsG, gradi)
+    gradi = fire.Function(V)
+    grad_prob = fire.LinearVariationalProblem(mgrad, ffG, gradi)
     grad_solver = fire.LinearVariationalSolver(
         grad_prob,
         solver_parameters={
-            "ksp_type": "preonly",
-            "pc_type": "jacobi",
-            "mat_type": "matfree",
+            "ksp_type": "preonly", "pc_type": "jacobi", "mat_type": "matfree",
         },
     )
 
-    # assembly_callable = create_assembly_callable(rhs, tensor=B)
+    return grad_solver, forward_field, uadj, gradi
 
-    for step in range(nt-1, -1, -1):
-        rhs_forcing.assign(0.0)
-        Wave_obj.rhs_no_pml_source().assign(
-            receivers.apply_receivers_as_source(rhs_forcing, residual, step)
-        )
-        Wave_obj.solver.solve()
 
-        if (step) % Wave_obj.output_frequency == 0:
-            if Wave_obj.forward_output:
-                output.write(X_n.sub(0), time=t, name="Pressure")
+def _compute_dufordt2(forward_solution: list, dt: float) -> fire.Function:
+    """Second time-derivative via 3-point central finite differences."""
+    if len(forward_solution) > 2:
+        return (
+            forward_solution.pop()
+            - 2.0 * forward_solution[-1]
+            + forward_solution[-2]
+        ) / fire.Constant(dt**2)
+    else:
+        return forward_solution.pop() / fire.Constant(dt**2)
 
-            helpers.display_progress(Wave_obj.comm, t)
 
-        if step % Wave_obj.gradient_sampling_frequency == 0:
-            # duadjdt2.assign( ((u_np1 - 2.0 * u_n + u_nm1) / fire.Constant(dt**2)) )
-            uadj.assign(X_np1.sub(0))
-            ufor.assign(forward_solution.pop())
+def _trapezoidal_gradient_integration(
+        dJ: fire.Function, gradi: fire.Function, step: int, nt: int) -> None:
+    """Trapezoidal-rule gradient accumulation.
 
-            grad_solver.solve()
-            if step == nt-1 or step == 0:
-                dJ += gradi
-            else:
-                dJ += 2*gradi
+    Parameters:
+    -----------
+    dJ : Firedrake 'Function'
+        The accumulated gradient.
+    gradi : Firedrake 'Function'
+        The gradient at the current time step.
+    step : int
+        The current time step.
+    nt : int
+        The total number of time steps.
+    """
 
-        X_nm1.assign(X_n)
-        X_n.assign(X_np1)
-
-        t = step * float(dt)
-
-    Wave_obj.current_time = t
-    helpers.display_progress(Wave_obj.comm, t)
-
-    dJ.dat.data_with_halos[:] *= (dt/2)
-    return dJ
+    if step == nt - 1 or step == 0:
+        dJ += gradi
+    else:
+        dJ += 2 * gradi

@@ -11,9 +11,13 @@ on:
     - cron: '0 0 * * 0'
 # on: [push, pull_request]
 
+concurrency:
+  group: build-firedrake-main-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   test:
-    name: Install and test Firedrake (Linux)
+    name: build
     runs-on: self-hosted
 
     container:

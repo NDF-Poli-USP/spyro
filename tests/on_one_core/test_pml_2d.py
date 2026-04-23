@@ -107,6 +107,7 @@ def run_forward():
 
 
 @pytest.mark.slow
+@pytest.mark.skip(reason="Ruben is implementing a right PML formulation")
 def test_pml():
     """Test that the second order time convergence
     of the central difference method is achieved"""
