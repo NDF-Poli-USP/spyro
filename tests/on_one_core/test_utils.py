@@ -5,7 +5,9 @@ import math
 
 
 def test_butter_lowpast_filter():
-    Wave_obj = spyro.examples.Rectangle_acoustic()
+    Wave_obj = spyro.examples.Rectangle_acoustic(
+        dictionary={"absorving_boundary_conditions": {"absorb_top": True}}
+    )
     layer_values = [1.5, 2.0, 2.5, 3.0]
     z_switches = [-0.25, -0.5, -0.75]
     Wave_obj.multiple_layer_velocity_model(z_switches, layer_values)
