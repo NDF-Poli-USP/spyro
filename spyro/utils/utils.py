@@ -771,3 +771,48 @@ def write_hdf5_velocity_model(obj_with_comm, segy_filename):
 #         (time**2) * sin(pi * z) * sin(pi * x)  # noqa: F405
 #     )
 #     return p
+
+def get_real_shot_record(wave_object):
+    """Get the real shot record for the active sources.
+
+    The returned object is typically an array with shape
+    ``(n_timesteps, n_receivers)`` for a single active shot.
+    """
+    real_shot_record = wave_object.real_shot_record
+
+    if real_shot_record is None:
+        raise ValueError(
+            "Set wave.real_shot_record before enabling functional "
+            "accumulation during the forward solve."
+        )
+
+    if (
+        not isinstance(wave_object.current_sources, (list, tuple))
+        or len(wave_object.current_sources) == 0
+    ):
+        raise ValueError(
+            "Current sources must be set to a non-empty list or tuple "
+            "before retrieving the real shot record."
+        )
+
+    if isinstance(real_shot_record, np.ndarray):
+        if real_shot_record.ndim == 3:
+            return real_shot_record[wave_object.current_sources[0]]
+        if real_shot_record.ndim == 2:
+            return real_shot_record
+
+    if isinstance(real_shot_record, (list, tuple)):
+        if (
+            self.current_sources is not None
+            and len(real_shot_record) > self.current_sources[0]
+        ):
+            source_record = real_shot_record[self.current_sources[0]]
+            if isinstance(source_record, np.ndarray) and source_record.ndim == 2:
+                return source_record
+
+    return real_shot_record
+
+
+def get_real_shot_step(wave_object, step):
+    """Get one time step from the real shot record for the active sources."""
+    return get_real_shot_record(wave_object)[step]

@@ -6,7 +6,7 @@ from .. import utils
 from ..utils.typing import FunctionalEvaluationMode
 
 
-def _propagate_forward_central_difference(wave_obj, source_ids=None):
+def _propagate_forward_central_difference(wave_obj, source_ids):
     """Advance the forward solve with the central-difference scheme.
 
     This is an internal helper used by :meth:`Wave.wave_propagator`. It updates
@@ -17,11 +17,9 @@ def _propagate_forward_central_difference(wave_obj, source_ids=None):
     wave_obj: Wave
         The wave solver object containing all necessary information to perform
         the forward solve.
-    source_ids: list of int, optional
-        List of source IDs to simulate. If `None`, defaults to `[0]`.
+    source_ids: list of int
+        List of source IDs to simulate.
     """
-    if source_ids is None:
-        source_ids = [0]
     if wave_obj.sources is not None:
         wave_obj.sources.current_sources = source_ids
         rhs_forcing = fire.Cofunction(wave_obj.function_space.dual())
@@ -82,7 +80,7 @@ def _propagate_forward_central_difference(wave_obj, source_ids=None):
             helpers.display_progress(wave_obj.comm, t)
 
         if functional_mode is FunctionalEvaluationMode.PER_TIMESTEP:
-            observed_step = wave_obj.sources.get_real_shot_step(wave_obj, step)
+            observed_step = utils.get_real_shot_step(wave_obj, step)
             if wave_obj.use_vertex_only_mesh:
                 if isinstance(observed_step, np.ndarray):
                     real_shot = fire.Function(
@@ -116,7 +114,7 @@ def _propagate_forward_central_difference(wave_obj, source_ids=None):
     wave_obj.forward_solution = usol
     wave_obj.forward_solution_receivers = usol_recv
     if functional_mode is FunctionalEvaluationMode.AFTER_SOLVE:
-        observed_shot = wave_obj.sources.get_real_shot_record(wave_obj)
+        observed_shot = utils.get_real_shot_record(wave_obj)
         residual = observed_shot - usol_recv
         J = utils.compute_functional(wave_obj, residual)
     if compute_functional:

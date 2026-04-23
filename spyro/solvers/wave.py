@@ -120,7 +120,6 @@ class Wave(Model_parameters, metaclass=ABCMeta):
             warnings.warn("No mesh found. Please define a mesh.")
         # Expression to define sources through UFL (less efficient)
         self.source_expression = None
-        self.functional_value = None
         self.real_shot_record = None
 
         self.field_logger = FieldLogger(self.comm,
@@ -471,9 +470,10 @@ class Wave(Model_parameters, metaclass=ABCMeta):
             self.final_time = final_time
         if dt is not None:
             self.dt = dt
-
+        if source_nums is None:
+            source_nums = [0]
         self.current_sources = source_nums
-        _forward_time_integrator(self, source_ids=source_nums)
+        _forward_time_integrator(self, source_nums)
 
     def get_dt(self):
         return self._dt
@@ -508,7 +508,14 @@ class Wave(Model_parameters, metaclass=ABCMeta):
     def enable_compute_functional(
         self, mode=FunctionalEvaluationMode.PER_TIMESTEP
     ):
-        """Enable functional evaluation during forward solves."""
+        """Enable functional evaluation during forward solves.
+
+        Parameters:
+        -----------
+        mode: FunctionalEvaluationMode, optional
+            The mode in which to evaluate the functional.
+            Default is :attribute:`FunctionalEvaluationMode.PER_TIMESTEP`.
+        """
         self.functional_evaluation_mode = mode
 
     @property
@@ -521,25 +528,9 @@ class Wave(Model_parameters, metaclass=ABCMeta):
 
     @functional_evaluation_mode.setter
     def functional_evaluation_mode(self, mode: FunctionalEvaluationMode):
-        if mode is None:
-            try:
-                del self._functional_evaluation_mode
-            except AttributeError:
-                pass
-            return
-
         if not isinstance(mode, FunctionalEvaluationMode):
             raise ValueError(
                 f"Invalid functional evaluation mode: {mode}. "
                 f"Expected an instance of FunctionalEvaluationMode enum."
             )
         self._functional_evaluation_mode = mode
-
-    @property
-    def compute_functional(self):
-        """Backward-compatible alias for functional_evaluation_mode."""
-        return self.functional_evaluation_mode
-
-    @compute_functional.setter
-    def compute_functional(self, mode: FunctionalEvaluationMode):
-        self.functional_evaluation_mode = mode

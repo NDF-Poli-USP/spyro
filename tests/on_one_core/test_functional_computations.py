@@ -69,8 +69,6 @@ def _build_wave():
 
 def test_compute_functional_mode_defaults_to_none():
     wave = _build_wave()
-
-    assert wave.compute_functional is None
     assert wave.functional_evaluation_mode is None
 
 
@@ -78,8 +76,6 @@ def test_enable_compute_functional_defaults_to_per_timestep():
     wave = _build_wave()
 
     wave.enable_compute_functional()
-
-    assert wave.compute_functional == FunctionalEvaluationMode.PER_TIMESTEP
     assert wave.functional_evaluation_mode == FunctionalEvaluationMode.PER_TIMESTEP
 
 
@@ -87,8 +83,6 @@ def test_compute_functional_accepts_after_solve_mode():
     wave = _build_wave()
 
     wave.functional_evaluation_mode = FunctionalEvaluationMode.AFTER_SOLVE
-
-    assert wave.compute_functional == FunctionalEvaluationMode.AFTER_SOLVE
     assert wave.functional_evaluation_mode == FunctionalEvaluationMode.AFTER_SOLVE
 
 
