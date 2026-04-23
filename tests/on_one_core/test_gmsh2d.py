@@ -1,5 +1,4 @@
-import matplotlib.pyplot as plt
-import firedrake as fire
+import math
 from spyro.meshing.meshing_parameters import MeshingParameters
 from spyro.meshing.meshing_functions import AutomaticMesh
 
@@ -15,7 +14,7 @@ def test_gmsh2d():
         "output_filename": "avenir.msh",
 
         # SEGY / Seismic constraints
-        "velocity_model": "avenir.segy",  # Velocity model segy file
+        "velocity_model": "tests/inputfiles/velocity_models/avenir.segy",  # Velocity model segy file
         "cells_per_wavelength": 2.0,
         "source_frequency": 3.0,
 
@@ -50,13 +49,4 @@ def test_gmsh2d():
     print("Starting Gmsh mesh generation...")
     firedrake_mesh = mesh_generator.create_mesh()
 
-    if firedrake_mesh is not None:
-        print(f"Mesh successfully generated and loaded from {mesh_params.output_filename}!")
-
-        fig, axes = plt.subplots(figsize=(60, 60))
-        fire.triplot(firedrake_mesh, axes=axes)
-        axes.set_aspect('equal')
-        axes.set_title("Marmousi Mesh")
-        axes.set_xlabel("Distance X (m)")
-        axes.set_ylabel("Depth Z (m)")
-        plt.show()
+    assert math.isclose(firedrake_mesh.cell_set.core_size, 19275)

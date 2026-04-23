@@ -189,3 +189,6 @@ fw_outputs*.*
 output/
 forgotten_files/
 PacMeshIgnore/
+
+# Allow specific test SEG-Y files
+!tests/inputfiles/velocity_models/*.segy
