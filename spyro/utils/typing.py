@@ -29,6 +29,8 @@ class RieszMapType(Enum):
     L2 = 0
     H1 = 1
     l2 = 2
+
+
 class FunctionalType(Enum):
     """Enum for different types of functionals that can be computed.
 
