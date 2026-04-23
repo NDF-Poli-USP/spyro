@@ -12,8 +12,11 @@ from spyro.habc.rec_lay import RectangLayer
 from spyro.habc.damp_profile import HABC_Damping
 from spyro.habc.nrbc import NRBC
 from spyro.habc.error_measure import HABC_Error
+from spyro.domains.space import create_function_space
 from spyro.habc.lay_len import calc_size_lay
 from spyro.plots.plots_habc import plot_function_layer_size
+from spyro.tools.habc_tools import (clipping_coordinates_lay_field,
+                                    extend_scalar_field_profile)
 from spyro.utils.error_management import value_parameter_error
 from spyro.utils.freq_tools import freq_response
 
@@ -177,9 +180,9 @@ class HABC_Wave(AcousticWave, HABC_Mesh, RectangLayer,
         dom_dim = self.habc_domain_dimensions(only_orig_dom=True)
 
         # Initializing the Mesh class
-        HABC_Mesh.__init__(
-            self, dom_dim, dimension=self.dimension,
-            quadrilateral=self.mesh_parameters.quadrilateral, comm=self.comm)
+        HABC_Mesh.__init__(self, dom_dim, dimension=self.dimension,
+                           quadrilateral=self.mesh_parameters.quadrilateral,
+                           func_space_type='scalar', comm=self.comm)
 
         # Identifier for the current case study
         self.identify_habc_case(output_folder=output_folder)
@@ -445,12 +448,12 @@ class HABC_Wave(AcousticWave, HABC_Mesh, RectangLayer,
         # Computing layer sizes
         self.F_L, self.pad_len, self.ele_pad, self.d_norm, \
             self.a_par, self.FLpos = calc_size_lay(
-                self.freq_ref, z_par, self.lmin, self.lref,
+                self.freq_ref, z_par, self.mesh_parameters.lmin, self.lref,
                 n_root=n_root, layer_based_on_mesh=layer_based_on_mesh)
 
         plot_function_layer_size([self.a_par, z_par],
                                  [self.freq_ref, self.frequency],
-                                 [self.lmin, self.lref], self.FLpos,
+                                 [self.mesh_parameters.lmin, self.lref], self.FLpos,
                                  output_folder=self.path_case_habc)
 
         print("\nDetermining New Geometry with Absorbing Layer", flush=True)
@@ -473,7 +476,8 @@ class HABC_Wave(AcousticWave, HABC_Mesh, RectangLayer,
             print("Determining Hypershape Layer Parameters", flush=True)
 
             # Geometric properties of the hypershape layer
-            self.calc_hyp_geom_prop(dom_lay_full, self.pad_len, self.lmin)
+            self.calc_hyp_geom_prop(dom_lay_full, self.pad_len,
+                                    self.mesh_parameters.lmin)
 
         # Domain dimensions with free surface truncation
         dom_lay_trunc = self.habc_domain_dimensions(only_habc_dom=True,
@@ -483,7 +487,8 @@ class HABC_Wave(AcousticWave, HABC_Mesh, RectangLayer,
         layer_par = (self.F_L, self.a_par, self.d_norm)
 
         # mesh parameters
-        mesh_par = (self.lmin, self.lmax, self.alpha, self.variant)
+        mesh_par = (self.mesh_parameters.lmin, self.mesh_parameters.lmax,
+                    self.mesh_parameters.alpha, self.variant)
 
         # wave parameters
         c_ref = min([bnd[1] for bnd in self.eik_bnd])
@@ -599,30 +604,29 @@ class HABC_Wave(AcousticWave, HABC_Mesh, RectangLayer,
 
         print("\nUpdating Velocity Profile", flush=True)
 
-        # Initialize velocity field and assigning the original velocity model
-        if self.quadrilateral:
-            base_mesh = self.mesh._base_mesh
-            base_cell = base_mesh.ufl_cell()
-            element_zx = fire.FiniteElement("DQ", base_cell, 0,
-                                            variant="spectral")
-            element_y = fire.FiniteElement("DG", fire.interval, 0,
-                                           variant="spectral")
-            tensor_element = fire.TensorProductElement(element_zx, element_y)
-            V = fire.FunctionSpace(self.mesh, tensor_element)
-        else:
-            V = fire.FunctionSpace(self.mesh, self.ele_type_c0, self.p_c0)
+        # Scalar space for auxiliar field of clipped coordinates
+        method_element = "DQ" if self.quadrilateral else "DG"
+        V = create_function_space(self.mesh, method_element, 0)
 
+        # Initialize velocity field and assigning the original velocity model
         self.c = fire.Function(V).interpolate(self.initial_velocity_model,
                                               allow_missing_dofs=True)
 
         # Clipping coordinates to the layer domain
-        lay_field, layer_mask = self.clipping_coordinates_lay_field(V)
+        ufl_coordinates_habc = self.get_spatial_coordinates_habc()
+        lay_field, layer_mask = \
+            clipping_coordinates_lay_field(self.mesh_ops.domain_dim, self.mesh,
+                                           self.dimension, ufl_coordinates_habc,
+                                           V, quadrilateral=self.quadrilateral)
 
         # Extending velocity model within the absorbing layer
-        self.extend_velocity_profile(lay_field, layer_mask, method=method)
+        extended_velocity = \
+            extend_scalar_field_profile(self.mesh_original, self.initial_velocity_model,
+                                        lay_field, layer_mask, self.mesh_parameters.tol,
+                                        method=method, name_prop="Velocity")
 
         # Interpolating the velocity model in the layer
-        self.c.interpolate(lay_field.sub(0) * layer_mask + (
+        self.c.interpolate(extended_velocity * layer_mask + (
             1. - layer_mask) * self.c, allow_missing_dofs=True)
         del layer_mask, lay_field
 
@@ -1042,7 +1046,8 @@ class HABC_Wave(AcousticWave, HABC_Mesh, RectangLayer,
         add_dom -= dist_to_bnd
 
         # Pad length for the infinite domain extension
-        infinite_pad_len = self.lmin * np.ceil(add_dom / self.lmin)
+        infinite_pad_len = self.mesh_parameters.lmin * \
+            np.ceil(add_dom / self.mesh_parameters.lmin)
 
         return infinite_pad_len
 
