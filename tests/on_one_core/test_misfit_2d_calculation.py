@@ -2,6 +2,13 @@ import numpy as np
 import spyro
 
 
+def expected_functional(residual, dt):
+    weights = np.ones(residual.shape[0])
+    weights[0] = 0.5
+    weights[-1] = 0.5
+    return 0.5 * dt * np.sum(weights * np.sum(residual**2, axis=1))
+
+
 def test_misfit_2d():
     default_optimization_parameters = {
         "General": {
@@ -94,9 +101,12 @@ def test_misfit_2d():
         expression="4.0 + 1.0 * tanh(10.0 * (0.5 - sqrt((x - 1.5) ** 2 + (z + 1.5) ** 2)))",
     )
     FWI_obj.generate_real_shot_record()
+    rec_out_exact = FWI_obj.real_shot_record
 
     FWI_obj.set_guess_mesh(input_mesh_parameters={"edge_length": 0.05})
     FWI_obj.set_guess_velocity_model(constant=4.0)
+    FWI_obj.enable_compute_functional()
+    FWI_obj.forward_solve()
     misfit = FWI_obj.calculate_misfit()
 
     # Using only wave objects
@@ -112,17 +122,40 @@ def test_misfit_2d():
     Wave_obj_guess = spyro.AcousticWave(dictionary=dictionary)
     Wave_obj_guess.set_mesh(input_mesh_parameters={"edge_length": 0.05})
     Wave_obj_guess.set_initial_velocity_model(constant=4.0)
+    Wave_obj_guess.real_shot_record = rec_out_exact
+    Wave_obj_guess.enable_compute_functional()
     Wave_obj_guess.forward_solve()
     rec_out_guess = Wave_obj_guess.receivers_output
 
     misfit_second_calc = rec_out_exact - rec_out_guess
+    functional_second_calc = expected_functional(
+        misfit_second_calc,
+        Wave_obj_guess.dt,
+    )
 
     arevaluesclose = np.isclose(misfit, misfit_second_calc)
     test = arevaluesclose.all()
+    functional_matches_wave = np.isclose(
+        Wave_obj_guess.functional_value,
+        functional_second_calc,
+    )
+    functional_matches_fwi = np.isclose(
+        FWI_obj.functional_value,
+        functional_second_calc,
+    )
 
     print(f"Misfit calculated with FWI object is close to the individually calculated: {test}")
+    print(
+        "Functional accumulated during forward solve matches manual calculation: "
+        f"{functional_matches_wave and functional_matches_fwi}"
+    )
 
     assert test
+    assert functional_matches_wave
+    assert functional_matches_fwi
+    print("functional value from FWI object:", FWI_obj.functional_value)
+    print("functional value from wave object:", Wave_obj_guess.functional_value)
+    print("functional value from manual calculation:", functional_second_calc)
 
 
 if __name__ == "__main__":
