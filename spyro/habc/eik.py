@@ -88,10 +88,10 @@ class HABC_Eikonal(Eikonal_Modeling):
         self.funct_space_eik = Wave.funct_space_eik
 
         # Mesh cell diameters
-        self.diam_mesh = Wave.diam_mesh
+        self.diam_mesh = Wave.mesh_parameters.diam_mesh
 
         # Minimum mesh size
-        self.lmin = Wave.lmin
+        self.lmin = Wave.mesh_parameters.lmin
 
         # Velocity profile model
         self.c = Wave.c
@@ -99,12 +99,14 @@ class HABC_Eikonal(Eikonal_Modeling):
         # Minimum velocity value in the model
         self.c_min = Wave.c_min
 
-        # Extract node positions
-        self.node_positions = Wave.extract_node_positions(self.funct_space_eik)
+        # # Extract node positions
+        self.node_positions = Wave.mesh_ops.extract_node_positions(self.mesh,
+                                                                   self.funct_space_eik)
 
         # Extract boundary node indices
-        self.bnds = Wave.extract_bnd_node_indices(self.node_positions,
-                                                  self.funct_space_eik)
+        self.bnds = Wave.mesh_ops.extract_bnd_node_indices(self.mesh,
+                                                           self.funct_space_eik,
+                                                           Wave.mesh_parameters)
 
         # Path to save data
         self.path_save = Wave.path_save + "preamble/"
