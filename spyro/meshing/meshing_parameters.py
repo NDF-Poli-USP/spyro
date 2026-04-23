@@ -920,11 +920,11 @@ class MeshingParameters():
     @property
     def padding_x(self):
         """Pad length in the x-direction.
-        
+
         float or None
             The padding length in the x-direction, or None if not set.
             If None and abc_pad_length is set it returns it.
-        
+
         Raises
         ------
         ValueError
@@ -942,11 +942,11 @@ class MeshingParameters():
     @property
     def padding_z(self):
         """Pad length in the z-direction.
-        
+
         float or None
             The padding length in the z-direction, or None if not set.
             If None and abc_pad_length is set it returns it.
-        
+
         Raises
         ------
         ValueError
@@ -967,7 +967,7 @@ class MeshingParameters():
 
         float or None
             The padding element size, or None if not set.
-        
+
         Raises
         ------
         ValueError
@@ -1002,7 +1002,7 @@ class MeshingParameters():
 
         str or None
             The implementation method ('default', 'fast', 'numba', or None).
-        
+
         Raises
         ------
         ValueError
@@ -1020,7 +1020,7 @@ class MeshingParameters():
     @property
     def apply_winslow(self):
         """Flag indicating whether to apply Winslow smoothing.
-        
+
         bool
             True if Winslow smoothing is enabled, False otherwise.
         """
