@@ -4,7 +4,7 @@ import firedrake as fire
 import spyro.meshing.meshing_operations as mshops
 
 from .time_integration_central_difference import \
-    central_difference as time_integrator
+    _propagate_forward_central_difference as _forward_time_integrator
 from ..domains.quadrature import quadrature_rules
 from ..domains.space import check_function_space_type
 from ..io import Model_parameters
@@ -14,7 +14,7 @@ from ..io import parallel_print
 from ..io.field_logger import FieldLogger
 from ..receivers.Receivers import Receivers
 from ..sources.Sources import Sources
-from ..utils.typing import WaveType
+from ..utils.typing import FunctionalEvaluationMode, WaveType
 from .solver_parameters import get_default_parameters_for_method
 from ..utils import eval_functions_to_ufl
 from .modal.modal_sol import Modal_Solver
@@ -121,6 +121,7 @@ class Wave(Model_parameters, metaclass=ABCMeta):
             warnings.warn("No mesh found. Please define a mesh.")
         # Expression to define sources through UFL (less efficient)
         self.source_expression = None
+        self.real_shot_record = None
 
         self.field_logger = FieldLogger(self.comm,
                                         self.input_dictionary["visualization"])
@@ -443,7 +444,7 @@ class Wave(Model_parameters, metaclass=ABCMeta):
         pass
 
     @ensemble_propagator
-    def wave_propagator(self, dt=None, final_time=None, source_nums=[0]):
+    def wave_propagator(self, dt=None, final_time=None, source_nums=None):
         """
         Propagate the wave forward in time.
         Currently uses central differences.
@@ -456,6 +457,8 @@ class Wave(Model_parameters, metaclass=ABCMeta):
         final_time: Python 'float' (optional)
             Time which simulation ends. If not mentioned uses the default,
             that was estabilished in the wave object.
+        source_nums: list of int (optional)
+            List of source numbers to be simulated. If not mentioned, simulates all sources.
 
         Returns:
         --------
@@ -468,11 +471,10 @@ class Wave(Model_parameters, metaclass=ABCMeta):
             self.final_time = final_time
         if dt is not None:
             self.dt = dt
-
+        if source_nums is None:
+            source_nums = [0]
         self.current_sources = source_nums
-        usol, usol_recv = time_integrator(self, source_nums)
-
-        return usol, usol_recv
+        _forward_time_integrator(self, source_nums)
 
     def get_dt(self):
         return self._dt
@@ -503,3 +505,35 @@ class Wave(Model_parameters, metaclass=ABCMeta):
     def set_material_property(self, *args, **kwargs):
         """Backward-compatible alias for set_material_properties."""
         return self.set_material_properties(*args, **kwargs)
+
+    def enable_compute_functional(
+        self, mode=FunctionalEvaluationMode.AFTER_SOLVE
+    ):
+        """Enable functional evaluation during forward solves.
+
+        Parameters:
+        -----------
+        mode: FunctionalEvaluationMode, optional
+            The mode in which to evaluate the functional.
+            Default is :attribute:`FunctionalEvaluationMode.AFTER_SOLVE`.
+        """
+        # Create the Wave attributes required to compute functional.
+        self.functional_evaluation_mode = mode
+        self.functional_value = None
+
+    @property
+    def functional_evaluation_mode(self):
+        """Get the current functional evaluation mode."""
+        try:
+            return self._functional_evaluation_mode
+        except AttributeError:
+            return None
+
+    @functional_evaluation_mode.setter
+    def functional_evaluation_mode(self, mode: FunctionalEvaluationMode):
+        if not isinstance(mode, FunctionalEvaluationMode):
+            raise ValueError(
+                f"Invalid functional evaluation mode: {mode}. "
+                f"Expected an instance of FunctionalEvaluationMode enum."
+            )
+        self._functional_evaluation_mode = mode
