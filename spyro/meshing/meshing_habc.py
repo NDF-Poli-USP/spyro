@@ -1,11 +1,12 @@
 import firedrake as fire
-from firedrake.__future__ import interpolate
 import numpy as np
+import spyro.meshing.meshing_operations as mshops
 from netgen.geom2d import SplineGeometry
+from firedrake.__future__ import interpolate
 from netgen.meshing import Element2D, \
     Element3D, FaceDescriptor, Mesh, MeshPoint
 from scipy.spatial import cKDTree
-from spyro.utils.error_management import value_parameter_error
+from spyro.tools.habc_tools import point_cloud_field
 fire.interpolate = interpolate
 
 # Work from Ruben Andres Salas, Andre Luis Ferreira da Silva,
@@ -23,15 +24,17 @@ class HABC_Mesh():
 
     Attributes
     ----------
-    alpha : `float`
-        Ratio between the representative mesh dimensions
+    func_space_type, `str`
+        Type of function space for the state variable.
+        Options: 'scalar' or 'vector'. Default is None
+
     bnds : 'array'
         Mesh node indices on boundaries of the original domain
     bnd_nodes : `tuple`
         Mesh node coordinates on boundaries of the origianl domain.
         - (z_data[bnds], x_data[bnds]) for 2D
         - (z_data[bnds], x_data[bnds], y_data[bnds]) for 3D
-    c : `firedrake function`
+    c : `Firedrake.Function`
         Velocity model without absorbing layer
     c_bnd_min : `float`
         Minimum velocity value on the boundary of the original domain
@@ -44,11 +47,9 @@ class HABC_Mesh():
     comm : object
         An object representing the communication interface
         for parallel processing. Default is None
-    diam_mesh : `ufl.geometry.CellDiameter`
-        Mesh cell diameters
     dimension : `int`
         Model dimension (2D or 3D). Default is 2D
-    dom_dim : `tuple`
+    domain_dim : `tuple`
         Original domain dimensions: (Lx, Lz) for 2D or (Lx, Lz, Ly) for 3D
     ele_type_c0 : `string`
         Finite element type for the velocity model without absorbing layer
@@ -56,22 +57,27 @@ class HABC_Mesh():
         Finite element type for the Eikonal modeling. 'CG' or 'KMV'
     f_est : `float`
         Factor for the stabilizing term in Eikonal Eq. Default is 0.03
-    funct_space_eik: `firedrake function space`
+    funct_space_eik: `Firedrake.FunctionSpace`
         Function space for the Eikonal modeling
-    lmin : `float`
-        Minimum mesh size
-    lmax : `float`
-        Maxmum mesh size
+
     mesh_original : `firedrake mesh`
         Original mesh without absorbing layer
+    mesh_parameters.alpha : `float`
+        Ratio between the representative mesh dimensions
+    mesh_parameters.diam_mesh : `ufl.geometry.CellDiameter`
+        Mesh cell diameters
+    mesh_parameters.lmin : `float`
+        Minimum mesh size
+    mesh_parameters.lmax : `float`
+        Maxmum mesh size
+    mesh_parameters.tol : `float`
+        Tolerance for searching nodes in the mesh
     p_c0 : `int`
         Finite element order for the velocity model without absorbing layer
     p_eik : `int`
         Finite element order for the Eikonal modeling
     quadrilateral : bool
         Flag to indicate whether to use quadrilateral/hexahedral elements
-    tol : `float`
-        Tolerance for searching nodes in the mesh
 
     Methods
     -------
@@ -90,6 +96,8 @@ class HABC_Mesh():
     extract_bnd_node_indices()
         Extract boundary node indices on boundaries of the domain
         excluding the free surface at the top boundary
+    get_spatial_coordinates_habc()
+        Get the ufl coordinates of the mesh with absorbing layer.
     hypershape_mesh_habc()
         Generate a mesh with a hypershape absorbing layer
     inside_hyp_3D()
@@ -112,8 +120,6 @@ class HABC_Mesh():
         Project a point radially onto the hyperellipsoid surface
     rectangular_mesh_habc()
         Generate a rectangular mesh with an absorbing layer
-    representative_mesh_dimensions()
-        Get the representative mesh dimensions from original mesh
     sharp_mesh_3D()
         Generate a sharp mesh by cutting the rectangular mesh
         with the hyperellipsoid surface
@@ -123,18 +129,22 @@ class HABC_Mesh():
         Generate the boundary points for a truncated hyperellipse
     '''
 
-    def __init__(self, dom_dim, dimension=2, quadrilateral=False, comm=None):
+    def __init__(self, domain_dim, dimension=2, quadrilateral=False,
+                 func_space_type=None, comm=None):
         '''
         Initialize the HABC_Mesh class
 
         Parameters
         ----------
-        dom_dim : `tuple`
+        domain_dim : `tuple`
             Original domain dimensions: (Lx, Lz) for 2D or (Lx, Lz, Ly) for 3D
         dimension : `int`, optional
             Model dimension (2D or 3D). Default is 2D
         quadrilateral : bool, optional
             Flag to indicate whether to use quadrilateral/hexahedral elements
+        func_space_type, `str`, optional
+            Type of function space for the state variable.
+            Options: 'scalar' or 'vector'. Default is None
         comm : `object`, optional
             An object representing the communication interface
             for parallel processing. Default is None
@@ -145,7 +155,7 @@ class HABC_Mesh():
         '''
 
         # Original domain dimensions
-        self.dom_dim = dom_dim
+        self.domain_dim = domain_dim
 
         # Model dimension
         self.dimension = dimension
@@ -153,116 +163,17 @@ class HABC_Mesh():
         # Quadrilateral/hexahedral elements
         self.quadrilateral = quadrilateral
 
+        # Type of function space
+        self.func_space_type = func_space_type
+
         # Communicator MPI
         self.comm = comm
 
-    def representative_mesh_dimensions(self):
-        '''
-        Get the representative mesh dimensions from original mesh
-
-        Parameters
-        ----------
-        None
-
-        Returns
-        -------
-        None
-        '''
-
-        # Mesh cell diameters
-        self.diam_mesh = fire.CellDiameter(self.mesh)
-
-        if self.dimension == 2:  # 2D
-            fdim = 2**0.5
-
-        if self.dimension == 3:  # 3D
-            fdim = 3**0.5
-
-        # Minimum and maximum mesh size for habc parameters
-        diam = fire.assemble(fire.interpolate(self.diam_mesh,
-                                              self.function_space))
-        self.lmin = round(diam.dat.data_with_halos.min() / fdim, 6)
-        self.lmax = round(diam.dat.data_with_halos.max() / fdim, 6)
-
-        # Ratio between the representative mesh dimensions
-        self.alpha = self.lmax / self.lmin
-
-        # Tolerance for searching nodes in the mesh
-        self.tol = 10**(min(int(np.log10(self.lmin / 10)), -6))
-
-    def extract_node_positions(self, func_space):
-        '''
-        Extract node positions from the mesh
-
-        Parameters
-        ----------
-        func_space : `firedrake function space`
-            Function space to extract node positions
-
-        Returns
-        -------
-        node_positions : `tuple`
-            Tuple containing the node positions in the mesh.
-            - (z_data, x_data) for 2D
-            - (z_data, x_data, y_data) for 3D
-        '''
-
-        # Extract node positions
-        z_f = fire.assemble(fire.interpolate(self.mesh_z, func_space))
-        x_f = fire.assemble(fire.interpolate(self.mesh_x, func_space))
-        z_data = z_f.dat.data_with_halos[:]
-        x_data = x_f.dat.data_with_halos[:]
-        node_positions = (z_data, x_data)
-
-        if self.dimension == 3:  # 3D
-            y_f = fire.assemble(fire.interpolate(self.mesh_y, func_space))
-            y_data = y_f.dat.data_with_halos[:]
-            node_positions += (y_data,)
-
-        return node_positions
-
-    def extract_bnd_node_indices(self, node_positions, func_space):
-        '''
-        Extract boundary node indices on boundaries of the domain
-        excluding the free surface at the top boundary
-
-        Parameters
-        ----------
-        node_positions : `tuple`
-            Tuple containing the node positions in the mesh.
-            - (z_data, x_data) for 2D
-            - (z_data, x_data, y_data) for 3D
-        func_space : `firedrake function space`
-            Function space to extract node positions
-
-        Returns
-        -------
-        bnds : `tuple` of 'arrays'
-            Mesh node indices on boundaries of the domain.
-            - (left_boundary, right_boundary, bottom_boundary) for 2D
-            - (left_boundary, right_boundary, bottom_boundary,
-                left_bnd_y, right_bnd_y) for 3D
-        '''
-
-        # Extract node positions
-        z_data, x_data = node_positions[0:2]
-
-        # Boundary array
-        left_boundary = np.where(x_data <= self.tol)
-        right_boundary = np.where(x_data >= self.mesh_parameters.length_x
-                                  - self.tol)
-        bottom_boundary = np.where(z_data <= self.tol
-                                   - self.mesh_parameters.length_z)
-        bnds = (left_boundary, right_boundary, bottom_boundary)
-
-        if self.dimension == 3:  # 3D
-            y_data = node_positions[2]
-            left_bnd_y = np.where(y_data <= self.tol)
-            right_bnd_y = np.where(y_data >= self.mesh_parameters.length_y
-                                   - self.tol)
-            bnds += (left_bnd_y, right_bnd_y,)
-
-        return bnds
+        if not hasattr(self, "mesh_ops"):
+            self.mesh_ops = mshops.MeshOps(domain_dim, dimension=dimension,
+                                           quadrilateral=quadrilateral,
+                                           func_space_type=func_space_type,
+                                           comm=comm)
 
     def original_boundary_data(self):
         '''
@@ -278,11 +189,13 @@ class HABC_Mesh():
         '''
 
         # Extract node positions
-        node_positions = self.extract_node_positions(self.function_space)
+        node_positions = self.mesh_ops.extract_node_positions(self.mesh,
+                                                              self.function_space)
 
         # Extract boundary node indices
-        bnds = self.extract_bnd_node_indices(node_positions,
-                                             self.function_space)
+        bnds = self.mesh_ops.extract_bnd_node_indices(self.mesh,
+                                                      self.function_space,
+                                                      self.mesh_parameters)
         self.bnds = np.unique(np.concatenate([idxs for idx_list in bnds
                                               for idxs in idx_list]))
 
@@ -297,9 +210,11 @@ class HABC_Mesh():
         mask_boundary = np.isin(
             np.asarray(self.bnd_nodes).T,
             self.mesh_original.coordinates.dat.data_with_halos).all(axis=1)
-        vel_on_boundary = self.point_cloud_field(
-            self.mesh_original, np.asarray(self.bnd_nodes).T[mask_boundary],
-            self.initial_velocity_model).dat.data_with_halos[:]
+        vel_on_boundary = \
+            point_cloud_field(self.mesh_original,
+                              np.asarray(self.bnd_nodes).T[mask_boundary],
+                              self.initial_velocity_model,
+                              self.mesh_parameters.tol).dat.data_with_halos[:]
         self.c_bnd_min = vel_on_boundary[vel_on_boundary > 0.].min()
         self.c_bnd_max = vel_on_boundary[vel_on_boundary > 0.].max()
 
@@ -356,7 +271,14 @@ class HABC_Mesh():
               f"and {self.mesh.num_cells()} Volume Elements", flush=True)
 
         # Get mesh parameters from original mesh
-        self.representative_mesh_dimensions()
+        mesh_derived_parameters = \
+            self.mesh_ops.representative_mesh_dimensions(self.mesh,
+                                                         self.function_space)
+        self.mesh_parameters.diam_mesh = mesh_derived_parameters[0]
+        self.mesh_parameters.lmin = mesh_derived_parameters[1]
+        self.mesh_parameters.lmax = mesh_derived_parameters[2]
+        self.mesh_parameters.alpha = mesh_derived_parameters[3]
+        self.mesh_parameters.tol = mesh_derived_parameters[4]
 
         # Save a copy of the original mesh
         self.mesh_original = self.mesh
@@ -412,12 +334,12 @@ class HABC_Mesh():
         '''
 
         # Domain dimensions
-        Lx, Lz = self.dom_dim[:2]
+        Lx, Lz = self.domain_dim[:2]
 
         # Number of elements
-        n_pad = round(pad_len / self.lmin)  # Elements in the layer
-        nz = int(round(Lz / self.lmin)) + int(n_pad)
-        nx = int(round(Lx / self.lmin)) + int(2 * n_pad)
+        n_pad = round(pad_len / self.mesh_parameters.lmin)  # Elements in the layer
+        nz = int(round(Lz / self.mesh_parameters.lmin)) + int(n_pad)
+        nx = int(round(Lx / self.mesh_parameters.lmin)) + int(2 * n_pad)
 
         # New geometry with layer
         Lx_habc, Lz_habc = dom_lay[:2]
@@ -434,8 +356,8 @@ class HABC_Mesh():
         if self.dimension == 3:  # 3D
 
             # Number of elements
-            Ly = self.dom_dim[2]
-            ny = int(round(Ly / self.lmin)) + int(2 * n_pad)
+            Ly = self.domain_dim[2]
+            ny = int(round(Ly / self.mesh_parameters.lmin)) + int(2 * n_pad)
 
             # New geometry with layer
             Ly_habc = dom_lay[2]
@@ -569,7 +491,7 @@ class HABC_Mesh():
         n_hyp, perimeter, a_hyp, b_hyp = hyp_par
 
         # Boundary points: Use 16 or 24 as a minimum
-        lmin = self.lmin
+        lmin = self.mesh_parameters.lmin
         num_bnd_pts = int(max(np.ceil(perimeter / lmin), 16)) - 1
 
         # Generate the hyperellipse boundary points
@@ -672,7 +594,7 @@ class HABC_Mesh():
                 if idp == ini_trunc or idp == end_trunc - 1:
                     curves.append(["line", p1, p2, ltrunc])
                 else:
-                    curves.append(["line", p1, p2, self.lmin])
+                    curves.append(["line", p1, p2, self.mesh_parameters.lmin])
 
             for idp in range(end_trunc, num_bnd_pts - 1, 2):
                 p1 = geo.PointData()[2][idp]
@@ -689,7 +611,7 @@ class HABC_Mesh():
                 # print(p1, p2)
 
                 if ini_trunc + 1 <= idp <= end_trunc - 2:
-                    curves.append(["line", p1, p2, self.lmin])
+                    curves.append(["line", p1, p2, self.mesh_parameters.lmin])
                 else:
                     curves.append(["line", p1, p2, ltrunc])
 
@@ -722,7 +644,7 @@ class HABC_Mesh():
         '''
 
         # Domain dimensions
-        Lx, Lz = self.dom_dim[:2]
+        Lx, Lz = self.domain_dim[:2]
 
         # Generate the hyperellipse boundary points
         bnd_pts, trunc_feat = self.trunc_hyp_bndpts_2D(hyp_par, Lx / 2, Lz / 2)
@@ -742,7 +664,7 @@ class HABC_Mesh():
                             rightdomain=0) for c in curves]
 
                 # Generate the mesh using netgen library
-                hyp_mesh = geo.GenerateMesh(maxh=self.lmin,
+                hyp_mesh = geo.GenerateMesh(maxh=self.mesh_parameters.lmin,
                                             quad_dominated=self.quadrilateral,
                                             optsteps2d=10,  # Optimize mesh
                                             )
@@ -826,8 +748,8 @@ class HABC_Mesh():
 
             # Check if the point is on the original boundary
             if boundary_tree.query(
-                coord, distance_upper_bound=self.tol,
-                    workers=-1)[0] <= self.tol:
+                coord, distance_upper_bound=self.mesh_parameters.tol,
+                    workers=-1)[0] <= self.mesh_parameters.tol:
                 boundary_coords.append(coord)
                 boundary_points.append(rec_map[i])
 
@@ -854,9 +776,9 @@ class HABC_Mesh():
 
             # Check if the point is on the original boundary
             dist, idx = boundary_tree.query(
-                coord, distance_upper_bound=self.tol, workers=-1)
+                coord, distance_upper_bound=self.mesh_parameters.tol, workers=-1)
 
-            if dist <= self.tol:
+            if dist <= self.mesh_parameters.tol:
                 # Reuse the existing point
                 hyp_map[i] = boundary_points[idx]
             else:
@@ -1142,7 +1064,7 @@ class HABC_Mesh():
         '''
 
         # Original domain dimensions
-        Lx, Lz, Ly = self.dom_dim
+        Lx, Lz, Ly = self.domain_dim
 
         # Centroid of the hyperellipsoid
         centroid = np.array([-Lz / 2, Lx / 2., Ly / 2.])
@@ -1212,289 +1134,13 @@ class HABC_Mesh():
 
         return mesh_habc
 
-    def layer_mask_field(self, coords, V, damp_par=None,
-                         type_marker='damping', name_mask=None):
-        '''
-        Generate a mask for the absorbing layer. The mask is defined
-        for conditional expressions to identify the domain of the layer
-        (option: 'mask') or the reference to the original boundary
-        (option: 'damping') used to compute the damping profile.
-
-        Parameters
-        ----------
-        coords : 'ufl.geometry.SpatialCoordinate'
-            Domain Coordinates including the absorbing layer
-        V : `firedrake function space`
-            Function space for the mask field
-        damp_par : `tuple`, optional
-            Damping parameters for the absorbing layer.
-            Structure: (pad_len, eta_crt, aq, bq)
-            - pad_len : `float`
-                Size of the absorbing layer
-            - eta_crt : `float`
-                Critical damping coefficient (1/s)
-            - aq : `float`
-                Coefficient for quadratic term in the damping function
-            - bq : `float`
-                Coefficient bq for linear term in the damping function
-        type_marker : `string`, optional
-            Type of marker. Default is 'mask'.
-            - 'damping' : Get the reference distance to the original boundary
-            - 'mask' : Define a mask to filter the layer boundary domain
-        name_mask : `string`, optional
-            Name for the mask field. Default is None
-
-        Returns
-        -------
-        layer_mask : `firedrake function`
-            Mask for the absorbing layer
-            - 'damping' : `ufl.conditional.Conditional`
-                Reference distance to the original boundary
-            - 'mask' : `ufl.algebra.Division`
-                Conditional expression to identify the layer domain
-        '''
-
-        # Domain dimensions
-        Lx, Lz = self.dom_dim[:2]
-
-        # Domain coordinates
-        z, x = coords[0], coords[1]
-
-        # Conditional value
-        val_condz = (z + Lz)**2 if type_marker == 'damping' else 1.
-        val_condx1 = x**2 if type_marker == 'damping' else 1.
-        val_condx2 = (x - Lx)**2 if type_marker == 'damping' else 1.
-
-        # Conditional expressions for the mask
-        z_pd = fire.conditional(z < -Lz, val_condz, 0.)
-        x_pd = fire.conditional(x < 0., val_condx1, 0.) + \
-            fire.conditional(x > Lx, val_condx2, 0.)
-        ref = z_pd + x_pd
-
-        if self.dimension == 3:  # 3D
-
-            # 3D dimension
-            Ly = self.dom_dim[2]
-            y = coords[2]
-
-            # Conditional value
-            val_condy1 = y**2 if type_marker == 'damping' else 1.
-            val_condy2 = (y - Ly)**2 if type_marker == 'damping' else 1.
-
-            # Conditional expressions for the mask
-            y_pd = fire.conditional(y < 0., val_condy1, 0.) + \
-                fire.conditional(y > Ly, val_condy2, 0.)
-            ref += y_pd
-
-        # Final value for the mask
-        if type_marker == 'damping':
-
-            if damp_par is None:
-                raise ValueError("Damping parameters must be provided "
-                                 "when 'type_marker' is 'damping'.")
-
-            # Damping parameters
-            pad_len, eta_crt, aq, bq = damp_par
-
-            if pad_len <= 0:
-                raise ValueError(f"Invalid value for 'pad_len': {pad_len}. "
-                                 "'pad_len' must be greater than zero "
-                                 "when 'type_marker' is 'damping'.")
-            if eta_crt <= 0:
-                raise ValueError(f"Invalid value for 'eta_crt': {eta_crt}. "
-                                 "'eta_crt' must be greater than zero "
-                                 "when 'type_marker' is 'damping'.")
-
-            # Reference distance to the original boundary
-            ref = fire.sqrt(ref) / fire.Constant(pad_len)
-
-            # Quadratic damping profile
-            if bq == 0.:
-                ref = fire.Constant(eta_crt) * fire.Constant(aq) * ref**2
-            else:
-                ref = fire.Constant(eta_crt) * (fire.Constant(aq) * ref**2
-                                                + fire.Constant(bq) * ref)
-
-        elif type_marker == 'mask':
-            # Mask filter for layer boundary domain
-            ref = fire.conditional(ref > 0, 1., 0.)
-
-        else:
-            value_parameter_error('type_marker', type_marker,
-                                  ['damping', 'mask'])
-
-        layer_mask = fire.Function(V, name=name_mask)
-        layer_mask.assign(fire.assemble(fire.interpolate(ref, V)))
-
-        return layer_mask
-
-    def clipping_coordinates_lay_field(self, V):
-        '''
-        Generate a field with clipping coordinates to the original boundary
-
-        Parameters
-        ----------
-        V : `firedrake function space`
-            Function space for the mask field
-
-        Returns
-        -------
-        lay_field : `firedrake function`
-            Field with clipped coordinates only in the absorbing layer
-        layer_mask : `firedrake function`
-            Mask for the absorbing layer
-        '''
-
-        print("Clipping Coordinates Inside Layer", flush=True)
-
-        # Domain dimensions
-        Lx, Lz = self.dom_dim[:2]
-
-        # Vectorial space for auxiliar field of clipped coordinates
-        if self.quadrilateral:
-            base_mesh = self.mesh._base_mesh
-            base_cell = base_mesh.ufl_cell()
-            element_zx = fire.FiniteElement("DQ", base_cell, 0,
-                                            variant="spectral")
-            element_y = fire.FiniteElement("DG", fire.interval, 0,
-                                           variant="spectral")
-            tensor_element = fire.TensorProductElement(element_zx, element_y)
-            W_sp = fire.VectorFunctionSpace(self.mesh, tensor_element)
-        else:
-            W_sp = fire.VectorFunctionSpace(self.mesh,
-                                            self.ele_type_c0,
-                                            self.p_c0)
-
-        # Mesh coordinates
-        coords = fire.SpatialCoordinate(self.mesh)
-
-        # Clipping coordinates
-        lay_field = fire.Function(W_sp)
-        lay_field.assign(fire.assemble(fire.interpolate(coords, W_sp)))
-        lay_arr = lay_field.dat.data_with_halos[:]
-        lay_arr[:, 0] = np.clip(lay_arr[:, 0], -Lz, 0.)
-        lay_arr[:, 1] = np.clip(lay_arr[:, 1], 0., Lx)
-
-        if self.dimension == 3:  # 3D
-
-            # 3D dimension
-            Ly = self.dom_dim[2]
-
-            # Clipping coordinates
-            lay_arr[:, 2] = np.clip(lay_arr[:, 2], 0., Ly)
-
-        # Mask function to identify the absorbing layer domain
-        layer_mask = self.layer_mask_field(coords, V, type_marker='mask')
-
-        # Field with clipped coordinates only in the absorbing layer
-        lay_field.assign(fire.assemble(fire.interpolate(
-            lay_field * layer_mask, W_sp)))
-
-        return lay_field, layer_mask
-
-    def point_cloud_field(self, parent_mesh, pts_cloud, parent_field):
-        '''
-        Create a field on a point cloud from a parent mesh and field
-
-        Parameters
-        ----------
-        parent_mesh : `firedrake mesh`
-            Parent mesh containing the original field
-        pts_cloud : `array`
-            Array of shape (num_pts, dim) containing the coordinates
-            of the point cloud
-        parent_field : `firedrake function`
-            Parent field defined on the parent mesh
-
-        Returns
-        -------
-        cloud_field : `firedrake function`
-            Field defined on the point cloud
-        '''
-
-        # Creating a point cloud field from the parent mesh
-        pts_mesh = fire.VertexOnlyMesh(
-            parent_mesh, pts_cloud, reorder=True, tolerance=self.tol,
-            missing_points_behaviour='error', redundant=False)
-        del pts_cloud
-
-        # Cloud field
-        V0 = fire.FunctionSpace(pts_mesh, "DG", 0)
-        f_pts = fire.assemble(fire.interpolate(parent_field, V0))
-
-        # Ensuring correct assemble
-        V1 = fire.FunctionSpace(pts_mesh.input_ordering, "DG", 0)
-        del pts_mesh
-        cloud_field = fire.Function(V1)
-        cloud_field.assign(fire.assemble(fire.interpolate(f_pts, V1)))
-        del f_pts
-
-        return cloud_field
-
-    def extend_velocity_profile(self, lay_field, layer_mask,
-                                method='point_cloud'):
-        '''
-        Extend the velocity profile inside the absorbing layer
-
-        Parameters
-        ----------
-        lay_field : `firedrake function`
-            Field with clipped coordinates only in the absorbing layer
-        layer_mask : `firedrake function`
-            Mask for the absorbing layer
-        method : `str`, optional
-            Method to extend the velocity profile. Options:
-            'point_cloud' or 'nearest_point'. Default is 'point_cloud'
-
-        Returns
-        -------
-        None
-        '''
-
-        print("Extending Profile Inside Layer", flush=True)
-
-        # Extracting the nodes from the layer field
-        lay_nodes = lay_field.dat.data_with_halos[:]
-
-        # Nodes to extend the velocity model
-        ind_nodes = np.where(layer_mask.dat.data_with_halos)[0]
-        pts_to_extend = lay_nodes[ind_nodes]
-
-        if method == 'point_cloud':
-
-            print("Using Cloud Points Method to Extend Velocity Profile",
-                  flush=True)
-
-            # Set the velocity of the nearest point on the original boundary
-            vel_to_extend = self.point_cloud_field(
-                self.mesh_original, pts_to_extend,
-                self.initial_velocity_model).dat.data_with_halos[:]
-
-        elif method == 'nearest_point':
-
-            print("Using Nearest Point Method to Extend Velocity Profile",
-                  flush=True)
-
-            # Set the velocity of the nearest point on the original boundary
-            vel_to_extend = self.initial_velocity_model.at(pts_to_extend,
-                                                           dont_raise=True)
-            del pts_to_extend
-
-        else:
-            value_parameter_error('method', method,
-                                  ['point_cloud', 'nearest_point'])
-
-        # Velocity profile inside the layer
-        lay_field.dat.data_with_halos[ind_nodes, 0] = vel_to_extend
-        del vel_to_extend, ind_nodes
-
     def layer_boundary_data(self, V):
         '''
         Generate the boundary data from the domain with the absorbing layer
 
         Parameters
         ----------
-        V : `firedrake function space`
+        V : `Firedrake.FunctionSpace`
             Function space for the boundary of the domain with absorbing layer
 
         Returns
@@ -1511,7 +1157,7 @@ class HABC_Mesh():
         bnd_nod = fire.DirichletBC(V, 0., "on_boundary").nodes
 
         # Extract node positions
-        node_positions = self.extract_node_positions(V)
+        node_positions = self.mesh_ops.extract_node_positions(self.mesh, V)
 
         # Boundary node coordinates
         z_f, x_f = node_positions[:2]
@@ -1519,7 +1165,7 @@ class HABC_Mesh():
         bnd_x = x_f[bnd_nod]
 
         # Identify non-free surfaces (remain unchanged)
-        no_free_surf = ~(abs(bnd_z) <= self.tol)
+        no_free_surf = ~(abs(bnd_z) <= self.mesh_parameters.tol)
 
         bnd_nodes_nfs = (bnd_z[no_free_surf], bnd_x[no_free_surf])
         if self.dimension == 3:  # 3D
@@ -1531,3 +1177,31 @@ class HABC_Mesh():
         bnd_nfs = bnd_nod[no_free_surf]
 
         return bnd_nfs, bnd_nodes_nfs
+
+    def get_spatial_coordinates_habc(self):
+        """ Get the ufl coordinates of the mesh with absorbing layer.
+
+        Parameters
+        ----------
+        None
+
+        Returns
+        -------
+        ufl_coordinates_habc : `ufl.geometry.SpatialCoordinate`
+            Domain Coordinates including the absorbing layer
+        """
+
+        min_coordinates, max_coordinates = \
+            self.mesh_ops.extract_extreme_coordinates(self.mesh)
+        domain_habc = np.asarray([self.Lz_habc, self.Lx_habc]) if self.dimension == 2 \
+            else np.asarray([self.Lz_habc, self.Lx_habc, self.Ly_habc])
+        domain_to_check = abs(max_coordinates - min_coordinates)
+
+        assert np.allclose(domain_habc, domain_to_check, atol=0.01), \
+            "Mesh dimensions do not match with expected dimensions of" \
+            f"domain with absorbing layer. Expected: {np.round(domain_habc, 3)}, " \
+            f"Got: {np.round(domain_to_check, 3)}."
+
+        ufl_coordinates_habc = fire.SpatialCoordinate(self.mesh)
+
+        return ufl_coordinates_habc
