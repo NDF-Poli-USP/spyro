@@ -74,7 +74,7 @@ class AcousticWave(Wave):
         adjoint_type=AdjointType.IMPLEMENTED_ADJOINT,
         riesz_map=RieszMapType.L2
     ):
-        """Solve the adjoint problem to calculate the gradient.
+        """Compute the adjoint-based gradient.
 
         Parameters:
         -----------
