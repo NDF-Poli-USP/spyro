@@ -117,7 +117,7 @@ def test_misfit_2d():
         output=True
     )
     Wave_obj_exact.forward_solve()
-    rec_out_exact = Wave_obj_exact.receivers_output
+    rec_out_exact = Wave_obj_exact.forward_solution_receivers
 
     Wave_obj_guess = spyro.AcousticWave(dictionary=dictionary)
     Wave_obj_guess.set_mesh(input_mesh_parameters={"edge_length": 0.05})
@@ -125,7 +125,7 @@ def test_misfit_2d():
     Wave_obj_guess.real_shot_record = rec_out_exact
     Wave_obj_guess.enable_compute_functional()
     Wave_obj_guess.forward_solve()
-    rec_out_guess = Wave_obj_guess.receivers_output
+    rec_out_guess = Wave_obj_guess.forward_solution_receivers
 
     misfit_second_calc = rec_out_exact - rec_out_guess
     functional_second_calc = expected_functional(

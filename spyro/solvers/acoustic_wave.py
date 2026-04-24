@@ -201,7 +201,7 @@ class AcousticWave(Wave):
             return self.u_np1
 
     @override
-    def get_receivers_output(self):
+    def get_forward_solution_receivers(self):
         if self.abc_boundary_layer_type == "PML":
             data_with_halos = self.X_n.dat.data_ro_with_halos[0][:]
         else:
