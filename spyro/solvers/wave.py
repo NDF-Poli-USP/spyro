@@ -14,10 +14,11 @@ from ..io import parallel_print
 from ..io.field_logger import FieldLogger
 from ..receivers.Receivers import Receivers
 from ..sources.Sources import Sources
-from ..utils.typing import FunctionalEvaluationMode, WaveType
+from ..utils.typing import AdjointType, WaveType, FunctionalEvaluationMode
 from .solver_parameters import get_default_parameters_for_method
 from ..utils import eval_functions_to_ufl
 from .modal.modal_sol import Modal_Solver
+from .automatic_differentiation_solver import AutomatedAdjoint
 
 fire.set_log_level(fire.ERROR)
 
@@ -96,14 +97,20 @@ class Wave(Model_parameters, metaclass=ABCMeta):
         self.vector_function_space = None
         self.tensor_function_space0 = None
         self.tensor_function_space1 = None
-        self.forward_solution_receivers = None
+        self._forward_solution_receivers = None
+        self._store_forward_time_steps = False
+        self.forward_solution = None
         self.adjoint_solution = None
+        self.adjoint_type = AdjointType.NONE
         self.current_time = 0.0
-        self.set_solver_parameters()
-
-        self.mesh = self.get_mesh()
-        self.c = None
+        # Expression to define sources through UFL (less efficient)
+        self.source_expression = None
         self.sources = None
+        self.real_shot_record = None
+        self.c = None
+        self.mesh = self.get_mesh()
+
+        self.set_solver_parameters()
 
         # Creating mesh operations manager
         self.mesh_ops = mshops.MeshOps(
@@ -119,9 +126,6 @@ class Wave(Model_parameters, metaclass=ABCMeta):
             )
         else:
             warnings.warn("No mesh found. Please define a mesh.")
-        # Expression to define sources through UFL (less efficient)
-        self.source_expression = None
-        self.real_shot_record = None
 
         self.field_logger = FieldLogger(self.comm,
                                         self.input_dictionary["visualization"])
@@ -423,7 +427,7 @@ class Wave(Model_parameters, metaclass=ABCMeta):
                            fset=lambda self, value: self._set_next_vstate(value))
 
     @abstractmethod
-    def get_receivers_output(self):
+    def get_forward_solution_receivers(self):
         pass
 
     @abstractmethod
@@ -506,6 +510,37 @@ class Wave(Model_parameters, metaclass=ABCMeta):
         """Backward-compatible alias for set_material_properties."""
         return self.set_material_properties(*args, **kwargs)
 
+    @property
+    def store_forward_time_steps(self):
+        return self._store_forward_time_steps
+
+    @store_forward_time_steps.setter
+    def store_forward_time_steps(self, value):
+        self._store_forward_time_steps = value
+
+    def enable_automated_adjoint(self):
+        self.enable_compute_functional()
+        self.store_forward_time_steps = False
+        self.automatic_adjoint = True
+        self.adjoint_type = AdjointType.AUTOMATED_ADJOINT
+        self.use_vertex_only_mesh = True
+        controls = self.c if self.c is not None else self.initial_velocity_model
+        self.automated_adjoint = AutomatedAdjoint(controls)
+
+    def enable_implemented_adjoint(self):
+        self.enable_compute_functional()
+        self.store_forward_time_steps = True
+        self.automatic_adjoint = False
+        self.adjoint_type = AdjointType.IMPLEMENTED_ADJOINT
+
+    @property
+    def forward_solution_receivers(self):
+        return self._forward_solution_receivers
+
+    @forward_solution_receivers.setter
+    def forward_solution_receivers(self, value):
+        self._forward_solution_receivers = value
+
     def enable_compute_functional(
         self, mode=FunctionalEvaluationMode.AFTER_SOLVE
     ):
@@ -519,7 +554,6 @@ class Wave(Model_parameters, metaclass=ABCMeta):
         """
         # Create the Wave attributes required to compute functional.
         self.functional_evaluation_mode = mode
-        self.functional_value = None
 
     @property
     def functional_evaluation_mode(self):
@@ -537,3 +571,5 @@ class Wave(Model_parameters, metaclass=ABCMeta):
                 f"Expected an instance of FunctionalEvaluationMode enum."
             )
         self._functional_evaluation_mode = mode
+        self.functional_value = None
+        self.misfit = None

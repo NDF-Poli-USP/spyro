@@ -90,7 +90,7 @@ def run_forward_hexahedral(dt, final_time, offset):
     Wave_obj.forward_solve()
     # time_vector = np.linspace(0.0, final_time, int(final_time/dt)+1)
 
-    rec_out = Wave_obj.receivers_output
+    rec_out = Wave_obj.forward_solution_receivers
     output = rec_out.flatten()
     my_ensemble = Wave_obj.comm
     if my_ensemble.comm.rank == 0 and my_ensemble.ensemble_comm.rank == 0:
