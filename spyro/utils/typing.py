@@ -17,7 +17,7 @@ class WaveType(Enum):
 
 class AdjointType(Enum):
     """Enum for the type of adjoint solver to use.
-    
+
     NONE: No adjoint solver.
     AUTOMATED_ADJOINT: Use the automated adjoint solver via `firedrake.adjoint`.
     IMPLEMENTED_ADJOINT: Use the manually implemented adjoint solver.
