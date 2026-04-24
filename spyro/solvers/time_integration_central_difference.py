@@ -58,15 +58,15 @@ def _propagate_forward_central_difference(wave_obj, source_ids):
     usol_recv = []
     save_step = 0
 
-    if adjoint_type == AdjointType.AUTOMATED_ADJOINT:
-        wave.automated_adjoint.start_recording()
-
     if compute_functional:
         J = 0.0
         # Reset misfit to None at the start of the solve to avoid
         # using stale misfit values from previous solves.
         wave_obj.misfit = None
         wave.misfit = []
+
+    if adjoint_type == AdjointType.AUTOMATED_ADJOINT:
+        wave.automated_adjoint.start_recording()
 
     for step in range(nt):
         # Basic way of applying sources
@@ -87,7 +87,7 @@ def _propagate_forward_central_difference(wave_obj, source_ids):
         if wave_obj.use_vertex_only_mesh:
             usol_recv.append(fire.assemble(interpolate_receivers))
         else:
-            usol_recv.append(wave_obj.get_receivers_output())
+            usol_recv.append(wave_obj.get_forward_solution_receivers())
 
         if (
             wave_obj.store_forward_time_steps
@@ -150,7 +150,7 @@ def _propagate_forward_central_difference(wave_obj, source_ids):
         # for use in the implemented adjoint.
         wave.forward_solution = usol
 
-    wave_obj.receivers_output = usol_recv
+    wave_obj.forward_solution_receivers = usol_recv
 
     if functional_mode is FunctionalEvaluationMode.AFTER_SOLVE:
         observed_shot = utils.get_real_shot_record(wave_obj)

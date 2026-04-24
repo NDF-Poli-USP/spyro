@@ -1206,7 +1206,7 @@ class SyntheticRealAcousticWave(AcousticWave):
             real_shot_record_list = []
             for snum in range(self.number_of_sources):
                 switch_serial_shot(self, snum)
-                real_shot_record_list.append(self.receivers_output)
+                real_shot_record_list.append(self.forward_solution_receivers)
             self.real_shot_record = real_shot_record_list
         else:
-            self.real_shot_record = self.receivers_output
+            self.real_shot_record = self.forward_solution_receivers

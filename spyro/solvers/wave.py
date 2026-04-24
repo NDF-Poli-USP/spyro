@@ -97,8 +97,8 @@ class Wave(Model_parameters, metaclass=ABCMeta):
         self.vector_function_space = None
         self.tensor_function_space0 = None
         self.tensor_function_space1 = None
-        self._receivers_output = None
-        self._store_forward_time_steps = True
+        self._forward_solution_receivers = None
+        self._store_forward_time_steps = False
         self.forward_solution = None
         self.adjoint_solution = None
         self.adjoint_type = AdjointType.NONE
@@ -427,7 +427,7 @@ class Wave(Model_parameters, metaclass=ABCMeta):
                            fset=lambda self, value: self._set_next_vstate(value))
 
     @abstractmethod
-    def get_receivers_output(self):
+    def get_forward_solution_receivers(self):
         pass
 
     @abstractmethod
@@ -534,12 +534,12 @@ class Wave(Model_parameters, metaclass=ABCMeta):
         self.adjoint_type = AdjointType.IMPLEMENTED_ADJOINT
 
     @property
-    def receivers_output(self):
-        return self._receivers_output
+    def forward_solution_receivers(self):
+        return self._forward_solution_receivers
 
-    @receivers_output.setter
-    def receivers_output(self, value):
-        self._receivers_output = value
+    @forward_solution_receivers.setter
+    def forward_solution_receivers(self, value):
+        self._forward_solution_receivers = value
 
     def enable_compute_functional(
         self, mode=FunctionalEvaluationMode.AFTER_SOLVE
