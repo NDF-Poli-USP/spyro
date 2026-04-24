@@ -49,4 +49,9 @@ def test_gmsh2d():
     print("Starting Gmsh mesh generation...")
     firedrake_mesh = mesh_generator.create_mesh()
 
+    if not hasattr(firedrake_mesh.topology, "_entity_classes") and hasattr(firedrake_mesh, "init"):
+        firedrake_mesh.init()
+
+    print(firedrake_mesh.cell_set.core_size, firedrake_mesh.topology.num_cells())
+
     assert math.isclose(firedrake_mesh.cell_set.core_size, 19275)
