@@ -98,17 +98,20 @@ class Wave(Model_parameters, metaclass=ABCMeta):
         self.tensor_function_space0 = None
         self.tensor_function_space1 = None
         self._receivers_output = None
-        self._compute_functional = False
         self._store_forward_time_steps = True
-        self._store_misfit = False
-        self.forward_solution_receivers = None
         self.adjoint_solution = None
         self.current_time = 0.0
-        self.set_solver_parameters()
-
-        self.mesh = self.get_mesh()
+        # Expression to define sources through UFL (less efficient)
+        self.source_expression = None
+        self.functional_value = None
+        self.real_shot_record = None
+        self.forward_solution = None
+        self.adjoint_type = AdjointType.NONE
         self.c = None
         self.sources = None
+        self.mesh = self.get_mesh()
+
+        self.set_solver_parameters()
 
         # Creating mesh operations manager
         self.mesh_ops = mshops.MeshOps(
@@ -124,15 +127,6 @@ class Wave(Model_parameters, metaclass=ABCMeta):
             )
         else:
             warnings.warn("No mesh found. Please define a mesh.")
-        # Expression to define sources through UFL (less efficient)
-        self.source_expression = None
-        self.functional_value = None
-        self.real_shot_record = None
-        self.forward_solution = None
-        self.misfit = None
-        self.automated_adjoint = None
-        self.adjoint_type = AdjointType.NONE
-        self.real_shot_record = None
 
         self.field_logger = FieldLogger(self.comm,
                                         self.input_dictionary["visualization"])
@@ -525,14 +519,9 @@ class Wave(Model_parameters, metaclass=ABCMeta):
     def store_forward_time_steps(self, value):
         self._store_forward_time_steps = value
 
-    def enable_store_misfit(self):
-        self._store_misfit = True
-        self.misfit = []
-
     def enable_automated_adjoint(self):
         self.enable_compute_functional()
         self.store_forward_time_steps = False
-        self._store_misfit = False
         self.misfit = None
         self.automatic_adjoint = True
         self.adjoint_type = AdjointType.AUTOMATED_ADJOINT
@@ -542,18 +531,9 @@ class Wave(Model_parameters, metaclass=ABCMeta):
 
     def enable_implemented_adjoint(self):
         self.enable_compute_functional()
-        self.enable_store_misfit()
         self.store_forward_time_steps = True
         self.automatic_adjoint = False
         self.adjoint_type = AdjointType.IMPLEMENTED_ADJOINT
-
-    @property
-    def forward_solution_receivers(self):
-        return self._receivers_output
-
-    @forward_solution_receivers.setter
-    def forward_solution_receivers(self, value):
-        self._receivers_output = value
 
     @property
     def receivers_output(self):
@@ -577,6 +557,7 @@ class Wave(Model_parameters, metaclass=ABCMeta):
         # Create the Wave attributes required to compute functional.
         self.functional_evaluation_mode = mode
         self.functional_value = None
+        self.misfit = None
 
     @property
     def functional_evaluation_mode(self):
@@ -594,3 +575,4 @@ class Wave(Model_parameters, metaclass=ABCMeta):
                 f"Expected an instance of FunctionalEvaluationMode enum."
             )
         self._functional_evaluation_mode = mode
+        self.misfit = None

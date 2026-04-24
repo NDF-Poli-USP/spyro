@@ -87,7 +87,7 @@ class AcousticWave(Wave):
         dJ: Firedrake 'Function'
             Gradient of the cost functional.
         """
-        if adjoint_type== AdjointType.AUTOMATED_ADJOINT:
+        if adjoint_type == AdjointType.AUTOMATED_ADJOINT:
             if self.automated_adjoint.reduced_functional is None:
                 self.forward_solve()
                 self.automated_adjoint.create_reduced_functional(
@@ -111,7 +111,7 @@ class AcousticWave(Wave):
                 return fire.Function(self.function_space, val=dJ)
             return dJ
 
-        if adjoint_type!= AdjointType.IMPLEMENTED_ADJOINT:
+        if adjoint_type != AdjointType.IMPLEMENTED_ADJOINT:
             self.enable_implemented_adjoint()
 
         if misfit is not None:
