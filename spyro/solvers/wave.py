@@ -99,16 +99,15 @@ class Wave(Model_parameters, metaclass=ABCMeta):
         self.tensor_function_space1 = None
         self._receivers_output = None
         self._store_forward_time_steps = True
+        self.forward_solution = None
         self.adjoint_solution = None
+        self.adjoint_type = AdjointType.NONE
         self.current_time = 0.0
         # Expression to define sources through UFL (less efficient)
         self.source_expression = None
-        self.functional_value = None
-        self.real_shot_record = None
-        self.forward_solution = None
-        self.adjoint_type = AdjointType.NONE
-        self.c = None
         self.sources = None
+        self.real_shot_record = None
+        self.c = None
         self.mesh = self.get_mesh()
 
         self.set_solver_parameters()
@@ -522,7 +521,6 @@ class Wave(Model_parameters, metaclass=ABCMeta):
     def enable_automated_adjoint(self):
         self.enable_compute_functional()
         self.store_forward_time_steps = False
-        self.misfit = None
         self.automatic_adjoint = True
         self.adjoint_type = AdjointType.AUTOMATED_ADJOINT
         self.use_vertex_only_mesh = True
@@ -556,8 +554,6 @@ class Wave(Model_parameters, metaclass=ABCMeta):
         """
         # Create the Wave attributes required to compute functional.
         self.functional_evaluation_mode = mode
-        self.functional_value = None
-        self.misfit = None
 
     @property
     def functional_evaluation_mode(self):
@@ -575,4 +571,5 @@ class Wave(Model_parameters, metaclass=ABCMeta):
                 f"Expected an instance of FunctionalEvaluationMode enum."
             )
         self._functional_evaluation_mode = mode
+        self.functional_value = None
         self.misfit = None
