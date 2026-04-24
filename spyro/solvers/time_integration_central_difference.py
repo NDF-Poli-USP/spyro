@@ -65,7 +65,7 @@ def _propagate_forward_central_difference(wave_obj, source_ids):
         if wave_obj.use_vertex_only_mesh:
             usol_recv.append(fire.assemble(interpolate_receivers))
         else:
-            usol_recv.append(wave.get_forward_solution_receivers())
+            usol_recv.append(wave_obj.get_forward_solution_receivers())
 
         if step % wave_obj.gradient_sampling_frequency == 0:
             usol[save_step].assign(wave_obj.get_function())
@@ -109,8 +109,8 @@ def _propagate_forward_central_difference(wave_obj, source_ids):
     usol_recv = helpers.fill(
         usol_recv, wave_obj.receivers.is_local, nt, wave_obj.receivers.number_of_points
     )
-    
-    usol_recv = utils.utils.communicate(usol_recv, wave.comm)
+
+    usol_recv = utils.utils.communicate(usol_recv, wave_obj.comm)
 
     wave_obj.forward_solution = usol
     wave_obj.forward_solution_receivers = usol_recv
@@ -125,4 +125,3 @@ def _propagate_forward_central_difference(wave_obj, source_ids):
         wave_obj.functional_value = None
 
     wave_obj.field_logger.stop_logging()
-
