@@ -65,7 +65,7 @@ def central_difference(wave, source_ids=[0]):
         if wave.use_vertex_only_mesh:
             usol_recv.append(fire.assemble(interpolate_receivers))
         else:
-            usol_recv.append(wave.get_receivers_output())
+            usol_recv.append(wave.get_forward_solution_receivers())
 
         if step % wave.gradient_sampling_frequency == 0:
             usol[save_step].assign(wave.get_function())
@@ -88,7 +88,7 @@ def central_difference(wave, source_ids=[0]):
     )
     usol_recv = utils.utils.communicate(usol_recv, wave.comm)
 
-    wave.receivers_output = usol_recv
+    wave.forward_solution_receivers = usol_recv
     wave.forward_solution = usol
     wave.forward_solution_receivers = usol_recv
 

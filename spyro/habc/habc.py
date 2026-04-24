@@ -100,7 +100,7 @@ class HABC_Wave(AcousticWave, HABC_Mesh, RectangLayer,
         Minimum damping ratio of the absorbing layer (psi_min = xCR * d)
     receiver_locations: `list`
         List of receiver locations
-    receivers_output : `array`
+    forward_solution_receivers : `array`
         Receiver waveform data in the HABC scheme
     xCR : `float`
         Heuristic factor for the minimum damping ratio

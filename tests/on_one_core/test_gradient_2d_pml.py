@@ -53,7 +53,7 @@ def check_gradient(Wave_obj_guess, dJ, rec_out_exact, Jm, plot=False, tol=1.0):
         c_guess = fire.Constant(2.0) + step*dm
         Wave_obj_guess.initial_velocity_model = c_guess
         Wave_obj_guess.forward_solve()
-        misfit_plusdm = rec_out_exact - Wave_obj_guess.receivers_output
+        misfit_plusdm = rec_out_exact - Wave_obj_guess.forward_solution_receivers
         J_plusdm = spyro.utils.compute_functional(Wave_obj_guess, misfit_plusdm)
 
         grad_fd = (J_plusdm - Jm) / (step)
@@ -169,14 +169,14 @@ def get_forward_model(dictionary=None):
     )
     spyro.plots.plot_model(Wave_obj_exact, filename="pml_grad_test_model.png", abc_points=[(-0, 0), (-1, 0), (-1, 1), (-0, 1)])
     Wave_obj_exact.forward_solve()
-    rec_out_exact = Wave_obj_exact.receivers_output
+    rec_out_exact = Wave_obj_exact.forward_solution_receivers
 
     # Guess model
     Wave_obj_guess = spyro.AcousticWave(dictionary=dictionary)
     Wave_obj_guess.set_mesh(input_mesh_parameters={"edge_length": 0.03})
     Wave_obj_guess.set_initial_velocity_model(constant=2.0)
     Wave_obj_guess.forward_solve()
-    rec_out_guess = Wave_obj_guess.receivers_output
+    rec_out_guess = Wave_obj_guess.forward_solution_receivers
 
     return rec_out_exact, rec_out_guess, Wave_obj_guess
 
