@@ -70,13 +70,11 @@ class AcousticWave(Wave):
 
     @ensemble_gradient
     def gradient_solve(
-        self,
-        guess=None,
-        misfit=None,
-        forward_solution=None,
-        riesz_map=RieszMapType.L2,
+        self, guess=None, misfit=None, forward_solution=None,
+        adjoint_type=AdjointType.IMPLEMENTED_ADJOINT,
+        riesz_map=RieszMapType.L2
     ):
-        """Solves the adjoint problem to calculate de gradient.
+        """Solve the adjoint problem to calculate the gradient.
 
         Parameters:
         -----------
@@ -89,7 +87,7 @@ class AcousticWave(Wave):
         dJ: Firedrake 'Function'
             Gradient of the cost functional.
         """
-        if self.adjoint_type == AdjointType.AUTOMATED_ADJOINT:
+        if adjoint_type== AdjointType.AUTOMATED_ADJOINT:
             if self.automated_adjoint.reduced_functional is None:
                 self.forward_solve()
                 self.automated_adjoint.create_reduced_functional(
@@ -113,7 +111,7 @@ class AcousticWave(Wave):
                 return fire.Function(self.function_space, val=dJ)
             return dJ
 
-        if self.adjoint_type != AdjointType.IMPLEMENTED_ADJOINT:
+        if adjoint_type!= AdjointType.IMPLEMENTED_ADJOINT:
             self.enable_implemented_adjoint()
 
         if misfit is not None:
