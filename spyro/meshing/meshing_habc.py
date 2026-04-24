@@ -6,6 +6,7 @@ from firedrake.__future__ import interpolate
 from netgen.meshing import Element2D, \
     Element3D, FaceDescriptor, Mesh, MeshPoint
 from scipy.spatial import cKDTree
+# from spyro.meshing.meshing_functions import box_mesh, rectangle_mesh
 from spyro.tools.habc_tools import point_cloud_field
 fire.interpolate = interpolate
 
@@ -1116,6 +1117,9 @@ class HABC_Mesh():
             # Base rectangular mesh
             dom_lay_trunc = self.habc_domain_dimensions(only_habc_dom=True,
                                                         full_hyp=False)
+
+            # import idpb
+            # ipdb.set_trace()
             rec_mesh = self.rectangular_mesh_habc(dom_lay_trunc, self.pad_len)
             # fire.VTKFile("output/rectang_test.pvd").write(rec_mesh)
 
