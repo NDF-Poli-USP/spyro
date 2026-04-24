@@ -39,7 +39,7 @@ class DummyWave(Wave):
     def _get_next_vstate(self):
         return getattr(self, "_next_vstate", None)
 
-    def get_receivers_output(self):
+    def get_forward_solution_receivers(self):
         return None
 
     def get_function(self):
