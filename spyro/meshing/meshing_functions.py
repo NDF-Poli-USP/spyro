@@ -4,6 +4,8 @@ import numpy as np
 from scipy.interpolate import RegularGridInterpolator
 from ..io import parallel_print
 from ..utils import run_in_one_core
+from .meshing_gmsh2d import build_gmsh_geometry_and_groups, apply_structured_winslow_smoothing2d
+from .meshing_utils import create_sizing_function
 
 try:
     import gmsh
@@ -68,6 +70,8 @@ class AutomaticMesh:
         Creates a 2D mesh based on SeismicMesh meshing utilities.
     create_seismicmesh_2D_mesh_homogeneous()
         Creates a 2D mesh homogeneous velocity mesh based on SeismicMesh meshing utilities.
+    create_gmsh_2D_mesh()
+        Creates a 2D mesh using Gmsh with padding and smoothing.
     """
 
     def __init__(
@@ -168,6 +172,8 @@ class AutomaticMesh:
                 return fire.Mesh(self.output_file_name, comm=self.comm.comm)
             else:
                 return fire.Mesh(self.output_file_name)
+        elif self.mesh_type == "gmsh_mesh":
+            return self.create_gmsh_2D_mesh()
         else:
             raise ValueError("mesh_type is not supported")
 
@@ -211,7 +217,7 @@ class AutomaticMesh:
             self.edge_length = calculate_edge_length(
                 self.cpw, self.minimum_velocity, self.source_frequency)
         if self.abc_pad:
-            nx = int(round((self.length_x + 2*self.abc_pad) / self.edge_length, 0))
+            nx = int(round((self.length_x + 2 * self.abc_pad) / self.edge_length, 0))
             nz = int(round((self.length_z + self.abc_pad) / self.edge_length, 0))
         else:
             nx = int(round(self.length_x / self.edge_length, 0))
@@ -335,12 +341,12 @@ class AutomaticMesh:
             length_z = self.length_z
             length_x = self.length_x
             domain_pad = self.abc_pad
-            lbda_min = v_min/frequency
+            lbda_min = v_min / frequency
 
             bbox = (-length_z, 0.0, 0.0, length_x)
             domain = SeismicMesh.Rectangle(bbox)
 
-            hmin = lbda_min/C
+            hmin = lbda_min / C
             self.comm.comm.barrier()
 
             ef = SeismicMesh.get_sizing_function_from_segy(
@@ -425,7 +431,7 @@ class AutomaticMesh:
 
         edge_length = self.edge_length
         if edge_length is None:
-            edge_length = self.minimum_velocity/(self.source_frequency*self.cpw)
+            edge_length = self.minimum_velocity / (self.source_frequency * self.cpw)
 
         bbox = (-real_lz, 0.0, -pad, real_lx - pad)
         rectangle = SeismicMesh.Rectangle(bbox)
@@ -484,6 +490,156 @@ class AutomaticMesh:
             # return self.create_seismicmesh_3D_mesh()
         else:
             raise ValueError("dimension is not supported")
+
+    def create_gmsh_2D_mesh(self):
+        """
+        Creates a 2D mesh using Gmsh with optional water interface,
+        hyperelliptical/rectangular padding, and Winslow smoothing.
+
+        Returns
+        -------
+        mesh : Firedrake Mesh
+            The loaded Firedrake mesh object.
+        """
+        if gmsh is None:
+            raise ImportError("gmsh is not available. Please install it.")
+
+        if self.comm is None or self.comm.ensemble_comm.rank == 0:
+            parallel_print("Generating Gmsh mesh...", comm=self.comm)
+
+            depth_z = -abs(self.length_z)
+            length_x = self.length_x
+            padding_z = self.mesh_parameters.padding_z
+            padding_x = self.mesh_parameters.padding_x
+            hyper_n = self.mesh_parameters.hyper_n
+            fname = self.velocity_model
+            hmin_segy = self.mesh_parameters.hmin_segy
+            wl = self.cpw
+            freq = self.source_frequency
+            grade = self.mesh_parameters.grade
+            water_search_value = self.mesh_parameters.water_search_value
+            padding_type = self.mesh_parameters.padding_type
+            output_file = self.output_file_name
+            water_interface = self.mesh_parameters.water_interface
+            vp_water = self.mesh_parameters.vp_water
+            structured_mesh = self.mesh_parameters.structured_mesh
+            minElementSize = self.mesh_parameters.min_element_size
+            winslow_implementation = self.mesh_parameters.winslow_implementation
+            apply_winslow = self.mesh_parameters.apply_winslow
+            winslow_iterations = self.mesh_parameters.winslow_iterations
+            winslow_omega = self.mesh_parameters.winslow_omega
+            extend_segy = self.mesh_parameters.extend_segy
+            h_padding = self.mesh_parameters.h_padding
+            segy_bbox = (depth_z, 0, 0, length_x)
+
+            # Calculating domain bounding box according to selected padding
+            box_xmax = length_x
+            box_zmin = depth_z
+            xc = box_xmax / 2.0
+            zc = box_zmin / 2.0
+
+            if padding_type is None:
+                domain_xmin, domain_xmax = 0.0, length_x
+                domain_zmax, domain_zmin = depth_z, 0.0
+
+            if padding_type == "hyperelliptical":
+                hyper_a = (box_zmin / 2.0) - padding_z
+                hyper_b = (box_xmax / 2.0) + padding_x
+                domain_zmin = zc + hyper_a
+                domain_zmax = 0.0
+                domain_xmin = xc - hyper_b
+                domain_xmax = xc + hyper_b
+
+            if padding_type == "rectangular":
+                domain_zmin = box_zmin - padding_z
+                domain_zmax = 0.0
+                domain_xmin = 0.0 - padding_x
+                domain_xmax = box_xmax + padding_x
+
+            # Interpolating sizing function from segy file
+            ef_segy2, f_min, f_max, n_samples, n_traces = create_sizing_function(
+                fname=fname, hmin=hmin_segy, bbox=segy_bbox, wl=wl, freq=freq,
+                pad_type=padding_type, pad_size_x=padding_x, pad_size_z=padding_z,
+                grade=grade, vp_water=vp_water
+            )
+
+            gmsh.initialize()
+            gmsh.option.setNumber("Geometry.Tolerance", 1e-16)
+            gmsh.model.add("seismic_model")
+
+            geom_params = build_gmsh_geometry_and_groups(
+                gmsh=gmsh, fname=fname, length_x=length_x, depth_z=depth_z,
+                padding_type=padding_type, padding_x=padding_x, padding_z=padding_z,
+                hyper_n=hyper_n, water_interface=water_interface,
+                water_search_value=water_search_value, structured_mesh=structured_mesh,
+                minElementSize=minElementSize
+            )
+
+            # Standard Params
+            z_water_L = geom_params.get("z_water_L")
+            z_water_R = geom_params.get("z_water_R")
+            pad_x_min = geom_params.get("pad_x_min")
+            pad_x_max = geom_params.get("pad_x_max")
+            pad_z_min = geom_params.get("pad_z_min")
+            a_val = geom_params.get("a_val")
+            b_val = geom_params.get("b_val")
+            xc = geom_params.get("xc")
+            zc = geom_params.get("zc")
+
+            def mesh_size_callback(dim, tag, x, y, z, lc):
+                if extend_segy:
+                    return float(ef_segy2(np.array([x]), np.array([y]))[0])
+                else:
+                    z_min_segy, z_max_segy, x_min_segy, x_max_segy = segy_bbox
+                    if (x_min_segy <= x <= x_max_segy) and (z_min_segy <= y <= z_max_segy):
+                        return float(ef_segy2(np.array([x]), np.array([y]))[0])
+                    else:
+                        x_proj, y_proj = min(max(x, x_min_segy), x_max_segy), min(max(y, z_min_segy), z_max_segy)
+                        base_size = float(ef_segy2(np.array([x_proj]), np.array([y_proj]))[0])
+                        tx = abs(x - x_proj) / padding_x if padding_x > 0 else 0.0
+                        ty = abs(y - y_proj) / padding_z if padding_z > 0 else 0.0
+                        t = min((tx**hyper_n + ty**hyper_n)**(1.0 / hyper_n) if padding_type == "hyperelliptical" else max(tx, ty), 1.0)
+                        return float(base_size + t * (h_padding - base_size))
+
+            gmsh.model.mesh.setSizeCallback(mesh_size_callback)
+            gmsh.option.setNumber("Mesh.SaveWithoutOrphans", 1)
+            gmsh.option.setNumber("Mesh.MeshSizeExtendFromBoundary", 0)
+            gmsh.option.setNumber("Mesh.MeshSizeFromPoints", 0)
+            gmsh.option.setNumber("Mesh.MeshSizeFromCurvature", 0)
+            if structured_mesh and padding_type != "hyperelliptical":
+                gmsh.option.setNumber('Mesh.MeshSizeMin', minElementSize)
+                gmsh.option.setNumber('Mesh.MeshSizeMax', minElementSize)
+                gmsh.model.mesh.setTransfiniteAutomatic()
+            gmsh.model.mesh.generate(2)
+
+            if structured_mesh:
+                apply_structured_winslow_smoothing2d(
+                    gmsh=gmsh, comm=self.comm, geom_params=geom_params,
+                    length_x=length_x, depth_z=depth_z, padding_type=padding_type,
+                    water_interface=water_interface, hyper_n=hyper_n,
+                    winslow_implementation=winslow_implementation,
+                    winslow_iterations=winslow_iterations, winslow_omega=winslow_omega,
+                    n_samples=n_samples, n_traces=n_traces,
+                    domain_xmin=domain_xmin, domain_xmax=domain_xmax,
+                    domain_zmin=domain_zmin, domain_zmax=domain_zmax,
+                    ef_segy2=ef_segy2, parallel_print=parallel_print,
+                    z_water_L=z_water_L, z_water_R=z_water_R, pad_x_min=pad_x_min,
+                    pad_x_max=pad_x_max, pad_z_min=pad_z_min, a_val=a_val,
+                    b_val=b_val, xc=xc, zc=zc, apply_winslow=apply_winslow
+                )
+            gmsh.write(output_file)
+            parallel_print(f"Gmsh mesh written to {output_file}", comm=self.comm)
+            gmsh.finalize()
+
+        # MPI Sync
+        if self.comm is not None:
+            if hasattr(self.comm, 'ensemble_comm'):
+                self.comm.ensemble_comm.barrier()
+            self.comm.comm.barrier()
+            parallel_print("Loading mesh into Firedrake.", comm=self.comm)
+            return fire.Mesh(self.output_file_name, comm=self.comm.comm)
+        else:
+            return fire.Mesh(self.output_file_name)
 
 
 def calculate_edge_length(cpw, minimum_velocity, frequency):
