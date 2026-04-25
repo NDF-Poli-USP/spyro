@@ -7985,7 +7985,7 @@ Simulation time is:        5.0 seconds
 </div>
 <div class="jp-InputArea jp-Cell-inputArea"><div class="jp-InputPrompt jp-InputArea-prompt">
 </div><div class="jp-RenderedHTMLCommon jp-RenderedMarkdown jp-MarkdownOutput" data-mime-type="text/markdown">
-<p>In seismic imagining, the shot record is one of the most important outputs of the forward problem. It represents the pressure values recorded at every receiver and timestep. This is the data that we will use for inversion. Shot record data is saved inside the wave object as the receivers_output attribute.</p>
+<p>In seismic imagining, the shot record is one of the most important outputs of the forward problem. It represents the pressure values recorded at every receiver and timestep. This is the data that we will use for inversion. Shot record data is saved inside the wave object as the forward_solution_receivers attribute.</p>
 </div>
 </div>
 </div>
@@ -7997,7 +7997,7 @@ Simulation time is:        5.0 seconds
 <div class="jp-InputPrompt jp-InputArea-prompt">In [ ]:</div>
 <div class="jp-CodeMirrorEditor jp-Editor jp-InputArea-editor" data-type="inline">
 <div class="cm-editor cm-s-jupyter">
-<div class="highlight hl-ipython3"><pre><span></span><span class="n">shot_record</span> <span class="o">=</span> <span class="n">Wave_obj</span><span class="o">.</span><span class="n">receivers_output</span>
+<div class="highlight hl-ipython3"><pre><span></span><span class="n">shot_record</span> <span class="o">=</span> <span class="n">Wave_obj</span><span class="o">.</span><span class="n">forward_solution_receivers</span>
 </pre></div>
 </div>
 </div>
