@@ -171,13 +171,44 @@ class AutomaticMesh:
         else:
             raise ValueError("mesh_type is not supported")
 
-    def create_firedrake_mesh(self):
-        """
-        Creates a mesh based on Firedrake meshing utilities.
+    def ensure_common_origin(self, mesh, pad=0.):
+        """Ensures that the mesh has a common origin.
+
+        Parameters
+        ----------
+        mesh : Mesh
+            The mesh to be adjusted.
+        pad : float, optional
+            The padding to be added to the mesh. The default is 0
 
         Returns
         -------
-        mesh : Firedrake Mesh
+        None
+        """
+
+        # Adjusting coordinates
+        if self.dimension == 3:  # 3D
+            min_y = mesh.coordinates.dat.data_with_halos[:, 2].min()
+            if abs(min_y / pad) != 1.:  # Forcing node at (0,0,0)
+                parallel_print("Adjusting Mesh Y-coordinates", comm=self.comm)
+                err_y = (1. - abs(min_y / pad)) * pad
+                err_y *= -np.sign(err_y)
+                mesh.coordinates.dat.data_with_halos[:, 2] += err_y
+
+        # Adjusting coordinates
+        min_x = mesh.coordinates.dat.data_with_halos[:, 1].min()
+        if abs(min_x / pad) != 1.:  # Forcing node at (0,0)
+            parallel_print("Adjusting Mesh X-coordinates", comm=self.comm)
+            err_x = (1. - abs(min_x / pad)) * pad
+            err_x *= -np.sign(err_x)
+            mesh.coordinates.dat.data_with_halos[:, 1] += err_x
+
+    def create_firedrake_mesh(self):
+        """Creates a mesh based on Firedrake meshing utilities.
+
+        Returns
+        -------
+        mesh : `Firedrake.Mesh`
             The generated mesh.
 
         Raises
@@ -186,11 +217,52 @@ class AutomaticMesh:
             If the dimension is not supported (must be 2 or 3).
         """
         if self.dimension == 2:
-            return self.create_firedrake_2D_mesh()
+            typ_ele_str = "Area Elements"
+            mesh = self.create_firedrake_2D_mesh()
+
         elif self.dimension == 3:
-            return self.create_firedrake_3D_mesh()
+            typ_ele_str = "Volume Elements"
+            mesh = self.create_firedrake_3D_mesh()
+
         else:
             raise ValueError("dimension is not supported")
+
+        if self.abc_pad is not None and self.abc_pad > 0.:
+            self.ensure_common_origin(mesh, pad=self.abc_pad)
+
+        # Mesh data
+        msh_str = f"Mesh Created with {mesh.num_vertices()} Nodes " + \
+            f"and {mesh.num_cells()} " + typ_ele_str
+        parallel_print(msh_str, comm=self.comm)
+
+        return mesh
+
+    def define_discretization_for_mesh(self):
+        """Define the discretization of the mesh.
+
+        Returns
+        -------
+        discretization : `tuple`
+            Number of elements in each dimension of the mesh.
+            Structure: (nz, nx) for 2D and (nz, nx, ny) for 3D
+        """
+
+        # Compute the edge length if there is no one
+        if self.edge_length is None and self.cpw is not None:
+            self.edge_length = calculate_edge_length(
+                self.cpw, self.minimum_velocity, self.source_frequency)
+
+        # Number of elements
+        pad = 0. if self.abc_pad is None else self.abc_pad
+        n_pad = round(pad / self.edge_length, 0)  # Elements in the layer
+        nz = int(round(self.length_z / self.edge_length, 0)) + int(n_pad)
+        nx = int(round(self.length_x / self.edge_length, 0)) + int(2 * n_pad)
+        discretization = (nz, nx)
+        if self.dimension == 3:
+            ny = int(round(self.length_y / self.edge_length, 0)) + int(2 * n_pad)
+            discretization += (ny,)
+
+        return discretization
 
     def create_firedrake_2D_mesh(self):
         """
@@ -198,7 +270,7 @@ class AutomaticMesh:
 
         Returns
         -------
-        mesh : Firedrake Mesh
+        mesh : `Firedrake.Mesh`
             The generated 2D mesh.
 
         Notes
@@ -207,15 +279,9 @@ class AutomaticMesh:
         the edge length will be calculated automatically. The method creates either
         a periodic or non-periodic rectangular mesh based on the periodic attribute.
         """
-        if self.edge_length is None and self.cpw is not None:
-            self.edge_length = calculate_edge_length(
-                self.cpw, self.minimum_velocity, self.source_frequency)
-        if self.abc_pad:
-            nx = int(round((self.length_x + 2*self.abc_pad) / self.edge_length, 0))
-            nz = int(round((self.length_z + self.abc_pad) / self.edge_length, 0))
-        else:
-            nx = int(round(self.length_x / self.edge_length, 0))
-            nz = int(round(self.length_z / self.edge_length, 0))
+
+        # Define the discretization
+        nz, nx = self.define_discretization_for_mesh()
 
         if self.comm is not None:
             comm = self.comm.comm
@@ -249,7 +315,7 @@ class AutomaticMesh:
 
         Returns
         -------
-        mesh : Firedrake Mesh
+        mesh : `Firedrake.Mesh`
             The generated 3D box mesh.
 
         Notes
@@ -257,10 +323,9 @@ class AutomaticMesh:
         Uses the edge_length parameter to determine the number of elements
         in each direction(x, y, z).
         """
-        dx = self.edge_length
-        nx = int(round(self.length_x / dx, 0))
-        nz = int(round(self.length_z / dx, 0))
-        ny = int(round(self.length_y / dx, 0))
+
+        # Define the discretization
+        nz, nx, ny = self.define_discretization_for_mesh()
 
         return BoxMesh(
             nz,
@@ -269,8 +334,9 @@ class AutomaticMesh:
             self.length_z,
             self.length_x,
             self.length_y,
+            pad=self.abc_pad,
             quadrilateral=self.quadrilateral,
-        )
+            comm=self.comm.comm)
 
     def create_seismicmesh_mesh(self):
         """
@@ -401,7 +467,7 @@ class AutomaticMesh:
 
         Returns
         -------
-        mesh : Firedrake Mesh
+        mesh : `Firedrake.Mesh`
             The generated 2D mesh with uniform element sizes.
 
         Notes
@@ -463,7 +529,7 @@ class AutomaticMesh:
 
         Returns
         -------
-        mesh : Firedrake Mesh
+        mesh : `Firedrake.Mesh`
             The generated mesh.
 
         Raises
@@ -547,9 +613,13 @@ def RectangleMesh(nx, ny, length_x, length_y, pad=None, comm=None, quadrilateral
         pad = 0
 
     if comm is None:
-        mesh = fire.RectangleMesh(nx, ny, length_x, length_y, quadrilateral=quadrilateral)
+        mesh = fire.RectangleMesh(nx, ny, length_x, length_y,
+                                  quadrilateral=quadrilateral)
     else:
-        mesh = fire.RectangleMesh(nx, ny, length_x, length_y, quadrilateral=quadrilateral, comm=comm)
+        mesh = fire.RectangleMesh(nx, ny, length_x, length_y,
+                                  quadrilateral=quadrilateral, comm=comm)
+
+    # Adjusting to Spyro's reference system (z, x) with origin at (0, 0)
     mesh.coordinates.dat.data[:, 0] *= -1.0
     mesh.coordinates.dat.data[:, 1] -= pad
 
@@ -591,16 +661,23 @@ def PeriodicRectangleMesh(
         length_y += 2 * pad
     else:
         pad = 0
-    mesh = fire.PeriodicRectangleMesh(
-        nx, ny, length_x, length_y, quadrilateral=quadrilateral, comm=comm
-    )
+
+    if comm is None:
+        mesh = fire.PeriodicRectangleMesh(nx, ny, length_x, length_y,
+                                          quadrilateral=quadrilateral)
+    else:
+        mesh = fire.PeriodicRectangleMesh(nx, ny, length_x, length_y,
+                                          quadrilateral=quadrilateral, comm=comm)
+
+    # Adjusting to Spyro's reference system (z, x) with origin at (0, 0)
     mesh.coordinates.dat.data[:, 0] *= -1.0
     mesh.coordinates.dat.data[:, 1] -= pad
 
     return mesh
 
 
-def BoxMesh(nx, ny, nz, length_x, length_y, length_z, pad=None, quadrilateral=False):
+def BoxMesh(nx, ny, nz, length_x, length_y, length_z, pad=None,
+            quadrilateral=False, comm=None):
     """
     Create a 3D box mesh based on Firedrake mesh utilities.
 
@@ -623,6 +700,8 @@ def BoxMesh(nx, ny, nz, length_x, length_y, length_z, pad=None, quadrilateral=Fa
     quadrilateral : bool, optional
         If True, the mesh is created by extruding a quadrilateral mesh.
         The default is False.
+    comm : MPI communicator, optional
+      MPI communicator. The default is None.
 
     Returns
     -------
@@ -641,15 +720,36 @@ def BoxMesh(nx, ny, nz, length_x, length_y, length_z, pad=None, quadrilateral=Fa
         length_z += 2 * pad
     else:
         pad = 0
+
     if quadrilateral:
-        quad_mesh = fire.RectangleMesh(nx, ny, length_x, length_y, quadrilateral=quadrilateral)
+
+        if comm is None:
+            quad_mesh = fire.RectangleMesh(nx, ny, length_x, length_y,
+                                           quadrilateral=quadrilateral)
+
+        else:
+            quad_mesh = fire.RectangleMesh(nx, ny, length_x, length_y,
+                                           quadrilateral=quadrilateral, comm=comm)
+
+        # Adjusting to Spyro's reference system (z, x, y) with origin at (0, 0, 0)
         quad_mesh.coordinates.dat.data[:, 0] *= -1.0
         quad_mesh.coordinates.dat.data[:, 1] -= pad
         layer_height = length_z / nz
         mesh = fire.ExtrudedMesh(quad_mesh, nz, layer_height=layer_height)
     else:
-        mesh = fire.BoxMesh(nx, ny, nz, length_x, length_y, length_z)
+
+        if comm is None:
+            mesh = fire.BoxMesh(nx, ny, nz, length_x, length_y, length_z)
+
+        else:
+            mesh = fire.BoxMesh(nx, ny, nz, length_x, length_y, length_z, comm=comm)
+
+        # Adjusting to Spyro's reference system (z, x, y) with origin at (0, 0, 0)
         mesh.coordinates.dat.data[:, 0] *= -1.0
+        mesh.coordinates.dat.data[:, 1] -= pad
+
+    # Offset to respect the origin of the domain
+    mesh.coordinates.dat.data_with_halos[:, 2] -= pad
 
     return mesh
 
