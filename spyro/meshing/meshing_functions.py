@@ -570,6 +570,8 @@ def calculate_edge_length(cpw, minimum_velocity, frequency):
     edge_length : float
         Calculated edge length for mesh elements.
     """
+    if cpw == 0.0 or cpw is None:
+        raise ValueError("cpw value of {cpw} invalid for edge length calculation.")
     v_min = minimum_velocity
 
     lbda_min = v_min / frequency
