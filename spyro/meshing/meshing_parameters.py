@@ -1079,3 +1079,13 @@ class MeshingParameters():
 
         # Update automatic_mesh flag based on final mesh_type
         self.automatic_mesh = self.mesh_type in {"firedrake_mesh", "SeismicMesh", "spyro_mesh", "gmsh_mesh"}
+
+    @property
+    def velocity_model(self):
+        return self._velocity_model
+    
+    @velocity_model.setter
+    def velocity_model(self, value):
+        self._velocity_model = value
+        if hasattr(self, 'is_complete'):
+            self.check_completeness()

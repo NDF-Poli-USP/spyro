@@ -24,6 +24,7 @@ from .backwards_compatibility_io import Dictionary_conversion
 from . import dictionaryio
 from . import boundary_layer_io
 from . import time_io
+from . import material_properties_io
 
 __all__ = [
     "write_function_to_grid",
@@ -52,4 +53,5 @@ __all__ = [
     "ensemble_shot_record",
     "ensemble_functional",
     "time_io",
+    "material_properties_io",
 ]
