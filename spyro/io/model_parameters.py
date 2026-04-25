@@ -5,6 +5,7 @@ import warnings
 from copy import deepcopy
 from ..io.dictionaryio import Read_options, Read_outputs
 from ..io.boundary_layer_io import Read_boundary_layer
+from ..io.material_properties_io import VelocityModelFileIO
 from ..io.time_io import Read_time_axis
 from .. import io
 from .. import utils
@@ -12,7 +13,7 @@ from .. import meshing
 
 
 class Model_parameters(Read_options, Read_boundary_layer,
-                       Read_time_axis, Read_outputs):
+                       Read_time_axis, Read_outputs, VelocityModelFileIO):
     """
     Class that reads and sanitizes input parameters.
 
@@ -198,6 +199,9 @@ class Model_parameters(Read_options, Read_boundary_layer,
 
         # Checks outputs
         Read_outputs.__init__(self)
+
+        # Check velocity model file io
+        VelocityModelFileIO.__init__(self)
 
         # Checking source and receiver inputs
         self.input_dictionary["acquisition"].setdefault("source_type", "ricker")
