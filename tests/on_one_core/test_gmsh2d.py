@@ -3,55 +3,209 @@ from spyro.meshing.meshing_parameters import MeshingParameters
 from spyro.meshing.meshing_functions import AutomaticMesh
 
 
-def test_gmsh2d():
-    avenir_params = {
-        "mesh_type": "gmsh_mesh",  # Type of automatic mesh
-        "dimension": 2,  # Dimension of the mesh
+def test_gmsh2d_structured():
+    print("STARTING STRUCTURED MESH TESTS")
 
-        # Dimensions
-        "length_z": 7760.0,
-        "length_x": 32040.0,
-        "output_filename": "avenir.msh",
+    winslow_implementations = ["default", "fast", "numba"]
 
-        # SEGY / Seismic constraints
-        "velocity_model": "tests/inputfiles/velocity_models/avenir.segy",  # Velocity model segy file
-        "cells_per_wavelength": 2.0,
-        "source_frequency": 3.0,
+    structured_configurations = [
+        (True, None, 11610),
+        (True, "rectangular", 19275),
+        (True, "hyperelliptical", 18070),
 
-        # Padding Parameters
-        "padding_type": "rectangular",  # Padding types "rectangular" "hyperelliptical" None
-        "padding_x": 3000.0,  # Padding size in x direction
-        "padding_z": 3000.0,  # Padding size in z direction
-        "hyper_n": 3.0,  # Hyperellipse exponent
-        "hmin_segy": 0.0,  # Minimum Element size for segy, will apply if higher than function minimum
-        "grade": 0.75,  # function grading for smooth element transition, None = no smooth, 0.9 = small smooth, 0.1 = high smooth
+        (False, None, 11395),
+        (False, "rectangular", 19018),
+        (False, "hyperelliptical", 17560)
+    ]
 
-        # Water Interface
-        "water_interface": True,  # If True detect and implement water interface
-        "water_search_value": 0.0,  # If enabled water interface, search for this water value to make the interface
-        "vp_water": 500.0,  # Substitute Water speed for this value if vs = 0.0
+    for winslow_impl in winslow_implementations:
+        for water_interface, padding_type, expected_cells in structured_configurations:
 
-        # Structured Mesh & Winslow Smoothing
-        "structured_mesh": True,  # True if structured quad mesh, False if triangular unstructured mesh
-        "min_element_size": 150.0,  # Element size for structured mesh
-        "apply_winslow": True,  # If True apply winslow smoothing
-        "winslow_implementation": "fast",  # Winslow version to use, default, fast and numba are options
-        "winslow_iterations": 100,  # Number of iterations for Winslow Smoothing
-        "winslow_omega": 0.5,  # Winslow Smoothing node movement factor
-        "extend_segy": False,  # Extend the segy function into the padding ( for unstructured mesh )
-        "h_padding": 500.0  # If extend_segy = False, use this value of constant padding size
-    }
+            print(f"\nTesting Struct | Winslow: {winslow_impl:<7} | Water: {str(water_interface):<5} | Padding: {padding_type}")
 
-    mesh_params = MeshingParameters(input_mesh_dictionary=avenir_params, velocity_model=avenir_params["velocity_model"])
+            avenir_params = {
+                "mesh_type": "gmsh_mesh",
+                "dimension": 2,
 
-    mesh_generator = AutomaticMesh(mesh_parameters=mesh_params)
+                "length_z": 7760.0,
+                "length_x": 32040.0,
 
-    print("Starting Gmsh mesh generation...")
-    firedrake_mesh = mesh_generator.create_mesh()
+                "output_filename": f"avenir_struct_{winslow_impl}_wat_{water_interface}_pad_{padding_type}.msh",
 
-    if not hasattr(firedrake_mesh.topology, "_entity_classes") and hasattr(firedrake_mesh, "init"):
-        firedrake_mesh.init()
+                "velocity_model": "tests/inputfiles/velocity_models/avenir.segy",
+                "cells_per_wavelength": 2.0,
+                "source_frequency": 3.0,
 
-    print(firedrake_mesh.cell_set.core_size, firedrake_mesh.topology.num_cells())
+                "padding_type": padding_type,
+                "padding_x": 3000.0,
+                "padding_z": 3000.0,
+                "hyper_n": 3.0,
+                "hmin_segy": 0.0,
+                "grade": 0.75,
 
-    assert math.isclose(firedrake_mesh.cell_set.core_size, 19275)
+                "water_interface": water_interface,
+                "water_search_value": 0.0,
+                "vp_water": 500.0,
+
+                "structured_mesh": True,
+                "min_element_size": 150.0,
+                "apply_winslow": True,
+                "winslow_implementation": winslow_impl,
+                "winslow_iterations": 100,
+                "winslow_omega": 0.5,
+                "extend_segy": False,
+                "h_padding": 500.0
+            }
+
+            mesh_params = MeshingParameters(input_mesh_dictionary=avenir_params, velocity_model=avenir_params["velocity_model"])
+            mesh_generator = AutomaticMesh(mesh_parameters=mesh_params)
+
+            firedrake_mesh = mesh_generator.create_mesh()
+
+            if not hasattr(firedrake_mesh.topology, "_entity_classes") and hasattr(firedrake_mesh, "init"):
+                firedrake_mesh.init()
+
+            actual_cells = firedrake_mesh.cell_set.core_size
+            print(f"     Cells actual: {actual_cells} | Expected: {expected_cells}")
+
+            assert math.isclose(actual_cells, expected_cells), \
+                f"FAILED: Struct | Winslow: {winslow_impl} | Wat: {water_interface} | Pad: {padding_type}. Got {actual_cells}, expected {expected_cells}"
+
+
+def test_gmsh2d_unstructured():
+    print("STARTING UNSTRUCTURED MESH TESTS")
+
+    unstructured_configurations = [
+        (True, True, None, 30275),
+        (True, True, "rectangular", 37517),
+        (True, True, "hyperelliptical", 36380),
+        (True, False, None, 30281),
+        (True, False, "rectangular", 37549),
+        (True, False, "hyperelliptical", 36242),
+
+        (False, True, None, 30275),
+        (False, True, "rectangular", 32983),
+        (False, True, "hyperelliptical", 32624),
+        (False, False, None, 30281),
+        (False, False, "rectangular", 32932),
+        (False, False, "hyperelliptical", 32502),
+    ]
+
+    for extend_segy, water_interface, padding_type, expected_cells in unstructured_configurations:
+
+        print(f"\nTesting Unstruct | Ext SEGY: {str(extend_segy):<5} | Water: {str(water_interface):<5} | Padding: {padding_type}")
+
+        avenir_params = {
+            "mesh_type": "gmsh_mesh",
+            "dimension": 2,
+
+            "length_z": 7760.0,
+            "length_x": 32040.0,
+            "output_filename": f"avenir_unstruct_ext_{extend_segy}_wat_{water_interface}_pad_{padding_type}.msh",
+
+            "velocity_model": "tests/inputfiles/velocity_models/avenir.segy",
+            "cells_per_wavelength": 2.0,
+            "source_frequency": 3.0,
+
+            "padding_type": padding_type,
+            "padding_x": 3000.0,
+            "padding_z": 3000.0,
+            "hyper_n": 3.0,
+            "hmin_segy": 0.0,
+            "grade": 0.75,
+
+            "water_interface": water_interface,
+            "water_search_value": 0.0,
+            "vp_water": 500.0,
+
+            "structured_mesh": False,
+            "min_element_size": 150.0,
+            "apply_winslow": False,
+            "winslow_implementation": "default",
+            "winslow_iterations": 100,
+            "winslow_omega": 0.5,
+
+            "extend_segy": extend_segy,
+            "h_padding": 500.0
+        }
+
+        mesh_params = MeshingParameters(input_mesh_dictionary=avenir_params, velocity_model=avenir_params["velocity_model"])
+        mesh_generator = AutomaticMesh(mesh_parameters=mesh_params)
+
+        firedrake_mesh = mesh_generator.create_mesh()
+
+        if not hasattr(firedrake_mesh.topology, "_entity_classes") and hasattr(firedrake_mesh, "init"):
+            firedrake_mesh.init()
+
+        actual_cells = firedrake_mesh.cell_set.core_size
+        print(f"     Cells actual: {actual_cells} | Expected: {expected_cells}")
+
+        assert math.isclose(actual_cells, expected_cells), \
+            f"FAILED: Unstruct | Ext: {extend_segy} | Wat: {water_interface} | Pad: {padding_type}. Got {actual_cells}, expected {expected_cells}"
+
+
+def test_gmsh2d_structured_no_winslow():
+    print("STARTING STRUCTURED MESH (NO WINSLOW) TESTS")
+
+    configurations = [
+        (True, None, 11610),
+        (True, "rectangular", 19275),
+        (True, "hyperelliptical", 18070),
+
+        (False, None, 11395),
+        (False, "rectangular", 19018),
+        (False, "hyperelliptical", 17560)
+    ]
+
+    for water_interface, padding_type, expected_cells in configurations:
+
+        print(f"\nTesting Struct (No Winslow) | Water: {str(water_interface):<5} | Padding: {padding_type}")
+
+        avenir_params = {
+            "mesh_type": "gmsh_mesh",
+            "dimension": 2,
+
+            "length_z": 7760.0,
+            "length_x": 32040.0,
+            "output_filename": f"avenir_struct_nowinslow_wat_{water_interface}_pad_{padding_type}.msh",
+
+            "velocity_model": "tests/inputfiles/velocity_models/avenir.segy",
+            "cells_per_wavelength": 2.0,
+            "source_frequency": 3.0,
+
+            "padding_type": padding_type,
+            "padding_x": 3000.0,
+            "padding_z": 3000.0,
+            "hyper_n": 3.0,
+            "hmin_segy": 0.0,
+            "grade": 0.75,
+
+            # Injected water parameter
+            "water_interface": water_interface,
+            "water_search_value": 0.0,
+            "vp_water": 500.0,
+
+            "structured_mesh": True,
+            "min_element_size": 150.0,
+            "apply_winslow": False,
+            "winslow_implementation": "default",
+            "winslow_iterations": 100,
+            "winslow_omega": 0.5,
+
+            "extend_segy": False,
+            "h_padding": 500.0
+        }
+
+        mesh_params = MeshingParameters(input_mesh_dictionary=avenir_params, velocity_model=avenir_params["velocity_model"])
+        mesh_generator = AutomaticMesh(mesh_parameters=mesh_params)
+
+        firedrake_mesh = mesh_generator.create_mesh()
+
+        if not hasattr(firedrake_mesh.topology, "_entity_classes") and hasattr(firedrake_mesh, "init"):
+            firedrake_mesh.init()
+
+        actual_cells = firedrake_mesh.cell_set.core_size
+        print(f"     Cells actual: {actual_cells} | Expected: {expected_cells}")
+
+        assert math.isclose(actual_cells, expected_cells), \
+            f"FAILED: Struct (No Winslow) | Wat: {water_interface} | Pad: {padding_type}. Got {actual_cells}, expected {expected_cells}"
