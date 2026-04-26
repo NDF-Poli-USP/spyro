@@ -1,12 +1,20 @@
 import math
 from spyro.meshing.meshing_parameters import MeshingParameters
 from spyro.meshing.meshing_functions import AutomaticMesh
+import importlib.util
+
+HAS_NUMBA = importlib.util.find_spec("numba") is not None
 
 
 def test_gmsh2d_structured():
     print("STARTING STRUCTURED MESH TESTS")
 
-    winslow_implementations = ["default", "fast", "numba"]
+    winslow_implementations = ["default", "fast"]
+    if HAS_NUMBA:
+        print("Numba is installed, making numba test")
+        winslow_implementations.append("numba")
+    else:
+        print("\n[INFO] Numba is not installed. Skipping 'numba' Winslow implementations.")
 
     structured_configurations = [
         (True, None, 11610),
