@@ -294,8 +294,8 @@ class HABC_Mesh():
         print("Setting Mesh Properties for Eikonal Analysis", flush=True)
         self.properties_eik_mesh(p_usu=self.abc_deg_eikonal, f_est=f_est)
 
-  @staticmethod
-   def bnd_pnts_hyp_2D(a, b, n, num_pts):
+    @staticmethod
+    def bnd_pnts_hyp_2D(a, b, n, num_pts):
         """
         Generate points on the boundary of a hyperellipse.
 
