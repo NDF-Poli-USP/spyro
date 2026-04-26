@@ -39,7 +39,7 @@ class DummyWave(Wave):
     def _get_next_vstate(self):
         return getattr(self, "_next_vstate", None)
 
-    def get_receivers_output(self):
+    def get_forward_solution_receivers(self):
         return None
 
     def get_function(self):
@@ -149,7 +149,7 @@ def test_functional_computations_match_per_timestep_and_after_solve():
 
     observed_wave = _build_acoustic_wave(model_dictionary, velocity=2.5)
     observed_wave.forward_solve()
-    observed_shot = np.array(observed_wave.receivers_output, copy=True)
+    observed_shot = np.array(observed_wave.forward_solution_receivers, copy=True)
 
     wave_per_timestep = _build_acoustic_wave(
         model_dictionary,

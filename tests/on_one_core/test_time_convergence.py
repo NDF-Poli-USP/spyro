@@ -80,7 +80,7 @@ def run_forward(dt):
     Wave_obj.set_initial_velocity_model(constant=1.5)
     Wave_obj.forward_solve()
 
-    rec_out = Wave_obj.receivers_output
+    rec_out = Wave_obj.forward_solution_receivers
 
     return rec_out
 
