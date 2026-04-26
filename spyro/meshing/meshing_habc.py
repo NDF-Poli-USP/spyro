@@ -66,7 +66,7 @@ class HABC_Mesh():
     quadrilateral : bool
         Flag to indicate whether to use quadrilateral/hexahedral elements
 
-    Migrate:
+    # Migrate to meshing operations:
     bnds : 'array'
         Mesh node indices on boundaries of the original domain
     bnd_nodes : `tuple`
@@ -104,7 +104,7 @@ class HABC_Mesh():
     trunc_hyp_bndpts_2D()
         Generate the boundary points for a truncated hyperellipse
 
-    # Migrate
+    # Migrate to meshing operations:
     get_spatial_coordinates_habc()
         Get the ufl coordinates of the mesh with absorbing layer.
     layer_boundary_data()
