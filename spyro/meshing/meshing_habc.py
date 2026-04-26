@@ -294,8 +294,101 @@ class HABC_Mesh():
         print("Setting Mesh Properties for Eikonal Analysis", flush=True)
         self.properties_eik_mesh(p_usu=self.abc_deg_eikonal, f_est=f_est)
 
-    @staticmethod
-    def bnd_pnts_hyp_2D(a, b, n, num_pts):
+
+<< << << < HEAD
+== == == =
+  def rectangular_mesh_habc(self, dom_lay, pad_len):
+       """
+        Generate a rectangular mesh with an absorbing layer
+
+        Parameters
+        ----------
+        dom_lay : `tuple`
+            Domain dimensions with layer including truncation by free surface.
+            - 2D : (Lx + 2 * pad_len, Lz + pad_len)
+            - 3D : (Lx + 2 * pad_len, Lz + pad_len, Ly + 2 * pad_len)
+        pad_len : `float`
+            Size of the absorbing layer
+
+        Returns
+        -------
+        mesh_habc : `firedrake mesh`
+            Rectangular mesh with an absorbing layer.
+        """
+
+        # Domain dimensions
+        Lx, Lz = self.domain_dim[:2]
+
+        # Number of elements
+        n_pad = round(pad_len / self.mesh_parameters.lmin)  # Elements in the layer
+        nz = int(round(Lz / self.mesh_parameters.lmin)) + int(n_pad)
+        nx = int(round(Lx / self.mesh_parameters.lmin)) + int(2 * n_pad)
+
+        # New geometry with layer
+        Lx_habc, Lz_habc = dom_lay[:2]
+
+        # Creating the rectangular mesh with layer
+        q = {"overlap_type": (fire.DistributedMeshOverlapType.NONE, 0)}
+        if self.dimension == 2:  # 2D
+            mesh_habc = fire.RectangleMesh(nz, nx, Lz_habc, Lx_habc,
+                                           distribution_parameters=q,
+                                           quadrilateral=self.quadrilateral,
+                                           comm=self.comm.comm)
+            typ_ele_str = "Area Elements"
+
+        if self.dimension == 3:  # 3D
+
+            # Number of elements
+            Ly = self.domain_dim[2]
+            ny = int(round(Ly / self.mesh_parameters.lmin)) + int(2 * n_pad)
+
+            # New geometry with layer
+            Ly_habc = dom_lay[2]
+
+            # Mesh
+            if self.quadrilateral:
+                quad_habc = fire.RectangleMesh(
+                    nz, nx, Lz_habc, Lx_habc, distribution_parameters=q,
+                    quadrilateral=self.quadrilateral, comm=self.comm.comm)
+                # fire.VTKFile("output/quad_habc.pvd").write(quad_habc)
+
+                mesh_habc = fire.ExtrudedMesh(quad_habc, ny,
+                                              layer_height=Ly_habc / ny)
+                # fire.VTKFile("output/extr_habc.pvd").write(mesh_habc)
+            else:
+                mesh_habc = fire.BoxMesh(
+                    nz, nx, ny, Lz_habc, Lx_habc, Ly_habc,
+                    distribution_parameters=q, comm=self.comm.comm)
+            typ_ele_str = "Volume Elements"
+
+            # Adjusting coordinates
+            mesh_habc.coordinates.dat.data_with_halos[:, 2] -= pad_len
+            min_y = mesh_habc.coordinates.dat.data_with_halos[:, 2].min()
+            if abs(min_y / pad_len) != 1.:  # Forcing node at (0,0,0)
+                err_y = (1. - abs(min_y / pad_len)) * pad_len
+                err_y *= -np.sign(err_y)
+                mesh_habc.coordinates.dat.data_with_halos[:, 2] += err_y
+
+        # Adjusting coordinates
+        mesh_habc.coordinates.dat.data_with_halos[:, 0] *= -1.0
+        mesh_habc.coordinates.dat.data_with_halos[:, 1] -= pad_len
+        min_x = mesh_habc.coordinates.dat.data_with_halos[:, 1].min()
+        if abs(min_x / pad_len) != 1.:  # Forcing node at (0,0)
+            err_x = (1. - abs(min_x / pad_len)) * pad_len
+            err_x *= -np.sign(err_x)
+            mesh_habc.coordinates.dat.data_with_halos[:, 1] += err_x
+
+        # Mesh data
+        print(f"Mesh Created with {mesh_habc.num_vertices()} Nodes "
+              f"and {mesh_habc.num_cells()} " + typ_ele_str, flush=True)
+
+        print("Extended Rectangular Mesh Generated Successfully", flush=True)
+
+        return mesh_habc
+
+>>>>>> > main
+  @staticmethod
+   def bnd_pnts_hyp_2D(a, b, n, num_pts):
         """
         Generate points on the boundary of a hyperellipse.
 
