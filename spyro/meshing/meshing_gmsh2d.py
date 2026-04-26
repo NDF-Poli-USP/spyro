@@ -412,8 +412,8 @@ def build_gmsh_geometry_and_groups(
             arc_TL_BL = make_arc(pt_O_TL, pt_O_BL, x_O_TL, z_O_TL, x_O_BL, z_O_BL)
             arc_BL_BML = make_arc(pt_O_BL, pt_O_BML, x_O_BL, z_O_BL, x_O_BML, z_O_BML)
             arc_BML_BMR = make_arc(pt_O_BML, pt_O_BMR, x_O_BML, z_O_BML, x_O_BMR, z_O_BMR)
-            arc_BMR_BR = make_arc(pt_O_BMR, pt_O_BR, x_O_BMR, z_O_BMR, x_O_BR, z_O_BMR)
-            arc_BR_TR = make_arc(pt_O_BR, pt_O_TR, x_O_BR, z_O_BMR, x_O_TR, z_O_TR)
+            arc_BMR_BR = make_arc(pt_O_BMR, pt_O_BR, x_O_BMR, z_O_BMR, x_O_BR, z_O_BR)
+            arc_BR_TR = make_arc(pt_O_BR, pt_O_TR, x_O_BR, z_O_BR, x_O_TR, z_O_TR)
 
             surf_rock = gmsh.model.occ.addPlaneSurface([gmsh.model.occ.addCurveLoop([line_top, line_right, line_bot_right, line_bot_mid, line_bot_left, line_left])])
             surf_pad_left = gmsh.model.occ.addPlaneSurface([gmsh.model.occ.addCurveLoop([ray_BL, -arc_TL_BL, -ray_TL, -line_left])])
