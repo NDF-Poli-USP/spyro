@@ -227,7 +227,7 @@ class MeshOps():
         return min_coordinates, max_coordinates
 
     def extract_node_positions(self, mesh, function_space, output_type="tuple"):
-        '''Extract the node positions from the mesh and return as a tuple of arrays.
+        """Extract the node positions from the mesh and return as a tuple of arrays.
 
         Parameters
         ----------
@@ -245,7 +245,7 @@ class MeshOps():
             Tuple containing the node positions in the mesh.
             - (z_data, x_data) for 2D
             - (z_data, x_data, y_data) for 3D
-        '''
+        """
 
         # Interpolate the coordinates according to the function space
         coords = []
@@ -284,7 +284,7 @@ class MeshOps():
         return node_positions
 
     def mapping_boundary_ids(self, mesh, function_space, boundaries,
-                             box_domain=True, get_boundary_nodes=False):
+                             box_domain=True, get_boundary_node_ids=True):
         """Map the boundaries of the a mesh.
 
         Parameters
@@ -300,15 +300,17 @@ class MeshOps():
                 absorb_left, absorb_front, absorb_back) for 3D
         box_domain : `bool`, optional
             Flag to indicate whether the domain is a box (Rectangle or Parallelepiped).
-            Default is True.
-        get_boundary_nodes : `bool`, optional
-            if True, return the boundary node coordinates according to the boudary map.
-            Default is False.
+            Default is True
+        get_boundary_node_ids : `bool`, optional
+            if True, return the boundary node ids according to the boundary map.
+            Default is True
 
         Returns
         -------
-        boundary_idx_map: dict
+        boundary_ids_map: `dict`
             Mapping of boundary IDs for applying absorbing boundary conditions
+        boundary_nodes_ids: `dict`
+            IDs of the boundary nodes according to the function space provide.
         """
 
         if box_domain:
@@ -330,6 +332,7 @@ class MeshOps():
                 max_y = max_coordinates[2]
                 absorb_front, absorb_back = boundaries[4:]
 
+            # Node coordinates
             node_positions = self.extract_node_positions(mesh, function_space)
 
             # Verify numerical ids
@@ -338,12 +341,12 @@ class MeshOps():
 
             # Boundary nodes indices
             if len(exterior_markers) == 0:
-                boundary_idx_map = {idx_bdn: None for idx_bdn
+                boundary_ids_map = {idx_bdn: None for idx_bdn
                                     in range(1, num_boundaries + 1)}
-                return boundary_idx_map
+                return boundary_ids_map
 
-            boundary_idx_map = {}
-            boundary_nodes = {}
+            boundary_ids_map = {}
+            boundary_nodes_ids = {}
             for idx_bdn in range(1, num_boundaries + 1):
 
                 if self.dimension == 3 and self.quadrilateral:
@@ -355,7 +358,7 @@ class MeshOps():
 
                 if len(bnd_node_ids) == 0:
                     # For DG spaces, DirichletBC doesn't work
-                    boundary_idx_map[idx_bdn] = None
+                    boundary_ids_map[idx_bdn] = None
                     continue
 
                 idx_test = np.linspace(0, len(bnd_node_ids) - 1, 10, dtype=int)
@@ -365,39 +368,37 @@ class MeshOps():
                 z_data = node_positions[0][sample_nodes]
                 x_data = node_positions[1][sample_nodes]
                 if np.allclose(z_data, min_z):
-                    boundary_idx_map[idx_bdn] = absorb_bottom  # Bottom boundary
+                    boundary_ids_map[idx_bdn] = absorb_bottom  # Bottom boundary
                     key_bnd = "Zmin"
                 elif np.allclose(z_data, max_z):
-                    boundary_idx_map[idx_bdn] = absorb_top  # Top boundary
+                    boundary_ids_map[idx_bdn] = absorb_top  # Top boundary
                     key_bnd = "Zmax"
                 elif np.allclose(x_data, min_x):
-                    boundary_idx_map[idx_bdn] = absorb_left  # Left boundary
+                    boundary_ids_map[idx_bdn] = absorb_left  # Left boundary
                     key_bnd = "Xmin"
                 elif np.allclose(x_data, max_x):
-                    boundary_idx_map[idx_bdn] = absorb_right  # Right boundary
+                    boundary_ids_map[idx_bdn] = absorb_right  # Right boundary
                     key_bnd = "Xmax"
 
                 if self.dimension == 3:
                     y_data = node_positions[2][sample_nodes]
                     if np.allclose(y_data, min_y):
-                        boundary_idx_map[idx_bdn] = absorb_front  # Front boundary
+                        boundary_ids_map[idx_bdn] = absorb_front  # Front boundary
                         key_bnd = "Ymin"
                     elif np.allclose(y_data, max_y):
-                        boundary_idx_map[idx_bdn] = absorb_back  # Back boundary
+                        boundary_ids_map[idx_bdn] = absorb_back  # Back boundary
                         key_bnd = "Ymax"
 
                 # Boundary node coordinates
-                if get_boundary_nodes:
-                    boundary_coordinates = np.array([node_positions[dim][
-                        bnd_node_ids] for dim in range(self.dimension)]).T
-                    boundary_nodes[key_bnd] = boundary_coordinates
-                    del boundary_coordinates
+                if get_boundary_node_ids:
+                    boundary_nodes_ids[key_bnd] = bnd_node_ids
+                del bnd_node_ids
 
-            if get_boundary_nodes:
-                return boundary_idx_map, boundary_nodes
+            if get_boundary_node_ids:
+                return boundary_ids_map, boundary_nodes_ids
 
             else:
-                return boundary_idx_map
+                return boundary_ids_map
         else:
             raise NotImplementedError("Mapping of boundary ids for other type of "
                                       "domains is not implemented yet. Only box "
@@ -405,8 +406,7 @@ class MeshOps():
                                       "future boundary ids must start at 7.")
 
     def extract_bnd_node_indices(self, mesh, function_space, mesh_parameters):
-        """
-        Extract boundary node indices the domain excluding the free surface at the top.
+        """Extract boundary node indices excluding the free surface at the top.
 
         Parameters
         ----------

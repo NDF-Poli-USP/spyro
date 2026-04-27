@@ -171,9 +171,11 @@ class Wave(Model_parameters, metaclass=ABCMeta):
                                self.absorb_back])
 
         # Build the boundary ID mapping
-        self.mesh_parameters.boundary_idx_map = \
+        self.mesh_parameters.boundary_ids_map, \
+            self.mesh_parameters.boundary_nodes_ids = \
             self.mesh_ops.mapping_boundary_ids(self.mesh, self.function_space,
-                                               boundaries, box_domain=True)
+                                               boundaries, box_domain=True,
+                                               get_boundary_node_ids=True)
 
     def set_mesh(
             self,
