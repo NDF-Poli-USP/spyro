@@ -3,11 +3,11 @@ import spyro
 length_z = 7760.0
 length_x = 32040.0
 length_y = 0.0
-quadrilateral = False
+quadrilateral = True
 mesh_type = "gmsh_mesh"
 velocity_model = "tests/inputfiles/velocity_models/avenir.segy"
 cells_per_wavelength = 2.6
-dt = 0.0001  # if none, will use 70% of stable (which takes time to calculate)
+dt = 0.00001  # if none, will use 70% of stable (which takes time to calculate)
 
 if not quadrilateral:
     cell_type = "T"
@@ -32,7 +32,7 @@ dictionary["mesh"] = {
     "length_z": length_z,  # depth in km - always positive
     "length_x": length_x,  # width in km - always positive
     "length_y": 0.0,  # thickness in km - always positive
-    "mesh_type": mesh_type,
+    "mesh_file": "meshes/avenir.msh",
 }
 dictionary["acquisition"] = {
     "source_type": "ricker",
@@ -61,10 +61,10 @@ dictionary["visualization"] = {
 }
 
 wave_obj = spyro.AcousticWave(dictionary=dictionary)
-wave_obj.set_mesh(input_mesh_parameters={
-    "cells_per_wavelength": cells_per_wavelength,
-    "velocity_model": velocity_model,
-})
+# wave_obj.set_mesh(input_mesh_parameters={
+#     "cells_per_wavelength": cells_per_wavelength,
+#     "velocity_model": velocity_model,
+# })
 wave_obj.forward_solve()
 
 print("END")
