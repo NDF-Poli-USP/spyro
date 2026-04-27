@@ -38,7 +38,7 @@ class HABC_Eikonal(Eikonal_Modeling):
         Function space for the Eikonal modeling
     lmin : `float`
         Minimum mesh size
-    mesh: `Firedrake.Mesh`
+    mesh : `Firedrake.Mesh`
         Original mesh without absorbing layer
     mesh_ops : `spyro.meshing.meshing_operations.MeshOps`
         Object with general mesh operations for domains w/o an absorbing layer
@@ -46,7 +46,7 @@ class HABC_Eikonal(Eikonal_Modeling):
         Node positions of the mesh
         - array of shape (num_nodes, 2) and coordinates (z, x) for 2D
         - array of shape (num_nodes, 3) and coordinates (z, x, y) for 3D
-    node_tol: `float`   
+    node_tol : `float`
         Tolerance for identifying minimum Eikonal values on boundaries  
     path_save : `str`
         Path to save Eikonal results
