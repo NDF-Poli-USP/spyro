@@ -1,7 +1,6 @@
 import firedrake as fire
 from firedrake.__future__ import interpolate
 import numpy as np
-# from spyro.utils.error_management import value_parameter_error
 fire.interpolate = interpolate
 from spyro.utils.error_management import value_parameter_error
 from spyro.utils.eval_functions_to_ufl import generate_ufl_functions
@@ -227,7 +226,7 @@ class MeshOps():
         return min_coordinates, max_coordinates
 
     def extract_node_positions(self, mesh, function_space, output_type="tuple"):
-        """Extract the node positions from the mesh and return as a tuple of arrays.
+        """Extract the node positions from the mesh.
 
         Parameters
         ----------
@@ -241,10 +240,14 @@ class MeshOps():
 
         Returns
         -------
-        node_positions : `tuple`
-            Tuple containing the node positions in the mesh.
-            - (z_data, x_data) for 2D
-            - (z_data, x_data, y_data) for 3D
+        node_positions : `tuple` or `array` 
+            Node positions of the mesh
+            If output_type is "tuple":
+                - (z_data, x_data) for 2D
+                - (z_data, x_data, y_data) for 3D
+            If output_type is "array":
+                - array of shape (num_nodes, 2) and coordinates (z, x) for 2D
+                - array of shape (num_nodes, 3) and coordinates (z, x, y) for 3D
         """
 
         # Interpolate the coordinates according to the function space
@@ -462,49 +465,7 @@ class MeshOps():
 
         return bnds
 
-    # def original_boundary_data(self):
-    #     """
-    #     Generate the boundary data from the original domain mesh
 
-    #     Parameters
-    #     ----------
-    #     None
-
-    #     Returns
-    #     -------
-    #     None
-    #     """
-
-    #     # Extract node positions
-    #     node_positions = self.extract_node_positions(self.function_space)
-
-    #     # Extract boundary node indices
-    #     bnds = self.extract_bnd_node_indices(node_positions,
-    #                                          self.function_space)
-    #     self.bnds = np.unique(np.concatenate([idxs for idx_list in bnds
-    #                                           for idxs in idx_list]))
-
-    #     # Extract boundary node positions
-    #     z_data, x_data = node_positions[0:2]
-    #     self.bnd_nodes = (z_data[self.bnds], x_data[self.bnds])
-    #     if self.dimension == 3:  # 3D
-    #         y_data = node_positions[2]
-    #         self.bnd_nodes += (y_data[self.bnds],)
-
-    #     # Get extreme values of the velocity model on the boundary
-    #     mask_boundary = np.isin(
-    #         np.asarray(self.bnd_nodes).T,
-    #         self.mesh_original.coordinates.dat.data_with_halos).all(axis=1)
-    #     vel_on_boundary = self.point_cloud_field(
-    #         self.mesh_original, np.asarray(self.bnd_nodes).T[mask_boundary],
-    #         self.initial_velocity_model).dat.data_with_halos[:]
-    #     self.c_bnd_min = vel_on_boundary[vel_on_boundary > 0.].min()
-    #     self.c_bnd_max = vel_on_boundary[vel_on_boundary > 0.].max()
-
-    #     # Print on screen
-    #     cbnd_str = "Boundary Velocity Range (km/s): {:.3f} - {:.3f}"
-    #     print(cbnd_str.format(self.c_bnd_min, self.c_bnd_max), flush=True)
-    #
     # def layer_boundary_data(self, V):
     #     """
     #     Generate the boundary data from the domain with the absorbing layer

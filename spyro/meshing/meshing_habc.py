@@ -66,14 +66,6 @@ class HABC_Mesh():
     quadrilateral : bool
         Flag to indicate whether to use quadrilateral/hexahedral elements
 
-    # Migrate to meshing operations:
-    bnds : 'array'
-        Mesh node indices on boundaries of the original domain
-    bnd_nodes : `tuple`
-        Mesh node coordinates on boundaries of the origianl domain.
-        - (z_data[bnds], x_data[bnds]) for 2D
-        - (z_data[bnds], x_data[bnds], y_data[bnds]) for 3D
-
     Methods
     -------
     bnd_pnts_hyp_2D()
@@ -90,6 +82,8 @@ class HABC_Mesh():
         Check if a point is inside a hyperellipsoid
     merge_mesh_2D()
         Merge the rectangular and the hyperelliptical meshes
+    original_boundary_data()
+        Generate the boundary data from the original domain mesh
     preamble_mesh_operations()
         Perform mesh operations previous to size an absorbing layer
     properties_eik_mesh()
@@ -109,8 +103,6 @@ class HABC_Mesh():
         Get the ufl coordinates of the mesh with absorbing layer.
     layer_boundary_data()
         Generate the boundary data from the domain with the absorbing layer
-    original_boundary_data()
-        Generate the boundary data from the original domain mesh
     """
 
     def __init__(self, domain_dim, dimension=2, quadrilateral=False,
@@ -174,39 +166,28 @@ class HABC_Mesh():
 
         # Extract node positions
         node_positions = self.mesh_ops.extract_node_positions(self.mesh,
-                                                              self.function_space)
-
-        # Extract boundary node indices
-        bnds = self.mesh_ops.extract_bnd_node_indices(self.mesh,
-                                                      self.function_space,
-                                                      self.mesh_parameters)
-        self.bnds = np.unique(np.concatenate([idxs for idx_list in bnds
-                                              for idxs in idx_list]))
+                                                              self.function_space,
+                                                              output_type="array")
 
         # Extract boundary node positions
-        z_data, x_data = node_positions[0:2]
-        self.bnd_nodes = (z_data[self.bnds], x_data[self.bnds])
-        if self.dimension == 3:  # 3D
-            y_data = node_positions[2]
-            self.bnd_nodes += (y_data[self.bnds],)
-        del node_positions
-
-        # Get extreme values of the velocity on the boundary excluding free surfaces
         all_bnd_nodes = []
         for (bnd_ids, status) in self.mesh_parameters.boundary_nodes_ids.values():
             if status:
                 all_bnd_nodes.append(bnd_ids)
         all_bnd_nodes = np.unique(np.concatenate(all_bnd_nodes))
-        node_positions = self.mesh_ops.extract_node_positions(self.mesh,
-                                                              self.function_space,
-                                                              output_type="array")
-        mask_boundary = np.isin(node_positions[all_bnd_nodes,:], 
-            self.mesh_original.coordinates.dat.data_with_halos).all(axis=1)
-        vel_on_boundary = \
-            point_cloud_field(self.mesh_original,
-                              np.asarray(self.bnd_nodes).T[mask_boundary],
-                              self.initial_velocity_model,
-                              self.mesh_parameters.tol).dat.data_with_halos[:]
+        coord_msh = self.mesh_original.coordinates.dat.data_with_halos
+        coord_bnd = node_positions[all_bnd_nodes,:]
+        msh_view = coord_msh.view([('', coord_msh.dtype)] * coord_msh.shape[1])
+        bnd_view = coord_bnd.view([('', coord_bnd.dtype)] * coord_bnd.shape[1])
+        mask_boundary = np.where(np.isin(msh_view, bnd_view))[0]
+    
+        # Create a point cloud to get the extreme velocity values on the boundary
+        ptos_bnd = self.mesh_original.coordinates.dat.data_with_halos[mask_boundary, :]
+        vel_on_boundary = point_cloud_field(
+            self.mesh_original, ptos_bnd, self.initial_velocity_model,
+            self.mesh_parameters.tol).dat.data_with_halos[:]
+        
+        # Get extreme values of the velocity on the boundary excluding free surfaces
         decimal = int(abs(np.log10(self.mesh_parameters.tol)))
         self.c_bnd_min = round(vel_on_boundary[vel_on_boundary > 0.].min(), decimal)
         self.c_bnd_max = round(vel_on_boundary[vel_on_boundary > 0.].max(), decimal)
