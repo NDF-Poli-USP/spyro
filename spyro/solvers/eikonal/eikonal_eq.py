@@ -2,7 +2,7 @@ import firedrake as fire
 import numpy as np
 from sys import float_info, exit
 from spyro.utils.error_management import clean_inst_num, value_parameter_error
-from spyro.domains.quadrature import quadrature_rules   
+from spyro.domains.quadrature import quadrature_rules
 
 # Work from Ruben Andres Salas, Andre Luis Ferreira da Silva,
 # Luis Fernando Nogueira de Sá, Emilio Carlos Nelli Silva.
@@ -157,7 +157,7 @@ class Eikonal_Modeling():
         '''
 
         # Extract node positions
-        z_data, x_data = node_positions[:, 0], node_positions[:, 1]    
+        z_data, x_data = node_positions[:, 0], node_positions[:, 1]
 
         # Identify source indices in the mesh
         it = int(-1)
