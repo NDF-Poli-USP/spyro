@@ -154,12 +154,12 @@ class Wave(Model_parameters, metaclass=ABCMeta):
     def get_absorbing_boundaries(self):
         """Get the absorbing boundaries for the problem.
 
-        Parameters: 
-        ----------- 
+        Parameters:
+        -----------
         None
 
         Returns:
-        --------   
+        --------
         boundaries : `tuple`
             Tuple containing the boundary boolean labels for applying absorbing BCs.
             - (absorb_top, absorb_bottom, absorb_right, absorb_left) for 2D
