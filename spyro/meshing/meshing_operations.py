@@ -8,8 +8,7 @@ from spyro.utils.eval_functions_to_ufl import generate_ufl_functions
 
 
 class MeshOps():
-    """
-    Class for general mesh operations for domains w/o an absorbing layer.
+    """Class for general mesh operations for domains w/o an absorbing layer.
 
     Attributes
     ----------
@@ -94,8 +93,7 @@ class MeshOps():
 
     def __init__(self, domain_dim, dimension=2, quadrilateral=False,
                  func_space_type=None, comm=None):
-        """
-        Initialize the HABC_Mesh class.
+        """Initialize the MeshOps class.
 
         Parameters
         ----------
@@ -134,8 +132,7 @@ class MeshOps():
         self.comm = comm
 
     def _set_spatial_coordinates(self, mesh):
-        """
-        Set the coordinates of a mesh.
+        """Set the coordinates of a mesh.
 
         Parameters
         ----------
@@ -160,8 +157,7 @@ class MeshOps():
             return mesh_z, mesh_x, mesh_y
 
     def representative_mesh_dimensions(self, mesh, function_space):
-        """
-        Get the representative mesh dimensions from a mesh.
+        """Get the representative mesh dimensions from a mesh.
 
         Parameters
         ----------
@@ -209,8 +205,7 @@ class MeshOps():
 
     @staticmethod
     def extract_extreme_coordinates(mesh):
-        """
-        Extract the minimum and maximum coordinates from a mesh.
+        """Extract the minimum and maximum coordinates from a mesh.
 
         Parameters
         ----------
@@ -232,8 +227,7 @@ class MeshOps():
         return min_coordinates, max_coordinates
 
     def extract_node_positions(self, mesh, function_space, output_type="tuple"):
-        '''
-        Extract the node positions from the mesh and return as a tuple of arrays.
+        '''Extract the node positions from the mesh and return as a tuple of arrays.
 
         Parameters
         ----------
@@ -289,9 +283,9 @@ class MeshOps():
         # to decouple it from wave altogether.
         return node_positions
 
-    def mapping_boundary_ids(self, mesh, function_space, boundaries, box_domain=True):
-        """
-        Map the boundaries of the a mesh
+    def mapping_boundary_ids(self, mesh, function_space, boundaries,
+                             box_domain=True, get_boundary_nodes=False):
+        """Map the boundaries of the a mesh.
 
         Parameters
         ----------
@@ -307,6 +301,9 @@ class MeshOps():
         box_domain : `bool`, optional
             Flag to indicate whether the domain is a box (Rectangle or Parallelepiped).
             Default is True.
+        get_boundary_nodes : `bool`, optional
+            if True, return the boundary node coordinates according to the boudary map.
+            Default is False.
 
         Returns
         -------
@@ -316,7 +313,7 @@ class MeshOps():
 
         if box_domain:
 
-            # Simulating a Dirichlet BC in every boundary
+            # Simulating a Dirichlet BC at each boundary
             if self.func_space_type == "scalar":
                 bc_val = 0.
             else:
@@ -346,6 +343,7 @@ class MeshOps():
                 return boundary_idx_map
 
             boundary_idx_map = {}
+            boundary_nodes = {}
             for idx_bdn in range(1, num_boundaries + 1):
 
                 if self.dimension == 3 and self.quadrilateral:
@@ -368,21 +366,38 @@ class MeshOps():
                 x_data = node_positions[1][sample_nodes]
                 if np.allclose(z_data, min_z):
                     boundary_idx_map[idx_bdn] = absorb_bottom  # Bottom boundary
+                    key_bnd = "Zmin"
                 elif np.allclose(z_data, max_z):
                     boundary_idx_map[idx_bdn] = absorb_top  # Top boundary
+                    key_bnd = "Zmax"
                 elif np.allclose(x_data, min_x):
                     boundary_idx_map[idx_bdn] = absorb_left  # Left boundary
+                    key_bnd = "Xmin"
                 elif np.allclose(x_data, max_x):
                     boundary_idx_map[idx_bdn] = absorb_right  # Right boundary
+                    key_bnd = "Xmax"
 
                 if self.dimension == 3:
                     y_data = node_positions[2][sample_nodes]
                     if np.allclose(y_data, min_y):
                         boundary_idx_map[idx_bdn] = absorb_front  # Front boundary
+                        key_bnd = "Ymin"
                     elif np.allclose(y_data, max_y):
                         boundary_idx_map[idx_bdn] = absorb_back  # Back boundary
+                        key_bnd = "Ymax"
 
-            return boundary_idx_map
+                # Boundary node coordinates
+                if get_boundary_nodes:
+                    boundary_coordinates = np.array([node_positions[dim][
+                        bnd_node_ids] for dim in range(self.dimension)]).T
+                    boundary_nodes[key_bnd] = boundary_coordinates
+                    del boundary_coordinates
+
+            if get_boundary_nodes:
+                return boundary_idx_map, boundary_nodes
+
+            else:
+                return boundary_idx_map
         else:
             raise NotImplementedError("Mapping of boundary ids for other type of "
                                       "domains is not implemented yet. Only box "
@@ -485,96 +500,7 @@ class MeshOps():
     #     # Print on screen
     #     cbnd_str = "Boundary Velocity Range (km/s): {:.3f} - {:.3f}"
     #     print(cbnd_str.format(self.c_bnd_min, self.c_bnd_max), flush=True)
-
-    # def rectangular_mesh_habc(self, dom_lay, pad_len):
-    #     """
-    #     Generate a rectangular mesh with an absorbing layer
-
-    #     Parameters
-    #     ----------
-    #     dom_lay : `tuple`
-    #         Domain dimensions with layer including truncation by free surface.
-    #         - 2D : (Lx + 2 * pad_len, Lz + pad_len)
-    #         - 3D : (Lx + 2 * pad_len, Lz + pad_len, Ly + 2 * pad_len)
-    #     pad_len : `float`
-    #         Size of the absorbing layer
-
-    #     Returns
-    #     -------
-    #     mesh_habc : `firedrake mesh`
-    #         Rectangular mesh with an absorbing layer.
-    #     """
-
-    #     # Domain dimensions
-    #     Lx, Lz = self.domain_dim[:2]
-
-    #     # Number of elements
-    #     n_pad = round(pad_len / self.lmin)  # Elements in the layer
-    #     nz = int(round(Lz / self.lmin)) + int(n_pad)
-    #     nx = int(round(Lx / self.lmin)) + int(2 * n_pad)
-
-    #     # New geometry with layer
-    #     Lx_habc, Lz_habc = dom_lay[:2]
-
-    #     # Creating the rectangular mesh with layer
-    #     q = {"overlap_type": (fire.DistributedMeshOverlapType.NONE, 0)}
-    #     if self.dimension == 2:  # 2D
-    #         mesh_habc = fire.RectangleMesh(nz, nx, Lz_habc, Lx_habc,
-    #                                        distribution_parameters=q,
-    #                                        quadrilateral=self.quadrilateral,
-    #                                        comm=self.comm.comm)
-    #         typ_ele_str = "Area Elements"
-
-    #     if self.dimension == 3:  # 3D
-
-    #         # Number of elements
-    #         Ly = self.domain_dim[2]
-    #         ny = int(round(Ly / self.lmin)) + int(2 * n_pad)
-
-    #         # New geometry with layer
-    #         Ly_habc = dom_lay[2]
-
-    #         # Mesh
-    #         if self.quadrilateral:
-    #             quad_habc = fire.RectangleMesh(
-    #                 nz, nx, Lz_habc, Lx_habc, distribution_parameters=q,
-    #                 quadrilateral=self.quadrilateral, comm=self.comm.comm)
-    #             # fire.VTKFile("output/quad_habc.pvd").write(quad_habc)
-
-    #             mesh_habc = fire.ExtrudedMesh(quad_habc, ny,
-    #                                           layer_height=Ly_habc / ny)
-    #             # fire.VTKFile("output/extr_habc.pvd").write(mesh_habc)
-    #         else:
-    #             mesh_habc = fire.BoxMesh(
-    #                 nz, nx, ny, Lz_habc, Lx_habc, Ly_habc,
-    #                 distribution_parameters=q, comm=self.comm.comm)
-    #         typ_ele_str = "Volume Elements"
-
-    #         # Adjusting coordinates
-    #         mesh_habc.coordinates.dat.data_with_halos[:, 2] -= pad_len
-    #         min_y = mesh_habc.coordinates.dat.data_with_halos[:, 2].min()
-    #         if abs(min_y / pad_len) != 1.:  # Forcing node at (0,0,0)
-    #             err_y = (1. - abs(min_y / pad_len)) * pad_len
-    #             err_y *= -np.sign(err_y)
-    #             mesh_habc.coordinates.dat.data_with_halos[:, 2] += err_y
-
-    #     # Adjusting coordinates
-    #     mesh_habc.coordinates.dat.data_with_halos[:, 0] *= -1.0
-    #     mesh_habc.coordinates.dat.data_with_halos[:, 1] -= pad_len
-    #     min_x = mesh_habc.coordinates.dat.data_with_halos[:, 1].min()
-    #     if abs(min_x / pad_len) != 1.:  # Forcing node at (0,0)
-    #         err_x = (1. - abs(min_x / pad_len)) * pad_len
-    #         err_x *= -np.sign(err_x)
-    #         mesh_habc.coordinates.dat.data_with_halos[:, 1] += err_x
-
-    #     # Mesh data
-    #     print(f"Mesh Created with {mesh_habc.num_vertices()} Nodes "
-    #           f"and {mesh_habc.num_cells()} " + typ_ele_str, flush=True)
-
-    #     print("Extended Rectangular Mesh Generated Successfully", flush=True)
-
-    #     return mesh_habc
-
+    #
     # def layer_boundary_data(self, V):
     #     """
     #     Generate the boundary data from the domain with the absorbing layer
