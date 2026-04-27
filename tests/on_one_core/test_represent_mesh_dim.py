@@ -231,7 +231,8 @@ def test_boundary_ids(element_type, dimension):
 
     # Checking the boundary nodes
     assert boundary_nodes_ids is not None, "✗ Boundary nodes should not be None."
-    assert isinstance(boundary_nodes_ids, dict), "✗ Boundary nodes should be a dictionary."
+    assert isinstance(boundary_nodes_ids, dict), \
+        "✗ Boundary nodes should be a dictionary."
     for key in expected_node_ids_key:
         assert key in boundary_nodes_ids, \
             f"✗ Boundary ID {key} not found in boundary node map."
@@ -242,7 +243,9 @@ def test_boundary_ids(element_type, dimension):
         elif key.startswith('Y'):
             idx = 2
         val_expected = 0. if key.endswith('min') else 1.
-        assert allclose(val_expected, node_positions[boundary_nodes_ids[key], idx], rtol=1e-8), \
-            f"{key} should be 1 for all nodes, but got {boundary_nodes_ids[key][:, idx]}"
+        assert allclose(val_expected, node_positions[boundary_nodes_ids[key][0], idx],
+                        rtol=1e-8), \
+            f"{key} should be {val_expected} for all nodes, " + \
+            f"but got {boundary_nodes_ids[key][:, idx]}"
     print(f"✓ Boundary nodes for {element_type} {dimension}D mesh are "
           + "correctly identified.", flush=True)
