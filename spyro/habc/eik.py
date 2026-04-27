@@ -47,7 +47,7 @@ class HABC_Eikonal(Eikonal_Modeling):
         - array of shape (num_nodes, 2) and coordinates (z, x) for 2D
         - array of shape (num_nodes, 3) and coordinates (z, x, y) for 3D
     node_tol : `float`
-        Tolerance for identifying minimum Eikonal values on boundaries 
+        Tolerance for identifying minimum Eikonal values on boundaries
     path_save : `str`
         Path to save Eikonal results
     yp : `firedrake function`
