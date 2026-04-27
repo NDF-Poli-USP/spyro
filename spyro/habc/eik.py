@@ -1,6 +1,7 @@
 import firedrake as fire
 import numpy as np
 from ..solvers.eikonal.eikonal_eq import Eikonal_Modeling
+from spyro.tools.habc_tools import point_cloud_field
 
 # Work from Ruben Andres Salas, Andre Luis Ferreira da Silva,
 # Luis Fernando Nogueira de Sá, Emilio Carlos Nelli Silva.
@@ -17,13 +18,13 @@ class HABC_Eikonal(Eikonal_Modeling):
 
     Attributes
     ----------
-    bnds : `tuple` of 'arrays'
-        Mesh node indices on boundaries of the domain. Structure:
-        - (left_boundary, right_boundary, bottom_boundary) for 2D
-        - (left_boundary, right_boundary, bottom_boundary,
-            left_bnd_y, right_bnd_y) for 3D
     bcs_eik : `list`
         Dirichlet BCs for eikonal
+    boundaries : `tuple`
+        Tuple containing the boundary boolean labels for applying absorbing BCs.
+        - (absorb_top, absorb_bottom, absorb_right, absorb_left) for 2D
+        - (absorb_top, absorb_bottom, absorb_right,
+            absorb_left, absorb_front, absorb_back) for 3D
     c : `firedrake function`
         Velocity model without absorbing layer
     c_min : `float`
@@ -37,12 +38,16 @@ class HABC_Eikonal(Eikonal_Modeling):
         Function space for the Eikonal modeling
     lmin : `float`
         Minimum mesh size
-    mesh: `firedrake mesh`
+    mesh: `Firedrake.Mesh`
         Original mesh without absorbing layer
-    node_positions : `tuple`
-        Tuple containing the node positions in the mesh.
-        - (z_data, x_data) for 2D
-        - (z_data, x_data, y_data) for 3D
+    mesh_ops : `spyro.meshing.meshing_operations.MeshOps`
+        Object with general mesh operations for domains w/o an absorbing layer
+    node_positions : `array`
+        Node positions of the mesh
+        - array of shape (num_nodes, 2) and coordinates (z, x) for 2D
+        - array of shape (num_nodes, 3) and coordinates (z, x, y) for 3D
+    node_tol: `float`   
+        Tolerance for identifying minimum Eikonal values on boundaries  
     path_save : `str`
         Path to save Eikonal results
     yp : `firedrake function`
@@ -99,14 +104,19 @@ class HABC_Eikonal(Eikonal_Modeling):
         # Minimum velocity value in the model
         self.c_min = Wave.c_min
 
-        # # Extract node positions
-        self.node_positions = Wave.mesh_ops.extract_node_positions(self.mesh,
-                                                                   self.funct_space_eik)
+        # Absorbing boundaries  
+        self.boundaries = Wave.get_absorbing_boundaries()
 
-        # Extract boundary node indices
-        self.bnds = Wave.mesh_ops.extract_bnd_node_indices(self.mesh,
-                                                           self.funct_space_eik,
-                                                           Wave.mesh_parameters)
+        # Mesh operations   
+        self.mesh_ops = Wave.mesh_ops
+
+        # Extract node positions
+        self.node_positions = self.mesh_ops.extract_node_positions(self.mesh,
+                                                              self.funct_space_eik,
+                                                              output_type="array")
+
+        # Tolerance for identifying minimum Eikonal values on boundaries
+        self.node_tol = Wave.mesh_parameters.tol
 
         # Path to save data
         self.path_save = Wave.path_save + "preamble/"
@@ -129,8 +139,10 @@ class HABC_Eikonal(Eikonal_Modeling):
 
         print("\nDefining Eikonal BCs")
 
-        self.bcs_eik, sou_marker = self.eikonal_bcs(
-            self.node_positions, self.funct_space_eik, self.lmin)
+        # Define Eikonal BCs and source marker  
+        self.bcs_eik, sou_marker = self.eikonal_bcs(self.node_positions, 
+                                                    self.funct_space_eik,
+                                                    self.lmin)
 
         # Save source marker
         outfile = fire.VTKFile(self.path_save + "souEik.pvd")
@@ -158,14 +170,14 @@ class HABC_Eikonal(Eikonal_Modeling):
         eikonal_file = fire.VTKFile(self.path_save + "Eik.pvd")
         eikonal_file.write(self.yp)
 
-    def ident_eik_on_bnd(self, boundary):
+    def ident_eik_on_bnd(self, bnd_ids):
         '''
         Identify Eikonal minimum values on a boundary.
 
         Parameters
         ----------
-        boundary : `array`
-            Domain boundary subject to reflections
+        bnd_ids : `array`
+            IDs of the boundary subject to reflections
 
         Returns
         -------
@@ -175,10 +187,14 @@ class HABC_Eikonal(Eikonal_Modeling):
             Array index corresponding to the minimum eikonal value
         '''
 
-        boundary_eik = self.yp.dat.data_with_halos[boundary]
-        idxbnd = boundary_eik.argmin()
-        eikmin = boundary_eik[idxbnd]  # Minimum Eikonal
-        idxmin = boundary[0][idxbnd]  # Original index
+        # Create a point cloud to get the minimum eikonal value on the boundary
+        ptos_bnd = self.node_positions[bnd_ids, :]
+        eik_on_boundary = point_cloud_field(
+            self.mesh, ptos_bnd, self.yp, self.node_tol).dat.data_with_halos[:]
+
+        # Identify minimum Eikonal value on the boundary
+        eikmin = eik_on_boundary.min()
+        idxmin = eik_on_boundary.argmin()
 
         return eikmin, idxmin
 
@@ -203,42 +219,39 @@ class HABC_Eikonal(Eikonal_Modeling):
             - sou_cr : Critical source coordinates
         '''
 
-        # Node positions and boundary strings
-        z_data, x_data = self.node_positions[:2]
-        if self.dimension == 2:  # 2D
-            bnds_str = ['Left Boundary', 'Right Boundary', 'Bottom Boundary']
-        if self.dimension == 3:  # 3D
-            y_data = self.node_positions[2]
-            bnds_str = ['Xmin Boundary', 'Xmax Boundary', 'Bottom Boundary',
-                        'Ymin Boundary', 'Ymax Boundary', ]
+        # Build the boundary ID mapping
+        self.boundary_nodes_ids = self.mesh_ops.mapping_boundary_ids(
+            self.mesh, self.funct_space_eik, self.boundaries,
+            box_domain=True, get_boundary_node_ids=True)[1]
 
         print("\nIdentifying Critical Points on Boundaries")
 
         # Loop over boundaries
         eik_bnd = []
-        eik_str = "Min Eikonal on {0:>16} (ms): {1:>7.3f} "
-        for bnd, bnd_str in zip(self.bnds, bnds_str):
+        eik_str = "Min Eikonal on {0:>4} (ms): {1:>7.3f} "
+        for bnd_str, (bnd_ids, status) in self.boundary_nodes_ids.items():
+            if not status:
+                continue
 
-            # Identify Eikonal minimum
-            eikmin, idxmin = self.ident_eik_on_bnd(bnd)
+            # Identify minimum Eikonal value on the boundary
+            eikmin, idxmin = self.ident_eik_on_bnd(bnd_ids)
 
             # Identify critical point coordinates
-            pt_cr = (z_data[idxmin], x_data[idxmin])
-            pnt_str = "at (in km): ({2:3.3f}, {3:3.3f})"
-            if self.dimension == 3:  # 3D
-                pt_cr += (y_data[idxmin],)
-                pnt_str = pnt_str[:-1] + ", {4:3.3f})"
-
+            pt_cr = self.node_positions[idxmin, :]
+            
             # Identifying propagation speed at critical point
             c_bnd = np.float64(self.c.at(pt_cr).item())
 
             # Print critical point coordinates
+            pnt_str = "at (in km): ({2:3.3f}, {3:3.3f})"
+            if self.dimension == 3:  # 3D
+                pnt_str = pnt_str[:-1] + ", {4:3.3f})"
             print((eik_str + pnt_str).format(bnd_str, 1e3 * eikmin, *pt_cr))
 
             # Identify closest source
             lref_allsou = np.linalg.norm(
                 np.asarray(pt_cr) - np.asarray(self.source_locations), axis=1)
-            idxsou = np.argmin(lref_allsou)
+            idxsou = lref_allsou.argmin()
             lref = lref_allsou[idxsou]
             sou_cr = self.source_locations[idxsou]
             z_par = 1. / eikmin
@@ -246,5 +259,5 @@ class HABC_Eikonal(Eikonal_Modeling):
             # Grouping properties
             eik_bnd.append([pt_cr, c_bnd, eikmin, z_par, lref, sou_cr])
 
-        # Sort the list by the minimum Eikonal and then by the maximum velocity
+         # Sort the list by the minimum Eikonal and then by the maximum velocity
         return sorted(eik_bnd, key=lambda x: (x[2], -x[1]))

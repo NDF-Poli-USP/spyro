@@ -1,8 +1,8 @@
 import firedrake as fire
-import finat
 import numpy as np
 from sys import float_info, exit
 from spyro.utils.error_management import clean_inst_num, value_parameter_error
+from spyro.domains.quadrature import quadrature_rules   
 
 # Work from Ruben Andres Salas, Andre Luis Ferreira da Silva,
 # Luis Fernando Nogueira de Sá, Emilio Carlos Nelli Silva.
@@ -157,7 +157,7 @@ class Eikonal_Modeling():
         '''
 
         # Extract node positions
-        z_data, x_data = node_positions[:2]
+        z_data, x_data = node_positions[:, 0], node_positions[:, 1]    
 
         # Identify source indices in the mesh
         it = int(-1)
@@ -174,7 +174,7 @@ class Eikonal_Modeling():
                                     )[0] for z_s, x_s in self.source_locations]
 
             if self.dimension == 3:  # 3D
-                y_data = node_positions[2]
+                y_data = node_positions[:, 2]
                 sou_ids = [np.where(np.isclose(
                     z_data, z_s, atol=tol_node)
                     & np.isclose(x_data, x_s, atol=tol_node)
@@ -212,10 +212,9 @@ class Eikonal_Modeling():
         '''
 
         if self.ele_type == 'CG':
-            dx = fire.dx  # At least: degree=2*self.p_eik
-        elif self.ele_type == 'KMV':  # ToDo - Can I use quadrature.py?
-            quad_rule = finat.quadrature.make_quadrature(
-                V.finat_element.cell, self.p_eik, self.ele_type)
+            dx = fire.dx  # At least: degree = 2 * p_eik
+        elif self.ele_type == 'KMV':
+            quad_rule = quadrature_rules(V)[0]
             dx = fire.dx(**quad_rule)
 
         return dx
