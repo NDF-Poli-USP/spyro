@@ -189,18 +189,27 @@ class HABC_Mesh():
         if self.dimension == 3:  # 3D
             y_data = node_positions[2]
             self.bnd_nodes += (y_data[self.bnds],)
+        del node_positions
 
-        # Get extreme values of the velocity model on the boundary
-        mask_boundary = np.isin(
-            np.asarray(self.bnd_nodes).T,
+        # Get extreme values of the velocity on the boundary excluding free surfaces
+        all_bnd_nodes = []
+        for (bnd_ids, status) in self.mesh_parameters.boundary_nodes_ids.values():
+            if status:
+                all_bnd_nodes.append(bnd_ids)
+        all_bnd_nodes = np.unique(np.concatenate(all_bnd_nodes))
+        node_positions = self.mesh_ops.extract_node_positions(self.mesh,
+                                                              self.function_space,
+                                                              output_type="array")
+        mask_boundary = np.isin(node_positions[all_bnd_nodes,:], 
             self.mesh_original.coordinates.dat.data_with_halos).all(axis=1)
         vel_on_boundary = \
             point_cloud_field(self.mesh_original,
                               np.asarray(self.bnd_nodes).T[mask_boundary],
                               self.initial_velocity_model,
                               self.mesh_parameters.tol).dat.data_with_halos[:]
-        self.c_bnd_min = vel_on_boundary[vel_on_boundary > 0.].min()
-        self.c_bnd_max = vel_on_boundary[vel_on_boundary > 0.].max()
+        decimal = int(abs(np.log10(self.mesh_parameters.tol)))
+        self.c_bnd_min = round(vel_on_boundary[vel_on_boundary > 0.].min(), decimal)
+        self.c_bnd_max = round(vel_on_boundary[vel_on_boundary > 0.].max(), decimal)
 
         # Print on screen
         cbnd_str = "Boundary Velocity Range (km/s): {:.3f} - {:.3f}"

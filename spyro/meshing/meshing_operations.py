@@ -311,7 +311,7 @@ class MeshOps():
             Mapping of boundary IDs for applying absorbing boundary conditions
         boundary_nodes_ids: `dict`
             IDs of the boundary nodes according to the function space provide and their
-            status to apply absorbing boundary conditions. Structure:
+            status to apply absorbing boundary conditions. Structure is a `tuple`:
             boundary_nodes_ids[key_bnd] = (bnd_node_ids, status) where key_bnd is 'Imin'
             or 'Imax' with I = Z, X or Y, and status is a boolean from boundary_ids_map. 
         """
