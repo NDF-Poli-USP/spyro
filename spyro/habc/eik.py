@@ -104,16 +104,16 @@ class HABC_Eikonal(Eikonal_Modeling):
         # Minimum velocity value in the model
         self.c_min = Wave.c_min
 
-        # Absorbing boundaries  
+        # Absorbing boundaries
         self.boundaries = Wave.get_absorbing_boundaries()
 
-        # Mesh operations   
+        # Mesh operations
         self.mesh_ops = Wave.mesh_ops
 
         # Extract node positions
         self.node_positions = self.mesh_ops.extract_node_positions(self.mesh,
-                                                              self.funct_space_eik,
-                                                              output_type="array")
+                                                                   self.funct_space_eik,
+                                                                   output_type="array")
 
         # Tolerance for identifying minimum Eikonal values on boundaries
         self.node_tol = Wave.mesh_parameters.tol
@@ -139,8 +139,8 @@ class HABC_Eikonal(Eikonal_Modeling):
 
         print("\nDefining Eikonal BCs")
 
-        # Define Eikonal BCs and source marker  
-        self.bcs_eik, sou_marker = self.eikonal_bcs(self.node_positions, 
+        # Define Eikonal BCs and source marker
+        self.bcs_eik, sou_marker = self.eikonal_bcs(self.node_positions,
                                                     self.funct_space_eik,
                                                     self.lmin)
 
@@ -238,7 +238,7 @@ class HABC_Eikonal(Eikonal_Modeling):
 
             # Identify critical point coordinates
             pt_cr = self.node_positions[idxmin, :]
-            
+
             # Identifying propagation speed at critical point
             c_bnd = np.float64(self.c.at(pt_cr).item())
 
@@ -259,5 +259,5 @@ class HABC_Eikonal(Eikonal_Modeling):
             # Grouping properties
             eik_bnd.append([pt_cr, c_bnd, eikmin, z_par, lref, sou_cr])
 
-         # Sort the list by the minimum Eikonal and then by the maximum velocity
+        # Sort the list by the minimum Eikonal and then by the maximum velocity
         return sorted(eik_bnd, key=lambda x: (x[2], -x[1]))
