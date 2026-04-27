@@ -240,7 +240,7 @@ class MeshOps():
 
         Returns
         -------
-        node_positions : `tuple` or `array` 
+        node_positions : `tuple` or `array`
             Node positions of the mesh
             If output_type is "tuple":
                 - (z_data, x_data) for 2D
@@ -316,7 +316,7 @@ class MeshOps():
             IDs of the boundary nodes according to the function space provide and their
             status to apply absorbing boundary conditions. Structure is a `tuple`:
             boundary_nodes_ids[key_bnd] = (bnd_node_ids, status) where key_bnd is 'Imin'
-            or 'Imax' with I = Z, X or Y, and status is a boolean from boundary_ids_map. 
+            or 'Imax' with I = Z, X or Y, and status is a boolean from boundary_ids_map.
         """
 
         if box_domain:
