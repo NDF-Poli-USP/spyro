@@ -176,17 +176,17 @@ class HABC_Mesh():
                 all_bnd_nodes.append(bnd_ids)
         all_bnd_nodes = np.unique(np.concatenate(all_bnd_nodes))
         coord_msh = self.mesh_original.coordinates.dat.data_with_halos
-        coord_bnd = node_positions[all_bnd_nodes,:]
+        coord_bnd = node_positions[all_bnd_nodes, :]
         msh_view = coord_msh.view([('', coord_msh.dtype)] * coord_msh.shape[1])
         bnd_view = coord_bnd.view([('', coord_bnd.dtype)] * coord_bnd.shape[1])
         mask_boundary = np.where(np.isin(msh_view, bnd_view))[0]
-    
+
         # Create a point cloud to get the extreme velocity values on the boundary
         ptos_bnd = self.mesh_original.coordinates.dat.data_with_halos[mask_boundary, :]
         vel_on_boundary = point_cloud_field(
             self.mesh_original, ptos_bnd, self.initial_velocity_model,
             self.mesh_parameters.tol).dat.data_with_halos[:]
-        
+
         # Get extreme values of the velocity on the boundary excluding free surfaces
         decimal = int(abs(np.log10(self.mesh_parameters.tol)))
         self.c_bnd_min = round(vel_on_boundary[vel_on_boundary > 0.].min(), decimal)

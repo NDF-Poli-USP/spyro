@@ -168,11 +168,11 @@ class Wave(Model_parameters, metaclass=ABCMeta):
         """
         boundaries = (self.absorb_top, self.absorb_bottom,
                       self.absorb_right, self.absorb_left)
-        
+
         if self.dimension == 3:
             boundaries += (self.absorb_front, self.absorb_back,)
 
-        return boundaries   
+        return boundaries
 
     def building_mesh_derived_paramenters(self):
         """Build parameters that are derived from the mesh."""
@@ -190,9 +190,9 @@ class Wave(Model_parameters, metaclass=ABCMeta):
 
         # Build the boundary ID mapping
         # TODO: Include the logic for hypershape layer from HABC
-        boundaries = self.get_absorbing_boundaries()    
-        if not (self.abc_boundary_layer_shape == 'hypershape' and 
-            hasattr(self.mesh_parameters, 'boundary_ids_map')):
+        boundaries = self.get_absorbing_boundaries()
+        if not (self.abc_boundary_layer_shape == 'hypershape'
+                and hasattr(self.mesh_parameters, 'boundary_ids_map')):
             self.mesh_parameters.boundary_ids_map, \
                 self.mesh_parameters.boundary_nodes_ids = \
                 self.mesh_ops.mapping_boundary_ids(self.mesh, self.function_space,
