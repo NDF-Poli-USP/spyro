@@ -80,7 +80,7 @@ def test_forward_supershot():
     Wave_obj.forward_solve()
     comm = Wave_obj.comm
 
-    rec_out = Wave_obj.receivers_output
+    rec_out = Wave_obj.forward_solution_receivers
     if comm.comm.rank == 0:
         analytical_p = spyro.utils.nodal_homogeneous_analytical(Wave_obj, 0.2, 1.5, n_extra=100)
     else:
