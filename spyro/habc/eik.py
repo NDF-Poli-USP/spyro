@@ -183,8 +183,8 @@ class HABC_Eikonal(Eikonal_Modeling):
         -------
         eikmin : `float`
             Minimum eikonal value
-        idxmin : 'int'
-            Array index corresponding to the minimum eikonal value
+        pnt_crit : `array`
+            Critical point coordinates
         '''
 
         # Create a point cloud to get the minimum eikonal value on the boundary
@@ -194,9 +194,11 @@ class HABC_Eikonal(Eikonal_Modeling):
 
         # Identify minimum Eikonal value on the boundary
         eikmin = eik_on_boundary.min()
-        idxmin = eik_on_boundary.argmin()
 
-        return eikmin, idxmin
+        # Identify critical point coordinates
+        pnt_crit = ptos_bnd[eik_on_boundary.argmin(), :]
+
+        return eikmin, pnt_crit
 
     def ident_crit_eik(self):
         '''
@@ -210,13 +212,13 @@ class HABC_Eikonal(Eikonal_Modeling):
         -------
         eik_bnd: `list`
             Properties on boundaries according to minimum values of Eikonal
-            Structure sublist: [pt_cr, c_bnd, eikmin, z_par, lref, sou_cr]
-            - pt_cr : Critical point coordinates
+            Structure sublist: [pnt_crit, c_bnd, eikmin, z_par, lref, sou_crit]
+            - pnt_crit : Critical point coordinates
             - c_bnd : Propagation speed at critical point
             - eikmin : Eikonal value in seconds
             - z_par : Inverse of minimum Eikonal (Equivalent to c_bound/lref)
             - lref : Distance to the closest source from critical point
-            - sou_cr : Critical source coordinates
+            - sou_crit : Critical source coordinates
         '''
 
         # Build the boundary ID mapping
@@ -233,31 +235,28 @@ class HABC_Eikonal(Eikonal_Modeling):
             if not status:
                 continue
 
-            # Identify minimum Eikonal value on the boundary
-            eikmin, idxmin = self.ident_eik_on_bnd(bnd_ids)
-
-            # Identify critical point coordinates
-            pt_cr = self.node_positions[idxmin, :]
+            # Identify minimum Eikonal and critical point on the boundary
+            eikmin, pnt_crit = self.ident_eik_on_bnd(bnd_ids)
 
             # Identifying propagation speed at critical point
-            c_bnd = np.float64(self.c.at(pt_cr).item())
+            c_bnd = np.float64(self.c.at(pnt_crit).item())
 
             # Print critical point coordinates
             pnt_str = "at (in km): ({2:3.3f}, {3:3.3f})"
             if self.dimension == 3:  # 3D
                 pnt_str = pnt_str[:-1] + ", {4:3.3f})"
-            print((eik_str + pnt_str).format(bnd_str, 1e3 * eikmin, *pt_cr))
+            print((eik_str + pnt_str).format(bnd_str, 1e3 * eikmin, *pnt_crit))
 
             # Identify closest source
             lref_allsou = np.linalg.norm(
-                np.asarray(pt_cr) - np.asarray(self.source_locations), axis=1)
+                np.asarray(pnt_crit) - np.asarray(self.source_locations), axis=1)
             idxsou = lref_allsou.argmin()
             lref = lref_allsou[idxsou]
-            sou_cr = self.source_locations[idxsou]
+            sou_crit = self.source_locations[idxsou]
             z_par = 1. / eikmin
 
             # Grouping properties
-            eik_bnd.append([pt_cr, c_bnd, eikmin, z_par, lref, sou_cr])
+            eik_bnd.append([pnt_crit, c_bnd, eikmin, z_par, lref, sou_crit])
 
         # Sort the list by the minimum Eikonal and then by the maximum velocity
         return sorted(eik_bnd, key=lambda x: (x[2], -x[1]))
