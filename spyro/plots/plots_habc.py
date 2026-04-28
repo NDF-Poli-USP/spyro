@@ -202,7 +202,7 @@ def plot_hist_receivers(Wave_object, show=False):
     for rec in range(num_recvs):
 
         # Plot the receiver data
-        rc_dat = Wave_object.receivers_output[:, rec]
+        rc_dat = Wave_object.forward_solution_receivers[:, rec]
         rf_dat = Wave_object.receivers_reference[:, rec]
         axes[rec].plot(t_rec, rc_dat, color=cl_rc, linestyle='-', linewidth=2)
         axes[rec].plot(t_rec, rf_dat, color=cl_rf, linestyle='--', linewidth=2)
