@@ -25,6 +25,8 @@ class HABC_Mesh():
 
     Attributes
     ----------
+    bnd_nodes : `array`
+        Mesh node coordinates on boundaries of the original domain.
     c_bnd_min : `float`
         Minimum velocity value on the boundary of the original domain
     c_bnd_max : `float`
@@ -180,6 +182,7 @@ class HABC_Mesh():
         msh_view = coord_msh.view([('', coord_msh.dtype)] * coord_msh.shape[1])
         bnd_view = coord_bnd.view([('', coord_bnd.dtype)] * coord_bnd.shape[1])
         mask_boundary = np.where(np.isin(msh_view, bnd_view))[0]
+        self.bnd_nodes = coord_bnd
 
         # Create a point cloud to get the extreme velocity values on the boundary
         ptos_bnd = self.mesh_original.coordinates.dat.data_with_halos[mask_boundary, :]
@@ -615,9 +618,7 @@ class HABC_Mesh():
         coord_rec = rec_mesh.coordinates.dat.data_with_halos
 
         # Create KDTree for efficient nearest neighbor search
-        boundary_coords = np.column_stack((self.bnd_nodes[0],
-                                           self.bnd_nodes[1]))
-        boundary_tree = cKDTree(boundary_coords)
+        boundary_tree = cKDTree(self.bnd_nodes)
 
         # Add all vertices from rectangular mesh and create mapping
         rec_map = {}
