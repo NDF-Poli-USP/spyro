@@ -70,7 +70,7 @@ def test_forward_3_shots():
 
     comm = Wave_obj.comm
 
-    arr = Wave_obj.receivers_output
+    arr = Wave_obj.forward_solution_receivers
 
     if comm.ensemble_comm.rank == 0:
         analytical_p = spyro.utils.nodal_homogeneous_analytical(
