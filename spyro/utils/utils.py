@@ -5,8 +5,10 @@ from mpi4py import MPI
 import os
 from scipy.signal import butter, filtfilt
 import warnings
+
 from ..io import ensemble_functional
 from ..io import parallel_print
+from .typing import FunctionalEvaluationMode, FunctionalType
 try:
     from SeismicMesh import write_velocity_model
     SEISMIC_MESH_AVAILABLE = True
@@ -46,26 +48,36 @@ def butter_lowpass_filter(shot, cutoff, fs, order=2):
 
 
 @ensemble_functional
-def compute_functional(Wave_object, residual):
-    """Compute the functional to be optimized.
+def compute_functional(
+    wave_object, misfit, evaluation_mode=FunctionalEvaluationMode.AFTER_SOLVE, step=None, nsteps=None,
+    functional_form=FunctionalType.L2Norm
+):
+    """Compute the functional value for the given misfit at receiver
+    locations.
 
-    Computes the L2 norm of the residual at receiver locations,
-    integrated over time using the trapezoidal rule. This functional
-    is commonly used in classical full waveform inversion (FWI) as the
+    This functional is commonly used in classical full waveform inversion (FWI)
+    as the
     measure to be minimized.
 
     Parameters
     ----------
-    Wave_object : object
+    wave_object : object
         Wave propagation object containing simulation parameters.
         Must have attributes:
         - number_of_receivers : int
             Number of receivers in the simulation.
         - dt : float
             Time step size.
-    residual : numpy.ndarray
-        Residual array of shape (n_time_steps, n_receivers) containing
+    misfit : numpy.ndarray
+        Misfit array of shape (n_time_steps, n_receivers) containing
         the difference between observed and real (or synthetic) data.
+    evaluation_mode : FunctionalEvaluationMode, optional
+        The mode in which to evaluate the functional. Default is
+        FunctionalEvaluationMode.AFTER_SOLVE.
+    step : int, optional
+        Current time step index. Required if evaluation_mode is PER_TIMESTEP.
+    nsteps : int, optional
+        Total number of time steps. Required if evaluation_mode is PER_TIMESTEP.
 
     Returns
     -------
@@ -77,17 +89,36 @@ def compute_functional(Wave_object, residual):
     The functional is computed as:
 
     .. math::
-        J = \\frac{1}{2} \\sum_{r=1}^{N_r} \\int_0^T (residual_r(t))^2 dt
+        J = \\frac{1}{2} \\sum_{r=1}^{N_r} \\int_0^T (misfit_r(t))^2 dt
 
     where :math:`N_r` is the number of receivers and :math:`T` is the
     total simulation time.
     """
-    num_receivers = Wave_object.number_of_receivers
-    dt = Wave_object.dt
+    if functional_form != FunctionalType.L2Norm:
+        raise NotImplementedError(
+            f"Functional form {functional_form} not implemented. Only L2Norm"
+            " is currently supported.")
+    if evaluation_mode == FunctionalEvaluationMode.PER_TIMESTEP:
+        weight = 0.5 if step == 0 or step == nsteps - 1 else 1.0
+
+        if wave_object.use_vertex_only_mesh:
+            return assemble(
+                0.5 * wave_object.dt * weight
+                * inner(misfit, misfit) * dx
+            )
+        elif isinstance(misfit, np.ndarray):
+            return np.sum(misfit**2) * (0.5 * wave_object.dt * weight)
+        else:
+            raise ValueError(
+                "Expected misfit to be a numpy array when not using vertex-only mesh."
+            )
+
+    num_receivers = wave_object.number_of_receivers
+    dt = wave_object.dt
 
     J = 0
     for rn in range(num_receivers):
-        J += np.trapezoid(residual[:, rn] ** 2, dx=dt)
+        J += np.trapezoid(misfit[:, rn] ** 2, dx=dt)
 
     J *= 0.5
 
@@ -747,3 +778,48 @@ def write_hdf5_velocity_model(obj_with_comm, segy_filename):
 #         (time**2) * sin(pi * z) * sin(pi * x)  # noqa: F405
 #     )
 #     return p
+
+def get_real_shot_record(wave_object):
+    """Get the real shot record for the active sources.
+
+    The returned object is typically an array with shape
+    ``(n_timesteps, n_receivers)`` for a single active shot.
+    """
+    real_shot_record = wave_object.real_shot_record
+
+    if real_shot_record is None:
+        raise ValueError(
+            "Set wave.real_shot_record before enabling functional "
+            "accumulation during the forward solve."
+        )
+
+    if (
+        not isinstance(wave_object.current_sources, (list, tuple))
+        or len(wave_object.current_sources) == 0
+    ):
+        raise ValueError(
+            "Current sources must be set to a non-empty list or tuple "
+            "before retrieving the real shot record."
+        )
+
+    if isinstance(real_shot_record, np.ndarray):
+        if real_shot_record.ndim == 3:
+            return real_shot_record[wave_object.current_sources[0]]
+        if real_shot_record.ndim == 2:
+            return real_shot_record
+
+    if isinstance(real_shot_record, (list, tuple)):
+        if (
+            self.current_sources is not None
+            and len(real_shot_record) > self.current_sources[0]
+        ):
+            source_record = real_shot_record[self.current_sources[0]]
+            if isinstance(source_record, np.ndarray) and source_record.ndim == 2:
+                return source_record
+
+    return real_shot_record
+
+
+def get_real_shot_step(wave_object, step):
+    """Get one time step from the real shot record for the active sources."""
+    return get_real_shot_record(wave_object)[step]

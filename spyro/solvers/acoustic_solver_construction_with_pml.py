@@ -28,7 +28,6 @@ def construct_solver_or_matrix_with_pml_2d(Wave_object):
     W = V * Z
     Wave_object.mixed_function_space = W
     dxlump = dx(**Wave_object.quadrature_rule)
-    dslump = ds(**Wave_object.surface_quadrature_rule)
 
     u, pp = fire.TrialFunctions(W)
     v, qq = fire.TestFunctions(W)
@@ -55,7 +54,22 @@ def construct_solver_or_matrix_with_pml_2d(Wave_object):
     m1 = ((u - 2.0 * u_n + u_nm1) / Constant(dt**2)) * v * dxlump
     a = c * c * dot(grad(u_n), grad(v)) * dxlump  # explicit
 
-    nf = c * ((u_n - u_nm1) / dt) * v * dslump
+    # First-order ABC on outer PML boundaries only (not the free surface).
+    # Firedrake documents the base facet labels in
+    # firedrake.utility_meshes.RectangleMesh/TensorRectangleMesh:
+    # https://www.firedrakeproject.org/_modules/firedrake/utility_meshes.html#RectangleMesh
+    # Spyro builds RectangleMesh(nz, nx, length_z, length_x) and negates
+    # Firedrake's first coordinate, so the labels map here as:
+    #   1 = top (z = 0, free surface), 2 = bottom, 3 = left, 4 = right
+    qr_s = Wave_object.surface_quadrature_rule
+    abc_expr = c * ((u_n - u_nm1) / dt) * v
+    nf = (
+        abc_expr * ds(2, **qr_s)
+        + abc_expr * ds(3, **qr_s)
+        + abc_expr * ds(4, **qr_s)
+    )
+    if Wave_object.absorb_top:
+        nf += abc_expr * ds(1, **qr_s)
 
     FF = m1 + a + nf
 
@@ -95,7 +109,6 @@ def construct_solver_or_matrix_with_pml_3d(Wave_object):
     W = V * V * Z
     Wave_object.mixed_function_space = W
     dxlump = dx(**Wave_object.quadrature_rule)
-    dslump = ds(**Wave_object.surface_quadrature_rule)
 
     u, psi, pp = fire.TrialFunctions(W)
     v, phi, qq = fire.TestFunctions(W)
@@ -138,7 +151,24 @@ def construct_solver_or_matrix_with_pml_3d(Wave_object):
     m1 = ((u - 2.0 * u_n + u_nm1) / Constant(dt**2)) * v * dxlump
     a = c * c * dot(grad(u_n), grad(v)) * dxlump  # explicit
 
-    nf = c * ((u_n - u_nm1) / dt) * v * dslump
+    # First-order ABC on outer PML boundaries only (not the free surface).
+    # Firedrake documents the base facet labels in
+    # firedrake.utility_meshes.BoxMesh/TensorBoxMesh:
+    # https://www.firedrakeproject.org/_modules/firedrake/utility_meshes.html#BoxMesh
+    # Spyro builds BoxMesh(nz, nx, ny, length_z, length_x, length_y) and
+    # negates Firedrake's first coordinate, so ds(1) is the top free surface
+    # (z = 0) and ds(2) is the bottom boundary.
+    qr_s = Wave_object.surface_quadrature_rule
+    abc_expr = c * ((u_n - u_nm1) / dt) * v
+    nf = (
+        abc_expr * ds(2, **qr_s)
+        + abc_expr * ds(3, **qr_s)
+        + abc_expr * ds(4, **qr_s)
+        + abc_expr * ds(5, **qr_s)
+        + abc_expr * ds(6, **qr_s)
+    )
+    if Wave_object.absorb_top:
+        nf += abc_expr * ds(1, **qr_s)
 
     FF = m1 + a + nf
 

@@ -38,7 +38,7 @@ def plot_shots(
     ----------
     Wave_object : Wave
         Wave simulation object containing the shot record data in the
-        receivers_output attribute, along with timing and receiver information.
+        forward_solution_receivers attribute, along with timing and receiver information.
     show : bool, optional
         If True, display the plot interactively. Default is False.
     file_name : str, optional
@@ -60,7 +60,7 @@ def plot_shots(
         Index of the last receiver to plot. If 0, uses all receivers.
         Default is 0.
     out_index : int, optional
-        Index for selecting a specific output dimension from receivers_output.
+        Index for selecting a specific output dimension from forward_solution_receivers.
         If None, uses the entire array. Default is None.
 
     Returns
@@ -87,9 +87,9 @@ def plot_shots(
     tf = Wave_object.final_time
 
     if out_index is None:
-        arr = Wave_object.receivers_output
+        arr = Wave_object.forward_solution_receivers
     else:
-        arr = Wave_object.receivers_output[:, :, out_index]
+        arr = Wave_object.forward_solution_receivers[:, :, out_index]
 
     nt = int(tf / dt) + 1  # number of timesteps
 
@@ -429,7 +429,7 @@ def plot_hist_receivers(Wave_object, show=False):
     Wave_object : Wave
         The Wave object containing the simulation results. Must have the
         following attributes:
-        - receivers_output: Computed receiver data
+        - forward_solution_receivers: Computed receiver data
         - receivers_reference: Reference receiver data
         - dt: Time step
         - final_time: Final simulation time
@@ -478,7 +478,7 @@ def plot_hist_receivers(Wave_object, show=False):
     for rec in range(num_recvs):
 
         # Plot the receiver data
-        rc_dat = Wave_object.receivers_output[:, rec]
+        rc_dat = Wave_object.forward_solution_receivers[:, rec]
         rf_dat = Wave_object.receivers_reference[:, rec]
         axes[rec].plot(t_rec, rc_dat, color=cl_rc, linestyle='-', linewidth=2)
         axes[rec].plot(t_rec, rf_dat, color=cl_rf, linestyle='--', linewidth=2)
