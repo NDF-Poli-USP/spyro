@@ -19,21 +19,11 @@ fire.interpolate = interpolate
 
 
 class HABC_Mesh():
-    '''
+    """
     Class for HABC mesh generation
 
     Attributes
     ----------
-    func_space_type, `str`
-        Type of function space for the state variable.
-        Options: 'scalar' or 'vector'. Default is None
-
-    bnds : 'array'
-        Mesh node indices on boundaries of the original domain
-    bnd_nodes : `tuple`
-        Mesh node coordinates on boundaries of the origianl domain.
-        - (z_data[bnds], x_data[bnds]) for 2D
-        - (z_data[bnds], x_data[bnds], y_data[bnds]) for 3D
     c : `Firedrake.Function`
         Velocity model without absorbing layer
     c_bnd_min : `float`
@@ -59,7 +49,9 @@ class HABC_Mesh():
         Factor for the stabilizing term in Eikonal Eq. Default is 0.03
     funct_space_eik: `Firedrake.FunctionSpace`
         Function space for the Eikonal modeling
-
+    func_space_type, `str`
+        Type of function space for the state variable.
+        Options: 'scalar' or 'vector'. Default is None
     mesh_original : `firedrake mesh`
         Original mesh without absorbing layer
     mesh_parameters.alpha : `float`
@@ -79,47 +71,36 @@ class HABC_Mesh():
     quadrilateral : bool
         Flag to indicate whether to use quadrilateral/hexahedral elements
 
+    Migrate:
+    bnds : 'array'
+        Mesh node indices on boundaries of the original domain
+    bnd_nodes : `tuple`
+        Mesh node coordinates on boundaries of the origianl domain.
+        - (z_data[bnds], x_data[bnds]) for 2D
+        - (z_data[bnds], x_data[bnds], y_data[bnds]) for 3D
+
     Methods
     -------
     bnd_pnts_hyp_2D()
         Generate points on the boundary of a hyperellipse
     build_hyp_mesh_3D()
         Build a hyperellipsoidal mesh from a box mesh by snapping the boundary
-    clipping_coordinates_lay_field()
-        Generate a field with clipping coordinates to the original boundary
     create_bnd_mesh_2D()
         Generate the boundary segment curves for the hyperellipse boundary mesh
     create_hyp_trunc_mesh_2D()
         Generate the mesh for the hyperelliptical absorbing layer
-    extend_velocity_profile()
-        Extend the velocity profile inside the absorbing layer
-    extract_bnd_node_indices()
-        Extract boundary node indices on boundaries of the domain
-        excluding the free surface at the top boundary
-    get_spatial_coordinates_habc()
-        Get the ufl coordinates of the mesh with absorbing layer.
     hypershape_mesh_habc()
         Generate a mesh with a hypershape absorbing layer
     inside_hyp_3D()
         Check if a point is inside a hyperellipsoid
-    layer_boundary_data()
-        Generate the boundary data from the domain with the absorbing layer
-    layer_mask_field()
-        Generate a mask for the absorbing layer
     merge_mesh_2D()
         Merge the rectangular and the hyperelliptical meshes
-    original_boundary_data()
-        Generate the boundary data from the original domain mesh
-    point_cloud_field()
-        Create a field on a point cloud from a parent mesh and field
     preamble_mesh_operations()
         Perform mesh operations previous to size an absorbing layer
     properties_eik_mesh()
         Set the properties for the mesh used to solve the Eikonal equation
     radial_project_on_hyp_3D()
         Project a point radially onto the hyperellipsoid surface
-    rectangular_mesh_habc()
-        Generate a rectangular mesh with an absorbing layer
     sharp_mesh_3D()
         Generate a sharp mesh by cutting the rectangular mesh
         with the hyperellipsoid surface
@@ -127,11 +108,21 @@ class HABC_Mesh():
         Snap boundary nodes of a sharp mesh to the hyperellipsoid surface
     trunc_hyp_bndpts_2D()
         Generate the boundary points for a truncated hyperellipse
-    '''
+
+    # Migrate
+    get_spatial_coordinates_habc()
+        Get the ufl coordinates of the mesh with absorbing layer.
+    layer_boundary_data()
+        Generate the boundary data from the domain with the absorbing layer
+    original_boundary_data()
+        Generate the boundary data from the original domain mesh
+    rectangular_mesh_habc()
+        Generate a rectangular mesh with an absorbing layer
+    """
 
     def __init__(self, domain_dim, dimension=2, quadrilateral=False,
                  func_space_type=None, comm=None):
-        '''
+        """
         Initialize the HABC_Mesh class
 
         Parameters
@@ -152,7 +143,7 @@ class HABC_Mesh():
         Returns
         -------
         None
-        '''
+        """
 
         # Original domain dimensions
         self.domain_dim = domain_dim
@@ -176,7 +167,7 @@ class HABC_Mesh():
                                            comm=comm)
 
     def original_boundary_data(self):
-        '''
+        """
         Generate the boundary data from the original domain mesh
 
         Parameters
@@ -186,7 +177,7 @@ class HABC_Mesh():
         Returns
         -------
         None
-        '''
+        """
 
         # Extract node positions
         node_positions = self.mesh_ops.extract_node_positions(self.mesh,
@@ -223,7 +214,7 @@ class HABC_Mesh():
         print(cbnd_str.format(self.c_bnd_min, self.c_bnd_max), flush=True)
 
     def properties_eik_mesh(self, p_usu=None, ele_type='CG', f_est=0.03):
-        '''
+        """
         Set the properties for the mesh used to solve the Eikonal equation
 
         Parameters
@@ -238,7 +229,7 @@ class HABC_Mesh():
         Returns
         -------
         None
-        '''
+        """
 
         # Setting the properties of the mesh used to solve the Eikonal equation
         self.ele_type_eik = ele_type
@@ -251,7 +242,7 @@ class HABC_Mesh():
         self.f_est = f_est
 
     def preamble_mesh_operations(self, f_est=0.03):
-        '''
+        """
         Perform mesh operations previous to size an absorbing layer
 
         Parameters
@@ -262,7 +253,7 @@ class HABC_Mesh():
         Returns
         -------
         None
-        '''
+        """
 
         print("\nCreating Mesh and Initial Velocity Model", flush=True)
 
@@ -315,7 +306,7 @@ class HABC_Mesh():
         self.properties_eik_mesh(p_usu=self.abc_deg_eikonal, f_est=f_est)
 
     def rectangular_mesh_habc(self, dom_lay, pad_len):
-        '''
+        """
         Generate a rectangular mesh with an absorbing layer
 
         Parameters
@@ -331,7 +322,7 @@ class HABC_Mesh():
         -------
         mesh_habc : `firedrake mesh`
             Rectangular mesh with an absorbing layer.
-        '''
+        """
 
         # Domain dimensions
         Lx, Lz = self.domain_dim[:2]
@@ -405,7 +396,7 @@ class HABC_Mesh():
 
     @staticmethod
     def bnd_pnts_hyp_2D(a, b, n, num_pts):
-        '''
+        """
         Generate points on the boundary of a hyperellipse.
 
         'Parameters
@@ -424,7 +415,7 @@ class HABC_Mesh():
         bnd_pnts : `array`
             Array of shape (num_pts, 2) containing the coordinates
             of the hyperellipse boundary points
-        '''
+        """
 
         # Generate angle values for the parametric equations
         theta = np.linspace(0., 2. * np.pi, num_pts)
@@ -448,7 +439,7 @@ class HABC_Mesh():
         return bnd_pnts
 
     def trunc_hyp_bndpts_2D(self, hyp_par, xdom, z0):
-        '''
+        """
         Generate the boundary points for a truncated hyperellipse
 
         Parameters
@@ -485,7 +476,7 @@ class HABC_Mesh():
                 Number of filtered boundary points
             - ltrunc : `float`
                 Mesh size for arc length due to the truncation operation
-        '''
+        """
 
         # Hyperellipse parameters
         n_hyp, perimeter, a_hyp, b_hyp = hyp_par
@@ -543,7 +534,7 @@ class HABC_Mesh():
         return filt_bnd_pts, trunc_feat
 
     def create_bnd_mesh_2D(self, geo, bnd_pts, trunc_feat, spln):
-        '''
+        """
         Generate the boundary segments for the hyperellipse boundary mesh
 
         Parameters
@@ -572,7 +563,7 @@ class HABC_Mesh():
         curves : `list`
             List of curves to be added to the geometry object. Each curve is
             represented as a list containing the curve type and its points.
-        '''
+        """
 
         ini_trunc, end_trunc, num_bnd_pts, ltrunc = trunc_feat
 
@@ -618,7 +609,7 @@ class HABC_Mesh():
         return curves
 
     def create_hyp_trunc_mesh_2D(self, hyp_par, spln=True):
-        '''
+        """
         Generate the mesh for the hyperelliptical absorbing layer
 
         Parameters
@@ -641,7 +632,7 @@ class HABC_Mesh():
         -------
         hyp_mesh : `netgen mesh`
             Generated mesh for the hyperelliptical layer
-        '''
+        """
 
         # Domain dimensions
         Lx, Lz = self.domain_dim[:2]
@@ -710,7 +701,7 @@ class HABC_Mesh():
         return hyp_mesh
 
     def merge_mesh_2D(self, rec_mesh, hyp_mesh):
-        '''
+        """
         Merge the rectangular and the hyperelliptical meshes
 
         Parameters
@@ -724,7 +715,7 @@ class HABC_Mesh():
         -------
         final_mesh : `firedrake mesh`
             Merged final mesh
-        '''
+        """
 
         # Create the final mesh that will contain both
         final_mesh = Mesh()
@@ -816,7 +807,7 @@ class HABC_Mesh():
 
     @staticmethod
     def inside_hyp_3D(pnt, a, b, c, n):
-        '''
+        """
         Check if a point is inside a hyperellipsoid
 
         Parameters
@@ -836,7 +827,7 @@ class HABC_Mesh():
         -------
         in_hyp : `bool`
             True if the point is inside the hyperellipsoid, False otherwise
-        '''
+        """
 
         # Evaluate hyperellipsoid equation
         x, y, z = pnt
@@ -845,7 +836,7 @@ class HABC_Mesh():
         return in_hyp
 
     def sharp_mesh_3D(self, rec_mesh, hyp_par, centroid):
-        '''
+        """
         Generate a sharp mesh by cutting the rectangular mesh
         with the hyperellipsoid surface
 
@@ -873,7 +864,7 @@ class HABC_Mesh():
         -------
         sharp_mesh : `firedrake mesh`
             Generated sharp mesh
-        '''
+        """
 
         # Hyperellipsoid parameters
         n_hyp, _, a_hyp, b_hyp, c_hyp = hyp_par
@@ -927,7 +918,7 @@ class HABC_Mesh():
 
     @staticmethod
     def radial_project_on_hyp_3D(p_to_snap, centroid, a, b, c, n):
-        '''
+        """
         Project a point radially onto the hyperellipsoid surface
 
         Parameters
@@ -949,7 +940,7 @@ class HABC_Mesh():
         -------
         q_snapped : `array`
             Projected point (x', y', z')
-        '''
+        """
 
         # Vector from centroid to the point
         d = p_to_snap - centroid
@@ -968,7 +959,7 @@ class HABC_Mesh():
         return q_snapped
 
     def snap_nodes_to_hyp(self, mesh, hyp_par, centroid, plane_tol=1e-5):
-        '''
+        """
         Snap boundary nodes of a sharp mesh to the hyperellipsoid surface
 
         Parameters
@@ -997,7 +988,7 @@ class HABC_Mesh():
         -------
         mesh : `firedrake mesh`
             Modified mesh with snapped boundary nodes
-        '''
+        """
 
         # Hyperellipsoid parameters
         n_hyp, _, a_hyp, b_hyp, c_hyp = hyp_par
@@ -1034,7 +1025,7 @@ class HABC_Mesh():
         return mesh
 
     def build_hyp_mesh_3D(self, rec_mesh, hyp_par, plane_tol=1e-5):
-        '''
+        """
         Build a hyperellipsoidal mesh from a box mesh by snapping the boundary
 
         Parameters
@@ -1061,7 +1052,7 @@ class HABC_Mesh():
         -------
         final_mesh : `firedrake mesh`
             Merged final mesh
-        '''
+        """
 
         # Original domain dimensions
         Lx, Lz, Ly = self.domain_dim
@@ -1079,7 +1070,7 @@ class HABC_Mesh():
         return final_mesh
 
     def hypershape_mesh_habc(self, hyp_par, spln=True):
-        '''
+        """
         Generate a mesh with a hypershape absorbing layer
 
         Parameters
@@ -1108,7 +1099,7 @@ class HABC_Mesh():
         -------
         mesh_habc : `firedrake mesh`
             Mesh with a hypershape absorbing layer
-        '''
+        """
 
         if self.dimension == 2:  # 2D
 
@@ -1135,7 +1126,7 @@ class HABC_Mesh():
         return mesh_habc
 
     def layer_boundary_data(self, V):
-        '''
+        """
         Generate the boundary data from the domain with the absorbing layer
 
         Parameters
@@ -1151,7 +1142,7 @@ class HABC_Mesh():
             Mesh node coordinates on non-free surfaces.
             - (z_data[nfs_idx], x_data[nfs_idx]) for 2D
             - (z_data[nfs_idx], x_data[nfs_idx], y_data[nfs_idx]) for 3D
-        '''
+        """
 
         # Boundary nodes indices
         bnd_nod = fire.DirichletBC(V, 0., "on_boundary").nodes
@@ -1198,7 +1189,7 @@ class HABC_Mesh():
         domain_to_check = abs(max_coordinates - min_coordinates)
 
         assert np.allclose(domain_habc, domain_to_check, atol=0.01), \
-            "Mesh dimensions do not match with expected dimensions of" \
+            "Mesh dimensions do not match with expected dimensions of " \
             f"domain with absorbing layer. Expected: {np.round(domain_habc, 3)}, " \
             f"Got: {np.round(domain_to_check, 3)}."
 
