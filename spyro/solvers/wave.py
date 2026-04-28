@@ -101,6 +101,7 @@ class Wave(Model_parameters, metaclass=ABCMeta):
         self.current_time = 0.0
         self.set_solver_parameters()
 
+        # Create or get the mesh
         self.mesh = self.get_mesh()
         self.c = None
         self.sources = None
@@ -111,6 +112,7 @@ class Wave(Model_parameters, metaclass=ABCMeta):
             quadrilateral=self.mesh_parameters.quadrilateral,
             comm=self.mesh_parameters.comm)
 
+        # Getting parameters from the mesh
         if self.mesh is not None:
             self.building_mesh_derived_paramenters()
         elif self.mesh_parameters.mesh_type == "firedrake_mesh":
@@ -119,10 +121,12 @@ class Wave(Model_parameters, metaclass=ABCMeta):
             )
         else:
             warnings.warn("No mesh found. Please define a mesh.")
+
         # Expression to define sources through UFL (less efficient)
         self.source_expression = None
         self.real_shot_record = None
 
+        # Logger
         self.field_logger = FieldLogger(self.comm,
                                         self.input_dictionary["visualization"])
         self.field_logger.add_field("forward", self.get_function_name(),
@@ -191,8 +195,9 @@ class Wave(Model_parameters, metaclass=ABCMeta):
         # Build the boundary ID mapping
         # TODO: Include the logic for hypershape layer from HABC
         boundaries = self.get_absorbing_boundaries()
-        if not (self.abc_boundary_layer_shape == 'hypershape'
-                and hasattr(self.mesh_parameters, 'boundary_ids_map')):
+        if not (hasattr(self, 'abc_boundary_layer_shape')
+                and hasattr(self.mesh_parameters, 'boundary_ids_map')
+                and self.abc_boundary_layer_shape == 'hypershape'):
             self.mesh_parameters.boundary_ids_map, \
                 self.mesh_parameters.boundary_nodes_ids = \
                 self.mesh_ops.mapping_boundary_ids(self.mesh, self.function_space,
