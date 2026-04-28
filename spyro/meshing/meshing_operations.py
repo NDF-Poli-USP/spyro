@@ -25,39 +25,6 @@ class MeshOps():
     quadrilateral : bool
         Flag to indicate whether to use quadrilateral/hexahedral elements
 
-    bnds : 'array'
-        Mesh node indices on boundaries of the original domain
-    bnd_nodes : `tuple`
-        Mesh node coordinates on boundaries of the origianl domain.
-        - (z_data[bnds], x_data[bnds]) for 2D
-        - (z_data[bnds], x_data[bnds], y_data[bnds]) for 3D
-    c : `firedrake function`
-        Velocity model without absorbing layer
-    c_bnd_min : `float`
-        Minimum velocity value on the boundary of the original domain
-    c_bnd_max : `float`
-        Maximum velocity value on the boundary of the original domain
-    c_min : `float`
-        Minimum velocity value in the model without absorbing layer
-    c_max : `float`
-        Maximum velocity value in the model without absorbing layer
-    domain_dim : `tuple`
-        Original domain dimensions: (Lx, Lz) for 2D or (Lx, Lz, Ly) for 3D
-    ele_type_c0 : `string`
-        Finite element type for the velocity model without absorbing layer
-    ele_type_eik : `string`
-        Finite element type for the Eikonal modeling. 'CG' or 'KMV'
-    f_est : `float`
-        Factor for the stabilizing term in Eikonal Eq. Default is 0.03
-    funct_space_eik: `firedrake function space`
-        Function space for the Eikonal modeling
-    mesh_original : `firedrake mesh`
-        Original mesh without absorbing layer
-    p_c0 : `int`
-        Finite element order for the velocity model without absorbing layer
-    p_eik : `int`
-        Finite element order for the Eikonal modeling
-
     Methods
     -------
     _set_spatial_coordinates()
@@ -66,28 +33,10 @@ class MeshOps():
         Extract the minimum and maximum coordinates from a mesh.
     extract_node_positions()
         Extract the node positions from the mesh and return as a tuple of arrays.
+    mapping_boundary_ids()
+        Map the boundaries of the a mesh.
     representative_mesh_dimensions()
         Get the representative mesh dimensions from a mesh.
-
-
-
-    clipping_coordinates_lay_field()
-        Generate a field with clipping coordinates to the original boundary
-    extend_velocity_profile()
-        Extend the velocity profile inside the absorbing layer
-    extract_bnd_node_indices()
-        Extract boundary node indices on boundaries of the domain
-        excluding the free surface at the top boundary
-    layer_boundary_data()
-        Generate the boundary data from the domain with the absorbing layer
-    layer_mask_field()
-        Generate a mask for the absorbing layer
-    original_boundary_data()
-        Generate the boundary data from the original domain mesh
-    point_cloud_field()
-        Create a field on a point cloud from a parent mesh and field
-    rectangular_mesh_habc()
-        Generate a rectangular mesh with an absorbing layer
     """
 
     def __init__(self, domain_dim, dimension=2, quadrilateral=False,
@@ -417,56 +366,3 @@ class MeshOps():
                                       "domains is not implemented yet. Only box "
                                       "domains are supported. The numbering the "
                                       "future boundary ids must start at 7.")
-
-    def extract_bnd_node_indices(self, mesh, function_space, mesh_parameters):
-        """Extract boundary node indices excluding the free surface at the top.
-
-        Parameters
-        ----------
-        node_positions : `tuple`
-            Tuple containing the node positions in the mesh.
-            - (z_data, x_data) for 2D
-            - (z_data, x_data, y_data) for 3D
-        function_space : `FiredrakeFunctionSpace`
-            Function space to extract node positions.
-        mesh_parameters : `MeshParameters`
-            Mesh parameters for the problem.
-            - length_z : float
-                Mesh length in the z-direction.
-            - length_x : float
-                Mesh length in the x-direction.
-            - length_y : float
-                Mesh length in the y-direction (for 3D meshes).
-            - tol : `float`
-                Tolerance for searching nodes in the mesh.
-
-        Returns
-        -------
-        bnds : `tuple` of 'arrays'
-            Mesh node indices on boundaries of the domain.
-            - (left_boundary, right_boundary, bottom_boundary) for 2D
-            - (left_boundary, right_boundary, bottom_boundary,
-                left_bnd_y, right_bnd_y) for 3D
-        """
-
-        node_positions = self.extract_node_positions(mesh, function_space)
-
-        # Extract node positions
-        z_data, x_data = node_positions[0:2]
-
-        # Boundary array
-        left_boundary = np.where(x_data <= mesh_parameters.tol)
-        right_boundary = np.where(x_data >= mesh_parameters.length_x
-                                  - mesh_parameters.tol)
-        bottom_boundary = np.where(z_data <= mesh_parameters.tol
-                                   - mesh_parameters.length_z)
-        bnds = (left_boundary, right_boundary, bottom_boundary)
-
-        if self.dimension == 3:  # 3D
-            y_data = node_positions[2]
-            left_bnd_y = np.where(y_data <= mesh_parameters.tol)
-            right_bnd_y = np.where(y_data >= mesh_parameters.length_y
-                                   - mesh_parameters.tol)
-            bnds += (left_bnd_y, right_bnd_y,)
-
-        return bnds
