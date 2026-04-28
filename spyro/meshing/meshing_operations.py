@@ -349,7 +349,13 @@ class MeshOps():
             if len(exterior_markers) == 0:
                 boundary_ids_map = {idx_bdn: None for idx_bdn
                                     in range(1, num_boundaries + 1)}
-                return boundary_ids_map
+                boundary_keys = ["Zmin", "Zmax", "Xmin", "Xmax"] + (
+                    ["Ymin", "Ymax"] if self.dimension == 3 else [])
+                boundary_nodes_ids = {k_bnd: (None, None) for k_bnd in boundary_keys}
+                if get_boundary_node_ids:
+                    return boundary_ids_map, boundary_nodes_ids
+                else:
+                    return boundary_ids_map
 
             boundary_ids_map = {}
             boundary_nodes_ids = {}
