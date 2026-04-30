@@ -227,7 +227,7 @@ class HABC_Mesh():
         # Factor for the stabilizing term in Eikonal equation
         self.f_est = f_est
 
-    def preamble_mesh_operations(self, f_est=0.03):
+    def preamble_mesh_operations(self, ele_type='CG', f_est=0.03):
         """
         Perform mesh operations previous to size an absorbing layer
 
@@ -235,6 +235,8 @@ class HABC_Mesh():
         ----------
         f_est : `float`, optional
             Factor for the stabilizing term in Eikonal Eq. Default is 0.03
+        ele_type : `string`, optional
+            Finite element type. 'CG' or 'KMV'. Default is 'CG'
 
         Returns
         -------
@@ -285,7 +287,8 @@ class HABC_Mesh():
 
         # Mesh properties for Eikonal
         print("Setting Mesh Properties for Eikonal Analysis", flush=True)
-        self.properties_eik_mesh(p_usu=self.abc_deg_eikonal, f_est=f_est)
+        self.properties_eik_mesh(p_usu=self.abc_deg_eikonal,
+                                 ele_type=ele_type, f_est=f_est)
 
     @staticmethod
     def bnd_pnts_hyp_2D(a, b, n, num_pts):
