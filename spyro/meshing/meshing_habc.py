@@ -6,8 +6,10 @@ from firedrake.__future__ import interpolate
 from netgen.meshing import Element2D, \
     Element3D, FaceDescriptor, Mesh, MeshPoint
 from scipy.spatial import cKDTree
+from spyro.domains.space import create_function_space
 from spyro.meshing.meshing_functions import AutomaticMesh
 from spyro.tools.habc_tools import point_cloud_field
+from spyro.utils.error_management import value_parameter_error
 fire.interpolate = interpolate
 
 # Work from Ruben Andres Salas, Andre Luis Ferreira da Silva,
@@ -217,12 +219,24 @@ class HABC_Mesh():
         None
         """
 
+        allowed_ele_types = ['CG', 'KMV']
+        if ele_type not in allowed_ele_types:
+            value_parameter_error('ele_type', ele_type, allowed_ele_types)
+
         # Setting the properties of the mesh used to solve the Eikonal equation
         self.ele_type_eik = ele_type
         self.p_eik = self.degree if p_usu is None else p_usu
-        self.funct_space_eik = fire.FunctionSpace(self.mesh,
-                                                  self.ele_type_eik,
-                                                  self.p_eik)
+
+        # Function space for the Eikonal modeling
+        if self.quadrilateral:
+            self.funct_space_eik = create_function_space(self.mesh,
+                                                         "spectral_quadrilateral",
+                                                         2 * self.p_eik)
+
+        else:
+            self.funct_space_eik = fire.FunctionSpace(self.mesh,
+                                                      self.ele_type_eik,
+                                                      self.p_eik)
 
         # Factor for the stabilizing term in Eikonal equation
         self.f_est = f_est
