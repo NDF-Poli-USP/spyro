@@ -12,8 +12,7 @@ warnings.filterwarnings("ignore", category=RuntimeWarning)
 
 
 def wave_dict_2d(element_type):
-    '''
-    Create a dictionary with parameters for the model
+    """Create a dictionary with parameters for the 2D model.
 
     Parameters
     ----------
@@ -24,7 +23,7 @@ def wave_dict_2d(element_type):
     -------
     dictionary : `dict`
         Dictionary containing the parameters for the model
-    '''
+    """
 
     dictionary = {}
     dictionary["options"] = {
@@ -92,8 +91,7 @@ def wave_dict_2d(element_type):
 
 
 def wave_dict_3d(element_type, degree_eikonal):
-    '''
-    Create a dictionary with parameters for the model
+    """Create a dictionary with parameters for the 3D model.
 
     Parameters
     ----------
@@ -106,7 +104,7 @@ def wave_dict_3d(element_type, degree_eikonal):
     -------
     dictionary : `dict`
         Dictionary containing the parameters for the model
-    '''
+    """
 
     dictionary = {}
     dictionary["options"] = {
@@ -178,8 +176,7 @@ def wave_dict_3d(element_type, degree_eikonal):
 
 
 class HABC_Wave(AcousticWave, HABC_Mesh):
-    '''
-    Class HABC that determines absorbing layer size and parameters to be used
+    """Class HABC that determines absorbing layer size and parameters to be used.
 
     Attributes
     ----------
@@ -189,10 +186,10 @@ class HABC_Wave(AcousticWave, HABC_Mesh):
     Methods
     -------
     None added to the ones inherited from AcousticWave and HABC_Mesh
-    '''
+    """
 
     def __init__(self, dictionary=None, comm=None):
-        '''
+        """
         Initialize the HABC class
 
         Parameters
@@ -206,7 +203,7 @@ class HABC_Wave(AcousticWave, HABC_Mesh):
         Returns
         -------
         None
-        '''
+        """
 
         # Initializing the Wave class
         AcousticWave.__init__(self, dictionary=dictionary, comm=comm)
@@ -233,10 +230,10 @@ class HABC_Wave(AcousticWave, HABC_Mesh):
 
 
 def critical_boundary_points(Wave_obj):
-    '''
-    Determine the critical points on domain boundaries of the original
-    model to size an absorbing layer using the Eikonal criterion for HABCs.
-    See Salas et al (2022) for details.
+    """Determine the critical points on domain boundaries of the original model.
+
+    Information on critical points allows to size an absorbing layer using the
+    Eikonal criterion for HABCs. See Salas et al (2022) for details.
 
     Parameters
     ----------
@@ -253,7 +250,7 @@ def critical_boundary_points(Wave_obj):
         - eikmin : Eikonal value in seconds
         - z_par : Inverse of minimum Eikonal (Equivalent to c_bound / lref)
         - lref : Distance to the closest source
-    '''
+    """
 
     # Initializing Eikonal object
     Eikonal = eik.HABC_Eikonal(Wave_obj)
@@ -267,9 +264,8 @@ def critical_boundary_points(Wave_obj):
     return eik_bnd
 
 
-def eikonal_analysis(dictionary, edge_length, f_est):
-    '''
-    Run the the Eikonal analysis
+def eikonal_analysis(dictionary, edge_length, f_est, ele_type='CG'):
+    """Run the the Eikonal analysis.
 
     Parameters
     ----------
@@ -277,14 +273,16 @@ def eikonal_analysis(dictionary, edge_length, f_est):
         Dictionary containing the parameters for the model
     edge_length : `float`
         Mesh size in km
-    f_est : `float`, optional
+    f_est : `float`
         Factor for the stabilizing term in Eikonal Eq.
+    ele_type : `string`, optional
+        Finite element type. 'CG' or 'KMV'. Default is 'CG'
 
     Returns
     -------
     min_eik : `float`
         Minimum Eikonal value in miliseconds
-    '''
+    """
 
     # ============ MESH FEATURES ============
 
@@ -302,7 +300,7 @@ def eikonal_analysis(dictionary, edge_length, f_est):
     Wave_obj.set_initial_velocity_model(conditional=cond)
 
     # Preamble mesh operations
-    Wave_obj.preamble_mesh_operations(f_est=f_est)
+    Wave_obj.preamble_mesh_operations(f_est=f_est, ele_type=ele_type)
 
     # Estimating computational resource usage
     comp_cost("tfin", tRef=tRef, user_name=Wave_obj.path_save + "MSH_")
@@ -325,9 +323,7 @@ def eikonal_analysis(dictionary, edge_length, f_est):
 
 @pytest.mark.slow
 def test_loop_eikonal_2d():
-    '''
-    Loop for testing eikonal solver in 2D with the model
-    in Fig. 8 of Salas et al. (2022)
+    """Loop for testing eikonal solver in 2D with Fig. 8 of Salas et al (2022).
 
     eik_min = 83.333 ms (Theoretical value)
     f_est  T-ele   Q-ele
@@ -339,7 +335,7 @@ def test_loop_eikonal_2d():
      0.06 82.942* 85.118
      0.07 84.160  86.345
      0.08 85.233  87.480
-    '''
+    """
 
     # ============ SIMULATION PARAMETERS ============
 
@@ -348,8 +344,6 @@ def test_loop_eikonal_2d():
     # lba = minimum_velocity / source_frequency
     # edge_length = lba / cpw
     edge_length = 0.1
-
-    # Factor for the stabilizing term in Eikonal equation
 
     for case in range(0, 2):
 
@@ -377,19 +371,17 @@ def test_loop_eikonal_2d():
 
             thr_val = 83.333  # in ms
             assert isclose(min_eik / thr_val, 1., atol=5e-3), \
-                f"✗ Minimum Eikonal 2D Element-{ele_type} " + \
+                f"✗ Minimum Eikonal 2D Element-{ele_type}-CG " + \
                 f"→ Expected value {thr_val}, got {min_eik:.3f}"
-            print(f"✓ Minimum Eikonal 2D Verified: expected "
-                  f"{thr_val}, got = {min_eik:.3f}", flush=True)
+            print(f"✓ Minimum Eikonal 2D Element-{ele_type}-CG Verified: "
+                  f"expected {thr_val}, got {min_eik:.3f}", flush=True)
 
         except fire.ConvergenceError as e:
-            pytest.fail(f"Checking Eikonal 2D raised an exception: {str(e)}")
+            pytest.fail(f"Checking Eikonal 2D-CG raised an exception: {str(e)}")
 
 
 def test_loop_eikonal_3d():
-    '''
-    Loop for testing eikonal solver in 3D with the model
-    in Fig. 8 of Salas et al. (2022)
+    """Loop for testing eikonal solver in 3D with Fig. 8 of Salas et al (2022).
 
     eik_min = 83.333 ms (Theoretical value)
     f_est  T-ele   Q-ele
@@ -400,7 +392,7 @@ def test_loop_eikonal_3d():
      0.06 85.347  78.548
      0.07 88.562  81.431*
      0.08 91.876  84.377
-    '''
+    """
 
     # ============ SIMULATION PARAMETERS ============
 
@@ -409,8 +401,6 @@ def test_loop_eikonal_3d():
     # lba = minimum_velocity / source_frequency
     # edge_length = lba / cpw
     edge_length = 0.15
-
-    # Factor for the stabilizing term in Eikonal equation
 
     for case in range(0, 1):
 
@@ -442,12 +432,62 @@ def test_loop_eikonal_3d():
             min_eik = round(eikonal_analysis(dict_3d, edge_length, f_est), 3)
 
             thr_val = 83.333  # in ms
-
             assert isclose(min_eik / thr_val, 1., atol=3e-2), \
-                f"✗ Minimum Eikonal 3D Element-{ele_type} " + \
+                f"✗ Minimum Eikonal 3D Element-{ele_type}-CG " + \
                 f"→ Expected value {thr_val}, got {min_eik:.3f}"
-            print(f"✓ Minimum Eikonal 3D Verified: expected "
-                  f"{thr_val}, got = {min_eik:.3f}", flush=True)
+            print(f"✓ Minimum Eikonal 3D Element-{ele_type}-CG Verified: "
+                  f"Expected {thr_val}, got = {min_eik:.3f}", flush=True)
 
         except fire.ConvergenceError as e:
-            pytest.fail(f"Checking Eikonal 3D raised an exception: {str(e)}")
+            pytest.fail(f"Checking Eikonal 3D-CG raised an exception: {str(e)}")
+
+
+@pytest.mark.slow
+def test_loop_eik_kmv_2d():
+    """ Loop for testing eikonal solver in 2D and KMV elements.
+
+    eik_min = 83.333 ms (Theoretical value)
+    f_est  T-ele
+     0.07 82.630*
+     0.08 84.272
+     0.09 85.654
+    """
+
+    # ============ SIMULATION PARAMETERS ============
+
+    # Mesh size (in km)
+    # cpw: cells per wavelength
+    # lba = minimum_velocity / source_frequency
+    # edge_length = lba / cpw
+    edge_length = 0.1
+
+    # Element type
+    ele_type = "T"
+
+    # Factor for the stabilizing term in Eikonal equation
+    f_est = 0.07
+
+    # Get simulation parameters
+    print("\nMesh Size: {:.4f} m".format(1e3 * edge_length), flush=True)
+    print("Element type: {}".format(ele_type), flush=True)
+    print("Eikonal Stabilizing Factor: {:.2f}".format(f_est), flush=True)
+
+    try:
+        # ============ MESH AND EIKONAL ============
+
+        # Create dictionary with parameters for the model
+        dict_2d = wave_dict_2d(ele_type)
+
+        # Creating mesh and performing eikonal analysis
+        min_eik = round(eikonal_analysis(
+            dict_2d, edge_length, f_est, ele_type='KMV'), 3)
+
+        thr_val = 83.333  # in ms
+        assert isclose(min_eik / thr_val, 1., atol=1e-2), \
+            f"✗ Minimum Eikonal 2D Element-{ele_type}-KMV " + \
+            f"→ Expected value {thr_val}, got {min_eik:.3f}"
+        print(f"✓ Minimum Eikonal 2D Element-{ele_type}-KMV Verified: "
+              f"Expected {thr_val}, got {min_eik:.3f}", flush=True)
+
+    except fire.ConvergenceError as e:
+        pytest.fail(f"Checking Eikonal 2D-KMV raised an exception: {str(e)}")
