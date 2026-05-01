@@ -228,7 +228,7 @@ class HABC_Mesh():
         self.p_eik = self.degree if p_usu is None else p_usu
 
         # Function space for the Eikonal modeling
-        if self.quadrilateral:
+        if self.quadrilateral and self.ele_type_eik == 'KMV':
             self.funct_space_eik = create_function_space(self.mesh,
                                                          "spectral_quadrilateral",
                                                          2 * self.p_eik)
