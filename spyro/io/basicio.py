@@ -214,7 +214,6 @@ def switch_serial_shot(wave, propagation_id, file_name=None, just_for_dat_manage
     else:
         receiver_solution_filename = _shot_filename(propagation_id, wave, prefix=file_name, random_str_in_use=False)
     wave.forward_solution_receivers = np.load(receiver_solution_filename, allow_pickle=True)
-    wave.receivers_output = wave.forward_solution_receivers
 
 
 def ensemble_functional(func):

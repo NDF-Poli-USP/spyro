@@ -423,7 +423,7 @@ class Wave(Model_parameters, metaclass=ABCMeta):
                            fset=lambda self, value: self._set_next_vstate(value))
 
     @abstractmethod
-    def get_receivers_output(self):
+    def get_forward_solution_receivers(self):
         pass
 
     @abstractmethod
