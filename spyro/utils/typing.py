@@ -55,7 +55,8 @@ class FunctionalType(Enum):
 class FunctionalEvaluationMode(Enum):
     """The mode in which to evaluate the functional.
 
-    PER_TIMESTEP: Evaluate the functional at every time step during the time integration.
+    PER_TIMESTEP: Evaluate the functional at every time step during the time
+    integration.
     AFTER_SOLVE: Evaluate the functional after the time integration is complete.
     """
 

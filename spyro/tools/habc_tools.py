@@ -37,7 +37,6 @@ def generate_conditional_value_for_layer(
         Conditional expression to identify the layer domain or reference
         distance for the damping function inside the layer
     """
-
     # Domain dimensions
     Lz, Lx = domain_dim[:2]
 
@@ -144,7 +143,6 @@ def layer_mask_field(
         - 'mask' : `ufl.algebra.Division`
             Conditional expression to identify the layer domain
     """
-
     # Reference function for the layer mask
     ref_funct = generate_conditional_value_for_layer(
         domain_dim, mesh, dimension, ufl_coordinates_habc, type_marker=type_marker
@@ -226,7 +224,6 @@ def clipping_coordinates_lay_field(
     layer_mask : `Firedrake.Function`
         Mask for the absorbing layer
     """
-
     print("Clipping Coordinates Inside Layer", flush=True)
 
     # Domain dimensions
@@ -282,7 +279,6 @@ def point_cloud_field(parent_mesh, pts_cloud, parent_field, tolerance):
     cloud_field : `Firedrake.Function`
         Field defined on the point cloud
     """
-
     # Creating a point cloud field from the parent mesh
     pts_mesh = fire.VertexOnlyMesh(
         parent_mesh,
@@ -342,7 +338,6 @@ def extend_scalar_field_profile(
     extended_field : `Firedrake.Function`
         Extended scalar field defined on the same function space as `lay_field`.
     """
-
     print("Extending Profile Inside Layer", flush=True)
 
     # Extracting the nodes from the layer field

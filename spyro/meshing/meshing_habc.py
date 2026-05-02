@@ -48,7 +48,7 @@ class HABC_Mesh:
         Finite element type for the Eikonal modeling. 'CG' or 'KMV'
     f_est : `float`
         Factor for the stabilizing term in Eikonal Eq. Default is 0.03
-    funct_space_eik: `Firedrake.FunctionSpace`
+    funct_space_eik : `Firedrake.FunctionSpace`
         Function space for the Eikonal modeling
     func_space_type, `str`
         Type of function space for the state variable.
@@ -151,7 +151,6 @@ class HABC_Mesh:
         -------
         None
         """
-
         # Original domain dimensions
         self.domain_dim = domain_dim
 
@@ -187,7 +186,6 @@ class HABC_Mesh:
         -------
         None
         """
-
         # Extract node positions
         node_positions = self.mesh_ops.extract_node_positions(
             self.mesh, self.function_space
@@ -1029,7 +1027,6 @@ class HABC_Mesh:
         mesh : `firedrake mesh`
             Modified mesh with snapped boundary nodes
         """
-
         # Hyperellipsoid parameters
         n_hyp, _, a_hyp, b_hyp, c_hyp = hyp_par
 
@@ -1093,7 +1090,6 @@ class HABC_Mesh:
         final_mesh : `firedrake mesh`
             Merged final mesh
         """
-
         # Original domain dimensions
         Lx, Lz, Ly = self.domain_dim
 
@@ -1139,7 +1135,6 @@ class HABC_Mesh:
         mesh_habc : `firedrake mesh`
             Mesh with a hypershape absorbing layer
         """
-
         if self.dimension == 2:  # 2D
 
             # Creating the hyperellipse layer mesh
@@ -1182,7 +1177,6 @@ class HABC_Mesh:
             - (z_data[nfs_idx], x_data[nfs_idx]) for 2D
             - (z_data[nfs_idx], x_data[nfs_idx], y_data[nfs_idx]) for 3D
         """
-
         # Boundary nodes indices
         bnd_nod = fire.DirichletBC(V, 0.0, "on_boundary").nodes
 
@@ -1220,7 +1214,6 @@ class HABC_Mesh:
         ufl_coordinates_habc : `ufl.geometry.SpatialCoordinate`
             Domain Coordinates including the absorbing layer
         """
-
         min_coordinates, max_coordinates = self.mesh_ops.extract_extreme_coordinates(
             self.mesh
         )

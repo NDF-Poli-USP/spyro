@@ -175,7 +175,7 @@ class AutomaticMesh:
         else:
             raise ValueError("mesh_type is not supported")
 
-    def ensure_common_origin(self, mesh, pad=0.):
+    def ensure_common_origin(self, mesh, pad=0.0):
         """Ensure that the mesh has a common origin.
 
         Parameters
@@ -189,21 +189,20 @@ class AutomaticMesh:
         -------
         None
         """
-
         # Adjusting coordinates
         if self.dimension == 3:  # 3D
             min_y = mesh.coordinates.dat.data_with_halos[:, 2].min()
-            if abs(min_y / pad) != 1.:  # Forcing node at (0,0,0)
+            if abs(min_y / pad) != 1.0:  # Forcing node at (0,0,0)
                 parallel_print("Adjusting Mesh Y-coordinates", comm=self.comm)
-                err_y = (1. - abs(min_y / pad)) * pad
+                err_y = (1.0 - abs(min_y / pad)) * pad
                 err_y *= -np.sign(err_y)
                 mesh.coordinates.dat.data_with_halos[:, 2] += err_y
 
         # Adjusting coordinates
         min_x = mesh.coordinates.dat.data_with_halos[:, 1].min()
-        if abs(min_x / pad) != 1.:  # Forcing node at (0,0)
+        if abs(min_x / pad) != 1.0:  # Forcing node at (0,0)
             parallel_print("Adjusting Mesh X-coordinates", comm=self.comm)
-            err_x = (1. - abs(min_x / pad)) * pad
+            err_x = (1.0 - abs(min_x / pad)) * pad
             err_x *= -np.sign(err_x)
             mesh.coordinates.dat.data_with_halos[:, 1] += err_x
 
@@ -231,12 +230,15 @@ class AutomaticMesh:
         else:
             raise ValueError("dimension is not supported")
 
-        if self.abc_pad is not None and self.abc_pad > 0.:
+        if self.abc_pad is not None and self.abc_pad > 0.0:
             self.ensure_common_origin(mesh, pad=self.abc_pad)
 
         # Mesh data
-        msh_str = f"Mesh Created with {mesh.num_vertices()} Nodes " + \
-            f"and {mesh.num_cells()} " + typ_ele_str
+        msh_str = (
+            f"Mesh Created with {mesh.num_vertices()} Nodes "
+            + f"and {mesh.num_cells()} "
+            + typ_ele_str
+        )
         parallel_print(msh_str, comm=self.comm)
 
         return mesh
@@ -250,14 +252,14 @@ class AutomaticMesh:
             Number of elements in each dimension of the mesh.
             Structure: (nz, nx) for 2D and (nz, nx, ny) for 3D
         """
-
         # Compute the edge length if there is no one
         if self.edge_length is None and self.cpw is not None:
             self.edge_length = calculate_edge_length(
-                self.cpw, self.minimum_velocity, self.source_frequency)
+                self.cpw, self.minimum_velocity, self.source_frequency
+            )
 
         # Number of elements
-        pad = 0. if self.abc_pad is None else self.abc_pad
+        pad = 0.0 if self.abc_pad is None else self.abc_pad
         n_pad = round(pad / self.edge_length, 0)  # Elements in the layer
         nz = int(round(self.length_z / self.edge_length, 0)) + int(n_pad)
         nx = int(round(self.length_x / self.edge_length, 0)) + int(2 * n_pad)
@@ -282,7 +284,6 @@ class AutomaticMesh:
         the edge length will be calculated automatically. The method creates either
         a periodic or non-periodic rectangular mesh based on the periodic attribute.
         """
-
         # Define the discretization
         nz, nx = self.define_discretization_for_mesh()
 
@@ -325,7 +326,6 @@ class AutomaticMesh:
         Uses the edge_length parameter to determine the number of elements
         in each direction(x, y, z).
         """
-
         # Define the discretization
         nz, nx, ny = self.define_discretization_for_mesh()
 
@@ -338,7 +338,8 @@ class AutomaticMesh:
             self.length_y,
             pad=self.abc_pad,
             quadrilateral=self.quadrilateral,
-            comm=self.comm.comm)
+            comm=self.comm.comm,
+        )
 
     def create_seismicmesh_mesh(self):
         """Create a mesh based on SeismicMesh meshing utilities.
@@ -663,11 +664,13 @@ def PeriodicRectangleMesh(
         pad = 0
 
     if comm is None:
-        mesh = fire.PeriodicRectangleMesh(nx, ny, length_x, length_y,
-                                          quadrilateral=quadrilateral)
+        mesh = fire.PeriodicRectangleMesh(
+            nx, ny, length_x, length_y, quadrilateral=quadrilateral
+        )
     else:
-        mesh = fire.PeriodicRectangleMesh(nx, ny, length_x, length_y,
-                                          quadrilateral=quadrilateral, comm=comm)
+        mesh = fire.PeriodicRectangleMesh(
+            nx, ny, length_x, length_y, quadrilateral=quadrilateral, comm=comm
+        )
 
     # Adjusting to Spyro's reference system (z, x) with origin at (0, 0)
     mesh.coordinates.dat.data[:, 0] *= -1.0
@@ -676,7 +679,9 @@ def PeriodicRectangleMesh(
     return mesh
 
 
-def BoxMesh(nx, ny, nz, length_x, length_y, length_z, pad=None, quadrilateral=False, comm=None):
+def BoxMesh(
+    nx, ny, nz, length_x, length_y, length_z, pad=None, quadrilateral=False, comm=None
+):
     """Create a 3D box mesh based on Firedrake mesh utilities.
 
     Parameters
@@ -724,12 +729,12 @@ def BoxMesh(nx, ny, nz, length_x, length_y, length_z, pad=None, quadrilateral=Fa
         if comm is None:
             quad_mesh = fire.RectangleMesh(
                 nx, ny, length_x, length_y, quadrilateral=quadrilateral
-        )
+            )
 
         else:
             quad_mesh = fire.RectangleMesh(
                 nx, ny, length_x, length_y, quadrilateral=quadrilateral, comm=comm
-        )
+            )
 
         # Adjusting to Spyro's reference system (z, x, y) with origin at (0, 0, 0)
         quad_mesh.coordinates.dat.data[:, 0] *= -1.0

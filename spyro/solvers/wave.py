@@ -492,8 +492,8 @@ class Wave(Model_parameters, metaclass=ABCMeta):
         final_time : Python 'float' (optional)
             Time which simulation ends. If not mentioned uses the default,
             that was estabilished in the wave object.
-        source_nums: list of int (optional)
-            List of source numbers to be simulated. If not mentioned, simulates all sources.
+        source_nums : list of int (optional)
+            List of source numbers to be simulated. Default is [0].
 
         Returns
         -------
@@ -543,9 +543,9 @@ class Wave(Model_parameters, metaclass=ABCMeta):
     def enable_compute_functional(self, mode=FunctionalEvaluationMode.AFTER_SOLVE):
         """Enable functional evaluation during forward solves.
 
-        Parameters:
-        -----------
-        mode: FunctionalEvaluationMode, optional
+        Parameters
+        ----------
+        mode : FunctionalEvaluationMode, optional
             The mode in which to evaluate the functional.
             Default is :attribute:`FunctionalEvaluationMode.AFTER_SOLVE`.
         """

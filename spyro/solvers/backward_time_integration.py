@@ -11,21 +11,21 @@ def backward_wave_propagator(wave_obj: Wave, dt: float = None) -> fire.Function:
 
     Currently uses central differences.
 
-    Parameters:
-    -----------
+    Parameters
+    ----------
     wave_obj : Wave
         Wave object that already propagated a forward wave.
     dt : float (optional)
         Time step to be used explicitly. If not mentioned uses the default,
         that was estabilished in the wave object for the adjoint model.
 
-    Returns:
-    --------
+    Returns
+    -------
     dJ : Firedrake 'Function'
         Calculated gradient
 
-    Notes:
-    ------
+    Notes
+    -----
     This is an unified backward wave propagation for both PML and no-PML cases.
     The PML path uses the mixed-space gradient form ``2c * ∇u_adj · ∇u_fwd``
     while the no-PML path uses ``-2/c³ * ü_fwd * u_adj``.
@@ -129,8 +129,8 @@ def _build_gradient_solver(
 ) -> tuple[fire.LinearVariationalSolver, fire.Function, fire.Function, fire.Function]:
     """Assemble the gradient variational problem.
 
-    Parameters:
-    -----------
+    Parameters
+    ----------
     wave_obj : Wave
         The wave object containing the forward and adjoint solutions, as well
         as the velocity model and other parameters needed to build the
@@ -139,8 +139,8 @@ def _build_gradient_solver(
         Flag indicating whether a gradient mask is available. If True, the
         gradient will be computed only in the inner region of the domain.
 
-    Returns:
-    --------
+    Returns
+    -------
     grad_solver, forward_field, uadj, gradi
     """
     V = wave_obj.get_scalar_function_space()
@@ -214,8 +214,8 @@ def _trapezoidal_gradient_integration(
 ) -> None:
     """Trapezoidal-rule gradient accumulation.
 
-    Parameters:
-    -----------
+    Parameters
+    ----------
     dJ : Firedrake 'Function'
         The accumulated gradient.
     gradi : Firedrake 'Function'
@@ -225,7 +225,6 @@ def _trapezoidal_gradient_integration(
     nt : int
         The total number of time steps.
     """
-
     if step == nt - 1 or step == 0:
         dJ += gradi
     else:

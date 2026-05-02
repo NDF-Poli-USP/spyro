@@ -40,7 +40,7 @@ def plot_shots(
     ----------
     Wave_object : Wave
         Wave simulation object containing the shot record data in the
-        forward_solution_receivers attribute, along with timing and receiver information.
+        forward_solution_receivers attribute, along with timing and receiver info.
     show : bool, optional
         If True, display the plot interactively. Default is False.
     file_name : str, optional

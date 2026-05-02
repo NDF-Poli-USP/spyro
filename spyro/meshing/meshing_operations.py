@@ -3,9 +3,6 @@
 import firedrake as fire
 from firedrake.__future__ import interpolate
 import numpy as np
-
-# from spyro.utils.error_management import value_parameter_error
-fire.interpolate = interpolate
 from spyro.utils.error_management import value_parameter_error
 from spyro.utils.eval_functions_to_ufl import generate_ufl_functions
 

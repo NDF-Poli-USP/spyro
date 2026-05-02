@@ -16,10 +16,10 @@ def _propagate_forward_central_difference(wave_obj, source_ids):
 
     Parameters
     ----------
-    wave_obj: Wave
+    wave_obj : Wave
         The wave solver object containing all necessary information to perform
         the forward solve.
-    source_ids: list of int
+    source_ids : list of int
         The ID of the sources being propagated. Defaults to [0].
 
     Returns

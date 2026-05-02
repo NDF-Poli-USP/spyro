@@ -213,16 +213,17 @@ class AcousticWave(Wave):
         is `None`, return the wave field corresponding to the time step ``n``.
         For PML, this corresponds to the first component of X_n.
 
-        Parameters:
-        -----------
+        Parameters
+        ----------
         state : Firedrake 'Function' (optional)
             The state for which to return the wave field. If None, returns the
             wave field corresponding to the time step ``n``.
 
-        Returns:
-        --------
+        Returns
+        -------
         Firedrake 'Function'
-            The scalar wave field corresponding to the specified `state` or the time step ``n``.
+            The scalar wave field corresponding to the specified `state`
+            or the time step ``n``.
         """
         if state is None:
             if self.abc_boundary_layer_type == "PML":
