@@ -14,8 +14,13 @@ from spyro.habc.rec_lay import RectangLayer
 from spyro.habc.damp_profile import HABC_Damping
 from spyro.habc.nrbc import NRBC
 from spyro.habc.error_measure import HABC_Error
+from spyro.domains.space import create_function_space
 from spyro.habc.lay_len import calc_size_lay
 from spyro.plots.plots_habc import plot_function_layer_size
+from spyro.tools.habc_tools import (
+    clipping_coordinates_lay_field,
+    extend_scalar_field_profile,
+)
 from spyro.utils.error_management import value_parameter_error
 from spyro.utils.freq_tools import freq_response
 
@@ -108,7 +113,7 @@ class HABC_Wave(
         Minimum damping ratio of the absorbing layer (psi_min = xCR * d)
     receiver_locations : `list`
         List of receiver locations
-    receivers_output : `array`
+    forward_solution_receivers : `array`
         Receiver waveform data in the HABC scheme
     xCR : `float`
         Heuristic factor for the minimum damping ratio
@@ -179,12 +184,12 @@ class HABC_Wave(
         self.f_Nyq = 1.0 / (2.0 * self.dt)
 
         # Original domain dimensions
-        dom_dim = self.habc_domain_dimensions(only_orig_dom=True)
+        domain_dim = self.habc_domain_dimensions(only_orig_dom=True)
 
         # Initializing the Mesh class
         HABC_Mesh.__init__(
             self,
-            dom_dim,
+            domain_dim,
             dimension=self.dimension,
             quadrilateral=self.mesh_parameters.quadrilateral,
             func_space_type="scalar",
@@ -210,7 +215,7 @@ class HABC_Wave(
         None
         """
         # Original domain dimensions
-        dom_dim = self.habc_domain_dimensions(only_orig_dom=True)
+        domain_dim = self.habc_domain_dimensions(only_orig_dom=True)
 
         # Layer shape
         self.layer_shape = self.abc_boundary_layer_shape
@@ -220,7 +225,7 @@ class HABC_Wave(
         if self.layer_shape == "rectangular":  # Rectangular layer
 
             # Initializing the rectangular layer
-            RectangLayer.__init__(self, dom_dim, dimension=self.dimension)
+            RectangLayer.__init__(self, domain_dim, dimension=self.dimension)
             self.case_habc = "REC"  # Label
 
         elif self.layer_shape == "hypershape":  # Hypershape layer
@@ -228,7 +233,7 @@ class HABC_Wave(
             # Initializing the hyperelliptical layer
             HyperLayer.__init__(
                 self,
-                dom_dim,
+                domain_dim,
                 n_hyp=self.abc_deg_layer,
                 n_type=self.abc_degree_type,
                 dimension=self.dimension,
@@ -279,7 +284,7 @@ class HABC_Wave(
         # Initializing the NRBC class
         NRBC.__init__(
             self,
-            dom_dim,
+            domain_dim,
             self.layer_shape,
             dimension=self.dimension,
             output_folder=self.path_case_habc,
@@ -400,7 +405,7 @@ class HABC_Wave(
 
         Returns
         -------
-        dom_dim : `tuple`
+        domain_dim : `tuple`
             Original domain dimensions: (Lx, Lz) for 2D or (Lx, Lz, Ly) for 3D
         dom_lay : `tuple`
             Domain dimensions with layer. For rectangular layers, truncation
@@ -411,12 +416,12 @@ class HABC_Wave(
             - 3D : (Lx + 2 * pad_len, Lz + n * pad_len, Ly + 2 * pad_len)
         """
         # Original domain dimensions
-        dom_dim = (self.mesh_parameters.length_x, self.mesh_parameters.length_z)
+        domain_dim = (self.mesh_parameters.length_x, self.mesh_parameters.length_z)
         if self.dimension == 3:  # 3D
-            dom_dim += (self.mesh_parameters.length_y,)
+            domain_dim += (self.mesh_parameters.length_y,)
 
         if only_orig_dom:
-            return dom_dim
+            return domain_dim
 
         # Domain dimension with layer w/ or w/o truncations
         if self.layer_shape == "rectangular":  # Rectangular layer
@@ -435,7 +440,7 @@ class HABC_Wave(
         if only_habc_dom:
             return dom_lay
 
-        return dom_dim, dom_lay
+        return domain_dim, dom_lay
 
     def size_habc_criterion(self, fpad=4, n_root=1, layer_based_on_mesh=True):
         """Determine absorbing-layer size using the Eikonal criterion.
@@ -568,8 +573,11 @@ class HABC_Wave(
 
         # New mesh with layer
         if layer_shape == "rectangular":
-            dom_lay = self.habc_domain_dimensions(only_habc_dom=True)
-            mesh_habc = self.rectangular_mesh_habc(dom_lay, self.pad_len)
+            # dom_lay = self.habc_domain_dimensions(only_habc_dom=True)
+            # mesh_habc = self.rectangular_mesh_habc(dom_lay, self.pad_len)
+            self.mesh_parameters.set_mesh(abc_pad_length=self.pad_len)
+            self.set_mesh()
+            print("Extended Rectangular Mesh Generated Successfully", flush=True)
 
         elif layer_shape == "hypershape":
 
@@ -583,8 +591,11 @@ class HABC_Wave(
             hyp_par = (self.n_hyp, par_geom, *self.hyper_axes)
             mesh_habc = self.hypershape_mesh_habc(hyp_par, spln=spln)
 
-        # Updating the mesh with the absorbing layer
-        self.set_mesh(user_mesh=mesh_habc)
+            # Updating the mesh with the absorbing layer
+            self.set_mesh(user_mesh=mesh_habc)
+
+        # # Updating the mesh with the absorbing layer
+        # self.set_mesh(user_mesh=mesh_habc)
         print("Mesh Generated Successfully")
 
         if inf_model:
@@ -642,30 +653,40 @@ class HABC_Wave(
         """
         print("\nUpdating Velocity Profile", flush=True)
 
-        # Initialize velocity field and assigning the original velocity model
-        if self.quadrilateral:
-            base_mesh = self.mesh._base_mesh
-            base_cell = base_mesh.ufl_cell()
-            element_zx = fire.FiniteElement("DQ", base_cell, 0, variant="spectral")
-            element_y = fire.FiniteElement("DG", fire.interval, 0, variant="spectral")
-            tensor_element = fire.TensorProductElement(element_zx, element_y)
-            V = fire.FunctionSpace(self.mesh, tensor_element)
-        else:
-            V = fire.FunctionSpace(self.mesh, self.ele_type_c0, self.p_c0)
+        # Scalar space for auxiliar field of clipped coordinates
+        method_element = "DQ" if self.quadrilateral else "DG"
+        V = create_function_space(self.mesh, method_element, 0)
 
+        # Initialize velocity field and assigning the original velocity model
         self.c = fire.Function(V).interpolate(
             self.initial_velocity_model, allow_missing_dofs=True
         )
 
         # Clipping coordinates to the layer domain
-        lay_field, layer_mask = self.clipping_coordinates_lay_field(V)
+        ufl_coordinates_habc = self.get_spatial_coordinates_habc()
+        lay_field, layer_mask = clipping_coordinates_lay_field(
+            self.mesh_ops.domain_dim,
+            self.mesh,
+            self.dimension,
+            ufl_coordinates_habc,
+            V,
+            quadrilateral=self.quadrilateral,
+        )
 
         # Extending velocity model within the absorbing layer
-        self.extend_velocity_profile(lay_field, layer_mask, method=method)
+        extended_velocity = extend_scalar_field_profile(
+            self.mesh_original,
+            self.initial_velocity_model,
+            lay_field,
+            layer_mask,
+            self.mesh_parameters.tol,
+            method=method,
+            name_prop="Velocity",
+        )
 
         # Interpolating the velocity model in the layer
         self.c.interpolate(
-            lay_field.sub(0) * layer_mask + (1.0 - layer_mask) * self.c,
+            extended_velocity * layer_mask + (1.0 - layer_mask) * self.c,
             allow_missing_dofs=True,
         )
         del layer_mask, lay_field
@@ -799,7 +820,7 @@ class HABC_Wave(
             hyp_par = (self.n_hyp, *self.hyper_axes)
 
             # Cut plane at free surface
-            Lz = self.dom_dim[1]
+            Lz = self.domain_dim[1]
             z_cut = Lz / 2.0
 
             # Cut plane percentage
@@ -839,7 +860,7 @@ class HABC_Wave(
 
             # Normalized coordinates
             coord_norm = mod_sol.generate_norm_coords(
-                self.mesh, self.dom_dim, self.hyper_axes
+                self.mesh, self.domain_dim, self.hyper_axes
             )
 
             Lsp = mod_sol.solve_eigenproblem(

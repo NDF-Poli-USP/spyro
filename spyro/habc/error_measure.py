@@ -50,7 +50,7 @@ class HABC_Error:
         Path to save data for the current case study
     receiver_locations : `list`
         List of receiver locations
-    receivers_output : `array`
+    forward_solution_receivers : `array`
         Receiver waveform data in the HABC scheme
     receivers_out_fft : `array`
         Frequency response at the receivers in the HABC scheme
@@ -80,7 +80,7 @@ class HABC_Error:
         dt,
         f_Nyq,
         receiver_locations,
-        receivers_output=None,
+        forward_solution_receivers=None,
         output_folder=None,
         output_case=None,
     ):
@@ -94,7 +94,7 @@ class HABC_Error:
             Nyquist frequency according to the time step. f_Nyq = 1 / (2 * dt)
         receiver_locations : `list`
             List of receiver locations
-        receivers_output : `array`, optional
+        forward_solution_receivers : `array`, optional
             Receiver waveform data in the HABC scheme. Default is None
         output_folder : str, optional
             The folder where output data will be saved. Default is None
@@ -114,7 +114,7 @@ class HABC_Error:
         # Receivers data and initialization
         self.receiver_locations = receiver_locations
         self.number_of_receivers = len(self.receiver_locations)
-        self.receivers_output = receivers_output
+        self.forward_solution_receivers = forward_solution_receivers
 
         # Path to save data
         if output_folder is None:
@@ -145,7 +145,7 @@ class HABC_Error:
         pth_str = self.path_save_error + "preamble/"
 
         # Saving reference signal
-        self.receivers_reference = self.receivers_output.copy()
+        self.receivers_reference = self.forward_solution_receivers.copy()
         np.save(pth_str + "habc_ref.npy", self.receivers_reference)
 
         # Computing and saving FFT of the reference signal at receivers
@@ -205,7 +205,7 @@ class HABC_Error:
         for i in range(self.number_of_receivers):
 
             # Transient response in receiver
-            u_abc = self.receivers_output[:, i]
+            u_abc = self.forward_solution_receivers[:, i]
             u_ref = self.receivers_reference[:, i]
 
             # Finding peaks in transient response
@@ -284,7 +284,7 @@ class HABC_Error:
         # Compute FFT for output signal at receivers
         self.receivers_out_fft = []
         for rec in range(self.number_of_receivers):
-            signal = self.receivers_output[:, rec]
+            signal = self.forward_solution_receivers[:, rec]
             yf = freq_response(signal, self.f_Nyq)
             self.receivers_out_fft.append(yf)
         self.receivers_out_fft = np.asarray(self.receivers_out_fft).T

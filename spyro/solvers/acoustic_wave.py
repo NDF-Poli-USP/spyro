@@ -1,7 +1,6 @@
 """Acoustic wave solver."""
 
 import firedrake as fire
-import warnings
 
 from .wave import Wave
 
@@ -116,11 +115,12 @@ class AcousticWave(Wave):
         -----
         Emits a warning if pressure state variables are not available.
         """
-        try:
+        if self.abc_boundary_layer_type == "PML":
+            self.X_n.assign(0.0)
+            self.X_nm1.assign(0.0)
+        else:
             self.u_nm1.assign(0.0)
             self.u_n.assign(0.0)
-        except Exception:
-            warnings.warn("No pressure to reset")
 
     @override
     def _initialize_model_parameters(self):
@@ -190,7 +190,7 @@ class AcousticWave(Wave):
             return self.u_np1
 
     @override
-    def get_receivers_output(self):
+    def get_forward_solution_receivers(self):
         """Interpolate the current pressure field at receiver locations.
 
         Returns
@@ -205,19 +205,42 @@ class AcousticWave(Wave):
         return self.receivers.interpolate(data_with_halos)
 
     @override
-    def get_function(self):
-        """Return the function for output and diagnostics.
+    def get_function(self, state: fire.Function = None) -> fire.Function:
+        """Return the wave equation solution.
 
-        Returns
-        -------
-        firedrake.Function
-            Pressure field function. For PML, this is the first component of
-            the mixed state.
+        If `state` is provided, return the wave field corresponding to that
+        state (e.g., for PML, the first component of the state vector). If `state`
+        is `None`, return the wave field corresponding to the time step ``n``.
+        For PML, this corresponds to the first component of X_n.
+
+        Parameters:
+        -----------
+        state : Firedrake 'Function' (optional)
+            The state for which to return the wave field. If None, returns the
+            wave field corresponding to the time step ``n``.
+
+        Returns:
+        --------
+        Firedrake 'Function'
+            The scalar wave field corresponding to the specified `state` or the time step ``n``.
         """
-        if self.abc_boundary_layer_type == "PML":
-            return self.X_n.sub(0)
+        if state is None:
+            if self.abc_boundary_layer_type == "PML":
+                return self.X_n.sub(0)
+            else:
+                return self.u_n
         else:
-            return self.u_n
+            if self.abc_boundary_layer_type == "PML":
+                return state.sub(0)
+            else:
+                return state
+
+    def get_scalar_function_space(self) -> fire.FunctionSpace:
+        """Return the scalar space where the pressure equation is solved."""
+        if self.scalar_function_space is not None:
+            return self.scalar_function_space
+        else:
+            raise ValueError("Scalar function space not found in wave object.")
 
     @override
     def get_function_name(self):

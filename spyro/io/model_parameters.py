@@ -438,7 +438,7 @@ class Model_parameters(Read_options, Read_boundary_layer, Read_time_axis, Read_o
         ----------
         user_mesh : spyro.Mesh, optional
             The desired mesh. The default is None.
-        mesh_parameters : dict, optional
+        input_mesh_parameters : dict, optional
             Additional parameters for setting up the mesh.
             The default is an empty dictionary.
 
