@@ -131,7 +131,7 @@ class IsotropicWave(ElasticWave):
         return self.u_np1
 
     @override
-    def get_receivers_output(self):
+    def get_forward_solution_receivers(self):
         if self.abc_boundary_layer_type == "PML":
             raise NotImplementedError
         else:
