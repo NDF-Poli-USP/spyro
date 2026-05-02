@@ -7,8 +7,8 @@
 # https://www.sphinx-doc.org/en/master/usage/configuration.html#project-information
 
 project = 'spyro'
-copyright = '2026, Keith J. Roberts, Alexandre F. G. Olender, Ruben Andres Salas, Eduardo Moscatelli de Souza, Daiane I. Dolci, Thiago Dias dos Santos, Lucas Franceschini'
-author = 'Keith J. Roberts, Alexandre F. G. Olender, Ruben Andres Salas, Eduardo Moscatelli de Souza, Daiane I. Dolci, Thiago Dias dos Santos, Lucas Franceschini'
+copyright = '2026, Keith J. Roberts, Alexandre F. G. Olender, Ruben Andres Salas, Daiane I. Dolci, Eduardo Moscatelli de Souza, Thiago Dias dos Santos, Lucas Franceschini, Bruno S. Carmo'
+author = 'Keith J. Roberts, Alexandre F. G. Olender, Ruben Andres Salas, Daiane I. Dolci, Eduardo Moscatelli de Souza, Thiago Dias dos Santos, Lucas Franceschini, Bruno S. Carmo'
 release = '0.9.2'
 
 # -- General configuration ---------------------------------------------------
