@@ -390,7 +390,7 @@ def test_eik_consistent_ele_2d():
                   f"expected {thr_val}, got {min_eik:.3f}", flush=True)
 
         except fire.ConvergenceError as e:
-            pytest.fail(f"Checking Eikonal 2D Element-{ele_type}"
+            pytest.fail(f"Checking Eikonal 2D Element-{ele_geometry}"
                         f"-Consistent raised an exception: {str(e)}")
 
 
@@ -521,7 +521,7 @@ def test_eik_underintegrated_ele_3d():
 
     eik_min = 83.333 ms (Theoretical value)
     f_est  T-ele  f_est   Q-ele
-     0.07 85.178*  0.03 78.838 
+     0.07 85.178*  0.03 78.838
      0.08 87.990   0.04 80.940
      0.09 90.933   0.05 83.130*
      0.10 93.988   0.06 85.408
